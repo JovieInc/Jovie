@@ -11,6 +11,8 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   checkBudgets,
+  FORBIDDEN_CLIENT_CODE,
+  findForbiddenClientCode,
   measureRouteJs,
   routeFromManifestKey,
 } from './route-js-budget.mjs';
@@ -114,5 +116,25 @@ describe('route-js-budget', () => {
       expect(route.startsWith('/app')).toBe(true);
       expect(kb).toBeGreaterThan(budgets.defaultMaxGzipKb);
     }
+  });
+
+  it('flags forbidden client code only in the routes that ship it', () => {
+    const nextDir = buildFixture();
+    expect(findForbiddenClientCode(nextDir)).toEqual([]);
+
+    // A zod bump that stops the locales patch applying puts the translated
+    // error tables back into the chat route's chunk.
+    writeFileSync(
+      join(nextDir, 'static', 'chunks', 'heavy.js'),
+      'e.exports={invalid_type:"Ungültige Eingabe"};'
+    );
+    expect(findForbiddenClientCode(nextDir)).toEqual([
+      {
+        id: 'zod-locales',
+        fix: FORBIDDEN_CLIENT_CODE[0]?.fix,
+        file: 'static/chunks/heavy.js',
+        routes: ['/app/chat'],
+      },
+    ]);
   });
 });

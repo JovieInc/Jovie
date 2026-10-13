@@ -13,6 +13,7 @@ import {
 import { AnimatePresence, motion } from 'motion/react';
 import Link from 'next/link';
 import { APP_ROUTES } from '@/constants/routes';
+import { PRO_PLAN_DISPLAY_NAME } from '@/lib/config/plan-prices';
 import type { PendingFile } from '../hooks/useChatFileAttachments';
 import { fileKindIcon } from './file-kind-icons';
 
@@ -299,7 +300,7 @@ export function ChatUploadManifest({
                   {lockedCount} file{lockedCount > 1 ? 's' : ''} locked
                 </p>
                 <p className='text-xs text-tertiary-token'>
-                  Upgrade to Pro for unlimited file uploads
+                  {`Upgrade to ${PRO_PLAN_DISPLAY_NAME} for unlimited file uploads`}
                 </p>
               </div>
               <Button
@@ -308,7 +309,9 @@ export function ChatUploadManifest({
                 asChild
                 className='shrink-0'
               >
-                <Link href={APP_ROUTES.PRICING}>Upgrade to Pro</Link>
+                <Link
+                  href={APP_ROUTES.PRICING}
+                >{`Upgrade to ${PRO_PLAN_DISPLAY_NAME}`}</Link>
               </Button>
             </div>
           </div>

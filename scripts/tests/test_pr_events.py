@@ -407,6 +407,38 @@ class RelayTest(unittest.TestCase):
         self.assertEqual(events.relay_targets("workflow_run", {"workflow_run": {**run, "conclusion": "cancelled"}}), [])
         self.assertEqual(events.relay_targets("workflow_run", {"workflow_run": {**run, "event": "merge_group"}}), [])
 
+    def test_relay_reads_use_the_read_token_and_writes_stay_on_github_token(self):
+        # 2026-10-13: the relay was the shared GITHUB_TOKEN bucket's top caller in three storms.
+        reads = [["gh", "pr", "view", "7", "--repo", "r", "--json", "labels"],
+                 ["gh", "pr", "list", "--repo", "r"],
+                 ["gh", "api", "repos/r/commits/h/statuses?per_page=100", "--jq", "."],
+                 ["gh", "api", "--paginate", "repos/r/issues/7/comments?since=x"],
+                 ["gh", "api", "repos/r/pulls", "--method", "GET", "-f", "state=open"],
+                 ["gh", "api", "graphql", "-f", "query=query { viewer { login } }"],
+                 ["gh", "run", "view", "1", "--log-failed"]]
+        writes = [["gh", "api", "-X", "POST", "repos/r/issues/7/labels", "-f", "labels[]=lane-fix-red"],
+                  ["gh", "api", "-X", "DELETE", "repos/r/issues/7/labels/x"],
+                  ["gh", "api", "repos/r/statuses/h", "-f", "state=success"],
+                  ["gh", "api", "graphql", "-f", "query=mutation { x }"],
+                  ["gh", "pr", "comment", "7", "--body", "b"],
+                  ["gh", "issue", "create", "--title", "t"],
+                  ["git", "status"]]
+        for args in reads:
+            self.assertTrue(events.gh_read_only(args), args)
+        for args in writes:
+            self.assertFalse(events.gh_read_only(args), args)
+        seen = []
+        with patch.object(events.lifecycle, "run", side_effect=lambda args, **kw: seen.append(kw.get("env"))), \
+                patch.dict(events.os.environ, {"GH_READ_TOKEN": "read", "GH_TOKEN": "write"}):
+            events.run(reads[0])
+            events.run(writes[0])
+        self.assertEqual(seen[0]["GH_TOKEN"], "read")
+        self.assertIsNone(seen[1], "writes inherit GITHUB_TOKEN")
+        with patch.object(events.lifecycle, "run", side_effect=lambda args, **kw: seen.append(kw.get("env"))), \
+                patch.dict(events.os.environ, {"GH_READ_TOKEN": ""}):
+            events.run(reads[0])
+        self.assertIsNone(seen[2], "no minted token: everything stays on GITHUB_TOKEN")
+
     def test_queue_removal_and_review_feedback_are_relayed(self):
         base = {"pull_request": {"number": 7, "head": {"sha": "h7"}}}
         self.assertEqual(events.relay_targets("pull_request_target", {**base, "action": "dequeued"}), [(7, "dequeued", "h7")])
@@ -791,13 +823,57 @@ class ClaimCommentTest(unittest.TestCase):
         shell = Shell({("gh", "api", "--paginate"):
                        f"🤖 lane claim kind=fix sha=h1 host=mac at={stamp(60)}\n"
                        f"🤖 lane claim kind=gate sha=h1 host=gem at={stamp(30)}\n"})
-        self.assertTrue(events.claim_active(7, "h1", shell, NOW, kind=("fix", "gate"), exclude_host="gem"))
-        self.assertFalse(events.claim_active(7, "h1", shell, NOW, kind="gate", exclude_host="gem"),
-                         "a host never defers to its own claim")
-        self.assertFalse(events.claim_active(7, "h2", shell, NOW, kind=("fix", "gate"), exclude_host="gem"))
-        since = stamp(events.CLAIM_TTL_S)
+        with patch.object(events, "etag_cache_dir", return_value=None):
+            self.assertTrue(events.claim_active(7, "h1", shell, NOW, kind=("fix", "gate"), exclude_host="gem"))
+            self.assertFalse(events.claim_active(7, "h1", shell, NOW, kind="gate", exclude_host="gem"),
+                             "a host never defers to its own claim")
+            self.assertFalse(events.claim_active(7, "h2", shell, NOW, kind=("fix", "gate"), exclude_host="gem"))
+        # `since` is floored to a stable bucket (a superset of the TTL window) so it can be cached.
+        floor = (NOW - events.CLAIM_TTL_S) // events.CLAIM_SINCE_BUCKET_S * events.CLAIM_SINCE_BUCKET_S
+        self.assertLessEqual(floor, NOW - events.CLAIM_TTL_S)
+        since = stamp(NOW - floor)
         self.assertEqual(shell.calls[0][:4], ["gh", "api", "--paginate",
                                               f"repos/{events.REPO}/issues/7/comments?per_page=100&since={since}"])
+
+    def test_claim_read_reuses_a_304_and_still_ages_out_claims(self):
+        stamp = lambda age: datetime.fromtimestamp(NOW - age, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        body = [{"body": f"🤖 lane claim kind=fix sha=h1 host=mac at={stamp(events.CLAIM_TTL_S - 100)}"},
+                {"body": "ci report"}]
+        ok = "HTTP/2.0 200 OK\nEtag: W/\"e1\"\nContent-Type: application/json\r\n\r\n" + json.dumps(body)
+        not_modified = (1, "HTTP/2.0 304 Not Modified\nEtag: W/\"e1\"\r\n\r\n")
+        replies = iter([ok, not_modified, not_modified])
+        shell = Shell({("gh", "api", "-i"): lambda _: next(replies),
+                       ("gh", "api", "-H"): lambda _: next(replies)})
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.object(events, "etag_cache_dir", return_value=Path(tmp)):
+            self.assertTrue(events.claim_active(7, "h1", shell, NOW, exclude_host="gem"))
+            self.assertTrue(events.claim_active(7, "h1", shell, NOW + 30, exclude_host="gem"))
+            # The cached body still passes the live age check: an expired claim stops counting.
+            self.assertFalse(events.claim_active(7, "h1", shell, NOW + 150, exclude_host="gem"))
+        conditional = [call for call in shell.calls if "If-None-Match: W/\"e1\"" in call]
+        self.assertEqual(len(conditional), 2)
+        self.assertFalse(shell.made("gh", "api", "--paginate"))
+
+    def test_consecutive_five_minute_ticks_read_the_same_claim_url(self):
+        shell = Shell()
+        with patch.object(events, "etag_cache_dir", return_value=None):
+            for offset in range(0, 3600, 300):
+                events.claim_active(7, "h1", shell, NOW - (NOW - events.CLAIM_TTL_S) % 3600 + offset)
+        self.assertEqual(len({call[3] for call in shell.made("gh", "api", "--paginate")}), 1)
+
+    def test_conditional_page_falls_back_on_more_pages_errors_or_no_cache(self):
+        paged = ("HTTP/2.0 200 OK\nEtag: \"e\"\nLink: <https://x?page=2>; rel=\"next\"\r\n\r\n[]")
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = Path(tmp)
+            self.assertIsNone(events.conditional_page("p", Shell({("gh",): paged}), cache=cache))
+            self.assertIsNone(events.conditional_page("p", Shell({("gh",): (1, "HTTP/2.0 502 Bad Gateway\r\n\r\n")}),
+                                                      cache=cache))
+            self.assertIsNone(events.conditional_page("p", Shell({("gh",): (1, "HTTP/2.0 304 Not Modified\r\n\r\n")}),
+                                                      cache=cache), "a 304 without our own cached body is unusable")
+            self.assertEqual(list(cache.iterdir()), [])
+        shell = Shell()
+        self.assertIsNone(events.conditional_page("p", shell, cache=None))
+        self.assertEqual(shell.calls, [])
 
 
 class ClaimTest(unittest.TestCase):
@@ -982,12 +1058,12 @@ class TickTest(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    def test_a_clean_lane_draft_is_readied_with_its_merge_intent(self):
+    def test_a_clean_lane_draft_is_readied_without_merge_intent(self):
         shell = Shell()
         outcome = events.ready_green(self.host, fake_lane(shell), pr(draft=True, merge="CLEAN"), {}, NOW)
         self.assertEqual(outcome, "landing")
         self.assertEqual([call[:3] for call in shell.calls if call[0] == "gh"],
-                         [["gh", "pr", "ready"], ["gh", "pr", "merge"]])
+                         [["gh", "pr", "ready"]])
         ledger = [json.loads(line) for line in (self.host.state / "runs/ledger.jsonl").read_text().splitlines()]
         self.assertEqual((ledger[0]["kind"], ledger[0]["verdict"]), ("ready-green", "landing"))
 
@@ -1000,10 +1076,10 @@ class TickTest(unittest.TestCase):
                          "revoked:run-stopped")
         self.assertFalse(shell.calls, "a revoked branch takes no publication mutation")
 
-    def test_a_failed_enqueue_is_handed_to_the_requeue_retry(self):
-        shell = Shell({("gh", "pr", "merge"): (1, "")})
+    def test_a_failed_ready_is_handed_to_the_requeue_retry(self):
+        shell = Shell({("gh", "pr", "ready"): (1, "")})
         self.assertEqual(events.ready_green(self.host, fake_lane(shell), pr(draft=True, merge="CLEAN"), {}, NOW),
-                         "verified-not-queued")
+                         "held:ready-failed")
         self.assertEqual(json.loads((self.host.state / "requeue.json").read_text()), {"5": "h1"})
 
     def test_diff_policy_and_legacy_gate_holds_stand_despite_green_ci(self):
@@ -1545,6 +1621,26 @@ class GapTest(unittest.TestCase):
         partial = events.open_prs_state(fake_lane(shell), report)
         self.assertEqual(len(partial), 10)
         self.assertFalse(report['complete'])
+
+    def test_large_file_list_is_listed_once_per_head(self):
+        head = "a" * 40
+        def page(args):
+            return {"data": {"repository": {"pullRequests": {
+                "pageInfo": {"hasNextPage": False, "endCursor": None},
+                "nodes": [{"number": 1, "headRefOid": page.head, "files": {"totalCount": 101, "nodes": []}}]}}}}
+        page.head = head
+        rows = [[{"filename": f"f{i}", "status": "modified"} for i in range(100)], [{"filename": "f100"}]]
+        shell = Shell({("gh", "api", "graphql"): page, ("gh", "api", "--paginate"): json.dumps(rows)})
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.object(events, "etag_cache_dir", return_value=Path(tmp) / "etag"):
+            first = events.open_prs_state(fake_lane(shell))
+            again = events.open_prs_state(fake_lane(shell))
+            self.assertEqual(len(shell.made("gh", "api", "--paginate")), 1)
+            self.assertEqual(again[0]["files"], first[0]["files"])
+            self.assertTrue(again[0]["filesComplete"])
+            page.head = "b" * 40  # a new head is a new file list
+            events.open_prs_state(fake_lane(shell))
+            self.assertEqual(len(shell.made("gh", "api", "--paginate")), 2)
 
     def test_unreadable_large_file_list_preserves_metadata_without_certifying_overlap_inventory(self):
         page = {"data": {"repository": {"pullRequests": {
@@ -2129,7 +2225,7 @@ class TerminalPreservationTest(unittest.TestCase):
 
 
 class GreenPublicationProofTest(unittest.TestCase):
-    def test_spent_final_self_push_can_publish_then_requeue_without_another_repair(self):
+    def test_spent_final_self_push_can_publish_without_another_repair(self):
         with tempfile.TemporaryDirectory() as tmp:
             host = runner.Host(state=Path(tmp))
             target = pr(draft=True, merge="CLEAN", kinds=["green", "dequeued"], labels=["lane-fix-green"])
@@ -2138,21 +2234,15 @@ class GreenPublicationProofTest(unittest.TestCase):
             proof = {"schema": runner.GATE_RESULT_SCHEMA, "headSha": "h1", "verdict": "verified-not-queued",
                      "completedAt": runner.now_iso(), "policyDigest": runner.GATE_POLICY_DIGEST, "sensitive": False}
             (host.state / "verified.json").write_text(json.dumps({"5:h1": proof}))
-            shell = Shell({("gh", "pr", "merge"): (1, "temporary failure")})
+            shell = Shell()
             with patch.object(events, "reconcile", return_value=None), patch.object(events, "queued_prs", return_value=[target]):
                 outcome = events.tick(host, fake_lane(shell), lambda: self.fail("no retirement"), NOW)
-            self.assertEqual(outcome[5], "verified-not-queued")
-            self.assertEqual(json.loads((host.state / "requeue.json").read_text()), {"5": "h1"})
+            self.assertEqual(outcome[5], "landing")
+            self.assertEqual(json.loads((host.state / "requeue.json").read_text()), {})
             self.assertFalse(any("update-branch" in " ".join(call) for call in shell.calls))
             self.assertEqual(len(shell.made("gh", "api", "-X", "DELETE")), 1, "consume only green")
-            shell = Shell()
-            with patch.object(runner, "sh", shell), patch.object(runner, "claimed_elsewhere", return_value=False), \
-                 patch.object(runner, "reconcile_fix_target", return_value={**target, "state": "OPEN", "isDraft": False}):
-                runner.requeue_verified(host, [target])
-            self.assertEqual(json.loads((host.state / "requeue.json").read_text()), {})
-            self.assertEqual(json.loads((host.state / "fix-attempts.json").read_text()), history)
-            self.assertEqual(shell.made("gh", "pr", "ready"), [])
-            self.assertEqual(shell.made("gh", "pr", "merge")[0][-2:], ["--match-head-commit", "h1"])
+            self.assertEqual(len(shell.made("gh", "pr", "ready")), 1)
+            self.assertEqual(shell.made("gh", "pr", "merge"), [])
 
     def test_actual_tick_retains_green_event_without_terminal_proof_or_with_active_gate(self):
         with tempfile.TemporaryDirectory() as tmp:

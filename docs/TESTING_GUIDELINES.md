@@ -11,7 +11,7 @@ Coverage is not the goal — coverage on the right files is. The risk-based dash
 | [`TEST_RISK_REGISTER.md`](TEST_RISK_REGISTER.md) | Hand-curated taxonomy of high-risk surfaces with blast radius, reversibility, visibility, and target coverage. Source of truth. |
 | [`TEST_COVERAGE_HEATMAP.md`](TEST_COVERAGE_HEATMAP.md) | Auto-generated nightly. Joins the register with measured v8 coverage and Stryker mutation scores. Priority queue at the top is the action list. |
 | `scripts/audit-test-coverage.ts` | Generator. Regenerate locally with `pnpm exec tsx scripts/audit-test-coverage.ts`. |
-| `.context/test-coverage-snapshot.json` | Machine-readable snapshot (gitignored) used by the PR delta check. |
+| `apps/web/reports/test-coverage-snapshot.json` | Machine-readable snapshot committed by the nightly audit; the heatmap Δ7d baseline. |
 | `.github/workflows/test-coverage-audit.yml` | Nightly cron at 18:30 UTC, after the deterministic nightly lanes. Runs `test:coverage:diff` against the committed snapshot, then commits the heatmap when values change. Slack on failure. Merge-queue unit shards stay coverage-off. |
 
 **When you add or modify code in a critical surface,** check the heatmap's priority queue and aim for the surface's `target_coverage`. The register fields drive everything: change `blast_radius` / `reversibility` / `visibility` to recalibrate, change `target_coverage` to move the goal post.
@@ -75,6 +75,30 @@ Coverage is not the goal — coverage on the right files is. The risk-based dash
 - For regressions, **write the failing test before the fix** to lock the behavior.
 - Keep **test utilities DRY** but approachable—prefer readable fixtures over deep helper stacks.
 - Treat **lint/typecheck warnings in tests as bugs**; fix them before merging.
+
+## Mutation testing
+
+Coverage shows which lines ran. Mutation testing shows whether a test would
+notice those lines changing. The `Mutation Diff` workflow runs Stryker after
+merge on changed high-risk `apps/web` source: billing, entitlements, auth,
+Stripe, webhooks, and claim. It posts per-file scores and surviving mutants to
+the job summary. It is advisory and fails only when Stryker itself breaks.
+
+Before landing a change to one of those files, run it locally:
+
+```bash
+CI=true node scripts/mutation-diff.mjs --files apps/web/lib/cron/auth.ts
+```
+
+A survivor that changes behavior (for example, a dropped production check)
+means a test is missing. Add the assertion that kills it. Survivors in log
+messages, and mutants that can't change behavior, can stay. Aim for 80% or
+higher on these surfaces. Scores under 60% are flagged `(low)`.
+
+`apps/web/stryker.diff.config.mjs` uses Stryker's command runner. Don't switch
+it to `@stryker-mutator/vitest-runner`: version 10.0.0 with vitest 5 drops the
+results of tests inside `describe` blocks, so killed mutants get reported as
+Survived.
 
 
 ## Local worktree identity (JOV-7353)

@@ -769,7 +769,7 @@ def vacancy_hint(name: str, local: dict, linear: dict) -> str:
         return f"provider cooling {dur(local['cooldowns'][name])}"
     if name == "codex" and not local["codex"].get("available"):
         return "no codex account available"
-    return "no worker (timer restarts idle lanes each minute) · " + pool_hint(name, local)
+    return "no worker (timer restarts idle lanes every 5 min) · " + pool_hint(name, local)
 
 
 # ---------------------------------------------------------------- loop

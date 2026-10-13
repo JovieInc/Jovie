@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { jovieMarkAtSize } from '@/lib/brand/tokens';
 import { BrandLogo } from './BrandLogo';
 
 describe('BrandLogo', () => {
@@ -21,5 +22,22 @@ describe('BrandLogo', () => {
 
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
     expect(container.querySelector('svg')).not.toHaveAttribute('aria-label');
+  });
+
+  it('draws the same pixel-master O for every variant', () => {
+    const master = jovieMarkAtSize(16);
+    const { container } = render(
+      <>
+        <BrandLogo variant='jovie' size={16} />
+        <BrandLogo variant='ov' size={16} />
+      </>
+    );
+
+    const marks = container.querySelectorAll('svg');
+    expect(marks).toHaveLength(2);
+    for (const mark of marks) {
+      expect(mark).toHaveAttribute('viewBox', master.viewBox);
+      expect(mark.querySelector('path')).toHaveAttribute('d', master.d);
+    }
   });
 });

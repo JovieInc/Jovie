@@ -5,8 +5,13 @@ name: Fleet Gate Refresh
 # revisit-trigger: Remove when Symphony emits this atomic receipt natively.
 # clock-class: production-liveness
 
-# One-writer refresh for the canonical Gem receipt (JOV-5467: the sole
-# automatic issue-admission writer). Work pickup is owned by upstream OpenAI Symphony polling Linear directly.
+# Fallback writer for the canonical Gem receipt. The lanes fleet-gate emitter
+# (scripts/lanes/fleet_gate_emitter.py) owns the canonical latest.json;
+# the Gem runner .env files fence this workflow to a scratch state dir. Only when
+# the canonical receipt is over 15 min stale (emitter or Gem down) does the
+# refresh write canonical (scripts/fleet-gate/receipt_writer.py), so a dead
+# emitter cannot freeze issue admission (2026-10-12: 19 h controller-stale).
+# JOV-5467: this workflow is still the sole automatic issue-admission writer. Work pickup is owned by upstream OpenAI Symphony polling Linear directly.
 # The assess job below only rereads the exact signed Linear event, applies the existing reconciler's
 # Triage -> Todo/Backlog disposition, and wakes the already-running picker.
 #
@@ -117,10 +122,21 @@ jobs:
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
-      - name: Refresh canonical receipt
+      - name: Choose receipt writer (emitter fresh, or fallback to canonical)
+        id: writer
+        if: steps.debounce.outputs.skip != 'true'
+        env:
+          GEM_WORKSPACE: /home/timwhite/gem-workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/fleet-gate/receipt_writer.py | tee -a "$GITHUB_OUTPUT"
+      - name: Refresh fleet gate receipt
         id: refresh
         if: steps.debounce.outputs.skip != 'true'
         uses: ./.github/actions/evaluate-fleet-gate
+        env:
+          GEM_PRIORITY_GATE_STATE_DIR: ${{ steps.writer.outputs.state_dir }}
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           # pull_request_target must not write live latest.json (clobbers Gem capacity
@@ -144,31 +160,6 @@ jobs:
           }
           node "$GITHUB_WORKSPACE/scripts/backlog-orchestrator/delivery-state-machine.mjs" \
             --closure-health-file="${{ steps.refresh.outputs.receipt_path }}"
-
-      - name: Remediate JOV backlog after fleet gate refresh
-        if: >-
-          steps.refresh.outcome == 'success' &&
-          steps.stack-actions.outcome == 'success' &&
-          ((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-          (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
-          (github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'main'))
-        env:
-          GEM_WORKSPACE: /home/timwhite/gem-workspace
-          # Live lanes emitter state for emitter-keyed receipt freshness
-          # (admitter.mjs); explicit because HOME inside the runner is not
-          # guaranteed. A missing record fails closed to the age window.
-          LANES_STATE: /home/timwhite/.local/state/jovie-lanes
-          LANES_REPO: /home/timwhite/devin-sweep/Jovie
-        shell: bash
-        run: |
-          set -euo pipefail
-          linear_env="${HOME}/.config/jovie-lanes/linear.env"
-          [[ -r "$linear_env" ]] || linear_env="${HOME}/.config/symphony/linear.env"
-          if [[ -z "${LINEAR_API_KEY:-}" && -r "$linear_env" ]]; then
-            LINEAR_API_KEY="$(tr -d '\r\n' < "$linear_env")"
-            export LINEAR_API_KEY="${LINEAR_API_KEY#LINEAR_API_KEY=}"
-          fi
-          timeout 90s node "$GITHUB_WORKSPACE/scripts/backlog-orchestrator/backlog-orchestrator.mjs" remediate
 
       - name: Recover missed Linear Triage events
         # Independent of the receipt debounce and new-work admission. A missed
@@ -197,19 +188,6 @@ jobs:
           set +a
           timeout 90s node scripts/backlog-orchestrator/triage-event-assess.mjs \
             --sweep > "$RECEIPT_FILE"
-
-      - name: Wake existing picker after catch-up Todo transitions
-        if: always()
-        env:
-          RECEIPT_FILE: ${{ runner.temp }}/linear-triage-catch-up.json
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ -s "$RECEIPT_FILE" ]] && jq -e '.wakeSymphony == true' "$RECEIPT_FILE" >/dev/null; then
-            curl --fail --silent --show-error --max-time 5 \
-              -H 'content-type: application/json' -d '{}' \
-              http://127.0.0.1:4041/api/v1/refresh
-          fi
 
       - name: Preserve Triage catch-up receipt
         if: always()
@@ -266,17 +244,6 @@ jobs:
           timeout 60s node scripts/backlog-orchestrator/triage-event-assess.mjs \
             --event-file="$GITHUB_EVENT_PATH" > "$RECEIPT_FILE"
           jq -e '.schema == "linear-triage-assessment/v1"' "$RECEIPT_FILE"
-      - name: Wake the lanes picker after Todo transition
-        shell: bash
-        env:
-          RECEIPT_FILE: ${{ runner.temp }}/linear-triage-assessment.json
-        run: |
-          set -euo pipefail
-          if jq -e '.wakeSymphony == true' "$RECEIPT_FILE" >/dev/null; then
-            curl --fail --silent --show-error --max-time 5 \
-              -H 'content-type: application/json' -d '{}' \
-              http://127.0.0.1:4041/api/v1/refresh
-          fi
       - name: Preserve exact assessment receipt
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

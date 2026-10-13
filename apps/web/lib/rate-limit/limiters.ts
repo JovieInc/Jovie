@@ -5,6 +5,7 @@
  * Import these directly for the most common rate limiting scenarios.
  */
 
+import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { env } from '@/lib/env-server';
 import { RATE_LIMITERS } from './config';
 import { createPlanAwareRateLimiter } from './plan-aware-limiter';
@@ -816,7 +817,7 @@ export const aiChatWeeklyPlanAwareLimiter: PlanAwareRateLimiter =
     errorMessage: plan =>
       plan === 'max' || plan === 'pro' || plan === 'trial'
         ? 'You have reached your weekly AI message limit. Your quota resets when the current seven-day window ends.'
-        : 'You have reached your weekly AI message limit. Upgrade to Pro for 70 messages per week.',
+        : `You have reached your weekly AI message limit. Upgrade to ${getPlanDisplayName('pro')} for 70 messages per week.`,
   });
 
 /**
@@ -1027,7 +1028,7 @@ export const appleMusicRescanPlanAwareLimiter: PlanAwareRateLimiter =
     errorMessage: plan =>
       plan === 'max' || plan === 'pro' || plan === 'trial'
         ? 'Apple Music was recently refreshed. Please wait 1 hour before refreshing again.'
-        : 'Apple Music was recently refreshed. Please wait 24 hours before refreshing again. Upgrade to Pro for hourly refreshes.',
+        : `Apple Music was recently refreshed. Please wait 24 hours before refreshing again. Upgrade to ${getPlanDisplayName('pro')} for hourly refreshes.`,
   });
 
 /**
@@ -1089,7 +1090,7 @@ export const releaseRefreshPlanAwareLimiter: PlanAwareRateLimiter =
     errorMessage: plan =>
       plan === 'max' || plan === 'pro' || plan === 'trial'
         ? 'This release was recently refreshed. Please wait 1 hour before refreshing again.'
-        : 'This release was recently refreshed. Please wait 24 hours before refreshing again. Upgrade to Pro for hourly refreshes.',
+        : `This release was recently refreshed. Please wait 24 hours before refreshing again. Upgrade to ${getPlanDisplayName('pro')} for hourly refreshes.`,
   });
 
 /**

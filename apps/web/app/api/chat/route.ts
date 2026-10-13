@@ -141,6 +141,7 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { sqlAny } from '@/lib/db/sql-helpers';
 import { upsertRelease } from '@/lib/discography/queries';
 import { generateUniqueSlug } from '@/lib/discography/slug';
+import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { captureError } from '@/lib/error-tracking';
 import { scheduleOnlineScoring } from '@/lib/eval/scorers/online';
 import { checkGatesForUser, getAppFlagValue } from '@/lib/flags/server';
@@ -1047,7 +1048,7 @@ function createGenerateAlbumArtTool(params: {
           success: false as const,
           retryable: false,
           errorCode: 'PLAN_UNAVAILABLE' as const,
-          error: 'Album art generation requires a Pro plan.',
+          error: `Album art generation requires the ${getPlanDisplayName('pro')} plan.`,
         };
       }
 

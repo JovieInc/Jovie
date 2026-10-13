@@ -12,8 +12,10 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { load } from 'js-yaml';
 import {
+  inFlightReport,
   publishCoverageReport,
   publishNightlyReport,
+  REPORT_COALESCE_MS,
 } from './lib/publish-coverage-report.mjs';
 
 const heatmap = 'docs/TEST_COVERAGE_HEATMAP.md';
@@ -107,7 +109,8 @@ test('publishes only measured reports on an exact-source draft branch while main
     f.git('rev-parse', `origin/${result.branch}`),
     f.git('rev-parse', 'HEAD')
   );
-  assert.deepEqual(f.calls[0], [
+  assert.deepEqual(f.calls[0].slice(0, 2), ['pr', 'list']);
+  assert.deepEqual(f.calls[1], [
     'auth',
     'setup-git',
     '--hostname',
@@ -144,7 +147,7 @@ test('nightly evidence uses the existing exact-source draft publication with pro
     [lastRun, report]
   );
   assert.equal(f.git('show', `HEAD:${lastRun}`), '{"status":"fail"}');
-  const pr = f.calls.find(args => args[0] === 'pr');
+  const pr = f.calls.find(args => args[0] === 'pr' && args[1] === 'create');
   assert.equal(
     pr[pr.indexOf('--title') + 1],
     'chore(testing): refresh nightly testing evidence'
@@ -269,7 +272,9 @@ test('a rejected branch push fails the audit without creating a PR or touching m
     mode: 0o755,
   });
   assert.throws(() => publishCoverageReport(f), /Command failed/);
-  assert.equal(f.calls.length, 1);
+  // The in-flight read, then git auth; no PR is created.
+  assert.equal(f.calls.length, 2);
+  assert.ok(!f.calls.some(args => args[1] === 'create'));
   assert.equal(f.git('rev-parse', 'origin/main'), f.source);
 });
 
@@ -429,4 +434,72 @@ test('actual nightly publisher retires matching nightly evidence while retaining
   };
   assert.equal(publishNightlyReport({ ...f, gh }).status, 'published');
   assert.deepEqual(closed, [1]);
+});
+
+test('a report PR in flight absorbs a newer measurement instead of a new PR', t => {
+  const f = fixture(t, true);
+  writeFileSync(
+    join(f.cwd, 'docs/NIGHTLY_TESTING_AGENT_REPORT.md'),
+    'Nightly workflow: success\n'
+  );
+  const now = Date.parse('2026-10-12T12:00:00Z');
+  const open = [
+    {
+      number: 77,
+      headRefName: 'bot/nightly-evidence-111-1',
+      createdAt: '2026-10-12T10:00:00Z',
+    },
+  ];
+  const gh = args => {
+    f.calls.push(args);
+    if (args[0] === 'pr' && args[1] === 'list') return JSON.stringify(open);
+    throw new Error(`unexpected gh ${args.join(' ')}`);
+  };
+  const result = publishNightlyReport({ ...f, gh, now });
+  assert.deepEqual(result, { status: 'coalesced', source: f.source, into: 77 });
+  assert.equal(f.git('rev-parse', 'HEAD'), f.source, 'no report branch');
+  assert.match(
+    readFileSync(f.env.GITHUB_STEP_SUMMARY, 'utf8'),
+    /coalesced into #77/
+  );
+});
+
+test('only an open report PR of the same profile inside the window coalesces', () => {
+  const now = Date.parse('2026-10-12T12:00:00Z');
+  const at = ms => new Date(now - ms).toISOString();
+  const rows = [
+    {
+      number: 1,
+      headRefName: 'bot/nightly-evidence-1-1',
+      createdAt: at(REPORT_COALESCE_MS + 1),
+    },
+    { number: 2, headRefName: 'bot/coverage-audit-2-1', createdAt: at(60_000) },
+    {
+      number: 3,
+      headRefName: 'feat/nightly-evidence-3-1',
+      createdAt: at(60_000),
+    },
+  ];
+  assert.equal(inFlightReport(rows, 'nightly-evidence', now), null);
+  assert.equal(inFlightReport(rows, 'coverage-audit', now)?.number, 2);
+  assert.equal(
+    inFlightReport(
+      [
+        ...rows,
+        {
+          number: 4,
+          headRefName: 'bot/nightly-evidence-4-2',
+          createdAt: at(60_000),
+        },
+        {
+          number: 3,
+          headRefName: 'bot/nightly-evidence-3-1',
+          createdAt: at(120_000),
+        },
+      ],
+      'nightly-evidence',
+      now
+    )?.number,
+    4
+  );
 });
