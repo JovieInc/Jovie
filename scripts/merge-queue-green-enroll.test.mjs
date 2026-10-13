@@ -425,7 +425,12 @@ test('an UNKNOWN merge state after main moves is re-read instead of dropping the
   // Live 2026-10-11 18:57Z: every open PR read UNKNOWN right after main moved
   // and settled within seconds; a single read skipped the PR until the next
   // (throttled) sweep.
+  const wake = {
+    eventName: 'pull_request_target',
+    payload: { pull_request: { number: 1 } },
+  };
   const settles = await fixture({
+    ...wake,
     readCurrentSnapshot: (number, readCount) => ({
       ...current(number),
       mergeStateStatus: readCount < 3 ? 'UNKNOWN' : 'CLEAN',
@@ -434,6 +439,7 @@ test('an UNKNOWN merge state after main moves is re-read instead of dropping the
   assert.deepEqual(settles.reads, [1, 1, 1]);
   assert.deepEqual(settles.mutations, [{ id: 'PR_1', oid: sha }]);
   const never = await fixture({
+    ...wake,
     readCurrentSnapshot: number => ({
       ...current(number),
       mergeStateStatus: 'UNKNOWN',
@@ -442,9 +448,87 @@ test('an UNKNOWN merge state after main moves is re-read instead of dropping the
   assert.deepEqual(never.reads, [1, 1, 1]);
   assert.deepEqual(never.mutations, []);
   const settled = await fixture({
+    ...wake,
     overrides: { 1: { mergeStateStatus: 'BLOCKED' } },
   });
   assert.deepEqual(settled.reads, [1]);
+});
+
+test('a 70-PR sweep with UNKNOWN entries reads in parallel, never sleeps, and stays inside its budget', async () => {
+  // 2026-10-12 22:31Z onward: every push-to-main sweep (45-70 PRs, ~3 s per
+  // read, 3 s + 6 s UNKNOWN re-read sleeps) was cancelled at the 5-minute
+  // timeout and re-armed nothing.
+  const roster = Array.from({ length: 70 }, (_, i) => ({
+    ...candidate(i + 1),
+    updated_at: `2026-10-12T${String(10 + (i % 10)).padStart(2, '0')}:00:00Z`,
+  }));
+  let inFlight = 0;
+  let peak = 0;
+  const started = Date.now();
+  const result = await fixture({
+    roster,
+    eventName: 'push',
+    // A sleep would block the test far past its own timeout.
+    env: { MERGE_STATE_RETRY_MS: '600000' },
+    readCurrentSnapshot: async (number, readCount) => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await new Promise(resolve => setTimeout(resolve, 20));
+      inFlight -= 1;
+      // Every PR reads UNKNOWN first (main just moved); a third stay BLOCKED,
+      // a third settle CLEAN on the second read, a third stay UNKNOWN.
+      const firstRead = readCount <= 70;
+      const state =
+        number % 3 === 0
+          ? 'BLOCKED'
+          : firstRead || number % 3 === 2
+            ? 'UNKNOWN'
+            : 'CLEAN';
+      return { ...current(number), mergeStateStatus: state };
+    },
+  });
+  assert.ok(
+    Date.now() - started < 20 * 70,
+    'reads overlap instead of running serially'
+  );
+  assert.ok(peak > 1 && peak <= 6, `prefetch concurrency ${peak}`);
+  // One prefetch per PR plus one fresh read per UNKNOWN; no retry loop.
+  assert.equal(result.reads.length, 70 + 70 - 23);
+  const cleanNumbers = roster.map(pr => pr.number).filter(n => n % 3 === 1);
+  assert.deepEqual(
+    result.mutations.map(m => m.id).sort(),
+    cleanNumbers.map(n => `PR_${n}`).sort()
+  );
+});
+
+test('a sweep goes longest-waiting first and stops at its budget', async () => {
+  const roster = [
+    { ...candidate(3), updated_at: '2026-10-12T12:00:00Z' },
+    { ...candidate(1), updated_at: '2026-10-12T10:00:00Z' },
+    { ...candidate(2), updated_at: '2026-10-12T11:00:00Z' },
+  ];
+  const ordered = await fixture({ roster, eventName: 'push' });
+  assert.deepEqual(
+    ordered.mutations.map(m => m.id),
+    ['PR_1', 'PR_2', 'PR_3']
+  );
+  const spent = await fixture({
+    roster,
+    eventName: 'push',
+    env: { SWEEP_BUDGET_MS: '1000', SWEEP_READ_CONCURRENCY: '1' },
+    readCurrentSnapshot: async number => {
+      await new Promise(resolve => setTimeout(resolve, 600));
+      return current(number);
+    },
+  });
+  // Prefetch stops at half the budget; the loop reads PR 2 itself, then stops.
+  assert.deepEqual(
+    spent.mutations.map(m => m.id),
+    ['PR_1', 'PR_2']
+  );
+  assert.ok(
+    spent.warnings.some(w => w.includes('sweep budget spent after 2/3'))
+  );
 });
 
 test('a hold released after a manual dequeue re-enrolls the same head; check failures never do', async () => {
