@@ -305,9 +305,33 @@ JovieInc/Jovie`. After flipping the variable, also run
 and disarm every PR it prints. `scripts/merge-queue-green-enroll.test.mjs` fails if a job
 that can enqueue or arm lacks the guard.
 
-After a breaker dequeue, restore the snapshot directly, or release each PR
-with `hold` then unhold: green enroll does not re-admit a manually dequeued,
-unchanged head.
+Circuit-breaker dequeues: when a storm forces PRs out of the queue, mark each
+one so green enroll restores it after the lift instead of a hand restore:
+
+```sh
+gh api graphql -f query='mutation($id:ID!){dequeuePullRequest(input:{id:$id}){clientMutationId}}' \
+  -f id="$(gh pr view N --json id --jq .id -R JovieInc/Jovie)" &&
+  gh pr edit N --add-label queue-breaker -R JovieInc/Jovie
+```
+
+Once `QUEUE_FREEZE` is back to 0, green enroll's next sweep (any landing on
+main) or a dispatch re-admits a `queue-breaker` PR whose manual removal left
+the head unchanged, while it is still green and carries no hold label or
+failure hold. Immediately before enqueue it revalidates that state and consumes
+the marker as a one-shot authorization. If the marker cannot be consumed, the
+state changes, or enqueue then fails, the PR stays out and must be marked again
+before another restore attempt. A manual dequeue without the marker, or a
+`failed_checks` removal, is never re-admitted this way.
+
+The marker must be added after a successful dequeue, as the `&&` sequence
+above enforces. Green enroll binds that label event to the latest removal, so
+a failed/interrupted dequeue or an older marker cannot authorize a later one.
+If the head changes after the marked removal, normal admission handles the new
+revision and clears the stale marker after enqueue.
+
+For breaker dequeues that were not marked first, restore the snapshot
+directly, or release each PR with `hold` then unhold. Green enroll does not
+otherwise re-admit a manually dequeued, unchanged head.
 
 To admit one PR without a roster sweep, dispatch green enroll with
 `gh workflow run merge-queue-green-enroll.yml -f pr_number=N -R JovieInc/Jovie`.
