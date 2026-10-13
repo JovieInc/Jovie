@@ -1588,6 +1588,13 @@ describe('LibrarySurface', () => {
     );
   });
 
+  it('shows the item count once per breakpoint (toolbar on phones only)', () => {
+    renderLibrary([buildAsset()]);
+    expect(screen.getByTestId('library-toolbar-count').className).toContain(
+      'sm:hidden'
+    );
+  });
+
   it('uses shell focus tokens for library cards and drawer actions', () => {
     renderLibrary([buildAsset()]);
     clickGridView();
