@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { type KeyboardEvent, useState } from 'react';
 import { toast } from '@/components/feedback';
+import { OPERATOR_NAV_GROUP_LABEL } from '@/components/organisms/operator-navigation';
 import {
   SidebarMenu,
   SidebarMenuBadge,
@@ -63,12 +64,7 @@ function NavRow({
 
 function GroupLabel({ children }: { readonly children: string }) {
   return (
-    <span
-      className={cn(
-        'mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90',
-        SHELL_RAIL_BLOCK_LABEL
-      )}
-    >
+    <span className={cn(OPERATOR_NAV_GROUP_LABEL, SHELL_RAIL_BLOCK_LABEL)}>
       {children}
     </span>
   );

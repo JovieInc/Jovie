@@ -3,6 +3,7 @@
 // @coverage-via apps/web/tests/unit/components/organisms/UnifiedSidebar.library.test.tsx
 
 import { ArrowLeft } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Fragment, type PropsWithChildren, useMemo } from 'react';
@@ -49,14 +50,19 @@ import { useAppFlag } from '@/lib/flags/client';
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
 import { cn } from '@/lib/utils';
 import type { AppShellSection } from '@/types/app-shell';
-import { OperatorListsNav } from './OperatorListsNav';
 import {
   isOperatorNavigationHrefActive,
+  OPERATOR_NAV_GROUP_LABEL,
   OPERATOR_NAV_SECTIONS,
 } from './operator-navigation';
 import { IdentitySwitcher } from './ProfileSwitcher';
 import { SidebarBottomNowPlayingBridge } from './SidebarBottomNowPlayingBridge';
 import { WhatsNewBanner } from './whats-new/WhatsNewBanner';
+
+// Founder-only (OV) block: split out so creator routes never ship it.
+const OperatorListsNav = dynamic(() =>
+  import('./OperatorListsNav').then(module => module.OperatorListsNav)
+);
 
 export interface UnifiedSidebarProps {
   readonly section: AppShellSection;
@@ -100,12 +106,7 @@ function OperatorNavigation({ pathname }: { readonly pathname: string }) {
       {OPERATOR_NAV_SECTIONS.map(section => (
         <Fragment key={section.label}>
           <div>
-            <span
-              className={cn(
-                'mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90',
-                SHELL_RAIL_LABEL
-              )}
-            >
+            <span className={cn(OPERATOR_NAV_GROUP_LABEL, SHELL_RAIL_LABEL)}>
               {section.label}
             </span>
             <SettingsNavGroup

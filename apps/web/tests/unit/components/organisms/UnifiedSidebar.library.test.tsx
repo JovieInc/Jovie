@@ -684,12 +684,14 @@ describe('UnifiedSidebar library route', () => {
     expect(screen.queryByTestId('operator-lists-nav')).not.toBeInTheDocument();
   });
 
-  it('renders founder lists only inside the Ovie operator navigation', () => {
+  it('renders founder lists only inside the Ovie operator navigation', async () => {
     renderUnifiedSidebar({ pathname: APP_ROUTES.ADMIN_OPS, section: 'ov' });
     const operatorNavigation = screen.getByRole('navigation', {
       name: 'OV Navigation',
     });
-    const lists = within(operatorNavigation).getByTestId('operator-lists-nav');
+    // Lazy chunk: the lists block is split out of creator routes.
+    const lists =
+      await within(operatorNavigation).findByTestId('operator-lists-nav');
     // Between Workspaces and Utilities, matching Pen STAGING Neq0A.
     const labels = within(operatorNavigation)
       .getAllByText(/^(Workspaces|Lists|Utilities)$/)
