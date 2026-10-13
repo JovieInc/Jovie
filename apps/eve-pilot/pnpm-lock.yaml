@@ -30,23 +30,23 @@ importers:
         specifier: 2.8.1
         version: 2.8.1
       ai:
-        specifier: 7.0.136
-        version: 7.0.136(zod@4.6.5)
+        specifier: 7.0.137
+        version: 7.0.137(zod@4.6.6)
       braintrust:
-        specifier: 3.37.1
-        version: 3.37.1(zod@4.6.5)
+        specifier: 3.37.2
+        version: 3.37.2(@types/react@18.3.31)(zod@4.6.6)
       eve:
         specifier: 0.72.1
-        version: 0.72.1(patch_hash=prxir4aduj6i3ougmnnxgc6ada)(@opentelemetry/api@1.9.1)(ai@7.0.136(zod@4.6.5))(braintrust@3.37.1(zod@4.6.5))(just-bash@3.6.0)(microsandbox@0.7.7)
+        version: 0.72.1(patch_hash=prxir4aduj6i3ougmnnxgc6ada)(@opentelemetry/api@1.9.1)(ai@7.0.137(zod@4.6.6))(braintrust@3.37.2(@types/react@18.3.31)(zod@4.6.6))(just-bash@3.6.0)(microsandbox@0.7.8)
       just-bash:
         specifier: 3.6.0
         version: 3.6.0
       microsandbox:
-        specifier: 0.7.7
-        version: 0.7.7
+        specifier: 0.7.8
+        version: 0.7.8
       zod:
-        specifier: 4.6.5
-        version: 4.6.5
+        specifier: 4.6.6
+        version: 4.6.6
     devDependencies:
       '@types/node':
         specifier: 26.6.5
@@ -535,8 +535,8 @@ packages:
     engines: {node: '>=18'}
     hasBin: true
 
-  '@microsandbox/types@0.7.7':
-    resolution: {integrity: sha512-67/tP2k+tpksQbIIvzbPGtiq3Ai/3242NLTkxTZawelUk+qVvOc3BygAVK+kxoHYJW0fyTtmZ1mYAyJrXLSSEg==}
+  '@microsandbox/types@0.7.8':
+    resolution: {integrity: sha512-GCLuiSbTXU/5s8/VhyQzRc8AtDyz4uaIk3fP0GbWAPvj2xJfR7rpUr51UYZIFd9ONwAqa7XEfpyr8jnlFInkhA==}
 
   '@mixmark-io/domino@2.2.0':
     resolution: {integrity: sha512-Y28PR25bHXUg88kCV7nivXrP2Nj2RueZ3/l/jdx6J9f8J4nsEGcgX0Qe6lt7Pa+J79+kPiJU3LguR6O/6zrLOw==}
@@ -1180,32 +1180,32 @@ packages:
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
-  '@superradcompany/microsandbox-darwin-arm64@0.7.7':
-    resolution: {integrity: sha512-vvyMNGytk2R/HpCJXGekNniUuzKbQH+ARZMC4Ne4BxEu9q1gDmx4bfn6NdQ2Gej5oIfQEyiuK7naq3U8/GC2lQ==}
+  '@superradcompany/microsandbox-darwin-arm64@0.7.8':
+    resolution: {integrity: sha512-WoTlB2b06o32AXW3D3Xp6GLiSoAXGNqNikbakA/RP2Uqj2Z8mfoDZ7mYKONLG7PXUAWu/vTTqJkOtVt8JFEWvA==}
     engines: {node: '>= 22'}
     cpu: [arm64]
     os: [darwin]
 
-  '@superradcompany/microsandbox-linux-arm64-gnu@0.7.7':
-    resolution: {integrity: sha512-/s6icz7ox8jz1vCdr6c3USnX08cDNUZ0SEjFhYVrcmumXrMfjNmfCke7aRBxkmF17uhY/0h1wsmeDZPoUL4wAA==}
+  '@superradcompany/microsandbox-linux-arm64-gnu@0.7.8':
+    resolution: {integrity: sha512-NRm8GVXlgoPsLYX8BovMTwg4oNWiT0EZp34+6zM7s7slhCbv3TItebbg6urKj8yqKoLP1T+OHH/7Y/RnD9omZw==}
     engines: {node: '>= 22'}
     cpu: [arm64]
     os: [linux]
 
-  '@superradcompany/microsandbox-linux-x64-gnu@0.7.7':
-    resolution: {integrity: sha512-sn19EZNpHgQ/wFv6S0eyNEh/c5+CBl629h8AG5o94ZYY05tbVDmBqI33wrdA7nGKySbx/2Uni+ecKvGVi0jTgg==}
+  '@superradcompany/microsandbox-linux-x64-gnu@0.7.8':
+    resolution: {integrity: sha512-4AnLhlDSvgzQPTrKcd6kCpCpgPWq275sGWTy7tg1deo42lU0PXKtwnaUlBx7uBdQO4YFIGfIx0T8lgsGO9h5EA==}
     engines: {node: '>= 22'}
     cpu: [x64]
     os: [linux]
 
-  '@superradcompany/microsandbox-win32-arm64-msvc@0.7.7':
-    resolution: {integrity: sha512-Ggzi1SGFeErCjaNdMiel7siFjHHILVNrTHvnNMPH4VMVGTNnYmmz0LRx8Z6fWLEQrmZe9YsW2Bx1oEvD9mbpKQ==}
+  '@superradcompany/microsandbox-win32-arm64-msvc@0.7.8':
+    resolution: {integrity: sha512-wwXD/B9JwmyDAhrkX2V4L4VHVumDK1JbMnUFTOuNCoozyeNV4fogL+BziINp3HeInBTbKOJrAI7+A8kTawKfPA==}
     engines: {node: '>= 22'}
     cpu: [arm64]
     os: [win32]
 
-  '@superradcompany/microsandbox-win32-x64-msvc@0.7.7':
-    resolution: {integrity: sha512-KCiwNMN1beDzTEMuJ6AK4nJk2DMME3hvv8x4dB12uwpCRoRnIwWajs4rp7/UogZEMV/wO/skhNFJaNzTpt9QWQ==}
+  '@superradcompany/microsandbox-win32-x64-msvc@0.7.8':
+    resolution: {integrity: sha512-m11kPzyaid/DMXK5kJRvDZEGkdlvndmOzfjNjfhqpL+LFQssnJgQ2WSyYfBQMrHj17pRfDkDxqwZPr9iXZoSMw==}
     engines: {node: '>= 22'}
     cpu: [x64]
     os: [win32]
@@ -1514,8 +1514,8 @@ packages:
     resolution: {integrity: sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ==}
     engines: {node: '>= 14'}
 
-  ai@7.0.136:
-    resolution: {integrity: sha512-quFXFKEw7qUZL9v2ciJ9eruQYq9KUo3F+mDhwdL/pi7ZPu0bj7UX6yv55oAUiMjbGXd8MZRzIcu0oPc4y9llQw==}
+  ai@7.0.137:
+    resolution: {integrity: sha512-JxrPkSQknxIN/gYqS3UQksExS6eWI23QMPBrKMGXeeFHhru6xFtF4MuMq17WaHD+lXPh0lne6H0BM2Z2VMW9EQ==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -1617,11 +1617,15 @@ packages:
     resolution: {integrity: sha512-yQbXgO/OSZVD2IsiLlro+7Hf6Q18EJrKSEsdoMzKePKXct3gvD8oLcOQdIzGupr5Fj+EDe8gO/lxc1BzfMpxvA==}
     engines: {node: '>=8'}
 
-  braintrust@3.37.1:
-    resolution: {integrity: sha512-RRFgrLBAIds2BxUz9vJRATI7G8mjyQwEZmP7raqRgAl9CLS8e3Qp63cgmcqwh6y5lvOiZpPlMbKMBy7MFd99AQ==}
+  braintrust@3.37.2:
+    resolution: {integrity: sha512-iHbtwSBJ/5Q7yWE86L3xJZlGPkr0ZwqQbu4xELzXBRMcIbiOHBkyA+MDrY/QbW/50JLVaiJXWn+eP2DiWNr7+Q==}
     hasBin: true
     peerDependencies:
+      '@types/react': '>=18'
       zod: ^3.25.34 || ^4.0
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
 
   buffer-crc32@0.2.13:
     resolution: {integrity: sha512-VO9Ht/+p3SN7SKWqcrgEzjGbRSJYTx+Q1pTQC0wrWqHx0vpJraQ6GtHx8tvcg1rlK1byhU5gccxgOgj7B0TDkQ==}
@@ -2341,8 +2345,8 @@ packages:
     resolution: {integrity: sha512-PXwfBhYu0hBCPw8Dn0E+WDYb7af3dSLVWKi3HGv84IdF4TyFoC0ysxFd0Goxw7nSv4T/PzEJQxsYsEiFCKo2BA==}
     engines: {node: '>=8.6'}
 
-  microsandbox@0.7.7:
-    resolution: {integrity: sha512-H2ipvZyDATXlQAem3Yhf5OZ6dUxOVJlgC/QMSEVZOBqB3UN3OOqPcpk3Tg7MqkKnKucuUF5GMsAvmb8d8BADXQ==}
+  microsandbox@0.7.8:
+    resolution: {integrity: sha512-bUll2JNeVhAdvtlemsD5rNkVpLU0KQSXVpuSjXFmkG6Z52Z2ZL9sP8hAdFT8pIGoEPLj+OB9ohgFEPsJgBVkFg==}
     engines: {node: '>= 22'}
     hasBin: true
 
@@ -3251,26 +3255,26 @@ packages:
   zod@4.1.11:
     resolution: {integrity: sha512-WPsqwxITS2tzx1bzhIKsEs19ABD5vmCVa4xBo2tq/SrV4RNZtfws1EnCWQXM6yh8bD08a1idvkB5MZSBiZsjwg==}
 
-  zod@4.6.5:
-    resolution: {integrity: sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q==}
+  zod@4.6.6:
+    resolution: {integrity: sha512-4UmzQUF5fxvfcYHlbjBmejU+w+hbDnWFx4aS8kBx7nPBHcO2SqPbpAG8snbdg+Xse4pRefR98hgjFgIMCI/UhA==}
 
 snapshots:
 
-  '@ai-sdk/gateway@4.0.110(zod@4.6.5)':
+  '@ai-sdk/gateway@4.0.110(zod@4.6.6)':
     dependencies:
       '@ai-sdk/provider': 4.0.26
-      '@ai-sdk/provider-utils': 5.0.58(zod@4.6.5)
+      '@ai-sdk/provider-utils': 5.0.58(zod@4.6.6)
       '@vercel/oidc': 3.2.0
-      zod: 4.6.5
+      zod: 4.6.6
 
-  '@ai-sdk/provider-utils@5.0.58(zod@4.6.5)':
+  '@ai-sdk/provider-utils@5.0.58(zod@4.6.6)':
     dependencies:
       '@ai-sdk/provider': 4.0.26
       '@standard-schema/spec': 1.1.0
       '@workflow/serde': 4.1.0
       eventsource-parser: 3.1.0
       undici: 7.29.1
-      zod: 4.6.5
+      zod: 4.6.6
 
   '@ai-sdk/provider@4.0.26':
     dependencies:
@@ -3560,7 +3564,7 @@ snapshots:
       - encoding
       - supports-color
 
-  '@microsandbox/types@0.7.7': {}
+  '@microsandbox/types@0.7.8': {}
 
   '@mixmark-io/domino@2.2.0': {}
 
@@ -3945,19 +3949,19 @@ snapshots:
 
   '@standard-schema/spec@1.1.0': {}
 
-  '@superradcompany/microsandbox-darwin-arm64@0.7.7':
+  '@superradcompany/microsandbox-darwin-arm64@0.7.8':
     optional: true
 
-  '@superradcompany/microsandbox-linux-arm64-gnu@0.7.7':
+  '@superradcompany/microsandbox-linux-arm64-gnu@0.7.8':
     optional: true
 
-  '@superradcompany/microsandbox-linux-x64-gnu@0.7.7':
+  '@superradcompany/microsandbox-linux-x64-gnu@0.7.8':
     optional: true
 
-  '@superradcompany/microsandbox-win32-arm64-msvc@0.7.7':
+  '@superradcompany/microsandbox-win32-arm64-msvc@0.7.8':
     optional: true
 
-  '@superradcompany/microsandbox-win32-x64-msvc@0.7.7':
+  '@superradcompany/microsandbox-win32-x64-msvc@0.7.8':
     optional: true
 
   '@tokenizer/inflate@0.4.1':
@@ -4002,12 +4006,14 @@ snapshots:
     dependencies:
       undici-types: 8.9.0
 
-  '@types/prop-types@15.7.15': {}
+  '@types/prop-types@15.7.15':
+    optional: true
 
   '@types/react@18.3.31':
     dependencies:
       '@types/prop-types': 15.7.15
       csstype: 3.2.3
+    optional: true
 
   '@vercel/backends@8.0.1(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(@vercel/build-utils@14.10.1)':
     dependencies:
@@ -4382,7 +4388,7 @@ snapshots:
       tar-stream: 3.1.7
       undici: 7.29.1
       xdg-app-paths: 5.1.0
-      zod: 4.6.5
+      zod: 4.6.6
     transitivePeerDependencies:
       - bare-abort-controller
       - react-native-b4a
@@ -4474,12 +4480,12 @@ snapshots:
 
   agent-base@7.1.4: {}
 
-  ai@7.0.136(zod@4.6.5):
+  ai@7.0.137(zod@4.6.6):
     dependencies:
-      '@ai-sdk/gateway': 4.0.110(zod@4.6.5)
+      '@ai-sdk/gateway': 4.0.110(zod@4.6.6)
       '@ai-sdk/provider': 4.0.26
-      '@ai-sdk/provider-utils': 5.0.58(zod@4.6.5)
-      zod: 4.6.5
+      '@ai-sdk/provider-utils': 5.0.58(zod@4.6.6)
+      zod: 4.6.6
 
   ajv@8.20.0:
     dependencies:
@@ -4576,10 +4582,9 @@ snapshots:
     dependencies:
       fill-range: 7.1.1
 
-  braintrust@3.37.1(zod@4.6.5):
+  braintrust@3.37.2(@types/react@18.3.31)(zod@4.6.6):
     dependencies:
       '@next/env': 14.2.35
-      '@types/react': 18.3.31
       '@vercel/functions': 1.6.0
       acorn: 8.17.0
       acorn-import-attributes: 1.9.5(acorn@8.17.0)
@@ -4606,8 +4611,8 @@ snapshots:
       termi-link: 1.1.0
       unplugin: 2.3.11
       uuid: 11.1.1
-      zod: 4.6.5
-      zod-to-json-schema: 3.25.2(zod@4.6.5)
+      zod: 4.6.6
+      zod-to-json-schema: 3.25.2(zod@4.6.6)
     optionalDependencies:
       '@braintrust/bt-darwin-arm64': 0.12.0
       '@braintrust/bt-darwin-x64': 0.12.0
@@ -4616,6 +4621,7 @@ snapshots:
       '@braintrust/bt-linux-x64-musl': 0.12.0
       '@braintrust/bt-win32-arm64': 0.12.0
       '@braintrust/bt-win32-x64': 0.12.0
+      '@types/react': 18.3.31
     transitivePeerDependencies:
       - '@aws-sdk/credential-provider-web-identity'
       - supports-color
@@ -4704,7 +4710,8 @@ snapshots:
     optionalDependencies:
       srvx: 1.0.5
 
-  csstype@3.2.3: {}
+  csstype@3.2.3:
+    optional: true
 
   db0@0.4.1: {}
 
@@ -4863,16 +4870,16 @@ snapshots:
 
   etag@1.8.1: {}
 
-  eve@0.72.1(patch_hash=prxir4aduj6i3ougmnnxgc6ada)(@opentelemetry/api@1.9.1)(ai@7.0.136(zod@4.6.5))(braintrust@3.37.1(zod@4.6.5))(just-bash@3.6.0)(microsandbox@0.7.7):
+  eve@0.72.1(patch_hash=prxir4aduj6i3ougmnnxgc6ada)(@opentelemetry/api@1.9.1)(ai@7.0.137(zod@4.6.6))(braintrust@3.37.2(@types/react@18.3.31)(zod@4.6.6))(just-bash@3.6.0)(microsandbox@0.7.8):
     dependencies:
-      ai: 7.0.136(zod@4.6.5)
+      ai: 7.0.137(zod@4.6.6)
       nitro: 3.0.260903-beta
       undici: 8.10.2
     optionalDependencies:
       '@opentelemetry/api': 1.9.1
-      braintrust: 3.37.1(zod@4.6.5)
+      braintrust: 3.37.2(@types/react@18.3.31)(zod@4.6.6)
       just-bash: 3.6.0
-      microsandbox: 0.7.7
+      microsandbox: 0.7.8
 
   events-intercept@2.0.0: {}
 
@@ -5336,15 +5343,15 @@ snapshots:
       braces: 3.0.3
       picomatch: 2.3.2
 
-  microsandbox@0.7.7:
+  microsandbox@0.7.8:
     dependencies:
-      '@microsandbox/types': 0.7.7
+      '@microsandbox/types': 0.7.8
     optionalDependencies:
-      '@superradcompany/microsandbox-darwin-arm64': 0.7.7
-      '@superradcompany/microsandbox-linux-arm64-gnu': 0.7.7
-      '@superradcompany/microsandbox-linux-x64-gnu': 0.7.7
-      '@superradcompany/microsandbox-win32-arm64-msvc': 0.7.7
-      '@superradcompany/microsandbox-win32-x64-msvc': 0.7.7
+      '@superradcompany/microsandbox-darwin-arm64': 0.7.8
+      '@superradcompany/microsandbox-linux-arm64-gnu': 0.7.8
+      '@superradcompany/microsandbox-linux-x64-gnu': 0.7.8
+      '@superradcompany/microsandbox-win32-arm64-msvc': 0.7.8
+      '@superradcompany/microsandbox-win32-x64-msvc': 0.7.8
 
   mime-db@1.52.0: {}
 
@@ -5782,7 +5789,7 @@ snapshots:
       async-retry: 1.3.3
       debug: 4.4.3
       ws: 8.21.3
-      zod: 4.6.5
+      zod: 4.6.6
     transitivePeerDependencies:
       - bare-abort-controller
       - bufferutil
@@ -6284,12 +6291,12 @@ snapshots:
       buffer-crc32: 0.2.13
       fd-slicer: 1.1.0
 
-  zod-to-json-schema@3.25.2(zod@4.6.5):
+  zod-to-json-schema@3.25.2(zod@4.6.6):
     dependencies:
-      zod: 4.6.5
+      zod: 4.6.6
 
   zod@3.22.4: {}
 
   zod@4.1.11: {}
 
-  zod@4.6.5: {}
+  zod@4.6.6: {}
