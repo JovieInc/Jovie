@@ -1,25 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { render, screen } from '@testing-library/react';
-import { type ComponentType, lazy, Suspense } from 'react';
+import type { ComponentType } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-
-// Resolve each next/dynamic loader through React.lazy so the test proves every
-// lazy boundary imports the module export the HUD renders.
-vi.mock('next/dynamic', () => ({
-  default: (loader: () => Promise<ComponentType<Record<string, unknown>>>) => {
-    const Lazy = lazy(() =>
-      loader().then(component => ({ default: component }))
-    );
-    return function DynamicStub(props: Record<string, unknown>) {
-      return (
-        <Suspense fallback={null}>
-          <Lazy {...props} />
-        </Suspense>
-      );
-    };
-  },
-}));
 
 function stub(name: string) {
   return function Stub() {
@@ -55,6 +38,7 @@ vi.mock('@/components/features/admin/ShippingVelocityChart', () => ({
   ShippingVelocityChart: stub('ShippingVelocityChart'),
 }));
 
+// Real next/dynamic: each lazy boundary must resolve to the export it wraps.
 describe('HUD noise-section lazy boundaries', () => {
   it('resolves every lazy section to the component it wraps', async () => {
     const sections = (await import(
