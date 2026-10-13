@@ -1924,10 +1924,16 @@ describe('ci-fast bounded parallel workflow', () => {
       'packages/agent-transport-contracts/'
     );
     expect(STRUCTURAL_CONTROL_PATHS).toContain(
-      'symphony-health-contract\\.test\\.mjs'
+      'provider-attempt-receipt|provider-incident-contract|symphony-health-contract'
     );
     expect(CI_FAST_SOURCE).toContain(
       "selected.has('operations') || selected.has('web')"
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      'lib/__tests__/provider-attempt-receipt.test.mjs --coverage --coverage.allowExternal'
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      '--coverage.include="$PWD/packages/agent-transport-contracts/provider-attempt-receipt.ts"'
     );
     expect(CI_FAST_SOURCE).toContain(
       'lib/__tests__/provider-incident-contract.test.mjs --coverage --coverage.allowExternal'

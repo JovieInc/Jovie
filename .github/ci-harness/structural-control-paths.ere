@@ -8,7 +8,7 @@
 ^scripts/(hooks/pre-push-gate\.sh$|security/scan-secrets\.sh$|lib/__tests__/pre-push-gate\.test\.mjs$)
 ^apps/web/(app/api/internal/ovie/summer-bottleneck/|lib/ovie/summer-admissions\.ts$)
 ^packages/agent-transport-contracts/
-^scripts/lib/__tests__/symphony-health-contract\.test\.mjs$
+^scripts/lib/__tests__/(provider-attempt-receipt|provider-incident-contract|symphony-health-contract)\.test\.mjs$
 ^\.github/
 ^\.claude/rules/(ci-branching|release|testing|gstack)\.md
 ^AGENTS\.md
