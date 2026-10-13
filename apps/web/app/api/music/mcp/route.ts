@@ -82,7 +82,7 @@ export async function POST(request: Request) {
     clearTimeout(timer);
   }
   if (!body.ok) return body.response;
-  const server = createMusicMcpServer(request.signal);
+  const server = createMusicMcpServer(request.signal, request);
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     enableJsonResponse: true,

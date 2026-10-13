@@ -14,7 +14,11 @@ export const JOVIE_PLANS_PATH = '/smart-links#pricing';
 export const MAKE_LINK_ANNOTATIONS = {
   readOnlyHint: false,
   destructiveHint: false,
+<<<<<<< HEAD
   idempotentHint: false,
+=======
+  idempotentHint: true,
+>>>>>>> ff56f50cd12 (feat(links): add flagged Jovie link creation and make_link)
   openWorldHint: true,
 } as const;
 
@@ -93,6 +97,7 @@ export type LinkResult = z.infer<typeof linkResultSchema>;
 export type LinkProvider = z.infer<typeof providerSchema>;
 export type LinkCandidate = z.infer<typeof candidateSchema>;
 
+<<<<<<< HEAD
 const COMMERCIAL_COPY =
   /\$\s?\d|\bupgrade\b|\bcheckout\b|\bstripe\b|\bper month\b|\bpricing\b|\/mo\b/i;
 
@@ -107,6 +112,14 @@ export function assertNeutralToolResult(result: LinkResult): void {
       ? rest
       : { status: rest.status };
   if (COMMERCIAL_COPY.test(JSON.stringify(copy))) {
+=======
+const COMMERCIAL_COPY = /\$|upgrade|checkout|stripe|\/mo|per month|pricing/i;
+
+/** MCP tool text must stay neutral. The plans URL is the only commercial pointer. */
+export function assertNeutralToolResult(result: LinkResult): void {
+  const { plansUrl: _plansUrl, ...rest } = result;
+  if (COMMERCIAL_COPY.test(JSON.stringify(rest))) {
+>>>>>>> ff56f50cd12 (feat(links): add flagged Jovie link creation and make_link)
     throw new Error('Jovie link tool output includes commercial copy');
   }
 }

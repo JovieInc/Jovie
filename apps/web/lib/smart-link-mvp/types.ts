@@ -21,12 +21,15 @@ export interface CanonicalRelease {
   readonly artworkUrl: string | null;
 }
 
+<<<<<<< HEAD
 export interface NewStoredLink extends StoredLink {
   readonly anonymousSubjectHash: string | null;
   readonly createdAt: Date;
   readonly anonymousMonth: Date | null;
 }
 
+=======
+>>>>>>> ff56f50cd12 (feat(links): add flagged Jovie link creation and make_link)
 export interface SmartLinkStore {
   findByIsrc(isrc: string): Promise<StoredLink | null>;
   findByProviderKey(providerKey: string): Promise<StoredLink | null>;
@@ -34,6 +37,7 @@ export interface SmartLinkStore {
     readonly isrc?: string | null;
     readonly providerKey?: string | null;
   }): Promise<CanonicalRelease | null>;
+<<<<<<< HEAD
   /** Diagnostic after a conflict; this read never grants permission to insert. */
   countAnonymousInMonth(subjectHash: string, month: Date): Promise<number>;
   /**
@@ -42,6 +46,23 @@ export interface SmartLinkStore {
    * storage failures throw. Bind the month to createdAt, never to a later clock.
    */
   insertWithQuota(row: NewStoredLink): Promise<StoredLink | 'conflict'>;
+=======
+  countAnonymousSince(subjectHash: string, since: Date): Promise<number>;
+  insert(row: {
+    readonly code: string;
+    readonly query: string;
+    readonly kind: 'track' | 'artist';
+    readonly title: string | null;
+    readonly artistName: string | null;
+    readonly artworkUrl: string | null;
+    readonly providers: readonly LinkProvider[];
+    readonly isrc: string | null;
+    readonly upc: string | null;
+    readonly providerKey: string | null;
+    readonly createdByUserId: string | null;
+    readonly anonymousSubjectHash: string | null;
+  }): Promise<StoredLink | 'conflict'>;
+>>>>>>> ff56f50cd12 (feat(links): add flagged Jovie link creation and make_link)
 }
 
 export interface ResolvedRelease {
@@ -72,7 +93,13 @@ export interface SmartLinkResolver {
   resolveTrackUrl(url: string): Promise<ResolveResult<ResolvedRelease>>;
   resolveIsrc(isrc: string): Promise<ResolveResult<ResolvedRelease>>;
   searchTracks(query: string): Promise<ResolveResult<readonly LinkCandidate[]>>;
+<<<<<<< HEAD
   resolveArtist(query: string): Promise<
+=======
+  resolveArtist(
+    query: string
+  ): Promise<
+>>>>>>> ff56f50cd12 (feat(links): add flagged Jovie link creation and make_link)
     ResolveResult<
       | { readonly status: 'resolved'; readonly release: ResolvedRelease }
       | {

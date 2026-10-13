@@ -20,8 +20,9 @@ archive root, `mcp.json`, and relative asset paths.
 
 ## What this listing is
 
-ChatGPT suggests one HTTPS MCP URL. The directory app is anonymous and
-read-only:
+ChatGPT suggests one HTTPS MCP URL. The directory app stays anonymous
+(`noauth`). The four artist tools are read-only. `make_link` is a separate
+write, listed only while `SMART_LINK_MVP` is also on.
 
 | Tool | What it does |
 | --- | --- |
@@ -29,6 +30,7 @@ read-only:
 | `get_profile` | Public name, bio, genres, profile URL, and public listening links for an exact handle. |
 | `get_updates` | Up to eight public releases and eight confirmed upcoming shows. |
 | `subscribe_to_updates` | The public page `https://jov.ie/{username}?mode=subscribe`. It does not collect contact details or create a subscription. |
+| `make_link` | One public Jovie link for a track URL, ISRC, or name. A name returns candidates. The link is unclaimed. Listed only when `SMART_LINK_MVP` is on. |
 
 Production URL, only after the flag below is enabled and the app is redeployed:
 `https://jov.ie/api/chatgpt/mcp`.
@@ -38,9 +40,18 @@ Production URL, only after the flag below is enabled and the app is redeployed:
 **Then:** submit from Tim's OpenAI account. Do not enable dynamic client
 registration for this listing.
 
-**EVENT:** the directory MCP is anonymous and read-only. It does not collect
-contact details or create subscriptions. Owner tools stay on the per-username
-OAuth endpoint. Dynamic client registration stays off.
+**EVENT:** the four directory read tools stay anonymous and read-only. They
+do not collect contact details or create subscriptions. `make_link` is a
+separate flagged noauth write. It uses the same free behavior as the website
+(three new anonymous links per UTC month, plus the public-artist rate limit),
+leaves the link unclaimed, and publishes honest write annotations. A missing
+or foreign bearer does not reject the call. When a Jovie session is already
+present, that `users.id` is stored as the creator and the link is still
+unclaimed. Owner tools stay on the per-username OAuth endpoint. Dynamic
+client registration stays off.
+
+Turn `SMART_LINK_MVP` and `CHATGPT_APP_DIRECTORY_MCP` on together, and only
+after this package update is merged. The directory scan will see `make_link`.
 
 ## Requirement map
 
@@ -48,13 +59,13 @@ OAuth endpoint. Dynamic client registration stays off.
 | --- | --- | --- | --- |
 | One universal HTTPS MCP URL | Per-artist `/api/mcp/{username}` and music `/api/music/mcp` exist, but neither is the directory shape (see below). | New `/api/chatgpt/mcp`, implemented, default off. | This PR. Tim enables the flag before scan. |
 | Auth mode | OAuth discovery, 401 plus `WWW-Authenticate`, and the ChatGPT redirect allowlist are live for the per-artist owner endpoint. Dynamic client registration is behind `FEATURE_OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION`, default off. | Directory listing is `noauth`. ChatGPT does not need dynamic client registration. Leave that flag off. Jovie does not advertise `client_id_metadata_document_supported`. | Tim: do not turn the registration flag on. |
-| Tool annotations | Music MCP annotates its own tools. The per-artist route does not, and changing it would ship outside this flag. | Directory tools set `readOnlyHint: true`, `destructiveHint: false`, `idempotentHint: true`, `openWorldHint: false`. | This PR. |
+| Tool annotations | Music MCP annotates its own tools. The per-artist route does not, and changing it would ship outside this flag. | The four directory tools set `readOnlyHint: true`, `destructiveHint: false`, `idempotentHint: true`, `openWorldHint: false`. `make_link` sets `readOnlyHint: false`, `destructiveHint: false`, `idempotentHint: true` (the same query returns the existing link), `openWorldHint: true` (it creates a public page and calls MusicFetch). | This PR. |
 | Privacy policy URL | `https://jov.ie/legal/privacy` (and `/privacy` redirects there). The Feb 2026 policy covers collection, purposes, sharing, retention, controls, and under-13. | It does not name ChatGPT or OpenAI as a caller of these public tools. This PR does not rewrite legal copy. | Counsel, before submit, if review requires that sentence. |
 | Terms URL | `https://jov.ie/legal/terms` (and `/terms` redirects there). | None for the URL itself. | Tim pastes the canonical URL. |
 | Support and website | `https://jov.ie/support`, `https://jov.ie`. Support email `support@jov.ie`. | None. | Tim. |
 | App metadata and icons | Brand mark exists. Music plugin metadata is a different product. | `apps/web/plugins/jovie-artists/` with square SVG logo and composer icons, name, subtitle, category Entertainment, brand color `#635aff`. | This PR. Tim uploads the ZIP. |
-| Review cases | None for this server. | Five positive and three negative cases in `plugin.json`. No demo URL in git. | Tim records the walkthrough in the dashboard after the flag is on. |
-| Domain verification | `jov.ie` already serves the app. | Portal issues a one-time token. Host it as plain text at `https://jov.ie/.well-known/openai-apps-challenge`. This PR does not add that route or a token. | Tim, at submission time. |
+| Review cases | None for this server. | Six positive and four negative cases in `plugin.json`, including a positive and a negative `make_link` case. No prices in the package. No demo URL in git. | Tim records the walkthrough in the dashboard after both flags are on. |
+| Domain verification | `jov.ie` already serves the app. `GET /.well-known/openai-apps-challenge` returns the portal token as `text/plain` from `OPENAI_APPS_CHALLENGE`. | The token is not in git. An unset variable returns 404. | Tim sets the env value at submission time. |
 | Identity verification and submit | OpenAI account is Tim's. | Not started. No spend and no submission from this change. | Tim. |
 
 ## Why this URL
@@ -65,7 +76,8 @@ authenticated listing would need a reviewer login.
 
 `/api/music/mcp` searches Spotify and Apple Music identities. Its origin check
 allows only the Jovie app origin, so a ChatGPT `Origin` is rejected. It is a
-different product. This change does not alter it.
+different product. While `SMART_LINK_MVP` is on it also lists `make_link`. The
+directory scan uses `/api/chatgpt/mcp`, not the music route.
 
 OpenAI's auth doc says anonymous read-only mode is valid. OAuth prefers Client
 ID Metadata Documents. Dynamic client registration runs only when the
@@ -101,7 +113,7 @@ credentials or one-time codes through a tool.
 
 ## Annotations
 
-Each tool publishes:
+`find_artist`, `get_profile`, `get_updates`, and `subscribe_to_updates` publish:
 
 ```json
 {
@@ -112,11 +124,34 @@ Each tool publishes:
 }
 ```
 
-`openWorldHint` is false because the tools read Jovie's public catalog. They
-return public Spotify, Apple Music, YouTube, and ticket URLs, but they do not
-fetch the open web. If an automated scan disagrees, appeal with that
+`openWorldHint` is false on those four because they read Jovie's public catalog.
+They return public Spotify, Apple Music, YouTube, and ticket URLs, but they do
+not fetch the open web. If an automated scan disagrees, appeal with that
 explanation. Do not flip the hint to true just to clear the scan unless the
 tool actually starts fetching those URLs.
+
+`make_link` writes a row and a public page, so its annotations are different:
+
+```json
+{
+  "readOnlyHint": false,
+  "destructiveHint": false,
+  "idempotentHint": true,
+  "openWorldHint": true
+}
+```
+
+`idempotentHint` is true because the same query returns the existing link.
+`openWorldHint` is true because the tool creates a public link page and calls
+MusicFetch. A noauth write draws review scrutiny. Anonymous calls are rate
+limited with the public-artist limiter and capped at three new links per UTC
+month, the same cap as the website. A signed-in Jovie session is recorded as
+`created_by_user_id` and is not under that anonymous cap. Either way the link
+stays unclaimed. `claimUrl` is `/l/{code}/claim`, the same posture as CLI
+`profile create`: opening it does not create an account and does not prove DSP
+ownership. The artist verifies later. The tool does not return a raw claim
+token, a price, a plan name, or a checkout link. A free-limit error may include
+the informational plans URL only.
 
 Descriptions say when to use each tool, what public fields come back, and what
 the tool does not do. They do not compare Jovie with other products.
@@ -151,7 +186,7 @@ no `frameDomains`.
 
 From the plugin guidelines page:
 
-- The plugin has one clear purpose: find a public artist, read the profile, and get public updates.
+- The plugin has one clear purpose: find a public artist, read the profile, get public updates, and, when `SMART_LINK_MVP` is on, make one unclaimed Jovie link.
 - Tool names and descriptions match that purpose. They are not promotional and do not rank Jovie against other products.
 - Tools are independently usable. Search does not require the other tools. Profile, updates, and subscribe require an exact handle, which search returns.
 - Annotations are explicit booleans, not omitted.
@@ -170,13 +205,13 @@ Do this from Tim's OpenAI account. Do not submit, pay, or change DNS from the
 repository.
 
 1. Leave the plugin unsubmitted until production answers MCP initialize. The route 404s while the flag is off, and the scan will fail.
-2. Set `FEATURE_CHATGPT_APP_DIRECTORY_MCP=true` on Production in the existing env system and redeploy. Do not set `FEATURE_OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION`.
-3. Confirm `https://jov.ie/api/chatgpt/mcp` in developer mode: Settings, Apps & Connectors, Advanced settings, create a connector, authentication None, URL above. Expect four tools, the annotations above, and no owner fields. MCP Inspector is an acceptable check of the same URL.
+2. Set `FEATURE_CHATGPT_APP_DIRECTORY_MCP=true` and `FEATURE_SMART_LINK_MVP=true` together on Production in the existing env system, and only after this package update is merged, then redeploy. The directory scan will see `make_link`. Do not turn either flag on before that merge. Do not set `FEATURE_OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION`. Do not create Stripe prices.
+3. Confirm `https://jov.ie/api/chatgpt/mcp` in developer mode: Settings, Apps & Connectors, Advanced settings, create a connector, authentication None, URL above. With both flags on, expect five tools: the four read-only artist tools with the read-only annotations above, plus `make_link` with the write annotations above, and no owner fields. MCP Inspector is an acceptable check of the same URL. If only the directory flag is on, expect the four read-only tools.
 4. In the OpenAI Platform, use the org and project that should own the plugin. Complete individual or business verification. The owner role includes Apps Management Write (`api.apps.write`).
 5. From `apps/web/plugins/jovie-artists`, create a ZIP whose root contains `plugin.json`, `mcp.json`, `README.md`, and `assets/`. Upload it under Plugins. Do not put secrets in the ZIP.
-6. Connect the MCP server with authentication None. Complete domain verification by hosting the portal's exact token as `text/plain` at `https://jov.ie/.well-known/openai-apps-challenge`, or at an allowed parent host. Do not replace another plugin's token. This repository does not contain that token or that route.
+6. Connect the MCP server with authentication None. Complete domain verification by setting `OPENAI_APPS_CHALLENGE` to the portal's exact token. `GET https://jov.ie/.well-known/openai-apps-challenge` serves that value as `text/plain`. The route 404s when the variable is unset. Do not commit the token. Do not replace another plugin's token.
 7. Wait for the tool scan. Fix server findings in this flag-gated route and rescan. Appeal only when an annotation finding is wrong, using the `openWorldHint` note above.
-8. Run the five positive and three negative cases in developer mode against production. Record a walkthrough and put that URL in Review details in the dashboard, not in git.
+8. Run the six positive and four negative cases in developer mode against production, including the `make_link` cases. Record a walkthrough and put that URL in Review details in the dashboard, not in git.
 9. Leave reviewer credentials blank, or state that the app has no sign-in. Do not use a real user account. If the portal requires a login, this anonymous app is the wrong shape. Do not turn on dynamic client registration to satisfy that prompt.
 10. Ask counsel whether the Feb 2026 privacy policy needs one sentence that ChatGPT can call these public artist tools. Do not invent that sentence in the repo.
 11. Attest and submit for review. Only one review can be in progress. Track status by email. Publish only after approval, and only when the listing should be live.

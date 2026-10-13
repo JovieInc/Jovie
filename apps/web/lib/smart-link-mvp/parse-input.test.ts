@@ -30,6 +30,7 @@ describe('parseLinkQuery', () => {
     expect(providerKeyForUrl(SPOTIFY_ARTIST)).toBe(
       'artist:spotify:4Z8W4fKeB5YxbusRsdQVPb'
     );
+<<<<<<< HEAD
     expect(
       providerKeyForUrl(
         'https://music.apple.com/us/album/motion-sickness/1256607808?i=1256607810&uo=4'
@@ -38,6 +39,8 @@ describe('parseLinkQuery', () => {
     expect(providerKeyForUrl('https://www.deezer.com/track/384037361')).toBe(
       'deezer:384037361'
     );
+=======
+>>>>>>> ff56f50cd12 (feat(links): add flagged Jovie link creation and make_link)
   });
 
   it('treats a bare name as an artist and rejects a mismatched kind', () => {

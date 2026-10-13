@@ -29,6 +29,7 @@ access remain authoritative in the product feature list below.
 
 | Feature ID | Product feature |
 |---|---|
+| public-jovie-link | Public Jovie link from one track, ISRC, or name |
 | smart-link-editing-and-customization | Smart link editing and customization |
 | auto-dsp-detection-linking | Auto DSP detection & linking |
 | auto-sync-from-spotify | Auto-sync from Spotify |
@@ -47,6 +48,7 @@ access remain authoritative in the product feature list below.
 
 | Product area | Feature | Status | Access model | Flag / Gate | Notes |
 |---|---|---|---|---|---|
+| Smart Links | Public Jovie link from a track, ISRC, or name | Flagged off | Anonymous: 3 new links a UTC month. A signed-in session is recorded and the link stays unclaimed. | `SMART_LINK_MVP` env code flag, default off. Not a Statsig gate. | `POST /api/links`, `/l/{code}`, and `make_link`. Turn on with `CHATGPT_APP_DIRECTORY_MCP` only after the directory package that describes `make_link` is merged. No Stripe prices. |
 | Smart Links | Unlimited smart links | Shipped | Free+ | None | Core product capability |
 | Smart Links | Smart deep links | Shipped | Free+ | None | Included in all plans |
 | Smart Links | Smart link editing and customization | Shipped | Free+ | None | Entitlement-backed (`canEditSmartLinks`) |

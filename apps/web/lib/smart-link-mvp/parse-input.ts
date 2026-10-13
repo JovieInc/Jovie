@@ -47,6 +47,7 @@ export function providerKeyForUrl(value: string): string | null {
     );
     if (artist) return `artist:spotify:${artist[1]}`;
   }
+<<<<<<< HEAD
   if (host === 'music.apple.com' || host === 'itunes.apple.com') {
     const song = /^\/[a-z]{2}\/song\/(?:[^/]+\/)?(\d+)\/?$/.exec(url.pathname);
     if (song) return `apple_music:${song[1]}`;
@@ -58,15 +59,23 @@ export function providerKeyForUrl(value: string): string | null {
     ) {
       return `apple_music:${trackId}`;
     }
+=======
+  if (host === 'music.apple.com') {
+    const song = /^\/[a-z]{2}\/song\/(?:[^/]+\/)?(\d+)\/?$/.exec(url.pathname);
+    if (song) return `apple_music:${song[1]}`;
+>>>>>>> ff56f50cd12 (feat(links): add flagged Jovie link creation and make_link)
     const artist = /^\/[a-z]{2}\/artist\/(?:[^/]+\/)?(\d+)\/?$/.exec(
       url.pathname
     );
     if (artist) return `artist:apple_music:${artist[1]}`;
   }
+<<<<<<< HEAD
   if (host === 'deezer.com' || host === 'www.deezer.com') {
     const track = /^\/(?:[a-z]{2}\/)?track\/(\d+)\/?$/.exec(url.pathname);
     if (track) return `deezer:${track[1]}`;
   }
+=======
+>>>>>>> ff56f50cd12 (feat(links): add flagged Jovie link creation and make_link)
   if (
     host === 'music.youtube.com' ||
     host === 'www.youtube.com' ||

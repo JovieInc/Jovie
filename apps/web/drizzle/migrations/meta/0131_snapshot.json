@@ -1,5 +1,9 @@
 {
+<<<<<<< HEAD
   "id": "685749b8-097f-4968-80ce-f67f46baaa60",
+=======
+  "id": "1bf78092-85e6-47d0-91aa-3b7e72e25040",
+>>>>>>> ff56f50cd12 (feat(links): add flagged Jovie link creation and make_link)
   "prevId": "dfcc0d40-a568-4ca7-97a6-a9a56afd34dd",
   "version": "7",
   "dialect": "postgresql",
@@ -1646,6 +1650,7 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+<<<<<<< HEAD
     "public.artist_daily_snapshots": {
       "name": "artist_daily_snapshots",
       "schema": "",
@@ -1770,6 +1775,8 @@
       },
       "isRLSEnabled": false
     },
+=======
+>>>>>>> ff56f50cd12 (feat(links): add flagged Jovie link creation and make_link)
     "public.artist_identity_links": {
       "name": "artist_identity_links",
       "schema": "",
@@ -35237,6 +35244,199 @@
       },
       "isRLSEnabled": false
     },
+<<<<<<< HEAD
+=======
+    "public.smart_links": {
+      "name": "smart_links",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "query": {
+          "name": "query",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "artist_name": {
+          "name": "artist_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "artwork_url": {
+          "name": "artwork_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "providers": {
+          "name": "providers",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "isrc": {
+          "name": "isrc",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "upc": {
+          "name": "upc",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "provider_key": {
+          "name": "provider_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by_user_id": {
+          "name": "created_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "anonymous_subject_hash": {
+          "name": "anonymous_subject_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "click_count": {
+          "name": "click_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "smart_links_code_unique": {
+          "name": "smart_links_code_unique",
+          "columns": [
+            {
+              "expression": "code",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "smart_links_isrc_unique": {
+          "name": "smart_links_isrc_unique",
+          "columns": [
+            {
+              "expression": "isrc",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "isrc IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "smart_links_provider_key_unique": {
+          "name": "smart_links_provider_key_unique",
+          "columns": [
+            {
+              "expression": "provider_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "provider_key IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "smart_links_anonymous_created_idx": {
+          "name": "smart_links_anonymous_created_idx",
+          "columns": [
+            {
+              "expression": "anonymous_subject_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "smart_links_created_by_user_id_users_id_fk": {
+          "name": "smart_links_created_by_user_id_users_id_fk",
+          "tableFrom": "smart_links",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+>>>>>>> ff56f50cd12 (feat(links): add flagged Jovie link creation and make_link)
     "public.sms_subscribe_intents": {
       "name": "sms_subscribe_intents",
       "schema": "",

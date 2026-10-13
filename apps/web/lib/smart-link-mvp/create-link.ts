@@ -5,7 +5,10 @@ import {
   type LinkCandidate,
   type LinkResult,
 } from './contract';
+<<<<<<< HEAD
 import { sameRecording, splitArtistTitle } from './match';
+=======
+>>>>>>> ff56f50cd12 (feat(links): add flagged Jovie link creation and make_link)
 import { parseLinkQuery, providerKeyForUrl } from './parse-input';
 import type {
   CanonicalRelease,
@@ -120,6 +123,7 @@ async function persist(
   if (reused) return reused;
   if (release.providers.length === 0) return failure('NOT_FOUND', input.origin);
 
+<<<<<<< HEAD
   const createdAt = new Date(input.now ?? Date.now());
   const anonymousHash = input.actor.userId
     ? null
@@ -132,6 +136,21 @@ async function persist(
   const allocate = input.allocateCode ?? allocateLinkCode;
   for (let attempt = 0; attempt < 5; attempt++) {
     const inserted = await input.store.insertWithQuota({
+=======
+  const now = input.now ?? new Date();
+  if (!input.actor.userId) {
+    const hash = input.actor.anonymousSubjectHash;
+    if (!hash) return failure('UPSTREAM_FAILURE', input.origin);
+    const used = await input.store.countAnonymousSince(hash, monthStart(now));
+    if (used >= FREE_LINKS_PER_MONTH) {
+      return failure('LIMIT_REACHED', input.origin);
+    }
+  }
+
+  const allocate = input.allocateCode ?? allocateLinkCode;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const inserted = await input.store.insert({
+>>>>>>> ff56f50cd12 (feat(links): add flagged Jovie link creation and make_link)
       code: allocate(),
       query,
       kind,
@@ -143,9 +162,15 @@ async function persist(
       upc: release.upc,
       providerKey,
       createdByUserId: input.actor.userId,
+<<<<<<< HEAD
       anonymousSubjectHash: anonymousHash,
       createdAt,
       anonymousMonth,
+=======
+      anonymousSubjectHash: input.actor.userId
+        ? null
+        : input.actor.anonymousSubjectHash,
+>>>>>>> ff56f50cd12 (feat(links): add flagged Jovie link creation and make_link)
     });
     if (inserted !== 'conflict') {
       return fromStored(inserted, input.origin, 'created');
@@ -155,6 +180,7 @@ async function persist(
       providerKey,
     });
     if (again) return again;
+<<<<<<< HEAD
     if (anonymousHash && anonymousMonth) {
       const used = await input.store.countAnonymousInMonth(
         anonymousHash,
@@ -164,6 +190,8 @@ async function persist(
         return failure('LIMIT_REACHED', input.origin);
       }
     }
+=======
+>>>>>>> ff56f50cd12 (feat(links): add flagged Jovie link creation and make_link)
   }
   return failure('UPSTREAM_FAILURE', input.origin);
 }
@@ -265,6 +293,7 @@ export async function createSmartLink(
   const found = await input.resolver.searchTracks(parsed.query);
   if (!found.ok) return failure(found.code, input.origin);
   if (found.value.length === 0) return failure('NOT_FOUND', input.origin);
+<<<<<<< HEAD
   const only = found.value[0];
   const split = splitArtistTitle(parsed.query);
   const exactMatch =
@@ -278,6 +307,12 @@ export async function createSmartLink(
   if (!exactMatch || !only?.url) {
     return choices(found.value);
   }
+=======
+  if (found.value.length > 1 || !found.value[0]?.url) {
+    return choices(found.value);
+  }
+  const only = found.value[0];
+>>>>>>> ff56f50cd12 (feat(links): add flagged Jovie link creation and make_link)
   const resolved = await input.resolver.resolveTrackUrl(only.url!);
   if (!resolved.ok) return failure(resolved.code, input.origin);
   return persist(

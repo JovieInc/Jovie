@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+<<<<<<< HEAD
 import {
   assertNeutralToolResult,
   FREE_LINKS_PER_MONTH,
@@ -13,6 +14,17 @@ import type {
   ResolvedRelease,
   SmartLinkResolver,
   SmartLinkStore,
+=======
+import { assertNeutralToolResult, FREE_LINKS_PER_MONTH } from './contract';
+import { createSmartLink } from './create-link';
+import type {
+  CanonicalRelease,
+  LinkActor,
+  ResolvedRelease,
+  SmartLinkResolver,
+  SmartLinkStore,
+  StoredLink,
+>>>>>>> ff56f50cd12 (feat(links): add flagged Jovie link creation and make_link)
 } from './types';
 
 const ORIGIN = 'https://jov.ie';
@@ -38,6 +50,7 @@ function release(overrides: Partial<ResolvedRelease> = {}): ResolvedRelease {
 }
 
 function memory() {
+<<<<<<< HEAD
   const rows: NewStoredLink[] = [];
   let canonical: CanonicalRelease | null = null;
   const used = (hash: string, month: Date) =>
@@ -46,6 +59,11 @@ function memory() {
         row.anonymousSubjectHash === hash &&
         row.anonymousMonth?.getTime() === month.getTime()
     ).length;
+=======
+  const rows: StoredLink[] = [];
+  const anonymous = new Map<string, number>();
+  let canonical: CanonicalRelease | null = null;
+>>>>>>> ff56f50cd12 (feat(links): add flagged Jovie link creation and make_link)
   const store: SmartLinkStore = {
     async findByIsrc(isrc) {
       return rows.find(row => row.isrc === isrc) ?? null;
@@ -56,10 +74,17 @@ function memory() {
     async findCanonical() {
       return canonical;
     },
+<<<<<<< HEAD
     async countAnonymousInMonth(subjectHash, month) {
       return used(subjectHash, month);
     },
     async insertWithQuota(row) {
+=======
+    async countAnonymousSince(subjectHash) {
+      return anonymous.get(subjectHash) ?? 0;
+    },
+    async insert(row) {
+>>>>>>> ff56f50cd12 (feat(links): add flagged Jovie link creation and make_link)
       if (
         rows.some(
           existing =>
@@ -71,6 +96,7 @@ function memory() {
       ) {
         return 'conflict';
       }
+<<<<<<< HEAD
       if (row.anonymousSubjectHash) {
         if (!row.anonymousMonth) throw new Error('Missing quota month');
         if (
@@ -81,6 +107,29 @@ function memory() {
       }
       rows.push(row);
       return row;
+=======
+      const stored: StoredLink = {
+        code: row.code,
+        query: row.query,
+        kind: row.kind,
+        title: row.title,
+        artistName: row.artistName,
+        artworkUrl: row.artworkUrl,
+        providers: row.providers,
+        isrc: row.isrc,
+        upc: row.upc,
+        providerKey: row.providerKey,
+        createdByUserId: row.createdByUserId,
+      };
+      rows.push(stored);
+      if (row.anonymousSubjectHash) {
+        anonymous.set(
+          row.anonymousSubjectHash,
+          (anonymous.get(row.anonymousSubjectHash) ?? 0) + 1
+        );
+      }
+      return stored;
+>>>>>>> ff56f50cd12 (feat(links): add flagged Jovie link creation and make_link)
     },
   };
   return {
@@ -132,6 +181,7 @@ const anonymous: LinkActor = {
   anonymousSubjectHash: 'abc123',
 };
 
+<<<<<<< HEAD
 function createRecording(
   number: number,
   db: ReturnType<typeof memory>,
@@ -169,6 +219,8 @@ function createRecording(
   });
 }
 
+=======
+>>>>>>> ff56f50cd12 (feat(links): add flagged Jovie link creation and make_link)
 describe('createSmartLink', () => {
   it('returns the stored link on a repeat and does not resolve again', async () => {
     const db = memory();
@@ -208,7 +260,11 @@ describe('createSmartLink', () => {
     let n = 0;
     for (let i = 0; i < FREE_LINKS_PER_MONTH; i++) {
       const created = await createSmartLink({
+<<<<<<< HEAD
         query: `Artist ${i} - Track ${i}`,
+=======
+        query: `Artist ${i} - Track`,
+>>>>>>> ff56f50cd12 (feat(links): add flagged Jovie link creation and make_link)
         origin: ORIGIN,
         actor: anonymous,
         store: db.store,
@@ -283,6 +339,7 @@ describe('createSmartLink', () => {
       plansUrl: 'https://jov.ie/smart-links#pricing',
     });
     expect(() => assertNeutralToolResult(limited)).not.toThrow();
+<<<<<<< HEAD
     expect(() =>
       assertNeutralToolResult({
         status: 'created',
@@ -306,10 +363,13 @@ describe('createSmartLink', () => {
         title: 'Upgrade for $10/mo',
       })
     ).toThrow(/commercial copy/);
+=======
+>>>>>>> ff56f50cd12 (feat(links): add flagged Jovie link creation and make_link)
     expect(JSON.stringify(limited)).not.toMatch(/\$|upgrade|checkout/i);
     expect(n).toBe(FREE_LINKS_PER_MONTH);
   });
 
+<<<<<<< HEAD
   it('asks before saving a different version of the song', async () => {
     const db = memory();
     const result = await createSmartLink({
@@ -339,6 +399,8 @@ describe('createSmartLink', () => {
     expect(db.rows).toHaveLength(0);
   });
 
+=======
+>>>>>>> ff56f50cd12 (feat(links): add flagged Jovie link creation and make_link)
   it('asks for a choice on an artist name and does not insert', async () => {
     const db = memory();
     const calls = { n: 0 };
@@ -402,6 +464,7 @@ describe('createSmartLink', () => {
     expect(db.rows[0]?.createdByUserId).toBe(
       '11111111-1111-4111-8111-111111111111'
     );
+<<<<<<< HEAD
     expect(db.rows[0]?.anonymousSubjectHash).toBeNull();
     expect(db.rows[0]?.anonymousMonth).toBeNull();
   });
@@ -641,4 +704,7 @@ describe('createSmartLink', () => {
       ).not.toThrow();
     }
   );
+=======
+  });
+>>>>>>> ff56f50cd12 (feat(links): add flagged Jovie link creation and make_link)
 });

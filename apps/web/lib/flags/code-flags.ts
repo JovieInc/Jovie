@@ -55,6 +55,7 @@ export const CODE_FLAGS = {
   // registration limited to the shared MCP redirect allowlist. The founder
   // Ovie issuer advertises /api/ovie/oauth/register on its own.
   OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION: false,
+<<<<<<< HEAD
   // Social-network HTML must not be fetched from Jovie server IPs. Default
   // off. FEATURE_SOCIAL_HTML_ISOLATED_PROVIDER=true is reserved for a future
   // isolated provider and still fails closed until that provider exists.
@@ -64,6 +65,17 @@ export const CODE_FLAGS = {
   // flag flips on only when Tim certifies the redo output. Env override:
   // FEATURE_YOUTUBE_THUMBNAILS_PASTE_GENERATE=true
   YOUTUBE_THUMBNAILS_PASTE_GENERATE: false,
+=======
+  // ChatGPT app-directory MCP at /api/chatgpt/mcp. Default off: the route
+  // 404s and is not a live connector. FEATURE_CHATGPT_APP_DIRECTORY_MCP=true
+  // enables the anonymous public-artist tools. Does not enable DCR.
+  CHATGPT_APP_DIRECTORY_MCP: false,
+  // Public "make a Jovie link" API, /l/{code} pages, and the make_link MCP
+  // tool. Default off. FEATURE_SMART_LINK_MVP=true enables them. Turn this on
+  // together with CHATGPT_APP_DIRECTORY_MCP only after the directory package
+  // that describes make_link is merged. Does not create Stripe prices.
+  SMART_LINK_MVP: false,
+>>>>>>> ff56f50cd12 (feat(links): add flagged Jovie link creation and make_link)
 } as const satisfies Record<string, boolean>;
 
 export type CodeFlagName = keyof typeof CODE_FLAGS;
