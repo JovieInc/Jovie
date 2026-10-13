@@ -291,6 +291,21 @@ JovieInc/Jovie`. After flipping the variable, also run
 and disarm every PR it prints. `scripts/merge-queue-green-enroll.test.mjs` fails if a job
 that can enqueue or arm lacks the guard.
 
+Circuit-breaker dequeues: when a storm forces PRs out of the queue, mark each
+one so green enroll restores it after the lift instead of a hand restore:
+
+```sh
+gh pr edit N --add-label queue-breaker -R JovieInc/Jovie
+gh api graphql -f query='mutation($id:ID!){dequeuePullRequest(input:{id:$id}){clientMutationId}}' \
+  -f id="$(gh pr view N --json id --jq .id -R JovieInc/Jovie)"
+```
+
+Once `QUEUE_FREEZE` is back to 0, green enroll's next sweep (any landing on
+main) or a dispatch re-admits a `queue-breaker` PR whose manual removal left
+the head unchanged, while it is still green and carries no hold label or
+failure hold, then removes the marker. A manual dequeue without the marker,
+or a `failed_checks` removal, is never re-admitted this way.
+
 To admit one PR without a roster sweep, dispatch green enroll with
 `gh workflow run merge-queue-green-enroll.yml -f pr_number=N -R JovieInc/Jovie`.
 

@@ -85,7 +85,9 @@ async function fixture(
   const inventories = [];
   const gets = [];
   const mainReads = [];
+  const labelRemovals = [];
   const effects = {
+    labelRemovals,
     mainReads,
     reads,
     mutations,
@@ -120,6 +122,12 @@ async function fixture(
               base: { ref: 'main' },
             },
           };
+        },
+      },
+      issues: {
+        removeLabel: async params => {
+          labelRemovals.push(params);
+          return {};
         },
       },
       repos: {
@@ -528,6 +536,59 @@ test('a sweep goes longest-waiting first and stops at its budget', async () => {
   );
   assert.ok(
     spent.warnings.some(w => w.includes('sweep budget spent after 2/3'))
+  );
+});
+
+test('a queue-breaker dequeue is re-admitted after the freeze and its marker removed', async () => {
+  // 2026-10-13: four quota storms each ended with queue-watch restoring every
+  // circuit-breaker dequeue by hand (manual removal, unchanged head).
+  const breaker = (reason, labels = ['queue-breaker']) => ({
+    timelineItems: { nodes: [{ createdAt: '2026-10-02T13:00:00Z', reason }] },
+    labels: {
+      pageInfo: { hasNextPage: false },
+      nodes: labels.map(name => ({ name })),
+    },
+  });
+  const marked = await fixture({
+    overrides: { 1: breaker('MANUAL') },
+    eventName: 'push',
+  });
+  assert.deepEqual(marked.mutations, [{ id: 'PR_1', oid: sha }]);
+  assert.deepEqual(marked.labelRemovals, [
+    {
+      owner: 'JovieInc',
+      repo: 'Jovie',
+      issue_number: 1,
+      name: 'queue-breaker',
+    },
+  ]);
+  const plain = await fixture({
+    overrides: { 1: breaker('MANUAL', []) },
+    eventName: 'push',
+  });
+  assert.deepEqual(
+    plain.mutations,
+    [],
+    "a plain manual dequeue keeps today's behavior"
+  );
+  const failed = await fixture({
+    overrides: { 1: breaker('FAILED_CHECKS') },
+    eventName: 'push',
+  });
+  assert.deepEqual(
+    failed.mutations,
+    [],
+    'the marker never re-admits a failed_checks removal'
+  );
+  const notGreen = await fixture({
+    overrides: { 1: { ...breaker('MANUAL'), mergeStateStatus: 'BLOCKED' } },
+    eventName: 'push',
+  });
+  assert.deepEqual(notGreen.mutations, []);
+  assert.deepEqual(
+    notGreen.labelRemovals,
+    [],
+    'the marker stays until the head is green'
   );
 });
 

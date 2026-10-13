@@ -191,6 +191,7 @@ jobs:
               `${process.env.GITHUB_WORKSPACE}/scripts/lib/admission-hold-labels.json`, 'utf8'
             ));
             const BLOCKING = new Set([...holdLabels.stopHoldLabels, holdLabels.queuePoisonLabel]);
+            const BREAKER_LABEL = 'queue-breaker';
             if (BLOCKING.size < 2) throw new Error('admission hold labels are unreadable');
             // Required checks green and no conflicts. UNSTABLE only adds a
             // non-required pending/red context (e.g. lane execution receipts).
@@ -389,12 +390,18 @@ jobs:
               // release of that same head. A failed_checks removal never is,
               // and any revision failure hold still blocks first.
               const removalReason = String(pr.timelineItems.nodes[0]?.reason || 'unknown').toLowerCase();
+              // A circuit-breaker dequeue during a quota storm carries the
+              // queue-breaker marker (MERGE_QUEUE.md runbook). This job only
+              // runs while QUEUE_FREEZE is not 1, so a marked, still-green,
+              // unheld head is re-admitted and the marker removed; a plain
+              // manual dequeue without it keeps today's behavior.
+              const breakerMarked = pr.labels.nodes.some(l => l.name.toLowerCase() === BREAKER_LABEL);
               const releasedAfterManualRemoval = Boolean(removedUnchangedHead) &&
                 failure.action === 'allow' &&
                 removalReason === 'manual' &&
-                (pr.releases?.nodes || []).some(event =>
+                (breakerMarked || (pr.releases?.nodes || []).some(event =>
                   typeof event?.createdAt === 'string' && event.createdAt > lastRemoval &&
-                  BLOCKING.has(String(event.label?.name || '').toLowerCase()));
+                  BLOCKING.has(String(event.label?.name || '').toLowerCase())));
               const ownerHoldRelease = failurePolicy.ownerHoldReleaseIntent({
                 eventName: context.eventName, event: context.payload,
               });
@@ -480,6 +487,10 @@ jobs:
                   }`, { id: pr.id, oid: pr.headRefOid });
                 enqueued += 1;
                 core.notice(`ENQUEUED #${pr.number} at position ${r.enqueuePullRequest.mergeQueueEntry.position}`);
+                if (breakerMarked) {
+                  await github.rest.issues.removeLabel({ owner, repo, issue_number: pr.number, name: BREAKER_LABEL })
+                    .catch(error => core.warning(`#${pr.number} ${BREAKER_LABEL} not removed: ${error.message}`));
+                }
               } catch (error) {
                 if (enqueueAttempted && failure.action === 'retry-once' && failurePolicy.enqueueWasRejected(error)) {
                   await writeRetry(failurePolicy.retryReleasedDescription(failure.latest));
