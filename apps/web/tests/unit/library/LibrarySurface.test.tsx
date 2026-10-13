@@ -1509,6 +1509,19 @@ describe('LibrarySurface', () => {
     expect(drawer.queryByText('a.zip')).not.toBeInTheDocument();
   });
 
+  it('opens the inspector for ?work=<id> deep links (Cmd+K entity commit)', () => {
+    navigationMock.searchParams = new URLSearchParams('work=release-b');
+    renderLibrary([
+      buildAsset({ id: 'release-a', title: 'Release A' }),
+      buildAsset({ id: 'release-b', title: 'Release B' }),
+    ]);
+
+    const drawer = within(screen.getByTestId('library-asset-drawer'));
+    expect(drawer.getByTestId('library-asset-entity-header')).toHaveTextContent(
+      'Release B'
+    );
+  });
+
   it('opens private file sharing in place from Share Privately (one share concept)', () => {
     renderLibrary([
       buildAsset({

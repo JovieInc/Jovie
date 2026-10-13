@@ -3137,6 +3137,17 @@ export function LibrarySurface({
     [playbackState.activeTrackId, toggleTrack]
   );
 
+  // `?work=<id>` (Cmd+K, links) opens that work's inspector once per id.
+  const workParam = searchParams.get('work');
+  const openedWorkParamRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!workParam || openedWorkParamRef.current === workParam) return;
+    if (!visibleAssets.some(asset => asset.id === workParam)) return;
+    openedWorkParamRef.current = workParam;
+    setSelectedId(workParam);
+    setDrawerOpen(true);
+  }, [visibleAssets, workParam]);
+
   useEffect(() => {
     if (selectedId && !visibleAssets.some(asset => asset.id === selectedId)) {
       setSelectedId(null);
