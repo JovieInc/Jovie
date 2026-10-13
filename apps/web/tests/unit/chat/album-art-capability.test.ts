@@ -60,7 +60,7 @@ describe('album art capability resolution', () => {
     expect(
       shouldHideAlbumArtChatSuggestion({
         availability: 'unavailable',
-        reason: 'Album art generation requires a Pro plan.',
+        reason: 'Album art generation requires the Artist Presence plan.',
         reasonCode: 'PLAN_UNAVAILABLE',
       })
     ).toBe(false);

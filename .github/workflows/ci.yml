@@ -3561,6 +3561,14 @@ jobs:
       contents: read
       statuses: write
     timeout-minutes: 30
+    # The 162 Storybook specs took 4.0m of a 6.6m job on two workers and set
+    # the merge-group wall (end p50 7.3m over 18 web merge groups on
+    # 2026-10-12). Playwright --shard splits the same fullyParallel spec list
+    # across two runners; the aggregates read the matrix result.
+    strategy:
+      fail-fast: true
+      matrix:
+        shard: [1, 2]
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -3594,6 +3602,7 @@ jobs:
           JOVIE_STORYBOOK_MANUAL_AXE: '1'
       # Web-independent checks ride here, off the Build + Layout tail.
       - name: Check extension and observability ingest
+        if: matrix.shard == 1
         run: pnpm --filter @jovie/extension typecheck && pnpm --filter @jovie/extension test && pnpm --filter @jovie/extension build && pnpm --filter @jovie/observability-ingest typecheck && pnpm --filter @jovie/observability-ingest test && pnpm --filter @jovie/canary-otp typecheck && pnpm --filter @jovie/canary-otp test
       - name: Setup Playwright (Chromium)
         uses: ./.github/actions/setup-playwright
@@ -3636,7 +3645,7 @@ jobs:
                   tests/e2e/storybook-task-row-geometry.spec.ts \
                   tests/e2e/storybook-desktop-update-modal.spec.ts \
                   --config=playwright.config.storybook.ts --project=chromium --reporter=line \
-                  --workers=2
+                  --workers=2 --shard="$STORYBOOK_SHARD"
               exit 0
             fi
             sleep 2
@@ -3645,6 +3654,7 @@ jobs:
           exit 1
         env:
           STORYBOOK_BASE_URL: http://localhost:6006
+          STORYBOOK_SHARD: ${{ matrix.shard }}/2
           MERGE_GROUP_DIFF_BASE_SHA: ${{ needs.ci-path-changes.outputs.path_diff_base_sha }}
           CI: true
           JOVIE_STORYBOOK_MANUAL_AXE: '1'
@@ -3658,7 +3668,7 @@ jobs:
         continue-on-error: true
         uses: ./.github/actions/upload-safe-playwright-artifact
         with:
-          name: combined-storybook-report-${{ github.run_id }}-${{ github.run_attempt }}
+          name: combined-storybook-report-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard }}
           path: apps/web/test-results/
           allow-markdown: 'true'
           retention-days: 3
@@ -3666,7 +3676,7 @@ jobs:
         if: ${{ success() && hashFiles('apps/web/test-results/storybook-input-evidence/**') != '' }}
         uses: ./.github/actions/upload-safe-playwright-artifact
         with:
-          name: storybook-input-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          name: storybook-input-evidence-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard }}
           path: apps/web/test-results/storybook-input-evidence/
           allow-images: 'true'
           retention-days: 7

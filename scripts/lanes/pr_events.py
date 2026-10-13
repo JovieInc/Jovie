@@ -370,8 +370,10 @@ def add_label(number: int, kind: str, sh=run) -> bool:
 # The dispatch tick re-read the same stuck PRs' claim comments every pass (~84 reads an hour on
 # Gem, 2026-10-12 gh ledger) though they rarely change. `since` is floored to this bucket, so the
 # URL stays stable long enough for a conditional request: a 304 costs no rate limit. A floored
-# `since` only widens the read; the age check below still bounds what counts as live.
-CLAIM_SINCE_BUCKET_S = 600
+# `since` only widens the read; the age check below still bounds what counts as live. An hour,
+# not 10 min: with the 5-minute tick a 10-min bucket moved the URL every other pass, so half the
+# reads were fresh 200s (2026-10-13 ledger: 44 full reads/h vs 5 conditional).
+CLAIM_SINCE_BUCKET_S = 3600
 
 
 def etag_cache_dir() -> Path | None:

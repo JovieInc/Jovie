@@ -44,8 +44,12 @@ describe('PricingComparisonChart', () => {
     );
 
     expect(within(desktopTable).getByText('Free')).toBeInTheDocument();
-    expect(within(desktopTable).getByText('Pro')).toBeInTheDocument();
-    expect(within(mobileTable).getByText('Pro')).toBeInTheDocument();
+    expect(
+      within(desktopTable).getByText('Artist Presence')
+    ).toBeInTheDocument();
+    expect(
+      within(mobileTable).getByText('Artist Presence')
+    ).toBeInTheDocument();
     expect(within(desktopTable).getAllByText('Included')).toHaveLength(2);
     expect(within(mobileTable).getAllByText('Included')).toHaveLength(1);
     expect(desktopTable.querySelector('svg')).toBeNull();
@@ -85,7 +89,9 @@ describe('PricingComparisonChart', () => {
 
     fireEvent.change(selector, { target: { value: 'pro' } });
     expect(selector).toHaveValue('pro');
-    expect(within(mobileTable).getByText('Pro')).toBeInTheDocument();
+    expect(
+      within(mobileTable).getByText('Artist Presence')
+    ).toBeInTheDocument();
     expect(within(mobileTable).getByText('$199')).toBeInTheDocument();
     expect(within(mobileTable).getByText('/mo')).toBeInTheDocument();
     expect(within(mobileTable).getByText('Unlimited')).toBeInTheDocument();

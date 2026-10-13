@@ -8,6 +8,9 @@ name: Merge Queue Green Enroll
 # promote and a red main are separate issues from source admission, so green
 # PRs keep entering the native queue while promotion is held.
 #
+# The only writer that puts PRs into the merge queue (Auto-Merge Default's
+# auto-merge arming and hourly triage were retired as duplicates of this
+# workflow and of the lanes stuck-PR ladder).
 # Enqueues open, non-draft, same-repo PRs into main whose required checks are
 # green with no conflicts (mergeStateStatus CLEAN, HAS_HOOKS or UNSTABLE: an
 # UNSTABLE head only has a non-required check pending or red, which the
@@ -26,8 +29,11 @@ on:
   workflow_run:
     workflows: ['Source Validation', 'CI', 'Fork PR Gate', 'PR Size Guard']
     types: [completed]
+  # ready_for_review: leaving draft emits no check completion (JOV-INV-029:
+  # an unchanged head never earns a second CI flight), so this is the wake
+  # that admits an already-green head. Sole ready_for_review subscriber.
   pull_request_target:
-    types: [labeled, unlabeled, reopened, synchronize]
+    types: [labeled, unlabeled, reopened, ready_for_review, synchronize]
   # Event-driven reconciliation (JOV-7589): every landing on main re-scans the
   # roster (re-enrolls green heads whose dequeue left no wake) and re-checks
   # hold receipts, so neither waits on a timer. Pushes coalesce into the one
@@ -119,6 +125,7 @@ jobs:
     if: >-
       always() &&
       github.event.action != 'labeled' &&
+      (github.event_name != 'pull_request_target' || github.event.pull_request.draft == false) &&
       (github.event_name != 'workflow_run' ||
        (github.event.workflow_run.conclusion == 'success' &&
         (github.event.workflow_run.event == 'pull_request' ||

@@ -1,14 +1,14 @@
 import 'server-only';
 
 import { env } from '@/lib/env-server';
-import { PLAN_PRICES, toCents } from './plan-prices';
+import { ARTIST_VISIBILITY_OFFER, PLAN_PRICES, toCents } from './plan-prices';
 
 export const PRICING = {
   pro: {
     monthly: {
       priceId: env.STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY,
       amount: toCents(PLAN_PRICES.pro.monthly),
-      label: 'Pro',
+      label: ARTIST_VISIBILITY_OFFER.pro.displayName,
       entitlementPlan: 'pro',
       billingTier: 'pro',
       interval: 'month',
@@ -16,7 +16,7 @@ export const PRICING = {
     annual: {
       priceId: env.STRIPE_PRICE_PRO_ANNUAL || env.STRIPE_PRICE_PRO_YEARLY,
       amount: toCents(PLAN_PRICES.pro.yearly),
-      label: 'Pro Annual',
+      label: `${ARTIST_VISIBILITY_OFFER.pro.displayName} Annual`,
       entitlementPlan: 'pro',
       billingTier: 'pro',
       interval: 'year',

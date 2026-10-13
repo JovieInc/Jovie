@@ -125,7 +125,7 @@ test.describe('/new landing page', () => {
       '$0'
     );
     await expect(page.getByTestId('marketing-pricing-plan-pro')).toContainText(
-      'Pro'
+      'Artist Presence'
     );
     await expect(page.getByTestId('marketing-pricing-plan-pro')).toContainText(
       '$199'

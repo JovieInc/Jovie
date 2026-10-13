@@ -11,7 +11,14 @@ name: Summer Eve identity check
 on:
   workflow_dispatch:
   schedule:
-    - cron: '*/30 * * * *'
+    # Hourly: summer.jov.ie deploys from JovieInc/summer-config, which sends
+    # this repository no event, so the identity readback needs a clock. A
+    # Summer identity regression is advisory (no Jovie traffic depends on the
+    # hourly result), so */30 bought nothing an hour does not.
+    - cron: '17 * * * *'
+  # Every PR runs only the cheap pin guard. The identity readback boots a second
+  # runner only when the PR touches the Summer bridge (one job instead of two on
+  # ~440 PR events/day).
   pull_request:
 
 permissions:
@@ -26,48 +33,59 @@ jobs:
     name: Reject Summer deployment pins
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      identity: ${{ steps.scope.outputs.identity }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # A PR checkout is the test merge commit; depth 2 keeps its base parent.
+          fetch-depth: 2
           persist-credentials: false
+
+      - name: Decide whether identity must be read
+        id: scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" != "pull_request" ]; then
+            echo "identity=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # HEAD^1 of the merge commit is the base head, so this is exactly the
+          # PR's change set. An unreadable parent fails closed onto the check.
+          if ! changed="$(git diff --name-only HEAD^1 HEAD)"; then
+            echo "identity=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if printf '%s\n' "$changed" | grep -Eq '^(apps/web/lib/ovie/summer-|apps/web/lib/env-server-schema.ts|scripts/check-summer-eve-pin.ts|.github/workflows/summer-eve-pin.yml|docs/operations/SUMMER_REPOSITORY_SEPARATION.md|docs/CRON_REGISTRY.md)'; then
+            echo "identity=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "identity=false" >> "$GITHUB_OUTPUT"
+            echo "Summer identity files unchanged."
+          fi
 
       - name: Fail on Summer deployment pins
         run: node --test scripts/summer-deployment-pin-guard.test.mjs
 
   check:
     name: Check production Summer identity
+    needs: guard
+    # A red pin guard must not hide an identity regression on the schedule.
+    if: ${{ always() && needs.guard.outputs.identity == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
           persist-credentials: false
 
-      - name: Decide whether identity must be read
-        id: gate
-        run: |
-          set -euo pipefail
-          if [ "${{ github.event_name }}" != "pull_request" ]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          git fetch --no-tags origin "${{ github.base_ref }}"
-          if git diff --name-only "origin/${{ github.base_ref }}...HEAD" | grep -Eq '^(apps/web/lib/ovie/summer-|apps/web/lib/env-server-schema.ts|scripts/check-summer-eve-pin.ts|.github/workflows/summer-eve-pin.yml|docs/operations/SUMMER_REPOSITORY_SEPARATION.md|docs/CRON_REGISTRY.md)$'; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=false" >> "$GITHUB_OUTPUT"
-            echo "Summer identity files unchanged."
-          fi
-
       - name: Setup Node and pnpm
-        if: steps.gate.outputs.run == 'true'
         uses: ./.github/actions/setup-node-pnpm
 
       - name: Check source-bound production Summer
-        if: steps.gate.outputs.run == 'true'
         env:
           SUMMER_PIN_CHECK_VERCEL_TOKEN: ${{ secrets.SUMMER_PIN_CHECK_VERCEL_TOKEN }}
         run: pnpm check:summer-eve-pin

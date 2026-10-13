@@ -134,3 +134,102 @@ jobs:
           if [ "$DRY_RUN" = "true" ]; then flag=--dry-run; fi
           node scripts/invariants/screen-audit.mjs --artifacts "$EVIDENCE_DIR" \
             --out "$RUNNER_TEMP/screen-audit.json" --file $flag
+
+  # Time bombs: a test that reads the real clock against a fixed fixture date
+  # turns main red the moment that date passes (2026-10-13 00:00Z,
+  # tests/unit/ovie/mcp-handler.test.ts). Run the suites a week ahead, off the
+  # PR and merge-group path, and file one fingerprinted issue per file that
+  # passes today but fails ahead (scripts/time-bomb/scan.mjs).
+  time-bombs:
+    name: Run tests a week ahead (${{ matrix.suite }} ${{ matrix.shard }})
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '11 8 * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { suite: web, shard: 1/6 }
+          - { suite: web, shard: 2/6 }
+          - { suite: web, shard: 3/6 }
+          - { suite: web, shard: 4/6 }
+          - { suite: web, shard: 5/6 }
+          - { suite: web, shard: 6/6 }
+          - { suite: scripts, shard: all }
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Load quarantined unit tests
+        id: quarantine
+        run: node .github/scripts/quarantine-ledger.mjs emit-github-output
+
+      - name: Run with the clock a week ahead
+        env:
+          SUITE: ${{ matrix.suite }}
+          SHARD: ${{ matrix.shard }}
+          UNIT_EXCLUDES: ${{ steps.quarantine.outputs.unit_excludes }}
+          NODE_OPTIONS: --max-old-space-size=3072
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/time-bombs.json"
+          if [ "$SUITE" = web ]; then
+            # shellcheck disable=SC2086 # UNIT_EXCLUDES is a list of --exclude flags.
+            node scripts/time-bomb/scan.mjs run --suite web --shard "$SHARD" --out "$out" -- $UNIT_EXCLUDES
+          else
+            node scripts/time-bomb/scan.mjs run --suite scripts --out "$out"
+          fi
+
+      - name: Upload findings
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: time-bombs-${{ matrix.suite }}-${{ strategy.job-index }}
+          path: ${{ runner.temp }}/time-bombs.json
+          retention-days: 7
+
+  time-bombs-file:
+    name: File time-bomb issues
+    needs: time-bombs
+    if: always() && !cancelled() && needs.time-bombs.result != 'skipped'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Download findings
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: time-bombs-*
+          path: ${{ runner.temp }}/time-bombs
+
+      - name: File one issue per time-bombed test file
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          shopt -s globstar nullglob
+          files=("$RUNNER_TEMP"/time-bombs/**/time-bombs.json)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "::error::No time-bomb findings were uploaded; every scan shard failed."
+            exit 1
+          fi
+          node scripts/time-bomb/scan.mjs file "${files[@]}"

@@ -105,7 +105,22 @@ export const COPY_GATE_COMMAND =
  * Each runs here when the diff touches a file it reads. `prOnly` guards
  * already run in every web merge group and push, so they run on PRs only.
  */
+/** Repo-wide web unit guards; see runMergeGroupGuards. */
+export const MERGE_GROUP_GUARDS_COMMAND =
+  'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system tests/unit/analytics-metrics-layer-guard.test.ts tests/unit/marketing/locked-pen-chrome-contract.test.ts';
+
 export const SOURCE_GUARDS = Object.freeze([
+  Object.freeze({
+    // The repo-wide design-system, metrics-layer and locked Pen chrome
+    // guards (~42s) ran only in ci-fast, i.e. merge groups: group pr-21458
+    // (2026-10-13) was ejected because a PR added text-destructive to
+    // OutboundRail.tsx and tripped destructive-red-drift-ratchet. They read
+    // web source from disk, so any web change can trip them.
+    id: 'merge-group-unit-guards',
+    command: MERGE_GROUP_GUARDS_COMMAND,
+    inputs: /^(?:apps\/web\/(?!tests\/e2e\/)|packages\/ui\/)/u,
+    prOnly: true,
+  }),
   Object.freeze({
     id: 'ci-schedule-inventory',
     command:
@@ -426,7 +441,6 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/lib/__tests__/web-source-read-tests.test.mjs',
   '.github/scripts/customer-notes-ready.test.js',
-  '.github/scripts/auto-merge-stuck-triage.test.js',
   '.claude/hooks/post-task-validate.test.mjs',
   '.claude/hooks/prod-db-session-guard.test.mjs',
   'scripts/agent-context/check.test.mjs',
@@ -470,6 +484,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/hooks/pre-push-gate.test.mjs',
   'scripts/idea-radar/idea-radar.test.mjs',
   'scripts/invariants/assurance-matrix.test.mjs',
+  'scripts/time-bomb/scan.test.mjs',
   'scripts/invariants/model-audit-contract.test.mjs',
   'scripts/invariants/pr-lifecycle-contract.test.mjs',
   'scripts/invariants/quality-saturation.test.mjs',
@@ -537,6 +552,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/blog-publish-latency.test.mjs',
   'scripts/lib/__tests__/nightly-agent-workflow.test.mjs',
   'scripts/lib/__tests__/stryker-babel-compatibility.test.mjs',
+  'scripts/lib/__tests__/mutation-diff.test.mjs',
   'scripts/lib/__tests__/actions-cache-supersede.test.mjs',
   'scripts/lib/__tests__/ci-dependency-workspace.test.mjs',
   'scripts/lib/__tests__/agent-branch-pattern.test.mjs',
@@ -737,8 +753,7 @@ const LANES = [
   {
     id: 'merge-group-guards',
     name: 'Merge-group unit guards',
-    nextLocalCommand:
-      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system tests/unit/analytics-metrics-layer-guard.test.ts tests/unit/marketing/locked-pen-chrome-contract.test.ts',
+    nextLocalCommand: MERGE_GROUP_GUARDS_COMMAND,
     run: runMergeGroupGuards,
   },
   {
@@ -2310,6 +2325,7 @@ export async function runStructural(opts = {}) {
     'node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/shipping-lead-gate.mjs --test-coverage-lines=95 --test-coverage-branches=80 --test-coverage-functions=95 scripts/backlog-orchestrator/__tests__/shipping-lead-gate.test.mjs',
     'node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/summer-shipping-lead-contract.mjs --test-coverage-lines=95 --test-coverage-branches=80 --test-coverage-functions=95 scripts/backlog-orchestrator/__tests__/summer-shipping-lead-contract.test.mjs',
     'python3 scripts/fleet-gate/tests/test_evaluate_fleet_gate.py',
+    'python3 scripts/fleet-gate/tests/test_receipt_writer.py',
     'node --test scripts/backlog-orchestrator/__tests__/pre-lease-gates.test.mjs',
     'node --test scripts/backlog-orchestrator/__tests__/gate-next-hold.test.mjs',
     'node --test scripts/backlog-orchestrator/__tests__/ownership-inventory.test.mjs',
