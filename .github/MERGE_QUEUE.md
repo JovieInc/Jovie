@@ -291,6 +291,10 @@ JovieInc/Jovie`. After flipping the variable, also run
 and disarm every PR it prints. `scripts/merge-queue-green-enroll.test.mjs` fails if a job
 that can enqueue or arm lacks the guard.
 
+After a breaker dequeue, restore the snapshot directly, or release each PR
+with `hold` then unhold: green enroll does not re-admit a manually dequeued,
+unchanged head.
+
 To admit one PR without a roster sweep, dispatch green enroll with
 `gh workflow run merge-queue-green-enroll.yml -f pr_number=N -R JovieInc/Jovie`.
 
