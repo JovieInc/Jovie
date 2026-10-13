@@ -132,12 +132,16 @@ vi.mock('@/components/organisms/table', () => ({
   },
   convertToCommonDropdownItems: vi.fn(() => []),
   ExportCSVButton: () => null,
+  TableBulkActionsToolbar: ({ selectedCount }: { selectedCount: number }) => (
+    <div data-testid='audience-bulk-bar' data-count={selectedCount} />
+  ),
   useRowSelection: () => ({
     selectedIds: new Set<string>(),
     isSelected: () => false,
     toggleSelect: vi.fn(),
     toggleSelectAll: vi.fn(),
     clearSelection: vi.fn(),
+    setSelection: vi.fn(),
   }),
 }));
 

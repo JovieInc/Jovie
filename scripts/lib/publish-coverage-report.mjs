@@ -28,6 +28,32 @@ const NIGHTLY = {
     'Publication does not imply that the nightly tests passed; inspect the recorded workflow conclusion and evidence warnings.',
 };
 
+// A report PR still in flight absorbs newer measurements for this long. Both
+// producers run on most pushes to main, so one PR per run opened 45 of the 113
+// PRs on 2026-10-12, and 162 of 199 PRs closed unmerged in the week before were
+// superseded report drafts. The window bounds staleness; a report PR that has
+// not landed after it is replaced and retired as before.
+export const REPORT_COALESCE_MS = 6 * 60 * 60 * 1000;
+
+/** The open report PR of this profile created within the coalesce window. */
+export function inFlightReport(
+  openPrs,
+  branch,
+  now,
+  windowMs = REPORT_COALESCE_MS
+) {
+  const owned = new RegExp(`^bot/${branch}-[1-9]\\d*-[1-9]\\d*$`);
+  return (
+    openPrs
+      .filter(
+        pr =>
+          owned.test(pr.headRefName ?? '') &&
+          now - Date.parse(pr.createdAt) < windowMs
+      )
+      .sort((a, b) => b.number - a.number)[0] ?? null
+  );
+}
+
 // The audited commit stays the parent: never rebase measured data onto a
 // different source revision. Publication is a draft PR, subject to normal CI.
 function publishReport(
@@ -36,6 +62,7 @@ function publishReport(
     env = process.env,
     gh = args =>
       execFileSync('gh', args, { cwd, env, encoding: 'utf8' }).trim(),
+    now = Date.now(),
   } = {},
   profile = COVERAGE
 ) {
@@ -63,6 +90,35 @@ function publishReport(
     throw new Error('Refusing to publish unrelated tracked changes');
   }
   if (changed.length === 0) return { status: 'unchanged', source };
+  const inFlight = inFlightReport(
+    JSON.parse(
+      gh([
+        'pr',
+        'list',
+        '--repo',
+        repo,
+        '--state',
+        'open',
+        '--base',
+        'main',
+        '--limit',
+        '1000',
+        '--json',
+        'number,headRefName,createdAt',
+      ]) || '[]'
+    ),
+    profile.branch,
+    now
+  );
+  if (inFlight) {
+    if (env.GITHUB_STEP_SUMMARY) {
+      appendFileSync(
+        env.GITHUB_STEP_SUMMARY,
+        `Report coalesced into #${inFlight.number}; measured source ${source} not published.\n`
+      );
+    }
+    return { status: 'coalesced', source, into: inFlight.number };
+  }
 
   // A rerun has its own attempt ref. Never force-push or replace another report.
   const branch = `bot/${profile.branch}-${runId}-${attempt}`;

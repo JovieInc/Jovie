@@ -202,12 +202,29 @@ function AvatarStatusDot({ status, size, className }: AvatarStatusDotProps) {
 // Higher-level UserAvatar
 // ---------------------------------------------------------------------------
 
-/** Derive up-to-2-char initials from a full name string. */
+function firstGrapheme(word: string): string {
+  const Segmenter = (
+    globalThis as { Intl?: { Segmenter?: typeof Intl.Segmenter } }
+  ).Intl?.Segmenter;
+  if (!Segmenter) return Array.from(word)[0] ?? '';
+  const first = new Segmenter(undefined, { granularity: 'grapheme' })
+    .segment(word)
+    [Symbol.iterator]()
+    .next();
+  return first.done ? '' : first.value.segment;
+}
+
+/**
+ * Derive up-to-2-char initials from a full name string. Grapheme-safe, so
+ * emoji-prefixed, CJK, and combining-mark names never split a character.
+ */
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/);
   if (parts.length === 0 || parts[0] === '') return '?';
-  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
-  return (parts[0].charAt(0) + (parts.at(-1) || '').charAt(0)).toUpperCase();
+  if (parts.length === 1) return firstGrapheme(parts[0]).toUpperCase();
+  return (
+    firstGrapheme(parts[0]) + firstGrapheme(parts.at(-1) ?? '')
+  ).toUpperCase();
 }
 
 export interface UserAvatarProps {

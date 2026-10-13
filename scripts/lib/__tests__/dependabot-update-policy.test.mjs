@@ -466,20 +466,18 @@ describe('Dependabot reconciliation workflow contract', () => {
     expect(WORKFLOW).not.toContain('gh pr merge --auto');
   });
 
-  it('records native auto-merge intent only after certification and classification', () => {
-    expect(WORKFLOW).toContain('scripts/native-merge-intent.mjs');
-    expect(
-      readFileSync(
-        resolve(REPO_ROOT, 'scripts/native-merge-intent.mjs'),
-        'utf8'
-      )
-    ).toContain('--match-head-commit');
-    expect(WORKFLOW).not.toContain('gh pr merge --auto');
+  it('never arms auto-merge: green enroll is the sole queue writer', () => {
+    expect(WORKFLOW).not.toContain('native-merge-intent');
+    expect(WORKFLOW).not.toMatch(/--auto\b/);
+    expect(WORKFLOW).not.toContain('enablePullRequestAutoMerge');
+    expect(WORKFLOW).not.toContain('enqueuePullRequest');
+    expect(WORKFLOW).not.toMatch(
+      /steps\.policy\.outputs\.decision == 'queue'$/m
+    );
     expect(WORKFLOW).toContain('permission-checks: read');
     expect(WORKFLOW).toContain('permission-contents: write');
     expect(WORKFLOW).toContain('permission-pull-requests: write');
     expect(WORKFLOW).toContain('permission-statuses: read');
-    expect(WORKFLOW).toMatch(/steps\.policy\.outputs\.decision == 'queue'$/m);
     expect(WORKFLOW).toContain(
       "steps.policy.outputs.decision == 'queue-recovered'"
     );
@@ -492,13 +490,15 @@ describe('Dependabot reconciliation workflow contract', () => {
 });
 
 describe('Dependabot discovery contract', () => {
-  it('checks npm every weekday without the observed ten-slot starvation', () => {
+  it('checks npm weekly (grouped) without the observed ten-slot starvation', () => {
     const npm = CONFIG.match(
       /  - package-ecosystem: 'npm'[\s\S]*?(?=\n  - package-ecosystem:|$)/
     )?.[0];
 
     expect(npm).toBeTruthy();
-    expect(npm).toContain("interval: 'daily'");
+    // Weekly since 2026-10-12: daily single-package PRs each cost a full
+    // merge group. Grouping keeps the PR count far below the 25-slot limit.
+    expect(npm).toContain("interval: 'weekly'");
     expect(npm).toContain('open-pull-requests-limit: 25');
     expect(npm).toContain('semver-patch-days: 1');
     expect(npm).toContain('semver-minor-days: 3');
@@ -528,7 +528,7 @@ describe('Dependabot discovery contract', () => {
 });
 
 describe('Dependabot npm grouping (JOV-6837)', () => {
-  it('lands the vitest family and dev patches as single PRs, never majors', () => {
+  it('lands the vitest family and dev non-major bumps as single weekly PRs, never majors', () => {
     const npm = CONFIG.slice(
       0,
       CONFIG.indexOf("package-ecosystem: 'github-actions'")
@@ -537,7 +537,18 @@ describe('Dependabot npm grouping (JOV-6837)', () => {
       /vitest:\n\s+patterns:\n\s+- 'vitest'\n\s+- '@vitest\/\*'\n\s+update-types:\n\s+- 'minor'\n\s+- 'patch'/
     );
     expect(npm).toMatch(
-      /dev-patch:\n\s+dependency-type: 'development'\n\s+update-types:\n\s+- 'patch'\n/
+      /dev-non-major:\n\s+dependency-type: 'development'\n\s+update-types:\n\s+- 'minor'\n\s+- 'patch'\n/
+    );
+    expect(npm).toMatch(/schedule:\n\s+interval: 'weekly'/);
+  });
+
+  it('groups non-major GitHub Actions bumps into one PR, majors stay separate', () => {
+    const actions = CONFIG.slice(
+      CONFIG.indexOf("package-ecosystem: 'github-actions'"),
+      CONFIG.indexOf("package-ecosystem: 'docker'")
+    );
+    expect(actions).toMatch(
+      /actions-non-major:\n\s+patterns:\n\s+- '\*'\n\s+update-types:\n\s+- 'minor'\n\s+- 'patch'/
     );
   });
 

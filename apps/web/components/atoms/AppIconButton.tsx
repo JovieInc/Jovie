@@ -27,6 +27,8 @@ export type AppIconButtonProps = Omit<
     readonly children: React.ReactNode;
     readonly tooltipLabel?: string;
     readonly tooltipShortcut?: string;
+    /** Container size: sm 28px (app-control default) or md 32px (JOV-5063). */
+    readonly size?: 'sm' | 'md';
   };
 
 /**
@@ -46,6 +48,7 @@ export const AppIconButton = React.forwardRef<
     'aria-label': ariaLabelProp,
     tooltipLabel,
     tooltipShortcut,
+    size = 'sm',
     className,
     ...props
   },
@@ -57,7 +60,7 @@ export const AppIconButton = React.forwardRef<
     <IconButton
       ref={ref}
       variant='control'
-      size='sm'
+      size={size}
       className={className}
       aria-label={resolvedAriaLabel}
       {...props}

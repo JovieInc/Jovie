@@ -3634,6 +3634,17 @@ describe('deterministic Symphony admission boundary', () => {
       assert.equal(gate.state, greenFleetGate().state);
     });
 
+    it('keeps it current across one 5-minute lanes tick plus its runtime', () => {
+      const gate = admitter.evaluateFleetGate(
+        fleetEvidence({
+          inputGeneration: 'gen-1',
+          emitter: liveEmitter({ tickAt: '2026-08-09T05:22:00.000Z' }),
+        }),
+        { now: NOW }
+      );
+      for (const code of stale) assert.ok(!codes(gate).includes(code), code);
+    });
+
     it('deliberate red: fails closed when live main moved past the receipt', () => {
       const gate = admitter.evaluateFleetGate(
         fleetEvidence({

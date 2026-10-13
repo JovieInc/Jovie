@@ -45,6 +45,7 @@ import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActio
 import { DashboardHeaderActionButton } from '@/components/features/dashboard/atoms/DashboardHeaderActionButton';
 import { DashboardHeaderActionGroup } from '@/components/features/dashboard/atoms/DashboardHeaderActionGroup';
 import {
+  PRESENCE_BUTTON_DESKTOP_DENSITY,
   PresenceSignalList,
   PresenceStatusBadge,
 } from '@/components/features/presence/PresenceStatusParts';
@@ -532,7 +533,7 @@ function TypeCell({ row }: Readonly<{ row: ProfileWorkspaceRow }>) {
         role='img'
         aria-label={`${label} profile type`}
         className={cn(
-          'inline-flex h-7 w-7 items-center justify-center',
+          'inline-flex h-8 w-8 items-center justify-center',
           row.kind === 'jovie' ? 'text-accent' : 'text-tertiary-token'
         )}
       >
@@ -651,7 +652,7 @@ function ConnectionRail({
           <EntityHeader
             thumbnail={
               row.rowType === 'connector' ? (
-                <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-subtle bg-surface-0'>
+                <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-subtle bg-surface-0'>
                   <ConnectionBrandIcon
                     row={row}
                     className='h-6 w-6'
@@ -818,7 +819,12 @@ function ConnectionRail({
                           : 'grid-cols-2'
                       )}
                     >
-                      <Button asChild variant='secondary' size='sm'>
+                      <Button
+                        asChild
+                        variant='secondary'
+                        size='sm'
+                        className={PRESENCE_BUTTON_DESKTOP_DENSITY}
+                      >
                         <Link
                           href={row.url}
                           target={
@@ -841,7 +847,11 @@ function ConnectionRail({
                       !(
                         primaryAction === 'review' && row.rowType === 'surface'
                       ) ? (
-                        <Button asChild size='sm'>
+                        <Button
+                          asChild
+                          size='sm'
+                          className={PRESENCE_BUTTON_DESKTOP_DENSITY}
+                        >
                           <Link
                             href={
                               primaryAction === 'upgrade'
@@ -967,6 +977,7 @@ function IdentityConfirmationSection({
               variant={decision === 'yes' ? 'primary' : 'secondary'}
               loading={pendingDecision === decision}
               disabled={pendingDecision !== null}
+              className={PRESENCE_BUTTON_DESKTOP_DENSITY}
               onClick={() => void decide(decision)}
             >
               {decision === 'yes' ? 'Yes' : decision === 'no' ? 'No' : 'Unsure'}
@@ -1092,6 +1103,7 @@ function SuggestedConnectionsState({
               type='button'
               variant='secondary'
               size='sm'
+              className={PRESENCE_BUTTON_DESKTOP_DENSITY}
               onClick={onRetry}
             >
               <RefreshCw className='h-3.5 w-3.5' aria-hidden /> Try Again
@@ -1164,7 +1176,10 @@ function SuggestedConnectionRow({
           ref={registerActionRef(suggestion.id, 'accept')}
           type='button'
           size='sm'
-          className='w-full whitespace-nowrap sm:w-auto'
+          className={cn(
+            PRESENCE_BUTTON_DESKTOP_DENSITY,
+            'w-full whitespace-nowrap sm:w-auto'
+          )}
           onClick={() => onAction(suggestion, 'accept')}
         >
           <CircleCheck className='h-3.5 w-3.5' aria-hidden /> Add
@@ -1174,7 +1189,10 @@ function SuggestedConnectionRow({
           type='button'
           variant='secondary'
           size='sm'
-          className='w-full whitespace-nowrap sm:w-auto'
+          className={cn(
+            PRESENCE_BUTTON_DESKTOP_DENSITY,
+            'w-full whitespace-nowrap sm:w-auto'
+          )}
           onClick={() => onAction(suggestion, 'reject')}
         >
           {/* ui-casing-allow: canonical sentence-case identity-rejection label, pinned by ProfilesWorkspace.test */}
@@ -1246,7 +1264,7 @@ function SuggestedConnectionsReview({
               data-suggestion-identity={group.id}
               className='min-w-0 border-b border-subtle last:border-b-0'
             >
-              <div className='flex min-h-9 items-center justify-between gap-2 border-b border-subtle bg-surface-2 px-3'>
+              <div className='flex min-h-8 items-center justify-between gap-2 border-b border-subtle bg-surface-2 px-3'>
                 <span className='truncate text-2xs font-medium text-secondary-token'>
                   Add canonical {group.identity} profile
                 </span>
@@ -1748,7 +1766,7 @@ function ProfilesWorkspaceContent({
                   aria-label={`Actions for ${row.label}`}
                   onClick={event => event.stopPropagation()}
                   onKeyDown={event => event.stopPropagation()}
-                  className='inline-flex h-11 w-11 items-center justify-center rounded-full border border-transparent bg-transparent text-tertiary-token transition-colors duration-fast hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus/50 sm:h-7 sm:w-7'
+                  className='inline-flex h-11 w-11 items-center justify-center rounded-full border border-transparent bg-transparent text-tertiary-token transition-colors duration-fast hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus/50 sm:h-8 sm:w-8'
                 >
                   <MoreHorizontal className='h-4 w-4' aria-hidden />
                 </button>

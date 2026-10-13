@@ -5,12 +5,18 @@ import {
   buildCommentBody,
   buildPrompt,
   callGateway,
+  changedPathsFromDiff,
   findReviewComment,
+  globToRegExp,
   HARD_SKIP_DIFF_CHARS,
+  loadRuleContext,
   MARKER,
   MAX_DIFF_CHARS,
+  MAX_RULE_CHARS,
+  MAX_RULE_CONTEXT_CHARS,
   main,
   parseEnv,
+  RULE_SCOPES_PATH,
   run,
 } from './internal-pr-review.mjs';
 
@@ -31,7 +37,12 @@ const jsonResponse = body => ({
 });
 
 /** Fake fetch routing GitHub + gateway calls for run()/main() tests. */
-function fakeFetch({ comments = [], diff = '@@ small diff @@', gateway }) {
+function fakeFetch({
+  comments = [],
+  diff = '@@ small diff @@',
+  gateway,
+  headSha = HEAD_SHA,
+}) {
   const calls = [];
   const fetchImpl = async (url, init = {}) => {
     calls.push({ body: init.body, method: init.method ?? 'GET', url });
@@ -46,7 +57,11 @@ function fakeFetch({ comments = [], diff = '@@ small diff @@', gateway }) {
     if (url.includes('/pulls/')) {
       if (init.headers?.accept === 'application/vnd.github.v3.diff')
         return { ok: true, status: 200, text: async () => diff };
-      return jsonResponse({ changed_files: 3, title: 'test pr' });
+      return jsonResponse({
+        changed_files: 3,
+        head: headSha ? { sha: headSha } : undefined,
+        title: 'test pr',
+      });
     }
     if (url.includes('/issues/comments/') && init.method === 'PATCH')
       return jsonResponse({ id: 7 });
@@ -282,5 +297,138 @@ describe('internal-pr-review run', () => {
       () => {}
     );
     assert.equal(code, 0);
+  });
+});
+
+describe('internal-pr-review head binding and dispatch', () => {
+  it('accepts a dispatch environment without an event head', () => {
+    const config = parseEnv({ ...ENV, PR_HEAD_SHA: '' });
+    assert.equal(config.headSha, undefined);
+  });
+
+  it('skips a stale event head without calling the model', async () => {
+    const { calls, fetchImpl } = fakeFetch({
+      gateway: { body: {} },
+      headSha: 'b'.repeat(40),
+    });
+    const result = await run({ env: ENV, fetchImpl, log: () => {} });
+    assert.equal(result.outcome, 'stale');
+    assert.equal(
+      calls.some(
+        c => c.url.includes('/chat/completions') || c.method === 'POST'
+      ),
+      false
+    );
+  });
+
+  it('stamps the live head on a dispatch run', async () => {
+    const live = 'c'.repeat(40);
+    const { calls, fetchImpl } = fakeFetch({
+      gateway: { body: { choices: [{ message: { content: 'ok' } }] } },
+      headSha: live,
+    });
+    const env = { ...ENV, PR_HEAD_SHA: '' };
+    const result = await run({ env, fetchImpl, log: () => {} });
+    assert.equal(result.outcome, 'reviewed');
+    const post = calls.find(
+      c => c.method === 'POST' && c.url.includes('/issues/')
+    );
+    assert.ok(post.body.includes(`head-sha:${live}`));
+  });
+
+  it('skips when no head SHA can be resolved', async () => {
+    const { fetchImpl } = fakeFetch({ gateway: { body: {} }, headSha: null });
+    const env = { ...ENV, PR_HEAD_SHA: '' };
+    const result = await run({ env, fetchImpl, log: () => {} });
+    assert.deepEqual(result, { outcome: 'skipped', reason: 'head' });
+  });
+});
+
+describe('internal-pr-review convention context', () => {
+  const scopes = JSON.stringify([
+    { file: '.claude/rules/db.md', paths: ['**/db/**'] },
+    { file: '.claude/rules/code-style.md', paths: ['**/*.ts'] },
+    { file: '.claude/rules/ci.md', paths: ['.github/**', 'scripts/ci-*'] },
+    { file: '.claude/rules/big.md', paths: ['big/**'] },
+    { file: '.claude/rules/gone.md', paths: ['**/*.ts'] },
+    { paths: ['x'] },
+  ]);
+  const files = {
+    '.claude/rules/big.md': 'B'.repeat(MAX_RULE_CHARS),
+    '.claude/rules/ci.md': 'CI rule',
+    '.claude/rules/code-style.md': 'style',
+    '.claude/rules/db.md': 'D'.repeat(MAX_RULE_CHARS + 10),
+    [RULE_SCOPES_PATH]: scopes,
+  };
+  const readFile = path => {
+    if (!(path in files)) throw new Error('ENOENT');
+    return files[path];
+  };
+
+  it('reads changed paths from diff headers', () => {
+    assert.deepEqual(
+      changedPathsFromDiff(
+        'diff --git a/old.ts b/new.ts\n+x\ndiff --git a/c.md b/c.md\n'
+      ),
+      ['old.ts', 'new.ts', 'c.md']
+    );
+  });
+
+  it('matches repo glob shapes', () => {
+    assert.ok(globToRegExp('**/db/**').test('apps/web/lib/db/schema.ts'));
+    assert.ok(globToRegExp('**/db/**').test('db/x.ts'));
+    assert.ok(globToRegExp('scripts/ci-*').test('scripts/ci-a.mjs'));
+    assert.equal(globToRegExp('scripts/ci-*').test('scripts/ci-a/b'), false);
+    assert.ok(globToRegExp('a?.ts').test('ab.ts'));
+    assert.equal(globToRegExp('a.ts').test('abts'), false);
+  });
+
+  it('includes specific matching rules, bounded, skipping catch-alls', () => {
+    const context = loadRuleContext(
+      ['apps/web/lib/db/schema.ts', 'scripts/ci-x.mjs', 'big/a'],
+      readFile
+    );
+    assert.deepEqual(context.files, [
+      '.claude/rules/db.md',
+      '.claude/rules/ci.md',
+    ]);
+    assert.ok(context.text.length <= MAX_RULE_CONTEXT_CHARS + 200);
+    assert.equal(context.text.includes('style'), false);
+  });
+
+  it('degrades to empty context on missing or malformed scopes', () => {
+    assert.deepEqual(
+      loadRuleContext(['a'], () => 'not json'),
+      {
+        files: [],
+        text: '',
+      }
+    );
+    assert.deepEqual(
+      loadRuleContext(['a'], () => '{}'),
+      {
+        files: [],
+        text: '',
+      }
+    );
+  });
+
+  it('puts conventions in the prompt and cites them in the comment', () => {
+    const { prompt } = buildPrompt({
+      changedFiles: 1,
+      diff: 'd',
+      prNumber: 1,
+      rules: 'RULE TEXT',
+      title: 't',
+    });
+    assert.match(prompt, /Repo conventions[\s\S]*RULE TEXT/);
+    const body = buildCommentBody({
+      headSha: HEAD_SHA,
+      model: 'm',
+      outcome: 'reviewed',
+      ruleFiles: ['.claude/rules/db.md'],
+      text: 'x',
+    });
+    assert.match(body, /Conventions checked: \.claude\/rules\/db\.md/);
   });
 });

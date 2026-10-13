@@ -289,7 +289,7 @@ describe('signup page', () => {
     });
     expect(screen.queryByTestId('auth-offer-summary')).not.toBeInTheDocument();
     expect(
-      screen.queryByText('Start your 14-day Pro trial')
+      screen.queryByText('Start your 14-day Artist Presence trial')
     ).not.toBeInTheDocument();
   });
 

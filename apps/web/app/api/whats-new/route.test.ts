@@ -162,9 +162,18 @@ it('projects the actual published hero and exact post destination into the daily
         fixed: [],
         removed: [],
       },
-      customerOutcomes: {
-        [bullet]: { availability: 'unverified', prerequisites: [] },
-      },
+      customerOutcomes: [
+        {
+          storyId: 'profile-links',
+          entryId: 'customer-update:profile-links',
+          slug: 'update-profile-links',
+          aliases: [],
+          summary: bullet,
+          section: 'added',
+          availability: 'unverified',
+          prerequisites: [],
+        },
+      ],
     },
   ]);
   const { prompt } = await (await GET()).json();

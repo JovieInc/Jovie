@@ -119,9 +119,16 @@ final class JovieUITests: XCTestCase {
       app.buttons["Close Public Profile"].waitForExistence(timeout: 3),
       "Embedded public-profile browser did not open.\n\(app.debugDescription)"
     )
-    XCTAssertTrue(app.buttons["Back"].exists)
+    let actionsMenu = app.buttons["public-profile-browser-actions"]
+    XCTAssertTrue(
+      actionsMenu.exists,
+      "Public Profile browser must expose exactly one trailing Actions menu.\n\(app.debugDescription)"
+    )
+    actionsMenu.tap()
+    XCTAssertTrue(app.buttons["Back"].waitForExistence(timeout: 3))
     XCTAssertTrue(app.buttons["Forward"].exists)
     XCTAssertTrue(app.buttons["Reload"].exists)
+    app.buttons["Reload"].tap()
     XCTAssertTrue(
       app.staticTexts["Public Profile"].waitForExistence(timeout: 3),
       "Embedded public-profile content did not finish loading.\n\(app.debugDescription)"
