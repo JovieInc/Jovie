@@ -4038,7 +4038,9 @@ class PreservedRecoveryTest(unittest.TestCase):
         for patcher in (patch.object(lane, "sh", side_effect=shell),
                         patch.object(lane, "reconcile_fix_target", side_effect=lambda _: dict(self.live)),
                         patch.object(lane, "install_dependencies"), patch.object(lane, "failure_excerpt", return_value=""),
-                        patch.object(lane.disk_guard, "free_pct", return_value=50)):
+                        patch.object(lane.disk_guard, "free_pct", return_value=50),
+                        # Guard tests below read GitHub on every tick; the throttle has its own test.
+                        patch.object(lane, "AGENT_GUARD_REMOTE_S", 0)):
             patcher.start()
             self.addCleanup(patcher.stop)
 
@@ -4138,6 +4140,29 @@ class PreservedRecoveryTest(unittest.TestCase):
                 receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
         self.assertEqual(receipt["verdict"], "fix-no-change")
         self.assertEqual(receipt["targetUnreadableMidRun"], 2)
+
+    def test_agent_guard_rereads_github_only_every_remote_interval(self):
+        stages = []
+        lane_require = lane.require_fix_target
+        def spy(pr, stage, **kwargs):
+            stages.append(stage)
+            return lane_require(pr, stage, **kwargs)
+        def agent(cmd, cwd, log, timeout, guard=None, **kwargs):
+            for _ in range(5):
+                guard()  # local checks only: the before-agent read is still fresh
+            self.live["state"] = "MERGED"
+            guard()
+            return SimpleNamespace(returncode=0)
+        with patch.object(lane, "AGENT_GUARD_REMOTE_S", 3600), \
+                patch.object(lane, "run_agent", side_effect=agent), \
+                patch.object(lane, "require_fix_target", side_effect=spy), \
+                patch.object(lane, "require_publishable") as publishable:
+            receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+        self.assertNotIn("agent-running", stages)
+        self.assertGreaterEqual(sum(call.args[2] == "agent-running" for call in publishable.call_args_list), 6)
+        # The boundary after the run is still a fresh read and still stops on positive evidence.
+        self.assertIn("after-agent", stages)
+        self.assertEqual(receipt["cancellation"]["stage"], "after-agent")
 
     def test_agent_guard_stops_on_a_sustained_unreadable_target(self):
         def agent(cmd, cwd, log, timeout, guard=None, **kwargs):
@@ -4727,9 +4752,11 @@ class FixRedTest(unittest.TestCase):
                     if stage == "agent-running":
                         kwargs["guard"]()
                     return SimpleNamespace(returncode=0)
+                # The mid-run guard here reads GitHub on every tick (no AGENT_GUARD_REMOTE_S wait).
                 with patch.object(lane, "reconcile_fix_target", side_effect=live), \
                         patch.object(lane, "sh", side_effect=shell), patch.object(lane, "run_agent", side_effect=agent), \
                         patch.object(lane, "failure_excerpt", return_value=""), \
+                        patch.object(lane, "AGENT_GUARD_REMOTE_S", 0), \
                         patch.object(lane.disk_guard, "free_pct", return_value=50.0):
                     receipt = lane.fix_red_pr(host, "codex", {"cmd": ["true"]}, self.pr())
                 self.assertEqual(receipt["verdict"], "cancelled")

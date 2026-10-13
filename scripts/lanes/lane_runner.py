@@ -4794,6 +4794,12 @@ def end_local_fix_attempt(host: Host, pr: dict, receipt: dict) -> None:
 
 # Consecutive unreadable target snapshots the in-run guard tolerates (~90s at its 30s cadence).
 AGENT_GUARD_UNREADABLE_LIMIT = 3
+# While the agent runs, the 30 s guard re-read the full target (up to 6 GraphQL pages) each
+# time: ~120 reads an hour per running fix, the largest single gh cost on Gem (2026-10-12 gh
+# ledger). After a good read the mid-run guard keeps local checks every tick and re-reads
+# GitHub only this often; an unreadable read retries on the next tick, so a sustained outage
+# still stops the run at the same ~90 s. Every boundary around the run stays a fresh read.
+AGENT_GUARD_REMOTE_S = 120
 
 
 class RepairStopped(RuntimeError):
@@ -5233,8 +5239,13 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
     with open(runs / f"{run_id}.log", "w") as log:
         try:
             unreadable = [0]  # consecutive unavailable reads while the agent runs
+            last_read = [None]  # monotonic time of the last good mid-run read
 
             def verify_target(target, stage, *, worktree=None):
+                if (stage == "agent-running" and last_read[0] is not None
+                        and time.monotonic() - last_read[0] < AGENT_GUARD_REMOTE_S):
+                    require_publishable(host, pr["headRefName"], stage)
+                    return None
                 receipt["targetStateReads"] += 1
                 try:
                     live = require_fix_target(target, stage, worktree=worktree, repair=True)
@@ -5252,6 +5263,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                     require_publishable(host, pr["headRefName"], stage)
                     return None
                 unreadable[0] = 0
+                last_read[0] = time.monotonic()
                 require_publishable(host, live.get("headRefName") or pr["headRefName"], stage)
                 return live
             require_disk(host, "repair-checkout")
