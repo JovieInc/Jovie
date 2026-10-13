@@ -151,16 +151,15 @@ describe('ClientProviders composition', () => {
       expect(screen.queryByTestId('core-providers')).not.toBeInTheDocument();
     });
 
-    it('TooltipProvider has correct delay duration', () => {
+    it('delegates tooltip timing to the shared provider', () => {
       render(
         <ClientProviders skipCoreProviders>
           <TestChild />
         </ClientProviders>
       );
 
-      expect(screen.getByTestId('tooltip-provider')).toHaveAttribute(
-        'data-delay',
-        '1200'
+      expect(screen.getByTestId('tooltip-provider')).not.toHaveAttribute(
+        'data-delay'
       );
     });
   });

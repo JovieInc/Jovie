@@ -2,11 +2,10 @@
 
 // @coverage-via apps/web/tests/unit/DrawerHeaderActions.test.tsx
 
-import type { CommonDropdownItem } from '@jovie/ui';
+import { type CommonDropdownItem, IconButton } from '@jovie/ui';
 import type { LucideIcon } from 'lucide-react';
-import { MoreVertical } from 'lucide-react';
+import { MoreVertical, X } from 'lucide-react';
 import Link from 'next/link';
-import { AppIconButton } from '@/components/atoms/AppIconButton';
 import type { TableActionMenuItem } from '@/components/atoms/table-action-menu';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import {
@@ -15,6 +14,11 @@ import {
 } from '@/components/molecules/drawer/menu-items';
 import { cn } from '@/lib/utils';
 
+/**
+ * @deprecated Restyles IconButton (shadcn/no-restyle). Drawer header actions
+ * use the canonical `ghost` / `sm` IconButton; kept only for
+ * DrawerCardActionBar until it migrates.
+ */
 export const DRAWER_HEADER_ICON_BUTTON_CLASSNAME =
   'h-7 w-7 rounded-full border border-transparent bg-transparent shadow-none hover:bg-surface-1 focus-visible:outline-none focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-ring active:bg-surface-1';
 
@@ -84,7 +88,8 @@ export function DrawerHeaderActions({
 
   return (
     <div className='flex items-center gap-0.5'>
-      {/* Primary actions - always visible */}
+      {/* Primary actions - always visible. Canonical ghost/sm IconButton:
+          28px, transparent at rest, surface on hover, shared focus ring. */}
       {displayActions.map(action => {
         const Icon =
           action.isActive && action.activeIcon
@@ -93,19 +98,17 @@ export function DrawerHeaderActions({
 
         if (action.href) {
           return (
-            <AppIconButton
+            <IconButton
               key={action.id}
               asChild
-              className={cn(
-                DRAWER_HEADER_ICON_BUTTON_CLASSNAME,
-                'text-tertiary-token'
-              )}
+              variant='ghost'
+              size='sm'
               ariaLabel={action.label}
             >
               <Link href={action.href}>
-                <Icon className='h-3.5 w-3.5' aria-hidden='true' />
+                <Icon aria-hidden='true' />
               </Link>
-            </AppIconButton>
+            </IconButton>
           );
         }
 
@@ -113,17 +116,14 @@ export function DrawerHeaderActions({
         const ActiveIcon = action.activeIcon;
 
         return (
-          <AppIconButton
+          <IconButton
             key={action.id}
+            variant='ghost'
+            size='sm'
             disabled={action.disabled}
             onClick={action.onClick}
-            className={cn(
-              DRAWER_HEADER_ICON_BUTTON_CLASSNAME,
-              action.isActive
-                ? 'text-success hover:text-success'
-                : 'text-tertiary-token hover:text-primary-token'
-            )}
             ariaLabel={action.label}
+            data-active={action.isActive ? 'true' : undefined}
           >
             <span className='relative flex h-3.5 w-3.5 items-center justify-center'>
               <DefaultIcon
@@ -143,7 +143,7 @@ export function DrawerHeaderActions({
                 />
               )}
             </span>
-          </AppIconButton>
+          </IconButton>
         );
       })}
 
@@ -157,17 +157,27 @@ export function DrawerHeaderActions({
           searchPlaceholder={searchPlaceholder}
           searchMode={searchMode}
         >
-          <AppIconButton
-            className={cn(
-              DRAWER_HEADER_ICON_BUTTON_CLASSNAME,
-              'text-tertiary-token'
-            )}
-            ariaLabel='More actions'
-          >
-            <MoreVertical className='h-3.5 w-3.5' aria-hidden='true' />
-          </AppIconButton>
+          <IconButton variant='ghost' size='sm' ariaLabel='More actions'>
+            <MoreVertical aria-hidden='true' />
+          </IconButton>
         </TableActionMenu>
       )}
+
+      {/* Below lg every drawer is a full-screen sheet with nothing outside it
+          to tap, so a closable drawer shows a visible Close (desktop keeps
+          Esc and the menu item). */}
+      {onClose ? (
+        <IconButton
+          variant='ghost'
+          size='sm'
+          onClick={onClose}
+          ariaLabel='Close'
+          className='lg:hidden'
+          data-testid='drawer-header-close'
+        >
+          <X aria-hidden='true' />
+        </IconButton>
+      ) : null}
     </div>
   );
 }

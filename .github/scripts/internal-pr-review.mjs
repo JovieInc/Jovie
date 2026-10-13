@@ -19,6 +19,7 @@
 // trusted base checkout and added to the prompt, bounded by
 // MAX_RULE_CONTEXT_CHARS, so findings can cite the repo's own decisions.
 
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
@@ -28,13 +29,28 @@ export const DEFAULT_MODEL = 'zai/glm-5.3-flash';
 export const DEFAULT_GATEWAY_BASE_URL = 'https://ai-gateway.vercel.sh/v1';
 export const MAX_DIFF_CHARS = 48_000;
 export const HARD_SKIP_DIFF_CHARS = 400_000;
-export const MAX_OUTPUT_TOKENS = 1_500;
+// glm-5.3-flash reasons before answering, and reasoning tokens count against
+// max_tokens: at 1,500 a ~3k-token prompt finished on `length` with no content.
+export const MAX_OUTPUT_TOKENS = 8_000;
 export const COMMENT_PAGE_LIMIT = 3;
 export const MAX_RULE_CONTEXT_CHARS = 12_000;
 export const MAX_RULE_CHARS = 6_000;
 // Catch-all rules match nearly every PR and would crowd out the specific ones.
 export const BROAD_RULES = new Set(['.claude/rules/code-style.md']);
 export const RULE_SCOPES_PATH = 'scripts/agent-context/rule-scopes.json';
+export const MAX_CALL_SITE_SYMBOLS = 8;
+export const MAX_CALL_SITES_PER_SYMBOL = 5;
+export const MAX_CALL_SITE_CHARS = 4_000;
+const EXPORT_PATTERN =
+  /^[+-]\s*export\s+(?:default\s+)?(?:async\s+)?(?:function\*?|const|let|class)\s+([A-Za-z_$][\w$]*)/u;
+// Hunk headers name the enclosing function of an edit in its body.
+const HUNK_FUNCTION_PATTERN =
+  /^@@ [^@]+ @@.*?\b(?:function\*?\s+([A-Za-z_$][\w$]*)|(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?\()/u;
+const SCRIPT_PATH_PATTERN =
+  /^diff --git a\/\S+ b\/(?:\S+\/)?((?!\S*\.test\.)[\w.-]+\.(?:mjs|cjs|js|ts|py|sh))$/u;
+const TEST_PATH_PATTERN =
+  /(?:^|\/)(?:__tests__|tests?|fixtures)\/|\.(?:test|spec)\.[^/]+$/u;
+const FLAG_PATTERN = /(?<![\w-])--[a-z][a-z0-9]*(?:-[a-z0-9]+)+\b/gu;
 const GITHUB_API = 'https://api.github.com';
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const REPO_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
@@ -153,6 +169,74 @@ export function globToRegExp(glob) {
 }
 
 /**
+ * Exported symbols, functions enclosing an edit, changed script file names
+ * (their workflow/CLI callers), and multi-word CLI flags touched by the diff,
+ * in that order. Markdown hunks are ignored.
+ */
+export function changedSymbolsFromDiff(diff) {
+  const exports = new Set();
+  const enclosing = new Set();
+  const scripts = new Set();
+  const flags = new Set();
+  let markdown = false;
+  for (const line of diff.split('\n')) {
+    if (line.startsWith('diff --git ')) {
+      markdown = /\.md$/u.test(line);
+      const script = SCRIPT_PATH_PATTERN.exec(line);
+      if (script) scripts.add(script[1]);
+      continue;
+    }
+    if (markdown || line.startsWith('+++') || line.startsWith('---')) continue;
+    const hunk = HUNK_FUNCTION_PATTERN.exec(line);
+    if (hunk) enclosing.add(hunk[1] ?? hunk[2]);
+    if (!line.startsWith('+') && !line.startsWith('-')) continue;
+    const exported = EXPORT_PATTERN.exec(line);
+    if (exported) exports.add(exported[1]);
+    for (const flag of line.matchAll(FLAG_PATTERN)) flags.add(flag[0]);
+  }
+  return [...new Set([...exports, ...enclosing, ...scripts, ...flags])].slice(
+    0,
+    MAX_CALL_SITE_SYMBOLS
+  );
+}
+
+function gitGrep(symbol) {
+  try {
+    return execFileSync(
+      'git',
+      ['grep', '-n', '-I', '-F', '-w', '-e', symbol, '--', '.', ':!*.md'],
+      { encoding: 'utf8', maxBuffer: 4 * 1024 * 1024 }
+    );
+  } catch {
+    // git grep exits 1 when nothing matches.
+    return '';
+  }
+}
+
+/**
+ * Bounded call-site context from the trusted base checkout, so claims that
+ * depend on how a changed export or flag is used can be checked.
+ */
+export function loadCallSiteContext(symbols, grep = gitGrep) {
+  const sections = [];
+  let used = 0;
+  for (const symbol of symbols) {
+    // Production callers first; tests only fill what is left of the cap.
+    const lines = grep(symbol).split('\n').filter(Boolean);
+    const isTest = hit => TEST_PATH_PATTERN.test(hit.split(':', 1)[0]);
+    const hits = [...lines.filter(hit => !isTest(hit)), ...lines.filter(isTest)]
+      .slice(0, MAX_CALL_SITES_PER_SYMBOL)
+      .map(hit => hit.slice(0, 200));
+    if (hits.length === 0) continue;
+    const section = `${symbol}:\n${hits.join('\n')}`;
+    if (used + section.length > MAX_CALL_SITE_CHARS) break;
+    used += section.length;
+    sections.push(section);
+  }
+  return sections.join('\n\n');
+}
+
+/**
  * Bounded convention context: the specific scoped rules that apply to the
  * changed paths. Missing or malformed scope data yields an empty context.
  */
@@ -190,6 +274,7 @@ export function loadRuleContext(changedPaths, readFile = readFileSync) {
 }
 
 export function buildPrompt({
+  callSites = '',
   changedFiles,
   diff,
   prNumber,
@@ -212,6 +297,9 @@ export function buildPrompt({
     '   irreversible changes, missing backfill.',
     '4. Violations of the repo conventions below; cite the rule file.',
     '',
+    'A claim that depends on how a changed export or flag is called must',
+    'cite a call site shown below; otherwise omit it.',
+    '',
     'Rules:',
     '- Terse markdown bullets with file paths; at most ~250 words.',
     '- Report only material risks; no style nitpicks, no praise, no summary',
@@ -221,6 +309,13 @@ export function buildPrompt({
     '',
     ...(rules
       ? ['Repo conventions for the changed paths (trusted):', rules, '']
+      : []),
+    ...(callSites
+      ? [
+          'Call sites on the base branch (trusted, capped; may be incomplete):',
+          callSites,
+          '',
+        ]
       : []),
     `PR #${prNumber}: ${title}`,
     `Changed files: ${changedFiles}`,
@@ -257,9 +352,13 @@ export async function callGateway(
     if (!response.ok)
       return { ok: false, reason: `gateway HTTP ${response.status}` };
     const body = await response.json();
-    const text = body?.choices?.[0]?.message?.content;
+    const choice = body?.choices?.[0];
+    const text = choice?.message?.content;
     if (typeof text !== 'string' || text.trim() === '')
-      return { ok: false, reason: 'empty model response' };
+      return {
+        ok: false,
+        reason: `empty model response (finish ${choice?.finish_reason ?? 'unknown'})`,
+      };
     return { ok: true, text };
   } catch (error) {
     return {
@@ -378,6 +477,7 @@ export async function run({ env, fetchImpl = fetch, log = console.log }) {
       changedFiles: pr.changedFiles,
       diff: pr.diff,
       prNumber: config.prNumber,
+      callSites: loadCallSiteContext(changedSymbolsFromDiff(pr.diff)),
       rules: ruleContext.text,
       title: pr.title,
     });
@@ -398,15 +498,14 @@ export async function run({ env, fetchImpl = fetch, log = console.log }) {
         },
         fetchImpl
       );
-      if (result.ok) {
-        outcome = 'reviewed';
-        text = result.text + (truncated ? '\n\n_(Diff was truncated.)_' : '');
-      } else {
-        outcome = 'unavailable';
-        text = `The internal reviewer could not run (${result.reason}). `;
-        text += 'This is advisory only — merge gates are unaffected. Retry by ';
-        text += 'pushing or reopening the PR.';
+      if (!result.ok) {
+        // An outage is not a review: annotate the run instead of adding a
+        // PR comment nobody can act on.
+        log(`::warning::internal review unavailable: ${result.reason}`);
+        return { outcome: 'unavailable', reason: result.reason };
       }
+      outcome = 'reviewed';
+      text = result.text + (truncated ? '\n\n_(Diff was truncated.)_' : '');
     }
     const action = await upsertReviewComment(
       {

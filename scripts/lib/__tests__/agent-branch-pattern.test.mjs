@@ -73,23 +73,6 @@ describe('agent-branch-pattern (open-agent-PR capacity)', () => {
     expect(AGENT_OPEN_PR_BRANCH_JQ_TEST).toContain('jov-[0-9]+([_-].+)?');
   });
 
-  it('agent-pipeline uses the shared allowlist, not an infra denylist', () => {
-    const text = readFileSync(
-      `${repoRoot}/.github/workflows/agent-pipeline.yml`,
-      'utf8'
-    );
-    expect(text).toContain('scripts/lib/agent-branch-pattern.mjs --match');
-    expect(text).toMatch(/\^\(codex\|codegen-bot\|linear\|claude\)\//);
-    expect(text).toContain('^[^/]+/jov-[0-9]+([_-].+)?$');
-    expect(text).not.toMatch(
-      /\^\(main\|dependabot\/\|gh-readonly-queue\/\|renovate\/\)/
-    );
-    expect(text).not.toContain('"Scope Judge"');
-    expect(text).not.toContain('AGENT_RUN_SOURCE_RUN_ID');
-    expect(text).toContain('SLACK_WEBHOOK_URL');
-    expect(text).toContain('LINEAR_API_KEY');
-  });
-
   it('actionlint is not push/PR-triggered (agent-branch push → zero runs)', () => {
     const text = readFileSync(
       `${repoRoot}/.github/workflows/actionlint.yml`,

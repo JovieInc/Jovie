@@ -1,6 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import {
+  cronGapMinutes,
+  triggerNames,
+  workflowTriggers,
+} from '../workflow-triggers.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 const WORKFLOW = readFileSync(
@@ -56,11 +61,18 @@ describe('Sentry autofix workflow contract', () => {
   });
 
   it('closes the loop on a scheduled or manual recurrence check, never source PRs', () => {
-    expect(RECURRENCE).toMatch(/^\s*schedule:/m);
-    expect(RECURRENCE).toContain("cron: '41 * * * *'");
-    expect(RECURRENCE).toContain('workflow_dispatch:');
-    expect(RECURRENCE).not.toMatch(/^\s*pull_request:/m);
-    expect(RECURRENCE).not.toMatch(/^\s*merge_group:/m);
+    // Clock wake (repository_dispatch) plus an hourly-or-better cron
+    // backstop and manual dispatch; never a source-PR or merge-queue event.
+    const on = workflowTriggers(RECURRENCE);
+    for (const event of triggerNames(on)) {
+      expect([
+        'repository_dispatch',
+        'schedule',
+        'workflow_dispatch',
+      ]).toContain(event);
+    }
+    expect(on).toHaveProperty('workflow_dispatch');
+    expect(cronGapMinutes(on).max).toBeLessThanOrEqual(60);
     expect(RECURRENCE).toContain(
       "github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'"
     );

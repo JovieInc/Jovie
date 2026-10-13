@@ -35,6 +35,13 @@ const WEB = 'apps/web/';
 const FS_READ =
   /\bfrom\s+['"](?:node:)?fs(?:\/promises)?['"]|require\(\s*['"](?:node:)?fs['"]|\breaddirSync\b|\bglobSync\b|fast-glob/u;
 const TEST_FILE = /\.test\.[cm]?[jt]sx?$/u;
+// Tests that launch a browser or the Playwright runner need installed
+// browsers, which Source Validation's guard step does not provision; they run
+// in the web Unit Tests shards instead. playwright-artifact-secrets reads
+// every workflow, so without this any workflow edit failed the guard with
+// "Executable doesn't exist ... chrome-headless-shell" (#21546, 10-13).
+const LAUNCHES_BROWSER =
+  /\b(?:chromium|firefox|webkit)\.launch\(|\blaunchPersistentContext\(|['"]playwright['"]\s*,\s*['"]test['"]/u;
 const LITERAL = /(['"`])((?:(?!\1)[^\\\n$])*)\1/gu;
 const CALL =
   /\b(?:join|resolve)\(((?:[^()'"`]|'[^'\n]*'|"[^"\n]*"|`[^`\n]*`)*)\)/gu;
@@ -134,7 +141,8 @@ export function keyMatches(key, file) {
 }
 
 /**
- * Repo-relative apps/web test files that read the filesystem.
+ * Repo-relative apps/web test files that read the filesystem and do not
+ * launch a browser.
  * @param {string} [root]
  */
 export function sourceReadTests(root = REPO_ROOT) {
@@ -146,7 +154,10 @@ export function sourceReadTests(root = REPO_ROOT) {
         .split('\\')
         .join('/')
     )
-    .filter(test => FS_READ.test(readFileSync(join(root, test), 'utf8')))
+    .filter(test => {
+      const source = readFileSync(join(root, test), 'utf8');
+      return FS_READ.test(source) && !LAUNCHES_BROWSER.test(source);
+    })
     .sort();
 }
 

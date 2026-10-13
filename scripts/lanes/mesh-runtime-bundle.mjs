@@ -34,6 +34,20 @@ const pinnedRecords = (lock, name) => {
     throw new Error('mesh-runtime-dependency-pin-mismatch');
   return records;
 };
+/** The exact version an importer resolves for a direct dependency, read from
+ * the reviewed lockfile, so Dependabot bumps need no source edit here. */
+export const importerVersion = (lock, importer, name) => {
+  const lines = lock.toString().split('\n');
+  const start = lines.indexOf(`  ${importer}:`);
+  const key = name.startsWith('@') ? `      '${name}':` : `      ${name}:`;
+  for (let i = start + 1; start >= 0 && i < lines.length; i++) {
+    if (/^ {0,2}\S/u.test(lines[i])) break;
+    if (lines[i] !== key) continue;
+    const match = /^ {8}version: (\d+\.\d+\.\d+)(?:\(|$)/u.exec(lines[i + 2]);
+    if (match) return match[1];
+  }
+  throw new Error('mesh-runtime-dependency-pin-mismatch');
+};
 export function buildMeshRuntime(sourceRoot, dependencyRoot) {
   if (process.env.ESBUILD_BINARY_PATH)
     throw new Error('mesh-runtime-binary-override-unbound');
@@ -56,7 +70,17 @@ export function buildMeshRuntime(sourceRoot, dependencyRoot) {
   // The host repo may retain an older product checkout while its updater tracks
   // main. Compare both exact package/integrity and dependency snapshot records,
   // rather than requiring unrelated product lockfile entries to be identical.
-  for (const name of ['esbuild@0.28.2', 'zod@4.6.7', `${binaryName}@0.28.2`]) {
+  const compilerPin = importerVersion(lock, 'apps/desktop', 'esbuild');
+  const zodPin = importerVersion(
+    lock,
+    'packages/agent-transport-contracts',
+    'zod'
+  );
+  for (const name of [
+    `esbuild@${compilerPin}`,
+    `zod@${zodPin}`,
+    `${binaryName}@${compilerPin}`,
+  ]) {
     const expected = pinnedRecords(lock, name);
     if (
       JSON.stringify(expected) !==
@@ -73,7 +97,7 @@ export function buildMeshRuntime(sourceRoot, dependencyRoot) {
     `${binaryName}/package.json`
   );
   const binaryMetadata = JSON.parse(readFileSync(binaryPackage, 'utf8'));
-  if (binaryMetadata.version !== '0.28.2')
+  if (binaryMetadata.version !== compilerPin)
     throw new Error('mesh-runtime-binary-pin-mismatch');
   const binarySha256 = sha(
     readFileSync(join(dirname(binaryPackage), 'bin/esbuild'))
@@ -87,10 +111,10 @@ export function buildMeshRuntime(sourceRoot, dependencyRoot) {
   const zodRoot = realpathSync(dirname(zodPackage));
   const zod = JSON.parse(readFileSync(zodPackage, 'utf8'));
   if (
-    compiler.version !== '0.28.2' ||
-    zod.version !== '4.6.7' ||
-    !lock.includes('  esbuild@0.28.2:') ||
-    !lock.includes('  zod@4.6.7:')
+    compiler.version !== compilerPin ||
+    zod.version !== zodPin ||
+    !lock.includes(`  esbuild@${compilerPin}:`) ||
+    !lock.includes(`  zod@${zodPin}:`)
   )
     throw new Error('mesh-runtime-dependency-pin-mismatch');
   const sourceFiles = [

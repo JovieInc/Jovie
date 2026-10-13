@@ -2,6 +2,10 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import {
+  triggerNames,
+  workflowTriggers,
+} from '../../../../../scripts/lib/workflow-triggers.mjs';
 
 const testDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(testDir, '..', '..', '..', '..', '..');
@@ -15,10 +19,9 @@ describe('fixed runner canary workflow', () => {
   const workflow = readFileSync(workflowPath, 'utf8');
 
   it('is manual-only and cannot mutate runner routing', () => {
-    expect(workflow).toContain('workflow_dispatch:');
-    expect(workflow).not.toContain('pull_request:');
-    expect(workflow).not.toContain('push:');
-    expect(workflow).not.toContain('schedule:');
+    expect(triggerNames(workflowTriggers(workflow))).toEqual([
+      'workflow_dispatch',
+    ]);
     expect(workflow).not.toContain('CI_FAST_RUNNER');
     expect(workflow).toContain('contents: read');
   });

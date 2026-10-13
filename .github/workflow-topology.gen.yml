@@ -46,7 +46,6 @@ normalPrWorkflows:
   - Repository documentation shadow
   - Summer Eve identity check
 inactiveWorkflows:
-  - Agent Pipeline
   - Agent Tick
   - Auto-PR on Agent Push
   - Auto-Ready Agent Drafts
@@ -94,17 +93,6 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:report
     jobCount: 1
-  - name: Agent Pipeline
-    path: .github/workflows/agent-pipeline.yml
-    active: false
-    category: remediation-dispatch
-    authoritativeProducer: Lane Fix Relay
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - workflow_run
-    terminalReceipt: job:exhaust
-    jobCount: 5
   - name: Auto-Ready Agent Drafts
     path: .github/workflows/auto-ready-agent-drafts.yml
     active: false
@@ -159,7 +147,6 @@ nodes:
     authoritativeProducer: Source Validation
     authoritativeFor: []
     allowedConsumers:
-      - Agent Pipeline
       - iOS CI
       - Mac CI
       - Fleet Gate Refresh
@@ -173,8 +160,8 @@ nodes:
       - merge_group
       - push
       - workflow_dispatch
-    terminalReceipt: job:main-release-ready
-    jobCount: 64
+    terminalReceipt: job:ci-exact-head-coverage-shard-fail-fast
+    jobCount: 81
   - name: CLI Chaos Nightly
     path: .github/workflows/cli-chaos-nightly.yml
     active: true

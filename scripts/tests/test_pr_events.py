@@ -1199,6 +1199,32 @@ class GapTest(unittest.TestCase):
         self.assertEqual(events.queue_failure(fake_lane(Shell({("gh", "run", "list"): []})), 5), "")
         self.assertEqual(events.queue_failure(fake_lane(Shell({("gh", "run", "list"): (0, "not json")})), 5), "")
 
+    def test_a_quota_ejection_waits_before_merging_main(self):
+        # 2026-10-13 07:52Z: each quota ejection was synced with main within minutes, a new head
+        # re-entered the dry bucket and was ejected again (#20970: eight groups in an hour).
+        queued = [pr(merge="CLEAN", labels=["lane-fix-dequeued"])]
+        routes = {("gh", "pr", "list"): queued,
+                  ("gh", "run", "list"): [{"databaseId": 9, "headBranch": "gh-readonly-queue/main/pr-5-abc",
+                                           "workflowName": "PR Size Guard"}],
+                  ("gh", "run", "view"): "x\tGitHub API 403 for /repos/r/compare/a...b: API rate limit exceeded for installation"}
+        (self.host.state / "reconcile.json").write_text(json.dumps({"atEpoch": NOW}))
+        with patch.object(events, "classify_github_failure", return_value="primary-rate-limit") as classify:
+            shell = Shell(routes)
+            self.assertEqual(events.tick(self.host, fake_lane(shell), lambda: None, NOW), {5: "held:github-quota"})
+            self.assertEqual(shell.made("gh", "api", "-X", "PUT"), [], "no main merge into a dry bucket")
+            later = Shell(routes)
+            self.assertEqual(events.tick(self.host, fake_lane(later), lambda: None, NOW + 600),
+                             {5: "held:github-quota"})
+            self.assertEqual(later.made("gh", "run", "view"), [], "the same head is not re-read inside the backoff")
+            done = Shell(routes)
+            self.assertEqual(events.tick(self.host, fake_lane(done),
+                                         lambda: None, NOW + events.QUOTA_EJECTION_BACKOFF_S + 1),
+                             {5: "synced"})
+        self.assertEqual(classify.call_count, 1)
+        clean = Shell({("gh", "pr", "list"): [pr(number=6, merge="CLEAN", labels=["lane-fix-dequeued"])]})
+        with patch.object(events, "classify_github_failure", return_value="none"):
+            self.assertEqual(events.tick(self.host, fake_lane(clean), lambda: None, NOW), {6: "synced"})
+
     def test_tick_syncs_a_dequeued_head_with_main_once(self):
         queued = [pr(merge="CLEAN", labels=["lane-fix-dequeued"]), pr(number=6, merge="DIRTY", labels=["lane-fix-dequeued"])]
         shell = Shell({("gh", "pr", "list"): queued})

@@ -246,7 +246,6 @@ export const NODE_RUNTIME_CONTRACT_PATHS = Object.freeze([
   '.github/actions/setup-node-pnpm/**',
   '.github/actions/setup-playwright/**',
   '.github/runner-image/**',
-  '.github/workflows/agent-pipeline.yml',
   '.github/workflows/ci.yml',
   '.github/workflows/e2e-full-matrix.yml',
   '.github/workflows/fleet-gate-refresh.yml',
@@ -457,7 +456,6 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/lib/__tests__/script-contract-affected.test.mjs',
   'scripts/lib/__tests__/web-source-read-tests.test.mjs',
-  '.github/scripts/customer-notes-ready.test.js',
   '.claude/hooks/post-task-validate.test.mjs',
   '.claude/hooks/prod-db-session-guard.test.mjs',
   'scripts/agent-context/check.test.mjs',
@@ -558,7 +556,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
 ]);
 export const DEPRECATION_COVERAGE_COMMAND =
   'node --test --experimental-test-coverage --test-coverage-include=scripts/deprecation-clearance.mjs --test-coverage-include=scripts/lib/deprecation-observation.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=90 scripts/deprecation-clearance.test.mjs';
-export const SCRIPT_CONTRACT_NODE_COMMAND = `${DEPRECATION_COVERAGE_COMMAND} && node --test ${SCRIPT_CONTRACT_NODE_TESTS.join(' ')} && node --test --experimental-test-coverage --test-coverage-include=.github/scripts/customer-notes-ready.js --test-coverage-lines=100 --test-coverage-branches=95 --test-coverage-functions=100 .github/scripts/customer-notes-ready.test.js`;
+export const SCRIPT_CONTRACT_NODE_COMMAND = `${DEPRECATION_COVERAGE_COMMAND} && node --test ${SCRIPT_CONTRACT_NODE_TESTS.join(' ')}`;
 export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/merge-group-failure-hold.test.mjs',
   'scripts/lib/__tests__/mesh-host-ack.test.mjs',
@@ -654,6 +652,8 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/web-test-selectors.test.mjs',
   'scripts/lib/__tests__/web-vitest-fast-runner.test.mjs',
   'scripts/lib/__tests__/merge-group-fail-fast.test.mjs',
+  'scripts/lib/__tests__/merge-group-token-budget.test.mjs',
+  'scripts/lib/__tests__/workflow-triggers.test.mjs',
 ]);
 export const MESH_HOST_ACK_COVERAGE_COMMAND =
   'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/mesh-host-ack.test.mjs --coverage.enabled --coverage.provider=v8 --coverage.include=lanes/mesh-host-ack.mjs --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-mesh-host-ack-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=json-summary --coverage.thresholds.perFile=true --coverage.thresholds.lines=99 --coverage.thresholds.statements=99 --coverage.thresholds.branches=90 --coverage.thresholds.functions=100';
@@ -2332,7 +2332,7 @@ export async function runStructural(opts = {}) {
     'node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/linear-client.mjs --test-coverage-lines=73 --test-coverage-branches=83 --test-coverage-functions=66 scripts/backlog-orchestrator/__tests__/linear-client.transport.test.mjs scripts/backlog-orchestrator/__tests__/linear-pagination.test.mjs',
     'pnpm ci:branching-guard:validate',
     'pnpm ci:merge-queue:check',
-    "node --experimental-test-coverage --test --test-coverage-include='scripts/native-merge-intent.mjs' --test-coverage-include='scripts/lib/source-admission-policy.mjs' --test-coverage-include='scripts/source-admission-check.mjs' --test-coverage-lines=98 scripts/lib/__tests__/native-merge-intent.test.mjs scripts/lib/__tests__/source-admission-policy.test.mjs scripts/lib/__tests__/source-admission-check.test.mjs scripts/lib/__tests__/writer-owned-pr-promote.test.mjs",
+    "node --experimental-test-coverage --test --test-coverage-include='scripts/lib/source-admission-policy.mjs' --test-coverage-include='scripts/source-admission-check.mjs' --test-coverage-lines=98 scripts/lib/__tests__/source-admission-policy.test.mjs scripts/lib/__tests__/source-admission-check.test.mjs scripts/lib/__tests__/writer-owned-pr-promote.test.mjs",
     'pnpm ci:typecheck-gate-guard',
     'pnpm doc:freshness:check',
     'node .github/scripts/quarantine-ledger.mjs validate',

@@ -78,7 +78,6 @@ export function DashboardNav({
   const { selectedProfile, inboxNavigation } = useDashboardData();
   const runtimeUpdate = useRuntimeUpdate();
   const profilesWorkspaceEnabled = useAppFlag('PROFILES_WORKSPACE');
-  const inboxHomeEnabled = useAppFlag('INBOX_HOME');
   const sidebarNavigation = useMemo(
     () =>
       navigationVisibleForFlags(canonicalSidebarNavigation, {
@@ -87,7 +86,7 @@ export function DashboardNav({
     [profilesWorkspaceEnabled]
   );
   const hasRuntimeUpdate = Boolean(runtimeUpdate?.available);
-  const homeAttentionLabel = inboxHomeEnabled ? 'Inbox' : 'Home';
+  const homeAttentionLabel = inboxNavItem.name;
   const homeAttentionName = hasRuntimeUpdate
     ? `${homeAttentionLabel} — App Update Available`
     : homeAttentionLabel;

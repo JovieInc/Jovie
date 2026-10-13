@@ -18,9 +18,23 @@ vi.mock('@jovie/ui', () => ({
   IconButton: ({
     children,
     asChild: _,
+    ariaLabel,
+    variant,
+    size,
     ...props
-  }: ComponentProps<'button'> & { asChild?: boolean }) => (
-    <button type='button' {...props}>
+  }: ComponentProps<'button'> & {
+    asChild?: boolean;
+    ariaLabel?: string;
+    variant?: string;
+    size?: string;
+  }) => (
+    <button
+      type='button'
+      aria-label={ariaLabel ?? props['aria-label']}
+      data-variant={variant}
+      data-size={size}
+      {...props}
+    >
       {children}
     </button>
   ),
@@ -97,6 +111,23 @@ describe('DrawerHeaderActions', () => {
     ]);
   });
 
+  it('shows a visible close control below lg, where every drawer is a full-screen sheet', () => {
+    const onClose = vi.fn();
+    render(<DrawerHeaderActions primaryActions={[]} onClose={onClose} />);
+
+    const close = screen.getByTestId('drawer-header-close');
+    expect(close).toHaveAttribute('aria-label', 'Close');
+    expect(close).toHaveAttribute('data-variant', 'ghost');
+    expect(close.className).toBe('lg:hidden');
+    close.click();
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('omits the visible close control when the drawer cannot close', () => {
+    render(<DrawerHeaderActions primaryActions={[]} />);
+    expect(screen.queryByTestId('drawer-header-close')).toBeNull();
+  });
+
   it('keeps the overflow trigger borderless', () => {
     render(
       <DrawerHeaderActions
@@ -113,9 +144,10 @@ describe('DrawerHeaderActions', () => {
     );
 
     const trigger = screen.getByLabelText('More actions');
-    expect(trigger.className).toContain('border-transparent');
-    expect(trigger.className).not.toContain('border-(--linear-app-frame-seam)');
-    expect(trigger.className).not.toContain('border-subtle');
+    // Canonical ghost/sm IconButton: borderless by contract, no restyle.
+    expect(trigger).toHaveAttribute('data-variant', 'ghost');
+    expect(trigger).toHaveAttribute('data-size', 'sm');
+    expect(trigger.getAttribute('class') ?? '').toBe('');
   });
 
   it('keeps copy-state icon swaps free of scale motion', () => {

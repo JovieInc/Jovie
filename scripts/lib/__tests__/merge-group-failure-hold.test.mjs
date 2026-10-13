@@ -316,6 +316,14 @@ it('admission recovery preserves revision holds, source leases, intent and retry
     action: 'retry-once',
     latest: { runId: 123, runAttempt: 1 },
   });
+  // 2026-10-13 07:52Z: a quota ejection re-admitted at once re-entered the dry
+  // bucket. The one recovery waits out ADMISSION_RECOVERY_BACKOFF_MS.
+  expect(
+    reenrollmentDisposition({ ...input, now: ended + 60_000 })
+  ).toMatchObject({ action: 'block', reason: 'admission-recovery-backoff' });
+  expect(
+    reenrollmentDisposition({ ...input, now: ended + 15 * 60_000 + 1 })
+  ).toMatchObject({ action: 'retry-once' });
   for (const change of [
     { prNumber: 43 },
     { autoMergeEnabled: false },

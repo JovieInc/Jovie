@@ -89,6 +89,19 @@ describe('useAuthRouteConfig', () => {
     ]);
   });
 
+  it.each([APP_ROUTES.CONTACTS, APP_ROUTES.INSIGHTS])(
+    'titles the %s tab with its sidebar root, Audience',
+    route => {
+      mockUsePathname.mockReturnValue(route);
+
+      const { result } = renderHook(() => useAuthRouteConfig());
+
+      expect(result.current.breadcrumbs).toEqual([
+        { label: 'Audience', href: route },
+      ]);
+    }
+  );
+
   it('treats the canonical tour dates route as a dashboard table surface', () => {
     mockUsePathname.mockReturnValue('/app/tour-dates');
 

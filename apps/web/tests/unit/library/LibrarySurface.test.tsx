@@ -1577,14 +1577,21 @@ describe('LibrarySurface', () => {
     renderLibrary([buildAsset({ id: 'release-a', title: 'Release A' })]);
     fireEvent.click(screen.getByTestId('library-release-row-release-a'));
 
-    const close = screen.getByTestId('library-inspector-close');
+    const close = screen.getByTestId('drawer-header-close');
     expect(close).toHaveAttribute('aria-label', 'Close');
     // Desktop keeps Esc and the overflow menu; the X is for the sheet.
-    expect(close.className).toContain('lg:hidden');
+    expect(close.className).toContain('lg:hidden'); // via the shared header
     fireEvent.click(close);
     expect(screen.getByTestId('library-asset-drawer')).toHaveAttribute(
       'aria-hidden',
       'true'
+    );
+  });
+
+  it('shows the item count once per breakpoint (toolbar on phones only)', () => {
+    renderLibrary([buildAsset()]);
+    expect(screen.getByTestId('library-toolbar-count').className).toContain(
+      'sm:hidden'
     );
   });
 
@@ -1620,7 +1627,8 @@ describe('LibrarySurface', () => {
     fireEvent.click(drawer.getByRole('tab', { name: 'Overview' }));
     const providerLink = drawer.getByRole('link', { name: /Spotify/u });
 
-    expect(overflowButton.className).toContain('focus-visible:ring-ring');
+    // Canonical IconButton focus ring (shared Button), not a local restyle.
+    expect(overflowButton.className).toContain('focus-visible:ring-focus');
     expect(previewButton.className).toContain(
       'focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55'
     );

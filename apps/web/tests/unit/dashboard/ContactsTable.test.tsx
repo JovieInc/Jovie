@@ -208,6 +208,11 @@ describe('ContactsTable', () => {
     expect(screen.getByTestId('contacts-toolbar-count')).toHaveTextContent(
       'Loading contacts'
     );
+    // The sentence is for assistive tech only; sighted users get one skeleton.
+    expect(screen.getByText('Loading contacts')).toHaveClass('sr-only');
+    expect(
+      screen.getByTestId('contacts-toolbar-count-skeleton')
+    ).toBeInTheDocument();
     expect(screen.queryByText('No Contacts Yet')).not.toBeInTheDocument();
     // Loading and loaded rows share the 32px dense people-row geometry.
     expect(screen.getByTestId('contacts-unified-table')).toHaveAttribute(
