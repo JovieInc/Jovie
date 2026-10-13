@@ -47,7 +47,13 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-
+import {
+  PRODUCT_REFERENCE_KINDS,
+  PRODUCT_REFERENCE_SOURCE,
+  readProductReferenceOwner,
+  scanProductNavigationBindings,
+  scanProductReferenceCopy,
+} from './product-reference-coherence.mjs';
 import { readInvariantRegistry } from './registry.mjs';
 
 export const DESIGN_SURFACES_INVARIANT_ID = 'JOV-INV-038';
@@ -84,6 +90,7 @@ export const APP_UI_COPY_ROOTS = Object.freeze([
   'apps/web/components/organisms',
   'apps/web/components/molecules',
   'apps/web/components/jovie',
+  'apps/web/lib/chat',
 ]);
 
 export const DESIGN_SURFACE_ROOTS = Object.freeze([
@@ -770,6 +777,7 @@ export function scanBlockingUiWiring(repoRoot = DEFAULT_ROOT, sources = {}) {
 
 export function scanRuntime(repoRoot = DEFAULT_ROOT, files = {}) {
   const findings = [];
+  const productOwner = readProductReferenceOwner(repoRoot);
   for (const relPath of collectCopySurfaceFiles(repoRoot, files)) {
     const source =
       files[relPath] ??
@@ -778,6 +786,7 @@ export function scanRuntime(repoRoot = DEFAULT_ROOT, files = {}) {
         : null);
     if (source == null) continue;
     findings.push(...scanScaffoldingCopy(relPath, source));
+    findings.push(...scanProductReferenceCopy(relPath, source, productOwner));
     if (relPath === NAVIGATION_SOURCE) {
       findings.push(...scanNavSemantics(relPath, source));
     }
@@ -785,6 +794,13 @@ export function scanRuntime(repoRoot = DEFAULT_ROOT, files = {}) {
   findings.push(...scanRouteIntent(repoRoot, files));
   findings.push(...scanTasteLocks(repoRoot, files));
   findings.push(...scanBlockingUiWiring(repoRoot, files));
+  for (const path of [
+    'apps/web/components/features/dashboard/dashboard-nav/config.ts',
+    'apps/web/lib/commands/registry.ts',
+  ]) {
+    const source = files[path] ?? readFileSync(resolve(repoRoot, path), 'utf8');
+    findings.push(...scanProductNavigationBindings(path, source));
+  }
   return findings;
 }
 
@@ -1030,6 +1046,19 @@ export function validateDesignSurfacesContract(registry, options = {}) {
   ) {
     errors.push(
       'sharedInteractionOwners must bind the existing component ownership map'
+    );
+  }
+  const coherence = policy.productReferenceCoherence;
+  if (
+    coherence?.source !== PRODUCT_REFERENCE_SOURCE ||
+    coherence?.binding !==
+      'feature-id/label/destination/version/locale/resolved-flags' ||
+    coherence?.staleReference !== 'blocks-certification' ||
+    JSON.stringify(coherence?.referenceKinds) !==
+      JSON.stringify(PRODUCT_REFERENCE_KINDS)
+  ) {
+    errors.push(
+      'productReferenceCoherence must bind the existing product ontology and all reference kinds; stale references block certification'
     );
   }
   return errors;

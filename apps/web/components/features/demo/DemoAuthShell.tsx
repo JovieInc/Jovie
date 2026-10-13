@@ -121,7 +121,7 @@ export function DemoAuthShell({
     <ClerkSafeDefaultsProvider>
       <QueryClientProvider client={demoQueryClient}>
         <NuqsProvider>
-          <TooltipProvider delayDuration={1200}>
+          <TooltipProvider>
             <DashboardDataProvider value={data}>
               <AuthShellWrapper
                 persistSidebarCollapsed={noopPersist}

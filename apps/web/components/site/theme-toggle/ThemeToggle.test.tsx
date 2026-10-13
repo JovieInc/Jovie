@@ -1,3 +1,4 @@
+import { TooltipProvider } from '@jovie/ui';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeToggle } from './ThemeToggle';
@@ -7,6 +8,11 @@ const themeState = vi.hoisted(() => ({
   resolvedTheme: 'dark',
   setTheme: vi.fn(),
 }));
+
+vi.mock('@jovie/ui', async importOriginal => {
+  const actual = await importOriginal<typeof import('@jovie/ui')>();
+  return { ...actual, TooltipProvider: vi.fn(actual.TooltipProvider) };
+});
 
 vi.mock('next-themes', () => ({
   useTheme: () => themeState,
@@ -22,6 +28,11 @@ describe('ThemeToggle', () => {
   it('renders an accessible icon control and cycles to the next theme', () => {
     render(<ThemeToggle shortcutKey='t' />);
 
+    expect(vi.mocked(TooltipProvider)).toHaveBeenCalled();
+    for (const [props] of vi.mocked(TooltipProvider).mock.calls) {
+      expect(props.delayDuration).toBeUndefined();
+      expect(props.skipDelayDuration).toBeUndefined();
+    }
     const button = screen.getByRole('button', { name: /Toggle theme/ });
     expect(button).toHaveAttribute(
       'title',

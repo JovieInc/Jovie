@@ -12,6 +12,10 @@ import {
 } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  screenNeedsProductReferences,
+  validateProductReferenceSnapshot,
+} from './product-reference-coherence.mjs';
 import { projectScreenDecisionRouting } from './screen-decision-routing.mjs';
 import {
   resolveTrustedArtifactId,
@@ -289,6 +293,7 @@ web.ovie-certifications|web|ovie-certifications|apps/web/app/app/(shell)/admin/c
 web.ovie-outbound|web|ovie-outbound|apps/web/app/app/(shell)/admin/outbound/page.tsx|desktop,mobile
 web.ov-hud-shell|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/hud/page.tsx|desktop,mobile
 web.ov-chat|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/chat/page.tsx|desktop,mobile
+web.ov-inbox|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/inbox/page.tsx|desktop,mobile
 web.ov-integrations|web|settings-connectors|apps/web/app/app/(shell)/admin/integrations/page.tsx|desktop,mobile
 web.admin-chat-playground|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/chat-playground/page.tsx,apps/web/app/app/(shell)/admin/chat-playground/layout.tsx|desktop,mobile
 web.ov-founder-cockpit|web|ovie-founder-cockpit|apps/web/app/app/(shell)/admin/activity/page.tsx,apps/web/app/app/(shell)/admin/growth/page.tsx,apps/web/app/app/(shell)/admin/needs-you/page.tsx,apps/web/app/app/(shell)/admin/operations/page.tsx,apps/web/app/app/(shell)/admin/product/page.tsx|desktop,mobile
@@ -576,6 +581,16 @@ export function evaluateScreenProof(proof, { screen, headSha }) {
   if (proof.screenId !== screen.id) {
     findings.push(
       `proof screenId ${proof.screenId ?? '<missing>'} does not match ${screen.id}`
+    );
+  }
+  if (
+    screenNeedsProductReferences(screen.id) ||
+    proof.productReferences !== undefined
+  ) {
+    findings.push(
+      ...validateProductReferenceSnapshot(proof.productReferences, {
+        screenId: screen.id,
+      })
     );
   }
   const proofHead =

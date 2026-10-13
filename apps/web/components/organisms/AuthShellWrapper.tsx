@@ -324,7 +324,7 @@ export function AuthShellWrapper({
   children,
 }: Readonly<AuthShellWrapperProps>) {
   return (
-    <TooltipProvider delayDuration={120} skipDelayDuration={40}>
+    <TooltipProvider>
       <KeyboardShortcutsProvider>
         <FounderDoorProvider>
           <HeaderActionsProvider>

@@ -12,7 +12,13 @@ describe('IconBadge', () => {
     expect(icon).toHaveAttribute('aria-hidden', 'true');
     expect(icon).not.toHaveAttribute('role');
     const iconContainer = icon?.parentElement;
-    expect(iconContainer).toHaveClass('h-8', 'w-8', 'rounded-full');
+    expect(iconContainer).toHaveClass(
+      'h-8',
+      'w-8',
+      'rounded-full',
+      'icon-glyph'
+    );
+    expect((iconContainer as HTMLElement).style.backgroundColor).toBe('');
   });
 
   it('applies custom className', () => {

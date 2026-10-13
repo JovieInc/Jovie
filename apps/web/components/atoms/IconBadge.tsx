@@ -1,5 +1,7 @@
+// @coverage-via apps/web/tests/unit/IconBadge.test.tsx
+
 import { Icon, type IconName } from '@/components/atoms/Icon';
-import { cn } from '@/lib/utils';
+import { IconGlyphFrame } from './IconGlyphFrame';
 
 interface IconBadgeProps {
   readonly name: IconName;
@@ -15,14 +17,11 @@ export function IconBadge({
   ariaLabel,
 }: IconBadgeProps) {
   return (
-    <div
-      className={cn(
-        'relative flex h-8 w-8 items-center justify-center rounded-full',
-        className
-      )}
-      style={{
-        backgroundColor: `color-mix(in srgb, var(${colorVar}) 12%, transparent)`,
-      }}
+    <IconGlyphFrame
+      className={
+        className ? `relative h-8 w-8 ${className}` : 'relative h-8 w-8'
+      }
+      hoverSurface={`color-mix(in srgb, var(${colorVar}) 12%, transparent)`}
     >
       <Icon
         name={name}
@@ -34,6 +33,6 @@ export function IconBadge({
         role={ariaLabel ? 'img' : undefined}
         aria-label={ariaLabel}
       />
-    </div>
+    </IconGlyphFrame>
   );
 }
