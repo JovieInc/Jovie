@@ -3608,7 +3608,9 @@ class DispatchTest(unittest.TestCase):
                 "bank": {"kind": "usage-limit", "until": time.time() + 60},
             }))
             try:
-                with patch.dict(os.environ, {"LANES_SLOTS_CLAUDE": "2", "LANES_SLOTS_D": "0"}):
+                # Autoscale samples live load/PSI; on a busy CI runner it trimmed a's seats.
+                with patch.dict(os.environ, {"LANES_SLOTS_CLAUDE": "2", "LANES_SLOTS_D": "0",
+                                             "SYMPHONY_AUTOSCALE": "off"}):
                     host = lane.Host(state=Path(tmp), repo=Path(tmp))
                     self.assertEqual(lane.dispatch(host), 0)
             finally:
