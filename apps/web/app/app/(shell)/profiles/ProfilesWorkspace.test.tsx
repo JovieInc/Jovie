@@ -17,6 +17,7 @@ import {
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { classifyConnectionInput } from './AddConnectionRail';
 import type { ProfilesWorkspaceData } from './data';
+import { PRESENCE_BUTTON_DESKTOP_DENSITY } from './PresenceStatusParts';
 import { ProfilesWorkspace } from './ProfilesWorkspace';
 
 const navigationMock = vi.hoisted(() => ({
@@ -1299,6 +1300,34 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(
       within(finalRow as HTMLElement).getByText('@tim')
     ).toBeInTheDocument();
+  });
+
+  it('locks Presence controls to 32px desktop geometry with the 44px hit target on mobile only', () => {
+    renderWorkspace(data);
+
+    // Row overflow action: 44px mobile target, 32px visible on desktop.
+    const rowAction = screen.getByRole('button', {
+      name: 'Actions for Spotify',
+    });
+    expect(rowAction).toHaveClass('h-11', 'w-11', 'sm:h-8', 'sm:w-8');
+    expect(rowAction.className).not.toContain('sm:h-7');
+
+    // Status pill renders at the locked 32px minimum.
+    const spotifyRow = rowAction.closest('tr');
+    const status = within(spotifyRow as HTMLElement)
+      .getAllByText('Limit Reached')[0]
+      ?.closest('[tabindex="0"]');
+    expect(status).toHaveClass('min-h-8');
+
+    // Monitoring lock affordance follows the same 44px-mobile / 32px-desktop
+    // contract.
+    const lockButton = screen.getAllByTestId('presence-lock')[0];
+    expect(lockButton).toHaveClass('h-11', 'w-11', 'sm:h-8', 'sm:w-8');
+
+    // Text controls collapse both hit-target axes on desktop, not just height.
+    expect(PRESENCE_BUTTON_DESKTOP_DENSITY.split(' ')).toEqual(
+      expect.arrayContaining(['sm:before:min-h-8', 'sm:before:min-w-0'])
+    );
   });
 
   it('keeps generic OG images unverified and lock explanations keyboard-reachable', async () => {

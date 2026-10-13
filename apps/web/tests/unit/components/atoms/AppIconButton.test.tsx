@@ -46,4 +46,17 @@ describe('AppIconButton', () => {
     expect(button).toHaveAttribute('data-variant', 'control');
     expect(button).toHaveAttribute('data-size', 'sm');
   });
+
+  it('forwards the md (32px) size when requested', () => {
+    render(
+      <AppIconButton ariaLabel='Copy link' size='md'>
+        <span aria-hidden='true'>+</span>
+      </AppIconButton>
+    );
+
+    expect(screen.getByRole('button', { name: 'Copy link' })).toHaveAttribute(
+      'data-size',
+      'md'
+    );
+  });
 });
