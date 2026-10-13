@@ -3,7 +3,7 @@
  * Single source of truth for open-agent-PR capacity counting.
  *
  * Used by:
- * - .github/workflows/agent-pipeline.yml (branch matching)
+ * - scripts/lib/needs-human-autoclose.mjs (isOpenAgentPrBranch)
  *
  * Call sites must feed paginated open-PR JSON (`gh api --paginate … | jq -s`)
  * so every gate counts the same PR universe.

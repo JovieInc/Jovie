@@ -38,6 +38,20 @@ Branch protection pins aggregate contexts only—never individual CI jobs.
 | `Fork PR Gate`    | Human approval policy for external forks                                                                                 | Revalidates every exact group member before emitting the combined-head context                                                                                                       |
 | `PR Size Guard`   | Source-diff size policy                                                                                                  | Revalidates every exact group member before emitting the combined-head context                                                                                                       |
 
+### GITHUB_TOKEN budget per group
+
+Every workflow in the repo shares one GITHUB_TOKEN REST bucket (1,000 calls/h),
+and each rebuild runs a group's CI again. In a green merge group, ci.yml jobs
+other than Merge Group Admission spend no REST calls. Their token-bearing steps
+only authenticate git fetches, which are git traffic and not REST, or they never
+run in merge groups, or they return before reading (the report-only
+security gate), or they are path-gated to DB/schema groups. Supersede cancels
+cost one call per superseded run. Admission's reads, and the Fork PR Gate and
+PR Size Guard member policy, are budgeted in their own scripts.
+`scripts/lib/__tests__/merge-group-token-budget.test.mjs` lists every
+token-bearing step with its per-group cost. A new one fails that test until it
+is classified, and the green-group total must stay at 5 or less.
+
 ### Fail-fast ejection
 
 A merge-group `PR Ready` waits for its slowest lane, so a failed group used to
@@ -305,6 +319,10 @@ main) or a dispatch re-admits a `queue-breaker` PR whose manual removal left
 the head unchanged, while it is still green and carries no hold label or
 failure hold, then removes the marker. A manual dequeue without the marker,
 or a `failed_checks` removal, is never re-admitted this way.
+
+For breaker dequeues that were not marked first, restore the snapshot
+directly, or release each PR with `hold` then unhold. Green enroll does not
+otherwise re-admit a manually dequeued, unchanged head.
 
 To admit one PR without a roster sweep, dispatch green enroll with
 `gh workflow run merge-queue-green-enroll.yml -f pr_number=N -R JovieInc/Jovie`.
