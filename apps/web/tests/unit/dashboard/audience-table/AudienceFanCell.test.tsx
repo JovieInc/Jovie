@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { AudienceFanCell } from '@/components/features/dashboard/organisms/dashboard-audience-table/cells';
+import { AudienceFanCell } from '@/components/features/dashboard/organisms/dashboard-audience-table/cells/AudienceFanCell';
 import type { AudienceMember } from '@/types';
 
 const baseMember: AudienceMember = {
@@ -105,6 +105,22 @@ describe('AudienceFanCell', () => {
       />
     );
     expect(screen.getByText('Anonymous Fan')).toBeInTheDocument();
+    // A neutral face, not initials that read as a real person ("AF").
+    expect(
+      document.querySelector('[data-slot="app-avatar"]')?.textContent
+    ).toBe('?');
+  });
+
+  it('renders one line with a 20px face for the dense people row', () => {
+    render(
+      <AudienceFanCell member={{ ...baseMember, emailVisibleToArtist: true }} />
+    );
+    expect(
+      document.querySelector('[data-slot="app-avatar-frame"]')
+    ).toHaveAttribute('data-size', 'sm');
+    expect(
+      document.querySelector('[data-table-person-cell]')
+    ).toHaveTextContent('Tim Whitetim@example.com');
   });
 
   it('treats a row as anonymous when the only identity is a hidden email', () => {
@@ -134,8 +150,8 @@ describe('AudienceFanCell', () => {
     );
     // First grapheme should be the emoji or "T" — never the broken
     // surrogate-pair fragment that charAt(0) would produce.
-    const monogram = screen.getByLabelText(/avatar$/i);
-    const text = monogram.textContent ?? '';
+    const monogram = document.querySelector('[data-slot="app-avatar"]');
+    const text = monogram?.textContent ?? '';
     expect(text.length).toBeGreaterThan(0);
     expect(text.charCodeAt(0)).not.toBe(0xd83d); // not a stray high-surrogate
   });
@@ -144,7 +160,7 @@ describe('AudienceFanCell', () => {
     render(
       <AudienceFanCell member={{ ...baseMember, displayName: '田中太郎' }} />
     );
-    const monogram = screen.getByLabelText(/avatar$/i);
-    expect(monogram.textContent).toBe('田');
+    const monogram = document.querySelector('[data-slot="app-avatar"]');
+    expect(monogram?.textContent).toBe('田');
   });
 });

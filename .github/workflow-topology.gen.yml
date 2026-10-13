@@ -97,17 +97,6 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:report
     jobCount: 1
-  - name: Agent Landing Sweep
-    path: .github/workflows/agent-landing-sweep.yml
-    active: true
-    category: source-validation
-    authoritativeProducer: Source Validation
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - workflow_dispatch
-    terminalReceipt: job:sweep
-    jobCount: 1
   - name: Agent Pipeline
     path: .github/workflows/agent-pipeline.yml
     active: false
@@ -499,28 +488,6 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:drift
     jobCount: 1
-  - name: GitHub AI Dispatcher
-    path: .github/workflows/github-ai-dispatcher.yml
-    active: false
-    category: source-validation
-    authoritativeProducer: Source Validation
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - workflow_dispatch
-    terminalReceipt: job:dispatch
-    jobCount: 1
-  - name: GitHub AI Orchestrator (retired)
-    path: .github/workflows/github-ai-orchestrator.yml
-    active: false
-    category: source-validation
-    authoritativeProducer: Source Validation
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - workflow_dispatch
-    terminalReceipt: job:finalize_claim
-    jobCount: 4
   - name: Golden Path Nightly
     path: .github/workflows/golden-path-nightly.yml
     active: true
@@ -1327,17 +1294,6 @@ nodes:
       - workflow_run
     terminalReceipt: job:staging-result
     jobCount: 3
-  - name: Stuck Draft Auto-Close
-    path: .github/workflows/stuck-draft-autoclose.yml
-    active: false
-    category: source-validation
-    authoritativeProducer: Source Validation
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - workflow_dispatch
-    terminalReceipt: job:autoclose
-    jobCount: 1
   - name: Summer Eve identity check
     path: .github/workflows/summer-eve-pin.yml
     active: true
