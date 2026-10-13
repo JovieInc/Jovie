@@ -208,6 +208,11 @@ jobs:
       # shadcn/no-restyle 65 > baseline 63). Run it here against the pinned
       # event head and merge base so the regression fails before enqueue.
       # Non-web diffs exit before the ESLint module load.
+      - name: PROOF (do not merge) full script contracts in this environment
+        run: |
+          start=$(date +%s)
+          node scripts/lib/script-contract-affected.mjs scripts/ci-fast-lanes.mjs
+          echo "proof elapsed $(( $(date +%s) - start ))s"
       - name: Lint changed web files against the shadcn baseline
         if: steps.reuse.outputs.reuse != 'true'
         env:
