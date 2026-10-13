@@ -29,7 +29,7 @@ The publisher checks public identity again after collection. Superseded generati
 `--write` requires a clean `release/daily-changelog-YYYY-MM-DD-<run>-<attempt>` checkout.
 The release PR changes only CHANGELOG.md and follows exact-head source CI, the native queue and Production Controller.
 No CalVer, package version, tag, desktop release or alias is mutated. Implementation-branch restrictions remain.
-The existing hourly Auto-Merge Default owner finishes only changelog-only drafts with every required check passing at the observed head, then requests native auto-merge. The production publisher is not a second merge owner.
+The draft follows the same path as every other PR: Auto-Ready green-source undrafts it once every required check passes at the observed head, and Merge Queue Green Enroll admits it. The production publisher is not a second merge owner.
 
 At most three grouped outcomes per UTC date. Later changes append to that post, preserving copy, source/runtime provenance and whole-post dismissal. Overflow remains pending for the next date. Source IDs are persisted in receipts.
 No-change/deferral plans are retained as workflow artifacts; validation failures fail the job.

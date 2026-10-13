@@ -679,7 +679,12 @@ describe('combined size + fork merge-group producer (JOV-7744)', () => {
     head: { sha: SOURCE_101, repo: { fork: true } },
   };
 
-  function combinedRun({ pr, treeBytes = 10, reviews = [] }) {
+  function combinedRun({
+    pr,
+    treeBytes = 10,
+    reviews = [],
+    rangeFiles = undefined,
+  }) {
     const paths = [];
     const outputs = [];
     const logs = [];
@@ -693,9 +698,20 @@ describe('combined size + fork merge-group producer (JOV-7744)', () => {
       async request(path) {
         paths.push(path);
         if (path.includes('/compare/')) {
-          return { data: comparison([commit(FIRST, BASE, 101)]) };
+          if (!rangeFiles) {
+            return { data: comparison([commit(FIRST, BASE, 101)]) };
+          }
+          const head = commit(FIRST, BASE, 101);
+          head.commit.tree = { sha: TREE };
+          return { data: { ...comparison([head]), files: rangeFiles } };
         }
         if (path.endsWith('/pulls/101')) return { data: pr };
+        if (path.includes('/pulls/101/files?')) {
+          return {
+            data: [{ filename: 'a.ts', additions: 1, deletions: 0 }],
+            link: null,
+          };
+        }
         if (path.includes('/pulls/101/reviews?')) {
           return { data: reviews, link: null };
         }
@@ -725,6 +741,36 @@ describe('combined size + fork merge-group producer (JOV-7744)', () => {
       `/repos/JovieInc/Jovie/git/trees/${TREE}?recursive=1`,
     ]);
     expect(outputs).toEqual(['fork_verdict=pass']);
+  });
+
+  it("takes a one-member group's files and tree from the compare read (3 calls, not 5)", async () => {
+    // 2026-10-13 storm: ~5 GITHUB_TOKEN calls per group rebuild drained the
+    // repo's 1,000/h bucket. The compare read already carries both answers.
+    const files = [{ filename: 'apps/web/a.ts', additions: 900, deletions: 0 }];
+    const { run, paths, logs } = combinedRun({
+      pr: internalPr([]),
+      rangeFiles: files,
+    });
+    await expect(run).rejects.toThrow('PR #101 failed size merge-group policy');
+    expect(paths).toEqual([
+      `/repos/JovieInc/Jovie/compare/${BASE}...${FIRST}`,
+      '/repos/JovieInc/Jovie/pulls/101',
+      `/repos/JovieInc/Jovie/git/trees/${TREE}?recursive=1`,
+    ]);
+    expect(logs.some(line => line.startsWith('PR #101: FAIL'))).toBe(true);
+
+    const capped = combinedRun({
+      pr: internalPr([]),
+      rangeFiles: Array.from({ length: 300 }, (_, index) => ({
+        filename: `f${index}.ts`,
+        additions: 0,
+        deletions: 0,
+      })),
+    });
+    await capped.run;
+    expect(capped.paths).toContain(
+      '/repos/JovieInc/Jovie/pulls/101/files?per_page=100&page=1'
+    );
   });
 
   it('hands off a failing fork verdict while the size policy still passes', async () => {
