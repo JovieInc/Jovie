@@ -62,7 +62,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+          # Merge bases need full commit history, not every historical blob:
+          # with 7,477 branches the full fetch was this job's slowest setup
+          # step (p50 47s, p90 57s). Blobless history is ~34 MB for main;
+          # the head's blobs arrive with the checkout and the few trusted-base
+          # blobs a guard reads are fetched on demand from the public origin.
           fetch-depth: 0
+          filter: blob:none
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
       - name: Validate performance policy source bindings
@@ -270,8 +276,9 @@ jobs:
       contents: read
     steps:
       - *proof-reuse
-      - &reused-checkout
-        if: steps.reuse.outputs.reuse != 'true'
+      # TruffleHog reads the object store directly and cannot use a partial
+      # clone (#13994), so this job keeps the full-blob history fetch.
+      - if: steps.reuse.outputs.reuse != 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
@@ -302,7 +309,14 @@ jobs:
       contents: read
     steps:
       - *proof-reuse
-      - *reused-checkout
+      - &reused-checkout
+        if: steps.reuse.outputs.reuse != 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          filter: blob:none
+          persist-credentials: false
       - *reused-setup
       - name: Validate changed migration surfaces
         if: steps.reuse.outputs.reuse != 'true'

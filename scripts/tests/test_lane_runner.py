@@ -4125,6 +4125,48 @@ class PreservedRecoveryTest(unittest.TestCase):
         self.assertEqual((self.path / "repair.txt").read_text(), "unpublished fix")
         self.assertTrue((self.path / lane.disk_guard.PRESERVED_REPAIR).exists())
 
+    def test_superseded_preserved_work_is_archived_and_the_repair_does_work(self):
+        # 2026-10-12 on Gem: #20840's preserved merge commit sat on an old head, so 694
+        # repairs in a day handed off and none ran.
+        self.cancelled_predecessor(commit=True)
+        (self.path / "draft.txt").write_text("uncommitted follow-up")
+        self.age_marker()
+        self.git(self.host.repo, "commit", "--allow-empty", "-qm", "writer push")
+        self.live["headRefOid"] = self.pr["headRefOid"] = self.git(self.host.repo, "rev-parse", "HEAD")
+        self.git(self.host.repo, "update-ref", "refs/remotes/origin/devin/jov-1", self.pr["headRefOid"])
+        ran = []
+        def agent(cmd, cwd, log, timeout, **kwargs):
+            ran.append(cwd)
+            return SimpleNamespace(returncode=0)
+        with patch.object(lane, "run_agent", side_effect=agent):
+            receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+        ref = lane.PRESERVED_ARCHIVE_REF + self.path.name
+        self.assertEqual(receipt["archivedPreserved"], [ref])
+        self.assertEqual(receipt["verdict"], "fix-no-change")
+        self.assertEqual(len(ran), 1)
+        self.assertFalse(self.path.exists())
+        self.assertEqual(self.git(self.host.repo, "show", f"{ref}:repair.txt"), "unpublished fix")
+        self.assertEqual(self.git(self.host.repo, "show", f"{ref}:draft.txt"), "uncommitted follow-up")
+        self.assertNotIn(lane.disk_guard.PRESERVED_REPAIR,
+                         self.git(self.host.repo, "ls-tree", "--name-only", ref))
+
+    def age_marker(self, hours=7):
+        marker = self.path / lane.disk_guard.PRESERVED_REPAIR
+        data = json.loads(marker.read_text())
+        data["at"] = datetime.fromtimestamp(time.time() - hours * 3600, timezone.utc).isoformat()
+        marker.write_text(json.dumps(data))
+
+    def test_fresh_resumable_or_busy_preserved_work_is_never_archived(self):
+        self.cancelled_predecessor(commit=True)
+        self.assertIsNone(lane.archive_unresumable_preserved(self.host, self.path, "preserved-head-superseded"),
+                          "a fresh handoff waits for its owner")
+        self.age_marker()
+        self.assertIsNone(lane.archive_unresumable_preserved(self.host, self.path, "preserved-head-diverged"))
+        self.active = f"p123\nn{self.path}\n"
+        self.assertIsNone(lane.archive_unresumable_preserved(self.host, self.path, "preserved-head-superseded"))
+        self.assertTrue((self.path / lane.disk_guard.PRESERVED_REPAIR).exists())
+        self.assertEqual(self.git(self.host.repo, "for-each-ref", lane.PRESERVED_ARCHIVE_REF), "")
+
     def test_busy_published_checkout_is_never_retired(self):
         self.cancelled_predecessor()
         self.active = f"p123\nn{self.path}\n"
@@ -7036,6 +7078,12 @@ class RepairQueueAuthorityTest(unittest.TestCase):
             self.assertEqual(json.loads((host.state / "fix-attempts.json").read_text())["5"]["count"], 1)
 
 class LifecycleOwnershipTest(unittest.TestCase):
+    # Hang guards, not latency budgets: every wait below polls a readiness
+    # file or lock and returns as soon as it flips (well under 1s when idle).
+    # A loaded host (load avg 20-87) needs 10s+ just to spawn a Python worker
+    # and import lane_runner, so fixed 8-10s deadlines failed 4/5 runs there.
+    HANG_GUARD = 60
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -7055,6 +7103,27 @@ class LifecycleOwnershipTest(unittest.TestCase):
     def assert_activation_held(self):
         with self.assertRaises(BlockingIOError):
             self.exclusive()
+
+    def wait_started(self, marker, process, message):
+        deadline = time.monotonic() + self.HANG_GUARD
+        while not marker.exists() and time.monotonic() < deadline:
+            if process is not None and process.poll() is not None:
+                break
+            time.sleep(.01)
+        if not marker.exists() and process is not None and process.poll() is not None:
+            self.fail(f"{message}: worker exited {process.returncode}: {process.communicate()[1]}")
+        self.assertTrue(marker.exists(), message)
+
+    def wait_drained(self, message):
+        deadline = time.monotonic() + self.HANG_GUARD
+        while True:
+            try:
+                with self.exclusive():
+                    return
+            except BlockingIOError:
+                if time.monotonic() >= deadline:
+                    self.fail(message)
+                time.sleep(.01)
 
     def test_exclusive_fence_denies_all_controller_effects(self):
         handle = self.exclusive()
@@ -7212,24 +7281,22 @@ class LifecycleOwnershipTest(unittest.TestCase):
         done = self.state / "gate-done"
         command = ("from pathlib import Path; import time; "
                    f"Path({str(started)!r}).touch(); "
-                   f"deadline=time.monotonic()+8\nwhile not Path({str(done)!r}).exists():\n"
+                   f"deadline=time.monotonic()+{self.HANG_GUARD}\nwhile not Path({str(done)!r}).exists():\n"
                    " if time.monotonic()>deadline: raise RuntimeError('test gate not released')\n"
                    " time.sleep(.01)\n")
         results = []
         with (self.state / "gate-owner.lock").open("a+") as owner:
             with lane.lifecycle.Guard(self.state):
                 thread = threading.Thread(target=lambda: results.append(
-                    lane.sh([sys.executable, "-c", command], timeout=10, pass_fds=(owner.fileno(),))))
+                    lane.sh([sys.executable, "-c", command], timeout=self.HANG_GUARD,
+                            pass_fds=(owner.fileno(),))))
                 thread.start()
-                deadline = time.monotonic() + 8
-                while not started.exists() and time.monotonic() < deadline:
-                    time.sleep(.01)
-                self.assertTrue(started.exists(), "gate command did not start")
+                self.wait_started(started, None, "gate command did not start")
             try:
                 self.assert_activation_held()
             finally:
                 done.touch()
-                thread.join(timeout=12)
+                thread.join(timeout=self.HANG_GUARD + 2)
             self.assertFalse(thread.is_alive())
             self.assertEqual(len(results), 1)
             self.assertEqual(results[0].returncode, 0, results[0].stderr)
@@ -7242,33 +7309,23 @@ class LifecycleOwnershipTest(unittest.TestCase):
         agent = ("from pathlib import Path; import os,time; "
                  "os.fstat(int(os.environ['LANES_LIFECYCLE_FD'])); "
                  f"Path({str(started)!r}).touch(); "
-                 f"deadline=time.monotonic()+10\nwhile not Path({str(done)!r}).exists():\n"
+                 f"deadline=time.monotonic()+{self.HANG_GUARD}\nwhile not Path({str(done)!r}).exists():\n"
                  " if time.monotonic()>deadline: raise RuntimeError('test provider not released')\n"
                  " time.sleep(.01)\n")
         worker = ("import sys; from pathlib import Path; "
                   f"sys.path.insert(0,{str(ROOT / 'scripts/lanes')!r}); import lane_runner as lane; "
                   f"guard=lane.lifecycle.Guard(Path({str(self.state)!r})); guard.__enter__(); "
-                  f"lane.run_agent([sys.executable,'-c',{agent!r}],Path({str(self.state)!r}),sys.stdout,15)")
+                  f"lane.run_agent([sys.executable,'-c',{agent!r}],Path({str(self.state)!r}),sys.stdout,"
+                  f"{self.HANG_GUARD + 15})")
         process = subprocess.Popen([sys.executable, "-u", "-c", worker],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=lane.selftest_env(self.state))
         try:
-            deadline = time.monotonic() + 8
-            while not started.exists() and time.monotonic() < deadline:
-                time.sleep(.01)
-            self.assertTrue(started.exists(), "fake provider did not start")
+            self.wait_started(started, process, "fake provider did not start")
             process.kill()  # this test-created parent; no real provider/assignment
             process.wait(timeout=5)
             self.assert_activation_held()
             done.touch()
-            deadline = time.monotonic() + 10
-            while True:
-                try:
-                    with self.exclusive():
-                        break
-                except BlockingIOError:
-                    if time.monotonic() >= deadline:
-                        self.fail("fake provider helper did not drain")
-                    time.sleep(.01)
+            self.wait_drained("fake provider helper did not drain")
         finally:
             done.touch()
             if process.poll() is None:
@@ -7318,34 +7375,23 @@ class LifecycleOwnershipTest(unittest.TestCase):
     def test_ordinary_command_helper_survives_controller_death(self):
         started, done = self.state / "started", self.state / "done"
         child = ("import os,time; from pathlib import Path; "
-                 f"Path({str(started)!r}).touch(); deadline=time.monotonic()+10\n"
+                 f"Path({str(started)!r}).touch(); deadline=time.monotonic()+{self.HANG_GUARD}\n"
                  f"while not Path({str(done)!r}).exists():\n"
                  " if time.monotonic()>deadline: raise RuntimeError('fixture not released')\n"
                  " time.sleep(.01)\n")
         worker = ("import sys; from pathlib import Path; "
                   f"sys.path.insert(0,{str(ROOT / 'scripts/lanes')!r}); import lane_runner as lane; "
                   f"guard=lane.lifecycle.Guard(Path({str(self.state)!r})); guard.__enter__(); "
-                  f"lane.sh([sys.executable,'-c',{child!r}],timeout=15)")
+                  f"lane.sh([sys.executable,'-c',{child!r}],timeout={self.HANG_GUARD + 15})")
         process = subprocess.Popen([sys.executable, "-u", "-c", worker],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=lane.selftest_env(self.state))
         try:
-            deadline = time.monotonic() + 8
-            while not started.exists() and time.monotonic() < deadline:
-                time.sleep(.01)
-            self.assertTrue(started.exists(), "ordinary command fixture did not start")
+            self.wait_started(started, process, "ordinary command fixture did not start")
             process.kill()  # only this fake controller
             process.wait(timeout=5)
             self.assert_activation_held()
             done.touch()
-            deadline = time.monotonic() + 10
-            while True:
-                try:
-                    with self.exclusive():
-                        break
-                except BlockingIOError:
-                    if time.monotonic() >= deadline:
-                        self.fail("ordinary command helper did not drain")
-                    time.sleep(.01)
+            self.wait_drained("ordinary command helper did not drain")
         finally:
             done.touch()
             if process.poll() is None:
