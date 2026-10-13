@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Per-route initial client JS budget for authed /app routes.
+ * Per-route initial client JS budget for authed /app routes (PR-time proof).
  *
  * Reads a finished `next build` (.next): for each /app page, the initial JS
  * is the root main files plus every chunk in the page's client-reference
