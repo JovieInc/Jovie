@@ -66,6 +66,11 @@ describe('ArtistProfileContent', () => {
   it('keeps the canonical settings header and panel anatomy while loading', () => {
     render(<ArtistProfileContent />);
 
+    // Same companion-rail reservation marker before and after load (no shift).
+    expect(
+      document.querySelectorAll('[data-settings-companion-rail="true"]')
+    ).toHaveLength(1);
+
     expect(
       screen.getByRole('heading', { name: 'Profile' })
     ).toBeInTheDocument();
@@ -131,6 +136,9 @@ describe('ArtistProfileContent', () => {
       name: /view as visitor/i,
     });
     expect(publicProfile).toHaveAttribute('href', '/ada');
+    expect(
+      document.querySelectorAll('[data-settings-companion-rail="true"]')
+    ).toHaveLength(1);
     expect(publicProfile).toHaveAttribute('target', '_blank');
     expect(screen.getByText('Profile fields')).toBeInTheDocument();
     expect(screen.getByText('Pay settings')).toBeInTheDocument();
