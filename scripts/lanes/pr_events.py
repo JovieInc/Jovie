@@ -1251,6 +1251,29 @@ def read_state(host, name: str) -> dict:
         return {}
 
 
+# 2026-10-13 07:52Z storm: groups failed on the repo's exhausted GITHUB_TOKEN, the relay
+# labelled each ejected PR `dequeued`, and this tick merged main into it within minutes: a
+# new head, re-enqueued into the same dry bucket, ejected again (#20970 eight groups in an
+# hour). An ejection GitHub's quota caused waits this long before main is merged in.
+QUOTA_EJECTION_BACKOFF_S = 30 * 60
+
+
+def quota_ejection_hold(host, lane, pr: dict, now: float) -> bool:
+    """True while this exact head's last merge-group failure was GitHub quota or 5xx and the
+    backoff has not elapsed. Unreadable evidence never holds."""
+    key, head = str(pr["number"]), pr.get("headRefOid")
+    row = read_state(host, "quota-ejections.json").get(key)
+    if isinstance(row, dict) and row.get("head") == head:
+        return now - float(row.get("at") or 0) < QUOTA_EJECTION_BACKOFF_S
+    excerpt = queue_failure(lane, pr["number"])
+    kind = classify_github_failure(excerpt) if excerpt else None
+    if kind in (None, "none"):
+        return False
+    lane.update_json(host.state / "quota-ejections.json",
+                     lambda rows: rows.update({key: {"head": head, "at": now, "kind": kind}}))
+    return True
+
+
 def queue_failure(lane, number: int, limit: int = 4000) -> str:
     """The merge group's own failing lines: a dequeued head is often green on its own, so the
     PR's checks say nothing about why the queue rejected it."""
@@ -1981,9 +2004,12 @@ def tick(host, lane, linear_factory, now: float | None = None) -> dict:
         if "dequeued" in pr["eventKinds"] and str(pr["number"]) not in synced and pr.get("mergeStateStatus") != "DIRTY" \
                 and POISON_LABEL not in label_names(pr) \
                 and in_scope(pr, "red", set()):
-            outcomes[pr["number"]] = sync_main(host, lane, pr, now)
-            if outcomes[pr["number"]] == "synced":
-                consume(lane, pr, ["dequeued"])
+            if quota_ejection_hold(host, lane, pr, now):
+                outcomes[pr["number"]] = "held:github-quota"
+            else:
+                outcomes[pr["number"]] = sync_main(host, lane, pr, now)
+                if outcomes[pr["number"]] == "synced":
+                    consume(lane, pr, ["dequeued"])
         if "green" in pr["eventKinds"]:
             outcome = ready_green(host, lane, pr, held, now)
             outcomes[pr["number"]] = outcome
