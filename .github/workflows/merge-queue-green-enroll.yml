@@ -46,13 +46,17 @@ on:
         description: 'Log eligible PRs without enqueueing'
         required: false
         default: 'false'
+      pr_number:
+        description: 'Admit only this PR (per-PR path, no roster sweep); empty sweeps every open PR'
+        required: false
+        default: ''
 
 permissions: {}
 
 concurrency:
   # A global pending slot loses another PR's final wake. Coalesce only wakes
   # attributed to the same PR; association-free receipts retain their run ID.
-  group: merge-queue-green-enroll-${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'push') && 'reconcile' || github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.id || github.run_id }}
+  group: merge-queue-green-enroll-${{ ((github.event_name == 'workflow_dispatch' && inputs.pr_number == '') || github.event_name == 'push') && 'reconcile' || inputs.pr_number || github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.id || github.run_id }}
   cancel-in-progress: false
 
 jobs:
@@ -122,8 +126,10 @@ jobs:
   enroll:
     name: Enqueue green PRs
     needs: [hold-failed-revision]
+    # QUEUE_FREEZE=1 (repo variable) admits nothing; holds and dequeues still run.
     if: >-
       always() &&
+      vars.QUEUE_FREEZE != '1' &&
       github.event.action != 'labeled' &&
       (github.event_name != 'pull_request_target' || github.event.pull_request.draft == false) &&
       (github.event_name != 'workflow_run' ||
@@ -168,6 +174,7 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           DRY_RUN: ${{ inputs.dry_run || 'false' }}
+          DISPATCH_PR_NUMBER: ${{ inputs.pr_number || '' }}
           MERGE_STATE_RETRY_MS: '3000'
           FAILURE_HOLD_RECEIPT: ${{ needs.hold-failed-revision.outputs.failure_receipt || '' }}
           ADMISSION_RECOVERY_RECEIPT: ${{ needs.hold-failed-revision.outputs.admission_recovery_receipt || '' }}
@@ -200,8 +207,13 @@ jobs:
             // Use the triggering PR for automatic wakes. Scanning every eligible PR
             // on every check completion exhausts the shared app GraphQL quota.
             const validNumber = n => Number.isSafeInteger(n) && n > 0;
+            // A dispatch naming one PR takes the per-PR path; only an unnamed
+            // dispatch or a landing on main sweeps the roster.
+            const dispatchedPr = Number(process.env.DISPATCH_PR_NUMBER || 0);
+            const sweep = context.eventName === 'push' ||
+              (context.eventName === 'workflow_dispatch' && !validNumber(dispatchedPr));
             let prs;
-            if (['workflow_dispatch', 'push'].includes(context.eventName)) {
+            if (sweep) {
               // Reconciliation (a landing on main or a manual run)
               // keeps a complete paginated inventory.
               prs = await github.paginate(github.rest.pulls.list, {
@@ -209,7 +221,9 @@ jobs:
               });
             } else {
               let numbers = [];
-              if (context.eventName === 'pull_request_target') {
+              if (context.eventName === 'workflow_dispatch') {
+                numbers = [dispatchedPr];
+              } else if (context.eventName === 'pull_request_target') {
                 numbers = [context.payload.pull_request?.number].filter(validNumber);
               } else if (context.eventName === 'workflow_run') {
                 const run = context.payload.workflow_run || {};
@@ -259,7 +273,6 @@ jobs:
             // give an UNKNOWN PR one fresh read with no sleep, go
             // longest-waiting first, and stop at a time budget; the PRs left
             // over are re-read on their own events and on the next sweep.
-            const sweep = ['workflow_dispatch', 'push'].includes(context.eventName);
             const startedAt = Date.now();
             const budgetMs = Math.max(1000, Number(process.env.SWEEP_BUDGET_MS ?? 200000) || 200000);
             const overBudget = () => sweep && Date.now() - startedAt > budgetMs;
@@ -602,6 +615,7 @@ jobs:
     needs: [hold-failed-revision]
     if: >-
       always() &&
+      vars.QUEUE_FREEZE != '1' &&
       needs.hold-failed-revision.result == 'success' &&
       github.event_name == 'workflow_run' &&
       github.event.workflow_run.event == 'merge_group'
