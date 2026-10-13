@@ -35,7 +35,13 @@ const NIGHTLY = {
 // not landed after it is replaced and retired as before.
 export const REPORT_COALESCE_MS = 6 * 60 * 60 * 1000;
 
-/** The open report PR of this profile created within the coalesce window. */
+/**
+ * The open report PR of this profile created within the coalesce window. A
+ * conflicted one can never land (its parent is the pinned measured source, so
+ * a later report merging over the same files makes it DIRTY): it absorbs
+ * nothing, and the next publication replaces and retires it (#21585,
+ * 2026-10-13 09:22Z).
+ */
 export function inFlightReport(
   openPrs,
   branch,
@@ -48,6 +54,7 @@ export function inFlightReport(
       .filter(
         pr =>
           owned.test(pr.headRefName ?? '') &&
+          pr.mergeable !== 'CONFLICTING' &&
           now - Date.parse(pr.createdAt) < windowMs
       )
       .sort((a, b) => b.number - a.number)[0] ?? null
@@ -104,7 +111,7 @@ function publishReport(
         '--limit',
         '1000',
         '--json',
-        'number,headRefName,createdAt',
+        'number,headRefName,createdAt,mergeable',
       ]) || '[]'
     ),
     profile.branch,
