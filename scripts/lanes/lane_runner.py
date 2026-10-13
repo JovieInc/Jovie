@@ -3577,7 +3577,7 @@ def revisit_terminal_prs(host: Host, prs: list[dict], now: float | None = None) 
     `queue_ejections` counts from, so a defect that still fails re-poisons after two more
     ejections, whoever authored the PR (bots and Dependabot included).
     A conflicted (DIRTY) head cannot take all of main without a model, but it can take the
-    newest main commit that still merges cleanly (`partial_main_sync`): that moves it as far
+    newest main commit that still merges cleanly (`partial_main_sync`, JOV-INV-043): that moves it as far
     as a deterministic merge can and gives the remaining conflict a fresh, smaller generation.
     No attempt or rung is refunded or reset. The PR revisited longest ago goes first, so a
     few PRs whose conflict main cannot move past never starve the rest.
