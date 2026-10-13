@@ -208,13 +208,18 @@ it('uses the same published hero descriptor as the validated update feed', async
   const release = RELEASES[0]!;
   const reviewed = {
     ...release,
-    customerOutcomes: Object.fromEntries(
-      Object.values(release.sections)
-        .flat()
-        .map(text => [
-          text,
-          { availability: 'unverified' as const, prerequisites: [] },
-        ])
+    customerOutcomes: Object.entries(release.sections).flatMap(
+      ([section, entries]) =>
+        (entries as readonly string[]).map((summary, index) => ({
+          storyId: `${section}-${index}`,
+          entryId: `customer-update:${section}-${index}`,
+          slug: `update-${section}-${index}`,
+          aliases: [],
+          summary,
+          section: section as keyof typeof release.sections,
+          availability: 'unverified' as const,
+          prerequisites: [],
+        }))
     ),
   };
   const update = parseWhatsNewFeed(

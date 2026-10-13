@@ -80,7 +80,7 @@ interface ContactDetailResponse {
   readonly certification: ContactCertificationInspection;
 }
 
-function humanize(value: string) {
+export function humanize(value: string) {
   if (value === 'dsp') return 'DSP artist identities';
   if (value === 'catalog') return 'Releases, recordings & ISRCs';
   if (value === 'stale') return 'Recertification required';
@@ -124,13 +124,17 @@ function StageBadge({ stage }: { readonly stage: ContactLifecycleStage }) {
   );
 }
 
-function EvidenceItemCard({
+/** One discovered fact with Yes / No / Unsure; reused by Ovie Outbound. */
+export function EvidenceItemCard({
   item,
   pending,
+  active = false,
   onDecision,
 }: Readonly<{
   item: ContactEvidenceItem;
   pending: boolean;
+  /** Keyboard target for y / n / u in Ovie Outbound. */
+  active?: boolean;
   onDecision: (
     item: ContactEvidenceItem,
     decision: ContactEvidenceDecision,
@@ -143,7 +147,13 @@ function EvidenceItemCard({
       ? 'unknown'
       : `${Math.round(item.confidence * 100)}%`;
   return (
-    <article className='space-y-2 border-t border-subtle px-1 py-3 first:border-t-0'>
+    <article
+      className={cn(
+        'space-y-2 border-t border-subtle px-1 py-3 first:border-t-0',
+        active && 'rounded-md bg-surface-1'
+      )}
+      aria-current={active ? 'true' : undefined}
+    >
       <p className='text-xs font-medium text-primary-token'>{item.label}</p>
       {item.url ? (
         <a

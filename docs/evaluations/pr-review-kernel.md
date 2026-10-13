@@ -22,7 +22,7 @@ Contract: [`scripts/lib/pr-review-contracts.mjs`](../../scripts/lib/pr-review-co
 - **FX is not the executor.** `fx-cli` is the hosted remediation tier, and Rolling
   CI Dispatch is `disabled_manually`. The review emits a receipt. The PR's author
   session reads it and fixes verified findings on the same PR.
-- **Trusted execution only.** Per `claude-review.yml`, PR-controlled code never
+- **Trusted execution only.** As in the retired `claude-review.yml`, PR-controlled code never
   runs with review credentials.
   - The review job runs from `main`. It reads the PR diff and files as data and
     never checks out or executes PR code.

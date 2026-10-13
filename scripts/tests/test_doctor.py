@@ -995,6 +995,16 @@ class StatusFeedTest(unittest.TestCase):
         self.assertEqual(metric["accountIdleSecondsWhileQualifiedWorkExists"], 100)
         self.assertEqual(feed["_idleQualifiedSince"], {"codex": 900.0})
 
+    def test_feed_names_expected_quota_block_instead_of_unhealthy_capacity(self):
+        host = type("Host", (), {"state": Path("/tmp")})()
+        lane = type("Lane", (), {"HOST": "gem", "provider_throughput": staticmethod(throughput_stub)})
+        observed = obs(poolByProvider={"claude": 5},
+                       capacityByProvider={"claude": {"running": 0, "slots": 2}})
+        feed = doctor.status_feed(host, lane, observed, {},
+                                  {"quotaBlocked": {"claude": "banked:usage-limit"}})
+        self.assertEqual(feed["throughput"]["providers"]["claude"]["idleReason"],
+                         "quota-blocked:banked:usage-limit")
+
     def test_terminal_pr_backlog_is_its_own_idle_reason(self):
         """JOV-7514: parked hold/exhausted PRs must not be reported as the active open-PR cap."""
         host = type("Host", (), {"state": Path("/tmp")})()
@@ -1583,11 +1593,10 @@ class MergeWindowTest(unittest.TestCase):
                 "updatedAt": doctor.epoch_iso(self.NOW - age)}
 
     def pages(self, rows):
-        def fetch(cursor):
-            start = int(cursor or 0)
-            end = min(start + 100, len(rows))
-            return {"totalCount": len(rows), "nodes": rows[start:end],
-                    "pageInfo": {"hasNextPage": end < len(rows), "endCursor": str(end)}}
+        """A search API stand-in: every PR merged in [lo, hi], at most 100 per page."""
+        def fetch(lo, hi):
+            hits = [row for row in rows if lo <= doctor.merge_evidence._epoch(row["mergedAt"]) <= hi]
+            return {"issueCount": len(hits), "nodes": hits[:100]}
         return fetch
 
     def collect(self, fetch, **options):
@@ -1598,9 +1607,16 @@ class MergeWindowTest(unittest.TestCase):
         rows = [self.row(i + 1, i) for i in range(206)]
         result = self.collect(self.pages(rows))
         self.assertTrue(result["complete"])
-        self.assertEqual(result["pages"], 6)
-        self.assertEqual(result["scans"], 2)
+        self.assertGreater(result["pages"], 1, "a window over one page is split, never paged by cursor")
         self.assertEqual([r["number"] for r in result["prs"]], list(range(2, 202)))
+
+    def test_lagging_updated_order_no_longer_makes_the_window_unknown(self):
+        # 2026-10-13: the connection listed #21435 (22:41Z) ahead of #21430 (23:19Z).
+        late = self.row(2, 5)
+        late["updatedAt"] = doctor.epoch_iso(self.NOW - 1)
+        result = self.collect(self.pages([self.row(1, 3), late, self.row(3, 1)]))
+        self.assertTrue(result["complete"])
+        self.assertEqual([r["number"] for r in result["prs"]], [1, 2, 3])
 
     def test_old_merge_updated_recently_does_not_count(self):
         old = self.row(1, 300)
@@ -1608,53 +1624,30 @@ class MergeWindowTest(unittest.TestCase):
         result = self.collect(self.pages([old, self.row(2, 1)]))
         self.assertEqual([r["number"] for r in result["prs"]], [2])
 
-    def test_second_scan_detects_equal_count_changed_membership(self):
-        rounds = 0
-        def fetch(cursor):
-            nonlocal rounds
-            rounds += 1
-            return self.pages([self.row(rounds, 1)])(cursor)
-        result = self.collect(fetch)
-        self.assertEqual(result["reason"], "unstable_snapshot")
-        self.assertEqual(result["prs"], [])
-
     def test_typed_incomplete_for_corrupt_or_partial_pages(self):
-        good = self.pages([self.row(1, 1)])(None)
+        good = self.pages([self.row(1, 1)])(0, self.NOW)
         cases = [
             (None, "malformed_page"),
-            ({**good, "totalCount": True}, "malformed_page"),
-            ({**good, "totalCount": 2}, "result_count_mismatch"),
-            ({**good, "totalCount": 0}, "result_count_mismatch"),
+            ({**good, "issueCount": True}, "malformed_page"),
+            ({**good, "issueCount": 0}, "malformed_page"),
             ({**good, "nodes": [{**good["nodes"][0], "mergedAt": "bad"}]}, "malformed_pr"),
             ({**good, "nodes": [{**good["nodes"][0], "number": True}]}, "malformed_pr"),
-            ({**good, "nodes": [self.row(1, 2), self.row(2, 1)]}, "unstable_page_order"),
-            ({**good, "totalCount": 2, "nodes": [self.row(1, 1), self.row(1, 1)]}, "duplicate_pr"),
-            ({**good, "pageInfo": {"hasNextPage": False}}, "malformed_page"),
-            ({**good, "pageInfo": {"hasNextPage": True, "endCursor": ""}}, "malformed_cursor"),
+            ({"issueCount": 2, "nodes": [self.row(1, 1), {**self.row(1, 1), "title": "other"}]}, "duplicate_pr"),
+            ({"issueCount": 101, "nodes": []}, "slice_too_dense"),
         ]
         for page, reason in cases:
             with self.subTest(reason=reason, page=page):
-                result = self.collect(lambda cursor: page)
+                result = self.collect(lambda lo, hi: page)
                 self.assertFalse(result["complete"])
                 self.assertEqual(result["reason"], reason)
                 self.assertEqual(result["prs"], [])
                 with self.assertRaisesRegex(doctor.merge_evidence.IncompleteMergeEvidence, reason):
                     doctor.merge_evidence.require_complete(result)
 
-    def test_page_limit_count_drift_and_repeated_cursor(self):
+    def test_page_limit(self):
         source = self.pages([self.row(i + 1, i + 1) for i in range(102)])
         self.assertEqual(self.collect(source, max_pages=1)["reason"], "max_pages_reached")
-        def changed_count(cursor):
-            page = source(cursor)
-            if cursor:
-                page["totalCount"] += 1
-            return page
-        self.assertEqual(self.collect(changed_count)["reason"], "unstable_snapshot")
-        def repeated(cursor):
-            page = source(cursor)
-            page["pageInfo"] = {"hasNextPage": True, "endCursor": "100"}
-            return page
-        self.assertEqual(self.collect(repeated)["reason"], "malformed_cursor")
+        self.assertTrue(self.collect(source)["complete"])
 
     def test_read_failure_deadline_and_invalid_options(self):
         with mock.patch.object(doctor.merge_evidence.subprocess, "run", side_effect=OSError("offline")):
@@ -1665,27 +1658,26 @@ class MergeWindowTest(unittest.TestCase):
         self.assertEqual(self.collect(self.pages([]), max_pages=0)["reason"], "invalid_fetch_options")
         self.assertEqual(self.collect(self.pages([]), timeout_s=float("nan"))["reason"], "invalid_fetch_options")
 
-    def test_default_transport_paginates_both_scans_under_one_deadline(self):
+    def test_default_transport_splits_search_windows_under_one_deadline(self):
         source = self.pages([self.row(i + 1, i + 1) for i in range(120)])
         calls = []
         def run(args, **kwargs):
             calls.append((args, kwargs))
-            cursor = next((arg.removeprefix("cursor=") for arg in args
-                           if arg.startswith("cursor=")), None)
-            return SimpleNamespace(returncode=0, stdout=json.dumps({
-                "data": {"repository": {"pullRequests": source(cursor)}}}))
+            query = next(arg.removeprefix("q=") for arg in args if arg.startswith("q="))
+            lo, hi = query.split("merged:", 1)[1].split("..")
+            page = source(doctor.merge_evidence._epoch(lo), doctor.merge_evidence._epoch(hi))
+            return SimpleNamespace(returncode=0, stdout=json.dumps({"data": {"search": page}}))
         with mock.patch.object(doctor.merge_evidence.subprocess, "run", side_effect=run):
             result = doctor.merge_evidence.collect("JovieInc/Jovie", self.NOW - 200, self.NOW)
         self.assertTrue(result["complete"])
-        self.assertEqual((result["pages"], result["scans"], len(result["prs"])), (4, 2, 120))
-        self.assertEqual(len(calls), 4)
+        self.assertEqual(len(result["prs"]), 120)
+        self.assertEqual(result["pages"], len(calls))
+        self.assertGreater(len(calls), 1)
         for args, kwargs in calls:
             self.assertEqual(args[:3], ["gh", "api", "graphql"])
-            self.assertIn("owner=JovieInc", args)
-            self.assertIn("name=Jovie", args)
+            self.assertTrue(any(arg.startswith("q=repo:JovieInc/Jovie is:pr is:merged merged:") for arg in args))
             self.assertGreater(kwargs["timeout"], 0)
             self.assertLessEqual(kwargs["timeout"], 60)
-        self.assertEqual(sum("cursor=100" in args for args, _ in calls), 2)
         timeouts = [kwargs["timeout"] for _, kwargs in calls]
         self.assertEqual(timeouts, sorted(timeouts, reverse=True))
 
@@ -1695,7 +1687,7 @@ class MergeWindowTest(unittest.TestCase):
             (SimpleNamespace(returncode=0, stdout="not json"), "fetch_failed"),
             (SimpleNamespace(returncode=0, stdout="[]"), "fetch_failed"),
             (SimpleNamespace(returncode=0, stdout='{"errors":[{"message":"unavailable"}]}'), "fetch_failed"),
-            (SimpleNamespace(returncode=0, stdout='{"data":{"repository":null}}'), "fetch_failed"),
+            (SimpleNamespace(returncode=0, stdout='{"data":null}'), "fetch_failed"),
             (doctor.merge_evidence.subprocess.TimeoutExpired("gh", 1), "deadline_exceeded"),
         ]
         for response, reason in cases:

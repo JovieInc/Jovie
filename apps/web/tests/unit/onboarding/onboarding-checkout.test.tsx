@@ -324,10 +324,10 @@ describe('OnboardingCheckoutClient', () => {
     ).toBeInTheDocument();
   });
 
-  it('leads with canonical offer outcomes and never contradicts the live profile', () => {
+  it('leads with certified highlights and never contradicts the live profile', () => {
     render(<OnboardingCheckoutClient {...defaultProps} isDefaultUpsell />);
 
-    // Hierarchy: heading → profile identity → outcomes → price → CTA → free keep.
+    // Hierarchy: heading → profile identity → highlights → price → CTA → free keep.
     const heading = screen.getByRole('heading', {
       name: 'Upgrade To Artist Presence',
     });
@@ -344,14 +344,17 @@ describe('OnboardingCheckoutClient', () => {
       Node.DOCUMENT_POSITION_FOLLOWING
     );
 
-    // Outcome-led value from canonical offer truth.
-    for (const outcome of [
-      'Continuous visibility monitoring',
-      'Prioritized opportunities',
-      'Agentic fixes',
+    // Certified capabilities only (JOV-7794); monitoring is internal-only.
+    for (const highlight of [
+      'Payments',
+      '90-day Analytics',
+      'Verified Badge',
     ]) {
-      expect(screen.getByText(outcome)).toBeInTheDocument();
+      expect(screen.getByText(highlight)).toBeInTheDocument();
     }
+    expect(
+      screen.queryByText('Continuous visibility monitoring')
+    ).not.toBeInTheDocument();
 
     // The profile is already live — "start free" copy must never appear.
     expect(screen.queryByText(/start free/i)).not.toBeInTheDocument();
@@ -422,5 +425,55 @@ describe('OnboardingCheckoutClient', () => {
     );
 
     expect(recordOfferDecisionMock).not.toHaveBeenCalled();
+  });
+
+  it('shows computed claim-time proof before the price, capped at four facts', () => {
+    render(
+      <OnboardingCheckoutClient
+        {...defaultProps}
+        proofFindings={[
+          {
+            slot: 'assembled-profile',
+            title: 'Profile assembly',
+            facts: [
+              { label: 'Tracks', value: '12' },
+              { label: 'Releases', value: '3' },
+              { label: 'Active links', value: '5' },
+            ],
+          },
+          {
+            slot: 'live-profile-url',
+            title: 'Smart link',
+            facts: [
+              { label: 'Handle', value: '@timwhite' },
+              { label: 'URL', value: 'https://jov.ie/timwhite' },
+            ],
+          },
+        ]}
+      />
+    );
+
+    const card = screen.getByTestId('claim-time-proof');
+    expect(card).toHaveTextContent('Found From Your Profile');
+    expect(card).toHaveTextContent('Tracks12');
+    expect(card).toHaveTextContent('Handle@timwhite');
+    expect(card).not.toHaveTextContent('https://jov.ie/timwhite');
+    expect(
+      card.compareDocumentPosition(screen.getByText('$39.00')) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+
+  it('hides the proof card when there is no real finding', () => {
+    render(<OnboardingCheckoutClient {...defaultProps} proofFindings={[]} />);
+    expect(screen.queryByTestId('claim-time-proof')).not.toBeInTheDocument();
+  });
+
+  it('sells certified capabilities, not internal-only monitoring', () => {
+    render(<OnboardingCheckoutClient {...defaultProps} />);
+    expect(screen.queryByText(/monitoring/i)).not.toBeInTheDocument();
+    expect(
+      screen.getByText('Take tips and payments on your profile')
+    ).toBeInTheDocument();
   });
 });

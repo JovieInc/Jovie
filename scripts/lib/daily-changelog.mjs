@@ -38,6 +38,9 @@ export const DAILY_EXCLUSION_REASONS = Object.freeze([
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const SHA_RE = /^[0-9a-f]{40}$/;
+const OUTCOME_KEY_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const ENTRY_ID_RE = /^customer-update:[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const FRAGMENT_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const NUMBER_TOKEN_RE = /\d[\d.,%x-]*/g;
 const RECEIPT_COMMENT_RE =
   /<!--\s*daily-changelog-receipt\/v1\s+(\{[\s\S]*?\})\s*-->/g;
@@ -216,6 +219,23 @@ export function validateDailyDraft(draft, eligibleById) {
     findings.push({
       rule: 'story-contract',
       message: `${prefix} has an invalid section.`,
+    });
+  }
+  if (
+    !OUTCOME_KEY_RE.test(draft.id ?? '') ||
+    !ENTRY_ID_RE.test(draft.entryId ?? '') ||
+    !FRAGMENT_RE.test(draft.slug ?? '') ||
+    !Array.isArray(draft.aliases) ||
+    draft.aliases.length > 20 ||
+    !draft.aliases.every(alias => FRAGMENT_RE.test(alias)) ||
+    new Set([draft.slug, ...draft.aliases]).size !== draft.aliases.length + 1 ||
+    draft.entryId !== `customer-update:${draft.id}` ||
+    draft.slug !== `update-${draft.id}`
+  ) {
+    findings.push({
+      rule: 'story-identity',
+      storyId: draft.id,
+      message: `${prefix} needs one collision-free immutable entry identity.`,
     });
   }
   if (
@@ -428,6 +448,9 @@ export function evaluateDailyWindow({
   const eligibleSourceIds = [...eligibleById.keys()].sort();
   const stories = drafts.map(draft => ({
     id: draft.id,
+    entryId: draft.entryId,
+    slug: draft.slug,
+    aliases: [...(Array.isArray(draft.aliases) ? draft.aliases : [])],
     section: draft.section,
     summary: draft.summary,
     bullets: (Array.isArray(draft.bullets) ? draft.bullets : [])

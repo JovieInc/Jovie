@@ -73,6 +73,8 @@ export function projectWhatsNew(
         release.kind === 'daily'
           ? lead.summary
           : release.summary || lead.summary,
+      // The version post is the immutable published URL and the hero's post
+      // binding (#21224); entry fragments live on the archive, not here.
       url: `${baseUrl}/changelog/${encodeURIComponent(release.version)}`,
       highlights: outcomes
         .slice(1, HIGHLIGHT_LIMIT + 1)
