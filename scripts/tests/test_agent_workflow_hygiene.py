@@ -1505,8 +1505,9 @@ def test_api_only_pr_controllers_never_consume_fixed_ci_capacity() -> None:
         encoding="utf-8"
     )
     assert "Graphite" not in dependabot
-    assert "scripts/native-merge-intent.mjs" in dependabot
-    assert "--match-head-commit" in (REPO_ROOT / "scripts" / "native-merge-intent.mjs").read_text(encoding="utf-8")
+    # Green enroll is the sole queue writer; Dependabot reconciliation never arms.
+    assert "native-merge-intent" not in dependabot
+    assert "--auto" not in dependabot
     adapter = (REPO_ROOT / "scripts" / "dependabot-workflow-run-adapter.mjs").read_text(
         encoding="utf-8"
     )
@@ -1527,10 +1528,7 @@ def test_dependabot_workflow_materializes_trusted_policy_runtime() -> None:
     assert "\n  workflow_run:" not in workflow
     assert "actions/download-artifact" not in workflow
     assert "      actions: read" in workflow
-    for entrypoint in (
-        "scripts/dependabot-workflow-run-adapter.mjs",
-        "scripts/native-merge-intent.mjs",
-    ):
+    for entrypoint in ("scripts/dependabot-workflow-run-adapter.mjs",):
         assert entrypoint in materialized
         _assert_local_runtime_closure(materialized, entrypoint)
 
