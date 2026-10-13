@@ -157,7 +157,7 @@ test.describe('Pricing Page', () => {
           await expect(selector).toBeFocused();
           await expect(selector).toHaveValue('pro');
           await expect(
-            table.getByRole('columnheader', { name: /Pro/ })
+            table.getByRole('columnheader', { name: /Artist Presence/ })
           ).toContainText('$199/mo');
           await expect(
             table
@@ -195,7 +195,7 @@ test.describe('Pricing Page', () => {
           await expect(selector).toBeFocused();
           await expect(selector).toHaveValue('pro');
           await expect(
-            table.getByRole('columnheader', { name: /Pro/ })
+            table.getByRole('columnheader', { name: /Artist Presence/ })
           ).toContainText('$199/mo');
           await expect(
             table
@@ -214,7 +214,7 @@ test.describe('Pricing Page', () => {
             table.getByRole('columnheader', { name: /Free/ })
           ).toContainText('$0');
           await expect(
-            table.getByRole('columnheader', { name: /Pro/ })
+            table.getByRole('columnheader', { name: /Artist Presence/ })
           ).toContainText('$199/mo');
         }
         if (width === 320) {

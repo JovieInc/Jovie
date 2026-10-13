@@ -103,7 +103,7 @@ describe('resolveChatAccountContext', () => {
 
     expect(context.email).toBe('tim@jov.ie');
     expect(context.plan).toBe('pro');
-    expect(context.displayPlan).toBe('Pro');
+    expect(context.displayPlan).toBe('Artist Presence');
     expect(context.isPro).toBe(true);
     expect(context.billingVerification).toBe('verified');
     expect(context.entitlements.canAccessMerchCreation).toBe(true);

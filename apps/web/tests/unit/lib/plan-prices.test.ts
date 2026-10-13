@@ -45,7 +45,7 @@ describe('PLAN_PRICES', () => {
     }
   });
 
-  it('Artist Visibility Pro is the $199 monthly public offer', () => {
+  it('Artist Presence is the $199 monthly public offer', () => {
     expect(ARTIST_VISIBILITY_OFFER.pro.monthlyUsd).toBe(199);
     expect(PLAN_PRICES.pro.monthly).toBe(199);
     expect(PLAN_PRICES.pro.monthly).toBe(

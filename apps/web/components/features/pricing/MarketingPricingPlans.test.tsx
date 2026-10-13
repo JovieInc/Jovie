@@ -14,7 +14,7 @@ describe('MarketingPricingPlans', () => {
         `[data-offer-contract="${ARTIST_VISIBILITY_OFFER_CONTRACT_ID}"]`
       )
     ).not.toBeNull();
-    expect(screen.getByText('Pro')).toBeInTheDocument();
+    expect(screen.getByText('Artist Presence')).toBeInTheDocument();
     expect(screen.getByText('$199')).toBeInTheDocument();
     expect(screen.queryByText('Max')).not.toBeInTheDocument();
     expect(screen.queryByText('$149')).not.toBeInTheDocument();

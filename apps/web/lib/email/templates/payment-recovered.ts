@@ -42,7 +42,7 @@ export function getPaymentRecoveredText(
 
 Great news! Your payment of ${amount} for ${planName} was successful.
 
-Your Pro access has been fully restored. All your Pro features are available again:
+Your ${planName} access has been fully restored. All your ${planName} features are available again:
 
 ✓ Branding removed from your profile
 ✓ Advanced analytics enabled
