@@ -8,7 +8,7 @@
 # Nightly Testing Agent — Daily Report
 
 Repo: jovie
-Generated: 2026-10-12T23:57:18.497Z
+Generated: 2026-10-13T02:41:58.185Z
 Workflow conclusion: failure
 
 ## Evidence warnings

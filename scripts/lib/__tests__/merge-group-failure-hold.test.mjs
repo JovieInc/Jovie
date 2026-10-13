@@ -19,6 +19,7 @@ import {
 import {
   ADMISSION_RECOVERY_SCHEMA,
   admissionRecoveryReceiptStatus,
+  aheadEntryUnproven,
   applyMergeGroupFailure,
   autoMergeWasNotArmed,
   classifyDequeueDenial,
@@ -587,6 +588,91 @@ process.stdout.write(JSON.stringify(result));
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+it.each([
+  ['behind', 'in_progress', true],
+  ['diverged', 'failure', true],
+  ['behind', 'success', false],
+  ['ahead', null, false],
+])(
+  'reads the group base from main and the ahead run: %s base, %s ahead',
+  (compareStatus, aheadConclusion, waits) => {
+    const dir = mkdtempSync(join(tmpdir(), 'failure-hold-ahead-'));
+    try {
+      const fixturePath = join(dir, 'fixture.json');
+      writeFileSync(
+        fixturePath,
+        JSON.stringify({
+          run,
+          timeline,
+          source: SOURCE,
+          compareStatus,
+          aheadConclusion,
+        })
+      );
+      writeFileSync(
+        join(dir, 'gh'),
+        `#!${process.execPath}
+const fs = require('node:fs');
+const fixture = JSON.parse(fs.readFileSync(process.env.HOLD_TEST_FIXTURE, 'utf8'));
+const args = process.argv.slice(2);
+let result;
+if (args[1] === 'graphql') {
+  const query = args.find(arg => arg.startsWith('query='));
+  const pr = query.includes('timelineItems')
+    ? { timelineItems: { nodes: fixture.timeline, pageInfo: { hasNextPage: false } } }
+    : { id: 'PR_42', state: 'OPEN', headRefOid: fixture.source,
+        isInMergeQueue: false, mergeQueueEntry: null, autoMergeRequest: null };
+  result = { data: { repository: { pullRequest: pr } } };
+} else if (args.includes('POST')) result = {};
+else if (args[1].includes('/compare/')) result = { status: fixture.compareStatus };
+else if (args[1].includes('/actions/runs?head_sha=')) result = { workflow_runs: [
+  { workflow_id: 178737329, created_at: '2026-10-12T08:43:05Z', conclusion: fixture.aheadConclusion },
+  { workflow_id: 1, created_at: '2026-10-12T08:44:05Z', conclusion: 'success' },
+] };
+else if (args[1].includes('/jobs?')) result = { jobs: [
+  { steps: [{ name: 'Run structural ci-fast lane', conclusion: 'failure' }] }
+] };
+else if (args[1].includes('/statuses')) result = [];
+else result = fixture.run;
+process.stdout.write(JSON.stringify(result));
+`,
+        { mode: 0o755 }
+      );
+      const eventPath = join(dir, 'event.json');
+      writeFileSync(
+        eventPath,
+        JSON.stringify({
+          repository: { full_name: REPOSITORY },
+          workflow_run: { id: run.id },
+        })
+      );
+      const execution = spawnSync(
+        process.execPath,
+        [
+          resolve(import.meta.dirname, '../../merge-group-failure-hold.mjs'),
+          '--event-path',
+          eventPath,
+        ],
+        {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${dir}:${process.env.PATH}`,
+            HOLD_TEST_FIXTURE: fixturePath,
+            GITHUB_OUTPUT: join(dir, 'output'),
+          },
+        }
+      );
+      expect(execution.status, execution.stderr).toBe(0);
+      const receipt = JSON.parse(execution.stdout);
+      expect(Boolean(receipt.aheadEntryUnproven)).toBe(waits);
+      expect(receipt.statusWritten).toBe(!waits);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+);
 
 it.each([
   ['annotations', 'base-branch'],
@@ -1486,6 +1572,52 @@ describe('terminal failure hold application', () => {
       expect(dequeuePullRequest).not.toHaveBeenCalled();
       expect(disableAutoMerge).not.toHaveBeenCalled();
     }
+  });
+
+  it('waits while the group ahead of this entry has not passed', async () => {
+    for (const aheadConclusion of [null, 'failure', 'cancelled']) {
+      const writeStatus = vi.fn();
+      const dequeuePullRequest = vi.fn();
+      const disableAutoMerge = vi.fn();
+      const result = await applyMergeGroupFailure(
+        { ...failureInput, aheadGroup: { baseOnMain: false, aheadConclusion } },
+        {
+          writeStatus,
+          readPullRequest: vi.fn(async () => ({
+            id: 'PR_42',
+            state: 'OPEN',
+            headRefOid: SOURCE,
+            isInMergeQueue: true,
+            mergeQueueEntry: { id: 'MQE_42', headCommit: { oid: GROUP } },
+            autoMergeRequest: { enabledAt: '2026-09-30T10:00:00Z' },
+          })),
+          dequeuePullRequest,
+          disableAutoMerge,
+        }
+      );
+      expect(result).toMatchObject({
+        skipped: true,
+        aheadEntryUnproven: true,
+        aheadConclusion,
+        statusWritten: false,
+        dequeued: false,
+      });
+      expect(writeStatus).not.toHaveBeenCalled();
+      expect(dequeuePullRequest).not.toHaveBeenCalled();
+      expect(disableAutoMerge).not.toHaveBeenCalled();
+    }
+  });
+
+  it('holds when the base is main, the group ahead passed, or the base is unreadable', () => {
+    expect(aheadEntryUnproven({ baseOnMain: true })).toBe(false);
+    expect(
+      aheadEntryUnproven({ baseOnMain: false, aheadConclusion: 'success' })
+    ).toBe(false);
+    expect(aheadEntryUnproven({})).toBe(false);
+    expect(aheadEntryUnproven(undefined)).toBe(false);
+    expect(
+      aheadEntryUnproven({ baseOnMain: false, aheadConclusion: null })
+    ).toBe(true);
   });
 
   it('only treats a live queued exact source as superseded', () => {
