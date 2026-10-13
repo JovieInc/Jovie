@@ -255,6 +255,21 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     });
   });
 
+  it('does not call One Tap in managed account-less browser audits', async () => {
+    document.documentElement.dataset.e2eMode = '1';
+
+    try {
+      oneTapConfiguredState.value = true;
+      render(<AuthShell mode='sign-up' />);
+
+      await waitFor(() => {
+        expect(oneTapMock).not.toHaveBeenCalled();
+      });
+    } finally {
+      delete document.documentElement.dataset.e2eMode;
+    }
+  });
+
   it('suppresses One Tap on public auth landing surfaces', async () => {
     oneTapConfiguredState.value = true;
     render(<AuthShell mode='sign-up' suppressOneTap />);
