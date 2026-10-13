@@ -79,7 +79,11 @@ export function ComposerSendButton({
 
   return (
     <SimpleTooltip content={tooltipContent}>
+      {/* SimpleTooltip makes its trigger focusable by default. The wrapper is
+          only a pointer target for the disabled-state tooltip, so keep it out
+          of the tab order; the named button inside is the stop. */}
       <span
+        tabIndex={-1}
         className={cn(
           'inline-flex shrink-0',
           !isInteractive && 'cursor-not-allowed'
