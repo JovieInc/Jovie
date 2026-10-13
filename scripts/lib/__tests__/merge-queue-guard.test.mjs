@@ -2363,8 +2363,8 @@ describe('native merge-queue singleton groups (JOV-8112)', () => {
       transientFailure: 'bounded-retry',
       liveRulesetCutover: 'applied',
     });
-    expect(NATIVE_QUEUE_POLICY.max_entries_to_build).toBe(10);
-    expect(NATIVE_QUEUE_POLICY.max_entries_to_merge).toBe(1);
+    expect(NATIVE_QUEUE_POLICY.max_entries_to_build).toBe(6);
+    expect(NATIVE_QUEUE_POLICY.max_entries_to_merge).toBe(5);
     expect(NATIVE_QUEUE_POLICY.min_entries_to_merge).toBe(1);
     expect(NATIVE_QUEUE_POLICY.min_entries_to_merge_wait_minutes).toBe(0);
     expect(
@@ -2393,7 +2393,7 @@ describe('native merge-queue singleton groups (JOV-8112)', () => {
             type: 'merge_queue',
             parameters: {
               ...NATIVE_QUEUE_POLICY,
-              max_entries_to_merge: 5,
+              max_entries_to_merge: 3,
             },
           },
         ],
@@ -2402,7 +2402,7 @@ describe('native merge-queue singleton groups (JOV-8112)', () => {
     );
 
     expect(result.errors).toContain(
-      'live native merge_queue max_entries_to_merge must be 1 (observed 5)'
+      'live native merge_queue max_entries_to_merge must be 5 (observed 3)'
     );
   });
 
@@ -2415,8 +2415,8 @@ describe('native merge-queue singleton groups (JOV-8112)', () => {
     });
     const drifted = buildNativeQueuePolicyReadback({
       ...NATIVE_QUEUE_POLICY,
-      max_entries_to_merge: 5,
-      min_entries_to_merge: 5,
+      max_entries_to_merge: 4,
+      min_entries_to_merge: 4,
       min_entries_to_merge_wait_minutes: 10,
     });
     expect(drifted.matched).toBe(false);
@@ -2445,8 +2445,8 @@ describe('native merge-queue singleton groups (JOV-8112)', () => {
             type: 'merge_queue',
             parameters: {
               ...NATIVE_QUEUE_POLICY,
-              max_entries_to_merge: 5,
-              min_entries_to_merge: 5,
+              max_entries_to_merge: 4,
+              min_entries_to_merge: 4,
               min_entries_to_merge_wait_minutes: 10,
             },
           },
@@ -2550,7 +2550,7 @@ describe('native merge-queue singleton groups (JOV-8112)', () => {
         liveQueueConfiguration: {
           checkResponseTimeout: 1200,
           maximumEntriesToBuild: 1,
-          maximumEntriesToMerge: 1,
+          maximumEntriesToMerge: 5,
           mergeMethod: 'SQUASH',
           minimumEntriesToMerge: 1,
           minimumEntriesToMergeWaitTime: 0,

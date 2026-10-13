@@ -670,10 +670,18 @@ class ClosureClassificationTests(unittest.TestCase):
         guard = (ROOT / "scripts/lib/merge-queue-guard.mjs").read_text(
             encoding="utf-8"
         )
+        # The checked-in ruleset and the guard's lock must agree on every
+        # tunable queue field; the tuned values themselves live in one place.
         for source in (ruleset, guard):
             self.assertRegex(source, r"check_response_timeout_minutes:\s*60")
-            self.assertRegex(source, r"max_entries_to_build:\s*10")
-            self.assertRegex(source, r"max_entries_to_merge:\s*1")
+        for field in ("max_entries_to_build", "max_entries_to_merge"):
+            pattern = rf"{field}:\s*(\d+)"
+            ruleset_value = re.search(pattern, ruleset)
+            guard_value = re.search(pattern, guard)
+            self.assertIsNotNone(ruleset_value, field)
+            self.assertIsNotNone(guard_value, field)
+            self.assertEqual(ruleset_value.group(1), guard_value.group(1), field)
+            self.assertGreaterEqual(int(ruleset_value.group(1)), 1, field)
 
     def test_clean_pr_with_stale_base_is_repair_not_promote(self):
         evidence = exact_green_promotion_evidence(12)
