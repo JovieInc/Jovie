@@ -25,6 +25,7 @@ import { canonicalizeSurfaceUrl } from '@/lib/profile-surfaces/contracts';
 import { cn } from '@/lib/utils';
 import { detectPlatform, normalizeUrl } from '@/lib/utils/platform-detection';
 import type { ProfilesWorkspaceData } from './data';
+import { PRESENCE_BUTTON_DESKTOP_DENSITY } from './PresenceStatusParts';
 
 type AddConnectionView = 'home' | 'profile';
 
@@ -342,7 +343,7 @@ export function AddConnectionRail({
           <Button
             type='button'
             size='sm'
-            className='w-full'
+            className={cn(PRESENCE_BUTTON_DESKTOP_DENSITY, 'w-full')}
             disabled={!intake.candidate}
             onClick={() => {
               if (intake.candidate) onReviewCandidate(intake.candidate);
@@ -356,7 +357,7 @@ export function AddConnectionRail({
       entityHeader={
         <EntityHeader
           thumbnail={
-            <div className='flex h-9 w-9 items-center justify-center rounded-md bg-surface-2 text-accent'>
+            <div className='flex h-8 w-8 items-center justify-center rounded-md bg-surface-2 text-accent'>
               <Plus className='h-4 w-4' aria-hidden />
             </div>
           }
@@ -439,7 +440,7 @@ export function AddConnectionRail({
             <div className='min-h-28'>
               {intake.candidate ? (
                 <div className='flex items-center gap-2 rounded-lg bg-surface-1 px-2.5 py-2'>
-                  <span className='flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-surface-2 text-secondary-token'>
+                  <span className='flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-surface-2 text-secondary-token'>
                     <SocialIcon
                       platform={intake.candidate.platformId}
                       className='h-4 w-4'

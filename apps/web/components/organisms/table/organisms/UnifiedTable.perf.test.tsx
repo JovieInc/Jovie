@@ -11,17 +11,17 @@ import { VIRTUALIZATION_INITIAL_VIEWPORT_PX } from './useTableVirtualization';
  * Perf budget for the canonical table (one system for every app table).
  * 10k rows must render a bounded window, a j/k keystroke must re-render only
  * the two rows whose focus changed, and a scroll step must not re-render the
- * whole window. Render counts are deterministic. The timing check takes the
- * fastest of ten keystrokes against the 16ms frame budget: machine load only
- * slows samples down, so the fastest one still shows a regression in the work
- * a keystroke does (re-rendering the window costs far more than 16ms).
+ * whole window. Every assertion is a render count or a DOM fact, so the
+ * budget holds on any machine: a regression that re-renders the window on a
+ * keystroke shows up as cell renders, not as wall-clock milliseconds. (A 16ms
+ * wall-clock check here failed merge groups under runner load, 17.38ms on
+ * 2026-10-12, while every render count passed.)
  */
 
 const ROW_COUNT = 10_000;
 const VIEWPORT_PX = 640;
 const OVERSCAN = 5;
 const ROW_PX = TABLE_ROW_MODES.dense.rowHeight;
-const FRAME_BUDGET_MS = 16;
 
 type PerfRow = { id: string; name: string };
 
@@ -128,20 +128,22 @@ describe('UnifiedTable perf budget (10k rows)', () => {
     expect(initialRows.length).toBeGreaterThan(0);
     expect(initialRows.length).toBeLessThanOrEqual(maxWindowRows(VIEWPORT_PX));
 
-    // j/k: only the row losing focus and the row gaining it re-render.
-    const durations: number[] = [];
+    // j/k: only the row losing focus and the row gaining it re-render, and
+    // focus really moves one row per keystroke.
+    const row = (index: number) =>
+      container.querySelector<HTMLElement>(`tbody tr[data-index="${index}"]`);
     for (let step = 0; step < 10; step += 1) {
-      const focused = container.querySelector<HTMLElement>(
-        `tbody tr[data-index="${step}"]`
-      );
+      const focused = row(step);
       expect(focused).not.toBeNull();
       cellRenders = 0;
-      const start = performance.now();
       fireEvent.keyDown(focused as HTMLElement, { key: 'j' });
-      durations.push(performance.now() - start);
       expect(cellRenders).toBeLessThanOrEqual(2);
+      expect(row(step + 1)?.tabIndex).toBe(0);
+      expect(row(step)?.tabIndex).toBe(-1);
     }
-    expect(Math.min(...durations)).toBeLessThan(FRAME_BUDGET_MS);
+    expect(bodyRows(container).length).toBeLessThanOrEqual(
+      maxWindowRows(VIEWPORT_PX)
+    );
 
     // Scroll: jump far, then step three rows. Rows entering the window render,
     // plus at most the column-snap stagger slots at its top; every other row
