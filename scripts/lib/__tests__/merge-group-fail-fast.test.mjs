@@ -26,7 +26,6 @@ const FAIL_FAST_LANES = [
   'ci-profile-admission-browser',
   'ci-fast-structural-python',
   'ci-fast-structural-web',
-  'ci-build-layout',
   'ci-build-ovie',
   'ci-typecheck-ovie',
   'ci-storybook-surfaces',

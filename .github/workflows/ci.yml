@@ -3237,10 +3237,6 @@ jobs:
         )
       )
     runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: read
-      statuses: write
     timeout-minutes: 30
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
@@ -3399,17 +3395,6 @@ jobs:
         with:
           path: apps/web/.next/cache/turbopack
           key: ${{ steps.next-build-cache.outputs.cache-primary-key }}
-      # Fail fast: the queue ejects on this failing required context now,
-      # not when the slowest lane finishes (.github/MERGE_QUEUE.md).
-      - name: Eject the merge group on this lane failure
-        if: ${{ failure() && github.event_name == 'merge_group' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          body="{\"state\":\"failure\",\"context\":\"PR Ready\",\"description\":\"${GITHUB_JOB} failed; ejected before the slowest lane\",\"target_url\":\"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
-          /usr/bin/curl -sS -o /dev/null -w 'status post: %{http_code}\n' -X POST \
-            -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' \
-            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -d "$body" || true
 
   ci-build-ovie:
     name: Ovie Build (combined)
