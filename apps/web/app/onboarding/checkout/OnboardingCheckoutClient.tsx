@@ -399,7 +399,7 @@ export function OnboardingCheckoutClient({
 
         {/* Price display */}
         <div className='mb-6 text-center'>
-          <span className='text-3xl font-semibold tracking-tight text-primary-token'>
+          <span className='text-3xl font-semibold tracking-tight tabular-nums text-primary-token'>
             {formatAmount(currentAmount)}
           </span>
           <span className='text-sm text-tertiary-token'>
