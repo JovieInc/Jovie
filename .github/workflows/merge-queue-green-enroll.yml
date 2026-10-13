@@ -191,6 +191,7 @@ jobs:
               `${process.env.GITHUB_WORKSPACE}/scripts/lib/admission-hold-labels.json`, 'utf8'
             ));
             const BLOCKING = new Set([...holdLabels.stopHoldLabels, holdLabels.queuePoisonLabel]);
+            const BREAKER_LABEL = 'queue-breaker';
             if (BLOCKING.size < 2) throw new Error('admission hold labels are unreadable');
             // Required checks green and no conflicts. UNSTABLE only adds a
             // non-required pending/red context (e.g. lane execution receipts).
@@ -292,6 +293,13 @@ jobs:
                       timelineItems(last: 1, itemTypes: [REMOVED_FROM_MERGE_QUEUE_EVENT]) {
                         nodes { ... on RemovedFromMergeQueueEvent { createdAt reason } }
                       }
+                      breakerEvents: timelineItems(last: 100, itemTypes: [REMOVED_FROM_MERGE_QUEUE_EVENT, LABELED_EVENT]) {
+                        nodes {
+                          __typename
+                          ... on RemovedFromMergeQueueEvent { createdAt reason }
+                          ... on LabeledEvent { createdAt label { name } }
+                        }
+                      }
                       releases: timelineItems(last: 20, itemTypes: [UNLABELED_EVENT]) {
                         nodes { ... on UnlabeledEvent { createdAt label { name } } }
                       }
@@ -389,12 +397,38 @@ jobs:
               // release of that same head. A failed_checks removal never is,
               // and any revision failure hold still blocks first.
               const removalReason = String(pr.timelineItems.nodes[0]?.reason || 'unknown').toLowerCase();
+              // A circuit-breaker dequeue during a quota storm carries the
+              // queue-breaker marker (MERGE_QUEUE.md runbook). This job only
+              // runs while QUEUE_FREEZE is not 1, so a marked, still-green,
+              // unheld head is re-admitted and the marker removed; a plain
+              // manual dequeue without it keeps today's behavior.
+              const breakerMarked = pr.labels.nodes.some(l => l.name.toLowerCase() === BREAKER_LABEL);
+              const hasBreakerReceipt = currentPr => {
+                const events = currentPr.breakerEvents?.nodes || [];
+                const removalIndex = events.findLastIndex(
+                  event => event.__typename === 'RemovedFromMergeQueueEvent'
+                );
+                const removal = events[removalIndex];
+                if (removalIndex < 0 || removal?.createdAt !== lastRemoval ||
+                    String(removal?.reason || 'unknown').toLowerCase() !== 'manual') return false;
+                return events.slice(removalIndex + 1).some(event =>
+                  event.__typename === 'LabeledEvent' &&
+                  String(event.label?.name || '').toLowerCase() === BREAKER_LABEL
+                );
+              };
+              // The runbook adds the marker only after dequeue succeeds. Binding
+              // the ordered label event to the latest removal prevents a stale
+              // marker from reversing a later unrelated manual dequeue, even
+              // when GitHub gives both events the same timestamp.
+              const breakerRestore = Boolean(removedUnchangedHead) &&
+                failure.action === 'allow' && removalReason === 'manual' && breakerMarked &&
+                hasBreakerReceipt(pr);
               const releasedAfterManualRemoval = Boolean(removedUnchangedHead) &&
                 failure.action === 'allow' &&
                 removalReason === 'manual' &&
-                (pr.releases?.nodes || []).some(event =>
+                (breakerRestore || (pr.releases?.nodes || []).some(event =>
                   typeof event?.createdAt === 'string' && event.createdAt > lastRemoval &&
-                  BLOCKING.has(String(event.label?.name || '').toLowerCase()));
+                  BLOCKING.has(String(event.label?.name || '').toLowerCase())));
               const ownerHoldRelease = failurePolicy.ownerHoldReleaseIntent({
                 eventName: context.eventName, event: context.payload,
               });
@@ -438,6 +472,41 @@ jobs:
                 });
                 return disposition.reason === 'owner-hold-release' && disposition.removalAt === failure.removalAt;
               };
+              const breakerReleaseStillCurrent = async markerRequired => {
+                const sameRemoval = currentPr => {
+                  const removal = currentPr.timelineItems.nodes[0];
+                  const committedAt = currentPr.commits.nodes[0]?.commit.committedDate;
+                  return removal?.createdAt === lastRemoval &&
+                    String(removal?.reason || 'unknown').toLowerCase() === 'manual' &&
+                    (!committedAt || committedAt <= lastRemoval);
+                };
+                const hasMarker = currentPr => currentPr.labels.nodes.some(
+                  label => label.name.toLowerCase() === BREAKER_LABEL
+                );
+                const observed = await readCurrent();
+                if (!eligible(observed) || observed.id !== pr.id || observed.number !== pr.number ||
+                    observed.headRefOid !== pr.headRefOid || !sameRemoval(observed) ||
+                    !hasBreakerReceipt(observed) ||
+                    (markerRequired && !hasMarker(observed))) return false;
+                const freshStatuses = await github.paginate(
+                  github.rest.repos.listCommitStatusesForRef,
+                  { owner, repo, ref: observed.headRefOid, per_page: 100 }
+                );
+                const freshFailure = failurePolicy.revisionFailureDisposition({
+                  statuses: freshStatuses,
+                  repository: `${owner}/${repo}`,
+                  currentMainSha: freshStatuses.some(
+                    status => status?.context === failurePolicy.FAILURE_HOLD_CONTEXT
+                  ) ? await readMainSha() : undefined,
+                });
+                // Fence marker/hold/removal/head changes during status pagination.
+                // This is the final awaited read before the enqueue mutation.
+                const fresh = await readCurrent();
+                return eligible(fresh) && fresh.id === pr.id && fresh.number === pr.number &&
+                  fresh.headRefOid === observed.headRefOid && sameRemoval(fresh) &&
+                  hasBreakerReceipt(fresh) &&
+                  (!markerRequired || hasMarker(fresh)) && freshFailure.action === 'allow';
+              };
               const recoveryStillCurrent = async () => {
                 const fresh = await readCurrent();
                 if (!eligible(fresh) || fresh.id !== pr.id || fresh.number !== pr.number) return false;
@@ -471,6 +540,21 @@ jobs:
                 // that reservation spent and never reaches enqueue or a refund.
                 if (admissionRecovery && !await recoveryStillCurrent()) continue;
                 if (failure.reason === 'owner-hold-release' && !await ownerReleaseStillCurrent()) continue;
+                if (breakerRestore) {
+                  if (!await breakerReleaseStillCurrent(true)) continue;
+                  try {
+                    // Consume the operator's one-shot authorization before enqueue.
+                    // Failure is fail-closed so a stale marker can never authorize
+                    // a later manual dequeue of this unchanged head.
+                    await github.rest.issues.removeLabel({
+                      owner, repo, issue_number: pr.number, name: BREAKER_LABEL,
+                    });
+                  } catch (error) {
+                    core.warning(`#${pr.number} ${BREAKER_LABEL} not consumed: ${error.message}`);
+                    continue;
+                  }
+                  if (!await breakerReleaseStillCurrent(false)) continue;
+                }
                 enqueueAttempted = true;
                 const r = await github.graphql(`
                   mutation($id: ID!, $oid: GitObjectID!) {
@@ -480,6 +564,13 @@ jobs:
                   }`, { id: pr.id, oid: pr.headRefOid });
                 enqueued += 1;
                 core.notice(`ENQUEUED #${pr.number} at position ${r.enqueuePullRequest.mergeQueueEntry.position}`);
+                if (breakerMarked && !breakerRestore) {
+                  await github.rest.issues.removeLabel({
+                    owner, repo, issue_number: pr.number, name: BREAKER_LABEL,
+                  }).catch(error => core.warning(
+                    `#${pr.number} stale ${BREAKER_LABEL} not removed: ${error.message}`
+                  ));
+                }
               } catch (error) {
                 if (enqueueAttempted && failure.action === 'retry-once' && failurePolicy.enqueueWasRejected(error)) {
                   await writeRetry(failurePolicy.retryReleasedDescription(failure.latest));
