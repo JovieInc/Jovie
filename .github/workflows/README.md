@@ -26,7 +26,7 @@ Orchestrator, GitHub AI Dispatcher, Agent Tick, Agent Landing Sweep, and Stuck
 Draft Auto-Close were deleted on 2026-10-12; Taste Classifier and Taste Label
 Guard are deleted at source. Main Autofix and Auto-Fix Lint
 on Agent Drafts are retired at source — the lanes fix loop owns PR and red-main
-repair. Keep Agent Pipeline, PR
+repair (Agent Pipeline was deleted on 2026-10-12). Keep PR
 Conflict Handler, Auto-PR on Agent Push, and the legacy Release Loop disabled
 throughout the drain. The newly added Production
 Controller, Production Controller Health, and Production Release workflows

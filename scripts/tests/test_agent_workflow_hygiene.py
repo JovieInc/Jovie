@@ -317,31 +317,10 @@ def test_merge_queue_ruleset_verify_is_scheduled_not_pr_ready() -> None:
     assert "ci-harness/manifest.json" not in workflow
 
 
-def test_agent_pipeline_retires_dead_qc_wires() -> None:
-    """Scope Judge, self-attested GStack comments, and denylist classifier stay gone."""
-    workflow = (WORKFLOWS / "agent-pipeline.yml").read_text(encoding="utf-8")
-    trigger_block = workflow.split("\non:\n", 1)[1].split(
-        "\npermissions:", 1
-    )[0]
-    assert '"Scope Judge"' not in trigger_block
-    assert 'workflows: ["CI"]' in trigger_block
-    assert "AGENT_RUN_SOURCE_RUN_ID" not in workflow
-    assert "check-agent-gate-evidence.ts" not in workflow
-    assert "gstack-gates" not in workflow
-    assert 'Scope judge (diff aligns with ticket intent)' not in workflow
-    assert "retries_exhausted" in workflow
-    assert "SLACK_WEBHOOK_URL" in _job_block("agent-pipeline.yml", "exhaust")
-    assert "LINEAR_API_KEY" in _job_block("agent-pipeline.yml", "exhaust")
-    assert "stale-cleanup:" not in workflow
-    assert "needs-human-autoclose.mjs" not in workflow
-    assert "scripts/lib/agent-branch-pattern.mjs" in workflow
-    assert "scripts/lib/agent-branch-pattern.mjs --match" in workflow
-
 
 def test_node_only_agent_jobs_do_not_write_to_system_corepack_dir() -> None:
     """Node scripts must not call corepack enable on locked-down runners."""
     for workflow_name in (
-        "agent-pipeline.yml",
         "pr-conflict-handler.yml",
     ):
         content = (WORKFLOWS / workflow_name).read_text(encoding="utf-8")
@@ -453,7 +432,6 @@ def test_event_complete_workflows_do_not_retain_fallback_clocks() -> None:
 def test_agent_landing_does_not_treat_risk_classifier_as_human_merge_gate() -> None:
     """Autonomous shipping uses machine gates and never creates a human hold."""
     for workflow_name in (
-        "agent-pipeline.yml",
         "sentry-autofix.yml",
     ):
         content = (WORKFLOWS / workflow_name).read_text(encoding="utf-8")
@@ -495,15 +473,6 @@ def test_retired_human_hold_labels_are_removed_at_the_pr_boundary() -> None:
 
 
 
-
-def test_trigger_guard_materializes_systemic_detector_import_closure() -> None:
-    """The detector must not fail before it can classify a systemic failure."""
-    step = _step_block("agent-pipeline.yml", "Checkout systemic detector")
-    materialized = _sparse_checkout_paths(step)
-    entrypoint = "scripts/lib/detect-systemic-failures.mjs"
-
-    assert entrypoint in materialized
-    _assert_local_runtime_closure(materialized, entrypoint)
 
 
 def test_self_hosted_gate_jobs_materialize_full_checkout() -> None:
@@ -676,33 +645,13 @@ def test_workflow_run_controllers_ignore_non_pr_and_stale_runs() -> None:
     assert "scripts/auto-ready-green-drafts.sh" in green_source
     assert "--auto --squash" not in green_source
 
-    pipeline = _job_block("agent-pipeline.yml", "guard")
-    assert "github.event.workflow_run.event == 'pull_request'" in pipeline
-    assert 'if [[ "$PR_HEAD_SHA" != "$HEAD_SHA" ]]' in pipeline
-    assert "workflow_run.pull_requests[0].number" in pipeline
-    assert "pulls?state=open" not in pipeline
 
 
-def test_agent_pipeline_retry_budget_is_durable() -> None:
-    """Each remediation run must record the attempt its guard counted."""
-    fix = _job_block("agent-pipeline.yml", "fix")
-    assert "Record bounded remediation attempt" in fix
-    assert 'ATTEMPT_LABEL="agent-fix-${TRIGGER_TYPE}-${SHORT_SHA}-${ATTEMPT}"' in fix
-    assert '"labels[]=$ATTEMPT_LABEL"' in fix
-
-
-def test_agent_pipeline_remediation_mutex_is_scoped_per_pr() -> None:
-    """Independent PR remediations run concurrently while retries stay serial."""
-    guard = _job_block("agent-pipeline.yml", "guard")
-    fix = _job_block("agent-pipeline.yml", "fix")
-
-    assert "pr_number: ${{ steps.evaluate.outputs.pr_number }}" in guard
-    assert (
-        "group: agent-remediation-${{ github.repository }}-"
-        "${{ needs.guard.outputs.pr_number }}"
-    ) in fix
-    assert "group: agent-remediation-${{ github.repository }}\n" not in fix
-    assert "cancel-in-progress: false" in fix
+def test_agent_pipeline_stays_deleted() -> None:
+    """The Agent Pipeline was disabled_manually from 2026-07-15 and deleted on
+    2026-10-12; the lanes fix loop and native auto-merge own remediation."""
+    assert not (WORKFLOWS / "agent-pipeline.yml").exists()
+    assert not (REPO_ROOT / "scripts/lib/detect-systemic-failures.mjs").exists()
 
 
 def test_conflict_paths_preserve_native_queue_and_use_only_non_force_delivery() -> None:
@@ -1430,7 +1379,6 @@ def test_retired_merge_queue_label_has_no_active_producers() -> None:
         REPO_ROOT / ".claude/rules/release.md",
         REPO_ROOT / ".claude/rules/swarm.md",
         REPO_ROOT / ".github/rulesets/branch-protection.yml",
-        WORKFLOWS / "agent-pipeline.yml",
         # codex-issue-shipper moved to JovieInc/symphony-control and is checked there.
     ]
     forbidden = re.compile(

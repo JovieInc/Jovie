@@ -71,7 +71,6 @@ describe('Node runtime contract', () => {
   it('uses .nvmrc for reusable and standalone workflow setup', () => {
     const setupFiles = [
       '.github/actions/setup-node-pnpm/action.yml',
-      '.github/workflows/agent-pipeline.yml',
       '.github/workflows/pr-conflict-handler.yml',
     ];
 
@@ -82,10 +81,6 @@ describe('Node runtime contract', () => {
         /node-version:\s*['"]?22(?:\.|['"\n])/
       );
     }
-
-    expect(read('.github/workflows/agent-pipeline.yml')).toMatch(
-      /sparse-checkout: \|\n\s+\.nvmrc\n[\s\S]*?node-version-file: '\.nvmrc'/
-    );
 
     for (const workflowPath of [
       '.github/workflows/fleet-gate-refresh.yml',
