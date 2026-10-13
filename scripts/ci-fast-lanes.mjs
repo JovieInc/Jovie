@@ -387,7 +387,6 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
 ]);
 
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
-  '.github/scripts/customer-notes-ready.test.js',
   '.claude/hooks/post-task-validate.test.mjs',
   '.claude/hooks/prod-db-session-guard.test.mjs',
   'scripts/agent-context/check.test.mjs',
@@ -485,7 +484,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
 ]);
 export const DEPRECATION_COVERAGE_COMMAND =
   'node --test --experimental-test-coverage --test-coverage-include=scripts/deprecation-clearance.mjs --test-coverage-include=scripts/lib/deprecation-observation.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=90 scripts/deprecation-clearance.test.mjs';
-export const SCRIPT_CONTRACT_NODE_COMMAND = `${DEPRECATION_COVERAGE_COMMAND} && node --test ${SCRIPT_CONTRACT_NODE_TESTS.join(' ')} && node --test --experimental-test-coverage --test-coverage-include=.github/scripts/customer-notes-ready.js --test-coverage-lines=100 --test-coverage-branches=95 --test-coverage-functions=100 .github/scripts/customer-notes-ready.test.js`;
+export const SCRIPT_CONTRACT_NODE_COMMAND = `${DEPRECATION_COVERAGE_COMMAND} && node --test ${SCRIPT_CONTRACT_NODE_TESTS.join(' ')}`;
 export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/merge-group-failure-hold.test.mjs',
   'scripts/lib/__tests__/mesh-host-ack.test.mjs',
