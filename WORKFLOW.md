@@ -2,8 +2,11 @@
 tracker:
   kind: linear
   provider:
-    project_slug: "ba6736cbfbb9"
+    # Stock v0.0.3 rejects team_key; use the reviewed symphony-ops adapter.
+    team_key: "JOV"
     api_key: $LINEAR_API_KEY
+    excluded_labels:
+      - no-symphony
   required_labels: []
   active_states:
     - Todo
@@ -92,6 +95,8 @@ The agent should be able to talk to Linear, either via a configured Linear MCP s
 - Move status only when the matching quality bar is met.
 - Operate autonomously end-to-end unless blocked by missing requirements, secrets, or permissions.
 - Use the blocked-access escape hatch only for true external blockers (missing required tools/auth) after exhausting documented fallbacks.
+- For Vercel incidents, retain the exact failed run, attempt, deployment identity,
+  and owner. A deployment failure must not become a global source-merge gate.
 
 ## Related skills
 

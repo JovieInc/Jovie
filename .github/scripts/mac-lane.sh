@@ -84,14 +84,17 @@ result() {
     summary "Unreadable or wrong SHA: running hosted."
     exit 0
   fi
-  # success: every Mac job passed. failure: a step failed (a real test or build
-  # failure) and the lane fails. Anything else (cancelled, timed out, runner
-  # lost) is the Mac's fault, not the change's, so the hosted job runs and its
-  # result decides the lane.
+  # success: every Mac job passed. failure: a build or test step failed and the
+  # lane fails. Anything else (cancelled, timed out, runner lost, or only a
+  # checkout/setup step failed) is the Mac's fault, not the change's, so the
+  # hosted job runs and its result decides the lane. Setup failures were the
+  # Mac's uplink timing out on the registry (run 38311623148); a change that
+  # really breaks setup fails again on hosted.
   verdict="$(jq -r '
+    def setup: test("^(Set up |Setup |Run actions/checkout@|Run \\./\\.github/actions/setup-)");
     if length == 0 then "infra"
     elif all(.[]; .conclusion == "success" or .conclusion == "skipped") then "success"
-    elif any(.[]; .conclusion == "failure" and any(.steps[]?; .conclusion == "failure")) then "failure"
+    elif any(.[]; .conclusion == "failure" and any(.steps[]?; .conclusion == "failure" and (.name | setup | not))) then "failure"
     else "infra" end' <<<"$jobs")"
   emit infra "$([ "$verdict" = infra ] && echo true || echo false)"
   summary "Result: $verdict"

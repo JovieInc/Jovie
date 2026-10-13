@@ -82,8 +82,8 @@ GitHub enablement state. During the PR-drain rollout, enable only **Merge Queue
 Auto-Enroll** and **Auto-Ready Agent Drafts** first. Enable **Main CI Health
 Monitor** and **Main Autofix** only after the staged queue and production path
 have produced bounded proof. **GitHub AI Orchestrator**, **GitHub AI
-Dispatcher**, and **Agent Tick** are retired at source under the Linear-only
-intake contract. Keep **Agent Pipeline**,
+Dispatcher** are retired at source under the Linear-only intake contract;
+**Agent Tick** was deleted on 2026-10-12. Keep **Agent Pipeline**,
 **PR Conflict Handler**, **Stuck Draft Auto-Close**, **Auto-Fix
 Lint on Agent Drafts**, **Taste Classifier**, **Taste Label Guard**, **Auto-PR on
 Agent Push**, and the legacy **Release Loop** disabled throughout the drain. The new **Production

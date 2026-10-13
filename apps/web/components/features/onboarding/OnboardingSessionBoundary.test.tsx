@@ -206,6 +206,14 @@ describe('onboarding identity boundary', () => {
     );
     expect(mocks.fetch.mock.calls[1][1].body).toContain('"action":"logout"');
   });
+  it('exposes an SSR-visible restore-state marker while loading and on failure', async () => {
+    mocks.fetch.mockRejectedValueOnce(new Error('offline'));
+    render(<OnboardingSessionBoundary sessionLabel='pending' />);
+    const boundary = screen.getByTestId('onboarding-session-boundary');
+    expect(boundary).toHaveAttribute('data-restore-state', 'restoring');
+    expect(await screen.findByRole('alert')).toBe(boundary);
+    expect(boundary).toHaveAttribute('data-restore-state', 'failed');
+  });
   it('offers restoration retry without fabricating a fresh onboarding flow', async () => {
     mocks.fetch
       .mockRejectedValueOnce(new Error('offline'))

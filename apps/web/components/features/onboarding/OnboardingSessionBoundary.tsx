@@ -131,6 +131,8 @@ export function OnboardingSessionBoundary(props: OnboardingShellProps) {
         className='flex min-h-0 flex-1 flex-col items-center justify-center gap-3'
         role={failed ? 'alert' : 'status'}
         aria-live='polite'
+        data-testid='onboarding-session-boundary'
+        data-restore-state={failed ? 'failed' : 'restoring'}
       >
         <p>
           {failed
