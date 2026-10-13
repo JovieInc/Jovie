@@ -3,9 +3,10 @@
 // @coverage-via apps/web/tests/unit/components/organisms/UnifiedSidebar.library.test.tsx
 
 import { ArrowLeft } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { type PropsWithChildren, useMemo } from 'react';
+import { Fragment, type PropsWithChildren, useMemo } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { AskJovieMark } from '@/components/ask-jovie/AskJovie';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
@@ -51,11 +52,17 @@ import { cn } from '@/lib/utils';
 import type { AppShellSection } from '@/types/app-shell';
 import {
   isOperatorNavigationHrefActive,
+  OPERATOR_NAV_GROUP_LABEL,
   OPERATOR_NAV_SECTIONS,
 } from './operator-navigation';
 import { IdentitySwitcher } from './ProfileSwitcher';
 import { SidebarBottomNowPlayingBridge } from './SidebarBottomNowPlayingBridge';
 import { WhatsNewBanner } from './whats-new/WhatsNewBanner';
+
+// Founder-only (OV) block: split out so creator routes never ship it.
+const OperatorListsNav = dynamic(() =>
+  import('./OperatorListsNav').then(module => module.OperatorListsNav)
+);
 
 export interface UnifiedSidebarProps {
   readonly section: AppShellSection;
@@ -97,23 +104,24 @@ function OperatorNavigation({ pathname }: { readonly pathname: string }) {
       className='flex flex-1 flex-col gap-4 overflow-y-auto pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
     >
       {OPERATOR_NAV_SECTIONS.map(section => (
-        <div key={section.label}>
-          <span
-            className={cn(
-              'mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90',
-              SHELL_RAIL_LABEL
-            )}
-          >
-            {section.label}
-          </span>
-          <SettingsNavGroup
-            items={section.items}
-            pathname={pathname}
-            isItemActive={item =>
-              isOperatorNavigationHrefActive(pathname, item.href)
-            }
-          />
-        </div>
+        <Fragment key={section.label}>
+          <div>
+            <span className={cn(OPERATOR_NAV_GROUP_LABEL, SHELL_RAIL_LABEL)}>
+              {section.label}
+            </span>
+            <SettingsNavGroup
+              items={section.items}
+              pathname={pathname}
+              isItemActive={item =>
+                isOperatorNavigationHrefActive(pathname, item.href)
+              }
+            />
+          </div>
+          {/* Founder lists sit between Workspaces and Utilities (Pen Neq0A). */}
+          {section.label === 'Workspaces' ? (
+            <OperatorListsNav pathname={pathname} />
+          ) : null}
+        </Fragment>
       ))}
     </nav>
   );

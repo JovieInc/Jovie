@@ -1,14 +1,18 @@
-"""Complete, stable merge windows for the existing lane doctor and HUD.
+"""Complete merge windows for the existing lane doctor and HUD.
 
-Adapts JOV-5004's repository-connection/two-scan contract into the canonical
-lanes runtime after scripts/symphony retired (JOV-6637). No search-result cap,
-background collector, attribution policy, or new persisted authority. The doctor (every
-dispatch tick) and the HUD read the same 24 h window, so `collect_shared` lets them share
-one complete read for a few minutes instead of each re-reading it twice per refresh.
+Reads merged PRs through the search API's `merged:` qualifier, which filters on mergedAt
+itself. The repository connection's UPDATED_AT order lags (2026-10-13: #21435 at 22:41Z
+listed ahead of #21430 at 23:19Z), so the old two-scan early-stop reader reported
+`unstable_page_order` and an unknown 24 h window most of the time. Search caps a query at
+1000 results and a page at 100, so a window with more matches than one page is split in
+half until every slice fits one page: no cursor, no ordering assumption. Incomplete now
+means a real read failure or a malformed reply. No background collector, attribution
+policy, or new persisted authority. The doctor (every dispatch tick) and the HUD read the
+same 24 h window, so `collect_shared` lets them share one complete read for a few minutes.
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 import math
 import os
@@ -16,12 +20,10 @@ from pathlib import Path
 import subprocess
 import time
 
-QUERY = '''query($owner:String!,$name:String!,$cursor:String){
-  repository(owner:$owner,name:$name){
-    pullRequests(states:MERGED,orderBy:{field:UPDATED_AT,direction:DESC},first:100,after:$cursor){
-      totalCount pageInfo{hasNextPage endCursor}
-      nodes{number title headRefName headRefOid mergeCommit{oid} baseRefName createdAt updatedAt mergedAt}
-    }
+QUERY = '''query($q:String!){
+  search(query:$q,type:ISSUE,first:100){
+    issueCount
+    nodes{... on PullRequest{number title headRefName headRefOid mergeCommit{oid} baseRefName createdAt updatedAt mergedAt}}
   }
 }'''
 
@@ -39,11 +41,18 @@ def _epoch(value):
     return stamp.timestamp()
 
 
+def _iso(epoch: float) -> str:
+    return datetime.fromtimestamp(epoch, timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+
 def collect(repository: str, since: float, until: float, *, fetch_page=None,
             max_pages: int = 20, timeout_s: float = 60) -> dict:
-    """Return typed incomplete evidence on every bounded-read failure; never partial counts."""
+    """Return typed incomplete evidence on every bounded-read failure; never partial counts.
+
+    `fetch_page(lo, hi)` returns one search page ({issueCount, nodes}) for PRs merged in
+    [lo, hi] (whole seconds, inclusive as search is); rows are kept half-open per slice."""
     result = {'schema': 'jovie-merge-window/v1', 'complete': False, 'reason': None,
-              'window': {'since': since, 'until': until}, 'pages': 0, 'scans': 0, 'prs': []}
+              'window': {'since': since, 'until': until}, 'pages': 0, 'scans': 1, 'prs': []}
     def incomplete(reason):
         return {**result, 'reason': reason, 'prs': []}
     if (not all(isinstance(v, (float, int)) and not isinstance(v, bool) and math.isfinite(v)
@@ -52,16 +61,14 @@ def collect(repository: str, since: float, until: float, *, fetch_page=None,
             or not isinstance(repository, str) or len(repository.split('/')) != 2
             or not all(repository.split('/'))):
         return incomplete('invalid_fetch_options')
-    owner, name = repository.split('/')
     deadline = time.monotonic() + timeout_s
-    def remote(cursor):
+    def remote(lo, hi):
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             raise TimeoutError()
-        args = ['gh', 'api', 'graphql', '-f', 'query=' + QUERY, '-f', 'owner=' + owner, '-f', 'name=' + name]
-        if cursor is not None:
-            args += ['-f', 'cursor=' + cursor]
-        response = subprocess.run(args, capture_output=True, text=True, timeout=remaining)
+        query = f'repo:{repository} is:pr is:merged merged:{_iso(lo)}..{_iso(hi)}'
+        response = subprocess.run(['gh', 'api', 'graphql', '-f', 'query=' + QUERY, '-f', 'q=' + query],
+                                  capture_output=True, text=True, timeout=remaining)
         if response.returncode:
             raise RuntimeError('github_read_failed')
         data = json.loads(response.stdout)
@@ -69,80 +76,56 @@ def collect(repository: str, since: float, until: float, *, fetch_page=None,
             raise ValueError('malformed graphql response')
         if data.get('errors'):
             raise RuntimeError('github_graphql_errors')
-        return data['data']['repository']['pullRequests']
+        return data['data']['search']
     fetch = fetch_page or remote
-    previous = None
-    for scan in range(2):
-        result['scans'] = scan + 1
-        seen, cursors, rows = set(), set(), []
-        cursor, total, last_updated = None, None, math.inf
-        for _ in range(max_pages):
-            if time.monotonic() >= deadline:
-                return incomplete('deadline_exceeded')
-            try:
-                page = fetch(cursor)
-            except (subprocess.TimeoutExpired, TimeoutError):
-                return incomplete('deadline_exceeded')
-            except (OSError, ValueError, KeyError, TypeError, RuntimeError, subprocess.SubprocessError):
-                return incomplete('fetch_failed')
-            result['pages'] += 1
-            if time.monotonic() >= deadline:
-                return incomplete('deadline_exceeded')
-            if not isinstance(page, dict):
-                return incomplete('malformed_page')
-            nodes, info, count = page.get('nodes'), page.get('pageInfo'), page.get('totalCount')
-            if (not isinstance(nodes, list) or len(nodes) > 100 or not isinstance(info, dict)
-                    or type(count) is not int or count < 0
-                    or type(info.get('hasNextPage')) is not bool
-                    or 'endCursor' not in info
-                    or (info.get('endCursor') is not None and not isinstance(info['endCursor'], str))):
-                return incomplete('malformed_page')
-            if total is not None and total != count:
-                return incomplete('unstable_snapshot')
-            total = count
-            for row in nodes:
-                if (not isinstance(row, dict) or type(row.get('number')) is not int or row['number'] < 1
-                        or not all(isinstance(row.get(k), str) for k in
-                                   ('title', 'headRefName', 'baseRefName', 'createdAt', 'updatedAt', 'mergedAt'))):
-                    return incomplete('malformed_pr')
-                try:
-                    created, merged, updated = (_epoch(row[k]) for k in ('createdAt', 'mergedAt', 'updatedAt'))
-                except (ValueError, OverflowError):
-                    return incomplete('malformed_pr')
-                if not created <= merged <= updated:
-                    return incomplete('malformed_pr')
-                if updated > last_updated:
-                    return incomplete('unstable_page_order')
-                last_updated = updated
-                if row['number'] in seen:
-                    return incomplete('duplicate_pr')
-                seen.add(row['number'])
-                if since <= merged < until:
-                    rows.append(row)
-            if len(seen) > total:
-                return incomplete('result_count_mismatch')
-            if not info['hasNextPage']:
-                if len(seen) != total:
-                    return incomplete('result_count_mismatch')
-                break
-            next_cursor = info.get('endCursor')
-            if not nodes or not next_cursor or next_cursor in cursors:
-                return incomplete('malformed_cursor')
-            cursors.add(next_cursor)
-            if last_updated < since:
-                break  # updatedAt >= mergedAt proves every remaining row outside the window
-            cursor = next_cursor
-        else:
+    rows, slices = {}, [(math.floor(since), math.ceil(until))]
+    while slices:
+        if result['pages'] >= max_pages:
             return incomplete('max_pages_reached')
-        rows.sort(key=lambda row: row['number'])
-        if previous is not None and rows != previous:
-            return incomplete('unstable_snapshot')
-        previous = rows
-    return {**result, 'complete': True, 'prs': previous}
+        if time.monotonic() >= deadline:
+            return incomplete('deadline_exceeded')
+        lo, hi = slices.pop()
+        try:
+            page = fetch(lo, hi)
+        except (subprocess.TimeoutExpired, TimeoutError):
+            return incomplete('deadline_exceeded')
+        except (OSError, ValueError, KeyError, TypeError, RuntimeError, subprocess.SubprocessError):
+            return incomplete('fetch_failed')
+        result['pages'] += 1
+        if time.monotonic() >= deadline:
+            return incomplete('deadline_exceeded')
+        if not isinstance(page, dict):
+            return incomplete('malformed_page')
+        nodes, count = page.get('nodes'), page.get('issueCount')
+        if not isinstance(nodes, list) or len(nodes) > 100 or type(count) is not int or count < len(nodes):
+            return incomplete('malformed_page')
+        if count > len(nodes):
+            if hi - lo < 2:
+                return incomplete('slice_too_dense')
+            mid = (lo + hi) // 2
+            slices += [(lo, mid), (mid + 1, hi)]  # search bounds are inclusive whole seconds
+            continue
+        for row in nodes:
+            if (not isinstance(row, dict) or type(row.get('number')) is not int or row['number'] < 1
+                    or not all(isinstance(row.get(k), str) for k in
+                               ('title', 'headRefName', 'baseRefName', 'createdAt', 'updatedAt', 'mergedAt'))):
+                return incomplete('malformed_pr')
+            try:
+                created, merged, updated = (_epoch(row[k]) for k in ('createdAt', 'mergedAt', 'updatedAt'))
+            except (ValueError, OverflowError):
+                return incomplete('malformed_pr')
+            if not created <= merged <= updated:
+                return incomplete('malformed_pr')
+            if not since <= merged < until:
+                continue
+            if row['number'] in rows and rows[row['number']] != row:
+                return incomplete('duplicate_pr')
+            rows[row['number']] = row
+    return {**result, 'complete': True, 'prs': [rows[number] for number in sorted(rows)]}
 
 
-# Every collect() is two full scans; the doctor ran it each dispatch tick and the HUD every
-# refresh, about 140 GraphQL reads an hour on Gem for one 24 h stat (2026-10-12 gh ledger).
+# The doctor ran collect() each dispatch tick and the HUD every refresh, about 140 GraphQL
+# reads an hour on Gem for one 24 h stat (2026-10-12 gh ledger).
 SHARED_TTL_S = 300
 
 

@@ -1,0 +1,115 @@
+{
+  "schema": "customer-changelog-permalink-migrations/v1",
+  "entries": [
+    {
+      "releaseKey": "2026-10-02",
+      "storyId": "fan-updates",
+      "entryId": "customer-update:fan-updates",
+      "slug": "update-fan-updates",
+      "aliases": ["get-updates-from-an-artist-2026-10-02-1"],
+      "sourceIds": [
+        "JovieInc/Jovie#18988@1ff39e1e88a19422220cc8326ffee86ad9dee5fc"
+      ]
+    },
+    {
+      "releaseKey": "2026-10-02",
+      "storyId": "help-center",
+      "entryId": "customer-update:help-center",
+      "slug": "update-help-center",
+      "aliases": ["help-is-easier-to-find-2026-10-02-2"],
+      "sourceIds": [
+        "JovieInc/Jovie#18817@b4cc23f883483f64414bd1262df688934743d3d5"
+      ]
+    },
+    {
+      "releaseKey": "2026-10-02",
+      "storyId": "profile-link-claim",
+      "entryId": "customer-update:profile-link-claim",
+      "slug": "update-profile-link-claim",
+      "aliases": ["choose-your-jovie-link-2026-10-02-0"],
+      "sourceIds": [
+        "JovieInc/Jovie#19295@08e545f609fc991a4be355612177273b63206b67"
+      ]
+    },
+    {
+      "releaseKey": "2026-10-03",
+      "storyId": "identity-reach-line",
+      "entryId": "customer-update:identity-reach-line",
+      "slug": "update-identity-reach-line",
+      "aliases": [],
+      "sourceIds": [
+        "JovieInc/Jovie#20170@53af6a69e58e477ae321cef5962b7fe0a2f2b2bd"
+      ]
+    },
+    {
+      "releaseKey": "2026-10-03",
+      "storyId": "public-artist-profile-discovery-fields",
+      "entryId": "customer-update:public-artist-profile-discovery-fields",
+      "slug": "update-public-artist-profile-discovery-fields",
+      "aliases": [],
+      "sourceIds": [
+        "JovieInc/Jovie#20283@15018865b7da01b915c1fb932233860791eb6ca7"
+      ]
+    },
+    {
+      "releaseKey": "2026-10-05",
+      "storyId": "generic-creator-smart-links-copy",
+      "entryId": "customer-update:generic-creator-smart-links-copy",
+      "slug": "update-generic-creator-smart-links-copy",
+      "aliases": [],
+      "sourceIds": [
+        "JovieInc/Jovie#20568@0518d41046d829b172a1f002bc0e796e4a9ab8ac"
+      ]
+    },
+    {
+      "releaseKey": "2026-10-05",
+      "storyId": "homepage-faq",
+      "entryId": "customer-update:homepage-faq",
+      "slug": "update-homepage-faq",
+      "aliases": [],
+      "sourceIds": [
+        "JovieInc/Jovie#20519@da629691ed9ffa08db03c363caaf03280cde8de4"
+      ]
+    },
+    {
+      "releaseKey": "2026-10-05",
+      "storyId": "profile-link-preview-avif",
+      "entryId": "customer-update:profile-link-preview-avif",
+      "slug": "update-profile-link-preview-avif",
+      "aliases": [],
+      "sourceIds": [
+        "JovieInc/Jovie#20463@043e0004ea59ad2bc1719800c68980ab48386e38"
+      ]
+    },
+    {
+      "releaseKey": "2026-10-06",
+      "storyId": "creator-lookup-real-data",
+      "entryId": "customer-update:creator-lookup-real-data",
+      "slug": "update-creator-lookup-real-data",
+      "aliases": [],
+      "sourceIds": [
+        "JovieInc/Jovie#20465@636754f5193183d445bdca3bcfae30999e71abb8"
+      ]
+    },
+    {
+      "releaseKey": "2026-10-06",
+      "storyId": "profile-release-preview-playback",
+      "entryId": "customer-update:profile-release-preview-playback",
+      "slug": "update-profile-release-preview-playback",
+      "aliases": [],
+      "sourceIds": [
+        "JovieInc/Jovie#20296@9e778086d492b2c3472b0b6142f83d7c57a1b20b"
+      ]
+    },
+    {
+      "releaseKey": "2026-10-08",
+      "storyId": "onboarding-saved-conversation-resume",
+      "entryId": "customer-update:onboarding-saved-conversation-resume",
+      "slug": "update-onboarding-saved-conversation-resume",
+      "aliases": [],
+      "sourceIds": [
+        "JovieInc/Jovie#20984@485542fe6f370f20191e3e67e427f3870d84f984"
+      ]
+    }
+  ]
+}

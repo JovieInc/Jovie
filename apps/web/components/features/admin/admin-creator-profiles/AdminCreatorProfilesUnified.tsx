@@ -509,6 +509,7 @@ export function AdminCreatorProfilesUnified({
         >
           {() => (
             <AdminDataTable
+              rowMode='dense'
               data={filteredProfiles}
               columns={columns}
               isLoading={false}
