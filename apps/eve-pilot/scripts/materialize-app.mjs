@@ -298,6 +298,7 @@ The source export is preparatory; deployment and commissioning require separate 
       'index.ts',
       'prediction-outcome.ts',
       'prediction-receipt.ts',
+      'provider-attempt-receipt.ts',
       'provider-incident.ts',
       'symphony-outage.ts',
       'package.json',
@@ -317,6 +318,12 @@ The source export is preparatory; deployment and commissioning require separate 
         // Workspace index stays bundler-safe for Next typecheck/Turbopack.
         // Isolated NodeNext copies re-export the health module with .js.
         contents = `${contents.trimEnd()}\n\nexport * from './symphony-outage.js';\n`;
+      }
+      if (
+        path === 'index.ts' &&
+        !contents.includes("from './provider-attempt-receipt.js'")
+      ) {
+        contents = `${contents.trimEnd()}\n\nexport * from './provider-attempt-receipt.js';\n`;
       }
       if (
         path === 'index.ts' &&
@@ -343,6 +350,7 @@ The source export is preparatory; deployment and commissioning require separate 
     '../../packages/agent-transport-contracts/index.ts',
     '../../packages/agent-transport-contracts/prediction-outcome.ts',
     '../../packages/agent-transport-contracts/prediction-receipt.ts',
+    '../../packages/agent-transport-contracts/provider-attempt-receipt.ts',
     '../../packages/agent-transport-contracts/provider-incident.ts',
     '../../packages/agent-transport-contracts/symphony-outage.ts',
     '../../packages/agent-transport-contracts/package.json',
