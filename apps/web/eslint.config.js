@@ -22,6 +22,7 @@ const chatToolSchemaStrictRule = require('./eslint-rules/chat-tool-schema-strict
 const canonicalUiLabelCasingRule = require('./eslint-rules/canonical-ui-label-casing');
 const noHardcodedThemeColorsRule = require('./eslint-rules/no-hardcoded-theme-colors');
 const noDirectStripeClientRule = require('./eslint-rules/no-direct-stripe-client');
+const uiFeelRule = require('./eslint-rules/ui-feel');
 const { plugin: shadcn } = require('@shadcn/lint');
 const shadcnNoRestyleBaseline = require('./tests/unit/design-system/shadcn-no-restyle.baseline.json');
 const shadcnNoRestyleOptions = require('./eslint-rules/shadcn-no-restyle.options.json');
@@ -69,6 +70,7 @@ const baseConfig = {
         'canonical-ui-label-casing': canonicalUiLabelCasingRule,
         'no-hardcoded-theme-colors': noHardcodedThemeColorsRule,
         'no-direct-stripe-client': noDirectStripeClientRule,
+        'ui-feel': uiFeelRule,
       },
     },
   },
@@ -238,6 +240,14 @@ const baseConfig = {
     // retry, idempotency, and key handling cannot be bypassed by local
     // implementations. Type-only imports remain allowed everywhere.
     '@jovie/no-direct-stripe-client': 'error',
+    // JOV-8196: deterministic UI-feel checks — tabular-nums on changing
+    // numerals, text-wrap balance on headings, 40x40 hit-area floor, and
+    // concentric border radii (System B tokens). Heuristics documented in
+    // eslint-rules/ui-feel.js. Off here: the lint:ui-feel baseline ratchet
+    // (ci-fast design governance) owns enforcement. As 'error' it failed
+    // lint-staged and Source Validation's lint:eslint:changed on the
+    // baselined legacy violations in any touched file.
+    '@jovie/ui-feel': 'off',
     // JOV-6280: call-site appearance is owned by @jovie/ui. Layout/placement is
     // allowed. Extra upstream rules stay off until a fixture proves incremental
     // protection (see docs/design-system/shadcn-lint-overlap.md).

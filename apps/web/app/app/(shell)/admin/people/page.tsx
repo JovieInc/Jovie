@@ -1,17 +1,10 @@
 import type { Metadata } from 'next';
-import dynamic from 'next/dynamic';
 import type { SearchParams } from 'nuqs/server';
 import { AdminPeopleRightPanelProvider } from '@/components/features/admin/AdminPeopleRightPanelProvider';
-import { AdminCreatorsPageWrapper } from '@/components/features/admin/admin-creator-profiles/AdminCreatorsPageWrapper';
-import { AdminReleasesPageWrapper } from '@/components/features/admin/admin-releases-table';
-import { AdminUsersTableUnified } from '@/components/features/admin/admin-users-table/AdminUsersTableUnified';
 import { AdminContactsTable } from '@/components/features/admin/contacts-table/AdminContactsTable';
 import { CustomerRecoveryPanel } from '@/components/features/admin/customer-recovery/CustomerRecoveryPanel';
-import { AdminFeedbackTable } from '@/components/features/admin/feedback-table/AdminFeedbackTable';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { WaitlistMetrics } from '@/components/features/admin/WaitlistMetrics';
-import { WaitlistSettingsPanel } from '@/components/features/admin/WaitlistSettingsPanel';
-import { AdminWaitlistTableWithViews } from '@/components/features/admin/waitlist-table/AdminWaitlistTableWithViews';
 import {
   type AdminPeopleView,
   adminPeopleViews,
@@ -46,6 +39,15 @@ import {
   adminReleasesSortFields,
   adminUsersSortFields,
 } from '@/lib/nuqs';
+import {
+  AdminAssetsPageWrapper,
+  AdminCreatorsPageWrapper,
+  AdminFeedbackTable,
+  AdminReleasesPageWrapper,
+  AdminUsersTableUnified,
+  AdminWaitlistTableWithViews,
+  WaitlistSettingsPanel,
+} from './AdminPeopleLazyViews';
 
 interface AdminPeoplePageProps {
   readonly searchParams: Promise<SearchParams>;
@@ -57,12 +59,6 @@ export const metadata: Metadata = {
 };
 
 export const runtime = 'nodejs';
-
-const AdminAssetsPageWrapper = dynamic(() =>
-  import('@/components/features/admin/admin-assets-table').then(mod => ({
-    default: mod.AdminAssetsPageWrapper,
-  }))
-);
 
 const peopleTabs = adminPeopleViews.map(view => ({
   value: view,
