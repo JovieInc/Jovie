@@ -9,6 +9,6 @@
     "./work-order-adapters": "./work-order-adapters.ts"
   },
   "dependencies": {
-    "zod": "^4.6.5"
+    "zod": "^4.6.6"
   }
 }

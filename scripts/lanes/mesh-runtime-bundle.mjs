@@ -56,7 +56,7 @@ export function buildMeshRuntime(sourceRoot, dependencyRoot) {
   // The host repo may retain an older product checkout while its updater tracks
   // main. Compare both exact package/integrity and dependency snapshot records,
   // rather than requiring unrelated product lockfile entries to be identical.
-  for (const name of ['esbuild@0.28.2', 'zod@4.6.5', `${binaryName}@0.28.2`]) {
+  for (const name of ['esbuild@0.28.2', 'zod@4.6.7', `${binaryName}@0.28.2`]) {
     const expected = pinnedRecords(lock, name);
     if (
       JSON.stringify(expected) !==
@@ -88,9 +88,9 @@ export function buildMeshRuntime(sourceRoot, dependencyRoot) {
   const zod = JSON.parse(readFileSync(zodPackage, 'utf8'));
   if (
     compiler.version !== '0.28.2' ||
-    zod.version !== '4.6.5' ||
+    zod.version !== '4.6.7' ||
     !lock.includes('  esbuild@0.28.2:') ||
-    !lock.includes('  zod@4.6.5:')
+    !lock.includes('  zod@4.6.7:')
   )
     throw new Error('mesh-runtime-dependency-pin-mismatch');
   const sourceFiles = [

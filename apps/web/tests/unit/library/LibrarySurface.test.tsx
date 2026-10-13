@@ -1509,6 +1509,19 @@ describe('LibrarySurface', () => {
     expect(drawer.queryByText('a.zip')).not.toBeInTheDocument();
   });
 
+  it('opens the inspector for ?work=<id> deep links (Cmd+K entity commit)', () => {
+    navigationMock.searchParams = new URLSearchParams('work=release-b');
+    renderLibrary([
+      buildAsset({ id: 'release-a', title: 'Release A' }),
+      buildAsset({ id: 'release-b', title: 'Release B' }),
+    ]);
+
+    const drawer = within(screen.getByTestId('library-asset-drawer'));
+    expect(drawer.getByTestId('library-asset-entity-header')).toHaveTextContent(
+      'Release B'
+    );
+  });
+
   it('opens private file sharing in place from Share Privately (one share concept)', () => {
     renderLibrary([
       buildAsset({
@@ -1558,6 +1571,21 @@ describe('LibrarySurface', () => {
     } finally {
       click.mockRestore();
     }
+  });
+
+  it('gives the full-screen mobile inspector a visible close control', () => {
+    renderLibrary([buildAsset({ id: 'release-a', title: 'Release A' })]);
+    fireEvent.click(screen.getByTestId('library-release-row-release-a'));
+
+    const close = screen.getByTestId('library-inspector-close');
+    expect(close).toHaveAttribute('aria-label', 'Close');
+    // Desktop keeps Esc and the overflow menu; the X is for the sheet.
+    expect(close.className).toContain('lg:hidden');
+    fireEvent.click(close);
+    expect(screen.getByTestId('library-asset-drawer')).toHaveAttribute(
+      'aria-hidden',
+      'true'
+    );
   });
 
   it('uses shell focus tokens for library cards and drawer actions', () => {

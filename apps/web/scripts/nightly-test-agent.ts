@@ -816,7 +816,6 @@ const allowedArgvPrefixes: readonly string[][] = [
   ['pnpm', '--filter=@jovie/web', 'exec', 'playwright', 'test'],
   ['pnpm', '--filter=@jovie/web', 'exec', 'stryker', 'run'],
   ['pnpm', '--filter=@jovie/web', 'run', 'test'],
-  ['pnpm', '--filter=@jovie/web', 'run', 'test:mutation:hotspots'],
 ];
 
 function loadCandidates(fileOrDir: string): CandidateTest[] {

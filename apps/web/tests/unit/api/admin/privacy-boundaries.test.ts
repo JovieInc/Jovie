@@ -65,6 +65,7 @@ import * as Route34 from '@/app/api/admin/leads/route.ts';
 import * as Route35 from '@/app/api/admin/leads/seed/route.ts';
 import * as Route36 from '@/app/api/admin/leads/settings/route.ts';
 import * as Route37 from '@/app/api/admin/moderation/route.ts';
+import * as Route48 from '@/app/api/admin/outbound/readiness/route.ts';
 import * as Route47 from '@/app/api/admin/outbound/route.ts';
 import * as Route38 from '@/app/api/admin/outreach/debug/route.ts';
 import * as Route39 from '@/app/api/admin/outreach/route.ts';
@@ -142,6 +143,7 @@ const cases = [
   ['POST', '/api/admin/leads/[id]/refresh-evidence', RouteLeadEvidence.POST],
   ['GET', '/api/admin/outbound', Route47.GET],
   ['POST', '/api/admin/outbound', Route47.POST],
+  ['GET', '/api/admin/outbound/readiness', Route48.GET],
 ] as const;
 // The real handlers must invoke scoped operator access before private data or
 // side effects. The access helper's own tests verify locked/role/MFA decisions.
