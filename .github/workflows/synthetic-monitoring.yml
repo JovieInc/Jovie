@@ -52,16 +52,8 @@ jobs:
       - name: Setup Node and pnpm
         uses: ./.github/actions/setup-node-pnpm
 
-      - name: Cache Playwright Browsers
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v5
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-
-
-      - name: Install Playwright Browsers (chromium only)
-        run: pnpm --filter=@jovie/web exec playwright install --with-deps chromium
+      - name: Setup Playwright (Chromium)
+        uses: ./.github/actions/setup-playwright
 
       - name: Install Doppler CLI
         run: |
