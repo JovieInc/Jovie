@@ -92,6 +92,10 @@ export function TableHeaderCell<TData extends RowData>({
     // The sort pill pads 6px; inset the cell 6px so the label lands on
     // the body cells' 12px text edge.
     canSort && 'px-1.5',
+    // Plain labels take the body cell's seam on the <th> itself, so a
+    // column meta padding (e.g. px-2) moves header and body together.
+    // Padding on the inner label as well put headers 12px right of cells.
+    !canSort && 'px-3',
     metaClassName,
     'whitespace-nowrap'
   );
@@ -150,7 +154,7 @@ export function TableHeaderCell<TData extends RowData>({
           <div
             className={cn(
               tableHeaderClass,
-              'line-clamp-1',
+              'line-clamp-1 px-0',
               tableAlignment.text[align]
             )}
           >

@@ -271,6 +271,27 @@ runtime behavior, or Summer commissioning.
 - Emergency response: inspect the native ruleset and exact queue entry,
   repair the source or required check, and prove a fresh native canary.
 
+## Queue freeze (queue-watch runbook)
+
+Merge Queue Green Enroll is the sole queue writer, so one repository variable
+freezes admission:
+
+- Freeze: `gh variable set QUEUE_FREEZE --body 1 -R JovieInc/Jovie`
+- Lift: `gh variable set QUEUE_FREEZE --body 0 -R JovieInc/Jovie`
+
+While `QUEUE_FREEZE=1`, green enroll's `enroll` and `rearm-green-victims` jobs
+and the manual Auto-Ready Agent Drafts `auto-ready` job are skipped. Failure
+holds, the hold contract and held-PR dequeues keep running. PRs already in
+the queue keep landing, so dequeue any that must stop. The variable does not
+disarm native auto-merge: a PR armed before the flip (by an agent's
+`gh pr merge --auto` or any remaining writer) is still enqueued by GitHub
+when it turns green. Disarm those with `gh pr merge N --disable-auto -R
+JovieInc/Jovie`. `scripts/merge-queue-green-enroll.test.mjs` fails if a job
+that can enqueue or arm lacks the guard.
+
+To admit one PR without a roster sweep, dispatch green enroll with
+`gh workflow run merge-queue-green-enroll.yml -f pr_number=N -R JovieInc/Jovie`.
+
 ## Signed commits
 
 Commit signing remains an audit signal, but live ruleset `10512119` does not

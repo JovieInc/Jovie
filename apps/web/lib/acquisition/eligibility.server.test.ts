@@ -19,15 +19,23 @@ vi.mock('@/lib/github/hud-token.server', () => ({
   resolveHudGithubToken: vi.fn(),
 }));
 vi.mock('@/lib/error-tracking', () => ({ captureError: vi.fn() }));
+vi.mock('@/lib/http/server-fetch', () => ({ serverFetch: vi.fn() }));
+vi.mock('@/lib/env-server', () => ({
+  env: { HUD_GITHUB_OWNER: 'JovieInc', HUD_GITHUB_REPO: 'Jovie' },
+}));
 
 import type { FounderFunnelData } from '@/lib/admin/founder-funnel';
 import type { M2RevenuePathReceipt } from '@/lib/canaries/m2-revenue-path';
 import type { CanaryReport } from '@/lib/canaries/public-profile';
+import { resolveHudGithubToken } from '@/lib/github/hud-token.server';
+import { serverFetch } from '@/lib/http/server-fetch';
 import {
   type AcquisitionEligibilityDeps,
   CONE_WORKFLOWS,
   computeAcquisitionEligibility,
+  defaultAcquisitionEligibilityDeps,
   getAcquisitionEligibility,
+  jobConclusion,
   type WorkflowRunRead,
 } from './eligibility.server';
 
@@ -293,5 +301,108 @@ describe('getAcquisitionEligibility', () => {
     hoisted.redis?.get.mockRejectedValue(new Error('quota'));
     const result = await getAcquisitionEligibility({}, deps());
     expect(result.eligible).toBe(true);
+  });
+});
+
+describe('Golden Path workflow evidence', () => {
+  const fetchMock = vi.mocked(serverFetch);
+  const json = (body: unknown, status = 200) =>
+    ({
+      json: async () => body,
+      ok: status < 400,
+      status,
+    }) as unknown as Response;
+
+  beforeEach(() => {
+    fetchMock.mockReset();
+    vi.mocked(resolveHudGithubToken).mockResolvedValue('token');
+  });
+
+  it('reads the Golden Path job, not the dispatching run', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        json({
+          workflow_runs: [
+            {
+              conclusion: 'failure',
+              created_at: RECENT,
+              head_sha: 'a'.repeat(40),
+              html_url: 'https://github.com/run/9',
+              id: 9,
+            },
+          ],
+        })
+      )
+      .mockResolvedValueOnce(
+        json({
+          jobs: [
+            { conclusion: 'failure', name: 'Unit Tests' },
+            { conclusion: 'success', name: 'Golden Path (manual)' },
+          ],
+        })
+      );
+    const read = await defaultAcquisitionEligibilityDeps.readWorkflowRun(
+      CONE_WORKFLOWS.goldenPath
+    );
+    expect(read).toEqual({
+      run: {
+        conclusion: 'success',
+        createdAt: RECENT,
+        headSha: 'a'.repeat(40),
+        url: 'https://github.com/run/9',
+      },
+      status: 'observed',
+    });
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain(
+      '/actions/workflows/ci.yml/runs?branch=main&status=completed&event=workflow_dispatch&per_page=1'
+    );
+    expect(String(fetchMock.mock.calls[1]?.[0])).toContain(
+      '/actions/runs/9/jobs?filter=latest&per_page=100'
+    );
+  });
+
+  it('keeps whole-run evidence for plain workflow files', async () => {
+    fetchMock.mockResolvedValueOnce(
+      json({ workflow_runs: [{ conclusion: 'success', created_at: RECENT }] })
+    );
+    const read = await defaultAcquisitionEligibilityDeps.readWorkflowRun(
+      CONE_WORKFLOWS.revenuePath
+    );
+    expect(read).toMatchObject({ run: { conclusion: 'success' } });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0]?.[0])).not.toContain('event=');
+  });
+
+  it('reports an unreadable run or job list as unavailable', async () => {
+    fetchMock.mockResolvedValueOnce(json({}, 502));
+    expect(
+      await defaultAcquisitionEligibilityDeps.readWorkflowRun(
+        CONE_WORKFLOWS.goldenPath
+      )
+    ).toEqual({ reason: 'GitHub API error (502).', status: 'unavailable' });
+
+    fetchMock
+      .mockResolvedValueOnce(
+        json({ workflow_runs: [{ created_at: RECENT, id: 3 }] })
+      )
+      .mockResolvedValueOnce(json({}, 403));
+    expect(
+      await defaultAcquisitionEligibilityDeps.readWorkflowRun(
+        CONE_WORKFLOWS.goldenPath
+      )
+    ).toEqual({ reason: 'GitHub API error (403).', status: 'unavailable' });
+  });
+
+  it('counts a skipped or missing Golden Path job as red unless cancelled', () => {
+    const skipped = [{ conclusion: 'skipped', name: 'Golden Path (manual)' }];
+    expect(jobConclusion(skipped, 'Golden Path (manual)', 'failure')).toBe(
+      'failure'
+    );
+    expect(jobConclusion([], 'Golden Path (manual)', 'success')).toBe(
+      'failure'
+    );
+    expect(jobConclusion([], 'Golden Path (manual)', 'cancelled')).toBe(
+      'cancelled'
+    );
   });
 });
