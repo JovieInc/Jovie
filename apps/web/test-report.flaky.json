@@ -10,23 +10,13 @@
     "event": null,
     "job": null
   },
-  "generatedAt": "2026-10-13T05:47:49.687Z",
+  "generatedAt": "2026-10-13T10:46:23.251Z",
   "complete": true,
   "executions": [
     {
-      "file": "tests/unit/utils/capitalizeFirst.test.ts",
-      "fileHash": "2652c70cae54eeab7e450bf011aabf79deb64a2631d40bcb969987c393c0fb3c",
-      "executedCount": 6,
-      "skippedCount": 0,
-      "retryCount": 0,
-      "outcome": "clean",
-      "complete": true,
-      "failures": []
-    },
-    {
-      "file": "tests/unit/utils/public-url.test.ts",
-      "fileHash": "7937736800c0e73c2f9b81124d7e524c90dd6ff07be0cd1c55de16cc23004027",
-      "executedCount": 7,
+      "file": "tests/unit/design-system/one-primary-action-per-screen-v1.test.ts",
+      "fileHash": "53e80d4ac8c07c71820619b51c50816e38253f600bd65dd3c788191fe57349d8",
+      "executedCount": 2,
       "skippedCount": 0,
       "retryCount": 0,
       "outcome": "clean",

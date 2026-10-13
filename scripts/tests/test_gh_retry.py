@@ -4046,7 +4046,7 @@ JSON
                 if [[ "$1" == api && "$2" == *"/commits/{head}"* ]]; then echo '2026-09-05T00:00:00Z'; exit 0; fi
                 if [[ "$1" == api && "$2" == *"/actions/workflows/ci.yml/runs"* ]]; then echo '[]'; exit 0; fi
                 if [[ "$1" == api && "$2" == "repos/JovieInc/Jovie" ]]; then echo '{{"default_branch":"main","allow_auto_merge":true,"allow_squash_merge":true}}'; exit 0; fi
-                if [[ "$1" == api && "$2" == *"/rulesets/10512119"* ]]; then echo '{{"id":10512119,"enforcement":"active","target":"branch","conditions":{{"ref_name":{{"include":["refs/heads/main"],"exclude":[]}}}},"bypass_actors":[],"rules":[{{"type":"required_status_checks","parameters":{{"strict_required_status_checks_policy":false,"required_status_checks":[{{"context":"PR Ready"}},{{"context":"Migration Guard"}},{{"context":"Fork PR Gate"}},{{"context":"PR Size Guard"}}]}}}},{{"type":"merge_queue","parameters":{{"check_response_timeout_minutes":20,"grouping_strategy":"ALLGREEN","max_entries_to_build":1,"max_entries_to_merge":1,"merge_method":"SQUASH","min_entries_to_merge":1,"min_entries_to_merge_wait_minutes":0}}}}]}}'; exit 0; fi
+                if [[ "$1" == api && "$2" == *"/rulesets/10512119"* ]]; then echo '{{"id":10512119,"enforcement":"active","target":"branch","conditions":{{"ref_name":{{"include":["refs/heads/main"],"exclude":[]}}}},"bypass_actors":[],"rules":[{{"type":"required_status_checks","parameters":{{"strict_required_status_checks_policy":false,"required_status_checks":[{{"context":"PR Ready"}},{{"context":"Migration Guard"}},{{"context":"Fork PR Gate"}},{{"context":"PR Size Guard"}}]}}}},{{"type":"merge_queue","parameters":{{"check_response_timeout_minutes":60,"grouping_strategy":"ALLGREEN","max_entries_to_build":6,"max_entries_to_merge":5,"merge_method":"SQUASH","min_entries_to_merge":1,"min_entries_to_merge_wait_minutes":0}}}}]}}'; exit 0; fi
                 if [[ "$1" == api && "$*" == *"/contents/.github/workflows/ci.yml"* ]]; then printf 'name: CI\non:\n  pull_request:\n    branches: [main]\n  merge_group:\n    types: [checks_requested]\n'; exit 0; fi
                 if [[ "$1 $2" == "api graphql" ]]; then
                   args="$*"
@@ -4062,7 +4062,7 @@ JSON
                   fi
                   if [[ "$args" == *"MergeQueueOpenPullRequestStates"* ]]; then state=$(state_json); jq -nc --argjson state "$state" '{{data:{{repository:{{pullRequests:{{nodes:[$state],pageInfo:{{hasNextPage:false}}}}}}}}}}'; exit 0; fi
                   if [[ "$args" == *"MergeQueueBranchProtection"* ]]; then echo '{{"data":{{"repository":{{"ref":{{"name":"main","branchProtectionRule":null}}}}}}}}'; exit 0; fi
-                  if [[ "$args" == *"MergeQueueLiveConfiguration"* ]]; then echo '{{"data":{{"repository":{{"mergeQueue":{{"configuration":{{"checkResponseTimeout":1200,"maximumEntriesToBuild":1,"maximumEntriesToMerge":1,"mergeMethod":"SQUASH","minimumEntriesToMerge":1,"minimumEntriesToMergeWaitTime":0}}}}}}}}}}'; exit 0; fi
+                  if [[ "$args" == *"MergeQueueLiveConfiguration"* ]]; then echo '{{"data":{{"repository":{{"mergeQueue":{{"configuration":{{"checkResponseTimeout":3600,"maximumEntriesToBuild":6,"maximumEntriesToMerge":5,"mergeMethod":"SQUASH","minimumEntriesToMerge":1,"minimumEntriesToMergeWaitTime":0}}}}}}}}}}'; exit 0; fi
                 fi
                 echo "unexpected gh args: $*" >&2; exit 2
                 """
