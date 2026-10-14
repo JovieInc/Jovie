@@ -1,6 +1,178 @@
 /** Evidence-bound JOV-INV-028 consumer; no fetch, send, policy change, or external authorization. */
 export const GROWTH_LEARNING_INVARIANT_ID = 'JOV-INV-028';
 export const GROWTH_LEARNING_SCHEMA = 'jovie-growth-learning/v1';
+export const APP_REVIEW_READOUT_SCHEMA = 'app-review-readout/v1';
+
+/** Read-only adapter for the existing learning loop, never an experiment engine.
+ * Feed sanitized aggregate snapshots from the maintained provider connectors.
+ * No customer/health payloads, provider calls, randomization, or live mutations.
+ * @param {{ now?: Date | string }} [options]
+ */
+export function assessAppReviewReadout(snapshot, options = {}) {
+  const { now = new Date() } = options;
+  const errors = [];
+  const checkKeys = (value, allowed, scope) => {
+    if (value && typeof value === 'object') {
+      for (const key of Object.keys(value)) {
+        if (!allowed.includes(key))
+          errors.push(`unexpected-field:${scope}.${key}`);
+      }
+    }
+  };
+  checkKeys(
+    snapshot,
+    [
+      'schema',
+      'app',
+      'appVersion',
+      'storefront',
+      'policyRevision',
+      'window',
+      'metrics',
+      'sources',
+      'guardrails',
+    ],
+    'snapshot'
+  );
+  checkKeys(
+    snapshot?.window,
+    ['start', 'end', 'outcomesCompleteThrough'],
+    'window'
+  );
+  checkKeys(
+    snapshot?.metrics,
+    ['eligibleOpportunities', 'requestInvocations', 'storeWrittenReviews'],
+    'metrics'
+  );
+  checkKeys(snapshot?.sources, ['posthog', 'app-store-connect'], 'sources');
+  checkKeys(
+    snapshot?.guardrails,
+    ['interruptionReports', 'repeatRequestViolations', 'privacyIncidents'],
+    'guardrails'
+  );
+  const nowMs = now instanceof Date ? now.getTime() : Date.parse(now);
+  if (!Number.isFinite(nowMs)) errors.push('evaluation-time-invalid');
+  if (snapshot?.schema !== APP_REVIEW_READOUT_SCHEMA)
+    errors.push('schema-invalid');
+  const start = Date.parse(snapshot?.window?.start);
+  const end = Date.parse(snapshot?.window?.end);
+  const complete = Date.parse(snapshot?.window?.outcomesCompleteThrough);
+  if (
+    !Number.isFinite(start) ||
+    !Number.isFinite(end) ||
+    start >= end ||
+    end > nowMs
+  ) {
+    errors.push('window-invalid');
+  }
+  if (!Number.isFinite(complete) || complete < end || complete > nowMs) {
+    errors.push('outcomes-not-mature');
+  }
+  // StoreKit's void action has no display or review-outcome callback. Reject
+  // attempts to convert invocation counts into those unobservable metrics.
+  for (const field of [
+    'promptDisplays',
+    'promptDismissals',
+    'attributedReviews',
+    'reviewConversionRate',
+  ]) {
+    if (Object.hasOwn(snapshot?.metrics ?? {}, field))
+      errors.push(`unobservable-metric:${field}`);
+  }
+  const metrics = snapshot?.metrics;
+  for (const field of [
+    'eligibleOpportunities',
+    'requestInvocations',
+    'storeWrittenReviews',
+  ]) {
+    if (!Number.isSafeInteger(metrics?.[field]) || metrics[field] < 0)
+      errors.push(`metric-missing:${field}`);
+  }
+  if (metrics?.requestInvocations > metrics?.eligibleOpportunities)
+    errors.push('requests-exceed-eligibility');
+  for (const owner of ['posthog', 'app-store-connect']) {
+    const source = snapshot?.sources?.[owner];
+    checkKeys(
+      source,
+      [
+        'status',
+        'receiptRef',
+        'observedAt',
+        'app',
+        'appVersion',
+        'storefront',
+        'windowStart',
+        'windowEnd',
+      ],
+      `sources.${owner}`
+    );
+    const observed = Date.parse(source?.observedAt);
+    if (
+      source?.status !== 'connected' ||
+      !source?.receiptRef ||
+      !Number.isFinite(observed) ||
+      observed > nowMs ||
+      nowMs - observed > 24 * 60 * 60 * 1000
+    ) {
+      errors.push(`source-unverified:${owner}`);
+    }
+    if (
+      source?.app !== snapshot?.app ||
+      source?.windowStart !== snapshot?.window?.start ||
+      source?.windowEnd !== snapshot?.window?.end ||
+      source?.storefront !== snapshot?.storefront ||
+      source?.appVersion !== snapshot?.appVersion
+    )
+      errors.push(`source-scope-mismatch:${owner}`);
+  }
+  // Written review volume is descriptive and can mix cohorts, versions,
+  // storefronts and acquisition sources. They are never a per-user causal win.
+  if (!snapshot?.app || !snapshot?.storefront || !snapshot?.appVersion)
+    errors.push('store-scope-missing');
+  const policyBound =
+    typeof snapshot?.policyRevision === 'string' &&
+    /^[a-zA-Z0-9_.-]{1,80}$/.test(snapshot.policyRevision);
+  if (!policyBound) errors.push('policy-revision-missing');
+  const guards = snapshot?.guardrails;
+  for (const field of [
+    'interruptionReports',
+    'repeatRequestViolations',
+    'privacyIncidents',
+  ]) {
+    if (!Number.isSafeInteger(guards?.[field]) || guards[field] < 0)
+      errors.push(`guardrail-missing:${field}`);
+  }
+  const harm = [
+    'interruptionReports',
+    'repeatRequestViolations',
+    'privacyIncidents',
+  ].some(field => guards?.[field] > 0);
+  return {
+    schema: APP_REVIEW_READOUT_SCHEMA,
+    learningInvariant: GROWTH_LEARNING_INVARIANT_ID,
+    mode: 'prepare-only',
+    errors,
+    causalCertification: 'not-certified',
+    display: 'unobservable',
+    reviewAttribution: 'unobservable',
+    nextAction: harm
+      ? 'prepare-disable-proposal'
+      : errors.length > 0
+        ? 'collect-read-only-evidence'
+        : 'prepare-policy-experiment-proposal',
+    proposedMutation:
+      harm && policyBound && snapshot?.app
+        ? {
+            app: snapshot.app,
+            policyRevision: snapshot.policyRevision,
+            owner: 'AppReview.Policy',
+            patch: { enabled: false },
+          }
+        : null,
+    // Existing JOV-INV-028 validation/authorization owns any proposal execution.
+    executionAuthority: 'none',
+  };
+}
 export const GROWTH_LEARNING_RETENTION_REVIEW_FLOOR =
   '2026-11-18T00:00:00.000Z';
 const SIGNAL_WINDOW_DAYS = 14;
