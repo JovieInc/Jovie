@@ -1,8 +1,8 @@
 import { Bell, Check } from 'lucide-react';
 import Link from 'next/link';
 import type { MouseEvent } from 'react';
-import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { EntityHeaderThumbnail } from '@/components/molecules/drawer/EntityHeader';
 import { HOSTNAME } from '@/constants/domains';
 import { cn } from '@/lib/utils';
 import {
@@ -95,34 +95,17 @@ export function ProfileIdentityHeader({
       className={cn('flex flex-col items-center text-center', className)}
       data-testid='profile-identity-header'
     >
-      <div className='relative h-20 w-20 shrink-0'>
-        <div
-          className='relative h-full w-full overflow-hidden rounded-full bg-surface-2'
-          data-testid='profile-identity-portrait'
-        >
-          <ImageWithFallback
-            src={imageUrl}
-            alt=''
-            fill
-            priority={imagePriority}
-            sizes='80px'
-            className='object-cover'
-            fallbackVariant='avatar'
-            fallbackClassName='bg-surface-2'
-          />
-        </div>
-        {isVerified ? (
-          <span
-            className='absolute bottom-0 right-0 inline-flex h-5 w-5 items-center justify-center rounded-full bg-(--profile-stage-bg) text-primary-token ring-2 ring-(--profile-stage-bg)'
-            role='img'
-            aria-label='Verified Jovie Profile'
-            title='Verified Jovie Profile'
-            data-testid='profile-identity-verified'
-          >
-            <Check className='h-3 w-3' strokeWidth={2.5} aria-hidden='true' />
-          </span>
-        ) : null}
-      </div>
+      <EntityHeaderThumbnail
+        variant='person'
+        name={name}
+        alt=''
+        src={imageUrl}
+        size={80}
+        priority={imagePriority}
+        verified={isVerified}
+        className='h-20 w-20'
+        data-testid='profile-identity-portrait'
+      />
 
       <Heading
         className='mt-1.5 min-w-0 max-w-full'

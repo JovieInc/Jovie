@@ -160,16 +160,11 @@ describe('AudienceMemberSidebar', () => {
       screen.getByRole('button', { name: 'More actions' })
     ).toBeInTheDocument();
     const avatarFrame = screen.getByTestId('audience-entity-avatar-frame');
-    expect(avatarFrame).toHaveClass(
-      'size-14',
-      'p-1',
-      'rounded-[calc(var(--radius-lg)+var(--space-1))]',
-      'shadow-none'
-    );
+    expect(avatarFrame).toHaveClass('size-14', 'rounded-full');
     expect(avatarFrame.firstElementChild).toHaveClass(
-      'size-12',
-      'rounded-lg',
-      'shadow-none'
+      'h-full',
+      'w-full',
+      'rounded-full'
     );
     expect(screen.getByTestId('audience-member-sidebar')).toHaveAttribute(
       'data-surface-variant',

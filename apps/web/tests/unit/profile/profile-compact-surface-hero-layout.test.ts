@@ -116,9 +116,10 @@ describe('ProfileCompactSurface identity header layout', () => {
   it('keeps the portrait art untouched: 80px circle, no overlay but the verified glyph', () => {
     const header = readFileSync(PROFILE_IDENTITY_HEADER, 'utf8');
 
-    expect(header).toContain("'relative h-20 w-20 shrink-0'");
-    expect(header).toContain('overflow-hidden rounded-full');
-    expect(header).toContain("sizes='80px'");
+    expect(header).toContain('EntityHeaderThumbnail');
+    expect(header).toContain("variant='person'");
+    expect(header).toContain('size={80}');
+    expect(header).toContain('verified={isVerified}');
     expect(header).not.toMatch(/gradient|backdrop-blur|bg-black\//);
   });
 

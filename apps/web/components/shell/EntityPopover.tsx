@@ -14,7 +14,6 @@
 // component just renders what it's given.
 
 import { Gauge, Music, Users } from 'lucide-react';
-import Image from 'next/image';
 import {
   type KeyboardEvent,
   type ReactNode,
@@ -25,9 +24,9 @@ import {
   useState,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { EntityHeaderThumbnail } from '@/components/molecules/drawer/EntityHeader';
 import { LINEAR_SURFACE } from '@/components/tokens/linear-surface';
 import { cn } from '@/lib/utils';
-import { getInitials } from '@/lib/utils/initials';
 
 // ---------------------------------------------------------------------------
 // Data shapes
@@ -208,60 +207,7 @@ export function EntityRowArt({
   readonly entity: EntityPopoverData;
 }) {
   if (!entity || typeof entity.label !== 'string') return null;
-  if (entity.kind === 'event' && !entity.thumbnail) {
-    const stamp = stampParts(entity.eventDate);
-    if (stamp) {
-      return (
-        <span className='flex h-7 w-7 shrink-0 flex-col items-center justify-center rounded-xl border border-subtle bg-surface-1 shadow-app-control'>
-          <span className='text-3xs font-caption leading-none text-tertiary-token'>
-            {stamp.month}
-          </span>
-          <span className='mt-0.5 text-2xs font-bold leading-none text-primary-token'>
-            {stamp.day}
-          </span>
-        </span>
-      );
-    }
-  }
-  if (entity.thumbnail) {
-    const rounded =
-      entity.kind === 'artist' ||
-      entity.kind === 'contact' ||
-      entity.kind === 'teammate'
-        ? 'rounded-full'
-        : 'rounded-xl';
-    return (
-      <span
-        className={cn(
-          'relative h-7 w-7 shrink-0 overflow-hidden shadow-app-control',
-          rounded
-        )}
-      >
-        <Image
-          src={entity.thumbnail}
-          alt=''
-          fill
-          sizes='28px'
-          className='object-cover'
-          unoptimized
-        />
-      </span>
-    );
-  }
-  const isCircular =
-    entity.kind === 'artist' ||
-    entity.kind === 'contact' ||
-    entity.kind === 'teammate';
-  return (
-    <span
-      className={cn(
-        'flex h-7 w-7 shrink-0 items-center justify-center border border-subtle bg-surface-1 text-3xs font-caption text-primary-token shadow-app-control',
-        isCircular ? 'rounded-full' : 'rounded-xl'
-      )}
-    >
-      {getInitials(entity.label) || '·'}
-    </span>
-  );
+  return <CardArtwork entity={entity} size={28} />;
 }
 
 // ---------------------------------------------------------------------------
@@ -435,71 +381,31 @@ function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
 }
 
-interface DateStampParts {
-  readonly month: string;
-  readonly day: string;
-}
-
-function stampParts(iso: string | undefined): DateStampParts | null {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  return {
-    month: d.toLocaleString('en-US', { month: 'short' }).toUpperCase(),
-    day: d.getDate().toString(),
-  };
-}
-
-// 48px hero artwork inside the card.
-function CardArtwork({ entity }: { readonly entity: EntityPopoverData }) {
+// Shared identity geometry in row and popover densities.
+function CardArtwork({
+  entity,
+  size = 48,
+}: {
+  readonly entity: EntityPopoverData;
+  readonly size?: number;
+}) {
   if (!entity) return null;
-  if (entity.kind === 'event' && !entity.thumbnail) {
-    const stamp = stampParts(entity.eventDate);
-    if (stamp) {
-      return (
-        <div className='flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-xl bg-surface-1'>
-          <span className='text-3xs font-caption text-tertiary-token'>
-            {stamp.month}
-          </span>
-          <span className='text-mid font-bold leading-none text-primary-token'>
-            {stamp.day}
-          </span>
-        </div>
-      );
-    }
-  }
-  const isCircular =
+  const person =
     entity.kind === 'artist' ||
     entity.kind === 'contact' ||
     entity.kind === 'teammate';
-  if (entity.thumbnail) {
-    return (
-      <div
-        className={cn(
-          'relative h-12 w-12 shrink-0 overflow-hidden',
-          isCircular ? 'rounded-full' : 'rounded-xl'
-        )}
-      >
-        <Image
-          src={entity.thumbnail}
-          alt=''
-          fill
-          sizes='48px'
-          className='object-cover'
-          unoptimized
-        />
-      </div>
-    );
-  }
   return (
-    <div
-      className={cn(
-        'flex h-12 w-12 shrink-0 items-center justify-center bg-surface-1 text-app font-caption text-primary-token',
-        isCircular ? 'rounded-full' : 'rounded-xl'
-      )}
-    >
-      {getInitials(entity.label) || '·'}
-    </div>
+    <EntityHeaderThumbnail
+      variant={
+        person ? 'person' : entity.kind === 'event' ? 'event' : 'artwork'
+      }
+      name={entity.label}
+      alt=''
+      src={entity.thumbnail}
+      size={size}
+      eventDate={entity.kind === 'event' ? entity.eventDate : undefined}
+      // Provider artist verification is not a Jovie verification badge.
+    />
   );
 }
 

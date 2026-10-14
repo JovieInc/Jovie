@@ -3,7 +3,6 @@
 import { Button } from '@jovie/ui';
 import { QueryClientContext } from '@tanstack/react-query';
 import {
-  AudioLines,
   Calendar,
   CheckSquare,
   Copy,
@@ -15,7 +14,6 @@ import {
   X,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -33,6 +31,7 @@ import { CompactReleasePlanUpgradeCard } from '@/components/features/dashboard/t
 import {
   DrawerSection,
   EntityHeader,
+  EntityHeaderThumbnail,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
@@ -41,8 +40,6 @@ import {
   chatReleaseContextToEntityCard,
   chatTourDateContextToEntityCard,
   EntityCard,
-  entityCardArtStyle,
-  KIND_PRESETS,
 } from '@/components/organisms/entity-card';
 import {
   type ContextMenuItemType,
@@ -116,19 +113,6 @@ function releaseTypeLabel(type: ReleaseViewModel['releaseType']): string {
   return type
     .replaceAll('_', ' ')
     .replaceAll(/\b\w/g, letter => letter.toUpperCase());
-}
-
-function getProfileInitials(profile: ChatProfileContextSummary): string {
-  const label = profile.displayName ?? profile.username ?? 'Profile';
-  const words = label
-    .split(/\s+/)
-    .map(word => word.trim())
-    .filter(Boolean);
-  const initials = words
-    .slice(0, 2)
-    .map(word => word[0]?.toUpperCase())
-    .join('');
-  return initials || 'P';
 }
 
 function contextKindLabel(kind: ChatRailContextKind): string {
@@ -232,21 +216,13 @@ function ChatProfileContextCard({
         className='flex min-w-0 flex-1 items-center gap-0 border-0 bg-transparent p-0 text-left'
         onClick={() => onOpenProfilePreview?.()}
       >
-        <div className='system-b-chat-entity-context-avatar'>
-          {profile?.avatarUrl ? (
-            <Image
-              src={profile.avatarUrl}
-              alt=''
-              fill
-              sizes='36px'
-              className='object-cover'
-            />
-          ) : (
-            <div className='flex h-full w-full items-center justify-center'>
-              {profile ? getProfileInitials(profile) : 'P'}
-            </div>
-          )}
-        </div>
+        <EntityHeaderThumbnail
+          variant='person'
+          name={title}
+          src={profile?.avatarUrl}
+          size={36}
+          alt=''
+        />
         <ChatContextCardCopy title={title} meta={meta} />
       </button>
       <ChatContextDismissControl
@@ -577,7 +553,6 @@ function ChatReleaseEntityPanel({
     usePlanGate();
   const [showTasksUpgrade, setShowTasksUpgrade] = useState(true);
   const releaseDate = formatReleaseDate(release?.releaseDate);
-  const releaseArtStyle = entityCardArtStyle(KIND_PRESETS.music.accent);
   const visibleProviders = release?.providers.filter(provider => provider.url);
   const hasMedia =
     Boolean(release?.artworkUrl) ||
@@ -621,22 +596,12 @@ function ChatReleaseEntityPanel({
         entityHeader={
           <EntityHeader
             thumbnail={
-              <div
-                className='relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md border border-subtle bg-surface-0 text-tertiary-token'
-                style={releaseArtStyle}
-              >
-                {release?.artworkUrl ? (
-                  <Image
-                    src={release.artworkUrl}
-                    alt=''
-                    fill
-                    className='object-cover'
-                    sizes='40px'
-                  />
-                ) : (
-                  <AudioLines className='h-4 w-4' />
-                )}
-              </div>
+              <EntityHeaderThumbnail
+                variant='artwork'
+                src={release?.artworkUrl}
+                name={panelTitle}
+                size={40}
+              />
             }
             eyebrow='Release'
             title={panelTitle}
@@ -899,9 +864,7 @@ function ChatContactEntityPanelLoader({
       entityHeader={
         <EntityHeader
           thumbnail={
-            <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-subtle bg-surface-0 text-tertiary-token'>
-              <UserRound className='h-4 w-4' />
-            </div>
+            <EntityHeaderThumbnail variant='person' name={title} size={40} />
           }
           eyebrow='Contact'
           title={title}
@@ -1020,9 +983,12 @@ function ChatTourDateEntityPanelLoader({
       entityHeader={
         <EntityHeader
           thumbnail={
-            <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-subtle bg-surface-0 text-tertiary-token'>
-              <Calendar className='h-4 w-4' />
-            </div>
+            <EntityHeaderThumbnail
+              variant='event'
+              name={title}
+              eventDate={event?.eventDate}
+              size={40}
+            />
           }
           eyebrow='Tour date'
           title={title}

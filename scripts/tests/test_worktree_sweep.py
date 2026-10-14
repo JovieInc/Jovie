@@ -147,21 +147,42 @@ class SweepTest(unittest.TestCase):
         (path / "node_modules/pkg/index.js").write_text("build output\n")
         (path / ".pnpm-store-private/v10").mkdir(parents=True)
         (path / ".pnpm-store-private/v10/blob").write_text("per-checkout store\n")
+        private = path / ".symphony/package-cache/pnpm-store/v10"
+        private.mkdir(parents=True)
+        (private / "blob").write_text("retired Elixir private cache\n")
+        provenance = path / ".symphony/package-cache/network-trace"
+        provenance.write_text("retain provenance\n")
         report = self.sweep(now=time.time() + 2 * DAY)
         self.assertFalse(path.exists())
         self.assertEqual(report["backups"], ["backup/mac/dirty-20261003"])
         files = git(self.remote, "ls-tree", "-r", "--name-only", "backup/mac/dirty-20261003").split()
-        self.assertEqual(sorted(files), ["a.txt", "b.txt", "new.txt"], "build dirs never reach the backup")
+        self.assertEqual(sorted(files), [".symphony/package-cache/network-trace", "a.txt", "b.txt", "new.txt"],
+                         "private cache bytes never reach the backup; source and provenance do")
         self.assertEqual(git(self.remote, "show", "backup/mac/dirty-20261003:a.txt"), "edited")
 
     def test_failed_backup_keeps_checkout_and_strips_build_output(self):
         path = self.worktree("unsaved")
         (path / "a.txt").write_text("edited\n")
         (path / ".next").mkdir()
+        private = path / ".symphony/package-cache/pnpm-store/v10"
+        private.mkdir(parents=True)
+        (private / "blob").write_text("regenerable cache\n")
+        provenance = path / ".symphony/package-cache/network-trace"
+        provenance.write_text("retain provenance\n")
+        shared = self.base / "shared/pnpm-store/blob"
+        shared.parent.mkdir(parents=True)
+        shared.write_text("shared store\n")
+        source = path / "src/pnpm-store/keep.txt"
+        source.parent.mkdir(parents=True)
+        source.write_text("unrelated source\n")
         git(self.repo, "remote", "set-url", "origin", str(self.base / "missing.git"))
         report = self.sweep()
         self.assertTrue((path / "a.txt").exists())
         self.assertFalse((path / ".next").exists())
+        self.assertFalse(private.parent.exists())
+        self.assertEqual(provenance.read_text(), "retain provenance\n")
+        self.assertEqual(shared.read_text(), "shared store\n")
+        self.assertEqual(source.read_text(), "unrelated source\n")
         self.assertEqual(report["stripped"], [str(path)])
 
     def test_live_process_recent_activity_and_scope_protect_checkouts(self):
@@ -170,6 +191,10 @@ class SweepTest(unittest.TestCase):
         outside = self.worktree("outside", root=self.base / "elsewhere")
         never = self.worktree("never", root=self.base / "never")
         self.roots.append(self.base / "never")
+        for checkout in (live, recent, outside, never):
+            cache = checkout / ".symphony/package-cache/pnpm-store/v10/blob"
+            cache.parent.mkdir(parents=True)
+            cache.write_text("protected cache\n")
 
         def run(args, **kw):
             if args[0] == "lsof":
@@ -180,6 +205,8 @@ class SweepTest(unittest.TestCase):
         (recent / "a.txt").write_text("edited just now\n")
         report = self.sweep(run=run, now=time.time() + 60)
         self.assertTrue(live.exists() and recent.exists() and outside.exists() and never.exists())
+        for checkout in (live, recent, outside, never):
+            self.assertTrue((checkout / ".symphony/package-cache/pnpm-store/v10/blob").exists())
         self.assertEqual(report["removed"], [])
         report = self.sweep(run=run)
         self.assertTrue(live.exists(), "a process cwd inside the checkout always protects it")

@@ -1,10 +1,14 @@
 ---
 id: 2026-09-28-codex-lane-attribution-gap
-status: draft
+status: reviewed
 severity: sev2
 detected: 2026-09-27T17:09Z
 repaired: 2026-09-28T20:24Z
 failure_classes: [green-by-implication, evidence-forgery-or-staleness]
+detectable_before_human: false
+detection_gaps: [false-green, missing-join, stale-signal]
+replay_corpus: [docs/postmortems/2026-09-28-codex-lane-attribution-gap.md#timeline-utc]
+founder_rescues: 1
 incident_issue: JOV-6867
 actions: [JOV-7088]
 gbrain: ops/postmortems/2026-09-28-codex-lane-attribution-gap
