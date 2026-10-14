@@ -606,10 +606,6 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/isolated-ui-docs-policy.test.mjs',
   'scripts/lib/__tests__/lighthouse-production-collect.test.mjs',
   'scripts/lib/__tests__/lighthouse-retry.test.mjs',
-  'scripts/lib/__tests__/linear-sync-on-merge.test.mjs',
-  'scripts/lib/__tests__/validation-lifecycle.test.mjs',
-  'scripts/lib/__tests__/validation-sync.test.mjs',
-  'scripts/lib/__tests__/founder-taste-order.test.mjs',
   'scripts/lib/__tests__/m2-revenue-path-canary-intake.test.mjs',
   'scripts/lib/__tests__/synthetic-monitoring-plan.test.mjs',
   'scripts/lib/__tests__/remediation-detector-plans.test.mjs',
@@ -674,6 +670,8 @@ export const MESH_RUNTIME_BUNDLE_COVERAGE_COMMAND =
   'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/mesh-runtime-bundle.test.mjs --coverage.enabled --coverage.provider=v8 --coverage.include=lanes/mesh-runtime-bundle.mjs --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-mesh-runtime-bundle-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=json-summary --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=100';
 export const MESH_CURRENT_WIRE_COVERAGE_COMMAND =
   'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/mesh-current-wire.test.mjs --coverage.enabled --coverage.provider=v8 --coverage.include=lanes/mesh-current-wire.mjs --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-mesh-current-wire-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=json-summary --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=100';
+export const VALIDATION_LIFECYCLE_COVERAGE_COMMAND =
+  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/validation-lifecycle.test.mjs lib/__tests__/validation-sync.test.mjs lib/__tests__/linear-sync-on-merge.test.mjs lib/__tests__/founder-taste-order.test.mjs --maxWorkers=1 --coverage --coverage.include="lib/{validation-lifecycle,validation-sync,linear-sync-on-merge,founder-taste-order}.mjs" --coverage.reporter=text --coverage.reporter=json-summary --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-validation-lifecycle-coverage" --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=75 --coverage.thresholds.functions=85';
 // Keep scanner-heavy script contracts outside V8 instrumentation; cover the
 // document helpers with the same behavior test in a small separate process.
 export const SCRIPT_CONTRACT_VITEST_COMMAND = `pnpm exec vitest --root scripts --config vitest.config.mts run ${SCRIPT_CONTRACT_VITEST_TESTS.map(
@@ -2331,6 +2329,7 @@ export async function runStructural(opts = {}) {
     // Orphan sweep: script contracts no other CI command ran.
     SCRIPT_CONTRACT_NODE_COMMAND,
     SCRIPT_CONTRACT_VITEST_COMMAND,
+    VALIDATION_LIFECYCLE_COVERAGE_COMMAND,
     MESH_HOST_ACK_COVERAGE_COMMAND,
     MESH_NATIVE_TERMINAL_COVERAGE_COMMAND,
     MESH_RUNTIME_BUNDLE_COVERAGE_COMMAND,

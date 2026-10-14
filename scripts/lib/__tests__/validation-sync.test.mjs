@@ -183,7 +183,11 @@ describe('validation sync: receipts', () => {
       {
         title: 'Summer product bets: require falsifiable decisions',
         history: [
-          { fromState: { type: 'completed' }, toState: { type: 'unstarted' } },
+          {
+            createdAt: '2026-10-03T11:00:00Z',
+            fromState: { type: 'completed' },
+            toState: { type: 'unstarted' },
+          },
         ],
       },
     ],
@@ -440,6 +444,47 @@ describe('validation sync: founder taste (JOV-7759)', () => {
     expect(
       extractWorkBlocks(world.issues['JOV-1'].description).orders
     ).toHaveLength(2);
+  });
+
+  it('files a new taste order after reopening and ignores a delayed result for the previous order', async () => {
+    const { world, fetchImpl } = createWorld();
+    const issue = world.issues['JOV-1'];
+    const firstTime = () => new Date('2026-10-04T01:00:00Z');
+    await merge(world, fetchImpl, 101, {
+      assuranceMatrix: TASTE_MATRIX,
+      now: firstTime,
+    });
+    const oldOrder = extractWorkBlocks(issue.description).orders[0];
+    summerTick(world, 'approved');
+    await evaluate(world, fetchImpl, {
+      assuranceMatrix: TASTE_MATRIX,
+      now: firstTime,
+    });
+    expect(issue.state).toBe('Done');
+    issue.state = 'Validating';
+    issue.history = [
+      {
+        createdAt: '2026-10-04T03:00:00Z',
+        fromState: { type: 'completed' },
+        toState: { type: 'started' },
+      },
+    ];
+    world.clock = Date.parse('2026-10-04T04:00:00Z');
+    // A repeated old work-result gets a later delivery timestamp, but it
+    // remains bound to the previously consumed order and cannot pass.
+    summerTick(world, 'approved');
+    issue.comments.push(receiptComment('JOV-1', {}, '2026-10-04T04:00:00Z'));
+    const now = () => new Date('2026-10-04T04:00:00Z');
+    await evaluate(world, fetchImpl, { assuranceMatrix: TASTE_MATRIX, now });
+    await evaluate(world, fetchImpl, { assuranceMatrix: TASTE_MATRIX, now });
+    expect(issue.state).toBe('Validating');
+    const orders = extractWorkBlocks(issue.description).orders;
+    expect(orders).toHaveLength(2);
+    expect(orders[1].orderId).not.toBe(oldOrder.orderId);
+    expect(orders[1].idempotencyKey).not.toBe(oldOrder.idempotencyKey);
+    expect(orders[1].scope.entityRefs).toContain(
+      'episode:2026-10-04T03:00:00.000Z'
+    );
   });
 
   it('surfaces a refused order write', async () => {

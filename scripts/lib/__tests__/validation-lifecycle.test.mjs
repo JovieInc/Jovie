@@ -87,6 +87,34 @@ describe('validation manifest', () => {
     expect(manifest.bindingSha).toBe(SHA_A);
   });
 
+  it('honors an explicit machine audit without inferred UI rows', () => {
+    const manifest = manifestFor({
+      description: 'validation-required: screen-audit',
+    });
+    expect(manifest.required.map(entry => entry.kind)).toEqual([
+      'deployment',
+      'screen-audit',
+    ]);
+    expect(
+      decideValidationTransition({
+        state: STARTED,
+        manifest,
+        holds: [],
+        deployment: VERIFIED,
+        receipts: [],
+      }).target
+    ).toBe('Validating');
+    expect(
+      decideValidationTransition({
+        state: STARTED,
+        manifest,
+        holds: [],
+        deployment: VERIFIED,
+        receipts: [receipt({ kind: 'screen-audit' })],
+      }).target
+    ).toBe('Done');
+  });
+
   it.each([
     [
       'commissioning parent',
@@ -244,6 +272,50 @@ describe('validation manifest', () => {
 });
 
 describe('validation receipts', () => {
+  it.each(['outcome', 'screen-audit', 'human-certification', 'founder-taste'])(
+    'requires %s proof from the current episode',
+    kind => {
+      const manifest = manifestFor({
+        reopenedAfterDone: true,
+        receiptNotBefore: '2026-10-03T13:00:00Z',
+        description: `validation-required: ${kind}`,
+      });
+      const old = receipt({ kind });
+      const fresh = receipt({ kind, recordedAt: '2026-10-03T14:00:00Z' });
+      const base = {
+        state: STARTED,
+        manifest,
+        holds: [],
+        deployment: VERIFIED,
+      };
+      const currentOutcome = receipt({
+        kind: 'outcome',
+        recordedAt: '2026-10-03T14:00:00Z',
+      });
+      expect(
+        decideValidationTransition({
+          ...base,
+          receipts: [old, ...(kind === 'outcome' ? [] : [currentOutcome])],
+        }).target
+      ).toBe('Validating');
+      expect(
+        decideValidationTransition({
+          ...base,
+          receipts: [fresh, currentOutcome],
+        }).target
+      ).toBe('Done');
+      expect(
+        decideValidationTransition({
+          ...base,
+          receipts: [
+            receipt({ ...old, status: 'fail' }),
+            fresh,
+            currentOutcome,
+          ],
+        }).target
+      ).toBe('Done');
+    }
+  );
   const body = formatValidationReceipt({
     issue: 'jov-1',
     kind: 'outcome',

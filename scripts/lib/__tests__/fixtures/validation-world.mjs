@@ -245,7 +245,10 @@ export function createWorld(overrides = {}) {
               })),
             },
             attachments: { nodes: issue.attachments.map(url => ({ url })) },
-            history: { nodes: issue.history },
+            history: {
+              nodes: issue.history,
+              pageInfo: { hasNextPage: false, endCursor: null },
+            },
             team: { states: { nodes: STATES } },
           },
         },
@@ -371,6 +374,12 @@ export function validClosure(identifier, deployedSha) {
  */
 export function snapshotFor(world, identifier) {
   const issue = world.issues[identifier];
+  const reopens = issue.history.filter(
+    entry =>
+      entry?.fromState?.type === 'completed' &&
+      entry?.toState?.type !== 'completed'
+  );
+  const times = reopens.map(entry => Date.parse(entry.createdAt ?? ''));
   return {
     id: issue.id,
     identifier: issue.identifier,
@@ -381,6 +390,11 @@ export function snapshotFor(world, identifier) {
     states: STATES,
     commentRecords: [...issue.comments],
     attachmentUrls: [...issue.attachments],
+    receiptNotBefore: times.some(time => !Number.isFinite(time))
+      ? null
+      : times.length
+        ? new Date(Math.max(...times)).toISOString()
+        : undefined,
     reopenedAfterDone: issue.history.some(
       entry =>
         entry?.fromState?.type === 'completed' &&

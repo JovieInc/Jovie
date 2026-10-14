@@ -585,6 +585,7 @@ export function selectStateId(name, states) {
  *   labels: string[],
  *   description: string,
  *   reopenedAfterDone?: boolean,
+ *   receiptNotBefore?: string | null,
  *   state: { id: string, name: string, type: string },
  *   states: { id?: string, name?: string, type?: string }[],
  *   commentRecords: { body: string, createdAt: string }[],
@@ -621,6 +622,15 @@ export function selectStateId(name, states) {
  */
 export async function reconcileValidation(ctx) {
   const { issue } = ctx;
+  // Server time, not producer-provided time, separates acceptance episodes.
+  // Description markers have no individual timestamp and must be re-recorded
+  // as a comment after reopening before they can close the new episode.
+  const cutoff = issue.reopenedAfterDone
+    ? Date.parse(issue.receiptNotBefore ?? '')
+    : -Infinity;
+  const currentComments = issue.commentRecords.filter(
+    comment => Date.parse(comment.createdAt) > cutoff
+  );
   const merged = await listMergedLinkedPulls({
     github: ctx.github,
     repository: ctx.repository,
@@ -630,7 +640,8 @@ export async function reconcileValidation(ctx) {
   });
   const escapedDefect = evaluateEscapedDefectClosure({
     ...issue,
-    comments: issue.commentRecords,
+    description: issue.reopenedAfterDone ? '' : issue.description,
+    comments: currentComments,
   });
   const files = await listMergedFiles({
     github: ctx.github,
@@ -672,11 +683,12 @@ export async function reconcileValidation(ctx) {
 
   const receipts = [];
   for (const receipt of [
-    ...parseValidationReceipts(issue.commentRecords, issue.identifier),
+    ...parseValidationReceipts(currentComments, issue.identifier),
     ...tasteReceiptsFromResults(
       issue.description,
-      issue.commentRecords,
-      issue.identifier
+      currentComments,
+      issue.identifier,
+      issue.receiptNotBefore
     ),
   ]) {
     const containsBinding = await ctx.facts.contains(
@@ -810,7 +822,11 @@ export async function reconcileValidation(ctx) {
  */
 async function fileTasteOrder(ctx, manifest, deploymentSha) {
   const { issue } = ctx;
-  const orderId = tasteOrderId(issue.identifier, manifest.bindingSha);
+  const orderId = tasteOrderId(
+    issue.identifier,
+    manifest.bindingSha,
+    manifest.receiptNotBefore
+  );
   const filed = (/** @type {string} */ body) =>
     readTasteOrders(body, issue.identifier).some(
       entry => entry.order.orderId === orderId
@@ -833,6 +849,7 @@ async function fileTasteOrder(ctx, manifest, deploymentSha) {
       manifest.required.find(entry => entry.kind === 'founder-taste')?.reason ??
       'a founder taste receipt is required',
     now: (ctx.now ?? (() => new Date()))().toISOString(),
+    episodeStartedAt: manifest.receiptNotBefore,
   });
   const body = `${current.trimEnd()}\n\n### Founder taste (JOV-7759)\n\n${renderTasteOrder(order)}\n`;
   if (!(await ctx.linear.setDescription(issue.id, body))) {

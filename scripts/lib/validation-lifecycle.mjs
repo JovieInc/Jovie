@@ -204,6 +204,7 @@ function hasOpenAcceptanceSection(description) {
  *   riskLevel: string,
  *   required: RequiredReceipt[],
  *   uiEvidence?: UiEvidence[],
+ *   receiptNotBefore?: string | null,
  * }} ValidationManifest
  */
 
@@ -239,6 +240,7 @@ export function selectBindingPull(pulls) {
  *     readonly labels?: readonly string[],
  *     readonly description?: string,
  *     readonly reopenedAfterDone?: boolean,
+ *     readonly receiptNotBefore?: string | null,
  *   },
  *   readonly mergedPulls: readonly MergedPull[],
  *   readonly risk: RiskSummary | null,
@@ -316,6 +318,15 @@ export function deriveValidationManifest(input) {
       reason: `UI change invalidates ${describe(machine)}; the screen-audit ledger (JOV-7713) must show every changed screen green on the exact production build`,
     });
   }
+  if (
+    !required.some(entry => entry.kind === 'screen-audit') &&
+    declaredRequirements(input.issue.description ?? '').includes('screen-audit')
+  ) {
+    required.push({
+      kind: 'screen-audit',
+      reason: 'the issue declares validation-required: screen-audit',
+    });
+  }
   if (taste.length > 0) {
     required.push({
       kind: 'founder-taste',
@@ -343,6 +354,9 @@ export function deriveValidationManifest(input) {
       .map(pull => pull.url),
     riskLevel,
     required,
+    ...(input.issue.reopenedAfterDone
+      ? { receiptNotBefore: input.issue.receiptNotBefore ?? null }
+      : {}),
     ...(uiEvidence && uiEvidence.length > 0
       ? {
           uiEvidence: uiEvidence.map(entry => ({
@@ -496,13 +510,20 @@ export function formatValidationReceipt(receipt) {
  * must run again on the new generation.
  *
  * @param {readonly ResolvedReceipt[]} receipts
+ * @param {string | null} [receiptNotBefore]
  * @returns {Map<string, ResolvedReceipt>}
  */
-export function currentReceiptsByKind(receipts) {
+export function currentReceiptsByKind(receipts, receiptNotBefore) {
   /** @type {Map<string, ResolvedReceipt>} */
   const latest = new Map();
+  const cutoff =
+    receiptNotBefore === undefined
+      ? -Infinity
+      : Date.parse(receiptNotBefore ?? '');
+  if (Number.isNaN(cutoff)) return latest;
   for (const receipt of receipts) {
-    if (!receipt.containsBinding) continue;
+    if (!receipt.containsBinding || !(Date.parse(receipt.recordedAt) > cutoff))
+      continue;
     const previous = latest.get(receipt.kind);
     if (
       !previous ||
@@ -548,7 +569,20 @@ export function decideValidationTransition(input) {
       explanation: [...input.holds],
     };
   }
-  const current = currentReceiptsByKind(input.receipts);
+  if (input.manifest.receiptNotBefore === null) {
+    return {
+      target: null,
+      missing: ['outcome'],
+      failing: [],
+      explanation: [
+        'The reopened episode boundary is unknown; re-read complete Linear history before accepting receipts.',
+      ],
+    };
+  }
+  const current = currentReceiptsByKind(
+    input.receipts,
+    input.manifest.receiptNotBefore
+  );
   const requiredKinds = input.manifest.required.map(entry => entry.kind);
   const failing = requiredKinds
     .map(kind => current.get(kind))
@@ -646,6 +680,7 @@ export function lifecycleStatusKey(input) {
       JSON.stringify({
         target: input.target,
         binding: input.manifest.bindingSha,
+        episode: input.manifest.receiptNotBefore,
         required: input.manifest.required.map(entry => entry.kind),
         missing: [...input.missing].sort(),
         failing: input.failing

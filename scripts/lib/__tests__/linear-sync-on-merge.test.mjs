@@ -30,6 +30,7 @@ import {
   NO_UI_MATRIX,
   REPO,
   receiptComment,
+  validClosure,
 } from './fixtures/validation-world.mjs';
 
 const MERGE_URL = 'https://github.com/JovieInc/Jovie/pull/18275';
@@ -124,6 +125,164 @@ function sweep(fetchImpl) {
 }
 
 describe('linear sync on merge', () => {
+  it('does not reuse an earlier episode receipt and converges after fresh proof', async () => {
+    const { world, fetchImpl } = createWorld();
+    const issue = world.issues['JOV-1'];
+    issue.state = 'Validating';
+    issue.history = [
+      {
+        createdAt: '2026-10-03T14:00:00Z',
+        fromState: { type: 'completed' },
+        toState: { type: 'started' },
+      },
+      {
+        createdAt: '2026-10-03T12:00:00Z',
+        fromState: { type: 'completed' },
+        toState: { type: 'started' },
+      },
+    ];
+    issue.comments.push(receiptComment('JOV-1', {}, '2026-10-03T13:00:00Z'));
+    await sweep(fetchImpl);
+    expect(issue.state).toBe('Validating');
+    expect(world.updates).toEqual([]);
+    issue.comments.push(receiptComment('JOV-1', {}, '2026-10-03T15:00:00Z'));
+    await sweep(fetchImpl);
+    await sweep(fetchImpl);
+    expect(issue.state).toBe('Done');
+    expect(world.updates).toEqual(['JOV-1:Done']);
+  });
+
+  it('cannot close a reopened episode when its server timestamp is unreadable', async () => {
+    const { world, fetchImpl } = createWorld();
+    const issue = world.issues['JOV-1'];
+    issue.state = 'Validating';
+    issue.history = [
+      { fromState: { type: 'completed' }, toState: { type: 'started' } },
+    ];
+    issue.comments.push(receiptComment('JOV-1', {}, '2026-10-03T15:00:00Z'));
+    await sweep(fetchImpl);
+    expect(issue.state).toBe('Validating');
+    expect(world.updates).toEqual([]);
+    expect(issue.comments.at(-1).body).toMatch(/episode.*unknown/i);
+  });
+
+  it('does not reuse an escaped-defect closure from before the current episode', async () => {
+    const { world, fetchImpl } = createWorld();
+    const issue = world.issues['JOV-1'];
+    issue.state = 'Validating';
+    issue.labels = ['escaped-defect'];
+    issue.history = [
+      {
+        createdAt: '2026-10-03T14:00:00Z',
+        fromState: { type: 'completed' },
+        toState: { type: 'started' },
+      },
+    ];
+    issue.description = validClosure('JOV-1', MAIN[2]);
+    issue.comments.push(receiptComment('JOV-1', {}, '2026-10-03T15:00:00Z'));
+    await sweep(fetchImpl);
+    expect(issue.state).toBe('Validating');
+    expect(world.updates).toEqual([]);
+    issue.comments.push({
+      body: validClosure('JOV-1', MAIN[2]),
+      createdAt: '2026-10-03T15:01:00Z',
+    });
+    await sweep(fetchImpl);
+    expect(issue.state).toBe('Done');
+    expect(world.updates).toEqual(['JOV-1:Done']);
+  });
+
+  it('reads a later history page before deciding which receipt belongs to this episode', async () => {
+    const { world, fetchImpl } = createWorld();
+    const issue = world.issues['JOV-1'];
+    issue.state = 'Validating';
+    issue.comments.push(receiptComment('JOV-1', {}, '2026-10-03T13:00:00Z'));
+    const paged = intercept(fetchImpl, async (_url, body, next) => {
+      if (body?.query?.includes('IssueLifecycleHistory')) {
+        expect(body.query).toContain('createdAt');
+        expect(body.variables.after).toBe('h1');
+        return json({
+          data: {
+            issue: {
+              history: {
+                nodes: [
+                  {
+                    createdAt: '2026-10-03T14:00:00Z',
+                    fromState: { type: 'completed' },
+                    toState: { type: 'started' },
+                  },
+                ],
+                pageInfo: { hasNextPage: false, endCursor: null },
+              },
+            },
+          },
+        });
+      }
+      if (!body?.query?.includes('IssueLifecycle(')) return null;
+      expect(body.query).toContain('createdAt fromState');
+      const response = await (await next()).json();
+      response.data.issue.history = {
+        nodes: [],
+        pageInfo: { hasNextPage: true, endCursor: 'h1' },
+      };
+      return json(response);
+    });
+    await sweep(paged);
+    expect(issue.state).toBe('Validating');
+    expect(world.updates).toEqual([]);
+  });
+
+  it.each([
+    null,
+    {},
+    { nodes: [] },
+    { nodes: [], pageInfo: { hasNextPage: true } },
+  ])('fails closed on incomplete history %j', async history => {
+    const { world, fetchImpl } = createWorld();
+    const incomplete = intercept(fetchImpl, async (_url, body, next) => {
+      if (!body?.query?.includes('IssueLifecycle(')) return null;
+      const response = await (await next()).json();
+      response.data.issue.history = history;
+      return json(response);
+    });
+    await expect(mergeEvent(incomplete, 101)).rejects.toThrow(
+      /history.*JOV-1/i
+    );
+    expect(world.updates).toEqual([]);
+  });
+
+  it('bounds a non-terminating history read without changing state', async () => {
+    const { world, fetchImpl } = createWorld();
+    let pages = 0;
+    const endless = intercept(fetchImpl, async (_url, body, next) => {
+      if (body?.query?.includes('IssueLifecycleHistory')) {
+        pages += 1;
+        return json({
+          data: {
+            issue: {
+              history: {
+                nodes: [],
+                pageInfo: { hasNextPage: true, endCursor: `h${pages}` },
+              },
+            },
+          },
+        });
+      }
+      if (!body?.query?.includes('IssueLifecycle(')) return null;
+      const response = await (await next()).json();
+      response.data.issue.history.pageInfo = {
+        hasNextPage: true,
+        endCursor: 'h0',
+      };
+      return json(response);
+    });
+    await expect(mergeEvent(endless, 101)).rejects.toThrow(
+      /history.*exceeds the read bound/
+    );
+    expect(pages).toBe(10);
+    expect(world.updates).toEqual([]);
+  });
+
   it('enters the validation lifecycle for a Summer-bound bot merge', async () => {
     const body = '<!-- summer-issue-bind -->\nJOV-1\ntaskKey:abc';
     expect(
@@ -356,7 +515,11 @@ describe('linear sync on merge', () => {
     expect((await mergeEvent(fetchImpl, 101)).action).toBe('hold');
     world.issues['JOV-1'].children = [['JOV-2', 'completed']];
     world.issues['JOV-1'].history = [
-      { fromState: { type: 'completed' }, toState: { type: 'started' } },
+      {
+        createdAt: '2026-10-03T11:00:00Z',
+        fromState: { type: 'completed' },
+        toState: { type: 'started' },
+      },
     ];
     await mergeEvent(fetchImpl, 101);
     expect(world.issues['JOV-1'].state).toBe('Validating');

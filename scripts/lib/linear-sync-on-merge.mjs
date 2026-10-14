@@ -545,7 +545,10 @@ const ISSUE_FIELDS = `
     }
     children(first: 50) { nodes { identifier state { type } } }
     attachments(first: 50) { nodes { url } }
-    history(first: 100) { nodes { fromState { type } toState { type } } }
+    history(first: 100) {
+      nodes { createdAt fromState { type } toState { type } }
+      pageInfo { hasNextPage endCursor }
+    }
     team { states { nodes { id name type } } }`;
 
 const ISSUE_QUERY = `query IssueLifecycle($issueId: String!) {
@@ -564,6 +567,15 @@ const COMMENTS_PAGE_QUERY = `query IssueLifecycleComments($issueId: String!, $af
 
 const ISSUE_STATE_QUERY = `query IssueLifecycleState($issueId: String!) {
   issue(id: $issueId) { id state { id name } }
+}`;
+
+const HISTORY_PAGE_QUERY = `query IssueLifecycleHistory($issueId: String!, $after: String!) {
+  issue(id: $issueId) {
+    history(first: 100, after: $after) {
+      nodes { createdAt fromState { type } toState { type } }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
 }`;
 
 const SWEEP_QUERY = `query LifecycleSweep($states: [String!]!, $after: String) {
@@ -596,6 +608,42 @@ async function readLifecycleIssue(fetchImpl, apiKey, lookupId) {
   });
   const raw = data.issue;
   if (!raw || typeof raw !== 'object') return null;
+  const history = [];
+  let historyPage = raw.history;
+  for (let page = 0; ; page += 1) {
+    if (
+      !Array.isArray(historyPage?.nodes) ||
+      typeof historyPage?.pageInfo?.hasNextPage !== 'boolean'
+    ) {
+      throw new Error(`Malformed lifecycle history for ${raw.identifier}`);
+    }
+    history.push(...historyPage.nodes);
+    if (!historyPage.pageInfo.hasNextPage) break;
+    if (page >= MAX_COMMENT_PAGES || !historyPage.pageInfo.endCursor) {
+      throw new Error(
+        `Lifecycle history for ${raw.identifier} exceeds the read bound`
+      );
+    }
+    const more = await linearGraphql(fetchImpl, apiKey, HISTORY_PAGE_QUERY, {
+      issueId: raw.id,
+      after: historyPage.pageInfo.endCursor,
+    });
+    historyPage = more.issue?.history;
+  }
+  const reopens = history.filter(
+    entry =>
+      entry?.fromState?.type === 'completed' &&
+      typeof entry?.toState?.type === 'string' &&
+      entry.toState.type !== 'completed'
+  );
+  const reopenTimes = reopens.map(entry =>
+    Date.parse(String(entry.createdAt ?? ''))
+  );
+  const receiptNotBefore = reopenTimes.some(time => !Number.isFinite(time))
+    ? null
+    : reopenTimes.length > 0
+      ? new Date(Math.max(...reopenTimes)).toISOString()
+      : undefined;
   const comments = [...(raw.comments?.nodes ?? [])];
   let pageInfo = raw.comments?.pageInfo;
   for (
@@ -645,13 +693,8 @@ async function readLifecycleIssue(fetchImpl, apiKey, lookupId) {
       )
       .map(child => String(child?.identifier ?? '').toUpperCase())
       .filter(Boolean),
-    reopenedAfterDone: (raw.history?.nodes ?? []).some(
-      /** @param {any} entry */
-      entry =>
-        entry?.fromState?.type === 'completed' &&
-        typeof entry?.toState?.type === 'string' &&
-        entry.toState.type !== 'completed'
-    ),
+    reopenedAfterDone: reopens.length > 0,
+    receiptNotBefore,
     attachmentUrls: (raw.attachments?.nodes ?? [])
       .map(node => String(node?.url ?? ''))
       .filter(Boolean),
