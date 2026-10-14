@@ -9200,6 +9200,191 @@ class RemediationEventRecoveryTest(unittest.TestCase):
         self.assertEqual(after['attempts'], before['attempts'])
         self.assertEqual(after['claimedAt'], before['claimedAt'])
 
+    def spent_event(self, **extra):
+        event = {'issueId': self.issue['id'], 'status': 'exhausted', 'release': False,
+                 'attempts': [{'kind': 'model', 'lane': name, 'head': 'delivery-stalled',
+                               'at': index + 1, 'topRung': index == 1}
+                              for index, name in enumerate(('codex', 'host-local'))]}
+        event.update(extra)
+        return event
+
+    def observe_completion(self, event, state='completed', stamp='2026-10-13T00:00:00Z'):
+        lane.save_escalation(self.host, {'events': {'delivery-stalled': event}})
+        self.issue['state'] = {'type': state, 'name': 'Done' if state == 'completed' else state}
+        self.issue['updatedAt'] = stamp
+        lane.claim_remediation_events(self.host, self.linear)
+        return lane.load_escalation(self.host)['events']['delivery-stalled']
+
+    def reopen(self, stamp='2026-10-14T00:00:00Z'):
+        self.issue['state'] = {'type': 'unstarted', 'name': 'Todo'}
+        self.issue['updatedAt'] = stamp
+
+    def test_observed_same_issue_completion_renews_ladder_once_after_restart(self):
+        spent = self.spent_event()
+        closed = self.observe_completion(spent)
+        self.assertEqual(closed['status'], 'done')
+        self.assertEqual(closed['attempts'], spent['attempts'])
+        # A second completed tick must not archive or renew anything.
+        lane.claim_remediation_events(self.host, self.linear)
+        self.assertEqual(lane.load_escalation(self.host)['events']['delivery-stalled'], closed)
+        self.reopen()
+        report = lane.claim_remediation_events(self.host, self.linear)
+        self.assertEqual(report['eventsClaimed'], 1)
+        row = lane.load_escalation(self.host)['events']['delivery-stalled']
+        self.assertEqual(row['priorAttempts'], spent['attempts'])
+        self.assertEqual(len(row['attempts']), 1)
+        self.assertEqual((row['issueId'], row['team'], row['fingerprint']),
+                         (self.issue['id'], 'JOV', 'delivery-stalled'))
+        first = lane.claim_labeled_event(self.host, 'codex', self.linear)
+        self.assertEqual(first.id, self.issue['id'])
+        admitted = lane.load_escalation(self.host)['events']['delivery-stalled']
+        lane.claim_remediation_events(self.host, self.linear)
+        self.assertIsNone(lane.claim_labeled_event(self.host, 'codex', self.linear))
+        again = lane.load_escalation(self.host)['events']['delivery-stalled']
+        self.assertEqual(again['attempts'], admitted['attempts'])
+        self.assertEqual(again['priorAttempts'], spent['attempts'])
+        self.assertEqual(again['claimedAt'], admitted['claimedAt'])
+
+    def test_unproven_same_issue_reopen_does_not_renew_spent_attempts(self):
+        cases = [
+            ('local-result-only', None, '2026-10-14T00:00:00Z'),
+            ('same-version', '2026-10-13T00:00:00Z', '2026-10-13T00:00:00Z'),
+            ('older-open', '2026-10-13T00:00:00Z', '2026-10-12T00:00:00Z'),
+            ('missing-close-version', None, '2026-10-14T00:00:00Z'),
+            ('invalid-close-version', 'invalid', '2026-10-14T00:00:00Z'),
+            ('missing-open-version', '2026-10-13T00:00:00Z', None),
+            ('invalid-open-version', '2026-10-13T00:00:00Z', 'invalid'),
+        ]
+        for kind, closed_at, opened_at in cases:
+            with self.subTest(kind=kind):
+                spent = self.spent_event(status='done')
+                if kind == 'local-result-only':
+                    lane.save_escalation(self.host, {'events': {'delivery-stalled': spent}})
+                else:
+                    self.observe_completion(spent, stamp=closed_at)
+                self.reopen(opened_at)
+                report = lane.claim_remediation_events(self.host, self.linear)
+                self.assertEqual(report['eventsExhausted'], 1)
+                row = lane.load_escalation(self.host)['events']['delivery-stalled']
+                self.assertEqual(row['attempts'], spent['attempts'])
+                self.assertFalse(row.get('priorAttempts'))
+                self.assertIsNone(lane.claim_labeled_event(self.host, 'codex', self.linear))
+        # Canceled is terminal history, not evidence the work completed.
+        spent = self.spent_event()
+        self.observe_completion(spent, state='canceled')
+        self.reopen()
+        lane.claim_remediation_events(self.host, self.linear)
+        self.assertEqual(lane.load_escalation(self.host)['events']['delivery-stalled']['attempts'], spent['attempts'])
+
+    def test_observed_recurrence_keeps_provider_spend_and_unknown_start_holds(self):
+        spent = self.spent_event()
+        self.observe_completion(spent)
+        self.reopen()
+        with patch.object(lane, 'provider_healthy', return_value=False):
+            lane.claim_remediation_events(self.host, self.linear)
+        row = lane.load_escalation(self.host)['events']['delivery-stalled']
+        self.assertEqual(row['priorAttempts'], spent['attempts'])
+        self.assertEqual(row['attempts'], [])
+        self.assertIsNone(lane.claim_labeled_event(self.host, 'codex', self.linear))
+        self.observe_completion(spent)
+        self.reopen()
+        self.issue['description'] = 'Approve spend for an outside vendor'
+        lane.claim_remediation_events(self.host, self.linear)
+        row = lane.load_escalation(self.host)['events']['delivery-stalled']
+        self.assertEqual(row['status'], 'human')
+        self.assertEqual(row['attempts'], [])
+        self.assertIsNone(lane.claim_labeled_event(self.host, 'codex', self.linear))
+        self.issue['description'] = ''
+        # The new ladder cannot erase an ambiguous old start-delivery fence.
+        delivery = {'attempts': lane.EVENT_DELIVERY_ATTEMPTS, 'status': 'failed',
+                    'nextAt': 0, 'deadline': 1, 'error': 'event-start-ownership-unproven'}
+        self.observe_completion(self.spent_event(startDelivery=delivery))
+        self.reopen()
+        lane.claim_remediation_events(self.host, self.linear)
+        self.assertIsNone(lane.claim_labeled_event(self.host, 'codex', self.linear))
+        row = lane.load_escalation(self.host)['events']['delivery-stalled']
+        self.assertEqual(row['startDelivery']['attempts'], delivery['attempts'])
+        self.assertFalse(row.get('running', False))
+
+    def test_delayed_completed_snapshot_cannot_renew_the_same_generation_twice(self):
+        spent = self.spent_event(priorAttempts=[{'at': index} for index in range(25)])
+        self.observe_completion(spent)
+        self.reopen()
+        lane.claim_remediation_events(self.host, self.linear)
+        first = lane.load_escalation(self.host)['events']['delivery-stalled']
+        self.assertEqual(len(first['priorAttempts']), 20)
+        # A delayed read of the already-consumed completion must not rearm it.
+        for stamp in ('2026-10-13T00:00:00Z', '2026-10-13T01:00:00Z'):
+            with self.subTest(delayed_completion=stamp):
+                self.issue['state'] = {'type': 'completed', 'name': 'Done'}
+                self.issue['updatedAt'] = stamp
+                lane.claim_remediation_events(self.host, self.linear)
+                self.reopen()
+                lane.claim_remediation_events(self.host, self.linear)
+                again = lane.load_escalation(self.host)['events']['delivery-stalled']
+                self.assertEqual(again['attempts'], first['attempts'])
+                self.assertEqual(again['priorAttempts'], first['priorAttempts'])
+        # A later actual completion/open cycle is a distinct bounded generation.
+        self.issue['state'] = {'type': 'completed', 'name': 'Done'}
+        self.issue['updatedAt'] = '2026-10-15T00:00:00Z'
+        lane.claim_remediation_events(self.host, self.linear)
+        self.reopen('2026-10-16T00:00:00Z')
+        lane.claim_remediation_events(self.host, self.linear)
+        final = lane.load_escalation(self.host)['events']['delivery-stalled']
+        self.assertEqual(final['priorAttempts'][-1], first['attempts'][0])
+        self.assertEqual(len(final['priorAttempts']), 20)
+        self.assertEqual(len(final['attempts']), 1)
+
+    def test_canceled_observation_invalidates_pending_completion_generation(self):
+        spent = self.spent_event()
+        self.observe_completion(spent)
+        self.issue['state'] = {'type': 'canceled', 'name': 'Canceled'}
+        self.issue['updatedAt'] = '2026-10-13T01:00:00Z'
+        lane.claim_remediation_events(self.host, self.linear)
+        # An older completed-comment version cannot undo the observed cancellation.
+        self.issue['state'] = {'type': 'completed', 'name': 'Done'}
+        self.issue['updatedAt'] = '2026-10-13T00:30:00Z'
+        lane.claim_remediation_events(self.host, self.linear)
+        self.reopen()
+        report = lane.claim_remediation_events(self.host, self.linear)
+        self.assertEqual(report['eventsExhausted'], 1)
+        row = lane.load_escalation(self.host)['events']['delivery-stalled']
+        self.assertEqual(row['attempts'], spent['attempts'])
+        self.assertFalse(row.get('priorAttempts'))
+        self.assertIsNone(lane.claim_labeled_event(self.host, 'codex', self.linear))
+
+    def test_completed_generation_cannot_renew_changed_team_or_unknown_state(self):
+        for kind in ('changed-team', 'unknown-state'):
+            with self.subTest(kind=kind):
+                self.issue['team']['key'] = 'JOV'
+                spent = self.spent_event()
+                self.observe_completion(spent)
+                self.reopen()
+                if kind == 'changed-team':
+                    self.issue['team']['key'] = 'LYB'
+                else:
+                    self.issue['state'] = {}
+                lane.claim_remediation_events(self.host, self.linear)
+                row = lane.load_escalation(self.host)['events']['delivery-stalled']
+                self.assertEqual(row['attempts'], spent['attempts'])
+                self.assertFalse(row.get('priorAttempts'))
+                self.assertIsNone(lane.claim_labeled_event(self.host, 'codex', self.linear))
+
+    def test_different_issue_recurrence_keeps_bounded_history_and_identity(self):
+        from scripts.tests.test_remediation import linear_issue
+        spent = self.spent_event(priorAttempts=[{'at': index} for index in range(25)])
+        self.observe_completion(spent)
+        old_id = self.issue['id']
+        self.issue.clear()
+        self.issue.update(linear_issue('JOV-8', 'delivery-stalled', updated='2026-10-14T00:00:00Z'))
+        lane.claim_remediation_events(self.host, self.linear)
+        row = lane.load_escalation(self.host)['events']['delivery-stalled']
+        self.assertNotEqual(row['issueId'], old_id)
+        self.assertEqual(row['issueId'], 'id-JOV-8')
+        self.assertEqual(len(row['priorAttempts']), 20)
+        self.assertEqual(row['priorAttempts'][-2:], spent['attempts'])
+        self.assertEqual(len(row['attempts']), 1)
+
     def test_rejected_unknown_or_failed_start_never_admits_model_or_erases_attempts(self):
         event = {'issueId': self.issue['id'], 'identifier': 'JOV-1', 'status': 'claimed', 'lane': 'codex',
                  'startedStateId': 'ip-JOV', 'attempts': [{'kind': 'model', 'lane': 'codex'}]}
