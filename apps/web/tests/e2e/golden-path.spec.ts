@@ -366,6 +366,8 @@ async function exerciseGoogleProviderRecovery(page: Page): Promise<void> {
   await expect(page.locator('[data-auth-shell-hydrated="true"]')).toBeVisible({
     timeout: 30_000,
   });
+  const signupOrigin = new URL(page.url()).origin;
+  let errorReturn: string | null = null;
 
   const googleRoute = async (route: import('@playwright/test').Route) => {
     await route.abort('aborted');
@@ -407,20 +409,53 @@ async function exerciseGoogleProviderRecovery(page: Page): Promise<void> {
     ]);
     const body = request.postDataJSON() as Record<string, unknown>;
     expect(body.provider).toBe('google');
-    expect(JSON.stringify(body)).toContain('/onboarding/checkout');
+    // Auth returns through the server entry so access and subscriber state
+    // resolve before checkout. Every callback must retain the explicit intent.
+    for (const field of [
+      'callbackURL',
+      'newUserCallbackURL',
+      'errorCallbackURL',
+    ] as const) {
+      expect(body[field]).toEqual(expect.any(String));
+      expect(body[field]).not.toBe('');
+      const callback = new URL(String(body[field]), signupOrigin);
+      expect(callback.origin).toBe(signupOrigin);
+      expect(callback.pathname).toBe(APP_ROUTES.SIGNUP);
+      expect(callback.username).toBe('');
+      expect(callback.password).toBe('');
+      expect(callback.hash).toBe('');
+      for (const [key, value] of Object.entries({
+        redirect_url: APP_ROUTES.START,
+        plan: 'pro',
+        interval: 'month',
+        artist_name: TEST_SPOTIFY_ARTIST.name,
+      })) {
+        expect(callback.searchParams.getAll(key)).toEqual([value]);
+      }
+      expect(callback.searchParams.getAll('oauth_error')).toEqual([]);
+      expect(callback.searchParams.getAll('error')).toEqual(
+        field === 'errorCallbackURL' ? ['oauth_failed'] : []
+      );
+      if (field === 'errorCallbackURL')
+        errorReturn = callback.pathname + callback.search;
+    }
     expect(new URL(providerRequest.url()).hostname).toBe('accounts.google.com');
   } finally {
     await page.unroute('**/api/auth/sign-in/social', socialRoute);
     await page.unroute('https://accounts.google.com/**', googleRoute);
   }
 
-  await page.goto(`${signupPath}&oauth_error=access_denied`, {
+  expect(errorReturn).not.toBeNull();
+  await page.goto(errorReturn!, {
     waitUntil: 'domcontentloaded',
   });
-  await expect(page.getByRole('alert').first()).toContainText(
-    'Sign-in was cancelled',
-    { timeout: 30_000 }
-  );
+  // JOV-8349: keep a missing canonical recovery message red while continuing
+  // the same identity's email fallback and downstream Home/billing checks.
+  await expect
+    .soft(page.getByRole('alert').first())
+    .toContainText('Something went wrong with sign-up. Please try again.', {
+      timeout: 30_000,
+    });
   const savedIntent = await page.evaluate(() =>
     sessionStorage.getItem('jovie_plan_intent')
   );
