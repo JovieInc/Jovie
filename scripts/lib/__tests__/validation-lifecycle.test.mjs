@@ -11,6 +11,7 @@ import {
   lifecycleStatusKey,
   outcomeAcceptanceReasons,
   parseValidationReceipts,
+  RECORDED_RECEIPT_KINDS,
   selectBindingPull,
 } from '../validation-lifecycle.mjs';
 
@@ -401,28 +402,32 @@ describe('validation receipts', () => {
     );
   });
 
-  it('ignores receipts for another issue, computed kinds, and malformed bodies', () => {
+  it('ignores other issues and computed kinds but retains malformed evidence as unknown', () => {
     const forged = body.replace('"kind":"outcome"', '"kind":"deployment"');
     const other = body.replace('JOV-1', 'JOV-2');
     expect(COMPUTED_RECEIPT_KINDS).toContain('deployment');
-    expect(
-      parseValidationReceipts(
-        [
-          { body: forged, createdAt: '2026-10-03T12:00:00Z' },
-          { body: other, createdAt: '2026-10-03T12:00:00Z' },
-          { body, createdAt: 'not a time' },
-          {
-            body: '<!-- validation-receipt:v1\n{not json}\n-->',
-            createdAt: '2026-10-03T12:00:00Z',
-          },
-          {
-            body: '<!-- validation-receipt:v1\n"text"\n-->',
-            createdAt: '2026-10-03T12:00:00Z',
-          },
-        ],
-        'JOV-1'
-      )
-    ).toEqual([]);
+    const parsed = parseValidationReceipts(
+      [
+        { body: forged, createdAt: '2026-10-03T12:00:00Z' },
+        { body: other, createdAt: '2026-10-03T12:00:00Z' },
+        { body, createdAt: 'not a time' },
+        {
+          body: '<!-- validation-receipt:v1\n{not json}\n-->',
+          createdAt: '2026-10-03T12:00:00Z',
+        },
+        {
+          body: '<!-- validation-receipt:v1\n"text"\n-->',
+          createdAt: '2026-10-03T12:00:00Z',
+        },
+      ],
+      'JOV-1'
+    );
+    expect(parsed).toHaveLength(8);
+    expect(parsed.every(receipt => receipt.status === 'invalid')).toBe(true);
+    expect(parsed.map(receipt => receipt.kind)).toEqual([
+      ...RECORDED_RECEIPT_KINDS,
+      ...RECORDED_RECEIPT_KINDS,
+    ]);
   });
 
   it.each([

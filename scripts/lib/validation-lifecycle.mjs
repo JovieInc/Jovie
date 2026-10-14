@@ -47,7 +47,7 @@ export const RECORDED_RECEIPT_KINDS = Object.freeze([
 const TASTE_JUDGMENTS = new Set(['taste', 'mixed']);
 const MAX_NOTE_LENGTH = 2000;
 
-const RECEIPT_MARKER = /<!--\s*validation-receipt:v1\s*\n?([\s\S]*?)\n?\s*-->/g;
+const RECEIPT_MARKER = /<!--\s*validation-receipt:v1\s*\n?([\s\S]*?)(?:-->|$)/g;
 const STATUS_MARKER = /<!--\s*validation-lifecycle:v1\s+([0-9a-f]{16})\s*-->/;
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 const IDENTIFIER_RE = /^JOV-\d+$/i;
@@ -373,7 +373,7 @@ export function deriveValidationManifest(input) {
 /**
  * @typedef {{
  *   kind: string,
- *   status: 'pass' | 'fail',
+ *   status: 'pass' | 'fail' | 'invalid',
  *   sha: string,
  *   evidence: string,
  *   note?: string,
@@ -384,7 +384,8 @@ export function deriveValidationManifest(input) {
 /**
  * Read recorded receipts from issue comments. The time is the comment's
  * server timestamp, never a value the producer wrote. Receipts for another
- * issue, computed kinds, or malformed bodies are ignored.
+ * issue or computed kinds are ignored. Malformed evidence invalidates the
+ * affected kind (all recorded kinds if unreadable) until a later correction.
  *
  * @param {readonly { body?: string, createdAt?: string }[]} comments
  * @param {string} identifier
@@ -398,14 +399,36 @@ export function parseValidationReceipts(comments, identifier) {
     const recordedAt = String(comment?.createdAt ?? '');
     if (Number.isNaN(Date.parse(recordedAt))) continue;
     for (const match of String(comment?.body ?? '').matchAll(RECEIPT_MARKER)) {
+      const invalidate = (kinds = RECORDED_RECEIPT_KINDS) => {
+        for (const kind of kinds)
+          receipts.push({
+            kind,
+            status: 'invalid',
+            sha: '',
+            evidence: 'malformed validation receipt',
+            recordedAt,
+          });
+      };
       let parsed;
       try {
+        if (!match[0].endsWith('-->')) throw new Error('unterminated receipt');
         parsed = JSON.parse(match[1]);
       } catch {
+        invalidate();
         continue;
       }
-      if (!parsed || typeof parsed !== 'object') continue;
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        invalidate();
+        continue;
+      }
+      if (parsed.issue && String(parsed.issue).toUpperCase() !== issue)
+        continue;
+      if (!parsed.issue || !parsed.kind) {
+        invalidate();
+        continue;
+      }
       const kind = String(parsed.kind ?? '');
+      if (!RECORDED_RECEIPT_KINDS.includes(kind)) continue;
       const status = String(parsed.status ?? '');
       const sha = String(parsed.sha ?? '').toLowerCase();
       if (
@@ -417,6 +440,7 @@ export function parseValidationReceipts(comments, identifier) {
         typeof parsed.evidence !== 'string' ||
         parsed.evidence.trim().length < 8
       ) {
+        invalidate([kind]);
         continue;
       }
       const note =
@@ -496,6 +520,8 @@ export function formatValidationReceipt(receipt) {
  *   status: 'verified' | 'pending' | 'unknown',
  *   sha?: string,
  *   detail?: string,
+ *   containsBinding?: boolean,
+ *   previousVerifiedEntry?: boolean,
  * }} DeploymentFact
  * @typedef {ValidationReceipt & {
  *   containsBinding: boolean,
@@ -613,7 +639,12 @@ export function decideValidationTransition(input) {
   }
   if (input.deployment.status !== 'verified') {
     return {
-      target: LIFECYCLE_STATES.merging,
+      target:
+        input.state.name === LIFECYCLE_STATES.validating &&
+        input.deployment.containsBinding === true &&
+        input.deployment.previousVerifiedEntry === true
+          ? LIFECYCLE_STATES.validating
+          : LIFECYCLE_STATES.merging,
       missing: ['deployment'],
       failing: [],
       explanation: [
@@ -638,9 +669,11 @@ export function decideValidationTransition(input) {
     if (receipt?.status === 'pass' && receipt.verifiedArtifact) continue;
     missing.push(entry.kind);
     explanation.push(
-      receipt?.status === 'pass'
-        ? `${entry.kind}: the passing receipt names ${receipt.sha.slice(0, 12)}, which is not a verified production generation`
-        : `${entry.kind}: no current receipt (${entry.reason})`
+      receipt?.status === 'invalid'
+        ? `${entry.kind}: latest receipt is malformed; record corrected evidence before completion`
+        : receipt?.status === 'pass'
+          ? `${entry.kind}: the passing receipt names ${receipt.sha.slice(0, 12)}, which is not a verified production generation`
+          : `${entry.kind}: no current receipt (${entry.reason})`
     );
   }
   if (missing.length > 0) {

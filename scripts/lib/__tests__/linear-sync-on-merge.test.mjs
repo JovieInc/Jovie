@@ -110,6 +110,7 @@ function mergeEvent(fetchImpl, number, identifier = 'JOV-1', env = {}) {
     fetchImpl,
     harnessManifest: HARNESS_MANIFEST,
     assuranceMatrix: NO_UI_MATRIX,
+    verifyMarker: () => true,
     log: () => {},
   });
 }
@@ -120,6 +121,7 @@ function sweep(fetchImpl) {
     fetchImpl,
     harnessManifest: HARNESS_MANIFEST,
     assuranceMatrix: NO_UI_MATRIX,
+    verifyMarker: () => true,
     log: () => {},
   });
 }
@@ -672,6 +674,7 @@ describe('linear sync on merge', () => {
           PR_BODY: '<!-- linear-issue-identifier:JOV-1 -->',
         },
         fetchImpl,
+        verifyMarker: () => true,
         log: () => {},
       });
       expect(world.issues['JOV-1'].state).toBe(expected);

@@ -134,6 +134,8 @@ export function createWorld(overrides = {}) {
     }
     if (href.startsWith('https://api.github.com/')) {
       const path = href.slice('https://api.github.com/'.length);
+      if (path === `repos/${REPO}/actions/workflows/production-controller.yml`)
+        return ok({ id: 91 });
       if (path.startsWith(`repos/${REPO}/pulls?state=open`))
         return ok(world.openPulls);
       let match = /^repos\/JovieInc\/Jovie\/pulls\/(\d+)\/files/.exec(path);
@@ -172,18 +174,23 @@ export function createWorld(overrides = {}) {
           base === head ? 'identical' : head > base ? 'ahead' : 'behind';
         return ok({ status });
       }
-      match = /name=production-generation-verified-([0-9a-f]{40})/.exec(path);
+      match =
+        /name=production-generation-verified-(recovery-)?([0-9a-f]{40})/.exec(
+          path
+        );
       if (match) {
+        const name = `production-generation-verified-${match[1] ?? ''}${match[2]}`;
         return ok({
-          artifacts: world.markers.has(match[1])
-            ? [
-                {
-                  name: `production-generation-verified-${match[1]}`,
-                  expired: false,
-                  workflow_run: { head_branch: 'main' },
-                },
-              ]
-            : [],
+          artifacts:
+            !match[1] && world.markers.has(match[2])
+              ? [
+                  {
+                    name,
+                    expired: false,
+                    workflow_run: { head_branch: 'main' },
+                  },
+                ]
+              : [],
         });
       }
       throw new Error(`unexpected GitHub path ${path}`);

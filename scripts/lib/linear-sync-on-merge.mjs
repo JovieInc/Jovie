@@ -833,6 +833,7 @@ function loadJson(root, path) {
  *   readonly allowlist?: ReadonlySet<string>,
  *   readonly harnessManifest?: unknown,
  *   readonly assuranceMatrix?: unknown,
+ *   readonly verifyMarker?: (sha: string, controllerWorkflowId: number) => Promise<boolean> | boolean,
  * }} [options]
  */
 export async function syncLinearIssueOnMerge(options = {}) {
@@ -875,6 +876,7 @@ export async function syncLinearIssueOnMerge(options = {}) {
     github,
     repository,
     versionUrl: env.PRODUCTION_VERSION_URL,
+    verifyMarker: options.verifyMarker,
   });
   const root = env.GITHUB_WORKSPACE ?? process.cwd();
   const harnessManifest =
