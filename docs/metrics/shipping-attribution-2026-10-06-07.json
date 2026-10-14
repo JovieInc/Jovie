@@ -1,0 +1,179 @@
+{
+  "schema": "jovie-company-shipping-attribution-backfill/v1",
+  "generatedAt": "2026-10-14T09:19:43Z",
+  "repository": "JovieInc/Jovie",
+  "window": {
+    "since": "2026-10-06T23:24:51Z",
+    "until": "2026-10-07T23:24:51Z",
+    "halfOpen": true
+  },
+  "evidence": {
+    "githubWindowComplete": true,
+    "githubPages": 1,
+    "githubScans": 1,
+    "receiptStreamComplete": true,
+    "corruptReceiptRows": 0,
+    "sources": [
+      "https://github.com/JovieInc/Jovie/pulls?q=is%3Apr+is%3Amerged+merged%3A2026-10-06T23%3A24%3A51Z..2026-10-07T23%3A24%3A51Z",
+      "runs/ledger.jsonl"
+    ]
+  },
+  "mergeCount": 69,
+  "coverage": {
+    "numerator": 8,
+    "denominator": 69,
+    "percent": 11.6
+  },
+  "byConfidence": {
+    "verified": 8,
+    "inferred": 61,
+    "unknown": 0
+  },
+  "byShippingMethod": {
+    "symphony": 9,
+    "dependabot": 19,
+    "founder-operated-unknown-provider": 37,
+    "other-automation": 4,
+    "unknown": 0
+  },
+  "verifiedOrigins": [
+    {
+      "pr": 20782,
+      "provider": "codex",
+      "runId": "20261005T185831Z-JOV-7915-codex-60bb77",
+      "headSha": "63bbf6f9b375b946448da7a6a49e923803838420"
+    },
+    {
+      "pr": 20827,
+      "provider": "codex",
+      "runId": "20261006T230509Z-JOV-7959-codex-94986c",
+      "headSha": "27d86a57b05caa489d03abb48941e62131adc800"
+    },
+    {
+      "pr": 20853,
+      "provider": "codex",
+      "runId": "20261007T032032Z-JOV-7973-codex-993cc2",
+      "headSha": "bb8ddb410ba25fec4c5b48d2d56d66f65a3de7ea"
+    },
+    {
+      "pr": 20920,
+      "provider": "codex",
+      "runId": "20261007T153313Z-JOV-7991-codex-0fc312",
+      "headSha": "456e1c1130173913fab394e2f4c12f7cfbcc6ed5"
+    },
+    {
+      "pr": 20928,
+      "provider": "codex",
+      "runId": "20261007T183634Z-JOV-6875-codex-9127cd",
+      "headSha": "2b9d36062c081af33ba7223a9ec1aa55de63ac61"
+    },
+    {
+      "pr": 20929,
+      "provider": "codex",
+      "runId": "20261007T183706Z-JOV-6823-codex-e92ddb",
+      "headSha": "14cb07ccee0d7b2db92f4d7dc512cc2d7cd055ec"
+    },
+    {
+      "pr": 20930,
+      "provider": "codex",
+      "runId": "20261007T183706Z-JOV-6844-codex-f3cc16",
+      "headSha": "75d129bd10a41283f5ca627c95c3a2b1b8158a35"
+    },
+    {
+      "pr": 20938,
+      "provider": "codex",
+      "runId": "20261007T210742Z-JOV-8003-codex-4c7838",
+      "headSha": "1a225b4cae7cc264e1318b0ce375562d6097c63d"
+    }
+  ],
+  "inferredOrigins": {
+    "symphony": [20829],
+    "dependabot": [
+      20850, 20877, 20879, 20880, 20881, 20882, 20883, 20884, 20885, 20886,
+      20888, 20889, 20890, 20891, 20893, 20894, 20897, 20898, 20899
+    ],
+    "founder-operated-unknown-provider": [
+      20760, 20813, 20814, 20819, 20822, 20826, 20828, 20830, 20832, 20835,
+      20837, 20838, 20839, 20842, 20843, 20845, 20847, 20848, 20849, 20851,
+      20858, 20859, 20861, 20862, 20864, 20873, 20904, 20926, 20931, 20932,
+      20933, 20935, 20936, 20937, 20941, 20942, 20943
+    ],
+    "other-automation": [20915, 20927, 20934, 20939]
+  },
+  "inferenceCaveats": {
+    "20829": "The Symphony origin receipt names the PR but its head f77aff5fae857c76dcfe85a1bd9d58ec89348bd3 does not match merged head 854ff044dd90a70a5cba3c45b641139aadae4ce5.",
+    "dependabot": "Candidate only from the GitHub PR author; dependency titles and branch names are not origin proof.",
+    "founder-operated-unknown-provider": "Candidate only from GitHub PR author itstimwhite; the producing provider is not evidenced.",
+    "other-automation": "Candidate only from a GitHub bot PR author; the originating workflow receipt is missing."
+  },
+  "missingOriginReceiptPullRequests": [
+    "https://github.com/JovieInc/Jovie/pull/20760",
+    "https://github.com/JovieInc/Jovie/pull/20813",
+    "https://github.com/JovieInc/Jovie/pull/20814",
+    "https://github.com/JovieInc/Jovie/pull/20819",
+    "https://github.com/JovieInc/Jovie/pull/20822",
+    "https://github.com/JovieInc/Jovie/pull/20826",
+    "https://github.com/JovieInc/Jovie/pull/20828",
+    "https://github.com/JovieInc/Jovie/pull/20829",
+    "https://github.com/JovieInc/Jovie/pull/20830",
+    "https://github.com/JovieInc/Jovie/pull/20832",
+    "https://github.com/JovieInc/Jovie/pull/20835",
+    "https://github.com/JovieInc/Jovie/pull/20837",
+    "https://github.com/JovieInc/Jovie/pull/20838",
+    "https://github.com/JovieInc/Jovie/pull/20839",
+    "https://github.com/JovieInc/Jovie/pull/20842",
+    "https://github.com/JovieInc/Jovie/pull/20843",
+    "https://github.com/JovieInc/Jovie/pull/20845",
+    "https://github.com/JovieInc/Jovie/pull/20847",
+    "https://github.com/JovieInc/Jovie/pull/20848",
+    "https://github.com/JovieInc/Jovie/pull/20849",
+    "https://github.com/JovieInc/Jovie/pull/20850",
+    "https://github.com/JovieInc/Jovie/pull/20851",
+    "https://github.com/JovieInc/Jovie/pull/20858",
+    "https://github.com/JovieInc/Jovie/pull/20859",
+    "https://github.com/JovieInc/Jovie/pull/20861",
+    "https://github.com/JovieInc/Jovie/pull/20862",
+    "https://github.com/JovieInc/Jovie/pull/20864",
+    "https://github.com/JovieInc/Jovie/pull/20873",
+    "https://github.com/JovieInc/Jovie/pull/20877",
+    "https://github.com/JovieInc/Jovie/pull/20879",
+    "https://github.com/JovieInc/Jovie/pull/20880",
+    "https://github.com/JovieInc/Jovie/pull/20881",
+    "https://github.com/JovieInc/Jovie/pull/20882",
+    "https://github.com/JovieInc/Jovie/pull/20883",
+    "https://github.com/JovieInc/Jovie/pull/20884",
+    "https://github.com/JovieInc/Jovie/pull/20885",
+    "https://github.com/JovieInc/Jovie/pull/20886",
+    "https://github.com/JovieInc/Jovie/pull/20888",
+    "https://github.com/JovieInc/Jovie/pull/20889",
+    "https://github.com/JovieInc/Jovie/pull/20890",
+    "https://github.com/JovieInc/Jovie/pull/20891",
+    "https://github.com/JovieInc/Jovie/pull/20893",
+    "https://github.com/JovieInc/Jovie/pull/20894",
+    "https://github.com/JovieInc/Jovie/pull/20897",
+    "https://github.com/JovieInc/Jovie/pull/20898",
+    "https://github.com/JovieInc/Jovie/pull/20899",
+    "https://github.com/JovieInc/Jovie/pull/20904",
+    "https://github.com/JovieInc/Jovie/pull/20915",
+    "https://github.com/JovieInc/Jovie/pull/20926",
+    "https://github.com/JovieInc/Jovie/pull/20927",
+    "https://github.com/JovieInc/Jovie/pull/20931",
+    "https://github.com/JovieInc/Jovie/pull/20932",
+    "https://github.com/JovieInc/Jovie/pull/20933",
+    "https://github.com/JovieInc/Jovie/pull/20934",
+    "https://github.com/JovieInc/Jovie/pull/20935",
+    "https://github.com/JovieInc/Jovie/pull/20936",
+    "https://github.com/JovieInc/Jovie/pull/20937",
+    "https://github.com/JovieInc/Jovie/pull/20939",
+    "https://github.com/JovieInc/Jovie/pull/20941",
+    "https://github.com/JovieInc/Jovie/pull/20942",
+    "https://github.com/JovieInc/Jovie/pull/20943"
+  ],
+  "work": {
+    "initiatedPullRequests": 69,
+    "remediationPullRequests": 13,
+    "handoffPullRequests": 0
+  },
+  "instrumentationFollowUp": "https://linear.app/jovie/issue/JOV-8318/instrument-exact-origin-receipts-for-non-symphony-pr-producers",
+  "detailContract": "scripts/lanes/shipping_attribution.py emits PR author, merge actor, exact head, merge timestamp, origin provider/model/initiator/host/run/attempt/Linear issue, and separate remediation/finalizing contributions for every row."
+}
