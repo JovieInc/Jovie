@@ -3714,6 +3714,37 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     );
   });
 
+  it('registers standalone auth recovery and checkout loading while still requiring exact-head evidence', () => {
+    const changedFiles = [
+      'apps/web/app/error/user-creation-failed/page.tsx',
+      'apps/web/app/error/user-creation-failed/loading.tsx',
+      'apps/web/app/onboarding/checkout/loading.tsx',
+    ].map(path => ({ path, status: 'M' }));
+    const registration = evaluateChangedScreens({
+      changedFiles,
+      headSha: HEAD,
+      proofs: [],
+    });
+
+    assert.deepEqual(registration.issues, []);
+    assert.deepEqual(
+      registration.changedScreens.map(screen => screen.id),
+      ['web.account-creation-recovery', 'web.onboarding-checkout']
+    );
+    assert.deepEqual(registration.excludedChanges, []);
+
+    const certification = evaluateChangedScreens({
+      changedFiles,
+      headSha: HEAD,
+      proofs: [],
+      requireExternalEvidence: true,
+    });
+    assert.deepEqual(certification.issues, [
+      'missing exact-head proof for web.account-creation-recovery',
+      'missing exact-head proof for web.onboarding-checkout',
+    ]);
+  });
+
   it('rejects a modified protected source when its registration is missing', () => {
     const source = 'apps/web/app/app/(shell)/jovie-work/page.tsx';
     const registry = SCREEN_REGISTRY.filter(
