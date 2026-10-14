@@ -27,6 +27,7 @@ import { buildAiTelemetry } from '@/lib/ai/telemetry';
 import type { ChatAccountContext } from '@/lib/chat/account-context';
 import { buildReferencedEntitiesBlock } from '@/lib/chat/entity-hydration';
 import { resolveImportBioRestrictedTools } from '@/lib/chat/import-bio-turn-guard';
+import { retrieveKnowledgeContext } from '@/lib/chat/knowledge/retrieval';
 import { selectKnowledgeContext } from '@/lib/chat/knowledge/router';
 import { extractLastUserText } from '@/lib/chat/message-text';
 import {
@@ -255,6 +256,8 @@ export interface ExecuteChatTurnInput {
   telemetry?: ChatTelemetry;
   /** Optional durable persistence hook for model stream failures. */
   onStreamError?: (error: unknown) => PromiseLike<void> | void;
+  /** Optional knowledge retrieval seam for deterministic tests and evals. */
+  knowledgeRetriever?: typeof retrieveKnowledgeContext;
   /**
    * Mode discriminator (JOV-2132). `'app'` is the existing authenticated
    * artist chat path; `'onboarding'` is the anonymous /start visitor flow
@@ -336,6 +339,7 @@ export async function executeChatTurn(
     resolvedProfileId,
     telemetry,
     onStreamError,
+    knowledgeRetriever = retrieveKnowledgeContext,
     mode = 'app',
     identity,
   } = input;
@@ -347,10 +351,16 @@ export async function executeChatTurn(
     );
   }
 
+  const disclosureProbeText =
+    lastUserText ?? extractLastUserText(uiMessages) ?? '';
+  const blockedForDisclosure =
+    disclosureProbeText.length > 0 &&
+    isPromptDisclosureRequest(disclosureProbeText);
+
   // Onboarding mode swaps in the Stanley-style prompt and skips the
-  // music-industry knowledge context (which is keyed on the artist's profile,
-  // not relevant pre-account). Authenticated `mode='app'` keeps the existing
-  // buildSystemPrompt path so this refactor is behaviour-stable for in-app chat.
+  // music-industry knowledge context. Authenticated `mode='app'` keeps the
+  // existing buildSystemPrompt path so this refactor is behaviour-stable for
+  // in-app chat.
   let systemPromptParts: SystemPromptParts;
   if (mode === 'onboarding') {
     systemPromptParts = { stable: ONBOARDING_SYSTEM_PROMPT, dynamic: '' };
@@ -375,11 +385,14 @@ export async function executeChatTurn(
     });
     const pinnedOpportunityBlock =
       buildPinnedOpportunityBlock(pinnedOpportunity);
+    const knowledgeContext = blockedForDisclosure
+      ? ''
+      : await knowledgeRetriever(recentUserTexts(uiMessages).join(' '), signal);
     const parts = buildSystemPromptParts(artistContext, releases, {
       aiCanUseTools: planLimits.booleans.aiCanUseTools,
       aiWeeklyMessageLimit: planLimits.limits.aiWeeklyMessageLimit,
       insightsEnabled,
-      knowledgeContext: selectKnowledgeContextForTurn(uiMessages) || undefined,
+      knowledgeContext: knowledgeContext || undefined,
       accountContext,
       referencedEntities,
       pinnedOpportunity: pinnedOpportunityBlock,
@@ -484,12 +497,6 @@ export async function executeChatTurn(
     planLimits.booleans.aiCanUseTools
   );
   const turnSignals = { toolStepCapExhausted: false };
-
-  const disclosureProbeText =
-    lastUserText ?? extractLastUserText(uiMessages) ?? '';
-  const blockedForDisclosure =
-    disclosureProbeText.length > 0 &&
-    isPromptDisclosureRequest(disclosureProbeText);
 
   const coreChatTrace = resolveCoreChatTrace({
     harness: coreChatHarness,
