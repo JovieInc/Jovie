@@ -654,6 +654,7 @@ export function selectStateId(name, states) {
  *   description: string,
  *   reopenedAfterDone?: boolean,
  *   receiptNotBefore?: string | null,
+ *   outcomeNotBefore?: string,
  *   state: { id: string, name: string, type: string },
  *   states: { id?: string, name?: string, type?: string }[],
  *   commentRecords: { body: string, createdAt: string }[],
@@ -699,6 +700,27 @@ export async function reconcileValidation(ctx) {
   const currentComments = issue.commentRecords.filter(
     comment => Date.parse(comment.createdAt) > cutoff
   );
+  const outcomeCutoff = Math.max(
+    cutoff,
+    issue.outcomeNotBefore ? Date.parse(issue.outcomeNotBefore) : -Infinity
+  );
+  const recordedReceipts = parseValidationReceipts(
+    currentComments,
+    issue.identifier
+  ).filter(
+    receipt =>
+      receipt.kind !== 'outcome' ||
+      Date.parse(receipt.recordedAt) > outcomeCutoff
+  );
+  const parentOutcome = ctx.parentReason
+    ? recordedReceipts
+        .filter(
+          receipt =>
+            receipt.kind === 'outcome' && /^[0-9a-f]{40}$/.test(receipt.sha)
+        )
+        .sort((a, b) => Date.parse(a.recordedAt) - Date.parse(b.recordedAt))
+        .at(-1)
+    : null;
   const merged = await listMergedLinkedPulls({
     github: ctx.github,
     repository: ctx.repository,
@@ -723,6 +745,7 @@ export async function reconcileValidation(ctx) {
     parentReason: ctx.parentReason,
     escapedDefect: escapedDefect.applicable,
     uiEvidence: mergedUiEvidence(files, ctx.assuranceMatrix),
+    parentOutcome,
   });
   if (!manifest) {
     ctx.log(
@@ -781,7 +804,7 @@ export async function reconcileValidation(ctx) {
 
   const receipts = [];
   for (const receipt of [
-    ...parseValidationReceipts(currentComments, issue.identifier),
+    ...recordedReceipts,
     ...tasteReceiptsFromResults(
       issue.description,
       currentComments,
@@ -790,9 +813,9 @@ export async function reconcileValidation(ctx) {
     ),
   ]) {
     if (receipt.status === 'invalid') {
-      const bindingTime = merged.find(
-        pull => pull.mergeSha.toLowerCase() === manifest.bindingSha
-      )?.mergedAt;
+      const bindingTime =
+        merged.find(pull => pull.mergeSha.toLowerCase() === manifest.bindingSha)
+          ?.mergedAt ?? parentOutcome?.recordedAt;
       receipts.push({
         ...receipt,
         containsBinding:

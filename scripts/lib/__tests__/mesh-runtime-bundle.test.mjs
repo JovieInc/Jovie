@@ -17,6 +17,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   buildMeshRuntime,
   importerVersion,
+  pinnedRecords,
 } from '../../lanes/mesh-runtime-bundle.mjs';
 
 const repo = resolve(import.meta.dirname, '../../..');
@@ -170,6 +171,43 @@ describe('immutable managed mesh dependency closure', () => {
     ]);
     expect(proof.isolatedImportPassed).toBe(true);
   });
+  it.each([
+    'changed-patch-context',
+    'missing-snapshot',
+    'changed-snapshot-record',
+  ])('refuses a %s while Zod package and patch metadata agree', kind => {
+    const snapshot = repoLock
+      .split('\nsnapshots:\n')[1]
+      .split('\n')
+      .find(
+        line =>
+          line.startsWith(`  zod@${zodPin}:`) ||
+          line.startsWith(`  zod@${zodPin}(`)
+      );
+    expect(snapshot).toBeDefined();
+    const replacement =
+      kind === 'missing-snapshot'
+        ? ''
+        : kind === 'changed-patch-context'
+          ? snapshot.replace(
+              `zod@${zodPin}`,
+              `zod@${zodPin}(patch_hash=CHANGED)`
+            )
+          : snapshot.replace(
+              ': {}',
+              ':\n    optionalDependencies:\n      changed: 1.0.0'
+            );
+    const changed = repoLock.replace(snapshot, replacement);
+    expect(changed).not.toBe(repoLock);
+    expect(() =>
+      buildMeshRuntime(archive, dependencies(Buffer.from(changed)))
+    ).toThrow(
+      kind === 'changed-snapshot-record'
+        ? 'mesh-runtime-dependency-generation-mismatch'
+        : 'mesh-runtime-dependency-pin-mismatch'
+    );
+    expect(() => statSync(portable())).toThrow('ENOENT');
+  });
   it('refuses missing restored dependencies without downloading anything', () => {
     const deps = join(root, 'deps');
     mkdirSync(deps);
@@ -200,6 +238,150 @@ describe('immutable managed mesh dependency closure', () => {
       vi.unstubAllEnvs();
     }
   });
+  it.each(['1.2.3', '1.2.3(patch_hash=abc)(peer@4.0.0)'])(
+    'binds one package and the exact %s snapshot, ignoring patch metadata',
+    resolution => {
+      const packageRecord =
+        '  zod@1.2.3:\n    resolution: {integrity: sha512-fixture}';
+      const snapshotRecord = `  zod@${resolution}: {}`;
+      const lock = [
+        'patchedDependencies:',
+        '  zod@1.2.3:',
+        '    hash: abc',
+        '    path: patches/zod.patch',
+        'packages:',
+        packageRecord,
+        '  "unrelated@9.0.0": {}',
+        '# A section comment does not change record ownership.',
+        'snapshots:',
+        snapshotRecord,
+        '  "unrelated@9.0.0": {}',
+      ].join('\n');
+      expect(pinnedRecords(lock, 'zod@1.2.3', `zod@${resolution}`)).toEqual([
+        hash(Buffer.from(packageRecord)),
+        hash(Buffer.from(snapshotRecord)),
+      ]);
+    }
+  );
+  it.each([
+    ['packages', 'missing'],
+    ['packages', 'duplicate'],
+    ['snapshots', 'missing'],
+    ['snapshots', 'duplicate'],
+  ])(
+    'refuses %s with a %s relevant record even when patch metadata exists',
+    (section, fault) => {
+      const packageRecord =
+        '  zod@1.2.3:\n    resolution: {integrity: sha512-fixture}';
+      const snapshotRecord = '  zod@1.2.3(patch_hash=abc): {}';
+      const selected = section === 'packages' ? packageRecord : snapshotRecord;
+      const replacement = fault === 'missing' ? '' : `${selected}\n${selected}`;
+      const lock = [
+        'patchedDependencies:',
+        '  zod@1.2.3:',
+        '    hash: abc',
+        'packages:',
+        section === 'packages' ? replacement : packageRecord,
+        'snapshots:',
+        section === 'snapshots' ? replacement : snapshotRecord,
+      ].join('\n');
+      expect(() =>
+        pinnedRecords(lock, 'zod@1.2.3', 'zod@1.2.3(patch_hash=abc)')
+      ).toThrow('mesh-runtime-dependency-pin-mismatch');
+    }
+  );
+  it.each(['inline-fields', 'inline-comment', 'duplicate-section'])(
+    'refuses ambiguous relevant records from %s',
+    fault => {
+      const packageRecord =
+        '  zod@1.2.3:\n    resolution: {integrity: sha512-fixture}';
+      const snapshotKey = '  zod@1.2.3(patch_hash=abc):';
+      const extraSection =
+        fault === 'duplicate-section' ? ['packages:', '  other@1.0.0: {}'] : [];
+      const extraSnapshot =
+        fault === 'inline-fields'
+          ? `${snapshotKey} {dependencies: {other: 1.0.0}}`
+          : fault === 'inline-comment'
+            ? `${snapshotKey} {} # duplicate key`
+            : '';
+      const lock = [
+        'packages:',
+        packageRecord,
+        ...extraSection,
+        'snapshots:',
+        `${snapshotKey} {}`,
+        extraSnapshot,
+      ].join('\n');
+      expect(() =>
+        pinnedRecords(lock, 'zod@1.2.3', 'zod@1.2.3(patch_hash=abc)')
+      ).toThrow('mesh-runtime-dependency-pin-mismatch');
+    }
+  );
+  it.each([
+    ['single-quoted package', 'zod@1.2.3', 'packages', "  'zod@1.2.3': {}"],
+    ['double-quoted package', 'zod@1.2.3', 'packages', '  "zod@1.2.3": {}'],
+    [
+      'double-quoted scoped snapshot',
+      '@scope/y@1.2.3',
+      'snapshots',
+      '  "@scope/y@1.2.3(patch_hash=abc)": {}',
+    ],
+    [
+      'single-quoted section',
+      'zod@1.2.3',
+      'packages',
+      "'packages':\n  other@1.0.0: {}",
+    ],
+    [
+      'double-quoted section',
+      'zod@1.2.3',
+      'packages',
+      '"packages":\n  other@1.0.0: {}',
+    ],
+    [
+      'escaped package',
+      'zod@1.2.3',
+      'packages',
+      String.raw`  "\u007aod@1.2.3": {}`,
+    ],
+    [
+      'escaped section',
+      'zod@1.2.3',
+      'packages',
+      String.raw`"\u0070ackages": {}`,
+    ],
+    [
+      'unsupported package encoding',
+      'zod@1.2.3',
+      'packages',
+      String.raw`  "zo\x64@1.2.3": {}`,
+    ],
+    [
+      'unsupported section encoding',
+      'zod@1.2.3',
+      'packages',
+      String.raw`"\x70ackages": {}`,
+    ],
+    ['unterminated quoted key', 'zod@1.2.3', 'packages', '  "zod@1.2.3: {}'],
+  ])(
+    'refuses relevant semantic aliases from a %s',
+    (_label, name, section, extra) => {
+      const canonical = value =>
+        value.startsWith('@') ? `  '${value}': {}` : `  ${value}: {}`;
+      const snapshotName = `${name}(patch_hash=abc)`;
+      const lock = [
+        'packages:',
+        canonical(name),
+        section === 'packages' ? extra : '',
+        'snapshots:',
+        canonical(snapshotName),
+        section === 'snapshots' ? extra : '',
+      ].join('\n');
+      expect(() => pinnedRecords(lock, name, snapshotName)).toThrow(
+        'mesh-runtime-dependency-pin-mismatch'
+      );
+    }
+  );
   it('reads importer pins from the lockfile, ignoring patch and peer suffixes', () => {
     const lock = [
       'importers:',
