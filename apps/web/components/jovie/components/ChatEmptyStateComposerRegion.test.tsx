@@ -15,6 +15,28 @@ describe('ChatEmptyStateComposerRegion', () => {
     sessionStorage.removeItem(CHAT_EMPTY_SAMPLE_STORAGE_KEY);
   });
 
+  it('centers only the opted-in Home above content while preserving the bottom composer', () => {
+    render(
+      <ChatEmptyStateComposerRegion
+        stableDocked
+        fullBleed
+        centerAbove
+        above={<div>Welcome, Tim</div>}
+      >
+        <div>Composer</div>
+      </ChatEmptyStateComposerRegion>
+    );
+    const region = screen.getByTestId('chat-empty-state-composer-region');
+    expect(region).toHaveClass('w-full');
+    const group = region.querySelector('[data-empty-chat-suggestions]');
+    expect(group).toHaveClass('my-auto');
+    expect(group).not.toHaveClass('mt-auto');
+    expect(group).not.toHaveClass('min-h-full');
+    expect(
+      screen.getByTestId('chat-empty-state-centered-composer')
+    ).toHaveAttribute('data-dock', 'bottom');
+  });
+
   it('renders Just ask and a role-neutral executable sample, with no brand logo', () => {
     const onSelectSample = vi.fn();
     render(

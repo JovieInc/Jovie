@@ -31,6 +31,7 @@ import {
 } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import {
+  type ChatEmptyStateAction,
   getChatEmptyStateFirstName,
   resolveChatEmptyStateInsight,
 } from './chat-empty-greeting';
@@ -91,8 +92,6 @@ export function JovieChat({
   displayName,
   avatarUrl,
   username,
-  isFirstSession = false,
-  isProfileComplete = false,
   chatMode,
   ovieHomeBriefing,
   ambientOwnedByShell = false,
@@ -531,17 +530,84 @@ export function JovieChat({
   const chatEmptyStateFirstName = getChatEmptyStateFirstName(displayName);
   const showEmptyGreeting =
     !showThreadView && !showOvieBriefing && !composerHasIntent;
-  const { data: insightsSummary } = useInsightsSummaryQuery({
+  const {
+    data: insightsSummary,
+    isLoading: insightsLoading,
+    isError: insightsError,
+  } = useInsightsSummaryQuery({
     enabled: showEmptyGreeting,
   });
-  const topActiveInsightTitle =
-    insightsSummary?.insights.find(insight => insight.status === 'active')
-      ?.title ?? null;
-  const chatEmptyStateInsight = resolveChatEmptyStateInsight({
-    topInsightTitle: topActiveInsightTitle,
-    isProfileComplete,
-    isFirstSession,
-  });
+  // Commit one next step per empty session. Refetches must not swap the user's
+  // visible task, and a failed query must not turn cached prose into a win.
+  const [emptyNextStep, setEmptyNextStep] = useState<{
+    readonly action: ChatEmptyStateAction | null;
+  } | null>(null);
+  useEffect(() => {
+    if (showThreadView) {
+      setEmptyNextStep(null);
+    } else if (showEmptyGreeting && !insightsLoading && !emptyNextStep) {
+      setEmptyNextStep({
+        action: insightsError
+          ? null
+          : resolveChatEmptyStateInsight(insightsSummary?.insights ?? []),
+      });
+    }
+  }, [
+    showThreadView,
+    showEmptyGreeting,
+    insightsLoading,
+    insightsError,
+    insightsSummary,
+    emptyNextStep,
+  ]);
+  const selectedEmptyAction = emptyNextStep?.action;
+  const currentEmptyInsight = insightsSummary?.insights.find(
+    insight => insight.id === selectedEmptyAction?.insightId
+  );
+  const activeEmptyAction = currentEmptyInsight
+    ? resolveChatEmptyStateInsight([currentEmptyInsight])
+    : null;
+  const usableEmptyAction =
+    activeEmptyAction?.prompt === selectedEmptyAction?.prompt
+      ? selectedEmptyAction
+      : null;
+  useEffect(() => {
+    if (!selectedEmptyAction) return;
+    // Expiration is a material context change, even with an idle query cache.
+    const timer = setTimeout(
+      () => {
+        setEmptyNextStep({ action: null });
+      },
+      Math.min(
+        2_147_483_647,
+        Math.max(0, selectedEmptyAction.expiresAt - Date.now())
+      )
+    );
+    return () => clearTimeout(timer);
+  }, [selectedEmptyAction]);
+  const handleEmptyNextStep = useCallback(
+    (prompt: string) => {
+      if (
+        !usableEmptyAction ||
+        usableEmptyAction.prompt !== prompt ||
+        usableEmptyAction.expiresAt <= Date.now() ||
+        draft.getSnapshot().trim() ||
+        composerPickerOpen ||
+        chipTray.chips.length > 0
+      )
+        return;
+      setInput(prompt);
+      inputRef.current?.focus();
+    },
+    [
+      usableEmptyAction,
+      draft,
+      composerPickerOpen,
+      chipTray.chips.length,
+      setInput,
+      inputRef,
+    ]
+  );
   const shouldReservePickerClearance = showBottomComposer && composerPickerOpen;
   const messageViewportPaddingBottom = shouldReservePickerClearance
     ? CHAT_PICKER_THREAD_CLEARANCE
@@ -866,16 +932,22 @@ export function JovieChat({
                 ) : (
                   <ChatEmptyStateComposerRegion
                     stableDocked
+                    fullBleed
+                    centerAbove
                     above={
                       showEmptyGreeting ? (
                         <ChatEmptyStateGreeting
                           firstName={chatEmptyStateFirstName}
-                          insight={chatEmptyStateInsight}
+                          action={usableEmptyAction}
+                          isLoading={!emptyNextStep}
+                          onSelectAction={handleEmptyNextStep}
                         />
                       ) : undefined
                     }
                   >
-                    {composerSurface}
+                    <div className={CHAT_CONTENT_SHELL_CLASSNAME}>
+                      {composerSurface}
+                    </div>
                     {inlineChatError ? (
                       <div className='mt-3 w-full'>{inlineChatError}</div>
                     ) : null}

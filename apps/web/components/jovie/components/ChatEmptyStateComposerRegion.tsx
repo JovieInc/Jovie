@@ -111,6 +111,7 @@ export function ChatEmptyStateComposerRegion({
   hideWelcomeHeader = false,
   stableDocked = false,
   showDockedWelcome = false,
+  centerAbove = false,
   onSelectSample,
 }: {
   readonly above?: ReactNode;
@@ -125,6 +126,8 @@ export function ChatEmptyStateComposerRegion({
    * the centered welcome (Just ask + sample) instead of blank space.
    */
   readonly showDockedWelcome?: boolean;
+  /** Home welcome fills the usable space; task/Ovie stacks remain bottom-aligned. */
+  readonly centerAbove?: boolean;
   readonly onSelectSample?: (prompt: string) => void;
 }) {
   const showWelcomeHeader = !above && !hideWelcomeHeader;
@@ -153,8 +156,9 @@ export function ChatEmptyStateComposerRegion({
           {above ? (
             <div
               className={cn(
-                'mt-auto flex shrink-0 flex-col',
-                fullBleed && 'min-h-full'
+                'flex shrink-0 flex-col',
+                centerAbove ? 'my-auto' : 'mt-auto',
+                fullBleed && !centerAbove && 'min-h-full'
               )}
               data-empty-chat-suggestions='true'
             >
