@@ -407,6 +407,29 @@ State and receipts live under `~/.local/state/jovie-lanes`. Every gated run reco
 `gateWaitMedianS24h`/`gateWaitMaxS24h` into the status feed so a seat raise or a
 second host is decided on measured queue time, not on timeouts alone.
 
+### Factory stay-up watchdog (JOV-8125)
+
+`install.sh` installs an independent one-minute `jovie-lanes-watchdog` timer (launchd on
+macOS, systemd user units on Linux). It makes no healthy-path API calls. Local receipts detect
+a missing/stale factory tick after 10 minutes (with a 22-minute grace for an active bounded
+release self-test), a zero-worker state with known demand sustained for 5 minutes, the doctor's
+bounded stuck-retry/provider-down conditions, and a complete
+provider-capacity bank. Recoverable states restart/kickstart the existing `jovie-lanes` service;
+the watchdog never starts a second controller directly. A recovery passes only after a newer
+tick and doctor observation prove a healthy provider is admitting work and, when work is
+waiting, a worker is running or completed after the recovery request.
+
+Each incident gets at most three attempts, spaced by at least two minutes. The atomic latest
+receipt is `factory-watchdog.json`; every incident, action, and verified after-state is also
+fsynced to `runs/factory-watchdog.jsonl`. Exhaustion or a complete provider-capacity bank opens
+one deduped Linear doctor issue; alert delivery retries at most every 15 minutes until
+acknowledged. A later healthy observation closes that issue. Inspect the receipt before manual
+action; restarting workers outside the installed service path would bypass its ownership lock.
+
+The extra timer is necessary because the normal event-driven worker re-exec and five-minute
+idle fallback cannot observe their own timer/process being dark. It performs only local file
+reads while healthy, so it adds no recurring external API or provider cost.
+
 **Ship now:** the gate timeout defaults to 3,600 seconds on macOS and remains 2,400 seconds
 elsewhere; `LANES_GATE_TIMEOUT_S` still overrides either default. **Re-evaluate when:** the mac
 records five gate timeouts in a 24-hour window after a full day on this release. **Then:** use the
