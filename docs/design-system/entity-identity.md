@@ -36,9 +36,9 @@ an authenticated production walkthrough.
 | Chat entity picker, `EntityPreviewPane` | Every image cover-cropped; local initials and separate event date markup | Semantic thumbnail at existing 72px density |
 | Entity hover cards and rows, `shell/EntityPopover` | Two separate image/initials/date implementations; cover-cropped releases | Semantic thumbnail at 28px row / 48px card density |
 | Public profile / dashboard preview, `ProfileIdentityHeader` | Local portrait fallback and Check badge | Person thumbnail at existing 80px density with source `isVerified` |
-| Identity workspace, `profiles/PresenceIdentityPhoto` | Already uses Avatar; generic source metadata can be artwork rather than a person photo | Retains existing source-aware adapter; source/provider provenance remains distinct from Jovie verification |
+| Identity workspace, `profiles/PresenceIdentityPhoto` | Already uses Avatar; generic source metadata can be artwork rather than a person photo | Retains the source-aware outer accessible name with a decorative inner Avatar; source/provider provenance remains distinct from Jovie verification |
 | Release inspector, `ReleaseSidebarSections`, `ReleaseArtwork`, `TrackSidebar` | Existing artwork/upload owners | Retains editable AvatarUploadable / ArtworkFrame composition; no new upload implementation |
-| Table and shell identities, `AvatarCell`, `ArtistAvatarStack`, `ProfileSwitcher`, `UserButton` | Already use shared Avatar family | Retains compact owner; benefits from source replacement/fallback repair |
+| Table and shell identities, `AvatarCell`, `ArtistAvatarStack`, `ProfileSwitcher`, `UserButton` | Already use shared Avatar family | Retains compact owner; benefits from source replacement/fallback repair. Artist stacks provide real names for initials and own one group label |
 
 Content previews (file thumbnails, videos, merch and event posters in editorial
 cards) retain their content-specific media owners. They are not person avatars.
