@@ -12,7 +12,7 @@ export function WaitlistInviteMessage({
   body,
 }: WaitlistInviteMessageProps) {
   return (
-    <main className='mx-auto flex min-h-screen w-full max-w-lg flex-col justify-center px-6 py-16'>
+    <div className='mx-auto flex min-h-screen w-full max-w-lg flex-col justify-center px-6 py-16'>
       <div className='space-y-4'>
         <h1 className='text-title font-semibold tracking-normal text-primary-token'>
           {title}
@@ -26,6 +26,6 @@ export function WaitlistInviteMessage({
           Check waitlist status
         </Link>
       </div>
-    </main>
+    </div>
   );
 }

@@ -493,6 +493,75 @@ describe('POST /api/webhooks/linear', () => {
     });
   });
 
+  it.each(['succeeded', 'denied'])(
+    'wakes validation for a terminal founder %s result without accepting it',
+    async terminalState => {
+      mockAcquireRecentDispatch.mockResolvedValue({
+        acquired: true,
+        reason: 'acquired',
+      });
+      mockServerFetch.mockResolvedValue(new Response(null, { status: 204 }));
+      const { POST } = await import('@/app/api/webhooks/linear/route');
+      const body = JSON.stringify({
+        type: 'Comment',
+        action: 'create',
+        data: {
+          id: 'founder-result',
+          body: `Founder decision.\n\n\`\`\`json\n${JSON.stringify({ schema: 'jovie.work-result/v1', phase: 'terminal', actor: { class: 'founder-decision' }, terminalState })}\n\`\`\``,
+          issue: { id: 'issue-receipt', identifier: 'JOV-7001' },
+        },
+      });
+      const response = await POST(
+        new Request('https://example.com/api/webhooks/linear', {
+          method: 'POST',
+          headers: { 'linear-signature': sign(body) },
+          body,
+        }) as never
+      );
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ dispatched: true });
+      expect(
+        JSON.parse(mockServerFetch.mock.calls[0]?.[1]?.body)
+      ).toMatchObject({
+        event_type: 'linear_validation_receipt',
+        client_payload: { issue_identifier: 'JOV-7001' },
+      });
+    }
+  );
+
+  it.each([
+    {
+      schema: 'jovie.work-result/v1',
+      phase: 'progress',
+      actor: { class: 'founder-decision' },
+    },
+    {
+      schema: 'jovie.work-result/v1',
+      phase: 'terminal',
+      actor: { class: 'code-execution' },
+    },
+    { schema: 'jovie.work-result/v1', phase: 'terminal', actor: null },
+  ])('ignores non-terminal or non-founder work results %j', async result => {
+    const { POST } = await import('@/app/api/webhooks/linear/route');
+    const body = JSON.stringify({
+      type: 'Comment',
+      action: 'create',
+      data: {
+        body: `\`\`\`json\n${JSON.stringify(result)}\n\`\`\``,
+        issue: { id: 'issue-receipt', identifier: 'JOV-7001' },
+      },
+    });
+    const response = await POST(
+      new Request('https://example.com/api/webhooks/linear', {
+        method: 'POST',
+        headers: { 'linear-signature': sign(body) },
+        body,
+      }) as never
+    );
+    expect(await response.json()).toEqual({ received: true, ignored: true });
+    expect(mockServerFetch).not.toHaveBeenCalled();
+  });
+
   it('bridges a closed post-mortem action or escaped defect, or a gained defect label, to the quality gap scan', async () => {
     mockAcquireRecentDispatch.mockResolvedValue({
       acquired: true,

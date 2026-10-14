@@ -23,6 +23,9 @@ const SCORE_FACTORS = new Set(
 );
 const TERMINAL_STATE_TYPES = new Set(['completed', 'canceled']);
 const MUTATION_KINDS = new Set(['cancel', 'rewrite', 'rerank']);
+const MAX_LINEAR_READY_UPDATES = 20;
+const SENSITIVE_OUTPUT =
+  /(?:\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b|\b(?:acct|ch|cs|cus|evt|in|ii|pi|pm|price|prod|req|rk|seti|si|sk|src|sub|tok|whsec)_[A-Za-z0-9_-]+\b|\b(?:gh[pousr]_|github_pat_)[A-Za-z0-9_-]+\b|\b[0-9]{12,19}\b)/iu;
 
 function text(value, field) {
   if (typeof value !== 'string' || value.trim().length === 0) {
@@ -35,6 +38,22 @@ function normalized(value) {
   return text(value, 'id')
     .toLowerCase()
     .replace(/[^a-z0-9]+/gu, '-');
+}
+
+function boundedText(value, field, maxLength) {
+  const result = text(value, field);
+  if (result.length > maxLength) {
+    throw new Error(`${field} must be at most ${maxLength} characters`);
+  }
+  return result;
+}
+
+function redactionSafeText(value, field, maxLength) {
+  const result = boundedText(value, field, maxLength);
+  if (SENSITIVE_OUTPUT.test(result)) {
+    throw new Error(`${field} contains sensitive or reusable identifiers`);
+  }
+  return result;
 }
 
 function digest(value) {
@@ -108,6 +127,36 @@ function validateDecision(decision) {
     ) {
       throw new Error(
         `decision.${field} must be ${field === 'alternativesConsidered' ? 'an array' : 'non-empty'}`
+      );
+    }
+  }
+  if (decision.commerceProjection) {
+    for (const [value, field] of [
+      [decision.commerceProjection.offer, 'offer'],
+      [decision.commerceProjection.channel, 'channel'],
+      [decision.commerceProjection.rail, 'rail'],
+    ]) {
+      const token = redactionSafeText(
+        value,
+        `decision.commerceProjection.${field}`,
+        128
+      );
+      if (!/^[a-z0-9][a-z0-9._:-]*$/u.test(token)) {
+        throw new Error(
+          `decision.commerceProjection.${field} must be a safe token`
+        );
+      }
+    }
+    const issueIds = decision.commerceProjection.issueIds;
+    if (
+      !Array.isArray(issueIds) ||
+      issueIds.length === 0 ||
+      issueIds.length > 8 ||
+      new Set(issueIds).size !== issueIds.length ||
+      issueIds.some(issueId => !/^JOV-[1-9][0-9]*$/u.test(issueId))
+    ) {
+      throw new Error(
+        'decision.commerceProjection.issueIds must contain 1-8 unique JOV issue identifiers'
       );
     }
   }
@@ -186,6 +235,63 @@ function validateBenchmark(benchmark, event, invalidated) {
   return results;
 }
 
+function planLinearReadyUpdates({ event, invalidated, results, impacts }) {
+  const eligible = new Set(
+    impacts
+      .filter(impact => impact.mutationEligible)
+      .map(impact => impact.issueId)
+  );
+  const updates = invalidated.flatMap(decision => {
+    const commerce = decision.commerceProjection;
+    if (!commerce) return [];
+    const result = results.get(decision.id);
+    const nextReevaluation = redactionSafeText(
+      result.nextReevaluation,
+      'benchmark nextReevaluation',
+      500
+    );
+    const decisionId = redactionSafeText(decision.id, 'decision id', 128);
+    const evidenceId = redactionSafeText(
+      event.evidenceId,
+      'event evidenceId',
+      256
+    );
+    return commerce.issueIds.map(issueId => {
+      if (!eligible.has(issueId)) {
+        throw new Error(`Linear-ready update is not eligible: ${issueId}`);
+      }
+      const id = `${decisionId}:${issueId}:commerce-projection`;
+      const body = [
+        `Commerce capability invalidated by ${event.id}.`,
+        `Offer: ${commerce.offer}`,
+        `Channel: ${commerce.channel}`,
+        `Rail: ${commerce.rail}`,
+        `Prior decision: ${decisionId}`,
+        `Invalidating evidence: ${evidenceId}`,
+        `Next re-evaluation: ${nextReevaluation}`,
+      ].join('\n');
+      boundedText(body, 'Linear-ready update body', 2000);
+      return {
+        id,
+        issueId,
+        kind: 'comment',
+        sourceEventId: event.id,
+        sourceEvidenceId: evidenceId,
+        body,
+      };
+    });
+  });
+  if (updates.length > MAX_LINEAR_READY_UPDATES) {
+    throw new Error(
+      `Linear-ready updates exceed the ${MAX_LINEAR_READY_UPDATES} update bound`
+    );
+  }
+  if (new Set(updates.map(update => update.id)).size !== updates.length) {
+    throw new Error('Linear-ready updates must have unique identities');
+  }
+  return updates;
+}
+
 export function planCapabilityReconciliation({
   event,
   decisions,
@@ -203,6 +309,7 @@ export function planCapabilityReconciliation({
       eventId: event.id,
       eventDigest: event.digest,
       actions: [],
+      linearReadyUpdates: [],
     };
   }
   decisions.forEach(validateDecision);
@@ -273,6 +380,12 @@ export function planCapabilityReconciliation({
       };
     })
   );
+  const linearReadyUpdates = planLinearReadyUpdates({
+    event,
+    invalidated,
+    results,
+    impacts,
+  });
   return {
     schema: RECONCILIATION_SCHEMA,
     status: 'ready',
@@ -291,6 +404,7 @@ export function planCapabilityReconciliation({
     })),
     impacts,
     actions,
+    linearReadyUpdates,
   };
 }
 
@@ -349,6 +463,27 @@ export async function applyCapabilityReconciliation(receipt, client) {
       throw new Error(`Linear audit readback failed: ${action.issueId}`);
     }
     outcomes.push({ actionId: action.id, status: 'verified' });
+  }
+  for (const update of receipt.linearReadyUpdates ?? []) {
+    const marker = `<!-- capability-reconciliation:${update.sourceEventId}:${update.id}:linear-update -->`;
+    const before = await client.fetchIssue(update.issueId);
+    if (
+      before.comments?.nodes?.some(comment => comment.body.includes(marker))
+    ) {
+      outcomes.push({ updateId: update.id, status: 'unchanged' });
+      continue;
+    }
+    if (TERMINAL_STATE_TYPES.has(before.state?.type)) {
+      throw new Error(`terminal Linear issue: ${update.issueId}`);
+    }
+    await client.addComment(before.id, `${marker}\n${update.body}`);
+    const after = await client.fetchIssue(update.issueId);
+    if (
+      !after.comments?.nodes?.some(comment => comment.body.includes(marker))
+    ) {
+      throw new Error(`Linear update readback failed: ${update.issueId}`);
+    }
+    outcomes.push({ updateId: update.id, status: 'verified' });
   }
   return { schema: RECONCILIATION_SCHEMA, eventId: receipt.eventId, outcomes };
 }

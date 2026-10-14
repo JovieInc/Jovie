@@ -2811,6 +2811,32 @@ class WorkerTest(unittest.TestCase):
         self.assertFalse(lane.failures_path(self.host).exists())
         self.assertEqual(self.execs, [])
 
+    def test_pr_recovery_hold_filters_every_selector_and_keeps_fresh_work_eligible(self):
+        blocked = {"number": 7, "headRefOid": "a" * 40}
+        fresh = {"number": 8, "headRefOid": "b" * 40}
+        lane.note_recovery_handoff(self.host, f"pr:7:{blocked['headRefOid']}")
+        seen = []
+        def check(prs):
+            seen.append([pr["number"] for pr in prs])
+            self.assertNotIn(7, seen[-1])
+        def event(host, module, name, prs):
+            check(prs)
+        def escalation(host, name, prs):
+            check(prs)
+        def polling(host, name, prs):
+            check(prs)
+            return fresh
+        with patch.object(lane, "fix_candidates", return_value=[blocked, fresh]), \
+                patch.object(lane, "lane_prs", return_value=[blocked]), \
+                patch.object(lane.pr_events, "queued_prs", return_value=[blocked]), \
+                patch.object(lane.pr_events, "claim_event_pr", side_effect=event), \
+                patch.object(lane, "claim_escalation_pr", side_effect=escalation), \
+                patch.object(lane, "claim_red_pr", side_effect=polling), \
+                patch.object(lane, "fix_red_pr") as repair:
+            self.assertEqual(lane.worker(self.host, "devin"), 0)
+        self.assertEqual(seen, [[], [8], [8]])
+        self.assertEqual(repair.call_args.args[-1], fresh)
+
     def test_recovery_handoff_keeps_an_accountable_disposition_without_spending_retries(self):
         handoff = lane.RecoveryHandoff("preserved-issue-needs-execution-reconciliation", Path("/retained"), "JOV-3")
         lane.run_issue = lambda *args: {"verdict": "recovery-handoff", "recovery": handoff.evidence}
@@ -4271,6 +4297,177 @@ class TerminalRevisitTest(unittest.TestCase):
             {"name": "lint", "conclusion": "SUCCESS", "detailsUrl": "https://x/actions/runs/33/job/4"}])
         self.assertTrue(lane._rerun_failed(pr))
         self.assertEqual([args[3] for args in self.calls if args[:3] == ["gh", "run", "rerun"]], ["11", "22"])
+
+
+class PrRecoveryCooldownTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.host = lane.Host(state=Path(self.tmp.name), repo=Path(self.tmp.name))
+        self.pr = {"number": 7, "headRefOid": "a" * 40, "headRefName": "codex/jov-7-20261014",
+                   "state": "OPEN", "isDraft": False, "isCrossRepository": False,
+                   "isInMergeQueue": False, "mergeStateStatus": "DIRTY", "labels": []}
+        self.path = self.host.state / "worktrees" / "retained"
+        self.path.mkdir(parents=True)
+        self.marker = self.path / lane.disk_guard.PRESERVED_REPAIR
+        self.marker.write_text("{}")
+        self.key = f"pr:7:{self.pr['headRefOid']}"
+
+    def test_same_head_recovery_is_refused_before_charge_and_claim(self):
+        lane.note_recovery_handoff(self.host, self.key)
+        with patch.object(lane, "load_providers", return_value={"codex": {}}), \
+                patch.object(lane, "claimed_elsewhere", return_value=False), \
+                patch.object(lane, "reconcile_fix_target", return_value=self.pr), \
+                patch.object(lane.pr_events, "charge_reentry", return_value=True) as charge, \
+                patch.object(lane, "post_claim") as claim:
+            self.assertIsNone(lane.claim_red_pr(self.host, "codex", [self.pr]))
+        charge.assert_not_called()
+        claim.assert_not_called()
+
+    def test_cooldown_written_during_fresh_event_read_is_rechecked_before_claim(self):
+        pr = {**self.pr, "eventKinds": ["conflict"]}
+        def fresh(target):
+            lane.note_recovery_handoff(self.host, self.key)
+            return target
+        with patch.object(lane, "load_providers", return_value={"codex": {}}), \
+                patch.object(lane, "claimed_elsewhere", return_value=False), \
+                patch.object(lane, "reconcile_fix_target", side_effect=fresh) as read, \
+                patch.object(lane.pr_events, "charge_reentry", return_value=True) as charge, \
+                patch.object(lane, "post_claim") as claim, patch.object(lane, "run_agent") as model:
+            self.assertIsNone(lane.pr_events.claim_event_pr(self.host, lane, "codex", [pr]))
+        read.assert_called_once()
+        charge.assert_not_called()
+        claim.assert_not_called()
+        model.assert_not_called()
+        self.assertFalse((self.host.state / "fix-attempts.json").exists())
+
+    def test_malformed_refund_evidence_does_not_raise_or_create_a_hold(self):
+        for value in (None, [], "bad", *({"sha": self.pr["headRefOid"], "repairVerdict": "recovery-handoff",
+                                          "noWorkRefund": refund} for refund in ([], "bad", {"at": "bad"}, {"reason": [], "at": 1000},
+                                                                 {"reason": "preserved-target-needs-reconciliation", "at": 10 ** 400}))):
+            with self.subTest(value=value):
+                (self.host.state / "fix-attempts.json").write_text(json.dumps({"7": value}))
+                self.assertFalse(lane.pr_recovery_held(self.host, self.pr, now=1001))
+
+    def test_malformed_cooldown_holds_only_its_head_without_starving_fresh_work(self):
+        fresh = {**self.pr, "number": 8, "headRefOid": "b" * 40}
+        for until in (10 ** 400, float("inf"), None, "bad"):
+            with self.subTest(until=str(until)[:20]):
+                lane.handoff_cooldown_path(self.host).write_text(json.dumps({self.key: {"until": until}}))
+                self.assertTrue(lane.pr_recovery_held(self.host, self.pr, now=1001))
+                self.assertFalse(lane.pr_recovery_held(self.host, fresh, now=1001))
+                with patch("time.time", return_value=1001), \
+                        patch.object(lane, "load_providers", return_value={"codex": {}}), \
+                        patch.object(lane, "claimed_elsewhere", return_value=False), \
+                        patch.object(lane, "reconcile_fix_target", return_value=fresh), \
+                        patch.object(lane.pr_events, "charge_reentry", return_value=True) as charge, \
+                        patch.object(lane, "post_claim") as claim:
+                    self.assertEqual(lane.claim_red_pr(self.host, "codex", [self.pr, fresh]), fresh)
+                self.assertEqual(charge.call_args.args[2], fresh)
+                claim.assert_called_once_with(8, fresh["headRefOid"], "fix")
+
+    def test_cooldown_has_new_head_expiry_and_reconciliation_exits(self):
+        lane.note_recovery_handoff(self.host, self.key, now=1000, preserved=self.path)
+        self.assertTrue(lane.pr_recovery_held(self.host, self.pr, now=1001))
+        self.assertFalse(lane.pr_recovery_held(self.host, {**self.pr, "headRefOid": "b" * 40}, now=1001))
+        self.assertFalse(lane.pr_recovery_held(self.host, self.pr, now=1300))
+        self.marker.unlink()
+        self.assertFalse(lane.pr_recovery_held(self.host, self.pr, now=1001))
+
+    def test_reentry_can_claim_after_new_head_expiry_or_safe_reconciliation(self):
+        for exit_kind in ("new-head", "expiry", "reconciled"):
+            with self.subTest(exit_kind=exit_kind):
+                lane.handoff_cooldown_path(self.host).unlink(missing_ok=True)
+                self.marker.write_text("{}")
+                lane.note_recovery_handoff(self.host, self.key, now=1000, preserved=self.path)
+                pr = {**self.pr, "headRefOid": "b" * 40} if exit_kind == "new-head" else self.pr
+                if exit_kind == "reconciled":
+                    self.marker.unlink()
+                with patch("time.time", return_value=1300 if exit_kind == "expiry" else 1001), \
+                        patch.object(lane, "load_providers", return_value={"codex": {}}), \
+                        patch.object(lane, "claimed_elsewhere", return_value=False), \
+                        patch.object(lane, "reconcile_fix_target", return_value=pr), \
+                        patch.object(lane.pr_events, "charge_reentry", return_value=True) as charge, \
+                        patch.object(lane, "post_claim") as claim:
+                    self.assertEqual(lane.claim_red_pr(self.host, "codex", [pr]), pr)
+                charge.assert_called_once()
+                claim.assert_called_once_with(pr["number"], pr["headRefOid"], "fix")
+
+    def test_recent_existing_no_work_refund_is_held_without_changing_its_count(self):
+        record = {"sha": self.pr["headRefOid"], "count": 0, "endedAt": 1000,
+                  "repairVerdict": "recovery-handoff",
+                  "noWorkRefund": {"reason": "preserved-target-needs-reconciliation", "at": 1000}}
+        path = self.host.state / "fix-attempts.json"
+        path.write_text(json.dumps({"7": record}))
+        before = path.read_bytes()
+        self.assertTrue(lane.pr_recovery_held(self.host, self.pr, now=1001))
+        self.assertFalse(lane.pr_recovery_held(self.host, self.pr, now=1300))
+        self.assertFalse(lane.pr_recovery_held(self.host, {**self.pr, "headRefOid": "b" * 40}, now=1001))
+        self.assertEqual(path.read_bytes(), before)
+
+    def test_refund_remains_correct_and_repeated_handoffs_use_existing_backoff(self):
+        attempts = self.host.state / "fix-attempts.json"
+        bank = self.host.state / "codex-accounts.json"
+        bank.write_text('{"fixture":{"credits":17}}')
+        for index in (1, 2):
+            attempts.write_text(json.dumps({"7": {"sha": self.pr["headRefOid"], "count": 1}}))
+            receipt = {"verdict": "recovery-handoff", "reasons": ["preserved-target-needs-reconciliation"],
+                       "recovery": {"worktree": str(self.path)}, "runId": f"run-{index}",
+                       "branch": self.pr["headRefName"], "headBefore": self.pr["headRefOid"]}
+            with patch("time.time", return_value=1000):
+                lane.end_local_fix_attempt(self.host, self.pr, receipt)
+            record = json.loads(attempts.read_text())["7"]
+            self.assertEqual(record["count"], 0)
+            self.assertEqual(receipt["attemptRefunded"], "preserved-target-needs-reconciliation")
+            row = json.loads(lane.handoff_cooldown_path(self.host).read_text())[self.key]
+            self.assertEqual(row["count"], index)
+            self.assertEqual(row["until"], 1000 + lane.HANDOFF_BACKOFF_S * 2 ** (index - 1))
+        self.assertEqual(bank.read_text(), '{"fixture":{"credits":17}}')
+
+    def test_cooldown_write_failure_cannot_lose_the_refund_or_ledger_receipt(self):
+        attempts = self.host.state / "fix-attempts.json"
+        attempts.write_text(json.dumps({"7": {"sha": self.pr["headRefOid"], "count": 1, "at": 900}}))
+        cooldown = lane.handoff_cooldown_path(self.host)
+        cooldown.write_text(json.dumps({self.key: {"count": 1, "until": 900}}))
+        write = lane.update_json
+        def fail_cooldown(path, change):
+            if path == cooldown:
+                record = json.loads(attempts.read_text())["7"]
+                self.assertEqual((record["count"], record["endedAt"]), (0, 1000))
+                self.assertEqual(record["noWorkRefund"]["reason"], "preserved-target-needs-reconciliation")
+                raise OSError("fixture cooldown write failure")
+            return write(path, change)
+        with patch("time.time", return_value=1000), patch.object(lane, "update_json", side_effect=fail_cooldown), \
+                patch.object(lane, "require_fix_target", return_value=self.pr), \
+                patch.object(lane, "execution_coordination", return_value=None), \
+                patch.object(lane, "retire_published_preserved", return_value=[]), \
+                patch.object(lane, "preserved_run",
+                             side_effect=lane.RecoveryHandoff("preserved-target-needs-reconciliation", self.path)), \
+                patch.object(lane, "archive_unresumable_preserved", return_value=None), \
+                patch.object(lane.execution_attempt, "claim") as claim, patch.object(lane, "run_agent") as model:
+            receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+        record = json.loads(attempts.read_text())["7"]
+        self.assertEqual((record["count"], record["endedAt"], record["repairRunId"]), (0, 1000, receipt["runId"]))
+        self.assertEqual(receipt["attemptRefunded"], "preserved-target-needs-reconciliation")
+        self.assertEqual(receipt["handoffCooldownError"], "OSError")
+        self.assertFalse(lane.pr_events.in_flight(record, self.pr, 1001))
+        ledger = [json.loads(row) for row in (self.host.state / "runs/ledger.jsonl").read_text().splitlines()]
+        self.assertEqual(ledger, [receipt])
+        self.assertEqual(ledger[0]["result"]["commit"], None)
+        claim.assert_not_called()
+        model.assert_not_called()
+        self.assertTrue(lane.pr_recovery_held(self.host, self.pr, now=1001))
+        self.assertFalse(lane.pr_recovery_held(self.host, self.pr, now=1300))
+        self.assertEqual(json.loads(cooldown.read_text())[self.key], {"count": 1, "until": 900})
+
+    def test_unknown_or_foreign_preserved_path_does_not_clear_the_cooldown(self):
+        lane.note_recovery_handoff(self.host, self.key, now=1000, preserved=self.path)
+        with patch.object(lane.Path, "lstat", side_effect=PermissionError):
+            self.assertTrue(lane.pr_recovery_held(self.host, self.pr, now=1001))
+        data = json.loads(lane.handoff_cooldown_path(self.host).read_text())
+        data[self.key]["preserved"] = str(self.host.state / "outside")
+        lane.handoff_cooldown_path(self.host).write_text(json.dumps(data))
+        self.assertTrue(lane.pr_recovery_held(self.host, self.pr, now=1001))
 
 
 class PreservedRecoveryTest(unittest.TestCase):

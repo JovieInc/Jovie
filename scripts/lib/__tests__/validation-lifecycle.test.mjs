@@ -11,6 +11,7 @@ import {
   lifecycleStatusKey,
   outcomeAcceptanceReasons,
   parseValidationReceipts,
+  RECORDED_RECEIPT_KINDS,
   selectBindingPull,
 } from '../validation-lifecycle.mjs';
 
@@ -85,6 +86,34 @@ describe('validation manifest', () => {
     expect(manifest.required.map(entry => entry.kind)).toEqual(['deployment']);
     expect(manifest.schema).toBe('jovie.validation-manifest/v1');
     expect(manifest.bindingSha).toBe(SHA_A);
+  });
+
+  it('honors an explicit machine audit without inferred UI rows', () => {
+    const manifest = manifestFor({
+      description: 'validation-required: screen-audit',
+    });
+    expect(manifest.required.map(entry => entry.kind)).toEqual([
+      'deployment',
+      'screen-audit',
+    ]);
+    expect(
+      decideValidationTransition({
+        state: STARTED,
+        manifest,
+        holds: [],
+        deployment: VERIFIED,
+        receipts: [],
+      }).target
+    ).toBe('Validating');
+    expect(
+      decideValidationTransition({
+        state: STARTED,
+        manifest,
+        holds: [],
+        deployment: VERIFIED,
+        receipts: [receipt({ kind: 'screen-audit' })],
+      }).target
+    ).toBe('Done');
   });
 
   it.each([
@@ -244,6 +273,50 @@ describe('validation manifest', () => {
 });
 
 describe('validation receipts', () => {
+  it.each(['outcome', 'screen-audit', 'human-certification', 'founder-taste'])(
+    'requires %s proof from the current episode',
+    kind => {
+      const manifest = manifestFor({
+        reopenedAfterDone: true,
+        receiptNotBefore: '2026-10-03T13:00:00Z',
+        description: `validation-required: ${kind}`,
+      });
+      const old = receipt({ kind });
+      const fresh = receipt({ kind, recordedAt: '2026-10-03T14:00:00Z' });
+      const base = {
+        state: STARTED,
+        manifest,
+        holds: [],
+        deployment: VERIFIED,
+      };
+      const currentOutcome = receipt({
+        kind: 'outcome',
+        recordedAt: '2026-10-03T14:00:00Z',
+      });
+      expect(
+        decideValidationTransition({
+          ...base,
+          receipts: [old, ...(kind === 'outcome' ? [] : [currentOutcome])],
+        }).target
+      ).toBe('Validating');
+      expect(
+        decideValidationTransition({
+          ...base,
+          receipts: [fresh, currentOutcome],
+        }).target
+      ).toBe('Done');
+      expect(
+        decideValidationTransition({
+          ...base,
+          receipts: [
+            receipt({ ...old, status: 'fail' }),
+            fresh,
+            currentOutcome,
+          ],
+        }).target
+      ).toBe('Done');
+    }
+  );
   const body = formatValidationReceipt({
     issue: 'jov-1',
     kind: 'outcome',
@@ -329,28 +402,32 @@ describe('validation receipts', () => {
     );
   });
 
-  it('ignores receipts for another issue, computed kinds, and malformed bodies', () => {
+  it('ignores other issues and computed kinds but retains malformed evidence as unknown', () => {
     const forged = body.replace('"kind":"outcome"', '"kind":"deployment"');
     const other = body.replace('JOV-1', 'JOV-2');
     expect(COMPUTED_RECEIPT_KINDS).toContain('deployment');
-    expect(
-      parseValidationReceipts(
-        [
-          { body: forged, createdAt: '2026-10-03T12:00:00Z' },
-          { body: other, createdAt: '2026-10-03T12:00:00Z' },
-          { body, createdAt: 'not a time' },
-          {
-            body: '<!-- validation-receipt:v1\n{not json}\n-->',
-            createdAt: '2026-10-03T12:00:00Z',
-          },
-          {
-            body: '<!-- validation-receipt:v1\n"text"\n-->',
-            createdAt: '2026-10-03T12:00:00Z',
-          },
-        ],
-        'JOV-1'
-      )
-    ).toEqual([]);
+    const parsed = parseValidationReceipts(
+      [
+        { body: forged, createdAt: '2026-10-03T12:00:00Z' },
+        { body: other, createdAt: '2026-10-03T12:00:00Z' },
+        { body, createdAt: 'not a time' },
+        {
+          body: '<!-- validation-receipt:v1\n{not json}\n-->',
+          createdAt: '2026-10-03T12:00:00Z',
+        },
+        {
+          body: '<!-- validation-receipt:v1\n"text"\n-->',
+          createdAt: '2026-10-03T12:00:00Z',
+        },
+      ],
+      'JOV-1'
+    );
+    expect(parsed).toHaveLength(8);
+    expect(parsed.every(receipt => receipt.status === 'invalid')).toBe(true);
+    expect(parsed.map(receipt => receipt.kind)).toEqual([
+      ...RECORDED_RECEIPT_KINDS,
+      ...RECORDED_RECEIPT_KINDS,
+    ]);
   });
 
   it.each([
