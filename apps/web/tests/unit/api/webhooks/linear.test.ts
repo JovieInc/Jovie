@@ -555,6 +555,81 @@ describe('POST /api/webhooks/linear', () => {
     ).toEqual(['quality-gap-scan', 'quality-gap-scan', 'quality-gap-scan']);
   });
 
+  it('wakes the compiler when Tim records a founder rescue in a defect comment', async () => {
+    mockAcquireRecentDispatch.mockResolvedValue({
+      acquired: true,
+      reason: 'acquired',
+    });
+    mockServerFetch.mockResolvedValue(new Response(null, { status: 204 }));
+    const { POST } = await import('@/app/api/webhooks/linear/route');
+    const body = JSON.stringify({
+      type: 'Comment',
+      action: 'create',
+      data: {
+        id: 'comment-founder-rescue',
+        body: 'Founder manually found the composed sidebar failed after the second transition.',
+        user: { name: 'Tim White' },
+        issue: {
+          id: 'issue-founder-rescue',
+          identifier: 'JOV-7207',
+          teamId: 'bdc09edc-f91c-4a06-b308-74b4fcf093f8',
+          state: { name: 'In Progress', type: 'started' },
+        },
+      },
+    });
+
+    const response = await POST(
+      new Request('https://example.com/api/webhooks/linear', {
+        method: 'POST',
+        headers: { 'linear-signature': sign(body) },
+        body,
+      }) as never
+    );
+
+    expect(await response.json()).toMatchObject({
+      dispatched: true,
+      eventId: eventId(body, 'quality-gap-input'),
+    });
+    expect(
+      JSON.parse(mockServerFetch.mock.calls[0]?.[1]?.body).event_type
+    ).toBe('quality-gap-scan');
+  });
+
+  it('wakes the compiler from a Tim rescue comment that only carries a JOV identifier', async () => {
+    mockAcquireRecentDispatch.mockResolvedValue({
+      acquired: true,
+      reason: 'acquired',
+    });
+    mockServerFetch.mockResolvedValue(new Response(null, { status: 204 }));
+    const { POST } = await import('@/app/api/webhooks/linear/route');
+    const body = JSON.stringify({
+      type: 'Comment',
+      action: 'create',
+      data: {
+        id: 'comment-founder-rescue-identifier-only',
+        body: 'Tim manually found the rail toggle dead after one cycle.',
+        user: { name: 'Tim White' },
+        issue: {
+          id: 'issue-founder-rescue-identifier-only',
+          identifier: 'JOV-7207',
+        },
+      },
+    });
+
+    const response = await POST(
+      new Request('https://example.com/api/webhooks/linear', {
+        method: 'POST',
+        headers: { 'linear-signature': sign(body) },
+        body,
+      }) as never
+    );
+
+    expect(await response.json()).toMatchObject({
+      dispatched: true,
+      eventId: eventId(body, 'quality-gap-input'),
+    });
+  });
+
   it('ignores receipts off JOV, open defects, unlabeled closes, non-state edits, and kept labels', async () => {
     const { POST } = await import('@/app/api/webhooks/linear/route');
     const closed = { id: 'done', name: 'Done', type: 'completed' };
@@ -577,6 +652,15 @@ describe('POST /api/webhooks/linear', () => {
         action: 'create',
         data: {
           body: 'plain comment',
+          issue: { id: 'issue-x', identifier: 'JOV-7003' },
+        },
+      },
+      {
+        type: 'Comment',
+        action: 'create',
+        data: {
+          body: 'Founder manually found this.',
+          user: { name: 'CodeRabbit' },
           issue: { id: 'issue-x', identifier: 'JOV-7003' },
         },
       },
