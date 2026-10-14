@@ -5623,6 +5623,8 @@ class FixRedTest(unittest.TestCase):
     def test_non_pushing_fix_runs_the_configured_second_attempt(self):
         real, real_excerpt = lane.sh, lane.failure_excerpt
         def fake(args, cwd=None, timeout=600, env=None, log=None):
+            if args == ["git", "rev-parse", "--verify", "HEAD"]:
+                return SimpleNamespace(returncode=0, stderr="", stdout="h1\n")
             if args[:2] == ["git", "ls-remote"]:
                 return SimpleNamespace(returncode=0, stderr="", stdout="h1\trefs/heads/devin/jov-1\n")
             if args[:3] == ["git", "worktree", "add"]:
@@ -5645,6 +5647,8 @@ class FixRedTest(unittest.TestCase):
         real_sh, real_excerpt, real_resolve = lane.sh, lane.failure_excerpt, lane.resolve_generated_conflict
 
         def fake(args, cwd=None, timeout=600, env=None, log=None):
+            if args == ["git", "rev-parse", "--verify", "HEAD"]:
+                return SimpleNamespace(returncode=0, stderr="", stdout="h1\n")
             if args[:2] == ["git", "ls-remote"]:
                 return SimpleNamespace(returncode=0, stderr="", stdout="h1\trefs/heads/devin/jov-1\n")
             if args[:3] == ["git", "worktree", "add"]:
