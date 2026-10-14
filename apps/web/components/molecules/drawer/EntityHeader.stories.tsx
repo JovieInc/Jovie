@@ -121,6 +121,7 @@ export const BrokenPerson: Story = {
 const COMPLETE_ARTWORK = '/img/releases/never-say-a-word.jpg';
 
 export const IdentityStates: Story = {
+  args: { title: 'Entity identity' },
   render: () => (
     <div className='flex w-full flex-col gap-5'>
       <EntityHeader
