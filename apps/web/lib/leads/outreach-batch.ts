@@ -15,6 +15,7 @@ import {
 } from 'drizzle-orm';
 import { getAppUrl } from '@/constants/domains';
 import { db } from '@/lib/db';
+import { runLegacyDbTransaction } from '@/lib/db/legacy-transaction';
 import { contactEvidenceReviews } from '@/lib/db/schema/contacts';
 import { leadPipelineSettings, leads } from '@/lib/db/schema/leads';
 import { captureError } from '@/lib/error-tracking';
@@ -178,7 +179,7 @@ async function claimOutreachLeads(
   const claimCutoff = new Date(now.getTime() - OUTREACH_QUEUE_CLAIM_TTL_MS);
   const pendingEmailWhereClause = getPendingEmailWhereClause(now);
 
-  return db.transaction(async tx => {
+  return runLegacyDbTransaction(async tx => {
     const lockRows = await tx.execute<{ locked: boolean }>(
       drizzleSql`SELECT pg_try_advisory_xact_lock(${OUTREACH_BATCH_ADVISORY_LOCK_KEY}) AS locked`
     );
