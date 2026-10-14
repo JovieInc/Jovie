@@ -40,8 +40,43 @@ import {
   stripGitFetchNoise,
   structuralConcurrency,
   structuralLocks,
+  VALIDATION_LIFECYCLE_COVERAGE_COMMAND,
   webCiContractTestsCommand,
 } from '../../ci-fast-lanes.mjs';
+
+it('enforces lifecycle coverage through the real structural selector', async () => {
+  const commands = [];
+  await runStructural({
+    execute: command => {
+      commands.push(command);
+      return { code: 0, output: '' };
+    },
+  });
+  expect(
+    commands.filter(
+      command => command === VALIDATION_LIFECYCLE_COVERAGE_COMMAND
+    )
+  ).toHaveLength(1);
+  for (const test of [
+    'validation-lifecycle',
+    'validation-sync',
+    'linear-sync-on-merge',
+    'founder-taste-order',
+  ]) {
+    expect(VALIDATION_LIFECYCLE_COVERAGE_COMMAND).toContain(
+      `lib/__tests__/${test}.test.mjs`
+    );
+  }
+  expect(VALIDATION_LIFECYCLE_COVERAGE_COMMAND).toContain(
+    '--coverage.thresholds.perFile=true'
+  );
+  expect(VALIDATION_LIFECYCLE_COVERAGE_COMMAND).toContain(
+    '--coverage.thresholds.lines=90'
+  );
+  expect(VALIDATION_LIFECYCLE_COVERAGE_COMMAND).toContain(
+    '--coverage.thresholds.branches=75'
+  );
+});
 
 describe('Shared fenced-attempt coverage contract', () => {
   it('runs existing fenced-attempt and lane regressions in the real structural selector', () => {
