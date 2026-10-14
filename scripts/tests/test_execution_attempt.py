@@ -505,6 +505,23 @@ class InterruptedAppendTest(unittest.TestCase):
         self.assertFalse(attempt.resume(self.path, self.ident, start["fencingToken"], owner(), 104, self.coord)["admitted"])
         rows, _ = attempt._github_rows(self.coord, self.ident)
         self.assertEqual((len(rows), attempt._usage(rows, 104)["spend"], rows[-1]["terminalState"]), (3, 1, "failed_unknown"))
+    def test_late_original_boundary_response_cannot_cross_a_pending_unknown_terminal_seal(self):
+        start = self.claim(); interleaved = []
+        def recover_then_crash(phase, point, body):
+            if (phase, point) == ("after", "append"):
+                row = json.loads(self.tags[body["sha"]]["message"])["candidate"]
+                if row["event"] == "attempt_finished": raise self.Interrupted()
+            if (phase, point) == ("before", "status") and "boundary_admitted" in body["description"] and not interleaved:
+                interleaved.append(True)
+                with self.assertRaises(self.Interrupted): self.claim(now=102, who=owner("helper"))
+        self.hook = recover_then_crash
+        with self.assertRaisesRegex(RuntimeError, "stale-fencing-token"):
+            attempt.boundary(self.path, self.ident, start["fencingToken"], {"spend": 1}, 101, self.coord, boundary_id="dispatch")
+        self.hook = lambda *_: None
+        self.assertEqual(len(self.statuses), 2, "the helper died before projecting its reserved terminal")
+        self.assertFalse(attempt.resume(self.path, self.ident, start["fencingToken"], owner(), 103, self.coord)["admitted"])
+        rows, _ = attempt._github_rows(self.coord, self.ident)
+        self.assertEqual((attempt._usage(rows, 103)["spend"], rows[-1]["terminalState"]), (1, "failed_unknown"))
     def test_concurrent_boundary_helpers_share_one_terminal_barrier_and_never_admit(self):
         start = self.claim(); self.interrupt = ("after", "append")
         with self.assertRaises(self.Interrupted):

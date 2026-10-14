@@ -289,13 +289,15 @@ def _locked(path: Path, ident: dict, coordination: dict | None, fn, *, now=None)
         if len(additions) != 1: raise RuntimeError("execution-coordinator-non-atomic-append")
         event_id = _github_append(coordination, ident, additions[0], head)
         if event_id is None: continue
-        canonical, _ = _github_rows(coordination, ident)
+        canonical, canonical_head = _github_rows(coordination, ident)
         winner = next((row for row in canonical if row.get("_remote", {}).get("eventId") == event_id), None)
         if winner:
             _file_locked(path, lambda _rows: (None, [winner]))
-            if isinstance(result, dict) and result.get("admitted") and any(row.get("terminalState") in TERMINAL or row.get("event") == "completion_fenced"
-                or (row.get("event") == "attempt_finished" and row.get("fencingToken") == winner.get("fencingToken")) for row in canonical):
-                raise RuntimeError("stale-fencing-token")
+            if isinstance(result, dict) and result.get("admitted"):
+                if (canonical[-1] is not winner or any(row.get("terminalState") in TERMINAL or row.get("event") == "completion_fenced"
+                    or (row.get("event") == "attempt_finished" and row.get("fencingToken") == winner.get("fencingToken")) for row in canonical)
+                    or IMMUTABLE_WRITER_ENABLED and _read_ref(coordination, _append_ref(ident, canonical_head)) is not None):
+                    raise RuntimeError("stale-fencing-token")
             return result
     raise RuntimeError("execution-coordinator-contention")
 def _for(rows: list[dict], ident: dict) -> list[dict]: return [row for row in rows if row["identityDigest"] == ident["identityDigest"]]
