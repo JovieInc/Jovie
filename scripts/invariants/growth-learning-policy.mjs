@@ -6,8 +6,10 @@ export const APP_REVIEW_READOUT_SCHEMA = 'app-review-readout/v1';
 /** Read-only adapter for the existing learning loop, never an experiment engine.
  * Feed sanitized aggregate snapshots from the maintained provider connectors.
  * No customer/health payloads, provider calls, randomization, or live mutations.
+ * @param {{ now?: Date | string }} [options]
  */
-export function assessAppReviewReadout(snapshot, { now = new Date() } = {}) {
+export function assessAppReviewReadout(snapshot, options = {}) {
+  const { now = new Date() } = options;
   const errors = [];
   const checkKeys = (value, allowed, scope) => {
     if (value && typeof value === 'object') {
@@ -48,7 +50,7 @@ export function assessAppReviewReadout(snapshot, { now = new Date() } = {}) {
     ['interruptionReports', 'repeatRequestViolations', 'privacyIncidents'],
     'guardrails'
   );
-  const nowMs = Date.parse(now);
+  const nowMs = now instanceof Date ? now.getTime() : Date.parse(now);
   if (!Number.isFinite(nowMs)) errors.push('evaluation-time-invalid');
   if (snapshot?.schema !== APP_REVIEW_READOUT_SCHEMA)
     errors.push('schema-invalid');
