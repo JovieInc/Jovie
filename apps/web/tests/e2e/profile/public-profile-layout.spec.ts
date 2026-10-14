@@ -362,6 +362,74 @@ async function collectLayoutMetrics(page: Page) {
   });
 }
 
+async function readSelectorGeometry(page: Page) {
+  return page.evaluate(() => {
+    const rail = document.querySelector<HTMLElement>(
+      '[data-testid="profile-bottom-nav"]'
+    );
+    const lens = document.querySelector<HTMLElement>(
+      '[data-testid="profile-bottom-nav-indicator"]'
+    );
+    const tabs = Array.from(
+      document.querySelectorAll<HTMLButtonElement>(
+        '[data-testid="profile-bottom-nav"] button'
+      )
+    );
+
+    if (!rail || !lens || tabs.length !== 4) return null;
+
+    const box = (element: HTMLElement) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+        left: rect.left,
+        width: rect.width,
+        height: rect.height,
+        centerX: rect.left + rect.width / 2,
+      };
+    };
+
+    return {
+      rail: box(rail),
+      lens: box(lens),
+      tabs: tabs.map(tab => ({
+        label: tab.getAttribute('aria-label'),
+        ...box(tab),
+      })),
+    };
+  });
+}
+
+async function waitForSelectorAt(page: Page, activeIndex: number) {
+  await expect(
+    page.getByTestId('profile-bottom-nav-indicator')
+  ).toHaveAttribute('data-active-index', String(activeIndex));
+  await expect
+    .poll(
+      async () => {
+        const geometry = await readSelectorGeometry(page);
+        if (!geometry) return false;
+        const target = geometry.tabs[activeIndex];
+        return (
+          Math.abs(geometry.lens.centerX - target.centerX) <= 0.75 &&
+          Math.abs(geometry.lens.width - target.width) <= 0.75
+        );
+      },
+      {
+        timeout: 5_000,
+        message: `Expected selector lens to settle on tab ${activeIndex}`,
+      }
+    )
+    .toBe(true);
+
+  const geometry = await readSelectorGeometry(page);
+  expect(geometry).not.toBeNull();
+  if (!geometry) throw new Error('profile selector geometry is unavailable');
+  return geometry;
+}
+
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe('Public profile /tim layout hardening @regression', () => {
@@ -405,6 +473,82 @@ test.describe('Public profile /tim layout hardening @regression', () => {
         target.height,
         `${target.label} should stay at least 44px tall`
       ).toBeGreaterThanOrEqual(44);
+    }
+  });
+
+  test('selector reaches both rail edges across canonical compact widths', async ({
+    page,
+  }, testInfo) => {
+    const selectorViewports = VIEWPORTS.filter(viewport =>
+      ['320x568', '390x844', '768x1024'].includes(viewport.id)
+    );
+    const tabNames = ['Home', 'Music', 'Events', 'About'] as const;
+
+    for (const viewport of selectorViewports) {
+      // The admission fixture renders the same canonical BottomTabBar without
+      // making geometry coverage depend on mutable artist or provider data.
+      await prepareProfileAdmissionFixture(page, viewport);
+
+      const positions = [];
+      for (const [activeIndex, tabName] of tabNames.entries()) {
+        if (activeIndex > 0) {
+          await page
+            .getByRole('button', { name: tabName, exact: true })
+            .click();
+        }
+        const geometry = await waitForSelectorAt(page, activeIndex);
+        positions.push(geometry);
+
+        const target = geometry.tabs[activeIndex];
+        expect(
+          Math.abs(geometry.lens.centerX - target.centerX),
+          `${viewport.id} ${tabName} lens should center on its 44px target`
+        ).toBeLessThanOrEqual(0.75);
+        expect(target.width).toBeGreaterThanOrEqual(44);
+        expect(target.height).toBeGreaterThanOrEqual(44);
+      }
+
+      const first = positions[0];
+      const last = positions[positions.length - 1];
+      const topInset = first.lens.top - first.rail.top;
+      const bottomInset = first.rail.bottom - first.lens.bottom;
+      const leftInset = first.lens.left - first.rail.left;
+      const rightInset = last.rail.right - last.lens.right;
+
+      expect(Math.abs(topInset - bottomInset)).toBeLessThanOrEqual(0.75);
+      expect(
+        Math.abs(leftInset - topInset),
+        `${viewport.id} Home face should reach the left rail edge optically`
+      ).toBeLessThanOrEqual(0.75);
+      expect(
+        Math.abs(rightInset - topInset),
+        `${viewport.id} About face should reach the right rail edge optically`
+      ).toBeLessThanOrEqual(0.75);
+
+      await page.evaluate(
+        labels => {
+          for (const label of labels) {
+            document
+              .querySelector<HTMLButtonElement>(
+                `[data-testid="profile-bottom-nav"] button[aria-label="${label}"]`
+              )
+              ?.click();
+          }
+        },
+        ['Home', 'Events', 'Music', 'About']
+      );
+      await waitForSelectorAt(page, 3);
+
+      const screenshotPath = testInfo.outputPath(
+        `jov-6571-selector-${viewport.id}.png`
+      );
+      await page.getByTestId('profile-bottom-nav').screenshot({
+        path: screenshotPath,
+      });
+      await testInfo.attach(`jov-6571-selector-${viewport.id}`, {
+        path: screenshotPath,
+        contentType: 'image/png',
+      });
     }
   });
 
