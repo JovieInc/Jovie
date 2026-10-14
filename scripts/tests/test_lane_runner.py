@@ -9335,6 +9335,33 @@ class RemediationEventRecoveryTest(unittest.TestCase):
         self.assertEqual(len(final['priorAttempts']), 20)
         self.assertEqual(len(final['attempts']), 1)
 
+    def test_consumed_version_survives_delayed_terminal_then_completed_comment(self):
+        for state, stamp in ((None, None), ('canceled', '2026-10-13T01:00:00Z'),
+                             ('cancelled', '2026-10-13T01:00:00Z'), ('canceled', None),
+                             ('canceled', 'invalid'), ('canceled', '2026-10-15T00:00:00Z')):
+            with self.subTest(terminal=state, version=stamp):
+                self.observe_completion(self.spent_event())
+                self.reopen()
+                with patch.object(lane.time, 'time', return_value=100):
+                    lane.claim_remediation_events(self.host, self.linear)
+                first = lane.load_escalation(self.host)['events']['delivery-stalled']
+                if state:
+                    self.issue['state'] = {'type': state, 'name': state}
+                    self.issue['updatedAt'] = stamp
+                    lane.claim_remediation_events(self.host, self.linear)
+                # The completed read is also from before the consumed reopen.
+                self.issue['state'] = {'type': 'completed', 'name': 'Done'}
+                self.issue['updatedAt'] = '2026-10-13T02:00:00Z'
+                lane.claim_remediation_events(self.host, self.linear)
+                self.reopen()
+                with patch.object(lane.time, 'time', return_value=200):
+                    lane.claim_remediation_events(self.host, self.linear)
+                final = lane.load_escalation(self.host)['events']['delivery-stalled']
+                self.assertEqual(final['attempts'], first['attempts'])
+                self.assertEqual(final['priorAttempts'], first['priorAttempts'])
+                expected = stamp if stamp == '2026-10-15T00:00:00Z' else '2026-10-14T00:00:00Z'
+                self.assertEqual(final['completedGeneration']['consumedAt'], expected)
+
     def test_canceled_observation_invalidates_pending_completion_generation(self):
         spent = self.spent_event()
         self.observe_completion(spent)

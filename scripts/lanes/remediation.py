@@ -1319,7 +1319,10 @@ def plan_labeled_events(issues: list, recorded: dict | None, providers: dict, no
                             row["completedGeneration"] = {"issueId": closed.get("id"), "updatedAt": closed["updatedAt"],
                                                           "team": (closed.get("team") or {}).get("key")}
                     elif completed:
-                        row["completedGeneration"] = {**completed, "consumed": True, "consumedAt": closed.get("updatedAt")}
+                        row["completedGeneration"] = {**completed, "consumed": True}
+                        # Delayed/unknown terminal reads cannot lower the accepted version.
+                        if closed_at is not None and (completed_at is None or closed_at > completed_at):
+                            row["completedGeneration"]["consumedAt"] = closed["updatedAt"]
                 row["status"] = "done"
                 row["running"] = False
                 events[fingerprint] = row
