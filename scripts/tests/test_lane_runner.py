@@ -1922,6 +1922,14 @@ class RunIssueTest(unittest.TestCase):
         self.assertEqual(receipt["execution"]["retryDecision"], "stop")
         self.assertEqual(self.ledger()[-1]["result"], receipt["result"])
 
+    def test_issue_cleanup_keeps_the_branch_when_its_worktree_is_retained(self):
+        lane.verify_and_land = lambda *a, **k: {"verdict": "no-change", "reasons": []}
+        with patch.object(lane, "remove_worktree", return_value=False), \
+                patch.object(lane, "sh", wraps=lane.sh) as shell:
+            lane.run_issue(self.host, "devin", {"cmd": ["true"]}, FakeLinear([]), issue())
+        self.assertFalse(any(call.args[0][:3] == ["git", "branch", "-D"]
+                             for call in shell.call_args_list))
+
     def test_deferred_or_reused_gate_does_not_quarantine_completed_implementation(self):
         for index, verdict in enumerate(("gate-in-progress", "gate-deferred", "gate-already-completed")):
             with self.subTest(verdict=verdict):
@@ -3635,12 +3643,18 @@ class DispatchTest(unittest.TestCase):
     def test_unprotected_worktree_removal_does_not_kill_processes_by_path(self):
         with tempfile.TemporaryDirectory() as tmp:
             fake = FakeShell([])
-            with patch.object(lane, "sh", side_effect=fake):
+
+            def shell(args, **kwargs):
+                result = fake(args, **kwargs)
+                if args[:2] == ["git", "rev-parse"]:
+                    result.stdout = "a" * 40
+                return result
+
+            with patch.object(lane, "sh", side_effect=shell):
                 lane.remove_worktree(lane.Host(state=Path(tmp), repo=Path(tmp)), Path(tmp))
-            self.assertEqual(fake.calls, [["lsof", "-nP", "-a", "-d", "cwd", "-F", "pn"],
-                                          ["git", "status", "--porcelain", *lane.disk_guard.SOURCE_PATHSPEC],
-                                          ["git", "rev-list", "--count", "HEAD", "--not", "--all"],
-                                          ["git", "worktree", "remove", "--force", tmp]])
+            self.assertFalse(any(call[0] == "pkill" for call in fake.calls))
+            self.assertIn(["git", "rev-list", "--count", "a" * 40, "--not", "--remotes=origin"], fake.calls)
+            self.assertIn(["git", "worktree", "remove", "--force", tmp], fake.calls)
 
     def test_removal_is_journaled_before_the_remove_runs(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -3653,6 +3667,8 @@ class DispatchTest(unittest.TestCase):
             def shell(args, **kwargs):
                 if args[:3] == ["git", "worktree", "remove"]:
                     self.assertTrue(journal.exists(), "the receipt precedes the destructive call")
+                if args[:2] == ["git", "rev-parse"]:
+                    return SimpleNamespace(returncode=0, stdout="a" * 40, stderr="")
                 if args[:2] == ["git", "rev-list"]:
                     return SimpleNamespace(returncode=0, stdout="0", stderr="")
                 return SimpleNamespace(returncode=0, stdout="", stderr="")
@@ -3671,6 +3687,8 @@ class DispatchTest(unittest.TestCase):
 
             def shell(args, **kwargs):
                 calls.append(args)
+                if args[:2] == ["git", "rev-parse"]:
+                    return SimpleNamespace(returncode=0, stdout="a" * 40, stderr="")
                 if args[:2] == ["git", "rev-list"]:
                     return SimpleNamespace(returncode=0, stdout="0", stderr="")
                 return SimpleNamespace(returncode=0, stdout="", stderr="")
@@ -3726,6 +3744,8 @@ class DispatchTest(unittest.TestCase):
             path.mkdir(parents=True)
 
             def shell(args, **kwargs):
+                if args[:2] == ["git", "rev-parse"]:
+                    return SimpleNamespace(returncode=0, stdout="a" * 40, stderr="")
                 if args[:2] == ["git", "rev-list"]:
                     return SimpleNamespace(returncode=0, stdout="2", stderr="")
                 return SimpleNamespace(returncode=0, stdout="", stderr="")
@@ -3806,6 +3826,147 @@ class DispatchTest(unittest.TestCase):
 
 
 TERMINAL_NOW = 2_000_000_000.0
+
+
+class WorktreePublicationTest(unittest.TestCase):
+    """Real local Git refs must never stand in for publication to origin."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        root = Path(self.tmp.name)
+        self.origin, self.repo = root / "origin.git", root / "repo"
+        self.git(root, "init", "--bare", str(self.origin))
+        self.git(root, "init", "-b", "main", str(self.repo))
+        self.git(self.repo, "config", "user.email", "fixture@example.test")
+        self.git(self.repo, "config", "user.name", "Publication fixture")
+        self.git(self.repo, "config", "commit.gpgsign", "false")
+        (self.repo / "base.py").write_text("published = True\n")
+        self.git(self.repo, "add", "base.py")
+        self.git(self.repo, "commit", "-qm", "published base")
+        self.git(self.repo, "remote", "add", "origin", str(self.origin))
+        self.git(self.repo, "push", "-q", "origin", "main")
+        self.host = lane.Host(state=root / "state", repo=self.repo)
+        self.path = self.host.state / "worktrees/candidate"
+        self.path.parent.mkdir(parents=True)
+        idle = patch.object(lane, "worktree_busy", return_value=None)
+        idle.start()
+        self.addCleanup(idle.stop)
+
+    def git(self, cwd, *args):
+        return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True,
+                              check=True, timeout=10).stdout.strip()
+
+    def candidate(self, *, detached=False, unpublished=True):
+        args = ["--detach"] if detached else ["-b", "candidate"]
+        self.git(self.repo, "worktree", "add", "-q", *args, str(self.path), "main")
+        if unpublished:
+            (self.path / "repair.py").write_text("valuable_source = True\n")
+            self.git(self.path, "add", "repair.py")
+            self.git(self.path, "commit", "-qm", "unpublished repair")
+        return self.git(self.path, "rev-parse", "HEAD")
+
+    def assert_preserved(self, reason):
+        self.assertTrue(self.path.exists())
+        self.assertTrue((self.path / lane.disk_guard.PRESERVED_REPAIR).exists())
+        rows = [json.loads(line) for line in
+                (self.host.state / "runs/worktree-removals.jsonl").read_text().splitlines()]
+        self.assertEqual((rows[-1]["verdict"], rows[-1]["reason"]), ("preserved", reason))
+
+    def test_clean_unpublished_branch_remains_reachable(self):
+        head = self.candidate()
+        self.assertEqual(self.git(self.path, "rev-list", "--count", "HEAD", "--not", "--all"), "0")
+        self.assertFalse(lane.remove_worktree(self.host, self.path))
+        self.assert_preserved("unpublished-work")
+        self.assertEqual(self.git(self.repo, "rev-parse", "candidate"), head)
+
+    def test_clean_unpublished_detached_head_is_preserved(self):
+        head = self.candidate(detached=True)
+        self.assertFalse(lane.remove_worktree(self.host, self.path))
+        self.assert_preserved("unpublished-work")
+        self.assertEqual(self.git(self.path, "rev-parse", "HEAD"), head)
+
+    def test_published_clean_worktree_can_retire(self):
+        self.candidate()
+        self.git(self.path, "push", "-q", "origin", "HEAD:refs/heads/candidate")
+        with patch.object(lane.worktree_pool, "recycle", return_value=None):
+            self.assertTrue(lane.remove_worktree(self.host, self.path))
+        self.assertFalse(self.path.exists())
+
+    def test_deleted_origin_branch_is_not_stale_publication_proof(self):
+        self.candidate()
+        self.git(self.path, "push", "-q", "origin", "HEAD:refs/heads/candidate")
+        self.git(self.repo, "fetch", "-q", "origin")
+        self.git(self.origin, "update-ref", "-d", "refs/heads/candidate")
+        self.assertEqual(self.git(self.path, "rev-list", "--count", "HEAD", "--not", "--remotes=origin"), "0")
+        self.assertFalse(lane.remove_worktree(self.host, self.path))
+        self.assert_preserved("unpublished-work")
+
+    def test_unknown_publication_preserves_source(self):
+        self.candidate(unpublished=False)
+        real_sh = lane.sh
+        for mode in ("fetch-error", "fetch-timeout", "head-error", "head-empty",
+                     "rev-list-error", "malformed-count"):
+            with self.subTest(mode=mode):
+                (self.path / lane.disk_guard.PRESERVED_REPAIR).unlink(missing_ok=True)
+
+                def shell(args, **kwargs):
+                    if args[:2] == ["git", "fetch"] and mode.startswith("fetch"):
+                        if mode == "fetch-timeout":
+                            raise subprocess.TimeoutExpired(args, 30)
+                        return SimpleNamespace(returncode=1, stdout="", stderr="origin unavailable")
+                    if args[:2] == ["git", "rev-list"] and mode in {"rev-list-error", "malformed-count"}:
+                        return SimpleNamespace(returncode=int(mode == "rev-list-error"), stdout="unknown", stderr="")
+                    if args[:2] == ["git", "rev-parse"] and mode.startswith("head"):
+                        return SimpleNamespace(returncode=int(mode == "head-error"), stdout="", stderr="")
+                    return real_sh(args, **kwargs)
+
+                with patch.object(lane, "sh", side_effect=shell):
+                    self.assertFalse(lane.remove_worktree(self.host, self.path))
+                self.assert_preserved("publication-unverified")
+
+    def test_new_commit_after_publication_proof_is_preserved(self):
+        self.candidate(unpublished=False)
+        real_sh = lane.sh
+
+        def shell(args, **kwargs):
+            result = real_sh(args, **kwargs)
+            if args[:2] == ["git", "rev-list"]:
+                (self.path / "late.py").write_text("late_source = True\n")
+                self.git(self.path, "add", "late.py")
+                self.git(self.path, "commit", "-qm", "late unpublished source")
+            return result
+
+        with patch.object(lane, "sh", side_effect=shell):
+            self.assertFalse(lane.remove_worktree(self.host, self.path))
+        self.assert_preserved("cleanup-source-unverified")
+
+    def test_new_source_edit_during_origin_read_is_preserved(self):
+        self.candidate(unpublished=False)
+        real_sh = lane.sh
+
+        def shell(args, **kwargs):
+            result = real_sh(args, **kwargs)
+            if args[:2] == ["git", "fetch"]:
+                (self.path / "late.py").write_text("late_source = True\n")
+            return result
+
+        with patch.object(lane, "sh", side_effect=shell):
+            self.assertFalse(lane.remove_worktree(self.host, self.path))
+        self.assert_preserved("cleanup-source-unverified")
+
+    def test_new_owner_during_origin_read_is_preserved(self):
+        self.candidate(unpublished=False)
+        with patch.object(lane, "worktree_busy", side_effect=[None, "process-still-running"]):
+            self.assertFalse(lane.remove_worktree(self.host, self.path))
+        self.assert_preserved("cleanup-not-idle:process-still-running")
+
+    def test_prune_preserves_unpublished_source_even_if_marker_write_fails(self):
+        self.candidate()
+        os.utime(self.path, (0, 0))
+        with patch.object(lane, "preserve_repair"):
+            lane.prune_worktrees(self.host)
+        self.assertEqual((self.path / "repair.py").read_text(), "valuable_source = True\n")
 
 
 class TerminalRevisitTest(unittest.TestCase):
@@ -3998,7 +4159,13 @@ class PreservedRecoveryTest(unittest.TestCase):
         real = lane.sh
         def shell(args, **kwargs):
             self.calls.append(args)
-            if args[:2] == ["git", "fetch"] or args[0] == "gh":
+            if args[:2] == ["git", "fetch"]:
+                if "+refs/heads/*:refs/remotes/origin/*" in args:
+                    # The fixture's authoritative ls-remote head must also appear
+                    # in a refreshed origin inventory before cleanup can trust it.
+                    self.git(self.host.repo, "update-ref", "refs/remotes/origin/devin/jov-1", self.live["headRefOid"])
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+            if args[0] == "gh":
                 return SimpleNamespace(returncode=0, stdout="", stderr="")
             if args[:2] == ["git", "ls-remote"]:
                 return SimpleNamespace(returncode=0, stdout=self.live["headRefOid"], stderr="")
