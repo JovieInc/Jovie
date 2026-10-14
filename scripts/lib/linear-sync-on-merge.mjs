@@ -543,7 +543,10 @@ const ISSUE_FIELDS = `
       nodes { body createdAt }
       pageInfo { hasNextPage endCursor }
     }
-    children(first: 50) { nodes { identifier state { type } } }
+    children(first: 50) {
+      nodes { identifier completedAt canceledAt state { type } }
+      pageInfo { hasNextPage }
+    }
     attachments(first: 50) { nodes { url } }
     history(first: 100) {
       nodes { createdAt fromState { type } toState { type } }
@@ -584,7 +587,7 @@ const SWEEP_QUERY = `query LifecycleSweep($states: [String!]!, $after: String) {
     after: $after
     filter: { team: { key: { eq: "JOV" } }, state: { name: { in: $states } } }
   ) {
-    nodes { identifier updatedAt state { name } attachments(first: 50) { nodes { url } } }
+    nodes { identifier updatedAt state { name } attachments(first: 50) { nodes { url } } children(first: 1) { nodes { identifier } } labels(first: 50) { nodes { name } } }
     pageInfo { hasNextPage endCursor }
   }
 }`;
@@ -675,6 +678,30 @@ async function readLifecycleIssue(fetchImpl, apiKey, lookupId) {
   const childNodes = Array.isArray(raw.children?.nodes)
     ? raw.children.nodes
     : [];
+  if (
+    !Array.isArray(raw.children?.nodes) ||
+    raw.children?.pageInfo?.hasNextPage !== false
+  ) {
+    throw new Error(
+      `Child delivery evidence for ${raw.identifier} is incomplete`
+    );
+  }
+  const childDeliveryTimes = childNodes
+    .filter(child => ['completed', 'canceled'].includes(child?.state?.type))
+    .map(child =>
+      Date.parse(
+        String(
+          child.state.type === 'completed'
+            ? child.completedAt
+            : child.canceledAt
+        )
+      )
+    );
+  if (childDeliveryTimes.some(time => !Number.isFinite(time))) {
+    throw new Error(
+      `Child delivery timestamp for ${raw.identifier} is unknown`
+    );
+  }
   return {
     ...snapshot,
     state: {
@@ -695,6 +722,13 @@ async function readLifecycleIssue(fetchImpl, apiKey, lookupId) {
       .filter(Boolean),
     reopenedAfterDone: reopens.length > 0,
     receiptNotBefore,
+    ...(childDeliveryTimes.length > 0
+      ? {
+          outcomeNotBefore: new Date(
+            Math.max(...childDeliveryTimes)
+          ).toISOString(),
+        }
+      : {}),
     attachmentUrls: (raw.attachments?.nodes ?? [])
       .map(node => String(node?.url ?? ''))
       .filter(Boolean),
@@ -893,7 +927,12 @@ export async function syncLinearIssueOnMerge(options = {}) {
   }
 
   const lookups = [];
-  if (sweep) {
+  const receiptIssue = String(env.LINEAR_VALIDATION_ISSUE ?? '').toUpperCase();
+  if (sweep && IDENTIFIER_RE.test(receiptIssue)) {
+    // A receipt for parent-only commissioning work need not have a PR.
+    // Read exactly its canonical record; the evaluator still owns admission.
+    lookups.push(receiptIssue);
+  } else if (sweep) {
     /** @type {{ identifier: string, updatedAt: string }[]} */
     const found = [];
     let after = null;
@@ -914,6 +953,10 @@ export async function syncLinearIssueOnMerge(options = {}) {
         // into the lifecycle or interpreting age/status as completion.
         if (
           ['In Progress', 'In Review'].includes(node.state?.name) &&
+          !(node.children?.nodes?.length > 0) &&
+          !(node.labels?.nodes ?? []).some(label =>
+            /epic|commission/i.test(label?.name ?? '')
+          ) &&
           !(node.attachments?.nodes ?? []).some(attachment =>
             String(attachment.url ?? '')
               .toLowerCase()
