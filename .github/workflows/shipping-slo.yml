@@ -77,7 +77,9 @@ jobs:
           if [ "$EVENT_NAME" != 'workflow_dispatch' ] && [ "$(date -u +%u)" != '1' ]; then
             exit 0
           fi
-          node scripts/postmortem-review.mjs --apply --mirror \
+          # JOV-INV-042: scheduled reconciliation is read-only in Linear;
+          # Quality Gap Finder owns event-driven control/class issue writes.
+          node scripts/postmortem-review-report.mjs \
             --out "$RUNNER_TEMP/postmortem-review.json" > /dev/null
           echo "ran=true" >> "$GITHUB_OUTPUT"
 
