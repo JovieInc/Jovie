@@ -666,8 +666,11 @@ print(json.dumps(result))
     def cli(self, command, *, enabled=False, **fields):
         request = {"command": command, "path": str(self.root / "ledger.jsonl"), "ident": self.ident,
                    "coordination": self.coord, **fields}
+        # One CLI transition verifies several immutable objects through real
+        # tracked helpers (13 calls for claim, 22 for an ambiguous boundary).
+        # Bound the whole fixture without imposing a 10s budget on all helpers.
         result = subprocess.run([sys.executable, str(self.enabled if enabled else MODULE)], input=json.dumps(request),
-                                capture_output=True, text=True, env=self.env, timeout=10)
+                                capture_output=True, text=True, env=self.env, timeout=30)
         return result.returncode, json.loads(result.stdout)
     def claim(self, *, enabled=False):
         return self.cli("claim", enabled=enabled, owner=owner(), policy=policy(), trigger={"triggerId": "same"}, now=100)
