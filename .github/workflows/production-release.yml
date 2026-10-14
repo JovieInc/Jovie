@@ -3,8 +3,9 @@ name: Production Release
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Symphony
 # capability-gap: Forward-only release lineage must prove that an authorized SHA
-#   is still an ancestor of main; that ancestry lives only behind the GitHub
-#   compare API, because every job checks out the exact release SHA, not main.
+#   is still an ancestor of main. Jobs check out the release SHA, not main.
+#   The staging-alias recheck uses the compare API, then git, when REST is
+#   unavailable. The other rechecks still read lineage through the compare API.
 # revisit-trigger: Revisit when the controller carries lineage on its own
 #   workflow_run payload or promotion moves to a webhook-dispatched writer.
 
@@ -578,19 +579,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           EXPECTED_SHA: ${{ inputs.expected_sha }}
         run: |
-          set -euo pipefail
-          current_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
-          [[ "$current_sha" =~ ^[0-9a-f]{40}$ ]] || {
-            echo "::error::GitHub returned an invalid main HEAD at staging alias."
-            exit 1
-          }
-          if [ "$current_sha" != "$EXPECTED_SHA" ] &&
-            [ "$(gh api "repos/${{ github.repository }}/compare/${EXPECTED_SHA}...${current_sha}" --jq '.status // empty')" != "ahead" ]; then
-            echo "::notice::Release $EXPECTED_SHA left main's lineage (main is $current_sha) at staging alias."
-            echo "is_current=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "is_current=true" >> "$GITHUB_OUTPUT"
-          fi
+          bash "$GITHUB_WORKSPACE/.github/scripts/recheck-main-lineage.sh" "at staging alias"
       - name: Alias verified deployment
         if: ${{ steps.head.outputs.is_current == 'true' }}
         env:

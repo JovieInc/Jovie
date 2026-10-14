@@ -756,15 +756,39 @@ describe('forward-only release lineage', () => {
       'gh',
       `#!/bin/sh
 case "$*" in
-  *compare/*) printf '%s\\n' "$STUB_COMPARE_STATUS" ;;
-  *) printf '%s\\n' "$STUB_MAIN_SHA" ;;
+  *compare/*)
+    if [ "\${STUB_COMPARE_FAILURES:-0}" -gt 0 ]; then
+      echo "gh: API rate limit exceeded for installation." >&2
+      exit 1
+    fi
+    printf '%s\\n' "$STUB_COMPARE_STATUS"
+    ;;
+  *)
+    n=0
+    [ -f "$STUB_MAIN_ATTEMPTS" ] && n="$(cat "$STUB_MAIN_ATTEMPTS")"
+    n=$((n + 1))
+    printf '%s' "$n" > "$STUB_MAIN_ATTEMPTS"
+    if [ "$n" -le "$STUB_MAIN_FAILURES" ]; then
+      echo "gh: API rate limit exceeded for installation." >&2
+      exit 1
+    fi
+    printf '%s\\n' "$STUB_MAIN_SHA"
+    ;;
 esac
 `
     );
   }
 
-  function runRecheck(jobKey, stepName, mainSha, compareStatus) {
+  function runRecheck(
+    jobKey,
+    stepName,
+    mainSha,
+    compareStatus,
+    mainFailures = 0,
+    extraEnv = {}
+  ) {
     const fixture = makeFixture('lineage-recheck-');
+    const attempts = join(fixture.root, 'main-attempts');
     stubLineageGh(fixture.bin);
     const script = materialize(
       getStepRunScript(getJobBlock(RELEASE_WORKFLOW, jobKey), stepName),
@@ -773,10 +797,21 @@ esac
     const result = runScript(script, fixture, {
       EXPECTED_SHA,
       EXPECTED_MAIN_SHA: EXPECTED_SHA,
+      GITHUB_REPOSITORY: 'JovieInc/Jovie',
+      STUB_COMPARE_FAILURES: '0',
       STUB_COMPARE_STATUS: compareStatus,
+      STUB_MAIN_ATTEMPTS: attempts,
+      STUB_MAIN_FAILURES: String(mainFailures),
       STUB_MAIN_SHA: mainSha,
+      ...extraEnv,
     });
-    return { result, outputs: parseOutputs(fixture.output) };
+    return {
+      attempts: existsSync(attempts)
+        ? Number(readFileSync(attempts, 'utf8'))
+        : 0,
+      result,
+      outputs: parseOutputs(fixture.output),
+    };
   }
 
   it.each(RECHECK_STEPS)(
@@ -798,6 +833,98 @@ esac
     },
     30_000
   );
+
+  function makeLineageRemote(mode) {
+    const root = mkdtempSync(join(tmpdir(), 'lineage-remote-'));
+    tempRoots.push(root);
+    const src = join(root, 'src');
+    mkdirSync(src);
+    const git = args => {
+      const result = spawnSync('git', args, {
+        cwd: src,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          GIT_AUTHOR_NAME: 'Lineage',
+          GIT_AUTHOR_EMAIL: 'lineage@example.com',
+          GIT_COMMITTER_NAME: 'Lineage',
+          GIT_COMMITTER_EMAIL: 'lineage@example.com',
+        },
+      });
+      if (result.status !== 0) {
+        throw new Error(`${args.join(' ')}\n${result.stderr || result.stdout}`);
+      }
+      return result.stdout.trim();
+    };
+    git(['init', '-q', '-b', 'main']);
+    writeFileSync(join(src, 'file'), 'base\n');
+    git(['add', 'file']);
+    git(['commit', '-qm', 'base']);
+    const base = git(['rev-parse', 'HEAD']);
+    if (mode === 'ahead') {
+      writeFileSync(join(src, 'file'), 'child\n');
+      git(['commit', '-qam', 'child']);
+    } else if (mode === 'diverged') {
+      git(['checkout', '-q', '--orphan', 'rewritten']);
+      writeFileSync(join(src, 'other'), 'other\n');
+      git(['add', 'other']);
+      git(['commit', '-qm', 'rewritten']);
+      git(['branch', '-M', 'main']);
+    }
+    return { remote: src, base, tip: git(['rev-parse', 'HEAD']) };
+  }
+
+  function runRateLimitedAlias(mode) {
+    const remote = makeLineageRemote(mode);
+    const expected = mode === 'exact' ? remote.tip : remote.base;
+    return runRecheck(
+      'alias-staging',
+      'Recheck main immediately before staging alias',
+      remote.tip,
+      'identical',
+      9,
+      {
+        EXPECTED_SHA: expected,
+        EXPECTED_MAIN_SHA: expected,
+        MAIN_LINEAGE_REMOTE: remote.remote,
+        STUB_COMPARE_FAILURES: '1',
+      }
+    );
+  }
+
+  it('resolves an unchanged main through git when REST is rate limited', () => {
+    const current = runRateLimitedAlias('exact');
+    expect(current.result.status, current.result.stderr).toBe(0);
+    expect(current.attempts).toBe(1);
+    expect(current.outputs.is_current).toBe('true');
+  });
+
+  it('keeps the staging alias when rate-limited REST still has an ancestor main', () => {
+    const current = runRateLimitedAlias('ahead');
+    expect(current.result.status, current.result.stderr).toBe(0);
+    expect(current.attempts).toBe(1);
+    expect(current.outputs.is_current).toBe('true');
+  });
+
+  it('yields the staging alias when rate-limited REST shows main left the release', () => {
+    const current = runRateLimitedAlias('diverged');
+    expect(current.result.status, current.result.stderr).toBe(0);
+    expect(current.outputs.is_current).toBe('false');
+  });
+
+  it('fails closed when the pre-alias main read stays unavailable', () => {
+    const unavailable = runRecheck(
+      'alias-staging',
+      'Recheck main immediately before staging alias',
+      EXPECTED_SHA,
+      'identical',
+      9,
+      { MAIN_LINEAGE_REMOTE: join(tmpdir(), 'missing-lineage-remote') }
+    );
+    expect(unavailable.result.status).toBe(1);
+    expect(unavailable.attempts).toBe(1);
+    expect(unavailable.outputs.is_current).toBeUndefined();
+  });
 
   function runPromote(mainSha, compareStatus) {
     const fixture = makeFixture('lineage-promote-');
