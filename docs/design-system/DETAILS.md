@@ -1104,3 +1104,12 @@ the JSX-comment form for a text child).
 ## Shell
 
 EVENT: icon/emoji glyphs are transparent at rest. A hover background must be circular, with equal dimensions and full rounding, owned by `IconGlyphFrame`. Keep an interactive parent's focus ring, hit target, accessible name, tooltip, and selected/pressed semantics. Do not put a rounded-square plate behind the glyph. Semantic status badges, avatars, and complete text actions keep their existing contracts. This applies to Jovie, Ovie, and generated marketing previews. EVENT: tooltips share the canonical compact surface, viewport-safe full wrapping, and 300ms discovery/300ms warm-up timing. Default nested providers reuse the app timing scope; explicit isolated notices and fixtures retain their own timing. History titles use single-line ellipsis with reserved date/action tracks; tooltips preserve the full clean display title.
+
+## Entity identity (founder-locked 2026-10-13)
+
+EVENT: one primary shared treatment: circular people, complete square release
+art, calendar events. This supersedes tentative square-person wording. Shared
+owners handle fallbacks, accessible names and source-backed verification;
+density and layout remain supported variants. Provider provenance is not Jovie
+verification. See the [owner map and consumer contract](entity-identity.md).
+The executable `semantic-entity-identity` invariant lives in `canon/invariants.jsonl`.

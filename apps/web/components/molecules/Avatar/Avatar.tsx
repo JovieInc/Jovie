@@ -56,9 +56,10 @@ function generateInitials(name?: string): string {
   return getInitials(name);
 }
 
-const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
+const AvatarImage = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
   {
     src,
+    alt,
     name,
     size = 'md',
     shape = 'person',
@@ -116,18 +117,15 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
           size={size}
           shape={shape}
           data-slot='app-avatar'
-          className='text-primary-token shadow-sm transition-colors duration-subtle'
-          aria-hidden='true'
+          role={alt ? 'img' : undefined}
+          aria-label={alt || undefined}
+          aria-hidden={alt ? undefined : true}
         >
-          <BaseAvatarFallback
-            size={size}
-            shape={shape}
-            className='font-medium leading-none select-none text-primary-token'
-          >
+          <BaseAvatarFallback size={size} shape={shape}>
             {initials}
           </BaseAvatarFallback>
         </BaseAvatar>
-        {verified && (
+        {verified && shape === 'person' && (
           <span className='absolute -bottom-0.5 -right-0.5'>
             <VerifiedBadge size={badgeSize} />
           </span>
@@ -149,11 +147,9 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
         size={size}
         shape={shape}
         data-slot='app-avatar'
-        className={cn(
-          'text-primary-token shadow-sm transition-colors duration-subtle',
-          isLoaded && 'bg-surface-1'
-        )}
-        aria-hidden='true'
+        role={alt ? 'img' : undefined}
+        aria-label={alt || undefined}
+        aria-hidden={alt ? undefined : true}
       >
         <Image
           src={src}
@@ -188,7 +184,7 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
         )}
       </BaseAvatar>
 
-      {verified && (
+      {verified && shape === 'person' && (
         <span className='absolute -bottom-0.5 -right-0.5'>
           <VerifiedBadge size={badgeSize} />
         </span>
@@ -196,6 +192,13 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
     </div>
   );
 });
+
+const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(
+  function Avatar(props, ref) {
+    // A changed source starts a fresh loading/failure state without changing geometry.
+    return <AvatarImage key={props.src ?? ''} {...props} ref={ref} />;
+  }
+);
 
 AvatarComponent.displayName = 'Avatar';
 

@@ -223,7 +223,7 @@ export function BottomTabBar({
       <nav
         aria-label='Profile Navigation'
         data-testid='profile-bottom-nav'
-        className='profile-liquid-glass-nav h-8 rounded-full border px-1'
+        className='profile-liquid-glass-nav h-8 rounded-full border px-px'
       >
         <div
           className='profile-liquid-glass-nav__grid relative -my-1.5 grid h-11 items-center'

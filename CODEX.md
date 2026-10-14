@@ -1,95 +1,90 @@
-# Codex Setup Guide for Jovie
+# Codex setup for Jovie
 
-Read and obey [`/canon/OPERATING_SYSTEM.md`](canon/OPERATING_SYSTEM.md) first. It defines how to think; this file defines Codex-specific setup and execution.
+Read `canon/OPERATING_SYSTEM.md` and `AGENTS.md` first. Codex uses the same
+canonical local bootstrap as humans and Claude: `bash scripts/codex-setup.sh`
+delegates to `scripts/setup.sh`. The wrapper selects the source-pinned Node
+runtime from nvm when already installed, including in non-interactive desktop
+hook shells. Current pins are Node 24.21.0 and pnpm 9.15.9.
 
-This repo uses the shared Jovie setup and archive scripts for Codex. Keep Codex-specific files as thin wrappers so they cannot drift from `/canon/OPERATING_SYSTEM.md`, `CLAUDE.md` (and its `AGENTS.md` symlink), the scoped rules under `.claude/rules/`, `conductor.json`, or the scripts humans run locally.
+## Desktop worktrees and hooks
 
-Codex agents should treat `/canon/OPERATING_SYSTEM.md` plus `CLAUDE.md`/`AGENTS.md` as the canonical instruction prefix and keep task-specific context in the user prompt or invoked skills. Do not copy large gstack skill preambles into Codex-specific files; use the generated Codex skill output or the source `.tmpl` files when modifying the skill system.
+`.codex/config.toml` enables `features.hooks`. `.codex/hooks.json` runs setup
+on SessionStart and a cleanup report on Stop. Hooks resolve their script from
+the Git root so sessions started in a subdirectory use the same entrypoint.
 
-## Automatic Local Setup
+`.codex/environments/environment.toml` supplies desktop worktree setup,
+cleanup, and common actions using the app's `script` and `[[actions]]` schema.
+The previous `local-env.toml` used unsupported `commands` and action-table
+fields; it has been replaced. Platform overrides use `win32`, `darwin`, and
+`linux`. Windows setup delegates to `scripts/setup.ps1`.
 
-Codex project config lives in `.codex/`:
+Codex requires review and trust of each new or changed hook definition through
+`/hooks`. A checked-in hook file or feature flag is not proof that it ran.
+Do not fabricate trust hashes or bypass hook review. Manual setup remains
+available before trust.
 
-- `.codex/config.toml` enables Codex lifecycle hooks.
-- `.codex/hooks.json` runs `scripts/codex-setup.sh` on `SessionStart`.
-- `.codex/hooks.json` runs `scripts/codex-cleanup.sh` on `Stop`.
-- `.codex/local-env.toml` points Codex app worktree setup and common actions at the same wrappers.
+The normal setup path also attempts bounded GBrain health/index maintenance.
+That is best effort and does not retrieve prior decisions or prove durable
+writeback. Query GBrain explicitly before exploration; write durable findings
+and verify the same slug after non-trivial work. Report failures as gaps.
 
-Codex hooks are currently a Codex lifecycle feature and may not run on every platform. If hooks are unavailable, run the same scripts manually.
+## Secret-free cloud coding
 
-The setup and cleanup wrappers also run `scripts/codex-gbrain-sync.sh`. That script performs a bounded `gbrain doctor --fast --json` check and, when local GBrain is healthy, runs the incremental GBrain sync path so Codex refreshes the repo/code index and curated gstack artifacts at session start and task stop. The hook is best effort: a missing, unhealthy, locked, or slow GBrain setup is reported but does not block Codex setup or cleanup.
+The existing cloud coding lane prepares dependencies without Doppler, remote
+database access, service provisioning, or placeholder secrets. Set
+`JOVIE_CODEX_SECRET_FREE=1` in that environment. The same setup wrapper then
+runs `scripts/codex-cloud-setup.mjs`, including in SessionStart, and does not
+enter the authenticated local setup or GBrain maintenance path.
 
-## Manual Setup
+Install and activate the Node and pnpm versions from `.nvmrc` and
+`package.json.packageManager` before invoking the bootstrap. pnpm must be
+available. The bootstrap verifies both exact pins and runs frozen dependency
+installation with optional browser/ONNX downloads disabled. An install or
+version failure propagates; setup never labels it as success.
 
-Run this from the repository root on every fresh worktree:
+Setup shell exports do not persist into later cloud command shells. Retain
+the toolchain on disk and activate its PATH in the cloud Start skill. Refresh
+frozen dependencies after a checkout or lockfile change. Until the checkout
+contains the secret-free wrapper, use the environment's dependency-only
+install script and disable repository hooks for nested CLI invocations with
+`-c features.hooks=false`.
 
-```bash
-./scripts/codex-setup.sh
-```
+Authenticated web tests/builds, browser E2E, database/migration checks, native
+builds, and release acceptance require their own environments and receipts.
+A dependency bootstrap does not certify them.
 
-On Windows PowerShell, use the Git Bash wrapper:
+## Cleanup and archive
 
-```powershell
-.\scripts\setup.ps1
-```
+`bash scripts/codex-cleanup.sh` defaults to a report. Stop always forces this
+mode, even if optional cleanup flags or `--apply` are supplied. It preserves
+worktrees, source, dependencies, runtime allocations, caches, Git packs, and
+shared Git registrations. A turn ending is not an allocation release.
 
-`scripts/codex-setup.sh` delegates to the canonical bootstrap:
+Explicit `--apply` can retain completed generated artifacts under their
+existing policy. Optional E2E cleanup requires both `--apply` and
+`CODEX_CLEANUP_E2E_USERS=1`; the legacy Clerk cleanup does not delete Better
+Auth users. `CODEX_ARCHIVE_ON_STOP=1` cannot make Stop delete a workspace.
+`scripts/archive.sh` reports candidates and preserves unreleased allocations.
+For managed Codex worktrees, use Codex's archive operation to save a recoverable
+Git snapshot before removing the checkout.
 
-```bash
-./scripts/setup.sh
-```
+## Models and verification
 
-That script verifies Node.js 24.x, pnpm 9.15.9, ripgrep, Doppler, GitHub CLI auth, installs dependencies, clears stale Turbopack cache, and checks the configured Doppler environment. Authentication uses self-hosted Better Auth; local test users are provisioned through the app database.
+Start general implementation with GPT-6.1 Sol at medium and Claude Code with
+Opus 5.5 at medium. Increase effort for a measured correctness gap. Keep model
+choice in user/account configuration rather than forcing it on every teammate.
+CLI profiles can preserve a focused cheaper model, deeper Sol reasoning, and
+an Astra option. Discover supported models and efforts from the active client;
+public provider documentation alone does not prove account access.
 
-## Cleanup
+**Ship now:** medium effort as the routine starting point. **Re-evaluate when:**
+representative tasks regress in correctness or require repeated repair.
+**Then:** compare a higher effort or stronger model on those same tasks.
 
-Codex stop hooks run:
-
-```bash
-./scripts/codex-cleanup.sh
-```
-
-By default this only performs safe, lightweight cleanup:
-
-- prune stale git worktree metadata
-- clear stale Turbopack cache entries
-
-Optional heavier cleanup is controlled by environment flags:
-
-```bash
-CODEX_CLEANUP_E2E_USERS=1 ./scripts/codex-cleanup.sh
-CODEX_ARCHIVE_ON_STOP=1 ./scripts/codex-cleanup.sh
-```
-
-`CODEX_CLEANUP_E2E_USERS=1` invokes the retired E2E cleanup script through Doppler; it reports that Clerk cleanup is retired and does not delete Better Auth users. `CODEX_ARCHIVE_ON_STOP=1` delegates to `scripts/archive.sh`, which removes build artifacts and dependencies for archived workspaces.
-
-## Required Tooling
-
-| Tool | Required Version |
-|------|------------------|
-| Node.js | 24.x (24.21.0+) |
-| pnpm | 9.15.9 |
-| Doppler CLI | Required for secret-bound commands |
-| GitHub CLI | Required for PR and GitHub automation |
-
-## Common Commands
-
-Always run commands from the repo root.
-
-```bash
-pnpm run dev:web:fast
-pnpm run test:web
-pnpm run build
-pnpm run typecheck
-pnpm lint
-```
-
-Commands that need secrets must use the repo wrappers or an explicit Doppler prefix:
-
-```bash
-doppler run --project jovie-web --config dev -- <command>
-```
-
-## Scoped Rules
-
-Codex agents follow the same rules as Claude. The canonical entry point is `CLAUDE.md`/`AGENTS.md`, which points to topic-scoped files under `.claude/rules/` (environment, auth, db, ui, security, release, testing, infra, code-style, linear, gstack). Read the relevant rule before editing the topic it covers.
+The CI bootstrap coverage command exercises version mismatches, missing tools,
+install errors/signals, environment preservation, and SessionStart JSON:
+`node --test --experimental-test-coverage
+--test-coverage-include=scripts/codex-cloud-setup.mjs --test-coverage-lines=90
+--test-coverage-branches=90 --test-coverage-functions=100
+scripts/codex-cloud-setup.test.mjs`. Source PR and structural CI use the same
+gate. Existing retention tests separately exercise cleanup/archive safety.

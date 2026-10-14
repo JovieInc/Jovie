@@ -2,9 +2,9 @@
 
 // @coverage-via apps/web/components/molecules/drawer/EntityHeader.test.tsx
 import { getAvatarArtworkRadiusClassName, getInitials } from '@jovie/ui';
-import Image from 'next/image';
+import { Calendar } from 'lucide-react';
 import type { ComponentType, ReactNode } from 'react';
-import { useState } from 'react';
+import { ReleaseArtworkThumb } from '@/components/atoms/ReleaseArtworkThumb';
 import {
   STABLE_HEADER_LINE_CLAMP_CLASSNAME,
   STABLE_HEADER_TITLE_HEIGHT_CLASSNAME,
@@ -12,8 +12,10 @@ import {
   type StableHeaderLineCount,
   StableHeaderTextSlot,
 } from '@/components/atoms/StableHeaderSlots';
+import { VerifiedBadge } from '@/components/atoms/VerifiedBadge';
 import { Tooltip } from '@/components/shell/Tooltip';
 import { cn } from '@/lib/utils';
+import { DrawerMediaThumb } from './DrawerMediaThumb';
 
 /**
  * EntityHeader — the ONE right-rail identity header shared by every entity
@@ -33,92 +35,132 @@ import { cn } from '@/lib/utils';
  */
 
 export const ENTITY_HEADER_THUMBNAIL_SIZE_PX = 56;
-const ENTITY_HEADER_THUMBNAIL_SIZE_CLASSNAME = 'size-14';
 
-export type EntityHeaderThumbnailVariant = 'artwork' | 'person' | 'connection';
+export type EntityHeaderThumbnailVariant =
+  | 'artwork'
+  | 'person'
+  | 'event'
+  | 'connection';
 
 export interface EntityHeaderThumbnailProps {
-  /** `artwork` = release/song art (rounded square, never cropped); `person` =
-   * contact/fan avatar (circle); `connection` = provider glyph (circle). */
+  /** Semantic identity: circular people, complete square artwork, calendar events. */
   readonly variant: EntityHeaderThumbnailVariant;
   readonly src?: string | null;
+  /** Empty alt explicitly makes the media decorative beside a visible title. */
   readonly alt?: string;
-  /** Used for initials fallback (person) and default alt text. */
   readonly name?: string;
-  /** Provider glyph rendered for the `connection` variant. */
+  /** Density belongs to the consumer; semantics and fallback belong here. */
+  readonly size?: number;
+  readonly priority?: boolean;
+  /** Only a source-backed Jovie profile verification flag; never connection status. */
+  readonly verified?: boolean;
+  readonly eventDate?: string | null;
   readonly icon?: ReactNode;
-  /** Overrides the default fallback content shown when no image resolves. */
-  readonly fallback?: ReactNode;
   readonly className?: string;
   readonly 'data-testid'?: string;
 }
 
-/** Canonical 56px identity thumbnail — release art never crops; people are circles. */
+function eventDateStamp(value?: string | null) {
+  if (!value) return null;
+  const date = new Date(
+    /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00Z` : value
+  );
+  if (Number.isNaN(date.getTime())) return null;
+  return {
+    month: date
+      .toLocaleString('en-US', { month: 'short', timeZone: 'UTC' })
+      .toUpperCase(),
+    day: date.toLocaleString('en-US', { day: 'numeric', timeZone: 'UTC' }),
+  };
+}
+
+/** One identity/media treatment, independent of the surrounding card anatomy. */
 export function EntityHeaderThumbnail({
   variant,
   src,
   alt,
   name,
+  size = ENTITY_HEADER_THUMBNAIL_SIZE_PX,
+  priority = false,
+  verified = false,
+  eventDate,
   icon,
-  fallback,
   className,
   'data-testid': testId,
 }: EntityHeaderThumbnailProps) {
-  const [failedSrc, setFailedSrc] = useState<string | null>(null);
-  const resolvedSrc = src && src !== failedSrc ? src : null;
-
-  if (variant === 'connection') {
-    return (
-      <div
-        data-testid={testId}
-        data-entity-header-thumbnail-variant={variant}
-        className={cn(
-          ENTITY_HEADER_THUMBNAIL_SIZE_CLASSNAME,
-          'grid shrink-0 place-items-center rounded-full bg-surface-2 text-secondary-token',
-          className
-        )}
-      >
-        {icon}
-      </div>
-    );
-  }
-
-  const shapeClassName =
-    variant === 'person'
-      ? 'rounded-full'
-      : getAvatarArtworkRadiusClassName(ENTITY_HEADER_THUMBNAIL_SIZE_PX);
-  const defaultFallback =
-    variant === 'person' ? (
-      <span className='text-sm font-semibold tracking-tight text-secondary-token'>
-        {getInitials(name ?? '')}
-      </span>
-    ) : null;
+  const label = alt ?? name ?? '';
+  const stamp = variant === 'event' ? eventDateStamp(eventDate) : null;
+  const circular = variant === 'person' || variant === 'connection';
+  const shape = circular
+    ? 'rounded-full'
+    : getAvatarArtworkRadiusClassName(size);
 
   return (
     <div
       data-testid={testId}
       data-entity-header-thumbnail-variant={variant}
       className={cn(
-        ENTITY_HEADER_THUMBNAIL_SIZE_CLASSNAME,
-        'relative shrink-0 overflow-hidden bg-surface-1 outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10',
-        shapeClassName,
+        'relative shrink-0',
+        size === 56 && 'size-14',
+        shape,
         className
       )}
+      style={{ width: size, height: size }}
     >
-      {resolvedSrc ? (
-        <Image
-          src={resolvedSrc}
-          alt={alt ?? name ?? ''}
-          fill
-          sizes={`${ENTITY_HEADER_THUMBNAIL_SIZE_PX}px`}
-          className={variant === 'artwork' ? 'object-contain' : 'object-cover'}
-          onError={() => setFailedSrc(src ?? null)}
+      {variant === 'person' ? (
+        <DrawerMediaThumb
+          src={src}
+          alt={label}
+          dimension={size}
+          sizes={`${size}px`}
+          sizeClassName='h-full w-full'
+          className='rounded-full'
+          imageClassName='rounded-full'
+          priority={priority}
+          fallback={
+            <span className='text-sm font-semibold tracking-tight text-secondary-token'>
+              {getInitials(name ?? '')}
+            </span>
+          }
         />
+      ) : variant === 'artwork' ? (
+        <ReleaseArtworkThumb src={src} alt={label} size={size} />
       ) : (
-        <div className='flex h-full w-full items-center justify-center'>
-          {fallback ?? defaultFallback}
+        <div
+          role='img'
+          aria-label={label || undefined}
+          aria-hidden={label ? undefined : true}
+          className={cn(
+            'flex h-full w-full flex-col items-center justify-center bg-surface-2 text-secondary-token',
+            shape
+          )}
+        >
+          {variant === 'connection' ? (
+            icon
+          ) : stamp ? (
+            <>
+              <span className='text-3xs font-semibold leading-none'>
+                {stamp.month}
+              </span>
+              <span
+                className={cn(
+                  'font-semibold leading-none tabular-nums',
+                  size >= 48 ? 'text-xl' : 'text-xs'
+                )}
+              >
+                {stamp.day}
+              </span>
+            </>
+          ) : (
+            <Calendar className='h-5 w-5' aria-hidden='true' />
+          )}
         </div>
       )}
+      {variant === 'person' && verified ? (
+        <span className='absolute -bottom-0.5 -right-0.5'>
+          <VerifiedBadge size={size >= 64 ? 'lg' : 'sm'} />
+        </span>
+      ) : null}
     </div>
   );
 }

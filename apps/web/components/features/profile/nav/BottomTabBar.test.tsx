@@ -247,7 +247,8 @@ describe('BottomTabBar — grid layout', () => {
     const { container } = render(<BottomTabBar {...makeProps()} />);
     const nav = screen.getByTestId('profile-bottom-nav');
     expect(nav.className).toContain('h-8');
-    expect(nav.className).toContain('px-1');
+    expect(nav.className).toContain('px-px');
+    expect(nav.className).not.toContain('px-1');
     expect(nav.className).not.toContain('p-1');
     expect(nav.className).toContain('rounded-full');
 

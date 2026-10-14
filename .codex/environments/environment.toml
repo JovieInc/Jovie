@@ -1,0 +1,31 @@
+version = 1
+name = "Jovie"
+
+[setup]
+script = "bash scripts/codex-setup.sh"
+
+[setup.win32]
+script = "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\setup.ps1"
+
+[cleanup]
+script = "bash scripts/codex-cleanup.sh --dry-run"
+
+[[actions]]
+name = "Run"
+icon = "run"
+command = "bash scripts/codex-setup.sh --run run dev:web:local"
+
+[[actions]]
+name = "Test"
+icon = "test"
+command = "bash scripts/codex-setup.sh --run run test:web"
+
+[[actions]]
+name = "Typecheck"
+icon = "tool"
+command = "bash scripts/codex-setup.sh --run run typecheck"
+
+[[actions]]
+name = "Cleanup report"
+icon = "tool"
+command = "bash scripts/codex-cleanup.sh --dry-run"

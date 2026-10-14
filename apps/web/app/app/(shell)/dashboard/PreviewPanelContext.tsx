@@ -28,6 +28,8 @@ export interface PreviewPanelLink {
 }
 
 export interface PreviewPanelData {
+  /** Source profile verification, independent of connected providers. */
+  isVerified?: boolean;
   username: string;
   displayName: string;
   avatarUrl: string | null;
