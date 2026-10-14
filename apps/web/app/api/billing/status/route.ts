@@ -181,7 +181,9 @@ function buildStaleBillingStatusPayload(
 export async function GET() {
   try {
     // Check authentication
-    const { userId } = await getCachedAuth();
+    // Billing state is an access-control read. A revoked database session must
+    // not be resurrected by Better Auth's signed cookie cache.
+    const { userId } = await getCachedAuth({ session: 'fresh' });
     if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
