@@ -6,6 +6,7 @@ Run with:
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import os
 import sys
@@ -15,6 +16,7 @@ import unittest
 from unittest.mock import ANY, patch
 from types import SimpleNamespace
 from pathlib import Path
+from contextlib import redirect_stdout
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location("codex_lane", ROOT / "scripts/lanes/codex_lane.py")
@@ -769,6 +771,147 @@ class RunTest(Isolated):
         self.assertTrue(all(row["schema"] == "jovie-provider-lease/v1" and
                             row["accountClass"] == "chatgpt-oauth" and
                             row["event"] == "account-leased" for row in self.lease_events))
+
+
+class CompletionBankTest(Isolated):
+    """Order overlapping runs deterministically through the real locked state writer."""
+    START = 1_000_000.0
+
+    def setUp(self):
+        super().setUp()
+        self.clock = self.START
+        self.patchers = [
+            patch.dict(os.environ, {"CODEX_LANE_AUTH_MODE": "current-login",
+                                    "CODEX_LANE_LOGIN_SLOTS": "2",
+                                    "CODEX_HOME": str(Path(self.tmp.name) / "login")}),
+            patch.object(codex.time, "time", side_effect=lambda: self.clock),
+            patch.object(codex, "maybe_redeem", side_effect=AssertionError("no reset credit authority")),
+        ]
+        for patcher in self.patchers:
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        self.receipt = Path(self.tmp.name) / "provider.jsonl"
+
+    def complete(self, output="OK\n", code=0, during_wait=None, account="current-login"):
+        handle = codex.lease(account)
+        self.assertIsNotNone(handle, "two overlapping runs must hold distinct native slots")
+        def wait():
+            if during_wait:
+                during_wait()
+            return code
+        proc = SimpleNamespace(pid=123, stdin=io.StringIO(), stdout=io.StringIO(output), wait=wait)
+        with patch.object(codex.subprocess, "Popen", return_value=proc), redirect_stdout(io.StringIO()):
+            result = codex.run_account(account, handle, ["fake-codex"], "fixture", self.tmp.name,
+                                       self.clock, str(self.receipt))
+        self.assertTrue(handle.closed)
+        return result
+
+    def diagnostic(self, account="current-login"):
+        row = codex.read_state()[account]
+        return {key: row.get(key) for key in ("exhaustedUntil", "lastKind", "lastError", "lastExit", "lastRunAt")}
+
+    def test_success_and_limit_overlap_in_both_completion_orders(self):
+        for limit_first in (True, False):
+            with self.subTest(limit_first=limit_first):
+                codex.write_state({})
+                self.clock = self.START
+                inner = []
+                def second():
+                    self.clock += 1
+                    inner.append(self.complete("usage limit. Try again in 1 hour.\n" if limit_first else "OK\n",
+                                               1 if limit_first else 0))
+                    self.clock += 1
+                outer = self.complete("OK\n" if limit_first else "usage limit. Try again in 1 hour.\n",
+                                      0 if limit_first else 1, second)
+                self.assertEqual(outer[:2], (0, "ok") if limit_first else (1, "limit"))
+                self.assertEqual(inner[0][:2], (1, "limit") if limit_first else (0, "ok"))
+                row = codex.read_state()["current-login"]
+                banked_at = self.START + (1 if limit_first else 2)
+                self.assertEqual(self.diagnostic(), {"exhaustedUntil": banked_at + 3600,
+                    "lastKind": "limit", "lastError": "usage limit", "lastExit": 1, "lastRunAt": banked_at})
+                self.assertEqual(row["runs"], 2)
+                self.assertEqual(row["lastUsed"], self.START + 1)
+                self.assertFalse(codex.available("current-login", codex.read_state(), self.clock))
+                events = [json.loads(line) for line in self.receipt.read_text().splitlines()]
+                self.assertEqual(len([e for e in events if e["event"] == "account-leased"]), 2)
+                self.assertEqual(len([e for e in events if e["event"] == "cli-launch"]), 2)
+                self.receipt.unlink()
+
+    def test_failure_cannot_shorten_a_longer_bank_in_either_order(self):
+        for longer_first in (True, False):
+            with self.subTest(longer_first=longer_first):
+                codex.write_state({})
+                self.clock = self.START
+                def second():
+                    self.clock += 1
+                    self.complete("usage limit. Try again in 2 hours.\n" if longer_first else
+                                  "error: 429 Too Many Requests\n", 1)
+                    self.clock += 1
+                self.complete("error: 429 Too Many Requests\n" if longer_first else
+                              "usage limit. Try again in 2 hours.\n", 1, second)
+                banked_at = self.START + (1 if longer_first else 2)
+                self.assertEqual(self.diagnostic(), {"exhaustedUntil": banked_at + 7200,
+                    "lastKind": "limit", "lastError": "usage limit", "lastExit": 1, "lastRunAt": banked_at})
+                self.assertEqual(codex.read_state()["current-login"]["runs"], 2)
+
+    def test_active_auth_bank_and_evidence_survive_success_or_generic_error(self):
+        for code in (0, 1):
+            with self.subTest(code=code):
+                codex.write_state({})
+                observed = []
+                def auth_failure():
+                    self.complete("401 Unauthorized\n", 1)
+                    observed.append(self.diagnostic())
+                self.complete("ordinary output\n", code, auth_failure)
+                self.assertEqual(self.diagnostic(), observed[0])
+                self.assertEqual(observed[0]["lastKind"], "auth")
+                self.assertEqual(observed[0]["exhaustedUntil"], self.clock + 86400)
+
+    def test_expired_bank_clears_at_reset_boundary_but_not_before(self):
+        for offset in (-1, 0, 1):
+            with self.subTest(offset=offset):
+                until = self.START + 100
+                bank = {"exhaustedUntil": until, "lastKind": "limit", "lastError": "usage limit",
+                        "lastExit": 1, "lastRunAt": self.START - 1}
+                codex.write_state({"current-login": bank})
+                self.clock = until + offset
+                self.assertEqual(self.complete(), (0, "ok", None))
+                row = codex.read_state()["current-login"]
+                if offset < 0:
+                    self.assertEqual(self.diagnostic(), bank)
+                else:
+                    self.assertNotIn("exhaustedUntil", row)
+                    self.assertNotIn("lastError", row)
+                    self.assertEqual((row["lastKind"], row["lastExit"], row["lastRunAt"]), ("ok", 0, self.clock))
+
+    def test_explicit_auth_reverification_can_clear_the_bank(self):
+        codex.write_state({"current-login": {"exhaustedUntil": self.START + 86400,
+                                            "lastKind": "auth", "lastError": "401"}})
+        def reverify():
+            with patch.object(codex, "current_login_available", return_value=True):
+                codex.reverify_auth_bank(codex.read_state(), self.clock)
+        self.complete(during_wait=reverify)
+        row = codex.read_state()["current-login"]
+        self.assertNotIn("exhaustedUntil", row)
+        self.assertNotIn("lastError", row)
+        self.assertEqual(row["authReverifiedAt"], self.clock)
+        self.assertEqual(row["lastKind"], "ok")
+
+    def test_equal_reset_window_keeps_the_original_failure_attribution(self):
+        bank = {"exhaustedUntil": self.START + 3600, "lastKind": "limit", "lastError": "usage limit",
+                "lastExit": 7, "lastRunAt": self.START - 1}
+        codex.write_state({"current-login": bank})
+        self.complete("error: 429 Too Many Requests. Try again in 1 hour.\n", 1)
+        self.assertEqual(self.diagnostic(), bank)
+
+    def test_independent_account_success_does_not_change_another_bank(self):
+        bank = {"exhaustedUntil": self.START + 3600, "lastKind": "limit", "lastError": "usage limit"}
+        codex.write_state({"alpha": bank})
+        self.complete(account="beta")
+        state = codex.read_state()
+        self.assertEqual(state["alpha"], bank)
+        self.assertEqual(state["beta"]["lastKind"], "ok")
+        self.assertNotIn("exhaustedUntil", state["beta"])
 
 
 class LaunchIdentityTest(Isolated):
