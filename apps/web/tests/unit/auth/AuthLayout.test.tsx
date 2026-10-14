@@ -57,19 +57,25 @@ describe('AuthLayout', () => {
     keyboardVisible = false;
   });
 
-  it('renders a skip link to a focusable main landmark', async () => {
-    render(
-      <AuthLayout formTitle='Sign In'>
-        <div>Auth form body</div>
-      </AuthLayout>
+  it('keeps one main landmark when composed inside the auth route', () => {
+    const { container } = render(
+      <main id='main-content'>
+        <AuthLayout formTitle='Sign In'>
+          <div>Auth form body</div>
+        </AuthLayout>
+      </main>
     );
 
     expect(screen.getByRole('link', { name: 'Skip to form' })).toHaveAttribute(
       'href',
       '#auth-form'
     );
-    expect(screen.getByRole('main')).toHaveAttribute('id', 'auth-form');
-    expect(screen.getByRole('main')).toHaveAttribute('tabIndex', '-1');
+    expect(screen.getAllByRole('main')).toHaveLength(1);
+    expect(screen.getByRole('main')).toHaveAttribute('id', 'main-content');
+    expect(container.querySelector('#auth-form')).toHaveAttribute(
+      'tabIndex',
+      '-1'
+    );
   });
 
   it('keeps the homepage logo link available when the split rail is shown', async () => {
@@ -260,7 +266,7 @@ describe('AuthLayout', () => {
     expect(hiddenTitle).toHaveTextContent('Sign In');
     expect(hiddenTitle).toHaveAttribute('aria-hidden', 'true');
     expect(screen.queryByText('Need an account?')).not.toBeInTheDocument();
-    expect(screen.getByRole('main')).toHaveTextContent('Auth form body');
+    expect(screen.getByText('Auth form body')).toBeVisible();
   });
 
   it('hides shared-shell chrome while the mobile keyboard is visible', async () => {
