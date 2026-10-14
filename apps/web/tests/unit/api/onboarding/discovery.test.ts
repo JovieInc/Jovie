@@ -161,177 +161,191 @@ describe('GET /api/onboarding/discovery', () => {
     });
   });
 
-  it('returns a shaped onboarding snapshot with pending discovery state', async () => {
-    mockDbSelect
-      .mockImplementationOnce(() =>
-        limitChain([
-          {
-            id: 'profile_123',
-            username: 'artist',
-            displayName: 'Artist',
-            avatarUrl: 'https://images.test/avatar.png',
-            bio: 'Bio',
-            genres: ['pop'],
-            location: 'Los Angeles',
-            settings: {
-              hometown: 'Nashville',
-              spotifyImportStatus: 'complete',
+  it.each([
+    {
+      matchSource: 'isrc_discovery',
+      expectedImage: 'https://images.test/spotify.png',
+    },
+    { matchSource: 'musicfetch', expectedImage: null },
+  ])(
+    'returns a shaped onboarding snapshot with $matchSource portrait provenance',
+    async ({ matchSource, expectedImage }) => {
+      mockDbSelect
+        .mockImplementationOnce(() =>
+          limitChain([
+            {
+              id: 'profile_123',
+              username: 'artist',
+              displayName: 'Artist',
+              avatarUrl: 'https://images.test/avatar.png',
+              bio: 'Bio',
+              genres: ['pop'],
+              location: 'Los Angeles',
+              settings: {
+                hometown: 'Nashville',
+                spotifyImportStatus: 'complete',
+              },
+              activeSinceYear: 2020,
+              spotifyId: 'spotify_1',
+              spotifyUrl: 'https://open.spotify.com/artist/spotify_1',
+              appleMusicId: 'apple_1',
+              onboardingCompletedAt: new Date('2025-01-01T00:00:00.000Z'),
+              ownerUserId: 'user_owner_123',
             },
-            activeSinceYear: 2020,
-            spotifyId: 'spotify_1',
-            spotifyUrl: 'https://open.spotify.com/artist/spotify_1',
-            appleMusicId: 'apple_1',
-            onboardingCompletedAt: new Date('2025-01-01T00:00:00.000Z'),
-            ownerUserId: 'user_owner_123',
-          },
-        ])
-      )
-      .mockImplementationOnce(() =>
-        orderByChain([
-          {
-            id: 'match_1',
-            providerId: 'spotify',
-            externalArtistId: 'spotify_1',
-            externalArtistName: 'Artist',
-            externalArtistUrl: 'https://open.spotify.com/artist/spotify_1',
-            externalArtistImageUrl: 'https://images.test/spotify.png',
-            confidenceScore: '0.95',
-            status: 'confirmed',
-            updatedAt: new Date('2025-01-02T00:00:00.000Z'),
-          },
-        ])
-      )
-      .mockImplementationOnce(() =>
-        orderByChain([
-          {
-            id: 'link_1',
-            platform: 'soundcloud',
-            url: 'https://soundcloud.com/artist',
-            displayText: 'artist',
-            state: 'active',
-            confidence: '0.81',
-            sourcePlatform: 'spotify',
-            updatedAt: new Date('2025-01-02T00:00:00.000Z'),
-            version: 2,
-          },
-        ])
-      )
-      .mockImplementationOnce(() =>
-        orderByChain([
-          {
-            id: 'suggestion_1',
-            platform: 'youtube_music',
-            url: 'https://music.youtube.com/channel/test',
-            username: 'artist-official',
-            sourceProvider: 'musicbrainz',
-            confidenceScore: '0.67',
-            status: 'pending',
-            updatedAt: new Date('2025-01-03T00:00:00.000Z'),
-          },
-        ])
-      )
-      .mockImplementationOnce(() =>
-        limitChain([
-          {
-            id: 'release_1',
-            title: 'Latest Release',
-            artworkUrl: 'https://images.test/release.png',
-            releaseDate: new Date('2024-02-10T00:00:00.000Z'),
-            spotifyPopularity: 75,
-          },
-        ])
-      )
-      .mockImplementationOnce(() => whereChain([{ value: 12 }]))
-      .mockImplementationOnce(() => whereChain([{ value: 1 }]))
-      .mockImplementationOnce(() => whereChain([{ value: 1 }]))
-      .mockImplementationOnce(() =>
-        limitChain([
-          {
-            status: 'processing',
-            createdAt: new Date('2025-01-04T00:00:00.000Z'),
-            updatedAt: new Date('2025-01-04T00:00:00.000Z'),
-          },
-        ])
+          ])
+        )
+        .mockImplementationOnce(() =>
+          orderByChain([
+            {
+              id: 'match_1',
+              providerId: 'spotify',
+              externalArtistId: 'spotify_1',
+              externalArtistName: 'Artist',
+              externalArtistUrl: 'https://open.spotify.com/artist/spotify_1',
+              externalArtistImageUrl: 'https://images.test/spotify.png',
+              matchSource,
+              confidenceScore: '0.95',
+              status: 'confirmed',
+              updatedAt: new Date('2025-01-02T00:00:00.000Z'),
+            },
+          ])
+        )
+        .mockImplementationOnce(() =>
+          orderByChain([
+            {
+              id: 'link_1',
+              platform: 'soundcloud',
+              url: 'https://soundcloud.com/artist',
+              displayText: 'artist',
+              state: 'active',
+              confidence: '0.81',
+              sourcePlatform: 'spotify',
+              updatedAt: new Date('2025-01-02T00:00:00.000Z'),
+              version: 2,
+            },
+          ])
+        )
+        .mockImplementationOnce(() =>
+          orderByChain([
+            {
+              id: 'suggestion_1',
+              platform: 'youtube_music',
+              url: 'https://music.youtube.com/channel/test',
+              username: 'artist-official',
+              sourceProvider: 'musicbrainz',
+              confidenceScore: '0.67',
+              status: 'pending',
+              updatedAt: new Date('2025-01-03T00:00:00.000Z'),
+            },
+          ])
+        )
+        .mockImplementationOnce(() =>
+          limitChain([
+            {
+              id: 'release_1',
+              title: 'Latest Release',
+              artworkUrl: 'https://images.test/release.png',
+              releaseDate: new Date('2024-02-10T00:00:00.000Z'),
+              spotifyPopularity: 75,
+            },
+          ])
+        )
+        .mockImplementationOnce(() => whereChain([{ value: 12 }]))
+        .mockImplementationOnce(() => whereChain([{ value: 1 }]))
+        .mockImplementationOnce(() => whereChain([{ value: 1 }]))
+        .mockImplementationOnce(() =>
+          limitChain([
+            {
+              status: 'processing',
+              createdAt: new Date('2025-01-04T00:00:00.000Z'),
+              updatedAt: new Date('2025-01-04T00:00:00.000Z'),
+            },
+          ])
+        );
+      mockIsActiveDiscoveryJob.mockReturnValueOnce(true);
+
+      const { GET } = await import('@/app/api/onboarding/discovery/route');
+      const response = await GET(
+        new Request(
+          `http://localhost/api/onboarding/discovery?profileId=${validProfileId}`
+        )
       );
-    mockIsActiveDiscoveryJob.mockReturnValueOnce(true);
+      const payload = await response.json();
 
-    const { GET } = await import('@/app/api/onboarding/discovery/route');
-    const response = await GET(
-      new Request(
-        `http://localhost/api/onboarding/discovery?profileId=${validProfileId}`
-      )
-    );
-    const payload = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(payload.success).toBe(true);
-    expect(payload.snapshot.profile).toEqual(
-      expect.objectContaining({
-        id: 'profile_123',
-        username: 'artist',
-        displayName: 'Artist',
-        appleMusicConnected: true,
-        hometown: 'Nashville',
-      })
-    );
-    expect(payload.snapshot.selectedSpotifyProfile).toEqual(
-      expect.objectContaining({
-        id: 'spotify_1',
-        name: 'Artist',
-      })
-    );
-    expect(payload.snapshot.dspItems).toEqual([
-      expect.objectContaining({
-        id: 'match_1',
-        providerId: 'spotify',
-        confidenceScore: 0.95,
-        status: 'confirmed',
-      }),
-    ]);
-    expect(payload.snapshot.socialItems).toEqual([
-      expect.objectContaining({
-        id: 'link_1',
-        kind: 'link',
-        confidence: 0.81,
-      }),
-      expect.objectContaining({
-        id: 'suggestion_1',
-        kind: 'suggestion',
-        confidence: 0.67,
-      }),
-    ]);
-    expect(payload.snapshot.releases).toEqual([
-      expect.objectContaining({
-        id: 'release_1',
-        title: 'Latest Release',
-      }),
-    ]);
-    expect(payload.snapshot.counts).toEqual({
-      releaseCount: 12,
-      activeSocialCount: 1,
-      dspCount: 2,
-    });
-    expect(payload.snapshot.importState).toEqual({
-      spotifyImportStatus: 'complete',
-      releaseCount: 12,
-      recordingCount: 1,
-      activeSocialCount: 1,
-      confirmedDspCount: 2,
-      hasSpotifySelection: true,
-      hasImportedReleases: true,
-    });
-    expect(payload.snapshot.readiness).toEqual({
-      phase: 'discovering',
-      canProceedToDashboard: false,
-      blockingReason: 'discovery_in_progress',
-    });
-    expect(payload.snapshot.hasPendingDiscoveryJob).toBe(true);
-    expect(mockIsActiveDiscoveryJob).toHaveBeenCalledWith(
-      expect.objectContaining({ status: 'processing' }),
-      new Date('2025-01-02T00:00:00.000Z'),
-      true
-    );
-  });
+      expect(response.status).toBe(200);
+      expect(payload.success).toBe(true);
+      expect(payload.snapshot.profile).toEqual(
+        expect.objectContaining({
+          id: 'profile_123',
+          username: 'artist',
+          displayName: 'Artist',
+          appleMusicConnected: true,
+          hometown: 'Nashville',
+        })
+      );
+      expect(payload.snapshot.selectedSpotifyProfile).toEqual(
+        expect.objectContaining({
+          id: 'spotify_1',
+          name: 'Artist',
+        })
+      );
+      expect(payload.snapshot.dspItems).toEqual([
+        expect.objectContaining({
+          id: 'match_1',
+          providerId: 'spotify',
+          confidenceScore: 0.95,
+          status: 'confirmed',
+          externalArtistImageUrl: expectedImage,
+        }),
+      ]);
+      expect(mockDbSelect.mock.calls[1]?.[0].matchSource?.name).toBe(
+        'match_source'
+      );
+      expect(payload.snapshot.socialItems).toEqual([
+        expect.objectContaining({
+          id: 'link_1',
+          kind: 'link',
+          confidence: 0.81,
+        }),
+        expect.objectContaining({
+          id: 'suggestion_1',
+          kind: 'suggestion',
+          confidence: 0.67,
+        }),
+      ]);
+      expect(payload.snapshot.releases).toEqual([
+        expect.objectContaining({
+          id: 'release_1',
+          title: 'Latest Release',
+        }),
+      ]);
+      expect(payload.snapshot.counts).toEqual({
+        releaseCount: 12,
+        activeSocialCount: 1,
+        dspCount: 2,
+      });
+      expect(payload.snapshot.importState).toEqual({
+        spotifyImportStatus: 'complete',
+        releaseCount: 12,
+        recordingCount: 1,
+        activeSocialCount: 1,
+        confirmedDspCount: 2,
+        hasSpotifySelection: true,
+        hasImportedReleases: true,
+      });
+      expect(payload.snapshot.readiness).toEqual({
+        phase: 'discovering',
+        canProceedToDashboard: false,
+        blockingReason: 'discovery_in_progress',
+      });
+      expect(payload.snapshot.hasPendingDiscoveryJob).toBe(true);
+      expect(mockIsActiveDiscoveryJob).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'processing' }),
+        new Date('2025-01-02T00:00:00.000Z'),
+        true
+      );
+    }
+  );
 
   it('returns 500 and captures unexpected errors', async () => {
     const discoveryError = new Error('database down');
