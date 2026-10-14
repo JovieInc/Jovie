@@ -334,6 +334,9 @@ describe.skipIf(!process.env.DATABASE_URL)(
       );
       expect(direct.rows).toHaveLength(0);
 
+      // SELECT FOR UPDATE is filtered by UPDATE policies. An owned profile is
+      // invisible to a different user, so the claim fails closed as not found
+      // before the application can observe a PROFILE_CONFLICT.
       await expect(
         withRlsUser(userBClerkId, tx =>
           claimPrebuiltProfileForUser(tx, {
@@ -344,7 +347,7 @@ describe.skipIf(!process.env.DATABASE_URL)(
             source: 'direct_profile_reserve',
           })
         )
-      ).rejects.toThrow('[PROFILE_CONFLICT]');
+      ).rejects.toThrow('[CLAIM_NOT_FOUND] Profile not found');
 
       await expect(
         withRlsUser(userBId, tx =>
