@@ -36,12 +36,17 @@ vi.mock('./links/hooks/useProfileEditor', () => ({
       setProfileUsername: vi.fn(),
       displayNameInputRef: { current: null },
       usernameInputRef: { current: null },
-      profileSaveStatus: 'idle',
+      profileSaveStatus: {
+        saving: false,
+        error: null,
+        success: null,
+        lastSaved: null,
+      },
       debouncedProfileSave: Object.assign(
         vi.fn(async () => {}),
         { flush: vi.fn(async () => {}), cancel: vi.fn() }
       ),
-      handleAvatarUpload: vi.fn(async () => {}),
+      handleAvatarUpload: vi.fn(async () => '/avatar.jpg'),
       handleDisplayNameChange: vi.fn(),
       handleUsername: vi.fn(),
       handleInputKeyDown: vi.fn(),
@@ -72,7 +77,7 @@ vi.mock('./links/hooks/useSuggestionSync', () => ({
   useSuggestionSync: () =>
     ({
       syncSuggestionsFromServer: vi.fn(),
-      handleAcceptSuggestion: vi.fn(async () => {}),
+      handleAcceptSuggestion: vi.fn(async () => null),
       handleDismissSuggestion: vi.fn(async () => {}),
     }) satisfies ReturnType<typeof useSuggestionSync>,
 }));

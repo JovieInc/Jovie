@@ -1104,3 +1104,25 @@ the JSX-comment form for a text child).
 ## Shell
 
 EVENT: icon/emoji glyphs are transparent at rest. A hover background must be circular, with equal dimensions and full rounding, owned by `IconGlyphFrame`. Keep an interactive parent's focus ring, hit target, accessible name, tooltip, and selected/pressed semantics. Do not put a rounded-square plate behind the glyph. Semantic status badges, avatars, and complete text actions keep their existing contracts. This applies to Jovie, Ovie, and generated marketing previews. EVENT: tooltips share the canonical compact surface, viewport-safe full wrapping, and 300ms discovery/300ms warm-up timing. Default nested providers reuse the app timing scope; explicit isolated notices and fixtures retain their own timing. History titles use single-line ellipsis with reserved date/action tracks; tooltips preserve the full clean display title.
+
+## Entity identity (founder-locked 2026-10-13)
+
+EVENT: one primary identity/media treatment per entity. **People/users are
+circular; albums/releases are square and uncropped; events use the calendar
+treatment.** This explicitly supersedes any earlier tentative square-person
+wording. The adopted `semantic-entity-identity` invariant lives in
+`canon/invariants.jsonl` (JOV-INV-019).
+
+`EntityHeader` owns rail identity layout; `EntityHeaderThumbnail` owns semantic
+media composition, including initials, broken-image fallback and the shared
+`VerifiedBadge`. `Avatar` owns compact person/avatar consumers and
+`ReleaseArtworkThumb` / `ArtworkFrame` own release art. Use those owners in
+cards, tables, pickers and right rails. Pass source verification explicitly;
+connected providers, observed source photos and pending/claimed states are not
+Jovie profile verification. A media fallback retains its accessible label and
+reserved dimensions. Use an empty alt only beside an equivalent visible label.
+
+Sizes, density, inline/grid header anatomy, metadata and actions remain supported
+composition choices. Do not recreate media, initials or badges in route markup,
+and do not force unrelated card content into a single generic component.
+See [the source audit and owner map](entity-identity.md).

@@ -13,7 +13,7 @@ parallel design system or review standard.
 
 ## Entity identity
 
-Follow [the founder-locked entity identity contract](../../DESIGN.md#entity-identity-founder-locked-2026-10-13): circular people, square uncropped releases, calendar events. Reuse shared media/fallback/verification owners; choose supported density and layout variants. Provider connection is not Jovie verification. The executable invariant projects from `canon/invariants.jsonl`, and the current [consumer audit](../../docs/design-system/entity-identity.md) names the owners.
+Follow [the founder-locked entity identity contract](../../docs/design-system/entity-identity.md): circular people, square uncropped releases, calendar events. Reuse shared media/fallback/verification owners; choose supported density and layout variants. Provider connection is not Jovie verification. The executable invariant projects from `canon/invariants.jsonl`, and the current [consumer audit](../../docs/design-system/entity-identity.md) names the owners.
 
 ## Interaction Quality Contract
 
