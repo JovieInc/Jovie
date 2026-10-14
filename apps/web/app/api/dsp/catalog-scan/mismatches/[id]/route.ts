@@ -55,7 +55,7 @@ export async function PATCH(
     .where(
       and(
         eq(creatorProfiles.id, mismatch.creatorProfileId),
-        eq(users.clerkId, userId)
+        eq(users.id, userId)
       )
     )
     .limit(1);
