@@ -239,7 +239,9 @@ export async function runDeprecationClearance(
   args,
   env = process.env,
   fetchImpl = fetch,
-  { verifyMarker } = {}
+  {
+    verifyMarker,
+  } = /** @type {{ verifyMarker?: (sha: string, controllerWorkflowId: number) => Promise<boolean> | boolean }} */ ({})
 ) {
   if (!args[0] || !args[1] || !env.LINEAR_API_KEY || !env.GH_TOKEN)
     throw new Error(
