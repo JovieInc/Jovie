@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import re
 import subprocess
@@ -25,6 +26,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import disk_guard  # noqa: E402
 import lifecycle  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
@@ -55,6 +57,8 @@ GREEN_TTL_S = 2 * 3600
 # A fix attempt still running holds its head this long; after it ends (or the lease runs out)
 # the same head may be tried again by the next lane, so a no-push attempt never parks a PR.
 FIX_LEASE_S = 3 * 3600
+HANDOFF_BACKOFF_S = 300
+UNRESUMABLE_PRESERVED = frozenset({"preserved-head-superseded", "preserved-target-needs-reconciliation"})
 # Cross-host repair claims fence the exact head while a worker owns it. Detectors honor the
 # same lease so a temporarily missing queue label cannot recreate its own trigger.
 CLAIM_TTL_S = 2 * 3600
@@ -1302,9 +1306,49 @@ def fresh_reentry(lane, pr: dict, record: dict) -> dict | None:
     return live
 
 
+def pr_recovery_held(host, pr: dict, now: float | None = None) -> bool:
+    """Suppress a same-head no-work recovery before any repair claim or provider work."""
+    now = time.time() if now is None else now
+    rows = read_state(host, "handoff-cooldown.json")
+    row = rows.get(f"pr:{pr['number']}:{pr.get('headRefOid')}") if isinstance(rows, dict) else None
+    if isinstance(row, dict):
+        until = row.get("until")
+        if type(until) not in (int, float) or not -sys.float_info.max <= until <= sys.float_info.max \
+                or not math.isfinite(until):
+            return True  # Malformed ownership evidence holds only this head, never the whole scan.
+        if until > now:
+            if isinstance(row.get("preserved"), str):
+                try:
+                    path = Path(row["preserved"])
+                    if not path.is_absolute() or path.resolve().parent != (host.state / "worktrees").resolve() or path.is_symlink():
+                        return True
+                    (path / disk_guard.PRESERVED_REPAIR).lstat()
+                except FileNotFoundError:
+                    return False  # Ordinary safe reconciliation removed this exact marker.
+                except (OSError, ValueError, RuntimeError):
+                    pass  # Busy/unreadable ownership remains with its recovery owner.
+            return True
+    # A recent durable refund also holds when a cooldown is absent or its refresh failed.
+    attempts = read_state(host, "fix-attempts.json")
+    record = attempts.get(str(pr["number"]), {}) if isinstance(attempts, dict) else None
+    if not isinstance(record, dict):
+        return False
+    refund = record.get("noWorkRefund")
+    stamp = refund.get("at") if isinstance(refund, dict) else None
+    return bool(record.get("sha") == pr.get("headRefOid")
+                and record.get("repairVerdict") == "recovery-handoff"
+                and isinstance(refund, dict) and isinstance(refund.get("reason"), str)
+                and refund["reason"] in UNRESUMABLE_PRESERVED
+                and type(stamp) in (int, float) and -sys.float_info.max <= stamp <= sys.float_info.max
+                and math.isfinite(stamp)
+                and now < stamp + HANDOFF_BACKOFF_S)
+
+
 def current_repair_claim(host, lane, pr: dict, expected: dict, now: float | None = None) -> dict | None:
     """Recheck local preservation after the last remote read, before the existing CAS."""
     try:
+        if pr_recovery_held(host, pr, now):
+            return None
         paths = [host.state / name for name in ("fix-attempts.json", "held.json")]
         attempts, held = [json.loads(path.read_text()) if path.exists() else {} for path in paths]
         if not isinstance(attempts, dict) or not isinstance(held, dict):
