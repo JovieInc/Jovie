@@ -87,19 +87,29 @@ function hasDurablePublicArtistIdentity(
   return Boolean(state.socialLinks[0] ?? state.artist?.url);
 }
 
-function hasWaitlistDecision(rows: readonly { toolCalls: unknown }[]): boolean {
+/**
+ * JOV-8068: the only signal that may authorize a handoff off /start is a
+ * durable, server-verified terminal next-step decision written by
+ * `proposeNextStep`. Transcript ownership (`claimed > 0` / `alreadyClaimed`)
+ * is not proof the interview finished. `needs_more_info` is not terminal —
+ * the latest succeeded decision must be `instant_access` or `waitlist`.
+ */
+function deriveTerminalDecisionKind(
+  rows: readonly { toolCalls: unknown }[]
+): 'instant_access' | 'waitlist' | null {
   const events = rows.flatMap(row => decodeToolEvents(row.toolCalls).events);
   for (const event of events.toReversed()) {
     if (event.toolName !== 'proposeNextStep' || event.state !== 'succeeded') {
       continue;
     }
     const output = isRecord(event.output) ? event.output : null;
-    const decision = isRecord(output?.decision) ? output.decision : null;
-    return (
-      output?.action === 'propose_next_step' && decision?.kind === 'waitlist'
-    );
+    if (output?.action !== 'propose_next_step') continue;
+    const decision = isRecord(output.decision) ? output.decision : null;
+    return decision?.kind === 'instant_access' || decision?.kind === 'waitlist'
+      ? decision.kind
+      : null;
   }
-  return false;
+  return null;
 }
 
 async function createWaitlistReceipt(params: {
@@ -172,6 +182,12 @@ interface ClaimHandoff {
   readonly waitlist: WaitlistAccessRequestResult | null;
   readonly waitlistIntakeRequired: boolean;
 }
+
+const EMPTY_CLAIM_HANDOFF: ClaimHandoff = {
+  profile: null,
+  waitlist: null,
+  waitlistIntakeRequired: false,
+};
 
 async function resolveClaimHandoff(params: {
   readonly appUserId: string;
@@ -271,7 +287,18 @@ async function resolveClaimHandoff(params: {
   };
 }
 
-function claimHandoffPayload(handoff: ClaimHandoff) {
+function claimHandoffPayload(
+  handoff: ClaimHandoff,
+  terminalKind: 'instant_access' | 'waitlist' | null
+) {
+  // Checkout handoff requires a terminal instant-access outcome: a materialized
+  // public profile and no pending waitlist receipt. A skipped materialization
+  // (profileId null) or a durable waitlist entry never unlocks checkout.
+  const readyForCheckout =
+    terminalKind !== null &&
+    !handoff.waitlist &&
+    !handoff.profileError &&
+    Boolean(handoff.profile?.profileId);
   return {
     ...(handoff.profileError
       ? {
@@ -283,6 +310,7 @@ function claimHandoffPayload(handoff: ClaimHandoff) {
     ...(handoff.waitlist ? { waitlist: handoff.waitlist } : {}),
     ...(handoff.waitlistIntakeRequired ? { waitlistIntakeRequired: true } : {}),
     ...profilePayload(handoff.profile),
+    ...(readyForCheckout ? { readyForCheckout: true } : {}),
   };
 }
 
@@ -377,9 +405,9 @@ export async function POST(req: Request) {
         const messageRows = await loadConversationMessageRows(
           alreadyClaimed.id
         );
+        const terminalKind = deriveTerminalDecisionKind(messageRows);
         const mustWaitlist =
-          !alreadyApproved &&
-          (accessControlled || hasWaitlistDecision(messageRows));
+          !alreadyApproved && (accessControlled || terminalKind === 'waitlist');
         if (mustWaitlist && !hasDurablePublicArtistIdentity(messageRows)) {
           return NextResponse.json({
             claimed: 0,
@@ -388,21 +416,27 @@ export async function POST(req: Request) {
             waitlistIntakeRequired: true,
           });
         }
-        const handoff = await resolveClaimHandoff({
-          appUserId: userId,
-          conversationId: alreadyClaimed.id,
-          messageRows,
-          mustWaitlist,
-          ipAddress,
-          userAgent,
-        });
-        if (!handoff.profileError) await clearOnboardingSessionCookie();
+        // JOV-8068: no terminal next-step decision yet — the interview is
+        // still in progress. Ownership is already claimed; keep the session
+        // cookie so the next-turn retry can resolve the handoff then.
+        const handoff = terminalKind
+          ? await resolveClaimHandoff({
+              appUserId: userId,
+              conversationId: alreadyClaimed.id,
+              messageRows,
+              mustWaitlist,
+              ipAddress,
+              userAgent,
+            })
+          : EMPTY_CLAIM_HANDOFF;
+        if (terminalKind && !handoff.profileError)
+          await clearOnboardingSessionCookie();
         return NextResponse.json(
           {
             claimed: 0,
             conversationId: alreadyClaimed.id,
             alreadyClaimed: true,
-            ...claimHandoffPayload(handoff),
+            ...claimHandoffPayload(handoff, terminalKind),
           },
           { status: handoff.profileError ? 409 : 200 }
         );
@@ -418,9 +452,9 @@ export async function POST(req: Request) {
 
     try {
       const messageRows = await loadConversationMessageRows(primary.id);
+      const terminalKind = deriveTerminalDecisionKind(messageRows);
       const mustWaitlist =
-        !alreadyApproved &&
-        (accessControlled || hasWaitlistDecision(messageRows));
+        !alreadyApproved && (accessControlled || terminalKind === 'waitlist');
 
       // Do not consume the anonymous transcript until a public artist
       // identity exists. The same /start conversation retries after the next
@@ -482,34 +516,43 @@ export async function POST(req: Request) {
           });
         }
 
-        const handoff = await resolveClaimHandoff({
-          appUserId: userId,
-          conversationId: primary.id,
-          messageRows,
-          mustWaitlist,
-          ipAddress,
-          userAgent,
-        });
-        if (!handoff.profileError) await clearOnboardingSessionCookie();
+        const handoff = terminalKind
+          ? await resolveClaimHandoff({
+              appUserId: userId,
+              conversationId: primary.id,
+              messageRows,
+              mustWaitlist,
+              ipAddress,
+              userAgent,
+            })
+          : EMPTY_CLAIM_HANDOFF;
+        if (terminalKind && !handoff.profileError)
+          await clearOnboardingSessionCookie();
         return NextResponse.json(
           {
             claimed: 0,
             conversationId: primary.id,
             alreadyClaimed: true,
-            ...claimHandoffPayload(handoff),
+            ...claimHandoffPayload(handoff, terminalKind),
           },
           { status: handoff.profileError ? 409 : 200 }
         );
       }
 
-      const handoff = await resolveClaimHandoff({
-        appUserId: userId,
-        conversationId: primary.id,
-        messageRows,
-        mustWaitlist,
-        ipAddress,
-        userAgent,
-      });
+      // JOV-8068: claiming transcript ownership is not onboarding
+      // completion. Without a terminal next-step decision the handoff is
+      // deferred — the conversation stays on /start, keeps its session
+      // cookie, and retries after the next turn.
+      const handoff = terminalKind
+        ? await resolveClaimHandoff({
+            appUserId: userId,
+            conversationId: primary.id,
+            messageRows,
+            mustWaitlist,
+            ipAddress,
+            userAgent,
+          })
+        : EMPTY_CLAIM_HANDOFF;
 
       // Controlled-access visitors stop at the durable waitlist receipt. Only
       // instant-access decisions may materialize a claimed/public profile and
@@ -556,13 +599,14 @@ export async function POST(req: Request) {
           );
       }
 
-      if (!handoff.profileError) await clearOnboardingSessionCookie();
+      if (terminalKind && !handoff.profileError)
+        await clearOnboardingSessionCookie();
 
       return NextResponse.json(
         {
           claimed: candidates.length,
           conversationId: primary.id,
-          ...claimHandoffPayload(handoff),
+          ...claimHandoffPayload(handoff, terminalKind),
         },
         { status: handoff.profileError ? 409 : 200 }
       );

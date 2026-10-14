@@ -484,17 +484,36 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
 
     const { betterAuthUserId, claimPayload } = await createFreshUser(page);
 
-    // Assert the real client auto-claim response captured during OTP completion.
-    // A duplicate request here would race the hook and mask which caller won.
+    // JOV-8068: the mount claim transfers transcript ownership only. It must
+    // NOT materialize a profile or authorize a checkout handoff before the
+    // interview reaches a server-verified terminal next-step decision.
     expect(claimPayload).toMatchObject({
       claimed: 1,
       conversationId,
-      profile: {
-        profileId: expect.any(String),
-        handle: uniqueHandle,
-        status: 'created',
-      },
     });
+    expect(claimPayload).not.toHaveProperty('readyForCheckout');
+
+    // Finish the interview as the now-signed-in user. Meaningful free text
+    // after the social card is the access-decision turn: the scripted engine
+    // persists a terminal proposeNextStep decision, the post-turn claim
+    // resolves the handoff, and only then is the profile materialized.
+    const signedInInput = page.locator('[aria-label="Chat message input" i]');
+    await expect(signedInInput).toBeVisible({ timeout: 60_000 });
+    const signedInSend = page.getByRole('button', { name: 'Send message' });
+    await fillControlledInputUntilEnabled(
+      signedInInput,
+      signedInSend,
+      'About 500 monthly listeners right now'
+    );
+    const [decisionResponse] = await Promise.all([
+      page.waitForResponse(
+        candidate =>
+          candidate.request().method() === 'POST' &&
+          new URL(candidate.url()).pathname === '/api/chat'
+      ),
+      signedInSend.click(),
+    ]);
+    expect(decisionResponse.status()).toBe(200);
 
     const readClaimedProfileProof = async () => {
       const [proof] = await sql`

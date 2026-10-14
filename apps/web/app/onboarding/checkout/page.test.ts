@@ -23,7 +23,8 @@ vi.mock('@/app/app/(shell)/dashboard/actions', () => ({
 vi.mock('@/lib/auth/gate', () => ({
   CanonicalUserState: { UNAUTHENTICATED: 'logged_out' },
   resolveUserState: async () => ({ clerkUserId: 'user', state: 'active' }),
-  getRedirectForState: () => '/app',
+  getRedirectForState: (state: string) =>
+    state === 'active' ? '/app' : '/start',
 }));
 vi.mock('@/lib/auth/plan-intent', () => ({
   DEFAULT_UPSELL_PLAN: 'pro',
@@ -71,7 +72,20 @@ it('rejects retired Max instead of silently purchasing Pro', async () => {
     Page({ searchParams: Promise.resolve({ plan: 'max' }) })
   ).rejects.toThrow('redirect:/pricing');
 });
+const PROFILE_ID = '11111111-1111-4111-8111-111111111111';
+const PROFILE = {
+  id: PROFILE_ID,
+  displayName: 'Test Artist',
+  username: 'testartist',
+  avatarUrl: null,
+  spotifyFollowers: null,
+  isPublic: true,
+  isClaimed: true,
+  onboardingCompletedAt: new Date('2026-10-01'),
+};
+
 it('passes only the current monthly price to checkout', async () => {
+  mocks.profile.mockResolvedValue({ selectedProfile: PROFILE });
   const page = await Page({
     searchParams: Promise.resolve({ plan: 'pro', interval: 'month' }),
   });
@@ -83,14 +97,25 @@ it('passes only the current monthly price to checkout', async () => {
   });
 });
 
-const PROFILE_ID = '11111111-1111-4111-8111-111111111111';
-const PROFILE = {
-  id: PROFILE_ID,
-  displayName: 'Test Artist',
-  username: 'testartist',
-  avatarUrl: null,
-  spotifyFollowers: null,
-};
+it.each([null, { selectedProfile: { ...PROFILE, isClaimed: false } }])(
+  'never renders the organic upsell without a live claimed profile (JOV-8068): %j',
+  async selected => {
+    mocks.profile.mockResolvedValue(selected ?? { selectedProfile: null });
+    // Canonical-state routing resumes mid-onboarding users at /start and
+    // already-active users at /app — either way the offer is not shown.
+    await expect(
+      Page({ searchParams: Promise.resolve({ plan: 'pro' }) })
+    ).rejects.toThrow('redirect:/app');
+    expect(mocks.recordOfferEvent).not.toHaveBeenCalled();
+  }
+);
+
+it('still serves explicit paid intent without a live profile', async () => {
+  const page = await Page({
+    searchParams: Promise.resolve({ plan: 'pro', source: 'intent' }),
+  });
+  expect(page.props).toMatchObject({ plan: 'pro', profileId: null });
+});
 
 it('records offer seen and renders for a first-time claimed artist', async () => {
   mocks.profile.mockResolvedValue({ selectedProfile: PROFILE });

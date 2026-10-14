@@ -186,6 +186,77 @@ function waitlistDecisionMessageRows() {
   ];
 }
 
+function instantAccessDecisionMessageRows() {
+  return [
+    {
+      toolCalls: [
+        {
+          schemaVersion: 2,
+          toolCallId: 'artist-1',
+          toolName: 'confirmSpotifyArtist',
+          state: 'succeeded',
+          input: {},
+          output: {
+            action: 'spotify_artist_confirmed',
+            spotifyArtistId: 'artist-1',
+            artist: {
+              id: 'artist-1',
+              name: 'Test Creator',
+              url: 'https://open.spotify.com/artist/artist-1',
+              imageUrl: null,
+              followers: 5000,
+              popularity: 40,
+              genres: [],
+            },
+          },
+          uiHint: 'artifact',
+        },
+        {
+          schemaVersion: 2,
+          toolCallId: 'decision-1',
+          toolName: 'proposeNextStep',
+          state: 'succeeded',
+          input: {},
+          output: {
+            action: 'propose_next_step',
+            decision: {
+              kind: 'instant_access',
+              rationale: 'spotify_followers_5000',
+              score: 90,
+            },
+          },
+          uiHint: 'artifact',
+        },
+      ],
+    },
+  ];
+}
+
+function needsMoreInfoDecisionMessageRows() {
+  return [
+    {
+      toolCalls: [
+        {
+          schemaVersion: 2,
+          toolCallId: 'decision-1',
+          toolName: 'proposeNextStep',
+          state: 'succeeded',
+          input: {},
+          output: {
+            action: 'propose_next_step',
+            decision: {
+              kind: 'needs_more_info',
+              rationale: 'insufficient_signal',
+              score: 10,
+            },
+          },
+          uiHint: 'artifact',
+        },
+      ],
+    },
+  ];
+}
+
 function waitlistDecisionAfterSocialSkipRows() {
   return [
     {
@@ -434,17 +505,29 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
 
   it('claims the single (most recent) candidate, writes audit, clears cookie, returns claimed count', async () => {
     const appUserId = '3a53ba3e-150c-4ab5-8e73-2d2499764e2c';
-    setupDbSelectForCandidates([
-      { id: 'conv_1', createdAt: new Date('2026-05-01') },
-    ]);
+    setupDbSelectForCandidates(
+      [{ id: 'conv_1', createdAt: new Date('2026-05-01') }],
+      instantAccessDecisionMessageRows()
+    );
     setupUpdateForPrimary(1);
     setupInsertAudit(true);
+    mockMaterializeClaimedOnboardingProfile.mockResolvedValue({
+      profileId: 'profile_1',
+      handle: 'testcreator',
+      status: 'created',
+    });
 
     const res = await POST(makeRequest());
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
       claimed: 1,
       conversationId: 'conv_1',
+      profile: {
+        profileId: 'profile_1',
+        handle: 'testcreator',
+        status: 'created',
+      },
+      readyForCheckout: true,
     });
     expect(mockClearOnboardingSessionCookie).toHaveBeenCalledTimes(1);
     expect(mockDbUpdate).toHaveBeenCalled();
@@ -605,7 +688,7 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
     );
   });
 
-  it('rechecks the authoritative gate at claim time when the persisted decision is not waitlist', async () => {
+  it('claims ownership but defers the handoff when the interview has no terminal decision (JOV-8068)', async () => {
     const socialOnlyRows = [
       {
         toolCalls: waitlistDecisionMessageRows()[0]?.toolCalls.slice(0, 1),
@@ -613,7 +696,7 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
     ];
     mockIsWaitlistGateEnabled.mockResolvedValue(true);
     setupDbSelectForCandidates(
-      [{ id: 'conv_gate_toggled', createdAt: new Date('2026-05-01') }],
+      [{ id: 'conv_mid_interview', createdAt: new Date('2026-05-01') }],
       socialOnlyRows
     );
     setupUpdateForPrimary(1);
@@ -622,15 +705,70 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
     const res = await POST(makeRequest());
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({
-      waitlist: { entryId: 'entry-1', status: 'waitlisted' },
+    // Ownership is claimed, but no waitlist receipt, no materialized profile,
+    // and no checkout signal — the user stays on /start until proposeNextStep
+    // records a durable terminal decision.
+    expect(await res.json()).toEqual({
+      claimed: 1,
+      conversationId: 'conv_mid_interview',
     });
-    expect(mockMaterializeClaimedOnboardingProfile).toHaveBeenCalledWith(
-      expect.objectContaining({
-        visibility: 'reserved',
-        waitlistEntryId: 'entry-1',
-      })
+    expect(mockSubmitWaitlistAccessRequest).not.toHaveBeenCalled();
+    expect(mockMaterializeClaimedOnboardingProfile).not.toHaveBeenCalled();
+    // The session cookie is retained so the next-turn retry can find the
+    // claimed conversation and resolve the handoff then.
+    expect(mockClearOnboardingSessionCookie).not.toHaveBeenCalled();
+  });
+
+  it('treats a needs_more_info decision as non-terminal: claim only, no handoff', async () => {
+    setupDbSelectForCandidates(
+      [{ id: 'conv_needs_info', createdAt: new Date('2026-05-01') }],
+      needsMoreInfoDecisionMessageRows()
     );
+    setupUpdateForPrimary(1);
+    setupInsertAudit(true);
+
+    const res = await POST(makeRequest());
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      claimed: 1,
+      conversationId: 'conv_needs_info',
+    });
+    expect(mockMaterializeClaimedOnboardingProfile).not.toHaveBeenCalled();
+    expect(mockClearOnboardingSessionCookie).not.toHaveBeenCalled();
+  });
+
+  it('never unlocks checkout when an instant-access materialization is skipped', async () => {
+    setupDbSelectForCandidates(
+      [{ id: 'conv_skipped', createdAt: new Date('2026-05-01') }],
+      instantAccessDecisionMessageRows()
+    );
+    setupUpdateForPrimary(1);
+    setupInsertAudit(true);
+    // Default mock: materialize returns { profileId: null, status: 'skipped' }.
+    const res = await POST(makeRequest());
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({ claimed: 1, conversationId: 'conv_skipped' });
+    expect(body).not.toHaveProperty('readyForCheckout');
+    expect(body).not.toHaveProperty('profile');
+  });
+
+  it('recovers an already-claimed interview still in progress without a handoff', async () => {
+    setupRecoveredClaim('conv_in_progress', needsMoreInfoDecisionMessageRows());
+
+    const res = await POST(makeRequest());
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      claimed: 0,
+      alreadyClaimed: true,
+      conversationId: 'conv_in_progress',
+    });
+    expect(mockMaterializeClaimedOnboardingProfile).not.toHaveBeenCalled();
+    expect(mockSubmitWaitlistAccessRequest).not.toHaveBeenCalled();
+    expect(mockClearOnboardingSessionCookie).not.toHaveBeenCalled();
   });
 
   it('refuses to consume the transcript when the current gate is on but durable artist data is missing', async () => {
@@ -754,8 +892,11 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
     expect(mockDbUpdate).toHaveBeenCalledTimes(2);
   });
 
-  it('idempotent on concurrent claim race: CAS returns 0 rows → soft success with alreadyClaimed, clears cookie', async () => {
-    setupDbSelectForCandidates([{ id: 'conv_1', createdAt: new Date() }]);
+  it('idempotent on concurrent claim race: CAS returns 0 rows → soft success with alreadyClaimed, clears cookie once a terminal handoff resolves', async () => {
+    setupDbSelectForCandidates(
+      [{ id: 'conv_1', createdAt: new Date() }],
+      instantAccessDecisionMessageRows()
+    );
     setupUpdateForPrimary(0); // race lost
     setupOwnedConversation('conv_1', true);
     const res = await POST(makeRequest());
