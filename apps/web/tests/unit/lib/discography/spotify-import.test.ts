@@ -10,7 +10,11 @@
 
 import { PgDialect } from 'drizzle-orm/pg-core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { discogRecordings, discogReleaseTracks } from '@/lib/db/schema/content';
+import {
+  discogRecordings,
+  discogReleaseTracks,
+  discogTracks,
+} from '@/lib/db/schema/content';
 import { generateUniqueSlug } from '@/lib/discography/slug';
 
 function createSelectChain(rows: unknown[]) {
@@ -19,7 +23,10 @@ function createSelectChain(rows: unknown[]) {
     innerJoin: vi.fn().mockReturnThis(),
     where: vi.fn().mockReturnThis(),
     limit: vi.fn().mockResolvedValue(rows),
-    then: (resolve: (value: unknown[]) => unknown) => resolve(rows),
+    then: (
+      resolve: (value: unknown[]) => unknown,
+      reject?: (error: unknown) => unknown
+    ) => Promise.resolve(rows).then(resolve, reject),
   };
 }
 
@@ -452,6 +459,31 @@ describe('spotify-import', () => {
         missingIsrc: false,
         retryCredits: true,
       },
+      {
+        recordingCacheHit: true,
+        repeated: 'none',
+        missingIsrc: false,
+        fresh: true,
+      },
+      {
+        recordingCacheHit: false,
+        repeated: 'none',
+        missingIsrc: false,
+        fresh: true,
+        legacy: true,
+      },
+      {
+        recordingCacheHit: true,
+        repeated: 'none',
+        missingIsrc: false,
+        misplaced: true,
+      },
+      {
+        recordingCacheHit: false,
+        repeated: 'none',
+        missingIsrc: false,
+        queryFailure: true,
+      },
     ])(
       'preserves saved occurrence URLs over regenerated/canonical slugs (%j)',
       async ({
@@ -460,6 +492,9 @@ describe('spotify-import', () => {
         missingIsrc,
         fresh,
         retryCredits,
+        legacy,
+        misplaced,
+        queryFailure,
       }) => {
         const credits = [
           {
@@ -565,6 +600,15 @@ describe('spotify-import', () => {
             discNumber: repeated === 'disc' ? 2 : 1,
           });
         const occurrence = createSelectChain(fresh ? [] : occurrenceRows);
+        if (misplaced) occurrenceRows[0].discNumber = 2;
+        if (queryFailure)
+          vi.spyOn(occurrence, 'then').mockImplementationOnce(
+            async (_resolve, reject) => {
+              const error = new Error('appearance lookup unavailable');
+              if (!reject) throw error;
+              return reject(error);
+            }
+          );
         const recording = createSelectChain(
           recordingCacheHit
             ? [
@@ -581,6 +625,14 @@ describe('spotify-import', () => {
           query.from.mockImplementation(table => {
             if (table === discogReleaseTracks) return occurrence;
             if (table === discogRecordings) return recording;
+            if (table === discogTracks && legacy)
+              return createSelectChain([
+                {
+                  id: 'legacy-track',
+                  slug: 'legacy-saved-slug',
+                  spotifyTrackId: track.id,
+                },
+              ]);
             return query;
           });
           return query as never;
@@ -604,13 +656,32 @@ describe('spotify-import', () => {
           );
           expect(processRecordingArtistCredits).toHaveBeenCalledTimes(2);
         }
+        if (queryFailure) {
+          expect(result.failed).toBe(1);
+          expect(result.errors.join(' ')).toContain(
+            'appearance lookup unavailable'
+          );
+          expect(mockUpsertRecording).not.toHaveBeenCalled();
+          expect(mockUpsertReleaseTrack).not.toHaveBeenCalled();
+          result = await importReleasesFromSpotify(
+            'profile-123',
+            '6Ghvu1VvMGScGpOUJBAHNH'
+          );
+        }
 
         expect(result.imported).toBe(1);
         expect(mockUpsertReleaseTrack).toHaveBeenCalledWith(
           expect.objectContaining({
             releaseId: 'release-1',
             recordingId: 'canonical-recording',
-            slug: fresh ? 'take-me-over-3' : 'take-me-over-2',
+            slug:
+              fresh || misplaced
+                ? recordingCacheHit
+                  ? 'take-me-over'
+                  : legacy
+                    ? 'legacy-saved-slug'
+                    : 'take-me-over-3'
+                : 'take-me-over-2',
             metadata: { spotifyId: track.id },
           })
         );
@@ -627,8 +698,9 @@ describe('spotify-import', () => {
           vi
             .mocked(generateUniqueSlug)
             .mock.calls.some(call => call[2] === 'track')
-        ).toBe(!!fresh);
-        if (fresh) expect(mockUpsertRecording).toHaveBeenCalledTimes(1);
+        ).toBe(!!(fresh || misplaced) && !recordingCacheHit && !legacy);
+        if (fresh || misplaced)
+          expect(mockUpsertRecording).toHaveBeenCalledTimes(1);
         else expect(mockUpsertRecording).not.toHaveBeenCalled();
         expect(processRecordingArtistCredits).toHaveBeenCalledWith(
           'canonical-recording',
