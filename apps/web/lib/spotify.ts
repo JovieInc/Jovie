@@ -194,8 +194,9 @@ export function buildSpotifyTrackUrl(trackId: string): string {
 }
 
 /**
- * Get all albums for an artist from Spotify
- * Fetches singles, albums, and compilations
+ * Return the requested artist inventory for the supplied market and groups,
+ * bounded to 500 albums. Check `complete` before treating the returned albums
+ * as exhaustive; failures and clipped pagination preserve partial evidence.
  */
 export async function getSpotifyArtistAlbums(
   artistId: string,
