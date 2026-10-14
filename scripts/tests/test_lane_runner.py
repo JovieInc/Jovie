@@ -8274,6 +8274,7 @@ class TimerInstallerNodePathTests(unittest.TestCase):
                 units = root / "units"
                 units.mkdir()
                 plist = root / "lanes.plist"
+                watchdog_plist = root / "lanes-watchdog.plist"
                 # Redirect only service output destinations; keep HOME and the
                 # actual installer logic intact. No host timer is installed.
                 script = source.replace("$HOME/.config/systemd/user", str(units))
@@ -8282,6 +8283,7 @@ class TimerInstallerNodePathTests(unittest.TestCase):
                 script = script.replace("$HOME/.local/bin", str(root / "local-bin"))
                 script = script.replace("$HOME/.npm-global/bin", str(root / "npm-bin"))
                 script = script.replace("$HOME/Library/LaunchAgents/com.jovie.lanes.plist", str(plist))
+                script = script.replace("$HOME/Library/LaunchAgents/com.jovie.lanes-watchdog.plist", str(watchdog_plist))
                 installer = root / "install.sh"
                 installer.write_text(script)
                 commands = root / "commands.log"
@@ -8327,15 +8329,24 @@ with open(os.environ['INSTALL_COMMAND_LOG'], 'a') as log:
                 self.assertEqual(result.returncode, 0, result.stderr)
                 if platform == "Darwin":
                     config = plistlib.loads(plist.read_bytes())
+                    watchdog_config = plistlib.loads(watchdog_plist.read_bytes())
                     timer_path = config["EnvironmentVariables"]["PATH"]
                     tick = config["ProgramArguments"][-1]
                     self.assertEqual(config["EnvironmentVariables"]["CODEX_LEDGER_CADENCE_S"], "3600")
+                    self.assertEqual(watchdog_config["StartInterval"], 60)
+                    self.assertEqual(watchdog_config["Label"], "com.jovie.lanes-watchdog")
+                    self.assertIn("factory_watchdog.py", watchdog_config["ProgramArguments"][-1])
                 else:
                     service = (units / "jovie-lanes.service").read_text()
+                    watchdog_service = (units / "jovie-lanes-watchdog.service").read_text()
+                    watchdog_timer = (units / "jovie-lanes-watchdog.timer").read_text()
                     timer_path = next(line.removeprefix("Environment=PATH=") for line in service.splitlines() if line.startswith("Environment=PATH="))
                     tick = service
                     self.assertIn("KillMode=process", service)
                     self.assertIn("Environment=CODEX_LEDGER_CADENCE_S=3600", service)
+                    self.assertIn("factory_watchdog.py", watchdog_service)
+                    self.assertNotIn("After=jovie-lanes.service", watchdog_service)
+                    self.assertIn("OnUnitActiveSec=60s", watchdog_timer)
                 self.assertEqual(timer_path.split(":")[0], str(bin_dir))
                 if with_gbrain:
                     self.assertEqual(shutil.which("gbrain", path=timer_path), str(brain))

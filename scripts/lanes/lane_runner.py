@@ -608,7 +608,8 @@ def admission_rejection(issue: Issue, failures: dict, now: float,
 
 # JOV-7708: files that concurrent PRs keep colliding on (31 of 66 open PRs were DIRTY on
 # 2026-10-03). While an open PR holds one, a new issue predicted to touch it waits.
-LANES_HARNESS = frozenset({"scripts/lanes/lane_runner.py", "scripts/lanes/hud.py", "scripts/lanes/doctor.py"})
+LANES_HARNESS = frozenset({"scripts/lanes/doctor.py", "scripts/lanes/factory_watchdog.py",
+                           "scripts/lanes/hud.py", "scripts/lanes/lane_runner.py"})
 HOTSPOT_SEED = LANES_HARNESS | frozenset({
     "apps/web/lib/flags/code-flags.ts",
     "apps/web/lib/commands/registry.ts",
