@@ -2283,19 +2283,57 @@ def cool_down(host: Host, name: str, code: int | None = None) -> bool:
     return True
 
 
-def next_provider(host: Host, exclude: set[str], providers: dict | None = None):
+def next_provider(host: Host, exclude: set[str], providers: dict | None = None, *,
+                  issue: Issue | None = None, minimum_capability: str | None = None):
     """The cheapest enabled, healthy, non-cooling lane not yet tried on this run.
 
     Order comes from providers.json (optional `tier`, else list position). Registry
     exclusions and the same host slot limits used by dispatch also apply to handoff.
+    An issue handoff keeps its guarded lanes and capability floor, including model choice.
     """
     catalog = providers or load_providers()
     host_excluded = {name for name, spec in catalog.items()
                      if isinstance(spec, dict) and host.slots(name, spec.get("slots", 1)) <= 0}
     cooled = {name for name in catalog if cooling(host, name)}
 
-    def healthy(_name, spec):
-        return provider_healthy(spec)
+    health = {}
+    def healthy(name, spec):
+        if name not in health:
+            health[name] = provider_healthy(spec)
+        return health[name]
+
+    if issue is not None:
+        routing_catalog = catalog
+        if minimum_capability is not None:
+            if minimum_capability not in remediation.CAPABILITIES:
+                return None
+            floor = remediation.capability_rank(minimum_capability)
+            routing_catalog = {name: {**spec, "routes": [route for route in spec.get("routes") or ()
+                               if isinstance(route, dict) and remediation.capability_rank(route.get("capability")) >= floor]}
+                               for name, spec in catalog.items() if isinstance(spec, dict)}
+        allowed = lane_restriction(issue, catalog)
+        allowed = set(catalog) if allowed is None else allowed
+        allowed -= set(exclude) | host_excluded | cooled | {
+            name for name, spec in catalog.items() if isinstance(spec, dict) and spec.get("repairs") is False}
+        availability = lane_availability(host, "", catalog)
+
+        def available(name, route):
+            seen = availability(name, route)
+            if seen["ok"] and not healthy(name, catalog[name]):
+                return {"ok": False, "why": "unhealthy", "pressure": seen.get("pressure", 0)}
+            return seen
+
+        decision = remediation.route_issue(
+            {"identifier": issue.identifier, "title": issue.title, "description": issue.description,
+             "labels": issue.labels}, routing_catalog, read_json(ROUTING_POLICY), available, only_lanes=allowed)
+        if minimum_capability is not None and remediation.capability_rank(decision["required"]) < floor:
+            decision.update(required=minimum_capability,
+                            reasons=[*decision["reasons"], f"initial-handoff-floor:{minimum_capability}"],
+                            rationale=f"Preserving {minimum_capability} handoff floor; {decision['rationale']}")
+        chosen = decision["chosen"]
+        if chosen is None:
+            return None
+        return chosen["lane"], {**catalog[chosen["lane"]], "model": chosen["model"], "route": decision}
 
     chosen = remediation.route_lane(catalog, exclude=set(exclude) | host_excluded, healthy=healthy, cooled=cooled)
     if chosen is None:
@@ -2558,7 +2596,8 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
             # lane finishes it on the same worktree.
             handoffs, current = [], name
             while agent.returncode != 0 and len(handoffs) < PROVIDER_HANDOFFS:
-                nxt = next_provider(host, {name, *(h["to"] for h in handoffs)})
+                nxt = next_provider(host, {name, *(h["to"] for h in handoffs)}, issue=issue,
+                                    minimum_capability=(spec.get("route") or {}).get("required"))
                 if nxt is None:
                     break
                 cool_down(host, current, agent.returncode)
