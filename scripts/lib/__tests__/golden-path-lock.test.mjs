@@ -1194,6 +1194,73 @@ describe('golden-path autofix dedupe (JOV-6832)', () => {
     expect(findOwnedAgents(agents, FINGERPRINT)).toEqual(['running']);
   });
 
+  it('binds Cursor dispatch to a stable boundary phase and stops when that boundary is held', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'golden-path-boundary-'));
+    const receiptPath = join(directory, 'receipt.json');
+    const requests = join(directory, 'execution-requests.jsonl');
+    writeFileSync(
+      receiptPath,
+      `${JSON.stringify(buildProdProbeReceipt({ ok: false, checks: CHECKS }))}\n`
+    );
+    writeFileSync(join(directory, 'gh'), '#!/bin/sh\nprintf "[]\\n"\n');
+    writeFileSync(
+      join(directory, 'python3'),
+      [
+        `#!${process.execPath}`,
+        "const fs = require('node:fs');",
+        'const request = JSON.parse(fs.readFileSync(0, "utf8"));',
+        `fs.appendFileSync(${JSON.stringify(requests)}, JSON.stringify(request) + "\\n");`,
+        'if (request.command === "identity") console.log(JSON.stringify({ identityDigest: "fixture", workKey: "fixture", executionGeneration: "fixture" }));',
+        'else if (request.command === "claim") console.log(JSON.stringify({ admitted: true, fencingToken: "fixture-fence" }));',
+        'else { console.log(JSON.stringify({ error: "fixture-boundary-held" })); process.exitCode = 2; }',
+      ].join('\n')
+    );
+    chmodSync(join(directory, 'gh'), 0o755);
+    chmodSync(join(directory, 'python3'), 0o755);
+    try {
+      const result = spawnSync(
+        process.execPath,
+        [
+          resolve(REPO_ROOT, 'scripts/golden-path-lock.mjs'),
+          'autofix',
+          '--receipt',
+          receiptPath,
+        ],
+        {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${directory}:${process.env.PATH}`,
+            CURSOR_API_KEY: 'fixture-no-network',
+            LINEAR_API_KEY: '',
+            GH_REPO: 'Fixture/Repo',
+            GITHUB_SHA: 'a'.repeat(40),
+          },
+        }
+      );
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('fixture-boundary-held');
+      const calls = readFileSync(requests, 'utf8')
+        .trim()
+        .split('\n')
+        .map(line => JSON.parse(line));
+      expect(calls.map(call => call.command)).toEqual([
+        'identity',
+        'claim',
+        'boundary',
+      ]);
+      expect(calls[1].owner.model).toBeNull();
+      expect(calls[2]).toMatchObject({
+        boundary_id: 'cursor-autofix',
+        fence: 'fixture-fence',
+        reservation: { spend: 1, mutations: 2 },
+      });
+      expect(result.stderr).not.toContain('Launched Cursor-direct');
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it('existing open PR: launches nothing and skips intake', () => {
     const directory = mkdtempSync(join(tmpdir(), 'golden-path-dedupe-'));
     const receiptPath = join(directory, 'receipt.json');

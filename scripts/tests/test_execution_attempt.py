@@ -159,6 +159,8 @@ class ExecutionAttemptTest(unittest.TestCase):
         self.assertEqual(self.claim(now=103, policy=policy(spend=1))["reason"], "spend_budget_exhausted")
 class GithubCoordinationBoundaryTest(unittest.TestCase):
     def setUp(self):
+        enabled = patch.object(attempt, "IMMUTABLE_WRITER_ENABLED", True)
+        enabled.start(); self.addCleanup(enabled.stop)
         self.coord = {"kind": "github-status", "repository": "Fixture/Repo", "sha": "a" * 40}
         self.ident = attempt.identity("fixture", {"pr": 1}, {"head": "a" * 40})
 
@@ -266,6 +268,8 @@ class InterruptedAppendTest(unittest.TestCase):
     """Local immutable Git/ref/status fixture; no remote API or provider dispatch."""
     class Interrupted(BaseException): pass
     def setUp(self):
+        enabled = patch.object(attempt, "IMMUTABLE_WRITER_ENABLED", True)
+        enabled.start(); self.addCleanup(enabled.stop)
         self.tmp = tempfile.TemporaryDirectory(); self.addCleanup(self.tmp.cleanup)
         self.path = Path(self.tmp.name) / "ledger.jsonl"
         self.coord = {"kind": "github-status", "repository": "Fixture/Repo", "sha": "a" * 40}
@@ -382,7 +386,7 @@ class InterruptedAppendTest(unittest.TestCase):
         self.assertEqual(rows[0]["_remote"]["statusId"], 1)
         self.assertEqual(head, next(iter(self.tags)))
         # A duplicate projection's numeric ID cannot create a second append slot.
-        attempt.boundary(self.path, self.ident, first["fencingToken"], {"spend": 1}, 102, self.coord)
+        attempt.boundary(self.path, self.ident, first["fencingToken"], {"spend": 1}, 102, self.coord, boundary_id="dispatch")
         rows, head = attempt._github_rows(self.coord, self.ident)
         self.assertEqual([r["event"] for r in rows], ["attempt_started", "boundary_admitted"])
         self.assertEqual(rows[1]["_remote"]["prevStatusId"], rows[0]["_remote"]["reservationSha"])
@@ -435,12 +439,90 @@ class InterruptedAppendTest(unittest.TestCase):
     def test_recovered_boundary_charges_once_and_never_returns_dispatch_authorization(self):
         start = self.claim(); self.interrupt = ("after", "append")
         with self.assertRaises(self.Interrupted):
-            attempt.boundary(self.path, self.ident, start["fencingToken"], {"spend": 1, "mutations": 1}, 101, self.coord)
+            attempt.boundary(self.path, self.ident, start["fencingToken"], {"spend": 1, "mutations": 1}, 101, self.coord, boundary_id="dispatch")
         with self.assertRaisesRegex(RuntimeError, "recovered-boundary"):
-            attempt.boundary(self.path, self.ident, start["fencingToken"], {"spend": 1, "mutations": 1}, 102, self.coord)
+            attempt.boundary(self.path, self.ident, start["fencingToken"], {"spend": 1, "mutations": 1}, 102, self.coord, boundary_id="dispatch")
+        with self.assertRaisesRegex(RuntimeError, "stale-fencing-token|recovered-boundary"):
+            attempt.boundary(self.path, self.ident, start["fencingToken"], {"spend": 1, "mutations": 1}, 103, self.coord, boundary_id="dispatch")
+        self.assertFalse(attempt.resume(self.path, self.ident, start["fencingToken"], owner(), 104, self.coord)["admitted"])
         rows, _ = attempt._github_rows(self.coord, self.ident)
-        self.assertEqual([r["event"] for r in rows], ["attempt_started", "boundary_admitted"])
-        self.assertEqual((attempt._usage(rows, 102)["spend"], attempt._usage(rows, 102)["mutations"]), (1, 1))
+        self.assertEqual([r["event"] for r in rows], ["attempt_started", "boundary_admitted", "attempt_finished"])
+        self.assertEqual(rows[-1]["terminalState"], "failed_unknown")
+        self.assertEqual((attempt._usage(rows, 103)["spend"], attempt._usage(rows, 103)["mutations"]), (1, 1))
+    def test_boundary_ids_hold_duplicate_or_changed_cost_and_charge_distinct_phases(self):
+        start = self.claim(); fence = start["fencingToken"]
+        attempt.boundary(self.path, self.ident, fence, {"spend": 1}, 101, self.coord, boundary_id="dispatch")
+        for cost in (1, 0, .5):
+            with self.subTest(cost=cost), self.assertRaisesRegex(RuntimeError, "boundary-already-reserved"):
+                attempt.boundary(Path(self.tmp.name) / "restart.jsonl", self.ident, fence, {"spend": cost}, 102, self.coord, boundary_id="dispatch")
+        second = attempt.boundary(self.path, self.ident, fence, {"spend": 1}, 103, self.coord, boundary_id="handoff:1")
+        self.assertTrue(second["admitted"])
+        rows, _ = attempt._github_rows(self.coord, self.ident)
+        self.assertEqual((attempt._usage(rows, 103)["spend"], attempt._usage(rows, 103)["attempts"]), (2, 1))
+        self.assertEqual([r["boundaryId"] for r in rows if r["event"] == "boundary_admitted"], ["dispatch", "handoff:1"])
+    def test_candidate_boundary_requires_valid_phase_before_transport(self):
+        for boundary_id in (None, "", "x" * 129, "path/escape", True):
+            with self.subTest(boundary_id=boundary_id), self.assertRaisesRegex(ValueError, "execution-boundary-id"):
+                attempt.boundary(self.path, self.ident, "f" * 64, {}, 101, self.coord, boundary_id=boundary_id)
+        self.assertEqual(self.calls, [])
+    def test_null_model_generic_owner_is_preserved_without_adopting_another_owner(self):
+        generic = {**owner(), "model": None}
+        start = self.claim(who=generic)
+        self.assertEqual(start["owner"], generic)
+        self.assertFalse(attempt.resume(self.path, self.ident, start["fencingToken"], owner(), 101, self.coord)["admitted"])
+        self.assertTrue(attempt.resume(self.path, self.ident, start["fencingToken"], generic, 101, self.coord)["admitted"])
+    def test_ambiguous_committed_boundary_seals_restart_and_same_or_new_phase_retries(self):
+        start = self.claim(); real, once = self.gh, [True]
+        def lost(coord, method, endpoint, body=None):
+            result = real(coord, method, endpoint, body)
+            if method == "POST" and "/statuses/" in endpoint and once:
+                once.pop(); raise RuntimeError("fixture-boundary-response-lost")
+            return result
+        with patch.object(attempt, "_gh", side_effect=lost), self.assertRaisesRegex(RuntimeError, "fixture-boundary-response-lost"):
+            attempt.boundary(self.path, self.ident, start["fencingToken"], {"spend": 1}, 101, self.coord, boundary_id="dispatch")
+        for boundary_id in ("dispatch", "dispatch", "handoff:1"):
+            with self.subTest(boundary_id=boundary_id), self.assertRaisesRegex(RuntimeError, "stale-fencing-token"):
+                attempt.boundary(Path(self.tmp.name) / "restart.jsonl", self.ident, start["fencingToken"], {"spend": 1}, 102, self.coord, boundary_id=boundary_id)
+        self.assertFalse(attempt.resume(self.path, self.ident, start["fencingToken"], owner(), 103, self.coord)["admitted"])
+        rows, _ = attempt._github_rows(self.coord, self.ident)
+        self.assertEqual([r["event"] for r in rows], ["attempt_started", "boundary_admitted", "attempt_finished"])
+        self.assertEqual((attempt._usage(rows, 103)["spend"], rows[-1]["terminalState"]), (1, "failed_unknown"))
+    def test_helper_crash_after_terminal_reservation_before_boundary_projection_stays_sealed(self):
+        start = self.claim(); self.interrupt = ("after", "append")
+        with self.assertRaises(self.Interrupted):
+            attempt.boundary(self.path, self.ident, start["fencingToken"], {"spend": 1}, 101, self.coord, boundary_id="dispatch")
+        def stop(phase, point, body):
+            if (phase, point) == ("after", "append"):
+                row = json.loads(self.tags[body["sha"]]["message"])["candidate"]
+                if row["event"] == "attempt_finished": raise self.Interrupted()
+        self.hook = stop
+        with self.assertRaises(self.Interrupted):
+            attempt.boundary(self.path, self.ident, start["fencingToken"], {"spend": 1}, 102, self.coord, boundary_id="dispatch")
+        self.assertEqual(len(self.statuses), 1, "terminal CAS must precede recovered boundary projection")
+        self.hook = lambda *_: None
+        with self.assertRaisesRegex(RuntimeError, "recovered-boundary"):
+            attempt.resume(Path(self.tmp.name) / "new-process.jsonl", self.ident, start["fencingToken"], owner(), 103, self.coord)
+        self.assertFalse(attempt.resume(self.path, self.ident, start["fencingToken"], owner(), 104, self.coord)["admitted"])
+        rows, _ = attempt._github_rows(self.coord, self.ident)
+        self.assertEqual((len(rows), attempt._usage(rows, 104)["spend"], rows[-1]["terminalState"]), (3, 1, "failed_unknown"))
+    def test_concurrent_boundary_helpers_share_one_terminal_barrier_and_never_admit(self):
+        start = self.claim(); self.interrupt = ("after", "append")
+        with self.assertRaises(self.Interrupted):
+            attempt.boundary(self.path, self.ident, start["fencingToken"], {"spend": 1}, 101, self.coord, boundary_id="dispatch")
+        barrier = threading.Barrier(2)
+        def overlap(phase, point, body):
+            if (phase, point) == ("before", "append"): barrier.wait(timeout=5)
+        self.hook = overlap
+        def recover(name):
+            try: attempt.boundary(Path(self.tmp.name) / f"helper-{name}.jsonl", self.ident, start["fencingToken"], {"spend": 1}, 102, self.coord, boundary_id="dispatch")
+            except RuntimeError as error: return str(error)
+            self.fail("recovery granted execution")
+        with ThreadPoolExecutor(2) as pool: results = list(pool.map(recover, ["a", "b"]))
+        self.assertTrue(all("recovered-boundary" in result or "stale-fencing-token" in result for result in results))
+        rows, _ = attempt._status_rows(self.statuses, self.ident, strict=True, coordination=self.coord)
+        self.assertEqual([r["event"] for r in rows], ["attempt_started", "boundary_admitted", "attempt_finished"])
+        self.assertEqual((attempt._usage(rows, 103)["spend"], attempt._usage(rows, 103)["attempts"]), (1, 1))
+
     def test_legacy_reservation_and_different_attempt_candidate_are_never_reused_or_deleted(self):
         ref = attempt._append_ref(self.ident, None)
         legacy = {"ref": ref, "object": {"type": "commit", "sha": self.coord["sha"]}}
@@ -514,9 +596,106 @@ class InterruptedAppendTest(unittest.TestCase):
             self.claim(now=102)
         self.assertEqual(len(self.statuses), 1)
 
+class WriterRolloutTest(unittest.TestCase):
+    """Real CLI processes against a file-backed local GitHub transport fixture."""
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(); self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.remote = self.root / "remote.json"
+        self.remote.write_text(json.dumps({"refs": {}, "tags": {}, "statuses": [], "calls": [], "unknownOnce": False}))
+        shim = self.root / "gh"
+        shim.write_text(f"#!{sys.executable}\n" + r'''
+import hashlib, json, os, sys
+from pathlib import Path
+path = Path(os.environ["FIXTURE_GITHUB_STATE"])
+state = json.loads(path.read_text())
+args = sys.argv[1:]; i = args.index("-X"); method, endpoint = args[i + 1:i + 3]
+body = json.load(sys.stdin) if method == "POST" else None
+state["calls"].append([method, endpoint, body]); result = None; error = False
+if method == "GET":
+    if "/statuses?" in endpoint: result = [state["statuses"]]
+    elif "/git/matching-refs/" in endpoint:
+        prefix = "refs/" + endpoint.split("/git/matching-refs/", 1)[1]
+        result = [[ref for name, ref in state["refs"].items() if name.startswith(prefix)]]
+    elif "/git/tags/" in endpoint: result = [state["tags"][endpoint.rsplit("/", 1)[1]]]
+    else: raise AssertionError(endpoint)
+elif endpoint.endswith("/git/tags"):
+    sha = hashlib.sha1(json.dumps(body, sort_keys=True).encode()).hexdigest()
+    result = {**body, "sha": sha, "object": {"type": body["type"], "sha": body["object"]}}
+    state["tags"][sha] = result
+elif endpoint.endswith("/git/refs"):
+    if body["ref"] in state["refs"]:
+        path.write_text(json.dumps(state)); sys.stderr.write("HTTP422 ref exists"); sys.exit(1)
+    result = {"ref": body["ref"], "object": {"type": "tag" if body["sha"] in state["tags"] else "commit", "sha": body["sha"]}}
+    state["refs"][body["ref"]] = result
+elif "/statuses/" in endpoint:
+    result = {**body, "id": len(state["statuses"]) + 1, "creator": {"login": "jovie-bot[bot]", "type": "Bot"}}
+    state["statuses"].append(result)
+    if state["unknownOnce"] and "boundary_admitted" in body["description"]:
+        state["unknownOnce"] = False; error = True
+else: raise AssertionError(endpoint)
+path.write_text(json.dumps(state))
+if error: sys.stderr.write("fixture response lost after remote commit"); sys.exit(1)
+print(json.dumps(result))
+''')
+        shim.chmod(0o755)
+        self.enabled = self.root / "enabled-execution-attempt.py"
+        self.enabled.write_text(MODULE.read_text().replace("IMMUTABLE_WRITER_ENABLED = False", "IMMUTABLE_WRITER_ENABLED = True"))
+        self.coord = {"kind": "github-status", "repository": "Fixture/Repo", "sha": "a" * 40}
+        self.ident = attempt.identity("fixture", {"pr": 1}, {"head": "a" * 40})
+        self.env = {**attempt.os.environ, "PATH": f"{self.root}:/usr/bin:/bin", "PYTHONPATH": str(MODULE.parent),
+                    "LANES_STATE": str(self.root / "state"), "FIXTURE_GITHUB_STATE": str(self.remote)}
+        self.env.pop(attempt.lifecycle.FD_ENV, None)
+    def cli(self, command, *, enabled=False, **fields):
+        request = {"command": command, "path": str(self.root / "ledger.jsonl"), "ident": self.ident,
+                   "coordination": self.coord, **fields}
+        result = subprocess.run([sys.executable, str(self.enabled if enabled else MODULE)], input=json.dumps(request),
+                                capture_output=True, text=True, env=self.env, timeout=10)
+        return result.returncode, json.loads(result.stdout)
+    def claim(self, *, enabled=False):
+        return self.cli("claim", enabled=enabled, owner=owner(), policy=policy(), trigger={"triggerId": "same"}, now=100)
+    def test_default_cli_and_caller_or_env_assertions_cannot_activate_new_writer(self):
+        self.coord.update(immutableWriterEnabled=True, reservationProtocol=attempt.RESERVATION_SCHEMA)
+        self.env.update(IMMUTABLE_WRITER_ENABLED="1", LANES_IMMUTABLE_WRITER_ENABLED="1")
+        code, start = self.claim()
+        self.assertEqual(code, 0); self.assertTrue(start["admitted"])
+        code, row = self.cli("boundary", fence=start["fencingToken"], reservation={"spend": 1}, now=101, boundary_id="dispatch")
+        self.assertEqual(code, 0); self.assertTrue(row["admitted"])
+        state = json.loads(self.remote.read_text())
+        self.assertEqual(state["tags"], {})
+        self.assertTrue(all(ref["object"] == {"type": "commit", "sha": self.coord["sha"]} for ref in state["refs"].values()))
+        rows, head = attempt._status_rows(state["statuses"], self.ident, strict=True)
+        self.assertEqual([r["event"] for r in rows], ["attempt_started", "boundary_admitted"])
+        self.assertIsInstance(head, int)
+        self.assertTrue(all(set(r["_remote"]) == {"prevStatusId", "eventId", "statusId"} for r in rows))
+    def test_enabled_cli_unknown_committed_boundary_stays_terminal_across_real_processes(self):
+        code, start = self.claim(enabled=True)
+        self.assertEqual(code, 0); self.assertTrue(start["admitted"])
+        state = json.loads(self.remote.read_text()); state["unknownOnce"] = True; self.remote.write_text(json.dumps(state))
+        fields = {"fence": start["fencingToken"], "reservation": {"spend": 1}, "now": 101, "boundary_id": "dispatch"}
+        code, result = self.cli("boundary", enabled=True, **fields)
+        self.assertEqual(code, 2); self.assertIn("execution-coordinator-http", result["error"])
+        for now in (102, 103, 104):
+            code, result = self.cli("boundary", enabled=True, **{**fields, "now": now})
+            self.assertEqual(code, 2); self.assertEqual(result["error"], "stale-fencing-token")
+        code, result = self.claim(enabled=True)
+        self.assertEqual(code, 0); self.assertEqual(result["reason"], "generation_terminal")
+        state = json.loads(self.remote.read_text())
+        rows = [attempt._unpack(s["target_url"].split("#jovie-execution=", 1)[1]) for s in state["statuses"]]
+        self.assertEqual([r["event"] for r in rows], ["attempt_started", "boundary_admitted", "attempt_finished"])
+        self.assertEqual((attempt._usage(rows, 104)["spend"], rows[-1]["terminalState"]), (1, "failed_unknown"))
+    def test_disabled_writer_reads_new_receipts_but_cannot_resume_or_extend_them(self):
+        code, start = self.claim(enabled=True)
+        self.assertEqual(code, 0)
+        code, result = self.claim()
+        self.assertEqual(code, 2); self.assertEqual(result["error"], "execution-coordinator-writer-not-activated")
+        self.assertEqual(len(json.loads(self.remote.read_text())["statuses"]), 1)
+
 class CompletedFailureReconciliationTest(unittest.TestCase):
     """Exercise the production GitHub adapter with ended journals, not caller proof flags."""
     def setUp(self):
+        enabled = patch.object(attempt, "IMMUTABLE_WRITER_ENABLED", True)
+        enabled.start(); self.addCleanup(enabled.stop)
         self.tmp = tempfile.TemporaryDirectory(); self.addCleanup(self.tmp.cleanup)
         self.state = Path(self.tmp.name); (self.state / "runs").mkdir()
         env = {**attempt.os.environ, "LANES_STATE": str(self.state)}
@@ -614,6 +793,16 @@ class CompletedFailureReconciliationTest(unittest.TestCase):
         self.assertTrue(self.path.read_bytes().startswith(prefix))
         self.assertEqual(before, ((self.state / "fix-attempts.json").read_bytes(), (self.state / "runs/ledger.jsonl").read_bytes()))
         self.assertEqual(attempt.claim(self.path, self.identities[0], owner(), policy(), {}, now=self.now, coordination=self.coord)["reason"], "generation_terminal")
+    def test_default_writer_keeps_legacy_reconciliation_and_numeric_history(self):
+        with patch.object(attempt, "IMMUTABLE_WRITER_ENABLED", False):
+            self.assertTrue(self.reconcile()["reconciled"])
+            self.assertTrue(self.reconcile()["alreadyReconciled"])
+        self.assertEqual(self.tags, {})
+        self.assertEqual([body["state"] for body in self.posts], ["pending", "success"])
+        self.assertTrue(all(ref["object"]["sha"] == self.sha for ref in self.refs.values()))
+        rows, head = attempt._status_rows(self.statuses, self.identities[0], strict=True)
+        self.assertIsInstance(head, int)
+        self.assertFalse(any("reservationSha" in row["_remote"] for row in rows))
     def test_latest_bank_run_cannot_certify_the_other_identity(self):
         self.journal.pop(0); self.flush(); self.blocked("own-ended-receipt-missing")
     def test_duplicate_ended_receipts_are_ambiguous(self):
@@ -849,6 +1038,8 @@ class CompletedFailureReconciliationTest(unittest.TestCase):
 class StaleStatusSweepTest(unittest.TestCase):
     """Every jovie-execution/* status on a PR head ends unless a live lease still owns it."""
     def setUp(self):
+        enabled = patch.object(attempt, "IMMUTABLE_WRITER_ENABLED", True)
+        enabled.start(); self.addCleanup(enabled.stop)
         self.tmp = tempfile.TemporaryDirectory(); self.addCleanup(self.tmp.cleanup)
         self.dir = Path(self.tmp.name)
         self.sha = "b" * 40

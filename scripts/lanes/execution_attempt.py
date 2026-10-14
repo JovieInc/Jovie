@@ -117,6 +117,10 @@ def _github_rows(coordination: dict, ident: dict) -> tuple[list[dict], int | str
     pages = _gh(coordination, "GET", f"repos/{repository}/commits/{sha}/statuses?per_page=100")
     return _status_rows(_status_pages(pages), ident, coordination=coordination)
 RESERVATION_SCHEMA = "jovie-execution-reservation/v1"
+# Reader-first rollout: self-update must not activate incompatible writer links.
+# Enable only in a reviewed release after every participating reader/writer is
+# verified ready. This is deliberately not a JSON or environment override.
+IMMUTABLE_WRITER_ENABLED = False
 def _append_ref(ident: dict, head) -> str:
     return f"refs/jovie-execution/{ident['identityDigest']}/append-{head if head is not None else 'root'}"
 def _without_status(row: dict) -> dict:
@@ -149,7 +153,8 @@ def _candidate(coord: dict, ident: dict, head, sha: str, obj: dict) -> dict:
     if valid and row.get("event") == "attempt_started":
         who = row.get("owner")
         valid = (isinstance(who, dict) and all(isinstance(who.get(key), str) and who[key].strip()
-                 for key in ("owner", "runtime", "provider", "model", "tool", "accountPool"))
+                 for key in ("owner", "runtime", "provider", "tool", "accountPool"))
+                 and "model" in who and (who["model"] is None or isinstance(who["model"], str) and who["model"].strip())
                  and isinstance(row.get("fencingToken"), str) and re.fullmatch(r"[0-9a-f]{64}", row["fencingToken"]))
     if not valid: raise RuntimeError("execution-coordinator-candidate-unverified")
     return {**row, "_remote": {**remote, "reservationSha": sha}}
@@ -191,7 +196,28 @@ def _verify_reservations(coord: dict, ident: dict, candidate: dict):
     refs = [_append_ref(ident, candidate["_remote"]["prevStatusId"]), _attempt_reservation(ident, candidate)]
     if any(ref and _read_ref(coord, ref) != expected for ref in refs):
         raise RuntimeError("execution-coordinator-reservation-unverified")
-def _recover_append(coord: dict, ident: dict, head):
+def _unknown_boundary(coord: dict, ident: dict, candidate: dict, rows: list[dict], now: float):
+    # Reserve the existing terminal disposition BEFORE exposing a recovered
+    # boundary. If this helper dies next, every later operation sees the
+    # terminal reservation before it can authorize another action or resume.
+    head = candidate["_remote"]["reservationSha"]
+    ref = _append_ref(ident, head)
+    if _read_ref(coord, ref) is None:
+        start = next((row for row in rows if row.get("event") == "attempt_started"
+                      and row.get("fencingToken") == candidate.get("fencingToken")), None)
+        if start is None: raise RuntimeError("execution-coordinator-boundary-unbound")
+        ended = _expired_row(rows, ident, start, now)
+        ended.update(failureClass="boundary_outcome_unknown", failureFingerprint="recovered_boundary_without_dispatch_outcome")
+        ended["diagnosis"] = _diagnosis([*rows, candidate, ended], "failed_unknown")
+        _github_append(coord, ident, ended, head, publish=False)
+    observed = _read_ref(coord, ref)
+    if not observed or observed.get("type") != "tag": raise RuntimeError("execution-coordinator-boundary-unknown")
+    ended = _read_candidate(coord, ident, head, observed.get("sha"))
+    if (ended.get("event") != "attempt_finished" or ended.get("fencingToken") != candidate.get("fencingToken")
+        or ended.get("terminalState") != "failed_unknown" or ended.get("failureClass") != "boundary_outcome_unknown"):
+        raise RuntimeError("execution-coordinator-boundary-unknown")
+    _verify_reservations(coord, ident, ended)
+def _recover_append(coord: dict, ident: dict, head, rows: list[dict], now: float):
     ref = _append_ref(ident, head)
     observed = _read_ref(coord, ref)
     if observed is None: return None
@@ -200,11 +226,25 @@ def _recover_append(coord: dict, ident: dict, head):
     attempt_ref = _attempt_reservation(ident, candidate)
     if attempt_ref and not _reserve(coord, ident, candidate, attempt_ref): raise RuntimeError("execution-coordinator-attempt-reserved")
     _verify_reservations(coord, ident, candidate)
+    if candidate["event"] == "boundary_admitted": _unknown_boundary(coord, ident, candidate, rows, now)
     # This only completes the winning receipt. It never grants the helper the
     # winner's fence, renews a lease, or chooses a replacement outcome.
     _gh(coord, "POST", f"repos/{coord['repository']}/statuses/{coord['sha']}", _status_body(coord, ident, candidate))
+    if candidate["event"] == "boundary_admitted": _recover_append(coord, ident, candidate["_remote"]["reservationSha"], [*rows, candidate], now)
     return candidate
-def _github_append(coordination: dict, ident: dict, row: dict, head) -> str | None:
+def _legacy_append(coord: dict, ident: dict, row: dict, head) -> str | None:
+    candidate = {**row, "_remote": {"prevStatusId": head, "eventId": uuid.uuid4().hex}}
+    body = _status_body(coord, ident, candidate)
+    if _gh(coord, "POST", f"repos/{coord['repository']}/git/refs", {"ref": _append_ref(ident, head), "sha": coord["sha"]}) is None: return None
+    if row["event"] == "attempt_started":
+        ref = _completion_ref(ident, row["attempt"])
+        if _gh(coord, "POST", f"repos/{coord['repository']}/git/refs", {"ref": ref, "sha": coord["sha"]}) is None: return None
+    _gh(coord, "POST", f"repos/{coord['repository']}/statuses/{coord['sha']}", body)
+    return candidate["_remote"]["eventId"]
+def _github_append(coordination: dict, ident: dict, row: dict, head, *, publish=True) -> str | None:
+    if not IMMUTABLE_WRITER_ENABLED:
+        if isinstance(head, str) or not publish: raise RuntimeError("execution-coordinator-writer-not-activated")
+        return _legacy_append(coordination, ident, row, head)
     candidate = {**row, "_remote": {"prevStatusId": head, "eventId": uuid.uuid4().hex}}
     # Include the fixed-size object proof in the preflight; an oversize status
     # must not strand a reservation. Candidate creation precedes every CAS.
@@ -219,15 +259,23 @@ def _github_append(coordination: dict, ident: dict, row: dict, head) -> str | No
     ref = _attempt_reservation(ident, candidate)
     if ref and not _reserve(coordination, ident, candidate, ref): return None
     _verify_reservations(coordination, ident, candidate)
-    _gh(coordination, "POST", f"repos/{coordination['repository']}/statuses/{coordination['sha']}", body)
+    if publish:
+        try: _gh(coordination, "POST", f"repos/{coordination['repository']}/statuses/{coordination['sha']}", body)
+        except RuntimeError:
+            if row["event"] == "boundary_admitted":
+                rows, _ = _github_rows(coordination, ident)
+                _unknown_boundary(coordination, ident, candidate, rows, max(time.time(), candidate["at"]))
+            raise
     return candidate["_remote"]["eventId"]
-def _locked(path: Path, ident: dict, coordination: dict | None, fn):
+def _locked(path: Path, ident: dict, coordination: dict | None, fn, *, now=None):
     kind = (coordination or {}).get("kind")
     if kind == "local-test": return _file_locked(path, fn)
     if kind != "github-status": raise ValueError("execution-coordination-required")
+    now = time.time() if now is None else now
     for _ in range(4):
         rows, head = _github_rows(coordination, ident)
-        recovered = _recover_append(coordination, ident, head)
+        if not IMMUTABLE_WRITER_ENABLED and isinstance(head, str): raise RuntimeError("execution-coordinator-writer-not-activated")
+        recovered = _recover_append(coordination, ident, head, rows, now) if IMMUTABLE_WRITER_ENABLED else None
         if recovered:
             rows, head = _github_rows(coordination, ident)
             winner = next((row for row in rows if row.get("_remote", {}).get("eventId") == recovered["_remote"]["eventId"]), None)
@@ -308,7 +356,7 @@ def claim(path: Path, ident: dict, owner: dict, policy: dict, trigger: dict, now
             "leaseExpiresAt": now + policy["leaseSeconds"], "trigger": trigger, "policy": policy,
             "remainingBudgets": _remaining(policy, {**used, "attempts": number, "concurrency": used["concurrency"] + 1})}
         return {"admitted": True, **row}, [row]
-    return _locked(Path(path), ident, coordination, decide)
+    return _locked(Path(path), ident, coordination, decide, now=now)
 def resume(path: Path, ident: dict, fence: str, owner: dict, now: float | None = None, coordination: dict | None = None) -> dict:
     """Resume the same live fenced attempt; never renew its lease or budgets.
 
@@ -323,9 +371,13 @@ def resume(path: Path, ident: dict, fence: str, owner: dict, now: float | None =
             or any(r.get("terminalState") in TERMINAL or (r["event"] == "attempt_finished" and r.get("fencingToken") == fence) for r in rows)):
             return {"admitted": False, "reason": "resume_not_admitted"}, []
         return {"admitted": True, **start, "resumed": True}, []
-    return _locked(Path(path), ident, coordination, decide)
+    return _locked(Path(path), ident, coordination, decide, now=now)
 
-def boundary(path: Path, ident: dict, fence: str, reservation: dict, now: float | None = None, coordination: dict | None = None) -> dict:
+def boundary(path: Path, ident: dict, fence: str, reservation: dict, now: float | None = None, coordination: dict | None = None, *, boundary_id: str | None = None) -> dict:
+    if boundary_id is not None and (not isinstance(boundary_id, str) or not re.fullmatch(r"[A-Za-z0-9_.:-]{1,128}", boundary_id)):
+        raise ValueError("execution-boundary-id-malformed")
+    if IMMUTABLE_WRITER_ENABLED and (coordination or {}).get("kind") == "github-status" and boundary_id is None:
+        raise ValueError("execution-boundary-id-required")
     now = time.time() if now is None else now
     reservation = {"spend": reservation.get("spend", 0), "mutations": reservation.get("mutations", 0)}
     if any(not _number(value) or value < 0 for value in reservation.values()): raise ValueError("execution-reservation-malformed")
@@ -337,11 +389,15 @@ def boundary(path: Path, ident: dict, fence: str, reservation: dict, now: float 
                        or (row["event"] == "attempt_finished" and row.get("fencingToken") == fence)
                        for row in rows)):
             raise RuntimeError("stale-fencing-token")
+        if boundary_id is not None and any(row.get("event") == "boundary_admitted" and row.get("fencingToken") == fence
+            and row.get("boundaryId") == boundary_id for row in rows):
+            raise RuntimeError("execution-boundary-already-reserved")
         used, policy = _usage(rows, now), start["policy"]
         if used["wallSeconds"] >= policy["wallSeconds"] or any(used[key] + reservation[key] > policy[key] for key in ("spend", "mutations")): raise RuntimeError("execution-budget-exhausted")
         row = {**ident, "schema": SCHEMA, "event": "boundary_admitted", "at": now, "attempt": start["attempt"], "fencingToken": fence, "reservation": reservation}
+        if boundary_id is not None: row["boundaryId"] = boundary_id
         return {"admitted": True, **row}, [row]
-    return _locked(Path(path), ident, coordination, decide)
+    return _locked(Path(path), ident, coordination, decide, now=now)
 def finish(path: Path, ident: dict, fence: str, result: str, detail: dict, now: float | None = None, coordination: dict | None = None) -> dict:
     now, detail = (time.time() if now is None else now), dict(detail)
     if result not in TERMINAL:
@@ -368,7 +424,7 @@ def finish(path: Path, ident: dict, fence: str, result: str, detail: dict, now: 
         if terminal and terminal != "succeeded":
             row["diagnosis"] = _diagnosis([*rows, row], terminal)
         return row, [row]
-    return _locked(Path(path), ident, coordination, decide)
+    return _locked(Path(path), ident, coordination, decide, now=now)
 
 def finalize_stale_statuses(path: Path, coordination: dict, now: float | None = None) -> list[dict]:
     """End every jovie-execution/* status on one head that no live attempt owns.
@@ -426,7 +482,7 @@ def finalize_stale_statuses(path: Path, coordination: dict, now: float | None = 
             if active["leaseExpiresAt"] > now: return "live", []
             return "expired", [_expired_row(rows, ident, active, now)]
         try:
-            outcomes.append({"context": context, "outcome": _locked(Path(path), ident, coordination, expire)})
+            outcomes.append({"context": context, "outcome": _locked(Path(path), ident, coordination, expire, now=now)})
         except RuntimeError as error:
             outcomes.append({"context": context, "outcome": f"contended:{error}"})
     return outcomes
@@ -609,12 +665,16 @@ def reconcile_completed_failure(path: Path, ident: dict, pr: int, *, coordinatio
                 return {"fenced": True}, []
             ended = rows[-1]
             next_attempt = ended["attempt"] + 1
+            if not IMMUTABLE_WRITER_ENABLED:
+                ref = _completion_ref(ident, next_attempt)
+                if _gh(coordination, "POST", f"repos/{coordination['repository']}/git/refs", {"ref": ref, "sha": coordination["sha"]}) is None:
+                    raise RuntimeError("reconciliation-next-slot-already-reserved")
             row = {**ident, "schema": SCHEMA, "event": "completion_fenced", "at": now, "attempt": ended["attempt"], "fencingToken": ended["fencingToken"],
                    "sealedAttempt": next_attempt, "result": "failed_known", "terminalState": None, "remainingBudgets": ended["remainingBudgets"],
                    "endedReceiptDigest": next(digest(item) for item in [json.loads(line) for line in (state / "runs/ledger.jsonl").read_text().splitlines()] if item.get("execution") == _plain(ended)),
                    "evidenceDigest": digest(proof)}
             return {"fenced": True}, [row]
-        _locked(Path(path), ident, coordination, fence)
+        _locked(Path(path), ident, coordination, fence, now=now)
         def decide(rows):
             proof = _reconciliation_proof(coordination, ident, rows, pr, state, json.loads(bank_path.read_text()), now)
             sealed = next(row for row in rows if row.get("event") == "completion_fenced")
@@ -628,7 +688,7 @@ def reconcile_completed_failure(path: Path, ident: dict, pr: int, *, coordinatio
                    "endedReceiptDigest": sealed["endedReceiptDigest"],
                    "evidenceDigest": digest(proof), "bankDigest": proof["bankDigest"]}
             return {"reconciled": True, **row, "proof": proof}, [row]
-        return _locked(Path(path), ident, coordination, decide)
+        return _locked(Path(path), ident, coordination, decide, now=now)
 if __name__ == "__main__":
     request = json.load(__import__("sys").stdin); command = request.pop("command")
     if command == "identity": print(json.dumps(identity(**request))); raise SystemExit(0)
