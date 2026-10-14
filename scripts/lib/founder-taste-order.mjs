@@ -48,9 +48,12 @@ export function workOrderDigest(order) {
     .digest('hex');
 }
 
-/** @param {string} identifier @param {string} bindingSha */
-export function tasteOrderId(identifier, bindingSha) {
-  return `founder-taste-${identifier.toUpperCase()}-${bindingSha.slice(0, 12)}`;
+/** @param {string} identifier @param {string} bindingSha @param {string | null} [episodeStartedAt] */
+export function tasteOrderId(identifier, bindingSha, episodeStartedAt) {
+  const episode = episodeStartedAt
+    ? `-${createHash('sha256').update(episodeStartedAt).digest('hex').slice(0, 12)}`
+    : '';
+  return `founder-taste-${identifier.toUpperCase()}-${bindingSha.slice(0, 12)}${episode}`;
 }
 
 /**
@@ -68,6 +71,7 @@ export function tasteOrderId(identifier, bindingSha) {
  *   uiEvidence: readonly { row: string, failureClass: string, targets: readonly string[] }[],
  *   reason: string,
  *   now: string,
+ *   episodeStartedAt?: string | null,
  * }} input
  */
 export function founderTasteOrder(input) {
@@ -78,10 +82,12 @@ export function founderTasteOrder(input) {
   ];
   const order = {
     schema: WORK_ORDER_SCHEMA,
-    orderId: tasteOrderId(identifier, input.bindingSha),
+    orderId: tasteOrderId(identifier, input.bindingSha, input.episodeStartedAt),
     revision: 1,
     idempotencyKey: `taste_${createHash('sha256')
-      .update(`${identifier}:${input.bindingSha}`)
+      .update(
+        `${identifier}:${input.bindingSha}${input.episodeStartedAt ? `:${input.episodeStartedAt}` : ''}`
+      )
       .digest('hex')
       .slice(0, 40)}`,
     gate: { ...TASTE_GATE },
@@ -102,7 +108,14 @@ export function founderTasteOrder(input) {
     authorityClass: 'founder',
     scope: {
       target: 'jov.ie',
-      entityRefs: [identifier, input.bindingPull, `sha:${input.deploymentSha}`],
+      entityRefs: [
+        identifier,
+        input.bindingPull,
+        `sha:${input.deploymentSha}`,
+        ...(input.episodeStartedAt
+          ? [`episode:${input.episodeStartedAt}`]
+          : []),
+      ],
     },
     evidence: [
       { ref: input.productionUrl, observedAt: input.now, freshness: 'fresh' },
@@ -223,9 +236,20 @@ export function readTasteOrders(description, identifier) {
  * @param {readonly { body?: string, createdAt?: string }[]} comments
  * @param {string} identifier
  * @returns {import('./validation-lifecycle.mjs').ValidationReceipt[]}
+ * @param {string | null} [episodeStartedAt]
  */
-export function tasteReceiptsFromResults(description, comments, identifier) {
-  const orders = readTasteOrders(description, identifier);
+export function tasteReceiptsFromResults(
+  description,
+  comments,
+  identifier,
+  episodeStartedAt
+) {
+  const orders = readTasteOrders(description, identifier).filter(
+    ({ order }) =>
+      episodeStartedAt === undefined ||
+      (episodeStartedAt !== null &&
+        order.scope.entityRefs.includes(`episode:${episodeStartedAt}`))
+  );
   if (orders.length === 0) return [];
   /** @type {import('./validation-lifecycle.mjs').ValidationReceipt[]} */
   const receipts = [];

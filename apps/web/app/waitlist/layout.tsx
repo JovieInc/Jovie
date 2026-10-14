@@ -22,5 +22,9 @@ export default async function WaitlistLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return <ResolvedClientProviders>{children}</ResolvedClientProviders>;
+  return (
+    <ResolvedClientProviders>
+      <main id='main-content'>{children}</main>
+    </ResolvedClientProviders>
+  );
 }
