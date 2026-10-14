@@ -78,6 +78,9 @@ export const CERTIFICATION_KERNEL_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/agent-os/certification.test.ts --coverage.enabled --coverage.provider=v8 --coverage.include=lib/agent-os/certification.ts --coverage.thresholds.lines=94 --coverage.thresholds.statements=93 --coverage.thresholds.branches=84 --coverage.thresholds.functions=96';
 export const ACQUISITION_CERTIFICATION_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts --pool=forks --maxWorkers=1 lib/acquisition/certification-store.test.ts lib/agent-os/certification-adapter.test.ts --coverage.enabled --coverage.provider=v8 --coverage.include=lib/acquisition/certification-store.ts --coverage.include=lib/agent-os/certification-cas.ts --coverage.include=lib/agent-os/certification-adapter.ts --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.statements=85 --coverage.thresholds.branches=80 --coverage.thresholds.functions=90 --coverage.reportsDirectory=coverage/jov-5603-acquisition';
+export const CODEX_BOOTSTRAP_COVERAGE_COMMAND =
+  'node --test --experimental-test-coverage --test-coverage-include=scripts/codex-cloud-setup.mjs --test-coverage-lines=90 --test-coverage-branches=90 --test-coverage-functions=100 scripts/codex-cloud-setup.test.mjs';
+
 export const BILLING_PROVENANCE_COVERAGE_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/lib/entitlements/creator-plan.test.ts tests/unit/lib/entitlements.server.test.ts tests/unit/lib/stripe/customer-sync.billing-info.test.ts tests/unit/lib/stripe/customer-sync.queries.test.ts lib/stripe/test-price-contract.test.ts --coverage.enabled --coverage.provider=v8 --coverage.include=lib/entitlements/creator-plan.ts --coverage.include=lib/entitlements/server.ts --coverage.include=lib/stripe/customer-sync/billing-info.ts --coverage.include=lib/stripe/test-price-contract.ts --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-billing-provenance-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=lcov --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=70 --coverage.thresholds.functions=80';
 export const FAN_SEND_SAFETY_COVERAGE_COMMAND =
@@ -162,6 +165,12 @@ export const SOURCE_GUARDS = Object.freeze([
       fileURLToPath(new URL('./lib/web-source-read-tests.mjs', import.meta.url))
     )}`,
     inputs: /./u,
+    prOnly: true,
+  }),
+  Object.freeze({
+    id: 'codex-bootstrap',
+    command: CODEX_BOOTSTRAP_COVERAGE_COMMAND,
+    inputs: /^(?:scripts\/codex-|\.codex\/|\.mcp\.json$)/u,
     prOnly: true,
   }),
   Object.freeze({
@@ -555,7 +564,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
 ]);
 export const DEPRECATION_COVERAGE_COMMAND =
   'node --test --experimental-test-coverage --test-coverage-include=scripts/deprecation-clearance.mjs --test-coverage-include=scripts/lib/deprecation-observation.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=90 scripts/deprecation-clearance.test.mjs';
-export const SCRIPT_CONTRACT_NODE_COMMAND = `${DEPRECATION_COVERAGE_COMMAND} && node --test ${SCRIPT_CONTRACT_NODE_TESTS.join(' ')}`;
+export const SCRIPT_CONTRACT_NODE_COMMAND = `${DEPRECATION_COVERAGE_COMMAND} && ${CODEX_BOOTSTRAP_COVERAGE_COMMAND} && node --test ${SCRIPT_CONTRACT_NODE_TESTS.join(' ')}`;
 export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/merge-group-failure-hold.test.mjs',
   'scripts/lib/__tests__/mesh-host-ack.test.mjs',
