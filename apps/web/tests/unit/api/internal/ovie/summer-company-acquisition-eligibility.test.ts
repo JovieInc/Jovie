@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const hoisted = vi.hoisted(() => ({
   verify: vi.fn(),
   eligibility: vi.fn(),
+  cache: vi.fn(),
   captureError: vi.fn(),
 }));
 
@@ -11,6 +12,9 @@ vi.mock('@/lib/ovie/summer-oidc.server', () => ({
 }));
 vi.mock('@/lib/acquisition/eligibility.server', () => ({
   getAcquisitionEligibility: hoisted.eligibility,
+}));
+vi.mock('@/lib/ovie/company-state.server', () => ({
+  readCompanyStateCache: hoisted.cache,
 }));
 vi.mock('@/lib/error-tracking', () => ({
   captureError: hoisted.captureError,
@@ -34,6 +38,20 @@ describe('GET /api/internal/ovie/summer-company/acquisition-eligibility', () => 
     const response = await route.GET(new Request(URL));
     expect(response.status).toBe(401);
     expect(hoisted.eligibility).not.toHaveBeenCalled();
+    expect(hoisted.cache).not.toHaveBeenCalled();
+  });
+
+  it('uses company state without probing providers for an ordinary read', async () => {
+    hoisted.cache.mockResolvedValue({
+      snapshot: {
+        sourcePayloads: {
+          acquisitionEligibility: { eligible: true, verdict: 'ELIGIBLE' },
+        },
+      },
+    });
+    const response = await route.GET(new Request(URL));
+    await expect(response.json()).resolves.toMatchObject({ eligible: true });
+    expect(hoisted.eligibility).not.toHaveBeenCalled();
   });
 
   it('returns the predicate uncached and honors fresh=1', async () => {
@@ -52,7 +70,7 @@ describe('GET /api/internal/ovie/summer-company/acquisition-eligibility', () => 
   });
 
   it('fails closed with an UNKNOWN verdict instead of an error', async () => {
-    hoisted.eligibility.mockRejectedValue(new Error('boom'));
+    hoisted.cache.mockRejectedValue(new Error('boom'));
     const response = await route.GET(new Request(URL));
     expect(response.status).toBe(200);
     const body = await response.json();
