@@ -18,6 +18,7 @@ import {
 import { getAppUserByBetterAuthId } from '@/lib/auth/app-user';
 import { auth } from '@/lib/auth/better-auth';
 import { checkUserStatus } from '@/lib/auth/status-checker';
+import { validateChatMessageParts } from '@/lib/chat/attachment-policy';
 import {
   confirmSelectedArtist,
   decideFallbackTurn,
@@ -1249,6 +1250,8 @@ function validateOnboardingMessages(messages: unknown[]): string | null {
     if (shapeError) return shapeError;
     // shape check guarantees parts is an array
     const parts = (messages[i] as { parts: unknown[] }).parts;
+    const attachmentError = validateChatMessageParts(parts);
+    if (attachmentError) return attachmentError;
     const partsError = validateTextPartLengths(parts, i);
     if (partsError) return partsError;
   }
