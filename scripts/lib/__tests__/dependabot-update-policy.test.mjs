@@ -1,6 +1,7 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
+import { load } from 'js-yaml';
 import { describe, expect, it, vi } from 'vitest';
 import {
   classifyDependabotEventPayload,
@@ -514,6 +515,48 @@ describe('Dependabot discovery contract', () => {
       expect(ecosystem).not.toMatch(/^\s+reviewers:/m);
       expect(ecosystem).toContain("assignees:\n      - 'itstimwhite'");
     }
+  });
+
+  it.each([
+    [
+      '/apps/eve-pilot',
+      [
+        { 'dependency-name': '@fastify/busboy', versions: ['2.1.1'] },
+        { 'dependency-name': 'sprintf-js', versions: ['1.1.3'] },
+        { 'dependency-name': 'undici', versions: ['5.28.4', '5.29.0'] },
+      ],
+    ],
+    [
+      '/scripts/security/deepsec',
+      [
+        { 'dependency-name': 'protobufjs', versions: ['7.6.4'] },
+        { 'dependency-name': 'undici', versions: ['8.5.0'] },
+      ],
+    ],
+  ])(
+    'limits security ignores in %s to the upstream-blocked versions',
+    (directory, ignores) => {
+      const entries = load(CONFIG).updates.filter(
+        entry =>
+          entry['package-ecosystem'] === 'npm' && entry.directory === directory
+      );
+      expect(entries).toHaveLength(1);
+      expect(entries[0]['open-pull-requests-limit']).toBe(0);
+      expect(entries[0].ignore).toEqual(ignores);
+    }
+  );
+
+  it('keeps the standalone scanner undici override compatible with npm ci', () => {
+    const directory = resolve(REPO_ROOT, 'scripts/security/deepsec');
+    const manifest = JSON.parse(
+      readFileSync(resolve(directory, 'package.json'), 'utf8')
+    );
+    const lockfile = JSON.parse(
+      readFileSync(resolve(directory, 'package-lock.json'), 'utf8')
+    );
+    expect(manifest.overrides['undici@^7.16.0']).toBe(
+      lockfile.packages['node_modules/undici'].version
+    );
   });
 
   it('routes framework majors instead of silently ignoring them', () => {
