@@ -9,6 +9,7 @@ import {
   hasAdminCredentials,
   prepareBetterAuthEmailOtp,
 } from '../helpers/auth';
+import { completeGoldenPathBillingJourney } from './helpers/golden-path-billing';
 import {
   captureKeyframe,
   watchKeyframeErrors,
@@ -19,7 +20,7 @@ import {
 } from './utils/runtime-automation-bypass';
 
 /**
- * Golden Path E2E — Anonymous Chat -> Signup -> Claim -> Live Profile
+ * Golden Path E2E — Anonymous Chat -> Auth -> Claim -> Catalog -> Billing
  *
  * Tests the complete new-user journey end to end with REAL data:
  * - Real anonymous conversation persistence and Better Auth signup
@@ -29,11 +30,8 @@ import {
  *
  * MusicFetch integration coverage remains in musicfetch-coverage.spec.ts.
  *
- * Jovie's pricing is a 14-day reverse trial with NO card required at signup
- * (see docs/PRICING-PHILOSOPHY.md), so the golden path's "first value" moment
- * is the artist's public profile going live with imported music — not a
- * paywall. Checkout is a post-activation upgrade path, not part of this
- * journey; persistence is covered by money-path-persistence.spec.ts.
+ * The profile first-value proof and post-activation Stripe persistence proof
+ * intentionally share one identity, claim, catalog, and production build.
  *
  * Test artist: "UNMARKED" (public catalog, no known Jovie owner)
  */
@@ -56,6 +54,7 @@ const IS_LOCAL_AUTH_BYPASS =
   process.env.E2E_USE_TEST_AUTH_BYPASS === '1' ||
   process.env.NEXT_PUBLIC_CLERK_MOCK === '1' ||
   process.env.NEXT_PUBLIC_CLERK_PROXY_DISABLED === '1';
+const IS_REQUIRED_GOLDEN_PATH = process.env.GOLDEN_PATH_REQUIRED === '1';
 
 function hasRealEnv(): boolean {
   return Object.values(REQUIRED_ENV).every(
@@ -147,6 +146,97 @@ async function interceptTrackingCalls(page: Page) {
   await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
 }
 
+/** Exercise the Google handoff and its denied-provider recovery UI. */
+async function exerciseGoogleProviderRecovery(page: Page): Promise<void> {
+  const signupPath = `/signup?plan=pro&interval=month&artist_name=${encodeURIComponent(TEST_SPOTIFY_ARTIST.name)}&redirect_url=%2Fstart`;
+  await page.goto(signupPath, { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('[data-auth-shell-hydrated="true"]')).toBeVisible({
+    timeout: 30_000,
+  });
+
+  const googleRoute = async (route: import('@playwright/test').Route) => {
+    await route.abort('aborted');
+  };
+  const socialRoute = async (route: import('@playwright/test').Route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        redirect: true,
+        url: 'https://accounts.google.com/o/oauth2/v2/auth?client_id=golden-path&redirect_uri=http%3A%2F%2Flocalhost%3A3250%2Fapi%2Fauth%2Fcallback%2Fgoogle',
+      }),
+    });
+  };
+  // Provider credentials and consent remain Google-owned. Stub only the
+  // transport response at the Better Auth boundary, then exercise the real
+  // hydrated button, redirect behavior, denial return, and saved offer state.
+  await page.route('**/api/auth/sign-in/social', socialRoute);
+  await page.route('https://accounts.google.com/**', googleRoute);
+  try {
+    const socialPost = page.waitForRequest(
+      request =>
+        request.method() === 'POST' &&
+        new URL(request.url()).pathname === '/api/auth/sign-in/social',
+      { timeout: 30_000 }
+    );
+    const providerNavigation = page.waitForRequest(
+      request =>
+        request.isNavigationRequest() &&
+        new URL(request.url()).hostname === 'accounts.google.com',
+      { timeout: 30_000 }
+    );
+    await page
+      .locator('button[data-auth-provider-slot="google"]')
+      .click({ noWaitAfter: true });
+    const [request, providerRequest] = await Promise.all([
+      socialPost,
+      providerNavigation,
+    ]);
+    const body = request.postDataJSON() as Record<string, unknown>;
+    expect(body.provider).toBe('google');
+    expect(JSON.stringify(body)).toContain('/onboarding/checkout');
+    expect(new URL(providerRequest.url()).hostname).toBe('accounts.google.com');
+  } finally {
+    await page.unroute('**/api/auth/sign-in/social', socialRoute);
+    await page.unroute('https://accounts.google.com/**', googleRoute);
+  }
+
+  await page.goto(`${signupPath}&oauth_error=access_denied`, {
+    waitUntil: 'domcontentloaded',
+  });
+  await expect(page.getByRole('alert').first()).toContainText(
+    'Sign-in was cancelled',
+    { timeout: 30_000 }
+  );
+  const savedIntent = await page.evaluate(() =>
+    sessionStorage.getItem('jovie_plan_intent')
+  );
+  expect(savedIntent).toBeTruthy();
+  expect(JSON.parse(String(savedIntent))).toMatchObject({
+    artist: TEST_SPOTIFY_ARTIST.name,
+    interval: 'month',
+    plan: 'pro',
+  });
+
+  // Continue through the product's card-free first-value path before upgrading.
+  // This overwrites only the offer tier; the anonymous claim session and artist
+  // survive into email fallback, and billing later receives explicit correlation.
+  await page.goto(
+    `/signup?plan=free&artist_name=${encodeURIComponent(TEST_SPOTIFY_ARTIST.name)}&redirect_url=%2Fstart`,
+    { waitUntil: 'domcontentloaded' }
+  );
+  await expect(page.locator('[data-auth-shell-hydrated="true"]')).toBeVisible({
+    timeout: 30_000,
+  });
+  const fallbackIntent = await page.evaluate(() =>
+    sessionStorage.getItem('jovie_plan_intent')
+  );
+  expect(JSON.parse(String(fallbackIntent))).toMatchObject({
+    artist: TEST_SPOTIFY_ARTIST.name,
+    plan: 'free',
+  });
+}
+
 /**
  * Create a brand-new Better Auth test user through the visible email-OTP
  * signup surface. E2E_TEST_MODE supplies the deterministic 424242 code only
@@ -157,6 +247,10 @@ async function createFreshUserOnce(page: import('@playwright/test').Page) {
   const preparedAuth = await prepareBetterAuthEmailOtp(page, {
     email,
     entryPath: '/signup',
+    recovery: {
+      initialEmail: email.replace('gp-', 'gp-abandoned-'),
+      resendCode: true,
+    },
     beforeResponseFulfill: ensureDbUser,
   });
 
@@ -410,7 +504,7 @@ async function createFreshUser(page: import('@playwright/test').Page) {
 /*  Test suite                                                          */
 /* ------------------------------------------------------------------ */
 
-test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', () => {
+test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () => {
   test.describe.configure({ mode: 'serial', retries: 0 });
 
   // Fresh browser — no inherited auth state
@@ -418,6 +512,11 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
 
   test.beforeEach(async ({ page }) => {
     if (IS_LOCAL_AUTH_BYPASS) {
+      if (IS_REQUIRED_GOLDEN_PATH) {
+        throw new Error(
+          'Required Golden Path refuses the smoke auth bypass identity'
+        );
+      }
       test.skip(
         true,
         'Golden path requires the dedicated real-auth lane, not the smoke auth bypass'
@@ -425,17 +524,24 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
     }
 
     if (!hasRealEnv()) {
+      if (IS_REQUIRED_GOLDEN_PATH) {
+        throw new Error('Required Golden Path is missing its real database');
+      }
       test.skip(true, 'Better Auth/DB env vars not configured');
+    }
+
+    if (IS_REQUIRED_GOLDEN_PATH && process.env.E2E_TEST_MODE !== '1') {
+      throw new Error('Required Golden Path is missing deterministic OTP mode');
     }
 
     await interceptTrackingCalls(page);
   });
 
-  test('complete user journey from signup to live public profile', async ({
+  test('completes one identity from provider recovery through revoked return', async ({
     page,
     browser,
   }) => {
-    test.setTimeout(600_000);
+    test.setTimeout(900_000);
     // JOV-5489: keyframes for the recorded visual review (no-op unless enabled).
     watchKeyframeErrors(page);
 
@@ -471,6 +577,25 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
     // STEP 3: Create account
     // ──────────────────────────────────────────────────────────────────
     const sql = neon(process.env.DATABASE_URL!);
+    const databaseRole = decodeURIComponent(
+      new URL(process.env.DATABASE_URL!).username
+    );
+    const [databaseContract] = await sql`
+      SELECT current_user AS role,
+             current_schema() AS schema,
+             to_regclass('public.users') IS NOT NULL AS "hasUsers",
+             to_regclass('public.creator_profiles') IS NOT NULL AS "hasProfiles",
+             to_regclass('public.user_profile_claims') IS NOT NULL AS "hasClaims",
+             to_regclass('public.stripe_webhook_events') IS NOT NULL AS "hasStripeEvents"
+    `;
+    expect(databaseContract).toMatchObject({
+      role: databaseRole,
+      schema: 'public',
+      hasUsers: true,
+      hasProfiles: true,
+      hasClaims: true,
+      hasStripeEvents: true,
+    });
     const conflictingProfiles = await sql`
       SELECT cp.id, cp.username_normalized, u.email
       FROM creator_profiles cp
@@ -482,7 +607,9 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
       `Protected Golden Path fixture is already owned; refusing to detach ${TEST_SPOTIFY_ARTIST.id}: ${JSON.stringify(conflictingProfiles)}`
     ).toHaveLength(0);
 
-    const { betterAuthUserId, claimPayload } = await createFreshUser(page);
+    await exerciseGoogleProviderRecovery(page);
+    const { email, betterAuthUserId, claimPayload } =
+      await createFreshUser(page);
 
     // JOV-8068: the mount claim transfers transcript ownership only. It must
     // NOT materialize a profile or authorize a checkout handoff before the
@@ -531,6 +658,15 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
                c.user_id AS "conversationUserId",
                c.creator_profile_id AS "conversationProfileId",
                (
+                 SELECT upc.id
+                 FROM user_profile_claims upc
+                 WHERE upc.user_id = u.id
+                   AND upc.creator_profile_id = cp.id
+                   AND upc.role = 'owner'
+                 ORDER BY upc.created_at ASC
+                 LIMIT 1
+               ) AS "ownerClaimId",
+               (
                  SELECT COUNT(*)::int
                  FROM user_profile_claims upc
                  WHERE upc.user_id = u.id
@@ -562,10 +698,15 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
         onboardingCompletedAt: expect.anything(),
         selectedSpotifyArtistId: TEST_SPOTIFY_ARTIST.id,
         ownerClaimCount: 1,
+        ownerClaimId: expect.any(String),
       });
     const claimedProfile = await readClaimedProfileProof();
     expect(claimedProfile).not.toBeNull();
     const profileId = claimedProfile?.id as string;
+    const appUserId = claimedProfile?.appUserId as string;
+    const claimId = claimedProfile?.ownerClaimId as string;
+    expect(appUserId).toBeTruthy();
+    expect(claimId).toBeTruthy();
     expect(claimedProfile?.activeProfileId).toBe(profileId);
     expect(claimedProfile?.conversationProfileId).toBe(profileId);
     expect(claimedProfile?.conversationUserId).toBe(claimedProfile?.appUserId);
@@ -853,5 +994,21 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
     } finally {
       await fanContext.close();
     }
+
+    // STEP 9: Reuse this exact identity and context for the post-activation
+    // checkout, webhook, fresh-browser return, refund, and revoked-cookie proof.
+    await completeGoldenPathBillingJourney({
+      appUserId,
+      betterAuthUserId,
+      browser,
+      claimId,
+      conversationId: String(conversationId),
+      databaseUrl: process.env.DATABASE_URL!,
+      email,
+      handle: uniqueHandle,
+      page,
+      profileId,
+      spotifyArtistId: TEST_SPOTIFY_ARTIST.id,
+    });
   });
 });
