@@ -485,6 +485,7 @@ async function runAutofix(args) {
     ident: executionIdentity,
     fence: execution.fencingToken,
     reservation: { spend: 1, mutations: 2 },
+    boundary_id: 'cursor-autofix',
   });
   const finishExecution = (
     result,

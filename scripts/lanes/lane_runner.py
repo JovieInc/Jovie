@@ -2445,9 +2445,9 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue) -> dict:
                     raise OSError("Hyperagent transport unavailable")
                 prompt = render_prompt(issue, branch, context_pack(issue), provider="hyperagent")
                 (runs / f"{run_id}.prompt.md").write_text(prompt)
-                def boundary(spend, mutations):
+                def boundary(spend, mutations, phase):
                     execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
-                                               {"spend": spend, "mutations": mutations}, coordination=coordination)
+                                               {"spend": spend, "mutations": mutations}, coordination=coordination, boundary_id=phase)
                 def find_pr(number):
                     result = sh(["gh", "pr", "view", str(number), "--repo", REPO_SLUG, "--json",
                                  "number,url,state,title,body,headRefName,headRefOid"])
@@ -2455,14 +2455,14 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue) -> dict:
                         raise RuntimeError("PR read unavailable")
                     return json.loads(result.stdout)
                 def gate(pr):
-                    boundary(0, 1)
+                    boundary(0, 1, "hyperagent-adopt")
                     # Existing adoption owns its isolated checkout, diff policy,
                     # canonical checks and native queue; no second PR is created.
                     return adopt_pr(host, "hyperagent", pr)
                 receipt["offer"]["accepted"] = True
                 receipt.update(hyperagent_lane.run(spec, issue.identifier, claimed["fencingToken"], branch, prompt,
                     evidence, api["mcp_call"], find_pr, gate, timeout=host.agent_timeout,
-                    before_dispatch=lambda: boundary(1, 1), refresh=refresh))
+                    before_dispatch=lambda: boundary(1, 1, "hyperagent-create"), refresh=refresh))
                 if receipt["verdict"] != "remote-held":
                     result = "succeeded" if receipt["verdict"] in ("landing", "verified-not-queued", "held", "gate-timeout") else "failed_unknown"
                     receipt["execution"] = execution_attempt.finish(runs / "execution-attempts.jsonl", ident,
@@ -2571,7 +2571,7 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
                  "gbrain": brain_context, "branch": branch})]
             started = time.time()
             execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
-                                       {"spend": 1, "mutations": 1}, coordination=coordination)
+                                       {"spend": 1, "mutations": 1}, coordination=coordination, boundary_id="issue-dispatch")
             agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file), "cwd": str(worktree),
                                                        "provider_receipt": str(provider_evidence),
                                                        "model": str(spec.get("model"))}),
@@ -2599,7 +2599,7 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
                                  "reason": "provider-error"})
                 note_failover(host, current, nxt_name, "provider-error")
                 execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
-                                           {"spend": 1, "mutations": 1}, coordination=coordination)
+                                           {"spend": 1, "mutations": 1}, coordination=coordination, boundary_id=f"issue-handoff:{len(handoffs)}")
                 agent = run_agent(template(nxt_spec["cmd"], {"prompt": handoff_prompt, "prompt_file": str(handoff_file),
                                                              "cwd": str(worktree),
                                                              "provider_receipt": str(provider_evidence),
@@ -5345,7 +5345,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
             resolved_generated = False
             if pr.get("mergeStateStatus") == "DIRTY":
                 execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
-                                           {"spend": 0, "mutations": 1}, coordination=coordination)
+                                           {"spend": 0, "mutations": 1}, coordination=coordination, boundary_id="repair-generated-conflict")
                 resolved_generated = resolve_generated_conflict(worktree, pr["headRefName"], log, guard=boundary)
             agent = None
             if resolved_generated:
@@ -5363,7 +5363,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                     {"pr": json.dumps(pr, sort_keys=True), "rendered_context": prompt})]
                 boundary("before-agent")
                 execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
-                                           {"spend": 1, "mutations": 1}, coordination=coordination)
+                                           {"spend": 1, "mutations": 1}, coordination=coordination, boundary_id="repair-dispatch")
                 agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file),
                                                          "cwd": str(worktree),
                                                          "provider_receipt": str(provider_evidence),
