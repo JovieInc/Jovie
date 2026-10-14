@@ -104,6 +104,9 @@ export function buildAuthOfferContinueUrl(handoff: AuthOfferHandoff): string {
   const url = new URL(APP_ROUTES.ONBOARDING_CHECKOUT, 'https://n');
   url.searchParams.set('plan', handoff.plan);
   url.searchParams.set('interval', handoff.interval ?? 'month');
+  // A paid-plan handoff is explicit intent, not an organic offer impression —
+  // JOV-8068 keeps it reachable even before the profile is live.
+  url.searchParams.set('source', 'intent');
   if (handoff.artist) url.searchParams.set('artist_name', handoff.artist);
   return url.pathname + url.search;
 }
