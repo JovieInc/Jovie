@@ -68,6 +68,7 @@ function input(overrides: Partial<CertificationMetricsInput> = {}) {
     roster: [],
     receipts: [],
     knownGoodDeploymentIds: [],
+    qualityReceipts: null,
     ...overrides,
   });
 }
@@ -76,6 +77,7 @@ describe('computeCertificationMetrics', () => {
   it('reports the contract and every lane with null metrics on empty input', () => {
     const result = input();
     expect(result.contract).toBe(CERTIFICATION_METRICS_CONTRACT);
+    expect(result.qualityScoreboard.source.status).toBe('disconnected');
     expect(Object.keys(result.lanes).sort()).toEqual(['jov', 'lyb', 'ovie']);
     const jov = result.lanes.jov;
     expect(jov.founderBlockingMinutes).toBe(0);
