@@ -374,10 +374,15 @@ describe('OnboardingCheckoutClient', () => {
       />
     );
 
-    expect(screen.getByText('Your artist profile')).toBeInTheDocument();
-    // No fake handle or placeholder glyph.
+    // JOV-8068: no fake handle, placeholder glyph, or fabricated preview —
+    // and the subtitle must not claim a nonexistent profile is live.
+    expect(screen.queryByText('Your artist profile')).not.toBeInTheDocument();
     expect(screen.queryByText(/^@/)).not.toBeInTheDocument();
     expect(screen.queryByText('?')).not.toBeInTheDocument();
+    expect(screen.queryByText(/profile is live/i)).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/adds on top of the free plan/i)
+    ).toBeInTheDocument();
   });
 
   it('records the offer as accepted server-side when upgrade starts', async () => {

@@ -20,11 +20,15 @@ import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
  * `jovie_onboarding_session` cookie and attaches matching anonymous
  * conversations to the freshly created user.
  *
- * On a durable pending receipt it navigates to `/waitlist`; admitted users
- * continue to `/onboarding/checkout`. Missing durable artist data stays in
- * the same `/start` conversation and retries after the next natural-language
- * turn. If the claim returns `claimed: 0` without an idempotent receipt, it
- * stays put and retries after later chat activity.
+ * On a durable pending receipt it navigates to `/waitlist`; a server-verified
+ * completed interview (`readyForCheckout`) continues to
+ * `/onboarding/checkout`. Claimed transcript ownership alone is NOT a
+ * handoff signal (JOV-8068): `claimed > 0` / `alreadyClaimed` without a
+ * terminal next-step decision keeps the user on /start and retries after the
+ * next turn. Missing durable artist data stays in the same `/start`
+ * conversation and retries after the next natural-language turn. If the
+ * claim returns `claimed: 0` without an idempotent receipt, it stays put and
+ * retries after later chat activity.
  *
  * Duplicate-request guard (JOV-2203):
  * React 18+ re-runs effects whenever any dependency changes. Clerk's auth
@@ -61,6 +65,12 @@ interface ClaimResponse {
     readonly handle: string | null;
     readonly status: 'created' | 'updated' | 'skipped';
   } | null;
+  /**
+   * Server-verified terminal handoff: a completed interview produced a
+   * materialized public profile. Only this (or a durable waitlist entry)
+   * may navigate off /start — bare `claimed`/`alreadyClaimed` may not.
+   */
+  readonly readyForCheckout?: boolean;
 }
 
 const MAX_RETRIES = 3;
@@ -214,7 +224,8 @@ export function useOnboardingClaim(
             status: body.profile.status,
           });
         }
-        // Hand off to the existing /onboarding/checkout flow.
+        // Hand off to the existing /onboarding/checkout flow. Only reached
+        // when the server confirmed a completed interview.
         router.replace(APP_ROUTES.ONBOARDING_CHECKOUT);
       };
 
@@ -231,7 +242,16 @@ export function useOnboardingClaim(
       }
 
       if ((body.claimed && body.claimed > 0) || body.alreadyClaimed) {
-        completeClaim();
+        // JOV-8068: transcript ownership is claimed, but that is not proof
+        // the interview finished. Only a durable waitlist receipt or a
+        // server-verified readyForCheckout may navigate off /start; anything
+        // less stays in the conversation and retries after the next turn.
+        if (body.waitlist?.entryId || body.readyForCheckout) {
+          completeClaim();
+          return;
+        }
+        markTriggerCompleted();
+        setStatus('claimed');
         return;
       }
 

@@ -121,6 +121,10 @@ export default async function OnboardingCheckoutPage({
     spotifyFollowers: null,
   };
 
+  // JOV-8068: a truthful "your profile is live" upsell requires a claimed,
+  // completed, public profile — not just any row selected by the dashboard.
+  let profileLive = false;
+
   try {
     const dashboardData = await getDashboardData();
     const profile = dashboardData.selectedProfile;
@@ -135,6 +139,9 @@ export default async function OnboardingCheckoutPage({
             | number
             | null) ?? null,
       };
+      profileLive = Boolean(
+        profile.isPublic && profile.isClaimed && profile.onboardingCompletedAt
+      );
     }
   } catch {
     // Profile load failed — proceed with empty data
@@ -157,6 +164,16 @@ export default async function OnboardingCheckoutPage({
   const returnTo = normalizeOnboardingReturnTo(
     typeof params.returnTo === 'string' ? params.returnTo : null
   );
+
+  // JOV-8068: the organic upsell may only render once the claimed profile is
+  // actually live. A signed-in visitor mid-interview (or a bare claim) is
+  // routed by canonical state — /start to finish onboarding, /app when
+  // already active — never a premature offer over an empty preview.
+  // Explicit paid intent (source=intent) is unaffected — it is
+  // artist-initiated checkout, not an offer impression.
+  if (isDefaultUpsell && !profileLive) {
+    redirect(getRedirectForState(authResult.state) ?? APP_ROUTES.START);
+  }
 
   // JOV-6675: the Artist Presence upgrade offer surfaces at most once per
   // claimed artist. Any prior seen/accepted/dismissed receipt means the offer
