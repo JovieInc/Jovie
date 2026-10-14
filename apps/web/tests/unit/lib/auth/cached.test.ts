@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   mockGetSession,
   mockGetAppUserByBetterAuthId,
+  mockGetAppUserById,
+  mockGetImpersonationState,
   mockCache,
   mockGetCachedDevTestAuthSession,
   mockBuildDevTestAuthCurrentUser,
@@ -10,6 +12,8 @@ const {
 } = vi.hoisted(() => ({
   mockGetSession: vi.fn(),
   mockGetAppUserByBetterAuthId: vi.fn(),
+  mockGetAppUserById: vi.fn(),
+  mockGetImpersonationState: vi.fn(),
   mockGetCachedDevTestAuthSession: vi.fn(),
   mockBuildDevTestAuthCurrentUser: vi.fn(),
   mockHeaders: vi.fn(),
@@ -48,6 +52,11 @@ vi.mock('@/lib/auth/better-auth', () => ({
 
 vi.mock('@/lib/auth/app-user', () => ({
   getAppUserByBetterAuthId: mockGetAppUserByBetterAuthId,
+  getAppUserById: mockGetAppUserById,
+}));
+
+vi.mock('@/lib/admin/impersonation', () => ({
+  getImpersonationState: mockGetImpersonationState,
 }));
 
 vi.mock('@/lib/auth/dev-test-auth.server', () => ({
@@ -66,6 +75,7 @@ describe('cached auth utilities', () => {
     vi.resetModules();
     mockHeaders.mockResolvedValue(new Headers());
     mockGetCachedDevTestAuthSession.mockResolvedValue(null);
+    mockGetImpersonationState.mockResolvedValue(null);
     mockBuildDevTestAuthCurrentUser.mockImplementation(session => ({
       id: session.clerkUserId,
       username: session.username,
@@ -152,6 +162,39 @@ describe('cached auth utilities', () => {
 
       expect(result.userId).toBe('user_hdr');
       expect(mockGetSession).not.toHaveBeenCalled();
+    });
+
+    it('returns the impersonated effective user while retaining the admin actor', async () => {
+      mockGetSession.mockResolvedValue({
+        user: { id: 'ba_admin' },
+        session: { id: 'sess_admin' },
+      });
+      mockGetAppUserByBetterAuthId.mockResolvedValue({
+        id: 'user_admin',
+        userStatus: 'active',
+        deletedAt: null,
+      });
+      mockGetImpersonationState.mockResolvedValue({
+        realAdminUserId: 'user_admin',
+        effectiveUserId: 'user_target',
+      });
+      mockGetAppUserById.mockResolvedValue({
+        id: 'user_target',
+        betterAuthUserId: 'ba_target',
+        email: 'target@example.com',
+        name: 'Target Creator',
+        userStatus: 'active',
+        deletedAt: null,
+      });
+
+      const { getCachedAuth } = await import('@/lib/auth/cached');
+      await expect(getCachedAuth()).resolves.toEqual({
+        userId: 'user_target',
+        actorUserId: 'user_admin',
+        sessionId: 'sess_admin',
+        orgId: null,
+      });
+      expect(mockGetImpersonationState).toHaveBeenCalledWith('user_admin');
     });
 
     it.each([
@@ -271,6 +314,43 @@ describe('cached auth utilities', () => {
         'reader@example.com'
       );
       expect(mockGetSession.mock.calls[0]?.[0]?.query).toBeUndefined();
+    });
+
+    it('returns the effective Better Auth identity during impersonation', async () => {
+      mockGetSession.mockResolvedValue({
+        user: {
+          id: 'ba_admin',
+          email: 'admin@example.com',
+          name: 'Admin',
+          image: null,
+        },
+        session: { id: 'sess_admin' },
+      });
+      mockGetAppUserByBetterAuthId.mockResolvedValue({
+        id: 'user_admin',
+        userStatus: 'active',
+        deletedAt: null,
+      });
+      mockGetImpersonationState.mockResolvedValue({
+        realAdminUserId: 'user_admin',
+        effectiveUserId: 'user_target',
+      });
+      mockGetAppUserById.mockResolvedValue({
+        id: 'user_target',
+        betterAuthUserId: 'ba_target',
+        email: 'target@example.com',
+        name: 'Target Creator',
+        userStatus: 'active',
+        deletedAt: null,
+      });
+
+      const { getCachedCurrentUser } = await import('@/lib/auth/cached');
+      const user = await getCachedCurrentUser();
+
+      expect(user?.id).toBe('ba_target');
+      expect(user?.primaryEmailAddress?.emailAddress).toBe(
+        'target@example.com'
+      );
     });
   });
 });

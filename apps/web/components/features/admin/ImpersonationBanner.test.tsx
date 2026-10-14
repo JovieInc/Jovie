@@ -24,7 +24,7 @@ function mockImpersonation(overrides = {}) {
     data: {
       enabled: true,
       isImpersonating: true,
-      effectiveClerkId: 'user_active_impersonation_123456789',
+      effectiveUserId: '11111111-1111-4111-8111-111111111111',
       timeRemainingMs: 125_000,
       ...overrides,
     },
@@ -40,6 +40,7 @@ function mockImpersonation(overrides = {}) {
 describe('ImpersonationBanner', () => {
   afterEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it('renders the active impersonation warning and countdown affordances', async () => {
@@ -52,7 +53,7 @@ describe('ImpersonationBanner', () => {
       'alert'
     );
     expect(screen.getByText('Admin Impersonation Active')).toBeInTheDocument();
-    expect(screen.getByText(/user_active_impe/)).toBeInTheDocument();
+    expect(screen.getByText(/11111111-1111-41/)).toBeInTheDocument();
     expect(await screen.findByText('2:05')).toBeInTheDocument();
   });
 
@@ -87,5 +88,19 @@ describe('ImpersonationBanner', () => {
       undefined,
       expect.objectContaining({ onSuccess: expect.any(Function) })
     );
+  });
+
+  it('returns to the administrator surface after ending impersonation', () => {
+    const assign = vi.fn();
+    vi.stubGlobal('location', { assign });
+    mockImpersonation();
+    mockMutate.mockImplementation(
+      (_input, options: { onSuccess?: () => void }) => options.onSuccess?.()
+    );
+
+    render(<ImpersonationBanner />);
+    fireEvent.click(screen.getByRole('button', { name: 'End Session' }));
+
+    expect(assign).toHaveBeenCalledWith('/app/ov');
   });
 });

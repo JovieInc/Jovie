@@ -914,6 +914,295 @@ class CompletionBankTest(Isolated):
         self.assertNotIn("exhaustedUntil", state["beta"])
 
 
+class SubscriptionPoolTest(Isolated):
+    NOW = 1_000_000
+
+    def setUp(self):
+        super().setUp()
+        import hashlib
+        self.homes = {"current-login": (Path(self.tmp.name) / "active").resolve(),
+                      "lyb-pro": (Path(self.tmp.name) / "staged").resolve()}
+        self.emails = {"current-login": "primary@example.invalid", "lyb-pro": "extra@example.invalid"}
+        for home in self.homes.values():
+            home.mkdir()
+        self.profiles = {name: {"home": str(home), "slots": 3 if name == "current-login" else 1,
+                               "emailSha256": hashlib.sha256(self.emails[name].encode()).hexdigest()}
+                         for name, home in self.homes.items()}
+        self.env = patch.dict(os.environ, {"CODEX_LANE_AUTH_MODE": "subscription-pool",
+            "CODEX_LANE_SUBSCRIPTION_PROFILES": json.dumps(self.profiles), "CODEX_LANE_LOGIN_SLOTS": "3",
+            "CODEX_HOME": str(self.homes["current-login"]), "OPENAI_API_KEY": "must-not-reach-child",
+            "OPENAI_BASE_URL": "https://forbidden.invalid", "CODEX_API_KEY": "must-not-reach-child"})
+        self.env.start()
+        self.addCleanup(self.env.stop)
+        self.clock = patch.object(codex.time, "time", return_value=self.NOW)
+        self.clock.start()
+        self.addCleanup(self.clock.stop)
+
+    def snapshot(self, name):
+        value = current_snapshot(self.NOW)
+        value["account"]["account"].update(email=self.emails[name], planType="pro")
+        return value
+
+    def reconcile(self):
+        return codex.reconcile(self.NOW, if_due=0, fetch=self.snapshot)
+
+    def execute(self, name="lyb-pro", output="OK\n", code=0):
+        handle = codex.lease(name)
+        self.assertIsNotNone(handle)
+        descriptor = handle.fileno()
+        proc = SimpleNamespace(pid=123, stdin=io.StringIO(), stdout=io.StringIO(output), wait=lambda: code)
+        with patch.object(codex, "current_subscription_snapshot", side_effect=lambda name, **_: self.snapshot(name)), \
+                patch.object(codex.subprocess, "Popen", return_value=proc) as spawn, redirect_stdout(io.StringIO()):
+            result = codex.run_account(name, handle, ["fake"], "fixture", self.tmp.name, self.NOW)
+        self.assertTrue(handle.closed)
+        return result, spawn.call_args, descriptor
+
+    def test_invalid_configuration_fails_closed_without_discovery(self):
+        invalid = ["", "[]", "{}", "null", "{bad"]
+        for mutate in (lambda p: p.pop("current-login"),
+                       lambda p: p.update(third=p["lyb-pro"]),
+                       lambda p: p.update({"current-login.1": p.pop("lyb-pro")}),
+                       lambda p: p.update({"_ledger": p.pop("lyb-pro")}),
+                       lambda p: p["lyb-pro"].update(home=p["current-login"]["home"]),
+                       lambda p: p["lyb-pro"].update(emailSha256=p["current-login"]["emailSha256"]),
+                       lambda p: p["lyb-pro"].update(slots=2),
+                       lambda p: p["lyb-pro"].update(slots=True),
+                       lambda p: p["current-login"].update(slots=2),
+                       lambda p: p["current-login"].update(home=p["lyb-pro"]["home"]),
+                       lambda p: p["lyb-pro"].update(home="relative"),
+                       lambda p: p["lyb-pro"].update(home=str(Path(self.tmp.name) / "absent")),
+                       lambda p: p["lyb-pro"].update(emailSha256="unknown"),
+                       lambda p: p["lyb-pro"].update(credential="forbidden")):
+            value = json.loads(json.dumps(self.profiles)); mutate(value); invalid.append(json.dumps(value))
+        with patch.object(codex, "current_login_available", side_effect=AssertionError("invalid config must not probe")):
+            for raw in invalid:
+                with self.subTest(raw=raw), patch.dict(os.environ, {"CODEX_LANE_SUBSCRIPTION_PROFILES": raw}):
+                    with self.assertRaises(ValueError):
+                        codex.accounts()
+
+    def test_three_primary_plus_one_extra_preserve_existing_slot_paths(self):
+        self.reconcile()
+        handles = [codex.lease("current-login") for _ in range(3)] + [codex.lease("lyb-pro")]
+        try:
+            self.assertTrue(all(handles))
+            self.assertIsNone(codex.lease("current-login"))
+            self.assertIsNone(codex.lease("lyb-pro"))
+            self.assertEqual([Path(h.name).name for h in handles],
+                             ["current-login.lock", "current-login.1.lock", "current-login.2.lock", "lyb-pro.lock"])
+            report = codex.status(self.NOW, names=list(self.profiles))
+            self.assertEqual([r["freeSlots"] for r in report["accounts"].values()], [0, 0])
+            with patch.dict(os.environ, {"CODEX_LANE_AUTH_MODE": "current-login"}):
+                self.assertIsNone(codex.lease("current-login"), "old and pool workers must contend on the same locks")
+        finally:
+            for handle in handles: handle.close()
+        self.assertEqual([len(codex._slot_paths(n)) for n in self.profiles], [3, 1])
+
+    def test_reconciliation_keeps_independent_cadence_and_banks(self):
+        bank = {"exhaustedUntil": self.NOW + 100, "lastKind": "limit", "lastError": "usage limit", "runs": 2}
+        codex.write_state({"current-login": bank})
+        busy = codex.lease("lyb-pro")
+        try:
+            result = self.reconcile()
+            self.assertTrue(result["profiles"]["current-login"]["reconciled"])
+            self.assertEqual(result["profiles"]["lyb-pro"]["reason"], "account-lease-busy")
+        finally:
+            busy.close()
+        with patch.object(codex, "current_subscription_snapshot", side_effect=lambda name, **_: self.snapshot(name)) as fetch:
+            result = codex.reconcile(self.NOW)
+        self.assertEqual([call.args[0] for call in fetch.call_args_list], ["lyb-pro"])
+        self.assertEqual(result["profiles"]["current-login"]["reason"], "cadence")
+        row = codex.read_state()["current-login"]
+        self.assertTrue(all(row[key] == value for key, value in bank.items()))
+        self.assertTrue(codex.available("lyb-pro", codex.read_state(), self.NOW))
+        self.assertFalse(codex.available("lyb-pro", codex.read_state(), self.NOW + codex.LEDGER_CADENCE_S))
+
+    def test_unknown_identity_capacity_and_rebinding_are_not_available(self):
+        self.assertFalse(codex.available("lyb-pro", {}, self.NOW))
+        self.reconcile()
+        for mutate in (lambda r: r.pop("subscriptionBinding"),
+                       lambda r: r["subscriptionBinding"].update(home="/other"),
+                       lambda r: r.update(subscriptionIdentityVerifiedAt=self.NOW+1),
+                       lambda r: r.update(capacityLease={}),
+                       lambda r: r["capacityLease"]["usableCapacityRemaining"]["primary"].update(remainingPercent=0)):
+            state = codex.read_state(); mutate(state["lyb-pro"])
+            self.assertFalse(codex.available("lyb-pro", state, self.NOW))
+        row = codex.read_state()["lyb-pro"]; row["subscriptionBinding"]["home"] = "/prior"
+        codex.write_state({"lyb-pro": row})
+        with self.assertRaisesRegex(ValueError, "rebound"):
+            codex.lease("lyb-pro")
+
+    def test_wrong_account_plan_or_missing_identity_cannot_execute(self):
+        self.reconcile()
+        for account in ({"type":"apiKey"}, {"type":"chatgpt","email":None,"planType":"pro"},
+                        {"type":"chatgpt","email":"wrong@example.invalid","planType":"pro"},
+                        {"type":"chatgpt","email":self.emails["lyb-pro"],"planType":"plus"}):
+            with self.subTest(account=account):
+                value = self.snapshot("lyb-pro"); value["account"]["account"] = account
+                handle = codex.lease("lyb-pro")
+                with patch.object(codex, "current_subscription_snapshot", return_value=value), \
+                        patch.object(codex.subprocess, "Popen", side_effect=AssertionError("must not execute")):
+                    with self.assertRaises(ValueError):
+                        codex.run_account("lyb-pro", handle, ["fake"], "fixture", self.tmp.name, self.NOW)
+                self.assertTrue(handle.closed)
+                self.assertNotIn("runs", codex.read_state()["lyb-pro"])
+
+    def test_execution_pins_profile_home_strips_api_credentials_and_inherits_lease(self):
+        self.reconcile()
+        result, call, descriptor = self.execute()
+        self.assertEqual(result, (0, "ok", None))
+        self.assertEqual(call.kwargs["env"]["CODEX_HOME"], str(self.homes["lyb-pro"]))
+        self.assertFalse({"OPENAI_API_KEY","OPENAI_BASE_URL","CODEX_API_KEY"}.intersection(call.kwargs["env"]))
+        self.assertEqual(call.kwargs["pass_fds"], (descriptor,))
+
+    def test_no_same_run_rotation_or_credit_redemption_after_limit(self):
+        self.reconcile()
+        busy = [codex.lease("current-login") for _ in range(3)]
+        prompt = Path(self.tmp.name) / "prompt.txt"; prompt.write_text("fixture")
+        proc = SimpleNamespace(pid=123, stdin=io.StringIO(), stdout=io.StringIO("usage limit. Try again in 1 hour.\n"), wait=lambda:1)
+        try:
+            with patch.object(codex, "current_login_available", return_value=True), \
+                    patch.object(codex, "current_subscription_snapshot", side_effect=lambda name, **_: self.snapshot(name)), \
+                    patch.object(codex, "maybe_redeem", side_effect=AssertionError("no reset authority")), \
+                    patch.object(codex.subprocess, "Popen", return_value=proc) as spawn, redirect_stdout(io.StringIO()):
+                code = codex.run(SimpleNamespace(prompt_file=str(prompt),cwd=self.tmp.name,model=None,reasoning_effort=None))
+            self.assertEqual(code, codex.NO_ACCOUNT_EXIT)
+            self.assertEqual(spawn.call_count, 1)
+            argv = spawn.call_args.args[0]
+            self.assertNotIn("--dangerously-bypass-approvals-and-sandbox", argv)
+            self.assertIn('approvals_reviewer="auto_review"', argv)
+            self.assertIn('model_provider="openai"', argv)
+            self.assertIn('forced_login_method="chatgpt"', argv)
+        finally:
+            for handle in busy: handle.close()
+
+    def test_metadata_transport_rejects_wrong_lease_and_nonpublic_calls(self):
+        handle = codex.lease("current-login")
+        try:
+            for name,calls in (("lyb-pro",codex.CURRENT_METADATA_CALLS),
+                               ("current-login",[("account/rateLimitResetCredit/consume",{})])):
+                with self.subTest(name=name), patch.object(codex.subprocess,"Popen",side_effect=AssertionError("no probe")):
+                    with self.assertRaises(ValueError):codex.app_server_calls(name,calls,lease_handle=handle)
+            with patch.dict(os.environ,{"CODEX_LANE_SUBSCRIPTION_PROFILES":json.dumps({
+                    **self.profiles,"lyb-pro":{**self.profiles["lyb-pro"],"emailSha256":"a"*64}})}):
+                # A change to an unrelated profile does not change this bound current lease.
+                self.assertEqual(codex.leased_profile("current-login",handle),self.profiles["current-login"])
+        finally:handle.close()
+
+    def test_verified_depletion_banks_only_that_account_without_execution(self):
+        self.reconcile()
+        value = self.snapshot("lyb-pro")
+        value["rateLimits"]["rateLimits"]["primary"]["usedPercent"] = 100
+        handle = codex.lease("lyb-pro")
+        with patch.object(codex,"current_subscription_snapshot",return_value=value), \
+                patch.object(codex.subprocess,"Popen",side_effect=AssertionError("no exhausted execution")):
+            self.assertEqual(codex.run_account("lyb-pro",handle,["fake"],"fixture",self.tmp.name,self.NOW),
+                             (codex.NO_ACCOUNT_EXIT,"limit",self.NOW+7200))
+        self.assertTrue(codex.available("current-login",codex.read_state(),self.NOW))
+        self.assertFalse(codex.available("lyb-pro",codex.read_state(),self.NOW))
+
+    def test_failed_observation_keeps_its_own_cadence_without_suppressing_other_profile(self):
+        seen = []
+        def fetch(name):
+            seen.append(name)
+            if name == "current-login": raise ValueError("unavailable")
+            return self.snapshot(name)
+        result = codex.reconcile(self.NOW,fetch=fetch)
+        self.assertFalse(result["profiles"]["current-login"]["reconciled"])
+        self.assertTrue(result["profiles"]["lyb-pro"]["reconciled"])
+        codex.reconcile(self.NOW,fetch=fetch)
+        self.assertEqual(seen,["current-login","lyb-pro"])
+
+    def test_auth_bank_clears_only_after_newer_bound_official_identity_observation(self):
+        self.reconcile()
+        for failed_at,verified_at,clears in ((self.NOW-1,self.NOW,True),
+                (self.NOW,self.NOW,False),(self.NOW+1,self.NOW,False),
+                (self.NOW-4000,self.NOW-3600,False)):
+            with self.subTest(failed_at=failed_at,verified_at=verified_at):
+                state=codex.read_state()
+                state["lyb-pro"].update(exhaustedUntil=self.NOW+86400,lastKind="auth",lastRunAt=failed_at,
+                                        lastError="401",subscriptionIdentityVerifiedAt=verified_at)
+                state["current-login"].update(exhaustedUntil=self.NOW+3600,lastKind="limit")
+                codex.write_state(state)
+                result=codex.reverify_auth_bank(state,self.NOW)
+                self.assertEqual("exhaustedUntil" not in result["lyb-pro"],clears)
+                self.assertEqual(result["current-login"]["exhaustedUntil"],self.NOW+3600)
+
+    def test_changed_selected_profile_cannot_cross_lease_to_execution(self):
+        self.reconcile()
+        handle=codex.lease("lyb-pro")
+        changed=json.loads(json.dumps(self.profiles));changed["lyb-pro"]["emailSha256"]="b"*64
+        with patch.dict(os.environ,{"CODEX_LANE_SUBSCRIPTION_PROFILES":json.dumps(changed)}), \
+                patch.object(codex.subprocess,"Popen",side_effect=AssertionError("must not spawn")):
+            with self.assertRaises(ValueError):codex.run_account("lyb-pro",handle,["fake"],"fixture",self.tmp.name,self.NOW)
+        self.assertTrue(handle.closed)
+
+    def test_child_inherited_descriptor_keeps_exclusive_extra_lease_after_parent_close(self):
+        import subprocess
+        handle=codex.lease("lyb-pro")
+        child=subprocess.Popen([sys.executable,"-c","import sys; print('ready',flush=True); sys.stdin.read()"],
+                               stdin=subprocess.PIPE,stdout=subprocess.PIPE,text=True,pass_fds=(handle.fileno(),))
+        try:
+            self.assertEqual(child.stdout.readline().strip(),"ready")
+            handle.close()
+            self.assertIsNone(codex.lease("lyb-pro"))
+        finally:
+            child.stdin.close();child.wait(timeout=5);child.stdout.close()
+            if not handle.closed:handle.close()
+        again=codex.lease("lyb-pro");self.assertIsNotNone(again);again.close()
+
+    def test_invalid_or_expired_public_capacity_never_spawns(self):
+        self.reconcile()
+        for mutate in (lambda v:v["rateLimits"].update(rateLimits={}),
+                       lambda v:v["rateLimits"]["rateLimits"]["primary"].update(usedPercent=float("nan")),
+                       lambda v:v["rateLimits"]["rateLimits"]["primary"].update(resetsAt=self.NOW)):
+            value=self.snapshot("lyb-pro");mutate(value);handle=codex.lease("lyb-pro")
+            with patch.object(codex,"current_subscription_snapshot",return_value=value), \
+                    patch.object(codex.subprocess,"Popen",side_effect=AssertionError("no execution")):
+                with self.assertRaises(ValueError):codex.run_account("lyb-pro",handle,["fake"],"fixture",self.tmp.name,self.NOW)
+            self.assertTrue(handle.closed)
+
+    def test_renaming_an_account_cannot_bypass_its_live_lease_or_bank(self):
+        self.reconcile()
+        handle=codex.lease("lyb-pro")
+        codex.update_state(lambda state:state["lyb-pro"].update(exhaustedUntil=self.NOW+86400,lastKind="auth"))
+        changed=json.loads(json.dumps(self.profiles));changed["renamed-pro"]=changed.pop("lyb-pro")
+        try:
+            with patch.dict(os.environ,{"CODEX_LANE_SUBSCRIPTION_PROFILES":json.dumps(changed)}):
+                with self.assertRaisesRegex(ValueError,"another alias"):
+                    codex.lease("renamed-pro")
+                self.assertNotIn("renamed-pro",codex.read_state())
+                self.assertEqual(codex.read_state()["lyb-pro"]["exhaustedUntil"],self.NOW+86400)
+        finally:handle.close()
+
+    def test_new_alias_identity_reservation_is_atomic_before_any_execution_lease(self):
+        # Even an unreconciled native lease binds the identity permanently.
+        handle=codex.lease("lyb-pro")
+        changed=json.loads(json.dumps(self.profiles));changed["renamed-pro"]=changed.pop("lyb-pro")
+        try:
+            with patch.dict(os.environ,{"CODEX_LANE_SUBSCRIPTION_PROFILES":json.dumps(changed)}):
+                with self.assertRaises(ValueError):codex.lease("renamed-pro")
+        finally:handle.close()
+
+    def test_natural_reset_refreshes_once_and_failed_refresh_retains_hourly_throttle(self):
+        def near_reset(name):
+            value=self.snapshot(name)
+            if name=="lyb-pro":value["rateLimits"]["rateLimits"]["primary"]["resetsAt"]=self.NOW+30
+            return value
+        codex.reconcile(self.NOW,fetch=near_reset)
+        self.assertFalse(codex.available("lyb-pro",codex.read_state(),self.NOW+31))
+        seen=[]
+        def refresh(name):seen.append(name);return self.snapshot(name)
+        result=codex.reconcile(self.NOW+31,fetch=refresh)
+        self.assertEqual(seen,["lyb-pro"])
+        self.assertTrue(result["profiles"]["lyb-pro"]["reconciled"])
+        self.assertTrue(codex.available("lyb-pro",codex.read_state(),self.NOW+31))
+        codex.write_state({});codex.reconcile(self.NOW,fetch=near_reset)
+        seen=[]
+        def fail(name):seen.append(name);raise ValueError("unavailable")
+        codex.reconcile(self.NOW+31,fetch=fail);codex.reconcile(self.NOW+32,fetch=fail)
+        self.assertEqual(seen,["lyb-pro"])
+
+
 class LaunchIdentityTest(Isolated):
     """Exercise the real pipe/receipt boundary with a model-free CLI stand-in."""
     SESSION = "01a10a2c-4cd3-7150-b5dd-575434d84155"

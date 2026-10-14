@@ -39,7 +39,7 @@ function impersonationRateLimitResponse(result: RateLimitResult) {
 }
 
 const StartImpersonationSchema = z.object({
-  targetClerkId: z.string().min(1, 'Target user ID is required'),
+  targetUserId: z.string().uuid('Target user ID must be a valid UUID'),
 });
 
 /**
@@ -55,12 +55,13 @@ export async function GET() {
   if (authError) return authError;
 
   // Apply rate limiting (5 attempts per hour per admin)
-  const { userId: adminClerkId } = await getCachedAuth();
-  if (!adminClerkId) {
+  const auth = await getCachedAuth();
+  const adminUserId = auth.actorUserId ?? auth.userId;
+  if (!adminUserId) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
-  const rateLimitResult = await adminImpersonateLimiter.limit(adminClerkId);
+  const rateLimitResult = await adminImpersonateLimiter.limit(adminUserId);
   if (!rateLimitResult.success) {
     return impersonationRateLimitResponse(rateLimitResult);
   }
@@ -74,8 +75,8 @@ export async function GET() {
       });
     }
 
-    const state = await getImpersonationState();
-    const timeRemaining = await getImpersonationTimeRemaining();
+    const state = await getImpersonationState(adminUserId);
+    const timeRemaining = await getImpersonationTimeRemaining(adminUserId);
 
     if (!state) {
       return NextResponse.json({
@@ -87,9 +88,8 @@ export async function GET() {
     return NextResponse.json({
       enabled: true,
       isImpersonating: true,
-      realAdminClerkId: state.realAdminClerkId,
-      effectiveClerkId: state.effectiveClerkId,
-      effectiveDbId: state.effectiveDbId,
+      realAdminUserId: state.realAdminUserId,
+      effectiveUserId: state.effectiveUserId,
       issuedAt: state.issuedAt,
       expiresAt: state.expiresAt,
       timeRemainingMs: timeRemaining,
@@ -116,7 +116,7 @@ export async function GET() {
  * Start impersonating a user
  *
  * Requires: Admin privileges
- * Body: { targetClerkId: string }
+ * Body: { targetUserId: string }
  */
 export async function POST(request: Request) {
   // Require admin privileges
@@ -124,15 +124,16 @@ export async function POST(request: Request) {
   if (authError) return authError;
 
   // Apply rate limiting (5 attempts per hour per admin)
-  const { userId: adminClerkId } = await getCachedAuth({ session: 'fresh' });
+  const auth = await getCachedAuth({ session: 'fresh' });
+  const adminUserId = auth.actorUserId ?? auth.userId;
   const clientIp = getClientIP(request);
-  const rateLimitKey = adminClerkId ?? `ip:${clientIp}`;
+  const rateLimitKey = adminUserId ?? `ip:${clientIp}`;
   const rateLimitResult = await adminImpersonateLimiter.limit(rateLimitKey);
   if (!rateLimitResult.success) {
     return impersonationRateLimitResponse(rateLimitResult);
   }
 
-  if (!adminClerkId) {
+  if (!adminUserId) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
@@ -158,7 +159,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { targetClerkId } = validation.data;
+    const { targetUserId } = validation.data;
 
     // Get request metadata for audit logging
     const headersList = await headers();
@@ -167,8 +168,8 @@ export async function POST(request: Request) {
     const userAgent = headersList.get('user-agent') ?? undefined;
 
     const result = await startImpersonation(
-      adminClerkId,
-      targetClerkId,
+      adminUserId,
+      targetUserId,
       ipAddress,
       userAgent
     );
@@ -178,13 +179,13 @@ export async function POST(request: Request) {
     }
 
     logger.info(
-      `[admin/impersonate] Impersonation started: admin=${adminClerkId} target=${targetClerkId}`
+      `[admin/impersonate] Impersonation started: admin=${adminUserId} target=${targetUserId}`
     );
 
     return NextResponse.json({
       success: true,
       message: 'Impersonation session started',
-      targetClerkId,
+      effectiveUserId: targetUserId,
       expiresInMinutes: 15,
     });
   } catch (error) {
@@ -212,12 +213,13 @@ export async function DELETE() {
   if (authError) return authError;
 
   // Apply rate limiting (5 attempts per hour per admin)
-  const { userId: adminClerkId } = await getCachedAuth({ session: 'fresh' });
-  if (!adminClerkId) {
+  const auth = await getCachedAuth({ session: 'fresh' });
+  const adminUserId = auth.actorUserId ?? auth.userId;
+  if (!adminUserId) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
-  const rateLimitResult = await adminImpersonateLimiter.limit(adminClerkId);
+  const rateLimitResult = await adminImpersonateLimiter.limit(adminUserId);
   if (!rateLimitResult.success) {
     return impersonationRateLimitResponse(rateLimitResult);
   }
@@ -229,7 +231,7 @@ export async function DELETE() {
       headersList.get('x-forwarded-for')?.split(',')[0] ?? undefined;
     const userAgent = headersList.get('user-agent') ?? undefined;
 
-    const result = await endImpersonation(ipAddress, userAgent);
+    const result = await endImpersonation(adminUserId, ipAddress, userAgent);
 
     if (!result.success) {
       return NextResponse.json(
