@@ -930,9 +930,6 @@ def convert_intake(lane, linear_factory, sh, now: float) -> list[int] | None:
     for row in rows:
         if not isinstance(row, dict):
             continue
-        body = row.get("body") or ""
-        if "linear-issue-id:" in body:
-            continue
         updated = iso_ts(row.get("updatedAt"))
         if updated is None or remediation.claim_open(updated, now):
             continue
@@ -960,8 +957,10 @@ def convert_intake(lane, linear_factory, sh, now: float) -> list[int] | None:
             notes = [note for page in pages for note in page]
             if any(not isinstance(note, dict) or not isinstance(note.get("body"), str) for note in notes):
                 continue
-            if any("linear-issue-id:" in note["body"] for note in notes):
-                continue  # Recover linkage written by the original comment-only converter.
+            # Body/comment markers are hints only. Resolve their destination
+            # against authoritative fingerprint history before trusting them.
+            linked_ids = set(re.findall(r"<!-- linear-issue-id:([0-9a-fA-F-]{36}) -->",
+                                        "\n".join([body] + [note["body"] for note in notes])))
         except (OSError, subprocess.SubprocessError, ValueError, AttributeError):
             continue
         ws = "ci"
@@ -975,7 +974,7 @@ def convert_intake(lane, linear_factory, sh, now: float) -> list[int] | None:
             issue_id = ensure_linear_intake(linear, event)
         except Exception:
             continue
-        if not issue_id:
+        if not issue_id or issue_id in linked_ids:
             continue
         try:
             sh(["gh", "issue", "comment", str(row["number"]), "--repo", REPO, "--body",

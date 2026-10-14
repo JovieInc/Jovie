@@ -831,12 +831,27 @@ class IntakeConversionTest(unittest.TestCase):
         self.assertEqual(uuid.UUID(linear.creates[0]['id']).version, 4)
 
     def test_complete_comment_inventory_recovers_legacy_linkage(self):
+        body = events.remediation.intake_body({'source': 'intake', 'fingerprint': self.fingerprint})
+        existing = {'id': str(uuid.uuid4()), 'description': body, 'createdAt': '2026-10-13T00:00:00Z'}
         shell = self.shell()
-        shell.routes[('gh', 'api', '--paginate', '--slurp')] = [[], [{'body': '<!-- linear-issue-id:existing -->'}]]
-        linear = self.linear()
+        shell.routes[('gh', 'api', '--paginate', '--slurp')] = [[], [{'body': f"<!-- linear-issue-id:{existing['id']} -->"}]]
+        linear = self.linear(existing=[existing])
         self.assertIsNone(self.convert(linear, shell))
         self.assertFalse(linear.creates)
         self.assertFalse(shell.made('gh', 'issue', 'comment'))
+
+    def test_unbound_body_or_comment_marker_cannot_suppress_a_due_intake(self):
+        for hint in ('Quoted explanation of linear-issue-id: syntax',
+                     '<!-- linear-issue-id:not-an-id -->', f'<!-- linear-issue-id:{uuid.uuid4()} -->'):
+            for location in ('body', 'comment'):
+                with self.subTest(hint=hint, location=location):
+                    shell = self.shell(comments=[{'body': hint}] if location == 'comment' else [])
+                    if location == 'body':
+                        shell.routes[('gh', 'issue', 'list')][0]['body'] += '\n' + hint
+                    linear = self.linear()
+                    self.assertEqual(self.convert(linear, shell), [10])
+                    self.assertEqual(len(linear.creates), 1)
+                    self.assertEqual(len(shell.made('gh', 'issue', 'comment')), 1)
 
     def test_unreadable_linkage_does_not_authorize_creation(self):
         for reply in ((1, '[[]]'), 'not-json', {}, [None], [[{'body': None}]]):
