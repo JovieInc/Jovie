@@ -882,6 +882,29 @@ class AgedPrTest(unittest.TestCase):
 
 
 class StatusFeedTest(unittest.TestCase):
+    def test_feed_publishes_per_project_attribution_and_missing_receipt_links(self):
+        merged = {"number": 7, "title": "change", "url": "https://github.com/JovieInc/Jovie/pull/7",
+                  "headRefName": "feature/work", "headRefOid": "a" * 40,
+                  "mergeCommit": {"oid": "b" * 40}, "baseRefName": "main",
+                  "createdAt": "2026-10-07T10:00:00Z", "updatedAt": "2026-10-07T12:00:01Z",
+                  "mergedAt": "2026-10-07T12:00:00Z", "author": {"login": "itstimwhite"},
+                  "mergedBy": {"login": "merge-queue[bot]"}}
+        complete = lambda rows: {"complete": True, "reason": None,
+                                 "window": {"since": 900_000.0, "until": 1_000_000.0}, "prs": rows}
+        observed = obs(_mergeEvidenceByRepository={"JovieInc/Jovie": complete([merged]),
+                                                    "JovieInc/LogYourBody": complete([])},
+                       _ledgerEvidence={"complete": True, "reason": None, "corruptRows": 0,
+                                        "observedAt": None, "rows": []})
+        host = SimpleNamespace(state=Path("/tmp"))
+        lane = SimpleNamespace(HOST="gem", provider_throughput=throughput_stub)
+        report = doctor.status_feed(host, lane, observed, {}, {})["shippingAttribution"]
+        jovie = next(row for row in report["projects"] if row["channel"] == "Jovie")
+        lyb = next(row for row in report["projects"] if row["channel"] == "LogYourBody")
+        self.assertEqual(jovie["coverage"], {"numerator": 0, "denominator": 1, "percent": 0.0})
+        self.assertEqual(jovie["byShippingMethod"], {"founder-operated-unknown-provider": 1})
+        self.assertEqual(jovie["missingOriginReceiptPullRequests"], [merged["url"]])
+        self.assertEqual(lyb["mergeCount"], 0)
+
     def test_incomplete_merge_evidence_suppresses_landed_counts(self):
         with tempfile.TemporaryDirectory() as tmp:
             host = SimpleNamespace(state=Path(tmp))

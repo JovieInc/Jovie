@@ -23,7 +23,8 @@ import time
 QUERY = '''query($q:String!){
   search(query:$q,type:ISSUE,first:100){
     issueCount
-    nodes{... on PullRequest{number title headRefName headRefOid mergeCommit{oid} baseRefName createdAt updatedAt mergedAt}}
+    nodes{... on PullRequest{number title url author{login} mergedBy{login} headRefName headRefOid
+      mergeCommit{oid} baseRefName createdAt updatedAt mergedAt}}
   }
 }'''
 
@@ -109,6 +110,13 @@ def collect(repository: str, since: float, until: float, *, fetch_page=None,
             if (not isinstance(row, dict) or type(row.get('number')) is not int or row['number'] < 1
                     or not all(isinstance(row.get(k), str) for k in
                                ('title', 'headRefName', 'baseRefName', 'createdAt', 'updatedAt', 'mergedAt'))):
+                return incomplete('malformed_pr')
+            for actor in ('author', 'mergedBy'):
+                value = row.get(actor)
+                if value is not None and (not isinstance(value, dict)
+                                          or not isinstance(value.get('login'), str)):
+                    return incomplete('malformed_pr')
+            if row.get('url') is not None and not isinstance(row['url'], str):
                 return incomplete('malformed_pr')
             try:
                 created, merged, updated = (_epoch(row[k]) for k in ('createdAt', 'mergedAt', 'updatedAt'))
