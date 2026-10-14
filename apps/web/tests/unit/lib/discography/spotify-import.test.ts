@@ -8,7 +8,27 @@
  * - Error handling
  */
 
+import { PgDialect } from 'drizzle-orm/pg-core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  discogRecordings,
+  discogReleaseTracks,
+  discogTracks,
+} from '@/lib/db/schema/content';
+import { generateUniqueSlug } from '@/lib/discography/slug';
+
+function createSelectChain(rows: unknown[]) {
+  return {
+    from: vi.fn().mockReturnThis(),
+    innerJoin: vi.fn().mockReturnThis(),
+    where: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockResolvedValue(rows),
+    then: (
+      resolve: (value: unknown[]) => unknown,
+      reject?: (error: unknown) => unknown
+    ) => Promise.resolve(rows).then(resolve, reject),
+  };
+}
 
 const mockDbUpdateWhere = vi.fn().mockResolvedValue([]);
 const mockDbUpdateSet = vi.fn().mockReturnValue({ where: mockDbUpdateWhere });
@@ -32,17 +52,7 @@ vi.mock('@sentry/nextjs', async importOriginal => {
 
 vi.mock('@/lib/db', () => ({
   db: {
-    select: vi.fn().mockImplementation(() => {
-      const queryBuilder = {
-        from: vi.fn().mockReturnThis(),
-        innerJoin: vi.fn().mockReturnThis(),
-        where: vi.fn().mockReturnThis(),
-        limit: vi.fn().mockResolvedValue([]),
-        then: (resolve: (value: unknown[]) => unknown) => resolve([]),
-      };
-
-      return queryBuilder;
-    }),
+    select: vi.fn().mockImplementation(() => createSelectChain([])),
     update: mockDbUpdate,
   },
 }));
@@ -143,9 +153,26 @@ vi.mock('@/lib/library/approval-status.server', () => ({
     mockEnsureImportedReleasePublishedByDefault,
 }));
 
+let testDb: typeof import('@/lib/db')['db'];
+
 describe('spotify-import', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    testDb = (await import('@/lib/db')).db;
     vi.clearAllMocks();
+    vi.mocked(testDb.select).mockReset();
+    vi.mocked(testDb.select).mockImplementation(
+      () => createSelectChain([]) as never
+    );
+    vi.mocked(generateUniqueSlug).mockReset();
+    vi.mocked(generateUniqueSlug).mockResolvedValue('test-slug');
+    const { parseArtistCredits } = await import(
+      '@/lib/discography/artist-parser'
+    );
+    vi.mocked(parseArtistCredits).mockReset().mockReturnValue([]);
+    const { processRecordingArtistCredits } = await import(
+      '@/lib/discography/artist-queries'
+    );
+    vi.mocked(processRecordingArtistCredits).mockReset().mockResolvedValue([]);
     // Reset default mock implementations
     mockGetSpotifyArtistAlbums.mockResolvedValue({ albums: [], total: 0 });
     mockGetSpotifyAlbums.mockResolvedValue([]);
@@ -414,6 +441,292 @@ describe('spotify-import', () => {
   });
 
   describe('release metadata precedence', () => {
+    it.each([
+      { recordingCacheHit: false, repeated: 'none', missingIsrc: false },
+      { recordingCacheHit: true, repeated: 'none', missingIsrc: false },
+      { recordingCacheHit: false, repeated: 'track', missingIsrc: false },
+      { recordingCacheHit: false, repeated: 'disc', missingIsrc: false },
+      { recordingCacheHit: false, repeated: 'none', missingIsrc: true },
+      {
+        recordingCacheHit: false,
+        repeated: 'none',
+        missingIsrc: false,
+        fresh: true,
+      },
+      {
+        recordingCacheHit: false,
+        repeated: 'none',
+        missingIsrc: false,
+        retryCredits: true,
+      },
+      {
+        recordingCacheHit: true,
+        repeated: 'none',
+        missingIsrc: false,
+        fresh: true,
+      },
+      {
+        recordingCacheHit: false,
+        repeated: 'none',
+        missingIsrc: false,
+        fresh: true,
+        legacy: true,
+      },
+      {
+        recordingCacheHit: true,
+        repeated: 'none',
+        missingIsrc: false,
+        misplaced: true,
+      },
+      {
+        recordingCacheHit: false,
+        repeated: 'none',
+        missingIsrc: false,
+        queryFailure: true,
+      },
+    ])(
+      'preserves saved occurrence URLs over regenerated/canonical slugs (%j)',
+      async ({
+        recordingCacheHit,
+        repeated,
+        missingIsrc,
+        fresh,
+        retryCredits,
+        legacy,
+        misplaced,
+        queryFailure,
+      }) => {
+        const credits = [
+          {
+            name: 'Tim White',
+            spotifyId: 'artist-1',
+            role: 'main_artist' as const,
+            position: 0,
+            isPrimary: true,
+            joinPhrase: null,
+          },
+        ];
+        const { parseArtistCredits } = await import(
+          '@/lib/discography/artist-parser'
+        );
+        vi.mocked(parseArtistCredits).mockReturnValue(credits);
+        const { processRecordingArtistCredits } = await import(
+          '@/lib/discography/artist-queries'
+        );
+        if (retryCredits)
+          vi.mocked(processRecordingArtistCredits).mockRejectedValueOnce(
+            new Error('interrupted credit import')
+          );
+        const track = {
+          id: 'alternate-track',
+          name: 'Take Me Over',
+          track_number: 1,
+          disc_number: 1,
+          duration_ms: 232066,
+          explicit: false,
+          uri: 'spotify:track:alternate-track',
+          preview_url: null,
+          external_urls: {
+            spotify: 'https://open.spotify.com/track/alternate-track',
+          },
+          external_ids: missingIsrc ? {} : { isrc: 'QMT671400004' },
+          artists: [{ id: 'artist-1', name: 'Tim White' }],
+        };
+        const tracks =
+          repeated !== 'none'
+            ? [
+                track,
+                {
+                  ...track,
+                  track_number: repeated === 'track' ? 2 : 1,
+                  disc_number: repeated === 'disc' ? 2 : 1,
+                },
+              ]
+            : [track];
+        const album = {
+          id: 'alternate-album',
+          name: 'Alternate Release',
+          album_type: 'single' as const,
+          total_tracks: tracks.length,
+          release_date: '2014-05-01',
+          release_date_precision: 'day' as const,
+          artists: track.artists,
+          images: [],
+          uri: 'spotify:album:alternate-album',
+          external_urls: {
+            spotify: 'https://open.spotify.com/album/alternate-album',
+          },
+        };
+        mockGetSpotifyArtistAlbums.mockResolvedValue({
+          albums: [album],
+          total: 1,
+        });
+        mockGetSpotifyAlbums.mockResolvedValue([
+          {
+            ...album,
+            tracks: { items: tracks, total: tracks.length, next: null },
+            label: 'Test Label',
+            popularity: 20,
+            copyrights: [],
+            external_ids: {},
+          },
+        ]);
+        mockGetSpotifyTracks.mockResolvedValue([track]);
+        mockUpsertRecording.mockResolvedValue({
+          id: missingIsrc
+            ? 'unrelated-recording-at-occurrence-slug'
+            : 'canonical-recording',
+        });
+        // Another same-title recording has claimed the suffix since this
+        // occurrence was saved. Regenerating would break its existing URL.
+        vi.mocked(generateUniqueSlug).mockImplementation(
+          async (_profile, _title, type) =>
+            type === 'track' ? 'take-me-over-3' : 'alternate-release'
+        );
+        const occurrenceRows = [
+          {
+            id: 'canonical-recording',
+            slug: 'take-me-over-2',
+            spotifyTrackId: track.id,
+            discNumber: 1,
+            trackNumber: 1,
+          },
+        ];
+        if (repeated !== 'none')
+          occurrenceRows.push({
+            ...occurrenceRows[0],
+            slug: 'take-me-over-4',
+            trackNumber: repeated === 'track' ? 2 : 1,
+            discNumber: repeated === 'disc' ? 2 : 1,
+          });
+        const occurrence = createSelectChain(fresh ? [] : occurrenceRows);
+        if (misplaced) occurrenceRows[0].discNumber = 2;
+        if (queryFailure)
+          vi.spyOn(occurrence, 'then').mockImplementationOnce(
+            async (_resolve, reject) => {
+              const error = new Error('appearance lookup unavailable');
+              if (!reject) throw error;
+              return reject(error);
+            }
+          );
+        const recording = createSelectChain(
+          recordingCacheHit
+            ? [
+                {
+                  id: 'canonical-recording',
+                  slug: 'take-me-over',
+                  spotifyTrackId: track.id,
+                },
+              ]
+            : []
+        );
+        vi.mocked(testDb.select).mockImplementation(() => {
+          const query = createSelectChain([]);
+          query.from.mockImplementation(table => {
+            if (table === discogReleaseTracks) return occurrence;
+            if (table === discogRecordings) return recording;
+            if (table === discogTracks && legacy)
+              return createSelectChain([
+                {
+                  id: 'legacy-track',
+                  slug: 'legacy-saved-slug',
+                  spotifyTrackId: track.id,
+                },
+              ]);
+            return query;
+          });
+          return query as never;
+        });
+
+        const { importReleasesFromSpotify } = await import(
+          '@/lib/discography/spotify-import'
+        );
+        let result = await importReleasesFromSpotify(
+          'profile-123',
+          '6Ghvu1VvMGScGpOUJBAHNH'
+        );
+        if (retryCredits) {
+          expect(result.failed).toBe(1);
+          expect(result.errors.join(' ')).toContain(
+            'interrupted credit import'
+          );
+          result = await importReleasesFromSpotify(
+            'profile-123',
+            '6Ghvu1VvMGScGpOUJBAHNH'
+          );
+          expect(processRecordingArtistCredits).toHaveBeenCalledTimes(2);
+        }
+        if (queryFailure) {
+          expect(result.failed).toBe(1);
+          expect(result.errors.join(' ')).toContain(
+            'appearance lookup unavailable'
+          );
+          expect(mockUpsertRecording).not.toHaveBeenCalled();
+          expect(mockUpsertReleaseTrack).not.toHaveBeenCalled();
+          result = await importReleasesFromSpotify(
+            'profile-123',
+            '6Ghvu1VvMGScGpOUJBAHNH'
+          );
+        }
+
+        expect(result.imported).toBe(1);
+        expect(mockUpsertReleaseTrack).toHaveBeenCalledWith(
+          expect.objectContaining({
+            releaseId: 'release-1',
+            recordingId: 'canonical-recording',
+            slug:
+              fresh || misplaced
+                ? recordingCacheHit
+                  ? 'take-me-over'
+                  : legacy
+                    ? 'legacy-saved-slug'
+                    : 'take-me-over-3'
+                : 'take-me-over-2',
+            metadata: { spotifyId: track.id },
+          })
+        );
+        if (repeated !== 'none')
+          expect(mockUpsertReleaseTrack).toHaveBeenNthCalledWith(
+            2,
+            expect.objectContaining({
+              slug: 'take-me-over-4',
+              trackNumber: repeated === 'track' ? 2 : 1,
+              discNumber: repeated === 'disc' ? 2 : 1,
+            })
+          );
+        expect(
+          vi
+            .mocked(generateUniqueSlug)
+            .mock.calls.some(call => call[2] === 'track')
+        ).toBe(!!(fresh || misplaced) && !recordingCacheHit && !legacy);
+        if (fresh || misplaced)
+          expect(mockUpsertRecording).toHaveBeenCalledTimes(1);
+        else expect(mockUpsertRecording).not.toHaveBeenCalled();
+        expect(processRecordingArtistCredits).toHaveBeenCalledWith(
+          'canonical-recording',
+          credits,
+          {
+            deleteExisting: false,
+            sourceType: 'ingested',
+            provider: 'spotify',
+            sourceEntityId: track.id,
+          }
+        );
+        const query = new PgDialect().sqlToQuery(
+          occurrence.where.mock.calls[0][0]
+        );
+        expect(query.params).toEqual([
+          'profile-123',
+          'profile-123',
+          'release-1',
+          track.id,
+        ]);
+        expect(query.sql).toContain('"creator_profile_id"');
+        expect(query.sql).toContain('"release_id"');
+        expect(query.sql).toContain(' and ');
+      }
+    );
+
     it('imports one canonical release for duplicate Spotify editions', async () => {
       const baseAlbum = {
         name: 'All This Noise EP',

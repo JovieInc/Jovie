@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import {
   discogRecordings,
   discogReleases,
+  discogReleaseTracks,
   discogTracks,
 } from '@/lib/db/schema/content';
 import { captureError, captureWarning } from '@/lib/error-tracking';
@@ -671,6 +672,7 @@ function parseAlbumArtistInputs(
  */
 async function fetchExistingTrackSlugs(
   creatorProfileId: string,
+  releaseId: string,
   spotifyTrackIds: string[]
 ): Promise<Map<string, { id: string; slug: string }>> {
   const existingTracksBySpotifyId = new Map<
@@ -709,6 +711,49 @@ async function fetchExistingTrackSlugs(
       id: row.id,
       slug: row.slug,
     });
+  }
+
+  // A provider's alternate version may exist only as a release appearance.
+  // Its saved URL takes precedence over the shared recording's slug. Include
+  // position because the same recording can appear twice on one release.
+  const occurrenceRows = await db
+    .select({
+      id: discogReleaseTracks.recordingId,
+      slug: discogReleaseTracks.slug,
+      discNumber: discogReleaseTracks.discNumber,
+      trackNumber: discogReleaseTracks.trackNumber,
+      spotifyTrackId:
+        drizzleSql<string>`${discogReleaseTracks.metadata} ->> 'spotifyId'`.as(
+          'spotify_track_id'
+        ),
+    })
+    .from(discogReleaseTracks)
+    .innerJoin(
+      discogReleases,
+      eq(discogReleaseTracks.releaseId, discogReleases.id)
+    )
+    .innerJoin(
+      discogRecordings,
+      eq(discogReleaseTracks.recordingId, discogRecordings.id)
+    )
+    .where(
+      and(
+        eq(discogReleases.creatorProfileId, creatorProfileId),
+        eq(discogRecordings.creatorProfileId, creatorProfileId),
+        eq(discogReleaseTracks.releaseId, releaseId),
+        inArray(
+          drizzleSql<string>`${discogReleaseTracks.metadata} ->> 'spotifyId'`,
+          spotifyTrackIds
+        )
+      )
+    );
+
+  for (const row of occurrenceRows) {
+    if (!row.spotifyTrackId) continue;
+    existingTracksBySpotifyId.set(
+      `${row.spotifyTrackId}:${row.discNumber}:${row.trackNumber}`,
+      { id: row.id, slug: row.slug }
+    );
   }
 
   // Fall back to legacy tracks for any not found in recordings
@@ -758,9 +803,12 @@ async function processTracksForRelease(
   maxTracksPerRelease: number
 ): Promise<boolean> {
   const tracksToImport = fullAlbum.tracks.items.slice(0, maxTracksPerRelease);
-  const spotifyTrackIds = tracksToImport.map(t => t.id).filter(Boolean);
+  const spotifyTrackIds = [
+    ...new Set(tracksToImport.map(t => t.id).filter(Boolean)),
+  ];
   const existingTracksBySpotifyId = await fetchExistingTrackSlugs(
     creatorProfileId,
+    release.id,
     spotifyTrackIds
   );
 
@@ -772,9 +820,16 @@ async function processTracksForRelease(
     }
 
     const sanitizedTrackTitle = sanitizeName(track.name);
-    const existingTrack = track.id
-      ? existingTracksBySpotifyId.get(track.id)
+    const trackNumber = sanitizeBoundedInteger(track.track_number, 1, 999, 1);
+    const discNumber = sanitizeBoundedInteger(track.disc_number, 1, 99, 1);
+    const savedOccurrence = track.id
+      ? existingTracksBySpotifyId.get(
+          `${track.id}:${discNumber}:${trackNumber}`
+        )
       : undefined;
+    const existingTrack =
+      savedOccurrence ??
+      (track.id ? existingTracksBySpotifyId.get(track.id) : undefined);
     const trackSlug =
       existingTrack?.slug ??
       (await generateUniqueSlug(
@@ -792,8 +847,6 @@ async function processTracksForRelease(
     const audioFallbackUrl = sanitizedPreviewUrl;
     const audioFallbackFormat = audioFallbackUrl ? 'mp3' : null;
 
-    const trackNumber = sanitizeBoundedInteger(track.track_number, 1, 999, 1);
-    const discNumber = sanitizeBoundedInteger(track.disc_number, 1, 99, 1);
     const trackArtistInputs: SpotifyArtistInput[] = track.artists.map(a => ({
       id: a.id,
       name: sanitizeName(a.name),
@@ -803,29 +856,33 @@ async function processTracksForRelease(
       trackArtistInputs
     );
 
-    // New model: upsert recording (canonical audio entity)
-    const createdRecording = await upsertRecording({
-      creatorProfileId,
-      title: sanitizedTrackTitle,
-      slug: trackSlug,
-      isrc: sanitizedIsrc,
-      durationMs: sanitizeBoundedNullableInteger(
-        track.duration_ms,
-        0,
-        60 * 60 * 1000
-      ),
-      isExplicit: track.explicit,
-      previewUrl: sanitizedPreviewUrl,
-      audioUrl: audioFallbackUrl,
-      audioFormat: audioFallbackFormat,
-      sourceType: 'ingested',
-      metadata: {
-        spotifyId: track.id,
-        spotifyUri: track.uri,
-        spotifyArtists: trackArtistInputs,
-        spotifyCredits: trackArtistCredits,
-      },
-    });
+    // An accepted occurrence already identifies its canonical recording. Its
+    // public slug is not a recording identity, and absent provider fields must
+    // not erase that recording's facts on replay. Enrichment is separate.
+    const createdRecording = savedOccurrence
+      ? { id: savedOccurrence.id }
+      : await upsertRecording({
+          creatorProfileId,
+          title: sanitizedTrackTitle,
+          slug: trackSlug,
+          isrc: sanitizedIsrc,
+          durationMs: sanitizeBoundedNullableInteger(
+            track.duration_ms,
+            0,
+            60 * 60 * 1000
+          ),
+          isExplicit: track.explicit,
+          previewUrl: sanitizedPreviewUrl,
+          audioUrl: audioFallbackUrl,
+          audioFormat: audioFallbackFormat,
+          sourceType: 'ingested',
+          metadata: {
+            spotifyId: track.id,
+            spotifyUri: track.uri,
+            spotifyArtists: trackArtistInputs,
+            spotifyCredits: trackArtistCredits,
+          },
+        });
 
     // New model: upsert release track (recording appearance on release)
     const createdReleaseTrack = await upsertReleaseTrack({
