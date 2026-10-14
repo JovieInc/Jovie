@@ -236,7 +236,7 @@ function receipts(): QualityOutcomeReceipt[] {
       releases: 10,
       usageEvents: 1000,
       evidence: evidence(
-        'release://window/2026-10-01--2026-10-10',
+        'release://reporting-period/2026-10-01--2026-10-10',
         '2026-10-08T00:00:00.000Z'
       ),
     },
