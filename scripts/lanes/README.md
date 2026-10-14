@@ -473,19 +473,34 @@ provider's credits: codex is capped at running plus unleased login runs.
 The kill switch is `SYMPHONY_AUTOSCALE=0`. Missing, stale or corrupt input fails safe to base;
 an unknown GitHub budget never exceeds base; a disabled lane stays at 0.
 
-When growth is blocked only by a real limit, `capacity_limit.py` names it after the spawn loop
-of the same tick. It maps the hold to a resource: `host-cpu`, `host-memory`, `host-disk`,
-`codex-accounts`, `codex-credits`, `claude-credits` or `github-api-quota`. A resource is
-published after 3 consecutive binding ticks and cleared after 3 clear ticks. The local record
+After the spawn loop, `capacity_limit.py` reports measured host pressure,
+a typed Codex quota cooldown, or a measured GitHub growth guard. Configured
+worker ceilings and login seats do not establish a provider hard limit; native
+lease occupancy, authentication holds and burst-rate holds remain distinct local
+evidence. Generic cooldown markers cannot prove exhausted credits. The doctor
+describes quota attribution as existing cooldown policy, not a live quota probe.
+
+A capacity record requires positive current eligible-pool or maintenance demand.
+The local record preserves eligible demand separately from reported waiting,
+configured seats separately from native leases, each source observation timestamp,
+and unknown delivered/marginal throughput. CPU/memory observations come from the
+autoscale sample, provider/quota observations retain their doctor/account source
+time, and disk is identified as the current tick input. Three distinct fresh
+source observations bind or clear a resource; cached polls, stale, future and
+out-of-order samples do not advance hysteresis. Unknown demand cannot prove a clear.
+Pressure jitter refreshes local evidence without another ping; release replay uses
+the latest supported measurement and its original time.
+
 `capacity-limit.json` (`symphony-lanes-capacity-limit/v1`) feeds the status feed's
-`capacityLimit`. Each change is also POSTed once to Summer as a signed
-`jovie.capacity-limit/v1` record (`limited`, or `cleared` once). The signature is Ed25519 over
-the triage client's canonical JSON. The key is read from `~/.config/symphony/summer-bottleneck*.env`
-on every send and is never put into the service env, which agents inherit. Each release install
-replays the current state once. There is no heartbeat. An undelivered record is retried on the
-next tick, and a failed POST never touches dispatch. Software holds are never sent as a
-capacity limit; they set `bottleneckFound` locally. Those holds are: current failures, stale
-doctor, unknown measurements, unhealthy, and a cooldown without provider bank evidence.
+`capacityLimit`. Changes use the existing strict `jovie.capacity-limit/v1` signed
+wire contract (`limited` or `cleared`), with observation time in `needs` and episode
+start in `since`. Signing and credential loading are unchanged. There is no
+heartbeat. Supported undelivered records retry on the next tick with the same
+delivery ID; an obsolete unsupported limit is suppressed. Failed delivery never
+changes dispatch. Software and unknown-measurement holds set `bottleneckFound`
+locally. Recommendations use existing authorised capacity first: a snapshot
+cannot establish paid-capacity ROI or that shipping is causally capped. No allocator,
+admission ceiling, account scope, service, or purchasing policy changes here.
 
 ## Worktree pool and shared caches (JOV-7705)
 
