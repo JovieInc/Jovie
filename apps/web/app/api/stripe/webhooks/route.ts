@@ -216,15 +216,20 @@ export async function POST(request: NextRequest) {
       // two requests from both reading the same unprocessed record. Claiming
       // with a compare-and-set lease closes that race without requiring a
       // transaction, which the Neon HTTP driver does not support.
+      if (!webhookRecordId) {
+        throw new Error('Webhook record ID was not resolved');
+      }
+      const claimedWebhookRecordId = webhookRecordId;
       const leaseCutoff = new Date(Date.now() - WEBHOOK_PROCESSING_LEASE_MS);
       leaseStartedAt = new Date();
+      const claimedLeaseStartedAt = leaseStartedAt;
       const [claimedRecord] = await withSystemIngestionSession(tx =>
         tx
           .update(stripeWebhookEvents)
-          .set({ processingStartedAt: leaseStartedAt })
+          .set({ processingStartedAt: claimedLeaseStartedAt })
           .where(
             and(
-              eq(stripeWebhookEvents.id, webhookRecordId),
+              eq(stripeWebhookEvents.id, claimedWebhookRecordId),
               isNull(stripeWebhookEvents.processedAt),
               or(
                 isNull(stripeWebhookEvents.processingStartedAt),
@@ -259,8 +264,11 @@ export async function POST(request: NextRequest) {
           .set({ processedAt: new Date(), processingStartedAt: null })
           .where(
             and(
-              eq(stripeWebhookEvents.id, webhookRecordId),
-              eq(stripeWebhookEvents.processingStartedAt, leaseStartedAt),
+              eq(stripeWebhookEvents.id, claimedWebhookRecordId),
+              eq(
+                stripeWebhookEvents.processingStartedAt,
+                claimedLeaseStartedAt
+              ),
               isNull(stripeWebhookEvents.processedAt)
             )
           )
@@ -276,6 +284,8 @@ export async function POST(request: NextRequest) {
       // Release the lease on handled failures so Stripe retries immediately;
       // an abrupt process exit still self-heals when the lease expires.
       if (leaseClaimed && leaseStartedAt && webhookRecordId) {
+        const failedLeaseStartedAt = leaseStartedAt;
+        const failedWebhookRecordId = webhookRecordId;
         try {
           await withSystemIngestionSession(tx =>
             tx
@@ -283,8 +293,11 @@ export async function POST(request: NextRequest) {
               .set({ processingStartedAt: null })
               .where(
                 and(
-                  eq(stripeWebhookEvents.id, webhookRecordId),
-                  eq(stripeWebhookEvents.processingStartedAt, leaseStartedAt),
+                  eq(stripeWebhookEvents.id, failedWebhookRecordId),
+                  eq(
+                    stripeWebhookEvents.processingStartedAt,
+                    failedLeaseStartedAt
+                  ),
                   isNull(stripeWebhookEvents.processedAt)
                 )
               )
