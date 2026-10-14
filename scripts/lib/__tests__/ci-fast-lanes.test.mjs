@@ -16,6 +16,7 @@ import {
   BIOME_TOOLCHAIN_FILES,
   biomeNeedsFullTree,
   CERTIFICATION_KERNEL_COMMAND,
+  DESKTOP_INSTALLED_IDENTITY_COVERAGE_COMMAND,
   earlierLaneFailed,
   escapeAnnotationMessage,
   escapeAnnotationProperty,
@@ -288,6 +289,24 @@ describe('runStructural screenshot contract discovery', () => {
     }
     vi.clearAllMocks();
   });
+
+  it.each(['mac', 'web'])(
+    'selects installed-identity coverage only for the Mac lane (%s)',
+    async lane => {
+      process.env.GITHUB_EVENT_NAME = 'pull_request';
+      process.env.CI_PRODUCT_LANES = lane;
+      process.env.CI_FAST_SKIP_STRUCTURAL = 'false';
+      const execute = vi.fn().mockReturnValue({ code: 0, output: 'ok\n' });
+      await runStructural({
+        execute,
+        changedFileList: ['scripts/desktop-installed-apps-audit.mjs'],
+      });
+      const commands = execute.mock.calls.map(([command]) => String(command));
+      expect(
+        commands.includes(DESKTOP_INSTALLED_IDENTITY_COVERAGE_COMMAND)
+      ).toBe(lane === 'mac');
+    }
+  );
 
   it.each([
     ['web', ['apps/web/lib/leads/constants.ts'], true],

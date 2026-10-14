@@ -271,6 +271,9 @@ export const NODE_RUNTIME_CONTRACT_PATHS = Object.freeze([
 export const BILLING_COVERAGE_COMMAND = Object.freeze(
   `${BILLING_PROVENANCE_COVERAGE_COMMAND} && ${FAN_SEND_SAFETY_COVERAGE_COMMAND}`
 );
+export const DESKTOP_INSTALLED_IDENTITY_COVERAGE_COMMAND =
+  'node --test --experimental-test-coverage --test-coverage-include=scripts/desktop-installed-apps-audit.mjs --test-coverage-lines=70 --test-coverage-branches=80 --test-coverage-functions=65 scripts/desktop-installed-apps-audit.test.mjs';
+
 export const DESKTOP_RELEASE_COVERAGE_COMMAND =
   'node --test --experimental-test-coverage --test-coverage-include=scripts/desktop-release-assets.mjs --test-coverage-lines=75 --test-coverage-branches=88 --test-coverage-functions=65 scripts/desktop-release-guard.test.mjs scripts/desktop-release-publisher.test.mjs && node --test --experimental-test-coverage --test-coverage-include=apps/desktop/scripts/notarize-release-dmg.cjs --test-coverage-lines=75 --test-coverage-branches=100 --test-coverage-functions=50 scripts/desktop-release-guard.test.mjs';
 // apps/web/tests/unit/ci reads .github/**, scripts/**, and other non-web
@@ -2398,7 +2401,10 @@ export async function runStructural(opts = {}) {
     'pnpm --filter @jovie/web run test:reliability-detectors',
     // Merge-group-only unit guards run in their own web lane (merge-group-guards).
   ];
-  const macParts = [DESKTOP_RELEASE_COVERAGE_COMMAND];
+  const macParts = [
+    DESKTOP_RELEASE_COVERAGE_COMMAND,
+    DESKTOP_INSTALLED_IDENTITY_COVERAGE_COMMAND,
+  ];
   // Script contracts run with the operations lane, but they also read web and
   // docs sources. Without operations, run the ones whose derived imports/reads
   // the diff touches (#20922 reddened main through rubric.test.mjs).
