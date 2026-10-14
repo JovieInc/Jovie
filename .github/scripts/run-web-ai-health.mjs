@@ -6,6 +6,12 @@ import { parseArgs } from 'node:util';
 
 export const EXPECTED_WEB_AI_HEALTH_SCHEMA = 'jovie-web-ai-health/v1';
 export const EXPECTED_GATEWAY_ALLOWLIST_NAME = 'founder-strict-2026-09-17';
+// Mirrors GATEWAY_ALLOWED_MODELS in apps/web/lib/constants/ai-models.ts.
+export const EXPECTED_GATEWAY_ALLOWED_MODELS = [
+  'typesafe-ai/jev',
+  'zai/glm-5.3',
+  'zai/glm-5.3-flash',
+];
 
 const EXPECTED_PROBES = [
   ['web_chat', 'zai/glm-5.3'],
@@ -44,7 +50,7 @@ export function fallbackWebAiHealthReceipt(reason) {
     signal: { severity: 'high', route: 'bug' },
     gatewayAllowlist: {
       name: EXPECTED_GATEWAY_ALLOWLIST_NAME,
-      models: ['zai/glm-5.3', 'zai/glm-5.3-flash'],
+      models: EXPECTED_GATEWAY_ALLOWED_MODELS,
     },
     results: EXPECTED_PROBES.map(([surface, model]) => ({
       surface,
@@ -69,10 +75,12 @@ export function isValidWebAiHealthReceipt(receipt) {
     !Array.isArray(receipt.gatewayAllowlist?.models)
   )
     return false;
+  const reportedModels = [...receipt.gatewayAllowlist.models].sort();
   if (
-    receipt.gatewayAllowlist.models.length !== 2 ||
-    !receipt.gatewayAllowlist.models.includes('zai/glm-5.3') ||
-    !receipt.gatewayAllowlist.models.includes('zai/glm-5.3-flash')
+    reportedModels.length !== EXPECTED_GATEWAY_ALLOWED_MODELS.length ||
+    !EXPECTED_GATEWAY_ALLOWED_MODELS.every(
+      (model, index) => model === reportedModels[index]
+    )
   )
     return false;
   if (!Array.isArray(receipt.results) || receipt.results.length !== 5)
