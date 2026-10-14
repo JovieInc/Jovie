@@ -224,6 +224,7 @@ test('desktop actions select the repository and forward arguments without reinst
     '#!/bin/bash\nprintf "%s\\n" "$PWD" "$*"\n',
     { mode: 0o755 }
   );
+  /** @type {import('node:child_process').SpawnSyncOptionsWithStringEncoding} */
   const options = {
     cwd: join(root, 'nested'),
     encoding: 'utf8',

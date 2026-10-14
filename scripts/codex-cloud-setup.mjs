@@ -18,6 +18,7 @@ export function bootstrap(root, env = process.env) {
       'Expected an exact pnpm version in package.json packageManager.'
     );
   }
+  /** @type {import('node:child_process').SpawnSyncOptionsWithStringEncoding} */
   const options = { cwd: root, env, encoding: 'utf8' };
   const version = spawnSync('pnpm', ['--version'], options);
   if (version.error) throw version.error;
