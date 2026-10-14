@@ -43,11 +43,90 @@ const CONTROLLER_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/production-controller.yml'),
   'utf8'
 );
+const PUBLIC_PROFILE_ALIAS_GRADUATION = JSON.parse(
+  readFileSync(
+    resolve(REPO_ROOT, 'docs/performance/public-profile-alias-graduation.json'),
+    'utf8'
+  )
+);
 const EXPECTED_SHA = 'a'.repeat(40);
 const NEWER_SHA = 'b'.repeat(40);
 const DEPLOYMENT_ID = 'dpl_exact_generation';
 const DEPLOYMENT_URL = 'https://jovie-exact-generation-jovie.vercel.app';
 const tempRoots = [];
+
+describe('public-profile alias graduation policy', () => {
+  it('proves the bounded production decision from exactly 14 controller jobs', () => {
+    const receipt = PUBLIC_PROFILE_ALIAS_GRADUATION;
+    const { policy, result, runs, selection } = receipt;
+
+    expect(receipt.schema).toBe('jovie-public-profile-alias-graduation/v1');
+    expect(receipt.surface).toBe('production-canonical-alias');
+    expect(selection.windowSize).toBe(policy.requiredConsecutiveRuns);
+    expect(runs).toHaveLength(selection.windowSize);
+    expect(new Set(runs.map(run => run.controllerRunId)).size).toBe(
+      selection.windowSize
+    );
+    expect(new Set(runs.map(run => run.jobId)).size).toBe(selection.windowSize);
+    expect(policy.samplesPerRoute).toBe(5);
+    expect(policy.p95Estimator).toBe('nearest-rank');
+    expect(policy.trackingIssue).toBe('JOV-8338');
+    expect(receipt.measuredAt).toBe(runs[0].completedAt);
+
+    for (const [index, run] of runs.entries()) {
+      const observedP95Ms = Math.max(...Object.values(run.routeP95Ms));
+      expect(run.observedP95Ms).toBe(observedP95Ms);
+      expect(run.qualifies).toBe(observedP95Ms <= policy.thresholdMs);
+      expect(run.headSha).toMatch(/^[0-9a-f]{40}$/);
+      expect(run.jobUrl).toBe(
+        `https://github.com/JovieInc/Jovie/actions/runs/${run.controllerRunId}/job/${run.jobId}`
+      );
+      if (index > 0) {
+        expect(Date.parse(runs[index - 1].completedAt)).toBeGreaterThan(
+          Date.parse(run.completedAt)
+        );
+      }
+    }
+
+    const qualifyingRuns = runs.filter(run => run.qualifies).length;
+    const firstMiss = runs.findIndex(run => !run.qualifies);
+    const consecutiveQualifyingRuns =
+      firstMiss === -1 ? runs.length : firstMiss;
+    expect(result.qualifyingRunsInWindow).toBe(qualifyingRuns);
+    expect(result.consecutiveQualifyingRuns).toBe(consecutiveQualifyingRuns);
+    expect(result.graduated).toBe(
+      consecutiveQualifyingRuns >= policy.requiredConsecutiveRuns
+    );
+    expect(result.decision).toBe(result.graduated ? 'block' : 'warn');
+    expect(policy.currentEnforcement).toBe(result.decision);
+
+    const measuredAt = Date.parse(receipt.measuredAt);
+    const nextReviewAt = Date.parse(policy.nextReviewAt);
+    expect(nextReviewAt).toBeGreaterThan(measuredAt);
+    expect(nextReviewAt).toBeGreaterThan(Date.now());
+    expect(nextReviewAt - measuredAt).toBeLessThanOrEqual(
+      7 * 24 * 60 * 60 * 1000
+    );
+  });
+
+  it('keeps staging independent and bounds the production warning', () => {
+    const staging = getJobBlock(RELEASE_WORKFLOW, 'promote-production');
+    const production = getJobBlock(
+      RELEASE_WORKFLOW,
+      'production-public-profile-alias-gate'
+    );
+
+    expect(staging).toContain('Staging policy is independent');
+    expect(staging).toContain('Recheck by 2026-10-21 under JOV-8338');
+    expect(production).toContain(
+      'docs/performance/public-profile-alias-graduation.json'
+    );
+    expect(production).toContain('current streak of 1/14');
+    expect(production).toContain('no later than 2026-10-21 (JOV-8338)');
+    expect(production).toContain('performance_status=warn');
+    expect(production).not.toContain('JOV-4854');
+  });
+});
 
 describe('production verification admission', () => {
   const job = getJobBlock(CONTROLLER_WORKFLOW, 'production-verified');

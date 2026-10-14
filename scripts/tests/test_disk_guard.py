@@ -406,26 +406,56 @@ class RetiredHostLoopTest(unittest.TestCase):
             self.assertEqual((guard.runner_roots(), guard.retired_workspace_roots()), ([], []))
             self.assertEqual(guard.log_dirs(SimpleNamespace(state=self.root)), [self.root / "runs"])
 
-    def test_idle_runner_loses_transient_work_busy_runner_keeps_it(self):
-        idle, busy, unknown = self.runner("r1"), self.runner("r2"), self.root / "r3"
+    def test_runner_owned_paths_survive_idle_busy_or_unobservable_workers(self):
+        names = ("_actions", "_temp", "_tool", "_update")
+        runner = self.runner("r1", transient=names)
+        unknown = self.root / "unknown"
         (unknown / "_work/_temp").mkdir(parents=True)
-        ps = SimpleNamespace(returncode=0, stderr="",
-                             stdout=f"{busy}/bin/Runner.Listener run\n{busy}/bin/Runner.Worker spawnclient 1 2\n")
-        report = self.report()
-        guard.sweep_runner_work(lambda *a, **k: ps, report, roots=[idle, busy, unknown])
-        self.assertEqual(sorted(p.name for p in (idle / "_work").iterdir()), ["Jovie"], "job checkout stays warm")
-        self.assertTrue((busy / "_work/_temp/f").exists())
-        self.assertTrue((unknown / "_work/_temp").exists(), "not a runner install")
-        self.assertIn(f"preserved busy runner {busy}", report["actions"])
-
-    def test_unattributable_or_unobservable_worker_holds_every_runner(self):
-        idle = self.runner("r1")
-        for ps in (SimpleNamespace(returncode=0, stdout="Runner.Worker spawnclient 1 2\n", stderr=""),
-                   SimpleNamespace(returncode=1, stdout="", stderr="ps: denied")):
+        alias = self.root / "alias"
+        alias.symlink_to(runner, target_is_directory=True)
+        for output in ("", f"{runner}/bin/Runner.Worker spawnclient 1 2\n",
+                       "Runner.Worker spawnclient 1 2\n"):
             report = self.report()
-            guard.sweep_runner_work(lambda *a, **k: ps, report, roots=[idle])
-            self.assertTrue((idle / "_work/_temp/f").exists())
-            self.assertEqual(report["errors"], ["runner-state-unavailable"])
+            run = unittest.mock.Mock(return_value=SimpleNamespace(returncode=0, stdout=output))
+            guard.sweep_runner_work(run, report, roots=[runner, unknown, alias])
+            for name in (*names, "Jovie"):
+                self.assertEqual((runner / "_work" / name / "f").read_text(), "x")
+            self.assertTrue((unknown / "_work/_temp").exists())
+            self.assertEqual(report["errors"], [])
+            self.assertEqual(report["actions"], [f"preserved runner-owned work {runner}"])
+            run.assert_not_called()
+
+    def test_job_start_after_idle_snapshot_keeps_actions_and_tools(self):
+        runner = self.runner("r1", transient=("_actions", "_temp", "_tool", "_update"))
+        action = runner / "_work/_actions/actions/checkout/v7/action.yml"
+        action.parent.mkdir(parents=True)
+        action.write_text("checked-out action")
+        worker_started = False
+        observations = []
+        real_is_file = Path.is_file
+
+        def is_file(path):
+            nonlocal worker_started
+            result = real_is_file(path)
+            if path == runner / ".runner":
+                # The old sweep checks registration after observing idle workers.
+                # A job can start in that interval, before any recursive delete.
+                worker_started = True
+            return result
+
+        def run(*args, **kwargs):
+            observations.append(worker_started)
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        with patch.object(Path, "is_file", is_file), \
+                patch.object(guard.shutil, "rmtree", wraps=guard.shutil.rmtree) as delete:
+            guard.sweep_runner_work(run, self.report(), roots=[runner])
+            self.assertTrue(worker_started)
+            self.assertEqual(action.read_text(), "checked-out action")
+            for name in ("_temp", "_tool", "_update"):
+                self.assertTrue((runner / "_work" / name / "f").exists())
+            delete.assert_not_called()
+        self.assertEqual(observations, [], "a process snapshot is not ownership")
 
     def git(self, *args, cwd):
         subprocess.run(["git", *args], cwd=cwd, env=self.env, check=True, capture_output=True)
