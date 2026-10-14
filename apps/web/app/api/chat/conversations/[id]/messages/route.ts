@@ -3,7 +3,10 @@ import { NextResponse } from 'next/server';
 import { gateway, generateText } from '@/lib/ai/sdk';
 import { buildAiTelemetry } from '@/lib/ai/telemetry';
 import { getSessionContext } from '@/lib/auth/session';
-import { ownedConversationCondition } from '@/lib/chat/conversation-access';
+import {
+  ownedConversationCondition,
+  titleForConversationAudience,
+} from '@/lib/chat/conversation-access';
 import { sanitizeConversationTitle } from '@/lib/chat/title';
 import { conversationTitleSource } from '@/lib/chat/title-source';
 import {
@@ -45,7 +48,7 @@ async function maybeGenerateTitle(
   const saveTitle = (title: string) =>
     db
       .update(chatConversations)
-      .set({ title })
+      .set({ title: titleForConversationAudience(title, 'customer') })
       .where(
         and(
           ownedConversationCondition({

@@ -66,6 +66,7 @@ import {
   resolveAlbumArtCapability,
 } from '@/lib/chat/album-art-capability';
 import { assertChatToolsRegistered } from '@/lib/chat/chat-tool-inventory';
+import { ConversationAccessError } from '@/lib/chat/conversation-access';
 import {
   buildLockedToolPromptInfo,
   buildLockedToolSet,
@@ -2582,6 +2583,15 @@ export async function POST(req: Request) {
         audience: 'customer',
       });
     } catch (error) {
+      if (error instanceof ConversationAccessError) {
+        return NextResponse.json(
+          { error: error.message, requestId },
+          {
+            status: 404,
+            headers: { ...corsHeaders, 'x-request-id': requestId },
+          }
+        );
+      }
       await captureError(
         'Chat turn reserve failed; continuing without durable turn',
         error,

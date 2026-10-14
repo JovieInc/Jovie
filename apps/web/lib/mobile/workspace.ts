@@ -2,10 +2,7 @@ import 'server-only';
 
 import { NextResponse } from 'next/server';
 import { isAdmin } from '@/lib/admin/roles';
-import {
-  OV_CONVERSATION_TITLE_PREFIX,
-  titleForConversationAudience,
-} from '@/lib/chat/conversation-access';
+import { OV_CONVERSATION_TITLE_PREFIX } from '@/lib/chat/conversation-access';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { requireMobileProfileSession } from '@/lib/mobile/session-auth';
 import type { AppShellMode } from '@/types/app-shell';
@@ -32,11 +29,6 @@ export function isOvConversationTitle(
   title: string | null | undefined
 ): boolean {
   return (title ?? '').startsWith(MOBILE_OV_CONVERSATION_TITLE_PREFIX);
-}
-
-export function withOvConversationTitle(title: string | null): string {
-  const base = title?.trim() || 'Summer';
-  return titleForConversationAudience(base, 'ov');
 }
 
 export type MobileWorkspaceAccess =

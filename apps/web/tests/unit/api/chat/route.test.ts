@@ -9,6 +9,7 @@ import {
   vi,
 } from 'vitest';
 import type { ChatAccountContext } from '@/lib/chat/account-context';
+import { ConversationAccessError } from '@/lib/chat/conversation-access';
 import { getEntitlements } from '@/lib/entitlements/registry';
 import { MemoryOperatingStore } from '@/lib/ovie/mcp/store';
 import { ovieSummerTurnId } from '@/lib/ovie/summer-conversation';
@@ -474,6 +475,31 @@ describe('POST /api/chat guard wiring', () => {
     );
     expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
     expect(hoisted.reserveChatTurnMock).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 without dispatching when turn reservation rejects conversation ownership', async () => {
+    hoisted.getSessionContextMock.mockResolvedValue({
+      user: { id: 'app-user-1' },
+      profile: { id: PROFILE_ID },
+    });
+    hoisted.reserveChatTurnMock.mockRejectedValue(
+      new ConversationAccessError()
+    );
+
+    const response = await POST(
+      chatRequest(
+        validBody({
+          conversationId: 'foreign-conversation',
+          clientTurnId: 'client-turn-foreign',
+        })
+      )
+    );
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toMatchObject({
+      error: 'Conversation not found or unauthorized',
+    });
+    expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
   });
 
   it('overrides the 429 message when billing verification is unavailable', async () => {

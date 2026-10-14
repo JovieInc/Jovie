@@ -7945,8 +7945,10 @@ function evaluateChatTitleContract(vars: EvalVars) {
     ]),
     guardsGeneratedAndFallbackUpdates:
       guardedNullUpdateCount === 1 &&
+      /import\s*\{[^}]*\bownedConversationCondition\b[^}]*\}\s*from\s*['"]@\/lib\/chat\/conversation-access['"]/s.test(
+        routeSource
+      ) &&
       textIncludesAll(routeSource, [
-        "import { ownedConversationCondition } from '@/lib/chat/conversation-access'",
         'const saveTitle = (title: string)',
         'ownedConversationCondition({',
         'conversationId,',

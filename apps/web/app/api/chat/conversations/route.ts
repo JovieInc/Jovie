@@ -1,7 +1,10 @@
 import { count } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { getSessionContext } from '@/lib/auth/session';
-import { ownedConversationCondition } from '@/lib/chat/conversation-access';
+import {
+  ownedConversationCondition,
+  titleForConversationAudience,
+} from '@/lib/chat/conversation-access';
 import { listCreatorConversations } from '@/lib/chat/conversation-queries';
 import { sanitizeConversationTitle } from '@/lib/chat/title';
 import { conversationTitleSource } from '@/lib/chat/title-source';
@@ -131,6 +134,9 @@ export async function POST(req: Request) {
     const sanitizedTitle =
       sanitizeConversationTitle(title) ??
       (source.deterministic ? source.text : null);
+    const customerTitle = sanitizedTitle
+      ? titleForConversationAudience(sanitizedTitle, 'customer')
+      : null;
 
     // Validate initial message length
     if (
@@ -151,7 +157,7 @@ export async function POST(req: Request) {
       .values({
         userId: user.id,
         creatorProfileId: profile.id,
-        title: sanitizedTitle,
+        title: customerTitle,
       })
       .returning();
 

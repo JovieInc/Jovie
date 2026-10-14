@@ -5,6 +5,7 @@ import type { ToolSet, UIMessage } from 'ai';
 import { classifyChatStreamFailure } from '@/lib/ai/gateway-errors';
 import { getSessionContext } from '@/lib/auth/session';
 import { resolveChatAccountContext } from '@/lib/chat/account-context';
+import { ConversationAccessError } from '@/lib/chat/conversation-access';
 import { sanitizeAssistantResponse } from '@/lib/chat/prompt-disclosure-guard';
 import { fetchReleasesForChat } from '@/lib/chat/releases';
 import { executeChatTurn } from '@/lib/chat/run';
@@ -150,7 +151,14 @@ export async function handleMobileChatTurn(
       audience: 'customer',
       limit: 1,
     });
-    if (existing && isOvConversationTitle(existing.conversation.title)) {
+    if (!existing) {
+      return errorNdjsonResponse(
+        404,
+        'CONVERSATION_NOT_FOUND',
+        'Conversation not found.'
+      );
+    }
+    if (isOvConversationTitle(existing.conversation.title)) {
       return errorNdjsonResponse(
         400,
         'WORKSPACE_MISMATCH',
@@ -159,16 +167,28 @@ export async function handleMobileChatTurn(
     }
   }
 
-  const reservation = await reserveChatTurn({
-    conversationId: parsed.conversationId ?? null,
-    clientTurnId: parsed.clientTurnId,
-    clientMessageId: parsed.clientMessageId,
-    source: parsed.source,
-    userMessage: parsed.text,
-    userId: session.user.id,
-    creatorProfileId: profileId,
-    audience: 'customer',
-  });
+  let reservation: Awaited<ReturnType<typeof reserveChatTurn>>;
+  try {
+    reservation = await reserveChatTurn({
+      conversationId: parsed.conversationId ?? null,
+      clientTurnId: parsed.clientTurnId,
+      clientMessageId: parsed.clientMessageId,
+      source: parsed.source,
+      userMessage: parsed.text,
+      userId: session.user.id,
+      creatorProfileId: profileId,
+      audience: 'customer',
+    });
+  } catch (error) {
+    if (error instanceof ConversationAccessError) {
+      return errorNdjsonResponse(
+        404,
+        'CONVERSATION_NOT_FOUND',
+        'Conversation not found.'
+      );
+    }
+    throw error;
+  }
 
   if (reservation.outcome === 'duplicate_in_progress') {
     return errorNdjsonResponse(

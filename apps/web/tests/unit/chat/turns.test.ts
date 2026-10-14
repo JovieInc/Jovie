@@ -235,6 +235,56 @@ describe('chat turn service', () => {
     expect(hoisted.insertMock).not.toHaveBeenCalled();
   });
 
+  it('rejects an explicit conversation outside the owner audience before inserting', async () => {
+    hoisted.selectLimitMock.mockResolvedValueOnce([]);
+
+    const { reserveChatTurn } = await import('@/lib/chat/turns');
+    await expect(
+      reserveChatTurn({
+        conversationId: 'conv-foreign',
+        clientTurnId: 'client-turn-foreign',
+        clientMessageId: 'client-message-foreign',
+        source: 'typed',
+        toolIntent: null,
+        userMessage: 'Show me the result',
+        userId: 'user-1',
+        creatorProfileId: 'profile-1',
+        audience: 'customer',
+      })
+    ).rejects.toMatchObject({ name: 'ConversationAccessError' });
+    expect(hoisted.insertMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a conflict replay when the resolved turn is outside the owner audience', async () => {
+    hoisted.selectLimitMock
+      .mockResolvedValueOnce([{ id: 'conv-1' }])
+      .mockResolvedValueOnce([
+        {
+          id: 'turn-foreign',
+          conversationId: 'conv-foreign',
+          clientTurnId: 'client-turn-1',
+          status: 'completed',
+        },
+      ])
+      .mockResolvedValueOnce([]);
+    hoisted.insertReturningMock.mockResolvedValueOnce([]);
+
+    const { reserveChatTurn } = await import('@/lib/chat/turns');
+    await expect(
+      reserveChatTurn({
+        conversationId: 'conv-1',
+        clientTurnId: 'client-turn-1',
+        clientMessageId: 'client-message-1',
+        source: 'typed',
+        toolIntent: null,
+        userMessage: 'Show me the result',
+        userId: 'user-1',
+        creatorProfileId: 'profile-1',
+        audience: 'customer',
+      })
+    ).rejects.toMatchObject({ name: 'ConversationAccessError' });
+  });
+
   it('reserves a new turn and persists the user message with client ids', async () => {
     const insertedTurn = {
       id: 'turn-1',
@@ -314,6 +364,62 @@ describe('chat turn service', () => {
     );
     expect(hoisted.insertValuesMock).toHaveBeenCalledWith(
       expect.objectContaining({ content: userMessage, role: 'user' })
+    );
+  });
+
+  it('marks newly created OV conversations without double-prefixing customer-shaped titles', async () => {
+    hoisted.selectLimitMock.mockResolvedValueOnce([]);
+    hoisted.insertReturningMock
+      .mockResolvedValueOnce([{ id: 'conv-ov' }])
+      .mockResolvedValueOnce([
+        { id: 'turn-ov', conversationId: 'conv-ov', status: 'reserved' },
+      ]);
+
+    const { reserveChatTurn } = await import('@/lib/chat/turns');
+    await reserveChatTurn({
+      conversationId: null,
+      clientTurnId: 'client-ov',
+      clientMessageId: 'message-ov',
+      source: 'typed',
+      toolIntent: null,
+      userMessage: 'Taste plan',
+      userId: 'user-1',
+      creatorProfileId: 'profile-1',
+      audience: 'ov',
+    });
+
+    expect(hoisted.insertValuesMock.mock.calls[0][0]).toEqual(
+      expect.objectContaining({ title: 'OV | Taste plan' })
+    );
+  });
+
+  it('escapes the reserved OV prefix from newly created customer titles', async () => {
+    hoisted.selectLimitMock.mockResolvedValueOnce([]);
+    hoisted.insertReturningMock
+      .mockResolvedValueOnce([{ id: 'conv-customer' }])
+      .mockResolvedValueOnce([
+        {
+          id: 'turn-customer',
+          conversationId: 'conv-customer',
+          status: 'reserved',
+        },
+      ]);
+
+    const { reserveChatTurn } = await import('@/lib/chat/turns');
+    await reserveChatTurn({
+      conversationId: null,
+      clientTurnId: 'client-customer',
+      clientMessageId: 'message-customer',
+      source: 'typed',
+      toolIntent: null,
+      userMessage: 'OV | Private plan',
+      userId: 'user-1',
+      creatorProfileId: 'profile-1',
+      audience: 'customer',
+    });
+
+    expect(hoisted.insertValuesMock.mock.calls[0][0]).toEqual(
+      expect.objectContaining({ title: 'Private plan' })
     );
   });
 

@@ -10,6 +10,7 @@ import {
 import { ensureChatWorkRecord } from '@/lib/tasks/chat-work-record';
 import { logger } from '@/lib/utils/logger';
 import {
+  ConversationAccessError,
   type ConversationAudience,
   ownedConversationCondition,
   titleForConversationAudience,
@@ -270,7 +271,7 @@ export async function reserveChatTurn(input: {
         audience: input.audience,
       });
       if (!canReplay) {
-        throw new Error('Conversation not found or unauthorized');
+        throw new ConversationAccessError();
       }
       return toDuplicateReservationResult(existingClientTurn);
     }
@@ -284,21 +285,22 @@ export async function reserveChatTurn(input: {
       audience: input.audience,
     });
     if (!canAccess) {
-      throw new Error('Conversation not found or unauthorized');
+      throw new ConversationAccessError();
     }
   } else {
+    const conversationTitle = toConversationTitle(input.userMessage);
     const [conversation] = await db
       .insert(chatConversations)
       .values({
         userId: input.userId,
         creatorProfileId: input.creatorProfileId,
         title:
-          input.audience === 'ov'
+          conversationTitle || input.audience === 'ov'
             ? titleForConversationAudience(
-                toConversationTitle(input.userMessage) ?? 'Summer',
-                'ov'
+                conversationTitle ?? 'Summer',
+                input.audience
               )
-            : toConversationTitle(input.userMessage),
+            : null,
         createdAt: now,
         updatedAt: now,
       })
@@ -358,7 +360,7 @@ export async function reserveChatTurn(input: {
       audience: input.audience,
     });
     if (!canReplay) {
-      throw new Error('Conversation not found or unauthorized');
+      throw new ConversationAccessError();
     }
 
     return toDuplicateReservationResult(existingTurn);

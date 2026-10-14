@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChatAccountContext } from '@/lib/chat/account-context';
+import { ConversationAccessError } from '@/lib/chat/conversation-access';
 import { getEntitlements } from '@/lib/entitlements/registry';
 import type { MobileChatNdjsonEvent } from '@/lib/mobile/chat/contract';
 import { mobileMerchToolEventsFromResults } from '@/lib/mobile/chat/tool-artifacts';
@@ -324,6 +325,55 @@ describe('handleMobileChatTurn artist-context seam', () => {
     expect(response).toBe(ovResponse);
     expect(hoisted.executeChatTurn).not.toHaveBeenCalled();
     expect(hoisted.reserveChatTurn).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 before reservation when an existing conversation is outside the customer boundary', async () => {
+    hoisted.getMobileConversationDetail.mockResolvedValueOnce(null);
+
+    const response = await handleMobileChatTurn(
+      USER_ID,
+      {
+        conversationId: 'foreign-conversation',
+        clientTurnId: 'client-turn-foreign',
+        clientMessageId: 'client-message-foreign',
+        text: 'Show me the result',
+        source: 'typed',
+        chatMode: null,
+      },
+      new AbortController().signal
+    );
+
+    expect(response.status).toBe(404);
+    expect(await response.text()).toContain('CONVERSATION_NOT_FOUND');
+    expect(hoisted.reserveChatTurn).not.toHaveBeenCalled();
+    expect(hoisted.executeChatTurn).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 when ownership changes between detail lookup and reservation', async () => {
+    hoisted.getMobileConversationDetail.mockResolvedValueOnce({
+      conversation: { title: 'Release plan' },
+      messages: [],
+    });
+    hoisted.reserveChatTurn.mockRejectedValueOnce(
+      new ConversationAccessError()
+    );
+
+    const response = await handleMobileChatTurn(
+      USER_ID,
+      {
+        conversationId: 'conversation-1',
+        clientTurnId: 'client-turn-race',
+        clientMessageId: 'client-message-race',
+        text: 'Show me the result',
+        source: 'typed',
+        chatMode: null,
+      },
+      new AbortController().signal
+    );
+
+    expect(response.status).toBe(404);
+    expect(await response.text()).toContain('CONVERSATION_NOT_FOUND');
+    expect(hoisted.executeChatTurn).not.toHaveBeenCalled();
   });
 
   it.each<[string, Record<string, unknown>, string]>([

@@ -1,9 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  isOvConversationTitle,
-  parseMobileWorkspace,
-  withOvConversationTitle,
-} from './workspace';
+import { isOvConversationTitle, parseMobileWorkspace } from './workspace';
 
 const h = vi.hoisted(() => ({
   canUseOvChatMode: vi.fn(),
@@ -168,7 +164,7 @@ describe('mobile Ovie workspace', () => {
 
   it('parses ids, streams Summer, and fails closed on red paths', async () => {
     expect(parseMobileWorkspace('ov')).toEqual({ ok: true, workspace: 'ov' });
-    expect(isOvConversationTitle(withOvConversationTitle('Taste'))).toBe(true);
+    expect(isOvConversationTitle('OV | Taste')).toBe(true);
     const live = await eventsOf(await handleMobileOvChatTurn(ovInput));
     expect(live.some(event => event.state === 'queued')).toBe(true);
     expect(live.at(-1)).toMatchObject({

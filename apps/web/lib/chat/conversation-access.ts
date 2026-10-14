@@ -7,6 +7,13 @@ export const OV_CONVERSATION_TITLE_PREFIX = 'OV | ';
 
 export type ConversationAudience = 'customer' | 'ov';
 
+export class ConversationAccessError extends Error {
+  constructor() {
+    super('Conversation not found or unauthorized');
+    this.name = 'ConversationAccessError';
+  }
+}
+
 function conversationAudienceCondition(
   audience: ConversationAudience
 ): SQL | undefined {
@@ -47,7 +54,14 @@ export function titleForConversationAudience(
   title: string,
   audience: ConversationAudience
 ): string {
-  if (audience !== 'ov' || title.startsWith(OV_CONVERSATION_TITLE_PREFIX)) {
+  if (audience === 'customer') {
+    if (!title.startsWith(OV_CONVERSATION_TITLE_PREFIX)) return title;
+    return (
+      title.slice(OV_CONVERSATION_TITLE_PREFIX.length).trimStart() || 'Chat'
+    );
+  }
+
+  if (title.startsWith(OV_CONVERSATION_TITLE_PREFIX)) {
     return title;
   }
   return `${OV_CONVERSATION_TITLE_PREFIX}${title}`;

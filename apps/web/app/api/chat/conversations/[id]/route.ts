@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getSessionContext } from '@/lib/auth/session';
-import { ownedConversationCondition } from '@/lib/chat/conversation-access';
+import {
+  ownedConversationCondition,
+  titleForConversationAudience,
+} from '@/lib/chat/conversation-access';
 import { getCreatorConversationDetail } from '@/lib/chat/conversation-queries';
 import {
   sanitizeConversationTitle,
@@ -147,12 +150,15 @@ export async function PATCH(req: Request, { params }: RouteParams) {
 
     const { title } = body;
     const sanitizedTitle = sanitizeConversationTitle(title);
+    const customerTitle = sanitizedTitle
+      ? titleForConversationAudience(sanitizedTitle, 'customer')
+      : null;
 
     // Update the conversation, ensuring it belongs to the user's profile
     const [updated] = await db
       .update(chatConversations)
       .set({
-        title: sanitizedTitle,
+        title: customerTitle,
         updatedAt: new Date(),
       })
       .where(
