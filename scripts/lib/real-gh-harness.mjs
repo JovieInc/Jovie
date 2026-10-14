@@ -95,6 +95,7 @@ export function realGhOnlyDirectory(binary, platform = process.platform) {
       return null;
     accessSync(realBinary, constants.X_OK);
     const directory = dirname(realBinary);
+    if (directory.includes(delimiter)) return null;
     const entries = readdirSync(directory);
     return entries.length === 1 && entries[0] === 'gh' ? directory : null;
   } catch {

@@ -103,6 +103,16 @@ function env(root, extra = {}) {
 }
 
 describe('real gh directory selection', () => {
+  it('refuses a directory that cannot occupy one PATH entry', () => {
+    const root = workspace();
+    const bin = join(root, `real${delimiter}cli`);
+    mkdirSync(bin);
+    const binary = join(bin, 'gh');
+    writeFileSync(binary, 'binary fixture');
+    chmodSync(binary, 0o755);
+    expect(realGhOnlyDirectory(binary, 'darwin')).toBeNull();
+  });
+
   it('resolves a symlink to the canonical CLI-only directory', () => {
     const root = workspace();
     const bin = join(root, 'bin');
