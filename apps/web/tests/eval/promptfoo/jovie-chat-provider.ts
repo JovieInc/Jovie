@@ -7946,9 +7946,14 @@ function evaluateChatTitleContract(vars: EvalVars) {
     guardsGeneratedAndFallbackUpdates:
       guardedNullUpdateCount === 1 &&
       textIncludesAll(routeSource, [
+        "import { ownedConversationCondition } from '@/lib/chat/conversation-access'",
         'const saveTitle = (title: string)',
-        'eq(chatConversations.id, conversationId)',
-        'eq(chatConversations.creatorProfileId, identity.creatorProfileId)',
+        'ownedConversationCondition({',
+        'conversationId,',
+        'userId: identity.userId',
+        'creatorProfileId: identity.creatorProfileId',
+        "audience: 'customer'",
+        'isNull(chatConversations.title)',
         'await saveTitle(titleSource)',
         'await saveTitle(title)',
         'await saveTitle(fallback)',
@@ -7961,7 +7966,7 @@ function evaluateChatTitleContract(vars: EvalVars) {
       'const titlePending = hasUserMessage && !conversation.title',
       'scheduleAfter(async () =>',
       'await maybeGenerateTitle(conversationId, messagesToInsert,',
-      'userId: clerkUserId',
+      'userId: user.id',
       'creatorProfileId: profile.id',
     ]),
   };
