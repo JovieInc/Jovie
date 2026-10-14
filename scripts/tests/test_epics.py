@@ -1,4 +1,4 @@
-"""Epics decompose into children and close when they finish; a stale `hold` expires."""
+"""Child delivery requests parent outcome validation; a stale `hold` expires."""
 import json
 import os
 import sys
@@ -24,9 +24,11 @@ def plan(*children, summary="Two slices."):
     return f"```json\n{json.dumps({'schema': epics.PLAN_SCHEMA, 'summary': summary, 'children': rows})}\n```"
 
 
-def child(identifier, kind, title="x"):
+def child(identifier, kind, title="x", delivered_at="2026-10-03T11:00:00Z"):
     return {"id": identifier.lower(), "identifier": identifier, "title": title,
-            "state": {"name": kind, "type": kind}}
+            "state": {"name": kind, "type": kind},
+            "completedAt": delivered_at if kind == "completed" else None,
+            "canceledAt": delivered_at if kind == "canceled" else None}
 
 
 class FakeLinear:
@@ -40,8 +42,11 @@ class FakeLinear:
         if self.rate_limited:
             raise lane.LinearRateLimited(NOW + 60)
         if query == epics.DETAIL_QUERY:
-            return {"issue": {"id": variables["id"], "team": TEAM, "children": {
-                "pageInfo": {"hasNextPage": self.more}, "nodes": self.children}}}
+            found = next((epic for epic in self.epics if epic["id"] == variables["id"]), None)
+            children = found["children"] if found else {"pageInfo": {"hasNextPage": self.more}, "nodes": self.children}
+            return {"issue": {"id": variables["id"], "team": TEAM, "state": found["state"] if found else {"name": "In Progress"}, "children": children,
+                "comments": {"pageInfo": {"hasNextPage": False}, "nodes": [{"body": body} for issue_id, body in self.comments if issue_id == variables["id"]]},
+                "history": {"pageInfo": {"hasNextPage": False}, "nodes": []}}}
         if query == epics.CREATE_MUTATION:
             given = variables["i"]
             self.created.append(given)
@@ -74,6 +79,70 @@ def epic_issue(**fields):
 
 
 class PlanTest(unittest.TestCase):
+    def test_closed_merch_children_do_not_certify_the_parent_outcome(self):
+        linear = FakeLinear(children=[child("JOV-2", "completed"), child("JOV-3", "completed")])
+        epics.close_epic(linear, "e1", linear.children)
+        self.assertNotIn(("e1", "Done"), linear.moves)
+
+    def test_parent_validation_request_rechecks_children_and_deduplicates(self):
+        linear = FakeLinear(children=[child("JOV-2", "completed")])
+        self.assertTrue(epics.close_epic(linear, "e1", []))
+        self.assertFalse(epics.close_epic(linear, "e1", []))
+        self.assertEqual(len(linear.comments), 1)
+        linear.children[0]["completedAt"] = "2026-10-03T14:00:00Z"
+        self.assertTrue(epics.close_epic(linear, "e1", []))
+        self.assertFalse(epics.close_epic(linear, "e1", []))
+        self.assertEqual(len(linear.comments), 2)
+        linear.children.append(child("JOV-3", "started"))
+        self.assertFalse(epics.close_epic(linear, "e1", [child("JOV-2", "completed")]))
+        self.assertEqual(linear.moves, [])
+
+    def test_reopened_parent_requests_a_new_outcome_for_unchanged_children(self):
+        linear = FakeLinear(children=[child("JOV-2", "completed")])
+        self.assertTrue(epics.close_epic(linear, "e1", []))
+        detail = linear.gql(epics.DETAIL_QUERY, {"id": "e1"})
+        detail["issue"]["history"] = {"pageInfo": {"hasNextPage": False}, "nodes": [
+            {"createdAt": "2026-10-14T21:00:00Z", "fromState": {"type": "completed"},
+             "toState": {"type": "started"}}]}
+        with patch.object(linear, "gql", return_value=detail):
+            self.assertTrue(epics.close_epic(linear, "e1", []))
+            detail["issue"]["comments"]["nodes"].append({"body": linear.comments[-1][1]})
+            self.assertFalse(epics.close_epic(linear, "e1", []))
+        self.assertEqual(len(linear.comments), 2)
+        self.assertEqual(linear.moves, [])
+
+    def test_partial_parent_evidence_and_unknown_child_identity_stay_open(self):
+        linear = FakeLinear(children=[child("JOV-2", "completed")])
+        for connection in ("children", "comments", "history"):
+            detail = linear.gql(epics.DETAIL_QUERY, {"id": "e1"})
+            detail["issue"][connection]["pageInfo"]["hasNextPage"] = True
+            with patch.object(linear, "gql", return_value=detail):
+                self.assertFalse(epics.close_epic(linear, "e1", linear.children))
+        linear.children = [{"state": {"type": "completed"}}]
+        self.assertFalse(epics.close_epic(linear, "e1", linear.children))
+        self.assertEqual((linear.moves, linear.comments), ([], []))
+        linear.children = [child("JOV-2", "completed", delivered_at=None)]
+        self.assertFalse(epics.close_epic(linear, "e1", []))
+
+    def test_unknown_reopen_episode_cannot_issue_duplicate_validation_requests(self):
+        linear = FakeLinear(children=[child("JOV-2", "completed")])
+        for stamp, target in (("invalid", "started"), ("2026-10-14T21:00:00", "started"),
+                              ("2026-10-14T21:00:00Z", None)):
+            detail = linear.gql(epics.DETAIL_QUERY, {"id": "e1"})
+            detail["issue"]["history"]["nodes"] = [{"createdAt": stamp,
+                "fromState": {"type": "completed"}, "toState": {"type": target}}]
+            with patch.object(linear, "gql", return_value=detail):
+                self.assertFalse(epics.close_epic(linear, "e1", []))
+        self.assertEqual((linear.moves, linear.comments), ([], []))
+
+    def test_canonical_validation_states_are_not_taken_over(self):
+        linear = FakeLinear(children=[child("JOV-2", "completed")])
+        for state in ("Done", "Canceled", "Merging", "Validating", "Rework"):
+            detail = linear.gql(epics.DETAIL_QUERY, {"id": "e1"})
+            detail["issue"]["state"]["name"] = state
+            with patch.object(linear, "gql", return_value=detail):
+                self.assertFalse(epics.close_epic(linear, "e1", linear.children))
+        self.assertEqual((linear.moves, linear.comments), ([], []))
     def test_is_epic_and_children_status(self):
         self.assertTrue(epics.is_epic(epic_issue()))
         self.assertFalse(epics.is_epic(epic_issue(labels=["bug"])))
@@ -172,9 +241,11 @@ class RunEpicTest(unittest.TestCase):
         self.assertEqual((receipt["verdict"], removed, linear.created), ("epic-children-active", [], []))
         linear = FakeLinear(children=[child("JOV-2", "completed"), child("JOV-3", "canceled")])
         receipt, _ = self.run_epic(linear)
-        self.assertEqual(receipt["verdict"], "epic-done")
-        self.assertEqual(linear.moves, [("e1", "Done")])
-        self.assertIn("all 2 child issues are closed (1 done)", linear.comments[-1][1])
+        self.assertEqual(receipt["verdict"], "epic-awaiting-validation")
+        self.assertEqual(linear.moves, [])
+        self.assertIn("parent outcome", linear.comments[-1][1])
+        self.run_epic(linear)
+        self.assertEqual(len(linear.comments), 1)
         self.assertEqual(self.run_epic(FakeLinear(children=[child("JOV-2", "completed")], more=True))[0]["verdict"],
                          "epic-children-active")
 
@@ -226,14 +297,16 @@ class ReconcileTest(unittest.TestCase):
     def test_closes_finished_epics_and_starts_todo_epics_with_open_children(self):
         def epic(identifier, state, kinds, more=False):
             return {"id": identifier.lower(), "identifier": identifier, "state": {"name": state},
-                    "children": {"pageInfo": {"hasNextPage": more}, "nodes": [{"state": {"type": k}} for k in kinds]}}
+                    "children": {"pageInfo": {"hasNextPage": more}, "nodes": [child(f"child-{n}", k) for n, k in enumerate(kinds)]}}
         self.linear.epics = [epic("JOV-1", "In Progress", ["completed", "canceled"]),
                              epic("JOV-2", "Todo", ["started"]), epic("JOV-3", "In Progress", ["started"]),
                              epic("JOV-4", "Todo", []), epic("JOV-5", "In Progress", ["canceled"]),
                              epic("JOV-6", "In Progress", ["completed"], more=True)]
         result = self.reconcile()
-        self.assertEqual((result["epicsDone"], result["epicsStarted"]), (["JOV-1"], ["JOV-2"]))
-        self.assertEqual(self.linear.moves, [("jov-1", "Done"), ("jov-2", "In Progress")])
+        self.assertEqual((result["epicsDone"], result["epicsStarted"]), ([], ["JOV-2"]))
+        self.assertEqual(result["epicsAwaitingValidation"], ["JOV-1"])
+        self.assertEqual(self.linear.moves, [("jov-2", "In Progress")])
+        self.assertEqual(self.reconcile(now=NOW + epics.RECONCILE_INTERVAL_S)["epicsAwaitingValidation"], [])
 
     def test_expires_holds_without_activity_for_72h(self):
         hold = lambda ident: {"id": ident, "identifier": ident, "labels": {"nodes": [
