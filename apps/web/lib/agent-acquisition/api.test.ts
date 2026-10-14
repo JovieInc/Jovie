@@ -233,6 +233,18 @@ describe('shared anonymous REST/MCP draft boundary', () => {
     ).toBe(404);
     expect(mocks.read).toHaveBeenLastCalledWith('draft', 'private.token');
   });
+  it.each(['2025-11-25', '2025-06-18', '2025-03-26'])(
+    'the draft MCP negotiates supported protocol %s',
+    async protocolVersion => {
+      const response = await mcpPost(
+        request(rpc('initialize', { protocolVersion }))
+      );
+      expect((await response.json()).result.protocolVersion).toBe(
+        protocolVersion
+      );
+    }
+  );
+
   it('negotiates protocols, lists only draft tools, accepts notifications, and declines SSE', async () => {
     const init = await mcpPost(
       request(rpc('initialize', { protocolVersion: '2025-06-18' }))

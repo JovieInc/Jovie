@@ -52,7 +52,11 @@ const SPECIFIER_PATTERN =
   /(?:\bfrom|\bimport|\brequire(?:\.resolve)?|\bvi\.(?:mock|doMock|unmock|doUnmock|importActual|importMock))\s*\(?\s*(['"])([^'"\r\n]+)\1/g;
 
 export function isCoverageSourcePath(path) {
-  return SOURCE_PATH.test(path) && !EXCLUDED_SOURCE_PATH.test(path);
+  // This evidence producer must fail the same patch-coverage gate as product code.
+  return (
+    path === 'apps/web/tests/e2e/utils/performance-test-utils.ts' ||
+    (SOURCE_PATH.test(path) && !EXCLUDED_SOURCE_PATH.test(path))
+  );
 }
 
 export function toWebCoverageIncludePaths(files) {

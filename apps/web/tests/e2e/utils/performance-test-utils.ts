@@ -170,9 +170,9 @@ export async function measurePageLoad(
 }
 
 /**
- * Measure Core Web Vitals using PerformanceObserver
- *
- * Waits up to 10 seconds for LCP and FCP to be captured.
+ * Sample buffered Web Vitals after at least 100ms of supported observation.
+ * Wait up to 10 seconds for actual LCP/FCP evidence; unavailable data rejects.
+ * This bounded sample is not a final page-lifetime measurement.
  */
 export async function measureWebVitals(
   page: Page
@@ -180,118 +180,132 @@ export async function measureWebVitals(
   return page.evaluate(() => {
     const METRIC_TIMEOUT_MS = 100;
     const TOTAL_TIMEOUT_MS = 10000;
-    const EXPECTED_METRICS = 3; // LCP, FCP, CLS
+    const types = ['largest-contentful-paint', 'paint', 'layout-shift'];
 
-    return new Promise(resolve => {
+    return new Promise<PerformanceMetrics['vitals']>((resolve, reject) => {
       const vitals: PerformanceMetrics['vitals'] = {};
-      const observers: PerformanceObserver[] = [];
-      let metricsCollected = 0;
+      const observers: Array<{
+        observer: PerformanceObserver;
+        consume: (entries: PerformanceEntry[]) => void;
+      }> = [];
+      let settled = false;
+      let observationElapsed = false;
+      let clsValue = 0;
+      let windowTimer: ReturnType<typeof setTimeout> | undefined;
+      let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
+
+      function cleanup(): void {
+        clearTimeout(windowTimer);
+        clearTimeout(deadlineTimer);
+        observers.forEach(({ observer }) => observer.disconnect());
+      }
+
+      function fail(message: string): void {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(new Error(`Web Vitals observation unavailable: ${message}`));
+      }
+
+      function validValue(
+        metric: string,
+        value: number | undefined
+      ): value is number {
+        if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+          fail(`invalid ${metric}`);
+          return false;
+        }
+        return true;
+      }
+
+      function drain(): void {
+        for (const { observer, consume } of observers) {
+          if (settled) return;
+          consume(observer.takeRecords());
+        }
+      }
 
       function checkComplete(): void {
-        metricsCollected++;
-        if (metricsCollected >= EXPECTED_METRICS) {
-          observers.forEach(obs => obs.disconnect());
-          resolve(vitals);
-        }
+        if (settled || !observationElapsed) return;
+        drain();
+        if (settled || vitals.lcp === undefined || vitals.fcp === undefined)
+          return;
+        settled = true;
+        cleanup();
+        resolve({ ...vitals, cls: clsValue });
       }
 
-      function setupMetricObserver(
-        observerFn: () => PerformanceObserver,
-        metricKey: keyof PerformanceMetrics['vitals'],
-        defaultValue: number
+      function observe(
+        type: string,
+        consume: (entries: PerformanceEntry[]) => void
       ): void {
-        try {
-          const observer = observerFn();
-          observers.push(observer);
-        } catch (_e) {
-          // Metric not supported in this browser
-        }
+        const observer = new PerformanceObserver(list => {
+          if (settled) return;
+          consume(list.getEntries());
+          checkComplete();
+        });
+        // Retain constructed observers even if registration throws.
+        observers.push({ observer, consume });
+        observer.observe({ type, buffered: true });
+      }
 
-        setTimeout(() => {
-          if (vitals[metricKey] === undefined) {
-            vitals[metricKey] = defaultValue as never;
+      try {
+        if (
+          typeof PerformanceObserver === 'undefined' ||
+          !types.every(type =>
+            PerformanceObserver.supportedEntryTypes?.includes(type)
+          )
+        ) {
+          fail('unsupported observer capability');
+          return;
+        }
+        observe(types[0], entries => {
+          const lastEntry = entries.at(-1);
+          if (lastEntry && validValue('lcp', lastEntry.startTime)) {
+            vitals.lcp = lastEntry.startTime;
           }
+        });
+        observe(types[1], entries => {
+          const entry = entries.find(
+            item => item.name === 'first-contentful-paint'
+          );
+          if (entry && validValue('fcp', entry.startTime))
+            vitals.fcp = entry.startTime;
+        });
+        observe(types[2], entries => {
+          for (const entry of entries) {
+            const shift = entry as PerformanceEntry & {
+              value?: number;
+              hadRecentInput?: boolean;
+            };
+            if (shift.hadRecentInput) continue;
+            if (!validValue('cls', shift.value)) return;
+            clsValue += shift.value;
+            if (!validValue('cls', clsValue)) return;
+          }
+        });
+
+        const timing = performance.getEntriesByType('navigation')[0] as
+          | PerformanceNavigationTiming
+          | undefined;
+        if (timing) vitals.ttfb = timing.responseStart - timing.startTime;
+
+        windowTimer = setTimeout(() => {
+          observationElapsed = true;
           checkComplete();
         }, METRIC_TIMEOUT_MS);
+        deadlineTimer = setTimeout(() => {
+          checkComplete();
+          if (!settled) {
+            const missing = ['lcp', 'fcp'].filter(
+              metric => vitals[metric as 'lcp' | 'fcp'] === undefined
+            );
+            fail(`missing ${missing.join(', ')}`);
+          }
+        }, TOTAL_TIMEOUT_MS);
+      } catch {
+        fail('observer registration failed');
       }
-
-      // Measure LCP (Largest Contentful Paint)
-      setupMetricObserver(
-        () => {
-          const observer = new PerformanceObserver(list => {
-            const entries = list.getEntries();
-            const lastEntry = entries[
-              entries.length - 1
-            ] as PerformanceEntry & {
-              renderTime?: number;
-              loadTime?: number;
-            };
-            vitals.lcp = lastEntry.renderTime || lastEntry.loadTime || 0;
-          });
-          observer.observe({
-            type: 'largest-contentful-paint',
-            buffered: true,
-          });
-          return observer;
-        },
-        'lcp',
-        0
-      );
-
-      // Measure FCP (First Contentful Paint)
-      setupMetricObserver(
-        () => {
-          const observer = new PerformanceObserver(list => {
-            const fcpEntry = list
-              .getEntries()
-              .find(entry => entry.name === 'first-contentful-paint');
-            if (fcpEntry) {
-              vitals.fcp = fcpEntry.startTime;
-            }
-          });
-          observer.observe({ type: 'paint', buffered: true });
-          return observer;
-        },
-        'fcp',
-        0
-      );
-
-      // Measure CLS (Cumulative Layout Shift)
-      setupMetricObserver(
-        () => {
-          let clsValue = 0;
-          const observer = new PerformanceObserver(list => {
-            for (const entry of list.getEntries()) {
-              const layoutShiftEntry = entry as PerformanceEntry & {
-                value?: number;
-                hadRecentInput?: boolean;
-              };
-              if (!layoutShiftEntry.hadRecentInput) {
-                clsValue += layoutShiftEntry.value || 0;
-              }
-            }
-            vitals.cls = clsValue;
-          });
-          observer.observe({ type: 'layout-shift', buffered: true });
-          return observer;
-        },
-        'cls',
-        0
-      );
-
-      // Get TTFB from Navigation Timing (synchronous)
-      const timing = performance.getEntriesByType(
-        'navigation'
-      )[0] as PerformanceNavigationTiming;
-      if (timing) {
-        vitals.ttfb = timing.responseStart - timing.startTime;
-      }
-
-      // Fallback timeout to ensure promise resolves
-      setTimeout(() => {
-        observers.forEach(obs => obs.disconnect());
-        resolve(vitals);
-      }, TOTAL_TIMEOUT_MS);
     });
   });
 }

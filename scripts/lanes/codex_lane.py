@@ -76,6 +76,9 @@ def subscription_profiles() -> dict:
         raise ValueError("subscription profiles malformed") from None
     if not isinstance(profiles, dict) or len(profiles) != 2 or CURRENT_LOGIN not in profiles:
         raise ValueError("subscription pool requires current-login and one additional profile")
+    primary_limit = os.cpu_count()
+    if type(primary_limit) is not int or primary_limit <= 0:
+        raise ValueError("subscription compute capacity unavailable")
     result, homes, identities = {}, set(), set()
     current_home = Path(os.environ.get("CODEX_HOME", Path.home() / ".codex")).resolve()
     for name, profile in profiles.items():
@@ -89,7 +92,7 @@ def subscription_profiles() -> dict:
         home = str(Path(home).resolve())
         if not Path(home).is_dir():
             raise ValueError("subscription home unavailable")
-        if type(slots) is not int or not 1 <= slots <= (3 if name == CURRENT_LOGIN else 1):
+        if type(slots) is not int or not 1 <= slots <= (primary_limit if name == CURRENT_LOGIN else 1):
             raise ValueError("subscription slot limit invalid")
         if not isinstance(identity, str) or not re.fullmatch(r"[0-9a-f]{64}", identity):
             raise ValueError("subscription identity binding invalid")

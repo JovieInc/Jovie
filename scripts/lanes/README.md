@@ -271,8 +271,11 @@ done each, no labels), skipping titles that already exist under the epic, verifi
 `issueCreate` readback, comments a summary and leaves the epic In Progress. An epic with open
 children is not decomposed: the children carry the work. Remote lanes (hyperagent) never take
 epics. The dispatch reconcile pass (`epics.reconcile`, every 15 minutes on
-`LANES_RECONCILE_OWNER`, default `gem`) moves an epic to Done with a comment once every child is
-terminal and at least one is Done, moves a Todo epic with open children to In Progress, and
+`LANES_RECONCILE_OWNER`, default `gem`) requests parent validation once every child is
+terminal and at least one is Done. Child delivery never closes the parent: the canonical
+validation lifecycle requires the parent's own current outcome receipt and verified
+production build, plus any other required acceptance evidence. Reconcile moves a Todo epic
+with open children to In Progress, and
 expires stale `hold` labels (one filtered read per kind, no per-issue reads, at most 10 writes
 per kind per pass).
 

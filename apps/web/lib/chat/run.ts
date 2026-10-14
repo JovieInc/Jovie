@@ -25,6 +25,10 @@ import {
 import { gateway, streamText } from '@/lib/ai/sdk';
 import { buildAiTelemetry } from '@/lib/ai/telemetry';
 import type { ChatAccountContext } from '@/lib/chat/account-context';
+import {
+  downloadChatAttachments,
+  validateChatMessageParts,
+} from '@/lib/chat/attachment-policy';
 import { buildReferencedEntitiesBlock } from '@/lib/chat/entity-hydration';
 import { resolveImportBioRestrictedTools } from '@/lib/chat/import-bio-turn-guard';
 import { retrieveKnowledgeContext } from '@/lib/chat/knowledge/retrieval';
@@ -351,6 +355,11 @@ export async function executeChatTurn(
     );
   }
 
+  for (const message of uiMessages) {
+    const partsError = validateChatMessageParts(message.parts);
+    if (partsError) throw new Error(partsError);
+  }
+
   const disclosureProbeText =
     lastUserText ?? extractLastUserText(uiMessages) ?? '';
   const blockedForDisclosure =
@@ -472,25 +481,29 @@ export async function executeChatTurn(
       },
     });
   };
-  const rotatingModel = createRotatingGatewayLanguageModel({
-    models: gatewayRetryChain,
-    resolveModel: modelId => gateway(modelId),
-    onRotate: ({ from, to, error }) => {
-      telemetry?.setTags?.({
-        chat_model: to,
-        chat_gateway_rotated: 'true',
-      });
-      telemetry?.addBreadcrumb?.({
-        category: 'ai-chat',
-        message: 'gateway_provider_retry',
-        level: 'warning',
-        data: { from, to, requestId },
-      });
-      if (isGatewayBudgetExceededError(error)) {
-        reportGatewayBudgetExceeded(error);
-      }
-    },
-  });
+  const rotatingModel = {
+    ...createRotatingGatewayLanguageModel({
+      models: gatewayRetryChain,
+      resolveModel: modelId => gateway(modelId),
+      onRotate: ({ from, to, error }) => {
+        telemetry?.setTags?.({
+          chat_model: to,
+          chat_gateway_rotated: 'true',
+        });
+        telemetry?.addBreadcrumb?.({
+          category: 'ai-chat',
+          message: 'gateway_provider_retry',
+          level: 'warning',
+          data: { from, to, requestId },
+        });
+        if (isGatewayBudgetExceededError(error)) {
+          reportGatewayBudgetExceeded(error);
+        }
+      },
+    }),
+    // The retry wrapper must preserve Gateway's URL pass-through capability.
+    supportedUrls: gateway(selectedModel).supportedUrls,
+  };
 
   const toolNames = Object.keys(tools).sort((a, b) => a.localeCompare(b));
   const toolStepLimit = resolveChatToolStepLimit(
@@ -562,6 +575,7 @@ export async function executeChatTurn(
       : (rotatingModel as unknown as LanguageModel),
     system: buildCachedSystemMessages(systemPromptParts),
     messages: modelMessages,
+    experimental_download: downloadChatAttachments,
     tools: blockedForDisclosure ? undefined : tools,
     stopWhen: blockedForDisclosure ? undefined : stepCountIs(toolStepLimit),
     prepareStep: blockedForDisclosure
