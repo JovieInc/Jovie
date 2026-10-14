@@ -27,10 +27,10 @@ import * as Sentry from '@sentry/nextjs';
 import { and, eq, isNull, lt, or } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import type Stripe from 'stripe';
-import { db } from '@/lib/db';
 import { stripeWebhookEvents } from '@/lib/db/schema/billing';
 import { env } from '@/lib/env-server';
 import { captureCriticalError } from '@/lib/error-tracking';
+import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { stripe } from '@/lib/stripe/client';
 import {
   getStripeObjectId,
@@ -164,31 +164,35 @@ export async function POST(request: NextRequest) {
     let webhookRecordId: string | null = null;
     try {
       // Attempt insert; unique constraint on stripeEventId handles duplicates
-      const [insertedRecord] = await db
-        .insert(stripeWebhookEvents)
-        .values({
-          stripeEventId: event.id,
-          type: event.type,
-          stripeObjectId: getStripeObjectId(event),
-          stripeCreatedAt,
-          payload: event as unknown as Record<string, unknown>,
-        })
-        .onConflictDoNothing()
-        .returning({ id: stripeWebhookEvents.id });
+      const [insertedRecord] = await withSystemIngestionSession(tx =>
+        tx
+          .insert(stripeWebhookEvents)
+          .values({
+            stripeEventId: event.id,
+            type: event.type,
+            stripeObjectId: getStripeObjectId(event),
+            stripeCreatedAt,
+            payload: event as unknown as Record<string, unknown>,
+          })
+          .onConflictDoNothing()
+          .returning({ id: stripeWebhookEvents.id })
+      );
 
       if (insertedRecord) {
         // New event — use the newly inserted record
         webhookRecordId = insertedRecord.id;
       } else {
         // Conflict: event already exists — check if already processed
-        const [existingEvent] = await db
-          .select({
-            id: stripeWebhookEvents.id,
-            processedAt: stripeWebhookEvents.processedAt,
-          })
-          .from(stripeWebhookEvents)
-          .where(eq(stripeWebhookEvents.stripeEventId, event.id))
-          .limit(1);
+        const [existingEvent] = await withSystemIngestionSession(tx =>
+          tx
+            .select({
+              id: stripeWebhookEvents.id,
+              processedAt: stripeWebhookEvents.processedAt,
+            })
+            .from(stripeWebhookEvents)
+            .where(eq(stripeWebhookEvents.stripeEventId, event.id))
+            .limit(1)
+        );
 
         if (!existingEvent) {
           throw new Error(
@@ -214,20 +218,22 @@ export async function POST(request: NextRequest) {
       // transaction, which the Neon HTTP driver does not support.
       const leaseCutoff = new Date(Date.now() - WEBHOOK_PROCESSING_LEASE_MS);
       leaseStartedAt = new Date();
-      const [claimedRecord] = await db
-        .update(stripeWebhookEvents)
-        .set({ processingStartedAt: leaseStartedAt })
-        .where(
-          and(
-            eq(stripeWebhookEvents.id, webhookRecordId),
-            isNull(stripeWebhookEvents.processedAt),
-            or(
-              isNull(stripeWebhookEvents.processingStartedAt),
-              lt(stripeWebhookEvents.processingStartedAt, leaseCutoff)
+      const [claimedRecord] = await withSystemIngestionSession(tx =>
+        tx
+          .update(stripeWebhookEvents)
+          .set({ processingStartedAt: leaseStartedAt })
+          .where(
+            and(
+              eq(stripeWebhookEvents.id, webhookRecordId),
+              isNull(stripeWebhookEvents.processedAt),
+              or(
+                isNull(stripeWebhookEvents.processingStartedAt),
+                lt(stripeWebhookEvents.processingStartedAt, leaseCutoff)
+              )
             )
           )
-        )
-        .returning({ id: stripeWebhookEvents.id });
+          .returning({ id: stripeWebhookEvents.id })
+      );
 
       if (!claimedRecord) {
         // Another request owns the active lease, but it has not durably
@@ -247,17 +253,19 @@ export async function POST(request: NextRequest) {
       await processStripeWebhookEvent(event, stripeCreatedAt);
 
       // Mark event as processed
-      const [processedRecord] = await db
-        .update(stripeWebhookEvents)
-        .set({ processedAt: new Date(), processingStartedAt: null })
-        .where(
-          and(
-            eq(stripeWebhookEvents.id, webhookRecordId),
-            eq(stripeWebhookEvents.processingStartedAt, leaseStartedAt),
-            isNull(stripeWebhookEvents.processedAt)
+      const [processedRecord] = await withSystemIngestionSession(tx =>
+        tx
+          .update(stripeWebhookEvents)
+          .set({ processedAt: new Date(), processingStartedAt: null })
+          .where(
+            and(
+              eq(stripeWebhookEvents.id, webhookRecordId),
+              eq(stripeWebhookEvents.processingStartedAt, leaseStartedAt),
+              isNull(stripeWebhookEvents.processedAt)
+            )
           )
-        )
-        .returning({ id: stripeWebhookEvents.id });
+          .returning({ id: stripeWebhookEvents.id })
+      );
 
       if (!processedRecord) {
         throw new Error(
@@ -269,16 +277,18 @@ export async function POST(request: NextRequest) {
       // an abrupt process exit still self-heals when the lease expires.
       if (leaseClaimed && leaseStartedAt && webhookRecordId) {
         try {
-          await db
-            .update(stripeWebhookEvents)
-            .set({ processingStartedAt: null })
-            .where(
-              and(
-                eq(stripeWebhookEvents.id, webhookRecordId),
-                eq(stripeWebhookEvents.processingStartedAt, leaseStartedAt),
-                isNull(stripeWebhookEvents.processedAt)
+          await withSystemIngestionSession(tx =>
+            tx
+              .update(stripeWebhookEvents)
+              .set({ processingStartedAt: null })
+              .where(
+                and(
+                  eq(stripeWebhookEvents.id, webhookRecordId),
+                  eq(stripeWebhookEvents.processingStartedAt, leaseStartedAt),
+                  isNull(stripeWebhookEvents.processedAt)
+                )
               )
-            );
+          );
         } catch (leaseReleaseError) {
           logger.warn('Stripe webhook lease release failed', {
             eventId: event.id,

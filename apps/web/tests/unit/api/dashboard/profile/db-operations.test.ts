@@ -90,7 +90,7 @@ describe('updateProfileRecords exact-profile CAS', () => {
   });
 
   it.each([
-    { reason: 'forbidden' as const, status: 403 },
+    { reason: 'forbidden' as const, status: 404 },
     { reason: 'not_found' as const, status: 404 },
   ])(
     'stops the profile update preflight at exact access $reason',
@@ -164,12 +164,12 @@ describe('updateProfileRecords exact-profile CAS', () => {
       location: 'Austin, TX',
       settings: { hide_branding: false, hometown: 'Tulsa, OK' },
     });
-    expect(predicates[0]).toEqual({
-      conditions: [
-        { left: creatorProfiles.id, right: 'profile-a' },
-        { left: creatorProfiles.profileEditVersion, right: 1 },
-      ],
-    });
+    const conditions = (predicates[0] as { conditions: unknown[] }).conditions;
+    expect(conditions.slice(0, 2)).toEqual([
+      { left: creatorProfiles.id, right: 'profile-a' },
+      { left: creatorProfiles.profileEditVersion, right: 1 },
+    ]);
+    expect(conditions).toHaveLength(3);
   });
 
   it('merges a precomputed avatar accent without external work', async () => {

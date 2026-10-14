@@ -2,15 +2,23 @@ import { sql as drizzleSql, eq } from 'drizzle-orm';
 /* eslint-disable no-restricted-imports -- Test requires full schema access */
 import type { NeonDatabase } from 'drizzle-orm/neon-serverless';
 import { beforeAll, describe, expect, it } from 'vitest';
+import { updateProfileRecords } from '@/app/api/dashboard/profile/lib/db-operations';
+import { claimPrebuiltProfileForUser } from '@/lib/claim/finalize';
 import * as schema from '@/lib/db/schema';
 import { tips } from '@/lib/db/schema/analytics';
 import { users } from '@/lib/db/schema/auth';
 import { billingAuditLog } from '@/lib/db/schema/billing';
 import { chatConversations, chatMessages } from '@/lib/db/schema/chat';
-import { creatorProfiles, profilePhotos } from '@/lib/db/schema/profiles';
+import {
+  creatorProfiles,
+  profilePhotos,
+  userProfileClaims,
+} from '@/lib/db/schema/profiles';
+import { getBillingAuditLogForOwner } from '@/lib/stripe/customer-sync/audit-log';
 import {
   setupDatabaseBeforeAll,
   withRlsAnonymous,
+  withRlsSystem,
   withRlsUser,
 } from '../setup-db';
 
@@ -41,6 +49,7 @@ describe.skipIf(!process.env.DATABASE_URL)(
     let privateProfileId: string;
     let publicPhotoId: string;
     let privatePhotoId: string;
+    let unownedPublicProfileId: string;
 
     beforeAll(async () => {
       const connection = (
@@ -65,52 +74,68 @@ describe.skipIf(!process.env.DATABASE_URL)(
       userAId = userA.id;
       userBId = userB.id;
 
-      const [publicProfile, privateProfile] = await db
-        .insert(creatorProfiles)
-        .values([
-          {
-            userId: userA.id,
-            creatorType: 'artist',
-            username: `rls-public-${now}`,
-            usernameNormalized: `rls-public-${now}`,
-            isPublic: true,
-          },
-          {
-            userId: userB.id,
-            creatorType: 'artist',
-            username: `rls-private-${now}`,
-            usernameNormalized: `rls-private-${now}`,
-            isPublic: false,
-          },
-        ])
-        .returning({ id: creatorProfiles.id });
+      const [publicProfile, privateProfile, unownedPublicProfile] =
+        await withRlsSystem(tx =>
+          tx
+            .insert(creatorProfiles)
+            .values([
+              {
+                userId: userA.id,
+                creatorType: 'artist',
+                username: `rls-public-${now}`,
+                usernameNormalized: `rls-public-${now}`,
+                isPublic: true,
+                isClaimed: true,
+              },
+              {
+                userId: userB.id,
+                creatorType: 'artist',
+                username: `rls-private-${now}`,
+                usernameNormalized: `rls-private-${now}`,
+                isPublic: false,
+                isClaimed: true,
+              },
+              {
+                userId: null,
+                creatorType: 'artist',
+                username: `rls-unowned-${now}`,
+                usernameNormalized: `rls-unowned-${now}`,
+                isPublic: true,
+                isClaimed: false,
+              },
+            ])
+            .returning({ id: creatorProfiles.id })
+        );
 
       publicProfileId = publicProfile.id;
       privateProfileId = privateProfile.id;
+      unownedPublicProfileId = unownedPublicProfile.id;
 
-      const [publicPhoto, privatePhoto] = await db
-        .insert(profilePhotos)
-        .values([
-          {
-            userId: userA.id,
-            creatorProfileId: publicProfile.id,
-            status: 'ready',
-            blobUrl: 'https://public-avatar.test/original.webp',
-            smallUrl: 'https://public-avatar.test/s.webp',
-            mediumUrl: 'https://public-avatar.test/m.webp',
-            largeUrl: 'https://public-avatar.test/l.webp',
-          },
-          {
-            userId: userB.id,
-            creatorProfileId: privateProfile.id,
-            status: 'ready',
-            blobUrl: 'https://private-avatar.test/original.webp',
-            smallUrl: 'https://private-avatar.test/s.webp',
-            mediumUrl: 'https://private-avatar.test/m.webp',
-            largeUrl: 'https://private-avatar.test/l.webp',
-          },
-        ])
-        .returning({ id: profilePhotos.id });
+      const [publicPhoto, privatePhoto] = await withRlsSystem(tx =>
+        tx
+          .insert(profilePhotos)
+          .values([
+            {
+              userId: userA.id,
+              creatorProfileId: publicProfile.id,
+              status: 'ready',
+              blobUrl: 'https://public-avatar.test/original.webp',
+              smallUrl: 'https://public-avatar.test/s.webp',
+              mediumUrl: 'https://public-avatar.test/m.webp',
+              largeUrl: 'https://public-avatar.test/l.webp',
+            },
+            {
+              userId: userB.id,
+              creatorProfileId: privateProfile.id,
+              status: 'ready',
+              blobUrl: 'https://private-avatar.test/original.webp',
+              smallUrl: 'https://private-avatar.test/s.webp',
+              mediumUrl: 'https://private-avatar.test/m.webp',
+              largeUrl: 'https://private-avatar.test/l.webp',
+            },
+          ])
+          .returning({ id: profilePhotos.id })
+      );
 
       publicPhotoId = publicPhoto.id;
       privatePhotoId = privatePhoto.id;
@@ -137,8 +162,11 @@ describe.skipIf(!process.env.DATABASE_URL)(
         row => row.policyname === 'creator_profiles_select_owner'
       );
       expect(migratedOwnerPolicy?.qual).toContain('current_app_user_uuid()');
-      expect(policies.rows.map(row => row.policyname)).toContain(
+      expect(policies.rows.map(row => row.policyname)).not.toContain(
         'creator_profiles_owner_bridge'
+      );
+      expect(policies.rows.map(row => row.policyname)).toContain(
+        'creator_profiles_claim_authenticated'
       );
     });
 
@@ -196,6 +224,36 @@ describe.skipIf(!process.env.DATABASE_URL)(
       expect(publicRows.rows[0]?.id).toBe(publicProfileId);
     });
 
+    it('keeps anonymous reads and system ingestion on separate policies', async () => {
+      const anonymousRead = await withRlsAnonymous(tx =>
+        tx.execute(
+          drizzleSql.raw(
+            `SELECT id FROM creator_profiles WHERE id = '${unownedPublicProfileId}'`
+          )
+        )
+      );
+      expect(anonymousRead.rows).toHaveLength(1);
+
+      await expect(
+        withRlsAnonymous(tx =>
+          tx.execute(drizzleSql`
+            INSERT INTO creator_profiles (
+              creator_type, username, username_normalized, is_public
+            ) VALUES ('artist', 'anonymous-write', 'anonymous-write', true)
+          `)
+        )
+      ).rejects.toThrow();
+
+      const systemWrite = await withRlsSystem(tx =>
+        tx.execute(
+          drizzleSql.raw(
+            `UPDATE creator_profiles SET display_name = 'system-ingested' WHERE id = '${unownedPublicProfileId}' RETURNING id`
+          )
+        )
+      );
+      expect(systemWrite.rows).toHaveLength(1);
+    });
+
     it('prevents anonymous reads of private profiles', async () => {
       const privateRows = await withRlsAnonymous(async tx => {
         return tx.execute(
@@ -237,14 +295,16 @@ describe.skipIf(!process.env.DATABASE_URL)(
     });
 
     it('prevents non-owners from reading billing audit rows (JOV-3061)', async () => {
-      const [audit] = await db
-        .insert(billingAuditLog)
-        .values({
-          userId: userAId,
-          eventType: 'rls_test',
-          source: 'test',
-        })
-        .returning({ id: billingAuditLog.id });
+      const [audit] = await withRlsSystem(tx =>
+        tx
+          .insert(billingAuditLog)
+          .values({
+            userId: userAId,
+            eventType: 'rls_test',
+            source: 'test',
+          })
+          .returning({ id: billingAuditLog.id })
+      );
 
       const asB = await withRlsUser(userBId, async tx => {
         return tx.execute(
@@ -254,7 +314,93 @@ describe.skipIf(!process.env.DATABASE_URL)(
         );
       });
       expect(asB.rows).toHaveLength(0);
+
+      const serviceAsB = await withRlsUser(userBClerkId, tx =>
+        getBillingAuditLogForOwner(tx, userBId, userAId)
+      );
+      expect(serviceAsB).toEqual({
+        success: false,
+        error: 'Unable to load billing history',
+      });
     });
+
+    it('pairs direct SQL and claim-service rejection for a cross-user claim', async () => {
+      const direct = await withRlsUser(userBId, tx =>
+        tx.execute(
+          drizzleSql.raw(
+            `UPDATE creator_profiles SET user_id = '${userBId}' WHERE id = '${publicProfileId}' RETURNING id`
+          )
+        )
+      );
+      expect(direct.rows).toHaveLength(0);
+
+      await expect(
+        withRlsUser(userBClerkId, tx =>
+          claimPrebuiltProfileForUser(tx, {
+            userId: userBId,
+            creatorProfileId: publicProfileId,
+            expectedUsername: `rls-public-${userAClerkId.split('_').at(-1)}`,
+            displayName: 'Cross-user claim',
+            source: 'direct_profile_reserve',
+          })
+        )
+      ).rejects.toThrow('[PROFILE_CONFLICT]');
+
+      await expect(
+        withRlsUser(userBId, tx =>
+          tx.insert(userProfileClaims).values({
+            userId: userBId,
+            creatorProfileId: publicProfileId,
+            role: 'owner',
+          })
+        )
+      ).rejects.toThrow();
+    });
+
+    it.each([
+      [
+        'username',
+        { username: 'cross-user-name', usernameNormalized: 'cross-user-name' },
+      ],
+      ['profile fields', { bio: 'cross-user mutation' }],
+    ] as const)(
+      'pairs direct SQL and application-filter rejection for cross-user %s changes',
+      async (label, updates) => {
+        const directMutation =
+          label === 'username'
+            ? "username = 'cross-user-direct', username_normalized = 'cross-user-direct'"
+            : "bio = 'cross-user-direct'";
+        const direct = await withRlsUser(userBId, tx =>
+          tx.execute(
+            drizzleSql.raw(
+              `UPDATE creator_profiles SET ${directMutation} WHERE id = '${publicProfileId}' RETURNING id`
+            )
+          )
+        );
+        expect(direct.rows).toHaveLength(0);
+
+        const serviceResult = await withRlsUser(userBClerkId, tx =>
+          updateProfileRecords({
+            tx,
+            appUserId: userBId,
+            profileId: publicProfileId,
+            dbProfileUpdates: updates,
+            displayNameForUserUpdate: undefined,
+            usernameUpdate:
+              'usernameNormalized' in updates
+                ? updates.usernameNormalized
+                : undefined,
+            precomputedAvatarTheme: undefined,
+          })
+        );
+        expect(serviceResult).toBeInstanceOf(Response);
+        const response = serviceResult as Response;
+        expect(response.status).toBe(404);
+        await expect(response.json()).resolves.toEqual({
+          error: 'Profile not found',
+        });
+      }
+    );
 
     it('prevents non-owners from reading another user chat conversation (JOV-3061)', async () => {
       const [conversation] = await db
