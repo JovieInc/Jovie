@@ -37,7 +37,7 @@ an authenticated production walkthrough.
 | Entity hover cards and rows, `shell/EntityPopover` | Two separate image/initials/date implementations; cover-cropped releases | Semantic thumbnail at 28px row / 48px card density |
 | Public profile / dashboard preview, `ProfileIdentityHeader` | Local portrait fallback and Check badge | Person thumbnail at existing 80px density with source `isVerified` |
 | Identity workspace, `profiles/PresenceIdentityPhoto` | Already uses Avatar; generic source metadata can be artwork rather than a person photo | Retains the source-aware outer accessible name with a decorative inner Avatar; source/provider provenance remains distinct from Jovie verification |
-| Release inspector, `ReleaseSidebarSections`, `ReleaseArtwork`, `TrackSidebar` | Existing artwork/upload owners | Retains editable AvatarUploadable / ArtworkFrame composition; no new upload implementation |
+| Release inspector, `ReleaseSidebarSections`, `ReleaseArtwork`, `TrackSidebar` | Editable artwork already shared; track rail still cover-cropped a raw thumb | Track rail uses semantic artwork at 44px; retains editable AvatarUploadable / ArtworkFrame composition |
 | Table and shell identities, `AvatarCell`, `ArtistAvatarStack`, `ProfileSwitcher`, `UserButton` | Already use shared Avatar family | Retains compact owner; benefits from source replacement/fallback repair. Artist stacks provide real names for initials and own one group label |
 
 Content previews (file thumbnails, videos, merch and event posters in editorial
