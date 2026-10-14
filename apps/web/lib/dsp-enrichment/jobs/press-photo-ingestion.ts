@@ -22,6 +22,7 @@ import {
   processPressPhotoBufferToSizes,
 } from '@/app/api/images/upload/lib/image-processing';
 import { db } from '@/lib/db';
+import { runLegacyDbTransaction } from '@/lib/db/legacy-transaction';
 import {
   creatorAvatarCandidates,
   creatorProfiles,
@@ -341,7 +342,7 @@ export async function ingestDspPressPhotos(
       return result;
     }
 
-    await db.transaction(async tx => {
+    await runLegacyDbTransaction(async tx => {
       const [lockedProfile] = await tx
         .select({ id: creatorProfiles.id })
         .from(creatorProfiles)
