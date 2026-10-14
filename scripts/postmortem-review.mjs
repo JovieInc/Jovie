@@ -402,7 +402,10 @@ async function linearGraphql(query, variables, apiKey, fetchImpl = fetch) {
     body: JSON.stringify({ query, variables }),
     signal: AbortSignal.timeout(15_000),
   });
-  const body = await response.json();
+  const body =
+    /** @type {{ errors?: unknown[], data?: Record<string, any> }} */ (
+      await response.json()
+    );
   if (!response.ok || body.errors?.length) {
     throw new Error(`Linear request failed (${response.status})`);
   }
