@@ -74,10 +74,19 @@ export async function processCatalogScan(
 
   try {
     // Step 1: Fetch all Spotify albums (excludes appears_on)
-    const { albums, total: _total } = await getSpotifyArtistAlbums(
-      spotifyArtistId,
-      { includeGroups: ['album', 'single', 'compilation'] }
-    );
+    const artistCatalog = await getSpotifyArtistAlbums(spotifyArtistId, {
+      includeGroups: ['album', 'single', 'compilation'],
+    });
+    const { albums, total } = artistCatalog;
+
+    if (!artistCatalog.complete || albums.length !== total) {
+      return await failScan(
+        tx,
+        scanId,
+        `Spotify artist catalog is incomplete: ${artistCatalog.issue ?? `received ${albums.length} of ${total} albums`}. No missing-track findings were generated.`,
+        { catalogIsrcCount: 0 }
+      );
+    }
 
     if (albums.length === 0) {
       return await failScan(

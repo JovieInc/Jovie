@@ -93,7 +93,16 @@ function CatalogStatusIcon({
 // Main Component
 // ============================================================================
 
-export function CatalogHealthSection({
+export function CatalogHealthSection(props: CatalogHealthSectionProps) {
+  return (
+    <CatalogHealthSectionContent
+      key={`${props.profileId}:${props.spotifyId}`}
+      {...props}
+    />
+  );
+}
+
+function CatalogHealthSectionContent({
   profileId,
   spotifyId,
   hasUnresolvedMismatches,
@@ -110,6 +119,7 @@ export function CatalogHealthSection({
   const [bulkDismissOpen, setBulkDismissOpen] = useState(false);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasLoadedRef = useRef(false);
+  const disposedRef = useRef(false);
 
   const mismatches = localMismatches ?? data?.mismatches ?? [];
   const unresolvedNotInCatalog = mismatches.filter(
@@ -119,27 +129,11 @@ export function CatalogHealthSection({
     m => m.status === 'flagged' && m.mismatchType === 'missing_from_dsp'
   );
 
-  // Lazy load data when section opens
-  useEffect(() => {
-    if (!isOpen || hasLoadedRef.current) return;
-    hasLoadedRef.current = true;
-    setIsLoading(true);
-
-    fetch(`/api/dsp/catalog-scan/results?profileId=${profileId}`)
-      .then(res => res.json())
-      .then((json: ScanResultsData) => {
-        setData(json);
-        setLocalMismatches(json.mismatches);
-        setIsLoading(false);
-      })
-      .catch(() => {
-        setIsLoading(false);
-      });
-  }, [isOpen, profileId]);
-
   // Cleanup poll timer
   useEffect(() => {
+    disposedRef.current = false;
     return () => {
+      disposedRef.current = true;
       if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
     };
   }, []);
@@ -149,6 +143,7 @@ export function CatalogHealthSection({
       const pollStartedAt = Date.now();
 
       const poll = async () => {
+        if (disposedRef.current) return;
         const nextDelayMs = getCatalogScanPollDelayMs(
           pollStartedAt,
           Date.now()
@@ -165,6 +160,7 @@ export function CatalogHealthSection({
             `/api/dsp/catalog-scan/status?scanId=${scanId}`
           );
           const json = await res.json();
+          if (disposedRef.current) return;
           if (
             json.scan?.status === 'completed' ||
             json.scan?.status === 'failed'
@@ -186,6 +182,7 @@ export function CatalogHealthSection({
           }
           pollTimerRef.current = globalThis.setTimeout(poll, nextDelayMs);
         } catch {
+          if (disposedRef.current) return;
           pollTimerRef.current = globalThis.setTimeout(
             poll,
             Math.max(nextDelayMs, SCAN_POLL_BACKOFF_INTERVAL_MS)
@@ -196,6 +193,37 @@ export function CatalogHealthSection({
     },
     [profileId]
   );
+
+  // Lazy load data when section opens
+  useEffect(() => {
+    if (!isOpen || hasLoadedRef.current) return;
+    hasLoadedRef.current = true;
+    setIsLoading(true);
+
+    fetch(`/api/dsp/catalog-scan/results?profileId=${profileId}`)
+      .then(res => res.json())
+      .then((json: ScanResultsData) => {
+        if (disposedRef.current) return;
+        setData(json);
+        setScanError(
+          json.scan?.status === 'failed'
+            ? (json.scan.error ?? 'Scan failed')
+            : null
+        );
+        if (
+          json.scan?.status === 'pending' ||
+          json.scan?.status === 'running'
+        ) {
+          setIsScanning(true);
+          pollScanStatus(json.scan.id);
+        }
+        setLocalMismatches(json.mismatches);
+        setIsLoading(false);
+      })
+      .catch(() => {
+        setIsLoading(false);
+      });
+  }, [isOpen, profileId, pollScanStatus]);
 
   const triggerScan = useCallback(async () => {
     if (!spotifyId || isScanning) return;
@@ -289,10 +317,9 @@ export function CatalogHealthSection({
   // Determine section header content
   const scan = data?.scan;
   const neverScanned = !scan && !isScanning;
-  const hasResults =
-    scan?.status === 'completed' && unresolvedNotInCatalog.length > 0;
-  const allClear =
-    scan?.status === 'completed' && unresolvedNotInCatalog.length === 0;
+  const unresolvedCount = unresolvedNotInCatalog.length + missingFromDsp.length;
+  const hasResults = scan?.status === 'completed' && unresolvedCount > 0;
+  const allClear = scan?.status === 'completed' && unresolvedCount === 0;
   const scanFailed = scan?.status === 'failed' || !!scanError;
 
   const headerText = getCatalogHeaderText({
@@ -301,7 +328,7 @@ export function CatalogHealthSection({
     neverScanned,
     allClear,
     matchedCount: scan?.matchedCount ?? 0,
-    unresolvedCount: unresolvedNotInCatalog.length,
+    unresolvedCount,
   });
 
   return (
@@ -363,7 +390,7 @@ export function CatalogHealthSection({
           {!isLoading && !isScanning && scanFailed && (
             <div className='flex flex-col items-center py-6 text-center'>
               <p className='mb-1 text-xs text-muted-foreground'>
-                {scanError ?? 'An error occurred.'}
+                {scanError ?? scan?.error ?? 'An error occurred.'}
               </p>
               <Button
                 variant='outline'
@@ -440,8 +467,9 @@ export function CatalogHealthSection({
                 <p className='mt-3 text-2xs text-muted-foreground'>
                   {missingFromDsp.length} track
                   {missingFromDsp.length === 1 ? '' : 's'} in your catalog{' '}
-                  {missingFromDsp.length === 1 ? "isn't" : "aren't"} on Spotify
-                  yet.
+                  {missingFromDsp.length === 1 ? 'was' : 'were'} not observed in
+                  the scanned artist catalog. Spotify availability is
+                  unverified.
                 </p>
               )}
             </div>
