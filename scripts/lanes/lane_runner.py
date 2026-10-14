@@ -17,6 +17,7 @@ the release it started with and the next issue runs on the new one.
 from __future__ import annotations
 
 import argparse
+from contextlib import nullcontext
 import fcntl
 import hashlib
 import math
@@ -7180,21 +7181,36 @@ MESH_DEPENDENCY_PINS = ("apps/desktop/node_modules/esbuild/package.json",
                         "packages/agent-transport-contracts/node_modules/zod/package.json")
 
 
-def mesh_dependency_root(host: Host) -> Path | None:
-    """The host repo when it is installed; otherwise the newest ready worktree-pool slot that
-    is. The Mac lanes repo is a bare source checkout with no node_modules, so every release
-    since 2026-10-09 was refused ("mesh runtime dependency closure failed") and no lane fix
-    reached that host. Pool slots are installed from origin/main, the same lock the staging
-    bundle carries."""
+def mesh_dependency_roots(host: Host, source_root: Path | None = None) -> list[Path]:
+    """Prefer dependencies restored from the staged lock, then the existing compatible
+    host/pool fallback. The runtime compiler still validates every exact dependency pin."""
     def installed(root: Path) -> bool:
         return all((root / pin).is_file() for pin in MESH_DEPENDENCY_PINS)
-    if installed(host.repo):
-        return host.repo
+    try:
+        source_lock = (source_root / "pnpm-lock.yaml").read_bytes() if source_root else None
+    except OSError:
+        source_lock = None
+
+    def restored_for_source(root: Path) -> bool:
+        if source_lock is None:
+            return False
+        try:
+            return all((root / name).read_bytes() == source_lock
+                       for name in ("pnpm-lock.yaml", "node_modules/.pnpm/lock.yaml"))
+        except OSError:
+            return False
+
+    host_installed = installed(host.repo)
     try:
         slots = worktree_pool.ready_slots(worktree_pool.pool_dir(host.repo))
     except (OSError, subprocess.CalledProcessError):
         slots = []
-    return next((slot for slot in slots if installed(slot)), None)
+    installed_slots = [slot for slot in slots if installed(slot)]
+    # A retained product checkout can differ in unrelated lock entries while its
+    # mesh pins remain compatible; only the compiler may admit that fallback.
+    candidates = ([host.repo] if host_installed else []) + installed_slots
+    matching = [root for root in candidates if restored_for_source(root)]
+    return matching + [root for root in candidates if root not in matching]
 
 
 def retain_selftest_diagnostic(staging: Path, stderr, returncode, *, timed_out=False, leftovers=0) -> None:
@@ -7253,16 +7269,32 @@ def prove_staging(host: Host, staging: Path) -> str | None:
     # Raw ports import workspace TypeScript/Zod. Compile from the immutable
     # archive with the host repo's existing identical pins before activation;
     # no dependency installation or running-worker mutation is permitted.
-    dependency_root = mesh_dependency_root(host) or host.repo
-    try:
-        runtime = lifecycle.run(["node", str(staging / "scripts/lanes/mesh-runtime-bundle.mjs"),
-                                 str(staging.resolve()), str(dependency_root.resolve())],
-                                cwd=staging, capture_output=True, text=True, timeout=60,
-                                env=worktree_pool.node_env(staging))
-    except subprocess.TimeoutExpired:
-        return "mesh runtime closure timeout"
-    if runtime.returncode != 0:
-        print(runtime.stderr[-2000:], file=sys.stderr)
+    runtime = None
+    for dependency_root in mesh_dependency_roots(host, staging) or [host.repo]:
+        # Pool take/fill/recycle share this inode lease. Retain it until the
+        # compiler has finished reading dependencies, without claiming the slot.
+        lease = nullcontext(True) if dependency_root == host.repo else worktree_pool.slot_lease(dependency_root)
+        with lease as owned:
+            if not owned:
+                continue
+            try:
+                runtime = lifecycle.run(["node", str(staging / "scripts/lanes/mesh-runtime-bundle.mjs"),
+                                         str(staging.resolve()), str(dependency_root.resolve())],
+                                        cwd=staging, capture_output=True, text=True, timeout=60,
+                                        env=worktree_pool.node_env(staging))
+            except subprocess.TimeoutExpired:
+                return "mesh runtime closure timeout"
+            if runtime.returncode == 0:
+                break
+            generated = staging / "scripts/lanes/.mesh-runtime"
+            if generated.exists() or generated.is_symlink():
+                # Exclusive generated writes are not replayable after a partial
+                # build. Preserve that refusal rather than reuse its output.
+                print(runtime.stderr[-2000:], file=sys.stderr)
+                return "mesh runtime dependency closure failed"
+    else:
+        if runtime is not None:
+            print(runtime.stderr[-2000:], file=sys.stderr)
         return "mesh runtime dependency closure failed"
     # ~60 s on an idle host; simulator/xcodebuild load from other sessions (load avg ~600 on
     # 2026-09-28) pushed it past 300 s, so every release was refused and fixes never landed.
