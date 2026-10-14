@@ -933,7 +933,7 @@ export function JovieChat({
                   <ChatEmptyStateComposerRegion
                     stableDocked
                     fullBleed
-                    centerAbove
+                    alignAbove='center'
                     above={
                       showEmptyGreeting ? (
                         <ChatEmptyStateGreeting
