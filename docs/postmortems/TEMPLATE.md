@@ -5,6 +5,10 @@ severity: sev2
 detected: YYYY-MM-DDTHH:MMZ
 repaired: YYYY-MM-DDTHH:MMZ
 failure_classes: []
+detectable_before_human: false
+detection_gaps: []
+replay_corpus: []
+founder_rescues: 0
 incident_issue: none
 actions: []
 gbrain: ops/postmortems/YYYY-MM-DD-slug
@@ -52,6 +56,10 @@ State the invariant that should have held.
 ## Why detection failed
 
 Which monitor, gate, or test should have caught it, and why it did not.
+Classify the gap with JOV-7084's taxonomy and put the real incident in
+`replay_corpus`. Count a founder rescue whenever Tim had to discover, chase,
+explain, or manually recover a consequential failure that should have been
+autonomous.
 
 ## Instance fix
 
