@@ -623,9 +623,9 @@ async function producerInfrastructureFailure({
       checkRunId: state.runId,
       deadlineMs,
     });
-  } catch (error) {
-    // The read itself hit the exhausted quota: the producer did too.
-    return isTransientApiError(error) ? 'primary-rate-limit' : null;
+  } catch {
+    // An observer read failure proves nothing about the producer's cause.
+    return null;
   }
   const messages = (Array.isArray(annotations) ? annotations : [])
     .filter(row => row?.annotation_level === 'failure')
@@ -1038,6 +1038,11 @@ function createGitHubAdmissionApi({
         `/repos/${encodedRepository}/check-runs/${checkRunId}/annotations?per_page=50`,
         { deadlineMs, env, fetchImpl, now, token }
       );
+      // Keep the existing single-read quota bound; a partial page cannot prove
+      // that every producer error was infrastructure-only.
+      if (linkHasNext(result.link)) {
+        fail('check-run annotations inventory is incomplete');
+      }
       return result.data;
     },
     loadCheckRuns({ checkName, deadlineMs, headSha }) {
