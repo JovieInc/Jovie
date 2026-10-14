@@ -13,6 +13,7 @@ import { ingestionJobs } from '@/lib/db/schema/ingestion';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { isActiveDiscoveryJob } from '@/lib/discovery/is-active-discovery-job';
+import { getDspArtistImageUrl } from '@/lib/dsp-enrichment/artist-image';
 import { captureError } from '@/lib/error-tracking';
 import {
   buildReadinessState,
@@ -140,6 +141,7 @@ export async function GET(request: Request) {
           externalArtistName: dspArtistMatches.externalArtistName,
           externalArtistUrl: dspArtistMatches.externalArtistUrl,
           externalArtistImageUrl: dspArtistMatches.externalArtistImageUrl,
+          matchSource: dspArtistMatches.matchSource,
           confidenceScore: dspArtistMatches.confidenceScore,
           status: dspArtistMatches.status,
           updatedAt: dspArtistMatches.updatedAt,
@@ -344,7 +346,7 @@ export async function GET(request: Request) {
             externalArtistId: match.externalArtistId,
             externalArtistName: match.externalArtistName,
             externalArtistUrl: match.externalArtistUrl,
-            externalArtistImageUrl: match.externalArtistImageUrl,
+            externalArtistImageUrl: getDspArtistImageUrl(match),
             confidenceScore: match.confidenceScore
               ? Number.parseFloat(match.confidenceScore)
               : null,

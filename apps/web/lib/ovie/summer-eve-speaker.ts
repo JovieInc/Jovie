@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import {
+  type CompanyStateReadback,
+  readCompanyStateCache,
+} from '@/lib/ovie/company-state.server';
 import { ovieSummerTurnId } from '@/lib/ovie/summer-conversation';
 import type { SummerFailureHop } from '@/lib/ovie/summer-failure';
 import { resolveSummerEveCallerOrigin } from '@/lib/ovie/summer-production-pin';
@@ -44,6 +48,12 @@ const PENDING_RECOVERY_TEXT =
   'Summer is still reconciling this turn. Retry this message in a moment; the same turn is recovered rather than duplicated.';
 const BLOCKING_RECOVERY_TEXT =
   'Summer is still finishing an earlier turn. This message was not sent; wait for that turn to finish, then retry.';
+
+function companyStateContext(readback: CompanyStateReadback | null) {
+  if (!readback) return null;
+  const { sourcePayloads: _payloads, ...snapshot } = readback.snapshot;
+  return { ...snapshot, cache: readback.cache };
+}
 
 async function verifiedDeploymentId(
   response: Response,
@@ -154,7 +164,8 @@ function failureHopFor(
 }
 
 export function createEveSummerSpeaker(
-  fetchShadow = fetchSummerShadow
+  fetchShadow = fetchSummerShadow,
+  readCompanyState = readCompanyStateCache
 ): SummerSpeaker {
   return {
     id: 'summer',
@@ -174,6 +185,12 @@ export function createEveSummerSpeaker(
         let deploymentId = admittedDeploymentId;
         const refreshDeploymentId = async () =>
           (await resolveSummerEveCallerOrigin({ refresh: true })).deploymentId;
+        let companyState: ReturnType<typeof companyStateContext> = null;
+        try {
+          companyState = companyStateContext(await readCompanyState());
+        } catch {
+          // A missing cache is explicit context, never a reason to fan out.
+        }
         const rawBody = JSON.stringify({
           eventId,
           conversationId: 'summer-session-current',
@@ -181,6 +198,7 @@ export function createEveSummerSpeaker(
           principalHash: input.principalHash,
           deploymentId,
           message: input.userText,
+          companyState,
           history: input.previousEveEventId
             ? []
             : boundedMigrationHistory(input.history),

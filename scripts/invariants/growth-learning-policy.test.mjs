@@ -1,12 +1,226 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  APP_REVIEW_READOUT_SCHEMA,
+  assessAppReviewReadout,
   evaluateGrowthLearning,
   evaluateInvariantAmendment,
   GROWTH_LEARNING_INVARIANT_ID,
   GROWTH_LEARNING_RETENTION_REVIEW_FLOOR,
   GROWTH_LEARNING_SCHEMA,
 } from './growth-learning-policy.mjs';
+
+describe('native review readout adapter', () => {
+  const now = '2026-10-13T20:00:00Z';
+  function snapshot() {
+    const window = {
+      start: '2026-10-01T00:00:00Z',
+      end: '2026-10-12T00:00:00Z',
+      outcomesCompleteThrough: '2026-10-12T00:00:00Z',
+    };
+    const source = {
+      status: 'connected',
+      receiptRef: 'fixture:read-only',
+      observedAt: now,
+      app: 'fixture-app',
+      storefront: 'US',
+      appVersion: '1.0',
+      windowStart: window.start,
+      windowEnd: window.end,
+    };
+    return {
+      schema: APP_REVIEW_READOUT_SCHEMA,
+      policyRevision: 'review-policy-v1',
+      app: 'fixture-app',
+      storefront: 'US',
+      appVersion: '1.0',
+      window,
+      metrics: {
+        eligibleOpportunities: 100,
+        requestInvocations: 20,
+        storeWrittenReviews: 5,
+      },
+      sources: { posthog: { ...source }, 'app-store-connect': { ...source } },
+      guardrails: {
+        interruptionReports: 0,
+        repeatRequestViolations: 0,
+        privacyIncidents: 0,
+      },
+    };
+  }
+  it('prepares a bounded proposal without claiming review attribution or a winner', () => {
+    const result = assessAppReviewReadout(snapshot(), { now });
+    assert.deepEqual(result.errors, []);
+    assert.equal(result.nextAction, 'prepare-policy-experiment-proposal');
+    assert.equal(result.causalCertification, 'not-certified');
+    assert.equal(result.display, 'unobservable');
+    assert.equal(result.reviewAttribution, 'unobservable');
+    assert.equal(result.executionAuthority, 'none');
+    assert.equal(result.proposedMutation, null);
+  });
+  it('accepts Date clocks and fails closed for invalid clocks', () => {
+    assert.deepEqual(
+      assessAppReviewReadout(snapshot(), { now: new Date(now) }),
+      assessAppReviewReadout(snapshot(), { now })
+    );
+    assert.ok(
+      assessAppReviewReadout(snapshot(), {
+        now: new Date('invalid'),
+      }).errors.includes('evaluation-time-invalid')
+    );
+    assert.equal(
+      assessAppReviewReadout(null).nextAction,
+      'collect-read-only-evidence'
+    );
+  });
+  it('prepares a disable patch on harm even while measurements are incomplete', () => {
+    const input = snapshot();
+    input.guardrails.privacyIncidents = 1;
+    input.window.outcomesCompleteThrough = input.window.start;
+    const result = assessAppReviewReadout(input, { now });
+    assert.equal(result.nextAction, 'prepare-disable-proposal');
+    assert.deepEqual(result.proposedMutation, {
+      app: 'fixture-app',
+      policyRevision: 'review-policy-v1',
+      owner: 'AppReview.Policy',
+      patch: { enabled: false },
+    });
+    assert.equal(result.mode, 'prepare-only');
+  });
+  it('does not treat unavailable sources as zero measurements or invent prompt metrics', () => {
+    assert.equal(
+      assessAppReviewReadout(null, { now }).nextAction,
+      'collect-read-only-evidence'
+    );
+    for (const field of [
+      'promptDisplays',
+      'promptDismissals',
+      'attributedReviews',
+      'reviewConversionRate',
+    ]) {
+      const input = snapshot();
+      input.metrics[field] = 0;
+      assert.ok(
+        assessAppReviewReadout(input, { now }).errors.includes(
+          `unobservable-metric:${field}`
+        )
+      );
+    }
+    const mutations = [
+      x => {
+        x.healthRecords = [];
+      },
+      x => {
+        x.metrics.healthValue = 1;
+      },
+      x => {
+        x.window.privateNote = 'private';
+      },
+      x => {
+        x.sources.customer = {};
+      },
+      x => {
+        x.guardrails.healthValue = 0;
+      },
+      x => {
+        x.sources.posthog.customerID = 'private';
+      },
+      x => {
+        delete x.policyRevision;
+      },
+      x => {
+        x.policyRevision = 'invalid key';
+      },
+      x => {
+        x.schema = 'unknown';
+      },
+      x => {
+        delete x.app;
+      },
+      x => {
+        delete x.storefront;
+      },
+      x => {
+        delete x.appVersion;
+      },
+      x => {
+        x.window.start = 'invalid';
+      },
+      x => {
+        x.window.end = '2027-01-01';
+      },
+      x => {
+        x.window.end = x.window.start;
+      },
+      x => {
+        x.window.outcomesCompleteThrough = 'invalid';
+      },
+      x => {
+        x.window.outcomesCompleteThrough = '2027-01-01';
+      },
+      x => {
+        delete x.metrics.storeWrittenReviews;
+      },
+      x => {
+        x.metrics.requestInvocations = 101;
+      },
+      x => {
+        x.metrics.requestInvocations = -1;
+      },
+      x => {
+        delete x.guardrails;
+      },
+      x => {
+        x.sources.posthog.status = 'not-connected';
+      },
+      x => {
+        x.sources.posthog.observedAt = 'invalid';
+      },
+      x => {
+        x.sources.posthog.observedAt = '2026-10-01';
+      },
+      x => {
+        x.sources.posthog.observedAt = '2027-01-01';
+      },
+      x => {
+        delete x.sources.posthog.receiptRef;
+      },
+      x => {
+        x.sources.posthog.app = 'other-app';
+      },
+      x => {
+        x.sources.posthog.windowStart = '2026-09-01';
+      },
+      x => {
+        x.sources.posthog.windowEnd = '2026-09-02';
+      },
+      x => {
+        delete x.sources;
+      },
+    ];
+    for (const mutate of mutations) {
+      const input = snapshot();
+      mutate(input);
+      assert.equal(
+        assessAppReviewReadout(input, { now }).nextAction,
+        'collect-read-only-evidence'
+      );
+    }
+    assert.ok(
+      assessAppReviewReadout(snapshot(), { now: 'invalid' }).errors.includes(
+        'evaluation-time-invalid'
+      )
+    );
+    assert.equal(assessAppReviewReadout(snapshot()).mode, 'prepare-only');
+    const unbound = snapshot();
+    unbound.guardrails.privacyIncidents = 1;
+    delete unbound.policyRevision;
+    assert.equal(
+      assessAppReviewReadout(unbound, { now }).proposedMutation,
+      null
+    );
+  });
+});
 
 const NOW = '2026-09-04T18:00:00.000Z';
 const NOW_DATE = new Date(NOW);

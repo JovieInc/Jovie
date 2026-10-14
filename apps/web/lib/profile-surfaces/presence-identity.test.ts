@@ -16,7 +16,7 @@ import {
 const now = new Date('2026-09-16T12:00:00.000Z');
 
 describe('presence identity', () => {
-  it('uses connector photos as verified profile images', () => {
+  it('does not certify a cached connector image without image observation evidence', () => {
     const photo = resolveIdentityPhoto({
       kind: 'dsp',
       artistAvatarUrl: 'https://cdn.jov.ie/artist.jpg',
@@ -30,10 +30,76 @@ describe('presence identity', () => {
       url: 'https://i.scdn.co/image/spotify.jpg',
       source: 'connector',
       kind: 'profile',
-      verified: true,
+      verified: false,
       freshness: 'current',
     });
   });
+
+  it('does not present MusicFetch reference artwork as an Anghami profile portrait', () => {
+    const reference = 'https://is1-ssl.mzstatic.com/image/reference.jpg';
+    const photo = resolveIdentityPhoto({
+      kind: 'dsp',
+      connectorImageUrl: reference,
+      connectorMatchSource: 'musicfetch',
+      metadata: { profileImageUrl: reference, ogImage: reference },
+      observedAt: '2026-04-12T02:06:27.166Z',
+      now,
+    });
+    expect(photo).toMatchObject({
+      url: null,
+      source: 'none',
+      kind: 'missing',
+      verified: false,
+    });
+  });
+
+  it('preserves independent public page metadata while excluding the shared reference photo', () => {
+    const photo = resolveIdentityPhoto({
+      kind: 'dsp',
+      connectorImageUrl: 'https://is1-ssl.mzstatic.com/image/reference.jpg',
+      connectorMatchSource: 'musicfetch',
+      metadata: {
+        profileImageUrl: 'https://artwork.anghcdn.co/profile-observation.jpg',
+      },
+      observedAt: now.toISOString(),
+      now,
+    });
+    expect(photo).toMatchObject({
+      url: 'https://artwork.anghcdn.co/profile-observation.jpg',
+      source: 'public_metadata',
+      kind: 'profile',
+      verified: false,
+    });
+  });
+
+  it.each(['profile', 'generic'] as const)(
+    'retains a later independent %s image after skipping the MusicFetch reference',
+    kind => {
+      const reference = 'https://is1-ssl.mzstatic.com/image/reference.jpg';
+      const independent = 'https://artwork.anghcdn.co/independent.jpg';
+      const photo = resolveIdentityPhoto({
+        kind: 'dsp',
+        connectorImageUrl: reference,
+        connectorMatchSource: 'musicfetch',
+        metadata:
+          kind === 'profile'
+            ? { avatarUrl: reference, profileImageUrl: independent }
+            : {
+                avatarUrl: reference,
+                ogImage: reference,
+                imageUrl: independent,
+              },
+        observedAt: now.toISOString(),
+        now,
+      });
+      expect(photo).toMatchObject({
+        url: independent,
+        source: 'public_metadata',
+        kind,
+        verified: false,
+      });
+    }
+  );
 
   it('does not label generic OG or album images as verified avatars', () => {
     const photo = resolveIdentityPhoto({

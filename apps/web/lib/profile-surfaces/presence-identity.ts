@@ -1,4 +1,5 @@
 import { isPresenceObservationStale } from '@/components/features/presence/evidence';
+import { getDspArtistImageUrl } from '@/lib/dsp-enrichment/artist-image';
 import { getDspDisplayName } from '@/lib/dsp-registry';
 
 export {
@@ -105,12 +106,13 @@ function pickHttpsUrl(value: unknown): string | null {
 
 function metadataUrl(
   metadata: Record<string, unknown> | null | undefined,
-  keys: readonly string[]
+  keys: readonly string[],
+  excludedUrl: string | null = null
 ): string | null {
   if (!metadata) return null;
   for (const key of keys) {
     const url = pickHttpsUrl(metadata[key]);
-    if (url) return url;
+    if (url && url !== excludedUrl) return url;
   }
   return null;
 }
@@ -127,6 +129,7 @@ export function resolveIdentityPhoto(input: {
   readonly kind: string;
   readonly artistAvatarUrl?: string | null;
   readonly connectorImageUrl?: string | null;
+  readonly connectorMatchSource?: string | null;
   readonly metadata?: Record<string, unknown> | null;
   readonly observedAt?: string | null;
   readonly now?: Date;
@@ -134,7 +137,16 @@ export function resolveIdentityPhoto(input: {
   const now = input.now ?? new Date();
   const observedAt = input.observedAt ?? null;
   const freshness = identityPhotoFreshness(observedAt, now);
-  const connectorUrl = pickHttpsUrl(input.connectorImageUrl);
+  const referenceUrl =
+    input.connectorMatchSource === 'musicfetch'
+      ? pickHttpsUrl(input.connectorImageUrl)
+      : null;
+  const connectorUrl = pickHttpsUrl(
+    getDspArtistImageUrl({
+      externalArtistImageUrl: input.connectorImageUrl,
+      matchSource: input.connectorMatchSource,
+    })
+  );
   if (connectorUrl) {
     return {
       url: connectorUrl,
@@ -142,7 +154,7 @@ export function resolveIdentityPhoto(input: {
       kind: 'profile',
       observedAt,
       freshness,
-      verified: true,
+      verified: false,
     };
   }
 
@@ -160,7 +172,11 @@ export function resolveIdentityPhoto(input: {
     }
   }
 
-  const profileUrl = metadataUrl(input.metadata, PROFILE_METADATA_KEYS);
+  const profileUrl = metadataUrl(
+    input.metadata,
+    PROFILE_METADATA_KEYS,
+    referenceUrl
+  );
   if (profileUrl) {
     return {
       url: profileUrl,
@@ -172,7 +188,11 @@ export function resolveIdentityPhoto(input: {
     };
   }
 
-  const genericUrl = metadataUrl(input.metadata, GENERIC_METADATA_KEYS);
+  const genericUrl = metadataUrl(
+    input.metadata,
+    GENERIC_METADATA_KEYS,
+    referenceUrl
+  );
   if (genericUrl) {
     return {
       url: genericUrl,

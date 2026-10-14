@@ -1,0 +1,386 @@
+{
+  "schema": "jovie.founder-calibration-corpus/v1",
+  "version": "mobile-artist-profile-chat/2026-10-14.1",
+  "issue": "JOV-7199",
+  "subject": {
+    "id": "experience:mobile-artist-profile-chat",
+    "kind": "experience",
+    "title": "Mobile artist-profile chat"
+  },
+  "labelAuthority": {
+    "actor": "Tim White",
+    "role": "Founder",
+    "directiveDate": "2026-09-29",
+    "ref": "linear://JOV-7199"
+  },
+  "cases": [
+    {
+      "id": "apc-001",
+      "split": "known_good",
+      "usedForTuning": true,
+      "scenario": "The mobile artist chat keeps the composer visible, answers from the correct artist context, completes one effect, reaches a terminal state, and proves the exact deployment.",
+      "facts": {
+        "composer": {
+          "composerVisibleAboveKeyboard": true,
+          "safeAreaApplied": true,
+          "viewportAnchored": true
+        },
+        "answer": {
+          "artistIdentityMatched": true,
+          "claimsGrounded": true
+        },
+        "retry": { "attempts": 1, "durableSideEffects": 1 },
+        "task": { "deadlineExceeded": false, "terminalState": "completed" },
+        "deployment": {
+          "evidenceFresh": true,
+          "expectedSha": "1111111111111111111111111111111111111111",
+          "observedSha": "1111111111111111111111111111111111111111"
+        }
+      },
+      "founderVerdict": "accept",
+      "expectedReasons": [],
+      "expectedReleaseChecks": []
+    },
+    {
+      "id": "apc-002",
+      "split": "known_good",
+      "usedForTuning": true,
+      "scenario": "A network retry reuses the turn, produces one durable effect, completes, and retains exact fresh deployment evidence.",
+      "facts": {
+        "composer": {
+          "composerVisibleAboveKeyboard": true,
+          "safeAreaApplied": true,
+          "viewportAnchored": true
+        },
+        "answer": {
+          "artistIdentityMatched": true,
+          "claimsGrounded": true
+        },
+        "retry": { "attempts": 2, "durableSideEffects": 1 },
+        "task": { "deadlineExceeded": false, "terminalState": "completed" },
+        "deployment": {
+          "evidenceFresh": true,
+          "expectedSha": "2222222222222222222222222222222222222222",
+          "observedSha": "2222222222222222222222222222222222222222"
+        }
+      },
+      "founderVerdict": "accept",
+      "expectedReasons": [],
+      "expectedReleaseChecks": []
+    },
+    {
+      "id": "apc-003",
+      "split": "known_bad",
+      "usedForTuning": true,
+      "scenario": "Opening the mobile keyboard covers the composer because the chat is anchored to a fixed viewport and omits safe-area handling.",
+      "facts": {
+        "composer": {
+          "composerVisibleAboveKeyboard": false,
+          "safeAreaApplied": false,
+          "viewportAnchored": false
+        },
+        "answer": {
+          "artistIdentityMatched": true,
+          "claimsGrounded": true
+        },
+        "retry": { "attempts": 1, "durableSideEffects": 0 },
+        "task": { "deadlineExceeded": false, "terminalState": "completed" },
+        "deployment": {
+          "evidenceFresh": true,
+          "expectedSha": "3333333333333333333333333333333333333333",
+          "observedSha": "3333333333333333333333333333333333333333"
+        }
+      },
+      "founderVerdict": "reject",
+      "expectedReasons": ["composer-keyboard-viewport-failure"],
+      "expectedReleaseChecks": ["ci-fast:mobile-chat-viewport"]
+    },
+    {
+      "id": "apc-004",
+      "split": "known_bad",
+      "usedForTuning": true,
+      "scenario": "The response is fluent but attributes another artist's release to the signed-in artist and makes an unsupported performance claim.",
+      "facts": {
+        "composer": {
+          "composerVisibleAboveKeyboard": true,
+          "safeAreaApplied": true,
+          "viewportAnchored": true
+        },
+        "answer": {
+          "artistIdentityMatched": false,
+          "claimsGrounded": false
+        },
+        "retry": { "attempts": 1, "durableSideEffects": 0 },
+        "task": { "deadlineExceeded": false, "terminalState": "completed" },
+        "deployment": {
+          "evidenceFresh": true,
+          "expectedSha": "4444444444444444444444444444444444444444",
+          "observedSha": "4444444444444444444444444444444444444444"
+        }
+      },
+      "founderVerdict": "reject",
+      "expectedReasons": ["inaccurate-artist-answer"],
+      "expectedReleaseChecks": ["ci-golden-eval-set:artist-grounding"]
+    },
+    {
+      "id": "apc-005",
+      "split": "known_bad",
+      "usedForTuning": true,
+      "scenario": "The client retries one turn and the server creates the same durable artist-profile side effect twice.",
+      "facts": {
+        "composer": {
+          "composerVisibleAboveKeyboard": true,
+          "safeAreaApplied": true,
+          "viewportAnchored": true
+        },
+        "answer": {
+          "artistIdentityMatched": true,
+          "claimsGrounded": true
+        },
+        "retry": { "attempts": 2, "durableSideEffects": 2 },
+        "task": { "deadlineExceeded": false, "terminalState": "completed" },
+        "deployment": {
+          "evidenceFresh": true,
+          "expectedSha": "5555555555555555555555555555555555555555",
+          "observedSha": "5555555555555555555555555555555555555555"
+        }
+      },
+      "founderVerdict": "reject",
+      "expectedReasons": ["duplicate-side-effect-after-retry"],
+      "expectedReleaseChecks": ["ci-fast:chat-turn-idempotency"]
+    },
+    {
+      "id": "apc-006",
+      "split": "known_bad",
+      "usedForTuning": true,
+      "scenario": "The artist-profile task remains running after its deadline and never exposes a terminal success, failure, cancellation, or timeout state.",
+      "facts": {
+        "composer": {
+          "composerVisibleAboveKeyboard": true,
+          "safeAreaApplied": true,
+          "viewportAnchored": true
+        },
+        "answer": {
+          "artistIdentityMatched": true,
+          "claimsGrounded": true
+        },
+        "retry": { "attempts": 1, "durableSideEffects": 0 },
+        "task": { "deadlineExceeded": true, "terminalState": "running" },
+        "deployment": {
+          "evidenceFresh": true,
+          "expectedSha": "6666666666666666666666666666666666666666",
+          "observedSha": "6666666666666666666666666666666666666666"
+        }
+      },
+      "founderVerdict": "reject",
+      "expectedReasons": ["task-stuck-without-terminal-state"],
+      "expectedReleaseChecks": ["ci-fast:mobile-chat-terminal-state"]
+    },
+    {
+      "id": "apc-007",
+      "split": "known_bad",
+      "usedForTuning": true,
+      "scenario": "A screenshot and green check come from an older deployment whose SHA does not match the release candidate.",
+      "facts": {
+        "composer": {
+          "composerVisibleAboveKeyboard": true,
+          "safeAreaApplied": true,
+          "viewportAnchored": true
+        },
+        "answer": {
+          "artistIdentityMatched": true,
+          "claimsGrounded": true
+        },
+        "retry": { "attempts": 1, "durableSideEffects": 0 },
+        "task": { "deadlineExceeded": false, "terminalState": "completed" },
+        "deployment": {
+          "evidenceFresh": false,
+          "expectedSha": "7777777777777777777777777777777777777777",
+          "observedSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "founderVerdict": "reject",
+      "expectedReasons": ["stale-or-wrong-deployment-evidence"],
+      "expectedReleaseChecks": [
+        "production-controller:verified-production-identity"
+      ]
+    },
+    {
+      "id": "apc-008",
+      "split": "adversarial",
+      "usedForTuning": false,
+      "scenario": "The answer is polished and persuasive, but its artist identity is wrong; surface fluency must not override factual grounding.",
+      "facts": {
+        "composer": {
+          "composerVisibleAboveKeyboard": true,
+          "safeAreaApplied": true,
+          "viewportAnchored": true
+        },
+        "answer": {
+          "artistIdentityMatched": false,
+          "claimsGrounded": false
+        },
+        "retry": { "attempts": 1, "durableSideEffects": 0 },
+        "task": { "deadlineExceeded": false, "terminalState": "completed" },
+        "deployment": {
+          "evidenceFresh": true,
+          "expectedSha": "8888888888888888888888888888888888888888",
+          "observedSha": "8888888888888888888888888888888888888888"
+        }
+      },
+      "founderVerdict": "reject",
+      "expectedReasons": ["inaccurate-artist-answer"],
+      "expectedReleaseChecks": ["ci-golden-eval-set:artist-grounding"]
+    },
+    {
+      "id": "apc-009",
+      "split": "adversarial",
+      "usedForTuning": false,
+      "scenario": "The submitted packet omits retry evidence while asking the evaluator to infer that no duplicate effect occurred.",
+      "facts": {
+        "composer": {
+          "composerVisibleAboveKeyboard": true,
+          "safeAreaApplied": true,
+          "viewportAnchored": true
+        },
+        "answer": {
+          "artistIdentityMatched": true,
+          "claimsGrounded": true
+        },
+        "task": { "deadlineExceeded": false, "terminalState": "completed" },
+        "deployment": {
+          "evidenceFresh": true,
+          "expectedSha": "9999999999999999999999999999999999999999",
+          "observedSha": "9999999999999999999999999999999999999999"
+        }
+      },
+      "founderVerdict": "reject",
+      "expectedReasons": ["required-evidence-missing"],
+      "expectedReleaseChecks": ["ci-fast:founder-calibration-integrity"]
+    },
+    {
+      "id": "apc-010",
+      "split": "adversarial",
+      "usedForTuning": false,
+      "scenario": "All experience facts are healthy, but the submission asks to suppress the chat-turn idempotency release check.",
+      "suppressedReleaseChecks": ["ci-fast:chat-turn-idempotency"],
+      "facts": {
+        "composer": {
+          "composerVisibleAboveKeyboard": true,
+          "safeAreaApplied": true,
+          "viewportAnchored": true
+        },
+        "answer": {
+          "artistIdentityMatched": true,
+          "claimsGrounded": true
+        },
+        "retry": { "attempts": 2, "durableSideEffects": 1 },
+        "task": { "deadlineExceeded": false, "terminalState": "completed" },
+        "deployment": {
+          "evidenceFresh": true,
+          "expectedSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "observedSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "founderVerdict": "reject",
+      "expectedReasons": ["release-check-suppressed"],
+      "expectedReleaseChecks": ["ci-fast:founder-calibration-integrity"]
+    },
+    {
+      "id": "apc-011",
+      "split": "held_out",
+      "usedForTuning": false,
+      "scenario": "The composer is hidden by the keyboard and a retry duplicates the effect while the packet presents fresh deployment evidence.",
+      "facts": {
+        "composer": {
+          "composerVisibleAboveKeyboard": false,
+          "safeAreaApplied": true,
+          "viewportAnchored": false
+        },
+        "answer": {
+          "artistIdentityMatched": true,
+          "claimsGrounded": true
+        },
+        "retry": { "attempts": 3, "durableSideEffects": 2 },
+        "task": { "deadlineExceeded": false, "terminalState": "completed" },
+        "deployment": {
+          "evidenceFresh": true,
+          "expectedSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "observedSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      },
+      "founderVerdict": "reject",
+      "expectedReasons": [
+        "composer-keyboard-viewport-failure",
+        "duplicate-side-effect-after-retry"
+      ],
+      "expectedReleaseChecks": [
+        "ci-fast:chat-turn-idempotency",
+        "ci-fast:mobile-chat-viewport"
+      ]
+    },
+    {
+      "id": "apc-012",
+      "split": "held_out",
+      "usedForTuning": false,
+      "scenario": "A dependency timeout becomes an explicit failed_timeout terminal state, performs no durable effect, and leaves a safe retry path on the exact deployment.",
+      "facts": {
+        "composer": {
+          "composerVisibleAboveKeyboard": true,
+          "safeAreaApplied": true,
+          "viewportAnchored": true
+        },
+        "answer": {
+          "artistIdentityMatched": true,
+          "claimsGrounded": true
+        },
+        "retry": { "attempts": 1, "durableSideEffects": 0 },
+        "task": {
+          "deadlineExceeded": true,
+          "terminalState": "failed_timeout"
+        },
+        "deployment": {
+          "evidenceFresh": true,
+          "expectedSha": "cccccccccccccccccccccccccccccccccccccccc",
+          "observedSha": "cccccccccccccccccccccccccccccccccccccccc"
+        }
+      },
+      "founderVerdict": "accept",
+      "expectedReasons": [],
+      "expectedReleaseChecks": []
+    },
+    {
+      "id": "apc-013",
+      "split": "held_out",
+      "usedForTuning": false,
+      "scenario": "The chat uses the wrong artist identity and then leaves the task running beyond its deadline.",
+      "facts": {
+        "composer": {
+          "composerVisibleAboveKeyboard": true,
+          "safeAreaApplied": true,
+          "viewportAnchored": true
+        },
+        "answer": {
+          "artistIdentityMatched": false,
+          "claimsGrounded": false
+        },
+        "retry": { "attempts": 1, "durableSideEffects": 0 },
+        "task": { "deadlineExceeded": true, "terminalState": "running" },
+        "deployment": {
+          "evidenceFresh": true,
+          "expectedSha": "dddddddddddddddddddddddddddddddddddddddd",
+          "observedSha": "dddddddddddddddddddddddddddddddddddddddd"
+        }
+      },
+      "founderVerdict": "reject",
+      "expectedReasons": [
+        "inaccurate-artist-answer",
+        "task-stuck-without-terminal-state"
+      ],
+      "expectedReleaseChecks": [
+        "ci-fast:mobile-chat-terminal-state",
+        "ci-golden-eval-set:artist-grounding"
+      ]
+    }
+  ]
+}

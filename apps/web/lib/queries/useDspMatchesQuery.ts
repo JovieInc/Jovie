@@ -30,14 +30,14 @@ export interface DspMatch {
   externalArtistName: string;
   externalArtistUrl: string | null;
   externalArtistImageUrl: string | null;
-  confidenceScore: number;
+  confidenceScore: number | null;
   confidenceBreakdown: {
     isrcMatchScore: number;
     upcMatchScore: number;
     nameSimilarityScore: number;
     followerRatioScore: number;
     genreOverlapScore: number;
-  };
+  } | null;
   matchingIsrcCount: number;
   matchingUpcCount: number;
   totalTracksChecked: number;
@@ -139,9 +139,17 @@ export function groupMatchesByProvider(
   return grouped;
 }
 
-/**
- * Get the best match for each provider (highest confidence)
- */
+/** Sort measured confidence first; uninspected suggestions have no score. */
+export function compareDspMatchConfidence(
+  a: Pick<DspMatch, 'confidenceScore'>,
+  b: Pick<DspMatch, 'confidenceScore'>
+): number {
+  if (a.confidenceScore === null) return b.confidenceScore === null ? 0 : 1;
+  if (b.confidenceScore === null) return -1;
+  return b.confidenceScore - a.confidenceScore;
+}
+
+/** Get the highest measured confidence for each provider, retaining unknowns. */
 export function getBestMatchPerProvider(
   matches: DspMatch[]
 ): Map<DspProviderId, DspMatch> {
@@ -149,9 +157,7 @@ export function getBestMatchPerProvider(
   const best = new Map<DspProviderId, DspMatch>();
 
   for (const [provider, providerMatches] of grouped) {
-    const sorted = [...providerMatches].sort(
-      (a, b) => b.confidenceScore - a.confidenceScore
-    );
+    const sorted = [...providerMatches].sort(compareDspMatchConfidence);
     if (sorted[0]) {
       best.set(provider, sorted[0]);
     }

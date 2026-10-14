@@ -12,6 +12,7 @@
  * flashing a loading banner on every page visit.
  */
 
+import { CardContent } from '@jovie/ui';
 import { useEffect, useMemo } from 'react';
 
 import { Icon } from '@/components/atoms/Icon';
@@ -21,7 +22,6 @@ import {
   DrawerSurfaceCard,
 } from '@/components/molecules/drawer';
 import { DspProviderIcon } from '@/features/dashboard/atoms/DspProviderIcon';
-import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import {
   type DspMatch,
@@ -29,6 +29,7 @@ import {
   useDspMatchesQuery,
   useRejectDspMatchMutation,
 } from '@/lib/queries';
+import { compareDspMatchConfidence } from '@/lib/queries/useDspMatchesQuery';
 import { cn } from '@/lib/utils';
 
 interface AppleMusicSyncBannerProps {
@@ -80,7 +81,10 @@ export function AppleMusicSyncBanner({
       enabled:
         providedIsLoading === undefined && spotifyConnected && !!profileId,
     });
-  const matches = providedMatches ?? queriedMatches ?? ([] as DspMatch[]);
+  const matches = useMemo(
+    () => providedMatches ?? queriedMatches ?? [],
+    [providedMatches, queriedMatches]
+  );
   const isLoading = providedIsLoading ?? isQueryLoading;
 
   const confirmMutation = useConfirmDspMatchMutation();
@@ -90,9 +94,7 @@ export function AppleMusicSyncBanner({
   const appleMusicMatch = useMemo((): DspMatch | null => {
     const amMatches = matches
       .filter((m: DspMatch) => m.providerId === 'apple_music')
-      .sort(
-        (a: DspMatch, b: DspMatch) => b.confidenceScore - a.confidenceScore
-      );
+      .sort(compareDspMatchConfidence);
     return amMatches[0] ?? null;
   }, [matches]);
 
@@ -154,7 +156,7 @@ export function AppleMusicSyncBanner({
     return (
       <div
         className={cn(
-          'system-b-release-provider-banner--apple system-b-release-provider-banner-compact inline-flex h-7.5 items-center gap-2 rounded-md border px-2 text-xs text-primary-token',
+          'system-b-release-provider-banner--apple system-b-release-provider-banner-compact inline-flex min-h-9 items-center gap-2 rounded-md border px-2 text-xs text-primary-token',
           className
         )}
       >
@@ -168,7 +170,6 @@ export function AppleMusicSyncBanner({
             rejectMutation.mutate({ matchId: match.id, profileId })
           }
           disabled={rejectMutation.isPending || confirmMutation.isPending}
-          className='h-7 rounded-md px-2 text-2xs'
         >
           Dismiss
         </DrawerButton>
@@ -178,7 +179,6 @@ export function AppleMusicSyncBanner({
             confirmMutation.mutate({ matchId: match.id, profileId })
           }
           disabled={confirmMutation.isPending || rejectMutation.isPending}
-          className='system-b-release-provider-action h-7 rounded-md px-2 text-2xs'
         >
           Confirm
         </DrawerButton>
@@ -188,25 +188,22 @@ export function AppleMusicSyncBanner({
 
   if (syncState === 'no_match') {
     return (
-      <DrawerSurfaceCard
-        variant='card'
-        className={cn(
-          LINEAR_SURFACE.bannerCard,
-          'flex items-center gap-3 px-4 py-3 text-secondary-token',
-          className
-        )}
-      >
-        <div className='system-b-release-provider-banner--apple system-b-release-provider-icon flex h-7 w-7 shrink-0 items-center justify-center rounded-full'>
-          <DspProviderIcon provider='apple_music' size='md' />
-        </div>
-        <div className='min-w-0 flex-1'>
-          <p className='text-app font-caption text-primary-token'>
-            No Apple Music match found
-          </p>
-          <p className='mt-0.5 text-2xs text-secondary-token'>
-            We couldn&apos;t confidently match your artist yet.
-          </p>
-        </div>
+      <DrawerSurfaceCard variant='card' className={className}>
+        <CardContent>
+          <div className='flex items-center gap-3'>
+            <div className='system-b-release-provider-banner--apple system-b-release-provider-icon flex h-7 w-7 shrink-0 items-center justify-center rounded-full'>
+              <DspProviderIcon provider='apple_music' size='md' />
+            </div>
+            <div className='min-w-0 flex-1'>
+              <p className='text-app font-caption text-primary-token'>
+                No Apple Music match found
+              </p>
+              <p className='mt-0.5 text-2xs text-secondary-token'>
+                We couldn&apos;t confidently match your artist yet.
+              </p>
+            </div>
+          </div>
+        </CardContent>
       </DrawerSurfaceCard>
     );
   }
@@ -216,81 +213,76 @@ export function AppleMusicSyncBanner({
   const externalArtistUrl = match.externalArtistUrl ?? undefined;
 
   return (
-    <DrawerSurfaceCard
-      variant='card'
-      className={cn(
-        'system-b-release-provider-banner system-b-release-provider-banner--apple flex items-center gap-3 border px-4 py-3',
-        className
-      )}
-    >
-      <div className='system-b-release-provider-icon flex h-7 w-7 shrink-0 items-center justify-center rounded-full'>
-        <DspProviderIcon provider='apple_music' size='md' />
-      </div>
+    <DrawerSurfaceCard variant='card' className={className}>
+      <CardContent>
+        <div className='flex items-center gap-3'>
+          <div className='system-b-release-provider-icon flex h-7 w-7 shrink-0 items-center justify-center rounded-full'>
+            <DspProviderIcon provider='apple_music' size='md' />
+          </div>
 
-      <div className='flex-1 min-w-0'>
-        <div className='flex items-center gap-2'>
-          <span className='min-w-0 truncate text-app font-caption text-primary-token'>
-            {match.externalArtistName}
-          </span>
-          {externalArtistUrl && (
-            <DrawerInlineIconButton
-              type='button'
-              aria-label='View on Apple Music'
+          <div className='flex-1 min-w-0'>
+            <div className='flex items-center gap-2'>
+              <span className='min-w-0 truncate text-app font-caption text-primary-token'>
+                {match.externalArtistName}
+              </span>
+              {externalArtistUrl && (
+                <DrawerInlineIconButton
+                  type='button'
+                  aria-label='View On Apple Music'
+                  onClick={() =>
+                    globalThis.open(
+                      externalArtistUrl,
+                      '_blank',
+                      'noopener,noreferrer'
+                    )
+                  }
+                >
+                  <Icon name='ExternalLink' className='h-3 w-3' />
+                </DrawerInlineIconButton>
+              )}
+            </div>
+            <p className='mt-0.5 text-2xs text-secondary-token'>
+              Confirm to link your Apple Music releases.
+            </p>
+          </div>
+
+          <div className='flex shrink-0 items-center gap-1.5'>
+            <DrawerButton
+              tone='ghost'
               onClick={() =>
-                globalThis.open(
-                  externalArtistUrl,
-                  '_blank',
-                  'noopener,noreferrer'
-                )
+                rejectMutation.mutate({ matchId: match.id, profileId })
               }
-              className='p-0.5 text-tertiary-token'
+              disabled={rejectMutation.isPending || confirmMutation.isPending}
             >
-              <Icon name='ExternalLink' className='h-3 w-3' />
-            </DrawerInlineIconButton>
-          )}
+              {rejectMutation.isPending &&
+              rejectMutation.variables?.matchId === match.id
+                ? 'Dismissing...'
+                : 'Dismiss'}
+            </DrawerButton>
+            <DrawerButton
+              tone='primary'
+              onClick={() =>
+                confirmMutation.mutate({ matchId: match.id, profileId })
+              }
+              disabled={confirmMutation.isPending || rejectMutation.isPending}
+            >
+              {confirmMutation.isPending &&
+              confirmMutation.variables?.matchId === match.id ? (
+                <>
+                  <Icon
+                    name='Loader2'
+                    className='mr-1 h-3 w-3 animate-spin'
+                    aria-hidden='true'
+                  />
+                  Confirming...
+                </>
+              ) : (
+                'Confirm'
+              )}
+            </DrawerButton>
+          </div>
         </div>
-        <p className='mt-0.5 text-2xs text-secondary-token'>
-          Confirm to link your Apple Music releases.
-        </p>
-      </div>
-
-      <div className='flex shrink-0 items-center gap-1.5'>
-        <DrawerButton
-          tone='ghost'
-          onClick={() =>
-            rejectMutation.mutate({ matchId: match.id, profileId })
-          }
-          disabled={rejectMutation.isPending || confirmMutation.isPending}
-          className='h-7 rounded-lg px-2.5 text-xs'
-        >
-          {rejectMutation.isPending &&
-          rejectMutation.variables?.matchId === match.id
-            ? 'Dismissing...'
-            : 'Dismiss'}
-        </DrawerButton>
-        <DrawerButton
-          tone='primary'
-          onClick={() =>
-            confirmMutation.mutate({ matchId: match.id, profileId })
-          }
-          disabled={confirmMutation.isPending || rejectMutation.isPending}
-          className='system-b-release-provider-action h-7 rounded-lg px-2.5 text-xs'
-        >
-          {confirmMutation.isPending &&
-          confirmMutation.variables?.matchId === match.id ? (
-            <>
-              <Icon
-                name='Loader2'
-                className='mr-1 h-3 w-3 animate-spin'
-                aria-hidden='true'
-              />
-              Confirming...
-            </>
-          ) : (
-            'Confirm'
-          )}
-        </DrawerButton>
-      </div>
+      </CardContent>
     </DrawerSurfaceCard>
   );
 }
