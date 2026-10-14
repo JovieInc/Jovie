@@ -58,6 +58,21 @@ describe('native review readout adapter', () => {
     assert.equal(result.executionAuthority, 'none');
     assert.equal(result.proposedMutation, null);
   });
+  it('accepts Date clocks and fails closed for invalid clocks', () => {
+    assert.deepEqual(
+      assessAppReviewReadout(snapshot(), { now: new Date(now) }),
+      assessAppReviewReadout(snapshot(), { now })
+    );
+    assert.ok(
+      assessAppReviewReadout(snapshot(), {
+        now: new Date('invalid'),
+      }).errors.includes('evaluation-time-invalid')
+    );
+    assert.equal(
+      assessAppReviewReadout(null).nextAction,
+      'collect-read-only-evidence'
+    );
+  });
   it('prepares a disable patch on harm even while measurements are incomplete', () => {
     const input = snapshot();
     input.guardrails.privacyIncidents = 1;
