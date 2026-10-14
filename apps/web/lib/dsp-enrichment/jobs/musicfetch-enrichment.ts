@@ -10,7 +10,7 @@
 
 import 'server-only';
 
-import { sql as drizzleSql, eq, isNull, ne, or } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, isNull, or } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { type DbOrTransaction, db as plainDb } from '@/lib/db';
@@ -257,8 +257,7 @@ async function importDiscography(
 const streamingDspKeySet = new Set(STREAMING_DSP_KEYS);
 
 /**
- * Upsert a single DSP artist match row, backfilling external ID via COALESCE
- * so ISRC-discovered matches retain their richer confidence data.
+ * Save discovery suggestions without replacing inspected matches or decisions.
  */
 async function upsertDspArtistMatch(
   creatorProfileId: string,
@@ -266,10 +265,9 @@ async function upsertDspArtistMatch(
   externalArtistId: string | null,
   artistUrl: string,
   artistName: string | null,
-  imageUrl: string | null,
   now: Date
-): Promise<void> {
-  await plainDb
+): Promise<boolean> {
+  const changed = await plainDb
     .insert(dspArtistMatches)
     .values({
       creatorProfileId,
@@ -277,14 +275,14 @@ async function upsertDspArtistMatch(
       externalArtistId,
       externalArtistName: artistName,
       externalArtistUrl: artistUrl,
-      externalArtistImageUrl: imageUrl,
+      externalArtistImageUrl: null,
       confidenceScore: null,
       confidenceBreakdown: null,
       matchingIsrcCount: 0,
       matchingUpcCount: 0,
       totalTracksChecked: 0,
-      status: 'auto_confirmed',
-      confirmedAt: now,
+      status: 'suggested',
+      confirmedAt: null,
       matchSource: 'musicfetch',
       createdAt: now,
       updatedAt: now,
@@ -299,23 +297,50 @@ async function upsertDspArtistMatch(
           : {}),
         externalArtistUrl: artistUrl,
         externalArtistName: artistName,
-        externalArtistImageUrl: imageUrl,
+        externalArtistImageUrl: null,
+        status: 'suggested',
+        confirmedAt: null,
+        matchSource: 'musicfetch',
         updatedAt: now,
       },
-      where: or(
-        isNull(dspArtistMatches.matchSource),
-        ne(dspArtistMatches.matchSource, 'manual')
+      where: and(
+        or(
+          isNull(dspArtistMatches.matchSource),
+          eq(dspArtistMatches.matchSource, 'musicfetch')
+        ),
+        or(
+          eq(dspArtistMatches.status, 'suggested'),
+          eq(dspArtistMatches.status, 'auto_confirmed')
+        ),
+        isNull(dspArtistMatches.confirmedBy),
+        isNull(dspArtistMatches.confidenceScore),
+        isNull(dspArtistMatches.confidenceBreakdown),
+        eq(dspArtistMatches.matchingIsrcCount, 0),
+        eq(dspArtistMatches.matchingUpcCount, 0),
+        eq(dspArtistMatches.totalTracksChecked, 0),
+        or(
+          isNull(dspArtistMatches.externalArtistUrl),
+          eq(dspArtistMatches.externalArtistUrl, artistUrl)
+        ),
+        externalArtistId
+          ? or(
+              isNull(dspArtistMatches.externalArtistId),
+              eq(dspArtistMatches.externalArtistId, externalArtistId)
+            )
+          : undefined
       ),
-    });
+    })
+    .returning({ id: dspArtistMatches.id });
+  return changed.length > 0;
 }
 
 /**
  * Seed dspArtistMatches from MusicFetch discovery results.
  *
  * For each streaming DSP that MusicFetch resolved a URL for, upsert a row
- * into dspArtistMatches. Uses onConflictDoUpdate on URL/name/image fields, and
- * backfills missing external IDs when MusicFetch provides one, so
- * ISRC-discovered matches retain their richer confidence data.
+ * into dspArtistMatches as an uninspected suggestion. The shared reference
+ * image is never a platform portrait. Only matching, uninspected discovery
+ * suggestions can be refreshed or have their external IDs backfilled.
  *
  * Runs outside the enrichment transaction (plainDb) so failures don't abort
  * the enrichment job — same pattern as the identity layer.
@@ -329,7 +354,6 @@ async function seedPresenceFromMusicFetch(
   let seeded = 0;
   const seededProviderIds = new Set<string>();
   const artistName = artistData.name ?? null;
-  const imageUrl = artistData.image?.url ?? null;
 
   for (const [serviceKey, service] of Object.entries(artistData.services)) {
     const url = getMusicFetchServiceUrl(service);
@@ -348,16 +372,15 @@ async function seedPresenceFromMusicFetch(
     if (seededProviderIds.has(dspEntry.key)) continue;
 
     try {
-      await upsertDspArtistMatch(
+      const changed = await upsertDspArtistMatch(
         creatorProfileId,
         dspEntry.key,
         service.id ?? null,
         url,
         artistName,
-        imageUrl,
         now
       );
-      seeded++;
+      if (changed) seeded++;
       seededProviderIds.add(dspEntry.key);
     } catch (error) {
       // Non-blocking — log and continue to next DSP
@@ -373,16 +396,15 @@ async function seedPresenceFromMusicFetch(
   if (spotifyUrl && !seededProviderIds.has('spotify')) {
     try {
       const spotifyId = extractSpotifyArtistId(spotifyUrl, null);
-      await upsertDspArtistMatch(
+      const changed = await upsertDspArtistMatch(
         creatorProfileId,
         'spotify',
         spotifyId,
         spotifyUrl,
         artistName,
-        imageUrl,
         now
       );
-      seeded++;
+      if (changed) seeded++;
     } catch (error) {
       logger.warn('MusicFetch presence seed: failed to upsert Spotify match', {
         creatorProfileId,
