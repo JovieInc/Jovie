@@ -1349,8 +1349,12 @@ def plan_labeled_events(issues: list, recorded: dict | None, providers: dict, no
                 if observed_recurrence:
                     # Retain the consumed version against a delayed completed snapshot.
                     row["completedGeneration"] = {**completed, "consumed": True, "consumedAt": canonical["updatedAt"]}
+                    # Structural Linear evidence, independent of a repeated/rolled-back host clock.
+                    # Merely observing a later pending completion must retain this old active binding.
+                    row["activeGeneration"] = {"completedAt": completed["updatedAt"], "openedAt": canonical["updatedAt"]}
                 else:
                     row.pop("completedGeneration", None)
+                    row.pop("activeGeneration", None)
                 row["release"] = True
                 row["running"] = False
                 row["lane"] = None

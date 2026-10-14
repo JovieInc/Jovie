@@ -4039,10 +4039,11 @@ def _apply_event_plan(linear, plan: dict, host: Host, data: dict, now: float) ->
 
 
 def _event_start_claim(fingerprint: str, row: dict) -> dict:
+    generation = {"activeGeneration": dict(row["activeGeneration"])} if row.get("activeGeneration") else {}
     correlation = _event_digest({"issueId": row.get("issueId"), "startedStateId": row.get("startedStateId"),
-                                 "owner": HOST, "generation": row.get("attempts") or []})
+                                 "owner": HOST, "generation": row.get("attempts") or [], **generation})
     return {"fingerprint": fingerprint, "issueId": row.get("issueId"), "team": row.get("team"),
-            "owner": HOST, "lane": row.get("lane"), "correlation": correlation}
+            "owner": HOST, "lane": row.get("lane"), "correlation": correlation, **generation}
 
 
 def claim_remediation_events(host: Host, linear) -> dict:

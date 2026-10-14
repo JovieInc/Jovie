@@ -9412,6 +9412,62 @@ class RemediationEventRecoveryTest(unittest.TestCase):
         self.assertEqual(duplicate['reasons'], ['generation_terminal'])
         provider.assert_not_called()
 
+    def test_current_claim_failure_outcomes_preserve_existing_ladder_and_holds(self):
+        lane.claim_remediation_events(self.host, self.linear)
+        claimed = lane.claim_labeled_event(self.host, 'codex', self.linear)
+        before = lane.load_escalation(self.host)
+        before['events'].update(unrelated={'issueId': 'different', 'running': True}, unreadable=None)
+        lane.save_escalation(self.host, before)
+        for unclaimed in (None, dataclasses.replace(claimed, event_claim=None)):
+            lane.note_event_outcome(self.host, unclaimed, 'provider-error')
+            self.assertEqual(lane.load_escalation(self.host), before)
+        cases = [('provider-error', 'claimed', None, True), ('not-shippable', 'exhausted', None, False),
+                 ('quarantined', 'exhausted', None, False), ('failed', 'claimed', 'codex', False)]
+        for verdict, status, owner, release in cases:
+            with self.subTest(outcome=verdict):
+                lane.save_escalation(self.host, before)
+                lane.note_event_outcome(self.host, claimed, verdict)
+                after = lane.load_escalation(self.host)
+                row = after['events']['delivery-stalled']
+                self.assertEqual((row['status'], row['lane'], row['release'], row['running']),
+                                 (status, owner, release, False))
+                self.assertEqual(row['attempts'], before['events']['delivery-stalled']['attempts'])
+                self.assertEqual(row['startDelivery'], before['events']['delivery-stalled']['startDelivery'])
+                self.assertNotIn('settled', row['startDelivery'])
+                self.assertEqual(after['events']['unrelated'], before['events']['unrelated'])
+                self.assertIsNone(after['events']['unreadable'])
+
+    def test_structural_generations_reject_old_callbacks_when_local_clock_repeats_or_rolls_back(self):
+        for clocks in ((10000, 10000, 10000), (10000, 9999, 10000)):
+            with self.subTest(clocks=clocks):
+                lane.save_escalation(self.host, {'events': {}})
+                previous = []
+                for index, clock in enumerate(clocks):
+                    with patch.object(lane.time, 'time', return_value=clock):
+                        self.issue['description'] = f'new signal {clocks} {index}'
+                        if previous:
+                            event = lane.load_escalation(self.host)['events']['delivery-stalled']
+                            binding = lane._event_start_claim('delivery-stalled', event)
+                            pending = self.observe_completion(event, stamp=f'2026-10-{15 + index * 2:02}T00:00:00Z')
+                            # Pending completion does not rewrite the still-owned old delivery.
+                            self.assertEqual(lane._event_start_claim('delivery-stalled', pending), binding)
+                            self.reopen(f'2026-10-{16 + index * 2:02}T00:00:00Z')
+                        else:
+                            self.reopen()
+                        self.remote_state = {'id': 'todo-JOV', 'name': 'Todo'}
+                        lane.claim_remediation_events(self.host, self.linear)
+                        current = lane.claim_labeled_event(self.host, 'codex', self.linear)
+                        self.assertIsNotNone(current)
+                        before = lane.load_escalation(self.host)
+                        for old, receipt in previous:
+                            self.assertNotEqual(current.event_claim, old.event_claim)
+                            for verdict in ('landing', 'provider-error'):
+                                lane.note_event_outcome(self.host, old, verdict, receipt=receipt)
+                                self.assertEqual(lane.load_escalation(self.host), before)
+                        receipt = self.settled_run(current)
+                        lane.note_event_outcome(self.host, current, 'landing', receipt=receipt)
+                        previous.append((current, receipt))
+
     def test_unproven_same_issue_reopen_does_not_renew_spent_attempts(self):
         cases = [
             ('local-result-only', None, '2026-10-14T00:00:00Z'),
