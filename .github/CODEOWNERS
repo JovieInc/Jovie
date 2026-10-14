@@ -1,6 +1,11 @@
 # Global code owners
 * @itstimwhite
 
+# Founder calibration protection (JOV-7199): builders cannot silently replace
+# founder labels, held-out baselines, evaluator rules, or the integrity detector.
+/scripts/invariants/fixtures/founder-calibration-* @itstimwhite
+/scripts/invariants/founder-calibration* @itstimwhite
+
 # Frontend components
 /apps/web/components/ @itstimwhite
 /apps/web/app/ @itstimwhite
