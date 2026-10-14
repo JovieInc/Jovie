@@ -10,7 +10,7 @@ import {
   Label,
 } from '@jovie/ui';
 import { parseISO } from 'date-fns';
-import { CalendarIcon, Globe, MapPin } from 'lucide-react';
+import { Globe, MapPin } from 'lucide-react';
 import {
   type ComponentType,
   useCallback,
@@ -24,9 +24,9 @@ import { DatePicker } from '@/components/molecules/DatePicker';
 import {
   DrawerAnalyticsSummaryCard,
   DrawerCardActionBar,
-  DrawerMediaThumb,
   DrawerSection,
   DrawerSurfaceCard,
+  EntityHeaderThumbnail,
   EntitySidebarShell,
   ShareableLinkRow,
 } from '@/components/molecules/drawer';
@@ -270,18 +270,11 @@ export function TourDateSidebar({
                   reserveMetaSlot
                   metaOverflow='scroll'
                   thumbnail={
-                    <DrawerMediaThumb
-                      alt=''
-                      fallback={
-                        <CalendarIcon
-                          className='h-4 w-4 text-tertiary-token'
-                          aria-hidden='true'
-                        />
-                      }
-                      dimension={44}
-                      sizeClassName='h-11 w-11'
-                      sizes='44px'
-                      className='rounded-md border-0 bg-surface-0 outline-none'
+                    <EntityHeaderThumbnail
+                      variant='event'
+                      name={tourDate.title?.trim() || tourDate.venueName}
+                      eventDate={tourDate.startDate}
+                      size={44}
                     />
                   }
                   subtitle={

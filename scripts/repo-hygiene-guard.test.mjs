@@ -226,6 +226,9 @@ test('blocks force-added build, test, coverage, and cache roots derived from git
     '.claude/teams/local/index',
     '.claude/tasks/local/index',
     '.codex/session/runtime.json',
+    '.codex/local-env.toml',
+    '.codex/environments/private.toml',
+    '.codex/environments/environment.toml.bak',
     '.worktrees/local/index',
     '.issues/local.json',
     '.gbrain-source',
@@ -260,7 +263,7 @@ test('blocks force-added build, test, coverage, and cache roots derived from git
     'agentos/manifests/canonical.json',
     '.codex/config.toml',
     '.codex/hooks.json',
-    '.codex/local-env.toml',
+    '.codex/environments/environment.toml',
   ]) {
     assert.deepEqual(
       evaluateRepoHygiene({ addedPaths: [sourcePath] }).errors,

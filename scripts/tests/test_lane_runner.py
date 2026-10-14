@@ -1806,6 +1806,76 @@ class HostHandoffAdmissionTest(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.host = lane.Host(state=Path(self.tmp.name), repo=Path(self.tmp.name))
 
+    @staticmethod
+    def routed_providers():
+        return {
+            "devin": {"tier": 0, "slots": 1, "model": "standard", "cmd": ["devin-test"],
+                      "routes": [{"model": "standard", "capability": "standard", "cost": 0}]},
+            "codex": {"tier": 1, "slots": 1, "model": "frontier", "cmd": ["codex-test"],
+                      "routes": [{"model": "frontier", "capability": "frontier", "cost": 3}]},
+            "claude": {"tier": 2, "slots": 1, "model": "sonnet", "cmd": ["claude-test", "{model}"],
+                       "routes": [{"model": "sonnet", "capability": "standard", "cost": 1},
+                                  {"model": "opus", "capability": "frontier", "cost": 2}]},
+            "hyperagent": {"tier": 0, "slots": 1, "repairs": False, "cmd": ["remote-test"],
+                           "routes": [{"model": "remote", "capability": "frontier", "cost": 0}]},
+        }
+
+    def test_issue_handoff_keeps_sensitive_and_codex_blocked_restrictions(self):
+        providers = self.routed_providers()
+        with patch.object(lane, "provider_healthy", return_value=True) as healthy:
+            self.assertIsNone(lane.next_provider(self.host, {"codex"}, providers, issue=issue(labels=["auth"])))
+            self.assertIsNone(lane.next_provider(self.host, set(), providers,
+                                                issue=issue(labels=["auth", "codex-blocked"])))
+            self.assertEqual(lane.next_provider(self.host, {"devin"}, providers,
+                                                issue=issue(labels=["codex-blocked"]))[0], "claude")
+        self.assertTrue(all(call.args[0] is providers["claude"] for call in healthy.call_args_list))
+
+    def test_frontier_handoff_selects_a_frontier_model_without_mutating_the_catalog(self):
+        providers = self.routed_providers()
+        with patch.object(lane, "provider_healthy", return_value=True):
+            name, spec = lane.next_provider(self.host, {"codex"}, providers, issue=issue(labels=["route:frontier"]))
+        self.assertEqual((name, spec["model"]), ("claude", "opus"))
+        self.assertEqual(spec["route"]["required"], "frontier")
+        self.assertEqual(providers["claude"]["model"], "sonnet")
+        self.assertEqual(lane.template(spec["cmd"], {"model": spec["model"]}), ["claude-test", "opus"])
+
+    def test_handoff_requires_proven_route_capability(self):
+        providers = {"devin": {"slots": 1, "model": "unknown", "cmd": ["devin-test"]}}
+        with patch.object(lane, "provider_healthy", return_value=True):
+            self.assertIsNone(lane.next_provider(self.host, set(), providers, issue=issue()))
+
+    def test_handoff_cannot_drop_the_initial_floor_when_policy_is_unreadable(self):
+        providers = self.routed_providers()
+        with patch.object(lane, "provider_healthy", return_value=True), \
+                patch.object(lane, "read_json", return_value={}):
+            name, spec = lane.next_provider(self.host, {"codex"}, providers, issue=issue(),
+                                            minimum_capability="frontier")
+            self.assertEqual((name, spec["model"]), ("claude", "opus"))
+            self.assertEqual(spec["route"]["required"], "frontier")
+            self.assertIsNone(lane.next_provider(self.host, {"codex", "claude"}, providers,
+                                                issue=issue(), minimum_capability="frontier"))
+            self.assertIsNone(lane.next_provider(self.host, set(), providers,
+                                                issue=issue(), minimum_capability="unknown"))
+
+    def test_issue_handoff_preserves_live_availability_and_remote_only_exclusions(self):
+        for mode in ("disabled", "no-slots", "remote-only", "quota", "cooling", "unhealthy", "saturated"):
+            with self.subTest(mode=mode):
+                providers = self.routed_providers()
+                spec = providers["claude"]
+                if mode == "disabled":
+                    spec["enabled"] = False
+                if mode == "no-slots":
+                    spec["slots"] = 0
+                if mode == "remote-only":
+                    spec["repairs"] = False
+                if mode == "quota":
+                    spec["quota"] = {"source": "ledger", "maxRuns": 0}
+                with patch.object(lane, "provider_healthy", return_value=mode != "unhealthy"), \
+                        patch.object(lane, "cooling", side_effect=lambda host, name: mode == "cooling" and name == "claude"), \
+                        patch.object(lane, "slot_free", return_value=mode != "saturated"):
+                    self.assertIsNone(lane.next_provider(self.host, {"codex"}, providers,
+                                                        issue=issue(labels=["route:frontier"])))
+
     def test_host_disabled_handoffs_are_not_probed_or_selected(self):
         providers = {"claude": {"slots": 2}, "hyperagent": {"slots": 2}}
         with patch.dict(os.environ, {"LANES_SLOTS_CLAUDE": "0", "LANES_SLOTS_HYPERAGENT": "0"}), \
@@ -1922,6 +1992,14 @@ class RunIssueTest(unittest.TestCase):
         self.assertEqual(receipt["execution"]["retryDecision"], "stop")
         self.assertEqual(self.ledger()[-1]["result"], receipt["result"])
 
+    def test_issue_cleanup_keeps_the_branch_when_its_worktree_is_retained(self):
+        lane.verify_and_land = lambda *a, **k: {"verdict": "no-change", "reasons": []}
+        with patch.object(lane, "remove_worktree", return_value=False), \
+                patch.object(lane, "sh", wraps=lane.sh) as shell:
+            lane.run_issue(self.host, "devin", {"cmd": ["true"]}, FakeLinear([]), issue())
+        self.assertFalse(any(call.args[0][:3] == ["git", "branch", "-D"]
+                             for call in shell.call_args_list))
+
     def test_deferred_or_reused_gate_does_not_quarantine_completed_implementation(self):
         for index, verdict in enumerate(("gate-in-progress", "gate-deferred", "gate-already-completed")):
             with self.subTest(verdict=verdict):
@@ -1983,7 +2061,7 @@ class RunIssueTest(unittest.TestCase):
         lane.verify_and_land = lambda *a, **k: {"verdict": "landing", "pr": 11, "reasons": []}
         seen = []
 
-        def nxt(host, exclude, providers=None):
+        def nxt(host, exclude, providers=None, **kwargs):
             seen.append(set(exclude))
             return ("devin", {"cmd": [sys.executable, "-c", "import os; open('done.txt','w').write(os.getcwd())"]}) \
                 if "devin" not in exclude else None
@@ -2004,6 +2082,58 @@ class RunIssueTest(unittest.TestCase):
         self.assertEqual((context["kind"], context["provider"]), ("handoff", "devin"))
         self.assertEqual(context["prompt"]["sha256"], hashlib.sha256(handoff.encode()).hexdigest())
 
+    def test_real_handoff_router_never_downgrades_sensitive_or_frontier_work(self):
+        providers = HostHandoffAdmissionTest.routed_providers()
+        providers.pop("claude")
+        seen = []
+
+        def agent(cmd, cwd, *args, **kwargs):
+            seen.append((cmd[0], cwd))
+            (cwd / "partial.py").write_text("preserve_partial_source = True\n")
+            return SimpleNamespace(returncode=75 if cmd[0] == "codex-test" else 0)
+
+        for index, labels in enumerate((["auth"], ["route:frontier"], [], [])):
+            with self.subTest(labels=labels):
+                seen.clear()
+                initial = {**providers["codex"], **({"route": {"required": "frontier"}} if index == 2 else {})}
+                lane.verify_and_land = lambda *a, **k: {"verdict": "landing" if len(seen) > 1 else "no-change", "reasons": []}
+                with patch.object(lane, "next_provider", side_effect=self.real_next), \
+                        patch.object(lane, "load_providers", return_value=providers), \
+                        patch.object(lane, "provider_healthy", return_value=True), \
+                        patch.object(lane, "run_agent", side_effect=agent):
+                    receipt = lane.run_issue(self.host, "codex", initial, FakeLinear([]),
+                                             issue(f"JOV-{90 + index}", labels=labels))
+                if labels or index == 2:
+                    self.assertEqual([name for name, _ in seen], ["codex-test"])
+                    self.assertEqual(receipt["verdict"], "provider-error")
+                    self.assertNotIn("handoffs", receipt)
+                    self.assertTrue((Path(receipt["worktree"]) / "partial.py").exists())
+                else:
+                    self.assertEqual([name for name, _ in seen], ["codex-test", "devin-test"])
+                    self.assertEqual(seen[0][1], seen[1][1])
+                    self.assertEqual((receipt["verdict"], receipt["finishedBy"]), ("landing", "devin"))
+
+    def test_frontier_floor_applies_again_after_the_first_handoff_fails(self):
+        providers = HostHandoffAdmissionTest.routed_providers()
+        providers["sakana"] = {"tier": 3, "slots": 1, "cmd": ["sakana-test"],
+                               "routes": [{"model": "standard", "capability": "standard", "cost": 4}]}
+        seen = []
+
+        def agent(cmd, *args, **kwargs):
+            seen.append(cmd)
+            return SimpleNamespace(returncode=75)
+
+        lane.verify_and_land = lambda *a, **k: {"verdict": "no-change", "reasons": []}
+        with patch.object(lane, "next_provider", side_effect=self.real_next), \
+                patch.object(lane, "load_providers", return_value=providers), \
+                patch.object(lane, "provider_healthy", return_value=True), \
+                patch.object(lane, "run_agent", side_effect=agent):
+            receipt = lane.run_issue(self.host, "codex", providers["codex"], FakeLinear([]),
+                                     issue(labels=["route:frontier"]))
+        self.assertEqual(seen, [["codex-test"], ["claude-test", "opus"]])
+        self.assertEqual(len(receipt["handoffs"]), 1)
+        self.assertEqual(receipt["verdict"], "provider-error")
+
     def test_next_provider_takes_the_cheapest_enabled_healthy_uncooled_lane(self):
         providers = {
             "devin": {"health": ["echo", "ok"], "healthy": "ok"},
@@ -2020,7 +2150,7 @@ class RunIssueTest(unittest.TestCase):
     def test_handoffs_are_capped_and_then_report_the_provider_error(self):
         lane.verify_and_land = lambda *a, **k: {"verdict": "no-change", "reasons": ["no-pr-and-no-commits"]}
         order = iter(["devin", "claude", "hyperagent"])
-        lane.next_provider = lambda host, exclude, providers=None: (next(order), {"cmd": ["false"]})
+        lane.next_provider = lambda host, exclude, providers=None, **kwargs: (next(order), {"cmd": ["false"]})
         receipt = lane.run_issue(self.host, "codex", {"cmd": ["false"]}, FakeLinear([]), issue())
         self.assertEqual(len(receipt["handoffs"]), lane.PROVIDER_HANDOFFS)
         self.assertEqual(receipt["verdict"], "provider-error")
@@ -3635,12 +3765,18 @@ class DispatchTest(unittest.TestCase):
     def test_unprotected_worktree_removal_does_not_kill_processes_by_path(self):
         with tempfile.TemporaryDirectory() as tmp:
             fake = FakeShell([])
-            with patch.object(lane, "sh", side_effect=fake):
+
+            def shell(args, **kwargs):
+                result = fake(args, **kwargs)
+                if args[:2] == ["git", "rev-parse"]:
+                    result.stdout = "a" * 40
+                return result
+
+            with patch.object(lane, "sh", side_effect=shell):
                 lane.remove_worktree(lane.Host(state=Path(tmp), repo=Path(tmp)), Path(tmp))
-            self.assertEqual(fake.calls, [["lsof", "-nP", "-a", "-d", "cwd", "-F", "pn"],
-                                          ["git", "status", "--porcelain", *lane.disk_guard.SOURCE_PATHSPEC],
-                                          ["git", "rev-list", "--count", "HEAD", "--not", "--all"],
-                                          ["git", "worktree", "remove", "--force", tmp]])
+            self.assertFalse(any(call[0] == "pkill" for call in fake.calls))
+            self.assertIn(["git", "rev-list", "--count", "a" * 40, "--not", "--remotes=origin"], fake.calls)
+            self.assertIn(["git", "worktree", "remove", "--force", tmp], fake.calls)
 
     def test_removal_is_journaled_before_the_remove_runs(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -3653,6 +3789,8 @@ class DispatchTest(unittest.TestCase):
             def shell(args, **kwargs):
                 if args[:3] == ["git", "worktree", "remove"]:
                     self.assertTrue(journal.exists(), "the receipt precedes the destructive call")
+                if args[:2] == ["git", "rev-parse"]:
+                    return SimpleNamespace(returncode=0, stdout="a" * 40, stderr="")
                 if args[:2] == ["git", "rev-list"]:
                     return SimpleNamespace(returncode=0, stdout="0", stderr="")
                 return SimpleNamespace(returncode=0, stdout="", stderr="")
@@ -3671,6 +3809,8 @@ class DispatchTest(unittest.TestCase):
 
             def shell(args, **kwargs):
                 calls.append(args)
+                if args[:2] == ["git", "rev-parse"]:
+                    return SimpleNamespace(returncode=0, stdout="a" * 40, stderr="")
                 if args[:2] == ["git", "rev-list"]:
                     return SimpleNamespace(returncode=0, stdout="0", stderr="")
                 return SimpleNamespace(returncode=0, stdout="", stderr="")
@@ -3726,6 +3866,8 @@ class DispatchTest(unittest.TestCase):
             path.mkdir(parents=True)
 
             def shell(args, **kwargs):
+                if args[:2] == ["git", "rev-parse"]:
+                    return SimpleNamespace(returncode=0, stdout="a" * 40, stderr="")
                 if args[:2] == ["git", "rev-list"]:
                     return SimpleNamespace(returncode=0, stdout="2", stderr="")
                 return SimpleNamespace(returncode=0, stdout="", stderr="")
@@ -3806,6 +3948,147 @@ class DispatchTest(unittest.TestCase):
 
 
 TERMINAL_NOW = 2_000_000_000.0
+
+
+class WorktreePublicationTest(unittest.TestCase):
+    """Real local Git refs must never stand in for publication to origin."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        root = Path(self.tmp.name)
+        self.origin, self.repo = root / "origin.git", root / "repo"
+        self.git(root, "init", "--bare", str(self.origin))
+        self.git(root, "init", "-b", "main", str(self.repo))
+        self.git(self.repo, "config", "user.email", "fixture@example.test")
+        self.git(self.repo, "config", "user.name", "Publication fixture")
+        self.git(self.repo, "config", "commit.gpgsign", "false")
+        (self.repo / "base.py").write_text("published = True\n")
+        self.git(self.repo, "add", "base.py")
+        self.git(self.repo, "commit", "-qm", "published base")
+        self.git(self.repo, "remote", "add", "origin", str(self.origin))
+        self.git(self.repo, "push", "-q", "origin", "main")
+        self.host = lane.Host(state=root / "state", repo=self.repo)
+        self.path = self.host.state / "worktrees/candidate"
+        self.path.parent.mkdir(parents=True)
+        idle = patch.object(lane, "worktree_busy", return_value=None)
+        idle.start()
+        self.addCleanup(idle.stop)
+
+    def git(self, cwd, *args):
+        return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True,
+                              check=True, timeout=10).stdout.strip()
+
+    def candidate(self, *, detached=False, unpublished=True):
+        args = ["--detach"] if detached else ["-b", "candidate"]
+        self.git(self.repo, "worktree", "add", "-q", *args, str(self.path), "main")
+        if unpublished:
+            (self.path / "repair.py").write_text("valuable_source = True\n")
+            self.git(self.path, "add", "repair.py")
+            self.git(self.path, "commit", "-qm", "unpublished repair")
+        return self.git(self.path, "rev-parse", "HEAD")
+
+    def assert_preserved(self, reason):
+        self.assertTrue(self.path.exists())
+        self.assertTrue((self.path / lane.disk_guard.PRESERVED_REPAIR).exists())
+        rows = [json.loads(line) for line in
+                (self.host.state / "runs/worktree-removals.jsonl").read_text().splitlines()]
+        self.assertEqual((rows[-1]["verdict"], rows[-1]["reason"]), ("preserved", reason))
+
+    def test_clean_unpublished_branch_remains_reachable(self):
+        head = self.candidate()
+        self.assertEqual(self.git(self.path, "rev-list", "--count", "HEAD", "--not", "--all"), "0")
+        self.assertFalse(lane.remove_worktree(self.host, self.path))
+        self.assert_preserved("unpublished-work")
+        self.assertEqual(self.git(self.repo, "rev-parse", "candidate"), head)
+
+    def test_clean_unpublished_detached_head_is_preserved(self):
+        head = self.candidate(detached=True)
+        self.assertFalse(lane.remove_worktree(self.host, self.path))
+        self.assert_preserved("unpublished-work")
+        self.assertEqual(self.git(self.path, "rev-parse", "HEAD"), head)
+
+    def test_published_clean_worktree_can_retire(self):
+        self.candidate()
+        self.git(self.path, "push", "-q", "origin", "HEAD:refs/heads/candidate")
+        with patch.object(lane.worktree_pool, "recycle", return_value=None):
+            self.assertTrue(lane.remove_worktree(self.host, self.path))
+        self.assertFalse(self.path.exists())
+
+    def test_deleted_origin_branch_is_not_stale_publication_proof(self):
+        self.candidate()
+        self.git(self.path, "push", "-q", "origin", "HEAD:refs/heads/candidate")
+        self.git(self.repo, "fetch", "-q", "origin")
+        self.git(self.origin, "update-ref", "-d", "refs/heads/candidate")
+        self.assertEqual(self.git(self.path, "rev-list", "--count", "HEAD", "--not", "--remotes=origin"), "0")
+        self.assertFalse(lane.remove_worktree(self.host, self.path))
+        self.assert_preserved("unpublished-work")
+
+    def test_unknown_publication_preserves_source(self):
+        self.candidate(unpublished=False)
+        real_sh = lane.sh
+        for mode in ("fetch-error", "fetch-timeout", "head-error", "head-empty",
+                     "rev-list-error", "malformed-count"):
+            with self.subTest(mode=mode):
+                (self.path / lane.disk_guard.PRESERVED_REPAIR).unlink(missing_ok=True)
+
+                def shell(args, **kwargs):
+                    if args[:2] == ["git", "fetch"] and mode.startswith("fetch"):
+                        if mode == "fetch-timeout":
+                            raise subprocess.TimeoutExpired(args, 30)
+                        return SimpleNamespace(returncode=1, stdout="", stderr="origin unavailable")
+                    if args[:2] == ["git", "rev-list"] and mode in {"rev-list-error", "malformed-count"}:
+                        return SimpleNamespace(returncode=int(mode == "rev-list-error"), stdout="unknown", stderr="")
+                    if args[:2] == ["git", "rev-parse"] and mode.startswith("head"):
+                        return SimpleNamespace(returncode=int(mode == "head-error"), stdout="", stderr="")
+                    return real_sh(args, **kwargs)
+
+                with patch.object(lane, "sh", side_effect=shell):
+                    self.assertFalse(lane.remove_worktree(self.host, self.path))
+                self.assert_preserved("publication-unverified")
+
+    def test_new_commit_after_publication_proof_is_preserved(self):
+        self.candidate(unpublished=False)
+        real_sh = lane.sh
+
+        def shell(args, **kwargs):
+            result = real_sh(args, **kwargs)
+            if args[:2] == ["git", "rev-list"]:
+                (self.path / "late.py").write_text("late_source = True\n")
+                self.git(self.path, "add", "late.py")
+                self.git(self.path, "commit", "-qm", "late unpublished source")
+            return result
+
+        with patch.object(lane, "sh", side_effect=shell):
+            self.assertFalse(lane.remove_worktree(self.host, self.path))
+        self.assert_preserved("cleanup-source-unverified")
+
+    def test_new_source_edit_during_origin_read_is_preserved(self):
+        self.candidate(unpublished=False)
+        real_sh = lane.sh
+
+        def shell(args, **kwargs):
+            result = real_sh(args, **kwargs)
+            if args[:2] == ["git", "fetch"]:
+                (self.path / "late.py").write_text("late_source = True\n")
+            return result
+
+        with patch.object(lane, "sh", side_effect=shell):
+            self.assertFalse(lane.remove_worktree(self.host, self.path))
+        self.assert_preserved("cleanup-source-unverified")
+
+    def test_new_owner_during_origin_read_is_preserved(self):
+        self.candidate(unpublished=False)
+        with patch.object(lane, "worktree_busy", side_effect=[None, "process-still-running"]):
+            self.assertFalse(lane.remove_worktree(self.host, self.path))
+        self.assert_preserved("cleanup-not-idle:process-still-running")
+
+    def test_prune_preserves_unpublished_source_even_if_marker_write_fails(self):
+        self.candidate()
+        os.utime(self.path, (0, 0))
+        with patch.object(lane, "preserve_repair"):
+            lane.prune_worktrees(self.host)
+        self.assertEqual((self.path / "repair.py").read_text(), "valuable_source = True\n")
 
 
 class TerminalRevisitTest(unittest.TestCase):
@@ -3998,7 +4281,13 @@ class PreservedRecoveryTest(unittest.TestCase):
         real = lane.sh
         def shell(args, **kwargs):
             self.calls.append(args)
-            if args[:2] == ["git", "fetch"] or args[0] == "gh":
+            if args[:2] == ["git", "fetch"]:
+                if "+refs/heads/*:refs/remotes/origin/*" in args:
+                    # The fixture's authoritative ls-remote head must also appear
+                    # in a refreshed origin inventory before cleanup can trust it.
+                    self.git(self.host.repo, "update-ref", "refs/remotes/origin/devin/jov-1", self.live["headRefOid"])
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+            if args[0] == "gh":
                 return SimpleNamespace(returncode=0, stdout="", stderr="")
             if args[:2] == ["git", "ls-remote"]:
                 return SimpleNamespace(returncode=0, stdout=self.live["headRefOid"], stderr="")
@@ -5456,6 +5745,8 @@ class FixRedTest(unittest.TestCase):
     def test_non_pushing_fix_runs_the_configured_second_attempt(self):
         real, real_excerpt = lane.sh, lane.failure_excerpt
         def fake(args, cwd=None, timeout=600, env=None, log=None):
+            if args == ["git", "rev-parse", "--verify", "HEAD"]:
+                return SimpleNamespace(returncode=0, stderr="", stdout="h1\n")
             if args[:2] == ["git", "ls-remote"]:
                 return SimpleNamespace(returncode=0, stderr="", stdout="h1\trefs/heads/devin/jov-1\n")
             if args[:3] == ["git", "worktree", "add"]:
@@ -5478,6 +5769,8 @@ class FixRedTest(unittest.TestCase):
         real_sh, real_excerpt, real_resolve = lane.sh, lane.failure_excerpt, lane.resolve_generated_conflict
 
         def fake(args, cwd=None, timeout=600, env=None, log=None):
+            if args == ["git", "rev-parse", "--verify", "HEAD"]:
+                return SimpleNamespace(returncode=0, stderr="", stdout="h1\n")
             if args[:2] == ["git", "ls-remote"]:
                 return SimpleNamespace(returncode=0, stderr="", stdout="h1\trefs/heads/devin/jov-1\n")
             if args[:3] == ["git", "worktree", "add"]:

@@ -8,8 +8,8 @@ import { SeekBar } from '@/components/atoms/SeekBar';
 import { toast } from '@/components/feedback';
 import {
   DrawerBackButton,
-  DrawerMediaThumb,
   DrawerSurfaceCard,
+  EntityHeaderThumbnail,
   ShareableLinkRow,
 } from '@/components/molecules/drawer';
 import { EntityHeader } from '@/components/molecules/drawer/EntityHeader';
@@ -350,15 +350,12 @@ export function TrackSidebar({
                 </span>
               }
               thumbnail={
-                <DrawerMediaThumb
+                <EntityHeaderThumbnail
+                  variant='artwork'
                   src={track.releaseArtworkUrl}
-                  alt={`${track.releaseTitle} artwork`}
-                  dimension={44}
-                  sizeClassName='h-11 w-11 rounded-lg'
-                  sizes='44px'
-                  fallback={
-                    <div className='h-11 w-11 rounded-lg bg-surface-0' />
-                  }
+                  name={`${track.releaseTitle} artwork`}
+                  size={44}
+                  data-testid='track-artwork'
                 />
               }
               meta={

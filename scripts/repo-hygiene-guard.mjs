@@ -109,7 +109,7 @@ const FORBIDDEN_GENERATED_PATHS = [
   /^(?:\.build|build|out)(?:\/|$)/,
   /^\.(?:audit|claude-flow|hermes|swarm|worktrees)(?:\/|$)/,
   /^\.claude\/(?:projects|tasks|teams|worktrees)(?:\/|$)/,
-  /^\.codex\/(?!(?:config\.toml|hooks\.json|local-env\.toml)$)/,
+  /^\.codex\/(?!(?:config\.toml|hooks\.json|environments\/environment\.toml)$)/,
   /^\.gbrain-source$/,
   /^logs\/security(?:\/|$)/,
   /^apps\/desktop\/(?:dist|dist-electron)(?:\/|$)/,

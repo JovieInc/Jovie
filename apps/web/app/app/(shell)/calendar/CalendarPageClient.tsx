@@ -3,7 +3,6 @@
 import { Button } from '@jovie/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import Image from 'next/image';
 import Link from 'next/link';
 import {
   useCallback,
@@ -25,6 +24,7 @@ import {
   rejectEvents,
   undoRejectEvent,
 } from '@/app/app/(shell)/dashboard/tour-dates/events-actions';
+import { ReleaseArtworkThumb } from '@/components/atoms/ReleaseArtworkThumb';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
 import { PageContent } from '@/components/organisms/PageShell';
@@ -649,18 +649,11 @@ export function CalendarPageClient() {
                     <ul className='mt-2 flex flex-col gap-2'>
                       {selectedReleases.map(r => (
                         <li key={r.id} className='flex items-center gap-3'>
-                          <div className='system-b-calendar-release-artwork relative h-9 w-9 shrink-0 overflow-hidden'>
-                            {r.artworkUrl && (
-                              <Image
-                                src={r.artworkUrl}
-                                alt=''
-                                fill
-                                sizes='36px'
-                                className='object-cover'
-                                unoptimized
-                              />
-                            )}
-                          </div>
+                          <ReleaseArtworkThumb
+                            src={r.artworkUrl}
+                            alt={r.title}
+                            size={36}
+                          />
                           <div className='min-w-0 flex-1'>
                             <div className='flex min-w-0 items-center gap-2'>
                               <div className='system-b-calendar-row-title truncate font-caption'>

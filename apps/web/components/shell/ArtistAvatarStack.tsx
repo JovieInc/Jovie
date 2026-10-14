@@ -45,7 +45,8 @@ export function ArtistAvatarStack({
         <Avatar
           key={artist.id}
           src={artist.avatarUrl}
-          alt={artist.displayName}
+          alt=''
+          name={artist.displayName}
           size='sm'
           className={cn(AVATAR_RING_CLASSNAME, index > 0 && '-ml-1.5')}
         />

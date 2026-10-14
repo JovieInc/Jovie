@@ -8,6 +8,7 @@ import type { PreviewPanelData } from '@/app/app/(shell)/dashboard/PreviewPanelC
 import { PreviewPanel } from '@/components/features/dashboard/layout/PreviewPanel';
 
 const closeMock = vi.fn();
+const profilePreviewMock = vi.fn();
 let currentPreviewData: PreviewPanelData | null = null;
 
 vi.mock('@jovie/ui', () => ({
@@ -83,10 +84,15 @@ vi.mock('@/features/dashboard/molecules/ProfilePreview', () => ({
   ProfilePreview: ({
     username,
     displayName,
+    isVerified,
   }: {
     username: string;
     displayName: string;
-  }) => <div>{`Preview ${displayName || username}`}</div>,
+    isVerified?: boolean;
+  }) => {
+    profilePreviewMock({ isVerified });
+    return <div>{`Preview ${displayName || username}`}</div>;
+  },
 }));
 
 vi.mock('@/lib/queries', () => ({
@@ -107,6 +113,7 @@ describe('PreviewPanel', () => {
   beforeEach(() => {
     currentPreviewData = null;
     closeMock.mockReset();
+    profilePreviewMock.mockReset();
   });
 
   it('renders the hydration fallback while preview data is unavailable', () => {
@@ -189,4 +196,29 @@ describe('PreviewPanel', () => {
     expect(source).toContain('@/components/tokens/linear-surface');
     expect(source).not.toContain("dashboard/tokens'");
   });
+
+  it.each([false, true])(
+    'forwards hydrated profile verification: %s',
+    isVerified => {
+      currentPreviewData = {
+        username: 'sasha',
+        displayName: 'Sasha Waves',
+        isVerified,
+        avatarUrl: null,
+        bio: null,
+        genres: null,
+        location: null,
+        hometown: null,
+        activeSinceYear: null,
+        profilePath: '/sasha',
+        dspConnections: {
+          spotify: { connected: true, artistName: 'Sasha Waves' },
+          appleMusic: { connected: false, artistName: null },
+        },
+        links: [],
+      };
+      render(<PreviewPanel />);
+      expect(profilePreviewMock).toHaveBeenCalledWith({ isVerified });
+    }
+  );
 });

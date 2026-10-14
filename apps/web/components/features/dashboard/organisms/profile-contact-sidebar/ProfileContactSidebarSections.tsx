@@ -1,17 +1,16 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { Check, UserRound } from 'lucide-react';
+import { Check } from 'lucide-react';
 import Link from 'next/link';
 import { type PreviewPanelData } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import {
-  DrawerMediaThumb,
   DrawerSurfaceCard,
   EntityHeader,
+  EntityHeaderThumbnail,
 } from '@/components/molecules/drawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { useProfileHeaderParts } from '@/components/organisms/profile-sidebar/ProfileSidebarHeader';
-import { DrawerHero } from '@/components/shell/DrawerHero';
 import { APP_ROUTES } from '@/constants/routes';
 import { getProductProjection, PRODUCT_ONTOLOGY } from '@/data/productOntology';
 import { useAppFlag } from '@/lib/flags/client';
@@ -52,13 +51,12 @@ export function ProfileBentoView({
     >
       <EntityHeader
         thumbnail={
-          <DrawerMediaThumb
+          <EntityHeaderThumbnail
+            variant='person'
             src={previewData.avatarUrl}
-            alt={title}
-            fallback={<UserRound className='h-5 w-5 text-tertiary-token' />}
-            dimension={40}
-            sizes='40px'
-            sizeClassName='h-10 w-10 rounded-full'
+            name={title}
+            size={40}
+            verified={previewData.isVerified}
           />
         }
         title={title}
@@ -120,7 +118,6 @@ export function ProfileSidebarHeaderCard({
     previewData.location?.trim() || null,
     `${previewData.links.length} link${previewData.links.length === 1 ? '' : 's'}`,
   ].filter(Boolean);
-  const fallbackLabel = primaryLabel.replace(/^@/, '').charAt(0).toUpperCase();
 
   return (
     <DrawerSurfaceCard
@@ -146,9 +143,8 @@ export function ProfileSidebarHeaderCard({
             onClose={onClose}
           />
         </div>
-        <DrawerHero
+        <EntityHeader
           title={primaryLabel}
-          density='rail'
           subtitle={secondaryLabel}
           stableLayout
           titleLineClamp={1}
@@ -156,18 +152,13 @@ export function ProfileSidebarHeaderCard({
           reserveSubtitleSlot
           reserveMetaSlot
           metaOverflow='scroll'
-          artwork={
-            <DrawerMediaThumb
+          thumbnail={
+            <EntityHeaderThumbnail
+              variant='person'
               src={previewData.avatarUrl}
-              alt={primaryLabel}
-              dimension={44}
-              sizeClassName='h-11 w-11 rounded-lg'
-              sizes='44px'
-              fallback={
-                <span className='text-sm font-semibold text-secondary-token'>
-                  {fallbackLabel}
-                </span>
-              }
+              name={primaryLabel}
+              size={44}
+              verified={previewData.isVerified}
             />
           }
           meta={
