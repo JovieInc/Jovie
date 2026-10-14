@@ -850,6 +850,32 @@ describe('GitHub evidence read resilience (JOV-8231)', () => {
     expect(sleeps).toEqual([2_000]);
   });
 
+  it('retries a dropped connection and still marks the final error as GitHub evidence', async () => {
+    const fetchImpl = vi.fn(async () => {
+      throw new Error('socket hang up');
+    });
+    const sleeps = [];
+    await expect(
+      githubRequest('/repos/x', {
+        token: 't',
+        fetchImpl,
+        now: () => 1_000,
+        sleep: async ms => {
+          sleeps.push(ms);
+        },
+      })
+    ).rejects.toMatchObject({
+      name: 'GitHubApiError',
+      githubApi: true,
+      status: null,
+      headers: null,
+      body: '',
+      message: 'GitHub GET /repos/x request failed: socket hang up',
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+    expect(sleeps).toEqual([1_000, 2_000]);
+  });
+
   it('never retries a permission 403', async () => {
     const fetchImpl = vi.fn(async () =>
       jsonResponse('{"message":"Resource not accessible by integration"}', 403)

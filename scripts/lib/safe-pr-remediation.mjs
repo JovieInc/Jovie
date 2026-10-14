@@ -672,6 +672,27 @@ export function apiRetryWaitMs({ status, message, headers, attempt, nowMs }) {
   return waitMs <= MAX_API_WAIT_MS ? Math.max(0, waitMs) : null;
 }
 
+/**
+ * GitHub transport failure. `githubApi` is a real field so checkJs can see
+ * it; callers use it to tell missing evidence from a workflow defect.
+ */
+class GitHubApiError extends Error {
+  /**
+   * @param {string} message
+   * @param {number | null} status
+   * @param {unknown} headers
+   * @param {string} body
+   */
+  constructor(message, status, headers, body) {
+    super(message);
+    this.name = 'GitHubApiError';
+    this.githubApi = true;
+    this.status = status;
+    this.headers = headers;
+    this.body = body;
+  }
+}
+
 function gitHubApiError(path, method, status, text, headers) {
   let detail = '';
   try {
@@ -679,14 +700,12 @@ function gitHubApiError(path, method, status, text, headers) {
   } catch {
     detail = '';
   }
-  const error = new Error(
-    `GitHub ${method} ${path} returned ${status}${detail ? `: ${detail}` : ''}`
+  return new GitHubApiError(
+    `GitHub ${method} ${path} returned ${status}${detail ? `: ${detail}` : ''}`,
+    status,
+    headers,
+    text
   );
-  error.githubApi = true;
-  error.status = status;
-  error.headers = headers;
-  error.body = text;
-  return error;
 }
 
 /**
@@ -724,15 +743,14 @@ export async function githubRequest(
         body: body === undefined ? undefined : JSON.stringify(body),
       });
     } catch (cause) {
-      const error = new Error(
+      const error = new GitHubApiError(
         `GitHub ${method} ${path} request failed: ${
           cause instanceof Error ? cause.message : String(cause)
-        }`
+        }`,
+        null,
+        null,
+        ''
       );
-      error.githubApi = true;
-      error.status = null;
-      error.headers = null;
-      error.body = '';
       const waitMs = apiRetryWaitMs({
         status: null,
         message: error.message,
