@@ -580,6 +580,24 @@ describe('surface elevation guardrails', () => {
     expect(adminFeedbackTable).not.toContain('EntityHeaderCard');
   });
 
+  it('keeps feedback classification and disposition visible in table, drawer, and stories', () => {
+    const adminFeedbackTable = readComponent(
+      'components/features/admin/feedback-table/AdminFeedbackTable.tsx'
+    );
+    const adminFeedbackStories = readComponent(
+      'components/features/admin/feedback-table/AdminFeedbackTable.stories.tsx'
+    );
+
+    expect(adminFeedbackTable).toContain("id: 'disposition'");
+    expect(adminFeedbackTable).toContain("title='Disposition'");
+    expect(adminFeedbackTable).toContain("label='Class'");
+    expect(adminFeedbackTable).toContain("label='Outcome'");
+    expect(adminFeedbackStories).toContain("classification: 'bug_verifiable'");
+    expect(adminFeedbackStories).toContain("disposition: 'auto_remediation'");
+    expect(adminFeedbackStories).toContain('classification: null');
+    expect(adminFeedbackStories).toContain("disposition: 'pending'");
+  });
+
   it('names the hidden-header release table for screen readers', () => {
     const releaseTable = readComponent(
       'components/features/dashboard/organisms/release-provider-matrix/ReleaseTable.tsx'
