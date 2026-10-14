@@ -6,6 +6,9 @@ Run with:
 from __future__ import annotations
 
 import importlib.util
+import concurrent.futures
+import threading
+import uuid
 import json
 import os
 import subprocess
@@ -734,6 +737,207 @@ class RelayTest(unittest.TestCase):
             finally:
                 os.environ.clear()
                 os.environ.update(saved)
+
+
+class IntakeConversionTest(unittest.TestCase):
+    fingerprint = 'a123b456c789d012'
+
+    def linear(self, existing=(), pages=None, unknown=False, barrier=None):
+        test = self
+        class Linear:
+            def __init__(self):
+                self.rows = {row['id']: row for row in existing}
+                self.creates, self.reads, self.lock = [], [], threading.Lock()
+                self.unknown = unknown
+
+            def gql(self, query, variables):
+                if 'teams(' in query:
+                    return {'teams': {'nodes': [{'id': 'team', 'states': {'nodes': [{'id': 'todo', 'name': 'Todo'}]},
+                        'labels': {'nodes': [{'id': name, 'name': name} for name in
+                            events.remediation.intake_labels('ci')]}}]}}
+                if 'issueCreate(' in query:
+                    if barrier:
+                        barrier.wait(timeout=5)
+                    with self.lock:
+                        data = variables['i']
+                        issue_id = data.get('id', str(uuid.uuid4()))
+                        self.creates.append(dict(data))
+                        if issue_id in self.rows:
+                            raise RuntimeError('duplicate issue UUID')
+                        self.rows[issue_id] = {'id': issue_id, 'description': data['description'],
+                                              'createdAt': '2026-10-14T01:00:00Z'}
+                        if self.unknown:
+                            self.unknown = False
+                            raise OSError('response lost after commit')
+                        return {'issueCreate': {'success': True, 'issue': {'id': issue_id}}}
+                if 'issues(' in query:
+                    self.reads.append(variables)
+                    if isinstance(pages, Exception):
+                        raise pages
+                    if pages is not None:
+                        return pages[min(len(self.reads) - 1, len(pages) - 1)]
+                    with self.lock:
+                        rows = list(self.rows.values())
+                    return {'issues': {'nodes': rows, 'pageInfo': {'hasNextPage': False, 'endCursor': None}}}
+                test.fail(query)
+        return Linear()
+
+    def shell(self, number=10, comment_failure=False, comments=None, body=None):
+        notes = [] if comments is None else comments
+        body = body if body is not None else events.remediation.intake_body({'source': 'workflow_run',
+            'fingerprint': self.fingerprint, 'ws': 'ci'})
+        updated = datetime.fromtimestamp(NOW - 3601, timezone.utc).isoformat()
+        def comment(args):
+            if comment_failure:
+                return (1, 'unavailable')
+            notes.append({'body': args[-1]})
+            return ''
+        shell = Shell({('gh', 'issue', 'list'): [{'number': number, 'body': body, 'updatedAt': updated}],
+            ('gh', 'api', '--paginate', '--slurp'): lambda args: [notes],
+            ('gh', 'issue', 'comment'): comment})
+        return shell
+
+    def convert(self, linear, shell):
+        return events.convert_intake(None, lambda: linear, shell, NOW)
+
+    def test_two_ticks_and_failed_linkage_recover_one_authoritative_issue(self):
+        for failed in (False, True):
+            with self.subTest(comment_failure=failed):
+                linear, shell = self.linear(), self.shell(comment_failure=failed)
+                self.assertEqual(self.convert(linear, shell), [10])
+                self.convert(linear, shell)
+                self.assertEqual(len(linear.rows), 1)
+                self.assertEqual(len(linear.creates), 1)
+                expected_comments = 2 if failed else 1
+                self.assertEqual(len(shell.made('gh', 'issue', 'comment')), expected_comments)
+
+    def test_committed_unknown_create_is_recovered_without_a_second_mutation(self):
+        linear, shell = self.linear(unknown=True), self.shell()
+        self.assertEqual(self.convert(linear, shell), [10])
+        self.assertEqual(len(linear.creates), 1)
+        self.assertEqual(len(linear.rows), 1)
+        self.assertEqual(len(linear.reads), 2)
+        restarted = self.shell(number=11)
+        self.assertEqual(self.convert(linear, restarted), [11])
+        self.assertEqual(len(linear.creates), 1)
+
+    def test_concurrent_converters_share_one_durable_destination(self):
+        linear = self.linear(barrier=threading.Barrier(2))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            tasks = [pool.submit(self.convert, linear, self.shell(number=number)) for number in (10, 11)]
+            self.assertEqual([task.result(timeout=10) for task in tasks], [[10], [11]])
+        self.assertEqual(len(linear.rows), 1)
+        self.assertEqual({row['id'] for row in linear.creates}, set(linear.rows))
+        self.assertEqual(uuid.UUID(linear.creates[0]['id']).version, 4)
+
+    def test_complete_comment_inventory_recovers_legacy_linkage(self):
+        body = events.remediation.intake_body({'source': 'intake', 'fingerprint': self.fingerprint})
+        existing = {'id': str(uuid.uuid4()), 'description': body, 'createdAt': '2026-10-13T00:00:00Z'}
+        shell = self.shell()
+        shell.routes[('gh', 'api', '--paginate', '--slurp')] = [[], [{'body': f"<!-- linear-issue-id:{existing['id']} -->"}]]
+        linear = self.linear(existing=[existing])
+        self.assertIsNone(self.convert(linear, shell))
+        self.assertFalse(linear.creates)
+        self.assertFalse(shell.made('gh', 'issue', 'comment'))
+
+    def test_unbound_body_or_comment_marker_cannot_suppress_a_due_intake(self):
+        for hint in ('Quoted explanation of linear-issue-id: syntax',
+                     '<!-- linear-issue-id:not-an-id -->', f'<!-- linear-issue-id:{uuid.uuid4()} -->'):
+            for location in ('body', 'comment'):
+                with self.subTest(hint=hint, location=location):
+                    shell = self.shell(comments=[{'body': hint}] if location == 'comment' else [])
+                    if location == 'body':
+                        shell.routes[('gh', 'issue', 'list')][0]['body'] += '\n' + hint
+                    linear = self.linear()
+                    self.assertEqual(self.convert(linear, shell), [10])
+                    self.assertEqual(len(linear.creates), 1)
+                    self.assertEqual(len(shell.made('gh', 'issue', 'comment')), 1)
+
+    def test_unreadable_linkage_does_not_authorize_creation(self):
+        for reply in ((1, '[[]]'), 'not-json', {}, [None], [[{'body': None}]]):
+            with self.subTest(reply=reply):
+                shell = self.shell()
+                shell.routes[('gh', 'api', '--paginate', '--slurp')] = reply
+                linear = self.linear()
+                self.assertIsNone(self.convert(linear, shell))
+                self.assertFalse(linear.creates)
+
+    def test_authoritative_fingerprint_read_is_complete_and_reuses_oldest_canonical(self):
+        body = events.remediation.intake_body({'source': 'intake', 'fingerprint': self.fingerprint})
+        older = {'id': str(uuid.uuid4()), 'description': body, 'createdAt': '2026-10-13T00:00:00Z'}
+        newer = {**older, 'id': str(uuid.uuid4()), 'createdAt': '2026-10-14T00:00:00Z'}
+        linear = self.linear(pages=[{'issues': {'nodes': [newer], 'pageInfo': {'hasNextPage': True, 'endCursor': 'page1'}}},
+            {'issues': {'nodes': [older], 'pageInfo': {'hasNextPage': False, 'endCursor': None}}}])
+        shell = self.shell()
+        self.assertEqual(self.convert(linear, shell), [10])
+        self.assertFalse(linear.creates)
+        self.assertIn(older['id'], shell.made('gh', 'issue', 'comment')[0][-1])
+        self.assertEqual(linear.reads[1]['after'], 'page1')
+
+    def test_unreadable_or_incomplete_authoritative_inventory_never_creates(self):
+        for page in ({}, {'issues': None}, {'issues': {'nodes': None}},
+            {'issues': {'nodes': [], 'pageInfo': {}}},
+            {'issues': {'nodes': [], 'pageInfo': {'hasNextPage': True, 'endCursor': None}}},
+            {'issues': {'nodes': [], 'pageInfo': {'hasNextPage': True, 'endCursor': 'repeat'}}},
+            {'issues': {'nodes': [None], 'pageInfo': {'hasNextPage': False}}}, OSError('read unavailable')):
+            with self.subTest(page=page):
+                linear = self.linear(pages=page if isinstance(page, Exception) else [page])
+                self.assertIsNone(self.convert(linear, self.shell()))
+                self.assertFalse(linear.creates)
+
+    def test_unknown_uncommitted_create_keeps_the_same_uuid_on_later_reconciliation(self):
+        linear, shell = self.linear(), self.shell()
+        gql = linear.gql
+        attempts = []
+        def lose_first(query, variables):
+            if 'issueCreate(' in query:
+                attempts.append(variables['i'].get('id'))
+                if len(attempts) == 1:
+                    raise OSError('unknown request outcome')
+            return gql(query, variables)
+        linear.gql = lose_first
+        self.assertIsNone(self.convert(linear, shell))
+        self.assertEqual(len(attempts), 1, 'no immediate mutation replay')
+        self.assertEqual(self.convert(linear, shell), [10])
+        self.assertEqual(attempts[0], attempts[1])
+        self.assertIsNotNone(attempts[0])
+        self.assertEqual(len(linear.rows), 1)
+
+    def test_ambiguous_linkage_write_recovers_from_authoritative_issue(self):
+        linear, shell = self.linear(), self.shell()
+        def lost(args):
+            raise subprocess.TimeoutExpired(args, 30)
+        shell.routes[('gh', 'issue', 'comment')] = lost
+        self.assertEqual(self.convert(linear, shell), [10])
+        self.assertEqual(self.convert(linear, self.shell()), [10])
+        self.assertEqual(len(linear.creates), 1)
+
+    def test_foreign_or_embedded_fingerprint_cannot_bind_an_unrelated_issue(self):
+        marker = events.remediation.intake_body({'source': 'intake', 'fingerprint': self.fingerprint})
+        for description in ('Unrelated report quotes:\n' + marker,
+                            marker + '\n<!-- symphony-remediation-repository:foreign/repo -->'):
+            with self.subTest(description=description):
+                row = {'id': str(uuid.uuid4()), 'description': description, 'createdAt': '2026-10-13T00:00:00Z'}
+                linear = self.linear(existing=[row])
+                self.assertEqual(self.convert(linear, self.shell()), [10])
+                self.assertEqual(len(linear.creates), 1)
+                self.assertNotEqual(linear.creates[0]['id'], row['id'])
+
+    def test_rebound_destination_or_malformed_rows_fail_closed(self):
+        seed = self.linear()
+        self.convert(seed, self.shell())
+        original = next(iter(seed.rows.values()))
+        for row in ({**original, 'description': 'changed binding'},
+                    {**original, 'createdAt': 'not-a-date'}, {**original, 'id': 'not-a-uuid'}):
+            with self.subTest(row=row):
+                linear = self.linear(existing=[row])
+                self.assertIsNone(self.convert(linear, self.shell()))
+                self.assertFalse(linear.creates)
+
+    def test_missing_fingerprint_does_not_create_from_a_github_issue_number(self):
+        linear = self.linear()
+        self.assertIsNone(self.convert(linear, self.shell(body='unbound remediation')))
+        self.assertFalse(linear.creates)
 
 
 class QuotaRelayTest(unittest.TestCase):

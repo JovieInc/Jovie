@@ -21,6 +21,7 @@ import re
 import subprocess
 import sys
 import time
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -929,9 +930,6 @@ def convert_intake(lane, linear_factory, sh, now: float) -> list[int] | None:
     for row in rows:
         if not isinstance(row, dict):
             continue
-        body = row.get("body") or ""
-        if "linear-issue-id:" in body:
-            continue
         updated = iso_ts(row.get("updatedAt"))
         if updated is None or remediation.claim_open(updated, now):
             continue
@@ -947,30 +945,60 @@ def convert_intake(lane, linear_factory, sh, now: float) -> list[int] | None:
     linked = []
     for row in due:
         body = row.get("body") or ""
-        found = re.search(r"fingerprint=([0-9a-f]+)", body)
+        found = re.search(r"<!-- symphony-remediation fingerprint=([0-9a-f]+) -->", body)
+        if not found:
+            continue  # An issue number is not the source event's identity.
+        try:
+            comments = sh(["gh", "api", "--paginate", "--slurp",
+                           f"repos/{REPO}/issues/{row['number']}/comments?per_page=100"])
+            pages = json.loads(comments.stdout) if comments.returncode == 0 else None
+            if not isinstance(pages, list) or not pages or any(not isinstance(page, list) for page in pages):
+                continue
+            notes = [note for page in pages for note in page]
+            if any(not isinstance(note, dict) or not isinstance(note.get("body"), str) for note in notes):
+                continue
+            # Body/comment markers are hints only. Resolve their destination
+            # against authoritative fingerprint history before trusting them.
+            linked_ids = set(re.findall(r"<!-- linear-issue-id:([0-9a-fA-F-]{36}) -->",
+                                        "\n".join([body] + [note["body"] for note in notes])))
+        except (OSError, subprocess.SubprocessError, ValueError, AttributeError):
+            continue
         ws = "ci"
         if "ws:release-deploy" in body or "release-deploy" in body:
             ws = "release-deploy"
         elif "ws:reliability" in body or "source': 'sentry'" in body or "sentry" in body[:80]:
             ws = "reliability"
-        event = {"source": "intake", "fingerprint": found.group(1) if found else str(row.get("number")),
+        event = {"source": "intake", "fingerprint": found.group(1),
                  "ws": ws, "subject": {"github_issue": row.get("number")}, "evidence": {"excerpt": body[:400]}}
         try:
             issue_id = ensure_linear_intake(linear, event)
         except Exception:
             continue
-        if not issue_id:
+        if not issue_id or issue_id in linked_ids:
             continue
-        sh(["gh", "issue", "comment", str(row["number"]), "--repo", REPO, "--body",
-            f"<!-- linear-issue-id:{issue_id} -->\nSymphony intake linked."])
+        try:
+            sh(["gh", "issue", "comment", str(row["number"]), "--repo", REPO, "--body",
+                f"<!-- linear-issue-id:{issue_id} -->\nSymphony intake linked."])
+        except (OSError, subprocess.SubprocessError):
+            pass  # The canonical Linear destination remains recoverable next tick.
         linked.append(row["number"])
     return linked or None
 
 
 def ensure_linear_intake(linear, event: dict) -> str | None:
-    """Create the remediation label only when it is missing, then one agent-ready issue."""
+    """Resolve authoritative history first; a stable destination fences racing creates."""
+    fingerprint = event.get("fingerprint")
+    if not isinstance(fingerprint, str) or not re.fullmatch(r"[0-9a-f]+", fingerprint):
+        return None
     team = linear.gql('query{teams(filter:{key:{eq:"JOV"}}){nodes{id states{nodes{id name}} labels{nodes{id name}}}}}',
                       {})["teams"]["nodes"][0]
+    # Linear accepts a client-supplied UUID v4. Its unique entity ID is the
+    # cross-host fence, including a committed create whose response was lost.
+    digest = hashlib.sha256(f"symphony-remediation:{REPO}:{team['id']}:{fingerprint}".encode()).digest()
+    issue_id = str(uuid.UUID(bytes=digest[:16], version=4))
+    existing = linear_intake_issue(linear, team["id"], fingerprint, issue_id)
+    if existing:
+        return existing
     names = {label["name"]: label["id"] for label in team["labels"]["nodes"]}
     wanted = remediation.intake_labels(str(event.get("ws") or "ci"))
     ids = []
@@ -985,10 +1013,53 @@ def ensure_linear_intake(linear, event: dict) -> str | None:
         ids.append(created["issueLabelCreate"]["issueLabel"]["id"])
     todo = next(state["id"] for state in team["states"]["nodes"] if state["name"] == "Todo")
     plan = remediation.linear_intake_plan(event)
-    data = linear.gql('mutation($i:IssueCreateInput!){issueCreate(input:$i){issue{id}}}',
-                      {"i": {"teamId": team["id"], "stateId": todo, "labelIds": ids,
-                             "title": plan["title"], "description": plan["description"]}})
-    return data["issueCreate"]["issue"]["id"]
+    try:
+        data = linear.gql('mutation($i:IssueCreateInput!){issueCreate(input:$i){success issue{id}}}',
+                          {"i": {"id": issue_id, "teamId": team["id"], "stateId": todo, "labelIds": ids,
+                                 "title": plan["title"], "description": plan["description"] +
+                                 f"\n<!-- symphony-remediation-repository:{REPO} -->"}})
+        if data.get("issueCreate", {}).get("success") is True and data["issueCreate"]["issue"]["id"] == issue_id:
+            return issue_id
+    except Exception:
+        pass  # No second mutation: a race or unknown result requires a fresh read.
+    return linear_intake_issue(linear, team["id"], fingerprint, issue_id)
+
+
+def linear_intake_issue(linear, team_id: str, fingerprint: str, issue_id: str) -> str | None:
+    """Only a complete, bounded authoritative inventory can authorize creation."""
+    marker = f"Fingerprint: `{fingerprint}`"
+    query = ('query($filter:IssueFilter!,$after:String){issues(filter:$filter,includeArchived:true,first:100,after:$after)'
+             '{nodes{id description createdAt} pageInfo{hasNextPage endCursor}}}')
+    filters = {"team": {"id": {"eq": team_id}},
+               "or": [{"id": {"eq": issue_id}}, {"description": {"contains": marker}}]}
+    matches, cursors, after = [], set(), None
+    for _ in range(10):
+        page = linear.gql(query, {"filter": filters, "after": after})["issues"]
+        nodes, info = page["nodes"], page["pageInfo"]
+        if not isinstance(nodes, list) or not isinstance(info, dict):
+            raise ValueError("intake-inventory-unreadable")
+        for row in nodes:
+            if not isinstance(row, dict) or not all(isinstance(row.get(key), str) and row[key]
+                                                   for key in ("id", "description", "createdAt")):
+                raise ValueError("intake-inventory-unreadable")
+            stamp = iso_ts(row["createdAt"])
+            if stamp is None:
+                raise ValueError("intake-inventory-unreadable")
+            uuid.UUID(row["id"])
+            bound = row["description"].startswith(f"Symphony remediation intake (intake).\n{marker}\n")
+            repository = re.search(r"<!-- symphony-remediation-repository:([^ ]+) -->", row["description"])
+            bound = bound and (repository.group(1) == REPO if repository else REPO == "JovieInc/Jovie")
+            if row["id"] == issue_id and not bound:
+                raise ValueError("intake-destination-binding-mismatch")
+            if bound:
+                matches.append((stamp, row["id"]))
+        if info.get("hasNextPage") is False:
+            return min(matches)[1] if matches else None
+        after = info.get("endCursor")
+        if info.get("hasNextPage") is not True or not isinstance(after, str) or not after or after in cursors:
+            raise ValueError("intake-inventory-incomplete")
+        cursors.add(after)
+    raise ValueError("intake-inventory-incomplete")
 
 
 def backlog_targets(prs: list[dict], disabled: set[str], kinds=("conflict", "green", "orphan")) -> list[tuple[int, str]]:
