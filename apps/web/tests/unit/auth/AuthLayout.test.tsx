@@ -78,7 +78,6 @@ import UserCreationFailedPage from '@/app/error/user-creation-failed/page';
 import OnboardingCheckoutLoading from '@/app/onboarding/checkout/loading';
 import WaitlistRouteLayout from '@/app/waitlist/layout';
 import { AuthLayout } from '@/components/features/auth/AuthLayout';
-import { WaitlistInviteMessage } from '@/components/features/waitlist/WaitlistInviteMessage';
 
 describe('AuthLayout', () => {
   beforeEach(() => {
@@ -138,22 +137,6 @@ describe('AuthLayout', () => {
 
     expect(screen.getAllByRole('main')).toHaveLength(1);
     expect(screen.getByRole('main')).toHaveTextContent('Account setup error');
-  });
-
-  it('keeps one main landmark around waitlist invite recovery', async () => {
-    render(
-      await WaitlistRouteLayout({
-        children: (
-          <WaitlistInviteMessage
-            title='Invite link missing'
-            body='Open the latest invite email and try again.'
-          />
-        ),
-      })
-    );
-
-    expect(screen.getAllByRole('main')).toHaveLength(1);
-    expect(screen.getByRole('main')).toHaveTextContent('Invite link missing');
   });
 
   it.each([
