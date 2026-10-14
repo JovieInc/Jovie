@@ -1107,22 +1107,9 @@ EVENT: icon/emoji glyphs are transparent at rest. A hover background must be cir
 
 ## Entity identity (founder-locked 2026-10-13)
 
-EVENT: one primary identity/media treatment per entity. **People/users are
-circular; albums/releases are square and uncropped; events use the calendar
-treatment.** This explicitly supersedes any earlier tentative square-person
-wording. The adopted `semantic-entity-identity` invariant lives in
-`canon/invariants.jsonl` (JOV-INV-019).
-
-`EntityHeader` owns rail identity layout; `EntityHeaderThumbnail` owns semantic
-media composition, including initials, broken-image fallback and the shared
-`VerifiedBadge`. `Avatar` owns compact person/avatar consumers and
-`ReleaseArtworkThumb` / `ArtworkFrame` own release art. Use those owners in
-cards, tables, pickers and right rails. Pass source verification explicitly;
-connected providers, observed source photos and pending/claimed states are not
-Jovie profile verification. A media fallback retains its accessible label and
-reserved dimensions. Use an empty alt only beside an equivalent visible label.
-
-Sizes, density, inline/grid header anatomy, metadata and actions remain supported
-composition choices. Do not recreate media, initials or badges in route markup,
-and do not force unrelated card content into a single generic component.
-See [the source audit and owner map](entity-identity.md).
+EVENT: one primary shared treatment: circular people, complete square release
+art, calendar events. This supersedes tentative square-person wording. Shared
+owners handle fallbacks, accessible names and source-backed verification;
+density and layout remain supported variants. Provider provenance is not Jovie
+verification. See the [owner map and consumer contract](entity-identity.md).
+The executable `semantic-entity-identity` invariant lives in `canon/invariants.jsonl`.
