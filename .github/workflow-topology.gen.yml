@@ -53,7 +53,6 @@ inactiveWorkflows:
   - GitHub AI Orchestrator (retired)
   - Main CI health monitor
   - PR Conflict Handler
-  - Real-Model Eval Lane
   - Rolling CI Dispatch
   - Stuck Draft Auto-Close
 generatedAt: deterministic
@@ -345,18 +344,6 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:notify
     jobCount: 3
-  - name: Real-Model Eval Lane
-    path: .github/workflows/eval-real-model.yml
-    active: false
-    category: source-validation
-    authoritativeProducer: Source Validation
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - push
-      - workflow_dispatch
-    terminalReceipt: job:real-model-eval
-    jobCount: 1
   - name: Eve Pilot
     path: .github/workflows/eve-pilot.yml
     active: true

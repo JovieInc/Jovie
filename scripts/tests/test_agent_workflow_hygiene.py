@@ -24,7 +24,6 @@ FLEET_CONTROLLER_JOBS = (
 )
 
 MODEL_OR_ADVISORY_JOBS = (
-    ("eval-real-model.yml", "real-model-eval"),
     ("sentry-autofix.yml", "autofix"),
 )
 
@@ -401,9 +400,7 @@ def test_changed_evidence_workflows_do_not_use_schedule_dedupe() -> None:
         assert "needs: unchanged" not in workflow, workflow_name
         assert "needs.unchanged.outputs.skip" not in workflow, workflow_name
 
-    live_model = (WORKFLOWS / "eval-real-model.yml").read_text(encoding="utf-8")
     nightly = (WORKFLOWS / "nightly-tests.yml").read_text(encoding="utf-8")
-    assert "uses: ./.github/actions/skip-if-unchanged" not in live_model
     assert "needs: unchanged" not in _job_block("nightly-tests.yml", "e2e-tests")
     assert "needs.unchanged.outputs.skip" not in _job_block(
         "nightly-tests.yml", "e2e-tests"
@@ -997,13 +994,6 @@ def test_scheduled_synthetic_alerts_before_preserving_failure() -> None:
     )
 
 
-
-def test_live_model_work_never_fans_out_from_pull_requests() -> None:
-    """PR evals stay deterministic; live-model spend belongs off the PR path."""
-    real_model = (WORKFLOWS / "eval-real-model.yml").read_text(encoding="utf-8")
-
-    assert "pull_request:" not in real_model
-    assert "pnpm exec vitest run" in real_model
 
 
 def test_deep_lanes_are_event_driven_and_bounded() -> None:

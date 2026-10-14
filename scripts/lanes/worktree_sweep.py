@@ -44,8 +44,11 @@ LOW_INTERVAL_S = 600
 # Regenerable output, plus per-checkout pnpm stores (never the shared store, which lives outside checkouts).
 BUILD_DIRS = frozenset({"node_modules", ".next", ".turbo", "test-results", ".build", "DerivedData",
                         ".pnpm-store", ".pnpm-store-private"})
+# Retired Elixir workspaces used this private store. Keep its cache bytes out of backups.
+LEGACY_PRIVATE_STORE = ".symphony/package-cache/pnpm-store"
 EXCLUDE = [f":(exclude,glob)**/{name}/**" for name in sorted(BUILD_DIRS)] + [f":(exclude){PRESERVED_REPAIR}",
-                                                                          ":(exclude).codex-last-message.txt"]
+                                                                          ":(exclude).codex-last-message.txt",
+                                                                          f":(exclude){LEGACY_PRIVATE_STORE}"]
 
 
 def default_roots(home: Path, state: Path) -> list[Path]:
@@ -176,7 +179,7 @@ def strip_build_dirs(path: Path) -> None:
     for root, dirs, _files in os.walk(path):
         keep = []
         for name in dirs:
-            if name in BUILD_DIRS:
+            if name in BUILD_DIRS or (Path(root) / name).relative_to(path).as_posix() == LEGACY_PRIVATE_STORE:
                 shutil.rmtree(Path(root) / name, ignore_errors=True)
             elif name != ".git":
                 keep.append(name)
