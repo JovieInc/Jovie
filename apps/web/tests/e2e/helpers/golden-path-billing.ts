@@ -388,7 +388,12 @@ export async function completeGoldenPathBillingJourney({
     const portalResponse =
       await returningPage.request.post('/api/stripe/portal');
     expect(portalResponse.ok()).toBeTruthy();
-    expect(portalResponse.headers()['cache-control']).toBe('no-store');
+    expect(
+      portalResponse
+        .headers()
+        ['cache-control']?.split(',')
+        .map(directive => directive.trim().toLowerCase())
+    ).toContain('no-store');
     const portalBody = (await portalResponse.json()) as {
       sessionId: string;
       url: string;
@@ -620,11 +625,21 @@ export async function completeGoldenPathBillingJourney({
         { headers: { 'cache-control': 'no-cache' } }
       );
       expect(revokedBilling.status()).toBe(401);
-      expect(revokedBilling.headers()['cache-control']).toBe('no-store');
+      expect(
+        revokedBilling
+          .headers()
+          ['cache-control']?.split(',')
+          .map(directive => directive.trim().toLowerCase())
+      ).toContain('no-store');
     }
     const revokedPortal = await revokedPage.request.post('/api/stripe/portal');
     expect(revokedPortal.status()).toBe(401);
-    expect(revokedPortal.headers()['cache-control']).toBe('no-store');
+    expect(
+      revokedPortal
+        .headers()
+        ['cache-control']?.split(',')
+        .map(directive => directive.trim().toLowerCase())
+    ).toContain('no-store');
   } finally {
     await revokedContext?.close();
     await returningContext?.close();
