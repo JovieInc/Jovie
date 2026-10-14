@@ -268,7 +268,7 @@ class CheckTest(unittest.TestCase):
         over reclaimable retired-workspace state must actually act (backed-up
         or removed workspaces), so the receipt never says reclaimable with an
         empty action list."""
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory() as tmp, patch.object(guard, "mount_points", return_value=set()):
             state = Path(tmp)
             retired = state / "symphony-elixir-workspaces"
             stale_ws = retired / "JOV-8000"
@@ -291,7 +291,7 @@ class CheckTest(unittest.TestCase):
     def test_tick_spawned_sweep_acts_and_the_receipt_survives_observation(self):
         """The tick drives reclaim (maybe_sweep) and an observation-only check
         afterwards must not flatten the sweep's actions to []."""
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory() as tmp, patch.object(guard, "mount_points", return_value=set()):
             state = Path(tmp)
             retired = state / "symphony-elixir-workspaces"
             stale_ws = retired / "JOV-8001"

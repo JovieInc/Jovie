@@ -400,6 +400,7 @@ export function PreviewPanel() {
                         <div className='h-1.5 w-24 rounded-full bg-black/55' />
                       </div>
                       <ProfilePreview
+                        isVerified={previewData.isVerified}
                         username={username}
                         displayName={displayName}
                         avatarUrl={avatarUrl}

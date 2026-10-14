@@ -1,9 +1,13 @@
 ---
 id: 2026-10-02-pr-recovery-stall
-status: draft
+status: reviewed
 severity: sev2
 detected: 2026-10-02T13:30Z
 failure_classes: [non-convergent-control-loop, pre-merge-parity-gap]
+detectable_before_human: false
+detection_gaps: [coverage-gap, missing-invariant, missing-signal]
+replay_corpus: [docs/postmortems/2026-10-02-pr-recovery-stall.md#timeline-utc]
+founder_rescues: 0
 incident_issue: JOV-7455
 actions: [JOV-7460, JOV-7461, JOV-7462, JOV-7468, JOV-7469]
 gbrain: ops/postmortems/2026-10-02-pr-recovery-stall

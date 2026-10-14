@@ -117,13 +117,8 @@ describe('ContactDetailSidebar', () => {
     );
     const avatarFrame = screen.getByTestId('contact-entity-avatar-frame');
     const avatarMedia = avatarFrame.firstElementChild;
-    expect(avatarFrame).toHaveClass(
-      'size-14',
-      'p-1',
-      'rounded-[calc(var(--radius-lg)+var(--space-1))]',
-      'shadow-none'
-    );
-    expect(avatarMedia).toHaveClass('size-12', 'rounded-lg');
+    expect(avatarFrame).toHaveClass('size-14', 'rounded-full');
+    expect(avatarMedia).toHaveClass('h-full', 'w-full', 'rounded-full');
     expect(avatarFrame).toHaveTextContent('AR');
     expect(
       screen

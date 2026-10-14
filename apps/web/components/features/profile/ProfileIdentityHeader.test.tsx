@@ -64,6 +64,21 @@ describe('ProfileIdentityHeader', () => {
     expect(screen.queryByTestId('profile-identity-verified')).toBeNull();
   });
 
+  it('retains the circular fallback and verification after portrait failure', () => {
+    const { container } = renderHeader({ isVerified: true });
+    fireEvent.error(container.querySelector('img')!);
+    const portrait = screen.getByTestId('profile-identity-portrait');
+    expect(portrait).toHaveClass('rounded-full');
+    expect(portrait).toHaveTextContent('TW');
+    expect(portrait.querySelector('[role="img"]')).toHaveAttribute(
+      'aria-hidden',
+      'true'
+    );
+    expect(
+      screen.getByRole('img', { name: 'Verified Jovie Profile' })
+    ).toBeVisible();
+  });
+
   it('renders the Listen action as flat frosted glass with a 44px hit area', () => {
     const onListenClick = vi.fn(event => event.preventDefault());
     renderHeader({ onListenClick });

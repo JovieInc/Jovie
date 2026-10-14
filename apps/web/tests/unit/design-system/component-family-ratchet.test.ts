@@ -174,3 +174,39 @@ describe('bespoke EmptyState path guard', () => {
     expect(currentPaths).toEqual([...allowedPaths].sort());
   });
 });
+
+describe('shared entity identity adapters', () => {
+  // These modules compose identity, not arbitrary editorial/file content.
+  // Keep size, header layout, metadata and actions free to vary.
+  const adapters = [
+    'components/features/profile/ProfileIdentityHeader.tsx',
+    'components/features/dashboard/organisms/profile-contact-sidebar/ProfileContactSidebarSections.tsx',
+    'components/jovie/components/EntityPreviewPane.tsx',
+    'components/shell/EntityPopover.tsx',
+  ];
+  const hasLocalMedia = (source: string) =>
+    /from ['"]next\/image['"]|<img\b|<ImageWithFallback\b|<DrawerMediaThumb\b/.test(
+      source
+    );
+
+  it('rejects a route-local media fixture while allowing semantic layout variants', () => {
+    expect(hasLocalMedia('<img src={person.photo} />')).toBe(true);
+    expect(
+      hasLocalMedia("<EntityHeaderThumbnail variant='person' size={44} />")
+    ).toBe(false);
+    expect(
+      hasLocalMedia(
+        "<EntityHeader layout='grid' thumbnail={<EntityHeaderThumbnail variant='artwork' />} />"
+      )
+    ).toBe(false);
+  });
+
+  it.each(adapters)(
+    '%s delegates identity media to the canonical family',
+    path => {
+      const source = readFileSync(join(WEB_ROOT, path), 'utf8');
+      expect(source).toContain('EntityHeaderThumbnail');
+      expect(hasLocalMedia(source)).toBe(false);
+    }
+  );
+});

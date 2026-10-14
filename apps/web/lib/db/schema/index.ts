@@ -368,6 +368,10 @@ export {
   selectCreatorDocumentRevisionSchema,
   selectCreatorDocumentSchema,
 } from './creator-documents';
+export {
+  dogfooderBindings,
+  dogfooders,
+} from './dogfooders';
 // DSP Bio Sync (Bio update pushes to DSPs)
 export {
   type DspBioSyncMetadata,

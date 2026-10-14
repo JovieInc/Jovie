@@ -1,5 +1,5 @@
 {
-  "id": "4cfb53a8-2b82-46ce-ab87-396f9f274d89",
+  "id": "6beb867f-cbe1-4f7c-bf7e-c57f1e722e94",
   "prevId": "c09e9153-c693-49bf-8653-5bed88d9fa6d",
   "version": "7",
   "dialect": "postgresql",
@@ -13933,6 +13933,450 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.dogfooder_bindings": {
+      "name": "dogfooder_bindings",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "dogfooder_id": {
+          "name": "dogfooder_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "product": {
+          "name": "product",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "account_subject": {
+          "name": "account_subject",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "session_subject": {
+          "name": "session_subject",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "device_subject": {
+          "name": "device_subject",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "binding_key": {
+          "name": "binding_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'active'"
+        },
+        "authorized_at": {
+          "name": "authorized_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_seen_at": {
+          "name": "last_seen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "dogfooder_bindings_key_unique": {
+          "name": "dogfooder_bindings_key_unique",
+          "columns": [
+            {
+              "expression": "binding_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "dogfooder_bindings_account_unique": {
+          "name": "dogfooder_bindings_account_unique",
+          "columns": [
+            {
+              "expression": "product",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "account_subject",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"dogfooder_bindings\".\"session_subject\" IS NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "dogfooder_bindings_session_unique": {
+          "name": "dogfooder_bindings_session_unique",
+          "columns": [
+            {
+              "expression": "product",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "session_subject",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"dogfooder_bindings\".\"session_subject\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "dogfooder_bindings_account_idx": {
+          "name": "dogfooder_bindings_account_idx",
+          "columns": [
+            {
+              "expression": "product",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "account_subject",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "dogfooder_bindings_dogfooder_idx": {
+          "name": "dogfooder_bindings_dogfooder_idx",
+          "columns": [
+            {
+              "expression": "dogfooder_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "dogfooder_bindings_dogfooder_id_dogfooders_id_fk": {
+          "name": "dogfooder_bindings_dogfooder_id_dogfooders_id_fk",
+          "tableFrom": "dogfooder_bindings",
+          "tableTo": "dogfooders",
+          "columnsFrom": [
+            "dogfooder_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.dogfooders": {
+      "name": "dogfooders",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "actor_key": {
+          "name": "actor_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "actor_kind": {
+          "name": "actor_kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tier": {
+          "name": "tier",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "products": {
+          "name": "products",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'"
+        },
+        "channel": {
+          "name": "channel",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "handle": {
+          "name": "handle",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "jovie_user_id": {
+          "name": "jovie_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "consent": {
+          "name": "consent",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "signal_state": {
+          "name": "signal_state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'invited'"
+        },
+        "vouched_by": {
+          "name": "vouched_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "calibration": {
+          "name": "calibration",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "contact_budget": {
+          "name": "contact_budget",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{\"maxContacts\":1,\"windowDays\":7}'::jsonb"
+        },
+        "scopes": {
+          "name": "scopes",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'"
+        },
+        "allowed_modes": {
+          "name": "allowed_modes",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{\"customer_control\",\"early_access\"}'"
+        },
+        "agent_surfaces": {
+          "name": "agent_surfaces",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'"
+        },
+        "membership_expires_at": {
+          "name": "membership_expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_contacted_at": {
+          "name": "last_contacted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_feedback_at": {
+          "name": "last_feedback_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "dogfooders_actor_key_unique": {
+          "name": "dogfooders_actor_key_unique",
+          "columns": [
+            {
+              "expression": "actor_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "dogfooders_jovie_user_unique": {
+          "name": "dogfooders_jovie_user_unique",
+          "columns": [
+            {
+              "expression": "jovie_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"dogfooders\".\"jovie_user_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "dogfooders_state_idx": {
+          "name": "dogfooders_state_idx",
+          "columns": [
+            {
+              "expression": "signal_state",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "dogfooders_jovie_user_id_users_id_fk": {
+          "name": "dogfooders_jovie_user_id_users_id_fk",
+          "tableFrom": "dogfooders",
+          "tableTo": "users",
+          "columnsFrom": [
+            "jovie_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "dogfooders_products_check": {
+          "name": "dogfooders_products_check",
+          "value": "cardinality(\"dogfooders\".\"products\") > 0 AND \"dogfooders\".\"products\" <@ ARRAY['jov', 'lyb', 'ovie']::text[]"
+        },
+        "dogfooders_allowed_modes_check": {
+          "name": "dogfooders_allowed_modes_check",
+          "value": "cardinality(\"dogfooders\".\"allowed_modes\") > 0 AND \"dogfooders\".\"allowed_modes\" <@ ARRAY['customer_control', 'early_access']::text[]"
+        },
+        "dogfooders_agent_surfaces_check": {
+          "name": "dogfooders_agent_surfaces_check",
+          "value": "\"dogfooders\".\"agent_surfaces\" <@ ARRAY['api', 'browser', 'cli', 'cloud', 'local', 'mcp', 'native']::text[]"
+        },
+        "dogfooders_actor_tier_check": {
+          "name": "dogfooders_actor_tier_check",
+          "value": "(\"dogfooders\".\"actor_kind\" = 'agent' AND \"dogfooders\".\"tier\" IS NULL) OR (\"dogfooders\".\"actor_kind\" <> 'agent')"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.dsp_artist_matches": {
       "name": "dsp_artist_matches",
       "schema": "",
@@ -15846,122 +16290,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.feedback_decisions": {
-      "name": "feedback_decisions",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "feedback_item_id": {
-          "name": "feedback_item_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "decision": {
-          "name": "decision",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "reason": {
-          "name": "reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "''"
-        },
-        "actor": {
-          "name": "actor",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "payload": {
-          "name": "payload",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::jsonb"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "feedback_decisions_item_created_idx": {
-          "name": "feedback_decisions_item_created_idx",
-          "columns": [
-            {
-              "expression": "feedback_item_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "feedback_decisions_decision_idx": {
-          "name": "feedback_decisions_decision_idx",
-          "columns": [
-            {
-              "expression": "decision",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "feedback_decisions_feedback_item_id_feedback_items_id_fk": {
-          "name": "feedback_decisions_feedback_item_id_feedback_items_id_fk",
-          "tableFrom": "feedback_decisions",
-          "tableTo": "feedback_items",
-          "columnsFrom": [
-            "feedback_item_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.feedback_items": {
       "name": "feedback_items",
       "schema": "",
@@ -16051,25 +16379,6 @@
         },
         "vote": {
           "name": "vote",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "classification": {
-          "name": "classification",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "disposition": {
-          "name": "disposition",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'pending'"
-        },
-        "fingerprint": {
-          "name": "fingerprint",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -16178,43 +16487,6 @@
           ],
           "isUnique": false,
           "where": "\"feedback_items\".\"vote\" IS NOT NULL",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "feedback_items_disposition_idx": {
-          "name": "feedback_items_disposition_idx",
-          "columns": [
-            {
-              "expression": "disposition",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "feedback_items_fingerprint_idx": {
-          "name": "feedback_items_fingerprint_idx",
-          "columns": [
-            {
-              "expression": "fingerprint",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"feedback_items\".\"fingerprint\" IS NOT NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}

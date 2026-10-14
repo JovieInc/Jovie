@@ -11,6 +11,10 @@ artifacts, rendered specs, approval consoles, review pages, admin tools, and ops
 tools. Internal or generated output has no exemption and must not introduce a
 parallel design system or review standard.
 
+## Entity identity
+
+Follow [the founder-locked entity identity contract](../../docs/design-system/entity-identity.md): circular people, square uncropped releases, calendar events. Reuse shared media/fallback/verification owners; choose supported density and layout variants. Provider connection is not Jovie verification. The executable invariant projects from `canon/invariants.jsonl`, and the current [consumer audit](../../docs/design-system/entity-identity.md) names the owners.
+
 ## Interaction Quality Contract
 
 Jovie is a focused work surface. Every feature must make its frequent work feel
