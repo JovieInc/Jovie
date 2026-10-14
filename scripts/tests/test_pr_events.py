@@ -8,6 +8,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import time
@@ -776,6 +777,42 @@ class QuotaRelayTest(unittest.TestCase):
                       shell.calls)
         self.assertNotIn(["gh", "api", "-X", "POST", f"repos/{events.REPO}/issues/5/labels", "-f",
                           "labels[]=lane-fix-red"], shell.calls)
+
+    def test_failed_rerun_preserves_red_until_current_healthy_reconciliation(self):
+        rerun = ("gh", "api", "-X", "POST", f"repos/{events.REPO}/actions/runs/900/rerun-failed-jobs")
+        for code in (1, 124, -15):
+            with self.subTest(returncode=code):
+                shell = self.shell([self.QUOTA_LOG])
+                shell.routes[rerun] = (code, "rerun response unavailable")
+                with patch("builtins.print") as output:
+                    self.assertEqual(self.relay(shell), [(5, "red")])
+                self.assertTrue(any("keeping repair signal" in str(call) for call in output.call_args_list))
+                self.assertEqual(shell.made(*rerun), [list(rerun)], "an uncertain write is never retried")
+                label = ["gh", "api", "-X", "POST", f"repos/{events.REPO}/issues/5/labels", "-f",
+                         "labels[]=lane-fix-red"]
+                self.assertIn(label, shell.calls)
+                healthy = pr(kinds=["red"], labels=["lane-fix-red"], merge="CLEAN",
+                             checks=[{"name": "ci", "status": "COMPLETED", "conclusion": "SUCCESS"}])
+                with tempfile.TemporaryDirectory() as tmp:
+                    host = runner.Host(state=Path(tmp))
+                    self.assertEqual(events.cleanup_one_event(host, fake_lane(shell), [healthy], NOW), 5)
+                self.assertEqual(shell.made("gh", "api", "-X", "DELETE"),
+                                 [["gh", "api", "-X", "DELETE", f"repos/{events.REPO}/issues/5/labels/lane-fix-red"]])
+                self.assertEqual(shell.made(*rerun), [list(rerun)], "healthy reconciliation does not rerun again")
+
+    def test_unknown_rerun_outcome_preserves_red_without_repeating_the_post(self):
+        rerun = ("gh", "api", "-X", "POST", f"repos/{events.REPO}/actions/runs/900/rerun-failed-jobs")
+        for error in (subprocess.TimeoutExpired(list(rerun), 120), OSError("spawn failed"),
+                      RuntimeError("lifecycle-command-outcome-unavailable")):
+            with self.subTest(error=type(error).__name__):
+                def unknown(_args):
+                    raise error
+                shell = self.shell([self.QUOTA_LOG])
+                shell.routes[rerun] = unknown
+                self.assertEqual(self.relay(shell), [(5, "red")])
+                self.assertEqual(shell.made(*rerun), [list(rerun)])
+                self.assertIn(["gh", "api", "-X", "POST", f"repos/{events.REPO}/issues/5/labels", "-f",
+                               "labels[]=lane-fix-red"], shell.calls)
 
     def test_an_unreadable_run_on_the_same_quota_is_not_labelled(self):
         shell = self.shell([], jobs=(), jobs_reply=(1, "gh: API rate limit exceeded for installation. (HTTP 403)"))
