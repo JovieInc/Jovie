@@ -12,6 +12,7 @@ import {
   loadOwnershipInventory,
   resolveAdmissionTarget,
   resourceForArtifact,
+  validateOwnershipInventory,
 } from '../ownership-inventory.mjs';
 import * as planGate from '../plan-gate.mjs';
 import { planEvidenceFor, withPreLeaseReceipts } from './pre-lease.mjs';
@@ -194,6 +195,64 @@ Write the inventory later slices consume.
     });
     assert.equal(result.status, 'rejected');
     assert.equal(result.reason, 'no-jovie-artifact');
+  });
+
+  it('routes retained Summer authority source away from the broad Jovie app owner', () => {
+    for (const artifact of [
+      'apps/eve-pilot/agent/lib/summer-bottleneck-loop.ts',
+      'apps/eve-pilot/agent/schedules/summer-liveness-heartbeat.ts',
+      'apps/eve-pilot/identities/summer/instructions.md',
+    ]) {
+      const targeting = resolveAdmissionTarget(
+        issue({
+          description: `## Proposed fix
+Change ${artifact}.
+
+## Acceptance criteria
+* Summer runtime policy changes only in its owning repository.`,
+        })
+      );
+      assert.equal(targeting.decision, 'reroute');
+      assert.equal(targeting.target.target_system, 'summer-runtime-policy');
+      assert.equal(targeting.target.target_repo, 'JovieInc/summer-config');
+      assert.equal(targeting.target.artifact, artifact);
+    }
+  });
+
+  it('keeps every allowlisted product adapter in the Jovie lane', () => {
+    for (const artifact of loadOwnershipInventory().adapter_sets.summer) {
+      const targeting = resolveAdmissionTarget(
+        issue({
+          description: `## Proposed fix
+Change ${artifact}.
+
+## Acceptance criteria
+* The product adapter contract remains compatible.`,
+        })
+      );
+      assert.equal(targeting.decision, 'admit');
+      assert.equal(targeting.target.target_system, 'jovie-thin-adapters');
+      assert.equal(targeting.target.target_repo, 'JovieInc/Jovie');
+    }
+  });
+
+  it('fails closed when a second active Summer authority is declared', () => {
+    const inventory = structuredClone(loadOwnershipInventory());
+    inventory.authorities.summer.active.push({
+      repository: 'JovieInc/Jovie',
+      root: 'apps/eve-pilot',
+    });
+    assert.throws(
+      () => validateOwnershipInventory(inventory),
+      /ownership-inventory-duplicate-authority:summer/
+    );
+
+    const stale = structuredClone(loadOwnershipInventory());
+    stale.authorities.summer.compatibility[0].activation = 'allowed';
+    assert.throws(
+      () => validateOwnershipInventory(stale),
+      /ownership-inventory-stale-authority:summer/
+    );
   });
 
   it('writes target fields onto a new admission receipt', () => {
