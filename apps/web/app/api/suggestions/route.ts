@@ -41,6 +41,7 @@ import {
   creatorAvatarCandidates,
   creatorProfiles,
 } from '@/lib/db/schema/profiles';
+import { getDspArtistImageUrl } from '@/lib/dsp-enrichment/artist-image';
 import { captureError } from '@/lib/error-tracking';
 import {
   getConfirmedFeaturedPlaylistFallback,
@@ -146,6 +147,7 @@ export async function GET(request: Request) {
           externalArtistName: dspArtistMatches.externalArtistName,
           externalArtistUrl: dspArtistMatches.externalArtistUrl,
           externalArtistImageUrl: dspArtistMatches.externalArtistImageUrl,
+          matchSource: dspArtistMatches.matchSource,
           confidenceScore: dspArtistMatches.confidenceScore,
         })
         .from(dspArtistMatches)
@@ -155,7 +157,9 @@ export async function GET(request: Request) {
             eq(dspArtistMatches.status, 'suggested')
           )
         )
-        .orderBy(desc(dspArtistMatches.confidenceScore))
+        .orderBy(
+          drizzleSql`${dspArtistMatches.confidenceScore} DESC NULLS LAST`
+        )
         .limit(20),
 
       // Social link suggestions with status 'pending'
@@ -259,7 +263,7 @@ export async function GET(request: Request) {
         platformLabel: formatProviderLabel(match.providerId),
         title: match.externalArtistName ?? 'Unknown Artist',
         subtitle: `on ${formatProviderLabel(match.providerId)}`,
-        imageUrl: match.externalArtistImageUrl,
+        imageUrl: getDspArtistImageUrl(match),
         externalUrl: match.externalArtistUrl,
         confidence: match.confidenceScore
           ? Number.parseFloat(match.confidenceScore)
