@@ -25,6 +25,7 @@ vi.mock('react', async importOriginal => {
 });
 
 vi.mock('next/headers', () => ({
+  cookies: async () => ({ get: () => undefined }),
   headers: async () =>
     new Headers({ cookie: 'better-auth.session_data=stale' }),
 }));

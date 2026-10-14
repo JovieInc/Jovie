@@ -2,12 +2,17 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AdminAssetRow } from '@/lib/admin/types';
 import { AdminAssetsTable } from './AdminAssetsTable';
 import { assets as storyAssets } from './story-fixtures';
 
-const { mockUseAdminAssetsInfiniteQuery, mockSetFilters } = vi.hoisted(() => ({
+const {
+  mockStartImpersonation,
+  mockUseAdminAssetsInfiniteQuery,
+  mockSetFilters,
+} = vi.hoisted(() => ({
+  mockStartImpersonation: vi.fn(),
   mockUseAdminAssetsInfiniteQuery: vi.fn(),
   mockSetFilters: vi.fn(),
 }));
@@ -20,6 +25,7 @@ vi.mock('nuqs', () => ({
 
 vi.mock('@/lib/queries', () => ({
   useAdminAssetsInfiniteQuery: mockUseAdminAssetsInfiniteQuery,
+  useStartImpersonationMutation: () => ({ mutate: mockStartImpersonation }),
 }));
 
 vi.mock('@/components/organisms/table', () => ({
@@ -203,7 +209,13 @@ describe('AdminAssetsTable', () => {
     });
   });
 
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('renders asset rows, owner identity, and context menu actions', () => {
+    const assign = vi.fn();
+    vi.stubGlobal('location', { assign });
     const openSpy = vi.spyOn(globalThis, 'open').mockImplementation(() => null);
     render(<AdminAssetsTable {...baseProps} />);
     expect(screen.getAllByText('First Light').length).toBeGreaterThan(0);
@@ -220,10 +232,15 @@ describe('AdminAssetsTable', () => {
       '_blank'
     );
     screen.getAllByText('Impersonate')[0]?.click();
-    expect(openSpy).toHaveBeenCalledWith(
-      '/api/admin/impersonate?userId=user-alpha',
-      '_blank'
+    expect(mockStartImpersonation).toHaveBeenCalledWith(
+      { targetUserId: 'user-alpha' },
+      expect.objectContaining({ onSuccess: expect.any(Function) })
     );
+    const options = mockStartImpersonation.mock.calls[0]?.[1] as {
+      readonly onSuccess: () => void;
+    };
+    options.onSuccess();
+    expect(assign).toHaveBeenCalledWith('/app');
     openSpy.mockRestore();
   });
 
