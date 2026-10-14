@@ -48,6 +48,14 @@ export interface SpotifyAlbum {
   }>;
 }
 
+export interface SpotifyAlbumTrackCollection {
+  items: SpotifyTrack[];
+  total: number;
+  next: string | null;
+  limit?: number;
+  offset?: number;
+}
+
 export interface SpotifyTrack {
   id: string;
   name: string;
@@ -67,6 +75,9 @@ export interface SpotifyTrack {
     id: string;
     name: string;
   }>;
+  linked_from?: {
+    id: string;
+  };
 }
 
 export interface SpotifyTrackFull extends SpotifyTrack {
@@ -78,11 +89,7 @@ export interface SpotifyTrackFull extends SpotifyTrack {
 }
 
 export interface SpotifyAlbumFull extends SpotifyAlbum {
-  tracks: {
-    items: SpotifyTrack[];
-    total: number;
-    next: string | null;
-  };
+  tracks: SpotifyAlbumTrackCollection;
   label: string;
   popularity: number;
   genres?: string[];
@@ -98,6 +105,29 @@ interface SpotifyAlbumsResponse {
   limit: number;
   offset: number;
   next: string | null;
+}
+
+interface SpotifyAlbumTracksPage {
+  items: SpotifyTrack[];
+  total: number;
+  limit: number;
+  offset: number;
+  next: string | null;
+}
+
+export interface SpotifyArtistAlbumsResult {
+  albums: SpotifyAlbum[];
+  total: number;
+  complete: boolean;
+  issue?: string;
+}
+
+export interface SpotifyAlbumTracksResult {
+  albumId: string;
+  tracks: SpotifyTrack[];
+  total: number | null;
+  complete: boolean;
+  issue?: string;
 }
 
 // Search for artists on Spotify
@@ -174,19 +204,30 @@ export async function getSpotifyArtistAlbums(
     limit?: number;
     market?: string;
   } = {}
-): Promise<{ albums: SpotifyAlbum[]; total: number }> {
+): Promise<SpotifyArtistAlbumsResult> {
   const includeGroups = options.includeGroups ?? [
     'album',
     'single',
     'compilation',
   ];
-  const limit = options.limit ?? 50;
+  const limit = options.limit ?? 10;
   const market = options.market ?? 'US';
 
   const albums: SpotifyAlbum[] = [];
   let totalFromApi = 0;
   let offset = 0;
   let hasMore = true;
+  let issue: string | undefined;
+  const seenAlbumIds = new Set<string>();
+
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 10) {
+    return {
+      albums,
+      total: 0,
+      complete: false,
+      issue: 'Spotify artist album page limit must be between 1 and 10',
+    };
+  }
 
   try {
     while (hasMore) {
@@ -200,27 +241,239 @@ export async function getSpotifyArtistAlbums(
       const data = await spotifyClient.requestJson<SpotifyAlbumsResponse>(
         `/artists/${artistId}/albums?${params}`
       );
-      if (offset === 0) totalFromApi = data.total;
-      albums.push(...data.items);
+      if (!Number.isSafeInteger(data.total) || data.total < 0) {
+        issue = 'Spotify returned an invalid artist album total';
+        break;
+      }
 
-      if (data.next && albums.length < data.total) {
-        offset += limit;
-      } else {
-        hasMore = false;
+      if (offset === 0) {
+        totalFromApi = data.total;
+      } else if (data.total !== totalFromApi) {
+        issue = 'Spotify artist album total changed during pagination';
+        break;
+      }
+
+      if (data.offset !== offset || !Array.isArray(data.items)) {
+        issue = `Spotify artist album page at offset ${offset} was invalid`;
+        break;
+      }
+      if (data.limit !== limit) {
+        issue = `Spotify artist album page at offset ${offset} returned limit ${data.limit} when ${limit} was requested`;
+        break;
+      }
+
+      const expectedPageLength = Math.min(limit, data.total - offset);
+      if (data.items.length !== expectedPageLength) {
+        issue = `Spotify artist album page at offset ${offset} returned ${data.items.length} of ${expectedPageLength} expected items`;
+        break;
+      }
+
+      for (const album of data.items) {
+        if (!album || typeof album.id !== 'string' || album.id.trim() === '') {
+          issue = `Spotify artist album page at offset ${offset} contained an album without an ID`;
+          break;
+        }
+        if (seenAlbumIds.has(album.id)) {
+          issue = `Spotify artist album pagination repeated album ${album.id}`;
+          break;
+        }
+        seenAlbumIds.add(album.id);
+        albums.push(album);
+      }
+      if (issue) break;
+
+      const nextOffset = offset + data.items.length;
+      const expectsMore = nextOffset < data.total;
+      if (Boolean(data.next) !== expectsMore) {
+        issue = `Spotify artist album pagination ended inconsistently at offset ${offset}`;
+        break;
       }
 
       if (albums.length >= 500) {
+        if (albums.length < data.total) {
+          issue = `Spotify artist album pagination reached the 500 album cap with ${data.total} albums available`;
+        }
+        hasMore = false;
+      } else if (expectsMore) {
+        offset = nextOffset;
+      } else {
         hasMore = false;
       }
     }
 
-    return { albums, total: totalFromApi };
+    return {
+      albums,
+      total: totalFromApi,
+      complete: issue === undefined && albums.length === totalFromApi,
+      ...(issue ? { issue } : {}),
+    };
   } catch (error) {
     await captureError('Failed to fetch Spotify artist albums', error, {
       artistId,
       operation: 'getSpotifyArtistAlbums',
     });
-    return { albums: [], total: 0 };
+    return {
+      albums,
+      total: totalFromApi,
+      complete: false,
+      issue: `Failed to fetch Spotify artist albums: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    };
+  }
+}
+
+const SPOTIFY_ALBUM_TRACKS_PAGE_SIZE = 50;
+const SPOTIFY_ALBUM_TRACKS_MAX_TRACKS = 1000;
+
+/**
+ * Fetch every track in one Spotify album, continuing an embedded album page
+ * when available. A partial listing is returned as incomplete evidence so a
+ * caller cannot mistake an unavailable or repeated page for a clean catalog.
+ */
+export async function getSpotifyAlbumTracks(
+  albumId: string,
+  initialPage?: SpotifyAlbumTrackCollection,
+  market: string = 'US'
+): Promise<SpotifyAlbumTracksResult> {
+  const tracks: SpotifyTrack[] = [];
+  const seenTrackIds = new Set<string>();
+  let total: number | null = null;
+  let offset = 0;
+  let pageIndex = 0;
+  let page = initialPage;
+
+  const incomplete = (issue: string): SpotifyAlbumTracksResult => ({
+    albumId,
+    tracks,
+    total,
+    complete: false,
+    issue,
+  });
+
+  while (true) {
+    try {
+      if (!page) {
+        const params = new URLSearchParams({
+          limit: String(SPOTIFY_ALBUM_TRACKS_PAGE_SIZE),
+          offset: String(offset),
+          market,
+        });
+        page = await spotifyClient.requestJson<SpotifyAlbumTracksPage>(
+          `/albums/${encodeURIComponent(albumId)}/tracks?${params}`
+        );
+      }
+    } catch (error) {
+      await captureError('Failed to fetch Spotify album tracks', error, {
+        albumId,
+        offset,
+        operation: 'getSpotifyAlbumTracks',
+      });
+      return incomplete(
+        `Failed to fetch Spotify album ${albumId} tracks at offset ${offset}: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    }
+
+    if (
+      !page ||
+      !Array.isArray(page.items) ||
+      !Number.isSafeInteger(page.total) ||
+      page.total < 0
+    ) {
+      return incomplete(
+        `Spotify album ${albumId} returned an invalid track page at offset ${offset}`
+      );
+    }
+
+    if (total === null) {
+      total = page.total;
+    } else if (page.total !== total) {
+      return incomplete(
+        `Spotify album ${albumId} track total changed during pagination`
+      );
+    }
+
+    if (total > SPOTIFY_ALBUM_TRACKS_MAX_TRACKS) {
+      return incomplete(
+        `Spotify album ${albumId} exceeds the ${SPOTIFY_ALBUM_TRACKS_MAX_TRACKS} track audit limit`
+      );
+    }
+
+    if (
+      (page.offset !== undefined || !initialPage || pageIndex > 0) &&
+      page.offset !== offset
+    ) {
+      return incomplete(
+        `Spotify album ${albumId} returned track offset ${page.offset} when ${offset} was requested`
+      );
+    }
+
+    const pageLimit =
+      page.limit ??
+      (pageIndex === 0 && page.items.length > 0
+        ? page.items.length
+        : SPOTIFY_ALBUM_TRACKS_PAGE_SIZE);
+    if (
+      !Number.isSafeInteger(pageLimit) ||
+      pageLimit < 1 ||
+      pageLimit > SPOTIFY_ALBUM_TRACKS_PAGE_SIZE ||
+      ((!initialPage || pageIndex > 0) &&
+        pageLimit !== SPOTIFY_ALBUM_TRACKS_PAGE_SIZE)
+    ) {
+      return incomplete(
+        `Spotify album ${albumId} returned an invalid page limit at offset ${offset}`
+      );
+    }
+
+    const expectedPageLength = Math.min(pageLimit, total - offset);
+    if (page.items.length !== expectedPageLength) {
+      return incomplete(
+        `Spotify album ${albumId} track page at offset ${offset} returned ${page.items.length} of ${expectedPageLength} expected items`
+      );
+    }
+
+    for (const track of page.items) {
+      if (!track || typeof track.id !== 'string' || track.id.trim() === '') {
+        return incomplete(
+          `Spotify album ${albumId} track page at offset ${offset} contained a track without an ID`
+        );
+      }
+      if (seenTrackIds.has(track.id)) {
+        return incomplete(
+          `Spotify album ${albumId} track pagination repeated track ${track.id}`
+        );
+      }
+      if (track.linked_from) {
+        return incomplete(
+          `Spotify relinked track ${track.linked_from.id || 'with unknown source ID'} to ${track.id} in album ${albumId}`
+        );
+      }
+      seenTrackIds.add(track.id);
+      tracks.push(track);
+    }
+
+    const nextOffset = offset + page.items.length;
+    const expectsMore = nextOffset < total;
+    if (Boolean(page.next) !== expectsMore) {
+      return incomplete(
+        `Spotify album ${albumId} track pagination ended inconsistently at offset ${offset}`
+      );
+    }
+
+    if (!expectsMore) {
+      if (tracks.length !== total) {
+        return incomplete(
+          `Spotify album ${albumId} returned ${tracks.length} of ${total} tracks`
+        );
+      }
+      return { albumId, tracks, total, complete: true };
+    }
+
+    offset = nextOffset;
+    pageIndex += 1;
+    page = undefined;
   }
 }
 
