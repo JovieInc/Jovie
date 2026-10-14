@@ -9,19 +9,43 @@ numbers — budgets live in the sources below and in the GBrain page, not here.
 
 | # | File | Owns | Enforcement today |
 |---|------|------|-------------------|
-| 1 | `apps/web/scripts/performance-route-manifest.ts` | Route budgets (FCP/LCP/CLS/TTFB, `interactive-shell-ready`, `warm-shell-response`, `skeleton-to-content`, `usable-alias-result`) and resource budgets in transferSize KB | `performance-budgets-guard.ts` in `production-release.yml` — warning-only |
+| 1 | `apps/web/scripts/performance-route-manifest.ts` | Route budgets (FCP/LCP/CLS/TTFB, `interactive-shell-ready`, `warm-shell-response`, `skeleton-to-content`, `usable-alias-result`) and resource budgets in transferSize KB | `performance-budgets-guard.ts` in `production-release.yml`; public-profile alias staging and production exceptions are bounded below |
 | 2 | `apps/web/.lighthouserc.json` | Production Lighthouse for `/` and `/tim` | production-controller / postdeploy — perf assertions warn; only accessibility ≥ 0.9 errors |
 | 3 | `apps/web/.lighthouserc.{dashboard,onboarding,admin,chat,public-launch,pr}.json` | Per-surface Lighthouse thresholds (error level) | `ci.yml` `ci-lighthouse-*` jobs — `workflow_dispatch` only |
 | 4 | `apps/web/scripts/performance-interaction-manifest.ts` | Interaction latency / dropped frames (jank) classes | `perf:interactions` — manual |
 | 5 | `docs/performance/route-budgets.json`, `apps/web/scripts/compare-chunks.ts` | Aspirational initial-JS gzip targets | Unwired; `bundle-baseline.json` is empty. Targets, never gates |
 
-Rows 1–4 fail surfaces; row 5 numbers are citable targets only. Where two live sources
-disagree, the stricter number governs and the file is named in the audit report.
+Rows 1–4 define certified surfaces; row 5 numbers are citable targets only. Where two live
+sources disagree, the stricter number governs and the file is named in the audit report.
+The only current row 1 advisory exceptions are bounded by the graduation policy below.
+
+## Public-profile alias graduation
+
+Staging and production use separate evidence windows. Staging measures the exact immutable
+protected build before promotion; only those staged-build executions can graduate that gate.
+Production measures canonical `jov.ie` aliases after promotion; only completed Production
+Controller executions where that job ran can enter its window. Neither surface can borrow the
+other surface's streak.
+
+**Ship now:** production remains warning-only. The dated
+[`jovie-public-profile-alias-graduation/v1`](./public-profile-alias-graduation.json) receipt
+records 12 qualifying runs in the latest 14-run window and a current consecutive streak of
+1/14. With five samples per route, nearest-rank p95 is the maximum sample; every selected
+route must be at or below 1500 ms for a run to qualify.
+
+**Re-evaluate when:** production reaches 14 consecutive eligible executions, and no later
+than 2026-10-21 under JOV-8338. Staging must present its own equivalent 14-run receipt before
+its policy changes.
+
+**Then:** make the qualifying surface's budget gate blocking. If a surface still does not
+qualify, refresh its dated measurement and set another bounded review date.
 
 ## Rules binding repo edits
 
-1. A perf gate that only warns is red on a certified surface — flip existing assertions to
-   blocking in place; never add a parallel tool.
+1. A perf gate that only warns is red on a certified surface unless a checked-in measurement
+   proves its graduation threshold is unmet and names an unexpired review owner/date. The
+   exception expires at that date; otherwise flip existing assertions to blocking in place.
+   Never add a parallel tool.
 2. Unknown is red: no measurement in 7 days on a certified surface is a FAIL.
 3. Budgets move one way: raising a row 1–3 number needs founder approval and a Linear ID in
    the file's note; lowering is free.
