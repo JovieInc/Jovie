@@ -83,7 +83,7 @@ describe('Avatar Component', () => {
       expect(mockedImage.mock.calls[0]?.[0].unoptimized).toBe(false);
     });
 
-    it('applies aria-hidden on inner container', () => {
+    it('labels the media independently of its decorative inner image', () => {
       const { container } = render(
         <Avatar
           src='https://example.com/avatar.jpg'
@@ -92,7 +92,7 @@ describe('Avatar Component', () => {
         />
       );
 
-      const innerDiv = container.querySelector('[aria-hidden="true"]');
+      const innerDiv = container.querySelector('[data-slot="app-avatar"]');
       expect(innerDiv).toBeInTheDocument();
     });
 
@@ -106,7 +106,7 @@ describe('Avatar Component', () => {
         />
       );
 
-      let innerDiv = container.querySelector('[aria-hidden="true"]');
+      let innerDiv = container.querySelector('[data-slot="app-avatar"]');
       expect(innerDiv).toHaveAttribute('data-slot', 'app-avatar');
       expect(innerDiv).toHaveAttribute('data-size', 'sm');
       expect(innerDiv).toHaveAttribute('data-shape', 'person');
@@ -122,7 +122,7 @@ describe('Avatar Component', () => {
         />
       );
 
-      innerDiv = container.querySelector('[aria-hidden="true"]');
+      innerDiv = container.querySelector('[data-slot="app-avatar"]');
       expect(innerDiv).toHaveAttribute('data-size', 'lg');
       expect(innerDiv).toHaveStyle({ width: '32px', height: '32px' });
     });
@@ -136,7 +136,7 @@ describe('Avatar Component', () => {
         />
       );
 
-      let innerDiv = container.querySelector('[aria-hidden="true"]');
+      let innerDiv = container.querySelector('[data-slot="app-avatar"]');
       expect(innerDiv).toHaveClass('rounded-full');
       expect(innerDiv).toHaveAttribute('data-shape', 'person');
 
@@ -150,7 +150,7 @@ describe('Avatar Component', () => {
         />
       );
 
-      innerDiv = container.querySelector('[aria-hidden="true"]');
+      innerDiv = container.querySelector('[data-slot="app-avatar"]');
       expect(innerDiv).toHaveAttribute('data-shape', 'artwork');
       expect(innerDiv).toHaveClass('rounded-lg');
       expect(innerDiv).not.toHaveClass('rounded-full');
@@ -219,7 +219,7 @@ describe('Avatar Component', () => {
   });
 
   describe('Accessibility', () => {
-    it('inner container is aria-hidden', () => {
+    it('exposes an accessible label on the media frame', () => {
       const { container } = render(
         <Avatar
           src='https://example.com/avatar.jpg'
@@ -228,7 +228,7 @@ describe('Avatar Component', () => {
         />
       );
 
-      const innerDiv = container.querySelector('[aria-hidden="true"]');
+      const innerDiv = container.querySelector('[data-slot="app-avatar"]');
       expect(innerDiv).toBeInTheDocument();
     });
 
@@ -411,4 +411,34 @@ describe('Avatar Component', () => {
       expect(shimmer).not.toBeInTheDocument();
     });
   });
+});
+
+it('retries changed avatar URLs and resets loading while preserving verification', () => {
+  const { rerender, container } = render(
+    <Avatar
+      src='https://example.com/broken.jpg'
+      alt='Alex Rivera'
+      name='Alex Rivera'
+      verified
+    />
+  );
+  fireEvent.error(screen.getByTestId('avatar-image'));
+  expect(screen.getByText('AR')).toBeInTheDocument();
+  expect(screen.getByRole('img', { name: 'Alex Rivera' })).toBeInTheDocument();
+  rerender(
+    <Avatar
+      src='https://example.com/replacement.jpg'
+      alt='Alex Rivera'
+      name='Alex Rivera'
+      verified
+    />
+  );
+  expect(screen.getByTestId('avatar-image')).toHaveAttribute(
+    'src',
+    'https://example.com/replacement.jpg'
+  );
+  expect(container.querySelector('.skeleton')).toBeInTheDocument();
+  expect(
+    screen.getByRole('img', { name: 'Verified Jovie Profile' })
+  ).toBeInTheDocument();
 });

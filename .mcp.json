@@ -5,14 +5,16 @@
       "args": ["shadcn@latest", "mcp"]
     },
     "Sentry": {
-      "url": "https://mcp.sentry.dev/mcp/jovie/jovie-web"
+      "url": "https://mcp.sentry.dev/mcp/jovie/jovie-web",
+      "type": "http"
     },
     "puppeteer": {
       "command": "/opt/homebrew/bin/npx",
       "args": ["-y", "@modelcontextprotocol/server-puppeteer"]
     },
     "linear": {
-      "url": "https://mcp.linear.app/sse"
+      "url": "https://mcp.linear.app/sse",
+      "type": "sse"
     },
     "next-devtools": {
       "command": "/opt/homebrew/bin/npx",
@@ -22,13 +24,15 @@
       "url": "https://stitch.googleapis.com/mcp",
       "headers": {
         "X-Goog-Api-Key": "${GOOGLE_STITCH_API_KEY:-}"
-      }
+      },
+      "type": "http"
     },
     "braintrust": {
       "url": "https://api.braintrust.dev/mcp",
       "headers": {
         "Authorization": "Bearer ${BRAINTRUST_API_KEY:-}"
-      }
+      },
+      "type": "http"
     }
   }
 }

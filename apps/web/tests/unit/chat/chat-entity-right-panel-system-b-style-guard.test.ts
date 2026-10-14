@@ -46,7 +46,8 @@ describe('chat entity right panel System B style guard', () => {
     expect(source).toContain('ChatRailEntityCard');
     expect(source).toContain('chatReleaseContextToEntityCard');
     expect(source).toContain('chatTourDateContextToEntityCard');
-    expect(source).toContain('entityCardArtStyle');
+    expect(source).toContain('EntityHeaderThumbnail');
+    expect(source).not.toContain("from 'next/image'");
   });
 
   it('defines right-panel chrome from System B aliases', () => {

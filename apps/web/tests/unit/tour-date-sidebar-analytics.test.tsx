@@ -52,8 +52,8 @@ vi.mock('@/components/molecules/drawer', () => ({
       )}
     </div>
   ),
-  DrawerMediaThumb: ({ fallback }: { fallback: React.ReactNode }) => (
-    <div data-testid='drawer-media-thumb'>{fallback}</div>
+  EntityHeaderThumbnail: ({ variant }: { variant: string }) => (
+    <div data-testid='entity-media' data-variant={variant} />
   ),
   DrawerSection: ({
     title,

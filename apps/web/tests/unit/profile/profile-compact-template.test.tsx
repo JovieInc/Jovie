@@ -744,9 +744,10 @@ describe('ProfileCompactTemplate', () => {
 
     // Portrait is decorative (empty alt) so the H1 name is not duplicated.
     const identity = screen.getByTestId('profile-identity-header');
-    const artistPhoto = identity.querySelector(
-      'img[src="https://example.com/artist.jpg"]'
-    );
+    const artistPhoto = identity.querySelector('img');
+    expect(
+      decodeURIComponent(artistPhoto?.getAttribute('src') ?? '')
+    ).toContain('https://example.com/artist.jpg');
     expect(artistPhoto).not.toBeNull();
     expect(artistPhoto?.getAttribute('alt') ?? '').toBe('');
     expect(artistPhoto?.className).not.toContain('grayscale');

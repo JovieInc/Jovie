@@ -829,14 +829,20 @@ def failure_held(sha: str | None, sh=run) -> bool:
 
 
 def rerun_after_quota(workflow_run: dict, kind: str, sh=run) -> bool:
-    """Re-run the failed jobs instead of queueing repair; False past the attempt cap."""
+    """Defer repair only after an accepted rerun; failed/unknown requests retain red."""
     attempt = workflow_run.get("run_attempt")
     if not isinstance(attempt, int) or attempt >= INFRA_RERUN_MAX_ATTEMPT:
         return False
-    rerun = sh(["gh", "api", "-X", "POST", f"repos/{REPO}/actions/runs/{workflow_run['id']}/rerun-failed-jobs"])
-    print(f"run {workflow_run['id']} attempt {attempt} failed on GitHub {kind}: "
-          f"{'re-ran failed jobs' if rerun.returncode == 0 else 'rerun request failed'}; not repair work")
-    return True
+    try:
+        rerun = sh(["gh", "api", "-X", "POST", f"repos/{REPO}/actions/runs/{workflow_run['id']}/rerun-failed-jobs"])
+    except (OSError, subprocess.SubprocessError, RuntimeError):
+        print(f"run {workflow_run['id']} attempt {attempt} failed on GitHub {kind}: "
+              "rerun outcome unknown; keeping repair signal")
+        return False
+    accepted = rerun.returncode == 0
+    outcome = "re-ran failed jobs; not repair work" if accepted else "rerun request failed; keeping repair signal"
+    print(f"run {workflow_run['id']} attempt {attempt} failed on GitHub {kind}: {outcome}")
+    return accepted
 
 
 def relay(event: str, payload: dict, sh=run, disabled: set[str] | None = None) -> list[tuple[int, str]]:
