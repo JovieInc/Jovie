@@ -56,6 +56,30 @@ const baseMismatch = {
 };
 
 describe('CatalogHealthSection', () => {
+  it('keeps legacy inventory misses visible as unverified and does not claim all clear', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        scan: baseScan,
+        mismatches: [{ ...baseMismatch, mismatchType: 'missing_from_dsp' }],
+      }),
+    });
+    render(
+      <CatalogHealthSection
+        profileId='profile-1'
+        spotifyId='spotify-1'
+        hasUnresolvedMismatches={true}
+      />
+    );
+    expect(
+      await screen.findByText(/Spotify availability is unverified/)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Catalog Health — 1 to review')
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/All clear/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/on Spotify yet/)).not.toBeInTheDocument();
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     mockFetch = vi.fn();
@@ -239,7 +263,7 @@ describe('CatalogHealthSection', () => {
       expect(screen.getByText('Bad Love')).toBeInTheDocument();
       // The missing_from_dsp one shows as info text, not a card
       expect(
-        screen.getByText(/1 track in your catalog isn't on Spotify yet/)
+        screen.getByText(/1 track in your catalog was not observed/)
       ).toBeInTheDocument();
     });
   });
@@ -442,4 +466,70 @@ describe('CatalogHealthSection', () => {
 
     vi.useRealTimers();
   });
+});
+
+it('shows persisted unknown scan failure after reload and never revives all clear', async () => {
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      scan: {
+        ...baseScan,
+        status: 'failed',
+        error: 'Spotify availability remains unknown',
+      },
+      mismatches: [],
+    }),
+  } as Response);
+  try {
+    render(
+      <CatalogHealthSection
+        profileId='profile-1'
+        spotifyId='spotify-1'
+        hasUnresolvedMismatches={true}
+      />
+    );
+    expect(
+      await screen.findByText('Spotify availability remains unknown')
+    ).toBeInTheDocument();
+    expect(screen.getByText('Scan failed')).toBeInTheDocument();
+    expect(screen.queryByText(/All clear/)).not.toBeInTheDocument();
+  } finally {
+    vi.restoreAllMocks();
+  }
+});
+
+it('drops a cached all-clear and reloads when the artist connection changes', async () => {
+  const fetcher = vi.spyOn(globalThis, 'fetch');
+  fetcher.mockResolvedValueOnce({
+    ok: true,
+    json: async () => ({ scan: baseScan, mismatches: [] }),
+  } as Response);
+  fetcher.mockResolvedValueOnce({
+    ok: true,
+    json: async () => ({ scan: null, mismatches: [] }),
+  } as Response);
+  try {
+    const view = render(
+      <CatalogHealthSection
+        profileId='profile-1'
+        spotifyId='artist-A'
+        hasUnresolvedMismatches={true}
+      />
+    );
+    expect(await screen.findByText(/All clear/)).toBeInTheDocument();
+    view.rerender(
+      <CatalogHealthSection
+        profileId='profile-1'
+        spotifyId='artist-B'
+        hasUnresolvedMismatches={true}
+      />
+    );
+    expect(
+      await screen.findByRole('button', { name: 'Scan Catalog' })
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/All clear/)).not.toBeInTheDocument();
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  } finally {
+    vi.restoreAllMocks();
+  }
 });

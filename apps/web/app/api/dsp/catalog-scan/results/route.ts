@@ -9,6 +9,7 @@ import {
   dspCatalogScans,
 } from '@/lib/db/schema/dsp-catalog-scan';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { getBoundSpotifyArtistId } from '@/lib/dsp-enrichment/catalog-scan-target';
 
 export async function GET(request: Request) {
   const { userId } = await getCachedAuth();
@@ -31,7 +32,7 @@ export async function GET(request: Request) {
     .select({ id: creatorProfiles.id })
     .from(creatorProfiles)
     .innerJoin(users, eq(users.id, creatorProfiles.userId))
-    .where(and(eq(creatorProfiles.id, profileId), eq(users.clerkId, userId)))
+    .where(and(eq(creatorProfiles.id, profileId), eq(users.id, userId)))
     .limit(1);
 
   if (!profile) {
@@ -41,37 +42,59 @@ export async function GET(request: Request) {
     );
   }
 
-  // Get latest completed scan for this profile
+  const boundArtistId = await getBoundSpotifyArtistId(db, profileId);
+  // A newer failed/pending observation must not expose an older all-clear.
   const [latestScan] = await db
     .select()
     .from(dspCatalogScans)
     .where(
       and(
         eq(dspCatalogScans.creatorProfileId, profileId),
-        eq(dspCatalogScans.providerId, 'spotify'),
-        eq(dspCatalogScans.status, 'completed')
+        eq(dspCatalogScans.providerId, 'spotify')
       )
     )
-    .orderBy(desc(dspCatalogScans.completedAt))
+    .orderBy(desc(dspCatalogScans.createdAt), desc(dspCatalogScans.id))
     .limit(1);
 
   if (!latestScan) {
     return NextResponse.json({
       scan: null,
       mismatches: [],
-      message: 'No completed scan found',
+      message: 'No scan found',
     });
   }
 
-  // Get all mismatches for this profile (across all scans, using dedup key)
+  if (!boundArtistId || latestScan.externalArtistId !== boundArtistId) {
+    return NextResponse.json({
+      scan: {
+        ...latestScan,
+        status: 'failed',
+        error:
+          'The Spotify connection changed. Previous scan results are historical; current catalog health is unverified.',
+      },
+      mismatches: [],
+    });
+  }
+
+  // Retain triage history for this provider and bound artist.
   const mismatches = await db
-    .select()
+    .select({ mismatch: dspCatalogMismatches })
     .from(dspCatalogMismatches)
-    .where(eq(dspCatalogMismatches.creatorProfileId, profileId))
+    .innerJoin(
+      dspCatalogScans,
+      eq(dspCatalogScans.id, dspCatalogMismatches.scanId)
+    )
+    .where(
+      and(
+        eq(dspCatalogMismatches.creatorProfileId, profileId),
+        eq(dspCatalogScans.providerId, 'spotify'),
+        eq(dspCatalogScans.externalArtistId, boundArtistId)
+      )
+    )
     .orderBy(dspCatalogMismatches.status, desc(dspCatalogMismatches.updatedAt));
 
   return NextResponse.json({
     scan: latestScan,
-    mismatches,
+    mismatches: mismatches.map(row => row.mismatch),
   });
 }
