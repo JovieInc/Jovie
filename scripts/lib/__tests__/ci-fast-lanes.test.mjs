@@ -2060,6 +2060,19 @@ describe('source-read guard selection', () => {
 
   it('points every guard at a test file that exists', () => {
     for (const guard of SOURCE_GUARDS) {
+      if (guard.id === 'codex-bootstrap') {
+        expect(guard.command).toContain('--experimental-test-coverage');
+        expect(guard.command).toContain('--test-coverage-lines=90');
+        expect(guard.command).toContain('--test-coverage-branches=90');
+        expect(guard.command).toContain('--test-coverage-functions=100');
+        expect(
+          readFileSync(
+            join(REPO_ROOT, 'scripts/codex-cloud-setup.test.mjs'),
+            'utf8'
+          )
+        ).toContain("from 'node:test'");
+        continue;
+      }
       if (guard.id === 'script-contracts') {
         expect(guard.command).toContain('/lib/script-contract-affected.mjs');
         continue;
