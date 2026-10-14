@@ -5987,7 +5987,7 @@ class UpdateTest(unittest.TestCase):
         self.assertFalse(set(secrets) & set(env))
         self.assertEqual((env["HOME"], env["PATH"]), ("/scratch/home", "/usr/bin"))
 
-    def test_mesh_dependency_root_falls_back_to_an_installed_pool_slot(self):
+    def test_mesh_dependency_roots_falls_back_to_an_installed_pool_slot(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp = Path(tmp).resolve()
             repo, pool = tmp / "repo", tmp / "pool"
@@ -6001,13 +6001,144 @@ class UpdateTest(unittest.TestCase):
             (pool / "slot-b.ready").write_text("")
             host = lane.Host(state=tmp / "state", repo=repo)
             with patch.object(lane.worktree_pool, "pool_dir", return_value=pool):
-                self.assertEqual(lane.mesh_dependency_root(host), slot)
+                self.assertEqual(lane.mesh_dependency_roots(host), [slot])
                 for pin in lane.MESH_DEPENDENCY_PINS:
                     (repo / pin).parent.mkdir(parents=True)
                     (repo / pin).write_text("{}")
-                self.assertEqual(lane.mesh_dependency_root(host), repo, "an installed host repo wins")
+                self.assertEqual(lane.mesh_dependency_roots(host), [repo, slot], "an installed host repo stays first")
             with patch.object(lane.worktree_pool, "pool_dir", return_value=tmp / "missing"):
-                self.assertIsNone(lane.mesh_dependency_root(lane.Host(state=tmp / "state", repo=tmp / "bare")))
+                self.assertEqual(lane.mesh_dependency_roots(lane.Host(state=tmp / "state", repo=tmp / "bare")), [])
+
+    def mesh_dependency_fixture(self, tmp):
+        repo, slot, staging = tmp / "repo", tmp / "pool/slot-a", tmp / "staging"
+        staging.mkdir()
+        (staging / "pnpm-lock.yaml").write_text("staged lock")
+        for root, lock in ((repo, "old lock"), (slot, "staged lock")):
+            for pin in lane.MESH_DEPENDENCY_PINS:
+                (root / pin).parent.mkdir(parents=True)
+                (root / pin).write_text("{}")
+            (root / "pnpm-lock.yaml").write_text(lock)
+            (root / "node_modules/.pnpm").mkdir(parents=True)
+            (root / "node_modules/.pnpm/lock.yaml").write_text(lock)
+        return lane.Host(state=tmp / "state", repo=repo), slot, staging
+
+    def test_staged_proof_uses_matching_pool_instead_of_stale_host(self):
+        # Installed package files alone previously made a stale host win, so the
+        # exact-pin compiler refused every release despite a restored pool slot.
+        with tempfile.TemporaryDirectory() as tmp:
+            host, slot, staging = self.mesh_dependency_fixture(Path(tmp).resolve())
+            replies = [subprocess.CompletedProcess([], 0, stdout="", stderr="")] * 2
+            with patch.object(lane.worktree_pool, "ready_slots", return_value=[slot]), \
+                    patch.object(lane.worktree_pool, "pool_dir", return_value=slot.parent), \
+                    patch.object(lane.worktree_pool, "node_env", return_value={"PATH": os.defpath}), \
+                    patch.object(lane.lifecycle, "run", side_effect=replies) as run:
+                self.assertIsNone(lane.prove_staging(host, staging))
+            self.assertEqual(run.call_args_list[0].args[0][-2:], [str(staging), str(slot)])
+            self.assertEqual(run.call_args_list[1].args[0],
+                             [sys.executable, "-m", "unittest", "-q", *lane.LANE_TESTS])
+
+    def test_mesh_dependency_preference_requires_both_source_and_restored_locks(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host, slot, staging = self.mesh_dependency_fixture(Path(tmp).resolve())
+            restored = slot / "node_modules/.pnpm/lock.yaml"
+            with patch.object(lane.worktree_pool, "ready_slots", return_value=[slot]), \
+                    patch.object(lane.worktree_pool, "pool_dir", return_value=slot.parent):
+                self.assertEqual(lane.mesh_dependency_roots(host, staging), [slot, host.repo])
+                for stale in ("old lock", None):
+                    with self.subTest(restored=stale):
+                        if stale is None:
+                            restored.unlink()
+                        else:
+                            restored.write_text(stale)
+                        self.assertEqual(lane.mesh_dependency_roots(host, staging), [host.repo, slot],
+                                         "unrestored pool must not displace the compiler-checked fallback")
+                restored.write_text("staged lock")
+                (slot / "pnpm-lock.yaml").write_text("different product lock")
+                self.assertEqual(lane.mesh_dependency_roots(host, staging), [host.repo, slot])
+                (slot / "pnpm-lock.yaml").write_text("staged lock")
+                for name in ("pnpm-lock.yaml", "node_modules/.pnpm/lock.yaml"):
+                    (host.repo / name).write_text("staged lock")
+                self.assertEqual(lane.mesh_dependency_roots(host, staging), [host.repo, slot],
+                                 "an exactly restored host remains preferred")
+                (staging / "pnpm-lock.yaml").unlink()
+                self.assertEqual(lane.mesh_dependency_roots(host, staging), [host.repo, slot])
+
+    def test_staged_proof_tries_compatible_pool_after_unrelated_lock_churn(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host, slot, staging = self.mesh_dependency_fixture(Path(tmp).resolve())
+            (staging / "pnpm-lock.yaml").write_text("staged lock plus unrelated dependency")
+            replies = [subprocess.CompletedProcess([], 1, stdout="", stderr="pin mismatch"),
+                       subprocess.CompletedProcess([], 0, stdout="", stderr=""),
+                       subprocess.CompletedProcess([], 0, stdout="", stderr="")]
+            with patch.object(lane.worktree_pool, "ready_slots", return_value=[slot]), \
+                    patch.object(lane.worktree_pool, "pool_dir", return_value=slot.parent), \
+                    patch.object(lane.worktree_pool, "node_env", return_value={"PATH": os.defpath}), \
+                    patch.object(lane.lifecycle, "run", side_effect=replies) as run:
+                self.assertIsNone(lane.prove_staging(host, staging))
+            self.assertEqual([call.args[0][-1] for call in run.call_args_list[:2]],
+                             [str(host.repo), str(slot)])
+            self.assertEqual(run.call_args_list[2].args[0][1:4], ["-m", "unittest", "-q"])
+
+    def test_staged_compiler_holds_pool_lease_against_competing_take(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host, slot, staging = self.mesh_dependency_fixture(Path(tmp).resolve())
+            calls = []
+
+            def run(argv, **kwargs):
+                calls.append(argv)
+                if argv[0] == "node":
+                    # A real maintained take must skip the leased slot and use
+                    # its fresh-worktree path, without claiming or moving it.
+                    with patch.object(lane.worktree_pool, "enabled", return_value=True), \
+                            patch.object(lane.worktree_pool, "same_volume", return_value=True), \
+                            patch.object(lane.worktree_pool, "claim") as claim:
+                        fresh = unittest.mock.Mock(return_value=subprocess.CompletedProcess([], 0))
+                        self.assertEqual(lane.worktree_pool.take(host.repo, Path(tmp) / "other", None,
+                                                               sh=fresh), "fresh")
+                        claim.assert_not_called()
+                        fresh.assert_called_once()
+                return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+            with patch.object(lane.worktree_pool, "ready_slots", return_value=[slot]), \
+                    patch.object(lane.worktree_pool, "pool_dir", return_value=slot.parent), \
+                    patch.object(lane.worktree_pool, "node_env", return_value={"PATH": os.defpath}), \
+                    patch.object(lane.lifecycle, "run", side_effect=run):
+                self.assertIsNone(lane.prove_staging(host, staging))
+            self.assertEqual(len(calls), 2)
+            with lane.worktree_pool.slot_lease(slot) as owned:
+                self.assertTrue(owned, "compilation releases the pool lease")
+
+    def test_staged_proof_never_reuses_output_from_a_failed_candidate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host, slot, staging = self.mesh_dependency_fixture(Path(tmp).resolve())
+            (staging / "pnpm-lock.yaml").write_text("unrelated lock churn")
+
+            def fail(argv, **kwargs):
+                (staging / "scripts/lanes/.mesh-runtime").mkdir(parents=True)
+                return subprocess.CompletedProcess(argv, 1, stdout="", stderr="partial build")
+
+            with patch.object(lane.worktree_pool, "ready_slots", return_value=[slot]), \
+                    patch.object(lane.worktree_pool, "pool_dir", return_value=slot.parent), \
+                    patch.object(lane.worktree_pool, "node_env", return_value={"PATH": os.defpath}), \
+                    patch.object(lane.lifecycle, "run", side_effect=fail) as run, \
+                    contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(lane.prove_staging(host, staging), "mesh runtime dependency closure failed")
+            self.assertEqual(run.call_count, 1, "neither fallback nor release tests may reuse a partial build")
+
+    def test_staged_proof_skips_a_pool_slot_already_owned_by_a_worker(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host, slot, staging = self.mesh_dependency_fixture(Path(tmp).resolve())
+            replies = [subprocess.CompletedProcess([], 1, stdout="", stderr="pin mismatch")]
+            with lane.worktree_pool.slot_lease(slot) as owned:
+                self.assertTrue(owned)
+                with patch.object(lane.worktree_pool, "ready_slots", return_value=[slot]), \
+                        patch.object(lane.worktree_pool, "pool_dir", return_value=slot.parent), \
+                        patch.object(lane.worktree_pool, "node_env", return_value={"PATH": os.defpath}), \
+                        patch.object(lane.lifecycle, "run", side_effect=replies) as run, \
+                        contextlib.redirect_stderr(io.StringIO()):
+                    self.assertEqual(lane.prove_staging(host, staging), "mesh runtime dependency closure failed")
+                self.assertEqual(run.call_count, 1, "busy slot is skipped and the host still faces pin checks")
+                self.assertEqual(run.call_args.args[0][-1], str(host.repo))
 
     def test_staged_proof_completes_a_bundle_an_older_installer_archived(self):
         # 2026-10-11: the installed installer lacked test_lifecycle.py in LANE_TESTS, so every
@@ -9261,7 +9392,7 @@ class OperatorInstallerGlueTest(unittest.TestCase):
         replies = [subprocess.CompletedProcess([], 0, stdout="", stderr=""),
                    subprocess.CompletedProcess([], 1, stdout="", stderr=stderr),
                    subprocess.CompletedProcess([], 1, stdout="", stderr=stderr)]
-        with patch.object(lane, "mesh_dependency_root", return_value=self.host.repo), \
+        with patch.object(lane, "mesh_dependency_roots", return_value=[self.host.repo]), \
                 patch.object(lane.worktree_pool, "node_env", return_value={"PATH": os.defpath}), \
                 patch.object(lane.lifecycle, "run", side_effect=replies) as run, contextlib.redirect_stderr(io.StringIO()) as console:
             self.assertEqual(lane.prove_staging(self.host, stage), "release tests failed")
@@ -9285,7 +9416,7 @@ class OperatorInstallerGlueTest(unittest.TestCase):
         replies = [subprocess.CompletedProcess([], 0, stdout="", stderr=""),
                    subprocess.CompletedProcess([], 1, stdout="", stderr=flaky),
                    subprocess.CompletedProcess([], 0, stdout="", stderr="")]
-        with patch.object(lane, "mesh_dependency_root", return_value=self.host.repo), \
+        with patch.object(lane, "mesh_dependency_roots", return_value=[self.host.repo]), \
                 patch.object(lane.worktree_pool, "node_env", return_value={"PATH": os.defpath}), \
                 patch.object(lane.lifecycle, "run", side_effect=replies) as run, contextlib.redirect_stderr(io.StringIO()):
             self.assertIsNone(lane.prove_staging(self.host, stage))
@@ -9314,7 +9445,7 @@ class OperatorInstallerGlueTest(unittest.TestCase):
         stderr = b"FAIL: test_partial (scripts.tests.test_fixture.Example)\n" + b"x" * 4000
         replies = [subprocess.CompletedProcess([], 0, stdout="", stderr=""),
                    subprocess.TimeoutExpired("fixture", lane.UPDATE_TEST_TIMEOUT_S, stderr=stderr)]
-        with patch.object(lane, "mesh_dependency_root", return_value=self.host.repo), \
+        with patch.object(lane, "mesh_dependency_roots", return_value=[self.host.repo]), \
                 patch.object(lane.worktree_pool, "node_env", return_value={"PATH": os.defpath}), \
                 patch.object(lane.lifecycle, "run", side_effect=replies):
             self.assertEqual(lane.prove_staging(self.host, stage), f"self-test timeout {lane.UPDATE_TEST_TIMEOUT_S}s")
@@ -9337,7 +9468,7 @@ class OperatorInstallerGlueTest(unittest.TestCase):
             return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
 
         try:
-            with patch.object(lane, "mesh_dependency_root", return_value=self.host.repo), \
+            with patch.object(lane, "mesh_dependency_roots", return_value=[self.host.repo]), \
                     patch.object(lane.worktree_pool, "node_env", return_value={"PATH": os.defpath}), \
                     patch.object(lane.lifecycle, "run", side_effect=run), \
                     contextlib.redirect_stderr(io.StringIO()) as console:
