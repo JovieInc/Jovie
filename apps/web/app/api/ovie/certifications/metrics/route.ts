@@ -13,10 +13,10 @@ function json(body: Record<string, unknown>, status: number) {
 }
 
 /**
- * Certification v2 section 8 metrics, computed from the same stores as
+ * Certification and Summer quality metrics, computed from the same stores as
  * `GET /api/ovie/certifications` (packet files, decision ledger, Summer
- * cards). Admin-only and never cached; metrics with no data report `null`
- * rather than zero.
+ * cards, immutable quality receipts). Admin-only and never cached; metrics
+ * with no authoritative source report `null` rather than zero.
  */
 export async function GET(request: Request): Promise<NextResponse> {
   const principal = await resolveOviePrincipal(request).catch(() => null);

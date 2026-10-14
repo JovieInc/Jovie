@@ -2255,38 +2255,49 @@ class CapacityHorizonTest(unittest.TestCase):
 class AttributionAndThroughputTest(unittest.TestCase):
     def test_receipts_outrank_branch_prefixes_and_preserve_distinct_roles(self):
         merged = {"number": 9, "headRefName": "codex/manual-looking", "createdAt": "2026-09-28T10:00:00Z",
-                  "mergedAt": "2026-09-28T11:00:00Z"}
+                  "mergedAt": "2026-09-28T11:00:00Z", "headRefOid": "a" * 40}
         receipts = [
             {"runId": "create", "issue": "JOV-9", "pr": 9, "provider": "devin",
-             "startedAt": "2026-09-28T10:00:00Z"},
-            {"runId": "review", "kind": "adopt", "pr": 9, "provider": "codex", "endedAt": "2026-09-28T10:30:00Z"},
-            {"runId": "fix", "kind": "fix-red", "pr": 9, "provider": "codex", "verdict": "fix-pushed",
+             "schema": "jovie-lane-run/v1", "origin": "autonomous-lane", "headSha": "a" * 40,
+             "attribution": {"category": "autonomous-created", "originProvider": "devin",
+                             "finalProvider": "devin"}, "startedAt": "2026-09-28T10:00:00Z"},
+            {"schema": "jovie-lane-run/v1", "origin": "autonomous-lane", "runId": "review",
+             "kind": "adopt", "pr": 9, "provider": "codex", "headSha": "a" * 40,
+             "attribution": {"category": "review-only", "provider": "codex"},
+             "endedAt": "2026-09-28T10:30:00Z"},
+            {"schema": "jovie-lane-run/v1", "origin": "autonomous-lane", "runId": "fix",
+             "kind": "fix-red", "pr": 9, "provider": "codex", "verdict": "fix-pushed",
+             "headAfter": "a" * 40, "attribution": {"category": "autonomous-remediation",
+                                                        "provider": "codex"},
              "endedAt": "2026-09-28T10:45:00Z"},
         ]
         attributed = lane.pr_attribution(merged, receipts)
         self.assertEqual(attributed["category"], "cross-provider-finalizer")
         self.assertEqual((attributed["origin"], attributed["originProvider"], attributed["finalProvider"]),
                          ("autonomous-lane", "devin", "codex"))
-        self.assertIn({"provider": "codex", "category": "review-only", "runId": "review"},
-                      attributed["roles"])
+        self.assertEqual(attributed["confidence"], "verified")
 
-    def test_unreceipted_codex_branches_are_not_counted_as_autonomous(self):
+    def test_unreceipted_codex_branches_remain_unknown(self):
         recent = {"number": 1, "headRefName": "codex/manual", "createdAt": "2026-09-28T10:00:00Z",
-                  "mergedAt": "2026-09-28T11:00:00Z"}
+                  "mergedAt": "2026-09-28T11:00:00Z", "headRefOid": "a" * 40}
         old = {**recent, "number": 2, "createdAt": "2026-09-20T10:00:00Z"}
-        self.assertEqual(lane.pr_attribution(recent, [])["category"], "manual-codex-app-created")
-        self.assertEqual(lane.pr_attribution(old, [])["category"], "old-codex-branch-landed-later")
+        self.assertEqual(lane.pr_attribution(recent, [])["category"], "unknown")
+        self.assertEqual(lane.pr_attribution(old, [])["category"], "unknown")
         self.assertNotEqual(lane.pr_attribution(recent, [])["origin"], "autonomous-lane")
 
     def test_provider_metrics_count_only_receipted_origin_as_landed_output(self):
-        rows = [{"runId": "r", "issue": "JOV-9", "pr": 9, "provider": "codex", "agentExit": 0,
+        rows = [{"schema": "jovie-lane-run/v1", "origin": "autonomous-lane", "runId": "r",
+                 "issue": "JOV-9", "pr": 9, "provider": "codex", "agentExit": 0,
+                 "headSha": "a" * 40,
+                 "attribution": {"category": "autonomous-created", "originProvider": "codex",
+                                 "finalProvider": "codex"},
                  "startedAt": "2026-09-28T10:00:00Z", "endedAt": "2026-09-28T10:10:00Z",
                  "verdict": "landing", "execution": {"event": "attempt_finished"},
                  "providerEvidence": [{"provider": "codex", "event": "account-leased"}]}]
         merged = [{"number": 9, "headRefName": "codex/jov-9-x", "createdAt": "2026-09-28T10:00:00Z",
-                   "mergedAt": "2026-09-28T10:30:00Z"},
+                   "mergedAt": "2026-09-28T10:30:00Z", "headRefOid": "a" * 40},
                   {"number": 10, "headRefName": "codex/manual", "createdAt": "2026-09-28T10:00:00Z",
-                   "mergedAt": "2026-09-28T10:20:00Z"}]
+                   "mergedAt": "2026-09-28T10:20:00Z", "headRefOid": "b" * 40}]
         report = lane.provider_throughput(rows, ["codex", "devin"], merged)
         codex = report["providers"]["codex"]
         self.assertEqual((codex["eligibleWorkOffered"], codex["workerStarts"], codex["productiveRuns"],
@@ -2295,7 +2306,7 @@ class AttributionAndThroughputTest(unittest.TestCase):
         self.assertEqual(codex["issueToPrSecondsP50"], 600)
         self.assertEqual(codex["issueToMergeSecondsP50"], 1800)
         self.assertEqual(report["landedByAttribution"],
-                         {"autonomous-created": 1, "manual-codex-app-created": 1})
+                         {"autonomous-created": 1, "unknown": 1})
 
 
 class MaintenanceDemandTest(unittest.TestCase):
@@ -8263,6 +8274,7 @@ class TimerInstallerNodePathTests(unittest.TestCase):
                 units = root / "units"
                 units.mkdir()
                 plist = root / "lanes.plist"
+                watchdog_plist = root / "lanes-watchdog.plist"
                 # Redirect only service output destinations; keep HOME and the
                 # actual installer logic intact. No host timer is installed.
                 script = source.replace("$HOME/.config/systemd/user", str(units))
@@ -8271,6 +8283,7 @@ class TimerInstallerNodePathTests(unittest.TestCase):
                 script = script.replace("$HOME/.local/bin", str(root / "local-bin"))
                 script = script.replace("$HOME/.npm-global/bin", str(root / "npm-bin"))
                 script = script.replace("$HOME/Library/LaunchAgents/com.jovie.lanes.plist", str(plist))
+                script = script.replace("$HOME/Library/LaunchAgents/com.jovie.lanes-watchdog.plist", str(watchdog_plist))
                 installer = root / "install.sh"
                 installer.write_text(script)
                 commands = root / "commands.log"
@@ -8316,15 +8329,24 @@ with open(os.environ['INSTALL_COMMAND_LOG'], 'a') as log:
                 self.assertEqual(result.returncode, 0, result.stderr)
                 if platform == "Darwin":
                     config = plistlib.loads(plist.read_bytes())
+                    watchdog_config = plistlib.loads(watchdog_plist.read_bytes())
                     timer_path = config["EnvironmentVariables"]["PATH"]
                     tick = config["ProgramArguments"][-1]
                     self.assertEqual(config["EnvironmentVariables"]["CODEX_LEDGER_CADENCE_S"], "3600")
+                    self.assertEqual(watchdog_config["StartInterval"], 60)
+                    self.assertEqual(watchdog_config["Label"], "com.jovie.lanes-watchdog")
+                    self.assertIn("factory_watchdog.py", watchdog_config["ProgramArguments"][-1])
                 else:
                     service = (units / "jovie-lanes.service").read_text()
+                    watchdog_service = (units / "jovie-lanes-watchdog.service").read_text()
+                    watchdog_timer = (units / "jovie-lanes-watchdog.timer").read_text()
                     timer_path = next(line.removeprefix("Environment=PATH=") for line in service.splitlines() if line.startswith("Environment=PATH="))
                     tick = service
                     self.assertIn("KillMode=process", service)
                     self.assertIn("Environment=CODEX_LEDGER_CADENCE_S=3600", service)
+                    self.assertIn("factory_watchdog.py", watchdog_service)
+                    self.assertNotIn("After=jovie-lanes.service", watchdog_service)
+                    self.assertIn("OnUnitActiveSec=60s", watchdog_timer)
                 self.assertEqual(timer_path.split(":")[0], str(bin_dir))
                 if with_gbrain:
                     self.assertEqual(shutil.which("gbrain", path=timer_path), str(brain))

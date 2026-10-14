@@ -84,6 +84,18 @@ function stream(text: string) {
 }
 
 describe('authenticated persistent Summer conversation', () => {
+  it('renders cached company truth as data with no provider-query instruction', () => {
+    const rendered = renderConversation({
+      ...input(),
+      companyState: {
+        activeConstraint: 'funnel:onboarding_starts',
+        cache: { readPathUpstreamCalls: 0 },
+      },
+    });
+    expect(rendered).toContain('Canonical company-state cache');
+    expect(rendered).toContain('funnel:onboarding_starts');
+    expect(rendered).toContain('Do not query providers');
+  });
   it('requires the fixed founder principal and rejects malformed values', () => {
     expect(
       verifyFounderPrincipal(input().principalHash, {

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { getSummerFunnel } from '@/lib/analytics/signup-funnel.server';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { readCompanyStateCache } from '@/lib/ovie/company-state.server';
 import { verifySummerOidcRequest } from '@/lib/ovie/summer-oidc.server';
 
 export const runtime = 'nodejs';
@@ -20,7 +20,14 @@ export async function GET(request: Request): Promise<NextResponse> {
     );
   }
   try {
-    return NextResponse.json(await getSummerFunnel(), {
+    const cached = await readCompanyStateCache();
+    if (!cached) {
+      return NextResponse.json(
+        { error: 'funnel_unavailable' },
+        { status: 503, headers: NO_STORE_HEADERS }
+      );
+    }
+    return NextResponse.json(cached.snapshot.sourcePayloads.signupFunnel, {
       headers: NO_STORE_HEADERS,
     });
   } catch (error) {

@@ -298,7 +298,7 @@ class RenderTest(unittest.TestCase):
         self.assertIn("requeue pending #18720", text)
         self.assertIn("gate-timeout 2", text)
         self.assertIn("Todo candidates 99 (agent-ready 87 · devin 0 · codex 19)", text)
-        self.assertIn("autonomous 1 · manual Codex app 0 · old codex/* 0 · total 2 in 24h", text)
+        self.assertIn("verified 0/2 · inferred 0 · unknown 2 · total 2 in 24h", text)
         self.assertIn("THROUGHPUT 24h · codex offer 0", text)
         self.assertIn("devin offer 1 start 1 productive 1 PR 1 first-pass 100%", text)
         self.assertIn("disk 3.1% free", text)

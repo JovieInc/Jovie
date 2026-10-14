@@ -56,6 +56,7 @@ import linear_app_token  # noqa: E402  (Jovie Lanes OAuth app quota, separate fr
 import linear_sync  # noqa: E402  (local issue mirror, claim ledger, write outbox)
 import pr_events  # noqa: E402
 import remediation  # noqa: E402  (classifier, router, escalation ladder)
+import shipping_attribution  # noqa: E402  (receipt-first merged-PR provenance)
 import workstreams  # noqa: E402  (shared workstream rank + duplicate identity)
 import worktree_sweep  # noqa: E402  (idle / merged-PR checkout retirement, JOV-7704)
 import worktree_pool  # noqa: E402  (pre-installed worktree pool, JOV-7705)
@@ -210,52 +211,31 @@ def receipt_category(receipt: dict) -> str:
 
 
 def pr_attribution(pr: dict, receipts: list[dict]) -> dict:
-    """Attribute a PR from durable lane receipts; branch names are fallback evidence only."""
-    number = int(pr["number"])
-    matched = [row for row in receipts if row.get("pr") == number]
-    created = [row for row in matched if row.get("issue") and (row.get("kind") or "issue") == "issue"]
-    creator = min(created, key=lambda row: row.get("startedAt", "")) if created else None
-    roles = []
-    for row in matched:
-        provider = row.get("provider")
-        category = receipt_category(row)
-        if provider:
-            roles.append({"provider": provider, "category": category, "runId": row.get("runId")})
-
-    if creator:
-        category = receipt_category(creator)
-        origin_category = category
-        origin_provider = creator.get("provider")
-        final_provider = creator.get("finishedBy") or origin_provider
+    """Compatibility projection of the receipt-first company attribution contract."""
+    report = shipping_attribution.attribute_pr(pr, receipts, REPO_SLUG)
+    source = report["origin"]
+    confidence, method = source["confidence"], source["method"]
+    provider = source.get("provider")
+    final_provider = source.get("finalizingProvider") or provider
+    exact_finalizers = [row for row in report["contributions"]
+                        if row["role"] in {"finalizing", "remediation"}
+                        and row.get("exactFinalHead") and row.get("provider")]
+    if exact_finalizers:
+        final_provider = exact_finalizers[-1]["provider"]
+    if confidence == "verified" and method == "symphony":
+        category = ("cross-provider-handoff" if source.get("finalizingProvider") else
+                    "cross-provider-finalizer" if final_provider != provider else "autonomous-created")
         origin = AUTONOMOUS_ORIGIN
+    elif confidence == "inferred":
+        category, origin = f"inferred:{method}", "inferred"
     else:
-        branch = pr.get("headRefName") or ""
-        created_at, merged_at = pr.get("createdAt"), pr.get("mergedAt")
-        old = False
-        try:
-            age = datetime.fromisoformat(merged_at.replace("Z", "+00:00")) - \
-                datetime.fromisoformat(created_at.replace("Z", "+00:00"))
-            old = age.total_seconds() >= 24 * 3600
-        except (AttributeError, TypeError, ValueError):
-            pass
-        if branch.startswith("codex/") and old:
-            category, origin, origin_provider = "old-codex-branch-landed-later", "branch-fallback", None
-        elif branch.startswith("codex/"):
-            category, origin, origin_provider = "manual-codex-app-created", "branch-fallback", "codex-app"
-        else:
-            category, origin, origin_provider = "unattributed", "unknown", None
-        origin_category = category
-        final_provider = origin_provider
-
-    pushed = [row for row in matched if row.get("kind") == "fix-red" and row.get("verdict") == "fix-pushed"]
-    if pushed:
-        last = max(pushed, key=lambda row: row.get("endedAt", ""))
-        finalizer = last.get("provider")
-        if finalizer and finalizer != final_provider:
-            category, final_provider = "cross-provider-finalizer", finalizer
-
-    return {"category": category, "originCategory": origin_category, "origin": origin, "originProvider": origin_provider,
-            "finalProvider": final_provider, "roles": roles}
+        category, origin = "unknown", "unknown"
+    roles = [{"provider": row.get("provider"), "category": row["role"], "runId": row.get("runId")}
+             for row in report["contributions"] if row.get("provider")]
+    return {"category": category, "originCategory": category, "origin": origin,
+            "originProvider": provider, "finalProvider": final_provider, "roles": roles,
+            "shippingMethod": method, "confidence": confidence,
+            "missingOriginReceipt": confidence != "verified"}
 
 
 def provider_throughput(receipts: list[dict], provider_names=(), merged_prs: list[dict] | None = None,
@@ -628,7 +608,8 @@ def admission_rejection(issue: Issue, failures: dict, now: float,
 
 # JOV-7708: files that concurrent PRs keep colliding on (31 of 66 open PRs were DIRTY on
 # 2026-10-03). While an open PR holds one, a new issue predicted to touch it waits.
-LANES_HARNESS = frozenset({"scripts/lanes/lane_runner.py", "scripts/lanes/hud.py", "scripts/lanes/doctor.py"})
+LANES_HARNESS = frozenset({"scripts/lanes/doctor.py", "scripts/lanes/factory_watchdog.py",
+                           "scripts/lanes/hud.py", "scripts/lanes/lane_runner.py"})
 HOTSPOT_SEED = LANES_HARNESS | frozenset({
     "apps/web/lib/flags/code-flags.ts",
     "apps/web/lib/commands/registry.ts",
@@ -2416,7 +2397,9 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue) -> dict:
     branch = f"hyperagent/{issue.identifier.lower()}-{ident['identityDigest'][:15]}"
     evidence = runs / f"{ident['identityDigest']}.provider.jsonl"
     run_id = f"{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}-{issue.identifier}-hyperagent-{uuid.uuid4().hex[:6]}"
-    receipt = {"schema": "jovie-lane-run/v1", "runId": run_id, "provider": "hyperagent", "model": spec.get("model"),
+    receipt = {"schema": "jovie-lane-run/v1", "runId": run_id, "repository": REPO_SLUG,
+               "executionHost": HOST, "initiator": "symphony",
+               "provider": "hyperagent", "model": spec.get("model"),
                "origin": AUTONOMOUS_ORIGIN, "issue": issue.identifier, "linearIssueId": issue.id,
                "branch": branch, "startedAt": now_iso(), "offer": {"eligible": True, "accepted": False},
                "attribution": {"category": "autonomous-created", "originProvider": "hyperagent", "finalProvider": "hyperagent"},
@@ -2505,7 +2488,8 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
     branch = f"{name}/{issue.identifier.lower()}-{run_id[:15].lower()}"
     worktree = host.state / "worktrees" / run_id
     provider_evidence = runs / f"{run_id}.provider.jsonl"
-    receipt = {"schema": "jovie-lane-run/v1", "runId": run_id, "provider": name, "model": spec.get("model"),
+    receipt = {"schema": "jovie-lane-run/v1", "runId": run_id, "repository": REPO_SLUG,
+               "executionHost": HOST, "initiator": "symphony", "provider": name, "model": spec.get("model"),
                "accountClass": spec.get("accountClass"), "origin": AUTONOMOUS_ORIGIN,
                "issue": issue.identifier, "linearIssueId": issue.id, "branch": branch,
                "worktree": str(worktree), "offer": {"eligible": True, "accepted": False},
@@ -5209,7 +5193,8 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
     runs.mkdir(parents=True, exist_ok=True)
     worktree = host.state / "worktrees" / run_id
     provider_evidence = runs / f"{run_id}.provider.jsonl"
-    receipt = {"schema": "jovie-lane-run/v1", "runId": run_id, "provider": name, "kind": "fix-red",
+    receipt = {"schema": "jovie-lane-run/v1", "runId": run_id, "repository": REPO_SLUG,
+               "executionHost": HOST, "initiator": "symphony", "provider": name, "kind": "fix-red",
                "accountClass": spec.get("accountClass"), "origin": AUTONOMOUS_ORIGIN,
                "attribution": {"category": "autonomous-remediation", "provider": name},
                "worktree": str(worktree), "branch": pr["headRefName"], "pr": pr["number"],
@@ -5525,7 +5510,8 @@ def _adopt_pr(host: Host, name: str, pr: dict, claim: GateClaim, *, sensitive: b
     runs = host.state / "runs"
     runs.mkdir(parents=True, exist_ok=True)
     worktree = host.state / "worktrees" / run_id
-    receipt = {"schema": "jovie-lane-run/v1", "runId": run_id, "provider": name, "kind": "adopt",
+    receipt = {"schema": "jovie-lane-run/v1", "runId": run_id, "repository": REPO_SLUG,
+               "executionHost": HOST, "initiator": "symphony", "provider": name, "kind": "adopt",
                "origin": AUTONOMOUS_ORIGIN, "attribution": {"category": "review-only", "provider": name},
                "worktree": str(worktree), "branch": pr.get("headRefName"), "pr": pr["number"],
                "startedAt": now_iso()}
