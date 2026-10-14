@@ -150,7 +150,7 @@ RED = frozenset({"FAILURE", "TIMED_OUT", "STARTUP_FAILURE"})
 # JOV-7690: a recovery-handoff run does no work, so the issue backs off exponentially
 # (5 min doubling to 6 h) instead of being re-claimed on the next reexec. Linear hears
 # about the first handoff and once more at HANDOFF_COMMENT_AT, never once per loop.
-HANDOFF_BACKOFF_S = 300
+HANDOFF_BACKOFF_S = pr_events.HANDOFF_BACKOFF_S
 HANDOFF_BACKOFF_CAP_S = 6 * 3600
 HANDOFF_COMMENT_AT = 3
 PRESERVED_RUN_NAME = re.compile(r"^\d{8}T\d{6}Z-(?P<issue>[A-Z]+-\d+)-")
@@ -4764,7 +4764,9 @@ def unworked_fix_attempt(receipt: dict) -> str | None:
 
 def end_local_fix_attempt(host: Host, pr: dict, receipt: dict) -> None:
     """Release the host-local claim without fabricating an attempt when called directly."""
+    handoff = False
     def finish(attempts: dict) -> None:
+        nonlocal handoff
         attempt = attempts.get(str(pr["number"]))
         if not attempt or attempt.get("sha") != pr.get("headRefOid"):
             return
@@ -4779,7 +4781,17 @@ def end_local_fix_attempt(host: Host, pr: dict, receipt: dict) -> None:
             attempt["noWorkRefund"] = {"reason": refund[:120], "runId": receipt.get("runId"),
                                        "at": time.time()}
             receipt["attemptRefunded"] = refund[:120]
+            handoff = receipt.get("verdict") == "recovery-handoff"
     update_json(host.state / "fix-attempts.json", finish)
+    if handoff:
+        try:
+            path = (receipt.get("recovery") or {}).get("worktree")
+            note_recovery_handoff(host, f"pr:{pr['number']}:{pr['headRefOid']}",
+                                  preserved=Path(path) if isinstance(path, str) and path else None)
+        except Exception as exc:
+            # The durable refund itself supplies the short hold if this best-effort
+            # cooldown write fails. Its failure must not discard the terminal receipt.
+            receipt["handoffCooldownError"] = type(exc).__name__
 
 
 # Consecutive unreadable target snapshots the in-run guard tolerates (~90s at its 30s cadence).
@@ -4860,8 +4872,9 @@ def handoff_cooldown_path(host: Host) -> Path:
     return host.state / "handoff-cooldown.json"
 
 
-def note_recovery_handoff(host: Host, identifier: str, now: float | None = None) -> dict:
-    """Count one recovery-handoff for an issue and start its capped exponential cooldown."""
+def note_recovery_handoff(host: Host, identifier: str, now: float | None = None, *,
+                          preserved: Path | None = None) -> dict:
+    """Count one recovery-handoff and start its capped exponential cooldown."""
     now = time.time() if now is None else now
     noted: dict = {}
 
@@ -4870,9 +4883,18 @@ def note_recovery_handoff(host: Host, identifier: str, now: float | None = None)
         count = int(row.get("count") or 0) + 1
         until = now + min(HANDOFF_BACKOFF_S * 2 ** (count - 1), HANDOFF_BACKOFF_CAP_S)
         data[identifier] = {"count": count, "until": until}
+        try:
+            if preserved is not None and (preserved / disk_guard.PRESERVED_REPAIR).exists():
+                data[identifier]["preserved"] = str(preserved)
+        except OSError:
+            pass  # Unknown context retains the timed hold; it never authorizes cleanup.
         noted.update(count=count, until=until, comment=count in (1, HANDOFF_COMMENT_AT))
     update_json(handoff_cooldown_path(host), bump)
     return noted
+
+
+def pr_recovery_held(host: Host, pr: dict, now: float | None = None) -> bool:
+    return pr_events.pr_recovery_held(host, pr, now)
 
 
 def held_back_issues(host: Host, now: float | None = None) -> frozenset[str]:
@@ -5103,7 +5125,7 @@ def retire_published_preserved(host: Host, number: int) -> list[str]:
 # logged 1,606 recovery-handoff runs for 9 PRs (#20840 alone 694) on such checkouts, so
 # those PRs got no repair at all. A fresh handoff still waits for its owner; one nobody
 # reconciled within PRESERVED_ARCHIVE_AFTER_S is archived so the PR can be repaired again.
-UNRESUMABLE_PRESERVED = frozenset({"preserved-head-superseded", "preserved-target-needs-reconciliation"})
+UNRESUMABLE_PRESERVED = pr_events.UNRESUMABLE_PRESERVED
 PRESERVED_ARCHIVE_REF = "refs/jovie-preserved/"
 PRESERVED_ARCHIVE_AFTER_S = 6 * 3600
 
@@ -6021,7 +6043,8 @@ def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict |
     providers = load_providers()
     order, now = pr_events.cost_order(providers), time.time()
     disabled = set(providers) - set(order)
-    prs = [pr for pr in prs if pr_events.may_take(name, pr, attempts.get(str(pr["number"]), {}), order, now)]
+    prs = [pr for pr in prs if not pr_recovery_held(host, pr, now)
+           and pr_events.may_take(name, pr, attempts.get(str(pr["number"]), {}), order, now)]
     pr = red_pr(prs, attempts, held)
     # A head another host is fixing is skipped (no attempt charged); the next red PR is ours.
     while pr:
@@ -6412,14 +6435,15 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
         # A remote-only lane (Hyperagent) cannot repair a local checkout: it only claims issues,
         # and the local lanes repair its PRs like any orphan (`repairs: false`).
         local = spec.get("repairs") is not False
-        candidates = fix_candidates(name) if local else []
+        candidates = [pr for pr in fix_candidates(name) if not pr_recovery_held(host, pr)] if local else []
         # Reclaimed abandoned drafts (the only non-lane drafts among the fix candidates) are
         # gated and readied like this lane's own drafts. Derived from the one cached scan so
         # no extra inventory read happens per worker pass.
-        lane_owned = lane_prs(name) if local else []
+        lane_owned = [pr for pr in lane_prs(name) if not pr_recovery_held(host, pr)] if local else []
         owned_numbers = {pr["number"] for pr in lane_owned}
         prs = lane_owned + [pr for pr in candidates if pr.get("isDraft") and pr["number"] not in owned_numbers]
-        events = pr_events.queued_prs(THIS, pr_events.FIX_KINDS) if local else []
+        events = [pr for pr in pr_events.queued_prs(THIS, pr_events.FIX_KINDS)
+                  if not pr_recovery_held(host, pr)] if local else []
         red = local and (pr_events.claim_event_pr(host, THIS, name, events)
                          or claim_escalation_pr(host, name, candidates)
                          or claim_red_pr(host, name, candidates)) or None
