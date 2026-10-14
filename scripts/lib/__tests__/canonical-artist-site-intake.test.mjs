@@ -33,6 +33,15 @@ function certificate(overrides = {}) {
   };
 }
 
+/**
+ * Matches one real success from closeLinearIssueByFingerprint. A bare
+ * `{ ok: true }` is not a member of that return union under checkJs.
+ * @returns {{ ok: true, action: 'noop', reason: 'none_open' }}
+ */
+function closedIssue() {
+  return { ok: true, action: 'noop', reason: 'none_open' };
+}
+
 async function filed(certificate, upsert) {
   const opened = [];
   const closed = [];
@@ -46,7 +55,7 @@ async function filed(certificate, upsert) {
       },
       close: async args => {
         closed.push(args.fingerprint);
-        return { ok: true };
+        return closedIssue();
       },
     }
   );
@@ -140,7 +149,7 @@ describe('canonical artist-site intake', () => {
         {
           env: enabled,
           upsert: async () => ({ ok: false, reason: 'linear_down' }),
-          close: async () => ({ ok: true }),
+          close: async () => closedIssue(),
         }
       ),
       /linear_down/
