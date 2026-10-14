@@ -72,6 +72,35 @@ describe('presence identity', () => {
     });
   });
 
+  it.each(['profile', 'generic'] as const)(
+    'retains a later independent %s image after skipping the MusicFetch reference',
+    kind => {
+      const reference = 'https://is1-ssl.mzstatic.com/image/reference.jpg';
+      const independent = 'https://artwork.anghcdn.co/independent.jpg';
+      const photo = resolveIdentityPhoto({
+        kind: 'dsp',
+        connectorImageUrl: reference,
+        connectorMatchSource: 'musicfetch',
+        metadata:
+          kind === 'profile'
+            ? { avatarUrl: reference, profileImageUrl: independent }
+            : {
+                avatarUrl: reference,
+                ogImage: reference,
+                imageUrl: independent,
+              },
+        observedAt: now.toISOString(),
+        now,
+      });
+      expect(photo).toMatchObject({
+        url: independent,
+        source: 'public_metadata',
+        kind,
+        verified: false,
+      });
+    }
+  );
+
   it('does not label generic OG or album images as verified avatars', () => {
     const photo = resolveIdentityPhoto({
       kind: 'dsp',
