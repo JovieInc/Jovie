@@ -8,6 +8,11 @@
 
 > This document is the canonical UX contract for the public profile epic. Implementation sub-issues MUST cite this spec. When a finding conflicts with this spec, update this doc and cite the amendment.
 
+The first-cohort taste cut line is locked separately in
+[`product/canonical-artist-site-experience.md`](product/canonical-artist-site-experience.md).
+That contract uses Tim White's live site as the reference journey and is the
+input to JOV-6572 certification; this document continues to own the general IA.
+
 ---
 
 ## 1. Route Categories
