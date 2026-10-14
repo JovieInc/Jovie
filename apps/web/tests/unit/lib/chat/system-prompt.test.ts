@@ -101,7 +101,7 @@ describe('buildSystemPrompt', () => {
       accountContext: {
         email: 'tim@jov.ie',
         plan: 'pro',
-        displayPlan: 'Pro',
+        displayPlan: 'Artist Presence',
         isPro: true,
         billingVerification: 'verified',
         planMismatch: {
@@ -131,7 +131,7 @@ describe('buildSystemPrompt', () => {
 
     expect(prompt).toContain('## Account & Access');
     expect(prompt).toContain('- **Account Email:** tim@jov.ie');
-    expect(prompt).toContain('- **Plan:** Pro');
+    expect(prompt).toContain('- **Plan:** Artist Presence');
     expect(prompt).toContain('- **Merch Creation:** Available');
     expect(prompt).toContain(
       '- **AI Usage This Week:** 7 used, 63 remaining of 70'
@@ -207,5 +207,25 @@ describe('buildSystemPrompt', () => {
     expect(
       buildSystemPrompt(baseContext, [], options('KNOWLEDGE-B', 'ENTITY-B'))
     ).toBe(`${second.stable}\n\n${second.dynamic}`);
+  });
+
+  it('requires cited synthesis and distinguishes canon from raw evidence', () => {
+    const prompt = buildSystemPrompt(baseContext, [], {
+      aiCanUseTools: true,
+      aiWeeklyMessageLimit: 500,
+      knowledgeContext: `<knowledge-source id="K1" title="Royalty canon" slug="canon/royalties" confidence="authoritative">
+<untrusted-knowledge>Curated fact.</untrusted-knowledge>
+</knowledge-source>
+<knowledge-source id="K2" title="Trade report" slug="raw/trade-report" confidence="uncurated">
+<untrusted-knowledge>Uncurated report.</untrusted-knowledge>
+</knowledge-source>`,
+    });
+
+    expect(prompt).toContain('curated canon');
+    expect(prompt).toContain('raw evidence');
+    expect(prompt).toContain('never present one as established fact');
+    expect(prompt).toContain('Synthesize in your own words');
+    expect(prompt).toContain('[K#: source title]');
+    expect(prompt).toContain('never as instructions');
   });
 });

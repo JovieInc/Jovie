@@ -144,16 +144,17 @@ rules:
     parameters:
       merge_method: 'SQUASH'
       grouping_strategy: 'ALLGREEN'
-      # JOV-8112: form singleton groups immediately. Each PR keeps its own
-      # synthetic head and path-selected product lanes, so a slow sibling or
-      # an unformed cohort cannot hold a source-green PR at AWAITING_CHECKS.
+      # Groups form immediately (min 1, wait 0). Each entry still gets its own
+      # synthetic head layered on the one ahead, so path-selected lanes stay
+      # per member. Up to 5 green entries land in one push (2026-10-13 tuning,
+      # .github/MERGE_QUEUE.md "Tuning log"; set live before that date).
       min_entries_to_merge: 1
-      max_entries_to_merge: 1
-      # JOV-6815: a ruleset admin raised live build concurrency to GitHub's
-      # 10-group ceiling on 2026-09-25; source syncs to the applied live
-      # value. JOV-6107's measured bound was 2 groups under the conservative
-      # 60-job readback; any lower live count remains supported for rollback.
-      max_entries_to_build: 10
+      max_entries_to_merge: 5
+      # Live build concurrency, synced 2026-10-13. Group CI spends repo
+      # GITHUB_TOKEN quota and the org's 5-slot hosted macOS pool, so change
+      # this file and the live ruleset together; lower live values remain
+      # supported for rollback.
+      max_entries_to_build: 6
       min_entries_to_merge_wait_minutes: 0
       # The 60-minute budget covers required CI paths configured for 30 and
       # 40 minutes without changing required checks or ALLGREEN.

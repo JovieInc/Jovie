@@ -108,8 +108,6 @@ const EVENT_DRIVEN_FIX = `use pull_request/pull_request_target/merge_group/workf
  */
 /** @type {Readonly<Record<string, string>>} */
 export const CRON_KEEP_REASONS = Object.freeze({
-  '.github/workflows/auto-merge-default.yml':
-    'owner-tracked (admissions): stuck-PR reporting + fork enable backstop; see ADMISSION_CRON_DEBT',
   '.github/workflows/ci-duration-ratchet.yml':
     'calendar window: daily rollup of rolling p95 CI wall time; a per-run trigger would re-alert on every completion',
   '.github/workflows/cli-chaos-nightly.yml':
@@ -120,10 +118,6 @@ export const CRON_KEEP_REASONS = Object.freeze({
     'AI credits: one subscription-bounded native security scan of main per day; per push would multiply native scanner spend',
   '.github/workflows/desktop-release.yml':
     'owner-tracked: daily signed staging desktop build until staging rides the Production Controller event without the 2026-09 supersession livelock; see ADMISSION_CRON_DEBT',
-  '.github/workflows/fleet-gate-refresh.yml':
-    'owner-tracked (Gem lanes): keeps the fleet receipt inside its wall-clock stale window until the lanes tick writes it; see ADMISSION_CRON_DEBT',
-  '.github/workflows/gem-producer-drift.yml':
-    'external: Gem host attestation drift (JOV-7223) emits no repository event; the symphony-control install owner runs host installs manually',
   '.github/workflows/golden-path-nightly.yml':
     'external: real auth plus Stripe test mode drift without a repository event, and acquisition eligibility needs Golden Path proof under 48 h old',
   '.github/workflows/m2-revenue-path-canary.yml':
@@ -166,8 +160,11 @@ export const CRON_KEEP_REASONS = Object.freeze({
 
 /** @type {readonly string[]} */
 export const CRON_ALLOWLIST = Object.freeze(Object.keys(CRON_KEEP_REASONS));
-// 27 = main's 26 after mac-runner-heartbeat removal, plus gem-producer-drift.
-export const CRON_ALLOWLIST_CEILING = 27;
+// 25 = 27 minus auto-merge-default (retired: merge-queue-green-enroll admits,
+// the lanes stuck-PR ladder reports) and gem-producer-drift (its producer and
+// symphony-control's own drift check were removed in symphony-control#15).
+// 24: fleet-gate-refresh, whose receipt the Gem lanes emitter now keeps fresh.
+export const CRON_ALLOWLIST_CEILING = 24;
 
 /**
  * Scheduled workflows that can change PR, merge-queue, issue, or label state.
@@ -176,38 +173,21 @@ export const CRON_ALLOWLIST_CEILING = 27;
  */
 /** @type {Readonly<Record<string, {reason: string, replacement: string}>>} */
 export const ADMISSION_CRON_DEBT = Object.freeze({
-  '.github/workflows/auto-merge-default.yml': Object.freeze({
-    reason:
-      'hourly triage: auto-merge enable for fork PRs (workflow_run lists no fork pull_requests) and stuck-PR reporting; same-repo enable is event-driven (synchronize + Source Validation workflow_run)',
-    replacement:
-      'fork enable via a pull_request_target enable path; stuck-PR reporting moves to the Gem lanes tick',
-  }),
   '.github/workflows/desktop-release.yml': Object.freeze({
     reason:
       'daily staging desktop build in the same workflow that opens and labels the release stamp PR',
     replacement:
       'staging builds from the existing Production Controller workflow_run trigger; drop the daily clock',
   }),
-  '.github/workflows/fleet-gate-refresh.yml': Object.freeze({
-    reason:
-      '*/5 rewrite keeps the Gem fleet-gate receipt (issue admission) inside its stale window',
-    replacement:
-      'Gem lanes tick emits the receipt natively (its removal-trigger); push and repository_dispatch stay',
-  }),
 });
-export const ADMISSION_CRON_DEBT_CEILING = 3;
+export const ADMISSION_CRON_DEBT_CEILING = 1;
 
 /**
  * Workflow steps that hold a runner polling GitHub, git, or queue state. Keyed
  * `<workflow path>#<job id>`. No entry may be added; the ceiling only goes down.
  */
 /** @type {Readonly<Record<string, string>>} */
-export const POLLING_DEBT = Object.freeze({
-  '.github/workflows/auto-merge-default.yml#self-test':
-    'manual self-test rereads autoMergeRequest 12 times for 60 s',
-  '.github/workflows/golden-path-nightly.yml#golden-path':
-    'dispatches ci.yml then waits up to 80 min for that run to complete',
-});
+export const POLLING_DEBT = Object.freeze({});
 export const POLLING_DEBT_CEILING = 2;
 
 /**

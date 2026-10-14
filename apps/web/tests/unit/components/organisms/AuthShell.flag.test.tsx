@@ -90,8 +90,19 @@ vi.mock('@/contexts/RightPanelContext', () => ({
 }));
 
 vi.mock('@/features/dashboard/organisms/DashboardHeader', () => ({
-  DashboardHeader: ({ sidebarTrigger }: { sidebarTrigger?: ReactNode }) => (
-    <header>{sidebarTrigger}Dashboard Header</header>
+  DashboardHeader: ({
+    sidebarTrigger,
+    railToggle,
+    mobileProfileSlot,
+  }: {
+    sidebarTrigger?: ReactNode;
+    railToggle?: ReactNode;
+    mobileProfileSlot?: ReactNode;
+  }) => (
+    <header>
+      {sidebarTrigger}Dashboard Header{railToggle}
+      {mobileProfileSlot}
+    </header>
   ),
 }));
 
@@ -236,6 +247,33 @@ describe('AuthShell canonical wiring', () => {
     expect(screen.getByTestId('app-shell-frame')).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Toggle Sidebar' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows exactly one mobile profile-panel control in the header', () => {
+    const { unmount } = renderAuthShell();
+    expect(
+      screen.getAllByRole('button', { name: 'Mobile Profile' })
+    ).toHaveLength(1);
+    unmount();
+
+    render(
+      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
+        <AuthShell
+          section='dashboard'
+          breadcrumbs={[]}
+          railToggle={<button type='button'>Show Profile</button>}
+        >
+          <div>Shell Content</div>
+        </AuthShell>
+      </AppFlagProvider>
+    );
+    // The rail toggle already opens the same panel; no second button.
+    expect(
+      screen.getByRole('button', { name: 'Show Profile' })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Mobile Profile' })
     ).not.toBeInTheDocument();
   });
 

@@ -67,7 +67,7 @@ export function HomepageV2Pricing() {
         <div className='homepage-pricing-shell system-b-mounted-home-pricing-shell'>
           <HomepageStoryHeader
             align='center'
-            body={`Jovie profiles are free forever. Artist Visibility Pro is ${proClaim.priceLabel}/month with limited access.`}
+            body={`Jovie profiles are free forever. Artist Presence is ${proClaim.priceLabel}/month with limited access.`}
             headline={HOMEPAGE_V2_COPY.pricing.headline}
             className='homepage-pricing-copy system-b-mounted-home-pricing-copy'
           />

@@ -12,6 +12,12 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { load as parseYaml, dump as stringifyYaml } from 'js-yaml';
 import { afterAll, describe, expect, it } from 'vitest';
+import {
+  cronGapMinutes,
+  filterList,
+  triggerNames,
+  workflowTriggers,
+} from '../../../../../scripts/lib/workflow-triggers.mjs';
 
 type CheckoutStep = {
   uses?: string;
@@ -583,20 +589,20 @@ describe('deploy workflow Vercel env resolution', () => {
   it('gives every main SHA CI evidence and a production-controller opportunity', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const controller = readFileSync(productionControllerWorkflowPath, 'utf8');
-    const ciTrigger = workflow.slice(0, workflow.indexOf('\npermissions:'));
-    const controllerTrigger = controller.slice(
-      0,
-      controller.indexOf('\npermissions:')
-    );
-
-    expect(ciTrigger).toContain('push:');
-    expect(ciTrigger).toContain('branches: [main]');
-    expect(ciTrigger).not.toContain('paths-ignore:');
-    expect(controllerTrigger).toContain('workflow_run:');
-    expect(controllerTrigger).toContain('workflows: [Staging Controller]');
-    expect(controllerTrigger).toContain('types: [completed]');
-    expect(controllerTrigger).toContain('branches: [main]');
-    expect(controllerTrigger).not.toContain('paths-ignore:');
+    // Every main push runs CI (no path filter) and every completed main
+    // Staging Controller run reaches the production controller.
+    const ciPush = workflowTriggers(workflow).push;
+    expect(filterList(ciPush.branches)).toEqual(['main']);
+    expect(ciPush).not.toHaveProperty('paths');
+    expect(ciPush).not.toHaveProperty('paths-ignore');
+    const controllerOn = workflowTriggers(controller);
+    expect(triggerNames(controllerOn)).toEqual(['workflow_run']);
+    expect(filterList(controllerOn.workflow_run.workflows)).toEqual([
+      'Staging Controller',
+    ]);
+    expect(filterList(controllerOn.workflow_run.types)).toEqual(['completed']);
+    expect(filterList(controllerOn.workflow_run.branches)).toEqual(['main']);
+    expect(controllerOn.workflow_run).not.toHaveProperty('paths-ignore');
     expect(workflow).not.toContain('  production-release:');
     expect(workflow).not.toContain('  production-verified:');
   });
@@ -4698,7 +4704,7 @@ describe('production promotion exact-artifact contract', () => {
   it('keeps the cost observer strict and bounded without GitHub Issue intake', () => {
     const cost = readFileSync(costAnomalyWorkflowPath, 'utf8');
 
-    expect(cost).toContain("cron: '*/15 * * * *'");
+    expect(cronGapMinutes(workflowTriggers(cost)).max).toBeLessThanOrEqual(15);
     expect(cost).toContain('name: Production – jovie');
     expect(cost).toContain('curl --fail --silent --show-error');
     expect(cost).toContain('name: Prepare Linear-only anomaly receipt');
@@ -4734,7 +4740,9 @@ describe('production promotion exact-artifact contract', () => {
     expect(health).not.toContain(
       'workflows: [Production Controller, Production Marker Recovery]'
     );
-    expect(health).toContain("cron: '17 4 * * *'");
+    expect(cronGapMinutes(workflowTriggers(health)).max).toBeLessThanOrEqual(
+      1440
+    );
     expect(health).toContain('polling-exception:');
     expect(health).toContain('safety net only');
     expect(controller).toContain(
@@ -5203,10 +5211,9 @@ describe('production marker recovery workflow (JOV-4965)', () => {
   it('is event-driven with a bounded manual fallback and never mutates release state', () => {
     const workflow = readFileSync(productionMarkerRecoveryWorkflowPath, 'utf8');
 
-    expect(workflow).toContain('workflow_dispatch:');
-    expect(workflow).not.toContain('workflow_run:');
-    expect(workflow).not.toContain('push:');
-    expect(workflow).not.toContain('schedule:');
+    expect(triggerNames(workflowTriggers(workflow))).toEqual([
+      'workflow_dispatch',
+    ]);
     expect(workflow).toContain('group: production-mutation');
     expect(workflow).toContain('queue: max');
     expect(workflow).toContain('cancel-in-progress: false');

@@ -1,5 +1,8 @@
+import { render, screen } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  CoreProviders,
   getCoreProviderVariant,
   isThemeEnabledRoute,
 } from '@/components/providers/CoreProviders';
@@ -57,4 +60,54 @@ describe('isThemeEnabledRoute', () => {
     expect(isThemeEnabledRoute('/brand')).toBe(false);
     expect(isThemeEnabledRoute('/pitch')).toBe(false);
   });
+});
+
+vi.mock('next/navigation', () => ({ usePathname: () => '/pricing' }));
+vi.mock('next-themes', () => ({
+  ThemeProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
+}));
+vi.mock('./LazyProviders', () => ({
+  LazyProviders: ({ children }: { children: ReactNode }) => <>{children}</>,
+}));
+vi.mock('./NuqsProvider', () => ({
+  NuqsProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
+}));
+vi.mock('./QueryProvider', () => ({
+  QueryProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
+}));
+vi.mock('@/lib/hooks/useChunkErrorHandler', () => ({
+  useChunkErrorHandler: vi.fn(),
+}));
+vi.mock('@jovie/ui', () => ({
+  TooltipProvider: ({
+    children,
+    delayDuration,
+    skipDelayDuration,
+  }: {
+    children: ReactNode;
+    delayDuration?: number;
+    skipDelayDuration?: number;
+  }) => (
+    <div
+      data-testid='core-tooltip-scope'
+      data-delay={delayDuration}
+      data-skip={skipDelayDuration}
+    >
+      {children}
+    </div>
+  ),
+}));
+it('keeps the public provider graph on the shared tooltip timing scope', () => {
+  render(
+    <CoreProviders>
+      <button type='button'>Public action</button>
+    </CoreProviders>
+  );
+  expect(screen.getByRole('button', { name: 'Public action' })).toBeVisible();
+  expect(screen.getByTestId('core-tooltip-scope')).not.toHaveAttribute(
+    'data-delay'
+  );
+  expect(screen.getByTestId('core-tooltip-scope')).not.toHaveAttribute(
+    'data-skip'
+  );
 });

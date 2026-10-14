@@ -14,6 +14,7 @@ import { dirname, join, resolve } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { crc32 } from 'node:zlib';
+import { readProductReferenceOwner } from './product-reference-coherence.mjs';
 import { readInvariantRegistry } from './registry.mjs';
 import {
   classifyScreenPath,
@@ -144,6 +145,79 @@ function findings(patch, screen = gated()[0]) {
 }
 
 describe('JOV-INV-018 screen-certification/v2', () => {
+  it('rejects stale product names, versions, destinations, locales, and disabled-feature screenshot claims', () => {
+    const screen = SCREEN_REGISTRY.find(entry => entry.id === 'web.presence');
+    const current = readProductReferenceOwner().getProductProjection({
+      PROFILES_WORKSPACE: true,
+    });
+    const proof = { ...validExternalProof(screen), productReferences: current };
+    const errors = candidate =>
+      evaluateScreenProof(candidate, { screen, headSha: HEAD }).filter(
+        error => !error.includes('trusted external browser producer')
+      );
+    assert.deepEqual(errors(proof), []);
+    assert.ok(
+      errors(validExternalProof(screen)).some(error =>
+        error.includes('product reference snapshot')
+      )
+    );
+    for (const mutate of [
+      snapshot => {
+        snapshot.version = 0;
+      },
+      snapshot => {
+        snapshot.locale = 'fr';
+      },
+      snapshot => {
+        snapshot.features[0].label = 'Presence';
+      },
+      snapshot => {
+        snapshot.features[0].destination = '/app/profiles';
+      },
+      snapshot => {
+        snapshot.flags.PROFILES_WORKSPACE = false;
+      },
+      snapshot => {
+        delete snapshot.flags.PROFILES_WORKSPACE;
+      },
+      snapshot => {
+        snapshot.features = [];
+      },
+    ]) {
+      const productReferences = structuredClone(current);
+      mutate(productReferences);
+      assert.ok(errors({ ...proof, productReferences }).length > 0);
+    }
+    assert.ok(
+      evaluateScreenProof(proof, { screen, headSha: HEAD }).some(error =>
+        error.includes('trusted external browser producer')
+      ),
+      'coherent labels do not grant artifact trust'
+    );
+  });
+  it('registers integrations while requiring separate public and operator proofs', () => {
+    for (const [path, id] of [
+      [
+        'apps/web/app/(marketing)/integrations/page.tsx',
+        'web.marketing-integrations',
+      ],
+      [
+        'apps/web/app/app/(shell)/admin/integrations/page.tsx',
+        'web.ov-integrations',
+      ],
+    ]) {
+      const result = classifyScreenPath(path);
+      assert.equal(result.kind, 'registered');
+      assert.equal(result.entry.id, id);
+      assert.deepEqual(result.entry.viewports, ['desktop', 'mobile']);
+    }
+    assert.equal(
+      SCREEN_MARKETING_ROUTES['web.marketing-integrations'],
+      '/integrations'
+    );
+    assert.equal(SCREEN_MARKETING_ROUTES['web.ov-integrations'], undefined);
+    assert.equal(SCREEN_PROOF_ROUTES['web.ov-integrations'], undefined);
+  });
   it('keeps canonical profile settings and retained aliases under screen ownership', () => {
     for (const path of [
       'apps/web/app/app/(shell)/settings/profile/page.tsx',
@@ -192,6 +266,34 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       assert.equal(entry?.id, 'web.admin-chat-playground');
       assert.deepEqual(entry?.viewports, ['desktop', 'mobile']);
     }
+  });
+  it('registers the guarded Ovie Inbox without substituting source ownership for browser proof', () => {
+    const source = 'apps/web/app/app/(shell)/admin/inbox/page.tsx';
+    const classified = classifyScreenPath(source);
+    assert.equal(classified.kind, 'registered');
+    assert.equal(classified.entry?.id, 'web.ov-inbox');
+    assert.equal(classified.entry?.owner, 'ovie-ops-shell');
+    assert.deepEqual(classified.entry?.viewports, ['desktop', 'mobile']);
+    assert.equal(SCREEN_MARKETING_ROUTES['web.ov-inbox'], undefined);
+    assert.equal(SCREEN_PROOF_ROUTES['web.ov-inbox'], undefined);
+    const registration = runScreenCertification({
+      headSha: HEAD,
+      changedFiles: [source],
+      registrationOnly: true,
+    });
+    assert.equal(registration.ok, true, registration.receipt.issues.join('\n'));
+    assert.equal(registration.receipt.certified, false);
+    assert.equal(registration.receipt.status, 'source-registered');
+    assert.deepEqual(
+      registration.receipt.changedScreens.map(item => [item.id, item.verdict]),
+      [['web.ov-inbox', 'evidence-required']]
+    );
+    const certification = runScreenCertification({
+      headSha: HEAD,
+      changedFiles: [source],
+    });
+    assert.equal(certification.ok, false);
+    assert.equal(certification.receipt.certified, false);
   });
   it('registers the admin share studio for both viewports', () => {
     const entry = classifyScreenPath(

@@ -13,6 +13,7 @@
 
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { ADMISSION_BLOCKING_LABELS } from './admission-hold-labels.mjs';
 import { hasControlledProofMarker } from './auto-ready-provenance.mjs';
 import { classifyQueueCheckBlockers } from './pr-check-failures.mjs';
 import { WRITER_PROMOTION_HOLD_LABELS } from './writer-owned-pr-promotion.mjs';
@@ -27,8 +28,14 @@ export const TIM_HOLD_LABELS = Object.freeze([
   'hold:tim',
 ]);
 
+// Every canonical admission stop label (hold, queue-deferred, ...) also keeps
+// a draft parked: undrafting a held PR only wakes work green enroll must skip.
 export const GREEN_SOURCE_HOLD_LABELS = Object.freeze([
-  ...new Set([...WRITER_PROMOTION_HOLD_LABELS, ...TIM_HOLD_LABELS]),
+  ...new Set([
+    ...WRITER_PROMOTION_HOLD_LABELS,
+    ...TIM_HOLD_LABELS,
+    ...ADMISSION_BLOCKING_LABELS,
+  ]),
 ]);
 
 // UNSTABLE means only non-required checks are red or pending. The fail-closed
@@ -101,6 +108,12 @@ export function classifyGreenSourceDraft(input = {}) {
   const draft = input.draft === true || input.isDraft === true;
   if (!draft) {
     return { eligible: false, reason: 'not-draft' };
+  }
+  // Someone converted this PR to draft after its last push: a deliberate park
+  // (e.g. a dequeued PR held out of the queue). Only a new push or a person
+  // marking it ready ends the park; this controller never overrides it.
+  if (input.parkedDraft === true) {
+    return { eligible: false, reason: 'parked-draft' };
   }
 
   const base = String(input.baseRefName ?? input.base ?? '');

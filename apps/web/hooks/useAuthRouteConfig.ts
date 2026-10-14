@@ -98,6 +98,13 @@ export function useAuthRouteConfig(
       searchParams.get('view') === 'releases'
     ) {
       lastPart = 'releases';
+    } else if (
+      pathname === APP_ROUTES.CONTACTS ||
+      pathname === APP_ROUTES.INSIGHTS
+    ) {
+      // Contacts / Audience / Insights are tabs of the one Audience root
+      // (sidebar name); the segmented control names the tab.
+      lastPart = 'audience';
     } else if (isChatThreadPath(parts)) {
       lastPart = 'chat';
     } else if (UUID_REGEX.test(lastPart) && parts.length >= 2) {

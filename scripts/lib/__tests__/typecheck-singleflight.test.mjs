@@ -125,7 +125,11 @@ function writeLock(stateDir, lock) {
   writeFileSync(resolve(stateDir, 'lock.json'), JSON.stringify(lock, null, 2));
 }
 
-function holdLiveProcess(ms = 5_000) {
+// Live-owner fixtures stay alive until the test kills them (afterEach reaps
+// leftovers). A 3s lifetime let the owner die while a loaded runner was still
+// booting the waiter, so the waiter correctly reclaimed a dead owner and the
+// live-owner assertions failed (merge group 38346527635, 2026-10-13).
+function holdLiveProcess(ms = 600_000) {
   const child = spawn(process.execPath, ['-e', `setTimeout(() => {}, ${ms})`], {
     stdio: 'ignore',
   });
@@ -433,7 +437,7 @@ describe('typecheck singleflight process integration', () => {
     const marker = resolve(stateDir, 'owners.txt');
     const active = resolve(stateDir, 'active.txt');
     writeFileSync(active, '0');
-    const holder = holdLiveProcess(3_000);
+    const holder = holdLiveProcess();
     writeLock(stateDir, {
       pid: holder.pid,
       startedAtMs: Date.now() - 60_000,
@@ -511,15 +515,22 @@ describe('typecheck singleflight process integration', () => {
     const stateDir = makeStateDir();
     const marker = resolve(stateDir, 'owners.txt');
 
+    // The second wrapper's cold start (node boot, git rev-parse) can outlast
+    // the suite's 5s window on a loaded runner, and an expired result is
+    // rightly re-run (merge group 38354601053). This test proves reuse inside
+    // the window, so make the window outlast any boot.
+    const env = { TYPECHECK_SINGLEFLIGHT_REUSE_WINDOW_MS: '600000' };
     const first = await runWrapper(stateDir, marker, {
       durationMs: 50,
       capture: true,
+      env,
     });
     expect(first.code).toBe(0);
 
     const second = await runWrapper(stateDir, marker, {
       durationMs: 50,
       capture: true,
+      env,
     });
     expect(second.code).toBe(0);
     expect(second.stderr).toContain('reused completed');
@@ -592,7 +603,7 @@ describe('typecheck singleflight process integration', () => {
     const marker = resolve(stateDir, 'owners.txt');
     const active = resolve(stateDir, 'active.txt');
     writeFileSync(active, '0');
-    const holder = holdLiveProcess(3_000);
+    const holder = holdLiveProcess();
     writeLock(stateDir, {
       pid: holder.pid,
       startedAtMs: Date.now() - 60_000,

@@ -92,7 +92,7 @@ describe('TimeRangeSelector (tabs variant)', () => {
     expect(disabledTab).toHaveAttribute('data-disabled', '');
     expect(disabledTab).toHaveAttribute(
       'title',
-      'Upgrade to Pro for extended analytics'
+      'Upgrade to Artist Presence for extended analytics'
     );
   });
 

@@ -119,11 +119,22 @@ final class JovieUITests: XCTestCase {
       app.buttons["Close Public Profile"].waitForExistence(timeout: 3),
       "Embedded public-profile browser did not open.\n\(app.debugDescription)"
     )
-    XCTAssertTrue(app.buttons["Back"].exists)
+    let actionsMenu = app.buttons["public-profile-browser-actions"]
+    XCTAssertTrue(
+      actionsMenu.exists,
+      "Public Profile browser must expose exactly one trailing Actions menu.\n\(app.debugDescription)"
+    )
+    actionsMenu.tap()
+    XCTAssertTrue(app.buttons["Back"].waitForExistence(timeout: 3))
     XCTAssertTrue(app.buttons["Forward"].exists)
     XCTAssertTrue(app.buttons["Reload"].exists)
+    app.buttons["Reload"].tap()
+    // Hermetic (JOV-7763): under -ui-testing-ready the browser loads a local
+    // HTML string (no network); assert the deterministic SwiftUI ready marker
+    // the harness exposes, never the WKWebView's accessibility tree (which
+    // timed out on device — TestFlight run 38396385722).
     XCTAssertTrue(
-      app.staticTexts["Public Profile"].waitForExistence(timeout: 3),
+      app.staticTexts["public-profile-content-ready"].waitForExistence(timeout: 3),
       "Embedded public-profile content did not finish loading.\n\(app.debugDescription)"
     )
     attachScreenshot(named: "public-profile-browser", app: app)
@@ -149,7 +160,7 @@ final class JovieUITests: XCTestCase {
     )
     app.buttons["Retry"].tap()
     XCTAssertTrue(
-      app.staticTexts["Public Profile"].waitForExistence(timeout: 5),
+      app.staticTexts["public-profile-content-ready"].waitForExistence(timeout: 5),
       "Retry did not recover the embedded browser.\n\(app.debugDescription)"
     )
   }

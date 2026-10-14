@@ -34,7 +34,8 @@ PREFIX = "lane-fix-"
 FIX_KINDS = ("red", "conflict", "dequeued", "review", "stale")
 TICK_KINDS = ("green", "orphan")
 RED_CONCLUSIONS = frozenset({"failure", "timed_out", "startup_failure"})
-HOLD_LABELS = frozenset({"hold", "gated", "incident", "do-not-merge", "tim-hold", "tim:hold", "hold:tim"})
+HOLD_LABELS = frozenset({"hold", "gated", "incident", "do-not-merge", "tim-hold", "tim:hold", "hold:tim",
+                         "queue-deferred"})
 LANE_BRANCH = re.compile(r"^(?P<lane>[a-z0-9-]+)/(?P<issue>jov-\d+)-\d{8}")
 # Agent/automation-owned prefixes that are not lane branches (a codex run, a manual agent
 # session). Their drafts are still lane-owned work: the reconcile sweep owes them a
@@ -97,8 +98,38 @@ RUN_FAILURES = (
 )
 
 
+READ_TOKEN_ENV = "GH_READ_TOKEN"
+READ_VERBS = {("pr", "view"), ("pr", "list"), ("issue", "list"), ("run", "list"), ("run", "view")}
+
+
+def gh_read_only(args: list[str]) -> bool:
+    """A gh call that only reads: no write verb, no non-GET method, no GraphQL mutation."""
+    if len(args) < 3 or args[0] != "gh":
+        return False
+    if (args[1], args[2]) in READ_VERBS:
+        return True
+    if args[1] != "api":
+        return False
+    for flag, value in zip(args, args[1:]):
+        if flag in ("-X", "--method") and value.upper() != "GET":
+            return False
+    if args[2] == "graphql":
+        return not any("mutation" in arg for arg in args)
+    # A field (-f/-F) without an explicit GET turns gh api into a POST.
+    explicit_get = any(f in ("-X", "--method") for f in args)
+    return explicit_get or not any(f in ("-f", "-F", "--field", "--raw-field", "--input") for f in args)
+
+
 def run(args: list[str], timeout: int = 120):
-    return lifecycle.run(args, capture_output=True, text=True, timeout=timeout)
+    """Reads go on the Jovie Bot read token when the relay minted one: the repo's shared
+    GITHUB_TOKEN bucket (1,000 REST/h) ran dry three times on 2026-10-13 with the relay its
+    top caller. Writes (labels, comments, reruns) stay on GITHUB_TOKEN, whose events start
+    no workflows, so a relay label never fans out into label-triggered runs."""
+    env = None
+    read_token = os.environ.get(READ_TOKEN_ENV)
+    if read_token and gh_read_only(args):
+        env = {**os.environ, "GH_TOKEN": read_token}
+    return lifecycle.run(args, capture_output=True, text=True, timeout=timeout, env=env)
 
 
 # ---------------------------------------------------------------- reason codes
@@ -370,8 +401,10 @@ def add_label(number: int, kind: str, sh=run) -> bool:
 # The dispatch tick re-read the same stuck PRs' claim comments every pass (~84 reads an hour on
 # Gem, 2026-10-12 gh ledger) though they rarely change. `since` is floored to this bucket, so the
 # URL stays stable long enough for a conditional request: a 304 costs no rate limit. A floored
-# `since` only widens the read; the age check below still bounds what counts as live.
-CLAIM_SINCE_BUCKET_S = 600
+# `since` only widens the read; the age check below still bounds what counts as live. An hour,
+# not 10 min: with the 5-minute tick a 10-min bucket moved the URL every other pass, so half the
+# reads were fresh 200s (2026-10-13 ledger: 44 full reads/h vs 5 conditional).
+CLAIM_SINCE_BUCKET_S = 3600
 
 
 def etag_cache_dir() -> Path | None:
@@ -1218,6 +1251,29 @@ def read_state(host, name: str) -> dict:
         return {}
 
 
+# 2026-10-13 07:52Z storm: groups failed on the repo's exhausted GITHUB_TOKEN, the relay
+# labelled each ejected PR `dequeued`, and this tick merged main into it within minutes: a
+# new head, re-enqueued into the same dry bucket, ejected again (#20970 eight groups in an
+# hour). An ejection GitHub's quota caused waits this long before main is merged in.
+QUOTA_EJECTION_BACKOFF_S = 30 * 60
+
+
+def quota_ejection_hold(host, lane, pr: dict, now: float) -> bool:
+    """True while this exact head's last merge-group failure was GitHub quota or 5xx and the
+    backoff has not elapsed. Unreadable evidence never holds."""
+    key, head = str(pr["number"]), pr.get("headRefOid")
+    row = read_state(host, "quota-ejections.json").get(key)
+    if isinstance(row, dict) and row.get("head") == head:
+        return now - float(row.get("at") or 0) < QUOTA_EJECTION_BACKOFF_S
+    excerpt = queue_failure(lane, pr["number"])
+    kind = classify_github_failure(excerpt) if excerpt else None
+    if kind in (None, "none"):
+        return False
+    lane.update_json(host.state / "quota-ejections.json",
+                     lambda rows: rows.update({key: {"head": head, "at": now, "kind": kind}}))
+    return True
+
+
 def queue_failure(lane, number: int, limit: int = 4000) -> str:
     """The merge group's own failing lines: a dequeued head is often green on its own, so the
     PR's checks say nothing about why the queue rejected it."""
@@ -1948,9 +2004,12 @@ def tick(host, lane, linear_factory, now: float | None = None) -> dict:
         if "dequeued" in pr["eventKinds"] and str(pr["number"]) not in synced and pr.get("mergeStateStatus") != "DIRTY" \
                 and POISON_LABEL not in label_names(pr) \
                 and in_scope(pr, "red", set()):
-            outcomes[pr["number"]] = sync_main(host, lane, pr, now)
-            if outcomes[pr["number"]] == "synced":
-                consume(lane, pr, ["dequeued"])
+            if quota_ejection_hold(host, lane, pr, now):
+                outcomes[pr["number"]] = "held:github-quota"
+            else:
+                outcomes[pr["number"]] = sync_main(host, lane, pr, now)
+                if outcomes[pr["number"]] == "synced":
+                    consume(lane, pr, ["dequeued"])
         if "green" in pr["eventKinds"]:
             outcome = ready_green(host, lane, pr, held, now)
             outcomes[pr["number"]] = outcome

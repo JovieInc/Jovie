@@ -119,7 +119,9 @@ function AuthShellInner({
               action={headerAction}
               commandPaletteHeader={commandPaletteHeader}
               mobileProfileSlot={
-                section === 'ov' || section === 'admin' ? null : (
+                // The rail toggle opens the same profile panel; render the
+                // mobile fallback only when no rail toggle exists.
+                section === 'ov' || section === 'admin' || railToggle ? null : (
                   <MobileProfileDrawer onOpen={previewPanelState.toggle} />
                 )
               }

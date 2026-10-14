@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { Copy, ExternalLink } from 'lucide-react';
+import { Check, Copy, ExternalLink } from 'lucide-react';
 import { DrawerHeaderActions } from './DrawerHeaderActions';
 
 const meta: Meta<typeof DrawerHeaderActions> = {
@@ -35,5 +35,28 @@ export const SearchableOverflow: Story = {
         onClick: () => undefined,
       },
     ],
+  },
+};
+
+/** Canonical ghost/sm IconButtons: link action, copied state and overflow. */
+export const CopiedStateWithLink: Story = {
+  args: {
+    primaryActions: [
+      {
+        id: 'open',
+        label: 'Open entity',
+        icon: ExternalLink,
+        href: '/app/library',
+      },
+      {
+        id: 'copy',
+        label: 'Copy link',
+        icon: Copy,
+        activeIcon: Check,
+        isActive: true,
+        onClick: () => undefined,
+      },
+    ],
+    onClose: () => undefined,
   },
 };

@@ -21,6 +21,10 @@ describe('getBreadcrumbLabel', () => {
     expect(getBreadcrumbLabel('app')).toBe('Home');
   });
 
+  it('returns the explicit title for the visibility audit', () => {
+    expect(getBreadcrumbLabel('visibility-audit')).toBe('Visibility Audit');
+  });
+
   it('converts unknown kebab-case to sentence case', () => {
     expect(getBreadcrumbLabel('some-route')).toBe('Some route');
   });

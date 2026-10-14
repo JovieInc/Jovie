@@ -63,6 +63,9 @@ describe('ChatUsageAlert', () => {
       screen.getByText("You're almost out of messages")
     ).toBeInTheDocument();
     expect(screen.getByText(/14 of 15 weekly messages/)).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Upgrade to Artist Presence' })
+    ).toBeInTheDocument();
   });
 
   it('keeps rendering silent while the usage query is loading', () => {

@@ -14,9 +14,21 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildMeshRuntime } from '../../lanes/mesh-runtime-bundle.mjs';
+import {
+  buildMeshRuntime,
+  importerVersion,
+} from '../../lanes/mesh-runtime-bundle.mjs';
 
 const repo = resolve(import.meta.dirname, '../../..');
+const repoLock = readFileSync(join(repo, 'pnpm-lock.yaml'), 'utf8');
+// Pins come from the reviewed lockfile, so a Dependabot bump needs no edit here.
+const compilerPin = importerVersion(repoLock, 'apps/desktop', 'esbuild');
+const zodPin = importerVersion(
+  repoLock,
+  'packages/agent-transport-contracts',
+  'zod'
+);
+const esc = value => value.replaceAll('.', '\\.');
 const ports = [
   'scripts/lanes/mesh-host-ack.mjs',
   'scripts/lanes/mesh-native-terminal.mjs',
@@ -137,7 +149,10 @@ describe('immutable managed mesh dependency closure', () => {
   });
   it('refuses a different dependency generation', () => {
     const lock = readFileSync(join(repo, 'pnpm-lock.yaml'), 'utf8').replace(
-      /(  esbuild@0\.28\.2:\n    resolution:.*)sha512-/u,
+      new RegExp(
+        `(  esbuild@${esc(compilerPin)}:\\n    resolution:.*)sha512-`,
+        'u'
+      ),
       '$1sha512-CHANGED'
     );
     writeFileSync(join(archive, 'pnpm-lock.yaml'), lock);
@@ -149,9 +164,9 @@ describe('immutable managed mesh dependency closure', () => {
     const lock = `${readFileSync(join(repo, 'pnpm-lock.yaml'), 'utf8')}\n# unrelated product change\n`;
     const proof = buildMeshRuntime(archive, dependencies(Buffer.from(lock)));
     expect(Object.keys(proof.dependencyPins)).toEqual([
-      'esbuild@0.28.2',
-      'zod@4.6.5',
-      `@esbuild/${process.platform}-${process.arch}@0.28.2`,
+      `esbuild@${compilerPin}`,
+      `zod@${zodPin}`,
+      `@esbuild/${process.platform}-${process.arch}@${compilerPin}`,
     ]);
     expect(proof.isolatedImportPassed).toBe(true);
   });
@@ -164,7 +179,7 @@ describe('immutable managed mesh dependency closure', () => {
   it('refuses changed active compiler binary integrity while wrapper and Zod pins agree', () => {
     const lock = readFileSync(join(repo, 'pnpm-lock.yaml'), 'utf8');
     const start = lock.indexOf(
-      `  '@esbuild/${process.platform}-${process.arch}@0.28.2':`
+      `  '@esbuild/${process.platform}-${process.arch}@${compilerPin}':`
     );
     expect(start).toBeGreaterThan(0);
     const changed =
@@ -185,9 +200,50 @@ describe('immutable managed mesh dependency closure', () => {
       vi.unstubAllEnvs();
     }
   });
+  it('reads importer pins from the lockfile, ignoring patch and peer suffixes', () => {
+    const lock = [
+      'importers:',
+      '  packages/x:',
+      '    dependencies:',
+      "      '@scope/y':",
+      '        specifier: ^1.0.0',
+      '        version: 1.2.3(patch_hash=abc)(react@19.3.0)',
+      '      zod:',
+      '        specifier: ^4.6.6',
+      '        version: 4.6.7',
+      '  packages/z:',
+      '    dependencies:',
+      '      zod:',
+      '        specifier: 3.0.0',
+      '        version: 3.0.0',
+      'packages:',
+    ].join('\n');
+    expect(importerVersion(lock, 'packages/x', '@scope/y')).toBe('1.2.3');
+    expect(importerVersion(lock, 'packages/x', 'zod')).toBe('4.6.7');
+    expect(importerVersion(lock, 'packages/z', 'zod')).toBe('3.0.0');
+    expect(() => importerVersion(lock, 'packages/x', 'esbuild')).toThrow(
+      'mesh-runtime-dependency-pin-mismatch'
+    );
+    expect(() => importerVersion(lock, 'packages/missing', 'zod')).toThrow(
+      'mesh-runtime-dependency-pin-mismatch'
+    );
+  });
+  it('refuses a lockfile importer pin the restored install does not match', () => {
+    const lock = repoLock.replace(
+      /(  packages\/agent-transport-contracts:[\s\S]*?      zod:\n        specifier: .*\n        version: )[^\n(]+/u,
+      '$10.0.1'
+    );
+    expect(
+      importerVersion(lock, 'packages/agent-transport-contracts', 'zod')
+    ).toBe('0.0.1');
+    writeFileSync(join(archive, 'pnpm-lock.yaml'), lock);
+    expect(() =>
+      buildMeshRuntime(archive, dependencies(Buffer.from(lock)))
+    ).toThrow('mesh-runtime-dependency-pin-mismatch');
+  });
   it('refuses unpinned versions even when both lockfiles agree', () => {
     const lock = readFileSync(join(repo, 'pnpm-lock.yaml'), 'utf8').replaceAll(
-      '  zod@4.6.5:',
+      `  zod@${zodPin}:`,
       '  zod@0.0.0:'
     );
     writeFileSync(join(archive, 'pnpm-lock.yaml'), lock);

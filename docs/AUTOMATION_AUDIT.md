@@ -83,9 +83,10 @@ Auto-Enroll** and **Auto-Ready Agent Drafts** first. Enable **Main CI Health
 Monitor** and **Main Autofix** only after the staged queue and production path
 have produced bounded proof. **GitHub AI Orchestrator**, **GitHub AI
 Dispatcher**, **Agent Tick**, **Agent Landing Sweep**, and **Stuck Draft
-Auto-Close** were deleted on 2026-10-12 under the Linear-only intake contract. Keep **Agent Pipeline**,
+Auto-Close** were deleted on 2026-10-12 under the Linear-only intake contract.
+**Taste Classifier**, **Taste Label Guard** and **Agent Pipeline** are deleted at source. Keep
 **PR Conflict Handler**, **Auto-Fix
-Lint on Agent Drafts**, **Taste Classifier**, **Taste Label Guard**, **Auto-PR on
+Lint on Agent Drafts**, **Auto-PR on
 Agent Push**, and the legacy **Release Loop** disabled throughout the drain. The new **Production
 Controller**, **Production Controller Health**, and **Production Release**
 workflows are intended to register active on land; verify that state explicitly
@@ -104,7 +105,6 @@ until the observer-only definition lands and is proven.
 | **Hermes CLI Worker** | `hermes-cli-worker.yml` | `repository_dispatch` (`hermes_cli_worker`) + `workflow_dispatch` | Runs a self-hosted CLI worker (codex-cli, claude-code, or ruflo) on Hermes tasks; supports kinds: investigation, bug_patch, code_review, qa, triage, support_draft | Recently shipped (PR #8092); triggered on-demand | **Keep — enable if self-hosted runner is ready** — requires `[self-hosted, hermes]` runner. Verify runner is operational before routing work here. |
 | **Merge Queue Auto-Enroll** | `merge-queue-autoenroll.yml` | PR/CI/main events + manual; no schedule | Revalidates the exact current head and enrolls eligible PRs into GitHub's native merge queue | First controller enabled during drain | **Keep enabled first** — canonical queue enrollment owner |
 | **Auto-Ready Agent Drafts** | `auto-ready-agent-drafts.yml` | writer-proof: manual dispatch only. green-source: `workflow_run` (Source Validation / Fork PR Gate / PR Size Guard success) + targeted dispatch; per-PR job concurrency; no schedule | Writer-proof recovery still pairs ready + native auto-merge from an exact-head `jovie-writer-pr-proof/v1` receipt. Green-source undrafts a main draft only when PR Ready + required checks are SUCCESS and mergeability is CLEAN (or UNSTABLE with an empty fail-closed blocker scan), then stops; Source Validation wakes also sweep a rotating 3-draft missed cohort — Auto-Enroll owns queue admission. Never mutates HOLD #17156 or Tim-hold / machine hold labels | First controller enabled during drain | **Keep enabled first** — restore the July green-source wake so drafts can enter the ready pool; writer-proof stays manual and never waits for green |
-| **Agent Pipeline** | `agent-pipeline.yml` | `workflow_run` (CI completes) | Unified: (1) fixes agent PRs after CI failures (up to 5 attempts/SHA), (2) auto-approves + enables auto-merge when all gates pass | Disabled throughout drain; trigger is declarative only | **Keep disabled during drain** — avoid a second repair/enrollment owner |
 | **Main Autofix** | retired (workflow removed) | none | Red-main repair is owned by the lanes fix loop on Gem (two attempts per head, then a Linear Triage issue); the workflow had not fired since 2026-07-08 | none | **Retired** — JOV-6637 |
 | **Runner Health Monitor** | `runner-health-monitor.yml` | Declared every 10 minutes + manual | Hosted read-only Runner Heartbeat observer; CI selects fixed or hosted unit capacity per run and never waits for repository-variable mutation | Verified `disabled_manually` (workflow ID `307794302`) after legacy HTTP 403 | **Re-enable only after observer-only proof** |
 | **Sentry Autofix** | `sentry-autofix.yml` | `repository_dispatch` (`sentry-issue`) | Receives Sentry error payload, calls Claude Code to fix root cause, opens auto-merge PR with dedup | Event-driven; fires when Sentry webhook delivers | **Keep** — directly compounds product stability KPI |
@@ -145,7 +145,6 @@ Founder priorities (current cycle): **product stability → design system transf
 | Linear-backed Symphony | Agentic ops lock, design system transfer | Canonical Linear issue → owned implementation → GitHub PR pipeline |
 | Lanes fix loop | Product stability | Detects and repairs red main without founder interrupt (the disabled `main-ci-health-monitor.yml` was deleted 2026-10-12) |
 | `sentry-autofix` | Product stability | Closes the production-error → fix loop automatically; each Sentry issue that gets auto-fixed is one fewer interrupt for the founder |
-| `agent-pipeline` (auto-approve + auto-merge) | All KPIs | Reduces PR review queue backlog; agent-generated code flows to production without founder bottleneck when quality gates pass |
 | `synthetic-monitoring` | Product stability | Catches production regressions between deploys; alerts without requiring the founder to manually health-check |
 | `nightly-tests` (Design V1 canary) | Design system transfer | Catches Design V1 flag regressions nightly; ensures the flagged surfaces don't silently break as the system rolls out |
 
@@ -178,7 +177,6 @@ There is no workflow that reports the weekly health of the agent pipeline itself
 | `generate-playlist` | Unknown (check `lib/playlists/pipeline.ts`) | `meta-llama/llama-3.1-8b-instruct:free` | Maybe | Playlist concept generation is creative; output quality is visible to admins. Test before switching. |
 | `linear-ai-orchestrator` (Claude Code action) | Claude Sonnet (Anthropic) | Not substitutable | No | Full code implementation requires strong reasoning. Claude Code OAuth token is a different billing vector (Anthropic usage, not OpenAI). Do not substitute. |
 | `sentry-autofix` (Claude Code action) | Claude Sonnet (Anthropic) | Not substitutable | No | Same as above. |
-| `agent-pipeline` fix job (Claude Code action) | Claude Sonnet (Anthropic) | Not substitutable | No | Same as above. |
 
 **Summary:** The remaining LLM-using cron routes are worth testing with free models on a staging branch before committing.
 

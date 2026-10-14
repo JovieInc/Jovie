@@ -149,6 +149,26 @@ export const MultipleSessions: Story = {
   ],
 };
 
+const MANY_SESSIONS = [
+  CURRENT_SESSION,
+  ...Array.from({ length: 13 }, (_, index) => ({
+    ...OTHER_SESSION,
+    id: `session-other-${index}`,
+    token: `token-other-${index}`,
+    updatedAt: `2026-09-${String(24 - index).padStart(2, '0')}T12:00:00.000Z`,
+  })),
+];
+
+export const ManySessionsCollapsed: Story = {
+  decorators: [
+    Story => (
+      <WithSessionsFetch mode='sessions' sessions={MANY_SESSIONS}>
+        <Story />
+      </WithSessionsFetch>
+    ),
+  ],
+};
+
 export const Loading: Story = {
   decorators: [
     Story => (

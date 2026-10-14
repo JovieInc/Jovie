@@ -90,7 +90,7 @@ describe('Artist Visibility billing startup contract', () => {
       expect(getActivePriceIds()).toEqual([]);
       expect(result.issues).toEqual([
         'Missing Stripe env vars: STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY',
-        'No Stripe price IDs configured — checkout will reject all requests. Set STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY to the Artist Visibility Pro $199/month USD recurring price ID.',
+        'No Stripe price IDs configured — checkout will reject all requests. Set STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY to the Artist Presence $199/month USD recurring price ID.',
       ]);
       expect(Sentry.captureMessage).toHaveBeenCalledTimes(
         deployment === 'development' ? 0 : 1
@@ -133,7 +133,7 @@ describe('Artist Visibility billing startup contract', () => {
       expect(result.healthy).toBe(false);
       expect(result.issues).toEqual([
         'Missing Stripe env vars: STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY',
-        'No Stripe price IDs configured — checkout will reject all requests. Set STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY to the Artist Visibility Pro $199/month USD recurring price ID.',
+        'No Stripe price IDs configured — checkout will reject all requests. Set STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY to the Artist Presence $199/month USD recurring price ID.',
       ]);
     }
 
@@ -162,7 +162,7 @@ describe('Artist Visibility billing startup contract', () => {
 
     expect(Sentry.captureMessage).toHaveBeenCalledTimes(2);
     expect(Sentry.captureMessage).toHaveBeenLastCalledWith(
-      'Stripe billing misconfigured at startup: Missing Stripe env vars: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY, STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY; No Stripe price IDs configured — checkout will reject all requests. Set STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY to the Artist Visibility Pro $199/month USD recurring price ID.',
+      'Stripe billing misconfigured at startup: Missing Stripe env vars: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY, STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY; No Stripe price IDs configured — checkout will reject all requests. Set STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY to the Artist Presence $199/month USD recurring price ID.',
       expect.objectContaining({ level: 'fatal' })
     );
   });

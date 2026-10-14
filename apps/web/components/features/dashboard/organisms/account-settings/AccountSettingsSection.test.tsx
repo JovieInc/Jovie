@@ -83,7 +83,8 @@ describe('AccountSettingsSection', () => {
     expect(screen.getByTestId('notifications-section')).toBeTruthy();
     expect(screen.queryByText(/connected accounts/i)).toBeNull();
     expect(screen.getByText('Active Sessions')).toBeTruthy();
-    expect(screen.getByTestId('session-management-card')).toBeTruthy();
+    // One sessions card; it owns its fixed loading geometry (no CLS).
+    expect(screen.getAllByTestId('session-management-card')).toHaveLength(1);
   });
 
   it('shows a loading skeleton while the session is pending', () => {

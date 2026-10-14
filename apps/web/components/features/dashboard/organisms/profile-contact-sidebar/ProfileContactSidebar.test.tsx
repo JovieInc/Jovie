@@ -69,13 +69,15 @@ const mockState = vi.hoisted(() => ({
   useRealProfileMutation: false,
   selectedProfileId: 'profile-1',
   previewReady: true,
+  routerPush: vi.fn(),
+  destination: '/app/profiles',
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/app/dashboard/profile',
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+  useRouter: () => ({ push: mockState.routerPush, replace: vi.fn() }),
   useSearchParams: () => ({ get: () => null, toString: () => '' }),
 }));
 
@@ -189,10 +191,24 @@ vi.mock('@/components/organisms/profile-sidebar/ProfileSidebarHeader', () => ({
 }));
 
 vi.mock('./ProfileContactSidebarSections', () => ({
-  ProfileBentoView: ({ onEditProfile }: { onEditProfile: () => void }) => (
-    <button type='button' onClick={onEditProfile}>
-      Edit profile
-    </button>
+  ProfileBentoView: ({
+    onEditProfile,
+    onManageConnections,
+  }: {
+    onEditProfile: () => void;
+    onManageConnections: (destination: string) => void;
+  }) => (
+    <div>
+      <button type='button' onClick={onEditProfile}>
+        Edit profile
+      </button>
+      <button
+        type='button'
+        onClick={() => onManageConnections(mockState.destination)}
+      >
+        Manage identity
+      </button>
+    </div>
   ),
   ProfileSidebarHeaderCard: () => <header>Profile header</header>,
 }));
@@ -414,6 +430,23 @@ async function rejectRemoveCall(index: number) {
 }
 
 describe('ProfileContactSidebar optimistic mutation sequencing', () => {
+  it.each(['/app/profiles', '/app/settings/profile?tab=music'])(
+    'preserves the header destination %s',
+    destination => {
+      mockState.destination = destination;
+      mockState.routerPush.mockClear();
+      const client = new QueryClient({
+        defaultOptions: { queries: { retry: false } },
+      });
+      render(
+        <QueryClientProvider client={client}>
+          <ProfileContactSidebar />
+        </QueryClientProvider>
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Manage identity' }));
+      expect(mockState.routerPush).toHaveBeenCalledWith(destination);
+    }
+  );
   beforeEach(() => {
     mockState.profileCalls.length = 0;
     mockState.removeCalls.length = 0;

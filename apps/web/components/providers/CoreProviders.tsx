@@ -186,7 +186,7 @@ function CoreProvidersInner({
       storageKey='jovie-theme'
     >
       <SearchKeyboardShortcut />
-      <TooltipProvider delayDuration={1200}>
+      <TooltipProvider>
         <LazyProviders enableAnalytics={enableAnalytics}>
           {children}
         </LazyProviders>

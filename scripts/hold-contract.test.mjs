@@ -281,3 +281,39 @@ test('every stop label is held to the contract, each on its own labeled time', (
   assert.match(writes[0][2], /removed `gated`/);
   assert.equal(writes.length, 2);
 });
+
+test('an exact-head queue-deferral receipt keeps queue-deferred until the head moves', () => {
+  const head = 'c'.repeat(40);
+  const body = [
+    '<!-- bot-comment:queue-deferral -->',
+    '```json',
+    JSON.stringify({
+      schema: 'jovie-queue-deferral/v1',
+      repository: 'JovieInc/Jovie',
+      pr: 7,
+      head,
+      reason: 'queue-pressure',
+      source: 'agent-pipeline',
+      deferredAt: '2026-10-13T00:00:00Z',
+    }),
+    '```',
+  ].join('\n');
+  assert.deepEqual(parseHoldReceipt(body), {
+    owner: 'agent-pipeline',
+    until: null,
+    head,
+    reason: 'queue-pressure',
+  });
+  const labeledAt = '2026-10-13T00:00:00Z';
+  const now = Date.parse(labeledAt) + 2 * 24 * 3600 * 1000;
+  const comments = [{ body, createdAt: labeledAt }];
+  assert.equal(
+    evaluateHold({ labeledAt, now, headSha: head, comments }).action,
+    'keep'
+  );
+  assert.equal(
+    evaluateHold({ labeledAt, now, headSha: 'd'.repeat(40), comments }).reason,
+    'head-changed'
+  );
+  assert.equal(parseHoldReceipt(body.replace('"pr":7', '"pr":0')), null);
+});

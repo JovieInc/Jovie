@@ -41,7 +41,7 @@ function wrapWithCoreProviders({
 }: WrappedProvidersOptions) {
   const content = skipCoreProviders ? (
     <QueryProvider>
-      <TooltipProvider delayDuration={1200}>{children}</TooltipProvider>
+      <TooltipProvider>{children}</TooltipProvider>
     </QueryProvider>
   ) : (
     <CoreProviders initialThemeMode={initialThemeMode}>

@@ -414,12 +414,28 @@ describe('MarketingCertificationStore', () => {
       records.get(MARKETING_CERTIFICATION_STORE_KEY) as string
     );
     ledger.records[REGISTRY[0].id].packet.subject.id = 'incorrect-identity';
-    const corrupted = JSON.stringify(ledger);
-    records.set(MARKETING_CERTIFICATION_STORE_KEY, corrupted);
-    await expect(
-      new MarketingCertificationStore(backend, REGISTRY).projectLedger()
-    ).rejects.toBeInstanceOf(MarketingCertificationPersistenceError);
-    expect(records.get(MARKETING_CERTIFICATION_STORE_KEY)).toBe(corrupted);
+    records.set(MARKETING_CERTIFICATION_STORE_KEY, JSON.stringify(ledger));
+    const projection = await new MarketingCertificationStore(
+      backend,
+      REGISTRY
+    ).projectLedger();
+    const stored = JSON.parse(
+      records.get(MARKETING_CERTIFICATION_STORE_KEY) as string
+    );
+    expect(stored.records[REGISTRY[0].id].packet.subject.id).toBe(
+      'incorrect-identity'
+    );
+    expect(stored.registryIds).toEqual(REGISTRY.map(entry => entry.id));
+    const failed = projection.entryOutcomes.find(
+      outcome => outcome.identityId === REGISTRY[0].id
+    );
+    expect(failed?.evaluation).toBe('failed');
+    expect(failed?.row.admission.state).toBe('working');
+    expect(
+      projection.entryOutcomes
+        .filter(outcome => outcome.identityId !== REGISTRY[0].id)
+        .every(outcome => outcome.evaluation === 'evaluated')
+    ).toBe(true);
   });
 
   it('bounds registry extension contention without persisting partial additions', async () => {
@@ -1316,6 +1332,153 @@ describe('MarketingCertificationStore', () => {
     ).rejects.toThrow('has no resolved canonical source');
   });
 
+  it('posts the rest of a ledger when one stored record cannot be evaluated', async () => {
+    const records = new Map<string, unknown>();
+    const store = new MarketingCertificationStore(
+      memoryBackend(records),
+      REGISTRY
+    );
+    await store.ingestPacket(packet(REGISTRY[0]), '2026-09-04T20:10:00.000Z');
+    await store.ingestPacket(packet(REGISTRY[1]), '2026-09-04T20:10:01.000Z');
+    const ledger = JSON.parse(
+      records.get(MARKETING_CERTIFICATION_STORE_KEY) as string
+    );
+    ledger.records[REGISTRY[0].id].packet.subject.title = 'Spoofed title';
+    records.set(MARKETING_CERTIFICATION_STORE_KEY, JSON.stringify(ledger));
+
+    const posted = await store.ingestPacket(
+      packet(REGISTRY[1]),
+      '2026-09-04T20:10:02.000Z'
+    );
+    expect(posted.identityId).toBe(REGISTRY[1].id);
+    expect(posted.admission.state).not.toBe('working');
+
+    const projection = await store.inspectLedger('2026-09-04T20:10:03.000Z');
+    const failed = projection.entryOutcomes.find(
+      outcome => outcome.identityId === REGISTRY[0].id
+    );
+    const sibling = projection.entryOutcomes.find(
+      outcome => outcome.identityId === REGISTRY[1].id
+    );
+    expect(failed).toMatchObject({
+      evaluation: 'failed',
+      message: expect.stringContaining(REGISTRY[0].id),
+    });
+    expect(failed?.row.admission.state).toBe('working');
+    expect(failed?.row.admission.blockers.length).toBeGreaterThan(0);
+    expect(failed?.row.packet.subject.title).toBe(REGISTRY[0].storybookTitle);
+    expect(sibling?.evaluation).toBe('evaluated');
+    expect(sibling?.row.packet.source?.paths).toEqual([
+      REGISTRY[1].resolvedSource,
+    ]);
+    const review = await store.projectReviewReady({
+      assuranceProfiles: ASSURANCE_PROFILES,
+      existingEntryId: null,
+    });
+    expect(review.eligibleSubjectIds).not.toContain(REGISTRY[0].id);
+  });
+
+  it('rebinds recipe.homepage onto its current source without certifying the stale packet', async () => {
+    const homepage = MARKETING_COMPONENT_REGISTRY.find(
+      entry => entry.id === 'recipe.homepage'
+    );
+    if (!homepage?.resolvedSource) {
+      throw new Error('recipe.homepage must stay source-backed');
+    }
+    const sibling = REGISTRY[0];
+    const registry = [homepage, sibling];
+    const records = new Map<string, unknown>();
+    const store = new MarketingCertificationStore(
+      memoryBackend(records),
+      registry
+    );
+    const admitted = await store.ingestPacket(
+      packet(homepage),
+      '2026-09-04T20:11:00.000Z'
+    );
+    await store.recordFounderDecision({
+      assuranceProfile: assuranceProfile(homepage),
+      decidedAt: '2026-09-04T20:11:01.000Z',
+      decision: decision(
+        admitted.admission.decisionEvidenceDigest!,
+        'homepage-lock'
+      ),
+      subjectId: homepage.id,
+    });
+    await store.ingestPacket(packet(sibling), '2026-09-04T20:11:02.000Z');
+
+    const stalePath =
+      'apps/web/components/marketing/homepage-v2/HomepageV2Route.tsx';
+    const ledger = JSON.parse(
+      records.get(MARKETING_CERTIFICATION_STORE_KEY) as string
+    );
+    ledger.records[homepage.id].packet.source.paths = [stalePath];
+    records.set(MARKETING_CERTIFICATION_STORE_KEY, JSON.stringify(ledger));
+    const beforeWrite = records.get(MARKETING_CERTIFICATION_STORE_KEY);
+
+    const viewed = await store.inspectLedger('2026-09-04T20:11:02.500Z');
+    expect(records.get(MARKETING_CERTIFICATION_STORE_KEY)).toBe(beforeWrite);
+    const viewedHomepage = viewed.entryOutcomes.find(
+      outcome => outcome.identityId === homepage.id
+    );
+    expect(viewedHomepage?.evaluation).toBe('evaluated');
+    expect(viewedHomepage?.row.admission.state).toBe('working');
+    expect(viewedHomepage?.row.packet.source?.paths).toEqual([
+      homepage.resolvedSource,
+    ]);
+
+    const posted = await store.ingestPacket(
+      packet(sibling),
+      '2026-09-04T20:11:03.000Z'
+    );
+    expect(posted.identityId).toBe(sibling.id);
+
+    const rebound = await store.inspectLedger('2026-09-04T20:11:04.000Z');
+    const homepageRow = rebound.entryOutcomes.find(
+      outcome => outcome.identityId === homepage.id
+    );
+    expect(homepageRow?.evaluation).toBe('evaluated');
+    expect(homepageRow?.row.admission.state).toBe('working');
+    expect(homepageRow?.row.admission.currentDecision).toBeNull();
+    expect(homepageRow?.row.admission.baselineStatus).toBe(
+      'candidate_pending_recertification'
+    );
+    expect(homepageRow?.row.decisions).toHaveLength(1);
+    expect(homepageRow?.row.packet.source?.paths).toEqual([
+      homepage.resolvedSource,
+    ]);
+    expect(homepageRow?.row.packet.source?.sha).toBe('0'.repeat(40));
+    expect(homepageRow?.row.packet.canonicalReferences[0]).toMatchObject({
+      status: 'failed',
+      ref: homepage.resolvedSource,
+    });
+    expect(homepageRow?.row.packet.canonicalReferences[0]?.summary).toContain(
+      stalePath
+    );
+    const stored = JSON.parse(
+      records.get(MARKETING_CERTIFICATION_STORE_KEY) as string
+    );
+    expect(stored.records[homepage.id].packet.source.paths).toEqual([
+      homepage.resolvedSource,
+    ]);
+    expect(stored.records[homepage.id].packetUpdatedAt).toBe(
+      '2026-09-04T20:11:00.000Z'
+    );
+
+    const recertified = await store.ingestPacket(
+      packet(homepage),
+      '2026-09-04T20:11:05.000Z'
+    );
+    expect(recertified.packet.source?.paths).toEqual([homepage.resolvedSource]);
+    expect(recertified.packet.source?.sha).toBe(SHA);
+    expect(recertified.admission.state).not.toBe('working');
+    expect(
+      recertified.packet.canonicalReferences.some(
+        receipt => receipt.id === `${homepage.id}:canonical-source-drift`
+      )
+    ).toBe(false);
+  });
+
   it.each([42, '{', '{}'] as const)(
     'fails closed for corrupt ledger %j',
     async raw => {
@@ -1328,13 +1491,8 @@ describe('MarketingCertificationStore', () => {
     }
   );
 
-  it('rejects persisted packet, decision, audit, and replay corruption', async () => {
-    for (const corruption of [
-      'packet',
-      'decision',
-      'audit',
-      'replay',
-    ] as const) {
+  it('rejects persisted decision, audit, and replay corruption', async () => {
+    for (const corruption of ['decision', 'audit', 'replay'] as const) {
       const records = new Map<string, unknown>();
       const store = new MarketingCertificationStore(
         memoryBackend(records),
@@ -1353,8 +1511,6 @@ describe('MarketingCertificationStore', () => {
       const ledger = JSON.parse(
         records.get(MARKETING_CERTIFICATION_STORE_KEY) as string
       );
-      if (corruption === 'packet')
-        ledger.records[REGISTRY[0].id].packet.subject.id = REGISTRY[1].id;
       if (corruption === 'decision')
         ledger.records[REGISTRY[0].id].decisions[0].subjectId = REGISTRY[1].id;
       if (corruption === 'audit')

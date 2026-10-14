@@ -4,6 +4,7 @@ import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { captureError } from '@/lib/error-tracking';
 import {
   checkVerificationRequestRateLimit,
@@ -47,7 +48,9 @@ export async function POST() {
 
       if (!user.isPro) {
         return NextResponse.json(
-          { error: 'Verification requests are available to Pro members.' },
+          {
+            error: `Verification requests are available to ${getPlanDisplayName('pro')} members.`,
+          },
           { status: 403 }
         );
       }

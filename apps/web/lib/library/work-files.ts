@@ -1,3 +1,4 @@
+import { getAudioFormat } from '@/lib/audio/constants';
 import type { LibraryDownloadView } from './post-release-types';
 
 export type WorkFileKind =
@@ -108,4 +109,70 @@ export function deriveWorkFiles(
   }
 
   return files;
+}
+
+/** What one dropped, pasted or picked file becomes on a work. */
+export type WorkAttachmentKind =
+  | 'audio'
+  | 'artwork'
+  | 'video'
+  | 'document'
+  | 'download'
+  | 'unknown';
+
+const VIDEO_EXTENSIONS = new Set(['mp4', 'mov', 'm4v', 'webm', 'mkv', 'avi']);
+const DOCUMENT_EXTENSIONS = new Set([
+  'pdf',
+  'doc',
+  'docx',
+  'txt',
+  'md',
+  'rtf',
+  'pages',
+]);
+const DOWNLOAD_EXTENSIONS = new Set(['zip', 'rar', '7z', 'tar', 'gz']);
+const IMAGE_EXTENSIONS = new Set([
+  'jpg',
+  'jpeg',
+  'png',
+  'webp',
+  'avif',
+  'heic',
+  'heif',
+]);
+
+function fileExtension(name: string): string {
+  const dot = name.lastIndexOf('.');
+  return dot === -1 ? '' : name.slice(dot + 1).toLowerCase();
+}
+
+/**
+ * Detect the attachment kind after the user hands over a file, so the
+ * inspector needs one Attach control instead of one button per media type.
+ * MIME wins when the browser provides one; the extension covers blank MIME.
+ */
+export function classifyWorkAttachment(file: {
+  readonly name: string;
+  readonly type: string;
+}): WorkAttachmentKind {
+  const mime = file.type.toLowerCase();
+  const extension = fileExtension(file.name);
+  if (getAudioFormat(file)) return 'audio';
+  if (mime.startsWith('image/') || IMAGE_EXTENSIONS.has(extension)) {
+    return 'artwork';
+  }
+  if (mime.startsWith('video/') || VIDEO_EXTENSIONS.has(extension)) {
+    return 'video';
+  }
+  if (
+    mime === 'application/pdf' ||
+    mime.startsWith('text/') ||
+    DOCUMENT_EXTENSIONS.has(extension)
+  ) {
+    return 'document';
+  }
+  if (mime.includes('zip') || DOWNLOAD_EXTENSIONS.has(extension)) {
+    return 'download';
+  }
+  return 'unknown';
 }

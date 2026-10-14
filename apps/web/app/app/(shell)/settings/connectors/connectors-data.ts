@@ -2,6 +2,7 @@ import 'server-only';
 
 import { eq } from 'drizzle-orm';
 import type { ConnectorStatus } from '@/components/features/connectors/ConnectorCard';
+import { getConnectorAvailability } from '@/lib/connectors/availability.server';
 import {
   CONNECTOR_PROVIDER_IDS,
   CONNECTOR_PROVIDERS,
@@ -20,6 +21,7 @@ interface ConnectorAccountRow {
   readonly scopes: readonly string[];
   readonly capabilities: unknown;
   readonly lastErrorUserMessage: string | null;
+  readonly lastSyncAt?: Date | null;
 }
 
 export interface SettingsConnectorState {
@@ -27,6 +29,9 @@ export interface SettingsConnectorState {
   readonly accountLabel?: string;
   readonly scopes?: readonly string[];
   readonly errorMessage?: string;
+  readonly lastSyncAt?: string;
+  readonly available?: boolean;
+  readonly unavailableReason?: string;
 }
 
 export interface SettingsConnectorsData {
@@ -39,7 +44,13 @@ function toConnectorStatus(
   row: Pick<ConnectorAccountRow, 'status' | 'lastErrorUserMessage'> | null
 ): { status: ConnectorStatus; errorMessage?: string } {
   if (!row) return { status: 'not_connected' };
-  const status = row.status as ConnectorStatus;
+  const status: ConnectorStatus =
+    row.status === 'connected' ||
+    row.status === 'needs_reauth' ||
+    row.status === 'error' ||
+    row.status === 'disabled'
+      ? row.status
+      : 'unavailable';
   return {
     status,
     errorMessage: row.lastErrorUserMessage ?? undefined,
@@ -73,6 +84,7 @@ function toConnectorState(
     accountLabel: row ? getAccountLabel(row, provider) : undefined,
     scopes: row?.scopes,
     errorMessage: state.errorMessage,
+    lastSyncAt: row?.lastSyncAt?.toISOString(),
   };
 }
 
@@ -80,23 +92,37 @@ function buildConnectorStates(
   rows: readonly ConnectorAccountRow[],
   creatorProfileId: string | null
 ): Readonly<Record<ConnectorProviderId, SettingsConnectorState>> {
+  const availability = getConnectorAvailability();
   return Object.fromEntries(
     CONNECTOR_PROVIDER_IDS.map(provider => {
-      const row =
-        rows.find(candidate => {
-          if (candidate.provider !== provider) return false;
-          return provider !== CONNECTOR_PROVIDERS.youtube
-            ? true
-            : candidate.creatorProfileId === creatorProfileId;
-        }) ?? null;
-      return [provider, toConnectorState(row, provider)];
+      const providerRows = rows.filter(
+        candidate => candidate.provider === provider
+      );
+      // Identity-bound accounts take precedence. User-wide fallback is explicit,
+      // and YouTube never falls back to an unbound or another identity's row.
+      const scopedRow =
+        (creatorProfileId
+          ? providerRows.find(
+              candidate => candidate.creatorProfileId === creatorProfileId
+            )
+          : null) ??
+        (provider === CONNECTOR_PROVIDERS.youtube
+          ? null
+          : providerRows.find(
+              candidate => candidate.creatorProfileId === null
+            )) ??
+        null;
+      return [
+        provider,
+        {
+          ...toConnectorState(scopedRow, provider),
+          ...availability[provider],
+          unavailableReason: availability[provider].reason,
+        },
+      ];
     })
   ) as Record<ConnectorProviderId, SettingsConnectorState>;
 }
-
-const EMPTY_CONNECTORS_DATA: SettingsConnectorsData = {
-  connectors: buildConnectorStates([], null),
-};
 
 export async function loadSettingsConnectorsData(
   clerkUserId: string,
@@ -112,7 +138,21 @@ export async function loadSettingsConnectorsData(
     return await loadSettingsConnectorsDataForUser(dbUser.id, creatorProfileId);
   } catch (error) {
     if (isMissingConnectorSchemaError(error)) {
-      return EMPTY_CONNECTORS_DATA;
+      const states = buildConnectorStates([], null);
+      return {
+        connectors: Object.fromEntries(
+          CONNECTOR_PROVIDER_IDS.map(provider => [
+            provider,
+            {
+              ...states[provider],
+              status: 'unavailable',
+              available: false,
+              unavailableReason:
+                'Connections could not be read. Refresh to try again.',
+            },
+          ])
+        ) as Record<ConnectorProviderId, SettingsConnectorState>,
+      };
     }
     throw error;
   }
@@ -131,6 +171,7 @@ async function loadSettingsConnectorsDataForUser(
       scopes: connectorAccounts.scopes,
       capabilities: connectorAccounts.capabilities,
       lastErrorUserMessage: connectorAccounts.lastErrorUserMessage,
+      lastSyncAt: connectorAccounts.lastSyncAt,
     })
     .from(connectorAccounts)
     .where(eq(connectorAccounts.userId, userId));

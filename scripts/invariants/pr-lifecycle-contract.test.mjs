@@ -73,7 +73,7 @@ describe('JOV-INV-029 PR lifecycle contract', () => {
     );
   });
 
-  it('fails closed when auto-merge drops ready_for_review', () => {
+  it('fails closed when the green-enroll subscriber drops ready_for_review', () => {
     assert.match(
       validatePrLifecycleContract(registry, {
         readFile: path => {

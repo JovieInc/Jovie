@@ -21,6 +21,7 @@ const THEME_SWITCHING_ROUTE_POLICY = {
     '/pay',
     '/voice',
     '/instant-merch',
+    '/integrations',
     '/youtube-thumbnails',
     '/product',
     '/smart-links',

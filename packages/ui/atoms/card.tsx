@@ -6,7 +6,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 
 const cardVariants = cva(
-  'rounded-(--system-b-radius-card) border border-subtle bg-surface-1 text-primary-token shadow-card transition-[background-color,border-color,box-shadow] duration-subtle ease-subtle motion-reduce:transition-none',
+  'min-w-0 max-w-full rounded-(--system-b-radius-card) border border-subtle bg-surface-1 text-primary-token shadow-card transition-[background-color,border-color,box-shadow] duration-subtle ease-subtle motion-reduce:transition-none',
   {
     variants: {
       variant: {

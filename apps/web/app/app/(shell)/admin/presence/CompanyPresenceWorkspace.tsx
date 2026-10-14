@@ -361,7 +361,7 @@ function CompanyPresenceWorkspaceContent({
         columns={columns as ColumnDef<CompanyPresencePage, unknown>[]}
         getRowId={page => page.id}
         onRowClick={setSelected}
-        rowHeight={56}
+        rowMode='two-line'
         containerClassName='min-h-0 flex-1'
         minWidth='0'
         className={styles.table}

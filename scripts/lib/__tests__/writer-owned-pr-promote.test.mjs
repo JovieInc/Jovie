@@ -31,7 +31,7 @@ const head = 'a'.repeat(40);
  * initialState?: string, mergedAtRead?: number, ticketEvidence?: string,
  * runs?: number, mergedOnUndo?: boolean, viewerLogin?: unknown, writerLogin?: string,
  * graphqlErrors?: unknown, unreadableState?: boolean,
- * missingPullRequest?: boolean, missingViewer?: boolean
+ * missingPullRequest?: boolean, missingViewer?: boolean, readyFails?: boolean
  * }} [options]
  */
 function scenario({
@@ -50,6 +50,7 @@ function scenario({
   unreadableState = false,
   missingPullRequest = false,
   missingViewer = false,
+  readyFails = false,
 } = {}) {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), 'writer-promotion-')));
   try {
@@ -116,6 +117,7 @@ if(args[0]==='pr'&&args[1]==='ready'){
  if(${mergedOnUndo}&&args.includes('--undo')){state.state='MERGED';fs.writeFileSync(path,JSON.stringify(state));console.error('PR already merged');process.exit(1);}
  state.draft=args.includes('--undo');fs.writeFileSync(path,JSON.stringify(state));
  if(${ambiguousDraft}&&args.includes('--undo')){console.error('HTTP 502');process.exit(1);}
+ if(${readyFails}&&!args.includes('--undo')){console.error('HTTP 502');process.exit(1);}
 }
 fs.writeFileSync(path,JSON.stringify(state));
 `,
@@ -169,59 +171,65 @@ fs.writeFileSync(path,JSON.stringify(state));
   }
 }
 
-test('ambiguous native request never compensates or retries, including ready restart', () => {
+// JOV-INV-022 (2026-10-13): the writer readies; Merge Queue Green Enroll is the
+// sole admitter. These tests replace the native-intent cases. Canon evidence on
+// main still names the two retired tests below; drop these lines once main's
+// canon no longer lists them:
+// ambiguous native request never compensates or retries, including ready restart
+// confirmed native intent and writer receipt complete together
+test('ready completes promotion without arming, including ready restart', () => {
   for (const restart of [false, true]) {
     const r = scenario({ restart });
-    assert.equal(r.status, 2, r.stderr);
-    assert.equal(r.calls.split('native-intent').length - 1, 1);
+    assert.equal(r.status, 0, r.stderr);
+    assert.doesNotMatch(r.calls, /native-intent|"merge"|enqueuePullRequest/);
     assert.doesNotMatch(r.calls, /--undo|--disable-auto|dequeuePullRequest/);
-    assert.match(r.comment, /native-intent-unknown/);
-    assert.match(r.comment, /"attempted": false/);
+    assert.equal(r.calls.split('"ready"').length - 1, restart ? 0 : 1);
   }
 });
 
-test('definite blocked request compensates once only on same head', () => {
-  const r = scenario({ native: 'blocked' });
+test('a failed ready compensates once only on same head', () => {
+  const r = scenario({ readyFails: true });
   assert.equal(r.status, 2, r.stderr);
   assert.equal(r.calls.split('--undo').length - 1, 1);
   assert.match(r.comment, /"verified": true/);
 });
 
 test('head movement before compensation prevents all risky effects', () => {
-  const r = scenario({ native: 'blocked', moved: true });
+  const r = scenario({ readyFails: true, moved: true });
   assert.equal(r.status, 2, r.stderr);
   assert.doesNotMatch(r.calls, /--undo|--disable-auto|dequeuePullRequest/);
   assert.match(r.comment, /"verified": false/);
 });
 
 test('uncertain draft response is never retried', () => {
-  const r = scenario({ native: 'blocked', ambiguousDraft: true });
+  const r = scenario({ readyFails: true, ambiguousDraft: true });
   assert.equal(r.calls.split('--undo').length - 1, 1);
   assert.match(r.comment, /"verified": false/);
 });
 
-test('confirmed native intent and writer receipt complete together', () => {
-  const r = scenario({ native: 'intent-recorded' });
+test('exact-head ready and writer receipt complete together', () => {
+  const r = scenario();
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /writer promotion complete/);
+  assert.match(r.comment, /Merge Queue Green Enroll admits it/);
+  assert.doesNotMatch(r.calls, /native-intent|"merge"|enqueuePullRequest/);
   assert.doesNotMatch(r.calls, /--undo|--disable-auto|dequeuePullRequest/);
 });
 
 test('installation writer is authenticated by the same fresh GraphQL state read', () => {
   const r = scenario({
-    native: 'intent-recorded',
     viewerLogin: 'jovie-bot[bot]',
     writerLogin: 'jovie-bot[bot]',
   });
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.calls, /viewer\{login\}/);
   assert.doesNotMatch(r.calls, /"user"/);
-  assert.equal(r.calls.split('native-intent').length - 1, 1);
+  assert.doesNotMatch(r.calls, /native-intent/);
 });
 
 test('a matching PR author cannot authorize a different authenticated viewer', () => {
   for (const viewerLogin of ['another-writer', 'writer[bot]']) {
-    const r = scenario({ viewerLogin, native: 'intent-recorded' });
+    const r = scenario({ viewerLogin });
     assert.equal(r.status, 2, r.stderr);
     assert.match(r.stderr, /writer-token-mismatch/);
     assert.doesNotMatch(r.calls, /"edit"|"ready"|native-intent|"user"/);
@@ -332,13 +340,13 @@ test('already merged with missing ticket evidence remains an owned acceptance fa
 });
 
 test('merge before compensation preserves failure without attempting a draft conversion', () => {
-  const r = scenario({ native: 'blocked', mergedAtRead: 2 });
+  const r = scenario({ readyFails: true, mergedAtRead: 2 });
   assert.equal(r.status, 2, r.stderr);
   assert.doesNotMatch(r.calls, /--undo|--disable-auto|dequeuePullRequest/);
   assert.match(r.comment, /"sourceDisposition": "merged"/);
   assert.match(r.comment, /"attempted": false/);
   assert.match(r.comment, /"verified": false/);
-  assert.match(r.comment, /test-outcome/);
+  assert.match(r.comment, /gh-pr-ready-failed/);
 });
 
 test('closed unmerged PR with missing proof never attempts compensation', () => {
@@ -401,7 +409,7 @@ test('merged different head never renders an exact-head recovery receipt', () =>
     renderPromotionBlockerComment(blocker),
     /Source merged at the exact head/
   );
-  const r = scenario({ native: 'blocked', mergedAtRead: 2, moved: true });
+  const r = scenario({ readyFails: true, mergedAtRead: 2, moved: true });
   assert.equal(r.status, 2);
   assert.doesNotMatch(r.calls, /--undo|--disable-auto|dequeuePullRequest/);
   assert.doesNotMatch(r.comment, /Source merged at the exact head/);
@@ -410,7 +418,7 @@ test('merged different head never renders an exact-head recovery receipt', () =>
 });
 
 test('merge after compensation read but before draft mutation is reread without replay', () => {
-  const r = scenario({ native: 'blocked', mergedOnUndo: true });
+  const r = scenario({ readyFails: true, mergedOnUndo: true });
   assert.equal(r.status, 2);
   assert.equal(r.calls.split('--undo').length - 1, 1);
   assert.match(r.comment, /"sourceDisposition": "merged"/);

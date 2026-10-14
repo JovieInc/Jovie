@@ -80,7 +80,7 @@ ${COMPANY_IDENTITY.definition}
 ## Pricing
 
 - **Free (${formatPublicPriceDisplay(freeClaim)})**: ${freeClaim.note}
-- **Artist Visibility Pro (${formatPublicPriceDisplay(proClaim)})**: ${proClaim.note}
+- **Artist Presence (${formatPublicPriceDisplay(proClaim)})**: ${proClaim.note}
 - **Enterprise (${formatPublicPriceDisplay(enterpriseClaim)})**: ${enterpriseClaim.note} Contact sales.
 - Capability maturity and account access remain separate from a feature being described publicly.
 

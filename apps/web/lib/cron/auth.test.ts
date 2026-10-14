@@ -110,6 +110,80 @@ describe('verifyCronRequest', () => {
 
     expect(result).toBeNull();
   });
+
+  it('refuses the development bypass in production', async () => {
+    vi.stubEnv('CRON_SECRET', 'test-secret');
+    vi.stubEnv('NODE_ENV', 'production');
+
+    const { verifyCronRequest } = await import('@/lib/cron/auth');
+
+    const result = verifyCronRequest(
+      new Request('https://example.com/api/cron/test'),
+      {
+        route: '/api/cron/test',
+        allowDevelopmentBypass: true,
+      }
+    );
+
+    expect(result?.status).toBe(401);
+  });
+
+  it('returns an uncacheable 401 when the Authorization header is missing', async () => {
+    vi.stubEnv('CRON_SECRET', 'test-secret');
+
+    const { verifyCronRequest } = await import('@/lib/cron/auth');
+
+    const result = verifyCronRequest(
+      new Request('https://example.com/api/cron/test'),
+      { route: '/api/cron/test' }
+    );
+
+    expect(result?.status).toBe(401);
+    expect(result?.headers.get('Cache-Control')).toBe('no-store');
+    await expect(result?.json()).resolves.toEqual({ error: 'Unauthorized' });
+  });
+
+  it('returns uncacheable 403 and 500 bodies', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('CRON_SECRET', '');
+
+    const { verifyCronRequest } = await import('@/lib/cron/auth');
+    const request = new Request('https://example.com/api/cron/test');
+
+    const forbidden = verifyCronRequest(request, {
+      route: '/api/cron/test',
+      requireTrustedOrigin: true,
+    });
+    const unconfigured = verifyCronRequest(request, {
+      route: '/api/cron/test',
+    });
+
+    expect(forbidden?.headers.get('Cache-Control')).toBe('no-store');
+    await expect(forbidden?.json()).resolves.toEqual({ error: 'Forbidden' });
+    expect(unconfigured?.headers.get('Cache-Control')).toBe('no-store');
+    await expect(unconfigured?.json()).resolves.toEqual({
+      error: 'Cron not configured',
+    });
+  });
+});
+
+describe('extractBearerToken', () => {
+  it.each([
+    [null, undefined],
+    ['', undefined],
+    ['Bearer', undefined],
+    ['Bearerx', undefined],
+    ['Basic abc', undefined],
+    ['Bearer ', undefined],
+    ['Bearer a b', undefined],
+    ['Bearer  abc', undefined],
+    ['Bearer abc', 'abc'],
+    ['bearer abc', 'abc'],
+  ])('parses %j as %j', async (header, expected) => {
+    const { extractBearerToken } = await import('@/lib/cron/auth');
+
+    expect(extractBearerToken(header)).toBe(expected);
+  });
 });
 
 describe('verifyTrustedCronOrigin', () => {

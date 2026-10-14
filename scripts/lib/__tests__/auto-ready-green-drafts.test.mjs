@@ -20,6 +20,11 @@ import {
   selectMissedCohort,
   TIM_HOLD_LABELS,
 } from '../auto-ready-green-drafts.mjs';
+import {
+  filterList,
+  triggerNames,
+  workflowTriggers,
+} from '../workflow-triggers.mjs';
 
 const repoRoot = resolve(import.meta.dirname, '../../..');
 const fleetScript = readFileSync(
@@ -225,6 +230,24 @@ describe('green-source draft classifier', () => {
     ).toMatchObject({ eligible: false, reason: 'checks:parity' });
   });
 
+  it('never undrafts a parked draft or one carrying an admission stop label', () => {
+    expect(classifyGreenSourceDraft(draft({ parkedDraft: true }))).toEqual({
+      eligible: false,
+      reason: 'parked-draft',
+    });
+    for (const name of [
+      'hold',
+      'queue-deferred',
+      'do-not-merge',
+      'queue-poison',
+    ]) {
+      expect(GREEN_SOURCE_HOLD_LABELS).toContain(name);
+      expect(
+        classifyGreenSourceDraft(draft({ labels: [{ name }] }))
+      ).toMatchObject({ eligible: false, reason: 'held' });
+    }
+  });
+
   it('emits a hold regex that matches Tim-hold and machine holds only', () => {
     const re = new RegExp(greenSourceHoldRegex());
     expect(re.test('hold')).toBe(true);
@@ -273,27 +296,25 @@ describe('green-source controller contract', () => {
   });
 
   it('keeps writer-proof recovery manual-only and wakes green-source from CI events', () => {
-    expect(workflow).toContain('workflow_dispatch:');
-    expect(workflow).toContain('workflow_run:');
-    expect(workflow).not.toContain('check_suite:');
+    const on = workflowTriggers(workflow);
+    expect(triggerNames(on)).toEqual(['workflow_dispatch', 'workflow_run']);
+    expect(filterList(on.workflow_run.workflows)).toEqual([
+      'Fork PR Gate',
+      'PR Size Guard',
+      'Source Validation',
+    ]);
+    expect(filterList(on.workflow_run.types)).toEqual(['completed']);
     expect(workflow).not.toContain('github.event.check_suite');
     expect(workflow).not.toMatch(/^concurrency:/m);
     expect(workflow).toContain(
       'group: auto-ready-green-source-${{ github.event.inputs.pr_number'
     );
     expect(workflow).toContain('RUN_OFFSET: ${{ github.run_number }}');
-    expect(workflow).toContain(
-      "workflows: ['Source Validation', 'Fork PR Gate', 'PR Size Guard']"
-    );
     expect(workflow).toContain('scripts/auto-ready-green-drafts.sh');
     expect(workflow).toContain("github.event_name == 'workflow_dispatch'");
     expect(workflow).toContain(
       "github.event.workflow_run.event == 'pull_request'"
     );
-    expect(workflow).not.toContain('schedule:');
-    expect(workflow).not.toContain('pull_request:');
-    expect(workflow).not.toContain('types: [opened, synchronize, reopened]');
-    expect(workflow).not.toContain('types: [ready_for_review');
     expect(workflow).not.toContain('ready_for_review/CI cascade');
     expect(workflow).not.toContain('secrets.GITHUB_TOKEN');
   });
@@ -375,6 +396,7 @@ describe('green-source shell controller (fake gh)', () => {
                   mergeable: pr.mergeable,
                   mergeStateStatus: pr.mergeStateStatus,
                   labels: { nodes: pr.labels },
+                  timelineItems: { nodes: pr.timeline ?? [] },
                 },
               },
             },
@@ -451,6 +473,40 @@ esac
     expect(result.stdout).toContain('would mark #20874 ready');
     expect(result.stdout).toContain('would mark #20834 ready');
     expect(result.stdout).not.toContain('#20991');
+  });
+
+  it('leaves a draft parked after its last push, and undrafts it after a new push', () => {
+    const converted = {
+      __typename: 'ConvertToDraftEvent',
+      createdAt: '2026-10-13T02:00:00Z',
+    };
+    const commit = at => ({
+      __typename: 'PullRequestCommit',
+      commit: { committedDate: at },
+    });
+    const parked = runController(
+      [
+        listed({
+          number: 21429,
+          timeline: [commit('2026-10-13T01:00:00Z'), converted],
+        }),
+      ],
+      { TARGET_PR: '21429', TARGET_HEAD: head, MISSED_COHORT: '0' }
+    );
+    expect(parked.status).toBe(0);
+    expect(parked.stdout).toContain('green-source parked-draft');
+    expect(parked.stdout).not.toContain('would mark #21429 ready');
+    const pushed = runController(
+      [
+        listed({
+          number: 21429,
+          timeline: [converted, commit('2026-10-13T03:00:00Z')],
+        }),
+      ],
+      { TARGET_PR: '21429', TARGET_HEAD: head, MISSED_COHORT: '0' }
+    );
+    expect(pushed.status).toBe(0);
+    expect(pushed.stdout).toContain('would mark #21429 ready');
   });
 
   it('an event for a ready PR costs one API read and never lists every PR', () => {

@@ -71,6 +71,7 @@ async function fixture(
     payload = {},
     associatedPages,
     beforeStatusResponse,
+    labelRemovalError,
     afterStatusWrite,
     readCurrentSnapshot,
     effectSink,
@@ -85,7 +86,9 @@ async function fixture(
   const inventories = [];
   const gets = [];
   const mainReads = [];
+  const labelRemovals = [];
   const effects = {
+    labelRemovals,
     mainReads,
     reads,
     mutations,
@@ -120,6 +123,13 @@ async function fixture(
               base: { ref: 'main' },
             },
           };
+        },
+      },
+      issues: {
+        removeLabel: async params => {
+          labelRemovals.push(params);
+          if (labelRemovalError) throw labelRemovalError;
+          return {};
         },
       },
       repos: {
@@ -531,6 +541,219 @@ test('a sweep goes longest-waiting first and stops at its budget', async () => {
   );
 });
 
+test('a queue-breaker dequeue is re-admitted after the freeze and its marker removed', async () => {
+  // 2026-10-13: four quota storms each ended with queue-watch restoring every
+  // circuit-breaker dequeue by hand (manual removal, unchanged head).
+  const breaker = (
+    reason,
+    labels = ['queue-breaker'],
+    markedAt = '2026-10-02T13:01:00Z'
+  ) => {
+    const removal = {
+      __typename: 'RemovedFromMergeQueueEvent',
+      createdAt: '2026-10-02T13:00:00Z',
+      reason,
+    };
+    const marker = markedAt
+      ? {
+          __typename: 'LabeledEvent',
+          createdAt: markedAt,
+          label: { name: 'queue-breaker' },
+        }
+      : null;
+    return {
+      timelineItems: { nodes: [removal] },
+      breakerEvents: {
+        nodes: marker
+          ? markedAt < removal.createdAt
+            ? [marker, removal]
+            : [removal, marker]
+          : [removal],
+      },
+      labels: {
+        pageInfo: { hasNextPage: false },
+        nodes: labels.map(name => ({ name })),
+      },
+    };
+  };
+  const marked = await fixture({
+    overrides: { 1: breaker('MANUAL') },
+    eventName: 'push',
+  });
+  assert.deepEqual(marked.mutations, [{ id: 'PR_1', oid: sha }]);
+  assert.deepEqual(marked.labelRemovals, [
+    {
+      owner: 'JovieInc',
+      repo: 'Jovie',
+      issue_number: 1,
+      name: 'queue-breaker',
+    },
+  ]);
+  const equalTimestamps = await fixture({
+    overrides: {
+      1: breaker('MANUAL', ['queue-breaker'], '2026-10-02T13:00:00Z'),
+    },
+    eventName: 'push',
+  });
+  assert.deepEqual(
+    equalTimestamps.mutations,
+    [{ id: 'PR_1', oid: sha }],
+    'combined timeline order proves a marker added in the same timestamp tick'
+  );
+  const staleSameTickState = breaker(
+    'MANUAL',
+    ['queue-breaker'],
+    '2026-10-02T13:00:00Z'
+  );
+  staleSameTickState.breakerEvents.nodes.reverse();
+  const staleSameTick = await fixture({
+    overrides: { 1: staleSameTickState },
+    eventName: 'push',
+  });
+  assert.deepEqual(
+    staleSameTick.mutations,
+    [],
+    'a same-timestamp marker before the removal cannot authorize restoration'
+  );
+  const plain = await fixture({
+    overrides: { 1: breaker('MANUAL', []) },
+    eventName: 'push',
+  });
+  assert.deepEqual(
+    plain.mutations,
+    [],
+    "a plain manual dequeue keeps today's behavior"
+  );
+  const failed = await fixture({
+    overrides: { 1: breaker('FAILED_CHECKS') },
+    eventName: 'push',
+  });
+  assert.deepEqual(
+    failed.mutations,
+    [],
+    'the marker never re-admits a failed_checks removal'
+  );
+  const notGreen = await fixture({
+    overrides: { 1: { ...breaker('MANUAL'), mergeStateStatus: 'BLOCKED' } },
+    eventName: 'push',
+  });
+  assert.deepEqual(notGreen.mutations, []);
+  assert.deepEqual(
+    notGreen.labelRemovals,
+    [],
+    'the marker stays until the head is green'
+  );
+  const cleanupDenied = await fixture({
+    overrides: { 1: breaker('MANUAL') },
+    eventName: 'push',
+    labelRemovalError: new Error('secondary rate limit'),
+  });
+  assert.deepEqual(
+    cleanupDenied.mutations,
+    [],
+    'a marker that cannot be consumed never authorizes enqueue'
+  );
+  assert.ok(
+    cleanupDenied.warnings.some(message =>
+      message.includes('queue-breaker not consumed: secondary rate limit')
+    )
+  );
+  const enqueueDenied = await fixture({
+    overrides: { 1: breaker('MANUAL') },
+    eventName: 'push',
+    failMutation: true,
+  });
+  assert.deepEqual(
+    enqueueDenied.labelRemovals,
+    marked.labelRemovals,
+    'the one-shot marker is consumed before an enqueue attempt'
+  );
+  const staleMarker = await fixture({
+    overrides: {
+      1: breaker('MANUAL', ['queue-breaker'], '2026-10-02T12:59:00Z'),
+    },
+    eventName: 'push',
+  });
+  assert.deepEqual(
+    staleMarker.mutations,
+    [],
+    'a marker created before the latest dequeue cannot authorize restoration'
+  );
+  assert.deepEqual(staleMarker.labelRemovals, []);
+  const repairedHead = await fixture({
+    overrides: {
+      1: {
+        ...breaker('MANUAL'),
+        commits: {
+          nodes: [{ commit: { committedDate: '2026-10-02T13:02:00Z' } }],
+        },
+      },
+    },
+    eventName: 'push',
+  });
+  assert.deepEqual(
+    repairedHead.mutations,
+    [{ id: 'PR_1', oid: sha }],
+    'head movement uses normal admission instead of stale breaker restore'
+  );
+  assert.deepEqual(
+    repairedHead.labelRemovals,
+    marked.labelRemovals,
+    'normal admission clears the stale breaker marker after enqueue'
+  );
+});
+
+test('a queue-breaker restore is fenced against revocation and a new hold', async () => {
+  const runRace = async labels => {
+    const live = {
+      ...current(1),
+      timelineItems: {
+        nodes: [
+          {
+            __typename: 'RemovedFromMergeQueueEvent',
+            createdAt: '2026-10-02T13:00:00Z',
+            reason: 'MANUAL',
+          },
+        ],
+      },
+      breakerEvents: {
+        nodes: [
+          {
+            __typename: 'RemovedFromMergeQueueEvent',
+            createdAt: '2026-10-02T13:00:00Z',
+            reason: 'MANUAL',
+          },
+          {
+            __typename: 'LabeledEvent',
+            createdAt: '2026-10-02T13:01:00Z',
+            label: { name: 'queue-breaker' },
+          },
+        ],
+      },
+      labels: {
+        pageInfo: { hasNextPage: false },
+        nodes: [{ name: 'queue-breaker' }],
+      },
+    };
+    let changed = false;
+    return fixture({
+      eventName: 'push',
+      readCurrentSnapshot: () => live,
+      beforeStatusResponse: () => {
+        if (changed) return;
+        changed = true;
+        live.labels.nodes = labels.map(name => ({ name }));
+      },
+    });
+  };
+  const revoked = await runRace([]);
+  assert.deepEqual(revoked.mutations, []);
+  assert.deepEqual(revoked.labelRemovals, []);
+  const held = await runRace(['queue-breaker', 'hold']);
+  assert.deepEqual(held.mutations, []);
+  assert.deepEqual(held.labelRemovals, []);
+});
+
 test('a hold released after a manual dequeue re-enrolls the same head; check failures never do', async () => {
   const removal = reason => ({
     timelineItems: { nodes: [{ createdAt: '2026-10-02T13:00:00Z', reason }] },
@@ -686,10 +909,17 @@ test('wakes on completed Source Validation and on the push-to-main reconciliatio
     'labeled',
     'unlabeled',
     'reopened',
+    'ready_for_review',
     'synchronize',
   ]);
   // A label is never an enroll wake; only a blocking one dequeues its PR.
   assert.match(workflow.jobs.enroll.if, /github\.event\.action != 'labeled'/);
+  // Leaving draft is the only wake for an already-green head (JOV-INV-029);
+  // draft events never boot the enroll runner.
+  assert.match(
+    workflow.jobs.enroll.if,
+    /github\.event_name != 'pull_request_target' \|\| github\.event\.pull_request\.draft == false/
+  );
   // JOV-7589: a dequeue while checks are already green emits no completion
   // event, so every landing on main runs the full-roster sweep.
   assert.deepEqual(workflow.on.push, { branches: ['main'] });
@@ -1027,7 +1257,10 @@ function concurrencyGroup(github) {
         'github.event.workflow_run.id',
         'github.event.workflow_run?.id'
       );
-    return new Function('github', `return (${js});`)(github);
+    return new Function('github', 'inputs', `return (${js});`)(
+      github,
+      github.inputs ?? {}
+    );
   });
 }
 
@@ -1063,6 +1296,7 @@ test('same-PR wakes coalesce while unattributed receipts and manual reconciliati
   const manual = id => ({
     event_name: 'workflow_dispatch',
     event: {},
+    inputs: { pr_number: '' },
     run_id: id,
   });
   assert.equal(concurrencyGroup(manual(1)), concurrencyGroup(manual(2)));
@@ -1474,4 +1708,68 @@ test('a landing on main reconciles the full roster and the hold contract without
     assert.match(contract, new RegExp(`"${event}"`));
   }
   assert.match(contract, /workflow_run\.event == 'merge_group'/);
+});
+
+test('a dispatch naming one PR takes the per-PR path and coalesces with its wakes', async () => {
+  const roster = Array.from({ length: 40 }, (_, i) => candidate(i + 1));
+  const one = await fixture({ roster, env: { DISPATCH_PR_NUMBER: '7' } });
+  assert.deepEqual(one.inventories, []);
+  assert.deepEqual(one.gets, [7]);
+  assert.deepEqual(one.reads, [7]);
+  assert.equal(one.mutations.length, 1);
+  for (const unnamed of ['', '0', 'abc']) {
+    const sweep = await fixture({
+      roster,
+      env: { DISPATCH_PR_NUMBER: unnamed },
+    });
+    assert.equal(sweep.inventories.length, 1, `unnamed ${unnamed} sweeps`);
+    assert.deepEqual(sweep.gets, []);
+  }
+  const dispatched = {
+    event_name: 'workflow_dispatch',
+    event: {},
+    inputs: { pr_number: '7' },
+    run_id: 1,
+  };
+  assert.equal(concurrencyGroup(dispatched), concurrencyGroup(wake(7, 101)));
+  assert.ok(workflow.on.workflow_dispatch.inputs.pr_number);
+});
+
+// QUEUE_FREEZE=1 (repo variable) is the one-flip queue freeze: every job that
+// can enqueue or arm admits nothing, while holds and dequeues keep running.
+const FREEZE_GUARD = "vars.QUEUE_FREEZE != '1'";
+const QUEUE_WRITE =
+  /\benqueuePullRequest\b|\benablePullRequestAutoMerge\b|merge-group-victim-rearm|auto-ready-agent-drafts\.sh|--auto\b/;
+test('QUEUE_FREEZE gates every job that can enqueue or arm, and nothing else', () => {
+  const writers = [];
+  for (const file of [
+    'merge-queue-green-enroll.yml',
+    'auto-ready-agent-drafts.yml',
+  ]) {
+    const jobs = load(readFileSync(`.github/workflows/${file}`, 'utf8')).jobs;
+    for (const [name, job] of Object.entries(jobs)) {
+      const steps = JSON.stringify(job.steps ?? []).replace(
+        /--disable-auto/g,
+        ''
+      );
+      const guarded = String(job.if ?? '').includes(FREEZE_GUARD);
+      if (QUEUE_WRITE.test(steps)) {
+        writers.push(`${file}#${name}`);
+        assert.ok(
+          guarded,
+          `${file}#${name} writes the queue without the freeze guard`
+        );
+      } else {
+        assert.ok(
+          !guarded,
+          `${file}#${name} must keep running during a freeze`
+        );
+      }
+    }
+  }
+  assert.deepEqual(writers.sort(), [
+    'auto-ready-agent-drafts.yml#auto-ready',
+    'merge-queue-green-enroll.yml#enroll',
+    'merge-queue-green-enroll.yml#rearm-green-victims',
+  ]);
 });

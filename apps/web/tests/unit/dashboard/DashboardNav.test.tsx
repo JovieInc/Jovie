@@ -18,7 +18,7 @@ vi.mock('@/app/app/(shell)/chat/ChatPageClient', () => ({
 }));
 
 const CANONICAL_NAV = [
-  ['Home', APP_ROUTES.DASHBOARD],
+  ['Inbox', APP_ROUTES.DASHBOARD],
   ['Identity', APP_ROUTES.PRESENCE],
   ['Work', APP_ROUTES.LIBRARY],
   ['Audience', APP_ROUTES.CONTACTS_AUDIENCE],
@@ -105,7 +105,7 @@ describe('DashboardNav', () => {
     const inbox = document.querySelector('[data-navigation-item-id="inbox"]');
     expect(inbox).toBeInstanceOf(HTMLElement);
     if (!(inbox instanceof HTMLElement)) return;
-    expect(inbox).toHaveAccessibleName('Home');
+    expect(inbox).toHaveAccessibleName('Inbox');
     const search = getByRole('button', { name: 'Search' });
     const newChat = getByRole('link', { name: 'New Chat' });
 
@@ -132,7 +132,7 @@ describe('DashboardNav', () => {
         link.getAttribute('href'),
       ])
     ).toEqual([
-      ['Home', APP_ROUTES.DASHBOARD],
+      ['Inbox', APP_ROUTES.DASHBOARD],
       ['Work', APP_ROUTES.LIBRARY],
       ['Audience', APP_ROUTES.CONTACTS_AUDIENCE],
     ]);
@@ -152,7 +152,7 @@ describe('DashboardNav', () => {
 
     expect(
       document.querySelector('[data-navigation-item-id="inbox"]')
-    ).toHaveAccessibleName('Home');
+    ).toHaveAccessibleName('Inbox');
     expect(getByRole('link', { name: 'New Chat' })).toBeInTheDocument();
   });
 
@@ -183,7 +183,7 @@ describe('DashboardNav', () => {
 
     expect(
       document.querySelector('[data-navigation-item-id="inbox"]')
-    ).toHaveAccessibleName('Home');
+    ).toHaveAccessibleName('Inbox');
   });
 
   it('keeps the exact customer IA invariant for admin users', () => {

@@ -274,9 +274,14 @@ apps/desktop/src/*
 # Vitest junit output (generated; never commit — caused recurring PR conflicts)
 *.junit.xml
 test-report.*.flaky.json
+test-report.flaky.json
 
 # marketing architecture loop state (JOV loop, 2026-07-06)
 .context/marketing-architecture/
 
 # Build-time copies of monorepo runtime files (apps/web/scripts/stage-runtime-data.mjs)
 apps/web/runtime-data/
+
+# Stryker mutation runs (scripts/mutation-diff.mjs)
+.stryker-tmp/
+**/reports/mutation/

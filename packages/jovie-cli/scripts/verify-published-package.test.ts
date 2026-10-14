@@ -36,6 +36,14 @@ function template() {
 }
 
 describe('published artifact and registry identity', () => {
+  it('keeps the generated release description within the MCP registry schema', () => {
+    const manifest = createRegistryManifest(template(), '26.10.3');
+
+    expect(typeof manifest.description).toBe('string');
+    const characters = Array.from(manifest.description);
+    expect(characters.length).toBeGreaterThanOrEqual(1);
+    expect(characters.length).toBeLessThanOrEqual(100);
+  });
   it('accepts only byte-identical tested archive and stamps an immutable template copy', () => {
     expect(() =>
       verifyPublishedPackage(metadata(), bytes, version)

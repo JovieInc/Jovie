@@ -821,10 +821,12 @@ jobs:
             scripts/lib/pr-size-guard-policy.mjs
             scripts/lib/repo-hygiene-limits.mjs
             scripts/ci-fast-lanes.mjs
+            scripts/lib/test-file-dependencies.mjs
             scripts/invariants/scanned-paths.mjs
             LESSONS.guards.json
             scripts/invariants/overlay-layer-contract.mjs
             scripts/invariants/design-surfaces.mjs
+            scripts/invariants/product-reference-coherence.mjs
             scripts/invariants/done-sprint-invariants.mjs
             scripts/invariants/ios-web-no-scroll-jank.mjs
             scripts/invariants/latency-sensitive-execution-paths.mjs

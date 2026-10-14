@@ -20,6 +20,7 @@ import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { enqueuePaidWelcomeAfterEntitlement } from '@/lib/email/paid-welcome';
+import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { captureCriticalError, logFallback } from '@/lib/error-tracking';
 import { attributeLeadPaidConversionByAppUserId } from '@/lib/leads/funnel-events';
 import {
@@ -228,7 +229,7 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
     plan: string
   ): Promise<void> {
     const displayName = await this.getUserDisplayName(appUserId);
-    const planName = plan === 'max' || plan === 'growth' ? 'Max' : 'Pro';
+    const planName = getPlanDisplayName(plan);
 
     await notifySlackUpgrade(displayName, planName);
   }

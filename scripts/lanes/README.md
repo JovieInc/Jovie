@@ -38,7 +38,7 @@ The harness, not the model, owns:
 | Gate seats (`LANES_GATE_SLOTS`, default 2 per host) and streamed gate logs | `gate_slot()`, `sh(stream=True)` |
 | Host-local exact-head gate reservation before adoption setup or original verification; claims are never proof | `reserve_gate()`, `claim_adoptable_pr()`, `gate_pr()` |
 | Gate timeouts are transient: re-gated by adopt, held only after 3 on one head | `gate_timeouts()` |
-| Landing: only a gate-passing PR is marked ready and auto-merged; CI and the queue decide | `gate_pr()`, `requeue_verified()` |
+| Landing: only a gate-passing PR is marked ready. Lanes never arm auto-merge or enqueue: Merge Queue Green Enroll is the sole queue writer and admits the ready head | `gate_pr()`, `requeue_verified()` |
 | Receipts (`runs/ledger.jsonl`) bind Linear issue, provider/account class and lease, worktree/branch, PR/head or terminal failure; per-run log and prompt, Linear handoff comments | `run_issue()`, `codex_lane.record_lease()`, `worker()` |
 | Retry to Todo with no backoff; 3 failures park the issue on this host until the next lanes release (no Backlog sink); a provider error returns the issue to Todo and cools the lane only on a measured limit (exit 75); not-shippable goes to Backlog once | `worker()`, `failure_rejection()`, `cool_down()` |
 | Fix loop owns every open non-draft PR in the repo (red checks, conflicts, changes requested), reconciles live state before checkout/install/push, 2 attempts per head, then the escalation ladder | `fix_candidates()`, `reconcile_fix_target()`, `red_pr()`, `escalate_exhausted()`, `remediation.py` |
@@ -102,13 +102,14 @@ gate policy digest and sensitive-review mode. Legacy SHA strings were claim mark
 not certification, and are ignored. Failed setup and transient timeouts remain
 retryable; legacy held records, active repairs and spent generations retain their
 existing dispositions without being converted into certification. A changed or
-unreadable remote/local head cannot publish proof; enqueue requests bind the expected
-head with `--match-head-commit`. A reused terminal result is reported as
+unreadable remote/local head cannot publish proof. A reused terminal result is reported as
 `gate-already-completed`, not another landing.
 
 Every existing publisher (`gate_pr`, event `ready_green`, `requeue_verified` and
 repair completion) now converges on `publish_verified`. A successful completed
-proof is required before ready or enqueue. Repair completion records exact-head
+proof is required before ready; `requeue.json` retries a failed ready. Publication
+ends at ready: Merge Queue Green Enroll is the sole queue writer (2026-10-13), so
+lanes never arm auto-merge or enqueue a Jovie PR. Repair completion records exact-head
 intent and ended-owner provenance for the existing adopter; it does not enqueue
 directly or replenish the repair budget. A final successful self-push can receive
 its first gate after the owner ends, including the gap before its final ledger

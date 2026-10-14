@@ -163,6 +163,21 @@ describe('TableHeaderCell (molecule)', () => {
     expect(container.querySelector('th')).not.toHaveClass('px-1.5');
   });
 
+  it('puts a plain label on the same seam as its body cells', () => {
+    const { container } = renderCell({
+      canSort: false,
+      tableHeaderClass: 'px-3 py-1.5',
+      header: mockHeader('Artist', { className: 'px-2' }),
+    });
+    const th = container.querySelector('th');
+    // Same padding source as the body <td> (px-3, then column meta).
+    expect(th).toHaveClass('px-2');
+    expect(th).not.toHaveClass('px-3');
+    const label = th?.firstElementChild;
+    expect(label).toHaveClass('px-0');
+    expect(label).not.toHaveClass('px-3');
+  });
+
   it('keeps column heading cells bounded to one line', () => {
     const { container } = renderCell();
     expect(container.querySelector('th')).toHaveClass('whitespace-nowrap');

@@ -218,7 +218,7 @@ describe('Plan Configuration (Entitlement Registry)', () => {
 
     it('returns correct display names', () => {
       expect(getPlanDisplayName('free')).toBe('Free');
-      expect(getPlanDisplayName('pro')).toBe('Pro');
+      expect(getPlanDisplayName('pro')).toBe('Artist Presence');
       expect(getPlanDisplayName('max')).toBe('Max');
     });
 

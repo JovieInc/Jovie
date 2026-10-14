@@ -1007,7 +1007,7 @@
       },
       "deterministicProbes": [
         "pnpm run test:coverage:diff",
-        "pnpm --filter @jovie/web run test:mutation:hotspots",
+        "node scripts/mutation-diff.mjs --base origin/main",
         "pnpm run evals",
         "pnpm run test:quarantine-ledger"
       ],

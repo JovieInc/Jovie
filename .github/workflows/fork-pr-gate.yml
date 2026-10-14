@@ -42,11 +42,10 @@ on:
   # workflow never checks out PR code, so re-evaluating metadata is safe.
   pull_request_review:
     types: [submitted, dismissed]
-  # Active native-queue required-context producer. Source approval is mutable
-  # after its status turns green, so revalidate every member of the exact
-  # synthetic group before reproducing the required context on the combined head.
-  merge_group:
-    types: [checks_requested]
+  # The merge-group "Fork PR Gate" context is produced by PR Size Guard's
+  # workflow from the same member reads (--also=fork, JOV-7744): one producer
+  # spends the repo's shared GITHUB_TOKEN quota once per group, not twice
+  # (2026-10-13 01:55Z and 03:40Z storms).
 
 permissions: {}
 
@@ -61,35 +60,6 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'merge_group' }}
 
 jobs:
-  merge-group-gate:
-    name: ${{ github.event_name == 'merge_group' && 'Fork PR Gate' || 'Fork PR Gate (merge-group inactive)' }}
-    if: github.event_name == 'merge_group'
-    runs-on: ubuntu-latest
-    timeout-minutes: 3
-    permissions:
-      contents: read
-      pull-requests: read
-    steps:
-      - name: Check out trusted queue policy
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          # ALLGREEN may set base_sha to a prior synthetic group commit. Run
-          # policy only from the protected default branch, never queue refs.
-          ref: main
-          persist-credentials: false
-          sparse-checkout: |
-            scripts/lib/merge-group-member-policy.mjs
-            scripts/lib/pr-size-guard-policy.mjs
-            scripts/lib/repo-hygiene-limits.mjs
-          sparse-checkout-cone-mode: false
-
-      - name: Revalidate every merge-group member's fork policy
-        env:
-          # The synthetic head controls this workflow definition. Never expose
-          # an App private key here; the read-only ephemeral token is enough.
-          GH_TOKEN: ${{ github.token }}
-        run: node scripts/lib/merge-group-member-policy.mjs --policy=fork
-
   # Fast path: Dependabot PRs are internal (not forks) but pull_request runs
   # in dependabot's restricted secret context. Run via pull_request_target so
   # the Jovie Bot App private key is available — the branch ruleset requires

@@ -28,6 +28,13 @@ describe('Card', () => {
     expect(card.className).toContain('motion-reduce:transition-none');
   });
 
+  it('stays fluid inside flex and grid containers without overflowing', () => {
+    render(<Card data-testid='card'>Card content</Card>);
+    const card = screen.getByTestId('card');
+    expect(card.className).toContain('min-w-0');
+    expect(card.className).toContain('max-w-full');
+  });
+
   it('applies hoverable variant classes', () => {
     render(
       <Card variant='hoverable' data-testid='card'>

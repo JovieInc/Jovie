@@ -72,6 +72,7 @@ const SAME_ORIGIN_EXTERNAL_ROUTE_PREFIXES = [
   '/engineering',
   '/go',
   '/instant-merch',
+  '/integrations',
   '/investors',
   '/launch',
   '/legal',

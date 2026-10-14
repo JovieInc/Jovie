@@ -52,6 +52,11 @@ export function readConfiguredMerges() {
   return configuredReaders['github-merges']();
 }
 
+/** jov.ie build-info plus commits behind main, through the shared cache. */
+export function readConfiguredLiveBuild() {
+  return configuredReaders['live-build-info']();
+}
+
 /** A warm instance has a projection to serve before reconciling. */
 export function hasCachedConfiguredShippingState(): boolean {
   return getLastKnownShippingState() != null;

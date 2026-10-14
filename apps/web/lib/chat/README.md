@@ -6,7 +6,7 @@ Provider-neutral chat-turn pipeline. Wraps the Vercel AI SDK with Jovie-specific
 
 `run.ts:executeChatTurn()` is the entry point. The pipeline:
 
-1. **Knowledge selection** — `knowledge/router.ts` extracts relevant industry context from the last few user turns (topics in `knowledge/topics.ts`).
+1. **Knowledge retrieval** — `knowledge/retrieval.ts` sends the last few user turns through gbrain's hybrid query, formats curated canon ahead of lower-confidence raw evidence with citation labels, and falls back to the bundled topic selector in `knowledge/router.ts` when gbrain is unavailable.
 2. **System prompt** — `system-prompt.ts:buildSystemPrompt()` composes artist context, discography summary, plan capabilities, and tool docs. `buildSystemPromptParts()` splits it into a stable prefix (sent first with an Anthropic cache breakpoint) and per-turn context (knowledge, usage counters, referenced entities, pinned card). Tool calls older than the last two user turns are pruned before the model call, and every call is tagged `feature:<functionId>` + `app:web` for AI Gateway spend reporting.
 3. **Message conversion** — UIMessage history → AI SDK ModelMessage format.
 4. **Model selection** — frontier model by default; `forceLightModel` (Statsig kill-switch) routes to the cheaper/faster model. Free-tier short-intent traffic also routes light.
@@ -20,7 +20,8 @@ Key files:
 - `tool-schemas.ts` — Zod schemas (shared with eval / test runners)
 - `tool-ui-registry.ts` / `tool-events.ts` — UI affordances and event types for streamed tool calls
 - `command-registry.ts` — slash-command intents
-- `knowledge/router.ts` + `knowledge/topics.ts` — knowledge retrieval
+- `knowledge/retrieval.ts` — gbrain hybrid retrieval, confidence tiers, and citation context
+- `knowledge/router.ts` + `knowledge/topics.ts` — bundled fallback knowledge
 - `submit-feedback.ts` — concrete tool implementation called from the route's free tool set
 - `tokens.ts` — token estimation for budget guards
 

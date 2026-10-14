@@ -7,15 +7,16 @@
 ## Purpose
 
 The testing agent ranks high-risk surfaces after relevant evidence changes, runs deterministic test lanes,
-optionally exercises Stryker mutation hotspots, and emits a compact report
-for the admin ops panel and `docs/NIGHTLY_TESTING_AGENT_REPORT.md`.
+and emits a compact report
+for the admin ops panel and `docs/NIGHTLY_TESTING_AGENT_REPORT.md`. Mutation
+testing runs in the separate `Mutation Diff` workflow (see `docs/TESTING_GUIDELINES.md`).
 
 ## Triggers
 
 | Workflow | Causal event | Purpose |
 |----------|--------------|---------|
 | `Changed-Evidence Test Suites` | Relevant web/shared/toolchain push to `main` | Full unit + E2E suite, Knip audit |
-| `Nightly Testing Agent` | Test, mutation config, or harness push to `main` | Risk scoring, unit telemetry, mutation hotspots, report |
+| `Nightly Testing Agent` | Test or harness push to `main` | Risk scoring, unit telemetry, report |
 
 Manual dispatch remains available for a bounded diagnostic run. Twenty-four hours
 without a matching input change launches neither workflow.
@@ -28,7 +29,6 @@ This automation is intentionally **LLM-free**:
 |------|------|-------|
 | Context + target selection | $0 | Reads manifests + local failure memory |
 | Unit telemetry | $0 | Reuses existing Vitest JUnit output |
-| Mutation hotspots | $0 | Stryker on curated files only; incremental mode |
 | Report generation | $0 | Markdown + JSON from normalized telemetry |
 | Redis publish | ~$0 | One `SET` per run via existing Upstash REST |
 

@@ -33,7 +33,7 @@ export const Visible: Story = {
       priceUsd: 199,
       label: 'Digital Footprint & Visibility Audit — $199',
       detail:
-        'This $199 audit is credited toward the first month of Artist Visibility Pro ($199/mo).',
+        'This $199 audit is credited toward the first month of Artist Presence ($199/mo).',
     }),
   },
 };

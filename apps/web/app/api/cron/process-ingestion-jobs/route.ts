@@ -14,6 +14,7 @@
 
 import { NextResponse } from 'next/server';
 import { verifyCronRequest } from '@/lib/cron/auth';
+import { withRetry } from '@/lib/db';
 import { captureError } from '@/lib/error-tracking';
 import {
   claimPendingJobs,
@@ -42,8 +43,9 @@ export async function GET(request: Request) {
   const errors: string[] = [];
 
   try {
-    const claimed = await withSystemIngestionSession(tx =>
-      claimPendingJobs(tx, now, 5)
+    const claimed = await withRetry(
+      () => withSystemIngestionSession(tx => claimPendingJobs(tx, now, 5)),
+      'ingestion.claimPendingJobs'
     );
 
     attempted = claimed.length;

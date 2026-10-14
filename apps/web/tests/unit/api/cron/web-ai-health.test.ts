@@ -36,7 +36,7 @@ function receipt(status: 'passed' | 'failed'): WebAiHealthReceipt {
     signal: { severity: 'high', route: 'bug' },
     gatewayAllowlist: {
       name: 'founder-strict-2026-09-17',
-      models: ['zai/glm-5.3', 'zai/glm-5.3-flash'],
+      models: ['typesafe-ai/jev', 'zai/glm-5.3', 'zai/glm-5.3-flash'],
     },
     results: [
       {

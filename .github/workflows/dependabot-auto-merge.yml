@@ -5,20 +5,19 @@ name: Dependabot Auto-Merge
 # necessary-trust-boundary: pull_request_target reads trusted base policy before reconciling Dependabot-authored PR state.
 # revisit-trigger: Remove this hop when Dependabot exposes equivalent exact-head recreate and native-admission policy hooks.
 
-# Records native merge intent for certified patch updates and stable-version
-# minor updates. The event actor is not the authority: maintainer and
-# controller synchronizations must preserve policy derived from the PR author
-# and Dependabot metadata.
+# Reconciles Dependabot PR state (recreate conflicts, reopen unheld closes,
+# note majors). It never arms auto-merge or enqueues: Merge Queue Green Enroll
+# is the sole queue writer and admits green Dependabot heads like any other PR
+# (queue writer consolidation, 2026-10-13). The event actor is not the
+# authority: policy derives from the PR author and Dependabot metadata.
 #
 # fetch-metadata refuses heads that no longer contain only Dependabot commits
 # (maintainer rebase). That refusal must skip/succeed, never fail: a FAILURE
-# check makes mergeStateStatus UNSTABLE and blocks native auto-merge even when
-# every required gate is green. Do not disable commit certification — uncertified
-# heads must not receive patch/minor native intent from this job. A successful
+# check makes mergeStateStatus UNSTABLE and keeps green enroll from admitting
+# the head. Do not disable commit certification.
 #
-# Patch updates and metadata-confirmed stable-version minors may record native
-# merge intent. Pre-1.0 minors and majors remain open for review. Confirmed
-# conflicts are recreated; unmerged closes without a durable hold are reopened.
+# Confirmed conflicts are recreated; unmerged closes without a durable hold
+# are reopened.
 # Re-evaluate when: a patch/minor update with these receipts causes a rollback.
 # Then: narrow the affected package family, not the global safe-update lane
 # (JOV-5465).
@@ -64,7 +63,6 @@ jobs:
             .nvmrc
             scripts/dependabot-update-policy.mjs
             scripts/dependabot-workflow-run-adapter.mjs
-            scripts/native-merge-intent.mjs
             scripts/lib/source-admission-policy.mjs
             scripts/lib/product-lane-classifier.mjs
             scripts/lib/merge-group-member-policy.mjs
@@ -108,7 +106,7 @@ jobs:
           PR_URL: ${{ steps.run-context.outputs.pr_url || github.event.pull_request.html_url }}
         run: |
           echo "fetch-metadata could not certify Dependabot commits on $PR_URL."
-          echo "Expected after a maintainer rebase. No native merge intent is recorded for an uncertified event."
+          echo "Expected after a maintainer rebase. No reconciliation runs for an uncertified event."
           echo "This job succeeds so mergeStateStatus is not UNSTABLE."
 
       - name: Classify exact Dependabot event
@@ -120,9 +118,7 @@ jobs:
         run: node scripts/dependabot-update-policy.mjs
 
       - name: Generate narrowly scoped Jovie App token
-        if: >-
-          steps.policy.outputs.decision == 'queue' ||
-          steps.policy.outputs.decision == 'queue-recovered'
+        if: steps.policy.outputs.decision == 'queue-recovered'
         id: app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
@@ -132,29 +128,6 @@ jobs:
           permission-contents: write
           permission-pull-requests: write
           permission-statuses: read
-
-      - name: Record exact native merge intent
-        if: steps.policy.outputs.decision == 'queue'
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          GH_REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ steps.run-context.outputs.pr_number || github.event.pull_request.number }}
-          PR_HEAD: ${{ steps.run-context.outputs.head_sha || github.event.pull_request.head.sha }}
-          RECEIPT_DIR: ${{ runner.temp }}/dependabot-native-merge-intent
-        run: |
-          set +e
-          result=$(node scripts/native-merge-intent.mjs \
-            --repo "$GH_REPO" \
-            --pr "$PR_NUMBER" \
-            --head "$PR_HEAD" \
-            --base main \
-            --receipt-dir "$RECEIPT_DIR" 2>&1)
-          status=$?
-          set -e
-          echo "$result"
-          if [ "$status" -ne 0 ]; then
-            echo "::warning::Native merge intent was not confirmed for PR #$PR_NUMBER; exact-head state and native gates remain authoritative."
-          fi
 
       - name: Recreate confirmed-conflict safe update
         if: steps.policy.outputs.decision == 'recreate'

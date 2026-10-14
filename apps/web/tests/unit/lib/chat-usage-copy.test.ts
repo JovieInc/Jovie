@@ -69,7 +69,7 @@ describe('getChatUsageCopy', () => {
 
     expect(copy.state).toBe('exhausted');
     expect(copy.headerLabel).toBe('Weekly chat limit reached');
-    expect(copy.ctaLabel).toBe('Upgrade to Pro');
+    expect(copy.ctaLabel).toBe('Upgrade to Artist Presence');
   });
 
   it('does not treat trial users as Free for upgrade copy', () => {

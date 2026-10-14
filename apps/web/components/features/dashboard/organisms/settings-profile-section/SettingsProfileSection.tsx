@@ -82,7 +82,9 @@ export function SettingsProfileSection({
 
   return (
     <SettingsPanel
-      title='Profile'
+      // The page section is already titled Profile; this panel keeps the
+      // name its loading skeleton shows, so nothing renames on load.
+      title='Identity'
       description='Display name, username, image, and place details fans see.'
       actions={<SettingsStatusPill status={profileSaveStatus} />}
     >

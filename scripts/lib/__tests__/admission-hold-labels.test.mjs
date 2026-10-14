@@ -1,15 +1,16 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
 import {
-  chmodSync,
+  existsSync,
+  mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { delimiter, join } from 'node:path';
+import { dirname, join, normalize } from 'node:path';
 import { test } from 'node:test';
 import { CONTRACT_LABELS } from '../../hold-contract.mjs';
 import {
@@ -107,101 +108,113 @@ test('every enroll, dequeue, and auto-merge copy matches the canonical set', () 
     rearm.with['sparse-checkout'],
     /scripts\/lib\/admission-hold-labels\.json\n\s*scripts\/lib\/admission-hold-labels\.mjs/
   );
-
-  const enable = readWorkflow('auto-merge-default.yml').jobs.enable.steps.find(
-    s => s.name === 'Enable auto-merge'
-  ).run;
-  assert.deepEqual(
-    sorted([...enable.matchAll(/\. == "([^"]+)"/g)].map(m => m[1])),
-    sorted(ADMISSION_BLOCKING_LABELS)
-  );
-
-  const {
-    BLOCKING_LABELS,
-  } = require('../../../.github/scripts/customer-notes-ready.js');
-  assert.deepEqual(sorted(BLOCKING_LABELS), sorted(ADMISSION_BLOCKING_LABELS));
 });
 
-// Runs the real enable step against a fake gh: a held PR must never be armed,
-// because arming a CLEAN PR enqueues it and a held member fails every group.
-function runEnable(labels, { isDraft = false, env: extraEnv = {} } = {}) {
-  const dir = mkdtempSync(join(tmpdir(), 'auto-merge-enable-'));
+// Auto-Merge Default was retired as a second queue writer; green enroll is the
+// only active workflow that arms or enqueues, so a held head has one admission
+// path to guard. agent-pipeline.yml is disabled_manually in GitHub and is
+// deleted with the other dormant agent landing controllers.
+// A queue writer enqueues, or arms native auto-merge (GitHub enqueues an armed
+// PR when it turns green, even after the arming workflow is disabled).
+const QUEUE_WRITE =
+  /\benqueuePullRequest\b|\benablePullRequestAutoMerge\b|\bpr merge\b[^\n]*\s--auto\b|['"]--auto['"]/;
+// Interpreter-invoked scripts only: a path in a string map or a test is not a call.
+const RUN = String.raw`(?:node|bash|sh|python3?|tsx)\s+(?:-[\w=.-]+\s+)*["']?`;
+const SCRIPT = String.raw`[\w./-]+\.(?:mjs|cjs|js|sh|py)`;
+const uncommented = text =>
+  text
+    .split('\n')
+    .filter(line => !/^\s*(#|\/\/|\*)/.test(line))
+    .join('\n');
+const invokedScripts = (path, source, root) =>
+  [
+    ...[
+      ...source.matchAll(
+        new RegExp(`${RUN}((?:\\.github\\/)?scripts\\/${SCRIPT})`, 'g')
+      ),
+    ].map(m => join(root, m[1])),
+    ...[
+      ...source.matchAll(
+        new RegExp(`${RUN}\\$\\{?(?:SCRIPT_DIR|HERE)\\}?\\/(${SCRIPT})`, 'g')
+      ),
+    ].map(m => normalize(join(dirname(path), m[1]))),
+  ].filter(ref => !/__tests__|\/tests\/|\.test\./.test(ref));
+/** @returns {string[] | null} the call chain that reaches a queue write */
+const queueWriteChain = (path, root = '.', seen = new Set(), chain = []) => {
+  if (seen.has(path) || chain.length > 4 || !existsSync(path)) return null;
+  seen.add(path);
+  const source = uncommented(readFileSync(path, 'utf8'));
+  if (QUEUE_WRITE.test(source)) return [...chain, path];
+  for (const ref of invokedScripts(path, source, root)) {
+    const hit = queueWriteChain(ref, root, seen, [...chain, path]);
+    if (hit) return hit;
+  }
+  return null;
+};
+
+// Auto-Merge Default was retired as a second queue writer; green enroll is the
+// only active workflow that arms or enqueues, so a held head has one admission
+// path to guard. The scan follows invoked scripts, so a writer cannot hide
+// behind `run: node scripts/...`.
+test('merge-queue-green-enroll is the only workflow that arms or enqueues PRs', () => {
+  const writers = readdirSync('.github/workflows')
+    .filter(name => /\.ya?ml$/.test(name))
+    .map(name => queueWriteChain(`.github/workflows/${name}`))
+    .filter(Boolean)
+    .map(chain => chain.join(' -> '));
+  // Tolerated only while they exist (both disabled_manually in GitHub); deleting
+  // them must not turn this red, and no other workflow may join them.
+  const dormant = [
+    '.github/workflows/agent-pipeline.yml',
+    '.github/workflows/rolling-ci-dispatch.yml',
+  ];
+  assert.deepEqual(
+    writers.filter(chain => !dormant.some(name => chain.startsWith(name))),
+    ['.github/workflows/merge-queue-green-enroll.yml']
+  );
+});
+
+test('the queue-writer scan follows invoked scripts but not mentions', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'queue-writer-scan-'));
   try {
-    const log = join(dir, 'calls.log');
-    const fake = join(dir, 'gh');
+    mkdirSync(join(dir, 'scripts'));
+    const at = name => join(dir, name);
+    writeFileSync(at('scripts/arm.sh'), 'gh pr merge "$n" -R "$R" --auto\n');
+    writeFileSync(at('scripts/hop.sh'), 'bash "$SCRIPT_DIR/arm.sh"\n');
+    writeFileSync(at('scripts/off.sh'), 'gh pr merge "$n" --disable-auto\n');
+    writeFileSync(at('run.yml'), 'run: bash scripts/hop.sh\n');
     writeFileSync(
-      fake,
-      `#!/usr/bin/env bash
-printf '%s\\n' "$*" >> "${log}"
-jq_expr=""; json=""
-while [ $# -gt 0 ]; do
-  case "$1" in
-    --jq) jq_expr="$2"; shift ;;
-    --json) json="$2"; shift ;;
-  esac
-  shift
-done
-case "$json" in
-  labels) printf '%s' '{"labels":${JSON.stringify(labels.map(name => ({ name })))}}' | jq -r "$jq_expr" ;;
-  state,isDraft) printf '%s' '{"state":"OPEN","isDraft":${isDraft}}' | jq -r "$jq_expr" ;;
-  headRefOid) echo ${'a'.repeat(40)} ;;
-  autoMergeRequest) echo "" ;;
-  "") echo '[[]]' ;;
-esac
-`
+      at('note.yml'),
+      '# bash scripts/arm.sh\nrun: echo scripts/arm.sh\n'
     );
-    chmodSync(fake, 0o755);
-    const run = readWorkflow('auto-merge-default.yml').jobs.enable.steps.find(
-      s => s.name === 'Enable auto-merge'
-    ).run;
-    const result = spawnSync('bash', ['-c', run], {
-      encoding: 'utf8',
-      env: {
-        ...process.env,
-        PATH: `${dir}${delimiter}${process.env.PATH}`,
-        GH_TOKEN: 'token',
-        PR_NUMBER: '7',
-        HEAD_REPO: 'JovieInc/Jovie',
-        BASE_REPO: 'JovieInc/Jovie',
-        ...extraEnv,
-      },
-    });
-    assert.equal(result.status, 0, result.stderr);
-    return {
-      stdout: result.stdout,
-      merged: readFileSync(log, 'utf8')
-        .split('\n')
-        .some(line => line.startsWith('pr merge 7')),
-    };
+    writeFileSync(at('off.yml'), 'run: bash scripts/off.sh\n');
+    assert.deepEqual(queueWriteChain(at('run.yml'), dir), [
+      at('run.yml'),
+      at('scripts/hop.sh'),
+      at('scripts/arm.sh'),
+    ]);
+    assert.equal(queueWriteChain(at('note.yml'), dir), null);
+    assert.equal(queueWriteChain(at('off.yml'), dir), null);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
-}
-
-test('the auto-merge enable step skips held PRs and arms unheld ones', () => {
-  for (const label of ['tim:hold', 'Gated', 'queue-poison']) {
-    const held = runEnable(['ui', label]);
-    assert.equal(held.merged, false, label);
-    assert.match(held.stdout, /admission-blocking label/);
-  }
-  assert.equal(runEnable(['ui']).merged, true);
 });
 
-test('a Source Validation completion re-arms a missed same-repo enable but never a draft', () => {
-  const enable = readWorkflow('auto-merge-default.yml');
-  assert.deepEqual(enable.on.workflow_run, {
-    workflows: ['Source Validation'],
-    types: ['completed'],
-  });
-  assert.ok(enable.on.pull_request.types.includes('synchronize'));
+test('green enroll wakes on ready_for_review but never runs enroll for a draft event', () => {
+  const enroll = readWorkflow('merge-queue-green-enroll.yml');
+  assert.ok(enroll.on.pull_request_target.types.includes('ready_for_review'));
+  assert.ok(enroll.on.pull_request_target.types.includes('synchronize'));
   assert.match(
-    enable.jobs.enable.if,
-    /workflow_run\.pull_requests\[0\]\.number != null/
+    enroll.jobs.enroll.if,
+    /github\.event_name != 'pull_request_target' \|\| github\.event\.pull_request\.draft == false/
   );
-  assert.match(
-    enable.jobs.enable.if,
-    /head_repository\.full_name == github\.repository/
-  );
-  assert.equal(runEnable([], { isDraft: true }).merged, false);
-  assert.equal(runEnable([]).merged, true);
+});
+
+// Agents defer PRs with `queue-deferred`; the sole queue writer must honor it
+// like any other stop label (queue writer consolidation, 2026-10-13).
+test('queue-deferred blocks admission and is governed by the hold contract', () => {
+  assert.ok(STOP_HOLD_LABELS.includes('queue-deferred'));
+  assert.ok(ADMISSION_BLOCKING_LABELS.includes('queue-deferred'));
+  assert.ok(CONTRACT_LABELS.includes('queue-deferred'));
+  assert.ok(MEMBER_POLICY_HOLD_LABELS.has('queue-deferred'));
 });

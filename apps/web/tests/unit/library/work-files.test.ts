@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  classifyWorkAttachment,
   deriveWorkFiles,
   fileNameFromMediaUrl,
 } from '@/lib/library/work-files';
@@ -87,5 +88,21 @@ describe('deriveWorkFiles', () => {
     expect(docFiles).toEqual([
       expect.objectContaining({ kind: 'document', accessLabel: 'Private' }),
     ]);
+  });
+});
+
+describe('classifyWorkAttachment', () => {
+  it.each([
+    ['take-me-over.mp3', 'audio/mpeg', 'audio'],
+    ['master.wav', '', 'audio'],
+    ['cover.png', 'image/png', 'artwork'],
+    ['cover.HEIC', '', 'artwork'],
+    ['teaser.mov', 'video/quicktime', 'video'],
+    ['one-sheet.pdf', 'application/pdf', 'document'],
+    ['lyrics.txt', 'text/plain', 'document'],
+    ['stems.zip', 'application/zip', 'download'],
+    ['project.als', 'application/octet-stream', 'unknown'],
+  ] as const)('detects %s (%s) as %s', (name, type, kind) => {
+    expect(classifyWorkAttachment({ name, type })).toBe(kind);
   });
 });

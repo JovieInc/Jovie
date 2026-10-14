@@ -26,8 +26,8 @@ constraint; spawn noise is the cheapest capacity to buy back.
    Auto-Ready has two wakes: writer-proof recovery stays manual, and
    green-source undraft listens to successful `workflow_run` / `check_suite`
    for required source checks (not `synchronize`, not cron).
-   `auto-merge-default.yml` is the sole `ready_for_review` subscriber
-   (JOV-INV-029): the enable job turns on native auto-merge when a PR leaves
+   `merge-queue-green-enroll.yml` is the sole `ready_for_review` subscriber
+   (JOV-INV-029): its enroll job admits an already-green head when a PR leaves
    draft and still skips drafts. That listener does not restart CI — an
    unchanged head never earns a second CI flight. No other workflow may listen
    to `ready_for_review`.

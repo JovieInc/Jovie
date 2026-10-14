@@ -8,6 +8,9 @@ name: Merge Queue Green Enroll
 # promote and a red main are separate issues from source admission, so green
 # PRs keep entering the native queue while promotion is held.
 #
+# The only writer that puts PRs into the merge queue (Auto-Merge Default's
+# auto-merge arming and hourly triage were retired as duplicates of this
+# workflow and of the lanes stuck-PR ladder).
 # Enqueues open, non-draft, same-repo PRs into main whose required checks are
 # green with no conflicts (mergeStateStatus CLEAN, HAS_HOOKS or UNSTABLE: an
 # UNSTABLE head only has a non-required check pending or red, which the
@@ -26,8 +29,11 @@ on:
   workflow_run:
     workflows: ['Source Validation', 'CI', 'Fork PR Gate', 'PR Size Guard']
     types: [completed]
+  # ready_for_review: leaving draft emits no check completion (JOV-INV-029:
+  # an unchanged head never earns a second CI flight), so this is the wake
+  # that admits an already-green head. Sole ready_for_review subscriber.
   pull_request_target:
-    types: [labeled, unlabeled, reopened, synchronize]
+    types: [labeled, unlabeled, reopened, ready_for_review, synchronize]
   # Event-driven reconciliation (JOV-7589): every landing on main re-scans the
   # roster (re-enrolls green heads whose dequeue left no wake) and re-checks
   # hold receipts, so neither waits on a timer. Pushes coalesce into the one
@@ -40,13 +46,17 @@ on:
         description: 'Log eligible PRs without enqueueing'
         required: false
         default: 'false'
+      pr_number:
+        description: 'Admit only this PR (per-PR path, no roster sweep); empty sweeps every open PR'
+        required: false
+        default: ''
 
 permissions: {}
 
 concurrency:
   # A global pending slot loses another PR's final wake. Coalesce only wakes
   # attributed to the same PR; association-free receipts retain their run ID.
-  group: merge-queue-green-enroll-${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'push') && 'reconcile' || github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.id || github.run_id }}
+  group: merge-queue-green-enroll-${{ ((github.event_name == 'workflow_dispatch' && inputs.pr_number == '') || github.event_name == 'push') && 'reconcile' || inputs.pr_number || github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.id || github.run_id }}
   cancel-in-progress: false
 
 jobs:
@@ -116,9 +126,12 @@ jobs:
   enroll:
     name: Enqueue green PRs
     needs: [hold-failed-revision]
+    # QUEUE_FREEZE=1 (repo variable) admits nothing; holds and dequeues still run.
     if: >-
       always() &&
+      vars.QUEUE_FREEZE != '1' &&
       github.event.action != 'labeled' &&
+      (github.event_name != 'pull_request_target' || github.event.pull_request.draft == false) &&
       (github.event_name != 'workflow_run' ||
        (github.event.workflow_run.conclusion == 'success' &&
         (github.event.workflow_run.event == 'pull_request' ||
@@ -161,6 +174,7 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           DRY_RUN: ${{ inputs.dry_run || 'false' }}
+          DISPATCH_PR_NUMBER: ${{ inputs.pr_number || '' }}
           MERGE_STATE_RETRY_MS: '3000'
           FAILURE_HOLD_RECEIPT: ${{ needs.hold-failed-revision.outputs.failure_receipt || '' }}
           ADMISSION_RECOVERY_RECEIPT: ${{ needs.hold-failed-revision.outputs.admission_recovery_receipt || '' }}
@@ -177,6 +191,7 @@ jobs:
               `${process.env.GITHUB_WORKSPACE}/scripts/lib/admission-hold-labels.json`, 'utf8'
             ));
             const BLOCKING = new Set([...holdLabels.stopHoldLabels, holdLabels.queuePoisonLabel]);
+            const BREAKER_LABEL = 'queue-breaker';
             if (BLOCKING.size < 2) throw new Error('admission hold labels are unreadable');
             // Required checks green and no conflicts. UNSTABLE only adds a
             // non-required pending/red context (e.g. lane execution receipts).
@@ -193,8 +208,13 @@ jobs:
             // Use the triggering PR for automatic wakes. Scanning every eligible PR
             // on every check completion exhausts the shared app GraphQL quota.
             const validNumber = n => Number.isSafeInteger(n) && n > 0;
+            // A dispatch naming one PR takes the per-PR path; only an unnamed
+            // dispatch or a landing on main sweeps the roster.
+            const dispatchedPr = Number(process.env.DISPATCH_PR_NUMBER || 0);
+            const sweep = context.eventName === 'push' ||
+              (context.eventName === 'workflow_dispatch' && !validNumber(dispatchedPr));
             let prs;
-            if (['workflow_dispatch', 'push'].includes(context.eventName)) {
+            if (sweep) {
               // Reconciliation (a landing on main or a manual run)
               // keeps a complete paginated inventory.
               prs = await github.paginate(github.rest.pulls.list, {
@@ -202,7 +222,9 @@ jobs:
               });
             } else {
               let numbers = [];
-              if (context.eventName === 'pull_request_target') {
+              if (context.eventName === 'workflow_dispatch') {
+                numbers = [dispatchedPr];
+              } else if (context.eventName === 'pull_request_target') {
                 numbers = [context.payload.pull_request?.number].filter(validNumber);
               } else if (context.eventName === 'workflow_run') {
                 const run = context.payload.workflow_run || {};
@@ -252,7 +274,6 @@ jobs:
             // give an UNKNOWN PR one fresh read with no sleep, go
             // longest-waiting first, and stop at a time budget; the PRs left
             // over are re-read on their own events and on the next sweep.
-            const sweep = ['workflow_dispatch', 'push'].includes(context.eventName);
             const startedAt = Date.now();
             const budgetMs = Math.max(1000, Number(process.env.SWEEP_BUDGET_MS ?? 200000) || 200000);
             const overBudget = () => sweep && Date.now() - startedAt > budgetMs;
@@ -271,6 +292,13 @@ jobs:
                       commits(last: 1) { nodes { commit { committedDate } } }
                       timelineItems(last: 1, itemTypes: [REMOVED_FROM_MERGE_QUEUE_EVENT]) {
                         nodes { ... on RemovedFromMergeQueueEvent { createdAt reason } }
+                      }
+                      breakerEvents: timelineItems(last: 100, itemTypes: [REMOVED_FROM_MERGE_QUEUE_EVENT, LABELED_EVENT]) {
+                        nodes {
+                          __typename
+                          ... on RemovedFromMergeQueueEvent { createdAt reason }
+                          ... on LabeledEvent { createdAt label { name } }
+                        }
                       }
                       releases: timelineItems(last: 20, itemTypes: [UNLABELED_EVENT]) {
                         nodes { ... on UnlabeledEvent { createdAt label { name } } }
@@ -369,12 +397,38 @@ jobs:
               // release of that same head. A failed_checks removal never is,
               // and any revision failure hold still blocks first.
               const removalReason = String(pr.timelineItems.nodes[0]?.reason || 'unknown').toLowerCase();
+              // A circuit-breaker dequeue during a quota storm carries the
+              // queue-breaker marker (MERGE_QUEUE.md runbook). This job only
+              // runs while QUEUE_FREEZE is not 1, so a marked, still-green,
+              // unheld head is re-admitted and the marker removed; a plain
+              // manual dequeue without it keeps today's behavior.
+              const breakerMarked = pr.labels.nodes.some(l => l.name.toLowerCase() === BREAKER_LABEL);
+              const hasBreakerReceipt = currentPr => {
+                const events = currentPr.breakerEvents?.nodes || [];
+                const removalIndex = events.findLastIndex(
+                  event => event.__typename === 'RemovedFromMergeQueueEvent'
+                );
+                const removal = events[removalIndex];
+                if (removalIndex < 0 || removal?.createdAt !== lastRemoval ||
+                    String(removal?.reason || 'unknown').toLowerCase() !== 'manual') return false;
+                return events.slice(removalIndex + 1).some(event =>
+                  event.__typename === 'LabeledEvent' &&
+                  String(event.label?.name || '').toLowerCase() === BREAKER_LABEL
+                );
+              };
+              // The runbook adds the marker only after dequeue succeeds. Binding
+              // the ordered label event to the latest removal prevents a stale
+              // marker from reversing a later unrelated manual dequeue, even
+              // when GitHub gives both events the same timestamp.
+              const breakerRestore = Boolean(removedUnchangedHead) &&
+                failure.action === 'allow' && removalReason === 'manual' && breakerMarked &&
+                hasBreakerReceipt(pr);
               const releasedAfterManualRemoval = Boolean(removedUnchangedHead) &&
                 failure.action === 'allow' &&
                 removalReason === 'manual' &&
-                (pr.releases?.nodes || []).some(event =>
+                (breakerRestore || (pr.releases?.nodes || []).some(event =>
                   typeof event?.createdAt === 'string' && event.createdAt > lastRemoval &&
-                  BLOCKING.has(String(event.label?.name || '').toLowerCase()));
+                  BLOCKING.has(String(event.label?.name || '').toLowerCase())));
               const ownerHoldRelease = failurePolicy.ownerHoldReleaseIntent({
                 eventName: context.eventName, event: context.payload,
               });
@@ -418,6 +472,41 @@ jobs:
                 });
                 return disposition.reason === 'owner-hold-release' && disposition.removalAt === failure.removalAt;
               };
+              const breakerReleaseStillCurrent = async markerRequired => {
+                const sameRemoval = currentPr => {
+                  const removal = currentPr.timelineItems.nodes[0];
+                  const committedAt = currentPr.commits.nodes[0]?.commit.committedDate;
+                  return removal?.createdAt === lastRemoval &&
+                    String(removal?.reason || 'unknown').toLowerCase() === 'manual' &&
+                    (!committedAt || committedAt <= lastRemoval);
+                };
+                const hasMarker = currentPr => currentPr.labels.nodes.some(
+                  label => label.name.toLowerCase() === BREAKER_LABEL
+                );
+                const observed = await readCurrent();
+                if (!eligible(observed) || observed.id !== pr.id || observed.number !== pr.number ||
+                    observed.headRefOid !== pr.headRefOid || !sameRemoval(observed) ||
+                    !hasBreakerReceipt(observed) ||
+                    (markerRequired && !hasMarker(observed))) return false;
+                const freshStatuses = await github.paginate(
+                  github.rest.repos.listCommitStatusesForRef,
+                  { owner, repo, ref: observed.headRefOid, per_page: 100 }
+                );
+                const freshFailure = failurePolicy.revisionFailureDisposition({
+                  statuses: freshStatuses,
+                  repository: `${owner}/${repo}`,
+                  currentMainSha: freshStatuses.some(
+                    status => status?.context === failurePolicy.FAILURE_HOLD_CONTEXT
+                  ) ? await readMainSha() : undefined,
+                });
+                // Fence marker/hold/removal/head changes during status pagination.
+                // This is the final awaited read before the enqueue mutation.
+                const fresh = await readCurrent();
+                return eligible(fresh) && fresh.id === pr.id && fresh.number === pr.number &&
+                  fresh.headRefOid === observed.headRefOid && sameRemoval(fresh) &&
+                  hasBreakerReceipt(fresh) &&
+                  (!markerRequired || hasMarker(fresh)) && freshFailure.action === 'allow';
+              };
               const recoveryStillCurrent = async () => {
                 const fresh = await readCurrent();
                 if (!eligible(fresh) || fresh.id !== pr.id || fresh.number !== pr.number) return false;
@@ -451,6 +540,21 @@ jobs:
                 // that reservation spent and never reaches enqueue or a refund.
                 if (admissionRecovery && !await recoveryStillCurrent()) continue;
                 if (failure.reason === 'owner-hold-release' && !await ownerReleaseStillCurrent()) continue;
+                if (breakerRestore) {
+                  if (!await breakerReleaseStillCurrent(true)) continue;
+                  try {
+                    // Consume the operator's one-shot authorization before enqueue.
+                    // Failure is fail-closed so a stale marker can never authorize
+                    // a later manual dequeue of this unchanged head.
+                    await github.rest.issues.removeLabel({
+                      owner, repo, issue_number: pr.number, name: BREAKER_LABEL,
+                    });
+                  } catch (error) {
+                    core.warning(`#${pr.number} ${BREAKER_LABEL} not consumed: ${error.message}`);
+                    continue;
+                  }
+                  if (!await breakerReleaseStillCurrent(false)) continue;
+                }
                 enqueueAttempted = true;
                 const r = await github.graphql(`
                   mutation($id: ID!, $oid: GitObjectID!) {
@@ -460,6 +564,13 @@ jobs:
                   }`, { id: pr.id, oid: pr.headRefOid });
                 enqueued += 1;
                 core.notice(`ENQUEUED #${pr.number} at position ${r.enqueuePullRequest.mergeQueueEntry.position}`);
+                if (breakerMarked && !breakerRestore) {
+                  await github.rest.issues.removeLabel({
+                    owner, repo, issue_number: pr.number, name: BREAKER_LABEL,
+                  }).catch(error => core.warning(
+                    `#${pr.number} stale ${BREAKER_LABEL} not removed: ${error.message}`
+                  ));
+                }
               } catch (error) {
                 if (enqueueAttempted && failure.action === 'retry-once' && failurePolicy.enqueueWasRejected(error)) {
                   await writeRetry(failurePolicy.retryReleasedDescription(failure.latest));
@@ -498,6 +609,7 @@ jobs:
             scripts/hold-contract.mjs
             scripts/lib/admission-hold-labels.json
             scripts/lib/admission-hold-labels.mjs
+            scripts/lib/queue-deferral-receipt.mjs
           sparse-checkout-cone-mode: false
 
       - name: Set up pinned Node.js
@@ -530,7 +642,7 @@ jobs:
     if: >-
       github.event_name == 'pull_request_target' &&
       github.event.action == 'labeled' &&
-      contains(fromJSON('["hold","gated","incident","do-not-merge","tim-hold","tim:hold","hold:tim","queue-poison"]'), github.event.label.name)
+      contains(fromJSON('["hold","gated","incident","do-not-merge","tim-hold","tim:hold","hold:tim","queue-deferred","queue-poison"]'), github.event.label.name)
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions: {}
@@ -554,7 +666,7 @@ jobs:
             const sourceHead = context.payload.pull_request?.head?.sha;
             const rawLabel = context.payload.label?.name;
             const label = typeof rawLabel === 'string' ? rawLabel.toLowerCase() : null;
-            const blocking = new Set(['hold', 'gated', 'incident', 'do-not-merge', 'tim-hold', 'tim:hold', 'hold:tim', 'queue-poison']);
+            const blocking = new Set(['hold', 'gated', 'incident', 'do-not-merge', 'tim-hold', 'tim:hold', 'hold:tim', 'queue-deferred', 'queue-poison']);
             if (!Number.isSafeInteger(number) || number <= 0 ||
                 typeof sourceHead !== 'string' || !/^[a-f0-9]{40}$/.test(sourceHead) || !blocking.has(label)) {
               core.info('Ignoring an incomplete blocking-label event');
@@ -595,6 +707,7 @@ jobs:
     needs: [hold-failed-revision]
     if: >-
       always() &&
+      vars.QUEUE_FREEZE != '1' &&
       needs.hold-failed-revision.result == 'success' &&
       github.event_name == 'workflow_run' &&
       github.event.workflow_run.event == 'merge_group'

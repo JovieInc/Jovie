@@ -182,6 +182,13 @@ describe('LeadTable', () => {
     const row = document.querySelector('tbody tr');
     // Canonical shell row via presets.tableRow / rowState (no explicit 'group' needed for this table)
     expect(row).toHaveClass('system-b-table-row-hover');
+    // Leads sit on the 32px dense people row with a face (JOV-7798).
+    expect(
+      document.querySelector('table[data-table-row-mode="dense"]')
+    ).not.toBeNull();
+    expect(row?.querySelector('[data-table-person-cell]')).toHaveTextContent(
+      'Test Artist@testartist'
+    );
   });
 
   it('renders status filter tabs', async () => {

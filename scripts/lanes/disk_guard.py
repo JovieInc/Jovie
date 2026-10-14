@@ -2,7 +2,8 @@
 """Disk-pressure guard: reclaim space before ENOSPC takes every lane down (JOV-6769).
 
 Runs inside the existing event paths — the dispatch tick and each worker spawn —
-never on its own timer. Below LOW_PCT free on the state filesystem the guard sweeps,
+never on its own timer: the tick spawns a detached sweep (maybe_sweep) when its
+interval has elapsed, and a worker holding the cleanup lock sweeps in-process. Below LOW_PCT free on the state filesystem the guard sweeps,
 in order: DerivedData idle > 5h, clean worktrees idle > 12h (branches kept),
 .next/test-results inside idle worktrees that stay, idle worktree-pool slots once
 free space is under the pool's floor (`worktree_pool.shed`), transient `_work` output of
@@ -25,6 +26,7 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import autoscale  # noqa: E402  (sibling module of the release)
@@ -375,6 +377,41 @@ def sweep_host_tools(run, report: dict) -> None:
     report["actions"].append("preserved shared pnpm store")
 
 
+SWEEP_INTERVAL_S = 600  # a detached tick sweep at most this often; workers sweep whenever admitted
+
+
+def maybe_sweep(host, free: float | None, *, now: float | None = None,
+                popen=subprocess.Popen) -> str:
+    """Called from the dispatch tick: start one detached sweep when its interval
+    has elapsed and free space is low (the same model as worktree_sweep.maybe_spawn).
+    Critical disk is exactly when the sweep must still run; a critical reading
+    still spawns, the sweep itself re-checks and stops if disk stays critical."""
+    if free is None or free > LOW_PCT:
+        return "not-low"
+    now = time.time() if now is None else now
+    stamp = host.state / "disk-sweep.json"
+    try:
+        last = json.loads(stamp.read_text()).get("startedAt", 0)
+    except (OSError, ValueError, AttributeError):
+        last = 0
+    if now - last < SWEEP_INTERVAL_S:
+        return "not-due"
+    host.state.mkdir(parents=True, exist_ok=True)
+    stamp.write_text(json.dumps({"startedAt": now}))
+    popen([sys.executable, str(Path(__file__).resolve()), "--state", str(host.state),
+           "--repo", str(host.repo)], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+          stderr=subprocess.DEVNULL, start_new_session=True)
+    return "spawned"
+
+
+def sweep_main(state: Path, repo: Path) -> int:
+    """Detached sweep entry point (the tick's maybe_sweep child)."""
+    ensure_sbin_on_path()
+    host = SimpleNamespace(state=state, repo=repo)
+    check(host, sweep=True)
+    return 0
+
+
 def check(host, *, run=subprocess.run, now: float | None = None, sweep: bool = False) -> dict:
     """Observe by default. Only a worker holding a slot requests serialized cleanup.
 
@@ -413,6 +450,22 @@ def check(host, *, run=subprocess.run, now: float | None = None, sweep: bool = F
             report["errors"].append(f"cleanup-lock:{error}"[:200])
         pct = free_pct(host.state)
     report["freePctAfter"] = pct
+    # An observation-only check never flattens the last real sweep's record: a
+    # fresh receipt without its own sweep carries the last sweep's actions and
+    # errors forward, so a worker sweep's results survive the next require_disk.
+    if not sweep:
+        try:
+            prior = json.loads((host.state / "disk-pressure.json").read_text())
+            if (isinstance(prior, dict) and prior.get("sweptAt")
+                    and isinstance(prior.get("actions"), list) and not report["actions"]):
+                report["actions"] = prior["actions"]
+                if isinstance(prior.get("errors"), list):
+                    report["errors"] = prior["errors"]
+                report["carriedFrom"] = prior["sweptAt"]
+        except (OSError, ValueError):
+            pass
+    else:
+        report["sweptAt"] = now_iso()
     # Disk is a capacity limit only once nothing reclaimable is left (capacity_limit reads this).
     report["reclaimable"] = reclaimable(host)
     report["critical"] = pct is not None and pct <= CRITICAL_PCT
@@ -424,3 +477,12 @@ def check(host, *, run=subprocess.run, now: float | None = None, sweep: bool = F
     except OSError:
         pass
     return report
+
+
+if __name__ == "__main__":  # manual: python3 disk_guard.py --state <state> --repo <repo>
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Detached disk-pressure sweep")
+    parser.add_argument("--state", type=Path, required=True)
+    parser.add_argument("--repo", type=Path, required=True)
+    raise SystemExit(sweep_main(parser.parse_args().state, parser.parse_args().repo))

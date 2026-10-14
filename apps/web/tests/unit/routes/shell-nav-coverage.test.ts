@@ -47,6 +47,8 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
     'Sub-tool reached from Investors workspace actions',
   '/app/ov/hud':
     'Operator HUD workspace reached from the default /hud rewrite into the OV app shell',
+  '/app/ov/inbox':
+    'Guarded founder Inbox reached by direct Ovie links that open a requested pending case (JOV-6795)',
   '/app/ov/chat-playground':
     'Internal chat visual QA workspace reached by direct product and design review links',
   '/app/ov/wiki':
@@ -55,8 +57,14 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
     'Internal admin wiki article reached from the /hud/wiki/:path* rewrite into the OV app shell',
   '/app/ov/lists':
     'Founder lists index reached from the Lists block in the OV sidebar, which links each list directly',
+  '/app/ov/lists/[id]':
+    'One founder list, linked from the OV sidebar Lists block and the lists index',
+  '/app/ov/lists/views/[viewId]':
+    'One smart view across lists, linked from the OV sidebar Smart Views group and the lists index',
   '/app/ov/screenshots':
     'Internal screenshot QA utility retained for direct admin access outside founder navigation',
+  [APP_ROUTES.ADMIN_VISIBILITY_AUDIT]:
+    'Internal visibility-audit sample retained for direct admin access outside founder navigation',
   '/app/ov/system':
     'Internal system diagnostics retained for direct admin access outside founder navigation',
   '/app/ov/agent-runs/[id]':
@@ -72,6 +80,8 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
   '/app/dashboard/tasks': 'Legacy tasks workspace retained for old bookmarks',
   '/app/settings/connectors':
     'Settings Connections page loads shared shell route context directly (data-backed since JOV-4799)',
+  '/app/ov/integrations':
+    'Account settings sub-tool reached from Platform Connections',
   '/app/settings/admin': 'Legacy admin settings route redirected to Ops',
   '/app/dashboard/release-plan':
     'Release plan demo page (gated by RELEASE_PLAN_DEMO flag)',

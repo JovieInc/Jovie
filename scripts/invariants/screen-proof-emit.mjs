@@ -58,6 +58,7 @@ function parseArgs(argv) {
  *     activeFlow?: unknown,
  *     historyProof?: unknown,
  *     visibleActions?: unknown,
+ *     productReferences?: unknown,
  *   },
  *   artifactRoot?: string,
  *   producerRunId?: number,
@@ -147,6 +148,9 @@ export function emitScreenProof({
     activeFlow: measurements?.activeFlow,
     historyProof: measurements?.historyProof,
     visibleActions: measurements?.visibleActions,
+    ...(measurements?.productReferences !== undefined
+      ? { productReferences: measurements.productReferences }
+      : {}),
   };
   // Validate shape only. The caller owns these bytes and metrics, so the output
   // remains explicitly unverified until the trusted resolver admits the

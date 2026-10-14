@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { z } from 'zod';
 import { getOptionalAuth } from '@/lib/auth/cached';
+import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { getAppFlagValue } from '@/lib/flags/server';
 
@@ -32,7 +33,9 @@ export async function requireAlbumArtUser() {
     return {
       ok: false as const,
       response: NextResponse.json(
-        { error: 'Album art generation requires a Pro plan.' },
+        {
+          error: `Album art generation requires the ${getPlanDisplayName('pro')} plan.`,
+        },
         { status: 403 }
       ),
     };

@@ -6,7 +6,7 @@ import {
 } from '../../synthetic-monitoring-intake.mjs';
 
 const RED_CALLERS = [
-  '.github/workflows/golden-path-nightly.yml',
+  'scripts/golden-path-nightly-intake.mjs',
   'scripts/synthetic-monitoring-intake.mjs',
   'scripts/web-ai-health-intake.mjs',
   'scripts/deprecation-intake.mjs',
@@ -39,8 +39,8 @@ describe('red intakes reopen a Done issue', () => {
       );
     }
     expect(
-      readFileSync('.github/workflows/golden-path-nightly.yml', 'utf8')
-    ).toContain('createStateName: "Todo"');
+      readFileSync('scripts/golden-path-nightly-intake.mjs', 'utf8')
+    ).toContain("createStateName: 'Todo'");
   });
 
   it('moves a completed synthetic-monitoring issue out of Done', async () => {

@@ -18,8 +18,14 @@ describe('@sentry/nextjs pinned floor', () => {
     readFileSync(resolve(appWebRoot, 'package.json'), 'utf8')
   ) as { dependencies: Record<string, string> };
 
-  it('declares ^11.2.0 so dependabot cannot silently downgrade', () => {
-    expect(manifest.dependencies['@sentry/nextjs']).toBe('^11.2.0');
+  it('declares a caret range at or above ^11.2.0 so dependabot cannot silently downgrade', () => {
+    const declared = manifest.dependencies['@sentry/nextjs'];
+    expect(declared).toMatch(/^\^\d+\.\d+\.\d+$/);
+    const [major, minor] = majorMinor(declared.slice(1));
+    expect(major).toBeGreaterThanOrEqual(11);
+    if (major === 11) {
+      expect(minor).toBeGreaterThanOrEqual(2);
+    }
   });
 
   it('resolves an installed SDK at or above the 11.2.0 floor', () => {

@@ -1,3 +1,4 @@
+import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import type { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 
 export type ToolAvailability = 'available' | 'unavailable' | 'unknown';
@@ -27,7 +28,7 @@ export function resolveRetouchCapability(input: {
   if (!input.entitlements?.canAccessAiRetouching) {
     return {
       availability: 'unavailable',
-      reason: 'Image retouching requires a Pro plan.',
+      reason: `Image retouching requires the ${getPlanDisplayName('pro')} plan.`,
       reasonCode: 'PLAN_UNAVAILABLE',
     };
   }

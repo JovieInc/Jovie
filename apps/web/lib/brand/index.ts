@@ -1,8 +1,9 @@
 export {
   Lockup,
   Mark,
-  WORDMARK_TOTAL_WIDTH_U,
+  WORDMARK_ASPECT,
   Wordmark,
+  wordmarkGeometry,
 } from '@/lib/brand/primitives';
 export type {
   BrandMarkSize,
@@ -16,14 +17,8 @@ export {
   BRAND_MARK_SIZE,
   JOVIE_PATH,
   JOVIE_VIEWBOX,
+  jovieMarkAtSize,
   PALETTE,
   resolveBrandMarkSize,
   TYPOGRAPHY,
-  WORDMARK_TRACK,
 } from '@/lib/brand/tokens';
-export type { LetterPath } from '@/lib/brand/wordmark-letters';
-export {
-  LETTER_PAIRS,
-  LETTER_PATHS,
-  LETTER_SEQUENCE,
-} from '@/lib/brand/wordmark-letters';

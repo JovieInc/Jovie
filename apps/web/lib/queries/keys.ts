@@ -299,6 +299,8 @@ export const queryKeys = {
     impersonation: () => [...queryKeys.admin.all, 'impersonation'] as const,
     certifications: () => [...queryKeys.admin.all, 'certifications'] as const,
     outbound: () => [...queryKeys.admin.all, 'outbound'] as const,
+    outboundReadiness: () =>
+      [...queryKeys.admin.all, 'outbound-readiness'] as const,
     outboundLead: (leadId: string) =>
       [...queryKeys.admin.all, 'outbound', 'lead', leadId] as const,
     waitlistSettings: () =>

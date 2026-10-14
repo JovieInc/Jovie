@@ -8,6 +8,7 @@ import {
   TrendingUp,
   Users,
 } from 'lucide-react';
+import { IconGlyphFrame } from '@/components/atoms/IconGlyphFrame';
 import {
   type AccentPaletteName,
   getAccentCssVars,
@@ -52,22 +53,24 @@ export function InsightCategoryIcon({
 
   if (!config.accent) {
     return (
-      <div
-        className={`shrink-0 flex ${chipSize} items-center justify-center rounded-lg bg-surface-0`}
-      >
-        <IconComponent className={`${iconSize} text-tertiary-token`} />
-      </div>
+      <IconGlyphFrame className={chipSize}>
+        <IconComponent
+          aria-hidden
+          className={`${iconSize} text-tertiary-token`}
+        />
+      </IconGlyphFrame>
     );
   }
 
   const accent = getAccentCssVars(config.accent);
 
   return (
-    <div
-      className={`shrink-0 flex ${chipSize} items-center justify-center rounded-lg`}
-      style={{ backgroundColor: accent.subtle }}
-    >
-      <IconComponent className={iconSize} style={{ color: accent.solid }} />
-    </div>
+    <IconGlyphFrame className={chipSize} hoverSurface={accent.subtle}>
+      <IconComponent
+        aria-hidden
+        className={iconSize}
+        style={{ color: accent.solid }}
+      />
+    </IconGlyphFrame>
   );
 }

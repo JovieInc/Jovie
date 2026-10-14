@@ -13,6 +13,7 @@ import {
   getTimeRangeLabel,
   isRangeBeyondRetention,
 } from '@/lib/analytics/time-range';
+import { PRO_PLAN_DISPLAY_NAME } from '@/lib/config/plan-prices';
 import { cn } from '@/lib/utils';
 
 /**
@@ -100,10 +101,9 @@ export function TimeRangeSelector<T extends AnalyticsRange>({
                 onClick={() => {
                   if (!disabled) onValueChange(range);
                 }}
-                className={cn(isActive && 'font-medium')}
               >
                 <span className='flex w-full items-center gap-2'>
-                  <span className='flex-1'>
+                  <span className={cn('flex-1', isActive && 'font-medium')}>
                     {getTimeRangeLabel(range, 'menu')}
                   </span>
                   {disabled && (
@@ -144,7 +144,7 @@ export function TimeRangeSelector<T extends AnalyticsRange>({
             id: tabsBaseId ? `${tabsBaseId}-tab-${range}` : undefined,
             ariaControls: panelId,
             title: disabled
-              ? 'Upgrade to Pro for extended analytics'
+              ? `Upgrade to ${PRO_PLAN_DISPLAY_NAME} for extended analytics`
               : undefined,
           };
         })}

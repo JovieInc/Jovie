@@ -228,7 +228,7 @@ test.describe('Billing Checkout: Stripe checkout session creation', () => {
     const proMonthlyPriceId = proMonthlyOption!.priceId!;
     expect(
       proMonthlyOption!.amount,
-      'Artist Visibility Pro monthly price should be $199/mo (19900 cents)'
+      'Artist Presence monthly price should be $199/mo (19900 cents)'
     ).toBe(toCents(ARTIST_VISIBILITY_OFFER.pro.monthlyUsd));
 
     // Create checkout session with Pro monthly price

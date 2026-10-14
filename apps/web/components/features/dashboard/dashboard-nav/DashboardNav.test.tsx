@@ -56,7 +56,7 @@ describe('DashboardNav route warming', () => {
   it.each([false, true])(
     'leaves home attention to the brand row and retains destinations with INBOX_HOME=%s',
     inboxHome => {
-      const label = inboxHome ? 'Inbox' : 'Home';
+      const label = 'Inbox';
       const destinations = () =>
         screen.getAllByRole('link').map(link => ({
           label: link.getAttribute('aria-label') ?? link.textContent?.trim(),
@@ -112,7 +112,7 @@ describe('DashboardNav route warming', () => {
         'true'
       );
     }
-    const homeLinks = screen.getAllByRole('link', { name: 'Home' });
+    const homeLinks = screen.getAllByRole('link', { name: 'Inbox' });
     expect(homeLinks).toHaveLength(2);
     for (const link of homeLinks) {
       expect(link).toHaveAttribute('data-prefetch', 'true');
@@ -236,7 +236,7 @@ describe('DashboardNav route warming', () => {
       },
     });
     expect(
-      pending.getByRole('link', { name: 'Home — App Update Available' })
+      pending.getByRole('link', { name: 'Inbox — App Update Available' })
     ).toHaveAttribute('href', APP_ROUTES.DASHBOARD);
     expect(
       pending.getByRole('status', { name: '3 pending items' })
@@ -255,7 +255,7 @@ describe('DashboardNav route warming', () => {
       },
     });
     const updateLink = updateOnly.getByRole('link', {
-      name: 'Home — App Update Available',
+      name: 'Inbox — App Update Available',
     });
     expect(updateLink).toHaveAttribute('data-inbox-attention', 'available');
     expect(
@@ -273,7 +273,7 @@ describe('DashboardNav route warming', () => {
     const link = caughtUp.container.querySelector(
       '[data-navigation-item-id="inbox"]'
     );
-    expect(link).toHaveAccessibleName('Home');
+    expect(link).toHaveAccessibleName('Inbox');
     if (!(link instanceof HTMLElement)) return;
     expect(link).toHaveAttribute('data-inbox-attention', 'empty');
     expect(link.querySelector('[data-inbox-runtime-update]')).toBeNull();

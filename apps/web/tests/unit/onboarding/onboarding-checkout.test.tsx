@@ -92,7 +92,10 @@ vi.mock('@/app/onboarding/actions/upgrade-offer', () => ({
 
 vi.mock('@/lib/entitlements/registry', () => ({
   getEntitlements: () => ({
-    marketing: { displayName: 'Pro', tagline: 'For serious artists' },
+    marketing: {
+      displayName: 'Artist Presence',
+      tagline: 'For serious artists',
+    },
   }),
 }));
 
@@ -148,13 +151,13 @@ describe('OnboardingCheckoutClient', () => {
     render(<OnboardingCheckoutClient {...defaultProps} />);
 
     expect(
-      screen.getByRole('heading', { name: 'Upgrade To Pro' })
+      screen.getByRole('heading', { name: 'Upgrade To Artist Presence' })
     ).toBeInTheDocument();
     expect(screen.getByText('Tim White')).toBeInTheDocument();
     expect(screen.getByText('@timwhite')).toBeInTheDocument();
     expect(screen.getByText('5,000 Spotify followers')).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Upgrade to Pro' })
+      screen.getByRole('button', { name: 'Upgrade to Artist Presence' })
     ).toBeInTheDocument();
     expect(screen.getByText('$39.00')).toBeInTheDocument();
     expect(screen.getByText('/mo')).toBeInTheDocument();
@@ -207,7 +210,9 @@ describe('OnboardingCheckoutClient', () => {
     render(<OnboardingCheckoutClient {...defaultProps} />);
 
     await user.click(screen.getByRole('radio', { name: /annual/i }));
-    await user.click(screen.getByRole('button', { name: 'Upgrade to Pro' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Upgrade to Artist Presence' })
+    );
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
@@ -245,7 +250,9 @@ describe('OnboardingCheckoutClient', () => {
 
     render(<OnboardingCheckoutClient {...defaultProps} />);
 
-    await user.click(screen.getByRole('button', { name: 'Upgrade to Pro' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Upgrade to Artist Presence' })
+    );
 
     expect(
       await screen.findByRole('alert', {
@@ -253,7 +260,7 @@ describe('OnboardingCheckoutClient', () => {
       })
     ).toHaveTextContent('Checkout is temporarily unavailable.');
     expect(
-      screen.getByRole('button', { name: 'Upgrade to Pro' })
+      screen.getByRole('button', { name: 'Upgrade to Artist Presence' })
     ).toBeEnabled();
     expect(hrefState.current).toBe('http://localhost/onboarding/checkout');
   });
@@ -308,12 +315,73 @@ describe('OnboardingCheckoutClient', () => {
     expect(
       screen.getByRole('heading', { name: 'Upgrade To Artist Presence' })
     ).toBeInTheDocument();
-    expect(screen.getByText(/free forever/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/free forever/i).length).toBeGreaterThan(0);
     expect(
       screen.getByRole('button', { name: 'Upgrade to Artist Presence' })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Start free, upgrade anytime' })
+      screen.getByRole('button', { name: 'Keep My Free Profile' })
+    ).toBeInTheDocument();
+  });
+
+  it('leads with certified highlights and never contradicts the live profile', () => {
+    render(<OnboardingCheckoutClient {...defaultProps} isDefaultUpsell />);
+
+    // Hierarchy: heading → profile identity → highlights → price → CTA → free keep.
+    const heading = screen.getByRole('heading', {
+      name: 'Upgrade To Artist Presence',
+    });
+    const cta = screen.getByRole('button', {
+      name: 'Upgrade to Artist Presence',
+    });
+    const keepFree = screen.getByRole('button', {
+      name: 'Keep My Free Profile',
+    });
+    expect(heading.compareDocumentPosition(cta)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+    expect(cta.compareDocumentPosition(keepFree)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+
+    // Certified capabilities only (JOV-7794); monitoring is internal-only.
+    for (const highlight of [
+      'Payments',
+      '90-day Analytics',
+      'Verified Badge',
+    ]) {
+      expect(screen.getByText(highlight)).toBeInTheDocument();
+    }
+    expect(
+      screen.queryByText('Continuous visibility monitoring')
+    ).not.toBeInTheDocument();
+
+    // The profile is already live — "start free" copy must never appear.
+    expect(screen.queryByText(/start free/i)).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/stays live and free forever/i)
+    ).toBeInTheDocument();
+  });
+
+  it('renders a deliberate empty state instead of placeholder chrome', () => {
+    render(
+      <OnboardingCheckoutClient
+        {...defaultProps}
+        displayName=''
+        username=''
+        avatarUrl={null}
+        spotifyFollowers={null}
+      />
+    );
+
+    // JOV-8068: no fake handle, placeholder glyph, or fabricated preview —
+    // and the subtitle must not claim a nonexistent profile is live.
+    expect(screen.queryByText('Your artist profile')).not.toBeInTheDocument();
+    expect(screen.queryByText(/^@/)).not.toBeInTheDocument();
+    expect(screen.queryByText('?')).not.toBeInTheDocument();
+    expect(screen.queryByText(/profile is live/i)).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/adds on top of the free plan/i)
     ).toBeInTheDocument();
   });
 
@@ -324,7 +392,9 @@ describe('OnboardingCheckoutClient', () => {
       <OnboardingCheckoutClient {...defaultProps} profileId={profileId} />
     );
 
-    await user.click(screen.getByRole('button', { name: 'Upgrade to Pro' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Upgrade to Artist Presence' })
+    );
 
     expect(recordOfferDecisionMock).toHaveBeenCalledWith(
       profileId,

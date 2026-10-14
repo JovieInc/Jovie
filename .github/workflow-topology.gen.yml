@@ -40,14 +40,12 @@ blockingPrChecks:
   - llm-review
 normalPrWorkflows:
   - Source Validation
-  - Auto-Merge Default
   - Fork PR Gate
   - PR Size Guard
   - PR targets main
   - Repository documentation shadow
   - Summer Eve identity check
 inactiveWorkflows:
-  - Agent Pipeline
   - Agent Tick
   - Auto-PR on Agent Push
   - Auto-Ready Agent Drafts
@@ -57,10 +55,8 @@ inactiveWorkflows:
   - PR Conflict Handler
   - Rolling CI Dispatch
   - Stuck Draft Auto-Close
-  - Taste Classifier
-  - Taste Label Guard
 generatedAt: deterministic
-normalPrCheckRecords: 25
+normalPrCheckRecords: 22
 nodes:
   - name: Workflow Lint
     path: .github/workflows/actionlint.yml
@@ -85,18 +81,6 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:gc
     jobCount: 1
-  - name: Actions Cache Supersede
-    path: .github/workflows/actions-cache-supersede.yml
-    active: true
-    category: source-validation
-    authoritativeProducer: Source Validation
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - push
-      - workflow_dispatch
-    terminalReceipt: job:prune
-    jobCount: 1
   - name: Agent Harness Health Report
     path: .github/workflows/agent-harness-health-report.yml
     active: true
@@ -108,31 +92,6 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:report
     jobCount: 1
-  - name: Agent Pipeline
-    path: .github/workflows/agent-pipeline.yml
-    active: false
-    category: remediation-dispatch
-    authoritativeProducer: Lane Fix Relay
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - workflow_run
-    terminalReceipt: job:exhaust
-    jobCount: 5
-  - name: Auto-Merge Default
-    path: .github/workflows/auto-merge-default.yml
-    active: true
-    category: source-validation
-    authoritativeProducer: Source Validation
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - pull_request
-      - schedule
-      - workflow_dispatch
-      - workflow_run
-    terminalReceipt: job:self-test
-    jobCount: 3
   - name: Auto-Ready Agent Drafts
     path: .github/workflows/auto-ready-agent-drafts.yml
     active: false
@@ -187,7 +146,6 @@ nodes:
     authoritativeProducer: Source Validation
     authoritativeFor: []
     allowedConsumers:
-      - Agent Pipeline
       - iOS CI
       - Mac CI
       - Fleet Gate Refresh
@@ -201,8 +159,8 @@ nodes:
       - merge_group
       - push
       - workflow_dispatch
-    terminalReceipt: job:main-release-ready
-    jobCount: 63
+    terminalReceipt: job:ci-exact-head-coverage-shard-fail-fast
+    jobCount: 81
   - name: CLI Chaos Nightly
     path: .github/workflows/cli-chaos-nightly.yml
     active: true
@@ -300,6 +258,17 @@ nodes:
       - pull_request_target
     terminalReceipt: job:auto-merge
     jobCount: 1
+  - name: Dependabot Pin Sync
+    path: .github/workflows/dependabot-pin-sync.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_run
+    terminalReceipt: job:commit
+    jobCount: 2
   - name: Deprecation Intake (Linear devin lane)
     path: .github/workflows/deprecation-intake.yml
     active: true
@@ -410,7 +379,6 @@ nodes:
     triggeringStateTransition:
       - push
       - repository_dispatch
-      - schedule
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:assess
@@ -426,24 +394,11 @@ nodes:
       - Lane Fix Relay
       - Merge Queue Green Enroll
     triggeringStateTransition:
-      - merge_group
       - pull_request
       - pull_request_review
       - pull_request_target
     terminalReceipt: job:fork-gate
-    jobCount: 3
-  - name: Gem Producer Drift
-    path: .github/workflows/gem-producer-drift.yml
-    active: true
-    category: source-validation
-    authoritativeProducer: Source Validation
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - schedule
-      - workflow_dispatch
-    terminalReceipt: job:drift
-    jobCount: 1
+    jobCount: 2
   - name: Golden Path Nightly
     path: .github/workflows/golden-path-nightly.yml
     active: true
@@ -501,6 +456,7 @@ nodes:
     allowedConsumers: []
     triggeringStateTransition:
       - pull_request_target
+      - workflow_dispatch
     terminalReceipt: job:review
     jobCount: 1
   - name: iOS App Store Graphics
@@ -701,6 +657,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:verify
     jobCount: 1
+  - name: Mutation Diff
+    path: .github/workflows/mutation-diff.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:mutate
+    jobCount: 1
   - name: Neon Ephemeral Branch Cleanup
     path: .github/workflows/neon-ephemeral-branch-cleanup.yml
     active: true
@@ -746,7 +714,7 @@ nodes:
       - push
       - workflow_dispatch
     terminalReceipt: job:report
-    jobCount: 5
+    jobCount: 4
   - name: Changed-Evidence Test Suites
     path: .github/workflows/nightly-tests.yml
     active: true
@@ -893,7 +861,7 @@ nodes:
       - merge_group
       - pull_request
     terminalReceipt: job:size
-    jobCount: 2
+    jobCount: 3
   - name: PR targets main
     path: .github/workflows/pr-targets-main.yml
     active: true
@@ -1081,8 +1049,8 @@ nodes:
       - repository_dispatch
       - schedule
       - workflow_dispatch
-    terminalReceipt: job:remediation-clock
-    jobCount: 2
+    terminalReceipt: job:heartbeat
+    jobCount: 1
   - name: Safe PR Remediation
     path: .github/workflows/safe-pr-remediation.yml
     active: true
@@ -1198,8 +1166,8 @@ nodes:
     authoritativeFor:
       - source-validation
     allowedConsumers:
-      - Auto-Merge Default
       - Auto-Ready Agent Drafts
+      - Dependabot Pin Sync
       - Lane Fix Relay
       - Merge Queue Green Enroll
       - PR Review (shadow)
@@ -1245,28 +1213,6 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:docs-deploy-jovie
     jobCount: 6
-  - name: Taste Classifier
-    path: .github/workflows/taste-classifier.yml
-    active: false
-    category: source-validation
-    authoritativeProducer: Source Validation
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - pull_request_target
-    terminalReceipt: job:classify
-    jobCount: 1
-  - name: Taste Label Guard
-    path: .github/workflows/taste-label-guard.yml
-    active: false
-    category: source-validation
-    authoritativeProducer: Source Validation
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - pull_request_target
-    terminalReceipt: job:guard
-    jobCount: 1
   - name: Test Coverage Audit
     path: .github/workflows/test-coverage-audit.yml
     active: true
@@ -1377,9 +1323,6 @@ nodes:
     terminalReceipt: job:mine
     jobCount: 1
 edges:
-  - from: Source Validation
-    to: Auto-Merge Default
-    type: workflow_run
   - from: CI
     to: iOS CI
     type: workflow_call
@@ -1391,6 +1334,9 @@ edges:
     type: workflow_call
   - from: Production Controller
     to: Delivery Control Receipts
+    type: workflow_run
+  - from: Source Validation
+    to: Dependabot Pin Sync
     type: workflow_run
   - from: Production Controller
     to: desktop-release

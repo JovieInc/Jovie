@@ -1,4 +1,5 @@
 import type { SkillCommand } from '@/lib/commands/registry';
+import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import type { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 
 export type ToolAvailability = 'available' | 'unavailable' | 'unknown';
@@ -29,7 +30,7 @@ export function resolveAlbumArtCapability(input: {
   if (!input.entitlements?.canGenerateAlbumArt) {
     return {
       availability: 'unavailable',
-      reason: 'Album art generation requires a Pro plan.',
+      reason: `Album art generation requires the ${getPlanDisplayName('pro')} plan.`,
       reasonCode: 'PLAN_UNAVAILABLE',
     };
   }

@@ -93,4 +93,43 @@ describe('CmdKMainPlaneSearchInput', () => {
     expect(parentKeyDown).not.toHaveBeenCalled();
     expect(input).not.toHaveAttribute('aria-activedescendant');
   });
+
+  it('keeps every keystroke when the parent echoes the value a commit late', () => {
+    const onQueryChange = vi.fn();
+    const { rerender } = render(
+      <CmdKMainPlaneSearchInput {...baseProps} onQueryChange={onQueryChange} />
+    );
+    const input = screen.getByRole('combobox', {
+      name: 'Command Palette Search',
+    });
+
+    // Header slot re-renders with stale values while the user keeps typing.
+    let typed = '';
+    for (const char of 'settings') {
+      typed += char;
+      fireEvent.change(input, { target: { value: typed } });
+      rerender(
+        <CmdKMainPlaneSearchInput
+          {...baseProps}
+          value={typed.slice(0, -1)}
+          onQueryChange={onQueryChange}
+        />
+      );
+      expect(input).toHaveValue(typed);
+    }
+    expect(onQueryChange).toHaveBeenLastCalledWith('settings');
+  });
+
+  it('accepts an external reset that the user never typed', () => {
+    const { rerender } = render(
+      <CmdKMainPlaneSearchInput {...baseProps} value='' />
+    );
+    const input = screen.getByRole('combobox', {
+      name: 'Command Palette Search',
+    });
+    fireEvent.change(input, { target: { value: 'rel' } });
+    rerender(<CmdKMainPlaneSearchInput {...baseProps} value='rel' />);
+    rerender(<CmdKMainPlaneSearchInput {...baseProps} value='Releases' />);
+    expect(input).toHaveValue('Releases');
+  });
 });

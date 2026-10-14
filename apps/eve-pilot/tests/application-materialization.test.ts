@@ -98,6 +98,9 @@ describe('independent application source export', () => {
           );
           expect(entrypoint).toContain("export * from './symphony-outage.js'");
           expect(entrypoint).toContain(
+            "export * from './provider-attempt-receipt.js'"
+          );
+          expect(entrypoint).toContain(
             "export * from './provider-incident.js'"
           );
           for (const [, target] of entrypoint.matchAll(
@@ -108,6 +111,11 @@ describe('independent application source export', () => {
                 join(contractDirectory, `${target.replace(/\.js$/u, '')}.ts`)
               )
             ).toBe(true);
+          expect(
+            receipt.files[
+              'vendor/agent-transport-contracts/provider-attempt-receipt.ts'
+            ]
+          ).toBeDefined();
           expect(
             receipt.files[
               'vendor/agent-transport-contracts/provider-incident.ts'

@@ -1,5 +1,5 @@
 import { ImageResponse } from 'next/og';
-import { JOVIE_PATH } from '@/lib/brand';
+import { JOVIE_PATH, JOVIE_VIEWBOX } from '@/lib/brand';
 import { loadDMSansFont, loadSatoshiFont } from '@/lib/share/image-utils';
 
 export const runtime = 'nodejs';
@@ -30,7 +30,7 @@ export default async function Image() {
       <svg
         width='220'
         height='220'
-        viewBox='0 0 360 360'
+        viewBox={`0 0 ${JOVIE_VIEWBOX.width} ${JOVIE_VIEWBOX.height}`}
         xmlns='http://www.w3.org/2000/svg'
         aria-hidden='true'
       >

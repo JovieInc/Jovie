@@ -8,15 +8,21 @@ const {
   mockLoggerError,
   mockProcessJob,
   mockSucceedJob,
+  mockWithRetry,
   mockWithSystemIngestionSession,
 } = vi.hoisted(() => ({
   mockCaptureError: vi.fn(),
+  mockWithRetry: vi.fn(),
   mockClaimPendingJobs: vi.fn(),
   mockHandleIngestionJobFailure: vi.fn(),
   mockLoggerError: vi.fn(),
   mockProcessJob: vi.fn(),
   mockSucceedJob: vi.fn(),
   mockWithSystemIngestionSession: vi.fn(),
+}));
+
+vi.mock('@/lib/db', () => ({
+  withRetry: mockWithRetry,
 }));
 
 vi.mock('@/lib/ingestion/processor', () => ({
@@ -46,6 +52,9 @@ describe('POST /api/ingestion/jobs', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    mockWithRetry.mockImplementation(
+      async (operation: () => Promise<unknown>) => operation()
+    );
     mockWithSystemIngestionSession.mockImplementation(async callback =>
       callback({})
     );
@@ -82,6 +91,22 @@ describe('POST /api/ingestion/jobs', () => {
 
     expect(response.status).toBe(401);
     await expect(response.json()).resolves.toEqual({ error: 'Unauthorized' });
+  });
+
+  it('claims pending jobs through withRetry for transient failures', async () => {
+    const { POST } = await import('@/app/api/ingestion/jobs/route');
+    await POST(
+      new NextRequest('http://localhost/api/ingestion/jobs', {
+        method: 'POST',
+        headers: { 'x-ingestion-secret': 'test-secret' },
+      })
+    );
+
+    expect(mockWithRetry).toHaveBeenCalledWith(
+      expect.any(Function),
+      'ingestion.claimPendingJobs'
+    );
+    expect(mockClaimPendingJobs).toHaveBeenCalled();
   });
 
   it('processes successful jobs and captures partial-success warnings', async () => {

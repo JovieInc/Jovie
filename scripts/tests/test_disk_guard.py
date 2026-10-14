@@ -263,6 +263,80 @@ class CheckTest(unittest.TestCase):
                 self.assertEqual(report["reason"], "disk-unobservable" if pct is None else
                                  "disk-available" if pct == 10.0 else "disk-critical")
 
+    def test_low_disk_with_reclaimable_state_produces_actions(self):
+        """The reported bug: reclaimable=true but actions=[]. A low-disk sweep
+        over reclaimable retired-workspace state must actually act (backed-up
+        or removed workspaces), so the receipt never says reclaimable with an
+        empty action list."""
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            retired = state / "symphony-elixir-workspaces"
+            stale_ws = retired / "JOV-8000"
+            make_tree(stale_ws, ["README.md"], age_s=3 * 86400)
+            host = SimpleNamespace(state=state, repo=state)
+            saved_free, saved_roots = guard.free_pct, guard.retired_workspace_roots
+            guard.free_pct = lambda path: 10.0
+            guard.retired_workspace_roots = lambda: [retired]
+            try:
+                report = guard.check(host, run=ok, now=NOW, sweep=True)
+            finally:
+                guard.free_pct, guard.retired_workspace_roots = saved_free, saved_roots
+            self.assertTrue(report["low"])
+            self.assertTrue(report["reclaimable"])
+            self.assertTrue(report["actions"], "reclaimable=true must produce actions")
+            self.assertTrue(any("workspace" in a for a in report["actions"]))
+            # A non-checkout workspace loses regenerable output but keeps its
+            # directory (safe bounds: only verifiable checkouts are removed).
+
+    def test_tick_spawned_sweep_acts_and_the_receipt_survives_observation(self):
+        """The tick drives reclaim (maybe_sweep) and an observation-only check
+        afterwards must not flatten the sweep's actions to []."""
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            retired = state / "symphony-elixir-workspaces"
+            stale_ws = retired / "JOV-8001"
+            make_tree(stale_ws, ["README.md"], age_s=3 * 86400)
+            host = SimpleNamespace(state=state, repo=state)
+            saved_free, saved_roots = guard.free_pct, guard.retired_workspace_roots
+            guard.free_pct = lambda path: 10.0
+            guard.retired_workspace_roots = lambda: [retired]
+            spawns = []
+            try:
+                # (a) the tick's maybe_sweep spawns exactly one detached sweep
+                def popen(*a, **k):
+                    spawns.append(a)
+                    return None
+                self.assertEqual(guard.maybe_sweep(host, 10.0, now=NOW, popen=popen), "spawned")
+                self.assertEqual(len(spawns), 1)
+                # throttled: a second tick within the interval does not spawn
+                self.assertEqual(guard.maybe_sweep(host, 10.0, now=NOW + 60), "not-due")
+                # healthy disk never spawns
+                self.assertEqual(guard.maybe_sweep(host, 60.0, now=NOW), "not-low")
+                # (b) the detached child sweeps in-process
+                report = guard.check(host, run=ok, now=NOW + 60, sweep=True)
+                self.assertTrue(report["reclaimable"])
+                self.assertTrue(report["actions"])
+                self.assertTrue(any("workspace" in a for a in report["actions"]))
+                # (c) a later observation-only check carries the sweep's actions
+                observed = guard.check(host, run=ok, now=NOW + 120, sweep=False)
+                self.assertTrue(observed["actions"], "observation must not flatten sweep actions")
+                self.assertTrue(any("workspace" in a for a in observed["actions"]))
+            finally:
+                guard.free_pct, guard.retired_workspace_roots = saved_free, saved_roots
+
+    def test_observation_only_never_carries_stale_actions_when_disk_recovered(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            host = SimpleNamespace(state=state, repo=state)
+            # no prior receipt: nothing to carry, still empty actions
+            saved_free = guard.free_pct
+            guard.free_pct = lambda path: 60.0
+            try:
+                report = guard.check(host, run=ok, now=NOW, sweep=False)
+            finally:
+                guard.free_pct = saved_free
+            self.assertEqual(report["actions"], [])
+
     def test_sweep_runs_where_autoscale_stops_growth_and_reports_reclaimable(self):
         # Gem 04:12Z: autoscale blocked growth at <= 15% free, the sweep ran only below 15%.
         self.assertEqual(guard.LOW_PCT, float(guard.autoscale.DISK_INCREASE_MIN))

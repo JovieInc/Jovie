@@ -411,6 +411,8 @@ export function ownerHoldReleaseIntent({ eventName, event } = {}) {
  * Recovery never replaces a source failure; owner hold release is not a CI retry.
  * @param {{ failure: object, statuses: object[], repository: string, prNumber: number, lastRemoval: string|undefined, headCommittedAt: string|undefined, autoMergeEnabled: boolean, headSha?: string, lastRemovalReason?: string, ownerHoldRelease?: object|null }} input
  */
+export const ADMISSION_RECOVERY_BACKOFF_MS = 15 * 60 * 1000;
+
 export function reenrollmentDisposition({
   failure,
   statuses,
@@ -419,9 +421,10 @@ export function reenrollmentDisposition({
   lastRemoval,
   headCommittedAt,
   autoMergeEnabled,
-  headSha,
-  lastRemovalReason,
-  ownerHoldRelease,
+  headSha = undefined,
+  lastRemovalReason = undefined,
+  ownerHoldRelease = undefined,
+  now = Date.now(),
 }) {
   const removedAt = Date.parse(lastRemoval);
   const committedAt = Date.parse(headCommittedAt);
@@ -464,6 +467,10 @@ export function reenrollmentDisposition({
   );
   if (!latest || latest.completedAt < removedAt)
     return blocked('no-current-admission-recovery');
+  // A quota or gateway ejection re-admitted at once re-enters the same dry
+  // bucket (2026-10-13 07:52Z storm); the next sweep after the backoff retries.
+  if (now - latest.completedAt < ADMISSION_RECOVERY_BACKOFF_MS)
+    return blocked('admission-recovery-backoff');
   const retry = statuses
     .map(status => parseTrustedRetryStatus(status, repository))
     .find(

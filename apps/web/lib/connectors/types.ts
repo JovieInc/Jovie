@@ -44,7 +44,26 @@ export const CONNECTOR_DB_STATUS_IDS = [
  * UI-facing connector status. Includes derived states that are not stored in DB
  * (`not_connected` when no row exists, `syncing` while a sync is in flight).
  */
-export type ConnectorStatus = ConnectorDbStatus | 'not_connected' | 'syncing';
+export type ConnectorStatus =
+  | ConnectorDbStatus
+  | 'not_connected'
+  | 'syncing'
+  | 'unavailable';
+
+export interface ConnectorCapability {
+  readonly id: string;
+  readonly label: string;
+  readonly mode: 'read' | 'write';
+  readonly requiredScopes: readonly string[];
+  /** OAuth access never substitutes for approval of a write. */
+  readonly requiresApproval: boolean;
+  readonly availability: 'available' | 'planned' | 'blocked';
+}
+
+export interface ConnectorAvailability {
+  readonly available: boolean;
+  readonly reason?: string;
+}
 
 export type ConnectorIconKey = 'mail' | 'calendar' | 'spotify' | 'youtube';
 
@@ -84,4 +103,8 @@ export interface ConnectorDefinition {
    */
   readonly webhookHandler: string | null;
   readonly displayOrder: number;
+  /** Actual operations, shared by Settings and public integration copy. */
+  readonly capabilities: readonly ConnectorCapability[];
+  readonly accountScope: 'user' | 'identity';
+  readonly platforms: readonly ('web' | 'mac' | 'ios')[];
 }

@@ -366,6 +366,76 @@ jobs:
           export JOVIE_COVERAGE_INCLUDE JOVIE_COVERAGE_RELATED_TESTS
           pnpm --filter @jovie/web test:coverage --changed "$base_sha" --bail 1
           node scripts/check-changed-test-coverage.mjs --base "$base_sha" --head "$EXPECTED_HEAD" --coverage apps/web/coverage/coverage-final.json
+      # Route JS budgets and SEO certification read a finished `next build`,
+      # so until now only the merge group's Build + Layout ran them. They were
+      # the top merge-group-only ejection: 61 group runs across 22 PRs in the
+      # 7 days to 2026-10-12 (/app/admin/* a few KB over), plus 6 from
+      # seo:certify. Run the same build and checks here when the diff can
+      # change build output, so the PR fails before enqueue; the merge-group
+      # job stays. Coverage plus this build still finishes inside Source
+      # Validation's wall time, so it adds no PR latency and no check record.
+      - name: Select build-affecting diff
+        id: scope
+        if: steps.reuse.outputs.reuse != 'true'
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          base_sha="$(git merge-base "origin/${{ github.base_ref }}" HEAD)"
+          if git diff --quiet "$base_sha" HEAD -- \
+            apps/web packages pnpm-lock.yaml package.json turbo.json \
+            ':(exclude,glob)apps/web/tests/**' \
+            ':(exclude,glob)**/__tests__/**' \
+            ':(exclude,glob)**/*.test.*' \
+            ':(exclude,glob)**/*.spec.*' \
+            ':(exclude,glob)**/*.stories.*'; then
+            echo 'No build-affecting source changed; non-applicable receipt recorded.'
+            echo 'build=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'build=true' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Resolve Next build cache hour
+        id: next-build-cache-hour
+        if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.build == 'true'
+        run: echo "hour=$(date -u +%Y%m%d%H)" >> "$GITHUB_OUTPUT"
+      # Same read-only restore of next-build-cache-warm.yml's main entry as
+      # the merge group's Build + Layout; PR code never writes it.
+      - name: Restore Next build cache (read-only)
+        if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.build == 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/web/.next/cache/turbopack
+          key: ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-${{ steps.next-build-cache-hour.outputs.hour }}
+          restore-keys: |
+            ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-
+            ${{ runner.os }}-next-build-web-v1-
+      - name: Build exact PR head
+        if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.build == 'true'
+        run: pnpm turbo build --filter=@jovie/web
+        env:
+          TURBO_ENGINE_READ_ONLY: '1'
+          TURBO_CACHE: local:r
+          # Same public mock environment as the merge group's Build + Layout,
+          # so both measure identical bundles without secrets.
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
+          NEXT_PUBLIC_APP_URL: http://localhost:3230
+          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3230
+          NEXT_PUBLIC_CLERK_MOCK: '1'
+          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
+          NEXT_PUBLIC_E2E_MODE: '1'
+          NEXT_IGNORE_ESLINT: '1'
+          NEXT_IGNORE_TYPECHECK: '1'
+          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+      - name: Enforce authed route initial JS budgets
+        if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.build == 'true'
+        run: node apps/web/scripts/route-js-budget.mjs --next-dir apps/web/.next
+      - name: Certify marketing SEO against prerendered HTML
+        if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.build == 'true'
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: pnpm --filter @jovie/web seo:certify --sha "$EXPECTED_HEAD" --run-ref "pr-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
   ready:
     name: PR Ready
     if: ${{ always() }}

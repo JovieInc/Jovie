@@ -40,4 +40,12 @@ describe('JovieLogo', () => {
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
     expect(screen.getByTitle('Jovie wordmark')).toBeInTheDocument();
   });
+
+  it('draws the shared wordmark primitive at the small height', () => {
+    render(<JovieLogo href='' size='sm' title='Jovie wordmark' />);
+
+    const mark = screen.getByRole('img', { name: 'Jovie logo' });
+    expect(mark).toHaveAttribute('height', '16');
+    expect(mark.querySelectorAll('path').length).toBeGreaterThan(1);
+  });
 });

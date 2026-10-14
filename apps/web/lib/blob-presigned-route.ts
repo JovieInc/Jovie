@@ -2,6 +2,7 @@ import 'server-only';
 
 import { handleUploadPresigned } from '@vercel/blob/client';
 import { NextRequest, NextResponse } from 'next/server';
+import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 type GetBlobPresignedToken = NonNullable<
@@ -12,7 +13,7 @@ const CLIENT_ERROR_MESSAGES = new Set([
   'Creator profile not found',
   'Invalid audio upload pathname',
   'Invalid file upload pathname',
-  'Pro plan required for promo downloads',
+  `${getPlanDisplayName('pro')} plan required for promo downloads`,
 ]);
 
 export async function handleBlobPresignedUploadTokenRequest(

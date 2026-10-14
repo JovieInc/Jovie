@@ -30,6 +30,10 @@ UNCERTAIN_S = 900
 # deadline met a few seconds late must not slip a whole tick.
 SLACK_S = 60
 ACTIVE = frozenset({"queued", "in_progress", "requested", "waiting", "pending"})
+# Every clocked job times out within 20 min. An "active" run older than this is a
+# GitHub ghost (sentry-autofix-recurrence run 37655501164 sat "queued" from
+# 2026-10-07, uncancellable), and must not block its clock forever.
+GHOST_ACTIVE_S = 6 * 3600
 CLOCK_EVENTS = frozenset({"schedule", "workflow_dispatch", "repository_dispatch"})
 
 
@@ -94,7 +98,8 @@ def observe(run, now: float, clock: Clock = CONTINUITY) -> dict:
         if created.tzinfo is None or created.timestamp() > now + 60:
             raise ValueError("workflow-run-clock-invalid")
         observations.append((created.timestamp(), row))
-    active = next((row for _, row in observations if row["status"] in ACTIVE), None)
+    active = next((row for at, row in observations
+                   if row["status"] in ACTIVE and now-at < GHOST_ACTIVE_S), None)
     if active:
         return {"status": "active", "runId": active["id"]}
     at, latest = max(observations, key=lambda item: item[0])

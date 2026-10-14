@@ -1,0 +1,102 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Claude
+# capability-gap: Mutation testing must trigger on high-risk source pushes; folding it into Nightly Testing Agent would also run that workflow's 4-shard deterministic lane on every such push. Read-only token, no writes to GitHub or Linear.
+# revisit-trigger: Fold into Nightly Testing Agent if it gains per-job path filters, or retire when mutation testing moves into an existing PR check.
+name: Mutation Diff
+
+# Advisory, diff-scoped mutation testing for changed high-risk apps/web source
+# (billing, entitlements, auth, Stripe, webhooks, claim). Runs after merge on
+# main, path-filtered, so it adds no PR or merge-group check. Scores and
+# surviving mutants land in the job summary. The job fails only when Stryker
+# itself breaks, so a dead harness cannot pass as a clean run.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/app/api/billing/**'
+      - 'apps/web/app/api/stripe/**'
+      - 'apps/web/app/api/webhooks/**'
+      - 'apps/web/lib/auth/**'
+      - 'apps/web/lib/billing/**'
+      - 'apps/web/lib/claim/**'
+      - 'apps/web/lib/cron/auth.ts'
+      - 'apps/web/lib/entitlements/**'
+      - 'apps/web/lib/idempotency.ts'
+      - 'apps/web/lib/stripe/**'
+      - 'apps/web/proxy.ts'
+  workflow_dispatch:
+    inputs:
+      files:
+        description: Space-separated repo paths to mutate (e.g. apps/web/lib/cron/auth.ts)
+        required: true
+        type: string
+
+permissions: {}
+
+# No concurrency group: a shared group drops queued runs during merge
+# bursts, and each run only diffs its own push. Runs are read-only.
+
+jobs:
+  mutate:
+    name: Mutate changed high-risk source
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Diff from the last successful push run, so files from a failed or
+      # dropped run are mutated next time. Falls back to the push's `before`.
+      # A merge-queue push carries several PRs, so use the compare API, not
+      # HEAD~1 on a shallow clone.
+      - name: Resolve files to mutate
+        id: files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+          INPUT_FILES: ${{ inputs.files }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = workflow_dispatch ]; then
+            files="$INPUT_FILES"
+          else
+            base="$(gh api "repos/$REPO/actions/workflows/mutation-diff.yml/runs?branch=main&event=push&status=success&per_page=1" \
+              --jq '.workflow_runs[0].head_sha // empty')"
+            base="${base:-$BEFORE}"
+            if [ -z "$base" ] || [[ "$base" =~ ^0+$ ]]; then
+              echo "::notice::No baseline commit to diff against; skipping."
+              files=""
+            else
+              echo "Diffing $base...$HEAD_SHA"
+              files="$(gh api "repos/$REPO/compare/$base...$HEAD_SHA" \
+                --jq '[.files[] | select(.status != "removed") | .filename] | join(" ")')"
+            fi
+          fi
+          echo "files=$files" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node.js and pnpm
+        if: steps.files.outputs.files != ''
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Run Stryker on changed high-risk files
+        if: steps.files.outputs.files != ''
+        env:
+          CI: 'true'
+          FILES: ${{ steps.files.outputs.files }}
+        run: node scripts/mutation-diff.mjs --files "$FILES" --summary "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload mutation reports
+        if: ${{ always() && hashFiles('apps/web/reports/mutation/diff/*.json') != '' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mutation-diff-${{ github.run_id }}
+          path: apps/web/reports/mutation/diff/
+          retention-days: 14

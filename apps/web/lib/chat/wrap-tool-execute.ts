@@ -2,6 +2,7 @@ import 'server-only';
 
 import type { Tool, ToolSet } from 'ai';
 import { logEntitlementDenial } from '@/lib/entitlements/demand-signal';
+import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { captureError } from '@/lib/error-tracking';
 import {
   buildLockedToolResultForTool,
@@ -50,7 +51,9 @@ export function withFailSoftToolExecute(
     } catch (error) {
       if (isEntitlementDenialError(error)) {
         const message =
-          error instanceof Error ? error.message : 'Requires a Pro plan.';
+          error instanceof Error
+            ? error.message
+            : `Requires the ${getPlanDisplayName('pro')} plan.`;
         return await toLockedUpgradeResult(toolName, message, {
           source: 'chat-tool-throw',
           code:

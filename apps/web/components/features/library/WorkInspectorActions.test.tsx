@@ -142,7 +142,9 @@ describe('WorkInspectorActions', () => {
       onSharePrivately,
     });
     expect(screen.queryByTestId('work-action-review-publish')).toBeNull();
-    fireEvent.click(screen.getByTestId('work-action-share-privately'));
+    const sharePrivately = screen.getByTestId('work-action-share-privately');
+    expect(sharePrivately).toHaveTextContent('Share Privately');
+    fireEvent.click(sharePrivately);
     expect(onSharePrivately).toHaveBeenCalledOnce();
   });
 

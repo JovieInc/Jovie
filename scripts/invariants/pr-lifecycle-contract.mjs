@@ -12,7 +12,7 @@ import { ownedHere } from './registry.mjs';
 export const PR_LIFECYCLE_INVARIANT_ID = 'JOV-INV-029';
 export const PR_LIFECYCLE_SCHEMA = 'jovie-pr-lifecycle/v1';
 export const READY_FOR_REVIEW_SUBSCRIBER =
-  '.github/workflows/auto-merge-default.yml';
+  '.github/workflows/merge-queue-green-enroll.yml';
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
 export const REQUIRED_PHASES = Object.freeze([
@@ -33,7 +33,6 @@ const REQUIRED_BINDINGS = Object.freeze([
   ],
   ['scripts/backlog-orchestrator/delivery-state-machine.mjs', 'JOV-INV-029'],
   ['scripts/lib/writer-owned-pr-promotion.mjs', 'JOV-INV-029'],
-  ['scripts/native-merge-intent.mjs', 'JOV-INV-029'],
   ['.github/workflows/production-controller.yml', 'JOV-INV-029'],
   ['docs/PR_FLOW.md', 'JOV-INV-029'],
 ]);
@@ -141,7 +140,7 @@ export function validatePrLifecycleContract(
     }
     for (const name of names) {
       if (!name.endsWith('.yml') && !name.endsWith('.yaml')) continue;
-      if (name === 'auto-merge-default.yml') continue;
+      if (`.github/workflows/${name}` === READY_FOR_REVIEW_SUBSCRIBER) continue;
       let source = '';
       try {
         source = readFile(`.github/workflows/${name}`);

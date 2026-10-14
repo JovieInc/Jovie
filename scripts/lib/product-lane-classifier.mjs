@@ -158,7 +158,7 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
     'mac-consumed-web-input',
     'web',
     ['mac', 'web'],
-    /^apps\/web\/(scripts\/generate-brand-assets\.ts|lib\/brand\/(tokens|wordmark-letters)\.ts|lib\/design\/generated\/design-tokens\.ts|styles\/(design-system|system-b-app)\.css|data\/marketing\/routeManifest\.ts|constants\/routes\.ts|app\/desktop-auth\/DesktopAuthClient\.tsx|components\/organisms\/(DesktopTitlebar|CmdKPalette|CommandPalette|user-button\/UserButton)\.tsx|components\/features\/(workspace-lock\/WorkspaceLockScreen\.tsx|dashboard\/dashboard-nav\/config\.ts))$/,
+    /^(?:packages\/ui\/brand\/(geometry\.gen|jovie-o-geometry)\.ts$|apps\/web\/(scripts\/generate-brand-assets\.ts|lib\/brand\/tokens\.ts|lib\/design\/generated\/design-tokens\.ts|styles\/(design-system|system-b-app)\.css|data\/marketing\/routeManifest\.ts|constants\/routes\.ts|app\/desktop-auth\/DesktopAuthClient\.tsx|components\/organisms\/(DesktopTitlebar|CmdKPalette|CommandPalette|user-button\/UserButton)\.tsx|components\/features\/(workspace-lock\/WorkspaceLockScreen\.tsx|dashboard\/dashboard-nav\/config\.ts))$)/,
   ],
   [
     'ios-product',

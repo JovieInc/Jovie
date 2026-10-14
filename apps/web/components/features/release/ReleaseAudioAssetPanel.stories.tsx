@@ -7,7 +7,7 @@ const meta = {
   parameters: {
     layout: 'centered',
     jovie: {
-      uncoveredProps: ['releaseId', 'releaseTitle'],
+      uncoveredProps: ['releaseId', 'releaseTitle', 'pendingFile'],
     },
   },
 } satisfies Meta<typeof ReleaseAudioAssetPanel>;

@@ -501,6 +501,34 @@ describe('merge-group admission evidence', () => {
     expect(statuses.at(-1)).toMatch(/admission passed/);
   });
 
+  it('does not re-read a required check that already succeeded on this head', async () => {
+    // 2026-10-13 GITHUB_TOKEN storm: every pending poll re-read both checks.
+    let round = 0;
+    const loadCheckRuns = vi.fn(async ({ checkName }) =>
+      checkName === 'PR Size Guard' || round >= 3
+        ? checkPage(checkName, 'completed', 'success')
+        : checkPage(checkName, 'in_progress')
+    );
+    await waitForMergeGroupAdmission({
+      event: event(),
+      loadCheckRuns,
+      loadLiveQueueEntries: vi.fn(async () => [liveEntry()]),
+      loadQueueRef: vi.fn(async () => queueRef()),
+      maxWaitMs: 100,
+      now: () => round * 3,
+      onStatus: () => {},
+      pollIntervalMs: 3,
+      sleep: async () => {
+        round += 1;
+      },
+    });
+    const reads = name =>
+      loadCheckRuns.mock.calls.filter(([args]) => args.checkName === name)
+        .length;
+    expect(reads('PR Size Guard')).toBe(1);
+    expect(reads('Fork PR Gate')).toBe(4);
+  });
+
   describe('a producer that failed only on GitHub quota', () => {
     const { classifyGitHubFailure } = sharedClassifier;
     const classifyFailureText = message =>

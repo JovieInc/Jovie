@@ -86,7 +86,7 @@ describe('SidebarThreadsSection', () => {
     ).toHaveClass('h-3', 'w-3', 'text-accent-teal!');
   });
 
-  it('uses the full middle track at rest and layers chat actions over a visible cross-engine faded edge', () => {
+  it('reserves the trailing action track and ellipsizes the full title', () => {
     const title =
       'Reply with exactly one short sentence confirming the artist release plan';
 
@@ -115,25 +115,23 @@ describe('SidebarThreadsSection', () => {
       'justify-self-stretch',
       'overflow-hidden'
     );
-    expect(label).not.toHaveClass('justify-self-start', 'truncate');
-    expect(label.className).toContain(
-      'mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)'
-    );
-    expect(label.className).toContain(
-      '-webkit-mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)'
-    );
+    expect(label).toHaveClass('text-ellipsis', 'whitespace-nowrap');
+    expect(label.className).not.toContain('mask-image');
     const row = screen.getByRole('link', { name: title });
     const action = screen.getByRole('button', {
       name: `Chat Actions for ${title}`,
     });
 
-    expect(row).toHaveClass('grid-cols-[18px_minmax(0,1fr)]');
-    expect(row).not.toHaveClass(
-      'grid-cols-[18px_minmax(0,1fr)_20px]',
-      'grid-cols-[18px_minmax(0,1fr)_minmax(34px,auto)]',
-      'pr-8'
+    expect(row).toHaveClass('grid-cols-[18px_minmax(0,1fr)_minmax(34px,auto)]');
+    expect(action).toHaveClass(
+      'right-2.5',
+      'hover:bg-surface-0',
+      'active:bg-surface-0'
     );
-    expect(action).toHaveClass('right-2.5', 'group-hover/thread:bg-surface-0');
+    expect(action).not.toHaveClass(
+      'group-hover/thread:bg-surface-0',
+      'focus-visible:bg-surface-0'
+    );
     expect(action).toHaveClass('absolute', 'opacity-0');
   });
 

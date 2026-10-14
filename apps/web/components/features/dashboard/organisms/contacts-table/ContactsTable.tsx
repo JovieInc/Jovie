@@ -191,11 +191,22 @@ export const ContactsTable = memo(function ContactsTable({
               className={PAGE_TOOLBAR_META_TEXT_CLASS}
               data-testid='contacts-toolbar-count'
             >
-              {isLoading && contacts.length === 0
-                ? 'Loading contacts'
-                : `${contacts.length} ${
-                    contacts.length === 1 ? 'contact' : 'contacts'
-                  }`}
+              {isLoading && contacts.length === 0 ? (
+                // One loading signal: the rows already show skeletons, so the
+                // count slot holds a quiet placeholder, not a sentence.
+                <>
+                  <span className='sr-only'>Loading contacts</span>
+                  <span
+                    aria-hidden='true'
+                    data-testid='contacts-toolbar-count-skeleton'
+                    className='inline-block h-3 w-16 animate-pulse rounded-sm bg-surface-1 align-middle motion-reduce:animate-none'
+                  />
+                </>
+              ) : (
+                `${contacts.length} ${
+                  contacts.length === 1 ? 'contact' : 'contacts'
+                }`
+              )}
             </span>
           }
           end={

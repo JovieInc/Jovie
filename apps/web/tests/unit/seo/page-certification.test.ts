@@ -33,6 +33,7 @@ function page({
 ${head}</head><body><header><nav>Pricing Blog</nav></header>${body}<footer>Legal</footer></body></html>`;
 }
 
+const INTEGRATIONS_URL = 'https://jov.ie/integrations';
 const CONTEXT = { siteOrigin: 'https://jov.ie', inSitemap: true } as const;
 
 function certify(
@@ -150,11 +151,22 @@ describe('certifyPage', () => {
         'https://jov.ie/tim/the-deep-end'
       )
     ).toBe('passed');
+    expect(
+      statusOf(smartLink, 'server-rendered-content', INTEGRATIONS_URL)
+    ).toBe('failed');
   });
 
   it('fails copy with an em dash and never runs judges in the sweep', () => {
     const html = page({
       body: `<main><h1>Release</h1><p>${BODY_WORDS} Your fans — all of them.</p></main>`,
+    });
+    expect(
+      certify(html, 200, INTEGRATIONS_URL).checks.find(
+        item => item.id === 'copy-lint'
+      )
+    ).toMatchObject({
+      status: 'failed',
+      summary: expect.stringContaining('jovie-marketing'),
     });
     const result = certify(html, 200, 'https://jov.ie/');
     expect(result.checks.find(item => item.id === 'copy-lint')?.status).toBe(
@@ -197,6 +209,8 @@ describe('classifySurface', () => {
     ['/support', 'docs'],
     ['/legal/terms', 'legal'],
     ['/pricing', 'marketing'],
+    ['/integrations', 'marketing'],
+    ['/integrations-fan', 'profile'],
     ['/changelog/26.9.0', 'marketing'],
     ['/tim', 'profile'],
     ['/tim/the-deep-end', 'smart_link'],

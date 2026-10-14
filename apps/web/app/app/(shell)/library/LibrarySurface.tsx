@@ -1510,8 +1510,13 @@ function LibraryToolbar({
               hidden={filtersOpen}
             />
           </div>
+          {/* One count per breakpoint: the status bar owns it from sm up. */}
           <span
-            className={cn(PAGE_TOOLBAR_META_TEXT_CLASS, 'whitespace-nowrap')}
+            className={cn(
+              PAGE_TOOLBAR_META_TEXT_CLASS,
+              'whitespace-nowrap sm:hidden'
+            )}
+            data-testid='library-toolbar-count'
           >
             {visibleCount}
             {visibleCount === totalCount ? '' : ` of ${totalCount}`} visible
@@ -2213,6 +2218,19 @@ function ApprovalStatusEditor({
   );
 }
 
+/**
+ * Name the header link by where it goes. A release without its own target
+ * falls back to its public smart-link page, which "Open Full View" misnamed
+ * as an in-app view.
+ */
+export function workPrimaryActionLabel(
+  asset: Pick<LibraryReleaseAsset, 'primaryActionHref'>
+): string {
+  const href = asset.primaryActionHref;
+  if (!href) return 'View Public Page';
+  return href.startsWith('/app') ? 'Open Full View' : 'Open Original';
+}
+
 function AssetDrawer({
   asset,
   open,
@@ -2292,6 +2310,38 @@ function AssetDrawer({
     },
     [currentId]
   );
+  // One share concept: the link row owns private file sharing too.
+  const [privateShareObjectId, setPrivateShareObjectId] = useState<
+    string | null
+  >(null);
+  const privateShareOpen =
+    currentId !== null && privateShareObjectId === currentId;
+  const openPrivateShare = useCallback(() => {
+    setPrivateShareObjectId(currentId);
+  }, [currentId]);
+  const handlePrivateShareOpenChange = useCallback(
+    (next: boolean) => setPrivateShareObjectId(next ? currentId : null),
+    [currentId]
+  );
+  // One attach concept: ⌘U from anywhere in the open inspector.
+  const [attachRequested, setAttachRequested] = useState(false);
+  const clearAttachRequest = useCallback(() => setAttachRequested(false), []);
+  const canAttachFiles = open && current !== null && !isMerch;
+  useEffect(() => {
+    if (!canAttachFiles) return;
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
+      if (event.shiftKey || event.key.toLowerCase() !== 'u') return;
+      // Rich-text editors keep ⌘U for underline.
+      if (event.target instanceof HTMLElement && event.target.isContentEditable)
+        return;
+      event.preventDefault();
+      handleTabChange('files');
+      setAttachRequested(true);
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [canAttachFiles, handleTabChange]);
   const [findingState, setFindingState] = useState({
     source: postReleaseBundle.findings,
     findings: postReleaseBundle.findings,
@@ -2347,11 +2397,12 @@ function AssetDrawer({
     [onClose]
   );
   const drawerHeaderActions = current ? (
+    // The shared header shows the visible mobile Close for every drawer.
     <DrawerHeaderActions
       primaryActions={[
         {
           id: 'open-full-view',
-          label: 'Open Full View',
+          label: workPrimaryActionLabel(current),
           icon: ExternalLink,
           href: current.primaryActionHref ?? current.smartLinkPath,
         },
@@ -2451,7 +2502,7 @@ function AssetDrawer({
                       launches={workLaunches}
                       canPublish={profileId !== null}
                       disabled={!open}
-                      onSharePrivately={() => handleTabChange('files')}
+                      onSharePrivately={openPrivateShare}
                     />
                   </InspectorSection>
                 ) : null}
@@ -2521,9 +2572,28 @@ function AssetDrawer({
                         disabled={!open}
                         initialShare={current.share}
                         onShareChange={onShareChange}
+                        onSharePrivately={
+                          isYouTubeVideo ? undefined : openPrivateShare
+                        }
                       />
                     ) : null}
                   </InspectorSection>
+                ) : null}
+
+                {privateShareOpen && !isMerch && !isYouTubeVideo ? (
+                  <div className='py-3' data-testid='work-private-share'>
+                    <LibraryShareDropCreator
+                      key={current.id}
+                      open
+                      onOpenChange={handlePrivateShareOpenChange}
+                      releaseIds={[current.id]}
+                      candidateAssets={shareCandidates.map(item => ({
+                        id: item.id,
+                        title: item.title,
+                      }))}
+                      defaultTitle={`${current.title} files`}
+                    />
+                  </div>
                 ) : null}
 
                 <InspectorSection
@@ -2733,40 +2803,27 @@ function AssetDrawer({
             ) : isMerch ? (
               <InspectorEmpty message='No files for this merch item.' />
             ) : (
-              <>
-                <LibraryFilesPanel
-                  asset={current}
-                  downloads={inspectorBundle.downloads}
-                  disabled={!open}
-                  disabledTabIndex={closedTabIndex}
-                  audioPreviewAction={
-                    hasVerifiedLibraryAudioPreview(current) ? (
-                      <PreviewActionButton
-                        asset={current}
-                        isPreviewPlaying={isPreviewPlaying}
-                        onTogglePreview={onTogglePreview}
-                        compact
-                        disabledTabIndex={closedTabIndex}
-                      />
-                    ) : null
-                  }
-                  onAudioUploaded={onAudioUploaded}
-                  onArtworkUploaded={onArtworkUploaded}
-                />
-
-                {!isYouTubeVideo ? (
-                  <InspectorSection title='Share Files Privately'>
-                    <LibraryShareDropCreator
-                      releaseIds={[current.id]}
-                      candidateAssets={shareCandidates.map(item => ({
-                        id: item.id,
-                        title: item.title,
-                      }))}
-                      defaultTitle={`${current.title} files`}
+              <LibraryFilesPanel
+                asset={current}
+                downloads={inspectorBundle.downloads}
+                disabled={!open}
+                disabledTabIndex={closedTabIndex}
+                audioPreviewAction={
+                  hasVerifiedLibraryAudioPreview(current) ? (
+                    <PreviewActionButton
+                      asset={current}
+                      isPreviewPlaying={isPreviewPlaying}
+                      onTogglePreview={onTogglePreview}
+                      compact
+                      disabledTabIndex={closedTabIndex}
                     />
-                  </InspectorSection>
-                ) : null}
-              </>
+                  ) : null
+                }
+                onAudioUploaded={onAudioUploaded}
+                onArtworkUploaded={onArtworkUploaded}
+                attachRequested={attachRequested}
+                onAttachRequestHandled={clearAttachRequest}
+              />
             )}
           </div>
         </TableContextMenu>
@@ -3098,6 +3155,17 @@ export function LibrarySurface({
     },
     [playbackState.activeTrackId, toggleTrack]
   );
+
+  // `?work=<id>` (Cmd+K, links) opens that work's inspector once per id.
+  const workParam = searchParams.get('work');
+  const openedWorkParamRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!workParam || openedWorkParamRef.current === workParam) return;
+    if (!visibleAssets.some(asset => asset.id === workParam)) return;
+    openedWorkParamRef.current = workParam;
+    setSelectedId(workParam);
+    setDrawerOpen(true);
+  }, [visibleAssets, workParam]);
 
   useEffect(() => {
     if (selectedId && !visibleAssets.some(asset => asset.id === selectedId)) {

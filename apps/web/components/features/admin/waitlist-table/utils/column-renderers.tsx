@@ -12,6 +12,7 @@ import {
   DateCell,
   TableCheckboxCell,
 } from '@/components/organisms/table';
+import { PersonCell } from '@/components/organisms/table/atoms/PersonCell';
 import { PlatformPill } from '@/features/dashboard/atoms/PlatformPill';
 import type { WaitlistEntryRow } from '@/lib/admin/types';
 import type { CellContext, HeaderContext, Table } from '@/lib/tanstack-table';
@@ -23,10 +24,10 @@ import {
 } from '../constants';
 
 /**
- * Renders a name cell with primary token styling
+ * Renders the waitlist person on the shared one-line people row
  */
 export function renderNameCell(value: string) {
-  return <span className='font-medium text-primary-token'>{value}</span>;
+  return <PersonCell name={value} />;
 }
 
 /**

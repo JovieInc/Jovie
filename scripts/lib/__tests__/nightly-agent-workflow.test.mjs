@@ -37,7 +37,6 @@ function conclusion(overrides) {
   const results = {
     context: 'success',
     deterministic: 'success',
-    'mutation-hotspots': 'success',
     'candidate-validation': 'skipped',
     ...overrides,
   };
@@ -66,12 +65,7 @@ describe('Nightly Testing Agent evidence flow', () => {
     ).toBe(false);
   });
 
-  it.each([
-    'context',
-    'deterministic',
-    'mutation-hotspots',
-    'candidate-validation',
-  ])(
+  it.each(['context', 'deterministic', 'candidate-validation'])(
     'preserves %s failure and cancellation in the executed conclusion step',
     job => {
       expect(conclusion({ [job]: 'failure' })).toBe('value=failure');
@@ -80,12 +74,12 @@ describe('Nightly Testing Agent evidence flow', () => {
   );
 
   it('allows deliberately skipped optional lanes with successful executed lanes', () => {
-    expect(conclusion({ 'mutation-hotspots': 'skipped' })).toBe(
+    expect(conclusion({ 'candidate-validation': 'skipped' })).toBe(
       'value=success'
     );
-    expect(
-      conclusion({ deterministic: 'cancelled', 'mutation-hotspots': 'failure' })
-    ).toBe('value=failure');
+    expect(conclusion({ deterministic: 'cancelled', context: 'failure' })).toBe(
+      'value=failure'
+    );
   });
 
   it('shards the full existing selector without cancelling siblings or raising the budget', () => {

@@ -35,6 +35,7 @@ export type AdminWorkspaceId =
   | 'overview'
   | 'chat'
   | 'certifications'
+  | 'outbound'
   | 'product'
   | 'operations'
   | 'needs_you'
@@ -77,6 +78,7 @@ export const ADMIN_PRIMARY_WORKSPACE_IDS = [
 export const ADMIN_SETTINGS_TOOL_IDS = [
   'chat',
   'certifications',
+  'outbound',
   'shipping',
   'people',
   'interviews',
@@ -141,6 +143,14 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     href: APP_ROUTES.ADMIN_CERTIFICATIONS,
     description:
       'Founder review of certification evidence, with certify and reject',
+    section: 'utilities',
+  },
+  {
+    id: 'outbound',
+    label: 'Outbound',
+    href: APP_ROUTES.ADMIN_OUTBOUND,
+    description:
+      'Certify potential outbound artists and approve every target and message',
     section: 'utilities',
   },
   {

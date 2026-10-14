@@ -14,11 +14,13 @@ vi.mock('@/features/admin/table/AdminDataTable', () => ({
     columns,
     emptyState,
     getRowClassName,
+    rowMode,
   }: {
     readonly children?: ReactNode;
     readonly columns?: Array<{ id?: string }>;
     readonly emptyState?: ReactNode;
     readonly getRowClassName?: (row: unknown, index: number) => string;
+    readonly rowMode?: string;
   }) => {
     capturedGetRowClassName = getRowClassName;
     capturedColumnIds = (columns ?? [])
@@ -26,7 +28,7 @@ vi.mock('@/features/admin/table/AdminDataTable', () => ({
       .filter((id): id is string => typeof id === 'string');
 
     return (
-      <div data-testid='admin-data-table'>
+      <div data-testid='admin-data-table' data-row-mode={rowMode}>
         {children}
         <div data-testid='waitlist-empty-state'>{emptyState}</div>
       </div>
@@ -81,6 +83,11 @@ describe('AdminWaitlistTableUnified', () => {
 
     // Converged: no explicit getRowClassName; presets.tableRow + rowState provide hover
     expect(capturedGetRowClassName).toBeUndefined();
+    // Waitlist people use the 32px dense row (JOV-7798).
+    expect(screen.getByTestId('admin-data-table')).toHaveAttribute(
+      'data-row-mode',
+      'dense'
+    );
 
     expect(screen.getByText('No waitlist entries').className).toContain(
       'text-primary-token'

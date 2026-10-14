@@ -59,12 +59,12 @@ describe('tasks entitlement gate', () => {
     await expect(requireTasksWorkspaceAccess()).rejects.toMatchObject({
       name: 'TasksUpgradeRequiredError',
       code: 'TASKS_WORKSPACE_LOCKED',
-      message: 'Tasks requires a Pro plan.',
+      message: 'Tasks requires an Artist Presence plan.',
     });
     await expect(requireReleasePlanGenerationAccess()).rejects.toMatchObject({
       name: 'TasksUpgradeRequiredError',
       code: 'RELEASE_PLAN_LOCKED',
-      message: 'Release plans require a Pro plan.',
+      message: 'Release plans require an Artist Presence plan.',
     });
 
     await expect(requireTasksWorkspaceAccess()).rejects.toBeInstanceOf(

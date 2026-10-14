@@ -62,6 +62,11 @@ const RESOURCE_LINKS = [
       'Active v1 lifecycle boundary, additive versus breaking changes, and future Deprecation and Sunset signals.',
   },
   {
+    href: APP_ROUTES.INTEGRATIONS,
+    label: 'Integrations',
+    description: 'Account integrations and the capabilities each supports.',
+  },
+  {
     href: '/llms.txt',
     label: 'llms.txt', // ui-casing-allow: literal, case-sensitive filename; also asserted verbatim by page.test.tsx
     description: 'A concise guide to Jovie’s public site and agent surfaces.',

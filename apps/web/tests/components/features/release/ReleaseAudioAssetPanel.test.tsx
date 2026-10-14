@@ -179,6 +179,48 @@ describe('ReleaseAudioAssetPanel', () => {
     );
   });
 
+  it('uploads a file handed over by a parent attach control exactly once', async () => {
+    blobUploadMock.mockResolvedValue({
+      url: 'https://cdn.example.com/attached.mp3',
+      pathname: 'library/audio/attached.mp3',
+    });
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          previewUrl: 'https://cdn.example.com/attached.mp3',
+        }),
+        { status: 200 }
+      )
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const file = new File(['audio'], 'attached.mp3', { type: 'audio/mpeg' });
+    const onUploaded = vi.fn();
+
+    const { rerender } = render(
+      <ReleaseAudioAssetPanel
+        releaseId='release-1'
+        releaseTitle='Take Me Over'
+        pendingFile={file}
+        onUploaded={onUploaded}
+      />
+    );
+    rerender(
+      <ReleaseAudioAssetPanel
+        releaseId='release-1'
+        releaseTitle='Take Me Over'
+        pendingFile={file}
+        onUploaded={onUploaded}
+      />
+    );
+
+    await waitFor(() =>
+      expect(onUploaded).toHaveBeenCalledWith(
+        'https://cdn.example.com/attached.mp3'
+      )
+    );
+    expect(blobUploadMock).toHaveBeenCalledTimes(1);
+  });
+
   it('shows "Audio preview unavailable" with retry when preview fetch fails', async () => {
     decodeWaveformPeaksMock.mockRejectedValueOnce(
       new AudioPreviewError('network')

@@ -2,6 +2,11 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import {
+  cronGapMinutes,
+  triggerNames,
+  workflowTriggers,
+} from '../../../../../scripts/lib/workflow-triggers.mjs';
 
 const testDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(testDir, '..', '..', '..', '..', '..');
@@ -22,12 +27,14 @@ describe('M2 revenue-path canary workflow (JOV-6439)', () => {
     expect(workflow).toContain('# necessary-trust-boundary:');
     expect(workflow).toContain('# removal-trigger:');
     expect(workflow).toContain('`big-pr` opt-out as #17861');
-    expect(workflow).toContain("- cron: '37 6 * * *'");
-    expect(workflow).toContain('workflow_dispatch:');
-    expect(workflow).toContain('workflow_call:');
-    expect(workflow).not.toContain('workflow_run:');
-    expect(workflow).not.toContain('pull_request:');
-    expect(workflow).not.toContain('merge_group:');
+    // Daily clock, deploy-hook workflow_call and manual dispatch only.
+    const on = workflowTriggers(workflow);
+    expect(triggerNames(on)).toEqual([
+      'schedule',
+      'workflow_call',
+      'workflow_dispatch',
+    ]);
+    expect(cronGapMinutes(on).max).toBeLessThanOrEqual(1440);
   });
 
   it('is distinct from generic uptime and the existing canaries', () => {

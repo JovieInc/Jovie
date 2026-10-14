@@ -14,6 +14,8 @@ export const SANCTIONED_EXEMPTION_BASELINE = [
   '(marketing)/ai/page.tsx',
   '(marketing)/blog/[slug]/page.tsx',
   '(marketing)/blog/authors/[username]/page.tsx',
+  // JOV-8012 / PR20958: generated connector reference, not an authored recipe.
+  '(marketing)/integrations/page.tsx',
   '(marketing)/changelog/page.tsx',
   '(marketing)/changelog/[version]/page.tsx',
   '(marketing)/demo/video/page.tsx',

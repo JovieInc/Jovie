@@ -19,7 +19,7 @@ const FOUNDER_NOTE_TARGET = {
   category: 'note',
 } as const;
 
-export function OvieInbox() {
+export function OvieInbox({ caseId }: { readonly caseId?: string }) {
   const [captureOpen, setCaptureOpen] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const queryClient = useQueryClient();
@@ -43,7 +43,12 @@ export function OvieInbox() {
     refetchOnWindowFocus: true,
     refetchInterval: submitting ? false : 30_000,
   });
-  const item = query.data?.cases[0];
+  // A requested case stays bound to the current source response. Never
+  // substitute a different actionable card when it disappears or is stale.
+  const item =
+    caseId === undefined
+      ? query.data?.cases[0]
+      : query.data?.cases.find(entry => entry.id === caseId);
   const notes = item ? (drafts[item.id] ?? '') : '';
   function setNotes(value: string) {
     if (item) setDrafts(current => ({ ...current, [item.id]: value }));
@@ -100,7 +105,9 @@ export function OvieInbox() {
     <ContentSurfaceCard data-testid='ovie-inbox'>
       <div className='min-h-64 p-4'>
         <div className='flex items-center justify-between gap-3'>
-          <h2 className='text-sm font-semibold text-primary-token'>Inbox</h2>
+          <h2 className='whitespace-nowrap text-sm font-semibold text-primary-token'>
+            Inbox
+          </h2>
           <DrawerButton
             type='button'
             tone='secondary'
@@ -129,7 +136,7 @@ export function OvieInbox() {
             </div>
           ) : item ? (
             <article data-testid='ovie-inbox-decision' key={item.id}>
-              <h3 className='text-app font-medium text-primary-token'>
+              <h3 className='text-balance text-app font-medium text-primary-token'>
                 {item.title}
               </h3>
               <p className='mt-2 whitespace-pre-wrap text-app text-secondary-token'>
@@ -213,6 +220,11 @@ export function OvieInbox() {
                 </p>
               )}
             </article>
+          ) : caseId !== undefined ? (
+            <p role='status'>
+              This decision is not in the current inbox. Refresh to check its
+              status.
+            </p>
           ) : (
             <p role='status'>
               {query.data?.issues.length

@@ -56,10 +56,12 @@ function readClientManifest(path) {
 /** @typedef {{ route: string, gzipKb: number, chunks: number }} RouteJsMeasurement */
 
 /**
+ * Initial JS files per /app route: root main files plus the page's
+ * client-reference entry chunks.
  * @param {string} nextDir
- * @returns {RouteJsMeasurement[]}
+ * @returns {{ route: string, files: Set<string> }[]}
  */
-export function measureRouteJs(nextDir) {
+function collectRouteFiles(nextDir) {
   const buildManifest = JSON.parse(
     readFileSync(join(nextDir, 'build-manifest.json'), 'utf8')
   );
@@ -67,6 +69,21 @@ export function measureRouteJs(nextDir) {
     ...(buildManifest.rootMainFiles ?? []),
     ...(buildManifest.polyfillFiles ?? []),
   ];
+  return findManifests(join(nextDir, 'server', 'app', 'app')).map(path => {
+    const [key, manifest] = readClientManifest(path);
+    const files = new Set(rootFiles);
+    for (const chunks of Object.values(manifest.entryJSFiles ?? {})) {
+      for (const chunk of chunks) files.add(chunk);
+    }
+    return { route: routeFromManifestKey(key), files };
+  });
+}
+
+/**
+ * @param {string} nextDir
+ * @returns {RouteJsMeasurement[]}
+ */
+export function measureRouteJs(nextDir) {
   const gzipCache = new Map();
   const gzipBytes = file => {
     if (!gzipCache.has(file)) {
@@ -76,23 +93,59 @@ export function measureRouteJs(nextDir) {
     return gzipCache.get(file);
   };
 
-  const manifests = findManifests(join(nextDir, 'server', 'app', 'app'));
-  return manifests
-    .map(path => {
-      const [key, manifest] = readClientManifest(path);
-      const files = new Set(rootFiles);
-      for (const chunks of Object.values(manifest.entryJSFiles ?? {})) {
-        for (const chunk of chunks) files.add(chunk);
-      }
+  return collectRouteFiles(nextDir)
+    .map(({ route, files }) => {
       let bytes = 0;
       for (const file of files) bytes += gzipBytes(file);
       return {
-        route: routeFromManifestKey(key),
+        route,
         gzipKb: Math.round(bytes / 1024),
         chunks: files.size,
       };
     })
     .sort((a, b) => b.gzipKb - a.gzipKb);
+}
+
+/**
+ * Code that must never reach initial /app JS, identified by a string literal
+ * that survives minification. zod's translated error tables (~39 KB gzip)
+ * ride in through `export * as locales` unless patches/zod@<version>.patch
+ * applies; a zod bump that drops the patch would bring them back silently.
+ */
+export const FORBIDDEN_CLIENT_CODE = [
+  {
+    id: 'zod-locales',
+    markers: ['Ungültige Eingabe', 'Μη έγκυρη είσοδος'],
+    fix: 'Re-key patches/zod@<version>.patch to the resolved zod version.',
+  },
+];
+
+/**
+ * @param {string} nextDir
+ * @param {typeof FORBIDDEN_CLIENT_CODE} [rules]
+ * @returns {{ id: string, fix: string, file: string, routes: string[] }[]}
+ */
+export function findForbiddenClientCode(
+  nextDir,
+  rules = FORBIDDEN_CLIENT_CODE
+) {
+  const routesByFile = new Map();
+  for (const { route, files } of collectRouteFiles(nextDir)) {
+    for (const file of files) {
+      if (!routesByFile.has(file)) routesByFile.set(file, []);
+      routesByFile.get(file).push(route);
+    }
+  }
+  const hits = [];
+  for (const [file, routes] of routesByFile) {
+    const source = readFileSync(join(nextDir, file), 'utf8');
+    for (const rule of rules) {
+      if (rule.markers.some(marker => source.includes(marker))) {
+        hits.push({ id: rule.id, fix: rule.fix, file, routes: routes.sort() });
+      }
+    }
+  }
+  return hits;
 }
 
 /**
@@ -161,7 +214,13 @@ function main() {
         'Dynamic-import heavy client code, or raise the budget with a measured reason.'
     );
   }
-  process.exit(result.violations.length > 0 ? 1 : 0);
+  const forbidden = findForbiddenClientCode(options.nextDir);
+  for (const hit of forbidden) {
+    console.log(
+      `::error::${hit.file} ships forbidden client code (${hit.id}) in ${hit.routes.length} /app routes, e.g. ${hit.routes[0]}. ${hit.fix}`
+    );
+  }
+  process.exit(result.violations.length > 0 || forbidden.length > 0 ? 1 : 0);
 }
 
 if (

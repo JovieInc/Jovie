@@ -11,6 +11,8 @@ export const RUNTIME_DATA_FILES = Object.freeze([
   'docs/FEATURE_REGISTRY.md',
   'apps/eve-pilot/identities/jovie/instructions.md',
   'apps/eve-pilot/identities/summer/instructions.md',
+  // Funnel judge trend for the Ovie outbound readiness checklist.
+  'scripts/funnel-judge/trend.jsonl',
 ]);
 
 const appRoot = join(import.meta.dirname, '..');

@@ -39,6 +39,8 @@ export interface ReleaseAudioAssetPanelProps {
   readonly onSnippetSaved?: (snippet: AudioSnippet) => void;
   readonly disabledTabIndex?: number;
   readonly testIdPrefix?: 'release' | 'library';
+  /** A file handed over by a parent attach control; uploads once on arrival. */
+  readonly pendingFile?: File | null;
 }
 
 export function ReleaseAudioAssetPanel({
@@ -52,6 +54,7 @@ export function ReleaseAudioAssetPanel({
   onSnippetSaved,
   disabledTabIndex,
   testIdPrefix = 'release',
+  pendingFile = null,
 }: ReleaseAudioAssetPanelProps) {
   const { userId } = useAuthSafe();
   const dropzoneTestId =
@@ -202,6 +205,13 @@ export function ReleaseAudioAssetPanel({
     },
     [isEditable, onUploaded, releaseId, userId]
   );
+
+  const handledPendingFileRef = useRef<File | null>(null);
+  useEffect(() => {
+    if (!pendingFile || handledPendingFileRef.current === pendingFile) return;
+    handledPendingFileRef.current = pendingFile;
+    uploadFile(pendingFile).catch(() => {});
+  }, [pendingFile, uploadFile]);
 
   const handleInputChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {

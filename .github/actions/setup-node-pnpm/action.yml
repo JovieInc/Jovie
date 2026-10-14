@@ -68,10 +68,16 @@ runs:
     # 36175640539 each Unit Tests shard spent 12-24s extracting the 1.3 GB
     # pnpm store and another 13-18s in `pnpm fetch` linking 3,083 packages
     # into node_modules/.pnpm. An exact node_modules hit replaces both with
-    # one extract. No restore-keys: only an exact lockfile, workspace, patch,
-    # .npmrc and Node pin match restores. Standard jobs still run frozen
-    # install; merge-group consumers validate the prepared-tree receipt and
-    # installed lockfile. Self-hosted runners never use Actions caches.
+    # one extract. Only an exact lockfile, workspace, patch, .npmrc and Node
+    # pin match is a hit. On a miss, the newest tree for the same Node pin
+    # (restore-keys) is a starting point, never a result: cache-hit stays
+    # false, so the frozen install reconciles it to the lockfile (pruning,
+    # linking and fetching only the delta) and a merge-group producer still
+    # stamps and saves the exact key. Queued lockfile and manifest changes
+    # reach every later merge group before main can seed their key (59 key
+    # changes in the 7 days to 2026-10-13), and each such producer fetched
+    # all ~3,100 packages: workspace prep p50 29s -> 71s, p90 153s.
+    # Self-hosted runners never use Actions caches.
     # Bump v4 when the install command, its environment or the pruned set
     # below changes; scripts/lib/actions-cache-supersede.mjs tracks it.
     - name: Restore installed node_modules (GitHub-hosted)
@@ -85,6 +91,8 @@ runs:
           packages/*/node_modules
           workers/*/node_modules
         key: pnpm-node-modules-v4-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc', 'package.json', 'apps/*/package.json', 'packages/*/package.json', 'workers/*/package.json', 'patches/**') }}
+        restore-keys: |
+          pnpm-node-modules-v4-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-
 
     # setup-node's pnpm cache is GitHub-hosted only. Every self-hosted runner,
     # fixed or ephemeral, skips Actions cache restore/save. Fixed runners reuse
@@ -99,11 +107,13 @@ runs:
       uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
       with:
         node-version-file: '.nvmrc'
-        cache: ${{ runner.environment == 'github-hosted' && inputs.package_cache == 'true' && github.event_name != 'merge_group' && steps.node-modules-cache.outputs.cache-hit != 'true' && 'pnpm' || '' }}
+        cache: ${{ runner.environment == 'github-hosted' && inputs.package_cache == 'true' && github.event_name != 'merge_group' && steps.node-modules-cache.outputs.cache-matched-key == '' && 'pnpm' || '' }}
         cache-dependency-path: '**/pnpm-lock.yaml'
 
+    # A restored tree (exact or prior) already holds every unchanged package;
+    # the frozen install fetches only what the lockfile adds.
     - name: Warm pnpm store
-      if: steps.runner-prereqs.outputs.dependencies_warm != 'true' && steps.node-modules-cache.outputs.cache-hit != 'true' && !(github.event_name == 'merge_group' && inputs.reuse_merge_group_workspace == 'true')
+      if: steps.runner-prereqs.outputs.dependencies_warm != 'true' && steps.node-modules-cache.outputs.cache-matched-key == '' && !(github.event_name == 'merge_group' && inputs.reuse_merge_group_workspace == 'true')
       shell: bash
       env:
         ONNXRUNTIME_NODE_INSTALL: skip
@@ -141,7 +151,9 @@ runs:
         fi
         if [[ "${{ steps.node-modules-cache.outputs.cache-hit }}" != 'true' ]]; then
           echo "::warning::Prepared merge-group dependency workspace was not restored (cache evicted); installing the frozen lockfile instead."
-          pnpm fetch --frozen-lockfile
+          if [[ -z "${{ steps.node-modules-cache.outputs.cache-matched-key }}" ]]; then
+            pnpm fetch --frozen-lockfile
+          fi
           pnpm install --frozen-lockfile
           node scripts/lib/ci-dependency-workspace.mjs prepare
         fi

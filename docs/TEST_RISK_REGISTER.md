@@ -56,7 +56,7 @@ surfaces:
     notes: >-
       Single source of truth for plan capabilities. 4 plans × 26 booleans + 5 numeric limits.
       Legacy plan aliases (founding→pro, growth→max) must be covered.
-      Already in stryker.config.mjs mutate[]; add a registry.test.ts targeted by Stryker testFiles.
+      Covered by the Mutation Diff lane (lib/entitlements/ prefix in scripts/lib/mutation-diff.mjs).
     last_reviewed: 2026-05-10
 
   # proxy.ts is one 1412-line file. Three logical regions (Clerk routing,
@@ -238,7 +238,7 @@ Each surface has three dimensions (1-5):
 - **Reversibility** — how hard to recover. 5 = irreversible (charged card, leaked data).
 - **Visibility** — user-facing impact. 5 = front-and-center UI.
 
-The heatmap generator computes a numeric priority score and joins it with measured `coverage_pct` and `mutation_score` from `apps/web/coverage/coverage-final.json` and `apps/web/reports/stryker-incremental.json`.
+The heatmap generator computes a numeric priority score and joins it with measured `coverage_pct` and `mutation_score` from `apps/web/coverage/coverage-final.json` and `apps/web/reports/stryker-incremental.json` (not produced yet: the Mutation Diff lane reports to its job summary).
 
 ## Active Surfaces
 

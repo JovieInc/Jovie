@@ -853,10 +853,13 @@ export function ProfileContactSidebar() {
     router.push(APP_ROUTES.AUDIENCE);
   }, [router]);
 
-  const handleManageConnections = useCallback(() => {
-    close();
-    router.push(APP_ROUTES.PROFILES);
-  }, [close, router]);
+  const handleManageConnections = useCallback(
+    (destination: string) => {
+      close();
+      router.push(destination);
+    },
+    [close, router]
+  );
 
   // Handle smart add — receives a detected link from SidebarLinkInput
   const handleSmartAddLink = useCallback(

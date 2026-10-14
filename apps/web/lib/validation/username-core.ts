@@ -62,6 +62,7 @@ export const RESERVED_USERNAMES = [
   'demovideo',
   'developers',
   'instant-merch',
+  'integrations',
   'investors',
   'launch',
   'new',

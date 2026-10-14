@@ -99,6 +99,15 @@ test('selects only disk-reading tests whose keys name a changed path', () => {
       'apps/web/tests/unit/css.test.ts',
       "import { readFileSync } from 'node:fs';\nreadFileSync(join(R, 'styles', 'base.css'));\n"
     );
+    write(
+      'apps/web/tests/unit/ci/browser.test.ts',
+      "import { readFileSync } from 'node:fs';\nreadFileSync('.github/workflows/ci.yml');\nspawnSync('pnpm', ['exec', 'playwright', 'test']);\n"
+    );
+    write(
+      'apps/web/tests/unit/ci/chromium.test.ts',
+      "import fs from 'node:fs';\nfs.readFileSync('.github/workflows/ci.yml');\nawait chromium.launch();\n"
+    );
+    // Browser-launching tests need installed browsers; the shards run them.
     assert.deepEqual(sourceReadTests(root), [
       'apps/web/tests/unit/css.test.ts',
       'apps/web/tests/unit/routes/shell-nav.test.ts',
@@ -166,5 +175,21 @@ test('the CLI lists the selection from the checkout it runs in', () => {
   assert.match(
     result.stdout,
     /^tests\/unit\/routes\/shell-nav-coverage\.test\.ts$/m
+  );
+});
+
+test('never selects browser-launching tests, even for a workflow they read', () => {
+  const selected = selectSourceReadTests(['.github/workflows/ci.yml'], {
+    root: ROOT,
+  });
+  assert.ok(
+    !selected.includes(
+      'apps/web/tests/unit/ci/playwright-artifact-secrets.test.ts'
+    )
+  );
+  assert.ok(
+    !sourceReadTests(ROOT).includes(
+      'apps/web/tests/unit/ci/playwright-artifact-secrets.test.ts'
+    )
   );
 });

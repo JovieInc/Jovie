@@ -9,7 +9,7 @@
  */
 
 import { Badge, Button, ConfirmDialog } from '@jovie/ui';
-import { useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { APP_ROUTES } from '@/constants/routes';
 import { signOut } from '@/hooks/useJovieAuth';
@@ -29,6 +29,50 @@ export interface SessionManagementCardProps {
   readonly activeSessionId: string | null | undefined;
 }
 
+/** Rows shown before "Show all"; the loading frame reserves exactly this. */
+export const SESSION_PREVIEW_ROWS = 3;
+const SESSION_SKELETON_KEYS = Array.from(
+  { length: SESSION_PREVIEW_ROWS },
+  (_, index) => `session-skeleton-${index}`
+);
+const SESSION_ROW_CLASS =
+  'flex h-16 items-center justify-between gap-3 px-4 sm:px-5';
+
+/**
+ * Fixed geometry for every state (loading, error, empty, loaded) so the list
+ * arriving ~seconds after paint never pushes the settings page (was CLS 0.22
+ * desktop / 0.37 mobile).
+ */
+function SessionsFrame({
+  actions,
+  children,
+}: {
+  readonly actions?: ReactNode;
+  readonly children: ReactNode;
+}) {
+  return (
+    <div data-testid='session-management-frame'>
+      <div className='flex h-8 items-center justify-between gap-2 px-4 sm:px-5'>
+        {actions}
+      </div>
+      <div className='min-h-48 divide-y divide-subtle/60 overflow-hidden'>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function orderSessions(
+  sessions: readonly BetterAuthSessionResource[],
+  activeSessionId: string | null | undefined
+): BetterAuthSessionResource[] {
+  return [...sessions].sort((a, b) => {
+    if (a.id === activeSessionId) return -1;
+    if (b.id === activeSessionId) return 1;
+    return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+  });
+}
+
 export function SessionManagementCard({
   activeSessionId,
 }: SessionManagementCardProps) {
@@ -44,6 +88,7 @@ export function SessionManagementCard({
   const [sessionToEnd, setSessionToEnd] =
     useState<BetterAuthSessionResource | null>(null);
   const [confirmEndAllOthers, setConfirmEndAllOthers] = useState(false);
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -132,23 +177,34 @@ export function SessionManagementCard({
   const otherSessionCount = sessions.filter(
     session => session.id !== activeSessionId
   ).length;
+  const orderedSessions = useMemo(
+    () => orderSessions(sessions, activeSessionId),
+    [sessions, activeSessionId]
+  );
+  const visibleSessions = showAll
+    ? orderedSessions
+    : orderedSessions.slice(0, SESSION_PREVIEW_ROWS);
+  const hiddenCount = orderedSessions.length - SESSION_PREVIEW_ROWS;
 
   if (sessionsLoading) {
     return (
-      <div className='divide-y divide-subtle/60 overflow-hidden'>
-        <div className='px-4 py-3 sm:px-5'>
-          <LoadingSkeleton height='h-10' />
-        </div>
-        <div className='px-4 py-3 sm:px-5'>
-          <LoadingSkeleton height='h-10' />
-        </div>
-      </div>
+      <SessionsFrame>
+        {SESSION_SKELETON_KEYS.map(key => (
+          <div
+            key={key}
+            className={SESSION_ROW_CLASS}
+            data-testid='session-row-skeleton'
+          >
+            <LoadingSkeleton height='h-10' />
+          </div>
+        ))}
+      </SessionsFrame>
     );
   }
 
   if (sessionsError) {
     return (
-      <div className='overflow-hidden'>
+      <SessionsFrame>
         <div
           role='alert'
           className='flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5'
@@ -184,44 +240,65 @@ export function SessionManagementCard({
             </Button>
           )}
         </div>
-      </div>
+      </SessionsFrame>
     );
   }
 
   if (sessions.length === 0) {
     return (
-      <div className='overflow-hidden'>
-        <div className='px-4 py-3 sm:px-5'>
+      <SessionsFrame>
+        <div className={SESSION_ROW_CLASS}>
           <p className='text-app text-secondary-token'>No active sessions.</p>
         </div>
-      </div>
+      </SessionsFrame>
     );
   }
 
   return (
     <>
-      {otherSessionCount > 0 ? (
-        <div className='flex justify-end'>
-          <Button
-            variant='ghost'
-            size='sm'
-            destructive
-            disabled={endingAllOthers}
-            onClick={() => setConfirmEndAllOthers(true)}
-          >
-            {endingAllOthers ? 'Signing out…' : 'Sign out other sessions'}
-          </Button>
-        </div>
-      ) : null}
-
-      <div className='divide-y divide-subtle/60 overflow-hidden'>
-        {sessions.map(session => {
+      <SessionsFrame
+        actions={
+          <>
+            {hiddenCount > 0 ? (
+              <Button
+                variant='ghost'
+                size='sm'
+                onClick={() => setShowAll(current => !current)}
+                aria-expanded={showAll}
+                // Optical seam: label text aligns with the row text below.
+                className='-ml-3'
+                data-testid='session-show-all'
+              >
+                {showAll
+                  ? 'Show Recent Sessions'
+                  : `Show All ${orderedSessions.length} Sessions`}
+              </Button>
+            ) : (
+              <span />
+            )}
+            {otherSessionCount > 0 ? (
+              <Button
+                variant='ghost'
+                size='sm'
+                destructive
+                disabled={endingAllOthers}
+                onClick={() => setConfirmEndAllOthers(true)}
+                className='-mr-3'
+              >
+                {endingAllOthers ? 'Signing out…' : 'Sign out other sessions'}
+              </Button>
+            ) : null}
+          </>
+        }
+      >
+        {visibleSessions.map(session => {
           const isCurrent = session.id === activeSessionId;
 
           return (
             <div
               key={session.id}
-              className='flex items-start justify-between gap-3 px-4 py-3 sm:px-5'
+              className={SESSION_ROW_CLASS}
+              data-testid='session-row'
             >
               <div className='min-w-0'>
                 <div className='flex flex-wrap items-center gap-1.5'>
@@ -245,7 +322,6 @@ export function SessionManagementCard({
                 <Button
                   variant='ghost'
                   size='sm'
-                  destructive
                   disabled={endingSessionId === session.id}
                   onClick={() => setSessionToEnd(session)}
                   className='shrink-0'
@@ -256,7 +332,7 @@ export function SessionManagementCard({
             </div>
           );
         })}
-      </div>
+      </SessionsFrame>
 
       <ConfirmDialog
         open={Boolean(sessionToEnd)}

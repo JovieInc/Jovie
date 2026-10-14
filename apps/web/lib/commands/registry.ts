@@ -287,20 +287,21 @@ export function buildCommands(
       'Share feedback, report a bug, or request a feature.',
       'MessageSquare'
     ),
+    // Sidebar order first (Home, Identity, Work, Audience), same icons.
     nav(
-      'go-profile',
-      'Profile',
-      'Open your profile in the chat workspace.',
-      'UserCircle',
-      APP_ROUTES.CHAT_PROFILE_PANEL
+      'go-home',
+      'Home',
+      'Open your Jovie home.',
+      'Home',
+      APP_ROUTES.DASHBOARD
     ),
     nav(
       'go-presence',
       PRODUCT_ONTOLOGY.identity.label,
       PRODUCT_ONTOLOGY.identity.definition,
-      'Waypoints',
-      APP_ROUTES.PRESENCE,
-      'PROFILES_WORKSPACE'
+      'User',
+      PRODUCT_ONTOLOGY.identity.canonicalRoute,
+      PRODUCT_ONTOLOGY.identity.requiredFlag
     ),
     nav(
       'go-work',
@@ -315,6 +316,13 @@ export function buildCommands(
       'People who visited, subscribed, or are in your contacts.',
       'Users',
       APP_ROUTES.CONTACTS_AUDIENCE
+    ),
+    nav(
+      'go-profile',
+      'Profile',
+      'Open your profile in the chat workspace.',
+      'UserCircle',
+      APP_ROUTES.CHAT_PROFILE_PANEL
     ),
     nav(
       'go-insights',

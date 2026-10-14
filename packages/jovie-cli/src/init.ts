@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import {
   existsSync,
   mkdirSync,
+  readFileSync,
   renameSync,
   rmSync,
   writeFileSync,
@@ -58,6 +59,13 @@ function writeSkill(skillsDir: string): string {
       rmSync(temp, { force: true });
     } catch {
       // The temp path is unreachable for the same reason the write failed.
+    }
+    try {
+      // Windows can reject a losing concurrent rename after another process
+      // has already installed the same bytes. The requested state still won.
+      if (readFileSync(file, 'utf8') === SKILL_MD) return file;
+    } catch {
+      // Preserve the original write error when no complete target is readable.
     }
     const code = (error as NodeJS.ErrnoException).code ?? '';
     const reason = WRITE_FAILURES[code];

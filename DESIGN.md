@@ -306,3 +306,6 @@ Read [the canonical surface split reference](docs/design-system/DETAILS.md#canon
 ## Decisions Log
 
 Read [the decisions log reference](docs/design-system/DETAILS.md#decisions-log) when changing this area.
+
+## Shell
+[Details](docs/design-system/DETAILS.md#shell)

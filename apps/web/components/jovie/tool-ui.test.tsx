@@ -252,4 +252,30 @@ describe('ToolPartsRenderer locked tool output', () => {
       screen.getByRole('button', { name: 'Upgrade to Max' })
     ).toBeInTheDocument();
   });
+
+  it('falls back to the canonical Artist Presence plan when plan_required is absent', () => {
+    render(
+      <ToolPartsRenderer
+        variant='chat'
+        parts={[
+          {
+            type: 'dynamic-tool',
+            toolName: 'generateAlbumArt',
+            toolCallId: 'tool-locked-default-plan',
+            state: 'output-available',
+            input: {},
+            output: {
+              success: true,
+              locked: true,
+              reason: 'Album art requires a paid plan.',
+            },
+          },
+        ]}
+      />
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Upgrade to Artist Presence' })
+    ).toBeInTheDocument();
+  });
 });

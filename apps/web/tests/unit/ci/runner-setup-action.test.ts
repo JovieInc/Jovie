@@ -86,6 +86,7 @@ describe('self-hosted runner setup action', () => {
     'inputs.save_merge_group_workspace': 'false',
     'steps.node-modules-cache.outcome': 'success',
     'steps.node-modules-cache.outputs.cache-hit': 'false',
+    'steps.node-modules-cache.outputs.cache-matched-key': '',
     'github.event_name': 'push',
     'github.repository': 'JovieInc/Jovie',
     'github.event.pull_request.head.repo.full_name': 'JovieInc/Jovie',
@@ -149,11 +150,17 @@ describe('self-hosted runner setup action', () => {
       'workers/*/node_modules',
     ]);
     // The key binds OS, arch, Node pin, lockfile, workspace, patches and
-    // .npmrc, and no prefix match may restore a stale tree.
-    expect(restore.with?.key).toBe(
-      "pnpm-node-modules-v4-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc', 'package.json', 'apps/*/package.json', 'packages/*/package.json', 'workers/*/package.json', 'patches/**') }}"
-    );
-    expect(restore.with).not.toHaveProperty('restore-keys');
+    // .npmrc. The only fallback is a prior tree for the same OS, arch and
+    // Node pin, which the frozen install then reconciles (cache-hit false).
+    const key =
+      "pnpm-node-modules-v4-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc', 'package.json', 'apps/*/package.json', 'packages/*/package.json', 'workers/*/package.json', 'patches/**') }}";
+    expect(restore.with?.key).toBe(key);
+    const prefix =
+      "pnpm-node-modules-v4-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-";
+    expect(String(restore.with?.['restore-keys']).trim().split('\n')).toEqual([
+      prefix,
+    ]);
+    expect(key.startsWith(prefix)).toBe(true);
     for (const environment of ['self-hosted', ''])
       expect(
         evaluateCondition(restore.if, {
@@ -169,14 +176,34 @@ describe('self-hosted runner setup action', () => {
     ).toBe(false);
   });
 
-  it('skips the pnpm store and fetch only on an exact installed-tree hit', () => {
+  it('skips the pnpm store and fetch whenever a tree was restored', () => {
     const hit = {
       ...coldHosted,
       'steps.node-modules-cache.outputs.cache-hit': 'true',
+      'steps.node-modules-cache.outputs.cache-matched-key': 'exact',
     };
-    expect(evaluateCondition(actionStep('Warm pnpm store').if, hit)).toBe(
-      false
-    );
+    // A prior tree is not a hit: the frozen install still runs and fetches
+    // only the lockfile delta, and the exact key is saved afterwards.
+    const prior = {
+      ...coldHosted,
+      'steps.node-modules-cache.outputs.cache-matched-key': 'prior',
+    };
+    for (const restored of [hit, prior])
+      expect(
+        evaluateCondition(actionStep('Warm pnpm store').if, restored)
+      ).toBe(false);
+    expect(
+      evaluateCondition(actionStep('Warm pnpm store').if, coldHosted)
+    ).toBe(true);
+    expect(
+      evaluateCondition(actionStep('Install dependencies').if, prior)
+    ).toBe(true);
+    expect(
+      evaluateCondition(
+        actionStep('Save installed node_modules (GitHub-hosted)').if,
+        prior
+      )
+    ).toBe(true);
     const setupNode = actionStep('Setup Node.js with pnpm cache');
     expect(setupNode.with?.['node-version-file']).toBe('.nvmrc');
     expect(setupNode.with?.['cache-dependency-path']).toBe('**/pnpm-lock.yaml');
@@ -187,7 +214,8 @@ describe('self-hosted runner setup action', () => {
     );
     expect(evaluateCondition(cacheExpression, coldHosted)).toBe(true);
     for (const override of [
-      { 'steps.node-modules-cache.outputs.cache-hit': 'true' },
+      { 'steps.node-modules-cache.outputs.cache-matched-key': 'exact' },
+      { 'steps.node-modules-cache.outputs.cache-matched-key': 'prior' },
       { 'runner.environment': 'self-hosted' },
       { 'github.event_name': 'merge_group' },
       { 'inputs.package_cache': 'false' },
@@ -327,6 +355,63 @@ describe('self-hosted runner setup action', () => {
       ['@rollup+rollup-linux-x64-gnu@4.0.0', 'rollup.node'],
     ] as const)
       expect(kept(dir, file), dir).toBe(true);
+  });
+
+  it('reinstalls an evicted merge-group workspace over any restored tree', () => {
+    const fallback = String(
+      actionStep('Require prepared merge-group workspace').run
+    );
+    const run = (matched: string) => {
+      const root = mkdtempSync(resolve(tmpdir(), 'jovie-mg-workspace-'));
+      pruneRoots.push(root);
+      const bin = resolve(root, 'bin');
+      mkdirSync(bin);
+      for (const tool of ['pnpm', 'node'])
+        writeFileSync(
+          resolve(bin, tool),
+          `#!/bin/sh\necho "${tool} $*" >> "${root}/calls.log"\n`,
+          { mode: 0o755 }
+        );
+      const script = fallback
+        .replaceAll('${{ runner.environment }}', 'github-hosted')
+        .replaceAll(
+          '${{ steps.node-modules-cache.outputs.cache-hit }}',
+          'false'
+        )
+        .replaceAll(
+          '${{ steps.node-modules-cache.outputs.cache-matched-key }}',
+          matched
+        );
+      const result = spawnSync('bash', ['-eo', 'pipefail', '-c', script], {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${bin}${delimiter}${process.env.PATH ?? ''}`,
+        },
+      });
+      expect(result.status, result.stderr).toBe(0);
+      return readFileSync(resolve(root, 'calls.log'), 'utf8');
+    };
+    // Nothing restored: fetch the whole store, then install and re-stamp.
+    expect(run('')).toBe(
+      [
+        'pnpm fetch --frozen-lockfile',
+        'pnpm install --frozen-lockfile',
+        'node scripts/lib/ci-dependency-workspace.mjs prepare',
+        'node scripts/lib/ci-dependency-workspace.mjs validate',
+        '',
+      ].join('\n')
+    );
+    // A prior tree: install fetches only the delta; the receipt is re-stamped
+    // and validated exactly as before.
+    expect(run('pnpm-node-modules-v4-prior')).toBe(
+      [
+        'pnpm install --frozen-lockfile',
+        'node scripts/lib/ci-dependency-workspace.mjs prepare',
+        'node scripts/lib/ci-dependency-workspace.mjs validate',
+        '',
+      ].join('\n')
+    );
   });
 
   it('skips non-bundled onnxruntime downloads in every install phase', () => {

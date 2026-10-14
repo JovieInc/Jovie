@@ -212,7 +212,7 @@ describe('BillingDashboard', () => {
     });
 
     expect(screen.getByText('Free')).toBeInTheDocument();
-    expect(screen.getByText('Pro')).toBeInTheDocument();
+    expect(screen.getByText('Artist Presence')).toBeInTheDocument();
     expect(screen.getByText('Max')).toBeInTheDocument();
   });
 
@@ -226,7 +226,7 @@ describe('BillingDashboard', () => {
     renderBillingDashboard();
 
     await waitFor(() => {
-      expect(screen.getByText('Pro Plan')).toBeInTheDocument();
+      expect(screen.getByText('Artist Presence Plan')).toBeInTheDocument();
     });
 
     expect(screen.getByText('Active')).toBeInTheDocument();

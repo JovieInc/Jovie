@@ -37,8 +37,8 @@ export { resolveContactsWorkspaceTab } from './contacts-workspace';
 export const runtime = 'nodejs';
 
 export const metadata: Metadata = {
-  title: 'Contacts',
-  description: 'Manage bookings, management, and press contacts',
+  title: 'Audience',
+  description: 'Your audience, contacts, and audience insights',
 };
 
 function buildAudienceWorkspaceHref(searchParams: SearchParams): string {

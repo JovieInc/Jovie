@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { pathToFileURL } from 'node:url';
+import { planSuperseded } from './actions-cache-supersede.mjs';
 
 export const CACHE_COUNT_SOFT_LIMIT = 400;
 export const CACHE_BYTES_SOFT_LIMIT = 8 * 1024 * 1024 * 1024;
@@ -137,8 +138,21 @@ export function planCacheGc(input = {}) {
     }
   }
 
-  let keep = [];
+  // Superseded main generations (allowlisted families, newest per stem kept)
+  // go on every run, over budget or not: they are dead weight that LRU would
+  // otherwise trade against live caches.
+  const superseded = new Set(planSuperseded(afterTurbo).map(cache => cache.id));
+  const afterSupersede = [];
   for (const cache of afterTurbo) {
+    if (superseded.has(cache.id)) {
+      evict.push(evictRecord(cache, 'superseded_main'));
+      continue;
+    }
+    afterSupersede.push(cache);
+  }
+
+  let keep = [];
+  for (const cache of afterSupersede) {
     const stale = nowMs - accessedAtMs(cache) > PROTECTED_MAX_AGE_MS;
     if (overBudget && isProtectedCacheKey(cache.key) && stale) {
       evict.push(evictRecord(cache, 'protected_stale_over_budget'));
@@ -276,8 +290,8 @@ async function main() {
           { env: process.env }
         );
       } catch (error) {
-        // Actions Cache Supersede runs on the same main push; a cache it
-        // already deleted is the outcome this run wanted.
+        // A cache that expired or was deleted since the snapshot is the
+        // outcome this run wanted.
         if (!/HTTP 404|Not Found/.test(`${error?.stderr ?? ''}${error}`)) {
           throw error;
         }

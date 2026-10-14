@@ -133,12 +133,12 @@ describe('Actions cache GC', () => {
     );
     const plan = planCacheGc({
       nowMs: now,
-      openRefs: new Set(['refs/heads/main']),
+      openRefs: new Set(['refs/heads/main', 'refs/pull/7/merge']),
       usage: { active_caches_count: 10, active_caches_size_in_bytes: 1000 },
       caches: [1, 2, 3].map(day =>
         cache({
           id: day,
-          ref: 'refs/heads/main',
+          ref: 'refs/pull/7/merge',
           key: `Linux-next-build-web-v1-abc-2026082${day}`,
           last_accessed_at: `2026-08-2${day}T11:00:00Z`,
         })
@@ -148,6 +148,49 @@ describe('Actions cache GC', () => {
       [1, 'turbo_surplus'],
     ]);
     expect(plan.keep.map(item => item.id).sort()).toEqual([2, 3]);
+  });
+
+  it('prunes superseded main generations in the same pass as turbo surplus', () => {
+    // Formerly a second workflow (Actions Cache Supersede) listed the same
+    // caches on the same push; now one plan keeps the newest main generation.
+    const plan = planCacheGc({
+      nowMs: now,
+      openRefs: new Set(['refs/heads/main']),
+      usage: { active_caches_count: 10, active_caches_size_in_bytes: 1000 },
+      caches: [
+        ...[1, 2, 3].map(day =>
+          cache({
+            id: day,
+            ref: 'refs/heads/main',
+            key: `Linux-next-build-web-v1-abc-2026082${day}`,
+            created_at: `2026-08-2${day}T10:00:00Z`,
+            last_accessed_at: `2026-08-2${day}T11:00:00Z`,
+          })
+        ),
+        cache({
+          id: 4,
+          ref: 'refs/heads/main',
+          key: 'pnpm-node-modules-v3-Linux-X64-a',
+          created_at: '2026-08-22T10:00:00Z',
+        }),
+        cache({
+          id: 5,
+          ref: 'refs/heads/main',
+          key: 'Linux-playwright-chromium-1.55.0',
+          created_at: '2026-08-22T10:00:00Z',
+        }),
+      ],
+    });
+    expect(
+      plan.evict
+        .map(item => [item.id, item.reason])
+        .sort(([left], [right]) => left - right)
+    ).toEqual([
+      [1, 'turbo_surplus'],
+      [2, 'superseded_main'],
+      [4, 'superseded_main'],
+    ]);
+    expect(plan.keep.map(item => item.id).sort()).toEqual([3, 5]);
   });
 
   it('does not smash a recently used live playwright cache under budget', () => {
@@ -255,6 +298,7 @@ describe('Actions cache GC', () => {
       'workflow_dispatch:',
       'actions: write',
       'node scripts/lib/actions-cache-gc.mjs',
+      'scripts/lib/actions-cache-supersede.mjs',
       "APPLY: ${{ github.event.inputs.apply || 'true' }}",
     ]) {
       expect(WORKFLOW, token).toContain(token);

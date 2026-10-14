@@ -18,7 +18,7 @@ export const ARTIST_VISIBILITY_OFFER = {
     audienceCapture: true,
   },
   pro: {
-    displayName: 'Pro',
+    displayName: 'Artist Presence',
     monthlyUsd: 199,
     currency: 'usd',
     interval: 'month',
@@ -43,6 +43,13 @@ export const ARTIST_VISIBILITY_OFFER = {
     paidSendingEnabled: false,
   },
 } as const;
+
+/**
+ * Canonical paid-plan name. Client surfaces import this instead of the
+ * entitlement registry so upgrade copy does not ship the registry into
+ * every authed route's initial JS (route-js-budget, JOV-7809).
+ */
+export const PRO_PLAN_DISPLAY_NAME = ARTIST_VISIBILITY_OFFER.pro.displayName;
 
 export const PLAN_PRICES = {
   pro: {

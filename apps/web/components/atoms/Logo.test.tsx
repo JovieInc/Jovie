@@ -8,7 +8,27 @@ describe('Logo', () => {
 
     const wordmark = screen.getByRole('img', { name: 'Jovie logo' });
     expect(wordmark).toHaveClass('h-16', 'w-auto');
-    expect(wordmark).toHaveAttribute('viewBox', '0 0 136 39');
+    expect(wordmark).toHaveAttribute('data-wordmark-master', 'display');
+    expect(wordmark.querySelectorAll('path')).toHaveLength(5);
+  });
+
+  it('draws the same construction wordmark for word and wordAlt', () => {
+    const { container } = render(
+      <>
+        <Logo variant='word' size='md' />
+        <Logo variant='wordAlt' size='md' />
+      </>
+    );
+    const [word, alt] = container.querySelectorAll('svg');
+    expect(word.innerHTML).toBe(alt.innerHTML);
+  });
+
+  it('uses the Text master below 24 px', () => {
+    render(<Logo size='xs' />);
+    expect(screen.getByRole('img', { name: 'Jovie logo' })).toHaveAttribute(
+      'data-wordmark-master',
+      'text'
+    );
   });
 
   it('renders the icon variant through the canonical brand mark', () => {

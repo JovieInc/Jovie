@@ -22,6 +22,7 @@ import {
 import { requireAuth } from '@/lib/auth/require-auth';
 import { getSessionContext } from '@/lib/auth/session';
 import { issueBlobPutUploadToken } from '@/lib/blob-presigned';
+import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 export const runtime = 'nodejs';
@@ -62,7 +63,9 @@ export async function POST(request: NextRequest) {
         }
 
         if (!user.isPro) {
-          throw new Error('Pro plan required for promo downloads');
+          throw new Error(
+            `${getPlanDisplayName('pro')} plan required for promo downloads`
+          );
         }
 
         return issueBlobPutUploadToken({

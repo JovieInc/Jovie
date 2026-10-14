@@ -32,3 +32,12 @@ export const CuratedAssets: Story = {
     defaultTitle: 'Story press kit',
   },
 };
+
+export const OpenFromLinkRow: Story = {
+  args: {
+    releaseIds: ['release-story-1'],
+    defaultTitle: 'Story files',
+    open: true,
+    onOpenChange: () => undefined,
+  },
+};

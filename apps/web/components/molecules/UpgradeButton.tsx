@@ -5,6 +5,7 @@ import { Rocket } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
 import { track, useFeatureFlag } from '@/lib/analytics';
+import { PRO_PLAN_DISPLAY_NAME } from '@/lib/config/plan-prices';
 import { useCheckoutMutation } from '@/lib/queries';
 
 interface UpgradeButtonProps {
@@ -17,7 +18,7 @@ interface UpgradeButtonProps {
 
 export function UpgradeButton({
   className,
-  children = 'Upgrade to Pro',
+  children = `Upgrade to ${PRO_PLAN_DISPLAY_NAME}`,
   variant = 'primary',
   size = 'md',
   priceId,

@@ -11,6 +11,7 @@ import { withDbSessionTx } from '@/lib/auth/session';
 import type { DbOrTransaction } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
@@ -37,8 +38,7 @@ export async function withPixelSession(
     if (!entitlements.canAccessAdPixels) {
       return NextResponse.json(
         {
-          error:
-            'Ad pixels require a Pro plan. Upgrade to unlock this feature.',
+          error: `Ad pixels require a ${getPlanDisplayName('pro')} plan. Upgrade to unlock this feature.`,
         },
         { status: 403, headers: NO_STORE_HEADERS }
       );

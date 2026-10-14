@@ -8,14 +8,15 @@ import {
   Home,
   IdCard,
   Keyboard,
+  Layers,
   Link2,
   Lock,
   LogOut,
   MessageCircle,
   Mic2,
-  Music,
   PanelLeft,
   PanelRight,
+  Paperclip,
   Play,
   Radio,
   Repeat2,
@@ -174,9 +175,10 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
   },
 
   // Navigation shortcuts (G then letter)
+  // Sidebar order first: Home, then Work.
   {
     id: 'nav-dashboard',
-    label: 'Go to dashboard',
+    label: 'Go to home',
     keys: 'G then D',
     category: 'navigation',
     icon: Home,
@@ -184,6 +186,18 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     isSequential: true,
     firstKey: 'g',
     secondKey: 'd',
+    decision: { status: 'required', binding: 'useSequentialShortcuts' },
+  },
+  {
+    id: 'nav-releases',
+    label: 'Go to work',
+    keys: 'G then R',
+    category: 'navigation',
+    icon: Layers,
+    href: APP_ROUTES.LIBRARY,
+    isSequential: true,
+    firstKey: 'g',
+    secondKey: 'r',
     decision: { status: 'required', binding: 'useSequentialShortcuts' },
   },
   {
@@ -208,18 +222,6 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     isSequential: true,
     firstKey: 'g',
     secondKey: 'c',
-    decision: { status: 'required', binding: 'useSequentialShortcuts' },
-  },
-  {
-    id: 'nav-releases',
-    label: 'Go to library',
-    keys: 'G then R',
-    category: 'navigation',
-    icon: Music,
-    href: APP_ROUTES.LIBRARY,
-    isSequential: true,
-    firstKey: 'g',
-    secondKey: 'r',
     decision: { status: 'required', binding: 'useSequentialShortcuts' },
   },
   {
@@ -302,6 +304,16 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     icon: Lock,
     shortcutKey: 'Alt+Shift+L',
     decision: { status: 'required', binding: 'useGlobalShortcutActions' },
+  },
+  {
+    id: 'attach-file',
+    label: 'Attach file',
+    keys: `${GLYPH_CMD} U`,
+    description: 'Attach any file to the open work; Jovie detects the type',
+    category: 'actions',
+    icon: Paperclip,
+    shortcutKey: 'Meta+u',
+    decision: { status: 'required', binding: 'LibrarySurface AssetDrawer' },
   },
   {
     id: 'sign-out',
@@ -414,6 +426,7 @@ export function shortcutsForHelpSheet(options: {
  * Map from nav item ID to shortcut for quick lookup
  */
 export const NAV_SHORTCUTS: Record<string, KeyboardShortcut> = {
+  home: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-dashboard')!,
   overview: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-dashboard')!,
   profile: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-profile')!,
   'artist-profile': KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-profile')!,

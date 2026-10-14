@@ -11,6 +11,7 @@ import {
   TRUSTED_FX_WORKFLOW_NAME,
   TRUSTED_FX_WORKFLOW_PATH,
 } from '../auto-ready-provenance.mjs';
+import { triggerNames, workflowTriggers } from '../workflow-triggers.mjs';
 import {
   buildWriterProofReceipt,
   evaluateWriterPromotion,
@@ -125,14 +126,12 @@ function writerPromotion(receipt = proofReceipt(), state = prState()) {
 }
 
 describe('Auto-Ready fleet live-state guard', () => {
-  it('does not wait for checks or mergeability before paired promotion', () => {
+  it('does not wait for checks or mergeability before promotion', () => {
     expect(fleetScript).not.toContain('check_failures_for_pr');
     expect(fleetScript).not.toContain('gh pr checks');
     expect(fleetScript).not.toContain('--classify-auto-ready');
     expect(fleetScript).not.toContain('.mergeable == "MERGEABLE"');
-    expect(fleetScript).toContain(
-      'Existing source checks may still be pending'
-    );
+    expect(fleetScript).toContain('Pending checks are expected');
   });
 
   it('pins promotion to the exact live head and hold-label snapshot', () => {
@@ -143,51 +142,25 @@ describe('Auto-Ready fleet live-state guard', () => {
     expect(fleetScript).toContain('.branch == $expected_branch');
     expect(fleetScript).toContain('before_mutation="$(read_state "$n"');
     expect(fleetScript.indexOf('before_mutation="$(read_state')).toBeLessThan(
-      fleetScript.indexOf(
-        'promote_with_auto_merge "$n" "$expected_head" || pair_status=$?'
-      )
+      fleetScript.indexOf('if ! promote_ready "$n" "$expected_head"; then')
     );
   });
 
-  it('pairs ready and auto-merge, then compensates any incomplete pair', () => {
-    const ready = 'gh_retry pr ready "$n" -R "$REPO"';
-    const autoMerge = 'gh_retry pr merge "$n" -R "$REPO" --auto --squash';
-    expect(fleetScript).toContain(ready);
-    expect(fleetScript).toContain(autoMerge);
-    expect(fleetScript.indexOf(ready)).toBeLessThan(
-      fleetScript.indexOf(autoMerge)
-    );
-    expect(fleetScript).toContain('auto-merge request failed after ready');
-    expect(fleetScript).toContain('--match-head-commit "$expected_head"');
-    expect(fleetScript).toContain(
-      'gh_retry pr merge "$n" -R "$REPO" --disable-auto'
-    );
+  // JOV-INV-022 (2026-10-13): the writer readies; Merge Queue Green Enroll is
+  // the sole admitter, so this recovery never arms auto-merge or enqueues.
+  it('readies only, then compensates a promotion that fails verification', () => {
+    expect(fleetScript).toContain('gh_retry pr ready "$n" -R "$REPO"');
+    expect(fleetScript).not.toMatch(/pr merge "\$n"[^\n]*--auto\b/);
+    expect(fleetScript).not.toContain('enqueuePullRequest');
+    expect(fleetScript).not.toContain('recover_ready_without_auto_merge');
+    expect(fleetScript).toContain('.draft == true');
     expect(fleetScript).toContain('if ! undo_ready "$n"; then');
-    expect(fleetScript).toContain('after="$(read_state "$n"');
-    expect(fleetScript).toContain('auto_merge_after=');
-    expect(fleetScript).toContain('queued_after=');
-    expect(fleetScript).toContain(
-      '( "$auto_merge_after" == "true" || "$queued_after" == "true" )'
-    );
+    expect(fleetScript).not.toContain('undo_ready "$n" || true');
     expect(fleetScript).toContain('held_after=');
     expect(fleetScript).toContain('gh_retry pr ready "$n" -R "$REPO" --undo');
     expect(fleetScript).toContain('restored="$(read_state "$n"');
     expect(fleetScript.indexOf('after="$(read_state')).toBeGreaterThan(
-      fleetScript.indexOf(
-        'promote_with_auto_merge "$n" "$expected_head" || pair_status=$?'
-      )
-    );
-  });
-
-  it('reconciles an interrupted ready-without-auto-merge state', () => {
-    expect(fleetScript).toContain('recover_ready_without_auto_merge');
-    expect(fleetScript).toContain('state_needs_pairing');
-    expect(fleetScript).toContain(
-      '.draft == false and .autoMerge == false and .queued == false'
-    );
-    expect(fleetScript).not.toContain('undo_ready "$n" || true');
-    expect(fleetScript).toContain(
-      'stopping: #$n could not be returned to a closed-loop state'
+      fleetScript.indexOf('if ! promote_ready "$n" "$expected_head"; then')
     );
   });
 });
@@ -211,12 +184,10 @@ describe('Auto-Ready provenance selector', () => {
     expect(
       fleetScript.indexOf('mutation_verdict="$(resolve_promotion')
     ).toBeLessThan(
-      fleetScript.indexOf(
-        'promote_with_auto_merge "$n" "$expected_head" || pair_status=$?'
-      )
+      fleetScript.indexOf('if ! promote_ready "$n" "$expected_head"; then')
     );
     expect(fleetScript).toContain('READY_ATTEMPTED_FOR=');
-    expect(fleetScript).toContain('refusing a second paired promotion');
+    expect(fleetScript).toContain('refusing a second promotion');
     expect(fleetScript).toContain('gh_retry pr ready "$n" -R "$REPO" --undo');
   });
 
@@ -371,7 +342,10 @@ describe('Writer-owned PR promotion proof', () => {
     });
   });
 
-  it('rejects reconciliation dependency, hard holds, and ready-unenrolled state', () => {
+  // Canon evidence on main still names the retired test below; drop this line
+  // once main's canon no longer lists it:
+  // rejects reconciliation dependency, hard holds, and ready-unenrolled state
+  it('rejects reconciliation dependency and hard holds; a ready exact head is complete', () => {
     expect(
       writerPromotion(proofReceipt({ reconciliationRequired: true }))
     ).toMatchObject({
@@ -381,8 +355,8 @@ describe('Writer-owned PR promotion proof', () => {
     expect(
       writerPromotion(proofReceipt(), prState({ draft: false }))
     ).toMatchObject({
-      action: 'compensate',
-      reason: 'ready-unenrolled',
+      action: 'already-complete',
+      reason: 'ready-at-exact-head',
     });
     expect(
       writerPromotion(proofReceipt(), prState({ labels: ['controlled-proof'] }))
@@ -405,12 +379,11 @@ describe('Writer-owned PR promotion proof', () => {
     expect(WRITER_PROMOTION_BLOCKER_SCHEMA).toBe(
       'jovie-writer-pr-promotion-blocker/v1'
     );
-    [
-      '--match-head-commit "$EXPECTED_HEAD"',
-      'dequeuePullRequest',
-      'compensate_to_draft',
-      'render-blocker',
-    ].forEach(token => expect(promotionScript).toContain(token));
+    ['dequeuePullRequest', 'compensate_to_draft', 'render-blocker'].forEach(
+      token => expect(promotionScript).toContain(token)
+    );
+    expect(promotionScript).not.toContain('native-merge-intent');
+    expect(promotionScript).not.toMatch(/pr merge[^\n]*\s--auto\b/);
   });
 });
 
@@ -433,14 +406,15 @@ describe('Auto-Ready App-token workflow', () => {
   });
 
   it('keeps workflow recovery manual-only and never source-event driven', () => {
-    expect(workflow).toContain('workflow_dispatch:');
+    // Manual recovery plus completed source-check runs; no PR, schedule or
+    // ready_for_review wake can start a cascade.
+    expect(triggerNames(workflowTriggers(workflow))).toEqual([
+      'workflow_dispatch',
+      'workflow_run',
+    ]);
     expect(workflow).toContain(
       "github.event_name == 'workflow_dispatch' && inputs.pr_number == ''"
     );
-    expect(workflow).not.toContain('pull_request:');
-    expect(workflow).not.toContain('types: [opened, synchronize, reopened]');
-    expect(workflow).not.toContain('types: [ready_for_review');
     expect(workflow).not.toContain('ready_for_review/CI cascade');
-    expect(workflow).not.toContain('schedule:');
   });
 });

@@ -8,12 +8,18 @@ const fleetGateRefreshWorkflow = readFileSync(
   'utf8'
 );
 
-const STACK_LIVENESS_CRON = "cron: '*/5 * * * *'";
+// JOV-INV-042: the receipt follows main events and the Gem lanes emitter; no
+// clock may come back to rewrite observedAt.
+const SCHEDULE_TRIGGER = /^  schedule:/m;
+const MAIN_CI_COMPLETION =
+  'workflow_run:\n    workflows: [CI]\n    types: [completed]\n    branches: [main]';
 const STACK_EVENT_GUARD =
-  /schedule:[\s\S]*if: steps\.refresh\.outcome == 'success'[\s\S]*steps\.refresh\.outputs\.receipt_path/;
+  /workflow_dispatch:[\s\S]*steps\.refresh\.outcome == 'success'[\s\S]*steps\.refresh\.outputs\.receipt_path/;
 
 function assertTrustedStackHealthContract(value) {
-  expect(value).toContain(STACK_LIVENESS_CRON);
+  expect(value).not.toMatch(SCHEDULE_TRIGGER);
+  expect(value).toContain(MAIN_CI_COMPLETION);
+  expect(value).not.toContain('steps.debounce');
   expect(value).toContain('group: fleet-gate-receipt');
   expect(value).toContain('cancel-in-progress: false');
   expect(value).toContain('branches: [main]');
@@ -31,10 +37,14 @@ function assertTrustedStackHealthContract(value) {
     'node "$GITHUB_WORKSPACE/scripts/backlog-orchestrator/delivery-state-machine.mjs"'
   );
   expect(value).toContain(
-    '--closure-health-file="${{ steps.refresh.outputs.receipt_path }}"'
+    '--closure-health-file="${{ steps.refresh.outputs.receipt_path || steps.writer.outputs.receipt_path }}"'
   );
   expect(value).not.toContain('state/gem-priority-gate/latest.json');
-  expect(value).toContain("steps.stack-actions.outcome == 'success'");
+  // The canonical receipt belongs to the lanes emitter; this workflow writes
+  // it only through the stale-receipt fallback choice.
+  expect(value).toContain(
+    'GEM_PRIORITY_GATE_STATE_DIR: ${{ steps.writer.outputs.state_dir }}'
+  );
 }
 
 describe('retired queue release and retained fleet refresh', () => {
@@ -64,7 +74,7 @@ describe('retired queue release and retained fleet refresh', () => {
     expect(fleetGateRefreshWorkflow).not.toContain('pull_request_target:');
     assertTrustedStackHealthContract(fleetGateRefreshWorkflow);
     expect(fleetGateRefreshWorkflow).toContain('push:\n    branches: [main]');
-    expect(fleetGateRefreshWorkflow).toContain('schedule:');
+    expect(fleetGateRefreshWorkflow).not.toMatch(SCHEDULE_TRIGGER);
     expect(fleetGateRefreshWorkflow).toContain('cancel-in-progress: false');
     const markerRecovery = readFileSync(
       resolve(repoRoot, '.github/workflows/production-marker-recovery.yml'),
@@ -86,16 +96,21 @@ describe('retired queue release and retained fleet refresh', () => {
         'group: fleet-gate-${{ github.run_id }}'
       ),
       fleetGateRefreshWorkflow.replace(
-        STACK_LIVENESS_CRON,
-        "cron: '0 0 * * *'"
+        '  workflow_dispatch:\n',
+        "  schedule:\n    - cron: '*/5 * * * *'\n  workflow_dispatch:\n"
       ),
+      fleetGateRefreshWorkflow.replace(MAIN_CI_COMPLETION, ''),
       fleetGateRefreshWorkflow.replace(
         'ref: main',
         'ref: ${{ github.event.pull_request.head.sha }}'
       ),
       fleetGateRefreshWorkflow.replace(
-        '${{ steps.refresh.outputs.receipt_path }}',
+        '${{ steps.refresh.outputs.receipt_path || steps.writer.outputs.receipt_path }}',
         'state/gem-priority-gate/latest.json'
+      ),
+      fleetGateRefreshWorkflow.replace(
+        'GEM_PRIORITY_GATE_STATE_DIR: ${{ steps.writer.outputs.state_dir }}',
+        'GEM_PRIORITY_GATE_STATE_DIR: /home/timwhite/gem-workspace/state/gem-priority-gate'
       ),
     ];
     for (const workflowValue of regressions) {

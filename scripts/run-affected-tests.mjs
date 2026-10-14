@@ -681,13 +681,11 @@ const DEPENDABOT_AUTO_MERGE_SCRIPT_TESTS = [
 ];
 const DEPENDABOT_AUTO_MERGE_NODE_TESTS = [
   'scripts/lib/__tests__/dependabot-workflow-run-adapter.test.mjs',
-  'scripts/lib/__tests__/native-merge-intent.test.mjs',
   'scripts/lib/__tests__/source-admission-policy.test.mjs',
 ];
 const DEPENDABOT_AUTO_MERGE_NODE_TEST_ARGS = [
   '--experimental-test-coverage',
   '--test-coverage-include=scripts/dependabot-workflow-run-adapter.mjs',
-  '--test-coverage-include=scripts/native-merge-intent.mjs',
   '--test-coverage-include=scripts/lib/source-admission-policy.mjs',
   '--test-coverage-lines=95',
 ];
@@ -903,7 +901,6 @@ const PERFORMANCE_PROFILER_REPAIR_MANIFEST = new Set([
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ]);
 const SCANNER_LOAD_REPAIR_PRIMARY_MANIFEST = new Set([
-  '.github/workflows/agent-pipeline.yml',
   '.github/workflows/ci.yml',
   '.github/workflows/merge-queue-autoenroll.yml',
   'apps/web/tests/unit/analytics-metrics-layer-guard.test.ts',

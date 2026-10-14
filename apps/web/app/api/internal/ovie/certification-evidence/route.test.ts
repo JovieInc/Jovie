@@ -68,7 +68,17 @@ describe('POST /api/internal/ovie/certification-evidence', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     verifyCronRequestMock.mockReturnValue(null);
-    ingestMock.mockResolvedValue({ id: 'marketing.hero', state: 'working' });
+    ingestMock.mockResolvedValue({
+      entries: [
+        {
+          evaluation: 'evaluated',
+          identityId: 'marketing.hero',
+          message: null,
+          row: { admission: { state: 'working' } },
+        },
+      ],
+      row: { id: 'marketing.hero', state: 'working' },
+    });
   });
 
   it('rejects unauthenticated callers before reading the body', async () => {
@@ -89,6 +99,17 @@ describe('POST /api/internal/ovie/certification-evidence', () => {
       packet: packet(),
     });
     expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      entries: [
+        {
+          evaluation: 'evaluated',
+          identityId: 'marketing.hero',
+          state: 'working',
+        },
+      ],
+      ok: true,
+      row: { id: 'marketing.hero' },
+    });
     expect(ingestMock).toHaveBeenCalledWith(
       expect.objectContaining({
         subject: expect.objectContaining({ id: 'marketing.hero' }),
@@ -132,6 +153,44 @@ describe('POST /api/internal/ovie/certification-evidence', () => {
     expect((await post('x'.repeat(65 * 1024))).status).toBe(413);
     expect((await post('{not json')).status).toBe(400);
     expect(ingestMock).not.toHaveBeenCalled();
+  });
+
+  it('returns a failed sibling entry without rejecting the posted packet', async () => {
+    ingestMock.mockResolvedValueOnce({
+      entries: [
+        {
+          evaluation: 'failed',
+          identityId: 'recipe.homepage',
+          message:
+            'Certification ledger record recipe.homepage cannot be evaluated.',
+          row: { admission: { state: 'working' } },
+        },
+        {
+          evaluation: 'evaluated',
+          identityId: 'marketing.hero',
+          message: null,
+          row: { admission: { state: 'working' } },
+        },
+      ],
+      row: { id: 'marketing.hero', state: 'working' },
+    });
+    const response = await post({
+      evaluatedAt: EVALUATED_AT,
+      packet: packet(),
+    });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      entries: [
+        {
+          evaluation: 'failed',
+          identityId: 'recipe.homepage',
+          state: 'working',
+        },
+        { evaluation: 'evaluated', identityId: 'marketing.hero' },
+      ],
+      ok: true,
+      row: { id: 'marketing.hero' },
+    });
   });
 
   it('maps store rejections to 422 and unexpected failures to 503', async () => {

@@ -43,7 +43,7 @@ describe('TooltipShortcut', () => {
       expect(tooltip).toHaveTextContent('⌘B');
       expect(screen.getByTestId('tooltip-content')).toHaveClass(
         'rounded-(--system-b-radius-overlay)',
-        'whitespace-nowrap'
+        'whitespace-normal'
       );
     });
 

@@ -253,10 +253,10 @@ describe('Entitlements registry plan matrix contract (4 plans × 28 booleans + 7
 
   it('display names and exported trial limit', () => {
     expect(getPlanDisplayName('free')).toBe('Free');
-    expect(getPlanDisplayName('pro')).toBe('Pro');
+    expect(getPlanDisplayName('pro')).toBe('Artist Presence');
     expect(getPlanDisplayName('max')).toBe('Max');
-    expect(getPlanDisplayName('trial')).toBe('Pro Trial');
-    expect(getPlanDisplayName('founding')).toBe('Pro');
+    expect(getPlanDisplayName('trial')).toBe('Artist Presence Trial');
+    expect(getPlanDisplayName('founding')).toBe('Artist Presence');
     expect(getPlanDisplayName('growth')).toBe('Max');
     expect(TRIAL_NOTIFICATION_RECIPIENT_LIMIT).toBe(50);
   });

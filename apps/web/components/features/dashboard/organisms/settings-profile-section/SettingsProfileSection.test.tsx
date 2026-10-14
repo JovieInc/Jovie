@@ -47,4 +47,22 @@ describe('SettingsProfileSection', () => {
       'The name on your profile'
     );
   });
+
+  it('keeps its loading-skeleton panel name instead of repeating the page title', () => {
+    render(
+      <SettingsProfileSection
+        artist={
+          { name: 'Ada', handle: 'ada', image_url: null } as unknown as Artist
+        }
+        onRefresh={vi.fn()}
+      />
+    );
+
+    expect(
+      screen.getByRole('heading', { name: 'Identity' })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Profile' })
+    ).not.toBeInTheDocument();
+  });
 });

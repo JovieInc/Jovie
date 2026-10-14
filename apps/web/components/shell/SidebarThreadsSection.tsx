@@ -205,7 +205,6 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
     getSidebarNavRowClassName({
       active,
       tight,
-      trailingOverlay: Boolean(onThreadContextMenu),
     }),
     'text-left',
     calm &&
@@ -231,10 +230,8 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
       />
       <span
         className={cn(
-          // The label owns the complete middle grid track. A fixed terminal
-          // fade (with the WebKit property for every supported shell) makes
-          // truncation read as intentional rather than a hard crop.
-          'min-w-0 w-full justify-self-stretch overflow-hidden whitespace-nowrap text-clip text-left [-webkit-mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)] [mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)]',
+          // Reserve date/actions tracks; truncation never paints beneath them.
+          'min-w-0 w-full justify-self-stretch overflow-hidden whitespace-nowrap text-ellipsis text-left',
           calm
             ? 'text-(length:--app-shell-sidebar-history-font-size)'
             : 'text-xs',
@@ -293,12 +290,9 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
             onClick={e => onThreadContextMenu(e, thread)}
             aria-label={`Chat Actions for ${thread.title}`}
             className={cn(
-              // The action deliberately sits above the label instead of
-              // owning a permanent grid track. The title can use the full
-              // middle column at rest; on intent, its existing right-edge
-              // fade runs beneath this opaque action surface.
-              'absolute right-2.5 top-1/2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full text-quaternary-token transition-[background-color,color,opacity] duration-subtle ease-subtle hover:bg-surface-0 hover:text-primary-token focus-visible:bg-surface-0 focus-visible:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55',
-              'opacity-0 group-hover/thread:opacity-100 group-hover/thread:bg-surface-0 focus-visible:opacity-100'
+              // The reserved trailing track keeps this action off the title.
+              'absolute right-2.5 top-1/2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full text-quaternary-token transition-[background-color,color,opacity] duration-subtle ease-subtle hover:bg-surface-0 active:bg-surface-0 hover:text-primary-token focus-visible:bg-transparent focus-visible:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55',
+              'opacity-0 group-hover/thread:opacity-100 focus-visible:opacity-100'
             )}
           >
             <Icon
@@ -524,19 +518,19 @@ export function SidebarThreadsSection({
                 tight,
               }),
               calm
-                ? 'mt-3 h-7 flex justify-end text-(length:--app-shell-sidebar-history-font-size)'
-                : 'text-left'
+                ? 'mt-3 h-7 flex justify-between text-left text-(length:--app-shell-sidebar-history-font-size)'
+                : 'flex justify-between text-left'
             )}
           >
+            <span className='min-w-0 truncate justify-self-start'>
+              {calm ? 'All chats' : 'All Chats'}
+            </span>
             <Icon
               name='ArrowRight'
               className={getSidebarNavIconClassName({ tight })}
               aria-hidden='true'
               strokeWidth={2.25}
             />
-            <span className='min-w-0 truncate justify-self-start'>
-              {calm ? 'All chats' : 'All Chats'}
-            </span>
           </Link>
         ) : null}
       </div>

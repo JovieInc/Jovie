@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/user-button/UsageMenuItem.test.tsx
 import { Button } from '@jovie/ui';
 import { ChevronDown, ChevronRight, ExternalLink, Gauge } from 'lucide-react';
 import Link from 'next/link';
@@ -11,6 +12,7 @@ import {
   formatUsageResetLabel,
   getWeeklyUsageModel,
 } from '@/lib/chat-usage/metrics';
+import { PRO_PLAN_DISPLAY_NAME } from '@/lib/config/plan-prices';
 import { env } from '@/lib/env-client';
 import { useChatUsageQuery } from '@/lib/queries';
 import type { ChatUsageData } from '@/lib/queries/useChatUsageQuery';
@@ -26,7 +28,7 @@ interface UsageMenuItemProps {
 export function UsageMenuItem({
   usageStatsUrl,
   onUpgrade,
-  upgradeLabel = 'Upgrade to Pro',
+  upgradeLabel = `Upgrade to ${PRO_PLAN_DISPLAY_NAME}`,
   isUpgradeLoading = false,
 }: UsageMenuItemProps) {
   const [expanded, setExpanded] = useState(false);

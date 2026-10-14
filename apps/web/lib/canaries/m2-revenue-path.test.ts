@@ -71,7 +71,7 @@ function headerValue(headers: Headers | null, name: string): string | null {
 }
 
 describe('M2 revenue-path canary contract', () => {
-  it('is the $199 Artist Visibility Pro path, not generic uptime', () => {
+  it('is the $199 Artist Presence path, not generic uptime', () => {
     expect(M2_REVENUE_PATH_CANARY).toBe('m2-revenue-path');
     expect(M2_REVENUE_PATH_ISSUE).toBe('JOV-6439');
     expect(M2_REVENUE_PATH_DISTINCT_FROM).toBe('generic-uptime');
@@ -190,7 +190,7 @@ describe('evaluateProCheckout199', () => {
         amount: 19900,
         currency: 'usd',
         interval: 'month',
-        description: 'Pro',
+        description: 'Artist Presence',
       },
     ],
   });
@@ -202,13 +202,13 @@ describe('evaluateProCheckout199', () => {
           priceId: 'price_legacy',
           amount: 3900,
           interval: 'month',
-          description: 'Pro',
+          description: 'Artist Presence',
         },
         {
           priceId: 'price_visibility_pro',
           amount: 19900,
           interval: 'month',
-          description: 'Pro',
+          description: 'Artist Presence',
         },
       ])?.priceId
     ).toBe('price_visibility_pro');
@@ -336,7 +336,7 @@ describe('runM2RevenuePathCanary', () => {
                 amount: 19900,
                 currency: 'usd',
                 interval: 'month',
-                description: 'Pro',
+                description: 'Artist Presence',
               },
             ],
           });
@@ -388,7 +388,7 @@ describe('runM2RevenuePathCanary', () => {
                 amount: 3900,
                 currency: 'usd',
                 interval: 'month',
-                description: 'Pro',
+                description: 'Artist Presence',
               },
             ],
           });

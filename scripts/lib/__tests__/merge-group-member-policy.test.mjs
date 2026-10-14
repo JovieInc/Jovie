@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  apiRetryDelay,
   assertCurrentPullRequest,
   enforceCombinedTreePayload,
   evaluateForkMemberPolicy,
@@ -377,6 +378,102 @@ describe('merge-group combined-tree payload policy', () => {
     expect(request).not.toHaveBeenCalled();
   });
 
+  it('retries GitHub quota and 5xx answers that fit the deadline, never real failures', async () => {
+    // 2026-10-13 01:53-01:55Z: 19 PR Size Guard merge groups failed red on
+    // "API rate limit exceeded for installation" from the shared GITHUB_TOKEN.
+    const answers = [
+      new Response('{"message":"You have exceeded a secondary rate limit"}', {
+        status: 403,
+        headers: { 'retry-after': '1' },
+      }),
+      new Response('{"message":"Server Error"}', { status: 502 }),
+      new Response('{"ok":true}', { status: 200 }),
+    ];
+    const sleeps = [];
+    let clock = 1_000;
+    const result = await githubRequest('/repos/JovieInc/Jovie/pulls/1', {
+      deadlineMs: 60_000,
+      fetchImpl: async () => answers.shift(),
+      now: () => clock,
+      sleep: async ms => {
+        sleeps.push(ms);
+        clock += ms;
+      },
+      token: 'test-token',
+    });
+    expect(result.data).toEqual({ ok: true });
+    expect(sleeps).toEqual([2_000, 2_000]);
+
+    const quota = (reset, body = 'API rate limit exceeded for installation') =>
+      new Response(JSON.stringify({ message: body }), {
+        status: 403,
+        headers: {
+          'x-ratelimit-remaining': '0',
+          'x-ratelimit-reset': String(reset),
+        },
+      });
+    // A primary reset past the deadline fails at once, with the classified text.
+    await expect(
+      githubRequest('/repos/JovieInc/Jovie/compare/a...b', {
+        deadlineMs: 45_000,
+        fetchImpl: async () => quota(3_600),
+        now: () => 1_000,
+        sleep: async () => expect.unreachable('no wait past the deadline'),
+        token: 'test-token',
+      })
+    ).rejects.toThrow(
+      /GitHub API 403 for \/repos\/JovieInc\/Jovie\/compare\/a\.\.\.b: API rate limit exceeded/
+    );
+    // Three attempts at most; a permission 403 is never retried.
+    let calls = 0;
+    await expect(
+      githubRequest('/repos/JovieInc/Jovie/pulls/1', {
+        deadlineMs: 60_000,
+        fetchImpl: async () => {
+          calls += 1;
+          return new Response(
+            '{"message":"Resource not accessible by integration"}',
+            { status: 403 }
+          );
+        },
+        now: () => 1_000,
+        sleep: async () => expect.unreachable('permission answers are final'),
+        token: 'test-token',
+      })
+    ).rejects.toThrow(/Resource not accessible/);
+    expect(calls).toBe(1);
+    expect(
+      apiRetryDelay({
+        status: 502,
+        message: '',
+        headers: null,
+        attempt: 3,
+        nowMs: 0,
+        deadlineMs: 60_000,
+      })
+    ).toBeNull();
+    expect(
+      apiRetryDelay({
+        status: 403,
+        message: 'API rate limit exceeded for installation',
+        headers: null,
+        attempt: 1,
+        nowMs: 0,
+        deadlineMs: 60_000,
+      })
+    ).toBeNull();
+    expect(
+      apiRetryDelay({
+        status: 429,
+        message: '',
+        headers: null,
+        attempt: 2,
+        nowMs: 0,
+        deadlineMs: 60_000,
+      })
+    ).toBe(2_000);
+  });
+
   it('bounds each authenticated API request and fails closed on transport errors', async () => {
     let signal;
     const response = await githubRequest('/repos/JovieInc/Jovie', {
@@ -679,7 +776,12 @@ describe('combined size + fork merge-group producer (JOV-7744)', () => {
     head: { sha: SOURCE_101, repo: { fork: true } },
   };
 
-  function combinedRun({ pr, treeBytes = 10, reviews = [] }) {
+  function combinedRun({
+    pr,
+    treeBytes = 10,
+    reviews = [],
+    rangeFiles = undefined,
+  }) {
     const paths = [];
     const outputs = [];
     const logs = [];
@@ -693,9 +795,20 @@ describe('combined size + fork merge-group producer (JOV-7744)', () => {
       async request(path) {
         paths.push(path);
         if (path.includes('/compare/')) {
-          return { data: comparison([commit(FIRST, BASE, 101)]) };
+          if (!rangeFiles) {
+            return { data: comparison([commit(FIRST, BASE, 101)]) };
+          }
+          const head = commit(FIRST, BASE, 101);
+          head.commit.tree = { sha: TREE };
+          return { data: { ...comparison([head]), files: rangeFiles } };
         }
         if (path.endsWith('/pulls/101')) return { data: pr };
+        if (path.includes('/pulls/101/files?')) {
+          return {
+            data: [{ filename: 'a.ts', additions: 1, deletions: 0 }],
+            link: null,
+          };
+        }
         if (path.includes('/pulls/101/reviews?')) {
           return { data: reviews, link: null };
         }
@@ -725,6 +838,36 @@ describe('combined size + fork merge-group producer (JOV-7744)', () => {
       `/repos/JovieInc/Jovie/git/trees/${TREE}?recursive=1`,
     ]);
     expect(outputs).toEqual(['fork_verdict=pass']);
+  });
+
+  it("takes a one-member group's files and tree from the compare read (3 calls, not 5)", async () => {
+    // 2026-10-13 storm: ~5 GITHUB_TOKEN calls per group rebuild drained the
+    // repo's 1,000/h bucket. The compare read already carries both answers.
+    const files = [{ filename: 'apps/web/a.ts', additions: 900, deletions: 0 }];
+    const { run, paths, logs } = combinedRun({
+      pr: internalPr([]),
+      rangeFiles: files,
+    });
+    await expect(run).rejects.toThrow('PR #101 failed size merge-group policy');
+    expect(paths).toEqual([
+      `/repos/JovieInc/Jovie/compare/${BASE}...${FIRST}`,
+      '/repos/JovieInc/Jovie/pulls/101',
+      `/repos/JovieInc/Jovie/git/trees/${TREE}?recursive=1`,
+    ]);
+    expect(logs.some(line => line.startsWith('PR #101: FAIL'))).toBe(true);
+
+    const capped = combinedRun({
+      pr: internalPr([]),
+      rangeFiles: Array.from({ length: 300 }, (_, index) => ({
+        filename: `f${index}.ts`,
+        additions: 0,
+        deletions: 0,
+      })),
+    });
+    await capped.run;
+    expect(capped.paths).toContain(
+      '/repos/JovieInc/Jovie/pulls/101/files?per_page=100&page=1'
+    );
   });
 
   it('hands off a failing fork verdict while the size policy still passes', async () => {

@@ -114,21 +114,87 @@ describe('LibraryFilesPanel', () => {
     expect(screen.queryByText('Stems')).toBeNull();
   });
 
-  it('collects acquisition behind one Add File section', () => {
+  it('offers ONE Attach File control instead of a button per media type', () => {
     render(<LibraryFilesPanel asset={asset()} downloads={[]} />);
 
-    expect(screen.getByText('Add File')).toBeInTheDocument();
-    expect(screen.getByTestId('library-add-audio-acquisition')).toBeDefined();
-    expect(screen.getByTestId('library-add-video-acquisition')).toHaveAttribute(
-      'href',
-      '/app/library?view=videos'
+    const attach = screen.getByTestId('library-attach-file');
+    expect(attach).toHaveTextContent('Attach File');
+    expect(attach).toHaveAttribute('aria-keyshortcuts', 'Meta+U');
+    expect(screen.queryByText('Add File')).toBeNull();
+    expect(screen.queryByTestId('library-add-audio-acquisition')).toBeNull();
+    expect(screen.queryByTestId('library-add-video-acquisition')).toBeNull();
+    expect(screen.queryByText('No files attached yet.')).toBeNull();
+    expect(screen.getByTestId('library-attach-file-input')).not.toHaveAttribute(
+      'accept'
     );
-    expect(
-      screen.getByTestId('library-add-document-acquisition')
-    ).toHaveAttribute('href', '/app/library?view=documents');
-    expect(
-      screen.getByTestId('library-add-download-acquisition')
-    ).toHaveAttribute('href', '/app/releases/release-1/downloads');
+  });
+
+  it('opens the picker once when the inspector requests attach (Cmd+U)', () => {
+    const click = vi
+      .spyOn(HTMLInputElement.prototype, 'click')
+      .mockImplementation(() => undefined);
+    const onHandled = vi.fn();
+    try {
+      render(
+        <LibraryFilesPanel
+          asset={asset()}
+          downloads={[]}
+          attachRequested
+          onAttachRequestHandled={onHandled}
+        />
+      );
+      expect(click).toHaveBeenCalledTimes(1);
+      expect(onHandled).toHaveBeenCalledTimes(1);
+    } finally {
+      click.mockRestore();
+    }
+  });
+
+  it('routes a dropped audio file to the audio upload without a type button', () => {
+    const upload = vi
+      .spyOn(globalThis, 'fetch')
+      .mockReturnValue(new Promise<Response>(() => undefined));
+    try {
+      render(<LibraryFilesPanel asset={asset()} downloads={[]} />);
+      const file = new File(['audio'], 'master.mp3', { type: 'audio/mpeg' });
+
+      fireEvent.drop(screen.getByTestId('library-files-panel'), {
+        dataTransfer: { files: [file], types: ['Files'] },
+      });
+
+      expect(screen.getByTestId('library-file-detail')).toBeInTheDocument();
+      expect(screen.getByTestId('library-audio-dropzone')).toBeInTheDocument();
+    } finally {
+      upload.mockRestore();
+    }
+  });
+
+  it('attaches a pasted image as artwork and shows it attaching in place', () => {
+    const upload = vi
+      .spyOn(globalThis, 'fetch')
+      .mockReturnValue(new Promise<Response>(() => undefined));
+    try {
+      render(
+        <LibraryFilesPanel
+          asset={asset({ artworkUrl: null, hasArtwork: false })}
+          downloads={[]}
+        />
+      );
+      const paste = new Event('paste', { bubbles: true }) as ClipboardEvent;
+      Object.defineProperty(paste, 'clipboardData', {
+        value: {
+          files: [new File(['art'], 'cover.png', { type: 'image/png' })],
+        },
+      });
+      document.body.dispatchEvent(paste);
+
+      expect(upload).toHaveBeenCalledWith(
+        '/api/images/artwork/upload?releaseId=release-1',
+        expect.objectContaining({ method: 'POST' })
+      );
+    } finally {
+      upload.mockRestore();
+    }
   });
 
   it('opens focused file detail with a Back path', async () => {
@@ -145,14 +211,6 @@ describe('LibraryFilesPanel', () => {
 
     fireEvent.click(screen.getByTestId('library-file-back'));
     expect(screen.getByTestId('library-files-list')).toBeInTheDocument();
-  });
-
-  it('keeps the audio upload dropzone behind the Add audio action', async () => {
-    render(<LibraryFilesPanel asset={asset()} downloads={[]} />);
-    expect(screen.queryByTestId('library-audio-dropzone')).toBeNull();
-
-    fireEvent.click(screen.getByTestId('library-add-audio-acquisition'));
-    expect(screen.getByTestId('library-audio-dropzone')).toBeInTheDocument();
   });
 
   it.each([false, true])(
@@ -174,15 +232,14 @@ describe('LibraryFilesPanel', () => {
           />
         );
         expect(screen.queryByTestId('library-artwork-dropzone')).toBeNull();
-        fireEvent.click(screen.getByTestId('library-add-artwork-acquisition'));
-        expect(
-          screen.getByTestId('library-artwork-dropzone')
-        ).toBeInTheDocument();
-        fireEvent.change(screen.getByLabelText('Drop artwork'), {
+        fireEvent.change(screen.getByTestId('library-attach-file-input'), {
           target: {
             files: [new File(['art'], 'uploaded.jpg', { type: 'image/jpeg' })],
           },
         });
+        expect(
+          screen.getByTestId('library-attach-uploading')
+        ).toHaveTextContent('Attaching uploaded.jpg');
         if (switchWork)
           rerender(
             <LibraryFilesPanel
@@ -203,17 +260,13 @@ describe('LibraryFilesPanel', () => {
           ).toBeNull();
           return;
         }
-        await screen.findByTestId('library-artwork-object');
         expect(upload).toHaveBeenCalledWith(
           '/api/images/artwork/upload?releaseId=release-1',
           expect.objectContaining({ method: 'POST' })
         );
-        fireEvent.click(screen.getByTestId('library-file-back'));
-        const row = screen.getByTestId('library-file-artwork:release-1');
+        const row = await screen.findByTestId('library-file-artwork:release-1');
         expect(row).toHaveTextContent('uploaded.jpg');
-        expect(
-          screen.queryByTestId('library-add-artwork-acquisition')
-        ).toBeNull();
+        expect(screen.queryByTestId('library-attach-uploading')).toBeNull();
         fireEvent.click(row);
         expect(screen.getByAltText('Artwork for Take Me Over')).toHaveAttribute(
           'src',

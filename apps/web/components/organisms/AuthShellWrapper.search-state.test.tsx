@@ -1,3 +1,4 @@
+import { TooltipProvider } from '@jovie/ui';
 import {
   act,
   fireEvent,
@@ -31,6 +32,11 @@ const {
   railScope: { current: undefined as string | undefined },
   shortcutsRender: vi.fn(),
 }));
+vi.mock('@jovie/ui', async importOriginal => {
+  const actual = await importOriginal<typeof import('@jovie/ui')>();
+  return { ...actual, TooltipProvider: vi.fn(actual.TooltipProvider) };
+});
+
 vi.mock('next/navigation', () => ({
   usePathname: () => route.pathname,
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
@@ -274,6 +280,11 @@ describe('main-plane Search route recovery', () => {
         </AuthShellWrapper>
       </DashboardDataProvider>
     );
+    expect(vi.mocked(TooltipProvider)).toHaveBeenCalled();
+    for (const [props] of vi.mocked(TooltipProvider).mock.calls) {
+      expect(props.delayDuration).toBeUndefined();
+      expect(props.skipDelayDuration).toBeUndefined();
+    }
     expect(shortcutsRender).not.toHaveBeenCalled();
     expect(
       screen.queryByRole('button', { name: 'Close shortcut help' })

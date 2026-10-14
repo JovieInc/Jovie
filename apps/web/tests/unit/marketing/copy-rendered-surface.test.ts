@@ -34,7 +34,7 @@ const brief: MarketingCopyPageBrief = {
     },
     {
       id: 'pro-price',
-      statement: 'Artist Visibility Pro is a paid monthly plan.',
+      statement: 'Artist Presence is a paid monthly plan.',
       evidence: ['offer-truth:pro'],
     },
   ],

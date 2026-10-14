@@ -42,6 +42,7 @@ export const BREADCRUMB_LABELS: Record<string, string> = {
   investors: 'Investors',
   screenshots: 'Screenshots',
   feedback: 'Feedback',
+  'visibility-audit': 'Visibility Audit',
 
   // Root routes
   app: 'Home',

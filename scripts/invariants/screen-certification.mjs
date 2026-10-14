@@ -12,6 +12,10 @@ import {
 } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  screenNeedsProductReferences,
+  validateProductReferenceSnapshot,
+} from './product-reference-coherence.mjs';
 import { projectScreenDecisionRouting } from './screen-decision-routing.mjs';
 import {
   resolveTrustedArtifactId,
@@ -48,6 +52,7 @@ export const SCREEN_MARKETING_ROUTES = Object.freeze({
   'web.marketing-launch': '/launch',
   'web.marketing-about': '/about',
   'web.marketing-support': '/support',
+  'web.marketing-integrations': '/integrations',
   'web.developers': '/developers',
   'web.api-versioning-policy': '/api-versioning',
   'web.cli-landing': '/cli',
@@ -236,6 +241,7 @@ web.marketing-shell|web|marketing-shell|apps/web/app/(marketing)/layout.tsx|desk
 web.marketing-about|web|marketing-about|apps/web/app/(marketing)/about/page.tsx|desktop,mobile
 web.marketing-solutions|web|marketing-solutions|apps/web/app/(marketing)/solutions/|desktop,mobile
 web.marketing-support|web|marketing-support|apps/web/app/(marketing)/support/page.tsx|desktop,mobile
+web.marketing-integrations|web|marketing-integrations|apps/web/app/(marketing)/integrations/page.tsx|desktop,mobile
 web.artist-profiles|web|marketing-artist-profiles|apps/web/app/(marketing)/artist-profiles/|desktop,mobile
 web.artist-profile|web|marketing-artist-profile|apps/web/app/(marketing)/artist-profile/page.tsx|desktop,mobile
 web.artist-notifications|web|marketing-artist-notifications|apps/web/app/(marketing)/artist-notifications/page.tsx|desktop,mobile
@@ -284,8 +290,11 @@ web.settings-referral|web|settings-referral|apps/web/app/app/(shell)/settings/re
 web.investor-updates|web|investor-updates|apps/web/app/app/(shell)/admin/investors/updates/page.tsx|desktop,mobile
 web.investor-pipeline|web|investor-pipeline|apps/web/app/app/(shell)/admin/investors/page.tsx|desktop,mobile
 web.ovie-certifications|web|ovie-certifications|apps/web/app/app/(shell)/admin/certifications/page.tsx|desktop,mobile
+web.ovie-outbound|web|ovie-outbound|apps/web/app/app/(shell)/admin/outbound/page.tsx|desktop,mobile
 web.ov-hud-shell|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/hud/page.tsx|desktop,mobile
 web.ov-chat|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/chat/page.tsx|desktop,mobile
+web.ov-inbox|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/inbox/page.tsx|desktop,mobile
+web.ov-integrations|web|settings-connectors|apps/web/app/app/(shell)/admin/integrations/page.tsx|desktop,mobile
 web.admin-chat-playground|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/chat-playground/page.tsx,apps/web/app/app/(shell)/admin/chat-playground/layout.tsx|desktop,mobile
 web.ov-founder-cockpit|web|ovie-founder-cockpit|apps/web/app/app/(shell)/admin/activity/page.tsx,apps/web/app/app/(shell)/admin/growth/page.tsx,apps/web/app/app/(shell)/admin/needs-you/page.tsx,apps/web/app/app/(shell)/admin/operations/page.tsx,apps/web/app/app/(shell)/admin/product/page.tsx|desktop,mobile
 web.ov-company-presence|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/presence/page.tsx|desktop,mobile
@@ -301,6 +310,7 @@ web.ov-lists|web|ovie-lists|apps/web/app/app/(shell)/admin/lists/|desktop,mobile
 web.admin-screenshots|web|admin-screenshots|apps/web/app/app/(shell)/admin/screenshots/|desktop,mobile
 web.admin-share-studio|web|admin-share-studio|apps/web/app/app/(shell)/admin/share-studio/page.tsx|desktop,mobile
 web.admin-wiki|web|admin-wiki|apps/web/app/app/(shell)/admin/wiki/|desktop,mobile
+web.admin-visibility-audit|web|admin-visibility-audit|apps/web/app/app/(shell)/admin/visibility-audit/page.tsx|desktop,mobile
 web.hud-isolated|web|ovie-ops-isolated|apps/web/app/hud/page.tsx,apps/web/app/hud/layout.tsx|desktop,mobile
 web.hud-tv|web|ovie-ops-isolated|apps/web/app/hud-tv/page.tsx|desktop,mobile
 web.hud-wiki|web|admin-wiki|apps/web/app/hud/wiki/|desktop,mobile
@@ -571,6 +581,16 @@ export function evaluateScreenProof(proof, { screen, headSha }) {
   if (proof.screenId !== screen.id) {
     findings.push(
       `proof screenId ${proof.screenId ?? '<missing>'} does not match ${screen.id}`
+    );
+  }
+  if (
+    screenNeedsProductReferences(screen.id) ||
+    proof.productReferences !== undefined
+  ) {
+    findings.push(
+      ...validateProductReferenceSnapshot(proof.productReferences, {
+        screenId: screen.id,
+      })
     );
   }
   const proofHead =

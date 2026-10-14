@@ -47,6 +47,7 @@ import {
   affectsWebTestTypecheck,
   classifyCiRepoLanes,
 } from './lib/ci-repo-lanes.mjs';
+import { testsAffectedBy } from './lib/test-file-dependencies.mjs';
 
 export { affectsWebTestTypecheck };
 
@@ -163,6 +164,21 @@ export const SOURCE_GUARDS = Object.freeze([
     inputs: /./u,
     prOnly: true,
   }),
+  Object.freeze({
+    // Script contracts run only in the structural lane (merge groups); about
+    // 37 group runs failed on them in the 7 days to 2026-10-12. Full lists
+    // for script/workflow/toolchain diffs, derived ones otherwise
+    // (scripts/lib/script-contract-affected.mjs). Resolved beside this module
+    // because Source Validation loads guards from the trusted base archive.
+    id: 'script-contracts',
+    command: `node ${JSON.stringify(
+      fileURLToPath(
+        new URL('./lib/script-contract-affected.mjs', import.meta.url)
+      )
+    )}`,
+    inputs: /./u,
+    prOnly: true,
+  }),
 ]);
 
 /**
@@ -230,7 +246,6 @@ export const NODE_RUNTIME_CONTRACT_PATHS = Object.freeze([
   '.github/actions/setup-node-pnpm/**',
   '.github/actions/setup-playwright/**',
   '.github/runner-image/**',
-  '.github/workflows/agent-pipeline.yml',
   '.github/workflows/ci.yml',
   '.github/workflows/e2e-full-matrix.yml',
   '.github/workflows/fleet-gate-refresh.yml',
@@ -439,9 +454,8 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
 ]);
 
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
+  'scripts/lib/__tests__/script-contract-affected.test.mjs',
   'scripts/lib/__tests__/web-source-read-tests.test.mjs',
-  '.github/scripts/customer-notes-ready.test.js',
-  '.github/scripts/auto-merge-stuck-triage.test.js',
   '.claude/hooks/post-task-validate.test.mjs',
   '.claude/hooks/prod-db-session-guard.test.mjs',
   'scripts/agent-context/check.test.mjs',
@@ -479,8 +493,8 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/funnel-judge/proof-gate.test.mjs',
   'scripts/funnel-judge/rubric.test.mjs',
   'scripts/funnel-judge/coherence-screen.test.mjs',
+  'scripts/lib/__tests__/test-file-dependencies.test.mjs',
   'scripts/gate-ladder/gate-ladder.test.mjs',
-  'scripts/gem-producer-drift/check-attestation.test.mjs',
   'scripts/homepage-screenshot-output.test.mjs',
   'scripts/hooks/pre-push-gate.test.mjs',
   'scripts/idea-radar/idea-radar.test.mjs',
@@ -541,7 +555,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
 ]);
 export const DEPRECATION_COVERAGE_COMMAND =
   'node --test --experimental-test-coverage --test-coverage-include=scripts/deprecation-clearance.mjs --test-coverage-include=scripts/lib/deprecation-observation.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=90 scripts/deprecation-clearance.test.mjs';
-export const SCRIPT_CONTRACT_NODE_COMMAND = `${DEPRECATION_COVERAGE_COMMAND} && node --test ${SCRIPT_CONTRACT_NODE_TESTS.join(' ')} && node --test --experimental-test-coverage --test-coverage-include=.github/scripts/customer-notes-ready.js --test-coverage-lines=100 --test-coverage-branches=95 --test-coverage-functions=100 .github/scripts/customer-notes-ready.test.js`;
+export const SCRIPT_CONTRACT_NODE_COMMAND = `${DEPRECATION_COVERAGE_COMMAND} && node --test ${SCRIPT_CONTRACT_NODE_TESTS.join(' ')}`;
 export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/merge-group-failure-hold.test.mjs',
   'scripts/lib/__tests__/mesh-host-ack.test.mjs',
@@ -552,6 +566,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/blog-publish-latency.test.mjs',
   'scripts/lib/__tests__/nightly-agent-workflow.test.mjs',
   'scripts/lib/__tests__/stryker-babel-compatibility.test.mjs',
+  'scripts/lib/__tests__/mutation-diff.test.mjs',
   'scripts/lib/__tests__/actions-cache-supersede.test.mjs',
   'scripts/lib/__tests__/ci-dependency-workspace.test.mjs',
   'scripts/lib/__tests__/agent-branch-pattern.test.mjs',
@@ -613,11 +628,13 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/remediation-sweep-workflow-contract.test.mjs',
   'scripts/lib/__tests__/repository-docs-ratchet.test.mjs',
   'scripts/lib/__tests__/remediation-reopen.test.mjs',
+  'scripts/lib/__tests__/golden-path-nightly.test.mjs',
   'scripts/lib/__tests__/rolling-ci-hosted-writer.test.mjs',
   'scripts/lib/__tests__/rolling-ci-learning.test.mjs',
   'scripts/lib/__tests__/rolling-ci-pipeline.test.mjs',
   'scripts/lib/__tests__/rolling-ci-remediation-concurrency.test.mjs',
   'scripts/lib/__tests__/safe-pr-remediation.test.mjs',
+  'scripts/lib/__tests__/dependabot-pin-sync.test.mjs',
   'scripts/lib/__tests__/scope-governor.test.mjs',
   'scripts/lib/__tests__/scripts-typecheck.test.mjs',
   'scripts/lib/__tests__/seo-certify-workflow-contract.test.mjs',
@@ -634,6 +651,9 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/visual-snapshot-compare.test.mjs',
   'scripts/lib/__tests__/web-test-selectors.test.mjs',
   'scripts/lib/__tests__/web-vitest-fast-runner.test.mjs',
+  'scripts/lib/__tests__/merge-group-fail-fast.test.mjs',
+  'scripts/lib/__tests__/merge-group-token-budget.test.mjs',
+  'scripts/lib/__tests__/workflow-triggers.test.mjs',
 ]);
 export const MESH_HOST_ACK_COVERAGE_COMMAND =
   'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/mesh-host-ack.test.mjs --coverage.enabled --coverage.provider=v8 --coverage.include=lanes/mesh-host-ack.mjs --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-mesh-host-ack-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=json-summary --coverage.thresholds.perFile=true --coverage.thresholds.lines=99 --coverage.thresholds.statements=99 --coverage.thresholds.branches=90 --coverage.thresholds.functions=100';
@@ -2312,7 +2332,7 @@ export async function runStructural(opts = {}) {
     'node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/linear-client.mjs --test-coverage-lines=73 --test-coverage-branches=83 --test-coverage-functions=66 scripts/backlog-orchestrator/__tests__/linear-client.transport.test.mjs scripts/backlog-orchestrator/__tests__/linear-pagination.test.mjs',
     'pnpm ci:branching-guard:validate',
     'pnpm ci:merge-queue:check',
-    "node --experimental-test-coverage --test --test-coverage-include='scripts/native-merge-intent.mjs' --test-coverage-include='scripts/lib/source-admission-policy.mjs' --test-coverage-include='scripts/source-admission-check.mjs' --test-coverage-lines=98 scripts/lib/__tests__/native-merge-intent.test.mjs scripts/lib/__tests__/source-admission-policy.test.mjs scripts/lib/__tests__/source-admission-check.test.mjs scripts/lib/__tests__/writer-owned-pr-promote.test.mjs",
+    "node --experimental-test-coverage --test --test-coverage-include='scripts/lib/source-admission-policy.mjs' --test-coverage-include='scripts/source-admission-check.mjs' --test-coverage-lines=98 scripts/lib/__tests__/source-admission-policy.test.mjs scripts/lib/__tests__/source-admission-check.test.mjs scripts/lib/__tests__/writer-owned-pr-promote.test.mjs",
     'pnpm ci:typecheck-gate-guard',
     'pnpm doc:freshness:check',
     'node .github/scripts/quarantine-ledger.mjs validate',
@@ -2323,6 +2343,7 @@ export async function runStructural(opts = {}) {
     'node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/shipping-lead-gate.mjs --test-coverage-lines=95 --test-coverage-branches=80 --test-coverage-functions=95 scripts/backlog-orchestrator/__tests__/shipping-lead-gate.test.mjs',
     'node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/summer-shipping-lead-contract.mjs --test-coverage-lines=95 --test-coverage-branches=80 --test-coverage-functions=95 scripts/backlog-orchestrator/__tests__/summer-shipping-lead-contract.test.mjs',
     'python3 scripts/fleet-gate/tests/test_evaluate_fleet_gate.py',
+    'python3 scripts/fleet-gate/tests/test_receipt_writer.py',
     'node --test scripts/backlog-orchestrator/__tests__/pre-lease-gates.test.mjs',
     'node --test scripts/backlog-orchestrator/__tests__/gate-next-hold.test.mjs',
     'node --test scripts/backlog-orchestrator/__tests__/ownership-inventory.test.mjs',
@@ -2365,6 +2386,13 @@ export async function runStructural(opts = {}) {
     // Merge-group-only unit guards run in their own web lane (merge-group-guards).
   ];
   const macParts = [DESKTOP_RELEASE_COVERAGE_COMMAND];
+  // Script contracts run with the operations lane, but they also read web and
+  // docs sources. Without operations, run the ones whose derived imports/reads
+  // the diff touches (#20922 reddened main through rubric.test.mjs).
+  const dependentScriptTests =
+    selected.has('operations') || !changed?.length
+      ? []
+      : testsAffectedBy(SCRIPT_CONTRACT_NODE_TESTS, changed, REPO_ROOT);
   const allParts = [
     ...(selected.has('operations') || selected.has('web')
       ? [
@@ -2372,6 +2400,7 @@ export async function runStructural(opts = {}) {
           STRUCTURAL_RUNNER_COVERAGE_COMMAND,
           'pnpm --filter @jovie/web exec node scripts/test-truth-guard.mjs',
           'pnpm --dir apps/web exec vitest run --config vitest.config.fast.mts app/api/internal/ovie/summer-bottleneck/route.test.ts --coverage --coverage.include=app/api/internal/ovie/summer-bottleneck/route.ts --coverage.include=lib/ovie/summer-admissions.ts --coverage.include=lib/ovie/summer-ci-audit.ts',
+          'pnpm exec vitest --config scripts/vitest.config.mts run lib/__tests__/provider-attempt-receipt.test.mjs --coverage --coverage.allowExternal --coverage.include="$PWD/packages/agent-transport-contracts/provider-attempt-receipt.ts" --coverage.thresholds.lines=95 --coverage.thresholds.statements=95 --coverage.thresholds.functions=100 --coverage.thresholds.branches=90 --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-provider-attempt-receipt-coverage"',
           'pnpm exec vitest --config scripts/vitest.config.mts run lib/__tests__/provider-incident-contract.test.mjs --coverage --coverage.allowExternal --coverage.include="$PWD/packages/agent-transport-contracts/provider-incident.ts" --coverage.thresholds.lines=95 --coverage.thresholds.statements=95 --coverage.thresholds.functions=100 --coverage.thresholds.branches=90 --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-provider-incident-contract-coverage"',
           'pnpm exec vitest --config scripts/vitest.config.mts run lib/__tests__/symphony-health-contract.test.mjs --coverage --coverage.allowExternal --coverage.include="$PWD/packages/agent-transport-contracts/symphony-outage.ts" --coverage.thresholds.lines=100 --coverage.thresholds.statements=100 --coverage.thresholds.functions=100 --coverage.thresholds.branches=90 --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-symphony-health-contract-coverage"',
           // Run the deploy contract by name for operations-only changes too:
@@ -2389,6 +2418,9 @@ export async function runStructural(opts = {}) {
         ]
       : []),
     ...invariantParts,
+    ...(dependentScriptTests.length
+      ? [`node --test ${dependentScriptTests.join(' ')}`]
+      : []),
     ...(selected.has('operations') ? operationsParts : []),
     ...(selected.has('web') ? webParts : []),
     ...(selected.has('mac') ? macParts : []),

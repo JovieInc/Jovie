@@ -9,16 +9,18 @@ import {
   FileText,
   ImageIcon,
   type LucideIcon,
-  Plus,
+  Paperclip,
   Video,
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import {
+  type DragEvent,
   type ReactNode,
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import {
@@ -35,8 +37,10 @@ import {
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
 import type { LibraryDownloadView } from '@/lib/library/post-release-types';
 import {
+  classifyWorkAttachment,
   deriveWorkFiles,
   fileNameFromMediaUrl,
+  type WorkAttachmentKind,
   type WorkFileEntry,
   type WorkFileKind,
 } from '@/lib/library/work-files';
@@ -78,6 +82,20 @@ async function uploadLibraryArtwork(releaseId: string, file: File) {
   return body.artworkUrl;
 }
 
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return (
+    target.isContentEditable ||
+    target.tagName === 'INPUT' ||
+    target.tagName === 'TEXTAREA' ||
+    target.tagName === 'SELECT'
+  );
+}
+
+function hasDraggedFiles(event: DragEvent<HTMLElement>): boolean {
+  return Array.from(event.dataTransfer?.types ?? []).includes('Files');
+}
+
 const ROW_FOCUS_CLASS =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55';
 
@@ -89,9 +107,15 @@ export interface LibraryFilesPanelProps {
   readonly audioPreviewAction?: ReactNode;
   readonly onAudioUploaded?: (assetId: string, previewUrl: string) => void;
   readonly onArtworkUploaded?: (assetId: string, artworkUrl: string) => void;
+  /** Opens the file picker once (⌘U from anywhere in the inspector). */
+  readonly attachRequested?: boolean;
+  readonly onAttachRequestHandled?: () => void;
 }
 
-/** Populated work files, focused detail and one acquisition section. */
+/**
+ * Populated work files, focused detail and ONE Attach File control. Click,
+ * drop, paste or ⌘U all take any file; the kind is detected after hand-off.
+ */
 export function LibraryFilesPanel({
   asset,
   downloads,
@@ -100,6 +124,8 @@ export function LibraryFilesPanel({
   audioPreviewAction,
   onAudioUploaded,
   onArtworkUploaded,
+  attachRequested = false,
+  onAttachRequestHandled,
 }: LibraryFilesPanelProps) {
   const releaseId = releaseIdForAsset(asset);
   const stems = useMemo(() => {
@@ -121,23 +147,30 @@ export function LibraryFilesPanel({
     [asset, artworkUrl, stems]
   );
 
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [pendingAudio, setPendingAudio] = useState<File | null>(null);
+  const [uploadingArtwork, setUploadingArtwork] = useState<{
+    readonly assetId: string;
+    readonly name: string;
+  } | null>(null);
+  const uploadingArtworkName =
+    uploadingArtwork?.assetId === asset.id ? uploadingArtwork.name : null;
+  const [isDragging, setIsDragging] = useState(false);
+
   useEffect(() => {
     setFocusedId(null);
+    setPendingAudio(null);
     setLocalArtwork({ assetId: asset.id, url: asset.artworkUrl });
   }, [asset.id, asset.artworkUrl]);
 
   const focused = files.find(file => file.id === focusedId) ?? null;
   const focusedKind: WorkFileKind | null =
-    focused?.kind ??
-    (focusedId === 'add:audio'
-      ? 'audio'
-      : focusedId === 'add:artwork'
-        ? 'artwork'
-        : null);
+    focused?.kind ?? (focusedId === 'add:audio' ? 'audio' : null);
 
   const handleArtworkFile = useCallback(
     (file: File) => {
       if (!releaseId) return;
+      setUploadingArtwork({ assetId: asset.id, name: file.name });
       void uploadLibraryArtwork(releaseId, file)
         .then(nextUrl => {
           setLocalArtwork({ assetId: asset.id, url: nextUrl });
@@ -148,7 +181,8 @@ export function LibraryFilesPanel({
           toast.error(
             error instanceof Error ? error.message : 'Artwork upload failed'
           );
-        });
+        })
+        .finally(() => setUploadingArtwork(null));
     },
     [asset.id, onArtworkUploaded, releaseId]
   );
@@ -157,45 +191,113 @@ export function LibraryFilesPanel({
     ? buildReleaseDownloadsRoute(releaseId)
     : undefined;
 
-  const addEntries: ReadonlyArray<{
-    readonly id: string;
-    readonly label: string;
-    readonly href?: string;
-    readonly focusId?: string;
-    readonly missing: boolean;
-  }> = [
-    {
-      id: 'add-audio',
-      label: 'Add Audio',
-      focusId: 'add:audio',
-      missing: !asset.previewUrl,
+  const attachFile = useCallback(
+    (file: File) => {
+      const kind = classifyWorkAttachment(file);
+      if (kind === 'audio') {
+        setPendingAudio(file);
+        setFocusedId('add:audio');
+        return;
+      }
+      if (kind === 'artwork' && releaseId) {
+        handleArtworkFile(file);
+        return;
+      }
+      const route = attachElsewhereRoute(kind, stemsHref);
+      toast.info(attachElsewhereMessage(kind, file.name), {
+        action: route
+          ? {
+              label: route.label,
+              onClick: () => globalThis.location?.assign(route.href),
+            }
+          : undefined,
+      });
     },
-    {
-      id: 'add-artwork',
-      label: 'Add Artwork',
-      focusId: releaseId ? 'add:artwork' : undefined,
-      missing: !artworkUrl,
+    [handleArtworkFile, releaseId, stemsHref]
+  );
+
+  const attachFiles = useCallback(
+    (fileList: FileList | readonly File[] | null | undefined) => {
+      if (disabled || !fileList) return;
+      for (const file of Array.from(fileList)) attachFile(file);
     },
-    {
-      id: 'add-video',
-      label: 'Add Video',
-      href: buildLibraryViewRoute('videos'),
-      missing: !files.some(file => file.kind === 'video'),
+    [attachFile, disabled]
+  );
+
+  const openPicker = useCallback(() => {
+    if (!disabled) inputRef.current?.click();
+  }, [disabled]);
+
+  useEffect(() => {
+    if (!attachRequested) return;
+    openPicker();
+    onAttachRequestHandled?.();
+  }, [attachRequested, onAttachRequestHandled, openPicker]);
+
+  useEffect(() => {
+    if (disabled) return;
+    const handlePaste = (event: ClipboardEvent) => {
+      const pasted = event.clipboardData?.files;
+      if (!pasted?.length || isEditableTarget(event.target)) return;
+      event.preventDefault();
+      attachFiles(pasted);
+    };
+    document.addEventListener('paste', handlePaste);
+    return () => document.removeEventListener('paste', handlePaste);
+  }, [attachFiles, disabled]);
+
+  const dropHandlers = {
+    onDragOver: (event: DragEvent<HTMLDivElement>) => {
+      if (disabled || event.defaultPrevented || !hasDraggedFiles(event)) {
+        return;
+      }
+      event.preventDefault();
+      setIsDragging(true);
     },
-    {
-      id: 'add-document',
-      label: 'Add Document',
-      href: buildLibraryViewRoute('documents'),
-      missing: asset.itemKind !== 'document',
+    onDragLeave: (event: DragEvent<HTMLDivElement>) => {
+      const next = event.relatedTarget;
+      if (next instanceof Node && event.currentTarget.contains(next)) return;
+      setIsDragging(false);
     },
-    {
-      id: 'add-download',
-      label: 'Add Stems Or Downloads',
-      href: stemsHref,
-      missing:
-        Boolean(stemsHref) && !files.some(file => file.kind === 'download'),
+    onDrop: (event: DragEvent<HTMLDivElement>) => {
+      setIsDragging(false);
+      // A nested dropzone (audio replace, artwork slot) already handled it.
+      if (disabled || event.defaultPrevented || !hasDraggedFiles(event)) {
+        return;
+      }
+      event.preventDefault();
+      attachFiles(event.dataTransfer.files);
     },
-  ].filter(entry => entry.missing);
+  };
+
+  const attachInput = (
+    <input
+      ref={inputRef}
+      type='file'
+      multiple
+      hidden
+      aria-label='Attach File'
+      data-testid='library-attach-file-input'
+      onChange={event => {
+        attachFiles(event.target.files);
+        event.target.value = '';
+      }}
+    />
+  );
+
+  const dropOverlay = (
+    <div
+      aria-hidden='true'
+      className={cn(
+        'pointer-events-none absolute inset-0 grid place-items-center rounded-lg border border-dashed border-default bg-surface-1 text-xs font-medium text-primary-token opacity-0 transition-opacity duration-subtle',
+        isDragging && 'opacity-100'
+      )}
+      data-testid='library-attach-drop-overlay'
+      data-active={isDragging ? 'true' : 'false'}
+    >
+      Drop to attach
+    </div>
+  );
 
   const backButton = (
     <button
@@ -215,7 +317,12 @@ export function LibraryFilesPanel({
 
   if (focusedKind) {
     return (
-      <div className='space-y-3' data-testid='library-file-detail'>
+      <div
+        className='relative space-y-3'
+        data-testid='library-file-detail'
+        {...dropHandlers}
+      >
+        {attachInput}
         <div className='flex items-center justify-between gap-2'>
           {backButton}
           {focusedKind === 'audio' ? audioPreviewAction : null}
@@ -228,6 +335,7 @@ export function LibraryFilesPanel({
             durationMs={asset.totalDurationMs}
             disabledTabIndex={disabledTabIndex}
             testIdPrefix='library'
+            pendingFile={pendingAudio}
             onUploaded={previewUrl => onAudioUploaded?.(asset.id, previewUrl)}
           />
         ) : null}
@@ -293,123 +401,108 @@ export function LibraryFilesPanel({
             disabledTabIndex={disabledTabIndex}
           />
         ) : null}
+        {dropOverlay}
       </div>
     );
   }
 
   return (
-    <div data-testid='library-files-panel' className='space-y-4'>
+    <div
+      data-testid='library-files-panel'
+      className='relative'
+      {...dropHandlers}
+    >
+      {attachInput}
       <InspectorSection title='Files'>
-        {files.length === 0 ? (
-          <p className='rounded-lg border border-dashed border-subtle px-3 py-3 text-2xs text-tertiary-token'>
-            No files attached yet.
-          </p>
-        ) : (
-          <div className='space-y-0.5' data-testid='library-files-list'>
-            {files.map(file => {
-              const Icon = FILE_ICONS[file.kind];
-              return (
-                <div
-                  key={file.id}
-                  className='group flex items-center gap-1 rounded-md transition-colors duration-subtle hover:bg-surface-1'
-                >
-                  <button
-                    type='button'
-                    onClick={() => setFocusedId(file.id)}
-                    disabled={disabled}
-                    tabIndex={disabledTabIndex}
-                    data-testid={`library-file-${file.id}`}
-                    className={cn(
-                      'flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-md px-2 text-left',
-                      ROW_FOCUS_CLASS
-                    )}
-                  >
-                    <span className='grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-md bg-surface-1 text-secondary-token'>
-                      {file.thumbnailUrl ? (
-                        <Image
-                          src={file.thumbnailUrl}
-                          alt=''
-                          width={32}
-                          height={32}
-                          className='h-8 w-8 object-cover'
-                          unoptimized
-                        />
-                      ) : (
-                        <Icon className='h-4 w-4' strokeWidth={2.25} />
-                      )}
-                    </span>
-                    <span className='min-w-0 flex-1'>
-                      <span className='block truncate text-xs font-medium text-primary-token'>
-                        {file.name}
-                      </span>
-                      <span className='mt-0.5 block truncate text-2xs leading-4 text-tertiary-token'>
-                        {file.roleLabel} · {file.accessLabel}
-                      </span>
-                    </span>
-                    <ChevronRight
-                      className='h-3.5 w-3.5 shrink-0 text-quaternary-token'
-                      aria-hidden='true'
-                    />
-                  </button>
-                  {file.kind === 'audio' ? audioPreviewAction : null}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </InspectorSection>
-
-      {addEntries.length > 0 ? (
-        <InspectorSection title='Add File'>
-          <div className='space-y-0.5'>
-            {addEntries.map(entry =>
-              entry.href ? (
-                <Link
-                  key={entry.id}
-                  href={entry.href}
-                  data-testid={`library-${entry.id}-acquisition`}
-                  data-asset-slot-mode='acquisition'
-                  tabIndex={disabledTabIndex ?? (disabled ? -1 : undefined)}
-                  className={cn(
-                    'group flex min-h-11 items-center gap-2 rounded-md px-2 text-xs text-secondary-token transition-colors duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:bg-surface-1',
-                    ROW_FOCUS_CLASS
-                  )}
-                >
-                  <Plus
-                    className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
-                    aria-hidden='true'
-                  />
-                  <span className='min-w-0 flex-1 truncate'>{entry.label}</span>
-                </Link>
-              ) : (
+        <div className='space-y-0.5' data-testid='library-files-list'>
+          {files.map(file => {
+            const Icon = FILE_ICONS[file.kind];
+            return (
+              <div
+                key={file.id}
+                className='group flex items-center gap-1 rounded-md transition-colors duration-subtle hover:bg-surface-1'
+              >
                 <button
-                  key={entry.id}
                   type='button'
-                  onClick={() =>
-                    entry.focusId ? setFocusedId(entry.focusId) : undefined
-                  }
-                  disabled={disabled || !entry.focusId}
+                  onClick={() => setFocusedId(file.id)}
+                  disabled={disabled}
                   tabIndex={disabledTabIndex}
-                  data-testid={`library-${entry.id}-acquisition`}
-                  data-asset-slot-mode='acquisition'
+                  data-testid={`library-file-${file.id}`}
                   className={cn(
-                    'group flex min-h-11 w-full items-center gap-2 rounded-md px-2 text-xs text-secondary-token transition-colors duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:bg-surface-1 disabled:opacity-60',
+                    'flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-md px-2 text-left',
                     ROW_FOCUS_CLASS
                   )}
                 >
-                  <Plus
-                    className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
+                  <span className='grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-md bg-surface-1 text-secondary-token'>
+                    {file.thumbnailUrl ? (
+                      <Image
+                        src={file.thumbnailUrl}
+                        alt=''
+                        width={32}
+                        height={32}
+                        className='h-8 w-8 object-cover'
+                        unoptimized
+                      />
+                    ) : (
+                      <Icon className='h-4 w-4' strokeWidth={2.25} />
+                    )}
+                  </span>
+                  <span className='min-w-0 flex-1'>
+                    <span className='block truncate text-xs font-medium text-primary-token'>
+                      {file.name}
+                    </span>
+                    <span className='mt-0.5 block truncate text-2xs leading-4 text-tertiary-token'>
+                      {file.roleLabel} · {file.accessLabel}
+                    </span>
+                  </span>
+                  <ChevronRight
+                    className='h-3.5 w-3.5 shrink-0 text-quaternary-token'
                     aria-hidden='true'
                   />
-                  <span className='min-w-0 flex-1 truncate text-left'>
-                    {entry.label}
-                  </span>
                 </button>
-              )
+                {file.kind === 'audio' ? audioPreviewAction : null}
+              </div>
+            );
+          })}
+          {uploadingArtworkName ? (
+            <div
+              role='status'
+              className='flex h-11 items-center gap-3 px-2 text-xs text-tertiary-token'
+              data-testid='library-attach-uploading'
+            >
+              <span className='h-8 w-8 shrink-0 animate-pulse rounded-md bg-surface-1' />
+              <span className='min-w-0 flex-1 truncate'>
+                Attaching {uploadingArtworkName}…
+              </span>
+            </div>
+          ) : null}
+          <button
+            type='button'
+            onClick={openPicker}
+            disabled={disabled}
+            tabIndex={disabledTabIndex}
+            aria-keyshortcuts='Meta+U'
+            data-testid='library-attach-file'
+            className={cn(
+              'group flex h-8 w-full items-center gap-2 rounded-md px-2 text-xs text-secondary-token transition-colors duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:bg-surface-1 disabled:opacity-60',
+              ROW_FOCUS_CLASS
             )}
-          </div>
-        </InspectorSection>
-      ) : null}
+          >
+            <Paperclip
+              className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
+              aria-hidden='true'
+            />
+            <span className='min-w-0 flex-1 truncate text-left'>
+              Attach File
+            </span>
+            <span className='shrink-0 text-2xs text-quaternary-token'>
+              Drop or paste
+            </span>
+            <kbd className='shrink-0 text-2xs text-tertiary-token'>⌘U</kbd>
+          </button>
+        </div>
+      </InspectorSection>
+      {dropOverlay}
     </div>
   );
 }
@@ -452,4 +545,43 @@ function FocusedFileLinkCard({
       ) : null}
     </div>
   );
+}
+
+const ATTACH_ELSEWHERE_LABELS: Record<
+  Exclude<WorkAttachmentKind, 'audio' | 'unknown'>,
+  string
+> = {
+  artwork: 'Artwork attaches to releases.',
+  video: 'Videos attach from the Videos view.',
+  document: 'Documents attach from the Documents view.',
+  download: 'Stems and downloads attach from Downloads.',
+};
+
+function attachElsewhereMessage(
+  kind: WorkAttachmentKind,
+  fileName: string
+): string {
+  if (kind === 'audio' || kind === 'unknown') {
+    return `Jovie can't attach ${fileName} yet.`;
+  }
+  return `${fileName}: ${ATTACH_ELSEWHERE_LABELS[kind]}`;
+}
+
+function attachElsewhereRoute(
+  kind: WorkAttachmentKind,
+  stemsHref: string | undefined
+): { readonly label: string; readonly href: string } | null {
+  if (kind === 'video') {
+    return { label: 'Open Videos', href: buildLibraryViewRoute('videos') };
+  }
+  if (kind === 'document') {
+    return {
+      label: 'Open Documents',
+      href: buildLibraryViewRoute('documents'),
+    };
+  }
+  if (kind === 'download' && stemsHref) {
+    return { label: 'Open Downloads', href: stemsHref };
+  }
+  return null;
 }

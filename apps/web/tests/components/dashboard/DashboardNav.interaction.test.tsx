@@ -42,7 +42,7 @@ describe('DashboardNav interactions', () => {
       expect(link.querySelector('svg')).toBeTruthy();
       expect(link).toHaveAccessibleName(label);
     }
-    const homeLinks = screen.getAllByRole('link', { name: 'Home' });
+    const homeLinks = screen.getAllByRole('link', { name: 'Inbox' });
     expect(homeLinks).toHaveLength(2);
     for (const link of homeLinks) {
       expect(link.querySelector('svg')).toBeTruthy();
@@ -62,7 +62,7 @@ describe('DashboardNav interactions', () => {
     const inbox = container.querySelector('[data-navigation-item-id="inbox"]');
     expect(inbox).toBeInstanceOf(HTMLElement);
     if (!(inbox instanceof HTMLElement)) return;
-    expect(inbox).toHaveAccessibleName('Home');
+    expect(inbox).toHaveAccessibleName('Inbox');
 
     expect(newChat).toHaveClass(
       'size-6',

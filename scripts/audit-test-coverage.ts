@@ -690,7 +690,7 @@ function renderHeatmap(
   for (const r of rows) {
     if (r.metrics.coverage_pct >= 60 && r.metrics.mutation_score === null) {
       mutationWarnings.push(
-        `- \`${r.surface.id}\` — ${r.metrics.coverage_pct}% coverage but no mutation score. Risk: assertions may exercise code without verifying behavior. Add to \`apps/web/stryker.config.mjs\` \`mutate[]\`.`
+        `- \`${r.surface.id}\` — ${r.metrics.coverage_pct}% coverage but no mutation score. Risk: assertions may exercise code without verifying behavior. Run \`node scripts/mutation-diff.mjs --files <file>\`, and add its prefix to \`HIGH_RISK_PREFIXES\` in \`scripts/lib/mutation-diff.mjs\` if it is missing.`
       );
     } else if (
       r.metrics.mutation_score !== null &&

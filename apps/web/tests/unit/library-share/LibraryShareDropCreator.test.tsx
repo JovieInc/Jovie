@@ -168,3 +168,57 @@ describe('LibraryShareDropCreator', () => {
     expect(body.message).toBeNull();
   });
 });
+
+describe('LibraryShareDropCreator controlled by the link row', () => {
+  it('renders no standalone trigger and reports close to its owner', () => {
+    const onOpenChange = vi.fn();
+    const { rerender } = render(
+      <LibraryShareDropCreator
+        releaseIds={['release-1']}
+        defaultTitle='Take Me Over files'
+        open={false}
+        onOpenChange={onOpenChange}
+      />
+    );
+    expect(screen.queryByTestId('library-share-create-trigger')).toBeNull();
+    expect(screen.queryByTestId('library-share-create-panel')).toBeNull();
+
+    rerender(
+      <LibraryShareDropCreator
+        releaseIds={['release-1']}
+        defaultTitle='Take Me Over files'
+        open
+        onOpenChange={onOpenChange}
+      />
+    );
+    expect(screen.getByTestId('library-share-create-panel')).toHaveTextContent(
+      'Share files privately'
+    );
+    fireEvent.click(screen.getByTestId('library-share-create-cancel'));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+});
+
+describe('LibraryShareDropCreator asset picker', () => {
+  it('leads with the work being shared and contains long titles', () => {
+    render(
+      <LibraryShareDropCreator
+        releaseIds={['release-3']}
+        candidateAssets={[
+          { id: 'release-1', title: 'Midnight Drive' },
+          { id: 'release-3', title: 'Afterhours' },
+        ]}
+        defaultTitle='Afterhours files'
+        open
+      />
+    );
+    const picker = screen.getByTestId('library-share-asset-picker');
+    expect(picker.className).toContain('min-w-0');
+    const boxes = picker.querySelectorAll('input[type=checkbox]');
+    expect(boxes[0]).toHaveAttribute(
+      'data-testid',
+      'library-share-asset-release-3'
+    );
+    expect(boxes[0]).toBeChecked();
+  });
+});

@@ -50,11 +50,7 @@ export function TooltipShortcut({
   return (
     <Tooltip defaultOpen={defaultOpen}>
       <TooltipTrigger asChild>{children}</TooltipTrigger>
-      <TooltipContent
-        contentVariant={contentVariant}
-        side={side}
-        className='flex items-center gap-2'
-      >
+      <TooltipContent contentVariant={contentVariant} side={side}>
         <span
           data-testid='tooltip-label'
           className={contentVariant === 'rich' ? 'min-w-0' : undefined}

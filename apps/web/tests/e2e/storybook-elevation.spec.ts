@@ -615,7 +615,7 @@ test.describe('central runtime notifications', () => {
       page.getByRole('button', { name: 'Downloading Jovie Update…' })
     ).toBeDisabled();
     await expect(
-      page.getByRole('link', { name: 'Home — App Update Available' })
+      page.getByRole('link', { name: 'Inbox — App Update Available' })
     ).toHaveAttribute('href', '/app');
     await page.evaluate(() =>
       (window as unknown as { downloaded: () => void }).downloaded()
@@ -638,13 +638,13 @@ test.describe('central runtime notifications', () => {
 });
 
 test.describe('sidebar attention and Settings header', () => {
-  test('legacy admin keeps its default-flags fallback Home link', async ({
+  test('legacy admin keeps its default-flags fallback Inbox link', async ({
     page,
   }) => {
     await openStory(page, 'organisms-unifiedsidebar--legacy-admin', 'light');
     await expect(
       page.locator('[data-sidebar-search-slot]').getByRole('link', {
-        name: 'Home',
+        name: 'Inbox',
         exact: true,
       })
     ).toHaveAttribute('href', '/app');
@@ -699,7 +699,7 @@ test.describe('sidebar attention and Settings header', () => {
       Math.abs(line.x - trigger.x - trigger.width - gap)
     ).toBeLessThanOrEqual(2);
     await expect(
-      slot.getByRole('link', { name: 'Home', exact: true })
+      slot.getByRole('link', { name: 'Inbox', exact: true })
     ).toBeVisible();
   });
 
@@ -784,11 +784,11 @@ test.describe('sidebar attention and Settings header', () => {
       expect(searchBox.x).toBeGreaterThan(bellBox.x);
       await expect(
         page.getByRole('link', { name: 'Inbox', exact: true })
-      ).toHaveCount(0);
+      ).toHaveCount(1);
       // Current navigation groups Calendar within Work. Preserve every
       // canonical destination exposed by this default-flags story.
       for (const [name, href] of [
-        ['Home', '/app'],
+        ['Inbox', '/app'],
         ['Work', '/app/library'],
         ['Audience', '/app/contacts?tab=audience'],
       ]) {

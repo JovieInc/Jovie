@@ -143,5 +143,39 @@ class LegacyHoldReleaseTest(unittest.TestCase):
         self.assertFalse(hasattr(overlap, "_hold"))
 
 
+class StackedChildRetargetTest(unittest.TestCase):
+    """A released overlap pair never retargets a stacked child while its parent is open
+    (2026-10-13: #21507/#21508 were moved to main under open #21429, dragging its commits)."""
+
+    def release(self, prs, child, *, live_open):
+        calls = []
+        def sh(args, **_kwargs):
+            calls.append(list(args))
+            if args[:2] == ["gh", "api"] and "pulls?state=open" in args[2]:
+                return SimpleNamespace(returncode=0, stdout="1" if live_open else "0", stderr="")
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        lane = SimpleNamespace(REPO_SLUG="JovieInc/Jovie", ledger=lambda *_a: None, sh=sh)
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            legacy = {"schema": "symphony-file-overlap/v1", "events": [], "tasks": {},
+                      "metrics": {"conflicts_prevented": 0, "overlap_flags": 0, "rebases_caused_by_overlap": 0},
+                      "active": {f"9:{child['number']}": {"firstPr": 9, "laterPr": child["number"],
+                                                          "policyAction": "sequence", "actionTaken": "sequence"}}}
+            (state / "file-overlap.json").write_text(json.dumps(legacy))
+            overlap.reconcile_open_prs(SimpleNamespace(state=state), lane, prs)
+        return [args for args in calls if "--base" in args]
+
+    def test_child_of_an_open_parent_keeps_its_stack_base(self):
+        parent = pr(1, [changed("a.md")], branch="chore/parent")
+        child = pr(2, [changed("b.md")], base="chore/parent")
+        self.assertEqual(self.release([parent, child], child, live_open=False), [])
+
+    def test_parent_missing_from_inventory_is_checked_live(self):
+        child = pr(2, [changed("b.md")], base="chore/parent")
+        self.assertEqual(self.release([child], child, live_open=True), [])
+        self.assertEqual(self.release([child], child, live_open=False),
+                         [["gh", "pr", "edit", "2", "--repo", "JovieInc/Jovie", "--base", "main"]])
+
+
 if __name__ == "__main__":
     unittest.main()

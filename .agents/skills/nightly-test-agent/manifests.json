@@ -13,7 +13,7 @@
         "unitCoverage": "CI=true pnpm --filter=@jovie/web run test -- --coverage",
         "nightlyE2E": "pnpm --filter=@jovie/web exec playwright test --config=playwright.config.nightly.ts --project=chromium",
         "flake": "pnpm --filter=@jovie/web run test:flaky",
-        "mutationHotspots": "pnpm --filter=@jovie/web run test:mutation:hotspots"
+        "mutationDiff": "CI=true node scripts/mutation-diff.mjs --base origin/main"
       },
       "nightlyBudget": {
         "maxTargets": 8,

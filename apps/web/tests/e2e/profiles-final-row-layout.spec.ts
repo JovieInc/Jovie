@@ -177,7 +177,6 @@ test('keeps the final profile row and destination line visible in a constrained 
 
   const workspace = page.getByTestId('profiles-workspace');
   await expect(workspace).toBeVisible({ timeout: 30_000 });
-  await page.getByRole('button', { name: 'All Pages', exact: true }).click();
   const table = workspace.getByRole('table');
   await expect(table).toBeVisible({ timeout: 30_000 });
   await expect(table.locator('tbody tr').first()).toBeVisible({
@@ -199,7 +198,6 @@ test('keeps the final profile row and destination line visible in a constrained 
     timeout: 30_000,
   });
 
-  await page.getByRole('button', { name: 'All Pages', exact: true }).click();
   const shortMetrics = await readFinalRowMetrics(table);
   logMetrics('short', shortMetrics);
   expect(shortMetrics.scrollHeight).toBeGreaterThan(shortMetrics.clientHeight);
@@ -242,12 +240,16 @@ test('keeps page identity and review status readable at narrow widths', async ({
     success: true,
     suggestions: expect.any(Array),
   });
-  await page.getByRole('button', { name: 'Suggested', exact: true }).click();
+  await page
+    .getByRole('button', { name: /^Review Suggestions \(\d+\)$/ })
+    .click();
   await expect(page.getByTestId('suggested-connections-review')).toBeVisible();
   await expect(
     page.getByTestId('suggested-connections-error-state')
   ).toHaveCount(0);
-  await page.getByRole('button', { name: 'All Pages', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Close Suggestions', exact: true })
+    .click();
   const workspace = page.getByTestId('profiles-workspace');
   for (const width of [320, 390, 1280]) {
     await page.setViewportSize({ width, height: 800 });

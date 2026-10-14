@@ -1,30 +1,19 @@
+import { JOVIE_BRAND_GEOMETRY } from '@jovie/ui/brand/geometry.gen';
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import {
   JOVIE_PATH,
   JOVIE_VIEWBOX,
-  LETTER_PAIRS,
-  LETTER_PATHS,
-  LETTER_SEQUENCE,
   Lockup,
   Mark,
-  WORDMARK_TOTAL_WIDTH_U,
-  WORDMARK_TRACK,
+  WORDMARK_ASPECT,
   Wordmark,
 } from '@/lib/brand';
 
-describe('JOVIE_PATH (drift guard)', () => {
-  it('has the canonical viewBox dimensions', () => {
-    expect(JOVIE_VIEWBOX).toEqual({ width: 360, height: 360 });
-  });
-
-  it('matches the canonical path constant — length and endpoints', () => {
-    // Drift guard: if anyone "improves" the mark path, this fails loudly so
-    // we can decide whether the change is intentional and propagate it through
-    // every consumer (favicons, OG image, JSON-LD, desktop icon).
-    expect(JOVIE_PATH.length).toBe(1043);
-    expect(JOVIE_PATH.startsWith('M179.16,6 L182.24,6.05')).toBe(true);
-    expect(JOVIE_PATH.endsWith('C86.18,25.47 130.38,6 179.16,6 Z')).toBe(true);
+describe('JOVIE_PATH', () => {
+  it('is the display master of the construction (packages/brand)', () => {
+    expect(JOVIE_VIEWBOX).toEqual({ width: 100, height: 100 });
+    expect(JOVIE_PATH).toBe(JOVIE_BRAND_GEOMETRY.o.display.mark);
   });
 });
 
@@ -34,7 +23,7 @@ describe('Mark', () => {
     const svg = container.querySelector('svg');
     const path = container.querySelector('path');
     expect(svg).not.toBeNull();
-    expect(svg?.getAttribute('viewBox')).toBe('0 0 360 360');
+    expect(svg?.getAttribute('viewBox')).toBe('0 0 100 100');
     expect(svg?.getAttribute('width')).toBe('120');
     expect(path?.getAttribute('d')).toBe(JOVIE_PATH);
     expect(path?.getAttribute('fill')).toBe('#F5F4F0');
@@ -57,70 +46,51 @@ describe('Mark', () => {
 });
 
 describe('Wordmark', () => {
-  it('renders five letter glyphs by default', () => {
+  it('renders the five construction glyphs, the o being the mark', () => {
     const { container } = render(<Wordmark height={64} color='#08090a' />);
     const paths = container.querySelectorAll('svg > path');
-    expect(paths.length).toBe(LETTER_SEQUENCE.length);
-    expect([...paths].map(path => path.getAttribute('transform'))).toEqual([
-      'translate(0 0)',
-      'translate(78 0)',
-      'translate(190 0)',
-      'translate(274 0)',
-      'translate(310 0)',
-    ]);
+    const glyphs = JOVIE_BRAND_GEOMETRY.wordmark.display.glyphs;
+    expect(paths).toHaveLength(5);
+    expect([...paths].map(p => p.getAttribute('d'))).toEqual(
+      glyphs.map(g => g.d)
+    );
+    const [, , w, h] = JOVIE_BRAND_GEOMETRY.wordmark.display.viewBox;
     expect(container.querySelector('svg')?.getAttribute('viewBox')).toBe(
-      '0 0 374 100'
+      `0 0 ${w} ${h}`
     );
   });
 
-  it('substitutes the mark glyph for the O when markAsO is true', () => {
-    const plain = render(<Wordmark height={64} markAsO={false} />);
-    const integrated = render(<Wordmark height={64} markAsO />);
-    const plainPaths = plain.container.querySelectorAll('svg > path').length;
-    const integratedPaths =
-      integrated.container.querySelectorAll('svg > path').length;
-    const integratedGroups =
-      integrated.container.querySelectorAll('svg > g').length;
-    // Plain wordmark renders 5 top-level letter paths.
-    expect(plainPaths).toBe(5);
-    // markAsO replaces the O path with a <g> wrapping the mark path, so we
-    // expect 4 top-level paths + 1 group.
-    expect(integratedPaths).toBe(4);
-    expect(integratedGroups).toBe(1);
+  it('sizes width from the construction aspect ratio', () => {
+    const { container } = render(<Wordmark height={40} />);
+    const width = Number(container.querySelector('svg')?.getAttribute('width'));
+    expect(width).toBeCloseTo(40 * WORDMARK_ASPECT, 3);
   });
 
-  it('has the canonical total width — drift guard for letter kerning', () => {
-    // J(66) + JO(12) + O(100) + OV(12) + V(76) + VI(8) + I(22) + IE(14) + E(64)
-    expect(WORDMARK_TOTAL_WIDTH_U).toBe(374);
+  it('switches to the Text master below 24 px', () => {
+    const { container } = render(<Wordmark height={16} />);
+    const [, , w, h] = JOVIE_BRAND_GEOMETRY.wordmark.text.viewBox;
+    expect(container.querySelector('svg')?.getAttribute('viewBox')).toBe(
+      `0 0 ${w} ${h}`
+    );
   });
 
-  it('respects per-pair tracking constants', () => {
-    expect(WORDMARK_TRACK.JO).toBe(12);
-    expect(WORDMARK_TRACK.OV).toBe(12);
-    expect(WORDMARK_TRACK.VI).toBe(8);
-    expect(WORDMARK_TRACK.IE).toBe(14);
-  });
-
-  it('letter widths and pair labels match the canonical sequence', () => {
-    expect(LETTER_SEQUENCE).toEqual(['J', 'O', 'V', 'I', 'E']);
-    expect(LETTER_PAIRS).toEqual(['JO', 'OV', 'VI', 'IE']);
-    expect(LETTER_PATHS.J.w).toBe(66);
-    expect(LETTER_PATHS.O.w).toBe(100);
-    expect(LETTER_PATHS.O.rule).toBe('evenodd');
-    expect(LETTER_PATHS.V.w).toBe(76);
-    expect(LETTER_PATHS.I.w).toBe(22);
-    expect(LETTER_PATHS.E.w).toBe(64);
+  it('is labelled only when titled', () => {
+    const plain = render(<Wordmark height={24} />);
+    expect(
+      plain.container.querySelector('svg')?.getAttribute('aria-hidden')
+    ).toBe('true');
+    const titled = render(<Wordmark height={24} title='Jovie' />);
+    expect(titled.container.querySelector('svg')?.getAttribute('role')).toBe(
+      'img'
+    );
   });
 });
 
 describe('Lockup', () => {
-  it('renders horizontal mark + wordmark by default', () => {
+  it('is the wordmark alone when horizontal (its o is the mark)', () => {
     const { container } = render(<Lockup height={48} color='#F5F4F0' />);
-    const svgs = container.querySelectorAll('svg');
-    // One Mark svg + one Wordmark svg = 2 top-level svgs.
-    expect(svgs.length).toBe(2);
-    const root = container.firstElementChild as HTMLElement;
-    expect(root.style.flexDirection).toBe('');
+    expect(container.querySelectorAll('svg')).toHaveLength(1);
+    expect(container.querySelectorAll('svg > path')).toHaveLength(5);
   });
 
   it('stacks the mark above the wordmark when stacked is true', () => {

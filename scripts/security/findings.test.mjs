@@ -307,6 +307,39 @@ test('security gate is report-only until explicitly enabled', async () => {
   );
 });
 
+test('a report-only merge group spends no GitHub or Linear read', async () => {
+  const calls = [];
+  const fetchImpl = async url => {
+    calls.push(String(url));
+    throw new Error('no network in a report-only merge group');
+  };
+  const decision = await runSecurityGate({
+    env: { LINEAR_API_KEY: 'test', GITHUB_EVENT_NAME: 'merge_group' },
+    fetchImpl,
+  });
+  assert.deepEqual(decision, {
+    status: 'report-only',
+    reason: 'merge_group_report_skipped',
+    blocking: [],
+    exitCode: 0,
+  });
+  assert.deepEqual(calls, []);
+  const enforced = await runSecurityGate({
+    env: {
+      LINEAR_API_KEY: 'test',
+      GITHUB_EVENT_NAME: 'merge_group',
+      SECURITY_GATE_ENABLED: 'true',
+    },
+    fetchImpl,
+  });
+  assert.equal(
+    enforced.status,
+    'fail',
+    'an enforced gate still reads and fails closed'
+  );
+  assert.ok(calls.length > 0);
+});
+
 test('missing Linear credentials skip without exposing finding details', async () => {
   const summary = join(
     mkdtempSync(join(tmpdir(), 'security-gate-')),

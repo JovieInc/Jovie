@@ -47,7 +47,8 @@ const FOLLOWER_TIERS: readonly [number, string][] = [
   [1_000_000, '100K-1M'],
 ];
 
-function followerTier(followers: number): string {
+/** Spotify follower bucket, shared by feature tokens and row labels. */
+export function followerTier(followers: number): string {
   for (const [ceiling, label] of FOLLOWER_TIERS) {
     if (followers < ceiling) return label;
   }
