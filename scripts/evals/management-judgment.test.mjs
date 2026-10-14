@@ -371,7 +371,7 @@ describe('independent rubric and paired reporting', () => {
     assert.ok(blocked.criticalFailures.length > 0);
 
     const malformed = completeEvaluation();
-    malformed.pairs[0].candidate = {};
+    malformed.pairs[0].candidate = /** @type {any} */ ({});
     assert.equal(
       evaluateManagementJudgment(malformed).disposition,
       'blocked-retain-incumbent'
