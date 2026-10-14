@@ -34,6 +34,7 @@ import subprocess
 import sys
 import time
 import uuid
+from contextlib import contextmanager
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import lifecycle  # noqa: E402
@@ -120,13 +121,45 @@ def ready_slots(pool: Path, now: float | None = None) -> list[Path]:
     return [slot for _built, slot in sorted(slots, reverse=True)]
 
 
-def claim(slot: Path) -> bool:
-    """Atomic: exactly one taker renames the ready marker. The claimed marker keeps a
-    filler's stale sweep off the slot while `take` moves it out of the pool."""
+@contextmanager
+def slot_lease(slot: Path):
+    """Non-blocking ownership of the directory inode, retained across a pool move.
+
+    Failed or unsupported ownership proof leaves the slot alone. A directory lock
+    avoids unlink/recreate races and permanent per-slot lock files in the pool.
+    """
     try:
-        os.rename(slot.parent / f"{slot.name}{READY}", slot.parent / f"{slot.name}{CLAIMED}")
+        handle = os.open(slot, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    except OSError:
+        yield False
+        return
+    try:
+        try:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            opened, current = os.fstat(handle), os.stat(slot, follow_symlinks=False)
+        except OSError:
+            yield False
+            return
+        if (opened.st_dev, opened.st_ino) != (current.st_dev, current.st_ino):
+            yield False  # moved or replaced between opening and ownership
+            return
+        yield True
+    finally:
+        os.close(handle)
+
+
+def claim(slot: Path) -> bool:
+    """Rename the ready marker while the caller holds the slot lease.
+
+    The lease spans the move; timestamp grace also protects a recently abandoned
+    claim. Renaming alone would inherit the ready marker's potentially old mtime.
+    """
+    try:
+        marker = slot.parent / f"{slot.name}{CLAIMED}"
+        os.rename(slot.parent / f"{slot.name}{READY}", marker)
+        os.utime(marker, None)
         return True
-    except FileNotFoundError:
+    except OSError:
         return False
 
 
@@ -176,25 +209,26 @@ def take(repo: Path, dest: Path, branch: str | None, base: str = "origin/main", 
         pool = None  # not a git checkout: the fresh path reports the real error
     if pool is not None and same_volume(pool, dest):
         for slot in ready_slots(pool):
-            if not claim(slot):
-                continue
-            try:
-                run(["git", "worktree", "move", str(slot), str(dest)], cwd=repo, log=log, timeout=120)
-            except (subprocess.SubprocessError, OSError):
-                remove_worktree(repo, slot, log)
-                continue
-            finally:
-                release(slot)
-            try:
-                if not is_clean(dest):
-                    raise RuntimeError(f"pool slot {slot.name} was dirty")
-                checkout = ["git", "checkout", "-q"] + (["-b", branch] if branch else ["--detach"]) + [base]
-                run(checkout, cwd=dest, log=log, timeout=300)
-                return "pool"
-            except (subprocess.SubprocessError, OSError, RuntimeError) as error:
-                if log is not None:
-                    log.write(f"worktree-pool: discarding slot: {error}\n")
-                remove_worktree(repo, dest, log)
+            with slot_lease(slot) as owned:
+                if not owned or not claim(slot):
+                    continue
+                try:
+                    run(["git", "worktree", "move", str(slot), str(dest)], cwd=repo, log=log, timeout=120)
+                except (subprocess.SubprocessError, OSError):
+                    remove_worktree(repo, slot, log)
+                    continue
+                finally:
+                    release(slot)
+                try:
+                    if not is_clean(dest):
+                        raise RuntimeError(f"pool slot {slot.name} was dirty")
+                    checkout = ["git", "checkout", "-q"] + (["-b", branch] if branch else ["--detach"]) + [base]
+                    run(checkout, cwd=dest, log=log, timeout=300)
+                    return "pool"
+                except (subprocess.SubprocessError, OSError, RuntimeError) as error:
+                    if log is not None:
+                        log.write(f"worktree-pool: discarding slot: {error}\n")
+                    remove_worktree(repo, dest, log)
     args = ["git", "worktree", "add", "-q"] + (["-b", branch] if branch else ["--detach"]) + [str(dest), base]
     result = (sh or (lambda a, cwd=None, log=None: run(a, cwd=cwd, log=log, timeout=600)))(args, cwd=repo, log=log)
     # The lanes `sh` records and returns instead of raising; a failed add must not
@@ -211,40 +245,43 @@ def recycle(repo: Path, path: Path, base: str = "origin/main", size: int = POOL_
     volume, a preserved repair, or any uncommitted change. The caller decides whether its
     commits are published; the branch ref itself survives in the repository either way."""
     repo, path = Path(repo), Path(path)
-    moved = False
-    marker = None
-    try:
-        if not enabled() or not path.is_dir() or (path / PRESERVED_REPAIR).exists() or not is_clean(path):
+    with slot_lease(path) as owned:
+        if not owned:
             return None
-        pool = pool_dir(repo, root)
-        if not same_volume(pool, path) or len(ready_slots(pool)) >= size or free_gb(pool) < min_free_gb:
+        moved = False
+        marker = None
+        try:
+            if not enabled() or not path.is_dir() or (path / PRESERVED_REPAIR).exists() or not is_clean(path):
+                return None
+            pool = pool_dir(repo, root)
+            if not same_volume(pool, path) or len(ready_slots(pool)) >= size or free_gb(pool) < min_free_gb:
+                return None
+            slot = pool / f"slot-{uuid.uuid4().hex[:8]}"
+            run(["git", "checkout", "-q", "--detach", base], cwd=path, log=log, timeout=300)
+            run(["git", "clean", "-ffdxq"] + [arg for keep in RECYCLE_KEEP for arg in ("-e", keep)],
+                cwd=path, log=log, timeout=900)
+            pool.mkdir(parents=True, exist_ok=True)
+            run(["git", "worktree", "move", str(path), str(slot)], cwd=repo, log=log, timeout=120)
+            moved = True
+            marker = pool / f"{slot.name}{READY}"
+            marker.touch()
+        except (subprocess.SubprocessError, OSError) as error:
+            if moved:
+                try:
+                    run(["git", "worktree", "move", str(slot), str(path)], cwd=repo, log=log, timeout=120)
+                except (subprocess.SubprocessError, OSError):
+                    # The finished, clean checkout is eligible for normal removal; branch
+                    # refs survive. A failed rollback must not leave an unusable pool slot.
+                    remove_worktree(repo, slot, log)
+            if marker is not None:
+                try:
+                    marker.unlink(missing_ok=True)
+                except OSError:
+                    pass  # without a slot directory this marker cannot be consumed
+            if log is not None:
+                log.write(f"worktree-pool: not recycled: {error}\n")
             return None
-        slot = pool / f"slot-{uuid.uuid4().hex[:8]}"
-        run(["git", "checkout", "-q", "--detach", base], cwd=path, log=log, timeout=300)
-        run(["git", "clean", "-ffdxq"] + [arg for keep in RECYCLE_KEEP for arg in ("-e", keep)],
-            cwd=path, log=log, timeout=900)
-        pool.mkdir(parents=True, exist_ok=True)
-        run(["git", "worktree", "move", str(path), str(slot)], cwd=repo, log=log, timeout=120)
-        moved = True
-        marker = pool / f"{slot.name}{READY}"
-        marker.touch()
-    except (subprocess.SubprocessError, OSError) as error:
-        if moved:
-            try:
-                run(["git", "worktree", "move", str(slot), str(path)], cwd=repo, log=log, timeout=120)
-            except (subprocess.SubprocessError, OSError):
-                # The finished, clean checkout is eligible for normal removal; branch
-                # refs survive. A failed rollback must not leave an unusable pool slot.
-                remove_worktree(repo, slot, log)
-        if marker is not None:
-            try:
-                marker.unlink(missing_ok=True)
-            except OSError:
-                pass  # without a slot directory this marker cannot be consumed
-        if log is not None:
-            log.write(f"worktree-pool: not recycled: {error}\n")
-        return None
-    return slot.name
+        return slot.name
 
 
 def fill(repo: Path, size: int = POOL_SIZE, base: str = "origin/main", warm: bool = True, log=None,
@@ -259,13 +296,22 @@ def fill(repo: Path, size: int = POOL_SIZE, base: str = "origin/main", warm: boo
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             return ["busy: another filler holds the lock"]
-        fresh, now = set(ready_slots(pool)), time.time()
         for child in pool.iterdir():
-            # Stale ready slots and half-built ones a crashed filler left behind; a slot
-            # `take` is moving out right now keeps its claimed marker and is left alone.
-            if child.is_dir() and child not in fresh and not recently_claimed(child, now):
+            if not child.is_dir():
+                continue
+            with slot_lease(child) as owned:
+                now = time.time()
+                # Re-read readiness under ownership: recycle may have published a
+                # new ready marker after the filler discovered this directory.
+                if not owned or child in ready_slots(pool, now):
+                    continue
+                if (pool / f"{child.name}{CLAIMED}").exists():
+                    if not recently_claimed(child, now):
+                        # An abandoned taker may have source here. Marker age is
+                        # not publication/retirement proof; leave recovery to its owner.
+                        actions.append(f"preserved abandoned claim {child.name}")
+                    continue
                 (pool / f"{child.name}{READY}").unlink(missing_ok=True)
-                release(child)
                 remove_worktree(repo, child, log)
                 actions.append(f"removed stale {child.name}")
         lifecycle.run(["git", "worktree", "prune"], cwd=repo, capture_output=True)
@@ -299,10 +345,11 @@ def drain(repo: Path, root: Path | None = None, log=None) -> list[str]:
     removed = []
     for marker in list(pool.glob(f"*{READY}")) if pool.exists() else []:
         slot = marker.with_suffix("")
-        if claim(slot):
-            remove_worktree(repo, slot, log)
-            release(slot)
-            removed.append(slot.name)
+        with slot_lease(slot) as owned:
+            if owned and claim(slot):
+                remove_worktree(repo, slot, log)
+                release(slot)
+                removed.append(slot.name)
     return removed
 
 

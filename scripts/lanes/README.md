@@ -484,6 +484,9 @@ space is under that same floor, so a sweep and a refill never fight. Disk-cleanu
 must leave `~/.cache/jovie` and the pnpm store (`pnpm store path`) alone; use
 `scripts/agent/worktree-new --drain` to reclaim pool space. Tests and
 `JOVIE_WORKTREE_POOL=0` never touch the pool.
+Per-slot directory locks span claim/move and recycle/ready publication; stale fill
+and disk drain skip owned slots. Abandoned claims remain in place for their owner
+because marker age does not prove source publication or safe retirement.
 
 Finished worktrees go back instead of being deleted (JOV-7723): `remove_worktree()` keeps
 its idle, clean and published checks, then `worktree_pool.recycle()` detaches HEAD at

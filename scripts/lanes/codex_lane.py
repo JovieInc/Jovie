@@ -948,17 +948,24 @@ def run_account(name: str, handle, cmd: list[str], prompt: str, cwd, now: float,
         launch.finish()
         code = proc.wait()
         output = "".join(tail)
-        kind, until = classify(output, code, time.time())
+        completed_at = time.time()
+        kind, until = classify(output, code, completed_at)
 
         def record(st: dict) -> None:
             entry = st.setdefault(name, {})
-            entry.update(lastKind=kind, lastExit=code, lastRunAt=time.time())
+            bank_until = float(entry.get("exhaustedUntil") or 0)
+            # Another slot may have banked this account while this run was executing.
+            # Completion cannot disprove an active bank or shorten its reset window;
+            # retain the diagnostics of the observation that owns the longer bank.
+            if bank_until > completed_at and (until is None or bank_until >= until):
+                return
+            entry.update(lastKind=kind, lastExit=code, lastRunAt=completed_at)
             if until:
                 entry.update(exhaustedUntil=until, lastError=(LIMIT.search(output) or AUTH.search(output)).group(0)[:80])
             else:
                 entry.pop("exhaustedUntil", None)
             if kind == "ok":
-                entry.pop("lastError", None)  # a working run disproves the last failure
+                entry.pop("lastError", None)  # stale failure with no active bank
         update_state(record)
         if kind == "limit" and not current_login_mode() and maybe_redeem(name, handle, time.time()):
             return 0, "reset-credit", None
