@@ -94,6 +94,12 @@ required even when no UI matrix row was inferred. Unknown proof holds completion
 a required failure routes to `Rework`; fresh passing receipts trigger the existing
 webhook/deployment reconciliation path to `Done`.
 
+A commissioning parent with no implementing PR may bind its own `outcome`
+receipt to the exact production build it exercised. The lifecycle still checks
+verified deployment, all linked work, and every other required receipt. Child
+completion only requests this validation; lane reconciliation never writes the
+parent's `Done`. Ordinary implementation issues still require their merged PR.
+
 After reopening from `Done`, receipts belong to a new acceptance episode.
 The lifecycle reads complete paginated Linear history and uses the latest server
 reopen timestamp. Older receipts and timestamp-free description closure markers

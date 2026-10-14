@@ -584,7 +584,7 @@ const SWEEP_QUERY = `query LifecycleSweep($states: [String!]!, $after: String) {
     after: $after
     filter: { team: { key: { eq: "JOV" } }, state: { name: { in: $states } } }
   ) {
-    nodes { identifier updatedAt state { name } attachments(first: 50) { nodes { url } } }
+    nodes { identifier updatedAt state { name } attachments(first: 50) { nodes { url } } children(first: 1) { nodes { identifier } } labels(first: 50) { nodes { name } } }
     pageInfo { hasNextPage endCursor }
   }
 }`;
@@ -893,7 +893,12 @@ export async function syncLinearIssueOnMerge(options = {}) {
   }
 
   const lookups = [];
-  if (sweep) {
+  const receiptIssue = String(env.LINEAR_VALIDATION_ISSUE ?? '').toUpperCase();
+  if (sweep && IDENTIFIER_RE.test(receiptIssue)) {
+    // A receipt for parent-only commissioning work need not have a PR.
+    // Read exactly its canonical record; the evaluator still owns admission.
+    lookups.push(receiptIssue);
+  } else if (sweep) {
     /** @type {{ identifier: string, updatedAt: string }[]} */
     const found = [];
     let after = null;
@@ -914,6 +919,10 @@ export async function syncLinearIssueOnMerge(options = {}) {
         // into the lifecycle or interpreting age/status as completion.
         if (
           ['In Progress', 'In Review'].includes(node.state?.name) &&
+          !(node.children?.nodes?.length > 0) &&
+          !(node.labels?.nodes ?? []).some(label =>
+            /epic|commission/i.test(label?.name ?? '')
+          ) &&
           !(node.attachments?.nodes ?? []).some(attachment =>
             String(attachment.url ?? '')
               .toLowerCase()

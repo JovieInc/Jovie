@@ -4,16 +4,17 @@ An epic with no open child issues is a decomposition job: a lane reads the epic 
 and answers with a plan; the harness (never the agent) files the children in the epic's team
 (Todo, parent = the epic, a Goal and a Definition of done each, no labels), comments a
 summary and leaves the epic In Progress. An epic with open children is not decomposed: the
-children drive the work. Once every child is terminal and at least one is Done, the epic is
-Done, deterministically, without a model call.
+children drive the work. Once every child is terminal, the parent still owes its own
+outcome receipt. Only the canonical validation lifecycle may write Done.
 
-`reconcile` is the throttled, single-owner pass dispatch runs: it closes finished epics, moves
+`reconcile` is the throttled, single-owner pass dispatch runs: it requests parent validation, moves
 Todo epics whose children are open to In Progress, and expires `hold` labels on Todo issues
 with no activity for HOLD_EXPIRY_S (one team-wide filtered read, no per-issue reads).
 """
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import re
 import time
@@ -30,9 +31,10 @@ TERMINAL_TYPES = frozenset({"completed", "canceled"})
 RECONCILE_INTERVAL_S = 900
 RECONCILE_LIMIT = 10  # writes per kind per pass; the next pass takes the rest
 # Verdicts after which the epic's Linear state is already settled by this module.
-SETTLED_VERDICTS = frozenset({"decomposed", "epic-children-active", "epic-done"})
+SETTLED_VERDICTS = frozenset({"decomposed", "epic-children-active", "epic-done", "epic-awaiting-validation"})
 
-DETAIL_QUERY = ('query($id:String!){issue(id:$id){id identifier team{id key states{nodes{id name type}}} '
+DETAIL_QUERY = ('query($id:String!){issue(id:$id){id identifier state{name type} team{id key states{nodes{id name type}}} '
+                'comments(first:100){pageInfo{hasNextPage} nodes{body}} '
                 'children(first:100){pageInfo{hasNextPage} nodes{id identifier title state{name type}}}}}')
 CREATE_MUTATION = ('mutation($i:IssueCreateInput!){issueCreate(input:$i){success '
                    'issue{id identifier title parent{id} state{id}}}}')
@@ -180,11 +182,11 @@ def run_epic(lane, host, name: str, spec: dict, linear, issue, repo: Path) -> di
         status = children_status(children, complete=not detail["children"]["pageInfo"]["hasNextPage"])
         if status == "open":
             linear.comment(issue.id, "🤖 lanes: this epic has open child issues; they carry the work and "
-                                     "the epic closes when they are done.")
+                                     "the parent outcome still requires its own validation after delivery.")
             receipt.update(verdict="epic-children-active")
         elif status == "done":
             close_epic(linear, issue.id, children)
-            receipt.update(verdict="epic-done")
+            receipt.update(verdict="epic-awaiting-validation")
         else:
             receipt.update(_decompose(lane, host, name, spec, linear, issue, repo, detail, run_id, worktree))
     except lane.DiskAdmissionError as error:
@@ -239,11 +241,33 @@ def _decompose(lane, host, name, spec, linear, issue, repo, detail, run_id, work
     return {"verdict": "decomposed", "children": [row["identifier"] for row in created]}
 
 
-def close_epic(linear, epic_id: str, children: list[dict]) -> None:
-    done = sum(1 for child in children if (child.get("state") or {}).get("type") == "completed")
-    linear.move(epic_id, "Done")
-    linear.comment(epic_id, f"🤖 lanes: all {len(children)} child issues are closed ({done} done); "
-                            "closing this epic.")
+def close_epic(linear, epic_id: str, children: list[dict]) -> bool:
+    """Request parent validation once; child counts never certify the parent."""
+    detail = linear.gql(DETAIL_QUERY, {"id": epic_id})["issue"]
+    if (detail.get("state") or {}).get("name") in {"Done", "Canceled", "Merging", "Validating", "Rework"}:
+        return False
+    child_connection = detail.get("children") or {}
+    comments = detail.get("comments") or {}
+    if (child_connection.get("pageInfo", {}).get("hasNextPage") is not False
+            or comments.get("pageInfo", {}).get("hasNextPage") is not False
+            or not isinstance(comments.get("nodes"), list)):
+        return False
+    current = child_connection.get("nodes") or []
+    if children_status(current) != "done":
+        return False
+    identity = sorted((str(child.get("id") or child.get("identifier") or ""),
+                       (child.get("state") or {}).get("type")) for child in current)
+    if any(not identifier for identifier, _ in identity):
+        return False
+    key = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()[:16]
+    marker = f"<!-- parent-validation-required:v1 {key} -->"
+    if any(marker in str(comment.get("body") or "") for comment in comments["nodes"]):
+        return False
+    linear.comment(epic_id, f"🤖 lanes: all {len(current)} child issues are closed. The parent outcome is "
+                   "not certified by child completion. The canonical validation lifecycle (JOV-7694) "
+                   "owns Done; its acceptance owner must record the parent's fresh outcome proof on "
+                   "a verified production generation. State is unchanged until that proof arrives.\n\n" + marker)
+    return True
 
 
 # ---------------------------------------------------------------- reconcile pass
@@ -262,15 +286,15 @@ def reconcile(lane, host, linear_factory, teams: list[str], now: float | None = 
     if now - float(last.get("at") or 0) < RECONCILE_INTERVAL_S:
         return {"status": "throttled", "last": last.get("result")}
     linear = linear_factory()
-    result = {"epicsDone": [], "epicsStarted": [], "holdsExpired": []}
+    result = {"epicsDone": [], "epicsAwaitingValidation": [], "epicsStarted": [], "holdsExpired": []}
     try:
         epics = linear.gql(EPICS_QUERY, {"teams": teams})["issues"]["nodes"]
         for epic in epics:
             children = epic["children"]["nodes"]
             status = children_status(children, complete=not epic["children"]["pageInfo"]["hasNextPage"])
-            if status == "done" and len(result["epicsDone"]) < RECONCILE_LIMIT:
-                close_epic(linear, epic["id"], children)
-                result["epicsDone"].append(epic["identifier"])
+            if status == "done" and len(result["epicsAwaitingValidation"]) < RECONCILE_LIMIT:
+                if close_epic(linear, epic["id"], children):
+                    result["epicsAwaitingValidation"].append(epic["identifier"])
             elif (status == "open" and epic["state"]["name"] == "Todo"
                   and len(result["epicsStarted"]) < RECONCILE_LIMIT):
                 linear.move(epic["id"], "In Progress")

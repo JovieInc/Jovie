@@ -200,6 +200,7 @@ function hasOpenAcceptanceSection(description) {
  *   issue: string,
  *   bindingSha: string,
  *   bindingPull: string,
+ *   bindingKind?: 'merge' | 'outcome',
  *   mergedPulls: string[],
  *   riskLevel: string,
  *   required: RequiredReceipt[],
@@ -247,17 +248,29 @@ export function selectBindingPull(pulls) {
  *   readonly parentReason?: string,
  *   readonly escapedDefect?: boolean,
  *   readonly uiEvidence?: readonly UiEvidence[] | null,
+ *   readonly parentOutcome?: ValidationReceipt | null,
  * }} input
  * @returns {ValidationManifest | null}
  */
 export function deriveValidationManifest(input) {
   const binding = selectBindingPull(input.mergedPulls);
-  if (!binding) return null;
+  const outcomeBinding =
+    !binding &&
+    input.parentReason &&
+    input.parentOutcome?.kind === 'outcome' &&
+    FULL_SHA.test(input.parentOutcome.sha)
+      ? input.parentOutcome
+      : null;
+  if (!binding && !outcomeBinding) return null;
+  const bindingSha = binding?.mergeSha ?? outcomeBinding.sha;
+  const bindingRef = binding?.url ?? outcomeBinding.evidence;
   /** @type {RequiredReceipt[]} */
   const required = [
     {
       kind: 'deployment',
-      reason: 'a verified production generation contains the merge',
+      reason: binding
+        ? 'a verified production generation contains the merge'
+        : 'a verified production generation contains the parent outcome artifact',
     },
   ];
   if (input.escapedDefect) {
@@ -347,8 +360,9 @@ export function deriveValidationManifest(input) {
   return {
     schema: VALIDATION_MANIFEST_SCHEMA,
     issue: input.issue.identifier.toUpperCase(),
-    bindingSha: binding.mergeSha.toLowerCase(),
-    bindingPull: binding.url,
+    bindingSha: bindingSha.toLowerCase(),
+    bindingPull: bindingRef,
+    ...(!binding ? { bindingKind: 'outcome' } : {}),
     mergedPulls: [...input.mergedPulls]
       .sort((left, right) => left.number - right.number)
       .map(pull => pull.url),
@@ -764,7 +778,7 @@ export function formatLifecycleComment(input) {
       : `Validation lifecycle kept ${input.identifier} in ${input.from}.`;
   const lines = [
     moved,
-    `Binding merge: ${input.manifest.bindingPull} (${input.manifest.bindingSha}).`,
+    `Binding ${input.manifest.bindingKind === 'outcome' ? 'outcome' : 'merge'}: ${input.manifest.bindingPull} (${input.manifest.bindingSha}).`,
   ];
   if (input.deploymentSha) {
     lines.push(`Verified production generation: ${input.deploymentSha}.`);

@@ -127,6 +127,118 @@ function sweep(fetchImpl) {
 }
 
 describe('linear sync on merge', () => {
+  it('retains a parent without its own outcome, then closes from fresh verified proof without inventing a parent PR', async () => {
+    const { world, fetchImpl } = createWorld();
+    const issue = world.issues['JOV-1'];
+    issue.state = 'In Progress';
+    issue.children = [['JOV-2', 'completed']];
+    issue.attachments = [];
+    await sweep(fetchImpl);
+    expect(issue.state).toBe('In Progress');
+    issue.comments.push(receiptComment('JOV-1', {}, '2026-10-03T13:00:00Z'));
+    await sweep(fetchImpl);
+    await sweep(fetchImpl);
+    expect(issue.state).toBe('Done');
+    expect(world.updates).toEqual(['JOV-1:Done']);
+    expect(issue.comments.at(-1).body).toContain('Binding outcome:');
+  });
+
+  it('does not let an ordinary unmerged issue use a recorded outcome to bypass source delivery', async () => {
+    const { world, fetchImpl } = createWorld();
+    const issue = world.issues['JOV-1'];
+    issue.attachments = [];
+    issue.comments.push(receiptComment('JOV-1', {}, '2026-10-03T13:00:00Z'));
+    await mergeEvent(fetchImpl, 0);
+    expect(world.updates).toEqual([]);
+  });
+
+  it.each([
+    ['open child', { children: [['JOV-2', 'started']] }, {}, 'In Progress'],
+    ['failed outcome', {}, { status: 'fail' }, 'Rework'],
+    ['outcome build not deployed', {}, { sha: MAIN[3] }, 'Merging'],
+    [
+      'reopened episode',
+      {
+        history: [
+          {
+            createdAt: '2026-10-03T14:00:00Z',
+            fromState: { type: 'completed' },
+            toState: { type: 'started' },
+          },
+        ],
+      },
+      {},
+      'In Progress',
+    ],
+  ])(
+    'retains the parent gate for %s',
+    async (_name, changes, proof, expected) => {
+      const { world, fetchImpl } = createWorld();
+      const issue = world.issues['JOV-1'];
+      Object.assign(
+        issue,
+        {
+          state: 'In Progress',
+          attachments: [],
+          children: [['JOV-2', 'completed']],
+        },
+        changes
+      );
+      issue.comments.push(
+        receiptComment('JOV-1', proof, '2026-10-03T13:00:00Z')
+      );
+      await sweep(fetchImpl);
+      expect(issue.state).toBe(expected);
+    }
+  );
+
+  it('does not fall back to an old parent pass when its latest evidence is malformed', async () => {
+    const { world, fetchImpl } = createWorld();
+    const issue = world.issues['JOV-1'];
+    Object.assign(issue, {
+      state: 'In Progress',
+      attachments: [],
+      children: [['JOV-2', 'completed']],
+    });
+    issue.comments.push(receiptComment('JOV-1', {}, '2026-10-03T13:00:00Z'));
+    issue.comments.push({
+      body: '<!-- validation-receipt:v1\n{broken}\n-->',
+      createdAt: '2026-10-03T14:00:00Z',
+    });
+    await sweep(fetchImpl);
+    expect(issue.state).toBe('Validating');
+    expect(issue.comments.at(-1).body).toContain('malformed');
+  });
+
+  it('targets a parent-only commissioning receipt and preserves its proof across unrelated forward generations', async () => {
+    const { world, fetchImpl } = createWorld({ served: MAIN[4].slice(0, 7) });
+    const issue = world.issues['JOV-1'];
+    Object.assign(issue, {
+      title: 'Commission the paid merch loop',
+      state: 'In Progress',
+      attachments: [],
+    });
+    issue.comments.push(receiptComment('JOV-1', {}, '2026-10-03T13:00:00Z'));
+    const exact = intercept(fetchImpl, (_url, body) => {
+      if (body?.query?.includes('LifecycleSweep'))
+        throw new Error('receipt should target its exact issue');
+      return null;
+    });
+    await syncLinearIssueOnMerge({
+      env: {
+        ...BASE_ENV,
+        LIFECYCLE_MODE: 'sweep',
+        LINEAR_VALIDATION_ISSUE: 'JOV-1',
+      },
+      fetchImpl: exact,
+      harnessManifest: HARNESS_MANIFEST,
+      assuranceMatrix: NO_UI_MATRIX,
+      verifyMarker: () => true,
+      log: () => {},
+    });
+    expect(issue.state).toBe('Done');
+    expect(issue.comments.at(-1).body).toContain(MAIN[2]);
+  });
   it('does not reuse an earlier episode receipt and converges after fresh proof', async () => {
     const { world, fetchImpl } = createWorld();
     const issue = world.issues['JOV-1'];
