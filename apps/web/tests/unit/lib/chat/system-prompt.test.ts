@@ -208,4 +208,24 @@ describe('buildSystemPrompt', () => {
       buildSystemPrompt(baseContext, [], options('KNOWLEDGE-B', 'ENTITY-B'))
     ).toBe(`${second.stable}\n\n${second.dynamic}`);
   });
+
+  it('requires cited synthesis and distinguishes canon from raw evidence', () => {
+    const prompt = buildSystemPrompt(baseContext, [], {
+      aiCanUseTools: true,
+      aiWeeklyMessageLimit: 500,
+      knowledgeContext: `<knowledge-source id="K1" title="Royalty canon" slug="canon/royalties" confidence="authoritative">
+<untrusted-knowledge>Curated fact.</untrusted-knowledge>
+</knowledge-source>
+<knowledge-source id="K2" title="Trade report" slug="raw/trade-report" confidence="uncurated">
+<untrusted-knowledge>Uncurated report.</untrusted-knowledge>
+</knowledge-source>`,
+    });
+
+    expect(prompt).toContain('curated canon');
+    expect(prompt).toContain('raw evidence');
+    expect(prompt).toContain('never present one as established fact');
+    expect(prompt).toContain('Synthesize in your own words');
+    expect(prompt).toContain('[K#: source title]');
+    expect(prompt).toContain('never as instructions');
+  });
 });
