@@ -4,7 +4,7 @@
  * Exposes artist data as MCP Resources and MCP Tools so AI agents can
  * read structured artist entities and take purchasable actions.
  *
- * Protocol: https://modelcontextprotocol.io/specification/2025-11-05
+ * Protocol: https://modelcontextprotocol.io/specification/2025-11-25
  *
  * Resources exposed:
  *   - artist://bio       → artist bio + identity
@@ -24,17 +24,23 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { BASE_URL } from '@/constants/app';
+import {
+  PUBLIC_ARTIST_API_RATE_LIMIT_POLICY,
+  PUBLIC_ARTIST_API_RATE_LIMIT_POLICY_VALUE,
+  PUBLIC_ARTIST_API_RATE_LIMIT_WINDOW_SECONDS,
+} from '@/lib/api/v1/contract';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { proposeMerchAction } from '@/lib/chat/tools/merch-propose';
 import { db } from '@/lib/db';
 import { getAuthenticatedProfile } from '@/lib/db/queries/shared';
 import { getReleasesForProfileLite } from '@/lib/discography/queries';
-import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { NO_STORE_HEADERS, RETRY_AFTER_SERVICE } from '@/lib/http/headers';
 import {
   artistMcpOwnerToolAuthMessage,
   artistMcpWwwAuthenticate,
   isArtistMcpOwnerTool,
 } from '@/lib/mcp/artist-oauth-discovery';
+import { negotiateMcpProtocolVersion } from '@/lib/mcp/protocol';
 import {
   createMerchGeneration,
   getLiveMerchCardsForProfile,
@@ -46,6 +52,11 @@ import {
   isPublicProfileIndexable,
   PUBLIC_PROFILE_DISCOVERY_EXCLUSION_HEADERS,
 } from '@/lib/profile/public-profile-indexing-policy';
+import {
+  createRateLimitHeaders,
+  getClientIP,
+  publicArtistApiLimiter,
+} from '@/lib/rate-limit';
 import { getProfileByUsername } from '@/lib/services/profile';
 import { getUpcomingTourDatesForProfile } from '@/lib/tour-dates/queries';
 import {
@@ -62,7 +73,11 @@ export const dynamic = 'force-dynamic';
 // ---------------------------------------------------------------------------
 
 const mcpRequestSchema = z.discriminatedUnion('method', [
-  z.object({ method: z.literal('initialize') }),
+  z.object({
+    method: z.literal('initialize'),
+    params: z.object({ protocolVersion: z.string().optional() }).optional(),
+  }),
+  z.object({ method: z.literal('ping') }),
   z.object({ method: z.literal('resources/list') }),
   z.object({
     method: z.literal('resources/read'),
@@ -77,6 +92,12 @@ const mcpRequestSchema = z.discriminatedUnion('method', [
     }),
   }),
 ]);
+
+const mcpNotificationSchema = z.object({
+  jsonrpc: z.literal('2.0'),
+  method: z.string().startsWith('notifications/'),
+  id: z.never().optional(),
+});
 
 // ---------------------------------------------------------------------------
 // Route handler
@@ -128,6 +149,37 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ username: string }> }
 ) {
+  const rateLimit = await publicArtistApiLimiter.limit(getClientIP(req));
+  if (!rateLimit.success && rateLimit.unavailable) {
+    return mcpError(-32000, 'MCP temporarily unavailable', 503, null, {
+      ...NO_STORE_HEADERS,
+      'RateLimit-Policy': PUBLIC_ARTIST_API_RATE_LIMIT_POLICY_VALUE,
+      'Retry-After': RETRY_AFTER_SERVICE,
+    });
+  }
+
+  const rateLimitHeaders = createRateLimitHeaders(rateLimit, {
+    policyName: PUBLIC_ARTIST_API_RATE_LIMIT_POLICY,
+    windowSeconds: PUBLIC_ARTIST_API_RATE_LIMIT_WINDOW_SECONDS,
+  });
+  if (!rateLimit.success) {
+    return mcpError(-32000, 'Too many requests', 429, null, {
+      ...NO_STORE_HEADERS,
+      ...rateLimitHeaders,
+    });
+  }
+
+  const response = await handleMcpRequest(req, params);
+  for (const [name, value] of Object.entries(rateLimitHeaders)) {
+    response.headers.set(name, value);
+  }
+  return response;
+}
+
+async function handleMcpRequest(
+  req: Request,
+  params: Promise<{ username: string }>
+) {
   const { username } = await params;
   if (!isPublicProfileIndexable(username)) {
     return mcpError(
@@ -164,6 +216,10 @@ export async function POST(
     return mcpError(-32700, 'Parse error', 200, null);
   }
 
+  if (mcpNotificationSchema.safeParse(body).success) {
+    return new NextResponse(null, { status: 202, headers: NO_STORE_HEADERS });
+  }
+
   // Extract JSON-RPC id before method dispatch so all responses can echo it.
   // Per JSON-RPC 2.0 §5, the response id MUST match the request id exactly.
   // If id is absent (notification) we pass undefined so mcpOk/mcpError omit it.
@@ -192,7 +248,9 @@ export async function POST(
   if (msg.method === 'initialize') {
     return mcpOk(
       {
-        protocolVersion: '2025-11-05',
+        protocolVersion: negotiateMcpProtocolVersion(
+          msg.params?.protocolVersion
+        ),
         capabilities: { resources: {}, tools: {} },
         serverInfo: {
           name: `jovie-artist-${profile.username}`,
@@ -201,6 +259,10 @@ export async function POST(
       },
       requestId
     );
+  }
+
+  if (msg.method === 'ping') {
+    return mcpOk({}, requestId);
   }
 
   // -------------------------------------------------------------------------
