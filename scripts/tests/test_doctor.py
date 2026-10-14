@@ -29,6 +29,7 @@ def load(name):
 
 
 doctor = load("doctor")
+factory_watchdog = load("factory_watchdog")
 
 # Capacity fixtures model an eligible lane; expiry has its own real guard suite.
 _devin_free_fixture = mock.patch('devin_free_policy.admission_open', return_value=True)
@@ -57,6 +58,221 @@ def obs(**overrides):
 def throughput_stub(_receipts, provider_names=(), _merged=None, attribution_receipts=None):
     return {"schema": "jovie-provider-throughput/v1", "windowHours": 24,
             "providers": {name: {} for name in provider_names}, "landedByAttribution": {}}
+
+
+def factory_observation(**overrides):
+    base = {
+        "observedAt": "2026-10-14T00:00:00Z",
+        "tickAt": "2026-10-14T00:00:00Z",
+        "tickEpoch": 1000,
+        "tickAgeSeconds": 0,
+        "doctorAt": "2026-10-14T00:00:00Z",
+        "doctorEpoch": 1000,
+        "doctorAgeSeconds": 0,
+        "tickError": None,
+        "admissionDenied": None,
+        "enabledProviders": ["codex"],
+        "spawnedProviders": ["codex"],
+        "unhealthyProviders": [],
+        "quotaBlocked": {},
+        "runningWorkers": 1,
+        "eligibleWork": 2,
+        "openPullRequests": 0,
+        "demandKnown": True,
+        "demand": 2,
+        "lastWorkEpoch": None,
+        "activeConditions": [],
+    }
+    base.update(overrides)
+    return base
+
+
+class MutableClock:
+    def __init__(self, value):
+        self.value = value
+
+    def __call__(self):
+        return self.value
+
+    def advance(self, seconds):
+        self.value += seconds
+
+
+class FactoryStayUpWatchdogTest(unittest.TestCase):
+    def test_active_release_update_gets_a_bounded_grace_instead_of_interruption(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            recovery = mock.Mock()
+            updating = factory_observation(
+                tickEpoch=300,
+                tickAgeSeconds=700,
+                runningWorkers=0,
+                service={"active": True, "ageSeconds": 60, "manager": "systemd"},
+            )
+            result = factory_watchdog.run_once(
+                Path(tmp), clock=MutableClock(1000), observe=lambda *_: updating,
+                recover=recovery, alert=lambda *_: None,
+            )
+            self.assertEqual(result["status"], "observing")
+            self.assertEqual(result["reasons"], ["factory-tick-in-progress"])
+            recovery.assert_not_called()
+
+    def test_stale_factory_recovers_only_after_a_new_writing_observation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            clock = MutableClock(1000.4)
+            recovered = False
+            before = factory_observation(tickEpoch=300, tickAgeSeconds=700,
+                                         runningWorkers=0, spawnedProviders=[])
+            after = factory_observation(tickEpoch=1001, doctorEpoch=1001,
+                                        runningWorkers=1)
+
+            def observe(_state, _now):
+                return after if recovered else before
+
+            def recover():
+                nonlocal recovered
+                recovered = True
+                return {"action": "restart-systemd-lanes-service", "returncodes": [0, 0], "accepted": True}
+
+            result = factory_watchdog.run_once(
+                state, clock=clock, monotonic=lambda: 0, sleep=lambda _: None,
+                observe=observe, recover=recover, alert=lambda *_: None,
+            )
+            self.assertEqual(result["status"], "recovered")
+            self.assertEqual(result["attempts"][0]["before"], before)
+            self.assertEqual(result["attempts"][0]["after"], after)
+            self.assertEqual(result["attempts"][0]["action"], "restart-systemd-lanes-service")
+            self.assertEqual(result["verification"], {"status": "passed", "mode": "admitting-and-writing"})
+            rows = [json.loads(line) for line in (state / "runs/factory-watchdog.jsonl").read_text().splitlines()]
+            self.assertEqual(rows[-1]["event"], "recovered")
+
+    def test_old_healthy_receipts_do_not_satisfy_recovery_verification(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            clock = MutableClock(1500)
+            dark = factory_observation(tickEpoch=700, tickAgeSeconds=800,
+                                       runningWorkers=0, spawnedProviders=[])
+            old_healthy = factory_observation(tickEpoch=1400, doctorEpoch=1400)
+            observations = iter([dark, old_healthy])
+            result = factory_watchdog.run_once(
+                state, clock=clock, monotonic=lambda: 0, sleep=lambda _: None,
+                observe=lambda *_: next(observations), verify_timeout_s=0,
+                recover=lambda: {"action": "restart-systemd-lanes-service",
+                                 "returncodes": [0, 0], "accepted": True},
+                alert=lambda *_: None,
+            )
+            self.assertEqual(result["status"], "observing")
+            self.assertEqual(result["verification"], {"status": "pending", "reasons": ["no-new-tick"]})
+
+            result = factory_watchdog.run_once(
+                state, clock=clock, observe=lambda *_: old_healthy,
+                recover=mock.Mock(), alert=lambda *_: None,
+            )
+            self.assertEqual(result["status"], "observing")
+            self.assertEqual(result["verification"], {"status": "pending", "reasons": ["no-new-tick"]})
+
+            new_healthy = factory_observation(tickEpoch=1501, doctorEpoch=1501)
+            result = factory_watchdog.run_once(
+                state, clock=clock, observe=lambda *_: new_healthy,
+                recover=mock.Mock(), alert=lambda *_: None,
+            )
+            self.assertEqual(result["status"], "recovered")
+            self.assertEqual(result["verification"], {"status": "passed", "mode": "admitting-and-writing"})
+
+    def test_zero_worker_timer_starts_when_that_condition_first_appears(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            clock = MutableClock(1800)
+            recovery = mock.Mock(return_value={"action": "restart-systemd-lanes-service",
+                                               "returncodes": [1], "accepted": False})
+            updating = factory_observation(
+                tickEpoch=1000, tickAgeSeconds=800, runningWorkers=0,
+                service={"active": True, "ageSeconds": 60, "manager": "systemd"},
+            )
+            factory_watchdog.run_once(state, clock=clock, observe=lambda *_: updating,
+                                      recover=recovery, alert=lambda *_: None)
+            clock.advance(factory_watchdog.ZERO_WORKER_S + 1)
+            zero_worker = factory_observation(runningWorkers=0)
+            factory_watchdog.run_once(state, clock=clock, observe=lambda *_: zero_worker,
+                                      recover=recovery, alert=lambda *_: None)
+            recovery.assert_not_called()
+            clock.advance(factory_watchdog.ZERO_WORKER_S)
+            factory_watchdog.run_once(state, clock=clock, observe=lambda *_: zero_worker,
+                                      recover=recovery, alert=lambda *_: None)
+            recovery.assert_called_once()
+
+    def test_zero_worker_state_must_persist_for_five_minutes_before_recovery(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            clock = MutableClock(2000)
+            calls = []
+            observation = factory_observation(runningWorkers=0)
+
+            def recover():
+                calls.append(clock())
+                return {"action": "restart-systemd-lanes-service", "returncodes": [1], "accepted": False}
+
+            first = factory_watchdog.run_once(state, clock=clock, observe=lambda *_: observation,
+                                               recover=recover, alert=lambda *_: None)
+            self.assertEqual(first["status"], "observing")
+            self.assertEqual(calls, [])
+            clock.advance(factory_watchdog.ZERO_WORKER_S - 1)
+            factory_watchdog.run_once(state, clock=clock, observe=lambda *_: observation,
+                                      recover=recover, alert=lambda *_: None)
+            self.assertEqual(calls, [])
+            clock.advance(2)
+            factory_watchdog.run_once(state, clock=clock, observe=lambda *_: observation,
+                                      recover=recover, alert=lambda *_: None)
+            self.assertEqual(calls, [clock()])
+
+    def test_recovery_is_bounded_and_alerts_once_after_exhaustion(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            clock = MutableClock(3000)
+            recoveries, alerts = [], []
+            dark = factory_observation(tickEpoch=2000, tickAgeSeconds=1000,
+                                       runningWorkers=0, spawnedProviders=[])
+
+            def recover():
+                recoveries.append(clock())
+                return {"action": "restart-systemd-lanes-service", "returncodes": [1], "accepted": False}
+
+            def alert(record, issue_id, resolve):
+                alerts.append((record["status"], issue_id, resolve))
+                return "linear-incident-id"
+
+            result = None
+            for _ in range(factory_watchdog.MAX_RECOVERY_ATTEMPTS):
+                result = factory_watchdog.run_once(state, clock=clock, observe=lambda *_: dark,
+                                                   recover=recover, alert=alert)
+                clock.advance(factory_watchdog.ATTEMPT_COOLDOWN_S + 1)
+            self.assertEqual(result["status"], "exhausted")
+            self.assertEqual(len(recoveries), factory_watchdog.MAX_RECOVERY_ATTEMPTS)
+            self.assertEqual(alerts, [("exhausted", None, False)])
+            factory_watchdog.run_once(state, clock=clock, observe=lambda *_: dark,
+                                      recover=recover, alert=alert)
+            self.assertEqual(len(recoveries), factory_watchdog.MAX_RECOVERY_ATTEMPTS)
+            self.assertEqual(len(alerts), 1)
+
+    def test_zero_provider_capacity_requires_a_decision_without_blind_restart(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            recovery = mock.Mock()
+            alerts = []
+            zero_capacity = factory_observation(
+                runningWorkers=0,
+                spawnedProviders=[],
+                quotaBlocked={"codex": "all-accounts-banked"},
+            )
+            result = factory_watchdog.run_once(
+                state, clock=MutableClock(4000), observe=lambda *_: zero_capacity,
+                recover=recovery,
+                alert=lambda record, issue_id, resolve: alerts.append(record["reasons"]) or "issue-id",
+            )
+            self.assertEqual(result["status"], "decision-required")
+            self.assertIn("zero-provider-capacity", result["reasons"])
+            recovery.assert_not_called()
+            self.assertEqual(len(alerts), 1)
 
 
 class JudgeTest(unittest.TestCase):
