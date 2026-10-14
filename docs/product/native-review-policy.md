@@ -72,17 +72,23 @@ The three-display system limit is a ceiling, not an instruction to use every slo
 
 ## Consumer boundary
 
-The root `Package.swift` exposes the same JovieKit source and tests as the local
-Xcode package. External consumers pin a reviewed full Git revision:
+Authorized company consumers use an immutable, checksum-verified source snapshot
+of the existing nested JovieKit package and a relative local Swift package
+reference. The company [source contract](../company/REPOSITORY_SOURCE_CONTRACT.md)
+permits pinned imports; Jovie remains the only policy writer. Consumer updates
+and rollback are independent reviewed PRs. Never hand-edit the imported policy.
 
 ```swift
-.package(url: "https://github.com/JovieInc/Jovie.git", revision: reviewedFullSHA)
+.package(path: "Vendor/JovieKit")
 // Target dependency:
-.product(name: "JovieKit", package: "jovie")
+.product(name: "JovieKit", package: "JovieKit")
 ```
 
 Requirements match existing JovieKit: Swift tools 6.0, Swift language 5, iOS 18+
-or macOS 14+. Do not copy the policy or commit another writer's local package path.
+or macOS 14+. Do not commit a machine-specific absolute package path. The direct
+Jovie Git dependency is superseded: real LYB Xcode resolution timed out fetching
+the large repository, including with the supported system SCM provider. A
+successful temporary Git consumer did not establish native portability.
 
 Apps construct `AppReview.Opportunity(id:moment:achievedAt:)`, with a typed
 `ValueMoment`, and `Context(now:isAppStoreBuild:isForegroundActive:
