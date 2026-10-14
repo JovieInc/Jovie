@@ -360,17 +360,23 @@ export function OnboardingCheckoutClient({
           <p className={FORM_LAYOUT.hint}>
             {isDefaultUpsell && username
               ? `Congrats! Your profile, links, and fan capture are live at jov.ie/${username} — free forever. Here's what ${planMarketing.displayName} adds on top.`
-              : `Your profile is live and stays free either way. Here's what ${planMarketing.displayName} adds on top.`}
+              : username
+                ? `Your profile is live and stays free either way. Here's what ${planMarketing.displayName} adds on top.`
+                : `Here's what ${planMarketing.displayName} adds on top of the free plan.`}
           </p>
         </div>
 
-        <ProfilePreviewCard
-          avatarUrl={avatarUrl}
-          displayName={displayName}
-          offerName={planMarketing.displayName}
-          spotifyFollowers={spotifyFollowers}
-          username={username}
-        />
+        {/* JOV-8068: never render a placeholder preview for a profile that
+            does not exist — no "?" avatar, no bare "@". */}
+        {username || displayName ? (
+          <ProfilePreviewCard
+            avatarUrl={avatarUrl}
+            displayName={displayName}
+            offerName={planMarketing.displayName}
+            spotifyFollowers={spotifyFollowers}
+            username={username}
+          />
+        ) : null}
 
         <ClaimTimeProofCard findings={proofFindings} />
 

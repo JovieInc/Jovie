@@ -124,7 +124,16 @@ describe('useOnboardingClaim', () => {
       expect(replaceMock).not.toHaveBeenCalled();
       expect(fetchMock).toHaveBeenCalledTimes(1);
       fetchMock.mockResolvedValue(
-        jsonResponse({ claimed: 1, alreadyClaimed: true })
+        jsonResponse({
+          claimed: 1,
+          alreadyClaimed: true,
+          readyForCheckout: true,
+          profile: {
+            profileId: 'profile_1',
+            handle: 'testcreator',
+            status: 'created',
+          },
+        })
       );
       rerender(renderClaimHarness(1));
       await waitFor(() =>
@@ -146,12 +155,84 @@ describe('useOnboardingClaim', () => {
     expect(initialAttemptCount).toBeGreaterThanOrEqual(1);
     expect(replaceMock).not.toHaveBeenCalled();
 
-    fetchMock.mockResolvedValue(jsonResponse({ claimed: 1 }));
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        claimed: 1,
+        readyForCheckout: true,
+        profile: {
+          profileId: 'profile_1',
+          handle: 'testcreator',
+          status: 'created',
+        },
+      })
+    );
     rerender(renderClaimHarness(1));
 
     await waitFor(() =>
       expect(fetchMock.mock.calls.length).toBeGreaterThan(initialAttemptCount)
     );
+    await waitFor(() =>
+      expect(replaceMock).toHaveBeenCalledWith('/onboarding/checkout')
+    );
+  });
+
+  it.each([
+    [{ claimed: 1 }, 'claimed'],
+    [{ claimed: 0, alreadyClaimed: true }, 'claimed'],
+    [
+      {
+        claimed: 1,
+        profile: { profileId: null, handle: null, status: 'skipped' },
+      },
+      'claimed',
+    ],
+  ] as const)(
+    'stays on /start when the claim returns ownership without a terminal handoff (JOV-8068): %j',
+    async (body, expectedStatus) => {
+      const fetchMock = vi.fn().mockResolvedValue(jsonResponse(body));
+      vi.stubGlobal('fetch', fetchMock);
+
+      render(renderClaimHarness(0));
+
+      await waitFor(() =>
+        expect(screen.getByTestId('claim-status')).toHaveTextContent(
+          expectedStatus
+        )
+      );
+      expect(replaceMock).not.toHaveBeenCalled();
+      expect(replaceMock).not.toHaveBeenCalledWith('/onboarding/checkout');
+      expect(replaceMock).not.toHaveBeenCalledWith('/waitlist');
+    }
+  );
+
+  it('claims on mount without navigating, then hands off once the server reports readyForCheckout', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ claimed: 1 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { rerender } = render(renderClaimHarness(0));
+
+    // The founder-reported mount claim must not redirect to checkout.
+    await waitFor(() =>
+      expect(screen.getByTestId('claim-status')).toHaveTextContent('claimed')
+    );
+    expect(replaceMock).not.toHaveBeenCalled();
+
+    // A later turn completed the interview — the next claim resolves the
+    // server-verified handoff and only then navigates.
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        claimed: 0,
+        alreadyClaimed: true,
+        readyForCheckout: true,
+        profile: {
+          profileId: 'profile_1',
+          handle: 'testcreator',
+          status: 'created',
+        },
+      })
+    );
+    rerender(renderClaimHarness(1));
+
     await waitFor(() =>
       expect(replaceMock).toHaveBeenCalledWith('/onboarding/checkout')
     );

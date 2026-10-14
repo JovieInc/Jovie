@@ -70,7 +70,7 @@ describe('auth offer reconciliation', () => {
         offerHandoff: pro,
       })
     ).toBe(
-      `${APP_ROUTES.ONBOARDING_CHECKOUT}?plan=pro&interval=month&artist_name=Tim+White`
+      `${APP_ROUTES.ONBOARDING_CHECKOUT}?plan=pro&interval=month&source=intent&artist_name=Tim+White`
     );
     expect(
       getAuthenticatedAuthRouteRedirect(CanonicalUserState.ACTIVE, {
@@ -133,7 +133,7 @@ describe('auth offer reconciliation', () => {
         artist: 'Tim White',
       })
     ).toBe(
-      `${APP_ROUTES.ONBOARDING_CHECKOUT}?plan=pro&interval=month&artist_name=Tim+White`
+      `${APP_ROUTES.ONBOARDING_CHECKOUT}?plan=pro&interval=month&source=intent&artist_name=Tim+White`
     );
   });
 
