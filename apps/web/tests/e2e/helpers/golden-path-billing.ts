@@ -1,6 +1,6 @@
 import { neon } from '@neondatabase/serverless';
-import { expect, test } from '@playwright/test';
-import { prepareBetterAuthEmailOtp } from '../helpers/auth';
+import { type Browser, expect, type Page } from '@playwright/test';
+import { prepareBetterAuthEmailOtp } from '../../helpers/auth';
 import {
   createCheckoutSession,
   createSignedStripeWebhook,
@@ -11,19 +11,7 @@ import {
   getRequiredStripeTestContext,
   materializeTestCheckoutCompletion,
   postStripeWebhook,
-} from './helpers/stripe-helpers';
-
-test.use({ storageState: { cookies: [], origins: [] } });
-test.setTimeout(300_000);
-
-test.skip(
-  process.env.E2E_TEST_MODE !== '1',
-  'Money-path persistence requires the dedicated real-auth Golden Path lane'
-);
-test.skip(
-  process.env.E2E_USE_TEST_AUTH_BYPASS === '1',
-  'Money-path persistence refuses test-auth bypass identities'
-);
+} from './stripe-helpers';
 
 interface MoneyUserRow {
   id: string;
@@ -36,35 +24,53 @@ interface MoneyUserRow {
   stripePriceId: string | null;
 }
 
-test('persists verified checkout entitlement for a fresh and returning session', async ({
+export interface GoldenPathBillingContext {
+  readonly appUserId: string;
+  readonly betterAuthUserId: string;
+  readonly browser: Browser;
+  readonly claimId: string;
+  readonly conversationId: string;
+  readonly databaseUrl: string;
+  readonly email: string;
+  readonly handle: string;
+  readonly page: Page;
+  readonly profileId: string;
+  readonly spotifyArtistId: string;
+}
+
+/** Continue the claimed-profile journey through Stripe and revoked-session return. */
+export async function completeGoldenPathBillingJourney({
+  appUserId,
+  betterAuthUserId,
   browser,
+  claimId,
+  conversationId,
+  databaseUrl,
+  email,
+  handle,
   page,
-}) => {
-  const dbUrl = process.env.DATABASE_URL;
-  if (!dbUrl) throw new Error('DATABASE_URL is required');
-  const sql = neon(dbUrl);
+  profileId,
+  spotifyArtistId,
+}: GoldenPathBillingContext): Promise<void> {
+  const sql = neon(databaseUrl);
   const runId = [
     process.env.GITHUB_RUN_ID ?? 'local',
     process.env.GITHUB_RUN_ATTEMPT ?? '1',
     Date.now().toString(36),
   ].join('-');
-  const email = `money-${runId}+e2e@test.jovie.com`;
   const { stripeClient, priceId } = await getRequiredStripeTestContext();
 
-  let appUserId: string | null = null;
-  let betterAuthUserId: string | null = null;
   let referrerUserId: string | null = null;
-  let referralCodeId: string | null = null;
   let checkoutSessionId: string | null = null;
   let customerId: string | null = null;
   let stripeEventId: string | null = null;
   const stripeEventIds: string[] = [];
   let returningContext: Awaited<ReturnType<typeof browser.newContext>> | null =
     null;
+  let revokedContext: Awaited<ReturnType<typeof browser.newContext>> | null =
+    null;
 
-  const readMoneyUser = async (
-    targetEmail = email
-  ): Promise<MoneyUserRow | null> => {
+  const readMoneyUser = async (): Promise<MoneyUserRow | null> => {
     const [user] = await sql`
       SELECT id,
              better_auth_user_id AS "betterAuthUserId",
@@ -75,9 +81,43 @@ test('persists verified checkout entitlement for a fresh and returning session',
              stripe_subscription_id AS "stripeSubscriptionId",
              stripe_price_id AS "stripePriceId"
       FROM users
-      WHERE email = ${targetEmail}
+      WHERE id = ${appUserId}
     `;
     return (user as MoneyUserRow | undefined) ?? null;
+  };
+
+  const readJourneyContext = async () => {
+    const [context] = await sql`
+      SELECT u.active_profile_id AS "activeProfileId",
+             cp.spotify_id AS "spotifyArtistId",
+             cp.username_normalized AS handle,
+             c.user_id AS "conversationUserId",
+             c.creator_profile_id AS "conversationProfileId",
+             upc.id AS "claimId",
+             upc.role AS "claimRole"
+      FROM users u
+      INNER JOIN creator_profiles cp ON cp.id = ${profileId}
+      INNER JOIN chat_conversations c ON c.id = ${conversationId}
+      INNER JOIN user_profile_claims upc
+        ON upc.id = ${claimId}
+       AND upc.user_id = u.id
+       AND upc.creator_profile_id = cp.id
+      WHERE u.id = ${appUserId}
+        AND u.better_auth_user_id = ${betterAuthUserId}
+    `;
+    return context ?? null;
+  };
+
+  const expectJourneyContext = async () => {
+    expect(await readJourneyContext()).toMatchObject({
+      activeProfileId: profileId,
+      claimId,
+      claimRole: 'owner',
+      conversationProfileId: profileId,
+      conversationUserId: appUserId,
+      handle,
+      spotifyArtistId,
+    });
   };
 
   const readCommission = async (stripeInvoiceId: string) => {
@@ -93,56 +133,10 @@ test('persists verified checkout entitlement for a fresh and returning session',
   };
 
   try {
-    const preparedSignup = await prepareBetterAuthEmailOtp(page, {
-      email,
-      entryPath: '/signup',
-      beforeResponseFulfill: async candidateBetterAuthUserId => {
-        await expect
-          .poll(
-            async () => {
-              const [user] = await sql`
-                UPDATE users
-                SET user_status = 'waitlist_approved', updated_at = NOW()
-                WHERE better_auth_user_id = ${candidateBetterAuthUserId}
-                  AND email = ${email}
-                RETURNING id, is_pro AS "isPro", plan
-              `;
-              if (!user) return null;
-              if (user.isPro !== false || user.plan !== 'free') {
-                throw new Error('Fresh money-path identity did not start free');
-              }
-              appUserId = user.id as string;
-              betterAuthUserId = candidateBetterAuthUserId;
-              return user.id as string;
-            },
-            {
-              message:
-                'Better Auth did not provision the exact money-path user',
-              timeout: 30_000,
-            }
-          )
-          .toBeTruthy();
-      },
-    });
-    try {
-      const authNavigation = page.waitForURL(
-        url => !/\/(sign-in|signin|sign-up|signup)(\/|$)/.test(url.pathname),
-        { timeout: 30_000 }
-      );
-      void authNavigation.catch(() => undefined);
-      ({ betterAuthUserId } = await preparedSignup.submit());
-      await authNavigation;
-    } finally {
-      await preparedSignup.dispose();
-    }
-
     const freshUser = await readMoneyUser();
     expect(freshUser).not.toBeNull();
-    appUserId = freshUser?.id ?? null;
-    if (!appUserId) {
-      throw new Error('Money-path user did not expose its application ID');
-    }
     expect(freshUser).toMatchObject({
+      id: appUserId,
       betterAuthUserId,
       email,
       isPro: false,
@@ -150,6 +144,7 @@ test('persists verified checkout entitlement for a fresh and returning session',
       stripeCustomerId: null,
       stripeSubscriptionId: null,
     });
+    await expectJourneyContext();
 
     const referrerEmail = `money-referrer-${runId}@test.jovie.com`;
     const referrerClerkId = `user_e2e_referrer_${runId.replaceAll('-', '_')}`;
@@ -167,7 +162,8 @@ test('persists verified checkout entitlement for a fresh and returning session',
       VALUES (${referrerUserId}, ${referralCode}, true)
       RETURNING id
     `;
-    referralCodeId = (createdReferralCode?.id as string | undefined) ?? null;
+    const referralCodeId =
+      (createdReferralCode?.id as string | undefined) ?? null;
     expect(referralCodeId).toBeTruthy();
 
     const [createdReferral] = await sql`
@@ -194,7 +190,22 @@ test('persists verified checkout entitlement for a fresh and returning session',
     const freeStatus = await getBillingStatus(page);
     expect(freeStatus).toMatchObject({ isPro: false, plan: 'free' });
 
-    const checkout = await createCheckoutSession(page, priceId);
+    const checkoutCorrelation = {
+      claim_id: claimId,
+      run_id: conversationId,
+      candidate_id: profileId,
+      offer_version: 'golden-path-exact-build-v1',
+      first_touch: 'anonymous-artist-claim',
+    } as const;
+    const checkout = await createCheckoutSession(page, priceId, {
+      claimId,
+      runId: conversationId,
+      candidateId: profileId,
+      offerVersion: checkoutCorrelation.offer_version,
+      firstTouch: checkoutCorrelation.first_touch,
+      source: 'onboarding',
+      returnTo: '/app/chat?from=onboarding&panel=profile',
+    });
     checkoutSessionId = checkout.sessionId;
     const createdSession =
       await stripeClient.checkout.sessions.retrieve(checkoutSessionId);
@@ -203,6 +214,13 @@ test('persists verified checkout entitlement for a fresh and returning session',
     }
     expect(createdSession.mode).toBe('subscription');
     expect(createdSession.metadata?.clerk_user_id).toBe(appUserId);
+    expect(createdSession.metadata).toMatchObject(checkoutCorrelation);
+    expect(createdSession.success_url).toContain(
+      '/app/chat?from=onboarding&panel=profile&upgrade=success'
+    );
+    expect(createdSession.cancel_url).toContain(
+      '/app/chat?from=onboarding&panel=profile&upgrade=cancel'
+    );
     const checkoutUrl = new URL(checkout.url);
     expect(checkoutUrl.protocol).toBe('https:');
     expect(checkoutUrl.hostname).toBe('checkout.stripe.com');
@@ -220,6 +238,7 @@ test('persists verified checkout entitlement for a fresh and returning session',
     });
     customerId = completed.customerId;
     expect(completed.session.metadata?.clerk_user_id).toBe(appUserId);
+    expect(completed.session.metadata).toMatchObject(checkoutCorrelation);
 
     // A Stripe-side test payment is not authority: only Jovie's verified
     // webhook may persist access.
@@ -256,6 +275,9 @@ test('persists verified checkout entitlement for a fresh and returning session',
     const validResponse = await postStripeWebhook(page, webhook);
     expect(validResponse.ok()).toBeTruthy();
 
+    const duplicateCheckoutResponse = await postStripeWebhook(page, webhook);
+    expect(duplicateCheckoutResponse.status()).toBe(200);
+
     await expect
       .poll(
         async () => {
@@ -268,7 +290,8 @@ test('persists verified checkout entitlement for a fresh and returning session',
                    swe.processed_at AS "processedAt",
                    swe.type AS "webhookType",
                    bal.event_type AS "auditEventType",
-                   bal.source AS "auditSource"
+                   bal.source AS "auditSource",
+                   bal.metadata AS "auditMetadata"
             FROM users u
             JOIN stripe_webhook_events swe
               ON swe.stripe_event_id = ${stripeEventId}
@@ -288,9 +311,36 @@ test('persists verified checkout entitlement for a fresh and returning session',
         stripePriceId: priceId,
         webhookType: 'checkout.session.completed',
         auditEventType: 'subscription_created',
+        auditMetadata: {
+          candidateId: profileId,
+          claimId,
+          firstTouch: checkoutCorrelation.first_touch,
+          offerVersion: checkoutCorrelation.offer_version,
+          runId: conversationId,
+        },
         auditSource: 'webhook',
         processedAt: expect.anything(),
       });
+
+    const [checkoutExactlyOnce] = await sql`
+      SELECT (
+               SELECT COUNT(*)::int
+               FROM stripe_webhook_events
+               WHERE stripe_event_id = ${stripeEventId}
+             ) AS "webhookCount",
+             (
+               SELECT COUNT(*)::int
+               FROM billing_audit_log
+               WHERE user_id = ${appUserId}
+                 AND stripe_event_id = ${stripeEventId}
+                 AND event_type = 'subscription_created'
+             ) AS "auditCount"
+    `;
+    expect(checkoutExactlyOnce).toMatchObject({
+      auditCount: 1,
+      webhookCount: 1,
+    });
+    await expectJourneyContext();
 
     const currentUsage = await page.request.get('/api/usage/summary');
     expect(currentUsage.ok()).toBeTruthy();
@@ -333,6 +383,24 @@ test('persists verified checkout entitlement for a fresh and returning session',
       stripeCustomerId: customerId,
       stripeSubscriptionId: completed.subscriptionId,
     });
+    await expectJourneyContext();
+
+    const portalResponse =
+      await returningPage.request.post('/api/stripe/portal');
+    expect(portalResponse.ok()).toBeTruthy();
+    expect(portalResponse.headers()['cache-control']).toBe('no-store');
+    const portalBody = (await portalResponse.json()) as {
+      sessionId: string;
+      url: string;
+    };
+    expect(new URL(portalBody.url).hostname).toBe('billing.stripe.com');
+    const portalSession = await stripeClient.billingPortal.sessions.retrieve(
+      portalBody.sessionId
+    );
+    expect(portalSession.customer).toBe(customerId);
+    expect(portalSession.return_url).toBe(
+      `${process.env.BASE_URL ?? 'http://localhost:3250'}/app`
+    );
 
     const paidSubscription = await stripeClient.subscriptions.retrieve(
       completed.subscriptionId
@@ -524,60 +592,76 @@ test('persists verified checkout entitlement for a fresh and returning session',
       eventType: 'charge_refunded',
       source: 'webhook',
     });
+    expect(await readMoneyUser()).toMatchObject({
+      isPro: false,
+      plan: 'free',
+      stripeCustomerId: customerId,
+    });
+    await expectJourneyContext();
+
+    // Keep the signed browser cookies, revoke their backing database sessions,
+    // then prove neither the billing read cache nor the portal mutation accepts
+    // those cookies. The second read catches accidental cache resurrection.
+    const revokedStorageState = await returningContext.storageState();
+    const revokedSessions = await sql`
+      DELETE FROM ba_sessions
+      WHERE user_id = ${betterAuthUserId}
+      RETURNING id
+    `;
+    expect(revokedSessions.length).toBeGreaterThan(0);
+    revokedContext = await browser.newContext({
+      baseURL: process.env.BASE_URL ?? 'http://localhost:3250',
+      storageState: revokedStorageState,
+    });
+    const revokedPage = await revokedContext.newPage();
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const revokedBilling = await revokedPage.request.get(
+        '/api/billing/status',
+        { headers: { 'cache-control': 'no-cache' } }
+      );
+      expect(revokedBilling.status()).toBe(401);
+      expect(revokedBilling.headers()['cache-control']).toBe('no-store');
+    }
+    const revokedPortal = await revokedPage.request.post('/api/stripe/portal');
+    expect(revokedPortal.status()).toBe(401);
+    expect(revokedPortal.headers()['cache-control']).toBe('no-store');
   } finally {
+    await revokedContext?.close();
     await returningContext?.close();
 
-    if (appUserId) {
-      if (checkoutSessionId) {
-        await expireRunOwnedTestCheckoutSession(
-          stripeClient,
-          checkoutSessionId,
-          appUserId
-        );
-      }
-      const databaseCustomerId = (await readMoneyUser())?.stripeCustomerId;
-      const cleanupCustomerIds = new Set(
-        [customerId, databaseCustomerId].filter(
-          (value): value is string => typeof value === 'string'
-        )
-      );
-      const discoveredCustomerIds = await findRunOwnedStripeCustomerIds(
+    if (checkoutSessionId) {
+      await expireRunOwnedTestCheckoutSession(
         stripeClient,
+        checkoutSessionId,
+        appUserId
+      );
+    }
+    const databaseCustomerId = (await readMoneyUser())?.stripeCustomerId;
+    const cleanupCustomerIds = new Set(
+      [customerId, databaseCustomerId].filter(
+        (value): value is string => typeof value === 'string'
+      )
+    );
+    const discoveredCustomerIds = await findRunOwnedStripeCustomerIds(
+      stripeClient,
+      appUserId,
+      email
+    );
+    discoveredCustomerIds.forEach(id => cleanupCustomerIds.add(id));
+
+    for (const cleanupCustomerId of cleanupCustomerIds) {
+      await deleteRunOwnedStripeCustomer(
+        stripeClient,
+        cleanupCustomerId,
         appUserId,
         email
       );
-      discoveredCustomerIds.forEach(id => cleanupCustomerIds.add(id));
-
-      for (const cleanupCustomerId of cleanupCustomerIds) {
-        await deleteRunOwnedStripeCustomer(
-          stripeClient,
-          cleanupCustomerId,
-          appUserId,
-          email
-        );
-      }
     }
     for (const cleanupEventId of stripeEventIds) {
       await sql`
         DELETE FROM stripe_webhook_events
         WHERE stripe_event_id = ${cleanupEventId}
       `;
-    }
-    if (appUserId && betterAuthUserId) {
-      const deletedUsers = await sql`
-        DELETE FROM users
-        WHERE id = ${appUserId}
-          AND better_auth_user_id = ${betterAuthUserId}
-          AND email = ${email}
-        RETURNING id
-      `;
-      expect(deletedUsers).toHaveLength(1);
-      const deletedAuthUsers = await sql`
-        DELETE FROM ba_users
-        WHERE id = ${betterAuthUserId} AND email = ${email}
-        RETURNING id
-      `;
-      expect(deletedAuthUsers).toHaveLength(1);
     }
     if (referrerUserId) {
       const deletedReferrer = await sql`
@@ -589,4 +673,4 @@ test('persists verified checkout entitlement for a fresh and returning session',
       expect(deletedReferrer).toHaveLength(1);
     }
   }
-});
+}
