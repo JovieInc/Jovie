@@ -83,7 +83,11 @@ jobs:
 
       - name: Test iOS release configuration scripts
         run: |
-          node --test apps/ios/scripts/write-configuration.test.mjs \
+          node --test --experimental-test-coverage \
+          --test-coverage-include='**/import-joviekit.mjs' \
+          --test-coverage-lines=90 --test-coverage-branches=85 --test-coverage-functions=90 \
+          apps/ios/scripts/import-joviekit.test.mjs \
+          apps/ios/scripts/write-configuration.test.mjs \
           apps/ios/scripts/run-xcodebuild.test.mjs \
           apps/ios/scripts/validate-wallet-release-env.test.mjs \
           apps/ios/scripts/validate-testflight-env.test.mjs \
