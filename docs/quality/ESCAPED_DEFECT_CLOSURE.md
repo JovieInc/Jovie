@@ -41,6 +41,12 @@ Put the marker in the originating issue description or a comment. The latest
 marker is authoritative. Replace every example value with real evidence; URLs,
 SHAs, `TODO`, and narration are validated rather than trusted by implication.
 
+After an issue reopens from Done, record the replacement marker in a new comment
+after the reopen transition. The lifecycle uses Linear's server timestamp to bind
+the proof to that acceptance episode. A description marker has no receipt
+timestamp and cannot establish fresh closure for a reopened issue; earlier
+comments cannot satisfy it either. See [the lifecycle rule](../../.claude/rules/linear.md#entry-proof-and-remaining-validation).
+
 ```markdown
 <!-- escaped-defect-closure:v1
 {

@@ -200,11 +200,13 @@ function hasOpenAcceptanceSection(description) {
  *   issue: string,
  *   bindingSha: string,
  *   bindingPull: string,
+ *   bindingKind?: 'merge' | 'outcome',
  *   mergedPulls: string[],
  *   riskLevel: string,
  *   required: RequiredReceipt[],
  *   uiEvidence?: UiEvidence[],
  *   receiptNotBefore?: string | null,
+ *   outcomeNotBefore?: string,
  * }} ValidationManifest
  */
 
@@ -241,23 +243,36 @@ export function selectBindingPull(pulls) {
  *     readonly description?: string,
  *     readonly reopenedAfterDone?: boolean,
  *     readonly receiptNotBefore?: string | null,
+ *     readonly outcomeNotBefore?: string,
  *   },
  *   readonly mergedPulls: readonly MergedPull[],
  *   readonly risk: RiskSummary | null,
  *   readonly parentReason?: string,
  *   readonly escapedDefect?: boolean,
  *   readonly uiEvidence?: readonly UiEvidence[] | null,
+ *   readonly parentOutcome?: ValidationReceipt | null,
  * }} input
  * @returns {ValidationManifest | null}
  */
 export function deriveValidationManifest(input) {
   const binding = selectBindingPull(input.mergedPulls);
-  if (!binding) return null;
+  const outcomeBinding =
+    !binding &&
+    input.parentReason &&
+    input.parentOutcome?.kind === 'outcome' &&
+    FULL_SHA.test(input.parentOutcome.sha)
+      ? input.parentOutcome
+      : null;
+  if (!binding && !outcomeBinding) return null;
+  const bindingSha = binding?.mergeSha ?? outcomeBinding.sha;
+  const bindingRef = binding?.url ?? outcomeBinding.evidence;
   /** @type {RequiredReceipt[]} */
   const required = [
     {
       kind: 'deployment',
-      reason: 'a verified production generation contains the merge',
+      reason: binding
+        ? 'a verified production generation contains the merge'
+        : 'a verified production generation contains the parent outcome artifact',
     },
   ];
   if (input.escapedDefect) {
@@ -269,6 +284,11 @@ export function deriveValidationManifest(input) {
   }
   const outcome = outcomeAcceptanceReasons(input.issue, input.parentReason);
   if (outcome.length > 0) {
+    if (input.issue.outcomeNotBefore) {
+      outcome.push(
+        `record outcome after child delivery at ${input.issue.outcomeNotBefore}`
+      );
+    }
     required.push({ kind: 'outcome', reason: outcome.join('; ') });
   }
   const riskLevel = input.risk?.riskLevel ?? 'unknown';
@@ -347,8 +367,9 @@ export function deriveValidationManifest(input) {
   return {
     schema: VALIDATION_MANIFEST_SCHEMA,
     issue: input.issue.identifier.toUpperCase(),
-    bindingSha: binding.mergeSha.toLowerCase(),
-    bindingPull: binding.url,
+    bindingSha: bindingSha.toLowerCase(),
+    bindingPull: bindingRef,
+    ...(!binding ? { bindingKind: 'outcome' } : {}),
     mergedPulls: [...input.mergedPulls]
       .sort((left, right) => left.number - right.number)
       .map(pull => pull.url),
@@ -356,6 +377,9 @@ export function deriveValidationManifest(input) {
     required,
     ...(input.issue.reopenedAfterDone
       ? { receiptNotBefore: input.issue.receiptNotBefore ?? null }
+      : {}),
+    ...(input.issue.outcomeNotBefore
+      ? { outcomeNotBefore: input.issue.outcomeNotBefore }
       : {}),
     ...(uiEvidence && uiEvidence.length > 0
       ? {
@@ -714,6 +738,7 @@ export function lifecycleStatusKey(input) {
         target: input.target,
         binding: input.manifest.bindingSha,
         episode: input.manifest.receiptNotBefore,
+        outcomeAfter: input.manifest.outcomeNotBefore,
         required: input.manifest.required.map(entry => entry.kind),
         missing: [...input.missing].sort(),
         failing: input.failing
@@ -764,7 +789,7 @@ export function formatLifecycleComment(input) {
       : `Validation lifecycle kept ${input.identifier} in ${input.from}.`;
   const lines = [
     moved,
-    `Binding merge: ${input.manifest.bindingPull} (${input.manifest.bindingSha}).`,
+    `Binding ${input.manifest.bindingKind === 'outcome' ? 'outcome' : 'merge'}: ${input.manifest.bindingPull} (${input.manifest.bindingSha}).`,
   ];
   if (input.deploymentSha) {
     lines.push(`Verified production generation: ${input.deploymentSha}.`);

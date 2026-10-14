@@ -166,11 +166,11 @@
     ".claude/rules/linear.md": {
       "owner": "@itstimwhite",
       "claim": "Issue closure behavior is implemented by the existing merge synchronizer.",
-      "documentSha256": "5629444b1fb60b0e65e72a548df9d444ebcd633605fdd66d1a2d6018fcff43a6",
+      "documentSha256": "8ec6b7b5551e8b1acc8325927f68eb366510817c5b095f7e8edfcf51cf7a1978",
       "sources": [
         {
           "path": "scripts/lib/linear-sync-on-merge.mjs",
-          "sha256": "8a091bc6d861054228f3a042f60eb2fa437a4e2821d1497530ef1a2c5fd83cdc"
+          "sha256": "00c2eb0bbe938ff5552ba168d7889cf10c724846e200b55646834fd69b19513d"
         }
       ]
     },
