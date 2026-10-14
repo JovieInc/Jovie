@@ -1366,7 +1366,7 @@ export interface UpsertRecordingInput {
 /**
  * Upsert a recording (canonical audio entity).
  * Conflict resolution: (creatorProfileId, slug).
- * Falls back on ISRC collision by nulling ISRC.
+ * Reuses the creator's canonical recording on an exact ISRC collision.
  */
 export async function upsertRecording(
   input: UpsertRecordingInput
@@ -1420,22 +1420,27 @@ export async function upsertRecording(
       !isUniqueConstraintViolation(
         error,
         'discog_recordings_creator_isrc_unique'
-      )
+      ) ||
+      !input.isrc
     ) {
       throw error;
     }
 
-    // ISRC collision — another recording for this creator already has this ISRC.
-    // Store without ISRC; the existing recording is the canonical one.
+    // Release occurrences may use different provider IDs for the same audio.
+    // Keep the canonical identifier and its existing facts instead of creating
+    // an ISRC-less duplicate. The caller retains the new release occurrence.
     const [result] = await db
-      .insert(discogRecordings)
-      .values({ ...insertData, isrc: null })
-      .onConflictDoUpdate({
-        target: [discogRecordings.creatorProfileId, discogRecordings.slug],
-        set: { ...baseSet, isrc: null },
-      })
-      .returning();
+      .select()
+      .from(discogRecordings)
+      .where(
+        and(
+          eq(discogRecordings.creatorProfileId, input.creatorProfileId),
+          eq(discogRecordings.isrc, input.isrc)
+        )
+      )
+      .limit(1);
 
+    if (!result) throw error;
     return result;
   }
 }
