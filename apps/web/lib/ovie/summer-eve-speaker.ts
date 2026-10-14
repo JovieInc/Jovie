@@ -146,7 +146,9 @@ export function createEveSummerSpeaker(
         if (!input.clientTurnId) throw new Error('client_turn_id_required');
         if (!input.principalHash) throw new Error('founder_principal_required');
         const target = await resolveSummerEveCallerOrigin();
-        let deploymentId = target.deploymentId;
+        const admittedDeploymentId = target.deploymentId;
+        // Serving identity can advance; the immutable turn binding cannot.
+        let deploymentId = admittedDeploymentId;
         const refreshDeploymentId = async () =>
           (await resolveSummerEveCallerOrigin({ refresh: true })).deploymentId;
         const rawBody = JSON.stringify({
@@ -245,7 +247,7 @@ export function createEveSummerSpeaker(
             if (
               checkpoint.eventId !== eventId ||
               checkpoint.principalHash !== input.principalHash ||
-              checkpoint.deploymentId !== deploymentId
+              checkpoint.deploymentId !== admittedDeploymentId
             )
               throw new Error('summer_checkpoint_drift');
             yield { type: 'checkpoint', checkpoint };
@@ -275,7 +277,7 @@ export function createEveSummerSpeaker(
           signal: input.signal,
           headers: {
             'x-jovie-summer-principal-hash': input.principalHash,
-            'x-jovie-summer-deployment-id': deploymentId,
+            'x-jovie-summer-deployment-id': admittedDeploymentId,
           },
         });
         deploymentId = await verifiedDeploymentId(
@@ -309,7 +311,7 @@ export function createEveSummerSpeaker(
         if (
           result.eventId !== eventId ||
           result.principalHash !== input.principalHash ||
-          result.deploymentId !== deploymentId ||
+          result.deploymentId !== admittedDeploymentId ||
           (input.previousEveSessionId &&
             result.sessionId !== input.previousEveSessionId)
         )

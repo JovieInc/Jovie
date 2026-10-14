@@ -72,41 +72,98 @@ describe('Summer promotion inside the pin TTL', () => {
     vi.restoreAllMocks();
   });
 
-  it('accepts verified deployment B without replaying the POST', async () => {
+  it.each([202, 503])(
+    'keeps admission A after status %s when the result is served by verified B',
+    async status => {
+      let live = 'dpl_admittedA';
+      const identityFetch = vi.fn<typeof fetch>(async () => identity(live));
+      vi.stubGlobal('fetch', identityFetch);
+      fetchShadow.mockImplementation(async (_path, init) => {
+        if (init?.method === 'POST') {
+          expect(JSON.parse(String(init.body)).deploymentId).toBe(
+            'dpl_admittedA'
+          );
+          return Response.json(
+            {
+              ok: status === 202,
+              code: status === 503 ? 'dispatch_unknown' : undefined,
+              accepted: { eventId },
+            },
+            { status, headers: { 'x-jovie-eve-deployment-id': live } }
+          );
+        }
+        live = 'dpl_promotedB';
+        return Response.json(
+          { ok: true, result: result('dpl_admittedA') },
+          { headers: { 'x-jovie-eve-deployment-id': live } }
+        );
+      });
+
+      expect(await speak()).toContainEqual({
+        type: 'text-delta',
+        text: 'Hello Tim, Summer Jovi here.',
+      });
+      expect(postCount()).toBe(1);
+      expect(identityFetch).toHaveBeenCalledTimes(2);
+      expect(fetchShadow.mock.calls[1]?.[1]?.headers).toMatchObject({
+        'x-jovie-summer-deployment-id': 'dpl_admittedA',
+      });
+    }
+  );
+
+  it('does not resend when promotion rejects a stale admission binding', async () => {
     let live = 'dpl_cachedA';
     const identityFetch = vi.fn<typeof fetch>(async () => identity(live));
     vi.stubGlobal('fetch', identityFetch);
     await resolveSummerEveCallerOrigin({ fetchImpl: identityFetch });
-    expect(identityFetch).toHaveBeenCalledOnce();
-
-    fetchShadow.mockImplementation(async (_path, init) => {
-      if (init?.method === 'POST') {
-        live = 'dpl_promotedB';
-        return Response.json(
-          { ok: true, accepted: { eventId } },
-          {
-            status: 202,
-            headers: { 'x-jovie-eve-deployment-id': 'dpl_promotedB' },
-          }
-        );
-      }
+    fetchShadow.mockImplementation(async () => {
+      live = 'dpl_promotedB';
       return Response.json(
-        { ok: true, result: result('dpl_promotedB') },
-        { headers: { 'x-jovie-eve-deployment-id': 'dpl_promotedB' } }
+        { ok: false, code: 'invalid_deployment_binding' },
+        { status: 403, headers: { 'x-jovie-eve-deployment-id': live } }
       );
     });
 
-    const events = await speak();
-    expect(events).toContainEqual({
-      type: 'text-delta',
-      text: 'Hello Tim, Summer Jovi here.',
-    });
+    expect(await speak()).toEqual([
+      { type: 'error', state: 'unavailable', hop: 'summer_admission_rejected' },
+    ]);
+    expect(fetchShadow).toHaveBeenCalledOnce();
     expect(postCount()).toBe(1);
     expect(identityFetch).toHaveBeenCalledTimes(2);
-    expect(fetchShadow.mock.calls[1]?.[1]?.headers).toMatchObject({
-      'x-jovie-summer-deployment-id': 'dpl_promotedB',
-    });
   });
+
+  it.each([
+    ['deployment', { deploymentId: 'dpl_promotedB' }],
+    ['principal', { principalHash: 'b'.repeat(43) }],
+    ['event', { eventId: 'sum_foreign' }],
+    ['conversation', { conversationId: 'foreign-conversation' }],
+  ])(
+    'rejects a crossed %s result from a verified promoted responder',
+    async (_name, patch) => {
+      let live = 'dpl_admittedA';
+      vi.stubGlobal(
+        'fetch',
+        vi.fn<typeof fetch>(async () => identity(live))
+      );
+      fetchShadow.mockImplementation(async (_path, init) => {
+        if (init?.method === 'POST') {
+          return Response.json(
+            { ok: true, accepted: { eventId } },
+            { status: 202, headers: { 'x-jovie-eve-deployment-id': live } }
+          );
+        }
+        live = 'dpl_promotedB';
+        return Response.json(
+          { ok: true, result: { ...result('dpl_admittedA'), ...patch } },
+          { headers: { 'x-jovie-eve-deployment-id': live } }
+        );
+      });
+      expect(await speak()).toEqual([
+        { type: 'error', state: 'unknown', hop: 'summer_result_unverified' },
+      ]);
+      expect(postCount()).toBe(1);
+    }
+  );
 
   it('rejects a deployment the refreshed identity does not serve', async () => {
     const identityFetch = vi.fn<typeof fetch>(async () =>
