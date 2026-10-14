@@ -52,12 +52,44 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+
       - name: Generate Jovie Bot token
         id: app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+
+      - name: Run weekly post-mortem failure-class review
+        id: postmortems
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          GBRAIN_API_URL: ${{ secrets.GBRAIN_API_URL }}
+          GBRAIN_API_KEY: ${{ secrets.GBRAIN_API_KEY }}
+        run: |
+          set -euo pipefail
+          echo "ran=false" >> "$GITHUB_OUTPUT"
+          if [ "$EVENT_NAME" != 'workflow_dispatch' ] && [ "$(date -u +%u)" != '1' ]; then
+            exit 0
+          fi
+          # JOV-INV-042: scheduled reconciliation is read-only in Linear;
+          # Quality Gap Finder owns event-driven control/class issue writes.
+          node scripts/postmortem-review-report.mjs \
+            --out "$RUNNER_TEMP/postmortem-review.json" > /dev/null
+          echo "ran=true" >> "$GITHUB_OUTPUT"
+
+      - name: Preserve weekly post-mortem review
+        if: ${{ steps.postmortems.outputs.ran == 'true' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: postmortem-review-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/postmortem-review.json
+          retention-days: 30
 
       - name: Measure and evaluate
         id: slo

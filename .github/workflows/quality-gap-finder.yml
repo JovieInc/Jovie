@@ -61,6 +61,19 @@ jobs:
         with:
           node-version-file: .nvmrc
 
+      - name: Review post-mortems and reconcile controls
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          GBRAIN_API_URL: ${{ secrets.GBRAIN_API_URL }}
+          GBRAIN_API_KEY: ${{ secrets.GBRAIN_API_KEY }}
+          DRY_RUN: ${{ inputs.dry_run || 'false' }}
+        run: |
+          set -euo pipefail
+          flags=(--mirror)
+          if [ "$DRY_RUN" != 'true' ]; then flags+=(--apply); fi
+          node scripts/postmortem-review.mjs "${flags[@]}" \
+            --out postmortem-review.json > /dev/null
+
       - name: Find and file quality gaps
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
@@ -79,6 +92,8 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: quality-gaps-${{ github.run_id }}
-          path: quality-gaps.json
+          path: |
+            postmortem-review.json
+            quality-gaps.json
           retention-days: 14
           if-no-files-found: ignore
