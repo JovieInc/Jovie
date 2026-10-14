@@ -1318,7 +1318,8 @@ def plan_labeled_events(issues: list, recorded: dict | None, providers: dict, no
                         if completed.get("issueId") != closed.get("id") or (completed_at is not None and closed_at > completed_at):
                             row["completedGeneration"] = {"issueId": closed.get("id"), "updatedAt": closed["updatedAt"],
                                                           "team": (closed.get("team") or {}).get("key")}
-                    elif completed:
+                    # Only newer or unreadable terminal evidence invalidates a pending completion.
+                    elif completed and (closed_at is None or completed_at is None or closed_at >= completed_at):
                         row["completedGeneration"] = {**completed, "consumed": True}
                         # Delayed/unknown terminal reads cannot lower the accepted version.
                         if closed_at is not None and (completed_at is None or closed_at > completed_at):
@@ -1401,6 +1402,9 @@ def plan_labeled_events(issues: list, recorded: dict | None, providers: dict, no
                 continue
         elif row.get("status") in {"human", "exhausted", "done"} and not row.get("release"):
             if row.get("status") == "done":
+                if escalation_enabled() and (row.get("startDelivery") or {}).get("settled"):
+                    events[fingerprint] = row
+                    continue  # A settled delivery waits for a proven new completed-to-open generation.
                 stamp = str(canonical.get("updatedAt") or "")
                 if _note(row, f"recur:{stamp}"):
                     comments.append({
