@@ -12,11 +12,24 @@ const meta = {
       </div>
     ),
   ],
-  args: { username: 'sashawaves', displayName: 'Sasha Waves', links: [] },
+  args: {
+    username: 'sashawaves',
+    displayName: 'Sasha Waves',
+    links: [
+      {
+        id: 'spotify',
+        title: 'Spotify',
+        platform: 'spotify',
+        url: 'https://open.spotify.com/artist/sashawaves',
+        isVisible: true,
+      },
+    ],
+  },
 } satisfies Meta<typeof ProfilePreview>;
 export default meta;
 type Story = StoryObj<typeof meta>;
 export const Unverified: Story = {};
+export const EmptyLinks: Story = { args: { links: [] } };
 export const VerifiedFallback: Story = { args: { isVerified: true } };
 export const VerifiedPortrait: Story = {
   args: { isVerified: true, avatarUrl: '/avatars/default-user.png' },
