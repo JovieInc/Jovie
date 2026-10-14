@@ -184,6 +184,32 @@ describe('executeChatTurn — parity assertions', () => {
     expect(turn.selectedModel).toBe(CHAT_MODEL);
   });
 
+  it('injects hybrid knowledge results into the AI SDK system context', async () => {
+    const knowledgeRetriever = vi
+      .fn()
+      .mockResolvedValue(
+        '<knowledge-source id="K1" title="Playlist canon" slug="canon/playlists" confidence="authoritative">grounded evidence</knowledge-source>'
+      );
+    const signal = new AbortController().signal;
+    const turn = await executeChatTurn({
+      ...baseInput,
+      uiMessages: [
+        userMessage('How does editorial playlist pitching work?', 'older'),
+        userMessage('What should I do first?', 'latest'),
+      ],
+      knowledgeRetriever,
+      planLimits: paidPlanLimits,
+      signal,
+    });
+
+    expect(knowledgeRetriever).toHaveBeenCalledWith(
+      'What should I do first? How does editorial playlist pitching work?',
+      signal
+    );
+    expect(turn.systemPrompt).toContain('title="Playlist canon"');
+    expect(turn.systemPrompt).toContain('[K#: source title]');
+  });
+
   it('rotates to the fallback chain model when modelRotationStep is set (👎 recovery, #11461)', async () => {
     const turn = await executeChatTurn({
       ...baseInput,
