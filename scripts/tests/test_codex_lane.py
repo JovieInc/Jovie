@@ -1262,6 +1262,35 @@ class LaunchIdentityTest(Isolated):
         self.assertEqual(row["cliReported"]["model"], "gpt-5.6-sol")
         self.assertFalse(row["providerAttested"])
 
+    def test_latest_verified_cli_header_has_explicit_version_provenance(self):
+        # rust-v0.162.1 exec/src/event_processor_with_human_output.rs preserves
+        # the pre-prompt header contract; this is CLI evidence, not attestation.
+        row, result = self.invoke(self.header(version="0.162.1", model="gpt-6.1-sol"))
+        self.assertEqual(result, (0, "ok", None))
+        self.assertEqual(row["identityState"], "reported")
+        self.assertEqual(row["cliVersion"], "0.162.1")
+        self.assertEqual(row["cliReported"], {"model": "gpt-6.1-sol", "provider": "openai",
+                                             "reasoningEffort": "xhigh", "sessionId": self.SESSION})
+        self.assertEqual(row["requested"]["model"], "configured-alias")
+        self.assertEqual(row["provenance"], "codex-cli-startup-header")
+        self.assertFalse(row["providerAttested"])
+        self.assertIsNone(row["usage"])
+        self.assertIsNone(row["costUsd"])
+
+    def test_latest_cli_still_rejects_unknown_versions_and_malformed_identity(self):
+        header = self.header(version="0.162.1")
+        cases = [header.replace("v0.162.1", "v0.162.2"),
+                 header.replace("session id: " + self.SESSION, "session id: invalid"),
+                 header.replace("provider: openai", "provider: openai SECRET"),
+                 header.replace("--------\nuser\n", "--------\n"),
+                 "codex\n" + header]
+        for index, output in enumerate(cases):
+            with self.subTest(index=index):
+                row, _ = self.invoke(output)
+                self.assertEqual(row["identityState"], "unknown")
+                self.assertIsNone(row["cliReported"])
+                self.assertFalse(row["providerAttested"])
+
     def test_missing_malformed_or_incomplete_startup_stays_unknown(self):
         cases = ["", "codex\n" + self.header(),
                  self.header().replace("session id: " + self.SESSION, "session id: not-a-session"),
