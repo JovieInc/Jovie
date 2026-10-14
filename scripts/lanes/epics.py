@@ -35,7 +35,8 @@ SETTLED_VERDICTS = frozenset({"decomposed", "epic-children-active", "epic-done",
 
 DETAIL_QUERY = ('query($id:String!){issue(id:$id){id identifier state{name type} team{id key states{nodes{id name type}}} '
                 'comments(first:100){pageInfo{hasNextPage} nodes{body}} '
-                'children(first:100){pageInfo{hasNextPage} nodes{id identifier title state{name type}}}}}')
+                'history(first:100){pageInfo{hasNextPage} nodes{createdAt fromState{type} toState{type}}} '
+                'children(first:100){pageInfo{hasNextPage} nodes{id identifier title completedAt canceledAt state{name type}}}}}')
 CREATE_MUTATION = ('mutation($i:IssueCreateInput!){issueCreate(input:$i){success '
                    'issue{id identifier title parent{id} state{id}}}}')
 EPICS_QUERY = (
@@ -241,6 +242,14 @@ def _decompose(lane, host, name, spec, linear, issue, repo, detail, run_id, work
     return {"verdict": "decomposed", "children": [row["identifier"] for row in created]}
 
 
+def _timestamp(value) -> datetime | None:
+    try:
+        stamp = datetime.fromisoformat(str(value or "").replace("Z", "+00:00"))
+        return stamp.astimezone(timezone.utc) if stamp.tzinfo is not None else None
+    except ValueError:
+        return None
+
+
 def close_epic(linear, epic_id: str, children: list[dict]) -> bool:
     """Request parent validation once; child counts never certify the parent."""
     detail = linear.gql(DETAIL_QUERY, {"id": epic_id})["issue"]
@@ -255,11 +264,34 @@ def close_epic(linear, epic_id: str, children: list[dict]) -> bool:
     current = child_connection.get("nodes") or []
     if children_status(current) != "done":
         return False
-    identity = sorted((str(child.get("id") or child.get("identifier") or ""),
-                       (child.get("state") or {}).get("type")) for child in current)
-    if any(not identifier for identifier, _ in identity):
+    identity = []
+    for child in current:
+        identifier = str(child.get("id") or child.get("identifier") or "")
+        kind = (child.get("state") or {}).get("type")
+        stamp = _timestamp(child.get("completedAt" if kind == "completed" else "canceledAt"))
+        if not identifier or stamp is None:
+            return False
+        identity.append((identifier, kind, stamp.isoformat()))
+    identity.sort()
+    history = detail.get("history") or {}
+    if (history.get("pageInfo", {}).get("hasNextPage") is not False
+            or not isinstance(history.get("nodes"), list)):
         return False
-    key = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()[:16]
+    reopens = []
+    for entry in history["nodes"]:
+        if (entry.get("fromState") or {}).get("type") != "completed":
+            continue
+        target = (entry.get("toState") or {}).get("type")
+        if target == "completed":
+            continue
+        if not target:
+            return False
+        stamp = _timestamp(entry.get("createdAt"))
+        if stamp is None:
+            return False
+        reopens.append(stamp)
+    episode = max(reopens).isoformat() if reopens else None
+    key = hashlib.sha256(json.dumps({"children": identity, "episode": episode}, sort_keys=True).encode()).hexdigest()[:16]
     marker = f"<!-- parent-validation-required:v1 {key} -->"
     if any(marker in str(comment.get("body") or "") for comment in comments["nodes"]):
         return False

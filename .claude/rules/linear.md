@@ -97,6 +97,10 @@ webhook/deployment reconciliation path to `Done`.
 A commissioning parent with no implementing PR may bind its own `outcome`
 receipt to the exact production build it exercised. The lifecycle still checks
 verified deployment, all linked work, and every other required receipt. Child
+delivery timestamps must be complete and the parent's outcome comment must be
+newer than the last child completion/cancellation; an earlier outcome cannot
+certify work delivered later. Each reopened episode gets a new parent evidence
+request even when the terminal children are unchanged. Child
 completion only requests this validation; lane reconciliation never writes the
 parent's `Done`. Ordinary implementation issues still require their merged PR.
 

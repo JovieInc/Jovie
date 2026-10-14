@@ -206,6 +206,7 @@ function hasOpenAcceptanceSection(description) {
  *   required: RequiredReceipt[],
  *   uiEvidence?: UiEvidence[],
  *   receiptNotBefore?: string | null,
+ *   outcomeNotBefore?: string,
  * }} ValidationManifest
  */
 
@@ -242,6 +243,7 @@ export function selectBindingPull(pulls) {
  *     readonly description?: string,
  *     readonly reopenedAfterDone?: boolean,
  *     readonly receiptNotBefore?: string | null,
+ *     readonly outcomeNotBefore?: string,
  *   },
  *   readonly mergedPulls: readonly MergedPull[],
  *   readonly risk: RiskSummary | null,
@@ -282,6 +284,11 @@ export function deriveValidationManifest(input) {
   }
   const outcome = outcomeAcceptanceReasons(input.issue, input.parentReason);
   if (outcome.length > 0) {
+    if (input.issue.outcomeNotBefore) {
+      outcome.push(
+        `record outcome after child delivery at ${input.issue.outcomeNotBefore}`
+      );
+    }
     required.push({ kind: 'outcome', reason: outcome.join('; ') });
   }
   const riskLevel = input.risk?.riskLevel ?? 'unknown';
@@ -370,6 +377,9 @@ export function deriveValidationManifest(input) {
     required,
     ...(input.issue.reopenedAfterDone
       ? { receiptNotBefore: input.issue.receiptNotBefore ?? null }
+      : {}),
+    ...(input.issue.outcomeNotBefore
+      ? { outcomeNotBefore: input.issue.outcomeNotBefore }
       : {}),
     ...(uiEvidence && uiEvidence.length > 0
       ? {
@@ -728,6 +738,7 @@ export function lifecycleStatusKey(input) {
         target: input.target,
         binding: input.manifest.bindingSha,
         episode: input.manifest.receiptNotBefore,
+        outcomeAfter: input.manifest.outcomeNotBefore,
         required: input.manifest.required.map(entry => entry.kind),
         missing: [...input.missing].sort(),
         failing: input.failing

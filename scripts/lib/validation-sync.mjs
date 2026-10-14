@@ -654,6 +654,7 @@ export function selectStateId(name, states) {
  *   description: string,
  *   reopenedAfterDone?: boolean,
  *   receiptNotBefore?: string | null,
+ *   outcomeNotBefore?: string,
  *   state: { id: string, name: string, type: string },
  *   states: { id?: string, name?: string, type?: string }[],
  *   commentRecords: { body: string, createdAt: string }[],
@@ -699,9 +700,17 @@ export async function reconcileValidation(ctx) {
   const currentComments = issue.commentRecords.filter(
     comment => Date.parse(comment.createdAt) > cutoff
   );
+  const outcomeCutoff = Math.max(
+    cutoff,
+    issue.outcomeNotBefore ? Date.parse(issue.outcomeNotBefore) : -Infinity
+  );
   const recordedReceipts = parseValidationReceipts(
     currentComments,
     issue.identifier
+  ).filter(
+    receipt =>
+      receipt.kind !== 'outcome' ||
+      Date.parse(receipt.recordedAt) > outcomeCutoff
   );
   const parentOutcome = ctx.parentReason
     ? recordedReceipts

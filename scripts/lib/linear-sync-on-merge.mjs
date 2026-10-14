@@ -543,7 +543,10 @@ const ISSUE_FIELDS = `
       nodes { body createdAt }
       pageInfo { hasNextPage endCursor }
     }
-    children(first: 50) { nodes { identifier state { type } } }
+    children(first: 50) {
+      nodes { identifier completedAt canceledAt state { type } }
+      pageInfo { hasNextPage }
+    }
     attachments(first: 50) { nodes { url } }
     history(first: 100) {
       nodes { createdAt fromState { type } toState { type } }
@@ -675,6 +678,30 @@ async function readLifecycleIssue(fetchImpl, apiKey, lookupId) {
   const childNodes = Array.isArray(raw.children?.nodes)
     ? raw.children.nodes
     : [];
+  if (
+    !Array.isArray(raw.children?.nodes) ||
+    raw.children?.pageInfo?.hasNextPage !== false
+  ) {
+    throw new Error(
+      `Child delivery evidence for ${raw.identifier} is incomplete`
+    );
+  }
+  const childDeliveryTimes = childNodes
+    .filter(child => ['completed', 'canceled'].includes(child?.state?.type))
+    .map(child =>
+      Date.parse(
+        String(
+          child.state.type === 'completed'
+            ? child.completedAt
+            : child.canceledAt
+        )
+      )
+    );
+  if (childDeliveryTimes.some(time => !Number.isFinite(time))) {
+    throw new Error(
+      `Child delivery timestamp for ${raw.identifier} is unknown`
+    );
+  }
   return {
     ...snapshot,
     state: {
@@ -695,6 +722,13 @@ async function readLifecycleIssue(fetchImpl, apiKey, lookupId) {
       .filter(Boolean),
     reopenedAfterDone: reopens.length > 0,
     receiptNotBefore,
+    ...(childDeliveryTimes.length > 0
+      ? {
+          outcomeNotBefore: new Date(
+            Math.max(...childDeliveryTimes)
+          ).toISOString(),
+        }
+      : {}),
     attachmentUrls: (raw.attachments?.nodes ?? [])
       .map(node => String(node?.url ?? ''))
       .filter(Boolean),

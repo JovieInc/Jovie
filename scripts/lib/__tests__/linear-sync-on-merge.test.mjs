@@ -127,6 +127,64 @@ function sweep(fetchImpl) {
 }
 
 describe('linear sync on merge', () => {
+  it.each(['completed', 'canceled'])(
+    'holds unknown %s child delivery timestamps',
+    async type => {
+      const { world, fetchImpl } = createWorld();
+      const issue = world.issues['JOV-1'];
+      issue.state = 'In Progress';
+      issue.attachments = [];
+      issue.children = [['JOV-2', type, null]];
+      issue.comments.push(receiptComment('JOV-1', {}, '2026-10-03T15:00:00Z'));
+      await expect(sweep(fetchImpl)).rejects.toThrow(
+        'Child delivery timestamp'
+      );
+      expect(world.updates).toEqual([]);
+    }
+  );
+
+  it('holds partial child delivery evidence without accepting the parent outcome', async () => {
+    const { world, fetchImpl } = createWorld();
+    const issue = world.issues['JOV-1'];
+    issue.state = 'In Progress';
+    issue.children = [['JOV-2', 'completed']];
+    issue.comments.push(receiptComment('JOV-1', {}, '2026-10-03T15:00:00Z'));
+    const partial = intercept(fetchImpl, async (url, body, next) => {
+      if (
+        String(url) === 'https://api.linear.app/graphql' &&
+        body?.query?.includes('IssueLifecycle(')
+      ) {
+        const response = await next();
+        const payload = await response.json();
+        payload.data.issue.children.pageInfo.hasNextPage = true;
+        return json(payload);
+      }
+      return undefined;
+    });
+    await expect(sweep(partial)).rejects.toThrow('Child delivery evidence');
+    expect(world.updates).toEqual([]);
+  });
+
+  it.each([false, true])(
+    'requires a fresh parent outcome after child delivery (parent PR=%s)',
+    async hasPull => {
+      const { world, fetchImpl } = createWorld();
+      const issue = world.issues['JOV-1'];
+      issue.state = 'In Progress';
+      issue.attachments = hasPull ? issue.attachments : [];
+      issue.children = [['JOV-2', 'started']];
+      issue.comments.push(receiptComment('JOV-1', {}, '2026-10-03T13:00:00Z'));
+      await sweep(fetchImpl);
+      expect(issue.state).toBe('In Progress');
+      issue.children = [['JOV-2', 'completed', '2026-10-03T14:00:00Z']];
+      await sweep(fetchImpl);
+      expect(issue.state).toBe(hasPull ? 'Validating' : 'In Progress');
+      issue.comments.push(receiptComment('JOV-1', {}, '2026-10-03T15:00:00Z'));
+      await sweep(fetchImpl);
+      expect(issue.state).toBe('Done');
+    }
+  );
+
   it('retains a parent without its own outcome, then closes from fresh verified proof without inventing a parent PR', async () => {
     const { world, fetchImpl } = createWorld();
     const issue = world.issues['JOV-1'];
