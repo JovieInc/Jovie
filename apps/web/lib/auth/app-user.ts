@@ -7,6 +7,18 @@ import { users } from '@/lib/db/schema/auth';
 
 export type AppUser = typeof users.$inferSelect;
 
+/** Resolve an app user by its canonical `users.id` primary key. */
+export const getAppUserById = cache(
+  async (userId: string): Promise<AppUser | null> => {
+    const [row] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    return row ?? null;
+  }
+);
+
 /**
  * Resolve the app `users` row linked to a Better Auth identity.
  *

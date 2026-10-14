@@ -36,6 +36,8 @@ vi.mock('@/lib/admin/roles', () => ({
 
 describe('Admin Impersonation', () => {
   const originalEnv = process.env;
+  const adminUserId = '11111111-1111-4111-8111-111111111111';
+  const targetUserId = '22222222-2222-4222-8222-222222222222';
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -106,10 +108,7 @@ describe('Admin Impersonation', () => {
       delete process.env.URL_ENCRYPTION_KEY;
 
       const { startImpersonation } = await import('@/lib/admin/impersonation');
-      const result = await startImpersonation(
-        'admin-clerk-id',
-        'target-clerk-id'
-      );
+      const result = await startImpersonation(adminUserId, targetUserId);
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Impersonation is disabled');
@@ -120,13 +119,25 @@ describe('Admin Impersonation', () => {
       mockIsAdmin.mockResolvedValue(false);
 
       const { startImpersonation } = await import('@/lib/admin/impersonation');
-      const result = await startImpersonation('not-admin', 'target-clerk-id');
+      const result = await startImpersonation(adminUserId, targetUserId);
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Not authorized - admin access required');
     });
 
-    it('returns error when admin user not found in database', async () => {
+    it('returns error when trying to self-impersonate', async () => {
+      process.env.URL_ENCRYPTION_KEY = 'test-key';
+      mockIsAdmin.mockResolvedValue(true);
+
+      const { startImpersonation } = await import('@/lib/admin/impersonation');
+      const result = await startImpersonation(adminUserId, adminUserId);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Cannot impersonate yourself');
+      expect(mockDbSelect).not.toHaveBeenCalled();
+    });
+
+    it('returns error when target user not found', async () => {
       process.env.URL_ENCRYPTION_KEY = 'test-key';
       mockIsAdmin.mockResolvedValue(true);
 
@@ -139,35 +150,7 @@ describe('Admin Impersonation', () => {
       mockWhere.mockReturnValue({ limit: mockLimit });
 
       const { startImpersonation } = await import('@/lib/admin/impersonation');
-      const result = await startImpersonation(
-        'admin-clerk-id',
-        'target-clerk-id'
-      );
-
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Admin user not found in database');
-    });
-
-    it('returns error when target user not found', async () => {
-      process.env.URL_ENCRYPTION_KEY = 'test-key';
-      mockIsAdmin.mockResolvedValue(true);
-
-      const mockFrom = vi.fn().mockReturnThis();
-      const mockWhere = vi.fn().mockReturnThis();
-      const mockLimit = vi
-        .fn()
-        .mockResolvedValueOnce([{ id: 'admin-db-id' }]) // Admin found
-        .mockResolvedValueOnce([]); // Target not found
-
-      mockDbSelect.mockReturnValue({ from: mockFrom });
-      mockFrom.mockReturnValue({ where: mockWhere });
-      mockWhere.mockReturnValue({ limit: mockLimit });
-
-      const { startImpersonation } = await import('@/lib/admin/impersonation');
-      const result = await startImpersonation(
-        'admin-clerk-id',
-        'target-clerk-id'
-      );
+      const result = await startImpersonation(adminUserId, targetUserId);
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Target user not found');
@@ -181,21 +164,17 @@ describe('Admin Impersonation', () => {
       const mockWhere = vi.fn().mockReturnThis();
       const mockLimit = vi
         .fn()
-        .mockResolvedValueOnce([{ id: 'admin-db-id' }]) // Admin found
-        .mockResolvedValueOnce([{ id: 'target-db-id', deletedAt: new Date() }]); // Target deleted
+        .mockResolvedValue([{ id: targetUserId, deletedAt: new Date() }]);
 
       mockDbSelect.mockReturnValue({ from: mockFrom });
       mockFrom.mockReturnValue({ where: mockWhere });
       mockWhere.mockReturnValue({ limit: mockLimit });
 
       const { startImpersonation } = await import('@/lib/admin/impersonation');
-      const result = await startImpersonation(
-        'admin-clerk-id',
-        'target-clerk-id'
-      );
+      const result = await startImpersonation(adminUserId, targetUserId);
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe('Cannot impersonate deleted or banned user');
+      expect(result.error).toBe('Cannot impersonate a blocked user');
     });
 
     it('returns error when trying to impersonate banned user', async () => {
@@ -206,43 +185,45 @@ describe('Admin Impersonation', () => {
       const mockWhere = vi.fn().mockReturnThis();
       const mockLimit = vi
         .fn()
-        .mockResolvedValueOnce([{ id: 'admin-db-id' }])
-        .mockResolvedValueOnce([{ id: 'target-db-id', userStatus: 'banned' }]);
+        .mockResolvedValue([{ id: targetUserId, userStatus: 'banned' }]);
 
       mockDbSelect.mockReturnValue({ from: mockFrom });
       mockFrom.mockReturnValue({ where: mockWhere });
       mockWhere.mockReturnValue({ limit: mockLimit });
 
       const { startImpersonation } = await import('@/lib/admin/impersonation');
-      const result = await startImpersonation(
-        'admin-clerk-id',
-        'target-clerk-id'
-      );
+      const result = await startImpersonation(adminUserId, targetUserId);
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe('Cannot impersonate deleted or banned user');
+      expect(result.error).toBe('Cannot impersonate a blocked user');
     });
 
-    it('returns error when trying to self-impersonate', async () => {
+    it('returns error when target has no Better Auth identity', async () => {
       process.env.URL_ENCRYPTION_KEY = 'test-key';
       mockIsAdmin.mockResolvedValue(true);
 
       const mockFrom = vi.fn().mockReturnThis();
       const mockWhere = vi.fn().mockReturnThis();
-      const mockLimit = vi
-        .fn()
-        .mockResolvedValueOnce([{ id: 'admin-db-id' }])
-        .mockResolvedValueOnce([{ id: 'admin-db-id', userStatus: 'active' }]);
+      const mockLimit = vi.fn().mockResolvedValue([
+        {
+          id: targetUserId,
+          betterAuthUserId: null,
+          userStatus: 'active',
+          deletedAt: null,
+        },
+      ]);
 
       mockDbSelect.mockReturnValue({ from: mockFrom });
       mockFrom.mockReturnValue({ where: mockWhere });
       mockWhere.mockReturnValue({ limit: mockLimit });
 
       const { startImpersonation } = await import('@/lib/admin/impersonation');
-      const result = await startImpersonation('same-clerk-id', 'same-clerk-id');
+      const result = await startImpersonation(adminUserId, targetUserId);
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe('Cannot impersonate yourself');
+      expect(result.error).toBe(
+        'Target user does not have a Better Auth identity'
+      );
     });
 
     it('successfully starts impersonation session', async () => {
@@ -251,12 +232,15 @@ describe('Admin Impersonation', () => {
 
       const mockFrom = vi.fn().mockReturnThis();
       const mockWhere = vi.fn().mockReturnThis();
-      const mockLimit = vi
-        .fn()
-        .mockResolvedValueOnce([{ id: 'admin-db-id' }])
-        .mockResolvedValueOnce([
-          { id: 'target-db-id', userStatus: 'active', deletedAt: null },
-        ]);
+      const mockLimit = vi.fn().mockResolvedValue([
+        {
+          id: targetUserId,
+          betterAuthUserId: 'ba-target-id',
+          email: 'target@example.com',
+          userStatus: 'active',
+          deletedAt: null,
+        },
+      ]);
 
       mockDbSelect.mockReturnValue({ from: mockFrom });
       mockFrom.mockReturnValue({ where: mockWhere });
@@ -266,10 +250,12 @@ describe('Admin Impersonation', () => {
       const mockValues = vi.fn().mockResolvedValue(undefined);
       mockDbInsert.mockReturnValue({ values: mockValues });
 
-      const { startImpersonation } = await import('@/lib/admin/impersonation');
+      const { getImpersonationState, startImpersonation } = await import(
+        '@/lib/admin/impersonation'
+      );
       const result = await startImpersonation(
-        'admin-clerk-id',
-        'target-clerk-id',
+        adminUserId,
+        targetUserId,
         '192.168.1.1',
         'Mozilla/5.0'
       );
@@ -285,6 +271,13 @@ describe('Admin Impersonation', () => {
         })
       );
       expect(mockDbInsert).toHaveBeenCalled();
+
+      const tokenString = mockCookiesSet.mock.calls[0]?.[1] as string;
+      mockCookiesGet.mockReturnValue({ value: tokenString });
+      await expect(getImpersonationState(adminUserId)).resolves.toMatchObject({
+        realAdminUserId: adminUserId,
+        effectiveUserId: targetUserId,
+      });
     });
   });
 
@@ -357,8 +350,7 @@ describe('Admin Impersonation', () => {
       process.env.URL_ENCRYPTION_KEY = 'test-key';
 
       // Create a token with tampered signature
-      const tamperedToken =
-        'admin-clerk:admin-db:target-clerk:target-db:1234567890:1234567890:tampered-signature';
+      const tamperedToken = `${adminUserId}:${targetUserId}:1234567890:1234567890:tampered-signature`;
       mockCookiesGet.mockReturnValue({ value: tamperedToken });
 
       const { getImpersonationState } = await import(
@@ -375,7 +367,7 @@ describe('Admin Impersonation', () => {
 
       // Create a token with expired timestamp
       const expiredTime = Date.now() - 20 * 60 * 1000; // 20 minutes ago
-      const expiredToken = `admin-clerk:admin-db:target-clerk:target-db:${expiredTime}:${expiredTime}:fake-signature`;
+      const expiredToken = `${adminUserId}:${targetUserId}:${expiredTime}:${expiredTime}:fake-signature`;
       mockCookiesGet.mockReturnValue({ value: expiredToken });
 
       const { getImpersonationState } = await import(
@@ -392,7 +384,7 @@ describe('Admin Impersonation', () => {
 
       // Create a token with future timestamp (beyond allowed clock skew)
       const futureTime = Date.now() + 60 * 1000; // 1 minute in future
-      const futureToken = `admin-clerk:admin-db:target-clerk:target-db:${futureTime}:${futureTime + 15 * 60 * 1000}:fake-signature`;
+      const futureToken = `${adminUserId}:${targetUserId}:${futureTime}:${futureTime + 15 * 60 * 1000}:fake-signature`;
       mockCookiesGet.mockReturnValue({ value: futureToken });
 
       const { getImpersonationState } = await import(

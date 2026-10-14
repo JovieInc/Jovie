@@ -149,7 +149,7 @@ Complete inventory of TanStack Query usage across the Jovie codebase. All hooks 
 | `useApproveWaitlistMutation()` | `useWaitlistMutations.ts` | POST | `/app/admin/waitlist/approve` |
 | `useUpdateWaitlistStatusMutation()` | `useWaitlistMutations.ts` | PATCH | `/app/admin/waitlist/status` |
 
-### Other (5)
+### Other (6)
 
 | Hook | File | Method | Endpoint |
 |------|------|--------|----------|
@@ -157,6 +157,7 @@ Complete inventory of TanStack Query usage across the Jovie codebase. All hooks 
 | `useInviteMutation()` | `useInviteMutation.ts` | POST | `/api/invites` |
 | `useLinkVerificationMutation()` | `useLinkVerificationMutation.ts` | POST | `/api/links/verify` |
 | `usePixelSettingsMutation()` | `usePixelSettingsMutation.ts` | PUT | `/api/dashboard/pixels/settings` |
+| `useStartImpersonationMutation()` | `useImpersonationQuery.ts` | POST | `/api/admin/impersonate` |
 | `useWrapLinkMutation()` | `useWrapLinkMutation.ts` | POST | `/api/links/wrap` |
 
 ---

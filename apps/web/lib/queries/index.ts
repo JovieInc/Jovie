@@ -391,6 +391,7 @@ export {
   type ImpersonationState,
   useEndImpersonationMutation,
   useImpersonationQuery,
+  useStartImpersonationMutation,
 } from './useImpersonationQuery';
 // Ingest profile mutation
 export {
