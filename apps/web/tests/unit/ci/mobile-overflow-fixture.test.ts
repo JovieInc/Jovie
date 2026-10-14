@@ -1,3 +1,4 @@
+import { URL as NodeURL } from 'node:url';
 import type { PlaywrightWorkerOptions } from '@playwright/test';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -28,7 +29,10 @@ let suiteOptions: SuiteOptions;
 beforeAll(async () => {
   // Load the real registration at runtime while keeping the E2E graph outside
   // the maintained unit-test typecheck selector.
-  const specUrl = new URL('../../e2e/mobile-overflow.spec.ts', import.meta.url);
+  const specUrl = new NodeURL(
+    '../../e2e/mobile-overflow.spec.ts',
+    import.meta.url
+  );
   await import(specUrl.href);
   [suiteOptions] = registration.use.mock.calls[0];
 });
