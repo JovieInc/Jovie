@@ -87,3 +87,30 @@ test('rejects drift in the allowlist name or surface inventory', () => {
     false
   );
 });
+
+test('rejects allowlist model drift in either direction', () => {
+  const receipt = healthyReceipt();
+
+  // Stale two-model allowlist that predates typesafe-ai/jev (JOV-7953).
+  assert.equal(
+    isValidWebAiHealthReceipt({
+      ...receipt,
+      gatewayAllowlist: {
+        ...receipt.gatewayAllowlist,
+        models: ['zai/glm-5.3', 'zai/glm-5.3-flash'],
+      },
+    }),
+    false
+  );
+  // Unexpected extra model.
+  assert.equal(
+    isValidWebAiHealthReceipt({
+      ...receipt,
+      gatewayAllowlist: {
+        ...receipt.gatewayAllowlist,
+        models: [...receipt.gatewayAllowlist.models, 'openai/gpt-6'],
+      },
+    }),
+    false
+  );
+});
