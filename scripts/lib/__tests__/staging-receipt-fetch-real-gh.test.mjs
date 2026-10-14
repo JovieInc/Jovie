@@ -6,6 +6,7 @@ import {
   readFileSync,
   realpathSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -102,6 +103,50 @@ function env(root, extra = {}) {
 }
 
 describe('real gh directory selection', () => {
+  it('resolves a symlink to the canonical CLI-only directory', () => {
+    const root = workspace();
+    const bin = join(root, 'bin');
+    mkdirSync(bin);
+    const binary = join(bin, 'gh');
+    writeFileSync(binary, 'binary fixture');
+    chmodSync(binary, 0o755);
+    const link = join(root, 'gh');
+    symlinkSync(binary, link);
+    expect(realGhOnlyDirectory(link, 'darwin')).toBe(realpathSync(bin));
+  });
+
+  it('refuses a canonical executable with a different name', () => {
+    const bin = workspace();
+    const binary = join(bin, 'other-cli');
+    writeFileSync(binary, 'binary fixture');
+    chmodSync(binary, 0o755);
+    expect(realGhOnlyDirectory(binary, 'darwin')).toBeNull();
+  });
+
+  it('refuses a non-executable file and a directory named gh', () => {
+    const bin = workspace();
+    const binary = join(bin, 'gh');
+    writeFileSync(binary, 'binary fixture');
+    chmodSync(binary, 0o644);
+    expect(realGhOnlyDirectory(binary, 'darwin')).toBeNull();
+    rmSync(binary);
+    mkdirSync(binary);
+    expect(realGhOnlyDirectory(binary, 'darwin')).toBeNull();
+  });
+
+  it('falls back when its executable directory cannot be enumerated', () => {
+    const bin = workspace();
+    const binary = join(bin, 'gh');
+    writeFileSync(binary, 'binary fixture');
+    chmodSync(binary, 0o755);
+    chmodSync(bin, 0o111);
+    try {
+      expect(realGhOnlyDirectory(binary, 'darwin')).toBeNull();
+    } finally {
+      chmodSync(bin, 0o755);
+    }
+  });
+
   it('uses only a canonical CLI-only directory on macOS', () => {
     const bin = workspace();
     const binary = join(bin, 'gh');

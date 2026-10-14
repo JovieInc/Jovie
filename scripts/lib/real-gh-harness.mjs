@@ -11,6 +11,7 @@ import {
   readSync,
   realpathSync,
   rmSync,
+  statSync,
 } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
@@ -86,7 +87,11 @@ export function realGhOnlyDirectory(binary, platform = process.platform) {
   if (platform !== 'darwin') return null;
   try {
     const realBinary = realpathSync(binary);
-    if (basename(realBinary) !== 'gh' || isScriptWrapper(realBinary))
+    if (
+      basename(realBinary) !== 'gh' ||
+      !statSync(realBinary).isFile() ||
+      isScriptWrapper(realBinary)
+    )
       return null;
     accessSync(realBinary, constants.X_OK);
     const directory = dirname(realBinary);
