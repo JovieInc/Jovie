@@ -73,3 +73,96 @@ export const Connection: Story = {
     subtitle: 'Maya Vale · DSP',
   },
 };
+
+export const VerifiedPerson: Story = {
+  args: {
+    ...Person.args,
+    thumbnail: (
+      <EntityHeaderThumbnail variant='person' name='Maya Vale' verified />
+    ),
+  },
+};
+export const Event: Story = {
+  args: {
+    title: 'Club Night',
+    subtitle: 'Los Angeles',
+    thumbnail: (
+      <EntityHeaderThumbnail
+        variant='event'
+        name='Club Night'
+        eventDate='2026-06-12'
+      />
+    ),
+  },
+};
+export const MissingRelease: Story = {
+  args: {
+    title: 'Midnight Drive',
+    subtitle: 'Single',
+    thumbnail: (
+      <EntityHeaderThumbnail variant='artwork' name='Midnight Drive' />
+    ),
+  },
+};
+export const BrokenPerson: Story = {
+  args: {
+    ...Person.args,
+    thumbnail: (
+      <EntityHeaderThumbnail
+        variant='person'
+        name='Maya Vale'
+        src='/missing-identity.jpg'
+        verified
+      />
+    ),
+  },
+};
+
+const COMPLETE_ARTWORK = '/img/releases/never-say-a-word.jpg';
+
+export const IdentityStates: Story = {
+  render: () => (
+    <div className='flex w-full flex-col gap-5'>
+      <EntityHeader
+        title='Maya Vale'
+        subtitle='Verified profile'
+        stableLayout
+        thumbnail={
+          <EntityHeaderThumbnail
+            variant='person'
+            name='Maya Vale'
+            src='/identity-failure.jpg'
+            verified
+            data-testid='identity-person'
+          />
+        }
+      />
+      <EntityHeader
+        title='Midnight Drive'
+        subtitle='Single'
+        stableLayout
+        thumbnail={
+          <EntityHeaderThumbnail
+            variant='artwork'
+            name='Midnight Drive artwork'
+            src={COMPLETE_ARTWORK}
+            data-testid='identity-release'
+          />
+        }
+      />
+      <EntityHeader
+        title='Club Night'
+        subtitle='Los Angeles'
+        stableLayout
+        thumbnail={
+          <EntityHeaderThumbnail
+            variant='event'
+            name='Club Night date'
+            eventDate='2026-06-12'
+            data-testid='identity-event'
+          />
+        }
+      />
+    </div>
+  ),
+};

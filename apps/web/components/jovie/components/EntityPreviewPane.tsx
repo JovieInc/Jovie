@@ -1,6 +1,6 @@
 'use client';
 
-import Image from 'next/image';
+import { EntityHeaderThumbnail } from '@/components/molecules/drawer/EntityHeader';
 import type { EntityRef, EntityRefMeta } from '@/lib/commands/entities';
 import { cn } from '@/lib/utils';
 import { formatLongDate } from './entity-mappers';
@@ -235,68 +235,22 @@ function statsFor(entity: EntityRef): StatChip[] {
   return buildTrackStats(meta);
 }
 
-interface DateStampParts {
-  readonly month: string;
-  readonly day: string;
-}
-
-function dateStampParts(iso: string | undefined): DateStampParts | null {
-  if (!iso) return null;
-  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? `${iso}T00:00:00Z` : iso;
-  const d = new Date(normalized);
-  if (Number.isNaN(d.getTime())) return null;
-  const month = d
-    .toLocaleString('en-US', { month: 'short', timeZone: 'UTC' })
-    .toUpperCase();
-  const day = d.toLocaleString('en-US', { day: 'numeric', timeZone: 'UTC' });
-  return { month, day };
-}
-
-function EventDateArtwork({ stamp }: { readonly stamp: DateStampParts }) {
-  return (
-    <div
-      className='system-b-entity-preview-artwork system-b-entity-preview-event-art'
-      data-testid='entity-preview-event-art'
-    >
-      <span className='system-b-entity-preview-event-month'>{stamp.month}</span>
-      <span className='system-b-entity-preview-event-day'>{stamp.day}</span>
-    </div>
-  );
-}
-
 function PreviewArtwork({ entity }: { readonly entity: EntityRef }) {
-  if (
-    entity.kind === 'event' &&
-    entity.meta?.kind === 'event' &&
-    !entity.thumbnail
-  ) {
-    const stamp = dateStampParts(entity.meta.eventDate);
-    if (stamp) return <EventDateArtwork stamp={stamp} />;
-  }
-  if (entity.thumbnail) {
-    return (
-      <div className='system-b-entity-preview-artwork system-b-entity-preview-media-art'>
-        <Image
-          src={entity.thumbnail}
-          alt=''
-          fill
-          sizes='72px'
-          className='object-cover'
-          unoptimized
-        />
-      </div>
-    );
-  }
-  const initials = entity.label
-    .split(/\s+/)
-    .slice(0, 2)
-    .map(part => part.charAt(0))
-    .join('')
-    .toUpperCase();
+  const person = entity.kind === 'artist';
   return (
-    <div className='system-b-entity-preview-artwork system-b-entity-preview-placeholder-art'>
-      {initials || '·'}
-    </div>
+    <EntityHeaderThumbnail
+      variant={
+        person ? 'person' : entity.kind === 'event' ? 'event' : 'artwork'
+      }
+      name={entity.label}
+      alt=''
+      src={entity.thumbnail}
+      size={72}
+      eventDate={
+        entity.meta?.kind === 'event' ? entity.meta.eventDate : undefined
+      }
+      data-testid='entity-preview-media'
+    />
   );
 }
 

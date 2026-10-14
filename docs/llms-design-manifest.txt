@@ -36,6 +36,7 @@
 - `semantic-accent-only` — Accent color communicates semantic state or a named data category, never decoration.
 - `decorative-icons-unboxed` — Decorative icons and emoji have no border, ring, circle, or badge plate.
 - `single-component-family` — One canonical component family owns a concept across customer and operator targets, including state, motion, focus and interaction logic; target adapters supply authorized data, destinations and permissions. Separate implementations require a documented behavior the owner cannot express. Supported states are variants consumed as instances.
+- `semantic-entity-identity` — Entity identity uses one primary shared media treatment: people are circular, releases are square and uncropped, events use calendar treatment. Shared owners handle loading, missing/broken media, accessible labels and source-backed verification. Layout and density are supported variants; provider connection or provenance never implies Jovie verification.
 - `founder-review-canonical-only` — Founder review contains canonical masters and intentional variants, without receipts, duplicates, or filler.
 - `pen-source-identity-boundary` — Pen is proposal/review evidence until source identity and required persistence receipts pass.
 - `logo-visible-bounds-normalization` — Logos normalize visible non-transparent ink through the shared asset registry, never route-local crop or scale CSS.
@@ -58,7 +59,7 @@
 - `border-subtle`, `border-default`, `border-strong`
 - `focus-ring-themed` or `focus-visible:*` on interactive elements
 
-## Design Tokens (275 contract tokens; 536 total in CSS)
+## Design Tokens (282 contract tokens; 544 total in CSS)
 
 Contract tokens below are the semantic surface for AI edits. DSP brand colors and extended accent palettes live in `apps/web/styles/design-system.css` only.
 
@@ -241,7 +242,7 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--app-shell-sidebar-floating-radius`: 14px
 - `--app-shell-sidebar-foreground-rgb`: 18 18 20
 - `--app-shell-sidebar-history-font-size`: 0.78125rem
-- `--app-shell-sidebar-history-grid`: minmax(0, 1fr) auto
+- `--app-shell-sidebar-history-grid`: minmax(0, 1fr) auto var(--space-5)
 - `--app-shell-sidebar-icon-size`: 1rem
 - `--app-shell-sidebar-item-foreground-rgb`: 88 90 96
 - `--app-shell-sidebar-item-icon-rgb`: 122 125 132
@@ -369,6 +370,13 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--duration-fast`: 100ms
 - `--duration-instant`: 50ms
 - `--duration-normal`: 160ms
+- `--duration-o-orbit`: 2600ms
+- `--duration-o-shake`: 460ms
+- `--duration-o-turn`: 1250ms
+- `--duration-o-wind`: 1700ms
+- `--duration-ov-blink-close`: 90ms
+- `--duration-ov-blink-hold`: 40ms
+- `--duration-ov-blink-open`: 170ms
 - `--duration-slow`: 250ms
 - `--duration-slower`: 350ms
 - `--duration-slowest`: 350ms
