@@ -42,6 +42,31 @@ function mockTurnstile(
  * Everything else is silent and routed to OnboardingShell via onStateChange.
  */
 describe('OnboardingTurnstile (minimal presentation)', () => {
+  it('keeps a requested check silent until an interactive challenge paints (JOV-7771)', async () => {
+    vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'site-key');
+    const { render: renderMock } = mockTurnstile();
+
+    render(
+      <OnboardingTurnstile
+        onToken={vi.fn()}
+        onStateChange={vi.fn()}
+        instruction='One quick check before we send'
+      />
+    );
+
+    await waitFor(() => expect(renderMock).toHaveBeenCalled());
+    expect(
+      screen.getByTestId('onboarding-turnstile-widget-frame')
+    ).toHaveAttribute('data-turnstile-mount', 'silent');
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'One quick check before we send'
+    );
+    expect(
+      screen.queryByTestId('onboarding-turnstile-widget-skeleton')
+    ).toBeNull();
+  });
+
   beforeEach(() => {
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
@@ -318,7 +343,7 @@ describe('OnboardingTurnstile (minimal presentation)', () => {
     );
   });
 
-  it('reserves inline space when send is attempted during silent loading', async () => {
+  it('shows one send instruction while the provider stays silently mounted', async () => {
     vi.stubEnv('NODE_ENV', 'test');
     vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'site-key');
     const { render: renderMock } = mockTurnstile();
@@ -334,7 +359,10 @@ describe('OnboardingTurnstile (minimal presentation)', () => {
     await waitFor(() => expect(renderMock).toHaveBeenCalled());
     expect(
       screen.getByTestId('onboarding-turnstile-widget-frame')
-    ).toHaveAttribute('data-turnstile-mount', 'inline');
+    ).toHaveAttribute('data-turnstile-mount', 'silent');
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'One quick check before we send'
+    );
     expect(
       isOnboardingTurnstilePanelVisible(
         { status: 'loading' },

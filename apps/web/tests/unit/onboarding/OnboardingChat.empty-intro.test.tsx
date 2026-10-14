@@ -170,7 +170,7 @@ describe('OnboardingChat empty intro', () => {
     expect(screen.queryByTestId('onboarding-starter-suggestions')).toBeNull();
   });
 
-  it('shows a compact processing state for a validated starter handoff', () => {
+  it('keeps a validated starter as a draft while verification is pending', () => {
     process.env.NODE_ENV = 'test';
     render(
       <OnboardingChat
@@ -183,7 +183,10 @@ describe('OnboardingChat empty intro', () => {
       />
     );
 
-    expect(screen.getByText('Getting this ready')).toBeTruthy();
+    expect(
+      screen.getByRole('heading', { name: 'Your first message' })
+    ).toBeTruthy();
+    expect(screen.queryByText('Your message is on its way.')).toBeNull();
     expect(screen.queryByTestId('onboarding-start-ambient-mark')).toBeNull();
     expect(screen.queryByTestId('onboarding-starter-suggestions')).toBeNull();
   });
