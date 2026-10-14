@@ -303,6 +303,8 @@ def github_model() -> dict:
         merged = merge_evidence.require_complete(evidence)
         model["merged24h"] = [{"number": m["number"], "title": m["title"], "mergedAt": m["mergedAt"],
                                "createdAt": m["createdAt"], "headRefName": m["headRefName"],
+                               "headRefOid": m.get("headRefOid"), "mergeCommit": m.get("mergeCommit"),
+                               "url": m.get("url"), "author": m.get("author"), "mergedBy": m.get("mergedBy"),
                                "lane": (lambda found: found.group("lane") if found else None)(lane.LANE_BRANCH.match(m["headRefName"]))}
                               for m in sorted(merged, key=lambda m: m["mergedAt"], reverse=True)]
     except Exception as error:
@@ -460,6 +462,9 @@ def dur(seconds: int) -> str:
 
 
 def attribution_label(value: dict) -> str:
+    if value.get("confidence") != "verified":
+        method = value.get("shippingMethod") or "unknown"
+        return f"{value.get('confidence') or 'unknown'} {method}"
     category, origin_category = value.get("category"), value.get("originCategory")
     origin, final = value.get("originProvider"), value.get("finalProvider")
     if category == "autonomous-created":
@@ -477,7 +482,7 @@ def attribution_label(value: dict) -> str:
         label = "old codex/* landed later"
     else:
         label = category or "unattributed"
-    reviews = sorted({role["provider"] for role in value.get("roles", []) if role["category"] == "review-only"})
+    reviews = sorted({role["provider"] for role in value.get("roles", []) if role["category"] == "review"})
     return label + (f" · {','.join(reviews)} review-only" if reviews else "")
 
 
@@ -659,14 +664,15 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
     merged = [] if merge_error else github.get("merged24h", [])
     attribution_receipts = local.get("attributionReceipts") or []
     attributions = {m["number"]: lane.pr_attribution(m, attribution_receipts) for m in merged}
-    autonomous = sum(value.get("origin") == lane.AUTONOMOUS_ORIGIN for value in attributions.values())
-    manual_codex = sum(value.get("originCategory") == "manual-codex-app-created" for value in attributions.values())
-    old_codex = sum(value.get("originCategory") == "old-codex-branch-landed-later" for value in attributions.values())
+    verified = sum(value.get("confidence") == "verified" for value in attributions.values())
+    inferred = sum(value.get("confidence") == "inferred" for value in attributions.values())
+    unknown = sum(value.get("confidence") == "unknown" for value in attributions.values())
     if merge_error:
         lines.append(rgb(FG, "RECENTLY MERGED · unknown · ", bold=True) + rgb(RED, merge_error))
     else:
-        lines.append(rgb(FG, f"RECENTLY MERGED · autonomous {autonomous} · manual Codex app {manual_codex} · "
-                         f"old codex/* {old_codex} · total {len(merged)} in 24h · last lane gate {age(local.get('lastLanding'), now)}", bold=True))
+        coverage = f"{verified}/{len(merged)}" if merged else "0/0"
+        lines.append(rgb(FG, f"RECENTLY MERGED · verified {coverage} · inferred {inferred} · unknown {unknown} · "
+                         f"total {len(merged)} in 24h · last lane gate {age(local.get('lastLanding'), now)}", bold=True))
     for m in merged[:3]:
         label = attribution_label(attributions[m["number"]])
         lines.append(pad(f" {rgb(GREEN, '✓')} #{m['number']} {clip(m['title'], 90)} "

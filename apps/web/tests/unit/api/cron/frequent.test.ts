@@ -25,6 +25,7 @@ const {
   mockGetAcquisitionEligibility,
   mockGetAuthSignupOnboardingCanaryStatus,
   mockGetPublicProfileCanaryStatus,
+  mockRefreshCompanyStateCache,
 } = vi.hoisted(() => ({
   mockDbExecute: vi.fn(),
   mockDbSelect: vi.fn(),
@@ -50,6 +51,7 @@ const {
   mockGetAcquisitionEligibility: vi.fn(),
   mockGetAuthSignupOnboardingCanaryStatus: vi.fn(),
   mockGetPublicProfileCanaryStatus: vi.fn(),
+  mockRefreshCompanyStateCache: vi.fn(),
 }));
 
 vi.mock('@/lib/admin/ops-queries', () => ({
@@ -59,6 +61,10 @@ vi.mock('@/lib/admin/ops-queries', () => ({
 
 vi.mock('@/lib/acquisition/eligibility.server', () => ({
   getAcquisitionEligibility: mockGetAcquisitionEligibility,
+}));
+
+vi.mock('@/lib/ovie/company-state.server', () => ({
+  refreshCompanyStateCache: mockRefreshCompanyStateCache,
 }));
 
 vi.mock(
@@ -247,6 +253,11 @@ describe('GET /api/cron/frequent', () => {
     mockGetPublicProfileCanaryStatus.mockImplementation(async () => ({
       runAt: new Date().toISOString(),
     }));
+    mockRefreshCompanyStateCache.mockResolvedValue({
+      revision: 'company-state-revision',
+      activeConstraint: 'certification:public_profile',
+      investigations: [{ id: 'certification:public_profile' }],
+    });
   });
 
   afterEach(() => {
@@ -281,6 +292,7 @@ describe('GET /api/cron/frequent', () => {
       })
     );
     expect(mockProcessCampaigns).toHaveBeenCalledOnce();
+    expect(mockRefreshCompanyStateCache).toHaveBeenCalledOnce();
   });
 
   it('alarms on an expired Redis key even when no acquisition runs', async () => {
@@ -313,6 +325,11 @@ describe('GET /api/cron/frequent', () => {
     });
     expect(mockGetAuthSignupOnboardingCanaryStatus).not.toHaveBeenCalled();
     expect(mockGetPublicProfileCanaryStatus).not.toHaveBeenCalled();
+    expect(mockRefreshCompanyStateCache).toHaveBeenCalledWith(
+      new Date('2026-03-24T10:15:00.000Z'),
+      undefined,
+      { includeExecution: false }
+    );
   });
 
   it('runs notification scheduling and sending on every 15-minute invocation', async () => {
@@ -460,6 +477,11 @@ describe('GET /api/cron/frequent', () => {
     expect(data.results.canaryReceiptFreshness.success).toBe(true);
     expect(mockGetAuthSignupOnboardingCanaryStatus).toHaveBeenCalledOnce();
     expect(mockGetPublicProfileCanaryStatus).toHaveBeenCalledOnce();
+    expect(mockRefreshCompanyStateCache).toHaveBeenCalledWith(
+      new Date('2026-03-24T10:00:00.000Z'),
+      undefined,
+      { includeExecution: true }
+    );
   });
 
   it('returns 207 when notification scheduling fails', async () => {

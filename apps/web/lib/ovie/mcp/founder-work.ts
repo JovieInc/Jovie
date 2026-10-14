@@ -179,13 +179,16 @@ export function createFounderWorkReader(deps: FounderWorkDeps) {
   }
 
   return {
-    async listLinearIssues(limit: number) {
+    async listLinearIssues(limit: number, activeOnly = false) {
       const data = await linearGraphql<{
         issues?: { nodes?: unknown[] };
       }>(
         `query OvieJovieIssues($first: Int!) {
           issues(
-            filter: { team: { key: { eq: "JOV" } } }
+            filter: {
+              team: { key: { eq: "JOV" } }
+              ${activeOnly ? 'state: { type: { in: ["triage", "backlog", "unstarted", "started"] } }' : ''}
+            }
             first: $first
             orderBy: updatedAt
           ) {
