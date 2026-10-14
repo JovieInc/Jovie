@@ -43,6 +43,7 @@ async function expectEssentials(page: Page) {
 declare global {
   interface Window {
     __claimProviderFixture?: { interact: () => void; fail: () => void };
+    __claimLayout?: { supported: boolean; total: number };
   }
 }
 
@@ -142,9 +143,35 @@ test.describe('current-state essential actions (JOV-7771)', () => {
     // Presentation fixture only; real auth/provider acceptance stays in the
     // existing golden path. No ownership or access mutation occurs here.
     await page.addInitScript(installRuntimeAutomationBypass);
+    await page.addInitScript(() => {
+      const metric = {
+        supported:
+          typeof PerformanceObserver === 'function' &&
+          PerformanceObserver.supportedEntryTypes.includes('layout-shift'),
+        total: 0,
+      };
+      window.__claimLayout = metric;
+      if (!metric.supported) return;
+      new PerformanceObserver(list => {
+        for (const entry of list.getEntries()) {
+          const shift = entry as PerformanceEntry & {
+            hadRecentInput: boolean;
+            value: number;
+          };
+          if (!shift.hadRecentInput) metric.total += shift.value;
+        }
+      }).observe({ type: 'layout-shift' });
+    });
+    let releaseReply: () => void = () => {
+      throw new Error('Reply fixture is not initialized');
+    };
+    const replyReady = new Promise<void>(resolve => {
+      releaseReply = resolve;
+    });
     let chatPosts = 0;
     await page.route('**/api/chat', async route => {
       if (route.request().method() === 'POST') chatPosts++;
+      await replyReady;
       await route.fulfill({
         headers: {
           'content-type': 'text/event-stream',
@@ -158,6 +185,33 @@ test.describe('current-state essential actions (JOV-7771)', () => {
       page.getByTestId('chat-user-bubble').filter({ hasText: prompt })
     ).toHaveCount(1);
     await expect.poll(() => chatPosts).toBe(1);
+    const input = page.getByRole('textbox', {
+      name: 'Chat message input',
+      exact: false,
+    });
+    const beforeReply = await input.boundingBox();
+    await expectEssentials(page);
+    expect(await page.evaluate(() => window.__claimLayout?.supported)).toBe(
+      true
+    );
+    await page.evaluate(() => {
+      if (window.__claimLayout) window.__claimLayout.total = 0;
+    });
+    releaseReply();
+    await expect(page.getByText('Your draft is saved.')).toBeVisible();
+    await page.evaluate(
+      () =>
+        new Promise<void>(resolve =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+        )
+    );
+    expect(await page.evaluate(() => window.__claimLayout?.total)).toBe(0);
+    const afterReply = await input.boundingBox();
+    expect(beforeReply).not.toBeNull();
+    expect(afterReply).not.toBeNull();
+    if (beforeReply && afterReply)
+      expect(Math.abs(afterReply.y - beforeReply.y)).toBeLessThanOrEqual(1);
+    await expectEssentials(page);
     await page.route('**/api/onboarding/conversation', route =>
       route.fulfill({
         json: {
