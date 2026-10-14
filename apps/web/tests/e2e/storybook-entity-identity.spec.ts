@@ -1,5 +1,25 @@
 import { expect, test } from '@playwright/test';
 
+for (const width of [1440, 390]) {
+  test(`entity identity consumers render at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    const stories = [
+      ['dashboard-molecules-profilepreview--verified-fallback', 'Sasha Waves'],
+      ['shell-artistavatarstack--overflow', '+1 artists'],
+      ['jovie-entitypreviewpane--calendar-event', 'The Echo'],
+      [
+        'dashboard-organisms-enhanceddashboardlinks--connected-profile',
+        'Sasha Waves',
+      ],
+    ];
+    for (const [id, name] of stories) {
+      await page.goto(`/iframe.html?id=${id}&viewMode=story`);
+      await expect(page.getByText(name, { exact: true }).first()).toBeVisible();
+      await expect(page.locator('.sb-errordisplay')).toBeHidden();
+    }
+  });
+}
+
 for (const width of [1440, 834, 390]) {
   for (const theme of ['dark', 'light']) {
     test(`entity identity preserves semantics and geometry at ${width}px in ${theme}`, async ({
