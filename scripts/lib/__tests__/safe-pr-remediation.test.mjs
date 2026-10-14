@@ -1,15 +1,20 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  apiRetryWaitMs,
   buildCreateCommitVariables,
   buildRemediationReceipt,
   classifyDependencyManifestChange,
   classifyEveLockDrift,
   classifyRootLockDrift,
+  githubRequest,
+  planCommand,
   reportConfigMismatch,
+  reportEvidenceFailure,
   validatePlanAuthority,
   validateRemediationArtifact,
   validateRootRemediationArtifact,
@@ -804,5 +809,166 @@ describe('GitHub Actions remediation separation', () => {
     // Root pnpm.overrides is a deliberate pin: nothing writes package.json.
     expect(workflow).not.toMatch(/pnpm (?:add|up|update|pkg)\b/);
     expect(workflow).not.toContain('--fix-lockfile');
+  });
+});
+
+describe('GitHub evidence read resilience (JOV-8231)', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  const jsonResponse = (body, status = 200, headers = {}) =>
+    new Response(typeof body === 'string' ? body : JSON.stringify(body), {
+      status,
+      headers: { 'content-type': 'application/json', ...headers },
+    });
+
+  it('retries a secondary-limit 403 inside the bounded budget', async () => {
+    const responses = [
+      jsonResponse(
+        '{"message":"You have exceeded a secondary rate limit"}',
+        403,
+        {
+          'retry-after': '1',
+        }
+      ),
+      jsonResponse({ ok: true }),
+    ];
+    const fetchImpl = vi.fn(async () => responses.shift());
+    const sleeps = [];
+    const data = await githubRequest('/repos/x', {
+      token: 't',
+      fetchImpl,
+      now: () => 1_000,
+      sleep: async ms => {
+        sleeps.push(ms);
+      },
+    });
+    expect(data).toEqual({ ok: true });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(sleeps).toEqual([2_000]);
+  });
+
+  it('never retries a permission 403', async () => {
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse('{"message":"Resource not accessible by integration"}', 403)
+    );
+    await expect(
+      githubRequest('/repos/x/pulls/1', {
+        token: 't',
+        fetchImpl,
+        sleep: () => expect.unreachable('permission answers are final'),
+      })
+    ).rejects.toMatchObject({ githubApi: true, status: 403 });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses a primary quota reset that lands past the wait budget', async () => {
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse(
+        '{"message":"API rate limit exceeded for installation id 1"}',
+        403,
+        {
+          'x-ratelimit-remaining': '0',
+          'x-ratelimit-reset': String(Math.floor(1_000 / 1000) + 3_600),
+        }
+      )
+    );
+    await expect(
+      githubRequest('/x', {
+        token: 't',
+        fetchImpl,
+        now: () => 1_000,
+        sleep: () => expect.unreachable('a reset past the budget is final'),
+      })
+    ).rejects.toThrow(/GitHub GET \/x returned 403: API rate limit exceeded/);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('plans no retry past the attempt ceiling or on real answers', () => {
+    expect(
+      apiRetryWaitMs({
+        status: 503,
+        message: '',
+        headers: null,
+        attempt: 3,
+        nowMs: 0,
+      })
+    ).toBeNull();
+    expect(
+      apiRetryWaitMs({
+        status: 404,
+        message: 'Not Found',
+        headers: null,
+        attempt: 1,
+        nowMs: 0,
+      })
+    ).toBeNull();
+  });
+
+  function planEnv() {
+    const dir = mkdtempSync(join(tmpdir(), 'safe-plan-'));
+    const eventPath = join(dir, 'event.json');
+    const outputPath = join(dir, 'output.txt');
+    writeFileSync(
+      eventPath,
+      JSON.stringify({
+        workflow_run: {
+          id: 7,
+          name: 'Eve Pilot',
+          conclusion: 'failure',
+          event: 'pull_request',
+          head_sha: HEAD,
+          pull_requests: [{ number: 21533 }],
+        },
+      })
+    );
+    vi.stubEnv('GH_TOKEN', 't');
+    vi.stubEnv('GITHUB_REPOSITORY', REPO);
+    vi.stubEnv('GITHUB_EVENT_PATH', eventPath);
+    vi.stubEnv('GITHUB_OUTPUT', outputPath);
+    return outputPath;
+  }
+
+  it('turns an unrecoverable GitHub evidence read into a refused candidate, not a red step', async () => {
+    const outputPath = planEnv();
+    const stderr = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const denied = Object.assign(
+      new Error('GitHub GET /repos/JovieInc/Jovie/pulls/21533 returned 403'),
+      { githubApi: true, status: 403 }
+    );
+    const request = vi.fn(async () => {
+      throw denied;
+    });
+
+    await planCommand({ request });
+
+    const output = readFileSync(outputPath, 'utf8');
+    expect(output).toContain('candidate=false');
+    expect(output).toContain('reason=github-evidence-unavailable');
+    expect(stderr).toHaveBeenCalledOnce();
+    expect(stderr.mock.calls[0][0]).toContain('::warning');
+    expect(stderr.mock.calls[0][0]).toContain('PR #21533');
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it('still throws non-GitHub plan defects', async () => {
+    planEnv();
+    const request = vi.fn(async () => {
+      throw new Error('boom');
+    });
+    await expect(planCommand({ request })).rejects.toThrow('boom');
+  });
+
+  it('reportEvidenceFailure only accepts marked GitHub API errors', () => {
+    expect(reportEvidenceFailure(new Error('boom'), 1)).toBe(false);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(
+      reportEvidenceFailure(
+        Object.assign(new Error('denied'), { githubApi: true }),
+        1
+      )
+    ).toBe(true);
   });
 });
