@@ -239,7 +239,7 @@ export function sameAdmissionTarget(left, right) {
   return ADMISSION_TARGET_FIELDS.every(field => a[field] === b[field]);
 }
 
-function validateInventory(inventory) {
+export function validateOwnershipInventory(inventory) {
   const systems = inventory?.systems;
   if (
     inventory?.schema !== OWNERSHIP_INVENTORY_SCHEMA ||
@@ -265,13 +265,50 @@ function validateInventory(inventory) {
     if (!ids.has(required))
       throw new Error(`ownership-inventory-missing-behavior:${required}`);
   }
+  for (const [id, authority] of Object.entries(inventory.authorities || {})) {
+    if (!Array.isArray(authority?.active) || authority.active.length === 0)
+      throw new Error(`ownership-inventory-missing-authority:${id}`);
+    if (authority.active.length !== 1)
+      throw new Error(`ownership-inventory-duplicate-authority:${id}`);
+    for (const source of authority.active) {
+      if (
+        !nonEmptyString(source?.repository) ||
+        !nonEmptyString(source?.root) ||
+        !inventory.repos[source.repository]
+      )
+        throw new Error(`ownership-inventory-invalid-authority:${id}`);
+    }
+    for (const source of authority.compatibility || []) {
+      if (
+        source?.activation !== 'forbidden' ||
+        !nonEmptyString(source.repository) ||
+        !nonEmptyString(source.root) ||
+        !nonEmptyString(source.retirement_gate) ||
+        !inventory.repos[source.repository]
+      )
+        throw new Error(`ownership-inventory-stale-authority:${id}`);
+    }
+  }
+  const summer = systems.find(system => system.id === 'summer-runtime-policy');
+  const summerAuthority = inventory.authorities?.summer?.active?.[0];
+  if (
+    !summerAuthority ||
+    summerAuthority.repository !== summer?.intended_repo ||
+    !Array.isArray(summer.jovie_runtime_artifacts) ||
+    summer.jovie_runtime_artifacts.length === 0 ||
+    !Array.isArray(summer.split_contracts) ||
+    summer.split_contracts.some(
+      contract => !inventory.adapter_sets?.summer?.includes(contract)
+    )
+  )
+    throw new Error('ownership-inventory-invalid-authority:summer');
   return inventory;
 }
 
 export function loadOwnershipInventory() {
   if (cachedInventory) return cachedInventory;
   const parsed = JSON.parse(readFileSync(OWNERSHIP_INVENTORY_PATH, 'utf8'));
-  cachedInventory = Object.freeze(validateInventory(parsed));
+  cachedInventory = Object.freeze(validateOwnershipInventory(parsed));
   return cachedInventory;
 }
 
@@ -284,6 +321,7 @@ export function normalizeSystem(system, inventory = loadOwnershipInventory()) {
     target_system: system.target_system || system.id,
     current_artifacts: system.current_artifacts || [],
     adapter_artifacts: [...(system.adapter_artifacts || []), ...adapterSet],
+    jovie_runtime_artifacts: system.jovie_runtime_artifacts || [],
     keywords: system.keywords || [],
     later_slice: system.later_slice ?? null,
   };
@@ -384,6 +422,7 @@ function matchSystems(inventory, { paths, repos, text }) {
     const prefixes = [
       ...(system.current_artifacts || []),
       ...(system.adapter_artifacts || []),
+      ...(system.jovie_runtime_artifacts || []),
     ];
     const pathHit = longestMatch(paths, prefixes);
     const repoHit =
@@ -457,6 +496,14 @@ export function resolveAdmissionTarget(
         ({ system }) => system.current_repo === LOGYOURBODY_EXECUTION_REPO
       )?.system || defaultSystemForIssue(issue, inventory);
     return admit(packetForSystem(lyb, paths[0] || lyb.default_artifact));
+  }
+
+  const pathMatch = matches.find(({ pathLength }) => pathLength > 0);
+  if (pathMatch) {
+    const target = packetForSystem(pathMatch.system, pathMatch.artifact);
+    return canAdmitToJovie(pathMatch.system, pathMatch.artifact)
+      ? admit(target)
+      : reroute(target);
   }
 
   const jovieMatch = matches.find(({ system, artifact }) =>

@@ -4,6 +4,24 @@
   "slice": 1,
   "consumers": "Later JOV-5278 slices consume this inventory instead of rediscovering systems.",
   "flow": "Tim → Ovie → Eve intake/ack → Summer → Symphony → identified worker",
+  "authorities": {
+    "summer": {
+      "active": [
+        {
+          "repository": "JovieInc/summer-config",
+          "root": "apps/summer"
+        }
+      ],
+      "compatibility": [
+        {
+          "activation": "forbidden",
+          "repository": "JovieInc/Jovie",
+          "retirement_gate": "JOV-6025",
+          "root": "apps/eve-pilot"
+        }
+      ]
+    }
+  },
   "repos": {
     "JovieInc/Jovie": { "verification_authority": "JovieInc/Jovie CI" },
     "JovieInc/summer-config": {
@@ -28,7 +46,8 @@
       "apps/web/lib/ovie/summer-queue-speaker.ts",
       "apps/web/app/api/ovie/summer/",
       "apps/web/app/api/summer/",
-      "apps/desktop/src/summer-runtime-bridge.ts"
+      "apps/desktop/src/summer-runtime-bridge.ts",
+      "packages/agent-transport-contracts/"
     ]
   },
   "systems": [
@@ -80,8 +99,34 @@
         "summer installation",
         "summer recovery"
       ],
+      "jovie_runtime_artifacts": [
+        "apps/eve-pilot/COMMERCIAL_GOVERNOR.md",
+        "apps/eve-pilot/agent/channels/summer-",
+        "apps/eve-pilot/agent/channels/telegram.ts",
+        "apps/eve-pilot/agent/instructions/summer-shadow.ts",
+        "apps/eve-pilot/agent/lib/cursor-recovery.ts",
+        "apps/eve-pilot/agent/lib/e1-",
+        "apps/eve-pilot/agent/lib/governor-",
+        "apps/eve-pilot/agent/lib/runner-source-attestation.ts",
+        "apps/eve-pilot/agent/lib/summer-",
+        "apps/eve-pilot/agent/lib/telegram-allowlist.ts",
+        "apps/eve-pilot/agent/lib/vercel-blob-bottleneck-runtime.ts",
+        "apps/eve-pilot/agent/lib/vercel-blob-shadow-store.ts",
+        "apps/eve-pilot/agent/schedules/summer-",
+        "apps/eve-pilot/agent/tools/linear_issue.ts",
+        "apps/eve-pilot/identities/summer/",
+        "apps/eve-pilot/tests/cursor-recovery.test.ts",
+        "apps/eve-pilot/tests/e1-",
+        "apps/eve-pilot/tests/governor-",
+        "apps/eve-pilot/tests/jov-6163-attestation-interop.test.ts",
+        "apps/eve-pilot/tests/summer-",
+        "apps/eve-pilot/tests/telegram-fallback.test.ts",
+        "apps/eve-pilot/tests/vercel-blob-bottleneck-runtime.test.ts",
+        "apps/eve-pilot/tests/vercel-blob-shadow-store.test.ts"
+      ],
       "jovie_admission": "adapter-only",
-      "later_slice": 2
+      "later_slice": 2,
+      "split_contracts": ["packages/agent-transport-contracts/"]
     },
     {
       "id": "company-canon",
