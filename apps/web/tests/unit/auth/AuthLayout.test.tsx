@@ -50,32 +50,120 @@ vi.mock('@/hooks/useMobileKeyboard', () => ({
   useMobileKeyboard: () => ({ isKeyboardVisible: keyboardVisible }),
 }));
 
+vi.mock('@/components/providers/AuthClientProviders', () => ({
+  AuthClientProviders: ({ children }: { readonly children: ReactNode }) =>
+    children,
+}));
+
+vi.mock('@/components/providers/ResolvedClientProviders', () => ({
+  ResolvedClientProviders: ({ children }: { readonly children: ReactNode }) =>
+    children,
+}));
+
+vi.mock('@/lib/flags/client', () => ({
+  AppFlagProvider: ({ children }: { readonly children: ReactNode }) => children,
+}));
+
+vi.mock('@/lib/flags/server', () => ({
+  getAppFlagsSnapshot: vi.fn().mockResolvedValue({}),
+}));
+
+vi.mock('@/components/molecules/LoadingSkeleton', () => ({
+  AuthFormSkeleton: () => <div>Loading auth form</div>,
+}));
+
+import AuthRouteLayout from '@/app/(auth)/layout';
+import ErrorPageLoading from '@/app/error/user-creation-failed/loading';
+import UserCreationFailedPage from '@/app/error/user-creation-failed/page';
+import OnboardingCheckoutLoading from '@/app/onboarding/checkout/loading';
+import WaitlistRouteLayout from '@/app/waitlist/layout';
 import { AuthLayout } from '@/components/features/auth/AuthLayout';
+import { WaitlistInviteMessage } from '@/components/features/waitlist/WaitlistInviteMessage';
 
 describe('AuthLayout', () => {
   beforeEach(() => {
     keyboardVisible = false;
   });
 
-  it('keeps one main landmark when composed inside the auth route', () => {
+  it('provides a focusable form container without owning the route landmark', () => {
     const { container } = render(
-      <main id='main-content'>
-        <AuthLayout formTitle='Sign In'>
-          <div>Auth form body</div>
-        </AuthLayout>
-      </main>
+      <AuthLayout formTitle='Sign In'>
+        <div>Auth form body</div>
+      </AuthLayout>
     );
 
     expect(screen.getByRole('link', { name: 'Skip to form' })).toHaveAttribute(
       'href',
       '#auth-form'
     );
-    expect(screen.getAllByRole('main')).toHaveLength(1);
-    expect(screen.getByRole('main')).toHaveAttribute('id', 'main-content');
+    expect(screen.queryByRole('main')).not.toBeInTheDocument();
     expect(container.querySelector('#auth-form')).toHaveAttribute(
       'tabIndex',
       '-1'
     );
+  });
+
+  it('keeps one main landmark in the actual auth route composition', async () => {
+    render(
+      await AuthRouteLayout({
+        children: (
+          <AuthLayout formTitle='Sign In'>
+            <div>Auth form body</div>
+          </AuthLayout>
+        ),
+      })
+    );
+
+    expect(screen.getAllByRole('main')).toHaveLength(1);
+    expect(screen.getByRole('main')).toHaveTextContent('Auth form body');
+  });
+
+  it('keeps one main landmark in the standalone waitlist route', async () => {
+    render(
+      await WaitlistRouteLayout({
+        children: (
+          <AuthLayout formTitle='Continue to Jovie'>
+            <div>Waitlist form body</div>
+          </AuthLayout>
+        ),
+      })
+    );
+
+    expect(screen.getAllByRole('main')).toHaveLength(1);
+    expect(screen.getByRole('main')).toHaveTextContent('Waitlist form body');
+  });
+
+  it('keeps one main landmark on account-creation recovery', () => {
+    render(<UserCreationFailedPage />);
+
+    expect(screen.getAllByRole('main')).toHaveLength(1);
+    expect(screen.getByRole('main')).toHaveTextContent('Account setup error');
+  });
+
+  it('keeps one main landmark around waitlist invite recovery', async () => {
+    render(
+      await WaitlistRouteLayout({
+        children: (
+          <WaitlistInviteMessage
+            title='Invite link missing'
+            body='Open the latest invite email and try again.'
+          />
+        ),
+      })
+    );
+
+    expect(screen.getAllByRole('main')).toHaveLength(1);
+    expect(screen.getByRole('main')).toHaveTextContent('Invite link missing');
+  });
+
+  it.each([
+    ['account recovery', ErrorPageLoading],
+    ['onboarding checkout', OnboardingCheckoutLoading],
+  ])('keeps one main landmark while standalone %s loads', (_, Loading) => {
+    render(<Loading />);
+
+    expect(screen.getAllByRole('main')).toHaveLength(1);
+    expect(screen.getByRole('main')).toHaveTextContent('Loading auth form');
   });
 
   it('keeps the homepage logo link available when the split rail is shown', async () => {

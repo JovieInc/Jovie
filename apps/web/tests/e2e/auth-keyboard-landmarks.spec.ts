@@ -38,3 +38,35 @@ for (const route of ['/signup', '/signin']) {
     });
   }
 }
+
+for (const route of ['/waitlist', '/error/user-creation-failed']) {
+  for (const width of [390, 768, 1440]) {
+    test(`standalone ${route} retains a main landmark and keyboard skip at ${width}px @smoke`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 1000 });
+      await page.goto(route, { waitUntil: 'domcontentloaded' });
+      await expect(page.locator('#auth-form')).toBeVisible();
+      await expect(page.getByRole('main')).toHaveCount(1);
+      await page.getByRole('link', { name: 'Skip to form' }).focus();
+      await page.keyboard.press('Enter');
+      await expect(page.locator('#auth-form')).toBeFocused();
+    });
+  }
+}
+
+for (const width of [390, 768, 1440]) {
+  test(`waitlist invite recovery has one main landmark at ${width}px @smoke`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 1000 });
+    await page.goto('/waitlist/invite', { waitUntil: 'domcontentloaded' });
+    await expect(
+      page.getByRole('heading', { name: 'Invite link missing' })
+    ).toBeVisible();
+    await expect(page.getByRole('main')).toHaveCount(1);
+    await expect(
+      page.getByRole('link', { name: 'Check waitlist status' })
+    ).toHaveAttribute('href', '/waitlist');
+  });
+}
