@@ -947,10 +947,10 @@ export function JovieChat({
                   >
                     <div className={CHAT_CONTENT_SHELL_CLASSNAME}>
                       {composerSurface}
+                      {inlineChatError ? (
+                        <div className='mt-3 w-full'>{inlineChatError}</div>
+                      ) : null}
                     </div>
-                    {inlineChatError ? (
-                      <div className='mt-3 w-full'>{inlineChatError}</div>
-                    ) : null}
                   </ChatEmptyStateComposerRegion>
                 )}
               </div>
