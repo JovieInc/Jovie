@@ -133,6 +133,10 @@ export function capabilityEventFromEvidence(evidence, change) {
   };
 }
 
+/** @typedef {string | { version?: string }} LockSpec */
+/** @typedef {Record<string, Record<string, LockSpec> | undefined>} DepBlock */
+/** @typedef {{ importers: Record<string, DepBlock> }} PnpmLock */
+
 function filesUnder(root, directory) {
   const start = join(root, directory);
   if (!existsSync(start)) return [];
@@ -147,7 +151,7 @@ function filesUnder(root, directory) {
 export function buildStackInventory(root, commitSha, priorInventory = null) {
   text(commitSha, 'commitSha');
   const lockText = readFileSync(join(root, 'pnpm-lock.yaml'), 'utf8');
-  const lock = yaml.load(lockText);
+  const lock = /** @type {PnpmLock} */ (yaml.load(lockText));
   const rootPackageText = readFileSync(join(root, 'package.json'), 'utf8');
   const rootPackage = JSON.parse(rootPackageText);
   const manifests = [];
@@ -206,9 +210,7 @@ export function buildStackInventory(root, commitSha, priorInventory = null) {
     'turbo.json',
     ...globSync(
       '{apps,packages,workers}/*/{next.config.js,next.config.mjs,vercel.json}',
-      {
-        cwd: root,
-      }
+      { cwd: root }
     ),
   ].filter(path => existsSync(join(root, path)));
   const sourceDigest = digest([
@@ -313,9 +315,7 @@ export function adaptStackDelta(delta, source, priorSourceKeys = [], nowUtc) {
       freshness: 'unknown',
       researchPerformed: false,
       reason: text(source?.error, 'source.error'),
-      retryAt: new Date(
-        Date.parse(nowUtc) + delayHours * 3_600_000
-      ).toISOString(),
+      retryAt: new Date(Date.parse(nowUtc) + delayHours * 36e5).toISOString(),
     };
   }
   if (!STACK_CHANGE_TYPES.includes(delta?.changeType))
@@ -350,14 +350,12 @@ export function adaptStackDelta(delta, source, priorSourceKeys = [], nowUtc) {
     revenuePathConflict: 'preemptible behind revenue-critical work',
   });
   const className =
-    delta.changeType === 'security-patch'
-      ? 'policy-terms-security-or-privacy'
-      : delta.changeType === 'deprecation-eol'
-        ? 'deprecation'
-        : delta.changeType === 'breaking-migration' ||
-            delta.changeType === 'prerelease'
-          ? 'protocol-or-platform'
-          : 'new-or-improved-capability';
+    {
+      'security-patch': 'policy-terms-security-or-privacy',
+      'deprecation-eol': 'deprecation',
+      'breaking-migration': 'protocol-or-platform',
+      prerelease: 'protocol-or-platform',
+    }[delta.changeType] ?? 'new-or-improved-capability';
   const base = capabilityEventFromEvidence(evidence, {
     provider: delta.packageName,
     externalChangeId: `${delta.externalId}:${source.revision}`,
@@ -431,9 +429,8 @@ export function assessStackAdoption({
     )
   );
   const capabilityDecision = byKind.get('capability');
-  const checkedException = exception
-    ? validateException(exception, assessedAt)
-    : null;
+  const checkedException =
+    exception == null ? null : validateException(exception, assessedAt);
   if (
     mature &&
     coverage.counts['needs-migration'] > 0 &&
