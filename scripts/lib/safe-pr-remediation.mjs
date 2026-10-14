@@ -5,6 +5,8 @@ import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
 
+import { classifyGitHubFailure } from './github-rate-limit.mjs';
+
 export const PLAN_SCHEMA = 'jovie-safe-pr-remediation/v1';
 export const RECEIPT_SCHEMA = 'jovie-safe-pr-remediation-receipt/v1';
 export const REMEDIATION_CONTEXT = 'jovie-safe-remediation/v1';
@@ -642,27 +644,148 @@ export function buildCreateCommitVariables({ plan, receipt, lockfileBytes }) {
 }
 
 /**
- * @param {string} path
- * @param {{token: string, method?: string, body?: unknown}} options
+ * GitHub answers that say nothing about the PR under repair — quota
+ * exhaustion, secondary/abuse limits, transient 5xx — are retried inside a
+ * bounded budget instead of turning the classifier red and paging
+ * main-failure intake (the shared GITHUB_TOKEN quota outage on 2026-10-13
+ * failed this step on GET /pulls with a bare 403, JOV-8231). A permission
+ * 403, 404, or a reset past the wait budget still throws a marked
+ * `githubApi` error; the caller decides whether missing evidence is fatal.
  */
-async function githubRequest(path, { token, method = 'GET', body }) {
-  const response = await fetch(`https://api.github.com${path}`, {
-    method,
-    redirect: 'follow',
-    headers: {
-      Accept: 'application/vnd.github+json',
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      'X-GitHub-Api-Version': '2022-11-28',
-    },
-    body: body === undefined ? undefined : JSON.stringify(body),
+export const MAX_API_ATTEMPTS = 3;
+const MAX_API_WAIT_MS = 60_000;
+
+/** Wait before the next attempt, or null when the answer is final or past budget. */
+export function apiRetryWaitMs({ status, message, headers, attempt, nowMs }) {
+  if (attempt >= MAX_API_ATTEMPTS) return null;
+  const failure = classifyGitHubFailure({
+    status,
+    message,
+    headers,
+    now: nowMs,
   });
-  const text = await response.text();
-  if (!response.ok)
-    throw new Error(`GitHub ${method} ${path} returned ${response.status}`);
-  if (!text) return null;
-  const contentType = response.headers.get('content-type') ?? '';
-  return contentType.includes('json') ? JSON.parse(text) : text;
+  if (!failure.retryable) return null;
+  const waitMs =
+    failure.retryAtMs !== null
+      ? failure.retryAtMs - nowMs
+      : Math.min(30_000, 1_000 * 2 ** (attempt - 1));
+  return waitMs <= MAX_API_WAIT_MS ? Math.max(0, waitMs) : null;
+}
+
+/**
+ * GitHub transport failure. `githubApi` is a real field so checkJs can see
+ * it; callers use it to tell missing evidence from a workflow defect.
+ */
+class GitHubApiError extends Error {
+  /**
+   * @param {string} message
+   * @param {number | null} status
+   * @param {unknown} headers
+   * @param {string} body
+   */
+  constructor(message, status, headers, body) {
+    super(message);
+    this.name = 'GitHubApiError';
+    this.githubApi = true;
+    this.status = status;
+    this.headers = headers;
+    this.body = body;
+  }
+}
+
+function gitHubApiError(path, method, status, text, headers) {
+  let detail = '';
+  try {
+    detail = JSON.parse(text)?.message ?? '';
+  } catch {
+    detail = '';
+  }
+  return new GitHubApiError(
+    `GitHub ${method} ${path} returned ${status}${detail ? `: ${detail}` : ''}`,
+    status,
+    headers,
+    text
+  );
+}
+
+/**
+ * @param {string} path
+ * @param {{token: string, method?: string, body?: unknown,
+ *   fetchImpl?: typeof fetch, now?: () => number,
+ *   sleep?: (delayMs: number) => Promise<void>}} options
+ */
+export async function githubRequest(
+  path,
+  {
+    token,
+    method = 'GET',
+    body,
+    fetchImpl = fetch,
+    now = Date.now,
+    sleep = delayMs =>
+      new Promise(resolve => {
+        setTimeout(resolve, delayMs);
+      }),
+  }
+) {
+  for (let attempt = 1; ; attempt += 1) {
+    let response;
+    try {
+      response = await fetchImpl(`https://api.github.com${path}`, {
+        method,
+        redirect: 'follow',
+        headers: {
+          Accept: 'application/vnd.github+json',
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'X-GitHub-Api-Version': '2022-11-28',
+        },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+    } catch (cause) {
+      const error = new GitHubApiError(
+        `GitHub ${method} ${path} request failed: ${
+          cause instanceof Error ? cause.message : String(cause)
+        }`,
+        null,
+        null,
+        ''
+      );
+      const waitMs = apiRetryWaitMs({
+        status: null,
+        message: error.message,
+        headers: null,
+        attempt,
+        nowMs: now(),
+      });
+      if (waitMs === null) throw error;
+      await sleep(waitMs);
+      continue;
+    }
+    const text = await response.text();
+    if (!response.ok) {
+      const error = gitHubApiError(
+        path,
+        method,
+        response.status,
+        text,
+        response.headers
+      );
+      const waitMs = apiRetryWaitMs({
+        status: response.status,
+        message: text,
+        headers: response.headers,
+        attempt,
+        nowMs: now(),
+      });
+      if (waitMs === null) throw error;
+      await sleep(waitMs);
+      continue;
+    }
+    if (!text) return null;
+    const contentType = response.headers.get('content-type') ?? '';
+    return contentType.includes('json') ? JSON.parse(text) : text;
+  }
 }
 
 /**
@@ -712,9 +835,15 @@ export async function waitForCommittedPrHead({
   );
 }
 
-async function fetchRepositoryFile(repository, path, ref, token) {
+async function fetchRepositoryFile(
+  repository,
+  path,
+  ref,
+  token,
+  request = githubRequest
+) {
   const encodedPath = path.split('/').map(encodeURIComponent).join('/');
-  const payload = await githubRequest(
+  const payload = await request(
     `/repos/${repository}/contents/${encodedPath}?ref=${encodeURIComponent(ref)}`,
     { token }
   );
@@ -727,10 +856,15 @@ async function fetchRepositoryFile(repository, path, ref, token) {
   return Buffer.from(payload.content.replace(/\s/g, ''), 'base64');
 }
 
-async function fetchChangedFiles(repository, prNumber, token) {
+async function fetchChangedFiles(
+  repository,
+  prNumber,
+  token,
+  request = githubRequest
+) {
   const files = [];
   for (let page = 1; page <= 4; page += 1) {
-    const batch = await githubRequest(
+    const batch = await request(
       `/repos/${repository}/pulls/${prNumber}/files?per_page=100&page=${page}`,
       { token }
     );
@@ -778,8 +912,14 @@ export function reportConfigMismatch(result, prNumber) {
   return true;
 }
 
-async function fetchFailedJobLogs({ repository, workflowRun, token, accept }) {
-  const jobsResponse = await githubRequest(
+async function fetchFailedJobLogs({
+  repository,
+  workflowRun,
+  token,
+  accept,
+  request = githubRequest,
+}) {
+  const jobsResponse = await request(
     `/repos/${repository}/actions/runs/${workflowRun.id}/jobs?filter=latest&per_page=100`,
     { token }
   );
@@ -787,7 +927,7 @@ async function fetchFailedJobLogs({ repository, workflowRun, token, accept }) {
   for (const job of jobsResponse.jobs ?? []) {
     if (job.conclusion !== 'failure' || !accept(job)) continue;
     if (failedJobs.length >= MAX_ROOT_FAILED_JOB_LOGS) break;
-    const log = await githubRequest(
+    const log = await request(
       `/repos/${repository}/actions/jobs/${job.id}/logs`,
       { token }
     );
@@ -801,14 +941,27 @@ async function fetchFailedJobLogs({ repository, workflowRun, token, accept }) {
   return failedJobs;
 }
 
-async function planRootCommand({ repository, workflowRun, pr, files, token }) {
+async function planRootCommand({
+  repository,
+  workflowRun,
+  pr,
+  files,
+  token,
+  request,
+}) {
   const manifestPaths = files.filter(isManifestPath).sort();
   const manifestEvidence = [];
   if (manifestPaths.length <= MAX_ROOT_MANIFESTS) {
     for (const path of manifestPaths) {
       const [baseBytes, headBytes] = await Promise.all([
-        fetchRepositoryFile(repository, path, pr.base.sha, token),
-        fetchRepositoryFile(repository, path, workflowRun.head_sha, token),
+        fetchRepositoryFile(repository, path, pr.base.sha, token, request),
+        fetchRepositoryFile(
+          repository,
+          path,
+          workflowRun.head_sha,
+          token,
+          request
+        ),
       ]);
       manifestEvidence.push(
         classifyDependencyManifestChange({ baseBytes, headBytes, path })
@@ -820,6 +973,7 @@ async function planRootCommand({ repository, workflowRun, pr, files, token }) {
     workflowRun,
     token,
     accept: () => true,
+    request,
   });
   const result = classifyRootLockDrift({
     workflowRun,
@@ -833,7 +987,26 @@ async function planRootCommand({ repository, workflowRun, pr, files, token }) {
   reportConfigMismatch(result, pr.number);
 }
 
-async function planCommand() {
+/**
+ * A GitHub evidence read that cannot be satisfied — a bare 403 on the
+ * read-only Dependabot-triggered workflow_run token, or a quota reset past
+ * the retry budget (JOV-8231) — proves nothing about the PR and is not a
+ * workflow defect. Refuse the candidate with a warning annotation and step
+ * summary, keep the step green, and let the next failed run retry
+ * classification instead of paging main-failure intake.
+ */
+export function reportEvidenceFailure(error, prNumber) {
+  if (!error?.githubApi) return false;
+  const message = `PR #${prNumber}: GitHub evidence read failed (${error.message}). Safe remediation cannot prove the exact-head drift, so no repair is attempted.`;
+  console.error(
+    `::warning title=Safe remediation evidence unavailable::${message}`
+  );
+  if (process.env.GITHUB_STEP_SUMMARY)
+    appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${message}\n`);
+  return true;
+}
+
+export async function planCommand({ request = githubRequest } = {}) {
   const token = process.env.GH_TOKEN;
   const repository = process.env.GITHUB_REPOSITORY;
   const eventPath = process.env.GITHUB_EVENT_PATH;
@@ -847,57 +1020,75 @@ async function planCommand() {
     appendOutput('reason', 'workflow-has-no-unique-pr');
     return;
   }
-  const pr = await githubRequest(`/repos/${repository}/pulls/${prNumber}`, {
-    token,
-  });
-  // Cheap author gate first: the root lane observes every failed CI run.
-  if (
-    workflowRun.name === ROOT_WORKFLOW_NAME &&
-    pr?.user?.login !== 'dependabot[bot]'
-  ) {
-    writePlanOutputs({ eligible: false, reason: 'author-not-dependabot' });
-    return;
-  }
-  const files = await fetchChangedFiles(repository, prNumber, token);
-  if (!/^[0-9a-f]{40}$/.test(pr.base?.sha ?? '')) {
-    appendOutput('candidate', 'false');
-    appendOutput('reason', 'invalid-base');
-    return;
-  }
-  if (workflowRun.name === ROOT_WORKFLOW_NAME)
-    return planRootCommand({ repository, workflowRun, pr, files, token });
-  const basePackageBytes = await fetchRepositoryFile(
-    repository,
-    TARGET_PACKAGE_PATH,
-    pr.base?.sha,
-    token
-  );
-  const headPackageBytes = await fetchRepositoryFile(
-    repository,
-    TARGET_PACKAGE_PATH,
-    workflowRun.head_sha,
-    token
-  );
-  const manifestEvidence = classifyDependencyManifestChange({
-    baseBytes: basePackageBytes,
-    headBytes: headPackageBytes,
-  });
-  const failedJobs = await fetchFailedJobLogs({
-    repository,
-    workflowRun,
-    token,
-    accept: job => job.name === 'Verify isolated Eve pilot',
-  });
-  writePlanOutputs(
-    classifyEveLockDrift({
-      workflowRun,
-      pr,
-      files,
-      failedJobs,
+  try {
+    const pr = await request(`/repos/${repository}/pulls/${prNumber}`, {
+      token,
+    });
+    // Cheap author gate first: the root lane observes every failed CI run.
+    if (
+      workflowRun.name === ROOT_WORKFLOW_NAME &&
+      pr?.user?.login !== 'dependabot[bot]'
+    ) {
+      writePlanOutputs({ eligible: false, reason: 'author-not-dependabot' });
+      return;
+    }
+    const files = await fetchChangedFiles(repository, prNumber, token, request);
+    if (!/^[0-9a-f]{40}$/.test(pr.base?.sha ?? '')) {
+      appendOutput('candidate', 'false');
+      appendOutput('reason', 'invalid-base');
+      return;
+    }
+    if (workflowRun.name === ROOT_WORKFLOW_NAME)
+      return await planRootCommand({
+        repository,
+        workflowRun,
+        pr,
+        files,
+        token,
+        request,
+      });
+    const basePackageBytes = await fetchRepositoryFile(
       repository,
-      manifestEvidence,
-    })
-  );
+      TARGET_PACKAGE_PATH,
+      pr.base?.sha,
+      token,
+      request
+    );
+    const headPackageBytes = await fetchRepositoryFile(
+      repository,
+      TARGET_PACKAGE_PATH,
+      workflowRun.head_sha,
+      token,
+      request
+    );
+    const manifestEvidence = classifyDependencyManifestChange({
+      baseBytes: basePackageBytes,
+      headBytes: headPackageBytes,
+    });
+    const failedJobs = await fetchFailedJobLogs({
+      repository,
+      workflowRun,
+      token,
+      accept: job => job.name === 'Verify isolated Eve pilot',
+      request,
+    });
+    writePlanOutputs(
+      classifyEveLockDrift({
+        workflowRun,
+        pr,
+        files,
+        failedJobs,
+        repository,
+        manifestEvidence,
+      })
+    );
+  } catch (error) {
+    if (!reportEvidenceFailure(error, prNumber)) throw error;
+    writePlanOutputs({
+      eligible: false,
+      reason: 'github-evidence-unavailable',
+    });
+  }
 }
 
 function receiptCommand(args) {
