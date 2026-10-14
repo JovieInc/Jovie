@@ -96,12 +96,17 @@ vi.mock('@/components/features/onboarding/OnboardingToolArtifacts', () => ({
 vi.mock('@/components/jovie/components', () => ({
   ChatEmptyStateComposerRegion: ({
     above,
+    alignAbove,
     children,
   }: {
     readonly above?: React.ReactNode;
+    readonly alignAbove?: 'top' | 'bottom';
     readonly children: React.ReactNode;
   }) => (
-    <div data-testid='chat-empty-state-composer-region'>
+    <div
+      data-testid='chat-empty-state-composer-region'
+      data-align-above={alignAbove}
+    >
       {above}
       {children}
     </div>
@@ -147,6 +152,9 @@ describe('OnboardingChat empty intro', () => {
     });
     expect(chatMocks.sendMessage).not.toHaveBeenCalled();
     expect(activity).not.toHaveBeenCalled();
+    expect(
+      screen.getByTestId('chat-empty-state-composer-region')
+    ).toHaveAttribute('data-align-above', 'top');
   });
 
   beforeEach(() => {

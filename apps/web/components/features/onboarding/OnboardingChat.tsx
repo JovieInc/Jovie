@@ -692,7 +692,10 @@ function OnboardingMessageRegion({
   );
 
   return (
-    <ChatEmptyStateComposerRegion above={conversationAboveComposer}>
+    <ChatEmptyStateComposerRegion
+      alignAbove='top'
+      above={conversationAboveComposer}
+    >
       <div className='w-full' data-testid='onboarding-centered-composer'>
         {onboardingComposerSurface}
       </div>

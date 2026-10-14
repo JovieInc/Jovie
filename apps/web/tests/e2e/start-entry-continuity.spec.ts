@@ -97,6 +97,23 @@ test.describe('current-state essential actions (JOV-7771)', () => {
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
+    // Exercise actual verification, rather than CI's synthetic-principal
+    // short circuit. This fixture opts OUT of the HTML automation bypass;
+    // it grants no app auth/access and intercepts only the provider script.
+    await page.addInitScript(() => {
+      const requireVerification = () => {
+        if (document.documentElement?.dataset.e2eMode === '1') {
+          document.documentElement.dataset.e2eMode = '0';
+        }
+      };
+      new MutationObserver(requireVerification).observe(document, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['data-e2e-mode'],
+      });
+      requireVerification();
+    });
     await page.route(
       'https://challenges.cloudflare.com/turnstile/v0/api.js*',
       route =>
