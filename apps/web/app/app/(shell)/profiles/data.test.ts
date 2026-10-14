@@ -195,7 +195,9 @@ describe('profile workspace DSP portrait provenance', () => {
         profileId: 'profile-1',
       });
       const row = data.rows.find(item => item.id === 'surface-anghami');
-      expect(row?.identityPhoto).toMatchObject({
+      if (row?.rowType !== 'surface')
+        throw new Error('Expected an Anghami surface');
+      expect(row.identityPhoto).toMatchObject({
         url: expected,
         verified: false,
       });
