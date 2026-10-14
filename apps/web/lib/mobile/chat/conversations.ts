@@ -29,12 +29,15 @@ export interface MobileConversationMessage {
 }
 
 export async function listMobileConversations(input: {
+  readonly userId: string;
   readonly creatorProfileId: string;
   readonly limit?: number;
   readonly workspace?: AppShellMode;
 }): Promise<readonly MobileConversationSummary[]> {
   const conversations = await listCreatorConversations({
+    userId: input.userId,
     creatorProfileId: input.creatorProfileId,
+    audience: input.workspace === 'ov' ? 'ov' : 'customer',
     limit: 50,
   });
   const ov = input.workspace === 'ov';
@@ -48,7 +51,9 @@ export async function listMobileConversations(input: {
 
 export async function getMobileConversationDetail(input: {
   readonly conversationId: string;
+  readonly userId: string;
   readonly creatorProfileId: string;
+  readonly audience: 'customer' | 'ov';
   readonly limit?: number;
   readonly before?: string | null;
 }): Promise<{
