@@ -23,6 +23,69 @@ function chatRequest(body: unknown, headers?: Record<string, string>) {
 }
 
 describe('parseChatRequestBody', () => {
+  it.each(['https://example.com/file.png', 'http://127.0.0.1/file.png'])(
+    'rejects a remote attachment outside upload storage: %s',
+    async url => {
+      const result = await parseChatRequestBody(
+        chatRequest({
+          messages: [
+            {
+              id: 'm1',
+              role: 'user',
+              parts: [{ type: 'file', mediaType: 'image/png', url }],
+            },
+          ],
+        }),
+        { corsHeaders: {}, requestId: 'req-attachment' }
+      );
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.response.status).toBe(400);
+      expect(result.response.headers.get('x-request-id')).toBe(
+        'req-attachment'
+      );
+    }
+  );
+
+  it.each([
+    null,
+    { type: 'text', text: 42 },
+    { type: 'file', mediaType: 'image/png' },
+    {
+      type: 'file',
+      mediaType: '*/*',
+      url: 'https://test-store.public.blob.vercel-storage.com/file.png',
+    },
+  ])('returns 400 for malformed parts %j', async part => {
+    const result = await parseChatRequestBody(
+      chatRequest({ messages: [{ id: 'm1', role: 'user', parts: [part] }] }),
+      { corsHeaders: {}, requestId: 'req-malformed' }
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.response.status).toBe(400);
+  });
+
+  it.each([
+    'https://test-store.public.blob.vercel-storage.com/file.png',
+    'data:image/png;base64,iVBORw0KGgo=',
+  ])('preserves supported attachments in parsed messages: %s', async url => {
+    const messages = [
+      {
+        id: 'm1',
+        role: 'user',
+        parts: [{ type: 'file', mediaType: 'image/png', url }],
+      },
+    ];
+    const result = await parseChatRequestBody(chatRequest({ messages }), {
+      corsHeaders: {},
+      requestId: 'req-upload',
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.uiMessages).toEqual(messages);
+  });
+
   it('rejects oversized bodies before JSON parse with 413', async () => {
     const request = chatRequest(
       {
