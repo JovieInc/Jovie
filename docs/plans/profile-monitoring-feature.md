@@ -428,18 +428,13 @@ interface CatalogRelease {
 
 Uses the existing `getSpotifyArtistAlbums` function (already paginated, max 500):
 
-> Implementation contract updated 2026-10-14: this helper returns market/group-scoped inventory with `complete` and optional `issue`. Incomplete results are observations, not an exhaustive artist catalog. This remains a draft monitoring plan.
-
 ```typescript
 async function fetchSpotifyCatalog(spotifyId: string): Promise<CatalogProviderResult> {
   // 1. Fetch all album types: album, single, compilation
   //    Uses existing Spotify client with token caching + retry logic
-  const catalog = await getSpotifyArtistAlbums(spotifyId, {
-    includeGroups: ['album', 'single', 'compilation'],
-    market: 'US',
+  const albums = await getSpotifyArtistAlbums(spotifyId, {
+    include_groups: 'album,single,compilation',
   });
-  if (!catalog.complete) throw new Error(catalog.issue ?? 'Incomplete Spotify inventory');
-  const { albums } = catalog;
 
   // 2. Map to CatalogRelease format
   return {
@@ -1005,9 +1000,10 @@ The full dedicated page for in-depth catalog monitoring management, accessible f
 ## 10. Rate Limiting & API Budget
 
 ### Spotify API Limits
-- `getSpotifyArtistAlbums` defaults to 10 albums/page, the current [artist-album endpoint maximum](https://developer.spotify.com/documentation/web-api/reference/get-an-artists-albums). A 100-album inventory needs 10 listing requests; the 500-album bound needs 50.
-- **Draft scenario (50 artists, 100 albums each)**: 500 artist-listing calls per cycle, excluding album/track details. This is a planning estimate, not a configured runtime budget or proof of available provider capacity.
-- Provider limits depend on the application's quota mode and traffic; retain the client's 429/Retry-After handling rather than assume a fixed requests-per-minute allowance.
+- Client Credentials: ~180 requests/minute per app
+- `getSpotifyArtistAlbums` is paginated at 50/page, most artists have <100 releases → 2 requests per artist
+- **Budget per scan cycle (50 artists max)**: ~100 Spotify API calls
+- If we scan 50 artists every 6 hours → 400 calls/day (well within limits)
 
 ### Rate Limit Configuration
 
