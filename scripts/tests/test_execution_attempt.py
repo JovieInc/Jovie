@@ -71,6 +71,7 @@ class ExecutionAttemptTest(unittest.TestCase):
                 event = "event-1"; rows.append({**row, "_remote": {"prevStatusId": head, "eventId": event, "statusId": 1}}); return event
         real = attempt._github_rows, attempt._github_append
         attempt._github_rows, attempt._github_append = fake_rows, fake_append
+        recovery = patch.object(attempt, "_recover_append", return_value=None); recovery.start(); self.addCleanup(recovery.stop)
         self.addCleanup(lambda: (setattr(attempt, "_github_rows", real[0]), setattr(attempt, "_github_append", real[1])))
         coordination = {"kind": "github-status", "repository": "JovieInc/Jovie", "sha": "a" * 40}
         with ThreadPoolExecutor(2) as pool:
@@ -162,7 +163,7 @@ class GithubCoordinationBoundaryTest(unittest.TestCase):
         self.ident = attempt.identity("fixture", {"pr": 1}, {"head": "a" * 40})
 
     def row(self, **fields):
-        return {**self.ident, "schema": attempt.SCHEMA, "event": "attempt_finished", "attempt": 1, **fields}
+        return {**self.ident, "schema": attempt.SCHEMA, "event": "attempt_finished", "attempt": 1, "owner": owner(), "fencingToken": "f" * 64, **fields}
 
     def status(self, number, previous=None, **fields):
         row = self.row(_remote={"prevStatusId": previous}, **fields)
@@ -217,28 +218,31 @@ class GithubCoordinationBoundaryTest(unittest.TestCase):
         self.assertEqual(head, 18)
 
     def test_append_ref_collision_does_not_publish_a_status(self):
-        with patch.object(attempt, "_gh", return_value=None) as transport:
-            self.assertIsNone(attempt._github_append(self.coord, self.ident, self.row(event="attempt_started"), None))
-            self.assertEqual(transport.call_count, 1)
-            self.assertIn("/git/refs", transport.call_args.args[2])
+        fixture = InterruptedAppendTest(); fixture.setUp(); self.addCleanup(fixture.doCleanups)
+        ref = attempt._append_ref(self.ident, None)
+        fixture.refs[ref] = {"ref": ref, "object": {"type": "commit", "sha": self.coord["sha"]}}
+        self.assertIsNone(attempt._github_append(self.coord, self.ident, self.row(event="attempt_started"), None))
+        self.assertEqual(fixture.statuses, [])
+        self.assertEqual(fixture.refs[ref]["object"]["sha"], self.coord["sha"])
 
     def test_append_maps_terminal_states_and_preserves_predecessor(self):
-        # An ended retryable attempt is no longer running: only a live attempt or seal is pending.
         for event_name, terminal, expected in [("attempt_started", None, "pending"), ("boundary_admitted", None, "pending"),
                                                ("completion_fenced", None, "pending"), ("attempt_finished", None, "success"),
                                                ("attempt_finished", "succeeded", "success"),
                                                ("attempt_finished", "no_op_stale", "success"), ("disposition_reconciled", "no_op_stale", "success"),
                                                ("attempt_finished", "superseded", "success"),
                                                ("attempt_finished", "failed_known", "failure"), ("decision", "budget_exhausted", "failure")]:
-            with self.subTest(event=event_name, terminal=terminal), patch.object(attempt, "_gh", return_value={} ) as transport:
-                event = attempt._github_append(self.coord, self.ident, self.row(event=event_name, terminalState=terminal), 7)
-                self.assertEqual(transport.call_count, 3 if event_name == "attempt_started" else 2)
-                body = transport.call_args.args[3]
-                self.assertEqual(body["state"], expected)
-                packed = body["target_url"].split("#jovie-execution=", 1)[1]
-                row = attempt._unpack(packed)
-                self.assertEqual(row["_remote"], {"prevStatusId": 7, "eventId": event})
-                self.assertEqual(row["identityDigest"], self.ident["identityDigest"])
+            with self.subTest(event=event_name, terminal=terminal):
+                fixture = InterruptedAppendTest(); fixture.setUp()
+                try:
+                    event = attempt._github_append(self.coord, self.ident, self.row(event=event_name, terminalState=terminal, sealedAttempt=2), 7)
+                    body = fixture.statuses[-1]
+                    self.assertEqual(body["state"], expected)
+                    packed = body["target_url"].split("#jovie-execution=", 1)[1]
+                    row = attempt._unpack(packed)
+                    self.assertEqual(row["_remote"], {"prevStatusId": 7, "eventId": event, "reservationSha": next(iter(fixture.tags))})
+                    self.assertEqual(row["identityDigest"], self.ident["identityDigest"])
+                finally: fixture.doCleanups()
 
     def test_append_rejects_oversize_before_status_publication(self):
         with patch.object(attempt, "_gh") as transport:
@@ -250,12 +254,265 @@ class GithubCoordinationBoundaryTest(unittest.TestCase):
     def test_remote_contention_is_bounded_and_creates_no_local_receipt(self):
         with tempfile.TemporaryDirectory() as directory, \
              patch.object(attempt, "_github_rows", return_value=([], None)), \
+             patch.object(attempt, "_recover_append", return_value=None), \
              patch.object(attempt, "_github_append", return_value=None) as append:
             path = Path(directory) / "ledger.jsonl"
             with self.assertRaisesRegex(RuntimeError, "execution-coordinator-contention"):
                 attempt._locked(path, self.ident, self.coord, lambda _: ({"admitted": True}, [self.row()]))
             self.assertEqual(append.call_count, 4)
             self.assertFalse(path.exists())
+
+class InterruptedAppendTest(unittest.TestCase):
+    """Local immutable Git/ref/status fixture; no remote API or provider dispatch."""
+    class Interrupted(BaseException): pass
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(); self.addCleanup(self.tmp.cleanup)
+        self.path = Path(self.tmp.name) / "ledger.jsonl"
+        self.coord = {"kind": "github-status", "repository": "Fixture/Repo", "sha": "a" * 40}
+        self.ident = attempt.identity("fixture", {"pr": 1}, {"head": "a" * 40})
+        self.tags, self.refs, self.statuses, self.calls = {}, {}, [], []
+        self.interrupt, self.hook, self.cas_lock = None, lambda *_: None, threading.Lock()
+        transport = patch.object(attempt, "_gh", side_effect=self.gh)
+        transport.start(); self.addCleanup(transport.stop)
+    def gh(self, coord, method, endpoint, body=None):
+        self.calls.append((method, endpoint, copy.deepcopy(body)))
+        point = None
+        if method == "POST":
+            point = "tag" if endpoint.endswith("/git/tags") else ("append" if "/append-" in str(body.get("ref")) else "attempt") if endpoint.endswith("/git/refs") else "status"
+            self.hook("before", point, body)
+            self.crash("before", point)
+            if point == "tag":
+                sha = attempt.hashlib.sha1(json.dumps(body, sort_keys=True).encode()).hexdigest()
+                result = {**copy.deepcopy(body), "sha": sha, "object": {"type": body["type"], "sha": body["object"]}}
+                self.tags[sha] = result
+            elif point in {"append", "attempt"}:
+                with self.cas_lock:
+                    if body["ref"] in self.refs: return None
+                    result = {"ref": body["ref"], "object": {"type": "tag" if body["sha"] in self.tags else "commit", "sha": body["sha"]}}
+                    self.refs[body["ref"]] = result
+            else:
+                with self.cas_lock:
+                    result = {**body, "id": max((s["id"] for s in self.statuses), default=0) + 1,
+                              "creator": {"login": "jovie-bot[bot]", "type": "Bot"}}
+                    self.statuses.append(result)
+            self.hook("after", point, body)
+            self.crash("after", point)
+            return copy.deepcopy(result)
+        if "/statuses?" in endpoint: return [copy.deepcopy(self.statuses)]
+        if "/git/matching-refs/" in endpoint:
+            prefix = "refs/" + endpoint.split("/git/matching-refs/", 1)[1]
+            return [[copy.deepcopy(ref) for name, ref in self.refs.items() if name.startswith(prefix)]]
+        if "/git/tags/" in endpoint: return [copy.deepcopy(self.tags[endpoint.rsplit("/", 1)[1]])]
+        self.fail(f"unexpected fixture endpoint: {method} {endpoint}")
+    def crash(self, phase, point):
+        if self.interrupt == (phase, point):
+            self.interrupt = None
+            raise self.Interrupted(f"{phase}-{point}")
+    def claim(self, now=100, who=None, path=None):
+        return attempt.claim(path or self.path, self.ident, who or owner(), policy(), {"triggerId": "delivery-1"}, now, self.coord)
+    def test_crashed_append_reservation_recovers_without_regrant_or_extra_attempt(self):
+        self.interrupt = ("after", "append")
+        with self.assertRaises(self.Interrupted): self.claim()
+        result = self.claim(now=101)
+        self.assertEqual((result["admitted"], result["reason"]), (False, "duplicate_active"))
+        rows, _ = attempt._github_rows(self.coord, self.ident)
+        self.assertEqual([r["event"] for r in rows], ["attempt_started"])
+        self.assertEqual(rows[0]["attempt"], 1)
+        self.assertEqual(len(self.refs), 2)
+
+    def reset_remote(self):
+        self.tags.clear(); self.refs.clear(); self.statuses.clear(); self.calls.clear()
+    def test_interruptions_before_and_after_every_remote_write_boundary(self):
+        for phase in ("before", "after"):
+            for point in ("tag", "append", "attempt", "status"):
+                with self.subTest(phase=phase, point=point):
+                    self.reset_remote(); self.interrupt = (phase, point)
+                    with self.assertRaises(self.Interrupted): self.claim()
+                    reserved = bool(self.refs)
+                    result = self.claim(now=101, path=Path(self.tmp.name) / f"restart-{phase}-{point}.jsonl")
+                    self.assertEqual(result["admitted"], not reserved)
+                    if reserved: self.assertEqual(result["reason"], "duplicate_active")
+                    rows, head = attempt._github_rows(self.coord, self.ident)
+                    self.assertEqual(len(rows), 1); self.assertEqual(rows[0]["attempt"], 1)
+                    self.assertEqual(rows[0]["leaseExpiresAt"], 110 if reserved else 111)
+                    self.assertEqual(head, rows[0]["_remote"]["reservationSha"])
+                    self.assertEqual(len(self.refs), 2)
+    def test_ambiguous_status_post_after_remote_commit_does_not_duplicate_execution(self):
+        real = self.gh
+        unknown = [True]
+        def lost(coord, method, endpoint, body=None):
+            response = real(coord, method, endpoint, body)
+            if method == "POST" and "/statuses/" in endpoint and unknown:
+                unknown.pop(); raise RuntimeError("fixture-response-lost")
+            return response
+        with patch.object(attempt, "_gh", side_effect=lost), self.assertRaisesRegex(RuntimeError, "fixture-response-lost"):
+            self.claim()
+        result = self.claim(now=101)
+        self.assertEqual((result["admitted"], result["reason"]), (False, "duplicate_active"))
+        self.assertEqual(len(self.statuses), 1)
+        rows, _ = attempt._github_rows(self.coord, self.ident)
+        self.assertEqual(len(rows), 1); self.assertEqual(rows[0]["attempt"], 1)
+    def test_ambiguous_ref_responses_are_settled_only_by_exact_candidate_readback(self):
+        for point in ("append", "attempt"):
+            with self.subTest(point=point):
+                self.reset_remote(); real, unknown = self.gh, [True]
+                def lost(coord, method, endpoint, body=None):
+                    response = real(coord, method, endpoint, body)
+                    if method == "POST" and endpoint.endswith("/git/refs") and f"/{point}-" in body["ref"] and unknown:
+                        unknown.pop(); raise RuntimeError("fixture-response-lost")
+                    return response
+                with patch.object(attempt, "_gh", side_effect=lost): self.assertTrue(self.claim()["admitted"])
+                self.assertEqual(len(self.statuses), 1); self.assertEqual(len(self.refs), 2)
+    def test_competing_writer_can_only_project_winner_and_exact_duplicates_share_one_head(self):
+        # Suspend the winner immediately before projection. A different host
+        # recovers that exact immutable candidate, then the original POST lands.
+        raced, admissions = [], []
+        def competitor(phase, point, body):
+            if (phase, point) == ("before", "status") and not raced:
+                raced.append(True)
+                admissions.append(self.claim(now=101, who=owner("worker-b"), path=Path(self.tmp.name) / "other-host.jsonl"))
+        self.hook = competitor
+        first = self.claim()
+        self.assertTrue(first["admitted"])
+        self.assertEqual(admissions[0]["reason"], "duplicate_active")
+        self.assertEqual(len(self.statuses), 2)
+        rows, head = attempt._status_rows(list(reversed(self.statuses)), self.ident, strict=True, coordination=self.coord)
+        self.assertEqual(len(rows), 1); self.assertEqual(rows[0]["owner"], owner())
+        self.assertEqual(rows[0]["fencingToken"], first["fencingToken"])
+        self.assertEqual(rows[0]["_remote"]["statusId"], 1)
+        self.assertEqual(head, next(iter(self.tags)))
+        # A duplicate projection's numeric ID cannot create a second append slot.
+        attempt.boundary(self.path, self.ident, first["fencingToken"], {"spend": 1}, 102, self.coord)
+        rows, head = attempt._github_rows(self.coord, self.ident)
+        self.assertEqual([r["event"] for r in rows], ["attempt_started", "boundary_admitted"])
+        self.assertEqual(rows[1]["_remote"]["prevStatusId"], rows[0]["_remote"]["reservationSha"])
+        self.assertEqual(attempt._usage(rows, 102)["spend"], 1)
+    def test_two_distinct_remote_candidates_race_for_one_immutable_reservation(self):
+        barrier = threading.Barrier(2)
+        def overlap(phase, point, body):
+            if (phase, point) == ("before", "append"): barrier.wait(timeout=5)
+        self.hook = overlap
+        with ThreadPoolExecutor(2) as pool:
+            results = list(pool.map(lambda name: self.claim(who=owner(name), path=Path(self.tmp.name) / f"{name}.jsonl"), ["worker-a", "worker-b"]))
+        self.assertEqual(sorted(r["admitted"] for r in results), [False, True])
+        self.assertEqual(len(self.tags), 2)
+        rows, _ = attempt._status_rows(self.statuses, self.ident, strict=True, coordination=self.coord)
+        self.assertEqual(len(rows), 1); self.assertEqual(rows[0]["attempt"], 1)
+        winner = next(r for r in results if r["admitted"])
+        self.assertEqual(rows[0]["owner"], winner["owner"])
+        self.assertEqual({r["object"]["sha"] for r in self.refs.values()}, {rows[0]["_remote"]["reservationSha"]})
+    def test_late_original_response_cannot_regrant_an_attempt_already_expired_by_helper(self):
+        raced = []
+        def expire(phase, point, body):
+            if (phase, point) == ("after", "status") and not raced:
+                raced.append(True)
+                self.assertEqual(self.claim(now=111, who=owner("worker-b"))["terminalState"], "failed_unknown")
+        self.hook = expire
+        with self.assertRaisesRegex(RuntimeError, "stale-fencing-token"): self.claim()
+        rows, _ = attempt._github_rows(self.coord, self.ident)
+        self.assertEqual([r["event"] for r in rows], ["attempt_started", "attempt_finished"])
+        self.assertEqual(rows[-1]["terminalState"], "failed_unknown")
+    def test_expired_reserved_claim_is_unknown_terminal_and_never_taken_over(self):
+        self.interrupt = ("after", "attempt")
+        with self.assertRaises(self.Interrupted): self.claim()
+        result = self.claim(now=111, who=owner("worker-b"))
+        self.assertEqual((result["admitted"], result["terminalState"]), (False, "failed_unknown"))
+        rows, _ = attempt._github_rows(self.coord, self.ident)
+        self.assertEqual([r["event"] for r in rows], ["attempt_started", "attempt_finished"])
+        self.assertEqual(rows[0]["owner"], owner()); self.assertEqual(rows[-1]["failureClass"], "lost_worker")
+        self.assertFalse(attempt.resume(self.path, self.ident, rows[0]["fencingToken"], owner(), 112, self.coord)["admitted"])
+        self.assertEqual(self.claim(now=113)["reason"], "generation_terminal")
+    def test_reserved_owner_requires_existing_live_fence_for_resume(self):
+        self.interrupt = ("after", "append")
+        with self.assertRaises(self.Interrupted): self.claim()
+        self.assertFalse(self.claim(now=101)["admitted"])
+        rows, _ = attempt._github_rows(self.coord, self.ident); fence = rows[0]["fencingToken"]
+        self.assertFalse(attempt.resume(self.path, self.ident, fence, owner("worker-b"), 102, self.coord)["admitted"])
+        self.assertFalse(attempt.resume(self.path, self.ident, "other", owner(), 102, self.coord)["admitted"])
+        resumed = attempt.resume(self.path, self.ident, fence, owner(), 102, self.coord)
+        self.assertTrue(resumed["resumed"]); self.assertEqual(resumed["leaseExpiresAt"], 110)
+        self.assertEqual(len(self.statuses), 1)
+    def test_recovered_boundary_charges_once_and_never_returns_dispatch_authorization(self):
+        start = self.claim(); self.interrupt = ("after", "append")
+        with self.assertRaises(self.Interrupted):
+            attempt.boundary(self.path, self.ident, start["fencingToken"], {"spend": 1, "mutations": 1}, 101, self.coord)
+        with self.assertRaisesRegex(RuntimeError, "recovered-boundary"):
+            attempt.boundary(self.path, self.ident, start["fencingToken"], {"spend": 1, "mutations": 1}, 102, self.coord)
+        rows, _ = attempt._github_rows(self.coord, self.ident)
+        self.assertEqual([r["event"] for r in rows], ["attempt_started", "boundary_admitted"])
+        self.assertEqual((attempt._usage(rows, 102)["spend"], attempt._usage(rows, 102)["mutations"]), (1, 1))
+    def test_legacy_reservation_and_different_attempt_candidate_are_never_reused_or_deleted(self):
+        ref = attempt._append_ref(self.ident, None)
+        legacy = {"ref": ref, "object": {"type": "commit", "sha": self.coord["sha"]}}
+        self.refs[ref] = copy.deepcopy(legacy)
+        with self.assertRaisesRegex(RuntimeError, "reservation-unverified"): self.claim()
+        self.assertEqual(self.refs, {ref: legacy}); self.assertEqual(self.statuses, [])
+        self.reset_remote(); self.interrupt = ("after", "append")
+        with self.assertRaises(self.Interrupted): self.claim()
+        slot = attempt._completion_ref(self.ident, 1)
+        self.refs[slot] = {"ref": slot, "object": {"type": "tag", "sha": "b" * 40}}
+        before = copy.deepcopy(self.refs)
+        with self.assertRaisesRegex(RuntimeError, "attempt-reserved"): self.claim(now=101)
+        self.assertEqual(self.refs, before); self.assertEqual(self.statuses, [])
+    def test_candidate_owner_identity_nonce_source_and_payload_cannot_be_substituted(self):
+        self.interrupt = ("after", "append")
+        with self.assertRaises(self.Interrupted): self.claim()
+        sha = next(iter(self.tags)); original = copy.deepcopy(self.tags[sha])
+        changes = [lambda o: o["object"].update(sha="b" * 40), lambda o: o.update(tag="other"),
+                   lambda o: o.update(sha="b" * 40),
+                   lambda o: o.update(message=o["message"].replace('"worker-a"', '""'))]
+        for field, value in [("schema", "other"), ("repository", "Other/Repo"), ("sourceSha", "b" * 40)]:
+            changes.append(lambda o, f=field, v=value: o.update(message=json.dumps({**json.loads(o["message"]), f: v})))
+        for field, value in [("identityDigest", "other"), ("workKey", "other"), ("executionGeneration", "other")]:
+            def alter(o, f=field, v=value):
+                record = json.loads(o["message"]); record["candidate"][f] = v; o["message"] = json.dumps(record)
+            changes.append(alter)
+        for field, value in [("eventId", "not-a-nonce"), ("prevStatusId", 999)]:
+            def alter(o, f=field, v=value):
+                record = json.loads(o["message"]); record["candidate"]["_remote"][f] = v; o["message"] = json.dumps(record)
+            changes.append(alter)
+        for change in changes:
+            with self.subTest(change=change):
+                self.tags[sha] = copy.deepcopy(original); change(self.tags[sha])
+                with self.assertRaisesRegex(RuntimeError, "candidate-unverified"): self.claim(now=101)
+                self.assertEqual(self.statuses, [])
+        self.tags[sha] = original
+        self.claim(now=101)
+        status = copy.deepcopy(self.statuses[0])
+        row = attempt._unpack(status["target_url"].split("#jovie-execution=", 1)[1])
+        row["owner"] = owner("takeover")
+        status["id"] = 2; status["target_url"] = "https://fixture.invalid/#jovie-execution=" + attempt._pack(row)
+        self.statuses.append(status)
+        with self.assertRaisesRegex(RuntimeError, "candidate-mismatch"):
+            attempt._status_rows(self.statuses, self.ident, strict=True, coordination=self.coord)
+    def test_orphan_candidate_status_or_replaced_ref_is_never_execution_evidence(self):
+        self.claim(); original = copy.deepcopy(self.refs)
+        for ref in list(original):
+            with self.subTest(ref=ref):
+                self.refs = copy.deepcopy(original)
+                self.refs[ref]["object"]["sha"] = "b" * 40
+                with self.assertRaisesRegex(RuntimeError, "reservation-unverified"):
+                    attempt._github_rows(self.coord, self.ident)
+        self.refs.clear()
+        with self.assertRaisesRegex(RuntimeError, "reservation-unverified"):
+            self.claim(now=101)
+        self.assertEqual(len(self.statuses), 1)
+    def test_unknown_candidate_read_and_unknown_projection_remain_held(self):
+        self.interrupt = ("after", "append")
+        with self.assertRaises(self.Interrupted): self.claim()
+        before = copy.deepcopy(self.refs); real = self.gh
+        def unavailable(coord, method, endpoint, body=None):
+            if "/git/tags/" in endpoint: raise RuntimeError("fixture-authority-unavailable")
+            return real(coord, method, endpoint, body)
+        with patch.object(attempt, "_gh", side_effect=unavailable), self.assertRaisesRegex(RuntimeError, "authority-unavailable"):
+            self.claim(now=101)
+        self.assertEqual(self.refs, before); self.assertEqual(self.statuses, [])
+        def unreadable(coord, method, endpoint, body=None):
+            response = real(coord, method, endpoint, body)
+            return [[]] if "/statuses?" in endpoint else response
+        with patch.object(attempt, "_gh", side_effect=unreadable), self.assertRaisesRegex(RuntimeError, "outcome-unknown"):
+            self.claim(now=102)
+        self.assertEqual(len(self.statuses), 1)
 
 class CompletedFailureReconciliationTest(unittest.TestCase):
     """Exercise the production GitHub adapter with ended journals, not caller proof flags."""
@@ -291,7 +548,7 @@ class CompletedFailureReconciliationTest(unittest.TestCase):
         self.current = {"number": 7, "state": "open", "merged": False, "head": {"sha": self.sha, "ref": self.branch}, "labels": []}
         self.statuses.append({"id": 80, "context": "Fork PR Gate", "state": "success", "creator": self.creator})
         self.checks = [{"id": 100 + i, "name": name, "head_sha": self.sha, "status": "completed", "conclusion": "success", "app": {"slug": "github-actions"}} for i, name in enumerate(sorted(attempt.RECONCILE_CHECKS))]
-        self.comments, self.posts, self.refs = [], [], {}
+        self.comments, self.posts, self.refs, self.tags = [], [], {}, {}
         self.flush()
         self.transport = patch.object(attempt, "_gh", side_effect=self.gh); self.transport.start(); self.addCleanup(self.transport.stop)
     def flush(self):
@@ -308,9 +565,13 @@ class CompletedFailureReconciliationTest(unittest.TestCase):
         status["target_url"] = status["target_url"].split("#", 1)[0] + "#jovie-execution=" + attempt._pack(row)
     def gh(self, coord, method, endpoint, body=None):
         if method == "POST":
+            if endpoint.endswith("/git/tags"):
+                sha = attempt.hashlib.sha1(json.dumps(body, sort_keys=True).encode()).hexdigest()
+                self.tags[sha] = {**copy.deepcopy(body), "sha": sha, "object": {"type": body["type"], "sha": body["object"]}}
+                return copy.deepcopy(self.tags[sha])
             if endpoint.endswith("/git/refs"):
                 if body["ref"] in self.refs: return None
-                self.refs[body["ref"]] = {"ref": body["ref"], "object": {"sha": body["sha"]}}; return self.refs[body["ref"]]
+                self.refs[body["ref"]] = {"ref": body["ref"], "object": {"type": "tag", "sha": body["sha"]}}; return self.refs[body["ref"]]
             self.assertIn("/statuses/", endpoint)
             self.posts.append(body)
             self.statuses.append({**body, "id": max(item["id"] for item in self.statuses) + 1, "creator": dict(self.creator)})
@@ -320,6 +581,10 @@ class CompletedFailureReconciliationTest(unittest.TestCase):
         if "/check-runs?" in endpoint: return [{"total_count": len(self.checks), "check_runs": copy.deepcopy(self.checks)}]
         if "/comments?" in endpoint: return [copy.deepcopy(self.comments)]
         if "/git/ref/" in endpoint: return [copy.deepcopy(self.refs.get("refs/" + endpoint.split("/git/ref/", 1)[1], {}))]
+        if "/git/matching-refs/" in endpoint:
+            prefix = "refs/" + endpoint.split("/git/matching-refs/", 1)[1]
+            return [[copy.deepcopy(ref) for name, ref in self.refs.items() if name.startswith(prefix)]]
+        if "/git/tags/" in endpoint: return [copy.deepcopy(self.tags[endpoint.rsplit("/", 1)[1]])]
         self.fail(f"unexpected endpoint: {endpoint}")
     def reconcile(self, number=0):
         return attempt.reconcile_completed_failure(self.path, self.identities[number], self.pr, coordination=self.coord, state=self.state, now=self.now)
@@ -453,7 +718,7 @@ class CompletedFailureReconciliationTest(unittest.TestCase):
     def test_altered_prior_disposition_does_not_gain_idempotent_success(self):
         self.reconcile(); self.posts.clear()
         self.rewrite(len(self.statuses) - 1, lambda row: row.update(endedReceiptDigest="wrong"))
-        self.blocked("prior-disposition-mismatch")
+        self.blocked("candidate-mismatch")
     def test_missing_required_fork_receipt_and_wrong_check_head_block(self):
         fork = self.statuses.pop(); self.blocked("fork-gate-unverified")
         self.statuses.append(fork); self.checks[0]["head_sha"] = "b" * 40; self.blocked("check-head-mismatch")
@@ -481,14 +746,14 @@ class CompletedFailureReconciliationTest(unittest.TestCase):
     def test_remote_worker_winning_next_slot_prevents_any_success_append(self):
         ref = attempt._completion_ref(self.identities[0], 2)
         self.refs[ref] = {"ref": ref, "object": {"sha": self.sha}}
-        self.blocked("next-slot-already-reserved")
+        self.blocked("attempt-reserved")
     def test_remote_claim_racing_final_append_cannot_acquire_sealed_slot(self):
         real, races = self.gh, []
         def raced(coord, method, endpoint, body=None):
             if method == "POST" and body.get("state") == "success":
                 # The real claim protocol must acquire attempt-2 before publishing
                 # attempt_started. Even an old remote worker uses this same ref.
-                row = {**self.identities[0], "schema": attempt.SCHEMA, "event": "attempt_started", "attempt": 2}
+                row = {**self.identities[0], "schema": attempt.SCHEMA, "event": "attempt_started", "attempt": 2, "owner": owner("remote"), "fencingToken": "f" * 64}
                 races.append(attempt._github_append(self.coord, self.identities[0], row, 999))
             return real(coord, method, endpoint, body)
         with patch.object(attempt, "_gh", side_effect=raced): self.assertTrue(self.reconcile()["reconciled"])
@@ -511,37 +776,66 @@ class CompletedFailureReconciliationTest(unittest.TestCase):
             result = real(coord, method, endpoint, body)
             if method == "POST" and body.get("state") == "pending": self.refs.clear()
             return result
-        with patch.object(attempt, "_gh", side_effect=removed), self.assertRaisesRegex(RuntimeError, "remote-fence-unverified"): self.reconcile()
+        with patch.object(attempt, "_gh", side_effect=removed), self.assertRaisesRegex(RuntimeError, "reservation-unverified"): self.reconcile()
         self.assertEqual([body["state"] for body in self.posts], ["pending"])
-    def test_real_budget_exhausted_claim_after_pending_seal_is_a_no_write_stop(self):
-        real, races = self.gh, []
+    def test_real_claim_during_final_projection_cannot_reopen_generation(self):
+        real, races, triggered = self.gh, [], []
         def raced(coord, method, endpoint, body=None):
-            if method == "POST" and body.get("state") == "success":
+            if method == "POST" and body.get("state") == "success" and not triggered:
+                triggered.append(True)
+                races.append(attempt.claim(self.state / "remote.jsonl", self.identities[0], owner("remote"), policy(), {}, now=self.now, coordination=self.coord))
+            return real(coord, method, endpoint, body)
+        with patch.object(attempt, "_gh", side_effect=raced): self.assertTrue(self.reconcile()["reconciled"])
+        self.assertEqual(races[0]["reason"], "generation_terminal")
+        self.assertEqual([body["state"] for body in self.posts], ["pending", "success", "success"])
+        rows, _ = attempt._github_rows(self.coord, self.identities[0])
+        self.assertEqual(sum(row["event"] == "disposition_reconciled" for row in rows), 1)
+    def test_unseen_pending_seal_fences_real_budget_decision_append(self):
+        real, races, triggered = self.gh, [], []
+        def raced(coord, method, endpoint, body=None):
+            if method == "POST" and body.get("state") == "pending" and not triggered:
+                triggered.append(True)
                 races.append(attempt.claim(self.state / "remote.jsonl", self.identities[0], owner("remote"), policy(), {}, now=self.now, coordination=self.coord))
             return real(coord, method, endpoint, body)
         with patch.object(attempt, "_gh", side_effect=raced): self.assertTrue(self.reconcile()["reconciled"])
         self.assertEqual(races[0]["reason"], "generation_completion_fenced")
-        self.assertEqual([body["state"] for body in self.posts], ["pending", "success"])
-    def test_unseen_pending_seal_fences_real_budget_decision_append(self):
-        real, races = self.gh, []
-        def raced(coord, method, endpoint, body=None):
-            if method == "POST" and body.get("state") == "pending":
-                try: attempt.claim(self.state / "remote.jsonl", self.identities[0], owner("remote"), policy(), {}, now=self.now, coordination=self.coord)
-                except RuntimeError as error: races.append(str(error))
-            return real(coord, method, endpoint, body)
-        with patch.object(attempt, "_gh", side_effect=raced): self.assertTrue(self.reconcile()["reconciled"])
-        self.assertEqual(races, ["execution-coordinator-contention"])
-        self.assertEqual([body["state"] for body in self.posts], ["pending", "success"])
+        self.assertEqual([body["state"] for body in self.posts], ["pending", "pending", "success"])
+        rows, _ = attempt._github_rows(self.coord, self.identities[0])
+        self.assertEqual(sum(row["event"] == "completion_fenced" for row in rows), 1)
     def test_real_budget_decision_winning_remote_append_remains_failure(self):
         real, triggered = self.gh, []
         def raced(coord, method, endpoint, body=None):
-            if method == "POST" and str(body.get("ref", "")).endswith("/attempt-2") and not triggered:
+            if method == "POST" and "/append-" in str(body.get("ref", "")) and not triggered:
                 triggered.append(True)
                 result = attempt.claim(self.state / "remote.jsonl", self.identities[0], owner("remote"), policy(), {}, now=self.now, coordination=self.coord)
                 self.assertEqual(result["reason"], "wallSeconds_budget_exhausted")
             return real(coord, method, endpoint, body)
         with patch.object(attempt, "_gh", side_effect=raced), self.assertRaisesRegex(RuntimeError, "unsupported-history"): self.reconcile()
         self.assertEqual([body["state"] for body in self.posts], ["failure"])
+    def test_completion_seal_interruptions_recover_without_attempt_or_worker_success(self):
+        baseline = copy.deepcopy(self.statuses)
+        for phase, point in [("before", "append"), ("after", "append"), ("before", "attempt"), ("after", "attempt"), ("before", "status"), ("after", "status")]:
+            with self.subTest(phase=phase, point=point):
+                self.statuses = copy.deepcopy(baseline); self.refs.clear(); self.tags.clear(); self.posts.clear()
+                real, once = self.gh, [True]
+                def crash(coord, method, endpoint, body=None):
+                    matched = method == "POST" and ((point == "status" and "/statuses/" in endpoint) or
+                        (endpoint.endswith("/git/refs") and f"/{point}-" in body["ref"]))
+                    if matched and phase == "before" and once:
+                        once.pop(); raise InterruptedAppendTest.Interrupted()
+                    result = real(coord, method, endpoint, body)
+                    if matched and phase == "after" and once:
+                        once.pop(); raise InterruptedAppendTest.Interrupted()
+                    return result
+                with patch.object(attempt, "_gh", side_effect=crash), self.assertRaises(InterruptedAppendTest.Interrupted): self.reconcile()
+                result = self.reconcile()
+                self.assertEqual((result["result"], result["terminalState"]), ("failed_known", "no_op_stale"))
+                rows, _ = attempt._github_rows(self.coord, self.identities[0])
+                self.assertEqual(sum(row["event"] == "attempt_started" for row in rows), 1)
+                self.assertEqual(sum(row["event"] == "completion_fenced" for row in rows), 1)
+                self.assertEqual(sum(row["event"] == "disposition_reconciled" for row in rows), 1)
+                self.assertEqual((self.bank["7"]["count"], result["remainingBudgets"]), (2, self.journal[0]["execution"]["remainingBudgets"]))
+                self.assertTrue(self.reconcile()["alreadyReconciled"])
     def test_finalized_legacy_pending_statuses_keep_reconciliation_and_its_strict_history(self):
         outcomes = attempt.finalize_stale_statuses(self.state / "sweep.jsonl", self.coord, now=self.now)
         self.assertEqual([item["outcome"] for item in outcomes], ["finalized", "finalized"])
@@ -561,16 +855,25 @@ class StaleStatusSweepTest(unittest.TestCase):
         self.coord = {"kind": "github-status", "repository": "JovieInc/Jovie", "sha": self.sha}
         self.creator = {"login": "jovie-bot[bot]", "type": "Bot", "id": 12}
         self.ident = attempt.identity("pr-remediation", {"repository": "JovieInc/Jovie", "pr": 9, "failure": 0}, {"headSha": self.sha})
-        self.statuses, self.posts, self.refs = [], [], set()
+        self.statuses, self.posts, self.refs, self.tags = [], [], {}, {}
         self.transport = patch.object(attempt, "_gh", side_effect=self.gh); self.transport.start(); self.addCleanup(self.transport.stop)
     def gh(self, coord, method, endpoint, body=None):
         if method == "POST":
+            if endpoint.endswith("/git/tags"):
+                sha = attempt.hashlib.sha1(json.dumps(body, sort_keys=True).encode()).hexdigest()
+                self.tags[sha] = {**copy.deepcopy(body), "sha": sha, "object": {"type": body["type"], "sha": body["object"]}}
+                return copy.deepcopy(self.tags[sha])
             if endpoint.endswith("/git/refs"):
                 if body["ref"] in self.refs: return None
-                self.refs.add(body["ref"]); return {}
+                self.refs[body["ref"]] = {"ref": body["ref"], "object": {"type": "tag", "sha": body["sha"]}}
+                return copy.deepcopy(self.refs[body["ref"]])
             self.posts.append(body)
             self.statuses.append({**body, "id": len(self.statuses) + 1, "creator": dict(self.creator)}); return {}
         if "/statuses?" in endpoint: return [copy.deepcopy(self.statuses)]
+        if "/git/matching-refs/" in endpoint:
+            prefix = "refs/" + endpoint.split("/git/matching-refs/", 1)[1]
+            return [[copy.deepcopy(ref) for name, ref in self.refs.items() if name.startswith(prefix)]]
+        if "/git/tags/" in endpoint: return [copy.deepcopy(self.tags[endpoint.rsplit("/", 1)[1]])]
         self.fail(f"unexpected endpoint: {endpoint}")
     def publish(self, rows, *, legacy=True, creator=None):
         """Mirror the ledger to statuses as the pre-fix writer did (every non-terminal row pending)."""
@@ -598,8 +901,8 @@ class StaleStatusSweepTest(unittest.TestCase):
         self.assertEqual([body["state"] for body in self.posts], ["success"])
         marker = attempt._unpack(self.posts[0]["target_url"].split("#jovie-execution=", 1)[1])
         self.assertEqual((marker["event"], marker["finalizes"], marker["_remote"]["prevStatusId"]), (attempt.FINALIZED, "attempt_finished", 3))
-        chain, head = attempt._status_rows(self.statuses, self.ident, strict=True)
-        self.assertEqual(([row["event"] for row in chain], head), (["attempt_started", "boundary_admitted", "attempt_finished"], 4))
+        chain, head = attempt._status_rows(self.statuses, self.ident, strict=True, coordination=self.coord)
+        self.assertEqual(([row["event"] for row in chain], head), (["attempt_started", "boundary_admitted", "attempt_finished"], marker["_remote"]["reservationSha"]))
         self.assertEqual(self.sweep(300), [], "a terminal latest status is never rewritten")
         retried = attempt.claim(self.dir / "next.jsonl", self.ident, owner(), policy(leaseSeconds=50, wallSeconds=1000), {"triggerId": "run-2"}, 400, self.coord)
         self.assertTrue(retried["admitted"]); self.assertEqual(retried["attempt"], 2)

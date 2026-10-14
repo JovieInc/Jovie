@@ -68,9 +68,9 @@ def status_state(row: dict) -> str:
     if terminal in SUCCESS_TERMINAL: return "success"
     if terminal: return "failure"
     return "pending" if row.get("event") in PENDING_EVENTS else "success"
-def _status_rows(statuses: list[dict], ident: dict, *, strict=False) -> tuple[list[dict], int | None]:
+def _status_rows(statuses: list[dict], ident: dict, *, strict=False, coordination=None) -> tuple[list[dict], int | str | None]:
     context, children = f"jovie-execution/{ident['identityDigest']}", {}
-    seen = set()
+    seen, status_ids, candidates, objects = set(), set(), {}, {}
     for status in (item for item in statuses if item.get("context") == context):
         if strict and not _trusted_creator(status.get("creator")):
             raise RuntimeError("reconciliation-untrusted-status-creator")
@@ -81,39 +81,145 @@ def _status_rows(statuses: list[dict], ident: dict, *, strict=False) -> tuple[li
         if strict and any(row.get(key) != value for key, value in ident.items()): raise RuntimeError("reconciliation-identity-mismatch")
         remote = row.setdefault("_remote", {}); remote["statusId"] = int(status["id"])
         # Receipts written before ended attempts became terminal still read pending.
-        legacy = status.get("state") == "pending" and not row.get("terminalState") and row.get("event") != FINALIZED
-        if strict and (remote["statusId"] in seen or (status.get("state") != status_state(row) and not legacy)):
+        legacy = "reservationSha" not in remote and status.get("state") == "pending" and not row.get("terminalState") and row.get("event") != FINALIZED
+        if strict and (remote["statusId"] in status_ids or (status.get("state") != status_state(row) and not legacy)):
             raise RuntimeError("reconciliation-status-mismatch")
-        seen.add(remote["statusId"])
+        status_ids.add(remote["statusId"])
+        key = remote.get("reservationSha", remote["statusId"])
+        if "reservationSha" in remote:
+            if coordination is None: raise RuntimeError("execution-coordinator-candidate-unverified")
+            if key not in objects:
+                objects[key] = _read_candidate(coordination, ident, remote.get("prevStatusId"), key)
+                _verify_reservations(coordination, ident, objects[key])
+            if _without_status(row) != objects[key]: raise RuntimeError("execution-coordinator-candidate-mismatch")
+            # GitHub status POST has no idempotency key. Two helpers may project
+            # the EXACT immutable candidate; its object SHA is the stable link,
+            # never the response-dependent numeric status ID. All other forks
+            # retain the existing strict rejection/canonical selection rules.
+            if key in candidates:
+                previous = candidates[key]
+                if _without_status(previous) != _without_status(row): raise RuntimeError("execution-coordinator-candidate-mismatch")
+                if remote["statusId"] < previous["_remote"]["statusId"]: previous["_remote"]["statusId"] = remote["statusId"]
+                continue
+            candidates[key] = row
+        seen.add(key)
         children.setdefault(remote.get("prevStatusId"), []).append((remote["statusId"], row))
     chain, head, linked = [], None, 0
     while children.get(head):
         if strict and len(children[head]) != 1: raise RuntimeError("reconciliation-ambiguous-history")
-        head, row = min(children[head], key=lambda item: item[0]); linked += 1
+        _, row = min(children[head], key=lambda item: item[1]["_remote"]["statusId"]); head = row["_remote"].get("reservationSha", row["_remote"]["statusId"]); linked += 1
         if row.get("event") != FINALIZED: chain.append(row)
     if strict and linked != len(seen): raise RuntimeError("reconciliation-orphan-history")
     return chain, head
-def _github_rows(coordination: dict, ident: dict) -> tuple[list[dict], int | None]:
+def _github_rows(coordination: dict, ident: dict) -> tuple[list[dict], int | str | None]:
     repository, sha = coordination.get("repository", ""), coordination.get("sha", "")
     if not re.fullmatch(r"[\w.-]+/[\w.-]+", repository) or not re.fullmatch(r"[0-9a-fA-F]{40}", sha): raise ValueError("execution-coordinator-malformed")
     pages = _gh(coordination, "GET", f"repos/{repository}/commits/{sha}/statuses?per_page=100")
-    return _status_rows(_status_pages(pages), ident)
-def _github_append(coordination: dict, ident: dict, row: dict, head: int | None) -> str | None:
-    candidate = {**row, "_remote": {"prevStatusId": head, "eventId": uuid.uuid4().hex}}
-    repository, sha = coordination["repository"], coordination["sha"]
-    target = (coordination.get("targetUrl") or f"https://github.com/{repository}/commit/{sha}").split("#", 1)[0]
+    return _status_rows(_status_pages(pages), ident, coordination=coordination)
+RESERVATION_SCHEMA = "jovie-execution-reservation/v1"
+def _append_ref(ident: dict, head) -> str:
+    return f"refs/jovie-execution/{ident['identityDigest']}/append-{head if head is not None else 'root'}"
+def _without_status(row: dict) -> dict:
+    return {**row, "_remote": {key: value for key, value in row["_remote"].items() if key != "statusId"}}
+def _read_ref(coord: dict, ref: str):
+    refs = _status_pages(_gh(coord, "GET", f"repos/{coord['repository']}/git/matching-refs/{ref.removeprefix('refs/')}"))
+    exact = [item for item in refs if item.get("ref") == ref]
+    if not exact: return None
+    if len(exact) != 1: raise RuntimeError("execution-coordinator-reservation-unverified")
+    obj = exact[0].get("object") or {}
+    return {"type": obj.get("type"), "sha": obj.get("sha")}
+def _candidate(coord: dict, ident: dict, head, sha: str, obj: dict) -> dict:
+    """Validate the immutable Git object, never common source SHA or tagger text as ownership."""
+    try:
+        record = json.loads(obj["message"])
+        row = record["candidate"]
+        remote = row["_remote"]
+        event = remote["eventId"]
+        valid = (re.fullmatch(r"[0-9a-f]{40}", sha) and obj["sha"] == sha
+                 and obj["object"]["type"] == "commit" and obj["object"]["sha"] == coord["sha"]
+                 and record["schema"] == RESERVATION_SCHEMA and record["repository"] == coord["repository"]
+                 and record["sourceSha"] == coord["sha"] and row["schema"] == SCHEMA
+                 and all(row.get(key) == value for key, value in ident.items())
+                 and ident["identityDigest"] == digest({"workKey": ident["workKey"], "generation": ident["executionGeneration"]})
+                 and re.fullmatch(r"[0-9a-f]{32}", event)
+                 and remote == {"prevStatusId": head, "eventId": event}
+                 and obj["tag"] == f"jovie-execution/{ident['identityDigest']}/{event}")
+    except (KeyError, TypeError, ValueError, AttributeError):
+        valid = False
+    if valid and row.get("event") == "attempt_started":
+        who = row.get("owner")
+        valid = (isinstance(who, dict) and all(isinstance(who.get(key), str) and who[key].strip()
+                 for key in ("owner", "runtime", "provider", "model", "tool", "accountPool"))
+                 and isinstance(row.get("fencingToken"), str) and re.fullmatch(r"[0-9a-f]{64}", row["fencingToken"]))
+    if not valid: raise RuntimeError("execution-coordinator-candidate-unverified")
+    return {**row, "_remote": {**remote, "reservationSha": sha}}
+def _read_candidate(coord: dict, ident: dict, head, sha: str) -> dict:
+    if not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{40}", sha): raise RuntimeError("execution-coordinator-candidate-unverified")
+    objects = _gh(coord, "GET", f"repos/{coord['repository']}/git/tags/{sha}")
+    if not isinstance(objects, list) or len(objects) != 1 or not isinstance(objects[0], dict): raise RuntimeError("execution-coordinator-candidate-unverified")
+    return _candidate(coord, ident, head, sha, objects[0])
+def _status_body(coord: dict, ident: dict, candidate: dict) -> dict:
+    target = (coord.get("targetUrl") or f"https://github.com/{coord['repository']}/commit/{coord['sha']}").split("#", 1)[0]
     target = f"{target}#jovie-execution={_pack(candidate)}"
     if len(target) > 2000: raise RuntimeError("execution-coordinator-receipt-too-large")
-    body = {"state": status_state(candidate), "context": f"jovie-execution/{ident['identityDigest']}", "target_url": target,
+    return {"state": status_state(candidate), "context": f"jovie-execution/{ident['identityDigest']}", "target_url": target,
             "description": f"execution {candidate['event']} attempt={candidate.get('attempt', 0)} {ident['identityDigest'][:12]}"}
-    # Serialize ALL dispositions, including budget decisions, against this exact
-    # predecessor. The next-attempt ref alone only fences attempt_started.
-    append_ref = f"refs/jovie-execution/{ident['identityDigest']}/append-{head if head is not None else 'root'}"
-    if _gh(coordination, "POST", f"repos/{repository}/git/refs", {"ref": append_ref, "sha": sha}) is None: return None
-    if row["event"] == "attempt_started":
-        ref = f"refs/jovie-execution/{ident['identityDigest']}/attempt-{row['attempt']}"
-        if _gh(coordination, "POST", f"repos/{repository}/git/refs", {"ref": ref, "sha": sha}) is None: return None
-    _gh(coordination, "POST", f"repos/{repository}/statuses/{sha}", body)
+def _reserve(coord: dict, ident: dict, candidate: dict, ref: str) -> bool:
+    sha, head = candidate["_remote"]["reservationSha"], candidate["_remote"]["prevStatusId"]
+    # A lost create response is unknown until the exact immutable candidate is
+    # read back. A contender's ref (including a legacy equal-source-SHA ref) is
+    # never removed, rewritten, or inferred to be ours.
+    try: created = _gh(coord, "POST", f"repos/{coord['repository']}/git/refs", {"ref": ref, "sha": sha})
+    except RuntimeError:
+        observed = _read_ref(coord, ref)
+        if observed != {"type": "tag", "sha": sha}: raise
+    else:
+        if created is not None:
+            if (not isinstance(created, dict) or created.get("ref") != ref
+                or created.get("object", {}).get("type") != "tag" or created.get("object", {}).get("sha") != sha):
+                raise RuntimeError("execution-coordinator-reservation-unverified")
+            return True
+        observed = _read_ref(coord, ref)
+        if observed != {"type": "tag", "sha": sha}: return False
+    return _read_candidate(coord, ident, head, sha) == candidate
+def _attempt_reservation(ident: dict, candidate: dict):
+    if candidate["event"] == "attempt_started": return _completion_ref(ident, candidate["attempt"])
+    if candidate["event"] == "completion_fenced": return _completion_ref(ident, candidate["sealedAttempt"])
+    return None
+def _verify_reservations(coord: dict, ident: dict, candidate: dict):
+    expected = {"type": "tag", "sha": candidate["_remote"]["reservationSha"]}
+    refs = [_append_ref(ident, candidate["_remote"]["prevStatusId"]), _attempt_reservation(ident, candidate)]
+    if any(ref and _read_ref(coord, ref) != expected for ref in refs):
+        raise RuntimeError("execution-coordinator-reservation-unverified")
+def _recover_append(coord: dict, ident: dict, head):
+    ref = _append_ref(ident, head)
+    observed = _read_ref(coord, ref)
+    if observed is None: return None
+    if observed.get("type") != "tag": raise RuntimeError("execution-coordinator-reservation-unverified")
+    candidate = _read_candidate(coord, ident, head, observed.get("sha"))
+    attempt_ref = _attempt_reservation(ident, candidate)
+    if attempt_ref and not _reserve(coord, ident, candidate, attempt_ref): raise RuntimeError("execution-coordinator-attempt-reserved")
+    _verify_reservations(coord, ident, candidate)
+    # This only completes the winning receipt. It never grants the helper the
+    # winner's fence, renews a lease, or chooses a replacement outcome.
+    _gh(coord, "POST", f"repos/{coord['repository']}/statuses/{coord['sha']}", _status_body(coord, ident, candidate))
+    return candidate
+def _github_append(coordination: dict, ident: dict, row: dict, head) -> str | None:
+    candidate = {**row, "_remote": {"prevStatusId": head, "eventId": uuid.uuid4().hex}}
+    # Include the fixed-size object proof in the preflight; an oversize status
+    # must not strand a reservation. Candidate creation precedes every CAS.
+    _status_body(coordination, ident, {**candidate, "_remote": {**candidate["_remote"], "reservationSha": "0" * 40}})
+    record = {"schema": RESERVATION_SCHEMA, "repository": coordination["repository"], "sourceSha": coordination["sha"], "candidate": candidate}
+    obj = _gh(coordination, "POST", f"repos/{coordination['repository']}/git/tags",
+              {"tag": f"jovie-execution/{ident['identityDigest']}/{candidate['_remote']['eventId']}",
+               "message": json.dumps(record, sort_keys=True, separators=(",", ":")), "object": coordination["sha"], "type": "commit"})
+    candidate = _candidate(coordination, ident, head, obj.get("sha", ""), obj)
+    body = _status_body(coordination, ident, candidate)
+    if not _reserve(coordination, ident, candidate, _append_ref(ident, head)): return None
+    ref = _attempt_reservation(ident, candidate)
+    if ref and not _reserve(coordination, ident, candidate, ref): return None
+    _verify_reservations(coordination, ident, candidate)
+    _gh(coordination, "POST", f"repos/{coordination['repository']}/statuses/{coordination['sha']}", body)
     return candidate["_remote"]["eventId"]
 def _locked(path: Path, ident: dict, coordination: dict | None, fn):
     kind = (coordination or {}).get("kind")
@@ -121,6 +227,15 @@ def _locked(path: Path, ident: dict, coordination: dict | None, fn):
     if kind != "github-status": raise ValueError("execution-coordination-required")
     for _ in range(4):
         rows, head = _github_rows(coordination, ident)
+        recovered = _recover_append(coordination, ident, head)
+        if recovered:
+            rows, head = _github_rows(coordination, ident)
+            winner = next((row for row in rows if row.get("_remote", {}).get("eventId") == recovered["_remote"]["eventId"]), None)
+            if winner is None: raise RuntimeError("execution-coordinator-outcome-unknown")
+            _file_locked(path, lambda local: (None, [] if any(row.get("_remote", {}).get("eventId") == recovered["_remote"]["eventId"] for row in local) else [winner]))
+            # A recovered boundary is already charged and its dispatch outcome
+            # is unknown. Do not turn this invocation into another authorization.
+            if recovered["event"] == "boundary_admitted": raise RuntimeError("execution-coordinator-recovered-boundary")
         result, additions = fn(rows)
         if not additions: return result
         if len(additions) != 1: raise RuntimeError("execution-coordinator-non-atomic-append")
@@ -128,7 +243,12 @@ def _locked(path: Path, ident: dict, coordination: dict | None, fn):
         if event_id is None: continue
         canonical, _ = _github_rows(coordination, ident)
         winner = next((row for row in canonical if row.get("_remote", {}).get("eventId") == event_id), None)
-        if winner: _file_locked(path, lambda _rows: (None, [winner])); return result
+        if winner:
+            _file_locked(path, lambda _rows: (None, [winner]))
+            if isinstance(result, dict) and result.get("admitted") and any(row.get("terminalState") in TERMINAL or row.get("event") == "completion_fenced"
+                or (row.get("event") == "attempt_finished" and row.get("fencingToken") == winner.get("fencingToken")) for row in canonical):
+                raise RuntimeError("stale-fencing-token")
+            return result
     raise RuntimeError("execution-coordinator-contention")
 def _for(rows: list[dict], ident: dict) -> list[dict]: return [row for row in rows if row["identityDigest"] == ident["identityDigest"]]
 def _usage(rows: list[dict], now: float) -> dict:
@@ -282,10 +402,10 @@ def finalize_stale_statuses(path: Path, coordination: dict, now: float | None = 
                 or ident["identityDigest"] != digest({"workKey": ident["workKey"], "generation": ident["executionGeneration"]})):
             outcomes.append({"context": context, "outcome": "skipped-malformed"}); continue
         try:
-            chain, head = _status_rows(statuses, ident)
+            chain, head = _status_rows(statuses, ident, coordination=coordination)
         except (RuntimeError, ValueError, KeyError, zlib.error):
             outcomes.append({"context": context, "outcome": "skipped-malformed"}); continue
-        if not chain or head != status["id"]:
+        if not chain or head != row.get("_remote", {}).get("reservationSha", status["id"]):
             outcomes.append({"context": context, "outcome": "skipped-unlinked"}); continue
         last = chain[-1]
         if last.get("terminalState"):  # A terminal row always posts a terminal state; never restate it.
@@ -403,7 +523,7 @@ def _reconciliation_proof(coord: dict, ident: dict, rows: list[dict], pr: int, s
         candidate = {key: row.get(key) for key in ("workKey", "executionGeneration", "identityDigest")}
         if candidate["identityDigest"] != digest({"workKey": candidate["workKey"], "generation": candidate["executionGeneration"]}):
             raise RuntimeError("reconciliation-identity-invalid")
-        chain, _ = _status_rows(statuses, candidate, strict=True)
+        chain, _ = _status_rows(statuses, candidate, strict=True, coordination=coord)
         # Successful unrelated execution is not excluded. Pending/failing non-remediation
         # work must remain a blocker rather than being labeled stale by this operation.
         if not str(candidate["workKey"]).startswith("pr-remediation:"):
@@ -461,7 +581,7 @@ def _verify_completion_fence(coord: dict, ident: dict, row: dict):
     ref = _completion_ref(ident, row["sealedAttempt"])
     observed = _gh(coord, "GET", f"repos/{coord['repository']}/git/ref/{ref.removeprefix('refs/')}")
     if (not isinstance(observed, list) or len(observed) != 1 or observed[0].get("ref") != ref
-        or observed[0].get("object", {}).get("sha") != coord["sha"]):
+        or observed[0].get("object", {}).get("sha") != row.get("_remote", {}).get("reservationSha", coord["sha"])):
         raise RuntimeError("reconciliation-remote-fence-unverified")
 def reconcile_completed_failure(path: Path, ident: dict, pr: int, *, coordination: dict, state: Path | None = None, now: float | None = None) -> dict:
     """Append a stale-intent disposition after authoritative recovery; never retry or rewrite failure.
@@ -489,11 +609,6 @@ def reconcile_completed_failure(path: Path, ident: dict, pr: int, *, coordinatio
                 return {"fenced": True}, []
             ended = rows[-1]
             next_attempt = ended["attempt"] + 1
-            ref = _completion_ref(ident, next_attempt)
-            if _gh(coordination, "POST", f"repos/{coordination['repository']}/git/refs", {"ref": ref, "sha": coordination["sha"]}) is None:
-                # A worker or another reconciler won, possibly without publishing
-                # its receipt yet. Never infer ownership from an equal ref SHA.
-                raise RuntimeError("reconciliation-next-slot-already-reserved")
             row = {**ident, "schema": SCHEMA, "event": "completion_fenced", "at": now, "attempt": ended["attempt"], "fencingToken": ended["fencingToken"],
                    "sealedAttempt": next_attempt, "result": "failed_known", "terminalState": None, "remainingBudgets": ended["remainingBudgets"],
                    "endedReceiptDigest": next(digest(item) for item in [json.loads(line) for line in (state / "runs/ledger.jsonl").read_text().splitlines()] if item.get("execution") == _plain(ended)),
