@@ -1806,6 +1806,76 @@ class HostHandoffAdmissionTest(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.host = lane.Host(state=Path(self.tmp.name), repo=Path(self.tmp.name))
 
+    @staticmethod
+    def routed_providers():
+        return {
+            "devin": {"tier": 0, "slots": 1, "model": "standard", "cmd": ["devin-test"],
+                      "routes": [{"model": "standard", "capability": "standard", "cost": 0}]},
+            "codex": {"tier": 1, "slots": 1, "model": "frontier", "cmd": ["codex-test"],
+                      "routes": [{"model": "frontier", "capability": "frontier", "cost": 3}]},
+            "claude": {"tier": 2, "slots": 1, "model": "sonnet", "cmd": ["claude-test", "{model}"],
+                       "routes": [{"model": "sonnet", "capability": "standard", "cost": 1},
+                                  {"model": "opus", "capability": "frontier", "cost": 2}]},
+            "hyperagent": {"tier": 0, "slots": 1, "repairs": False, "cmd": ["remote-test"],
+                           "routes": [{"model": "remote", "capability": "frontier", "cost": 0}]},
+        }
+
+    def test_issue_handoff_keeps_sensitive_and_codex_blocked_restrictions(self):
+        providers = self.routed_providers()
+        with patch.object(lane, "provider_healthy", return_value=True) as healthy:
+            self.assertIsNone(lane.next_provider(self.host, {"codex"}, providers, issue=issue(labels=["auth"])))
+            self.assertIsNone(lane.next_provider(self.host, set(), providers,
+                                                issue=issue(labels=["auth", "codex-blocked"])))
+            self.assertEqual(lane.next_provider(self.host, {"devin"}, providers,
+                                                issue=issue(labels=["codex-blocked"]))[0], "claude")
+        self.assertTrue(all(call.args[0] is providers["claude"] for call in healthy.call_args_list))
+
+    def test_frontier_handoff_selects_a_frontier_model_without_mutating_the_catalog(self):
+        providers = self.routed_providers()
+        with patch.object(lane, "provider_healthy", return_value=True):
+            name, spec = lane.next_provider(self.host, {"codex"}, providers, issue=issue(labels=["route:frontier"]))
+        self.assertEqual((name, spec["model"]), ("claude", "opus"))
+        self.assertEqual(spec["route"]["required"], "frontier")
+        self.assertEqual(providers["claude"]["model"], "sonnet")
+        self.assertEqual(lane.template(spec["cmd"], {"model": spec["model"]}), ["claude-test", "opus"])
+
+    def test_handoff_requires_proven_route_capability(self):
+        providers = {"devin": {"slots": 1, "model": "unknown", "cmd": ["devin-test"]}}
+        with patch.object(lane, "provider_healthy", return_value=True):
+            self.assertIsNone(lane.next_provider(self.host, set(), providers, issue=issue()))
+
+    def test_handoff_cannot_drop_the_initial_floor_when_policy_is_unreadable(self):
+        providers = self.routed_providers()
+        with patch.object(lane, "provider_healthy", return_value=True), \
+                patch.object(lane, "read_json", return_value={}):
+            name, spec = lane.next_provider(self.host, {"codex"}, providers, issue=issue(),
+                                            minimum_capability="frontier")
+            self.assertEqual((name, spec["model"]), ("claude", "opus"))
+            self.assertEqual(spec["route"]["required"], "frontier")
+            self.assertIsNone(lane.next_provider(self.host, {"codex", "claude"}, providers,
+                                                issue=issue(), minimum_capability="frontier"))
+            self.assertIsNone(lane.next_provider(self.host, set(), providers,
+                                                issue=issue(), minimum_capability="unknown"))
+
+    def test_issue_handoff_preserves_live_availability_and_remote_only_exclusions(self):
+        for mode in ("disabled", "no-slots", "remote-only", "quota", "cooling", "unhealthy", "saturated"):
+            with self.subTest(mode=mode):
+                providers = self.routed_providers()
+                spec = providers["claude"]
+                if mode == "disabled":
+                    spec["enabled"] = False
+                if mode == "no-slots":
+                    spec["slots"] = 0
+                if mode == "remote-only":
+                    spec["repairs"] = False
+                if mode == "quota":
+                    spec["quota"] = {"source": "ledger", "maxRuns": 0}
+                with patch.object(lane, "provider_healthy", return_value=mode != "unhealthy"), \
+                        patch.object(lane, "cooling", side_effect=lambda host, name: mode == "cooling" and name == "claude"), \
+                        patch.object(lane, "slot_free", return_value=mode != "saturated"):
+                    self.assertIsNone(lane.next_provider(self.host, {"codex"}, providers,
+                                                        issue=issue(labels=["route:frontier"])))
+
     def test_host_disabled_handoffs_are_not_probed_or_selected(self):
         providers = {"claude": {"slots": 2}, "hyperagent": {"slots": 2}}
         with patch.dict(os.environ, {"LANES_SLOTS_CLAUDE": "0", "LANES_SLOTS_HYPERAGENT": "0"}), \
@@ -1983,7 +2053,7 @@ class RunIssueTest(unittest.TestCase):
         lane.verify_and_land = lambda *a, **k: {"verdict": "landing", "pr": 11, "reasons": []}
         seen = []
 
-        def nxt(host, exclude, providers=None):
+        def nxt(host, exclude, providers=None, **kwargs):
             seen.append(set(exclude))
             return ("devin", {"cmd": [sys.executable, "-c", "import os; open('done.txt','w').write(os.getcwd())"]}) \
                 if "devin" not in exclude else None
@@ -2004,6 +2074,58 @@ class RunIssueTest(unittest.TestCase):
         self.assertEqual((context["kind"], context["provider"]), ("handoff", "devin"))
         self.assertEqual(context["prompt"]["sha256"], hashlib.sha256(handoff.encode()).hexdigest())
 
+    def test_real_handoff_router_never_downgrades_sensitive_or_frontier_work(self):
+        providers = HostHandoffAdmissionTest.routed_providers()
+        providers.pop("claude")
+        seen = []
+
+        def agent(cmd, cwd, *args, **kwargs):
+            seen.append((cmd[0], cwd))
+            (cwd / "partial.py").write_text("preserve_partial_source = True\n")
+            return SimpleNamespace(returncode=75 if cmd[0] == "codex-test" else 0)
+
+        for index, labels in enumerate((["auth"], ["route:frontier"], [], [])):
+            with self.subTest(labels=labels):
+                seen.clear()
+                initial = {**providers["codex"], **({"route": {"required": "frontier"}} if index == 2 else {})}
+                lane.verify_and_land = lambda *a, **k: {"verdict": "landing" if len(seen) > 1 else "no-change", "reasons": []}
+                with patch.object(lane, "next_provider", side_effect=self.real_next), \
+                        patch.object(lane, "load_providers", return_value=providers), \
+                        patch.object(lane, "provider_healthy", return_value=True), \
+                        patch.object(lane, "run_agent", side_effect=agent):
+                    receipt = lane.run_issue(self.host, "codex", initial, FakeLinear([]),
+                                             issue(f"JOV-{90 + index}", labels=labels))
+                if labels or index == 2:
+                    self.assertEqual([name for name, _ in seen], ["codex-test"])
+                    self.assertEqual(receipt["verdict"], "provider-error")
+                    self.assertNotIn("handoffs", receipt)
+                    self.assertTrue((Path(receipt["worktree"]) / "partial.py").exists())
+                else:
+                    self.assertEqual([name for name, _ in seen], ["codex-test", "devin-test"])
+                    self.assertEqual(seen[0][1], seen[1][1])
+                    self.assertEqual((receipt["verdict"], receipt["finishedBy"]), ("landing", "devin"))
+
+    def test_frontier_floor_applies_again_after_the_first_handoff_fails(self):
+        providers = HostHandoffAdmissionTest.routed_providers()
+        providers["sakana"] = {"tier": 3, "slots": 1, "cmd": ["sakana-test"],
+                               "routes": [{"model": "standard", "capability": "standard", "cost": 4}]}
+        seen = []
+
+        def agent(cmd, *args, **kwargs):
+            seen.append(cmd)
+            return SimpleNamespace(returncode=75)
+
+        lane.verify_and_land = lambda *a, **k: {"verdict": "no-change", "reasons": []}
+        with patch.object(lane, "next_provider", side_effect=self.real_next), \
+                patch.object(lane, "load_providers", return_value=providers), \
+                patch.object(lane, "provider_healthy", return_value=True), \
+                patch.object(lane, "run_agent", side_effect=agent):
+            receipt = lane.run_issue(self.host, "codex", providers["codex"], FakeLinear([]),
+                                     issue(labels=["route:frontier"]))
+        self.assertEqual(seen, [["codex-test"], ["claude-test", "opus"]])
+        self.assertEqual(len(receipt["handoffs"]), 1)
+        self.assertEqual(receipt["verdict"], "provider-error")
+
     def test_next_provider_takes_the_cheapest_enabled_healthy_uncooled_lane(self):
         providers = {
             "devin": {"health": ["echo", "ok"], "healthy": "ok"},
@@ -2020,7 +2142,7 @@ class RunIssueTest(unittest.TestCase):
     def test_handoffs_are_capped_and_then_report_the_provider_error(self):
         lane.verify_and_land = lambda *a, **k: {"verdict": "no-change", "reasons": ["no-pr-and-no-commits"]}
         order = iter(["devin", "claude", "hyperagent"])
-        lane.next_provider = lambda host, exclude, providers=None: (next(order), {"cmd": ["false"]})
+        lane.next_provider = lambda host, exclude, providers=None, **kwargs: (next(order), {"cmd": ["false"]})
         receipt = lane.run_issue(self.host, "codex", {"cmd": ["false"]}, FakeLinear([]), issue())
         self.assertEqual(len(receipt["handoffs"]), lane.PROVIDER_HANDOFFS)
         self.assertEqual(receipt["verdict"], "provider-error")
