@@ -28,6 +28,7 @@
       "!apps/web/tests/unit/design-system/source-identity.baseline.json",
       "!scripts/public-benchmark/receipts",
       "!docs/design-system/drift-ledger.json",
+      "!docs/postmortems/reports/**",
       "!canon/design-refs/corpus.json",
       "!canon/design-refs/scout-seeds.json",
       "!packages/action-contracts/generated/**",

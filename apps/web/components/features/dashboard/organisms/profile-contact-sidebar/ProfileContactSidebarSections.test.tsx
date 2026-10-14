@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { PreviewPanelData } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { APP_ROUTES } from '@/constants/routes';
@@ -86,4 +86,41 @@ describe('ProfileBentoView', () => {
     ).toHaveAttribute('href', `${APP_ROUTES.SETTINGS_PROFILE}?tab=music`);
     expect(screen.queryByText('Manage In Identity')).not.toBeInTheDocument();
   });
+});
+
+it('carries source verification into the profile rail through image failure without treating DSP connection as verification', () => {
+  const props = {
+    previewData: {
+      ...previewData,
+      isVerified: true,
+      avatarUrl: 'https://example.com/missing.jpg',
+    },
+    profileUrl: 'https://jov.ie/alex',
+  };
+  const { container, rerender } = render(<ProfileBentoView {...props} />);
+  fireEvent.error(container.querySelector('img')!);
+  expect(
+    screen.getByRole('img', { name: 'Verified Jovie Profile' })
+  ).toBeInTheDocument();
+  expect(
+    screen
+      .getByTestId('profile-preview-entity-header')
+      .querySelector('[data-entity-header-thumbnail-variant]')
+  ).toHaveAttribute('data-entity-header-thumbnail-variant', 'person');
+  rerender(
+    <ProfileBentoView
+      {...props}
+      previewData={{
+        ...props.previewData,
+        isVerified: false,
+        dspConnections: {
+          ...previewData.dspConnections,
+          spotify: { connected: true, artistName: 'Alex Rivera' },
+        },
+      }}
+    />
+  );
+  expect(
+    screen.queryByRole('img', { name: 'Verified Jovie Profile' })
+  ).toBeNull();
 });

@@ -17,10 +17,12 @@ vi.mock('next/image', () => ({
     alt,
     fill: _fill,
     unoptimized: _unoptimized,
+    priority: _priority,
     ...rest
   }: ComponentProps<'img'> & {
     fill?: boolean;
     unoptimized?: boolean;
+    priority?: boolean;
   }) => <img src={src as string} alt={alt ?? ''} {...rest} />,
 }));
 
@@ -52,6 +54,34 @@ function advanceTimers(ms: number) {
 }
 
 describe('EntityHoverLink', () => {
+  it('uses circular artist fallback without inferring Jovie verification from provider metadata', () => {
+    vi.useFakeTimers();
+    fastRender(
+      <EntityHoverLink
+        entity={{
+          kind: 'artist',
+          id: 'sasha',
+          label: 'Sasha Waves',
+          thumbnail: '/broken-person.jpg',
+          verified: true,
+        }}
+      >
+        Sasha Waves
+      </EntityHoverLink>
+    );
+    fireEvent.focus(screen.getByRole('button', { name: 'Sasha Waves' }));
+    advanceTimers(200);
+    const portrait = screen
+      .getByRole('tooltip')
+      .querySelector('[data-entity-header-thumbnail-variant="person"]')!;
+    fireEvent.error(portrait.querySelector('img')!);
+    expect(portrait).toHaveClass('rounded-full');
+    expect(portrait).toHaveTextContent('SW');
+    expect(
+      screen.queryByRole('img', { name: 'Verified Jovie Profile' })
+    ).toBeNull();
+  });
+
   it('opens on hover and closes on mouse leave', () => {
     vi.useFakeTimers();
     fastRender(<EntityHoverLink entity={release}>Sober</EntityHoverLink>);

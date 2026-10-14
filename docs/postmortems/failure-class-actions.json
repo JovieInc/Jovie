@@ -1,0 +1,26 @@
+{
+  "schema": "jovie.postmortem-failure-class-actions/v1",
+  "sourceIssue": "JOV-6690",
+  "actions": [
+    {
+      "failureClass": "green-by-implication",
+      "issue": "JOV-8303",
+      "url": "https://linear.app/jovie/issue/JOV-8303/pm-classgreen-by-implication-forbid-false-green-across-automation"
+    },
+    {
+      "failureClass": "non-convergent-control-loop",
+      "issue": "JOV-8302",
+      "url": "https://linear.app/jovie/issue/JOV-8302/pm-classnon-convergent-control-loop-convergence-invariants-for"
+    },
+    {
+      "failureClass": "pre-merge-parity-gap",
+      "issue": "JOV-8301",
+      "url": "https://linear.app/jovie/issue/JOV-8301/pm-classpre-merge-parity-gap-failure-class-hardening-across-deploy"
+    },
+    {
+      "failureClass": "silent-production-staleness",
+      "issue": "JOV-8300",
+      "url": "https://linear.app/jovie/issue/JOV-8300/pm-classsilent-production-staleness-failure-class-hardening-across"
+    }
+  ]
+}

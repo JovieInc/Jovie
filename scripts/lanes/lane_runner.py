@@ -2283,19 +2283,57 @@ def cool_down(host: Host, name: str, code: int | None = None) -> bool:
     return True
 
 
-def next_provider(host: Host, exclude: set[str], providers: dict | None = None):
+def next_provider(host: Host, exclude: set[str], providers: dict | None = None, *,
+                  issue: Issue | None = None, minimum_capability: str | None = None):
     """The cheapest enabled, healthy, non-cooling lane not yet tried on this run.
 
     Order comes from providers.json (optional `tier`, else list position). Registry
     exclusions and the same host slot limits used by dispatch also apply to handoff.
+    An issue handoff keeps its guarded lanes and capability floor, including model choice.
     """
     catalog = providers or load_providers()
     host_excluded = {name for name, spec in catalog.items()
                      if isinstance(spec, dict) and host.slots(name, spec.get("slots", 1)) <= 0}
     cooled = {name for name in catalog if cooling(host, name)}
 
-    def healthy(_name, spec):
-        return provider_healthy(spec)
+    health = {}
+    def healthy(name, spec):
+        if name not in health:
+            health[name] = provider_healthy(spec)
+        return health[name]
+
+    if issue is not None:
+        routing_catalog = catalog
+        if minimum_capability is not None:
+            if minimum_capability not in remediation.CAPABILITIES:
+                return None
+            floor = remediation.capability_rank(minimum_capability)
+            routing_catalog = {name: {**spec, "routes": [route for route in spec.get("routes") or ()
+                               if isinstance(route, dict) and remediation.capability_rank(route.get("capability")) >= floor]}
+                               for name, spec in catalog.items() if isinstance(spec, dict)}
+        allowed = lane_restriction(issue, catalog)
+        allowed = set(catalog) if allowed is None else allowed
+        allowed -= set(exclude) | host_excluded | cooled | {
+            name for name, spec in catalog.items() if isinstance(spec, dict) and spec.get("repairs") is False}
+        availability = lane_availability(host, "", catalog)
+
+        def available(name, route):
+            seen = availability(name, route)
+            if seen["ok"] and not healthy(name, catalog[name]):
+                return {"ok": False, "why": "unhealthy", "pressure": seen.get("pressure", 0)}
+            return seen
+
+        decision = remediation.route_issue(
+            {"identifier": issue.identifier, "title": issue.title, "description": issue.description,
+             "labels": issue.labels}, routing_catalog, read_json(ROUTING_POLICY), available, only_lanes=allowed)
+        if minimum_capability is not None and remediation.capability_rank(decision["required"]) < floor:
+            decision.update(required=minimum_capability,
+                            reasons=[*decision["reasons"], f"initial-handoff-floor:{minimum_capability}"],
+                            rationale=f"Preserving {minimum_capability} handoff floor; {decision['rationale']}")
+        chosen = decision["chosen"]
+        if chosen is None:
+            return None
+        return chosen["lane"], {**catalog[chosen["lane"]], "model": chosen["model"], "route": decision}
 
     chosen = remediation.route_lane(catalog, exclude=set(exclude) | host_excluded, healthy=healthy, cooled=cooled)
     if chosen is None:
@@ -2558,7 +2596,8 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
             # lane finishes it on the same worktree.
             handoffs, current = [], name
             while agent.returncode != 0 and len(handoffs) < PROVIDER_HANDOFFS:
-                nxt = next_provider(host, {name, *(h["to"] for h in handoffs)})
+                nxt = next_provider(host, {name, *(h["to"] for h in handoffs)}, issue=issue,
+                                    minimum_capability=(spec.get("route") or {}).get("required"))
                 if nxt is None:
                     break
                 cool_down(host, current, agent.returncode)
@@ -2608,8 +2647,8 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
             if receipt.get("verdict") in {"disk-held", "pr-readback-pending"}:
                 preserve_repair(worktree, receipt)
             else:
-                remove_worktree(host, worktree)
-                sh(["git", "branch", "-D", branch], cwd=host.repo)
+                if remove_worktree(host, worktree):
+                    sh(["git", "branch", "-D", branch], cwd=host.repo)
     evidence = read_provider_evidence(provider_evidence)
     if evidence:
         receipt["providerEvidence"] = evidence
@@ -6802,31 +6841,62 @@ def record_worktree_disposition(host: Host, worktree: Path, verdict: str, reason
         pass
 
 
-def remove_worktree(host: Host, worktree: Path) -> None:
-    """Protected source is never cleanup; process ownership belongs to run_agent."""
+def remove_worktree(host: Host, worktree: Path) -> bool:
+    """True only when clean, published source retired; retained work keeps its branch."""
     if not worktree.exists() or (worktree / disk_guard.PRESERVED_REPAIR).exists():
-        return
+        return False
     busy = worktree_busy(worktree)
     if busy:
         record_worktree_disposition(host, worktree, "preserved", busy)
         preserve_repair(worktree, {"runId": worktree.name, "reasons": [f"cleanup-not-idle:{busy}"]})
-        return
+        return False
     status = sh(["git", "status", "--porcelain", *disk_guard.SOURCE_PATHSPEC], cwd=worktree)
     if status.returncode or status.stdout.strip():
         record_worktree_disposition(host, worktree, "preserved", "source-unverified")
         preserve_repair(worktree, {"runId": worktree.name, "reasons": ["cleanup-source-unverified"]})
-        return
-    unpushed = sh(["git", "rev-list", "--count", "HEAD", "--not", "--all"], cwd=worktree)
-    if unpushed.returncode or unpushed.stdout.strip() != "0":
-        record_worktree_disposition(host, worktree, "preserved", "unpublished-work")
-        preserve_repair(worktree, {"runId": worktree.name, "reasons": ["cleanup-unpublished-work"]})
-        return
+        return False
+    reason = "publication-unverified"
+    try:
+        # Local refs (including HEAD itself) are not publication. Refresh every
+        # origin branch atomically and prune deleted refs before trusting ancestry.
+        fetched = sh(["git", "fetch", "-q", "--atomic", "--prune", "--no-tags",
+                      "--no-recurse-submodules", "origin", "+refs/heads/*:refs/remotes/origin/*"],
+                     cwd=worktree, timeout=30)
+        head = (sh(["git", "rev-parse", "--verify", "HEAD"], cwd=worktree, timeout=30)
+                if fetched.returncode == 0 else None)
+        unpushed = (sh(["git", "rev-list", "--count", head.stdout.strip(), "--not", "--remotes=origin"],
+                       cwd=worktree, timeout=30)
+                    if head is not None and head.returncode == 0 and head.stdout.strip() else None)
+        if unpushed is not None and unpushed.returncode == 0:
+            count = unpushed.stdout.strip()
+            if count == "0":
+                reason = None
+            elif count.isdecimal():
+                reason = "unpublished-work"
+    except (OSError, subprocess.SubprocessError):
+        pass  # unknown publication is never permission to destroy source
+    if reason:
+        record_worktree_disposition(host, worktree, "preserved", reason)
+        preserve_repair(worktree, {"runId": worktree.name, "reasons": [f"cleanup-{reason}"]})
+        return False
+    # The origin read may have taken time; recheck live ownership and source.
+    busy = worktree_busy(worktree)
+    status = sh(["git", "status", "--porcelain", *disk_guard.SOURCE_PATHSPEC], cwd=worktree)
+    current_head = sh(["git", "rev-parse", "--verify", "HEAD"], cwd=worktree, timeout=30)
+    if (busy or status.returncode or status.stdout.strip() or current_head.returncode or
+            current_head.stdout.strip() != head.stdout.strip()):
+        reason = f"cleanup-not-idle:{busy}" if busy else "cleanup-source-unverified"
+        record_worktree_disposition(host, worktree, "preserved", reason)
+        preserve_repair(worktree, {"runId": worktree.name, "reasons": [reason]})
+        return False
     # Proven clean and published: hand it to the next run installed, instead of spending
     # minutes deleting ~230k node_modules files (JOV-7723).
     slot = worktree_pool.recycle(host.repo, worktree)
     record_worktree_disposition(host, worktree, "recycled" if slot else "removed", slot)
     if not slot:
-        sh(["git", "worktree", "remove", "--force", str(worktree)], cwd=host.repo)
+        removed = sh(["git", "worktree", "remove", "--force", str(worktree)], cwd=host.repo)
+        return removed.returncode == 0 and not worktree.exists()
+    return True
 
 
 def prune_worktrees(host: Host, max_age_s: int = 6 * 3600) -> None:
@@ -6843,8 +6913,6 @@ def prune_worktrees(host: Host, max_age_s: int = 6 * 3600) -> None:
             continue  # a worker removed it between listing and stat
         if stale:
             remove_worktree(host, path)
-            if not (path / disk_guard.PRESERVED_REPAIR).exists():
-                shutil.rmtree(path, ignore_errors=True)
     sh(["git", "worktree", "prune"], cwd=host.repo)
 
 

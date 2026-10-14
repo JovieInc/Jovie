@@ -83,3 +83,11 @@ describe('ArtistAvatarStack', () => {
     expect(overflowSpan).toHaveAttribute('aria-hidden', 'true');
   });
 });
+
+it('names the artist group once and uses real initials when portraits are absent', () => {
+  render(
+    <ArtistAvatarStack artists={[{ id: 'a', displayName: 'Tim White' }]} />
+  );
+  expect(screen.getAllByRole('img', { name: 'Tim White' })).toHaveLength(1);
+  expect(screen.getByText('TW')).toBeInTheDocument();
+});

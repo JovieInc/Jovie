@@ -3,6 +3,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import {
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -42,6 +43,12 @@ test('trusted source-read guards reject a deleted test on an old head and execut
       { maxBuffer: 20 * 1024 * 1024 }
     );
     execFileSync('tar', ['-x', '-C', repo], { input: archive });
+    // This synthetic base isolates the web manifest guard and predates the
+    // Codex bootstrap contract. Do not turn deletion of its checker scripts
+    // into an unrelated deletion of the Codex source/test surface.
+    for (const name of readdirSync(join(repo, 'scripts'))) {
+      if (name.startsWith('codex-')) rmSync(join(repo, 'scripts', name));
+    }
     const retired = join(repo, 'apps/web/lib/merch/qa-gate.test.ts');
     mkdirSync(join(repo, 'apps/web/lib/merch'), { recursive: true });
     mkdirSync(join(repo, 'apps/web/tests'), { recursive: true });

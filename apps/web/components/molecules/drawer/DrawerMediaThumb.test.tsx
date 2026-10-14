@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { DrawerMediaThumb } from './DrawerMediaThumb';
 
@@ -7,6 +7,7 @@ const { nextImage } = vi.hoisted(() => ({ nextImage: vi.fn() }));
 vi.mock('next/image', () => ({
   default: ({
     fill: _fill,
+    priority: _priority,
     alt,
     ...props
   }: {
@@ -35,7 +36,8 @@ describe('DrawerMediaThumb', () => {
       />
     );
 
-    const image = screen.getByRole('img', { name: 'Artist profile' });
+    const media = screen.getByRole('img', { name: 'Artist profile' });
+    const image = media.querySelector('img');
     expect(image).toHaveAttribute('width', '60');
     expect(image).toHaveAttribute('height', '60');
     expect(image).not.toHaveAttribute('fill');
@@ -45,4 +47,22 @@ describe('DrawerMediaThumb', () => {
     );
     expect(nextImage.mock.calls[0]?.[0]).not.toHaveProperty('fill');
   });
+});
+
+it('retains its accessible identity on failure and retries a replacement URL', () => {
+  const onImageError = vi.fn();
+  const props = { alt: 'Alex Rivera', fallback: <span>AR</span>, onImageError };
+  const { container, rerender } = render(
+    <DrawerMediaThumb {...props} src='/first.jpg' />
+  );
+  fireEvent.error(container.querySelector('img')!);
+  expect(onImageError).toHaveBeenCalledOnce();
+  expect(screen.getByRole('img', { name: 'Alex Rivera' })).toHaveTextContent(
+    'AR'
+  );
+  rerender(<DrawerMediaThumb {...props} src='/replacement.jpg' />);
+  expect(container.querySelector('img')).toHaveAttribute(
+    'src',
+    '/replacement.jpg'
+  );
 });

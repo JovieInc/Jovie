@@ -89,6 +89,10 @@ severity: sev1 | sev2 | sev3
 detected: 2026-09-23T21:37Z
 repaired: 2026-09-26T22:45Z
 failure_classes: [silent-production-staleness]
+detectable_before_human: false
+detection_gaps: [missing-signal, missing-invariant]
+replay_corpus: [docs/postmortems/2026-09-26-production-freeze.md#timeline-utc]
+founder_rescues: 0
 incident_issue: JOV-XXXX | none
 actions: [JOV-XXXX]
 gbrain: ops/postmortems/2026-09-26-production-freeze
@@ -136,6 +140,18 @@ improvement loop and bottleneck ranking (JOV-5817).
    red fixture, or the invariant test failed on the old code. Merging the
    change is not enough. The action row records the receipt. The post-mortem
    moves to `controls-verified`, then `closed`.
+5. **Detection learning.** Every review emits a JOV-7084 `DetectionGap`:
+   whether objective evidence existed before human discovery, the missing or
+   failed detection capability, the real incident replay, and the founder
+   rescue count. Recurring classes and rescues enter JOV-5817's capability
+   expansion ranking. A local fix without a generalized detector/invariant is
+   incomplete.
+
+The deterministic runner is `pnpm postmortem:review`. Post-mortem merges invoke
+it through the existing Quality Gap Finder event path; the existing Shipping
+SLO clock provides the weekly reconciliation without adding another scheduler.
+GBrain outages buffer the report and retry on the next run; only a read-back
+verified mirror is reported as mirrored.
 
 ## Keep it light
 
