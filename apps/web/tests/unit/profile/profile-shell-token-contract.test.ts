@@ -54,8 +54,7 @@ describe('profile shell token contract', () => {
       'utf8'
     );
     expect(compactSurfaceContents).toContain('--profile-content-bg');
-    // The identity header's verified glyph sits on the stage token so its
-    // ring reads as a cut-out of the page in every theme.
+    // Verification appearance belongs to the shared identity owner.
     const designSystemContents = readFileSync(DESIGN_SYSTEM, 'utf8');
     expect(designSystemContents).toContain('--profile-stage-bg');
     expect(
@@ -66,7 +65,7 @@ describe('profile shell token contract', () => {
         ),
         'utf8'
       )
-    ).toContain('bg-(--profile-stage-bg)');
+    ).toContain('EntityHeaderThumbnail');
   });
 
   it('keeps the production desktop stage on the canonical public width token', () => {

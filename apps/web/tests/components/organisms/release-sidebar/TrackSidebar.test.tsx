@@ -167,9 +167,13 @@ describe('TrackSidebar', () => {
       />
     );
 
+    expect(screen.getByTestId('track-artwork')).toHaveStyle({
+      width: '44px',
+      height: '44px',
+    });
     expect(
       screen.getByRole('img', { name: 'Midnight Echo (EP) artwork' })
-    ).toHaveAttribute('width', '44');
+    ).toHaveClass('object-contain');
   });
 
   it('treats missing preview verification as not checked and keeps unknown-confidence links out of canonical DSPs', async () => {
