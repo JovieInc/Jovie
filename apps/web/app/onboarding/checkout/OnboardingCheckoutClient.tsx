@@ -366,8 +366,6 @@ export function OnboardingCheckoutClient({
           </p>
         </div>
 
-        {/* JOV-8068: never render a placeholder preview for a profile that
-            does not exist — no "?" avatar, no bare "@". */}
         {username || displayName ? (
           <ProfilePreviewCard
             avatarUrl={avatarUrl}
