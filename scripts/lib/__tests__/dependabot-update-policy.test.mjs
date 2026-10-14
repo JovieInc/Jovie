@@ -536,7 +536,16 @@ describe('Dependabot discovery contract', () => {
   ])(
     'limits security ignores in %s to the upstream-blocked versions',
     (directory, ignores) => {
-      const entries = load(CONFIG).updates.filter(
+      const parsed = load(CONFIG);
+      if (
+        typeof parsed !== 'object' ||
+        parsed === null ||
+        !('updates' in parsed) ||
+        !Array.isArray(parsed.updates)
+      ) {
+        throw new Error('dependabot.yml must declare an updates array');
+      }
+      const entries = parsed.updates.filter(
         entry =>
           entry['package-ecosystem'] === 'npm' && entry.directory === directory
       );
