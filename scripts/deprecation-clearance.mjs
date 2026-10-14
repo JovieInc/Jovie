@@ -238,7 +238,8 @@ export async function recordDeprecationObservations({
 export async function runDeprecationClearance(
   args,
   env = process.env,
-  fetchImpl = fetch
+  fetchImpl = fetch,
+  { verifyMarker } = {}
 ) {
   if (!args[0] || !args[1] || !env.LINEAR_API_KEY || !env.GH_TOKEN)
     throw new Error(
@@ -264,6 +265,7 @@ export async function runDeprecationClearance(
       fetchImpl,
       github,
       repository: 'JovieInc/Jovie',
+      verifyMarker,
     }),
     linear,
     comment: args =>
