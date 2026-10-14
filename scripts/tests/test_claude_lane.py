@@ -1,13 +1,16 @@
 """Claude Code lane adapter: subscription-only auth, quota bank, run receipts (JOV-7706)."""
 from __future__ import annotations
 
+import fcntl
 import io
 import json
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
@@ -126,6 +129,98 @@ class ClaudeLaneTest(unittest.TestCase):
         self.assertEqual(state["bank"]["until"], 5000)
         old = claude.record_run(OPUS, 0, None, 200 + claude.WINDOW_S + 1, self.state)
         self.assertEqual(len(old["runs"]), 1)
+
+    def overlapping_completions(self, first_limit, second_limit):
+        claude.write_state({"runs": []}, self.state)
+        first_read, second_progress = threading.Event(), threading.Event()
+        release_first, first_written = threading.Event(), threading.Event()
+        role = threading.local()
+        read, write, flock = claude.read_state, claude.write_state, fcntl.flock
+
+        def observed_read(path):
+            state = read(path)
+            if role.name == "first":
+                first_read.set()
+                if not release_first.wait(5):
+                    raise TimeoutError("first completion was not released")
+            else:
+                # The old unlocked implementation has already read stale state.
+                second_progress.set()
+            return state
+
+        def observed_lock(handle, operation):
+            if role.name == "second":
+                # The fixed implementation reaches the real lock before reading.
+                second_progress.set()
+            return flock(handle, operation)
+
+        def ordered_write(state, path):
+            if role.name == "second" and not first_written.wait(5):
+                raise TimeoutError("first completion was not written")
+            write(state, path)
+            if role.name == "first":
+                first_written.set()
+
+        def complete(name, limit):
+            role.name = name
+            return claude.record_run(OPUS if name == "first" else "claude-sonnet-5-5",
+                                     1 if limit else 0, limit, 100, self.state)
+
+        with patch.object(claude, "read_state", side_effect=observed_read), \
+             patch.object(claude, "write_state", side_effect=ordered_write), \
+             patch.object(fcntl, "flock", side_effect=observed_lock), \
+             ThreadPoolExecutor(max_workers=2) as pool:
+            first = pool.submit(complete, "first", first_limit)
+            self.assertTrue(first_read.wait(5))
+            second = pool.submit(complete, "second", second_limit)
+            try:
+                self.assertTrue(second_progress.wait(5))
+            finally:
+                release_first.set()
+            first.result(timeout=5)
+            second.result(timeout=5)
+        return claude.read_state(self.state)
+
+    def test_overlapping_completions_preserve_both_runs_and_the_longest_bank(self):
+        usage = {"kind": "usage-limit", "until": 5000}
+        burst = {"kind": "rate-limit", "until": 400}
+        for first_limit, second_limit in ((usage, None), (usage, burst), (burst, usage)):
+            with self.subTest(first=first_limit, second=second_limit):
+                state = self.overlapping_completions(first_limit, second_limit)
+                self.assertEqual(state["bank"]["until"], 5000)
+                self.assertEqual([row["model"] for row in state["runs"]],
+                                 [OPUS, "claude-sonnet-5-5"])
+                self.assertEqual([row["exit"] for row in state["runs"]],
+                                 [1, 1 if second_limit else 0])
+
+    def test_overlapping_atomic_writes_use_distinct_temporary_files(self):
+        ready = threading.Barrier(2)
+        paths = []
+        replace = claude.os.replace
+
+        def overlap(source, destination):
+            paths.append(Path(source))
+            ready.wait(timeout=5)
+            return replace(source, destination)
+
+        with patch.object(claude.os, "replace", side_effect=overlap), \
+             ThreadPoolExecutor(max_workers=2) as pool:
+            futures = [pool.submit(claude.write_state, {"writer": writer}, self.state)
+                       for writer in (1, 2)]
+            for future in futures:
+                future.result(timeout=5)
+        self.assertEqual(len(set(paths)), 2)
+        self.assertIn(claude.read_state(self.state), ({"writer": 1}, {"writer": 2}))
+        self.assertTrue(all(not path.exists() for path in paths))
+
+    def test_atomic_write_failure_keeps_prior_state_and_removes_temporary_file(self):
+        claude.write_state({"bank": {"kind": "usage-limit", "until": 5000}}, self.state)
+        before = self.state.read_bytes()
+        with patch.object(claude.os, "replace", side_effect=OSError("disk unavailable")):
+            with self.assertRaises(OSError):
+                claude.write_state({"runs": []}, self.state)
+        self.assertEqual(self.state.read_bytes(), before)
+        self.assertEqual(list(self.state.parent.glob("*.tmp")), [])
 
     def test_status_and_health_require_a_subscription_login(self):
         self.state.write_text(json.dumps({"runs": [{"at": 990, "model": OPUS}, "junk"]}))
