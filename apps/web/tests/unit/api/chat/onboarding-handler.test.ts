@@ -1012,6 +1012,90 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     expect(hoisted.executeChatTurnMock).toHaveBeenCalledTimes(1);
   });
 
+  it.each(['https://example.com/file.png', 'http://127.0.0.1/file.png'])(
+    'rejects an unsafe onboarding attachment before chat dispatch: %s',
+    async url => {
+      hoisted.checkGateForUserMock.mockResolvedValue(false);
+      const { tryHandleAnonymousOnboardingChat } = await import(
+        '@/app/api/chat/onboarding-handler'
+      );
+      const result = await tryHandleAnonymousOnboardingChat(
+        makeRequest({
+          mode: 'onboarding',
+          messages: [
+            {
+              ...userMessage('Review this image'),
+              parts: [
+                { type: 'text', text: 'Review this image' },
+                { type: 'file', mediaType: 'image/png', url },
+              ],
+            },
+          ],
+        }),
+        'req-attachment'
+      );
+      expect(result?.status).toBe(400);
+      await expect(result?.json()).resolves.toMatchObject({
+        errorCode: 'INVALID_MESSAGES',
+        requestId: 'req-attachment',
+      });
+      expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
+      expect(hoisted.dbInsertMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    null,
+    { type: 'text', text: 42 },
+    { type: 'file', mediaType: 'image/png' },
+  ])('returns 400 for malformed onboarding parts %j', async part => {
+    const { tryHandleAnonymousOnboardingChat } = await import(
+      '@/app/api/chat/onboarding-handler'
+    );
+    const result = await tryHandleAnonymousOnboardingChat(
+      makeRequest({
+        mode: 'onboarding',
+        messages: [{ ...userMessage('hi'), parts: [part] }],
+      }),
+      'req-malformed'
+    );
+    expect(result?.status).toBe(400);
+    expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'https://test-store.public.blob.vercel-storage.com/file.png',
+    'data:image/png;base64,iVBORw0KGgo=',
+  ])('preserves supported onboarding attachments: %s', async url => {
+    hoisted.checkGateForUserMock.mockResolvedValue(false);
+    hoisted.executeChatTurnMock.mockResolvedValue({
+      streamResult: { toUIMessageStreamResponse: () => new Response('ok') },
+      selectedModel: 'test',
+      systemPrompt: '',
+      toolNames: [],
+      modelMessages: [],
+    });
+    const { tryHandleAnonymousOnboardingChat } = await import(
+      '@/app/api/chat/onboarding-handler'
+    );
+    const parts = [
+      { type: 'text', text: 'Review this image' },
+      { type: 'file', mediaType: 'image/png', url },
+    ];
+    const result = await tryHandleAnonymousOnboardingChat(
+      makeRequest({
+        mode: 'onboarding',
+        messages: [{ ...userMessage('hi'), parts }],
+      }),
+      'req-upload'
+    );
+    expect(result?.status).toBe(200);
+    expect(hoisted.executeChatTurnMock).toHaveBeenCalledTimes(1);
+    expect(
+      hoisted.executeChatTurnMock.mock.calls[0][0].uiMessages[0].parts
+    ).toEqual(parts);
+  });
+
   it('returns 400 when the messages array is missing', async () => {
     const { tryHandleAnonymousOnboardingChat } = await import(
       '@/app/api/chat/onboarding-handler'

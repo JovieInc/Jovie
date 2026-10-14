@@ -16,38 +16,90 @@ import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
-const pinnedRecords = (lock, name) => {
+// Recognize only a supplied key, including bounded quoted aliases. Canonical
+// spelling is checked by the caller; unsupported quoting cannot hide a second pin.
+const matchesKey = (line, key, indent = '') => {
+  if (!line.startsWith(indent)) return false;
+  const value = line.slice(indent.length);
+  if (value.startsWith(key) && /^[ \t]*:/u.test(value.slice(key.length)))
+    return true;
+  const quoted = /^("(?:[^"\\]|\\.)*"|'(?:[^']|'')*')[ \t]*:/u.exec(value);
+  if (!quoted) {
+    if (/^["']/u.test(value))
+      throw new Error('mesh-runtime-dependency-pin-mismatch');
+    return false;
+  }
+  if (quoted[1].startsWith('"')) {
+    try {
+      return JSON.parse(quoted[1]) === key;
+    } catch {
+      // Other YAML escapes are unsupported, so their pin identity is unknown.
+      throw new Error('mesh-runtime-dependency-pin-mismatch');
+    }
+  }
+  return quoted[1].slice(1, -1).replaceAll("''", "'") === key;
+};
+export const pinnedRecords = (lock, name, snapshotName = name) => {
   const lines = lock.toString().split('\n');
-  const records = [];
-  const header = name.startsWith('@') ? `  '${name}':` : `  ${name}:`;
+  const header = value =>
+    value.startsWith('@') ? `  '${value}':` : `  ${value}:`;
+  const headers = {
+    'packages:': header(name),
+    'snapshots:': header(snapshotName),
+  };
+  const records = { 'packages:': [], 'snapshots:': [] };
+  const seenSections = new Set();
+  let section;
   for (let i = 0; i < lines.length; i++) {
-    if (lines[i] !== header && lines[i] !== `${header} {}`) continue;
+    if (/^[^\s#]/u.test(lines[i])) {
+      section = lines[i];
+      const relevant = Object.keys(headers).find(key =>
+        matchesKey(section, key.slice(0, -1))
+      );
+      if (relevant) {
+        if (section !== relevant || seenSections.has(relevant))
+          throw new Error('mesh-runtime-dependency-pin-mismatch');
+        seenSections.add(relevant);
+      }
+    }
+    if (!Object.hasOwn(headers, section)) continue;
+    const recordName = section === 'packages:' ? name : snapshotName;
+    if (!matchesKey(lines[i], recordName, '  ')) continue;
+    if (lines[i] !== headers[section] && lines[i] !== `${headers[section]} {}`)
+      throw new Error('mesh-runtime-dependency-pin-mismatch');
     let end = i + 1;
     while (
       end < lines.length &&
       (!lines[end].trim() || lines[end].startsWith('    '))
     )
       end++;
-    records.push(sha(Buffer.from(lines.slice(i, end).join('\n').trimEnd())));
+    records[section].push(
+      sha(Buffer.from(lines.slice(i, end).join('\n').trimEnd()))
+    );
   }
-  if (records.length !== 2)
+  // Patch metadata has a matching package key, but is never a snapshot record.
+  if (Object.values(records).some(rows => rows.length !== 1))
     throw new Error('mesh-runtime-dependency-pin-mismatch');
-  return records;
+  return [records['packages:'][0], records['snapshots:'][0]];
 };
-/** The exact version an importer resolves for a direct dependency, read from
- * the reviewed lockfile, so Dependabot bumps need no source edit here. */
-export const importerVersion = (lock, importer, name) => {
+/** The exact resolution includes patch/peer context used by the snapshot key. */
+const importerResolution = (lock, importer, name) => {
   const lines = lock.toString().split('\n');
   const start = lines.indexOf(`  ${importer}:`);
   const key = name.startsWith('@') ? `      '${name}':` : `      ${name}:`;
   for (let i = start + 1; start >= 0 && i < lines.length; i++) {
     if (/^ {0,2}\S/u.test(lines[i])) break;
     if (lines[i] !== key) continue;
-    const match = /^ {8}version: (\d+\.\d+\.\d+)(?:\(|$)/u.exec(lines[i + 2]);
+    const match = /^ {8}version: (\d+\.\d+\.\d+(?:\([^\r\n]+\))?)$/u.exec(
+      lines[i + 2]
+    );
     if (match) return match[1];
   }
   throw new Error('mesh-runtime-dependency-pin-mismatch');
 };
+/** Package metadata uses semver; snapshot identity retains its full resolution. */
+export const importerVersion = (lock, importer, name) =>
+  importerResolution(lock, importer, name).split('(')[0];
 export function buildMeshRuntime(sourceRoot, dependencyRoot) {
   if (process.env.ESBUILD_BINARY_PATH)
     throw new Error('mesh-runtime-binary-override-unbound');
@@ -70,21 +122,27 @@ export function buildMeshRuntime(sourceRoot, dependencyRoot) {
   // The host repo may retain an older product checkout while its updater tracks
   // main. Compare both exact package/integrity and dependency snapshot records,
   // rather than requiring unrelated product lockfile entries to be identical.
-  const compilerPin = importerVersion(lock, 'apps/desktop', 'esbuild');
-  const zodPin = importerVersion(
+  const compilerResolution = importerResolution(
+    lock,
+    'apps/desktop',
+    'esbuild'
+  );
+  const zodResolution = importerResolution(
     lock,
     'packages/agent-transport-contracts',
     'zod'
   );
-  for (const name of [
-    `esbuild@${compilerPin}`,
-    `zod@${zodPin}`,
-    `${binaryName}@${compilerPin}`,
+  const compilerPin = compilerResolution.split('(')[0];
+  const zodPin = zodResolution.split('(')[0];
+  for (const [name, snapshotName] of [
+    [`esbuild@${compilerPin}`, `esbuild@${compilerResolution}`],
+    [`zod@${zodPin}`, `zod@${zodResolution}`],
+    [`${binaryName}@${compilerPin}`, `${binaryName}@${compilerPin}`],
   ]) {
-    const expected = pinnedRecords(lock, name);
+    const expected = pinnedRecords(lock, name, snapshotName);
     if (
       JSON.stringify(expected) !==
-      JSON.stringify(pinnedRecords(restoredLock, name))
+      JSON.stringify(pinnedRecords(restoredLock, name, snapshotName))
     )
       throw new Error('mesh-runtime-dependency-generation-mismatch');
     dependencyPins[name] = expected;

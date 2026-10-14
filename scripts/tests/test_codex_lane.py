@@ -937,6 +937,113 @@ class SubscriptionPoolTest(Isolated):
         self.clock = patch.object(codex.time, "time", return_value=self.NOW)
         self.clock.start()
         self.addCleanup(self.clock.stop)
+        compute = patch.object(codex.os, "cpu_count", return_value=8)
+        compute.start()
+        self.addCleanup(compute.stop)
+
+    def primary_slots(self, count):
+        profiles = {name: dict(profile) for name, profile in self.profiles.items()}
+        profiles["current-login"]["slots"] = count
+        return patch.dict(os.environ, {"CODEX_LANE_SUBSCRIPTION_PROFILES": json.dumps(profiles),
+                                       "CODEX_LANE_LOGIN_SLOTS": str(count)})
+
+    def test_explicit_primary_seats_accept_known_compute_without_a_fixed_three_ceiling(self):
+        for count in (1, 3, 4, 8):
+            with self.subTest(count=count), self.primary_slots(count):
+                self.assertEqual(codex.login_slots("current-login"), count)
+                self.assertEqual(codex.login_slots("lyb-pro"), 1)
+
+    def test_unknown_or_insufficient_compute_refuses_the_pool_before_any_lease(self):
+        for cpus in (None, 0, -1, True, 4.0, "4", 3):
+            with self.subTest(cpus=cpus), self.primary_slots(4), \
+                    patch.object(codex.os, "cpu_count", return_value=cpus), \
+                    patch.object(codex, "update_state", side_effect=AssertionError("no binding write")):
+                with self.assertRaises(ValueError):
+                    codex.lease("current-login")
+
+    def test_primary_seat_types_bounds_and_configuration_agreement_remain_strict(self):
+        for count in (0, -1, True, 4.0, "4", 9, 10**100):
+            with self.subTest(count=count), self.primary_slots(count):
+                with self.assertRaises(ValueError):
+                    codex.subscription_profiles()
+        with self.primary_slots(4), patch.dict(os.environ, {"CODEX_LANE_LOGIN_SLOTS": "3"}):
+            with self.assertRaisesRegex(ValueError, "slots must remain unchanged"):
+                codex.subscription_profiles()
+
+    def test_four_primary_flocks_and_one_exclusive_extra_share_existing_lock_namespace(self):
+        with self.primary_slots(4):
+            self.reconcile()
+            handles = [codex.lease("current-login") for _ in range(4)] + [codex.lease("lyb-pro")]
+            try:
+                self.assertTrue(all(handles))
+                self.assertIsNone(codex.lease("current-login"))
+                self.assertIsNone(codex.lease("lyb-pro"))
+                self.assertEqual([Path(handle.name).name for handle in handles],
+                                 ["current-login.lock", "current-login.1.lock", "current-login.2.lock",
+                                  "current-login.3.lock", "lyb-pro.lock"])
+                with patch.dict(os.environ, {"CODEX_LANE_AUTH_MODE": "current-login"}):
+                    self.assertIsNone(codex.lease("current-login"))
+            finally:
+                for handle in handles:
+                    if handle is not None:
+                        handle.close()
+            self.assertEqual([len(codex._slot_paths(name)) for name in self.profiles], [4, 1])
+
+    def test_widened_primary_quota_bank_stops_execution_and_all_new_primary_picks(self):
+        with self.primary_slots(4):
+            self.reconcile()
+            value = self.snapshot("current-login")
+            value["rateLimits"]["rateLimits"]["primary"]["usedPercent"] = 100
+            handle = codex.lease("current-login")
+            with patch.object(codex, "current_subscription_snapshot", return_value=value), \
+                    patch.object(codex.subprocess, "Popen", side_effect=AssertionError("no depleted execution")):
+                self.assertEqual(codex.run_account("current-login", handle, ["fake"], "fixture",
+                                                  self.tmp.name, self.NOW),
+                                 (codex.NO_ACCOUNT_EXIT, "limit", self.NOW + 7200))
+            self.assertTrue(handle.closed)
+            state = codex.read_state()
+            self.assertEqual(codex.pick(state, self.NOW, ["current-login"]), (None, None))
+            self.assertTrue(codex.available("lyb-pro", state, self.NOW))
+            self.assertEqual(state["current-login"]["exhaustedUntil"], self.NOW + 7200)
+
+    def test_primary_seat_capacity_never_bypasses_native_global_or_provider_admission(self):
+        from scripts.lanes import lane_runner as runner
+        with self.primary_slots(4):
+            self.reconcile()
+            host = runner.Host(repo=Path(self.tmp.name), state=Path(self.tmp.name) / "worker-state")
+            occupied = [runner.Locked(host.state / "slots" / f"codex.{index}.lock", False)
+                        for index in range(4)]
+            other = runner.Locked(host.state / "slots/grok.0.lock", False)
+            for lock in [*occupied, other]:
+                self.assertTrue(lock.held)
+                self.addCleanup(lambda lock=lock: lock.release() if not lock.handle.closed else None)
+            providers = {"codex": {"enabled": True, "slots": 5}, "grok": {"enabled": True, "slots": 1}}
+            def admitted(_host, name, _spec, slot, **_):
+                self.assertEqual(name, "codex")
+                self.assertTrue(slot.held)
+                self.assertEqual(sum(runner.occupied_worker_slots(host).values()), 5)
+                account = codex.lease("current-login")
+                self.assertIsNotNone(account)
+                account.close()
+                return 0
+            with patch.object(runner, "load_providers", return_value=providers), \
+                    patch.object(host, "slots", return_value=5) as provider_cap, \
+                    patch.object(host, "intake_slots", return_value=5), \
+                    patch.object(runner.autoscale, "host_ceiling", return_value=5) as global_cap, \
+                    patch.object(runner, "worker_with_slot", side_effect=admitted) as work:
+                self.assertEqual(runner.worker(host, "codex"), 0)  # Other providers consume the same ceiling.
+                work.assert_not_called()
+                other.release()
+                global_cap.return_value = 4
+                self.assertEqual(runner.worker(host, "codex"), 0)
+                work.assert_not_called()
+                global_cap.return_value = 5
+                provider_cap.return_value = 4
+                self.assertEqual(runner.worker(host, "codex"), 0)
+                work.assert_not_called()
+                provider_cap.return_value = 5
+                self.assertEqual(runner.worker(host, "codex"), 0)
+                work.assert_called_once()
 
     def snapshot(self, name):
         value = current_snapshot(self.NOW)

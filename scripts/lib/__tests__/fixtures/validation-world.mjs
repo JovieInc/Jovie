@@ -207,6 +207,10 @@ export function createWorld(overrides = {}) {
                 updatedAt: issue.updatedAt ?? '2026-10-03T12:00:00Z',
                 state: { name: issue.state },
                 attachments: { nodes: issue.attachments.map(url => ({ url })) },
+                children: {
+                  nodes: issue.children.map(([identifier]) => ({ identifier })),
+                },
+                labels: { nodes: issue.labels.map(name => ({ name })) },
               })),
             pageInfo: { hasNextPage: false, endCursor: null },
           },
@@ -246,10 +250,23 @@ export function createWorld(overrides = {}) {
               pageInfo: { hasNextPage: false, endCursor: null },
             },
             children: {
-              nodes: issue.children.map(([identifier, type]) => ({
+              nodes: issue.children.map(([identifier, type, deliveredAt]) => ({
                 identifier,
                 state: { type },
+                completedAt:
+                  type === 'completed'
+                    ? deliveredAt === undefined
+                      ? '2026-10-03T11:00:00Z'
+                      : deliveredAt
+                    : null,
+                canceledAt:
+                  type === 'canceled'
+                    ? deliveredAt === undefined
+                      ? '2026-10-03T11:00:00Z'
+                      : deliveredAt
+                    : null,
               })),
+              pageInfo: { hasNextPage: false },
             },
             attachments: { nodes: issue.attachments.map(url => ({ url })) },
             history: {

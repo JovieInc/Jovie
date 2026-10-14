@@ -566,7 +566,6 @@ function getDisplayMessages(
 }
 
 interface OnboardingFlowStatusProps {
-  readonly reserveTurnstileSpace?: boolean;
   readonly shouldShowTurnstileBanner: boolean;
   readonly turnstilePanel: ReactNode;
 }
@@ -582,20 +581,12 @@ function getOnboardingComposerPlaceholder(
 }
 
 function OnboardingFlowStatus({
-  reserveTurnstileSpace = false,
   shouldShowTurnstileBanner,
   turnstilePanel,
 }: OnboardingFlowStatusProps) {
   if (!shouldShowTurnstileBanner) return null;
 
-  return (
-    <div
-      className={reserveTurnstileSpace ? 'min-h-[10rem]' : undefined}
-      data-testid='onboarding-flow-status'
-    >
-      {turnstilePanel}
-    </div>
-  );
+  return <div data-testid='onboarding-flow-status'>{turnstilePanel}</div>;
 }
 
 interface OnboardingMessageRegionProps {
@@ -701,7 +692,10 @@ function OnboardingMessageRegion({
   );
 
   return (
-    <ChatEmptyStateComposerRegion above={conversationAboveComposer}>
+    <ChatEmptyStateComposerRegion
+      alignAbove='top'
+      above={conversationAboveComposer}
+    >
       <div className='w-full' data-testid='onboarding-centered-composer'>
         {onboardingComposerSurface}
       </div>
@@ -1124,7 +1118,6 @@ export function OnboardingChat({
       verificationRequested);
   const flowStatus = shouldShowTurnstileBanner ? (
     <OnboardingFlowStatus
-      reserveTurnstileSpace={shouldReserveStarterVerification}
       shouldShowTurnstileBanner={shouldShowTurnstileBanner}
       turnstilePanel={turnstilePanel}
     />
@@ -1170,6 +1163,7 @@ export function OnboardingChat({
   const sendLocalError = chatError;
   const onboardingComposerSurface = (
     <div className='mx-auto w-full max-w-[45rem]'>
+      {flowStatus}
       {sendLocalError ? (
         <OnboardingMessageRecoveryRow
           chatError={sendLocalError}
@@ -1194,7 +1188,7 @@ export function OnboardingChat({
         ref={scrollContainerRef}
         onScroll={onScroll}
         className={cn(
-          'relative flex-1 overflow-y-auto px-4 pb-5 sm:px-6 lg:px-8',
+          'relative min-h-0 flex-1 overflow-y-auto px-4 pb-5 sm:px-6 lg:px-8',
           // Under the floating sign-in row, scrolled-away messages fade out
           // instead of hard-clipping at the panel edge (JOV-7192).
           headerOverlay ? 'pt-16 system-b-chat-thread-top-fade' : 'pt-5'
@@ -1211,7 +1205,6 @@ export function OnboardingChat({
             !shouldDockComposer && 'h-full justify-center'
           )}
         >
-          {flowStatus}
           <OnboardingMessageRegion
             composerPickerOpen={composerPickerOpen}
             displayMessages={displayMessages}
