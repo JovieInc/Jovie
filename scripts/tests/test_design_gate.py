@@ -459,6 +459,7 @@ class DoctorCensusTest(unittest.TestCase):
             tracker = mock.Mock()
             tracker.lane_issues.return_value = [good, waiting, ready]
             with mock.patch.dict(os.environ, {"LANES_SELFTEST": "1", "LANES_SLOTS_DEVIN": "1"}), \
+                    mock.patch.object(lane.devin_free_policy, "admission_open", return_value=True), \
                     mock.patch.object(lane, "load_providers", return_value=providers), \
                     mock.patch.object(lane, "Linear", return_value=tracker), \
                     mock.patch.object(lane, "in_flight_issues", return_value=frozenset()), \
