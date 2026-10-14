@@ -2,6 +2,7 @@ import 'server-only';
 import { createHash } from 'node:crypto';
 import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
+import { runLegacyDbTransaction } from '@/lib/db/legacy-transaction';
 import { notificationSubscriptions } from '@/lib/db/schema/analytics';
 import { notificationContacts } from '@/lib/db/schema/notifications';
 import { normalizeSubscriptionPhone } from '@/lib/notifications/validation';
@@ -109,7 +110,7 @@ export async function suppressPhoneForStop(
   const phoneHash = hashPhoneE164(normalized);
   const now = new Date();
 
-  const result = await db.transaction(async tx => {
+  const result = await runLegacyDbTransaction(async tx => {
     const [contact] = await tx
       .insert(notificationContacts)
       .values({

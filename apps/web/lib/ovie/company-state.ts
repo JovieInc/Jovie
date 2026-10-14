@@ -621,8 +621,14 @@ export function buildCompanyState(
     homepage_entry: certificationMetric(['entry']),
     onboarding_auth_claim: certificationMetric(['auth_signup', 'claim']),
     checkout_payment_entitlement: certificationMetric([
+      'commerce_canary',
+      'handoff_correlation',
+      'jov6258_preflight',
       'offer_checkout',
       'payment_entitlement',
+      'payment_journey',
+      'reversal',
+      'selected_rail',
     ]),
     activation_dashboard: certificationMetric(['activation']),
   } satisfies CompanyStateSnapshot['certification'];

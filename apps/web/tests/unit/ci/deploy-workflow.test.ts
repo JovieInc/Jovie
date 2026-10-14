@@ -3135,8 +3135,8 @@ describe('CI E2E smoke workflow', () => {
       resolve(repoRoot, 'apps/web/tests/e2e/golden-path.spec.ts'),
       'utf8'
     );
-    const moneyPathSpec = readFileSync(
-      resolve(repoRoot, 'apps/web/tests/e2e/money-path-persistence.spec.ts'),
+    const billingHelper = readFileSync(
+      resolve(repoRoot, 'apps/web/tests/e2e/helpers/golden-path-billing.ts'),
       'utf8'
     );
     const authHelper = readFileSync(
@@ -3165,6 +3165,7 @@ describe('CI E2E smoke workflow', () => {
     expect(goldenPathStep).toContain('export E2E_TEST_MODE=1');
     expect(goldenPathStep).toContain('export E2E_FAST_ONBOARDING=1');
     expect(goldenPathStep).toContain("E2E_FAST_ONBOARDING: '1'");
+    expect(goldenPathStep).toContain("GOLDEN_PATH_REQUIRED: '1'");
     expect(goldenPathStep).toContain('export CHAT_LLM_FAILURE_INJECTION=1');
     expect(goldenPathStep).toContain('export PUBLIC_NOAUTH_SMOKE=1');
     expect(goldenPathStep).not.toContain('E2E_USE_TEST_AUTH_BYPASS');
@@ -3187,10 +3188,19 @@ describe('CI E2E smoke workflow', () => {
       'tests/e2e/golden-path.spec.ts'
     );
     expect(packageJson.scripts['test:e2e:golden-path:ci']).toContain(
-      'tests/e2e/money-path-persistence.spec.ts'
+      'GOLDEN_PATH_REQUIRED=1'
+    );
+    expect(packageJson.scripts['test:e2e:golden-path:ci']).not.toContain(
+      'money-path-persistence.spec.ts'
     );
     expect(goldenPathSpec).toContain(
       "process.env.E2E_USE_TEST_AUTH_BYPASS === '1'"
+    );
+    expect(goldenPathSpec).toContain(
+      "process.env.GOLDEN_PATH_REQUIRED === '1'"
+    );
+    expect(goldenPathSpec).toContain(
+      'Required Golden Path refuses the smoke auth bypass identity'
     );
     expect(goldenPathSpec).toContain(
       'Golden path requires the dedicated real-auth lane'
@@ -3203,6 +3213,8 @@ describe('CI E2E smoke workflow', () => {
     expect(authHelper).toContain("readonly entryPath: '/signup' | '/signin'");
     expect(authHelper).toContain("page.getByLabel('Email')");
     expect(authHelper).toContain("'Send sign-in code'");
+    expect(authHelper).toContain("name: 'Change email'");
+    expect(authHelper).toContain("name: 'Resend Verification Code'");
     const routeFetchIndex = authHelper.indexOf(
       'response = await route.fetch()'
     );
@@ -3250,13 +3262,18 @@ describe('CI E2E smoke workflow', () => {
     expect(goldenPathSpec).toContain(
       'resetAuthStatePreservingOnboardingSession(page.context())'
     );
-    expect(moneyPathSpec).toContain('getRequiredStripeTestContext()');
-    expect(moneyPathSpec).toContain('materializeTestCheckoutCompletion(');
-    expect(moneyPathSpec).toContain("'checkout.session.completed'");
-    expect(moneyPathSpec).toContain('invalidResponse.status()).toBe(400)');
-    expect(moneyPathSpec).toContain('deleteRunOwnedStripeCustomer(');
-    expect(moneyPathSpec).not.toContain('completeCardPayment(');
-    expect(moneyPathSpec).not.toContain('ensureUserIsFree');
+    expect(goldenPathSpec).toContain('completeGoldenPathBillingJourney({');
+    expect(goldenPathSpec).toContain('accounts.google.com');
+    expect(billingHelper).toContain('getRequiredStripeTestContext()');
+    expect(billingHelper).toContain('materializeTestCheckoutCompletion(');
+    expect(billingHelper).toContain("'checkout.session.completed'");
+    expect(billingHelper).toContain('duplicateCheckoutResponse');
+    expect(billingHelper).toContain('invalidResponse.status()).toBe(400)');
+    expect(billingHelper).toContain('billingPortal.sessions.retrieve(');
+    expect(billingHelper).toContain('DELETE FROM ba_sessions');
+    expect(billingHelper).toContain('deleteRunOwnedStripeCustomer(');
+    expect(billingHelper).not.toContain('completeCardPayment(');
+    expect(billingHelper).not.toContain('ensureUserIsFree');
     expect(goldenPathSpec).not.toContain('ensureSpotifyUrlOnProfile');
     expect(goldenPathSpec).not.toContain(
       'SET spotify_id = NULL, spotify_url = NULL'

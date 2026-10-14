@@ -7,6 +7,7 @@ import { appUserIdFilter } from '@/lib/auth/app-user-id';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { CACHE_TAGS } from '@/lib/cache/tags';
 import { db } from '@/lib/db';
+import { runLegacyDbTransaction } from '@/lib/db/legacy-transaction';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
@@ -186,7 +187,7 @@ export async function createAdditionalProfile(input: {
     }
 
     // All writes in a single transaction for atomicity
-    const profile = await db.transaction(async tx => {
+    const profile = await runLegacyDbTransaction(async tx => {
       const [newProfile] = await tx
         .insert(creatorProfiles)
         .values({
