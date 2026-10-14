@@ -156,7 +156,7 @@ export function AppleMusicSyncBanner({
     return (
       <div
         className={cn(
-          'system-b-release-provider-banner--apple system-b-release-provider-banner-compact inline-flex h-7.5 items-center gap-2 rounded-md border px-2 text-xs text-primary-token',
+          'system-b-release-provider-banner--apple system-b-release-provider-banner-compact inline-flex min-h-9 items-center gap-2 rounded-md border px-2 text-xs text-primary-token',
           className
         )}
       >
