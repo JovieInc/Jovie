@@ -12,12 +12,6 @@ export const runtime = 'nodejs';
 const bodySchema = z.object({
   disposition: z.enum(['now', 'later', 'never']),
   reason: z.string().trim().min(1).max(2000),
-  /**
-   * Optional actor override for service-to-service callers (e.g. 'summer').
-   * Defaults to the authenticated admin's user id — the ledger always
-   * records who decided.
-   */
-  actor: z.string().trim().min(1).max(120).optional(),
   payload: z.record(z.string(), z.unknown()).optional(),
 });
 
@@ -75,7 +69,7 @@ export async function POST(
     feedbackItemId: id,
     disposition: parsed.data.disposition,
     reason: parsed.data.reason,
-    actor: parsed.data.actor ?? auth.userId ?? 'admin',
+    actor: auth.userId ?? 'admin',
     payload: parsed.data.payload,
   });
 

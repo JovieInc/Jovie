@@ -4,6 +4,7 @@ const mockReturning = vi.hoisted(() => vi.fn());
 const mockValues = vi.hoisted(() => vi.fn());
 const mockInsert = vi.hoisted(() => vi.fn());
 const mockLimit = vi.hoisted(() => vi.fn());
+const mockOrderBy = vi.hoisted(() => vi.fn());
 const mockWhereSelect = vi.hoisted(() => vi.fn());
 const mockFrom = vi.hoisted(() => vi.fn());
 const mockSelect = vi.hoisted(() => vi.fn());
@@ -40,8 +41,9 @@ describe('createFeedbackItem closed-loop routing (JOV-6433)', () => {
       return { returning: mockReturning };
     });
     mockInsert.mockReturnValue({ values: mockValues });
-    mockLimit.mockResolvedValue([]);
-    mockWhereSelect.mockReturnValue({ limit: mockLimit });
+    mockLimit.mockResolvedValue([{ id: 'feedback_1' }]);
+    mockOrderBy.mockReturnValue({ limit: mockLimit });
+    mockWhereSelect.mockReturnValue({ orderBy: mockOrderBy });
     mockFrom.mockReturnValue({ where: mockWhereSelect });
     mockSelect.mockReturnValue({ from: mockFrom });
     mockWhereUpdate.mockImplementation(() => {
@@ -72,6 +74,18 @@ describe('createFeedbackItem closed-loop routing (JOV-6433)', () => {
       'auto_ship_bug',
     ]);
     expect(updateSets[0]).toMatchObject({ disposition: 'auto_remediation' });
+  });
+
+  it('keeps the earliest matching row canonical when concurrent reports are visible', async () => {
+    mockLimit.mockResolvedValue([{ id: 'feedback_1' }]);
+    await create('The publish button crashes every time');
+    const decisions = insertedValues[1] as { decision: string }[];
+    expect(decisions.map(d => d.decision)).toEqual([
+      'classified',
+      'auto_ship_bug',
+    ]);
+    expect(updateSets[0]).toMatchObject({ disposition: 'auto_remediation' });
+    expect(mockOrderBy).toHaveBeenCalledOnce();
   });
 
   it('dedupes identical fingerprints into one canonical case', async () => {

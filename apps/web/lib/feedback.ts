@@ -1,4 +1,4 @@
-import { and, desc, sql as drizzleSql, eq, ne } from 'drizzle-orm';
+import { and, asc, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -99,13 +99,13 @@ async function routeClassifiedFeedback(item: {
       .where(
         and(
           eq(feedbackItems.fingerprint, item.fingerprint),
-          eq(feedbackItems.classification, 'bug_verifiable'),
-          ne(feedbackItems.id, item.id)
+          eq(feedbackItems.classification, 'bug_verifiable')
         )
       )
+      .orderBy(asc(feedbackItems.createdAt), asc(feedbackItems.id))
       .limit(1);
 
-    if (canonical) {
+    if (canonical && canonical.id !== item.id) {
       disposition = 'duplicate';
       decisions.push(
         {
