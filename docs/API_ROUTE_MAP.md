@@ -40,7 +40,7 @@ sibling deployments, machine publishers, or source-repository automation.
 | Route | Methods | Auth | External Caller / Description |
 |-------|---------|------|-------------------------------|
 | `/api/hud/hermes-events` | GET, POST | HUD auth (GET); `HERMES_HUD_API_KEY` bearer (POST) | Hermes laptop publisher writes Agent OS events; HUD clients read the current feed |
-| `/api/ovie/certifications/metrics` | GET | Ovie principal + Summer control | Ovie/Summer certification clients use the shared Ovie route projection |
+| `/api/ovie/certifications/metrics` | GET | Ovie principal + Summer control | Ovie/Summer clients use the shared certification and receipt-backed product-quality projection |
 | `/api/ovie/ingest` | POST | Ovie principal + Summer control | Ovie/Summer clients submit durable operating-store dumps through the shared Ovie route projection |
 | `/api/internal/ovie/lyb-mrr` | GET | `CRON_SECRET` + trusted origin | Ovie and Summer company tools read the LogYourBody RevenueCat MRR record |
 | `/api/internal/release-communications/merge-events` | POST | HMAC `x-jovie-signature-256` | Source-repository merge automation submits verified release events |

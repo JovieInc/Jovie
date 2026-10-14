@@ -35,6 +35,7 @@ import merge_evidence  # noqa: E402  (shared complete merge-window reader)
 import file_overlap  # noqa: E402
 import linear_sync  # noqa: E402  (local Linear mirror and outbox status)
 import remediation  # noqa: E402
+import shipping_attribution  # noqa: E402  (company merge provenance report)
 
 COOL_OFF_S = 6 * 3600
 NO_LANDING_S = 6 * 3600
@@ -160,20 +161,10 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
     now = sample_clock()
     state = host.state
     tick = read_json(state / "tick.json", {})
-    all_receipts, receipts = [], []
-    try:
-        with open(state / "runs" / "ledger.jsonl") as handle:
-            for line in handle:
-                try:
-                    receipt = json.loads(line)
-                except ValueError:
-                    continue
-                all_receipts.append(receipt)
-                ended = age_s(receipt.get("endedAt"), now)
-                if ended is not None and ended <= 86400:
-                    receipts.append(receipt)
-    except OSError:
-        pass
+    ledger_evidence = shipping_attribution.read_ledger(state / "runs" / "ledger.jsonl")
+    all_receipts = ledger_evidence["rows"]
+    receipts = [receipt for receipt in all_receipts
+                if (ended := age_s(receipt.get("endedAt"), now)) is not None and ended <= 86400]
     landings = [age_s(r.get("endedAt"), now) for r in receipts if r.get("verdict") in ("landing", "verified-not-queued")]
     try:
         accounts = codex.status()
@@ -218,6 +209,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         eligible_pool, eligible_by_provider, budgets = None, {}, {}
     github = None
     merged, merged_error, merged_window, merge_throughput, merge_throughput_error = [], None, None, None, None
+    merged_projects = {}
     try:
         lane.load_github_env()
         budget = lane.graphql_budget()
@@ -225,11 +217,27 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         if not os.environ.get("LANES_SELFTEST"):
             merged_window = merge_evidence.collect_shared(lane.REPO_SLUG, now - 86400, now,
                                                           state / "merge-window.json")
+            merged_projects[lane.REPO_SLUG] = merged_window
             merged = merge_evidence.require_complete(merged_window)
     except merge_evidence.IncompleteMergeEvidence as error:
         merged_error = str(error)
     except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError):
         merged_error = "github-budget-unreadable"
+    if not os.environ.get("LANES_SELFTEST"):
+        for project in shipping_attribution.PROJECTS:
+            repository = project["repository"]
+            if repository in merged_projects:
+                continue
+            cache_name = "merge-window-" + repository.rsplit("/", 1)[-1].lower() + ".json"
+            try:
+                merged_projects[repository] = merge_evidence.collect_shared(
+                    repository, now - 86400, now, state / cache_name)
+            except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError):
+                merged_projects[repository] = {
+                    "schema": "jovie-merge-window/v1", "complete": False,
+                    "reason": "fetch_failed", "window": {"since": now - 86400, "until": now},
+                    "pages": 0, "scans": 0, "prs": [],
+                }
     if not os.environ.get("LANES_SELFTEST"):
         try:
             merge_throughput, merge_throughput_error = sample_merge_throughput(state, now)
@@ -296,6 +304,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "remediation": remediation.remediation_summary(read_json(state / "escalation.json", {}), all_receipts, now),
         "operatorDraining": lifecycle.draining(state),
         "_receipts24h": receipts, "_allReceipts": all_receipts,
+        "_ledgerEvidence": ledger_evidence, "_mergeEvidenceByRepository": merged_projects,
     }
 
 
@@ -1318,6 +1327,11 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
     if not overlap:
         overlap = (file_overlap.doctor_view(host.state) if getattr(host, "state", None) else
                    {"mode": file_overlap.guard_mode(), "pairs": [], "metrics": {}})
+    attribution = shipping_attribution.company_report(
+        obs.get("_mergeEvidenceByRepository") or {},
+        obs.get("_ledgerEvidence") or {"complete": False, "reason": "receipt-ledger-not-read",
+                                       "corruptRows": 0, "observedAt": None, "rows": []},
+        obs.get("now") or time.time())
     return {"schema": "symphony-lanes-status/v1", "at": now_iso(), "host": lane.HOST, "release": tick.get("release"),
             "fileOverlap": overlap, "linear": obs.get("linearSync") or tick.get("linear"),
             "lanes": counts, "running": sum(c["running"] for c in counts.values()),
@@ -1344,6 +1358,7 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             "diskFreePct": obs.get("diskFreePct"), "githubRemaining": obs.get("githubRemaining"),
             "held_by_reason": obs.get("heldByReason") or {}, "failed_by_reason": obs.get("failedByReason") or {},
             "throughput": throughput, "throughputError": obs.get("mergedAttributionError"),
+            "shippingAttribution": attribution,
             "mergeThroughput": obs.get("mergeThroughput"),
             "mergeThroughputError": obs.get("mergeThroughputError"),
             "mergedWindow": obs.get("mergedWindow"),
@@ -1489,7 +1504,9 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
     for key in ("eventsOpen", "eventsClaimed", "eventsHuman", "eventsExhausted"):
         result[key] = result["remediation"].get(key, 0)
     result["byFingerprint"] = result["remediation"].get("byFingerprint") or {}
-    result["observed"] = {k: v for k, v in obs.items() if k not in ("tick", "codex", "_receipts24h", "_allReceipts")}
+    private = {"tick", "codex", "_receipts24h", "_allReceipts", "_ledgerEvidence",
+               "_mergeEvidenceByRepository"}
+    result["observed"] = {k: v for k, v in obs.items() if k not in private}
     result["autoscale"] = _autoscale_block(host)
     if obs.get("linearSkipped"):
         result["linearSkipped"] = obs["linearSkipped"]

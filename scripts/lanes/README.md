@@ -55,6 +55,7 @@ The harness, not the model, owns:
 | Host upkeep on the same update event (no timers): fetch the bare object mirror the lanes clone borrows from (`objects/info/alternates`, under `<root>/locks/<name>-mirror.lock`) right before update's own fetch, and refresh the codex lanes' `autoreview`/`behavior-validator` skills from `~/agent-skills` only when its `main` moved. Both are bounded, non-fatal, and recorded in `update.json` | `update()` |
 | Codex accounts: lease one per run; a burst 429 backs off 2 min and rotates, a spent plan (usage limit / quota) banks until its reset, and only a failed run's closing lines can bank an account | `codex_lane.py` |
 | Provider throughput: matched-work offers, accepts, starts, productive/PR/first-pass rates, remediation, issue→PR→merge time, landed output, idle qualified capacity and failure reasons; landed attribution comes from receipts, never a branch prefix | `provider_throughput()`, `doctor.status_feed()`, `hud.py` |
+| Company shipping attribution: complete half-open GitHub merge windows join exact repository/PR/head origin receipts; Symphony, external agents, founder sessions and automation remain separate from review/remediation/finalizing roles. Status publishes Jovie and LYB coverage, candidate inference, unknowns and missing-receipt links; an unreadable project is never zero | `shipping_attribution.py`, `merge_evidence.py`, `doctor.status_feed()` |
 | Provider failover: a lane that exits non-zero mid-issue (every account spent, auth, crash, HTTP 404, unhealthy) hands the same worktree to the next available qualifying route from the issue risk/cost router, up to 2 handoffs. Sensitive and `codex-blocked` restrictions, the initially admitted capability floor and the chosen model apply to every handoff; quota, cooling, health and host slots remain authoritative. The receipt records `handoffs` (with `reason`) and `finishedBy`. Disabled entries and remote-only lanes (`repairs: false`, Hyperagent) are never chosen | `run_issue()`, `next_provider()`, `remediation.route_issue()`, `lane_availability()` |
 | Repository bindings: the one service also routes LogYourBody (Linear `LYB` -> `JovieInc/LogYourBody`, `~/LogYourBody` on Gem, `LANES_REPO_LYB` overrides, `LANES_BINDING_LYB=0` disables). A worker spends its held seat on one LYB repair (red or behind lane PR, 2 tries per head, a per-PR lease so two seats never repair one PR) or one claim (any Todo issue without `hold` or a hard-excluded label; sensitive labels only on the Codex lane; no LYB-specific concurrency cap or open-PR ceiling, only the host's seats) before Jovie intake. Jovie-only holds never block LYB and a binding fault never blocks Jovie. The harness pushes, opens a ready PR (never draft: LYB's native merge queue skips drafts; a repair readies a draft lane PR) and moves the issue to In Review; LYB required checks and its native queue land it. LYB runs iOS only in merge groups, so one failed_checks ejection sends that head to repair with the failed merge-group run's log in the prompt, and a queued PR is never re-enqueued Refusal reasons land in `bindings.json`. LYB remediation events never run in the Jovie repo | `bindings.py`, `routing.json` `bindings`, `worker_with_slot()` |
 | Cost-aware routing: one capability floor per issue (`routing.json`), then the cheapest available `(lane, model)` route that clears it by effective cost; every claim is logged with its rationale | `remediation.route_issue()`, `issue_router()`, `runs/routing.jsonl` |
@@ -86,6 +87,17 @@ leased and in a recorded hold. The existing available flag means eligible under
 cooldown policy, not a fresh positive quota reading. An empty unleased-available
 list does not mean all quotas are exhausted. Usage-limit, auth, rate and unknown
 holds remain distinct, and stale or incomplete rows report unknown.
+
+Manual and independently orchestrated runs can append provenance without gaining
+execution authority. After the PR's final head is known, run
+`python3 scripts/lanes/shipping_attribution.py record-origin --ledger <state>/runs/ledger.jsonl
+--repository <owner/repo> --pr <number> --head-sha <sha> --method <method>
+--initiator <human-or-agent> [--provider <provider>] [--model <model>]
+[--execution-host <host>] [--run-id <id>] [--linear-issue <KEY-N>] [--evidence-url <url>]`.
+The append is fsynced into the canonical ledger. GitHub author, branch name and PR
+body remain candidate context only; they never produce verified attribution.
+Receipt values can appear in the company status feed: use stable non-secret labels,
+never credentials, private paths or personal contact details.
 
 Gate reservations use kernel locks for the PR number and head SHA. An adopter carries
 its reservation through checkout, install, checks and terminal receipt publication;
@@ -394,6 +406,29 @@ State and receipts live under `~/.local/state/jovie-lanes`. Every gated run reco
 `gateWaitS` (seconds queued for a gate seat) on its receipt; the doctor aggregates
 `gateWaitMedianS24h`/`gateWaitMaxS24h` into the status feed so a seat raise or a
 second host is decided on measured queue time, not on timeouts alone.
+
+### Factory stay-up watchdog (JOV-8125)
+
+`install.sh` installs an independent one-minute `jovie-lanes-watchdog` timer (launchd on
+macOS, systemd user units on Linux). It makes no healthy-path API calls. Local receipts detect
+a missing/stale factory tick after 10 minutes (with a 22-minute grace for an active bounded
+release self-test), a zero-worker state with known demand sustained for 5 minutes, the doctor's
+bounded stuck-retry/provider-down conditions, and a complete
+provider-capacity bank. Recoverable states restart/kickstart the existing `jovie-lanes` service;
+the watchdog never starts a second controller directly. A recovery passes only after a newer
+tick and doctor observation prove a healthy provider is admitting work and, when work is
+waiting, a worker is running or completed after the recovery request.
+
+Each incident gets at most three attempts, spaced by at least two minutes. The atomic latest
+receipt is `factory-watchdog.json`; every incident, action, and verified after-state is also
+fsynced to `runs/factory-watchdog.jsonl`. Exhaustion or a complete provider-capacity bank opens
+one deduped Linear doctor issue; alert delivery retries at most every 15 minutes until
+acknowledged. A later healthy observation closes that issue. Inspect the receipt before manual
+action; restarting workers outside the installed service path would bypass its ownership lock.
+
+The extra timer is necessary because the normal event-driven worker re-exec and five-minute
+idle fallback cannot observe their own timer/process being dark. It performs only local file
+reads while healthy, so it adds no recurring external API or provider cost.
 
 **Ship now:** the gate timeout defaults to 3,600 seconds on macOS and remains 2,400 seconds
 elsewhere; `LANES_GATE_TIMEOUT_S` still overrides either default. **Re-evaluate when:** the mac

@@ -23,6 +23,11 @@ import {
   type FleetHardeningMetrics,
 } from '@/lib/agent-os/fleet-hardening';
 import { computeRatePercent } from '@/lib/analytics/metrics';
+import {
+  projectQualityScoreboard,
+  type QualityOutcomeReceipt,
+  type QualityScoreboardProjection,
+} from './quality-scoreboard';
 
 export const CERTIFICATION_METRICS_CONTRACT =
   'jovie.certification-metrics/v1' as const;
@@ -167,6 +172,8 @@ export interface CertificationMetricsInput {
    * pass rate on exactly these builds (spec section 8).
    */
   readonly knownGoodDeploymentIds: readonly string[];
+  /** Immutable Ovie quality ledger; null means the source is disconnected. */
+  readonly qualityReceipts: readonly QualityOutcomeReceipt[] | null;
 }
 
 export interface MetricValue {
@@ -249,6 +256,8 @@ export interface CertificationMetricsProjection {
   readonly generatedAt: string;
   readonly windowStart: string;
   readonly lanes: Readonly<Record<DogfoodProduct, CertificationLaneMetrics>>;
+  /** Product outcomes are top-line; engineering throughput is diagnostic only. */
+  readonly qualityScoreboard: QualityScoreboardProjection;
 }
 
 const MINUTES_PER_MS = 1 / 60_000;
@@ -664,5 +673,10 @@ export function computeCertificationMetrics(
     generatedAt: input.generatedAt,
     windowStart: input.windowStart,
     lanes,
+    qualityScoreboard: projectQualityScoreboard({
+      receipts: input.qualityReceipts,
+      generatedAt: input.generatedAt,
+      windowStart: input.windowStart,
+    }),
   };
 }

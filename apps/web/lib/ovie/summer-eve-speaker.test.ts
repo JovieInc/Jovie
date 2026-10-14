@@ -133,6 +133,34 @@ describe('Ovie speaks through durable Eve Summer', () => {
       'x-jovie-summer-deployment-id': 'dpl_test',
     });
   });
+  it('injects cached company state without a provider read in Eve', async () => {
+    const readCompanyState = vi.fn(async () => ({
+      snapshot: {
+        schema: 'jovie.summer-company-state/v1',
+        revision: 'r1',
+        generatedAt: '2026-10-14T08:00:00.000Z',
+        shipping: { rollingRatePerDay: { value: 3 } },
+        activeConstraint: 'funnel:onboarding_starts',
+      },
+      cache: { hit: true, readPathUpstreamCalls: 0 },
+    }));
+    const speaker = createEveSummerSpeaker(
+      fetchShadow,
+      readCompanyState as never
+    );
+    for await (const _event of speaker.speak(input)) {
+      // Drain the complete turn.
+    }
+    const posted = JSON.parse(
+      String(fetchShadow.mock.calls[0]?.[1]?.body)
+    ) as Record<string, unknown>;
+    expect(readCompanyState).toHaveBeenCalledOnce();
+    expect(posted.companyState).toMatchObject({
+      revision: 'r1',
+      activeConstraint: 'funnel:onboarding_starts',
+      cache: { hit: true, readPathUpstreamCalls: 0 },
+    });
+  });
   it('bounds the one-time legacy history import to Eve ingress limits', async () => {
     await collect({
       ...input,
