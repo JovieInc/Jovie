@@ -37,8 +37,8 @@ const loadDefaultPairs = () =>
  */
 
 describe('computed contrast gate — WCAG AA on design tokens', () => {
-  it('blocks new debt or coverage loss across generated text, state and status pairs', () => {
-    const { errors, warnings } = loadContrastGate(WEB_ROOT);
+  it('blocks new debt or coverage loss across generated text, state and status pairs', async () => {
+    const { errors, warnings } = await loadContrastGate(WEB_ROOT);
     expect(warnings, 'Every pair must be measured').toEqual([]);
     expect(errors, errors.join('\n')).toEqual([]);
   });
@@ -79,12 +79,12 @@ describe('computed contrast gate — WCAG AA on design tokens', () => {
     }
   });
 
-  it('checks a meaningful number of pair-theme combinations', () => {
+  it('checks a meaningful number of pair-theme combinations', async () => {
     const tables = loadDefaultTables();
     const pairs = loadDefaultPairs();
     const { passes } = runContrastChecks(pairs, tables);
     expect(passes.length).toBeGreaterThanOrEqual(20);
-    const gate = loadContrastGate(WEB_ROOT);
+    const gate = await loadContrastGate(WEB_ROOT);
     expect(gate.passes.length + gate.failures.length).toBeGreaterThan(5000);
   });
 });

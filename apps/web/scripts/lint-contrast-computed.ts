@@ -36,9 +36,9 @@ import {
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(__dirname, '..');
 
-function main(): void {
+async function main(): Promise<void> {
   const verbose = process.argv.includes('--verbose');
-  const result = loadContrastGate(projectRoot);
+  const result = await loadContrastGate(projectRoot);
   const { failures, warnings, passes, errors } = result;
 
   console.log(
@@ -70,4 +70,4 @@ function main(): void {
   );
 }
 
-main();
+await main();

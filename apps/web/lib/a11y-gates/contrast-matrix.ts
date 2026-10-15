@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   type ContrastPair,
@@ -159,10 +159,10 @@ export function generateTokenPairs(tables: ThemeTables): ContrastPair[] {
 }
 
 /** Include the app frame and marketing dark cascades that override root tokens. */
-export function loadGateTables(webRoot: string): ThemeTables {
+export async function loadGateTables(webRoot: string): Promise<ThemeTables> {
   const tables = loadThemeTablesFromFiles(defaultCssFiles(webRoot));
   // Tailwind @theme inline surfaces compile to these same runtime aliases.
-  const foundation = readFileSync(
+  const foundation = await readFile(
     join(webRoot, 'styles/tailwind-foundation.css'),
     'utf8'
   );
@@ -192,7 +192,7 @@ export function loadGateTables(webRoot: string): ThemeTables {
     const table = new Map(tables.dark);
     let matched = false;
     for (const rule of extractRules(
-      readFileSync(join(webRoot, 'styles', file), 'utf8')
+      await readFile(join(webRoot, 'styles', file), 'utf8')
     )) {
       if (
         rule.atContext ||
@@ -257,15 +257,15 @@ export function contrastRegressions(
   return errors;
 }
 
-export function loadContrastGate(webRoot: string) {
-  const tables = loadGateTables(webRoot);
+export async function loadContrastGate(webRoot: string) {
+  const tables = await loadGateTables(webRoot);
   const pairs = [
     ...loadPairsConfig(join(webRoot, 'contrast-pairs.config.json')),
     ...generateTokenPairs(tables),
   ];
   const result = runContrastChecks(pairs, tables);
   const baseline = JSON.parse(
-    readFileSync(join(webRoot, 'contrast-computed.baseline.json'), 'utf8')
+    await readFile(join(webRoot, 'contrast-computed.baseline.json'), 'utf8')
   ) as ContrastBaseline;
   return { ...result, baseline, errors: contrastRegressions(result, baseline) };
 }

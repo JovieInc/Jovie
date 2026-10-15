@@ -125,8 +125,8 @@ describe('generated contrast coverage', () => {
       )
     ).toThrow('No opaque surfaces');
   });
-  it('measures quaternary, button hover, tooltip and shell override states from source', () => {
-    const gate = loadContrastGate(webRoot);
+  it('measures quaternary, button hover, tooltip and shell override states from source', async () => {
+    const gate = await loadContrastGate(webRoot);
     expect(gate.errors).toEqual([]);
     const all = [...gate.passes, ...gate.failures];
     for (const theme of ['light', 'dark', 'dark app frame', 'dark marketing']) {
