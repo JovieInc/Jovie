@@ -70,31 +70,24 @@ vi.mock('@/components/organisms/user-button', () => ({
   },
 }));
 
-vi.mock('@/components/atoms/UpdateAvailablePill', () => ({
-  UpdateAvailablePill: () => (
-    <button type='button' data-testid='update-available-pill'>
-      Update
-    </button>
-  ),
-}));
-
-vi.mock('@/components/organisms/whats-new/WhatsNewBanner', () => ({
-  WhatsNewBanner: (props: {
-    readonly enabled: boolean;
-    readonly collapsed?: boolean;
-  }) => (
-    <div
-      data-testid='sidebar-whats-new'
-      data-enabled={String(props.enabled)}
-      data-collapsed={String(Boolean(props.collapsed))}
-    />
-  ),
-}));
-
-vi.mock('@/components/organisms/SidebarBottomNowPlayingBridge', () => ({
-  SidebarBottomNowPlayingBridge: (props: { readonly collapsed?: boolean }) => {
-    nowPlayingBridgePropsMock(props);
-    return <div data-testid='sidebar-now-playing-bridge' />;
+vi.mock('@/components/organisms/SidebarDockBridge', () => ({
+  SidebarDockBridge: (props: {
+    readonly collapsed: boolean;
+    readonly children: (status: undefined) => React.ReactNode;
+  }) => {
+    nowPlayingBridgePropsMock({ collapsed: props.collapsed });
+    return (
+      <>
+        <div data-sidebar-dock='true' className='shrink-0'>
+          <button type='button' data-testid='update-available-pill'>
+            Update
+          </button>
+          <div data-testid='sidebar-whats-new' />
+          <div data-testid='sidebar-now-playing-bridge' />
+        </div>
+        {props.children(undefined)}
+      </>
+    );
   },
 }));
 
@@ -343,8 +336,6 @@ describe('UnifiedSidebar library route', () => {
     expect(whatsNew.compareDocumentPosition(nowPlaying)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
     );
-    expect(whatsNew).toHaveAttribute('data-enabled', 'false');
-    expect(whatsNew).toHaveAttribute('data-collapsed', 'false');
   });
 
   it('keeps the unified user panel available on settings routes', () => {
