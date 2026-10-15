@@ -29,7 +29,14 @@ describe('PricingComparisonChart', () => {
       ).toHaveAttribute('scope', 'col');
       for (const header of table.querySelectorAll('thead th')) {
         expect(header).toHaveAccessibleName();
-        expect(header).toHaveClass('whitespace-nowrap');
+        if (
+          table === mobileTable &&
+          header.textContent?.includes('Artist Presence')
+        ) {
+          expect(header).toHaveClass('whitespace-normal');
+        } else {
+          expect(header).toHaveClass('whitespace-nowrap');
+        }
         expect(header).not.toHaveAttribute('data-wrap', 'feature-label');
       }
     }

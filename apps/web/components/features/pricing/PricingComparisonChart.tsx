@@ -232,7 +232,7 @@ export function PricingComparisonChart() {
                 <span className='sr-only'>Feature</span>
               </th>
               <th
-                className='system-b-pricing-chart-cell system-b-pricing-chart-cell--plan whitespace-nowrap'
+                className='system-b-pricing-chart-cell system-b-pricing-chart-cell--plan whitespace-normal'
                 data-selected={selectedPlan === 'pro' ? 'true' : undefined}
               >
                 <div className='system-b-pricing-plan-name'>

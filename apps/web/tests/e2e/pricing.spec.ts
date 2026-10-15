@@ -1,4 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
+import { permittedLogoAssetIds } from '@/data/product-truth/logo-permissions';
 import { expect, test } from './setup';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
@@ -36,6 +37,59 @@ test.describe('Pricing Page', () => {
     await waitForHydration(page);
   });
 
+  test('certifies the canonical pricing footer across responsive states', async ({
+    page,
+  }, testInfo) => {
+    const footer = page.getByTestId('marketing-footer');
+    for (const width of [390, 768, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await page.evaluate(() => document.fonts.ready);
+      await expect(footer).toHaveCount(1);
+      await expect(footer).toHaveAttribute('data-footer-variant', 'expanded');
+      await expect(
+        footer.getByRole('heading', { name: 'Product' })
+      ).toBeVisible();
+      await expect(
+        footer.getByRole('link', { name: 'Privacy' })
+      ).toHaveAttribute('href', '/legal/privacy');
+      await expect(page.getByTestId('marketing-footer-cta')).toHaveCount(0);
+      await expect(page.locator('main')).toHaveCount(1);
+      await expect(page.locator('h1')).toHaveText('Pricing');
+      expect(
+        await page.evaluate(
+          () =>
+            document.documentElement.scrollWidth <=
+            document.documentElement.clientWidth
+        )
+      ).toBe(true);
+
+      const before = await footer.boundingBox();
+      await page.evaluate(
+        () =>
+          new Promise(resolve =>
+            requestAnimationFrame(() => requestAnimationFrame(resolve))
+          )
+      );
+      expect(await footer.boundingBox()).toEqual(before);
+      const privacy = footer.getByRole('link', { name: 'Privacy' });
+      await privacy.focus();
+      await expect(privacy).toBeFocused();
+      await page.keyboard.press('Tab');
+      await expect(footer.getByRole('link', { name: 'Terms' })).toBeFocused();
+
+      const accessibility = await new AxeBuilder({ page })
+        .include('[data-testid="marketing-footer"]')
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+        .analyze();
+      expect(accessibility.violations).toEqual([]);
+      await testInfo.attach(`pricing-${width}`, {
+        body: await page.screenshot({ fullPage: true }),
+        contentType: 'image/png',
+      });
+    }
+  });
+
   test('displays pricing plans correctly', async ({ page }) => {
     // Check page title
     await expect(page).toHaveTitle(/Pricing|Jovie/);
@@ -56,7 +110,7 @@ test.describe('Pricing Page', () => {
       '$0'
     );
     await expect(page.getByTestId('marketing-pricing-plan-pro')).toContainText(
-      'Pro'
+      'Artist Presence'
     );
     await expect(page.getByTestId('marketing-pricing-plan-pro')).toContainText(
       'Limited access'
@@ -153,7 +207,7 @@ test.describe('Pricing Page', () => {
           ).toHaveText('Up to 100');
           await assertReadableCells();
           await selector.focus();
-          await selector.press('p');
+          await selector.press('a');
           await expect(selector).toBeFocused();
           await expect(selector).toHaveValue('pro');
           await expect(
@@ -191,7 +245,7 @@ test.describe('Pricing Page', () => {
           );
           await page.keyboard.press('Shift+Tab');
           await expect(selector).toBeFocused();
-          await selector.press('p');
+          await selector.press('a');
           await expect(selector).toBeFocused();
           await expect(selector).toHaveValue('pro');
           await expect(
@@ -324,7 +378,9 @@ test.describe('Pricing Page', () => {
       page.getByRole('link', { name: 'Explore Jovie Profiles' }).first()
     ).toBeVisible();
 
-    await expect(page.getByText('Compare all features').first()).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Compare All Features' })
+    ).toBeVisible();
   });
 
   test('shows pricing tier details', async ({ page }) => {
@@ -348,6 +404,11 @@ test.describe('Pricing Page', () => {
     await page.goto('/artist-notifications', { waitUntil: 'domcontentloaded' });
     await waitForHydration(page);
     const logoBar = page.locator('main [data-testid="homepage-trust"]');
+    if (permittedLogoAssetIds({ page: '/artist-notifications' }).length === 0) {
+      await expect(logoBar).toHaveCount(0);
+      await expect(page.locator('[data-logo-asset]')).toHaveCount(0);
+      return;
+    }
     await expect(logoBar).toBeVisible();
     const brokenImages = await logoBar
       .locator('img')

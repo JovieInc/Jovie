@@ -2,6 +2,9 @@
 
 This inventory records the current canonical component owners, known duplicates, and the migration slice responsible for convergence.
 
+Current surface status, accountable migration issues, the shrinking holdout
+ratchet and measured velocity live in the [surface census](surface-convergence.md).
+
 ## Shell, header, footer
 
 | Family | Canonical file | Duplicate files to retire or constrain | Current canonical routes | Current duplicate routes | Target slice |
