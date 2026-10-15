@@ -24,11 +24,36 @@ describe('OverflowMenuTrigger', () => {
     expect(container.querySelector('[aria-hidden="true"]')).toBeInTheDocument();
   });
 
+  it.each(['', ' \t\n '])(
+    'falls back to a meaningful accessible name for a blank label (%j)',
+    ariaLabel => {
+      const { rerender } = render(
+        <OverflowMenuTrigger aria-label={ariaLabel} />
+      );
+
+      expect(
+        screen.getByRole('button', { name: 'More tabs' })
+      ).toBeInTheDocument();
+
+      rerender(
+        <OverflowMenuTrigger
+          aria-label={ariaLabel}
+          hasActiveOverflow
+          disabled
+        />
+      );
+
+      expect(
+        screen.getByRole('button', { name: 'More tabs, current tab hidden' })
+      ).toBeDisabled();
+    }
+  );
+
   it('preserves an explicit accessible label', () => {
     render(
       <OverflowMenuTrigger
         hasActiveOverflow
-        aria-label='More profile sections'
+        aria-label='  More profile sections  '
       />
     );
 
@@ -72,6 +97,33 @@ describe('OverflowMenuTrigger', () => {
     expect(trigger.className).toContain(
       'data-[state=open]:bg-interactive-active'
     );
+  });
+
+  it('supports keyboard activation and suppresses activation while disabled', async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    const { rerender } = render(<OverflowMenuTrigger onClick={onClick} />);
+    const trigger = screen.getByRole('button');
+
+    await user.tab();
+    expect(trigger).toHaveFocus();
+    await user.keyboard('{Enter} ');
+    expect(onClick).toHaveBeenCalledTimes(2);
+
+    rerender(<OverflowMenuTrigger onClick={onClick} disabled />);
+    expect(trigger).toBeDisabled();
+    await user.keyboard('{Enter} ');
+    expect(onClick).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the active-selection name while loading prevents activation', () => {
+    render(<OverflowMenuTrigger hasActiveOverflow loading />);
+
+    const trigger = screen.getByRole('button', {
+      name: 'More tabs, current tab hidden',
+    });
+    expect(trigger).toBeDisabled();
+    expect(trigger).toHaveAttribute('aria-busy', 'true');
   });
 
   it('forwards refs, custom classes, and click behavior', async () => {
