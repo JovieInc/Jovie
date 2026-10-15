@@ -213,7 +213,7 @@ const baseConfig = {
     // Enforce readonly modifiers on React component props for type safety
     '@jovie/readonly-component-props': 'error',
     // Database guardrails - Neon WebSocket driver supports transactions for RLS
-    '@jovie/no-db-transaction': 'off',
+    '@jovie/no-db-transaction': 'error',
     '@jovie/no-manual-db-pooling': 'error',
     // Route management - prevent hardcoded paths
     '@jovie/no-hardcoded-routes': 'error',
@@ -467,7 +467,6 @@ module.exports = [
   {
     files: ['**/lib/db/**'],
     rules: {
-      '@jovie/no-db-transaction': 'off',
       '@jovie/no-manual-db-pooling': 'off',
     },
   },

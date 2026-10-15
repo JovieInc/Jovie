@@ -229,7 +229,7 @@ useQuery({
 | `use-client-directive` | React hooks (`useState`, `useEffect`, etc.) in files without `'use client'` | Add `'use client'` at top of file |
 | `server-only-imports` | `@/lib/db`, `@/lib/auth/better-auth`, `stripe`, `resend`, `drizzle-orm`, `*.server.ts` in `'use client'` files | Move logic to server component or API route |
 | `icon-usage` | Emoji in JSX, non-Lucide UI icons, direct `simple-icons` imports | Use `lucide-react` for UI icons; `SocialIcon` component for social/brand icons |
-| `no-db-transaction` | `db.transaction()` or `tx.transaction()` calls | Use sequential operations or `db.insert().values([...])` batch |
+| `no-db-transaction` | `db.transaction()` or `tx.transaction()` calls | Use `runAtomicDbOperation` for multi-statement invariants |
 | `no-handler-initialization` | `new Stripe()`, `new Pool()`, `new Resend()`, `new Client()` inside `GET`/`POST`/`PUT`/`DELETE` handlers | Move to module-level singleton: `const stripe = getStripe()` at file top |
 | `no-hardcoded-routes` | String literals like `'/app/dashboard/audience'` in app code | Import from `APP_ROUTES`: `import { APP_ROUTES } from '@/constants/routes'` |
 | `no-manual-db-pooling` | `import { Pool } from 'pg'` or `import pg from 'pg'` | Use `import { db } from '@/lib/db'` |

@@ -3,7 +3,7 @@ set -euo pipefail
 # db-patterns-check.sh - Check for forbidden database patterns after file edits
 #
 # This hook runs after Edit/Write operations to catch database anti-patterns
-# that violate our Neon HTTP driver constraints.
+# that bypass our centralized database and atomicity contract.
 
 # Get the file path from environment (set by Claude Code)
 FILE="${TOOL_INPUT_FILE_PATH:-}"
@@ -24,6 +24,10 @@ fi
 
 # Skip lib/db internal files (they're allowed to use these patterns)
 if [[ "$FILE" =~ lib/db/ ]]; then
+  if [[ ! "$FILE" =~ /legacy-transaction\.ts$ ]] && grep -qE "\b(db|tx)\.transaction\(" "$FILE"; then
+    echo 'Direct transaction must stay in lib/db/legacy-transaction.ts'
+    exit 1
+  fi
   exit 0
 fi
 
@@ -31,7 +35,7 @@ ERRORS=()
 
 # Check for db.transaction() usage (specific to db/tx objects)
 if grep -qE "\b(db|tx)\.transaction\(" "$FILE" 2>/dev/null; then
-  ERRORS+=("db.transaction() detected - Neon HTTP driver doesn't support transactions. Use batch operations: db.insert().values([...items])")
+  ERRORS+=("db.transaction() detected - Use runAtomicDbOperation for multi-statement invariants; direct transactions bypass certification.")
 fi
 
 # Check for manual pooling imports (ESM and CommonJS)

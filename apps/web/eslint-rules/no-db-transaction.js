@@ -1,11 +1,10 @@
 /**
  * ESLint rule to prevent direct app-level db.transaction() usage.
  *
- * Canonical policy: new application code should avoid direct transaction
- * calls and use sequential/batch operations or approved wrappers.
+ * Multi-statement business invariants use runAtomicDbOperation.
  *
  * Bad:  await db.transaction(async (tx) => { ... });
- * Good: await db.insert(table).values([item1, item2, item3]);
+ * Good: await runAtomicDbOperation(operation, options);
  */
 
 module.exports = {
@@ -17,11 +16,17 @@ module.exports = {
     },
     messages: {
       noTransaction:
-        'Direct db.transaction() usage is restricted. Use sequential/batch operations or an approved legacy wrapper.',
+        'Use runAtomicDbOperation for multi-statement invariants; direct transactions bypass certification.',
     },
     schema: [],
   },
   create(context) {
+    if (
+      context.filename
+        .replaceAll('\\', '/')
+        .endsWith('/lib/db/legacy-transaction.ts')
+    )
+      return {};
     return {
       CallExpression(node) {
         // Match: *.transaction( or db.transaction(
