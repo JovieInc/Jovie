@@ -22,6 +22,7 @@ function ScopedNavigationExample() {
   return (
     <main className='w-full max-w-xl space-y-4 p-6'>
       <InlinePalette
+        variant='inline'
         sections={[
           { id: 'nav', label: 'Go To', items: [{ kind: 'nav', nav: work }] },
         ]}
