@@ -1,5 +1,6 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
+import { renderToString } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
@@ -128,6 +129,60 @@ describe('signup page', () => {
     globalThis.history.replaceState(null, '', '/signup');
   });
 
+  it('server-renders the current checking announcement before hydration', () => {
+    searchParamsState.value = 'handle=TestHandle';
+    const container = document.createElement('div');
+    container.innerHTML = renderToString(<SignUpPageClient />);
+    const statuses = container.querySelectorAll('output');
+    expect(statuses).toHaveLength(1);
+    expect(statuses[0]).toHaveAttribute('aria-live', 'polite');
+    expect(statuses[0]).toHaveAttribute('aria-atomic', 'true');
+    expect(statuses[0]).toHaveAttribute('aria-busy', 'true');
+    expect(statuses[0]).toHaveTextContent(
+      'Checking if @testhandle is available...'
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      name: 'available',
+      response: () => Response.json({ available: true }),
+      message: '@testhandle is available. Sign up to claim it.',
+    },
+    {
+      name: 'taken',
+      response: () => Response.json({ available: false }),
+      message:
+        '@testhandle is already taken. You can pick another handle after signing up.',
+    },
+    {
+      name: 'error',
+      response: () => new Response('Unavailable', { status: 503 }),
+      message:
+        "Couldn't check if @testhandle is available. You can still sign up and choose a handle.",
+    },
+  ])(
+    'keeps one current accessible announcement through $name',
+    async ({ response, message }) => {
+      searchParamsState.value = 'handle=TestHandle';
+      const request = deferred<Response>();
+      fetchMock.mockReturnValueOnce(request.promise);
+      render(<SignUpPageClient />);
+      const output = screen.getByRole('status');
+      expect(output).toHaveAttribute('aria-busy', 'true');
+      expect(output).toHaveTextContent(
+        'Checking if @testhandle is available...'
+      );
+      await act(async () => request.resolve(response()));
+      await waitFor(() => expect(output).toHaveAttribute('aria-busy', 'false'));
+      expect(screen.getAllByRole('status')).toEqual([output]);
+      expect(output).toHaveAttribute('aria-atomic', 'true');
+      expect(output).toHaveTextContent(message);
+      expect(output).not.toHaveTextContent('Checking if');
+    }
+  );
+
   it('does not overwrite offer extras while capturing the signup claim', () => {
     searchParamsState.value = 'plan=pro&interval=monthly&artist=Tim%20White';
     render(<SignUpPageClient />);
@@ -191,9 +246,12 @@ describe('signup page', () => {
       );
     });
 
-    expect(
-      await screen.findByText('@testhandle is available. Sign up to claim it.')
-    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(
+        '@testhandle is available. Sign up to claim it.'
+      )
+    );
+    expect(screen.getByRole('status')).toBeVisible();
     expect(sessionStorage.getItem('pendingClaim')).toBeNull();
   });
 
@@ -489,11 +547,12 @@ describe('signup page', () => {
 
     render(<SignUpPageClient />);
 
-    expect(
-      await screen.findByText(
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(
         '@takenhandle is already taken. You can pick another handle after signing up.'
       )
-    ).toBeInTheDocument();
+    );
+    expect(screen.getByRole('status')).toBeVisible();
   });
 
   it('renders the fallback state when handle availability lookup fails', async () => {
@@ -502,11 +561,12 @@ describe('signup page', () => {
 
     render(<SignUpPageClient />);
 
-    expect(
-      await screen.findByText(
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(
         "Couldn't check if @brokenhandle is available. You can still sign up and choose a handle."
       )
-    ).toBeInTheDocument();
+    );
+    expect(screen.getByRole('status')).toBeVisible();
   });
 
   describe('truthful handle availability', () => {

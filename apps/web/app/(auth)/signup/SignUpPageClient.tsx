@@ -1,6 +1,6 @@
 'use client';
 
-import { Skeleton } from '@jovie/ui';
+import { LoadingSkeleton } from '@jovie/ui';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
@@ -165,38 +165,49 @@ function SignUpClaimDataPersistence() {
     availability?.handle === normalizedHandle
       ? availability.status
       : 'checking';
+  const messages = {
+    available: `@${normalizedHandle} is available. Sign up to claim it.`,
+    taken: `@${normalizedHandle} is already taken. You can pick another handle after signing up.`,
+    error: `Couldn't check if @${normalizedHandle} is available. You can still sign up and choose a handle.`,
+  };
 
   return (
-    <output
-      className='mb-4 block text-center text-app text-secondary-token'
-      aria-live='polite'
-    >
-      {status === 'checking' && (
-        <div className='flex items-center justify-center lg:justify-start'>
-          <Skeleton />
-          <span className='sr-only'>
-            Checking if @{normalizedHandle} is available...
-          </span>
-        </div>
-      )}
-      {status === 'available' && (
-        <p className='text-app font-book text-primary-token'>
-          @{normalizedHandle} is available. Sign up to claim it.
+    <div className='mb-4 grid text-center text-app text-secondary-token'>
+      {/* Intrinsic, inaccessible copies reserve the widest/tallest result
+          before hydration without adding stale text to the live output. */}
+      {Object.entries(messages).map(([state, message]) => (
+        <p
+          key={state}
+          aria-hidden='true'
+          className='invisible col-start-1 row-start-1 text-app font-book'
+        >
+          {message}
         </p>
-      )}
-      {status === 'taken' && (
-        <p className='text-app font-book text-secondary-token'>
-          @{normalizedHandle} is already taken. You can pick another handle
-          after signing up.
-        </p>
-      )}
-      {status === 'error' && (
-        <p className='text-app font-book text-secondary-token'>
-          Couldn&apos;t check if @{normalizedHandle} is available. You can still
-          sign up and choose a handle.
-        </p>
-      )}
-    </output>
+      ))}
+      <output
+        className='col-start-1 row-start-1 grid items-center text-center text-app text-secondary-token'
+        aria-live='polite'
+        aria-atomic='true'
+        aria-busy={status === 'checking'}
+      >
+        {status === 'checking' ? (
+          <div className='flex items-center justify-center lg:justify-start'>
+            <div className='w-44 max-w-full'>
+              <LoadingSkeleton height='h-4' announce={false} />
+            </div>
+            <span className='sr-only'>
+              Checking if @{normalizedHandle} is available...
+            </span>
+          </div>
+        ) : (
+          <p
+            className={`text-app font-book ${status === 'available' ? 'text-primary-token' : 'text-secondary-token'}`}
+          >
+            {messages[status]}
+          </p>
+        )}
+      </output>
+    </div>
   );
 }
 
