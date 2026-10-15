@@ -19,7 +19,7 @@ export function ArtistProfileRailToggle({
   previewTrigger = true,
 }: {
   readonly previewTrigger?: boolean;
-} = {}) {
+}) {
   const { selectedProfile } = useDashboardData();
   const { isOpen, isPreview, isPinned, toggle } = usePreviewPanelState();
 
