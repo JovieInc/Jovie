@@ -268,6 +268,15 @@ describe('AlertDialog', () => {
           'motion-reduce:animate-none'
         );
         expect(screen.getByRole('alertdialog')).not.toHaveClass('duration-200');
+        for (const surface of [
+          screen.getByRole('alertdialog'),
+          screen.getByTestId('alert-dialog-overlay'),
+        ]) {
+          expect(surface).toHaveClass(
+            'motion-reduce:data-[state=open]:animate-none',
+            'motion-reduce:data-[state=closed]:animate-none'
+          );
+        }
       }
     );
   });

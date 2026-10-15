@@ -14,6 +14,11 @@ import {
 import { cn } from '../lib/utils';
 import { Button } from './button';
 
+const alertDialogMotionStyles =
+  'duration-cinematic ease-cinematic ' +
+  'motion-reduce:data-[state=open]:animate-none ' +
+  'motion-reduce:data-[state=closed]:animate-none';
+
 const AlertDialog = AlertDialogPrimitive.Root;
 
 const AlertDialogTrigger = AlertDialogPrimitive.Trigger;
@@ -29,7 +34,7 @@ const AlertDialogOverlay = React.forwardRef<
   AlertDialogOverlayProps
 >(({ className, ...props }, ref) => (
   <AlertDialogPrimitive.Overlay
-    className={cn(overlayClassName, className)}
+    className={cn(overlayClassName, alertDialogMotionStyles, className)}
     data-slot='alert-dialog-overlay'
     data-testid='alert-dialog-overlay'
     {...props}
@@ -73,7 +78,7 @@ const AlertDialogContent = React.forwardRef<
     centeredContentStyles.surface,
     centeredContentStyles.animation.replace(
       'duration-200',
-      'duration-cinematic ease-cinematic'
+      alertDialogMotionStyles
     ),
     centeredContentStyles.rounded,
     centeredContentStyles.reducedMotion,
