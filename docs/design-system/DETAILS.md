@@ -709,7 +709,26 @@ for one-off cases — pick the closest intent and live with it.
 the two; 200ms is acceptable but new components should choose one of the
 two intent tokens unless there's a reason.
 
-### pill-state-continuity
+### Raw scale (legacy / specialized)
+
+Avoid in new code; prefer the intent tokens above.
+
+| Token | Duration | Usage |
+|-------|----------|-------|
+| instant | 50ms | Immediate feedback |
+| fast | 100ms | Hover states, toggles |
+| normal | 160ms | Buttons, transitions |
+| slow | 250ms | Panels, reveals |
+| slower / slowest | 350ms | Complex animations |
+
+**Header blur:** 20px backdrop-filter.
+
+**Reduced motion:** Respects `prefers-reduced-motion: reduce` — every
+duration token (subtle, cinematic, and raw scale) drops to 0ms automatically.
+
+---
+
+## pill-state-continuity
 
 The Button pilot is functional feedback under the existing motion policy.
 `pendingPresentation="morph"` opts text pills into a controlled
@@ -762,23 +781,6 @@ owners, including JOV-8179 for segmented selection and JOV-8182 for tooltips.
 when:** JOV-7713 records production quality acceptance. **Then:** adopt the
 accepted family contracts in their existing owners; keep chat-motion and shell
 RailMotion as their current sources of truth.
-
-### Raw scale (legacy / specialized)
-
-Avoid in new code; prefer the intent tokens above.
-
-| Token | Duration | Usage |
-|-------|----------|-------|
-| instant | 50ms | Immediate feedback |
-| fast | 100ms | Hover states, toggles |
-| normal | 160ms | Buttons, transitions |
-| slow | 250ms | Panels, reveals |
-| slower / slowest | 350ms | Complex animations |
-
-**Header blur:** 20px backdrop-filter.
-
-**Reduced motion:** Respects `prefers-reduced-motion: reduce` — every
-duration token (subtle, cinematic, and raw scale) drops to 0ms automatically.
 
 ---
 

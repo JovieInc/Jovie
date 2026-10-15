@@ -617,8 +617,12 @@ const ButtonMorph = React.forwardRef<HTMLButtonElement, ButtonMorphProps>(
           <span
             aria-hidden='true'
             data-part='morph-label'
-            className='pointer-events-none absolute inset-0 flex min-w-0 items-center justify-center px-2.5 transition-opacity duration-fast ease-subtle motion-reduce:transition-none'
-            style={{ opacity: compact ? 0 : 1, ...noTravel }}
+            className='pointer-events-none absolute inset-0 flex min-w-0 items-center justify-center transition-opacity duration-fast ease-subtle motion-reduce:transition-none'
+            style={{
+              paddingInline: 'inherit',
+              opacity: compact ? 0 : 1,
+              ...noTravel,
+            }}
           >
             <span className='grid w-full min-w-0'>
               <span

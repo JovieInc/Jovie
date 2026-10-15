@@ -102,7 +102,7 @@ test.describe('pill-state-continuity painted browser contract', () => {
       expect(circle?.height).toBeCloseTo(28, 2);
       expect(await button.boundingBox()).toEqual(slot);
       expect(await sibling.boundingBox()).toEqual(neighbor);
-      await testInfo.attach(`pending-${theme}`, {
+      await testInfo.attach(`pending-${theme}.png`, {
         body: await page.screenshot({
           path: testInfo.outputPath(`pending-${theme}.png`),
         }),
@@ -161,7 +161,7 @@ test.describe('pill-state-continuity painted browser contract', () => {
         expect(sample.width).toBeCloseTo(slot!.width, 1);
         expect(sample.center).toBeCloseTo(slot!.x + slot!.width / 2, 1);
       }
-      await testInfo.attach('painted-state-samples', {
+      await testInfo.attach('painted-state-samples.json', {
         body: JSON.stringify(proof),
         contentType: 'application/json',
       });
