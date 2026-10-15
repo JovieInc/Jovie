@@ -1045,6 +1045,79 @@ class SubscriptionPoolTest(Isolated):
                 self.assertEqual(runner.worker(host, "codex"), 0)
                 work.assert_called_once()
 
+
+    @patch.object(codex, "current_login_available", return_value=True)
+    def test_health_keeps_eligible_fully_leased_subscriptions_healthy(self, _login):
+        self.reconcile()
+        handles = [codex.lease("current-login") for _ in range(3)] + [codex.lease("lyb-pro")]
+        try:
+            self.assertTrue(all(handles))
+            before = codex.read_state()
+            report = codex.status()
+            self.assertEqual(report["available"], [])
+            self.assertTrue(all(row["available"] and row["freeSlots"] == 0
+                                for row in report["accounts"].values()))
+            with redirect_stdout(io.StringIO()):
+                self.assertEqual(codex.main(["health"]), 0)
+            self.assertEqual(codex.read_state(), before)
+            self.assertEqual(codex.status(), report)
+        finally:
+            for handle in handles:
+                if handle is not None:
+                    handle.close()
+
+    @patch.object(codex, "current_login_available", return_value=True)
+    def test_health_rejects_unverified_stale_banked_and_depleted_accounts(self, _login):
+        self.reconcile()
+        verified = codex.read_state()
+        mutations = {
+            "unknown": lambda row: row.pop("subscriptionIdentityVerifiedAt"),
+            "stale": lambda row: row.update(subscriptionIdentityVerifiedAt=self.NOW - codex.LEDGER_CADENCE_S),
+            "binding": lambda row: row.update(subscriptionBinding="unknown"),
+            "auth": lambda row: row.update(lastKind="auth", exhaustedUntil=self.NOW + 60),
+            "quota": lambda row: row.update(lastKind="limit", exhaustedUntil=self.NOW + 60),
+            "depleted": lambda row: row["capacityLease"]["usableCapacityRemaining"]["primary"].update(remainingPercent=0),
+            "expired": lambda row: row["capacityLease"]["usableCapacityRemaining"]["primary"].update(resetsAt=self.NOW),
+            "missing-capacity": lambda row: row.pop("capacityLease"),
+        }
+        for reason, mutate in mutations.items():
+            with self.subTest(reason=reason):
+                state = json.loads(json.dumps(verified))
+                for name in self.profiles:
+                    mutate(state[name])
+                codex.write_state(state)
+                with redirect_stdout(io.StringIO()):
+                    self.assertEqual(codex.main(["health"]), 1)
+                self.assertEqual(codex.status()["available"], [])
+                self.assertEqual(codex.read_state(), state)
+
+    @patch.object(codex, "current_login_available", return_value=True)
+    def test_health_accepts_busy_eligible_account_when_free_account_is_stale(self, _login):
+        self.reconcile()
+        state = codex.read_state()
+        state["current-login"]["subscriptionIdentityVerifiedAt"] = self.NOW - codex.LEDGER_CADENCE_S
+        codex.write_state(state)
+        handle = codex.lease("lyb-pro")
+        self.assertIsNotNone(handle)
+        try:
+            report = codex.status()
+            self.assertEqual(report["available"], [])
+            self.assertFalse(report["accounts"]["current-login"]["available"])
+            self.assertEqual(report["accounts"]["current-login"]["freeSlots"], 3)
+            self.assertTrue(report["accounts"]["lyb-pro"]["available"])
+            self.assertEqual(report["accounts"]["lyb-pro"]["freeSlots"], 0)
+            with redirect_stdout(io.StringIO()):
+                self.assertEqual(codex.main(["health"]), 0)
+        finally:
+            handle.close()
+
+    @patch.object(codex, "current_login_available", return_value=True)
+    def test_health_without_accounts_fails(self, _login):
+        self.reconcile()
+        _login.return_value = False
+        with redirect_stdout(io.StringIO()):
+            self.assertEqual(codex.main(["health"]), 1)
+
     def snapshot(self, name):
         value = current_snapshot(self.NOW)
         value["account"]["account"].update(email=self.emails[name], planType="pro")
