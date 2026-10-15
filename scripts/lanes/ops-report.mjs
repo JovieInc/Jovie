@@ -295,6 +295,7 @@ function deliveryReview(report, message, detail) {
     evidenceFingerprint: report.evidenceFingerprint,
     policyVersion: report.policyVersion,
     resolvedModel: detail.resolvedModel,
+    outcome: detail.outcome,
   });
   return Object.freeze({
     schema: OPS_REPORT_REVIEW_SCHEMA,
@@ -470,9 +471,15 @@ export function verifyOpsReportDelivery(preparedReport, currentInput, options) {
     evidenceFingerprint: current.evidenceFingerprint,
     policyVersion: current.policyVersion,
     resolvedModel: expected.resolvedModel,
+    outcome: preparedReport.review.outcome,
   };
   if (fingerprint(actual) !== preparedReport.review.reviewDigest) {
     throw new Error('ops report review invalidated before delivery');
+  }
+  if (current.deterministicIssues.length && actual.outcome !== 'review-queue') {
+    throw new Error(
+      'ops report evidence invalidated before delivery; prepare again'
+    );
   }
   return true;
 }
