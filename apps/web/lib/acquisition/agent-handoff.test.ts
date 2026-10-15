@@ -177,9 +177,7 @@ describe('signed agent handoff receipt chain', () => {
     );
     expect(after?.id).toBe(before?.id);
     expect(after?.agentIntent).toBeUndefined();
-    expect(agentCheckoutCorrelation(after)).toEqual({
-      acquisitionId: before?.id,
-    });
+    expect(agentCheckoutCorrelation(after)).toEqual({});
     expect(toReceiptFirstTouch(after)).not.toHaveProperty('agentIntent');
   });
 

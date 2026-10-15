@@ -5,6 +5,10 @@ import {
   AGENT_INTENT_QUERY,
   AGENT_INTENT_TTL_MS,
 } from '@/lib/acquisition/agent-intent';
+import {
+  buildFirstTouch,
+  sealFirstTouchEnvelope,
+} from '@/lib/acquisition/first-touch-envelope';
 import { supportedAgentDecision } from '@/tests/fixtures/agent-handoff';
 import { malformedJsonRequest } from '@/tests/helpers/malformed-json-request';
 
@@ -357,6 +361,33 @@ describe('POST /api/stripe/checkout', () => {
       ).toEqual([]);
     }
   );
+
+  it('preserves ordinary checkout acquisition identity when a passive cookie also exists', async () => {
+    vi.stubEnv('ACQUISITION_FIRST_TOUCH_SECRET', 'checkout-test-signing-key');
+    const passive = await sealFirstTouchEnvelope(
+      buildFirstTouch({ url: new URL('https://jov.ie/?utm_source=organic') })
+    );
+    const browserId = '7f5bb735-8e88-4d78-ae32-5228cc12a8bb';
+    mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
+    mockCreateCheckoutSession.mockResolvedValue({
+      id: 'cs_ordinary',
+      url: 'https://checkout.stripe.com/ordinary',
+    });
+    const response = await POST(
+      new NextRequest('https://jov.ie/api/stripe/checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: `jovie_first_touch=${passive}; jv_acquisition_id=${browserId}`,
+        },
+        body: JSON.stringify({ priceId: 'price_123' }),
+      })
+    );
+    expect(response.status).toBe(200);
+    expect(mockCreateCheckoutSession).toHaveBeenCalledWith(
+      expect.objectContaining({ correlation: { acquisitionId: browserId } })
+    );
+  });
 
   it('creates checkout session with durable correlation IDs', async () => {
     mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });

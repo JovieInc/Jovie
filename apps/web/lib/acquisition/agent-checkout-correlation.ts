@@ -5,19 +5,15 @@ import type { FirstTouchEnvelope } from './first-touch-envelope';
 export function agentCheckoutCorrelation(
   envelope: FirstTouchEnvelope | null
 ): CheckoutCorrelation {
-  if (!envelope) return {};
+  if (!envelope?.agentIntent) return {};
   const intent = envelope.agentIntent;
   return {
     acquisitionId: envelope.id,
-    ...(intent
-      ? {
-          agentChannel: intent.channel,
-          agentDecisionRevision: intent.decisionRevision,
-          agentIntentId: intent.id,
-          agentMatrixRevision: intent.matrixRevision,
-          agentOffer: intent.offer,
-          agentRail: intent.rail,
-        }
-      : {}),
+    agentChannel: intent.channel,
+    agentDecisionRevision: intent.decisionRevision,
+    agentIntentId: intent.id,
+    agentMatrixRevision: intent.matrixRevision,
+    agentOffer: intent.offer,
+    agentRail: intent.rail,
   };
 }
