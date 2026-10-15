@@ -1,4 +1,5 @@
 import { LoadingSkeleton } from '@jovie/ui';
+import { MarketingContentShell } from '@/components/marketing/MarketingContentShell';
 
 const LEGAL_SKELETON_SECTIONS = [
   'scope',
@@ -8,7 +9,7 @@ const LEGAL_SKELETON_SECTIONS = [
   'updates',
 ] as const;
 
-export default function LegalLoading() {
+export function LegalLoadingContent() {
   return (
     <div
       className='space-y-10'
@@ -111,5 +112,14 @@ export default function LegalLoading() {
         </div>
       </div>
     </div>
+  );
+}
+
+/** Segment fallback owns a frame; nested page fallbacks inherit their layout. */
+export default function LegalLoading() {
+  return (
+    <MarketingContentShell>
+      <LegalLoadingContent />
+    </MarketingContentShell>
   );
 }

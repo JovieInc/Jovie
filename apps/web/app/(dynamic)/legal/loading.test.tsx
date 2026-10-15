@@ -2,12 +2,13 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { MarketingContentShell } from '@/components/marketing/MarketingContentShell';
 import {
   inspectLoadingOwners,
   loadingOwnerIssueCodes,
 } from '@/tests/utils/loading-owner';
 import CookiesLegalLoading from './cookies/loading';
-import LegalLoading from './loading';
+import LegalLoading, { LegalLoadingContent } from './loading';
 import PrivacyLegalLoading from './privacy/loading';
 import TermsLegalLoading from './terms/loading';
 
@@ -98,10 +99,29 @@ describe('LegalLoading', () => {
     expect(container.querySelector('[aria-hidden] .space-y-8')).not.toBeNull();
   });
 
+  it('owns one reading frame at either segment or nested-page loading', () => {
+    const segment = render(<LegalLoading />);
+    expect(
+      segment.container.querySelectorAll('[data-public-content-shell]')
+    ).toHaveLength(1);
+    segment.unmount();
+    const nested = render(
+      <MarketingContentShell>
+        <TermsLegalLoading />
+      </MarketingContentShell>
+    );
+    expect(
+      nested.container.querySelectorAll('[data-public-content-shell]')
+    ).toHaveLength(1);
+    expect(
+      loadingOwnerIssueCodes(inspectLoadingOwners(nested.container))
+    ).toEqual([]);
+  });
+
   it('keeps privacy, terms, and cookies loading on the shared route', () => {
-    expect(PrivacyLegalLoading).toBe(LegalLoading);
-    expect(TermsLegalLoading).toBe(LegalLoading);
-    expect(CookiesLegalLoading).toBe(LegalLoading);
+    expect(PrivacyLegalLoading).toBe(LegalLoadingContent);
+    expect(TermsLegalLoading).toBe(LegalLoadingContent);
+    expect(CookiesLegalLoading).toBe(LegalLoadingContent);
   });
 
   it('does not keep a raw route-local skeleton implementation', () => {

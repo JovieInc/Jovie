@@ -42,6 +42,18 @@ describe('canonical public content route contract', () => {
     }
   );
 
+  it.each([
+    'app/(marketing)/blog/error.tsx',
+    'app/(marketing)/changelog/error.tsx',
+    'app/(dynamic)/legal/error.tsx',
+  ])('keeps %s inside the reading frame with recovery', path => {
+    const source = read(path);
+    expect(source).toContain('<MarketingContentShell>');
+    expect(source).toContain('<ErrorBoundary');
+    expect(source).toContain('reset={reset}');
+    expect(source).not.toContain('<PublicPageShell');
+  });
+
   it('uses one token-backed prose reader for blog and legal documents', () => {
     expect(read('components/molecules/LegalMarkdownReader.tsx')).toContain(
       '<BlogMarkdownReader'

@@ -98,6 +98,6 @@ describe('AuthLoader and legal loading owner contract', () => {
 
     expect(readSource(PRODUCTION_SOURCES[0])).toContain("role='status'");
     expect(readSource(PRODUCTION_SOURCES[1])).toContain("from '@jovie/ui'");
-    expect(readSource(PRODUCTION_SOURCES[1])).toContain('<Skeleton');
+    expect(readSource(PRODUCTION_SOURCES[1])).toContain('<LoadingSkeleton');
   });
 });

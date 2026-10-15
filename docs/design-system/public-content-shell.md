@@ -37,10 +37,11 @@ historical homepage CTA text overrides the current source contract.
 Route contracts cover blog index/article/category/author, changelog index/release,
 and cookies/DMCA/privacy/terms. Component tests cover directory/prose geometry,
 empty/populated blog content, release/archive behavior, document loading, and
-contents availability. Static content routes keep their existing error and
-not-found handling. Blog and changelog index loaders use the directory frame;
+contents availability. Blog/changelog and legal failures use the canonical ErrorBoundary inside the
+reading frame, inheriting their public chrome. Not-found behavior is retained. Blog and changelog index loaders use the directory frame;
 blog article loading uses the prose frame, and legal loading follows the
-single-column document flow.
+single-column document flow. The shared legal segment loader owns a frame;
+nested legal page loaders inherit their route frame without nesting another.
 
 `public-content-shell.spec.ts` exercises representative index, article, release,
 and legal pages at mobile/desktop in light/dark themes. It checks chrome,

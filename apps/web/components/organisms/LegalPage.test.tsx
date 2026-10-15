@@ -37,7 +37,7 @@ describe('legal reading surface', () => {
       'href',
       'mailto:legal@jov.ie'
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Print', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Print' }));
     expect(print).toHaveBeenCalledOnce();
     print.mockRestore();
   });
