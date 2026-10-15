@@ -131,25 +131,6 @@ describe('Tooltip', () => {
       expect(tooltips.length).toBeGreaterThan(0);
       expect(tooltips[0]).toBeVisible();
     });
-
-    it.skip('hides tooltip on unhover', () => {
-      render(<BasicTooltip />);
-
-      const triggerElement = screen.getByRole('button', { name: 'Trigger' });
-
-      // Show tooltip
-      fireEvent.mouseEnter(triggerElement);
-      const tooltips = screen.getAllByText('Test tooltip content');
-      expect(tooltips[0]).toBeVisible();
-
-      // Hide tooltip
-      fireEvent.mouseLeave(triggerElement);
-      const hidden = screen.queryAllByText('Test tooltip content');
-      const openTooltip = hidden.find(el =>
-        el.closest('[data-state="delayed-open"]')
-      );
-      expect(openTooltip).toBeUndefined();
-    });
   });
 
   describe('Keyboard Interactions', () => {
@@ -163,41 +144,6 @@ describe('Tooltip', () => {
 
       const tooltips = screen.getAllByText('Test tooltip content');
       expect(tooltips[0]).toBeVisible();
-    });
-
-    it.skip('hides tooltip on blur', () => {
-      render(
-        <TooltipWrapper>
-          <Tooltip>
-            <TooltipTrigger>
-              <button type='button'>First button</button>
-            </TooltipTrigger>
-            <TooltipContent>First tooltip</TooltipContent>
-          </Tooltip>
-          <button type='button'>Second button</button>
-        </TooltipWrapper>
-      );
-
-      const firstButton = screen.getByRole('button', { name: 'First button' });
-      const secondButton = screen.getByRole('button', {
-        name: 'Second button',
-      });
-
-      // Hover first button to show tooltip
-      fireEvent.mouseEnter(firstButton);
-      flushTimers();
-      const tooltips = screen.getAllByText('First tooltip');
-      expect(tooltips[0]).toBeVisible();
-
-      // Move focus to second button to hide tooltip
-      fireEvent.click(secondButton);
-      flushTimers();
-      const hidden = screen.queryAllByText('First tooltip');
-      const openTooltip = hidden.find(el =>
-        el.closest('[data-state="delayed-open"]')
-      );
-      // After blur, there should be no tooltip content in delayed-open state
-      expect(openTooltip).toBeUndefined();
     });
 
     it('hides tooltip on Escape key', () => {
