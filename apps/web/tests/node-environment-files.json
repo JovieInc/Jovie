@@ -256,7 +256,6 @@
   "lib/social/shortcut-platforms.test.ts",
   "lib/spotify/",
   "lib/stripe/",
-  "lib/stripe/customer-sync/update-status.test.ts",
   "lib/synthetic/",
   "lib/tasks/",
   "lib/theme/route-policy.test.ts",
