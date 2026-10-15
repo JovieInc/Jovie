@@ -234,6 +234,9 @@ export function classifyChangedFile(file) {
   ) {
     return [CI_LANES.SYMPHONY_CONTROL];
   }
+  if (/^docs\/playbooks\/[^/]+\.playbook\.md$/.test(normalized)) {
+    return [CI_LANES.JOVIE_PRODUCT];
+  }
   if (DOC_FILE.test(normalized) && !normalized.startsWith('.github/')) {
     return [];
   }
