@@ -28,6 +28,7 @@ All schema files live in `apps/web/lib/db/schema/`. Import tables and types from
 
 | Schema File | Tables | Key Relations |
 |-------------|--------|---------------|
+| `connector-write-receipts.ts` | `connectorWriteReceipts` | Append-only profile write/rollback proposal, approval, start and outcome evidence; tenant-scoped, no cascading FKs; unique proposal phase and destination rate window |
 | `connectors.ts` | `connectorAccounts`, `connectorSyncStates`, `externalObjects`, `webhookDeliveries`, `contextFacts`, `agentRuns`, `suggestedActions`, `workflowRuns` | `connectorAccounts.userId` → `users`; `connectorSyncStates.connectorAccountId` → `connectorAccounts`; `contextFacts.userId` → `users`; `suggestedActions.agentRunId` → `agentRuns` |
 
 Token read/write must go through `apps/web/lib/connectors/token-vault.ts` — never write `encryptedAccessToken`/`encryptedRefreshToken` directly.
