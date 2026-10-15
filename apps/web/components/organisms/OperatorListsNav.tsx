@@ -13,7 +13,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/organisms/sidebar';
-import { SHELL_RAIL_BLOCK_LABEL } from '@/components/shell/rail-motion';
+import { SHELL_RAIL_LABEL } from '@/components/shell/rail-motion';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   getListErrorMessage,
@@ -45,7 +45,12 @@ function NavRow({
 }) {
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton asChild isActive={active} tooltip={label}>
+      <SidebarMenuButton
+        asChild
+        isActive={active}
+        tooltip={label}
+        className='h-7'
+      >
         <Link
           href={href}
           aria-current={active ? 'page' : undefined}
@@ -64,7 +69,7 @@ function NavRow({
 
 function GroupLabel({ children }: { readonly children: string }) {
   return (
-    <span className={cn(OPERATOR_NAV_GROUP_LABEL, SHELL_RAIL_BLOCK_LABEL)}>
+    <span className={cn(OPERATOR_NAV_GROUP_LABEL, SHELL_RAIL_LABEL)}>
       {children}
     </span>
   );
@@ -125,7 +130,11 @@ function NewListRow() {
 
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton tooltip='New List' onClick={() => setEditing(true)}>
+      <SidebarMenuButton
+        tooltip='New List'
+        onClick={() => setEditing(true)}
+        className='h-7'
+      >
         <Plus className='size-3.5' aria-hidden='true' />
         <span className='truncate'>New List</span>
       </SidebarMenuButton>

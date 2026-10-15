@@ -3,6 +3,7 @@ import {
   buildDogfoodReceipt,
   type DogfoodReceipt,
 } from '@/lib/agent-os/dogfood-receipt';
+import { expectedExposure } from '../../../../../packages/release-channel-contracts/test-fixtures/dogfood-exposure';
 import {
   CERTIFICATION_METRICS_CONTRACT,
   type CertificationMetricsInput,
@@ -287,6 +288,21 @@ describe('computeCertificationMetrics', () => {
       receipts: [{ ...good, missionObservation: null }],
     });
     expect(regressionOnly.lanes.jov.dogfoodKindCoverage.value).toBe(0);
+  });
+
+  it('projects legacy green runs as a coverage gap for exposure-scoped missions', () => {
+    const result = input({
+      subjects: [
+        subject({
+          deploy: DEPLOY,
+          requiredMissions: [
+            { id: 'm-1', expectedExposure: expectedExposure() },
+          ],
+        }),
+      ],
+      receipts: [receipt(), receipt(), receipt()],
+    });
+    expect(result.lanes.jov.machineCertifiableCoverage.value).toBe(0);
   });
 
   it('averages distinct passing dogfood kinds per identity', () => {

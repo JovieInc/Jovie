@@ -143,7 +143,7 @@ describe('outcome missions', () => {
     ).toBe(false);
   });
 
-  it('keeps newer regression runs out of the capability reliability window', () => {
+  it('keeps newer regression runs out of the capability reliability sample', () => {
     const capable = run();
     const scripted = dogfoodReceiptFromPlaywrightReport(context, {
       stats: {
