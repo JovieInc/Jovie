@@ -403,7 +403,7 @@ export function SidebarThreadsSection({
               size='icon-xs'
               aria-label='New Chat'
               onClick={onNewThread}
-              className='relative flex shrink-0 items-center justify-center rounded-md text-sidebar-muted hover:bg-sidebar-accent hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+              className='shrink-0'
             >
               <Icon name='Plus' className='size-3.5' aria-hidden='true' />
             </Button>
