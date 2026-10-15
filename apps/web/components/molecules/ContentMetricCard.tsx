@@ -52,7 +52,7 @@ export const contentMetricCardValueVariants = cva(
   {
     variants: {
       layout: {
-        'icon-chip': 'mt-2 text-2xl leading-none tracking-[-0.011em]',
+        'icon-chip': 'mt-2 text-2xl leading-none tracking-tight',
         'icon-chip-inline': 'text-mid leading-tight',
       },
       density: { default: '', compact: '' },
