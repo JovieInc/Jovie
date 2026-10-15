@@ -70,4 +70,10 @@ async function main(): Promise<void> {
   );
 }
 
-await main();
+// tsx emits this script as CommonJS. Top-level await fails that transform
+// (esbuild: "cjs" output format), so the ratchet never reaches the gate.
+main().catch((error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(`[contrast-computed] ✗ ${message}`);
+  process.exit(1);
+});
