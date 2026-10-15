@@ -88,7 +88,7 @@ export async function GET() {
     return NextResponse.json({
       enabled: true,
       isImpersonating: true,
-      realAdminUserId: state.realAdminUserId,
+      actorUserId: state.actorUserId,
       effectiveUserId: state.effectiveUserId,
       issuedAt: state.issuedAt,
       expiresAt: state.expiresAt,
@@ -185,6 +185,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       message: 'Impersonation session started',
+      actorUserId: adminUserId,
       effectiveUserId: targetUserId,
       expiresInMinutes: 15,
     });
