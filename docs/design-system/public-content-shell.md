@@ -26,7 +26,8 @@ Then: complete the cross-app migration under JOV-8375.
 | Blog/changelog index and release heroes; legal privacy/terms heroes | Existing editorial heroes retain the canonical public width and docked-header behavior. Reading content below them uses the shared shell. |
 | `docs.jov.ie` index and articles | Separate Nextra deployment under `apps/docs`, currently using `HelpShell` with search, sidebar/drawer navigation, article metadata/SEO, and feedback. JOV-8375 tracks extracting web chrome into a shared package and migrating this app without crossing app-specific alias/provider boundaries. This slice does **not** claim docs chrome acceptance. |
 | `/investor-portal/*` | Authenticated investor documents use the portal shell and access boundary; they are not public publication routes. |
-| `/about`, `/support`, `/developers`, `/engineering/*`, product/pricing, comparisons, and other marketing landings | Keep their existing task-specific compositions and canonical public chrome. They are company, support-routing, API, or conversion surfaces rather than this document template. |
+| `/engineering/*` | `EngineeringPublication` shares its frame between published articles and founder previews, including publication status, provenance, and evidence receipts. Its article body already uses `MarketingContentProse` at the canonical reading width; the surrounding publication frame remains a route-specific exception. |
+| `/about`, `/support`, `/developers`, product/pricing, comparisons, and other marketing landings | Keep their existing task-specific compositions and canonical public chrome. They are company, support-routing, API, or conversion surfaces rather than this document template. |
 
 The homepage shell, navigation/CTA policy, footer, and mobile hydration code are
 unchanged. Existing homepage/chrome regression tests remain authoritative; no
