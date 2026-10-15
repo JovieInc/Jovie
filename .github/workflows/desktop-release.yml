@@ -1112,7 +1112,7 @@ jobs:
     steps:
       - name: Generate Jovie Bot token
         id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
@@ -1633,6 +1633,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Preserve the signed package while waiting for the shared API quota.
+          # Permission and ancestry failures still stop publication immediately.
+          gh() {
+            node scripts/lib/github-rate-limit.mjs run \
+              --max-wait-seconds 600 --attempts 4 -- gh "$@"
+          }
           release_version="$(tr -d '[:space:]' < VERSION)"
           [[ "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
             echo "::error::VERSION is not a valid desktop semver."

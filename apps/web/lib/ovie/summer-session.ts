@@ -231,7 +231,8 @@ export type AppendSummerTurnOutcome = {
 export async function appendSummerTurnWithOutcome(
   store: OperatingStore,
   turn: Omit<SummerPersistedTurn, 'turnIndex'>,
-  now: string = new Date().toISOString()
+  now: string = new Date().toISOString(),
+  options: { readonly reconcileCheckpoint?: SummerEveCheckpoint } = {}
 ): Promise<AppendSummerTurnOutcome> {
   for (let attempt = 0; attempt < 8; attempt += 1) {
     const currentRecord = await store.getDecisionForUpdate(
@@ -241,19 +242,58 @@ export async function appendSummerTurnWithOutcome(
       ? sessionFromDecision(currentRecord)
       : emptySession();
     assertSummerIdentity(session.identity);
-    const duplicate =
-      findTurnByClientId(session, turn.clientTurnId) ??
-      (turn.eveReceipt
-        ? session.turns.find(
-            existing =>
-              existing.eveReceipt?.eventId === turn.eveReceipt?.eventId
-          )
-        : undefined);
+    const clientMatch = findTurnByClientId(session, turn.clientTurnId);
+    const eventMatch = turn.eveReceipt
+      ? session.turns.find(
+          existing => existing.eveReceipt?.eventId === turn.eveReceipt?.eventId
+        )
+      : undefined;
+    // Distinct input/event owners need explicit repair, never a second receipt.
+    if (
+      options.reconcileCheckpoint &&
+      clientMatch &&
+      eventMatch &&
+      clientMatch !== eventMatch
+    ) {
+      return { session, persisted: 'existing' };
+    }
+    const duplicate = clientMatch ?? eventMatch;
+    // A result-only repair never changes an existing input or its binding,
+    // including when that input first appears during a failed CAS attempt.
+    const checkpoint = options.reconcileCheckpoint;
+    if (
+      duplicate &&
+      checkpoint &&
+      ((duplicate.eveCheckpoint &&
+        (duplicate.eveCheckpoint.eventId !== checkpoint.eventId ||
+          duplicate.eveCheckpoint.sessionId !== checkpoint.sessionId ||
+          duplicate.eveCheckpoint.nextStartIndex !==
+            checkpoint.nextStartIndex)) ||
+        (duplicate.eveReceipt &&
+          (duplicate.eveReceipt.eventId !== checkpoint.eventId ||
+            duplicate.eveReceipt.sessionId !== checkpoint.sessionId)))
+    ) {
+      return { session, persisted: 'existing' };
+    }
     if (duplicate && !shouldReplaceSummerTurn(duplicate, turn)) {
       return { session, persisted: 'existing' };
     }
     const persisted: SummerPersistedTurn = duplicate
-      ? { ...turn, turnIndex: duplicate.turnIndex }
+      ? {
+          ...turn,
+          turnIndex: duplicate.turnIndex,
+          ...(checkpoint
+            ? {
+                clientTurnId: duplicate.clientTurnId,
+                userText: duplicate.userText,
+                correlationId: duplicate.correlationId,
+                createdAt: duplicate.createdAt,
+                ...(duplicate.eveCheckpoint
+                  ? { eveCheckpoint: duplicate.eveCheckpoint }
+                  : {}),
+              }
+            : {}),
+        }
       : { ...turn, turnIndex: session.turns.length + 1 };
     const next: SummerSession = {
       identity: session.identity,

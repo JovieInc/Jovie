@@ -343,6 +343,7 @@ describe('Stripe Client - Cache Behavior', () => {
         {
           userId: 'clerk_user_error',
           email: 'error@example.com',
+          idempotencyKey: 'customer:create:clerk_user_error',
         }
       );
     });
@@ -685,15 +686,18 @@ describe('Stripe Client - Cache Behavior', () => {
 
       await getOrCreateCustomer('user_synthetic', email);
 
-      expect(mockStripeCustomers.create).toHaveBeenCalledWith({
-        email,
-        name: undefined,
-        metadata: {
-          clerk_user_id: 'user_synthetic',
-          created_via: 'jovie_app',
-          synthetic_principal: 'grokbot',
+      expect(mockStripeCustomers.create).toHaveBeenCalledWith(
+        {
+          email,
+          name: undefined,
+          metadata: {
+            clerk_user_id: 'user_synthetic',
+            created_via: 'jovie_app',
+            synthetic_principal: 'grokbot',
+          },
         },
-      });
+        { idempotencyKey: 'customer:create:user_synthetic' }
+      );
     });
 
     it('leaves real customer metadata unchanged', async () => {
@@ -706,11 +710,14 @@ describe('Stripe Client - Cache Behavior', () => {
 
       await getOrCreateCustomer('user_real', 'artist@band.com');
 
-      expect(mockStripeCustomers.create).toHaveBeenCalledWith({
-        email: 'artist@band.com',
-        name: undefined,
-        metadata: { clerk_user_id: 'user_real', created_via: 'jovie_app' },
-      });
+      expect(mockStripeCustomers.create).toHaveBeenCalledWith(
+        {
+          email: 'artist@band.com',
+          name: undefined,
+          metadata: { clerk_user_id: 'user_real', created_via: 'jovie_app' },
+        },
+        { idempotencyKey: 'customer:create:user_real' }
+      );
     });
   });
 });

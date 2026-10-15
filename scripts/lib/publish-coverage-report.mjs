@@ -140,7 +140,33 @@ function publishReport(
   git('add', '--', ...profile.files);
   git('commit', '-m', profile.title, '-m', `Measured source: ${source}`);
   gh(['auth', 'setup-git', '--hostname', 'github.com']);
-  git('push', 'origin', `HEAD:refs/heads/${branch}`);
+  for (let attempt = 1; ; attempt++) {
+    try {
+      git('push', 'origin', `HEAD:refs/heads/${branch}`);
+      break;
+    } catch (error) {
+      const stderr =
+        error && typeof error === 'object' && 'stderr' in error
+          ? String(error.stderr)
+          : '';
+      // GitHub can time out checking workflow permissions on a report-only
+      // push. Retry that check on the same commit, never a permission denial.
+      if (
+        attempt >= 3 ||
+        !stderr.includes(
+          'Unable to determine if workflow can be created or updated due to timeout'
+        )
+      ) {
+        throw error;
+      }
+      Atomics.wait(
+        new Int32Array(new SharedArrayBuffer(4)),
+        0,
+        0,
+        attempt * 1000
+      );
+    }
+  }
 
   const bodyDir = mkdtempSync(join(tmpdir(), 'coverage-report-'));
   try {
