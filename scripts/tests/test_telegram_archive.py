@@ -2,6 +2,7 @@
 import asyncio
 from datetime import datetime, timedelta, timezone
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -32,6 +33,7 @@ class FakeTelegram:
         self.authorized = authorized
         self.user = SimpleNamespace(id=user_id, bot=False)
         self.edits, self.deliveries, self.events = [], [], []
+        self.restored = []
         self.histories = {}
         self.failure = None
         self.fail_delivery = False
@@ -47,8 +49,9 @@ class FakeTelegram:
         return self.user
 
     async def get_dialogs(self, **options):
-        assert options == {"folder": 0, "ignore_migrated": True}
-        return [item for item in self.dialogs if item.id not in self.edits]
+        assert options["ignore_migrated"] is True
+        archived = set(self.edits) - set(self.restored)
+        return [item for item in self.dialogs if (item.id in archived) == (options["folder"] == 1)]
 
     async def get_messages(self, entity, limit):
         assert limit == 1
@@ -62,6 +65,9 @@ class FakeTelegram:
         return [] if value is None else [SimpleNamespace(date=value)]
 
     async def edit_folder(self, entity, folder):
+        if folder == 0:
+            self.restored.append(entity)
+            return
         assert folder == 1
         if entity == self.failure:
             raise OSError("private API request details must not be logged")
@@ -90,11 +96,21 @@ class StateTestCase(unittest.TestCase):
                        "api_hash": "a" * 32}
 
     def run_archive(self, client, dry_run=False):
+        plan = "report-20261015T120000-" + "0" * 32 + ".json"
+        if not dry_run:
+            archive.write_json(self.state / plan, {
+                "test_plan": True, "started_at": NOW.isoformat(), "user_id": 99,
+                "dry_run": True, "status": "completed",
+                "planned": [{"id": item.id, "reason": "empty" if item.date is None else "old"}
+                            for item in client.dialogs],
+            })
         with patch("builtins.print"):
-            return asyncio.run(archive.archive(client, self.state, self.config, dry_run, NOW))
+            return asyncio.run(archive.archive(client, self.state, self.config, dry_run, NOW,
+                                               reviewed_plan=plan if not dry_run else None))
 
     def reports(self):
-        return [archive.read_json(path) for path in self.state.glob("report-*.json")]
+        return [value for path in self.state.glob("report-*.json")
+                if not (value := archive.read_json(path)).get("test_plan")]
 
 
 class ArchiveTests(StateTestCase):
@@ -146,7 +162,7 @@ class ArchiveTests(StateTestCase):
         self.assertEqual(client.edits, [])
         report, _ = client.deliveries[0]
         self.assertEqual(report["status"], "failed")
-        self.assertEqual(report["error_type"], "PermissionError")
+        self.assertEqual(report["error_type"], "request_failed")
         self.assertNotIn("private title", json.dumps(report))
 
     def test_partial_failure_preserves_and_delivers_successful_moves(self):
@@ -179,7 +195,8 @@ class ArchiveTests(StateTestCase):
     def test_interrupted_report_is_delivered_as_interrupted(self):
         client = FakeTelegram([dialog(1)])
         self.run_archive(client, dry_run=True)
-        path = next(self.state.glob("report-*.json"))
+        path = next(path for path in self.state.glob("report-*.json")
+                    if not archive.read_json(path).get("test_plan"))
         report = archive.read_json(path)
         report.update(dry_run=False, status="running")
         archive.write_json(path, report)
@@ -289,7 +306,7 @@ class ArchiveTests(StateTestCase):
         line = archive.cron_line(Path("/tmp/telegram state%test"))
         self.assertTrue(line.startswith("0 7 * * * "))
         self.assertIn("'/tmp/telegram state\\%test/venv/bin/python'", line)
-        self.assertIn("archive --state-dir '/tmp/telegram state\\%test'", line)
+        self.assertIn("archive --dry-run --state-dir '/tmp/telegram state\\%test'", line)
 
     def test_requests_have_bounded_timeouts(self):
         async def hang():
@@ -381,7 +398,7 @@ class LoginTests(StateTestCase):
     def test_archive_main_never_bootstraps_or_prompts(self):
         with patch.object(archive, "bootstrap", side_effect=AssertionError("bootstrapped")), \
                 patch.dict(os.environ, {}, clear=True), patch("builtins.print"):
-            self.assertEqual(archive.main(["archive", "--state-dir", str(self.state)]), 1)
+            self.assertEqual(archive.main(["archive", "--state-dir", str(self.state)]), 2)
 
     def test_cli_cron_and_no_credentials_archive_work_from_another_directory(self):
         script = Path(archive.__file__).resolve()
@@ -393,8 +410,193 @@ class LoginTests(StateTestCase):
         result = subprocess.run([sys.executable, str(script), "archive", "--state-dir", str(self.state)],
                                 cwd="/tmp", env=environment, stdin=subprocess.DEVNULL,
                                 capture_output=True, text=True, timeout=10)
-        self.assertEqual(result.returncode, 1)
-        self.assertIn("run the login command", result.stderr)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("private terminal", result.stderr)
+
+
+class SafeResumeTests(StateTestCase):
+    def test_corrupt_or_unwritable_receipts_fail_without_private_tracebacks(self):
+        receipt = self.state / "auth-receipt.json"
+        receipt.write_text("broken-private-fixture")
+        with patch("builtins.print"):
+            self.assertEqual(archive.auth_receipt(self.state, False)["status"], "blocked")
+        receipt.unlink()
+        receipt.symlink_to(self.state / "private-session-fixture")
+        with patch.dict(os.environ, {}, clear=True), \
+                patch("sys.stderr", new_callable=io.StringIO) as errors:
+            self.assertEqual(archive.main(["status", "--state-dir", str(self.state)]), 1)
+        self.assertEqual(errors.getvalue().strip(), archive.FAILURE_MESSAGE)
+
+    def test_blocked_receipt_survives_process_restart_and_instructs_once(self):
+        environment = {k: v for k, v in os.environ.items() if not k.startswith("TELEGRAM_")}
+        command = [sys.executable, archive.__file__, "status", "--state-dir", str(self.state)]
+        results = [subprocess.run(command, env=environment, stdin=subprocess.DEVNULL,
+                                  capture_output=True, text=True, timeout=10) for _ in range(2)]
+        for result in results:
+            self.assertEqual(result.returncode, 2)
+            self.assertEqual(json.loads(result.stdout), archive.read_json(self.state / "auth-receipt.json"))
+            self.assertNotIn(str(self.state), result.stdout + result.stderr)
+        self.assertEqual(results[0].stderr.strip(), archive.LOGIN_INSTRUCTION)
+        self.assertEqual(results[1].stderr, "")
+        self.assertEqual(json.loads(results[0].stdout)["externalization"], "denied")
+
+    def test_resume_rechecks_authorization_and_revocation_without_secret_prompts(self):
+        archive.write_json(self.state / "account.json", self.config)
+        client = FakeTelegram()
+        with patch.object(archive, "make_client", return_value=client), \
+                patch.object(archive.getpass, "getpass", side_effect=AssertionError("prompted")), \
+                patch("sys.stdout", new_callable=io.StringIO) as output, \
+                patch("sys.stderr", new_callable=io.StringIO) as errors:
+            archive.auth_receipt(self.state, False)
+            errors.truncate(0)
+            errors.seek(0)
+            self.assertEqual(archive.main(["status", "--state-dir", str(self.state)]), 0)
+            self.assertEqual(archive.read_json(self.state / "auth-receipt.json")["status"], "ready")
+            client.authorized = False
+            for _ in range(2):
+                self.assertEqual(archive.main(["status", "--state-dir", str(self.state)]), 2)
+            self.assertEqual(errors.getvalue().count(archive.LOGIN_INSTRUCTION), 1)
+        client.send_code_request.assert_not_awaited()
+        client.sign_in.assert_not_awaited()
+        self.assertEqual(client.edits, [])
+        self.assertEqual(client.deliveries, [])
+        for secret in (self.config["phone"], self.config["api_hash"], str(self.state)):
+            self.assertNotIn(secret, output.getvalue() + errors.getvalue())
+
+    def test_receipt_projection_discards_arbitrary_nested_secrets(self):
+        secrets = [self.config["phone"], self.config["api_hash"], "otp-fixture", "session-fixture"]
+        archive.write_json(self.state / "auth-receipt.json", {
+            "schema": archive.AUTH_SCHEMA, "status": "blocked", "instruction_emitted": True,
+            "raw": secrets, "instruction": secrets,
+        })
+        with patch("sys.stdout", new_callable=io.StringIO) as output, \
+                patch("sys.stderr", new_callable=io.StringIO) as errors:
+            receipt = archive.auth_receipt(self.state, False)
+        self.assertEqual(set(receipt), {"schema", "classification", "externalization", "dispatch_allowed",
+                                        "status", "instruction_emitted"})
+        for secret in secrets:
+            self.assertNotIn(secret, output.getvalue() + errors.getvalue()
+                             + (self.state / "auth-receipt.json").read_text())
+
+    def test_headless_login_stops_before_bootstrap_or_prompt(self):
+        with patch.object(sys.stdin, "isatty", return_value=False), \
+                patch.object(archive, "bootstrap", side_effect=AssertionError("bootstrapped")), \
+                patch.object(archive.getpass, "getpass", side_effect=AssertionError("prompted")), \
+                patch("builtins.print"):
+            self.assertEqual(archive.main(["login", "--state-dir", str(self.state)]), 2)
+
+    def test_unexpected_exception_names_and_invalid_arguments_cannot_leak(self):
+        secret = "private-session-fixture"
+        exception = type(secret, (Exception,), {})
+        with patch.object(archive, "load_config", side_effect=exception(secret)), \
+                patch("sys.stderr", new_callable=io.StringIO) as errors:
+            self.assertEqual(archive.main(["status", "--state-dir", str(self.state)]), 1)
+        self.assertNotIn(secret, errors.getvalue())
+        result = subprocess.run([sys.executable, archive.__file__, "status", "--unknown", secret],
+                                capture_output=True, text=True, timeout=10)
+        self.assertEqual(result.returncode, 2)
+        self.assertNotIn(secret, result.stdout + result.stderr)
+
+
+class ReviewedArchiveTests(StateTestCase):
+    def test_ambiguous_move_is_journaled_and_can_be_undone(self):
+        client = FakeTelegram([dialog(1)])
+        plan = self.preview(client)
+        edit = client.edit_folder
+
+        async def ambiguous_move(entity, folder):
+            await edit(entity, folder)
+            if folder == 1:
+                raise OSError("private RPC response lost after move")
+
+        client.edit_folder = ambiguous_move
+        self.assertEqual(self.apply(client, plan), 1)
+        report_path = next(path for path in self.state.glob("report-*.json") if path != plan)
+        report = archive.read_json(report_path)
+        self.assertEqual(report["archived"], [])
+        self.assertEqual([item["id"] for item in report["attempted"]], [1])
+        with patch("builtins.print"):
+            self.assertEqual(asyncio.run(archive.inspect_archive(
+                client, self.state, self.config, report_path.name, undo=True)), 0)
+            self.assertEqual(asyncio.run(archive.inspect_archive(
+                client, self.state, self.config, report_path.name)), 0)
+        self.assertEqual(client.restored, [1])
+
+    def preview(self, client):
+        with patch("builtins.print"):
+            self.assertEqual(asyncio.run(archive.archive(client, self.state, self.config, True, NOW)), 0)
+        return next(self.state.glob("report-*.json"))
+
+    def apply(self, client, plan, now=NOW):
+        with patch("builtins.print"):
+            return asyncio.run(archive.archive(client, self.state, self.config, now=now,
+                                               reviewed_plan=plan.name))
+
+    def test_live_archive_requires_review_and_applies_only_previewed_candidates(self):
+        client = FakeTelegram([dialog(1), dialog(2, None)])
+        with self.assertRaises(archive.ArchiveError):
+            asyncio.run(archive.archive(client, self.state, self.config, now=NOW))
+        self.assertEqual(client.edits, [])
+        self.assertEqual(client.deliveries, [])
+        plan = self.preview(client)
+        client.dialogs.append(dialog(3))
+        client.dialogs[1].date = RECENT
+        self.assertEqual(self.apply(client, plan), 0)
+        self.assertEqual(client.edits, [1])
+        report = client.deliveries[0][0]
+        self.assertEqual(report["reviewed_plan"], plan.name)
+        self.assertNotIn("verification", report)
+        with self.assertRaises(archive.ArchiveError):
+            self.apply(client, plan)
+
+    def test_stale_failed_wrong_account_and_future_plans_fail_before_mutation(self):
+        client = FakeTelegram([dialog(1)])
+        plan = self.preview(client)
+        original = archive.read_json(plan)
+        for change in ({"user_id": 100}, {"status": "failed"}, {"dry_run": False},
+                       {"started_at": (NOW - timedelta(days=2)).isoformat()},
+                       {"started_at": (NOW + timedelta(days=1)).isoformat()}):
+            archive.write_json(plan, {**original, **change})
+            with self.assertRaises(archive.ArchiveError):
+                self.apply(client, plan)
+        self.assertEqual(client.edits, [])
+        self.assertEqual(client.deliveries, [])
+
+    def test_archive_and_undo_are_separately_verified_and_undo_is_idempotent(self):
+        client = FakeTelegram([dialog(1), dialog(2)])
+        plan = self.preview(client)
+        self.assertEqual(self.apply(client, plan), 0)
+        report_path = next(path for path in self.state.glob("report-*.json") if path != plan)
+
+        def inspect(undo=False):
+            with patch("builtins.print"):
+                return asyncio.run(archive.inspect_archive(client, self.state, self.config,
+                                                          report_path.name, undo))
+
+        self.assertEqual(inspect(), 0)
+        client.restored.append(1)  # Telegram returned one chat to the inbox.
+        self.assertEqual(inspect(), 1)
+        self.assertEqual(archive.read_json(report_path)["verification"]["status"], "failed")
+        self.assertEqual(inspect(undo=True), 0)
+        self.assertEqual(client.restored, [1, 2])
+        self.assertEqual(inspect(undo=True), 0)
+        self.assertEqual(client.restored, [1, 2])
+        self.assertEqual(inspect(), 0)
+        self.assertEqual(archive.read_json(report_path)["verification"]["status"], "passed")
+
+    def test_undo_rejects_dry_run_and_wrong_account_and_report_path_traversal(self):
+        client = FakeTelegram([dialog(1)])
+        plan = self.preview(client)
+        for identifier in (plan.name, "../account.json", str(plan)):
+            with self.assertRaises(archive.ArchiveError):
+                asyncio.run(archive.inspect_archive(client, self.state, self.config, identifier, True))
+        self.apply(client, plan)
+        report_path = next(path for path in self.state.glob("report-*.json") if path != plan)
+        report = archive.read_json(report_path)
+        archive.write_json(report_path, {**report, "user_id": 100})
+        with self.assertRaises(archive.ArchiveError):
+            asyncio.run(archive.inspect_archive(client, self.state, self.config, report_path.name, True))
+        self.assertEqual(client.restored, [])
 
 
 if __name__ == "__main__":

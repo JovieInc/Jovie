@@ -8,8 +8,8 @@ import {
 } from '../conversation-intake.mjs';
 
 const request = {
-  title: 'Archive stale Telegram chats',
-  summary: 'Telegram cleanup was requested again.',
+  title: 'Archive stale dashboard chats',
+  summary: 'dashboard cleanup was requested again.',
   conversationReceipt: {
     id: 'conversation-20260727-4',
     url: 'https://example.test/conversations/20260727#4',
@@ -48,16 +48,83 @@ function client(issues) {
 }
 
 describe('conversation issue reconciliation', () => {
+  it('denies personal or mixed cleanup before tracker, prompt or dispatch packet construction', async () => {
+    const secrets = [
+      'b'.repeat(32),
+      '+1 (202) 555-0199',
+      '681'.repeat(2),
+      'local.session',
+    ];
+    const cases = [
+      { title: 'Archive my Telegram chats' },
+      { title: 'Cleanup Telegram inbox', classification: 'company' },
+      { title: 'Local request', classification: 'personal' },
+      { title: 'Company bug plus private task', classification: 'mixed' },
+      { title: 'Local request', externalization: 'denied' },
+      { title: 'Company incident', evidence: [{ api_hash: secrets[0] }] },
+      { title: 'Company incident', summary: `phone ${secrets[1]}` },
+      { title: 'Company incident', description: `login_code=${secrets[2]}` },
+      {
+        title: 'Company incident',
+        conversationReceipt: { url: `https://example.test/${secrets[3]}` },
+      },
+    ];
+    for (const input of cases) {
+      const calls = [];
+      const api = new Proxy(
+        {},
+        {
+          get: (_, key) => () => {
+            calls.push(key);
+            throw new Error('outbound call');
+          },
+        }
+      );
+      const result = await reconcileConversationRequest({
+        request: { ...input, privateContext: 'private-canary-omit-entirely' },
+        client: api,
+      });
+      assert.deepEqual(result, {
+        schema: 'conversation-issue-reconciliation/v1',
+        classification: 'personal',
+        externalization: 'denied',
+        dispatchAllowed: false,
+        disposition: 'local_auth_required',
+        mutation: 'none',
+      });
+      assert.deepEqual(calls, []);
+      for (const secret of secrets)
+        assert.ok(!JSON.stringify(result).includes(secret));
+      assert.ok(
+        !JSON.stringify(result).includes('private-canary-omit-entirely')
+      );
+    }
+  });
+
+  it('keeps company Telegram webhook repairs eligible for normal intake', async () => {
+    const api = client([]);
+    const result = await reconcileConversationRequest({
+      request: {
+        ...request,
+        title: 'Fix Telegram webhook retry handling',
+        summary: 'Webhook retries fail.',
+      },
+      client: api,
+    });
+    assert.equal(result.disposition, 'new_issue');
+    assert.equal(api.calls.creates.length, 1);
+  });
+
   it('normalizes wording and scores repeated intent highly', () => {
-    assert.deepEqual(normalizeIntent('Requested: archiving Telegram chats'), [
+    assert.deepEqual(normalizeIntent('Requested: archiving dashboard chats'), [
       'archiv',
       'chat',
-      'telegram',
+      'dashboard',
     ]);
     assert.ok(
       intentSimilarity(
-        'Archive stale Telegram chats',
-        'Missed Telegram chat archiving never completed despite 5 requests'
+        'Archive stale dashboard chats',
+        'Missed dashboard chat archiving never completed despite 5 requests'
       ) >= 0.82
     );
   });
@@ -68,7 +135,7 @@ describe('conversation issue reconciliation', () => {
         id: 'existing-id',
         identifier: 'JOV-4423',
         title:
-          'Missed Telegram chat archiving never completed despite requests',
+          'Missed dashboard chat archiving never completed despite requests',
         description: '',
         url: 'https://linear.app/jovie/issue/JOV-4423/existing',
         state: { name: 'Todo' },
@@ -102,7 +169,7 @@ describe('conversation issue reconciliation', () => {
       {
         id: 'existing-id',
         identifier: 'JOV-4423',
-        title: 'Archive stale Telegram chats',
+        title: 'Archive stale dashboard chats',
         url: 'https://linear.app/jovie/issue/JOV-4423/existing',
         state: { name: 'In Progress' },
         comments: {
@@ -153,7 +220,7 @@ describe('conversation issue reconciliation', () => {
       {
         id: 'candidate-id',
         identifier: 'JOV-4425',
-        title: 'Archive Telegram cleanup health',
+        title: 'Archive dashboard cleanup health',
         url: 'https://linear.app/jovie/issue/JOV-4425/candidate',
         state: { name: 'Triage' },
         comments: { nodes: [] },
