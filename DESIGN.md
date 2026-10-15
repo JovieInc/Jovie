@@ -133,9 +133,80 @@ Raw Tailwind color utilities (`text-black`, `bg-white`, `text-[#fff]`) are the r
 
 ### Enforcement
 
-A custom ESLint rule (`@jovie/no-hardcoded-theme-colors`, set to `warn`) flags these patterns at author time. A ratchet script (`pnpm --filter web lint:contrast-ratchet`) counts existing violations and fails CI if new ones are introduced.
+The design-system lint and debt gates below enforce tokens and shared component
+ownership. `error` means a lint error, failed assertion, or nonzero CLI exit;
+`warn` is advisory. Baselines are committed allowances, not a live inventory.
+All five raw-color contrast buckets are at **zero**: any new match fails.
+
+CI lanes (path-selected; a blocking failure prevents the required aggregate from passing):
+
+- **L** — [Source Validation](.github/workflows/source-validation.yml),
+  `pnpm --filter @jovie/web lint:eslint:changed` (author-time full check:
+  `pnpm --filter @jovie/web lint:eslint`).
+- **S** — `ci-fast` → Structural Contract (web), including
+  `pnpm --filter @jovie/web lint:contrast-ratchet` and the optical-grid tests.
+- **G** — Source Validation → `merge-group-unit-guards` on web/UI source PRs;
+  `ci-fast` → Merge-group unit guards on selected merge groups. Both run
+  `tests/unit/design-system` through Vitest.
+- **D** — `ci-fast` → Design governance enforcement, including
+  `lint:touch-target` and `lint:ui-feel`.
+- **I** — `ci-fast` → Design-system source identity ratchet,
+  `pnpm design:source-count-ratchet`.
+
+The commands and selectors live in [ci-fast-lanes.mjs](scripts/ci-fast-lanes.mjs).
+Rule severities come from [the web ESLint config](apps/web/eslint.config.js).
+Count baselines live in [the design-system test directory](apps/web/tests/unit/design-system/)
+unless linked below. Rows are sorted by gate name.
+
+| Gate | Severity | CI lane | Blocks? | Committed baseline |
+| --- | --- | --- | --- | --- |
+| `@jovie/no-hardcoded-theme-colors` | `error` | L | Yes | None (no grandfathered count) |
+| `@jovie/ui-feel` | `off` | L | No | None (enforced by the UI-feel ratchet below) |
+| `arbitrary-radius` | `error` | S + G | Yes | 31 occurrences; 15 files |
+| `arbitrary-values` | `error` | G + I | Yes | 2170 |
+| `component-family` | `error` | G | Yes | button=37; emptyState=6; entityHeader=1; palette=4; shell=21; status=9 |
+| `contrast (computed pairs)` | `error` | S + G | Yes | No count baseline; 4.5:1 normal text, 3:1 large text/UI |
+| `contrast (raw colors)` | `error` | S | Yes | arbitraryHex=0; bareBgBlack=0; bareBgWhite=0; bareTextBlack=0; bareTextWhite=0 |
+| `deprecated-button-alias` | `error` | G | Yes | 91 |
+| `linear-namespace` | `error` | G + I | Yes | 853 |
+| `shadcn/no-restyle` | `error` | L + G | Yes | 221 files; 3122 messages (grandfathered) |
+| `source-identity` | `error` | I | Yes | 2611 |
+| `spacing-scale (conservative)` | `error` | S + G | Yes | 654; armed=true; marketing=86; packages/ui=11; web-other=304; web-shell=253 |
+| `spacing-scale (strict)` | `warn` | S + G | No | 2310; armed=false; marketing=258; packages/ui=60; web-other=1126; web-shell=866 |
+| `touch-target` | `error` | D | Yes | 159 |
+| `ui-feel ratchet` | `error` | D | Yes | headingNeedsBalance=324; missingTabularNums=354; nonConcentricRadius=0; undersizedHitArea=84 |
+
+The [raw-color baseline](apps/web/contrast-ratchet.baseline.json) and
+[computed pair config](apps/web/contrast-pairs.config.json) cover separate
+checks. Computed contrast blocks failing resolvable pairs; unresolved pairs
+warn and skip unless `--strict` is supplied. A zero static baseline is not proof
+of rendered contrast on every screen.
+
+The radius detector is active in `concentric-radius-contract.test.ts`.
+Component-family has `WARN_ONLY = false` and also enforces the explicit
+EmptyState path allowlist. Spacing's strict inventory is report-only;
+conservative growth blocks, including per-family ceilings. The source-identity
+gate blocks new `file + rule + value` identities (including arbitrary CSS
+properties), even when total counts stay flat. It also checks the arbitrary-value
+and linear-namespace count ceilings. Lower count baselines in the same PR when
+removing debt; see each detector's shrink policy for merge-group behavior.
+
+The [no-restyle baseline](apps/web/tests/unit/design-system/shadcn-no-restyle.baseline.json)
+grants exact legacy paths a lint override; the changed-file baseline probe and
+unit ratchet still block growth. Test/story files and canonical UI internals
+have scoped rule exemptions in the ESLint config. The separate
+[touch-target](apps/web/touch-target-ratchet.baseline.json) and
+[UI-feel](apps/web/ui-feel-ratchet.baseline.json) baselines remain blocking even
+though the author-time `@jovie/ui-feel` rule is off.
+
+[enforcement-documentation.test.ts](apps/web/tests/unit/design-system/enforcement-documentation.test.ts)
+compares this table's ESLint severities with the effective config and its counts
+and spacing activation flags with the committed baselines. It runs in G and is
+selected by Source Validation's source-read guard for documentation/config edits.
+Update the table together with its sources; the test never rewrites allowances.
 
 To fix a violation:
+
 1. Replace with a semantic token (preferred), or
 2. Pair with a `dark:` counterpart (`text-black dark:text-white`), or
 3. Add `// eslint-disable-next-line @jovie/no-hardcoded-theme-colors -- <reason>` for intentional brand/brand-swatch exceptions.
