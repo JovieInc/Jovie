@@ -44,6 +44,42 @@ import {
   webCiContractTestsCommand,
 } from '../../ci-fast-lanes.mjs';
 
+it('selects writing readiness regressions and the evaluator coverage command', async () => {
+  const names = [
+    'CI_PRODUCT_LANES',
+    'CI_FAST_STRUCTURAL_PYTEST',
+    'CI_FAST_STRUCTURAL_WEB',
+    'CI_FAST_SKIP_STRUCTURAL',
+  ];
+  const previous = Object.fromEntries(
+    names.map(name => [name, process.env[name]])
+  );
+  try {
+    for (const name of names) delete process.env[name];
+    process.env.CI_PRODUCT_LANES = 'operations';
+    const commands = [];
+    await runStructural({
+      changedFileList: ['scripts/invariants/jev-writing-readiness.mjs'],
+      stop: () => false,
+      execute: command => {
+        commands.push(command);
+        return { code: 0, output: '' };
+      },
+    });
+    expect(
+      commands.some(command =>
+        command.includes('scripts/invariants/jev-writing-readiness.test.mjs')
+      )
+    ).toBe(true);
+    expect(commands).toContain('pnpm invariants:check');
+  } finally {
+    for (const [name, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  }
+});
+
 it('enforces lifecycle coverage through the real structural selector', async () => {
   // The coverage command is an operations-lane part. A merge group narrows
   // CI_PRODUCT_LANES to the diff (web-only for an e2e spec) and the structural

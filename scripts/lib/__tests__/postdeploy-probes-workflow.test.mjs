@@ -1,4 +1,12 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { runInNewContext } from 'node:vm';
@@ -22,6 +30,9 @@ const workflow = /** @type {{ jobs: Record<string, WorkflowJob> }} */ (
 );
 const trigger = workflow.jobs['resolve-target'].steps.find(
   step => step.id === 'trigger'
+);
+const target = workflow.jobs['resolve-target'].steps.find(
+  step => step.id === 'target'
 );
 const repository = 'JovieInc/Jovie';
 const sha = 'a'.repeat(40);
@@ -181,6 +192,179 @@ describe('automatic landed production probes (JOV-8081)', () => {
     expect(result.code).toBe(0);
     expect(result.shouldProbe).toBe('should_probe=true');
     expect(result.requests).toEqual([]);
+  });
+});
+
+// Exercise the complete target step with real git history and the real gh
+// returning the production incident's 403. Only Vercel's network is stubbed.
+async function resolveTarget({ deployed = 'ancestor', metadata = '' } = {}) {
+  const root = mkdtempSync(join(tmpdir(), 'postdeploy-target-'));
+  const remote = join(root, 'remote');
+  const workspace = join(root, 'workspace');
+  const bin = join(root, 'bin');
+  for (const dir of [remote, workspace, bin]) mkdirSync(dir);
+  const gitEnv = {
+    ...process.env,
+    GIT_CONFIG_GLOBAL: '/dev/null',
+    GIT_CONFIG_NOSYSTEM: '1',
+    GIT_AUTHOR_NAME: 'Probe test',
+    GIT_AUTHOR_EMAIL: 'probe@example.com',
+    GIT_COMMITTER_NAME: 'Probe test',
+    GIT_COMMITTER_EMAIL: 'probe@example.com',
+  };
+  const git = (...args) =>
+    execFileSync('git', args, {
+      cwd: remote,
+      env: gitEnv,
+      encoding: 'utf8',
+    }).trim();
+  const executable = (path, script) =>
+    writeFileSync(path, `#!/bin/sh\n${script}\n`, { mode: 0o755 });
+  try {
+    git('init', '-q', '-b', 'main');
+    git('commit', '--allow-empty', '-qm', 'ancestor');
+    const ancestor = git('rev-parse', 'HEAD');
+    git('commit', '--allow-empty', '-qm', 'tip');
+    const tip = git('rev-parse', 'HEAD');
+    git('checkout', '-q', '--orphan', 'foreign');
+    git('commit', '--allow-empty', '-qm', 'foreign');
+    const foreign = git('rev-parse', 'HEAD');
+    git('checkout', '-q', 'main');
+    let ambiguous = '';
+    if (deployed === 'ambiguous') {
+      // Find two real commit objects sharing a seven-character prefix, then
+      // make both ancestors of main. No fake git or prefix resolver is used.
+      const seen = new Map();
+      const tree = git('rev-parse', 'HEAD^{tree}');
+      for (let i = 0; i < 200_000; i += 1) {
+        const body = `tree ${tree}\nauthor Probe <probe@example.com> 1 +0000\ncommitter Probe <probe@example.com> 1 +0000\n\n${i}\n`;
+        const hash = createHash('sha1')
+          .update(`commit ${Buffer.byteLength(body)}\0${body}`)
+          .digest('hex');
+        const prefix = hash.slice(0, 7);
+        if (seen.has(prefix)) {
+          const parents = [seen.get(prefix), body].map(content => {
+            const file = join(root, 'commit');
+            writeFileSync(file, content);
+            return git('hash-object', '-t', 'commit', '-w', file);
+          });
+          const merge = git(
+            'commit-tree',
+            tree,
+            '-p',
+            parents[0],
+            '-p',
+            parents[1],
+            '-m',
+            'ambiguous parents'
+          );
+          git('update-ref', 'refs/heads/main', merge);
+          ambiguous = prefix;
+          break;
+        }
+        seen.set(prefix, body);
+      }
+      if (!ambiguous) throw new Error('could not create ambiguous fixture');
+    }
+    if (deployed === 'unreadable') git('branch', '-m', 'unavailable');
+    const identities = {
+      ambiguous,
+      ancestor: ancestor.slice(0, 7),
+      foreign,
+      full: ancestor,
+      malformed: 'not-a-sha',
+      missing: 'f'.repeat(40),
+      tip,
+      unreadable: tip,
+    };
+    const vercelBin = join(workspace, 'node_modules/.bin');
+    mkdirSync(vercelBin, { recursive: true });
+    const deployment = {
+      id: 'dpl_exact',
+      url: 'https://jovie-exact-jovie.vercel.app',
+      readyState: 'READY',
+      target: 'production',
+      commitSha: metadata,
+    };
+    executable(
+      join(vercelBin, 'vercel'),
+      `printf '%s' '${JSON.stringify(deployment)}'`
+    );
+    executable(
+      join(bin, 'node'),
+      `case "$2" in
+  resolve-deployment) printf '%s' '${JSON.stringify(deployment)}' ;;
+  discover-build-identity) printf '%s' '${JSON.stringify({ commitSha: identities[deployed] })}' ;;
+  *) exit 99 ;;
+esac`
+    );
+    const output = join(root, 'output');
+    const result = await runWithRealGh({
+      script: `cd "$FIXTURE_WORKSPACE"\n${target.run}`,
+      env: {
+        PATH: `${bin}:${process.env.PATH}`,
+        FIXTURE_WORKSPACE: workspace,
+        GITHUB_OUTPUT: output,
+        REPOSITORY: repository,
+        SHOULD_PROBE: 'true',
+        VERCEL_AUTOMATION_BYPASS_SECRET: 'fixture',
+        VERCEL_TOKEN: 'fixture',
+        VERCEL_ORG_ID: 'fixture',
+        VERCEL_PROJECT_ID: 'fixture',
+        GIT_CONFIG_GLOBAL: '/dev/null',
+        GIT_CONFIG_NOSYSTEM: '1',
+        GIT_CONFIG_COUNT: '1',
+        GIT_CONFIG_KEY_0: `url.file://${remote}.insteadOf`,
+        GIT_CONFIG_VALUE_0: `https://github.com/${repository}.git`,
+      },
+      route: () => ({
+        status: 403,
+        body: { message: 'API rate limit exceeded for installation.' },
+      }),
+    });
+    return {
+      ...result,
+      output: readFileSync(output, 'utf8'),
+      expectedSha: deployed === 'tip' ? tip : ancestor,
+    };
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+describe('landed production identity during GitHub quota exhaustion (JOV-8495)', () => {
+  it.each(['ancestor', 'full', 'tip'])(
+    'resolves a deployed %s on main without REST quota',
+    async deployed => {
+      const result = await resolveTarget({ deployed });
+      expect(result.code, result.stderr).toBe(0);
+      expect(result.output).toContain(`commit_sha=${result.expectedSha}\n`);
+      expect(result.output).toContain('deployment_id=dpl_exact\n');
+      expect(result.requests).toEqual([]);
+    }
+  );
+
+  it.each([
+    ['ambiguous', /ambiguous/],
+    ['foreign', /did not resolve uniquely|not an ancestor/],
+    ['missing', /did not resolve uniquely/],
+    ['malformed', /omitted a valid commit SHA/],
+    ['unreadable', /couldn't find remote ref/],
+  ])('fails closed for a %s deployed identity', async (deployed, error) => {
+    const result = await resolveTarget({ deployed });
+    expect(result.code).not.toBe(0);
+    expect(result.stderr + result.stdout).toMatch(error);
+    expect(result.output).not.toContain('deployment_id=dpl_exact');
+    expect(result.output).not.toContain(`commit_sha=${result.expectedSha}`);
+  });
+
+  it('fails closed when Vercel metadata disagrees with the served build', async () => {
+    const result = await resolveTarget({ metadata: 'b'.repeat(40) });
+    expect(result.code).not.toBe(0);
+    expect(result.stderr + result.stdout).toContain(
+      'Vercel list metadata disagrees'
+    );
+    expect(result.output).not.toContain('deployment_id=dpl_exact');
   });
 });
 
