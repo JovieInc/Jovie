@@ -170,7 +170,10 @@ function SignUpOauthErrorBanner({
   signInUrl: string;
 }>) {
   const searchParams = useSearchParams();
-  const oauthError = searchParams.get('oauth_error');
+  // Better Auth appends the provider error after AuthShell's fallback value.
+  const oauthError =
+    searchParams.getAll('error').filter(Boolean).at(-1) ||
+    searchParams.get('oauth_error');
   // Used to personalise the account_exists message when the conflicting
   // address is known (e.g. forwarded by SsoCallbackHandler). React escapes
   // all text content so no additional XSS sanitisation is required. #26
@@ -180,6 +183,7 @@ function SignUpOauthErrorBanner({
     if (!oauthError) return;
 
     const url = new URL(globalThis.location.href);
+    url.searchParams.delete('error');
     url.searchParams.delete('oauth_error');
     globalThis.history.replaceState(
       globalThis.history.state,
