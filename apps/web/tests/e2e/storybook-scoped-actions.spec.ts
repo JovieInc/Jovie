@@ -31,7 +31,7 @@ test.describe('scoped action input', () => {
     await expect(target).toHaveText('No navigation', { timeout: 180_000 });
     await page.getByRole('option').click();
     await expect(target).toHaveText(href ?? 'missing');
-    await testInfo.attach('jovie-scoped-navigation', {
+    await testInfo.attach('jovie-scoped-navigation.png', {
       body: await page.screenshot(),
       contentType: 'image/png',
     });
@@ -124,7 +124,7 @@ test.describe('scoped action input', () => {
       bubbles: true,
     });
     expect(await readDecisions()).toHaveLength(0);
-    await testInfo.attach('ovie-pending-review', {
+    await testInfo.attach('ovie-pending-review.png', {
       body: await page.screenshot(),
       contentType: 'image/png',
     });
