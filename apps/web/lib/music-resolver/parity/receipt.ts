@@ -1,6 +1,7 @@
-import { execFileSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { execFile } from 'node:child_process';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { promisify } from 'node:util';
 import { CHARTMETRIC_SCHEMA_SNAPSHOT } from './chartmetric-endpoints';
 import {
   PARITY_TARGET_ROW_COUNT,
@@ -10,10 +11,17 @@ import {
 } from './target';
 import type { ScoreReport } from './types';
 
-export function cleanCandidateSha(repoRoot: string): string {
-  const git = (...args: string[]) =>
-    execFileSync('git', args, { cwd: repoRoot, encoding: 'utf8' }).trim();
-  if (git('status', '--porcelain', '--untracked-files=all')) {
+const execFileAsync = promisify(execFile);
+
+export async function cleanCandidateSha(repoRoot: string): Promise<string> {
+  const git = async (...args: string[]) => {
+    const { stdout } = await execFileAsync('git', args, {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    });
+    return stdout.trim();
+  };
+  if (await git('status', '--porcelain', '--untracked-files=all')) {
     throw new Error('parity receipts require a clean candidate worktree');
   }
   return git('rev-parse', 'HEAD');
@@ -64,13 +72,13 @@ export function createEvaluationReceipt(input: {
 }
 
 /** Content-addressed, exclusive creation: an existing receipt is never replaced. */
-export function writeEvaluationReceipt(
+export async function writeEvaluationReceipt(
   directory: string,
   receipt: ReturnType<typeof createEvaluationReceipt>
-): string {
+): Promise<string> {
   const bytes = `${JSON.stringify(receipt, null, 2)}\n`;
-  mkdirSync(directory, { recursive: true });
+  await mkdir(directory, { recursive: true });
   const file = join(directory, `${sha256(bytes)}.json`);
-  writeFileSync(file, bytes, { flag: 'wx', mode: 0o444 });
+  await writeFile(file, bytes, { flag: 'wx', mode: 0o444 });
   return file;
 }

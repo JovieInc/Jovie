@@ -30,13 +30,13 @@ async function main(): Promise<void> {
   ) {
     throw new Error('usage: parity:music-resolver [--receipt-dir DIRECTORY]');
   }
-  const candidateSha = cleanCandidateSha(repoRoot);
+  const candidateSha = await cleanCandidateSha(repoRoot);
   const startedAt = new Date().toISOString();
   const fixtureBytes = readFileSync(
     resolve(repoRoot, 'apps/web/lib/music-resolver/parity/probes.ts')
   );
   const report = await runParityEvaluation();
-  if (cleanCandidateSha(repoRoot) !== candidateSha) {
+  if ((await cleanCandidateSha(repoRoot)) !== candidateSha) {
     throw new Error('candidate changed during parity evaluation');
   }
   const receipt = createEvaluationReceipt({
@@ -47,7 +47,7 @@ async function main(): Promise<void> {
     report,
   });
   const receiptFile = args[1]
-    ? writeEvaluationReceipt(resolve(args[1]), receipt)
+    ? await writeEvaluationReceipt(resolve(args[1]), receipt)
     : null;
   const summary = {
     receipt,
