@@ -13,7 +13,10 @@ import {
   transitionFindings,
 } from './browser-owned-input.mjs';
 import { auditScreens, remediationPlans } from './screen-audit.mjs';
-import { evaluateScreenProof } from './screen-certification.mjs';
+import {
+  evaluateScreenProof,
+  SCREEN_REGISTRY,
+} from './screen-certification.mjs';
 
 const HEAD = 'a'.repeat(40);
 const screenId = 'web.public-profile';
@@ -583,4 +586,51 @@ test('web auth device cells follow fields the auth routes actually host', () => 
   assert.equal(plan.description.includes('auth-passkey/'), false);
   assert.equal(plan.description.includes('auth-email/'), true);
   assert.equal(plan.description.includes('auth-otp/'), true);
+});
+
+const HOSTED_TEL_FIELD =
+  /(?:type|autoComplete|autocomplete|inputMode|inputmode)\s*=\s*['"]tel['"]/;
+
+test('settings shell owes account-contact cells only when it hosts email and tel', () => {
+  const screen = SCREEN_REGISTRY.find(entry => entry.id === 'web.settings');
+  assert.ok(screen);
+  const sources = screen.sources.map(path => readFileSync(path, 'utf8'));
+  const hosted =
+    sources.some(source => HOSTED_EMAIL_FIELD.test(source)) &&
+    sources.some(source => HOSTED_TEL_FIELD.test(source));
+  const bound = INPUT_MATRIX.journeys.some(
+    journey =>
+      journey.id === 'account-contact' &&
+      journey.screens.includes('web.settings')
+  );
+  assert.equal(bound, hosted);
+  const accountContact = browserInputFindings(undefined, {
+    screenId: 'web.settings',
+    headSha: HEAD,
+  }).filter(finding => finding.includes('account-contact/'));
+  if (hosted) {
+    assert.equal(accountContact.length, 16);
+    assert.ok(accountContact.every(isMissingDeviceEvidence));
+    return;
+  }
+  assert.deepEqual(accountContact, []);
+  assert.equal(
+    inputCells('web.settings').some(cell =>
+      cell.id.startsWith('account-contact/')
+    ),
+    false
+  );
+  const settings = auditScreens({
+    registry: [screen],
+    headSha: HEAD,
+  });
+  assert.equal(settings.screens[0].producer, 'none');
+  assert.equal(settings.screens[0].verdict, 'uncovered');
+  assert.deepEqual(settings.screens[0].findings, []);
+  assert.equal(
+    remediationPlans(settings).some(
+      plan => plan.fingerprint === 'screen-audit:web.settings'
+    ),
+    false
+  );
 });
