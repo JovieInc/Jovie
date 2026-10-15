@@ -1123,6 +1123,17 @@ nodes:
       - repository_dispatch
     terminalReceipt: job:autofix
     jobCount: 1
+  - name: Shipping Origin Receipt
+    path: .github/workflows/shipping-origin.yml
+    active: true
+    category: telemetry-aggregation
+    authoritativeProducer: Delivery Control Receipts
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:receipt
+    jobCount: 1
   - name: Shipping SLO Ratchet
     path: .github/workflows/shipping-slo.yml
     active: true
