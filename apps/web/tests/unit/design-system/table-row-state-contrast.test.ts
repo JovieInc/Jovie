@@ -184,6 +184,14 @@ describe('table row-state contrast (JOV-7861)', () => {
     expect(ratio(parseRgba('#6a7078'), selected)).toBeLessThan(AA);
   });
 
+  it('flags the pre-fix dark muted text when a done row fades it to 75%', () => {
+    // Product Screenshots on 2b36121b: text-tertiary-token #8f95a0 at
+    // opacity 0.75 over the shell canvas composites to #6f747d (4.01:1).
+    const canvas = parseRgba('#101114');
+    const faded = over([143 / 255, 149 / 255, 160 / 255, 0.75], canvas);
+    expect(ratio(faded, canvas)).toBeLessThan(AA);
+  });
+
   for (const theme of themes()) {
     it(`keeps tail text at AA on hover and selected rows (${theme.name})`, () => {
       const failures: string[] = [];
@@ -204,4 +212,23 @@ describe('table row-state contrast (JOV-7861)', () => {
       expect(failures).toEqual([]);
     });
   }
+
+  it('keeps done-row text at AA when the row fades to 75% on the shell canvas', () => {
+    const frame = themes().find(theme => theme.name === 'dark app frame');
+    if (!frame) throw new Error('missing dark app frame theme');
+    const canvas = color('--app-shell-content-surface', frame.table);
+    const failures: string[] = [];
+    for (const text of [
+      '--color-text-secondary-token',
+      '--color-text-tertiary-token',
+    ] as const) {
+      const ink = color(text, frame.table);
+      const faded = over([ink[0], ink[1], ink[2], 0.75], canvas);
+      const value = ratio(faded, canvas);
+      if (value < AA) {
+        failures.push(`${text} at opacity 0.75: ${value.toFixed(2)}:1`);
+      }
+    }
+    expect(failures).toEqual([]);
+  });
 });

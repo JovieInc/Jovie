@@ -379,7 +379,7 @@ prior anchors without a second theme provider).
 | Floating | `#232427` | `--color-bg-surface-3` | Modals, tooltips |
 | Text primary | `#F5F7FB` | `--color-text-primary-token` | Body / headings |
 | Text secondary | `#A0A5AF` | `--color-text-secondary-token` | Labels |
-| Text muted | `#8F95A0` | `--color-text-tertiary-token` | Meta |
+| Text muted | `#9DA2AC` | `--color-text-tertiary-token` | Meta |
 | Text tertiary | `#8C939E` | `--color-text-quaternary-token` | Placeholders |
 | Text disabled | `#525D75` | `--color-text-disabled-token` | Disabled |
 | Text inverse | `#020307` | `--linear-text-inverse` | On light CTAs |
