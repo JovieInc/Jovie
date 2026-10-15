@@ -301,7 +301,8 @@ exit 0
     const landed = runFetch();
     expect(landed.result.status, landed.result.stderr).toBe(0);
     expect(landed.calls).toContain(
-      'fetch --filter=blob:limit=1g --no-tags --depth=2 origin ' + 'a'.repeat(40)
+      'fetch --filter=blob:limit=1g --no-tags --depth=2 origin ' +
+        'a'.repeat(40)
     );
     expect(landed.calls).not.toContain('--depth=64');
     expect(landed.calls).not.toContain('blob:none');
