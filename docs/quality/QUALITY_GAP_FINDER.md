@@ -7,7 +7,10 @@ Workflow: [`.github/workflows/quality-gap-finder.yml`](../../.github/workflows/q
 The finder looks for missing tests, guardrails, and invariants and proposes
 them as Linear issues. It is deterministic and model-free. One run is one
 filesystem walk, one `git log`, and at most four Linear queries. That makes it
-cheap enough to run on every relevant event. It has no clock.
+cheap enough to run on every relevant event. It has no clock. Scheduled handler
+invocations are rejected before collection or writes. Shipping SLO no longer
+runs post-mortem learning. The [learning delivery contract](EVENT_DRIVEN_LEARNING.md)
+distinguishes this deterministic owner from pending shared-compiler acceptance.
 
 ## When it runs
 

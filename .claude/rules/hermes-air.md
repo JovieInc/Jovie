@@ -2,11 +2,11 @@
 paths: ["docs/HERMES_AIR.md"]
 ---
 
-# Hermes on the MacBook Air (Always-On Orchestration Node)
+# MacBook Air lane and retired Hermes history
 
 > Symphony is the shipping lanes harness (`scripts/lanes/README.md`). The Symphony Elixir control plane is retired from Jovie; paths written `symphony-control/...` live in the private repo JovieInc/symphony-control (full history).
 
-Operating contract for the always-on Hermes gateway running on the dedicated 16 GB MacBook Air. This file is the canonical reference; the operator runbook lives at `docs/HERMES_AIR.md`.
+Current Mac lane contract and historical Hermes reference for the dedicated 16 GB MacBook Air. The operator reference lives at `docs/HERMES_AIR.md`.
 
 ## Current Role (2026-09-29): Mac Lane
 
@@ -16,9 +16,14 @@ Hermes was retired as Summer's runtime on 2026-09-05 and its gateway is unloaded
 - **Nightly Mac dogfood verifier:** a local launchd job running a headless Claude Code session on a clean `origin/main` worktree. It exercises the iOS simulator build, the macOS apps, and read-only production web. It files at most three `mac-dogfood` Linear issues per night and never edits, commits, pushes or merges.
 - **gbrain client only.** The Air uses the ops Mac server over Tailscale with its own bearer token. It runs no gbrain server against the shared database.
 
-The Hermes sections below describe the retired gateway and are kept for reactivation. The private Voice Memo invariants still apply to anything on the Air.
+The Hermes sections below are **superseded historical evidence**, not runtime
+instructions or reactivation authority. Neither this file, the old operator
+runbook, nor retired Fable/OpenClaw material authorizes a gateway, scheduler,
+learning job, or full dispatch-log sweep. A new runtime decision requires fresh
+source and runtime evidence under the current fleet contract. The private Voice
+Memo invariants still apply to anything on the Air.
 
-## What Hermes-Air IS
+## Historical gateway role
 
 A dedicated orchestration node that:
 
@@ -28,9 +33,9 @@ A dedicated orchestration node that:
 - Segments dumps into `memory` (gbrain only), `issue` (Linear), and `task` (sub-agent dispatch).
 - Files exactly one Linear issue for engineering/product/ops work using the canonical follow-up shape from `.claude/rules/linear.md` via `symphony-control/lib/tracker-client.ts`. Linear failures queue a Linear retry and fail closed; there is no GitHub fallback or dual-write.
 - Routes non-engineering tasks (calendar moves, Airtable updates, emails) to the right sub-agent which calls the appropriate MCP.
-- Runs deterministic cron jobs: PR-stuck monitor, CI failure triage, HUD refresh, daily briefing, cost monitor, deterministic-tracker (self-improvement), free-model health.
+- Runs deterministic cron jobs: PR-stuck monitor, CI failure triage, HUD refresh, daily briefing, cost monitor, free-model health.
 
-## What Hermes-Air IS NOT
+## Historical gateway boundaries
 
 - **NOT a code author.** No commits, pushes, PR authoring or PR merges from unattended jobs on this node. The Mac-lane runner and dogfood verifier above may build and test in isolated worktrees but do not change code. Interactive operator sessions follow the normal repo rules.
 - **NOT a GitHub Issue dispatcher.** Engineering intake is Linear-only and selection belongs to Linear-backed Symphony. The GitHub AI dispatcher/orchestrator and Pro codex issue shipper are retired.
@@ -86,16 +91,18 @@ The legacy `symphony-control/jobs/voice-memo-ingest.ts` watcher is not the activ
 
 If Linear is unavailable, rate-limited, or rejects the mutation, queue a Telegram-derived or already-sanitized intent in `~/.hermes/state/linear-queue.jsonl` for operator inspection and dispatch nothing. Never fall back to GitHub. A voice-derived proposal remains only in the private voice store and may be retried after service recovery without copying its raw memo or transcript into shared gbrain or the queue.
 
-## Self-Improvement Loop
+## Superseded learning loop
 
-`deterministic-tracker.ts` runs nightly:
+The nightly `deterministic-tracker.ts` dispatch-log clustering loop is retired.
+Do not reinstall it, schedule it, or sweep `~/.hermes/logs/dispatch.jsonl` for
+learning. Historical cluster counts and model-cost claims grant no authority.
 
-- Reads Hermes dispatch log (`~/.hermes/logs/dispatch.jsonl`).
-- Clusters intents by shape (similar input → similar action).
-- For any cluster firing ≥5 times in a 30-day window, files exactly one Linear issue: "Replace LLM-driven path X with deterministic script."
-- Linear-backed Symphony may pick up the issue under the normal ownership contract.
-
-This is how Hermes-Air keeps trending toward $0 model calls over time.
+Learning reconsideration follows delivered terminal/exception evidence, a
+confidence/value threshold crossing, a source revision, or a relevant pending
+job through existing evidence owners. Repeated unchanged evidence does not
+create another admission. See the [event-driven learning contract](../../docs/quality/EVENT_DRIVEN_LEARNING.md)
+for current source boundaries and uncommissioned dependencies. The Mac runner,
+dogfood verifier, monitoring, and release gates retain their existing owners.
 
 ## Cost Contract
 
