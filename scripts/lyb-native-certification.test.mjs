@@ -1,5 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import {
+  END,
+  expectedExposure,
+  exposureEvidence,
+  START,
+} from '../packages/release-channel-contracts/test-fixtures/dogfood-exposure.ts';
 import { certifyNativeReceipt, SCHEMA } from './lyb-native-certification.mjs';
 
 const routeTest =
@@ -78,6 +84,47 @@ function receipt() {
     infrastructureSkip: false,
   };
 }
+
+test('native exposure requires installed identity, real captures and no fixture overrides', () => {
+  const expected = expectedExposure('lyb');
+  const scope = { ...manifest(), expectedExposure: expected };
+  const native = {
+    ...receipt(),
+    startedAt: START,
+    completedAt: END,
+    configuration: { name: 'Release', flags: [] },
+    exposure: exposureEvidence(expected),
+  };
+  assert.equal(certifyNativeReceipt(scope, native).verdict, 'PASS');
+  assert.equal(
+    certifyNativeReceipt(scope, { ...native, exposure: undefined }).verdict,
+    'UNKNOWN_CONFIGURATION'
+  );
+  assert.equal(
+    certifyNativeReceipt(scope, {
+      ...native,
+      build: { ...native.build, installedGitSha: 'b'.repeat(40) },
+    }).verdict,
+    'BLOCKED_BUILD'
+  );
+  assert.equal(
+    certifyNativeReceipt(scope, { ...native, captures: [] }).verdict,
+    'BLOCKED_EXPOSURE'
+  );
+  assert.equal(
+    certifyNativeReceipt(scope, {
+      ...native,
+      configuration: receipt().configuration,
+    }).verdict,
+    'BLOCKED_EXPOSURE'
+  );
+  const changed = structuredClone(native);
+  changed.exposure.observations[1].configuration.generation = 'next';
+  assert.equal(
+    certifyNativeReceipt(scope, changed).verdict,
+    'UNKNOWN_CONFIGURATION'
+  );
+});
 
 test('certifies a changed-path installed-build replay with exact xcresult records', () => {
   const result = certifyNativeReceipt(manifest(), receipt());
