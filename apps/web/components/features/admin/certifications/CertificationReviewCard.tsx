@@ -18,7 +18,7 @@ export function CertificationReviewCard({
 }) {
   return (
     <div className='space-y-3' data-testid='certification-review-card'>
-      <h3 className='flex min-w-0 items-center gap-2'>
+      <h3 className='flex min-w-0 items-center gap-2 text-balance'>
         <CertificationStateGlyph state={row.state} />
         <CertificationIdentity row={row} />
       </h3>
