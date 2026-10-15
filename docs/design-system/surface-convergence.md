@@ -77,8 +77,8 @@ and refresh evidence as each bounded migration lands. Never invent a calendar ET
 
 Pricing already uses `PublicPageShell`, `MarketingHero`, `MarketingContainer`,
 `PricingRecipeBody` and offer-truth data. JOV-8097 removes the minimal-footer
-route exception, preserves its page-owned closing CTA, and lets the shared
-comparison component wrap the longer Artist Presence heading on mobile.
+route exception and preserves its page-owned closing CTA. The shared comparison
+keeps Artist Presence on one line using the canonical 40% feature column on mobile.
 Prices, access intent, JSON-LD and checkout destinations retain their owners.
 
 The static body/footer has anonymous idle, hydrated, narrow/wide and reduced-motion

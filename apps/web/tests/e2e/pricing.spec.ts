@@ -166,6 +166,14 @@ test.describe('Pricing Page', () => {
                 }
                 const range = document.createRange();
                 range.selectNodeContents(node);
+                if (
+                  cell.closest('thead') &&
+                  range.getClientRects().length > 1
+                ) {
+                  failures.push(
+                    `Wrapped column heading: ${node.textContent.trim()}`
+                  );
+                }
                 for (const ink of range.getClientRects()) {
                   if (
                     ink.left < bounds.left - 1 ||

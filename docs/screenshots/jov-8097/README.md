@@ -8,7 +8,8 @@ This is local source/browser evidence, not a deployment receipt.
 
 | Evidence | Result |
 | --- | --- |
-| [Mobile, 390px](pricing-390.png) | Reviewed: full footer, wrapped comparison heading, no horizontal overflow |
+| [Mobile, 320px](pricing-320.png) | Reviewed: complete one-line plan heading, wrapped feature labels, no horizontal overflow |
+| [Mobile, 390px](pricing-390.png) | Reviewed: full footer, one-line comparison heading, no horizontal overflow |
 | [Tablet, 768px](pricing-768.png) | Reviewed: shared grid, header and full footer |
 | [Desktop, 1440px](pricing-1440.png) | Reviewed: shared shell, three plan cards, one closing CTA |
 | Pricing Playwright suite | 11 passed, including setup; selection at 320–1440px, both motion preferences, keyboard, checkout links, redirect attribution |
@@ -18,7 +19,15 @@ This is local source/browser evidence, not a deployment receipt.
 
 The footer regression test failed on the original minimal variant. The existing
 painted-text test caught Artist Presence overflow at 320px; the shared comparison
-heading now wraps. Existing tier-name, keyboard typeahead and consent-logo test
-expectations were brought into line with current offer/permission registries.
+heading now stays on one line with the shared 40% feature-column width. Existing
+tier-name, keyboard typeahead and consent-logo test expectations were brought into
+line with current offer/permission registries.
 Pricing enters [JOV-8101](https://linear.app/jovie/issue/JOV-8101) for ongoing
 perceptual refinement. Full-footer and theme flags retain their shared behavior.
+
+PR #21801 gate repair: the component assertion and a browser text-range check
+both failed on the original wrapping heading. After restoring `whitespace-nowrap`
+and removing the mobile 60% feature-column override, all 11 Pricing Playwright
+tests pass, including 320–1440px, both motion preferences, plan changes, keyboard,
+footer accessibility and stable geometry. Captures and the census digest were
+renewed after this run. The locked column-heading invariant is unchanged.

@@ -353,13 +353,13 @@
         "apps/web/components/site/MarketingHeader.tsx",
         "apps/web/components/site/PublicPageShell.tsx"
       ],
-      "divergence": "No material local shell/footer fork; shared comparison heading wraps on mobile.",
+      "divergence": "No material local shell/footer fork; shared comparison column headings stay on one line on mobile.",
       "remainingScope": "Certified local source; continuous perceptual refinement is owned by JOV-8101.",
       "evidence": {
         "kind": "certification",
-        "at": "2026-10-15T04:43:44Z",
+        "at": "2026-10-15T08:24:03Z",
         "ref": "docs/screenshots/jov-8097/README.md",
-        "sourceDigest": "4ded7e09a29c952033981227426e9fa5ba506a84ddecef5cea9aecf366e2cc1e"
+        "sourceDigest": "e0d583b1c9d2a8979b644a97b972b919181b49c8906a7968ac44906dbc68439b"
       },
       "sources": ["apps/web/app/(marketing)/pricing/page.tsx"]
     },
