@@ -22,8 +22,8 @@ concurrency:
   # non-member mid-test. cancel-in-progress stays false so the active run
   # finishes and reports failure or success. GitHub still cancels the
   # previously pending run when a newer push queues, leaving one successor.
-  # A schedule is intentionally absent: execution follows changed evidence,
-  # and a cron would fail the frozen-schedule gate.
+  # No clock trigger: execution follows changed evidence, and a cron would
+  # fail the frozen clock gate.
   group: e2e-full-matrix-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: false
 
