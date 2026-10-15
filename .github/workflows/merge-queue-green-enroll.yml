@@ -14,7 +14,9 @@ name: Merge Queue Green Enroll
 # Enqueues open, non-draft, same-repo PRs into main whose required checks are
 # green with no conflicts (mergeStateStatus CLEAN, HAS_HOOKS or UNSTABLE: an
 # UNSTABLE head only has a non-required check pending or red, which the
-# ruleset does not gate on), that carry no hold/gated/incident label. GitHub
+# ruleset does not gate on), that carry no hold/gated/incident label. Green
+# enroll clears a stale lane-fix-red once that head is required-green, then
+# admits it; a red head keeps the label. GitHub
 # recomputes mergeability lazily, so a read right after main moves returns
 # UNKNOWN; the controller re-reads it briefly instead of dropping the wake. It runs when a required-check workflow finishes on a PR, or a PR loses
 # a hold label, plus a reconciliation sweep on every push to main: a queue
@@ -188,17 +190,22 @@ jobs:
             const failurePolicy = await import(pathToFileURL(
               `${process.env.GITHUB_WORKSPACE}/scripts/merge-group-failure-hold.mjs`
             ));
-            // Single source: scripts/lib/admission-hold-labels.json (stop labels plus
-            // queue-poison, which the lanes add after two ejections and remove with their fix).
+            // Single source: scripts/lib/admission-hold-labels.json. Stop labels
+            // and queue-poison skip the sweep. lane-fix-red is a machine block:
+            // it still blocks admission, but a required-green head is cleared
+            // below before the eligibility check so a stale label cannot strand it.
             const holdLabels = JSON.parse(require('node:fs').readFileSync(
               `${process.env.GITHUB_WORKSPACE}/scripts/lib/admission-hold-labels.json`, 'utf8'
             ));
-            const BLOCKING = new Set([...holdLabels.stopHoldLabels, holdLabels.queuePoisonLabel]);
+            const PREFILTER = new Set([...holdLabels.stopHoldLabels, holdLabels.queuePoisonLabel]);
+            const BLOCKING = new Set([...PREFILTER, ...holdLabels.machineBlockLabels]);
             const BREAKER_LABEL = 'queue-breaker';
             if (BLOCKING.size < 2) throw new Error('admission hold labels are unreadable');
             // Required checks green and no conflicts. UNSTABLE only adds a
             // non-required pending/red context (e.g. lane execution receipts).
             const ADMISSIBLE = new Set(['CLEAN', 'HAS_HOOKS', 'UNSTABLE']);
+            const laneFixRed = current => (current?.labels?.nodes || []).some(
+              label => String(label?.name || '').toLowerCase() === 'lane-fix-red');
             const retryMs = Math.max(0, Number(process.env.MERGE_STATE_RETRY_MS ?? 3000) || 0);
             const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
             const { owner, repo } = context.repo;
@@ -282,7 +289,7 @@ jobs:
             const overBudget = () => sweep && Date.now() - startedAt > budgetMs;
             const ownCandidate = candidate =>
               !candidate.draft && candidate.head.repo?.full_name === `${owner}/${repo}` &&
-              !candidate.labels.some(l => BLOCKING.has(l.name.toLowerCase()));
+              !candidate.labels.some(l => PREFILTER.has(l.name.toLowerCase()));
             // Read one current PR. The roster never authorizes enqueue.
             const readPr = async number => (await github.graphql(`
                 query($owner: String!, $repo: String!, $number: Int!) {
@@ -352,6 +359,26 @@ jobs:
               if (!pr || pr.mergeStateStatus === 'UNKNOWN') pr = await readCurrent();
               for (let attempt = 1; !sweep && pr?.mergeStateStatus === 'UNKNOWN' && attempt <= 2; attempt += 1) {
                 await sleep(retryMs * attempt);
+                pr = await readCurrent();
+              }
+              // A stale lane-fix-red from an older red head must not strand a
+              // head whose required checks are now green. A red (BLOCKED) head
+              // keeps the label. Stop labels and queue-poison are never cleared.
+              if (pr && pr.state === 'OPEN' && !pr.isDraft &&
+                  pr.labels?.pageInfo?.hasNextPage === false &&
+                  ADMISSIBLE.has(pr.mergeStateStatus) && laneFixRed(pr)) {
+                if (process.env.DRY_RUN === 'true') {
+                  core.notice(`[dry run] would clear stale lane-fix-red on #${pr.number}`);
+                } else {
+                  try {
+                    await github.rest.issues.removeLabel({
+                      owner, repo, issue_number: pr.number, name: 'lane-fix-red',
+                    });
+                    core.notice(`CLEARED stale lane-fix-red on #${pr.number}: required checks green`);
+                  } catch (error) {
+                    core.warning(`#${pr.number} lane-fix-red not cleared: ${error.message}`);
+                  }
+                }
                 pr = await readCurrent();
               }
               if (!eligible(pr)) {
@@ -645,7 +672,7 @@ jobs:
     if: >-
       github.event_name == 'pull_request_target' &&
       github.event.action == 'labeled' &&
-      contains(fromJSON('["hold","gated","incident","do-not-merge","tim-hold","tim:hold","hold:tim","queue-deferred","queue-poison"]'), github.event.label.name)
+      contains(fromJSON('["hold","gated","incident","do-not-merge","tim-hold","tim:hold","hold:tim","queue-deferred","queue-poison","lane-fix-red"]'), github.event.label.name)
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions: {}
@@ -669,7 +696,7 @@ jobs:
             const sourceHead = context.payload.pull_request?.head?.sha;
             const rawLabel = context.payload.label?.name;
             const label = typeof rawLabel === 'string' ? rawLabel.toLowerCase() : null;
-            const blocking = new Set(['hold', 'gated', 'incident', 'do-not-merge', 'tim-hold', 'tim:hold', 'hold:tim', 'queue-deferred', 'queue-poison']);
+            const blocking = new Set(['hold', 'gated', 'incident', 'do-not-merge', 'tim-hold', 'tim:hold', 'hold:tim', 'queue-deferred', 'queue-poison', 'lane-fix-red']);
             if (!Number.isSafeInteger(number) || number <= 0 ||
                 typeof sourceHead !== 'string' || !/^[a-f0-9]{40}$/.test(sourceHead) || !blocking.has(label)) {
               core.info('Ignoring an incomplete blocking-label event');

@@ -6,8 +6,10 @@
 // Stop labels are explicit intent from a person or agent. Each one is governed
 // by the hold contract (scripts/hold-contract.mjs, jovie-hold/v1): it needs a
 // receipt naming an owner and a machine-checkable release, or it is removed
-// after the ownerless grace period. `queue-poison` is machine state written by
-// the lanes and removed by their fix push.
+// after the ownerless grace period. `queue-poison` and `machineBlockLabels`
+// (`lane-fix-red`) are machine state, not hold-contract labels. Green enroll
+// removes `lane-fix-red` once the current head is required-green, then admits
+// that head. A red head keeps the label.
 //
 // Workflow `if:` expressions and the checkout-free auto-merge enable step
 // cannot read the file, so they repeat the list;
@@ -28,7 +30,15 @@ export function parseHoldLabels(text) {
     !raw.stopHoldLabels.every(isLabel) ||
     new Set(raw.stopHoldLabels).size !== raw.stopHoldLabels.length ||
     !isLabel(raw.queuePoisonLabel) ||
-    raw.stopHoldLabels.includes(raw.queuePoisonLabel)
+    raw.stopHoldLabels.includes(raw.queuePoisonLabel) ||
+    !Array.isArray(raw.machineBlockLabels) ||
+    raw.machineBlockLabels.length === 0 ||
+    !raw.machineBlockLabels.every(isLabel) ||
+    new Set(raw.machineBlockLabels).size !== raw.machineBlockLabels.length ||
+    raw.machineBlockLabels.some(
+      label =>
+        raw.stopHoldLabels.includes(label) || label === raw.queuePoisonLabel
+    )
   ) {
     throw new Error(`admission-hold-labels.json is not ${HOLD_LABELS_SCHEMA}`);
   }
@@ -43,8 +53,13 @@ export const STOP_HOLD_LABELS = Object.freeze([...labels.stopHoldLabels]);
 
 export const QUEUE_POISON_LABEL = labels.queuePoisonLabel;
 
+export const MACHINE_BLOCK_LABELS = Object.freeze([
+  ...labels.machineBlockLabels,
+]);
+
 /** Labels that keep a PR out of the merge queue and out of auto-merge. */
 export const ADMISSION_BLOCKING_LABELS = Object.freeze([
   ...STOP_HOLD_LABELS,
   QUEUE_POISON_LABEL,
+  ...MACHINE_BLOCK_LABELS,
 ]);
