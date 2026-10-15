@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  parseLsTreeLong,
   parseNumstatZ,
   readLocalMergeGroupEvidence,
 } from '../merge-group-local-evidence.mjs';
@@ -22,6 +23,18 @@ describe('local merge-group size evidence', () => {
       { filename: 'new.ts', additions: 0, deletions: 0 },
     ]);
     expect(parseNumstatZ('nope')).toBeNull();
+    expect(
+      parseLsTreeLong(
+        '100644 blob ' +
+          'a'.repeat(40) +
+          '       8\ta.ts\n100755 blob ' +
+          'b'.repeat(40) +
+          '       2\tb.ts\n120000 blob ' +
+          'c'.repeat(40) +
+          '       4\tlink\n'
+      )
+    ).toEqual({ bytes: 10, files: 2 });
+    expect(parseLsTreeLong('not a tree row')).toBeNull();
   });
 
   it('counts the checkout diff and ignores a commit GitHub did not create', () => {
@@ -57,6 +70,7 @@ describe('local merge-group size evidence', () => {
         { filename: 'a.ts', additions: 1, deletions: 0 },
         { filename: 'b.ts', additions: 1, deletions: 0 },
       ]);
+      expect(evidence.tracked).toEqual({ bytes: 10, files: 2 });
       expect(
         readLocalMergeGroupEvidence({
           baseSha: '1'.repeat(40),
