@@ -183,14 +183,15 @@ export function OnboardingShell({
       testMode={turnstileTestMode}
     />
   );
+  const turnstileSiteKey = resolveOnboardingTurnstileSiteKey(
+    getBrowserTurnstileHostname(),
+    publicEnv.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
+    turnstileTestMode
+  );
   const turnstilePanelVisible = isOnboardingTurnstilePanelVisible(
     turnstileState,
     turnstileInstruction,
-    resolveOnboardingTurnstileSiteKey(
-      getBrowserTurnstileHostname(),
-      publicEnv.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
-      turnstileTestMode
-    )
+    turnstileSiteKey
   );
 
   const isTurnstileUnavailable =
@@ -305,6 +306,7 @@ export function OnboardingShell({
                 turnstileStatus={turnstileState.status}
                 turnstilePanel={turnstilePanel}
                 turnstilePanelVisible={turnstilePanelVisible}
+                turnstileHasSiteKey={Boolean(turnstileSiteKey)}
                 onTurnstileRequired={handleTurnstileRequired}
                 onTurnstileRejected={handleTurnstileRejected}
               />

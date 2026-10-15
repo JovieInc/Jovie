@@ -90,6 +90,8 @@ import {
   type ToolPart,
 } from './onboardingChatHelpers';
 
+const STARTER_VERIFICATION_INSTRUCTION = 'One quick check before we send';
+
 /**
  * Anonymous onboarding chat client (JOV-2132 PR 3).
  *
@@ -113,6 +115,8 @@ interface OnboardingChatProps {
   readonly turnstilePanel?: ReactNode;
   /** Whether the Turnstile security chrome should appear in the composer. */
   readonly turnstilePanelVisible?: boolean;
+  /** A resolved public key exists; this does not establish provider readiness. */
+  readonly turnstileHasSiteKey?: boolean;
   /** Requests the visible Turnstile panel when a send needs verification. */
   readonly onTurnstileRequired?: (message?: string) => void;
   /** Clears stale verification after the server rejects a token. */
@@ -568,6 +572,7 @@ function getDisplayMessages(
 interface OnboardingFlowStatusProps {
   readonly shouldShowTurnstileBanner: boolean;
   readonly turnstilePanel: ReactNode;
+  readonly sizeStarterInstruction: boolean;
 }
 
 function getOnboardingComposerPlaceholder(
@@ -583,10 +588,31 @@ function getOnboardingComposerPlaceholder(
 function OnboardingFlowStatus({
   shouldShowTurnstileBanner,
   turnstilePanel,
+  sizeStarterInstruction,
 }: OnboardingFlowStatusProps) {
   if (!shouldShowTurnstileBanner) return null;
 
-  return <div data-testid='onboarding-flow-status'>{turnstilePanel}</div>;
+  return (
+    <div
+      data-testid='onboarding-flow-status'
+      className={cn(
+        sizeStarterInstruction &&
+          'grid grid-cols-1 [&>p[role=status]]:[grid-area:1/1] [&:has([data-turnstile-mount=inline])>p[aria-hidden=true]]:hidden'
+      )}
+    >
+      {/* Size the known instruction's text, never an unpainted provider frame. */}
+      {sizeStarterInstruction ? (
+        <p
+          aria-hidden='true'
+          className='invisible pointer-events-none mb-2 text-xs text-secondary-token [grid-area:1/1]'
+          data-testid='onboarding-verification-instruction-size'
+        >
+          {STARTER_VERIFICATION_INSTRUCTION}
+        </p>
+      ) : null}
+      {turnstilePanel}
+    </div>
+  );
 }
 
 interface OnboardingMessageRegionProps {
@@ -714,6 +740,7 @@ export function OnboardingChat({
   entryProfile = null,
   turnstilePanel,
   turnstilePanelVisible = false,
+  turnstileHasSiteKey = false,
   turnstileStatus,
   turnstileToken,
   initialMessages = [],
@@ -874,7 +901,7 @@ export function OnboardingChat({
       if (!text || isBusy || localAutomationBypass === null) return;
       if (isAwaitingFirstToken) {
         setVerificationRequested(true);
-        onTurnstileRequired?.('One quick check before we send');
+        onTurnstileRequired?.(STARTER_VERIFICATION_INSTRUCTION);
         pendingVerifiedSubmitRef.current = true;
         pendingStarterPromptRef.current = null;
         hasAutoSubmittedStarterPromptRef.current = true;
@@ -1028,7 +1055,7 @@ export function OnboardingChat({
       if (!hasRequestedStarterVerificationRef.current) {
         hasRequestedStarterVerificationRef.current = true;
         setVerificationRequested(true);
-        onTurnstileRequired?.('One quick check before we send');
+        onTurnstileRequired?.(STARTER_VERIFICATION_INSTRUCTION);
       }
       return;
     }
@@ -1120,6 +1147,11 @@ export function OnboardingChat({
     <OnboardingFlowStatus
       shouldShowTurnstileBanner={shouldShowTurnstileBanner}
       turnstilePanel={turnstilePanel}
+      sizeStarterInstruction={
+        shouldReserveStarterVerification &&
+        turnstileHasSiteKey &&
+        (turnstileStatus === 'loading' || turnstileStatus === 'interactive')
+      }
     />
   ) : null;
 
