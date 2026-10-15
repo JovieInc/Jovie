@@ -11,6 +11,15 @@ export const DESIGN_TASTE_JURY_CAPTURE_STYLES = [
 export type DesignTasteJuryCaptureStyle =
   (typeof DESIGN_TASTE_JURY_CAPTURE_STYLES)[number];
 
+export const DESIGN_TASTE_JURY_CRITERIA = [
+  'optical-alignment',
+  'shadow-depth',
+  'stagger-animation',
+] as const;
+
+export type DesignTasteJuryCriterion =
+  (typeof DESIGN_TASTE_JURY_CRITERIA)[number];
+
 export interface DesignTasteBenchmarkReference {
   readonly id: string;
   readonly label: string;
@@ -42,6 +51,7 @@ export interface DesignTasteCapturePlan {
 export interface DesignTasteJurorFinding {
   readonly id: string;
   readonly summary: string;
+  readonly criteria?: readonly DesignTasteJuryCriterion[];
   readonly disposition: DesignTasteJuryDisposition;
   readonly rank: number;
   readonly objective: boolean;
@@ -56,6 +66,7 @@ export interface DesignTasteJurorVerdict {
 export interface DesignTasteConsensusFinding {
   readonly id: string;
   readonly summary: string;
+  readonly criteria?: readonly DesignTasteJuryCriterion[];
   readonly disposition: DesignTasteJuryDisposition;
   readonly consensusRank: number;
   readonly voteCount: number;
@@ -72,6 +83,7 @@ export interface DesignTasteJuryConsensus {
 
 export interface DesignTasteIssueFiling {
   readonly id: string;
+  readonly criteria: readonly DesignTasteJuryCriterion[];
   readonly disposition: DesignTasteJuryDisposition;
   readonly title: string;
   readonly body: string;

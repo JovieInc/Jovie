@@ -1,0 +1,14 @@
+{
+  "schema": "jovie.ui-escape-replay/v1",
+  "id": "get-updates-2026-10-04",
+  "issue": "JOV-7846",
+  "journey": "get-updates",
+  "reportedAt": "2026-10-04",
+  "source": "https://linear.app/jovie/issue/JOV-7846",
+  "humanLabel": "fail",
+  "captureRef": null,
+  "replayStatus": "BLOCKED",
+  "reason": "The founder report is available, but the original capture is not attached. Detector fixtures are not a substitute for the historical capture.",
+  "commissioningIssue": "JOV-8387",
+  "detectorReplay": "scripts/invariants/browser-owned-input.test.mjs"
+}

@@ -10,12 +10,14 @@ import type {
   DesignTasteJurorFinding,
   DesignTasteJurorVerdict,
   DesignTasteJuryConsensus,
+  DesignTasteJuryCriterion,
   DesignTasteJuryDisposition,
 } from './types';
 
 interface AggregatedFinding {
   readonly id: string;
   readonly summary: string;
+  readonly criteria: readonly DesignTasteJuryCriterion[];
   readonly disposition: DesignTasteJuryDisposition;
   readonly objective: boolean;
   readonly ranks: number[];
@@ -36,6 +38,7 @@ function aggregateFindings(
         grouped.set(key, {
           id: finding.id,
           summary: finding.summary,
+          criteria: finding.criteria ?? [],
           disposition: finding.disposition,
           objective: finding.objective,
           ranks: [finding.rank],
@@ -46,6 +49,7 @@ function aggregateFindings(
 
       grouped.set(key, {
         ...existing,
+        criteria: [...existing.criteria, ...(finding.criteria ?? [])],
         ranks: [...existing.ranks, finding.rank],
         jurorIds: [...existing.jurorIds, verdict.jurorId],
       });
@@ -80,6 +84,7 @@ export function buildDesignTasteJuryConsensus(params: {
     .map(entry => ({
       id: entry.id,
       summary: entry.summary,
+      criteria: [...new Set(entry.criteria)].sort(),
       disposition: entry.disposition,
       consensusRank: medianRank(entry.ranks),
       voteCount: entry.jurorIds.length,
