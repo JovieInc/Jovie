@@ -115,11 +115,13 @@ export function sourcesFromSecret(secret: string): Source[] {
 }
 
 export function anonymize(text: string, source: Source): string {
-  let clean = text;
+  const normalize = (value: string) =>
+    value.normalize('NFKC').replace(/\s+/g, ' ').trim();
+  let clean = normalize(text);
   for (const term of [...source.identityTerms].sort(
     (a, b) => b.length - a.length
   )) {
-    const literal = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const literal = normalize(term).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     clean = clean.replace(new RegExp(literal, 'giu'), source.code);
   }
   return clean

@@ -447,6 +447,12 @@ test('identity redaction handles literal punctuation, case, links and HTML entit
     extractArticle(article('Fixture&#32;Source'), s).title,
     /^SRC-1$/
   );
+  assert.equal(
+    extractArticle(article('Fixture&nbsp;Source'), s).title,
+    'SRC-1'
+  );
+  assert.equal(anonymize('Fixture\nSource', s), 'SRC-1');
+  assert.equal(anonymize('Ｆｉｘｔｕｒｅ Source', s), 'SRC-1');
   assert.throws(
     () => extractArticle('<main>short</main>', s),
     /content_missing/
