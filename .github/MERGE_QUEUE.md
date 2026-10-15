@@ -197,7 +197,11 @@ required-green, non-draft, unlabeled-hold PRs on green checks so production
 holds never stall merging; required checks on the merge group remain the only
 gate. Required-green means `mergeStateStatus` CLEAN, HAS_HOOKS or UNSTABLE
 (UNSTABLE only adds a pending or red non-required context, such as a lane
-`jovie-execution/*` receipt). An UNKNOWN read right after main moves is
+`jovie-execution/*` receipt). `lane-fix-red` is machine admission state, not a
+hold-contract label: green enroll removes it when the current head is
+required-green and then admits that head. A head whose required checks are
+still red keeps the label, and adding it to a queued PR dequeues that PR.
+An UNKNOWN read right after main moves is
 re-read twice before the wake is dropped. An unchanged head removed from the
 queue stays out unless a typed retry/recovery applies, or the removal was
 `manual` and a blocking label (`hold`, `queue-poison`, ...) was removed after

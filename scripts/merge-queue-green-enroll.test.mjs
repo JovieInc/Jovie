@@ -754,6 +754,99 @@ test('a queue-breaker restore is fenced against revocation and a new hold', asyn
   assert.deepEqual(held.labelRemovals, []);
 });
 
+test('clears a stale lane-fix-red on a required-green head and then enrolls it', async () => {
+  const removed = removal =>
+    removal.labelRemovals?.some(item => item.name === 'lane-fix-red');
+  for (const mergeStateStatus of ['CLEAN', 'HAS_HOOKS', 'UNSTABLE']) {
+    const sink = {};
+    const result = await fixture({
+      effectSink: sink,
+      roster: [{ ...candidate(1), labels: [{ name: 'lane-fix-red' }] }],
+      readCurrentSnapshot: () => ({
+        ...current(1),
+        mergeStateStatus,
+        labels: {
+          pageInfo: { hasNextPage: false },
+          nodes: removed(sink) ? [] : [{ name: 'lane-fix-red' }],
+        },
+      }),
+    });
+    assert.deepEqual(
+      result.labelRemovals,
+      [
+        {
+          owner: 'JovieInc',
+          repo: 'Jovie',
+          issue_number: 1,
+          name: 'lane-fix-red',
+        },
+      ],
+      mergeStateStatus
+    );
+    assert.deepEqual(result.mutations, [{ id: 'PR_1', oid: sha }], mergeStateStatus);
+    assert.ok(
+      result.notices.some(notice =>
+        notice.includes('CLEARED stale lane-fix-red on #1')
+      ),
+      mergeStateStatus
+    );
+  }
+  const repaired = {};
+  const repairedResult = await fixture({
+    effectSink: repaired,
+    roster: [{ ...candidate(1), labels: [{ name: 'lane-fix-red' }] }],
+    readCurrentSnapshot: () => ({
+      ...current(1),
+      timelineItems: {
+        nodes: [{ createdAt: '2026-10-02T11:00:00Z', reason: 'FAILED_CHECKS' }],
+      },
+      labels: {
+        pageInfo: { hasNextPage: false },
+        nodes: removed(repaired) ? [] : [{ name: 'lane-fix-red' }],
+      },
+    }),
+  });
+  assert.equal(repairedResult.labelRemovals.length, 1);
+  assert.deepEqual(repairedResult.mutations, [{ id: 'PR_1', oid: sha }]);
+});
+
+test('keeps lane-fix-red and does not enroll while required checks are red', async () => {
+  const result = await fixture({
+    roster: [{ ...candidate(1), labels: [{ name: 'Lane-Fix-Red' }] }],
+    readCurrentSnapshot: () => ({
+      ...current(1),
+      mergeStateStatus: 'BLOCKED',
+      labels: {
+        pageInfo: { hasNextPage: false },
+        nodes: [{ name: 'Lane-Fix-Red' }],
+      },
+    }),
+  });
+  assert.deepEqual(result.labelRemovals, []);
+  assert.deepEqual(result.mutations, []);
+});
+
+test('a failed lane-fix-red clear leaves the label blocking admission', async () => {
+  const result = await fixture({
+    roster: [{ ...candidate(1), labels: [{ name: 'lane-fix-red' }] }],
+    labelRemovalError: new Error('denied'),
+    readCurrentSnapshot: () => ({
+      ...current(1),
+      labels: {
+        pageInfo: { hasNextPage: false },
+        nodes: [{ name: 'lane-fix-red' }],
+      },
+    }),
+  });
+  assert.equal(result.labelRemovals.length, 1);
+  assert.deepEqual(result.mutations, []);
+  assert.ok(
+    result.warnings.some(warning =>
+      warning.includes('#1 lane-fix-red not cleared: denied')
+    )
+  );
+});
+
 test('a hold released after a manual dequeue re-enrolls the same head; check failures never do', async () => {
   const removal = reason => ({
     timelineItems: { nodes: [{ createdAt: '2026-10-02T13:00:00Z', reason }] },
@@ -770,8 +863,14 @@ test('a hold released after a manual dequeue re-enrolls the same head; check fai
     1
   );
   assert.equal(await enqueued(removal('manual')), 0);
+  // lane-fix-red is a machine block, so removing it after a manual dequeue
+  // is an explicit release of that same head.
   assert.equal(
     await enqueued({ ...removal('manual'), ...release('lane-fix-red') }),
+    1
+  );
+  assert.equal(
+    await enqueued({ ...removal('FAILED_CHECKS'), ...release('lane-fix-red') }),
     0
   );
   assert.equal(
@@ -884,6 +983,7 @@ test('a blocking label on a queued PR dequeues only that PR', () => {
     'incident',
     'do-not-merge',
     'queue-poison',
+    'lane-fix-red',
   ]) {
     assert.ok(job.if.includes(`"${label}"`), label);
   }
@@ -1570,6 +1670,7 @@ for (const label of [
   'incident',
   'do-not-merge',
   'queue-poison',
+  'lane-fix-red',
 ]) {
   test(`dequeues the unchanged queued head while ${label} is still present`, async () => {
     const result = await dequeueFixture({
