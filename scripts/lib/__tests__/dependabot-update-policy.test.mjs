@@ -24,6 +24,7 @@ const VITEST_MANIFEST_PATHS = [
   'package.json',
   'apps/console/package.json',
   'apps/eve-pilot/package.json',
+  'apps/macos/package.json',
   'apps/ovie/package.json',
   'apps/web/package.json',
   'packages/action-contracts/package.json',
@@ -31,6 +32,7 @@ const VITEST_MANIFEST_PATHS = [
   'packages/auth-routing/package.json',
   'packages/copy/package.json',
   'packages/jovie-cli/package.json',
+  'packages/release-channel-contracts/package.json',
   'packages/ui/package.json',
 ];
 
@@ -628,4 +630,39 @@ describe('Dependabot npm grouping (JOV-6837)', () => {
       expectedVersion
     );
   });
+
+  it.each(['pnpm-lock.yaml', 'apps/eve-pilot/pnpm-lock.yaml'])(
+    'keeps direct Vitest family specifiers and resolutions aligned in %s',
+    path => {
+      const expectedVersion = JSON.parse(
+        readFileSync(resolve(REPO_ROOT, 'package.json'), 'utf8')
+      ).devDependencies.vitest;
+      const lockfile = load(readFileSync(resolve(REPO_ROOT, path), 'utf8'));
+      if (
+        typeof lockfile !== 'object' ||
+        lockfile === null ||
+        !('importers' in lockfile) ||
+        typeof lockfile.importers !== 'object' ||
+        lockfile.importers === null
+      ) {
+        throw new Error(`${path} must declare lockfile importers`);
+      }
+
+      for (const [importer, manifest] of Object.entries(lockfile.importers)) {
+        const dependencies = {
+          ...manifest.dependencies,
+          ...manifest.devDependencies,
+        };
+        for (const [name, dependency] of Object.entries(dependencies)) {
+          if (name === 'vitest' || name.startsWith('@vitest/')) {
+            const context = `${path}: ${importer}: ${name}`;
+            expect(dependency.specifier, context).toBe(expectedVersion);
+            expect(dependency.version.split('(')[0], context).toBe(
+              expectedVersion
+            );
+          }
+        }
+      }
+    }
+  );
 });
