@@ -24,5 +24,21 @@ export function hydratePersistedMessageParts(
     return parts;
   }
 
-  return parts.concat(decoded.events.map(toolEventToMessagePart));
+  return parts.concat(
+    decoded.events.map(event => ({
+      ...toolEventToMessagePart(event),
+      ...(decoded.source === 'v2'
+        ? {
+            persistedToolReceipt: {
+              operationKey: event.toolCallId,
+              state:
+                event.state === 'succeeded'
+                  ? ('succeeded' as const)
+                  : ('unknown' as const),
+              persisted: true,
+            },
+          }
+        : {}),
+    }))
+  );
 }

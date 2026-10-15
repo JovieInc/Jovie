@@ -3486,6 +3486,7 @@ jobs:
               node "$GITHUB_WORKSPACE/scripts/component-merge-group-storybook-cert.mjs"
               node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
                 pnpm exec playwright test \
+                  tests/e2e/storybook-agent-status.spec.ts \
                   tests/e2e/storybook-elevation.spec.ts \
                   tests/e2e/storybook-input.spec.ts \
                   tests/e2e/storybook-marketing-faq.spec.ts \
