@@ -1627,6 +1627,98 @@ describe('merge_group workflow contract', () => {
     );
   });
 
+  it('materializes a release-consumable intake receipt for equal-tree no-op groups', () => {
+    const root = mkdtempSync(join(tmpdir(), 'noop-intake-receipt-'));
+    const laneDir = join(root, 'product-lane-classification');
+    mkdirSync(laneDir);
+    writeFileSync(join(laneDir, 'changed-paths.txt'), '');
+    const sha = spawnSync('git', ['rev-parse', 'HEAD'], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+    }).stdout.trim();
+    const script = getStepRunScript(
+      getJobBlock(CI_WORKFLOW, 'ci-path-changes'),
+      'Classify blog qualification and seal intake receipts'
+    );
+    try {
+      const result = spawnSync('bash', ['-c', script], {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          RUNNER_TEMP: root,
+          BASE_SHA: sha,
+          HEAD_SHA: sha,
+          GITHUB_SHA: sha,
+          GITHUB_RUN_ID: '123',
+          GITHUB_RUN_ATTEMPT: '1',
+          GITHUB_OUTPUT: join(root, 'github-output'),
+          GITHUB_STEP_SUMMARY: join(root, 'summary.md'),
+        },
+      });
+      expect(result.status, result.stderr).toBe(0);
+      const receipt = JSON.parse(
+        readFileSync(join(laneDir, 'receipt.json'), 'utf8')
+      );
+      expect(receipt.provenance).toEqual({
+        sha,
+        runId: '123',
+        runAttempt: '1',
+      });
+      expect(receipt.selectedLanes).toEqual([]);
+      const workflow = load(CI_WORKFLOW);
+      const upload = workflow.jobs['ci-path-changes'].steps.find(
+        step => step.name === 'Preserve intake product-lane receipt'
+      );
+      expect(upload.if).not.toContain('is_noop_merge_group');
+      const ready = getJobBlock(CI_WORKFLOW, 'ci-pr-ready');
+      expect(ready).not.toContain('No-op receipt must skip');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    ['equal trees', 'a'.repeat(40), 0, 0],
+    ['different trees', 'b'.repeat(40), 0, 1],
+    ['unreadable trees', '', 128, 128],
+  ])(
+    'allows no-op classification only with exact proof: %s',
+    (_, headTree, gitStatus, status) => {
+      const detect = getStepRunScript(
+        getJobBlock(CI_WORKFLOW, 'ci-path-changes'),
+        'Detect path changes for all job types'
+      );
+      const start = detect.indexOf('    NOOP_BASE_TREE=');
+      const end = detect.indexOf('    PRODUCT_LANE_DIR=', start);
+      expect(start).toBeGreaterThanOrEqual(0);
+      const proof = detect.slice(start, end);
+      const root = mkdtempSync(join(tmpdir(), 'noop-tree-proof-'));
+      writeFileSync(
+        join(root, 'git'),
+        '#!/bin/sh\n[ "$STUB_GIT_STATUS" = 0 ] || exit "$STUB_GIT_STATUS"\ncase "$3" in "$MERGE_GROUP_BASE_SHA^{tree}") printf "%s\n" "$STUB_BASE_TREE" ;; *) printf "%s\n" "$STUB_HEAD_TREE" ;; esac\n'
+      );
+      chmodSync(join(root, 'git'), 0o755);
+      try {
+        const result = spawnSync('bash', ['-ec', proof], {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${root}${delimiter}${process.env.PATH}`,
+            MERGE_GROUP_BASE_SHA: 'c'.repeat(40),
+            MERGE_GROUP_HEAD_SHA: 'd'.repeat(40),
+            STUB_BASE_TREE: 'a'.repeat(40),
+            STUB_HEAD_TREE: headTree,
+            STUB_GIT_STATUS: String(gitStatus),
+          },
+        });
+        expect(result.status, result.stderr).toBe(status);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    }
+  );
+
   it('materializes the path artifact before a manual dispatch exits', () => {
     const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
     const detectScript = materializeWorkflowDispatchScript(
@@ -1934,7 +2026,7 @@ ${selectedGateScript}`,
       'true',
       'success',
       'true',
-      false,
+      true,
     ],
     [
       'feature push',
