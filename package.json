@@ -249,6 +249,7 @@
     "tailwind:check": "pnpm --filter=@jovie/web run tailwind:check",
     "db:web:migrate": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run drizzle:migrate",
     "db:web:studio": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run drizzle:studio",
+    "jovie": "node --import tsx scripts/content-os/cli.mts",
     "knip": "knip",
     "version:check": "node scripts/version-check.mjs",
     "version:fanout-guard": "node scripts/version-fanout-guard.mjs",
