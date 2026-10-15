@@ -262,6 +262,7 @@ test('launch fixture pins the narrow audience, optional wedge and audited surfac
   );
 });
 
+/** @type {Array<[string, (scope: ReturnType<typeof manifest>) => void, string]>} */
 const scopeDriftCases = [
   [
     'missing contract',
@@ -352,7 +353,8 @@ for (const [name, mutate, reason] of scopeDriftCases) {
 }
 
 test('launch certification rejects stale receipt policy and a foreign product repository', () => {
-  for (const [mutate, reason] of [
+  /** @type {Array<[(candidate: ReturnType<typeof receipt>) => void, string]>} */
+  const receiptDriftCases = [
     [
       candidate => {
         candidate.launchContractDigest = 'old';
@@ -371,7 +373,8 @@ test('launch certification rejects stale receipt policy and a foreign product re
       },
       'schema-mismatch',
     ],
-  ]) {
+  ];
+  for (const [mutate, reason] of receiptDriftCases) {
     const candidate = receipt();
     mutate(candidate);
     const result = certifyNativeReceipt(manifest(), candidate);

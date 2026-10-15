@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 const bytes = readFileSync(
   new URL('./fixtures/lyb-launch-contract.json', import.meta.url)
 );
-export const LAUNCH_CONTRACT = JSON.parse(bytes);
+export const LAUNCH_CONTRACT = JSON.parse(bytes.toString('utf8'));
 export const LAUNCH_CONTRACT_DIGEST = createHash('sha256')
   .update(bytes)
   .digest('hex');
