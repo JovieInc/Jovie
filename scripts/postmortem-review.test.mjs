@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
+import { load as yamlLoad } from 'js-yaml';
+import { assertEventDrivenLearning } from './lib/learning-trigger.mjs';
 import {
   buildReviewReport,
   findUnownedSystemicControls,
@@ -14,6 +17,17 @@ import {
   readPostmortemDocuments,
   reviewPostmortem,
 } from './postmortem-review.mjs';
+
+/**
+ * @typedef {{
+ *   on: {
+ *     schedule?: { cron: string }[],
+ *     push?: { paths: string[] },
+ *     repository_dispatch?: { types: string[] }
+ *   },
+ *   jobs: Record<string, { steps: { run?: string }[] }>
+ * }} LearningWorkflow
+ */
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
 const TARGET_PATH = 'docs/postmortems/2026-09-26-production-freeze.md';
@@ -218,7 +232,7 @@ test('systemic controls without an issue are selected for Linear intake', () => 
   ]);
 });
 
-test('weekly grouping opens one class action and ranks rescues', () => {
+test('event-driven grouping opens one class action and ranks rescues', () => {
   const base = reviewPostmortem(fixture(), {
     'JOV-9001': {
       identifier: 'JOV-9001',
@@ -339,4 +353,77 @@ test('GBrain mirror buffers a tool-level write failure', async () => {
   assert.equal(result.status, 'buffered');
   assert.equal(result.reason, 'tool-error');
   assert.equal(calls, 2);
+});
+
+test('shipping SLO retains monitoring while only evidence events run post-mortem review', () => {
+  const shipping = /** @type {LearningWorkflow} */ (
+    yamlLoad(
+      readFileSync(
+        resolve(REPO_ROOT, '.github/workflows/shipping-slo.yml'),
+        'utf8'
+      )
+    )
+  );
+  assert.deepEqual(shipping.on.schedule, [{ cron: '13 7 * * *' }]);
+  const commands = shipping.jobs.measure.steps
+    .map(step => step.run ?? '')
+    .join('\n');
+  assert.match(commands, /shipping-slo-report\.mjs report/);
+  assert.match(commands, /shipping-slo-intake\.mjs/);
+  assert.doesNotMatch(
+    commands,
+    /postmortem|quality-gap-finder|lesson-analysis|invariant-stewardship/
+  );
+  const quality = /** @type {LearningWorkflow} */ (
+    yamlLoad(
+      readFileSync(
+        resolve(REPO_ROOT, '.github/workflows/quality-gap-finder.yml'),
+        'utf8'
+      )
+    )
+  );
+  assert.equal(quality.on.schedule, undefined);
+  assert.ok(quality.on.push.paths.includes('docs/postmortems/**'));
+  assert.deepEqual(quality.on.repository_dispatch.types, ['quality-gap-scan']);
+  assert.match(
+    quality.jobs.find.steps.map(step => step.run ?? '').join('\n'),
+    /postmortem-review\.mjs/
+  );
+});
+
+test('scheduled learning commands reject before filesystem scans or network work', () => {
+  for (const script of [
+    'postmortem-review.mjs',
+    'postmortem-review-report.mjs',
+    'quality-gap-finder.mjs',
+  ]) {
+    const result = spawnSync(
+      process.execPath,
+      [
+        resolve(REPO_ROOT, 'scripts', script),
+        '--root',
+        '/nonexistent-learning-input',
+        '--out',
+        '/nonexistent-learning-output',
+      ],
+      {
+        encoding: 'utf8',
+        timeout: 5000,
+        env: { ...process.env, GITHUB_EVENT_NAME: 'schedule' },
+      }
+    );
+    assert.ifError(result.error);
+    assert.equal(result.status, 1, script);
+    assert.equal(result.stdout, '', script);
+    assert.match(result.stderr, /scheduled-learning-retired/, script);
+    assert.doesNotMatch(result.stderr, /ENOENT|fetch failed/, script);
+  }
+  for (const event of [
+    'push',
+    'repository_dispatch',
+    'workflow_dispatch',
+    undefined,
+  ]) {
+    assert.doesNotThrow(() => assertEventDrivenLearning(event));
+  }
 });

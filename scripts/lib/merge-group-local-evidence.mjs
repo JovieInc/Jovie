@@ -287,4 +287,11 @@ if (
     headSha: process.env.GROUP_HEAD,
   });
   if (target && evidence) writeFileSync(target, JSON.stringify(evidence));
+  if (evidence?.tracked) {
+    console.log(
+      `local tree byte count: ${evidence.tracked.bytes} tracked regular-file bytes across ${evidence.tracked.files} files`
+    );
+  } else {
+    console.log('local tree byte count: unavailable');
+  }
 }
