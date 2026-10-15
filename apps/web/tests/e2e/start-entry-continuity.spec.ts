@@ -40,14 +40,205 @@ async function expectEssentials(page: Page) {
   expect(await draftProgress(page)).toEqual({ liveRegions: 0, sentClaims: 0 });
 }
 
+async function installControlledVerification(page: Page) {
+  // Exercise actual verification, rather than CI's synthetic-principal
+  // short circuit. This fixture opts OUT of the HTML automation bypass;
+  // it grants no app auth/access and intercepts only the provider script.
+  await page.addInitScript(() => {
+    const requireVerification = () => {
+      if (document.documentElement?.dataset.e2eMode === '1') {
+        document.documentElement.dataset.e2eMode = '0';
+      }
+    };
+    new MutationObserver(requireVerification).observe(document, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['data-e2e-mode'],
+    });
+    requireVerification();
+  });
+  await page.route(
+    'https://challenges.cloudflare.com/turnstile/v0/api.js*',
+    route =>
+      route.fulfill({
+        contentType: 'application/javascript',
+        body: `window.turnstile = {
+      render(target, options) {
+        window.__claimProviderFixture = {
+          interact() {
+            const action = document.createElement('button');
+            action.textContent = 'Verify fixture';
+            action.style.cssText = 'width:180px;height:44px';
+            target.replaceChildren(action);
+            options['before-interactive-callback']();
+          },
+          fail() { options['error-callback']('controlled-fixture'); }
+        };
+        return 'claim-provider-fixture';
+      }, remove() {}, reset() {}
+    };`,
+      })
+  );
+}
+
 declare global {
   interface Window {
     __claimProviderFixture?: { interact: () => void; fail: () => void };
     __claimLayout?: { supported: boolean; total: number };
+    __claimInitialLayout?: {
+      supported: boolean;
+      total: number;
+      unguidedFirst: boolean;
+      first: number[] | null;
+      guided: number[] | null;
+    };
   }
 }
 
 test.describe('current-state essential actions (JOV-7771)', () => {
+  for (const viewport of [
+    { width: 1440, height: 900, fontSize: 12 },
+    { width: 390, height: 844, fontSize: 12 },
+    { width: 768, height: 1024, fontSize: 12 },
+    { width: 390, height: 615, fontSize: 12 },
+    { width: 615, height: 407, fontSize: 12 },
+    { width: 390, height: 844, fontSize: 24 },
+    { width: 390, height: 615, fontSize: 24 },
+    { width: 1440, height: 900, fontSize: 32 },
+    { width: 390, height: 844, fontSize: 32 },
+  ]) {
+    test(`delayed verification guidance stays stable at ${viewport.width}x${viewport.height} with ${viewport.fontSize}px text`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({
+        width: viewport.width,
+        height: viewport.height,
+      });
+      await installControlledVerification(page);
+      await page.addInitScript(fontSize => {
+        const metric = {
+          supported:
+            typeof PerformanceObserver === 'function' &&
+            PerformanceObserver.supportedEntryTypes.includes('layout-shift'),
+          total: 0,
+          unguidedFirst: false,
+          first: null as number[] | null,
+          guided: null as number[] | null,
+        };
+        window.__claimInitialLayout = metric;
+        if (!metric.supported) return;
+        new PerformanceObserver(list => {
+          for (const entry of list.getEntries()) {
+            const shift = entry as PerformanceEntry & {
+              hadRecentInput: boolean;
+              value: number;
+            };
+            if (!Number.isFinite(shift.value) || shift.value < 0) {
+              metric.total = Number.NaN;
+            } else if (!shift.hadRecentInput) {
+              metric.total += shift.value;
+            }
+          }
+        }).observe({ type: 'layout-shift', buffered: true });
+        const style = document.createElement('style');
+        const lineHeight = fontSize === 32 ? 40 : fontSize === 24 ? 32 : 16;
+        style.textContent = `[data-testid="onboarding-flow-status"] > p {font-size:${fontSize}px;line-height:${lineHeight}px}`;
+        // Delay only presentation, so even a fast hydration must expose the
+        // unguided first frame. Provider, token and send state stay unchanged.
+        const delay = document.createElement('style');
+        delay.id = 'claim-delay-guidance';
+        delay.textContent =
+          '[data-testid="onboarding-flow-status"] > p[role="status"] {display:none!important}';
+        const installTextSize = () => {
+          if (document.head && !style.isConnected)
+            document.head.append(style, delay);
+        };
+        new MutationObserver(installTextSize).observe(document, {
+          childList: true,
+          subtree: true,
+        });
+        installTextSize();
+        const sample = () => {
+          const elements = [
+            '[data-testid="onboarding-empty-intro"] h1',
+            '[data-testid="chat-empty-state-centered-composer"]',
+            '[aria-label="Chat message input" i]',
+            'button[aria-label="Send message"]',
+          ].map(selector => document.querySelector(selector));
+          const boxes = elements.map(element =>
+            element?.getBoundingClientRect()
+          );
+          if (boxes.every(box => box && box.width > 0 && box.height > 0)) {
+            const positions = boxes.map(box => box!.y);
+            const guidance = document.querySelector(
+              '[data-testid="onboarding-flow-status"] > p[role="status"]'
+            );
+            if (!metric.first) {
+              metric.first = positions;
+              metric.unguidedFirst = !guidance?.getBoundingClientRect().height;
+            }
+            if (guidance?.getBoundingClientRect().height)
+              metric.guided = positions;
+          }
+          if (!metric.guided) requestAnimationFrame(sample);
+        };
+        requestAnimationFrame(sample);
+      }, viewport.fontSize);
+      await page.goto(startUrl);
+      await expect
+        .poll(() => page.evaluate(() => Boolean(window.__claimProviderFixture)))
+        .toBe(true);
+      await expect
+        .poll(() =>
+          page.evaluate(() => Boolean(window.__claimInitialLayout?.first))
+        )
+        .toBe(true);
+      expect(
+        await page.evaluate(() => window.__claimInitialLayout?.unguidedFirst)
+      ).toBe(true);
+      await expect(page.locator('#claim-delay-guidance')).toHaveCount(1);
+      await page.evaluate(() =>
+        document.querySelector('#claim-delay-guidance')?.remove()
+      );
+      await expect
+        .poll(() =>
+          page.evaluate(() => Boolean(window.__claimInitialLayout?.guided))
+        )
+        .toBe(true);
+      await page.evaluate(
+        () =>
+          new Promise<void>(resolve =>
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+          )
+      );
+      const metric = await page.evaluate(() => window.__claimInitialLayout);
+      expect(metric?.supported).toBe(true);
+      expect(Number.isFinite(metric?.total)).toBe(true);
+      expect(metric?.total).toBe(0);
+      expect(metric?.first).toHaveLength(4);
+      expect(metric?.guided).toHaveLength(4);
+      for (let index = 0; index < 4; index++) {
+        expect(
+          Math.abs(metric!.first![index]! - metric!.guided![index]!)
+        ).toBeLessThanOrEqual(1);
+      }
+      await expectEssentials(page);
+      await expect(
+        page.getByRole('textbox', { name: 'Chat message input', exact: false })
+      ).toHaveValue(prompt);
+      const heading = await page
+        .locator('[data-testid="onboarding-empty-intro"] h1')
+        .boundingBox();
+      const guidance = await page
+        .locator('[data-testid="onboarding-flow-status"] > p[role="status"]')
+        .boundingBox();
+      expect(heading).not.toBeNull();
+      expect(guidance).not.toBeNull();
+      expect(heading!.y + heading!.height).toBeLessThanOrEqual(guidance!.y);
+    });
+  }
+
   test('deliberate red rejects redundant handoff progress even with valid action geometry', async ({
     page,
   }) => {
@@ -97,45 +288,7 @@ test.describe('current-state essential actions (JOV-7771)', () => {
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    // Exercise actual verification, rather than CI's synthetic-principal
-    // short circuit. This fixture opts OUT of the HTML automation bypass;
-    // it grants no app auth/access and intercepts only the provider script.
-    await page.addInitScript(() => {
-      const requireVerification = () => {
-        if (document.documentElement?.dataset.e2eMode === '1') {
-          document.documentElement.dataset.e2eMode = '0';
-        }
-      };
-      new MutationObserver(requireVerification).observe(document, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ['data-e2e-mode'],
-      });
-      requireVerification();
-    });
-    await page.route(
-      'https://challenges.cloudflare.com/turnstile/v0/api.js*',
-      route =>
-        route.fulfill({
-          contentType: 'application/javascript',
-          body: `window.turnstile = {
-        render(target, options) {
-          window.__claimProviderFixture = {
-            interact() {
-              const action = document.createElement('button');
-              action.textContent = 'Verify fixture';
-              action.style.cssText = 'width:180px;height:44px';
-              target.replaceChildren(action);
-              options['before-interactive-callback']();
-            },
-            fail() { options['error-callback']('controlled-fixture'); }
-          };
-          return 'claim-provider-fixture';
-        }, remove() {}, reset() {}
-      };`,
-        })
-    );
+    await installControlledVerification(page);
     await page.goto(startUrl);
     await expect
       .poll(() => page.evaluate(() => Boolean(window.__claimProviderFixture)))
@@ -147,7 +300,12 @@ test.describe('current-state essential actions (JOV-7771)', () => {
     ).toHaveAttribute('data-turnstile-mount', 'inline');
     await expectEssentials(page);
     await page.evaluate(() => window.__claimProviderFixture?.fail());
-    await expect(page.getByRole('alert')).toBeVisible();
+    // Next.js owns a separate, empty route-announcer alert outside this shell.
+    const recoveryAlert = page.locator(
+      '[data-onboarding-session] [role="alert"]'
+    );
+    await expect(recoveryAlert).toHaveCount(1);
+    await expect(recoveryAlert).toBeVisible();
     await expectEssentials(page);
     await expect(
       page.getByRole('textbox', { name: 'Chat message input', exact: false })

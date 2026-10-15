@@ -378,6 +378,134 @@ describe('OnboardingChat Turnstile gating', () => {
     ).toHaveAttribute('data-dictation-enabled', 'false');
   });
 
+  it('sizes delayed starter guidance without announcing it, then withdraws sizing on verified send', async () => {
+    const props = {
+      starterHandoff: { kind: 'prompt' as const, prompt: 'Claim my page' },
+      turnstileHasSiteKey: true,
+      turnstileStatus: 'loading' as const,
+      turnstileToken: null,
+    };
+    const { rerender } = render(
+      <OnboardingChat {...props} turnstilePanel={<span hidden />} />
+    );
+
+    const sizingCopy = screen.getByTestId(
+      'onboarding-verification-instruction-size'
+    );
+    expect(sizingCopy).toHaveAttribute('aria-hidden', 'true');
+    expect(sizingCopy).not.toHaveAttribute('role');
+    expect(sizingCopy).not.toHaveAttribute('aria-live');
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(chatMocks.sendMessage).not.toHaveBeenCalled();
+
+    rerender(
+      <OnboardingChat
+        {...props}
+        turnstilePanel={<p role='status'>One quick check before we send</p>}
+      />
+    );
+    expect(screen.getAllByRole('status')).toHaveLength(1);
+    expect(screen.getByRole('status')).toHaveTextContent(
+      sizingCopy.textContent!
+    );
+    expect(screen.getByLabelText('Chat Message Input')).toHaveValue(
+      'Claim my page'
+    );
+    expect(chatMocks.sendMessage).not.toHaveBeenCalled();
+
+    rerender(
+      <OnboardingChat
+        {...props}
+        turnstileToken='fresh-token'
+        turnstileStatus='verified'
+        turnstilePanel={<span hidden />}
+      />
+    );
+    await waitFor(() => expect(chatMocks.sendMessage).toHaveBeenCalledTimes(1));
+    expect(
+      screen.queryByTestId('onboarding-verification-instruction-size')
+    ).toBeNull();
+  });
+
+  it.each([
+    'error',
+    'timeout',
+    'unsupported',
+    'unconfigured',
+    'verified',
+  ] as const)(
+    'does not reserve unavailable starter guidance in %s state',
+    turnstileStatus => {
+      render(
+        <OnboardingChat
+          starterHandoff={{ kind: 'prompt', prompt: 'Claim my page' }}
+          turnstileHasSiteKey
+          turnstileStatus={turnstileStatus}
+          turnstileToken={turnstileStatus === 'verified' ? 'fresh-token' : null}
+          turnstilePanel={<span hidden />}
+        />
+      );
+      expect(
+        screen.queryByTestId('onboarding-verification-instruction-size')
+      ).toBeNull();
+    }
+  );
+
+  it('withdraws starter sizing when the configured key disappears', () => {
+    const props = {
+      starterHandoff: { kind: 'prompt' as const, prompt: 'Claim my page' },
+      turnstileStatus: 'loading' as const,
+      turnstileToken: null,
+      turnstilePanel: <span hidden />,
+    };
+    const { rerender } = render(
+      <OnboardingChat {...props} turnstileHasSiteKey />
+    );
+    expect(
+      screen.getByTestId('onboarding-verification-instruction-size')
+    ).toBeInTheDocument();
+    rerender(<OnboardingChat {...props} turnstileHasSiteKey={false} />);
+    expect(
+      screen.queryByTestId('onboarding-verification-instruction-size')
+    ).toBeNull();
+    expect(screen.getByLabelText('Chat Message Input')).toHaveValue(
+      'Claim my page'
+    );
+    expect(chatMocks.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('does not size a starter instruction for restored history or runtime bypass', () => {
+    chatMocks.messages = [
+      {
+        id: 'owned-history',
+        role: 'user',
+        parts: [{ type: 'text', text: 'Already sent' }],
+      },
+    ];
+    const props = {
+      turnstileHasSiteKey: true,
+      turnstileStatus: 'loading' as const,
+      turnstileToken: null,
+      turnstilePanel: <span hidden />,
+      starterHandoff: { kind: 'prompt' as const, prompt: 'Claim my page' },
+    };
+    const history = render(
+      <OnboardingChat {...props} initialMessages={chatMocks.messages} />
+    );
+    expect(
+      screen.queryByTestId('onboarding-verification-instruction-size')
+    ).toBeNull();
+    expect(chatMocks.sendMessage).not.toHaveBeenCalled();
+    history.unmount();
+    chatMocks.messages = [];
+    document.documentElement.dataset.e2eMode = '1';
+    render(<OnboardingChat {...props} />);
+    expect(
+      screen.queryByTestId('onboarding-verification-instruction-size')
+    ).toBeNull();
+    expect(chatMocks.sendMessage).toHaveBeenCalledTimes(1);
+  });
+
   it('auto-submits a queued first message once verification resolves', async () => {
     function DeferredTokenHarness() {
       const [turnstileToken, setTurnstileToken] = useState<string | null>(null);

@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { cache } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
-import { getCachedAuth } from '@/lib/auth/cached';
+import { getFreshAuth } from '@/lib/auth/cached';
 import { assertOviePrivacyUnlocked } from '@/lib/ovie/privacy-lock/server';
 
 export interface AdminPageAccess {
@@ -20,7 +20,8 @@ export interface AdminPageAccess {
  */
 export const getCurrentAdminPageAccess = cache(
   async function getCurrentAdminPageAccess(): Promise<AdminPageAccess> {
-    const { userId } = await getCachedAuth();
+    const auth = await getFreshAuth();
+    const userId = auth.actorUserId ?? auth.userId;
 
     if (!userId) {
       return {
@@ -49,6 +50,11 @@ export async function requireCurrentAdminPageAccess(): Promise<string> {
     redirect(APP_ROUTES.DASHBOARD);
   }
 
-  await assertOviePrivacyUnlocked();
+  const auth = await getFreshAuth();
+  await assertOviePrivacyUnlocked(
+    auth.sessionId
+      ? { userId: access.userId, sessionId: auth.sessionId }
+      : undefined
+  );
   return access.userId;
 }
