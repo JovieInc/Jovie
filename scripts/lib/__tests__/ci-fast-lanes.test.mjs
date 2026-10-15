@@ -44,6 +44,23 @@ import {
   webCiContractTestsCommand,
 } from '../../ci-fast-lanes.mjs';
 
+it('selects writing readiness regressions and the evaluator coverage command', async () => {
+  const commands = [];
+  await runStructural({
+    changedFileList: ['scripts/invariants/jev-writing-readiness.mjs'],
+    execute: command => {
+      commands.push(command);
+      return { code: 0, output: '' };
+    },
+  });
+  expect(
+    commands.some(command =>
+      command.includes('scripts/invariants/jev-writing-readiness.test.mjs')
+    )
+  ).toBe(true);
+  expect(commands).toContain('pnpm invariants:check');
+});
+
 it('enforces lifecycle coverage through the real structural selector', async () => {
   // The coverage command is an operations-lane part. A merge group narrows
   // CI_PRODUCT_LANES to the diff (web-only for an e2e spec) and the structural
