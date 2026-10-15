@@ -1150,7 +1150,6 @@ export async function runPolicy({
   }
   const members = resolveMergeGroupMembers({ event, comparison });
   let pullRequests;
-  let rateLimitedPull = false;
   try {
     pullRequests = await Promise.all(
       members.map(member =>
@@ -1172,7 +1171,6 @@ export async function runPolicy({
       );
       return;
     }
-    rateLimitedPull = true;
     log(
       `::notice::PR Size Guard kept the size cap on the local diff after a GitHub rate limit: ${error.message}`
     );
