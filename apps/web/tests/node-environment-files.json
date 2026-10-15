@@ -722,6 +722,7 @@
   "tests/unit/design-system/design-tokens-source.test.ts",
   "tests/unit/design-system/destructive-confirm-dialog-audit.test.ts",
   "tests/unit/design-system/editorial-card-max-v1.test.ts",
+  "tests/unit/design-system/enforcement-documentation.test.ts",
   "tests/unit/design-system/icon-alignment-policy.test.ts",
   "tests/unit/design-system/layout-stability-policy.test.ts",
   "tests/unit/design-system/linear-namespace-ratchet.test.ts",

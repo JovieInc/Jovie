@@ -1236,24 +1236,104 @@ describe('merge-group API outages do not eject a valid group', () => {
     ).rejects.toThrow('PR #101 failed size merge-group policy');
   });
 
-  it('defers a compare rate limit when no local diff exists instead of failing the check', async () => {
-    const outputs = [];
-    const logs = [];
-    await runPolicy({
-      argv: ['--policy=size', '--also=fork'],
-      env: { GH_TOKEN: 'test-token' },
-      event: event({ head_sha: FIRST, head_commit: { id: FIRST } }),
-      log: line => logs.push(line),
-      now: () => 1,
-      readLocal: async () => null,
-      writeOutput: line => outputs.push(line),
-      request(path) {
-        throw new MergeGroupPolicyRateLimitError(
-          `GitHub API 403 for ${path}: API rate limit exceeded for installation`
-        );
+  it('does not pass a rate limit when the diff or the tree byte count is missing', async () => {
+    const unread = [];
+    await expect(
+      runPolicy({
+        argv: ['--policy=size', '--also=fork'],
+        env: { GH_TOKEN: 'test-token' },
+        event: event({ head_sha: FIRST, head_commit: { id: FIRST } }),
+        log: () => {},
+        now: () => 1,
+        readLocal: async () => null,
+        writeOutput: line => unread.push(line),
+        request(path) {
+          throw new MergeGroupPolicyRateLimitError(
+            `GitHub API 403 for ${path}: API rate limit exceeded for installation`
+          );
+        },
+      })
+    ).rejects.toBeInstanceOf(MergeGroupPolicyRateLimitError);
+    expect(unread).toEqual([]);
+
+    const noFiles = localCheckoutFromEvidence(
+      {
+        baseSha: BASE,
+        headSha: FIRST,
+        parentSha: BASE,
+        treeSha: TREE,
+        subject: 'fix(ci): queue member 101 (#101)',
+        committerName: 'GitHub',
+        committerEmail: 'noreply@github.com',
+        files: null,
+        tracked: { bytes: 20, files: 1 },
       },
-    });
-    expect(outputs).toEqual(['fork_verdict=pass']);
-    expect(logs.some(line => line.includes('diff unread'))).toBe(true);
+      BASE,
+      FIRST
+    );
+    const missingDiff = [];
+    await expect(
+      runPolicy({
+        argv: ['--policy=size', '--also=fork'],
+        env: { GH_TOKEN: 'test-token' },
+        event: event({ head_sha: FIRST, head_commit: { id: FIRST } }),
+        log: () => {},
+        now: () => 1,
+        readLocal: async () => noFiles,
+        writeOutput: line => missingDiff.push(line),
+        request() {
+          throw new MergeGroupPolicyRateLimitError(
+            'GitHub API 403 for /repos/JovieInc/Jovie/pulls/101: API rate limit exceeded for installation'
+          );
+        },
+      })
+    ).rejects.toBeInstanceOf(MergeGroupPolicyRateLimitError);
+    expect(missingDiff).toEqual([]);
+
+    const noTree = [];
+    await expect(
+      runPolicy({
+        argv: ['--policy=size', '--also=fork'],
+        env: { GH_TOKEN: 'test-token', MAX_LINES: '800', MAX_FILES: '40' },
+        event: event({ head_sha: FIRST, head_commit: { id: FIRST } }),
+        log: () => {},
+        now: () => 1,
+        readLocal: async () =>
+          localCheckoutFromEvidence(
+            {
+              baseSha: BASE,
+              headSha: FIRST,
+              parentSha: BASE,
+              treeSha: TREE,
+              subject: 'fix(ci): queue member 101 (#101)',
+              committerName: 'GitHub',
+              committerEmail: 'noreply@github.com',
+              files: [{ filename: 'a.ts', additions: 1, deletions: 0 }],
+            },
+            BASE,
+            FIRST
+          ),
+        writeOutput: line => noTree.push(line),
+        request(path) {
+          if (path.endsWith('/pulls/101')) {
+            return {
+              data: {
+                number: 101,
+                state: 'open',
+                base: { ref: 'main' },
+                head: { sha: SOURCE_101, repo: { fork: false } },
+                labels: [],
+                user: { login: 'contributor' },
+                body: '',
+              },
+            };
+          }
+          throw new MergeGroupPolicyRateLimitError(
+            `GitHub API 403 for ${path}: API rate limit exceeded for installation`
+          );
+        },
+      })
+    ).rejects.toBeInstanceOf(MergeGroupPolicyRateLimitError);
+    expect(noTree).toEqual(['fork_verdict=pass']);
   });
 });

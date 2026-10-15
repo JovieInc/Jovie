@@ -25,10 +25,9 @@ import { findNewEmptyStatePaths } from '../app/app-ia-static-guard';
  * a genuinely-distinct component, raise the family's baseline in the SAME PR
  * with a Linear ID in the description (the inverse of "lower it when you dedup").
  *
- * WARN_ONLY: ships warn-mode first (per the convergence plan, D3) so the
- * mechanism + baseline land without risk. Flip WARN_ONLY to false once the
- * wave-1 dedup PRs (button/CTA, command palettes) have landed and the
- * canonical set is settled — then growth fails CI instead of just warning.
+ * Blocking enforcement is active (WARN_ONLY=false): growth fails CI.
+ * The count baseline and explicit EmptyState path allowlist preserve existing
+ * debt while blocking new forks.
  *
  * Sibling of arbitrary-values-ratchet.test.ts / raw-button-ratchet.test.ts.
  */
@@ -101,7 +100,7 @@ describe('design-system component-family ratchet', () => {
     if (!existsSync(BASELINE_PATH)) {
       writeFileSync(
         BASELINE_PATH,
-        `${JSON.stringify({ counts: current, note: 'Component files per drift-prone family in apps/web/components. Ratchet only goes down — lower when you dedup, raise with a Linear ID for a genuinely-distinct new component. Flip WARN_ONLY=false in the test after wave-1 dedup lands.' }, null, 2)}\n`
+        `${JSON.stringify({ counts: current, note: 'Component files per drift-prone family in apps/web/components. Ratchet only goes down — lower when you dedup, raise with a Linear ID for a genuinely-distinct new component. Blocking enforcement is active (WARN_ONLY=false); new family growth fails CI.' }, null, 2)}\n`
       );
     }
 
