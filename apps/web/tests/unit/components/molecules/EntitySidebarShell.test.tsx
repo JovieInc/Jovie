@@ -41,6 +41,7 @@ describe('EntitySidebarShell', () => {
         ariaLabel='Profile Preview'
         headerMode='minimal'
         hideMinimalHeaderBar
+        showMobileDismissal
         onClose={onClose}
       >
         <div>Preview content</div>
@@ -53,6 +54,91 @@ describe('EntitySidebarShell', () => {
     expect(close.closest('[data-testid="entity-header"]')).toHaveClass(
       'lg:hidden'
     );
+  });
+
+  it('leaves hidden utilities under caller ownership by default', () => {
+    render(
+      <EntitySidebarShell
+        isOpen
+        ariaLabel='Caller-owned inspector'
+        headerMode='minimal'
+        hideMinimalHeaderBar
+        onClose={vi.fn()}
+      >
+        <div>Inspector content</div>
+      </EntitySidebarShell>
+    );
+    expect(
+      screen.queryByRole('button', { name: 'Close', exact: true })
+    ).toBeNull();
+    expect(screen.queryByRole('button', { name: 'More actions' })).toBeNull();
+  });
+
+  it('keeps a supplied entity header as the sole dismissal owner by default', () => {
+    const onClose = vi.fn();
+    render(
+      <EntitySidebarShell
+        isOpen
+        ariaLabel='Track details'
+        headerMode='minimal'
+        hideMinimalHeaderBar
+        onClose={onClose}
+        entityHeader={
+          <button type='button' onClick={onClose}>
+            Close
+          </button>
+        }
+      >
+        <div>Track content</div>
+      </EntitySidebarShell>
+    );
+    const close = screen.getAllByRole('button', { name: 'Close', exact: true });
+    expect(close).toHaveLength(1);
+    fireEvent.click(close[0]);
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('keeps mobile dismissal when an empty state suppresses the entity header', () => {
+    const onClose = vi.fn();
+    render(
+      <EntitySidebarShell
+        isOpen
+        isEmpty
+        ariaLabel='Empty inspector'
+        headerMode='minimal'
+        hideMinimalHeaderBar
+        showMobileDismissal
+        onClose={onClose}
+        entityHeader={<div>Unavailable identity</div>}
+      >
+        <div>Unavailable details</div>
+      </EntitySidebarShell>
+    );
+    expect(screen.queryByText('Unavailable identity')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Close', exact: true }));
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('supports explicit mobile dismissal beside an identity-only header', () => {
+    const onClose = vi.fn();
+    render(
+      <EntitySidebarShell
+        isOpen
+        ariaLabel='Identity inspector'
+        headerMode='minimal'
+        hideMinimalHeaderBar
+        showMobileDismissal
+        onClose={onClose}
+        entityHeader={<div>Entity identity</div>}
+      >
+        <div>Inspector content</div>
+      </EntitySidebarShell>
+    );
+    expect(screen.getByText('Entity identity')).toBeInTheDocument();
+    const close = screen.getAllByRole('button', { name: 'Close', exact: true });
+    expect(close).toHaveLength(1);
+    fireEvent.click(close[0]);
+    expect(onClose).toHaveBeenCalledOnce();
   });
 
   it('derives the existing close handler into the drawer keyboard path', () => {

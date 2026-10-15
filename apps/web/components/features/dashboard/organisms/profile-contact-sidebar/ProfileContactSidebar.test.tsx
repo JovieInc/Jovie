@@ -148,16 +148,19 @@ vi.mock('@/components/molecules/drawer', () => ({
     'data-testid': testId,
     id,
     onClose,
+    showMobileDismissal = false,
   }: {
     children: React.ReactNode;
     id?: string;
     onClose?: () => void;
+    showMobileDismissal?: boolean;
     'data-testid'?: string;
   }) => (
     <aside
       id={id}
       data-testid={testId}
       data-close-handler={onClose ? 'present' : 'none'}
+      data-mobile-dismissal={String(showMobileDismissal)}
     >
       {children}
     </aside>
@@ -502,6 +505,25 @@ describe('ProfileContactSidebar optimistic mutation sequencing', () => {
     renderEditingSidebar();
 
     expect(screen.getByTestId('profile-contact-sidebar')).toBeInTheDocument();
+    expect(screen.getByTestId('profile-contact-sidebar')).toHaveAttribute(
+      'data-mobile-dismissal',
+      'false'
+    );
+  });
+
+  it('keeps explicit mobile dismissal in the read-only profile preview', () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <ProfileContactSidebar />
+      </QueryClientProvider>
+    );
+    expect(screen.getByTestId('profile-contact-sidebar')).toHaveAttribute(
+      'data-mobile-dismissal',
+      'true'
+    );
   });
 
   it('does not expose content readiness while the profile rail is a skeleton', () => {
@@ -522,6 +544,7 @@ describe('ProfileContactSidebar optimistic mutation sequencing', () => {
     const rail = screen.getByTestId('profile-contact-sidebar-skeleton');
     expect(rail).toHaveAttribute('id', 'shell-artist-profile-rail');
     expect(rail).toHaveAttribute('data-close-handler', 'present');
+    expect(rail).toHaveAttribute('data-mobile-dismissal', 'true');
     expect(
       screen.getByTestId('profile-contact-sidebar-skeleton')
     ).toBeInTheDocument();

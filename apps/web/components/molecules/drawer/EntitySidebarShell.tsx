@@ -38,8 +38,10 @@ export interface EntitySidebarShellProps {
   readonly headerActions?: ReactNode;
   /** Minimal mode keeps top chrome utility-only and moves entity header into scrollable content. */
   readonly headerMode?: 'standard' | 'minimal';
-  /** Hide desktop utilities in minimal mode; mobile keeps explicit dismissal. */
+  /** Hide the utility bar in minimal mode; callers retain dismissal ownership. */
   readonly hideMinimalHeaderBar?: boolean;
+  /** Add mobile dismissal when a hidden minimal utility bar has no caller-owned Close. */
+  readonly showMobileDismissal?: boolean;
   /**
    * Drops the shell's sub-lg outer padding so children can paint full-bleed to
    * the drawer edges (e.g. the profile preview gradient hero). Callers own
@@ -130,6 +132,7 @@ export function EntitySidebarShell({
   headerActions,
   headerMode = 'standard',
   hideMinimalHeaderBar = false,
+  showMobileDismissal = false,
   contentBleed = false,
   workspaceSurface = 'raised',
   entityHeader,
@@ -247,12 +250,15 @@ export function EntitySidebarShell({
           !contentBleed && 'px-1.5 py-1.5 lg:px-0 lg:py-0'
         )}
       >
-        {isMinimalHeader && hideMinimalHeaderBar && onClose ? (
+        {isMinimalHeader &&
+        hideMinimalHeaderBar &&
+        showMobileDismissal &&
+        onClose ? (
           <EntityHeader
             layout='chrome'
             title={<span className='sr-only'>{ariaLabel}</span>}
             actions={closeAction}
-            className='min-h-9 shrink-0 px-2.5 py-1 lg:hidden'
+            className='min-h-9 shrink-0 px-3 py-1 lg:hidden'
           />
         ) : null}
         {hasTopRailContent || minimalEntityHeaderContent ? (
