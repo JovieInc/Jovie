@@ -154,6 +154,13 @@ describe('AdminUserDetailDrawer', () => {
     ).toHaveTextContent('1');
     expect(screen.getByText('jov.ie/alex')).toBeInTheDocument();
     expect(screen.getByText('User ID')).toBeInTheDocument();
+    const details = screen.getByTestId('admin-user-details');
+    expect(details.closest('[data-surface-variant="card"]')).toBeNull();
+    expect(
+      screen
+        .getByTestId('admin-user-summary')
+        .compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
   });
 
   it('closes the composed user rail through Escape and removes stale details after selection clears', () => {
