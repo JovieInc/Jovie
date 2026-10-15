@@ -21,11 +21,13 @@ import {
 
 const ALL = ['ios', 'mac', 'web', 'cross-product'];
 const JS = ['mac', 'web', 'cross-product'];
-const pkg = (before, after) =>
+const pkg = (before, after, desktop = {}) =>
   classifyProductLanes(['package.json'], {
     packageJsonBefore:
       typeof before === 'string' ? before : JSON.stringify(before),
     packageJsonAfter: typeof after === 'string' ? after : JSON.stringify(after),
+    desktopPackageJsonBefore: desktop.before,
+    desktopPackageJsonAfter: desktop.after,
   });
 
 describe('product lane classifier', () => {
@@ -235,6 +237,119 @@ describe('product lane classifier', () => {
       ).selectedLanes
     ).toEqual(JS);
     expect(pkg({ scripts: {} }, {}).selectedLanes).toEqual(JS);
+  });
+
+  it('skips the Mac lane for a root script the Mac job cannot run (JOV-6113)', () => {
+    const desktop = {
+      before: JSON.stringify({
+        name: '@jovie/desktop',
+        scripts: { test: 'node --test scripts/desktop.test.mjs' },
+      }),
+      after: JSON.stringify({
+        name: '@jovie/desktop',
+        scripts: { test: 'node --test scripts/desktop.test.mjs' },
+      }),
+    };
+    const nodeTest = include =>
+      `node --test --experimental-test-coverage --test-coverage-include=${include} --test-coverage-lines=95 --test-coverage-branches=90 --test-coverage-functions=100 ${include.replace(/\.mjs$/, '.test.mjs')}`;
+    const before = {
+      scripts: {
+        'run-outcome:check': `${nodeTest('scripts/invariants/jev-writing-quality.mjs')} && pnpm evals:management-judgment`,
+        'evals:management-judgment':
+          'node scripts/evals/management-judgment.test.mjs',
+      },
+    };
+    const after = {
+      scripts: {
+        'run-outcome:check': `${nodeTest('scripts/invariants/jev-writing-controller.mjs')} && ${nodeTest('scripts/invariants/jev-writing-quality.mjs')} && pnpm evals:management-judgment`,
+        'evals:management-judgment':
+          'node scripts/evals/management-judgment.test.mjs',
+      },
+    };
+    const receipt = pkg(before, after, desktop);
+    expect(receipt.selectedLanes).toEqual(['web', 'cross-product']);
+    expect(receipt.classifications[0]).toMatchObject({
+      rule: 'shared-js-workspace-web-only',
+      affectedProducts: ['web'],
+    });
+    // No desktop evidence fails closed onto Mac.
+    expect(pkg(before, after).selectedLanes).toEqual(JS);
+    // Install hooks run on the Mac runner even when the command looks like a test.
+    expect(
+      pkg(
+        { scripts: { prepare: 'node scripts/hooks/configure.mjs' } },
+        { scripts: { prepare: 'node scripts/hooks/configure.mjs --strict' } },
+        desktop
+      ).selectedLanes
+    ).toEqual(JS);
+    // The desktop manifest calling the root script keeps Mac.
+    expect(
+      pkg(before, after, {
+        ...desktop,
+        after: JSON.stringify({
+          name: '@jovie/desktop',
+          scripts: { test: 'pnpm -w run run-outcome:check' },
+        }),
+      }).selectedLanes
+    ).toEqual(JS);
+    // Ambiguous or Mac-surface commands keep Mac.
+    for (const command of [
+      'bash scripts/rebuild.sh',
+      'node --eval "console.log(1)"',
+      'node scripts/invariants/check.mjs || node scripts/invariants/other.mjs',
+      'pnpm --filter @jovie/desktop run test',
+      'electron .',
+    ]) {
+      expect(
+        pkg(
+          { scripts: { 'ci:control:test': 'node scripts/ci/control.test.mjs' } },
+          { scripts: { 'ci:control:test': command } },
+          desktop
+        ).selectedLanes,
+        command
+      ).toEqual(JS);
+    }
+    // A callee that names the desktop package keeps Mac.
+    expect(
+      pkg(
+        {
+          scripts: {
+            'ci:control:test': 'pnpm ci:inner',
+            'ci:inner': 'node scripts/ci/inner.test.mjs',
+          },
+        },
+        {
+          scripts: {
+            'ci:control:test': 'pnpm ci:inner',
+            'ci:inner': 'pnpm --filter @jovie/desktop run test',
+          },
+        },
+        desktop
+      ).selectedLanes
+    ).toEqual(JS);
+    // Dependency edits still select Mac, with or without desktop evidence.
+    expect(
+      pkg(
+        { devDependencies: { turbo: '1' } },
+        { devDependencies: { turbo: '2' } },
+        desktop
+      ).selectedLanes
+    ).toEqual(JS);
+  });
+
+  it('locks the Mac lane to desktop-filtered pnpm so root scripts stay off that runner', () => {
+    const workflow = readFileSync(
+      new URL('../../../.github/workflows/macos-ci.yml', import.meta.url),
+      'utf8'
+    );
+    const invocations = workflow
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.startsWith('pnpm '));
+    expect(invocations.length).toBeGreaterThan(0);
+    for (const invocation of invocations) {
+      expect(invocation).toContain('--filter @jovie/desktop');
+    }
   });
 
   it('selects iOS for direct, forward-alias, and reverse-alias changes', () => {

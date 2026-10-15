@@ -313,7 +313,172 @@ function scriptChangeAffectsIos(script, scripts) {
   });
 }
 
-export function classifyPackageJsonChange(beforeSource, afterSource) {
+// pnpm install on the Mac runner executes these hooks. Publish hooks do not.
+const PNPM_INSTALL_LIFECYCLE = new Set([
+  'preinstall',
+  'install',
+  'postinstall',
+  'preprepare',
+  'prepare',
+  'postprepare',
+]);
+// The Mac lane's own run block (macos-ci.yml) invokes only
+// `pnpm --filter @jovie/desktop`. A root script change can still reach that
+// lane when install runs it, when the desktop manifest calls it with
+// `pnpm -w`, or when its command (or a script it calls) names Mac product
+// surfaces. Anything else that is not a static node/pnpm test chain keeps Mac.
+const MAC_COMMAND_SURFACE =
+  /apps\/(?:desktop|macos)(?:\/|["'\s]|$)|@jovie\/desktop\b|\belectron-builder\b|\belectron\b|MenuMonitor|\bswift\b|\bxcodebuild\b/;
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function lifecycleReaches(scripts, scriptName) {
+  if (!isJsonObject(scripts)) return true;
+  for (const hook of PNPM_INSTALL_LIFECYCLE) {
+    if (scriptDependsOn(hook, scriptName, scripts)) return true;
+  }
+  return false;
+}
+
+function desktopInvokesRootScript(source, scriptName) {
+  if (typeof source !== 'string') return true;
+  const name = escapeRegExp(scriptName);
+  return new RegExp(
+    String.raw`(?:^|[\s\n;&|"'])pnpm\s+(?:-w|--workspace-root)\s+(?:(?:run|run-script)\s+)?${name}(?=$|[\s\n;&|"'])`
+  ).test(source);
+}
+
+function scriptCommandMacIrrelevant(script, scripts, visited) {
+  if (visited.has(script)) return true;
+  const command = scripts[script];
+  if (typeof command !== 'string') return false;
+  const next = new Set(visited);
+  next.add(script);
+  return commandChainMacIrrelevant(command, scripts, next);
+}
+
+const NODE_TEST_FLAGS = new Set([
+  '--test',
+  '--experimental-test-coverage',
+  '--test-coverage-include',
+  '--test-coverage-exclude',
+  '--test-coverage-lines',
+  '--test-coverage-branches',
+  '--test-coverage-functions',
+  '--test-reporter',
+  '--test-reporter-destination',
+  '--test-name-pattern',
+  '--test-skip-pattern',
+  '--test-force-exit',
+  '--import',
+]);
+
+function nodeSegmentMacIrrelevant(segment) {
+  if (MAC_COMMAND_SURFACE.test(segment)) return false;
+  const tokens = segment.split(/\s+/);
+  if (tokens[0] !== 'node') return false;
+  let sawFile = false;
+  for (let index = 1; index < tokens.length; index += 1) {
+    const token = tokens[index];
+    if (token.startsWith('--')) {
+      const flag = token.split('=')[0];
+      if (!NODE_TEST_FLAGS.has(flag)) return false;
+      if (token === '--import') {
+        const modulePath = tokens[index + 1];
+        if (!modulePath || modulePath.startsWith('-')) return false;
+        index += 1;
+      }
+      continue;
+    }
+    if (token.startsWith('-')) return false;
+    sawFile = true;
+  }
+  return sawFile;
+}
+
+function segmentMacIrrelevant(segment, scripts, visited) {
+  if (segment === 'true') return true;
+  if (MAC_COMMAND_SURFACE.test(segment)) return false;
+  if (segment.startsWith('node ')) {
+    return nodeSegmentMacIrrelevant(segment);
+  }
+  if (/^(?:pnpm|npm|yarn)\s+/.test(segment)) {
+    if (/--filter\b|(?:^|\s)-w(?:\s|$)|--workspace-root\b/.test(segment)) {
+      return false;
+    }
+    const invocations = packageScriptInvocations(segment, scripts);
+    if (invocations.length !== 1) return false;
+    const name = invocations[0];
+    const bare = segment.replace(/\s+/g, ' ').trim();
+    const allowed = new Set([
+      `pnpm run ${name}`,
+      `pnpm run-script ${name}`,
+      `pnpm ${name}`,
+      `npm run ${name}`,
+      `npm run-script ${name}`,
+      `yarn run ${name}`,
+      `yarn ${name}`,
+    ]);
+    if (!allowed.has(bare)) return false;
+    return scriptCommandMacIrrelevant(name, scripts, visited);
+  }
+  return false;
+}
+
+function commandChainMacIrrelevant(command, scripts, visited) {
+  if (typeof command !== 'string' || command.length === 0) return false;
+  if (MAC_COMMAND_SURFACE.test(command) || /[;|]/.test(command)) return false;
+  const segments = command
+    .split('&&')
+    .map(segment => segment.trim())
+    .filter(Boolean);
+  if (segments.length === 0) return false;
+  return segments.every(segment =>
+    segmentMacIrrelevant(segment, scripts, visited)
+  );
+}
+
+/**
+ * True only when every changed root script is proven not to run on the Mac
+ * lane. Missing desktop manifests fail closed (keep Mac). JOV-6113.
+ */
+function changedRootScriptsSpareMacLane(
+  beforeScripts,
+  afterScripts,
+  changedScripts,
+  desktopBefore,
+  desktopAfter
+) {
+  if (typeof desktopBefore !== 'string' || typeof desktopAfter !== 'string') {
+    return false;
+  }
+  for (const script of changedScripts) {
+    if (
+      lifecycleReaches(beforeScripts, script) ||
+      lifecycleReaches(afterScripts, script) ||
+      desktopInvokesRootScript(desktopBefore, script) ||
+      desktopInvokesRootScript(desktopAfter, script)
+    ) {
+      return false;
+    }
+    const beforeOk =
+      beforeScripts[script] === undefined ||
+      scriptCommandMacIrrelevant(script, beforeScripts, new Set());
+    const afterOk =
+      afterScripts[script] === undefined ||
+      scriptCommandMacIrrelevant(script, afterScripts, new Set());
+    if (!beforeOk || !afterOk) return false;
+  }
+  return true;
+}
+
+export function classifyPackageJsonChange(
+  beforeSource,
+  afterSource,
+  { desktopPackageJsonBefore, desktopPackageJsonAfter } = {}
+) {
   if (typeof beforeSource !== 'string' || typeof afterSource !== 'string') {
     return sharedPackageClassification(
       'shared-js-workspace-unresolved',
@@ -399,6 +564,20 @@ export function classifyPackageJsonChange(beforeSource, afterSource) {
       scriptChangeAffectsIos(script, afterScripts)
     );
   });
+  // JOV-6113: a root script the Mac lane cannot run must not queue macos-15.
+  // Web stays selected. Missing desktop evidence or an ambiguous command keeps Mac.
+  if (
+    !changesIosCommand &&
+    changedRootScriptsSpareMacLane(
+      beforeScripts,
+      afterScripts,
+      changedScripts,
+      desktopPackageJsonBefore,
+      desktopPackageJsonAfter
+    )
+  ) {
+    return sharedPackageClassification('shared-js-workspace-web-only', ['web']);
+  }
   return sharedPackageClassification(
     'shared-js-workspace',
     changesIosCommand ? PRODUCT_LANES : JS_WORKSPACE_PRODUCTS
@@ -577,6 +756,8 @@ export function classifyProductLanes(
   {
     packageJsonBefore,
     packageJsonAfter,
+    desktopPackageJsonBefore,
+    desktopPackageJsonAfter,
     lockfileBefore,
     lockfileAfter,
     qualificationProfile = 'full',
@@ -591,7 +772,10 @@ export function classifyProductLanes(
   for (const path of changedPaths) {
     const rule =
       path === 'package.json'
-        ? classifyPackageJsonChange(packageJsonBefore, packageJsonAfter)
+        ? classifyPackageJsonChange(packageJsonBefore, packageJsonAfter, {
+            desktopPackageJsonBefore,
+            desktopPackageJsonAfter,
+          })
         : path === 'pnpm-lock.yaml'
           ? classifyLockfileChange(lockfileBefore, lockfileAfter)
           : RULES.find(([, , , pattern]) => pattern.test(path));
@@ -689,6 +873,18 @@ function readPackageJsonAtRef(ref, cwd) {
   return readFileAtRef(ref, 'package.json', cwd);
 }
 
+function readOptionalFileAtRef(ref, path, cwd) {
+  try {
+    return { ok: true, text: readFileAtRef(ref, path, cwd) };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/does not exist|exists on disk, but not in|not in ['"]/.test(message)) {
+      return { ok: true, text: '' };
+    }
+    return { ok: false, message };
+  }
+}
+
 export function evaluateProductLaneResults(receipt, results) {
   const selected = new Set(receipt.selectedLanes);
   const admissions = Object.fromEntries(
@@ -778,6 +974,8 @@ export function runProductLaneClassifier(
   const files = readFileSync(args['files-from'], 'utf8').split(/\r?\n/);
   let packageJsonBefore;
   let packageJsonAfter;
+  let desktopPackageJsonBefore;
+  let desktopPackageJsonAfter;
   if (files.map(normalizePath).includes('package.json')) {
     try {
       packageJsonBefore = readPackageJsonAtRef(args['base-ref'], cwd);
@@ -785,6 +983,24 @@ export function runProductLaneClassifier(
     } catch (error) {
       console.warn(
         `::warning::Could not inspect package.json change; selecting every product lane: ${error.message}`
+      );
+    }
+    const beforeDesktop = readOptionalFileAtRef(
+      args['base-ref'],
+      'apps/desktop/package.json',
+      cwd
+    );
+    const afterDesktop = readOptionalFileAtRef(
+      args['head-ref'],
+      'apps/desktop/package.json',
+      cwd
+    );
+    if (beforeDesktop.ok && afterDesktop.ok) {
+      desktopPackageJsonBefore = beforeDesktop.text;
+      desktopPackageJsonAfter = afterDesktop.text;
+    } else {
+      console.warn(
+        `::warning::Could not inspect apps/desktop/package.json; keeping the Mac lane for root script changes: ${beforeDesktop.message || afterDesktop.message}`
       );
     }
   }
@@ -803,6 +1019,8 @@ export function runProductLaneClassifier(
   const receipt = classifyProductLanes(files, {
     packageJsonBefore,
     packageJsonAfter,
+    desktopPackageJsonBefore,
+    desktopPackageJsonAfter,
     lockfileBefore,
     lockfileAfter,
     qualificationProfile: args['qualification-profile'] ?? 'full',
