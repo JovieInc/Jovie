@@ -386,6 +386,8 @@ module.exports = [
       '**/*.test.tsx',
     ],
     rules: {
+      // Fixtures may exercise driver transactions directly; runtime code may not.
+      '@jovie/no-db-transaction': 'off',
       '@jovie/use-client-directive': 'off',
       '@next/next/no-img-element': 'off',
       // Call-site no-restyle is a production contract (JOV-6280).
