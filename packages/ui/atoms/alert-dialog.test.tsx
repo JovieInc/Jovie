@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -24,6 +25,7 @@ const TestAlertDialog = ({
   actionText = 'Continue',
   cancelText = 'Cancel',
   actionVariant,
+  disablePortal,
 }: {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -34,12 +36,13 @@ const TestAlertDialog = ({
   actionText?: string;
   cancelText?: string;
   actionVariant?: 'destructive' | 'primary';
+  disablePortal?: boolean;
 }) => (
   <AlertDialog open={open} onOpenChange={onOpenChange}>
     <AlertDialogTrigger asChild>
       <button type='button'>Open Alert</button>
     </AlertDialogTrigger>
-    <AlertDialogContent>
+    <AlertDialogContent disablePortal={disablePortal}>
       <AlertDialogHeader>
         <AlertDialogTitle>{title}</AlertDialogTitle>
         <AlertDialogDescription>{description}</AlertDialogDescription>
@@ -248,6 +251,64 @@ describe('AlertDialog', () => {
       render(<TestAlertDialog open={true} />);
       const cancel = screen.getByTestId('alert-dialog-cancel');
       expect(cancel.className).toContain('border');
+    });
+  });
+
+  describe('Modal motion contract', () => {
+    it.each([false, true])(
+      'uses cinematic reveal tokens and preserves reduced motion (inline=%s)',
+      disablePortal => {
+        render(<TestAlertDialog open disablePortal={disablePortal} />);
+
+        expect(screen.getByRole('alertdialog')).toHaveClass(
+          'duration-cinematic',
+          'ease-cinematic',
+          'data-[state=open]:animate-in',
+          'data-[state=closed]:animate-out',
+          'motion-reduce:animate-none'
+        );
+        expect(screen.getByRole('alertdialog')).not.toHaveClass('duration-200');
+      }
+    );
+  });
+
+  describe('Confirmation state keyboard contract', () => {
+    it.each([
+      { state: 'default' },
+      { state: 'destructive', actionVariant: 'destructive' as const },
+      {
+        state: 'long-content',
+        description: 'Review the consequences before continuing. '.repeat(80),
+      },
+    ])('keeps safe focus and explicit confirmation in $state', async props => {
+      const user = userEvent.setup();
+      const onAction = vi.fn();
+      render(<TestAlertDialog {...props} onAction={onAction} />);
+      const trigger = screen.getByRole('button', { name: /open alert/i });
+      await user.click(trigger);
+
+      expect(screen.getByRole('alertdialog')).toHaveAccessibleName(
+        'Are you sure?'
+      );
+      expect(screen.getByRole('alertdialog')).toHaveAccessibleDescription(
+        props.description?.trim() ?? 'This action cannot be undone.'
+      );
+      expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus();
+      await user.tab();
+      expect(screen.getByRole('button', { name: 'Continue' })).toHaveFocus();
+      await user.tab();
+      expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus();
+      await user.keyboard('{Enter}');
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+      expect(trigger).toHaveFocus();
+      expect(onAction).not.toHaveBeenCalled();
+
+      await user.click(trigger);
+      await user.tab();
+      await user.keyboard('{Enter}');
+      expect(onAction).toHaveBeenCalledOnce();
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+      expect(trigger).toHaveFocus();
     });
   });
 

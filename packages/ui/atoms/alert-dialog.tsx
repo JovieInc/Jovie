@@ -71,7 +71,10 @@ const AlertDialogContent = React.forwardRef<
     centeredContentStyles.position,
     centeredContentStyles.layout,
     centeredContentStyles.surface,
-    centeredContentStyles.animation,
+    centeredContentStyles.animation.replace(
+      'duration-200',
+      'duration-cinematic ease-cinematic'
+    ),
     centeredContentStyles.rounded,
     centeredContentStyles.reducedMotion,
     className
