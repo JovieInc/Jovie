@@ -199,6 +199,7 @@ const mockOpportunityQueryOptions = vi.fn();
 
 let mockInsightsLoading = false;
 let mockInsightsError = false;
+let mockInsightsPending = false;
 let mockInsightsSummary: {
   readonly insights: InsightResponse[];
   readonly totalActive: number;
@@ -229,7 +230,7 @@ vi.mock('@/lib/queries', () => ({
     };
   },
   useInsightsSummaryQuery: () => ({
-    data: mockInsightsSummary,
+    data: mockInsightsPending ? undefined : mockInsightsSummary,
     isLoading: mockInsightsLoading,
     isError: mockInsightsError,
   }),
@@ -278,6 +279,7 @@ describe('JovieChat empty state', () => {
     mockPendingOpportunityCards.length = 0;
     mockInsightsLoading = false;
     mockInsightsError = false;
+    mockInsightsPending = false;
     mockInsightsSummary = {
       insights: [],
       totalActive: 0,
@@ -423,6 +425,37 @@ describe('JovieChat empty state', () => {
     expect(mockChatState.handleSuggestedPrompt).not.toHaveBeenCalled();
     expect(mockChatState.submitMessage).not.toHaveBeenCalled();
     expect(mockChatState.handleSubmit).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it('keeps the welcome pending until the insights summary has settled', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-14T20:00:00Z'));
+    mockInsightsPending = true;
+    mockInsightsLoading = false;
+    const { rerender } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' displayName='Tim White' />
+    );
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Finding your next step'
+    );
+    expect(
+      screen.queryByRole('button', { name: 'Draft This With Jovie' })
+    ).toBeNull();
+    expect(
+      screen.queryByRole('link', { name: 'Review Your Profile' })
+    ).toBeNull();
+
+    mockInsightsPending = false;
+    mockInsightsSummary = {
+      insights: [actionableInsight()],
+      totalActive: 1,
+      lastGeneratedAt: '2026-10-14T00:00:00Z',
+    };
+    rerender(<JovieChat profileId='profile-1' displayName='Tim White' />);
+    expect(
+      screen.getByRole('button', { name: 'Draft This With Jovie' })
+    ).toBeInTheDocument();
     vi.useRealTimers();
   });
 
