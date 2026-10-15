@@ -28,6 +28,40 @@ const roundedClasses: Record<RoundedVariant, string> = {
 };
 
 const RESERVED_GEOMETRY_UTILITY_PATTERN = /^(?:min-|max-)?[hw]-.+$|^size-.+$/;
+const RESERVED_GEOMETRY_PROPERTY_PATTERN =
+  /^\[(?:min-|max-)?(?:width|height|inline-size|block-size):.+\]$/i;
+
+function baseUtility(token: string): string {
+  let depth = 0;
+  let start = 0;
+  let quote: string | undefined;
+
+  // Colons inside arbitrary variants, values and properties are not separators.
+  for (let index = 0; index < token.length; index++) {
+    const character = token[index];
+    if (character === '\\') {
+      index++;
+      continue;
+    }
+    if (quote) {
+      if (character === quote) quote = undefined;
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      quote = character;
+      continue;
+    }
+    if (character === '[' || character === '(') {
+      depth++;
+    } else if (character === ']' || character === ')') {
+      depth--;
+    } else if (character === ':' && depth === 0) {
+      start = index + 1;
+    }
+  }
+
+  return token.slice(start).replace(/^!|!$/g, '');
+}
 
 function withoutReservedGeometry(className: string | undefined): string {
   if (!className) return '';
@@ -36,8 +70,11 @@ function withoutReservedGeometry(className: string | undefined): string {
     .split(/\s+/)
     .filter(Boolean)
     .filter(token => {
-      const utility = token.split(':').at(-1)?.replace(/^!|!$/g, '');
-      return !utility || !RESERVED_GEOMETRY_UTILITY_PATTERN.test(utility);
+      const utility = baseUtility(token);
+      return (
+        !RESERVED_GEOMETRY_UTILITY_PATTERN.test(utility) &&
+        !RESERVED_GEOMETRY_PROPERTY_PATTERN.test(utility)
+      );
     })
     .join(' ');
 }

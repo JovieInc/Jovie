@@ -225,18 +225,40 @@ describe('LoadingSkeleton', () => {
       expect(container).toHaveAttribute('role', 'status');
     });
 
-    it('normalizes invalid line counts to one visible placeholder', () => {
-      render(<LoadingSkeleton lines={0} />);
+    it.each([0, -3, 0.5])(
+      'normalizes %s lines to one visible placeholder',
+      lines => {
+        render(<LoadingSkeleton lines={lines} />);
 
-      expect(document.querySelectorAll('.skeleton')).toHaveLength(1);
-      expect(screen.getByRole('status')).toHaveAttribute('data-lines', '1');
-    });
+        expect(document.querySelectorAll('.skeleton')).toHaveLength(1);
+        expect(screen.getByRole('status')).toHaveAttribute('data-lines', '1');
+      }
+    );
 
-    it('normalizes non-finite line counts to one visible placeholder', () => {
-      render(<LoadingSkeleton lines={Number.NaN} />);
+    it.each([Number.NaN, Infinity, -Infinity])(
+      'normalizes non-finite %s lines to one visible placeholder',
+      lines => {
+        render(<LoadingSkeleton lines={lines} />);
 
-      expect(document.querySelectorAll('.skeleton')).toHaveLength(1);
-      expect(screen.getByRole('status')).toHaveAttribute('data-lines', '1');
+        expect(document.querySelectorAll('.skeleton')).toHaveLength(1);
+        expect(screen.getByRole('status')).toHaveAttribute('data-lines', '1');
+      }
+    );
+
+    it('floors fractional line counts and keeps one named polite status owner', () => {
+      const { container } = render(
+        <LoadingSkeleton lines={3.9} label='  Loading profile  ' />
+      );
+
+      const status = screen.getByRole('status', { name: 'Loading profile' });
+      expect(screen.getAllByRole('status')).toHaveLength(1);
+      expect(status).toHaveAttribute('aria-live', 'polite');
+      expect(status).toHaveAttribute('aria-busy', 'true');
+      expect(status).toHaveAttribute('aria-atomic', 'true');
+      expect(status).toHaveAttribute('data-lines', '3');
+      const skeletons = container.querySelectorAll('[data-slot="skeleton"]');
+      expect(skeletons).toHaveLength(3);
+      expect(skeletons[2]).toHaveClass('h-4', 'w-3/4');
     });
   });
 
@@ -278,6 +300,93 @@ describe('LoadingSkeleton', () => {
         'min-h-24',
         'max-w-0'
       );
+    });
+
+    it.each([
+      'h-[length:var(--caller-height)] w-[length:var(--caller-width)]',
+      'sm:!h-[length:var(--caller-height)] md:w-[length:var(--caller-width)]!',
+      'lg:hover:min-h-[length:var(--caller-height)] max-w-[length:var(--caller-width)]',
+      '[&:nth-child(2)]:size-[length:var(--caller-size)]',
+      "[&[data-shape='(']]:w-[length:var(--caller-width)]",
+      '[&[data-shape="]"]]:h-8',
+      '[&[data-shape=\\(]]:size-12',
+      'supports-[width:fit-content]:h-(length:--caller-height) sm:w-(length:--caller-width)',
+      '[height:13px] [width:29px]',
+      'sm:![min-height:13px] md:[max-width:29px]!',
+      '[max-height:13px] [min-width:29px]',
+      'lg:[block-size:13px] [inline-size:29px]',
+      '[min-block-size:13px] sm:[max-inline-size:29px]',
+    ])('rejects dimension overrides in caller styling: %s', className => {
+      const { container } = render(
+        <LoadingSkeleton className={className} height='h-6' width='w-48' />
+      );
+
+      const skeleton = container.querySelector('[data-slot="skeleton"]');
+      expect(skeleton).toHaveClass('h-6', 'w-48');
+      for (const utility of className.split(' ')) {
+        expect(skeleton).not.toHaveClass(utility);
+      }
+    });
+
+    it('preserves ordinary styling including colons and dimension-like text', () => {
+      const classes = [
+        'shrink-0',
+        'rounded-lg',
+        'shadow-sm',
+        'sm:hover:opacity-60',
+        'bg-[color:var(--color-skeleton-base)]',
+        '[mask-type:luminance]',
+        '[--caller-note:w-96]',
+        "before:content-['w-96:h-20']",
+        'data-[size=w-96]:opacity-60',
+        '[&:is([data-size=w-96])]:opacity-60',
+      ];
+      const { container } = render(
+        <LoadingSkeleton className={` \t${classes.join('  ')}\n `} />
+      );
+
+      expect(container.querySelector('[data-slot="skeleton"]')).toHaveClass(
+        'h-4',
+        'w-full',
+        ...classes
+      );
+    });
+
+    it('protects every line and the shorter last line beneath a shared status owner', () => {
+      const className = 'sm:w-[length:var(--caller-width)] [height:13px]';
+      render(
+        <div role='status' aria-live='polite' aria-label='Loading profile'>
+          <LoadingSkeleton
+            announce={false}
+            lines={3}
+            className={`${className} opacity-60`}
+            height='h-6'
+            width='w-48'
+          />
+        </div>
+      );
+
+      const status = screen.getByRole('status', { name: 'Loading profile' });
+      expect(screen.getAllByRole('status')).toHaveLength(1);
+      const skeletons = status.querySelectorAll('[data-slot="skeleton"]');
+      expect(skeletons).toHaveLength(3);
+      skeletons.forEach((skeleton, index) => {
+        expect(skeleton).toHaveClass(
+          'h-6',
+          index === 2 ? 'w-3/4' : 'w-48',
+          'opacity-60',
+          'motion-reduce:animate-none',
+          'motion-reduce:bg-none'
+        );
+        for (const utility of className.split(' ')) {
+          expect(skeleton).not.toHaveClass(utility);
+        }
+        expect(skeleton).toHaveAttribute('aria-hidden', 'true');
+        expect(skeleton).not.toHaveAttribute('role');
+      });
+      const owner = status.querySelector('[data-slot="loading-skeleton"]');
+      expect(owner).not.toHaveAttribute('aria-live');
+      expect(owner).not.toHaveAttribute('aria-label');
     });
 
     it('applies height to all lines', () => {
