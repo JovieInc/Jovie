@@ -3337,6 +3337,34 @@ describe('CI E2E smoke workflow', () => {
     expect(smokeJob).not.toContain('Export DATABASE_URL (main');
   });
 
+  it('builds the golden-path challenge fixture with a public test key and real auth', () => {
+    const workflow = parseYaml(readFileSync(workflowPath, 'utf8')) as {
+      jobs: Record<
+        string,
+        {
+          env?: Record<string, string>;
+          steps: { name?: string; env?: Record<string, string> }[];
+        }
+      >;
+    };
+    const job = workflow.jobs['ci-golden-path']!;
+    const builds = job.steps.filter(
+      step => step.name === 'Build real-Clerk golden-path artifact'
+    );
+
+    expect(builds).toHaveLength(1);
+    expect(builds[0]?.env).toMatchObject({
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: '1x00000000000000000000AA',
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:
+        '${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}',
+      NEXT_PUBLIC_APP_URL: 'http://localhost:3250',
+      NEXT_PUBLIC_BETTER_AUTH_URL: 'http://localhost:3250',
+    });
+    expect(builds[0]?.env).not.toHaveProperty('NEXT_PUBLIC_E2E_MODE');
+    expect(builds[0]?.env).not.toHaveProperty('E2E_TEST_MODE');
+    expect(job.env).not.toHaveProperty('NEXT_PUBLIC_TURNSTILE_SITE_KEY');
+  });
+
   it('pins Better Auth to the local standalone origin for smoke and golden-path jobs', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     // Shared build artifact feeds multiple lanes on one self-hosted machine, so
