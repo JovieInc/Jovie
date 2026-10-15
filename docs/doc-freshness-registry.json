@@ -476,7 +476,7 @@
     "docs/writing/SURFACE_COVERAGE.md": {
       "owner": "@itstimwhite",
       "claim": "Writing surface completeness is validated by the existing invariant consumer.",
-      "documentSha256": "1a1cf51249295ae88a750bc3a30254aec871c686ca555d01fe3f1d4583d0af68",
+      "documentSha256": "13afd3227d7edeb5277b2b7e9d5a343cd8ed67f0d5bf9769535f0f9f6ccf4391",
       "sources": [
         {
           "path": "scripts/invariants/writing-surfaces.mjs",
