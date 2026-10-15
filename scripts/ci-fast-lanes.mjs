@@ -144,6 +144,15 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: true,
   }),
   Object.freeze({
+    id: 'public-command-openapi',
+    command:
+      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/api/v1/public-command-openapi.test.ts app/api/agents/creator-lookup/route.test.ts app/api/agents/feedback/route.test.ts app/api/agents/profiles/route.test.ts',
+    // The contract spans the web document and the CLI/MCP command registry.
+    inputs:
+      /^(?:apps\/web\/(?:app\/(?:api\/(?:agents\/|music\/mcp\/|v1\/openapi\.json\/)|openapi\.json\/)|lib\/(?:api\/|music-resolver\/public-(?:read|schemas)\.ts$)|tests\/(?:unit\/api\/v1\/[^/]*openapi[^/]*\.test\.ts|utils\/public-openapi\.ts)$)|packages\/jovie-cli\/src\/)/u,
+    prOnly: true,
+  }),
+  Object.freeze({
     id: 'static-revalidate-policy',
     command:
       'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/marketing/static-revalidate-policy.test.ts',
