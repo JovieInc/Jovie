@@ -5,6 +5,7 @@ import { ImageIcon } from 'lucide-react';
 import Image from 'next/image';
 import { type KeyboardEvent, type RefObject, useCallback, useRef } from 'react';
 import type { OpportunityInboxCardViewModel } from '@/lib/connectors/opportunity-inbox-types';
+import { isShellShortcutSuppressed } from '@/lib/utils/keyboard';
 import {
   FounderReviewRecorder,
   type FounderReviewRecorderHandle,
@@ -38,12 +39,12 @@ export function FounderReviewStack({
     (event: KeyboardEvent<HTMLButtonElement>) => {
       if (
         !card ||
-        event.defaultPrevented ||
+        pendingActionId === card.id ||
+        isShellShortcutSuppressed(event.nativeEvent) ||
         event.metaKey ||
         event.ctrlKey ||
         event.altKey ||
         event.shiftKey ||
-        event.repeat ||
         event.target !== event.currentTarget
       ) {
         return;
@@ -64,7 +65,7 @@ export function FounderReviewStack({
         recorderRef.current?.reject();
       }
     },
-    [card, isYoutubeThumbnail, onApprove, onReject]
+    [card, isYoutubeThumbnail, onApprove, onReject, pendingActionId]
   );
   if (!card) return null;
 
@@ -79,6 +80,7 @@ export function FounderReviewStack({
         variant='ghost'
         size='sm'
         className='sr-only focus-visible:absolute focus-visible:top-0 focus-visible:left-0 focus-visible:z-20 focus-visible:not-sr-only'
+        disabled={pendingActionId === card.id}
         onClick={() => onOpen?.(card.id)}
         onKeyDown={handleKeyDown}
       >
