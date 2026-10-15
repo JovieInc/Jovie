@@ -55,6 +55,13 @@ export const centeredContentStyles = {
 } as const;
 
 /**
+ * Radix data-state enter/exit animations outrank motion-reduce:animate-none.
+ * Pair both states so reduced motion removes the open and close animation.
+ */
+export const overlayStateReducedMotion =
+  'motion-reduce:data-[state=open]:animate-none motion-reduce:data-[state=closed]:animate-none';
+
+/**
  * Combined centered content class string.
  */
 export const centeredContentClassName = [
