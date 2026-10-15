@@ -788,10 +788,10 @@ describe('golden-path Linear-only intake', () => {
   it('blocks all downstream requests when autofix has no Linear credentials', async () => {
     const fetchImpl = vi.fn();
     const result = await executeAutofix({
-      receipt: {
-        fingerprint: 'golden-path-lock:prod:test',
-        checks: [{ id: 'homepage-cta', ok: false }],
-      },
+      receipt: buildProdProbeReceipt({
+        ok: false,
+        checks: [{ id: 'homepage-cta', ok: false, reason: 'missing_cta' }],
+      }),
       cursorApiKey: 'cursor-test-key',
       linearApiKey: '',
       githubToken: 'github-test-token',
@@ -810,12 +810,14 @@ describe('golden-path Linear-only intake', () => {
   it.each([401, 429, 500])(
     'blocks GitHub fallback and Cursor dispatch when Linear returns %i',
     async status => {
-      const fetchImpl = vi.fn(async () => new Response('rejected', { status }));
+      const fetchImpl = vi.fn(
+        async (_input, _init) => new Response('rejected', { status })
+      );
       const result = await executeAutofix({
-        receipt: {
-          fingerprint: 'golden-path-lock:prod:test',
-          checks: [{ id: 'homepage-cta', ok: false }],
-        },
+        receipt: buildProdProbeReceipt({
+          ok: false,
+          checks: [{ id: 'homepage-cta', ok: false, reason: 'missing_cta' }],
+        }),
         cursorApiKey: 'cursor-test-key',
         linearApiKey: `linear-autofix-test-key-${status}`,
         githubToken: 'github-test-token',
