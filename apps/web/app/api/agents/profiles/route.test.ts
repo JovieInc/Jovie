@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { expectPublicOpenApiResponse } from '@/tests/utils/public-openapi';
 
 const hoisted = vi.hoisted(() => ({
   flag: vi.fn(),
@@ -42,12 +43,16 @@ const { POST } = await import('./route');
 
 const SPOTIFY_URL = 'https://open.spotify.com/artist/4Z8W4fKeB5YxbusRsdQVPb';
 
-function post(body: unknown) {
-  return POST(
-    new Request('https://jov.ie/api/agents/profiles', {
-      method: 'POST',
-      body: JSON.stringify(body),
-    })
+async function post(body: unknown) {
+  return expectPublicOpenApiResponse(
+    '/api/agents/profiles',
+    'post',
+    await POST(
+      new Request('https://jov.ie/api/agents/profiles', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      })
+    )
   );
 }
 

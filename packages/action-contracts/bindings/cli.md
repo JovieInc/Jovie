@@ -1,9 +1,13 @@
-# CLI binding contract (contract-only)
+# CLI binding contract
 
-Status: **contract-only**. No product CLI exists in the repo today; this
-defines the binding a future `jovie` CLI must implement.
+Public product commands ship as `@jovie/cli` from
+[`packages/jovie-cli`](../../jovie-cli).
 
-## Mapping
+Status: **owner action bindings remain contract-only** until
+[JOV-6866](https://linear.app/jovie/issue/JOV-6866) lands. The mapping below
+defines how the existing `jovie` CLI will invoke canonical owner actions.
+
+## Owner action mapping
 
 - One subcommand per action: `jovie chat start`, `jovie contacts create`,
   `jovie releases create`, `jovie tasks create`. Commands and `--help` output
@@ -37,6 +41,10 @@ defines the binding a future `jovie` CLI must implement.
   not predicted.
 
 ## Internal fleet transport
+
+The existing CLI consumes the generated fleet binding in
+[`packages/jovie-cli/src/fleet-contract.generated.ts`](../../jovie-cli/src/fleet-contract.generated.ts),
+emitted by [`generate-fleet-cli.ts`](../generate-fleet-cli.ts).
 
 The fleet/work/defect commands bind the same canonical actions with a scoped
 worker credential and an explicit stable idempotency key. Their `--input` is a

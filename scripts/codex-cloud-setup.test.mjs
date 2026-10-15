@@ -53,10 +53,22 @@ test('remote project MCP servers declare a transport supported by current Claude
   }
 });
 
+test('project MCP dogfoods the anonymous workspace CLI without worker privileges', () => {
+  const config = JSON.parse(readFileSync(resolve('.mcp.json'), 'utf8'));
+  assert.deepEqual(config.mcpServers.jovie, {
+    type: 'stdio',
+    command: 'node',
+    args: ['packages/jovie-cli/dist/cli.js', 'mcp'],
+    // Override any inherited worker identity so only public tools are exposed.
+    env: { JOVIE_WORKER_TOKEN: '' },
+  });
+});
+
 function fixture(t, behavior = '') {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'jovie-codex-')));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   mkdirSync(join(root, 'bin'));
+  symlinkSync(process.execPath, join(root, 'bin/node'));
   writeFileSync(join(root, '.nvmrc'), process.versions.node);
   writeFileSync(
     join(root, 'package.json'),
