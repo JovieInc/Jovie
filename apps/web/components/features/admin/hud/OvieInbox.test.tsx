@@ -1,7 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { fixtureInventory } from '@/lib/ovie/certifications/fixtures';
 import type { OvieInboxCase } from '@/lib/ovie/inbox';
+import { projectOvieInbox } from '@/lib/ovie/inbox';
 import { OvieInbox } from './OvieInbox';
 
 vi.mock(
@@ -53,6 +55,30 @@ const response = (cases: readonly OvieInboxCase[]) =>
 afterEach(() => vi.unstubAllGlobals());
 
 describe('Ovie Inbox', () => {
+  it('shows one canonical certification card and submits its exact evidence digest', async () => {
+    const cases = projectOvieInbox([], [], fixtureInventory()).cases;
+    const fetcher = mount(response(cases), new Response('{}'), response([]));
+    await screen.findByTestId('certification-review-card');
+    expect(
+      screen.getByTestId('certification-evidence-strip')
+    ).toBeInTheDocument();
+    expect(screen.getByText('Revision')).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Review certification evidence' })
+    ).toHaveAttribute(
+      'href',
+      '/app/ov/certifications?row=flows%3Asignup-golden-path'
+    );
+    expect(screen.getAllByTestId('ovie-inbox-decision')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Certify' }));
+    await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(3));
+    expect(JSON.parse(fetcher.mock.calls[1]![1].body)).toMatchObject({
+      rowId: cases[0]!.decisionTarget!.id,
+      evidenceDigest: cases[0]!.source.revision,
+      decision: 'approved',
+    });
+  });
+
   it('opens the requested current case beyond 50 others without deciding any case', async () => {
     const earlier = Array.from({ length: 76 }, (_, index) => ({
       ...item,
