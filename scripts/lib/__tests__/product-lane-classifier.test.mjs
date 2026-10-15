@@ -98,6 +98,23 @@ describe('product lane classifier', () => {
     ).toThrow(ProductLaneClassificationError);
   });
 
+  it('classifies retired knowledge-ingest paths as web after the workspace move', () => {
+    const receipt = classifyProductLanes([
+      'workers/knowledge-ingest/README.md',
+      'workers/knowledge-ingest/package.json',
+      'workers/knowledge-ingest/src/index.test.mjs',
+      'workers/knowledge-ingest/src/index.ts',
+      'workers/knowledge-ingest/src/source.ts',
+      'workers/knowledge-ingest/src/transport.ts',
+      'workers/knowledge-ingest/tsconfig.json',
+      'workers/knowledge-ingest/wrangler.toml',
+    ]);
+    expect(receipt.selectedLanes).toEqual(['web']);
+    expect(
+      receipt.classifications.every(item => item.rule === 'web-product')
+    ).toBe(true);
+  });
+
   it('maps shared Jev evaluator-only edits to the consuming web and contract lanes', () => {
     const receipt = classifyProductLanes([
       'packages/jev-evaluation/gateway.mjs',
