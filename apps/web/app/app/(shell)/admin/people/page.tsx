@@ -302,6 +302,7 @@ export default async function AdminPeoplePage({
   return (
     <AdminPage
       title='People'
+      layout={view === 'recovery' ? 'document' : 'workspace'}
       description='User table, roles, waitlist, creators, and individual actions.'
       tabs={{
         param: 'view',

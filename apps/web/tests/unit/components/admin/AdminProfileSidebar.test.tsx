@@ -121,6 +121,9 @@ describe('AdminProfileSidebar', () => {
       'data-surface-variant',
       'flat'
     );
+    expect(
+      document.querySelector('[data-right-rail-workspace]')
+    ).toHaveAttribute('data-surface-variant', 'flat');
     const header = screen.getByTestId('admin-creator-entity-header');
     expect(
       header.querySelector('[data-entity-header-thumbnail-variant="person"]')

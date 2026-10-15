@@ -479,6 +479,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   '.claude/hooks/post-task-validate.test.mjs',
   '.claude/hooks/prod-db-session-guard.test.mjs',
   'scripts/agent-context/check.test.mjs',
+  'scripts/agent-context/memory.test.mjs',
   'scripts/agent/fix-claim.test.mjs',
   'scripts/agent/pen-native-semantic-manifest-contract.test.mjs',
   'scripts/agent/pen-registry-audit.test.mjs',
@@ -673,6 +674,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/web-test-selectors.test.mjs',
   'scripts/lib/__tests__/web-vitest-fast-runner.test.mjs',
   'scripts/lib/__tests__/merge-group-fail-fast.test.mjs',
+  'scripts/lib/__tests__/merge-group-local-evidence.test.mjs',
   'scripts/lib/__tests__/merge-group-token-budget.test.mjs',
   'scripts/lib/__tests__/workflow-triggers.test.mjs',
 ]);

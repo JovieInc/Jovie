@@ -7,10 +7,11 @@ import {
   INPUT_MATRIX,
   INPUT_SCHEMA,
   inputCells,
+  isMissingDeviceEvidence,
   semanticFindings,
   transitionFindings,
 } from './browser-owned-input.mjs';
-import { auditScreens } from './screen-audit.mjs';
+import { auditScreens, remediationPlans } from './screen-audit.mjs';
 import { evaluateScreenProof } from './screen-certification.mjs';
 
 const HEAD = 'a'.repeat(40);
@@ -396,6 +397,25 @@ test('certification and screen-audit both block a green resting profile lacking 
       f => f.includes('browser-owned-input') && f.includes('UNKNOWN')
     )
   );
+  assert.ok(
+    findings
+      .filter(f => f.startsWith('browser-owned-input'))
+      .every(isMissingDeviceEvidence)
+  );
+  const duplicated = browserInputFindings(
+    {
+      records: [
+        { cellId: 'get-updates/android-chrome/android-current-portrait' },
+        { cellId: 'get-updates/android-chrome/android-current-portrait' },
+      ],
+    },
+    { screenId, headSha: HEAD }
+  );
+  assert.ok(
+    duplicated.some(
+      f => f.includes(': BLOCKED:') && !isMissingDeviceEvidence(f)
+    )
+  );
   const ledger = auditScreens({
     registry: [screen],
     headSha: HEAD,
@@ -404,5 +424,56 @@ test('certification and screen-audit both block a green resting profile lacking 
   assert.equal(ledger.screens[0].verdict, 'red');
   assert.ok(
     ledger.screens[0].findings.some(f => f.includes('browser-owned-input'))
+  );
+});
+
+const ARTIST_PAY_SOURCES = [
+  'apps/web/app/[username]/pay/page.tsx',
+  'apps/web/components/features/profile/views/PayView.tsx',
+  'apps/web/components/features/profile/views/ProfileIntentPage.tsx',
+  'apps/web/components/organisms/PaySection.tsx',
+];
+const BROWSER_EMAIL_FIELD =
+  /(?:type|autoComplete|autocomplete|inputMode|inputmode)\s*=\s*['"]email['"]/;
+
+test('artist pay owes browser-owned email evidence only when its surface hosts that field', () => {
+  const hosted = ARTIST_PAY_SOURCES.some(path =>
+    BROWSER_EMAIL_FIELD.test(readFileSync(path, 'utf8'))
+  );
+  const bound = INPUT_MATRIX.journeys.some(
+    journey =>
+      journey.fields.includes('email') &&
+      journey.screens.includes('web.artist-pay')
+  );
+  assert.equal(bound, hosted);
+  if (hosted) return;
+  assert.deepEqual(inputCells('web.artist-pay'), []);
+  assert.deepEqual(
+    browserInputFindings(undefined, {
+      screenId: 'web.artist-pay',
+      headSha: HEAD,
+    }),
+    []
+  );
+  const pay = auditScreens({
+    registry: [
+      {
+        id: 'web.artist-pay',
+        platform: 'web',
+        owner: 'artist-pay',
+        sources: ['apps/web/app/[username]/pay/page.tsx'],
+        viewports: ['desktop', 'mobile'],
+      },
+    ],
+    headSha: HEAD,
+  });
+  assert.equal(pay.screens[0].producer, 'none');
+  assert.equal(pay.screens[0].verdict, 'uncovered');
+  assert.deepEqual(pay.screens[0].findings, []);
+  assert.equal(
+    remediationPlans(pay).some(
+      plan => plan.fingerprint === 'screen-audit:web.artist-pay'
+    ),
+    false
   );
 });

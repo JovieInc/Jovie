@@ -27,7 +27,9 @@ export async function GET(request: Request, { params }: RouteParams) {
     try {
       detail = await getMobileConversationDetail({
         conversationId: id,
+        userId: session.userId,
         creatorProfileId: session.profile.id,
+        audience: session.workspace === 'ov' ? 'ov' : 'customer',
         limit: session.limit,
         before,
       });

@@ -16,6 +16,7 @@ import {
   isDeezerAvailable,
   isSpotifyAvailable,
 } from '@/lib/dsp-enrichment/providers';
+import { isCoreSocialHtmlHost } from '@/lib/ingestion/social-html-policy';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
 import { extractMetaContent, fetchDocument } from '../strategies/base';
 import {
@@ -28,11 +29,6 @@ import {
   extractLayloHandle,
   fetchLayloProfile,
 } from '../strategies/laylo';
-import {
-  extractLinktree,
-  fetchLinktreeDocument,
-  validateLinktreeUrl,
-} from '../strategies/linktree';
 import {
   extractYouTube,
   fetchYouTubeAboutDocument,
@@ -207,18 +203,6 @@ async function extractDeezerAvatar(
   }
 }
 
-async function tryExtractFromLinktree(
-  normalized: string
-): Promise<AvatarCandidate | null> {
-  const linktree = validateLinktreeUrl(normalized);
-  if (!linktree) return null;
-
-  const html = await fetchLinktreeDocument(linktree);
-  const extracted = extractLinktree(html);
-  const avatarUrl = sanitizeHttpsUrl(extracted.avatarUrl);
-  return avatarUrl ? { avatarUrl, sourcePlatform: 'linktree' } : null;
-}
-
 async function tryExtractFromBeacons(
   normalized: string
 ): Promise<AvatarCandidate | null> {
@@ -315,10 +299,10 @@ export async function extractAvatarCandidateFromLinkUrl(
   url: string
 ): Promise<AvatarCandidate | null> {
   const normalized = normalizeUrl(url);
+  if (isCoreSocialHtmlHost(new URL(normalized).hostname)) return null;
 
   // Try platform-specific extractors in sequence
   const extractors = [
-    tryExtractFromLinktree,
     tryExtractFromBeacons,
     tryExtractFromLaylo,
     tryExtractFromYouTube,

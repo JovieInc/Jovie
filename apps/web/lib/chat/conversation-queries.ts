@@ -23,6 +23,10 @@ import {
 } from '@/lib/db/schema/chat';
 import { tasks } from '@/lib/db/schema/tasks';
 import { logger } from '@/lib/utils/logger';
+import {
+  type ConversationAudience,
+  ownedConversationCondition,
+} from './conversation-access';
 
 export interface CreatorConversationSummary {
   readonly id: string;
@@ -45,7 +49,9 @@ export interface CreatorConversationMessageRow {
 }
 
 export async function listCreatorConversations(input: {
+  readonly userId: string;
   readonly creatorProfileId: string;
+  readonly audience?: ConversationAudience;
   readonly limit?: number;
 }): Promise<readonly CreatorConversationSummary[]> {
   const limit = Math.min(Math.max(input.limit ?? 20, 1), 50);
@@ -77,7 +83,11 @@ export async function listCreatorConversations(input: {
     )
     .where(
       and(
-        eq(chatConversations.creatorProfileId, input.creatorProfileId),
+        ownedConversationCondition({
+          userId: input.userId,
+          creatorProfileId: input.creatorProfileId,
+          audience: input.audience ?? 'customer',
+        }),
         or(
           isNull(tasks.id),
           and(
@@ -95,7 +105,9 @@ export async function listCreatorConversations(input: {
 
 export async function getCreatorConversationDetail(input: {
   readonly conversationId: string;
+  readonly userId: string;
   readonly creatorProfileId: string;
+  readonly audience?: ConversationAudience;
   readonly limit?: number;
   readonly before?: string | null;
 }): Promise<{
@@ -117,10 +129,12 @@ export async function getCreatorConversationDetail(input: {
     })
     .from(chatConversations)
     .where(
-      and(
-        eq(chatConversations.id, input.conversationId),
-        eq(chatConversations.creatorProfileId, input.creatorProfileId)
-      )
+      ownedConversationCondition({
+        conversationId: input.conversationId,
+        userId: input.userId,
+        creatorProfileId: input.creatorProfileId,
+        audience: input.audience ?? 'customer',
+      })
     )
     .limit(1);
 

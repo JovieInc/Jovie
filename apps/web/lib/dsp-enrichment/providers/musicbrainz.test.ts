@@ -41,6 +41,7 @@ vi.mock('@/lib/utils/logger', () => ({
 
 import timUrl from './fixtures/tim-white-musicbrainz-url.json';
 import {
+  browseMusicBrainzCatalog,
   bulkLookupMusicBrainzByIsrc,
   getMusicBrainzArtist,
   lookupMusicBrainzArtistsByUrl,
@@ -163,6 +164,205 @@ describe('MusicBrainz Provider', () => {
       { id: TIM_ID, name: 'Tim White' },
     ]);
   });
+
+  it('explicitly browses all release groups beyond the embedded cap through the existing quota', async () => {
+    const groups = Array.from({ length: 27 }, (_, index) => ({
+      id: `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
+      title: 'Synthetic catalog fixture',
+    }));
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        Response.json({
+          id: TIM_ID,
+          name: 'Tim White',
+          'release-groups': groups.slice(0, 25),
+        })
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          'release-group-count': 27,
+          'release-group-offset': 0,
+          'release-groups': groups.slice(0, 25),
+        })
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          'release-group-count': 27,
+          'release-group-offset': 25,
+          'release-groups': groups.slice(25),
+        })
+      );
+    const artist = await getMusicBrainzArtist(TIM_ID, {
+      includeReleaseGroups: 'all',
+    });
+    expect(artist?.['release-groups']).toEqual(groups);
+    expect(artist?.releaseGroupsComplete).toBe(true);
+    expect(vi.mocked(fetch).mock.calls[0][0]).toContain(
+      'inc=aliases+url-rels&fmt=json'
+    );
+    expect(fetch).toHaveBeenCalledTimes(3);
+    expect(mockLimit).toHaveBeenCalledTimes(3);
+    expect(mockExecute).toHaveBeenCalledTimes(3);
+    expect(vi.mocked(fetch).mock.calls[2][0]).toContain(
+      `release-group?artist=${TIM_ID}`
+    );
+    expect(vi.mocked(fetch).mock.calls[2][0]).toContain('offset=25');
+  });
+
+  it('keeps ordinary artist identity reads bounded and discards upstream completeness claims', async () => {
+    mockResponse({
+      id: TIM_ID,
+      name: 'Tim White',
+      'release-groups': [],
+      releaseGroupsComplete: true,
+    });
+    const artist = await getMusicBrainzArtist(TIM_ID, {
+      includeReleaseGroups: true,
+    });
+    expect(artist?.releaseGroupsComplete).toBeUndefined();
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not call an exhausted explicit browse complete', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(Response.json({ id: TIM_ID, name: 'Tim White' }))
+      .mockResolvedValueOnce(
+        Response.json({
+          'release-group-count': 2,
+          'release-group-offset': 0,
+          'release-groups': [{ id: OTHER_TIM_ID, title: 'Synthetic group' }],
+        })
+      );
+    const artist = await getMusicBrainzArtist(TIM_ID, {
+      includeReleaseGroups: 'all',
+      maxCatalogPages: 1,
+    });
+    expect(artist?.releaseGroupsComplete).toBe(false);
+    expect(artist?.['release-groups']).toHaveLength(1);
+  });
+
+  it.each([401, 404, 429])(
+    'propagates a catalog HTTP %s after a successful artist read',
+    async status => {
+      vi.mocked(fetch)
+        .mockResolvedValueOnce(Response.json({ id: TIM_ID, name: 'Tim White' }))
+        .mockResolvedValue(Response.json({}, { status }));
+      const result = getMusicBrainzArtist(TIM_ID, {
+        includeReleaseGroups: 'all',
+      });
+      if (status === 401) {
+        // Existing retry policy retries unauthorized upstream responses twice.
+        vi.useFakeTimers();
+        const assertion = expect(result).rejects.toMatchObject({
+          statusCode: status,
+        });
+        await vi.runAllTimersAsync();
+        await assertion;
+      } else {
+        await expect(result).rejects.toMatchObject({ statusCode: status });
+      }
+    }
+  );
+
+  it('fails closed when the quota backend is unavailable during a browse', async () => {
+    mockLimit.mockResolvedValue({
+      success: false,
+      unavailable: true,
+      reset: new Date(),
+    });
+    await expect(
+      browseMusicBrainzCatalog({
+        entity: 'recording',
+        by: 'artist',
+        mbid: TIM_ID,
+      })
+    ).rejects.toMatchObject({ statusCode: 429 });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(mockLimit).toHaveBeenCalledTimes(1);
+  });
+
+  it('propagates cancellation to the existing request signal', async () => {
+    const controller = new AbortController();
+    vi.mocked(fetch).mockImplementationOnce(async (_url, init) => {
+      expect(init?.signal?.aborted).toBe(false);
+      controller.abort();
+      expect(init?.signal?.aborted).toBe(true);
+      return Response.json({
+        'recording-count': 0,
+        'recording-offset': 0,
+        recordings: [],
+      });
+    });
+    await expect(
+      browseMusicBrainzCatalog({
+        entity: 'recording',
+        by: 'artist',
+        mbid: TIM_ID,
+        signal: controller.signal,
+      })
+    ).rejects.toBeInstanceOf(CallerCancellationError);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a midstream 503 a failure after the existing bounded retries', async () => {
+    vi.useFakeTimers();
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        Response.json({
+          'release-count': 2,
+          'release-offset': 0,
+          releases: [{ id: OTHER_TIM_ID, title: 'Synthetic release' }],
+        })
+      )
+      .mockResolvedValue(Response.json({}, { status: 503 }));
+    const result = browseMusicBrainzCatalog({
+      entity: 'release',
+      by: 'artist',
+      mbid: TIM_ID,
+    });
+    const assertion = expect(result).rejects.toMatchObject({ statusCode: 503 });
+    await vi.runAllTimersAsync();
+    await assertion;
+    expect(fetch).toHaveBeenCalledTimes(4);
+    expect(mockLimit).toHaveBeenCalledTimes(4);
+  });
+
+  it.each([false, true])(
+    'distinguishes traversal timeout from caller cancellation (caller aborted: %s)',
+    async callerAborted => {
+      const deadline = new AbortController();
+      const caller = new AbortController();
+      const timeout = vi
+        .spyOn(AbortSignal, 'timeout')
+        .mockReturnValue(deadline.signal);
+      vi.mocked(fetch).mockImplementationOnce(async () => {
+        if (callerAborted) caller.abort();
+        deadline.abort();
+        return Response.json({
+          'recording-count': 0,
+          'recording-offset': 0,
+          recordings: [],
+        });
+      });
+      try {
+        const result = browseMusicBrainzCatalog({
+          entity: 'recording',
+          by: 'artist',
+          mbid: TIM_ID,
+          signal: caller.signal,
+        });
+        if (callerAborted) {
+          await expect(result).rejects.toBeInstanceOf(CallerCancellationError);
+        } else {
+          await expect(result).rejects.toMatchObject({ errorCode: 'TIMEOUT' });
+        }
+        expect(timeout).toHaveBeenCalledWith(30_000);
+        expect(fetch).toHaveBeenCalledTimes(1);
+      } finally {
+        timeout.mockRestore();
+      }
+    }
+  );
 
   it('requires an exact URL response and propagates identity failures', async () => {
     mockResponse({
