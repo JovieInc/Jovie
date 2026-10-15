@@ -82,6 +82,8 @@ describe('conversation issue reconciliation', () => {
       );
       const result = await reconcileConversationRequest({
         request: { ...input, privateContext: 'private-canary-omit-entirely' },
+        teamId: 'team',
+        stateId: 'triage',
         client: api,
       });
       assert.deepEqual(result, {
@@ -109,6 +111,8 @@ describe('conversation issue reconciliation', () => {
         title: 'Fix Telegram webhook retry handling',
         summary: 'Webhook retries fail.',
       },
+      teamId: 'team',
+      stateId: 'triage',
       client: api,
     });
     assert.equal(result.disposition, 'new_issue');
@@ -187,6 +191,7 @@ describe('conversation issue reconciliation', () => {
       stateId: 'triage',
       client: api,
     });
+    assert.ok('receiptKey' in first);
     api.calls.comments.length = 0;
     api.calls.comments.push({
       body: `<!-- conversation-receipt:${first.receiptKey} -->`,
@@ -211,6 +216,7 @@ describe('conversation issue reconciliation', () => {
       client: api,
     });
     assert.equal(second.mutation, 'already_linked');
+    assert.ok('counts' in second);
     assert.equal(second.counts.receiptsLinked, 0);
     assert.equal(api.calls.comments.length, 1);
   });
