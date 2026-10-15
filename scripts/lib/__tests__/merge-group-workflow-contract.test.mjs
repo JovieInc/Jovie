@@ -452,11 +452,7 @@ describe('merge_group workflow contract', () => {
     expect(admission).toContain("github.event_name == 'merge_group'");
     expect(admission).toContain('runs-on: ubuntu-latest');
     expect(admission).toContain('timeout-minutes: 75');
-    expect(admission).toContain('gh api rate_limit');
-    expect(admission).toContain(
-      'Merge Group Admission holding ${wait_s}s for the installation rate-limit reset'
-    );
-    expect(admission).toContain('wait_s > 3960');
+    expect(admission).not.toContain('sleep "$wait_s"');
     expect(admission).toContain('actions: read');
     expect(admission).toContain(
       "admitted: ${{ steps.admission.outputs.admitted || 'false' }}"
