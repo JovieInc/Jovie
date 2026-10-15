@@ -1138,14 +1138,11 @@ export async function runPolicy({
       );
     } catch (error) {
       if (!(error instanceof MergeGroupPolicyRateLimitError)) throw error;
+      // No checkout diff. A green check here would merge an unread change.
       log(
-        `::notice::PR Size Guard deferred a GitHub rate limit before a diff was available: ${error.message}`
+        `::notice::PR Size Guard refused a GitHub rate limit with no local diff: ${error.message}`
       );
-      if (also) await emit(`${also}_verdict=pass`);
-      log(
-        'PR Size Guard rate-limit deferral: diff unread, so this is not a size-cap failure.'
-      );
-      return;
+      throw error;
     }
   }
   const members = resolveMergeGroupMembers({ event, comparison });
@@ -1163,13 +1160,9 @@ export async function runPolicy({
     if (!(error instanceof MergeGroupPolicyRateLimitError)) throw error;
     if (!Array.isArray(local?.files)) {
       log(
-        `::notice::PR Size Guard deferred a GitHub rate limit before a diff was available: ${error.message}`
+        `::notice::PR Size Guard refused a GitHub rate limit with no local diff: ${error.message}`
       );
-      if (also) await emit(`${also}_verdict=pass`);
-      log(
-        'PR Size Guard rate-limit deferral: diff unread, so this is not a size-cap failure.'
-      );
-      return;
+      throw error;
     }
     log(
       `::notice::PR Size Guard kept the size cap on the local diff after a GitHub rate limit: ${error.message}`
@@ -1234,9 +1227,11 @@ export async function runPolicy({
         logTrackedPayload(payload, log);
       } catch (error) {
         if (!(error instanceof MergeGroupPolicyRateLimitError)) throw error;
+        // The byte budget was not measured. Do not pass the size check.
         log(
-          `::notice::PR Size Guard deferred the combined-tree byte budget on a GitHub rate limit: ${error.message}`
+          `::notice::PR Size Guard refused a GitHub rate limit with no local tree byte count: ${error.message}`
         );
+        throw error;
       }
     }
   }
