@@ -2,10 +2,16 @@
 // Measurements are evidence, never authority: only the existing trusted
 // screen-proof resolver can certify the containing artifact.
 import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
+// Resolve a filesystem path so Vite cannot rewrite the JSON as a browser asset.
 export const INPUT_MATRIX = JSON.parse(
   readFileSync(
-    new URL('./browser-owned-input-matrix.json', import.meta.url),
+    join(
+      dirname(fileURLToPath(import.meta.url)),
+      'browser-owned-input-matrix.json'
+    ),
     'utf8'
   )
 );
