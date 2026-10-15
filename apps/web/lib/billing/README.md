@@ -4,6 +4,7 @@ Stripe-backed billing concerns that don't belong in entitlement registries or qu
 
 What's here:
 
+- **[`commerce/`](commerce/README.md)** — versioned agentic-commerce support projection and evidence validator over canonical offer, price, product, and checkout sources.
 - **`verified-upgrade.ts`** — price selection and label formatting for the verified-upgrade flow. `getPreferredVerifiedPrice()` picks the right Stripe price based on the user's currency / locale; `formatVerifiedPriceLabel()` produces the marketing string.
 - **`reconciliation/`** — batch tooling that detects and repairs drift between local subscription state and Stripe.
 
