@@ -81,6 +81,8 @@ class FakeTelegram:
 
 class StateTestCase(unittest.TestCase):
     def setUp(self):
+        previous_umask = os.umask(0o077)
+        self.addCleanup(os.umask, previous_umask)
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.state = archive.prepare_state(Path(temporary.name) / "private")
