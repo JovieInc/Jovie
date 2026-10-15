@@ -9,15 +9,14 @@ import {
   footerStyles,
   headerStyles,
   overlayClassName,
+  overlayStateReducedMotion,
   titleStyles,
 } from '../lib/overlay-styles';
 import { cn } from '../lib/utils';
 import { Button } from './button';
 
 const alertDialogMotionStyles =
-  'duration-cinematic ease-cinematic ' +
-  'motion-reduce:data-[state=open]:animate-none ' +
-  'motion-reduce:data-[state=closed]:animate-none';
+  'duration-cinematic ease-cinematic ' + overlayStateReducedMotion;
 
 const AlertDialog = AlertDialogPrimitive.Root;
 
