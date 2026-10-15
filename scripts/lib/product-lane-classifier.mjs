@@ -178,7 +178,9 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
     'web-product',
     'web',
     ['web'],
-    /^(apps\/(web|ovie|extension)\/|packages\/(action-contracts|audio-contracts|brand|extension-contracts|jovie-cli|ui)\/|workers\/(observability-ingest|canary-otp)\/|app\/|content\/|lib\/|trigger\/|creator_profiles\/|vercel\.json$|\.vercelignore$|skills\/jovie\/(SKILL\.md|README\.md|LICENSE)$|\.github\/workflows\/(production-release|production-marker-recovery|postdeploy-probes|canary-health-gate)\.yml$)/,
+    // knowledge-ingest now lives in observability-ingest. First-parent ranges
+    // still name the old prefix on the add and delete commits.
+    /^(apps\/(web|ovie|extension)\/|packages\/(action-contracts|audio-contracts|brand|extension-contracts|jovie-cli|ui)\/|workers\/(observability-ingest|canary-otp|knowledge-ingest)\/|app\/|content\/|lib\/|trigger\/|creator_profiles\/|vercel\.json$|\.vercelignore$|skills\/jovie\/(SKILL\.md|README\.md|LICENSE)$|\.github\/workflows\/(production-release|production-marker-recovery|postdeploy-probes|canary-health-gate)\.yml$)/,
   ],
   [
     'operations-tooling',

@@ -118,7 +118,7 @@ describe('AdminUserDetailDrawer', () => {
     }
   );
 
-  it('uses the compact raised entity hierarchy with summary before details', () => {
+  it('uses the canonical flat inspector hierarchy with summary before details', () => {
     render(
       <AdminUserDetailDrawer
         user={user}
@@ -131,7 +131,7 @@ describe('AdminUserDetailDrawer', () => {
       screen
         .getByRole('complementary', { name: 'User details' })
         .querySelector('[data-right-rail-workspace]')
-    ).toHaveAttribute('data-surface-variant', 'raised');
+    ).toHaveAttribute('data-surface-variant', 'flat');
     expect(screen.getByTestId('entity-sidebar-entity-header')).toHaveAttribute(
       'data-surface-variant',
       'flat'
@@ -154,6 +154,13 @@ describe('AdminUserDetailDrawer', () => {
     ).toHaveTextContent('1');
     expect(screen.getByText('jov.ie/alex')).toBeInTheDocument();
     expect(screen.getByText('User ID')).toBeInTheDocument();
+    const details = screen.getByTestId('admin-user-details');
+    expect(details.closest('[data-surface-variant="card"]')).toBeNull();
+    expect(
+      screen
+        .getByTestId('admin-user-summary')
+        .compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
   });
 
   it('closes the composed user rail through Escape and removes stale details after selection clears', () => {

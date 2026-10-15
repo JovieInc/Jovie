@@ -6,6 +6,7 @@ import {
 import { db } from '@/lib/db';
 import { leads } from '@/lib/db/schema/leads';
 import { captureError } from '@/lib/error-tracking';
+import { ExtractionError } from '@/lib/ingestion/strategies/base';
 import {
   LEAD_QUALIFICATION_CONCURRENCY,
   LINKTREE_FETCH_DELAY_MS,
@@ -145,6 +146,14 @@ async function processOneLead(
       leadId,
       error: error instanceof Error ? error.message : String(error),
     });
+    // Disabled HTML access is not evidence about the lead and must not consume
+    // scrape attempts or automatically disqualify them.
+    if (
+      error instanceof ExtractionError &&
+      error.code === 'SOCIAL_HTML_DISABLED'
+    ) {
+      return 'error';
+    }
     await captureError('Lead qualification failed', error, {
       route: 'leads/process-batch',
       contextData: { leadId },

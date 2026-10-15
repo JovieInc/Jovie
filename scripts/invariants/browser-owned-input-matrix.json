@@ -266,7 +266,6 @@
     {
       "id": "payment-tip",
       "screens": [
-        "web.artist-pay",
         "web.marketing-pay",
         "web.settings-billing",
         "web.settings-artist-profile"
