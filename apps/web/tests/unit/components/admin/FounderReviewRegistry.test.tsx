@@ -181,6 +181,7 @@ describe('FounderReviewRegistry', () => {
     expect(screen.getByText('Delete a contact')).toBeVisible();
 
     const rail = await screen.findByTestId('founder-review-detail-rail');
+    expect(rail.querySelector('[data-surface-variant="flat"]')).not.toBeNull();
     const media = within(rail).getByTestId('founder-review-evidence-media');
     const details = within(rail).getByText('Certification details');
     expect(
