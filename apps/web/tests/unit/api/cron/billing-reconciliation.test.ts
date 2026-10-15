@@ -26,6 +26,14 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
+vi.mock('@/lib/ingestion/session', () => ({
+  withSystemIngestionSession: vi.fn((operation: (tx: unknown) => unknown) =>
+    operation({
+      insert: vi.fn(() => ({ values: mockDbInsertValues })),
+    })
+  ),
+}));
+
 vi.mock('@/lib/db/schema/auth', () => ({
   users: {
     id: 'id',

@@ -12,6 +12,7 @@ import type Stripe from 'stripe';
 import { db } from '@/lib/db';
 import { stripeWebhookEvents } from '@/lib/db/schema/billing';
 import { merchOrders } from '@/lib/db/schema/merch';
+import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import {
   handleMerchChargeRefunded,
   handleMerchCheckoutCompleted,
@@ -57,30 +58,32 @@ export async function replayUnprocessedStripeWebhooks(
   now = new Date()
 ): Promise<WebhookReplaySummary> {
   const stuckBefore = new Date(now.getTime() - WEBHOOK_REDRIVE_AFTER_MS);
-  const candidates = await db
-    .select({
-      id: stripeWebhookEvents.id,
-      stripeEventId: stripeWebhookEvents.stripeEventId,
-      type: stripeWebhookEvents.type,
-      payload: stripeWebhookEvents.payload,
-      stripeCreatedAt: stripeWebhookEvents.stripeCreatedAt,
-    })
-    .from(stripeWebhookEvents)
-    .where(
-      and(
-        isNull(stripeWebhookEvents.processedAt),
-        lt(stripeWebhookEvents.createdAt, stuckBefore),
-        claimable(now)
+  const candidates = await withSystemIngestionSession(tx =>
+    tx
+      .select({
+        id: stripeWebhookEvents.id,
+        stripeEventId: stripeWebhookEvents.stripeEventId,
+        type: stripeWebhookEvents.type,
+        payload: stripeWebhookEvents.payload,
+        stripeCreatedAt: stripeWebhookEvents.stripeCreatedAt,
+      })
+      .from(stripeWebhookEvents)
+      .where(
+        and(
+          isNull(stripeWebhookEvents.processedAt),
+          lt(stripeWebhookEvents.createdAt, stuckBefore),
+          claimable(now)
+        )
       )
-    )
-    .orderBy(
-      asc(
-        drizzleSql`coalesce(${stripeWebhookEvents.processingStartedAt}, ${stripeWebhookEvents.createdAt})`
-      ),
-      asc(stripeWebhookEvents.createdAt),
-      asc(stripeWebhookEvents.id)
-    )
-    .limit(WEBHOOK_REDRIVE_LIMIT);
+      .orderBy(
+        asc(
+          drizzleSql`coalesce(${stripeWebhookEvents.processingStartedAt}, ${stripeWebhookEvents.createdAt})`
+        ),
+        asc(stripeWebhookEvents.createdAt),
+        asc(stripeWebhookEvents.id)
+      )
+      .limit(WEBHOOK_REDRIVE_LIMIT)
+  );
 
   const summary: WebhookReplaySummary = {
     processed: 0,
@@ -100,17 +103,19 @@ async function replayOne(
   now: Date,
   summary: WebhookReplaySummary
 ): Promise<void> {
-  const [claimed] = await db
-    .update(stripeWebhookEvents)
-    .set({ processingStartedAt: now })
-    .where(
-      and(
-        eq(stripeWebhookEvents.id, candidate.id),
-        isNull(stripeWebhookEvents.processedAt),
-        claimable(now)
+  const [claimed] = await withSystemIngestionSession(tx =>
+    tx
+      .update(stripeWebhookEvents)
+      .set({ processingStartedAt: now })
+      .where(
+        and(
+          eq(stripeWebhookEvents.id, candidate.id),
+          isNull(stripeWebhookEvents.processedAt),
+          claimable(now)
+        )
       )
-    )
-    .returning({ id: stripeWebhookEvents.id });
+      .returning({ id: stripeWebhookEvents.id })
+  );
 
   if (!claimed) return;
 
@@ -122,11 +127,13 @@ async function replayOne(
 
     await dispatchStoredEvent(event);
 
-    const [marked] = await db
-      .update(stripeWebhookEvents)
-      .set({ processedAt: now, processingStartedAt: null })
-      .where(owned(candidate.id, now))
-      .returning({ id: stripeWebhookEvents.id });
+    const [marked] = await withSystemIngestionSession(tx =>
+      tx
+        .update(stripeWebhookEvents)
+        .set({ processedAt: now, processingStartedAt: null })
+        .where(owned(candidate.id, now))
+        .returning({ id: stripeWebhookEvents.id })
+    );
 
     if (!marked) {
       throw new Error('Webhook replay lease was lost before completion');

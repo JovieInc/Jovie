@@ -8,7 +8,7 @@ import 'server-only';
 import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { appUserIdFilter } from '@/lib/auth/app-user-id';
 import { getCachedAuth } from '@/lib/auth/cached';
-import { withDbSession } from '@/lib/auth/session';
+import { withDbSession, withDbSessionTx } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { billingAuditLog } from '@/lib/db/schema/billing';
@@ -208,20 +208,38 @@ export async function ensureStripeCustomer(): Promise<{
 
       // Atomic update with optimistic locking
       try {
-        const result = await db
-          .update(users)
-          .set({
-            stripeCustomerId: customer.id,
-            billingUpdatedAt: new Date(),
-            billingVersion: drizzleSql`${users.billingVersion} + 1`,
-          })
-          .where(
-            and(
-              appUserIdFilter(appUserId),
-              eq(users.billingVersion, userData.billingVersion)
-            )
-          )
-          .returning({ id: users.id });
+        const result = await withDbSessionTx(
+          async tx => {
+            const updated = await tx
+              .update(users)
+              .set({
+                stripeCustomerId: customer.id,
+                billingUpdatedAt: new Date(),
+                billingVersion: drizzleSql`${users.billingVersion} + 1`,
+              })
+              .where(
+                and(
+                  appUserIdFilter(appUserId),
+                  eq(users.billingVersion, userData.billingVersion)
+                )
+              )
+              .returning({ id: users.id });
+
+            if (updated.length > 0) {
+              await tx.insert(billingAuditLog).values({
+                userId: userData.id,
+                eventType: 'customer_created',
+                previousState: { stripeCustomerId: null },
+                newState: { stripeCustomerId: customer.id },
+                source: 'manual',
+                metadata: { appUserId },
+              });
+            }
+
+            return updated;
+          },
+          { clerkUserId: appUserId }
+        );
 
         if (result.length === 0) {
           // Concurrent update detected, but customer was created
@@ -233,16 +251,6 @@ export async function ensureStripeCustomer(): Promise<{
           );
           return { success: true, customerId: customer.id };
         }
-
-        // Log the customer creation in audit log
-        await db.insert(billingAuditLog).values({
-          userId: userData.id,
-          eventType: 'customer_created',
-          previousState: { stripeCustomerId: null },
-          newState: { stripeCustomerId: customer.id },
-          source: 'manual',
-          metadata: { appUserId },
-        });
       } catch (updateError) {
         // Customer was created in Stripe but we couldn't save the ID
         // This is recoverable - we can find the customer later by metadata
