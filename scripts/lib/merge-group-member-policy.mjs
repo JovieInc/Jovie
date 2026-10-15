@@ -574,7 +574,10 @@ function backoffMs(attempt, random = () => 0.5) {
   const raw = Math.min(BACKOFF_CAP_MS, BACKOFF_BASE_MS * 2 ** (attempt - 1));
   const roll = Number(random());
   const unit = Number.isFinite(roll) ? Math.min(1, Math.max(0, roll)) : 0.5;
-  return Math.max(0, Math.round(raw * (1 - JITTER_RATIO + 2 * JITTER_RATIO * unit)));
+  return Math.max(
+    0,
+    Math.round(raw * (1 - JITTER_RATIO + 2 * JITTER_RATIO * unit))
+  );
 }
 
 /** Wait before the next attempt, or null when the answer is final or the wait misses the deadline. */
