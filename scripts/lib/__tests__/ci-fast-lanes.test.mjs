@@ -45,37 +45,59 @@ import {
 } from '../../ci-fast-lanes.mjs';
 
 it('enforces lifecycle coverage through the real structural selector', async () => {
-  const commands = [];
-  await runStructural({
-    execute: command => {
-      commands.push(command);
-      return { code: 0, output: '' };
-    },
-  });
-  expect(
-    commands.filter(
-      command => command === VALIDATION_LIFECYCLE_COVERAGE_COMMAND
-    )
-  ).toHaveLength(1);
-  for (const test of [
-    'validation-lifecycle',
-    'validation-sync',
-    'linear-sync-on-merge',
-    'founder-taste-order',
-  ]) {
+  // This file also runs in ci-fast (remaining) for web-only merge groups,
+  // where CI_PRODUCT_LANES is just "web". Lifecycle coverage is an operations
+  // command, so pin that lane instead of reading the ambient job selection.
+  const previous = {
+    GITHUB_EVENT_NAME: process.env.GITHUB_EVENT_NAME,
+    CI_PRODUCT_LANES: process.env.CI_PRODUCT_LANES,
+    CI_FAST_SKIP_STRUCTURAL: process.env.CI_FAST_SKIP_STRUCTURAL,
+    CI_FAST_STRUCTURAL_PYTEST: process.env.CI_FAST_STRUCTURAL_PYTEST,
+    CI_FAST_STRUCTURAL_WEB: process.env.CI_FAST_STRUCTURAL_WEB,
+  };
+  try {
+    process.env.GITHUB_EVENT_NAME = 'workflow_dispatch';
+    process.env.CI_PRODUCT_LANES = 'operations';
+    process.env.CI_FAST_SKIP_STRUCTURAL = 'false';
+    delete process.env.CI_FAST_STRUCTURAL_PYTEST;
+    delete process.env.CI_FAST_STRUCTURAL_WEB;
+    const commands = [];
+    await runStructural({
+      execute: command => {
+        commands.push(command);
+        return { code: 0, output: '' };
+      },
+    });
+    expect(
+      commands.filter(
+        command => command === VALIDATION_LIFECYCLE_COVERAGE_COMMAND
+      )
+    ).toHaveLength(1);
+    for (const test of [
+      'validation-lifecycle',
+      'validation-sync',
+      'linear-sync-on-merge',
+      'founder-taste-order',
+    ]) {
+      expect(VALIDATION_LIFECYCLE_COVERAGE_COMMAND).toContain(
+        `lib/__tests__/${test}.test.mjs`
+      );
+    }
     expect(VALIDATION_LIFECYCLE_COVERAGE_COMMAND).toContain(
-      `lib/__tests__/${test}.test.mjs`
+      '--coverage.thresholds.perFile=true'
     );
+    expect(VALIDATION_LIFECYCLE_COVERAGE_COMMAND).toContain(
+      '--coverage.thresholds.lines=90'
+    );
+    expect(VALIDATION_LIFECYCLE_COVERAGE_COMMAND).toContain(
+      '--coverage.thresholds.branches=75'
+    );
+  } finally {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
   }
-  expect(VALIDATION_LIFECYCLE_COVERAGE_COMMAND).toContain(
-    '--coverage.thresholds.perFile=true'
-  );
-  expect(VALIDATION_LIFECYCLE_COVERAGE_COMMAND).toContain(
-    '--coverage.thresholds.lines=90'
-  );
-  expect(VALIDATION_LIFECYCLE_COVERAGE_COMMAND).toContain(
-    '--coverage.thresholds.branches=75'
-  );
 });
 
 describe('Shared fenced-attempt coverage contract', () => {
