@@ -1,7 +1,7 @@
 # Telegram inbox archiving
 
-Standalone Telethon user-account tool for JOV-4423 and JOV-4490. This does not start or depend
-on an agent runtime. Run it on Summer's MacBook Air from a stable checkout that
+Standalone Telethon user-account tool for JOV-4423 and JOV-4490. This does not
+start or depend on an agent runtime. Run it on Summer's MacBook Air from a stable checkout that
 will remain on disk. Requires Python 3.9+ with `venv` and internet access.
 
 ## Agent privacy and resume contract
@@ -24,7 +24,8 @@ python3 scripts/telegram_archive.py status
 ```
 
 `status` checks the saved session against Telegram without sending a code. It
-prints and atomically stores `auth-receipt.json`: a fixed schema, personal
+automatically reuses the existing private virtual environment without installing
+anything, then prints and atomically stores `auth-receipt.json`: a fixed schema, personal
 classification, denied externalization, disabled dispatch, readiness (`ready`
 or `blocked`), and whether the blocked instruction has been emitted. It contains
 no phone, API hash, code, session contents/path, account ID, conversation link,
@@ -71,8 +72,8 @@ session as an account credential. State inside a Git checkout is rejected. An
 optional `--state-dir /absolute/private/path` must be used consistently on every
 command. Never copy session files or account details into a PR or shared brain.
 
-Successful login prints the redacted ready receipt. Re-running login reuses authorization
-without requesting another code. A revoked session requires this command again;
+Successful login prints the redacted ready receipt. Re-running login reuses
+authorization without requesting another code. A revoked session requires this command again;
 scheduled runs fail with an actionable error and never request codes.
 
 ## Preview and run
@@ -110,11 +111,12 @@ every archive run. Commissioning must verify that this is Tim's account.
 
 Reports record each successful chat move, the reason, skipped counts, UTC cutoff
 and completion/failure status. Raw message contents, codes and passwords are
-excluded. Output includes counts and an opaque report ID, never private paths or chat titles.
+excluded. Output includes counts and an opaque report ID, never private paths or
+chat titles.
 Delivery failures return nonzero and leave the report pending; the next live run
 retries delivery before any new changes. An interrupted run's report is marked
-interrupted on retry. Each move's intent is written before the RPC so an interrupted or ambiguous
-move remains a target for verification/undo; an ambiguous delivery can duplicate
+interrupted on retry. Each move's intent is written before the RPC so an
+interrupted or ambiguous move remains a target for verification/undo; an ambiguous delivery can duplicate
 a summary on retry. Neither is a claim of exactly-once delivery. Keep reports
 private and retain them according to the account owner's local data policy.
 
@@ -149,7 +151,8 @@ checkout and state path stable. The Mac must be awake and online at that time;
 cron does not catch up a missed invocation. Requests have finite retries and a
 90-second timeout; concurrent login/archive processes share a nonblocking lock.
 Large Telegram flood waits fail the run and are reported rather than sleeping
-indefinitely. A later daily preview evaluates the current inbox; live mutation still requires review.
+indefinitely. A later daily preview evaluates the current inbox; live mutation
+still requires review.
 
 Commissioning evidence: record the installed script's Git SHA, successful login,
 installed crontab, dry-run result, live exit code, private report counts, and the
@@ -165,10 +168,10 @@ python3 -m pytest scripts/tests/test_telegram_archive.py -q
 ```
 
 These tests run in the existing CI Python coverage suite without Telegram
-credentials or network. No new workflow or paid service is introduced. One
-daily account run reads inbox dialog pages, makes one latest-message request per
-dialog plus one per candidate, one folder edit per eligible chat, and uploads one
-small report. This is private single-account tooling, not per-customer polling.
+credentials or network. No new workflow or paid service is introduced. A
+preview reads inbox dialog pages and makes one latest-message request per dialog
+plus one per candidate. A reviewed live run adds one folder edit per eligible
+chat and uploads one small report. This is private single-account tooling, not per-customer polling.
 Telethon is MIT licensed; the pinned transitive dependencies retain their own
 licenses. To regenerate the lock with an existing `uv` installation:
 

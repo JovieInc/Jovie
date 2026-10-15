@@ -415,6 +415,21 @@ class LoginTests(StateTestCase):
 
 
 class SafeResumeTests(StateTestCase):
+    def test_system_python_status_resumes_in_saved_environment_without_installing(self):
+        python = self.state / "venv/bin/python"
+        python.parent.mkdir(parents=True)
+        # Stand in for an installed interpreter to exercise the real exec path.
+        python.write_text('#!/bin/sh\nprintf "saved-environment:%s\\n" "$3"\n')
+        python.chmod(0o700)
+        result = subprocess.run([sys.executable, archive.__file__, "status", "--state-dir", str(self.state)],
+                                stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=10)
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout.strip(), "saved-environment:--state-dir")
+        self.assertEqual(result.stderr, "")
+        with patch.object(sys, "prefix", str(self.state / "venv")), \
+                patch.object(os, "execv", side_effect=AssertionError("re-exec loop")):
+            archive.reuse_environment(self.state, ["status"])
+
     def test_corrupt_or_unwritable_receipts_fail_without_private_tracebacks(self):
         receipt = self.state / "auth-receipt.json"
         receipt.write_text("broken-private-fixture")

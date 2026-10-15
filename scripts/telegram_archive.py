@@ -189,6 +189,14 @@ def bootstrap(state, arguments):
     os.execv(str(python), [str(python), str(Path(__file__).resolve()), *arguments])
 
 
+def reuse_environment(state, arguments):
+    """Resume with the installed interpreter; headless commands never install."""
+    environment = state / "venv"
+    python = environment / "bin/python"
+    if Path(sys.prefix).resolve() != environment and python.is_file():
+        os.execv(str(python), [str(python), str(Path(__file__).resolve()), *arguments])
+
+
 def make_client(state, config):
     try:
         from telethon import TelegramClient
@@ -346,7 +354,7 @@ async def archive(client, state, config, dry_run=False, now=None, reviewed_plan=
                     report["archived"].append(item)
                 write_json(path, report)
         report["status"] = "completed"
-    except Exception as error:
+    except Exception:
         # Preserve partial success and avoid leaking request contents/phone in error text.
         report["status"] = "failed"
         report["error_type"] = "request_failed"
@@ -443,6 +451,8 @@ def main(arguments=None):
             if not sys.stdin.isatty():
                 raise AuthRequired()
             bootstrap(state, arguments)
+        else:
+            reuse_environment(state, arguments)
         with session_lock(state):
             config = load_config(state, interactive=args.command == "login" and sys.stdin.isatty())
             return asyncio.run(run(args.command, state, config, args.dry_run,
