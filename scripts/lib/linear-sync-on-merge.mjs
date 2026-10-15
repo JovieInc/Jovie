@@ -637,7 +637,7 @@ const ISSUE_FIELDS = `
     }
     children(first: 50) {
       nodes { identifier completedAt canceledAt state { type } }
-      pageInfo { hasNextPage }
+      pageInfo { hasNextPage endCursor }
     }
     attachments(first: 50) { nodes { url } }
     history(first: 100) {
@@ -655,6 +655,15 @@ const COMMENTS_PAGE_QUERY = `query IssueLifecycleComments($issueId: String!, $af
   issue(id: $issueId) {
     comments(first: 100, after: $after) {
       nodes { body createdAt }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
+}`;
+
+const CHILDREN_PAGE_QUERY = `query IssueLifecycleChildren($issueId: String!, $after: String!) {
+  issue(id: $issueId) {
+    children(first: 50, after: $after) {
+      nodes { identifier completedAt canceledAt state { type } }
       pageInfo { hasNextPage endCursor }
     }
   }
@@ -685,6 +694,7 @@ const SWEEP_QUERY = `query LifecycleSweep($states: [String!]!, $after: String) {
 }`;
 
 const MAX_COMMENT_PAGES = 10;
+const MAX_CHILD_PAGES = 20;
 const MAX_SWEEP_PAGES = 10;
 const CI_HARNESS_MANIFEST = '.github/ci-harness/manifest.json';
 const ASSURANCE_MATRIX = 'scripts/invariants/assurance-matrix.json';
@@ -820,16 +830,31 @@ async function materializeLifecycleIssue(fetchImpl, apiKey, raw) {
     ...raw,
     comments: { nodes: comments },
   });
-  const childNodes = Array.isArray(raw.children?.nodes)
-    ? raw.children.nodes
-    : [];
-  if (
-    !Array.isArray(raw.children?.nodes) ||
-    raw.children?.pageInfo?.hasNextPage !== false
-  ) {
-    throw new Error(
-      `Child delivery evidence for ${raw.identifier} is incomplete`
-    );
+  const childNodes = [];
+  let childPage = raw.children;
+  for (let page = 0; ; page += 1) {
+    if (
+      !Array.isArray(childPage?.nodes) ||
+      typeof childPage?.pageInfo?.hasNextPage !== 'boolean'
+    ) {
+      throw new Error(
+        `Child delivery evidence for ${raw.identifier} is incomplete`
+      );
+    }
+    childNodes.push(...childPage.nodes);
+    if (!childPage.pageInfo.hasNextPage) break;
+    // JOV-5853 has more shipped children than one page. A missing cursor is
+    // still incomplete evidence; a later page is read before any child closes.
+    if (page >= MAX_CHILD_PAGES || !childPage.pageInfo.endCursor) {
+      throw new Error(
+        `Child delivery evidence for ${raw.identifier} is incomplete`
+      );
+    }
+    const more = await linearGraphql(fetchImpl, apiKey, CHILDREN_PAGE_QUERY, {
+      issueId: raw.id,
+      after: childPage.pageInfo.endCursor,
+    });
+    childPage = more.issue?.children;
   }
   const childDeliveryTimes = childNodes
     .filter(child => ['completed', 'canceled'].includes(child?.state?.type))

@@ -166,6 +166,68 @@ describe('linear sync on merge', () => {
     expect(world.updates).toEqual([]);
   });
 
+  it('pages JOV-5853 child evidence and still closes a shipped child', async () => {
+    const { world, fetchImpl } = createWorld();
+    world.pulls[202] = {
+      mergeSha: MAIN[1],
+      mergedAt: '2026-10-03T10:00:00Z',
+      files: ['apps/web/components/Card.tsx'],
+      headRef: 'tim/jov-2-shipped-child',
+    };
+    world.issues['JOV-2'] = {
+      ...structuredClone(world.issues['JOV-1']),
+      id: 'uuid-2',
+      identifier: 'JOV-2',
+      state: 'Merging',
+      updatedAt: '2026-10-03T13:00:00Z',
+      attachments: [`https://github.com/${REPO}/pull/202`],
+      children: [],
+    };
+    world.issues['JOV-5853'] = {
+      ...structuredClone(world.issues['JOV-1']),
+      id: 'uuid-5853',
+      identifier: 'JOV-5853',
+      title: 'commission: fleet readiness',
+      state: 'In Progress',
+      updatedAt: '2026-10-03T09:00:00Z',
+      attachments: [],
+      children: [['JOV-2', 'started']],
+    };
+    const paged = intercept(fetchImpl, async (_url, body, next) => {
+      if (body?.query?.includes('IssueLifecycleChildren')) {
+        expect(body.variables.issueId).toBe('uuid-5853');
+        expect(body.variables.after).toBe('c1');
+        return json({
+          data: {
+            issue: {
+              children: {
+                nodes: [
+                  {
+                    identifier: 'JOV-4',
+                    state: { type: 'completed' },
+                    completedAt: '2026-10-03T11:00:00Z',
+                    canceledAt: null,
+                  },
+                ],
+                pageInfo: { hasNextPage: false, endCursor: null },
+              },
+            },
+          },
+        });
+      }
+      if (!body?.query?.includes('LifecycleIssueBatch')) return null;
+      const payload = await (await next()).json();
+      for (const node of Object.values(payload.data)) {
+        if (node?.identifier !== 'JOV-5853') continue;
+        node.children.pageInfo = { hasNextPage: true, endCursor: 'c1' };
+      }
+      return json(payload);
+    });
+    await sweep(paged);
+    expect(world.issues['JOV-2'].state).toBe('Done');
+    expect(world.issues['JOV-5853'].state).toBe('In Progress');
+  });
+
   it.each([false, true])(
     'requires a fresh parent outcome after child delivery (parent PR=%s)',
     async hasPull => {
