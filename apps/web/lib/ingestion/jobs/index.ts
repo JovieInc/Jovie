@@ -4,11 +4,9 @@
 
 export { beaconsJobConfig, processBeaconsJob } from './beacons';
 export { executeIngestionJob } from './executor';
-export { instagramJobConfig, processInstagramJob } from './instagram';
 export { deriveLayloHandle, layloJobConfig, processLayloJob } from './laylo';
 
 // Platform-specific job processors
-export { linktreeJobConfig, processLinktreeJob } from './linktree';
 export type {
   BeaconsPayload,
   InstagramPayload,
