@@ -287,7 +287,7 @@ export function buildCommands(
       'Share feedback, report a bug, or request a feature.',
       'MessageSquare'
     ),
-    // Sidebar order first (Home, Identity, Work, Audience), same icons.
+    // Sidebar order first (Home, Identity, Work, Contacts, Audience), same icons.
     nav(
       'go-home',
       'Home',
@@ -309,6 +309,13 @@ export function buildCommands(
       PRODUCT_ONTOLOGY.work.definition,
       'Layers',
       PRODUCT_ONTOLOGY.work.canonicalRoute
+    ),
+    nav(
+      'go-contacts',
+      'Contacts',
+      'Open your contacts.',
+      'Contact',
+      APP_ROUTES.CONTACTS
     ),
     nav(
       'go-audience',
