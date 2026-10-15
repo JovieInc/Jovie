@@ -71,9 +71,11 @@ export const PickerNoneOfThese: Story = {
       'onboarding-artist-none-of-these'
     );
     await expect(button).toBeEnabled();
+    await userEvent.click(button);
+    await waitFor(() => expect(args.onNoneOfThese).toHaveBeenCalledTimes(1));
     await button.focus();
     await userEvent.keyboard('{Enter}');
-    await waitFor(() => expect(args.onNoneOfThese).toHaveBeenCalled());
+    await waitFor(() => expect(args.onNoneOfThese).toHaveBeenCalledTimes(2));
   },
 };
 
