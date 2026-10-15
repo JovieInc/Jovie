@@ -46,6 +46,9 @@ A version-bound Storybook 10.6.2 patch supplies the layout cache-node context
 required by Next 16.4's real `useRouter`, retaining the real RedirectBoundary.
 JOV-8234's failure reproduces even on unpatched Storybook 10.6.2.
 Remove the patch when an upstream integration passes the same browser matrix.
+A separate Nextra 4.6.1 patch uses `repository.workdir()` for document-history
+paths: a 15+ minute build exposed incorrect paths outside linked worktrees.
+The installed-loader regression fails before this fix.
 
 The open-PR check found no Next 16.4 title match in either repo. Jovie #21682
 (parent commissioning) and #21705 also touch the lockfile; recheck/rebase through
@@ -160,13 +163,13 @@ verify those separately from tags. Follow [TanStack SSR guidance](https://tansta
 
 ## Certification and rollback
 
-Local evidence: 18 workspace typecheck tasks and 88 cache/config/isolation tests
-passed; Web, Ovie, Console and Should I Make production builds passed. The
-previously failing Storybook desktop-modal regression passed all six tests.
-Web build wall time was 4m00s, peak RSS 7,906,960 KiB; output was 28 MiB static,
-803 MiB standalone and 1.1 GiB compiler cache. There is no comparable clean
-baseline, so no performance improvement is claimed. Docs build and the full
-Storybook matrix require their own completion receipts.
+Local evidence: 18 workspace typecheck tasks, 88 cache/config/isolation tests
+and 76 Docs tests passed. All five Jovie production builds passed; the desktop
+modal regression passed six tests and the full Storybook matrix passed all 162.
+Web build: 4m00s wall / 7,906,960 KiB peak RSS; 28 MiB static, 803 MiB standalone,
+1.1 GiB compiler cache. No comparable clean baseline exists, so no framework
+speedup is claimed. With the Nextra fix, Docs built in 3m58s / 1,488,976 KiB peak
+RSS, generated 66 static entries and indexed 27 pages through normal Pagefind.
 
 Run pinned Node/pnpm, frozen install, explicit `pnpm turbo typecheck`, changed-file
 Biome and relevant tests, production builds and the full Storybook surface matrix.
