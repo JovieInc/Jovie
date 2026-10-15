@@ -4,6 +4,7 @@ import {
   boolean,
   check,
   date,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -88,6 +89,10 @@ export const audienceMembers = pgTable(
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
   table => ({
+    idProfileUnique: uniqueIndex('audience_members_id_profile_unique').on(
+      table.id,
+      table.creatorProfileId
+    ),
     creatorProfileFingerprintUnique: uniqueIndex(
       'audience_members_creator_profile_id_fingerprint_unique'
     ).on(table.creatorProfileId, table.fingerprint),
@@ -120,7 +125,7 @@ export const audienceMembers = pgTable(
   })
 );
 
-// Normalized audience referrer history (replaces JSONB referrer_history)
+// Event history; referrer_history remains a bounded compatibility projection.
 export const audienceReferrers = pgTable(
   'audience_referrers',
   {
@@ -170,7 +175,7 @@ export const publicProfileCaptureDismissals = pgTable(
   })
 );
 
-// Normalized audience action history (replaces JSONB latest_actions)
+// Authoritative live events; latest_actions remains a bounded detail projection.
 export const audienceActions = pgTable(
   'audience_actions',
   {
@@ -215,6 +220,11 @@ export const audienceActions = pgTable(
       .notNull(),
   },
   table => ({
+    memberProfileFk: foreignKey({
+      name: 'audience_actions_member_profile_fk',
+      columns: [table.audienceMemberId, table.creatorProfileId],
+      foreignColumns: [audienceMembers.id, audienceMembers.creatorProfileId],
+    }).onDelete('cascade'),
     creatorProfileTimestampIdx: index(
       'audience_actions_creator_profile_id_timestamp_idx'
     ).on(table.creatorProfileId, table.timestamp),

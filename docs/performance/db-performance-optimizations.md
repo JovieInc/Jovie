@@ -1,7 +1,7 @@
-# Database Performance Optimizations (Prelaunch)
+# Database Performance Guidance
 
-This document summarizes the highest-impact database performance optimizations
-based on a review of the schema (`apps/web/lib/db/schema/*`) and query hotspots
+This document records source-level index and query observations
+based on the schema (`apps/web/lib/db/schema/*`) and query hotspots
 in the web app (notably analytics, audience, and admin dashboards).
 
 ## Scope and Evidence
@@ -11,33 +11,24 @@ High-frequency, data-heavy queries:
   (`apps/web/lib/db/queries/analytics.ts`) scan `click_events` with time ranges,
   `is_bot` filters, and group-by aggregates.
 - Audience and activity views:
-  - `apps/web/app/app/dashboard/audience/audience-data.ts`
+  - `apps/web/app/app/(shell)/dashboard/audience/audience-data.ts`
   - `apps/web/app/api/dashboard/activity/recent/route.ts`
   These sort and paginate `audience_members` and `notification_subscriptions`.
 - Data retention cleanup:
   `apps/web/lib/analytics/data-retention.ts` deletes by `created_at` and
-  `last_seen_at` without supporting indexes.
+  `last_seen_at`; supporting indexes exist in the schema. Verify deployed plans.
 - Admin usage series:
   `apps/web/lib/admin/overview.ts` groups `click_events` by date.
 
-## Top Optimizations (ordered by impact)
+## Source inventory and measurement gates
 
-### 1) Partition high-volume event tables by time
-**Targets:** `click_events`, `audience_members`, `notification_subscriptions`
+### 1) Measure before partitioning
 
-**Why:** These are append-only tables with retention deletes and frequent
-time-range scans. Partitioning eliminates large table scans and turns retention
-into fast partition drops.
-
-**Approach:**
-- Range partition by month on `created_at` (or `last_seen_at` for
-  `audience_members`).
-- Add a default partition for safety.
-- Use partition-level BRIN indexes for time scans.
-- Update retention jobs to drop old partitions instead of row deletes.
-
-**Expected impact:** 10x+ reduction in I/O for analytics and retention as data
-grows.
+`audience_members` and `notification_subscriptions` are mutable entities, not
+append-only event logs. The checked-in schema does not partition these tables.
+No measured workload here supports partition drops or a claimed 10x I/O gain.
+Use the current retention predicates and indexes; measure row counts, growth,
+`EXPLAIN (ANALYZE, BUFFERS)`, write latency and deletion cost before proposing DDL.
 
 ### 2) Add analytics rollup tables or materialized views
 **Targets:** analytics queries that repeatedly aggregate large event tables.
@@ -85,17 +76,15 @@ read rollups first, falling back to raw tables only when needed.
 - Make `click_events.is_bot` NOT NULL default `false` (backfill existing NULLs)
   to avoid `is_bot = false OR is_bot IS NULL` filters and improve index usage.
 
-### 4) Normalize large JSONB fields on `audience_members`
-**Targets:** `latest_actions`, `referrer_history`
+### 4) Preserve bounded audience projections
 
-**Why:** These JSONB arrays grow over time and force large row rewrites on every
-update, increasing bloat and write latency.
-
-**Approach:**
-- Move to `audience_actions` and `audience_referrers` tables with
-  `(audience_member_id, created_at)` indexes.
-- Keep small summary fields (latest action, last referrer) on
-  `audience_members` for list views.
+Live actions use `audience_actions`; visits also write `audience_referrers`.
+`latest_actions` is capped at five by the event writer; visit referrer history
+is capped at three. Dashboard details and analytics still read these JSONB fields.
+Migration 0030 created event tables, without a historical parity backfill.
+Do not remove projections or normalize bounded tags, UTM, properties or context
+without query evidence. See [transition inventory](../db/legacy-model-transitions.md)
+for gaps, rebuild/parity gates and the bounded missing-owner backfill.
 
 ### 5) Improve observability for query hotspots
 **Why:** Prelaunch is the best time to capture baseline performance data.
@@ -106,19 +95,10 @@ update, increasing bloat and write latency.
   store (or log pipeline) for top query ranking.
 - Add an admin-only "EXPLAIN samples" endpoint for heavy queries.
 
-## Quick Wins (1-2 days)
-1. ~~Add indexes for `audience_members` and `notification_subscriptions`.~~ **DONE**
-2. ~~Add BRIN or partial index on `click_events.created_at` for retention.~~ **DONE**
-3. Make `click_events.is_bot` NOT NULL and add a partial index for
-   non-bot analytics. (partial index done; NOT NULL backfill remaining)
+## Decision rule
 
-## Larger Schema Changes (prelaunch-friendly)
-1. Partition event tables by month and update retention to drop partitions.
-2. Introduce analytics rollup tables/materialized views.
-3. Normalize audience JSONB histories into event tables.
-
-## Open Questions
-- Expected retention policy beyond 90 days?
-- Projected scale (events per day, audience size)?
-- Is near-real-time analytics required, or is hourly refresh acceptable?
-
+**Ship now:** retain supported indexes and compatibility projections.
+**Re-evaluate when:** measured scans, retention cost or row growth breach an
+observed budget. **Then:** benchmark the smallest query/index/rollup change on
+representative data and verify old/new application compatibility before rollout.
+The rollups above are proposals, not deployed tables or measured speedups.
