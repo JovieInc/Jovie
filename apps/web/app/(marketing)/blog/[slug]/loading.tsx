@@ -1,12 +1,12 @@
-import { MarketingContainer } from '@/components/marketing';
+import { MarketingContentShell } from '@/components/marketing/MarketingContentShell';
 
 /**
  * Loading skeleton for individual blog post pages.
  */
 export default function BlogPostLoading() {
   return (
-    <article className='py-16 sm:py-20 lg:py-24'>
-      <MarketingContainer width='prose'>
+    <MarketingContentShell>
+      <article>
         <header className='mb-8 md:mb-12'>
           {/* Back link skeleton */}
           <div className='mb-6 h-4 w-24 skeleton motion-reduce:animate-none rounded' />
@@ -34,7 +34,7 @@ export default function BlogPostLoading() {
             </div>
           ))}
         </div>
-      </MarketingContainer>
-    </article>
+      </article>
+    </MarketingContentShell>
   );
 }

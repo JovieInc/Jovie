@@ -38,7 +38,7 @@ const author: ResolvedAuthor = {
 
 describe('BlogPostPage', () => {
   it('composes the canonical content-prose body', () => {
-    render(
+    const { container } = render(
       <BlogPostPage
         post={post}
         author={author}
@@ -48,6 +48,15 @@ describe('BlogPostPage', () => {
       />
     );
 
+    expect(
+      container.querySelector('[data-public-content-shell]')
+    ).toHaveAttribute('data-public-content-width', 'prose');
+    expect(
+      screen.getByRole('navigation', { name: 'Table of contents' })
+    ).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Ship with context' })
+    ).toBeVisible();
     expect(
       screen.getByRole('heading', { level: 1, name: 'Release rhythm' })
     ).toBeInTheDocument();

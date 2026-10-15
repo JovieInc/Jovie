@@ -17,8 +17,8 @@ import { describe, expect, it } from 'vitest';
  * As of the 2026-09-26 marketing routes pass (Tim direction), /legal/privacy
  * and /legal/terms moved off the shared minimal shell onto their own
  * per-route layout with the full docked MarketingHeader and a route hero;
- * /legal/cookies and /legal/dmca keep the original minimal shell, now on
- * their own sibling layout files instead of the shared parent.
+ * JOV-5763 consolidates all four legal documents onto the full shell in
+ * the parent layout; sibling layouts retain only hero/content composition.
  */
 
 const sharedSources = [
@@ -35,7 +35,7 @@ const sharedSources = [
   'components/site/PublicPageShell.tsx',
 ] as const;
 
-const minimalShellSources = [
+const plainContentSources = [
   'app/(dynamic)/legal/cookies/layout.tsx',
   'app/(dynamic)/legal/dmca/layout.tsx',
 ] as const;
@@ -74,37 +74,36 @@ describe('legal pages System B source contract', () => {
     }
   });
 
-  it('keeps /legal/cookies and /legal/dmca on the minimal PublicPageShell', () => {
-    for (const sourcePath of minimalShellSources) {
-      const layout = readSource(sourcePath);
+  it('gives /legal/cookies and /legal/dmca the full public content shell', () => {
+    for (const sourcePath of plainContentSources) {
+      const contentLayout = readSource(sourcePath);
+      const layout = readSource('app/(dynamic)/legal/layout.tsx');
 
       expect(layout).toContain('<PublicPageShell');
-      expect(layout).toContain("headerVariant='minimal'");
-      expect(layout).toContain('MarketingContainer');
+      expect(layout).not.toContain("headerVariant='minimal'");
+      expect(layout).toContain("footerVariant='expanded'");
+      expect(contentLayout).toContain('MarketingContentShell');
       expect(layout).toContain('text-primary-token');
       expect(layout).not.toContain('mainOffset={false}');
       expect(layout).not.toContain('mainClassName=');
-      expect(layout).toContain(
-        "className='public-legal-content py-16 sm:py-20'"
-      );
+      expect(contentLayout).toContain("className='public-legal-content'");
     }
   });
 
   it('gives /legal/privacy and /legal/terms the full docked header, a route hero, and the full footer', () => {
     for (const sourcePath of heroShellSources) {
-      const layout = readSource(sourcePath);
+      const contentLayout = readSource(sourcePath);
+      const layout = readSource('app/(dynamic)/legal/layout.tsx');
 
       expect(layout).toContain('<PublicPageShell');
       // The full/docked MarketingHeader is PublicPageShell's default variant;
       // these routes must not opt back into the minimal variant.
       expect(layout).not.toContain("headerVariant='minimal'");
       expect(layout).toContain("footerVariant='expanded'");
-      expect(layout).toContain('marketing-hero-dock');
-      expect(layout).toContain('marketing-route-hero__media');
-      expect(layout).toContain('MarketingRouteHero.css');
-      expect(layout).toContain(
-        "className='public-legal-content py-16 sm:py-20'"
-      );
+      expect(contentLayout).toContain('marketing-hero-dock');
+      expect(contentLayout).toContain('marketing-route-hero__media');
+      expect(contentLayout).toContain('MarketingRouteHero.css');
+      expect(contentLayout).toContain("className='public-legal-content'");
     }
   });
 
@@ -121,10 +120,11 @@ describe('legal pages System B source contract', () => {
     expect(terms).toContain('marketing-route-hero__accent--pink');
   });
 
-  it('keeps the shared /legal segment layout a pass-through', () => {
+  it('owns the full legal chrome once at the shared segment', () => {
     const layout = readSource('app/(dynamic)/legal/layout.tsx');
 
-    expect(layout).not.toContain('<PublicPageShell');
+    expect(layout).toContain('<PublicPageShell');
+    expect(layout).toContain("footerVariant='expanded'");
     expect(layout).toContain('export const revalidate = false');
   });
 

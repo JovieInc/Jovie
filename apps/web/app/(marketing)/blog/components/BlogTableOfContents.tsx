@@ -6,11 +6,5 @@ export interface BlogTableOfContentsProps {
 }
 
 export function BlogTableOfContents({ toc }: BlogTableOfContentsProps) {
-  return (
-    <PublicTableOfContents
-      toc={toc}
-      stickyClassName='max-lg:hidden lg:sticky lg:top-24 lg:self-start'
-      trackActiveHeading
-    />
-  );
+  return <PublicTableOfContents toc={toc} trackActiveHeading />;
 }

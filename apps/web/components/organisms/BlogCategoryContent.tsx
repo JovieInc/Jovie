@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import { MarketingContainer, MarketingHero } from '@/components/marketing';
+import { MarketingHero } from '@/components/marketing';
+import { MarketingContentShell } from '@/components/marketing/MarketingContentShell';
 import type { BlogCategory } from '@/lib/blog/categories';
 
 interface BlogCategoryContentProps {
@@ -25,7 +26,7 @@ export function BlogCategoryContent({
         </p>
       </MarketingHero>
 
-      <MarketingContainer width='page' className='pb-20 sm:pb-28'>
+      <MarketingContentShell width='page'>
         <div className='marketing-divider mb-10' />
         {hasPosts ? (
           <div className='grid grid-cols-1 gap-8 md:grid-cols-2'>
@@ -34,7 +35,7 @@ export function BlogCategoryContent({
         ) : (
           <p className='text-secondary-token'>No posts in this category yet.</p>
         )}
-      </MarketingContainer>
+      </MarketingContentShell>
     </div>
   );
 }

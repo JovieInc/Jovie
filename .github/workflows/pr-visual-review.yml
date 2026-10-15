@@ -213,6 +213,25 @@ jobs:
             --retries=0 \
             -g "deliberate-red|$tests"
 
+      - name: Verify public content in both themes and viewports
+        if: steps.route.outputs.should_review == 'true' && steps.build.outcome == 'success' && steps.server.outcome == 'success'
+        working-directory: apps/web
+        env:
+          BASE_URL: http://127.0.0.1:3100
+          E2E_SKIP_WEB_SERVER: '1'
+          E2E_SKIP_SEED: '1'
+          E2E_SKIP_WARMUP: '1'
+          EXPECTED_COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          content_surface='^apps/web/(app/\((marketing|dynamic)\)/(blog|changelog|legal)/|components/(marketing/MarketingContentShell|molecules/(BlogMarkdownReader|Legal|DocToolbar)|organisms/(Blog|DocPage)))'
+          if ! grep -Eq "$content_surface" "$RUNNER_TEMP/changed-files.txt"; then
+            exit 0
+          fi
+          pnpm exec playwright test tests/e2e/public-content-shell.spec.ts \
+            --project=chromium --workers=2 --retries=0 --reporter=line \
+            --output=../../pr-visual-artifacts/public-content
+
       # JOV-7713: per-PR screen audit manifest for the Validating lifecycle
       # (changed inventory screens, their producer, invalidated UI matrix
       # rows) plus the audit ledger over this run's route DOM receipts.

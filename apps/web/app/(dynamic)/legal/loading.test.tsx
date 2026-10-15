@@ -27,10 +27,6 @@ const EXPECTED_SKELETON_SIGNATURES = [
   'h-4 w-24',
   'h-4 w-48',
   'h-4 w-40',
-  'h-4 w-24',
-  'h-4 w-44',
-  'h-4 w-36',
-  'h-4 w-40',
   ...Array.from({ length: 5 }, () => [
     'h-7 w-52',
     'h-4 w-full',
@@ -94,16 +90,12 @@ describe('LegalLoading', () => {
       expect(skeleton.className).toContain('motion-reduce:animate-none');
     }
 
-    expect(container.querySelector('.lg\\:hidden')).toHaveClass(
+    expect(container.querySelector('.border-y')).toHaveClass(
       'border-y',
       'border-subtle',
       'py-5'
     );
-    expect(
-      container.querySelector(
-        '.lg\\:grid-cols-\\[220px_minmax\\(0\\,760px\\)\\]'
-      )
-    ).not.toBeNull();
+    expect(container.querySelector('[aria-hidden] .space-y-8')).not.toBeNull();
   });
 
   it('keeps privacy, terms, and cookies loading on the shared route', () => {
