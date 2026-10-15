@@ -230,6 +230,7 @@ test.describe('Homepage', () => {
       const heading = page.getByRole('heading', { level: 1 });
       await expect(heading).toBeVisible();
       await expect(heading).toHaveText(firstSentence + secondSentence);
+      await expect(page.locator('#public-profile img')).toBeVisible();
 
       const secondLine = heading;
       const secondLineCount = await secondLine.evaluate(countVisualLines);

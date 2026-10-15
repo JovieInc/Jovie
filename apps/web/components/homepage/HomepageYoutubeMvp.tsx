@@ -131,7 +131,7 @@ export function HomepageYoutubeMvp() {
                 />
               )}
               {feature.id === 'public-profile' && (
-                <div className='mx-auto max-w-72'>
+                <div className='mx-auto w-full max-w-72'>
                   <ArtistProfilePhoneFrame size='md'>
                     <Image
                       src={PROFILE.publicUrl}
