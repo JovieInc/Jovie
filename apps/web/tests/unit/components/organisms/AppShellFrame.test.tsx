@@ -177,6 +177,24 @@ describe('AppShellFrame', () => {
     expect(screen.getByTestId('app-shell-right-rail')).toBeInTheDocument();
   });
 
+  it('omits the live landmark when rendered as a suspense placeholder', () => {
+    render(
+      <AppShellFrame
+        placeholder
+        sidebar={<aside>Sidebar</aside>}
+        header={<header>Header</header>}
+        main={<div>Main Content</div>}
+      />
+    );
+
+    const mainContent = screen.getByRole('main');
+    expect(mainContent).not.toHaveAttribute('id');
+    expect(mainContent.closest('[data-app-shell-frame]')).toBeNull();
+    expect(
+      mainContent.closest('[data-app-shell-placeholder="true"]')
+    ).toBeTruthy();
+  });
+
   it('fills sidebar mount height so footer mt-auto can pin Settings (JOV-3960)', () => {
     render(
       <AppShellFrame
