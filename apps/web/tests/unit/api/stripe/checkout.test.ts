@@ -1,5 +1,15 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { buildAgentHandoffDiscovery } from '@/lib/acquisition/agent-handoff';
+import {
+  AGENT_INTENT_QUERY,
+  AGENT_INTENT_TTL_MS,
+} from '@/lib/acquisition/agent-intent';
+import {
+  buildFirstTouch,
+  sealFirstTouchEnvelope,
+} from '@/lib/acquisition/first-touch-envelope';
+import { supportedAgentDecision } from '@/tests/fixtures/agent-handoff';
 import { malformedJsonRequest } from '@/tests/helpers/malformed-json-request';
 
 const mockGetCachedAuth = vi.hoisted(() => vi.fn());
@@ -228,6 +238,155 @@ describe('POST /api/stripe/checkout', () => {
     expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
     expect(mockStripeSubscriptionsList).not.toHaveBeenCalled();
     expect(mockCreateBillingPortalSession).not.toHaveBeenCalled();
+  });
+
+  async function agentRequest(
+    body: Record<string, unknown>,
+    age = 0,
+    tamper = false
+  ) {
+    vi.stubEnv('ACQUISITION_FIRST_TOUCH_SECRET', 'checkout-test-signing-key');
+    const capturedAt = new Date(Date.now() - age);
+    const discovery = await buildAgentHandoffDiscovery(
+      supportedAgentDecision(capturedAt),
+      capturedAt
+    );
+    const url = new URL(discovery.handoffUrl as string);
+    let token = url.searchParams.get(AGENT_INTENT_QUERY) as string;
+    if (tamper)
+      token = `${token.slice(0, -1)}${token.endsWith('a') ? 'b' : 'a'}`;
+    return new NextRequest('https://jov.ie/api/stripe/checkout', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: `jovie_first_touch=${token}`,
+      },
+      body: JSON.stringify(body),
+    });
+  }
+
+  it('requires explicit purchase confirmation even with valid signed intent', async () => {
+    mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
+    const response = await POST(await agentRequest({ priceId: 'price_123' }));
+    expect(response.status).toBe(400);
+    expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
+    expect(mockEnsureStripeCustomer).not.toHaveBeenCalled();
+  });
+
+  it('cannot use intent to bypass authentication or price validation', async () => {
+    mockGetCachedAuth.mockResolvedValue({ userId: null });
+    expect(
+      (
+        await POST(
+          await agentRequest({ priceId: 'price_123', humanConfirmed: true })
+        )
+      ).status
+    ).toBe(401);
+    mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
+    expect(
+      (await POST(await agentRequest({ humanConfirmed: true }))).status
+    ).toBe(400);
+    expect(
+      (
+        await POST(
+          await agentRequest({ priceId: 'unsupported', humanConfirmed: true })
+        )
+      ).status
+    ).toBe(400);
+    expect(
+      (
+        await POST(
+          await agentRequest({ priceId: 'price_123', humanConfirmed: true })
+        )
+      ).status
+    ).toBe(400);
+    expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
+  });
+
+  it('uses signed acquisition and agent fields ahead of forged request correlation', async () => {
+    mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
+    mockGetPriceMappingDetails.mockReturnValue({ plan: 'pro' });
+    mockCreateCheckoutSession.mockResolvedValue({
+      id: 'cs_agent',
+      url: 'https://checkout.stripe.com/agent',
+    });
+    const response = await POST(
+      await agentRequest({
+        priceId: 'price_123',
+        humanConfirmed: true,
+        acquisitionId: 'forged',
+        agentIntentId: 'forged',
+        agentRail: 'unsupported',
+        agentMatrixRevision: 'forged',
+      })
+    );
+    expect(response.status).toBe(200);
+    expect(mockCreateCheckoutSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        correlation: expect.objectContaining({
+          acquisitionId: expect.stringMatching(/^[0-9a-f-]{36}$/),
+          agentIntentId: expect.stringMatching(/^[0-9a-f-]{36}$/),
+          agentRail: 'ordinary-web-checkout',
+          agentMatrixRevision: 'matrix-r7',
+          agentDecisionRevision: 'decision-r4',
+        }),
+      })
+    );
+  });
+
+  it.each(['expired', 'tampered'])(
+    'cannot strengthen attribution with %s intent',
+    async kind => {
+      mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
+      mockCreateCheckoutSession.mockResolvedValue({
+        id: 'cs_ordinary',
+        url: 'https://checkout.stripe.com/ordinary',
+      });
+      const response = await POST(
+        await agentRequest(
+          {
+            priceId: 'price_123',
+            agentIntentId: 'forged',
+            agentRail: 'ordinary-web-checkout',
+          },
+          kind === 'expired' ? AGENT_INTENT_TTL_MS + 1 : 0,
+          kind === 'tampered'
+        )
+      );
+      expect(response.status).toBe(200);
+      const correlation =
+        mockCreateCheckoutSession.mock.calls[0][0].correlation ?? {};
+      expect(
+        Object.keys(correlation).filter(key => key.startsWith('agent'))
+      ).toEqual([]);
+    }
+  );
+
+  it('preserves ordinary checkout acquisition identity when a passive cookie also exists', async () => {
+    vi.stubEnv('ACQUISITION_FIRST_TOUCH_SECRET', 'checkout-test-signing-key');
+    const passive = await sealFirstTouchEnvelope(
+      buildFirstTouch({ url: new URL('https://jov.ie/?utm_source=organic') })
+    );
+    const browserId = '7f5bb735-8e88-4d78-ae32-5228cc12a8bb';
+    mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
+    mockCreateCheckoutSession.mockResolvedValue({
+      id: 'cs_ordinary',
+      url: 'https://checkout.stripe.com/ordinary',
+    });
+    const response = await POST(
+      new NextRequest('https://jov.ie/api/stripe/checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: `jovie_first_touch=${passive}; jv_acquisition_id=${browserId}`,
+        },
+        body: JSON.stringify({ priceId: 'price_123' }),
+      })
+    );
+    expect(response.status).toBe(200);
+    expect(mockCreateCheckoutSession).toHaveBeenCalledWith(
+      expect.objectContaining({ correlation: { acquisitionId: browserId } })
+    );
   });
 
   it('creates checkout session with durable correlation IDs', async () => {

@@ -222,6 +222,7 @@ describe('OnboardingCheckoutClient', () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             priceId: 'price_annual',
+            humanConfirmed: true,
             returnTo: '/app/chat?from=onboarding&panel=profile',
             source: 'onboarding',
           }),
