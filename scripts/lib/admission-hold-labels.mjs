@@ -7,9 +7,10 @@
 // by the hold contract (scripts/hold-contract.mjs, jovie-hold/v1): it needs a
 // receipt naming an owner and a machine-checkable release, or it is removed
 // after the ownerless grace period. `queue-poison` and `machineBlockLabels`
-// (`lane-fix-red`) are machine state, not hold-contract labels. Green enroll
-// removes `lane-fix-red` once the current head is required-green, then admits
-// that head. A red head keeps the label.
+// (`lane-fix-red`) are machine state, not hold-contract labels. The Lane Fix
+// Relay removes `lane-fix-red` with its existing GITHUB_TOKEN once the current
+// head is required-green. Green enroll does not remove the label and will not
+// admit that head while it remains. A red head keeps the label.
 //
 // Workflow `if:` expressions and the checkout-free auto-merge enable step
 // cannot read the file, so they repeat the list;

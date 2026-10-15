@@ -34,8 +34,8 @@ export const TIM_HOLD_LABELS = Object.freeze([
 const MACHINE_BLOCKS = new Set(MACHINE_BLOCK_LABELS);
 
 // Stop labels and queue-poison park a draft: undrafting them only wakes work
-// green enroll must skip. lane-fix-red is cleared by green enroll once required
-// checks are green, so it must not park an otherwise-ready draft.
+// green enroll must skip. lane-fix-red is cleared by the Lane Fix Relay once
+// required checks are green, so it must not park an otherwise-ready draft.
 export const GREEN_SOURCE_HOLD_LABELS = Object.freeze([
   ...new Set([
     ...WRITER_PROMOTION_HOLD_LABELS,

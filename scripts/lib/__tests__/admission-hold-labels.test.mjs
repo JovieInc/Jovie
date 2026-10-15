@@ -101,7 +101,14 @@ test('every enroll, dequeue, and auto-merge copy matches the canonical set', () 
     .script;
   assert.match(enrollScript, /scripts\/lib\/admission-hold-labels\.json/);
   assert.match(enrollScript, /holdLabels\.machineBlockLabels/);
-  assert.match(enrollScript, /CLEARED stale lane-fix-red/);
+  assert.doesNotMatch(enrollScript, /CLEARED stale lane-fix-red/);
+  assert.doesNotMatch(enrollScript, /name: 'lane-fix-red'/);
+  const relaySource = readFileSync('scripts/lanes/pr_events.py', 'utf8');
+  assert.match(relaySource, /LANE_FIX_RED = PREFIX \+ "red"/);
+  assert.match(relaySource, /labels\/\{LANE_FIX_RED\}/);
+  const relayWorkflow = readWorkflow('lane-fix-relay.yml');
+  assert.equal(relayWorkflow.jobs.relay.permissions.issues, 'write');
+  assert.equal(relayWorkflow.jobs.relay.permissions['pull-requests'], 'write');
   assert.match(
     enroll.jobs.enroll.steps.find(s => s.uses?.includes('checkout')).with[
       'sparse-checkout'
