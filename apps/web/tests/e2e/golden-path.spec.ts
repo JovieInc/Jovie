@@ -90,28 +90,35 @@ async function verifyHomeWelcome(page: Page) {
   page.on('request', watchPosts);
   await page.route('**/api/insights/summary', async route => {
     await ready;
-    if (mode === 'error')
-      return route.fulfill({
-        status: 500,
-        json: { error: 'Controlled summary failure' },
-      });
-    await route.fulfill({
-      json: {
-        insights:
-          mode === 'empty'
-            ? []
-            : [
-                {
-                  ...insight,
-                  id: 'expired',
-                  expiresAt: new Date(Date.now() - 1000).toISOString(),
-                },
-                insight,
-              ],
-        totalActive: mode === 'empty' ? 0 : 1,
-        lastGeneratedAt: new Date().toISOString(),
-      },
-    });
+    if (mode === 'error') {
+      await route
+        .fulfill({
+          status: 500,
+          json: { error: 'Controlled summary failure' },
+        })
+        .catch(() => {});
+      return;
+    }
+    // An earlier aborted summary must not reject the live fulfill.
+    await route
+      .fulfill({
+        json: {
+          insights:
+            mode === 'empty'
+              ? []
+              : [
+                  {
+                    ...insight,
+                    id: 'expired',
+                    expiresAt: new Date(Date.now() - 1000).toISOString(),
+                  },
+                  insight,
+                ],
+          totalActive: mode === 'empty' ? 0 : 1,
+          lastGeneratedAt: new Date().toISOString(),
+        },
+      })
+      .catch(() => {});
   });
   const heading = page.getByTestId('chat-empty-state-greeting-text');
   const input = page.getByRole('textbox', {
