@@ -30,7 +30,7 @@ export const VOICE_PAGE_STEPS = [
 /** Exact production presentation shared by `/voice` and its deterministic story. */
 export function VoicePageContent() {
   return (
-    <main className='bg-base text-primary-token'>
+    <div className='bg-base text-primary-token'>
       <MarketingHero
         eyebrow='Voice Cloning'
         title={
@@ -57,7 +57,9 @@ export function VoicePageContent() {
         // JOV-7772: lg splits the hero into two columns, so use 40px in its
         // narrower text column; xl restores 48px as the column widens.
         titleClassName='text-3xl md:text-5xl lg:text-4xl xl:text-5xl'
-        sectionTestId='voice-hero-section'
+        sectionTestId='marketing-section-hero'
+        sectionVariant='split-screenshot-right'
+        sectionOwner='apps/web/components/organisms/VoicePageContent.tsx'
         primaryCtaLabel='Start voice cloning'
         primaryCtaHref={APP_ROUTES.START}
         ctaEventName='voice_landing_cta_start'
@@ -73,7 +75,12 @@ export function VoicePageContent() {
         ]}
       />
 
-      <section className='border-t border-subtle bg-panel py-16 sm:py-20'>
+      <section
+        className='border-t border-subtle bg-panel py-16 sm:py-20'
+        data-testid='marketing-section-how-it-works'
+        data-marketing-variant='4-step-strip'
+        data-marketing-owner='apps/web/components/organisms/VoicePageContent.tsx'
+      >
         <MarketingContainer width='page'>
           <div className='mx-auto max-w-3xl text-center'>
             <p className='homepage-section-eyebrow'>Four steps</p>
@@ -107,7 +114,12 @@ export function VoicePageContent() {
         </MarketingContainer>
       </section>
 
-      <section className='py-16 sm:py-20'>
+      <section
+        className='py-16 sm:py-20'
+        data-testid='marketing-section-content-prose'
+        data-marketing-variant='article-body'
+        data-marketing-owner='apps/web/components/organisms/VoicePageContent.tsx'
+      >
         <MarketingContainer width='page'>
           <div className='mx-auto max-w-3xl'>
             <div className='rounded-3xl border border-subtle bg-panel px-8 py-10'>
@@ -145,7 +157,12 @@ export function VoicePageContent() {
         </MarketingContainer>
       </section>
 
-      <section className='border-t border-subtle bg-surface-0 py-14 text-primary-token'>
+      <section
+        className='border-t border-subtle bg-surface-0 py-14 text-primary-token'
+        data-testid='marketing-section-cta'
+        data-marketing-variant='final-single-claim'
+        data-marketing-owner='apps/web/components/organisms/VoicePageContent.tsx'
+      >
         <MarketingContainer width='page'>
           <div className='mx-auto flex max-w-2xl flex-col items-center gap-4 text-center'>
             {/* ui-casing-allow: marketing display headline */}
@@ -171,6 +188,6 @@ export function VoicePageContent() {
           </div>
         </MarketingContainer>
       </section>
-    </main>
+    </div>
   );
 }

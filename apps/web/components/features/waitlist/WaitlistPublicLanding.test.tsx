@@ -58,6 +58,7 @@ describe('WaitlistPublicLanding', () => {
         oppositeModeUrl: APP_ROUTES.SIGNIN,
         fallbackRedirectUrl: APP_ROUTES.START,
         suppressOneTap: true,
+        marketingCapture: true,
       })
     );
     expect(screen.getByTestId('auth-shell')).toBeInTheDocument();

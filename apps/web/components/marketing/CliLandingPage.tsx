@@ -137,105 +137,114 @@ export function CliLandingPage() {
         }}
         logos={false}
         align='center'
-        testId='cli-hero'
+        testId='marketing-section-hero'
+        sectionVariant='centered-none'
+        sectionOwner='apps/web/components/marketing/CliLandingPage.tsx'
       />
 
-      <MarketingContainer width='prose' className='pb-20 sm:pb-28'>
-        <div className='space-y-16'>
-          <section
-            id='install'
-            aria-labelledby='install-heading'
-            data-marketing-section='content-prose'
-          >
-            <h2
-              id='install-heading'
-              className='text-2xl font-semibold tracking-tight text-primary-token line-clamp-2'
+      <section
+        data-testid='marketing-section-content-prose'
+        data-marketing-variant='article-body'
+        data-marketing-owner='apps/web/components/marketing/CliLandingPage.tsx'
+      >
+        <MarketingContainer width='prose' className='pb-20 sm:pb-28'>
+          <div className='space-y-16'>
+            <section
+              id='install'
+              aria-labelledby='install-heading'
+              data-marketing-section='content-prose'
             >
-              Install
-            </h2>
-            <p className='mt-4 text-base leading-relaxed text-secondary-token'>
-              Install globally, or run it with npx from any agent. The CLI is
-              anonymous.
-            </p>
-            <pre className='mt-6 overflow-x-auto rounded-xl border border-subtle bg-surface-0 p-5 text-sm leading-relaxed text-secondary-token'>
-              <code>{INSTALL_COMMANDS}</code>
-            </pre>
-            <div className='mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-secondary-token'>
-              <span>No account</span>
-              <span>No API key</span>
-              <span>MCP server</span>
-              <span>JSON output</span>
-            </div>
-          </section>
+              <h2
+                id='install-heading'
+                className='text-2xl font-semibold tracking-tight text-primary-token line-clamp-2'
+              >
+                Install
+              </h2>
+              <p className='mt-4 text-base leading-relaxed text-secondary-token'>
+                Install globally, or run it with npx from any agent. The CLI is
+                anonymous.
+              </p>
+              <pre className='mt-6 overflow-x-auto rounded-xl border border-subtle bg-surface-0 p-5 text-sm leading-relaxed text-secondary-token'>
+                <code>{INSTALL_COMMANDS}</code>
+              </pre>
+              <div className='mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-secondary-token'>
+                <span>No account</span>
+                <span>No API key</span>
+                <span>MCP server</span>
+                <span>JSON output</span>
+              </div>
+            </section>
 
-          <section id='commands' aria-labelledby='commands-heading'>
-            <h2
-              id='commands-heading'
-              className='text-2xl font-semibold tracking-tight text-primary-token line-clamp-2'
-            >
-              What You Can Do
-            </h2>
-            <div className='mt-6 space-y-8'>
-              {CLI_JOBS.map(item => (
-                <article key={item.title}>
-                  <h3 className='text-base font-semibold text-primary-token'>
-                    {item.title}
-                  </h3>
-                  <section
-                    aria-label={`${item.title} command`}
-                    className='mt-3 overflow-x-auto rounded-xl border border-subtle bg-surface-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
-                    // biome-ignore lint/a11y/noNoninteractiveTabindex: long commands scroll sideways on narrow screens and need a keyboard entry point (axe scrollable-region-focusable)
-                    tabIndex={0}
-                  >
-                    <pre className='p-4 text-sm leading-relaxed text-primary-token'>
-                      <code>{item.command}</code>
-                    </pre>
-                  </section>
-                  <p className='mt-3 text-sm leading-relaxed text-secondary-token'>
-                    {item.body}
-                  </p>
-                </article>
-              ))}
-            </div>
-          </section>
+            <section id='commands' aria-labelledby='commands-heading'>
+              <h2
+                id='commands-heading'
+                className='text-2xl font-semibold tracking-tight text-primary-token line-clamp-2'
+              >
+                What You Can Do
+              </h2>
+              <div className='mt-6 space-y-8'>
+                {CLI_JOBS.map(item => (
+                  <article key={item.title}>
+                    <h3 className='text-base font-semibold text-primary-token'>
+                      {item.title}
+                    </h3>
+                    <section
+                      aria-label={`${item.title} command`}
+                      className='mt-3 overflow-x-auto rounded-xl border border-subtle bg-surface-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
+                      // biome-ignore lint/a11y/noNoninteractiveTabindex: long commands scroll sideways on narrow screens and need a keyboard entry point (axe scrollable-region-focusable)
+                      tabIndex={0}
+                    >
+                      <pre className='p-4 text-sm leading-relaxed text-primary-token'>
+                        <code>{item.command}</code>
+                      </pre>
+                    </section>
+                    <p className='mt-3 text-sm leading-relaxed text-secondary-token'>
+                      {item.body}
+                    </p>
+                  </article>
+                ))}
+              </div>
+            </section>
 
-          <section id='reference' aria-labelledby='reference-heading'>
-            <h2
-              id='reference-heading'
-              className='text-2xl font-semibold tracking-tight text-primary-token line-clamp-2'
-            >
-              CLI Reference
-            </h2>
-            <p className='mt-4 text-base leading-relaxed text-secondary-token'>
-              Every command accepts <code>--base-url</code> and{' '}
-              <code>--json</code>. <code>--json</code> emits JSON for API
-              responses and wraps text resources as{' '}
-              <code>{'{"content":"..."}'}</code>.
-            </p>
-            <dl className='mt-6 space-y-5'>
-              {CLI_DOCUMENTED_COMMANDS.map(item => (
-                <div key={item.command}>
-                  <dt>
-                    <code className='text-sm font-medium text-primary-token'>
-                      {item.command}
-                    </code>
-                  </dt>
-                  <dd className='mt-1 text-sm leading-relaxed text-secondary-token'>
-                    {item.request}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-            <p className='mt-6 text-sm leading-relaxed text-secondary-token'>
-              Maintainer note: package publication is main-only and
-              provenance-required. A local checkout can run the same command
-              surface with <code>pnpm --filter @jovie/cli dev</code>.
-            </p>
-          </section>
-        </div>
-      </MarketingContainer>
+            <section id='reference' aria-labelledby='reference-heading'>
+              <h2
+                id='reference-heading'
+                className='text-2xl font-semibold tracking-tight text-primary-token line-clamp-2'
+              >
+                CLI Reference
+              </h2>
+              <p className='mt-4 text-base leading-relaxed text-secondary-token'>
+                Every command accepts <code>--base-url</code> and{' '}
+                <code>--json</code>. <code>--json</code> emits JSON for API
+                responses and wraps text resources as{' '}
+                <code>{'{"content":"..."}'}</code>.
+              </p>
+              <dl className='mt-6 space-y-5'>
+                {CLI_DOCUMENTED_COMMANDS.map(item => (
+                  <div key={item.command}>
+                    <dt>
+                      <code className='text-sm font-medium text-primary-token'>
+                        {item.command}
+                      </code>
+                    </dt>
+                    <dd className='mt-1 text-sm leading-relaxed text-secondary-token'>
+                      {item.request}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+              <p className='mt-6 text-sm leading-relaxed text-secondary-token'>
+                Maintainer note: package publication is main-only and
+                provenance-required. A local checkout can run the same command
+                surface with <code>pnpm --filter @jovie/cli dev</code>.
+              </p>
+            </section>
+          </div>
+        </MarketingContainer>
+      </section>
 
       <FaqSection
+        sectionVariant='structured-data-list'
         items={[...CLI_FAQ_ITEMS]}
         heading='Questions'
         analyticsEventName='cli_faq_opened'
@@ -243,6 +252,7 @@ export function CliLandingPage() {
       />
 
       <MarketingFooterCta
+        sectionVariant='final-single-claim'
         title='Jovie, for your agents.'
         body='Install the Jovie CLI and give a creator a profile from their Spotify link.'
         ctaLabel={CLI_PRIMARY_CTA_LABEL}

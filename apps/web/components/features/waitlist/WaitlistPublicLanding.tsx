@@ -39,6 +39,7 @@ export function WaitlistPublicLanding() {
           oppositeModeUrl={APP_ROUTES.SIGNIN}
           fallbackRedirectUrl={APP_ROUTES.START}
           suppressOneTap
+          marketingCapture
         />
       </AuthLayout>
     </AuthenticatedAuthEntryGuard>

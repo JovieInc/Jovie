@@ -223,13 +223,16 @@ export const HERO_ROUTE_INTENTS: readonly HeroRouteIntent[] = [
   ),
   {
     url: '/artist-notifications',
-    input: { useCase: 'claim-conversion', conversion: 'claim-profile' },
-    why: 'single primary CTA into profile claim',
+    input: {
+      useCase: 'aha-capture',
+      captureId: 'artist-notifications-card-stage',
+    },
+    why: 'hero mounts the notification card stage as the aha capture',
   },
   {
     url: '/download',
-    input: { useCase: 'two-actions', actionCount: 2 },
-    why: 'desktop download plus iPhone alpha',
+    input: { useCase: 'aha-capture', captureId: 'download-desktop-screenshot' },
+    why: 'hero mounts the desktop workspace screenshot as the aha capture',
   },
   {
     url: '/pay',
@@ -238,8 +241,8 @@ export const HERO_ROUTE_INTENTS: readonly HeroRouteIntent[] = [
   },
   {
     url: '/voice',
-    input: { useCase: 'two-actions', actionCount: 2 },
-    why: 'landing hero with primary and secondary CTA',
+    input: { useCase: 'aha-capture', captureId: 'voice-demo-visual' },
+    why: 'hero mounts the voice demo as the aha capture',
   },
   {
     url: '/instant-merch',
@@ -268,8 +271,8 @@ export const HERO_ROUTE_INTENTS: readonly HeroRouteIntent[] = [
   },
   {
     url: '/launch',
-    input: { useCase: 'two-actions', actionCount: 2 },
-    why: 'primary and secondary launch links',
+    input: { useCase: 'aha-capture', captureId: 'launch-profile-stage' },
+    why: 'hero mounts the profile mock as the aha capture',
   },
   ...[
     '/about',
@@ -278,7 +281,6 @@ export const HERO_ROUTE_INTENTS: readonly HeroRouteIntent[] = [
     '/alternatives/*',
     '/blog',
     '/blog/category/*',
-    '/waitlist',
   ].map(
     (url): HeroRouteIntent => ({
       url,
