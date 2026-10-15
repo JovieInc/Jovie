@@ -2144,18 +2144,6 @@ describe('source-read guard selection', () => {
     expect(guard.command).toContain('playbooks:validate');
     expect(guard.command).toContain('playbooks:compile');
     expect(guard.command).not.toContain('--register');
-    const workflow = readFileSync(
-      join(REPO_ROOT, '.github/workflows/ci.yml'),
-      'utf8'
-    );
-    const docSkip = workflow.slice(
-      workflow.indexOf('# Changelog content and executable playbook'),
-      workflow.indexOf(
-        'echo "has_code_changes=true"',
-        workflow.indexOf('# Changelog content and executable playbook')
-      )
-    );
-    expect(docSkip).toContain('docs/playbooks/[^/]+\\.playbook\\.md$');
   });
 
   it('fails closed onto guards for manual, local, and unreadable diffs', () => {

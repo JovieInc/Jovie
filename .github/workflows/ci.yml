@@ -827,7 +827,7 @@ jobs:
             exit 0
           fi
 
-          # Changelog content and executable playbook sources require web checks.
+          # CHANGELOG.md is customer-facing web content, not documentation.
           if ! echo "$CHANGED_FILES" | grep -q -E '^(\.github/|CHANGELOG\.md$|docs/playbooks/[^/]+\.playbook\.md$)' &&
             ! echo "$CHANGED_FILES" | grep -q -v -E '\.(md|txt)$'; then
             echo "Only documentation files changed"

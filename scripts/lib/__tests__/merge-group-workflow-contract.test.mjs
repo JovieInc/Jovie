@@ -234,9 +234,15 @@ describe('merge_group workflow contract', () => {
     );
     const directory = mkdtempSync(join(tmpdir(), 'changelog-ci-routing-'));
     try {
-      for (const { files, builds } of [
+      for (const { files, builds, code = builds } of [
         { files: 'CHANGELOG.md', builds: true },
         { files: 'docs/changelog.md', builds: false },
+        {
+          files: 'docs/playbooks/growth-presence-repair-offer.playbook.md',
+          builds: false,
+          code: true,
+        },
+        { files: 'docs/playbooks/TEMPLATE.md', builds: false },
         { files: 'README.md', builds: false },
       ]) {
         const output = join(directory, 'outputs');
@@ -256,7 +262,7 @@ describe('merge_group workflow contract', () => {
         expect(result.status, result.stderr).toBe(0);
         expect(readFileSync(output, 'utf8')).toContain('run_build=' + builds);
         expect(readFileSync(output, 'utf8')).toContain(
-          'has_code_changes=' + builds
+          'has_code_changes=' + code
         );
       }
     } finally {
