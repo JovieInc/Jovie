@@ -1072,7 +1072,9 @@ describe('merge-group API outages do not eject a valid group', () => {
     expect(calls).toBe(1);
 
     const paths = [];
-    const oversized = [{ filename: 'apps/web/a.ts', additions: 2_000, deletions: 0 }];
+    const oversized = [
+      { filename: 'apps/web/a.ts', additions: 2_000, deletions: 0 },
+    ];
     await expect(
       runPolicy({
         argv: ['--policy=size'],

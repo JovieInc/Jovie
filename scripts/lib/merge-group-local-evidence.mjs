@@ -55,6 +55,11 @@ export function parseNumstatZ(stdout) {
 }
 
 /**
+ * @param {object} [options]
+ * @param {string} [options.baseSha]
+ * @param {string} [options.headSha]
+ * @param {string} [options.cwd]
+ * @param {(args: string[], cwd: string) => string} [options.git]
  * @returns {null | {
  *   baseSha: string,
  *   headSha: string,
@@ -72,12 +77,18 @@ export function readLocalMergeGroupEvidence({
   cwd = process.cwd(),
   git = runGit,
 } = {}) {
-  if (!SHA_PATTERN.test(String(baseSha ?? '')) || !SHA_PATTERN.test(String(headSha ?? ''))) {
+  if (
+    !SHA_PATTERN.test(String(baseSha ?? '')) ||
+    !SHA_PATTERN.test(String(headSha ?? ''))
+  ) {
     return null;
   }
   let meta;
   try {
-    const resolved = git(['rev-parse', '--verify', `${headSha}^{commit}`], cwd).trim();
+    const resolved = git(
+      ['rev-parse', '--verify', `${headSha}^{commit}`],
+      cwd
+    ).trim();
     if (resolved !== headSha) return null;
     git(['rev-parse', '--verify', `${baseSha}^{commit}`], cwd);
     meta = git(
@@ -124,7 +135,10 @@ export function readLocalMergeGroupEvidence({
   };
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
   const target = process.env.MERGE_GROUP_LOCAL_EVIDENCE;
   const evidence = readLocalMergeGroupEvidence({
     baseSha: process.env.GROUP_BASE,
