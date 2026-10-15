@@ -42,7 +42,10 @@ Branch protection pins aggregate contexts only—never individual CI jobs.
 ### GITHUB_TOKEN budget per group
 
 Every workflow in the repo shares one GITHUB_TOKEN REST bucket (1,000 calls/h),
-and each rebuild runs a group's CI again. In a green merge group, ci.yml jobs
+and each rebuild runs a group's CI again. GitHub reports that bucket as
+`API rate limit exceeded for installation` because `github.token` is an
+installation token. It is a separate hourly budget from the jovie-bot app.
+In a green merge group, ci.yml jobs
 other than Merge Group Admission spend no REST calls. Their token-bearing steps
 only authenticate git fetches, which are git traffic and not REST, or they never
 run in merge groups, or they return before reading (the report-only
@@ -52,6 +55,16 @@ PR Size Guard member policy, are budgeted in their own scripts.
 `scripts/lib/__tests__/merge-group-token-budget.test.mjs` lists every
 token-bearing step with its per-group cost. A new one fails that test until it
 is classified, and the green-group total must stay at 5 or less.
+
+When that shared bucket is empty and `x-ratelimit-reset` is outside the Size
+Guard job, the member policy does not fail the required check. It reuses the
+last cached pull record when one validates, and otherwise judges size from the
+local checkout (`git diff --numstat` and `git ls-tree -r -l`). An over-cap diff
+or an over-budget tree still fails. A checkout with no diff or no tree byte
+count still fails, so an unknown size does not pass. Fork and hold labels are
+enforced from the cached pull record. With no pull record, the fork hand-off
+passes only alongside in-budget local size evidence, and the job warns that
+live fork metadata and hold labels were not re-read.
 
 ### Fail-fast ejection
 

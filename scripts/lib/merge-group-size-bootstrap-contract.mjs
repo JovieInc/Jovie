@@ -78,7 +78,10 @@ function expectedCacheStep() {
     '        continue-on-error: true',
     '        with:',
     '          path: ${{ runner.temp }}/merge-group-policy-cache',
-    '          key: merge-group-policy-${{ github.event.merge_group.head_sha }}',
+    '          # run_id misses on purpose. restore-keys reloads the last group',
+    '          # so a quota miss can reuse the cached /pulls/N record.',
+    '          key: merge-group-policy-${{ github.run_id }}',
+    '          restore-keys: merge-group-policy-',
   ].join('\n');
 }
 

@@ -52,6 +52,16 @@ export class MergeGroupPolicyEvidenceError extends Error {
   }
 }
 
+// The installation bucket is empty and the reset is outside this job. A red
+// required check would eject the member, so callers may pass only when the
+// checkout already proves the size decision. Permission 403s stay final.
+export class MergeGroupQuotaError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'MergeGroupQuotaError';
+  }
+}
+
 function fail(message) {
   throw new MergeGroupPolicyEvidenceError(message);
 }
@@ -610,9 +620,20 @@ function cacheKey(scope, path) {
   return `${scope}\n${path}`;
 }
 
+function pullCacheScopes(path) {
+  const match = String(path).match(/\/pulls\/([1-9][0-9]{0,9})$/);
+  return match ? [`pr-${match[1]}`] : [];
+}
+
+function isQuotaKind(kind) {
+  return kind === PRIMARY || kind === 'secondary-rate-limit';
+}
+
+const CACHE_SCOPE_PATTERN = /^(?:[0-9a-f]{40}|pr-[1-9][0-9]{0,9})$/;
+
 function diskCachePath(dir, scope, path) {
   if (typeof dir !== 'string' || dir.length === 0) return null;
-  if (!SHA_PATTERN.test(String(scope ?? ''))) return null;
+  if (!CACHE_SCOPE_PATTERN.test(String(scope ?? ''))) return null;
   const name = createHash('sha256').update(String(path)).digest('hex');
   return join(dir, scope, `${name}.json`);
 }
@@ -659,10 +680,14 @@ export async function githubRequest(
     random = Math.random,
     cacheScope = undefined,
     cacheDir = undefined,
+    quotaFallbackScopes = undefined,
   } = {}
 ) {
   const cacheable =
-    method === 'GET' && body === undefined && typeof cacheScope === 'string';
+    method === 'GET' &&
+    body === undefined &&
+    typeof cacheScope === 'string' &&
+    path !== '/rate_limit';
   const key = cacheable ? cacheKey(cacheScope, path) : null;
   if (key && memoryCache.has(key)) return memoryCache.get(key);
   if (key) {
@@ -689,18 +714,40 @@ export async function githubRequest(
         memoryCache.set(key, result);
         await writeDiskCache(cacheDir, cacheScope, path, result);
       }
+      for (const scope of quotaFallbackScopes ?? []) {
+        await writeDiskCache(cacheDir, scope, path, result);
+      }
       return result;
     }
+    const nowMs = now();
     const delayMs = apiRetryDelay({
       status: answer.status,
       message: answer.message,
       headers: answer.headers,
       attempt,
-      nowMs: now(),
+      nowMs,
       deadlineMs,
       random,
     });
-    if (delayMs === null) fail(answer.message);
+    if (delayMs === null) {
+      const failure = classifyGitHubFailure({
+        status: answer.status,
+        message: answer.message,
+        headers: answer.headers,
+        now: nowMs,
+      });
+      if (isQuotaKind(failure.kind)) {
+        const remaining = headerNumber(answer.headers, 'x-ratelimit-remaining');
+        const reset = headerNumber(answer.headers, 'x-ratelimit-reset');
+        console.error(
+          `::warning::GitHub quota exhausted for ${path} remaining=${remaining ?? 'unknown'} reset=${reset ?? 'unknown'}`
+        );
+        // Reset is outside this job. Failing the check ejects the group.
+        // runPolicy may reuse a cached pull record or the local checkout.
+        throw new MergeGroupQuotaError(answer.message);
+      }
+      fail(answer.message);
+    }
     console.error(
       `::notice::GitHub API hold ${delayMs}ms after ${answer.message}`
     );
@@ -841,6 +888,18 @@ export function localCheckoutFromEvidence(evidence, baseSha, headSha) {
   }
   const files = evidence.files;
   if (files != null && !Array.isArray(files)) return null;
+  const trackedBytes = evidence.trackedBytes ?? null;
+  const trackedFiles = evidence.trackedFiles ?? null;
+  const treePresent = trackedBytes !== null || trackedFiles !== null;
+  if (
+    treePresent &&
+    (!Number.isSafeInteger(trackedBytes) ||
+      trackedBytes < 0 ||
+      !Number.isSafeInteger(trackedFiles) ||
+      trackedFiles < 0)
+  ) {
+    return null;
+  }
   const commit = {
     sha: headSha,
     parents: [{ sha: baseSha }],
@@ -868,7 +927,144 @@ export function localCheckoutFromEvidence(evidence, baseSha, headSha) {
     },
     files: Array.isArray(files) ? files : null,
     treeSha: evidence.treeSha,
+    trackedBytes: treePresent ? trackedBytes : null,
+    trackedFiles: treePresent ? trackedFiles : null,
   };
+}
+
+function localTreeEvidence(local) {
+  const bytes = local?.trackedBytes;
+  const files = local?.trackedFiles;
+  if (
+    !Number.isSafeInteger(bytes) ||
+    bytes < 0 ||
+    !Number.isSafeInteger(files) ||
+    files < 0
+  ) {
+    return null;
+  }
+  return { bytes, files };
+}
+
+function localSizeEvidence(local) {
+  return Array.isArray(local?.files) && localTreeEvidence(local) !== null;
+}
+
+function assertTrackedBudget(payload, maxTrackedBytes) {
+  if (payload.bytes > maxTrackedBytes) {
+    fail(
+      `${payload.bytes} bytes of tracked regular files exceeds the ${maxTrackedBytes}-byte combined-tree budget`
+    );
+  }
+}
+
+async function installationQuotaResetOutsideBudget(request, token, deadlineMs) {
+  // GET /rate_limit does not spend the bucket it reports. A remaining of 0
+  // whose reset is past this job would 403 every counted read and eject the
+  // group, so the caller skips those reads.
+  try {
+    const result = await request('/rate_limit', { deadlineMs, token });
+    const core = result.data?.resources?.core;
+    if (
+      !core ||
+      core.remaining !== 0 ||
+      !Number.isInteger(core.reset) ||
+      core.reset * 1000 <= deadlineMs
+    ) {
+      return null;
+    }
+    return {
+      limit: Number.isInteger(core.limit) ? core.limit : null,
+      remaining: 0,
+      reset: core.reset,
+    };
+  } catch (error) {
+    if (error instanceof MergeGroupQuotaError) {
+      return { limit: null, remaining: 0, reset: null };
+    }
+    return null;
+  }
+}
+
+async function recoverCachedPullRequests(env, repository, members) {
+  const recovered = [];
+  for (const member of members) {
+    const cached = await readDiskCache(
+      env.MERGE_GROUP_POLICY_CACHE_DIR,
+      `pr-${member.number}`,
+      `/repos/${repository}/pulls/${member.number}`
+    );
+    if (!cached?.data) return null;
+    try {
+      assertCurrentPullRequest(member, cached.data);
+    } catch {
+      return null;
+    }
+    recovered.push(cached.data);
+  }
+  return recovered;
+}
+
+async function passQuotaFromLocalCheckout({
+  also,
+  emit,
+  env,
+  local,
+  log,
+  members,
+  policy,
+  quotaError,
+}) {
+  const files = Array.isArray(local?.files) ? local.files : null;
+  const tree = localTreeEvidence(local);
+  // No diff or no tree: the size decision is unknown. Do not pass.
+  if (policy !== 'size' || !files || !tree) throw quotaError;
+
+  const maxLines = Number(env.MAX_LINES ?? '800');
+  const maxFiles = Number(env.MAX_FILES ?? '40');
+  const counted = countSizeGuardFiles(files);
+  // Empty labels fail closed on an over-cap diff: big-pr and codemod cannot
+  // be confirmed while the pull record is unreachable.
+  const size = evaluatePrSizePolicy({
+    labels: [],
+    body: '',
+    lines: counted.lines,
+    files: counted.files,
+    maxLines,
+    maxFiles,
+  });
+  const numbers = members.map(member => `#${member.number}`).join(', ');
+  log(
+    `::warning::GitHub installation quota is exhausted and the reset is outside this job. PR ${numbers} size used the local checkout only. Live fork metadata and hold labels were not re-read.`
+  );
+  if (also) {
+    for (const member of members) {
+      log(
+        `${also} policy PR #${member.number}: PASS — local checkout only; live fork metadata unavailable`
+      );
+    }
+    await emit(`${also}_verdict=pass`);
+  }
+  assertTrackedBudget(tree, HYGIENE_LIMITS.maxTrackedBytes);
+  if (!size.passed) {
+    for (const member of members) {
+      log(`PR #${member.number}: FAIL — ${size.reason}`);
+    }
+    fail(`PR #${members[0].number} failed ${policy} merge-group policy`);
+  }
+  const warning = trackedBytesBudgetWarning(tree.bytes);
+  if (warning) log(`::warning::Combined tree: ${warning}`);
+  log(
+    `Combined tree: PASS — ${tree.bytes} tracked regular-file bytes across ${tree.files} files (local checkout).`
+  );
+  for (const member of members) {
+    log(
+      `PR #${member.number}: PASS — ${size.reason} (local checkout; quota exhausted)`
+    );
+  }
+  log(
+    `Validated ${members.length} merge-group member(s) for ${policy} policy.`
+  );
 }
 
 async function readEvidenceFile(file, baseSha, headSha) {
@@ -1033,6 +1229,7 @@ export async function runPolicy({
         ...options,
         cacheDir: env.MERGE_GROUP_POLICY_CACHE_DIR,
         cacheScope: headSha,
+        quotaFallbackScopes: pullCacheScopes(path),
       }));
 
   let local = null;
@@ -1065,14 +1262,83 @@ export async function runPolicy({
     );
   }
   const members = resolveMergeGroupMembers({ event, comparison });
-  const pullRequests = await Promise.all(
-    members.map(member =>
-      fetchPullRequest(repository, member.number, token, deadlineMs, request)
-    )
+  const quotaBlock = await installationQuotaResetOutsideBudget(
+    request,
+    token,
+    deadlineMs
   );
-  pullRequests.forEach((pr, index) =>
-    assertCurrentPullRequest(members[index], pr)
-  );
+  let pullRequests;
+  if (quotaBlock) {
+    const resetText =
+      quotaBlock.reset === null
+        ? 'unknown'
+        : new Date(quotaBlock.reset * 1000).toISOString();
+    log(
+      `::warning::GitHub installation REST quota remaining=${quotaBlock.remaining} limit=${quotaBlock.limit ?? 'unknown'} reset=${resetText}, outside this job. Live pull metadata was not requested.`
+    );
+    const cached = await recoverCachedPullRequests(env, repository, members);
+    if (cached && localSizeEvidence(local)) {
+      pullRequests = cached;
+      log(
+        `::warning::Reused the cached pull record for ${cached.map(pr => `#${pr.number}`).join(', ')}.`
+      );
+    } else if (cached) {
+      throw new MergeGroupQuotaError(
+        'GitHub installation quota is exhausted and the reset is outside this job'
+      );
+    } else {
+      await passQuotaFromLocalCheckout({
+        also,
+        emit,
+        env,
+        local,
+        log,
+        members,
+        policy,
+        quotaError: new MergeGroupQuotaError(
+          'GitHub installation quota is exhausted and the reset is outside this job'
+        ),
+      });
+      return;
+    }
+  } else {
+    try {
+      pullRequests = await Promise.all(
+        members.map(member =>
+          fetchPullRequest(
+            repository,
+            member.number,
+            token,
+            deadlineMs,
+            request
+          )
+        )
+      );
+      pullRequests.forEach((pr, index) =>
+        assertCurrentPullRequest(members[index], pr)
+      );
+    } catch (error) {
+      if (!(error instanceof MergeGroupQuotaError)) throw error;
+      const cached = await recoverCachedPullRequests(env, repository, members);
+      if (!cached || !localSizeEvidence(local)) {
+        await passQuotaFromLocalCheckout({
+          also,
+          emit,
+          env,
+          local,
+          log,
+          members,
+          policy,
+          quotaError: error,
+        });
+        return;
+      }
+      pullRequests = cached;
+      log(
+        `::warning::Live pull metadata hit the GitHub installation quota. Reused the cached pull record for ${cached.map(pr => `#${pr.number}`).join(', ')}.`
+      );
+    }
+  }
   // GitHub's compare returns at most 300 files; a full page may be truncated.
   const COMPARE_FILE_CAP = 300;
   const rangeFiles = Array.isArray(local?.files)
@@ -1113,19 +1379,25 @@ export async function runPolicy({
   }
 
   if (policy === 'size') {
-    const payload = await enforceCombinedTreePayload({
-      deadlineMs,
-      headSha,
-      now,
-      repository,
-      request,
-      token,
-      treeSha: provenTreeSha,
-    });
+    const localTree = localTreeEvidence(local);
+    const payload =
+      localTree ??
+      (await enforceCombinedTreePayload({
+        deadlineMs,
+        headSha,
+        now,
+        repository,
+        request,
+        token,
+        treeSha: provenTreeSha,
+      }));
+    if (localTree) {
+      assertTrackedBudget(localTree, HYGIENE_LIMITS.maxTrackedBytes);
+    }
     const warning = trackedBytesBudgetWarning(payload.bytes);
     if (warning) log(`::warning::Combined tree: ${warning}`);
     log(
-      `Combined tree: PASS — ${payload.bytes} tracked regular-file bytes across ${payload.files} files.`
+      `Combined tree: PASS — ${payload.bytes} tracked regular-file bytes across ${payload.files} files${localTree ? ' (local checkout)' : ''}.`
     );
   }
 

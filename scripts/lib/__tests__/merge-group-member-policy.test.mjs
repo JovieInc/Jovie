@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -15,6 +15,8 @@ import {
   localCheckoutFromEvidence,
   MAX_API_ATTEMPTS,
   MERGE_GROUP_JOB_BUDGET_MS,
+  MergeGroupPolicyEvidenceError,
+  MergeGroupQuotaError,
   parseTrackedRegularTree,
   readBoundedResponseText,
   resolveMergeGroupMembers,
@@ -674,6 +676,7 @@ describe('merge-group fork policy', () => {
 
     expect(paths).toEqual([
       `/repos/JovieInc/Jovie/compare/${BASE}...${FIRST}`,
+      '/rate_limit',
       '/repos/JovieInc/Jovie/pulls/101',
       '/repos/JovieInc/Jovie/pulls/101/reviews?per_page=100&page=1',
     ]);
@@ -851,6 +854,7 @@ describe('combined size + fork merge-group producer (JOV-7744)', () => {
     await run;
     expect(paths).toEqual([
       `/repos/JovieInc/Jovie/compare/${BASE}...${FIRST}`,
+      '/rate_limit',
       '/repos/JovieInc/Jovie/pulls/101',
       `/repos/JovieInc/Jovie/git/commits/${FIRST}`,
       `/repos/JovieInc/Jovie/git/trees/${TREE}?recursive=1`,
@@ -869,6 +873,7 @@ describe('combined size + fork merge-group producer (JOV-7744)', () => {
     await expect(run).rejects.toThrow('PR #101 failed size merge-group policy');
     expect(paths).toEqual([
       `/repos/JovieInc/Jovie/compare/${BASE}...${FIRST}`,
+      '/rate_limit',
       '/repos/JovieInc/Jovie/pulls/101',
       `/repos/JovieInc/Jovie/git/trees/${TREE}?recursive=1`,
     ]);
@@ -1157,5 +1162,270 @@ describe('merge-group API outages do not eject a valid group', () => {
       clearCachedGitHubResponses();
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('quota reset outside the job budget', () => {
+  const quotaMessage =
+    'GitHub API 403 for /repos/JovieInc/Jovie/pulls/101: API rate limit exceeded for installation';
+
+  function checkout(overrides = {}) {
+    return localCheckoutFromEvidence(
+      {
+        baseSha: BASE,
+        headSha: FIRST,
+        parentSha: BASE,
+        treeSha: TREE,
+        subject: 'fix(ci): queue member 101 (#101)',
+        committerName: 'GitHub',
+        committerEmail: 'noreply@github.com',
+        files: [{ filename: 'a.ts', additions: 1, deletions: 0 }],
+        trackedBytes: 10,
+        trackedFiles: 1,
+        ...overrides,
+      },
+      BASE,
+      FIRST
+    );
+  }
+
+  function quotaRun({ readLocal, request, env = {} }) {
+    const outputs = [];
+    const logs = [];
+    const run = runPolicy({
+      argv: ['--policy=size', '--also=fork'],
+      env: {
+        GH_TOKEN: 'test-token',
+        MAX_LINES: '800',
+        MAX_FILES: '40',
+        ...env,
+      },
+      event: event({ head_sha: FIRST, head_commit: { id: FIRST } }),
+      log: line => logs.push(line),
+      now: () => 1,
+      readLocal: async () => readLocal,
+      request,
+      writeOutput: line => outputs.push(line),
+    });
+    return { logs, outputs, run };
+  }
+
+  it('passes an in-budget local checkout when the pull read cannot wait for reset', async () => {
+    const paths = [];
+    const { logs, outputs, run } = quotaRun({
+      readLocal: checkout(),
+      request: async path => {
+        paths.push(path);
+        if (path === '/rate_limit') {
+          return {
+            data: {
+              resources: {
+                core: { limit: 1000, remaining: 0, reset: 2_000_000_000 },
+              },
+            },
+          };
+        }
+        throw new Error(`counted read during quota: ${path}`);
+      },
+    });
+    await run;
+    expect(paths).toEqual(['/rate_limit']);
+    expect(outputs).toEqual(['fork_verdict=pass']);
+    expect(logs.some(line => line.includes('local checkout only'))).toBe(true);
+    expect(logs).toContain(
+      'Validated 1 merge-group member(s) for size policy.'
+    );
+  });
+
+  it('still fails an over-cap diff and an over-budget tree', async () => {
+    const overLines = quotaRun({
+      readLocal: checkout({
+        files: [{ filename: 'a.ts', additions: 2_000, deletions: 0 }],
+      }),
+      request: async () => {
+        throw new MergeGroupQuotaError(quotaMessage);
+      },
+    });
+    await expect(overLines.run).rejects.toThrow(
+      'PR #101 failed size merge-group policy'
+    );
+    expect(overLines.outputs).toEqual(['fork_verdict=pass']);
+
+    const overTree = quotaRun({
+      readLocal: checkout({
+        trackedBytes: HYGIENE_LIMITS.maxTrackedBytes + 1,
+      }),
+      request: async () => {
+        throw new MergeGroupQuotaError(quotaMessage);
+      },
+    });
+    await expect(overTree.run).rejects.toThrow('combined-tree budget');
+    expect(overTree.outputs).toEqual(['fork_verdict=pass']);
+  });
+
+  it('does not pass when the checkout has no diff or no tree byte count', async () => {
+    const missingFiles = quotaRun({
+      readLocal: checkout({ files: null }),
+      request: async () => {
+        throw new MergeGroupQuotaError(quotaMessage);
+      },
+    });
+    await expect(missingFiles.run).rejects.toBeInstanceOf(MergeGroupQuotaError);
+    expect(missingFiles.outputs).toEqual([]);
+
+    const missingTree = quotaRun({
+      readLocal: localCheckoutFromEvidence(
+        {
+          baseSha: BASE,
+          headSha: FIRST,
+          parentSha: BASE,
+          treeSha: TREE,
+          subject: 'fix(ci): queue member 101 (#101)',
+          committerName: 'GitHub',
+          committerEmail: 'noreply@github.com',
+          files: [{ filename: 'a.ts', additions: 1, deletions: 0 }],
+        },
+        BASE,
+        FIRST
+      ),
+      request: async () => {
+        throw new MergeGroupQuotaError(quotaMessage);
+      },
+    });
+    await expect(missingTree.run).rejects.toBeInstanceOf(MergeGroupQuotaError);
+    expect(missingTree.outputs).toEqual([]);
+    expect(
+      localCheckoutFromEvidence(
+        {
+          baseSha: BASE,
+          headSha: FIRST,
+          parentSha: BASE,
+          treeSha: TREE,
+          subject: 'fix(ci): queue member 101 (#101)',
+          committerName: 'GitHub',
+          committerEmail: 'noreply@github.com',
+          files: [],
+          trackedBytes: -1,
+          trackedFiles: 1,
+        },
+        BASE,
+        FIRST
+      )
+    ).toBeNull();
+  });
+
+  it('reuses a cached pull record, so a hold or fork still fails', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'mg-pr-cache-'));
+    const pull = {
+      number: 101,
+      state: 'open',
+      base: { ref: 'main' },
+      head: { sha: SOURCE_101, repo: { fork: false } },
+      labels: [{ name: 'hold' }],
+      user: { login: 'contributor' },
+      body: '',
+    };
+    try {
+      clearCachedGitHubResponses();
+      await githubRequest('/repos/JovieInc/Jovie/pulls/101', {
+        cacheDir: dir,
+        cacheScope: 'b'.repeat(40),
+        deadlineMs: 10_000,
+        fetchImpl: async () =>
+          new Response(JSON.stringify(pull), { status: 200 }),
+        now: () => 1,
+        quotaFallbackScopes: ['pr-101'],
+        token: 'test-token',
+      });
+      clearCachedGitHubResponses();
+      expect(readdirSync(dir)).toContain('pr-101');
+
+      const { outputs, run } = quotaRun({
+        env: { MERGE_GROUP_POLICY_CACHE_DIR: dir },
+        readLocal: checkout(),
+        request: async () => {
+          throw new MergeGroupQuotaError(quotaMessage);
+        },
+      });
+      await expect(run).rejects.toThrow(
+        'PR #101 failed size merge-group policy'
+      );
+      expect(outputs).toEqual(['fork_verdict=fail']);
+    } finally {
+      clearCachedGitHubResponses();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('skips the trees API when the checkout already counted tracked bytes', async () => {
+    const paths = [];
+    await runPolicy({
+      argv: ['--policy=size', '--also=fork'],
+      env: { GH_TOKEN: 'test-token', MAX_LINES: '800', MAX_FILES: '40' },
+      event: event({ head_sha: FIRST, head_commit: { id: FIRST } }),
+      log: () => {},
+      now: () => 1,
+      readLocal: async () => checkout(),
+      writeOutput: () => {},
+      async request(path) {
+        paths.push(path);
+        if (path.endsWith('/pulls/101')) {
+          return {
+            data: {
+              number: 101,
+              state: 'open',
+              base: { ref: 'main' },
+              head: { sha: SOURCE_101, repo: { fork: false } },
+              labels: [],
+              user: { login: 'contributor' },
+              body: '',
+            },
+          };
+        }
+        throw new Error(`unexpected request: ${path}`);
+      },
+    });
+    expect(paths).toEqual(['/rate_limit', '/repos/JovieInc/Jovie/pulls/101']);
+  });
+
+  it('keeps a permission 403 final and classifies an unwaitable reset as quota', async () => {
+    await expect(
+      githubRequest('/repos/JovieInc/Jovie/pulls/101', {
+        deadlineMs: 5_000,
+        fetchImpl: async () =>
+          new Response(
+            JSON.stringify({
+              message: 'API rate limit exceeded for installation',
+            }),
+            {
+              status: 403,
+              headers: {
+                'x-ratelimit-remaining': '0',
+                'x-ratelimit-reset': '3600',
+              },
+            }
+          ),
+        now: () => 1_000,
+        sleep: async () => {
+          throw new Error('must not wait past the budget');
+        },
+        token: 'test-token',
+      })
+    ).rejects.toBeInstanceOf(MergeGroupQuotaError);
+
+    await expect(
+      githubRequest('/repos/JovieInc/Jovie/pulls/101', {
+        deadlineMs: 5_000,
+        fetchImpl: async () =>
+          new Response('{"message":"Resource not accessible by integration"}', {
+            status: 403,
+          }),
+        now: () => 1_000,
+        sleep: async () => {
+          throw new Error('permission answers are final');
+        },
+        token: 'test-token',
+      })
+    ).rejects.toBeInstanceOf(MergeGroupPolicyEvidenceError);
   });
 });
