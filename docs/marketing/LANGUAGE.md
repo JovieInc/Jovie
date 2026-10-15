@@ -42,7 +42,7 @@ This matrix defines migration and review responsibilities. It is not a second ex
 
 | Family | Reader's question and language | Required treatment |
 | --- | --- | --- |
-| Homepage `/` | How does each YouTube upload become a release and a reachable fan? | JOV-5885 scopes `/` to [the YouTube artist MVP](YOUTUBE_ARTIST_MVP.md): thumbnails, release planning, smart links, public profile. Keep Find me, permissioned fan contact, and attributed founder proof. Shared product names and atoms retain their owners. |
+| Homepage | What is Jovie, and what can I do next? Shared identity and Profile | Preserve locked hero copy, search behavior, geometry, and approved evidence. General navigation must not define the entire product as music. |
 | Product overview, proposed /product | What does the shared product actually do? | Use supported presence, relationship, and growth capabilities with concrete examples. Product cards carry product truth; sections make useful arguments; the page composes them. |
 | Solutions hub, proposed /solutions | Is there a useful workflow for my goal? | Show only substantive, publication-eligible paths. Avoid placeholders and arbitrary equal quotas for audiences. |
 | Artists solution and /artist-profiles | How does this help my music and fan relationships? | Retain music, releases, shows, DSPs, and fan language. Distinguish the role-specific solution from the profile-feature explanation; avoid duplicate pages with only a different headline. |

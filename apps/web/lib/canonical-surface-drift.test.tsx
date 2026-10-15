@@ -43,7 +43,7 @@ describe('canonical web surface drift guard', () => {
     expect(codes()).toEqual([]);
 
     expect(getCanonicalSurface('homepage').sourceComponent).toContain(
-      'HomepageIdentityHero'
+      'HomepageYoutubeMvp'
     );
     expect(getCanonicalSurface('homepage').routeOwner).toContain(
       'PublicPageShell'
@@ -65,17 +65,34 @@ describe('canonical web surface drift guard', () => {
     const homepage = [
       readSource('apps/web/app/(home)/page.tsx'),
       readSource('apps/web/app/(home)/layout.tsx'),
+      readSource('apps/web/components/homepage/HomepageYoutubeMvp.tsx'),
     ].join('\n');
     const releases = readSource(
       'apps/web/app/app/(shell)/dashboard/releases/ReleaseCatalogPageClient.tsx'
     );
 
-    expect(homepage).toContain('HomepageIdentityHero');
-    expect(homepage).toContain('HomepageClose');
+    expect(homepage).toContain('HomepageYoutubeMvp');
+    expect(homepage).toContain('HomepagePrimaryAction');
+    expect(homepage).toContain("placement='hero'");
+    expect(homepage).toContain("placement='close'");
     expect(homepage).not.toContain('HomePageNarrative');
     expect(releases).toContain('LibraryLoadingState');
     expect(releases).toContain('PageErrorState');
     expect(releases).toContain("view === 'assets'");
+  });
+
+  it('rejects a detached homepage search placement', () => {
+    const issues = validateCanonicalSurfaceDrift({
+      screenshotScenarios: SCREENSHOT_SCENARIOS,
+      visualQaSurfaces: VISUAL_QA_SURFACES,
+      readSource: relativePath =>
+        readSource(relativePath)?.replace("placement='close'", '') ?? null,
+    });
+    expect(issues).toContainEqual({
+      code: 'detached-canonical-owner',
+      id: 'homepage',
+      detail: "placement='close'",
+    });
   });
 
   it('rejects the deliberate-red redirect-surface fixture', () => {

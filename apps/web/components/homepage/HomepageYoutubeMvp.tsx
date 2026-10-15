@@ -203,16 +203,14 @@ export function HomepageYoutubeMvp() {
               height={64}
               className='size-16 rounded-full object-cover'
             />
-            <div>
-              <p className='text-primary-token'>{copy.proof.attribution}</p>
-              <Link
-                href={APP_ROUTES.ABOUT}
-                className='text-secondary-token underline underline-offset-4'
-              >
-                Read the story
-              </Link>
-            </div>
+            <p className='text-primary-token'>{copy.proof.attribution}</p>
           </div>
+          <Link
+            href={APP_ROUTES.ABOUT}
+            className='mt-5 inline-block text-secondary-token underline underline-offset-4'
+          >
+            Read the story
+          </Link>
         </MarketingContentShell>
       </section>
       <section
