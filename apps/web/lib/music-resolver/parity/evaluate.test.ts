@@ -13,6 +13,7 @@ import { MUSICFETCH_DOCUMENTED_SERVICES } from './permissions';
 import { runParityProbes } from './probes';
 import { rowIsPass } from './score';
 import { SOCIALBLADE_ROWS } from './socialblade-rows';
+import { catalogHash, matchesTarget, PARITY_TARGET_SHA256 } from './target';
 import type { ParityRow } from './types';
 
 describe('music resolver parity eval', () => {
@@ -93,4 +94,54 @@ describe('music resolver parity eval', () => {
     expect(rowIsPass(extra)).toBe(true);
     expect(report.exitCode).toBe(1);
   });
+});
+
+describe('frozen catalog denominator', () => {
+  it('turns red when an access-blocked family is omitted', async () => {
+    const probes = await runParityProbes();
+    const rows = materializeCatalog(buildCatalog(), probes).filter(
+      row => row.id !== 'musicfetch:live-api'
+    );
+    const report = finishEvaluation(rows);
+    expect(report.exitCode).toBe(1);
+    expect(report.denominator).toBe(buildCatalog().length);
+    expect(report.targetError).toContain('frozen target');
+  });
+
+  it('turns red when a documented target is silently changed', async () => {
+    const probes = await runParityProbes();
+    const rows = materializeCatalog(buildCatalog(), probes).map(row =>
+      row.id === 'musicfetch:isrc'
+        ? { ...row, capability: 'Different target' }
+        : row
+    );
+    expect(finishEvaluation(rows).exitCode).toBe(1);
+  });
+});
+
+describe('versioned target', () => {
+  it('freezes the existing catalog and rejects documentation drift', async () => {
+    const target = buildCatalog();
+    expect(catalogHash(target)).toBe(PARITY_TARGET_SHA256);
+    expect(catalogHash([...target].reverse())).toBe(PARITY_TARGET_SHA256);
+    const rows = materializeCatalog(target, await runParityProbes());
+    expect(matchesTarget(rows, target)).toBe(true);
+    const changed = target.map((entry, i) =>
+      i === 0 ? { ...entry, docUrl: 'https://example.com/drift' } : entry
+    );
+    expect(matchesTarget(rows, changed)).toBe(false);
+  });
+});
+
+it('retains newly documented Chartmetric refresh operations as blocked', async () => {
+  const report = await runParityEvaluation();
+  for (const path of [
+    '/api/artist/{id}/tiktok/refresh',
+    '/api/playlist/{platform}/{id}/refresh',
+  ]) {
+    const row = report.rows.find(row => row.id === `chartmetric:POST ${path}`);
+    expect(row?.status).toBe('access-blocked');
+    expect(row?.blocker?.owner).toBeTruthy();
+    expect(row && rowIsPass(row)).toBe(false);
+  }
 });
