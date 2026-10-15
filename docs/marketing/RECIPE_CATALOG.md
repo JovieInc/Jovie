@@ -25,7 +25,7 @@ customer-adoption claims.
 
 **Arc:** upload promise → thumbnails → release → reachable fan → connected
 surfaces → attributed founder proof → free profile/current plans → action.
-See [the scoped MVP brief](YOUTUBE_ARTIST_MVP.md).
+See [the homepage copy contract](../../apps/web/data/homepageYoutubeMvp.ts).
 
 **CTA cadence:** sparse, “Find me”, hero-and-close. Auth still owns access.
 
