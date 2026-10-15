@@ -9,6 +9,32 @@ import {
 
 export type CertificationStateFilter = OvieCertificationState | 'all';
 export type CertificationDomainFilter = OvieCertificationDomainId | 'all';
+export type CertificationFreshnessFilter =
+  | 'all'
+  | 'current'
+  | 'stale'
+  | 'missing';
+export type CertificationBlockerFilter = 'all' | 'blocked' | 'clear';
+
+/** Freshness is about the artifact binding, independently of inventory fetch age. */
+export function certificationEvidenceFreshness(row: OvieCertificationRow) {
+  if (
+    row.staleFounderLock ||
+    row.blockers.some(
+      blocker =>
+        blocker.code === 'source_sha_mismatch' ||
+        blocker.code === 'evidence_source_sha_mismatch'
+    )
+  )
+    return 'stale';
+  if (
+    !row.source ||
+    row.evidence.length === 0 ||
+    TASTE_TIERS.some(tier => row.tiers[tier] === 'missing')
+  )
+    return 'missing';
+  return 'current';
+}
 
 /** The review queue leads; certified work trails. */
 export const CERTIFICATION_STATE_FILTERS: readonly CertificationStateFilter[] =
@@ -26,6 +52,9 @@ export function filterCertificationRows(
     readonly state: CertificationStateFilter;
     readonly domain: CertificationDomainFilter;
     readonly query?: string;
+    readonly owner?: string;
+    readonly freshness?: CertificationFreshnessFilter;
+    readonly blockers?: CertificationBlockerFilter;
   }
 ): OvieCertificationRow[] {
   const query = filters.query?.trim().toLowerCase() ?? '';
@@ -33,6 +62,19 @@ export function filterCertificationRows(
     row =>
       (filters.state === 'all' || row.state === filters.state) &&
       (filters.domain === 'all' || row.domain === filters.domain) &&
+      (!filters.owner ||
+        filters.owner === 'all' ||
+        (filters.owner === 'unassigned'
+          ? !row.owner
+          : row.owner === filters.owner)) &&
+      (!filters.freshness ||
+        filters.freshness === 'all' ||
+        certificationEvidenceFreshness(row) === filters.freshness) &&
+      (!filters.blockers ||
+        filters.blockers === 'all' ||
+        (filters.blockers === 'blocked'
+          ? row.blockers.length > 0
+          : row.blockers.length === 0)) &&
       (query.length === 0 ||
         row.subject.title.toLowerCase().includes(query) ||
         row.subject.id.toLowerCase().includes(query) ||

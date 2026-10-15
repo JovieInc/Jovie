@@ -1581,6 +1581,19 @@ jobs:
           gh pr create --draft --base main --head "$branch" \
             --title "docs(changelog): customer updates $(date -u +%F)" \
             --body-file "$RUNNER_TEMP/customer-changelog/pr.md"
+          python3 scripts/shipping_origin.py emit-automation \
+            --pr "$(gh pr view "$branch" --json number --jq .number)" \
+            --head-sha "$(git rev-parse HEAD)"
+
+      - name: Retain immutable origin payload
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: shipping-origin-v1
+          path: ${{ runner.temp }}/shipping-origin/*.json
+          if-no-files-found: ignore
+          retention-days: 30
+
       - name: Retain publication, exclusion and no-change receipt
         if: ${{ always() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
