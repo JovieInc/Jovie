@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { TooltipProvider } from '@jovie/ui';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   fireEvent,
   render,
@@ -231,12 +232,14 @@ function renderLibrary(
   props: Partial<ComponentProps<typeof LibrarySurface>> = {}
 ) {
   return render(
-    <TooltipProvider>
-      <RightPanelProvider>
-        <LibrarySurface assets={assets} {...props} />
-        <RightPanelOutlet />
-      </RightPanelProvider>
-    </TooltipProvider>
+    <QueryClientProvider client={new QueryClient()}>
+      <TooltipProvider>
+        <RightPanelProvider>
+          <LibrarySurface assets={assets} {...props} />
+          <RightPanelOutlet />
+        </RightPanelProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
   );
 }
 

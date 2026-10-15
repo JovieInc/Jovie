@@ -10,7 +10,11 @@ export const YOUTUBE_LINK_WRITE_SCOPE =
   'https://www.googleapis.com/auth/youtube.upload';
 export const YOUTUBE_LINK_APPLY_SCOPE = 'single-item-description-link' as const;
 
-export type YouTubeLinkOpStatus = 'attempted' | 'verified' | 'failed';
+export type YouTubeLinkOpStatus =
+  | 'attempted'
+  | 'verified'
+  | 'failed'
+  | 'rolled-back';
 export type YouTubeLinkApplyFailure =
   | 'invalid-approval'
   | 'stale-approval'
@@ -45,6 +49,7 @@ export interface YouTubeVideoSnippetRecord {
     readonly categoryId: string | null;
     readonly tags?: readonly string[];
     readonly defaultLanguage?: string | null;
+    readonly defaultAudioLanguage?: string | null;
     readonly channelId?: string | null;
   };
 }
@@ -67,6 +72,13 @@ export interface YouTubeLinkOperation {
   readonly approval: YouTubeLinkApproval | null;
   readonly error: YouTubeLinkApplyFailure | null;
   readonly updatedAt: string;
+  readonly approvedBy?: string;
+  readonly approvedAt?: string;
+  readonly rollbackApproval?: {
+    readonly approvedBy: string;
+    readonly sourceVersion: YouTubeLinkSourceVersion;
+    readonly approvedAt: string;
+  };
 }
 export interface YouTubeLinkApplyStore {
   load(videoId: string): Promise<YouTubeLinkOperation | null>;
@@ -168,13 +180,26 @@ async function writeAndReadback(
         ...(live.snippet.defaultLanguage
           ? { defaultLanguage: live.snippet.defaultLanguage }
           : {}),
+        ...(live.snippet.defaultAudioLanguage
+          ? { defaultAudioLanguage: live.snippet.defaultAudioLanguage }
+          : {}),
         ...(live.snippet.channelId
           ? { channelId: live.snippet.channelId }
           : {}),
       },
     });
-  } catch {
-    return { ok: false, error: 'provider-error' };
+  } catch (error) {
+    const conflict =
+      error &&
+      typeof error === 'object' &&
+      'status' in error &&
+      error.status === 412;
+    return {
+      ok: false,
+      error: conflict
+        ? 'stale-approval'
+        : (authError(error) ?? 'provider-error'),
+    };
   }
   try {
     const readback = await writer.getVideo(live.id);
@@ -200,6 +225,7 @@ export async function applyYouTubeLink(input: {
   readonly writer: YouTubeSnippetWriter;
   readonly store: YouTubeLinkApplyStore;
   readonly now?: Date;
+  readonly approvedBy?: string;
 }): Promise<YouTubeLinkApplyResult> {
   const now = input.now ?? new Date();
   if (input.auth.state !== 'ok') return { ok: false, error: 'revoked-auth' };
@@ -223,11 +249,34 @@ export async function applyYouTubeLink(input: {
   }
   if (!live) return { ok: false, error: 'not-imported' };
   const liveVersion = sourceVersionFor(live.snippet.description, live.etag);
+  const existing = await input.store.load(input.videoId);
+  const sameApproval =
+    existing?.approval &&
+    existing.approval.sourceVersion.descriptionSha256 ===
+      approval.sourceVersion.descriptionSha256 &&
+    existing.approval.sourceVersion.etag === approval.sourceVersion.etag &&
+    existing.approval.proposedDescriptionSha256 ===
+      approval.proposedDescriptionSha256;
   const alreadyApplied =
+    sameApproval &&
     liveVersion.descriptionSha256 === approval.proposedDescriptionSha256;
+  if (alreadyApplied && existing.status === 'verified') {
+    return {
+      ok: true,
+      status: 'verified',
+      operation: existing,
+      plan: inspectYouTubeLink({
+        description: live.snippet.description,
+        expectedUrl: input.expectedUrl,
+        videoUrl: input.videoUrl,
+      }),
+    };
+  }
   if (
     !alreadyApplied &&
-    liveVersion.descriptionSha256 !== approval.sourceVersion.descriptionSha256
+    (liveVersion.descriptionSha256 !==
+      approval.sourceVersion.descriptionSha256 ||
+      liveVersion.etag !== approval.sourceVersion.etag)
   ) {
     return { ok: false, error: 'stale-approval' };
   }
@@ -251,34 +300,32 @@ export async function applyYouTubeLink(input: {
   ) {
     return { ok: false, error: 'stale-approval', plan };
   }
-  const idempotencyKey = `youtube-link-apply:${input.videoId}:${liveVersion.descriptionSha256}:${approval.proposedDescriptionSha256}`;
-  const existing = await input.store.load(input.videoId);
-  if (
-    existing?.idempotencyKey === idempotencyKey &&
-    existing.status === 'verified'
-  ) {
-    return { ok: true, status: 'verified', plan, operation: existing };
-  }
+  const idempotencyKey = `youtube-link-apply:${input.videoId}:${approval.sourceVersion.descriptionSha256}:${approval.proposedDescriptionSha256}`;
   const save = async (
     status: YouTubeLinkOpStatus,
-    error: YouTubeLinkApplyFailure | null,
-    descriptions?: { original?: string; proposed?: string }
+    error: YouTubeLinkApplyFailure | null
   ) => {
     const operation: YouTubeLinkOperation = {
       videoId: input.videoId,
       idempotencyKey,
       status,
-      originalDescription: descriptions?.original ?? live.snippet.description,
-      proposedDescription: descriptions?.proposed ?? plan.proposedDescription,
-      sourceVersion: liveVersion,
+      originalDescription: sameApproval
+        ? existing.originalDescription
+        : live.snippet.description,
+      proposedDescription: plan.proposedDescription,
+      sourceVersion: sameApproval ? existing.sourceVersion : liveVersion,
       expectedUrl: input.expectedUrl,
       approval,
       error,
       updatedAt: now.toISOString(),
+      approvedBy: input.approvedBy ?? existing?.approvedBy,
+      approvedAt: sameApproval ? existing.approvedAt : now.toISOString(),
     };
     await input.store.save(operation);
     return operation;
   };
+  if (plan.status === 'unknown')
+    return { ok: false, error: 'destination-unverified', plan };
   if (plan.action === 'none') {
     const operation = await save('verified', null);
     return { ok: true, status: 'verified', plan, operation };
@@ -291,11 +338,7 @@ export async function applyYouTubeLink(input: {
   );
   if (!written.ok) {
     const failed = await save('failed', written.error);
-    const restored = await writeAndReadback(
-      input.writer,
-      live,
-      live.snippet.description
-    );
+    const restored = await restoreDescription(input.writer, failed);
     if (!restored.ok) {
       const conflicted = await save('failed', 'rollback-conflict');
       return {
@@ -322,4 +365,74 @@ export async function applyYouTubeLink(input: {
   }
   const operation = await save('verified', null);
   return { ok: true, status: 'verified', plan: verifiedPlan, operation };
+}
+
+/** Restore only our own write, using a fresh ETag to protect concurrent edits. */
+async function restoreDescription(
+  writer: YouTubeSnippetWriter,
+  operation: YouTubeLinkOperation
+) {
+  try {
+    const current = await writer.getVideo(operation.videoId);
+    if (!current) return { ok: false as const };
+    if (current.snippet.description === operation.originalDescription)
+      return { ok: true as const };
+    if (
+      current.snippet.description !== operation.proposedDescription ||
+      !current.etag
+    )
+      return { ok: false as const };
+    return await writeAndReadback(
+      writer,
+      current,
+      operation.originalDescription
+    );
+  } catch {
+    return { ok: false as const };
+  }
+}
+
+export async function rollbackYouTubeLink(input: {
+  readonly videoId: string;
+  readonly operationKey: string;
+  readonly sourceVersion: YouTubeLinkSourceVersion;
+  readonly approvedBy: string;
+  readonly writer: YouTubeSnippetWriter;
+  readonly store: YouTubeLinkApplyStore;
+}): Promise<{ ok: true } | { ok: false; error: YouTubeLinkApplyFailure }> {
+  const operation = await input.store.load(input.videoId);
+  if (!operation || operation.idempotencyKey !== input.operationKey)
+    return { ok: false, error: 'invalid-approval' };
+  const current = await input.writer.getVideo(input.videoId);
+  if (
+    !current ||
+    current.etag !== input.sourceVersion.etag ||
+    hashDescription(current.snippet.description) !==
+      input.sourceVersion.descriptionSha256 ||
+    current.snippet.description !== operation.proposedDescription
+  )
+    return { ok: false, error: 'rollback-conflict' };
+  const attempted = {
+    ...operation,
+    rollbackApproval: {
+      approvedBy: input.approvedBy,
+      sourceVersion: input.sourceVersion,
+      approvedAt: new Date().toISOString(),
+    },
+  };
+  await input.store.save(attempted);
+  const restored = current.etag
+    ? await writeAndReadback(
+        input.writer,
+        current,
+        operation.originalDescription
+      )
+    : { ok: false as const };
+  await input.store.save({
+    ...attempted,
+    status: restored.ok ? 'rolled-back' : 'failed',
+    error: restored.ok ? null : 'rollback-conflict',
+    updatedAt: new Date().toISOString(),
+  });
+  return restored.ok ? { ok: true } : { ok: false, error: 'rollback-conflict' };
 }
