@@ -9,6 +9,11 @@ import {
 } from '@/lib/db/schema/chat';
 import { ensureChatWorkRecord } from '@/lib/tasks/chat-work-record';
 import { logger } from '@/lib/utils/logger';
+import {
+  type ConversationAudience,
+  ownedConversationCondition,
+  titleForConversationAudience,
+} from './conversation-access';
 import { sanitizeConversationTitle } from './title';
 import { conversationTitleSource } from './title-source';
 import type { PersistedToolEvent } from './tool-events';
@@ -221,6 +226,20 @@ export type ReserveChatTurnResult =
       readonly turn: ChatTurn;
     };
 
+async function hasConversationAccess(input: {
+  readonly conversationId: string;
+  readonly userId: string;
+  readonly creatorProfileId: string;
+  readonly audience: ConversationAudience;
+}): Promise<boolean> {
+  const [conversation] = await db
+    .select({ id: chatConversations.id })
+    .from(chatConversations)
+    .where(ownedConversationCondition(input))
+    .limit(1);
+  return Boolean(conversation);
+}
+
 export async function reserveChatTurn(input: {
   readonly conversationId?: string | null;
   readonly clientTurnId: string;
@@ -230,6 +249,7 @@ export async function reserveChatTurn(input: {
   readonly userMessage: string;
   readonly userId: string;
   readonly creatorProfileId: string;
+  readonly audience: ConversationAudience;
 }): Promise<ReserveChatTurnResult> {
   const now = new Date();
   let conversationId = input.conversationId ?? null;
@@ -243,23 +263,27 @@ export async function reserveChatTurn(input: {
     });
 
     if (existingClientTurn) {
+      const canReplay = await hasConversationAccess({
+        conversationId: existingClientTurn.conversationId,
+        userId: input.userId,
+        creatorProfileId: input.creatorProfileId,
+        audience: input.audience,
+      });
+      if (!canReplay) {
+        throw new Error('Conversation not found or unauthorized');
+      }
       return toDuplicateReservationResult(existingClientTurn);
     }
   }
 
   if (conversationId) {
-    const [conversation] = await db
-      .select({ id: chatConversations.id })
-      .from(chatConversations)
-      .where(
-        and(
-          eq(chatConversations.id, conversationId),
-          eq(chatConversations.creatorProfileId, input.creatorProfileId)
-        )
-      )
-      .limit(1);
-
-    if (!conversation) {
+    const canAccess = await hasConversationAccess({
+      conversationId,
+      userId: input.userId,
+      creatorProfileId: input.creatorProfileId,
+      audience: input.audience,
+    });
+    if (!canAccess) {
       throw new Error('Conversation not found or unauthorized');
     }
   } else {
@@ -268,7 +292,13 @@ export async function reserveChatTurn(input: {
       .values({
         userId: input.userId,
         creatorProfileId: input.creatorProfileId,
-        title: toConversationTitle(input.userMessage),
+        title:
+          input.audience === 'ov'
+            ? titleForConversationAudience(
+                toConversationTitle(input.userMessage) ?? 'Summer',
+                'ov'
+              )
+            : toConversationTitle(input.userMessage),
         createdAt: now,
         updatedAt: now,
       })
@@ -319,6 +349,16 @@ export async function reserveChatTurn(input: {
       })) ?? (await fetchExistingTurn(conversationId, input.clientTurnId));
     if (!existingTurn) {
       throw new Error('Chat turn conflict could not be resolved');
+    }
+
+    const canReplay = await hasConversationAccess({
+      conversationId: existingTurn.conversationId,
+      userId: input.userId,
+      creatorProfileId: input.creatorProfileId,
+      audience: input.audience,
+    });
+    if (!canReplay) {
+      throw new Error('Conversation not found or unauthorized');
     }
 
     return toDuplicateReservationResult(existingTurn);

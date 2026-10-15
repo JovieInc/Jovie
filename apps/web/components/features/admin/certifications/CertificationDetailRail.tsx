@@ -38,10 +38,16 @@ import {
 import { CertificationEvidenceStrip } from './CertificationSummary';
 import { evidenceForTier, shortSha } from './certification-view';
 
+export interface CertificationDecisionTarget {
+  readonly rowId: string;
+  readonly evidenceDigest: string | null;
+}
+
 export interface CertificationDecisionHandler {
   (
     decision: OvieCertificationDecisionKind,
-    notes: string | null
+    notes: string | null,
+    target: CertificationDecisionTarget
   ): Promise<boolean | void>;
 }
 
@@ -277,7 +283,10 @@ function DecisionFooter({
   }
 
   const decide = (decision: OvieCertificationDecisionKind) =>
-    onDecide(decision, trimmed.length > 0 ? trimmed : null);
+    onDecide(decision, trimmed.length > 0 ? trimmed : null, {
+      rowId: row.id,
+      evidenceDigest: row.decision.evidenceDigest,
+    });
 
   return (
     <div className='space-y-2' data-testid='certification-decision'>

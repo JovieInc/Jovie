@@ -378,7 +378,9 @@ describe('handleMobileChatTurn artist-context seam', () => {
       >('@/lib/mobile/chat/conversations');
       const reloaded = await actual.getMobileConversationDetail({
         conversationId: 'conv_1',
+        userId: USER_ID,
         creatorProfileId: PROFILE_ID,
+        audience: 'customer',
       });
       expect(reloaded?.messages[0]).toMatchObject({
         content: completion.text,
