@@ -147,7 +147,12 @@ test.describe('current-state essential actions (JOV-7771)', () => {
     ).toHaveAttribute('data-turnstile-mount', 'inline');
     await expectEssentials(page);
     await page.evaluate(() => window.__claimProviderFixture?.fail());
-    await expect(page.getByRole('alert')).toBeVisible();
+    // Next.js owns a separate, empty route-announcer alert outside this shell.
+    const recoveryAlert = page.locator(
+      '[data-onboarding-session] [role="alert"]'
+    );
+    await expect(recoveryAlert).toHaveCount(1);
+    await expect(recoveryAlert).toBeVisible();
     await expectEssentials(page);
     await expect(
       page.getByRole('textbox', { name: 'Chat message input', exact: false })
