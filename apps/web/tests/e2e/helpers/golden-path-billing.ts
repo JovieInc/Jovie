@@ -1,5 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 import { type Browser, expect, type Page } from '@playwright/test';
+import type Stripe from 'stripe';
 import { prepareBetterAuthEmailOtp } from '../../helpers/auth';
 import {
   createCheckoutSession,
@@ -385,6 +386,7 @@ export async function completeGoldenPathBillingJourney({
     });
     await expectJourneyContext();
 
+    const portalCreatedAfter = Math.floor(Date.now() / 1000) - 60;
     const portalResponse =
       await returningPage.request.post('/api/stripe/portal');
     expect(portalResponse.ok()).toBeTruthy();
@@ -399,13 +401,85 @@ export async function completeGoldenPathBillingJourney({
       url: string;
     };
     expect(new URL(portalBody.url).hostname).toBe('billing.stripe.com');
-    const portalSession = await stripeClient.billingPortal.sessions.retrieve(
-      portalBody.sessionId
-    );
-    expect(portalSession.customer).toBe(customerId);
-    expect(portalSession.return_url).toBe(
-      `${process.env.BASE_URL ?? 'http://localhost:3250'}/app`
-    );
+    expect(
+      typeof portalBody.sessionId === 'string' &&
+        portalBody.sessionId.length > 0
+    ).toBe(true);
+    const expectedPortalReturnUrl = `${process.env.BASE_URL ?? 'http://localhost:3250'}/app`;
+    let portalProof: {
+      customerMatches: boolean;
+      returnUrlMatches: boolean;
+      urlMatches: boolean;
+      eventIsTestMode: boolean;
+      sessionIsTestMode: boolean;
+    } | null = null;
+    const portalEvidenceDeadline = Date.now() + 30_000;
+    // Portal sessions expose create only. Read the original session's documented
+    // creation event rather than inventing a retrieve API or creating a substitute.
+    // Keep bearer URLs and fixture identity out of poll/assertion diagnostics.
+    await expect
+      .poll(
+        async () => {
+          let startingAfter: string | undefined;
+          for (let batch = 0; batch < 3; batch++) {
+            const remaining = portalEvidenceDeadline - Date.now();
+            if (remaining <= 0)
+              throw new Error(
+                'Portal creation evidence lookup deadline elapsed'
+              );
+            const events = await stripeClient.events.list(
+              {
+                type: 'billing_portal.session.created',
+                created: { gte: portalCreatedAfter },
+                limit: 100,
+                ...(startingAfter ? { starting_after: startingAfter } : {}),
+              },
+              { timeout: Math.min(5000, remaining), maxNetworkRetries: 0 }
+            );
+            const event = events.data.find(
+              (
+                candidate
+              ): candidate is Stripe.BillingPortalSessionCreatedEvent =>
+                candidate.type === 'billing_portal.session.created' &&
+                candidate.data.object.object === 'billing_portal.session' &&
+                candidate.data.object.id === portalBody.sessionId
+            );
+            if (event) {
+              const session = event.data.object;
+              portalProof = {
+                customerMatches: session.customer === customerId,
+                returnUrlMatches:
+                  session.return_url === expectedPortalReturnUrl,
+                urlMatches: session.url === portalBody.url,
+                eventIsTestMode: event.livemode === false,
+                sessionIsTestMode: session.livemode === false,
+              };
+              return true;
+            }
+            if (!events.has_more) return false;
+            startingAfter = events.data.at(-1)?.id;
+            if (!startingAfter || batch === 2) {
+              throw new Error(
+                'Portal creation evidence truncated after bounded event lookup'
+              );
+            }
+          }
+          return false;
+        },
+        {
+          message: 'Original test-mode portal creation evidence is required',
+          timeout: 30_000,
+          intervals: [500, 1000, 2000],
+        }
+      )
+      .toBe(true);
+    expect(portalProof).toEqual({
+      customerMatches: true,
+      returnUrlMatches: true,
+      urlMatches: true,
+      eventIsTestMode: true,
+      sessionIsTestMode: true,
+    });
 
     const paidSubscription = await stripeClient.subscriptions.retrieve(
       completed.subscriptionId
