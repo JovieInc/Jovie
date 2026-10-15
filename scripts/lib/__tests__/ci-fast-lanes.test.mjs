@@ -2133,16 +2133,45 @@ describe('source-read guard selection', () => {
     }
   });
 
+  it('runs native validation, compilation and regression tests on playbook-only changes', () => {
+    const path = 'docs/playbooks/growth-presence-repair-offer.playbook.md';
+    for (const event of ['pull_request', 'merge_group', 'push']) {
+      expect(selected(event, [path])).toContain('playbook-authoring');
+    }
+    const guard = SOURCE_GUARDS.find(
+      entry => entry.id === 'playbook-authoring'
+    );
+    expect(guard.command).toContain('playbooks:validate');
+    expect(guard.command).toContain('playbooks:compile');
+    expect(guard.command).not.toContain('--register');
+    const workflow = readFileSync(
+      join(REPO_ROOT, '.github/workflows/ci.yml'),
+      'utf8'
+    );
+    const docSkip = workflow.slice(
+      workflow.indexOf('# Changelog content and executable playbook'),
+      workflow.indexOf(
+        'echo "has_code_changes=true"',
+        workflow.indexOf('# Changelog content and executable playbook')
+      )
+    );
+    expect(docSkip).toContain('docs/playbooks/[^/]+\\.playbook\\.md$');
+  });
+
   it('fails closed onto guards for manual, local, and unreadable diffs', () => {
     const all = SOURCE_GUARDS.map(guard => guard.id);
     // Manual dispatch runs web Unit Tests and structural, which carry the rest.
     expect(selected('workflow_dispatch', ['README.md'])).toEqual([
       'ci-schedule-inventory',
+      'playbook-authoring',
     ]);
     expect(selected('', ['README.md'])).toEqual(all);
     expect(selected('pull_request', null)).toEqual(all);
     expect(selected('pull_request', [])).toEqual(all);
-    expect(selected('merge_group', null)).toEqual(['ci-schedule-inventory']);
+    expect(selected('merge_group', null)).toEqual([
+      'ci-schedule-inventory',
+      'playbook-authoring',
+    ]);
   });
 
   it('points every guard at a test file that exists', () => {
