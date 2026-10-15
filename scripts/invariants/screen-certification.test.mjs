@@ -14,7 +14,10 @@ import { dirname, join, resolve } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { crc32 } from 'node:zlib';
-import { readProductReferenceOwner } from './product-reference-coherence.mjs';
+import {
+  readProductReferenceOwner,
+  screenNeedsProductReferences,
+} from './product-reference-coherence.mjs';
 import { readInvariantRegistry } from './registry.mjs';
 import {
   classifyScreenPath,
@@ -145,6 +148,37 @@ function findings(patch, screen = gated()[0]) {
 }
 
 describe('JOV-INV-018 screen-certification/v2', () => {
+  it('decides product-reference membership without loading typescript', () => {
+    assert.equal(screenNeedsProductReferences('web.presence'), true);
+    assert.equal(screenNeedsProductReferences('web.library'), true);
+    assert.equal(screenNeedsProductReferences('web.public-profile'), false);
+    const script = `
+      import { Module } from 'node:module';
+      const load = Module._load;
+      Module._load = function(request, parent, isMain) {
+        if (request === 'typescript') {
+          const error = new Error("Cannot find module 'typescript'");
+          error.code = 'MODULE_NOT_FOUND';
+          throw error;
+        }
+        return load.call(this, request, parent, isMain);
+      };
+      const { evaluateScreenProof, SCREEN_REGISTRY } = await import(${JSON.stringify(join(ROOT, 'scripts/invariants/screen-certification.mjs'))});
+      const screen = SCREEN_REGISTRY.find(entry => entry.id === 'web.public-profile');
+      const findings = evaluateScreenProof(
+        { schema: 'screen-browser-proof/v1' },
+        { screen, headSha: '${'a'.repeat(40)}' }
+      );
+      if (!findings.some(finding => finding.includes('browser-owned-input'))) process.exit(2);
+    `;
+    const result = spawnSync(
+      process.execPath,
+      ['--input-type=module', '-e', script],
+      { cwd: ROOT, encoding: 'utf8' }
+    );
+    assert.equal(result.status, 0, result.stderr);
+  });
+
   it('rejects stale product names, versions, destinations, locales, and disabled-feature screenshot claims', () => {
     const screen = SCREEN_REGISTRY.find(entry => entry.id === 'web.presence');
     const current = readProductReferenceOwner().getProductProjection({
