@@ -17,6 +17,7 @@ the release it started with and the next issue runs on the new one.
 from __future__ import annotations
 
 import argparse
+import copy
 from contextlib import nullcontext
 import fcntl
 import hashlib
@@ -5565,9 +5566,11 @@ def _adopt_pr(host: Host, name: str, pr: dict, claim: GateClaim, *, sensitive: b
     return receipt
 
 
-def lane_prs(name: str, providers: dict | None = None, fields: str = "") -> list[dict]:
+def lane_prs(name: str, providers: dict | None = None, fields: str = "", *, inventory: list[dict] | None = None) -> list[dict]:
     """This lane's open PRs (its recognized run branches), plus the orphaned PRs of disabled lanes:
     nobody else will fix or gate those, and any enabled lane can."""
+    if fields and inventory is not None:
+        raise ValueError("supplied-inventory-fields")
     providers = load_providers() if providers is None else providers
     names = [name] + [other for other, spec in providers.items()
                       if (not spec.get("enabled", True) or spec.get("repairs") is False) and other != name]
@@ -5578,7 +5581,7 @@ def lane_prs(name: str, providers: dict | None = None, fields: str = "") -> list
                          "--limit", "200", "--json", fields])
             candidates = json.loads(listed.stdout or "[]")
         else:
-            candidates = open_prs_summary()
+            candidates = inventory if inventory is not None else open_prs_summary()
         prs += [pr for pr in candidates if (owned := LANE_BRANCH.match(pr["headRefName"]))
                 and owned.group("lane") == owner]
     return prs
@@ -5590,10 +5593,10 @@ PR_FIELDS = "number,title,url,isDraft,headRefName,headRefOid,statusCheckRollup,m
 LIGHT_PR_FIELDS = "number,url,state,isDraft,headRefName,headRefOid,mergeStateStatus,labels"
 
 
-def repo_prs() -> list[dict]:
+def repo_prs(*, inventory: list[dict] | None = None) -> list[dict]:
     """Every open, non-draft PR whose branch lives in this repo (forks cannot be pushed to).
     Tim: no open PR should ever need his action; the fix loop owns them all."""
-    ready = [pr for pr in open_prs_summary() if not pr.get("isDraft") and not pr.get("isCrossRepository")]
+    ready = [pr for pr in (inventory if inventory is not None else open_prs_summary()) if not pr.get("isDraft") and not pr.get("isCrossRepository")]
     # No top-N window: an old red PR outside the 60 most recently updated was never repaired.
     return sorted(ready, key=lambda pr: pr.get("updatedAt") or "", reverse=True)
 
@@ -5647,7 +5650,7 @@ def shared(key: str, ttl: float, fetch, *, validate=None):
         return value
 
 
-def open_prs_summary() -> list[dict]:
+def open_prs_summary(*, capture: list[dict] | None = None) -> list[dict]:
     """Every open PR with its aggregate check state, in a few cheap GraphQL pages, cached for a
     minute. Per-check rollups over dozens of PRs 504 or trip GitHub's secondary rate limit
     (2026-09-27: devin had 43 red PRs and saw none of them, so it idled over budget). The
@@ -5655,10 +5658,14 @@ def open_prs_summary() -> list[dict]:
     the single PR a worker claims. Empty when GitHub cannot be read."""
     now = time.time()
     if now - _SUMMARY["at"] < SUMMARY_TTL_S:
+        if capture is not None:
+            capture.append(copy.deepcopy(_SUMMARY))
         return _SUMMARY["prs"]
     prs = shared("open-prs-labels-v2", SUMMARY_TTL_S, lambda: pr_events.open_prs_state(THIS))
     if prs is None:
         _SUMMARY["readable"] = False
+        if capture is not None:
+            capture.append({"at": now, "sourceAt": None, "prs": [], "readable": False})
         return []
     source_at = now
     if os.environ.get("LANES_EXECUTION_BACKEND") != "local-test":
@@ -5675,8 +5682,44 @@ def open_prs_summary() -> list[dict]:
             "name": "rollup", "synthetic": True,
             "status": "COMPLETED" if rollup in ("SUCCESS", "FAILURE", "ERROR") else "PENDING",
             "conclusion": {"SUCCESS": "SUCCESS", "FAILURE": "FAILURE", "ERROR": "FAILURE"}.get(rollup)}]
-    _SUMMARY.update(at=now, sourceAt=source_at, prs=prs, readable=True)
+    record = dict(at=now, sourceAt=source_at, prs=prs, readable=True)
+    _SUMMARY.update(record)
+    if capture is not None:
+        capture.append(copy.deepcopy(record))
     return prs
+
+
+class RepairInventoryHold(Exception):
+    """The initial repair census cannot qualify this pass; exit after releasing claim.lock."""
+
+
+def capture_repair_inventory(name: str) -> dict:
+    """Copy one summary invocation's rows and provenance outside global claim.lock."""
+    identity = {"repository": REPO_SLUG, "provider": name,
+                "cacheKey": "open-prs-labels-v2", "cacheRoot": str(SHARED_CACHE_DIR)}
+    paired = []
+    try:
+        returned = copy.deepcopy(open_prs_summary(capture=paired))
+        summary = paired[0] if len(paired) == 1 else {}
+        same = isinstance(returned, list) and isinstance(summary, dict) and returned == summary.get("prs")
+    except (OSError, ValueError, TypeError, KeyError, AttributeError, subprocess.SubprocessError):
+        returned, summary, same = [], {"sourceAt": None, "readable": False, "prs": []}, False
+    return {**identity, "summary": summary, "prs": returned, "sameCallRows": same}
+
+
+def repair_inventory_valid(receipt: dict, name: str) -> bool:
+    """The initial repair selection uses this copied pair, never later global metadata."""
+    if not isinstance(receipt, dict) or not isinstance(receipt.get("summary"), dict):
+        return False
+    summary = receipt["summary"]
+    stamp = summary.get("sourceAt")
+    return (receipt.get("repository") == REPO_SLUG and receipt.get("provider") == name
+            and receipt.get("cacheKey") == "open-prs-labels-v2"
+            and receipt.get("cacheRoot") == str(SHARED_CACHE_DIR)
+            and receipt.get("sameCallRows") is True and isinstance(receipt.get("prs"), list)
+            and receipt["prs"] == summary.get("prs") and summary.get("readable") is True
+            and type(stamp) in (int, float) and math.isfinite(stamp)
+            and 0 <= time.time() - stamp < CLAIM_SCAN_TTL_S)
 
 
 def overlap_prs_summary() -> list[dict] | None:
@@ -5723,28 +5766,30 @@ def with_checks(pr: dict) -> dict:
         return pr
 
 
-def reclaimable_drafts() -> list[dict]:
+def reclaimable_drafts(*, inventory: list[dict] | None = None) -> list[dict]:
     """Abandoned drafts the lanes reclaim (Tim, 2026-10-10/11): any same-repo non-lane draft
     past the age floor with no commit for 48h, red or conflicting, and not held."""
     now = time.time()
-    return [pr for pr in open_prs_summary() if not pr.get("isCrossRepository")
+    return [pr for pr in (inventory if inventory is not None else open_prs_summary()) if not pr.get("isCrossRepository")
             and pr_events.abandoned_agent_draft(pr, now)
             and not {label["name"].lower() for label in pr.get("labels", [])} & pr_events.HOLD_LABELS]
 
 
-def fix_candidates(name: str) -> list[dict]:
+def fix_candidates(name: str, *, inventory: list[dict] | None = None) -> list[dict]:
     """Lane PRs (all lanes), every other open non-draft PR and reclaimed abandoned drafts,
     de-duplicated by number.
 
-    Cached with the rest of the claim scan: N idle workers share one read per minute."""
+    Default callers share one cached read per minute; supplied rows project without a refill."""
     def fetch():
         seen, merged = set(), []
-        for pr in lane_prs(name) + repo_prs() + reclaimable_drafts():
+        for pr in (lane_prs(name) + repo_prs() + reclaimable_drafts() if inventory is None else
+                   lane_prs(name, inventory=inventory) + repo_prs(inventory=inventory)
+                   + reclaimable_drafts(inventory=inventory)):
             if pr["number"] not in seen:
                 seen.add(pr["number"])
                 merged.append(pr)
         return merged
-    return shared(f"claim-fix-candidates-{_cache_token(name)}", CLAIM_SCAN_TTL_S, fetch) or []
+    return fetch() if inventory is not None else shared(f"claim-fix-candidates-{_cache_token(name)}", CLAIM_SCAN_TTL_S, fetch) or []
 
 
 ISSUE_MARKER = re.compile(r"linear-issue-id:\s*(JOV-\d+)", re.IGNORECASE)
@@ -6280,17 +6325,18 @@ def maintenance_preserved(state: Path) -> set[int]:
 
 
 def record_maintenance_demand(host: Host, name: str, prs: list[dict], candidates: list[dict],
-                              events: list[dict], selected: set[int]) -> None:
+                              events: list[dict], selected: set[int], *, summary: dict | None = None) -> None:
     """Under claim.lock: a pre-claim demand hint from the scan already performed.
 
     No API, lease, attempt charge or model call. Actual admission still refreshes
     the exact target and enforces remote ownership, provider and integrity gates.
     Unknown is never an empty pool. A selected unit is running, not pending work.
     """
+    summary = _SUMMARY if summary is None else summary
     now, pending_count = time.time(), None
-    source_at = _SUMMARY.get("sourceAt")
+    source_at = summary.get("sourceAt")
     try:
-        if not _SUMMARY["readable"] or type(source_at) not in (int, float) \
+        if not summary["readable"] or type(source_at) not in (int, float) \
                 or not 0 <= now - source_at <= MAINTENANCE_DEMAND_MAX_AGE_S:
             raise ValueError("maintenance-inventory-unknown")
         snapshots = {}
@@ -6310,7 +6356,7 @@ def record_maintenance_demand(host: Host, name: str, prs: list[dict], candidates
         preserved = maintenance_preserved(host.state)
         eligible, unknown_rows = set(), 0
         rows = {pr["number"]: pr for pr in best_per_issue([*prs, *candidates, *events])}
-        current = {pr["number"]: pr for pr in _SUMMARY["prs"]}
+        current = {pr["number"]: pr for pr in summary["prs"]}
         event_rows = {pr["number"]: pr for pr in events}
         adopt_numbers = {pr["number"] for pr in prs}
         for number, candidate in rows.items():
@@ -6372,8 +6418,8 @@ def record_maintenance_demand(host: Host, name: str, prs: list[dict], candidates
                 unknown_rows += 1
         if eligible:
             pending_count = len(eligible)
-        elif not unknown_rows and _SUMMARY["readable"] and 0 <= now - _SUMMARY["at"] <= MAINTENANCE_DEMAND_MAX_AGE_S \
-                and not _SUMMARY["prs"] and not rows:
+        elif not unknown_rows and summary["readable"] and 0 <= now - summary["at"] <= MAINTENANCE_DEMAND_MAX_AGE_S \
+                and not summary["prs"] and not rows:
             # A complete empty repository inventory proves no PR maintenance.
             pending_count = 0
     except Exception:
@@ -6424,25 +6470,28 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
     # Publication can await canonical policy and native queue reads. Keep those
     # outside the global claim lock, then refresh inventory for ordinary admission.
     requeue_verified(host, lane_prs(name))
+    repair_inventory = capture_repair_inventory(name) if spec.get("repairs") is not False else None
     claim = Locked(host.state / "claim.lock", blocking=True)
-    # The claim lock serializes the scan, so the shared cache fill happens once. A rate
-    # limit skips the API for every worker until the cooldown file expires.
+    # Bulk repair inventory fills under its per-key lock outside this global lock.
+    # Current local filters and selected-head/owner/claim arbitration remain serialized.
     red = adopt = issue = route_decision = None
-    rate_limited = inventory_unknown = False
+    rate_limited = inventory_unknown = repair_inventory_held = False
     try:
         # Finish before starting: PRs a GitHub event queued, red PRs (any open PR in the repo),
         # then ungated lane drafts, then new issues.
         # A remote-only lane (Hyperagent) cannot repair a local checkout: it only claims issues,
         # and the local lanes repair its PRs like any orphan (`repairs: false`).
         local = spec.get("repairs") is not False
-        candidates = [pr for pr in fix_candidates(name) if not pr_recovery_held(host, pr)] if local else []
+        if local and not repair_inventory_valid(repair_inventory, name):
+            raise RepairInventoryHold()
+        candidates = [pr for pr in fix_candidates(name, inventory=repair_inventory["prs"]) if not pr_recovery_held(host, pr)] if local else []
         # Reclaimed abandoned drafts (the only non-lane drafts among the fix candidates) are
         # gated and readied like this lane's own drafts. Derived from the one cached scan so
         # no extra inventory read happens per worker pass.
-        lane_owned = [pr for pr in lane_prs(name) if not pr_recovery_held(host, pr)] if local else []
+        lane_owned = [pr for pr in lane_prs(name, inventory=repair_inventory["prs"]) if not pr_recovery_held(host, pr)] if local else []
         owned_numbers = {pr["number"] for pr in lane_owned}
         prs = lane_owned + [pr for pr in candidates if pr.get("isDraft") and pr["number"] not in owned_numbers]
-        events = [pr for pr in pr_events.queued_prs(THIS, pr_events.FIX_KINDS)
+        events = [pr for pr in pr_events.queued_prs(THIS, pr_events.FIX_KINDS, inventory=repair_inventory["prs"])
                   if not pr_recovery_held(host, pr)] if local else []
         red = local and (pr_events.claim_event_pr(host, THIS, name, events)
                          or claim_escalation_pr(host, name, candidates)
@@ -6452,7 +6501,7 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
         if local:
             selected = {red["number"]} if red else {adopt.pr["number"]} if adopt else set()
             try:
-                record_maintenance_demand(host, name, prs, candidates, events, selected)
+                record_maintenance_demand(host, name, prs, candidates, events, selected, summary=repair_inventory["summary"])
             except Exception:
                 pass  # Demand telemetry cannot prevent this selected repair.
         # Existing-PR admission uses fresh GitHub/attempt authority. Do not make
@@ -6520,6 +6569,8 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
                 break
         if red is None and adopt is None and issue is None:
             pr_events.cleanup_one_event(host, THIS, events)
+    except RepairInventoryHold:
+        repair_inventory_held = True
     except LaneInventoryUnknown:
         issue = None
         inventory_unknown = red is None and adopt is None
@@ -6529,6 +6580,10 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
         rate_limited = red is None and adopt is None
     finally:
         claim.release()
+    if repair_inventory_held:
+        record_idle_exit(host, name, "repair-inventory-unknown-or-stale")
+        slot.release()
+        return 0
     if rate_limited or inventory_unknown:
         record_idle_exit(host, name, "linear-rate-limited" if rate_limited else "linear-inventory-unknown")
         slot.release()
