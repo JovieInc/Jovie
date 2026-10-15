@@ -237,6 +237,119 @@ describe('signup page', () => {
     ).toHaveAttribute('href', '/signin?desktop_return=%2Fapp%2Fsettings');
   });
 
+  it.each([
+    [
+      'error=oauth_failed',
+      'Something went wrong with sign-up. Please try again.',
+    ],
+    [
+      'error=access_denied',
+      'Sign-in was cancelled. Try again, or pick a different method.',
+    ],
+    [
+      'error=account_exists',
+      'An account with this email already exists. Try signing in instead.',
+    ],
+    [
+      'error=unknown_provider_error',
+      'Something went wrong with sign-up. Please try again.',
+    ],
+    [
+      'error=&oauth_error=access_denied',
+      'Sign-in was cancelled. Try again, or pick a different method.',
+    ],
+    [
+      'error=access_denied&oauth_error=account_exists',
+      'Sign-in was cancelled. Try again, or pick a different method.',
+    ],
+    [
+      'error=access_denied&error=account_exists',
+      'An account with this email already exists. Try signing in instead.',
+    ],
+    [
+      'error=oauth_failed&error=access_denied',
+      'Sign-in was cancelled. Try again, or pick a different method.',
+    ],
+    [
+      'error=oauth_failed&error=account_exists',
+      'An account with this email already exists. Try signing in instead.',
+    ],
+    [
+      'error=oauth_failed&error=',
+      'Something went wrong with sign-up. Please try again.',
+    ],
+  ])(
+    'shows signup return feedback for %s and consumes only the error parameters',
+    async (error, message) => {
+      const context = 'handle=TestHandle&plan=pro&redirect_url=%2Fstart';
+      searchParamsState.value = `${error}&${context}`;
+      globalThis.history.replaceState(
+        { returnState: 'preserved' },
+        '',
+        `/signup?${searchParamsState.value}#recovery`
+      );
+
+      render(<SignUpPageClient />);
+
+      expect(screen.getAllByRole('alert')).toHaveLength(1);
+      expect(screen.getByRole('alert')).toBeVisible();
+      expect(screen.getByRole('alert')).toHaveTextContent(message);
+      if (message.includes('already exists')) {
+        expect(
+          screen.getByRole('link', { name: 'Sign in instead' })
+        ).toHaveAttribute(
+          'href',
+          '/signin?handle=testhandle&redirect_url=%2Fstart&plan=pro'
+        );
+      }
+      await waitFor(() => {
+        expect(globalThis.location.search).toBe(`?${context}`);
+      });
+      expect(globalThis.location.hash).toBe('#recovery');
+      expect(globalThis.history.state).toEqual({ returnState: 'preserved' });
+      expect(authShellMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mode: 'sign-up',
+          oppositeModeUrl:
+            '/signin?handle=testhandle&redirect_url=%2Fstart&plan=pro',
+          fallbackRedirectUrl: '/start',
+        })
+      );
+    }
+  );
+
+  it.each(['', 'error=&oauth_error='])(
+    'does not show return feedback without an error (%s)',
+    params => {
+      searchParamsState.value = params;
+
+      render(<SignUpPageClient />);
+
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    }
+  );
+
+  it.each(['desktop_return', 'mobile_return'])(
+    'preserves %s in canonical account recovery',
+    returnParam => {
+      searchParamsState.value = `error=account_exists&email=fixture%40example.com&${returnParam}=%2Fapp%2Fsettings`;
+      globalThis.history.replaceState(
+        null,
+        '',
+        `/signup?${searchParamsState.value}`
+      );
+
+      render(<SignUpPageClient />);
+
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'An account for fixture@example.com already exists. Try signing in instead.'
+      );
+      expect(
+        screen.getByRole('link', { name: 'Sign in instead' })
+      ).toHaveAttribute('href', `/signin?${returnParam}=%2Fapp%2Fsettings`);
+    }
+  );
+
   it('preserves redirect_url on the Clerk sign-in footer link', async () => {
     searchParamsState.value = 'redirect_url=%2Fonboarding';
 
