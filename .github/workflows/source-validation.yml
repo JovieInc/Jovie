@@ -78,11 +78,54 @@ jobs:
           path: ${{ runner.temp }}/jovie-dependency-parity/dep-digest.json
           if-no-files-found: error
           retention-days: 14
+      - name: Select component browser setup from trusted base
+        id: browser-scope
+        if: steps.reuse.outputs.reuse != 'true'
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -uo pipefail
+          required=true
+          reason=scope-unreadable
+          scope_root="$(mktemp -d "$GITHUB_WORKSPACE/.source-browser-scope.XXXXXX")"
+          trap 'rm -rf "$scope_root"' EXIT
+          mkdir -p "$scope_root/scripts"
+          if test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD" &&
+            git fetch --no-tags origin "${{ github.base_ref }}" &&
+            trusted_ref="$(git rev-parse "origin/${{ github.base_ref }}^{commit}")" &&
+            base_sha="$(git merge-base "$trusted_ref" HEAD)" &&
+            git show "$trusted_ref:scripts/component-ship-policy.mjs" > "$scope_root/scripts/component-ship-policy.mjs" &&
+            git diff --name-only "$base_sha"...HEAD > "$scope_root/changed-paths.txt" &&
+            candidate="$(node --input-type=module - "$scope_root/scripts/component-ship-policy.mjs" "$scope_root/changed-paths.txt" <<'NODE'
+          import { readFileSync } from 'node:fs';
+          import { pathToFileURL } from 'node:url';
+
+          const [policyPath, changedPath] = process.argv.slice(2);
+          const { isUnderShipScope } = await import(pathToFileURL(policyPath));
+          const changed = readFileSync(changedPath, 'utf8')
+            .split('\n')
+            .map(path => path.trim())
+            .filter(Boolean);
+          process.stdout.write(
+            changed.length === 0 || changed.some(isUnderShipScope)
+              ? 'true'
+              : 'false'
+          );
+          NODE
+          )" && [[ "$candidate" =~ ^(true|false)$ ]]; then
+            required="$candidate"
+            reason=trusted-component-policy
+          else
+            echo '::warning::Component browser scope was unreadable; installing Chromium fail-closed.'
+          fi
+          printf 'required=%s\nreason=%s\n' "$required" "$reason" >> "$GITHUB_OUTPUT"
+          echo "Browser setup required: $required ($reason)"
       # component-ship-gate's live-storybook-cert launches Chromium when the
       # diff touches in-scope UI components; without browsers the gate fails
       # closed before any story is measured.
       - name: Setup Playwright (Chromium)
-        if: steps.reuse.outputs.reuse != 'true'
+        if: steps.reuse.outputs.reuse != 'true' && steps.browser-scope.outputs.required == 'true'
         uses: ./.github/actions/setup-playwright
       - name: Validate customer changelog decision from trusted base
         shell: bash

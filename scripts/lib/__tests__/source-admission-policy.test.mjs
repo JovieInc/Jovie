@@ -1011,6 +1011,35 @@ function sourceValidationWorkflow() {
   return load(readFileSync('.github/workflows/source-validation.yml', 'utf8'));
 }
 
+test('Source Validation scopes Chromium to the trusted component policy', () => {
+  const steps = sourceValidationWorkflow().jobs.deterministic.steps;
+  const scopeIndex = steps.findIndex(
+    candidate =>
+      candidate.name === 'Select component browser setup from trusted base'
+  );
+  const setupIndex = steps.findIndex(
+    candidate => candidate.name === 'Setup Playwright (Chromium)'
+  );
+  assert.ok(scopeIndex >= 0, 'browser scope step missing');
+  assert.ok(
+    setupIndex > scopeIndex,
+    'browser setup must follow scope selection'
+  );
+
+  const scope = steps[scopeIndex];
+  assert.match(
+    scope.run,
+    /git show "\$trusted_ref:scripts\/component-ship-policy\.mjs"/
+  );
+  assert.match(scope.run, /changed\.some\(isUnderShipScope\)/);
+  assert.match(scope.run, /required=true/);
+  assert.match(scope.run, /changed\.length === 0/);
+  assert.equal(
+    steps[setupIndex].if,
+    "steps.reuse.outputs.reuse != 'true' && steps.browser-scope.outputs.required == 'true'"
+  );
+});
+
 function runProofReuse({ runs, ghFails = false, sha = 'a'.repeat(40) }) {
   const step = sourceValidationWorkflow().jobs.deterministic.steps.find(
     candidate => candidate.id === 'reuse'
