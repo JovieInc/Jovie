@@ -6,13 +6,13 @@ import {
   LearningMetadataSchema,
   LearningWorkSchema,
   sameLearningBinding,
-} from './learning-metadata.js';
-import { MeasuredOutcomeReceiptSchema } from './prediction-outcome.js';
-import { parseDecisionPredictionReceipt } from './prediction-receipt.js';
-import { verifyProviderAttemptReceipt } from './provider-attempt-receipt.js';
-import { parseWorkResult } from './work-order.js';
+} from './learning-metadata.ts';
+import { MeasuredOutcomeReceiptSchema } from './prediction-outcome.ts';
+import { parseDecisionPredictionReceipt } from './prediction-receipt.ts';
+import { verifyProviderAttemptReceipt } from './provider-attempt-receipt.ts';
+import { parseWorkResult } from './work-order.ts';
 
-export * from './learning-metadata.js';
+export * from './learning-metadata.ts';
 
 const OwnerContextSchema = z.strictObject({
   binding: LearningBindingSchema,
