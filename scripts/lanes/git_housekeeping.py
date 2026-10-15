@@ -281,8 +281,91 @@ def remove_linked_worktree(invoke, worktree: Path) -> tuple[bool, str]:
     return False, last_error.strip()
 
 
+def _ancestor_pids() -> set[int]:
+    found = set()
+    pid = os.getpid()
+    while pid > 1 and pid not in found:
+        found.add(pid)
+        try:
+            stat = (Path("/proc") / str(pid) / "stat").read_text()
+            pid = int(stat.rsplit(")", 1)[1].split()[1])
+        except (OSError, IndexError, ValueError):
+            break
+    return found
+
+
+def _cmdline(entry: Path) -> str:
+    try:
+        raw = (entry / "cmdline").read_bytes()
+    except OSError:
+        return ""
+    return raw.replace(b"\0", b" ").decode("utf-8", "replace")
+
+
+def _mentions(command: str, root: str) -> bool:
+    if not command or not root:
+        return False
+    padded = f" {command} "
+    return f" {root} " in padded or f" {root}/" in padded
+
+
+def _temp_writers(path: Path) -> list[int]:
+    """Pids still using a temp dir.
+
+    A dispatch sweep child keeps the runner's cwd and only names the directory
+    on its command line (`--state` / `--repo`). cwd-only scans miss it, and it
+    is still creating files when TemporaryDirectory cleanup runs.
+    """
+    texts = {str(path)}
+    try:
+        texts.add(str(path.resolve()))
+    except OSError:
+        pass
+    ancestors = _ancestor_pids()
+    found = []
+    proc = Path("/proc")
+    if not proc.is_dir():
+        return found
+    for entry in proc.iterdir():
+        if not entry.name.isdigit():
+            continue
+        pid = int(entry.name)
+        if pid in ancestors:
+            continue
+        raw = _cwd_text(entry)
+        if raw and any(_inside(root, raw) for root in texts):
+            found.append(pid)
+            continue
+        if any(_mentions(_cmdline(entry), root) for root in texts):
+            found.append(pid)
+    return found
+
+
+def reap_temp_writers(path: Path | str, *, timeout: float = 2.0) -> None:
+    """Wait for processes still using a temp dir, then stop them.
+
+    Test teardown only. Production deletes stay in `remove_tree`, which does
+    not signal a non-git process. `ignore_errors` is not applied here: if the
+    directory is still occupied after the wait, the caller raises.
+    """
+    root = Path(path)
+    if not _temp_writers(root):
+        return
+    deadline = time.monotonic() + timeout
+    while _temp_writers(root) and time.monotonic() < deadline:
+        time.sleep(0.02)
+    _signal(_temp_writers(root), signal.SIGTERM)
+    term = time.monotonic() + 0.4
+    while _temp_writers(root) and time.monotonic() < term:
+        time.sleep(0.02)
+    _signal(_temp_writers(root), signal.SIGKILL)
+    gone = time.monotonic() + 0.5
+    while _temp_writers(root) and time.monotonic() < gone:
+        time.sleep(0.02)
+
+
 def install_isolated_tempdirs() -> None:
-    """Per-process temp dirs whose cleanup waits out a detached git writer."""
+    """Per-process temp dirs whose cleanup waits out a detached writer."""
     if getattr(tempfile, "_jovie_isolated_temp", False):
         return
     original = tempfile.TemporaryDirectory
@@ -296,6 +379,11 @@ def install_isolated_tempdirs() -> None:
         @classmethod
         def _rmtree(cls, name, ignore_errors=False, repeated=False):
             del repeated
+            # DispatchTest's sweep child is not a git process and its cwd is the
+            # runner. Wait for it, then stop it, before the directory is removed.
+            # ignore_errors stays the caller's teardown flag and is never set
+            # here: a directory that remains still raises.
+            reap_temp_writers(name)
             try:
                 remove_tree(name)
             except OSError:

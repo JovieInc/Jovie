@@ -641,6 +641,44 @@ class GitHousekeepingTest(unittest.TestCase):
                 proc.kill()
                 proc.wait(timeout=5)
 
+    def test_temporary_directory_stops_a_writer_that_only_names_the_directory(self):
+        # DispatchTest teardown: disk_guard.maybe_sweep starts a child whose cwd
+        # is the runner, while --state/--repo point at the temp dir. The child
+        # keeps creating files there, so rmtree raises ENOTEMPTY. Cleanup must
+        # wait for that child and stop it. A directory that remains still raises.
+        directory = tempfile.TemporaryDirectory()
+        root = Path(directory.name)
+        script = (
+            "import pathlib, sys, time\n"
+            "root = pathlib.Path(sys.argv[1])\n"
+            "end = time.time() + 30\n"
+            "i = 0\n"
+            "while time.time() < end:\n"
+            "    root.mkdir(parents=True, exist_ok=True)\n"
+            "    (root / f'held-{i}').write_text('x')\n"
+            "    i += 1\n"
+            "    time.sleep(0.01)\n"
+        )
+        proc = subprocess.Popen(
+            [sys.executable, "-c", script, str(root)],
+            cwd=Path("/tmp"),
+            start_new_session=True,
+        )
+        try:
+            deadline = time.time() + 2
+            while time.time() < deadline and not any(root.glob("held-*")):
+                time.sleep(0.01)
+            self.assertTrue(any(root.glob("held-*")), "writer did not start")
+            self.assertFalse(git_housekeeping.processes_under(root),
+                             "this writer must not be visible by cwd")
+            directory.cleanup()
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait(timeout=5)
+        self.assertFalse(root.exists())
+        self.assertIsNotNone(proc.poll())
+
     def test_remove_tree_raises_for_a_file(self):
         root = Path(tempfile.mkdtemp(prefix=f"jovie-lanes-{os.getpid()}-file-"))
         target = root / "not-a-directory"
