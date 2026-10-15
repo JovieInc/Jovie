@@ -53,6 +53,20 @@ beforeEach(async () => {
       engagementScore: 88,
     }))
   );
+  await db.insert(audienceActions).values({
+    audienceMemberId: members[1],
+    creatorProfileId: profiles[1],
+    label: 'neighbor',
+  });
+  await db.insert(audienceProjectionSnapshots).values({
+    audienceMemberId: members[1],
+    original: {
+      latestActions: null,
+      referrerHistory: null,
+      latestActionLabel: 'neighbor',
+      latestReferrerUrl: null,
+    },
+  });
 });
 afterEach(async () => {
   await db.delete(creatorProfiles).where(inArray(creatorProfiles.id, profiles));
@@ -117,7 +131,12 @@ describe('historical audience projections (real PostgreSQL)', () => {
       referrers: { imported: 1 },
     });
     expect(await read()).toEqual(original);
-    expect(await db.select().from(audienceProjectionSnapshots)).toEqual([]);
+    expect(
+      await db
+        .select()
+        .from(audienceProjectionSnapshots)
+        .where(eq(audienceProjectionSnapshots.audienceMemberId, members[0]))
+    ).toEqual([]);
     const applied = await rebuild(true);
     expect(applied.reports).toEqual(
       dry.reports.map(row => ({ ...row, applied: true }))
@@ -316,8 +335,18 @@ describe('historical audience projections (real PostgreSQL)', () => {
       .set({ latestActions: [{ ...legacy, sourceLinkId: source.id }] })
       .where(eq(audienceMembers.id, members[0]));
     await expect(rebuild(true)).rejects.toThrow('relationship ownership');
-    expect(await db.select().from(audienceActions)).toEqual([]);
-    expect(await db.select().from(audienceProjectionSnapshots)).toEqual([]);
+    expect(
+      await db
+        .select()
+        .from(audienceActions)
+        .where(eq(audienceActions.audienceMemberId, members[0]))
+    ).toEqual([]);
+    expect(
+      await db
+        .select()
+        .from(audienceProjectionSnapshots)
+        .where(eq(audienceProjectionSnapshots.audienceMemberId, members[0]))
+    ).toEqual([]);
     await db
       .update(audienceMembers)
       .set({
@@ -325,6 +354,11 @@ describe('historical audience projections (real PostgreSQL)', () => {
       })
       .where(eq(audienceMembers.id, members[0]));
     await expect(rebuild(true)).rejects.toThrow('JOV-3063');
-    expect(await db.select().from(audienceProjectionSnapshots)).toEqual([]);
+    expect(
+      await db
+        .select()
+        .from(audienceProjectionSnapshots)
+        .where(eq(audienceProjectionSnapshots.audienceMemberId, members[0]))
+    ).toEqual([]);
   });
 });
