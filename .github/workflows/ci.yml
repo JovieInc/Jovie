@@ -1076,10 +1076,12 @@ jobs:
     needs: [ci-path-changes]
     if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'merge_group' }}
     runs-on: ubuntu-latest
-    # Must exceed MERGE_GROUP_ADMISSION_WAIT_MS (6 min) plus setup/checkout so
-    # a still-running required check fails via the helper's diagnostic, not a
-    # hard job cancel.
-    timeout-minutes: 8
+    # Must exceed MERGE_GROUP_ADMISSION_QUOTA_RECOVERY_MS (66 min) plus the
+    # 6-minute check poll plus setup/checkout. The helper sleeps until
+    # x-ratelimit-reset inside that window. A hard cancel would eject the
+    # group. The wait stays in the helper: a workflow sleep before a GitHub
+    # read is polling debt (JOV-INV-042).
+    timeout-minutes: 75
     outputs:
       admitted: ${{ steps.admission.outputs.admitted || 'false' }}
       obsolete: ${{ steps.admission.outputs.obsolete || 'false' }}

@@ -5559,3 +5559,32 @@ esac
     }, 30_000);
   });
 });
+
+describe('full matrix authenticated release fixtures', () => {
+  it('seeds the prepared ready persona before browser tests on full runs', () => {
+    const workflow = readFileSync(
+      resolve(
+        import.meta.dirname,
+        '../../../../../.github/workflows/e2e-full-matrix.yml'
+      ),
+      'utf8'
+    );
+    const job = getJobBlock(workflow, 'e2e-full-matrix');
+    const seedStep = getStepBlock(job, 'Seed authenticated release fixtures');
+    expect(seedStep).toContain('seed:test-data --ready-creator-releases-only');
+    expect(seedStep).toContain(
+      'DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}'
+    );
+    expect(seedStep).toContain("E2E_USE_TEST_AUTH_BYPASS: '1'");
+    expect(seedStep).toContain(
+      "github.event_name == 'push' || github.event.inputs.test_filter == ''"
+    );
+    const seedIndex = job.indexOf(
+      '- name: Seed authenticated release fixtures'
+    );
+    expect(seedIndex).toBeGreaterThan(
+      job.indexOf('- name: Start standalone E2E server')
+    );
+    expect(seedIndex).toBeLessThan(job.indexOf('- name: Run E2E tests'));
+  });
+});

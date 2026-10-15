@@ -269,7 +269,10 @@ Lane reads paginate the Todo pool (up to `LANE_ISSUE_PAGES` × 100).
 Gem has no inbound webhook, so `.github/workflows/lane-fix-relay.yml` turns each GitHub signal
 into a label on the exact PR: CI failure `lane-fix-red`, merge-queue removal `lane-fix-dequeued`,
 a push to main that leaves the PR conflicting `lane-fix-conflict`, requested changes or a human
-review comment `lane-fix-review`, green CI on a lane draft `lane-fix-green`. Every worker pass
+review comment `lane-fix-review`, green CI on a lane draft `lane-fix-green`.
+The same relay deletes a stale `lane-fix-red` once that head is required-green
+(CLEAN, HAS_HOOKS, or UNSTABLE), using the workflow token that applied the label.
+Every worker pass
 does one label search and takes a queued PR ahead of the rest of its work. Labels are consumed
 on claim, or when the PR's own state no longer backs them. A PR whose attempts are spent keeps
 its label, so the PR shows why it is waiting. The dispatch tick handles `green` (ready +
