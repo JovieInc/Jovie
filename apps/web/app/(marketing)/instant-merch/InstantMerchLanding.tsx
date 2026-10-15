@@ -101,6 +101,8 @@ export function InstantMerchLanding() {
           headingId='instant-merch-hero-heading'
           headlineMaxLines='none'
           sectionTestId='marketing-section-hero'
+          sectionVariant='split-screenshot-right'
+          sectionOwner='apps/web/app/(marketing)/instant-merch/InstantMerchLanding.tsx'
           primaryCtaLabel={copy.hero.primaryCta}
           primaryCtaHref={CREATE_MERCH_HREF}
           primaryCtaTestId='instant-merch-primary-cta'
@@ -114,6 +116,8 @@ export function InstantMerchLanding() {
           aria-labelledby='instant-merch-flow-heading'
           className='border-t border-subtle py-16 sm:py-20'
           data-testid='marketing-section-how-it-works'
+          data-marketing-variant='3-step-strip'
+          data-marketing-owner='apps/web/app/(marketing)/instant-merch/InstantMerchLanding.tsx'
         >
           <MarketingContainer width='page'>
             <div className='mx-auto max-w-3xl text-center'>
@@ -153,6 +157,8 @@ export function InstantMerchLanding() {
           aria-labelledby='instant-merch-details-heading'
           className='bg-panel py-16 sm:py-20'
           data-testid='marketing-section-feature-grid'
+          data-marketing-variant='two-column-text'
+          data-marketing-owner='apps/web/app/(marketing)/instant-merch/InstantMerchLanding.tsx'
         >
           <MarketingContainer width='page'>
             <div className='mx-auto max-w-3xl'>
@@ -172,6 +178,8 @@ export function InstantMerchLanding() {
           aria-labelledby='instant-merch-cta-heading'
           className='py-16 sm:py-24'
           data-testid='marketing-section-cta'
+          data-marketing-variant='included-single'
+          data-marketing-owner='apps/web/app/(marketing)/instant-merch/InstantMerchLanding.tsx'
         >
           <MarketingContainer width='prose' className='text-center'>
             <h2

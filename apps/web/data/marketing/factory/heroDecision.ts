@@ -243,8 +243,8 @@ export const HERO_ROUTE_INTENTS: readonly HeroRouteIntent[] = [
   },
   {
     url: '/instant-merch',
-    input: { useCase: 'two-actions', actionCount: 2 },
-    why: 'create merch plus see the flow',
+    input: { useCase: 'aha-capture', captureId: 'chat-merch-option-card' },
+    why: 'hero mounts the merch review carousel as the aha capture',
   },
   {
     url: '/youtube-thumbnails',
@@ -263,8 +263,8 @@ export const HERO_ROUTE_INTENTS: readonly HeroRouteIntent[] = [
   },
   {
     url: '/smart-links',
-    input: { useCase: 'two-actions', actionCount: 2 },
-    why: 'primary and secondary buttons',
+    input: { useCase: 'aha-capture', captureId: 'smart-links-demo' },
+    why: 'hero mounts the live smart-link dial as the aha capture',
   },
   {
     url: '/launch',
