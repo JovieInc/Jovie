@@ -33,7 +33,7 @@ const CONTEXT: DogfoodMissionContext = {
 };
 
 function receipt(overrides: Partial<DogfoodReceipt> = {}): DogfoodReceipt {
-  return buildDogfoodReceipt({
+  const input = {
     actor: 'summer',
     commitSha: COMMIT_SHA,
     completedAt: COMPLETED,
@@ -48,6 +48,35 @@ function receipt(overrides: Partial<DogfoodReceipt> = {}): DogfoodReceipt {
     startedAt: STARTED,
     subjectId: 'jov:smart-link',
     ...overrides,
+  } as const;
+  return buildDogfoodReceipt({
+    ...input,
+    evidenceRefs: ['artifact:result-state'],
+    missionObservation: {
+      purpose: 'capability',
+      method: 'goal_driven',
+      missionRevision: 1,
+      goalCompletion: 'completed',
+      correctness: 'correct',
+      resultingState: 'The intended result persists after a fresh read.',
+      checks: [
+        {
+          criterion: 'saved result',
+          status: 'passed',
+          evidenceRefs: ['artifact:result-state'],
+        },
+      ],
+      friction: { assessment: 'acceptable', details: [] },
+      recovery: { retries: 0, details: [] },
+      durationMs: Date.parse(input.completedAt) - Date.parse(input.startedAt),
+      resources: {
+        status: 'not_applicable',
+        reason: 'No metered service used.',
+      },
+    },
+    ...('missionObservation' in overrides
+      ? { missionObservation: overrides.missionObservation }
+      : {}),
   });
 }
 
@@ -188,6 +217,11 @@ describe('dogfoodReceiptFromCommandRun', () => {
     expect(result.driver).toBe('cli');
     expect(result.outcome).toBe('passed');
     expect(result.invocation?.latencyMs).toBe(60_000);
+    expect(
+      evaluateDogfoodReliability([result, result, result], CONTEXT, [
+        CONTEXT.missionId,
+      ]).machineCertifiable
+    ).toBe(false);
   });
 
   it('maps a nonzero exit to failed and a missing exit to blocked', () => {
@@ -216,6 +250,11 @@ describe('dogfoodReceiptFromIosReport', () => {
     expect(result.outcome).toBe('passed');
     expect(result.commitSha).toBe(COMMIT_SHA);
     expect(result.evidenceRefs).toContain('report.json');
+    expect(
+      evaluateDogfoodReliability([result, result, result], CONTEXT, [
+        CONTEXT.missionId,
+      ]).machineCertifiable
+    ).toBe(false);
   });
 
   it('maps fail to failed and inconclusive to blocked', () => {
@@ -339,10 +378,10 @@ describe('evaluateDogfoodReliability', () => {
     expect(evaluation.missions[0]?.reliableAgents).toEqual([]);
   });
 
-  it('does not require optional missions for machineCertifiable', () => {
+  it('does not certify without a required outcome mission', () => {
     const evaluation = evaluateDogfoodReliability([], binding, [
       { id: 'optional-mission', required: false },
     ]);
-    expect(evaluation.machineCertifiable).toBe(true);
+    expect(evaluation.machineCertifiable).toBe(false);
   });
 });

@@ -7,6 +7,7 @@ import {
   INPUT_MATRIX,
   INPUT_SCHEMA,
   inputCells,
+  isMissingDeviceEvidence,
   semanticFindings,
   transitionFindings,
 } from './browser-owned-input.mjs';
@@ -394,6 +395,25 @@ test('certification and screen-audit both block a green resting profile lacking 
   assert.ok(
     findings.some(
       f => f.includes('browser-owned-input') && f.includes('UNKNOWN')
+    )
+  );
+  assert.ok(
+    findings
+      .filter(f => f.startsWith('browser-owned-input'))
+      .every(isMissingDeviceEvidence)
+  );
+  const duplicated = browserInputFindings(
+    {
+      records: [
+        { cellId: 'get-updates/android-chrome/android-current-portrait' },
+        { cellId: 'get-updates/android-chrome/android-current-portrait' },
+      ],
+    },
+    { screenId, headSha: HEAD }
+  );
+  assert.ok(
+    duplicated.some(
+      f => f.includes(': BLOCKED:') && !isMissingDeviceEvidence(f)
     )
   );
   const ledger = auditScreens({
