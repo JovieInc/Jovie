@@ -251,7 +251,7 @@ describe('merge-group tree fetch depth', () => {
       .join('\n');
   }
 
-  function runFetch({ presentAfterDepth2 }) {
+  function runFetch() {
     const root = mkdtempSync(join(tmpdir(), 'size-tree-fetch-'));
     const bin = join(root, 'bin');
     mkdirSync(join(root, 'scripts/lib'), { recursive: true });
@@ -262,13 +262,6 @@ describe('merge-group tree fetch depth', () => {
     const git = `#!/bin/bash
 set -eu
 printf '%s\\n' "$*" >> "$CALL_LOG"
-if [[ "$1" == cat-file ]]; then
-  if [[ -f "$ROOT/have-commit" ]]; then exit 0; fi
-  exit 1
-fi
-if [[ "$*" == *--depth=2* ]]; then
-  if [[ "$PRESENT_AFTER_DEPTH_2" == 1 ]]; then touch "$ROOT/have-commit"; fi
-fi
 exit 0
 `;
     writeFileSync(join(bin, 'git'), git);
@@ -292,8 +285,6 @@ exit 0
           GROUP_BASE: 'b'.repeat(40),
           MERGE_GROUP_POLICY_CACHE_DIR: join(root, 'cache'),
           CALL_LOG: log,
-          ROOT: root,
-          PRESENT_AFTER_DEPTH_2: presentAfterDepth2 ? '1' : '0',
         },
       });
       let calls = '';
@@ -306,17 +297,17 @@ exit 0
     }
   }
 
-  it('does not cat-file the group commit before measuring bytes', () => {
-    const ran = runFetch({ presentAfterDepth2: true });
-    expect(ran.result.status, ran.result.stderr).toBe(0);
-    expect(ran.calls).toContain(
-      'fetch --refetch --filter=blob:limit=1g --no-tags --depth=2 origin'
+  it('fetches blob bytes at depth 2 even when the commit object is already local', () => {
+    const landed = runFetch();
+    expect(landed.result.status, landed.result.stderr).toBe(0);
+    expect(landed.calls).toContain(
+      'fetch --refetch --filter=blob:limit=1g --no-tags --depth=2 origin ' +
+        'a'.repeat(40)
     );
-    expect(ran.calls).toContain(
+    expect(landed.calls).not.toContain('--depth=64');
+    expect(landed.calls).not.toContain('blob:none');
+    expect(landed.calls).toContain(
       'node scripts/lib/merge-group-local-evidence.mjs'
     );
-    expect(ran.calls).not.toContain('--depth=64');
-    expect(ran.calls).not.toContain('cat-file');
-    expect(ran.calls).not.toContain('blob:none');
   });
 });

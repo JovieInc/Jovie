@@ -2607,7 +2607,8 @@ ${selectedGateScript}`,
     expect(coalesce).not.toContain('sleep "$wait_seconds"');
     expect(coalesce).not.toContain('sleep 60');
     // Event source: exact main only; the merge queue is not read.
-    expect(coalesce).toContain('commits/main');
+    expect(coalesce).toContain('resolve-main-sha.sh');
+    expect(coalesce).not.toContain('commits/main');
     expect(coalesce).not.toContain('mergeQueue(branch: "main")');
     expect(coalesce).toContain(
       'record_receipt "proceed" "exact SHA is current"'
@@ -3015,6 +3016,8 @@ ${selectedGateScript}`,
     expect(sizeGuard).toContain(
       'node scripts/lib/merge-group-member-policy.mjs --policy=size'
     );
+    expect(sizeGuard).toContain('--filter=blob:limit=1g');
+    expect(sizeGuard).not.toContain('--filter=blob:none');
     expect(MEMBER_POLICY).toContain('await enforceCombinedTreePayload({');
     expect(MEMBER_POLICY).toContain('/git/trees/${treeSha}?recursive=1');
     expect(MEMBER_POLICY).not.toContain("from 'node:child_process'");
