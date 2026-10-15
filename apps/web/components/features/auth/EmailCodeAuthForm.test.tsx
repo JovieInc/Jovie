@@ -88,7 +88,7 @@ describe('EmailCodeAuthForm', () => {
     'artist..name@example.com',
   ])('rejects %s accessibly before requesting an OTP', async email => {
     renderForm();
-    const input = screen.getByRole('textbox', { name: 'Email', exact: true });
+    const input = screen.getByRole('textbox', { name: 'Email' });
     fireEvent.change(input, { target: { value: email } });
     fireEvent.submit(input.closest('form') as HTMLFormElement);
 
@@ -111,7 +111,7 @@ describe('EmailCodeAuthForm', () => {
       error: null,
     });
     renderForm();
-    const input = screen.getByRole('textbox', { name: 'Email', exact: true });
+    const input = screen.getByRole('textbox', { name: 'Email' });
     const form = input.closest('form') as HTMLFormElement;
     fireEvent.change(input, { target: { value: '<script>@example.com' } });
     fireEvent.submit(form);
