@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import { CHARTMETRIC_SCHEMA_SNAPSHOT } from './chartmetric-endpoints';
 import type { CatalogEntry, ParityRow } from './types';
 
@@ -33,7 +34,8 @@ export function matchesTarget(
     return (
       row?.vendor === entry.vendor &&
       row.capability === entry.capability &&
-      row.docUrl === entry.docUrl
+      row.docUrl === entry.docUrl &&
+      isDeepStrictEqual(row.contract, entry.contract)
     );
   });
 }
