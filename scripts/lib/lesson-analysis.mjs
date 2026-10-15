@@ -17,6 +17,7 @@ import {
   excludeGeneratorFamily,
   JUDGE_INDEPENDENCE_POLICY_VERSION,
 } from '../../packages/copy/judge.ts';
+import { canonical } from './canonical-json.mjs';
 
 // Use the canonical contract package's pinned schema dependency.
 const { z } = await import(
@@ -184,7 +185,7 @@ const certificationSchema = z.strictObject({
   validUntil: z.iso.datetime({ offset: true }),
 });
 const digest = value =>
-  createHash('sha256').update(JSON.stringify(value)).digest('hex');
+  createHash('sha256').update(canonical(value)).digest('hex');
 const sameBinding = (a, b) =>
   ['tenantId', 'productId', 'cohortId'].every(key => a[key] === b[key]);
 

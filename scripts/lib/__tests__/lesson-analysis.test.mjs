@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { describe, it } from 'node:test';
 import { sealWorkOrder } from '../../../packages/agent-transport-contracts/work-order.ts';
+import { canonical } from '../canonical-json.mjs';
 import { runLessonAnalysis } from '../lesson-analysis.mjs';
 
 const NOW = Date.parse('2026-10-15T18:00:00Z');
@@ -14,7 +15,7 @@ const BINDING = {
   cohortId: 'shipping',
 };
 const hash = value =>
-  createHash('sha256').update(JSON.stringify(value)).digest('hex');
+  createHash('sha256').update(canonical(value)).digest('hex');
 const claim = (statement, refs = ['signal']) => ({
   statement,
   evidenceRefs: refs.map(value => REF + value),
@@ -275,6 +276,17 @@ async function run(f) {
 }
 
 describe('admitted bounded lesson analysis', () => {
+  it('uses canonical tuple bindings regardless of receipt key order', async () => {
+    const f = fixture();
+    const certify = f.environment.certify;
+    f.environment.certify = row => ({
+      ...certify(row),
+      tupleDigest: hash(
+        Object.fromEntries(Object.entries(row.tuple).reverse())
+      ),
+    });
+    assert.equal((await run(f)).disposition, 'target');
+  });
   it('reconstructs attempts, dispatches canonical orders, and records exact certified independent routes', async () => {
     const f = fixture();
     const result = await run(f);
