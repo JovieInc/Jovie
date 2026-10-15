@@ -301,21 +301,22 @@ HOUSE VOICE: ${options.voice}`;
       validateResearch
     ));
   validateResearch(research);
+  const locks = previous?.locks ?? [];
   const review = await stage<Review>(
     'adversarial review and thesis revision',
     '{symmetryTest:{namelessCase,rule,result},strongestCounterargument,thesis,revisionReason}',
     {
       plan,
       research,
+      locks,
       feedback: options.feedback ?? '',
       instruction:
-        'Act as a skeptical editor. Challenge the provisional thesis. Symmetry is a consistency test, not a demand to treat materially different cases as equivalent. Say explicitly why the final thesis changes or survives.',
+        'Act as a skeptical editor. Challenge the provisional thesis and any locked claims. Symmetry is a consistency test, not a demand to treat materially different cases as equivalent. Say explicitly why the final thesis changes or survives. Keep thesis and revision reason about the substantive argument; omit model workflow, validation and lock-mechanics notes.',
     },
     false,
     validateReview
   );
   validateReview(review);
-  const locks = previous?.locks ?? [];
   const proposed = await stage<Draft>(
     'essay and spoken script with repaired transitions',
     '{title,essay:"exploratory essay with [C1] citations",spoken:[{id:"B1",text,claimIds:["C1"]}],broll:string[]}',

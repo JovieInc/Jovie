@@ -1,5 +1,5 @@
-import { type CopyLintResult, lintCopy } from './lint.js';
-import type { CopyRegister } from './rules.js';
+import { type CopyLintResult, lintCopy } from './lint.ts';
+import type { CopyRegister } from './rules.ts';
 
 /**
  * Stakes tiers. Judge spend scales with how often the text runs and how much

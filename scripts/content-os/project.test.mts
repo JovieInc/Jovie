@@ -171,6 +171,9 @@ test('locks survive two regenerations byte-for-byte while unlocked transitions c
     assert.ok(
       requests[1].prompt.includes(JSON.stringify(current.locks[0].text))
     );
+    assert.ok(
+      requests[0].prompt.includes(JSON.stringify(current.locks[0].text))
+    );
     assert.ok(requests.every(request => !request.webSearch));
   }
   assert.equal(setLock(current, 'B2', false).locks.length, 0);

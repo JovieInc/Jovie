@@ -36,7 +36,8 @@ export async function runContentCli(
   } = {}
 ): Promise<number> {
   const out =
-    dependencies.stdout ?? (text => process.stdout.write(`${text}\n`));
+    dependencies.stdout ??
+    (text => process.stdout.write(text.endsWith('\n') ? text : `${text}\n`));
   const err =
     dependencies.stderr ?? (text => process.stderr.write(`${text}\n`));
   try {

@@ -11,7 +11,7 @@ import {
   type GatewayRequestPolicy,
   gatewayTransport,
   type JudgeTransport,
-} from './judge.js';
+} from './judge.ts';
 
 // Subscription CLIs carry frontier judges; the gateway carries allowlisted ones.
 // Codex now ships inside ChatGPT.app; env overrides win, then the bundled CLI, then PATH.

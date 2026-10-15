@@ -5,6 +5,8 @@ research and script package for Tim's line-by-line feedback. It uses the existin
 authenticated Codex subscription transport; no new service or API key is needed.
 Use the repository's pinned Node and pnpm versions and an authenticated `codex`.
 
+The [first real episode and lock/regenerate receipt](dogfood/README.md) are checked in.
+
 ```sh
 pnpm jovie script "Why do people selectively apply moral standards?"
 pnpm jovie script --input ./voice-note.txt --output ./my-episode
@@ -50,6 +52,9 @@ fails the integrity check; restore the log from its last complete saved copy.
 Projects default to `content-projects/<uuid>`. Keep private ideas outside the repo
 or exclude their output directory from version control.
 
+EVENT: Content OS references the global `character:tim-white` identity; project
+generation cannot invent a local Tim persona or wardrobe.
+
 Global identity resolves through [content-os.json](../../canon/content-os.json),
 which pins the existing Ops Tim White canon. It contains no locally invented Tim
 persona. The wardrobe collection is globally referenced and bounded to seven
@@ -80,6 +85,7 @@ Verification:
 
 ```sh
 node --import tsx --test --test-isolation=none --experimental-test-coverage --test-coverage-include='scripts/content-os/*.mts' scripts/content-os/project.test.mts
+pnpm --filter @jovie/copy exec vitest run transport.test.ts judge.test.ts
 pnpm run typecheck:scripts
 ```
 
