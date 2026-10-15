@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -37,6 +38,18 @@ const loadDefaultPairs = () =>
  */
 
 describe('computed contrast gate — WCAG AA on design tokens', () => {
+  it('loads the contrast CLI under tsx cjs output', () => {
+    const result = spawnSync(
+      process.execPath,
+      ['--import', 'tsx', join(WEB_ROOT, 'scripts/lint-contrast-computed.ts')],
+      { cwd: WEB_ROOT, encoding: 'utf8', timeout: 30_000 }
+    );
+    const stderr = result.stderr ?? '';
+    expect(stderr).not.toContain('Top-level await');
+    expect(stderr).not.toContain('Transform failed');
+    expect(result.status, `${result.stdout ?? ''}\n${stderr}`).toBe(0);
+  });
+
   it('blocks new debt or coverage loss across generated text, state and status pairs', async () => {
     const { errors, warnings } = await loadContrastGate(WEB_ROOT);
     expect(warnings, 'Every pair must be measured').toEqual([]);
