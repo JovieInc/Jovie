@@ -25,10 +25,15 @@ SPEC = importlib.util.spec_from_file_location("worktree_sweep", ROOT / "scripts/
 sweeper = importlib.util.module_from_spec(SPEC)
 sys.modules["worktree_sweep"] = sweeper
 SPEC.loader.exec_module(sweeper)
+import git_housekeeping  # noqa: E402  (sweeper puts scripts/lanes on sys.path)
+
+git_housekeeping.install_process_fixture_env()
+git_housekeeping.install_isolated_tempdirs()
 
 DAY = 86400.0
-GIT_ENV = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.com", "GIT_COMMITTER_NAME": "t",
-           "GIT_COMMITTER_EMAIL": "t@example.com", "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1"}
+GIT_ENV = git_housekeeping.apply_fixture_env(
+    {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.com", "GIT_COMMITTER_NAME": "t",
+     "GIT_COMMITTER_EMAIL": "t@example.com", "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1"})
 
 
 def git(cwd, *args):

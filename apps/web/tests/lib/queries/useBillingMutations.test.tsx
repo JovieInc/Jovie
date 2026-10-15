@@ -98,7 +98,10 @@ describe('useBillingMutations', () => {
             headers: expect.objectContaining({
               'Content-Type': 'application/json',
             }),
-            body: JSON.stringify({ priceId: 'price_pro_yearly' }),
+            body: JSON.stringify({
+              priceId: 'price_pro_yearly',
+              humanConfirmed: true,
+            }),
           })
         );
       });

@@ -53,19 +53,17 @@ PR Size Guard member policy, are budgeted in their own scripts.
 token-bearing step with its per-group cost. A new one fails that test until it
 is classified, and the green-group total must stay at 5 or less.
 
-### Fail-fast ejection
+### Red lanes do not rebuild the queue
 
-A merge-group `PR Ready` waits for its slowest lane, so a failed group used to
-report at about 7 minutes even when its first lane failed at about 3, and every
-group behind it kept building on a dead base. Each lane listed in
-`scripts/lib/__tests__/merge-group-fail-fast.test.mjs` ends with one
-`failure() && merge_group` step that posts a failing `PR Ready` commit status
-on the exact combined head. GitHub ejects the entry and rebuilds the groups
-behind it right away. That is one API call per failed lane and none per green
-group. The run itself still finishes, so the failure hold classifies the
-complete terminal run as before. The status only ever reports `failure`. It
-grants nothing a queued head could not already request, because
-`merge_group` workflow definitions come from the synthetic head.
+A failed merge-group lane used to post a failing `PR Ready` commit status
+immediately (`ejected before the slowest lane`). GitHub ejected that entry and
+rebuilt every group behind it. Each rebuild ran PR Size Guard and Merge Group
+Admission again on the shared GITHUB_TOKEN bucket (1,000 REST calls/hour),
+which is what exhausted the quota before the hourly reset. A red lane no longer
+posts that status. `ci-merge-group-ready` still runs with `always()` and fails
+`PR Ready` when the group is actually red, so the entry is ejected once, after
+the lanes already in flight finish. No job in `ci.yml` holds `statuses: write`.
+`scripts/lib/__tests__/merge-group-fail-fast.test.mjs` locks that.
 
 Preview, Neon, E2E, Lighthouse, a11y, Storybook, golden-path, and extended-smoke
 lanes are hosted manual, scheduled, repository-event, or post-merge work. They

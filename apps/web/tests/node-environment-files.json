@@ -87,6 +87,7 @@
   "lib/auth/profile-access.test.ts",
   "lib/auth/provision.test.ts",
   "lib/auth/sentry-rate-limit.test.ts",
+  "lib/billing/commerce/",
   "lib/billing/offer-truth.test.ts",
   "lib/blob-config.test.ts",
   "lib/cache/profile.test.ts",
