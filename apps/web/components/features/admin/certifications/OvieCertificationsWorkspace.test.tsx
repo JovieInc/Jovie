@@ -102,6 +102,71 @@ describe('OvieCertificationsWorkspace', () => {
     vi.setSystemTime(new Date(FIXTURE_NOW));
   });
 
+  it.each(['url', 'entry'])(
+    'opens a focused domain view from %s using the canonical table',
+    source => {
+      vi.spyOn(navigation, 'useSearchParams').mockReturnValue(
+        new URLSearchParams(
+          source === 'url' ? 'domain=public_profiles' : ''
+        ) as ReturnType<typeof navigation.useSearchParams>
+      );
+      mockQuery({ data: fixtureInventory() });
+      render(
+        <OvieCertificationsWorkspace
+          initialDomain={source === 'entry' ? 'public_profiles' : 'all'}
+        />
+      );
+      expect(screen.getByText('Public Profile')).toBeInTheDocument();
+      expect(
+        screen.queryByText('Flow signup-golden-path')
+      ).not.toBeInTheDocument();
+    }
+  );
+
+  it('filters owner and blockers together and clears all filters', async () => {
+    const inventory = fixtureInventory();
+    mockQuery({
+      data: {
+        ...inventory,
+        rows: inventory.rows.map((row, index) => ({
+          ...row,
+          owner: index === 0 ? 'Summer' : null,
+        })),
+      },
+    });
+    render(<OvieCertificationsWorkspace />);
+    fireEvent.pointerDown(
+      screen.getByRole('button', { name: 'Certification Filters' }),
+      { button: 0, ctrlKey: false }
+    );
+    fireEvent.click(
+      await screen.findByRole('menuitemradio', { name: 'Summer' })
+    );
+    expect(screen.getByText('Flow signup-golden-path')).toBeInTheDocument();
+    expect(screen.queryByText('Flow claim-profile')).not.toBeInTheDocument();
+    fireEvent.pointerDown(
+      screen.getByRole('button', { name: 'Certification Filters' }),
+      { button: 0, ctrlKey: false }
+    );
+    fireEvent.click(
+      await screen.findByRole('menuitemradio', { name: 'Current Revision' })
+    );
+    expect(screen.getByText('Flow signup-golden-path')).toBeInTheDocument();
+    fireEvent.pointerDown(
+      screen.getByRole('button', { name: 'Certification Filters' }),
+      { button: 0, ctrlKey: false }
+    );
+    fireEvent.click(
+      await screen.findByRole('menuitemradio', { name: 'Has Blockers' })
+    );
+    expect(
+      screen.getByText('No items match these filters')
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Clear Filters' }));
+    expect(screen.getByText('Flow signup-golden-path')).toBeInTheDocument();
+    expect(screen.getByText('Flow claim-profile')).toBeInTheDocument();
+  });
+
   it('keeps the live detail rail stable when its host renders the registered panel', async () => {
     const actual = await vi.importActual<
       typeof import('@/hooks/useRegisterRightPanel')

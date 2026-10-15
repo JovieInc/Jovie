@@ -124,6 +124,16 @@ export const ACTION_BUTTON_MOBILE_HIT_TARGET_PX = 44;
 export const ACTION_BUTTON_LABEL_WEIGHT = 510;
 export const ACTION_BUTTON_RADIUS_PX = 999;
 
+/** Controlled operation truth. Presentation never manufactures completion. */
+export type ButtonActionState = 'error' | 'idle' | 'pending' | 'success';
+
+export interface ButtonStateLabels {
+  readonly error: string;
+  readonly pending: string;
+  readonly retry: string;
+  readonly success: string;
+}
+
 /** Semantic CTAs share the canonical 28px control with a 44px mobile hit. */
 export const CTA_BUTTON_SIZE = 'marketing' as const satisfies ButtonSize;
 

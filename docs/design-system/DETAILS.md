@@ -728,6 +728,62 @@ duration token (subtle, cinematic, and raw scale) drops to 0ms automatically.
 
 ---
 
+## pill-state-continuity
+
+The Button pilot is functional feedback under the existing motion policy.
+`pendingPresentation="morph"` opts text pills into a controlled
+`actionState="idle|pending|success|error"`; existing `loading` also supplies
+pending. Default buttons, Slot links and IconButton retain their presentation.
+`stateLabels` supplies localized pending, success, error and retry messages.
+
+| Transition | Purpose and geometry | Tokens | Suppressed motion |
+| --- | --- | --- | --- |
+| Idle → pending | Fade the label first; converge both round caps on the slot center. Center fill compresses independently; glyphs never scale. Final face is exactly 28×28 CSS px. | `--duration-fast` label/delay, `--duration-subtle` travel, `--ease-in-out` travel, `--ease-subtle` opacity | Keyboard: immediate substitution. Reduce Motion: centralized zero-duration tokens; static spinner ring. |
+| Pending → success | Replace the spinner with an opacity-only check; keep the circle when the destination replaces the action. | `--duration-subtle`, `--ease-subtle` | Immediate check; no bounce or re-expansion. |
+| Pending → error → retry | Reopen the same pill, expose Retry, announce the failure and keep native keyboard activation. | `--duration-subtle`, `--ease-in-out`; `--duration-fast` label | Immediate replacement in the same slot. |
+| Any → idle/new pending | Interrupt and retarget CSS transitions from their current paint. No completion or minimum progress timer. | Same tokens | Immediate substitution. |
+
+The native button reserves the larger idle/retry label footprint and an actual
+44px minimum hit container. Its focus ring stays on that container. A full-width
+CTA reserves its responsive width in every state; only the cap and fill transforms
+change. Labels truncate visually within narrow slots while retaining their full
+accessible name. Browser zoom scales the entire CSS geometry together.
+Round caps reuse variant fills; the three paint pieces omit inset shadows and
+border strokes to avoid internal seams. This opt-in presentation does not claim
+an existing idle Pen master; promotion needs the existing Pen owner's readback.
+
+Pending is semantic immediately and blocks repeat activation without disabling
+the focused native button. Only spinner presentation waits one resolved
+`--duration-subtle` token; dispatch never waits. One sibling live region owns
+loading/complete/error messages; spinner and painted labels are hidden from
+assistive technology. Do not add a toast announcing the same status.
+
+The caller owns authoritative operation truth and stale-result rejection. The
+production pilot is the text `CopyToClipboardButton`: `useClipboard` sets real
+pending immediately, locks duplicate writes and uses a generation guard for
+reset/new-request/unmount. Success stays a check until the next activation;
+failure remains an explicit Retry. Icon-only clipboard controls retain their
+current presentation. No success is inferred from elapsed time.
+
+Preview: `shadcn/Button → Pill State Choreography` exposes manual resolve/reject/
+reset inputs, plus `Action State Matrix` covers static states. The production
+component is also available at `Dashboard/Molecules/CopyToClipboardButton`.
+Vitest exercises semantics, timers and stale requests; the Storybook Playwright
+spec samples painted intermediate caps, centering, focus and stable bounds in
+both themes, RTL, narrow full-width slots and 200% scale. These local proofs are
+not production or physical Mobile Safari certification; [JOV-8394](https://linear.app/jovie/issue/JOV-8394)
+tracks those receipts through JOV-7713 and the coordinated Pen readback.
+[JOV-8395](https://linear.app/jovie/issue/JOV-8395) tracks the remaining family
+vocabulary after pilot acceptance. Expansion remains with the approved family
+owners, including JOV-8179 for segmented selection and JOV-8182 for tooltips.
+
+**Ship now:** opt-in Button and one truthful clipboard pilot. **Re-evaluate
+when:** JOV-7713 records production quality acceptance. **Then:** adopt the
+accepted family contracts in their existing owners; keep chat-motion and shell
+RailMotion as their current sources of truth.
+
+---
+
 ## App IA & Page Scaffold
 
 The authenticated product has one shell and one reviewed default navigation.

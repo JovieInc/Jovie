@@ -1,0 +1,66 @@
+name: Shipping Origin Receipt
+
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: Remote publishers cannot append to the host ledger; a founder-authenticated read-only workflow retains minimal origin data for the existing host tick without executing PR code or granting merge authority.
+# removal-trigger: Remove this transport when the existing publication boundary can deliver authenticated exact-head origin data directly to the canonical host ledger.
+
+# Data-only founder publication handoff, including independently run agents.
+# This workflow cannot execute PR code, write source, review, dispatch work or merge.
+on:
+  workflow_dispatch:
+    inputs:
+      payload:
+        description: 'Minimal origin JSON: repository, pr, headSha, method, initiator and evidenced metadata'
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  receipt:
+    if: github.ref == 'refs/heads/main' && github.actor == 'itstimwhite'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          sparse-checkout: scripts/lanes
+      - name: Generate read-only receipt token for both reporting repositories
+        id: read-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          owner: JovieInc
+          repositories: |
+            Jovie
+            LogYourBody
+          permission-contents: read
+          permission-pull-requests: read
+      - name: Validate exact publication handoff
+        env:
+          GH_TOKEN: ${{ steps.read-token.outputs.token }}
+          ORIGIN_PAYLOAD: ${{ inputs.payload }}
+        run: |
+          python3 - <<'PY'
+          import os, sys
+          sys.path.insert(0, 'scripts')
+          from shipping_origin import HANDOFF_METHODS, decode_payload, emit, validate_payload
+          payload = decode_payload(os.environ['ORIGIN_PAYLOAD'])
+          validate_payload(payload)
+          if payload['method'] not in HANDOFF_METHODS or not payload.get('linearIssue'):
+              raise ValueError('origin-handoff-requires-method-and-linear-issue')
+          emit(payload, os.environ['RUNNER_TEMP'] + '/shipping-origin')
+          PY
+      - name: Retain immutable origin payload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: shipping-origin-v1
+          path: ${{ runner.temp }}/shipping-origin/*.json
+          if-no-files-found: error
+          retention-days: 30
