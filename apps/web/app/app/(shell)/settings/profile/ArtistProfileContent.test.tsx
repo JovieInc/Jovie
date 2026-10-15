@@ -265,6 +265,12 @@ describe('ArtistProfileContent', () => {
       name: 'Open Links And Music Preview Panel',
     });
     expect(mobileProfileTrigger).toHaveClass('min-h-16', 'lg:hidden');
+    expect(mobileProfileTrigger).toHaveAttribute('data-rail-toggle', 'right');
+    expect(mobileProfileTrigger).toHaveAttribute(
+      'aria-controls',
+      'shell-artist-profile-rail'
+    );
+    expect(mobileProfileTrigger).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(mobileProfileTrigger);
     expect(openPreview).toHaveBeenCalledOnce();
   });

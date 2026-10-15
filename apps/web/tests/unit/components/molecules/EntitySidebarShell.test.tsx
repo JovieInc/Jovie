@@ -33,6 +33,28 @@ vi.mock('@/components/molecules/drawer/RightDrawer', () => ({
 }));
 
 describe('EntitySidebarShell', () => {
+  it('keeps a mobile Close action when minimal mode hides desktop utilities', () => {
+    const onClose = vi.fn();
+    render(
+      <EntitySidebarShell
+        isOpen
+        ariaLabel='Profile Preview'
+        headerMode='minimal'
+        hideMinimalHeaderBar
+        onClose={onClose}
+      >
+        <div>Preview content</div>
+      </EntitySidebarShell>
+    );
+
+    const close = screen.getByRole('button', { name: 'Close', exact: true });
+    fireEvent.click(close);
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(close.closest('[data-testid="entity-header"]')).toHaveClass(
+      'lg:hidden'
+    );
+  });
+
   it('derives the existing close handler into the drawer keyboard path', () => {
     const onClose = vi.fn();
 

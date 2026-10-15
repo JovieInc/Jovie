@@ -20,12 +20,16 @@ import type { ArtistRuleView } from '@/lib/artist-rules/types';
 import { SettingsRiderSection } from './SettingsRiderSection';
 
 function MobileProfilePanelTrigger() {
-  const { open } = usePreviewPanelState();
+  const { isOpen, open } = usePreviewPanelState();
 
   return (
     <Button
       onClick={open}
       aria-label='Open Links And Music Preview Panel'
+      aria-controls='shell-artist-profile-rail'
+      aria-expanded={isOpen}
+      data-rail-toggle='right'
+      data-rail-preview-trigger='false'
       variant='secondary'
       className='h-auto min-h-16 w-full justify-between px-3 py-3 text-left lg:hidden'
     >

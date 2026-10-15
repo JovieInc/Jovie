@@ -9,7 +9,7 @@ test.use({
   trace: 'off',
 });
 
-async function enterProfileSettings(page: Page) {
+async function enterProfileSettings(page: Page, desktop = true) {
   await page.goto(
     `/api/dev/test-auth/enter?persona=creator-ready&redirect=${encodeURIComponent(APP_ROUTES.SETTINGS_PROFILE)}`,
     { waitUntil: 'domcontentloaded' }
@@ -20,6 +20,7 @@ async function enterProfileSettings(page: Page) {
   ).toHaveCount(1);
   await expect(page.getByTestId('settings-shell-content')).toBeVisible();
   await expect(page.locator('#displayName')).toBeVisible();
+  if (!desktop) return;
   await expect(page.locator('#shell-artist-profile-rail')).toHaveAttribute(
     'aria-hidden',
     'false'
@@ -328,7 +329,195 @@ test('Profile companion leaves one centered usable settings pane', async ({
   await assertOpenPane(page, testInfo, 'initial');
 });
 
-for (const width of [1024, 1100, 1280, 1440]) {
+async function assertMobileEditorAvailable(page: Page) {
+  const rail = page.locator('#shell-artist-profile-rail');
+  await expect(rail).toHaveAttribute('aria-hidden', 'true');
+  await expect(rail).toHaveAttribute('data-rail-phase', 'closed');
+  const opener = page.getByRole('button', {
+    name: 'Open Links And Music Preview Panel',
+  });
+  await expect(opener).toHaveCount(1);
+  await opener.click({ trial: true });
+  const field = page.locator('#displayName');
+  await field.click();
+  await expect(field).toBeFocused();
+  // A ready document alone does not prove the opener's mount effect has run.
+  // Keep the field focused through a bounded idle window and late renders.
+  await page.evaluate(
+    () =>
+      new Promise<void>(resolve => {
+        let frames = 0;
+        const sample = () => {
+          if (++frames >= 120) resolve();
+          else requestAnimationFrame(sample);
+        };
+        requestAnimationFrame(sample);
+      })
+  );
+  await expect(field).toBeFocused();
+  await expect(
+    page.getByRole('dialog', { name: 'Profile Preview' })
+  ).toHaveCount(0);
+  await expect(rail).toHaveAttribute('aria-hidden', 'true');
+  expect(
+    await field.evaluate(element => {
+      const rect = element.getBoundingClientRect();
+      return (
+        document.elementFromPoint(
+          rect.left + rect.width / 2,
+          rect.top + rect.height / 2
+        ) === element
+      );
+    })
+  ).toBe(true);
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)
+  ).toBeLessThanOrEqual(1);
+}
+
+for (const width of [390, 768, 1023]) {
+  test(`${width}px mobile preview requires intent and restores the editor`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width, height: 900 });
+    await enterProfileSettings(page, false);
+    await assertMobileEditorAvailable(page);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await assertMobileEditorAvailable(page);
+    const field = page.locator('#displayName');
+    const originalValue = await field.inputValue();
+    const opener = page.getByRole('button', {
+      name: 'Open Links And Music Preview Panel',
+    });
+    const rail = page.locator('#shell-artist-profile-rail');
+    for (const dismissal of ['button', 'Escape'] as const) {
+      await opener.focus();
+      await opener.press('Enter');
+      const dialog = page.getByRole('dialog', { name: 'Profile Preview' });
+      await expect(dialog).toHaveCount(1);
+      await expect(dialog).toHaveAttribute('aria-modal', 'true');
+      await expect(rail).toHaveAttribute('data-rail-phase', 'open');
+      await expect
+        .poll(() =>
+          dialog.evaluate(element => element.contains(document.activeElement))
+        )
+        .toBe(true);
+      await page.keyboard.press('Shift+Tab');
+      expect(
+        await dialog.evaluate(element =>
+          element.contains(document.activeElement)
+        )
+      ).toBe(true);
+      await page.keyboard.press('Tab');
+      expect(
+        await dialog.evaluate(element =>
+          element.contains(document.activeElement)
+        )
+      ).toBe(true);
+      expect(
+        await field.evaluate(element =>
+          Boolean(element.closest('[inert], [aria-hidden="true"]'))
+        )
+      ).toBe(true);
+      expect(
+        await dialog.evaluate(
+          element => element.scrollWidth - element.clientWidth
+        )
+      ).toBeLessThanOrEqual(1);
+      if (process.env.PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES !== 'false') {
+        await page.screenshot({
+          path: testInfo.outputPath(`mobile-${width}-${dismissal}.png`),
+        });
+      }
+      const close = dialog.getByRole('button', { name: 'Close', exact: true });
+      await expect(close).toBeVisible();
+      await close.click({ trial: true });
+      if (dismissal === 'button') await close.click();
+      else await page.keyboard.press('Escape');
+      await expect(rail).toHaveAttribute('data-rail-phase', 'closed');
+      await expect(dialog).toHaveCount(0);
+      await expect(opener).toBeFocused();
+      await assertMobileEditorAvailable(page);
+      await expect(field).toHaveValue(originalValue);
+    }
+  });
+}
+
+test('desktop companion does not become an unsolicited mobile modal on resize', async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await enterProfileSettings(page);
+  await assertOpenPane(page, testInfo, 'desktop-before-shrink');
+  const field = page.locator('#displayName');
+  await field.focus();
+  const transition = await page.evaluateHandle(() => {
+    const samples: { modal: boolean; focus: string | null }[] = [];
+    let frame = 0;
+    const sample = () => {
+      samples.push({
+        modal: Boolean(
+          document.querySelector(
+            '#shell-artist-profile-rail[role="dialog"][aria-modal="true"][aria-hidden="false"]'
+          )
+        ),
+        focus: document.activeElement?.id ?? null,
+      });
+      frame = requestAnimationFrame(sample);
+    };
+    sample();
+    return {
+      stop: () => {
+        cancelAnimationFrame(frame);
+        return samples;
+      },
+    };
+  });
+  for (const width of [1023, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(page.locator('#shell-artist-profile-rail')).toHaveAttribute(
+      'data-rail-phase',
+      'closed'
+    );
+    // Assert before any click/focus helper can repair a lost focus target.
+    await expect(field).toBeFocused();
+    await assertMobileEditorAvailable(page);
+  }
+  const samples = await transition.evaluate(observer => observer.stop());
+  await transition.dispose();
+  await testInfo.attach('responsive-modal-frames.json', {
+    body: JSON.stringify(samples),
+    contentType: 'application/json',
+  });
+  expect(
+    samples.some(sample => sample.modal),
+    'no painted unsolicited modal during resize'
+  ).toBe(false);
+  await page.setViewportSize({ width: 1024, height: 900 });
+  await expect(
+    page.getByRole('dialog', { name: 'Profile Preview' })
+  ).toHaveCount(0);
+  await expect(page.locator('#shell-artist-profile-rail')).toHaveAttribute(
+    'data-rail-phase',
+    'open'
+  );
+  await assertOpenPane(page, testInfo, 'desktop-after-grow');
+  const rail = page.locator('#shell-artist-profile-rail');
+  const railAction = rail.getByRole('button').first();
+  await expect(railAction).toBeVisible();
+  await railAction.focus();
+  expect(
+    await rail.evaluate(element => element.contains(document.activeElement))
+  ).toBe(true);
+  await page.setViewportSize({ width: 1023, height: 900 });
+  await expect(rail).toHaveAttribute('data-rail-phase', 'closed');
+  await expect(
+    page.getByRole('button', { name: 'Open Links And Music Preview Panel' })
+  ).toBeFocused();
+  await assertMobileEditorAvailable(page);
+});
+
+for (const width of [1024, 1025, 1100, 1280, 1440]) {
   for (const reducedMotion of ['no-preference', 'reduce'] as const) {
     test(`${width}px ${reducedMotion}: Profile pane closes, reopens and remains reachable`, async ({
       page,

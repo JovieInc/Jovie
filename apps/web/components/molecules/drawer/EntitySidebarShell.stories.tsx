@@ -27,3 +27,11 @@ export const Minimal: Story = {
     entityHeaderSurface: 'flat',
   },
 };
+
+export const MinimalWithMobileDismissal: Story = {
+  args: {
+    headerMode: 'minimal',
+    hideMinimalHeaderBar: true,
+    onClose: () => undefined,
+  },
+};
