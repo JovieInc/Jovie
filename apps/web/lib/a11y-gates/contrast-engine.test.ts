@@ -58,6 +58,32 @@ describe('sRGB contrast compositing', () => {
     );
     expect(result.ratio).toBeCloseTo(5.28082, 4);
   });
+  it('resolves a rebound foreground without renaming the pair', () => {
+    const result = checkPair(
+      {
+        name: 'paper',
+        fg: '--muted',
+        fgSource: '--fg',
+        bg: '--base',
+        minRatio: 4.5,
+      },
+      tables.light
+    );
+    expect(result.status).toBe('pass');
+    expect(result.ratio).toBeCloseTo(21, 4);
+    expect(
+      checkPair(
+        {
+          name: 'missing',
+          fg: '--muted',
+          fgSource: '--missing',
+          bg: '--base',
+          minRatio: 4.5,
+        },
+        tables.light
+      ).status
+    ).toBe('unresolvable');
+  });
   it('detects the chromatic row tint regression from JOV-7861', () => {
     const result = checkPair(
       { name: 'row', fg: '--muted', bg: '--chroma', minRatio: 4.5 },
