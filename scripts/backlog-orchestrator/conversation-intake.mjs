@@ -1,5 +1,11 @@
 import { createHash } from 'node:crypto';
 
+import {
+  classifyConversationRequest,
+  externalizeConversationRequest,
+  resumePrivateTask,
+} from './private-task.mjs';
+
 export const CONVERSATION_RECONCILIATION_SCHEMA =
   'conversation-issue-reconciliation/v1';
 export const SAFE_MERGE_THRESHOLD = 0.82;
@@ -139,11 +145,20 @@ export async function reconcileConversationRequest({
   stateId,
   client,
   dryRun = false,
+  privateTaskDirectory,
 }) {
+  const classification = classifyConversationRequest(request);
+  if (classification !== 'jovie')
+    return resumePrivateTask(request, {
+      directory: privateTaskDirectory,
+      dryRun,
+    });
+  if (!request.conversationReceipt?.id && !request.conversationReceipt?.url)
+    throw new Error('conversation receipt identity is required');
+  const key = receiptKey(request);
+  request = externalizeConversationRequest(request);
   if (!request?.title?.trim())
     throw new Error('conversation request title is required');
-  if (!request?.conversationReceipt?.url)
-    throw new Error('conversation receipt URL is required');
 
   const snapshot = await client.fetchTeamActiveIssueSnapshot(teamId);
   if (snapshot?.coverage?.complete !== true)
@@ -151,10 +166,11 @@ export async function reconcileConversationRequest({
 
   const matches = rankedMatches(request, snapshot.issues || []);
   const best = matches[0];
-  const key = receiptKey(request);
   const links = extractEvidenceLinks(request);
   const base = {
     schema: CONVERSATION_RECONCILIATION_SCHEMA,
+    classification,
+    externalization: 'sanitized',
     normalizedIntent: normalizeIntent(request.intent || request.title).join(
       ' '
     ),
