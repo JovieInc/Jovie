@@ -24,6 +24,33 @@ function runGit(args, cwd) {
   });
 }
 
+/**
+ * `git ls-tree -r -l <commit>`. Regular files (100644/100755) contribute their
+ * blob size. A malformed row returns null so the caller can fall back.
+ * @returns {{ bytes: number, files: number } | null}
+ */
+export function parseLsTreeLong(stdout) {
+  let bytes = 0;
+  let files = 0;
+  const lines = String(stdout ?? '').split('\n');
+  for (const line of lines) {
+    if (line.length === 0) continue;
+    const match = line.match(
+      /^(\d{6}) (blob|tree|commit) ([0-9a-f]{40})\s+(\d+|-)\t(.+)$/
+    );
+    if (!match) return null;
+    const [, mode, type, , size] = match;
+    if (mode !== '100644' && mode !== '100755') continue;
+    if (type !== 'blob' || size === '-') return null;
+    const length = Number(size);
+    if (!Number.isSafeInteger(length) || length < 0) return null;
+    bytes += length;
+    if (!Number.isSafeInteger(bytes)) return null;
+    files += 1;
+  }
+  return { bytes, files };
+}
+
 /** @returns {Array<{ filename: string, additions: number, deletions: number }> | null} */
 export function parseNumstatZ(stdout) {
   const files = [];
@@ -70,6 +97,7 @@ export function parseNumstatZ(stdout) {
  *   committerName: string,
  *   committerEmail: string,
  *   files: Array<{ filename: string, additions: number, deletions: number }> | null,
+ *   tracked: { bytes: number, files: number } | null,
  * }}
  */
 export function readLocalMergeGroupEvidence({
@@ -124,6 +152,12 @@ export function readLocalMergeGroupEvidence({
   } catch {
     files = null;
   }
+  let tracked = null;
+  try {
+    tracked = parseLsTreeLong(git(['ls-tree', '-r', '-l', headSha], cwd));
+  } catch {
+    tracked = null;
+  }
   return {
     baseSha,
     headSha,
@@ -133,6 +167,7 @@ export function readLocalMergeGroupEvidence({
     committerName,
     committerEmail,
     files,
+    tracked,
   };
 }
 

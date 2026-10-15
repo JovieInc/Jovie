@@ -13,6 +13,7 @@ import {
   linkEntityMentions,
 } from '@/lib/profile/entity-mentions';
 import { isPublicArtistMentionHref } from '@/lib/profile/opaque-internal-profile-handle';
+import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import {
   isPaymentSupportPlatform,
@@ -588,6 +589,23 @@ function buildLinkSections(
       id: `dsp-column-${fallback.platform}`,
       platform: fallback.platform,
       label: getPlatformLabel(fallback.platform),
+      url,
+    });
+  }
+
+  // ID-backed DSPs (Deezer, Tidal, YouTube Music, SoundCloud) have no social
+  // row and no URL column. The public listen strip is what profile text
+  // counts, so those canonical destinations belong here once.
+  for (const dsp of getCanonicalProfileDSPs(artist, socialLinks)) {
+    const key = normalizePlatformKey(dsp.key) ?? dsp.key;
+    if (!isDspPlatform(key) || seenPlatforms.has(key)) continue;
+    const url = sanitizePublicHref(dsp.url);
+    if (!url) continue;
+    seenPlatforms.add(key);
+    listenLinks.push({
+      id: `canonical-${key}`,
+      platform: dsp.key,
+      label: dsp.name,
       url,
     });
   }

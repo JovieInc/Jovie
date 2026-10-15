@@ -120,6 +120,27 @@ describe('frozen catalog denominator', () => {
 });
 
 describe('versioned target', () => {
+  it.each(['missing', 'changed'] as const)(
+    'rejects %s documented contract metadata',
+    async mutation => {
+      const target = buildCatalog();
+      const rows = materializeCatalog(target, await runParityProbes()).map(
+        row =>
+          row.contract
+            ? {
+                ...row,
+                contract:
+                  mutation === 'missing'
+                    ? undefined
+                    : { ...row.contract, queryParameters: ['invented'] },
+              }
+            : row
+      );
+      expect(matchesTarget(rows, target)).toBe(false);
+      expect(finishEvaluation(rows).exitCode).toBe(1);
+    }
+  );
+
   it('freezes the existing catalog and rejects documentation drift', async () => {
     const target = buildCatalog();
     expect(catalogHash(target)).toBe(PARITY_TARGET_SHA256);

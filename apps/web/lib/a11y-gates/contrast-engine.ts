@@ -27,6 +27,7 @@ export interface CssRule {
 export interface ThemeTables {
   readonly light: Map<string, string>;
   readonly dark: Map<string, string>;
+  readonly [theme: string]: Map<string, string>;
 }
 
 export interface ContrastPair {
@@ -34,7 +35,9 @@ export interface ContrastPair {
   readonly fg: string;
   readonly bg: string;
   readonly minRatio: number;
-  readonly themes?: readonly ('light' | 'dark')[];
+  readonly themes?: readonly string[];
+  /** Opaque surface below a translucent background tint. */
+  readonly underlay?: string;
 }
 
 export interface PairCheckResult {
@@ -54,6 +57,7 @@ export interface ContrastRunResult {
 }
 
 interface ParsedColor {
+  readonly rgb: readonly [number, number, number];
   readonly luminance: number;
   readonly alpha: number;
 }
@@ -204,30 +208,41 @@ export function luminanceFromRgb(r: number, g: number, b: number): number {
   );
 }
 
-/** CIELAB L* → relative luminance Y (Y depends only on L* in Lab/LCH). */
-function luminanceFromLabLightness(lStar: number): number {
-  const fy = (lStar + 16) / 116;
-  const d = 6 / 29;
-  return fy > d ? fy ** 3 : 3 * d * d * (fy - 4 / 29);
+function srgbFromLinear(c: number): number {
+  return c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055;
+}
+
+function color(r: number, g: number, b: number, alpha = 1): ParsedColor | null {
+  if (![r, g, b, alpha].every(Number.isFinite)) return null;
+  const rgb = [r, g, b].map(c => Math.min(1, Math.max(0, c))) as [
+    number,
+    number,
+    number,
+  ];
+  return {
+    rgb,
+    alpha: Math.min(1, Math.max(0, alpha)),
+    luminance: luminanceFromRgb(...rgb),
+  };
 }
 
 function parseAlphaComponent(s: string): number {
   const t = s.trim();
   const n = Number.parseFloat(t);
-  if (Number.isNaN(n)) return 1;
+  if (Number.isNaN(n)) return Number.NaN;
   return t.endsWith('%') ? n / 100 : n;
 }
 
 /**
  * Parse a resolved CSS color into luminance + alpha, or null when the format
- * cannot be statically evaluated (color-mix, gradients, chromatic oklch).
+ * cannot be statically evaluated (color-mix, gradients).
  */
 export function parseColor(value: string): ParsedColor | null {
   const v = value.trim().toLowerCase();
 
-  if (v === 'white') return { luminance: 1, alpha: 1 };
-  if (v === 'black') return { luminance: 0, alpha: 1 };
-  if (v === 'transparent') return { luminance: 0, alpha: 0 };
+  if (v === 'white') return color(1, 1, 1);
+  if (v === 'black') return color(0, 0, 0);
+  if (v === 'transparent') return color(0, 0, 0, 0);
 
   // #rgb / #rgba / #rrggbb / #rrggbbaa
   const hex = /^#([0-9a-f]{3,8})$/.exec(v);
@@ -241,7 +256,7 @@ export function parseColor(value: string): ParsedColor | null {
     const g = Number.parseInt(h.slice(2, 4), 16) / 255;
     const b = Number.parseInt(h.slice(4, 6), 16) / 255;
     const alpha = h.length === 8 ? Number.parseInt(h.slice(6, 8), 16) / 255 : 1;
-    return { luminance: luminanceFromRgb(r, g, b), alpha };
+    return color(r, g, b, alpha);
   }
 
   // rgb()/rgba() — comma or space syntax, optional % units
@@ -264,33 +279,54 @@ export function parseColor(value: string): ParsedColor | null {
         : Number.parseFloat(parts[3]);
     }
     if ([r, g, b, alpha].some(Number.isNaN)) return null;
-    return { luminance: luminanceFromRgb(r, g, b), alpha };
+    return color(r, g, b, alpha);
   }
 
-  // lch(L% C H [/ alpha]) — Y depends only on L*
-  const lch = /^lch\(([^)]+)\)$/.exec(v);
-  if (lch) {
-    const [main, alphaPart] = lch[1].split('/');
+  const polar = /^(oklch|lch)\(([^)]+)\)$/.exec(v);
+  if (polar) {
+    const [main, alphaPart] = polar[2].split('/');
     const parts = main.trim().split(/\s+/);
-    const lStar = Number.parseFloat(parts[0]);
-    if (Number.isNaN(lStar)) return null;
-    const alpha = alphaPart ? parseAlphaComponent(alphaPart) : 1;
-    return { luminance: luminanceFromLabLightness(lStar), alpha };
-  }
-
-  // oklch(L C H [/ alpha]) — exact only for (near-)achromatic colors,
-  // where Oklab lightness relates to Y as Y ≈ L^3.
-  const oklch = /^oklch\(([^)]+)\)$/.exec(v);
-  if (oklch) {
-    const [main, alphaPart] = oklch[1].split('/');
-    const parts = main.trim().split(/\s+/);
+    if (parts.length !== 3) return null;
     let l = Number.parseFloat(parts[0]);
-    if (Number.isNaN(l)) return null;
-    if (parts[0].includes('%')) l /= 100;
-    const chroma = Number.parseFloat(parts[1] ?? '0') || 0;
-    if (chroma > 0.04) return null; // chromatic — not statically evaluable
+    const c = Number.parseFloat(parts[1]);
+    const h = (Number.parseFloat(parts[2]) * Math.PI) / 180;
+    const a = c * Math.cos(h);
+    const b = c * Math.sin(h);
     const alpha = alphaPart ? parseAlphaComponent(alphaPart) : 1;
-    return { luminance: l ** 3, alpha };
+    if (polar[1] === 'oklch') {
+      if (parts[0].endsWith('%')) l /= 100;
+      const ll = (l + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+      const mm = (l - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+      const ss = (l - 0.0894841775 * a - 1.291485548 * b) ** 3;
+      return color(
+        srgbFromLinear(
+          4.0767416621 * ll - 3.3077115913 * mm + 0.2309699292 * ss
+        ),
+        srgbFromLinear(
+          -1.2684380046 * ll + 2.6097574011 * mm - 0.3413193965 * ss
+        ),
+        srgbFromLinear(
+          -0.0041960863 * ll - 0.7034186147 * mm + 1.707614701 * ss
+        ),
+        alpha
+      );
+    }
+    // CSS LCH uses Lab D50. Adapt XYZ D50 to D65 before converting to sRGB.
+    const f = (x: number) =>
+      x > 6 / 29 ? x ** 3 : 3 * (6 / 29) ** 2 * (x - 4 / 29);
+    const fy = (l + 16) / 116;
+    const x = 0.96422 * f(fy + a / 500);
+    const y = f(fy);
+    const z = 0.82521 * f(fy - b / 200);
+    const xd = 0.9555766 * x - 0.0230393 * y + 0.0631636 * z;
+    const yd = -0.0282895 * x + 1.0099416 * y + 0.0210077 * z;
+    const zd = 0.0122982 * x - 0.020483 * y + 1.3299098 * z;
+    return color(
+      srgbFromLinear(3.2404542 * xd - 1.5371385 * yd - 0.4985314 * zd),
+      srgbFromLinear(-0.969266 * xd + 1.8760108 * yd + 0.041556 * zd),
+      srgbFromLinear(0.0556434 * xd - 0.2040259 * yd + 1.0572252 * zd),
+      alpha
+    );
   }
 
   return null; // color-mix(), gradients, unknown keywords, etc.
@@ -304,10 +340,12 @@ export function contrastRatio(lumA: number, lumB: number): number {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
-/** Composite a translucent foreground luminance over an opaque background. */
-function compositeLuminance(fg: ParsedColor, bg: ParsedColor): number {
-  if (fg.alpha >= 1) return fg.luminance;
-  return fg.luminance * fg.alpha + bg.luminance * (1 - fg.alpha);
+/** Composite in encoded sRGB, then compute luminance (JOV-7861). */
+export function compositeColor(fg: ParsedColor, bg: ParsedColor): ParsedColor {
+  const rgb = fg.rgb.map(
+    (c, i) => c * fg.alpha + bg.rgb[i] * (1 - fg.alpha)
+  ) as [number, number, number];
+  return { rgb, alpha: 1, luminance: luminanceFromRgb(...rgb) };
 }
 
 /** Check one pair against a theme variable table. */
@@ -331,7 +369,7 @@ export function checkPair(
   }
 
   const fgColor = parseColor(fgResolved);
-  const bgColor = parseColor(bgResolved);
+  let bgColor = parseColor(bgResolved);
   if (fgColor === null || bgColor === null) {
     return {
       status: 'unresolvable',
@@ -339,10 +377,19 @@ export function checkPair(
     };
   }
   if (bgColor.alpha < 1) {
-    return { status: 'unresolvable', detail: 'translucent background' };
+    const underlayRaw = pair.underlay ? table.get(pair.underlay) : undefined;
+    const underlayValue = underlayRaw ? resolveValue(underlayRaw, table) : null;
+    const underlay = underlayValue ? parseColor(underlayValue) : null;
+    if (!underlay || underlay.alpha < 1) {
+      return {
+        status: 'unresolvable',
+        detail: 'translucent background needs an opaque underlay',
+      };
+    }
+    bgColor = compositeColor(bgColor, underlay);
   }
 
-  const fgLum = compositeLuminance(fgColor, bgColor);
+  const fgLum = compositeColor(fgColor, bgColor).luminance;
   const ratio = contrastRatio(fgLum, bgColor.luminance);
   return {
     status: ratio >= pair.minRatio ? 'pass' : 'fail',
@@ -359,9 +406,10 @@ export function runContrastChecks(
   const warnings: PairResultRecord[] = [];
   const passes: PairResultRecord[] = [];
   for (const pair of pairs) {
-    const themes = pair.themes ?? (['light', 'dark'] as const);
+    const themes = pair.themes ?? Object.keys(tables);
     for (const theme of themes) {
-      const table = theme === 'light' ? tables.light : tables.dark;
+      const table = tables[theme];
+      if (!table) throw new Error(`Missing contrast theme: ${theme}`);
       const result = checkPair(pair, table);
       const record: PairResultRecord = { ...pair, theme, ...result };
       if (result.status === 'fail') failures.push(record);

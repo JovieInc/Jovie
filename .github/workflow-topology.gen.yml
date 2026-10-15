@@ -786,6 +786,7 @@ nodes:
     allowedConsumers: []
     triggeringStateTransition:
       - workflow_dispatch
+      - workflow_run
     terminalReceipt: job:notify-failure
     jobCount: 6
   - name: PR Conflict Handler
@@ -924,6 +925,7 @@ nodes:
       - iOS TestFlight
       - Lane Fix Relay
       - Linear Sync on Merge
+      - Post-Deploy Probes
       - Production Release
     triggeringStateTransition:
       - workflow_run
@@ -1421,6 +1423,9 @@ edges:
   - from: Publish @jovie/cli to npm
     to: CLI Chaos
     type: workflow_call
+  - from: Production Controller
+    to: Post-Deploy Probes
+    type: workflow_run
   - from: Source Validation
     to: PR Review (shadow)
     type: workflow_run
