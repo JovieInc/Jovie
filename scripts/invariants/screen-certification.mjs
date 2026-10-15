@@ -12,7 +12,10 @@ import {
 } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { browserInputFindings } from './browser-owned-input.mjs';
+import {
+  browserInputFindings,
+  isMissingDeviceEvidence,
+} from './browser-owned-input.mjs';
 import {
   screenNeedsProductReferences,
   validateProductReferenceSnapshot,
@@ -1183,15 +1186,24 @@ export function evaluateChangedScreens({
       screen,
       headSha,
     });
-    if (findings.length > 0)
-      issues.push(`${screen.id}: ${findings.join('; ')}`);
+    // Missing real-device records stay UNKNOWN on the audit ledger (JOV-8387).
+    // They do not reject a rendered screenshot candidate. BLOCKED records do.
+    const blocking = findings.filter(
+      finding => !isMissingDeviceEvidence(finding)
+    );
+    const commissioning = findings.length - blocking.length;
+    if (blocking.length > 0)
+      issues.push(`${screen.id}: ${blocking.join('; ')}`);
     changedScreens.push({
       id: screen.id,
-      verdict: findings.length === 0 ? 'pass' : 'block',
-      findings,
+      verdict: blocking.length === 0 ? 'pass' : 'block',
+      findings: blocking,
+      ...(blocking.length === 0 && commissioning > 0
+        ? { deviceEvidence: 'UNKNOWN' }
+        : {}),
       // Renderer provenance + immutable artifact identity ride the receipt
       // for every certified screen.
-      ...(findings.length === 0
+      ...(blocking.length === 0
         ? { artifactDigest: proof.artifactDigest, rendererRunUrl: proof.runUrl }
         : {}),
     });
