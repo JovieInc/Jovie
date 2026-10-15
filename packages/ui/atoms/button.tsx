@@ -3,13 +3,18 @@
 import { cn } from '@jovie/ui/lib/utils';
 import { Slot } from '@radix-ui/react-slot';
 import { cva } from 'class-variance-authority';
+import { Check } from 'lucide-react';
 import * as React from 'react';
 
 import {
+  ACTION_BUTTON_MOBILE_HIT_TARGET_PX,
+  ACTION_BUTTON_VISIBLE_HEIGHT_PX,
   BUTTON_SIZE_NAMES,
   BUTTON_VARIANT_NAMES,
+  type ButtonActionState,
   type ButtonSize,
   type ButtonSizeInput,
+  type ButtonStateLabels,
   type ButtonVariant,
   type ButtonVariantInput,
   normalizeButtonSizeContract,
@@ -156,6 +161,10 @@ export interface ButtonProps
   readonly size?: ButtonSizeInput;
   readonly asChild?: boolean;
   readonly loading?: boolean;
+  /** Opt-in state choreography for text pills; Slot/link/icon keep legacy rendering. */
+  readonly pendingPresentation?: 'spinner' | 'morph';
+  readonly actionState?: ButtonActionState;
+  readonly stateLabels?: Partial<ButtonStateLabels>;
   /** Enables subtle tactile compression for actions without another immediate cue. */
   readonly pressFeedback?: boolean;
   /** @deprecated Prefer leaving pressFeedback unset. */
@@ -217,6 +226,9 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       size,
       asChild = false,
       loading = false,
+      pendingPresentation = 'spinner',
+      actionState = 'idle',
+      stateLabels,
       pressFeedback = false,
       static: isStatic = false,
       destructive = false,
@@ -248,6 +260,40 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const penContractProps = penMaster
       ? ({ 'data-pen-contract': penMaster.rootId } as const)
       : null;
+
+    if (
+      pendingPresentation === 'morph' &&
+      !asChild &&
+      normalizedVariant.variant !== 'link' &&
+      !normalizedSize.startsWith('icon')
+    ) {
+      return (
+        <ButtonMorph
+          {...props}
+          ref={ref}
+          className={className}
+          surfaceClassName={cn(
+            buttonVariants({
+              variant: normalizedVariant.variant,
+              size: normalizedSize,
+            }),
+            normalizedVariant.destructive &&
+              DESTRUCTIVE_CLASSES[normalizedVariant.variant]
+          )}
+          disabled={disabled}
+          aria-busy={ariaBusy}
+          aria-disabled={ariaDisabled}
+          state={loading ? 'pending' : actionState}
+          labels={stateLabels}
+          primary={normalizedVariant.variant === 'primary'}
+          destructive={normalizedVariant.destructive}
+          data-variant={normalizedVariant.variant}
+          data-size={normalizedSize}
+        >
+          {children}
+        </ButtonMorph>
+      );
+    }
 
     const sharedProps = {
       ref,
@@ -338,3 +384,291 @@ Button.displayName = 'Button';
 
 export type { ButtonSize, ButtonVariant };
 export { BUTTON_SIZE_NAMES, BUTTON_VARIANT_NAMES, Button, buttonVariants };
+
+interface ButtonMorphProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  readonly surfaceClassName: string;
+  readonly state: ButtonActionState;
+  readonly labels?: Partial<ButtonStateLabels>;
+  readonly primary: boolean;
+  readonly destructive: boolean;
+}
+
+function MorphFace({
+  compact,
+  pending,
+  keyboard,
+  chrome,
+}: {
+  compact: boolean;
+  pending: boolean;
+  keyboard: boolean;
+  chrome: string;
+}) {
+  const travel = {
+    transitionDelay: pending ? 'var(--duration-fast)' : undefined,
+    ...(keyboard ? { transitionProperty: 'none' } : {}),
+  };
+  const paint = {
+    borderWidth: 0,
+    boxShadow: 'none',
+    height: ACTION_BUTTON_VISIBLE_HEIGHT_PX,
+  };
+  const paintClass = cn(
+    chrome,
+    'pointer-events-none absolute top-0 min-h-0 min-w-0 px-0 before:hidden'
+  );
+  const motionClass =
+    'transition-transform duration-subtle ease-in-out motion-reduce:transition-none';
+  return (
+    <span
+      aria-hidden='true'
+      className='pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2'
+      style={{ height: ACTION_BUTTON_VISIBLE_HEIGHT_PX }}
+    >
+      <span
+        className={cn(paintClass, motionClass, 'rounded-none')}
+        style={{
+          ...paint,
+          ...travel,
+          left: ACTION_BUTTON_VISIBLE_HEIGHT_PX / 2,
+          right: ACTION_BUTTON_VISIBLE_HEIGHT_PX / 2,
+          transform: compact ? 'scaleX(0)' : 'scaleX(1)',
+        }}
+      />
+      {['left', 'right'].map(edge => (
+        <span
+          key={edge}
+          className={cn('absolute top-0 h-full w-1/2', motionClass)}
+          style={{
+            [edge]: 0,
+            transform: compact
+              ? `translateX(${edge === 'left' ? '' : '-'}100%)`
+              : 'translateX(0)',
+            ...travel,
+          }}
+        >
+          <span
+            data-part={edge === 'left' ? 'morph-surface' : 'morph-cap'}
+            className={cn(paintClass, motionClass)}
+            style={{
+              ...paint,
+              width: ACTION_BUTTON_VISIBLE_HEIGHT_PX,
+              [edge]: 0,
+              transform: compact
+                ? `translateX(${edge === 'left' ? '-' : ''}50%)`
+                : 'translateX(0)',
+              ...travel,
+            }}
+          />
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/** Internal presentation of Button, not a second action component. */
+const ButtonMorph = React.forwardRef<HTMLButtonElement, ButtonMorphProps>(
+  function ButtonMorph(
+    {
+      children,
+      className,
+      surfaceClassName,
+      state,
+      labels,
+      primary,
+      destructive,
+      disabled,
+      style,
+      onClick,
+      onClickCapture,
+      onKeyDown,
+      onPointerDown,
+      'aria-label': ariaLabel,
+      'aria-labelledby': ariaLabelledBy,
+      'aria-busy': ariaBusy,
+      'aria-disabled': ariaDisabled,
+      type = 'button',
+      ...props
+    },
+    ref
+  ) {
+    const labelId = React.useId();
+    const buttonRef = React.useRef<HTMLButtonElement | null>(null);
+    const [keyboard, setKeyboard] = React.useState(false);
+    const [spinnerVisible, setSpinnerVisible] = React.useState(false);
+    const pending = state === 'pending';
+    const compact = pending || state === 'success';
+    const text = {
+      error: 'Could not complete.',
+      pending: 'Loading',
+      retry: 'Retry',
+      success: 'Complete',
+      ...labels,
+    };
+
+    // Delay presentation only. Action dispatch and aria-busy are synchronous.
+    // Each pending episode owns its timer; reversals/unmount cancel it.
+    React.useEffect(() => {
+      if (!pending) {
+        setSpinnerVisible(false);
+        return;
+      }
+      const value = buttonRef.current
+        ? getComputedStyle(buttonRef.current)
+            .getPropertyValue('--duration-subtle')
+            .trim()
+        : '';
+      const delay =
+        Number.parseFloat(value) * (value.endsWith('ms') ? 1 : 1000);
+      const timer = setTimeout(
+        () => setSpinnerVisible(true),
+        Number.isFinite(delay) ? delay : 0
+      );
+      return () => clearTimeout(timer);
+    }, [pending]);
+
+    const noTravel = keyboard ? { transitionProperty: 'none' } : undefined;
+    const status =
+      state === 'idle'
+        ? ''
+        : state === 'error'
+          ? `${text.error} ${text.retry}`
+          : text[state];
+    return (
+      <>
+        <button
+          {...props}
+          ref={node => {
+            buttonRef.current = node;
+            if (typeof ref === 'function') ref(node);
+            else if (ref) ref.current = node;
+          }}
+          type={type}
+          disabled={disabled}
+          aria-busy={pending || ariaBusy}
+          aria-disabled={disabled || pending || ariaDisabled}
+          aria-label={ariaLabel}
+          aria-labelledby={ariaLabel ? undefined : (ariaLabelledBy ?? labelId)}
+          data-state={disabled ? 'disabled' : state}
+          data-destructive={destructive || undefined}
+          data-pending-presentation='morph'
+          data-keyboard={keyboard || undefined}
+          className={cn(
+            surfaceClassName,
+            'isolate max-w-full min-w-11 min-h-11',
+            pending && 'aria-disabled:opacity-100',
+            className
+          )}
+          style={{
+            ...style,
+            background: 'transparent',
+            borderColor: 'transparent',
+            boxShadow: 'none',
+            minHeight: ACTION_BUTTON_MOBILE_HIT_TARGET_PX,
+            minWidth: ACTION_BUTTON_MOBILE_HIT_TARGET_PX,
+          }}
+          onPointerDown={event => {
+            setKeyboard(false);
+            onPointerDown?.(event);
+          }}
+          onKeyDown={event => {
+            if (event.key === 'Enter' || event.key === ' ') setKeyboard(true);
+            onKeyDown?.(event);
+          }}
+          onClickCapture={event => {
+            if (
+              pending ||
+              disabled ||
+              ariaDisabled === true ||
+              ariaDisabled === 'true'
+            ) {
+              event.preventDefault();
+              event.stopPropagation();
+              return;
+            }
+            onClickCapture?.(event);
+          }}
+          onClick={event => {
+            setKeyboard(event.detail === 0);
+            onClick?.(event);
+          }}
+        >
+          {/* Both labels reserve the larger footprint, including full-width CTAs.
+              Only the face's caps/fill transform; the target/ring never move. */}
+          <span
+            aria-hidden='true'
+            className='invisible grid min-w-0 max-w-full'
+          >
+            <span className='col-start-1 row-start-1 truncate'>{children}</span>
+            <span className='col-start-1 row-start-1 truncate'>
+              {text.retry}
+            </span>
+          </span>
+          <span id={labelId} className='sr-only'>
+            {state === 'error' ? `${text.error} ${text.retry}` : children}
+          </span>
+          <MorphFace
+            compact={compact}
+            pending={pending}
+            keyboard={keyboard}
+            chrome={surfaceClassName}
+          />
+          <span
+            aria-hidden='true'
+            data-part='morph-label'
+            className='pointer-events-none absolute inset-0 flex min-w-0 items-center justify-center px-2.5 transition-opacity duration-fast ease-subtle motion-reduce:transition-none'
+            style={{ opacity: compact ? 0 : 1, ...noTravel }}
+          >
+            <span className='grid w-full min-w-0'>
+              <span
+                className='col-start-1 row-start-1 inline-flex min-w-0 items-center justify-center gap-1.5 truncate'
+                style={{ opacity: state === 'error' ? 0 : 1 }}
+              >
+                {children}
+              </span>
+              <span
+                className='col-start-1 row-start-1 truncate'
+                style={{ opacity: state === 'error' ? 1 : 0 }}
+              >
+                {text.retry}
+              </span>
+            </span>
+          </span>
+          <span
+            aria-hidden='true'
+            className='pointer-events-none absolute inset-0 flex items-center justify-center'
+          >
+            {pending && (
+              <span
+                data-part='morph-spinner'
+                style={{ opacity: spinnerVisible ? 1 : 0 }}
+              >
+                <Spinner
+                  size='sm'
+                  tone={primary ? 'inverse' : 'primary'}
+                  className={
+                    primary && destructive ? 'text-error-foreground' : undefined
+                  }
+                />
+              </span>
+            )}
+            <Check
+              data-part='morph-check'
+              className='absolute size-4 transition-opacity duration-subtle ease-subtle motion-reduce:transition-none'
+              style={{ opacity: state === 'success' ? 1 : 0, ...noTravel }}
+            />
+          </span>
+        </button>
+        <span
+          role='status'
+          aria-live='polite'
+          aria-atomic='true'
+          className='sr-only'
+        >
+          {status}
+        </span>
+      </>
+    );
+  }
+);
