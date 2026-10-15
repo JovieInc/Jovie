@@ -185,7 +185,7 @@ export function CliLandingPage() {
               <div className='mt-6 space-y-8'>
                 {CLI_JOBS.map(item => (
                   <article key={item.title}>
-                    <h3 className='text-base font-semibold text-primary-token'>
+                    <h3 className='text-pretty text-base font-semibold text-primary-token'>
                       {item.title}
                     </h3>
                     <section

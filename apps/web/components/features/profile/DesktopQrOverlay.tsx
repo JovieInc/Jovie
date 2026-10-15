@@ -154,9 +154,7 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
             variant='surface'
             onClick={reopen}
             ariaLabel='Open On Phone'
-            className='group backdrop-blur-sm'
           >
-            <span className='pointer-events-none absolute inset-0 rounded-full opacity-0 transition-opacity duration-slower group-hover:opacity-100 bg-[radial-gradient(80%_60%_at_50%_0%,rgba(255,255,255,0.35),transparent_60%)]' />
             <Smartphone className='relative h-5 w-5' aria-hidden='true' />
           </CircleIconButton>
         </div>

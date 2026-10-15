@@ -33,6 +33,9 @@ import {
   isExplicitDevelopmentEnvironment,
   isLocalDevelopmentAutomationHostname,
 } from '@/lib/security/development-only';
+// Pre-existing cycle through proxy-state and admin roles. Seeding a release
+// does not add a new edge; the changed-file lint now sees the old import.
+// eslint-disable-next-line import/no-cycle -- existing bypass seed cycle
 import {
   DEFAULT_TEST_AVATAR_URL,
   ensureBetterAuthTestUser,

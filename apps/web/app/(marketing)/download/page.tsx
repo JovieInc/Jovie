@@ -357,7 +357,7 @@ export default function DownloadPage() {
                     <div className='mb-4 flex size-8 items-center justify-center rounded-full bg-surface-1/10 text-secondary-token'>
                       <Check className='size-4' aria-hidden='true' />
                     </div>
-                    <h3 className='text-xl font-semibold tracking-normal text-(--system-b-text-primary)'>
+                    <h3 className='text-pretty text-xl font-semibold tracking-normal text-(--system-b-text-primary)'>
                       {row.title}
                     </h3>
                     <p className={`mt-3 text-mid leading-relaxed ${muted}`}>
