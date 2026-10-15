@@ -1956,7 +1956,8 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         alignment: 'left',
         chooseWhen:
           'recipe=seo OR recipe=blog-landing article view (long-form prose body — 680px prose container)',
-        status: 'unproven',
+        exemplar: { route: '/alternatives/linktree', section: 'content-prose' },
+        status: 'active',
       },
       {
         id: 'centered-video',

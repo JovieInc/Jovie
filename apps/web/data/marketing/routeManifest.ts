@@ -925,16 +925,37 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: '(marketing)/about/page.tsx',
     recipeId: 'seo',
-    renderedSections: approvedBindings(
-      'apps/web/components/organisms/AboutPageContent.tsx',
-      'hero',
-      'content-prose',
-      'content-prose',
-      'faq'
-    ),
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/components/organisms/AboutPageContent.tsx',
+        'hero',
+        'left-none'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/organisms/AboutPageContent.tsx',
+        'content-prose',
+        'article-body'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/organisms/AboutPageContent.tsx',
+        'feature-grid',
+        'two-column-text'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/marketing/FaqSection.tsx',
+        'faq',
+        'objection-handler'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/site/MarketingTerminalCta.tsx',
+        'cta',
+        'final-single-claim'
+      ),
+    ],
     bindingEvidence: {
       status: 'verified',
-      source: 'route audit 2026-07-11',
+      source:
+        'AboutPageContent mounts left-none, article-body, two-column-text, objection-handler, and the footer final-single-claim (2026-10-15)',
     },
     status: 'active',
     specVersion: '1.0.0',
@@ -943,12 +964,23 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: '(marketing)/support/page.tsx',
     recipeId: 'seo',
-    renderedSections: approvedBindings(
-      'apps/web/app/(marketing)/support/page.tsx',
-      'hero',
-      'content-prose',
-      'cta'
-    ),
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/components/organisms/SupportPageContent.tsx',
+        'hero',
+        'left-none'
+      ),
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/support/SupportContent.tsx',
+        'content-prose',
+        'article-body'
+      ),
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/support/SupportContent.tsx',
+        'cta',
+        'final-single-claim'
+      ),
+    ],
     bindingEvidence: {
       status: 'verified',
       source: 'source binding audit 2026-09-26',
@@ -961,7 +993,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     healthCheck: {
       path: '/support',
       expected: 'page',
-      waitFor: '[data-testid="support-hero"]',
+      waitFor: '[data-testid="marketing-section-hero"]',
     },
   },
   {
@@ -1101,16 +1133,32 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: '(marketing)/compare/[slug]/page.tsx',
     recipeId: 'comparison',
-    renderedSections: approvedBindings(
-      'apps/web/app/(marketing)/compare/[slug]/page.tsx',
-      'hero',
-      'comparison',
-      'cta',
-      'faq'
-    ),
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/components/organisms/ComparisonPageContent.tsx',
+        'hero',
+        'left-none'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/organisms/ComparisonPageContent.tsx',
+        'comparison',
+        'feature-matrix'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/organisms/ComparisonPageContent.tsx',
+        'cta',
+        'final-single-claim'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/marketing/FaqSection.tsx',
+        'faq',
+        'objection-handler'
+      ),
+    ],
     bindingEvidence: {
       status: 'verified',
-      source: 'route audit 2026-07-11',
+      source:
+        'ComparisonPageContent mounts left-none, feature-matrix, final-single-claim, and objection-handler (2026-10-15)',
     },
     status: 'active',
     specVersion: '1.0.0',
@@ -1123,17 +1171,37 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: '(marketing)/alternatives/[slug]/page.tsx',
     recipeId: 'comparison',
-    renderedSections: approvedBindings(
-      'apps/web/app/(marketing)/alternatives/[slug]/page.tsx',
-      'hero',
-      'content-prose',
-      'feature-grid',
-      'cta',
-      'faq'
-    ),
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/alternatives/[slug]/page.tsx',
+        'hero',
+        'left-none'
+      ),
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/alternatives/[slug]/page.tsx',
+        'content-prose',
+        'article-body'
+      ),
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/alternatives/[slug]/page.tsx',
+        'feature-grid',
+        'two-column-text'
+      ),
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/alternatives/[slug]/page.tsx',
+        'cta',
+        'final-single-claim'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/marketing/FaqSection.tsx',
+        'faq',
+        'objection-handler'
+      ),
+    ],
     bindingEvidence: {
       status: 'verified',
-      source: 'route audit 2026-07-11',
+      source:
+        'Alternatives slug page mounts left-none, article-body, two-column-text, final-single-claim, and objection-handler (2026-10-15)',
     },
     status: 'active',
     specVersion: '1.0.0',

@@ -68,6 +68,9 @@ export default async function AlternativesPage({
       <MarketingHero
         variant='left'
         className='marketing-hero-dock relative overflow-hidden'
+        testId='marketing-section-hero'
+        sectionVariant='left-none'
+        sectionOwner='apps/web/app/(marketing)/alternatives/[slug]/page.tsx'
       >
         <div className='absolute inset-0 -z-10' aria-hidden='true'>
           <Image
@@ -91,7 +94,11 @@ export default async function AlternativesPage({
 
       {/* Why Switch */}
       <MarketingContainer width='prose' className='pb-16'>
-        <section>
+        <section
+          data-testid='marketing-section-content-prose'
+          data-marketing-variant='article-body'
+          data-marketing-owner='apps/web/app/(marketing)/alternatives/[slug]/page.tsx'
+        >
           <h2 className='text-2xl font-semibold text-primary-token line-clamp-2'>
             Why Consider A Different Profile
           </h2>
@@ -111,7 +118,11 @@ export default async function AlternativesPage({
 
       {/* Highlights */}
       <MarketingContainer width='prose' className='pb-16'>
-        <section>
+        <section
+          data-testid='marketing-section-feature-grid'
+          data-marketing-variant='two-column-text'
+          data-marketing-owner='apps/web/app/(marketing)/alternatives/[slug]/page.tsx'
+        >
           <h2 className='text-2xl font-semibold text-primary-token line-clamp-2'>
             What You Get With {APP_NAME}
           </h2>
@@ -132,7 +143,11 @@ export default async function AlternativesPage({
 
       {/* CTA */}
       <MarketingContainer width='prose' className='pb-16'>
-        <section>
+        <section
+          data-testid='marketing-section-cta'
+          data-marketing-variant='final-single-claim'
+          data-marketing-owner='apps/web/app/(marketing)/alternatives/[slug]/page.tsx'
+        >
           <div className='rounded-xl border border-border-primary bg-surface-secondary p-8 text-center'>
             <h2 className='text-xl font-semibold text-primary-token line-clamp-2'>
               Start With A Free {APP_NAME} Profile
@@ -155,6 +170,7 @@ export default async function AlternativesPage({
       {/* FAQ */}
       <FaqSection
         items={data.faq}
+        sectionVariant='objection-handler'
         headingClassName='text-2xl font-semibold tracking-tight text-primary-token'
       />
     </>
