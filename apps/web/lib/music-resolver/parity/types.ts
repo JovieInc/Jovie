@@ -57,6 +57,7 @@ export interface ParityRow {
 }
 
 export interface ScoreReport {
+  readonly targetError?: string;
   readonly denominator: number;
   readonly passing: number;
   readonly unblockedFailures: readonly ParityRow[];

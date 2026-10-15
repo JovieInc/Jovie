@@ -451,6 +451,31 @@ test.describe('current-state essential actions (JOV-7771)', () => {
       (await inspectEssentialViewport(page, ['#action'])).findings
     ).toEqual([expect.objectContaining({ reason: 'occluded' })]);
     await page.locator('#cover').evaluate(el => el.remove());
+    await page.evaluate(() => {
+      const toast = document.createElement('p');
+      toast.id = 'toast';
+      toast.setAttribute('role', 'alert');
+      toast.style.cssText =
+        'position:fixed;left:20px;top:20px;width:350px;height:54px;z-index:40;pointer-events:none';
+      toast.textContent = 'Something went wrong';
+      document.body.append(toast);
+    });
+    expect(await inspectEssentialViewport(page, ['#toast'])).toEqual({
+      supported: true,
+      findings: [],
+    });
+    await page.evaluate(() => {
+      const cover = document.createElement('div');
+      cover.id = 'cover';
+      cover.style.cssText =
+        'position:fixed;inset:0;z-index:50;background:white';
+      document.body.append(cover);
+    });
+    expect((await inspectEssentialViewport(page, ['#toast'])).findings).toEqual(
+      [expect.objectContaining({ reason: 'occluded' })]
+    );
+    await page.locator('#cover').evaluate(el => el.remove());
+    await page.locator('#toast').evaluate(el => el.remove());
     await page.locator('#action').evaluate(el => el.after(el.cloneNode(true)));
     expect(
       (await inspectEssentialViewport(page, ['#action'])).findings

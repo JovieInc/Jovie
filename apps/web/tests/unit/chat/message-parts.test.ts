@@ -73,6 +73,11 @@ describe('message parts persistence', () => {
         type: 'dynamic-tool',
         toolName: 'showTopInsights',
         toolCallId: 'tool-v2',
+        persistedToolReceipt: {
+          operationKey: 'tool-v2',
+          state: 'succeeded',
+          persisted: true,
+        },
         state: 'output-available',
         input: {},
         output: { success: true, title: 'Top Signals' },

@@ -52,6 +52,15 @@ export class MergeGroupPolicyEvidenceError extends Error {
   }
 }
 
+/** A 403/429 that says nothing about the diff. Callers defer instead of failing the required check. */
+export class MergeGroupPolicyRateLimitError extends MergeGroupPolicyEvidenceError {
+  constructor(message) {
+    super(message);
+    this.name = 'MergeGroupPolicyRateLimitError';
+    this.rateLimit = true;
+  }
+}
+
 function fail(message) {
   throw new MergeGroupPolicyEvidenceError(message);
 }
@@ -700,7 +709,21 @@ export async function githubRequest(
       deadlineMs,
       random,
     });
-    if (delayMs === null) fail(answer.message);
+    if (delayMs === null) {
+      const failure = classifyGitHubFailure({
+        status: answer.status,
+        message: answer.message,
+        headers: answer.headers,
+        now: now(),
+      });
+      // A reset outside this job's budget used to fail the required check and
+      // dequeue a group whose diff was already within the cap (2026-10-15
+      // 15:49Z, runs 38763665593 and 38764049235).
+      if (failure.kind === PRIMARY || failure.kind === 'secondary-rate-limit') {
+        throw new MergeGroupPolicyRateLimitError(answer.message);
+      }
+      fail(answer.message);
+    }
     console.error(
       `::notice::GitHub API hold ${delayMs}ms after ${answer.message}`
     );
@@ -841,6 +864,7 @@ export function localCheckoutFromEvidence(evidence, baseSha, headSha) {
   }
   const files = evidence.files;
   if (files != null && !Array.isArray(files)) return null;
+  const tracked = trackedFromEvidence(evidence.tracked);
   const commit = {
     sha: headSha,
     parents: [{ sha: baseSha }],
@@ -868,7 +892,55 @@ export function localCheckoutFromEvidence(evidence, baseSha, headSha) {
     },
     files: Array.isArray(files) ? files : null,
     treeSha: evidence.treeSha,
+    tracked,
   };
+}
+
+function trackedFromEvidence(tracked) {
+  if (tracked == null) return null;
+  if (
+    !Number.isSafeInteger(tracked.bytes) ||
+    tracked.bytes < 0 ||
+    !Number.isSafeInteger(tracked.files) ||
+    tracked.files < 0
+  ) {
+    return null;
+  }
+  return { bytes: tracked.bytes, files: tracked.files };
+}
+
+function syntheticRateLimitedPull(member, headSha) {
+  // No labels, so big-pr / codemod / integration-train cannot bypass the cap.
+  return {
+    number: member.number,
+    state: 'open',
+    base: { ref: 'main' },
+    head: {
+      sha: headSha,
+      ref: 'gh-readonly-queue',
+      repo: { fork: false },
+    },
+    labels: [],
+    user: { login: 'github-merge-queue' },
+    body: '',
+  };
+}
+
+function logTrackedPayload(payload, log) {
+  const warning = trackedBytesBudgetWarning(payload.bytes);
+  if (warning) log(`::warning::Combined tree: ${warning}`);
+  log(
+    `Combined tree: PASS — ${payload.bytes} tracked regular-file bytes across ${payload.files} files.`
+  );
+}
+
+function enforceTrackedBudget(tracked) {
+  if (tracked.bytes > HYGIENE_LIMITS.maxTrackedBytes) {
+    fail(
+      `${tracked.bytes} bytes of tracked regular files exceeds the ${HYGIENE_LIMITS.maxTrackedBytes}-byte combined-tree budget`
+    );
+  }
+  return tracked;
 }
 
 async function readEvidenceFile(file, baseSha, headSha) {
@@ -1055,24 +1127,50 @@ export async function runPolicy({
     }
   }
   if (!comparison) {
-    comparison = await fetchComparison(
-      repository,
-      baseSha,
-      headSha,
-      token,
-      deadlineMs,
-      request
-    );
+    try {
+      comparison = await fetchComparison(
+        repository,
+        baseSha,
+        headSha,
+        token,
+        deadlineMs,
+        request
+      );
+    } catch (error) {
+      if (!(error instanceof MergeGroupPolicyRateLimitError)) throw error;
+      // No checkout diff. A green check here would merge an unread change.
+      log(
+        `::notice::PR Size Guard refused a GitHub rate limit with no local diff: ${error.message}`
+      );
+      throw error;
+    }
   }
   const members = resolveMergeGroupMembers({ event, comparison });
-  const pullRequests = await Promise.all(
-    members.map(member =>
-      fetchPullRequest(repository, member.number, token, deadlineMs, request)
-    )
-  );
-  pullRequests.forEach((pr, index) =>
-    assertCurrentPullRequest(members[index], pr)
-  );
+  let pullRequests;
+  try {
+    pullRequests = await Promise.all(
+      members.map(member =>
+        fetchPullRequest(repository, member.number, token, deadlineMs, request)
+      )
+    );
+    pullRequests.forEach((pr, index) =>
+      assertCurrentPullRequest(members[index], pr)
+    );
+  } catch (error) {
+    if (!(error instanceof MergeGroupPolicyRateLimitError)) throw error;
+    if (!Array.isArray(local?.files)) {
+      log(
+        `::notice::PR Size Guard refused a GitHub rate limit with no local diff: ${error.message}`
+      );
+      throw error;
+    }
+    log(
+      `::notice::PR Size Guard kept the size cap on the local diff after a GitHub rate limit: ${error.message}`
+    );
+    pullRequests = members.map(member =>
+      syntheticRateLimitedPull(member, headSha)
+    );
+  }
   // GitHub's compare returns at most 300 files; a full page may be truncated.
   const COMPARE_FILE_CAP = 300;
   const rangeFiles = Array.isArray(local?.files)
@@ -1113,20 +1211,29 @@ export async function runPolicy({
   }
 
   if (policy === 'size') {
-    const payload = await enforceCombinedTreePayload({
-      deadlineMs,
-      headSha,
-      now,
-      repository,
-      request,
-      token,
-      treeSha: provenTreeSha,
-    });
-    const warning = trackedBytesBudgetWarning(payload.bytes);
-    if (warning) log(`::warning::Combined tree: ${warning}`);
-    log(
-      `Combined tree: PASS — ${payload.bytes} tracked regular-file bytes across ${payload.files} files.`
-    );
+    if (local?.tracked) {
+      logTrackedPayload(enforceTrackedBudget(local.tracked), log);
+    } else {
+      try {
+        const payload = await enforceCombinedTreePayload({
+          deadlineMs,
+          headSha,
+          now,
+          repository,
+          request,
+          token,
+          treeSha: provenTreeSha,
+        });
+        logTrackedPayload(payload, log);
+      } catch (error) {
+        if (!(error instanceof MergeGroupPolicyRateLimitError)) throw error;
+        // The byte budget was not measured. Do not pass the size check.
+        log(
+          `::notice::PR Size Guard refused a GitHub rate limit with no local tree byte count: ${error.message}`
+        );
+        throw error;
+      }
+    }
   }
 
   const results = await evaluateMembers({ ...shared, policy });
