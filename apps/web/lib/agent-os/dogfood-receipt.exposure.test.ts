@@ -107,7 +107,7 @@ describe('exposure-scoped dogfood receipts', () => {
       expect(rebound.outcome).toBe('blocked');
     }
   });
-  it('keeps a recent exposure blocker in the reliability window', () => {
+  it('keeps a recent exposure blocker in the reliability evaluation', () => {
     const receipt = dogfoodReceiptFromPlaywrightReport(context, report);
     const blocked = {
       ...receipt,
