@@ -44,7 +44,9 @@ concurrency:
   # for one PR share a slot, so a burst keeps a single pending run and the
   # newer one cancels the waiter before a Jovie Bot token is minted. A second
   # workflow, review, or deploy keeps its own slot.
-  group: lane-fix-relay-${{ github.event_name == 'push' && 'push-main' || format('{0}-{1}-{2}', github.event_name, github.event.inputs.pr_number || github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_sha || github.event.deployment.sha || 'unscoped', github.event.workflow_run.name || github.event.workflow_run.conclusion || github.event.review.state || github.event.action || 'signal') }}
+  # workflow_dispatch declares no inputs. event.inputs.pr_number is an
+  # actionlint error (object type {}) and ejected the merge group.
+  group: lane-fix-relay-${{ github.event_name == 'push' && 'push-main' || format('{0}-{1}-{2}', github.event_name, github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_sha || github.event.deployment.sha || 'unscoped', github.event.workflow_run.name || github.event.workflow_run.conclusion || github.event.review.state || github.event.action || 'signal') }}
   cancel-in-progress: ${{ github.event_name == 'push' || github.event_name == 'workflow_run' }}
 
 jobs:

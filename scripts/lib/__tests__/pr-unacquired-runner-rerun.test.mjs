@@ -201,6 +201,11 @@ test('the relay skips the model-lane label only when a rerun was requested', () 
     "${{ github.event_name == 'push' || github.event_name == 'workflow_run' }}"
   );
   assert.doesNotMatch(String(workflow.concurrency.group), /github\.run_id/);
+  assert.doesNotMatch(
+    String(workflow.concurrency.group),
+    /event\.inputs\.pr_number/
+  );
+  assert.equal(workflow.on.workflow_dispatch, null);
   const relay = workflow.jobs.relay;
   assert.equal(relay.needs, 'rerun-unacquired');
   const debounce = relay.steps[0];
