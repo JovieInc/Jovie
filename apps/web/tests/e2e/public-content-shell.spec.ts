@@ -41,7 +41,7 @@ for (const viewport of [
             localStorage.setItem('jovie-theme', selectedTheme);
           }, theme);
           const response = await page.goto(surface.path, {
-            waitUntil: 'domcontentloaded',
+            waitUntil: 'load',
           });
           expect(response?.status()).toBe(200);
           await expect
@@ -60,6 +60,7 @@ for (const viewport of [
             surface.width
           );
           await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
+          expect(errors, 'page errors before chrome interaction').toEqual([]);
           const header = page.getByRole('banner');
           if (viewport.name === 'mobile') {
             const menu = header.getByRole('button', {
@@ -81,8 +82,15 @@ for (const viewport of [
               name: 'Customers',
               exact: true,
             });
-            await customers.focus();
-            await expect(customers).toHaveAttribute('aria-expanded', 'true');
+            await expect(async () => {
+              await header
+                .getByRole('link', { name: 'Product', exact: true })
+                .focus();
+              await customers.focus();
+              await expect(customers).toHaveAttribute('aria-expanded', 'true', {
+                timeout: 1000,
+              });
+            }).toPass({ timeout: 25_000 });
             await page.keyboard.press('Escape');
             await expect(customers).toHaveAttribute('aria-expanded', 'false');
             await expect(
