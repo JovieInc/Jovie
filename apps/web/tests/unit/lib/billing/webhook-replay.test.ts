@@ -11,6 +11,11 @@ const mockMerchRefund = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/db', () => ({
   db: { select: mockSelect, update: mockUpdate },
 }));
+vi.mock('@/lib/ingestion/session', () => ({
+  withSystemIngestionSession: vi.fn((operation: (tx: unknown) => unknown) =>
+    operation({ select: mockSelect, update: mockUpdate })
+  ),
+}));
 vi.mock('@/lib/stripe/webhooks/process-event', () => ({
   processStripeWebhookEvent: mockProcessStripeWebhookEvent,
 }));

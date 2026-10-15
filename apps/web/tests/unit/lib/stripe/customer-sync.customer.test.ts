@@ -24,6 +24,7 @@ const mocks = vi.hoisted(() => ({
     stripeCustomerId: Symbol('users.stripeCustomerId'),
   },
   withDbSession: vi.fn(),
+  withDbSessionTx: vi.fn(),
 }));
 
 vi.mock('server-only', () => ({}));
@@ -32,6 +33,7 @@ vi.mock('@/lib/auth/cached', () => ({
 }));
 vi.mock('@/lib/auth/session', () => ({
   withDbSession: mocks.withDbSession,
+  withDbSessionTx: mocks.withDbSessionTx,
 }));
 vi.mock('@/lib/db', () => ({
   db: {
@@ -76,6 +78,10 @@ describe('ensureStripeCustomer', () => {
     mocks.withDbSession.mockImplementation(
       async (operation: (appUserId: string) => Promise<unknown>) =>
         operation(APP_USER_ID)
+    );
+    mocks.withDbSessionTx.mockImplementation(
+      async (operation: (tx: unknown) => Promise<unknown>) =>
+        operation({ insert: mocks.dbInsert, update: mocks.dbUpdate })
     );
   });
 

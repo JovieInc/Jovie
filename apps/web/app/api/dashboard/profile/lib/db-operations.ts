@@ -4,14 +4,14 @@
  * Database operations for profile updates.
  */
 
-import { and, sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, or } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { getExactProfileAccess } from '@/lib/auth/profile-access';
 import type { DbOrTransaction } from '@/lib/db';
 import { db } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { users } from '@/lib/db/schema/auth';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
 import {
   mergeProfileTheme,
   type ProfileThemeRecord,
@@ -55,6 +55,26 @@ function versionConflictResponse(
   );
 }
 
+function profileNotFoundResponse() {
+  return NextResponse.json(
+    { error: 'Profile not found' },
+    { status: 404, headers: NO_STORE_HEADERS }
+  );
+}
+
+function writableProfileForUser(appUserId: string) {
+  return or(
+    eq(creatorProfiles.userId, appUserId),
+    drizzleSql`EXISTS (
+      SELECT 1
+      FROM ${userProfileClaims} ownership_claim
+      WHERE ownership_claim.creator_profile_id = ${creatorProfiles.id}
+        AND ownership_claim.user_id = ${appUserId}
+        AND ownership_claim.role IN ('owner', 'manager')
+    )`
+  );
+}
+
 export async function getProfileUpdatePreflight(
   tx: DbOrTransaction,
   appUserId: string,
@@ -62,16 +82,7 @@ export async function getProfileUpdatePreflight(
 ): Promise<ProfileUpdatePreflight | NextResponse> {
   const access = await getExactProfileAccess(tx, appUserId, profileId);
   if (!access.ok) {
-    return NextResponse.json(
-      {
-        error:
-          access.reason === 'forbidden' ? 'Forbidden' : 'Profile not found',
-      },
-      {
-        status: access.reason === 'forbidden' ? 403 : 404,
-        headers: NO_STORE_HEADERS,
-      }
-    );
+    return profileNotFoundResponse();
   }
 
   const [profile] = await tx
@@ -80,7 +91,9 @@ export async function getProfileUpdatePreflight(
       profileEditVersion: creatorProfiles.profileEditVersion,
     })
     .from(creatorProfiles)
-    .where(eq(creatorProfiles.id, profileId))
+    .where(
+      and(eq(creatorProfiles.id, profileId), writableProfileForUser(appUserId))
+    )
     .limit(1);
   if (!profile) {
     return NextResponse.json(
@@ -110,16 +123,7 @@ export async function updateProfileRecords({
 > {
   const access = await getExactProfileAccess(tx, appUserId, profileId);
   if (!access.ok) {
-    return NextResponse.json(
-      {
-        error:
-          access.reason === 'forbidden' ? 'Forbidden' : 'Profile not found',
-      },
-      {
-        status: access.reason === 'forbidden' ? 403 : 404,
-        headers: NO_STORE_HEADERS,
-      }
-    );
+    return profileNotFoundResponse();
   }
 
   const [existingProfile] = await tx
@@ -132,7 +136,9 @@ export async function updateProfileRecords({
       profileEditVersion: creatorProfiles.profileEditVersion,
     })
     .from(creatorProfiles)
-    .where(eq(creatorProfiles.id, profileId))
+    .where(
+      and(eq(creatorProfiles.id, profileId), writableProfileForUser(appUserId))
+    )
     .limit(1);
   if (!existingProfile) {
     return NextResponse.json(
@@ -227,7 +233,8 @@ export async function updateProfileRecords({
     .where(
       and(
         eq(creatorProfiles.id, profileId),
-        eq(creatorProfiles.profileEditVersion, compareVersion)
+        eq(creatorProfiles.profileEditVersion, compareVersion),
+        writableProfileForUser(appUserId)
       )
     )
     .returning();

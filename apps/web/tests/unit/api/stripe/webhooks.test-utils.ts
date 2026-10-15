@@ -175,6 +175,16 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
+vi.mock('@/lib/ingestion/session', () => ({
+  withSystemIngestionSession: vi.fn((operation: (tx: unknown) => unknown) =>
+    operation({
+      insert: mockDbInsert,
+      select: mockDbSelect,
+      update: mockDbUpdate,
+    })
+  ),
+}));
+
 vi.mock('@/lib/db/schema', () => ({
   users: {
     clerkId: 'clerk_id_column',
