@@ -1,3 +1,5 @@
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   LEARNING_METADATA_SCHEMA,
@@ -188,6 +190,38 @@ function history() {
 
 // These are canonical readers, not runtime/producer commissioning proof.
 describe('revision-bound learning attachments', () => {
+  it('typechecks its public reader and metadata exports with NodeNext', () => {
+    const root = new URL('../../../', import.meta.url);
+    const result = spawnSync(
+      process.execPath,
+      [
+        fileURLToPath(new URL('node_modules/typescript/bin/tsc', root)),
+        '--ignoreConfig',
+        '--noEmit',
+        '--skipLibCheck',
+        '--strict',
+        'false',
+        '--module',
+        'nodenext',
+        '--moduleResolution',
+        'nodenext',
+        '--allowImportingTsExtensions',
+        '--target',
+        'es2022',
+        '--types',
+        'node',
+        '--typeRoots',
+        fileURLToPath(new URL('apps/web/node_modules/@types', root)),
+        '--allowJs',
+        '--checkJs',
+        fileURLToPath(import.meta.url),
+      ],
+      { cwd: fileURLToPath(root), encoding: 'utf8', timeout: 25_000 }
+    );
+    expect(result.error).toBeUndefined();
+    expect(result.status, `${result.stdout}${result.stderr}`).toBe(0);
+  });
+
   it('reads all legacy receipt formats unchanged and checks their original validators', () => {
     for (const receipt of [workResult(), prediction(), outcome(), provider()]) {
       expect(parseLearningEvidenceReceipt(receipt)).toEqual({
