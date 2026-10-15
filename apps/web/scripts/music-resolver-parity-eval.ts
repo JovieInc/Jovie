@@ -2,6 +2,11 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runParityEvaluation } from '../lib/music-resolver/parity/evaluate';
+import {
+  cleanCandidateSha,
+  createEvaluationReceipt,
+  writeEvaluationReceipt,
+} from '../lib/music-resolver/parity/receipt';
 import { nodeMatchesNvmrc } from '../lib/music-resolver/parity/runtime';
 import { rowIsPass } from '../lib/music-resolver/parity/score';
 
@@ -18,8 +23,35 @@ function assertNode(): void {
 
 async function main(): Promise<void> {
   assertNode();
+  const args = process.argv.slice(2);
+  if (
+    args.length &&
+    (args.length !== 2 || args[0] !== '--receipt-dir' || !args[1])
+  ) {
+    throw new Error('usage: parity:music-resolver [--receipt-dir DIRECTORY]');
+  }
+  const candidateSha = cleanCandidateSha(repoRoot);
+  const startedAt = new Date().toISOString();
+  const fixtureBytes = readFileSync(
+    resolve(repoRoot, 'apps/web/lib/music-resolver/parity/probes.ts')
+  );
   const report = await runParityEvaluation();
+  if (cleanCandidateSha(repoRoot) !== candidateSha) {
+    throw new Error('candidate changed during parity evaluation');
+  }
+  const receipt = createEvaluationReceipt({
+    candidateSha,
+    fixtureBytes,
+    startedAt,
+    finishedAt: new Date().toISOString(),
+    report,
+  });
+  const receiptFile = args[1]
+    ? writeEvaluationReceipt(resolve(args[1]), receipt)
+    : null;
   const summary = {
+    receipt,
+    receiptFile,
     node: process.versions.node,
     denominator: report.denominator,
     passing: report.passing,
