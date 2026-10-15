@@ -1,5 +1,11 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const mockRevenueFailure = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/observability/revenue-spine', () => ({
+  captureRevenueSpineFailure: mockRevenueFailure,
+}));
+
 import { malformedJsonRequest } from '@/tests/helpers/malformed-json-request';
 
 const mockGetCachedAuth = vi.hoisted(() => vi.fn());
@@ -459,6 +465,12 @@ describe('POST /api/stripe/checkout', () => {
     expect(response.status).toBe(503);
     expect(response.headers.get('Retry-After')).toBe('5');
     expect(payload.error).toContain('temporarily unavailable');
+    expect(mockRevenueFailure).toHaveBeenCalledExactlyOnceWith({
+      stage: 'checkout',
+      severity: 'blocked',
+      userId: 'user_123',
+      error: expect.any(Error),
+    });
     expect(mockCreateCheckoutSession).toHaveBeenCalledTimes(3);
   });
 
