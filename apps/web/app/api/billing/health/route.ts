@@ -29,6 +29,7 @@ import { billingAuditLog, stripeWebhookEvents } from '@/lib/db/schema/billing';
 import { sqlTimestamp } from '@/lib/db/sql-helpers';
 import { captureWarning } from '@/lib/error-tracking';
 import { RETRY_AFTER_HEALTH } from '@/lib/http/headers';
+import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { withTimeout } from '@/lib/resilience/primitives';
 import { stripe } from '@/lib/stripe/client';
 import { getActivePriceIds, validateStripeConfig } from '@/lib/stripe/config';
@@ -154,42 +155,48 @@ export async function GET(request: Request) {
       lastBillingEvent,
     ] = await Promise.all([
       // Count webhooks in last 24 hours
-      db
-        .select({ count: drizzleSql<number>`count(*)` })
-        .from(stripeWebhookEvents)
-        .where(gte(stripeWebhookEvents.createdAt, twentyFourHoursAgo)),
+      withSystemIngestionSession(tx =>
+        tx
+          .select({ count: drizzleSql<number>`count(*)` })
+          .from(stripeWebhookEvents)
+          .where(gte(stripeWebhookEvents.createdAt, twentyFourHoursAgo))
+      ),
 
       // Count stuck (unprocessed) webhooks older than 30 minutes
-      db
-        .select({
-          count: drizzleSql<number>`count(*)`,
-          oldestCreatedAt: drizzleSql<
-            Date | string | null
-          >`min(${stripeWebhookEvents.createdAt})`,
-        })
-        .from(stripeWebhookEvents)
-        .where(
-          and(
-            isNull(stripeWebhookEvents.processedAt),
-            drizzleSql`${stripeWebhookEvents.createdAt} < ${sqlTimestamp(thirtyMinutesAgo)}`
+      withSystemIngestionSession(tx =>
+        tx
+          .select({
+            count: drizzleSql<number>`count(*)`,
+            oldestCreatedAt: drizzleSql<
+              Date | string | null
+            >`min(${stripeWebhookEvents.createdAt})`,
+          })
+          .from(stripeWebhookEvents)
+          .where(
+            and(
+              isNull(stripeWebhookEvents.processedAt),
+              drizzleSql`${stripeWebhookEvents.createdAt} < ${sqlTimestamp(thirtyMinutesAgo)}`
+            )
           )
-        ),
+      ),
 
       // A per-user repair does not prove the complete run succeeded.
-      db
-        .select({
-          createdAt: billingAuditLog.createdAt,
-          metadata: billingAuditLog.metadata,
-        })
-        .from(billingAuditLog)
-        .where(
-          and(
-            eq(billingAuditLog.source, 'reconciliation'),
-            eq(billingAuditLog.eventType, 'reconciliation_run')
+      withSystemIngestionSession(tx =>
+        tx
+          .select({
+            createdAt: billingAuditLog.createdAt,
+            metadata: billingAuditLog.metadata,
+          })
+          .from(billingAuditLog)
+          .where(
+            and(
+              eq(billingAuditLog.source, 'reconciliation'),
+              eq(billingAuditLog.eventType, 'reconciliation_run')
+            )
           )
-        )
-        .orderBy(drizzleSql`${billingAuditLog.createdAt} DESC`)
-        .limit(1),
+          .orderBy(drizzleSql`${billingAuditLog.createdAt} DESC`)
+          .limit(1)
+      ),
 
       // Count Pro users in DB
       db

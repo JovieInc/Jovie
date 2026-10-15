@@ -289,6 +289,26 @@ export async function withRlsAnonymous<T>(
 }
 
 /**
+ * Execute trusted ingestion work through the same explicit system identity as
+ * production jobs, while retaining the least-privilege real role.
+ */
+export async function withRlsSystem<T>(
+  operation: (tx: RlsTransactionType) => Promise<T>
+): Promise<T> {
+  if (!db) {
+    throw new Error('Database not initialized for RLS testing');
+  }
+
+  return db.transaction(async tx => {
+    await tx.execute('SET LOCAL ROLE test_app_user');
+    await tx.execute(
+      `SELECT set_config('app.clerk_user_id', 'system_rls_test', true)`
+    );
+    return operation(tx);
+  });
+}
+
+/**
  * Helper for integration tests to use in beforeAll.
  */
 export function setupDatabaseBeforeAll() {

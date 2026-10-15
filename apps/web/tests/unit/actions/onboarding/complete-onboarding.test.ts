@@ -656,8 +656,11 @@ describe('completeOnboarding', () => {
       },
       update: vi.fn(() => ({
         set: (values: Record<string, unknown>) => ({
-          where: async () => {
+          where: () => {
             if ('isClaimed' in values) Object.assign(profile, values);
+            return Object.assign(Promise.resolve(undefined), {
+              returning: async () => [{ id: profile.id }],
+            });
           },
         }),
       })),

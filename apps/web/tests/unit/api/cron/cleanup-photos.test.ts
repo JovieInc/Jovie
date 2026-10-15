@@ -29,6 +29,15 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
+vi.mock('@/lib/ingestion/session', () => ({
+  withSystemIngestionSession: vi.fn(
+    async (operation: (tx: unknown) => unknown) => {
+      const { db } = await import('@/lib/db');
+      return operation(db);
+    }
+  ),
+}));
+
 vi.mock('@/lib/db/schema', () => ({
   creatorProfiles: {},
 }));
