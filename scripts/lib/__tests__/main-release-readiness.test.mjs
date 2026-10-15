@@ -372,7 +372,7 @@ esac
       sha: SHA,
       token: 'token',
       apiUrl: 'https://api.github.test',
-      fetchImpl: async () => ({
+      fetchImpl: /** @type {any} */ (async () => ({
         ...limited,
         headers: {
           get(name) {
@@ -381,7 +381,7 @@ esac
             return null;
           },
         },
-      }),
+      })),
       now: () => 0,
       sleep: async () => {
         throw new Error('slept');

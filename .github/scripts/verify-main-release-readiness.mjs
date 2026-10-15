@@ -30,7 +30,7 @@ function headerNumber(headers, name) {
  *   nowMs: number,
  *   deadlineMs: number,
  * }} input
- * @returns {{ action: 'wait' | 'fail', waitMs?: number, reason?: string }}
+ * @returns {{ action: 'wait' | 'fail', waitMs?: number, reason?: string, retryAtMs?: number }}
  */
 export function planGitHubRestHold({
   status = 0,
@@ -164,6 +164,17 @@ function runProcess(command, args, env) {
  * Current refs/heads/main via .github/scripts/resolve-main-sha.sh (git
  * ls-remote, then one REST read that holds until x-ratelimit-reset inside
  * its budget). A failure throws. This never invents a SHA.
+ * @param {{
+ *   repository?: string,
+ *   token?: string,
+ *   env?: NodeJS.ProcessEnv,
+ *   scriptPath?: string,
+ *   spawnImpl?: (
+ *     command: string,
+ *     args: string[],
+ *     env: NodeJS.ProcessEnv,
+ *   ) => Promise<{ code: number, stdout: string, stderr: string }>,
+ * }} [options]
  */
 export async function resolveMainSha({
   repository,
@@ -195,9 +206,9 @@ export async function findExactQueueProof({
   token,
   apiUrl,
   fetchImpl = fetch,
-  now,
-  sleep,
-  budgetMs,
+  now = Date.now,
+  sleep = ms => new Promise(resolve => setTimeout(resolve, ms)),
+  budgetMs = DEFAULT_REST_BUDGET_MS,
 }) {
   const rest = { token, apiUrl, fetchImpl, now, sleep, budgetMs };
   const query = new URLSearchParams({
@@ -274,9 +285,9 @@ export async function checkMainQueueProvenance({
   apiUrl = 'https://api.github.com',
   fetchImpl = fetch,
   resolveMain = resolveMainSha,
-  now,
-  sleep,
-  budgetMs,
+  now = Date.now,
+  sleep = ms => new Promise(resolve => setTimeout(resolve, ms)),
+  budgetMs = DEFAULT_REST_BUDGET_MS,
 }) {
   if (!SHA_PATTERN.test(sha)) throw new Error('sha must be a full SHA');
 

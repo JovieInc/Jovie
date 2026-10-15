@@ -1117,8 +1117,8 @@ async function runSync(options) {
   let openPulls = {
     pulls: /** @type {object[]} */ ([]),
     complete: true,
-    failureMessage: '',
   };
+  let openPullFailure = '';
   try {
     openPulls = await listOpenPullRequests({ fetchImpl, token, repository });
   } catch (error) {
@@ -1149,7 +1149,8 @@ async function runSync(options) {
       );
     }
     log(`Open pull request scan failed: ${message}`);
-    openPulls = { pulls: [], complete: false, failureMessage: message };
+    openPulls = { pulls: [], complete: false };
+    openPullFailure = message;
   }
 
   const lookups = [];
@@ -1324,9 +1325,8 @@ async function runSync(options) {
   const reasons = [...failures];
   if (!openPulls.complete) {
     const detail =
-      openPulls.failureMessage &&
-      isInstallationQuota403(openPulls.failureMessage)
-        ? ` (${openPulls.failureMessage})`
+      openPullFailure && isInstallationQuota403(openPullFailure)
+        ? ` (${openPullFailure})`
         : '';
     reasons.unshift(
       `the open pull request scan failed${detail}, so issues were left in place`
