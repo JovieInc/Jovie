@@ -1049,6 +1049,13 @@ importers:
         version: 5.9.3
 
   workers/observability-ingest:
+    dependencies:
+      htmlparser2:
+        specifier: 8.0.2
+        version: 8.0.2
+      robots-parser:
+        specifier: 3.0.1
+        version: 3.0.1
     devDependencies:
       '@cloudflare/workers-types':
         specifier: ^5.20261010.1
@@ -27137,15 +27144,12 @@ snapshots:
       domelementtype: 2.3.0
       domhandler: 5.0.3
       entities: 4.5.0
-    optional: true
 
-  domelementtype@2.3.0:
-    optional: true
+  domelementtype@2.3.0: {}
 
   domhandler@5.0.3:
     dependencies:
       domelementtype: 2.3.0
-    optional: true
 
   dompurify@3.4.17:
     optionalDependencies:
@@ -27156,7 +27160,6 @@ snapshots:
       dom-serializer: 2.0.0
       domelementtype: 2.3.0
       domhandler: 5.0.3
-    optional: true
 
   dot-prop@5.3.0:
     dependencies:
@@ -29097,7 +29100,6 @@ snapshots:
       domhandler: 5.0.3
       domutils: 3.2.2
       entities: 4.5.0
-    optional: true
 
   http-cache-semantics@4.2.0: {}
 
