@@ -7,6 +7,10 @@ import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
 import { isLegacyFanSendPrice } from '@/lib/stripe/config';
 import { logger } from '@/lib/utils/logger';
 import {
+  type AutomaticLinkBilling,
+  canAutomaticallyCreateLinks,
+} from './automatic-links';
+import {
   getEntitlements,
   type PlanEntitlements,
   type PlanId,
@@ -41,9 +45,21 @@ function resolveEffectivePlan(
  */
 export function getCreatorPlanEntitlements(
   plan: PlanId,
-  stripePriceId?: string | null
+  stripePriceId?: string | null,
+  billing?: Pick<AutomaticLinkBilling, 'isPro' | 'stripeSubscriptionId'>
 ): PlanEntitlements {
-  const entitlements = getEntitlements(plan);
+  const base = getEntitlements(plan);
+  const entitlements: PlanEntitlements = {
+    ...base,
+    booleans: {
+      ...base.booleans,
+      canAutoCreateLinks: canAutomaticallyCreateLinks({
+        ...billing,
+        plan,
+        stripePriceId,
+      }),
+    },
+  };
   if (
     plan === 'trial' ||
     !entitlements.booleans.canSendNotifications ||
@@ -72,6 +88,19 @@ export function getCreatorPlanEntitlements(
 export async function getCreatorEntitlements(
   creatorProfileId: string
 ): Promise<{ plan: PlanId; entitlements: PlanEntitlements }> {
+  const { plan, entitlements } =
+    await getCreatorEntitlementsWithOwner(creatorProfileId);
+  return { plan, entitlements };
+}
+
+/** Bind billing evidence to its owner in the same database read. */
+export async function getCreatorEntitlementsWithOwner(
+  creatorProfileId: string
+): Promise<{
+  plan: PlanId;
+  entitlements: PlanEntitlements;
+  ownerUserId: string | null;
+}> {
   try {
     const [result] = await withRetry(
       () =>
@@ -79,10 +108,14 @@ export async function getCreatorEntitlements(
           .select({
             claimedUserId: userProfileClaims.userId,
             claimedPlan: claimedUsers.plan,
+            claimedIsPro: claimedUsers.isPro,
+            claimedStripeSubscriptionId: claimedUsers.stripeSubscriptionId,
             claimedTrialEndsAt: claimedUsers.trialEndsAt,
             claimedStripePriceId: claimedUsers.stripePriceId,
             legacyUserId: creatorProfiles.userId,
             legacyPlan: legacyUsers.plan,
+            legacyIsPro: legacyUsers.isPro,
+            legacyStripeSubscriptionId: legacyUsers.stripeSubscriptionId,
             legacyTrialEndsAt: legacyUsers.trialEndsAt,
             legacyStripePriceId: legacyUsers.stripePriceId,
           })
@@ -101,7 +134,11 @@ export async function getCreatorEntitlements(
 
     const ownerUserId = result?.claimedUserId ?? result?.legacyUserId ?? null;
     if (!ownerUserId) {
-      return { plan: 'free', entitlements: getEntitlements('free') };
+      return {
+        plan: 'free',
+        entitlements: getEntitlements('free'),
+        ownerUserId: null,
+      };
     }
 
     const plan = resolveEffectivePlan(
@@ -116,7 +153,15 @@ export async function getCreatorEntitlements(
       : result?.legacyStripePriceId;
     return {
       plan,
-      entitlements: getCreatorPlanEntitlements(plan, stripePriceId),
+      ownerUserId,
+      entitlements: getCreatorPlanEntitlements(plan, stripePriceId, {
+        isPro: result?.claimedUserId
+          ? result.claimedIsPro
+          : result?.legacyIsPro,
+        stripeSubscriptionId: result?.claimedUserId
+          ? result.claimedStripeSubscriptionId
+          : result?.legacyStripeSubscriptionId,
+      }),
     };
   } catch (error) {
     logger.error(
@@ -128,7 +173,11 @@ export async function getCreatorEntitlements(
       },
       'public-smart-link'
     );
-    return { plan: 'free', entitlements: getEntitlements('free') };
+    return {
+      plan: 'free',
+      entitlements: getEntitlements('free'),
+      ownerUserId: null,
+    };
   }
 }
 
@@ -197,6 +246,8 @@ export async function getBatchCreatorEntitlements(
           .select({
             id: users.id,
             plan: users.plan,
+            isPro: users.isPro,
+            stripeSubscriptionId: users.stripeSubscriptionId,
             trialEndsAt: users.trialEndsAt,
             stripePriceId: users.stripePriceId,
           })
@@ -209,9 +260,7 @@ export async function getBatchCreatorEntitlements(
       resolveEffectivePlan(row.plan, row.trialEndsAt),
     ])
   );
-  const priceByUserId = new Map(
-    userPlans.map(row => [row.id, row.stripePriceId])
-  );
+  const billingByUserId = new Map(userPlans.map(row => [row.id, row]));
 
   const map = new Map<
     string,
@@ -226,7 +275,8 @@ export async function getBatchCreatorEntitlements(
       plan,
       entitlements: getCreatorPlanEntitlements(
         plan,
-        ownerUserId ? priceByUserId.get(ownerUserId) : null
+        ownerUserId ? billingByUserId.get(ownerUserId)?.stripePriceId : null,
+        ownerUserId ? billingByUserId.get(ownerUserId) : undefined
       ),
     });
   }
