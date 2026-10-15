@@ -34,8 +34,7 @@ function preferredRoute(incumbent, id) {
 async function evaluate(record, context, owner) {
   const receipt = record?.receipt;
   const compiled = receipt?.compilation;
-  // Rehydrated JSON is not executable proof. The compiler/evidence owner must
-  // replay and validate it through the production compiler in this process.
+  // Rehydrated JSON is not proof. Replay it in this process before use.
   if (
     !hasCompilationProof(receipt, context.now()) ||
     !validateLearningReceipt(receipt).ok ||
@@ -164,19 +163,14 @@ async function evaluate(record, context, owner) {
   };
 }
 
-/** Optional evidence-owner port. Missing, unavailable or rejected learning
- * retains the incumbent. Current artifact state is read on every call.
- *
- * lookup(context, {signal}) returns bounded {receipt} records, qualified by
- * the production compiler; persisted JSON must be replayed, never self-sealed.
- * loadAnalysis(ref, {signal}) authenticates the independently reviewed source.
- * currentArtifact(id, {signal}) reads the existing lifecycle projection without
- * a stale cache. Its status/revision/version, source bytes, executable tuple
- * digest, requiredActions and selectionAllowed/releaseControlRef come from the
- * artifact, permission and rollout owners. Learning grants none of that power.
- * Ship now: one author boundary, exact revision compatibility, <=32 records.
- * Re-evaluate when: replay proves another boundary or revision is equivalent.
- * Then: its existing owner supplies and reviews that explicit compatibility.
+/** Optional evidence-owner port. Missing or rejected learning keeps the
+ * incumbent, and every call rereads current artifact state. lookup returns
+ * at most 32 compiler-qualified receipts; persisted JSON is replayed here.
+ * loadAnalysis authenticates the reviewed source. currentArtifact projects
+ * lifecycle, source, tuple digest, actions, and rollout from existing owners.
+ * Ship now: one author boundary and exact revision compatibility.
+ * Re-evaluate when: replay proves another boundary or revision equivalent.
+ * Then: that owner supplies and reviews the explicit compatibility.
  */
 export async function selectLearnedMethod(context, owner) {
   const consumption = {
@@ -226,8 +220,7 @@ export async function selectLearnedMethod(context, owner) {
         });
       }
     }
-    // Conflicting eligible lessons require the existing owner to reconcile;
-    // timestamp or retrieval order cannot silently decide a winner.
+    // Eligible conflicts keep the incumbent; retrieval order is not a vote.
     const methods = new Set(accepted.map(row => row.artifact.method));
     if (methods.size !== 1) return { route: context.incumbent, consumption };
     accepted.sort((a, b) => a.learningReceipt.localeCompare(b.learningReceipt));

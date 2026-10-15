@@ -688,9 +688,8 @@ describe('admitted bounded lesson analysis', () => {
   });
 });
 
-// Real Git revisions and the production invariant validator back the compiler
-// replay. Methods are fixture transports; their outcomes are observed, never
-// inferred from generated context or the selected route id.
+// Real Git revisions and the production invariant validator back replay.
+// Method outcomes are observed, never inferred from the selected route.
 const replayRoot = mkdtempSync(join(tmpdir(), 'jovie-method-consumption-'));
 after(() => rmSync(replayRoot, { recursive: true, force: true }));
 const replayGit = args =>
@@ -798,8 +797,7 @@ async function learnedFixture() {
   causal.causalVerification.successfulAttemptId = 'a7';
   f.finding.differences[0].successfulAttemptId = 'a7';
   f.finding.target = 'skill';
-  // The existing analysis and independent challenger run, rather than a
-  // handwritten analysis receipt standing in for that production validation.
+  // Run the real analysis and challenger; do not handwrite that receipt.
   const analyzed = await run(f);
   assert.equal(analyzed.disposition, 'target');
   const analysis = {
@@ -944,8 +942,7 @@ async function learnedFixture() {
   const compiled = await compileLesson(request, compiler);
   assert.equal(compiled.disposition, 'compiled', compiled.reason);
   assert.equal(validateLearningReceipt(compiled.receipt).ok, true);
-  // Seven actual transports are available to the existing analysis boundary.
-  // Independent challenger selection is still handled by its existing router.
+  // Seven real transports; the existing router still picks the challenger.
   const prototype = f.environment.routes[1];
   f.environment.routes = observed.map((attempt, i) => ({
     ...prototype,
@@ -1138,8 +1135,7 @@ describe('compiled learning consumption at the existing dispatch boundary', () =
       const g = await learnedFixture();
       change(g);
       if (name === 'expired') {
-        // Expiry is evaluated by the learning clock; keep the WorkOrder and
-        // certificate bounds valid so this tests selection, not job admission.
+        // Expire via the learning clock, not WorkOrder or certificate bounds.
         const now = g.f.environment.now();
         g.f.order = sealWorkOrder({
           ...g.f.order,
