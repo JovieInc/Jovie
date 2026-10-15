@@ -118,7 +118,7 @@ describe('AdminUserDetailDrawer', () => {
     }
   );
 
-  it('uses the compact raised entity hierarchy with summary before details', () => {
+  it('uses the canonical flat inspector hierarchy with summary before details', () => {
     render(
       <AdminUserDetailDrawer
         user={user}
@@ -131,7 +131,7 @@ describe('AdminUserDetailDrawer', () => {
       screen
         .getByRole('complementary', { name: 'User details' })
         .querySelector('[data-right-rail-workspace]')
-    ).toHaveAttribute('data-surface-variant', 'raised');
+    ).toHaveAttribute('data-surface-variant', 'flat');
     expect(screen.getByTestId('entity-sidebar-entity-header')).toHaveAttribute(
       'data-surface-variant',
       'flat'

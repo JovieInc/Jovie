@@ -12,9 +12,9 @@ import {
   DrawerCardActionBar,
   DrawerSection,
   EntityHeader,
-  EntitySidebarShell,
   ShareableLinkRow,
 } from '@/components/molecules/drawer';
+import { AdminDetailRail } from '@/features/admin/layout/AdminDetailRail';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import type { AdminUserRow } from '@/lib/admin/types';
 
@@ -82,17 +82,14 @@ export function AdminUserDetailDrawer({
   const hasUser = user !== null;
 
   return (
-    <EntitySidebarShell
+    <AdminDetailRail
       isOpen={hasUser}
-      width={400}
       ariaLabel='User details'
       scrollStrategy='shell'
       contentBleed
       onClose={onClose}
       headerMode='minimal'
       hideMinimalHeaderBar
-      workspaceSurface='raised'
-      entityHeaderSurface='flat'
       contextMenuItems={contextMenuItems}
       isEmpty={!hasUser}
       emptyMessage='Select a user to view details.'
@@ -164,7 +161,7 @@ export function AdminUserDetailDrawer({
           <UserDrawerContent user={user} />
         </div>
       )}
-    </EntitySidebarShell>
+    </AdminDetailRail>
   );
 }
 
@@ -211,7 +208,7 @@ function UserDrawerContent({ user }: { readonly user: AdminUserRow }) {
         <DrawerSection
           title='Social & music links'
           className='space-y-1.5'
-          surface='card'
+          surface='plain'
         >
           <div className='space-y-1'>
             {user.socialLinks.slice(0, 8).map(link => (
@@ -232,7 +229,7 @@ function UserDrawerContent({ user }: { readonly user: AdminUserRow }) {
         </DrawerSection>
       ) : null}
 
-      <DrawerSection title='Details' className='space-y-1.5' surface='card'>
+      <DrawerSection title='Details' className='space-y-1.5' surface='plain'>
         <dl className='space-y-2 text-xs'>
           <div className='flex justify-between'>
             <dt className='text-secondary-token'>User ID</dt>
