@@ -1,10 +1,15 @@
 #!/usr/bin/env node
-// Read-only size evidence from a merge-group checkout.
+// Size evidence from a merge-group checkout.
 //
 // The Size Guard workflow fetches the synthetic head, then this module counts
-// the diff with local git. That replaces the compare API and the per-PR files
-// API when both commits are already in the repo. It never fetches: a missing
-// object returns null and the caller uses the API. Line counts match
+// the diff and the tracked-byte total with local git. That replaces the
+// compare API, the per-PR files API, and GET /git/trees. Blob size is not
+// stored in the tree object: `git ls-tree -r -l` asks the object database,
+// and on a blobless fetch that lazy-fetches every missing blob until the
+// 20s git timeout (2026-10-15 17:37Z, the trees API 403 then ejected in-cap
+// groups). A missing size fetches that commit's blobs once over the git
+// protocol — not the REST API — and measures again. Still-unmeasured bytes
+// stay null so the caller can hold or fail closed. Line counts match
 // `git diff --numstat -z -M` the way the source PR Size Guard step does
 // (renames once, under the new path; binary rows count zero lines).
 import { execFileSync } from 'node:child_process';
@@ -13,14 +18,20 @@ import { pathToFileURL } from 'node:url';
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const MAX_GIT_OUTPUT_BYTES = 64 * 1024 * 1024;
+const NO_LAZY_FETCH = { GIT_NO_LAZY_FETCH: '1' };
 
-function runGit(args, cwd) {
+function runGit(args, cwd, options) {
+  const explicit = options?.env || typeof options?.input === 'string';
+  const env = explicit ? options.env : options;
+  const input = explicit ? options.input : undefined;
   return execFileSync('git', args, {
     cwd,
     encoding: 'utf8',
+    input,
     maxBuffer: MAX_GIT_OUTPUT_BYTES,
-    timeout: 20_000,
-    stdio: ['ignore', 'pipe', 'pipe'],
+    timeout: args[0] === 'fetch' ? 70_000 : 20_000,
+    stdio: ['pipe', 'pipe', 'pipe'],
+    env: { ...process.env, ...env },
   });
 }
 
@@ -49,6 +60,85 @@ export function parseLsTreeLong(stdout) {
     files += 1;
   }
   return { bytes, files };
+}
+
+/**
+ * `git cat-file --batch-check` sizes for regular blobs listed by
+ * `git ls-tree -r` (no `-l`). A missing object is incomplete: return null
+ * instead of a partial total.
+ * @returns {{ bytes: number, files: number } | null}
+ */
+export function trackedBytesFromCatFile(listing, batch) {
+  const wanted = new Map();
+  for (const line of String(listing ?? '').split('\n')) {
+    if (line.length === 0) continue;
+    const match = line.match(
+      /^(\d{6}) (blob|tree|commit) ([0-9a-f]{40})\t(.+)$/
+    );
+    if (!match) return null;
+    const [, mode, type, oid] = match;
+    if (mode !== '100644' && mode !== '100755') continue;
+    if (type !== 'blob') return null;
+    wanted.set(oid, (wanted.get(oid) ?? 0) + 1);
+  }
+  if (wanted.size === 0) return { bytes: 0, files: 0 };
+  let bytes = 0;
+  let files = 0;
+  const seen = new Set();
+  for (const line of String(batch ?? '').split('\n')) {
+    if (line.length === 0) continue;
+    const match = line.match(/^([0-9a-f]{40}) (\d+)$/);
+    if (!match) return null;
+    const [, oid, size] = match;
+    const copies = wanted.get(oid);
+    if (!copies || seen.has(oid)) return null;
+    const length = Number(size);
+    if (!Number.isSafeInteger(length) || length < 0) return null;
+    bytes += length * copies;
+    if (!Number.isSafeInteger(bytes)) return null;
+    files += copies;
+    seen.add(oid);
+  }
+  if (seen.size !== wanted.size) return null;
+  return { bytes, files };
+}
+
+function measureTrackedTree(git, headSha, cwd) {
+  try {
+    const listed = parseLsTreeLong(
+      git(['ls-tree', '-r', '-l', headSha], cwd, NO_LAZY_FETCH)
+    );
+    if (listed) return listed;
+  } catch {
+    // Missing blobs make ls-tree fail closed under GIT_NO_LAZY_FETCH.
+  }
+  let listing;
+  try {
+    listing = git(['ls-tree', '-r', headSha], cwd, NO_LAZY_FETCH);
+  } catch {
+    return null;
+  }
+  const oids = [];
+  const seen = new Set();
+  for (const line of String(listing).split('\n')) {
+    const match = line.match(/^100(?:644|755) blob ([0-9a-f]{40})\t/);
+    if (match && !seen.has(match[1])) {
+      seen.add(match[1]);
+      oids.push(match[1]);
+    }
+  }
+  if (oids.length === 0) return trackedBytesFromCatFile(listing, '');
+  try {
+    return trackedBytesFromCatFile(
+      listing,
+      git(['cat-file', '--batch-check=%(objectname) %(objectsize)'], cwd, {
+        env: NO_LAZY_FETCH,
+        input: `${oids.join('\n')}\n`,
+      })
+    );
+  } catch {
+    return null;
+  }
 }
 
 /** @returns {Array<{ filename: string, additions: number, deletions: number }> | null} */
@@ -152,11 +242,27 @@ export function readLocalMergeGroupEvidence({
   } catch {
     files = null;
   }
-  let tracked = null;
-  try {
-    tracked = parseLsTreeLong(git(['ls-tree', '-r', '-l', headSha], cwd));
-  } catch {
-    tracked = null;
+  let tracked = measureTrackedTree(git, headSha, cwd);
+  if (!tracked) {
+    try {
+      // One git-protocol backfill. --refetch is required after a blob:none
+      // fetch, which otherwise will not send blobs for a commit it already has.
+      git(
+        [
+          'fetch',
+          '--refetch',
+          '--filter=blob:limit=1g',
+          '--no-tags',
+          '--depth=2',
+          'origin',
+          headSha,
+        ],
+        cwd
+      );
+      tracked = measureTrackedTree(git, headSha, cwd);
+    } catch {
+      tracked = null;
+    }
   }
   return {
     baseSha,

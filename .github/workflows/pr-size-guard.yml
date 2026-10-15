@@ -135,7 +135,10 @@ jobs:
         # Publishes fork_verdict before any size failure, so the Fork PR Gate
         # job below judges the members it was asked about. The helper is absent
         # on the pinned bootstrap base; a missing file or a failed fetch falls
-        # back to the API inside the policy.
+        # back to the API inside the policy. Blob sizes are not in the tree
+        # object, so this fetch must include blobs. blob:none makes
+        # `git ls-tree -l` lazy-fetch every missing blob, time out, and eject
+        # the group on the trees API during an installation 403.
         run: |
           set -euo pipefail
           mkdir -p "$MERGE_GROUP_POLICY_CACHE_DIR"
@@ -151,8 +154,8 @@ jobs:
               GIT_TERMINAL_PROMPT=0 \
               GCM_INTERACTIVE=never \
               GIT_LFS_SKIP_SMUDGE=1 \
-                timeout --kill-after=5s 20s \
-                  git fetch --filter=blob:none --no-tags --depth=2 origin "$GROUP_HEAD" \
+                timeout --kill-after=5s 70s \
+                  git fetch --filter=blob:limit=1g --no-tags --depth=2 origin "$GROUP_HEAD" \
                   || true
               node scripts/lib/merge-group-local-evidence.mjs || true
             )
