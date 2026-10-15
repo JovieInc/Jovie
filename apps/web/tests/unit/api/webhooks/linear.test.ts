@@ -569,7 +569,12 @@ describe('POST /api/webhooks/linear', () => {
     });
     mockServerFetch.mockResolvedValue(new Response(null, { status: 204 }));
     const { POST } = await import('@/app/api/webhooks/linear/route');
-    for (const label of ['postmortem-action', 'bug']) {
+    for (const label of [
+      'postmortem-action',
+      'bug',
+      'escaped-defect',
+      'sentry',
+    ]) {
       const body = JSON.stringify({
         type: 'Issue',
         action: 'update',
@@ -594,34 +599,36 @@ describe('POST /api/webhooks/linear', () => {
         eventId: eventId(body, 'quality-gap-input'),
       });
     }
-    const gained = JSON.stringify({
-      type: 'Issue',
-      action: 'update',
-      updatedFrom: { labelIds: ['label-feature'] },
-      data: {
-        id: 'issue-gained',
-        identifier: 'JOV-7004',
-        teamId: 'bdc09edc-f91c-4a06-b308-74b4fcf093f8',
-        state: { id: 'todo', name: 'Todo', type: 'unstarted' },
-        labels: [
-          { id: 'label-feature', name: 'feature' },
-          { id: 'label-dogfood', name: 'dogfood' },
-        ],
-      },
-    });
-    const response = await POST(
-      new Request('https://example.com/api/webhooks/linear', {
-        method: 'POST',
-        headers: { 'linear-signature': sign(gained) },
-        body: gained,
-      }) as never
-    );
-    expect(await response.json()).toMatchObject({ dispatched: true });
+    for (const exceptionLabel of ['dogfood', 'sentry']) {
+      const gained = JSON.stringify({
+        type: 'Issue',
+        action: 'update',
+        updatedFrom: { labelIds: ['label-feature'] },
+        data: {
+          id: `issue-gained-${exceptionLabel}`,
+          identifier: 'JOV-7004',
+          teamId: 'bdc09edc-f91c-4a06-b308-74b4fcf093f8',
+          state: { id: 'todo', name: 'Todo', type: 'unstarted' },
+          labels: [
+            { id: 'label-feature', name: 'feature' },
+            { id: `label-${exceptionLabel}`, name: exceptionLabel },
+          ],
+        },
+      });
+      const response = await POST(
+        new Request('https://example.com/api/webhooks/linear', {
+          method: 'POST',
+          headers: { 'linear-signature': sign(gained) },
+          body: gained,
+        }) as never
+      );
+      expect(await response.json()).toMatchObject({ dispatched: true });
+    }
     expect(
       mockServerFetch.mock.calls.map(
         call => JSON.parse(call[1].body).event_type
       )
-    ).toEqual(['quality-gap-scan', 'quality-gap-scan', 'quality-gap-scan']);
+    ).toEqual(Array(6).fill('quality-gap-scan'));
   });
 
   it('ignores receipts off JOV, open defects, unlabeled closes, non-state edits, and kept labels', async () => {

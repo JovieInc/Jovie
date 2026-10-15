@@ -356,7 +356,8 @@ async function ArtistPageContent({
     artist.name
   );
   const showPayButton = links.some(link => link.platform === 'venmo');
-  const showBackButton = false;
+  const showBackButton =
+    getProfileModeDefinition(initialMode).shell.showBackButton;
   const subtitle = getProfileModeDefinition(initialMode).subtitle;
 
   // Read profile photo download settings
