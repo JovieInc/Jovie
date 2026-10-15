@@ -1,6 +1,7 @@
 // The active / route is locked to the YouTube artist MVP, including before access opens.
 import { render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { HomepageYoutubeMvp } from '@/components/homepage/HomepageYoutubeMvp';
 import { HOMEPAGE_YOUTUBE_MVP as copy } from '@/data/homepageYoutubeMvp';
 import {
   getMarketingRecipe,
@@ -70,6 +71,13 @@ async function renderHomePage() {
 describe('YouTube artist MVP page composition', { timeout: 60_000 }, () => {
   afterEach(() => {
     vi.resetModules();
+  });
+
+  it('links the founder story from the real homepage composition', () => {
+    render(<HomepageYoutubeMvp />);
+    expect(
+      screen.getByRole('link', { name: 'Read the story' })
+    ).toHaveAttribute('href', '/about');
   });
 
   it.each([true, false])(
