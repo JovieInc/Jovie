@@ -6,6 +6,7 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -37,6 +38,11 @@ import {
 } from '../resolve-merge-group-path-diff.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
+const noopReceiptRoots = [];
+afterEach(() => {
+  for (const root of noopReceiptRoots.splice(0))
+    rmSync(root, { recursive: true, force: true });
+});
 const CI_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/ci.yml'),
   'utf8'
@@ -1627,6 +1633,143 @@ describe('merge_group workflow contract', () => {
     );
   });
 
+  it('seals exact no-op intake and final receipts, rejecting unequal or unreadable trees', () => {
+    const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
+    const detect = getStepRunScript(
+      pathChanges,
+      'Detect path changes for all job types'
+    );
+    const start = detect.indexOf('if [[ "${IS_NOOP:-}" == "true" ]]; then');
+    const end = detect.indexOf('exit 0', start) + 'exit 0'.length;
+    const noop = `${detect.slice(start, end)}
+fi`;
+    const root = mkdtempSync(join(realpathSync(tmpdir()), 'noop-receipt-'));
+    noopReceiptRoots.push(root);
+    const output = join(root, 'output');
+    const summary = join(root, 'summary');
+    writeFileSync(output, '');
+    writeFileSync(summary, '');
+    const git = (...args) => {
+      const result = spawnSync('git', args, {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+      });
+      expect(result.status, result.stderr).toBe(0);
+      return result.stdout.trim();
+    };
+    const sha = git('rev-parse', 'origin/main');
+    const environment = {
+      ...process.env,
+      IS_NOOP: 'true',
+      PATH_DIFF_BASE_SHA: sha,
+      PATH_DIFF_HEAD_SHA: sha,
+      MERGE_GROUP_HEAD_SHA: sha,
+      RUNNER_TEMP: root,
+      GITHUB_OUTPUT: output,
+      GITHUB_STEP_SUMMARY: summary,
+      GITHUB_SHA: sha,
+      GITHUB_RUN_ID: '123',
+      GITHUB_RUN_ATTEMPT: '1',
+      GITHUB_EVENT_NAME: 'merge_group',
+      GITHUB_SERVER_URL: 'https://github.com',
+      GITHUB_REPOSITORY: 'JovieInc/Jovie',
+      BASE_SHA: sha,
+      HEAD_SHA: sha,
+      EXPECTED_HEAD_SHA: sha,
+    };
+    const execute = (script, extra = {}) =>
+      spawnSync('bash', ['-euo', 'pipefail', '-c', script], {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+        env: { ...environment, ...extra },
+      });
+    const detected = execute(noop.replace('emit_ci_lanes none', ':'));
+    expect(detected.status, detected.stderr).toBe(0);
+    expect(readFileSync(output, 'utf8')).toContain(`path_diff_base_sha=${sha}`);
+    const treeProof = getStepRunScript(
+      pathChanges,
+      'Verify typed no-op tree identity'
+    );
+    const proven = execute(treeProof);
+    expect(proven.status, proven.stderr).toBe(0);
+    const sealed = execute(
+      getStepRunScript(
+        pathChanges,
+        'Classify blog qualification and seal intake receipts'
+      )
+    );
+    expect(sealed.status, sealed.stderr).toBe(0);
+    const intake = JSON.parse(
+      readFileSync(
+        join(root, 'product-lane-classification/receipt.json'),
+        'utf8'
+      )
+    );
+    expect(intake.selectedLanes).toEqual([]);
+    expect(intake.provenance).toEqual({ sha, runId: '123', runAttempt: '1' });
+    const finalRoot = join(root, 'product-lane-receipt');
+    mkdirSync(finalRoot);
+    writeFileSync(join(finalRoot, 'receipt.json'), JSON.stringify(intake));
+    const finalized = execute(
+      getStepRunScript(
+        getJobBlock(CI_WORKFLOW, 'ci-product-lane-receipt'),
+        'Join exact lane results'
+      ),
+      {
+        ...Object.fromEntries(
+          [
+            'FAST',
+            'BLOG',
+            'WEB_UNIT',
+            'WEB_BUILD',
+            'WEB_OVIE',
+            'WEB_OVIE_TYPECHECK',
+            'WEB_STORYBOOK',
+            'IOS',
+            'MAC',
+            'CROSS',
+          ].map(name => [name, 'skipped'])
+        ),
+        BLOG_CONTENT_ONLY: 'false',
+        RUN_WEB: 'false',
+        RUN_IOS: 'false',
+        RUN_MAC: 'false',
+        RUN_OPERATIONS: 'false',
+        RUN_CROSS: 'false',
+        RISK_LEVEL: 'low',
+        RISK_SMOKE: 'false',
+        RISK_PREVIEW: 'false',
+        RISK_BLOCKS: 'false',
+        RISK_RULES: '',
+      }
+    );
+    expect(finalized.status, finalized.stderr).toBe(0);
+    const final = JSON.parse(
+      readFileSync(join(finalRoot, 'final.json'), 'utf8')
+    );
+    expect(final).toMatchObject({
+      provenance: intake.provenance,
+      selectedLanes: [],
+      aggregatePassed: true,
+    });
+    expect(
+      Object.values(final.admissions).every(
+        lane => !lane.selected && !lane.passed
+      )
+    ).toBe(true);
+    const different = git('rev-list', '--max-count=20', sha)
+      .split('\n')
+      .find(
+        commit =>
+          git('rev-parse', `${commit}^{tree}`) !==
+          git('rev-parse', `${sha}^{tree}`)
+      );
+    expect(different).toBeTruthy();
+    for (const base of [different, 'f'.repeat(40), 'bad-ref']) {
+      expect(execute(treeProof, { BASE_SHA: base }).status).not.toBe(0);
+    }
+  });
+
   it('materializes the path artifact before a manual dispatch exits', () => {
     const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
     const detectScript = materializeWorkflowDispatchScript(
@@ -1934,7 +2077,7 @@ ${selectedGateScript}`,
       'true',
       'success',
       'true',
-      false,
+      true,
     ],
     [
       'feature push',

@@ -292,6 +292,7 @@ jobs:
       is_current: ${{ steps.authorize.outputs.is_current }}
       source_ci_run_id: ${{ steps.authorize.outputs.source_ci_run_id }}
       source_ci_run_attempt: ${{ steps.authorize.outputs.source_ci_run_attempt }}
+      lane_range_artifact: ${{ format('production-lane-range-{0}-{1}', steps.authorize.outputs.expected_sha, github.run_attempt) }}
       expected_sha: ${{ steps.authorize.outputs.expected_sha }}
       already_verified: ${{ steps.authorize.outputs.already_verified }}
       marker_recovery: ${{ steps.authorize.outputs.marker_recovery }}
@@ -1128,7 +1129,7 @@ jobs:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         if: ${{ needs.authorize-production.outputs.authorized == 'true' }}
         with:
-          name: production-lane-range-${{ needs.authorize-production.outputs.expected_sha }}-${{ github.run_attempt }}
+          name: ${{ needs.authorize-production.outputs.lane_range_artifact }}
           path: ${{ runner.temp }}/release-lineage
       - name: Resolve current main before final verification
         id: current
@@ -1143,7 +1144,7 @@ jobs:
           {
             echo "superseded_before_marker=false"
           } >> "$GITHUB_OUTPUT"
-          current_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
+          current_sha="$(node "$GITHUB_WORKSPACE/.github/scripts/resolve-main-sha.mjs" "${{ github.repository }}")"
           [[ "$current_sha" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Could not resolve an exact current main SHA."
             exit 1
@@ -1254,7 +1255,7 @@ jobs:
           # Main can advance while setup runs. The workflow-level production
           # lease prevents a same-SHA rerun from mutating canonical production;
           # recheck main immediately before reading the canonical alias.
-          boundary_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
+          boundary_sha="$(node "$GITHUB_WORKSPACE/.github/scripts/resolve-main-sha.mjs" "${{ github.repository }}")"
           if [[ ! "$boundary_sha" =~ ^[0-9a-f]{40}$ ]]; then
             echo "::error::Could not resolve exact main at the canonical verification boundary."
             exit 1
@@ -1304,12 +1305,12 @@ jobs:
             exit 0
           fi
 
-          # API uncertainty fails before finalization. If main advanced after
+          # Git ref uncertainty fails before finalization. If main advanced after
           # successful promotion, preserve a marker only from the exact public
           # bind proof gathered while this controller still holds the production
           # FIFO. Marker write-through happens in this same step so successful
           # verification cannot complete without local marker bytes. JOV-4442.
-          boundary_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
+          boundary_sha="$(node "$GITHUB_WORKSPACE/.github/scripts/resolve-main-sha.mjs" "${{ github.repository }}")"
           if [[ ! "$boundary_sha" =~ ^[0-9a-f]{40}$ ]]; then
             echo "::error::Could not resolve exact main at the finalization boundary."
             exit 1

@@ -89,7 +89,7 @@ git_lineage() {
 
     judged() {
       local tip ancestor_status
-      tip="$(git -C "$work" rev-parse refs/heads/main)"
+      tip="$(git -C "$work" rev-parse refs/remotes/origin/main)"
       if [ "$tip" != "$current" ]; then
         echo "::error::main moved from ${current} to ${tip} while proving lineage ${context}." >&2
         exit 1
@@ -113,12 +113,12 @@ git_lineage() {
 
     for depth in 300 4000; do
       git -C "$work" fetch --no-tags --filter=blob:none --depth="$depth" \
-        "$remote" 'refs/heads/main:refs/heads/main'
+        "$remote" 'refs/heads/main:refs/remotes/origin/main'
       judged && exit 0
     done
 
     git -C "$work" fetch --no-tags --filter=blob:none --deepen=8000 \
-      "$remote" 'refs/heads/main:refs/heads/main' || true
+      "$remote" 'refs/heads/main:refs/remotes/origin/main' || true
     if judged; then
       exit 0
     fi

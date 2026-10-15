@@ -11,7 +11,10 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
+import { runInNewContext } from 'node:vm';
+import { load } from 'js-yaml';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { resolveMainSha } from '../../../.github/scripts/resolve-main-sha.mjs';
 import {
   STRUCTURAL_DEFAULT_CONCURRENCY,
   selectLanes,
@@ -129,6 +132,47 @@ describe('public-profile alias graduation policy', () => {
 });
 
 describe('production verification admission', () => {
+  it('downloads the original authorization artifact after failed jobs resume on a later attempt', () => {
+    const workflow =
+      /** @type {{jobs: Record<string, {outputs: Record<string, string>, steps: Array<{uses?: string, with?: {name?: string}}>}>}} */ (
+        load(CONTROLLER_WORKFLOW)
+      );
+    const expression =
+      workflow.jobs['authorize-production'].outputs.lane_range_artifact;
+    const artifact = runInNewContext(
+      expression.replace(/^\$\{\{\s*|\s*\}\}$/g, ''),
+      {
+        steps: { authorize: { outputs: { expected_sha: EXPECTED_SHA } } },
+        github: { run_attempt: '1' },
+        format: (pattern, ...args) =>
+          pattern.replace(/\{(\d+)\}/g, (_, index) => args[Number(index)]),
+      }
+    );
+    const producer = workflow.jobs['authorize-production'].steps.find(step =>
+      step.with?.name?.startsWith('production-lane-range-')
+    );
+    expect(
+      materialize(producer.with.name, {
+        'steps.authorize.outputs.expected_sha': EXPECTED_SHA,
+        'github.run_attempt': '1',
+      })
+    ).toBe(artifact);
+    const availableArtifacts = new Set([artifact]);
+    const download = workflow.jobs['production-verified'].steps.find(step =>
+      step.uses?.startsWith('actions/download-artifact@')
+    );
+    const requested = materialize(download.with.name, {
+      'needs.authorize-production.outputs.lane_range_artifact': artifact,
+      'needs.authorize-production.outputs.expected_sha': EXPECTED_SHA,
+      'github.run_attempt': '2',
+    });
+    expect(availableArtifacts.has(requested)).toBe(true);
+    expect(requested).toBe(`production-lane-range-${EXPECTED_SHA}-1`);
+    expect(
+      availableArtifacts.has(`production-lane-range-${EXPECTED_SHA}-2`)
+    ).toBe(false);
+  });
+
   const job = getJobBlock(CONTROLLER_WORKFLOW, 'production-verified');
   const condition = job.match(/if: >-\s*\$\{\{([\s\S]*?)\}\}/)?.[1];
   if (!condition) throw new Error('Missing production verification condition');
@@ -179,6 +223,59 @@ afterEach(() => {
   for (const root of tempRoots.splice(0)) {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+describe('bounded authoritative main Git ref', () => {
+  it('reads one exact ref with a deadline and without REST requests or interactive credentials', () => {
+    const run = vi.fn(() => ({
+      status: 0,
+      stdout: `${EXPECTED_SHA}\trefs/heads/main\n`,
+    }));
+    expect(resolveMainSha('JovieInc/Jovie', { run })).toBe(EXPECTED_SHA);
+    expect(run).toHaveBeenCalledExactlyOnceWith(
+      'git',
+      [
+        'ls-remote',
+        '--exit-code',
+        'https://github.com/JovieInc/Jovie.git',
+        'refs/heads/main',
+      ],
+      expect.objectContaining({
+        timeout: 15_000,
+        env: expect.objectContaining({ GIT_TERMINAL_PROMPT: '0' }),
+      })
+    );
+  });
+
+  it.each([
+    { status: 128, stderr: 'credential-bearing-remote' },
+    { status: null, error: new Error('ETIMEDOUT') },
+    { status: 0, stdout: '' },
+    { status: 0, stdout: `${'0'.repeat(40)}\trefs/heads/main\n` },
+    { status: 0, stdout: `${EXPECTED_SHA}\trefs/heads/other\n` },
+    {
+      status: 0,
+      stdout: `${EXPECTED_SHA}\trefs/heads/main\n${NEWER_SHA}\trefs/heads/main\n`,
+    },
+    { status: 0, stdout: `${EXPECTED_SHA.slice(0, 7)}\trefs/heads/main\n` },
+  ])(
+    'rejects unavailable, ambiguous, or malformed evidence %# without retrying',
+    result => {
+      const run = vi.fn(() => result);
+      expect(() => resolveMainSha('JovieInc/Jovie', { run })).toThrow(
+        /Current-main/
+      );
+      expect(run).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('rejects an invalid repository before starting a child', () => {
+    const run = vi.fn();
+    expect(() => resolveMainSha('../invalid;repo', { run })).toThrow(
+      /owner\/repository/
+    );
+    expect(run).not.toHaveBeenCalled();
+  });
 });
 
 function getJobBlock(workflow, jobKey) {
@@ -246,6 +343,14 @@ function stubCommand(bin, name, source) {
   chmodSync(path, 0o755);
 }
 
+function stubMainGit(fixture) {
+  stubCommand(
+    fixture.bin,
+    'git',
+    '#!/bin/sh\n[ "${STUB_REF_STATUS:-0}" = 0 ] || exit "$STUB_REF_STATUS"\nprintf "%s\\trefs/heads/main\\n" "$STUB_MAIN_SHA"\n'
+  );
+}
+
 function parseOutputs(path) {
   const values = {};
   for (const line of readFileSync(path, 'utf8').trim().split('\n')) {
@@ -308,10 +413,11 @@ function releaseExpressions(overrides = {}) {
 
 function runReleaseResult(overrides = {}, boundarySha = NEWER_SHA, env = {}) {
   const fixture = makeFixture('release-result-');
+  stubMainGit(fixture);
   stubCommand(
     fixture.bin,
     'gh',
-    '#!/bin/sh\nprintf "%s\\n" "$STUB_MAIN_SHA"\n'
+    '#!/bin/sh\n[ "${STUB_GH_QUOTA:-false}" != true ] || { echo "API rate limit exceeded for installation (HTTP 403)" >&2; exit 1; }\nprintf "%s\\n" "$STUB_MAIN_SHA"\n'
   );
   const script = materialize(
     getStepRunScript(
@@ -367,6 +473,7 @@ function runControllerVerify(
     fixture.bin,
     'node',
     `#!/bin/sh
+case "$1" in */resolve-main-sha.mjs) printf '%s\\n' "$STUB_MAIN_SHA"; exit 0;; esac
 printf '%s\\n' "$*" > "$STUB_DONE_SPRINT_MARKER"
 printf 'rescan=%s\\nurl=%s\\n' "$DONE_INVARIANT_RESCAN" "$DONE_INVARIANT_PRODUCTION_BASE_URL" >> "$STUB_DONE_SPRINT_MARKER"
 exit "$STUB_DONE_SPRINT_STATUS"
@@ -430,8 +537,9 @@ function finalizeExpressions(overrides = {}) {
   };
 }
 
-function runFinalize(overrides = {}, boundarySha = NEWER_SHA) {
+function runFinalize(overrides = {}, boundarySha = NEWER_SHA, env = {}) {
   const fixture = makeFixture('controller-finalize-');
+  stubMainGit(fixture);
   const marker = join(fixture.root, 'production-generation-verified.json');
   mkdirSync(join(fixture.root, 'release-lineage'), { recursive: true });
   writeFileSync(
@@ -445,7 +553,7 @@ function runFinalize(overrides = {}, boundarySha = NEWER_SHA) {
   stubCommand(
     fixture.bin,
     'gh',
-    '#!/bin/sh\nprintf "%s\\n" "$STUB_MAIN_SHA"\n'
+    '#!/bin/sh\n[ "${STUB_GH_QUOTA:-false}" != true ] || { echo "API rate limit exceeded for installation (HTTP 403)" >&2; exit 1; }\nprintf "%s\\n" "$STUB_MAIN_SHA"\n'
   );
   const script = materialize(
     getStepRunScript(
@@ -463,6 +571,7 @@ function runFinalize(overrides = {}, boundarySha = NEWER_SHA) {
     SELECTED_LANES: 'web',
     STUB_MAIN_SHA: boundarySha,
     WEB_EVIDENCE_SHA: EXPECTED_SHA,
+    ...env,
   });
   return {
     marker: existsSync(marker)
@@ -527,6 +636,28 @@ function runStagingStep(stepName, mainSha, env = {}) {
 }
 
 describe('production release supersession execution', () => {
+  it('preserves exact release and verified-marker evidence when REST quota is exhausted', () => {
+    const released = runReleaseResult({}, NEWER_SHA, { STUB_GH_QUOTA: 'true' });
+    expect(released.result.status, released.result.stderr).toBe(0);
+    expect(released.outputs.released).toBe('true');
+    const finalized = runFinalize({}, NEWER_SHA, { STUB_GH_QUOTA: 'true' });
+    expect(finalized.result.status, finalized.result.stderr).toBe(0);
+    expect(finalized.marker.sha).toBe(EXPECTED_SHA);
+    expect(finalized.marker.terminalReason).toBe('skipped_superseded');
+  });
+
+  it('fails release and marker finalization closed when the Git ref cannot be read', () => {
+    const released = runReleaseResult({}, NEWER_SHA, {
+      STUB_REF_STATUS: '128',
+    });
+    expect(released.result.status).not.toBe(0);
+    expect(released.outputs.released).toBe('false');
+    const finalized = runFinalize({}, NEWER_SHA, { STUB_REF_STATUS: '128' });
+    expect(finalized.result.status).not.toBe(0);
+    expect(finalized.outputs.verified).toBe('false');
+    expect(finalized.marker).toBeNull();
+  });
+
   it('neutralizes an intentional pre-alias supersession only', () => {
     const neutral = runReleaseResult({
       'needs.staging-head.outputs.is_current': 'false',
@@ -963,6 +1094,10 @@ esac
       'identical',
       9,
       {
+        // Reproduce hosts whose initial branch is main, including GitHub runners.
+        GIT_CONFIG_COUNT: '1',
+        GIT_CONFIG_KEY_0: 'init.defaultBranch',
+        GIT_CONFIG_VALUE_0: 'main',
         EXPECTED_SHA: expected,
         EXPECTED_MAIN_SHA: expected,
         MAIN_LINEAGE_REMOTE: remote.remote,
