@@ -111,6 +111,23 @@ transport settings. Configure Node's proxy support in that application or pass
 Tools: `lookup_creator`, `create_profile`, `get_artist`, `get_artist_guide`, `get_openapi`,
 `get_docs`, `report_issue`, `report_feedback`. `server.json` describes the package for the MCP registry.
 
+### Repository agents
+
+The repo-root [`.mcp.json`](../../.mcp.json) registers `jovie` over stdio using
+`node packages/jovie-cli/dist/cli.js mcp`. From the repository root, build the
+workspace CLI before starting your MCP client, and rebuild after CLI changes:
+
+```sh
+pnpm --filter @jovie/cli build
+```
+
+Local agents should prefer this `jovie` MCP server over ad-hoc `curl` calls to
+agent routes when a tool covers the task. It exercises the public product
+surface from the current checkout. The entry requires no login or API key and
+clears `JOVIE_WORKER_TOKEN` so inherited worker credentials cannot expose internal
+tools.
+Using the product MCP is optional; it is not a repository agent gate.
+
 ## JavaScript client
 
 ```js
