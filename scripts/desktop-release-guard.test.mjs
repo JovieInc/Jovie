@@ -956,6 +956,138 @@ printf '%s\n' '{"ok":true}'
   assert.match(exhausted.stderr, /HTTP 502/);
 });
 
+test('production publication waits out GitHub quota and preserves fail-closed provenance', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'jovie-desktop-publish-quota-'));
+  t.after(() => rm(root, { force: true, recursive: true }));
+  const mockBin = join(root, 'bin');
+  const releaseSha = 'a'.repeat(40);
+  const currentSha = 'b'.repeat(40);
+  await mkdir(mockBin);
+  await mkdir(join(root, 'scripts/lib'), { recursive: true });
+  await copyFile(
+    new URL('./lib/github-rate-limit.mjs', import.meta.url),
+    join(root, 'scripts/lib/github-rate-limit.mjs')
+  );
+  await mkdir(join(root, 'apps/desktop/dist'), { recursive: true });
+  await writeFile(join(root, 'VERSION'), '1.2.3\n');
+  for (const name of expectedDesktopAssetNames('1.2.3', 'production')) {
+    await writeFile(join(root, 'apps/desktop/dist', name), 'packaged asset');
+  }
+  await writeFile(
+    join(root, 'compare.json'),
+    JSON.stringify({
+      status: 'ahead',
+      base_commit: { sha: releaseSha },
+      merge_base_commit: { sha: releaseSha },
+      ahead_by: 1,
+      behind_by: 0,
+      commits: [{ sha: currentSha }],
+    })
+  );
+  await writeFile(
+    join(mockBin, 'gh'),
+    `#!/usr/bin/env bash
+set -euo pipefail
+if [ "$2" = rate_limit ]; then
+  printf '0 %s\\n' "$(( $(date +%s) + MOCK_RESET_SECONDS ))"
+  exit 0
+fi
+if [[ "$2" == *"$MOCK_FAIL_ENDPOINT"* ]]; then
+  count=0
+  if [ -f attempts ]; then read -r count < attempts; fi
+  count=$((count + 1))
+  printf '%s\\n' "$count" > attempts
+  if [ "$count" -le "$MOCK_FAILURES" ]; then
+    echo "$MOCK_ERROR" >&2
+    exit 1
+  fi
+fi
+if [[ "$2" == */commits/main ]]; then
+  echo '${currentSha}'
+else
+  cat compare.json
+fi
+`,
+    { mode: 0o755 }
+  );
+  await writeFile(
+    join(mockBin, 'node'),
+    `#!/usr/bin/env bash
+set -euo pipefail
+if [ "$1" = scripts/desktop-release-assets.mjs ]; then
+  touch published
+else
+  exec "$MOCK_REAL_NODE" "$@"
+fi
+`,
+    { mode: 0o755 }
+  );
+  // Exercise the real retry CLI with a deterministic clock wait, without
+  // spending quota or sleeping through a real reset in the test runner.
+  await writeFile(
+    join(root, 'no-sleep.mjs'),
+    `import { appendFileSync } from 'node:fs';
+globalThis.setTimeout = (callback, ms) => {
+  appendFileSync('sleeps', String(ms) + '\\n');
+  callback();
+  return 0;
+};
+`
+  );
+  const body = shellStepBody(
+    desktopWorkflow,
+    'Publish production desktop release'
+  ).replaceAll('${{ github.repository }}', 'JovieInc/Jovie');
+  const run = async (overrides = {}) => {
+    for (const name of ['attempts', 'published', 'sleeps']) {
+      await rm(join(root, name), { force: true });
+    }
+    return spawnSync('bash', ['-c', body], {
+      cwd: root,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        MOCK_ERROR: 'gh: API rate limit exceeded for installation. (HTTP 403)',
+        MOCK_FAILURES: '1',
+        MOCK_FAIL_ENDPOINT: 'commits/main',
+        MOCK_REAL_NODE: process.execPath,
+        MOCK_RESET_SECONDS: '90',
+        NODE_OPTIONS: `--import=${join(root, 'no-sleep.mjs')}`,
+        PATH: `${mockBin}:${process.env.PATH}`,
+        RELEASE_SHA: releaseSha,
+        ...overrides,
+      },
+    });
+  };
+  const published = () => readFile(join(root, 'published'));
+  for (const endpoint of ['commits/main', 'compare/']) {
+    const recovered = await run({ MOCK_FAIL_ENDPOINT: endpoint });
+    assert.equal(recovered.status, 0, recovered.stderr);
+    await published();
+    assert.equal((await readFile(join(root, 'attempts'), 'utf8')).trim(), '2');
+    const wait = Number((await readFile(join(root, 'sleeps'), 'utf8')).trim());
+    assert.ok(wait >= 90_000 && wait <= 91_000, `Unexpected wait: ${wait}`);
+  }
+  for (const overrides of [
+    { MOCK_RESET_SECONDS: '3600' },
+    { MOCK_FAILURES: '4' },
+    { MOCK_ERROR: 'gh: Resource not accessible by integration (HTTP 403)' },
+  ]) {
+    const failed = await run(overrides);
+    assert.notEqual(failed.status, 0, failed.stderr);
+    await assert.rejects(published(), { code: 'ENOENT' });
+    assert.equal(
+      (await readFile(join(root, 'attempts'), 'utf8')).trim(),
+      overrides.MOCK_FAILURES || '1'
+    );
+  }
+  await writeFile(join(root, 'compare.json'), '{"status":"diverged"}');
+  const untrusted = await run();
+  assert.notEqual(untrusted.status, 0);
+  assert.match(untrusted.stdout, /not a trusted ancestor/);
+  await assert.rejects(published(), { code: 'ENOENT' });
+});
+
 test('desktop authorizer accepts an exact successful recovered production marker', () => {
   const proof = step(
     job(desktopWorkflow, 'authorize-release'),
