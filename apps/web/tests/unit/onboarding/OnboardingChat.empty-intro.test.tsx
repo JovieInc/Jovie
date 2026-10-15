@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import type { UIMessage } from 'ai';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { OnboardingChat } from '@/components/features/onboarding/OnboardingChat';
 import { ONBOARDING_ENTRY_TITLE } from '@/lib/onboarding/empty-state';
 
@@ -166,6 +166,10 @@ describe('OnboardingChat empty intro', () => {
     process.env.NODE_ENV = 'development';
   });
 
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('shows welcome intro on a blank /start visit', () => {
     render(
       <OnboardingChat turnstileToken='token' turnstileStatus='verified' />
@@ -200,7 +204,7 @@ describe('OnboardingChat empty intro', () => {
   });
 
   it('sizes pending starter guidance once without announcing or submitting it', async () => {
-    process.env.NODE_ENV = 'test';
+    vi.stubEnv('NODE_ENV', 'test');
     const onTurnstileRequired = vi.fn();
     const props = {
       starterHandoff: { kind: 'prompt' as const, prompt: 'Claim my page' },
