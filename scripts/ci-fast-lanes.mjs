@@ -523,6 +523,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/invariants/assurance-matrix.test.mjs',
   'scripts/invariants/browser-owned-input.test.mjs',
   'scripts/invariants/founder-calibration.test.mjs',
+  'scripts/invariants/jev-writing-readiness.test.mjs',
   'scripts/time-bomb/scan.test.mjs',
   'scripts/invariants/model-audit-contract.test.mjs',
   'scripts/invariants/pr-lifecycle-contract.test.mjs',
