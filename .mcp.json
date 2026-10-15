@@ -1,16 +1,23 @@
 {
   "mcpServers": {
-    "shadcn": {
-      "command": "/opt/homebrew/bin/npx",
-      "args": ["shadcn@latest", "mcp"]
-    },
     "Sentry": {
       "url": "https://mcp.sentry.dev/mcp/jovie/jovie-web",
       "type": "http"
     },
-    "puppeteer": {
-      "command": "/opt/homebrew/bin/npx",
-      "args": ["-y", "@modelcontextprotocol/server-puppeteer"]
+    "braintrust": {
+      "url": "https://api.braintrust.dev/mcp",
+      "headers": {
+        "Authorization": "Bearer ${BRAINTRUST_API_KEY:-}"
+      },
+      "type": "http"
+    },
+    "jovie": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["packages/jovie-cli/dist/cli.js", "mcp"],
+      "env": {
+        "JOVIE_WORKER_TOKEN": ""
+      }
     },
     "linear": {
       "url": "https://mcp.linear.app/sse",
@@ -20,17 +27,18 @@
       "command": "/opt/homebrew/bin/npx",
       "args": ["-y", "next-devtools-mcp@latest"]
     },
+    "puppeteer": {
+      "command": "/opt/homebrew/bin/npx",
+      "args": ["-y", "@modelcontextprotocol/server-puppeteer"]
+    },
+    "shadcn": {
+      "command": "/opt/homebrew/bin/npx",
+      "args": ["shadcn@latest", "mcp"]
+    },
     "stitch": {
       "url": "https://stitch.googleapis.com/mcp",
       "headers": {
         "X-Goog-Api-Key": "${GOOGLE_STITCH_API_KEY:-}"
-      },
-      "type": "http"
-    },
-    "braintrust": {
-      "url": "https://api.braintrust.dev/mcp",
-      "headers": {
-        "Authorization": "Bearer ${BRAINTRUST_API_KEY:-}"
       },
       "type": "http"
     }
