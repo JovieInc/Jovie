@@ -3269,7 +3269,46 @@ describe('CI E2E smoke workflow', () => {
     expect(billingHelper).toContain("'checkout.session.completed'");
     expect(billingHelper).toContain('duplicateCheckoutResponse');
     expect(billingHelper).toContain('invalidResponse.status()).toBe(400)');
-    expect(billingHelper).toContain('billingPortal.sessions.retrieve(');
+    expect(billingHelper).not.toContain('billingPortal.sessions.retrieve(');
+    expect(billingHelper).toContain('stripeClient.events.list(');
+    expect(billingHelper).toContain("type: 'billing_portal.session.created'");
+    expect(billingHelper).toContain(
+      "candidate.type === 'billing_portal.session.created'"
+    );
+    expect(billingHelper).toContain(
+      "candidate.data.object.object === 'billing_portal.session'"
+    );
+    expect(billingHelper).toContain(
+      'candidate.data.object.id === portalBody.sessionId'
+    );
+    expect(billingHelper).toContain(
+      'customerMatches: session.customer === customerId'
+    );
+    expect(billingHelper).toMatch(
+      /returnUrlMatches:\s*session\.return_url === expectedPortalReturnUrl/
+    );
+    expect(billingHelper).toContain(
+      'urlMatches: session.url === portalBody.url'
+    );
+    expect(billingHelper).toContain(
+      'eventIsTestMode: event.livemode === false'
+    );
+    expect(billingHelper).toContain(
+      'sessionIsTestMode: session.livemode === false'
+    );
+    const portalProofAssertion = billingHelper.match(
+      /expect\(portalProof\)\.toEqual\(\{([\s\S]*?)\}\);/
+    )?.[1];
+    expect(portalProofAssertion).toBeDefined();
+    for (const proof of [
+      'customerMatches',
+      'returnUrlMatches',
+      'urlMatches',
+      'eventIsTestMode',
+      'sessionIsTestMode',
+    ]) {
+      expect(portalProofAssertion).toMatch(new RegExp(`${proof}:\\s*true,`));
+    }
     expect(billingHelper).toContain('DELETE FROM ba_sessions');
     expect(billingHelper).toContain('deleteRunOwnedStripeCustomer(');
     expect(billingHelper).not.toContain('completeCardPayment(');
