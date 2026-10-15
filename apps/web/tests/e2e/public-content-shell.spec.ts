@@ -38,7 +38,7 @@ for (const viewport of [
             if (message.type() === 'error') errors.push(message.text());
           });
           await page.addInitScript(selectedTheme => {
-            localStorage.setItem('theme', selectedTheme);
+            localStorage.setItem('jovie-theme', selectedTheme);
           }, theme);
           const response = await page.goto(surface.path, {
             waitUntil: 'domcontentloaded',
