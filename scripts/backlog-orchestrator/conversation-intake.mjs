@@ -141,11 +141,11 @@ function rankedMatches(request, issues) {
  */
 export async function reconcileConversationRequest({
   request,
-  teamId,
-  stateId,
-  client,
+  teamId = undefined,
+  stateId = undefined,
+  client = undefined,
   dryRun = false,
-  privateTaskDirectory,
+  privateTaskDirectory = undefined,
 }) {
   const classification = classifyConversationRequest(request);
   if (classification !== 'jovie')

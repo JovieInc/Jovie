@@ -137,6 +137,7 @@ describe('conversation issue reconciliation', () => {
       stateId: 'triage',
       client: api,
     });
+    assert.ok('receiptKey' in first);
     api.calls.comments.length = 0;
     api.calls.comments.push({
       body: `<!-- conversation-receipt:${first.receiptKey} -->`,
@@ -161,6 +162,7 @@ describe('conversation issue reconciliation', () => {
       client: api,
     });
     assert.equal(second.mutation, 'already_linked');
+    assert.ok('counts' in second);
     assert.equal(second.counts.receiptsLinked, 0);
     assert.equal(api.calls.comments.length, 1);
   });
@@ -277,6 +279,19 @@ const personalRequest = {
 };
 
 describe('private conversation intake and recovery', () => {
+  it('allows private dry runs without company tools or a state directory', async () => {
+    const receipt = await reconcileConversationRequest({
+      request: personalRequest,
+      dryRun: true,
+    });
+    assert.equal(receipt.disposition, 'private_task');
+    assert.equal(receipt.classification, 'personal');
+    assert.equal(receipt.externalization, 'denied');
+    assert.equal(receipt.mutation, 'none');
+    assert.ok(!('receiptKey' in receipt));
+    assert.ok(!('counts' in receipt));
+  });
+
   it('classifies before any tool use and fails unknown/conflicting scope closed', async t => {
     const directory = privateFixture(t);
     for (const [input, expected] of [
