@@ -7,6 +7,7 @@ import {
   parseLsTreeLong,
   parseNumstatZ,
   readLocalMergeGroupEvidence,
+  trackedBytesFromCatFile,
 } from '../merge-group-local-evidence.mjs';
 
 function git(cwd, args) {
@@ -41,6 +42,19 @@ describe('local merge-group size evidence', () => {
     expect(
       parseLsTreeLong(`100644 blob ${'a'.repeat(40)}       -\ta.ts\n`)
     ).toBeNull();
+    const oid = 'e'.repeat(40);
+    const listing = [
+      `100644 blob ${oid}\ta.ts`,
+      `100644 blob ${oid}\tb.ts`,
+      `120000 blob ${'f'.repeat(40)}\tlink`,
+      '',
+    ].join('\n');
+    expect(trackedBytesFromCatFile(listing, `${oid} 5\n`)).toEqual({
+      bytes: 10,
+      files: 2,
+    });
+    expect(trackedBytesFromCatFile(listing, '')).toBeNull();
+    expect(trackedBytesFromCatFile('not a tree row', '')).toBeNull();
   });
 
   it('counts the checkout diff and ignores a commit GitHub did not create', () => {
@@ -101,5 +115,96 @@ describe('local merge-group size evidence', () => {
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
+  });
+
+  it('measures tracked bytes from one git fetch when ls-tree cannot see blobs', () => {
+    const head = 'a'.repeat(40);
+    const base = 'b'.repeat(40);
+    const tree = 'c'.repeat(40);
+    const blob = 'd'.repeat(40);
+    const calls = [];
+    let longLists = 0;
+    const evidence = readLocalMergeGroupEvidence({
+      baseSha: base,
+      headSha: head,
+      cwd: '/tmp',
+      git(args) {
+        calls.push([...args]);
+        if (args[0] === 'rev-parse') {
+          return `${String(args[2]).startsWith(head) ? head : base}\n`;
+        }
+        if (args[0] === 'log') {
+          return `${base}\0GitHub\0noreply@github.com\0${tree}\0fix(ci): member (#1)\n`;
+        }
+        if (args[0] === 'diff') return '1\t0\ta.ts\0';
+        if (args[0] === 'ls-tree' && args.includes('-l')) {
+          longLists += 1;
+          if (longLists === 1) throw new Error('missing blob');
+          return `100644 blob ${blob}       4\ta.ts\n`;
+        }
+        if (args[0] === 'fetch') return '';
+        throw new Error(args.join(' '));
+      },
+    });
+    expect(evidence?.tracked).toEqual({ bytes: 4, files: 1 });
+    expect(evidence?.files).toEqual([
+      { filename: 'a.ts', additions: 1, deletions: 0 },
+    ]);
+    const fetches = calls.filter(args => args[0] === 'fetch');
+    expect(fetches).toEqual([
+      [
+        'fetch',
+        '--refetch',
+        '--filter=blob:limit=1g',
+        '--no-tags',
+        '--depth=2',
+        'origin',
+        head,
+      ],
+    ]);
+
+    const noFetch = [];
+    const ready = readLocalMergeGroupEvidence({
+      baseSha: base,
+      headSha: head,
+      cwd: '/tmp',
+      git(args) {
+        noFetch.push(args[0]);
+        if (args[0] === 'rev-parse') {
+          return `${String(args[2]).startsWith(head) ? head : base}\n`;
+        }
+        if (args[0] === 'log') {
+          return `${base}\0GitHub\0noreply@github.com\0${tree}\0fix(ci): member (#1)\n`;
+        }
+        if (args[0] === 'diff') return '1\t0\ta.ts\0';
+        if (args[0] === 'ls-tree') {
+          return `100644 blob ${blob}       4\ta.ts\n`;
+        }
+        throw new Error(`unexpected ${args.join(' ')}`);
+      },
+    });
+    expect(ready?.tracked).toEqual({ bytes: 4, files: 1 });
+    expect(noFetch).not.toContain('fetch');
+
+    const unmeasured = readLocalMergeGroupEvidence({
+      baseSha: base,
+      headSha: head,
+      cwd: '/tmp',
+      git(args) {
+        if (args[0] === 'rev-parse') {
+          return `${String(args[2]).startsWith(head) ? head : base}\n`;
+        }
+        if (args[0] === 'log') {
+          return `${base}\0GitHub\0noreply@github.com\0${tree}\0fix(ci): member (#1)\n`;
+        }
+        if (args[0] === 'diff') return '1\t0\ta.ts\0';
+        if (args[0] === 'fetch') return '';
+        throw new Error('missing blob');
+      },
+    });
+    expect(unmeasured?.files).toEqual([
+      { filename: 'a.ts', additions: 1, deletions: 0 },
+    ]);
+    expect(unmeasured?.tracked).toBeNull();
   });
 });
