@@ -1,12 +1,16 @@
 import type { DocumentedContract } from './types';
 
-/** Documentation only: no data access, redistribution right or runtime parity. */
-export const CHARTMETRIC_REFERENCE = {
+/** Complete official download; the Scalar chunk index alone contains no paths. */
+export const CHARTMETRIC_SCHEMA_SNAPSHOT = {
   url: 'https://apidocs.chartmetric.com/reference/openapi.json',
   version: '1.0.1575',
+  openapi: '3.1.1',
   retrievedOn: '2026-10-15',
   sha256: 'fe6e73a64c6c8d6075ae5993c818499cde28a32ffe7fc10d9c0f724cd716c379',
 } as const;
+
+/** Documentation only: no data access, redistribution right or runtime parity. */
+export const CHARTMETRIC_REFERENCE = CHARTMETRIC_SCHEMA_SNAPSHOT;
 
 const FAMILIES = {
   'audience-geography': ['JOV-7828', 'JOV-8474'],
