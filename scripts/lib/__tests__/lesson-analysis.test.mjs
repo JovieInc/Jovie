@@ -21,7 +21,16 @@ const claim = (statement, refs = ['signal']) => ({
   evidenceRefs: refs.map(value => REF + value),
 });
 
-function fixture() {
+/** @typedef {{status: 'supported', causeKey: string, statement: string, evidenceRefs: string[]} | {status: 'unknown', reason: string}} RootCause */
+
+/** @param {RootCause} [rootCause] */
+function fixture(
+  rootCause = {
+    status: 'supported',
+    causeKey: 'stale-payload',
+    ...claim('Stale payload caused failure', ['causal']),
+  }
+) {
   const order = sealWorkOrder({
     schema: 'jovie.work-order/v1',
     orderId: 'lesson-8420',
@@ -125,11 +134,7 @@ function fixture() {
     },
   };
   const finding = {
-    rootCause: {
-      status: 'supported',
-      causeKey: 'stale-payload',
-      ...claim('Stale payload caused failure', ['causal']),
-    },
+    rootCause,
     symptoms: [claim('Release failed', ['failed'])],
     differences: [
       {
@@ -208,6 +213,8 @@ function fixture() {
     }),
     dispatch: async call => {
       calls.push(call);
+      // Transport output is untrusted and deliberately corrupted by failure cases.
+      /** @type {Record<string, unknown>} */
       const output =
         call.role === 'author'
           ? structuredClone(finding)
@@ -429,7 +436,10 @@ describe('admitted bounded lesson analysis', () => {
     assert.doesNotMatch(JSON.stringify(result.attemptGraph), /protected-case/);
   });
 
-  for (const [mutate, reason] of [
+  for (const [
+    mutate,
+    reason,
+  ] of /** @type {Array<[(f: ReturnType<typeof fixture>) => void, string]>} */ ([
     [
       f => {
         f.request.evidence[0].access = 'unsafe';
@@ -484,7 +494,7 @@ describe('admitted bounded lesson analysis', () => {
       },
       'timed-out',
     ],
-  ]) {
+  ])) {
     it(`refuses ${reason} without dispatch`, async () => {
       const f = fixture();
       mutate(f);
@@ -495,7 +505,10 @@ describe('admitted bounded lesson analysis', () => {
     });
   }
 
-  for (const [mutate, reason] of [
+  for (const [
+    mutate,
+    reason,
+  ] of /** @type {Array<[(f: ReturnType<typeof fixture>) => void, string]>} */ ([
     [
       f => {
         f.request.evidence[3].causalVerification = null;
@@ -510,6 +523,7 @@ describe('admitted bounded lesson analysis', () => {
     ],
     [
       f => {
+        assert.ok(f.finding.rootCause.status === 'supported');
         f.finding.rootCause.evidenceRefs = [REF + 'invented'];
       },
       'unsupported-evidence-reference',
@@ -538,7 +552,7 @@ describe('admitted bounded lesson analysis', () => {
       },
       'unsupported-causal-claim',
     ],
-  ]) {
+  ])) {
     it(`rejects ${reason} before spending on challenge`, async () => {
       const f = fixture();
       mutate(f);
@@ -552,11 +566,10 @@ describe('admitted bounded lesson analysis', () => {
   }
 
   it('permits an independently reviewed no-change result when causality is unknown', async () => {
-    const f = fixture();
-    f.finding.rootCause = {
+    const f = fixture({
       status: 'unknown',
       reason: 'One success is insufficient causal evidence',
-    };
+    });
     f.finding.disposition = 'no-change';
     f.finding.target = null;
     const result = await run(f);

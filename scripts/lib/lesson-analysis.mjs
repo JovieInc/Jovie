@@ -404,6 +404,7 @@ export async function runLessonAnalysis(orderInput, request, environment) {
     const frontier =
       input.lessonClass !== 'local' ||
       ['high', 'critical'].includes(order.riskTier);
+    /** @returns {import('../../apps/eve-pilot/agent/lib/governor-route.ts').DecisionJob} */
     const job = role => ({
       kind: 'decision',
       id: `${order.orderId}:${role}`,
