@@ -5,6 +5,7 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -163,6 +164,68 @@ describe('linear sync on merge', () => {
     });
     await expect(sweep(partial)).rejects.toThrow('Child delivery evidence');
     expect(world.updates).toEqual([]);
+  });
+
+  it('pages JOV-5853 child evidence and still closes a shipped child', async () => {
+    const { world, fetchImpl } = createWorld();
+    world.pulls[202] = {
+      mergeSha: MAIN[1],
+      mergedAt: '2026-10-03T10:00:00Z',
+      files: ['apps/web/components/Card.tsx'],
+      headRef: 'tim/jov-2-shipped-child',
+    };
+    world.issues['JOV-2'] = {
+      ...structuredClone(world.issues['JOV-1']),
+      id: 'uuid-2',
+      identifier: 'JOV-2',
+      state: 'Merging',
+      updatedAt: '2026-10-03T13:00:00Z',
+      attachments: [`https://github.com/${REPO}/pull/202`],
+      children: [],
+    };
+    world.issues['JOV-5853'] = {
+      ...structuredClone(world.issues['JOV-1']),
+      id: 'uuid-5853',
+      identifier: 'JOV-5853',
+      title: 'commission: fleet readiness',
+      state: 'In Progress',
+      updatedAt: '2026-10-03T09:00:00Z',
+      attachments: [],
+      children: [['JOV-2', 'started']],
+    };
+    const paged = intercept(fetchImpl, async (_url, body, next) => {
+      if (body?.query?.includes('IssueLifecycleChildren')) {
+        expect(body.variables.issueId).toBe('uuid-5853');
+        expect(body.variables.after).toBe('c1');
+        return json({
+          data: {
+            issue: {
+              children: {
+                nodes: [
+                  {
+                    identifier: 'JOV-4',
+                    state: { type: 'completed' },
+                    completedAt: '2026-10-03T11:00:00Z',
+                    canceledAt: null,
+                  },
+                ],
+                pageInfo: { hasNextPage: false, endCursor: null },
+              },
+            },
+          },
+        });
+      }
+      if (!body?.query?.includes('LifecycleIssueBatch')) return null;
+      const payload = await (await next()).json();
+      for (const node of Object.values(payload.data)) {
+        if (node?.identifier !== 'JOV-5853') continue;
+        node.children.pageInfo = { hasNextPage: true, endCursor: 'c1' };
+      }
+      return json(payload);
+    });
+    await sweep(paged);
+    expect(world.issues['JOV-2'].state).toBe('Done');
+    expect(world.issues['JOV-5853'].state).toBe('In Progress');
   });
 
   it.each([false, true])(
@@ -741,8 +804,9 @@ describe('linear sync on merge', () => {
     expect(world.updates).toEqual([]);
   });
 
-  it('stops a sweep at the Linear rate limit, oldest issue first, and defers the rest', async () => {
+  it('stops a sweep at the Linear rate limit, oldest issue first, and persists the resume cursor', async () => {
     const { world, fetchImpl } = createWorld();
+    const cursorDir = mkdtempSync(join(tmpdir(), 'linear-sync-cursor-'));
     world.issues['JOV-1'].state = 'Merging';
     world.issues['JOV-1'].updatedAt = '2026-10-03T13:00:00Z';
     world.issues['JOV-2'] = {
@@ -751,13 +815,27 @@ describe('linear sync on merge', () => {
       identifier: 'JOV-2',
       updatedAt: '2026-10-03T09:00:00Z',
     };
+    world.pulls[303] = {
+      mergeSha: MAIN[1],
+      mergedAt: '2026-10-03T10:00:00Z',
+      files: ['apps/web/components/Card.tsx'],
+      headRef: 'tim/jov-3-editorial-card',
+    };
+    world.issues['JOV-3'] = {
+      ...structuredClone(world.issues['JOV-1']),
+      id: 'uuid-3',
+      identifier: 'JOV-3',
+      updatedAt: '2026-10-03T15:00:00Z',
+      attachments: [`https://github.com/${REPO}/pull/303`],
+    };
     const asked = [];
     const limited = intercept(fetchImpl, async (_url, body) => {
-      if (!body?.query?.includes('IssueLifecycle(')) return null;
-      asked.push(body.variables.issueId);
+      if (!body?.query?.includes('LifecycleIssueBatch')) return null;
+      asked.push(body.variables.id0);
       return {
         ok: false,
         status: 400,
+        headers: { get: () => null },
         json: async () => ({
           errors: [
             {
@@ -768,10 +846,234 @@ describe('linear sync on merge', () => {
         }),
       };
     });
-    await expect(sweep(limited)).rejects.toThrow(
-      /JOV-2: Linear rate limited \(HTTP 400\); 1 issue\(s\) deferred to the next sweep/
+    try {
+      const first = await syncLinearIssueOnMerge({
+        env: {
+          ...BASE_ENV,
+          LIFECYCLE_MODE: 'sweep',
+          LINEAR_SYNC_CURSOR_DIR: cursorDir,
+        },
+        fetchImpl: limited,
+        harnessManifest: HARNESS_MANIFEST,
+        assuranceMatrix: NO_UI_MATRIX,
+        verifyMarker: () => true,
+        sleep: async () => {},
+        log: () => {},
+      });
+      expect(first.action).toBe('deferred');
+      expect(first.deferred).toBe(3);
+      expect(asked.every(id => id === 'JOV-2')).toBe(true);
+      expect(asked.length).toBeGreaterThan(1);
+      expect(
+        JSON.parse(readFileSync(join(cursorDir, 'cursor.json'), 'utf8'))
+          .nextIdentifier
+      ).toBe('JOV-2');
+      expect(world.updates).toEqual([]);
+
+      writeFileSync(
+        join(cursorDir, 'cursor.json'),
+        `${JSON.stringify({
+          schema: 1,
+          nextIdentifier: 'JOV-1',
+          savedAt: '2026-10-15T00:00:00.000Z',
+        })}\n`
+      );
+      const resumed = [];
+      const healthy = intercept(fetchImpl, async (_url, body) => {
+        if (!body?.query?.includes('LifecycleIssueBatch')) return null;
+        resumed.push(body.variables.id0);
+        return null;
+      });
+      await syncLinearIssueOnMerge({
+        env: {
+          ...BASE_ENV,
+          LIFECYCLE_MODE: 'sweep',
+          LINEAR_SYNC_CURSOR_DIR: cursorDir,
+        },
+        fetchImpl: healthy,
+        harnessManifest: HARNESS_MANIFEST,
+        assuranceMatrix: NO_UI_MATRIX,
+        verifyMarker: () => true,
+        sleep: async () => {},
+        log: () => {},
+      });
+      expect(resumed[0]).toBe('JOV-1');
+      expect(world.issues['JOV-2'].state).toBe('Merging');
+      expect(world.issues['JOV-1'].state).toBe('Done');
+      expect(world.issues['JOV-3'].state).toBe('Done');
+      expect(
+        JSON.parse(readFileSync(join(cursorDir, 'cursor.json'), 'utf8'))
+          .nextIdentifier
+      ).toBe('');
+    } finally {
+      rmSync(cursorDir, { recursive: true, force: true });
+    }
+  });
+
+  it('skips one unreadable pull request and still closes the other issue', async () => {
+    const { world, fetchImpl } = createWorld();
+    world.issues['JOV-1'].state = 'Merging';
+    world.issues['JOV-2'] = {
+      ...structuredClone(world.issues['JOV-1']),
+      id: 'uuid-2',
+      identifier: 'JOV-2',
+      updatedAt: '2026-10-03T09:00:00Z',
+      attachments: [`https://github.com/${REPO}/pull/19767`],
+    };
+    const blocked = intercept(fetchImpl, async url =>
+      url.includes('/pulls/19767')
+        ? {
+            ok: false,
+            status: 403,
+            headers: new Headers({ 'x-ratelimit-remaining': '4000' }),
+            json: async () => ({
+              message: 'Resource not accessible by integration',
+            }),
+          }
+        : null
     );
-    expect(asked).toEqual(['JOV-2']);
+    const logs = [];
+    await syncLinearIssueOnMerge({
+      env: { ...BASE_ENV, LIFECYCLE_MODE: 'sweep' },
+      fetchImpl: blocked,
+      harnessManifest: HARNESS_MANIFEST,
+      assuranceMatrix: NO_UI_MATRIX,
+      verifyMarker: () => true,
+      log: message => logs.push(message),
+    });
+    expect(world.issues['JOV-1'].state).toBe('Done');
+    expect(world.issues['JOV-2'].state).toBe('Merging');
+    expect(logs.join('\n')).toContain('pulls/19767');
+    expect(logs.join('\n')).not.toContain('token permission gap');
+  });
+
+  it('defers a quota 403 on one linked pull and resumes after it', async () => {
+    const { world, fetchImpl } = createWorld();
+    const cursorDir = mkdtempSync(join(tmpdir(), 'linear-sync-cursor-'));
+    world.issues['JOV-1'].state = 'Merging';
+    world.issues['JOV-2'] = {
+      ...structuredClone(world.issues['JOV-1']),
+      id: 'uuid-2',
+      identifier: 'JOV-2',
+      updatedAt: '2026-10-03T09:00:00Z',
+      attachments: [`https://github.com/${REPO}/pull/19767`],
+    };
+    const exhausted = intercept(fetchImpl, async url =>
+      url.includes('/pulls/19767')
+        ? {
+            ok: false,
+            status: 403,
+            headers: new Headers({ 'x-ratelimit-remaining': '0' }),
+            json: async () => ({
+              message: 'API rate limit exceeded for installation.',
+            }),
+          }
+        : null
+    );
+    try {
+      const logs = [];
+      const first = await syncLinearIssueOnMerge({
+        env: {
+          ...BASE_ENV,
+          LIFECYCLE_MODE: 'sweep',
+          LINEAR_SYNC_CURSOR_DIR: cursorDir,
+        },
+        fetchImpl: exhausted,
+        harnessManifest: HARNESS_MANIFEST,
+        assuranceMatrix: NO_UI_MATRIX,
+        verifyMarker: () => true,
+        sleep: async () => {},
+        log: message => logs.push(message),
+      });
+      expect(first.action).toBe('deferred');
+      expect(first.deferred).toBe(2);
+      expect(world.issues['JOV-1'].state).toBe('Merging');
+      expect(world.issues['JOV-2'].state).toBe('Merging');
+      expect(logs.join('\n')).toContain('pulls/19767');
+      expect(logs.join('\n')).toContain('GitHub rate limit');
+      expect(logs.join('\n')).not.toContain('token permission gap');
+      expect(
+        JSON.parse(readFileSync(join(cursorDir, 'cursor.json'), 'utf8'))
+          .nextIdentifier
+      ).toBe('JOV-2');
+    } finally {
+      rmSync(cursorDir, { recursive: true, force: true });
+    }
+  });
+
+  it('defers a quota-exhausted open scan without holding every issue', async () => {
+    const { world, fetchImpl } = createWorld();
+    world.issues['JOV-1'].state = 'Merging';
+    const exhausted = intercept(fetchImpl, async url =>
+      url.includes('pulls?state=open')
+        ? {
+            ok: false,
+            status: 403,
+            headers: new Headers({ 'x-ratelimit-remaining': '0' }),
+            json: async () => ({
+              message: 'API rate limit exceeded for installation.',
+            }),
+          }
+        : null
+    );
+    const result = await syncLinearIssueOnMerge({
+      env: { ...BASE_ENV, LIFECYCLE_MODE: 'sweep' },
+      fetchImpl: exhausted,
+      harnessManifest: HARNESS_MANIFEST,
+      assuranceMatrix: NO_UI_MATRIX,
+      verifyMarker: () => true,
+      sleep: async () => {},
+      log: () => {},
+    });
+    expect(result.action).toBe('deferred');
+    expect(world.updates).toEqual([]);
+    expect(world.issues['JOV-1'].state).toBe('Merging');
+  });
+
+  it('fails a merge event closed when the open scan is quota exhausted', async () => {
+    const { world, fetchImpl } = createWorld();
+    const exhausted = intercept(fetchImpl, async url =>
+      url.includes('pulls?state=open')
+        ? {
+            ok: false,
+            status: 403,
+            headers: new Headers({ 'x-ratelimit-remaining': '0' }),
+            json: async () => ({
+              message: 'API rate limit exceeded for installation.',
+            }),
+          }
+        : null
+    );
+    await expect(mergeEvent(exhausted, 101)).rejects.toThrow(
+      /open pull request scan failed/
+    );
+    expect(world.updates).toEqual([]);
+  });
+
+  it('reports an open-scan 403 that is not a rate limit as a token permission gap', async () => {
+    const { fetchImpl } = createWorld();
+    const denied = intercept(fetchImpl, async url =>
+      url.includes('pulls?state=open')
+        ? {
+            ok: false,
+            status: 403,
+            headers: new Headers({ 'x-ratelimit-remaining': '4000' }),
+            json: async () => ({
+              message: 'Resource not accessible by integration',
+            }),
+          }
+        : null
+    );
+    await expect(
+      syncLinearIssueOnMerge({
+        env: { ...BASE_ENV, LIFECYCLE_MODE: 'sweep' },
+        fetchImpl: denied,
+        harnessManifest: HARNESS_MANIFEST,
+        assuranceMatrix: NO_UI_MATRIX,
+        verifyMarker: () => true,
+        log: () => {},
+      })
+    ).rejects.toThrow(/token permission gap/);
   });
 
   it('surfaces Linear HTTP and GraphQL errors, and skips unknown issues', async () => {
@@ -939,6 +1241,7 @@ describe('linear sync on merge', () => {
       'Production Controller',
       'actions: read',
       '.github/ci-harness/manifest.json',
+      'LINEAR_SYNC_CURSOR_DIR',
     ]) {
       expect(workflow).toContain(trigger);
     }
