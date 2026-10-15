@@ -32,6 +32,7 @@ from types import SimpleNamespace
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import autoscale  # noqa: E402  (sibling module of the release)
 import worktree_pool  # noqa: E402  (sibling module of the release)
+import git_housekeeping  # noqa: E402  (detached git maintenance vs cleanup)
 
 # One threshold (Gem 2026-10-12 04:12Z): autoscale stops growth at or below this free %, so the
 # sweep must already run there. At exactly 15% growth was blocked and nothing was reclaimed
@@ -309,6 +310,10 @@ def sweep_retired_workspaces(host, run, now: float, report: dict, roots=None,
                 continue
             if worktree_sweep.busy(resolved, live) or recently_touched(path, WORKTREE_IDLE_S, now):
                 continue
+            # inspect() is fail-closed when git cannot take the index. Wait out a
+            # detached maintenance writer first; a lock that outlives the wait still
+            # leaves the workspace in place.
+            git_housekeeping.quiesce(path)
             info = worktree_sweep.inspect(path, run) if (path / ".git").exists() else None
             if info is None:
                 worktree_sweep.strip_build_dirs(path)
@@ -321,7 +326,10 @@ def sweep_retired_workspaces(host, run, now: float, report: dict, roots=None,
                     report["actions"].append(f"stripped workspace {path}: backup failed")
                     continue
                 report["actions"].append(f"backed up {path} to {saved}")
-            shutil.rmtree(path, ignore_errors=True)
+            try:
+                git_housekeeping.remove_tree(path)
+            except OSError:
+                pass
             (report["errors"] if path.exists() else report["actions"]).append(f"removed retired workspace {path}")
 
 
