@@ -2,6 +2,7 @@ import { TooltipProvider } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
+import { RenderedFamily } from '@/.storybook/rendered-family';
 import { SidebarProvider } from '@/components/organisms/sidebar';
 import type { SidebarListsPayload } from '@/lib/ovie/lists/types';
 import { queryKeys } from '@/lib/queries/keys';
@@ -18,7 +19,13 @@ function withLists(payload: SidebarListsPayload | null) {
         <TooltipProvider>
           <SidebarProvider>
             <div className='ov-mode w-60 bg-base p-2'>
-              <Story />
+              <RenderedFamily
+                name='OperatorListsNav'
+                owner='OperatorListsNav'
+                interactive
+              >
+                <Story />
+              </RenderedFamily>
             </div>
           </SidebarProvider>
         </TooltipProvider>

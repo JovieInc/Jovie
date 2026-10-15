@@ -1,5 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import Link from 'next/link';
 import { fn } from 'storybook/test';
+import { RenderedFamily } from '@/.storybook/rendered-family';
+import { Icon } from '@/components/atoms/Icon';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   type SidebarThread,
   SidebarThreadsSection,
@@ -38,7 +42,13 @@ const meta = {
   decorators: [
     Story => (
       <div className='w-60 bg-sidebar p-3'>
-        <Story />
+        <RenderedFamily
+          name='SidebarThreadsSection'
+          owner='SidebarThreadsSection'
+          interactive
+        >
+          <Story />
+        </RenderedFamily>
       </div>
     ),
   ],
@@ -73,5 +83,20 @@ export const CalmLongTitles: Story = {
       unread: index === 1,
     })),
     onThreadContextMenu: fn(),
+  },
+};
+
+export const CanonicalCreation: Story = {
+  args: {
+    calm: true,
+    newThreadAction: (
+      <Link
+        href={APP_ROUTES.CHAT}
+        aria-label='New Chat'
+        className='flex size-6 items-center justify-center rounded-md text-sidebar-muted hover:bg-sidebar-accent focus-ring-themed'
+      >
+        <Icon name='Plus' className='size-3.5' aria-hidden='true' />
+      </Link>
+    ),
   },
 };
