@@ -597,14 +597,14 @@ function OnboardingFlowStatus({
       data-testid='onboarding-flow-status'
       className={cn(
         sizeStarterInstruction &&
-          'grid grid-cols-1 [&>p[role=status]]:[grid-area:1/1] [&:has([data-turnstile-mount=inline])>p[aria-hidden=true]]:hidden'
+          'grid grid-cols-1 [&>p[role=status]]:col-start-1 [&>p[role=status]]:row-start-1 [&:has([data-turnstile-mount=inline])>p[aria-hidden=true]]:hidden'
       )}
     >
       {/* Size the known instruction's text, never an unpainted provider frame. */}
       {sizeStarterInstruction ? (
         <p
           aria-hidden='true'
-          className='invisible pointer-events-none mb-2 text-xs text-secondary-token [grid-area:1/1]'
+          className='invisible pointer-events-none mb-2 text-xs text-secondary-token col-start-1 row-start-1'
           data-testid='onboarding-verification-instruction-size'
         >
           {STARTER_VERIFICATION_INSTRUCTION}
