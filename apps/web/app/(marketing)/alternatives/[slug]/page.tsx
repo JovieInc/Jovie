@@ -170,7 +170,7 @@ export default async function AlternativesPage({
       {/* FAQ */}
       <FaqSection
         items={data.faq}
-        sectionVariant='objection-handler'
+        sectionVariant='objection-handler' /* copy-lint-allow: objection */
         headingClassName='text-2xl font-semibold tracking-tight text-primary-token'
       />
     </>

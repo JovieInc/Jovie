@@ -75,7 +75,7 @@ export function BlogFeed({ entries }: Readonly<BlogFeedProps>) {
       </BlogHeroFrame>
 
       <section
-        aria-label='Blog posts'
+        aria-label='Blog Posts'
         data-testid='marketing-section-blog-feed'
         data-marketing-variant='featured-grid'
         data-marketing-owner='apps/web/app/(marketing)/blog/BlogFeed.tsx'
