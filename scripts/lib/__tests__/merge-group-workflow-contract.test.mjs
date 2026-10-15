@@ -25,7 +25,10 @@ import {
   EXACT_HEAD_COVERAGE_JOB_TIMEOUT_MINUTES,
   EXACT_HEAD_COVERAGE_STEP_TIMEOUT,
 } from '../changed-test-coverage.mjs';
-import { MERGE_GROUP_ADMISSION_WAIT_MS } from '../merge-group-admission.mjs';
+import {
+  MERGE_GROUP_ADMISSION_QUOTA_RECOVERY_MS,
+  MERGE_GROUP_ADMISSION_WAIT_MS,
+} from '../merge-group-admission.mjs';
 import {
   MERGE_GROUP_JOB_BUDGET_MS,
   MERGE_GROUP_POLICY_DEADLINE_MS,
@@ -448,7 +451,8 @@ describe('merge_group workflow contract', () => {
     expect(admission).toContain('needs: [ci-path-changes]');
     expect(admission).toContain("github.event_name == 'merge_group'");
     expect(admission).toContain('runs-on: ubuntu-latest');
-    expect(admission).toContain('timeout-minutes: 8');
+    expect(admission).toContain('timeout-minutes: 75');
+    expect(admission).not.toContain('sleep "$wait_s"');
     expect(admission).toContain('actions: read');
     expect(admission).toContain(
       "admitted: ${{ steps.admission.outputs.admitted || 'false' }}"
@@ -522,6 +526,10 @@ describe('merge_group workflow contract', () => {
     expect(
       admissionTimeoutMinutes * 60_000 - MERGE_GROUP_ADMISSION_WAIT_MS
     ).toBeGreaterThanOrEqual(90_000);
+    expect(MERGE_GROUP_ADMISSION_QUOTA_RECOVERY_MS).toBe(66 * 60 * 1000);
+    expect(
+      admissionTimeoutMinutes * 60_000 - MERGE_GROUP_ADMISSION_QUOTA_RECOVERY_MS
+    ).toBeGreaterThanOrEqual(MERGE_GROUP_ADMISSION_WAIT_MS + 90_000);
 
     for (const jobId of ['ci-fast-typecheck', 'ci-fast-remaining']) {
       const job = getJobBlock(CI_WORKFLOW, jobId);

@@ -35,10 +35,16 @@ const TERMINAL_CHECK_CONCLUSIONS = new Set([
 ]);
 // Required external checks can sit queued/in_progress on a busy runner pool for
 // well over a minute (PR Size Guard observed in_progress at attempt 20 of a
-// 90s budget). Poll for most of the job budget instead of failing a healthy
-// queue entry; concluded failures still fail immediately. Keep this below the
-// ci.yml `Merge Group Admission` job timeout with room for setup/checkout.
+// 90s budget). Poll for most of the check budget instead of failing a healthy
+// queue entry; concluded failures still fail immediately. This poll window is
+// not the quota-recovery window: an installation 403 whose reset is hours
+// away used to exit 1 inside six minutes and eject an in-cap group
+// (2026-10-15 19:53Z, run 38797397320).
 export const MERGE_GROUP_ADMISSION_WAIT_MS = 360_000;
+// Hourly installation reset is at most 60 minutes out. Wait that out, plus
+// a minute of clock skew, when the reset header says so. A later reset still
+// fails closed. The ci.yml job timeout must cover this plus the poll window.
+export const MERGE_GROUP_ADMISSION_QUOTA_RECOVERY_MS = 66 * 60 * 1000;
 const MAX_WAIT_MS = MERGE_GROUP_ADMISSION_WAIT_MS;
 // Every iteration spends one GraphQL and three REST calls from the
 // repository's shared GITHUB_TOKEN quota. A 3 s cadence across ten queue
@@ -663,7 +669,10 @@ export async function waitForMergeGroupAdmission({
   requireTimingBound(maxWaitMs, 'maxWaitMs', MAX_WAIT_MS);
   requireTimingBound(pollIntervalMs, 'pollIntervalMs', maxWaitMs);
 
-  const deadlineMs = now() + maxWaitMs;
+  const startedMs = now();
+  let deadlineMs = startedMs + maxWaitMs;
+  const recoveryDeadlineMs =
+    startedMs + MERGE_GROUP_ADMISSION_QUOTA_RECOVERY_MS;
   let attempt = 0;
   let lastGateStatus = null;
   let observedSourceHeadSha = null;
@@ -858,10 +867,17 @@ export async function waitForMergeGroupAdmission({
       recoverySourceHeadSha ??= observedSourceHeadSha;
       if (error.retryAtMs !== undefined && error.retryAtMs !== null) {
         delayMs = Math.max(pollIntervalMs, error.retryAtMs - now());
-        if (delayMs + MAX_API_REQUEST_MS > deadlineMs - now()) {
+        // Quota sleep uses the recovery budget, not the 6-minute check poll.
+        // After it, the poll window starts over so a long reset does not eat
+        // the time required checks still need.
+        if (now() + delayMs + MAX_API_REQUEST_MS > recoveryDeadlineMs) {
           fail(
             'GitHub rate-limit recovery does not fit within the admission budget'
           );
+        }
+        const resumeAtMs = now() + delayMs;
+        if (deadlineMs < resumeAtMs + maxWaitMs) {
+          deadlineMs = resumeAtMs + maxWaitMs;
         }
       }
       outcome = `GitHub API unavailable (${
