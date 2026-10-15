@@ -70,6 +70,19 @@ function publishReport(
     gh = args =>
       execFileSync('gh', args, { cwd, env, encoding: 'utf8' }).trim(),
     now = Date.now(),
+    recordOrigin = (pr, head) =>
+      execFileSync(
+        'python3',
+        [
+          new URL('../shipping_origin.py', import.meta.url).pathname,
+          'emit-automation',
+          '--pr',
+          pr,
+          '--head-sha',
+          head,
+        ],
+        { cwd, env, encoding: 'utf8', timeout: 60000 }
+      ),
   } = {},
   profile = COVERAGE
 ) {
@@ -196,6 +209,7 @@ function publishReport(
     if (!url.startsWith(`https://github.com/${repo}/pull/`)) {
       throw new Error('Coverage report PR creation returned no receipt');
     }
+    recordOrigin(url, git('rev-parse', 'HEAD'));
     const retired = retireGeneratedReports({
       gh,
       repo,

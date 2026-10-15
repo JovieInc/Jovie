@@ -27,6 +27,80 @@ describe('useClipboard', () => {
     expect(result.current.isError).toBe(false);
   });
 
+  it('reports pending immediately and blocks a second copy in the same turn', async () => {
+    let complete!: () => void;
+    const write = vi.fn(
+      () =>
+        new Promise<void>(resolve => {
+          complete = resolve;
+        })
+    );
+    Object.assign(navigator, { clipboard: { writeText: write } });
+    const { result } = renderHook(() => useClipboard());
+    let operation!: Promise<boolean>;
+    act(() => {
+      operation = result.current.copy('first');
+      void result.current.copy('duplicate');
+    });
+    expect(result.current.isCopying).toBe(true);
+    expect(write).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      complete();
+      await operation;
+    });
+    expect(result.current.isCopying).toBe(false);
+    expect(result.current.status).toBe('success');
+  });
+
+  it('ignores stale completion after reset, a newer request, and unmount', async () => {
+    const completions: Array<() => void> = [];
+    const onSuccess = vi.fn();
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: vi.fn(
+          () => new Promise<void>(resolve => completions.push(resolve))
+        ),
+      },
+    });
+    const { result, unmount } = renderHook(() => useClipboard({ onSuccess }));
+    let old!: Promise<boolean>;
+    act(() => {
+      old = result.current.copy('old');
+    });
+    act(() => result.current.reset());
+    let current!: Promise<boolean>;
+    act(() => {
+      current = result.current.copy('new');
+    });
+    await act(async () => {
+      completions[0]();
+      await old;
+    });
+    expect(result.current.isCopying).toBe(true);
+    expect(result.current.status).toBe('idle');
+    expect(onSuccess).not.toHaveBeenCalled();
+    unmount();
+    await act(async () => {
+      completions[1]();
+      await current;
+    });
+    expect(onSuccess).not.toHaveBeenCalled();
+  });
+
+  it('retains initiating focus when copying with the legacy fallback', async () => {
+    Object.assign(navigator, { clipboard: undefined });
+    document.execCommand = vi.fn().mockReturnValue(true);
+    const button = document.createElement('button');
+    document.body.append(button);
+    button.focus();
+    const { result } = renderHook(() => useClipboard());
+    await act(async () => {
+      await result.current.copy('text');
+    });
+    expect(button).toHaveFocus();
+    button.remove();
+  });
+
   it('should copy text successfully using Clipboard API', async () => {
     const { result } = renderHook(() => useClipboard());
 
