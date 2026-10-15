@@ -495,19 +495,74 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: '(marketing)/solutions/[audience]/page.tsx',
     recipeId: 'artist-lp',
-    renderedSections: approvedBindings(
-      'components/marketing/artist-profile/ArtistProfileLandingRoute.tsx',
-      'hero',
-      'feature-split',
-      'feature-grid',
-      'capture',
-      'comparison',
-      'spec-wall',
-      'how-it-works',
-      'feature-grid',
-      'faq',
-      'cta'
-    ),
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/components/marketing/MarketingPosterHero.tsx',
+        'hero',
+        'centered-phone'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/marketing/artist-profile/ArtistProfileAdaptiveSection.tsx',
+        'feature-split',
+        'phone-right',
+        'adaptive'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/marketing/artist-profile/ArtistProfileOutcomesCarousel.tsx',
+        'feature-grid',
+        '4-ledger'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/marketing/artist-profile/ArtistProfileCaptureSection.tsx',
+        'capture',
+        'product-demo',
+        'fan-capture'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/marketing/artist-profile/ArtistProfileOpinionatedSection.tsx',
+        'feature-split',
+        'phone-right',
+        'opinionated'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/marketing/artist-profile/ArtistProfileLandingPage.tsx',
+        'feature-split',
+        'phone-left',
+        'annotated-truth'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/marketing/MarketingShippedSitesShowcase.tsx',
+        'product-gallery',
+        'profile-grid',
+        'product-examples'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/marketing/MarketingPlatformSpecBento.tsx',
+        'spec-wall',
+        '5-screenshot-bento'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/marketing/artist-profile/ArtistProfileHowItWorks.tsx',
+        'how-it-works',
+        'split-setup'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/marketing/artist-profile/ArtistProfileSocialProof.tsx',
+        'product-gallery',
+        'release-rail',
+        'release-cycle'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/marketing/FaqSection.tsx',
+        'faq',
+        'objection-handler'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/site/MarketingTerminalCta.tsx',
+        'cta',
+        'final-single-claim'
+      ),
+    ],
     bindingEvidence: {
       status: 'verified',
       source:
@@ -640,13 +695,28 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: '(marketing)/instant-merch/page.tsx',
     recipeId: 'feature',
-    renderedSections: approvedBindings(
-      'apps/web/app/(marketing)/instant-merch/InstantMerchLanding.tsx',
-      'hero',
-      'feature-grid',
-      'how-it-works',
-      'cta'
-    ),
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/instant-merch/InstantMerchLanding.tsx',
+        'hero',
+        'split-screenshot-right'
+      ),
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/instant-merch/InstantMerchLanding.tsx',
+        'how-it-works',
+        '3-step-strip'
+      ),
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/instant-merch/InstantMerchLanding.tsx',
+        'feature-grid',
+        'two-column-text'
+      ),
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/instant-merch/InstantMerchLanding.tsx',
+        'cta',
+        'included-single'
+      ),
+    ],
     bindingEvidence: {
       status: 'verified',
       source: 'route audit 2026-08-01',
@@ -689,10 +759,11 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       ),
     ],
     bindingEvidence: {
-      status: 'unverified',
-      source: 'route implementation #17076 (JOV-5862); pinned 12b203f9',
+      status: 'verified',
+      source:
+        'YoutubeThumbnailsLanding section census; route implementation #17076 (JOV-5862)',
       notes:
-        'Current left/no-media hero, two-column title/body safeguards, and inline CTA are intentional source output. Hero/grid source variants are explicit; inline CTA has a source-only canonical root and included-single body binding; exact mounted validation remains pending and Pen identity is explicitly unknown. No render or visual admission.',
+        'Mounted stamps match the manifest: left-none hero, 3-step-strip, two-column-text, and included-single CTA. Pen identity remains unknown. No visual admission.',
     },
     status: 'active',
     specVersion: '1.4.0',
@@ -707,15 +778,23 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: '(marketing)/product/page.tsx',
     recipeId: 'feature',
-    renderedSections: approvedBindings(
-      'apps/web/app/(marketing)/product/ProductLanding.tsx',
-      'hero'
-    ),
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/product/ProductLanding.tsx',
+        'hero',
+        'split-claim-card'
+      ),
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/product/ProductLanding.tsx',
+        'cta',
+        'editorial-search'
+      ),
+    ],
     bindingEvidence: {
-      status: 'unverified',
+      status: 'verified',
       source: 'Tim DESIGN_READY ship 2026-09-17 /product hero + claim card',
       notes:
-        'PRODUCT / Your living identity on the internet. hero with jov.ie/you claim-card proof (headline swapped with the homepage 2026-09-28). Live marketing page — index and sitemap; do not 410 or treat as a reserved-gone username. Source-only; Pen identity is explicitly unknown. No render or visual admission.',
+        'Split claim-card hero and editorial-search close are the mounted stamps. Live marketing page — index and sitemap; do not 410 or treat as a reserved-gone username. Pen identity is explicitly unknown. No visual admission.',
     },
     status: 'active',
     specVersion: '1.4.0',
@@ -785,18 +864,29 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: '(marketing)/smart-links/page.tsx',
     recipeId: 'feature',
-    renderedSections: approvedBindings(
-      'apps/web/app/(marketing)/smart-links/SmartLinksLanding.tsx',
-      'hero',
-      'how-it-works',
-      'cta'
-    ),
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/smart-links/SmartLinksLanding.tsx',
+        'hero',
+        'split-screenshot-right'
+      ),
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/smart-links/SmartLinksLanding.tsx',
+        'how-it-works',
+        '3-step-strip'
+      ),
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/smart-links/SmartLinksLanding.tsx',
+        'cta',
+        'included-single'
+      ),
+    ],
     bindingEvidence: {
-      status: 'unverified',
+      status: 'verified',
       source:
         'JOV-8188 source reconciliation 2026-10-11; JOV-6560 interactive dial owner',
       notes:
-        'Hero contains the interactive two-release dial; the three-step handoff is one how-it-works section, followed by the closing CTA. There is no separate feature-split section. Local product-evidence render contract covers these jobs; exact deployed binding and native save proof remain separate.',
+        'Hero contains the interactive two-release dial; the three-step handoff is one how-it-works section, followed by the closing CTA. Mounted stamps are split-screenshot-right, 3-step-strip, and included-single. Native save proof remains separate.',
     },
     status: 'active',
     specVersion: '1.4.0',
@@ -835,16 +925,37 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: '(marketing)/about/page.tsx',
     recipeId: 'seo',
-    renderedSections: approvedBindings(
-      'apps/web/components/organisms/AboutPageContent.tsx',
-      'hero',
-      'content-prose',
-      'content-prose',
-      'faq'
-    ),
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/components/organisms/AboutPageContent.tsx',
+        'hero',
+        'left-none'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/organisms/AboutPageContent.tsx',
+        'content-prose',
+        'article-body'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/organisms/AboutPageContent.tsx',
+        'feature-grid',
+        'two-column-text'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/marketing/FaqSection.tsx',
+        'faq',
+        'objection-handler'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/site/MarketingTerminalCta.tsx',
+        'cta',
+        'final-single-claim'
+      ),
+    ],
     bindingEvidence: {
       status: 'verified',
-      source: 'route audit 2026-07-11',
+      source:
+        'AboutPageContent mounts left-none, article-body, two-column-text, objection-handler, and the footer final-single-claim (2026-10-15)',
     },
     status: 'active',
     specVersion: '1.0.0',
@@ -853,12 +964,23 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: '(marketing)/support/page.tsx',
     recipeId: 'seo',
-    renderedSections: approvedBindings(
-      'apps/web/app/(marketing)/support/page.tsx',
-      'hero',
-      'content-prose',
-      'cta'
-    ),
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/components/organisms/SupportPageContent.tsx',
+        'hero',
+        'left-none'
+      ),
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/support/SupportContent.tsx',
+        'content-prose',
+        'article-body'
+      ),
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/support/SupportContent.tsx',
+        'cta',
+        'final-single-claim'
+      ),
+    ],
     bindingEvidence: {
       status: 'verified',
       source: 'source binding audit 2026-09-26',
@@ -871,7 +993,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     healthCheck: {
       path: '/support',
       expected: 'page',
-      waitFor: '[data-testid="support-hero"]',
+      waitFor: '[data-testid="marketing-section-hero"]',
     },
   },
   {
@@ -1011,16 +1133,32 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: '(marketing)/compare/[slug]/page.tsx',
     recipeId: 'comparison',
-    renderedSections: approvedBindings(
-      'apps/web/app/(marketing)/compare/[slug]/page.tsx',
-      'hero',
-      'comparison',
-      'cta',
-      'faq'
-    ),
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/components/organisms/ComparisonPageContent.tsx',
+        'hero',
+        'left-none'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/organisms/ComparisonPageContent.tsx',
+        'comparison',
+        'feature-matrix'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/organisms/ComparisonPageContent.tsx',
+        'cta',
+        'final-single-claim'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/marketing/FaqSection.tsx',
+        'faq',
+        'objection-handler'
+      ),
+    ],
     bindingEvidence: {
       status: 'verified',
-      source: 'route audit 2026-07-11',
+      source:
+        'ComparisonPageContent mounts left-none, feature-matrix, final-single-claim, and objection-handler (2026-10-15)',
     },
     status: 'active',
     specVersion: '1.0.0',
@@ -1033,17 +1171,37 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: '(marketing)/alternatives/[slug]/page.tsx',
     recipeId: 'comparison',
-    renderedSections: approvedBindings(
-      'apps/web/app/(marketing)/alternatives/[slug]/page.tsx',
-      'hero',
-      'content-prose',
-      'feature-grid',
-      'cta',
-      'faq'
-    ),
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/alternatives/[slug]/page.tsx',
+        'hero',
+        'left-none'
+      ),
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/alternatives/[slug]/page.tsx',
+        'content-prose',
+        'article-body'
+      ),
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/alternatives/[slug]/page.tsx',
+        'feature-grid',
+        'two-column-text'
+      ),
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/alternatives/[slug]/page.tsx',
+        'cta',
+        'final-single-claim'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/marketing/FaqSection.tsx',
+        'faq',
+        'objection-handler'
+      ),
+    ],
     bindingEvidence: {
       status: 'verified',
-      source: 'route audit 2026-07-11',
+      source:
+        'Alternatives slug page mounts left-none, article-body, two-column-text, final-single-claim, and objection-handler (2026-10-15)',
     },
     status: 'active',
     specVersion: '1.0.0',
@@ -1056,14 +1214,22 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: '(marketing)/blog/page.tsx',
     recipeId: 'blog-landing',
-    renderedSections: approvedBindings(
-      'apps/web/app/(marketing)/blog/page.tsx',
-      'hero',
-      'blog-feed'
-    ),
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/blog/BlogFeed.tsx',
+        'hero',
+        'left-none'
+      ),
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/blog/BlogFeed.tsx',
+        'blog-feed',
+        'featured-grid'
+      ),
+    ],
     bindingEvidence: {
       status: 'verified',
-      source: 'route audit 2026-07-11',
+      source:
+        'BlogFeed mounts a left-none hero and a featured-grid feed (2026-10-15)',
     },
     status: 'active',
     specVersion: '1.0.0',
@@ -1072,14 +1238,22 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: '(marketing)/blog/category/[slug]/page.tsx',
     recipeId: 'blog-landing',
-    renderedSections: approvedBindings(
-      'apps/web/app/(marketing)/blog/category/[slug]/page.tsx',
-      'hero',
-      'blog-feed'
-    ),
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/components/organisms/BlogCategoryContent.tsx',
+        'hero',
+        'left-none'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/organisms/BlogCategoryContent.tsx',
+        'blog-feed',
+        'category-filtered-grid'
+      ),
+    ],
     bindingEvidence: {
       status: 'verified',
-      source: 'route audit 2026-07-11',
+      source:
+        'BlogCategoryContent mounts a left-none hero and a category-filtered-grid feed (2026-10-15)',
     },
     status: 'active',
     specVersion: '1.0.0',

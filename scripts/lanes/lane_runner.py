@@ -48,6 +48,7 @@ import devin_free_policy  # noqa: E402
 import autoscale  # noqa: E402
 import capacity_limit  # noqa: E402
 import disk_guard  # noqa: E402  (sibling module of the release)
+import git_housekeeping  # noqa: E402  (detached git maintenance vs cleanup)
 import fleet_gate_emitter  # noqa: E402
 import doctor  # noqa: E402  (sibling module of the release)
 import execution_attempt  # noqa: E402
@@ -1271,6 +1272,10 @@ def sensitive_review(host: Host, pr: dict, worktree: Path, log, pass_fds=()) -> 
 def sh(args: list[str], cwd: Path | None = None, timeout: int = 600, env=None, log=None, stream=False, pass_fds=()):
     """Run and record. `stream=True` writes output to the log as it happens, so a timeout
     shows where the command was, instead of losing everything it printed."""
+    # Git 2.55 detaches `maintenance run --auto` after ordinary commands. Lane git
+    # must not leave that writer holding `.git/objects` for the next status or delete.
+    if args and Path(args[0]).name == "git":
+        env = git_housekeeping.apply_housekeeping_env(os.environ if env is None else env)
     if pass_fds:
         # The helper owns the locks across worker death and reuses run_agent's tracked
         # descendant cleanup. Command wrappers may close inherited file descriptors.
@@ -6945,6 +6950,9 @@ def remove_worktree(host: Host, worktree: Path) -> bool:
     """True only when clean, published source retired; retained work keeps its branch."""
     if not worktree.exists() or (worktree / disk_guard.PRESERVED_REPAIR).exists():
         return False
+    # A maintenance child started before this config was in effect still holds
+    # index.lock. Wait for it to leave; do not treat that writer as unpublished source.
+    git_housekeeping.quiesce(worktree)
     busy = worktree_busy(worktree)
     if busy:
         record_worktree_disposition(host, worktree, "preserved", busy)
@@ -6980,6 +6988,7 @@ def remove_worktree(host: Host, worktree: Path) -> bool:
         preserve_repair(worktree, {"runId": worktree.name, "reasons": [f"cleanup-{reason}"]})
         return False
     # The origin read may have taken time; recheck live ownership and source.
+    git_housekeeping.quiesce(worktree)
     busy = worktree_busy(worktree)
     status = sh(["git", "status", "--porcelain", *disk_guard.SOURCE_PATHSPEC], cwd=worktree)
     current_head = sh(["git", "rev-parse", "--verify", "HEAD"], cwd=worktree, timeout=30)
@@ -6994,8 +7003,9 @@ def remove_worktree(host: Host, worktree: Path) -> bool:
     slot = worktree_pool.recycle(host.repo, worktree)
     record_worktree_disposition(host, worktree, "recycled" if slot else "removed", slot)
     if not slot:
-        removed = sh(["git", "worktree", "remove", "--force", str(worktree)], cwd=host.repo)
-        return removed.returncode == 0 and not worktree.exists()
+        removed, _error = git_housekeeping.remove_linked_worktree(
+            lambda args: sh(["git", *args], cwd=host.repo, timeout=120), worktree)
+        return removed
     return True
 
 
@@ -7232,8 +7242,11 @@ def selftest_env(scratch: Path) -> dict:
     shim = str(Path(os.environ.get("LANES_STATE", Path.home() / ".local/state/jovie-lanes")) / "bin")
     if "PATH" in env:
         env["PATH"] = os.pathsep.join(entry for entry in env["PATH"].split(os.pathsep) if entry.rstrip("/") != shim)
-    return {SELFTEST_RUN_ENV: uuid.uuid4().hex, **env, "HOME": str(Path(scratch) / "home"),
-            "LANES_SELFTEST": "1", "LANES_STATE": str(scratch)}
+    # The release self-test's own git fixtures inherit this. Without it, Git 2.55
+    # detaches maintenance inside the proof and `lane update` refuses a green tree.
+    return git_housekeeping.apply_fixture_env(
+        {SELFTEST_RUN_ENV: uuid.uuid4().hex, **env, "HOME": str(Path(scratch) / "home"),
+         "LANES_SELFTEST": "1", "LANES_STATE": str(scratch)})
 
 
 def marked_processes(marker: str) -> list[int]:
