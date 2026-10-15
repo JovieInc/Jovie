@@ -1205,14 +1205,15 @@ describe('compiled learning consumption at the existing dispatch boundary', () =
   it('aborts a hanging learning owner inside the existing job deadline without inference', async () => {
     const g = await learnedFixture();
     g.f.request.limits.maxWallTimeMs = 20;
+    /** @type {AbortSignal | undefined} */
     let signal;
     g.f.environment.learning.lookup = async (_, options) => {
-      signal = options.signal;
+      signal = options?.signal;
       return new Promise(() => {});
     };
     const result = await run(g.f);
     assert.equal(result.reason, 'timed-out');
-    assert.equal(signal.aborted, true);
+    assert.equal(signal?.aborted, true);
     assert.equal(result.expense.inferenceCalls, 0);
     assert.equal(result.firstAttemptedMethod, null);
     assert.equal(g.executions.length, 0);
