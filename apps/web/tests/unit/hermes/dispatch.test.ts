@@ -43,9 +43,16 @@ describe('Hermes dispatch', () => {
       runtime: 'codex-cli',
       skills: ['/investigate'],
       allowedPaths: ['./apps/web/', 'apps/web'],
+      routePolicy: {
+        mode: 'policy_bound',
+        allowedTransports: ['mcp'],
+        allowedTools: ['fleet.register'],
+        requireRouteAttestation: true,
+      },
       dryRun: true,
     });
 
+    expect(payload.routePolicy?.mode).toBe('policy_bound');
     expect(payload.skills).toEqual(['investigate']);
     expect(payload.allowedPaths).toEqual(['apps/web']);
     expect(payload.verification).toEqual([
