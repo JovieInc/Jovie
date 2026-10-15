@@ -10,6 +10,8 @@ const combinations = [
   ['update-and-whats-new', ['update', 'whats-new']],
   ['all-three', ['update', 'whats-new', 'now-playing']],
   ['with-install', ['update', 'whats-new', 'now-playing', 'install']],
+  ['collapsed', []],
+  ['collapsed-empty', []],
 ] as const;
 
 test('every stack combination fits in light and dark with 28px controls', async ({
@@ -17,14 +19,13 @@ test('every stack combination fits in light and dark with 28px controls', async 
 }) => {
   test.setTimeout(240_000);
   for (const [story, order] of combinations) {
-    await page.goto(
-      `/iframe.html?id=shell-sidebardock--${story}&viewMode=story`
-    );
-    await expect(page.locator('[data-sidebar-dock]')).toHaveCount(2);
-    for (const theme of ['light', 'dark']) {
-      const dock = page.locator(
-        `[data-dock-theme="${theme}"] [data-sidebar-dock]`
+    for (const theme of ['dark', 'light']) {
+      await page.goto(
+        `/iframe.html?id=shell-sidebardock--${story}${theme === 'light' ? '-light' : ''}&viewMode=story`
       );
+      await expect(page.locator('[data-sidebar-dock]')).toHaveCount(1);
+      await expect(page.locator('html')).toHaveClass(new RegExp(theme));
+      const dock = page.locator('[data-sidebar-dock]');
       await expect(dock.locator('[data-dock-card]')).toHaveCount(order.length);
       expect(
         await dock
@@ -49,7 +50,7 @@ test('dock changes preserve navigation coordinates and scroll', async ({
   await page.goto(
     '/iframe.html?id=shell-sidebardock--with-install&viewMode=story'
   );
-  const rail = page.locator('[data-dock-theme="light"]');
+  const rail = page.locator('[data-dock-preview]');
   const anchor = rail.getByTestId('nav-anchor');
   await expect(rail.locator('[data-dock-card]')).toHaveCount(4);
   const before = await anchor.boundingBox();
@@ -70,7 +71,7 @@ test('collapsed status stays on the working user menu and carries tooltip text',
   await page.goto(
     '/iframe.html?id=shell-sidebardock--collapsed&viewMode=story'
   );
-  const rail = page.locator('[data-dock-theme="light"]');
+  const rail = page.locator('[data-dock-preview]');
   await expect(rail.locator('[data-dock-card]')).toHaveCount(0);
   await expect(rail.locator('[data-dock-badge]')).toHaveCount(3);
   const user = rail.getByRole('button', {
@@ -91,7 +92,7 @@ test('downloading and ready updates stay visible and cannot be dismissed', async
     await page.goto(
       `/iframe.html?id=shell-sidebardock--${story}&viewMode=story`
     );
-    const rail = page.locator('[data-dock-theme="light"]');
+    const rail = page.locator('[data-dock-preview]');
     await expect(rail.locator('[data-dock-card="update"]')).toBeVisible();
     await expect(
       rail.getByRole('button', { name: 'Dismiss update' })

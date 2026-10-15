@@ -1,3 +1,4 @@
+import '../../styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
 import { fn } from 'storybook/test';
@@ -32,61 +33,51 @@ const audio = {
   onDismiss: fn(),
 };
 
-/** Every exported state renders in both supported themes. */
-function DockPair(args: SidebarDockProps) {
+/** Root theme overrides exercise the same tokens as the authenticated shell. */
+function DockPreview(args: SidebarDockProps) {
   const [hidden, setHidden] = useState(false);
   const [installed, setInstalled] = useState(false);
   return (
-    <div className='flex gap-8 p-6'>
-      {['light', 'dark'].map(theme => (
-        <div
-          key={theme}
-          data-dock-theme={theme}
-          className={`${theme} group flex flex-col bg-sidebar text-primary-token`}
-          data-collapsible={args.collapsed ? 'icon' : undefined}
-          style={{ height: 480, width: args.collapsed ? 52 : 224 }}
-        >
-          <nav className='min-h-0 flex-1 p-3'>
-            <span data-testid='nav-anchor' className='text-xs'>
-              Home
-            </span>
-          </nav>
-          <SidebarDock
-            {...args}
-            userId={`${args.userId}-${theme}`}
-            audio={
-              hidden
-                ? undefined
-                : args.audio
-                  ? {
-                      ...args.audio,
-                      onPlay: () => setHidden(false),
-                      onDismiss: () => setHidden(true),
-                    }
-                  : undefined
-            }
-            install={
-              installed
-                ? undefined
-                : args.install
-                  ? {
-                      ...args.install,
-                      onDismiss: () => setInstalled(true),
-                      onInstall: () => setInstalled(true),
-                    }
-                  : undefined
-            }
-          >
-            {status => (
-              <SidebarIdentityGroup
-                calm
-                profileHref={undefined}
-                dockStatus={status}
-              />
-            )}
-          </SidebarDock>
-        </div>
-      ))}
+    <div
+      data-dock-preview
+      className='group flex flex-col bg-sidebar text-primary-token'
+      data-collapsible={args.collapsed ? 'icon' : undefined}
+      style={{ height: 480, width: args.collapsed ? 52 : 224 }}
+    >
+      <nav className='min-h-0 flex-1 p-3'>
+        <span data-testid='nav-anchor' className='text-xs'>
+          Home
+        </span>
+      </nav>
+      <SidebarDock
+        {...args}
+        audio={
+          hidden
+            ? undefined
+            : args.audio
+              ? { ...args.audio, onDismiss: () => setHidden(true) }
+              : undefined
+        }
+        install={
+          installed
+            ? undefined
+            : args.install
+              ? {
+                  ...args.install,
+                  onDismiss: () => setInstalled(true),
+                  onInstall: () => setInstalled(true),
+                }
+              : undefined
+        }
+      >
+        {status => (
+          <SidebarIdentityGroup
+            calm
+            profileHref={undefined}
+            dockStatus={status}
+          />
+        )}
+      </SidebarDock>
     </div>
   );
 }
@@ -94,7 +85,7 @@ function DockPair(args: SidebarDockProps) {
 const meta = {
   title: 'Shell/SidebarDock',
   component: SidebarDock,
-  parameters: { layout: 'centered' },
+  parameters: { layout: 'centered', themes: { themeOverride: 'dark' } },
   decorators: [
     withSignedInSession,
     Story => (
@@ -104,7 +95,7 @@ const meta = {
     ),
   ],
   args: { userId: 'dock-story', onUpdate: fn() },
-  render: DockPair,
+  render: DockPreview,
 } satisfies Meta<typeof SidebarDock>;
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -151,3 +142,32 @@ export const UpdateError: Story = {
 export const IOSInstall: Story = {
   args: { install: { isIOS: true, onInstall: fn(), onDismiss: fn() } },
 };
+
+const light = { themes: { themeOverride: 'light' } };
+export const EmptyLight: Story = { ...Empty, parameters: light };
+export const AudioOnlyLight: Story = { ...AudioOnly, parameters: light };
+export const WhatsNewOnlyLight: Story = { ...WhatsNewOnly, parameters: light };
+export const WhatsNewAndAudioLight: Story = {
+  ...WhatsNewAndAudio,
+  parameters: light,
+};
+export const UpdateOnlyLight: Story = { ...UpdateOnly, parameters: light };
+export const UpdateAndAudioLight: Story = {
+  ...UpdateAndAudio,
+  parameters: light,
+};
+export const UpdateAndWhatsNewLight: Story = {
+  ...UpdateAndWhatsNew,
+  parameters: light,
+};
+export const AllThreeLight: Story = { ...AllThree, parameters: light };
+export const WithInstallLight: Story = { ...WithInstall, parameters: light };
+export const CollapsedLight: Story = { ...Collapsed, parameters: light };
+export const CollapsedEmptyLight: Story = {
+  ...CollapsedEmpty,
+  parameters: light,
+};
+export const DownloadingLight: Story = { ...Downloading, parameters: light };
+export const ReadyLight: Story = { ...Ready, parameters: light };
+export const UpdateErrorLight: Story = { ...UpdateError, parameters: light };
+export const IOSInstallLight: Story = { ...IOSInstall, parameters: light };
