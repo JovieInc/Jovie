@@ -198,9 +198,15 @@ holds never stall merging; required checks on the merge group remain the only
 gate. Required-green means `mergeStateStatus` CLEAN, HAS_HOOKS or UNSTABLE
 (UNSTABLE only adds a pending or red non-required context, such as a lane
 `jovie-execution/*` receipt). `lane-fix-red` is machine admission state, not a
-hold-contract label: green enroll removes it when the current head is
-required-green and then admits that head. A head whose required checks are
-still red keeps the label, and adding it to a queued PR dequeues that PR.
+hold-contract label. The Lane Fix Relay removes it with that workflow's
+existing GITHUB_TOKEN once the current head is required-green
+(`mergeStateStatus` CLEAN, HAS_HOOKS, or UNSTABLE) and the success event's
+head sha matches. A red, unknown, dirty, or behind head keeps the label.
+Green enroll does not remove the label and will not admit the PR while it
+remains. A GITHUB_TOKEN unlabel does not wake enroll, so admission is the
+next enroll read: the same success wake if the label is already gone,
+otherwise the next push-to-main sweep. Adding the label to a queued PR
+dequeues that PR.
 An UNKNOWN read right after main moves is
 re-read twice before the wake is dropped. An unchanged head removed from the
 queue stays out unless a typed retry/recovery applies, or the removal was
