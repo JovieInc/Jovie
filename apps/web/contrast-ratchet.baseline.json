@@ -1,5 +1,5 @@
 {
-  "_comment": "Contrast ratchet baseline — counts of hardcoded raw-color violations (JOV-11026/11038). To reduce: fix violations then run `pnpm --filter web lint:contrast-ratchet --update`. CI fails if counts exceed these baselines.",
+  "_comment": "Active raw-color contrast gate (JOV-11026/11038). All five buckets are zero; any new match fails CI. After removing debt, lower counts with `node apps/web/scripts/lint-contrast-ratchet.mjs --update` from the repository root and commit this file.",
   "bareTextBlack": 0,
   "bareBgWhite": 0,
   "bareTextWhite": 0,
