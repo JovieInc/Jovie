@@ -47,7 +47,7 @@ for (const theme of ['dark', 'light'] as const) {
         join(EVIDENCE, `states-${theme}-${width}.png`),
         matrixCapture
       );
-      await info.attach('seven-operation-states', {
+      await info.attach('seven-operation-states.png', {
         body: matrixCapture,
         contentType: 'image/png',
       });
@@ -97,7 +97,7 @@ for (const theme of ['dark', 'light'] as const) {
       await expect(page.getByRole('alert')).toHaveCount(0);
       const capture = await page.screenshot({ animations: 'disabled' });
       await writeFile(join(EVIDENCE, `chat-${theme}-${width}.png`), capture);
-      await info.attach('persisted-success', {
+      await info.attach('persisted-success.png', {
         body: capture,
         contentType: 'image/png',
       });
