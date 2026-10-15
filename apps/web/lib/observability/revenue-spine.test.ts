@@ -123,6 +123,7 @@ describe('revenue spine delivery', () => {
     Sentry.init({
       dsn: 'https://public@example.invalid/1',
       defaultIntegrations: false,
+      integrations: [Sentry.dedupeIntegration()],
       beforeSend(event) {
         events.push(event);
         // No network delivery in tests; inspect the actual final SDK event.

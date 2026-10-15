@@ -161,7 +161,10 @@ export function captureRevenueSpineFailure(
     const failure = buildRevenueSpineFailure(input);
     const safeEvent: Sentry.ErrorEvent = {
       type: undefined,
-      message: failure.fingerprint,
+      // The SDK's default Dedupe integration suppresses repeated `message`
+      // events. A structured logentry preserves occurrences; fingerprint still
+      // owns issue grouping without introducing per-occurrence identifiers.
+      logentry: { message: failure.fingerprint },
       fingerprint: [failure.fingerprint],
       level: failure.severity === 'blocked' ? 'error' : 'warning',
       tags: {
