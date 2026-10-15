@@ -116,6 +116,16 @@ jobs:
         run: |
           node --input-type=module -e "import { publishCoverageReport } from './scripts/lib/publish-coverage-report.mjs'; console.log(publishCoverageReport());"
 
+
+      - name: Retain immutable origin payload
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: shipping-origin-v1
+          path: ${{ runner.temp }}/shipping-origin/*.json
+          if-no-files-found: ignore
+          retention-days: 30
+
       - name: Slack alert on failure
         if: ${{ failure() && env.SLACK_WEBHOOK_URL != '' }}
         env:

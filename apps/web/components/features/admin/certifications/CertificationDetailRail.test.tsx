@@ -89,6 +89,16 @@ describe('CertificationDetailRail', () => {
     );
   });
 
+  it.each(['Summer', null])('shows shared evidence and owner %s', owner => {
+    const row = { ...fixtureRow('signup'), owner };
+    renderRail({ row });
+    const strip = screen.getByTestId('certification-evidence-strip');
+    expect(within(strip).getAllByRole('img')).toHaveLength(
+      Object.keys(row.tiers).length
+    );
+    expect(screen.getByText(`Owner: ${owner ?? 'Unassigned'}`)).toBeVisible();
+  });
+
   it('keeps history and source available behind collapsed sections', () => {
     renderRail();
     expect(screen.getByRole('button', { name: 'History' })).toHaveAttribute(

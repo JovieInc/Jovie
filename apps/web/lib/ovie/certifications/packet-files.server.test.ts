@@ -30,6 +30,23 @@ function fileBody(overrides: Record<string, unknown> = {}) {
 }
 
 describe('parseCertificationPacketFile', () => {
+  it.each(['company', 'design_system', 'icps', 'outcomes'])(
+    'accepts %s packets with the same owner and evidence contract',
+    domain => {
+      expect(
+        parseCertificationPacketFile(
+          fileBody({ domain, owner: ' Summer ' }),
+          'item.packet.json'
+        )
+      ).toMatchObject({ domain, owner: 'Summer' });
+    }
+  );
+  it.each(['', ' ', 42, 'x'.repeat(161)])('rejects invalid owner %j', owner => {
+    expect(
+      parseCertificationPacketFile(fileBody({ owner }), 'item.packet.json')
+    ).toMatch(/owner must be/);
+  });
+
   it('accepts a valid packet file and normalizes its timestamp and links', () => {
     const parsed = parseCertificationPacketFile(
       fileBody({

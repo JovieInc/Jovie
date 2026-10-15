@@ -189,6 +189,7 @@ describe('Certification Inbox convergence', () => {
       id: 'flows:subject',
       domain: 'flows',
       surface: 'Signup',
+      owner: null,
       subject,
       state: 'review_ready',
       tiers: {
@@ -249,6 +250,7 @@ describe('Certification Inbox convergence', () => {
     const source = {
       ...inventory,
       rows: [
+        { ...row, domain: 'icps' as const, id: 'icps:subject' },
         {
           ...row,
           id: 'old',

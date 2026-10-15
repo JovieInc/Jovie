@@ -11,6 +11,7 @@ import {
 } from '@/lib/agent-os/certification';
 import { MarketingCertificationStore } from '@/lib/agent-os/certification-adapter';
 import type { CertificationRecordBackend } from '@/lib/agent-os/certification-cas';
+import { projectOvieInbox } from '@/lib/ovie/inbox';
 import { founderReviewItemFixture } from '@/tests/fixtures/founder-review-item';
 import {
   FIXTURE_NOW,
@@ -89,6 +90,65 @@ function deps(
 }
 
 describe('readOvieCertificationInventory', () => {
+  it.each(['company', 'design_system', 'icps', 'outcomes'] as const)(
+    'certifies %s through the same table, inbox, and revision-bound ledger',
+    async domain => {
+      const file = packetFile('shared-subject', { domain, owner: 'Summer' });
+      const ports = deps([file]);
+      const before = await readOvieCertificationInventory(ports, FIXTURE_NOW);
+      const row = before.rows.find(item => item.domain === domain)!;
+      expect(row).toMatchObject({ owner: 'Summer', state: 'review_ready' });
+      expect(before.queue.needsYou).toHaveLength(1);
+      expect(projectOvieInbox([], [], before).cases).toMatchObject([
+        {
+          kind: 'certification',
+          certification: { row: { id: row.id } },
+          decisionTarget: {
+            id: row.id,
+            evidenceDigest: row.decision.evidenceDigest,
+          },
+        },
+      ]);
+      const request = {
+        rowId: row.id,
+        evidenceDigest: row.decision.evidenceDigest!,
+        decision: 'approved' as const,
+        notes: null,
+        actionId: 'unified-decision',
+      };
+      expect(
+        await recordOvieCertificationDecision(
+          request,
+          'Tim',
+          ports,
+          FIXTURE_NOW
+        )
+      ).toMatchObject({ ok: true, row: { state: 'founder_locked' } });
+      const changed = packetFile('shared-subject', {
+        domain,
+        packet: fixturePacket('shared-subject', {
+          source: { ...file.packet.source!, sha: 'b'.repeat(40) },
+        }),
+      });
+      const after = await readOvieCertificationInventory(
+        deps([changed], ports.backendInstance),
+        FIXTURE_NOW
+      );
+      expect(after.rows.find(item => item.domain === domain)).toMatchObject({
+        state: 'working',
+        staleFounderLock: true,
+      });
+      expect(
+        await recordOvieCertificationDecision(
+          { ...request, actionId: 'stale-decision' },
+          'Tim',
+          deps([changed], ports.backendInstance),
+          FIXTURE_NOW
+        )
+      ).toMatchObject({ ok: false, status: 409 });
+    }
+  );
+
   it('composes marketing and packet domains with an honest denominator', async () => {
     const inventory = await readOvieCertificationInventory(
       deps([
@@ -122,6 +182,10 @@ describe('readOvieCertificationInventory', () => {
       lyb: 'connected',
       acquisition: 'not_connected',
       feature_registry: 'empty',
+      company: 'empty',
+      design_system: 'empty',
+      icps: 'empty',
+      outcomes: 'empty',
     });
     expect(inventory.counts.total).toBe(
       MARKETING_COMPONENT_REGISTRY.length + 2

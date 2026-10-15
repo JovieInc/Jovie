@@ -35,6 +35,7 @@ import {
   CertificationStateGlyph,
   CertificationTierGlyph,
 } from './CertificationGlyphs';
+import { CertificationEvidenceStrip } from './CertificationSummary';
 import { evidenceForTier, shortSha } from './certification-view';
 
 export const CERTIFICATION_RAIL_WIDTH = 400;
@@ -455,6 +456,12 @@ export function CertificationDetailRail({
     >
       {row ? (
         <>
+          <DrawerSection title='Certification' surface='card'>
+            <CertificationEvidenceStrip row={row} />
+            <p className='mt-2 text-xs text-tertiary-token'>
+              Owner: {row.owner ?? 'Unassigned'}
+            </p>
+          </DrawerSection>
           <BlockersSection row={row} />
           <EvidenceSection row={row} />
           <LinksSection row={row} />
