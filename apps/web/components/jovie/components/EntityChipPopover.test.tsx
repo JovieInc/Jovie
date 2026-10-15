@@ -26,7 +26,12 @@ vi.mock('@/components/atoms/ImageWithFallback', () => ({
 
 function renderPopover(children?: ReactNode) {
   return fastRender(
-    <EntityChipPopover kind='release' id='rel_1' label='Sober'>
+    <EntityChipPopover
+      kind='release'
+      id='rel_1'
+      label='Sober'
+      entity={{ kind: 'release', id: 'rel_1', label: 'Sober' }}
+    >
       {children ?? (
         <EntityChip
           data={{ kind: 'release', id: 'rel_1', label: 'Sober' }}
@@ -138,13 +143,13 @@ describe('EntityChipPopover', () => {
     expect(content.textContent).toContain('Release');
   });
 
-  it('uses the chat overlay tier with an opaque bounded surface', async () => {
+  it('uses the canonical popover dialog for the compact entity card', async () => {
     const user = userEvent.setup();
     renderPopover();
     await user.click(screen.getByTestId('entity-chip-popover-trigger'));
     const content = await screen.findByTestId('entity-chip-popover-content');
 
-    expect(content).toHaveClass('system-b-entity-chip-popover-content');
+    expect(content).toHaveAttribute('role', 'dialog');
     expect(screen.getByTestId('entity-chip-popover-card')).toBeTruthy();
   });
 
@@ -178,7 +183,12 @@ describe('EntityChipPopover', () => {
     mockEntityPanelState.entityPanel = { open: openEntityPanel };
 
     fastRender(
-      <EntityChipPopover kind='event' id='evt_1' label='Brooklyn Bowl'>
+      <EntityChipPopover
+        kind='event'
+        id='evt_1'
+        label='Brooklyn Bowl'
+        entity={{ kind: 'event', id: 'evt_1', label: 'Brooklyn Bowl' }}
+      >
         <span>Brooklyn Bowl</span>
       </EntityChipPopover>
     );
@@ -210,8 +220,9 @@ describe('EntityChipPopover', () => {
     await user.click(screen.getByTestId('entity-chip-popover-trigger'));
     const card = await screen.findByTestId('entity-chip-popover-card');
     expect(card.tagName).toBe('DIV');
+    expect(screen.queryByText('Unknown Track')).toBeNull();
     expect(
-      screen.getByRole('heading', { name: 'Unknown Track' })
+      screen.getByRole('heading', { name: 'Unavailable reference' })
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Open/i })).toBeNull();
   });
