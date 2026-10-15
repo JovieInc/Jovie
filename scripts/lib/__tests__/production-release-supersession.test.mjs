@@ -132,10 +132,14 @@ describe('public-profile alias graduation policy', () => {
 
 describe('authoritative final main ref', () => {
   it('uses one bounded Git read with scoped authentication outside the REST quota', () => {
-    const run = vi.fn(() => ({
-      status: 0,
-      stdout: `${EXPECTED_SHA}\trefs/heads/main\n`,
-    }));
+    const run = vi.fn(
+      /** @type {import('../../../.github/scripts/resolve-main-sha.mjs').MainRefRunner} */ (
+        () => ({
+          status: 0,
+          stdout: `${EXPECTED_SHA}\trefs/heads/main\n`,
+        })
+      )
+    );
     expect(
       resolveMainSha({
         repository: 'JovieInc/Jovie',
@@ -183,8 +187,17 @@ describe('authoritative final main ref', () => {
   });
 
   it.each([
-    ['unavailable', { status: 128 }],
-    ['timeout', { status: null, error: { code: 'ETIMEDOUT' } }],
+    ['unavailable', { status: 128, stdout: '' }],
+    [
+      'timeout',
+      {
+        status: null,
+        stdout: '',
+        error: Object.assign(new Error('Git read timed out'), {
+          code: 'ETIMEDOUT',
+        }),
+      },
+    ],
   ])('fails closed without retrying an %s Git read', (_, result) => {
     const run = vi.fn(() => result);
     expect(() => resolveMainSha({ repository: 'JovieInc/Jovie', run })).toThrow(
@@ -210,7 +223,10 @@ describe('production lane evidence across failed-job retries', () => {
   ])(
     'downloads the artifact produced in attempt %s from consumer attempt %s',
     (producerAttempt, consumerAttempt) => {
-      const workflow = load(CONTROLLER_WORKFLOW);
+      const workflow =
+        /** @type {{ jobs: Record<string, { outputs: Record<string, string>, steps: { name?: string, uses?: string, with?: Record<string, string> }[] }> }} */ (
+          load(CONTROLLER_WORKFLOW)
+        );
       const producer = workflow.jobs['authorize-production'];
       const upload = producer.steps.find(
         step =>

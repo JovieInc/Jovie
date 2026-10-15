@@ -1666,7 +1666,10 @@ describe('merge_group workflow contract', () => {
         runAttempt: '1',
       });
       expect(receipt.selectedLanes).toEqual([]);
-      const workflow = load(CI_WORKFLOW);
+      const workflow =
+        /** @type {{ jobs: Record<string, { steps: { name?: string, if?: string }[] }> }} */ (
+          load(CI_WORKFLOW)
+        );
       const upload = workflow.jobs['ci-path-changes'].steps.find(
         step => step.name === 'Preserve intake product-lane receipt'
       );

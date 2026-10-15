@@ -1,8 +1,13 @@
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
+/**
+ * @typedef {(command: string, args: string[], options: import('node:child_process').SpawnSyncOptionsWithStringEncoding) => Pick<import('node:child_process').SpawnSyncReturns<string>, 'status' | 'stdout' | 'error'>} MainRefRunner
+ */
+
 // Final release decisions must use a fresh authoritative ref, independently
 // of the shared Actions REST quota. Never fall back to a cached checkout.
+/** @param {{ repository: string, token?: string, run?: MainRefRunner }} options */
 export function resolveMainSha({
   repository,
   token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN,
@@ -12,6 +17,7 @@ export function resolveMainSha({
     throw new Error('A valid GitHub repository is required to resolve main.');
   }
   const remote = `https://github.com/${repository}.git`;
+  /** @type {NodeJS.ProcessEnv} */
   const env = { ...process.env, GIT_TERMINAL_PROMPT: '0' };
   if (token) {
     const index = Number(env.GIT_CONFIG_COUNT || 0);
