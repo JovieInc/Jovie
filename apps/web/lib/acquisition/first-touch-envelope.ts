@@ -15,6 +15,8 @@
  * no `node:crypto`, no DB access.
  */
 
+import { type AgentIntent, agentIntentSchema } from './agent-intent';
+
 export const FIRST_TOUCH_COOKIE = 'jovie_first_touch';
 export const FIRST_TOUCH_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const FIRST_TOUCH_SECRET_DOMAIN = 'acquisition-first-touch-envelope-v1';
@@ -42,6 +44,7 @@ export interface FirstTouchEnvelope {
   readonly iat: number;
   readonly exp: number;
   readonly channel: FirstTouchChannel;
+  readonly agentIntent?: AgentIntent;
   readonly utm?: Partial<Record<(typeof UTM_KEYS)[number], string>>;
   /** External referrer hostname only — never path, query, or fragment. */
   readonly ref?: string;
@@ -299,6 +302,14 @@ export async function openFirstTouchEnvelope(
       payload.channel !== 'direct'
     ) {
       return null;
+    }
+    if (payload.agentIntent !== undefined) {
+      const intent = agentIntentSchema.safeParse(payload.agentIntent);
+      if (!intent.success || intent.data.expiresAt > payload.exp) return null;
+      return {
+        ...payload,
+        agentIntent: intent.data.expiresAt > now ? intent.data : undefined,
+      };
     }
     return payload;
   } catch {
