@@ -30,7 +30,7 @@ const meta = {
   title: 'Shell/SidebarThreadsSection',
   component: SidebarThreadsSection,
   parameters: {
-    layout: 'centered',
+    layout: 'fullscreen',
     jovie: { uncoveredProps: ['e'] },
   },
   args: {
@@ -41,13 +41,15 @@ const meta = {
   },
   decorators: [
     Story => (
-      <div className='w-60 bg-sidebar p-3'>
+      <div className='w-full max-w-60 bg-sidebar'>
         <RenderedFamily
           name='SidebarThreadsSection'
           owner='SidebarThreadsSection'
           interactive
         >
-          <Story />
+          <div className='p-3'>
+            <Story />
+          </div>
         </RenderedFamily>
       </div>
     ),
