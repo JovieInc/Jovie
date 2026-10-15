@@ -327,6 +327,43 @@ describe('MusicBrainz Provider', () => {
     expect(mockLimit).toHaveBeenCalledTimes(4);
   });
 
+  it.each([false, true])(
+    'distinguishes traversal timeout from caller cancellation (caller aborted: %s)',
+    async callerAborted => {
+      const deadline = new AbortController();
+      const caller = new AbortController();
+      const timeout = vi
+        .spyOn(AbortSignal, 'timeout')
+        .mockReturnValue(deadline.signal);
+      vi.mocked(fetch).mockImplementationOnce(async () => {
+        if (callerAborted) caller.abort();
+        deadline.abort();
+        return Response.json({
+          'recording-count': 0,
+          'recording-offset': 0,
+          recordings: [],
+        });
+      });
+      try {
+        const result = browseMusicBrainzCatalog({
+          entity: 'recording',
+          by: 'artist',
+          mbid: TIM_ID,
+          signal: caller.signal,
+        });
+        if (callerAborted) {
+          await expect(result).rejects.toBeInstanceOf(CallerCancellationError);
+        } else {
+          await expect(result).rejects.toMatchObject({ errorCode: 'TIMEOUT' });
+        }
+        expect(timeout).toHaveBeenCalledWith(30_000);
+        expect(fetch).toHaveBeenCalledTimes(1);
+      } finally {
+        timeout.mockRestore();
+      }
+    }
+  );
+
   it('requires an exact URL response and propagates identity failures', async () => {
     mockResponse({
       resource: 'https://open.spotify.com/artist/wrong',

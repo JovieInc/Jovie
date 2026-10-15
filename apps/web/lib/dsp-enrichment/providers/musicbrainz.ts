@@ -160,11 +160,22 @@ export async function browseMusicBrainzCatalog(
   const signal = options.signal
     ? AbortSignal.any([options.signal, deadline])
     : deadline;
-  return collectMusicBrainzCatalog({ ...options, signal }, endpoint =>
-    executeWithCircuitBreaker(() =>
-      musicBrainzRequest<unknown>(endpoint, true, signal)
-    )
-  );
+  try {
+    return await collectMusicBrainzCatalog({ ...options, signal }, endpoint =>
+      executeWithCircuitBreaker(() =>
+        musicBrainzRequest<unknown>(endpoint, true, signal)
+      )
+    );
+  } catch (error) {
+    if (deadline.aborted && !options.signal?.aborted) {
+      throw new MusicBrainzError(
+        'Catalog traversal timeout',
+        undefined,
+        'TIMEOUT'
+      );
+    }
+    throw error;
+  }
 }
 
 export async function lookupMusicBrainzByIsrc(
