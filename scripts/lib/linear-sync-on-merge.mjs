@@ -1092,10 +1092,11 @@ async function runSync(options) {
     const flagged = /** @type {{ rateLimited?: boolean, forbidden?: boolean }} */ (
       error
     );
-    if (flagged.rateLimited) {
+    if (flagged.rateLimited && sweep) {
       // Quota is already spent. Evaluating issues would 403 the first linked
       // pull (JOV-7355 → #19767 on 2026-10-15) and label that as a Linear
       // deferral. Leave the cursor where it is and let the next sweep resume.
+      // A merge event still fails closed so that one pull is not dropped.
       log(`Open pull request scan deferred: ${message}`);
       return {
         action: 'deferred',
@@ -1283,7 +1284,7 @@ async function runSync(options) {
       'the open pull request scan failed, so issues were left in place'
     );
   }
-  if (reasons.length > 0) {
+  if (reasons.length > 0 || (deferredNote && !sweep)) {
     throw new Error(
       `Lifecycle evaluation failed: ${[...reasons, deferredNote].filter(Boolean).join('; ')}`
     );

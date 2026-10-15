@@ -966,6 +966,26 @@ describe('linear sync on merge', () => {
     expect(world.issues['JOV-1'].state).toBe('Merging');
   });
 
+  it('fails a merge event closed when the open scan is quota exhausted', async () => {
+    const { world, fetchImpl } = createWorld();
+    const exhausted = intercept(fetchImpl, async url =>
+      url.includes('pulls?state=open')
+        ? {
+            ok: false,
+            status: 403,
+            headers: new Headers({ 'x-ratelimit-remaining': '0' }),
+            json: async () => ({
+              message: 'API rate limit exceeded for installation.',
+            }),
+          }
+        : null
+    );
+    await expect(mergeEvent(exhausted, 101)).rejects.toThrow(
+      /open pull request scan failed/
+    );
+    expect(world.updates).toEqual([]);
+  });
+
   it('reports an open-scan 403 that is not a rate limit as a token permission gap', async () => {
     const { fetchImpl } = createWorld();
     const denied = intercept(fetchImpl, async url =>
