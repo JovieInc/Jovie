@@ -77,7 +77,7 @@ describe('CopyToClipboardButton', () => {
 
     await flushPromises();
 
-    expect(button).toHaveTextContent('Copied!');
+    expect(button).toHaveAttribute('data-state', 'success');
     expect(mockWriteText).toHaveBeenCalledWith('https://jov.ie/test-profile');
     expect(track).toHaveBeenCalledWith('profile_copy_url_click', {
       status: 'success',
@@ -99,7 +99,7 @@ describe('CopyToClipboardButton', () => {
 
     await flushPromises();
 
-    expect(button).toHaveTextContent('Copied!');
+    expect(button).toHaveAttribute('data-state', 'success');
     expect(mockCreateElement).toHaveBeenCalledWith('textarea');
     expect(mockTextarea.value).toBe('https://jov.ie/test-profile');
     expect(mockTextarea.focus).toHaveBeenCalled();
@@ -127,7 +127,7 @@ describe('CopyToClipboardButton', () => {
 
     await flushPromises();
 
-    expect(button).toHaveTextContent('Copied!');
+    expect(button).toHaveAttribute('data-state', 'success');
     // Should try clipboard first, then fall back
     expect(mockWriteText).toHaveBeenCalledWith('https://jov.ie/test-profile');
     expect(mockCreateElement).toHaveBeenCalledWith('textarea');
@@ -215,7 +215,7 @@ describe('CopyToClipboardButton', () => {
     await flushPromises();
 
     const statusElement = screen.getByRole('status');
-    expect(statusElement).toHaveTextContent('Link copied');
+    expect(statusElement).toHaveTextContent('Copied!');
   });
 
   it('updates accessibility status on error', async () => {
@@ -233,6 +233,6 @@ describe('CopyToClipboardButton', () => {
     await flushPromises();
 
     const statusElement = screen.getByRole('status');
-    expect(statusElement).toHaveTextContent('Failed to copy profile URL');
+    expect(statusElement).toHaveTextContent('Failed to copy Retry');
   });
 });

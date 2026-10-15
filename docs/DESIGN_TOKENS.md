@@ -220,6 +220,10 @@ these, not redefine them.
 - **Canonical button sizes** — `sm`, `marketing`, `md`, and `lg` share one
   28px visible ActionButton (weight 510, radius 999) inside a 44px mobile
   tap target. Not 32-in-44. `icon` uses the `md` control height with equal width.
+- **Button state motion** — opt-in `pendingPresentation="morph"` uses the
+  `pill-state-continuity` contract in [the motion reference](design-system/DETAILS.md#pill-state-continuity).
+  It consumes existing geometry constants and duration/easing tokens; it adds
+  no token tier. Keyboard and reduced-motion state changes have no shape travel.
 
 ### Concentric radius-by-elevation
 
