@@ -1,4 +1,5 @@
-import { expect, type Page, test } from '@playwright/test';
+import { writeFile } from 'node:fs/promises';
+import { expect, type Page, type TestInfo, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 
@@ -112,17 +113,7 @@ async function readPaneGeometry(page: Page) {
   });
 }
 
-test('Profile companion leaves one centered usable settings pane', async ({
-  page,
-}, testInfo) => {
-  test.skip(
-    process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
-    'Requires the isolated dev-auth E2E lane'
-  );
-  test.setTimeout(180_000);
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await enterProfileSettings(page);
-
+async function assertOpenPane(page: Page, testInfo: TestInfo, name: string) {
   // Observe a fixed window after the actual rail lifecycle settles. Never
   // poll until the centering assertion passes: a stable wrong layout is RED.
   const samples = [];
@@ -131,12 +122,15 @@ test('Profile companion leaves one centered usable settings pane', async ({
     await page.evaluate(() => new Promise(requestAnimationFrame));
   }
   const result = samples.at(-1)!;
-  const geometryPath = testInfo.outputPath('settings-pane-geometry.json');
+  const geometryPath = testInfo.outputPath(`${name}.json`);
   await writeFile(geometryPath, JSON.stringify({ samples }, null, 2));
-  await testInfo.attach('settings-pane-geometry.json', {
+  await testInfo.attach(`${name}.json`, {
     path: geometryPath,
     contentType: 'application/json',
   });
+  // Numeric geometry is safe durable evidence even when the existing hosted
+  // artifact policy rejects Playwright's automatic error-context Markdown.
+  process.stdout.write(`${JSON.stringify({ name, samples })}\n`);
   expect(result.counts).toEqual({
     route: 1,
     pane: 1,
@@ -194,6 +188,170 @@ test('Profile companion leaves one centered usable settings pane', async ({
   expect(geometry.pageOverflow).toBeLessThanOrEqual(1);
   expect(geometry.columnOverflow).toBeLessThanOrEqual(1);
   expect(geometry.paneOverflow).toBeLessThanOrEqual(1);
+  return geometry;
+}
+
+async function assertFullSettingsPane(page: Page) {
+  await expect(page.getByTestId('settings-shell-content')).toBeVisible();
+  const geometry = await page.evaluate(() => {
+    const route = document.querySelector<HTMLElement>(
+      '[data-testid="app-shell-scroll"]'
+    )!;
+    const pane = document.querySelector<HTMLElement>(
+      '[data-testid="settings-shell-content"]'
+    )!;
+    const column = pane.querySelector<HTMLElement>(
+      '[data-settings-layout-column="true"]'
+    )!;
+    const routeBox = route.getBoundingClientRect();
+    const paneBox = pane.getBoundingClientRect();
+    const columnBox = column.getBoundingClientRect();
+    return {
+      leftDelta: Math.abs(paneBox.left - routeBox.left),
+      rightDelta: Math.abs(paneBox.right - routeBox.right),
+      centerDelta: Math.abs(
+        (columnBox.left + columnBox.right - paneBox.left - paneBox.right) / 2
+      ),
+      overflow: column.scrollWidth - column.clientWidth,
+    };
+  });
+  expect(geometry.leftDelta).toBeLessThanOrEqual(1);
+  expect(geometry.rightDelta).toBeLessThanOrEqual(1);
+  expect(geometry.centerDelta).toBeLessThanOrEqual(1);
+  expect(geometry.overflow).toBeLessThanOrEqual(1);
+}
+
+async function assertReachable(page: Page) {
+  const field = page.locator('#displayName');
+  await field.click({ trial: true });
+  await field.focus();
+  await field.evaluate((element: HTMLInputElement) => {
+    element.setSelectionRange(0, Math.min(2, element.value.length));
+  });
+  const before = await field.evaluate((element: HTMLInputElement) => ({
+    start: element.selectionStart,
+    end: element.selectionEnd,
+    scroll: element.closest('[data-testid="settings-shell-content"]')!
+      .scrollTop,
+  }));
+  await page.evaluate(
+    () =>
+      new Promise<void>(resolve => {
+        let frames = 0;
+        const sample = () => {
+          if (++frames >= 120) resolve();
+          else requestAnimationFrame(sample);
+        };
+        requestAnimationFrame(sample);
+      })
+  );
+  await expect(field).toBeFocused();
+  expect(
+    await field.evaluate((element: HTMLInputElement) => ({
+      start: element.selectionStart,
+      end: element.selectionEnd,
+      scroll: element.closest('[data-testid="settings-shell-content"]')!
+        .scrollTop,
+    }))
+  ).toEqual(before);
+  const visitor = page.getByRole('link', { name: 'View as Visitor' });
+  await visitor.click({ trial: true });
+  const lastAction = page
+    .locator('#artist-profile button:enabled:visible')
+    .last();
+  await lastAction.click({ trial: true });
+  await lastAction.focus();
+  await expect(lastAction).toBeFocused();
+  expect(
+    await lastAction.evaluate(element => {
+      const box = element.getBoundingClientRect();
+      const hit = document.elementFromPoint(
+        box.left + box.width / 2,
+        box.top + box.height / 2
+      );
+      return hit === element || element.contains(hit);
+    })
+  ).toBe(true);
+  await field.scrollIntoViewIfNeeded();
+}
+
+test.beforeEach(() => {
+  test.skip(
+    process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
+    'Requires the isolated dev-auth E2E lane'
+  );
+  test.setTimeout(180_000);
 });
 
-import { writeFile } from 'node:fs/promises';
+test('Profile companion leaves one centered usable settings pane', async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await enterProfileSettings(page);
+  await assertOpenPane(page, testInfo, 'initial');
+});
+
+for (const width of [1024, 1100, 1280, 1440]) {
+  for (const reducedMotion of ['no-preference', 'reduce'] as const) {
+    test(`${width}px ${reducedMotion}: Profile pane closes, reopens and remains reachable`, async ({
+      page,
+    }, testInfo) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.emulateMedia({
+        colorScheme: reducedMotion === 'reduce' ? 'light' : 'dark',
+        reducedMotion,
+      });
+      await enterProfileSettings(page);
+      await assertOpenPane(page, testInfo, 'opened');
+      await assertReachable(page);
+      const toggle = page.getByTestId('artist-profile-rail-toggle');
+      await expect(toggle).toHaveCount(1);
+      await toggle.scrollIntoViewIfNeeded();
+      await toggle.focus();
+      await toggle.press('Enter');
+      const rail = page.locator('#shell-artist-profile-rail');
+      await expect(rail).toHaveAttribute('aria-hidden', 'true');
+      await expect(rail).toHaveAttribute('data-rail-phase', 'closed');
+      await expect(rail).toHaveAttribute('inert', '');
+      await expect(toggle).toBeFocused();
+      await assertFullSettingsPane(page);
+      await assertReachable(page);
+      await toggle.scrollIntoViewIfNeeded();
+      await toggle.focus();
+      await toggle.press('Space');
+      await expect(rail).toHaveAttribute('data-rail-phase', 'open');
+      await assertOpenPane(page, testInfo, 'reopened');
+      await toggle.press('Enter');
+      await toggle.press('Enter');
+      await expect(rail).toHaveAttribute('data-rail-phase', 'open');
+      await assertOpenPane(page, testInfo, 'interrupted');
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await expect(page.locator('#displayName')).toBeVisible();
+      await expect(rail).toHaveAttribute('data-rail-phase', 'open');
+      await assertOpenPane(page, testInfo, 'reloaded');
+    });
+  }
+}
+
+test('Account keeps its full pane after Profile navigation and browser history', async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await enterProfileSettings(page);
+  await assertOpenPane(page, testInfo, 'profile');
+  await page.goto(APP_ROUTES.SETTINGS_ACCOUNT, {
+    waitUntil: 'domcontentloaded',
+  });
+  await expect(page).toHaveURL(new RegExp(`${APP_ROUTES.SETTINGS_ACCOUNT}$`));
+  await assertFullSettingsPane(page);
+  await page.goBack({ waitUntil: 'domcontentloaded' });
+  await expect(page).toHaveURL(new RegExp(`${APP_ROUTES.SETTINGS_PROFILE}$`));
+  await expect(page.locator('#shell-artist-profile-rail')).toHaveAttribute(
+    'data-rail-phase',
+    'open'
+  );
+  await assertOpenPane(page, testInfo, 'history-profile');
+  await page.goForward({ waitUntil: 'domcontentloaded' });
+  await expect(page).toHaveURL(new RegExp(`${APP_ROUTES.SETTINGS_ACCOUNT}$`));
+  await assertFullSettingsPane(page);
+});

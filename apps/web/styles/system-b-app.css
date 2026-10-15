@@ -6494,14 +6494,19 @@
   table-layout: fixed;
 }
 
-/* Settings > Profile keeps the profile rail open as a companion. The shell
-   rail is an overlay that never narrows the route, so the settings column
-   reserves its width (SIDEBAR_WIDTH 360 + overlay padding) from the first
-   server paint instead of being covered by it. */
+/* Settings owns its usable pane beside the companion overlay. Reserve on
+   the pane, so the capped form centers and shrinks inside the remaining
+   space. The shell's existing content inset already accounts for part of
+   the overlay padding; do not subtract that inset a second time. */
 @media (min-width: 1024px) {
-  [data-settings-layout-column="true"]:has(
-    > [data-settings-companion-rail="true"]
+  [data-testid="settings-shell-content"]:has(
+    [data-settings-companion-rail="true"]
   ) {
-    margin-inline-end: calc(360px + 2 * var(--space-1-5));
+    margin-inline-end: calc(
+      360px +
+      2 *
+      var(--space-1-5) -
+      var(--app-shell-content-inset)
+    );
   }
 }

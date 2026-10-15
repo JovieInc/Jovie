@@ -3,9 +3,11 @@
 import { Button, Skeleton } from '@jovie/ui';
 import { ExternalLink, PanelRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { ArtistRulesSheet } from '@/app/app/(shell)/library/ArtistRulesSheet';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
+import { ArtistProfileRailToggle } from '@/components/shell/ArtistProfileRailToggle';
 import { SettingsPaySection } from '@/features/dashboard/organisms/SettingsPaySection';
 import { SettingsSection } from '@/features/dashboard/organisms/SettingsSection';
 import { SettingsProfileSection } from '@/features/dashboard/organisms/settings-profile-section';
@@ -44,12 +46,21 @@ function MobileProfilePanelTrigger() {
 }
 
 /**
- * Marker read by system-b-app.css: on lg the settings column reserves the
- * companion profile rail's width from the first server paint, so the
- * auto-opened rail never covers the form and opening it shifts nothing.
+ * Reserve the automatic companion from the server paint, then follow the
+ * actual rail state. A manual close must reclaim the settings pane instead
+ * of leaving an empty reservation. Artist/data reloads keep this lifecycle.
  */
 function CompanionRailReservation() {
-  return <span hidden data-settings-companion-rail='true' />;
+  const { isOpen } = usePreviewPanelState();
+  const [hasOpened, setHasOpened] = useState(false);
+  if (isOpen && !hasOpened) setHasOpened(true);
+
+  return (
+    <span
+      hidden
+      data-settings-companion-rail={isOpen || !hasOpened ? 'true' : undefined}
+    />
+  );
 }
 
 export function ArtistProfileContent({
@@ -118,18 +129,23 @@ export function ArtistProfileContent({
         title='Profile'
         description='Photo, name, username, and brand details shown on your public profile.'
         headerAction={
-          artist.handle ? (
-            <Button asChild variant='secondary' size='sm'>
-              <a
-                href={`/${artist.handle}`}
-                target='_blank'
-                rel='noopener noreferrer'
-              >
-                View as Visitor
-                <ExternalLink className='h-3.5 w-3.5' aria-hidden='true' />
-              </a>
-            </Button>
-          ) : null
+          <div className='flex shrink-0 items-center gap-2'>
+            {artist.handle ? (
+              <Button asChild variant='secondary' size='sm'>
+                <a
+                  href={`/${artist.handle}`}
+                  target='_blank'
+                  rel='noopener noreferrer'
+                >
+                  View as Visitor
+                  <ExternalLink className='h-3.5 w-3.5' aria-hidden='true' />
+                </a>
+              </Button>
+            ) : null}
+            <span className='hidden lg:inline-flex'>
+              <ArtistProfileRailToggle />
+            </span>
+          </div>
         }
       >
         <div className='space-y-4'>
