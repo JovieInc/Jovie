@@ -333,12 +333,19 @@ for (const width of [1024, 1100, 1280, 1440]) {
     test(`${width}px ${reducedMotion}: Profile pane closes, reopens and remains reachable`, async ({
       page,
     }, testInfo) => {
+      const colorScheme = reducedMotion === 'reduce' ? 'light' : 'dark';
       await page.setViewportSize({ width, height: 900 });
       await page.emulateMedia({
-        colorScheme: reducedMotion === 'reduce' ? 'light' : 'dark',
+        colorScheme,
         reducedMotion,
       });
+      await page.addInitScript(theme => {
+        localStorage.setItem('jovie-theme', theme);
+      }, colorScheme);
       await enterProfileSettings(page);
+      await expect(page.locator('html')).toHaveClass(
+        new RegExp(`\\b${colorScheme}\\b`)
+      );
       await assertOpenPane(page, testInfo, 'opened');
       await assertReachable(page);
       const toggle = page.getByTestId('artist-profile-rail-toggle');
