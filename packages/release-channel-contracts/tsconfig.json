@@ -3,5 +3,5 @@
   "compilerOptions": {
     "tsBuildInfoFile": ".cache/tsbuildinfo"
   },
-  "include": ["index.ts", "release-channel.test.ts"]
+  "include": ["*.ts"]
 }
