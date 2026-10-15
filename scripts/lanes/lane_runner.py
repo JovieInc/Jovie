@@ -58,6 +58,7 @@ import linear_sync  # noqa: E402  (local issue mirror, claim ledger, write outbo
 import pr_events  # noqa: E402
 import remediation  # noqa: E402  (classifier, router, escalation ladder)
 import shipping_attribution  # noqa: E402  (receipt-first merged-PR provenance)
+import shipping_origin  # noqa: E402  (data-only remote provenance ingest)
 import workstreams  # noqa: E402  (shared workstream rank + duplicate identity)
 import worktree_sweep  # noqa: E402  (idle / merged-PR checkout retirement, JOV-7704)
 import worktree_pool  # noqa: E402  (pre-installed worktree pool, JOV-7705)
@@ -6701,6 +6702,11 @@ def dispatch(host: Host) -> int:
         if not tick["disk"].get("admitted"):
             raise DiskAdmissionError(tick["disk"].get("reason", "disk-unobservable"))
         ensure_full_history(host)
+        if not os.environ.get("LANES_SELFTEST"):
+            try:
+                tick["shippingOriginIngest"] = shipping_origin.collect(host.state)
+            except Exception as error:
+                tick["shippingOriginIngest"] = {"errors": [f"{type(error).__name__}:{error}"[:200]]}
         try:
             tick["remediationEvents"] = claim_remediation_events(host, Linear(host.linear_env))
         except (Exception, SystemExit) as error:  # the label scan (or a missing key) never takes spawn down

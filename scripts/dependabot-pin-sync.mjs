@@ -235,6 +235,7 @@ async function main() {
       }),
     });
     if (result.errors) throw new Error(JSON.stringify(result.errors));
+    output('head_sha', result.data.createCommitOnBranch.commit.oid);
     console.log(
       `committed ${result.data.createCommitOnBranch.commit.oid}: ${files.join(', ')}`
     );

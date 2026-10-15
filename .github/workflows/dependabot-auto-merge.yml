@@ -61,6 +61,8 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             .nvmrc
+            scripts/lanes/shipping_attribution.py
+            scripts/lanes/shipping_origin.py
             scripts/dependabot-update-policy.mjs
             scripts/dependabot-workflow-run-adapter.mjs
             scripts/lib/source-admission-policy.mjs
@@ -116,6 +118,25 @@ jobs:
           DEPENDABOT_UPDATE_TYPE: ${{ steps.meta.outputs.update-type }}
           DEPENDABOT_UPDATED_DEPENDENCIES_JSON: ${{ steps.meta.outputs.updated-dependencies-json }}
         run: node scripts/dependabot-update-policy.mjs
+
+      - name: Emit certified Dependabot origin
+        if: steps.meta.outcome == 'success' && github.event.pull_request.state == 'open'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 scripts/lanes/shipping_origin.py emit-automation \
+            --pr "$PR_NUMBER" --head-sha "$HEAD_SHA"
+
+      - name: Retain immutable origin payload
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: shipping-origin-v1
+          path: ${{ runner.temp }}/shipping-origin/*.json
+          if-no-files-found: ignore
+          retention-days: 30
 
       - name: Generate narrowly scoped Jovie App token
         if: steps.policy.outputs.decision == 'queue-recovered'

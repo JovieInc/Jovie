@@ -22,6 +22,57 @@ const heatmap = 'docs/TEST_COVERAGE_HEATMAP.md';
 const snapshot = 'apps/web/reports/test-coverage-snapshot.json';
 const url = 'https://github.com/JovieInc/Jovie/pull/123';
 
+test('every integrated workflow retains origin data and the handoff grants only read permissions', () => {
+  for (const name of [
+    'dependabot-auto-merge',
+    'dependabot-pin-sync',
+    'desktop-release',
+    'nightly-testing-agent',
+    'production-controller',
+    'screenshots',
+    'sentry-autofix',
+    'shipping-slo',
+    'test-coverage-audit',
+  ]) {
+    const workflow = load(
+      readFileSync(
+        new URL(`../.github/workflows/${name}.yml`, import.meta.url),
+        'utf8'
+      )
+    );
+    const steps = Object.values(workflow.jobs).flatMap(job => job.steps ?? []);
+    const publisher = steps.findIndex(step =>
+      /emit-automation|publishCoverageReport|publishNightlyReport/.test(
+        step.run ?? ''
+      )
+    );
+    const retention = steps.findIndex(
+      step => step.with?.name === 'shipping-origin-v1'
+    );
+    assert.ok(
+      publisher >= 0 && retention > publisher,
+      `${name} must retain published exact-head origin`
+    );
+    assert.equal(steps[retention].with['retention-days'], 30);
+    assert.ok(!steps[retention].with.overwrite);
+  }
+  const handoff = load(
+    readFileSync(
+      new URL('../.github/workflows/shipping-origin.yml', import.meta.url),
+      'utf8'
+    )
+  );
+  assert.deepEqual(handoff.permissions, {});
+  assert.deepEqual(handoff.jobs.receipt.permissions, { contents: 'read' });
+  assert.match(handoff.jobs.receipt.if, /refs\/heads\/main/);
+  assert.match(handoff.jobs.receipt.if, /itstimwhite/);
+  const token = handoff.jobs.receipt.steps.find(
+    step => step.id === 'read-token'
+  );
+  assert.equal(token.with['permission-contents'], 'read');
+  assert.equal(token.with['permission-pull-requests'], 'read');
+});
+
 function fixture(t, nightly = false) {
   const root = mkdtempSync(join(tmpdir(), 'coverage-publication-test-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
@@ -67,6 +118,9 @@ function fixture(t, nightly = false) {
     GITHUB_SHA: source,
     GITHUB_REPOSITORY: 'JovieInc/Jovie',
     GITHUB_RUN_ID: '12345',
+    GITHUB_WORKFLOW_REF:
+      'JovieInc/Jovie/.github/workflows/nightly-testing-agent.yml@refs/heads/main',
+    RUNNER_TEMP: root,
     GITHUB_RUN_ATTEMPT: '1',
     GITHUB_STEP_SUMMARY: join(root, 'summary.md'),
   };
@@ -84,8 +138,48 @@ function fixture(t, nightly = false) {
     }
     return '';
   };
+  const origins = [];
+  const recordOrigin = (pr, head) => origins.push({ pr, head });
   const change = () => writeFileSync(join(cwd, heatmap), 'measured coverage\n');
-  return { cwd, root, remote, git, source, env, calls, gh, change };
+  return {
+    cwd,
+    root,
+    remote,
+    git,
+    source,
+    env,
+    calls,
+    gh,
+    change,
+    origins,
+    recordOrigin,
+  };
+}
+
+function installOriginFixture(f, bin) {
+  mkdirSync(join(f.cwd, 'scripts/lanes'), { recursive: true });
+  for (const name of ['shipping_attribution.py', 'shipping_origin.py']) {
+    writeFileSync(
+      join(f.cwd, 'scripts/lanes', name),
+      readFileSync(new URL(`./lanes/${name}`, import.meta.url))
+    );
+  }
+  writeFileSync(
+    join(bin, 'gh'),
+    `#!/bin/sh
+case "$1:$2" in
+  pr:create) echo '${url}' ;;
+  pr:list) echo '[]' ;;
+  api:repos/JovieInc/Jovie/pulls/123)
+    sha=$(git rev-parse HEAD)
+    printf '{"number":123,"state":"open","base":{"repo":{"full_name":"JovieInc/Jovie"}},"head":{"sha":"%s","ref":"report","repo":{"full_name":"JovieInc/Jovie"}}}' "$sha" ;;
+  api:repos/JovieInc/Jovie/git/ref/heads/report)
+    printf '{"object":{"sha":"%s"}}' "$(git rev-parse HEAD)" ;;
+  api:repos/JovieInc/Jovie) echo '{"full_name":"JovieInc/Jovie"}' ;;
+esac
+`,
+    { mode: 0o755 }
+  );
 }
 
 function rejectReportPushes(f, failures, message) {
@@ -117,6 +211,7 @@ test('publishes only measured reports on an exact-source draft branch while main
   const result = publishCoverageReport(f);
   assert.equal(result.url, url);
   assert.equal(result.status, 'published');
+  assert.deepEqual(f.origins, [{ pr: url, head: f.git('rev-parse', 'HEAD') }]);
   assert.equal(f.git('rev-parse', 'HEAD^'), f.source);
   assert.equal(f.git('rev-parse', 'origin/main'), f.source);
   assert.equal(f.git('show', 'HEAD:source.txt'), 'measured');
@@ -202,11 +297,7 @@ test('the actual nightly publication step succeeds with main protected', t => {
   }
   const bin = join(f.root, 'bin');
   mkdirSync(bin);
-  writeFileSync(
-    join(bin, 'gh'),
-    `#!/bin/sh\nif [ "$2" = create ]; then echo '${url}'; elif [ "$2" = list ]; then echo '[]'; fi\n`,
-    { mode: 0o755 }
-  );
+  installOriginFixture(f, bin);
   const workflow =
     /** @type {{ jobs: { report: { steps: {name?: string, run?: string}[] } } }} */ (
       load(
@@ -376,14 +467,19 @@ test('uses the real gh command adapter and supports runners without a summary fi
   f.change();
   const bin = join(f.root, 'bin');
   mkdirSync(bin);
-  writeFileSync(
-    join(bin, 'gh'),
-    `#!/bin/sh\nif [ "$2" = create ]; then echo '${url}'; elif [ "$2" = list ]; then echo '[]'; fi\n`,
-    { mode: 0o755 }
-  );
+  installOriginFixture(f, bin);
   const env = { ...f.env, PATH: `${bin}:${process.env.PATH}` };
   delete env.GITHUB_STEP_SUMMARY;
   assert.equal(publishCoverageReport({ cwd: f.cwd, env }).url, url);
+  const head = f.git('rev-parse', 'HEAD');
+  const receipt = JSON.parse(
+    readFileSync(
+      join(f.root, 'shipping-origin', `JovieInc-Jovie-123-${head}.json`),
+      'utf8'
+    )
+  );
+  assert.equal(receipt.headSha, head);
+  assert.equal(receipt.method, 'other-automation');
 });
 
 test('real publication retires an ancestor report but preserves divergent measured source', t => {

@@ -170,3 +170,19 @@ def test_origin_append_is_strict_and_append_only(tmp_path):
     assert len(path.read_text().splitlines()) == 2
     with pytest.raises(ValueError, match="malformed-origin-receipt"):
         attribution.validate_origin_receipt({**receipt, "headSha": "bad"})
+
+
+def test_duplicate_and_conflicting_origin_appends_preserve_original_bytes(tmp_path):
+    path = tmp_path / "ledger.jsonl"
+    receipt = source_origin("grokbot")
+    attribution.append_origin_receipt(path, receipt)
+    first = path.read_bytes()
+    with pytest.raises(ValueError, match="duplicate-origin-receipt"):
+        attribution.append_origin_receipt(path, dict(receipt))
+    with pytest.raises(ValueError, match="conflicting-origin-receipt"):
+        attribution.append_origin_receipt(path, {**receipt, "method": "independent-hyperagent"})
+    assert path.read_bytes() == first
+    conflict = {**receipt, "method": "independent-hyperagent"}
+    row = attribution.attribute_pr(pr(), [receipt, conflict], "JovieInc/Jovie")
+    assert row["origin"]["confidence"] == "unknown"
+    assert row["evidenceErrors"][-1]["reason"] == "conflicting-exact-origin-receipts"
