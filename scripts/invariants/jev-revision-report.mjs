@@ -50,8 +50,7 @@ function latency(values) {
 }
 
 function summarize(rows) {
-  const metrics = {};
-  for (const phase of ['baseline', 'revised']) {
+  const summarizePhase = phase => {
     const labeled = rows.filter(
       r => r.label?.[phase] && r.run[phase].state !== 'fallback'
     );
@@ -66,7 +65,7 @@ function summarize(rows) {
         : null;
     });
     const knownCosts = costs.filter(c => c !== null);
-    metrics[phase] = {
+    return {
       usefulness: average(labeled.map(r => r.label[phase].usefulness)),
       voice: average(labeled.map(r => r.label[phase].voice)),
       factualFalseAcceptance: rate(
@@ -113,7 +112,7 @@ function summarize(rows) {
           .reduce((s, c) => s + (c?.outputTokens ?? 0), 0),
       },
     };
-  }
+  };
   const pairs = rows.filter(
     r =>
       r.label?.baseline &&
@@ -127,7 +126,8 @@ function summarize(rows) {
       r.run.revised.state !== 'fallback'
   );
   return {
-    ...metrics,
+    baseline: summarizePhase('baseline'),
+    revised: summarizePhase('revised'),
     pairedDelta: {
       usefulness: average(
         pairs.map(r => r.label.revised.usefulness - r.label.baseline.usefulness)

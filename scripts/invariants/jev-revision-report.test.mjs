@@ -295,7 +295,8 @@ test('reports separate paired quality, factual, revision, failure and full pipel
     assert.match(digest, /^[a-f0-9]{64}$/u);
 });
 
-for (const [path, value, reason] of [
+/** @type {Array<[path: string, value: unknown, reason: string]>} */
+const invalidEvidenceCases = [
   ['labels', null, 'human-labels-missing'],
   ['labels.labelProvenance', 'model-generated', 'human-labels-missing'],
   ['labels.sourceOwnerApprovalRef', null, 'human-labels-missing'],
@@ -360,7 +361,9 @@ for (const [path, value, reason] of [
   ['runs.0.baseline.calls.0', null, 'call-execution-evidence-invalid'],
   ['labels.rows', {}, 'human-labels-missing'],
   ['runs.1', null, 'missing-duplicate-or-unmatched-heldout-runs'],
-])
+];
+
+for (const [path, value, reason] of invalidEvidenceCases)
   test(`inconclusive for invalid ${path} = ${JSON.stringify(value)}`, () => {
     const input = fixture();
     const keys = path.split('.');
