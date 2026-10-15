@@ -22,9 +22,11 @@ import {
   assertMainlineAncestorCompare,
   assertStagingVersionTransition,
   expectedDesktopAssetNames,
+  fetchRecoverableProductionDraft,
   fetchRecoverableStagingDraft,
   prepare,
   releaseMetadataUpdate,
+  selectRecoverableProductionDraft,
   selectRecoverableStagingDraft,
   validateReleaseAssets,
 } from './desktop-release-assets.mjs';
@@ -494,6 +496,186 @@ function recoverableStagingDraft(overrides = {}) {
     ...overrides,
   };
 }
+
+const productionRecoveryInput = {
+  releaseSha: '43414c7da0e53f1b47cda7e562c2b43de4c386f7',
+  version: '26.10.0',
+};
+
+function recoverableProductionDraft(overrides = {}) {
+  return {
+    ...recoverableStagingDraft(),
+    id: 401449487,
+    name: productionRecoveryInput.version,
+    prerelease: false,
+    tag_name: 'untagged-4342acff1e28ec4b6d16',
+    target_commitish: productionRecoveryInput.releaseSha,
+    ...overrides,
+  };
+}
+
+test('production recovery selects the exact authorized source and preserves older drafts', () => {
+  const candidate = recoverableProductionDraft();
+  const others = [
+    { id: 401429954, target_commitish: '85315d'.padEnd(40, '0') },
+    { target_commitish: productionRecoveryInput.releaseSha.slice(0, 7) },
+    { target_commitish: 'main' },
+    { name: '26.9.16' },
+    { tag_name: 'v26.10.0' },
+    { tag_name: 'untagged-invalid' },
+    { tag_name: null },
+  ].map(recoverableProductionDraft);
+  const before = structuredClone(others);
+  assert.equal(
+    selectRecoverableProductionDraft(
+      [...others, candidate],
+      productionRecoveryInput
+    ),
+    candidate
+  );
+  assert.deepEqual(others, before);
+  assert.equal(
+    selectRecoverableProductionDraft(others, productionRecoveryInput),
+    null
+  );
+  assert.equal(
+    selectRecoverableProductionDraft([null], productionRecoveryInput),
+    null
+  );
+});
+
+test('production recovery rejects multiple exact authorized placeholders', () => {
+  assert.throws(
+    () =>
+      selectRecoverableProductionDraft(
+        [
+          recoverableProductionDraft(),
+          recoverableProductionDraft({ id: 401449488 }),
+        ],
+        productionRecoveryInput
+      ),
+    /Multiple recoverable production drafts/
+  );
+});
+
+test('production recovery rejects unsafe draft envelopes and assets', () => {
+  for (const unsafe of [
+    { id: 0 },
+    { id: '401449487' },
+    { id: null },
+    { draft: false },
+    { draft: undefined },
+    { prerelease: true },
+    { prerelease: undefined },
+    { published_at: '2026-10-02T00:00:00Z' },
+    { published_at: undefined },
+    { assets: null },
+    { assets: [{ id: 1 }] },
+  ]) {
+    assert.throws(
+      () =>
+        selectRecoverableProductionDraft(
+          [recoverableProductionDraft(unsafe)],
+          productionRecoveryInput
+        ),
+      /Recoverable production/
+    );
+  }
+});
+
+test('production recovery rejects malformed authorization and inventory', () => {
+  for (const input of [
+    { ...productionRecoveryInput, releaseSha: 'main' },
+    { ...productionRecoveryInput, releaseSha: '43414c7' },
+    { ...productionRecoveryInput, version: '26.10.0-staging.1.1' },
+  ]) {
+    assert.throws(
+      () => selectRecoverableProductionDraft([], input),
+      /malformed|semver/
+    );
+  }
+  assert.throws(
+    () => selectRecoverableProductionDraft(null, productionRecoveryInput),
+    /malformed/
+  );
+});
+
+test('production recovery scans every inventory page before selecting', async () => {
+  const candidate = recoverableProductionDraft();
+  const pages = [
+    [candidate],
+    [recoverableProductionDraft({ id: 401449488 })],
+    [],
+  ];
+  const requested = [];
+  await assert.rejects(
+    fetchRecoverableProductionDraft(
+      async path => {
+        requested.push(path);
+        return pages.shift();
+      },
+      productionRecoveryInput,
+      { pageSize: 1 }
+    ),
+    /Multiple recoverable production drafts/
+  );
+  assert.deepEqual(requested, [
+    '?per_page=1&page=1',
+    '?per_page=1&page=2',
+    '?per_page=1&page=3',
+  ]);
+  assert.deepEqual(
+    await fetchRecoverableProductionDraft(
+      async () => [candidate],
+      productionRecoveryInput
+    ),
+    candidate
+  );
+  assert.equal(
+    await fetchRecoverableProductionDraft(
+      async () => [],
+      productionRecoveryInput
+    ),
+    null
+  );
+});
+
+test('production recovery fails closed on incomplete or malformed paginated inventories', async () => {
+  await assert.rejects(
+    fetchRecoverableProductionDraft(
+      async () => [recoverableProductionDraft()],
+      productionRecoveryInput,
+      { maxPages: 1, pageSize: 1 }
+    ),
+    /inventory exceeds the 1-page safety bound/
+  );
+  await assert.rejects(
+    fetchRecoverableProductionDraft(async () => null, productionRecoveryInput),
+    /malformed/
+  );
+  await assert.rejects(
+    fetchRecoverableProductionDraft(
+      async () => [null, null],
+      productionRecoveryInput,
+      { pageSize: 1 }
+    ),
+    /exceeds the requested size/
+  );
+  await assert.rejects(
+    fetchRecoverableProductionDraft(null, productionRecoveryInput),
+    /request is missing/
+  );
+  for (const options of [{ maxPages: 0 }, { pageSize: 0 }, { pageSize: 101 }]) {
+    await assert.rejects(
+      fetchRecoverableProductionDraft(
+        async () => [],
+        productionRecoveryInput,
+        options
+      ),
+      /invalid/
+    );
+  }
+});
 
 test('selects only a unique private empty staging-shaped orphan draft', () => {
   const candidate = recoverableStagingDraft();
