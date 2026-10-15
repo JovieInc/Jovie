@@ -1,5 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
+import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -35,6 +36,7 @@ async function readPaneGeometry(page: Page) {
           box.height > 0 &&
           style.display !== 'none' &&
           style.visibility !== 'hidden' &&
+          Number(style.opacity) > 0 &&
           !element.closest('[hidden], [inert], [aria-hidden="true"]')
         );
       });
@@ -71,7 +73,13 @@ async function readPaneGeometry(page: Page) {
     const railMount = elements.rail[0].closest<HTMLElement>(
       '.shell-inspector-overlay'
     );
-    const occupiedRail = railMount ? box(railMount) : rail;
+    if (!railMount) return { counts, geometry: null };
+    const occupiedRail = box(railMount);
+    const fieldRect = elements.field[0].getBoundingClientRect();
+    const hit = document.elementFromPoint(
+      fieldRect.left + fieldRect.width / 2,
+      fieldRect.top + fieldRect.height / 2
+    );
     return {
       counts,
       geometry: {
@@ -79,7 +87,22 @@ async function readPaneGeometry(page: Page) {
         pane,
         column,
         field,
+        rail,
         occupiedRail,
+        relationships: {
+          routeContainsPane: elements.route[0].contains(elements.pane[0]),
+          paneContainsColumn: elements.pane[0].contains(elements.column[0]),
+          columnContainsField: elements.column[0].contains(elements.field[0]),
+          sameShell:
+            railMount.closest('[data-app-shell-main-content="true"]') ===
+            elements.route[0].closest('[data-app-shell-main-content="true"]'),
+          fieldHit:
+            hit === elements.field[0] || elements.field[0].contains(hit),
+        },
+        columnOverflow:
+          elements.column[0].scrollWidth - elements.column[0].clientWidth,
+        paneOverflow:
+          elements.pane[0].scrollWidth - elements.pane[0].clientWidth,
         centerDelta: Math.abs(
           (column.left + column.right - pane.left - pane.right) / 2
         ),
@@ -100,9 +123,18 @@ test('Profile companion leaves one centered usable settings pane', async ({
   await page.setViewportSize({ width: 1440, height: 900 });
   await enterProfileSettings(page);
 
-  const result = await readPaneGeometry(page);
+  // Observe a fixed window after the actual rail lifecycle settles. Never
+  // poll until the centering assertion passes: a stable wrong layout is RED.
+  const samples = [];
+  for (let frame = 0; frame < 12; frame += 1) {
+    samples.push(await readPaneGeometry(page));
+    await page.evaluate(() => new Promise(requestAnimationFrame));
+  }
+  const result = samples.at(-1)!;
+  const geometryPath = testInfo.outputPath('settings-pane-geometry.json');
+  await writeFile(geometryPath, JSON.stringify({ samples }, null, 2));
   await testInfo.attach('settings-pane-geometry.json', {
-    body: JSON.stringify(result, null, 2),
+    path: geometryPath,
     contentType: 'application/json',
   });
   expect(result.counts).toEqual({
@@ -114,11 +146,39 @@ test('Profile companion leaves one centered usable settings pane', async ({
   });
   expect(result.geometry).not.toBeNull();
   const geometry = result.geometry!;
+  expect(geometry.relationships).toEqual({
+    routeContainsPane: true,
+    paneContainsColumn: true,
+    columnContainsField: true,
+    sameShell: true,
+    fieldHit: true,
+  });
+  for (const sample of samples) {
+    expect(sample.counts).toEqual(result.counts);
+    expect(sample.geometry).not.toBeNull();
+    expect(
+      Math.abs(sample.geometry!.column.left - geometry.column.left)
+    ).toBeLessThanOrEqual(1);
+    expect(
+      Math.abs(sample.geometry!.column.right - geometry.column.right)
+    ).toBeLessThanOrEqual(1);
+  }
+  expect(geometry.rail.width).toBeGreaterThanOrEqual(SIDEBAR_WIDTH - 1);
   expect(
     geometry.centerDelta,
     'form centers in the actual usable pane'
   ).toBeLessThanOrEqual(1);
-  expect(geometry.pane.left).toBeGreaterThanOrEqual(geometry.route.left - 1);
+  expect(
+    Math.abs(geometry.pane.left - geometry.route.left)
+  ).toBeLessThanOrEqual(1);
+  expect(
+    Math.abs(
+      geometry.pane.width - (geometry.occupiedRail.left - geometry.route.left)
+    )
+  ).toBeLessThanOrEqual(16);
+  expect(geometry.occupiedRail.right).toBeGreaterThanOrEqual(
+    geometry.route.right
+  );
   expect(
     geometry.pane.right,
     'pane ends before occupied rail bounds'
@@ -132,4 +192,8 @@ test('Profile companion leaves one centered usable settings pane', async ({
   expect(geometry.field.left).toBeGreaterThanOrEqual(geometry.column.left - 1);
   expect(geometry.field.right).toBeLessThanOrEqual(geometry.column.right + 1);
   expect(geometry.pageOverflow).toBeLessThanOrEqual(1);
+  expect(geometry.columnOverflow).toBeLessThanOrEqual(1);
+  expect(geometry.paneOverflow).toBeLessThanOrEqual(1);
 });
+
+import { writeFile } from 'node:fs/promises';

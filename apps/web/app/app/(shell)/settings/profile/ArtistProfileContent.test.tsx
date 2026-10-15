@@ -8,7 +8,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ArtistProfileContent } from './ArtistProfileContent';
 
-const { contextState, openPreview, refresh } = vi.hoisted(() => ({
+const { contextState, openPreview, previewState, refresh } = vi.hoisted(() => ({
   contextState: {
     artist: null as null | {
       id: string;
@@ -20,6 +20,14 @@ const { contextState, openPreview, refresh } = vi.hoisted(() => ({
     setArtist: vi.fn(),
   },
   openPreview: vi.fn(),
+  previewState: {
+    isOpen: false,
+    isPreview: false,
+    isPinned: false,
+    isFloating: false,
+    close: vi.fn(),
+    toggle: vi.fn(),
+  },
   refresh: vi.fn(),
 }));
 
@@ -28,11 +36,19 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
-  usePreviewPanelState: () => ({ open: openPreview }),
+  usePreviewPanelState: () => ({ ...previewState, open: openPreview }),
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
-  useDashboardData: () => ({ selectedProfile: { username: 'ada' } }),
+  useDashboardData: () => ({
+    selectedProfile: { username: 'ada', displayName: 'Ada Artist' },
+  }),
+}));
+
+vi.mock('@jovie/ui', async importOriginal => ({
+  ...(await importOriginal<typeof import('@jovie/ui')>()),
+  TooltipShortcut: ({ children }: { readonly children: React.ReactNode }) =>
+    children,
 }));
 
 vi.mock('@/features/dashboard/organisms/useSettingsContext', () => ({
@@ -56,11 +72,75 @@ describe('ArtistProfileContent', () => {
     contextState.artist = null;
     contextState.setArtist.mockReset();
     openPreview.mockReset();
+    previewState.isOpen = false;
+    previewState.isPreview = false;
+    previewState.isPinned = false;
+    previewState.toggle.mockReset();
     refresh.mockReset();
+  });
+
+  it('offers a canonical preview control and releases space only after explicit close', () => {
+    vi.stubGlobal('fetch', vi.fn().mockReturnValue(new Promise(() => {})));
+    contextState.artist = {
+      id: 'profile-1',
+      handle: 'ada',
+      name: 'Ada Artist',
+      published: true,
+    };
+    const { rerender } = render(<ArtistProfileContent />);
+    const reserved = () =>
+      document.querySelectorAll('[data-settings-companion-rail="true"]');
+
+    // The automatic opening is pending during SSR/initial hydration.
+    expect(reserved()).toHaveLength(1);
+    const toggle = screen.getByRole('button', {
+      name: 'Show Ada Artist profile',
+    });
+    expect(toggle).toHaveAttribute(
+      'aria-controls',
+      'shell-artist-profile-rail'
+    );
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    previewState.isOpen = true;
+    previewState.isPinned = true;
+    rerender(<ArtistProfileContent />);
+    expect(reserved()).toHaveLength(1);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(toggle);
+    expect(previewState.toggle).toHaveBeenCalledOnce();
+
+    previewState.isOpen = false;
+    previewState.isPinned = false;
+    rerender(<ArtistProfileContent />);
+    expect(reserved()).toHaveLength(0);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    // Unrelated settings reloads must not reinstate an unsolicited reservation.
+    contextState.artist = null;
+    rerender(<ArtistProfileContent />);
+    expect(reserved()).toHaveLength(0);
+
+    previewState.isOpen = true;
+    rerender(<ArtistProfileContent />);
+    expect(reserved()).toHaveLength(1);
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('does not keep an empty desktop reservation after the companion closes', () => {
+    const { rerender } = render(<ArtistProfileContent />);
+    const reserved = () =>
+      document.querySelectorAll('[data-settings-companion-rail="true"]');
+    expect(reserved()).toHaveLength(1);
+    previewState.isOpen = true;
+    rerender(<ArtistProfileContent />);
+    expect(reserved()).toHaveLength(1);
+    previewState.isOpen = false;
+    rerender(<ArtistProfileContent />);
+    expect(reserved()).toHaveLength(0);
   });
 
   it('keeps the canonical settings header and panel anatomy while loading', () => {
