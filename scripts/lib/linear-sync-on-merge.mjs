@@ -12,8 +12,13 @@
  * need an outcome receipt (JOV-7300). Invariant consumer: JOV-INV-041.
  */
 
-import { appendFileSync, readFileSync } from 'node:fs';
-import { resolve as resolvePath } from 'node:path';
+import {
+  appendFileSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
+import { join, resolve as resolvePath } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { deprecationCheckGreen } from './deprecation-observation.mjs';
 import { GREEN_MARKER } from './remediation-signal.mjs';
@@ -26,7 +31,10 @@ import {
   createProductionFacts,
   fetchWithRetry,
   githubClient,
+  githubStatusError,
+  headerRetryMs,
   immutableGithubCache,
+  rateLimitWaitMs,
   reconcileValidation,
 } from './validation-sync.mjs';
 
@@ -41,6 +49,46 @@ const IDENTIFIER_RE = /^JOV-(\d+)$/i;
 const COMMISSIONING_LABEL_RE = /commission/i;
 const PARENT_LABEL_RE = /^(parent|epic|type:epic)$/i;
 const MAX_OPEN_PR_PAGES = 20;
+export const SWEEP_CURSOR_SCHEMA = 1;
+export const SWEEP_BATCH_SIZE = 4;
+const SWEEP_CURSOR_FILE = 'cursor.json';
+
+/** @type {(ms: number) => Promise<void>} */
+let sleepFn = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * @param {string | undefined} dir
+ * @returns {{ nextIdentifier: string } | null}
+ */
+export function readSweepCursor(dir) {
+  if (!dir) return null;
+  try {
+    const raw = JSON.parse(readFileSync(join(dir, SWEEP_CURSOR_FILE), 'utf8'));
+    if (raw?.schema !== SWEEP_CURSOR_SCHEMA) return null;
+    const nextIdentifier = String(raw.nextIdentifier ?? '').toUpperCase();
+    if (nextIdentifier && !IDENTIFIER_RE.test(nextIdentifier)) return null;
+    return { nextIdentifier };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @param {string | undefined} dir
+ * @param {string} nextIdentifier
+ */
+export function writeSweepCursor(dir, nextIdentifier) {
+  if (!dir) return;
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(
+    join(dir, SWEEP_CURSOR_FILE),
+    `${JSON.stringify({
+      schema: SWEEP_CURSOR_SCHEMA,
+      nextIdentifier: nextIdentifier || '',
+      savedAt: new Date().toISOString(),
+    })}\n`
+  );
+}
 
 /**
  * Subset of fetch that production `globalThis.fetch` and the regression
@@ -434,8 +482,9 @@ export function lifecycleHolds(input) {
 async function linearGraphql(fetchImpl, apiKey, query, variables) {
   // Bounded retry for transient Linear upstream failures (JOV-8012): a
   // 503/502/504 from Linear used to fail the whole sweep even though the
-  // next scheduled run converged. Retry the transport statuses and the
-  // shared-key rate limit with backoff; persistent errors still throw.
+  // next scheduled run converged. Retry the transport statuses and a short
+  // shared-key rate limit. A reset beyond the sweep budget throws so the
+  // caller can persist the cursor instead of sleeping out the hour.
   const maxAttempts = 4;
   /** @type {Error | null} */
   let lastError = null;
@@ -454,43 +503,70 @@ async function linearGraphql(fetchImpl, apiKey, query, variables) {
           await response.json()
         );
       if (Array.isArray(payload.errors) && payload.errors.length > 0) {
-        throw new Error(
-          payload.errors
-            .map(error =>
-              error && typeof error === 'object' && 'message' in error
-                ? String(error.message)
-                : 'Linear request failed'
-            )
-            .join('; ')
+        const errors = payload.errors;
+        const limited = errors.some(
+          error =>
+            error &&
+            typeof error === 'object' &&
+            'extensions' in error &&
+            /** @type {{ extensions?: { code?: string } }} */ (error).extensions
+              ?.code === 'RATELIMITED'
         );
+        if (!limited) {
+          throw new Error(
+            errors
+              .map(error =>
+                error && typeof error === 'object' && 'message' in error
+                  ? String(error.message)
+                  : 'Linear request failed'
+              )
+              .join('; ')
+          );
+        }
+        lastError = Object.assign(
+          new Error(`Linear rate limited (HTTP ${response.status})`),
+          { rateLimited: true, retryAfterMs: headerRetryMs(response.headers) }
+        );
+      } else {
+        return payload.data ?? {};
       }
-      return payload.data ?? {};
+    } else {
+      // Linear answers a spent rate limit with HTTP 400 and RATELIMITED. The
+      // lifecycle key is shared with Summer and agents, so name it plainly.
+      /** @type {any} */
+      const body = await response.json().catch(() => null);
+      const errors = Array.isArray(body?.errors) ? body.errors : [];
+      const limited =
+        response.status === 429 ||
+        errors.some(
+          (/** @type {any} */ error) => error?.extensions?.code === 'RATELIMITED'
+        );
+      const detail = errors
+        .map((/** @type {any} */ error) => String(error?.message ?? ''))
+        .filter(Boolean)
+        .join('; ');
+      lastError = Object.assign(
+        new Error(
+          limited
+            ? `Linear rate limited (HTTP ${response.status})`
+            : `Linear HTTP ${response.status}${detail ? `: ${detail}` : ''}`
+        ),
+        {
+          rateLimited: limited,
+          retryAfterMs: limited ? headerRetryMs(response.headers) : 0,
+        }
+      );
     }
-    // Linear answers a spent rate limit with HTTP 400 and RATELIMITED. The
-    // lifecycle key is shared with Summer and agents, so name it plainly.
-    /** @type {any} */
-    const body = await response.json().catch(() => null);
-    const errors = Array.isArray(body?.errors) ? body.errors : [];
-    const limited = errors.some(
-      (/** @type {any} */ error) => error?.extensions?.code === 'RATELIMITED'
+    const flagged = /** @type {{ rateLimited?: boolean, retryAfterMs?: number }} */ (
+      lastError
     );
-    const detail = errors
-      .map((/** @type {any} */ error) => String(error?.message ?? ''))
-      .filter(Boolean)
-      .join('; ');
-    lastError = Object.assign(
-      new Error(
-        limited
-          ? `Linear rate limited (HTTP ${response.status})`
-          : `Linear HTTP ${response.status}${detail ? `: ${detail}` : ''}`
-      ),
-      { rateLimited: limited }
-    );
-    const retryable = response.status === 429 || response.status >= 500;
-    if (!retryable || attempt === maxAttempts) throw lastError;
-    // Exponential backoff, bounded for the 15-minute sweep budget.
-    const delayMs = Math.min(4_000, 2 ** (attempt - 1) * 250);
-    await new Promise(resolve => setTimeout(resolve, delayMs));
+    const wait = flagged.rateLimited
+      ? rateLimitWaitMs(flagged.retryAfterMs ?? 0, attempt, maxAttempts)
+      : response.status === 429 || response.status >= 500
+        ? Math.min(4_000, 2 ** (attempt - 1) * 250)
+        : null;
+    if (wait == null || attempt === maxAttempts) throw lastError;
+    await sleepFn(wait);
   }
   throw lastError ?? new Error('Linear request failed');
 }
@@ -505,29 +581,45 @@ async function linearGraphql(fetchImpl, apiKey, query, variables) {
  */
 export async function listOpenPullRequests(input) {
   const maxPages = input.maxPages ?? MAX_OPEN_PR_PAGES;
+  const maxAttempts = 4;
   /** @type {ReturnType<typeof normalizePullRequest>[]} */
   const pulls = [];
   let url = `https://api.github.com/repos/${input.repository}/pulls?state=open&per_page=100&page=1`;
   for (let page = 0; page < maxPages; page += 1) {
-    const response = await input.fetchImpl(url, {
-      headers: {
-        Accept: 'application/vnd.github+json',
-        Authorization: `Bearer ${input.token}`,
-        'X-GitHub-Api-Version': '2022-11-28',
-        'User-Agent': 'jovie-linear-sync-on-merge',
-      },
-    });
-    if (!response.ok) {
-      throw new Error(`GitHub HTTP ${response.status}`);
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      const response = await input.fetchImpl(url, {
+        headers: {
+          Accept: 'application/vnd.github+json',
+          Authorization: `Bearer ${input.token}`,
+          'X-GitHub-Api-Version': '2022-11-28',
+          'User-Agent': 'jovie-linear-sync-on-merge',
+        },
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        const error = githubStatusError(
+          response.status,
+          response.headers,
+          body,
+          `repos/${input.repository}/pulls?state=open`
+        );
+        const wait = error.rateLimited
+          ? rateLimitWaitMs(error.retryAfterMs, attempt, maxAttempts)
+          : null;
+        if (wait == null || attempt === maxAttempts) throw error;
+        await sleepFn(wait);
+        continue;
+      }
+      const batch = await response.json();
+      if (!Array.isArray(batch)) {
+        throw new Error('GitHub pulls response was not a list');
+      }
+      pulls.push(...batch.map(normalizePullRequest));
+      const next = nextLink(response.headers?.get?.('link') ?? '');
+      if (!next) return { pulls, complete: true };
+      url = next;
+      break;
     }
-    const batch = await response.json();
-    if (!Array.isArray(batch)) {
-      throw new Error('GitHub pulls response was not a list');
-    }
-    pulls.push(...batch.map(normalizePullRequest));
-    const next = nextLink(response.headers?.get?.('link') ?? '');
-    if (!next) return { pulls, complete: true };
-    url = next;
   }
   return { pulls, complete: false };
 }
@@ -611,6 +703,59 @@ async function readLifecycleIssue(fetchImpl, apiKey, lookupId) {
   });
   const raw = data.issue;
   if (!raw || typeof raw !== 'object') return null;
+  return materializeLifecycleIssue(fetchImpl, apiKey, raw);
+}
+
+/**
+ * One Linear request for several issue records. Alias batching keeps a sweep
+ * inside the shared request budget; a single id keeps the original query so
+ * existing callers stay unchanged. Pagination and delivery checks happen later,
+ * per issue, so one bounded history read is not fetched twice.
+ *
+ * @param {HttpFetch} fetchImpl
+ * @param {string} apiKey
+ * @param {readonly string[]} lookupIds
+ * @returns {Promise<(Record<string, any> | null)[]>}
+ */
+async function fetchLifecycleRaws(fetchImpl, apiKey, lookupIds) {
+  if (lookupIds.length === 0) return [];
+  if (lookupIds.length === 1) {
+    const data = await linearGraphql(fetchImpl, apiKey, ISSUE_QUERY, {
+      issueId: lookupIds[0],
+    });
+    const raw = data.issue;
+    return [raw && typeof raw === 'object' ? raw : null];
+  }
+  /** @type {Record<string, string>} */
+  const variables = {};
+  const selections = lookupIds.map((id, index) => {
+    variables[`id${index}`] = id;
+    return `i${index}: issue(id: $id${index}) {${ISSUE_FIELDS}
+  }`;
+  });
+  const decls = lookupIds
+    .map((_, index) => `$id${index}: String!`)
+    .join(', ');
+  const data = await linearGraphql(
+    fetchImpl,
+    apiKey,
+    `query LifecycleIssueBatch(${decls}) {
+${selections.join('\n')}
+}`,
+    variables
+  );
+  return lookupIds.map((_, index) => {
+    const raw = data[`i${index}`];
+    return raw && typeof raw === 'object' ? raw : null;
+  });
+}
+
+/**
+ * @param {HttpFetch} fetchImpl
+ * @param {string} apiKey
+ * @param {Record<string, any>} raw
+ */
+async function materializeLifecycleIssue(fetchImpl, apiKey, raw) {
   const history = [];
   let historyPage = raw.history;
   for (let page = 0; ; page += 1) {
@@ -752,15 +897,15 @@ async function readLifecycleIssue(fetchImpl, apiKey, lookupId) {
  *   readonly allowlist?: ReadonlySet<string>,
  *   readonly eventPull?: { number: number },
  *   readonly dryRun?: boolean,
+ *   readonly issue?: Awaited<ReturnType<typeof readLifecycleIssue>>,
  *   readonly log: (message: string) => void,
  * }} ctx
  */
 export async function reconcileIssueLifecycle(ctx) {
-  const issue = await readLifecycleIssue(
-    ctx.fetchImpl,
-    ctx.apiKey,
-    ctx.lookupId
-  );
+  const issue =
+    ctx.issue !== undefined
+      ? ctx.issue
+      : await readLifecycleIssue(ctx.fetchImpl, ctx.apiKey, ctx.lookupId);
   if (!issue?.id || !issue.identifier) {
     ctx.log(
       `Could not resolve Linear issue for lookup '${ctx.lookupId}'; skipping`
@@ -868,9 +1013,31 @@ function loadJson(root, path) {
  *   readonly harnessManifest?: unknown,
  *   readonly assuranceMatrix?: unknown,
  *   readonly verifyMarker?: (sha: string, controllerWorkflowId: number) => Promise<boolean> | boolean,
+ *   readonly sleep?: (ms: number) => Promise<void>,
  * }} [options]
  */
 export async function syncLinearIssueOnMerge(options = {}) {
+  const previousSleep = sleepFn;
+  if (options.sleep) sleepFn = options.sleep;
+  try {
+    return await runSync(options);
+  } finally {
+    sleepFn = previousSleep;
+  }
+}
+
+/**
+ * @param {{
+ *   readonly fetchImpl?: HttpFetch,
+ *   readonly env?: NodeJS.ProcessEnv,
+ *   readonly log?: (message: string) => void,
+ *   readonly allowlist?: ReadonlySet<string>,
+ *   readonly harnessManifest?: unknown,
+ *   readonly assuranceMatrix?: unknown,
+ *   readonly verifyMarker?: (sha: string, controllerWorkflowId: number) => Promise<boolean> | boolean,
+ * }} options
+ */
+async function runSync(options) {
   /** @type {HttpFetch} */
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
   const env = options.env ?? process.env;
@@ -902,7 +1069,7 @@ export async function syncLinearIssueOnMerge(options = {}) {
     );
   }
   const github = immutableGithubCache(
-    githubClient(fetchImpl, token),
+    githubClient(fetchImpl, token, sleepFn),
     env.LINEAR_SYNC_GITHUB_CACHE_DIR
   );
   const facts = createProductionFacts({
@@ -922,6 +1089,27 @@ export async function syncLinearIssueOnMerge(options = {}) {
     openPulls = await listOpenPullRequests({ fetchImpl, token, repository });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    const flagged = /** @type {{ rateLimited?: boolean, forbidden?: boolean }} */ (
+      error
+    );
+    if (flagged.rateLimited) {
+      // Quota is already spent. Evaluating issues would 403 the first linked
+      // pull (JOV-7355 → #19767 on 2026-10-15) and label that as a Linear
+      // deferral. Leave the cursor where it is and let the next sweep resume.
+      log(`Open pull request scan deferred: ${message}`);
+      return {
+        action: 'deferred',
+        comment: '',
+        identifier: ref.identifier,
+        results: [],
+        deferred: 0,
+      };
+    }
+    if (flagged.forbidden) {
+      throw new Error(
+        `Open pull request scan refused (${message}). This is a token permission gap; permissions and tokens were not changed.`
+      );
+    }
     log(`Open pull request scan failed: ${message}`);
     openPulls = { pulls: [], complete: false };
   }
@@ -976,54 +1164,119 @@ export async function syncLinearIssueOnMerge(options = {}) {
       if (data.issues?.pageInfo?.hasNextPage !== true) break;
       after = data.issues.pageInfo.endCursor;
     }
-    // Least recently touched first: when a budget runs out mid-sweep, the
-    // next sweep starts where this one could not reach.
+    // Least recently touched first. A persisted cursor rotates the list so a
+    // rate limit resumes at the issue that did not finish, instead of
+    // re-reading the same prefix until the quota is gone again.
     found.sort(
       (left, right) =>
         (Date.parse(left.updatedAt) || 0) - (Date.parse(right.updatedAt) || 0)
     );
-    lookups.push(...found.map(entry => entry.identifier));
+    const ordered = found.map(entry => entry.identifier);
+    const cursor = readSweepCursor(env.LINEAR_SYNC_CURSOR_DIR);
+    const start = cursor?.nextIdentifier
+      ? ordered.indexOf(cursor.nextIdentifier)
+      : -1;
+    lookups.push(...(start > 0 ? ordered.slice(start) : ordered));
   } else {
     lookups.push(ref.issueId || ref.identifier);
   }
 
   const eventPull = sweep ? undefined : { number: Number(env.PR_NUMBER) };
+  const cursorDir = sweep ? env.LINEAR_SYNC_CURSOR_DIR : undefined;
   const results = [];
   const failures = [];
-  for (const [index, lookupId] of lookups.entries()) {
+  let deferredNote = '';
+  let cursorSaved = false;
+  const deferAt = (lookupId, message) => {
+    const source = message.startsWith('Linear')
+      ? 'Linear'
+      : message.startsWith('GitHub')
+        ? 'GitHub'
+        : 'upstream';
+    writeSweepCursor(cursorDir, lookupId);
+    cursorSaved = true;
+    const resumeAt = lookups.indexOf(lookupId);
+    const deferred = lookups.length - (resumeAt === -1 ? 0 : resumeAt);
+    deferredNote = `${deferred} issue(s) deferred to the next sweep by the ${source} rate limit; resume at ${lookupId}`;
+    log(`Lifecycle evaluation deferred at ${lookupId}: ${message}`);
+    log(deferredNote);
+  };
+  for (let index = 0; index < lookups.length; ) {
+    const slice = lookups.slice(index, index + SWEEP_BATCH_SIZE);
+    /** @type {Awaited<ReturnType<typeof fetchLifecycleRaws>> | undefined} */
+    let raws;
     try {
-      results.push(
-        await reconcileIssueLifecycle({
-          lookupId,
-          fetchImpl,
-          apiKey,
-          github,
-          repository,
-          facts,
-          openPulls,
-          harnessManifest,
-          assuranceMatrix,
-          allowlist: options.allowlist,
-          eventPull,
-          dryRun: env.LIFECYCLE_DRY_RUN === '1',
-          log,
-        })
-      );
+      raws = await fetchLifecycleRaws(fetchImpl, apiKey, slice);
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      failures.push(`${lookupId}: ${message}`);
-      log(`Lifecycle evaluation failed for ${lookupId}: ${message}`);
-      if (/** @type {{ rateLimited?: boolean }} */ (error)?.rateLimited) {
-        const deferred = lookups.length - index - 1;
-        if (deferred > 0) {
-          failures.push(
-            `${deferred} issue(s) deferred to the next sweep by the Linear rate limit`
-          );
-        }
+      const flagged = /** @type {{ rateLimited?: boolean }} */ (error);
+      if (flagged.rateLimited) {
+        deferAt(
+          slice[0],
+          error instanceof Error ? error.message : String(error)
+        );
         break;
       }
+      // A rejected batch query falls back to one read per issue. Rate limits
+      // already stopped above, so this is a query the alias form could not run.
+      raws = undefined;
     }
+    let stopped = false;
+    for (let offset = 0; offset < slice.length; offset += 1) {
+      const lookupId = slice[offset];
+      try {
+        const issue = raws
+          ? raws[offset]
+            ? await materializeLifecycleIssue(fetchImpl, apiKey, raws[offset])
+            : null
+          : undefined;
+        results.push(
+          await reconcileIssueLifecycle({
+            lookupId,
+            fetchImpl,
+            apiKey,
+            github,
+            repository,
+            facts,
+            openPulls,
+            harnessManifest,
+            assuranceMatrix,
+            allowlist: options.allowlist,
+            eventPull,
+            dryRun: env.LIFECYCLE_DRY_RUN === '1',
+            issue,
+            log,
+          })
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const flagged = /** @type {{ rateLimited?: boolean, forbidden?: boolean, unreadable?: boolean }} */ (
+          error
+        );
+        if (flagged.unreadable || flagged.forbidden) {
+          log(
+            `Linked pull request was not readable for ${lookupId}: ${message}`
+          );
+          results.push({
+            action: 'skip',
+            identifier: lookupId,
+            target: null,
+            comment: '',
+          });
+          continue;
+        }
+        if (flagged.rateLimited) {
+          deferAt(lookupId, message);
+          stopped = true;
+          break;
+        }
+        failures.push(`${lookupId}: ${message}`);
+        log(`Lifecycle evaluation failed for ${lookupId}: ${message}`);
+      }
+    }
+    if (stopped) break;
+    index += slice.length;
   }
+  if (sweep && !cursorSaved) writeSweepCursor(cursorDir, '');
   const reasons = [...failures];
   if (!openPulls.complete) {
     reasons.unshift(
@@ -1031,14 +1284,17 @@ export async function syncLinearIssueOnMerge(options = {}) {
     );
   }
   if (reasons.length > 0) {
-    throw new Error(`Lifecycle evaluation failed: ${reasons.join('; ')}`);
+    throw new Error(
+      `Lifecycle evaluation failed: ${[...reasons, deferredNote].filter(Boolean).join('; ')}`
+    );
   }
   const first = results[0];
   return {
-    action: first?.action ?? 'skip',
+    action: deferredNote ? 'deferred' : (first?.action ?? 'skip'),
     comment: first?.comment ?? '',
     identifier: first?.identifier ?? ref.identifier,
     results,
+    deferred: deferredNote ? Number(deferredNote.split(' ')[0]) || 0 : 0,
   };
 }
 
