@@ -1261,10 +1261,12 @@
       "owner": "design-system",
       "sources": ["JOV-7713", "JOV-4522", "JOV-4130"],
       "invalidatesOn": [
-        "apps/web/lib/animation",
+        "apps/web/components/jovie",
         "apps/web/components/organisms/sidebar",
         "apps/web/components/shell",
-        "apps/web/eslint-rules/no-raw-motion-values.js"
+        "apps/web/eslint-rules/no-raw-motion-values.js",
+        "apps/web/lib/animation",
+        "packages/ui/atoms/status-glyph.tsx"
       ],
       "layers": {
         "prevent": {
@@ -1295,6 +1297,10 @@
         ],
         "detectors": [
           {
+            "ref": "apps/web/components/jovie/tool-status.test.tsx",
+            "enforcement": "merge-group-blocking"
+          },
+          {
             "ref": "apps/web/eslint-rules/no-raw-motion-values.js",
             "enforcement": "pr-blocking",
             "inventory": ["ui:ownership-registry"],
@@ -1303,6 +1309,10 @@
           },
           {
             "ref": "apps/web/lib/hooks/useReducedMotion.test.ts",
+            "enforcement": "merge-group-blocking"
+          },
+          {
+            "ref": "apps/web/tests/e2e/storybook-agent-status.spec.ts",
             "enforcement": "merge-group-blocking"
           }
         ],
