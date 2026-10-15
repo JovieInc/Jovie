@@ -16,8 +16,9 @@ import * as realGhHarness from '../../../../../scripts/lib/real-gh-harness.mjs';
 
 // JOV-7707: staging alias ownership, the typed staging receipt and the
 // production release result are proven by executing the shipped
-// production-release.yml shell (stub vercel/node, real gh), not by matching
-// its text. OAuth retry behavior is executed in deploy-workflow.test.ts and
+// production-release.yml shell, not by matching its text. Alias steps stub
+// vercel/node. The release result runs the real main-ref resolver against a
+// stub git. OAuth retry behavior is executed in deploy-workflow.test.ts and
 // the staging identity/privacy proof in its "gates staging content identity"
 // cases.
 
@@ -421,7 +422,9 @@ describe.skipIf(!gh)(
   { timeout: 60_000 },
   () => {
     const resultJob = job('release-result');
-    const resultStep = resultJob.steps[0] as Step;
+    // Checkout is only how the job obtains the resolver. The proof executes
+    // the named result step, which is what failed-job retries must preserve.
+    const resultStep = step(resultJob, 'Resolve release result');
     type Needs = Record<
       string,
       { result?: string; outputs?: Record<string, string> }
@@ -456,8 +459,10 @@ describe.skipIf(!gh)(
           ...value,
           outputs: { ...needs[id]?.outputs, ...value.outputs },
         };
-      const root = realpathSync(mkdtempSync(join(tmpdir(), 'jovie-result-')));
-      roots.push(root);
+      const { root, bin, calls } = workspace({
+        // Authoritative final ref: one git ls-remote, outside the gh REST route.
+        git: `printf '%s\\trefs/heads/main\\n' '${NEWER}'`,
+      });
       const output = join(root, 'output');
       writeFileSync(output, '');
       const promote = needs['promote-production']?.outputs ?? {};
@@ -467,7 +472,9 @@ describe.skipIf(!gh)(
           inputs: { staging_verified: stagingVerified },
         }),
         env: {
+          PATH: `${bin}:${process.env.PATH ?? ''}`,
           GITHUB_OUTPUT: output,
+          GITHUB_WORKSPACE: repoRoot,
           EXPECTED_SHA: SHA,
           PROMOTION_SHA: promote.promotion_sha ?? '',
           PRODUCTION_DEPLOYMENT_ID: promote.production_deployment_id ?? '',
@@ -477,14 +484,29 @@ describe.skipIf(!gh)(
         },
         route: mainRoute(NEWER),
       });
-      return { ...result, outputs: readOutputs(output) };
+      return { ...result, calls: calls(), outputs: readOutputs(output) };
     }
 
     it('runs for every production release and reads every release job', () => {
       expect(resultJob.if).toBe(
         "${{ always() && inputs.release_mode == 'production' }}"
       );
+      const checkout = resultJob.steps.find(entry =>
+        entry.uses?.startsWith('actions/checkout@')
+      );
+      expect(checkout?.with).toMatchObject({
+        ref: '${{ inputs.expected_sha }}',
+        'persist-credentials': false,
+        'sparse-checkout': '.github/scripts/resolve-main-sha.mjs',
+        'sparse-checkout-cone-mode': false,
+      });
+      expect(resultJob.steps.indexOf(checkout as Step)).toBeLessThan(
+        resultJob.steps.indexOf(resultStep)
+      );
       const script = String(resultStep.run);
+      expect(script).toContain(
+        'node "$GITHUB_WORKSPACE/.github/scripts/resolve-main-sha.mjs"'
+      );
       // Ordering only: the receipt's verdict reaches this job as
       // inputs.staging_verified from the controller.
       const orderingOnly = ['staging-deployment-receipt'];
@@ -501,6 +523,9 @@ describe.skipIf(!gh)(
         released: 'true',
         superseded_before_promotion: 'false',
       });
+      expect(released.calls).toContain(
+        'git ls-remote --exit-code https://github.com/JovieInc/Jovie.git refs/heads/main'
+      );
       // A newer main does not erase the completed older generation.
       expect(released.stdout).toContain('preserving released=true');
     });
