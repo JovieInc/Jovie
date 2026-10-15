@@ -830,10 +830,6 @@ describe('default-deny security', () => {
 
     expect(DEFAULT_ONBOARDING_STATE.needsOnboarding).toBe(true);
   });
-
-  it.todo(
-    'documents that proxy.ts filters banned users at DB level — contract documentation'
-  );
 });
 
 // ============================================================================
@@ -857,10 +853,6 @@ describe('cache invalidation contract', () => {
       MEMORY_CACHE_TTL_TRANSITIONAL_MS
     );
   });
-
-  it.todo(
-    'documents that state changes must call invalidateProxyUserStateCache — contract documentation'
-  );
 });
 
 // ============================================================================
