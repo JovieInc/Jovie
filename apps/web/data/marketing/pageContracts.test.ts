@@ -15,7 +15,6 @@ import {
 
 describe('marketing language context', () => {
   it.each([
-    APP_ROUTES.HOME,
     APP_ROUTES.ABOUT,
     APP_ROUTES.PRICING,
     APP_ROUTES.SUPPORT,
@@ -30,6 +29,7 @@ describe('marketing language context', () => {
   });
 
   it.each([
+    APP_ROUTES.HOME,
     APP_ROUTES.ARTIST_PROFILES,
     APP_ROUTES.SOLUTIONS_ARTISTS,
     APP_ROUTES.ARTIST_NOTIFICATIONS,
@@ -80,7 +80,7 @@ describe('marketing language context', () => {
       const contract = getMarketingPageContractForPathname(
         `${APP_ROUTES.HOME}?role=${encodeURIComponent(role)}`
       );
-      expect(contract?.copyScope).toBe('shared');
+      expect(contract?.copyScope).toBe('music');
       expect(contract).toBe(
         getMarketingPageContractForPathname(APP_ROUTES.HOME)
       );
