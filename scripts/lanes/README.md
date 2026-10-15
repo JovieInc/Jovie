@@ -550,6 +550,34 @@ way; preserved-work admission therefore also checks live working directories.
 Cleanup retains protected, dirty or unreadable source. Installed-runtime evidence
 is required before calling this commissioned.
 
+## Cross-session continuity
+
+Before each issue dispatch, Symphony recalls up to four same-repository run
+receipts from the last 256 KiB of `runs/ledger.jsonl`: the current issue first,
+then recent runs in its classified workstream (excluding `general`). New run
+receipts retain that workstream. One Linear read supplies the five newest issue
+comments, including cross-host handoffs. The combined context is capped at 6,500
+characters; individual excerpts are clipped and older comments are explicitly
+marked omitted. Missing or unreadable history is marked unavailable, never
+proof that no fix was attempted. Auth/quota failures remain fail-soft.
+
+The issue prompt tells the agent to inspect prior findings and Git history before
+diagnosis, compare a recorded fix with current source and the exact running
+version, and investigate recurrence or reversion before repeating a mutation.
+Previously supplied inputs stay in authorized records/configuration. At the
+session boundary, agents persist a `Jovie session handoff` on the existing Linear
+issue with findings, ruled-out causes, attempted changes and SHA/PR, checks and
+failures, separate source/CI/merge/deploy/runtime status, and the next step.
+Secrets and private contact details do not belong in handoffs. Durable knowledge
+still goes to GBrain; these are existing operational records, not a second brain.
+
+Ship now: bounded evidence retrieval in the current Symphony issue path.
+Re-evaluate when: duplicate diagnosis persists despite available handoffs, or
+retrieval overhead becomes material. Then: use the broader memory projection
+tracked by JOV-7966, retaining Linear/GBrain/source ownership. Local fixture tests
+prove prompt delivery and failure isolation; they do not certify live agent
+judgment, deployment, or recurrence.
+
 ## Context receipts
 
 The existing spawn preflight checks `context-manifest.json` before issue,
