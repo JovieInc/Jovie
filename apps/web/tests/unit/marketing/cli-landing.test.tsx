@@ -44,10 +44,9 @@ describe('CLI landing page', () => {
       'data-marketing-variant',
       'centered-none'
     );
-    expect(screen.getByTestId('marketing-section-content-prose')).toHaveAttribute(
-      'data-marketing-variant',
-      'article-body'
-    );
+    expect(
+      screen.getByTestId('marketing-section-content-prose')
+    ).toHaveAttribute('data-marketing-variant', 'article-body');
     expect(screen.getByTestId('cli-hero-install')).toHaveAttribute(
       'href',
       '#install'

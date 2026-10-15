@@ -16,7 +16,7 @@ vi.mock('@/lib/analytics', () => ({
   track: (...args: unknown[]) => trackMock(...args),
 }));
 
-vi.mock('@/features/auth', async () => {
+vi.mock('@/components/features/auth/AuthLayout', async () => {
   const reactModule = await import('react');
   return {
     AuthLayout: (props: { children: ReactNode }) => {
@@ -27,6 +27,12 @@ vi.mock('@/features/auth', async () => {
         props.children
       );
     },
+  };
+});
+
+vi.mock('@/features/auth', async () => {
+  const reactModule = await import('react');
+  return {
     AuthRoutePrefetch: () => null,
     AuthShell: (props: Record<string, unknown>) => {
       authShellMock(props);

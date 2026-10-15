@@ -2,12 +2,13 @@
 
 import { useEffect } from 'react';
 import { AuthenticatedAuthEntryGuard } from '@/components/features/auth/AuthenticatedAuthEntryGuard';
+import { AuthLayout } from '@/components/features/auth/AuthLayout';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   WAITLIST_FRONT_DOOR_CONTEXT,
   WAITLIST_FRONT_DOOR_EVENTS,
 } from '@/data/homepageFrontDoorCta';
-import { AuthLayout, AuthRoutePrefetch, AuthShell } from '@/features/auth';
+import { AuthRoutePrefetch, AuthShell } from '@/features/auth';
 import { page, track } from '@/lib/analytics';
 
 /**

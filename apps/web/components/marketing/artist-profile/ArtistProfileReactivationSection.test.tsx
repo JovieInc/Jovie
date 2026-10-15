@@ -22,9 +22,8 @@ describe('ArtistProfileReactivationSection', () => {
         sectionOwner='apps/web/components/marketing/artist-profile/ArtistProfileReactivationSection.tsx'
       />
     );
-    expect(screen.getByTestId('marketing-section-feature-split')).toHaveAttribute(
-      'data-marketing-variant',
-      'editorial'
-    );
+    expect(
+      screen.getByTestId('marketing-section-feature-split')
+    ).toHaveAttribute('data-marketing-variant', 'editorial');
   });
 });
