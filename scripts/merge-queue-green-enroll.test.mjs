@@ -783,7 +783,11 @@ test('clears a stale lane-fix-red on a required-green head and then enrolls it',
       ],
       mergeStateStatus
     );
-    assert.deepEqual(result.mutations, [{ id: 'PR_1', oid: sha }], mergeStateStatus);
+    assert.deepEqual(
+      result.mutations,
+      [{ id: 'PR_1', oid: sha }],
+      mergeStateStatus
+    );
     assert.ok(
       result.notices.some(notice =>
         notice.includes('CLEARED stale lane-fix-red on #1')
