@@ -29,6 +29,7 @@ describe('Plan Configuration (Entitlement Registry)', () => {
         canFilterSelfFromAnalytics: false,
         canAccessAdPixels: false,
         canAccessInbox: false,
+        canAutoCreateLinks: false,
         canBeVerified: false,
         aiCanUseTools: true,
         canCreateManualReleases: true,
@@ -73,6 +74,7 @@ describe('Plan Configuration (Entitlement Registry)', () => {
         canFilterSelfFromAnalytics: true,
         canAccessAdPixels: true,
         canAccessInbox: true,
+        canAutoCreateLinks: false,
         canBeVerified: true,
         aiCanUseTools: true,
         canCreateManualReleases: true,
@@ -117,6 +119,7 @@ describe('Plan Configuration (Entitlement Registry)', () => {
         canFilterSelfFromAnalytics: true,
         canAccessAdPixels: true,
         canAccessInbox: true,
+        canAutoCreateLinks: false,
         canBeVerified: true,
         aiCanUseTools: true,
         canCreateManualReleases: true,
@@ -285,14 +288,12 @@ describe('Plan Configuration (Entitlement Registry)', () => {
       expect(ENTITLEMENT_REGISTRY.pro.limits.contactsLimit).toBeNull();
     });
 
-    it('max plan enables all boolean features', () => {
-      const paidPlans = ['max'] as const;
-      for (const plan of paidPlans) {
-        for (const [, value] of Object.entries(
-          ENTITLEMENT_REGISTRY[plan].booleans
-        )) {
-          expect(value).toBe(true);
-        }
+    it('max enables legacy plan features while automatic links require an exact offer', () => {
+      const { canAutoCreateLinks, ...legacyFeatures } =
+        ENTITLEMENT_REGISTRY.max.booleans;
+      expect(canAutoCreateLinks).toBe(false);
+      for (const value of Object.values(legacyFeatures)) {
+        expect(value).toBe(true);
       }
     });
 
