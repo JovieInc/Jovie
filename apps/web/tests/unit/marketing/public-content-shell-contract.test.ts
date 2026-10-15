@@ -5,18 +5,18 @@ import { describe, expect, it } from 'vitest';
 const read = (path: string) =>
   readFileSync(resolve(process.cwd(), path), 'utf8');
 
-const routes = [
+const routes: readonly (readonly [string, string])[] = [
   ['blog index', 'app/(marketing)/blog/BlogFeed.tsx'],
   ['blog post', 'components/organisms/BlogPostPage.tsx'],
   ['blog category', 'components/organisms/BlogCategoryContent.tsx'],
   ['blog author', 'components/organisms/BlogAuthorPage.tsx'],
   ['changelog index', 'app/(marketing)/changelog/page.tsx'],
   ['changelog release', 'app/(marketing)/changelog/[version]/page.tsx'],
-  ...['cookies', 'dmca', 'privacy', 'terms'].map(route => [
-    `legal ${route}`,
-    `app/(dynamic)/legal/${route}/layout.tsx`,
-  ]),
-] as const;
+  ...['cookies', 'dmca', 'privacy', 'terms'].map(
+    route =>
+      [`legal ${route}`, `app/(dynamic)/legal/${route}/layout.tsx`] as const
+  ),
+];
 
 describe('canonical public content route contract', () => {
   it.each(routes)(
