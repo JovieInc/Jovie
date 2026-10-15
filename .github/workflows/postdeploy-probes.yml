@@ -302,22 +302,28 @@ jobs:
             exit 1
           }
 
-          # Expand the deployed prefix inside this repository, then prove that
-          # exact commit is on main. GitHub rejects ambiguous or foreign SHAs.
-          commit_json="$(gh api "repos/$REPOSITORY/commits/$deployed_sha")"
-          commit_sha="$(jq -r '.sha // ""' <<<"$commit_json")"
+          # Resolve the deployed prefix and prove ancestry through git, outside
+          # the shared REST quota (JOV-8495). Fetch main into an isolated object
+          # store so a shallow checkout or stale local refs cannot supply proof.
+          # No checkout is needed; omit blobs to keep the history read small.
+          commit_history="$(mktemp -d)"
+          trap 'rm -rf "$commit_history"' EXIT
+          git init -q "$commit_history"
+          git -C "$commit_history" \
+            -c "http.extraheader=AUTHORIZATION: bearer $GH_TOKEN" \
+            fetch --quiet --no-tags --filter=blob:none \
+            "https://github.com/$REPOSITORY.git" \
+            refs/heads/main:refs/heads/main
+          commit_sha="$(git -C "$commit_history" rev-parse --verify "$deployed_sha^{commit}")" || {
+            echo "::error::Deployed commit identity did not resolve uniquely in main history."
+            exit 1
+          }
           [[ "$commit_sha" =~ ^[0-9a-f]{40}$ ]] &&
             [[ "$commit_sha" == "$deployed_sha"* ]] || {
             echo "::error::Deployed commit identity did not resolve uniquely in this repository."
             exit 1
           }
-          comparison_json="$(gh api "repos/$REPOSITORY/compare/$commit_sha...main")"
-          jq -e --arg sha "$commit_sha" '
-            type == "object" and
-            (.status == "ahead" or .status == "identical") and
-            .base_commit.sha == $sha and
-            .merge_base_commit.sha == $sha
-          ' >/dev/null <<<"$comparison_json" || {
+          git -C "$commit_history" merge-base --is-ancestor "$commit_sha" refs/heads/main || {
             echo "::error::Canonical production commit is not an ancestor of main."
             exit 1
           }
