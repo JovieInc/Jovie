@@ -116,6 +116,11 @@ const CENTER = VIEW / 2;
 const RING_R = 6.25;
 const FILL_R = 4.75;
 const STROKE = 1.5;
+const DASHED_RING = '2.6 2';
+/** Working arc is 30% of the same ring; the gap is the rest of the circumference. */
+const RING_LENGTH = 2 * Math.PI * RING_R;
+const WORKING_ARC_FRACTION = 0.3;
+const WORKING_RING_DASH = `${(RING_LENGTH * WORKING_ARC_FRACTION).toFixed(2)} ${(RING_LENGTH * (1 - WORKING_ARC_FRACTION)).toFixed(2)}`;
 
 /** Pie-sector path for a fractional fill, sweeping clockwise from 12 o'clock. */
 function sectorPath(fraction: number): string {
@@ -143,7 +148,7 @@ function GlyphMark({
       fill='none'
       stroke='currentColor'
       strokeWidth={STROKE}
-      strokeDasharray={spec.dashed ? '2.6 2' : undefined}
+      strokeDasharray={spec.dashed ? DASHED_RING : undefined}
     />
   );
   return (
@@ -167,7 +172,7 @@ function GlyphMark({
           fill='none'
           stroke='currentColor'
           strokeWidth={STROKE}
-          strokeDasharray='12 28'
+          strokeDasharray={WORKING_RING_DASH}
           strokeLinecap='round'
         />
       ) : spec.fill === 'empty' ? (
