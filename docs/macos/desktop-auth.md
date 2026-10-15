@@ -19,6 +19,31 @@ routes it loads (`/desktop-auth`, `/auth/start`, `/auth/callback`,
    `/auth/native-complete` exchanges the code with the PKCE verifier for a
    one-time token, which sets the session cookie in the app.
 
+## Runtime provenance gate
+
+`apps/desktop/scripts/smoke-native-auth.mjs` captures a
+`jovie-native-auth-provenance/v1` receipt before it creates or signs in a test
+identity. The receipt records:
+
+- the running app's channel, bundle version, source revision, build time, and
+  verified/development provenance;
+- the exact `/auth/native-return` URL plus its origin's public
+  `/api/health/build-info` build ID, release version, commit, deployment ID,
+  environment, and deployment time.
+
+Signed staging and production handbacks fail closed unless the app and hosted
+route report the same full commit and release version. The staging app must also
+be a verified `staging` package against a Vercel `preview` deployment; production
+must be a verified `production` package against a `production` deployment. A
+missing build-identity bridge, an old package, or an unknown hosted fingerprint
+therefore cannot produce current native-auth evidence. Local runs are recorded
+as `development` and do not qualify as signed runtime proof.
+
+Staging packages update from the signed rolling `desktop-staging` feed documented
+in `apps/desktop/SIGNING.md`; the provenance gate is the independent evidence
+stop-line if an unsupported installed package is still running. JOV-4480 owns the
+subsequent full iOS/macOS end-to-end handback acceptance.
+
 ## Return code fallback (deep-link independent)
 
 When the `jovie://` link cannot reach the app, the return page also shows an

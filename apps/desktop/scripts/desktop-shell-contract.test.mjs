@@ -9,6 +9,11 @@ import { promisify } from 'node:util';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import { bundleDesktopPreload } from './bundle-preload.mjs';
+import {
+  assertNativeAuthProvenance,
+  evaluateNativeAuthProvenance,
+  NATIVE_AUTH_PROVENANCE_SCHEMA,
+} from './smoke-native-auth-provenance.mjs';
 import { deriveStagingReleaseVersion } from './sync-version.mjs';
 
 const desktopRoot = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -1266,6 +1271,108 @@ test('native auth smoke keeps browser callbacks on the browser auth origin', asy
     smokeSource,
     /redirectUrl\.startsWith\(NATIVE_AUTH_CALLBACK_PREFIX\)/
   );
+});
+
+test('native auth smoke rejects stale packaged and hosted provenance', async () => {
+  const sourceRevision = 'a'.repeat(40);
+  const input = {
+    baseUrl: 'https://staging.jov.ie',
+    capturedAt: '2026-10-12T16:30:00.000Z',
+    desktop: {
+      channel: 'staging',
+      version: '26.10.1-staging.1234.1',
+      sourceRevision,
+      builtAt: '2026-10-12T15:00:00.000Z',
+      provenance: 'verified',
+    },
+    hosted: {
+      buildId: 'next-build-fingerprint',
+      version: '26.10.1',
+      commitSha: sourceRevision,
+      deploymentId: 'dpl_staging123',
+      environment: 'preview',
+      deployedAt: '2026-10-12T15:05:00.000Z',
+    },
+  };
+  const matched = assertNativeAuthProvenance(input);
+  assert.equal(matched.schema, NATIVE_AUTH_PROVENANCE_SCHEMA);
+  assert.equal(matched.status, 'matched');
+  assert.equal(
+    matched.hostedRoute.url,
+    'https://staging.jov.ie/auth/native-return'
+  );
+  assert.equal(matched.desktop.version, '26.10.1-staging.1234.1');
+
+  const staleInput = {
+    ...input,
+    desktop: {
+      ...input.desktop,
+      version: '26.9.9-staging.999.1',
+      sourceRevision: 'b'.repeat(40),
+    },
+  };
+  const stale = evaluateNativeAuthProvenance(staleInput);
+  assert.equal(stale.status, 'rejected');
+  assert.deepEqual(stale.violations, [
+    'desktop and hosted route commits do not match',
+    'desktop and hosted route release versions do not match',
+  ]);
+  assert.throws(
+    () => assertNativeAuthProvenance(staleInput),
+    /Native-auth provenance rejected:[\s\S]*commits do not match/u
+  );
+
+  const unverified = evaluateNativeAuthProvenance({
+    ...input,
+    desktop: { ...input.desktop, provenance: 'unverified' },
+  });
+  assert.deepEqual(unverified.violations, [
+    'packaged desktop build identity is not verified',
+  ]);
+
+  const wrongEnvironment = evaluateNativeAuthProvenance({
+    ...input,
+    hosted: { ...input.hosted, environment: 'production' },
+  });
+  assert.deepEqual(wrongEnvironment.violations, [
+    'hosted route environment production does not match preview',
+  ]);
+
+  const missingDesktop = evaluateNativeAuthProvenance({
+    ...input,
+    desktop: null,
+  });
+  assert.ok(
+    missingDesktop.violations.includes('desktop build identity is unavailable')
+  );
+
+  const local = assertNativeAuthProvenance({
+    baseUrl: 'http://localhost:3112',
+    capturedAt: input.capturedAt,
+    desktop: {
+      channel: 'local',
+      version: '26.10.1',
+      sourceRevision,
+      builtAt: null,
+      provenance: 'development',
+    },
+    hosted: { buildId: 'development', version: '26.10.1' },
+  });
+  assert.equal(local.status, 'development');
+
+  const smokeSource = await readFile(
+    join(desktopRoot, 'scripts/smoke-native-auth.mjs'),
+    'utf8'
+  );
+  const capture = smokeSource.indexOf(
+    'const provenance = await captureNativeAuthProvenance();'
+  );
+  const authMutation = smokeSource.indexOf(
+    'const testingToken = await getTestingToken(secretKey);'
+  );
+  assert.ok(capture >= 0);
+  assert.ok(capture < authMutation);
+  assert.match(smokeSource, /provenance,\s*\n\s*email,/u);
 });
 
 test('desktop main-window hub regression contracts (desktop QA)', async () => {

@@ -1,5 +1,6 @@
 import { Buffer } from 'node:buffer';
 import { execFileSync } from 'node:child_process';
+import { assertNativeAuthProvenance } from './smoke-native-auth-provenance.mjs';
 
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3112';
 const ELECTRON_CDP_URL =
@@ -888,6 +889,44 @@ function isBaseUrlTarget(target) {
   }
 }
 
+async function captureNativeAuthProvenance() {
+  const target = await waitForElectronTarget(
+    isBaseUrlTarget,
+    'desktop build identity'
+  );
+  const page = await connectCdpPage(target);
+  let desktop;
+  try {
+    desktop = await page.evaluate(`(async () => {
+      const getBuildIdentity = window.electronAPI?.getBuildIdentity;
+      return typeof getBuildIdentity === 'function'
+        ? await getBuildIdentity()
+        : null;
+    })()`);
+  } finally {
+    page.close();
+  }
+
+  const buildInfoUrl = new URL('/api/health/build-info', BASE_URL);
+  const response = await fetch(buildInfoUrl, {
+    cache: 'no-store',
+    headers: { accept: 'application/json' },
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!response.ok) {
+    throw new Error(
+      `Hosted build fingerprint request failed: ${response.status}`
+    );
+  }
+
+  return assertNativeAuthProvenance({
+    baseUrl: BASE_URL,
+    capturedAt: new Date().toISOString(),
+    desktop,
+    hosted: await response.json(),
+  });
+}
+
 function isDesktopAuthHandoffTarget(target) {
   if (!isBaseUrlTarget(target)) return false;
   try {
@@ -1482,6 +1521,7 @@ async function clearElectronAuthStorage() {
 }
 
 async function main() {
+  const provenance = await captureNativeAuthProvenance();
   const secretKey = process.env.CLERK_SECRET_KEY;
   const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
   if (!secretKey || !publishableKey) {
@@ -1553,6 +1593,7 @@ async function main() {
     console.log(
       JSON.stringify(
         {
+          provenance,
           email,
           provisionedSignin: {
             userId: provisionedSignin.userId,
