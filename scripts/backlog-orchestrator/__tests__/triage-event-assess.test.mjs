@@ -20,16 +20,35 @@ import {
  * @returns {Promise<any>}
  */
 function assessTriageEvent(event, client, summer) {
-  return assessWithRealClient(event, client, summer);
+  return assessWithRealClient(event, client, summer, {
+    inventory: [],
+    governor: governorContext(),
+  });
 }
 
 /** @param {any} client @param {any} [summer] @param {any} [options] @returns {Promise<any>} */
 function assessTriageSweep(client, summer, options) {
-  return sweepWithRealClient(client, summer, options);
+  return sweepWithRealClient(client, summer, {
+    capacity: CAPACITY,
+    ...options,
+  });
 }
 
 const ISSUE_ID = '68b3e8de-588e-46ba-8209-84329d154627';
 const TRIAGE_ID = '9844cfe6-6cf4-4347-842c-893a68f349b8';
+const CAPACITY = {
+  source: 'test',
+  verified: true,
+  value: 2,
+  target: 4,
+  status: 'healthy',
+  reason: 'test-capacity',
+};
+const governorContext = () => ({
+  capacity: CAPACITY,
+  target: CAPACITY.target,
+  qualifiedTodoCount: 0,
+});
 const summer = decision => async () => ({
   decision,
   schema: 'summer.linear-triage-assessment/v1',
@@ -152,10 +171,10 @@ test('applies Jev Todo with priority and preserved labels, verifies readback, th
   assert.deepEqual(world.writes, ['comment', 'update']);
 });
 
-test('sorts Jev Backlog and incomplete Todo without creating an implementation lease', async () => {
+test('sorts Jev Backlog and incomplete Todo into explicit Backlog lanes', async () => {
   for (const [overrides, assessment, destination] of [
     [{}, jev({ destination: 'Backlog', priority: 4 }), 'Backlog'],
-    [{ description: 'not scoped' }, jev(), 'Todo'],
+    [{ description: 'not scoped' }, jev(), 'Backlog'],
   ]) {
     const world = jevWorld(overrides);
     const result = await assessTriageEvent(
@@ -169,12 +188,12 @@ test('sorts Jev Backlog and incomplete Todo without creating an implementation l
   }
 });
 
-test('holds ambiguity, interrupted provider work, urgent downgrade and actual owners without writes', async () => {
-  for (const [overrides, assessment] of [
-    [{}, jev({ status: 'ambiguous', destination: null, priority: null })],
-    [{}, jev({ status: 'unavailable', destination: null, priority: null })],
-    [{ priority: 1 }, jev()],
-    [{ assignee: { id: 'owner', name: 'Live writer' } }, jev()],
+test('moves ambiguity, interrupted provider work and urgent downgrade to Backlog while preserving actual owners', async () => {
+  for (const [overrides, assessment, expectedWrites] of [
+    [{}, jev({ status: 'ambiguous', destination: null, priority: null }), 2],
+    [{}, jev({ status: 'unavailable', destination: null, priority: null }), 2],
+    [{ priority: 1 }, jev(), 2],
+    [{ assignee: { id: 'owner', name: 'Live writer' } }, jev(), 0],
   ]) {
     const world = jevWorld(overrides);
     const result = await assessTriageEvent(
@@ -183,12 +202,13 @@ test('holds ambiguity, interrupted provider work, urgent downgrade and actual ow
       world.receipt(assessment)
     );
     assert.equal(result.wakeSymphony, false);
-    assert.equal(result.mutations, 0);
-    assert.deepEqual(world.writes, []);
+    assert.equal(result.mutations, expectedWrites > 0 ? 1 : 0);
+    assert.equal(world.writes.length, expectedWrites);
+    if (expectedWrites > 0) assert.equal(result.disposition, 'Backlog');
   }
 });
 
-test('an unavailable Jev provider is a named provider-blocked escalation, not a red sweep', async () => {
+test('an unavailable Jev provider is moved out of Triage and remains a P0 escalation', async () => {
   const world = jevWorld();
   const result = await assessTriageEvent(
     event(),
@@ -202,13 +222,13 @@ test('an unavailable Jev provider is a named provider-blocked escalation, not a 
       })
     )
   );
-  assert.equal(result.disposition, 'unavailable');
-  assert.equal(result.requiresImmediateInvestigation, false);
+  assert.equal(result.disposition, 'Backlog');
+  assert.equal(result.requiresImmediateInvestigation, true);
   assert.equal(result.escalation.status, 'provider-block');
   assert.equal(result.escalation.code, 'provider-unavailable');
   assert.equal(result.escalation.requestedModel, 'typesafe-ai/jev');
-  assert.equal(result.mutations, 0);
-  assert.deepEqual(world.writes, []);
+  assert.equal(result.mutations, 1);
+  assert.deepEqual(world.writes, ['comment', 'update']);
 });
 
 test('fails closed on invalid Jev response, missing readiness label and ownership race', async () => {
@@ -254,7 +274,7 @@ test('requires authoritative mutation, comment and disposition readback before w
       });
     await assert.rejects(
       assessTriageEvent(event(), world.client, world.receipt(jev())),
-      /jev-triage-(comment|mutation|readback)-failed/
+    /summer-governor-(receipt-write|state-mutation|disposition-readback)-failed/
     );
   }
 });

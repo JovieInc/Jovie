@@ -191,6 +191,17 @@ jobs:
             export LINEAR_API_KEY="${LINEAR_API_KEY#LINEAR_API_KEY=}"
           fi
           test -n "${LINEAR_API_KEY:-}"
+          fleet_receipt="${{ steps.refresh.outputs.receipt_path }}"
+          [[ -r "$fleet_receipt" ]] || fleet_receipt="/home/timwhite/gem-workspace/state/gem-priority-gate/latest.json"
+          if [[ -r "$fleet_receipt" ]]; then
+            export SYMPHONY_WORKFLOW_CAPACITY="$(jq -r '.concurrency.gem.maxConcurrent // 0' "$fleet_receipt")"
+            export SYMPHONY_WORKFLOW_CAPACITY_VERIFIED="$(jq -r '.concurrency.gem.evidenceAccepted == true' "$fleet_receipt")"
+            export SYMPHONY_WORKFLOW_CAPACITY_OBSERVED_AT="$(jq -r '.observedAt // empty' "$fleet_receipt")"
+          else
+            export SYMPHONY_WORKFLOW_CAPACITY=0
+            export SYMPHONY_WORKFLOW_CAPACITY_VERIFIED=false
+            export SYMPHONY_WORKFLOW_CAPACITY_OBSERVED_AT=
+          fi
           set -a
           source "${HOME}/.config/symphony/summer-bottleneck.env"
           source "${HOME}/.config/symphony/summer-bottleneck-signing.env"
@@ -253,6 +264,16 @@ jobs:
             export LINEAR_API_KEY="${LINEAR_API_KEY#LINEAR_API_KEY=}"
           fi
           test -n "${LINEAR_API_KEY:-}"
+          fleet_receipt="/home/timwhite/gem-workspace/state/gem-priority-gate/latest.json"
+          if [[ -r "$fleet_receipt" ]]; then
+            export SYMPHONY_WORKFLOW_CAPACITY="$(jq -r '.concurrency.gem.maxConcurrent // 0' "$fleet_receipt")"
+            export SYMPHONY_WORKFLOW_CAPACITY_VERIFIED="$(jq -r '.concurrency.gem.evidenceAccepted == true' "$fleet_receipt")"
+            export SYMPHONY_WORKFLOW_CAPACITY_OBSERVED_AT="$(jq -r '.observedAt // empty' "$fleet_receipt")"
+          else
+            export SYMPHONY_WORKFLOW_CAPACITY=0
+            export SYMPHONY_WORKFLOW_CAPACITY_VERIFIED=false
+            export SYMPHONY_WORKFLOW_CAPACITY_OBSERVED_AT=
+          fi
           summer_env="${HOME}/.config/symphony/summer-bottleneck.env"
           signing_env="${HOME}/.config/symphony/summer-bottleneck-signing.env"
           test -r "$summer_env" && test -r "$signing_env"

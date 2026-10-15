@@ -58,6 +58,7 @@ function assertMutation(result) {
 
 export async function reconcileIssues({
   issues,
+  classificationIssues = issues,
   client,
   isDryRun = false,
   backlogStateId = null,
@@ -66,7 +67,7 @@ export async function reconcileIssues({
   const results = [];
   for (const snapshot of issues) {
     let issue = snapshot;
-    const c = classifier.classifyDeterministic(issue, issues);
+    const c = classifier.classifyDeterministic(issue, classificationIssues);
     const route = routeTriageIssue(issue, c, { backlogStateId, todoStateId });
     const ownership = triageOwnershipDecision(issue);
     const result = {

@@ -13,22 +13,48 @@ import {
   requestSummerAssessment,
   validJevTriageAssessment,
 } from './summer-triage-assessment-client.mjs';
+import {
+  applyGovernorDisposition,
+  buildTodoBufferSnapshot,
+  buildTriageHealth,
+  governorReceiptMarker,
+  parseGovernorCapacity,
+  persistGovernorReceipt,
+  promoteTodoBuffer,
+} from './triage-governor.mjs';
 import { routeTriageIssue, triageOwnershipDecision } from './triage-router.mjs';
 
-function triageSnapshot(issue) {
-  return JSON.stringify([
-    issue.id,
-    issue.identifier,
-    issue.title,
-    issue.description,
-    issue.state,
-    issue.priority,
-    issue.assignee,
-    issue.labels,
-    issue.children,
-    issue.relations,
-    issue.parent,
-  ]);
+const TEAM_ID = 'bdc09edc-f91c-4a06-b308-74b4fcf093f8';
+
+function defaultGovernorContext(capacity = parseGovernorCapacity()) {
+  return {
+    capacity,
+    target: capacity.target,
+    qualifiedTodoCount: 0,
+  };
+}
+
+function reserveTodoSlot(governor) {
+  if (
+    governor.capacity.status !== 'healthy' ||
+    governor.qualifiedTodoCount >= governor.target
+  ) {
+    return false;
+  }
+  governor.qualifiedTodoCount += 1;
+  return true;
+}
+
+async function agentReadyLabel(client) {
+  const label = await client.fetchTeamLabel(TEAM_ID, 'agent-ready');
+  if (!label?.id) throw new Error('agent-ready-label-unavailable');
+  return label;
+}
+
+function dispositionState(destination) {
+  return destination === 'Todo'
+    ? { id: TODO_STATE_ID, name: 'Todo' }
+    : { id: BACKLOG_STATE_ID, name: 'Backlog' };
 }
 
 /**
@@ -80,8 +106,15 @@ export function escalationBlockOf(summerReceipt) {
   return null;
 }
 
-/** Consume only a bounded recommendation; the existing picker still owns admission. */
-async function applyJevAssessment(issue, assessment, client) {
+/** Consume a bounded recommendation; official Symphony still owns execution pickup. */
+async function applyJevAssessment(
+  issue,
+  assessment,
+  client,
+  inventory,
+  governor,
+  now = new Date()
+) {
   if (!validJevTriageAssessment(assessment))
     throw new Error('invalid-jev-triage-assessment');
   const ownership = triageOwnershipDecision(issue);
@@ -91,119 +124,90 @@ async function applyJevAssessment(issue, assessment, client) {
       reason: ownership.reason,
       mutations: 0,
       wakeSymphony: false,
-    };
-  if (assessment.status === 'unavailable')
-    // The model provider is down, not the issue. Name the row as a
-    // provider-blocked escalation so the sweep stays green (2026-10-10:
-    // Fleet Gate Refresh went red on every main push for 26 such rows).
-    return {
-      disposition: assessment.status,
-      reason: assessment.reason,
-      mutations: 0,
-      wakeSymphony: false,
-      requiresImmediateInvestigation: false,
-      escalation: {
-        status: 'provider-block',
-        code: assessment.reason || 'provider-unavailable',
-        owner: null,
-        requestedModel: assessment.model ?? null,
-      },
-    };
-  if (assessment.status !== 'decided')
-    return {
-      disposition: assessment.status,
-      reason: assessment.reason,
-      mutations: 0,
-      wakeSymphony: false,
       requiresImmediateInvestigation: true,
     };
-  const route = routeTriageIssue(issue, classifyDeterministic(issue, [issue]), {
+  const route = routeTriageIssue(issue, classifyDeterministic(issue, inventory), {
     todoStateId: TODO_STATE_ID,
     backlogStateId: BACKLOG_STATE_ID,
   });
   // Deterministic blocked/dependency/follow-up dispositions outrank a model recommendation.
   if (route.reason !== 'genuine-intake') return null;
-  if (issue.priority === 1 && assessment.priority !== 1)
-    return {
-      disposition: 'ambiguous',
-      reason: 'urgent-priority-downgrade',
-      mutations: 0,
-      wakeSymphony: false,
-      requiresImmediateInvestigation: true,
-    };
+
   const readiness = classifyIntakeReadiness(issue);
   const labels = issue.labels?.nodes ?? [];
-  const ready =
+  const qualified =
+    assessment.status === 'decided' &&
     assessment.destination === 'Todo' &&
     readiness.disposition === 'mechanical-ready';
-  const label = ready
-    ? await client.fetchTeamLabel(
-        'bdc09edc-f91c-4a06-b308-74b4fcf093f8',
-        'agent-ready'
-      )
-    : null;
-  if (ready && !label?.id) throw new Error('agent-ready-label-unavailable');
-  const unchanged = async () => {
-    const current = await client.fetchIssue(issue.identifier);
-    if (
-      !current ||
-      triageSnapshot(current) !== triageSnapshot(issue) ||
-      !triageOwnershipDecision(current).allowed
-    )
-      throw new Error('jev-triage-ownership-changed');
-    return current;
-  };
-  await unchanged();
-  const marker = `<!-- jev-triage-disposition:v1 ${JSON.stringify(assessment)} -->`;
-  if (!(issue.comments?.nodes ?? []).some(comment => comment.body === marker)) {
-    const comment = await client.addComment(issue.id, marker);
-    if (
-      comment === false ||
-      comment?.success === false ||
-      comment?.commentCreate?.success === false
-    )
-      throw new Error('jev-triage-comment-failed');
-  }
-  await unchanged();
-  const input = {
-    stateId:
-      assessment.destination === 'Todo' ? TODO_STATE_ID : BACKLOG_STATE_ID,
-    priority: assessment.priority,
-    ...(ready
-      ? { labelIds: [...new Set([...labels.map(label => label.id), label.id])] }
+  const label = qualified ? await agentReadyLabel(client) : null;
+  const todoReserved = qualified && reserveTodoSlot(governor);
+  const destination = todoReserved ? 'Todo' : 'Backlog';
+  const urgentDowngrade =
+    issue.priority === 1 &&
+    assessment.status === 'decided' &&
+    assessment.priority !== 1;
+  const providerUnavailable = assessment.status === 'unavailable';
+  const requiresImmediateInvestigation =
+    providerUnavailable || assessment.status === 'ambiguous' || urgentDowngrade;
+  const reason = urgentDowngrade
+    ? 'urgent-priority-downgrade'
+    : qualified && !todoReserved
+      ? `${assessment.reason}; todo-buffer-full-or-unavailable`
+      : assessment.reason;
+  const priority = urgentDowngrade
+    ? issue.priority
+    : (assessment.priority ?? issue.priority);
+  const result = await applyGovernorDisposition({
+    issue,
+    client,
+    decision:
+      assessment.status === 'decided'
+        ? destination === 'Todo'
+          ? 'qualified-todo'
+          : qualified
+            ? 'qualified-backlog-buffered'
+            : 'explicit-backlog-lane'
+        : assessment.status,
+    category:
+      assessment.status === 'decided'
+        ? assessment.category
+        : providerUnavailable
+          ? 'provider-blocked'
+          : 'founder-decision',
+    reason,
+    newState: dispositionState(destination),
+    priority,
+    ...(label
+      ? { labelIds: [...new Set([...labels.map(row => row.id), label.id])] }
       : {}),
-  };
-  const mutation = await client.updateIssue(issue.id, input);
-  if (
-    mutation === false ||
-    mutation?.success === false ||
-    mutation?.issueUpdate?.success === false
-  )
-    throw new Error('jev-triage-mutation-failed');
-  const persisted = await client.fetchIssue(issue.identifier);
-  if (
-    persisted?.id !== issue.id ||
-    persisted?.state?.id !== input.stateId ||
-    persisted?.priority !== input.priority ||
-    !(persisted.comments?.nodes ?? []).some(
-      comment => comment.body === marker
-    ) ||
-    (ready && !(persisted.labels?.nodes ?? []).some(row => row.id === label.id))
-  )
-    throw new Error('jev-triage-readback-failed');
+    now,
+  });
   return {
-    disposition: assessment.destination,
-    reason: ready
-      ? assessment.reason
-      : `${assessment.reason}; ${readiness.reason}`,
+    disposition: destination,
+    reason:
+      qualified || assessment.status !== 'decided'
+        ? reason
+        : `${reason}; ${readiness.reason}`,
     category: assessment.category,
-    priority: persisted.priority,
+    priority: result.persisted.priority,
     mutations: 1,
-    wakeSymphony: ready,
+    wakeSymphony: todoReserved,
+    requiresImmediateInvestigation,
+    ...(providerUnavailable
+      ? {
+          escalation: {
+            status: 'provider-block',
+            code: assessment.reason || 'provider-unavailable',
+            owner: null,
+            requestedModel: assessment.model ?? null,
+          },
+        }
+      : {}),
     verified: {
-      state: persisted.state.name,
-      updatedAt: persisted.updatedAt,
+      state: result.persisted.state.name,
+      updatedAt: result.persisted.updatedAt,
       assessmentKey: assessment.assessmentKey,
+      decisionKey: result.receipt.decisionKey,
     },
   };
 }
@@ -264,14 +268,28 @@ export function triageSweepThrottle({ lastOkAt, nowMs }) {
 export async function assessTriageSweep(
   client = linear,
   summer = requestSummerAssessment,
-  { maxIssues = 25, timeBudgetMs = 60_000, now = Date.now } = {}
+  {
+    maxIssues = 25,
+    timeBudgetMs = 60_000,
+    now = Date.now,
+    capacity = parseGovernorCapacity(),
+  } = {}
 ) {
   const started = now();
   const issues = await client.fetchTeamTriageIssues(
-    'bdc09edc-f91c-4a06-b308-74b4fcf093f8',
+    TEAM_ID,
     1000,
     ['Triage']
   );
+  const inventory = client.fetchTeamActiveIssues
+    ? await client.fetchTeamActiveIssues(TEAM_ID)
+    : issues;
+  const bufferBefore = buildTodoBufferSnapshot(inventory, capacity);
+  const governor = {
+    capacity,
+    target: bufferBefore.target,
+    qualifiedTodoCount: bufferBefore.qualifiedTodoCount,
+  };
   issues.sort((a, b) => Date.parse(a.updatedAt) - Date.parse(b.updatedAt));
   const results = [];
   for (const issue of issues) {
@@ -292,7 +310,8 @@ export async function assessTriageSweep(
             },
           },
           client,
-          summer
+          summer,
+          { inventory, governor, now: () => new Date(now()) }
         )
       );
     } catch (error) {
@@ -305,23 +324,59 @@ export async function assessTriageSweep(
       });
     }
   }
+  const inventoryAfter = client.fetchTeamActiveIssues
+    ? await client.fetchTeamActiveIssues(TEAM_ID)
+    : inventory;
+  const todoBuffer = await promoteTodoBuffer({
+    issues: inventoryAfter,
+    client,
+    capacity,
+    todoState: { id: TODO_STATE_ID, name: 'Todo' },
+    now: new Date(now()),
+  });
+  const remainingTriage = await client.fetchTeamTriageIssues(
+    TEAM_ID,
+    1000,
+    ['Triage']
+  );
+  const health = buildTriageHealth(remainingTriage, {
+    now: new Date(now()),
+  });
+  const failed =
+    results.filter(result => result.disposition === 'assessment-failed')
+      .length + todoBuffer.failures.length;
+  const blocked = results.filter(
+    result =>
+      'requiresImmediateInvestigation' in result &&
+      result.requiresImmediateInvestigation
+  ).length;
+  const providerBlocked = results.filter(
+    result => 'escalation' in result && result.escalation
+  ).length;
+  const status =
+    failed === 0 &&
+    blocked === 0 &&
+    providerBlocked === 0 &&
+    health.status === 'healthy' &&
+    capacity.status === 'healthy'
+      ? 'healthy'
+      : 'p0';
   return {
     schema: 'linear-triage-catch-up/v1',
     observedAt: new Date(now()).toISOString(),
+    governorVersion: '2026-10-12',
+    status,
     issueCount: issues.length,
     assessed: results.length,
     deferred: issues.length - results.length,
-    failed: results.filter(result => result.disposition === 'assessment-failed')
-      .length,
-    blocked: results.filter(
-      result =>
-        'requiresImmediateInvestigation' in result &&
-        result.requiresImmediateInvestigation
-    ).length,
-    providerBlocked: results.filter(
-      result => 'escalation' in result && result.escalation
-    ).length,
-    wakeSymphony: results.some(result => result.wakeSymphony),
+    failed,
+    blocked,
+    providerBlocked,
+    wakeSymphony:
+      results.some(result => result.wakeSymphony) ||
+      todoBuffer.promotions.length > 0,
+    health,
+    todoBuffer,
     results,
   };
 }
@@ -355,7 +410,12 @@ export function parseTriageEvent(event) {
 export async function assessTriageEvent(
   event,
   client = linear,
-  summer = requestSummerAssessment
+  summer = requestSummerAssessment,
+  {
+    inventory = null,
+    governor = defaultGovernorContext(),
+    now = () => new Date(),
+  } = {}
 ) {
   const delivery = parseTriageEvent(event);
   const issue = await client.fetchIssue(delivery.identifier);
@@ -366,7 +426,8 @@ export async function assessTriageEvent(
     schema: 'linear-triage-assessment/v1',
     deliveryId: delivery.deliveryId,
     issue: delivery.identifier,
-    observedAt: new Date().toISOString(),
+    observedAt: now().toISOString(),
+    governorVersion: '2026-10-12',
   };
   if (issue.state?.id !== TRIAGE_STATE_ID || issue.state?.name !== 'Triage') {
     return {
@@ -388,56 +449,6 @@ export async function assessTriageEvent(
       throw error;
     summerReceipt = await summer(delivery);
   }
-  // A provider-blocked escalation is exempt from the sweep's exit no matter
-  // which Summer decision branch carries it (urgent-investigation-required
-  // without an assessment, or existing-intake-reconcile with an ambiguous
-  // Jev assessment) — the row is provider-blocked either way, and the
-  // escalation itself is the tracked signal.
-  const providerBlockedEscalation = escalationBlockOf(summerReceipt);
-  if (
-    summerReceipt.decision !== 'existing-intake-reconcile' &&
-    !summerReceipt.assessment
-  ) {
-    return {
-      ...base,
-      disposition: summerReceipt.decision,
-      summerAssessment: summerReceipt,
-      mutations: 0,
-      wakeSymphony: false,
-      requiresImmediateInvestigation:
-        summerReceipt.decision === 'urgent-investigation-required' &&
-        !providerBlockedEscalation,
-      ...(providerBlockedEscalation
-        ? { escalation: providerBlockedEscalation }
-        : {}),
-    };
-  }
-  if (providerBlockedEscalation) {
-    return {
-      ...base,
-      disposition: summerReceipt.decision,
-      reason: 'provider-blocked-escalation',
-      summerAssessment: summerReceipt,
-      mutations: 0,
-      wakeSymphony: false,
-      escalation: providerBlockedEscalation,
-      requiresImmediateInvestigation: false,
-    };
-  }
-  if (summerReceipt.decision === 'existing-intake-reconcile') {
-    const escalation = escalationBlockOf(summerReceipt);
-    if (escalation) {
-      return {
-        ...base,
-        disposition: summerReceipt.decision,
-        summerAssessment: summerReceipt,
-        mutations: 0,
-        wakeSymphony: false,
-        escalation,
-      };
-    }
-  }
-
   const current = await client.fetchIssue(delivery.identifier);
   if (
     current?.id !== delivery.issueId ||
@@ -446,18 +457,163 @@ export async function assessTriageEvent(
   ) {
     throw new Error('linear-triage-changed-after-summer-assessment');
   }
+  const classificationInventory = inventory ?? [current];
+  const providerBlockedEscalation = escalationBlockOf(summerReceipt);
+  if (
+    summerReceipt.decision !== 'existing-intake-reconcile' &&
+    !summerReceipt.assessment
+  ) {
+    const reason =
+      providerBlockedEscalation?.code ??
+      summerReceipt.reason ??
+      summerReceipt.decision;
+    const result = await applyGovernorDisposition({
+      issue: current,
+      client,
+      decision: summerReceipt.decision,
+      category: providerBlockedEscalation
+        ? 'provider-blocked'
+        : 'founder-decision',
+      reason,
+      newState: dispositionState('Backlog'),
+      now: now(),
+    });
+    return {
+      ...base,
+      disposition: 'Backlog',
+      reason,
+      summerAssessment: summerReceipt,
+      mutations: 1,
+      wakeSymphony: false,
+      requiresImmediateInvestigation: true,
+      verified: {
+        state: result.persisted.state.name,
+        updatedAt: result.persisted.updatedAt,
+        decisionKey: result.receipt.decisionKey,
+      },
+      ...(providerBlockedEscalation
+        ? { escalation: providerBlockedEscalation }
+        : {}),
+    };
+  }
+  if (providerBlockedEscalation) {
+    const result = await applyGovernorDisposition({
+      issue: current,
+      client,
+      decision: 'provider-blocked',
+      category: 'provider-blocked',
+      reason: providerBlockedEscalation.code,
+      newState: dispositionState('Backlog'),
+      now: now(),
+    });
+    return {
+      ...base,
+      disposition: 'Backlog',
+      reason: providerBlockedEscalation.code,
+      summerAssessment: summerReceipt,
+      mutations: 1,
+      wakeSymphony: false,
+      escalation: providerBlockedEscalation,
+      requiresImmediateInvestigation: true,
+      verified: {
+        state: result.persisted.state.name,
+        updatedAt: result.persisted.updatedAt,
+        decisionKey: result.receipt.decisionKey,
+      },
+    };
+  }
   const readiness = classifyIntakeReadiness(current);
   if (summerReceipt.assessment) {
     const applied = await applyJevAssessment(
       current,
       summerReceipt.assessment,
-      client
+      client,
+      classificationInventory,
+      governor,
+      now()
     );
     if (applied)
       return { ...base, summerAssessment: summerReceipt, ...applied };
   }
+  const classification = classifyDeterministic(
+    current,
+    classificationInventory
+  );
+  const route = routeTriageIssue(current, classification, {
+    backlogStateId: BACKLOG_STATE_ID,
+    todoStateId: TODO_STATE_ID,
+  });
+  if (route.reason === 'genuine-intake') {
+    const qualified = readiness.disposition === 'mechanical-ready';
+    const label = qualified ? await agentReadyLabel(client) : null;
+    const todoReserved = qualified && reserveTodoSlot(governor);
+    const destination = todoReserved ? 'Todo' : 'Backlog';
+    const reason = qualified
+      ? todoReserved
+        ? readiness.reason
+        : `${readiness.reason}; todo-buffer-full-or-unavailable`
+      : readiness.reason;
+    const result = await applyGovernorDisposition({
+      issue: current,
+      client,
+      decision: qualified
+        ? todoReserved
+          ? 'qualified-todo'
+          : 'qualified-backlog-buffered'
+        : readiness.disposition,
+      category: qualified ? 'qualified-code' : readiness.disposition,
+      reason,
+      newState: dispositionState(destination),
+      ...(label
+        ? {
+            labelIds: [
+              ...new Set([
+                ...(current.labels?.nodes ?? []).map(row => row.id),
+                label.id,
+              ]),
+            ],
+          }
+        : {}),
+      now: now(),
+    });
+    return {
+      ...base,
+      disposition: destination,
+      summerAssessment: summerReceipt,
+      reason,
+      priority: result.persisted.priority,
+      assignee: result.persisted.assignee?.name ?? null,
+      mutations: 1,
+      wakeSymphony: todoReserved,
+      requiresImmediateInvestigation:
+        qualified && governor.capacity.status !== 'healthy',
+      verified: {
+        state: result.persisted.state.name,
+        updatedAt: result.persisted.updatedAt,
+        decisionKey: result.receipt.decisionKey,
+      },
+    };
+  }
+  const desiredState = route.desiredStateId
+    ? dispositionState(
+        route.desiredStateId === TODO_STATE_ID ? 'Todo' : 'Backlog'
+      )
+    : {
+        id: current.state?.id ?? null,
+        name: current.state?.name ?? 'Triage',
+      };
+  const governorReceipt = await persistGovernorReceipt({
+    issue: current,
+    client,
+    decision: route.reason,
+    category: route.category,
+    reason: route.reason,
+    newState: desiredState,
+    now: now(),
+  });
   const reconciliation = await reconcileIssues({
     issues: [current],
+    classificationIssues: classificationInventory,
     client,
     backlogStateId: BACKLOG_STATE_ID,
     todoStateId: TODO_STATE_ID,
@@ -466,11 +622,22 @@ export async function assessTriageEvent(
     throw new Error('linear-triage-reconciliation-failed');
   }
   const result = reconciliation.results[0];
+  const persisted = await client.fetchIssue(current.identifier);
+  if (
+    result.wouldMove &&
+    (persisted?.state?.id !== desiredState.id ||
+      !(persisted?.comments?.nodes ?? []).some(
+        comment => comment.body === governorReceiptMarker(governorReceipt)
+      ))
+  ) {
+    throw new Error('summer-governor-disposition-readback-failed');
+  }
   return {
     ...base,
-    disposition: readiness.disposition,
+    disposition: persisted?.state?.name ?? current.state?.name,
     summerAssessment: summerReceipt,
-    reason: readiness.reason,
+    reason: route.reason,
+    category: route.category,
     priority: current.priority,
     assignee: current.assignee?.name ?? null,
     reconciliation: {
@@ -483,7 +650,13 @@ export async function assessTriageEvent(
     mutations: reconciliation.mutations,
     wakeSymphony:
       result.route === 'agent-ready-lane' && result.wouldMove && result.mutated,
-    requiresImmediateInvestigation: current.priority === 1 && !result.wouldMove,
+    requiresImmediateInvestigation:
+      !route.desiredStateId || (current.priority === 1 && !result.wouldMove),
+    verified: {
+      state: persisted?.state?.name ?? current.state?.name,
+      updatedAt: persisted?.updatedAt ?? current.updatedAt,
+      decisionKey: governorReceipt.decisionKey,
+    },
   };
 }
 
@@ -497,9 +670,8 @@ export async function runCli() {
   // Throttle the catch-up sweep (2026-10-10): the workflow invokes `--sweep`
   // under `if: always()` on every 5-minute tick + every main push on the
   // shared Linear credential, which was the main consumer behind the
-  // remediator deferring RATE_LIMITED. Skip when the last successful sweep
-  // is fresher than the 30-minute floor; log the skip so the receipt trail
-  // shows the throttle, and persist the timestamp only after a clean run.
+  // remediator deferring RATE_LIMITED. Skip when the last healthy sweep is
+  // fresher than the 30-minute floor; unhealthy sweeps never arm the throttle.
   let sweepCacheFile = null;
   if (isSweep) {
     sweepCacheFile = runtimeState.assertsOutsideGitTree(
@@ -510,37 +682,55 @@ export async function runCli() {
       nowMs: Date.now(),
     });
     if (throttle.skip) {
-      console.log(`triage-sweep skipped reason=${throttle.reason}`);
+      process.stdout.write(
+        `${JSON.stringify({
+          schema: 'linear-triage-catch-up/v1',
+          observedAt: new Date().toISOString(),
+          status: 'healthy',
+          skipped: true,
+          reason: throttle.reason,
+        })}\n`
+      );
       process.exitCode = 0;
       return;
     }
   }
-  const receipt = isSweep
-    ? await assessTriageSweep()
-    : await assessTriageEvent(JSON.parse(readFileSync(eventPath, 'utf8')));
+  const capacity = parseGovernorCapacity();
+  let receipt;
+  if (isSweep) {
+    receipt = await assessTriageSweep(linear, requestSummerAssessment, {
+      capacity,
+    });
+  } else {
+    const inventory = await linear.fetchTeamActiveIssues(TEAM_ID);
+    const buffer = buildTodoBufferSnapshot(inventory, capacity);
+    receipt = await assessTriageEvent(
+      JSON.parse(readFileSync(eventPath, 'utf8')),
+      linear,
+      requestSummerAssessment,
+      {
+        inventory,
+        governor: {
+          capacity,
+          target: buffer.target,
+          qualifiedTodoCount: buffer.qualifiedTodoCount,
+        },
+      }
+    );
+  }
   process.stdout.write(`${JSON.stringify(receipt)}\n`);
   if (
     isSweep &&
     sweepCacheFile &&
-    'failed' in receipt &&
-    Number(receipt.failed ?? 0) === 0
+    receipt.status === 'healthy'
   ) {
     const cache = readSweepCache(sweepCacheFile);
     cache[SWEEP_THROTTLE_KEY] = new Date().toISOString();
     writeSweepCache(sweepCacheFile, cache);
   }
   if ('failed' in receipt) {
-    // Named rows, never an anonymous exit. The exit rule keeps its full
-    // strength for every failure the sweep itself owns: failed > 0 exits 1,
-    // and a blocked row with no provider-blocked escalation still exits 1.
-    // A blocked row whose Summer receipt already carries a provider-blocked
-    // escalation (e.g. the reason lane's model capacity/cost binding being
-    // unverified upstream) is named, counted as providerBlocked, and does
-    // not redden this workflow — the escalation is the tracked signal, and
-    // Ops/owner act on the named rows, not on this job's color.
-    // Row access stays property-safe across the sweep's heterogeneous
-    // result shapes (an assessment-failed row carries `error`; other rows
-    // carry `reason` or neither).
+    // Named rows, never an anonymous exit. Provider/safe-mode failures are
+    // P0s too: a growing Triage queue must never be the first visible signal.
     for (const result of receipt.results ?? []) {
       const row = /** @type {Record<string, any>} */ (result ?? {});
       const identifier = String(row.issue ?? 'unknown-issue');
@@ -550,17 +740,26 @@ export async function runCli() {
         );
       else if (row.escalation)
         console.error(
-          `::warning title=Triage escalation provider-blocked::${identifier}: ${row.escalation.code}${row.escalation.requestedModel ? ` (requested ${row.escalation.requestedModel})` : ''}`
+          `::error title=Triage escalation provider-blocked::${identifier}: ${row.escalation.code}${row.escalation.requestedModel ? ` (requested ${row.escalation.requestedModel})` : ''}`
         );
       else if (row.requiresImmediateInvestigation)
         console.error(
-          `::warning title=Urgent Triage investigation required::${identifier}: ${row.reason ?? row.disposition ?? 'urgent investigation required'}`
+          `::error title=Urgent Triage investigation required::${identifier}: ${row.reason ?? row.disposition ?? 'urgent investigation required'}`
         );
     }
-    const blockedWithoutEscalation =
-      Number(receipt.blocked ?? 0) - Number(receipt.providerBlocked ?? 0);
-    if (Number(receipt.failed ?? 0) > 0 || blockedWithoutEscalation > 0)
-      process.exitCode = 1;
+    if (receipt.health?.status === 'p0')
+      console.error(
+        `::error title=Linear Triage health breach::count=${receipt.health.count} oldest=${receipt.health.oldestIssue ?? 'none'} ageMs=${receipt.health.oldestAgeMs}`
+      );
+    if (receipt.todoBuffer?.capacity?.status !== 'healthy')
+      console.error(
+        `::error title=Summer governor safe mode::${receipt.todoBuffer?.capacity?.reason ?? 'official Symphony capacity unavailable'}`
+      );
+    for (const failure of receipt.todoBuffer?.failures ?? [])
+      console.error(
+        `::error title=Todo buffer promotion failed::${failure.issue}: ${failure.error}`
+      );
+    if (receipt.status !== 'healthy') process.exitCode = 1;
   }
 }
 
