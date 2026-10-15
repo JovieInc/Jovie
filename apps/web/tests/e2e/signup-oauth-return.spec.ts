@@ -123,12 +123,17 @@ test('signup recovers the callback URL emitted by its provider control @smoke', 
   page,
   context,
 }, testInfo) => {
-  let blockedWrites = 0;
+  const blockedWrites: string[] = [];
+  const funnelSteps: unknown[] = [];
   await context.route('**/api/**', async route => {
     if (['GET', 'HEAD', 'OPTIONS'].includes(route.request().method())) {
       await route.continue();
     } else {
-      blockedWrites++;
+      const pathname = new URL(route.request().url()).pathname;
+      blockedWrites.push(pathname);
+      if (pathname === '/api/journey/step') {
+        funnelSteps.push(route.request().postDataJSON());
+      }
       await route.abort();
     }
   });
@@ -151,6 +156,11 @@ test('signup recovers the callback URL emitted by its provider control @smoke', 
   expect(callback.origin).toBe(new URL(page.url()).origin);
   expect(callback.pathname).toBe('/signup');
   expect(callback.searchParams.getAll('error')).toEqual(['oauth_failed']);
+  await expect(
+    page.getByRole('button', { name: 'Continue with Apple' })
+  ).toBeEnabled();
+  await expect(page.getByRole('alert').filter({ hasText: /\S/ })).toBeVisible();
+  await expect.poll(() => funnelSteps.length).toBe(2);
 
   // Better Auth appends the provider error to this published callback URL.
   // The provider-start POST was aborted; this is a return-rendering fixture,
@@ -169,5 +179,23 @@ test('signup recovers the callback URL emitted by its provider control @smoke', 
   );
   expect(new URL(page.url()).searchParams.get('handle')).toBe('joviedogfood');
   expect(new URL(page.url()).searchParams.get('redirect_url')).toBe('/start');
-  expect(blockedWrites).toBe(1);
+  expect(blockedWrites.sort()).toEqual([
+    '/api/auth/sign-in/social',
+    '/api/journey/step',
+    '/api/journey/step',
+  ]);
+  // AuthShell records the explicit start and the locally aborted failure.
+  expect(funnelSteps).toHaveLength(2);
+  expect(funnelSteps).toEqual(
+    expect.arrayContaining([
+      { funnel: 'artist_signup', step: 'auth_start', surface: 'signup' },
+      {
+        funnel: 'artist_signup',
+        step: 'auth_start',
+        outcome: 'error',
+        surface: 'signup',
+        reason: 'oauth_start_failed',
+      },
+    ])
+  );
 });
