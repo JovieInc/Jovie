@@ -10,9 +10,12 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import sys
 import time
 import zipfile
 
+# Shared receipt data lives with the host ledger; this transport has no lane authority.
+sys.path.insert(0, str(Path(__file__).resolve().parent / "lanes"))
 import shipping_attribution as attribution
 
 ARTIFACT = "shipping-origin-v1"

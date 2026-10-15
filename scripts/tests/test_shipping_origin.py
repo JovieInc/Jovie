@@ -10,9 +10,9 @@ import zipfile
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/lanes"))
-import shipping_attribution as attribution
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 import shipping_origin as origin
+import shipping_attribution as attribution
 
 
 def payload(**overrides):

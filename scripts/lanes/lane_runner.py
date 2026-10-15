@@ -40,6 +40,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, str(HERE))
 import continuity_clock  # noqa: E402
 import lifecycle  # noqa: E402
@@ -129,7 +130,7 @@ LANE_TESTS = ["scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_a
               "scripts/tests/test_linear_sync.py"]
 # Dependencies outside scripts/lanes for installed source admission and the HUD's
 # PROMOTION line (JOV-6836).
-RELEASE_EXTRAS = ["scripts/fleet-gate/gem-priority-gate.py", "scripts/fleet-gate/closure_health.py",
+RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/fleet-gate/gem-priority-gate.py", "scripts/fleet-gate/closure_health.py",
                   "scripts/fleet-gate/gem_gate_contract.py", "scripts/fleet-gate/summer_ci_audit.py",
                   "scripts/fleet-gate/symphony_proof_context.py",
                   "scripts/promotion-loss-metrics.mjs", "scripts/merge-group-failure-hold.mjs",

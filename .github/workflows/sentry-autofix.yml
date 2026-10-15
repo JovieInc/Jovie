@@ -231,7 +231,7 @@ jobs:
           EOF
           )")
 
-          python3 scripts/lanes/shipping_origin.py emit-automation \
+          python3 scripts/shipping_origin.py emit-automation \
             --pr "$PR_URL" --head-sha "$(git rev-parse HEAD)" \
             --provider claude ${LINEAR_IDENTIFIER:+--linear-issue "$LINEAR_IDENTIFIER"}
           echo "pr_url=${PR_URL}" >> "$GITHUB_OUTPUT"

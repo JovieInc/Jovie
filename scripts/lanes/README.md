@@ -144,7 +144,7 @@ Founder-operated ChatGPT, Codex and Claude sessions, and independent Hyperagent,
 Grokbot or other agents, use this publication handoff after the last push:
 
 ```bash
-python3 scripts/lanes/shipping_origin.py submit \
+python3 scripts/shipping_origin.py submit \
   --repository JovieInc/Jovie --pr 123 --head-sha <exact-final-head> \
   --method founder-operated-codex --initiator tim --provider codex \
   --execution-host <non-secret-host-label> --run-id <session-id> \

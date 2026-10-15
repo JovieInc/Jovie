@@ -1579,7 +1579,7 @@ jobs:
           gh pr create --draft --base main --head "$branch" \
             --title "docs(changelog): customer updates $(date -u +%F)" \
             --body-file "$RUNNER_TEMP/customer-changelog/pr.md"
-          python3 scripts/lanes/shipping_origin.py emit-automation \
+          python3 scripts/shipping_origin.py emit-automation \
             --pr "$(gh pr view "$branch" --json number --jq .number)" \
             --head-sha "$(git rev-parse HEAD)"
 

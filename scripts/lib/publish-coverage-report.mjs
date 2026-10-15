@@ -74,7 +74,7 @@ function publishReport(
       execFileSync(
         'python3',
         [
-          new URL('../lanes/shipping_origin.py', import.meta.url).pathname,
+          new URL('../shipping_origin.py', import.meta.url).pathname,
           'emit-automation',
           '--pr',
           pr,

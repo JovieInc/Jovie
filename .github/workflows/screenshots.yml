@@ -1117,7 +1117,7 @@ jobs:
 
           if [ -n "$EXISTING_PR" ]; then
             echo "Updated existing PR #$EXISTING_PR via force-push"
-            python3 scripts/lanes/shipping_origin.py emit-automation \
+            python3 scripts/shipping_origin.py emit-automation \
               --pr "$EXISTING_PR" --head-sha "$(git rev-parse HEAD)"
             if hold_screenshot_merge_queue; then
               exit 0
@@ -1127,7 +1127,7 @@ jobs:
             PR_URL=$(gh pr create \
               --title "chore: update product screenshots" \
               --body "Auto-generated screenshot update triggered by ${GITHUB_SHA::8}.")
-            python3 scripts/lanes/shipping_origin.py emit-automation \
+            python3 scripts/shipping_origin.py emit-automation \
               --pr "$PR_URL" --head-sha "$(git rev-parse HEAD)"
             if hold_screenshot_merge_queue; then
               exit 0

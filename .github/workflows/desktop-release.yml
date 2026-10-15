@@ -1241,7 +1241,7 @@ jobs:
 
           EOF
           )")"
-          python3 origin-policy/scripts/lanes/shipping_origin.py emit-automation \
+          python3 origin-policy/scripts/shipping_origin.py emit-automation \
             --pr "$pr_url" --head-sha "$(git rev-parse HEAD)"
           gh pr edit "$pr_url" --add-label "merge-queue"
           echo "Opened deterministic desktop release stamp PR: $pr_url"

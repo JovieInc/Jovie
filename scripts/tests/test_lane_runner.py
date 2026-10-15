@@ -6510,7 +6510,7 @@ class UpdateTest(unittest.TestCase):
 
 class ManagedMeshArchiveTest(unittest.TestCase):
     def test_managed_archive_retains_exact_verified_portable_closure(self):
-        required = [".nvmrc", "pnpm-lock.yaml", "packages/agent-transport-contracts/work-order.ts",
+        required = ["scripts/shipping_origin.py", ".nvmrc", "pnpm-lock.yaml", "packages/agent-transport-contracts/work-order.ts",
                     "scripts/backlog-orchestrator/summer-triage-assessment-client.mjs"]
         self.assertTrue(set(required) <= set(lane.RELEASE_EXTRAS))
         if os.environ.get("LANES_SELFTEST") != "1":

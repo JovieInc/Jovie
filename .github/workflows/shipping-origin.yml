@@ -49,7 +49,7 @@ jobs:
         run: |
           python3 - <<'PY'
           import os, sys
-          sys.path.insert(0, 'scripts/lanes')
+          sys.path.insert(0, 'scripts')
           from shipping_origin import HANDOFF_METHODS, decode_payload, emit, validate_payload
           payload = decode_payload(os.environ['ORIGIN_PAYLOAD'])
           validate_payload(payload)

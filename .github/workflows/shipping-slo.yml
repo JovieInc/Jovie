@@ -139,7 +139,7 @@ jobs:
             --body "Refs JOV-6783.
 
           Refreshes the committed shipping-SLO and blog-publish-latency snapshots from run ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}."
-          python3 scripts/lanes/shipping_origin.py emit-automation \
+          python3 scripts/shipping_origin.py emit-automation \
             --pr "$(gh pr view "$BRANCH" --json number --jq .number)" \
             --head-sha "$(git rev-parse HEAD)" --linear-issue JOV-6783
 
@@ -206,7 +206,7 @@ jobs:
             || gh pr create --draft --repo "${{ github.repository }}" --base main --head "$BRANCH" \
               --title "chore(metrics): ratchet shipping SLO baseline" \
               --body "Automated shipping-SLO ratchet (JOV-6783)."
-          python3 scripts/lanes/shipping_origin.py emit-automation \
+          python3 scripts/shipping_origin.py emit-automation \
             --pr "$(gh pr view "$BRANCH" --json number --jq .number)" \
             --head-sha "$(git rev-parse HEAD)" --linear-issue JOV-6783
 

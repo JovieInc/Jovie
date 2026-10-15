@@ -168,7 +168,7 @@ jobs:
           PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
           HEAD_SHA: ${{ steps.commit.outputs.head_sha }}
         run: |
-          python3 policy/scripts/lanes/shipping_origin.py emit-automation \
+          python3 policy/scripts/shipping_origin.py emit-automation \
             --pr "$PR_NUMBER" --head-sha "$HEAD_SHA"
 
       - name: Retain immutable origin payload

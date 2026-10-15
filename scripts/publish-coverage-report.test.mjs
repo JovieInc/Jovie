@@ -18,6 +18,17 @@ import {
   REPORT_COALESCE_MS,
 } from './lib/publish-coverage-report.mjs';
 
+/**
+ * @typedef {{
+ *   permissions: Record<string, string>,
+ *   jobs: Record<string, {
+ *     permissions?: Record<string, string>,
+ *     if?: string,
+ *     steps?: { id?: string, run?: string, with?: Record<string, string | number> }[]
+ *   }>
+ * }} Workflow
+ */
+
 const heatmap = 'docs/TEST_COVERAGE_HEATMAP.md';
 const snapshot = 'apps/web/reports/test-coverage-snapshot.json';
 const url = 'https://github.com/JovieInc/Jovie/pull/123';
@@ -34,10 +45,12 @@ test('every integrated workflow retains origin data and the handoff grants only 
     'shipping-slo',
     'test-coverage-audit',
   ]) {
-    const workflow = load(
-      readFileSync(
-        new URL(`../.github/workflows/${name}.yml`, import.meta.url),
-        'utf8'
+    const workflow = /** @type {Workflow} */ (
+      load(
+        readFileSync(
+          new URL(`../.github/workflows/${name}.yml`, import.meta.url),
+          'utf8'
+        )
       )
     );
     const steps = Object.values(workflow.jobs).flatMap(job => job.steps ?? []);
@@ -56,10 +69,12 @@ test('every integrated workflow retains origin data and the handoff grants only 
     assert.equal(steps[retention].with['retention-days'], 30);
     assert.ok(!steps[retention].with.overwrite);
   }
-  const handoff = load(
-    readFileSync(
-      new URL('../.github/workflows/shipping-origin.yml', import.meta.url),
-      'utf8'
+  const handoff = /** @type {Workflow} */ (
+    load(
+      readFileSync(
+        new URL('../.github/workflows/shipping-origin.yml', import.meta.url),
+        'utf8'
+      )
     )
   );
   assert.deepEqual(handoff.permissions, {});
@@ -158,10 +173,10 @@ function fixture(t, nightly = false) {
 
 function installOriginFixture(f, bin) {
   mkdirSync(join(f.cwd, 'scripts/lanes'), { recursive: true });
-  for (const name of ['shipping_attribution.py', 'shipping_origin.py']) {
+  for (const name of ['lanes/shipping_attribution.py', 'shipping_origin.py']) {
     writeFileSync(
-      join(f.cwd, 'scripts/lanes', name),
-      readFileSync(new URL(`./lanes/${name}`, import.meta.url))
+      join(f.cwd, 'scripts', name),
+      readFileSync(new URL(`./${name}`, import.meta.url))
     );
   }
   writeFileSync(

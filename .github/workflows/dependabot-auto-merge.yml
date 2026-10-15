@@ -62,7 +62,7 @@ jobs:
           sparse-checkout: |
             .nvmrc
             scripts/lanes/shipping_attribution.py
-            scripts/lanes/shipping_origin.py
+            scripts/shipping_origin.py
             scripts/dependabot-update-policy.mjs
             scripts/dependabot-workflow-run-adapter.mjs
             scripts/lib/source-admission-policy.mjs
@@ -126,7 +126,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          python3 scripts/lanes/shipping_origin.py emit-automation \
+          python3 scripts/shipping_origin.py emit-automation \
             --pr "$PR_NUMBER" --head-sha "$HEAD_SHA"
 
       - name: Retain immutable origin payload
