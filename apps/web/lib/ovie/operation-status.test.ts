@@ -8,6 +8,7 @@ import type { SummerKanbanCard } from './summer-kanban';
 
 const approval: SummerCard = {
   id: 'sc_11111111111111111111111111111111',
+  idempotencyKey: 'source-research-approval',
   kind: 'decision',
   product: 'company',
   title: 'Approve source research',
