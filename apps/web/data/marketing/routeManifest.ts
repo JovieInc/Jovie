@@ -1146,14 +1146,22 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: '(marketing)/blog/page.tsx',
     recipeId: 'blog-landing',
-    renderedSections: approvedBindings(
-      'apps/web/app/(marketing)/blog/page.tsx',
-      'hero',
-      'blog-feed'
-    ),
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/blog/BlogFeed.tsx',
+        'hero',
+        'left-none'
+      ),
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/blog/BlogFeed.tsx',
+        'blog-feed',
+        'featured-grid'
+      ),
+    ],
     bindingEvidence: {
       status: 'verified',
-      source: 'route audit 2026-07-11',
+      source:
+        'BlogFeed mounts a left-none hero and a featured-grid feed (2026-10-15)',
     },
     status: 'active',
     specVersion: '1.0.0',
@@ -1162,14 +1170,22 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: '(marketing)/blog/category/[slug]/page.tsx',
     recipeId: 'blog-landing',
-    renderedSections: approvedBindings(
-      'apps/web/app/(marketing)/blog/category/[slug]/page.tsx',
-      'hero',
-      'blog-feed'
-    ),
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/components/organisms/BlogCategoryContent.tsx',
+        'hero',
+        'left-none'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/organisms/BlogCategoryContent.tsx',
+        'blog-feed',
+        'category-filtered-grid'
+      ),
+    ],
     bindingEvidence: {
       status: 'verified',
-      source: 'route audit 2026-07-11',
+      source:
+        'BlogCategoryContent mounts a left-none hero and a category-filtered-grid feed (2026-10-15)',
     },
     status: 'active',
     specVersion: '1.0.0',
