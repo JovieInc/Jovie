@@ -14,7 +14,10 @@ import { Button } from './button';
 
 const meta: Meta = {
   title: 'UI/Atoms/AlertDialog',
-  parameters: { layout: 'centered' },
+  parameters: {
+    layout: 'centered',
+    chromatic: { viewports: [390, 768, 1280] },
+  },
   tags: ['autodocs'],
 };
 export default meta;
@@ -61,6 +64,13 @@ export const LongContent: Story = {
             <span className='mt-2 block'>
               Analytics history will remain available.
             </span>
+            {Array.from({ length: 12 }, (_, index) => index + 1).map(track => (
+              <span key={track} className='mt-2 block'>
+                Track {track} will no longer appear on your public release page.
+                Saved links to this track will stop working, and you will need
+                to upload it again to publish it in a future release.
+              </span>
+            ))}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
