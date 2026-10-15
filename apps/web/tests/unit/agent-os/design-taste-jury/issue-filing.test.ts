@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildIssueFilingsFromConsensus } from '@/lib/agent-os/design-taste-jury/issue-filing';
 import { buildDesignTasteJuryConsensus } from '@/lib/agent-os/design-taste-jury/jury';
+import type { DesignTasteJuryCriterion } from '@/lib/agent-os/design-taste-jury/types';
 
 describe('design-taste-jury issue filing', () => {
   it('auto-files objective ship issues with benchmark reference comps', () => {
@@ -36,6 +37,8 @@ describe('design-taste-jury issue filing', () => {
     ).toBe(true);
     expect(shipFiling?.body).toContain('Reference comps');
     expect(shipFiling?.body).toContain('https://www.apple.com/ios/health/');
+    expect(shipFiling?.criteria).toEqual([]);
+    expect(shipFiling?.body).not.toContain('## Rubric criteria');
   });
 
   it('routes subjective findings to the Tim taste queue', () => {
@@ -67,5 +70,62 @@ describe('design-taste-jury issue filing', () => {
     expect(
       tasteFiling?.referenceComps.some(comp => comp.id === 'raycast')
     ).toBe(true);
+  });
+
+  it('still files legacy consensus findings that have no criterion tags', () => {
+    const [filing] = buildIssueFilingsFromConsensus({
+      runId: 'legacy-jury-run',
+      surfaceId: 'dashboard-insights',
+      computedAt: '2026-06-20T12:00:00.000Z',
+      findings: [
+        {
+          id: 'contrast',
+          summary: 'Helper copy fails contrast.',
+          disposition: 'ship',
+          consensusRank: 1,
+          voteCount: 1,
+          jurorIds: ['legacy-juror'],
+          objective: true,
+        },
+      ],
+    });
+
+    expect(filing?.criteria).toEqual([]);
+    expect(filing?.queue).toBe('visual-qa');
+    expect(filing?.body).not.toContain('## Rubric criteria');
+  });
+
+  it.each<DesignTasteJuryCriterion>([
+    'optical-alignment',
+    'shadow-depth',
+    'stagger-animation',
+  ])('tags %s violations in structured filings and issue bodies', criterion => {
+    const consensus = buildDesignTasteJuryConsensus({
+      runId: 'jury-run-criteria',
+      surfaceId: 'dashboard-insights',
+      verdicts: [
+        {
+          jurorId: 'visual-reviewer',
+          modelLabel: 'Visual reviewer',
+          findings: [
+            {
+              id: 'ui-feel',
+              summary: 'The changed surface has a visible UI-feel regression.',
+              criteria: [criterion],
+              disposition: 'taste',
+              rank: 1,
+              objective: false,
+            },
+          ],
+        },
+      ],
+    });
+
+    const [filing] = buildIssueFilingsFromConsensus(consensus);
+
+    expect(filing?.criteria).toEqual([criterion]);
+    expect(filing?.body).toContain('## Rubric criteria');
+    expect(filing?.body).toContain(`(${criterion})`);
+    expect(filing?.queue).toBe('tim-taste');
   });
 });
