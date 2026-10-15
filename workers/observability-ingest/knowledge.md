@@ -1,6 +1,7 @@
 # Private knowledge ingestion
 
-JOV-8133 adds a Cloudflare Worker that checks approved upstream discovery feeds
+JOV-8133 adds a separate Cloudflare Worker entry in the existing ingest workspace,
+configured by `wrangler.knowledge.toml`, that checks approved upstream discovery feeds
 or sitemaps daily at 05:17 UTC. It has no public content endpoint. The private
 registry supplies each connector's endpoints and extraction settings; checked-in
 files use only `SRC-N`. No Browser Rendering or paid SaaS is required for sources
@@ -82,8 +83,8 @@ actual account limits and private source budgets before enabling the trigger.
 Run from the repository root:
 
 ```bash
-pnpm --filter @jovie/knowledge-ingest typecheck
-pnpm --filter @jovie/knowledge-ingest test
+pnpm --filter @jovie/observability-ingest typecheck
+pnpm --filter @jovie/observability-ingest test:knowledge
 ```
 
 Ship now: bounded daily ingestion with persistent dedupe and source approval.

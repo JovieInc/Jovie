@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { classifyProductLanes } from '../../../scripts/lib/product-lane-classifier.mjs';
+import { classifyProductLanes } from '../../../../scripts/lib/product-lane-classifier.mjs';
 import worker, { run } from './index.ts';
 import {
   anonymize,
@@ -530,16 +530,20 @@ test('scheduled handler reports incomplete runs and exposes no HTTP content', as
 test('existing CI lane selects and runs Worker checks', () => {
   assert.ok(
     classifyProductLanes([
-      'workers/knowledge-ingest/src/index.ts',
+      'workers/observability-ingest/src/knowledge/index.ts',
     ]).selectedLanes.includes('web')
   );
   const ci = readFileSync(
-    new URL('../../../.github/workflows/ci.yml', import.meta.url),
+    new URL('../../../../.github/workflows/ci.yml', import.meta.url),
     'utf8'
   );
   assert.ok(
     ci.includes(
-      'pnpm --filter @jovie/knowledge-ingest typecheck && pnpm --filter @jovie/knowledge-ingest test'
+      'pnpm --filter @jovie/observability-ingest typecheck && pnpm --filter @jovie/observability-ingest test'
     )
   );
+  const pkg = JSON.parse(
+    readFileSync(new URL('../../package.json', import.meta.url), 'utf8')
+  );
+  assert.ok(pkg.scripts.test.includes('pnpm run test:knowledge'));
 });

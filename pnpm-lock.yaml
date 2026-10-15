@@ -1048,7 +1048,7 @@ importers:
         specifier: ^5.8.2
         version: 5.9.3
 
-  workers/knowledge-ingest:
+  workers/observability-ingest:
     dependencies:
       htmlparser2:
         specifier: 8.0.2
@@ -1056,15 +1056,6 @@ importers:
       robots-parser:
         specifier: 3.0.1
         version: 3.0.1
-    devDependencies:
-      '@cloudflare/workers-types':
-        specifier: ^5.20261010.1
-        version: 5.20261013.1
-      typescript:
-        specifier: ^5.8.2
-        version: 5.9.3
-
-  workers/observability-ingest:
     devDependencies:
       '@cloudflare/workers-types':
         specifier: ^5.20261010.1
