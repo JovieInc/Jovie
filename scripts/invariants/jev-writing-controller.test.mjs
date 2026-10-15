@@ -1,10 +1,18 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import fs from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
+import { mock, test } from 'node:test';
 import { freePromotionDigest, JEV_ROUTE } from './jev-gateway.mjs';
 import {
   runWritingWorkflow,
   writingWorkflowFingerprint,
 } from './jev-writing-controller.mjs';
+import { WRITING_QUALITY_RUBRICS } from './jev-writing-quality.mjs';
+import {
+  bindApprovedWritingTemplate,
+  verifyWritingPilotReceipt,
+  writingTextDigest,
+} from './jev-writing-receipt.mjs';
 
 const originalText = 'This artist has 120 followers. What are you working on?';
 const revisedText = 'This artist has 120 followers. Which release comes next?';
@@ -15,6 +23,11 @@ function fixture(config = {}) {
   const calls = { write: 0, revise: 0, evaluate: 0, admission: 0, reserve: 0 };
   const controller = new AbortController();
   const input = {
+    candidateId: 'fixture-candidate',
+    writerImplementationSha256: 'b'.repeat(64),
+    voiceReferences: [
+      { id: 'canon/VOICE.md', version: 'fixture-v1', sha256: 'c'.repeat(64) },
+    ],
     sourceSha: 'a'.repeat(40),
     scope: 'synthetic onboarding response',
     writerModelId: 'zai/glm-5.3-flash',
@@ -75,9 +88,12 @@ function fixture(config = {}) {
           : (config.revisedText ?? revisedText),
       modelId: config.switchAt === stage ? 'other/model' : input.writerModelId,
       costUsd: config.overchargeAt === stage ? 0.03 : 0.015,
+      responseId: 'writer-response-1',
+      usage: { inputTokens: 20, outputTokens: 10 },
     };
   };
   const options = {
+    sanitizeText: config.sanitizeText,
     approval,
     now: () => time,
     signal: controller.signal,
@@ -167,7 +183,11 @@ function fixture(config = {}) {
           };
         return {
           answers,
-          response: { modelId: JEV_ROUTE.model },
+          response: {
+            modelId: JEV_ROUTE.model,
+            headers: { 'x-vercel-id': 'evaluator-response-1' },
+          },
+          usage: { inputTokens: 30, outputTokens: 5 },
           warnings: [],
           providerMetadata: {
             gateway: {
@@ -463,6 +483,283 @@ test('caller mutation cannot enlarge the envelope or replace the evidence', asyn
       costUsd: 0.01,
     };
   };
-  fallback(await f.run(), 'budget-failure');
+  fallback(await f.run(), 'stale-input');
   counts(f, 1, 0, 0);
+});
+
+const currentArtifact = (f, result, original = originalText) => ({
+  input: f.input,
+  originalText: original,
+  finalText: result.text ?? null,
+});
+
+test('receipt binds exact artifacts, review history and attributable telemetry', async () => {
+  const f = fixture({ repair: true });
+  const result = await f.run();
+  const r = result.receipt;
+  assert.equal(
+    verifyWritingPilotReceipt(
+      JSON.parse(JSON.stringify(r)),
+      currentArtifact(f, result)
+    ),
+    true
+  );
+  assert.equal(r.artifacts.originalTextSha256, writingTextDigest(originalText));
+  assert.equal(r.artifacts.finalTextSha256, writingTextDigest(revisedText));
+  assert.equal(r.outcome.revisionCount, 1);
+  assert.ok(
+    r.initialFindings.some(finding => finding.axis === 'task-completion')
+  );
+  assert.equal(r.terminalChecks.at(-1).status, 'evaluated');
+  assert.equal(r.terminalChecks.at(-1).findings.length, 0);
+  assert.equal(r.calls.length, 4);
+  assert.equal(r.calls[0].responseId, 'writer-response-1');
+  assert.equal(r.calls[0].inputTokens, 20);
+  assert.equal(r.calls[0].billedCostUsd, 0.015);
+  assert.equal(r.calls[1].generationId, 'fixture-generation');
+  assert.equal(r.calls[1].responseId, 'evaluator-response-1');
+  assert.equal(r.calls[1].inputTokens, 30);
+  assert.equal(r.calls[1].backendIdentityProven, false);
+  assert.equal(r.binding.writer.modelId, f.input.writerModelId);
+  assert.equal(r.binding.evaluatorRoute.model, JEV_ROUTE.model);
+  assert.equal(Object.keys(r.binding.implementations).length, 10);
+  assert.ok(r.binding.rubric.version && r.binding.calibration.version);
+  assert.equal(r.timing.startedAt, 1000);
+  assert.equal(r.timing.completedAt, 1000);
+  for (const field of ['certified', 'humanApproved', 'sendingAuthority'])
+    assert.equal(r[field], false);
+  const json = JSON.stringify(r);
+  for (const raw of [
+    ...f.input.contract.evidence,
+    ...f.input.contract.approvedVoiceExamples,
+    originalText,
+  ])
+    assert.equal(json.includes(raw), false);
+  assert.ok(Object.isFrozen(r.calls[0]));
+});
+
+test('receipt rejects changed on-disk implementation and missing binding identity', async () => {
+  const f = fixture();
+  const result = await f.run();
+  const read = fs.readFileSync;
+  const mocked = mock.method(fs, 'readFileSync', (path, options) =>
+    String(path).endsWith('/packages/copy/rules.ts')
+      ? Buffer.from('changed rules')
+      : read(path, options)
+  );
+  try {
+    syncBuiltinESMExports();
+    assert.equal(
+      verifyWritingPilotReceipt(result.receipt, currentArtifact(f, result)),
+      false
+    );
+    fallback(await fixture().run(), 'stale-input');
+  } finally {
+    mocked.mock.restore();
+    syncBuiltinESMExports();
+  }
+  const invalid = structuredClone(currentArtifact(f, result));
+  invalid.input.candidateId = '';
+  assert.equal(verifyWritingPilotReceipt(result.receipt, invalid), false);
+});
+
+const mutations = {
+  candidate: input => {
+    input.candidateId = 'another-candidate';
+  },
+  evidence: input => {
+    input.contract.evidence[0] += ' ';
+  },
+  brief: input => {
+    input.contract.intendedJob += '\n';
+  },
+  voice: input => {
+    input.contract.approvedVoiceExamples[0] += '\u00a0';
+  },
+  voiceReference: input => {
+    input.voiceReferences[0].version = 'v2';
+  },
+  model: input => {
+    input.writerModelId = 'other/model';
+  },
+  implementation: input => {
+    input.writerImplementationSha256 = 'd'.repeat(64);
+  },
+  source: input => {
+    input.sourceSha = 'd'.repeat(40);
+  },
+};
+for (const [name, mutate] of Object.entries(mutations)) {
+  test(`receipt rejects ${name} mutation at handoff and around inference`, async () => {
+    const f = fixture();
+    const result = await f.run();
+    const changed = structuredClone(currentArtifact(f, result));
+    mutate(changed.input);
+    assert.equal(verifyWritingPilotReceipt(result.receipt, changed), false);
+    for (const stage of ['preflight', 'write', 'evaluate']) {
+      const g = fixture();
+      if (stage === 'preflight') mutate(g.input);
+      else if (stage === 'write') {
+        const write = g.options.write;
+        g.options.write = async args => {
+          const written = await write(args);
+          mutate(g.input);
+          return written;
+        };
+      } else {
+        const transport = g.options.gateway.transport;
+        g.options.gateway.transport = async (...args) => {
+          const reviewed = await transport(...args);
+          mutate(g.input);
+          return reviewed;
+        };
+      }
+      fallback(
+        await g.run(),
+        stage === 'preflight' ? 'budget-failure' : 'stale-input'
+      );
+      assert.equal(g.calls.revise, 0);
+    }
+  });
+}
+
+test('receipt invalidates rubric mutation during inference and at handoff', async () => {
+  const f = fixture();
+  const result = await f.run();
+  const rubric = WRITING_QUALITY_RUBRICS['voice-fit'];
+  const question = rubric.question;
+  try {
+    rubric.question += ' Changed rubric.';
+    assert.equal(
+      verifyWritingPilotReceipt(result.receipt, currentArtifact(f, result)),
+      false
+    );
+    rubric.question = question;
+    const g = fixture();
+    const transport = g.options.gateway.transport;
+    g.options.gateway.transport = async (...args) => {
+      const reviewed = await transport(...args);
+      rubric.question += ' Changed rubric.';
+      return reviewed;
+    };
+    fallback(await g.run(), 'stale-input');
+  } finally {
+    rubric.question = question;
+  }
+});
+
+test('receipt hashes sanitized UTF-8 bytes and rejects whitespace and Unicode edits', async () => {
+  const text = `${originalText} Caf\u00e9.`;
+  const f = fixture({
+    originalText: ` ${text}\r\n`,
+    sanitizeText: value => value.trim(),
+  });
+  const result = await f.run();
+  assert.ok(result.status === 'reviewed');
+  assert.equal(result.text, text);
+  const current = currentArtifact(f, result, text);
+  assert.equal(verifyWritingPilotReceipt(result.receipt, current), true);
+  for (const edited of [
+    `${text} `,
+    `${text}\n`,
+    text.normalize('NFD'),
+    text.replaceAll(' ', '\u00a0'),
+  ]) {
+    assert.equal(
+      verifyWritingPilotReceipt(result.receipt, {
+        ...current,
+        finalText: edited,
+      }),
+      false
+    );
+    assert.equal(
+      verifyWritingPilotReceipt(result.receipt, {
+        ...current,
+        originalText: edited,
+      }),
+      false
+    );
+  }
+  const changed = structuredClone(result.receipt);
+  changed.outcome.revisionCount = 1;
+  assert.equal(verifyWritingPilotReceipt(changed, current), false);
+  assert.equal(verifyWritingPilotReceipt(null, current), false);
+});
+
+test('receipt retains fallback checks and unknown cost without private error detail', async () => {
+  const f = fixture({ repair: true, secondFailure: true });
+  const result = await f.run();
+  assert.equal(result.receipt.outcome.fallbackReason, 'revision-exhausted');
+  assert.ok(result.receipt.terminalChecks.at(-1).findings.length);
+  assert.equal(result.receipt.artifacts.finalTextSha256, null);
+  const g = fixture();
+  g.options.write = async () => ({
+    status: 'written',
+    text: originalText,
+    modelId: g.input.writerModelId,
+    costUsd: undefined,
+  });
+  const unknown = await g.run();
+  fallback(unknown, 'budget-failure');
+  assert.equal(unknown.receipt.calls[0].billedCostUsd, null);
+  const h = fixture({ throwAt: 'write' });
+  assert.equal(
+    JSON.stringify((await h.run()).receipt).includes(
+      'untrusted provider detail'
+    ),
+    false
+  );
+  const incomplete = await fixture({ incomplete: true }).run();
+  assert.equal(incomplete.receipt.calls[1].responseId, 'evaluator-response-1');
+  assert.equal(incomplete.receipt.calls[1].inputTokens, 30);
+});
+
+test('approved template gets a new receipt for its version and exact rendered bytes', async () => {
+  const f = fixture({ missingEvidence: true });
+  const result = await f.run();
+  const current = currentArtifact(f, result);
+  const template = {
+    id: 'onboarding-question',
+    version: 'v1',
+    renderedText: 'What are you working on?\n',
+  };
+  const bound = bindApprovedWritingTemplate(result.receipt, current, template);
+  const rendered = {
+    ...current,
+    finalText: bound.text,
+    template: bound.receipt.template,
+  };
+  assert.equal(bound.text, template.renderedText);
+  assert.notEqual(bound.receipt.receiptDigest, result.receipt.receiptDigest);
+  assert.equal(bound.receipt.outcome.reviewStatus, 'not-reviewed');
+  assert.equal(bound.receipt.outcome.fallbackReason, 'missing-evidence');
+  assert.equal(verifyWritingPilotReceipt(bound.receipt, rendered), true);
+  assert.equal(verifyWritingPilotReceipt(result.receipt, rendered), false);
+  assert.equal(
+    verifyWritingPilotReceipt(bound.receipt, {
+      ...rendered,
+      finalText: bound.text.trim(),
+    }),
+    false
+  );
+  assert.equal(
+    verifyWritingPilotReceipt(bound.receipt, {
+      ...rendered,
+      template: { ...rendered.template, version: 'v2' },
+    }),
+    false
+  );
+  assert.throws(() =>
+    bindApprovedWritingTemplate(
+      result.receipt,
+      { ...current, originalText: 'other' },
+      template
+    )
+  );
+  assert.throws(() =>
+    bindApprovedWritingTemplate(result.receipt, current, {
+      ...template,
+      version: '',
+    })
+  );
 });

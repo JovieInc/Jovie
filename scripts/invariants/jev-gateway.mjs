@@ -239,6 +239,9 @@ function returnedEvidence(result) {
   const gateway = result?.providerMetadata?.gateway;
   const routing = gateway?.routing;
   return {
+    responseId: result?.response?.headers?.['x-vercel-id'] ?? null,
+    inputTokens: result?.usage?.inputTokens ?? null,
+    outputTokens: result?.usage?.outputTokens ?? null,
     billedCostUsd: money(gateway?.gatewayCost),
     modelCostUsd: money(gateway?.cost),
     surchargeCostUsd: money(gateway?.surchargeCost),
@@ -541,9 +544,6 @@ export async function runPreparedJevEvaluation(
       ...read.detail,
       // SDK response.modelId echoes the selected route, not independent provider attestation.
       modelIdentityBasis: 'explicit-gateway-model-instance',
-      responseId: result.response.headers?.['x-vercel-id'] ?? null,
-      inputTokens: result.usage?.inputTokens ?? null,
-      outputTokens: result.usage?.outputTokens ?? null,
       authorityRef: approval.authorityRef,
     });
   };
