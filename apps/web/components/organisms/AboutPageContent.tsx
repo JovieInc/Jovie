@@ -32,7 +32,12 @@ export function AboutPageContent() {
           aria-hidden='true'
           className='marketing-hero-backdrop pointer-events-none absolute inset-0'
         />
-        <MarketingHero variant='left'>
+        <MarketingHero
+          variant='left'
+          testId='marketing-section-hero'
+          sectionVariant='left-none'
+          sectionOwner='apps/web/components/organisms/AboutPageContent.tsx'
+        >
           <p className='text-sm font-medium text-tertiary-token'>
             {ABOUT_COPY.kicker}
           </p>
@@ -46,7 +51,12 @@ export function AboutPageContent() {
       </div>
 
       <MarketingContainer width='page' className='pb-16'>
-        <section className='flex flex-col items-start gap-10 lg:flex-row lg:gap-16'>
+        <section
+          className='flex flex-col items-start gap-10 lg:flex-row lg:gap-16'
+          data-testid='marketing-section-content-prose'
+          data-marketing-variant='article-body'
+          data-marketing-owner='apps/web/components/organisms/AboutPageContent.tsx'
+        >
           <div className='min-w-0 max-w-prose flex-1'>
             <h2 className='text-2xl font-semibold text-primary-token'>
               {ABOUT_COPY.origin.heading}
@@ -80,7 +90,11 @@ export function AboutPageContent() {
       </MarketingContainer>
 
       <MarketingContainer width='prose' className='pb-16'>
-        <section>
+        <section
+          data-testid='marketing-section-feature-grid'
+          data-marketing-variant='two-column-text'
+          data-marketing-owner='apps/web/components/organisms/AboutPageContent.tsx'
+        >
           <h2 className='text-2xl font-semibold text-primary-token'>
             {ABOUT_COPY.featuresHeading}
           </h2>
@@ -107,10 +121,12 @@ export function AboutPageContent() {
 
       <FaqSection
         items={ABOUT_FAQ_ITEMS}
+        sectionVariant='objection-handler'
         headingClassName='text-2xl font-semibold tracking-tight text-primary-token'
       />
 
       <MarketingFooterCta
+        sectionVariant='final-single-claim'
         title='Ready to build your Jovie profile?'
         ctaAnalyticsEvent='about_footer_cta_start'
         ctaAnalyticsSource='about_page_footer'

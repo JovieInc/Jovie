@@ -5,6 +5,11 @@
 
 import * as Sentry from '@sentry/nextjs';
 import { NextRequest, NextResponse } from 'next/server';
+import { agentCheckoutCorrelation } from '@/lib/acquisition/agent-checkout-correlation';
+import {
+  FIRST_TOUCH_COOKIE,
+  openFirstTouchEnvelope,
+} from '@/lib/acquisition/first-touch-envelope';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { publicEnv } from '@/lib/env-public';
 import { captureCriticalError } from '@/lib/error-tracking';
@@ -145,6 +150,7 @@ export async function POST(request: NextRequest) {
     if (!userId) return jsonError('Unauthorized', 401);
 
     const parsedBody = await parseJsonBody<{
+      humanConfirmed?: unknown;
       priceId?: unknown;
       referralCode?: unknown;
       returnTo?: unknown;
@@ -172,9 +178,16 @@ export async function POST(request: NextRequest) {
       source: rawSource,
     } = parsedBody.data;
 
+    const envelope = await openFirstTouchEnvelope(
+      request.cookies.get(FIRST_TOUCH_COOKIE)?.value
+    );
+    if (envelope?.agentIntent && parsedBody.data.humanConfirmed !== true) {
+      return jsonError('Confirm the purchase before starting checkout', 400);
+    }
     let correlation;
     try {
       correlation = mergeCheckoutCorrelation(
+        agentCheckoutCorrelation(envelope),
         parseCheckoutCorrelation(parsedBody.data),
         parseCheckoutCorrelation({
           acquisitionId: request.cookies.get(ACQUISITION_COOKIE_NAME)?.value,
@@ -206,6 +219,9 @@ export async function POST(request: NextRequest) {
     }
 
     const priceDetails = getPriceMappingDetails(priceId);
+    if (envelope?.agentIntent && priceDetails?.plan !== 'pro') {
+      return jsonError('Invalid price for the selected offer', 400);
+    }
     logger.info('Creating checkout session for:', {
       userId,
       priceId,

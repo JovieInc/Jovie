@@ -46,11 +46,27 @@ export interface Blocker {
   readonly lease?: LeaseRecord;
 }
 
+/** A documented target, never evidence that the capability is implemented. */
+export interface DocumentedContract {
+  readonly family: string;
+  readonly ownerIssue: string;
+  readonly implementationIssue: string;
+  readonly queryParameters: readonly string[];
+  readonly source: {
+    readonly url: string;
+    readonly version: string;
+    readonly retrievedOn: string;
+    readonly sha256: string;
+  };
+  readonly caveat?: string;
+}
+
 export interface ParityRow {
   readonly id: string;
   readonly vendor: ParityVendor;
   readonly capability: string;
   readonly docUrl: string;
+  readonly contract?: DocumentedContract;
   readonly status: ParityStatus;
   readonly evidence?: Evidence;
   readonly blocker?: Blocker;
@@ -87,5 +103,6 @@ export interface CatalogEntry {
   readonly vendor: ParityVendor;
   readonly capability: string;
   readonly docUrl: string;
+  readonly contract?: DocumentedContract;
   readonly admission: CatalogAdmission;
 }

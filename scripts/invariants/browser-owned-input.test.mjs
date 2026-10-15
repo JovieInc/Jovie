@@ -13,7 +13,10 @@ import {
   transitionFindings,
 } from './browser-owned-input.mjs';
 import { auditScreens, remediationPlans } from './screen-audit.mjs';
-import { evaluateScreenProof } from './screen-certification.mjs';
+import {
+  evaluateScreenProof,
+  SCREEN_REGISTRY,
+} from './screen-certification.mjs';
 
 const HEAD = 'a'.repeat(40);
 const screenId = 'web.public-profile';
@@ -479,6 +482,53 @@ test('artist pay owes browser-owned email evidence only when its surface hosts t
   );
 });
 
+const SETTINGS_BILLING_SOURCES = [
+  'apps/web/app/app/(shell)/settings/billing/page.tsx',
+  'apps/web/components/features/dashboard/organisms/SettingsBillingSection.tsx',
+];
+
+test('settings billing owes payment-tip evidence only when its surface hosts an email field', () => {
+  const hosted = SETTINGS_BILLING_SOURCES.some(path =>
+    BROWSER_EMAIL_FIELD.test(readFileSync(path, 'utf8'))
+  );
+  const bound = INPUT_MATRIX.journeys.some(
+    journey =>
+      journey.id === 'payment-tip' &&
+      journey.screens.includes('web.settings-billing')
+  );
+  assert.equal(bound, hosted);
+  if (hosted) return;
+  assert.deepEqual(inputCells('web.settings-billing'), []);
+  assert.deepEqual(
+    browserInputFindings(undefined, {
+      screenId: 'web.settings-billing',
+      headSha: HEAD,
+    }),
+    []
+  );
+  const billing = auditScreens({
+    registry: [
+      {
+        id: 'web.settings-billing',
+        platform: 'web',
+        owner: 'screen.settings.billing',
+        sources: SETTINGS_BILLING_SOURCES,
+        viewports: ['desktop', 'mobile'],
+      },
+    ],
+    headSha: HEAD,
+  });
+  assert.equal(billing.screens[0].producer, 'none');
+  assert.equal(billing.screens[0].verdict, 'uncovered');
+  assert.deepEqual(billing.screens[0].findings, []);
+  assert.equal(
+    remediationPlans(billing).some(
+      plan => plan.fingerprint === 'screen-audit:web.settings-billing'
+    ),
+    false
+  );
+});
+
 const ARTIST_PROFILE_SETTINGS_ROOTS = [
   'apps/web/app/app/(shell)/settings/profile',
   'apps/web/app/app/(shell)/settings/artist-profile',
@@ -661,4 +711,107 @@ test('web auth device cells follow fields the auth routes actually host', () => 
   assert.equal(plan.description.includes('auth-passkey/'), false);
   assert.equal(plan.description.includes('auth-email/'), true);
   assert.equal(plan.description.includes('auth-otp/'), true);
+});
+
+const HOSTED_TEL_FIELD =
+  /(?:type|autoComplete|autocomplete|inputMode|inputmode)\s*=\s*['"]tel['"]/;
+
+test('settings shell owes account-contact cells only when it hosts email and tel', () => {
+  const screen = SCREEN_REGISTRY.find(entry => entry.id === 'web.settings');
+  assert.ok(screen);
+  const sources = screen.sources.map(path => readFileSync(path, 'utf8'));
+  const hosted =
+    sources.some(source => HOSTED_EMAIL_FIELD.test(source)) &&
+    sources.some(source => HOSTED_TEL_FIELD.test(source));
+  const bound = INPUT_MATRIX.journeys.some(
+    journey =>
+      journey.id === 'account-contact' &&
+      journey.screens.includes('web.settings')
+  );
+  assert.equal(bound, hosted);
+  const accountContact = browserInputFindings(undefined, {
+    screenId: 'web.settings',
+    headSha: HEAD,
+  }).filter(finding => finding.includes('account-contact/'));
+  if (hosted) {
+    assert.equal(accountContact.length, 16);
+    assert.ok(accountContact.every(isMissingDeviceEvidence));
+    return;
+  }
+  assert.deepEqual(accountContact, []);
+  assert.equal(
+    inputCells('web.settings').some(cell =>
+      cell.id.startsWith('account-contact/')
+    ),
+    false
+  );
+  const settings = auditScreens({
+    registry: [screen],
+    headSha: HEAD,
+  });
+  assert.equal(settings.screens[0].producer, 'none');
+  assert.equal(settings.screens[0].verdict, 'uncovered');
+  assert.deepEqual(settings.screens[0].findings, []);
+  assert.equal(
+    remediationPlans(settings).some(
+      plan => plan.fingerprint === 'screen-audit:web.settings'
+    ),
+    false
+  );
+});
+
+const BROWSER_CONTACT_FIELD =
+  /(?:type|autoComplete|autocomplete|inputMode|inputmode)\s*=\s*['"](?:email|tel)['"]/;
+
+function filesUnder(source) {
+  if (!existsSync(source)) return [];
+  let entries;
+  try {
+    entries = readdirSync(source, { withFileTypes: true });
+  } catch {
+    return [source];
+  }
+  return entries.flatMap(entry => {
+    const path = join(source, entry.name);
+    return entry.isDirectory() ? filesUnder(path) : [path];
+  });
+}
+
+test('dashboard contacts owes account-contact evidence only when its surface hosts email or phone inputs', () => {
+  const screen = SCREEN_REGISTRY.find(
+    item => item.id === 'web.dashboard-contacts'
+  );
+  assert.ok(screen);
+  const hosted = screen.sources
+    .flatMap(filesUnder)
+    .some(path => BROWSER_CONTACT_FIELD.test(readFileSync(path, 'utf8')));
+  const bound = INPUT_MATRIX.journeys.some(
+    journey =>
+      journey.id === 'account-contact' &&
+      journey.fields.some(field => field === 'email' || field === 'tel') &&
+      journey.screens.includes('web.dashboard-contacts')
+  );
+  assert.equal(bound, hosted);
+  if (hosted) return;
+  assert.deepEqual(inputCells('web.dashboard-contacts'), []);
+  assert.deepEqual(
+    browserInputFindings(undefined, {
+      screenId: 'web.dashboard-contacts',
+      headSha: HEAD,
+    }),
+    []
+  );
+  const ledger = auditScreens({
+    registry: [screen],
+    headSha: HEAD,
+  });
+  assert.equal(ledger.screens[0].producer, 'none');
+  assert.equal(ledger.screens[0].verdict, 'uncovered');
+  assert.deepEqual(ledger.screens[0].findings, []);
+  assert.equal(
+    remediationPlans(ledger).some(
+      plan => plan.fingerprint === 'screen-audit:web.dashboard-contacts'
+    ),
+    false
+  );
 });

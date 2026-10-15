@@ -19,7 +19,9 @@ stale builds, incomplete provenance) still fail emission and certification.
 Web auth email and one-time-code entry stay gated rather than excluded.
 Password and passkey cells attach only when a web.auth source hosts the
 declared input. AuthShell is passwordless, and passkey entry is a button
-chooser, so those journeys do not generate device cells. Native auth
+chooser, so those journeys do not generate device cells. The settings shell
+(`web.settings`, `settings/layout.tsx`) does not host an email or telephone
+input, so account-contact cells do not attach to that screen. Native auth
 ownership stays with its native suite. A resting screenshot or synthetic fill
 cannot satisfy the browser-owned input dimension. Device evidence does not
 bypass the existing immutable GitHub artifact/provenance resolver. Device

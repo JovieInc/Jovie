@@ -12,7 +12,9 @@ export function SupportPageContent() {
       <MarketingHero
         variant='unstyled'
         headingId='support-hero-heading'
-        testId='support-hero'
+        testId='marketing-section-hero'
+        sectionVariant='left-none'
+        sectionOwner='apps/web/components/organisms/SupportPageContent.tsx'
         className='marketing-hero-dock marketing-hero-dock--inset relative w-full overflow-hidden pt-20 pb-16 sm:pt-24 sm:pb-24 lg:pt-28 lg:pb-32'
       >
         <div className='marketing-route-hero__media' aria-hidden='true'>

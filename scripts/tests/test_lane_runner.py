@@ -30,6 +30,11 @@ from types import SimpleNamespace
 
 os.environ["LANES_EXECUTION_BACKEND"] = "local-test"
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "scripts/lanes"))
+import git_housekeeping  # noqa: E402
+
+git_housekeeping.install_process_fixture_env()
+git_housekeeping.install_isolated_tempdirs()
 SPEC = importlib.util.spec_from_file_location("lane_runner", ROOT / "scripts/lanes/lane_runner.py")
 lane = importlib.util.module_from_spec(SPEC)
 sys.modules["lane_runner"] = lane
@@ -655,8 +660,10 @@ class DependencyOnlyGateTest(unittest.TestCase):
                    "headRefName": "dependabot/npm_and_yarn/radix-tabs", "labels": [], "state": "OPEN"}
 
     def git(self, *args):
+        # Fixture commits must not detach maintenance. The structural lane runs
+        # Git 2.55, whose default is to keep writing `.git/objects` after commit returns.
         return subprocess.run(["git", *args], cwd=self.repo, check=True, capture_output=True,
-                              text=True).stdout.strip()
+                              text=True, env=git_housekeeping.apply_fixture_env(os.environ)).stdout.strip()
 
     def write(self, path, value):
         target = self.repo / path
@@ -4135,7 +4142,8 @@ class WorktreePublicationTest(unittest.TestCase):
 
     def git(self, cwd, *args):
         return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True,
-                              check=True, timeout=10).stdout.strip()
+                              check=True, timeout=10,
+                              env=git_housekeeping.apply_fixture_env(os.environ)).stdout.strip()
 
     def candidate(self, *, detached=False, unpublished=True):
         args = ["--detach"] if detached else ["-b", "candidate"]
@@ -6294,6 +6302,11 @@ class UpdateTest(unittest.TestCase):
             env = lane.selftest_env(Path("/scratch"))
         self.assertFalse(set(knobs) & set(env))
         self.assertEqual((env["PATH"], env["LANES_SELFTEST"], env["LANES_STATE"]), ("/bin", "1", "/scratch"))
+        pairs = [(env[f"GIT_CONFIG_KEY_{i}"], env[f"GIT_CONFIG_VALUE_{i}"])
+                 for i in range(int(env["GIT_CONFIG_COUNT"]))]
+        self.assertIn(("maintenance.auto", "false"), pairs)
+        self.assertIn(("maintenance.autoDetach", "false"), pairs)
+        self.assertIn(("gc.auto", "0"), pairs)
 
     def test_release_selftest_never_sees_host_credentials_or_home(self):
         secrets = {"GH_TOKEN": "ghs_live", "GITHUB_TOKEN": "ghs_live", "LINEAR_API_KEY": "lin_live",
