@@ -18,6 +18,17 @@ import {
   reviewPostmortem,
 } from './postmortem-review.mjs';
 
+/**
+ * @typedef {{
+ *   on: {
+ *     schedule?: { cron: string }[],
+ *     push?: { paths: string[] },
+ *     repository_dispatch?: { types: string[] }
+ *   },
+ *   jobs: Record<string, { steps: { run?: string }[] }>
+ * }} LearningWorkflow
+ */
+
 const REPO_ROOT = resolve(import.meta.dirname, '..');
 const TARGET_PATH = 'docs/postmortems/2026-09-26-production-freeze.md';
 
@@ -345,10 +356,12 @@ test('GBrain mirror buffers a tool-level write failure', async () => {
 });
 
 test('shipping SLO retains monitoring while only evidence events run post-mortem review', () => {
-  const shipping = yamlLoad(
-    readFileSync(
-      resolve(REPO_ROOT, '.github/workflows/shipping-slo.yml'),
-      'utf8'
+  const shipping = /** @type {LearningWorkflow} */ (
+    yamlLoad(
+      readFileSync(
+        resolve(REPO_ROOT, '.github/workflows/shipping-slo.yml'),
+        'utf8'
+      )
     )
   );
   assert.deepEqual(shipping.on.schedule, [{ cron: '13 7 * * *' }]);
@@ -361,10 +374,12 @@ test('shipping SLO retains monitoring while only evidence events run post-mortem
     commands,
     /postmortem|quality-gap-finder|lesson-analysis|invariant-stewardship/
   );
-  const quality = yamlLoad(
-    readFileSync(
-      resolve(REPO_ROOT, '.github/workflows/quality-gap-finder.yml'),
-      'utf8'
+  const quality = /** @type {LearningWorkflow} */ (
+    yamlLoad(
+      readFileSync(
+        resolve(REPO_ROOT, '.github/workflows/quality-gap-finder.yml'),
+        'utf8'
+      )
     )
   );
   assert.equal(quality.on.schedule, undefined);
