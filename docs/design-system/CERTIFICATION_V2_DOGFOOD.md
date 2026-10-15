@@ -127,6 +127,87 @@ one outcome a real user needs ("claim a smart link and see it resolve"), not an
 implementation step. `certify_feature` already drafts outcome-level missions from
 the profile capability inventory. v2 uses that as the proposer.
 
+### Outcome missions and friction (JOV-7200)
+
+The material surface denominator is the nine existing
+[`CANONICAL_SURFACES`](../../apps/web/lib/canonical-surfaces.ts) identities;
+each now owns an `outcomeMission`. The seven material user journeys in the
+[assurance matrix](../../scripts/invariants/assurance-matrix.json)
+(`scope.requiredObjects`, kind `user-journey`) also own outcome missions,
+including signup, billing, chat and publishing. These are mission metadata on
+existing identities, not another registry. Coverage tests reject missing missions.
+A definition is a customer persona, goal, observable success criteria, revision,
+and friction budget. `certify_feature` accepts a canonical surface ID (for
+example `public-profile`) and returns its `outcome_mission`; it still drafts
+rather than executes the mission. Identity assurance profiles pass those full
+mission definitions to the existing reliability evaluator/metrics input.
+
+Give an autonomous runner the goal, starting account/artist, constraints and
+success criteria. Let it choose its route, questions and recovery. Do not supply
+a selector sequence, expected click order or hints that hide discoverability
+problems. Use a provisioned test identity and real catalog; choose the same
+mission on web, native or an agent surface according to the identity's existing
+assurance profile. Record the actual driver. Browser agents use Playwright;
+using Playwright as a tool does not make a prescribed script outcome proof.
+Money missions use provider test mode. Reversible writes record undo evidence;
+notification missions verify saved consent without sending a real notification.
+Fixtures and deterministic tests validate this contract, not live usability.
+
+`dogfoodReceiptFromOutcomeMission` emits the existing
+`jovie.dogfood-receipt/v1`, with an additive `missionObservation` block:
+
+- `purpose`: `capability` explores whether a customer can accomplish a goal well;
+  `regression` replays an accepted invariant or known failure.
+- `method`: `goal_driven` or `scripted`. Only goal-driven capability observations
+  count toward outcome reliability. Aggregate Playwright/XCUITest/command
+  adapters remain regression evidence and never synthesize observations.
+- `goalCompletion`, `correctness`, `resultingState`, and `checks`: each success
+  criterion has a verdict and nonempty evidence refs (state readback, trace,
+  screenshot or provider receipt). State and correctness must be observed;
+  test counts, exit codes and the runner's completion claim cannot replace them.
+- `friction`: an independent acceptable/unacceptable judgment with details for
+  unacceptable friction, including confusion, excess navigation, misleading
+  feedback or manual workarounds even when the goal was achieved.
+- `recovery`: retries plus recovery details; zero retries is explicit.
+- `durationMs`: must equal the receipt's start/end interval. `resources` reports
+  measured usage and USD cost, or a reason they are not applicable/unavailable.
+  Unavailable applicable usage is retained but cannot certify the mission.
+- `missionRevision` plus the receipt's exact full source SHA, deployment ID,
+  environment, cohort and evidence refs bind the attempt to its target. Bumping
+  the mission revision invalidates prior proof under the revised definition.
+
+A goal can be **completed with unacceptable friction**: completion remains
+`completed`, friction is `unacceptable`, and the certification outcome is
+`failed`. Incorrect/unverified results, missing criterion proof, excessive
+latency/retries/cost, scripted runs and regression observations also cannot
+certify an outcome. The evaluator rechecks the observation against the mission
+requirements, even if a producer labels the outer receipt `passed`. A newer
+failed attempt stays in the reliability window; it cannot be discarded by
+filtering for successes. No required missions means no machine certification.
+The existing v2 machine-certifiable coverage and kind coverage consume these
+same receipts. Driver reliability retains
+execution pass rate on known-good builds as a separate regression signal; it
+does not establish customer outcome proof. This adds no queue, storage,
+controller, scheduled execution or certification authority. The server metrics
+adapter still reports unconnected dogfood inputs truthfully; this contract does
+not claim a live receipt store or a live dogfood run.
+
+When a capability meets the existing exact-deploy reliability rule, preserve
+its established behavior as regression coverage: add the observed invariant or
+failure/recovery case to the surface's existing Vitest/Playwright/native suite,
+link the originating mission receipt and state evidence in that change, and
+verify the test fails on the known broken state. Keep the outcome mission for
+open-ended discovery of the next improvement. Regression runs preserve standards;
+they never replace the capability mission or inflate its confidence.
+
+Ship now: public read goals allow 2 minutes, other canonical goals 3 minutes,
+and cross-surface journeys 5 minutes; all allow at most one recovery retry.
+Qualitative unacceptable friction fails regardless of those ceilings.
+Re-evaluate when: 30 days of exact-deploy receipts show false acceptance or
+rejection against observed customer friction. Then: revise the affected mission's
+budget and revision using those receipts. These are initial ceilings, not
+measured claims about current product performance.
+
 **Reliability rule (the "cannot reliably do the job" test).** An agent kind
 counts for a mission only if it passes the mission on the exact deploy:
 

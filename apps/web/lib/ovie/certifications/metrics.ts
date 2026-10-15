@@ -17,6 +17,7 @@ import {
   type DogfoodMissionSpec,
   type DogfoodProduct,
   type DogfoodReceipt,
+  dogfoodReceiptProvesOutcome,
   evaluateDogfoodReliability,
 } from '@/lib/agent-os/dogfood-receipt';
 import {
@@ -366,7 +367,12 @@ function dogfoodKindCoverage(facts: ScopeFacts): MetricValue {
         .filter(
           receipt =>
             receipt.subjectId === subject.id &&
-            receipt.outcome === 'passed' &&
+            dogfoodReceiptProvesOutcome(
+              receipt,
+              subject.requiredMissions.find(
+                mission => mission.id === receipt.missionId
+              )
+            ) &&
             (subject.deploy === null ||
               (receipt.commitSha === subject.deploy.commitSha &&
                 receipt.deploymentId === subject.deploy.deploymentId))
@@ -393,6 +399,7 @@ function driverReliability(
     if (!knownGood.has(receipt.deploymentId)) continue;
     const bucket = byDriver.get(receipt.driver) ?? { passed: 0, total: 0 };
     bucket.total += 1;
+    // Execution reliability is a regression signal, separate from outcome confidence.
     if (receipt.outcome === 'passed') bucket.passed += 1;
     byDriver.set(receipt.driver, bucket);
   }

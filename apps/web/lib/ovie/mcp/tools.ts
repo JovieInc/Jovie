@@ -1,3 +1,4 @@
+import { CANONICAL_SURFACES } from '@/lib/canonical-surfaces';
 import {
   getOvieBoundedApproval,
   OVIE_APPROVAL_ACTIONS,
@@ -830,13 +831,17 @@ function certifyFeature(args: Record<string, unknown>) {
     typeof args.feature === 'string' ? args.feature : 'public-profile';
   const inventory = loadProfileCapabilitiesFromDisk();
   const match = findProfileCapability(inventory, query);
+  const surface = CANONICAL_SURFACES.find(surface => surface.id === query);
   const spec =
+    surface?.outcomeMission.outcome.goal ??
     match?.proposedMission ??
     'Draft an outcome-level mission: a real user path must succeed; implementation details are not enough.';
   return {
     feature: query,
     executed_live_mission: false,
     money_path_executed: false,
+    outcome_mission: surface?.outcomeMission ?? null,
+    receipt_contract: 'jovie.dogfood-receipt/v1',
     spec,
     passes: certificationPasses(spec),
     current_level: match?.certLevel ?? 'discovered',
