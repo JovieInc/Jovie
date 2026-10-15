@@ -414,6 +414,9 @@ importers:
       '@jovie/extension-contracts':
         specifier: workspace:*
         version: link:../../packages/extension-contracts
+      '@jovie/release-channel-contracts':
+        specifier: workspace:*
+        version: link:../../packages/release-channel-contracts
       '@jovie/ui':
         specifier: workspace:*
         version: link:../../packages/ui
