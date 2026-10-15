@@ -400,10 +400,10 @@ export function SidebarThreadsSection({
             <Button
               type='button'
               variant='ghost'
-              size='icon'
+              size='icon-xs'
               aria-label='New Chat'
               onClick={onNewThread}
-              className='relative flex size-6 shrink-0 items-center justify-center rounded-md text-sidebar-muted hover:bg-sidebar-accent hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring after:absolute after:-inset-2.5 after:lg:hidden'
+              className='relative flex shrink-0 items-center justify-center rounded-md text-sidebar-muted hover:bg-sidebar-accent hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
             >
               <Icon name='Plus' className='size-3.5' aria-hidden='true' />
             </Button>

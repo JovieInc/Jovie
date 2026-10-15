@@ -296,7 +296,12 @@ describe('SidebarThreadsSection', () => {
       name: 'New Chat',
     });
 
-    expect(newThreadButton).toHaveClass('size-6');
+    expect(newThreadButton).toHaveClass(
+      'h-6',
+      'w-6',
+      'before:h-11',
+      'before:w-11'
+    );
     expect(newThreadButton.parentElement).toHaveAttribute(
       'data-sidebar-history-header'
     );
