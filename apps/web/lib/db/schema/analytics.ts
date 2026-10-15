@@ -322,6 +322,7 @@ export const clickEvents = pgTable(
     country: text('country'),
     city: text('city'),
     deviceType: text('device_type'),
+    /** OS family for click analytics; null when detection is unavailable. */
     os: text('os'),
     browser: text('browser'),
     isBot: boolean('is_bot').notNull().default(false),

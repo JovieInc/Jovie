@@ -94,6 +94,7 @@ describe('getUserDashboardAnalytics view metrics', () => {
           top_countries: [],
           top_referrers: [],
           top_links: [],
+          top_operating_systems: JSON.stringify([{ os: 'iOS', count: '12' }]),
         },
       ],
     });
@@ -107,6 +108,9 @@ describe('getUserDashboardAnalytics view metrics', () => {
       'traffic'
     );
 
+    expect(result).toHaveProperty('top_operating_systems', [
+      { os: 'iOS', count: 12 },
+    ]);
     expect(result.profile_views).toBe(150);
     expect(result.unique_views).toBe(62);
     expect(result.unique_views).toBeLessThanOrEqual(result.profile_views);
@@ -141,6 +145,7 @@ describe('getUserDashboardAnalytics view metrics', () => {
     const result = await getUserDashboardAnalytics('user_123', '7d', 'full');
 
     expect(result.unique_views).toBeLessThanOrEqual(result.profile_views);
+    expect(result).toHaveProperty('top_operating_systems', []);
   });
 });
 
