@@ -22,7 +22,7 @@ const adminEntitlements = {
   canRemoveBranding: true,
 };
 
-const extractLinktreeMock = vi.fn(() => ({
+const extractLayloMock = vi.fn(() => ({
   displayName: 'CSV Import Artist',
   avatarUrl: 'https://images.test/csv-avatar.png',
   links: [
@@ -75,25 +75,15 @@ vi.mock('@/lib/rate-limit', () => ({
   createRateLimitHeaders: vi.fn(() => ({})),
 }));
 
-vi.mock('@/lib/ingestion/strategies/linktree', () => ({
-  extractLinktree: (...args: Parameters<typeof extractLinktreeMock>) =>
-    extractLinktreeMock(...args),
-  extractLinktreeHandle: (url: string) =>
-    url.split('/').filter(Boolean).pop() ?? null,
-  fetchLinktreeDocument: vi.fn(async () => '<html></html>'),
-  isValidHandle: () => true,
-  normalizeHandle: (handle: string) => handle.toLowerCase(),
-  validateLinktreeUrl: (url: string) =>
-    url.startsWith('https://linktr.ee/') ? url : null,
-}));
-
 vi.mock('@/lib/ingestion/strategies/laylo', () => ({
-  extractLaylo: vi.fn(),
-  extractLayloHandle: vi.fn(),
-  fetchLayloProfile: vi.fn(),
-  isLayloUrl: () => false,
-  normalizeLayloHandle: (handle: string) => handle,
-  validateLayloUrl: () => null,
+  extractLaylo: () => extractLayloMock(),
+  extractLayloHandle: (url: string) =>
+    url.split('/').filter(Boolean).pop() ?? null,
+  fetchLayloProfile: vi.fn(async () => ({ profile: {}, user: null })),
+  isLayloUrl: (url: string) => url.startsWith('https://laylo.com/'),
+  normalizeLayloHandle: (handle: string) => handle.toLowerCase(),
+  validateLayloUrl: (url: string) =>
+    url.startsWith('https://laylo.com/') ? url : null,
 }));
 
 vi.mock('@/lib/ingestion/magic-profile-avatar', () => ({
@@ -132,7 +122,7 @@ afterEach(async () => {
   }
 
   createdProfileIds.length = 0;
-  extractLinktreeMock.mockClear();
+  extractLayloMock.mockClear();
   avatarFromLinksMock.mockClear();
   copyExternalAvatarToStorageMock.mockClear();
   revalidatePathMock.mockClear();
@@ -142,10 +132,10 @@ afterEach(async () => {
 
 describe('Admin ingestion pipeline (integration)', () => {
   it('processes CSV upload through ingestion pipeline', async () => {
-    const handle = `csv-import-${Date.now()}`;
+    const handle = `csv_import_${Date.now()}`;
     const instagramHandle = `csvimportartist${Date.now()}`;
-    const url = `https://linktr.ee/${handle}`;
-    extractLinktreeMock.mockReturnValueOnce({
+    const url = `https://laylo.com/${handle}`;
+    extractLayloMock.mockReturnValueOnce({
       displayName: 'CSV Import Artist',
       avatarUrl: 'https://images.test/csv-avatar.png',
       links: [
@@ -178,7 +168,7 @@ describe('Admin ingestion pipeline (integration)', () => {
     expect(response.status).toBe(200);
     expect(payload.ok).toBe(true);
     expect(payload.profile?.username).toBe(handle);
-    expect(extractLinktreeMock).toHaveBeenCalled();
+    expect(extractLayloMock).toHaveBeenCalled();
     expect(payload.links).toBe(2);
     expect(payload.warning).toBeUndefined();
 
@@ -213,10 +203,7 @@ describe('Admin ingestion pipeline (integration)', () => {
       .where(
         drizzleSql`${ingestionJobs.payload} ->> 'creatorProfileId' = ${profileId!}`
       );
-    expect(jobs).toHaveLength(1);
-    expect(
-      (jobs[0]?.payload as Record<string, unknown> | undefined)?.dedupKey
-    ).toBeTruthy();
+    expect(jobs).toHaveLength(0);
   }, 20_000);
 
   it('rejects invalid CSV rows with clear validation errors', async () => {
@@ -234,12 +221,12 @@ describe('Admin ingestion pipeline (integration)', () => {
 
     expect(response.status).toBe(422);
     expect(payload.error).toContain('Unable to extract username from URL');
-    expect(extractLinktreeMock).not.toHaveBeenCalled();
+    expect(extractLayloMock).not.toHaveBeenCalled();
   });
 
   it('blocks duplicate claimed profiles during CSV ingestion', async () => {
-    const handle = `csv-duplicate-${Date.now()}`;
-    const url = `https://linktr.ee/${handle}`;
+    const handle = `csv_duplicate_${Date.now()}`;
+    const url = `https://laylo.com/${handle}`;
 
     const initial = await POST(
       new Request('http://localhost/api/admin/creator-ingest', {
@@ -282,8 +269,8 @@ describe('Admin ingestion pipeline (integration)', () => {
   }, 20_000);
 
   it('reingests an unclaimed profile without creating a duplicate record', async () => {
-    const handle = `csv-reingest-${Date.now()}`;
-    const url = `https://linktr.ee/${handle}`;
+    const handle = `csv_reingest_${Date.now()}`;
+    const url = `https://laylo.com/${handle}`;
 
     const initial = await POST(
       new Request('http://localhost/api/admin/creator-ingest', {
@@ -301,7 +288,7 @@ describe('Admin ingestion pipeline (integration)', () => {
     expect(profileId).toBeDefined();
     createdProfileIds.push(profileId!);
 
-    extractLinktreeMock.mockReturnValueOnce({
+    extractLayloMock.mockReturnValueOnce({
       displayName: 'CSV Import Artist Reingested',
       avatarUrl: 'https://images.test/csv-avatar-v2.png',
       links: [

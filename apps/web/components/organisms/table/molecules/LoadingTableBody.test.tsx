@@ -37,4 +37,23 @@ describe('LoadingTableBody', () => {
       textCell.querySelector('.system-b-table-skeleton-person-face')
     ).toBeNull();
   });
+
+  it('applies a schema column class to the matching skeleton cell', () => {
+    const { container } = render(
+      <table>
+        <LoadingTableBody
+          rows={1}
+          columns={2}
+          columnConfig={[
+            { variant: 'text', className: 'schema-name-col' },
+            { variant: 'text' },
+          ]}
+        />
+      </table>
+    );
+
+    const [nameCell, otherCell] = container.querySelectorAll('td');
+    expect(nameCell).toHaveClass('schema-name-col');
+    expect(otherCell).not.toHaveClass('schema-name-col');
+  });
 });
