@@ -8,8 +8,16 @@
   "inputs": {
     "fix": ["pr", "rendered_context"],
     "handoff": ["previous_prompt", "handoff_note"],
-    "issue": ["issue", "gbrain", "branch"],
+    "issue": ["issue", "gbrain", "branch", "prior_attempts"],
     "sensitive-review": ["pr", "review_contract"]
+  },
+  "priorAttempts": {
+    "ledgerTailBytes": 262144,
+    "maxChars": 6500,
+    "maxComments": 5,
+    "maxRuns": 4,
+    "missing": "explicit unavailable markers; never evidence of no prior fix",
+    "sources": ["Linear issue comments", "runs/ledger.jsonl"]
   },
   "receipt": {
     "binding": [

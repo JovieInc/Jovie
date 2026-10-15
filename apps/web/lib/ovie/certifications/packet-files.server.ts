@@ -16,11 +16,15 @@ export const CERTIFICATION_PACKET_FILE_SCHEMA =
 
 /** Domains whose certification items arrive as committed packet files. */
 export const PACKET_FILE_DOMAINS = [
+  'company',
+  'design_system',
   'flows',
+  'icps',
+  'lyb',
+  'marketing',
+  'outcomes',
   'public_profiles',
   'smart_links',
-  'marketing',
-  'lyb',
 ] as const satisfies readonly OvieCertificationDomainId[];
 
 export type PacketFileDomain = (typeof PACKET_FILE_DOMAINS)[number];
@@ -38,6 +42,7 @@ const LINK_KINDS = new Set<OvieCertificationLinkKind>([
 export interface CertificationPacketFile {
   readonly domain: OvieCertificationDomainId;
   readonly surface: string;
+  readonly owner?: string | null;
   readonly packetUpdatedAt: string;
   readonly links: readonly OvieCertificationLink[];
   readonly packet: CertificationReviewPacket;
@@ -107,6 +112,14 @@ export function parseCertificationPacketFile(
   ) {
     return 'packetUpdatedAt must be an ISO timestamp.';
   }
+  if (
+    raw.owner != null &&
+    (typeof raw.owner !== 'string' ||
+      !raw.owner.trim() ||
+      raw.owner.length > 160)
+  ) {
+    return 'owner must be a non-empty string of at most 160 characters or null.';
+  }
   const links = parseLinks(raw.links);
   if (!links) return 'links must be an array of {label, href, kind}.';
   if (!isCertificationReviewPacket(raw.packet)) {
@@ -118,6 +131,7 @@ export function parseCertificationPacketFile(
   return {
     domain: raw.domain,
     surface: raw.surface.trim(),
+    owner: typeof raw.owner === 'string' ? raw.owner.trim() : null,
     packetUpdatedAt: new Date(raw.packetUpdatedAt).toISOString(),
     links,
     packet: raw.packet,

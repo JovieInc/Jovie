@@ -1124,6 +1124,14 @@ jobs:
           fetch-depth: 0
           token: ${{ steps.app-token.outputs.token }}
 
+      - name: Checkout trusted origin policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          path: origin-policy
+          persist-credentials: false
+          sparse-checkout: scripts/lanes
+
       - name: Create deterministic desktop release stamp PR
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -1233,8 +1241,19 @@ jobs:
 
           EOF
           )")"
+          python3 origin-policy/scripts/shipping_origin.py emit-automation \
+            --pr "$pr_url" --head-sha "$(git rev-parse HEAD)"
           gh pr edit "$pr_url" --add-label "merge-queue"
           echo "Opened deterministic desktop release stamp PR: $pr_url"
+
+      - name: Retain immutable origin payload
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: shipping-origin-v1
+          path: ${{ runner.temp }}/shipping-origin/*.json
+          if-no-files-found: ignore
+          retention-days: 30
 
   build:
     name: ${{ needs.authorize-release.outputs.environment == 'staging' && 'Publish staging desktop prerelease' || 'Publish production desktop release' }}

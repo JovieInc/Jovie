@@ -1117,6 +1117,8 @@ jobs:
 
           if [ -n "$EXISTING_PR" ]; then
             echo "Updated existing PR #$EXISTING_PR via force-push"
+            python3 scripts/shipping_origin.py emit-automation \
+              --pr "$EXISTING_PR" --head-sha "$(git rev-parse HEAD)"
             if hold_screenshot_merge_queue; then
               exit 0
             fi
@@ -1125,11 +1127,22 @@ jobs:
             PR_URL=$(gh pr create \
               --title "chore: update product screenshots" \
               --body "Auto-generated screenshot update triggered by ${GITHUB_SHA::8}.")
+            python3 scripts/shipping_origin.py emit-automation \
+              --pr "$PR_URL" --head-sha "$(git rev-parse HEAD)"
             if hold_screenshot_merge_queue; then
               exit 0
             fi
             echo "Opened $PR_URL. Native autoenroll owns queue mutation; the merge-queue label is retired."
           fi
+
+      - name: Retain immutable origin payload
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: shipping-origin-v1
+          path: ${{ runner.temp }}/shipping-origin/*.json
+          if-no-files-found: ignore
+          retention-days: 30
 
   certify:
     name: Certify Screenshots
