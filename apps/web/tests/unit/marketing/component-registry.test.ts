@@ -1506,9 +1506,7 @@ it('binds priority pages and acquisition occurrences to their declared variant o
     '/youtube-thumbnails',
   ]) {
     const route = MARKETING_ROUTE_MANIFEST.find(entry => entry.url === url)!;
-    expect(route.bindingEvidence.status).toBe(
-      url === '/youtube-thumbnails' ? 'unverified' : 'verified'
-    );
+    expect(route.bindingEvidence.status).toBe('verified');
     for (const binding of route.renderedSections) {
       expect(binding.kind).toBe('approved-section');
       if (binding.kind !== 'approved-section')
