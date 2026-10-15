@@ -12,6 +12,7 @@ import {
   HomepageLogoStrip,
 } from '@/components/homepage/HomepageLogoStrip';
 import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
+import { HOMEPAGE_YOUTUBE_MVP } from '@/data/homepageYoutubeMvp';
 import { permittedLogoAssetIds } from '@/data/product-truth/logo-permissions';
 
 vi.mock('@/lib/flags/homepage-v3', () => ({ HOMEPAGE_V3_ENABLED: true }));
@@ -29,6 +30,15 @@ vi.mock('next/navigation', async importOriginal => ({
   useRouter: () => ({ push: vi.fn(), prefetch: vi.fn() }),
   usePathname: () => '/',
   useSearchParams: () => new URLSearchParams(),
+}));
+vi.mock('@/lib/queries/useArtistSearchQuery', () => ({
+  useArtistSearchQuery: () => ({
+    results: [],
+    state: 'idle',
+    search: vi.fn(),
+    searchImmediate: vi.fn(),
+    clear: vi.fn(),
+  }),
 }));
 vi.mock('next/image', () => ({
   default: (props: Record<string, unknown>) => {
@@ -82,19 +92,17 @@ describe('homepage anatomy contract', { timeout: 60_000 }, () => {
     // Hero and close carry the one jov.ie/you claim action.
     expect(within(hero).getByRole('heading', { level: 1 })).toBeInTheDocument();
     for (const region of [hero, close]) {
-      expect(within(region).getByRole('textbox')).toHaveAttribute(
+      expect(within(region).getByRole('combobox')).toHaveAttribute(
         'placeholder',
-        HOMEPAGE_IDENTITY_COPY.hero.claim.placeholder
+        HOMEPAGE_YOUTUBE_MVP.search.placeholder
       );
     }
 
     // Removing the FAQ also removes its schema and leaves no empty slot.
     expect(screen.queryByTestId('marketing-section-faq')).toBeNull();
-    const structure = container.querySelector(
-      '[data-homepage-testid="homepage-section-structure"]'
-    );
-    expect(structure).not.toBeNull();
-    expect(structure?.nextElementSibling).toBe(close);
+    expect(
+      screen.getByTestId('marketing-section-pricing').nextElementSibling
+    ).toBe(close);
     const schemas = [
       ...container.querySelectorAll('script[type="application/ld+json"]'),
     ].map(node => JSON.parse(node.textContent ?? '{}') as { '@type'?: string });

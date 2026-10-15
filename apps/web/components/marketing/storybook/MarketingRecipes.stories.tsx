@@ -2,7 +2,9 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { Check, Minus } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { HomepageQueryProvider } from '@/app/(home)/homepage-query-provider';
 import { MarketingPricingPlans } from '@/components/features/pricing/MarketingPricingPlans';
+import { HomepageYoutubeMvp } from '@/components/homepage/HomepageYoutubeMvp';
 import {
   FaqSection,
   MarketingContainer,
@@ -11,7 +13,6 @@ import {
 } from '@/components/marketing';
 import { ArtistNotificationsLanding } from '@/components/marketing/artist-notifications/ArtistNotificationsLanding';
 import { ArtistProfileLandingRoute } from '@/components/marketing/artist-profile/ArtistProfileLandingRoute';
-import { HomepageV2Route } from '@/components/marketing/homepage-v2/HomepageV2Route';
 import { MarketingFinalCTA } from '@/components/site/MarketingFinalCTA';
 import { PublicPageShell } from '@/components/site/PublicPageShell';
 import { APP_ROUTES } from '@/constants/routes';
@@ -74,15 +75,16 @@ export const homepage: Story = {
   parameters: {
     docs: {
       description: {
-        story:
-          'Proven recipe `homepage` — reference route `/new` via HomepageV2Route.',
+        story: 'Homepage recipe — YouTube artist closed-loop MVP on `/`.',
       },
     },
   },
   render: () => (
     <RecipeChrome recipeId='homepage'>
       <PublicPageShell>
-        <HomepageV2Route />
+        <HomepageQueryProvider>
+          <HomepageYoutubeMvp />
+        </HomepageQueryProvider>
       </PublicPageShell>
     </RecipeChrome>
   ),

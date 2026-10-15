@@ -11,9 +11,9 @@ export const MARKETING_HERO_SOURCE_SHA =
  */
 export const MARKETING_HERO_DEFAULT_PROPS = {
   headingId: 'marketing-hero-default-heading',
-  headline: 'Drop more music, with less work.',
+  headline: 'Every upload, a release.',
   subtitle:
-    'The AI workspace for artists to plan releases, create assets, pitch playlists, and promote every drop.',
+    'YouTube thumbnails, release planning, smart links, and your public profile in one loop.',
   primaryCta: { label: 'Claim my workspace', href: '/start' },
   secondaryCta: { label: 'See pricing', href: '/pricing' },
 } satisfies MarketingHeroContentProps;

@@ -2,6 +2,7 @@
 'use client';
 
 import { Button } from '@jovie/ui/atoms/button';
+import { Spinner } from '@jovie/ui/atoms/spinner';
 import { BadgeCheck, Link2, Search } from 'lucide-react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -418,9 +419,7 @@ export function HeroSpotifySearch({
           : 'bg-btn-primary text-btn-primary-foreground'
       )}
     >
-      {isLoading && (
-        <div className='w-3 h-3 border-[1.5px] border-current border-t-transparent rounded-full animate-spin motion-reduce:animate-none' />
-      )}
+      {isLoading && <Spinner className='size-3' />}
       {submitLabel}
     </button>
   );

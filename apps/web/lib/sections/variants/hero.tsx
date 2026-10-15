@@ -14,8 +14,8 @@ export const HERO_VARIANTS: readonly SectionVariant[] = [
     canonical: true,
     render: () => (
       <MarketingHero
-        headline='Drop more music, with less work.'
-        subtitle='The AI workspace for artists to plan releases, create assets, pitch playlists, and promote every drop.'
+        headline='Every upload, a release.'
+        subtitle='YouTube thumbnails, release planning, smart links, and your public profile in one loop.'
         primaryCta={{ label: 'Claim my workspace', href: '/start' }}
         secondaryCta={{ label: 'See pricing', href: '/pricing' }}
       />

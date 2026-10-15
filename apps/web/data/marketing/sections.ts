@@ -1006,6 +1006,16 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         status: 'unproven',
       },
       {
+        id: 'founder-credits',
+        layout: 'contained',
+        media: 'none',
+        alignment: 'left',
+        chooseWhen:
+          'recipe=homepage AND attributed founder career evidence is available; past work is not customer adoption',
+        exemplar: { route: '/', section: 'social-proof' },
+        status: 'active',
+      },
+      {
         id: 'named-micro-case-study',
         layout: 'contained',
         media: 'none',
@@ -1214,8 +1224,8 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         media: 'none',
         alignment: 'centered',
         chooseWhen:
-          'audience=artist AND recipe=artist-lp (creator R8: no pricing table on artist LP; cost-objection resolved inside CTA string)',
-        status: 'unproven',
+          'recipe=homepage OR (audience=artist AND recipe=artist-lp); one line and a link to current plan terms',
+        status: 'active',
       },
     ],
     defaultVariant: 'tier-cards-recommended',
@@ -1648,7 +1658,7 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         density: 'large',
         alignment: 'centered',
         chooseWhen:
-          'tiles.length≥6 AND emphasis=high (bento grid, post-2023 pattern — prior-art §3, optional fold-into-feature-grid)',
+          'recipe=homepage with four capability links OR tiles.length≥6 AND emphasis=high',
         exemplar: { route: '/new', section: 'power-grid' },
         status: 'active',
       },

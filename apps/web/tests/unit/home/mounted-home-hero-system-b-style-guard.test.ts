@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 const webRoot = path.resolve(__dirname, '../../..');
 const pagePath = 'app/(home)/page.tsx';
-const heroComponentPath = 'components/homepage/HomepageIdentityHero.tsx';
+const heroComponentPath = 'components/homepage/HomepageYoutubeMvp.tsx';
 const searchComponentPath = 'components/features/home/HeroSpotifySearch.tsx';
 const cssPath = 'components/homepage/HomepageIdentity.css';
 
@@ -35,13 +35,7 @@ function extractMountedHeroCss(source: string): string {
 }
 
 function extractMountedHeroPageSource(source: string): string {
-  const heroStart = source.indexOf('function HomepageHero()');
-  const heroEnd = source.indexOf('function HomepageUnlockedSections()');
-
-  expect(heroStart, 'homepage hero source exists').toBeGreaterThanOrEqual(0);
-  expect(heroEnd, 'homepage hero source is bounded').toBeGreaterThan(heroStart);
-
-  return source.slice(heroStart, heroEnd);
+  return source;
 }
 
 describe('mounted homepage hero System B source contract', () => {
@@ -64,15 +58,16 @@ describe('mounted homepage hero System B source contract', () => {
 
     // The homepage copy module owns words; the hero owns the composition;
     // the jov.ie/you claim (Tim 2026-09-28) is the only control.
-    expect(pageSource).toContain('<HomepageIdentityHero');
+    expect(pageSource).toContain('<HomepageYoutubeMvp');
     expect(pageSource).not.toContain('HomeTrustSection');
     expect(pageSource).not.toMatch(/statsRow|stats=\{/);
     expect(pageSource).not.toContain('secondaryCta');
-    expect(heroComponentSource).toContain('<ProductClaimHandleForm');
-    expect(heroComponentSource).toContain("testIdPrefix='homepage'");
-    expect(heroComponentSource).not.toMatch(/<Button|<Link|href=/);
-    // Illustrative claim preview, never a product screenshot.
-    expect(heroComponentSource).not.toContain('<ArtistProfilePhoneFrame');
+    expect(heroComponentSource).toContain('<HomepagePrimaryAction');
+    const hero = heroComponentSource.slice(
+      heroComponentSource.indexOf('<MarketingHero\n'),
+      heroComponentSource.indexOf('</MarketingHero>')
+    );
+    expect(hero).not.toMatch(/<Button|<Link|href=/);
     for (const primitive of [
       '<MarketingHero',
       '<MarketingHeroPhoto',

@@ -46,7 +46,7 @@ const combinedLiveHomepageSource = [
 ].join('\n');
 
 describe('JOV-5386 homepage role and shipping invariants', () => {
-  it('keeps the public root page on the approved umbrella composition', () => {
+  it('keeps the public root page on the scoped YouTube composition', () => {
     expect(HOMEPAGE_ROLE_INVARIANT_ISSUE_ID).toBe('JOV-5386');
     expect(readHomepageUnlockedSectionMounts(liveHomepageSource)).toEqual([
       ...HOMEPAGE_UNLOCKED_SECTION_MOUNTS,
@@ -58,7 +58,7 @@ describe('JOV-5386 homepage role and shipping invariants', () => {
     expect(HOMEPAGE_IDENTITY_COPY.hero.headline).toBe(
       'Be found. Be understood.'
     );
-    expect(liveHomepageSource).toContain('<HomepageIdentityHero');
+    expect(liveHomepageSource).toContain('<HomepageYoutubeMvp');
   });
 
   it('keeps verified public proof, routes, and System B visual lock on `/`', () => {
@@ -115,7 +115,7 @@ describe('JOV-5386 homepage role and shipping invariants', () => {
         liveHomepageSource,
         HOMEPAGE_ARTIST_STORY_REGRESSION_REQUIRED_MOUNTS
       )
-    ).toBe(true);
+    ).toBe(false);
 
     const findings = auditHomepageRoleInvariants({
       pageSource: HOMEPAGE_ARTIST_STORY_REGRESSION_PAGE_SOURCE,

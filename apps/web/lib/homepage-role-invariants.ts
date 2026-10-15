@@ -13,22 +13,13 @@ export const HOMEPAGE_SHIPPING_LAYERS = [
 
 export type HomepageShippingLayer = (typeof HOMEPAGE_SHIPPING_LAYERS)[number];
 
-// Locked editorial homepage: the hero is followed by the connected and
-// relationships body, the changelog preview, and the close CTA.
-export const HOMEPAGE_UNLOCKED_SECTION_MOUNTS = [
-  'HomepageCertifiedSections',
-] as const;
-
+// JOV-5885: the scoped MVP replaces the legacy umbrella composition.
+export const HOMEPAGE_UNLOCKED_SECTION_MOUNTS = ['HomepageYoutubeMvp'] as const;
 export const HOMEPAGE_STORY_STACK_MOUNTS = [
-  'HomepageUnlockedSections',
-  'HomepageEditorialChangelog',
-  'HomepageClose',
+  'HomepageQueryProvider',
+  'HomepageYoutubeMvp',
 ] as const;
-
-export const HOMEPAGE_ROOT_MOUNTS = [
-  'HomepageHero',
-  'HomepageStoryStack',
-] as const;
+export const HOMEPAGE_ROOT_MOUNTS = ['HomepageYoutubeMvp'] as const;
 
 export const HOMEPAGE_FORBIDDEN_ARTIST_STORY_TOKENS = [
   'MarketingShippedSitesShowcase',
@@ -117,7 +108,10 @@ export function readHomepageUnlockedSectionMounts(
   pageSource: string
 ): readonly string[] {
   return readJsxComponentMounts(
-    extractFunctionBody(pageSource, 'HomepageUnlockedSections')
+    extractFunctionBody(pageSource, 'HomepageUnlockedSections') ||
+      extractFunctionBody(pageSource, 'HomePage')
+  ).filter(
+    mount => !['HomePageShell', 'HomepageQueryProvider'].includes(mount)
   );
 }
 
@@ -125,8 +119,9 @@ export function readHomepageStoryStackMounts(
   pageSource: string
 ): readonly string[] {
   return readJsxComponentMounts(
-    extractFunctionBody(pageSource, 'HomepageStoryStack')
-  );
+    extractFunctionBody(pageSource, 'HomepageStoryStack') ||
+      extractFunctionBody(pageSource, 'HomePage')
+  ).filter(mount => mount !== 'HomePageShell');
 }
 
 export function presenceOnlyHomepageMountsPass(
@@ -180,7 +175,7 @@ export function auditHomepageRootComposition(
       pushFinding(
         findings,
         'homepage-artist-profile-story',
-        `Live \`/\` is the umbrella Jovie homepage and must not mount artist-profile-story token \`${token}\`.`,
+        `Live \`/\` uses the scoped YouTube MVP composition and must not mount artist-profile-story token \`${token}\`.`,
         'source'
       );
     }

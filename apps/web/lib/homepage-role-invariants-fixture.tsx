@@ -1,8 +1,5 @@
 import {
   HOMEPAGE_FORBIDDEN_ARTIST_STORY_TOKENS,
-  HOMEPAGE_ROOT_MOUNTS,
-  HOMEPAGE_STORY_STACK_MOUNTS,
-  HOMEPAGE_UNLOCKED_SECTION_MOUNTS,
   type HomepagePublicProofTile,
   type HomepageShippingLayerClaim,
 } from '@/lib/homepage-role-invariants';
@@ -114,10 +111,14 @@ export const HOMEPAGE_ARTIST_STORY_REGRESSION_SHIPPING_CLAIM = {
   assertedLayer: 'public-runtime',
 } as const satisfies HomepageShippingLayerClaim;
 
+// Preserve the legacy presence-only detector fixture after JOV-5885.
 export const HOMEPAGE_ARTIST_STORY_REGRESSION_REQUIRED_MOUNTS = [
-  ...HOMEPAGE_ROOT_MOUNTS,
-  ...HOMEPAGE_UNLOCKED_SECTION_MOUNTS,
-  ...HOMEPAGE_STORY_STACK_MOUNTS,
+  'HomepageHero',
+  'HomepageStoryStack',
+  'HomepageCertifiedSections',
+  'HomepageUnlockedSections',
+  'HomepageEditorialChangelog',
+  'HomepageClose',
 ] as const;
 
 export function HomepageArtistStoryRegressionFixture() {

@@ -253,29 +253,39 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   // ── Proven recipes ────────────────────────────────────────────────────────
   {
     glob: '(home)/page.tsx',
+    // The unsupported adoption strip stays omitted without an attributable receipt.
     recipeId: 'homepage',
     renderedSections: [
       approvedVariantBinding(
-        'apps/web/components/homepage/HomepageIdentityHero.tsx',
+        'apps/web/components/homepage/HomepageYoutubeMvp.tsx',
         'hero',
-        'split-claim-card'
+        'centered-none'
       ),
-      // The unsupported adoption strip is intentionally omitted until it has
-      // an attributable permission or adoption receipt.
+      ...['youtube-thumbnails', 'release-launch', 'public-profile'].map(id =>
+        approvedVariantBinding(
+          'apps/web/components/homepage/HomepageYoutubeMvp.tsx',
+          'feature-split',
+          'editorial',
+          id
+        )
+      ),
       approvedVariantBinding(
-        'apps/web/components/homepage/HomepageIdentitySections.tsx',
-        'feature-split',
-        'editorial',
-        'presence'
+        'apps/web/components/homepage/HomepageYoutubeMvp.tsx',
+        'spec-wall',
+        'bento'
       ),
       approvedVariantBinding(
-        'apps/web/components/homepage/HomepageIdentitySections.tsx',
-        'feature-split',
-        'editorial',
-        'structure'
+        'apps/web/components/homepage/HomepageYoutubeMvp.tsx',
+        'social-proof',
+        'founder-credits'
       ),
-      approvedBinding(
-        'apps/web/components/homepage/HomepageIdentityClose.tsx',
+      approvedVariantBinding(
+        'apps/web/components/homepage/HomepageYoutubeMvp.tsx',
+        'pricing',
+        'one-liner-link'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/homepage/HomepageYoutubeMvp.tsx',
         'cta',
         'editorial-search'
       ),
@@ -283,9 +293,9 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     bindingEvidence: {
       status: 'verified',
       source:
-        'JOV-8188 selected identity source reconciliation 2026-10-11; homepage-v3-page and homepage anatomy render contracts; JOV-6220 / JOV-7795 ownership',
+        'JOV-5885 HomepageYoutubeMvp route render and recipe parity tests',
       notes:
-        'Selected branch: SHOW_HOME_V1_DESIGN=false, HOMEPAGE_V3_ENABLED=true, and no permissioned homepage logos. FAQ copy remains available but no FAQ is mounted. Rollback compositions, exact deployment, native mapping, visual and outcome receipts remain separate.',
+        'Source composition only: youtube-artist-closed-loop-mvp-v1. No permissioned logo cloud or unsupported customer adoption. Machine certification, exact deployed runtime, and Tim Taste remain separate receipts.',
     },
     status: 'active',
     specVersion: '1.4.0',
