@@ -1076,10 +1076,10 @@ jobs:
     needs: [ci-path-changes]
     if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'merge_group' }}
     runs-on: ubuntu-latest
-    # Must exceed MERGE_GROUP_ADMISSION_WAIT_MS (6 min) plus setup/checkout so
-    # a still-running required check fails via the helper's diagnostic, not a
-    # hard job cancel.
-    timeout-minutes: 8
+    # Must exceed MERGE_GROUP_ADMISSION_QUOTA_RECOVERY_MS (66 min) plus the
+    # 6-minute check poll plus setup/checkout. A rate-limit reset inside that
+    # recovery window is slept here; a hard cancel would eject the group.
+    timeout-minutes: 75
     outputs:
       admitted: ${{ steps.admission.outputs.admitted || 'false' }}
       obsolete: ${{ steps.admission.outputs.obsolete || 'false' }}
@@ -1112,6 +1112,31 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          # GET /rate_limit does not spend core or GraphQL. The helper checked
+          # out below is main's copy, so this wait has to live in the workflow
+          # the merge group actually runs. 3960s is
+          # MERGE_GROUP_ADMISSION_QUOTA_RECOVERY_MS. A later reset fails closed.
+          rate_line="$(gh api rate_limit --jq '[.resources.core.remaining, .resources.core.reset, .resources.graphql.remaining, .resources.graphql.reset] | @tsv')"
+          read -r core_remaining core_reset graphql_remaining graphql_reset <<<"$rate_line"
+          wait_until=0
+          if [[ "$core_remaining" == "0" && "$core_reset" =~ ^[0-9]+$ ]]; then
+            wait_until="$core_reset"
+          fi
+          if [[ "$graphql_remaining" == "0" && "$graphql_reset" =~ ^[0-9]+$ && "$graphql_reset" -gt "$wait_until" ]]; then
+            wait_until="$graphql_reset"
+          fi
+          if (( wait_until > 0 )); then
+            now="$(date +%s)"
+            wait_s="$((wait_until - now + 1))"
+            if (( wait_s > 3960 )); then
+              echo "::error::GitHub rate-limit recovery does not fit within the admission budget (resets in ${wait_s}s)"
+              exit 1
+            fi
+            if (( wait_s > 0 )); then
+              echo "::notice::Merge Group Admission holding ${wait_s}s for the installation rate-limit reset"
+              sleep "$wait_s"
+            fi
+          fi
           policy='scripts/lib/merge-group-admission.mjs'
           policy_contract="$(node "$policy" --print-contract-version)"
           if [[ "$policy_contract" == 'jovie-merge-group-live-admission/v2' \
