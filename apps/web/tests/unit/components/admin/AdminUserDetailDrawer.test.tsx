@@ -153,7 +153,9 @@ describe('AdminUserDetailDrawer', () => {
       screen.getByTestId('drawer-analytics-metric-value-linked-destinations')
     ).toHaveTextContent('1');
     expect(screen.getByText('jov.ie/alex')).toBeInTheDocument();
-    expect(screen.getByText('User ID')).toBeInTheDocument();
+    const details = screen.getByTestId('admin-user-details');
+    expect(details).toContainElement(screen.getByText('User ID'));
+    expect(details.closest('[data-surface-variant="card"]')).toBeNull();
   });
 
   it('closes the composed user rail through Escape and removes stale details after selection clears', () => {

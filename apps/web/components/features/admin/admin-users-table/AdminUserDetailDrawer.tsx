@@ -229,7 +229,12 @@ function UserDrawerContent({ user }: { readonly user: AdminUserRow }) {
         </DrawerSection>
       ) : null}
 
-      <DrawerSection title='Details' className='space-y-1.5' surface='plain'>
+      <DrawerSection
+        title='Details'
+        className='space-y-1.5'
+        surface='plain'
+        testId='admin-user-details'
+      >
         <dl className='space-y-2 text-xs'>
           <div className='flex justify-between'>
             <dt className='text-secondary-token'>User ID</dt>

@@ -243,16 +243,15 @@ for (const viewport of [
     expect(
       bounds!.x + bounds!.width - summary!.x - summary!.width
     ).toBeLessThanOrEqual(14);
-    const details = await page
-      .getByText('Details', { exact: true })
-      .evaluate(element => {
-        const card = element.closest('[data-surface-variant="card"]')!;
-        return { y: card.getBoundingClientRect().y };
-      });
-    expect(details.y - summary!.y - summary!.height).toBeGreaterThanOrEqual(
-      11.5
+    const details = page.getByTestId('admin-user-details');
+    await expect(details).toBeVisible();
+    const detailsBounds = await details.boundingBox();
+    expect(
+      detailsBounds!.y - summary!.y - summary!.height
+    ).toBeGreaterThanOrEqual(11.5);
+    expect(detailsBounds!.y - summary!.y - summary!.height).toBeLessThanOrEqual(
+      12.5
     );
-    expect(details.y - summary!.y - summary!.height).toBeLessThanOrEqual(12.5);
     expect(inset.left).toBeGreaterThan(12);
     expect(inset.right).toBeGreaterThanOrEqual(12);
     await page.screenshot({ path: testInfo.outputPath('ovie-user-rail.png') });
