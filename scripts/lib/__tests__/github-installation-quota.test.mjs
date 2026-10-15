@@ -28,7 +28,10 @@ describe('installation 403 detection', () => {
   it.each([
     ['Resource not accessible by integration', 403],
     ['API rate limit exceeded for user ID 1', 403],
-    ['You have exceeded a secondary rate limit. Please wait a few minutes.', 403],
+    [
+      'You have exceeded a secondary rate limit. Please wait a few minutes.',
+      403,
+    ],
     ['API rate limit exceeded for installation', 500],
     ['API rate limit exceeded for installation (HTTP 401)', null],
     ['HTTP 404 Not Found', 404],
@@ -40,8 +43,7 @@ describe('installation 403 detection', () => {
   it('soft-fails only the installation 403 and keeps every other error fatal', () => {
     const quota = failureDisposition('Actions Cache GC', {
       message: 'Command failed: gh api repos/JovieInc/Jovie/actions/caches',
-      stderr:
-        'API rate limit exceeded for installation ID 4242. (HTTP 403)\n',
+      stderr: 'API rate limit exceeded for installation ID 4242. (HTTP 403)\n',
     });
     expect(quota.code).toBe(0);
     expect(quota.softFailed).toBe(true);

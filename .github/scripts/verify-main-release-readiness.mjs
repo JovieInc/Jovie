@@ -57,7 +57,11 @@ export function planGitHubRestHold({
   }
   const retryAtMs = Math.max(nowMs, ...bounds) + 1000;
   if (retryAtMs > deadlineMs) {
-    return { action: 'fail', reason: 'outside the rate-limit budget', retryAtMs };
+    return {
+      action: 'fail',
+      reason: 'outside the rate-limit budget',
+      retryAtMs,
+    };
   }
   return { action: 'wait', waitMs: Math.max(0, retryAtMs - nowMs) };
 }

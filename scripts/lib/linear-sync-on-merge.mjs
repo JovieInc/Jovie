@@ -20,12 +20,12 @@ import {
 } from 'node:fs';
 import { join, resolve as resolvePath } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { deprecationCheckGreen } from './deprecation-observation.mjs';
 import {
   failureDisposition,
   installationQuotaLog,
   isInstallationQuota403,
 } from './github-installation-quota.mjs';
-import { deprecationCheckGreen } from './deprecation-observation.mjs';
 import { GREEN_MARKER } from './remediation-signal.mjs';
 import {
   formatValidationReceipt,

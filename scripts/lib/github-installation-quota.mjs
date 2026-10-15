@@ -49,9 +49,7 @@ export function installationQuotaLog(label) {
 export function errorText(error) {
   const stderr =
     error && typeof error === 'object' && 'stderr' in error
-      ? String(
-          /** @type {{ stderr?: unknown }} */ (error).stderr ?? ''
-        )
+      ? String(/** @type {{ stderr?: unknown }} */ (error).stderr ?? '')
       : '';
   const message = error instanceof Error ? error.message : String(error ?? '');
   return `${stderr}\n${message}`.trim();
@@ -163,7 +161,11 @@ function capture(command, env = process.env) {
  */
 export async function softFailCommand(
   argv,
-  { env = process.env, log = message => console.error(message), run = capture } = {}
+  {
+    env = process.env,
+    log = message => console.error(message),
+    run = capture,
+  } = {}
 ) {
   if (argv.length === 0) {
     log('soft-fail: command is required');

@@ -1,13 +1,8 @@
-import { describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import {
-  chmodSync,
-  mkdtempSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
+import { describe, expect, it } from 'vitest';
 import {
   checkMainQueueProvenance,
   findExactQueueProof,
@@ -372,16 +367,18 @@ esac
       sha: SHA,
       token: 'token',
       apiUrl: 'https://api.github.test',
-      fetchImpl: /** @type {any} */ (async () => ({
-        ...limited,
-        headers: {
-          get(name) {
-            if (name === 'x-ratelimit-remaining') return '0';
-            if (name === 'x-ratelimit-reset') return '999999';
-            return null;
+      fetchImpl: /** @type {any} */ (
+        async () => ({
+          ...limited,
+          headers: {
+            get(name) {
+              if (name === 'x-ratelimit-remaining') return '0';
+              if (name === 'x-ratelimit-reset') return '999999';
+              return null;
+            },
           },
-        },
-      })),
+        })
+      ),
       now: () => 0,
       sleep: async () => {
         throw new Error('slept');
