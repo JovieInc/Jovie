@@ -136,7 +136,10 @@ for (const viewport of [
           expect(bounds.frame).toBeGreaterThan(0);
           expect(bounds.frame).toBeLessThanOrEqual(bounds.max);
           expect(bounds.overflow).toBe(false);
-          await shell.scrollIntoViewIfNeeded();
+          await page.evaluate(() =>
+            globalThis.scrollTo({ top: 0, behavior: 'instant' })
+          );
+          await expect.poll(() => page.evaluate(() => scrollY)).toBe(0);
           const screenshot = testInfo.outputPath('public-content.png');
           await page.screenshot({ path: screenshot, fullPage: true });
           await testInfo.attach('public-content', {
