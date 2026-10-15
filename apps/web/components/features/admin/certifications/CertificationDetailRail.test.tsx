@@ -48,6 +48,11 @@ describe('CertificationDetailRail', () => {
     expect(
       screen.getByText('Select a certification to review its evidence.')
     ).toBeInTheDocument();
+    expect(
+      screen
+        .getByTestId('certification-detail-rail')
+        .querySelector('[data-surface-variant="flat"]')
+    ).not.toBeNull();
   });
 
   it('opens with the entity header, evidence links, history, and source', () => {
@@ -75,6 +80,9 @@ describe('CertificationDetailRail', () => {
     expect(screen.getByTestId('certification-history')).toBeInTheDocument();
     expect(screen.getByText('JovieInc/Jovie@abcdef0')).toBeInTheDocument();
     expect(screen.queryByTestId('certification-blockers')).toBeNull();
+    expect(screen.getByTestId('certification-evidence')).not.toHaveAttribute(
+      'data-surface-variant'
+    );
   });
 
   it('opens an existing public proof ref from the evidence list', () => {

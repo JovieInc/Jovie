@@ -16,6 +16,7 @@ interface SkeletonRowProps {
    */
   readonly columnConfig?: Array<{
     readonly width?: string;
+    readonly className?: string;
     readonly variant?:
       | 'text'
       | 'avatar'
@@ -64,7 +65,7 @@ export function SkeletonRow({
       {columnKeys.map((key, index) => {
         const config = columnConfig?.[index];
         return (
-          <td key={key} className={presets.tableCell}>
+          <td key={key} className={cn(presets.tableCell, config?.className)}>
             {config?.variant === 'person' ? (
               <PersonCellSkeleton width={config.width} />
             ) : (

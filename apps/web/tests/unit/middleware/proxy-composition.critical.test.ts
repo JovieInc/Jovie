@@ -12,7 +12,7 @@
  * @see apps/web/proxy.ts
  * @see apps/web/tests/unit/middleware/proxy-behavioral.test.ts (callee behavior)
  */
-import { NextResponse } from 'next/server';
+import type { NextResponse } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProxyUserState } from '@/lib/auth/proxy-state';
 
@@ -36,12 +36,6 @@ const mocks = vi.hoisted(() => ({
   buildReportToHeader: vi.fn().mockReturnValue(''),
   buildReportingEndpointsHeader: vi.fn().mockReturnValue(''),
   getCspReportUri: vi.fn().mockReturnValue(null),
-  resolveClerkKeys: vi.fn().mockReturnValue({
-    publishableKey: 'pk_test_real-key-123',
-    secretKey: 'sk_test_real-key-456',
-    status: 'ok',
-  }),
-  isStagingHost: vi.fn().mockReturnValue(false),
   isClerkRequiredPath: vi.fn().mockReturnValue(false),
   shouldBypassClerkForRequest: vi.fn().mockReturnValue(true),
   isTestAuthBypassEnabled: vi.fn().mockReturnValue(true),
@@ -80,10 +74,6 @@ vi.mock('@/lib/security/csp-reporting', () => ({
   buildReportToHeader: mocks.buildReportToHeader,
   buildReportingEndpointsHeader: mocks.buildReportingEndpointsHeader,
   getCspReportUri: mocks.getCspReportUri,
-}));
-vi.mock('@/lib/auth/staging-clerk-keys', () => ({
-  resolveClerkKeys: mocks.resolveClerkKeys,
-  isStagingHost: mocks.isStagingHost,
 }));
 vi.mock('@/lib/auth/clerk-middleware-bypass', () => ({
   isClerkRequiredPath: mocks.isClerkRequiredPath,
@@ -140,16 +130,10 @@ function resetMocks() {
   for (const mock of Object.values(mocks)) {
     if (typeof mock.mockClear === 'function') mock.mockClear();
   }
-  mocks.resolveClerkKeys.mockReturnValue({
-    publishableKey: 'pk_test_real-key-123',
-    secretKey: 'sk_test_real-key-456',
-    status: 'ok',
-  });
   mocks.resolveTestBypassUserId.mockReturnValue(null);
   mocks.isCookieBannerRequired.mockReturnValue(false);
   mocks.getUserState.mockResolvedValue(null);
   mocks.isKnownActiveUser.mockReturnValue(false);
-  mocks.isStagingHost.mockReturnValue(false);
   mocks.createBotResponse.mockReturnValue(undefined);
   mocks.clerkMiddleware.mockImplementation(
     (handler: Function) => async (req: unknown, event: unknown) =>
@@ -320,68 +304,6 @@ describe('proxy composition (critical)', () => {
       // Should redirect unauthenticated to signin
       expect(res.status).toBeGreaterThanOrEqual(300);
       expect(res.status).toBeLessThan(400);
-    });
-  });
-
-  // ==========================================================================
-  // Clerk publishable key header injection
-  // ==========================================================================
-  describe.skip('x-clerk-publishable-key header (retired: Better Auth)', () => {
-    const nextSpy = vi.spyOn(NextResponse, 'next');
-    beforeEach(() => {
-      nextSpy.mockClear();
-    });
-
-    const getInjectedClerkHeader = () => {
-      const arg = nextSpy.mock.calls.at(-1)?.[0] as
-        | { request?: { headers?: Headers } }
-        | undefined;
-      return arg?.request?.headers?.get('x-clerk-publishable-key') ?? null;
-    };
-
-    it('sets header when both publishableKey and secretKey are present', async () => {
-      mocks.resolveClerkKeys.mockReturnValue({
-        publishableKey: 'pk_test_valid-key',
-        secretKey: 'sk_test_valid-key',
-        status: 'ok',
-      });
-      mocks.shouldBypassClerkForRequest.mockReturnValue(true);
-
-      const req = createTestRequest({ pathname: '/signup' });
-      const res = await callMiddleware(req);
-
-      expect(res.status).toBeLessThan(400);
-      expect(getInjectedClerkHeader()).toBe('pk_test_valid-key');
-    });
-
-    it('does NOT set header when secretKey is missing (staging without CLERK_SECRET_KEY)', async () => {
-      mocks.resolveClerkKeys.mockReturnValue({
-        publishableKey: 'pk_live_valid-production-key',
-        secretKey: undefined,
-        status: 'staging_missing',
-      });
-      mocks.shouldBypassClerkForRequest.mockReturnValue(true);
-
-      const req = createTestRequest({ pathname: '/signup' });
-      const res = await callMiddleware(req);
-
-      expect(res.status).toBeLessThan(500);
-      expect(getInjectedClerkHeader()).toBeNull();
-    });
-
-    it('does NOT set header when publishableKey is missing', async () => {
-      mocks.resolveClerkKeys.mockReturnValue({
-        publishableKey: undefined,
-        secretKey: undefined,
-        status: 'staging_missing',
-      });
-      mocks.shouldBypassClerkForRequest.mockReturnValue(true);
-
-      const req = createTestRequest({ pathname: '/' });
-      const res = await callMiddleware(req);
-
-      expect(res.status).toBeLessThan(500);
-      expect(getInjectedClerkHeader()).toBeNull();
     });
   });
 

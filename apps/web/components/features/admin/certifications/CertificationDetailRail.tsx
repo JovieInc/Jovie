@@ -15,9 +15,9 @@ import {
   DrawerSection,
   EntityHeader,
   EntityHeaderThumbnail,
-  EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { Tooltip } from '@/components/shell/Tooltip';
+import { AdminDetailRail } from '@/features/admin/layout/AdminDetailRail';
 import {
   OVIE_CERTIFICATION_DOMAIN_LABELS,
   OVIE_CERTIFICATION_STATE_LABELS,
@@ -37,8 +37,6 @@ import {
 } from './CertificationGlyphs';
 import { CertificationEvidenceStrip } from './CertificationSummary';
 import { evidenceForTier, shortSha } from './certification-view';
-
-export const CERTIFICATION_RAIL_WIDTH = 400;
 
 export interface CertificationDecisionTarget {
   readonly rowId: string;
@@ -88,7 +86,7 @@ function EvidenceSection({ row }: { readonly row: OvieCertificationRow }) {
   return (
     <DrawerSection
       title='Evidence'
-      surface='card'
+      surface='plain'
       testId='certification-evidence'
     >
       <ul className='space-y-2'>
@@ -155,7 +153,7 @@ function BlockersSection({ row }: { readonly row: OvieCertificationRow }) {
   return (
     <DrawerSection
       title='Blockers'
-      surface='card'
+      surface='plain'
       testId='certification-blockers'
     >
       <ul className='space-y-1.5'>
@@ -180,7 +178,7 @@ function BlockersSection({ row }: { readonly row: OvieCertificationRow }) {
 function LinksSection({ row }: { readonly row: OvieCertificationRow }) {
   if (row.links.length === 0) return null;
   return (
-    <DrawerSection title='Links' surface='card' testId='certification-links'>
+    <DrawerSection title='Links' surface='plain' testId='certification-links'>
       <ul className='space-y-1'>
         {row.links.map(link => (
           <li key={`${link.kind}:${link.href}`}>
@@ -197,7 +195,7 @@ function HistorySection({ row }: { readonly row: OvieCertificationRow }) {
     <DrawerSection
       title='History'
       defaultOpen={false}
-      surface='card'
+      surface='plain'
       testId='certification-history'
     >
       {row.history.length === 0 ? (
@@ -232,7 +230,7 @@ function HistorySection({ row }: { readonly row: OvieCertificationRow }) {
 
 function SourceSection({ row }: { readonly row: OvieCertificationRow }) {
   return (
-    <DrawerSection title='Source' surface='card' defaultOpen={false}>
+    <DrawerSection title='Source' surface='plain' defaultOpen={false}>
       <div className='space-y-1'>
         <DrawerPropertyRow
           label='Subject'
@@ -387,17 +385,14 @@ export function CertificationDetailRail({
   };
 
   return (
-    <EntitySidebarShell
+    <AdminDetailRail
       isOpen={Boolean(row)}
-      width={CERTIFICATION_RAIL_WIDTH}
       ariaLabel='Certification details'
       data-testid='certification-detail-rail'
       scrollStrategy='shell'
       onClose={onClose}
       headerMode='minimal'
       hideMinimalHeaderBar
-      entityHeaderSurface='flat'
-      footerSurface='flat'
       isEmpty={!row}
       emptyMessage='Select a certification to review its evidence.'
       entityHeader={
@@ -469,6 +464,6 @@ export function CertificationDetailRail({
           <SourceSection row={row} />
         </>
       ) : null}
-    </EntitySidebarShell>
+    </AdminDetailRail>
   );
 }

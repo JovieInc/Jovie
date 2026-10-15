@@ -395,7 +395,9 @@ test.describe('Mobile Overflow', () => {
   test.use({
     deviceScaleFactor: 3,
     hasTouch: true,
-    isMobile: true,
+    isMobile: async ({ browserName }, provideIsMobile) => {
+      await provideIsMobile(browserName !== 'firefox');
+    },
     storageState: { cookies: [], origins: [] },
   });
 

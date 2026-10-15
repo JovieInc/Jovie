@@ -8,13 +8,153 @@
   "evidenceMaxAgeMs": 2592000000,
   "scope": {
     "requiredObjects": [
-      { "id": "journey:marketing-home-render", "kind": "user-journey" },
-      { "id": "journey:signup-onboarding", "kind": "user-journey" },
-      { "id": "journey:artist-profile-public", "kind": "user-journey" },
-      { "id": "journey:checkout-billing", "kind": "user-journey" },
-      { "id": "journey:chat-agent-turn", "kind": "user-journey" },
-      { "id": "journey:release-publish", "kind": "user-journey" },
-      { "id": "journey:smartlink-fan-click", "kind": "user-journey" },
+      {
+        "id": "journey:marketing-home-render",
+        "kind": "user-journey",
+        "outcomeMission": {
+          "id": "outcome:journey:marketing-home-render",
+          "outcome": {
+            "revision": 1,
+            "persona": "prospective artist",
+            "goal": "Understand what Jovie does, what access costs, and how to start with your own artist identity.",
+            "successCriteria": [
+              "The visitor can explain the offered artist outcome and access conditions",
+              "Price and availability agree with current product truth",
+              "The start path preserves the intended artist identity"
+            ],
+            "frictionBudget": {
+              "maxDurationMs": 300000,
+              "maxRetries": 1
+            }
+          }
+        }
+      },
+      {
+        "id": "journey:signup-onboarding",
+        "kind": "user-journey",
+        "outcomeMission": {
+          "id": "outcome:journey:signup-onboarding",
+          "outcome": {
+            "revision": 1,
+            "persona": "new artist",
+            "goal": "Start with your artist identity, establish your account, and reach a usable public profile you own.",
+            "successCriteria": [
+              "The claimed identity is the intended artist",
+              "A fresh session retains the correct ownership",
+              "The public profile is usable and contains the intended catalog"
+            ],
+            "frictionBudget": {
+              "maxDurationMs": 300000,
+              "maxRetries": 1
+            }
+          }
+        }
+      },
+      {
+        "id": "journey:artist-profile-public",
+        "kind": "user-journey",
+        "outcomeMission": {
+          "id": "outcome:journey:artist-profile-public",
+          "outcome": {
+            "revision": 1,
+            "persona": "fan",
+            "goal": "Discover this artist, understand who they are and their latest work, and arrange to hear when they play nearby.",
+            "successCriteria": [
+              "Identity and latest work match the canonical artist",
+              "A listening destination reaches the intended work",
+              "Nearby notification interest and consent persist for the intended artist"
+            ],
+            "frictionBudget": {
+              "maxDurationMs": 300000,
+              "maxRetries": 1
+            }
+          }
+        }
+      },
+      {
+        "id": "journey:checkout-billing",
+        "kind": "user-journey",
+        "outcomeMission": {
+          "id": "outcome:journey:checkout-billing",
+          "outcome": {
+            "revision": 1,
+            "persona": "artist choosing paid access",
+            "goal": "Choose the appropriate plan, complete checkout in test mode, and use the access you paid for.",
+            "successCriteria": [
+              "The charged amount and plan match the offer",
+              "The provider receipt and entitlement agree",
+              "A retry does not duplicate the charge"
+            ],
+            "frictionBudget": {
+              "maxDurationMs": 300000,
+              "maxRetries": 1
+            }
+          }
+        }
+      },
+      {
+        "id": "journey:chat-agent-turn",
+        "kind": "user-journey",
+        "outcomeMission": {
+          "id": "outcome:journey:chat-agent-turn",
+          "outcome": {
+            "revision": 1,
+            "persona": "artist asking for help",
+            "goal": "Ask the assistant to prepare a change to your artist profile, inspect the proposed result, and confirm that the authorized change persists.",
+            "successCriteria": [
+              "The assistant understands the requested artist and change",
+              "Only authorized state changes persist after reload",
+              "A failed or refused action explains how to recover without duplicate writes"
+            ],
+            "frictionBudget": {
+              "maxDurationMs": 300000,
+              "maxRetries": 1
+            }
+          }
+        }
+      },
+      {
+        "id": "journey:release-publish",
+        "kind": "user-journey",
+        "outcomeMission": {
+          "id": "outcome:journey:release-publish",
+          "outcome": {
+            "revision": 1,
+            "persona": "artist releasing music",
+            "goal": "Prepare your real release and share a public link whose identity and listening destinations are correct.",
+            "successCriteria": [
+              "The release belongs to the intended artist",
+              "Saved destinations survive reload",
+              "The shared link resolves to the intended release and provider"
+            ],
+            "frictionBudget": {
+              "maxDurationMs": 300000,
+              "maxRetries": 1
+            }
+          }
+        }
+      },
+      {
+        "id": "journey:smartlink-fan-click",
+        "kind": "user-journey",
+        "outcomeMission": {
+          "id": "outcome:journey:smartlink-fan-click",
+          "outcome": {
+            "revision": 1,
+            "persona": "fan",
+            "goal": "Identify this release and listen on your preferred available service without being sent to another artist or release.",
+            "successCriteria": [
+              "Release identity matches the canonical catalog",
+              "The chosen destination contains the intended music",
+              "An unavailable service has an understandable recovery path"
+            ],
+            "frictionBudget": {
+              "maxDurationMs": 300000,
+              "maxRetries": 1
+            }
+          }
+        }
+      },
       { "id": "boundary:tenant-isolation", "kind": "trust-boundary" },
       { "id": "boundary:auth-identity", "kind": "trust-boundary" },
       { "id": "boundary:billing-entitlement", "kind": "trust-boundary" },

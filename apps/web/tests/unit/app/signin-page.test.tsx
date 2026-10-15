@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -134,40 +134,6 @@ describe('signin page', () => {
       expect.objectContaining({
         initialValues: undefined,
       })
-    );
-  });
-
-  it.skip('shows access_denied banner when oauth_error=access_denied (oauth error banner surface changed)', async () => {
-    searchParamsState.value = 'oauth_error=access_denied';
-    globalThis.history.replaceState(
-      null,
-      '',
-      '/signin?oauth_error=access_denied'
-    );
-
-    render(<SignInPageClient />);
-
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'Sign-in was cancelled. Try again, or pick a different method.'
-    );
-
-    await waitFor(() => {
-      expect(globalThis.location.search).not.toContain('oauth_error');
-    });
-  });
-
-  it.skip('shows a generic banner for unknown oauth_error values (oauth error banner surface changed)', async () => {
-    searchParamsState.value = 'oauth_error=server_error';
-    globalThis.history.replaceState(
-      null,
-      '',
-      '/signin?oauth_error=server_error'
-    );
-
-    render(<SignInPageClient />);
-
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'Something went wrong with sign-in. Please try again.'
     );
   });
 

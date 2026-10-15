@@ -1,7 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { evaluateExposureEvidence } from '../packages/release-channel-contracts/dogfood-exposure.ts';
+import { launchContractReasons } from './lyb-launch-contract.mjs';
 
-export const SCHEMA = 'lyb-native-certification/v1';
+export const SCHEMA = 'lyb-native-certification/v2';
 const TIERS = new Set([
   'component_unit',
   'simulator_interaction',
@@ -15,7 +16,7 @@ const add = (reasons, reason) => {
 
 /** Reconcile a route manifest with records exported from an xcresult. */
 export function certifyNativeReceipt(manifest, receipt) {
-  const reasons = [];
+  const reasons = launchContractReasons(manifest, receipt);
   const exposure = manifest?.expectedExposure
     ? certifyNativeExposure(manifest.expectedExposure, receipt)
     : null;
@@ -84,7 +85,10 @@ export function certifyNativeReceipt(manifest, receipt) {
   }
 
   const counts = {
-    declared: paths.reduce((sum, path) => sum + (path.testIds?.length ?? 0), 0),
+    declared: paths.reduce(
+      (sum, path) => sum + (path?.testIds?.length ?? 0),
+      0
+    ),
     discovered: discovered.size,
     selected: selected.size,
     executed: records.length,
@@ -106,7 +110,7 @@ export function certifyNativeReceipt(manifest, receipt) {
     tiers: Object.fromEntries(
       [...TIERS].map(tier => [
         tier,
-        paths.filter(path => path.tier === tier).map(path => path.id),
+        paths.filter(path => path?.tier === tier).map(path => path.id),
       ])
     ),
     humanOnlyGates: manifest?.humanOnlyGates ?? [],
