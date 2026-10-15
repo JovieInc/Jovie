@@ -12,19 +12,29 @@ for (const width of [390, 1280]) {
       }, theme);
 
       await page.goto(
-        '/iframe.html?id=molecules-contentmetriccard--compact-loading-and-loaded&viewMode=story'
+        '/iframe.html?id=molecules-contentmetriccard--icon-chip-loading-and-loaded&viewMode=story'
       );
-      const loaded = page.getByTestId('loaded-metric');
-      const loading = page.getByTestId('loading-metric');
-      await expect(loaded.getByRole('definition')).toHaveText('$123.45');
       await expect(page.locator('html')).toHaveClass(new RegExp(theme));
-      const loadedBounds = await loaded.boundingBox();
-      const loadingBounds = await loading.boundingBox();
-      expect(loadedBounds).not.toBeNull();
-      expect(loadingBounds).not.toBeNull();
-      expect(loadedBounds?.height).toBe(loadingBounds?.height);
-      expect(loadedBounds?.width).toBe(loadingBounds?.width);
-      await testInfo.attach('compact-loading-and-loaded', {
+      for (const variant of [
+        'icon-chip-default',
+        'icon-chip-compact',
+        'icon-chip-inline-default',
+      ]) {
+        const loaded = page.getByTestId(`${variant}-loaded`);
+        const loading = page.getByTestId(`${variant}-loading`);
+        await expect(loaded.getByRole('term')).toHaveText('Total streams');
+        const loadedBounds = await loaded.boundingBox();
+        const loadingBounds = await loading.boundingBox();
+        expect(loadedBounds).not.toBeNull();
+        expect(loadingBounds).not.toBeNull();
+        expect(loadedBounds?.height, `${variant} height`).toBe(
+          loadingBounds?.height
+        );
+        expect(loadedBounds?.width, `${variant} width`).toBe(
+          loadingBounds?.width
+        );
+      }
+      await testInfo.attach('icon-chip-loading-and-loaded.png', {
         body: await page.locator('#storybook-root').screenshot(),
         contentType: 'image/png',
       });
@@ -55,7 +65,7 @@ for (const width of [390, 1280]) {
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
         .analyze();
       expect(a11y.violations).toEqual([]);
-      await testInfo.attach('waitlist-metrics', {
+      await testInfo.attach('waitlist-metrics.png', {
         body: await page.locator('#storybook-root').screenshot(),
         contentType: 'image/png',
       });

@@ -69,20 +69,43 @@ export const CompactIconChip: Story = {
   },
 };
 
-export const CompactLoadingAndLoaded: Story = {
-  args: CompactIconChip.args,
+export const IconChipLoadingAndLoaded: Story = {
   render: args => (
     <div className='space-y-3'>
-      <div data-testid='loading-metric'>
-        <ContentMetricCardSkeleton
-          layout='icon-chip'
-          density='compact'
-          showSubtitle={false}
-        />
-      </div>
-      <div data-testid='loaded-metric'>
-        <ContentMetricCard {...args} />
-      </div>
+      {(
+        [
+          {
+            layout: 'icon-chip',
+            density: 'default',
+            subtitle: 'Recent visits',
+          },
+          { layout: 'icon-chip', density: 'compact', subtitle: undefined },
+          {
+            layout: 'icon-chip-inline',
+            density: 'default',
+            subtitle: undefined,
+          },
+        ] as const
+      ).map(({ layout, density, subtitle }) => (
+        <div key={`${layout}-${density}`} className='space-y-3'>
+          <div data-testid={`${layout}-${density}-loading`}>
+            <ContentMetricCardSkeleton
+              layout={layout}
+              density={density}
+              showSubtitle={Boolean(subtitle)}
+            />
+          </div>
+          <div data-testid={`${layout}-${density}-loaded`}>
+            <ContentMetricCard
+              {...args}
+              layout={layout}
+              density={density}
+              subtitle={subtitle}
+              icon={Eye}
+            />
+          </div>
+        </div>
+      ))}
     </div>
   ),
 };

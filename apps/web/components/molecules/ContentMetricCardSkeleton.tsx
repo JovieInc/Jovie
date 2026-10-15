@@ -1,5 +1,7 @@
 import {
   type ContentMetricCardProps,
+  contentMetricCardLabelVariants,
+  contentMetricCardValueVariants,
   contentMetricCardVariants,
 } from '@/components/molecules/ContentMetricCard';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
@@ -47,12 +49,19 @@ export function ContentMetricCardSkeleton({
         <div className='min-w-0'>
           <div className='flex items-center gap-2'>
             {inline ? null : chip}
-            <LoadingSkeleton height='h-4' width='w-16' rounded='sm' />
+            <div
+              className={cn(
+                'flex h-lh items-center',
+                contentMetricCardLabelVariants({ layout })
+              )}
+            >
+              <LoadingSkeleton height='h-4' width='w-16' rounded='sm' />
+            </div>
           </div>
           <div
             className={cn(
-              inline ? 'h-5' : 'mt-2 h-6',
-              !inline && !compact && 'sm:h-9'
+              'h-lh',
+              contentMetricCardValueVariants({ layout, density })
             )}
           >
             <LoadingSkeleton height='h-full' width='w-20' rounded='md' />

@@ -38,7 +38,7 @@ export function WaitlistMetrics({ metrics }: WaitlistMetricsProps) {
         label='Email Failures'
         value={metrics.emailFailures.toLocaleString()}
         icon={AlertCircle}
-        tone='destructive'
+        tone='error'
       />
     </div>
   );

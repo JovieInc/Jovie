@@ -92,9 +92,9 @@ describe('EarningsTab', () => {
     queryState.loading = true;
     const { container } = renderTab();
     expect(screen.queryByText('Total Revenue')).toBeNull();
-    expect(
-      container.querySelectorAll('[aria-hidden="true"].p-2\\.5')
-    ).toHaveLength(3);
+    expect(container.querySelectorAll('[aria-hidden="true"].p-3')).toHaveLength(
+      3
+    );
   });
 
   it('retains zero fallbacks when earnings stats are absent', () => {

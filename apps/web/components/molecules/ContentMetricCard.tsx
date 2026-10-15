@@ -8,8 +8,8 @@ export const contentMetricCardVariants = cva('', {
   variants: {
     layout: {
       default: 'p-3.5',
-      'icon-chip': 'p-3.5 sm:p-4',
-      'icon-chip-inline': 'flex items-center gap-3 bg-surface-0 px-4 py-3.5',
+      'icon-chip': 'p-4',
+      'icon-chip-inline': 'flex items-center gap-3 bg-surface-0 px-4 py-3',
     },
     density: { default: '', compact: '' },
     appearance: {
@@ -18,7 +18,7 @@ export const contentMetricCardVariants = cva('', {
     },
   },
   compoundVariants: [
-    { layout: 'icon-chip', density: 'compact', className: 'p-2.5 sm:p-2.5' },
+    { layout: 'icon-chip', density: 'compact', className: 'p-3' },
   ],
   defaultVariants: {
     layout: 'default',
@@ -29,11 +29,39 @@ export const contentMetricCardVariants = cva('', {
 
 const iconTones = {
   accent: { icon: 'text-accent', chip: 'bg-accent/10' },
-  destructive: { icon: 'text-destructive', chip: 'bg-destructive/10' },
+  error: { icon: 'text-error', chip: 'bg-error/10' },
   info: { icon: 'text-info', chip: 'bg-info/10' },
   secondary: { icon: 'text-secondary-token', chip: 'bg-secondary/10' },
   success: { icon: 'text-success', chip: 'bg-success/10' },
 } as const;
+
+export const contentMetricCardLabelVariants = cva(
+  'min-w-0 truncate text-app text-secondary-token',
+  {
+    variants: {
+      layout: {
+        'icon-chip': 'font-caption',
+        'icon-chip-inline': 'font-semibold tracking-normal',
+      },
+    },
+  }
+);
+
+export const contentMetricCardValueVariants = cva(
+  'font-semibold tabular-nums text-primary-token',
+  {
+    variants: {
+      layout: {
+        'icon-chip': 'mt-2 text-2xl leading-none tracking-[-0.011em]',
+        'icon-chip-inline': 'text-mid leading-tight',
+      },
+      density: { default: '', compact: '' },
+    },
+    compoundVariants: [
+      { layout: 'icon-chip', density: 'default', className: 'sm:text-3xl' },
+    ],
+  }
+);
 
 export interface ContentMetricCardProps
   extends VariantProps<typeof contentMetricCardVariants> {
@@ -129,8 +157,7 @@ export function ContentMetricCard({
             {inline ? null : chip}
             <span
               className={cn(
-                'min-w-0 truncate text-app text-secondary-token',
-                inline ? 'font-semibold tracking-normal' : 'font-caption',
+                contentMetricCardLabelVariants({ layout }),
                 labelClassName
               )}
             >
@@ -142,11 +169,7 @@ export function ContentMetricCard({
           </dt>
           <dd
             className={cn(
-              'font-semibold tabular-nums text-primary-token',
-              inline
-                ? 'text-mid leading-tight'
-                : 'mt-2 text-2xl leading-none tracking-[-0.011em]',
-              !inline && !compact && 'sm:text-3xl',
+              contentMetricCardValueVariants({ layout, density }),
               valueClassName
             )}
           >

@@ -58,7 +58,7 @@ describe('ContentMetricCard', () => {
       <ContentMetricCard
         layout='icon-chip-inline'
         label='Email Failures'
-        tone='destructive'
+        tone='error'
         value={0}
         icon={Eye}
       />
@@ -87,7 +87,7 @@ describe('ContentMetricCard', () => {
       />
     );
 
-    expect(container.firstElementChild).toHaveClass('p-2.5');
+    expect(container.firstElementChild).toHaveClass('p-3');
     expect(container.firstElementChild).not.toHaveClass('p-3.5');
     expect(container.querySelector('svg')).toBeNull();
     expect(screen.getByRole('definition')).toContainElement(
