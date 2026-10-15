@@ -122,6 +122,7 @@ describe('ArtistProfileContent', () => {
     expect(reserved()).toHaveLength(0);
 
     previewState.isOpen = true;
+    previewState.isPinned = true;
     rerender(<ArtistProfileContent />);
     expect(reserved()).toHaveLength(1);
   });
@@ -136,11 +137,28 @@ describe('ArtistProfileContent', () => {
       document.querySelectorAll('[data-settings-companion-rail="true"]');
     expect(reserved()).toHaveLength(1);
     previewState.isOpen = true;
+    previewState.isPinned = true;
     rerender(<ArtistProfileContent />);
     expect(reserved()).toHaveLength(1);
     previewState.isOpen = false;
+    previewState.isPinned = false;
     rerender(<ArtistProfileContent />);
     expect(reserved()).toHaveLength(0);
+  });
+
+  it('keeps the closed pane stable while a transient preview is hovered', () => {
+    previewState.isOpen = true;
+    previewState.isPinned = true;
+    const { rerender } = render(<ArtistProfileContent />);
+    previewState.isOpen = false;
+    previewState.isPinned = false;
+    rerender(<ArtistProfileContent />);
+    previewState.isOpen = true;
+    previewState.isPreview = true;
+    rerender(<ArtistProfileContent />);
+    expect(
+      document.querySelectorAll('[data-settings-companion-rail="true"]')
+    ).toHaveLength(0);
   });
 
   it('keeps the canonical settings header and panel anatomy while loading', () => {

@@ -3,7 +3,7 @@
 import { Button, Skeleton } from '@jovie/ui';
 import { ExternalLink, PanelRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { ArtistRulesSheet } from '@/app/app/(shell)/library/ArtistRulesSheet';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
@@ -49,16 +49,19 @@ function MobileProfilePanelTrigger() {
  * Reserve the automatic companion from the server paint, then follow the
  * actual rail state. A manual close must reclaim the settings pane instead
  * of leaving an empty reservation. Artist/data reloads keep this lifecycle.
+ * Transient previews never change the pane or its control's hit target.
  */
 function CompanionRailReservation() {
-  const { isOpen } = usePreviewPanelState();
-  const [hasOpened, setHasOpened] = useState(false);
-  if (isOpen && !hasOpened) setHasOpened(true);
+  const { isPinned } = usePreviewPanelState();
+  const [hasPinned, setHasPinned] = useState(false);
+  useEffect(() => {
+    if (isPinned) setHasPinned(true);
+  }, [isPinned]);
 
   return (
     <span
       hidden
-      data-settings-companion-rail={isOpen || !hasOpened ? 'true' : undefined}
+      data-settings-companion-rail={isPinned || !hasPinned ? 'true' : undefined}
     />
   );
 }
@@ -143,7 +146,7 @@ export function ArtistProfileContent({
               </Button>
             ) : null}
             <span className='hidden lg:inline-flex'>
-              <ArtistProfileRailToggle />
+              <ArtistProfileRailToggle previewTrigger={false} />
             </span>
           </div>
         }

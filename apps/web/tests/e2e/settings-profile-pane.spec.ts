@@ -3,7 +3,11 @@ import { expect, type Page, type TestInfo, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 
-test.use({ storageState: { cookies: [], origins: [] } });
+test.use({
+  storageState: { cookies: [], origins: [] },
+  video: 'off',
+  trace: 'off',
+});
 
 async function enterProfileSettings(page: Page) {
   await page.goto(
@@ -104,6 +108,31 @@ async function readPaneGeometry(page: Page) {
           elements.column[0].scrollWidth - elements.column[0].clientWidth,
         paneOverflow:
           elements.pane[0].scrollWidth - elements.pane[0].clientWidth,
+        overflowingElements: [
+          ...elements.column[0].querySelectorAll<HTMLElement>('*'),
+        ]
+          .filter(element => {
+            const rect = element.getBoundingClientRect();
+            const style = getComputedStyle(element);
+            return (
+              rect.width > 0 &&
+              rect.height > 0 &&
+              style.visibility !== 'hidden' &&
+              (rect.right > column.right + 1 || rect.left < column.left - 1)
+            );
+          })
+          .slice(0, 30)
+          .map(element => {
+            const rect = element.getBoundingClientRect();
+            return {
+              tag: element.tagName,
+              id: element.id,
+              className: element.className,
+              left: rect.left,
+              right: rect.right,
+              width: rect.width,
+            };
+          }),
         centerDelta: Math.abs(
           (column.left + column.right - pane.left - pane.right) / 2
         ),
@@ -128,9 +157,14 @@ async function assertOpenPane(page: Page, testInfo: TestInfo, name: string) {
     path: geometryPath,
     contentType: 'application/json',
   });
+  if (process.env.PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES !== 'false') {
+    await page.screenshot({ path: testInfo.outputPath(`${name}.png`) });
+  }
   // Numeric geometry is safe durable evidence even when the existing hosted
   // artifact policy rejects Playwright's automatic error-context Markdown.
-  process.stdout.write(`${JSON.stringify({ name, samples })}\n`);
+  process.stdout.write(
+    `${JSON.stringify({ name, sampleCount: samples.length, first: samples[0], last: result })}\n`
+  );
   expect(result.counts).toEqual({
     route: 1,
     pane: 1,
@@ -192,6 +226,9 @@ async function assertOpenPane(page: Page, testInfo: TestInfo, name: string) {
 }
 
 async function assertFullSettingsPane(page: Page) {
+  await expect(
+    page.locator('[data-app-shell-frame="true"]:visible')
+  ).toHaveCount(1);
   await expect(page.getByTestId('settings-shell-content')).toBeVisible();
   const geometry = await page.evaluate(() => {
     const route = document.querySelector<HTMLElement>(
@@ -338,10 +375,7 @@ test('Account keeps its full pane after Profile navigation and browser history',
 }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await enterProfileSettings(page);
-  await assertOpenPane(page, testInfo, 'profile');
-  await page.goto(APP_ROUTES.SETTINGS_ACCOUNT, {
-    waitUntil: 'domcontentloaded',
-  });
+  await page.getByRole('link', { name: 'Account', exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`${APP_ROUTES.SETTINGS_ACCOUNT}$`));
   await assertFullSettingsPane(page);
   await page.goBack({ waitUntil: 'domcontentloaded' });
@@ -354,4 +388,173 @@ test('Account keeps its full pane after Profile navigation and browser history',
   await page.goForward({ waitUntil: 'domcontentloaded' });
   await expect(page).toHaveURL(new RegExp(`${APP_ROUTES.SETTINGS_ACCOUNT}$`));
   await assertFullSettingsPane(page);
+});
+
+test('manual preview control keeps its pointer target and restores rail focus', async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await enterProfileSettings(page);
+  const toggle = page.getByTestId('artist-profile-rail-toggle');
+  await toggle.click();
+  const rail = page.locator('#shell-artist-profile-rail');
+  await expect(rail).toHaveAttribute('data-rail-phase', 'closed');
+  await page.locator('#displayName').focus();
+  await page.mouse.move(10, 10);
+  const before = (await toggle.boundingBox())!;
+  await page.mouse.move(
+    before.x + before.width / 2,
+    before.y + before.height / 2
+  );
+  await page.evaluate(
+    () =>
+      new Promise<void>(resolve => {
+        let frames = 0;
+        const sample = () => {
+          if (++frames >= 60) resolve();
+          else requestAnimationFrame(sample);
+        };
+        requestAnimationFrame(sample);
+      })
+  );
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(toggle).toHaveAttribute('data-rail-pinned', 'false');
+  const after = (await toggle.boundingBox())!;
+  process.stdout.write(
+    `${JSON.stringify({ name: 'hover-target', before, after })}\n`
+  );
+  expect(
+    Math.abs(after.x - before.x),
+    'hover must not move its own hit target'
+  ).toBeLessThanOrEqual(1);
+  await assertFullSettingsPane(page);
+  // Click the original pointer coordinate. A locator could follow the moving
+  // button and conceal the actual failed interaction.
+  await page.mouse.click(
+    before.x + before.width / 2,
+    before.y + before.height / 2
+  );
+  await expect(toggle).toHaveAttribute('data-rail-pinned', 'true');
+  await expect(rail).toHaveAttribute('data-rail-phase', 'open');
+  await assertOpenPane(page, testInfo, 'pointer-pinned');
+  const railAction = rail.getByRole('button').first();
+  await railAction.focus();
+  await expect(railAction).toBeFocused();
+  await page.keyboard.press(']');
+  await expect(rail).toHaveAttribute('data-rail-phase', 'closed');
+  await expect(toggle).toBeFocused();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await assertFullSettingsPane(page);
+});
+
+test('pending automatic opening reserves the same pane before hydration', async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  let releaseScripts!: () => void;
+  const scriptsReady = new Promise<void>(resolve => {
+    releaseScripts = resolve;
+  });
+  await page.route('**/_next/static/**/*.js', async route => {
+    await scriptsReady;
+    await route.continue();
+  });
+  try {
+    await page.goto(
+      `/api/dev/test-auth/enter?persona=creator-ready&redirect=${encodeURIComponent(APP_ROUTES.SETTINGS_PROFILE)}`,
+      { waitUntil: 'commit' }
+    );
+    const column = page.locator('[data-settings-layout-column="true"]:visible');
+    await expect(column).toHaveCount(1);
+    await expect(
+      column.locator('[data-settings-companion-rail="true"]')
+    ).toHaveCount(1);
+    const before = (await column.boundingBox())!;
+    if (process.env.PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES !== 'false') {
+      await page.screenshot({
+        path: testInfo.outputPath('pending-opening.png'),
+      });
+    }
+    releaseScripts();
+    await expect(page.locator('#displayName')).toBeVisible();
+    await expect(page.locator('#shell-artist-profile-rail')).toHaveAttribute(
+      'data-rail-phase',
+      'open'
+    );
+    const after = (await column.boundingBox())!;
+    process.stdout.write(
+      `${JSON.stringify({ name: 'startup-reservation', before, after })}\n`
+    );
+    expect(Math.abs(after.x - before.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(after.width - before.width)).toBeLessThanOrEqual(1);
+    await assertOpenPane(page, testInfo, 'hydrated');
+    if (process.env.PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES !== 'false') {
+      await page.screenshot({
+        path: testInfo.outputPath('automatic-open.png'),
+      });
+    }
+  } finally {
+    releaseScripts();
+  }
+});
+
+test('unrelated Shop completion preserves the same editor and nonzero scroll', async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  let releaseShop!: () => void;
+  const shopReady = new Promise<void>(resolve => {
+    releaseShop = resolve;
+  });
+  let requested = false;
+  await page.route('**/api/dashboard/shop', async route => {
+    if (route.request().method() !== 'GET') return route.continue();
+    requested = true;
+    await shopReady;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ shopifyUrl: null }),
+    });
+  });
+  try {
+    await enterProfileSettings(page);
+    await expect.poll(() => requested).toBe(true);
+    const field = page.locator('#displayName');
+    const original = (await field.elementHandle())!;
+    await field.focus();
+    await field.evaluate((element: HTMLInputElement) => {
+      element.setSelectionRange(1, Math.min(4, element.value.length));
+      element.closest('[data-testid="settings-shell-content"]')!.scrollTop = 64;
+    });
+    const snapshot = () =>
+      field.evaluate((element: HTMLInputElement) => ({
+        left: element.getBoundingClientRect().left,
+        right: element.getBoundingClientRect().right,
+        start: element.selectionStart,
+        end: element.selectionEnd,
+        scroll: element.closest('[data-testid="settings-shell-content"]')!
+          .scrollTop,
+      }));
+    const before = await snapshot();
+    expect(before.scroll).toBeGreaterThan(0);
+    releaseShop();
+    await expect(
+      page.getByRole('status', { name: 'Loading Shop Settings' })
+    ).toHaveCount(0);
+    const after = await snapshot();
+    await expect(field).toBeFocused();
+    expect(
+      await original.evaluate(
+        element => element === document.querySelector('#displayName')
+      )
+    ).toBe(true);
+    expect(after).toEqual(before);
+    process.stdout.write(
+      `${JSON.stringify({ name: 'shop-completion', before, after })}\n`
+    );
+    await assertOpenPane(page, testInfo, 'shop-loaded');
+  } finally {
+    releaseShop();
+  }
 });
