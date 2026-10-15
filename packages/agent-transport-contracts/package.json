@@ -4,6 +4,7 @@
   "type": "module",
   "exports": {
     ".": "./index.ts",
+    "./learning-evidence": "./learning-evidence.ts",
     "./provider-attempt-receipt": "./provider-attempt-receipt.ts",
     "./provider-incident": "./provider-incident.ts",
     "./work-order": "./work-order.ts",
