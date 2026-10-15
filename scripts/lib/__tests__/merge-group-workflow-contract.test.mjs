@@ -2753,14 +2753,18 @@ ${selectedGateScript}`,
       0,
       POSTDEPLOY_PROBES_WORKFLOW.indexOf('\njobs:')
     );
-    expect(header).not.toContain('workflow_run:');
+    expect(load(POSTDEPLOY_PROBES_WORKFLOW).on.workflow_run).toEqual({
+      workflows: ['Production Controller'],
+      types: ['completed'],
+      branches: ['main'],
+    });
     expect(header).toMatch(/^  workflow_dispatch:\s*$/m);
     expect(header).not.toMatch(/^  (pull_request|push|merge_group|schedule):/m);
 
-    // Read-only evidence must never hold the deploy lease; coalescing keeps
-    // only the newest probe run during drains.
+    // Read-only evidence never holds the deploy lease. Active probes finish
+    // during drains while pending completions coalesce to the latest target.
     expect(header).toContain('group: postdeploy-probes');
-    expect(header).toContain('cancel-in-progress: true');
+    expect(header).toContain('cancel-in-progress: false');
     expect(header).toContain('contents: read');
     expect(header).toContain('actions: read');
     expect(POSTDEPLOY_PROBES_WORKFLOW).not.toContain(
