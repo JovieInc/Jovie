@@ -371,7 +371,7 @@
     "DESIGN.md": {
       "owner": "@itstimwhite",
       "claim": "Operational design authority derives from company design canon.",
-      "documentSha256": "405e61b21c6c8ac89472b8ba76a19f09693fc8320d13e7b23c26078afeaf6e6f",
+      "documentSha256": "85a3b182f64fa861141e7d77d06c1ac12ccaa4296a2630a2d58f477a6296be6d",
       "sources": [
         {
           "path": "canon/DESIGN.md",

@@ -99,15 +99,7 @@ Read [the copywriting reference](docs/design-system/DETAILS.md#copywriting) when
 
 ### Ovie Ops Cockpit Guardrail
 
-Ovie UI/UX work must use the make-interfaces-better path: load gstack `/design-review`, load `design-taste-frontend` where available, and run the checklist in `docs/ovie-design-guardrails.md`.
-
-Before changing Ovie UI, include the Design Read line:
-
-`Reading this as: <page kind> for <audience>, with a <vibe> language, leaning toward <design system or aesthetic>`
-
-Ovie should read as a macOS ops cockpit: dense but calm, fast, native-feeling, and focused on operator decisions. Do not import landing-page patterns, decorative AI-dashboard chrome, oversized hero/card structures, or motion that makes controls jump.
-
-Ovie UI PRs require before/after screenshots or component evidence and explicit pass/fail for hierarchy, spacing, typography scale, visual density, interaction states, contrast, macOS-native affordances, and no layout jank.
+Follow [the Ovie guardrail](docs/design-system/DETAILS.md#ovie-ops-cockpit-guardrail) before Ovie UI work.
 
 ---
 
@@ -133,12 +125,10 @@ Raw Tailwind color utilities (`text-black`, `bg-white`, `text-[#fff]`) are the r
 
 ### Enforcement
 
-The design-system lint and debt gates below enforce tokens and shared component
-ownership. `error` means a lint error, failed assertion, or nonzero CLI exit;
-`warn` is advisory. Baselines are committed allowances, not a live inventory.
-All five raw-color contrast buckets are at **zero**: any new match fails.
+`error` blocks; `warn` advises. Baselines are committed allowances, not live
+inventories. All five raw-color contrast buckets are **zero**; new matches fail.
 
-CI lanes (path-selected; a blocking failure prevents the required aggregate from passing):
+CI lanes are path-selected; blocking failures fail the required aggregate:
 
 - **L** — [Source Validation](.github/workflows/source-validation.yml),
   `pnpm --filter @jovie/web lint:eslint:changed` (author-time full check:
@@ -156,7 +146,7 @@ CI lanes (path-selected; a blocking failure prevents the required aggregate from
 The commands and selectors live in [ci-fast-lanes.mjs](scripts/ci-fast-lanes.mjs).
 Rule severities come from [the web ESLint config](apps/web/eslint.config.js).
 Count baselines live in [the design-system test directory](apps/web/tests/unit/design-system/)
-unless linked below. Rows are sorted by gate name.
+unless linked below.
 
 | Gate | Severity | CI lane | Blocks? | Committed baseline |
 | --- | --- | --- | --- | --- |
@@ -200,10 +190,9 @@ have scoped rule exemptions in the ESLint config. The separate
 though the author-time `@jovie/ui-feel` rule is off.
 
 [enforcement-documentation.test.ts](apps/web/tests/unit/design-system/enforcement-documentation.test.ts)
-compares this table's ESLint severities with the effective config and its counts
-and spacing activation flags with the committed baselines. It runs in G and is
-selected by Source Validation's source-read guard for documentation/config edits.
-Update the table together with its sources; the test never rewrites allowances.
+checks this table against effective ESLint severities, committed counts and spacing
+flags. It runs in G and Source Validation's source-read guard for doc/config edits.
+Update the table with its sources; the test never rewrites allowances.
 
 To fix a violation:
 
@@ -229,35 +218,7 @@ Read [the spacing reference](docs/design-system/DETAILS.md#spacing) when changin
 
 ## DS_FOUNDATION_V1 canonical decisions
 
-Wave 0 of the DS_FOUNDATION_V1 consolidation locks in the following canonical
-semantic aliases. Downstream files and components should consume these instead
-of redefining them.
-
-- **Canonical public/marketing width = 1298px** (Linear.app parity).
-  Exposed as `--ds-public-content-max` and Tailwind class `max-w-public-content`.
-- **Prose exception = 680px** for long-form reading surfaces.
-  Exposed as `--ds-prose-max` and Tailwind class `max-w-prose-canonical`.
-- **Motion taxonomy:** two intents only.
-  - `subtle` — 150ms with `--ds-motion-subtle-easing`. Use for hover, focus,
-    color, icon swap, toast. Tailwind: `duration-subtle ease-subtle`.
-  - `cinematic` — 420ms with `--ds-motion-cinematic-easing`. Use for drawers,
-    modals, audio player open/close. Tailwind: `duration-cinematic ease-cinematic`.
-  - Raw durations and easings in route code are forbidden (enforced in Wave 4).
-- **Canonical button variants:** `primary`, `secondary`, `tertiary`, `ghost`,
-  and `link`. Destructive styling is a `destructive` prop, not a variant.
-- **Canonical text button size (Tim KEEP 2026-09-10):** `sm`,
-  `marketing`, `md`, and `lg` share one 28px visible ActionButton / product
-  CTA, weight 510, radius 999. Mobile wraps that 28px pill in a 44px tap
-  target. Not 32-in-44 and not density-32 on every size.
-  `icon` remains a distinct 36px square utility control with a 44px hit target.
-- **Touch targets (founder-locked 2026-08-20):** enlarge the hit **container**,
-  never the visible item. Compact controls keep their visual height; the 44px
-  floor is an invisible `::before`/`::after` (or wrapping hit area).
-- **Marketing O-mark (founder-locked 2026-08-12):** render the visible mark at
-  32px and align it to the same control geometry.
-
-See [`docs/DESIGN_TOKENS.md`](docs/DESIGN_TOKENS.md#ds_foundation_v1-canonical-decisions)
-for the canonical CSS + Tailwind references.
+Read [the canonical foundation decisions](docs/design-system/DETAILS.md#ds_foundation_v1-canonical-decisions) before changing this area.
 
 ---
 
@@ -350,27 +311,7 @@ Read [the canonical surface split reference](docs/design-system/DETAILS.md#canon
 
 ## Source-of-Truth File Map
 
-| File | Responsibility |
-|------|----------------|
-| `apps/web/design/ziawi-color-sot.json` | **Color SoT (`ziawi-color-sot-v1`)** — Pen node ZiaWI hex lock. React projects this file. |
-| `apps/web/design/oklch-palette.json` | **OKLCH projection of ZiaWI** — not a color root; hex must match `ziawi-color-sot-v1` |
-| `apps/web/design/tokens.json` | **Machine-readable base-token source** — compiler-owned brand, gray, and radius values plus explicit migration divergences; accent hexes project ZiaWI |
-| `apps/web/styles/generated/design-tokens.css` | **Generated base-token emitter** — CSS projection of `design/tokens.json`; never hand-edit |
-| `apps/web/styles/design-system.css` | **Live semantic emitter** — imports generated base tokens and projects unmigrated semantic/color properties; color hex must match ZiaWI |
-| `apps/web/styles/linear-tokens.css` | Marketing-specific Linear-extracted tokens |
-| `apps/web/styles/theme.css` | Feature accents & animations only |
-| `apps/web/app/globals.css` | Tailwind registration + shared utilities |
-| `apps/web/tailwind.config.js` | Tailwind v4 token mapping |
-| `apps/web/app/(marketing)/layout.tsx` | Marketing shell |
-| `apps/web/components/site/MarketingHeader.tsx` | Marketing header |
-| `apps/web/components/site/MarketingFooter.tsx` | Marketing footer |
-| `apps/web/components/features/auth/AuthLayout.tsx` | Product-funnel shell |
-| `apps/web/components/features/dashboard/dashboard-nav/config.ts` | Reviewed authenticated-shell navigation and rollout insertions |
-| `apps/web/components/shell/SidebarNavItem.tsx` | Canonical sidebar row and icon chrome |
-| `apps/web/components/organisms/table/molecules/PageToolbar.tsx` | Canonical workspace toolbar and action hierarchy |
-| `apps/web/components/homepage/*` | Homepage chat-intake implementation (System B) |
-| `apps/web/components/features/home/*` | Legacy marketing-home components (still used by `(marketing)/new/*`) |
-| `apps/web/app/(home)/layout.tsx` | Homepage shell — `PublicPageShell` |
+Read [the source-of-truth file map](docs/design-system/DETAILS.md#source-of-truth-file-map) before changing this area.
 
 ---
 
