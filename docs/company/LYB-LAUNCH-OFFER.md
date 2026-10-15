@@ -1,44 +1,38 @@
 # LogYourBody (LYB) Launch Offer — 30-Day $5k MRR Plan
 
-Status: Proposed canon (launch offer lock pending paid-commitment evidence)
+Status: Commercial proposal (price validation pending); audience/outcome
+superseded by [JOV-6013 launch contract](../product/lyb-launch-contract.md)
 Owner: Tim White (taste, spend, legal, credentials)
-Last updated: 2026-09-27
+Last updated: 2026-10-15
 Parent authority: [`/canon/OPERATING_SYSTEM.md`](../../canon/OPERATING_SYSTEM.md)
 Issues: JOV-6066 (this offer), JOV-6065 (30-day $5k MRR governor), JOV-6020
 (checkout/entitlement plumbing — not duplicated here)
 
-This document is the single canonical LYB launch offer. Until a successor
-revision lands here, no product, marketing, or sales work may use other or
-ambiguous target-customer language for the 30-day launch.
+The launch contract owns audience, outcome, and product breadth. This document
+retains the commercial proposal and its paid-commitment validation bar; it
+cannot authorize additional product surfaces.
 
 ## The offer (one ICP, one paid outcome)
 
-**ICP — the only customer we sell to this month:**
-Men 25–40 who have lifted consistently for 1–4 years, already track body
-weight and/or progress photos, and are stuck at an aesthetics plateau — they
-train hard but cannot see measurable muscle gain or fat loss month over month.
-They already pay for at least one fitness app, coach, or program, which is the
-willingness-to-pay signal.
-
-Explicitly out of scope for launch language: beginners, weight-loss-only users
-(GLP-1 audience), powerlifters chasing strength totals, women-focused
-positioning, and anyone without an existing tracking habit.
+**ICP:** People whose appearance is materially tied to their work: actors,
+models, musicians, and creators. They need control around dates and constraints
+such as shoots, performances, travel, summer, and maintenance phases. GLP-1 +
+DEXA is an initial high-intent wedge, not an eligibility requirement. No
+male-only, age-band, or existing-training-habit requirement defines this launch.
 
 **Promised paid outcome (what they are buying):**
-One coached 8-week hypertrophy block that produces *visible, measurable
-physique change* — tracked through LYB's photo timeline and body metrics —
-driven by the powered-by-Jovie coach (evidence-based hypertrophy programming,
-weekly progression adjustments, voice workout logging on iOS).
-
-The promise is the outcome, not the app: "Follow one block. See the change on
-your own timeline." Delivery is iOS app + coach; web stays landing-only.
+Proactive body-composition control around a user-selected outcome and date:
+combine available signals, identify drift early, and deliver one clear next
+action through Jovi with isolated health memory. The visual timeline and
+stats/body score make progress understandable. Dates are planning constraints,
+not guaranteed results. Delivery is iOS; web stays landing/support/account-only.
 
 ## Packages (one strong default)
 
 | Package | Price | What it includes | Role |
 |---|---:|---|---|
-| **Self-Guided** | $79/mo | iOS app, coach chat, hypertrophy programming engine, photo/metric timeline | Floor tier; exists to anchor the default |
-| **Coached Block (default)** | $250/mo | Everything in Self-Guided + weekly program adjustment based on your logged sessions and photos + structured weekly check-in | The sell; all launch language points here |
+| **Self-Guided** | $79/mo | iOS timeline, stats/body score, Jovi coach and dated goal | Floor tier; exists to anchor the default |
+| **Coached Block (default)** | $250/mo | Everything in Self-Guided + weekly adjustment against the dated goal + structured weekly check-in | Commercial proposal; validate paid demand |
 | **Founding Cohort** | $400/mo, capped at 10 seats | Everything in Coached Block + direct async review of your check-ins by a human reviewer | Scarcity tier; tests ceiling willingness to pay |
 
 Sell the default. Offer Self-Guided only on a price objection and Founding
@@ -106,20 +100,20 @@ raise to $299/mo.
 
 ## Approved sales-surface copy (landing price section)
 
-Headline: **One block. Visible change.**
+Headline: **Your body-composition goal, planned around your next date.**
 
-> You've been lifting for years and your progress photos look the same. LYB
-> builds you an 8-week hypertrophy block, adjusts it every week from what you
-> actually log, and shows the change on your own timeline. iOS only.
+> Set an outcome and a date. LogYourBody follows your photos and measurements,
+> spots drift, and gives you one next action. Built for people whose appearance
+> is part of their work. iOS only.
 
 Price card (default shown first):
 
-- **Coached Block — $250/mo.** Your program, adjusted weekly from your logged
-  sessions and photos. Weekly check-in. Cancel anytime; 14-day money-back on
-  your first month.
+- **Coached Block — $250/mo.** Your next action, adjusted weekly from your
+  goal, photos, and measurements. Weekly check-in. Cancel anytime; 14-day
+  money-back on your first month.
 - Founding Cohort — $400/mo (10 seats). Everything above plus direct async
   review of your check-ins.
-- Self-Guided — $79/mo. The coach and the block, on your own.
+- Self-Guided — $79/mo. Timeline, stats, and your coach, on your own.
 
 No trial language. No "coming soon" tiers. No other ICP language on any
 launch surface.
