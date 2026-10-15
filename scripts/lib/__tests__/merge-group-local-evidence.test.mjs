@@ -1,9 +1,17 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  fetchMergeGroupTreeBlobs,
+  measureLocalTrackedBytes,
   parseLsTreeLong,
   parseNumstatZ,
   readLocalMergeGroupEvidence,
@@ -100,6 +108,136 @@ describe('local merge-group size evidence', () => {
       ).toBeNull();
     } finally {
       rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('deepens only when a depth-2 refetch still has no blob sizes', () => {
+    const calls = [];
+    const headSha = 'a'.repeat(40);
+    const tracked = fetchMergeGroupTreeBlobs({
+      headSha,
+      run(args) {
+        calls.push(args);
+      },
+      measure() {
+        return calls.some(args => args.includes('--depth=64'))
+          ? { bytes: 4, files: 1 }
+          : null;
+      },
+    });
+    expect(tracked).toEqual({ bytes: 4, files: 1 });
+    expect(calls).toHaveLength(2);
+    expect(calls[0]).toEqual([
+      'fetch',
+      '--refetch',
+      '--filter=blob:limit=1g',
+      '--no-tags',
+      '--depth=2',
+      'origin',
+      headSha,
+    ]);
+    expect(calls[1]).toContain('--depth=64');
+    expect(calls[0].join(' ')).not.toContain('blob:none');
+    expect(fetchMergeGroupTreeBlobs({ headSha: 'not-a-sha', run() {} })).toBe(
+      null
+    );
+  });
+
+  it('counts a shallow blob:none checkout once the group SHA is refetched', () => {
+    const root = mkdtempSync(join(tmpdir(), 'mg-shallow-'));
+    const origin = join(root, 'origin.git');
+    const source = join(root, 'source');
+    const clone = join(root, 'clone');
+    try {
+      mkdirSync(origin, { recursive: true });
+      git(origin, ['init', '--bare', '-b', 'main']);
+      git(origin, ['config', 'uploadpack.allowFilter', 'true']);
+      git(origin, ['config', 'uploadpack.allowAnySHA1InWant', 'true']);
+      mkdirSync(source, { recursive: true });
+      git(source, ['init', '-b', 'main']);
+      git(source, ['config', 'user.name', 'GitHub']);
+      git(source, ['config', 'user.email', 'noreply@github.com']);
+      writeFileSync(join(source, 'kept.txt'), 'aaaa');
+      mkdirSync(join(source, 'scripts/lib'), { recursive: true });
+      writeFileSync(
+        join(source, 'scripts/lib/merge-group-member-policy.mjs'),
+        'policy\n'
+      );
+      git(source, ['add', '.']);
+      git(source, ['commit', '-m', 'base']);
+      const base = git(source, ['rev-parse', 'HEAD']).trim();
+      writeFileSync(join(source, 'kept.txt'), 'aaaaX');
+      writeFileSync(join(source, 'added.txt'), 'group-only\n');
+      git(source, ['add', 'kept.txt', 'added.txt']);
+      git(source, ['commit', '-m', 'group (#1)']);
+      const head = git(source, ['rev-parse', 'HEAD']).trim();
+      git(source, ['remote', 'add', 'origin', origin]);
+      git(source, ['push', 'origin', 'main']);
+      git(origin, ['update-ref', 'refs/heads/main', base]);
+      git(origin, ['update-ref', 'refs/hidden/group', head]);
+
+      execFileSync(
+        'git',
+        [
+          '-c',
+          'protocol.file.allow=always',
+          'clone',
+          '--depth=1',
+          '--filter=blob:none',
+          '--sparse',
+          `file://${origin}`,
+          clone,
+        ],
+        { stdio: 'ignore' }
+      );
+      git(clone, ['sparse-checkout', 'set', '--no-cone', '/kept.txt']);
+      git(clone, ['config', 'protocol.file.allow', 'always']);
+      expect(git(clone, ['rev-parse', '--is-shallow-repository']).trim()).toBe(
+        'true'
+      );
+      expect(git(clone, ['rev-parse', 'HEAD']).trim()).toBe(base);
+      expect(
+        git(clone, [
+          'config',
+          '--get',
+          'remote.origin.partialclonefilter',
+        ]).trim()
+      ).toBe('blob:none');
+      expect(
+        measureLocalTrackedBytes({ headSha: head, cwd: clone })
+      ).toBeNull();
+      expect(fetchMergeGroupTreeBlobs({ headSha: head, cwd: clone })).toEqual({
+        bytes: 23,
+        files: 3,
+      });
+
+      const evidencePath = join(root, 'evidence.json');
+      const stdout = execFileSync(
+        'node',
+        [resolve(import.meta.dirname, '../merge-group-local-evidence.mjs')],
+        {
+          cwd: clone,
+          encoding: 'utf8',
+          timeout: 30_000,
+          env: {
+            ...process.env,
+            GROUP_BASE: base,
+            GROUP_HEAD: head,
+            MERGE_GROUP_LOCAL_EVIDENCE: evidencePath,
+            GIT_NO_LAZY_FETCH: '1',
+          },
+        }
+      );
+      expect(stdout).toContain(
+        'local tree byte count: 23 tracked regular-file bytes across 3 files'
+      );
+      expect(JSON.parse(readFileSync(evidencePath, 'utf8')).tracked).toEqual({
+        bytes: 23,
+        files: 3,
+      });
+      expect(git(clone, ['rev-parse', 'HEAD']).trim()).toBe(base);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
     }
   });
 });

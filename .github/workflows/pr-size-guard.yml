@@ -136,34 +136,34 @@ jobs:
         # job below judges the members it was asked about. The helper is absent
         # on the pinned bootstrap base; a missing file or a failed fetch falls
         # back to the API inside the policy.
-        # `git ls-tree -r -l` reads each blob's size from the local object
-        # database. --filter=blob:none omits changed blobs, ls-tree prints BAD,
-        # and the byte check used to fall through to git/trees during an
-        # installation 403. Fetch the blobs. Depth 2 is the synthetic commit
-        # plus its parent; if that object is still absent, deepen once.
+        # Checkout is depth-1 blob:none of main. `git cat-file` lazy-fetches the
+        # group commit without blob sizes, ls-tree prints BAD, and the byte
+        # check used to fall through to git/trees. Refetch the group SHA here,
+        # in this workflow, because the policy files on disk are still main's
+        # until this commit lands. `--refetch` reapplies a filter that keeps
+        # sizes. Depth 2 is the synthetic commit plus its parent; deepen once
+        # when that pack still has no measurable blobs. The evidence script
+        # logs the byte total.
         run: |
           set -euo pipefail
           mkdir -p "$MERGE_GROUP_POLICY_CACHE_DIR"
           if [[ -f scripts/lib/merge-group-local-evidence.mjs && "$GROUP_HEAD" =~ ^[0-9a-f]{40}$ && "$GROUP_BASE" =~ ^[0-9a-f]{40}$ ]]; then
             AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
             (
-              trap 'unset AUTH_HEADER' EXIT
-              GIT_CONFIG_COUNT=2 \
-              GIT_CONFIG_KEY_0=http.https://github.com/.extraheader \
-              GIT_CONFIG_VALUE_0="$AUTH_HEADER" \
-              GIT_CONFIG_KEY_1=core.hooksPath \
-              GIT_CONFIG_VALUE_1=/dev/null \
-              GIT_TERMINAL_PROMPT=0 \
-              GCM_INTERACTIVE=never \
-              GIT_LFS_SKIP_SMUDGE=1 \
-                bash --noprofile --norc -c '
-                  if ! git cat-file -e "$GROUP_HEAD^{commit}" >/dev/null 2>&1; then
-                    timeout --kill-after=5s 40s git fetch --no-tags --depth=2 origin "$GROUP_HEAD" || true
-                  fi
-                  if ! git cat-file -e "$GROUP_HEAD^{commit}" >/dev/null 2>&1; then
-                    timeout --kill-after=5s 20s git fetch --no-tags --depth=64 origin "$GROUP_HEAD" || true
-                  fi
-                '
+              trap 'unset AUTH_HEADER GIT_CONFIG_VALUE_0' EXIT
+              export GIT_CONFIG_COUNT=2
+              export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader
+              export GIT_CONFIG_VALUE_0="$AUTH_HEADER"
+              export GIT_CONFIG_KEY_1=core.hooksPath
+              export GIT_CONFIG_VALUE_1=/dev/null
+              export GIT_TERMINAL_PROMPT=0
+              export GCM_INTERACTIVE=never
+              export GIT_LFS_SKIP_SMUDGE=1
+              export GIT_NO_LAZY_FETCH=1
+              timeout --kill-after=5s 40s git fetch --refetch --filter=blob:limit=1g --no-tags --depth=2 origin "$GROUP_HEAD" || true
+              if ! git rev-parse --verify "$GROUP_HEAD^{commit}" >/dev/null 2>&1 || git ls-tree -r -l "$GROUP_HEAD" | grep -Eq 'BAD|[[:space:]]-[[:space:]]'; then
+                timeout --kill-after=5s 20s git fetch --refetch --filter=blob:limit=1g --no-tags --depth=64 origin "$GROUP_HEAD" || true
+              fi
               node scripts/lib/merge-group-local-evidence.mjs || true
             )
           fi

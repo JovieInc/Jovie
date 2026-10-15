@@ -1,12 +1,14 @@
 #!/usr/bin/env node
-// Read-only size evidence from a merge-group checkout.
+// Size evidence from a merge-group checkout.
 //
-// The Size Guard workflow fetches the synthetic head, then this module counts
-// the diff with local git. That replaces the compare API and the per-PR files
-// API when both commits are already in the repo. It never fetches: a missing
-// object returns null and the caller uses the API. Line counts match
-// `git diff --numstat -z -M` the way the source PR Size Guard step does
-// (renames once, under the new path; binary rows count zero lines).
+// The runner checks out main at depth 1 with --filter=blob:none. Asking
+// `git cat-file` whether the group SHA exists lazy-fetches that commit
+// without blob sizes, and `git ls-tree -l` then prints BAD. This module
+// refetches the group SHA with a filter that keeps sizes, then counts the
+// diff locally. A missing object returns null and the caller uses the API.
+// Line counts match `git diff --numstat -z -M` the way the source PR Size
+// Guard step does (renames once, under the new path; binary rows count zero
+// lines).
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
@@ -21,6 +23,18 @@ function runGit(args, cwd) {
     maxBuffer: MAX_GIT_OUTPUT_BYTES,
     timeout: 20_000,
     stdio: ['ignore', 'pipe', 'pipe'],
+    // A blob:none promisor must not satisfy this read by downloading one
+    // blob at a time. Missing sizes stay missing, and the caller refetches.
+    env: { ...process.env, GIT_NO_LAZY_FETCH: '1' },
+  });
+}
+
+function runFetch(args, cwd, timeout) {
+  execFileSync('git', args, {
+    cwd,
+    timeout,
+    stdio: ['ignore', 'inherit', 'inherit'],
+    env: process.env,
   });
 }
 
@@ -79,6 +93,53 @@ export function measureLocalTrackedBytes({
   } catch {
     return null;
   }
+}
+
+/**
+ * Refetch `<headSha>` so `git ls-tree -l` can see regular-file sizes.
+ * The checkout is already a blob:none partial clone, and a commit that is
+ * merely present still has no sizes. `--refetch` reapplies the filter.
+ * Depth 2 is the merge-group commit plus its parent; depth 64 is the retry
+ * when that pack still has no measurable blobs.
+ * @param {{
+ *   headSha?: string,
+ *   cwd?: string,
+ *   run?: (args: readonly string[], cwd: string, timeout: number) => void,
+ *   measure?: typeof measureLocalTrackedBytes,
+ *   depths?: readonly number[],
+ * }} [options]
+ * @returns {{ bytes: number, files: number } | null}
+ */
+export function fetchMergeGroupTreeBlobs({
+  headSha,
+  cwd = process.cwd(),
+  run = runFetch,
+  measure = measureLocalTrackedBytes,
+  depths = [2, 64],
+} = {}) {
+  if (!SHA_PATTERN.test(String(headSha ?? ''))) return null;
+  for (const depth of depths) {
+    try {
+      run(
+        [
+          'fetch',
+          '--refetch',
+          '--filter=blob:limit=1g',
+          '--no-tags',
+          `--depth=${depth}`,
+          'origin',
+          headSha,
+        ],
+        cwd,
+        depth <= 2 ? 40_000 : 20_000
+      );
+    } catch {
+      continue;
+    }
+    const tracked = measure({ headSha, cwd });
+    if (tracked) return tracked;
+  }
+  return null;
 }
 
 /** @returns {Array<{ filename: string, additions: number, deletions: number }> | null} */
@@ -201,9 +262,19 @@ if (
   import.meta.url === pathToFileURL(process.argv[1]).href
 ) {
   const target = process.env.MERGE_GROUP_LOCAL_EVIDENCE;
+  // The workflow refetches the group SHA before this process starts. Doing it
+  // again here would download the tree twice, and this file on main is older
+  // than the workflow that is already running in the queue.
   const evidence = readLocalMergeGroupEvidence({
     baseSha: process.env.GROUP_BASE,
     headSha: process.env.GROUP_HEAD,
   });
   if (target && evidence) writeFileSync(target, JSON.stringify(evidence));
+  if (evidence?.tracked) {
+    console.log(
+      `local tree byte count: ${evidence.tracked.bytes} tracked regular-file bytes across ${evidence.tracked.files} files`
+    );
+  } else {
+    console.log('local tree byte count: unavailable');
+  }
 }

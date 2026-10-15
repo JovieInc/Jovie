@@ -306,17 +306,17 @@ exit 0
     }
   }
 
-  it('fetches blob bytes at depth 2 and deepens only when the commit is still absent', () => {
-    const landed = runFetch({ presentAfterDepth2: true });
-    expect(landed.result.status, landed.result.stderr).toBe(0);
-    expect(landed.calls).toContain('fetch --no-tags --depth=2');
-    expect(landed.calls).not.toContain('--depth=64');
-    expect(landed.calls).not.toContain('blob:none');
-
-    const missing = runFetch({ presentAfterDepth2: false });
-    expect(missing.result.status, missing.result.stderr).toBe(0);
-    expect(missing.calls).toContain('fetch --no-tags --depth=2');
-    expect(missing.calls).toContain('fetch --no-tags --depth=64');
-    expect(missing.calls).not.toContain('blob:none');
+  it('does not cat-file the group commit before measuring bytes', () => {
+    const ran = runFetch({ presentAfterDepth2: true });
+    expect(ran.result.status, ran.result.stderr).toBe(0);
+    expect(ran.calls).toContain(
+      'fetch --refetch --filter=blob:limit=1g --no-tags --depth=2 origin'
+    );
+    expect(ran.calls).toContain(
+      'node scripts/lib/merge-group-local-evidence.mjs'
+    );
+    expect(ran.calls).not.toContain('--depth=64');
+    expect(ran.calls).not.toContain('cat-file');
+    expect(ran.calls).not.toContain('blob:none');
   });
 });
