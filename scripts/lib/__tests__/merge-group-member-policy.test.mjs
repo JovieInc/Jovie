@@ -1368,7 +1368,6 @@ describe('merge-group API outages do not eject a valid group', () => {
   it('passes an under-cap local tree without calling the tree API', async () => {
     const paths = [];
     const logs = [];
-    let measured = 0;
     await runPolicy({
       argv: ['--policy=size', '--also=fork'],
       env: { GH_TOKEN: 'test-token', MAX_LINES: '800', MAX_FILES: '40' },
@@ -1380,10 +1379,6 @@ describe('merge-group API outages do not eject a valid group', () => {
           files: [{ filename: 'a.ts', additions: 3, deletions: 1 }],
           tracked: { bytes: 20, files: 2 },
         }),
-      measureTracked: () => {
-        measured += 1;
-        return { bytes: 1, files: 1 };
-      },
       writeOutput: () => {},
       request(path) {
         paths.push(path);
@@ -1394,39 +1389,11 @@ describe('merge-group API outages do not eject a valid group', () => {
         throw new Error(`unexpected request: ${path}`);
       },
     });
-    expect(measured).toBe(0);
     expect(paths.some(path => path.includes('/git/'))).toBe(false);
     expect(logs.some(line => line.includes('20 tracked regular-file'))).toBe(
       true
     );
     expect(logs.some(line => line.includes('within standard size cap'))).toBe(
-      true
-    );
-
-    paths.length = 0;
-    logs.length = 0;
-    await runPolicy({
-      argv: ['--policy=size'],
-      env: { GH_TOKEN: 'test-token', MAX_LINES: '800', MAX_FILES: '40' },
-      event: event({ head_sha: FIRST, head_commit: { id: FIRST } }),
-      log: line => logs.push(line),
-      now: () => 1,
-      readLocal: async () =>
-        checkoutEvidence({
-          files: [{ filename: 'a.ts', additions: 1, deletions: 0 }],
-        }),
-      measureTracked: () => ({ bytes: 20, files: 2 }),
-      request(path) {
-        paths.push(path);
-        if (path.includes('/git/')) {
-          throw new Error(`tree API must not be called: ${path}`);
-        }
-        if (path.endsWith('/pulls/101')) return { data: openInternal };
-        throw new Error(`unexpected request: ${path}`);
-      },
-    });
-    expect(paths.some(path => path.includes('/git/'))).toBe(false);
-    expect(logs.some(line => line.includes('20 tracked regular-file'))).toBe(
       true
     );
   });
@@ -1445,8 +1412,8 @@ describe('merge-group API outages do not eject a valid group', () => {
         readLocal: async () =>
           checkoutEvidence({
             files: [{ filename: 'a.ts', additions: 1, deletions: 0 }],
+            tracked: { bytes: over, files: 1 },
           }),
-        measureTracked: () => ({ bytes: over, files: 1 }),
         writeOutput: line => outputs.push(line),
         request(path) {
           paths.push(path);
@@ -1478,9 +1445,6 @@ describe('merge-group API outages do not eject a valid group', () => {
           files: [{ filename: 'a.ts', additions: 3, deletions: 1 }],
           tracked: { bytes: 20, files: 2 },
         }),
-      measureTracked: () => {
-        throw new Error('local bytes are already measured');
-      },
       writeOutput: () => {},
       request(path) {
         paths.push(path);
@@ -1512,7 +1476,6 @@ describe('merge-group API outages do not eject a valid group', () => {
           checkoutEvidence({
             files: [{ filename: 'a.ts', additions: 1, deletions: 0 }],
           }),
-        measureTracked: () => null,
         writeOutput: line => outputs.push(line),
         request(path) {
           if (path.endsWith('/pulls/101')) return { data: openInternal };

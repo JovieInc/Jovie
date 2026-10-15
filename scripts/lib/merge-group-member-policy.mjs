@@ -2,7 +2,6 @@ import { createHash } from 'node:crypto';
 import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { measureLocalTrackedBytes } from './merge-group-local-evidence.mjs';
 import { evaluatePrSizePolicy } from './pr-size-guard-policy.mjs';
 import {
   HYGIENE_LIMITS,
@@ -1076,7 +1075,6 @@ export async function runPolicy({
   env = process.env,
   event: providedEvent = undefined,
   log = console.log,
-  measureTracked = measureLocalTrackedBytes,
   now = Date.now,
   readLocal = readLocalMergeGroupCheckout,
   request: providedRequest = undefined,
@@ -1213,21 +1211,14 @@ export async function runPolicy({
   }
 
   if (policy === 'size') {
-    // Prefer bytes from the merge-group checkout (`git ls-tree -r -l`). The
-    // git/trees read is only the fallback when that object is not local.
+    // Bytes come from the checkout evidence (`git ls-tree -r -l` in
+    // merge-group-local-evidence.mjs). This process must not spawn git.
+    // The git/trees read is only the fallback when that object is not local.
     // githubRequest already holds a rate-limit 403 until x-ratelimit-reset
     // when the reset is inside this job's budget. A rate limit that still
     // escapes, with nothing measured, fails closed.
-    let tracked = local?.tracked ?? null;
-    if (!tracked) {
-      try {
-        tracked = await measureTracked({ headSha });
-      } catch {
-        tracked = null;
-      }
-    }
-    if (tracked) {
-      logTrackedPayload(enforceTrackedBudget(tracked), log);
+    if (local?.tracked) {
+      logTrackedPayload(enforceTrackedBudget(local.tracked), log);
     } else {
       try {
         const payload = await enforceCombinedTreePayload({
