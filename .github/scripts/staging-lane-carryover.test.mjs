@@ -196,8 +196,13 @@ test('actual routing Bash handles no-op, stale generation, failed identity and w
       join(root, 'curl'),
       '#!/usr/bin/env node\nif(process.env.TEST_CURL_FAILURE)process.exit(7);process.stdout.write(process.env.TEST_IDENTITY);\n'
     );
+    writeFileSync(
+      join(root, 'git'),
+      '#!/bin/sh\ncase "$*" in\n  *ls-remote*) printf \'%s\\n\' "$TEST_MAIN" ;;\n  *) exec /usr/bin/git "$@" ;;\nesac\n'
+    );
     chmodSync(join(root, 'gh'), 0o755);
     chmodSync(join(root, 'curl'), 0o755);
+    chmodSync(join(root, 'git'), 0o755);
     for (const [initial, main, relation, failedCurl, good] of [
       ['proceed', '', '', '1', true],
       ['superseded', '', '', '1', true],
@@ -231,6 +236,7 @@ test('actual routing Bash handles no-op, stale generation, failed identity and w
           TEST_MAIN: main,
           TEST_RELATION: relation,
           TEST_CURL_FAILURE: failedCurl,
+          RESOLVE_MAIN_RETRY_SECONDS: '0',
           TEST_IDENTITY: JSON.stringify({
             commitSha: current,
             deploymentId: 'dpl_exactStage',
@@ -380,8 +386,13 @@ else{const row=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+'/routes.json'
       join(root, 'curl'),
       '#!/usr/bin/env node\nprocess.stdout.write(process.env.TEST_IDENTITY);\n'
     );
+    writeFileSync(
+      join(root, 'git'),
+      '#!/bin/sh\ncase "$*" in\n  *ls-remote*) printf \'%s\\n\' "$TEST_MAIN" ;;\n  *) exec /usr/bin/git "$@" ;;\nesac\n'
+    );
     chmodSync(join(root, 'gh'), 0o755);
     chmodSync(join(root, 'curl'), 0o755);
+    chmodSync(join(root, 'git'), 0o755);
     const env = {
       ...process.env,
       PATH: root + delimiter + process.env.PATH,
@@ -392,6 +403,7 @@ else{const row=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+'/routes.json'
       SOURCE_CI_RUN_ID: '37356737863',
       REPOSITORY: 'JovieInc/Jovie',
       TEST_MAIN: mainSha,
+      RESOLVE_MAIN_RETRY_SECONDS: '0',
       TEST_IDENTITY: JSON.stringify({
         commitSha: stagedSha,
         deploymentId: 'dpl_exactStage',

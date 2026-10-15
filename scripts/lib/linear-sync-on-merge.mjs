@@ -20,6 +20,11 @@ import {
 } from 'node:fs';
 import { join, resolve as resolvePath } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import {
+  failureDisposition,
+  installationQuotaLog,
+  isInstallationQuota403,
+} from './github-installation-quota.mjs';
 import { deprecationCheckGreen } from './deprecation-observation.mjs';
 import { GREEN_MARKER } from './remediation-signal.mjs';
 import {
@@ -1109,7 +1114,11 @@ async function runSync(options) {
     options.harnessManifest ?? loadJson(root, CI_HARNESS_MANIFEST);
   const assuranceMatrix =
     options.assuranceMatrix ?? loadJson(root, ASSURANCE_MATRIX);
-  let openPulls = { pulls: /** @type {object[]} */ ([]), complete: true };
+  let openPulls = {
+    pulls: /** @type {object[]} */ ([]),
+    complete: true,
+    failureMessage: '',
+  };
   try {
     openPulls = await listOpenPullRequests({ fetchImpl, token, repository });
   } catch (error) {
@@ -1120,7 +1129,11 @@ async function runSync(options) {
       // Quota is already spent. Evaluating issues would 403 the first linked
       // pull (JOV-7355 → #19767 on 2026-10-15) and label that as a Linear
       // deferral. Leave the cursor where it is and let the next sweep resume.
-      // A merge event still fails closed so that one pull is not dropped.
+      // A merge event still fails closed unless the answer is specifically an
+      // installation 403, which the process exit soft-fails.
+      if (isInstallationQuota403(message)) {
+        log(installationQuotaLog('Linear Sync'));
+      }
       log(`Open pull request scan deferred: ${message}`);
       return {
         action: 'deferred',
@@ -1136,7 +1149,7 @@ async function runSync(options) {
       );
     }
     log(`Open pull request scan failed: ${message}`);
-    openPulls = { pulls: [], complete: false };
+    openPulls = { pulls: [], complete: false, failureMessage: message };
   }
 
   const lookups = [];
@@ -1211,6 +1224,7 @@ async function runSync(options) {
   const results = [];
   const failures = [];
   let deferredNote = '';
+  let deferredDetail = '';
   let cursorSaved = false;
   const deferAt = (lookupId, message) => {
     const source = message.startsWith('Linear')
@@ -1223,6 +1237,10 @@ async function runSync(options) {
     const resumeAt = lookups.indexOf(lookupId);
     const deferred = lookups.length - (resumeAt === -1 ? 0 : resumeAt);
     deferredNote = `${deferred} issue(s) deferred to the next sweep by the ${source} rate limit; resume at ${lookupId}`;
+    deferredDetail = message;
+    if (isInstallationQuota403(message)) {
+      log(installationQuotaLog('Linear Sync'));
+    }
     log(`Lifecycle evaluation deferred at ${lookupId}: ${message}`);
     log(deferredNote);
   };
@@ -1305,13 +1323,22 @@ async function runSync(options) {
   if (sweep && !cursorSaved) writeSweepCursor(cursorDir, '');
   const reasons = [...failures];
   if (!openPulls.complete) {
+    const detail =
+      openPulls.failureMessage &&
+      isInstallationQuota403(openPulls.failureMessage)
+        ? ` (${openPulls.failureMessage})`
+        : '';
     reasons.unshift(
-      'the open pull request scan failed, so issues were left in place'
+      `the open pull request scan failed${detail}, so issues were left in place`
     );
   }
   if (reasons.length > 0 || (deferredNote && !sweep)) {
+    const quotaDetail =
+      deferredDetail && isInstallationQuota403(deferredDetail)
+        ? deferredDetail
+        : '';
     throw new Error(
-      `Lifecycle evaluation failed: ${[...reasons, deferredNote].filter(Boolean).join('; ')}`
+      `Lifecycle evaluation failed: ${[...reasons, deferredNote, quotaDetail].filter(Boolean).join('; ')}`
     );
   }
   const first = results[0];
@@ -1381,9 +1408,9 @@ if (isDirectRun) {
       : syncLinearIssueOnMerge();
   run
     .catch(error => {
-      const message = error instanceof Error ? error.message : String(error);
-      console.error(message);
-      process.exitCode = 1;
+      const disposition = failureDisposition('Linear Sync', error);
+      console.error(disposition.log);
+      if (!disposition.softFailed) process.exitCode = disposition.code;
     })
     .finally(() => {
       // Save the immutable-read cache only when its content changed.

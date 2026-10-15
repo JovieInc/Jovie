@@ -1,9 +1,66 @@
 #!/usr/bin/env node
 
+import { spawn } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
+const RESOLVE_MAIN_SCRIPT = fileURLToPath(
+  new URL('./resolve-main-sha.sh', import.meta.url)
+);
+const DEFAULT_REST_BUDGET_MS = 90_000;
+
+function headerNumber(headers, name) {
+  if (!headers) return null;
+  const value =
+    typeof headers.get === 'function' ? headers.get(name) : headers[name];
+  return value != null && /^[0-9]+$/.test(String(value).trim())
+    ? Number(value)
+    : null;
+}
+
+/**
+ * Hold a remaining REST read until x-ratelimit-reset (or retry-after) when
+ * that instant is inside the budget. Anything else fails closed. A rate-limit
+ * response never becomes a successful empty body.
+ * @param {{
+ *   status?: number,
+ *   headers?: { get?: (name: string) => string | null },
+ *   bodyText?: string,
+ *   nowMs: number,
+ *   deadlineMs: number,
+ * }} input
+ * @returns {{ action: 'wait' | 'fail', waitMs?: number, reason?: string }}
+ */
+export function planGitHubRestHold({
+  status = 0,
+  headers = null,
+  bodyText = '',
+  nowMs,
+  deadlineMs,
+}) {
+  const remaining = headerNumber(headers, 'x-ratelimit-remaining');
+  const reset = headerNumber(headers, 'x-ratelimit-reset');
+  const retryAfter = headerNumber(headers, 'retry-after');
+  const text = String(bodyText ?? '');
+  const rateLimited =
+    remaining === 0 ||
+    status === 429 ||
+    /\bAPI rate limit (?:already )?exceeded\b/i.test(text) ||
+    /\bsecondary rate limit\b/i.test(text);
+  if (!rateLimited) return { action: 'fail' };
+  const bounds = [];
+  if (reset !== null) bounds.push(reset * 1000);
+  if (retryAfter !== null) bounds.push(nowMs + retryAfter * 1000);
+  if (bounds.length === 0) {
+    return { action: 'fail', reason: 'missing x-ratelimit-reset' };
+  }
+  const retryAtMs = Math.max(nowMs, ...bounds) + 1000;
+  if (retryAtMs > deadlineMs) {
+    return { action: 'fail', reason: 'outside the rate-limit budget', retryAtMs };
+  }
+  return { action: 'wait', waitMs: Math.max(0, retryAtMs - nowMs) };
+}
 
 export function hasExactSuccessfulMergeGroupProof({ sha, runs, jobsByRun }) {
   if (!SHA_PATTERN.test(sha)) return false;
@@ -33,20 +90,103 @@ function requiredEnv(name) {
   return value;
 }
 
-async function githubApi(path, { token, apiUrl, fetchImpl = fetch }) {
-  const response = await fetchImpl(`${apiUrl}${path}`, {
-    headers: {
-      Accept: 'application/vnd.github+json',
-      Authorization: `Bearer ${token}`,
-      'User-Agent': 'jovie-main-queue-provenance',
-      'X-GitHub-Api-Version': '2022-11-28',
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`GitHub API ${path} returned HTTP ${response.status}`);
+async function githubApi(
+  path,
+  {
+    token,
+    apiUrl,
+    fetchImpl = fetch,
+    now = Date.now,
+    sleep = ms => new Promise(resolve => setTimeout(resolve, ms)),
+    budgetMs = DEFAULT_REST_BUDGET_MS,
   }
-  return response.json();
+) {
+  const deadlineMs = now() + budgetMs;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const response = await fetchImpl(`${apiUrl}${path}`, {
+      headers: {
+        Accept: 'application/vnd.github+json',
+        Authorization: `Bearer ${token}`,
+        'User-Agent': 'jovie-main-queue-provenance',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+    });
+    if (response.ok) return response.json();
+    let bodyText = '';
+    if (typeof response.text === 'function') {
+      bodyText = await response.text().catch(() => '');
+    }
+    const decision = planGitHubRestHold({
+      status: response.status,
+      headers: response.headers,
+      bodyText,
+      nowMs: now(),
+      deadlineMs,
+    });
+    if (decision.action === 'wait' && attempt === 0) {
+      console.error(
+        `::warning::Holding ${Math.ceil((decision.waitMs ?? 0) / 1000)}s for the GitHub rate limit reset before retrying ${path}.`
+      );
+      await sleep(decision.waitMs ?? 0);
+      continue;
+    }
+    const reason = decision.reason ? `: ${decision.reason}` : '';
+    throw new Error(
+      `GitHub API ${path} returned HTTP ${response.status}${reason}`
+    );
+  }
+}
+
+function runProcess(command, args, env) {
+  return new Promise(resolve => {
+    const child = spawn(command, args, {
+      env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const out = [];
+    const err = [];
+    child.stdout.on('data', chunk => out.push(chunk));
+    child.stderr.on('data', chunk => err.push(chunk));
+    child.on('error', error =>
+      resolve({ code: 127, stdout: '', stderr: String(error) })
+    );
+    child.on('close', code =>
+      resolve({
+        code: code ?? 1,
+        stdout: Buffer.concat(out).toString('utf8'),
+        stderr: Buffer.concat(err).toString('utf8'),
+      })
+    );
+  });
+}
+
+/**
+ * Current refs/heads/main via .github/scripts/resolve-main-sha.sh (git
+ * ls-remote, then one REST read that holds until x-ratelimit-reset inside
+ * its budget). A failure throws. This never invents a SHA.
+ */
+export async function resolveMainSha({
+  repository,
+  token = '',
+  env = process.env,
+  scriptPath = RESOLVE_MAIN_SCRIPT,
+  spawnImpl = runProcess,
+} = {}) {
+  if (!/^[^/\s]+\/[^/\s]+$/.test(String(repository ?? ''))) {
+    throw new Error('repository must be owner/name');
+  }
+  const outcome = await spawnImpl('bash', [scriptPath, repository], {
+    ...env,
+    GH_TOKEN: token || env.GH_TOKEN || env.GITHUB_TOKEN || '',
+    GITHUB_TOKEN: token || env.GITHUB_TOKEN || env.GH_TOKEN || '',
+  });
+  const sha = String(outcome.stdout ?? '').trim();
+  if (outcome.code === 0 && SHA_PATTERN.test(sha)) return sha;
+  const detail = String(outcome.stderr ?? '').trim();
+  throw new Error(
+    detail ||
+      `Could not resolve refs/heads/main for ${repository} via git ls-remote.`
+  );
 }
 
 export async function findExactQueueProof({
@@ -55,7 +195,11 @@ export async function findExactQueueProof({
   token,
   apiUrl,
   fetchImpl = fetch,
+  now,
+  sleep,
+  budgetMs,
 }) {
+  const rest = { token, apiUrl, fetchImpl, now, sleep, budgetMs };
   const query = new URLSearchParams({
     event: 'merge_group',
     head_sha: sha,
@@ -64,7 +208,7 @@ export async function findExactQueueProof({
   });
   const payload = await githubApi(
     `/repos/${repository}/actions/workflows/ci.yml/runs?${query}`,
-    { token, apiUrl, fetchImpl }
+    rest
   );
   const exactRuns = (payload.workflow_runs ?? []).filter(
     run =>
@@ -78,7 +222,7 @@ export async function findExactQueueProof({
   for (const run of exactRuns) {
     const jobsPayload = await githubApi(
       `/repos/${repository}/actions/runs/${run.id}/jobs?filter=latest&per_page=100`,
-      { token, apiUrl, fetchImpl }
+      rest
     );
     jobsByRun.set(run.id, jobsPayload.jobs ?? []);
   }
@@ -119,7 +263,9 @@ function writeSummary(lines) {
 
 /**
  * One-shot exact-SHA provenance check. This never polls the current run.
- * Superseded main SHAs are neutral; every GitHub API error fails closed.
+ * Main is resolved over git ls-remote. Superseded SHAs are neutral. Every
+ * remaining REST error fails closed; a rate-limit response holds until
+ * x-ratelimit-reset only inside the budget and never passes silently.
  */
 export async function checkMainQueueProvenance({
   repository,
@@ -127,18 +273,17 @@ export async function checkMainQueueProvenance({
   token,
   apiUrl = 'https://api.github.com',
   fetchImpl = fetch,
+  resolveMain = resolveMainSha,
+  now,
+  sleep,
+  budgetMs,
 }) {
   if (!SHA_PATTERN.test(sha)) throw new Error('sha must be a full SHA');
 
   const normalizedApiUrl = apiUrl.replace(/\/$/, '');
-  const tip = await githubApi(`/repos/${repository}/commits/main`, {
-    token,
-    apiUrl: normalizedApiUrl,
-    fetchImpl,
-  });
-  const currentMainSha = tip?.sha ?? '';
+  const currentMainSha = await resolveMain({ repository, token });
   if (!SHA_PATTERN.test(currentMainSha)) {
-    throw new Error('GitHub API returned an invalid main HEAD SHA');
+    throw new Error('git ls-remote returned an invalid main HEAD SHA');
   }
 
   if (currentMainSha !== sha) {
@@ -156,6 +301,9 @@ export async function checkMainQueueProvenance({
     token,
     apiUrl: normalizedApiUrl,
     fetchImpl,
+    now,
+    sleep,
+    budgetMs,
   });
   return {
     isCurrent: true,
