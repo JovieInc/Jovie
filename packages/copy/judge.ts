@@ -1,5 +1,5 @@
-import { type CopyLintResult, lintCopy } from './lint';
-import type { CopyRegister } from './rules';
+import { type CopyLintResult, lintCopy } from './lint.js';
+import type { CopyRegister } from './rules.js';
 
 /**
  * Stakes tiers. Judge spend scales with how often the text runs and how much
@@ -76,6 +76,8 @@ export type JudgeTransport = ((request: {
   model: string;
   system: string;
   prompt: string;
+  /** Content research only; the subscription transport requires a search receipt. */
+  webSearch?: boolean;
 }) => Promise<string>) & {
   /** Whether this transport can reach a model right now. Default: all. */
   available?: (model: string) => boolean;
