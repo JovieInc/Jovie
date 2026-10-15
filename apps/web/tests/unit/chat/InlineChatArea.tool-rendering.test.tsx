@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { TOOL_STATUS_PARTS } from '@/components/jovie/fixtures/tool-status';
 import type { ChatError } from '@/components/jovie/types';
 import { fastRender } from '@/tests/utils/fast-render';
 
@@ -530,8 +531,10 @@ describe('InlineChatArea tool invocation rendering', () => {
 
     const statusRow = screen.getByTestId('tool-status-row');
     expect(statusRow.getAttribute('data-tool-name')).toBe('summarizeAudience');
-    expect(screen.getByText('Summarize audience done')).toBeDefined();
-    expect(screen.getByText('Audience summary complete.')).toBeDefined();
+    expect(statusRow).toHaveAttribute('data-operation-status', 'unknown');
+    expect(
+      screen.getByText('Completion has not been confirmed.')
+    ).toBeDefined();
   });
 });
 
@@ -549,4 +552,33 @@ describe('InlineChatArea virtualized transcript under React Compiler', () => {
       "'use no memo';"
     );
   });
+});
+
+it('passes live execution through ChatMessage and resolves only after the saved receipt arrives', async () => {
+  const { ChatMessage } = await import(
+    '@/components/jovie/components/ChatMessage'
+  );
+  const messageProps = {
+    id: 'live-status-message',
+    role: 'assistant' as const,
+  };
+  const { container, rerender } = fastRender(
+    <ChatMessage
+      {...messageProps}
+      parts={TOOL_STATUS_PARTS.working}
+      isStreaming
+    />
+  );
+  expect(screen.getByTestId('tool-status-row')).toHaveAttribute(
+    'data-operation-status',
+    'working'
+  );
+  rerender(
+    <ChatMessage {...messageProps} parts={TOOL_STATUS_PARTS.unconfirmed} />
+  );
+  expect(container.querySelector('[data-fill="check"]')).toBeNull();
+  rerender(
+    <ChatMessage {...messageProps} parts={TOOL_STATUS_PARTS.succeeded} />
+  );
+  expect(container.querySelectorAll('[data-fill="check"]')).toHaveLength(1);
 });

@@ -16,10 +16,14 @@ required device record is missing. Visual screenshot emission and screen
 certification do not reject a rendered candidate when the only browser-owned
 input findings are UNKNOWN missing device evidence. BLOCKED records (duplicates,
 stale builds, incomplete provenance) still fail emission and certification.
-Web auth is now gated rather than excluded; native auth ownership stays with
-its native suite. A resting screenshot or synthetic fill cannot satisfy the
-browser-owned input dimension. Device evidence does not bypass the existing
-immutable GitHub artifact/provenance resolver. Device commissioning remains
+Web auth email and one-time-code entry stay gated rather than excluded.
+Password and passkey cells attach only when a web.auth source hosts the
+declared input. AuthShell is passwordless, and passkey entry is a button
+chooser, so those journeys do not generate device cells. Native auth
+ownership stays with its native suite. A resting screenshot or synthetic fill
+cannot satisfy the browser-owned input dimension. Device evidence does not
+bypass the existing immutable GitHub artifact/provenance resolver. Device
+commissioning remains
 [JOV-8387](https://linear.app/jovie/issue/JOV-8387).
 
 ## Deterministic layer
