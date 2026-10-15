@@ -193,7 +193,6 @@
       "id": "account-contact",
       "screens": [
         "web.contacts",
-        "web.dashboard-contacts",
         "web.settings",
         "web.settings-artist-profile"
       ],

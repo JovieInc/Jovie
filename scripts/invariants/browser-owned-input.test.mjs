@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { test } from 'node:test';
 import {
   browserInputFindings,
@@ -12,7 +13,10 @@ import {
   transitionFindings,
 } from './browser-owned-input.mjs';
 import { auditScreens, remediationPlans } from './screen-audit.mjs';
-import { evaluateScreenProof } from './screen-certification.mjs';
+import {
+  evaluateScreenProof,
+  SCREEN_REGISTRY,
+} from './screen-certification.mjs';
 
 const HEAD = 'a'.repeat(40);
 const screenId = 'web.public-profile';
@@ -473,6 +477,62 @@ test('artist pay owes browser-owned email evidence only when its surface hosts t
   assert.equal(
     remediationPlans(pay).some(
       plan => plan.fingerprint === 'screen-audit:web.artist-pay'
+    ),
+    false
+  );
+});
+
+const BROWSER_CONTACT_FIELD =
+  /(?:type|autoComplete|autocomplete|inputMode|inputmode)\s*=\s*['"](?:email|tel)['"]/;
+
+function filesUnder(source) {
+  if (!existsSync(source)) return [];
+  let entries;
+  try {
+    entries = readdirSync(source, { withFileTypes: true });
+  } catch {
+    return [source];
+  }
+  return entries.flatMap(entry => {
+    const path = join(source, entry.name);
+    return entry.isDirectory() ? filesUnder(path) : [path];
+  });
+}
+
+test('dashboard contacts owes account-contact evidence only when its surface hosts email or phone inputs', () => {
+  const screen = SCREEN_REGISTRY.find(
+    item => item.id === 'web.dashboard-contacts'
+  );
+  assert.ok(screen);
+  const hosted = screen.sources
+    .flatMap(filesUnder)
+    .some(path => BROWSER_CONTACT_FIELD.test(readFileSync(path, 'utf8')));
+  const bound = INPUT_MATRIX.journeys.some(
+    journey =>
+      journey.id === 'account-contact' &&
+      journey.fields.some(field => field === 'email' || field === 'tel') &&
+      journey.screens.includes('web.dashboard-contacts')
+  );
+  assert.equal(bound, hosted);
+  if (hosted) return;
+  assert.deepEqual(inputCells('web.dashboard-contacts'), []);
+  assert.deepEqual(
+    browserInputFindings(undefined, {
+      screenId: 'web.dashboard-contacts',
+      headSha: HEAD,
+    }),
+    []
+  );
+  const ledger = auditScreens({
+    registry: [screen],
+    headSha: HEAD,
+  });
+  assert.equal(ledger.screens[0].producer, 'none');
+  assert.equal(ledger.screens[0].verdict, 'uncovered');
+  assert.deepEqual(ledger.screens[0].findings, []);
+  assert.equal(
+    remediationPlans(ledger).some(
+      plan => plan.fingerprint === 'screen-audit:web.dashboard-contacts'
     ),
     false
   );
