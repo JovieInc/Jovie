@@ -38,6 +38,12 @@ export interface ContrastPair {
   readonly themes?: readonly string[];
   /** Opaque surface below a translucent background tint. */
   readonly underlay?: string;
+  /**
+   * Token to resolve for the ratio when the role in `fg` is rebound for
+   * this surface. The pair identity stays `fg` so the shrink-only ratchet
+   * tracks the same debt item.
+   */
+  readonly fgSource?: string;
 }
 
 export interface PairCheckResult {
@@ -353,12 +359,13 @@ export function checkPair(
   pair: ContrastPair,
   table: Map<string, string>
 ): PairCheckResult {
-  const fgRaw = table.get(pair.fg);
+  const fgToken = pair.fgSource ?? pair.fg;
+  const fgRaw = table.get(fgToken);
   const bgRaw = table.get(pair.bg);
   if (fgRaw === undefined || bgRaw === undefined) {
     return {
       status: 'unresolvable',
-      detail: `missing token ${fgRaw === undefined ? pair.fg : pair.bg}`,
+      detail: `missing token ${fgRaw === undefined ? fgToken : pair.bg}`,
     };
   }
 

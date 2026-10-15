@@ -19,6 +19,32 @@ export type ContrastBaseline = Readonly<
   Record<string, readonly [number, number]>
 >;
 
+const PAPER_SURFACE = '--color-bg-paper';
+
+/**
+ * Paper stays #f7f8f8 in dark themes. Canvas tertiary is the muted gray
+ * those themes use on near-black; paper rebinds to the light token.
+ */
+const LIGHT_READING_TEXT: Readonly<Record<string, string>> = {
+  '--color-text-tertiary-token': '--color-text-tertiary-on-light',
+};
+
+function lightReadingSource(
+  fg: string,
+  bg: string,
+  underlay: string | undefined,
+  table: Map<string, string>
+): string | undefined {
+  const source = LIGHT_READING_TEXT[fg];
+  if (!source || !table.has(source)) return undefined;
+  if (bg !== PAPER_SURFACE && underlay !== PAPER_SURFACE) return undefined;
+  return source;
+}
+
+function isLightReadingSwatch(token: string): boolean {
+  return token.endsWith('-on-light');
+}
+
 /**
  * Discover semantic token families rather than maintaining a pair allowlist.
  * Ordinary text is checked on every neutral surface and state; inverse,
@@ -52,6 +78,7 @@ export function generateTokenPairs(tables: ThemeTables): ContrastPair[] {
       const underlays =
         value && parseColor(value)?.alpha === 1 ? [undefined] : opaque;
       for (const underlay of underlays) {
+        const fgSource = lightReadingSource(fg, bg, underlay, table);
         pairs.push({
           name: `${fg} on ${bg}${underlay ? ` over ${underlay}` : ''}`,
           fg,
@@ -59,6 +86,7 @@ export function generateTokenPairs(tables: ThemeTables): ContrastPair[] {
           minRatio,
           underlay,
           themes: [theme],
+          ...(fgSource ? { fgSource } : {}),
         });
       }
     };
@@ -66,7 +94,8 @@ export function generateTokenPairs(tables: ThemeTables): ContrastPair[] {
       t =>
         /^--(?:color|linear|system-b)-text-/.test(t) &&
         !t.endsWith('-tooltip') &&
-        !t.endsWith('-inverse')
+        !t.endsWith('-inverse') &&
+        !isLightReadingSwatch(t)
     );
     const backgrounds = [...surfaces, ...tints];
     const statusTints = tokens.filter(t =>
@@ -143,7 +172,8 @@ export function generateTokenPairs(tables: ThemeTables): ContrastPair[] {
     );
     const required = tokens.filter(
       t =>
-        /^--(?:color|linear|system-b)-text-/.test(t) ||
+        (/^--(?:color|linear|system-b)-text-/.test(t) &&
+          !isLightReadingSwatch(t)) ||
         /^--(?:color|linear)-btn-.*-(?:fg|hover|active|selected)$/.test(t) ||
         /^--color-.*-foreground$/.test(t) ||
         /^--color-(?:bg|surface|interactive|cell|row|button)-.*(?:hover|active|selected)$/.test(
