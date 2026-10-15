@@ -14,6 +14,7 @@
 import type { FounderCertificationDecisionKind } from '@/lib/agent-os/certification';
 import {
   DOGFOOD_PRODUCTS,
+  type DogfoodMissionSpec,
   type DogfoodProduct,
   type DogfoodReceipt,
   evaluateDogfoodReliability,
@@ -75,7 +76,7 @@ export interface MetricsSubject {
   readonly product: DogfoodProduct;
   readonly riskClass: CertificationRiskClass;
   /** Missions the identity's assurance profile requires (spec section 4). */
-  readonly requiredMissions: readonly { id: string; required?: boolean }[];
+  readonly requiredMissions: readonly DogfoodMissionSpec[];
   /** The subject's current deploy binding; receipts must match it to count. */
   readonly deploy: { commitSha: string; deploymentId: string } | null;
   /** Confidence tier assigned when the subject entered `human_window`. */

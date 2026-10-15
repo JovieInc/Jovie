@@ -144,6 +144,15 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: true,
   }),
   Object.freeze({
+    id: 'public-command-openapi',
+    command:
+      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/api/v1/public-command-openapi.test.ts app/api/agents/creator-lookup/route.test.ts app/api/agents/feedback/route.test.ts app/api/agents/profiles/route.test.ts',
+    // The contract spans the web document and the CLI/MCP command registry.
+    inputs:
+      /^(?:apps\/web\/(?:app\/(?:api\/(?:agents\/|music\/mcp\/|v1\/openapi\.json\/)|openapi\.json\/)|lib\/(?:api\/|music-resolver\/public-(?:read|schemas)\.ts$)|tests\/(?:unit\/api\/v1\/[^/]*openapi[^/]*\.test\.ts|utils\/public-openapi\.ts)$)|packages\/jovie-cli\/src\/)/u,
+    prOnly: true,
+  }),
+  Object.freeze({
     id: 'static-revalidate-policy',
     command:
       'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/marketing/static-revalidate-policy.test.ts',
@@ -570,7 +579,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
 ]);
 export const DEPRECATION_COVERAGE_COMMAND =
   'node --test --experimental-test-coverage --test-coverage-include=scripts/deprecation-clearance.mjs --test-coverage-include=scripts/lib/deprecation-observation.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=90 scripts/deprecation-clearance.test.mjs';
-export const SCRIPT_CONTRACT_NODE_COMMAND = `${DEPRECATION_COVERAGE_COMMAND} && ${CODEX_BOOTSTRAP_COVERAGE_COMMAND} && node --test ${SCRIPT_CONTRACT_NODE_TESTS.join(' ')}`;
+export const SCRIPT_CONTRACT_NODE_COMMAND = `${DEPRECATION_COVERAGE_COMMAND} && ${CODEX_BOOTSTRAP_COVERAGE_COMMAND} && node --import tsx --test --test-isolation=none scripts/content-os/project.test.mts && pnpm --filter @jovie/copy exec vitest run --config vitest.config.mts transport.test.ts judge.test.ts && node --test ${SCRIPT_CONTRACT_NODE_TESTS.join(' ')}`;
 export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/merge-group-failure-hold.test.mjs',
   'scripts/lib/__tests__/mesh-host-ack.test.mjs',
@@ -602,6 +611,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/changelog-source-guard.test.mjs',
   'scripts/lib/__tests__/delivery-control-receipts-workflow.test.mjs',
   'scripts/lib/__tests__/dependabot-update-policy.test.mjs',
+  'scripts/lib/__tests__/design-surface-census.test.mjs',
   'scripts/lib/__tests__/doc-freshness.test.mjs',
   'scripts/lib/__tests__/flaky-test-filing.test.mjs',
   'scripts/lib/__tests__/gbrain-pool-env.test.mjs',

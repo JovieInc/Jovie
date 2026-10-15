@@ -116,6 +116,11 @@ readable but do not enter fleet-hardening denominators.
 A receipt counts only if `commitSha` and `deploymentId` match the subject's
 current deploy receipt.
 
+Exposure-scoped missions also require the versioned expected-versus-observed
+[effective-exposure evidence](../operations/dogfood-exposure.md). A green test
+summary or legacy receipt cannot certify a hidden feature. Early-access and
+customer-control missions retain independent expectations and execution proof.
+
 **Mission set.** Each registry identity declares which missions prove it, in its
 existing per-identity assurance profile (v1). No second registry. A mission names
 one outcome a real user needs ("claim a smart link and see it resolve"), not an
