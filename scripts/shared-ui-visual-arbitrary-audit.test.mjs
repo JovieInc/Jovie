@@ -65,7 +65,6 @@ const COVERED_PRODUCTION_SOURCES = [
   'packages/ui/lib/overlay-focus.ts',
   'packages/ui/atoms/founder-pen-atoms.ts',
   'packages/ui/atoms/status-glyph.tsx',
-  'packages/ui/lib/operation-status.ts',
   'packages/ui/brand/JovieO.tsx',
   'packages/ui/brand/JovieWordmark.tsx',
 ];
@@ -154,9 +153,7 @@ test('repo shared-UI visual arbitrary findings match the shrink-only baseline', 
   assert.equal(result.status, 'pass');
   assert.equal(result.totalFindings, 0);
   assert.deepEqual(result.findings, []);
-  // operation-status.ts is a non-visual resolver: one more scanned file, zero
-  // arbitrary visual findings. The shrink-only findings baseline stays at 0.
-  assert.equal(result.scannedFiles.length, 70);
+  assert.equal(result.scannedFiles.length, 69);
   for (const relativePath of COVERED_PRODUCTION_SOURCES) {
     assert.equal(
       result.scannedFiles.includes(relativePath),

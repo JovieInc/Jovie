@@ -1,7 +1,7 @@
 import {
   type OperationStatus,
   resolveOperationStatus,
-} from '@jovie/ui/lib/operation-status';
+} from '@jovie/ui/lib/utils';
 import type { SummerCard } from './summer-cards';
 import type { SummerKanbanCard } from './summer-kanban';
 

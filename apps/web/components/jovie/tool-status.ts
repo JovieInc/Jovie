@@ -1,7 +1,7 @@
 import {
   type OperationStatus,
   resolveOperationStatus,
-} from '@jovie/ui/lib/operation-status';
+} from '@jovie/ui/lib/utils';
 import type { PersistedToolEvent } from '@/lib/chat/tool-events';
 import type { MessagePart } from './types';
 

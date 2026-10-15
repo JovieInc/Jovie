@@ -254,7 +254,7 @@ export function isJovieToolPart(part: unknown): part is JovieToolPart {
 
 export type MessagePart = UIMessage['parts'][number] & {
   /** Only attached while hydrating authoritative persisted tool records. */
-  readonly persistedToolReceipt?: import('@jovie/ui/lib/operation-status').OperationReceipt;
+  readonly persistedToolReceipt?: import('@jovie/ui/lib/utils').OperationReceipt;
 };
 
 /** Shape of file attachments passed to AI SDK's sendMessage. */

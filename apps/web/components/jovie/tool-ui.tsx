@@ -1,7 +1,7 @@
 'use client';
 
 import { StatusGlyph } from '@jovie/ui/atoms/status-glyph';
-import type { OperationStatus } from '@jovie/ui/lib/operation-status';
+import type { OperationStatus } from '@jovie/ui/lib/utils';
 import { Lock } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef } from 'react';

@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import {
   type OperationObservation,
   resolveOperationStatus,
-} from '../lib/operation-status';
+} from '../lib/utils';
 import { STATUS_GLYPH_STATES, StatusGlyph } from './status-glyph';
 
 const meta: Meta<typeof StatusGlyph> = {

@@ -116,11 +116,8 @@ const CENTER = VIEW / 2;
 const RING_R = 6.25;
 const FILL_R = 4.75;
 const STROKE = 1.5;
+/** Dashed ring shared by the empty dashed states and the spinning working state. */
 const DASHED_RING = '2.6 2';
-/** Working arc is 30% of the same ring; the gap is the rest of the circumference. */
-const RING_LENGTH = 2 * Math.PI * RING_R;
-const WORKING_ARC_FRACTION = 0.3;
-const WORKING_RING_DASH = `${(RING_LENGTH * WORKING_ARC_FRACTION).toFixed(2)} ${(RING_LENGTH * (1 - WORKING_ARC_FRACTION)).toFixed(2)}`;
 
 /** Pie-sector path for a fractional fill, sweeping clockwise from 12 o'clock. */
 function sectorPath(fraction: number): string {
@@ -172,8 +169,7 @@ function GlyphMark({
           fill='none'
           stroke='currentColor'
           strokeWidth={STROKE}
-          strokeDasharray={WORKING_RING_DASH}
-          strokeLinecap='round'
+          strokeDasharray={DASHED_RING}
         />
       ) : spec.fill === 'empty' ? (
         ring

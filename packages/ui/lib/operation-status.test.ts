@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveOperationStatus } from './operation-status';
+import { resolveOperationStatus } from './utils';
 
 const succeeded = {
   operationKey: 'task:attempt-2',
