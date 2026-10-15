@@ -2808,13 +2808,21 @@ ${selectedGateScript}`,
       'EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$deployment_url"'
     );
     expect(resolve).toContain('EXPECTED_VERCEL_ENVIRONMENT=production');
+    // Commit identity and main ancestry must survive shared REST quota exhaustion.
+    expect(resolve).toContain('commit_history="$(mktemp -d)"');
+    expect(resolve).toContain('git init -q "$commit_history"');
+    expect(resolve).toContain('fetch --quiet --no-tags --filter=blob:none');
+    expect(resolve).toContain('"https://github.com/$REPOSITORY.git"');
+    expect(resolve).toContain('refs/heads/main:refs/heads/main');
+    expect(resolve).toContain('rev-parse --verify "$deployed_sha^{commit}"');
     expect(resolve).toContain(
-      'gh api "repos/$REPOSITORY/commits/$deployed_sha"'
+      'merge-base --is-ancestor "$commit_sha" refs/heads/main'
     );
+    expect(resolve).not.toContain('gh api "repos/$REPOSITORY/commits/');
+    expect(resolve).not.toContain('gh api "repos/$REPOSITORY/compare/');
     expect(resolve).toContain(
-      'gh api "repos/$REPOSITORY/compare/$commit_sha...main"'
+      'Canonical production commit is not an ancestor of main.'
     );
-    expect(resolve).toContain('.merge_base_commit.sha == $sha');
     expect(resolve).toContain(
       'Vercel list metadata disagrees with the exact origin build identity.'
     );
