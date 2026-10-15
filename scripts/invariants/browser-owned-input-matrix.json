@@ -191,12 +191,7 @@
   "journeys": [
     {
       "id": "account-contact",
-      "screens": [
-        "web.contacts",
-        "web.dashboard-contacts",
-        "web.settings",
-        "web.settings-artist-profile"
-      ],
+      "screens": ["web.contacts", "web.dashboard-contacts", "web.settings"],
       "source": "apps/web/components/features/settings",
       "fields": ["email", "tel"],
       "scenarios": [
@@ -266,11 +261,7 @@
     },
     {
       "id": "payment-tip",
-      "screens": [
-        "web.marketing-pay",
-        "web.settings-billing",
-        "web.settings-artist-profile"
-      ],
+      "screens": ["web.marketing-pay", "web.settings-billing"],
       "source": "apps/web/components/features/profile",
       "fields": ["email"],
       "scenarios": [
