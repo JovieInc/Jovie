@@ -1441,7 +1441,9 @@
   /* Cinematic depth ramp (Tim, 2026-09-25): one big step from primary, then a
      compressed ordered tail. */
   --noir-ion-text-secondary: #a0a5af;
-  --noir-ion-text-muted: #8f95a0;
+  /* Stays below secondary, and still clears 4.5:1 when a done task row
+     composites this color at opacity 0.75 over the shell canvas #101114. */
+  --noir-ion-text-muted: #9da2ac;
   /* Clears 4.5:1 on the selected row tint over surface-1 (JOV-7861). */
   --noir-ion-text-tertiary: #8c939e;
   --noir-ion-text-disabled: #525d75;
@@ -2996,7 +2998,7 @@
   --color-surface-active: var(--color-bg-active);
   --color-text-primary-token: #f5f7fb;
   --color-text-secondary-token: #a0a5af;
-  --color-text-tertiary-token: #8f95a0;
+  --color-text-tertiary-token: #9da2ac;
   --color-text-quaternary-token: #858b96;
   --color-primary-token: var(--color-text-primary-token);
   --color-secondary-token: var(--color-text-secondary-token);
