@@ -2160,6 +2160,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.expected_sha }}
           persist-credentials: false
           sparse-checkout: .github/scripts/resolve-main-sha.mjs
           sparse-checkout-cone-mode: false

@@ -1822,7 +1822,9 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(verified).toContain('authSmoke: $auth_smoke');
     expect(verified).toContain('did not complete successfully');
     expect(verified).not.toContain('concurrency:');
-    expect(verified).toContain('repos/${{ github.repository }}/commits/main');
+    expect(verified).toContain(
+      '$GITHUB_WORKSPACE/.github/scripts/resolve-main-sha.mjs'
+    );
     expect(verified).toContain('verify-production-alias.sh');
     expect(verified).toContain('superseded by $current_sha');
     expect(verified).toContain(
@@ -4375,7 +4377,7 @@ describe('production promotion exact-artifact contract', () => {
     expect(verified).not.toContain('neutral with no notification');
     expect(verified).toContain('Finalize exact current release generation');
     expect(verified).toContain('Notify exact verified production generation');
-    expect(verified.match(/commits\/main/g)).toHaveLength(3);
+    expect(verified.match(/resolve-main-sha\.mjs/g)).toHaveLength(3);
     // JOV-4442: marker payload is write-through in finalize (no separate write step).
     const finalizeStep = getStepBlock(
       verified,
