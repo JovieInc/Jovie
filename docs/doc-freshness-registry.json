@@ -471,12 +471,20 @@
     },
     "docs/writing/SURFACE_COVERAGE.md": {
       "owner": "@itstimwhite",
-      "claim": "Writing surface completeness is validated by the existing invariant consumer.",
-      "documentSha256": "1a1cf51249295ae88a750bc3a30254aec871c686ca555d01fe3f1d4583d0af68",
+      "claim": "The existing invariant consumer validates writing surface completeness; the bounded ops pilot rechecks artifact bindings at its Linear adapter and remains advisory.",
+      "documentSha256": "12eceb13da0e67515100dae4c954fbcc9e0c6e7abf782f23596935621313e3e1",
       "sources": [
         {
           "path": "scripts/invariants/writing-surfaces.mjs",
           "sha256": "91356a21ccf5164603191080d6fb3e4e03d7455b8d58ad0c08c5651965143145"
+        },
+        {
+          "path": "scripts/lanes/doctor.py",
+          "sha256": "62c6939febf3586175d3bd867909d7fe3ef7bc9175ba7583b7dda921ddf0938a"
+        },
+        {
+          "path": "scripts/lanes/ops-report.mjs",
+          "sha256": "13f2edce9dc44a1aef3bf1180a32aa6b78bb2a23f26b95274b0e23820752327b"
         }
       ]
     }
