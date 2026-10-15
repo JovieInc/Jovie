@@ -82,6 +82,31 @@ describe('MCP server', () => {
     ).toMatchObject({ readOnlyHint: true });
   });
 
+  it('advertises creator lookup source limits in its description and input', async () => {
+    const response = await handleMcpMessage(
+      { jsonrpc: '2.0', id: 49, method: 'tools/list' },
+      context()
+    );
+    const { tools } = response?.result as {
+      tools: Array<{
+        name: string;
+        description: string;
+        inputSchema: {
+          properties: Record<string, { description: string }>;
+        };
+      }>;
+    };
+    const lookup = tools.find(tool => tool.name === 'lookup_creator');
+    expect(lookup?.description).toContain(
+      'Only YouTube channels support extraction'
+    );
+    expect(lookup?.description).toContain('SOURCE_UNSUPPORTED');
+    expect(lookup?.description).toContain('UNSUPPORTED_URL');
+    expect(
+      lookup?.inputSchema.properties['url-or-handle'].description
+    ).toContain('existing Jovie profiles only');
+  });
+
   it('calls the read-only creator lookup tool', async () => {
     const urls: string[] = [];
     const fetchImpl: FetchImplementation = async (input, init) => {

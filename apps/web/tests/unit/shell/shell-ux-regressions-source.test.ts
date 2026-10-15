@@ -166,10 +166,12 @@ describe('shell UX regressions source contracts (JOV-3958/3959/3960)', () => {
     expect(threads).not.toContain("from 'lucide-react'");
     expect(threads).toContain("name='Ellipsis'");
     expect(threads).toContain("name='RefreshCw'");
-    expect(threads).toContain("name='MessageSquarePlus'");
+    expect(threads).toContain("name='Plus'");
     expect(threads).toContain("name='ArrowRight'");
+    expect(threads).toContain('newThreadAction');
+    expect(threads).not.toContain("name='MessageSquarePlus'");
     expect(icons).toContain('ArrowRight,');
-    expect(icons).toContain('MessageSquarePlus,');
+    expect(icons).toContain('Plus,');
   });
 
   it('keeps left allocation, main-plane geometry, and right allocation on one rail-motion contract (JOV-4522)', () => {

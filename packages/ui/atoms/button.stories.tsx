@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useState } from 'react';
 import { BUTTON_SIZE_NAMES, BUTTON_VARIANT_NAMES, Button } from './button';
+import type { ButtonActionState } from './button-contract';
 
 const meta: Meta<typeof Button> = {
   title: 'shadcn/Button',
@@ -46,6 +48,57 @@ const meta: Meta<typeof Button> = {
 
 export default meta;
 type Story = StoryObj<typeof meta>;
+
+function PillStateFixture() {
+  const [state, setState] = useState<ButtonActionState>('idle');
+  return (
+    <div className='grid w-full gap-6 p-6' data-testid='morph-fixture'>
+      <div className='flex items-center gap-4'>
+        <Button
+          pendingPresentation='morph'
+          actionState={state}
+          onClick={() => setState('pending')}
+        >
+          Save changes
+        </Button>
+        <span data-testid='morph-sibling'>Reserved neighbor</span>
+      </div>
+      <Button
+        pendingPresentation='morph'
+        actionState={state}
+        className='w-full'
+        onClick={() => setState('pending')}
+      >
+        Save this very long profile description and all of my changes
+      </Button>
+      <div className='flex flex-wrap gap-4'>
+        <Button variant='secondary' onClick={() => setState('error')}>
+          Reject request
+        </Button>
+        <Button variant='secondary' onClick={() => setState('idle')}>
+          Reset request
+        </Button>
+        <Button variant='secondary' onClick={() => setState('success')}>
+          Resolve request
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/** Manual completion controls are fixture inputs, never simulated product progress. */
+export const PillStateChoreography: Story = {
+  render: () => <PillStateFixture />,
+  parameters: {
+    layout: 'padded',
+    docs: {
+      description: {
+        story:
+          'pill-state-continuity: label fades with duration-fast; round caps converge with duration-subtle / ease-in-out. Fixed slot and 44px target; real caller state owns completion. Keyboard and reduced motion substitute immediately. Resolve/reject/reset interrupt the transition.',
+      },
+    },
+  },
+};
 
 // Core Variants
 export const Primary: Story = {
@@ -201,6 +254,27 @@ export const ActionStateMatrix: Story = {
             <Button variant={variant}>Idle</Button>
             <Button variant={variant} loading>
               Loading
+            </Button>
+            <Button
+              variant={variant}
+              pendingPresentation='morph'
+              actionState='pending'
+            >
+              Pending
+            </Button>
+            <Button
+              variant={variant}
+              pendingPresentation='morph'
+              actionState='success'
+            >
+              Complete
+            </Button>
+            <Button
+              variant={variant}
+              pendingPresentation='morph'
+              actionState='error'
+            >
+              Retry action
             </Button>
             <Button variant={variant} disabled>
               Disabled

@@ -64,17 +64,19 @@ describe('DashboardNav interactions', () => {
     if (!(inbox instanceof HTMLElement)) return;
     expect(inbox).toHaveAccessibleName('Inbox');
 
-    expect(newChat).toHaveClass(
-      'size-6',
-      'rounded-full',
-      'bg-foreground',
-      'text-(--color-bg-base)'
+    expect(newChat).toHaveClass('size-6', 'rounded-md', 'text-sidebar-muted');
+    expect(newChat.parentElement).toHaveAttribute(
+      'data-sidebar-history-header'
     );
-    expect(newChat).not.toHaveClass('bg-sidebar-accent-active', 'w-full');
+    expect(newChat).not.toHaveClass('bg-sidebar-accent-active');
+    expect(newChat).not.toHaveClass('w-full');
     expect(searchSlot).toHaveClass('h-9', 'shrink-0');
     expect(screen.getAllByRole('button', { name: 'Search' })).toHaveLength(1);
     expect(searchSlot).toContainElement(inbox);
-    expect(searchSlot).toContainElement(newChat);
+    expect(searchSlot).not.toContainElement(newChat);
+    expect(
+      container.querySelector('[data-nav-section]')?.parentElement
+    ).toHaveClass('pt-5');
   });
 
   it('wires a plain nav click to one canonical privacy-safe activation', async () => {

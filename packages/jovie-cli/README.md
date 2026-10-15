@@ -26,7 +26,7 @@ automated install. A repository build is not proof that npm has the package.
 | Command | Request |
 | --- | --- |
 | `music resolve <input>` | Read-only `resolve` tool on `/api/music/mcp`; artist names/URLs/MBIDs, track URLs/ISRCs, album URLs/UPCs, and artist/title searches |
-| `creator lookup <url-or-handle>` | `GET /api/agents/creator-lookup`; accepts a profile URL or `platform:handle` (youtube, instagram, tiktok, linktree); resolves an existing Jovie profile first, then extracts YouTube channels; Instagram, TikTok, and Linktree sources return `SOURCE_UNSUPPORTED` |
+| `creator lookup <url-or-handle>` | `GET /api/agents/creator-lookup`; YouTube channel URL or `youtube:handle` for extraction; YouTube, Instagram, TikTok, or Linktree URL or `platform:handle` for existing Jovie profiles. See source limits below. |
 | `profile create <url>` | `POST /api/agents/profiles` with a Spotify artist URL |
 | `artist get <username>` | `GET /api/v1/{username}` |
 | `artist llms <username>` | `GET /{username}/llms.txt` |
@@ -61,8 +61,14 @@ jovie music resolve 123456789012 --kind album --json
 When a public Jovie profile already holds that channel (matched by channel
 identity, not a username guess), the response is
 `{"exists":true,"username":...,"profileUrl":...}` and no source page is
-fetched. Otherwise it is `{"exists":false,...}` with the display name, bio,
-avatar URL, and public links extracted by the existing ingestion strategy.
+fetched. Only YouTube channels support extraction: an unmatched YouTube channel
+returns `{"exists":false,...}` with the display name, bio, avatar URL, and public
+links. Unmatched Instagram, TikTok, and Linktree inputs return
+`SOURCE_UNSUPPORTED` (HTTP 422, exit 1) because Jovie does not read those pages
+from its servers. Use the creator's YouTube channel URL instead. Bandcamp and
+custom websites return `UNSUPPORTED_URL` (HTTP 422, exit 1); they are outside
+this command's supported sources. A Linktree link in a YouTube result does not
+imply support for extracting that Linktree page.
 
 `--json` emits JSON for API responses and wraps text resources as
 `{"content":"..."}`. Failures print `{"error":{...}}`, and API failures carry
@@ -110,6 +116,23 @@ transport settings. Configure Node's proxy support in that application or pass
 
 Tools: `lookup_creator`, `create_profile`, `get_artist`, `get_artist_guide`, `get_openapi`,
 `get_docs`, `report_issue`, `report_feedback`. `server.json` describes the package for the MCP registry.
+
+### Repository agents
+
+The repo-root [`.mcp.json`](../../.mcp.json) registers `jovie` over stdio using
+`node packages/jovie-cli/dist/cli.js mcp`. From the repository root, build the
+workspace CLI before starting your MCP client, and rebuild after CLI changes:
+
+```sh
+pnpm --filter @jovie/cli build
+```
+
+Local agents should prefer this `jovie` MCP server over ad-hoc `curl` calls to
+agent routes when a tool covers the task. It exercises the public product
+surface from the current checkout. The entry requires no login or API key and
+clears `JOVIE_WORKER_TOKEN` so inherited worker credentials cannot expose internal
+tools.
+Using the product MCP is optional; it is not a repository agent gate.
 
 ## JavaScript client
 
