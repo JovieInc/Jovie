@@ -3,8 +3,8 @@
  * JOV-7725: creator lookup against the page shapes each platform really
  * serves. These run the real validators, fetcher, and extractors with only
  * the network stubbed, so a validator/fetcher disagreement (the YouTube bug)
- * or a login wall reported as data (the Instagram bug) fails here. TikTok,
- * Instagram, and Linktree pages are never fetched from core servers (#20190).
+ * or a login wall reported as data (the Instagram bug) fails here. YouTube,
+ * TikTok, Instagram, and Linktree pages are never fetched from core servers.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { lookupCreator } from '@/lib/ingestion/creator-lookup';
@@ -34,12 +34,6 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const youtubePage = `<script>var ytInitialData = ${JSON.stringify({
-  metadata: {
-    channelMetadataRenderer: { title: 'Real Channel', description: 'Bio' },
-  },
-})};</script>`;
-
 const tiktokPage = (detail: unknown) =>
   `<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application/json">${JSON.stringify(
     { __DEFAULT_SCOPE__: { 'webapp.user-detail': detail } }
@@ -58,18 +52,6 @@ describe('creator lookup source pages', () => {
   it.each([
     'https://www.youtube.com/@creator',
     'https://youtube.com/channel/UC123abc',
-  ])('fetches the about page and returns data for %s', async url => {
-    const requested = servePage(youtubePage);
-    const result = await lookupCreator(url);
-    expect(requested[0]).toMatch(/^https:\/\/www\.youtube\.com\/.+\/about$/);
-    expect(result).toMatchObject({
-      platform: 'youtube',
-      displayName: 'Real Channel',
-      bio: 'Bio',
-    });
-  });
-
-  it.each([
     'https://www.tiktok.com/@khaby.lame',
     'https://www.instagram.com/taylorswift',
     'https://linktr.ee/creator',
@@ -79,13 +61,6 @@ describe('creator lookup source pages', () => {
       code: 'SOCIAL_HTML_DISABLED',
     });
     expect(requested).toEqual([]);
-  });
-
-  it('never returns a blank 200 when the page has no profile data', async () => {
-    servePage('<html><body>Please wait...</body></html>');
-    await expect(
-      lookupCreator('https://www.youtube.com/@someone')
-    ).rejects.toMatchObject({ code: 'EMPTY_RESPONSE' });
   });
 
   // Extractors stay ready for the isolated provider (FEATURE_SOCIAL_HTML_ISOLATED_PROVIDER).
