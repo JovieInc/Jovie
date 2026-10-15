@@ -191,11 +191,7 @@
   "journeys": [
     {
       "id": "account-contact",
-      "screens": [
-        "web.contacts",
-        "web.dashboard-contacts",
-        "web.settings-artist-profile"
-      ],
+      "screens": ["web.contacts", "web.settings-artist-profile"],
       "source": "apps/web/components/features/settings",
       "fields": ["email", "tel"],
       "scenarios": [

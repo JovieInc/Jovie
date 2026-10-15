@@ -237,3 +237,76 @@ printf '%s\\n' "$(basename "$0") $*" >> "$CALL_LOG"
     expect(calls).not.toContain('node ');
   });
 });
+
+describe('merge-group tree fetch depth', () => {
+  function normalScript() {
+    return workflow
+      .split(
+        '      - name: Enforce combined-tree payload and member size policy'
+      )[1]
+      .split('        run: |\n')[1]
+      .split('\n  merge-group-fork:')[0]
+      .split('\n')
+      .map(line => (line.startsWith('          ') ? line.slice(10) : line))
+      .join('\n');
+  }
+
+  function runFetch() {
+    const root = mkdtempSync(join(tmpdir(), 'size-tree-fetch-'));
+    const bin = join(root, 'bin');
+    mkdirSync(join(root, 'scripts/lib'), { recursive: true });
+    mkdirSync(bin);
+    writeFileSync(join(root, 'scripts/lib/merge-group-local-evidence.mjs'), '');
+    const log = join(root, 'calls');
+    const head = 'a'.repeat(40);
+    const git = `#!/bin/bash
+set -eu
+printf '%s\\n' "$*" >> "$CALL_LOG"
+exit 0
+`;
+    writeFileSync(join(bin, 'git'), git);
+    writeFileSync(
+      join(bin, 'node'),
+      '#!/bin/bash\nprintf \'%s\\n\' "node $*" >> "$CALL_LOG"\nexit 0\n'
+    );
+    chmodSync(join(bin, 'git'), 0o700);
+    chmodSync(join(bin, 'node'), 0o700);
+    try {
+      const result = spawnSync('/bin/bash', ['--noprofile', '--norc'], {
+        input: normalScript(),
+        cwd: root,
+        encoding: 'utf8',
+        timeout: 15000,
+        env: {
+          ...process.env,
+          PATH: `${bin}${delimiter}${process.env.PATH}`,
+          GH_TOKEN: 'synthetic-test-token',
+          GROUP_HEAD: head,
+          GROUP_BASE: 'b'.repeat(40),
+          MERGE_GROUP_POLICY_CACHE_DIR: join(root, 'cache'),
+          CALL_LOG: log,
+        },
+      });
+      let calls = '';
+      try {
+        calls = readFileSync(log, 'utf8');
+      } catch {}
+      return { result, calls };
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+
+  it('fetches blob bytes at depth 2 even when the commit object is already local', () => {
+    const landed = runFetch();
+    expect(landed.result.status, landed.result.stderr).toBe(0);
+    expect(landed.calls).toContain(
+      'fetch --filter=blob:limit=1g --no-tags --depth=2 origin ' + 'a'.repeat(40)
+    );
+    expect(landed.calls).not.toContain('--depth=64');
+    expect(landed.calls).not.toContain('blob:none');
+    expect(landed.calls).toContain(
+      'node scripts/lib/merge-group-local-evidence.mjs'
+    );
+  });
+});
