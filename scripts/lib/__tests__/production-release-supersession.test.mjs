@@ -11,7 +11,9 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
+import { load } from 'js-yaml';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { resolveMainSha } from '../../../.github/scripts/resolve-main-sha.mjs';
 import {
   STRUCTURAL_DEFAULT_CONCURRENCY,
   selectLanes,
@@ -126,6 +128,133 @@ describe('public-profile alias graduation policy', () => {
     expect(production).toContain('performance_status=warn');
     expect(production).not.toContain('JOV-4854');
   });
+});
+
+describe('authoritative final main ref', () => {
+  it('uses one bounded Git read with scoped authentication outside the REST quota', () => {
+    const run = vi.fn(
+      /** @type {import('../../../.github/scripts/resolve-main-sha.mjs').MainRefRunner} */ (
+        () => ({
+          status: 0,
+          stdout: `${EXPECTED_SHA}\trefs/heads/main\n`,
+        })
+      )
+    );
+    expect(
+      resolveMainSha({
+        repository: 'JovieInc/Jovie',
+        token: 'fixture-token',
+        run,
+      })
+    ).toBe(EXPECTED_SHA);
+    expect(run).toHaveBeenCalledOnce();
+    const [command, args, options] = run.mock.calls[0];
+    expect(command).toBe('git');
+    expect(args).toEqual([
+      'ls-remote',
+      '--exit-code',
+      'https://github.com/JovieInc/Jovie.git',
+      'refs/heads/main',
+    ]);
+    expect(options).toMatchObject({ timeout: 15000, maxBuffer: 4096 });
+    expect(options.env.GIT_TERMINAL_PROMPT).toBe('0');
+    const authIndex = Number(options.env.GIT_CONFIG_COUNT) - 1;
+    expect(options.env[`GIT_CONFIG_KEY_${authIndex}`]).toBe(
+      'http.https://github.com/.extraheader'
+    );
+    expect(options.env[`GIT_CONFIG_VALUE_${authIndex}`]).toContain(
+      Buffer.from('x-access-token:fixture-token').toString('base64')
+    );
+    expect(args.join(' ')).not.toContain('fixture-token');
+  });
+
+  it.each([
+    ['empty', ''],
+    ['zero', `${'0'.repeat(40)}\trefs/heads/main\n`],
+    ['wrong ref', `${EXPECTED_SHA}\trefs/heads/main-copy\n`],
+    ['short SHA', 'abc123\trefs/heads/main\n'],
+    [
+      'ambiguous',
+      `${EXPECTED_SHA}\trefs/heads/main\n${NEWER_SHA}\trefs/heads/main\n`,
+    ],
+  ])('fails closed on %s Git evidence', (_, stdout) => {
+    expect(() =>
+      resolveMainSha({
+        repository: 'JovieInc/Jovie',
+        run: () => ({ status: 0, stdout }),
+      })
+    ).toThrow(/evidence/);
+  });
+
+  it.each([
+    ['unavailable', { status: 128, stdout: '' }],
+    [
+      'timeout',
+      {
+        status: null,
+        stdout: '',
+        error: Object.assign(new Error('Git read timed out'), {
+          code: 'ETIMEDOUT',
+        }),
+      },
+    ],
+  ])('fails closed without retrying an %s Git read', (_, result) => {
+    const run = vi.fn(() => result);
+    expect(() => resolveMainSha({ repository: 'JovieInc/Jovie', run })).toThrow(
+      /within 15 seconds/
+    );
+    expect(run).toHaveBeenCalledOnce();
+  });
+
+  it('rejects malformed repository identity before invoking git', () => {
+    const run = vi.fn();
+    expect(() =>
+      resolveMainSha({ repository: '../untrusted/repo', run })
+    ).toThrow(/valid GitHub repository/);
+    expect(run).not.toHaveBeenCalled();
+  });
+});
+
+describe('production lane evidence across failed-job retries', () => {
+  it.each([
+    [1, 1],
+    [1, 2],
+    [2, 3],
+  ])(
+    'downloads the artifact produced in attempt %s from consumer attempt %s',
+    (producerAttempt, consumerAttempt) => {
+      const workflow =
+        /** @type {{ jobs: Record<string, { outputs: Record<string, string>, steps: { name?: string, uses?: string, with?: Record<string, string> }[] }> }} */ (
+          load(CONTROLLER_WORKFLOW)
+        );
+      const producer = workflow.jobs['authorize-production'];
+      const upload = producer.steps.find(
+        step =>
+          step.uses?.startsWith('actions/upload-artifact@') &&
+          step.name === 'Preserve cumulative production lane evidence'
+      );
+      const producerValues = {
+        'steps.authorize.outputs.expected_sha': EXPECTED_SHA,
+        'github.run_attempt': String(producerAttempt),
+      };
+      const uploaded = materialize(upload.with.name, producerValues);
+      const output = producer.outputs.lane_range_artifact_name;
+      expect(
+        output,
+        'authorization must retain the producer artifact name'
+      ).toBeTypeOf('string');
+      const retained = materialize(output, producerValues);
+      const download = workflow.jobs['production-verified'].steps.find(step =>
+        step.uses?.startsWith('actions/download-artifact@')
+      );
+      const requested = materialize(download.with.name, {
+        'needs.authorize-production.outputs.lane_range_artifact_name': retained,
+        'needs.authorize-production.outputs.expected_sha': EXPECTED_SHA,
+        'github.run_attempt': String(consumerAttempt),
+      });
+      expect(requested).toBe(uploaded);
+    }
+  );
 });
 
 describe('production verification admission', () => {
@@ -311,7 +440,12 @@ function runReleaseResult(overrides = {}, boundarySha = NEWER_SHA, env = {}) {
   stubCommand(
     fixture.bin,
     'gh',
-    '#!/bin/sh\nprintf "%s\\n" "$STUB_MAIN_SHA"\n'
+    '#!/bin/sh\n[ "${STUB_REST_FAILURE:-false}" != true ] || { echo "API rate limit exceeded" >&2; exit 1; }\nprintf "%s\\n" "$STUB_MAIN_SHA"\n'
+  );
+  stubCommand(
+    fixture.bin,
+    'git',
+    '#!/bin/sh\nprintf "%s\trefs/heads/main\n" "$STUB_MAIN_SHA"\n'
   );
   const script = materialize(
     getStepRunScript(
@@ -367,6 +501,7 @@ function runControllerVerify(
     fixture.bin,
     'node',
     `#!/bin/sh
+case "$1" in */resolve-main-sha.mjs) exec "$STUB_REAL_NODE" "$@" ;; esac
 printf '%s\\n' "$*" > "$STUB_DONE_SPRINT_MARKER"
 printf 'rescan=%s\\nurl=%s\\n' "$DONE_INVARIANT_RESCAN" "$DONE_INVARIANT_PRODUCTION_BASE_URL" >> "$STUB_DONE_SPRINT_MARKER"
 exit "$STUB_DONE_SPRINT_STATUS"
@@ -382,6 +517,11 @@ exit "$STUB_DONE_SPRINT_STATUS"
     '#!/bin/sh\nprintf "called\\n" > "$STUB_ALIAS_MARKER"\nexit "$STUB_ALIAS_STATUS"\n'
   );
   chmodSync(aliasScript, 0o755);
+  stubCommand(
+    fixture.bin,
+    'git',
+    '#!/bin/sh\nprintf "%s\trefs/heads/main\n" "$STUB_MAIN_SHA"\n'
+  );
   const script = materialize(
     getStepRunScript(
       getJobBlock(CONTROLLER_WORKFLOW, 'production-verified'),
@@ -398,6 +538,7 @@ exit "$STUB_DONE_SPRINT_STATUS"
     STUB_ALIAS_STATUS: String(aliasStatus),
     STUB_DONE_SPRINT_MARKER: doneSprintMarker,
     STUB_DONE_SPRINT_STATUS: String(doneSprintStatus),
+    STUB_REAL_NODE: process.execPath,
     STUB_MAIN_SHA: NEWER_SHA,
   });
   return {
@@ -446,6 +587,11 @@ function runFinalize(overrides = {}, boundarySha = NEWER_SHA) {
     fixture.bin,
     'gh',
     '#!/bin/sh\nprintf "%s\\n" "$STUB_MAIN_SHA"\n'
+  );
+  stubCommand(
+    fixture.bin,
+    'git',
+    '#!/bin/sh\nprintf "%s\trefs/heads/main\n" "$STUB_MAIN_SHA"\n'
   );
   const script = materialize(
     getStepRunScript(
@@ -527,6 +673,17 @@ function runStagingStep(stepName, mainSha, env = {}) {
 }
 
 describe('production release supersession execution', () => {
+  it('preserves exact release success when REST is exhausted but git resolves main', () => {
+    const proof = runReleaseResult({}, NEWER_SHA, {
+      STUB_REST_FAILURE: 'true',
+    });
+    expect(
+      proof.result.status,
+      proof.result.stderr || proof.result.stdout
+    ).toBe(0);
+    expect(proof.outputs.released).toBe('true');
+  });
+
   it('neutralizes an intentional pre-alias supersession only', () => {
     const neutral = runReleaseResult({
       'needs.staging-head.outputs.is_current': 'false',
@@ -553,6 +710,19 @@ describe('production release supersession execution', () => {
       released: failedKey === 'needs.release-head.result' ? 'false' : 'true',
       superseded_before_promotion: 'false',
     });
+  });
+
+  it('withholds release success when the authoritative main ref is malformed', () => {
+    const proof = runReleaseResult({}, 'not-a-sha');
+    expect(proof.result.status).not.toBe(0);
+    expect(proof.outputs.released).toBe('false');
+  });
+
+  it('writes no verified marker when the authoritative main ref is unavailable', () => {
+    const proof = runFinalize({}, '');
+    expect(proof.result.status).not.toBe(0);
+    expect(proof.outputs.verified).toBe('false');
+    expect(proof.marker).toBeNull();
   });
 
   it('preserves released=true for an exact promoted generation after main advances', () => {

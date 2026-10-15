@@ -2158,6 +2158,12 @@ jobs:
       sentry_gate_status: ${{ steps.result.outputs.sentry_gate_status }}
       oauth_gate_status: ${{ steps.result.outputs.oauth_gate_status }}
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.expected_sha }}
+          persist-credentials: false
+          sparse-checkout: .github/scripts/resolve-main-sha.mjs
+          sparse-checkout-cone-mode: false
       - name: Resolve release result
         id: result
         shell: bash
@@ -2322,7 +2328,7 @@ jobs:
           # Exact promotion identity and all release gates have passed. A newer
           # main generation must not erase that completed older-generation fact;
           # controller probes remain bound to this immutable deployment and SHA.
-          boundary_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
+          boundary_sha="$(node "$GITHUB_WORKSPACE/.github/scripts/resolve-main-sha.mjs" "${{ github.repository }}")"
           [[ "$boundary_sha" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Could not resolve exact main at the release-result boundary."
             exit 1
