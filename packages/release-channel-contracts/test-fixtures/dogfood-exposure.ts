@@ -2,7 +2,7 @@ import type {
   ExpectedExposure,
   ExposureEvidence,
   ObservedExposure,
-} from '../dogfood-exposure';
+} from '../dogfood-exposure.js';
 
 const EXPOSURE_SCHEMA = 'jovie.dogfood-exposure/v1' as const;
 

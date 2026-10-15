@@ -118,8 +118,23 @@ test('native exposure requires installed identity, real captures and no fixture 
     }).verdict,
     'BLOCKED_EXPOSURE'
   );
-  const changed = structuredClone(native);
-  changed.exposure.observations[1].configuration.generation = 'next';
+  const changed = {
+    ...native,
+    exposure: {
+      ...native.exposure,
+      observations: native.exposure.observations.map((observation, index) =>
+        index === 1
+          ? {
+              ...observation,
+              configuration: {
+                ...observation.configuration,
+                generation: 'next',
+              },
+            }
+          : observation
+      ),
+    },
+  };
   assert.equal(
     certifyNativeReceipt(scope, changed).verdict,
     'UNKNOWN_CONFIGURATION'
