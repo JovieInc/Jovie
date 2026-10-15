@@ -2,6 +2,14 @@ import { expect, test } from '@playwright/test';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
+test.beforeEach(async ({ context, baseURL }) => {
+  expect(baseURL).toBeDefined();
+  // Keep the anonymous visitor's analytics choice deterministic across regions.
+  await context.addCookies([
+    { name: 'jv_tracking_consent', value: 'rejected', url: baseURL! },
+  ]);
+});
+
 // JOV-8349: return-URL rendering, not provider authentication. Block writes so
 // the same regression can safely replay against an exact deployed revision.
 const returns = [
