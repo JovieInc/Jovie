@@ -1,7 +1,7 @@
 'use client';
 
 import { cn } from '@jovie/ui/lib/utils';
-import type * as React from 'react';
+import * as React from 'react';
 import {
   Tooltip,
   TooltipContent,
@@ -23,20 +23,28 @@ import {
  */
 
 export const STATUS_GLYPH_STATES = [
-  'todo',
+  'blocked',
+  'canceled',
+  'cancelled',
+  'done',
+  'error',
+  'failed',
+  'idle',
   'in_progress',
   'in_review',
-  'done',
-  'canceled',
-  'blocked',
-  'warning',
+  'pending',
+  'succeeded',
   'success',
-  'error',
+  'todo',
+  'unknown',
+  'warning',
+  'working',
 ] as const;
 
 export type StatusGlyphState = (typeof STATUS_GLYPH_STATES)[number];
 export type StatusGlyphSize = 'sm' | 'md';
 export type StatusGlyphFill =
+  | 'indeterminate'
   | 'empty'
   | 'quarter'
   | 'half'
@@ -57,6 +65,27 @@ export const STATUS_GLYPH_STATE_SPECS: Record<
   StatusGlyphState,
   StatusGlyphStateSpec
 > = {
+  cancelled: { fill: 'x', tone: 'text-tertiary-token', label: 'Cancelled' },
+  failed: { fill: 'x', tone: 'text-error', label: 'Failed' },
+  idle: { fill: 'empty', tone: 'text-tertiary-token', label: 'Idle' },
+  pending: {
+    fill: 'empty',
+    tone: 'text-secondary-token',
+    label: 'Pending',
+    dashed: true,
+  },
+  succeeded: { fill: 'check', tone: 'text-success', label: 'Succeeded' },
+  unknown: {
+    fill: 'empty',
+    tone: 'text-tertiary-token',
+    label: 'Status unknown',
+    dashed: true,
+  },
+  working: {
+    fill: 'indeterminate',
+    tone: 'text-secondary-token',
+    label: 'Working',
+  },
   todo: { fill: 'empty', tone: 'text-tertiary-token', label: 'To do' },
   in_progress: { fill: 'half', tone: 'text-info', label: 'In progress' },
   in_review: {
@@ -100,7 +129,9 @@ function sectorPath(fraction: number): string {
 function GlyphMark({
   spec,
   size,
+  animate,
 }: {
+  readonly animate: boolean;
   readonly spec: StatusGlyphStateSpec;
   readonly size: StatusGlyphSize;
 }) {
@@ -120,10 +151,26 @@ function GlyphMark({
       aria-hidden='true'
       focusable='false'
       viewBox={`0 0 ${VIEW} ${VIEW}`}
-      className={cn('shrink-0', SIZE_CLASS[size], spec.tone)}
+      className={cn(
+        'shrink-0',
+        SIZE_CLASS[size],
+        spec.tone,
+        animate && 'motion-safe:animate-spin'
+      )}
       data-fill={spec.fill}
     >
-      {spec.fill === 'empty' ? (
+      {spec.fill === 'indeterminate' ? (
+        <circle
+          cx={CENTER}
+          cy={CENTER}
+          r={RING_R}
+          fill='none'
+          stroke='currentColor'
+          strokeWidth={STROKE}
+          strokeDasharray='12 28'
+          strokeLinecap='round'
+        />
+      ) : spec.fill === 'empty' ? (
         ring
       ) : spec.fill === 'full' ? (
         <circle cx={CENTER} cy={CENTER} r={FILL_R} fill='currentColor' />
@@ -190,6 +237,17 @@ export function StatusGlyph({
   className,
   ...props
 }: StatusGlyphProps) {
+  const ref = React.useRef<HTMLSpanElement>(null);
+  const [visible, setVisible] = React.useState(false);
+  const working = state === 'working';
+  React.useEffect(() => {
+    if (!working || !ref.current || !globalThis.IntersectionObserver) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      setVisible(entry?.isIntersecting ?? false);
+    });
+    observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, [working]);
   const spec = STATUS_GLYPH_STATE_SPECS[state];
   const accessibleLabel = tooltipLabel ?? label ?? spec.label;
 
@@ -198,6 +256,7 @@ export function StatusGlyph({
       <Tooltip>
         <TooltipTrigger asChild>
           <span
+            ref={ref}
             role='img'
             aria-label={accessibleLabel}
             data-status-glyph={state}
@@ -207,7 +266,7 @@ export function StatusGlyph({
             )}
             {...props}
           >
-            <GlyphMark spec={spec} size={size} />
+            <GlyphMark spec={spec} size={size} animate={working && visible} />
             {label ? (
               <span className='text-2xs leading-none text-secondary-token'>
                 {label}
