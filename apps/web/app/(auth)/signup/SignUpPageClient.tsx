@@ -38,10 +38,34 @@ import {
   buildMobileAuthReturnPath,
   sanitizeMobileReturnRoute,
 } from '@/lib/mobile/auth-return';
+import { normalizeHandleCandidate } from '@/lib/onboarding/handle-availability';
 import {
   DesktopAuthRouteHandoff,
   useShouldRenderDesktopAuthHandoff,
 } from '../DesktopAuthRouteHandoff';
+
+type HandleAvailability = 'checking' | 'available' | 'taken' | 'error';
+
+function readHandleAvailability(
+  data: unknown,
+  handle: string
+): Exclude<HandleAvailability, 'checking'> {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return 'error';
+  const result = data as Record<string, unknown>;
+  if (typeof result.available !== 'boolean') return 'error';
+  const availability = result.available ? 'available' : 'taken';
+  // Legacy responses may omit metadata; supplied metadata must agree with
+  // the definitive result and the handle this request actually checked.
+  if (
+    (result.reason !== undefined && result.reason !== availability) ||
+    (result.error !== undefined && result.error !== '') ||
+    (result.handle !== undefined &&
+      (typeof result.handle !== 'string' ||
+        normalizeHandleCandidate(result.handle) !== handle))
+  )
+    return 'error';
+  return availability;
+}
 
 /**
  * Persist pre-signup claim data from the homepage hero into sessionStorage,
@@ -50,9 +74,14 @@ import {
 function SignUpClaimDataPersistence() {
   const searchParams = useSearchParams();
   const handle = searchParams.get('handle');
-  const [availability, setAvailability] = useState<
-    'checking' | 'available' | 'taken' | 'error' | null
-  >(null);
+  const normalizedHandle = useMemo(
+    () => normalizeHandleCandidate(handle),
+    [handle]
+  );
+  const [availability, setAvailability] = useState<{
+    handle: string;
+    status: HandleAvailability;
+  } | null>(null);
 
   useEffect(() => {
     const spotifyUrl = searchParams.get('spotify_url');
@@ -104,38 +133,45 @@ function SignUpClaimDataPersistence() {
   }, [searchParams, handle]);
 
   useEffect(() => {
-    if (!handle || handle.length < 3) return;
-
-    setAvailability('checking');
+    if (normalizedHandle.length < 3) {
+      setAvailability(null);
+      return;
+    }
 
     const controller = new AbortController();
-    fetch(
-      `/api/handle/check?handle=${encodeURIComponent(handle.toLowerCase())}`,
-      { signal: controller.signal }
-    )
-      .then(res => res.json())
-      .then(data => {
-        setAvailability(data.available ? 'available' : 'taken');
-      })
-      .catch((err: unknown) => {
-        // Aborts from cleanup are expected control flow, not errors
-        if (err instanceof DOMException && err.name === 'AbortError') return;
-        setAvailability('error');
-      });
+    const updateAvailability = (status: HandleAvailability) => {
+      if (!controller.signal.aborted) {
+        setAvailability({ handle: normalizedHandle, status });
+      }
+    };
+    updateAvailability('checking');
+    fetch(`/api/handle/check?handle=${encodeURIComponent(normalizedHandle)}`, {
+      signal: controller.signal,
+    })
+      .then(async response =>
+        response.ok
+          ? readHandleAvailability(await response.json(), normalizedHandle)
+          : 'error'
+      )
+      .then(updateAvailability)
+      .catch(() => updateAvailability('error'));
 
     return () => controller.abort();
-  }, [handle]);
+  }, [normalizedHandle]);
 
-  const normalizedHandle = useMemo(() => handle?.toLowerCase() ?? '', [handle]);
+  if (normalizedHandle.length < 3) return null;
 
-  if (!handle || !availability) return null;
+  const status =
+    availability?.handle === normalizedHandle
+      ? availability.status
+      : 'checking';
 
   return (
     <output
       className='mb-4 block text-center text-app text-secondary-token'
       aria-live='polite'
     >
-      {availability === 'checking' && (
+      {status === 'checking' && (
         <div className='flex items-center justify-center lg:justify-start'>
           <Skeleton />
           <span className='sr-only'>
@@ -143,18 +179,18 @@ function SignUpClaimDataPersistence() {
           </span>
         </div>
       )}
-      {availability === 'available' && (
+      {status === 'available' && (
         <p className='text-app font-book text-primary-token'>
           @{normalizedHandle} is available. Sign up to claim it.
         </p>
       )}
-      {availability === 'taken' && (
+      {status === 'taken' && (
         <p className='text-app font-book text-secondary-token'>
           @{normalizedHandle} is already taken. You can pick another handle
           after signing up.
         </p>
       )}
-      {availability === 'error' && (
+      {status === 'error' && (
         <p className='text-app font-book text-secondary-token'>
           Couldn&apos;t check if @{normalizedHandle} is available. You can still
           sign up and choose a handle.
