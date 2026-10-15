@@ -30,6 +30,10 @@ def load(name):
 
 
 guard = load("disk_guard")
+import git_housekeeping  # noqa: E402  (load() puts scripts/lanes on sys.path)
+
+git_housekeeping.install_process_fixture_env()
+git_housekeeping.install_isolated_tempdirs()
 NOW = 1_800_000_000.0
 
 
@@ -458,7 +462,11 @@ class RetiredHostLoopTest(unittest.TestCase):
         self.assertEqual(observations, [], "a process snapshot is not ownership")
 
     def git(self, *args, cwd):
-        subprocess.run(["git", *args], cwd=cwd, env=self.env, check=True, capture_output=True)
+        # self.env strips GIT_* so a host cannot point fixtures at its checkout.
+        # Re-apply housekeeping: Git 2.55 would otherwise detach maintenance and
+        # the retired-workspace sweep would see a locked index or a nonempty objects dir.
+        subprocess.run(["git", *args], cwd=cwd, env=git_housekeeping.apply_fixture_env(self.env),
+                       check=True, capture_output=True)
 
     def checkout(self, root, name, origin):
         path = root / name
@@ -566,7 +574,8 @@ class HarnessArtifactTest(unittest.TestCase):
         import subprocess
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)
-            env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+            env = git_housekeeping.apply_fixture_env(
+                {key: value for key, value in os.environ.items() if not key.startswith("GIT_")})
             subprocess.run(["git", "init", "-q", str(repo)], check=True, env=env)
             for name in guard.HARNESS_ARTIFACTS:
                 (repo / name).write_text("harness\n")
@@ -574,6 +583,73 @@ class HarnessArtifactTest(unittest.TestCase):
                 self.assertTrue(guard.is_clean(repo, subprocess.run), "only harness artifacts: clean")
                 (repo / "unsaved.py").write_text("work\n")
                 self.assertFalse(guard.is_clean(repo, subprocess.run), "a real untracked file is work")
+
+class GitHousekeepingTest(unittest.TestCase):
+    """Detached git writers must not fail cleanup or be swallowed as success."""
+
+    def test_config_appends_without_dropping_existing_pairs(self):
+        env = git_housekeeping.apply_housekeeping_env({
+            "GIT_CONFIG_COUNT": "1",
+            "GIT_CONFIG_KEY_0": "user.name",
+            "GIT_CONFIG_VALUE_0": "kept",
+        })
+        self.assertEqual(env["GIT_CONFIG_KEY_0"], "user.name")
+        self.assertEqual(env["GIT_CONFIG_VALUE_0"], "kept")
+        pairs = [(env[f"GIT_CONFIG_KEY_{i}"], env[f"GIT_CONFIG_VALUE_{i}"])
+                 for i in range(int(env["GIT_CONFIG_COUNT"]))]
+        self.assertIn(("user.name", "kept"), pairs)
+        self.assertIn(("maintenance.auto", "false"), pairs)
+        again = git_housekeeping.apply_housekeeping_env(env)
+        self.assertEqual(again["GIT_CONFIG_COUNT"], env["GIT_CONFIG_COUNT"])
+
+    def test_remove_tree_waits_out_a_writer_refilling_git_objects(self):
+        root = Path(tempfile.mkdtemp(prefix=f"jovie-lanes-{os.getpid()}-writer-"))
+        pack = root / ".git" / "objects" / "pack"
+        pack.mkdir(parents=True)
+        script = (
+            "import pathlib, sys, time\n"
+            "pack = pathlib.Path(sys.argv[1])\n"
+            "for i in range(40):\n"
+            "    pack.mkdir(parents=True, exist_ok=True)\n"
+            "    path = pack / f'tmp_pack_{i}'\n"
+            "    path.write_text('x')\n"
+            "    time.sleep(0.02)\n"
+            "    path.unlink(missing_ok=True)\n"
+        )
+        proc = subprocess.Popen([sys.executable, "-c", script, str(pack)], cwd=root)
+        try:
+            git_housekeeping.remove_tree(root)
+            proc.wait(timeout=5)
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait(timeout=5)
+        self.assertFalse(root.exists())
+
+    def test_remove_tree_stops_a_git_process_holding_the_checkout(self):
+        root = Path(tempfile.mkdtemp(prefix=f"jovie-lanes-{os.getpid()}-git-"))
+        env = git_housekeeping.apply_fixture_env(os.environ)
+        subprocess.run(["git", "init", "-q"], cwd=root, check=True, env=env)
+        proc = subprocess.Popen(["git", "cat-file", "--batch"], cwd=root, env=env,
+                                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            git_housekeeping.remove_tree(root)
+            self.assertFalse(root.exists())
+            self.assertIsNotNone(proc.wait(timeout=5))
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait(timeout=5)
+
+    def test_remove_tree_raises_for_a_file(self):
+        root = Path(tempfile.mkdtemp(prefix=f"jovie-lanes-{os.getpid()}-file-"))
+        target = root / "not-a-directory"
+        target.write_text("keep")
+        with self.assertRaises(OSError):
+            git_housekeeping.remove_tree(target)
+        self.assertEqual(target.read_text(), "keep")
+        git_housekeeping.remove_tree(root)
+
 
 if __name__ == "__main__":
     unittest.main()
