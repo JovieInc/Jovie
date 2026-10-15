@@ -206,6 +206,14 @@ jobs:
           # lead-attribution cookies; without it claim routes 500.
           URL_ENCRYPTION_KEY: e2e-full-matrix-url-encryption-key
 
+      - name: Seed authenticated release fixtures
+        if: ${{ github.event_name == 'push' || github.event.inputs.test_filter == '' }}
+        run: pnpm --filter=@jovie/web run seed:test-data --ready-creator-releases-only
+        env:
+          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          NODE_ENV: test
+          E2E_USE_TEST_AUTH_BYPASS: '1'
+
       - name: Setup Playwright (Chromium)
         if: matrix.browser == 'chromium'
         uses: ./.github/actions/setup-playwright

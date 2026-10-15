@@ -34,9 +34,13 @@ sys.path.insert(0, str(HERE))
 import remediation  # noqa: E402  (classifier + non-PR intake; no lane_runner import)
 REPO = os.environ.get("GITHUB_REPOSITORY", "JovieInc/Jovie")
 PREFIX = "lane-fix-"
+LANE_FIX_RED = PREFIX + "red"
 FIX_KINDS = ("red", "conflict", "dequeued", "review", "stale")
 TICK_KINDS = ("green", "orphan")
 RED_CONCLUSIONS = frozenset({"failure", "timed_out", "startup_failure"})
+# Same required-green set green enroll admits on. Missing, UNKNOWN, BLOCKED,
+# DIRTY and BEHIND keep lane-fix-red.
+REQUIRED_GREEN = frozenset({"CLEAN", "HAS_HOOKS", "UNSTABLE"})
 HOLD_LABELS = frozenset({"hold", "gated", "incident", "do-not-merge", "tim-hold", "tim:hold", "hold:tim",
                          "queue-deferred"})
 LANE_BRANCH = re.compile(r"^(?P<lane>[a-z0-9-]+)/(?P<issue>jov-\d+)-\d{8}")
@@ -401,6 +405,25 @@ def add_label(number: int, kind: str, sh=run) -> bool:
     """The issues API creates a missing label, so the queue needs no setup."""
     return sh(["gh", "api", "-X", "POST", f"repos/{REPO}/issues/{number}/labels",
                "-f", f"labels[]={PREFIX}{kind}"]).returncode == 0
+
+
+def clear_stale_lane_fix_red(number: int, pr: dict, sh=run) -> bool:
+    """Drop lane-fix-red once this head is required-green.
+
+    DELETE is not read-only, so `run` leaves it on GITHUB_TOKEN — the Lane Fix
+    Relay job's existing issues and pull-requests write. A red, unknown, dirty,
+    behind, closed or forked head keeps the label. Drafts are cleared too:
+    auto-ready undrafts a green draft, and the label would block enroll after that.
+    """
+    if pr.get("isCrossRepository") or str(pr.get("state", "OPEN")).upper() != "OPEN":
+        return False
+    if LANE_FIX_RED not in {label.lower() for label in label_names(pr)}:
+        return False
+    if pr.get("mergeStateStatus") not in REQUIRED_GREEN:
+        return False
+    deleted = sh(["gh", "api", "-X", "DELETE",
+                  f"repos/{REPO}/issues/{number}/labels/{LANE_FIX_RED}"])
+    return deleted.returncode == 0
 
 
 # The dispatch tick re-read the same stuck PRs' claim comments every pass (~84 reads an hour on
@@ -855,6 +878,7 @@ def relay(event: str, payload: dict, sh=run, disabled: set[str] | None = None) -
     if event == "workflow_run":
         payload = resolve_ci_pr(payload, sh)
     added = []
+    cleared = []
     targets = relay_targets(event, payload)
     if event == "workflow_run" and any(kind == "red" for _, kind, _ in targets):
         workflow_run = payload.get("workflow_run") or {}
@@ -867,12 +891,19 @@ def relay(event: str, payload: dict, sh=run, disabled: set[str] | None = None) -
                 continue
             kind = "dequeued"
         viewed = sh(["gh", "pr", "view", str(number), "--repo", REPO, "--json",
-                     "state,isDraft,headRefName,headRefOid,isCrossRepository,labels"])
+                     "state,isDraft,headRefName,headRefOid,isCrossRepository,mergeStateStatus,labels"])
         if viewed.returncode != 0:
             continue
         pr = json.loads(viewed.stdout or "{}")
         if sha and pr.get("headRefOid") != sha:
             continue  # a newer head is already running CI; its own events speak for it
+        # Only a success for this exact head. A red event can still show a lagging
+        # CLEAN, and a missing sha is not evidence the required checks passed.
+        if kind == "green" and sha and clear_stale_lane_fix_red(number, pr, sh):
+            cleared.append((number, "cleared-red"))
+            pr["labels"] = [label for label in (pr.get("labels") or [])
+                            if (label.get("name") if isinstance(label, dict) else str(label)).lower()
+                            != LANE_FIX_RED]
         if terminal_signal(pr) or not in_scope(pr, kind, disabled):
             continue
         if kind == "dequeued" and mark_poison(number, pr, time.time(), sh):
@@ -888,7 +919,7 @@ def relay(event: str, payload: dict, sh=run, disabled: set[str] | None = None) -
         created = upsert_intake(intake, sh)
         if created:
             added.append((created, remediation.INTAKE_LABEL))
-    return added
+    return cleared + added
 
 
 def upsert_intake(event: dict, sh=run, now: float | None = None) -> int | None:
@@ -1107,6 +1138,10 @@ def label_backlog(sh=run, disabled: set[str] | None = None, kinds=("conflict", "
             continue
         if add_label(number, kind, sh):
             added.append((number, kind))
+    for pr in prs:
+        number = pr.get("number")
+        if isinstance(number, int) and clear_stale_lane_fix_red(number, pr, sh):
+            added.append((number, "cleared-red"))
     return added
 
 
@@ -2170,7 +2205,10 @@ def main(argv: list[str] | None = None) -> int:
         print(__doc__, file=sys.stderr)
         return 2
     for number, kind in added:
-        print(f"#{number} {PREFIX}{kind}")
+        if kind == "cleared-red":
+            print(f"#{number} cleared lane-fix-red")
+        else:
+            print(f"#{number} {PREFIX}{kind}")
     print(f"labeled={len(added)}")
     return 0
 
