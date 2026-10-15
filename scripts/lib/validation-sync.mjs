@@ -161,7 +161,10 @@ export function githubStatusError(status, headers, body, path) {
     {
       rateLimited,
       forbidden,
-      retryAfterMs: rateLimited && retryAfterMs <= 0 ? Number.POSITIVE_INFINITY : retryAfterMs,
+      retryAfterMs:
+        rateLimited && retryAfterMs <= 0
+          ? Number.POSITIVE_INFINITY
+          : retryAfterMs,
     }
   );
 }
@@ -202,10 +205,16 @@ export function githubClient(fetchImpl, token, sleep = defaultSleep) {
         };
       }
       const body = await response.json().catch(() => null);
-      lastError = githubStatusError(response.status, response.headers, body, path);
-      const flagged = /** @type {{ rateLimited?: boolean, forbidden?: boolean, retryAfterMs?: number }} */ (
-        lastError
+      lastError = githubStatusError(
+        response.status,
+        response.headers,
+        body,
+        path
       );
+      const flagged =
+        /** @type {{ rateLimited?: boolean, forbidden?: boolean, retryAfterMs?: number }} */ (
+          lastError
+        );
       if (flagged.forbidden) throw lastError;
       const wait = flagged.rateLimited
         ? rateLimitWaitMs(flagged.retryAfterMs ?? 0, attempt, maxAttempts)

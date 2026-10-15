@@ -864,9 +864,10 @@ describe('linear sync on merge', () => {
       expect(first.deferred).toBe(3);
       expect(asked.every(id => id === 'JOV-2')).toBe(true);
       expect(asked.length).toBeGreaterThan(1);
-      expect(JSON.parse(readFileSync(join(cursorDir, 'cursor.json'), 'utf8')).nextIdentifier).toBe(
-        'JOV-2'
-      );
+      expect(
+        JSON.parse(readFileSync(join(cursorDir, 'cursor.json'), 'utf8'))
+          .nextIdentifier
+      ).toBe('JOV-2');
       expect(world.updates).toEqual([]);
 
       writeFileSync(
@@ -900,9 +901,10 @@ describe('linear sync on merge', () => {
       expect(world.issues['JOV-2'].state).toBe('Merging');
       expect(world.issues['JOV-1'].state).toBe('Done');
       expect(world.issues['JOV-3'].state).toBe('Done');
-      expect(JSON.parse(readFileSync(join(cursorDir, 'cursor.json'), 'utf8')).nextIdentifier).toBe(
-        ''
-      );
+      expect(
+        JSON.parse(readFileSync(join(cursorDir, 'cursor.json'), 'utf8'))
+          .nextIdentifier
+      ).toBe('');
     } finally {
       rmSync(cursorDir, { recursive: true, force: true });
     }

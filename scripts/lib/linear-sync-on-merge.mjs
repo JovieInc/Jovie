@@ -539,7 +539,8 @@ async function linearGraphql(fetchImpl, apiKey, query, variables) {
       const limited =
         response.status === 429 ||
         errors.some(
-          (/** @type {any} */ error) => error?.extensions?.code === 'RATELIMITED'
+          (/** @type {any} */ error) =>
+            error?.extensions?.code === 'RATELIMITED'
         );
       const detail = errors
         .map((/** @type {any} */ error) => String(error?.message ?? ''))
@@ -557,9 +558,10 @@ async function linearGraphql(fetchImpl, apiKey, query, variables) {
         }
       );
     }
-    const flagged = /** @type {{ rateLimited?: boolean, retryAfterMs?: number }} */ (
-      lastError
-    );
+    const flagged =
+      /** @type {{ rateLimited?: boolean, retryAfterMs?: number }} */ (
+        lastError
+      );
     const wait = flagged.rateLimited
       ? rateLimitWaitMs(flagged.retryAfterMs ?? 0, attempt, maxAttempts)
       : response.status === 429 || response.status >= 500
@@ -743,9 +745,7 @@ async function fetchLifecycleRaws(fetchImpl, apiKey, lookupIds) {
     return `i${index}: issue(id: $id${index}) {${ISSUE_FIELDS}
   }`;
   });
-  const decls = lookupIds
-    .map((_, index) => `$id${index}: String!`)
-    .join(', ');
+  const decls = lookupIds.map((_, index) => `$id${index}: String!`).join(', ');
   const data = await linearGraphql(
     fetchImpl,
     apiKey,
@@ -1114,9 +1114,8 @@ async function runSync(options) {
     openPulls = await listOpenPullRequests({ fetchImpl, token, repository });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    const flagged = /** @type {{ rateLimited?: boolean, forbidden?: boolean }} */ (
-      error
-    );
+    const flagged =
+      /** @type {{ rateLimited?: boolean, forbidden?: boolean }} */ (error);
     if (flagged.rateLimited && sweep) {
       // Quota is already spent. Evaluating issues would 403 the first linked
       // pull (JOV-7355 → #19767 on 2026-10-15) and label that as a Linear
@@ -1275,9 +1274,10 @@ async function runSync(options) {
         );
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        const flagged = /** @type {{ rateLimited?: boolean, forbidden?: boolean, unreadable?: boolean }} */ (
-          error
-        );
+        const flagged =
+          /** @type {{ rateLimited?: boolean, forbidden?: boolean, unreadable?: boolean }} */ (
+            error
+          );
         if (flagged.unreadable || flagged.forbidden) {
           log(
             `Linked pull request was not readable for ${lookupId}: ${message}`
