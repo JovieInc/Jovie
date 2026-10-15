@@ -421,7 +421,7 @@ describe.skipIf(!gh)(
   { timeout: 60_000 },
   () => {
     const resultJob = job('release-result');
-    const resultStep = resultJob.steps[0] as Step;
+    const resultStep = step(resultJob, 'Resolve release result');
     type Needs = Record<
       string,
       { result?: string; outputs?: Record<string, string> }
@@ -456,8 +456,10 @@ describe.skipIf(!gh)(
           ...value,
           outputs: { ...needs[id]?.outputs, ...value.outputs },
         };
-      const root = realpathSync(mkdtempSync(join(tmpdir(), 'jovie-result-')));
-      roots.push(root);
+      const { root, bin } = workspace({
+        git: `test "$1" = ls-remote || exit 1
+printf '%s\\trefs/heads/main\\n' '${NEWER}'`,
+      });
       const output = join(root, 'output');
       writeFileSync(output, '');
       const promote = needs['promote-production']?.outputs ?? {};
@@ -468,6 +470,8 @@ describe.skipIf(!gh)(
         }),
         env: {
           GITHUB_OUTPUT: output,
+          GITHUB_WORKSPACE: repoRoot,
+          PATH: `${bin}:${process.env.PATH ?? ''}`,
           EXPECTED_SHA: SHA,
           PROMOTION_SHA: promote.promotion_sha ?? '',
           PRODUCTION_DEPLOYMENT_ID: promote.production_deployment_id ?? '',
