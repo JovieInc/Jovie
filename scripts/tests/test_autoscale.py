@@ -338,12 +338,15 @@ class AutoscaleTest(unittest.TestCase):
 
     def test_dispatch_worker_doctor_and_hud(self):
         spawned = []
-        with tempfile.TemporaryDirectory() as tmp, env(SYMPHONY_AUTOSCALE="apply"):
+        with tempfile.TemporaryDirectory() as tmp, env(SYMPHONY_AUTOSCALE="apply"), \
+                patch.object(lane.autoscale, "load_config", return_value=cfg()):
             host = lane.Host(state=Path(tmp), repo=Path(tmp))
             with patch.object(lane.autoscale, "apply_tick", side_effect=RuntimeError("boom")), \
                     patch.object(lane, "provider_healthy", return_value=True), patch.object(lane, "ensure_full_history"), \
                     patch.object(lane.disk_guard, "check", return_value={"admitted": True, "freePct": 40}), \
                     patch.object(lane.subprocess, "Popen", side_effect=lambda args, **kw: spawned.append(args[-1])), \
+                    patch.object(lane.shipping_origin, "collect", return_value={}), \
+                    patch.object(lane, "quota_pressure", return_value={"ok": True}), \
                     patch.object(lane.pr_events, "tick", return_value={}), patch.object(lane.reason_lane, "tick", return_value={}), \
                     patch.object(lane.yc_corpus, "tick", return_value={}), \
                     patch.object(lane.continuity_clock, "tick", return_value={"status": "current"}), \
@@ -354,7 +357,8 @@ class AutoscaleTest(unittest.TestCase):
             self.assertIn("boom", tick["autoscaleError"])
             self.assertEqual(tick["spawned"], ["devin", "devin", "devin", "devin", "codex", "codex", "codex", "claude", "claude", "hyperagent", "hyperagent", "grok"])
             self.assertEqual(spawned, tick["spawned"])
-        with tempfile.TemporaryDirectory() as tmp, env(SYMPHONY_AUTOSCALE="apply"):
+        with tempfile.TemporaryDirectory() as tmp, env(SYMPHONY_AUTOSCALE="apply"), \
+                patch.object(lane.autoscale, "load_config", return_value=cfg()):
             root = Path(tmp)
             (root / "doctor.json").write_text(json.dumps({"observed": {"now": time.time(), "capacityByProvider": {"devin": {"running": 4}},
                 "eligiblePoolByProvider": {"devin": 2}, "newIssueBudgetByProvider": {"devin": {"reason": "within-budget"}}, "githubRemaining": 4000}, "alerts": {}}))

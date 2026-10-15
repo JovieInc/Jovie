@@ -40,6 +40,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, str(HERE))
 import continuity_clock  # noqa: E402
 import lifecycle  # noqa: E402
@@ -58,6 +59,7 @@ import linear_sync  # noqa: E402  (local issue mirror, claim ledger, write outbo
 import pr_events  # noqa: E402
 import remediation  # noqa: E402  (classifier, router, escalation ladder)
 import shipping_attribution  # noqa: E402  (receipt-first merged-PR provenance)
+import shipping_origin  # noqa: E402  (data-only remote provenance ingest)
 import workstreams  # noqa: E402  (shared workstream rank + duplicate identity)
 import worktree_sweep  # noqa: E402  (idle / merged-PR checkout retirement, JOV-7704)
 import worktree_pool  # noqa: E402  (pre-installed worktree pool, JOV-7705)
@@ -128,7 +130,7 @@ LANE_TESTS = ["scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_a
               "scripts/tests/test_linear_sync.py"]
 # Dependencies outside scripts/lanes for installed source admission and the HUD's
 # PROMOTION line (JOV-6836).
-RELEASE_EXTRAS = ["scripts/fleet-gate/gem-priority-gate.py", "scripts/fleet-gate/closure_health.py",
+RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/fleet-gate/gem-priority-gate.py", "scripts/fleet-gate/closure_health.py",
                   "scripts/fleet-gate/gem_gate_contract.py", "scripts/fleet-gate/summer_ci_audit.py",
                   "scripts/fleet-gate/symphony_proof_context.py",
                   "scripts/promotion-loss-metrics.mjs", "scripts/merge-group-failure-hold.mjs",
@@ -6783,6 +6785,11 @@ def dispatch(host: Host) -> int:
         if not tick["disk"].get("admitted"):
             raise DiskAdmissionError(tick["disk"].get("reason", "disk-unobservable"))
         ensure_full_history(host)
+        if not os.environ.get("LANES_SELFTEST"):
+            try:
+                tick["shippingOriginIngest"] = shipping_origin.collect(host.state)
+            except Exception as error:
+                tick["shippingOriginIngest"] = {"errors": [f"{type(error).__name__}:{error}"[:200]]}
         try:
             tick["remediationEvents"] = claim_remediation_events(host, Linear(host.linear_env))
         except (Exception, SystemExit) as error:  # the label scan (or a missing key) never takes spawn down

@@ -3696,6 +3696,10 @@ class DispatchTest(unittest.TestCase):
         self.corpus_tick = corpus.start()
         self.addCleanup(corpus.stop)
 
+        origins = patch.object(lane.shipping_origin, "collect", return_value={"accepted": [], "rejected": [], "errors": []})
+        self.origin_collect = origins.start()
+        self.addCleanup(origins.stop)
+
     def test_coding_dispatch_continues_when_coordinator_reasoning_and_alerts_are_unavailable(self):
         # Summer/Gateway failure affects optional reasoning and observability, not
         # the independently admitted coding lane. Keep all existing disk/slot gates.
@@ -3720,7 +3724,14 @@ class DispatchTest(unittest.TestCase):
                 "actions": {"delivery": {"key": "delivery", "kind": "comments", "status": "failed",
                                          "nextAt": 123, "createdAt": 100}},
             })
+            self.origin_collect.side_effect = RuntimeError("origin transport unavailable")
             self.assertEqual(lane.dispatch(host), 0)
+            tick = json.loads((host.state / "tick.json").read_text())
+            if os.environ.get("LANES_SELFTEST"):
+                self.origin_collect.assert_not_called()
+            else:
+                self.origin_collect.assert_called_once_with(host.state)
+                self.assertIn("origin transport unavailable", tick["shippingOriginIngest"]["errors"][0])
             self.assertEqual(spawn.call_count, 1)
             self.assertEqual(spawn.call_args.args[0][-1], "codex")
             self.corpus_tick.assert_called_once_with(host.state)
@@ -6608,7 +6619,7 @@ class UpdateTest(unittest.TestCase):
 
 class ManagedMeshArchiveTest(unittest.TestCase):
     def test_managed_archive_retains_exact_verified_portable_closure(self):
-        required = [".nvmrc", "pnpm-lock.yaml", "packages/agent-transport-contracts/work-order.ts",
+        required = ["scripts/shipping_origin.py", ".nvmrc", "pnpm-lock.yaml", "packages/agent-transport-contracts/work-order.ts",
                     "scripts/backlog-orchestrator/summer-triage-assessment-client.mjs"]
         self.assertTrue(set(required) <= set(lane.RELEASE_EXTRAS))
         if os.environ.get("LANES_SELFTEST") != "1":
@@ -8066,6 +8077,7 @@ class LifecycleOwnershipTest(unittest.TestCase):
                 patch.object(lane.worktree_sweep, "maybe_spawn"), \
                 patch.object(lane, "ensure_full_history"), \
                 patch.object(lane, "claim_remediation_events"), \
+                patch.object(lane.shipping_origin, "collect", return_value={}), \
                 patch.object(lane, "provider_healthy", return_value=True), \
                 patch.object(lane.pr_events, "tick"), \
                 patch.object(lane.reason_lane, "tick"), \

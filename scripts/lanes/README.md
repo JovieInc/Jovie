@@ -115,6 +115,72 @@ body remain candidate context only; they never produce verified attribution.
 Receipt values can appear in the company status feed: use stable non-secret labels,
 never credentials, private paths or personal contact details.
 
+### Non-Symphony publication origins (JOV-8318)
+
+`record-origin` now reads the canonical GitHub repository, PR head and (while open)
+live branch ref before appending. A stale head, duplicate or conflicting exact-head
+origin fails without changing existing bytes. New heads require new receipts;
+neither repair nor review/finalizer receipts rewrite origin history.
+
+The Dependabot metadata-certified producer and atomic pin-sync writer emit after
+their final heads are known. Sentry Autofix, Shipping SLO (snapshot and ratchet),
+Screenshots (new and updated PR), Production Controller customer notes, Desktop
+Release stamps, and both coverage/nightly report publishers use the same
+`shipping_origin.py emit-automation` boundary after publication. Sentry records
+the evidenced Claude provider, without inventing a model from its routing tier.
+
+Hosted producers retain a data-only `shipping-origin-v1` Actions artifact for 30
+days. The existing lanes dispatch tick reads artifacts from both reporting
+repositories, checks the GitHub run's repository/workflow/event and trusted source
+context, rechecks the live exact head, and fsyncs one `jovie-shipping-origin/v1`
+receipt into `runs/ledger.jsonl`. Redelivery is acknowledged without appending.
+Invalid data and conflicts appear in `tick.shippingOriginIngest.rejected`;
+transport/pagination/deadline failures appear in `errors`, retry next tick and
+mark attribution evidence incomplete in the company status feed. Merge counts
+remain independent. The collector is bounded to 45 seconds and ten 100-artifact
+pages per repository; it never extracts or executes archive content.
+
+Founder-operated ChatGPT, Codex and Claude sessions, and independent Hyperagent,
+Grokbot or other agents, use this publication handoff after the last push:
+
+```bash
+python3 scripts/shipping_origin.py submit \
+  --repository JovieInc/Jovie --pr 123 --head-sha <exact-final-head> \
+  --method founder-operated-codex --initiator tim --provider codex \
+  --execution-host <non-secret-host-label> --run-id <session-id> \
+  --linear-issue JOV-123
+```
+
+Choose `founder-operated-chatgpt`, `founder-operated-claude`,
+`founder-operated-codex`, `founder-operated-unknown-provider`, `grokbot`,
+`independent-agent`, or `independent-hyperagent` from actual commissioning
+evidence. Add `--model` only when the run establishes it. Never infer it from
+the author, branch or PR text. `--payload-file` accepts the same minimal fields
+(`repository`, `pr`, `headSha`, `method`, `initiator`, optional `provider`, `model`,
+`executionHost`, `runId`, `linearIssue`); unknown fields and duplicate JSON keys fail.
+Both Jovie and LogYourBody are allowed. Founder/independent handoffs require a
+Linear issue and Tim's authenticated GitHub dispatch; an independent agent hands
+the payload to the existing authorized publisher when it lacks that identity.
+This is an origin attestation, not an autonomous-work admission.
+
+The main-only `shipping-origin.yml` workflow accepts that payload as environment
+data, reads both repositories with an explicitly read-only App token, and retains
+the artifact. It cannot push, review, execute PR code, start implementation or
+merge. The App must already be installed on both repositories; missing read
+access fails visibly. Host-local publishers may instead use `record-origin` with
+the same selected method and metadata.
+
+Ship now: exact-head instrumentation and the existing-tick transport. Re-evaluate
+when a fresh deployed daily window contains integrated producer runs. Then attach
+the producer run/artifact URLs, receipt IDs and fresh `shippingAttribution` status
+report link to JOV-8318, checking increased verified coverage for each producer,
+separate review/remediation/finalizer roles and unknown counts for unreadable or
+uninstrumented projects. Draft publication and deterministic fixtures do not
+establish deployed coverage. JOV-8318 retains this commissioning obligation until
+the independent landing/deploy gate produces those runtime receipts.
+
+Transport reference: [GitHub artifact API](https://docs.github.com/en/rest/actions/artifacts).
+
 Gate reservations use kernel locks for the PR number and head SHA. An adopter carries
 its reservation through checkout, install, checks and terminal receipt publication;
 another contender skips that head without taking a heavy seat or charging an issue
