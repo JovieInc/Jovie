@@ -70,7 +70,7 @@ const Avatar = React.forwardRef<HTMLSpanElement, AvatarProps>(
         data-size={size}
         data-shape={shape}
         className={cn(
-          'relative isolate inline-flex shrink-0 items-center justify-center',
+          'relative isolate inline-flex shrink-0 items-center justify-center align-middle',
           isPerson ? 'overflow-visible' : 'overflow-hidden',
           AVATAR_OUTLINE_CLASSNAME,
           ring && AVATAR_RING_CLASSNAME,
@@ -247,15 +247,23 @@ function UserAvatar({
   ring = false,
   className,
 }: UserAvatarProps) {
+  const [failedSrc, setFailedSrc] = React.useState<string | null>(null);
   const initials = name ? getInitials(name) : '?';
   const altText = name || 'Avatar';
 
   return (
     <Avatar size={size} ring={ring} shape='person' className={className}>
-      {src ? (
-        <AvatarImage src={src} alt={altText} />
+      {src && src !== failedSrc ? (
+        <AvatarImage
+          src={src}
+          alt={altText}
+          onError={() => setFailedSrc(src)}
+          onLoad={() => setFailedSrc(null)}
+        />
       ) : (
-        <AvatarFallback>{initials}</AvatarFallback>
+        <AvatarFallback role='img' aria-label={altText}>
+          {initials}
+        </AvatarFallback>
       )}
       {status && <AvatarStatusDot status={status} />}
     </Avatar>

@@ -1,10 +1,11 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import {
   AVATAR_PERSON_RADIUS_CLASSNAME,
+  AVATAR_SIZE_NAMES,
   Avatar,
   AvatarFallback,
   AvatarImage,
@@ -100,6 +101,75 @@ describe('Avatar', () => {
     const image = screen.getByRole('img', { name: 'Tim White' });
     expect(image).toHaveAttribute('src', '/tim-white.png');
     expect(image).toHaveClass('rounded-full', 'object-cover');
+  });
+
+  it.each(AVATAR_SIZE_NAMES)(
+    'replaces a failed %s portrait with named initials in the same frame',
+    size => {
+      render(
+        <UserAvatar
+          name='Tim White'
+          src='/broken-portrait.png'
+          size={size}
+          ring
+          status='away'
+        />
+      );
+
+      const image = screen.getByRole('img', { name: 'Tim White' });
+      const frame = image.parentElement;
+      const presence = screen.getByRole('img', { name: 'away status' });
+      expect(screen.queryByText('TW')).not.toBeInTheDocument();
+      fireEvent.error(image);
+
+      const fallback = screen.getByRole('img', { name: 'Tim White' });
+      expect(fallback).toHaveTextContent('TW');
+      expect(image).not.toBeInTheDocument();
+      expect(fallback.parentElement).toBe(frame);
+      expect(frame).toHaveClass('align-middle');
+      expect(frame).toHaveStyle({
+        width: `${getAvatarSizePx(size)}px`,
+        height: `${getAvatarSizePx(size)}px`,
+      });
+      expect(frame).toHaveAttribute('data-ring', 'true');
+      expect(fallback).toHaveClass('rounded-full', 'bg-surface-2');
+      expect(screen.getByRole('img', { name: 'away status' })).toBe(presence);
+    }
+  );
+
+  it('uses a named neutral fallback when an unidentified portrait fails', () => {
+    render(<UserAvatar src='/broken-portrait.png' />);
+
+    fireEvent.error(screen.getByRole('img', { name: 'Avatar' }));
+
+    expect(screen.getByRole('img', { name: 'Avatar' })).toHaveTextContent('?');
+  });
+
+  it('retries a replacement portrait and can recover a previously failed URL', () => {
+    const { rerender } = render(
+      <UserAvatar name='Tim White' src='/first.png' />
+    );
+    fireEvent.error(screen.getByRole('img', { name: 'Tim White' }));
+    expect(screen.getByText('TW')).toBeVisible();
+
+    rerender(<UserAvatar name='Tim White' src='/replacement.png' />);
+    const replacement = screen.getByRole('img', { name: 'Tim White' });
+    expect(replacement).toHaveAttribute('src', '/replacement.png');
+    expect(screen.queryByText('TW')).not.toBeInTheDocument();
+    fireEvent.load(replacement);
+
+    rerender(<UserAvatar name='Tim White' src='/first.png' />);
+    const retried = screen.getByRole('img', { name: 'Tim White' });
+    expect(retried).toHaveAttribute('src', '/first.png');
+    fireEvent.error(retried);
+    expect(screen.getByRole('img', { name: 'Tim White' })).toHaveTextContent(
+      'TW'
+    );
+
+    rerender(<UserAvatar name='Alex Chen' />);
+    expect(screen.getByRole('img', { name: 'Alex Chen' })).toHaveTextContent(
+      'AC'
+    );
   });
 
   it('keeps person geometry circular even when a square class is passed', () => {
