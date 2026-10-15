@@ -911,6 +911,36 @@ describe('Ovie MCP handler', () => {
     ]);
   });
 
+  it('proposes the canonical customer mission with friction requirements', async () => {
+    const result = await handleOvieMcpRequest({
+      principal: founder,
+      body: rpc('tools/call', {
+        name: 'certify_feature',
+        arguments: { feature: 'public-profile' },
+      }),
+    });
+    const body = toolResult<{
+      executed_live_mission: boolean;
+      receipt_contract: string;
+      outcome_mission: {
+        id: string;
+        outcome: {
+          goal: string;
+          successCriteria: string[];
+          frictionBudget: { maxRetries: number };
+        };
+      };
+      spec: string;
+    }>(result.body);
+    expect(body.executed_live_mission).toBe(false);
+    expect(body.receipt_contract).toBe('jovie.dogfood-receipt/v1');
+    expect(body.outcome_mission.id).toBe('outcome:public-profile');
+    expect(body.spec).toBe(body.outcome_mission.outcome.goal);
+    expect(body.spec).toContain('hear when they play nearby');
+    expect(body.outcome_mission.outcome.successCriteria).toHaveLength(3);
+    expect(body.outcome_mission.outcome.frictionBudget.maxRetries).toBe(1);
+  });
+
   it('projects invariant exceptions to Ovie for the founder without dumping healthy detail', async () => {
     const denied = await handleOvieMcpRequest({
       principal: user,

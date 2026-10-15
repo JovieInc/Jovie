@@ -85,11 +85,29 @@ export const ConformanceMatrix: Story = {
       </div>
       <div className='flex min-h-11 items-center gap-2'>
         <Switch
+          id='sw-conformance-disabled-checked'
+          aria-label='Disabled checked toggle'
+          defaultChecked
+          disabled
+        />
+        <Label htmlFor='sw-conformance-disabled-checked'>Disabled and on</Label>
+      </div>
+      <div className='flex min-h-11 items-center gap-2'>
+        <Switch
           id='sw-conformance-invalid'
           aria-label='Invalid toggle'
           aria-invalid='true'
         />
         <Label htmlFor='sw-conformance-invalid'>Invalid</Label>
+      </div>
+      <div className='flex min-h-11 items-center gap-2'>
+        <Switch
+          id='sw-conformance-invalid-checked'
+          aria-label='Invalid checked toggle'
+          aria-invalid='true'
+          defaultChecked
+        />
+        <Label htmlFor='sw-conformance-invalid-checked'>Invalid and on</Label>
       </div>
     </div>
   ),
@@ -108,7 +126,7 @@ export const ConformanceMatrix: Story = {
     await expect(keyboardSwitch).toHaveFocus();
 
     const invalidSwitch = canvasElement.querySelector<HTMLElement>(
-      '[role="switch"][aria-invalid="true"]'
+      '#sw-conformance-invalid'
     );
     await expect(invalidSwitch).toBeInTheDocument();
     await expect(invalidSwitch).toHaveAttribute('aria-invalid', 'true');
@@ -122,12 +140,38 @@ export const ConformanceMatrix: Story = {
     const hitTarget = getComputedStyle(keyboardSwitch, '::before');
     await expect([visibleBox.width, visibleBox.height]).toEqual([28, 16]);
     await expect([hitTarget.width, hitTarget.height]).toEqual(['44px', '44px']);
+
+    const checkedSwitch = canvasElement.querySelector<HTMLElement>(
+      '#sw-conformance-checked'
+    );
+    const invalidCheckedSwitch = canvasElement.querySelector<HTMLElement>(
+      '#sw-conformance-invalid-checked'
+    );
+    if (!checkedSwitch || !invalidCheckedSwitch) {
+      throw new Error('Both checked validation states must render');
+    }
+    const thumbInset = (control: HTMLElement) => {
+      const track = control.getBoundingClientRect();
+      const thumb = control.firstElementChild?.getBoundingClientRect();
+      if (!thumb) throw new Error('Switch thumb must render');
+      return [thumb.x - track.x, thumb.y - track.y, thumb.width, thumb.height];
+    };
+
+    // Validation feedback must not reposition a checked thumb.
+    await expect(thumbInset(invalidCheckedSwitch)).toEqual(
+      thumbInset(checkedSwitch)
+    );
+    const beforeError = thumbInset(checkedSwitch);
+    checkedSwitch.setAttribute('aria-invalid', 'true');
+    await expect(thumbInset(checkedSwitch)).toEqual(beforeError);
+    checkedSwitch.removeAttribute('aria-invalid');
+    await expect(thumbInset(checkedSwitch)).toEqual(beforeError);
   },
   parameters: {
     docs: {
       description: {
         story:
-          'Canonical Switch proof: unchecked, checked, disabled, invalid, focus, Space activation, and the 28×16 visual control with a 44px hit target.',
+          'Canonical Switch proof: unchecked/checked, disabled off/on, invalid off/on, focus, Space activation, validation geometry stability, and the 28×16 visual control with a 44px hit target.',
       },
     },
   },
