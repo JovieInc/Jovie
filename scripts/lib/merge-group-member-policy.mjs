@@ -881,6 +881,14 @@ async function readEvidenceFile(file, baseSha, headSha) {
   }
 }
 
+/**
+ * @param {{
+ *   baseSha?: string,
+ *   headSha?: string,
+ *   env?: NodeJS.ProcessEnv,
+ *   cwd?: string,
+ * }} [options]
+ */
 export async function readLocalMergeGroupCheckout({
   baseSha,
   headSha,

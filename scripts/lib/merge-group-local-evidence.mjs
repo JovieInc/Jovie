@@ -55,6 +55,12 @@ export function parseNumstatZ(stdout) {
 }
 
 /**
+ * @param {{
+ *   baseSha?: string,
+ *   headSha?: string,
+ *   cwd?: string,
+ *   git?: (args: readonly string[], cwd: string) => string,
+ * }} [options]
  * @returns {null | {
  *   baseSha: string,
  *   headSha: string,
