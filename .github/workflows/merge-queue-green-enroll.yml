@@ -55,8 +55,11 @@ permissions: {}
 
 concurrency:
   # A global pending slot loses another PR's final wake. Coalesce only wakes
-  # attributed to the same PR; association-free receipts retain their run ID.
-  group: merge-queue-green-enroll-${{ ((github.event_name == 'workflow_dispatch' && inputs.pr_number == '') || github.event_name == 'push') && 'reconcile' || inputs.pr_number || github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.id || github.run_id }}
+  # attributed to the same PR. An association-free receipt coalesces with the
+  # same workflow on the same head, and a different workflow keeps its own slot
+  # so a success cannot replace a failure hold. Receipts with no head stay on
+  # their run ID.
+  group: merge-queue-green-enroll-${{ ((github.event_name == 'workflow_dispatch' && inputs.pr_number == '') || github.event_name == 'push') && 'reconcile' || inputs.pr_number || github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || (github.event.workflow_run.head_sha && format('{0}-{1}', github.event.workflow_run.head_sha, github.event.workflow_run.name)) || github.event.workflow_run.id || github.run_id }}
   cancel-in-progress: false
 
 jobs:

@@ -1254,8 +1254,20 @@ function concurrencyGroup(github) {
         'github.event.workflow_run?.pull_requests?.[0]?.number'
       )
       .replaceAll(
+        'github.event.workflow_run.head_sha',
+        'github.event.workflow_run?.head_sha'
+      )
+      .replaceAll(
+        'github.event.workflow_run.name',
+        'github.event.workflow_run?.name'
+      )
+      .replaceAll(
         'github.event.workflow_run.id',
         'github.event.workflow_run?.id'
+      )
+      .replace(
+        /format\('\{0\}-\{1\}',\s*([^,]+?),\s*([^)]+?)\)/g,
+        '`${$1}-${$2}`'
       );
     return new Function('github', 'inputs', `return (${js});`)(
       github,
@@ -1309,6 +1321,26 @@ test('same-PR wakes coalesce while unattributed receipts and manual reconciliati
   assert.equal(concurrencyGroup(label), concurrencyGroup(wake(7, 101)));
   assert.equal(workflow.concurrency['cancel-in-progress'], false);
   assert.equal(workflow.jobs.enroll['timeout-minutes'], 5);
+  const sameHead = (id, name) => ({
+    event_name: 'workflow_run',
+    event: {
+      workflow_run: {
+        id,
+        name,
+        head_sha: 'a'.repeat(40),
+        pull_requests: [],
+      },
+    },
+    run_id: id + 1000,
+  });
+  assert.equal(
+    concurrencyGroup(sameHead(101, 'CI')),
+    concurrencyGroup(sameHead(102, 'CI'))
+  );
+  assert.notEqual(
+    concurrencyGroup(sameHead(101, 'CI')),
+    concurrencyGroup(sameHead(102, 'PR Size Guard'))
+  );
 });
 
 function recoveryDeferred() {
