@@ -10,6 +10,13 @@ Features, polish, experiments, and roadmap items are valid only insofar as they 
 
 ---
 
+## Current homepage MVP
+
+EVENT: JOV-5885 under JOV-5881 scopes `/` to `youtube-artist-closed-loop-mvp-v1`.
+[The scoped brief](../docs/marketing/YOUTUBE_ARTIST_MVP.md) owns the YouTube artist
+promise, four capabilities, and evidence limits. Atoms stay; machine surface
+certification precedes deployed Tim Taste. Source checks prove neither.
+
 ## Product Goal
 
 Increase the rate at which customers reach and repeatedly receive value from Jovie.

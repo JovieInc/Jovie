@@ -1,6 +1,7 @@
 import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
 import { HOMEPAGE_YOUTUBE_MVP as copy } from '@/data/homepageYoutubeMvp';
 import { expect, test } from './setup';
+import { inspectRouteDom } from './utils/route-dom-detector';
 import { waitForHydration } from './utils/smoke-test-utils';
 
 const isFastIteration = process.env.E2E_FAST_ITERATION === '1';
@@ -98,6 +99,25 @@ test.describe('Homepage', () => {
       .fill('Tim White');
     await page.getByTestId('homepage-primary-cta').click();
     await handoff;
+  });
+
+  test('aligns the founder proof copy and story action on desktop and mobile', async ({
+    page,
+  }) => {
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: 900 });
+      const proof = page.getByTestId('marketing-section-social-proof');
+      await proof.scrollIntoViewIfNeeded();
+      await expect(
+        proof.getByRole('link', { name: 'Read the story' })
+      ).toBeVisible();
+      const snapshot = await inspectRouteDom(page, { surface: 'marketing' });
+      expect(
+        snapshot.findings.filter(
+          finding => finding.kind === 'misaligned-text-stack'
+        )
+      ).toEqual([]);
+    }
   });
 
   test('mounts the upload loop, founder proof, pricing, and close in order', async ({
