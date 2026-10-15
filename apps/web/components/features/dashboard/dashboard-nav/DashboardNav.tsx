@@ -467,7 +467,7 @@ export function DashboardNav({
         pendingNavigation?.itemId === chatNavItem.id || undefined
       }
       className={cn(
-        'relative flex size-6 shrink-0 items-center justify-center rounded-md text-sidebar-muted transition-[color,background-color,opacity] duration-subtle ease-subtle hover:bg-sidebar-accent hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring after:absolute after:-inset-2.5 after:lg:hidden',
+        'relative flex size-6 shrink-0 items-center justify-center rounded-md text-sidebar-muted transition duration-subtle ease-subtle hover:bg-sidebar-accent hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring after:absolute after:-inset-2.5 after:lg:hidden',
         pendingNavigation?.itemId === chatNavItem.id && 'opacity-70'
       )}
     >
