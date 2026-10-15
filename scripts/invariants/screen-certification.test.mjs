@@ -342,12 +342,12 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     assert.equal(kindOf('apps/web/app/(home)/page.tsx'), 'registered');
     assert.equal(
       kindOf('apps/web/app/(auth)/auth/native-return/page.tsx'),
-      'excluded'
+      'registered'
     );
-    assert.equal(kindOf('apps/web/app/auth-return/page.tsx'), 'excluded');
+    assert.equal(kindOf('apps/web/app/auth-return/page.tsx'), 'registered');
     assert.equal(
       kindOf('apps/web/app/mobile-auth-return/page.tsx'),
-      'excluded'
+      'registered'
     );
     assert.equal(kindOf('apps/web/app/error.tsx'), 'registered');
     assert.equal(kindOf('apps/web/app/global-error.tsx'), 'registered');
@@ -3671,11 +3671,10 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     assert.match(dropped.join('\n'), /dropped its main-push trigger/);
   });
 
-  it('does not require proof for excluded Ovie, auth, MenuMonitor, or iOS shell changes', () => {
+  it('does not require proof for excluded Ovie, native auth, MenuMonitor, or iOS shell changes', () => {
     const result = evaluateChangedScreens({
       changedFiles: [
         'apps/desktop/src/ovie-door.ts',
-        'apps/web/app/(auth)/sign-in/page.tsx',
         'apps/macos/MenuMonitor/Package.swift',
         'apps/ios/Jovie/Features/AppShell/AppShellView.swift',
         'apps/ios/Jovie/Features/Auth/AuthScreen.swift',

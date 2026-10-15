@@ -300,6 +300,7 @@ function decodeMarketingProof(bytes, context, meta) {
       producerJobId: meta.jobId,
       capturedAt: new Date(capturedAt).toISOString(),
       artifactDigest: bundleDigest(captures),
+      browserOwnedInput: measured.get(context.viewports[0])?.browserOwnedInput,
       viewports: context.viewports.map(id => ({
         id,
         decision: 'pass',
