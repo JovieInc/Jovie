@@ -76,6 +76,80 @@ export function getToolParts(message: UIMessage): readonly ToolPart[] {
   return ((message.parts ?? []) as readonly MessagePart[]).filter(isToolPart);
 }
 
+export function getOnboardingComposerPlaceholder({
+  handleDraft,
+  hasConversationStarted,
+  messages,
+  selectedArtistId = null,
+}: {
+  readonly handleDraft: string | null;
+  readonly hasConversationStarted: boolean;
+  readonly messages: readonly UIMessage[];
+  readonly selectedArtistId?: string | null;
+}): string {
+  const fallback = hasConversationStarted
+    ? 'Reply to Jovie…'
+    : 'Artist, release, or link...';
+  // A draft survives subsequent steps. Only the current assistant turn can
+  // nominate a card; a later question must not revive an old handle prompt.
+  const latestAssistant = messages.findLast(
+    message => message.role === 'assistant'
+  );
+  if (!latestAssistant) return fallback;
+  const handleDone =
+    hasToolOutputAction(messages, 'handle_confirmed') ||
+    hasWidgetEvent(messages, 'handle_confirmed');
+  const socialDone =
+    hasToolOutputAction(messages, 'social_attached') ||
+    hasWidgetEvent(messages, 'social_attached');
+
+  for (const part of [...getToolParts(latestAssistant)].reverse()) {
+    const output = part.output;
+    switch (getToolName(part)) {
+      case 'searchSpotifyArtist':
+        if (
+          !selectedArtistId &&
+          (isArtistPickerOutput(output) || output === undefined)
+        ) {
+          return 'Pick an artist above or type a different name…';
+        }
+        break;
+      case 'checkHandle':
+        if (
+          !handleDone &&
+          (isHandleCheckOutput(output) || output === undefined)
+        ) {
+          return handleDraft || (isHandleCheckOutput(output) && output.handle)
+            ? 'Confirm handle or type a different one…'
+            : 'Type a handle to check…';
+        }
+        break;
+      case 'proposeSocialLink':
+        if (
+          !socialDone &&
+          (isSocialLinkOutput(output) || output === undefined)
+        ) {
+          return 'Attach a social link above or paste one here…';
+        }
+        break;
+      case 'proposeNextStep':
+        if (isNextStepPayload(output)) {
+          if (output.decision.kind === 'instant_access')
+            return 'Create your account above or ask a question…';
+          if (output.decision.kind === 'waitlist')
+            return 'Save your spot above or ask a question…';
+          return fallback;
+        }
+        break;
+      case 'proposeCheckout':
+        if (isCheckoutPayload(output))
+          return 'Continue to checkout above or ask a question…';
+        break;
+    }
+  }
+  return fallback;
+}
+
 export interface ToolOutputWithAction {
   readonly action?: string;
 }

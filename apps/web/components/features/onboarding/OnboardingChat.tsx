@@ -75,6 +75,7 @@ import {
   findLastAssistantMessageId,
   getInputQuery,
   getMessageText,
+  getOnboardingComposerPlaceholder,
   getOnboardingErrorMessage,
   getToolName,
   getToolParts,
@@ -573,16 +574,6 @@ interface OnboardingFlowStatusProps {
   readonly shouldShowTurnstileBanner: boolean;
   readonly turnstilePanel: ReactNode;
   readonly sizeStarterInstruction: boolean;
-}
-
-function getOnboardingComposerPlaceholder(
-  handleDraft: string | null,
-  hasConversationStarted: boolean
-) {
-  if (handleDraft) return 'Confirm handle or type a different one…';
-  return hasConversationStarted
-    ? 'Reply to Jovie…'
-    : 'Artist, release, or link...';
 }
 
 function OnboardingFlowStatus({
@@ -1180,10 +1171,12 @@ export function OnboardingChat({
     isSubmitting: isSubmitted,
     isStreaming,
     onStop: stop,
-    placeholder: getOnboardingComposerPlaceholder(
+    placeholder: getOnboardingComposerPlaceholder({
       handleDraft,
-      hasConversationStarted
-    ),
+      hasConversationStarted,
+      messages,
+      selectedArtistId: selectedArtist?.id ?? null,
+    }),
     dictationEnabled: false,
     onPickerOpenChange: setComposerPickerOpen,
     chips: chipTray.chips,
