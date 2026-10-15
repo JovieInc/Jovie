@@ -433,6 +433,48 @@ export function DashboardNav({
     ]
   );
 
+  // The same action changes slots on rail reveal; keep its keyboard focus.
+  const newChatRef = useRef<HTMLAnchorElement | null>(null);
+  const restoreNewChatFocus = useRef(false);
+  const preserveNewChatFocus = useCallback((node: HTMLAnchorElement | null) => {
+    if (!node) {
+      restoreNewChatFocus.current =
+        newChatRef.current === document.activeElement;
+    }
+    newChatRef.current = node;
+    if (node && restoreNewChatFocus.current) {
+      node.focus({ preventScroll: true });
+      restoreNewChatFocus.current = false;
+    }
+  }, []);
+
+  const newChatAction = (
+    <Link
+      ref={preserveNewChatFocus}
+      href={APP_ROUTES.CHAT}
+      onClick={event => handleCommandClick(event, chatNavItem)}
+      aria-busy={pendingNavigation?.itemId === chatNavItem.id || undefined}
+      aria-current={
+        normalizeTrailingSlash(pathname) === APP_ROUTES.CHAT &&
+        searchParams.get('panel') !== 'profile'
+          ? 'page'
+          : undefined
+      }
+      prefetch={!isDemo}
+      aria-label='New Chat'
+      data-navigation-item-id={chatNavItem.id}
+      data-navigation-pending={
+        pendingNavigation?.itemId === chatNavItem.id || undefined
+      }
+      className={cn(
+        'relative flex size-6 shrink-0 items-center justify-center rounded-md text-sidebar-muted transition-[color,background-color,opacity] duration-subtle ease-subtle hover:bg-sidebar-accent hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring after:absolute after:-inset-2.5 after:lg:hidden',
+        pendingNavigation?.itemId === chatNavItem.id && 'opacity-70'
+      )}
+    >
+      <Plus className='size-3.5' aria-hidden='true' />
+    </Link>
+  );
+
   // Memoize renderSection to prevent creating new functions on every render
   const renderSection = useCallback(
     (items: readonly NavItem[]) => (
@@ -468,7 +510,7 @@ export function DashboardNav({
             <div
               data-sidebar-search-slot='true'
               className={cn(
-                'mx-1 flex h-9 shrink-0 items-center gap-(--space-2-5) rounded-full border border-subtle bg-surface-1 pr-1.5',
+                'mx-1 flex h-9 shrink-0 items-center gap-(--space-2-5) pr-1.5',
                 // The command slot keeps its vertical allocation while the
                 // surrounding rail narrows; navigation below never moves.
                 'group-data-[collapsible=icon]:mx-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:border-transparent group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:pr-0'
@@ -536,31 +578,7 @@ export function DashboardNav({
                   </Link>
                 )}
               </RailStagedContent>
-              <Link
-                href={APP_ROUTES.CHAT}
-                onClick={event => handleCommandClick(event, chatNavItem)}
-                aria-busy={
-                  pendingNavigation?.itemId === chatNavItem.id || undefined
-                }
-                aria-current={
-                  normalizeTrailingSlash(pathname) === APP_ROUTES.CHAT &&
-                  searchParams.get('panel') !== 'profile'
-                    ? 'page'
-                    : undefined
-                }
-                prefetch={!isDemo}
-                aria-label='New Chat'
-                data-navigation-item-id={chatNavItem.id}
-                data-navigation-pending={
-                  pendingNavigation?.itemId === chatNavItem.id || undefined
-                }
-                className={cn(
-                  'relative flex size-6 shrink-0 items-center justify-center rounded-full bg-foreground text-(--color-bg-base) transition-opacity duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring after:absolute after:-inset-2.5 after:lg:hidden',
-                  pendingNavigation?.itemId === chatNavItem.id && 'opacity-70'
-                )}
-              >
-                <Plus className='size-3.5' aria-hidden='true' />
-              </Link>
+              {threadsVisible ? null : newChatAction}
             </div>
             <SidebarGroupContent className='pb-2 pt-5'>
               {navSections.map(section => (
@@ -581,6 +599,7 @@ export function DashboardNav({
                 normalizeTrailingSlash(pathname) === APP_ROUTES.CHATS
               }
               onThreadContextMenu={onThreadContextMenu}
+              newThreadAction={newChatAction}
               state={
                 conversationsError
                   ? 'error'

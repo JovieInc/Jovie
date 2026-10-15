@@ -3,7 +3,7 @@
 import { Button } from '@jovie/ui';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { NavBadge } from '@/components/atoms/NavBadge';
 import { APP_ROUTES } from '@/constants/routes';
@@ -61,6 +61,7 @@ export interface SidebarThreadsSectionProps {
   readonly state?: SidebarThreadListState;
   readonly onRetry?: () => void;
   readonly onNewThread?: () => void;
+  readonly newThreadAction?: ReactNode;
   // `tight` drops row height to 24px (h-6) to match dense workspace lists.
   readonly tight?: boolean;
   // `collapsed` hides the section entirely (sidebar icon mode).
@@ -347,28 +348,35 @@ export function SidebarThreadsSection({
   state = 'idle',
   onRetry,
   onNewThread,
+  newThreadAction,
   tight,
   collapsed,
 }: SidebarThreadsSectionProps) {
-  const [unreadOnly, setUnreadOnly] = useState(false);
   const sorted = useMemo(
     () => [...threads].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
     [threads]
   );
 
   if (collapsed) return null;
-  if (state === 'idle' && sorted.length === 0 && !onNewThread) return null;
+  if (
+    state === 'idle' &&
+    sorted.length === 0 &&
+    !onNewThread &&
+    !newThreadAction
+  )
+    return null;
 
-  const visible = sorted
-    .filter(thread => !unreadOnly || thread.unread)
-    .slice(0, 5);
+  const visible = sorted.slice(0, 5);
   const today = new Date(Date.now()).toDateString();
   const unreadCount = sorted.filter(t => t.unread).length;
   const hasThreads = sorted.length > 0;
 
   return (
     <div className={calm ? 'space-y-2' : 'space-y-1.5'}>
-      <div className='flex items-center justify-between px-2.5 pb-0.5 pt-2'>
+      <div
+        data-sidebar-history-header
+        className='flex min-h-6 items-center justify-between px-2.5 pb-0.5 pt-2'
+      >
         <span
           className={
             calm
@@ -379,24 +387,27 @@ export function SidebarThreadsSection({
           }
         >
           {calm
-            ? visible.some(
+            ? !hasThreads ||
+              visible.some(
                 thread => new Date(thread.updatedAt).toDateString() === today
               )
               ? 'Today'
               : 'Earlier'
             : 'Recent'}
         </span>
-        {calm ? (
-          <button
-            type='button'
-            aria-label='Filter Unread Chats'
-            aria-pressed={unreadOnly}
-            onClick={() => setUnreadOnly(value => !value)}
-            className='relative flex size-4 items-center justify-center text-sidebar-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring after:absolute after:-inset-3.5 after:lg:hidden'
-          >
-            <Icon name='Filter' className='size-3.5' aria-hidden='true' />
-          </button>
-        ) : null}
+        {newThreadAction ??
+          (onNewThread ? (
+            <Button
+              type='button'
+              variant='ghost'
+              size='icon'
+              aria-label='New Chat'
+              onClick={onNewThread}
+              className='relative flex size-6 shrink-0 items-center justify-center rounded-md text-sidebar-muted hover:bg-sidebar-accent hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring after:absolute after:-inset-2.5 after:lg:hidden'
+            >
+              <Icon name='Plus' className='size-3.5' aria-hidden='true' />
+            </Button>
+          ) : null)}
         {!calm && unreadCount > 0 && (
           <NavBadge
             variant='count'
@@ -451,36 +462,6 @@ export function SidebarThreadsSection({
               </Button>
             ) : null}
           </div>
-        ) : null}
-        {state === 'idle' && !hasThreads && onNewThread ? (
-          <Button
-            type='button'
-            variant='ghost'
-            onClick={onNewThread}
-            className={getSidebarNavRowClassName({
-              tight,
-              tone: 'primary',
-              className: 'text-left',
-            })}
-          >
-            <Icon
-              name='MessageSquarePlus'
-              className={getSidebarNavIconClassName({
-                tight,
-                tone: 'primary',
-              })}
-              aria-hidden='true'
-              strokeWidth={2.25}
-            />
-            <span className='min-w-0 truncate justify-self-start'>
-              New Chat
-            </span>
-          </Button>
-        ) : null}
-        {unreadOnly && visible.length === 0 ? (
-          <p className='px-(--space-2-5) text-xs text-tertiary-token'>
-            No unread chats
-          </p>
         ) : null}
         {visible.map((t, index) => {
           const active = activeThreadId === t.id;

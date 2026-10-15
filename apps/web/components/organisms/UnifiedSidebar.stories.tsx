@@ -1,4 +1,7 @@
-import { RenderedSidebarFamily } from '@/.storybook/rendered-family';
+import {
+  RenderedFamily,
+  RenderedSidebarFamily,
+} from '@/.storybook/rendered-family';
 import '../../styles/system-b-app.css';
 import { TooltipProvider } from '@jovie/ui';
 import type { Decorator, Meta, StoryObj } from '@storybook/nextjs-vite';
@@ -7,7 +10,9 @@ import { useState } from 'react';
 import { withSignedInSession } from '@/.storybook/signed-in-session';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { DashboardHeader } from '@/components/features/dashboard/organisms/DashboardHeader';
 import { SidebarCollapseButton } from '@/components/molecules/sidebar-collapse-button';
+import { AppShellFrame } from '@/components/organisms/AppShellFrame';
 import { SidebarProvider, useSidebar } from '@/components/organisms/sidebar';
 import { APP_ROUTES } from '@/constants/routes';
 import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
@@ -17,6 +22,28 @@ import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 import { queryKeys } from '@/lib/queries/keys';
 import { UnifiedSidebar } from './UnifiedSidebar';
+
+function SidebarStoryFrame({
+  children,
+  composed,
+}: {
+  readonly children: React.ReactNode;
+  readonly composed: boolean;
+}) {
+  return composed ? (
+    <RenderedFamily
+      name='unified-sidebar-shell'
+      owner='UnifiedSidebar'
+      interactive
+    >
+      <div className='h-screen w-full'>{children}</div>
+    </RenderedFamily>
+  ) : (
+    <RenderedSidebarFamily name='unified-sidebar' owner='UnifiedSidebar'>
+      <div className='h-screen w-(--app-shell-sidebar-width)'>{children}</div>
+    </RenderedSidebarFamily>
+  );
+}
 
 function StorySidebarProvider({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(true);
@@ -51,6 +78,11 @@ queryClient.setQueryData(queryKeys.chat.conversations(), [
     latestTurnStatus: 'completed',
   },
 ]);
+
+queryClient.setQueryData(queryKeys.admin.lists.sidebar(), {
+  lists: [],
+  smartViews: [],
+});
 
 const dashboardData: DashboardData = {
   user: { id: 'story-user' },
@@ -101,7 +133,7 @@ const meta: Meta<typeof UnifiedSidebar> = {
   },
   decorators: [
     withSignedInSession,
-    Story => (
+    (Story, context) => (
       <QueryClientProvider client={queryClient}>
         <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
           <DashboardDataProvider value={dashboardData}>
@@ -110,14 +142,11 @@ const meta: Meta<typeof UnifiedSidebar> = {
                 <JovieAuthValuesProvider>
                   <HeaderActionsProvider>
                     <ShellSidebarOverrideProvider>
-                      <RenderedSidebarFamily
-                        name='unified-sidebar'
-                        owner='UnifiedSidebar'
+                      <SidebarStoryFrame
+                        composed={Boolean(context.parameters.composedShell)}
                       >
-                        <div className='h-screen w-(--app-shell-sidebar-width)'>
-                          <Story />
-                        </div>
-                      </RenderedSidebarFamily>
+                        <Story />
+                      </SidebarStoryFrame>
                     </ShellSidebarOverrideProvider>
                   </HeaderActionsProvider>
                 </JovieAuthValuesProvider>
@@ -138,6 +167,21 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Dashboard: Story = {};
+
+const emptyHistoryClient = new QueryClient({
+  defaultOptions: { queries: { retry: false } },
+});
+emptyHistoryClient.setQueryData(queryKeys.chat.conversations(), []);
+
+export const EmptyHistory: Story = {
+  decorators: [
+    Story => (
+      <QueryClientProvider client={emptyHistoryClient}>
+        <Story />
+      </QueryClientProvider>
+    ),
+  ],
+};
 
 export const LegacyAdmin: Story = {
   args: { section: 'admin' },
@@ -194,4 +238,39 @@ export const AdminOperator: Story = {
   ...Operator,
   args: { ...Operator.args, headerOwnsCollapsedToggle: true },
   decorators: [adminShellDecorator],
+};
+
+function ComposedHistoryShell(
+  args: React.ComponentProps<typeof UnifiedSidebar>
+) {
+  return (
+    <AppShellFrame
+      sidebar={<UnifiedSidebar {...args} />}
+      header={<DashboardHeader breadcrumbs={[{ label: 'Work' }]} />}
+      main={
+        <label className='block p-4 text-sm text-primary-token'>
+          Campaign Draft
+          <textarea
+            aria-label='Campaign Draft'
+            className='mt-2 block w-full rounded-md border border-subtle bg-surface-1 p-3'
+            defaultValue='Announce the autumn release'
+          />
+        </label>
+      }
+    />
+  );
+}
+
+export const ComposedHistory: Story = {
+  parameters: {
+    composedShell: true,
+    nextjs: { navigation: { pathname: APP_ROUTES.LIBRARY } },
+  },
+  render: args => <ComposedHistoryShell {...args} />,
+};
+
+export const ComposedEmptyHistory: Story = {
+  ...EmptyHistory,
+  ...ComposedHistory,
+  decorators: EmptyHistory.decorators,
 };

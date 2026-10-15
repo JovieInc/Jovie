@@ -55,6 +55,7 @@ export const NewChatEmpty: Story = {
     activeThreadId: null,
     collapsed: false,
     tight: true,
+    calm: true,
     onNewThread: fn(),
   },
 };
@@ -62,6 +63,7 @@ export const NewChatEmpty: Story = {
 export const CalmLongTitles: Story = {
   args: {
     calm: true,
+    onNewThread: fn(),
     threads: threads.map((thread, index) => ({
       ...thread,
       title:
