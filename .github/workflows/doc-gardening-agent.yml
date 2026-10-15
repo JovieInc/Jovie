@@ -1,3 +1,7 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# capability-gap: Source-file changes require computed doc-freshness repairs; the Jovie App publishes those repairs as PRs that trigger source CI.
+# removal-trigger: Remove when the existing lanes writer generates the same freshness repairs directly from source-file change events.
 # Doc-gardening agent (JOV-3644).
 #
 # Scans gardening-only stale docs (docs/doc-gardening/**) and opens fix-up PRs

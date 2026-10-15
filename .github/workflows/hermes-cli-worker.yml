@@ -1,3 +1,7 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Symphony
+# capability-gap: A hosted dispatch bridges validated CLI task payloads to the self-hosted worker; its App identity publishes verified changes under the payload path allowlist.
+# removal-trigger: Remove when the coding orchestrator runs these validated CLI payloads directly on the worker with the same path allowlist and verification contract.
 name: Hermes CLI Worker
 
 on:

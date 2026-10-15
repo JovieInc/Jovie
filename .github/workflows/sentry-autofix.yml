@@ -1,3 +1,7 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Ops
+# capability-gap: Sentry repository events start deduplicated repair work from main; the Jovie App publishes the verified repair branch and PR so source CI runs.
+# removal-trigger: Remove when the primary Sentry intake writer directly produces the same deduplicated verified repair PRs with release and fingerprint evidence.
 name: Sentry Autofix
 
 on:

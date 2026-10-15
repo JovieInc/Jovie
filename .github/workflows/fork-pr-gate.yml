@@ -1,3 +1,7 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: The trusted metadata-only controller uses the Jovie App identity to publish the required fork-approval status without executing PR code.
+# removal-trigger: Remove when native GitHub rules enforce collaborator approval for fork heads while allowing first-party and Dependabot heads without this App status.
 # Fork PR Gate
 #
 # PURPOSE: Prevents external/fork PRs from being merged without human approval.

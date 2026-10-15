@@ -1,3 +1,7 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: Credential-free preparation executes only an allowlisted Dependabot diff; a separate trusted App writer commits the attested lockfile with expectedHeadOid.
+# removal-trigger: Remove when Dependabot keeps both the root workspace and isolated Eve lockfiles synchronized without a separate repair writer.
 name: Safe PR Remediation
 
 # Credential-free deterministic repair for proven repeatable lockfile drift on
