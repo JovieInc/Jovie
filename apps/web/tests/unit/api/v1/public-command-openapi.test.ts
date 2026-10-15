@@ -160,7 +160,7 @@ describe('published public CLI/MCP contract', () => {
         method: 'tools/call',
         params: { name: 'get_openapi', arguments: {} },
       },
-      { version: '1.0.0', fetchImpl }
+      { version: '1.0.0', baseUrl: 'https://jov.ie', fetchImpl }
     );
     expect(response?.result).toMatchObject({
       content: [{ type: 'text', text: expect.any(String) }],
