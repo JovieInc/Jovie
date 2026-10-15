@@ -323,7 +323,7 @@ describe('OnboardingChat Turnstile gating', () => {
     expect(screen.getByTestId('onboarding-composer-dock')).toBeVisible();
   });
 
-  it('renders a starter prompt and reserves verification space before effects run', () => {
+  it('retains the starter and mounts verification inside the composer boundary before effects run', () => {
     render(
       <OnboardingChat
         starterHandoff={{
@@ -340,8 +340,8 @@ describe('OnboardingChat Turnstile gating', () => {
     expect(screen.getByLabelText('Chat Message Input')).toHaveValue(
       'Hey, I want to get access to Jovie.'
     );
-    expect(screen.getByTestId('onboarding-flow-status')).toHaveClass(
-      'min-h-[10rem]'
+    expect(screen.getByTestId('onboarding-centered-composer')).toContainElement(
+      screen.getByTestId('onboarding-flow-status')
     );
     expect(screen.getByTestId('test-turnstile-panel')).toBeInTheDocument();
     expect(chatMocks.sendMessage).not.toHaveBeenCalled();

@@ -96,12 +96,17 @@ vi.mock('@/components/features/onboarding/OnboardingToolArtifacts', () => ({
 vi.mock('@/components/jovie/components', () => ({
   ChatEmptyStateComposerRegion: ({
     above,
+    alignAbove,
     children,
   }: {
     readonly above?: React.ReactNode;
+    readonly alignAbove?: 'top' | 'bottom';
     readonly children: React.ReactNode;
   }) => (
-    <div data-testid='chat-empty-state-composer-region'>
+    <div
+      data-testid='chat-empty-state-composer-region'
+      data-align-above={alignAbove}
+    >
       {above}
       {children}
     </div>
@@ -147,6 +152,9 @@ describe('OnboardingChat empty intro', () => {
     });
     expect(chatMocks.sendMessage).not.toHaveBeenCalled();
     expect(activity).not.toHaveBeenCalled();
+    expect(
+      screen.getByTestId('chat-empty-state-composer-region')
+    ).toHaveAttribute('data-align-above', 'top');
   });
 
   beforeEach(() => {
@@ -170,7 +178,7 @@ describe('OnboardingChat empty intro', () => {
     expect(screen.queryByTestId('onboarding-starter-suggestions')).toBeNull();
   });
 
-  it('shows a compact processing state for a validated starter handoff', () => {
+  it('keeps a validated starter as a draft while verification is pending', () => {
     process.env.NODE_ENV = 'test';
     render(
       <OnboardingChat
@@ -183,7 +191,10 @@ describe('OnboardingChat empty intro', () => {
       />
     );
 
-    expect(screen.getByText('Getting this ready')).toBeTruthy();
+    expect(
+      screen.getByRole('heading', { name: 'Your first message' })
+    ).toBeTruthy();
+    expect(screen.queryByText('Your message is on its way.')).toBeNull();
     expect(screen.queryByTestId('onboarding-start-ambient-mark')).toBeNull();
     expect(screen.queryByTestId('onboarding-starter-suggestions')).toBeNull();
   });
