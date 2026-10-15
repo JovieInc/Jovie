@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 
+import { requireIsoTimestamp } from '../summer-commissioning/receipt-trust.mjs';
 import { requiresOviCertification } from './capability-benchmark.mjs';
 
 export const CAPABILITY_EVENT_SCHEMA = 'jovie.capability-event/v1';
@@ -100,6 +101,174 @@ export function capabilityEventFromEvidence(evidence, change) {
   };
 }
 
+function commerceEvidenceSnapshot(value) {
+  const hash = (input, field) => {
+    if (!/^[a-f0-9]{64}$/u.test(input)) {
+      throw new Error(`commerce evidence ${field} must be a SHA-256 digest`);
+    }
+    return input;
+  };
+  const timestamp = (input, field) =>
+    requireIsoTimestamp(input, `commerce evidence ${field}`);
+  const flag = (input, field) => {
+    if (typeof input !== 'boolean') {
+      throw new Error(`commerce evidence ${field} must be boolean`);
+    }
+    return input;
+  };
+  if (
+    !['supported', 'partner-gated', 'unsupported', 'unknown'].includes(
+      value?.access?.state
+    )
+  ) {
+    throw new Error('commerce evidence needs an account-access receipt');
+  }
+  return {
+    matrixDigest: hash(value.matrixDigest, 'matrixDigest'),
+    policyDigest: hash(value.policyDigest, 'policyDigest'),
+    geographyDigest: hash(value.geographyDigest, 'geographyDigest'),
+    merchantOfRecord: redactionSafeText(
+      value.merchantOfRecord,
+      'merchantOfRecord',
+      128
+    ),
+    eligible: flag(value.eligible, 'eligible'),
+    geographyCompatible: flag(value.geographyCompatible, 'geographyCompatible'),
+    hostedMerchReady:
+      value.hostedMerchReady == null
+        ? null
+        : flag(value.hostedMerchReady, 'hostedMerchReady'),
+    observedAt: timestamp(value.observedAt, 'observedAt'),
+    expiresAt: timestamp(value.expiresAt, 'expiresAt'),
+    access: {
+      digest: hash(value.access.digest, 'access.digest'),
+      state: value.access.state,
+      observedAt: timestamp(value.access.observedAt, 'access.observedAt'),
+      expiresAt: timestamp(value.access.expiresAt, 'access.expiresAt'),
+    },
+    // Hash the complete Stripe price identity at the canonical billing owner.
+    // Equal dollar amounts alone do not establish the same price/product.
+    price:
+      value.price == null
+        ? null
+        : {
+            canonicalIdentityDigest: hash(
+              value.price.canonicalIdentityDigest,
+              'price.canonicalIdentityDigest'
+            ),
+            observedIdentityDigest: hash(
+              value.price.observedIdentityDigest,
+              'price.observedIdentityDigest'
+            ),
+          },
+  };
+}
+
+/**
+ * Adapt a rail-scoped matrix observation and account receipt to JOV-7339's
+ * event contract. The accepted snapshot lives on the existing decision;
+ * intake/recovery remains with JOV-7315, with no new clock or registry.
+ */
+export function capabilityEventFromCommerceEvidence(
+  evidence,
+  { decision, current, provider, now }
+) {
+  validateDecision(decision);
+  const commerce = decision.commerceProjection;
+  if (!commerce?.evidence)
+    throw new Error('accepted commerce evidence is required');
+  const decisionRevision = redactionSafeText(
+    commerce.decisionRevision,
+    'decisionRevision',
+    128
+  );
+  const accepted = commerceEvidenceSnapshot(commerce.evidence);
+  const observed = commerceEvidenceSnapshot(current);
+  const nowMs = now.getTime();
+  if (!Number.isFinite(nowMs)) throw new Error('now must be a valid Date');
+  const reasons = [];
+  if (
+    [observed, observed.access].some(
+      receipt => Date.parse(receipt.expiresAt) <= nowMs
+    )
+  )
+    reasons.push('evidence-expired');
+  if (
+    [observed, observed.access].some(
+      receipt =>
+        Date.parse(receipt.observedAt) > nowMs ||
+        Date.parse(receipt.observedAt) >= Date.parse(receipt.expiresAt)
+    )
+  )
+    reasons.push('evidence-invalid');
+  if (observed.matrixDigest !== accepted.matrixDigest)
+    reasons.push('matrix-evidence-changed');
+  if (observed.access.digest !== accepted.access.digest)
+    reasons.push('account-access-changed');
+  if (observed.access.state !== 'supported')
+    reasons.push('provider-access-lost');
+  if (!observed.eligible || observed.eligible !== accepted.eligible)
+    reasons.push('eligibility-changed');
+  if (observed.policyDigest !== accepted.policyDigest)
+    reasons.push('policy-changed');
+  if (
+    !observed.geographyCompatible ||
+    observed.geographyDigest !== accepted.geographyDigest
+  )
+    reasons.push('geography-incompatible');
+  if (observed.merchantOfRecord !== accepted.merchantOfRecord)
+    reasons.push('merchant-changed');
+  if (
+    observed.hostedMerchReady !== accepted.hostedMerchReady ||
+    observed.hostedMerchReady === false
+  )
+    reasons.push('hosted-merch-readiness-lost');
+  if (
+    digest(observed.price) !== digest(accepted.price) ||
+    observed.price?.observedIdentityDigest !==
+      observed.price?.canonicalIdentityDigest
+  )
+    reasons.push('canonical-price-drift');
+  if (reasons.length === 0) return null;
+  const invalidation = {
+    offer: commerce.offer,
+    channel: commerce.channel,
+    rail: commerce.rail,
+    priorDecision: decision.id,
+    decisionRevision,
+    matrixEvidenceDigest: observed.matrixDigest,
+    accountAccessReceiptDigest: observed.access.digest,
+    reasons: reasons.sort(),
+    nextReevaluationTrigger: redactionSafeText(
+      decision.nextReevaluation,
+      'nextReevaluation',
+      500
+    ),
+  };
+  const event = capabilityEventFromEvidence(evidence, {
+    provider,
+    externalChangeId: `commerce-${digest({ invalidation, observed })}`,
+    class: reasons.includes('canonical-price-drift')
+      ? 'pricing-credit-or-quota'
+      : reasons.some(reason =>
+            [
+              'policy-changed',
+              'eligibility-changed',
+              'geography-incompatible',
+            ].includes(reason)
+          )
+        ? 'policy-terms-security-or-privacy'
+        : 'internal-benchmark-or-runtime',
+    capabilityIds: [decision.capabilityId],
+  });
+  redactionSafeText(event.evidenceId, 'event evidenceId', 256);
+  return {
+    ...event,
+    commerce: invalidation,
+    digest: digest({ event: event.digest, invalidation, observed }),
+  };
+}
+
 function validateDecision(decision) {
   for (const [value, field] of [
     [decision?.id, 'id'],
@@ -163,6 +332,20 @@ function validateDecision(decision) {
 }
 
 function matchingAssumptions(decision, event) {
+  if (event.commerce) {
+    const target = event.commerce;
+    const commerce = decision.commerceProjection;
+    if (
+      target.priorDecision !== decision.id ||
+      !commerce ||
+      target.offer !== commerce.offer ||
+      target.channel !== commerce.channel ||
+      target.rail !== commerce.rail ||
+      target.decisionRevision !== commerce.decisionRevision
+    )
+      return [];
+    return target.reasons.map(id => ({ id }));
+  }
   const assumptions = new Map(
     decision.materialAssumptions.map(assumption => [assumption.id, assumption])
   );
@@ -235,11 +418,22 @@ function validateBenchmark(benchmark, event, invalidated) {
   return results;
 }
 
-function planLinearReadyUpdates({ event, invalidated, results, impacts }) {
+function planLinearReadyUpdates({
+  event,
+  invalidated,
+  results,
+  impacts,
+  issues,
+}) {
   const eligible = new Set(
     impacts
       .filter(impact => impact.mutationEligible)
       .map(impact => impact.issueId)
+  );
+  const terminal = new Set(
+    issues
+      .filter(issue => TERMINAL_STATE_TYPES.has(issue.state?.type))
+      .map(issue => issue.identifier)
   );
   const updates = invalidated.flatMap(decision => {
     const commerce = decision.commerceProjection;
@@ -256,30 +450,32 @@ function planLinearReadyUpdates({ event, invalidated, results, impacts }) {
       'event evidenceId',
       256
     );
-    return commerce.issueIds.map(issueId => {
-      if (!eligible.has(issueId)) {
-        throw new Error(`Linear-ready update is not eligible: ${issueId}`);
-      }
-      const id = `${decisionId}:${issueId}:commerce-projection`;
-      const body = [
-        `Commerce capability invalidated by ${event.id}.`,
-        `Offer: ${commerce.offer}`,
-        `Channel: ${commerce.channel}`,
-        `Rail: ${commerce.rail}`,
-        `Prior decision: ${decisionId}`,
-        `Invalidating evidence: ${evidenceId}`,
-        `Next re-evaluation: ${nextReevaluation}`,
-      ].join('\n');
-      boundedText(body, 'Linear-ready update body', 2000);
-      return {
-        id,
-        issueId,
-        kind: 'comment',
-        sourceEventId: event.id,
-        sourceEvidenceId: evidenceId,
-        body,
-      };
-    });
+    return commerce.issueIds
+      .filter(issueId => !terminal.has(issueId))
+      .map(issueId => {
+        if (!eligible.has(issueId)) {
+          throw new Error(`Linear-ready update is not eligible: ${issueId}`);
+        }
+        const id = `${decisionId}:${issueId}:commerce-projection`;
+        const body = [
+          `Commerce capability invalidated by ${event.id}.`,
+          `Offer: ${commerce.offer}`,
+          `Channel: ${commerce.channel}`,
+          `Rail: ${commerce.rail}`,
+          `Prior decision: ${decisionId}`,
+          `Invalidating evidence: ${evidenceId}`,
+          `Next re-evaluation: ${nextReevaluation}`,
+        ].join('\n');
+        boundedText(body, 'Linear-ready update body', 2000);
+        return {
+          id,
+          issueId,
+          kind: 'comment',
+          sourceEventId: event.id,
+          sourceEvidenceId: evidenceId,
+          body,
+        };
+      });
   });
   if (updates.length > MAX_LINEAR_READY_UPDATES) {
     throw new Error(
@@ -302,13 +498,17 @@ export function planCapabilityReconciliation({
 }) {
   if (event?.schema !== CAPABILITY_EVENT_SCHEMA)
     throw new Error('invalid capability event');
-  if (priorReceipts.some(receipt => receipt.eventDigest === event.digest)) {
+  const prior = priorReceipts.find(
+    receipt => receipt.eventDigest === event.digest
+  );
+  if (prior) {
     return {
       schema: RECONCILIATION_SCHEMA,
       status: 'unchanged',
       eventId: event.id,
       eventDigest: event.digest,
       actions: [],
+      commerceInvalidations: prior.commerceInvalidations ?? [],
       linearReadyUpdates: [],
     };
   }
@@ -321,11 +521,35 @@ export function planCapabilityReconciliation({
       brokenAssumptions: matchingAssumptions(decision, event),
     }))
     .filter(decision => decision.brokenAssumptions.length > 0);
-  const results = validateBenchmark(benchmark, event, invalidated);
+  // Closing a stale rail is deterministic and does not adopt a supplier or
+  // change economics. Reopening/reranking still needs the existing benchmark.
+  const results = validateBenchmark(
+    event.commerce
+      ? {
+          eventId: event.id,
+          status: 'complete',
+          results: invalidated.map(decision => ({
+            decisionId: decision.id,
+            disposition: 'DEFER',
+            confidence: 'high',
+            rationale: event.commerce.reasons.join(', '),
+            nextReevaluation: event.commerce.nextReevaluationTrigger,
+          })),
+        }
+      : benchmark,
+    event,
+    invalidated
+  );
   const issueById = new Map(issues.map(issue => [issue.identifier, issue]));
+  const commerceIssueIds = event.commerce
+    ? new Set(
+        invalidated.flatMap(decision => decision.commerceProjection.issueIds)
+      )
+    : null;
   const refs = capabilityGraph
     .filter(node => affected.has(node.id))
-    .flatMap(node => node.linearIssues ?? []);
+    .flatMap(node => node.linearIssues ?? [])
+    .filter(ref => !commerceIssueIds || commerceIssueIds.has(ref.id));
   const impacts = [...new Map(refs.map(ref => [ref.id, ref])).values()].flatMap(
     ref => {
       const issue = issueById.get(ref.id);
@@ -385,6 +609,7 @@ export function planCapabilityReconciliation({
     invalidated,
     results,
     impacts,
+    issues,
   });
   return {
     schema: RECONCILIATION_SCHEMA,
@@ -404,6 +629,18 @@ export function planCapabilityReconciliation({
     })),
     impacts,
     actions,
+    commerceInvalidations:
+      event.commerce && invalidated.length
+        ? [
+            {
+              ...event.commerce,
+              invalidatingEvidence: event.evidenceId,
+              sourceEventId: event.id,
+              state: 'blocked',
+              canary: 'invalidated',
+            },
+          ]
+        : [],
     linearReadyUpdates,
   };
 }
@@ -485,5 +722,5 @@ export async function applyCapabilityReconciliation(receipt, client) {
     }
     outcomes.push({ updateId: update.id, status: 'verified' });
   }
-  return { schema: RECONCILIATION_SCHEMA, eventId: receipt.eventId, outcomes };
+  return { ...receipt, outcomes };
 }
