@@ -87,9 +87,10 @@
       "@peculiar/asn1-schema": "2.9.5"
     },
     "patchedDependencies": {
-      "eslint-plugin-react@7.37.5": "patches/eslint-plugin-react@7.37.5.patch",
-      "@parse/node-apn@8.1.0": "patches/@parse__node-apn@8.1.0.patch",
       "@better-auth/oauth-provider@1.7.6": "patches/@better-auth__oauth-provider@1.7.6.patch",
+      "@parse/node-apn@8.1.0": "patches/@parse__node-apn@8.1.0.patch",
+      "@storybook/nextjs-vite@10.6.2": "patches/@storybook__nextjs-vite@10.6.2.patch",
+      "eslint-plugin-react@7.37.5": "patches/eslint-plugin-react@7.37.5.patch",
       "zod@4.6.7": "patches/zod@4.6.7.patch"
     }
   },
