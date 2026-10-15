@@ -135,12 +135,11 @@ jobs:
         # Publishes fork_verdict before any size failure, so the Fork PR Gate
         # job below judges the members it was asked about. The helper is absent
         # on the pinned bootstrap base; a missing file or a failed fetch falls
-        # back to the API inside the policy.
-        # `git ls-tree -r -l` reads each blob's size from the local object
-        # database. --filter=blob:none omits changed blobs, ls-tree prints BAD,
-        # and the byte check used to fall through to git/trees during an
-        # installation 403. Fetch the blobs. Depth 2 is the synthetic commit
-        # plus its parent; if that object is still absent, deepen once.
+        # back to the API inside the policy. Blob sizes are not in the tree
+        # object. This checkout is a blob:none partial clone, so a fetch
+        # without --refetch does not backfill those sizes. --refetch asks for
+        # the blobs. Otherwise ls-tree times out and the trees API 403 ejects
+        # an in-cap group.
         run: |
           set -euo pipefail
           mkdir -p "$MERGE_GROUP_POLICY_CACHE_DIR"
@@ -156,14 +155,9 @@ jobs:
               GIT_TERMINAL_PROMPT=0 \
               GCM_INTERACTIVE=never \
               GIT_LFS_SKIP_SMUDGE=1 \
-                bash --noprofile --norc -c '
-                  if ! git cat-file -e "$GROUP_HEAD^{commit}" >/dev/null 2>&1; then
-                    timeout --kill-after=5s 40s git fetch --no-tags --depth=2 origin "$GROUP_HEAD" || true
-                  fi
-                  if ! git cat-file -e "$GROUP_HEAD^{commit}" >/dev/null 2>&1; then
-                    timeout --kill-after=5s 20s git fetch --no-tags --depth=64 origin "$GROUP_HEAD" || true
-                  fi
-                '
+                timeout --kill-after=5s 70s \
+                  git fetch --refetch --filter=blob:limit=1g --no-tags --depth=2 origin "$GROUP_HEAD" \
+                  || true
               node scripts/lib/merge-group-local-evidence.mjs || true
             )
           fi
