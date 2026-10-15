@@ -25,9 +25,19 @@ const hoisted = vi.hoisted(() => ({
   getVideoMetricsForProfile: vi.fn(),
   registerThumbnailCandidateReview: vi.fn(),
   getAuthenticatedProfile: vi.fn(),
+  rateLimit: vi.fn(),
 }));
 
 vi.mock('server-only', () => ({}));
+
+vi.mock('@/lib/rate-limit', async () => {
+  const utils = await import('@/lib/rate-limit/utils');
+  return {
+    createRateLimitHeaders: utils.createRateLimitHeaders,
+    getClientIP: utils.getClientIP,
+    publicArtistApiLimiter: { limit: hoisted.rateLimit },
+  };
+});
 
 vi.mock('@/lib/services/profile', () => ({
   getProfileByUsername: hoisted.getProfileByUsername,
@@ -70,8 +80,6 @@ vi.mock('@/lib/tour-dates/queries', () => ({
 
 vi.mock('@/constants/app', () => ({ BASE_URL: 'https://jov.ie' }));
 
-vi.mock('@/lib/http/headers', () => ({ NO_STORE_HEADERS: {} }));
-
 // ---------------------------------------------------------------------------
 // Fixture
 // ---------------------------------------------------------------------------
@@ -89,10 +97,10 @@ const FAKE_PROFILE = {
   youtubeUrl: null,
 };
 
-function makeRequest(body: unknown) {
+function makeRequest(body: unknown, headers: Record<string, string> = {}) {
   return new Request('https://jov.ie/api/mcp/artist1', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify(body),
   });
 }
@@ -104,6 +112,12 @@ describe('POST /api/mcp/[username] — JSON-RPC id echo', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    hoisted.rateLimit.mockResolvedValue({
+      success: true,
+      limit: 100,
+      remaining: 99,
+      reset: new Date(Date.now() + 60_000),
+    });
     hoisted.getProfileByUsername.mockResolvedValue(FAKE_PROFILE);
     hoisted.getReleasesForProfileLite.mockResolvedValue([]);
     hoisted.getLiveMerchCardsForProfile.mockResolvedValue([]);
@@ -143,6 +157,167 @@ describe('POST /api/mcp/[username] — JSON-RPC id echo', () => {
     });
     hoisted.getAuthenticatedProfile.mockResolvedValue({ id: 'p1' });
   });
+
+  it('limits the client IP before profile reads and advertises the public artist quota', async () => {
+    hoisted.rateLimit.mockResolvedValue({
+      success: false,
+      limit: 100,
+      remaining: 0,
+      reset: new Date(Date.now() + 60_000),
+    });
+    const { POST } = await import('./route');
+    const res = await POST(
+      makeRequest(
+        {
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'resources/read',
+          params: { uri: 'artist://artist1/merch' },
+        },
+        {
+          'x-vercel-forwarded-for': '192.0.2.10',
+          'x-forwarded-for': '198.51.100.1',
+        }
+      ),
+      { params: Promise.resolve({ username: 'artist1' }) }
+    );
+
+    expect(hoisted.rateLimit).toHaveBeenCalledExactlyOnceWith('192.0.2.10');
+    expect(res.status).toBe(429);
+    expect(res.headers.get('ratelimit-policy')).toBe(
+      '"public-artist";q=100;w=60'
+    );
+    expect(res.headers.get('ratelimit')).toMatch(/^"public-artist";r=0;t=\d+$/);
+    expect(Number(res.headers.get('retry-after'))).toBeGreaterThan(0);
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect((await res.json()).error.message).toBe('Too many requests');
+    expect(hoisted.getProfileByUsername).not.toHaveBeenCalled();
+    expect(hoisted.getLiveMerchCardsForProfile).not.toHaveBeenCalled();
+  });
+
+  it('fails closed with a retry hint when the durable limiter is unavailable', async () => {
+    hoisted.rateLimit.mockResolvedValue({ success: false, unavailable: true });
+    const { POST } = await import('./route');
+    const res = await POST(
+      makeRequest({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+      { params: Promise.resolve({ username: 'artist1' }) }
+    );
+
+    expect(res.status).toBe(503);
+    expect(res.headers.get('retry-after')).toBe('30');
+    expect(res.headers.get('ratelimit-policy')).toBe(
+      '"public-artist";q=100;w=60'
+    );
+    expect(res.headers.get('ratelimit')).toBeNull();
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(hoisted.getProfileByUsername).not.toHaveBeenCalled();
+  });
+
+  it.each(['tools/list', 'unknown/method'])(
+    'includes rate-limit headers on an allowed %s request',
+    async method => {
+      const { POST } = await import('./route');
+      const res = await POST(
+        makeRequest({ jsonrpc: '2.0', id: 'headers', method }),
+        { params: Promise.resolve({ username: 'artist1' }) }
+      );
+
+      expect(res.headers.get('ratelimit-policy')).toBe(
+        '"public-artist";q=100;w=60'
+      );
+      expect(res.headers.get('ratelimit')).toMatch(
+        /^"public-artist";r=99;t=\d+$/
+      );
+      expect(res.headers.get('retry-after')).toBeNull();
+    }
+  );
+
+  it.each(['2025-11-25', '2025-06-18', '2025-03-26'])(
+    'negotiates the supported client protocol version %s',
+    async protocolVersion => {
+      const { POST } = await import('./route');
+      const res = await POST(
+        makeRequest({
+          jsonrpc: '2.0',
+          id: 'version',
+          method: 'initialize',
+          params: { protocolVersion },
+        }),
+        { params: Promise.resolve({ username: 'artist1' }) }
+      );
+
+      expect((await res.json()).result.protocolVersion).toBe(protocolVersion);
+    }
+  );
+
+  it.each([undefined, '2025-11-05', 'unknown'])(
+    'falls back to the latest supported version when requested version is %s',
+    async protocolVersion => {
+      const { POST } = await import('./route');
+      const res = await POST(
+        makeRequest({
+          jsonrpc: '2.0',
+          id: 'version',
+          method: 'initialize',
+          params: { protocolVersion },
+        }),
+        { params: Promise.resolve({ username: 'artist1' }) }
+      );
+
+      expect((await res.json()).result.protocolVersion).toBe('2025-11-25');
+    }
+  );
+
+  it.each([0, 'ping-request', null])(
+    'returns an empty ping result and echoes id %s',
+    async id => {
+      const { POST } = await import('./route');
+      const res = await POST(
+        makeRequest({ jsonrpc: '2.0', id, method: 'ping' }),
+        { params: Promise.resolve({ username: 'artist1' }) }
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ jsonrpc: '2.0', id, result: {} });
+    }
+  );
+
+  it.each([
+    'notifications/initialized',
+    'notifications/cancelled',
+    'notifications/custom',
+  ])('accepts %s without an id with an empty 202 response', async method => {
+    const { POST } = await import('./route');
+    const res = await POST(makeRequest({ jsonrpc: '2.0', method }), {
+      params: Promise.resolve({ username: 'artist1' }),
+    });
+
+    expect(res.status).toBe(202);
+    expect(await res.text()).toBe('');
+    expect(res.headers.get('ratelimit-policy')).toBe(
+      '"public-artist";q=100;w=60'
+    );
+    expect(hoisted.getCachedAuth).not.toHaveBeenCalled();
+    expect(hoisted.createMerchGeneration).not.toHaveBeenCalled();
+  });
+
+  it.each([0, null, 'notification-id'])(
+    'treats a notification method with id %s as an unsupported request',
+    async id => {
+      const { POST } = await import('./route');
+      const res = await POST(
+        makeRequest({
+          jsonrpc: '2.0',
+          id,
+          method: 'notifications/initialized',
+        }),
+        { params: Promise.resolve({ username: 'artist1' }) }
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({ id, error: { code: -32601 } });
+    }
+  );
 
   it('echoes a numeric request id in the success response', async () => {
     const { POST } = await import('./route');
@@ -703,6 +878,9 @@ describe('POST /api/mcp/[username] — JSON-RPC id echo', () => {
 
       expect(res.status).toBe(401);
       expect(res.headers.get('cache-control')).toBe('no-store');
+      expect(res.headers.get('ratelimit-policy')).toBe(
+        '"public-artist";q=100;w=60'
+      );
       expect(res.headers.get('www-authenticate')).toBe(
         'Bearer resource_metadata="https://jov.ie/.well-known/oauth-protected-resource/api/mcp/artist1"'
       );

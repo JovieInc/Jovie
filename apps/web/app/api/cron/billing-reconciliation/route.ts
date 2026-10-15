@@ -31,6 +31,7 @@ import { users } from '@/lib/db/schema/auth';
 import { billingAuditLog } from '@/lib/db/schema/billing';
 import { env } from '@/lib/env-server';
 import { captureCriticalError, captureWarning } from '@/lib/error-tracking';
+import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { stripe } from '@/lib/stripe/client';
 import { isActiveSubscription } from '@/lib/stripe/webhooks/utils';
 import { logger } from '@/lib/utils/logger';
@@ -153,24 +154,26 @@ async function recordReconciliationRun(input: {
   webhookReplay: WebhookReplaySummary;
   failure: unknown;
 }): Promise<void> {
-  await db.insert(billingAuditLog).values({
-    eventType: 'reconciliation_run',
-    source: 'reconciliation',
-    metadata: {
-      action: 'reconciliation_run',
-      success: input.success,
-      durationMs: input.duration,
-      errorCount: input.errorCount,
-      stats: input.stats,
-      webhookReplay: input.webhookReplay,
-      failure:
-        input.failure instanceof Error
-          ? { name: input.failure.name, message: input.failure.message }
-          : input.failure === undefined
-            ? null
-            : { name: 'UnknownError' },
-    },
-  });
+  await withSystemIngestionSession(tx =>
+    tx.insert(billingAuditLog).values({
+      eventType: 'reconciliation_run',
+      source: 'reconciliation',
+      metadata: {
+        action: 'reconciliation_run',
+        success: input.success,
+        durationMs: input.duration,
+        errorCount: input.errorCount,
+        stats: input.stats,
+        webhookReplay: input.webhookReplay,
+        failure:
+          input.failure instanceof Error
+            ? { name: input.failure.name, message: input.failure.message }
+            : input.failure === undefined
+              ? null
+              : { name: 'UnknownError' },
+      },
+    })
+  );
 }
 
 /**
@@ -387,16 +390,18 @@ async function repairProUserWithoutSubscription(user: {
         })
         .where(eq(users.id, user.id));
       try {
-        await db.insert(billingAuditLog).values({
-          userId: user.id,
-          eventType: 'reconciliation_fix',
-          previousState: { stripeSubscriptionId: null },
-          newState: { stripeSubscriptionId: activeSubscription.id },
-          source: 'reconciliation',
-          metadata: {
-            reason: 'linked_active_subscription',
-          },
-        });
+        await withSystemIngestionSession(tx =>
+          tx.insert(billingAuditLog).values({
+            userId: user.id,
+            eventType: 'reconciliation_fix',
+            previousState: { stripeSubscriptionId: null },
+            newState: { stripeSubscriptionId: activeSubscription.id },
+            source: 'reconciliation',
+            metadata: {
+              reason: 'linked_active_subscription',
+            },
+          })
+        );
       } catch (auditError) {
         await captureCriticalError(
           'Billing audit log insert failed after user update',
@@ -420,16 +425,18 @@ async function repairProUserWithoutSubscription(user: {
     })
     .where(eq(users.id, user.id));
   try {
-    await db.insert(billingAuditLog).values({
-      userId: user.id,
-      eventType: 'reconciliation_fix',
-      previousState: { stripeSubscriptionId: null },
-      newState: { isPro: false },
-      source: 'reconciliation',
-      metadata: {
-        reason: 'no_active_subscription',
-      },
-    });
+    await withSystemIngestionSession(tx =>
+      tx.insert(billingAuditLog).values({
+        userId: user.id,
+        eventType: 'reconciliation_fix',
+        previousState: { stripeSubscriptionId: null },
+        newState: { isPro: false },
+        source: 'reconciliation',
+        metadata: {
+          reason: 'no_active_subscription',
+        },
+      })
+    );
   } catch (auditError) {
     await captureCriticalError(
       'Billing audit log insert failed after user update',

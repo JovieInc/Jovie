@@ -88,6 +88,27 @@ function fixture(t, nightly = false) {
   return { cwd, root, remote, git, source, env, calls, gh, change };
 }
 
+function rejectReportPushes(f, failures, message) {
+  writeFileSync(
+    join(f.remote, 'hooks/update'),
+    `#!/bin/sh
+[ "$1" != refs/heads/main ] || exit 1
+echo "$3" >> push-attempts
+attempts=$(wc -l < push-attempts)
+if [ "$attempts" -le ${failures} ]; then
+  echo '${message}' >&2
+  exit 1
+fi
+`,
+    { mode: 0o755 }
+  );
+  return () =>
+    readFileSync(join(f.remote, 'push-attempts'), 'utf8').trim().split('\n');
+}
+
+const workflowCheckTimeout =
+  'Unable to determine if workflow can be created or updated due to timeout; `workflows` scope may be required.';
+
 test('publishes only measured reports on an exact-source draft branch while main is protected', t => {
   const f = fixture(t);
   f.change();
@@ -265,13 +286,63 @@ test('rejects missing or malformed producer identity without running publication
   assert.deepEqual(f.calls, []);
 });
 
-test('a rejected branch push fails the audit without creating a PR or touching main', t => {
+test('report publication retries workflow-check timeouts with the same exact-source commit', async t => {
+  for (const nightly of [false, true]) {
+    await t.test(nightly ? 'nightly' : 'coverage', sub => {
+      const f = fixture(sub, nightly);
+      writeFileSync(
+        join(f.cwd, nightly ? 'docs/NIGHTLY_TESTING_AGENT_REPORT.md' : heatmap),
+        'updated evidence\n'
+      );
+      const attempts = rejectReportPushes(f, 2, workflowCheckTimeout);
+      const waits = [];
+      sub.mock.method(Atomics, 'wait', (...args) => {
+        waits.push(args[3]);
+        return 'timed-out';
+      });
+      const publish = nightly ? publishNightlyReport : publishCoverageReport;
+      const result = publish(f);
+      assert.equal(result.status, 'published');
+      assert.deepEqual(attempts(), Array(3).fill(f.git('rev-parse', 'HEAD')));
+      assert.deepEqual(waits, [1000, 2000]);
+      assert.equal(f.git('rev-parse', 'HEAD^'), f.source);
+      assert.equal(f.git('rev-parse', 'origin/main'), f.source);
+      assert.equal(
+        f.git('rev-parse', `origin/${result.branch}`),
+        f.git('rev-parse', 'HEAD')
+      );
+      assert.equal(f.calls.filter(args => args[1] === 'create').length, 1);
+    });
+  }
+});
+
+test('persistent workflow-check timeouts stop after three pushes without creating a PR', t => {
+  const f = fixture(t, true);
+  writeFileSync(
+    join(f.cwd, 'docs/NIGHTLY_TESTING_AGENT_REPORT.md'),
+    'evidence\n'
+  );
+  const attempts = rejectReportPushes(f, 3, workflowCheckTimeout);
+  t.mock.method(Atomics, 'wait', () => 'timed-out');
+  assert.throws(() => publishNightlyReport(f), /Command failed/);
+  assert.equal(attempts().length, 3);
+  assert.ok(!f.calls.some(args => args[1] === 'create'));
+  assert.equal(f.git('rev-parse', 'origin/main'), f.source);
+});
+
+test('a permission-denied branch push fails immediately without creating a PR or touching main', t => {
   const f = fixture(t);
   f.change();
-  writeFileSync(join(f.remote, 'hooks/update'), '#!/bin/sh\nexit 1\n', {
-    mode: 0o755,
+  const attempts = rejectReportPushes(
+    f,
+    3,
+    'refusing to allow a GitHub App to create or update workflow without workflows permission'
+  );
+  t.mock.method(Atomics, 'wait', () => {
+    assert.fail('permission denials must not be retried');
   });
   assert.throws(() => publishCoverageReport(f), /Command failed/);
+  assert.equal(attempts().length, 1);
   // The in-flight read, then git auth; no PR is created.
   assert.equal(f.calls.length, 2);
   assert.ok(!f.calls.some(args => args[1] === 'create'));

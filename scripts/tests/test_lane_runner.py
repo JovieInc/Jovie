@@ -149,6 +149,7 @@ class ContextManifestTest(unittest.TestCase):
 
     def test_generator_does_not_load_credentials_or_query_services(self):
         with tempfile.TemporaryDirectory() as tmp, patch.object(lane, "HERE", Path(tmp)), \
+                patch.object(lane, "Host", return_value=lane.Host(state=Path(tmp) / "state")), \
                 patch.object(lane, "load_github_env", side_effect=AssertionError("credential access")):
             self.assertEqual(lane.main(["context-manifest", "--write"]), 0)
             self.assertEqual(lane.main(["context-manifest"]), 0)

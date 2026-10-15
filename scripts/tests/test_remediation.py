@@ -191,6 +191,24 @@ class RouterLadderTest(unittest.TestCase):
         prior = {"priorEscalations": [{"kind": "model", "head": "old", "at": 1}] * 4, "escalations": []}
         self.assertEqual(remediation.caps_allow(prior, HEAD, NOW)[1], "ladder-exhausted")
 
+    def test_terminal_and_waiting_ladders_do_not_start_model_work(self):
+        for classified, action, reason in (
+            ({"cls": "obsolete"}, "surface", "obsolete"),
+            ({"cls": "needs-human-decision"}, "surface", "needs-human-decision"),
+            ({"cls": "main-red"}, "wait", "main-red"),
+            ({"cls": "ready", "subtype": "awaiting"}, "wait", "awaiting"),
+            ({"cls": "ready", "next_action": "none"}, "none", "ready"),
+            ({"cls": "ready", "next_action": "ready-green"}, "ready-green", "ready"),
+            ({"cls": "unclassified"}, "wait", "unclassified"),
+        ):
+            with self.subTest(classified=classified):
+                result = remediation.plan_ladder(classified, {}, providers(), NOW, HEAD,
+                    healthy=lambda *_: self.fail("terminal or waiting work queried a provider"))
+                self.assertEqual((result["action"], result["reason"]), (action, reason))
+                self.assertNotIn("lane", result)
+        no_provider = remediation.plan_ladder({"cls": "fixable-by-model"}, {}, {}, NOW, HEAD)
+        self.assertEqual((no_provider["action"], no_provider["reason"]), ("surface", "ladder-exhausted"))
+
     def test_flag_defaults(self):
         for name in ("LANES_ESCALATION", "LANES_ESCALATION_NOTIFY_TIM", "LANES_ESCALATION_LIFT_HUMAN_HOLDS"):
             os.environ.pop(name, None)
@@ -237,6 +255,32 @@ class DoctorAndIntakeTest(unittest.TestCase):
         self.assertEqual(remediation_report["failovers24h"], 1)
         self.assertIn("#3", remediation.alert_reason(report))
         self.assertIsNone(remediation.alert_reason(remediation.empty_escalation()))
+
+    def test_health_counts_only_recent_verified_terminal_receipts(self):
+        from datetime import datetime, timezone
+        stamp = lambda seconds: datetime.fromtimestamp(seconds, timezone.utc).isoformat()
+        receipts = [
+            {"escalation": True, "verdict": "landing", "endedAt": stamp(NOW - 1)},
+            {"escalation": True, "verdict": "verified-not-queued", "endedAt": stamp(NOW - 2)},
+            {"escalation": True, "verdict": "landing", "endedAt": stamp(NOW - 86401)},
+            {"escalation": True, "verdict": "landing", "endedAt": "invalid"},
+            {"escalation": True, "verdict": "landing"},
+            {"escalation": True, "verdict": "provider-error", "endedAt": stamp(NOW)},
+            {"verdict": "landing", "endedAt": stamp(NOW)}, None,
+        ]
+        report = remediation.escalation_summary({"attempts": [
+            {"at": NOW - 1}, {"at": NOW - 86401}, {"at": "invalid"}, None]}, receipts, NOW)
+        self.assertEqual(report["landed_after_escalation24h"], 2)
+        self.assertEqual(report["attempts24h"], 1)
+
+    def test_only_qualified_event_labels_enter_remediation(self):
+        for labels, expected in (
+            (None, False), (["remediation"], False), ([{"name": "unrelated"}], False),
+            ([{"name": "remediation:stripe-reconcile"}], True),
+            (["unrelated", "remediation:stripe-reconcile"], True),
+        ):
+            with self.subTest(labels=labels):
+                self.assertEqual(remediation.has_remediation_event_label(labels), expected)
 
     def test_non_pr_events_fingerprint_and_claim_window(self):
         deploy = remediation.non_pr_event("deployment_status", {

@@ -268,7 +268,12 @@ export default defineConfig({
         : {}),
       exclude: [
         'node_modules/**',
-        'tests/**',
+        // Only the exact planned evidence producer opts into test-tree coverage.
+        ...(coverageInclude.includes(
+          'tests/e2e/utils/performance-test-utils.ts'
+        )
+          ? []
+          : ['tests/**']),
         '**/*.d.ts',
         '**/*.config.*',
         '**/coverage/**',

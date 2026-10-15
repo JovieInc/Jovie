@@ -1242,7 +1242,7 @@ def main(argv=None) -> int:
         print(json.dumps(report, indent=1))
         return 0
     print(f"codex accounts available: {len(report['available'])}/{report['count']}")
-    return 0 if report["available"] else 1
+    return 0 if any(row["available"] for row in report["accounts"].values()) else 1
 
 
 if __name__ == "__main__":

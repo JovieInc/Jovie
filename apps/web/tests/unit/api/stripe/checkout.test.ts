@@ -209,6 +209,27 @@ describe('POST /api/stripe/checkout', () => {
     );
   });
 
+  it('stops checkout when Stripe customer ownership could not be persisted', async () => {
+    mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
+    mockEnsureStripeCustomer.mockResolvedValue({
+      success: false,
+      error: 'Failed to create or retrieve customer',
+    });
+
+    const response = await POST(
+      new NextRequest('http://localhost/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priceId: 'price_123' }),
+      })
+    );
+
+    expect(response.status).toBeGreaterThanOrEqual(400);
+    expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
+    expect(mockStripeSubscriptionsList).not.toHaveBeenCalled();
+    expect(mockCreateBillingPortalSession).not.toHaveBeenCalled();
+  });
+
   it('creates checkout session with durable correlation IDs', async () => {
     mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
     mockCreateCheckoutSession.mockResolvedValue({
