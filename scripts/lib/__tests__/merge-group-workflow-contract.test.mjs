@@ -2753,7 +2753,10 @@ ${selectedGateScript}`,
       0,
       POSTDEPLOY_PROBES_WORKFLOW.indexOf('\njobs:')
     );
-    expect(load(POSTDEPLOY_PROBES_WORKFLOW).on.workflow_run).toEqual({
+    const workflow = /** @type {{ on: { workflow_run: unknown } }} */ (
+      load(POSTDEPLOY_PROBES_WORKFLOW)
+    );
+    expect(workflow.on.workflow_run).toEqual({
       workflows: ['Production Controller'],
       types: ['completed'],
       branches: ['main'],

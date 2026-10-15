@@ -6,13 +6,18 @@ import { load } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
 import { runWithRealGh } from '../real-gh-harness.mjs';
 
-const workflow = load(
-  readFileSync(
-    resolve(
-      import.meta.dirname,
-      '../../../.github/workflows/postdeploy-probes.yml'
-    ),
-    'utf8'
+/** @typedef {{ id?: string, run?: string, env?: Record<string, string> }} WorkflowStep */
+/** @typedef {{ if?: string, steps?: WorkflowStep[] }} WorkflowJob */
+
+const workflow = /** @type {{ jobs: Record<string, WorkflowJob> }} */ (
+  load(
+    readFileSync(
+      resolve(
+        import.meta.dirname,
+        '../../../.github/workflows/postdeploy-probes.yml'
+      ),
+      'utf8'
+    )
   )
 );
 const trigger = workflow.jobs['resolve-target'].steps.find(
@@ -27,6 +32,9 @@ const controller = {
   state: 'active',
 };
 
+/**
+ * @param {{ event?: Record<string, string>, record?: Record<string, unknown>, jobs?: Record<string, unknown>[] | string, totalCount?: number, apiFailure?: boolean }} [options]
+ */
 async function decide({
   event = {},
   record = {},
