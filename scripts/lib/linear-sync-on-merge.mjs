@@ -21,11 +21,6 @@ import {
 import { join, resolve as resolvePath } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { deprecationCheckGreen } from './deprecation-observation.mjs';
-import {
-  failureDisposition,
-  installationQuotaLog,
-  isInstallationQuota403,
-} from './github-installation-quota.mjs';
 import { GREEN_MARKER } from './remediation-signal.mjs';
 import {
   formatValidationReceipt,
@@ -42,6 +37,79 @@ import {
   rateLimitWaitMs,
   reconcileValidation,
 } from './validation-sync.mjs';
+
+/**
+ * The three classifiers merge-mode needs from github-installation-quota.mjs.
+ * The full module also owns Scorecard waits; this writer only classifies.
+ * @typedef {{
+ *   failureDisposition: (
+ *     label: string,
+ *     error: unknown,
+ *   ) => { code: number, log: string, softFailed: boolean },
+ *   installationQuotaLog: (label: string) => string,
+ *   isInstallationQuota403: (text: unknown, status?: number | null) => boolean,
+ * }} InstallationQuotaClassifier
+ */
+
+/**
+ * pull_request merge runs use the workflow file from the PR merge ref and
+ * then check out main. A merge ref from before this module was added omits
+ * it from sparse-checkout. A static import then dies with ERR_MODULE_NOT_FOUND
+ * before any lifecycle write. Load it when the checkout has it. When it does
+ * not, installation 403s stay fatal: this is not a skip and not exit 0.
+ * Any other load error still throws.
+ * @returns {Promise<InstallationQuotaClassifier>}
+ */
+async function loadInstallationQuotaClassifier() {
+  try {
+    return await import('./github-installation-quota.mjs');
+  } catch (error) {
+    const code =
+      error && typeof error === 'object' && 'code' in error
+        ? String(error.code)
+        : '';
+    if (code !== 'ERR_MODULE_NOT_FOUND') throw error;
+    console.error(
+      'Linear Sync: scripts/lib/github-installation-quota.mjs is absent from this sparse checkout. Installation 403s stay fatal. This is not a successful skip.'
+    );
+    return {
+      failureDisposition(_label, failure) {
+        const stderr =
+          failure && typeof failure === 'object' && 'stderr' in failure
+            ? String(/** @type {{ stderr?: unknown }} */ (failure).stderr ?? '')
+            : '';
+        const message =
+          failure instanceof Error ? failure.message : String(failure ?? '');
+        const text = `${stderr}\n${message}`.trim();
+        return {
+          code: 1,
+          log: text || 'unknown failure',
+          softFailed: false,
+        };
+      },
+      installationQuotaLog(label) {
+        return `Linear Sync: installation-quota classifier unavailable for ${label}; installation 403s stay fatal`;
+      },
+      isInstallationQuota403() {
+        return false;
+      },
+    };
+  }
+}
+
+const installationQuota = await loadInstallationQuotaClassifier();
+
+/** True only when the checked-out classifier recognized an installation 403. */
+export const installationQuotaClassifierReady =
+  installationQuota.isInstallationQuota403(
+    'API rate limit exceeded for installation ID 1'
+  ) === true;
+
+export const {
+  failureDisposition,
+  installationQuotaLog,
+  isInstallationQuota403,
+} = installationQuota;
 
 export const LINEAR_API = 'https://api.linear.app/graphql';
 export const COMMISSIONING_PARENT_ALLOWLIST = new Set([

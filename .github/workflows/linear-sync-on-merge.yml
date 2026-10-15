@@ -53,6 +53,10 @@ jobs:
         with:
           # Always the default branch: a replayed event must not run an
           # older closer revision from its merge commit.
+          # pull_request runs this file from the PR merge ref, whose
+          # sparse-checkout can lag main. The writer loads
+          # github-installation-quota.mjs dynamically and stays
+          # fail-closed when that checkout omitted it.
           ref: ${{ github.event.repository.default_branch }}
           fetch-depth: 1
           persist-credentials: false
