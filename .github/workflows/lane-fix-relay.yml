@@ -40,10 +40,12 @@ on:
 permissions: {}
 
 concurrency:
-  # Pushes to main supersede each other (only the newest conflict read matters);
-  # every other event is its own PR signal and must not be dropped.
-  group: lane-fix-relay-${{ github.event_name == 'push' && 'main' || github.run_id }}
-  cancel-in-progress: ${{ github.event_name == 'push' }}
+  # Pushes to main supersede each other. Repeated completions of one workflow
+  # for one PR share a slot, so a burst keeps a single pending run and the
+  # newer one cancels the waiter before a Jovie Bot token is minted. A second
+  # workflow, review, or deploy keeps its own slot.
+  group: lane-fix-relay-${{ github.event_name == 'push' && 'push-main' || format('{0}-{1}-{2}', github.event_name, github.event.inputs.pr_number || github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_sha || github.event.deployment.sha || 'unscoped', github.event.workflow_run.name || github.event.workflow_run.conclusion || github.event.review.state || github.event.action || 'signal') }}
+  cancel-in-progress: ${{ github.event_name == 'push' || github.event_name == 'workflow_run' }}
 
 jobs:
   # A pull_request job GitHub never handed to a hosted runner is cancelled after
@@ -121,6 +123,10 @@ jobs:
       # A hand dequeue counts only with the failure hold's receipt on the head (pr_events.failure_held).
       statuses: read
     steps:
+      - name: Debounce repeated workflow completions
+        if: github.event_name == 'workflow_run'
+        run: sleep 20
+
       - name: Checkout trusted lane policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
