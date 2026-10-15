@@ -54,8 +54,8 @@ export default async function AdminFeaturesPage() {
     >
       <div className='space-y-8'>
         <p className='text-sm text-secondary-token'>
-          Runtime feature flags. Toggle per environment — changes take effect
-          on the next request, no redeploy.
+          Runtime feature flags. Toggle per environment — changes take effect on
+          the next request, no redeploy.
         </p>
         {rows === null ? (
           <AdminReadUnavailable message='Feature flag values could not be read. Changes are unavailable until the current values can be verified.' />

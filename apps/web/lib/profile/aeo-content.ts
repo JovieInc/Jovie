@@ -7,13 +7,13 @@ import {
   normalizePlatformKey,
 } from '@/lib/dsp-registry';
 import type { PublicMerchCard } from '@/lib/merch/types';
-import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import {
   type EntityMentionContext,
   type EntityMentionSegment,
   linkEntityMentions,
 } from '@/lib/profile/entity-mentions';
 import { isPublicArtistMentionHref } from '@/lib/profile/opaque-internal-profile-handle';
+import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import {
   isPaymentSupportPlatform,
