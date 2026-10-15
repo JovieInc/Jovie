@@ -64,67 +64,117 @@ describe('getChatEmptyStateGreetingText', () => {
   });
 });
 
+const now = Date.parse('2026-10-14T20:00:00Z');
+const actionableInsight = {
+  id: 'insight-1',
+  insightType: 'release_momentum',
+  category: 'content',
+  priority: 'high',
+  title: 'Your release is getting attention',
+  description: '',
+  actionSuggestion: 'Draft an update about your release.',
+  confidence: '0.90',
+  status: 'active',
+  periodStart: '2026-10-01T00:00:00Z',
+  periodEnd: '2026-10-14T00:00:00Z',
+  createdAt: '2026-10-14T00:00:00Z',
+  expiresAt: '2026-10-15T00:00:00Z',
+} satisfies import('@/types/insights').InsightResponse;
+
 describe('resolveChatEmptyStateInsight', () => {
-  it('prefers a real active insight title', () => {
-    expect(
-      resolveChatEmptyStateInsight({
-        topInsightTitle: 'Your streams are up 320% today.',
-        isProfileComplete: false,
-        isFirstSession: false,
-      })
-    ).toBe('Your streams are up 320% today.');
+  it('uses the first eligible entry in server priority order, retaining its context', () => {
+    const action = resolveChatEmptyStateInsight(
+      [actionableInsight, { ...actionableInsight, id: 'second' }],
+      now
+    );
+    expect(action?.insightId).toBe('insight-1');
+    expect(action?.suggestion).toBe('Draft a release update');
+    expect(action?.prompt).toContain(
+      'Insight insight-1: Your release is getting attention'
+    );
   });
 
-  it('trims the insight title', () => {
+  it.each(['dismissed', 'acted_on', 'expired'] as const)(
+    'skips %s entries',
+    status => {
+      expect(
+        resolveChatEmptyStateInsight(
+          [
+            { ...actionableInsight, status },
+            { ...actionableInsight, id: 'eligible' },
+          ],
+          now
+        )?.insightId
+      ).toBe('eligible');
+    }
+  );
+
+  it.each([
+    { expiresAt: '2026-10-14T20:00:00Z' },
+    { expiresAt: 'invalid' },
+    { actionSuggestion: null },
+    { actionSuggestion: '  ' },
+    { actionSuggestion: 'x'.repeat(241) },
+    { id: '' },
+    { title: '  ' },
+  ])('skips stale or unusable content: %s', invalid => {
     expect(
-      resolveChatEmptyStateInsight({
-        topInsightTitle: '  Your streams are up 320% today.  ',
-        isProfileComplete: false,
-        isFirstSession: false,
-      })
-    ).toBe('Your streams are up 320% today.');
+      resolveChatEmptyStateInsight(
+        [
+          { ...actionableInsight, ...invalid },
+          { ...actionableInsight, id: 'eligible' },
+        ],
+        now
+      )?.insightId
+    ).toBe('eligible');
   });
 
-  it('falls back to the profile-ready sentence when there is no active insight', () => {
+  it('does not infer verified success or readiness from model prose', () => {
     expect(
-      resolveChatEmptyStateInsight({
-        topInsightTitle: null,
-        isProfileComplete: true,
-        isFirstSession: true,
-      })
-    ).toBe('Your profile is ready to share.');
+      resolveChatEmptyStateInsight(
+        [
+          {
+            ...actionableInsight,
+            title: 'Conversion improved 500%',
+            actionSuggestion: null,
+          },
+        ],
+        now
+      )
+    ).toBeNull();
+    expect(resolveChatEmptyStateInsight([], now)).toBeNull();
+    const unverifiedProse = resolveChatEmptyStateInsight(
+      [
+        {
+          ...actionableInsight,
+          actionSuggestion: 'Your streams are up 320% today.',
+        },
+      ],
+      now
+    );
+    expect(unverifiedProse?.suggestion).toBe('Draft a release update');
+    expect(unverifiedProse?.suggestion).not.toMatch(/320|streams|\bup\b/);
+    expect(unverifiedProse?.prompt).toContain('do not invent results');
   });
 
-  it('does not use the profile-ready fallback outside first session', () => {
-    expect(
-      resolveChatEmptyStateInsight({
-        topInsightTitle: null,
-        isProfileComplete: true,
-        isFirstSession: false,
-      })
-    ).toBeNull();
-  });
-
-  it('never fabricates an insight when the source is empty', () => {
-    expect(
-      resolveChatEmptyStateInsight({
-        topInsightTitle: null,
-        isProfileComplete: false,
-        isFirstSession: false,
-      })
-    ).toBeNull();
-    expect(
-      resolveChatEmptyStateInsight({
-        topInsightTitle: '   ',
-        isProfileComplete: false,
-        isFirstSession: false,
-      })
-    ).toBeNull();
-    expect(
-      resolveChatEmptyStateInsight({
-        isProfileComplete: false,
-        isFirstSession: false,
-      })
-    ).toBeNull();
+  it.each([
+    ['tip_hotspot', 'tip'],
+    ['capture_rate_change', 'signup'],
+  ] as const)('keeps %s conversion work with Jovie', (insightType, flow) => {
+    const action = resolveChatEmptyStateInsight(
+      [
+        {
+          ...actionableInsight,
+          insightType,
+          title: '27 clicks, zero completions',
+          actionSuggestion: 'Fix your conversion gap.',
+        },
+      ],
+      now
+    );
+    expect(action?.suggestion).toBe(`Review your ${flow} flow with Jovie`);
+    expect(action?.prompt).toContain('concrete improvement Jovie can make');
+    expect(action?.prompt).toContain('27 clicks, zero completions');
+    expect(action?.suggestion).not.toContain('gap');
   });
 });

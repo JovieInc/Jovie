@@ -17,6 +17,7 @@ import { JovieChat } from '@/components/jovie/JovieChat';
 import { CHAT_TRANSCRIPT_ROW_ESTIMATE_PX } from '@/lib/chat/transcript-window';
 import { getDesktopWorkState } from '@/lib/desktop/session-work-state';
 import { renderWithQueryClient } from '@/tests/utils/test-utils';
+import type { InsightResponse } from '@/types/insights';
 
 const virtualizerSpy = vi.hoisted(() => ({
   options: null as null | {
@@ -32,9 +33,7 @@ const resizeObserverCallbacks = vi.hoisted(
 );
 
 const mockInsightsSummary = vi.hoisted(() => ({
-  data: undefined as
-    | { insights: { status: string; title: string }[] }
-    | undefined,
+  data: undefined as { insights: InsightResponse[] } | undefined,
 }));
 
 const mockRailPanel = vi.hoisted(() => ({
@@ -602,7 +601,7 @@ describe('JovieChat styling regressions', () => {
     ).toBeNull();
   });
 
-  it('renders the greeting-only empty state left-aligned above the composer (JOV-7150)', () => {
+  it('renders a responsive personal welcome and one next step above the composer (JOV-7150)', () => {
     mockChatState.hasMessages = false;
     mockChatState.isLoading = false;
     mockChatState.isSubmitting = false;
@@ -624,8 +623,10 @@ describe('JovieChat styling regressions', () => {
     expect(greeting?.textContent).toMatch(
       /^Good (morning|afternoon|evening), Tim\.$/
     );
-    // Display line + left-aligned column, not a centered welcome block.
-    expect(greeting?.className).toContain('text-4xl');
+    // Text stays left-aligned; the whole group centers in the usable region.
+    // Responsive heading leaves room for the next step on short/mobile screens.
+    expect(greeting?.className).toContain('text-2xl');
+    expect(greeting?.className).toContain('sm:text-3xl');
     expect(greeting?.parentElement?.className).toContain('items-start');
     expect(greeting?.parentElement?.className).toContain('text-left');
 
@@ -636,14 +637,30 @@ describe('JovieChat styling regressions', () => {
     ).toBeNull();
   });
 
-  it('renders the one real insight as the only empty-state sentence (JOV-7150)', () => {
+  it('preserves the welcome and offers one action without promoting Insight prose to a win (JOV-7150)', () => {
     mockChatState.hasMessages = false;
     mockChatState.isLoading = false;
     mockChatState.isSubmitting = false;
     mockChatState.status = 'ready';
     mockChatState.messages = [];
     mockInsightsSummary.data = {
-      insights: [{ status: 'active', title: 'Streams are up 12% this week' }],
+      insights: [
+        {
+          id: 'release-insight',
+          status: 'active',
+          title: 'Streams are up 12% this week',
+          insightType: 'release_momentum',
+          category: 'content',
+          priority: 'high',
+          description: '',
+          actionSuggestion: 'Streams are up 320% today.',
+          confidence: '0.90',
+          createdAt: new Date().toISOString(),
+          periodStart: new Date().toISOString(),
+          periodEnd: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        },
+      ],
     };
 
     const { container } = renderWithQueryClient(
@@ -653,7 +670,17 @@ describe('JovieChat styling regressions', () => {
     const insight = container.querySelector(
       '[data-testid="chat-empty-state-greeting-text"]'
     );
-    expect(insight?.textContent).toBe('Streams are up 12% this week');
+    expect(insight?.textContent).toMatch(
+      /^Good (morning|afternoon|evening), Tim\.$/
+    );
+    expect(container.textContent).toContain('Draft a release update');
+    expect(container.textContent).not.toMatch(/12%|320%/);
+    expect(
+      container.querySelectorAll('[data-testid="chat-empty-state-next-step"]')
+    ).toHaveLength(1);
+    expect(
+      container.querySelector('[data-insight-id="release-insight"]')
+    ).toBeTruthy();
     expect(
       container.querySelector('[data-testid="chat-empty-state-insight"]')
     ).toBeNull();

@@ -1,5 +1,6 @@
 import '../../../styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { fn } from 'storybook/test';
 import { ChatEmptyStateGreeting } from './ChatEmptyStateGreeting';
 
 const meta = {
@@ -23,25 +24,31 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** JOV-7150: no real insight exists — the greeting stands alone. */
+/** JOV-7150: no eligible Insight — welcome plus the existing profile review path. */
 export const GreetingOnly: Story = {
   args: {
     insight: null,
   },
 };
 
-/** JOV-7150: a real, server-computed insight (release momentum, a stat
- * change, or similar) replaces the greeting as the single sentence. */
+/** Synthetic action fixture; no success or growth claim is inferred. */
 export const WithInsight: Story = {
   args: {
-    insight: 'Your streams are up 320% today.',
+    action: {
+      insightId: 'release-fixture',
+      suggestion: 'Draft a release update',
+      prompt:
+        'Help me draft an update about this release. Ask for missing facts.',
+      expiresAt: Date.parse('2099-01-01T00:00:00Z'),
+    },
+    onSelectAction: fn(),
   },
 };
 
 /**
  * JOV-7150: never fabricate a number. When the insight source is empty
- * (no active insight, profile not newly complete), the caller resolves
- * `insight` to `null` rather than inventing one — same render as
+ * (no current actionable insight), the caller resolves the action
+ * to `null` rather than inventing one — same render as
  * `GreetingOnly`, named separately to document the no-fabrication
  * contract explicitly (see `resolveChatEmptyStateInsight`).
  */
@@ -49,4 +56,8 @@ export const NoInsightWhenSourceIsEmpty: Story = {
   args: {
     insight: null,
   },
+};
+
+export const LoadingNextStep: Story = {
+  args: { isLoading: true },
 };

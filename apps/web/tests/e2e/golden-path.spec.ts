@@ -12,6 +12,7 @@ import {
 import { completeGoldenPathBillingJourney } from './helpers/golden-path-billing';
 import {
   captureKeyframe,
+  inspectEssentialViewport,
   watchKeyframeErrors,
 } from './helpers/golden-path-keyframes';
 import {
@@ -55,6 +56,218 @@ const IS_LOCAL_AUTH_BYPASS =
   process.env.NEXT_PUBLIC_CLERK_MOCK === '1' ||
   process.env.NEXT_PUBLIC_CLERK_PROXY_DISABLED === '1';
 const IS_REQUIRED_GOLDEN_PATH = process.env.GOLDEN_PATH_REQUIRED === '1';
+
+/** Auth is real from this journey; Insight responses below are presentation fixtures. */
+async function verifyHomeWelcome(page: Page) {
+  const insight = {
+    id: 'home-tip-fixture',
+    insightType: 'tip_hotspot',
+    category: 'revenue',
+    priority: 'high',
+    title: '27 tip link clicks, zero tips completed',
+    description: '',
+    actionSuggestion: 'Close the conversion gap.',
+    confidence: '0.90',
+    status: 'active',
+    periodStart: new Date(Date.now() - 86_400_000).toISOString(),
+    periodEnd: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+  };
+  let mode: 'action' | 'empty' | 'error' = 'action';
+  let releaseSummary: () => void = () => {};
+  const ready = new Promise<void>(resolve => {
+    releaseSummary = resolve;
+  });
+  let chatPosts = 0;
+  const watchPosts = (request: import('@playwright/test').Request) => {
+    if (
+      request.method() === 'POST' &&
+      new URL(request.url()).pathname === '/api/chat'
+    )
+      chatPosts++;
+  };
+  page.on('request', watchPosts);
+  await page.route('**/api/insights/summary', async route => {
+    await ready;
+    if (mode === 'error')
+      return route.fulfill({
+        status: 500,
+        json: { error: 'Controlled summary failure' },
+      });
+    await route.fulfill({
+      json: {
+        insights:
+          mode === 'empty'
+            ? []
+            : [
+                {
+                  ...insight,
+                  id: 'expired',
+                  expiresAt: new Date(Date.now() - 1000).toISOString(),
+                },
+                insight,
+              ],
+        totalActive: mode === 'empty' ? 0 : 1,
+        lastGeneratedAt: new Date().toISOString(),
+      },
+    });
+  });
+  const heading = page.getByTestId('chat-empty-state-greeting-text');
+  const input = page.getByRole('textbox', {
+    name: 'Chat message input',
+    exact: false,
+  });
+  const nextStep = page.getByTestId('chat-empty-state-next-step');
+  const measureCenter = () =>
+    page.evaluate(() => {
+      const group = document.querySelector(
+        '[data-testid="chat-empty-state-greeting-region"]'
+      );
+      const usable = document.querySelector(
+        '[data-testid="chat-empty-state-above-scroll"]'
+      );
+      if (!group || !usable) return null;
+      const box = group.getBoundingClientRect(),
+        region = usable.getBoundingClientRect();
+      const style = getComputedStyle(usable);
+      const top = region.top + parseFloat(style.paddingTop),
+        bottom = region.bottom - parseFloat(style.paddingBottom);
+      return {
+        delta: Math.abs((box.top + box.bottom) / 2 - (top + bottom) / 2),
+        tolerance: Math.max(4, (bottom - top) * 0.02),
+      };
+    });
+  const assertGeometry = async () => {
+    const selectors = [
+      '[data-testid="chat-empty-state-next-step"] button, [data-testid="chat-empty-state-next-step"] a',
+    ];
+    for (const button of await page
+      .getByTestId('chat-composer-surface')
+      .getByRole('button')
+      .all()) {
+      const name = await button.getAttribute('aria-label');
+      const painted = await button.evaluate(el => {
+        const box = el.getBoundingClientRect();
+        return (
+          box.width > 0 &&
+          box.height > 0 &&
+          getComputedStyle(el).opacity !== '0'
+        );
+      });
+      if (name && painted)
+        selectors.push(
+          `[data-testid="chat-composer-surface"] button[aria-label=${JSON.stringify(name)}]`
+        );
+    }
+    expect(
+      await inspectEssentialViewport(page, [
+        ...selectors,
+        '[data-testid="chat-empty-state-greeting-text"]',
+        '[data-testid="chat-empty-state-next-step"]',
+        '[data-testid="chat-composer-surface"]',
+        '[aria-label="Chat message input" i]',
+      ])
+    ).toEqual({ supported: true, findings: [] });
+    const centering = await measureCenter();
+    expect(centering).not.toBeNull();
+    if (centering)
+      expect(centering.delta).toBeLessThanOrEqual(centering.tolerance);
+    await expect(heading).toHaveCount(1);
+    await expect(heading).toContainText(TEST_SPOTIFY_ARTIST.name.split(' ')[0]);
+    await expect(nextStep).toHaveCount(1);
+    await expect(page.getByTestId('chat-empty-state-sample')).toHaveCount(0);
+    await expect(page.getByText(insight.title, { exact: true })).toHaveCount(0);
+  };
+  try {
+    for (const viewport of [
+      { width: 1440, height: 900 },
+      { width: 390, height: 844 },
+      { width: 768, height: 1024 },
+      { width: 615, height: 407 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.emulateMedia({
+        reducedMotion: viewport.width === 615 ? 'reduce' : 'no-preference',
+      });
+      await page.goto(APP_ROUTES.CHAT);
+      await expect(heading).toBeVisible();
+      const initialGreeting = await heading.textContent();
+      const before = await input.boundingBox();
+      if (viewport.width === 1440) {
+        await expect(nextStep.getByRole('status')).toHaveText(
+          'Finding your next step…'
+        );
+        releaseSummary();
+      }
+      const action = page.getByRole('button', {
+        name: 'Draft This With Jovie',
+      });
+      await expect(action).toBeVisible();
+      await expect(nextStep.locator('[data-insight-id]')).toHaveAttribute(
+        'data-insight-id',
+        insight.id
+      );
+      await expect(heading).toHaveText(initialGreeting!);
+      const after = await input.boundingBox();
+      expect(before).not.toBeNull();
+      expect(after).not.toBeNull();
+      if (before && after)
+        expect(Math.abs(before.y - after.y)).toBeLessThanOrEqual(1);
+      await assertGeometry();
+      if (viewport.width === 1440) {
+        // Independent deliberate red: truthful content, wrong bottom placement.
+        const group = page.locator('[data-empty-chat-suggestions]');
+        const previousStyle = await group.getAttribute('style');
+        await group.evaluate(el => {
+          (el as HTMLElement).style.marginTop = 'auto';
+          (el as HTMLElement).style.marginBottom = '0';
+        });
+        const misplaced = await measureCenter();
+        expect(misplaced).not.toBeNull();
+        if (misplaced)
+          expect(misplaced.delta).toBeGreaterThan(misplaced.tolerance);
+        await group.evaluate((el, style) => {
+          if (style === null) el.removeAttribute('style');
+          else el.setAttribute('style', style);
+        }, previousStyle);
+        await assertGeometry();
+      }
+      await action.focus();
+      await page.keyboard.press('Enter');
+      await expect(input).toHaveValue(new RegExp(`Insight ${insight.id}:`));
+      await expect(input).toBeFocused();
+      expect(chatPosts).toBe(0);
+      await input.fill('');
+      await assertGeometry();
+      await page.waitForTimeout(1000); // Idle effects are part of the contract.
+      await assertGeometry();
+      await page.reload();
+      await expect(action).toBeVisible();
+      await assertGeometry();
+      expect(chatPosts).toBe(0);
+      if (process.env.GOLDEN_PATH_KEYFRAME_DIR)
+        await captureKeyframe(page, `home-welcome-${viewport.width}`);
+    }
+    for (const state of ['empty', 'error'] as const) {
+      mode = state;
+      await page.goto(APP_ROUTES.CHAT);
+      await expect(
+        page.getByRole('link', { name: 'Review Your Profile' })
+      ).toBeVisible({ timeout: 30_000 });
+      await expect(
+        page.getByRole('button', { name: 'Draft This With Jovie' })
+      ).toHaveCount(0);
+      await assertGeometry();
+    }
+  } finally {
+    releaseSummary();
+    page.off('request', watchPosts);
+    await page.unroute('**/api/insights/summary');
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+  }
+}
 
 function hasRealEnv(): boolean {
   return Object.values(REQUIRED_ENV).every(
@@ -153,6 +366,8 @@ async function exerciseGoogleProviderRecovery(page: Page): Promise<void> {
   await expect(page.locator('[data-auth-shell-hydrated="true"]')).toBeVisible({
     timeout: 30_000,
   });
+  const signupOrigin = new URL(page.url()).origin;
+  let errorReturn: string | null = null;
 
   const googleRoute = async (route: import('@playwright/test').Route) => {
     await route.abort('aborted');
@@ -194,20 +409,53 @@ async function exerciseGoogleProviderRecovery(page: Page): Promise<void> {
     ]);
     const body = request.postDataJSON() as Record<string, unknown>;
     expect(body.provider).toBe('google');
-    expect(JSON.stringify(body)).toContain('/onboarding/checkout');
+    // Auth returns through the server entry so access and subscriber state
+    // resolve before checkout. Every callback must retain the explicit intent.
+    for (const field of [
+      'callbackURL',
+      'newUserCallbackURL',
+      'errorCallbackURL',
+    ] as const) {
+      expect(body[field]).toEqual(expect.any(String));
+      expect(body[field]).not.toBe('');
+      const callback = new URL(String(body[field]), signupOrigin);
+      expect(callback.origin).toBe(signupOrigin);
+      expect(callback.pathname).toBe(APP_ROUTES.SIGNUP);
+      expect(callback.username).toBe('');
+      expect(callback.password).toBe('');
+      expect(callback.hash).toBe('');
+      for (const [key, value] of Object.entries({
+        redirect_url: APP_ROUTES.START,
+        plan: 'pro',
+        interval: 'month',
+        artist_name: TEST_SPOTIFY_ARTIST.name,
+      })) {
+        expect(callback.searchParams.getAll(key)).toEqual([value]);
+      }
+      expect(callback.searchParams.getAll('oauth_error')).toEqual([]);
+      expect(callback.searchParams.getAll('error')).toEqual(
+        field === 'errorCallbackURL' ? ['oauth_failed'] : []
+      );
+      if (field === 'errorCallbackURL')
+        errorReturn = callback.pathname + callback.search;
+    }
     expect(new URL(providerRequest.url()).hostname).toBe('accounts.google.com');
   } finally {
     await page.unroute('**/api/auth/sign-in/social', socialRoute);
     await page.unroute('https://accounts.google.com/**', googleRoute);
   }
 
-  await page.goto(`${signupPath}&oauth_error=access_denied`, {
+  expect(errorReturn).not.toBeNull();
+  await page.goto(errorReturn!, {
     waitUntil: 'domcontentloaded',
   });
-  await expect(page.getByRole('alert').first()).toContainText(
-    'Sign-in was cancelled',
-    { timeout: 30_000 }
-  );
+  // JOV-8349: keep a missing canonical recovery message red while continuing
+  // the same identity's email fallback and downstream Home/billing checks.
+  await expect
+    .soft(page.getByRole('alert').first())
+    .toContainText('Something went wrong with sign-up. Please try again.', {
+      timeout: 30_000,
+    });
   const savedIntent = await page.evaluate(() =>
     sessionStorage.getItem('jovie_plan_intent')
   );
@@ -994,6 +1242,10 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
     } finally {
       await fanContext.close();
     }
+
+    // Use this admitted identity for the actual Home shell. Controlled Insight
+    // presentation does not certify Pro entitlement or a verified success claim.
+    await verifyHomeWelcome(page);
 
     // STEP 9: Reuse this exact identity and context for the post-activation
     // checkout, webhook, fresh-browser return, refund, and revoked-cookie proof.
