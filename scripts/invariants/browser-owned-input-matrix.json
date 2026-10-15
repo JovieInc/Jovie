@@ -208,12 +208,12 @@
     },
     {
       "id": "auth-credentials",
-      "screens": ["web.auth"],
-      "source": "apps/web/components/features/auth",
+      "screens": [],
+      "source": "apps/web/components/features/auth/AuthShell.tsx",
       "fields": ["username", "current-password", "new-password"],
       "scenarios": ["saved-credential", "third-party-manager"],
       "evidence": "BLOCKED",
-      "reason": "Passwordless entry is implemented; password/recovery applicability requires route-level evidence, not an assumed exemption"
+      "reason": "AuthShell never mounts a password or username field. No web.auth source hosts type=password or autocomplete current-password, new-password, or username, so these cells are not applicable."
     },
     {
       "id": "auth-email",
@@ -237,11 +237,12 @@
     },
     {
       "id": "auth-passkey",
-      "screens": ["web.auth"],
-      "source": "apps/web/components/features/auth",
+      "screens": [],
+      "source": "apps/web/app/desktop-auth/DesktopAuthClient.tsx",
       "fields": ["webauthn"],
       "scenarios": ["passkey"],
-      "evidence": "UNKNOWN"
+      "evidence": "BLOCKED",
+      "reason": "Passkey entry is a button that opens the platform chooser. No web.auth source hosts an input with autocomplete username webauthn, so the conditional-UI field contract is not applicable."
     },
     {
       "id": "get-updates",

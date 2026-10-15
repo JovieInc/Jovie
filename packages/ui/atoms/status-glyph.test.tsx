@@ -9,6 +9,13 @@ import {
 } from './status-glyph';
 
 const EXPECTED_FILL: Record<StatusGlyphState, StatusGlyphFill> = {
+  cancelled: 'x',
+  failed: 'x',
+  idle: 'empty',
+  pending: 'empty',
+  succeeded: 'check',
+  unknown: 'empty',
+  working: 'indeterminate',
   todo: 'empty',
   in_progress: 'half',
   in_review: 'three-quarter',
@@ -66,11 +73,59 @@ describe('StatusGlyph', () => {
   it('keeps red and green tones reserved for error and success', () => {
     for (const state of STATUS_GLYPH_STATES) {
       const tone = STATUS_GLYPH_STATE_SPECS[state].tone;
-      if (state === 'error' || state === 'success') continue;
+      if (['error', 'success', 'failed', 'succeeded'].includes(state)) continue;
       expect(tone).not.toContain('error');
       expect(tone).not.toContain('success');
     }
     expect(STATUS_GLYPH_STATE_SPECS.error.tone).toContain('error');
     expect(STATUS_GLYPH_STATE_SPECS.success.tone).toContain('success');
   });
+});
+
+it('animates only a visible working ring and preserves the status owner on completion', async () => {
+  const { act } = await import('@testing-library/react');
+  const { vi } = await import('vitest');
+  let visibility: IntersectionObserverCallback | undefined;
+  const disconnect = vi.fn();
+  vi.stubGlobal(
+    'IntersectionObserver',
+    class {
+      constructor(callback: IntersectionObserverCallback) {
+        visibility = callback;
+      }
+      observe() {}
+      disconnect = disconnect;
+    }
+  );
+  try {
+    const { container, rerender, unmount } = render(
+      <StatusGlyph state='working' />
+    );
+    const owner = screen.getByRole('img');
+    const spinning = () =>
+      container.querySelector('.motion-safe\\:animate-spin');
+    expect(spinning()).toBeNull();
+    act(() =>
+      visibility?.(
+        [{ isIntersecting: true } as IntersectionObserverEntry],
+        {} as IntersectionObserver
+      )
+    );
+    expect(spinning()).not.toBeNull();
+    act(() =>
+      visibility?.(
+        [{ isIntersecting: false } as IntersectionObserverEntry],
+        {} as IntersectionObserver
+      )
+    );
+    expect(spinning()).toBeNull();
+    rerender(<StatusGlyph state='succeeded' />);
+    expect(screen.getByRole('img')).toBe(owner);
+    expect(container.querySelectorAll('[data-fill="check"]')).toHaveLength(1);
+    expect(spinning()).toBeNull();
+    expect(disconnect).toHaveBeenCalledOnce();
+    unmount();
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });
