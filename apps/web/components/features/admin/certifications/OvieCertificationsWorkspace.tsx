@@ -8,7 +8,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from '@/components/feedback';
 import { PageShell } from '@/components/organisms/PageShell';
 import {
@@ -28,6 +28,7 @@ import {
   OVIE_CERTIFICATION_DOMAIN_LABELS,
   OVIE_CERTIFICATION_STATE_LABELS,
   type OvieCertificationDecisionKind,
+  type OvieCertificationDecisionRequest,
   type OvieCertificationDomainSummary,
   type OvieCertificationInventory,
   type OvieCertificationRow,
@@ -44,7 +45,10 @@ import {
 } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 import { formatTimeAgo } from '@/lib/utils/date-formatting';
-import { CertificationDetailRail } from './CertificationDetailRail';
+import {
+  type CertificationDecisionTarget,
+  CertificationDetailRail,
+} from './CertificationDetailRail';
 import {
   CertificationStateGlyph,
   CertificationTierGlyph,
@@ -340,7 +344,15 @@ export function OvieCertificationsWorkspace() {
   ]);
   const [pendingDecision, setPendingDecision] =
     useState<OvieCertificationDecisionKind | null>(null);
-  const [decisionError, setDecisionError] = useState<string | null>(null);
+  const [decisionFailure, setDecisionFailure] = useState<{
+    rowId: string;
+    message: string;
+  } | null>(null);
+  const decisionInFlight = useRef(false);
+  const preparedDecision = useRef<{
+    key: string;
+    request: OvieCertificationDecisionRequest;
+  } | null>(null);
   const [walkthroughOpen, setWalkthroughOpen] = useState(false);
 
   const inventory = query.data;
@@ -364,29 +376,63 @@ export function OvieCertificationsWorkspace() {
     [allRows, selectedId]
   );
 
-  useEffect(() => {
-    setDecisionError(null);
-  }, [selectedId]);
+  const decisionError =
+    decisionFailure?.rowId === selectedId ? decisionFailure.message : null;
 
   const handleDecide = useCallback(
-    async (kind: OvieCertificationDecisionKind, notes: string | null) => {
-      if (!selected?.decision.evidenceDigest) return false;
-      setPendingDecision(kind);
-      setDecisionError(null);
-      try {
-        await submitDecision({
-          rowId: selected.id,
-          evidenceDigest: selected.decision.evidenceDigest,
-          decision: kind,
-          notes,
-          actionId: crypto.randomUUID(),
+    async (
+      kind: OvieCertificationDecisionKind,
+      notes: string | null,
+      target: CertificationDecisionTarget
+    ) => {
+      if (decisionInFlight.current) return false;
+      if (
+        !target.evidenceDigest ||
+        !selected?.decision.available ||
+        selected.id !== target.rowId ||
+        selected.decision.evidenceDigest !== target.evidenceDigest
+      ) {
+        setDecisionFailure({
+          rowId: target.rowId,
+          message:
+            'The review scope changed. Reopen the current evidence before deciding.',
         });
+        return false;
+      }
+      // Retry an uncertain response with the same domain idempotency key.
+      const key = JSON.stringify([
+        target.rowId,
+        target.evidenceDigest,
+        kind,
+        notes,
+      ]);
+      if (preparedDecision.current?.key !== key) {
+        preparedDecision.current = {
+          key,
+          request: {
+            rowId: target.rowId,
+            evidenceDigest: target.evidenceDigest,
+            decision: kind,
+            notes,
+            actionId: crypto.randomUUID(),
+          },
+        };
+      }
+      decisionInFlight.current = true;
+      setPendingDecision(kind);
+      setDecisionFailure(null);
+      try {
+        await submitDecision(preparedDecision.current.request);
         toast.success(DECISION_TOASTS[kind]);
         return true;
       } catch (error) {
-        setDecisionError(getCertificationDecisionErrorMessage(error));
+        setDecisionFailure({
+          rowId: target.rowId,
+          message: getCertificationDecisionErrorMessage(error),
+        });
         return false;
       } finally {
+        decisionInFlight.current = false;
         setPendingDecision(null);
       }
     },

@@ -390,6 +390,7 @@ export async function executeChatTurn(
       artist: {
         displayName: artistContext.displayName,
         username: artistContext.username,
+        spotifyUrl: artistContext.spotifyUrl,
       },
     });
     const pinnedOpportunityBlock =

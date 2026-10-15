@@ -14,6 +14,10 @@ vi.mock('@/hooks/useBreakpoint', () => ({
   useBreakpointDown: () => false,
 }));
 
+const target = {
+  rowId: fixtureRow('signup').id,
+  evidenceDigest: fixtureRow('signup').decision.evidenceDigest,
+};
 const onDecide = vi.fn();
 const onClose = vi.fn();
 
@@ -105,7 +109,7 @@ describe('CertificationDetailRail', () => {
   it('certifies in one activation and requires a note to request changes', () => {
     renderRail();
     fireEvent.click(screen.getByRole('button', { name: 'Certify' }));
-    expect(onDecide).toHaveBeenCalledWith('approved', null);
+    expect(onDecide).toHaveBeenCalledWith('approved', null, target);
 
     const requestChanges = screen.getByRole('button', {
       name: 'Request Changes',
@@ -118,7 +122,8 @@ describe('CertificationDetailRail', () => {
     fireEvent.click(requestChanges);
     expect(onDecide).toHaveBeenLastCalledWith(
       'changes_requested',
-      'Fix the empty state'
+      'Fix the empty state',
+      target
     );
   });
 
@@ -129,7 +134,7 @@ describe('CertificationDetailRail', () => {
     const dialog = await screen.findByRole('dialog');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Reject' }));
     await vi.waitFor(() =>
-      expect(onDecide).toHaveBeenCalledWith('rejected', null)
+      expect(onDecide).toHaveBeenCalledWith('rejected', null, target)
     );
   });
 
