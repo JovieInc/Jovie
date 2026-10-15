@@ -29,6 +29,16 @@ const pkg = (before, after) =>
   });
 
 describe('product lane classifier', () => {
+  it('routes native playbook-only changes through web checks', () => {
+    expect(
+      classifyProductLanes([
+        'docs/playbooks/growth-presence-repair-offer.playbook.md',
+      ]).selectedLanes
+    ).toEqual(['web']);
+    expect(
+      classifyProductLanes(['docs/playbooks/TEMPLATE.md']).selectedLanes
+    ).toEqual(['operations']);
+  });
   it('routes the published CLI skill artifacts through the CLI web gate and rejects unknown skill paths', () => {
     const receipt = classifyProductLanes([
       'skills/jovie/SKILL.md',

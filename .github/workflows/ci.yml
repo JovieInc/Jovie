@@ -828,7 +828,7 @@ jobs:
           fi
 
           # CHANGELOG.md is customer-facing web content, not documentation.
-          if ! echo "$CHANGED_FILES" | grep -q -E '^(\.github/|CHANGELOG\.md$)' &&
+          if ! echo "$CHANGED_FILES" | grep -q -E '^(\.github/|CHANGELOG\.md$|docs/playbooks/[^/]+\.playbook\.md$)' &&
             ! echo "$CHANGED_FILES" | grep -q -v -E '\.(md|txt)$'; then
             echo "Only documentation files changed"
             for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon has_code_changes; do
@@ -851,7 +851,7 @@ jobs:
           fi
 
           # Test paths
-          TEST_PATTERN='^(apps/web/app/|apps/web/components/|apps/web/lib/|apps/web/hooks/|apps/web/types/|apps/web/tests/unit/|apps/web/__tests__/|packages/|.*\.test\.|.*\.spec\.|apps/web/package.*\.json|package.*\.json)'
+          TEST_PATTERN='^(docs/playbooks/[^/]+\.playbook\.md$|apps/web/app/|apps/web/components/|apps/web/lib/|apps/web/hooks/|apps/web/types/|apps/web/tests/unit/|apps/web/__tests__/|packages/|.*\.test\.|.*\.spec\.|apps/web/package.*\.json|package.*\.json)'
           if echo "$CHANGED_FILES" | grep -q -E "$TEST_PATTERN"; then
             RUN_TEST=true
             echo "run_test=true" >> "$GITHUB_OUTPUT"
