@@ -51,6 +51,36 @@ export function parseLsTreeLong(stdout) {
   return { bytes, files };
 }
 
+/**
+ * Sum regular-file blob sizes from `git ls-tree -r -l <commit>`.
+ * A missing commit, a malformed row, or a blob whose size is unknown (`-` or
+ * `BAD`, which is what a blob:none pack leaves behind) returns null. Null is
+ * not a measurement: the caller must not treat it as an empty tree.
+ * @param {{
+ *   headSha?: string,
+ *   cwd?: string,
+ *   git?: (args: readonly string[], cwd: string) => string,
+ * }} [options]
+ * @returns {{ bytes: number, files: number } | null}
+ */
+export function measureLocalTrackedBytes({
+  headSha,
+  cwd = process.cwd(),
+  git = runGit,
+} = {}) {
+  if (!SHA_PATTERN.test(String(headSha ?? ''))) return null;
+  try {
+    const resolved = git(
+      ['rev-parse', '--verify', `${headSha}^{commit}`],
+      cwd
+    ).trim();
+    if (resolved !== headSha) return null;
+    return parseLsTreeLong(git(['ls-tree', '-r', '-l', headSha], cwd));
+  } catch {
+    return null;
+  }
+}
+
 /** @returns {Array<{ filename: string, additions: number, deletions: number }> | null} */
 export function parseNumstatZ(stdout) {
   const files = [];
@@ -152,12 +182,7 @@ export function readLocalMergeGroupEvidence({
   } catch {
     files = null;
   }
-  let tracked = null;
-  try {
-    tracked = parseLsTreeLong(git(['ls-tree', '-r', '-l', headSha], cwd));
-  } catch {
-    tracked = null;
-  }
+  const tracked = measureLocalTrackedBytes({ headSha, cwd, git });
   return {
     baseSha,
     headSha,
