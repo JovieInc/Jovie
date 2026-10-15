@@ -49,6 +49,10 @@ describe('public marketing navigation', () => {
       href: '/ai',
       label: 'AI Operating System',
     });
+    expect(resources?.links).toContainEqual({
+      href: '/integrations',
+      label: 'Integrations',
+    });
   });
 
   it('keeps the Music footer and fan labels until the generic creator flag is on', () => {
