@@ -14,11 +14,17 @@
 
 export const CHECKOUT_CORRELATION_FIELDS = [
   'acquisitionId',
-  'claimId',
-  'runId',
+  'agentChannel',
+  'agentDecisionRevision',
+  'agentIntentId',
+  'agentMatrixRevision',
+  'agentOffer',
+  'agentRail',
   'candidateId',
-  'offerVersion',
+  'claimId',
   'firstTouch',
+  'offerVersion',
+  'runId',
 ] as const;
 
 export type CheckoutCorrelationField =
@@ -30,20 +36,32 @@ export type CheckoutCorrelation = {
 
 export const CHECKOUT_CORRELATION_STRIPE_KEYS = {
   acquisitionId: 'acquisition_id',
-  claimId: 'claim_id',
-  runId: 'run_id',
+  agentChannel: 'agent_channel',
+  agentDecisionRevision: 'agent_decision_revision',
+  agentIntentId: 'agent_intent_id',
+  agentMatrixRevision: 'agent_matrix_revision',
+  agentOffer: 'agent_offer',
+  agentRail: 'agent_rail',
   candidateId: 'candidate_id',
-  offerVersion: 'offer_version',
+  claimId: 'claim_id',
   firstTouch: 'first_touch',
+  offerVersion: 'offer_version',
+  runId: 'run_id',
 } as const satisfies Record<CheckoutCorrelationField, string>;
 
 export const CHECKOUT_CORRELATION_BODY_ALIASES = {
   acquisitionId: ['acquisitionId', 'acquisition_id'],
-  claimId: ['claimId', 'claim_id'],
-  runId: ['runId', 'run_id'],
+  agentChannel: ['agentChannel', 'agent_channel'],
+  agentDecisionRevision: ['agentDecisionRevision', 'agent_decision_revision'],
+  agentIntentId: ['agentIntentId', 'agent_intent_id'],
+  agentMatrixRevision: ['agentMatrixRevision', 'agent_matrix_revision'],
+  agentOffer: ['agentOffer', 'agent_offer'],
+  agentRail: ['agentRail', 'agent_rail'],
   candidateId: ['candidateId', 'candidate_id'],
-  offerVersion: ['offerVersion', 'offer_version'],
+  claimId: ['claimId', 'claim_id'],
   firstTouch: ['firstTouch', 'first_touch'],
+  offerVersion: ['offerVersion', 'offer_version'],
+  runId: ['runId', 'run_id'],
 } as const satisfies Record<
   CheckoutCorrelationField,
   readonly [string, string]
@@ -75,7 +93,10 @@ function normalizeCorrelationValue(
   return value;
 }
 
-export function parseCheckoutCorrelation(input: unknown): CheckoutCorrelation {
+export function parseCheckoutCorrelation(
+  input: unknown,
+  trustedAgentFields = false
+): CheckoutCorrelation {
   if (input === undefined || input === null || typeof input !== 'object') {
     return {};
   }
@@ -86,6 +107,7 @@ export function parseCheckoutCorrelation(input: unknown): CheckoutCorrelation {
   } = {};
 
   for (const field of CHECKOUT_CORRELATION_FIELDS) {
+    if (field.startsWith('agent') && !trustedAgentFields) continue;
     const aliases = CHECKOUT_CORRELATION_BODY_ALIASES[field];
     const raw = record[aliases[0]] ?? record[aliases[1]];
     const value = normalizeCorrelationValue(field, raw);
@@ -153,7 +175,7 @@ export function extractCheckoutCorrelation(
 
   for (const metadata of metadataSources) {
     if (!metadata) continue;
-    const parsed = parseCheckoutCorrelation(metadata);
+    const parsed = parseCheckoutCorrelation(metadata, true);
     for (const field of CHECKOUT_CORRELATION_FIELDS) {
       const value = parsed[field];
       if (typeof value === 'string' && value.length > 0 && !merged[field]) {

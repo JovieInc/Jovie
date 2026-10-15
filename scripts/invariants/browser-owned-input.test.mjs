@@ -482,6 +482,53 @@ test('artist pay owes browser-owned email evidence only when its surface hosts t
   );
 });
 
+const SETTINGS_BILLING_SOURCES = [
+  'apps/web/app/app/(shell)/settings/billing/page.tsx',
+  'apps/web/components/features/dashboard/organisms/SettingsBillingSection.tsx',
+];
+
+test('settings billing owes payment-tip evidence only when its surface hosts an email field', () => {
+  const hosted = SETTINGS_BILLING_SOURCES.some(path =>
+    BROWSER_EMAIL_FIELD.test(readFileSync(path, 'utf8'))
+  );
+  const bound = INPUT_MATRIX.journeys.some(
+    journey =>
+      journey.id === 'payment-tip' &&
+      journey.screens.includes('web.settings-billing')
+  );
+  assert.equal(bound, hosted);
+  if (hosted) return;
+  assert.deepEqual(inputCells('web.settings-billing'), []);
+  assert.deepEqual(
+    browserInputFindings(undefined, {
+      screenId: 'web.settings-billing',
+      headSha: HEAD,
+    }),
+    []
+  );
+  const billing = auditScreens({
+    registry: [
+      {
+        id: 'web.settings-billing',
+        platform: 'web',
+        owner: 'screen.settings.billing',
+        sources: SETTINGS_BILLING_SOURCES,
+        viewports: ['desktop', 'mobile'],
+      },
+    ],
+    headSha: HEAD,
+  });
+  assert.equal(billing.screens[0].producer, 'none');
+  assert.equal(billing.screens[0].verdict, 'uncovered');
+  assert.deepEqual(billing.screens[0].findings, []);
+  assert.equal(
+    remediationPlans(billing).some(
+      plan => plan.fingerprint === 'screen-audit:web.settings-billing'
+    ),
+    false
+  );
+});
+
 const WEB_AUTH_SOURCES = [
   'apps/web/app/(auth)',
   'apps/web/app/@auth',

@@ -26,6 +26,7 @@ interface AcquisitionRow extends Record<string, unknown> {
   captured_at: string;
   consent_revoked_at: string | null;
   first_touch: Record<string, unknown>;
+  identity_scope: string;
 }
 
 /**
@@ -68,7 +69,7 @@ export async function getPaidAcquisitionEvidence(
     ORDER BY paid.paid_at ASC, paid.logical_order_id ASC
   `);
   const acquisitionRows = await db.execute<AcquisitionRow>(drizzleSql`
-    SELECT id AS acquisition_id, user_id, captured_at, consent_revoked_at, first_touch
+    SELECT id AS acquisition_id, user_id, captured_at, consent_revoked_at, first_touch, identity_scope
     FROM acquisition_journeys
     WHERE captured_at <= ${asOf}
   `);
@@ -91,6 +92,10 @@ export async function getPaidAcquisitionEvidence(
       ? { consentRevokedAt: new Date(row.consent_revoked_at).toISOString() }
       : {}),
     firstTouch: row.first_touch,
+    identityScope:
+      row.identity_scope === 'pre_auth_first_party_cookie'
+        ? 'pre_auth_first_party_cookie'
+        : 'consented_first_party_browser',
   }));
 
   return reconcilePaidAcquisition(orders, acquisitions, asOf.toISOString());

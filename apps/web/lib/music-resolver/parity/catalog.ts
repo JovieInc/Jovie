@@ -1,4 +1,4 @@
-import { CHARTMETRIC_ENDPOINTS } from './chartmetric-endpoints';
+import { CHARTMETRIC_CONTRACTS } from './chartmetric-endpoints';
 import {
   CANONICAL_ASSERTION_BLOCKER,
   CHARTMETRIC_ACCESS_BLOCKER,
@@ -23,6 +23,7 @@ import { SOCIALBLADE_DOC_URL, SOCIALBLADE_ROWS } from './socialblade-rows';
 import type {
   Blocker,
   CatalogEntry,
+  DocumentedContract,
   Evidence,
   ParityRow,
   ParityStatus,
@@ -63,13 +64,15 @@ function blockedEntry(
   capability: string,
   docUrl: string,
   status: ParityStatus,
-  blocker: Blocker
+  blocker: Blocker,
+  contract?: DocumentedContract
 ): CatalogEntry {
   return {
     id,
     vendor,
     capability,
     docUrl,
+    contract,
     admission: { type: 'blocked', status, blocker },
   };
 }
@@ -232,17 +235,19 @@ export function buildCatalog(): readonly CatalogEntry[] {
     ),
   ];
 
-  const chartmetric = CHARTMETRIC_ENDPOINTS.map(([method, path, admission]) =>
-    blockedEntry(
-      `chartmetric:${method} ${path}`,
-      'chartmetric',
-      `${method} ${path}`,
-      CHARTMETRIC_DOCS_URL,
-      admission,
-      admission === 'vendor-only-opaque-metric'
-        ? CHARTMETRIC_SCORE_BLOCKER
-        : CHARTMETRIC_ACCESS_BLOCKER
-    )
+  const chartmetric = CHARTMETRIC_CONTRACTS.map(
+    ({ method, path, admission, contract }) =>
+      blockedEntry(
+        `chartmetric:${method} ${path}`,
+        'chartmetric',
+        `${method} ${path}`,
+        contract.source.url,
+        admission,
+        admission === 'vendor-only-opaque-metric'
+          ? CHARTMETRIC_SCORE_BLOCKER
+          : CHARTMETRIC_ACCESS_BLOCKER,
+        contract
+      )
   );
 
   const socialblade = SOCIALBLADE_ROWS.map(row => {
@@ -310,6 +315,7 @@ export function materializeCatalog(
         vendor: entry.vendor,
         capability: entry.capability,
         docUrl: entry.docUrl,
+        contract: entry.contract,
         status: entry.admission.status,
         blocker: entry.admission.blocker,
       };

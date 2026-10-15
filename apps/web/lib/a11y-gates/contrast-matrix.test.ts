@@ -1,12 +1,21 @@
+import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { buildThemeTables, runContrastChecks } from './contrast-engine';
+import {
+  buildThemeTables,
+  checkPair,
+  extractRules,
+  parseColor,
+  resolveValue,
+  runContrastChecks,
+} from './contrast-engine';
 import {
   contrastRegressions,
   failureBaseline,
   generateTokenPairs,
   loadContrastGate,
+  loadGateTables,
 } from './contrast-matrix';
 
 const webRoot = join(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -165,6 +174,74 @@ describe('generated contrast coverage', () => {
         )
       ).toBe(true);
     }
+  });
+});
+
+describe('light paper tertiary', () => {
+  it('keeps the dark muted gray and measures the light token on paper', async () => {
+    const tables = await loadGateTables(webRoot);
+    for (const theme of ['dark', 'dark app frame', 'dark marketing']) {
+      const table = tables[theme];
+      if (!table) throw new Error(`missing ${theme}`);
+      expect(
+        resolveValue(table.get('--noir-ion-text-muted') ?? '', table)
+      ).toBe('#9da2ac');
+      expect(
+        resolveValue(table.get('--color-text-tertiary-token') ?? '', table)
+      ).toBe('#9da2ac');
+      expect(
+        resolveValue(table.get('--linear-text-tertiary') ?? '', table)
+      ).toBe('#9da2ac');
+      expect(
+        resolveValue(table.get('--color-text-tertiary-on-light') ?? '', table)
+      ).toBe('#626872');
+    }
+
+    const light = tables.light;
+    const secondary = parseColor(
+      resolveValue(light.get('--color-text-secondary-token') ?? '', light) ?? ''
+    );
+    const tertiary = parseColor(
+      resolveValue(light.get('--color-text-tertiary-on-light') ?? '', light) ??
+        ''
+    );
+    expect(secondary).not.toBeNull();
+    expect(tertiary).not.toBeNull();
+    if (!secondary || !tertiary) return;
+    expect(tertiary.luminance).toBeGreaterThan(secondary.luminance);
+
+    const pairs = generateTokenPairs(tables);
+    const paper = pairs.find(
+      pair =>
+        pair.fg === '--color-text-tertiary-token' &&
+        pair.bg === '--color-bg-paper' &&
+        pair.themes?.includes('dark') &&
+        pair.underlay === undefined
+    );
+    expect(paper?.fgSource).toBe('--color-text-tertiary-on-light');
+    const onPaper = checkPair(paper!, tables.dark);
+    expect(onPaper.status).toBe('pass');
+    expect(onPaper.ratio).toBeGreaterThanOrEqual(4.5);
+
+    const canvas = pairs.find(
+      pair =>
+        pair.fg === '--color-text-tertiary-token' &&
+        pair.bg === '--color-bg-base' &&
+        pair.themes?.includes('dark') &&
+        pair.underlay === undefined
+    );
+    expect(canvas?.fgSource).toBeUndefined();
+
+    const css = await readFile(
+      join(webRoot, 'styles/design-system.css'),
+      'utf8'
+    );
+    const paperRule = extractRules(css).find(
+      rule => rule.selector === '.bg-paper'
+    );
+    expect(paperRule?.declarations.get('--color-text-tertiary-token')).toBe(
+      'var(--color-text-tertiary-on-light)'
+    );
   });
 });
 
