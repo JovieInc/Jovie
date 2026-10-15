@@ -66,10 +66,10 @@ export const MUSICFETCH_AGGREGATOR_BLOCKER: Blocker = {
 
 export const CHARTMETRIC_ACCESS_BLOCKER: Blocker = {
   failure:
-    'No Chartmetric refresh token is used here. This session must not call the paid API or spend credits.',
-  owner: 'Chartmetric account owner (signup via hi@chartmetric.com)',
+    'Independent source acquisition, per-use permissions, population/history coverage and canonical public projections are unverified. Public API documentation grants no data-use rights.',
+  owner: 'JOV-7824 / JOV-7827 / JOV-7828',
   reviewTrigger:
-    'A server-side refresh token exists and a local behavioral test calls a shipped adapter without spending credits.',
+    'The allocated implementation issue supplies permitted independent data, dated methodology/coverage receipts, canonical write/readback and deployed API/CLI/MCP evidence. No vendor token or spend is authorized by this catalog.',
 };
 
 export const CHARTMETRIC_SCORE_BLOCKER: Blocker = {

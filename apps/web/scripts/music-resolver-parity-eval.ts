@@ -29,6 +29,9 @@ async function main(): Promise<void> {
       .sort(),
     unblockedFailureIds: report.unblockedFailures.map(row => row.id).sort(),
     blockedIds: report.blocked.map(row => row.id).sort(),
+    documentedContracts: report.rows
+      .filter(row => row.contract)
+      .map(({ id, status, contract }) => ({ id, status, contract })),
     exitCode: report.exitCode,
   };
   process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
