@@ -785,6 +785,58 @@ describe('golden-path Linear-only intake', () => {
     );
   });
 
+  it('blocks all downstream requests when autofix has no Linear credentials', async () => {
+    const fetchImpl = vi.fn();
+    const result = await executeAutofix({
+      receipt: {
+        fingerprint: 'golden-path-lock:prod:test',
+        checks: [{ id: 'homepage-cta', ok: false }],
+      },
+      cursorApiKey: 'cursor-test-key',
+      linearApiKey: '',
+      githubToken: 'github-test-token',
+      fetchImpl,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      action: 'fail_closed',
+      stage: 'linear_intake',
+      reason: 'missing_linear_api_key',
+    });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it.each([401, 429, 500])(
+    'blocks GitHub fallback and Cursor dispatch when Linear returns %i',
+    async status => {
+      const fetchImpl = vi.fn(async () => new Response('rejected', { status }));
+      const result = await executeAutofix({
+        receipt: {
+          fingerprint: 'golden-path-lock:prod:test',
+          checks: [{ id: 'homepage-cta', ok: false }],
+        },
+        cursorApiKey: 'cursor-test-key',
+        linearApiKey: `linear-autofix-test-key-${status}`,
+        githubToken: 'github-test-token',
+        fetchImpl,
+      });
+
+      expect(result).toMatchObject({
+        ok: false,
+        action: 'fail_closed',
+        stage: 'linear_intake',
+        reason:
+          status === 429 ? 'linear_rate_limited' : `linear_search_${status}`,
+      });
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      expect(fetchImpl.mock.calls[0][0]).toBe('https://api.linear.app/graphql');
+      expect(JSON.parse(fetchImpl.mock.calls[0][1].body).query).toContain(
+        'query FindIssueByFingerprint'
+      );
+    }
+  );
+
   it('fails closed on a Linear rate limit without another tracker write', async () => {
     const fetchImpl = vi.fn(
       async (_input, _init) => new Response('rate limited', { status: 429 })
