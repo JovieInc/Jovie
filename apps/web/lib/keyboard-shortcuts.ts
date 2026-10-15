@@ -28,6 +28,7 @@ import {
   X,
 } from 'lucide-react';
 import { APP_ROUTES } from '@/constants/routes';
+import { COMMANDS } from '@/lib/commands/registry';
 // Unicode glyphs via String.fromCodePoint so they survive encoding-unaware
 // pipelines (CI, bundlers, proxies) without producing mojibake.
 export const GLYPH_CMD = String.fromCodePoint(0x2318);
@@ -73,6 +74,8 @@ export interface KeyboardShortcut {
   category: ShortcutCategory;
   /** Icon to display */
   icon?: LucideIcon;
+  /** Existing command owner when this is a projection of a menu action. */
+  commandId?: string;
   /** Navigation href (for nav shortcuts) */
   href?: string;
   /** Whether this is a sequential shortcut (e.g., G then D) */
@@ -119,6 +122,28 @@ export const FOUNDER_DOOR_SHORTCUT: KeyboardShortcut = {
   shortcutKey: FOUNDER_DOOR_SHORTCUT_KEY,
   decision: { status: 'required', binding: 'useGlobalShortcutActions' },
 };
+
+/** Project existing navigation actions; routes, names, and hints have one owner. */
+function commandShortcut(
+  commandId: string,
+  icon: LucideIcon
+): KeyboardShortcut {
+  const command = COMMANDS.find(entry => entry.id === commandId);
+  if (command?.kind !== 'nav' || !command.keyboardShortcut) {
+    throw new Error(`Unresolved keyboard command: ${commandId}`);
+  }
+  return {
+    ...command.keyboardShortcut,
+    commandId: command.id,
+    label: `Go to ${command.label.toLowerCase()}`,
+    keys: `${command.keyboardShortcut.firstKey.toUpperCase()} then ${command.keyboardShortcut.secondKey.toUpperCase()}`,
+    category: 'navigation',
+    icon,
+    href: command.href,
+    isSequential: true,
+    decision: { status: 'required', binding: 'useSequentialShortcuts' },
+  };
+}
 
 /**
  * All keyboard shortcuts organized by category
@@ -176,30 +201,8 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
 
   // Navigation shortcuts (G then letter)
   // Sidebar order first: Home, then Work.
-  {
-    id: 'nav-dashboard',
-    label: 'Go to home',
-    keys: 'G then D',
-    category: 'navigation',
-    icon: Home,
-    href: APP_ROUTES.DASHBOARD,
-    isSequential: true,
-    firstKey: 'g',
-    secondKey: 'd',
-    decision: { status: 'required', binding: 'useSequentialShortcuts' },
-  },
-  {
-    id: 'nav-releases',
-    label: 'Go to work',
-    keys: 'G then R',
-    category: 'navigation',
-    icon: Layers,
-    href: APP_ROUTES.LIBRARY,
-    isSequential: true,
-    firstKey: 'g',
-    secondKey: 'r',
-    decision: { status: 'required', binding: 'useSequentialShortcuts' },
-  },
+  commandShortcut('go-home', Home),
+  commandShortcut('go-work', Layers),
   {
     id: 'nav-profile',
     label: 'Go to profile',
@@ -224,42 +227,9 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     secondKey: 'c',
     decision: { status: 'required', binding: 'useSequentialShortcuts' },
   },
-  {
-    id: 'nav-links',
-    label: 'Go to links',
-    keys: 'G then K',
-    category: 'navigation',
-    icon: Link2,
-    href: APP_ROUTES.LINKS,
-    isSequential: true,
-    firstKey: 'g',
-    secondKey: 'k',
-    decision: { status: 'required', binding: 'useSequentialShortcuts' },
-  },
-  {
-    id: 'nav-calendar',
-    label: 'Go to calendar',
-    keys: 'G then L',
-    category: 'navigation',
-    icon: CalendarDays,
-    href: APP_ROUTES.CALENDAR,
-    isSequential: true,
-    firstKey: 'g',
-    secondKey: 'l',
-    decision: { status: 'required', binding: 'useSequentialShortcuts' },
-  },
-  {
-    id: 'nav-tour-dates',
-    label: 'Go to tour dates',
-    keys: 'G then O',
-    category: 'navigation',
-    icon: CalendarDays,
-    href: APP_ROUTES.TOUR_DATES,
-    isSequential: true,
-    firstKey: 'g',
-    secondKey: 'o',
-    decision: { status: 'required', binding: 'useSequentialShortcuts' },
-  },
+  commandShortcut('go-links', Link2),
+  commandShortcut('go-calendar', CalendarDays),
+  commandShortcut('go-tour-dates', CalendarDays),
   {
     id: 'nav-chat',
     label: 'Go to conversation',
@@ -272,18 +242,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     secondKey: 't',
     decision: { status: 'required', binding: 'useSequentialShortcuts' },
   },
-  {
-    id: 'nav-settings',
-    label: 'Go to settings',
-    keys: 'G then S',
-    category: 'navigation',
-    icon: Settings,
-    href: APP_ROUTES.SETTINGS,
-    isSequential: true,
-    firstKey: 'g',
-    secondKey: 's',
-    decision: { status: 'required', binding: 'useSequentialShortcuts' },
-  },
+  commandShortcut('go-settings', Settings),
 
   // Action shortcuts
   {

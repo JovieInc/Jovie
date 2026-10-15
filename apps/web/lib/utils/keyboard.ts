@@ -19,19 +19,24 @@ export function isFormElement(target: EventTarget | null): boolean {
   return false;
 }
 
-/** Shell shortcuts yield to editors, composite overlays, and held/IME input. */
+/** Shell shortcuts yield to focused editors, transient surfaces and media controls. */
 export function isShellShortcutSuppressed(event: KeyboardEvent): boolean {
   return (
     event.defaultPrevented ||
     event.repeat ||
     event.isComposing ||
-    isFormElement(event.target) ||
-    (event.target instanceof Element &&
-      Boolean(
-        event.target.closest(
-          '[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]'
-        )
-      ))
+    // Some IMEs report the final composing key only through the legacy code.
+    event.keyCode === 229 ||
+    [event.target, ...event.composedPath()].some(
+      target =>
+        isFormElement(target) ||
+        (target instanceof Element &&
+          Boolean(
+            target.closest(
+              'dialog[open], [role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"], [role="textbox"], [role="searchbox"], [role="combobox"], [role="slider"], [role="spinbutton"], [role="tablist"], [role="tree"], [role="grid"], audio, video, [inert], [hidden], [aria-hidden="true"]'
+            )
+          ))
+    )
   );
 }
 
