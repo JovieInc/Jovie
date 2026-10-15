@@ -84,12 +84,28 @@ def _is_git(comm: str) -> bool:
     return name == "git" or name.startswith("git-")
 
 
+def _cwd_text(entry: Path) -> str | None:
+    try:
+        raw = os.readlink(entry / "cwd")
+    except OSError:
+        return None
+    # A process whose directory was just removed still occupies that path.
+    suffix = " (deleted)"
+    if raw.endswith(suffix):
+        raw = raw[: -len(suffix)]
+    return raw
+
+
+def _inside(root: str, raw: str) -> bool:
+    return raw == root or raw.startswith(root + os.sep)
+
+
 def processes_under(path: Path) -> list[tuple[int, str]]:
     """(pid, comm) of other processes whose cwd is inside `path`."""
     try:
-        root = path.resolve()
+        root = str(path.resolve())
     except OSError:
-        return []
+        root = str(path)
     found = []
     proc = Path("/proc")
     if not proc.is_dir():
@@ -101,13 +117,14 @@ def processes_under(path: Path) -> list[tuple[int, str]]:
         pid = int(entry.name)
         if pid == me:
             continue
+        raw = _cwd_text(entry)
+        if raw is None or not _inside(root, raw):
+            continue
         try:
-            cwd = (entry / "cwd").resolve()
             comm = (entry / "comm").read_text(errors="replace").strip()
         except OSError:
-            continue
-        if cwd == root or root in cwd.parents:
-            found.append((pid, comm))
+            comm = ""
+        found.append((pid, comm))
     return found
 
 

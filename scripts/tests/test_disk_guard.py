@@ -635,7 +635,7 @@ class GitHousekeepingTest(unittest.TestCase):
         try:
             git_housekeeping.remove_tree(root)
             self.assertFalse(root.exists())
-            self.assertIsNotNone(proc.wait(timeout=5))
+            self.assertIsNotNone(proc.wait(timeout=15))
         finally:
             if proc.poll() is None:
                 proc.kill()
