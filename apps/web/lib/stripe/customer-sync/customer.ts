@@ -5,7 +5,7 @@
  */
 
 import 'server-only';
-import { and, sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, isNull } from 'drizzle-orm';
 import { appUserIdFilter } from '@/lib/auth/app-user-id';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSession, withDbSessionTx } from '@/lib/auth/session';
@@ -168,6 +168,8 @@ export async function ensureStripeCustomer(): Promise<{
   customerId?: string;
   error?: string;
 }> {
+  let resolvedAppUserId: string | undefined;
+  let candidateCustomerId: string | undefined;
   try {
     const { userId } = await getCachedAuth();
     if (!userId) {
@@ -175,6 +177,7 @@ export async function ensureStripeCustomer(): Promise<{
     }
 
     return await withDbSession(async appUserId => {
+      resolvedAppUserId = appUserId;
       const userResult = await fetchUserBillingDataByAppId({
         appUserId,
         fields: BILLING_FIELDS_CUSTOMER,
@@ -206,60 +209,74 @@ export async function ensureStripeCustomer(): Promise<{
         userData.email || ''
       );
 
-      // Atomic update with optimistic locking
-      try {
-        const result = await withDbSessionTx(
-          async tx => {
-            const updated = await tx
-              .update(users)
-              .set({
-                stripeCustomerId: customer.id,
-                billingUpdatedAt: new Date(),
-                billingVersion: drizzleSql`${users.billingVersion} + 1`,
-              })
-              .where(
-                and(
-                  appUserIdFilter(appUserId),
-                  eq(users.billingVersion, userData.billingVersion)
-                )
+      candidateCustomerId = customer.id;
+
+      // Persist ownership and its audit atomically before allowing checkout.
+      const result = await withDbSessionTx(
+        async tx => {
+          const updated = await tx
+            .update(users)
+            .set({
+              stripeCustomerId: customer.id,
+              billingUpdatedAt: new Date(),
+              billingVersion: drizzleSql`${users.billingVersion} + 1`,
+            })
+            .where(
+              and(
+                appUserIdFilter(appUserId),
+                eq(users.billingVersion, userData.billingVersion),
+                userData.stripeCustomerId
+                  ? eq(users.stripeCustomerId, userData.stripeCustomerId)
+                  : isNull(users.stripeCustomerId)
               )
-              .returning({ id: users.id });
+            )
+            .returning({ id: users.id });
 
-            if (updated.length > 0) {
-              await tx.insert(billingAuditLog).values({
-                userId: userData.id,
-                eventType: 'customer_created',
-                previousState: { stripeCustomerId: null },
-                newState: { stripeCustomerId: customer.id },
-                source: 'manual',
-                metadata: { appUserId },
-              });
-            }
+          if (updated.length > 0) {
+            await tx.insert(billingAuditLog).values({
+              userId: userData.id,
+              eventType: 'customer_created',
+              previousState: { stripeCustomerId: userData.stripeCustomerId },
+              newState: { stripeCustomerId: customer.id },
+              source: 'manual',
+              metadata: { appUserId },
+            });
+          }
 
-            return updated;
-          },
-          { clerkUserId: appUserId }
-        );
+          return updated;
+        },
+        { clerkUserId: appUserId }
+      );
 
-        if (result.length === 0) {
-          // Concurrent update detected, but customer was created
-          // This is recoverable - we can find the customer later by metadata
-          await captureWarning(
-            'Concurrent update detected during customer creation',
-            undefined,
-            { appUserId, customerId: customer.id }
+      if (result.length === 0) {
+        // A concurrent writer may have persisted a different customer. Only
+        // the fresh database winner can authorize checkout, never our candidate.
+        const winner = await fetchUserBillingDataByAppId({
+          appUserId,
+          fields: BILLING_FIELDS_CUSTOMER,
+        });
+        const winnerId = winner.success && winner.data?.stripeCustomerId;
+        const validWinnerId = winnerId
+          ? await validateExistingStripeCustomer(winnerId, appUserId)
+          : null;
+        if (!validWinnerId) {
+          throw new Error(
+            'Concurrent customer update has no valid persisted winner'
           );
-          return { success: true, customerId: customer.id };
         }
-      } catch (updateError) {
-        // Customer was created in Stripe but we couldn't save the ID
-        // This is recoverable - we can find the customer later by metadata
-        await captureWarning(
-          'Failed to update user with Stripe customer ID',
-          updateError,
-          { appUserId, customerId: customer.id }
-        );
-        return { success: true, customerId: customer.id };
+
+        if (validWinnerId !== customer.id) {
+          await captureWarning(
+            'Stripe customer orphan recovered by persisted winner',
+            undefined,
+            {
+              appUserId,
+              customerId: customer.id,
+              persistedCustomerId: validWinnerId,
+            }
+          );
+        }
+        return { success: true, customerId: validWinnerId };
       }
 
       return { success: true, customerId: customer.id };
@@ -267,6 +284,10 @@ export async function ensureStripeCustomer(): Promise<{
   } catch (error) {
     await captureCriticalError('Error ensuring Stripe customer', error, {
       function: 'ensureStripeCustomer',
+      diagnostic: 'stripe_customer_ownership_unresolved',
+      appUserId: resolvedAppUserId,
+      orphanCustomerId: candidateCustomerId,
+      recovery: 'retry_with_same_app_user_id',
     });
     return { success: false, error: 'Failed to create or retrieve customer' };
   }
