@@ -39,6 +39,10 @@ test('every stack combination fits in light and dark with 28px controls', async 
       ).toBe(true);
       for (const control of await dock.getByRole('button').all()) {
         expect((await control.boundingBox())?.height).toBe(28);
+        const hitHeight = await control.evaluate(node =>
+          Number.parseFloat(getComputedStyle(node, '::before').height)
+        );
+        expect(hitHeight).toBeGreaterThanOrEqual(44);
       }
     }
   }
