@@ -62,6 +62,7 @@ describe('truthful chat operation status', () => {
       type: 'message.send.started',
       conversationId: 'conversation',
       clientTurnId: 'turn',
+      clientMessageId: 'turn:user',
       parts: [{ type: 'text', text: 'Inspect source' }],
       now: 100,
     });
