@@ -635,6 +635,11 @@ describe('JovieChat styling regressions', () => {
     expect(
       container.querySelector('[data-testid="chat-empty-state-insight"]')
     ).toBeNull();
+    // Insights data is still undefined. Do not freeze the profile link or the
+    // draft button until that summary settles.
+    expect(container.textContent).toContain('Finding your next step');
+    expect(container.textContent).not.toContain('Draft This With Jovie');
+    expect(container.textContent).not.toContain('Review Your Profile');
   });
 
   it('preserves the welcome and offers one action without promoting Insight prose to a win (JOV-7150)', () => {

@@ -250,17 +250,8 @@ describe('MusicBrainz Provider', () => {
       const result = getMusicBrainzArtist(TIM_ID, {
         includeReleaseGroups: 'all',
       });
-      if (status === 401) {
-        // Existing retry policy retries unauthorized upstream responses twice.
-        vi.useFakeTimers();
-        const assertion = expect(result).rejects.toMatchObject({
-          statusCode: status,
-        });
-        await vi.runAllTimersAsync();
-        await assertion;
-      } else {
-        await expect(result).rejects.toMatchObject({ statusCode: status });
-      }
+      await expect(result).rejects.toMatchObject({ statusCode: status });
+      expect(fetch).toHaveBeenCalledTimes(2);
     }
   );
 
@@ -546,20 +537,7 @@ describe('MusicBrainz Provider', () => {
   it('keeps the timeout active while reading a stalled response body', async () => {
     vi.useFakeTimers();
     vi.mocked(fetch).mockImplementation(
-      async (_input, init) =>
-        ({
-          ok: true,
-          status: 200,
-          json: () =>
-            new Promise((_resolve, reject) => {
-              (init?.signal as AbortSignal).onabort = () =>
-                reject(
-                  Object.assign(new Error('aborted body'), {
-                    name: 'AbortError',
-                  })
-                );
-            }),
-        }) as Response
+      async () => new Response(new ReadableStream())
     );
     const result = expect(getMusicBrainzArtist(TIM_ID)).rejects.toMatchObject({
       errorCode: 'TIMEOUT',
@@ -569,21 +547,15 @@ describe('MusicBrainz Provider', () => {
     expect(fetch).toHaveBeenCalledTimes(3);
   });
 
-  it('rejects malformed JSON after bounded retries', async () => {
+  it('rejects malformed JSON without retrying it', async () => {
     vi.useFakeTimers();
-    vi.mocked(fetch).mockResolvedValue(
-      Object.assign(new Response(), {
-        json: async () => {
-          throw new SyntaxError('bad JSON');
-        },
-      })
-    );
+    vi.mocked(fetch).mockImplementation(async () => new Response('{broken'));
     const result = expect(
       lookupMusicBrainzByIsrc('USABC1234567')
-    ).rejects.toThrow('bad JSON');
+    ).rejects.toMatchObject({ errorCode: 'INVALID_RESPONSE' });
     await vi.runAllTimersAsync();
     await result;
-    expect(fetch).toHaveBeenCalledTimes(3);
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 
   it('resolves a barcode only from an exact release hit and retains artist credits', async () => {

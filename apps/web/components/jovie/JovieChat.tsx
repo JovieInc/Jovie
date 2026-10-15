@@ -373,6 +373,7 @@ export function JovieChat({
       measureChatTranscriptRow(el, scrollContainerRef.current),
   });
   const shouldVirtualizeMessages = messages.length > VIRTUALIZATION_THRESHOLD;
+  const [virtualizedMinHeight, setVirtualizedMinHeight] = useState(0);
 
   const scrollToBottom = useCallback(
     (behavior: ScrollBehavior = 'smooth') => {
@@ -424,6 +425,16 @@ export function JovieChat({
       return;
     }
 
+    const scrollport = scrollContainerRef.current;
+    // A 0px scrollport cannot place the tail in the virtual window. Leave the
+    // latch unset so the layout pass below can scroll once the height is real.
+    if (
+      shouldVirtualizeMessages &&
+      (!scrollport || scrollport.clientHeight === 0)
+    ) {
+      return;
+    }
+
     initialConversationScrollRef.current = conversationKey;
     setStuckToBottom(true);
     const frame = requestAnimationFrame(() => scrollToBottom('auto'));
@@ -439,6 +450,9 @@ export function JovieChat({
     messages.length,
     scrollToBottom,
     setStuckToBottom,
+    shouldVirtualizeMessages,
+    scrollContainerRef,
+    virtualizedMinHeight,
   ]);
 
   const lastAssistantIndex = findLastAssistantIndex(messages);
@@ -543,9 +557,15 @@ export function JovieChat({
     readonly action: ChatEmptyStateAction | null;
   } | null>(null);
   useEffect(() => {
+    // isLoading is false while data is still undefined (disabled, or the
+    // render before the in-flight summary arrives). Committing that gap as
+    // "no action" freezes the welcome on the profile link and drops the
+    // fixture that lands a moment later.
+    const insightsSettled =
+      insightsError || (!insightsLoading && insightsSummary !== undefined);
     if (showThreadView) {
       setEmptyNextStep(null);
-    } else if (showEmptyGreeting && !insightsLoading && !emptyNextStep) {
+    } else if (showEmptyGreeting && insightsSettled && !emptyNextStep) {
       setEmptyNextStep({
         action: insightsError
           ? null
@@ -612,7 +632,6 @@ export function JovieChat({
   const messageViewportPaddingBottom = shouldReservePickerClearance
     ? CHAT_PICKER_THREAD_CLEARANCE
     : undefined;
-  const [virtualizedMinHeight, setVirtualizedMinHeight] = useState(0);
   const scrollThreadToBottom = useCallback(() => {
     const scrollContainer = scrollContainerRef.current;
     if (!scrollContainer) return;
