@@ -57,6 +57,7 @@
     "next:proxy-guard": "node scripts/next-proxy-guard.mjs",
     "design-ci:judge-matrix": "tsx scripts/design-ci-judge-router.ts",
     "pre-push": "pnpm run next:proxy-guard && pnpm run tailwind:check && pnpm run typecheck",
+    "rebuild:audience-projections": "NODE_OPTIONS=--conditions=react-server tsx scripts/rebuild-audience-projections.ts",
     "ship": "pnpm run migration:guard && pnpm run migration:validate && pnpm run drizzle:migrate && pnpm run drizzle:check && pnpm run typecheck && pnpm run lint && pnpm run test",
     "ship:pr": "tsx scripts/ship-pr.ts",
     "check": "pnpm run validate && pnpm run build && pnpm run test",

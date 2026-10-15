@@ -65,7 +65,7 @@ not evidence of parity or permission to drop historical rows.
 
 | Schema File | Tables | Key Relations |
 |-------------|--------|---------------|
-| `analytics.ts` | `audienceActions`, `audienceMembers`, `audienceReferrers`, `audienceSourceGroups`, `audienceSourceLinks`, `clickEvents`, `dailyProfileViews`, `notificationSubscriptions`, `serverAnalyticsEvents`, `tips` | `clickEvents.providerLinkId` → `providerLinks`; `tips.creatorProfileId` → `creatorProfiles` |
+| `analytics.ts` | `audienceActions`, `audienceMembers`, `audienceProjectionSnapshots`, `audienceReferrers`, `audienceSourceGroups`, `audienceSourceLinks`, `clickEvents`, `dailyProfileViews`, `notificationSubscriptions`, `serverAnalyticsEvents`, `tips` | `clickEvents.providerLinkId` → `providerLinks`; `tips.creatorProfileId` → `creatorProfiles` |
 | `pixels.ts` | `creatorPixels`, `pixelEvents` | `creatorPixels.creatorProfileId` → `creatorProfiles`; `pixelEvents.creatorPixelId` → `creatorPixels` |
 | `insights.ts` | `aiInsights`, `insightGenerationRuns` | `aiInsights.creatorProfileId` → `creatorProfiles` |
 | `ai-crawler-analytics.ts` | `aiCrawlerAnalyticsSnapshots` | `creatorProfileId` → `creatorProfiles`; 30-day Cloudflare AI-crawl aggregates per profile |
