@@ -3,7 +3,7 @@
   "contract": "jovie.certification/v1",
   "issue": "JOV-6064",
   "extends": "JOV-5853",
-  "matrixRevision": "2026-10-13.1",
+  "matrixRevision": "2026-10-15.1",
   "asOf": "2026-10-03T00:00:00Z",
   "evidenceMaxAgeMs": 2592000000,
   "scope": {
@@ -1434,15 +1434,18 @@
       "id": "AM-022",
       "surface": "Responsive, mobile and packaged-desktop parity of supported surfaces",
       "failureClass": "ui-responsive-platform-parity",
-      "whatCanGoWrong": "Desktop assumptions break mobile, drawer/sheet/rail parity drifts, safe areas or orientation break, packaged Mac differs from browser for the same surface.",
+      "whatCanGoWrong": "Desktop assumptions break mobile, drawer/sheet/rail parity drifts, safe areas, keyboard/autofill/password-manager UI or orientation break, packaged Mac differs from browser for the same surface.",
       "covers": [
         "ui:supported-platforms",
         "ui:visual-qa-surfaces",
         "ui:screen-cert-routes"
       ],
       "owner": "design-system",
-      "sources": ["JOV-7713", "JOV-6928"],
+      "sources": ["JOV-6061", "JOV-6928", "JOV-7713", "JOV-7846"],
       "invalidatesOn": [
+        "scripts/invariants/browser-owned-input-matrix.json",
+        "apps/web/components/features/auth",
+        "apps/web/components/features/profile/artist-notifications-cta",
         "apps/web/lib/visual-qa",
         "apps/web/lib/platform/supported-platforms.ts",
         "apps/desktop",
@@ -1473,9 +1476,16 @@
         "severity": "high",
         "authority": [
           "apps/web/lib/visual-qa/viewports.ts",
-          "apps/web/lib/platform/supported-platforms.ts"
+          "apps/web/lib/platform/supported-platforms.ts",
+          "scripts/invariants/browser-owned-input-matrix.json"
         ],
         "detectors": [
+          {
+            "ref": "scripts/invariants/browser-owned-input.mjs",
+            "enforcement": "scheduled",
+            "deliberateRed": "scripts/invariants/browser-owned-input.test.mjs",
+            "inventory": ["ui:supported-platforms"]
+          },
           {
             "ref": "apps/web/lib/visual-qa/registry.ts",
             "enforcement": "manual",
@@ -1498,6 +1508,7 @@
         ],
         "requiredEvidence": ["web-desktop", "web-mobile", "macos-electron"],
         "blindSpots": [
+          "Browser-owned UI requires real-device exact-build evidence; UNKNOWN/BLOCKED cells cannot certify (JOV-7846).",
           "Mobile proof only exists in the post-merge screen-certification run.",
           "Packaged Mac parity verified manually through dogfood ledgers, not machine-compared."
         ],

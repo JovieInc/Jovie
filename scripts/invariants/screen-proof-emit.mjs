@@ -58,6 +58,7 @@ function parseArgs(argv) {
  *     activeFlow?: unknown,
  *     historyProof?: unknown,
  *     visibleActions?: unknown,
+ *     browserOwnedInput?: unknown,
  *     productReferences?: unknown,
  *   },
  *   artifactRoot?: string,
@@ -148,6 +149,9 @@ export function emitScreenProof({
     activeFlow: measurements?.activeFlow,
     historyProof: measurements?.historyProof,
     visibleActions: measurements?.visibleActions,
+    ...(measurements?.browserOwnedInput !== undefined
+      ? { browserOwnedInput: measurements.browserOwnedInput }
+      : {}),
     ...(measurements?.productReferences !== undefined
       ? { productReferences: measurements.productReferences }
       : {}),

@@ -160,6 +160,12 @@ export interface NavCommand {
   readonly iconName: string;
   readonly surfaces: readonly CommandSurface[];
   readonly href: string;
+  /** Existing shell sequence projected into keyboard help and navigation. */
+  readonly keyboardShortcut?: {
+    readonly id: string;
+    readonly firstKey: string;
+    readonly secondKey: string;
+  };
   /** Optional shortcut hint rendered on the cmd+k row. */
   readonly shortcutLabel?: string;
   /** Hide this row unless the flag is on. A missing value stays hidden. */
@@ -207,7 +213,8 @@ function nav(
   description: string,
   iconName: string,
   href: string,
-  requiredFlag?: AppFlagName
+  requiredFlag?: AppFlagName,
+  keyboardShortcut?: NavCommand['keyboardShortcut']
 ): NavCommand {
   return {
     kind: 'nav',
@@ -218,6 +225,7 @@ function nav(
     surfaces: CMDK_ONLY,
     href,
     ...(requiredFlag ? { requiredFlag } : {}),
+    ...(keyboardShortcut ? { keyboardShortcut } : {}),
   };
 }
 
@@ -293,7 +301,9 @@ export function buildCommands(
       'Home',
       'Open your Jovie home.',
       'Home',
-      APP_ROUTES.DASHBOARD
+      APP_ROUTES.DASHBOARD,
+      undefined,
+      { id: 'nav-dashboard', firstKey: 'g', secondKey: 'd' }
     ),
     nav(
       'go-presence',
@@ -308,7 +318,9 @@ export function buildCommands(
       PRODUCT_ONTOLOGY.work.label,
       PRODUCT_ONTOLOGY.work.definition,
       'Layers',
-      PRODUCT_ONTOLOGY.work.canonicalRoute
+      PRODUCT_ONTOLOGY.work.canonicalRoute,
+      undefined,
+      { id: 'nav-releases', firstKey: 'g', secondKey: 'r' }
     ),
     nav(
       'go-contacts',
@@ -343,7 +355,9 @@ export function buildCommands(
       'Links',
       'Open the links workspace. Shortcut G then K.',
       'Link',
-      APP_ROUTES.LINKS
+      APP_ROUTES.LINKS,
+      undefined,
+      { id: 'nav-links', firstKey: 'g', secondKey: 'k' }
     ),
     nav(
       'go-connections',
@@ -371,7 +385,9 @@ export function buildCommands(
       'Calendar',
       'Plan release dates and campaign moments.',
       'Calendar',
-      APP_ROUTES.CALENDAR
+      APP_ROUTES.CALENDAR,
+      undefined,
+      { id: 'nav-calendar', firstKey: 'g', secondKey: 'l' }
     ),
     nav(
       'go-tasks',
@@ -385,14 +401,18 @@ export function buildCommands(
       'Tour dates',
       'Manage show dates. Shortcut G then O.',
       'CalendarDays',
-      APP_ROUTES.TOUR_DATES
+      APP_ROUTES.TOUR_DATES,
+      undefined,
+      { id: 'nav-tour-dates', firstKey: 'g', secondKey: 'o' }
     ),
     nav(
       'go-settings',
       'Settings',
       'Account, billing, and profile settings.',
       'Settings',
-      APP_ROUTES.SETTINGS
+      APP_ROUTES.SETTINGS,
+      undefined,
+      { id: 'nav-settings', firstKey: 'g', secondKey: 's' }
     ),
     ...(showYouTube
       ? [

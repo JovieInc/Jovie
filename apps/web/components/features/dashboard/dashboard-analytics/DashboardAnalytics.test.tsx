@@ -62,6 +62,7 @@ describe('DashboardAnalytics metric consumer states', () => {
       top_cities: [{ city: 'London', count: 9 }],
       top_referrers: [{ referrer: '', count: 8 }],
       top_links: [{ id: 'listen', url: 'listen', clicks: 7 }],
+      top_operating_systems: [{ os: 'iOS', count: 12 }],
     };
     renderAnalytics();
     expect(screen.getByTestId('stat-profile-views')).toHaveTextContent('100');
@@ -71,9 +72,20 @@ describe('DashboardAnalytics metric consumer states', () => {
     expect(screen.getByTestId('stat-subscribers')).toHaveTextContent(
       '10% conversion'
     );
+    expect(
+      screen.getByRole('heading', { name: 'Clicks by operating system' })
+    ).toBeInTheDocument();
+    expect(screen.getByText('iOS')).toBeInTheDocument();
+    expect(screen.getByText('12')).toBeInTheDocument();
     expect(screen.getByText('London')).toBeInTheDocument();
     expect(screen.getByText('Direct')).toBeInTheDocument();
     expect(screen.getByText('Listen Link')).toBeInTheDocument();
+  });
+
+  it('shows Unknown for historical clicks without operating system data', () => {
+    state.data = { top_operating_systems: [{ os: 'Unknown', count: 4 }] };
+    renderAnalytics();
+    expect(screen.getByText('Unknown')).toBeInTheDocument();
   });
 
   it('hides contradictory values instead of presenting impossible conversion rates', () => {
@@ -90,6 +102,9 @@ describe('DashboardAnalytics metric consumer states', () => {
     renderAnalytics();
     expect(screen.queryByTestId('stat-profile-views')).not.toBeInTheDocument();
     expect(screen.queryByText('No city data yet')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('No operating system data yet')
+    ).not.toBeInTheDocument();
   });
 
   it('distinguishes observed empty metrics and lists from loading', () => {
@@ -98,6 +113,9 @@ describe('DashboardAnalytics metric consumer states', () => {
     expect(screen.getByText('No city data yet')).toBeInTheDocument();
     expect(screen.getByText('No referrer data yet')).toBeInTheDocument();
     expect(screen.getByText('No link data yet')).toBeInTheDocument();
+    expect(
+      screen.getByText('No operating system data yet')
+    ).toBeInTheDocument();
     expect(screen.getByTestId('stat-profile-views')).not.toHaveTextContent('—');
   });
 });

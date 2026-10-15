@@ -47,6 +47,8 @@ export type DashboardAnalyticsResponse = {
   top_countries: AnalyticsCountryRow[];
   top_referrers: AnalyticsReferrerRow[];
   top_links?: AnalyticsLinkRow[];
+  /** Non-bot clicks by OS in the selected range; missing OS is Unknown. */
+  top_operating_systems?: { os: string; count: number }[];
   total_clicks?: number;
   spotify_clicks?: number;
   social_clicks?: number;
