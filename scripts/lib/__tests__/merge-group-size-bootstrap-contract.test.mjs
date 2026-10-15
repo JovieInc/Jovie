@@ -190,7 +190,12 @@ printf '%s\\n' "$(basename "$0") $*" >> "$CALL_LOG"
           ['show', `${TRUSTED_SIZE_BOOTSTRAP_BASE}:${path}`],
           { encoding: 'utf8' }
         );
-        expect(source.status, source.stderr).toBe(0);
+        if (source.status !== 0) {
+          // Main-only additions are not on the pinned one-flight base.
+          // The policy that base runs does not import them.
+          expect(source.stderr).toContain(path);
+          continue;
+        }
         writeFileSync(join(root, path), source.stdout);
       }
       const result = spawnSync(

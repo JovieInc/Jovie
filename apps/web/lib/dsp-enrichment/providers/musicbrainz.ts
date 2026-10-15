@@ -10,6 +10,11 @@ import { CallerCancellationError } from '@/lib/resilience/caller-cancellation';
 import { logger } from '@/lib/utils/logger';
 import { musicBrainzCircuitBreaker } from '../circuit-breakers';
 import type { MusicBrainzArtist, MusicBrainzRecording } from '../types';
+import {
+  collectMusicBrainzCatalog,
+  type MusicBrainzCatalogQuery,
+  type MusicBrainzCatalogResult,
+} from './musicbrainz-catalog';
 
 const MUSICBRAINZ_API_BASE = 'https://musicbrainz.org/ws/2';
 const USER_AGENT = 'Jovie/1.0.0 (https://jov.ie)';
@@ -147,6 +152,32 @@ async function executeWithCircuitBreaker<T>(fn: () => Promise<T>): Promise<T> {
   return musicBrainzCircuitBreaker.execute(() => withRetry(fn));
 }
 
+/** Uses the existing distributed quota and breaker; no vendor or new cache. */
+export async function browseMusicBrainzCatalog(
+  options: MusicBrainzCatalogQuery
+): Promise<MusicBrainzCatalogResult> {
+  const deadline = AbortSignal.timeout(30_000);
+  const signal = options.signal
+    ? AbortSignal.any([options.signal, deadline])
+    : deadline;
+  try {
+    return await collectMusicBrainzCatalog({ ...options, signal }, endpoint =>
+      executeWithCircuitBreaker(() =>
+        musicBrainzRequest<unknown>(endpoint, true, signal)
+      )
+    );
+  } catch (error) {
+    if (deadline.aborted && !options.signal?.aborted) {
+      throw new MusicBrainzError(
+        'Catalog traversal timeout',
+        undefined,
+        'TIMEOUT'
+      );
+    }
+    throw error;
+  }
+}
+
 export async function lookupMusicBrainzByIsrc(
   isrc: string
 ): Promise<MusicBrainzRecording[]> {
@@ -191,7 +222,8 @@ export async function bulkLookupMusicBrainzByIsrc(
 export async function getMusicBrainzArtist(
   mbid: string,
   options: {
-    includeReleaseGroups?: boolean;
+    includeReleaseGroups?: boolean | 'all';
+    maxCatalogPages?: number;
     waitForQuota?: boolean;
     signal?: AbortSignal;
   } = {}
@@ -199,10 +231,15 @@ export async function getMusicBrainzArtist(
   if (!isMusicBrainzId(mbid)) return null;
   const normalizedId = mbid.toLowerCase();
   let response: Response | undefined;
+  let artist: MusicBrainzArtist;
   try {
-    const artist = await executeWithCircuitBreaker(async () => {
+    const includes =
+      options.includeReleaseGroups === 'all'
+        ? 'aliases+url-rels'
+        : `aliases+tags+genres+url-rels${options.includeReleaseGroups ? '+release-groups' : ''}`;
+    artist = await executeWithCircuitBreaker(async () => {
       return musicBrainzRequest<MusicBrainzArtist>(
-        `/artist/${normalizedId}?inc=aliases+tags+genres+url-rels${options.includeReleaseGroups ? '+release-groups' : ''}`,
+        `/artist/${normalizedId}?inc=${includes}`,
         options.waitForQuota,
         options.signal,
         value => {
@@ -218,13 +255,28 @@ export async function getMusicBrainzArtist(
         'INVALID_RESPONSE'
       );
     }
-    return artist;
   } catch (error) {
     if (error instanceof MusicBrainzError && error.statusCode === 404) {
       return null;
     }
     throw error;
   }
+  if (options.includeReleaseGroups === 'all') {
+    const catalog = await browseMusicBrainzCatalog({
+      entity: 'release-group',
+      by: 'artist',
+      mbid: artist.id,
+      maxPages: options.maxCatalogPages,
+      signal: options.signal,
+    });
+    return {
+      ...artist,
+      'release-groups': [...catalog.items],
+      releaseGroupsComplete: catalog.complete,
+    };
+  }
+  // This Jovie receipt must never be accepted from a raw upstream payload.
+  return { ...artist, releaseGroupsComplete: undefined };
 }
 
 export function isMusicBrainzId(value: string): boolean {

@@ -7,7 +7,7 @@
  * adopted only while classification_rationale IS NULL).
  */
 
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   NewYoutubeVideoMetricSnapshot,
   NewYoutubeVideoReleaseLink,
@@ -21,6 +21,15 @@ import type {
   YouTubeLibraryProvider,
   YouTubeVideoMetrics,
 } from '@/lib/youtube-library/types';
+
+const { canRefreshMock } = vi.hoisted(() => ({ canRefreshMock: vi.fn() }));
+vi.mock('@/lib/youtube-library/refresh-authority', () => ({
+  canRefreshYouTubeChannel: canRefreshMock,
+}));
+
+beforeEach(() => {
+  canRefreshMock.mockReset().mockResolvedValue(true);
+});
 
 vi.mock('@/lib/db', () => ({ db: {} }));
 vi.mock('@/lib/error-tracking', () => ({ captureError: vi.fn() }));
@@ -635,7 +644,7 @@ describe('runScheduledRefreshes', () => {
       now: new Date(NOW.getTime() + 12 * 60 * 60 * 1000),
       repo,
     });
-    expect(fresh).toEqual({ skipped: false, synced: 0, failed: 0 });
+    expect(fresh).toEqual({ skipped: false, synced: 0, failed: 0, denied: 0 });
 
     // 25h later: stale -> re-synced.
     const stale = await runScheduledRefreshes({
@@ -643,9 +652,169 @@ describe('runScheduledRefreshes', () => {
       now: new Date(NOW.getTime() + 25 * 60 * 60 * 1000),
       repo,
     });
-    expect(stale).toEqual({ skipped: false, synced: 1, failed: 0 });
+    expect(stale).toEqual({ skipped: false, synced: 1, failed: 0, denied: 0 });
     expect(videosByKey.get(`${CHANNEL_ID}|yt-1`)?.lastSyncedAt).toEqual(
       new Date(NOW.getTime() + 25 * 60 * 60 * 1000)
     );
+  });
+});
+
+describe('scheduled refresh entitlement boundaries', () => {
+  function scheduledFixture() {
+    const state = createInMemoryRepo();
+    state.repo.listStaleChannels = vi.fn(async () => [
+      { creatorProfileId: PROFILE_ID, channelId: CHANNEL_ID },
+    ]);
+    state.setCatalog([
+      {
+        id: 'rec-1',
+        isrc: 'USABC2600001',
+        releaseId: 'rel-1',
+        title: 'Neon Skyline',
+      },
+    ]);
+    return state;
+  }
+
+  it('performs no automatic tenant effects for the unentitled copy of the same work', async () => {
+    const state = scheduledFixture();
+    state.repo.listStaleChannels = vi.fn(async () => [
+      { creatorProfileId: 'free-profile', channelId: CHANNEL_ID },
+      { creatorProfileId: PROFILE_ID, channelId: CHANNEL_ID },
+    ]);
+    canRefreshMock.mockImplementation(
+      async channel => channel.creatorProfileId === PROFILE_ID
+    );
+    const provider = makeProvider([makeVideo()]);
+    const result = await runScheduledRefreshes({
+      provider,
+      repo: state.repo,
+      now: NOW,
+    });
+    expect(provider.listChannelVideos).toHaveBeenCalledTimes(1);
+    expect(
+      [...state.videosByKey.values()].map(v => v.creatorProfileId)
+    ).toEqual([PROFILE_ID]);
+    expect(state.links).toHaveLength(1);
+    expect(result).toEqual({ skipped: false, synced: 1, failed: 0, denied: 1 });
+  });
+
+  it('ignores caller-supplied manual initiators and entitlement flags on scheduled work', async () => {
+    const state = scheduledFixture();
+    const provider = makeProvider([makeVideo()]);
+    canRefreshMock.mockResolvedValue(false);
+    const input = {
+      provider,
+      repo: state.repo,
+      now: NOW,
+      initiator: 'manual',
+      canAutoCreateLinks: true,
+      isAdmin: true,
+    };
+    expect((await runScheduledRefreshes(input)).denied).toBe(1);
+    expect(provider.listChannelVideos).not.toHaveBeenCalled();
+    expect(state.videosByKey.size).toBe(0);
+  });
+
+  it('allows a bounded manual sync without granting future scheduled work', async () => {
+    const state = scheduledFixture();
+    const provider = makeProvider([makeVideo()]);
+    canRefreshMock.mockResolvedValue(false);
+    const manual = await syncChannelVideos({
+      creatorProfileId: PROFILE_ID,
+      channelId: CHANNEL_ID,
+      provider,
+      repo: state.repo,
+      windows: [],
+      now: NOW,
+    });
+    expect(manual.inserted).toBe(1);
+    expect(manual.linksCreated).toBe(1);
+    expect(canRefreshMock).not.toHaveBeenCalled();
+    const scheduled = await runScheduledRefreshes({
+      provider,
+      repo: state.repo,
+      now: NOW,
+    });
+    expect(scheduled.denied).toBe(1);
+    expect(provider.listChannelVideos).toHaveBeenCalledTimes(1);
+    expect(state.links).toHaveLength(1);
+  });
+
+  it.each([
+    [2, 'upsertVideos'],
+    [3, 'insertThumbnailVersions'],
+    [4, 'fetchVideoMetrics'],
+    [5, 'upsertMetricSnapshots'],
+    [6, 'insertReleaseLinks'],
+  ] as const)(
+    'stops at boundary %i after mid-flight downgrade or disconnect',
+    async (boundary, method) => {
+      const state = scheduledFixture();
+      const provider = makeProvider([makeVideo()], [makeMetric()]);
+      let checks = 0;
+      canRefreshMock.mockImplementation(async () => ++checks < boundary);
+      const effect =
+        method === 'fetchVideoMetrics'
+          ? provider.fetchVideoMetrics
+          : vi.spyOn(state.repo, method);
+      const result = await runScheduledRefreshes({
+        provider,
+        repo: state.repo,
+        now: NOW,
+      });
+      expect(result).toEqual({
+        skipped: false,
+        synced: 0,
+        failed: 0,
+        denied: 1,
+      });
+      expect(effect).not.toHaveBeenCalled();
+      expect(state.links).toHaveLength(0);
+    }
+  );
+
+  it('denies after an awaited thumbnail-history read before relabeling', async () => {
+    const state = scheduledFixture();
+    const provider = makeProvider([makeVideo()]);
+    await syncChannelVideos({
+      creatorProfileId: PROFILE_ID,
+      channelId: CHANNEL_ID,
+      provider,
+      repo: state.repo,
+      windows: [],
+      now: NOW,
+    });
+    const relabel = vi.spyOn(state.repo, 'relabelThumbnailVersions');
+    const append = state.repo.insertThumbnailVersions.bind(state.repo);
+    vi.spyOn(state.repo, 'insertThumbnailVersions').mockImplementation(
+      async rows => {
+        await append(rows);
+        canRefreshMock.mockResolvedValue(false);
+      }
+    );
+    const changed = makeProvider([
+      makeVideo({
+        thumbnails: { high: { url: 'https://i.ytimg.com/changed.jpg' } },
+      }),
+    ]);
+    const result = await runScheduledRefreshes({
+      provider: changed,
+      repo: state.repo,
+      now: NOW,
+    });
+    expect(result.denied).toBe(1);
+    expect(relabel).not.toHaveBeenCalled();
+  });
+
+  it('records authority-storage errors as failures and performs no fetch', async () => {
+    const state = scheduledFixture();
+    const provider = makeProvider([makeVideo()]);
+    canRefreshMock.mockRejectedValue(new Error('authority unavailable'));
+    expect(
+      await runScheduledRefreshes({ provider, repo: state.repo, now: NOW })
+    ).toEqual({ skipped: false, synced: 0, failed: 1, denied: 0 });
+    expect(provider.listChannelVideos).not.toHaveBeenCalled();
+    expect(state.videosByKey.size).toBe(0);
   });
 });
