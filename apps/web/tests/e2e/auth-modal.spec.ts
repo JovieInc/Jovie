@@ -12,7 +12,7 @@ import { waitForHydration } from './utils/smoke-test-utils';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
-const AUTH_MODAL_TIMEOUT = 120_000;
+const AUTH_MODAL_TIMEOUT = 30_000;
 
 function expectedDialogName(mode: 'signin' | 'signup') {
   const clerkUnavailable =
@@ -61,20 +61,47 @@ async function prepareHomepage(page: import('@playwright/test').Page) {
   }
 }
 
+async function openRequestAccess(page: import('@playwright/test').Page) {
+  // Homepage conversion lock keeps Request access off `/`. The intercepted
+  // signup modal still opens from the shared marketing-header CTA.
+  await blockAnalytics(page);
+  await page.goto(APP_ROUTES.PRICING, {
+    waitUntil: 'domcontentloaded',
+    timeout: AUTH_MODAL_TIMEOUT,
+  });
+  await waitForHydration(page, { timeout: AUTH_MODAL_TIMEOUT });
+
+  const requestAccess = page.getByRole('link', { name: /^request access$/i });
+  if (
+    await requestAccess
+      .first()
+      .isVisible()
+      .catch(() => false)
+  ) {
+    await requestAccess.first().click({
+      noWaitAfter: true,
+      timeout: AUTH_MODAL_TIMEOUT,
+    });
+    return;
+  }
+
+  await page.getByRole('button', { name: 'Open menu' }).click();
+  await requestAccess.first().click({
+    noWaitAfter: true,
+    timeout: AUTH_MODAL_TIMEOUT,
+  });
+}
+
 async function openInterceptedModal(
   page: import('@playwright/test').Page,
   mode: 'signin' | 'signup'
 ) {
-  await prepareHomepage(page);
-
-  if (mode === 'signin') {
-    await page
-      .getByRole('link', { name: /^sign in$/i })
-      .first()
-      .click({ noWaitAfter: true, timeout: AUTH_MODAL_TIMEOUT });
+  if (mode === 'signup') {
+    await openRequestAccess(page);
   } else {
+    await prepareHomepage(page);
     await page
-      .locator('[data-cta-sign-up="true"]')
+      .getByRole('link', { name: /^log in$/i })
       .first()
       .click({ noWaitAfter: true, timeout: AUTH_MODAL_TIMEOUT });
   }
@@ -133,7 +160,9 @@ test.describe('Intercepted auth modal', () => {
     );
   });
 
-  test('opens sign-up from the homepage primary CTA', async ({ page }) => {
+  test('opens sign-up from the marketing header request access CTA', async ({
+    page,
+  }) => {
     await openInterceptedModal(page, 'signup');
 
     await expect(page).toHaveURL(url => url.pathname === APP_ROUTES.SIGNUP, {
@@ -148,12 +177,7 @@ test.describe('Intercepted auth modal', () => {
   test('request access opens the same shared sign-up auth surface', async ({
     page,
   }) => {
-    await prepareHomepage(page);
-
-    await page
-      .getByRole('link', { name: /request access/i })
-      .first()
-      .click({ noWaitAfter: true, timeout: AUTH_MODAL_TIMEOUT });
+    await openRequestAccess(page);
 
     await expect(page).toHaveURL(url => url.pathname === APP_ROUTES.SIGNUP, {
       timeout: AUTH_MODAL_TIMEOUT,

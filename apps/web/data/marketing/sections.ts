@@ -661,7 +661,8 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         alignment: 'centered',
         chooseWhen:
           'items.length=3 AND emphasis=high (breadth survey before depth)',
-        status: 'unproven',
+        exemplar: { route: '/artist-notifications', section: 'benefits' },
+        status: 'active',
       },
       {
         id: '4-equal',
@@ -671,7 +672,8 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         density: 'large',
         alignment: 'centered',
         chooseWhen: 'items.length=4 AND emphasis=medium',
-        status: 'unproven',
+        exemplar: { route: '/pay', section: 'use-cases' },
+        status: 'active',
       },
       {
         id: '6-compact',
@@ -1093,7 +1095,8 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         alignment: 'centered',
         chooseWhen:
           'stats.length=3 AND placement=before-final-cta (B2B C2: scale metric as closing argument)',
-        status: 'unproven',
+        exemplar: { route: '/launch', section: 'why-now' },
+        status: 'active',
       },
       {
         id: '4-stat-band',
