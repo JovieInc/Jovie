@@ -281,6 +281,19 @@ describe('bounded onboarding writer pilot', () => {
     expect(mocks.send).not.toHaveBeenCalled();
   });
 
+  it('rejects evaluation labels or demonstrations added to the strict writer brief', async () => {
+    const input = turnInput();
+    Object.assign(input.writingPilot!.brief, {
+      heldoutLabels: [{ candidate: 'HELDOUT SENTINEL', usefulness: 4 }],
+      demonstrations: ['HELDOUT SENTINEL'],
+    });
+    await expect(executeChatTurn(input)).rejects.toMatchObject({
+      code: 'ineligible',
+    });
+    expect(streamText).not.toHaveBeenCalled();
+    expect(generateText).not.toHaveBeenCalled();
+  });
+
   it('retains existing caller behavior and selection when the seam is absent', async () => {
     const input = turnInput();
     delete input.writingPilot;
