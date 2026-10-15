@@ -33,7 +33,7 @@ const controller = {
 };
 
 /**
- * @param {{ event?: Record<string, string>, record?: Record<string, unknown>, jobs?: Record<string, unknown>[] | string, totalCount?: number, apiFailure?: boolean }} [options]
+ * @param {{ event?: Record<string, string>, record?: Record<string, unknown>, jobs?: Record<string, unknown>[] | string, totalCount?: number, apiFailure?: boolean, rateLimit?: boolean }} [options]
  */
 async function decide({
   event = {},
@@ -41,6 +41,7 @@ async function decide({
   jobs,
   totalCount,
   apiFailure,
+  rateLimit,
 } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'postdeploy-trigger-'));
   const output = join(root, 'output');
@@ -88,6 +89,15 @@ async function decide({
         ...event,
       },
       route: path => {
+        if (rateLimit) {
+          return {
+            status: 403,
+            body: {
+              message:
+                'API rate limit exceeded for installation. If you reach out to GitHub Support for help, please include the request ID 980B:3C6EDF:1EF9221:648E828:6AD12A91 and timestamp 2026-10-15 19:33:37 UTC.',
+            },
+          };
+        }
         if (apiFailure)
           return { status: 503, body: { message: 'unavailable' } };
         if (
@@ -176,6 +186,16 @@ describe('automatic landed production probes (JOV-8081)', () => {
     expect(result.shouldProbe).toBe('should_probe=false');
   });
 
+  it('defers an installation rate limit instead of failing the production monitor', async () => {
+    const result = await decide({ rateLimit: true });
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.shouldProbe).toBe('should_probe=false');
+    expect(result.stderr).toContain('GitHub primary-rate-limit');
+    expect(result.stdout).not.toContain(
+      'following up against landed production'
+    );
+  });
+
   it('retains explicit manual dispatch without requiring controller evidence', async () => {
     const result = await decide({ event: { EVENT_NAME: 'workflow_dispatch' } });
     expect(result.code).toBe(0);
@@ -231,6 +251,37 @@ describe('probe darkness is never healthy release evidence (JOV-7195)', () => {
       );
     }
   );
+
+  it('does not dispatch probes or page when the deployed-commit read is rate limited', () => {
+    const expression = workflow.jobs['resolve-target'].outputs.should_probe;
+    const shouldProbe = (trigger, quotaDeferred) =>
+      runInNewContext(
+        expression
+          .replace(/^\$\{\{\s*|\s*\}\}$/g, '')
+          .replaceAll(
+            'steps.trigger.outputs.should_probe',
+            JSON.stringify(trigger)
+          )
+          .replaceAll(
+            'steps.target.outputs.quota_deferred',
+            quotaDeferred === undefined ? 'null' : JSON.stringify(quotaDeferred)
+          )
+      );
+    expect(shouldProbe('true', undefined)).toBe(true);
+    expect(shouldProbe('true', '')).toBe(true);
+    expect(shouldProbe('true', 'true')).toBe(false);
+    expect(shouldProbe('false', undefined)).toBe(false);
+
+    const deferred = {
+      'resolve-target': 'success',
+      shouldProbe: 'false',
+      smoke: 'skipped',
+      'auth-smoke': 'skipped',
+      lighthouse: 'skipped',
+    };
+    expect(evaluate(workflow.jobs.remediation.if, deferred)).toBe(false);
+    expect(evaluate(workflow.jobs['notify-failure'].if, deferred)).toBe(false);
+  });
 
   it('does not clear an incident when exact in-lease evidence skips the fallback', () => {
     const results = { 'resolve-target': 'success', shouldProbe: 'false' };

@@ -56,7 +56,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
-      should_probe: ${{ steps.trigger.outputs.should_probe }}
+      # A rate-limited GitHub read sets quota_deferred and must not dispatch
+      # probes or page production (JOV-8495).
+      should_probe: ${{ steps.trigger.outputs.should_probe == 'true' && steps.target.outputs.quota_deferred != 'true' }}
       deployment_id: ${{ steps.target.outputs.deployment_id }}
       deployment_url_b64: ${{ steps.target.outputs.deployment_url_b64 }}
       commit_sha: ${{ steps.target.outputs.commit_sha }}
@@ -87,6 +89,8 @@ jobs:
         run: |
           set -euo pipefail
           echo "should_probe=false" >> "$GITHUB_OUTPUT"
+          # shellcheck source=scripts/ci/gh-api-or-defer.sh
+          source scripts/ci/gh-api-or-defer.sh
 
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             echo "should_probe=true" >> "$GITHUB_OUTPUT"
@@ -111,8 +115,9 @@ jobs:
             exit 1
           }
 
-          controller_workflow_json="$(gh api \
-            "repos/$REPOSITORY/actions/workflows/production-controller.yml")"
+          read_github_json \
+            "repos/$REPOSITORY/actions/workflows/production-controller.yml" \
+            controller_workflow_json
           jq -e '
             type == "object" and
             (.id | type == "number" and . > 0) and
@@ -125,8 +130,9 @@ jobs:
           }
           controller_workflow_id="$(jq -r '.id' <<<"$controller_workflow_json")"
 
-          run_record="$(gh api \
-            "repos/$REPOSITORY/actions/runs/$TRIGGER_RUN_ID/attempts/$TRIGGER_RUN_ATTEMPT")"
+          read_github_json \
+            "repos/$REPOSITORY/actions/runs/$TRIGGER_RUN_ID/attempts/$TRIGGER_RUN_ATTEMPT" \
+            run_record
           jq -e \
             --arg repo "$REPOSITORY" \
             --arg sha "$TRIGGER_HEAD_SHA" \
@@ -150,8 +156,9 @@ jobs:
             exit 1
           }
 
-          jobs_json="$(gh api \
-            "repos/$REPOSITORY/actions/runs/$TRIGGER_RUN_ID/attempts/$TRIGGER_RUN_ATTEMPT/jobs?per_page=100")"
+          read_github_json \
+            "repos/$REPOSITORY/actions/runs/$TRIGGER_RUN_ID/attempts/$TRIGGER_RUN_ATTEMPT/jobs?per_page=100" \
+            jobs_json
           jq -e '
             type == "object" and
             (.total_count | type == "number") and
@@ -223,6 +230,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # shellcheck source=scripts/ci/gh-api-or-defer.sh
+          source scripts/ci/gh-api-or-defer.sh
           {
             echo "should_probe=$SHOULD_PROBE"
             echo "deployment_id="
@@ -304,14 +313,16 @@ jobs:
 
           # Expand the deployed prefix inside this repository, then prove that
           # exact commit is on main. GitHub rejects ambiguous or foreign SHAs.
-          commit_json="$(gh api "repos/$REPOSITORY/commits/$deployed_sha")"
+          # Quota exhaustion exits 0 from read_github_json; it is not a
+          # production failure.
+          read_github_json "repos/$REPOSITORY/commits/$deployed_sha" commit_json
           commit_sha="$(jq -r '.sha // ""' <<<"$commit_json")"
           [[ "$commit_sha" =~ ^[0-9a-f]{40}$ ]] &&
             [[ "$commit_sha" == "$deployed_sha"* ]] || {
             echo "::error::Deployed commit identity did not resolve uniquely in this repository."
             exit 1
           }
-          comparison_json="$(gh api "repos/$REPOSITORY/compare/$commit_sha...main")"
+          read_github_json "repos/$REPOSITORY/compare/$commit_sha...main" comparison_json
           jq -e --arg sha "$commit_sha" '
             type == "object" and
             (.status == "ahead" or .status == "identical") and

@@ -2807,12 +2807,14 @@ ${selectedGateScript}`,
       'EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$deployment_url"'
     );
     expect(resolve).toContain('EXPECTED_VERCEL_ENVIRONMENT=production');
+    expect(resolve).toContain('source scripts/ci/gh-api-or-defer.sh');
     expect(resolve).toContain(
-      'gh api "repos/$REPOSITORY/commits/$deployed_sha"'
+      'read_github_json "repos/$REPOSITORY/commits/$deployed_sha" commit_json'
     );
     expect(resolve).toContain(
-      'gh api "repos/$REPOSITORY/compare/$commit_sha...main"'
+      'read_github_json "repos/$REPOSITORY/compare/$commit_sha...main" comparison_json'
     );
+    expect(resolve).toContain("steps.target.outputs.quota_deferred != 'true'");
     expect(resolve).toContain('.merge_base_commit.sha == $sha');
     expect(resolve).toContain(
       'Vercel list metadata disagrees with the exact origin build identity.'
