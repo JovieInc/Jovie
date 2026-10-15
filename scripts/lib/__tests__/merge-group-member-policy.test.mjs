@@ -1493,11 +1493,9 @@ describe('merge-group API outages do not eject a valid group', () => {
     expect(logs.some(line => line.includes('20 tracked regular-file'))).toBe(
       true
     );
-    expect(
-      logs.some(line =>
-        line.includes('no local tree byte count')
-      )
-    ).toBe(false);
+    expect(logs.some(line => line.includes('no local tree byte count'))).toBe(
+      false
+    );
   });
 
   it('does not pass when a tree-byte rate limit has no local measurement', async () => {
@@ -1525,12 +1523,10 @@ describe('merge-group API outages do not eject a valid group', () => {
       })
     ).rejects.toBeInstanceOf(MergeGroupPolicyRateLimitError);
     expect(outputs).toEqual(['fork_verdict=pass']);
-    expect(logs.some(line => line.includes('Combined tree: PASS'))).toBe(
-      false
-    );
+    expect(logs.some(line => line.includes('Combined tree: PASS'))).toBe(false);
     expect(logs.some(line => line.includes('Validated'))).toBe(false);
-    expect(
-      logs.some(line => line.includes('no local tree byte count'))
-    ).toBe(true);
+    expect(logs.some(line => line.includes('no local tree byte count'))).toBe(
+      true
+    );
   });
 });

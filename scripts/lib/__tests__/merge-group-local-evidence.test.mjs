@@ -36,9 +36,7 @@ describe('local merge-group size evidence', () => {
     ).toEqual({ bytes: 10, files: 2 });
     expect(parseLsTreeLong('not a tree row')).toBeNull();
     expect(
-      parseLsTreeLong(
-        `100644 blob ${'a'.repeat(40)}     BAD\ta.ts\n`
-      )
+      parseLsTreeLong(`100644 blob ${'a'.repeat(40)}     BAD\ta.ts\n`)
     ).toBeNull();
     expect(
       parseLsTreeLong(`100644 blob ${'a'.repeat(40)}       -\ta.ts\n`)
