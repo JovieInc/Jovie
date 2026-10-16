@@ -35,12 +35,22 @@ process.stdout.write(JSON.stringify({ ids, byKind, total: ids.length }));
 export function deriveCodeRegisteredIdentities({ cwd = process.cwd() } = {}) {
   let stdout;
   try {
-    stdout = execFileSync('pnpm', ['exec', 'tsx', '-e', DERIVATION_SNIPPET], {
-      cwd,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-      timeout: 120_000,
-    });
+    stdout = execFileSync(
+      'pnpm',
+      [
+        'exec',
+        'tsx',
+        '--tsconfig=apps/web/tsconfig.json',
+        '-e',
+        DERIVATION_SNIPPET,
+      ],
+      {
+        cwd,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+        timeout: 120_000,
+      }
+    );
   } catch (error) {
     throw new Error(
       `Cannot derive registered identities from ${CODE_REGISTRY_PATH}: ` +
