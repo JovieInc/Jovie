@@ -916,12 +916,6 @@ function withProducerActivationEvidence(args, result) {
     : result;
 }
 
-function ghWantsFileStdout(args) {
-  return args.some(
-    arg => typeof arg === 'string' && /\/zip$/.test(arg.split('?')[0])
-  );
-}
-
 function spawnFailure(command, args, result) {
   const stderr = Buffer.isBuffer(result.stderr)
     ? result.stderr.toString('utf8')
@@ -931,18 +925,22 @@ function spawnFailure(command, args, result) {
   );
 }
 
-function run(command, args, options = {}) {
+function runText(command, args) {
+  const result = spawnSync(command, args, {
+    encoding: 'utf8',
+    maxBuffer: 32 * 1024 * 1024,
+  });
+  if (result.status !== 0) spawnFailure(command, args, result);
+  if (typeof result.stdout !== 'string') {
+    throw new Error(`${command} ${args.join(' ')} returned no text`);
+  }
+  return result.stdout;
+}
+
+function runZip(command, args) {
   // gh 2.102 treats every GH_FORCE_TTY value, including 0, as a terminal and
   // refuses application/zip. A pipe is not a sufficient substitute: write the
-  // body to a file and drop the variable. JSON reads keep the caller env.
-  if (!ghWantsFileStdout(args)) {
-    const result = spawnSync(command, args, {
-      encoding: options.binary ? undefined : 'utf8',
-      maxBuffer: 32 * 1024 * 1024,
-    });
-    if (result.status !== 0) spawnFailure(command, args, result);
-    return result.stdout;
-  }
+  // body to a file and drop the variable.
   const env = { ...process.env };
   delete env.GH_FORCE_TTY;
   const file = join(
@@ -963,25 +961,31 @@ function run(command, args, options = {}) {
   let stdout = Buffer.alloc(0);
   try {
     stdout = readFileSync(file);
+    // Reader doubles return the body on stdout and do not write the fd.
+    if (
+      stdout.length === 0 &&
+      result?.stdout != null &&
+      result.stdout.length > 0
+    ) {
+      stdout = Buffer.isBuffer(result.stdout)
+        ? result.stdout
+        : Buffer.from(String(result.stdout));
+    }
   } finally {
     rmSync(file, { force: true });
   }
-  // Reader doubles return the body on stdout and do not write the fd.
-  if (
-    stdout.length === 0 &&
-    result.stdout != null &&
-    result.stdout.length > 0
-  ) {
-    stdout = Buffer.isBuffer(result.stdout)
-      ? result.stdout
-      : Buffer.from(String(result.stdout));
+  if (!result || result.status !== 0) {
+    spawnFailure(
+      command,
+      args,
+      result ?? { status: 1, stderr: 'spawn failed' }
+    );
   }
-  if (result.status !== 0) spawnFailure(command, args, result);
   return stdout;
 }
 
 function ghJson(endpoint) {
-  return JSON.parse(run('gh', ['api', endpoint]));
+  return JSON.parse(runText('gh', ['api', endpoint]));
 }
 
 function normalizeArtifacts(payload, expectedName) {
@@ -1011,13 +1015,14 @@ function downloadJsonArtifact(
   const directory = mkdtempSync(join(tmpdir(), 'jovie-production-marker-'));
   const archive = join(directory, 'artifact.zip');
   try {
-    const body = run(
-      'gh',
-      ['api', `repos/${repo}/actions/artifacts/${artifactId}/zip`],
-      { binary: true }
-    );
+    const body = runZip('gh', [
+      'api',
+      `repos/${repo}/actions/artifacts/${artifactId}/zip`,
+    ]);
     writeFileSync(archive, body);
-    const entries = run('unzip', ['-Z1', archive]).split('\n').filter(Boolean);
+    const entries = runText('unzip', ['-Z1', archive])
+      .split('\n')
+      .filter(Boolean);
     const allowedEntries = new Set([expectedFile, ...optionalFiles]);
     const uniqueEntries = new Set(entries);
     if (
@@ -1029,7 +1034,7 @@ function downloadJsonArtifact(
         `Artifact ${artifactId} does not contain one ${expectedFile} with only allowed companion files`
       );
     }
-    return JSON.parse(run('unzip', ['-p', archive, expectedFile]));
+    return JSON.parse(runText('unzip', ['-p', archive, expectedFile]));
   } finally {
     rmSync(directory, { force: true, recursive: true });
   }
