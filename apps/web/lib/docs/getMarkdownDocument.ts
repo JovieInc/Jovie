@@ -83,8 +83,20 @@ export async function getMarkdownDocument(
   return getMarkdownDocumentCached(relativePath);
 }
 
+export interface CreateMarkdownDocumentOptions {
+  /**
+   * Make GFM tables sequential focus stops with accessible names. Set it for
+   * readers that render tables as block-level scrollable regions
+   * (overflow-x-auto at narrow viewports): an unfocusable scrollable region
+   * fails axe's scrollable-region-focusable rule. Readers whose tables never
+   * scroll keep the default so no pointless tab stops appear.
+   */
+  readonly focusableTables?: boolean;
+}
+
 export async function createMarkdownDocument(
-  raw: string
+  raw: string,
+  options: CreateMarkdownDocumentOptions = {}
 ): Promise<MarkdownDocument> {
   const processor = remark()
     .use(remarkGfm)
@@ -112,9 +124,11 @@ export async function createMarkdownDocument(
     toc.push({ id: headingId, title, level: heading.depth });
   });
 
-  visit(ast, 'table', node => {
-    enrichTableForAccessibility(node as unknown as TableNode);
-  });
+  if (options.focusableTables) {
+    visit(ast, 'table', node => {
+      enrichTableForAccessibility(node as unknown as TableNode);
+    });
+  }
 
   const transformed = await processor.run(ast);
   const htmlResult = processor.stringify(transformed as never);
