@@ -1181,7 +1181,11 @@ def _human_category(key: str, blob: str) -> str | None:
             if not direct:
                 continue
             verb, subject = direct.groups()
-            if re.match(r"(?:(?:the|a|an)\s+)?(?:regression|tests?|coverage|fixture|example)\b", subject):
+            # Inspect the engineering object before purpose clauses mention
+            # credentials or operations; independent positive asks stay separate.
+            object_text = re.split(r"\b(?:for|to|so|that)\b", subject, maxsplit=1)[0].strip()
+            if (re.match(r"(?:(?:the|a|an)\s+)?(?:regression|tests?|coverage|fixture|example)\b", subject)
+                    or re.search(r"\b(?:regression|tests?|coverage|fixtures?|examples?|retry|retries)$", object_text)):
                 continue
             if (verb in {"expand", "increase", "grant", "elevate", "add", "enable", "raise", "change"}
                     and re.search(r"\b(?:github[_ -]token|tokens?|credentials?|app)\b", subject)
@@ -1200,7 +1204,8 @@ def _human_category(key: str, blob: str) -> str | None:
                 return "store submission"
             if re.search(r"billing[\s-]*actions?", subject):
                 return "billing action"
-            if re.search(r"manual[\s-]*deploy|\bmanually\b", subject):
+            if (re.search(r"manual[\s-]*deploy", subject)
+                    or (verb == "deploy" and re.search(r"\bmanually\b", subject))):
                 return "manual deploy"
             if re.search(r"outside[\s-]*humans?", subject):
                 return "outside human"
