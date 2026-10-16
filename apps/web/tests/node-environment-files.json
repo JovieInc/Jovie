@@ -118,6 +118,7 @@
   "lib/connectors/brand-deal-opportunity-emitter.test.ts",
   "lib/connectors/brand-deal-opportunity.test.ts",
   "lib/connectors/customer-pinned-opportunity.test.ts",
+  "lib/connectors/distributor-report-import.test.ts",
   "lib/connectors/enrichment/",
   "lib/connectors/eval/precision.test.ts",
   "lib/connectors/gmail/",

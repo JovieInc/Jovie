@@ -1,6 +1,6 @@
 {
   "name": "@jovie/web",
-  "version": "26.10.6",
+  "version": "26.10.7",
   "private": true,
   "sideEffects": false,
   "engines": {
@@ -294,6 +294,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
+    "csv-parse": "^7.0.3",
     "date-fns": "^4.3.0",
     "dompurify": "^3.4.17",
     "dotenv": "^18.0.8",

@@ -1353,7 +1353,8 @@ class ClaimTest(unittest.TestCase):
         saved = runner.sh
         runner.sh = lambda args, **k: SimpleNamespace(returncode=0, stderr="", stdout="- review: rename the prop")
         try:
-            prompt = runner.render_fix_prompt({**pr(kinds=["dequeued", "review"]), "title": "t"}, "")
+            prompt = runner.render_fix_prompt({**pr(kinds=["dequeued", "review"]), "title": "t",
+                "reviewSummaries": [{"author": {"login": "reviewer"}, "body": "rename the prop"}]}, "")
         finally:
             runner.sh = saved
         self.assertIn("merge queue removed this PR", prompt)
@@ -2022,6 +2023,8 @@ class RunnerHookTest(unittest.TestCase):
             self.assertEqual((record["reason"], record["next_action"]), ("secret-file", "bug-intake"))
 
     def test_exhausted_disabled_lane_preserves_pr_and_terminal_backlog_disposition(self):
+        fresh = patch.object(runner, "reconcile_fix_target", side_effect=lambda pr: {"state": "OPEN", "isInMergeQueue": False, **pr})
+        fresh.start(); self.addCleanup(fresh.stop)
         stuck = pr(number=7, branch="claude/jov-9-20260926t0100", sha="h1", merge="DIRTY")
         calls, moves, comments = [], [], []
         saved = (runner.sh, runner.load_providers)
@@ -2058,6 +2061,8 @@ class RunnerHookTest(unittest.TestCase):
                        "labels[]=lane-fix-exhausted"], calls)
 
     def test_an_unfixable_hold_escalates_once_without_burning_attempts(self):
+        fresh = patch.object(runner, "reconcile_fix_target", side_effect=lambda pr: {"state": "OPEN", "isInMergeQueue": False, **pr})
+        fresh.start(); self.addCleanup(fresh.stop)
         stuck = pr(number=7, title="big diff")
         calls, triaged = [], []
         saved = (runner.sh, runner.load_providers, events.return_to_pool)

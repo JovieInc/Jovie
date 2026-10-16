@@ -76,7 +76,25 @@ async function customerNavigationContract(
             aria: Object.fromEntries(
               Array.from(node.attributes)
                 .filter(attribute => attribute.name.startsWith('aria-'))
-                .map(attribute => [attribute.name, attribute.value])
+                .map(attribute => {
+                  // React useId values differ across sessions. Keep the
+                  // control relationship, not the generated id string.
+                  if (
+                    attribute.name === 'aria-controls' ||
+                    attribute.name === 'aria-owns'
+                  ) {
+                    const target = node.ownerDocument.getElementById(
+                      attribute.value
+                    );
+                    if (!target) return [attribute.name, 'missing-target'];
+                    const label =
+                      target.getAttribute('aria-label') ??
+                      target.getAttribute('role') ??
+                      target.tagName.toLowerCase();
+                    return [attribute.name, `controls:${label}`];
+                  }
+                  return [attribute.name, attribute.value];
+                })
             ),
           })
         )
@@ -242,7 +260,8 @@ test.describe('OV responsive navigation exclusivity', () => {
       test.setTimeout(180_000);
       await page.setViewportSize(viewport);
       await enterPersona(page, 'admin', APP_ROUTES.OV);
-      await expect(page).toHaveURL(new RegExp(`${APP_ROUTES.OV}/?$`));
+      // /app/ov rewrites to /app/admin, which redirects to the HUD.
+      await expect(page).toHaveURL(new RegExp(`${APP_ROUTES.HUD}/?$`));
 
       const mobileNavigation = page.getByRole('navigation', {
         name: 'OV Mobile Navigation',
