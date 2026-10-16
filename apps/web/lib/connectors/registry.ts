@@ -1,37 +1,46 @@
 /**
  * Connector Provider Registry — single source of truth for connector manifests.
  *
- * Adding a provider:
- * 1. Add the value to `connectorProviderEnum` in `lib/db/schema/enums.ts` (+ migration).
- * 2. Append the id to `CONNECTOR_PROVIDER_IDS` in `types.ts` (client-safe runtime list).
- * 3. Add a full `ConnectorDefinition` entry below (scopes, handlers, UI metadata).
- * 4. Wire OAuth/sync modules referenced by the definition.
- *
- * Provider *types* come from the Drizzle enum (`ConnectorProviderId` in enums.ts).
- * Do not hand-maintain a second union in UI components — import from this module.
+ * OAuth providers retain DB-enum parity. File imports are manifest-only and
+ * never enter connector_accounts or the OAuth/token flows. Add sorted entries
+ * to the appropriate runtime id list and registry; validate both variants.
  */
 
 import { z } from 'zod';
+import { DISTRIBUTOR_MANIFESTS } from './distributor-manifests';
 import { DSP_PROFILE_CATALOG } from './dsp-profile-catalog';
 import { validateConnectorRegistry } from './registry-validation';
 import { SPOTIFY_OAUTH_SCOPES } from './spotify/scopes';
 import {
+  CONNECTOR_MANIFEST_IDS,
   CONNECTOR_PROVIDER_IDS,
   type ConnectorDefinition,
+  type ConnectorManifestId,
+  type ConnectorOAuthBundle,
   type ConnectorProviderId,
+  DISTRIBUTOR_IDS,
+  type DistributorId,
+  type FileImportConnectorDefinition,
+  type OAuthConnectorDefinition,
 } from './types';
 import { YOUTUBE_OAUTH_SCOPES } from './youtube/scopes';
 
 export {
   CONNECTOR_DB_STATUS_IDS,
+  CONNECTOR_MANIFEST_IDS,
   CONNECTOR_PROVIDER_IDS,
   type ConnectorDbStatus,
   type ConnectorDefinition,
   type ConnectorIconKey,
+  type ConnectorManifestId,
   type ConnectorOAuthBundle,
   type ConnectorProviderId,
   type ConnectorStatus,
   type ConnectorTokenHandler,
+  DISTRIBUTOR_IDS,
+  type DistributorId,
+  type FileImportConnectorDefinition,
+  type OAuthConnectorDefinition,
 } from './types';
 
 /** Stable id map — prefer these over inline string literals at call sites. */
@@ -52,8 +61,12 @@ export const GOOGLE_OAUTH_SCOPE = {
 } as const;
 
 export const CONNECTOR_REGISTRY = validateConnectorRegistry({
+  awal: DISTRIBUTOR_MANIFESTS.awal,
+  cdbaby: DISTRIBUTOR_MANIFESTS.cdbaby,
+  distrokid: DISTRIBUTOR_MANIFESTS.distrokid,
   [CONNECTOR_PROVIDERS.gmail]: {
     id: CONNECTOR_PROVIDERS.gmail,
+    transport: 'oauth',
     label: 'Gmail',
     description: 'Find confirmed bookings in your email.',
     iconKey: 'mail',
@@ -83,6 +96,7 @@ export const CONNECTOR_REGISTRY = validateConnectorRegistry({
   },
   [CONNECTOR_PROVIDERS.google_calendar]: {
     id: CONNECTOR_PROVIDERS.google_calendar,
+    transport: 'oauth',
     label: 'Google Calendar',
     description: 'Check scheduling conflicts and add approved bookings.',
     iconKey: 'calendar',
@@ -123,8 +137,10 @@ export const CONNECTOR_REGISTRY = validateConnectorRegistry({
       },
     ],
   },
+  routenote: DISTRIBUTOR_MANIFESTS.routenote,
   [CONNECTOR_PROVIDERS.spotify]: {
     id: CONNECTOR_PROVIDERS.spotify,
+    transport: 'oauth',
     label: 'Spotify',
     description: 'Read playlists and publish playlists you approve.',
     iconKey: 'spotify',
@@ -168,8 +184,12 @@ export const CONNECTOR_REGISTRY = validateConnectorRegistry({
       },
     ],
   },
+  symphonic: DISTRIBUTOR_MANIFESTS.symphonic,
+  tunecore: DISTRIBUTOR_MANIFESTS.tunecore,
+  unitedmasters: DISTRIBUTOR_MANIFESTS.unitedmasters,
   [CONNECTOR_PROVIDERS.youtube]: {
     id: CONNECTOR_PROVIDERS.youtube,
+    transport: 'oauth',
     label: 'YouTube',
     description:
       'Import videos into Work and apply thumbnail changes you approve. Comment reply sending is disabled.',
@@ -224,7 +244,7 @@ export const CONNECTOR_REGISTRY = validateConnectorRegistry({
       },
     ],
   },
-} as const satisfies Record<ConnectorProviderId, ConnectorDefinition>);
+} as const satisfies Record<ConnectorManifestId, ConnectorDefinition>);
 
 /** Providers that share the Google OAuth authorize/callback/disconnect flow. */
 export const GOOGLE_CONNECTOR_PROVIDERS = CONNECTOR_PROVIDER_IDS.filter(
@@ -237,14 +257,32 @@ export const YOUTUBE_CONNECTOR_PROVIDERS = CONNECTOR_PROVIDER_IDS.filter(
 
 export const connectorProviderSchema = z.enum(CONNECTOR_PROVIDER_IDS);
 
-export function getConnectorDefinitions(): ConnectorDefinition[] {
+/** Existing Settings, advertising, and account consumers use OAuth providers only. */
+export function getConnectorDefinitions(): OAuthConnectorDefinition[] {
   return CONNECTOR_PROVIDER_IDS.map(
     providerId => CONNECTOR_REGISTRY[providerId]
   ).sort((left, right) => left.displayOrder - right.displayOrder);
 }
 
+export function getConnectorManifests(): ConnectorDefinition[] {
+  return CONNECTOR_MANIFEST_IDS.map(id => CONNECTOR_REGISTRY[id]);
+}
+
+export function getFileImportDefinitions(): FileImportConnectorDefinition[] {
+  return DISTRIBUTOR_IDS.map(id => CONNECTOR_REGISTRY[id]);
+}
+
 export function getConnectorDefinition(
   providerId: ConnectorProviderId
+): OAuthConnectorDefinition;
+export function getConnectorDefinition(
+  providerId: DistributorId
+): FileImportConnectorDefinition;
+export function getConnectorDefinition(
+  providerId: ConnectorManifestId
+): ConnectorDefinition;
+export function getConnectorDefinition(
+  providerId: ConnectorManifestId
 ): ConnectorDefinition {
   return CONNECTOR_REGISTRY[providerId];
 }
@@ -254,7 +292,7 @@ export function getConnectorDefinition(
  * Used by the combined Google authorize consent screen.
  */
 export function getOAuthScopesForBundle(
-  bundle: ConnectorDefinition['oauthBundle']
+  bundle: ConnectorOAuthBundle
 ): string[] {
   const seen = new Set<string>();
   const scopes: string[] = [];
