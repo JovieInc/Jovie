@@ -502,7 +502,7 @@ function AuthShellIdentity({
       >
         <BrandLogo size='chrome' tone='white' aria-hidden />
       </Link>
-      <h1 className='max-w-full wrap-anywhere text-xl font-semibold leading-tight tracking-tight text-primary-token'>
+      <h1 className='max-w-full wrap-anywhere text-balance text-xl font-semibold leading-tight tracking-tight text-primary-token'>
         {getAuthShellHeading(intent, claimHandle)}
       </h1>
     </div>
