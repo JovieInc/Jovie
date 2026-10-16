@@ -11,12 +11,7 @@ const PERMISSION = '{"message":"Resource not accessible by integration"}';
  */
 function response(status, body) {
   const text = typeof body === 'string' ? body : JSON.stringify(body);
-  return {
-    ok: status >= 200 && status < 300,
-    status,
-    json: async () => (typeof body === 'string' ? JSON.parse(body) : body),
-    text: async () => text,
-  };
+  return new Response(text, { status });
 }
 
 /**
