@@ -110,6 +110,13 @@ else
     --issue "$issue")"
 fi
 
+<<<<<<< Updated upstream
+=======
+model="$(node "$SCRIPT_DIR/../backlog-orchestrator/symphony-routing.mjs" launch \
+  --workspace "$workspace" \
+  --issue "$issue")"
+
+>>>>>>> Stashed changes
 stop_preflight_heartbeat
 trap - EXIT TERM INT
 # The tracker credential is needed only for receipt verification. Never pass it
