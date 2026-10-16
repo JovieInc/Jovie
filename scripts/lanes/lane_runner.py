@@ -692,24 +692,22 @@ def pool_rejections(issues: list[Issue], holds: dict[str, int] | None = None,
 
 
 def admission_order(issue: Issue, now: float) -> tuple:
-    """Dispatch rule shared by every lane and the doctor (JOV-7423 leverage-first):
+    """Order only eligible, unclaimed work; explicit Linear Urgent is first.
 
-    1. tier -1 = operator-designated `dispatch-next` in the agent-ready pool;
-       tier 0 = urgent (effective P1, including aged work) or compounding infrastructure
-       (CI, Symphony throughput); everything else is tier 1;
-    2. aged priority: waiting work gains one level per day until it reaches P1;
-    3. workstream rank (workstreams.RANK);
-    4. age (createdAt, malformed dates last).
+    A designation and anti-starvation aging break ties inside that boundary.
+    Invalid/missing priority never becomes Urgent. Non-urgent compounding work
+    retains its existing tier and aging, and all callers keep their own gates.
     """
     created_at = created_at_epoch(issue.created_at)
-    base_priority = issue.priority or 5
+    priority = issue.priority if type(issue.priority) is int and 1 <= issue.priority <= 4 else 0
+    base_priority = priority or 5
     waited = max(0, now - created_at) if created_at is not None else 0
     effective_priority = max(1, base_priority - int(waited // PRIORITY_AGING_S))
     stream = workstreams.classify(issue.title, issue.labels)
     labels = {label.lower() for label in issue.labels}
     tier = (-1 if {SHARED_LABEL, "dispatch-next"} <= labels
             else 0 if effective_priority == 1 or workstreams.compounding(stream) else 1)
-    return (tier, effective_priority, workstreams.rank(stream),
+    return (0 if priority == 1 else 1, tier, effective_priority, workstreams.rank(stream),
             created_at if created_at is not None else float("inf"))
 
 

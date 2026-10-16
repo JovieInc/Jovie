@@ -243,19 +243,19 @@ infrastructure first:
 `library-content` → `analytics-gtm` → `docs-changelog` → `lyb` → `memory-gbrain` →
 `general` → `human-decision`.
 
-`pick_issue()` orders candidates by `admission_order()`: an operator-designated
-`dispatch-next` issue carrying `agent-ready` is first among eligible new claims.
-Use it for the measured bottleneck (including binding CI or deployment work),
-clear a stale designation before replacing it, and verify the actual worker claim.
-It cannot interrupt active work or bypass repair-first, budget, routing, design,
-retry, duplicate, file-overlap or hotspot admission. Untagged aging is unchanged;
-multiple designations retain the existing priority/workstream/age tie-breakers.
-The Todo state filter consumes the designation when work starts. Otherwise tier 0 is urgent work
-(effective P1, including work aged to P1) or a compounding workstream (CI, Symphony
-throughput); then aged priority; then workstream rank; then age. Urgent-first and
-anti-starvation aging are preserved; a non-urgent CI or throughput fix runs ahead of
-non-urgent product work. The Linear backlog carries the same `ws:*` labels so new
-intake and existing work follow one rule.
+`pick_issue()` and the doctor share `admission_order()`. Current explicit Linear
+Urgent ranks before every lower-priority eligible unclaimed candidate, including
+aged CI work and `dispatch-next` (Tim, 2026-10-16; JOV-8022/JOV-7073). Only integer
+priority 1 is Urgent; missing and malformed priorities cannot acquire that status.
+The picker rereads current priority, so edits take effect on the next claim scan.
+
+Within each explicit urgency band, an operator-designated `dispatch-next` issue
+carrying `agent-ready` is first. Otherwise tier 0 is aged priority 1 or compounding
+CI/Symphony throughput; tier 1 is other work. Aged priority, workstream rank and age
+break ties. Aging still prevents starvation among non-urgent work. Designation
+cannot interrupt active work or bypass repair-first, budget, routing, design,
+retry, duplicate, file-overlap or hotspot admission. Todo filtering consumes the
+designation when work starts; labels on Backlog do not establish admission.
 
 Duplicate identity is deliberately exact: titles equal after case, punctuation and
 conventional `bug:`/`P1:` prefixes are stripped (bracketed tags such as `[web-053]`

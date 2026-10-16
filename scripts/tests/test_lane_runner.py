@@ -175,9 +175,9 @@ class ContextManifestTest(unittest.TestCase):
 
 
 class SelectionTest(unittest.TestCase):
-    def test_dispatch_next_precedes_aged_product_and_compounding_work(self):
+    def test_dispatch_next_breaks_ties_inside_explicit_urgency(self):
         now = datetime(2026, 10, 5, tzinfo=timezone.utc).timestamp()
-        target = issue("JOV-7896", priority=2, created="2026-10-05T00:00:00Z",
+        target = issue("JOV-7896", priority=1, created="2026-10-05T00:00:00Z",
                        labels=["agent-ready", "dispatch-next"])
         target.title = "Repair account to claim conversion"
         old = issue("JOV-4258", priority=1, created="2026-09-01T00:00:00Z")
@@ -189,9 +189,41 @@ class SelectionTest(unittest.TestCase):
         target.labels.remove("dispatch-next")
         self.assertIs(lane.pick_issue([old, ci, target], {}, now=now), ci)
 
+    def test_explicit_urgent_precedes_aged_or_designated_lower_priority(self):
+        now = datetime(2026, 10, 16, tzinfo=timezone.utc).timestamp()
+        urgent = issue("JOV-URGENT", priority=1, created="2026-10-15T23:00:00Z")
+        low = issue("JOV-LOW", priority=4, created="2026-09-01T00:00:00Z",
+                    labels=["agent-ready", "dispatch-next", "ws:ci"])
+        for pool in ([low, urgent], [urgent, low]):
+            self.assertIs(lane.pick_issue(pool, {}, now=now), urgent)
+        # A fresh priority edit is consumed by the same picker without restart state.
+        low.priority = 1
+        self.assertIs(lane.pick_issue([urgent, low], {}, now=now), low)
+
+    def test_priority_edits_survive_replay_and_serialized_restart(self):
+        now = datetime(2026, 10, 16, tzinfo=timezone.utc).timestamp()
+        a = issue("JOV-A", priority=1, created="2026-10-15T23:00:00Z")
+        b = issue("JOV-B", priority=4, created="2026-09-01T00:00:00Z", labels=["ws:ci"])
+        for priority, expected in [(4, "JOV-A"), (1, "JOV-B"), (2, "JOV-A")]:
+            b.priority = priority
+            snapshot = json.dumps([dataclasses.asdict(a), dataclasses.asdict(b)])
+            for replay in range(3):
+                pool = [lane.Issue(**row) for row in json.loads(snapshot)]
+                self.assertEqual(lane.pick_issue(pool, {}, now=now).identifier, expected)
+                self.assertEqual(json.dumps([dataclasses.asdict(row) for row in pool]), snapshot)
+
+    def test_missing_or_invalid_priority_never_acquires_explicit_urgency(self):
+        now = datetime(2026, 10, 16, tzinfo=timezone.utc).timestamp()
+        urgent = issue("JOV-URGENT", priority=1, created="2026-10-15T23:00:00Z")
+        for priority in [None, 0, -1, 5, 99, True, False, "1", 1.0]:
+            with self.subTest(priority=priority):
+                invalid = issue("JOV-INVALID", priority=priority, created="2026-09-01T00:00:00Z",
+                                labels=["agent-ready", "dispatch-next", "ws:ci"])
+                self.assertIs(lane.pick_issue([invalid, urgent], {}, now=now), urgent)
+
     def test_dispatch_next_preserves_admission_and_lane_routing(self):
         now = 10000.0
-        target = issue("JOV-PIN", labels=["agent-ready", "dispatch-next"])
+        target = issue("JOV-PIN", priority=1, labels=["agent-ready", "dispatch-next"])
         other = issue("JOV-OTHER", priority=1)
         for kwargs, failures in [
             ({"in_flight": frozenset({"jov-pin"})}, {}),
@@ -252,10 +284,10 @@ class SelectionTest(unittest.TestCase):
         ], {}, now=now)
         self.assertEqual(picked.identifier, "JOV-1")
 
-    def test_aged_work_eventually_precedes_a_sustained_urgent_stream(self):
+    def test_aging_breaks_ties_within_nonurgent_work(self):
         now = datetime(2026, 9, 5, tzinfo=timezone.utc).timestamp()
         picked = lane.pick_issue([
-            issue("JOV-1", priority=1, created="2026-09-04T23:00:00Z"),
+            issue("JOV-1", priority=2, created="2026-09-04T23:00:00Z"),
             issue("JOV-4", priority=4, created="2026-09-01T00:00:00Z"),
         ], {}, now=now)
         self.assertEqual(picked.identifier, "JOV-4")
@@ -267,7 +299,7 @@ class SelectionTest(unittest.TestCase):
             issue("JOV-0", priority=0, created="2026-09-01T00:00:00Z"),
             issue("JOV-BAD", priority=0, created="not-a-date"),
         ], {}, now=now)
-        self.assertEqual(picked.identifier, "JOV-0")
+        self.assertEqual(picked.identifier, "JOV-1")
 
     def test_skips_excluded_and_exhausted_work_but_drains_the_shared_pool(self):
         picked = lane.pick_issue([
@@ -473,9 +505,9 @@ class WorkstreamAdmissionTest(unittest.TestCase):
         urgent = self.titled("JOV-1", "Sidebar jank on profile", priority=1, created="2026-10-01T23:00:00Z")
         ci = self.titled("JOV-2", "Stabilize flaky CI shard", priority=2, created="2026-10-01T22:00:00Z")
         self.assertEqual(lane.pick_issue([ci, urgent], {}, now=now).identifier, "JOV-1")
-        # Work that has aged to P1 joins the urgent band, where CI rank then leads.
+        # Aging never promotes a lower explicit priority above current Urgent.
         ci.created_at = "2026-09-30T22:00:00Z"
-        self.assertEqual(lane.pick_issue([urgent, ci], {}, now=now).identifier, "JOV-2")
+        self.assertEqual(lane.pick_issue([urgent, ci], {}, now=now).identifier, "JOV-1")
 
     def test_explicit_workstream_label_overrides_and_ranks(self):
         self.assertEqual(lane.workstreams.classify("Sidebar jank", ["ws:ci"]), "ci")
