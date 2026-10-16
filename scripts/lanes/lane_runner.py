@@ -174,9 +174,8 @@ SWEEP_EVERY_S = 1800
 PROVIDER_COOLDOWN_S = 900
 WORKTREE_INSTALL = ["pnpm", "install", "--frozen-lockfile", "--prefer-offline",
                     "--package-import-method=hardlink"]
-# Non-urgent waiting work gains one effective level per day within its band. This preserves
-# urgent-first admission while guaranteeing that a sustained P1 stream cannot
-# starve older work forever.
+# Aging breaks ties among non-urgent work; it cannot override explicit Urgent.
+# Every waiting non-urgent item gains one effective level per day within its band.
 PRIORITY_AGING_S = 24 * 3600
 # Generated files do not count toward the reviewable-size cap.
 GENERATED = re.compile(r"(^|/)(drizzle/migrations/meta/|pnpm-lock\.yaml$|__snapshots__/|\.snap$)")
