@@ -234,7 +234,7 @@ describe('runWithGitHubRetry', () => {
       [
         'import { fstatSync } from "node:fs";',
         'const fifo = (fstatSync(1).mode & 0o170000) === 0o010000;',
-        'if (fifo) {',
+        'if (fifo || process.env.GH_FORCE_TTY) {',
         '  process.stderr.write("refusing to output binary content (application/zip)\\n");',
         '  process.exit(1);',
         '}',
@@ -245,7 +245,12 @@ describe('runWithGitHubRetry', () => {
     chmodSync(bin, 0o755);
     const result = await runWithGitHubRetry(
       [process.execPath, bin, 'api', 'repos/o/r/actions/artifacts/9/zip'],
-      { attempts: 1, maxWaitMs: 0, log: () => {} }
+      {
+        attempts: 1,
+        maxWaitMs: 0,
+        log: () => {},
+        env: { ...process.env, GH_FORCE_TTY: '1' },
+      }
     );
     expect(result.code).toBe(0);
     expect(Buffer.from(result.stdout)).toEqual(

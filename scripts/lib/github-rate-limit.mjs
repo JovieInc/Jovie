@@ -288,11 +288,13 @@ export async function runWithGitHubRetry(
 ) {
   const deadlineMs = now() + maxWaitMs;
   for (let attempt = 1; ; attempt += 1) {
-    const outcome = await run(command, {
-      ...env,
-      NO_COLOR: '1',
-      GH_FORCE_TTY: '0',
-    });
+    // gh 2.102 treats every GH_FORCE_TTY value, including 0, as a terminal
+    // and then refuses application/zip. JSON calls still force tty off so
+    // the body stays plain text. Zip calls must inherit a real file stdout.
+    const childEnv = { ...env, NO_COLOR: '1' };
+    if (commandWantsFileStdout(command)) delete childEnv.GH_FORCE_TTY;
+    else childEnv.GH_FORCE_TTY = '0';
+    const outcome = await run(command, childEnv);
     if (outcome.code === 0) return { ...outcome, kind: NONE, deferred: false };
     // gh prints HTTP error bodies on stdout and the summary on stderr.
     // Zip captures keep a Buffer so a successful body is not decoded as text.
