@@ -284,19 +284,38 @@ export function initializeDb(): DbType {
   _pool = pool;
 
   // Create drizzle instance with WebSocket driver
-  const dbInstance = drizzle(pool, {
-    schema,
-    logger: isProduction
-      ? false
-      : {
-          logQuery: (query: string, params: unknown[]): void => {
-            logDbInfo('query', 'Database query executed', {
-              query: query.slice(0, 200) + (query.length > 200 ? '...' : ''),
-              paramsLength: params.length,
-            });
+  const createDbInstance = (client: Pool | PoolClient) =>
+    drizzle(client, {
+      schema,
+      logger: isProduction
+        ? false
+        : {
+            logQuery: (query: string, params: unknown[]): void => {
+              logDbInfo('query', 'Database query executed', {
+                query: query.slice(0, 200) + (query.length > 200 ? '...' : ''),
+                paramsLength: params.length,
+              });
+            },
           },
-        },
-  });
+    });
+  const dbInstance = createDbInstance(pool);
+  // Drizzle's pooled transaction awaits BEGIN before entering its own
+  // release finally. Own the checkout here so even a failed BEGIN releases
+  // capacity. A client-bound Drizzle session never acquires/releases again.
+  dbInstance.transaction = async (operation, config) => {
+    const client = await pool.connect();
+    let releaseError: Error | undefined;
+    try {
+      return await createDbInstance(client).transaction(operation, config);
+    } catch (error) {
+      // Discard failed transactions, including uncertain rollback/commit
+      // transport failures, rather than returning them to another request.
+      releaseError = error instanceof Error ? error : new Error(String(error));
+      throw error;
+    } finally {
+      client.release(releaseError);
+    }
+  };
 
   // Store in global for development HMR reuse
   if (!isProduction && hasGlobal) {
