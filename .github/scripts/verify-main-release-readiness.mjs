@@ -8,7 +8,56 @@ const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const RESOLVE_MAIN_SCRIPT = fileURLToPath(
   new URL('./resolve-main-sha.sh', import.meta.url)
 );
-const DEFAULT_REST_BUDGET_MS = 90_000;
+// One hour, the lifetime of a GitHub App installation token. A retry after
+// that is a 401. Stay ten minutes under it, matching gh-api-hold.sh.
+export const INSTALLATION_TOKEN_LIFETIME_MS = 60 * 60 * 1000;
+export const INSTALLATION_TOKEN_MARGIN_MS = 10 * 60 * 1000;
+export const MAX_REST_HOLD_MS =
+  INSTALLATION_TOKEN_LIFETIME_MS - INSTALLATION_TOKEN_MARGIN_MS;
+// Main Queue Provenance timeout. Five minutes remain for checkout and the
+// retry after the longest hold.
+export const PROVENANCE_JOB_TIMEOUT_MINUTES = 55;
+export const PROVENANCE_JOB_MARGIN_MS = 5 * 60 * 1000;
+export const DEFAULT_REST_BUDGET_MS = MAX_REST_HOLD_MS;
+const REST_ATTEMPTS = 4;
+
+/**
+ * A rate-limit response whose reset does not fit the hold. This is not proof
+ * and not a successful empty body.
+ */
+export class GitHubRestBudgetExhausted extends Error {
+  /**
+   * @param {string} path
+   * @param {number} status
+   * @param {number | null} [retryAtMs]
+   */
+  constructor(path, status, retryAtMs = null) {
+    super(
+      `GitHub API ${path} returned HTTP ${status}: outside the rate-limit budget`
+    );
+    this.name = 'GitHubRestBudgetExhausted';
+    this.path = path;
+    this.status = status;
+    this.retryAtMs = retryAtMs;
+  }
+}
+
+/**
+ * Wait budget for one provenance pass. The smaller of the requested budget,
+ * the installation-token margin, and the job timeout minus teardown margin.
+ * @param {number} [requestedMs]
+ * @param {{ jobTimeoutMs?: number }} [options]
+ */
+export function restHoldBudgetMs(
+  requestedMs = DEFAULT_REST_BUDGET_MS,
+  { jobTimeoutMs = PROVENANCE_JOB_TIMEOUT_MINUTES * 60 * 1000 } = {}
+) {
+  const requested = Number.isFinite(requestedMs)
+    ? requestedMs
+    : DEFAULT_REST_BUDGET_MS;
+  const jobCap = Math.max(0, jobTimeoutMs - PROVENANCE_JOB_MARGIN_MS);
+  return Math.max(0, Math.min(requested, MAX_REST_HOLD_MS, jobCap));
+}
 
 function headerNumber(headers, name) {
   if (!headers) return null;
@@ -102,11 +151,10 @@ async function githubApi(
     fetchImpl = fetch,
     now = Date.now,
     sleep = ms => new Promise(resolve => setTimeout(resolve, ms)),
-    budgetMs = DEFAULT_REST_BUDGET_MS,
+    deadlineMs,
   }
 ) {
-  const deadlineMs = now() + budgetMs;
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  for (let attempt = 0; attempt < REST_ATTEMPTS; attempt += 1) {
     const response = await fetchImpl(`${apiUrl}${path}`, {
       headers: {
         Accept: 'application/vnd.github+json',
@@ -127,12 +175,22 @@ async function githubApi(
       nowMs: now(),
       deadlineMs,
     });
-    if (decision.action === 'wait' && attempt === 0) {
+    const rateLimited =
+      decision.action === 'wait' ||
+      decision.reason === 'outside the rate-limit budget';
+    if (decision.action === 'wait' && attempt < REST_ATTEMPTS - 1) {
       console.error(
         `::warning::Holding ${Math.ceil((decision.waitMs ?? 0) / 1000)}s for the GitHub rate limit reset before retrying ${path}.`
       );
       await sleep(decision.waitMs ?? 0);
       continue;
+    }
+    if (rateLimited) {
+      throw new GitHubRestBudgetExhausted(
+        path,
+        response.status,
+        decision.retryAtMs ?? null
+      );
     }
     const reason = decision.reason ? `: ${decision.reason}` : '';
     throw new Error(
@@ -213,8 +271,10 @@ export async function findExactQueueProof({
   now = Date.now,
   sleep = ms => new Promise(resolve => setTimeout(resolve, ms)),
   budgetMs = DEFAULT_REST_BUDGET_MS,
+  jobTimeoutMs = PROVENANCE_JOB_TIMEOUT_MINUTES * 60 * 1000,
 }) {
-  const rest = { token, apiUrl, fetchImpl, now, sleep, budgetMs };
+  const deadlineMs = now() + restHoldBudgetMs(budgetMs, { jobTimeoutMs });
+  const rest = { token, apiUrl, fetchImpl, now, sleep, deadlineMs };
   const query = new URLSearchParams({
     event: 'merge_group',
     head_sha: sha,
@@ -235,6 +295,8 @@ export async function findExactQueueProof({
   const jobsByRun = new Map();
 
   for (const run of exactRuns) {
+    // Run 38869365703 failed this jobs list on an installation 403 whose
+    // reset was outside a 90s budget. The shared deadline can wait that out.
     const jobsPayload = await githubApi(
       `/repos/${repository}/actions/runs/${run.id}/jobs?filter=latest&per_page=100`,
       rest
@@ -278,9 +340,22 @@ function writeSummary(lines) {
 
 /**
  * One-shot exact-SHA provenance check. This never polls the current run.
- * Main is resolved over git ls-remote. Superseded SHAs are neutral. Every
- * remaining REST error fails closed; a rate-limit response holds until
- * x-ratelimit-reset only inside the budget and never passes silently.
+ * Main is resolved over git ls-remote. Superseded SHAs are neutral. A
+ * rate-limit response holds until x-ratelimit-reset inside the job and token
+ * cap. Past that cap the result is rate_limit_hold with queueProven false.
+ * That is not proof. Every other REST error fails closed.
+ * @param {{
+ *   repository: string,
+ *   sha: string,
+ *   token: string,
+ *   apiUrl?: string,
+ *   fetchImpl?: typeof fetch,
+ *   resolveMain?: typeof resolveMainSha,
+ *   now?: () => number,
+ *   sleep?: (ms: number) => Promise<unknown>,
+ *   budgetMs?: number,
+ *   jobTimeoutMs?: number,
+ * }} input
  */
 export async function checkMainQueueProvenance({
   repository,
@@ -292,6 +367,7 @@ export async function checkMainQueueProvenance({
   now = Date.now,
   sleep = ms => new Promise(resolve => setTimeout(resolve, ms)),
   budgetMs = DEFAULT_REST_BUDGET_MS,
+  jobTimeoutMs = PROVENANCE_JOB_TIMEOUT_MINUTES * 60 * 1000,
 }) {
   if (!SHA_PATTERN.test(sha)) throw new Error('sha must be a full SHA');
 
@@ -307,24 +383,74 @@ export async function checkMainQueueProvenance({
       queueProven: false,
       proofRunId: null,
       currentMainSha,
+      disposition: 'superseded',
     };
   }
 
-  const proof = await findExactQueueProof({
-    repository,
-    sha,
-    token,
-    apiUrl: normalizedApiUrl,
-    fetchImpl,
-    now,
-    sleep,
-    budgetMs,
-  });
+  try {
+    const proof = await findExactQueueProof({
+      repository,
+      sha,
+      token,
+      apiUrl: normalizedApiUrl,
+      fetchImpl,
+      now,
+      sleep,
+      budgetMs,
+      jobTimeoutMs,
+    });
+    return {
+      isCurrent: true,
+      queueProven: proof.proven,
+      proofRunId: proof.runId,
+      currentMainSha,
+      disposition: proof.proven ? 'proven' : 'unproven',
+    };
+  } catch (error) {
+    if (!(error instanceof GitHubRestBudgetExhausted)) throw error;
+    return {
+      isCurrent: true,
+      queueProven: false,
+      proofRunId: null,
+      currentMainSha,
+      disposition: 'rate_limit_hold',
+      detail: error.message,
+    };
+  }
+}
+
+/**
+ * @param {{
+ *   disposition?: string,
+ *   isCurrent: boolean,
+ *   queueProven: boolean,
+ *   proofRunId: number | null,
+ *   currentMainSha: string,
+ * }} result
+ * @param {string} sha
+ */
+export function describeProvenance(result, sha) {
+  if (result.disposition === 'rate_limit_hold') {
+    return {
+      level: 'warning',
+      line: `::warning::rate-limit-hold: installation REST budget exhausted reading merge-group jobs for ${sha}. queue_proven stays false. This is not proof and not a pass. The fail-closed fallback contract runs.`,
+    };
+  }
+  if (!result.isCurrent) {
+    return {
+      level: 'info',
+      line: `Main run ${sha} was superseded by ${result.currentMainSha}; release is neutral.`,
+    };
+  }
+  if (result.queueProven) {
+    return {
+      level: 'info',
+      line: `Exact merge-group provenance found for ${sha} (run ${result.proofRunId}).`,
+    };
+  }
   return {
-    isCurrent: true,
-    queueProven: proof.proven,
-    proofRunId: proof.runId,
-    currentMainSha,
+    level: 'info',
+    line: `No exact merge-group proof for ${sha}; the current run must execute the fail-closed fallback contract.`,
   };
 }
 
@@ -345,6 +471,7 @@ export async function runMainQueueProvenance() {
     queue_proven: String(result.queueProven),
     proof_run_id: result.proofRunId ?? '',
     current_main_sha: result.currentMainSha,
+    provenance_disposition: result.disposition ?? '',
   });
   writeSummary([
     '### Main queue provenance',
@@ -354,21 +481,12 @@ export async function runMainQueueProvenance() {
     `- Current: \`${result.isCurrent}\``,
     `- Exact successful merge-group PR Ready proof: \`${result.queueProven}\``,
     `- Proof run: \`${result.proofRunId ?? 'none'}\``,
+    `- Disposition: \`${result.disposition ?? ''}\``,
   ]);
 
-  if (!result.isCurrent) {
-    console.log(
-      `Main run ${sha} was superseded by ${result.currentMainSha}; release is neutral.`
-    );
-  } else if (result.queueProven) {
-    console.log(
-      `Exact merge-group provenance found for ${sha} (run ${result.proofRunId}).`
-    );
-  } else {
-    console.log(
-      `No exact merge-group proof for ${sha}; the current run must execute the fail-closed fallback contract.`
-    );
-  }
+  const described = describeProvenance(result, sha);
+  if (described.level === 'warning') console.error(described.line);
+  else console.log(described.line);
   return result;
 }
 
