@@ -221,6 +221,83 @@ describe('AppShellFrameDedupe', () => {
     late.remove();
   });
 
+  it('drops duplicate test ids from a hidden shell when a painted copy still exposes them', () => {
+    const rectSpy = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function mockRect(this: HTMLElement) {
+        return this.closest('[data-hidden-shell]')
+          ? ({
+              ...paintedRect(),
+              width: 0,
+              height: 0,
+              bottom: 0,
+              right: 0,
+            } as DOMRect)
+          : paintedRect();
+      });
+
+    render(
+      <>
+        <AppShellFrameDedupe />
+        <div
+          data-testid='stale-frame'
+          data-app-shell-frame='true'
+          data-hidden-shell='true'
+          style={{ display: 'none' }}
+        >
+          <section data-testid='tasks-workspace'>Hidden tasks</section>
+          <section data-testid='hidden-only'>Unique</section>
+        </div>
+        <div data-testid='live-frame' data-app-shell-frame='true'>
+          <section data-testid='tasks-workspace'>Live tasks</section>
+        </div>
+      </>
+    );
+
+    expect(screen.getAllByTestId('tasks-workspace')).toHaveLength(1);
+    expect(screen.getByTestId('tasks-workspace')).toHaveTextContent(
+      'Live tasks'
+    );
+    expect(screen.getByTestId('hidden-only')).toBeInTheDocument();
+    expect(screen.getByTestId('stale-frame')).not.toHaveAttribute(
+      'data-app-shell-frame'
+    );
+    expect(screen.getByTestId('live-frame')).toHaveAttribute(
+      'data-app-shell-frame',
+      'true'
+    );
+    rectSpy.mockRestore();
+  });
+
+  it('keeps duplicate test ids when every frame is painted', () => {
+    const rectSpy = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockReturnValue(paintedRect());
+
+    render(
+      <>
+        <AppShellFrameDedupe />
+        <div data-testid='frame-a' data-app-shell-frame='true'>
+          <section data-testid='tasks-workspace'>A</section>
+        </div>
+        <div data-testid='frame-b' data-app-shell-frame='true'>
+          <section data-testid='tasks-workspace'>B</section>
+        </div>
+      </>
+    );
+    rectSpy.mockRestore();
+
+    expect(screen.getAllByTestId('tasks-workspace')).toHaveLength(2);
+    expect(screen.getByTestId('frame-a')).toHaveAttribute(
+      'data-app-shell-frame',
+      'true'
+    );
+    expect(screen.getByTestId('frame-b')).toHaveAttribute(
+      'data-app-shell-frame',
+      'true'
+    );
+  });
+
   it('disconnects the shared observer after the last subscriber unmounts', () => {
     const disconnect = vi.spyOn(MutationObserver.prototype, 'disconnect');
     const first = render(<AppShellFrameDedupe />);
