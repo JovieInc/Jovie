@@ -32,9 +32,16 @@ emit() {
 
 configure_git_auth() {
   if [ -n "${GH_TOKEN:-}" ] && [[ "$remote" == https://* ]]; then
+    # Git smart-HTTP accepts the Actions/App token only as the documented
+    # basic credential (x-access-token as username, token as password); a
+    # bearer scheme leaves git prompting for a username and exit 128 on the
+    # non-interactive runner (JOV-8495, staging run 38846794961). The
+    # URL-scoped key matches resolve-main-sha.sh's proven form, and
+    # GIT_TERMINAL_PROMPT=0 keeps any future auth regression fail-fast.
     export GIT_CONFIG_COUNT=1
-    export GIT_CONFIG_KEY_0=http.extraheader
-    export GIT_CONFIG_VALUE_0="AUTHORIZATION: bearer ${GH_TOKEN}"
+    export GIT_CONFIG_KEY_0="http.https://github.com/.extraheader"
+    export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "${GH_TOKEN}" | base64 | tr -d '\n')"
+    export GIT_TERMINAL_PROMPT=0
   fi
 }
 
