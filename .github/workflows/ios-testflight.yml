@@ -874,7 +874,9 @@ jobs:
         with:
           ref: ${{ github.sha }}
           path: .testflight-tools
-          sparse-checkout: .github/scripts/testflight-release-lease.mjs
+          sparse-checkout: |
+            .github/scripts/testflight-release-lease.mjs
+            .github/scripts/gh-api-hold.sh
           sparse-checkout-cone-mode: false
           persist-credentials: false
 
@@ -883,6 +885,7 @@ jobs:
         if: ${{ steps.select.outputs.should_release == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_API_HOLD_BUDGET_SECONDS: '480'
           RELEASE_SHA: ${{ steps.authorize.outputs.release_sha }}
           TESTFLIGHT_TRANSPORT_SHA: ${{ github.sha }}
           BASELINE_SHA: ${{ steps.authorize.outputs.baseline_sha }}

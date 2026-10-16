@@ -1122,6 +1122,9 @@ describe('certified TestFlight checkout isolation', () => {
     step => step.name === 'Checkout exact authorized main'
   );
   const pin = steps.find(step => step.id === 'pin');
+  const admitCheckout = steps.find(
+    step => step.name === 'Checkout pinned release guard'
+  );
 
   it('keeps transport sparse state out of the certified root checkout', () => {
     expect(bootstrap?.with).toMatchObject({
@@ -1134,6 +1137,13 @@ describe('certified TestFlight checkout isolation', () => {
     expect(authorizeStep?.run).toContain(
       '$GITHUB_WORKSPACE/.testflight-bootstrap/.github/scripts/gh-api-hold.sh'
     );
+    expect(String(admitCheckout?.with?.['sparse-checkout'])).toContain(
+      '.github/scripts/testflight-release-lease.mjs'
+    );
+    expect(String(admitCheckout?.with?.['sparse-checkout'])).toContain(
+      '.github/scripts/gh-api-hold.sh'
+    );
+    expect(pin?.env?.GH_API_HOLD_BUDGET_SECONDS).toBe('480');
     expect(source?.with?.ref).toBe(
       '${{ steps.authorize.outputs.release_sha }}'
     );
