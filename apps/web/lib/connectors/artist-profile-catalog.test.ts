@@ -210,4 +210,28 @@ describe('credential-free artist-profile catalog', () => {
       projectArtistProfileDestination('fixture', manifest, now)
     ).toThrow();
   });
+
+  it('does not advertise policies the current write ledger cannot enforce', () => {
+    const manifest = ready();
+    const bio = manifest.profile.fields.bio;
+    if (
+      bio.rollback.mode !== 'snapshot_restore' ||
+      bio.rateLimit.status !== 'documented'
+    )
+      throw new Error('fixture');
+    bio.rollback = { ...bio.rollback, mode: 'compensating_write' };
+    expect(
+      projectArtistProfileDestination('fixture', manifest, now).fields[0].write
+        .available
+    ).toBe(false);
+    bio.rollback = { ...bio.rollback, mode: 'snapshot_restore' };
+    bio.rateLimit = { ...bio.rateLimit, key: 'provider' };
+    expect(
+      projectArtistProfileDestination('fixture', manifest, now).fields[0].write
+        .available
+    ).toBe(false);
+    expect(buildProfileWriteManifest('fixture', manifest).fields).not.toContain(
+      'bio'
+    );
+  });
 });

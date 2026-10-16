@@ -46,13 +46,16 @@ export function projectArtistProfileDestination(
         blockingReason = `${mode} support is ${policy[mode]}.`;
       else if (evidenceFreshness !== 'fresh')
         blockingReason = `Operation evidence is ${evidenceFreshness}.`;
+      else if (mode === 'write' && policy.rollback.mode !== 'snapshot_restore')
+        blockingReason =
+          'The write ledger requires conditional snapshot restore.';
       else if (
         mode === 'write' &&
-        !['snapshot_restore', 'compensating_write'].includes(
-          policy.rollback.mode
-        )
+        policy.rateLimit.status === 'documented' &&
+        policy.rateLimit.key !== 'connection'
       )
-        blockingReason = 'A verified rollback path is required.';
+        blockingReason =
+          'The write ledger requires a per-connection rate limit.';
       return {
         support: policy[mode],
         available: blockingReason === null,
