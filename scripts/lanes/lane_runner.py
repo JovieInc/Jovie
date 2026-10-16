@@ -20,6 +20,7 @@ import argparse
 from contextlib import nullcontext
 import fcntl
 import hashlib
+import importlib
 import math
 import json
 import os
@@ -60,7 +61,6 @@ import linear_sync  # noqa: E402  (local issue mirror, claim ledger, write outbo
 import pr_events  # noqa: E402
 import remediation  # noqa: E402  (classifier, router, escalation ladder)
 import shipping_attribution  # noqa: E402  (receipt-first merged-PR provenance)
-import shipping_origin  # noqa: E402  (data-only remote provenance ingest)
 import workstreams  # noqa: E402  (shared workstream rank + duplicate identity)
 import worktree_sweep  # noqa: E402  (idle / merged-PR checkout retirement, JOV-7704)
 import worktree_pool  # noqa: E402  (pre-installed worktree pool, JOV-7705)
@@ -6777,6 +6777,13 @@ def ensure_full_history(host: Host) -> None:
         sh(["git", "fetch", "-q", "--unshallow", "origin"], cwd=host.repo, timeout=1800)
 
 
+def collect_shipping_origin(state: Path) -> dict:
+    """Import the transport after a staged installer has restored new release extras."""
+    import shipping_origin
+
+    return shipping_origin.collect(state)
+
+
 def dispatch(host: Host) -> int:
     tick = {"at": now_iso(), "release": read_marker(host), "unhealthy": [], "quotaBlocked": {},
             "spawned": [], "error": None, "admissionDenied": None}
@@ -6805,7 +6812,7 @@ def dispatch(host: Host) -> int:
         ensure_full_history(host)
         if not os.environ.get("LANES_SELFTEST"):
             try:
-                tick["shippingOriginIngest"] = shipping_origin.collect(host.state)
+                tick["shippingOriginIngest"] = collect_shipping_origin(host.state)
             except Exception as error:
                 tick["shippingOriginIngest"] = {"errors": [f"{type(error).__name__}:{error}"[:200]]}
         try:
@@ -7396,6 +7403,8 @@ def complete_staged_bundle(host: Host, staging: Path) -> str | None:
     if archive.returncode:
         return "release-bundle-incomplete"
     subprocess.run(["tar", "-x", "-C", str(staging)], input=archive.stdout, check=True)
+    # Tar restores directory mtimes, so importers may retain a missing-extra listing.
+    importlib.invalidate_caches()
     return None
 
 
