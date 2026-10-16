@@ -992,6 +992,30 @@ DESIGN_LOOP_CONTRACT = [
 ]
 
 
+# JOV-INV-044: one capability/IA contract for every provider and platform.
+# It lives in the task packet, not in an assumed callable Claude skill.
+PLANNING_CONTRACT = [
+    "## Capability and IA decisions (shadow qualification)",
+    "Read canon/ENGINEERING.md#capability-sourcing-and-ia-integration before new/expanded",
+    "commodity or UI work. Inspect current implementation/decision, installed versions,",
+    "official vendor integration indexes and platform features before custom mechanisms.",
+    "For UI, inspect the mounted surface/current source and Pen/interaction owner first.",
+    "Integrate > consolidate > replace > extend > add; account for deleted/merged UI and",
+    "before/after complexity. Reuse applicable decisions; routine fixes/helpers/docs need",
+    "no repeated research. Missing access/evidence becomes a bounded research task in",
+    "this run or the existing research/trusted dependency-preparation path, never a rewrite.",
+    "Extend the existing issue plan/workpad and PR JSON evidence with planningDecisions",
+    "(field contract: scripts/invariants/capability-planning.mjs). Bind the receipt to the",
+    "repository, final exact head, requirements/assumptions and trusted policy version/digest.",
+    "Carry decision references, scope, versions, unresolved evidence and IA disposition in",
+    "the same workpad through compaction/handoff; revalidate after head or assumption changes.",
+    "Separate research-ready from implementation-candidate; self-signed exceptions and",
+    "source-text/SDK-import tests are not independent review or runtime proof. Diagnostics",
+    "remain nonblocking; existing security/CI gates and emergency authority still apply.",
+    "",
+]
+
+
 # An issue section that already states when the work is done.
 DONE_SECTION = re.compile(
     r"^#{1,6}\s*(?:definition of done|acceptance(?: criteria)?|success criteria|done when|"
@@ -1070,6 +1094,7 @@ def render_prompt(issue: Issue, branch: str, context_pack: str, provider: str | 
         "until checked against current source and the exact running version and recurrence evidence.",
         "",
         *goal_contract(issue),
+        *PLANNING_CONTRACT,
         "## Contract (the harness verifies every line; unmet items fail the run)",
         f"- Repo {REPO_SLUG}. Work on branch `{branch}` from origin/main. Read CLAUDE.md, the",
         "  rules it routes to for the files you touch, and docs/PR_FLOW.md before editing.",
@@ -4500,6 +4525,7 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
                     "incomplete, make its checks green and push. If it cannot ship, end with NOT-SHIPPABLE.", ""]
     dossier = pr.get("dossier")
     return "\n".join([
+        *PLANNING_CONTRACT,
         *([dossier, ""] if dossier else []),
         f"# Make PR #{pr['number']} green ({pr.get('title', '')})",
         "",

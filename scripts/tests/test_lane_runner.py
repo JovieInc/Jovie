@@ -493,6 +493,32 @@ class PromptTest(unittest.TestCase):
                        "Do not mark it ready or merge it", "NOT-SHIPPABLE"):
             self.assertIn(needle, prompt)
 
+    def test_capability_ia_packet_survives_provider_handoff_and_compaction_recall(self):
+        # Real prompt/manifest functions, fake provider I/O: transport proof only,
+        # never a claim that a live model obeyed the policy.
+        decision = 'planningDecisions: decisionRef=linear:renderer-v1; IA=Files; unresolved=offline index'
+        for provider in ("codex", "claude", "devin", "hyperagent"):
+            with self.subTest(provider=provider), tempfile.TemporaryDirectory() as tmp:
+                task = issue("JOV-6212")
+                task.description = decision
+                prompt = lane.render_prompt(task, "codex/jov-6212", "", provider=provider,
+                                            prior_attempts="compaction handoff: " + decision)
+                inputs = {"issue": task.description, "gbrain": "", "branch": "codex/jov-6212", "prior_attempts": decision}
+                path = Path(tmp) / "issue.prompt.md"
+                first = lane.write_agent_prompt(path, prompt, "issue", provider, inputs)
+                self.assertTrue(first["qualification"]["ok"])
+                handoff = Path(tmp) / "handoff.prompt.md"
+                note = "Retain exact decision scope and unresolved evidence: " + decision
+                second = lane.write_agent_prompt(handoff, note + prompt, "handoff", provider,
+                                                 {"previous_prompt": prompt, "handoff_note": note})
+                self.assertTrue(second["qualification"]["ok"])
+                self.assertIn(decision, handoff.read_text())
+                self.assertIn("Integrate > consolidate > replace > extend > add", handoff.read_text())
+                self.assertIn("official vendor integration indexes", path.read_text())
+                self.assertIn("remain nonblocking", path.read_text())
+                self.assertIn("planningDecisions", lane.render_fix_prompt(
+                    {"number": 1, "headRefName": "codex/jov-6212", "mergeStateStatus": "BLOCKED"}, "offline"))
+
     def test_native_issue_link_is_nonclosing_before_the_agent_opens_a_pr(self):
         for labels in ([], ["commissioning"], ["parent"]):
             with self.subTest(labels=labels):
