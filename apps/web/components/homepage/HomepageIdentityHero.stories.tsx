@@ -9,7 +9,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Canonical Pen homepage hero: the blue technical texture (hero only, 20s CSS drift, still under reduced motion, header scrim), one headline, one support line, Request access while gated or name search when open, and the illustrative Avery Chen Jovie profile specimen.',
+          'Existing split-claim hero with its technical texture, generic jov.ie/you artist-profile identity and the real handle-claim form. The identity does not depict a claimed customer or advertise a paid benefit. Existing motion and reduced-motion behavior are preserved.',
       },
     },
   },
