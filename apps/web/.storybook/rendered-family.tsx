@@ -7,16 +7,22 @@ const variant = (
   interactive: boolean,
   radius = '--radius-none',
   keyboardTargetSelector?: string
-) => ({
-  'data-jovie-eval-variant': 'current-story',
-  'data-jovie-eval-target': 'true',
-  'data-jovie-eval-tone': 'neutral',
-  'data-jovie-eval-padding-x': '--space-0',
-  'data-jovie-eval-padding-y': '--space-0',
-  'data-jovie-eval-radius': radius,
-  'data-jovie-eval-interactive': String(interactive),
-  'data-jovie-eval-keyboard-target-selector': keyboardTargetSelector,
-});
+) => {
+  const attributes: Record<string, string> = {
+    'data-jovie-eval-variant': 'current-story',
+    'data-jovie-eval-target': 'true',
+    'data-jovie-eval-tone': 'neutral',
+    'data-jovie-eval-padding-x': '--space-0',
+    'data-jovie-eval-padding-y': '--space-0',
+    'data-jovie-eval-radius': radius,
+    'data-jovie-eval-interactive': String(interactive),
+  };
+  if (keyboardTargetSelector !== undefined) {
+    attributes['data-jovie-eval-keyboard-target-selector'] =
+      keyboardTargetSelector;
+  }
+  return attributes;
+};
 
 const family = (
   name: string,
