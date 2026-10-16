@@ -6376,7 +6376,10 @@ jobs:
     needs: [ci-path-changes, ci-risk-classifier, ci-build-public, neon-db]
     if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' && needs.neon-db.result == 'success' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 40
+    outputs:
+      journey_outcome: ${{ steps.canonical_journey.outcome }}
+      certification_outcome: ${{ steps.canonical_certification.outcome }}
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     # Scope pending replacement to one PR. GitHub replaces the older pending job in
     # a constant concurrency group even when cancel-in-progress is false, which can
@@ -6458,6 +6461,10 @@ jobs:
           GIT_BRANCH: pr-${{ github.event.pull_request.number }}
           ALLOW_PROD_MIGRATIONS: 'true'
 
+      - name: Seed required premade profile claim fixture
+        run: pnpm --filter=@jovie/web run seed:test-data
+        env: { DATABASE_URL: "${{ env.DATABASE_URL }}", NODE_ENV: test }
+
       - name: Setup Playwright (Chromium)
         uses: ./.github/actions/setup-playwright
 
@@ -6480,6 +6487,8 @@ jobs:
           cp -r apps/web/public apps/web/.next/standalone/apps/web/public
 
       - name: Run Golden Path (Chromium, Better Auth)
+        id: canonical_journey
+        continue-on-error: true
         run: |
           cd apps/web
 
@@ -6595,6 +6604,48 @@ jobs:
           STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY: ${{ secrets.STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY }}
           STRIPE_TEST_ACCOUNT_ID: acct_1T1DV0ASl9B9udHv
 
+      - name: Probe live $199 revenue path
+        id: canonical_revenue
+        continue-on-error: true
+        env:
+          M2_CANARY_RECEIPT_PATH: ${{ runner.temp }}/canonical-artist-site/m2-receipt.json
+        run: pnpm --filter=@jovie/web exec tsx scripts/m2-revenue-path-canary.ts --base-url https://jov.ie --receipt "$M2_CANARY_RECEIPT_PATH"
+
+      - name: Verify premade claim ownership contracts
+        id: canonical_claim_contract
+        continue-on-error: true
+        run: pnpm --filter=@jovie/web exec vitest run --config=vitest.config.mts lib/claim/finalize.test.ts 'tests/unit/app/[username]/claim/route.test.ts' tests/unit/app/claim-token-route.test.ts tests/unit/api/onboarding/claim.test.ts tests/unit/auth/waitlist-gating.test.ts --pool=forks --maxWorkers=1
+
+      - name: Probe live canonical Tim White profile
+        id: canonical_profile
+        continue-on-error: true
+        env:
+          PROFILE_CERT_DIR: ${{ runner.temp }}/canonical-artist-site/profile
+          PROFILE_RESULT: ${{ runner.temp }}/canonical-artist-site/profile-result.json
+        run: mkdir -p "$(dirname "$PROFILE_RESULT")" && pnpm --filter=@jovie/web exec tsx scripts/certify-artist-profile.ts --output "$PROFILE_CERT_DIR" > "$PROFILE_RESULT" && cat "$PROFILE_RESULT"
+
+      - name: Certify canonical outbound artist journey
+        id: canonical_certification
+        if: ${{ always() && !cancelled() }}
+        env:
+          CERT_DIR: ${{ runner.temp }}/canonical-artist-site
+          CLAIM_CONTRACT_STATUS: ${{ steps.canonical_claim_contract.outcome || 'skipped' }}
+          JOURNEY_STATUS: ${{ steps.canonical_journey.outcome || 'skipped' }}
+          M2_STATUS: ${{ steps.canonical_revenue.outcome || 'skipped' }}
+          PROFILE_STATUS: ${{ steps.canonical_profile.outcome || 'skipped' }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          pnpm --filter=@jovie/web exec tsx scripts/certify-canonical-artist-site.ts --candidate-id "acquisition:premade-artist-profile:tim-white:${{ github.run_id }}-${{ github.run_attempt }}" --run-id "${{ github.run_id }}-${{ github.run_attempt }}" --source-revision "${{ github.sha }}" --run-url "$RUN_URL" --golden-path-status "$JOURNEY_STATUS" --claim-contract-status "$CLAIM_CONTRACT_STATUS" --m2-status "$M2_STATUS" --m2-receipt "$CERT_DIR/m2-receipt.json" --profile-status "$PROFILE_STATUS" --profile-result "$CERT_DIR/profile-result.json" --output "$CERT_DIR/certificate.json"
+
+      - name: Upload canonical artist-site certification
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: canonical-artist-site-certification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/canonical-artist-site
+          if-no-files-found: warn
+          retention-days: 30
+
       - name: Upload Playwright Artifacts on Failure
         if: ${{ failure() && hashFiles('apps/web/test-results/**') != '' }}
         uses: ./.github/actions/upload-safe-playwright-artifact
@@ -6639,11 +6690,30 @@ jobs:
         with:
           fetch-depth: 1
           persist-credentials: false
-      - name: File or resolve the Golden Path Linear issue
+      - name: Download canonical artist-site certification
+        id: canonical_certificate
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: canonical-artist-site-certification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/canonical-artist-site-certification
+      - name: File canonical artist-site defects
+        if: ${{ always() && !cancelled() }}
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
-          GOLDEN_PATH_RESULT: ${{ needs.ci-golden-path.result }}
+          CERT_DIR: ${{ runner.temp }}/canonical-artist-site-certification
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          CERT_PATH="$(find "$CERT_DIR" -name certificate.json -print -quit 2>/dev/null || true)"
+          CERT_PATH="$CERT_PATH" node scripts/canonical-artist-site-intake.mjs
+      - name: File or resolve the Golden Path Linear issue
+        if: ${{ always() && !cancelled() }}
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
+          GOLDEN_PATH_RESULT: ${{ needs.ci-golden-path.outputs.certification_outcome == 'failure' && needs.ci-golden-path.outputs.journey_outcome == 'success' && 'success' || needs.ci-golden-path.result }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           MAIN_SHA: ${{ github.sha }}
         run: node scripts/golden-path-nightly-intake.mjs
