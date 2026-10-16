@@ -158,6 +158,7 @@ type World = {
     marker: Record<string, unknown> | string;
   }[];
   testflightRuns?: Record<number, Record<string, unknown>>;
+  testflightAttempts?: Record<string, Record<string, unknown>>;
   testflightJobs?: Record<string, unknown[]>;
   legacyRuns?: Record<string, unknown>[];
   binaries?: {
@@ -265,6 +266,8 @@ function routes(world: World) {
     table.set(`actions/runs/${id}`, run);
     table.set(`actions/runs/${id}/attempts/${run.run_attempt}`, run);
   }
+  for (const [key, run] of Object.entries(world.testflightAttempts ?? {}))
+    table.set(`actions/runs/${key}`, run);
   for (const [key, jobs] of Object.entries(world.testflightJobs ?? {}))
     table.set(`actions/runs/${key}/jobs?per_page=100`, { jobs });
   return (path: string) => {
@@ -657,7 +660,8 @@ describe.skipIf(!gh)(
 
     async function record(
       binary: ReturnType<typeof binaryAttestation>,
-      betaSha = NEWER
+      betaSha = NEWER,
+      { publisherAttempt = 1, source = RELEASE } = {}
     ) {
       const root = tempRoot('jovie-testflight-record-');
       const step = workflow.jobs['record-upload'].steps?.find(step => step.run);
@@ -665,25 +669,100 @@ describe.skipIf(!gh)(
         script: String(step?.run),
         env: {
           REPOSITORY: REPO,
-          RELEASE_SHA: RELEASE,
+          RELEASE_SHA: source,
           TRANSPORT_SHA: NEWER,
           RUN_ID: '90',
-          RUN_ATTEMPT: '1',
-          LEASE: JSON.stringify(binaryAttestation(RELEASE, NEWER, 90).lease),
+          RUN_ATTEMPT: String(publisherAttempt),
+          LEASE: JSON.stringify(binaryAttestation(source, NEWER, 90).lease),
           RUNNER_TEMP: root,
         },
         route: routes({
-          testflightRuns: { 90: testflightRun(90, NEWER) },
+          testflightRuns: { 90: testflightRun(90, NEWER, publisherAttempt) },
           testflightJobs: {
             '90/attempts/1': [
               job('Upload Internal TestFlight', betaSha, 'success', 9),
             ],
+            ...(publisherAttempt > 1
+              ? { [`90/attempts/${publisherAttempt}`]: [] }
+              : {}),
           },
           binaries: [{ id: 500, runId: 90, attempt: 1, payload: binary }],
         }),
       });
       return { ...result, path: join(root, 'testflight-upload-verified.json') };
     }
+    it('consumes a publisher-only rerun receipt from its failed earlier upload attempt', async () => {
+      const published = await record(
+        binaryAttestation(OLDER, NEWER, 90),
+        NEWER,
+        {
+          publisherAttempt: 2,
+          source: OLDER,
+        }
+      );
+      expect(published.code, published.stderr).toBe(0);
+      const marker = JSON.parse(readFileSync(published.path, 'utf8'));
+      expect(marker.uploadRunAttempt).toBe('1');
+      const recovered = await authorize({
+        mainSha: NEWER,
+        testflightMarkers: [{ id: 7, runId: 90, marker }],
+        testflightRuns: { 90: testflightRun(90, NEWER, 2) },
+        testflightAttempts: {
+          '90/attempts/1': {
+            ...testflightRun(90, NEWER),
+            conclusion: 'failure',
+          },
+        },
+        testflightJobs: { '90/attempts/1': [attestedJob(NEWER)] },
+      });
+      expect(recovered.code, recovered.stderr).toBe(0);
+      expect(recovered.outputs.baseline_sha).toBe(OLDER);
+    });
+
+    it.each([
+      ['same-attempt contradiction', 'failure', 1, true, 'success'],
+      ['cancelled prior attempt', 'cancelled', 2, true, 'success'],
+      ['timed-out prior attempt', 'timed_out', 2, true, 'success'],
+      ['unknown prior conclusion', null, 2, true, 'success'],
+      ['invalid latest attempt', 'failure', 0, true, 'success'],
+      ['legacy failed attempt', 'failure', 2, false, 'success'],
+      ['failed beta', 'failure', 2, true, 'failure'],
+    ] as const)(
+      'rejects publisher recovery with %s',
+      async (_name, conclusion, latestAttempt, attested, betaConclusion) => {
+        const binary = binaryAttestation(OLDER, NEWER, 90);
+        const marker = {
+          ...validMarker(OLDER, 90),
+          ...(attested
+            ? {
+                schema: 'jovie-testflight-upload/v2',
+                transportSha: NEWER,
+                lease: binary.lease,
+                binarySha256: binary.binarySha256,
+                buildNumber: binary.buildNumber,
+              }
+            : {}),
+        };
+        const transport = attested ? NEWER : OLDER;
+        const result = await authorize({
+          mainSha: NEWER,
+          testflightMarkers: [{ id: 7, runId: 90, marker }],
+          testflightRuns: { 90: testflightRun(90, transport, latestAttempt) },
+          testflightAttempts: {
+            '90/attempts/1': { ...testflightRun(90, transport), conclusion },
+          },
+          testflightJobs: {
+            '90/attempts/1': [
+              job('Upload Internal TestFlight', transport, betaConclusion, 9),
+            ],
+          },
+        });
+        expect(result.code).toBe(1);
+        expect(result.stdout).toContain(
+          'none fully proves a successful upload'
+        );
+      }
+    );
     it('records independent source and transport with the exact binary digest', async () => {
       const result = await record(binaryAttestation(RELEASE, NEWER, 90));
       expect(result.code, result.stderr).toBe(0);

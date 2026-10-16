@@ -83,6 +83,12 @@ controller transport, exact CI/verification attempts, evidence IDs, policy
 digest and fixed expiry. Actions job `head_sha` authenticates transport and
 must never be substituted for the source stamped into the binary.
 
+A publisher-only rerun may preserve the successful beta and its binary
+attestation from a strictly earlier failed attempt. Reading that v2 receipt
+still requires the latest workflow to have succeeded and the exact earlier
+beta job to have succeeded. Legacy receipts retain the successful-attempt
+requirement; cancelled, timed-out, unknown and contradictory attempts fail closed.
+
 ## Provenance inside the app
 
 `AppBuildInfo` (`apps/ios/Jovie/Features/Settings/SettingsView.swift`) reports:

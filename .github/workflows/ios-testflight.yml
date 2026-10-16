@@ -456,6 +456,7 @@ jobs:
 
             marker_sha="$(jq -r '.sha' "$marker_json")"
             marker_transport_sha="$(jq -r '.transportSha // .sha' "$marker_json")"
+            marker_attested=false
             if jq -e 'has("schema")' >/dev/null "$marker_json"; then
               jq -e '
                 .schema == "jovie-testflight-upload/v2" and
@@ -469,6 +470,7 @@ jobs:
                 echo "::error::TestFlight receipt contradicts its source/transport attestation."
                 exit 1
               }
+              marker_attested=true
             fi
             marker_run_id="$(jq -r '.workflowRun' "$marker_json")"
             upload_attempt="$(jq -r '.uploadRunAttempt' "$marker_json")"
@@ -490,6 +492,7 @@ jobs:
               --arg workflow_id "$testflight_workflow_id" '
                 type == "object" and
                 (.id | tostring) == $run and
+                (.run_attempt | type == "number" and . >= 1 and floor == .) and
                 (.workflow_id | tostring) == $workflow_id and
                 .path == ".github/workflows/ios-testflight.yml" and
                 .display_title == ("iOS TestFlight " + $sha) and
@@ -503,7 +506,12 @@ jobs:
               echo "::warning::Ignoring TestFlight marker $artifact_id without exact workflow identity."
               continue
             fi
+            marker_run_attempt="$(jq -r '.run_attempt' <<<"$marker_run")"
 
+            # A successful publisher-only rerun cannot change the first
+            # attempt's failure. Only an attested v2 receipt may recover that
+            # strictly earlier failed attempt; exact beta success is still
+            # required below. Cancelled or unknown attempts remain rejected.
             upload_run="$(gh api \
               "repos/$REPOSITORY/actions/runs/$run_id/attempts/$upload_attempt")"
             jq -e 'type == "object"' >/dev/null <<<"$upload_run" || {
@@ -515,7 +523,9 @@ jobs:
               --arg run "$run_id" \
               --arg attempt "$upload_attempt" \
               --arg sha "$marker_transport_sha" \
-              --arg workflow_id "$testflight_workflow_id" '
+              --arg workflow_id "$testflight_workflow_id" \
+              --argjson marker_attempt "$marker_run_attempt" \
+              --argjson attested "$marker_attested" '
                 type == "object" and
                 (.id | tostring) == $run and
                 (.run_attempt | tostring) == $attempt and
@@ -527,7 +537,11 @@ jobs:
                 .head_sha == $sha and
                 .head_repository.full_name == $repo and
                 .status == "completed" and
-                .conclusion == "success"
+                .run_attempt <= $marker_attempt and
+                (
+                  .conclusion == "success" or
+                  ($attested and .conclusion == "failure" and .run_attempt < $marker_attempt)
+                )
               ' >/dev/null <<<"$upload_run"; then
               echo "::warning::Ignoring TestFlight marker $artifact_id with mismatched upload attempt."
               continue
