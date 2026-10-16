@@ -330,10 +330,6 @@ const PNPM_INSTALL_LIFECYCLE = new Set([
 const MAC_COMMAND_SURFACE =
   /apps\/(?:desktop|macos)(?:\/|["'\s]|$)|@jovie\/desktop\b|\belectron-builder\b|\belectron\b|MenuMonitor|\bswift\b|\bxcodebuild\b/;
 
-function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 function lifecycleReaches(scripts, scriptName) {
   if (!isJsonObject(scripts)) return true;
   for (const hook of PNPM_INSTALL_LIFECYCLE) {
@@ -342,12 +338,28 @@ function lifecycleReaches(scripts, scriptName) {
   return false;
 }
 
-function desktopInvokesRootScript(source, scriptName) {
-  if (typeof source !== 'string') return true;
-  const name = escapeRegExp(scriptName);
-  return new RegExp(
-    String.raw`(?:^|[\s\n;&|"'])pnpm\s+(?:-w|--workspace-root)\s+(?:(?:run|run-script)\s+)?${name}(?=$|[\s\n;&|"'])`
-  ).test(source);
+function desktopRootScriptNames(source) {
+  const names = [];
+  const patterns = [
+    /(?:^|[\s\n;&|"'])(?:pnpm|npm|yarn)\s+(?:-w|--workspace-root)\s+(?:(?:run|run-script)\s+)?([A-Za-z0-9:_./-]+)/g,
+    /(?:^|[\s\n;&|"'])(?:pnpm|npm|yarn)\s+(?:run|run-script)\s+(?:-w|--workspace-root)\s+([A-Za-z0-9:_./-]+)/g,
+  ];
+  for (const pattern of patterns) {
+    for (const match of source.matchAll(pattern)) names.push(match[1]);
+  }
+  const flags =
+    source.match(/--workspace-root|(?:^|[\s\n;&|"'])-w(?=$|[\s\n;&|"'])/g) ??
+    [];
+  if (flags.length !== names.length) return null;
+  return names;
+}
+
+function desktopInvokesRootScript(source, scriptName, scripts) {
+  if (typeof source !== 'string' || !isJsonObject(scripts)) return true;
+  if (/(?:^|[\s\n;&|"'])cd\s+\.\./.test(source)) return true;
+  const names = desktopRootScriptNames(source);
+  if (names === null) return true;
+  return names.some(name => scriptDependsOn(name, scriptName, scripts));
 }
 
 function scriptCommandMacIrrelevant(script, scripts, visited) {
@@ -429,7 +441,13 @@ function segmentMacIrrelevant(segment, scripts, visited) {
 
 function commandChainMacIrrelevant(command, scripts, visited) {
   if (typeof command !== 'string' || command.length === 0) return false;
-  if (MAC_COMMAND_SURFACE.test(command) || /[;|]/.test(command)) return false;
+  if (MAC_COMMAND_SURFACE.test(command)) return false;
+  const withoutConjunction = command.replaceAll('&&', '');
+  if (/[&;|`<>\r\n]/.test(withoutConjunction)) return false;
+  if (withoutConjunction.includes('$(') || withoutConjunction.includes('${')) {
+    return false;
+  }
+  if (/[*?[\]]/.test(withoutConjunction)) return false;
   const segments = command
     .split('&&')
     .map(segment => segment.trim())
@@ -458,8 +476,8 @@ function changedRootScriptsSpareMacLane(
     if (
       lifecycleReaches(beforeScripts, script) ||
       lifecycleReaches(afterScripts, script) ||
-      desktopInvokesRootScript(desktopBefore, script) ||
-      desktopInvokesRootScript(desktopAfter, script)
+      desktopInvokesRootScript(desktopBefore, script, beforeScripts) ||
+      desktopInvokesRootScript(desktopAfter, script, afterScripts)
     ) {
       return false;
     }
@@ -878,14 +896,44 @@ function readPackageJsonAtRef(ref, cwd) {
   return readFileAtRef(ref, 'package.json', cwd);
 }
 
+function gitSucceeds(args, cwd) {
+  try {
+    execFileSync('git', args, {
+      cwd,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function readOptionalFileAtRef(ref, path, cwd) {
+  if (
+    !gitSucceeds(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`], cwd)
+  ) {
+    return { ok: false, message: `could not resolve ${ref}` };
+  }
+  let type;
+  try {
+    type = execFileSync('git', ['cat-file', '-t', `${ref}:${path}`], {
+      cwd,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }).trim();
+  } catch {
+    return { ok: true, text: '' };
+  }
+  if (type !== 'blob') {
+    return {
+      ok: false,
+      message: `${ref}:${path} is a ${type}, not a blob`,
+    };
+  }
   try {
     return { ok: true, text: readFileAtRef(ref, path, cwd) };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (/does not exist|exists on disk, but not in|not in ['"]/.test(message)) {
-      return { ok: true, text: '' };
-    }
     return { ok: false, message };
   }
 }

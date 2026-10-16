@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -292,17 +293,64 @@ describe('product lane classifier', () => {
         }),
       }).selectedLanes
     ).toEqual(JS);
+    // A desktop wrapper that reaches the changed root script keeps Mac.
+    expect(
+      pkg(
+        {
+          scripts: {
+            'run-outcome:check': 'node scripts/evals/outcome.test.mjs',
+            'test:ci': 'pnpm run run-outcome:check',
+          },
+        },
+        {
+          scripts: {
+            'run-outcome:check':
+              'node scripts/evals/outcome.test.mjs && node scripts/evals/outcome-extra.test.mjs',
+            'test:ci': 'pnpm run run-outcome:check',
+          },
+        },
+        {
+          before: JSON.stringify({
+            scripts: { test: 'pnpm -w run test:ci' },
+          }),
+          after: JSON.stringify({
+            scripts: { test: 'pnpm -w run test:ci' },
+          }),
+        }
+      ).selectedLanes
+    ).toEqual(JS);
+    expect(
+      pkg(before, after, {
+        ...desktop,
+        after: JSON.stringify({
+          scripts: { test: 'npm run -w run-outcome:check' },
+        }),
+      }).selectedLanes
+    ).toEqual(JS);
+    expect(
+      pkg(before, after, {
+        ...desktop,
+        after: JSON.stringify({
+          scripts: { test: 'cd .. && pnpm run run-outcome:check' },
+        }),
+      }).selectedLanes
+    ).toEqual(JS);
     // Ambiguous or Mac-surface commands keep Mac.
     for (const command of [
       'bash scripts/rebuild.sh',
       'node --eval "console.log(1)"',
       'node scripts/invariants/check.mjs || node scripts/invariants/other.mjs',
+      'node scripts/a.test.mjs & node scripts/b.test.mjs',
+      'node scripts/a.test.mjs && node $(echo scripts/b.test.mjs)',
+      'node scripts/*.test.mjs',
       'pnpm --filter @jovie/desktop run test',
       'electron .',
     ]) {
       expect(
         pkg(
-          { scripts: { 'ci:control:test': 'node scripts/ci/control.test.mjs' } },
+          {
+            scripts: { 'ci:control:test': 'node scripts/ci/control.test.mjs' },
+          },
           { scripts: { 'ci:control:test': command } },
           desktop
         ).selectedLanes,
@@ -596,6 +644,97 @@ describe('product lane classifier', () => {
       );
       expect(JSON.parse(readFileSync(receipt, 'utf8')).selectedLanes).toEqual(
         ALL
+      );
+    } finally {
+      vi.restoreAllMocks();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('treats a missing desktop manifest as absent and a non-blob as unreadable', () => {
+    const root = mkdtempSync(join(tmpdir(), 'jovie-product-lane-desktop-'));
+    const files = join(root, 'files.txt');
+    const receipt = join(root, 'receipt.json');
+    const git = args =>
+      execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
+    const writeRoot = command =>
+      writeFileSync(
+        join(root, 'package.json'),
+        `${JSON.stringify({ scripts: { 'run-outcome:check': command } })}\n`
+      );
+    try {
+      git(['init', '-q']);
+      git(['config', 'user.name', 'Product Lane Test']);
+      git(['config', 'user.email', 'product-lane@example.invalid']);
+      git(['config', 'commit.gpgsign', 'false']);
+      writeRoot('node scripts/evals/outcome.test.mjs');
+      git(['add', 'package.json']);
+      git(['commit', '-q', '-m', 'before']);
+      const absentBase = git(['rev-parse', 'HEAD']);
+      writeRoot(
+        'node scripts/evals/outcome.test.mjs && node scripts/evals/extra.test.mjs'
+      );
+      git(['add', 'package.json']);
+      git(['commit', '-q', '-m', 'after-absent']);
+      const absentHead = git(['rev-parse', 'HEAD']);
+      writeFileSync(files, 'package.json\n');
+      const run = (baseRef, headRef) =>
+        runProductLaneClassifier(
+          [
+            '--files-from',
+            files,
+            '--base-ref',
+            baseRef,
+            '--head-ref',
+            headRef,
+            '--json-out',
+            receipt,
+          ],
+          { cwd: root }
+        );
+      run(absentBase, absentHead);
+      expect(JSON.parse(readFileSync(receipt, 'utf8')).selectedLanes).toEqual([
+        'web',
+        'cross-product',
+      ]);
+
+      mkdirSync(join(root, 'apps/desktop'), { recursive: true });
+      writeFileSync(
+        join(root, 'apps/desktop/package.json'),
+        `${JSON.stringify({ scripts: { test: 'node --test scripts/desktop.test.mjs' } })}\n`
+      );
+      writeRoot('node scripts/evals/outcome.test.mjs');
+      git(['add', 'package.json', 'apps/desktop/package.json']);
+      git(['commit', '-q', '-m', 'desktop-file']);
+      const fileBase = git(['rev-parse', 'HEAD']);
+      writeRoot(
+        'node scripts/evals/outcome.test.mjs && node scripts/evals/extra.test.mjs'
+      );
+      git(['add', 'package.json']);
+      git(['commit', '-q', '-m', 'desktop-file-after']);
+      const fileHead = git(['rev-parse', 'HEAD']);
+      run(fileBase, fileHead);
+      expect(JSON.parse(readFileSync(receipt, 'utf8')).selectedLanes).toEqual([
+        'web',
+        'cross-product',
+      ]);
+
+      git(['rm', '-q', 'apps/desktop/package.json']);
+      mkdirSync(join(root, 'apps/desktop/package.json'), { recursive: true });
+      writeFileSync(
+        join(root, 'apps/desktop/package.json/placeholder'),
+        'not-a-manifest\n'
+      );
+      git(['add', 'apps/desktop/package.json']);
+      git(['commit', '-q', '-m', 'desktop-tree']);
+      const treeHead = git(['rev-parse', 'HEAD']);
+      const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      run(fileBase, treeHead);
+      expect(warning).toHaveBeenCalledWith(
+        expect.stringContaining('keeping the Mac lane')
+      );
+      expect(JSON.parse(readFileSync(receipt, 'utf8')).selectedLanes).toEqual(
+        JS
       );
     } finally {
       vi.restoreAllMocks();
