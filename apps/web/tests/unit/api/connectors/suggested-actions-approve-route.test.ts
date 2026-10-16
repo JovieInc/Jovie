@@ -272,14 +272,19 @@ describe('POST /api/connectors/suggested-actions/[id]/approve (real handler)', (
     expect(mockRecordInboxDecision).not.toHaveBeenCalled();
   });
 
-  it('returns 400 for a non-uuid action id before querying', async () => {
+  it('returns not-found when Postgres rejects a non-uuid action id', async () => {
     mockRequireAuth.mockResolvedValue({ userId: USER_ID, error: null });
+    const invalidUuid = Object.assign(
+      new Error('invalid input syntax for type uuid: "fake-id-000"'),
+      { code: '22P02' }
+    );
+    mockDbSelectLimit.mockRejectedValueOnce(invalidUuid);
 
     const response = await POST(makeRequest(), makeParams('fake-id-000'));
 
-    expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({ error: 'invalid-id' });
-    expect(mockDbSelect).not.toHaveBeenCalled();
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({ error: 'not-found' });
+    expect(mockCaptureError).not.toHaveBeenCalled();
     expect(mockDbUpdate).not.toHaveBeenCalled();
   });
 
