@@ -330,7 +330,7 @@ describe('OnboardingChat empty intro', () => {
     await waitFor(() => {
       expect(
         screen.getByTestId('onboarding-message-recovery')
-      ).toHaveTextContent('Complete the security check to send your message.');
+      ).toHaveTextContent('One quick check');
     });
   });
 });
