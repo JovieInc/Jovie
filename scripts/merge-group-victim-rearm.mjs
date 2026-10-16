@@ -327,6 +327,9 @@ export async function applyVictimRearms(decisions, io) {
     ) {
       continue;
     }
+    // The cap counts successful enqueues only. A denied or failed mutation
+    // leaves no receipt, so a later run can try this head again.
+    await io.enable(decision.prNumber, current);
     if (decision.increment) {
       await io.writeStatus({
         sha: decision.headSha,
@@ -334,7 +337,6 @@ export async function applyVictimRearms(decisions, io) {
         targetUrl: io.targetUrl,
       });
     }
-    await io.enable(decision.prNumber, current);
     applied.push(decision);
   }
   return applied;

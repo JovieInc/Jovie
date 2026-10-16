@@ -249,9 +249,10 @@ test('untrusted or foreign-sha receipts do not count toward the cap', () => {
   );
 });
 
-test('apply writes the receipt before enabling and skips a moved head', async () => {
+test('apply writes the receipt after a successful enqueue and skips a moved head', async () => {
   const writes = [];
   const enables = [];
+  const order = [];
   const applied = await applyVictimRearms(
     [
       {
@@ -292,16 +293,76 @@ test('apply writes the receipt before enabling and skips a moved head', async ()
       },
       async writeStatus(receipt) {
         writes.push(receipt);
+        order.push('write');
       },
       async enable(prNumber) {
         enables.push(prNumber);
+        order.push(`enable:${prNumber}`);
       },
     }
   );
   assert.deepEqual(enables, [10]);
+  assert.deepEqual(order, ['enable:10', 'write']);
   assert.equal(writes.length, 1);
   assert.equal(writes[0].description, `n=1;sha=${sha};run=7`);
   assert.equal(applied.length, 1);
+});
+
+test('a failed enqueue writes no receipt and leaves the cap unused', async () => {
+  const writes = [];
+  await assert.rejects(
+    applyVictimRearms(
+      [
+        {
+          action: 'rearm',
+          prNumber: 10,
+          headSha: sha,
+          classification: 'another-pr',
+          n: 1,
+          increment: true,
+          runId: 501,
+        },
+      ],
+      {
+        targetUrl: 'https://github.com/JovieInc/Jovie/actions/runs/501',
+        async readPullRequest() {
+          return {
+            headSha: sha,
+            mergeStateStatus: 'CLEAN',
+            inQueue: false,
+            autoMerge: false,
+          };
+        },
+        async writeStatus(receipt) {
+          writes.push(receipt);
+        },
+        async enable() {
+          const error = new Error(
+            '::error::Rearm of #10 denied: Resource not accessible by integration (enqueuePullRequest)'
+          );
+          error.code = 'ENQUEUE_PERMISSION_DENIED';
+          throw error;
+        },
+      }
+    ),
+    error => error.code === 'ENQUEUE_PERMISSION_DENIED'
+  );
+  assert.deepEqual(writes, []);
+  const [next] = planVictimRearms({
+    runId: 900,
+    implicatedPaths: ['apps/web/story.tsx'],
+    candidates: [
+      candidate({ files: ['docs/guide.md'] }),
+      candidate({
+        prNumber: 11,
+        headSha: other,
+        files: ['apps/web/story.tsx'],
+      }),
+    ],
+  });
+  assert.equal(next.action, 'rearm');
+  assert.equal(next.n, 1);
+  assert.equal(next.increment, true);
 });
 
 test('the rearm job is a later step of the existing enroll workflow', () => {
