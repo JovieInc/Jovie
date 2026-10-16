@@ -19,6 +19,7 @@ describe('flaky-test filing remediation', () => {
     expect(triggers).toContain("branches: [main, 'gh-readonly-queue/main/**']");
     expect(concurrency).toContain('cancel-in-progress: false');
     expect(concurrency).toContain('github.event.workflow_run.event');
+    expect(concurrency).toContain("== 'merge_group' && 'queue' || 'analysis'");
     expect(retired).toContain(
       "github.event.workflow_run.head_branch == 'main'"
     );
@@ -30,6 +31,10 @@ describe('flaky-test filing remediation', () => {
     expect(retired).toContain(
       "!cancelled() && steps.analyze.outputs.signature_quarantine_candidates != ''"
     );
+    expect(retired).toContain('flake-issues.json');
+    expect(
+      retired.indexOf('File verified failure signatures in Linear')
+    ).toBeLessThan(retired.indexOf('Upload flakiness report'));
   });
 
   it('keeps GitHub issue filing retired', () => {

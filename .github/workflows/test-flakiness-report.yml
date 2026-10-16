@@ -18,7 +18,7 @@ on:
 
 concurrency:
   # Serialize Linear writes; queue publication cannot replace main analysis.
-  group: test-flakiness-report-${{ github.event.workflow_run.event || github.event_name }}
+  group: test-flakiness-report-${{ github.event.workflow_run.event == 'merge_group' && 'queue' || 'analysis' }}
   cancel-in-progress: false
 
 permissions:
@@ -95,16 +95,6 @@ jobs:
           FLAKY_COUNT: ${{ steps.analyze.outputs.flaky_count }}
         run: node .github/scripts/check-flaky-ratchet.js
 
-      - name: Upload flakiness report
-        if: always() && hashFiles('flakiness-report.md') != ''
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: flakiness-report-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            flakiness-report.md
-            flakiness-clusters.json
-          retention-days: 90
-
       # Signals: a test failing then passing on retry is direct flake evidence.
       # Cross-shard and queue-only failures are clustered diagnostic signals;
       # neither alone authorizes quarantine. Three distinct successful retry
@@ -125,6 +115,17 @@ jobs:
           RATCHET_STATUS: ${{ steps.ratchet.outcome }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: node scripts/flaky-test-filing-intake.mjs
+
+      - name: Upload flakiness report
+        if: always() && hashFiles('flakiness-report.md') != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: flakiness-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            flakiness-report.md
+            flakiness-clusters.json
+            flake-issues.json
+          retention-days: 90
 
       - name: Summarize report
         if: always()
