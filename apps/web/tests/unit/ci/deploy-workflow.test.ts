@@ -519,6 +519,7 @@ describe('CI Storybook accessibility path gate', () => {
       'apps/web/.storybook/preview.tsx',
       'apps/web/app/globals.css',
       'apps/web/styles/theme.css',
+      'apps/web/styles/theme/tokens.css',
       'apps/web/tailwind.config.ts',
       'apps/web/postcss.config.mjs',
       'apps/web/package.json',
@@ -531,6 +532,12 @@ describe('CI Storybook accessibility path gate', () => {
         input
       ).toBe(0);
     }
+    expect(
+      spawnSync('grep', ['-q', '-E', visualPattern!], {
+        input: 'apps/web/styles.css',
+      }).status
+    ).toBe(1);
+    expect(visualWorkflow).toMatch(/- 'apps\/web\/styles\/\*\*'/);
   });
 });
 

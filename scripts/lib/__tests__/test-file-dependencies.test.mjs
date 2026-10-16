@@ -62,6 +62,34 @@ test('follows imports and file reads, by URL or by repo path', () => {
   }
 });
 
+test('a quoted root file and a same-directory ./file match without a deeper slash', () => {
+  const root = fixture({
+    'DESIGN.md': '# design',
+    'scripts/agent-context/design-sections.json': '{}\n',
+    'scripts/agent-context/helper.mjs': 'export {};\n',
+    'scripts/agent-context/check.test.mjs': [
+      "readFileSync(resolve(root, 'DESIGN.md'), 'utf8');",
+      "readFileSync(new URL('./design-sections.json', import.meta.url), 'utf8');",
+      "const mentioned = 'helper.mjs';",
+      "const skipped = 'NOT-A-FILE.md';",
+    ].join('\n'),
+  });
+  try {
+    assert.deepEqual(
+      [
+        ...testDependencies('scripts/agent-context/check.test.mjs', root),
+      ].sort(),
+      [
+        'DESIGN.md',
+        'scripts/agent-context/check.test.mjs',
+        'scripts/agent-context/design-sections.json',
+      ]
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('the funnel rubric contract depends on the lead DM template (#20922)', () => {
   assert.ok(
     testDependencies('scripts/funnel-judge/rubric.test.mjs', process.cwd()).has(
