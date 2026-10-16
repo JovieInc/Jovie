@@ -164,7 +164,7 @@ unless linked below.
 | `spacing-scale (conservative)` | `error` | S + G | Yes | 654; armed=true; marketing=86; packages/ui=11; web-other=304; web-shell=253 |
 | `spacing-scale (strict)` | `warn` | S + G | No | 2310; armed=false; marketing=258; packages/ui=60; web-other=1126; web-shell=866 |
 | `touch-target` | `error` | D | Yes | 159 |
-| `ui-feel ratchet` | `error` | D | Yes | headingNeedsBalance=320; missingTabularNums=81; nonConcentricRadius=0; undersizedHitArea=74 |
+| `ui-feel ratchet` | `error` | D | Yes | headingNeedsBalance=319; missingTabularNums=81; nonConcentricRadius=0; undersizedHitArea=74 |
 
 The [raw-color baseline](apps/web/contrast-ratchet.baseline.json) and
 [computed pair config](apps/web/contrast-pairs.config.json) cover separate
