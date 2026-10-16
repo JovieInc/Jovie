@@ -1,19 +1,26 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
+  compareEntitlementsToProfile,
+  evaluateDistributionCapabilities,
   PASS_TYPE_ID,
   PROFILE_NAME,
   PUSH_ENTITLEMENT,
+  parsePlist,
   TIM_PORTAL_STEP,
   WALLET_ENTITLEMENT,
-  compareEntitlementsToProfile,
-  evaluateDistributionCapabilities,
-  parsePlist,
 } from './validate-distribution-capabilities.mjs';
 
 const repoRoot = path.resolve(
@@ -39,7 +46,10 @@ function copyFixtureRepo(t) {
     'JovieDistribution.entitlements',
     'JovieDistributionCapabilities.entitlements',
   ]) {
-    cpSync(path.join(repoRoot, 'apps/ios/Jovie', file), path.join(ios, 'Jovie', file));
+    cpSync(
+      path.join(repoRoot, 'apps/ios/Jovie', file),
+      path.join(ios, 'Jovie', file)
+    );
   }
   return root;
 }
@@ -49,7 +59,7 @@ function writeProfile(root, entitlements) {
   const keys = Object.entries(entitlements)
     .map(([key, value]) => {
       const body = Array.isArray(value)
-        ? `<array>${value.map((item) => `<string>${item}</string>`).join('')}</array>`
+        ? `<array>${value.map(item => `<string>${item}</string>`).join('')}</array>`
         : `<string>${value}</string>`;
       return `<key>${key}</key>${body}`;
     })
@@ -89,10 +99,13 @@ test('current Release gate matches a profile without Push or Wallet', () => {
   });
   assert.equal(result.ok, true, result.lines.join('\n'));
   assert.match(result.lines.join('\n'), /JOVIE_DISTRIBUTION_PUSH_WALLET=NO/);
-  assert.match(result.lines.join('\n'), new RegExp(TIM_PORTAL_STEP.replace(/[.]/g, '\\.')));
+  assert.match(
+    result.lines.join('\n'),
+    new RegExp(TIM_PORTAL_STEP.replace(/[.]/g, '\\.'))
+  );
 });
 
-test('fails when Release entitlements still request Push and Wallet', (t) => {
+test('fails when Release entitlements still request Push and Wallet', t => {
   const root = copyFixtureRepo(t);
   cpSync(
     path.join(root, 'apps/ios/Jovie/Jovie.entitlements'),
@@ -112,19 +125,27 @@ test('fails when Release entitlements still request Push and Wallet', (t) => {
   assert.match(output, new RegExp(PASS_TYPE_ID));
   assert.match(output, /Push Notifications and Wallet/);
   assert.match(output, new RegExp(PROFILE_NAME));
-  assert.match(output, /Tim must enable Push Notifications and Wallet on App ID ie\.jov\.Jovie/);
+  assert.match(
+    output,
+    /Tim must enable Push Notifications and Wallet on App ID ie\.jov\.Jovie/
+  );
 });
 
-test('fails when the re-enabled Release entitlements exceed the profile', (t) => {
+test('fails when the re-enabled Release entitlements exceed the profile', t => {
   const root = copyFixtureRepo(t);
-  const projectPath = path.join(root, 'apps/ios/Jovie.xcodeproj/project.pbxproj');
-  const project = readFileSync(projectPath, 'utf8').replace(
-    'CODE_SIGN_ENTITLEMENTS = Jovie/JovieDistribution.entitlements;',
-    'CODE_SIGN_ENTITLEMENTS = Jovie/JovieDistributionCapabilities.entitlements;'
-  ).replace(
-    'JOVIE_DISTRIBUTION_PUSH_WALLET = NO;',
-    'JOVIE_DISTRIBUTION_PUSH_WALLET = YES;'
+  const projectPath = path.join(
+    root,
+    'apps/ios/Jovie.xcodeproj/project.pbxproj'
   );
+  const project = readFileSync(projectPath, 'utf8')
+    .replace(
+      'CODE_SIGN_ENTITLEMENTS = Jovie/JovieDistribution.entitlements;',
+      'CODE_SIGN_ENTITLEMENTS = Jovie/JovieDistributionCapabilities.entitlements;'
+    )
+    .replace(
+      'JOVIE_DISTRIBUTION_PUSH_WALLET = NO;',
+      'JOVIE_DISTRIBUTION_PUSH_WALLET = YES;'
+    );
   writeFileSync(projectPath, project);
   const result = evaluateDistributionCapabilities({
     repoRoot: root,
@@ -134,17 +155,26 @@ test('fails when the re-enabled Release entitlements exceed the profile', (t) =>
   });
   const output = result.lines.join('\n');
   assert.equal(result.ok, false);
-  assert.match(output, /Capability mismatch: provisioning profile "match AppStore ie\.jov\.Jovie"/);
-  assert.match(output, /Missing profile entitlements: aps-environment, com\.apple\.developer\.pass-type-identifiers/);
+  assert.match(
+    output,
+    /Capability mismatch: provisioning profile "match AppStore ie\.jov\.Jovie"/
+  );
+  assert.match(
+    output,
+    /Missing profile entitlements: aps-environment, com\.apple\.developer\.pass-type-identifiers/
+  );
   assert.match(output, /does not support Pass Type ID pass\.ie\.jov\.profile/);
   assert.match(output, /lacks the Push Notifications capability/);
   assert.match(output, /lacks the Wallet capability/);
   assert.match(output, /Tim must enable Push Notifications and Wallet/);
 });
 
-test('accepts a profile that covers production Push and Wallet', (t) => {
+test('accepts a profile that covers production Push and Wallet', t => {
   const root = copyFixtureRepo(t);
-  const projectPath = path.join(root, 'apps/ios/Jovie.xcodeproj/project.pbxproj');
+  const projectPath = path.join(
+    root,
+    'apps/ios/Jovie.xcodeproj/project.pbxproj'
+  );
   writeFileSync(
     projectPath,
     readFileSync(projectPath, 'utf8')
@@ -162,7 +192,10 @@ test('accepts a profile that covers production Push and Wallet', (t) => {
     profilePath: writeProfile(root, capableProfile),
   });
   assert.equal(result.ok, true, result.lines.join('\n'));
-  assert.match(result.lines.join('\n'), /covers the Release Push and Wallet entitlements/);
+  assert.match(
+    result.lines.join('\n'),
+    /covers the Release Push and Wallet entitlements/
+  );
 });
 
 test('rejects a development aps-environment against a production profile', () => {
@@ -176,11 +209,17 @@ test('rejects a development aps-environment against a production profile', () =>
       Entitlements: capableProfile,
     }
   );
-  assert.match(compared.problems.join('\n'), /aps-environment is "development"/);
+  assert.match(
+    compared.problems.join('\n'),
+    /aps-environment is "development"/
+  );
 });
 
 test('beta lane runs the preflight after match and before gym', () => {
-  const fastfile = readFileSync(path.join(repoRoot, 'fastlane/Fastfile'), 'utf8');
+  const fastfile = readFileSync(
+    path.join(repoRoot, 'fastlane/Fastfile'),
+    'utf8'
+  );
   const beta = fastfile.slice(fastfile.indexOf('lane :beta do'));
   const matchAt = beta.indexOf('match(');
   const preflightAt = beta.indexOf('validate-distribution-capabilities.sh');
@@ -194,7 +233,10 @@ test('cli fails closed when the required profile is not installed', () => {
   try {
     execFileSync(
       'bash',
-      ['apps/ios/scripts/validate-distribution-capabilities.sh', '--require-profile'],
+      [
+        'apps/ios/scripts/validate-distribution-capabilities.sh',
+        '--require-profile',
+      ],
       {
         cwd: repoRoot,
         encoding: 'utf8',

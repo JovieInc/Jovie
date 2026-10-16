@@ -93,7 +93,10 @@ export function parsePlist(xml) {
   }
 
   function parseDict() {
-    if (source.startsWith('<dict/>', index) || source.startsWith('<dict />', index)) {
+    if (
+      source.startsWith('<dict/>', index) ||
+      source.startsWith('<dict />', index)
+    ) {
       index = source.indexOf('>', index) + 1;
       return {};
     }
@@ -117,7 +120,10 @@ export function parsePlist(xml) {
   }
 
   function parseArray() {
-    if (source.startsWith('<array/>', index) || source.startsWith('<array />', index)) {
+    if (
+      source.startsWith('<array/>', index) ||
+      source.startsWith('<array />', index)
+    ) {
       index = source.indexOf('>', index) + 1;
       return [];
     }
@@ -159,7 +165,7 @@ export function readAppBuildSettings(pbxproj, configurationName) {
     if (name !== configurationName) continue;
     const settings = block;
     if (!settings.includes(`PRODUCT_BUNDLE_IDENTIFIER = ${APP_ID};`)) continue;
-    const read = (key) => {
+    const read = key => {
       const match = settings.match(new RegExp(`${key} = "?([^";]+)"?;`));
       return match ? match[1].trim() : null;
     };
@@ -168,9 +174,7 @@ export function readAppBuildSettings(pbxproj, configurationName) {
       pushWallet: read('JOVIE_DISTRIBUTION_PUSH_WALLET'),
     };
   }
-  throw new Error(
-    `Missing ${configurationName} build settings for ${APP_ID}`
-  );
+  throw new Error(`Missing ${configurationName} build settings for ${APP_ID}`);
 }
 
 export function normalizePassType(value) {
@@ -183,10 +187,6 @@ function asList(value) {
   if (Array.isArray(value)) return value.map(String);
   if (typeof value === 'string') return [value];
   return [];
-}
-
-function entitlementKeys(entitlements) {
-  return Object.keys(entitlements ?? {});
 }
 
 /**
@@ -207,7 +207,8 @@ export function compareEntitlementsToProfile(appEntitlements, profile) {
         'Provisioning profile lacks the Push Notifications capability (aps-environment).'
       );
     } else if (
-      profileEntitlements[PUSH_ENTITLEMENT] !== appEntitlements[PUSH_ENTITLEMENT]
+      profileEntitlements[PUSH_ENTITLEMENT] !==
+      appEntitlements[PUSH_ENTITLEMENT]
     ) {
       problems.push(
         `aps-environment is "${appEntitlements[PUSH_ENTITLEMENT]}" but profile "${profile.Name ?? PROFILE_NAME}" allows "${profileEntitlements[PUSH_ENTITLEMENT]}".`
@@ -227,9 +228,9 @@ export function compareEntitlementsToProfile(appEntitlements, profile) {
       normalizePassType
     );
     const unsupported = requested.filter(
-      (id) =>
+      id =>
         !allowed.some(
-          (candidate) =>
+          candidate =>
             candidate === id || candidate === '*' || candidate.endsWith('.*')
         )
     );
@@ -247,7 +248,9 @@ function profileHasPushAndWallet(profile) {
   const entitlements = /** @type {Record<string, unknown>} */ (
     profile?.Entitlements ?? {}
   );
-  const passTypes = asList(entitlements[WALLET_ENTITLEMENT]).map(normalizePassType);
+  const passTypes = asList(entitlements[WALLET_ENTITLEMENT]).map(
+    normalizePassType
+  );
   return (
     Object.hasOwn(entitlements, PUSH_ENTITLEMENT) &&
     passTypes.includes(PASS_TYPE_ID)
@@ -290,7 +293,10 @@ function resolveProfile(options) {
 
 function mustContain(entitlements, label) {
   const problems = [];
-  if (entitlements[PUSH_ENTITLEMENT] !== 'production' && label.includes('Capabilities')) {
+  if (
+    entitlements[PUSH_ENTITLEMENT] !== 'production' &&
+    label.includes('Capabilities')
+  ) {
     problems.push(
       `${label} must set aps-environment to production before a TestFlight archive can request Push.`
     );
@@ -301,7 +307,9 @@ function mustContain(entitlements, label) {
   if (!Object.hasOwn(entitlements, WALLET_ENTITLEMENT)) {
     problems.push(`${label} is missing ${WALLET_ENTITLEMENT}.`);
   }
-  const passTypes = asList(entitlements[WALLET_ENTITLEMENT]).map(normalizePassType);
+  const passTypes = asList(entitlements[WALLET_ENTITLEMENT]).map(
+    normalizePassType
+  );
   if (!passTypes.includes(PASS_TYPE_ID)) {
     problems.push(`${label} must include Pass Type ID ${PASS_TYPE_ID}.`);
   }
@@ -319,7 +327,10 @@ function mustContain(entitlements, label) {
  */
 export function evaluateDistributionCapabilities(options = {}) {
   const repoRoot = options.repoRoot ?? defaultRepoRoot;
-  const projectPath = path.join(repoRoot, 'apps/ios/Jovie.xcodeproj/project.pbxproj');
+  const projectPath = path.join(
+    repoRoot,
+    'apps/ios/Jovie.xcodeproj/project.pbxproj'
+  );
   const infoPlistPath = path.join(repoRoot, 'apps/ios/Jovie/Info.plist');
   const lines = [];
   const problems = [];
@@ -375,17 +386,19 @@ export function evaluateDistributionCapabilities(options = {}) {
     problems.push(`Debug entitlements are missing ${PUSH_ENTITLEMENT}.`);
   }
   if (!debugPassTypes.includes(PASS_TYPE_ID)) {
-    problems.push(`Debug entitlements must include Pass Type ID ${PASS_TYPE_ID}.`);
+    problems.push(
+      `Debug entitlements must include Pass Type ID ${PASS_TYPE_ID}.`
+    );
   }
 
   problems.push(
-    ...mustContain(
-      capabilityEntitlements,
-      CAPABILITY_ENTITLEMENTS
-    )
+    ...mustContain(capabilityEntitlements, CAPABILITY_ENTITLEMENTS)
   );
 
-  const releaseRequestsPush = Object.hasOwn(releaseEntitlements, PUSH_ENTITLEMENT);
+  const releaseRequestsPush = Object.hasOwn(
+    releaseEntitlements,
+    PUSH_ENTITLEMENT
+  );
   const releaseRequestsWallet = Object.hasOwn(
     releaseEntitlements,
     WALLET_ENTITLEMENT
@@ -417,7 +430,10 @@ export function evaluateDistributionCapabilities(options = {}) {
       );
     }
     problems.push(
-      ...mustContain(releaseEntitlements, release.entitlements ?? 'Release entitlements')
+      ...mustContain(
+        releaseEntitlements,
+        release.entitlements ?? 'Release entitlements'
+      )
     );
   }
 
@@ -429,14 +445,21 @@ export function evaluateDistributionCapabilities(options = {}) {
   }
 
   if (profile) {
-    if (profile.plist.Name && profile.plist.Name !== (options.profileName ?? PROFILE_NAME)) {
+    if (
+      profile.plist.Name &&
+      profile.plist.Name !== (options.profileName ?? PROFILE_NAME)
+    ) {
       problems.push(
         `Capability mismatch: expected provisioning profile "${options.profileName ?? PROFILE_NAME}" but decoded "${profile.plist.Name}".`
       );
     }
-    const compared = compareEntitlementsToProfile(releaseEntitlements, profile.plist);
+    const compared = compareEntitlementsToProfile(
+      releaseEntitlements,
+      profile.plist
+    );
     if (compared.problems.length > 0) {
-      const profileLabel = profile.plist.Name ?? options.profileName ?? PROFILE_NAME;
+      const profileLabel =
+        profile.plist.Name ?? options.profileName ?? PROFILE_NAME;
       problems.push(
         `Capability mismatch: provisioning profile "${profileLabel}" cannot sign the Release entitlements.`,
         ...compared.problems
