@@ -720,7 +720,7 @@
     "group": "settings",
     "groupLabel": "Settings",
     "canonicalSurfaceId": "settings-artist-profile",
-    "canonicalSurfaceLabel": "Settings Artist Profile",
+    "canonicalSurfaceLabel": "Settings Profile",
     "canonicalSurfaceReviewRoute": "/demo/showcase/settings",
     "route": "/demo/showcase/settings",
     "viewport": "desktop",
