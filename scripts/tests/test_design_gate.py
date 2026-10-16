@@ -359,7 +359,8 @@ class AdmissionTest(unittest.TestCase):
         linear = FakeLinear([target, urgent])
         self.assertIs(design_gate.pick_build_issue([target, urgent], {}, pick=self.lane.pick_issue,
                       linear=linear, provider="devin", now=NOW), urgent)
-        self.assertEqual(linear.calls, [])
+        self.assertEqual(linear.calls[0][1], {"id": urgent.id})
+        self.assertNotIn(target.id, json.dumps(linear.calls))
 
     def test_designation_preserves_whole_pool_duplicate_admission(self):
         canonical = self.task("JOV-1", "Repair account claim conversion", "body", 2, [])
