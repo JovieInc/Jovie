@@ -318,29 +318,37 @@ describe.skipIf(!gh)(
         [SHA, 'current'],
         [NEWER, 'superseded_after_mutation'],
       ] as const) {
-        const root = realpathSync(
-          mkdtempSync(join(tmpdir(), 'jovie-receipt-'))
-        );
-        roots.push(root);
+        const { root, bin } = workspace({
+          git: `if [ "$1" = ls-remote ]; then printf '%s\\trefs/heads/main\\n' '${main}'; exit 0; fi\nexit 1`,
+        });
         const output = join(root, 'output');
         writeFileSync(output, '');
         const result = await runWithRealGh({
           script: classify,
           env: {
+            PATH: `${bin}:${process.env.PATH ?? ''}`,
             GITHUB_OUTPUT: output,
             GITHUB_REPOSITORY: 'JovieInc/Jovie',
+            GITHUB_WORKSPACE: repoRoot,
             EXPECTED_COMMIT_SHA: SHA,
+            RESOLVE_MAIN_BUDGET_SECONDS: '0',
+            RESOLVE_MAIN_RETRY_SECONDS: '0',
           },
           route: mainRoute(main),
         });
         expect(result.code, result.stderr).toBe(0);
         expect(readOutputs(output).staging_refresh_outcome).toBe(outcome);
       }
+      const { bin } = workspace({ git: 'exit 1' });
       const unresolved = await runWithRealGh({
         script: classify,
         env: {
+          PATH: `${bin}:${process.env.PATH ?? ''}`,
           GITHUB_OUTPUT: '/dev/null',
           GITHUB_REPOSITORY: 'JovieInc/Jovie',
+          GITHUB_WORKSPACE: repoRoot,
+          RESOLVE_MAIN_BUDGET_SECONDS: '0',
+          RESOLVE_MAIN_RETRY_SECONDS: '0',
         },
         route: () => null,
       });
@@ -357,6 +365,7 @@ describe.skipIf(!gh)(
         const { root, bin } = workspace({
           // GNU date semantics for `date -u -d <iso> +%s`.
           date: `case "$*" in *-d*) echo ${NOW - latency} ;; '-u +%s') echo ${NOW} ;; *) /bin/date "$@" ;; esac`,
+          git: `if [ "$1" = ls-remote ]; then printf '%s\\trefs/heads/main\\n' '${NEWER}'; exit 0; fi\nexit 1`,
         });
         const output = join(root, 'output');
         writeFileSync(output, '');
@@ -370,8 +379,11 @@ describe.skipIf(!gh)(
           env: {
             PATH: `${bin}:${process.env.PATH ?? ''}`,
             GITHUB_OUTPUT: output,
+            GITHUB_WORKSPACE: repoRoot,
             RUNNER_TEMP: root,
             GITHUB_REPOSITORY: 'JovieInc/Jovie',
+            RESOLVE_MAIN_BUDGET_SECONDS: '0',
+            RESOLVE_MAIN_RETRY_SECONDS: '0',
             DEPLOYMENT_URL_B64: b64(DEPLOYMENT_URL),
             EXPECTED_COMMIT_SHA: SHA,
             EXPECTED_DEPLOYMENT_ID: DEPLOYMENT_ID,
