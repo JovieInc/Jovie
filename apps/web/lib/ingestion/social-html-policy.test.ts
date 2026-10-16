@@ -8,6 +8,16 @@ import {
   isCoreSocialHtmlHost,
 } from './social-html-policy';
 
+const RETIRED_PROFILE_URLS = [
+  'https://beacons.ai/artist',
+  'https://beacons.page/artist',
+  'https://m.youtube.com/@artist',
+  'https://music.youtube.com/channel/UCartist',
+  'https://www.beacons.ai/artist',
+  'https://www.youtube.com/@artist/about',
+  'https://youtu.be/video',
+];
+
 const WEB_ROOT = path.resolve(__dirname, '../..');
 const SKIP_DIRS = new Set([
   'node_modules',
@@ -18,10 +28,10 @@ const SKIP_DIRS = new Set([
   '__tests__',
 ]);
 
-const SOCIAL_HOST = String.raw`(?:^|[^a-z0-9.-])(?:(?:www|m|vm|mobile|l)\.)?(?:instagram\.com|linktr\.ee|linktree\.com|x\.com|twitter\.com|tiktok\.com)(?![a-z0-9.-])`;
+const SOCIAL_HOST = String.raw`(?:^|[^a-z0-9.-])(?:(?:www|m|vm|mobile|l)\.)?(?:beacons\.ai|beacons\.page|instagram\.com|linktr\.ee|linktree\.com|music\.youtube\.com|tiktok\.com|twitter\.com|x\.com|youtu\.be|youtube\.com)(?![a-z0-9.-])`;
 
 const LITERAL_SOCIAL_FETCH = new RegExp(
-  String.raw`(?:fetchDocument|\bfetch)\s*(?:<[^>\n]*>)?\s*\(\s*['"\`]https?:\/\/(?:www\.|m\.|vm\.|mobile\.|l\.)?(?:instagram\.com|linktr\.ee|linktree\.com|x\.com|twitter\.com|tiktok\.com)(?![a-z0-9.-])`,
+  String.raw`(?:fetchDocument|\bfetch)\s*(?:<[^>\n]*>)?\s*\(\s*['"\`]https?:\/\/(?:www\.|m\.|vm\.|mobile\.|l\.)?(?:beacons\.ai|beacons\.page|instagram\.com|linktr\.ee|linktree\.com|music\.youtube\.com|tiktok\.com|twitter\.com|x\.com|youtu\.be|youtube\.com)(?![a-z0-9.-])`,
   'i'
 );
 
@@ -55,7 +65,7 @@ function socialHtmlFetchViolations(source: string): string[] {
 
 describe('core social HTML policy', () => {
   afterEach(() => {
-    delete process.env.FEATURE_SOCIAL_HTML_ISOLATED_PROVIDER;
+    vi.unstubAllEnvs();
     vi.unstubAllGlobals();
   });
 
@@ -68,9 +78,39 @@ describe('core social HTML policy', () => {
     expect(isCoreSocialHtmlHost('x.com')).toBe(true);
     expect(isCoreSocialHtmlHost('mobile.twitter.com')).toBe(true);
     expect(isCoreSocialHtmlHost('vm.tiktok.com')).toBe(true);
+    for (const url of RETIRED_PROFILE_URLS) {
+      expect(isCoreSocialHtmlHost(new URL(url).hostname)).toBe(true);
+    }
+    expect(isCoreSocialHtmlHost('WWW.YOUTUBE.COM.')).toBe(true);
+    expect(isCoreSocialHtmlHost('www.googleapis.com')).toBe(false);
+    expect(isCoreSocialHtmlHost('youtube.googleapis.com')).toBe(false);
+    expect(isCoreSocialHtmlHost('youtube.com.example.com')).toBe(false);
+    expect(isCoreSocialHtmlHost('fake-beacons.ai')).toBe(false);
     expect(isCoreSocialHtmlHost('business-api.tiktok.com')).toBe(false);
     expect(isCoreSocialHtmlHost('cdninstagram.com')).toBe(false);
     expect(isCoreSocialHtmlHost('scontent.cdninstagram.com')).toBe(false);
+  });
+
+  describe.each(['false', 'true'])('isolated provider flag = %s', flag => {
+    it.each(RETIRED_PROFILE_URLS)('blocks core HTML reads of %s', async url => {
+      vi.stubEnv('FEATURE_SOCIAL_HTML_ISOLATED_PROVIDER', flag);
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response('<html>Profile</html>', {
+          headers: { 'content-type': 'text/html' },
+        })
+      );
+      vi.stubGlobal('fetch', fetchMock);
+
+      await expect(fetchDocument(url)).rejects.toMatchObject({
+        code: 'SOCIAL_HTML_DISABLED',
+        message: coreSocialHtmlFetchBlockMessage(),
+      });
+      await expect(safeFetchPublicHtml(url)).resolves.toEqual({
+        ok: false,
+        error: 'blocked_host',
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
   });
 
   it('fails closed before fetchDocument contacts a social host', async () => {
@@ -85,7 +125,7 @@ describe('core social HTML policy', () => {
     });
     expect(fetchMock).not.toHaveBeenCalled();
 
-    process.env.FEATURE_SOCIAL_HTML_ISOLATED_PROVIDER = 'true';
+    vi.stubEnv('FEATURE_SOCIAL_HTML_ISOLATED_PROVIDER', 'true');
     await expect(fetchDocument('https://linktr.ee/artist')).rejects.toThrow(
       coreSocialHtmlFetchBlockMessage()
     );
@@ -105,23 +145,26 @@ describe('core social HTML policy', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('blocks redirected social HTML without contacting the target or retrying', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(null, {
-        status: 302,
-        headers: { location: 'https://mobile.twitter.com/artist' },
-      })
-    );
-    vi.stubGlobal('fetch', fetchMock);
-    await expect(
-      fetchDocument('https://example.com/profile', { maxRetries: 2 })
-    ).rejects.toMatchObject({
-      code: 'SOCIAL_HTML_DISABLED',
-    });
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock.mock.calls[0][0]).toBe('https://example.com/profile');
-    expect(fetchMock.mock.calls[0][1].redirect).toBe('manual');
-  });
+  it.each(['https://mobile.twitter.com/artist', ...RETIRED_PROFILE_URLS])(
+    'blocks redirects to %s without contacting the target or retrying',
+    async target => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(null, {
+          status: 302,
+          headers: { location: target },
+        })
+      );
+      vi.stubGlobal('fetch', fetchMock);
+      await expect(
+        fetchDocument('https://example.com/profile', { maxRetries: 2 })
+      ).rejects.toMatchObject({
+        code: 'SOCIAL_HTML_DISABLED',
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][0]).toBe('https://example.com/profile');
+      expect(fetchMock.mock.calls[0][1].redirect).toBe('manual');
+    }
+  );
 
   it('preserves approved redirects and reports their final URL', async () => {
     const fetchMock = vi
@@ -155,6 +198,17 @@ describe('core social HTML policy', () => {
         "await fetch('https://business-api.tiktok.com/open_api/v1.3/event/track/')"
       )
     ).toEqual([]);
+
+    for (const url of RETIRED_PROFILE_URLS) {
+      expect(socialHtmlFetchViolations(`await fetch('${url}')`)).toContain(
+        'literal social HTML fetch'
+      );
+      expect(
+        socialHtmlFetchViolations(
+          `const host = '${new URL(url).hostname}';\nawait fetchDocument(url);`
+        )
+      ).toContain('fetchDocument shares a file with a social HTML host');
+    }
 
     const violations = listCoreSources(WEB_ROOT).flatMap(filePath => {
       const found = socialHtmlFetchViolations(

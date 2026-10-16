@@ -2045,6 +2045,15 @@ describe('source-read guard selection', () => {
   const selected = (event, files) =>
     selectSourceGuards(event, files).map(guard => guard.id);
 
+  it.each(['pull_request', 'merge_group', 'push'])(
+    'runs profile conformance for adapters on %s',
+    event => {
+      expect(
+        selected(event, ['apps/web/lib/connectors/new-social/profile.ts'])
+      ).toContain('artist-profile-conformance');
+    }
+  );
+
   it.each([
     ['pull_request', ['web-source-read-tests', 'script-contracts']],
     ['merge_group', []],
@@ -2072,7 +2081,11 @@ describe('source-read guard selection', () => {
     ],
     [
       'apps/web/app/api/cron/example/route.test.ts',
-      ['merge-group-unit-guards', 'node-environment-files'],
+      [
+        'artist-launch-contract',
+        'merge-group-unit-guards',
+        'node-environment-files',
+      ],
     ],
     [
       'apps/web/eslint-rules/rule.test.js',
@@ -2100,11 +2113,19 @@ describe('source-read guard selection', () => {
     ],
     [
       'apps/web/lib/queries/fetch.ts',
-      ['merge-group-unit-guards', 'static-revalidate-policy'],
+      [
+        'artist-profile-conformance',
+        'merge-group-unit-guards',
+        'static-revalidate-policy',
+      ],
     ],
     [
       'apps/web/app/(marketing)/download/page.tsx',
-      ['merge-group-unit-guards', 'static-revalidate-policy'],
+      [
+        'artist-launch-contract',
+        'merge-group-unit-guards',
+        'static-revalidate-policy',
+      ],
     ],
     [
       'apps/web/tests/unit/marketing/static-revalidate-policy.test.ts',
@@ -2158,14 +2179,17 @@ describe('source-read guard selection', () => {
     ).toContain('public-command-openapi.test.ts');
   });
 
-  it('keeps web-only guards to PRs; web merge groups already run them', () => {
+  it('keeps web unit guards on PRs and runs profile conformance on every head', () => {
     for (const path of [
       'apps/web/lib/queries/fetch.ts',
       'apps/web/tests/node-environment-files.json',
     ]) {
       expect(classifyProductLanes([path]).selectedLanes).toContain('web');
-      expect(selected('merge_group', [path])).toEqual([]);
-      expect(selected('push', [path])).toEqual([]);
+      const expected = path.startsWith('apps/web/lib/')
+        ? ['artist-profile-conformance']
+        : [];
+      expect(selected('merge_group', [path])).toEqual(expected);
+      expect(selected('push', [path])).toEqual(expected);
     }
   });
 
@@ -2173,16 +2197,38 @@ describe('source-read guard selection', () => {
     const all = SOURCE_GUARDS.map(guard => guard.id);
     // Manual dispatch runs web Unit Tests and structural, which carry the rest.
     expect(selected('workflow_dispatch', ['README.md'])).toEqual([
+      'artist-launch-contract',
+      'artist-profile-conformance',
       'ci-schedule-inventory',
     ]);
     expect(selected('', ['README.md'])).toEqual(all);
     expect(selected('pull_request', null)).toEqual(all);
     expect(selected('pull_request', [])).toEqual(all);
-    expect(selected('merge_group', null)).toEqual(['ci-schedule-inventory']);
+    expect(selected('merge_group', null)).toEqual([
+      'artist-launch-contract',
+      'artist-profile-conformance',
+      'ci-schedule-inventory',
+    ]);
   });
 
   it('points every guard at a test file that exists', () => {
     for (const guard of SOURCE_GUARDS) {
+      if (guard.id === 'artist-profile-conformance') {
+        expect(guard.command).toContain(
+          join(REPO_ROOT, 'scripts/artist-profile-conformance.mjs')
+        );
+        expect(guard.command).toContain(
+          join(REPO_ROOT, 'scripts/artist-profile-conformance.test.mjs')
+        );
+        continue;
+      }
+      if (guard.id === 'artist-launch-contract') {
+        expect(guard.command).toContain('node scripts/artist-');
+        expect(
+          readFileSync(join(REPO_ROOT, `scripts/${guard.id}.test.mjs`), 'utf8')
+        ).toContain("from 'node:test'");
+        continue;
+      }
       if (guard.id === 'codex-bootstrap') {
         expect(guard.command).toContain('--experimental-test-coverage');
         expect(guard.command).toContain('--test-coverage-lines=90');
