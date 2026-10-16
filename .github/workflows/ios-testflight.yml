@@ -1044,15 +1044,21 @@ jobs:
     if: ${{ always() && needs.authorize-release.result == 'success' && needs.beta.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    outputs:
+      quota_deferred: ${{ steps.record.outputs.quota_deferred }}
+      quota_reset_epoch: ${{ steps.record.outputs.quota_reset_epoch }}
     steps:
       - name: Checkout the rate-limit hold
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-          sparse-checkout: .github/scripts/gh-api-hold.sh
+          sparse-checkout: |
+            .github/scripts/gh-api-hold.sh
+            .github/scripts/testflight-record-upload.sh
           sparse-checkout-cone-mode: false
       - name: Cross-prove and record the exact upload job
+        id: record
         env:
           GH_TOKEN: ${{ github.token }}
           GH_API_HOLD_BUDGET_SECONDS: '180'
@@ -1063,140 +1069,77 @@ jobs:
           RUN_ID: ${{ github.run_id }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
         shell: bash
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/testflight-record-upload.sh"
+
+      - name: Preserve upload-only TestFlight baseline marker
+        if: ${{ steps.record.outputs.quota_deferred != 'true' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: testflight-upload-verified
+          path: ${{ runner.temp }}/testflight-upload-verified.json
+          if-no-files-found: error
+          retention-days: 90
+
+  # One sleep until the known reset, then one re-attempt of the same proof.
+  # This does not upload again and does not poll GitHub.
+  wait-for-deferred-testflight-record:
+    name: Wait for deferred TestFlight record
+    needs: [record-upload]
+    if: ${{ always() && needs.record-upload.result == 'success' && needs.record-upload.outputs.quota_deferred == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    steps:
+      - name: Wait until the installation quota reset
+        env:
+          QUOTA_RESET_EPOCH: ${{ needs.record-upload.outputs.quota_reset_epoch }}
+        shell: bash
         run: |
           set -euo pipefail
-          gh() {
-            if [ "${1:-}" = "api" ]; then
-              GH_API_HOLD_BIN="$(command -v gh)" bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" "$@"
-              return
-            fi
-            command gh "$@"
-          }
-          [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]] &&
-            [[ "$RUN_ID" =~ ^[1-9][0-9]*$ ]] &&
-            [[ "$RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]] || {
-            echo "::error::TestFlight upload marker identity is malformed."
+          [[ "$QUOTA_RESET_EPOCH" =~ ^[0-9]+$ ]] || {
+            echo "::error::TestFlight record defer has no quota reset epoch." >&2
             exit 1
           }
+          now="$(date +%s)"
+          wait_for=$((QUOTA_RESET_EPOCH + 5 - now))
+          if [ "$wait_for" -lt 0 ]; then
+            wait_for=0
+          fi
+          if [ "$wait_for" -gt 3900 ]; then
+            echo "::error::Installation quota reset is ${wait_for}s away, outside the 3900s retry cap. Not passing." >&2
+            exit 1
+          fi
+          echo "Waiting ${wait_for}s to record the same TestFlight upload."
+          sleep "$wait_for"
 
-          run_record="$(gh api "repos/$REPOSITORY/actions/runs/$RUN_ID")"
-          testflight_workflow="$(gh api \
-            "repos/$REPOSITORY/actions/workflows/ios-testflight.yml")"
-          jq -e '
-            type == "object" and
-            (.id | type == "number" and . >= 1 and floor == .) and
-            .name == "iOS TestFlight" and
-            .path == ".github/workflows/ios-testflight.yml"
-          ' >/dev/null <<<"$testflight_workflow" || {
-            echo "::error::GitHub returned malformed TestFlight workflow identity."
-            exit 1
-          }
-          testflight_workflow_id="$(jq -r '.id | tostring' \
-            <<<"$testflight_workflow")"
-          jq -e \
-            --arg repo "$REPOSITORY" \
-            --arg run "$RUN_ID" \
-            --arg attempt "$RUN_ATTEMPT" \
-            --arg sha "$TRANSPORT_SHA" \
-            --arg workflow_id "$testflight_workflow_id" '
-              type == "object" and
-              (.id | tostring) == $run and
-              (.run_attempt | tostring) == $attempt and
-              (.workflow_id | tostring) == $workflow_id and
-              .path == ".github/workflows/ios-testflight.yml" and
-              .display_title == ("iOS TestFlight " + $sha) and
-              (.event == "workflow_run" or .event == "workflow_dispatch") and
-              .head_branch == "main" and
-              .head_sha == $sha and
-              .head_repository.full_name == $repo
-            ' >/dev/null <<<"$run_record" || {
-            echo "::error::Current TestFlight run does not match the authorized upload identity."
-            exit 1
-          }
-
-          # Publisher-only reruns may retain a successful beta from an earlier
-          # attempt. Upload intents prevent another upload; recover its exact
-          # successful attempt and binary attestation without repeating beta.
-          upload_attempt=""
-          upload_job=""
-          for attempt in $(seq 1 "$RUN_ATTEMPT"); do
-            jobs_json="$(gh api --paginate --slurp \
-              "repos/$REPOSITORY/actions/runs/$RUN_ID/attempts/$attempt/jobs?per_page=100")"
-            jq -e '
-              type == "array" and length > 0 and
-              all(.[]; type == "object" and (.jobs | type == "array"))
-            ' >/dev/null <<<"$jobs_json" || {
-              echo "::error::GitHub returned malformed TestFlight upload evidence."
-              exit 1
-            }
-            attempt_matches="$(jq -c \
-              --arg sha "$TRANSPORT_SHA" \
-              '
-                [
-                  .[].jobs[]?
-                  | select(
-                      .name == "Upload Internal TestFlight" and
-                      .head_sha == $sha and
-                      .status == "completed" and
-                      .conclusion == "success" and
-                      (.id | type == "number")
-                    )
-                  | (.id | tostring)
-                ]
-              ' <<<"$jobs_json")"
-            attempt_match_count="$(jq 'unique | length' <<<"$attempt_matches")"
-            if [ "$attempt_match_count" -gt 1 ]; then
-              echo "::error::TestFlight attempt $attempt has ambiguous successful upload jobs."
-              exit 1
-            fi
-            if [ "$attempt_match_count" = "1" ]; then
-              upload_attempt="$attempt"
-              upload_job="$(jq -r 'unique | .[0]' <<<"$attempt_matches")"
-            fi
-          done
-
-          [[ "$upload_attempt" =~ ^[1-9][0-9]*$ ]] &&
-            [[ "$upload_job" =~ ^[1-9][0-9]*$ ]] || {
-            echo "::error::No successful exact TestFlight upload job exists in this run."
-            exit 1
-          }
-          binary_artifacts="$(gh api "repos/$REPOSITORY/actions/runs/$RUN_ID/artifacts?per_page=100")"
-          binary_id="$(jq -er --arg name "testflight-binary-$upload_attempt" '
-            [.artifacts[] | select(.name == $name and .expired == false)] |
-            if length == 1 then .[0].id else error("ambiguous binary attestation") end
-          ' <<<"$binary_artifacts")"
-          gh api "repos/$REPOSITORY/actions/artifacts/$binary_id/zip" > "$RUNNER_TEMP/testflight-binary.zip"
-          unzip -p "$RUNNER_TEMP/testflight-binary.zip" testflight-upload-attestation.json > "$RUNNER_TEMP/testflight-binary.json"
-          jq -e --argjson lease "$LEASE" --arg sha "$RELEASE_SHA" --arg transport "$TRANSPORT_SHA" --arg run "$RUN_ID" --arg attempt "$upload_attempt" '
-            .schema == "jovie-testflight-binary/v1" and .lease == $lease and
-            .lease.sourceSha == $sha and .lease.transportSha == $transport and
-            .lease.workflowRun == $run and .lease.workflowAttempt == $attempt and
-            (.binarySha256 | type == "string" and test("^[0-9a-f]{64}$")) and
-            (.buildNumber | type == "string" and test("^[0-9]+$"))
-          ' >/dev/null "$RUNNER_TEMP/testflight-binary.json" || {
-            echo "::error::Uploaded binary attestation does not match the certified source lease."
-            exit 1
-          }
-          jq -n \
-            --slurpfile binary "$RUNNER_TEMP/testflight-binary.json" \
-            --arg sha "$RELEASE_SHA" \
-            --arg transport "$TRANSPORT_SHA" \
-            --argjson lease "$LEASE" \
-            --arg workflow_run "$RUN_ID" \
-            --arg upload_attempt "$upload_attempt" \
-            --arg upload_job "$upload_job" \
-            '{
-              schema: "jovie-testflight-upload/v2",
-              sha: $sha,
-              transportSha: $transport,
-              lease: $lease,
-              binarySha256: $binary[0].binarySha256,
-              buildNumber: $binary[0].buildNumber,
-              workflowRun: $workflow_run,
-              uploadRunAttempt: $upload_attempt,
-              uploadJob: $upload_job
-            }' > "$RUNNER_TEMP/testflight-upload-verified.json"
-
+  record-deferred-upload:
+    name: Record deferred TestFlight upload
+    needs: [authorize-release, wait-for-deferred-testflight-record]
+    if: ${{ needs.wait-for-deferred-testflight-record.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout the rate-limit hold
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          sparse-checkout: |
+            .github/scripts/gh-api-hold.sh
+            .github/scripts/testflight-record-upload.sh
+          sparse-checkout-cone-mode: false
+      - name: Cross-prove and record the exact upload job
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_API_HOLD_BUDGET_SECONDS: '180'
+          TESTFLIGHT_RECORD_QUOTA_RETRY: '1'
+          RELEASE_SHA: ${{ needs.authorize-release.outputs.release_sha }}
+          TRANSPORT_SHA: ${{ github.sha }}
+          LEASE: ${{ needs.authorize-release.outputs.lease }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        shell: bash
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/testflight-record-upload.sh"
       - name: Preserve upload-only TestFlight baseline marker
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -1204,3 +1147,25 @@ jobs:
           path: ${{ runner.temp }}/testflight-upload-verified.json
           if-no-files-found: error
           retention-days: 90
+
+  require-recorded-upload:
+    name: Require recorded TestFlight upload
+    needs: [record-upload, record-deferred-upload]
+    if: ${{ always() && needs.record-upload.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fail unless the successful upload has a marker
+        env:
+          QUOTA_DEFERRED: ${{ needs.record-upload.outputs.quota_deferred }}
+          RETRY_RESULT: ${{ needs.record-deferred-upload.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$QUOTA_DEFERRED" != "true" ]; then
+            exit 0
+          fi
+          if [ "$RETRY_RESULT" != "success" ]; then
+            echo "::error::Successful TestFlight upload was not recorded after the quota defer." >&2
+            exit 1
+          fi
