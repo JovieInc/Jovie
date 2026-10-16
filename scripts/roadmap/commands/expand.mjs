@@ -28,6 +28,13 @@ export async function runExpand(opts) {
     };
   }
 
+  if (!opts.client) {
+    return {
+      ok: false,
+      error: 'expand requires a Linear client; set LINEAR_API_KEY or inject a client for tests',
+    };
+  }
+
   const parent = await opts.client.fetchIssueByIdentifier(issueId);
   if (!parent) {
     return { ok: false, error: `Issue not found: ${issueId}` };

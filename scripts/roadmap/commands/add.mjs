@@ -25,6 +25,13 @@ export async function runAdd(opts) {
     };
   }
 
+  if (!opts.client) {
+    return {
+      ok: false,
+      error: 'add requires a Linear client; set LINEAR_API_KEY or inject a client for tests',
+    };
+  }
+
   const description =
     typeof flags.description === 'string' ? flags.description : '';
   const priority = normalizePriority(

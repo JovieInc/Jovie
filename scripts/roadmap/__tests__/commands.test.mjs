@@ -244,6 +244,12 @@ describe('runAdd', () => {
     });
     assert.equal(result.ok, false);
   });
+
+  it('reports a missing Linear client instead of throwing', async () => {
+    const result = await runAdd({ positionals: ['Issue'], flags: {} });
+    assert.equal(result.ok, false);
+    assert.match(result.error, /requires a Linear client/);
+  });
 });
 
 describe('runExpand', () => {
@@ -318,6 +324,12 @@ describe('runExpand', () => {
       result.planned.map(p => p.title),
       ['Alpha', 'Beta']
     );
+  });
+
+  it('reports a missing Linear client instead of throwing', async () => {
+    const result = await runExpand({ positionals: ['JOV-1000'], flags: {} });
+    assert.equal(result.ok, false);
+    assert.match(result.error, /requires a Linear client/);
   });
 });
 
@@ -394,6 +406,12 @@ describe('runSync', () => {
     });
     assert.equal(checkDrift.ok, false);
     assert.equal(checkDrift.drifted, true);
+  });
+
+  it('reports a missing Linear client instead of throwing', async () => {
+    const result = await runSync({ flags: {} });
+    assert.equal(result.ok, false);
+    assert.match(result.error, /requires a Linear client/);
   });
 });
 

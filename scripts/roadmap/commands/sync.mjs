@@ -60,6 +60,12 @@ export function buildBacklogSnapshot(input) {
  */
 export async function runSync(opts) {
   const flags = opts.flags ?? {};
+  if (!opts.client) {
+    return {
+      ok: false,
+      error: 'sync requires a Linear client; set LINEAR_API_KEY or inject a client for tests',
+    };
+  }
   const cwd = opts.cwd ?? process.cwd();
   const outRel =
     typeof flags.out === 'string' ? flags.out : DEFAULT_BACKLOG_PATH;
