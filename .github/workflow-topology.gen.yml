@@ -318,7 +318,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:record-production-publish
-    jobCount: 4
+    jobCount: 6
   - name: Doc Gardening Agent
     path: .github/workflows/doc-gardening-agent.yml
     active: true

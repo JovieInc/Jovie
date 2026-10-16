@@ -1491,6 +1491,10 @@ fi
     new URL('../.github/scripts/resolve-main-sha.sh', import.meta.url),
     join(root, '.github/scripts/resolve-main-sha.sh')
   );
+  await copyFile(
+    new URL('../.github/scripts/desktop-quota-defer-exit.sh', import.meta.url),
+    join(root, '.github/scripts/desktop-quota-defer-exit.sh')
+  );
   await writeFile(
     join(mockBin, 'git'),
     `#!/usr/bin/env bash
@@ -2032,6 +2036,11 @@ esac
                     status: 'completed',
                     conclusion: 'success',
                   },
+                  {
+                    name: 'Capture production publisher identity',
+                    status: 'completed',
+                    conclusion: 'success',
+                  },
                 ],
               },
             ],
@@ -2431,7 +2440,7 @@ test('desktop staging publishes an exact signed prerelease and production stays 
     /package:production/,
   ]);
   assertPatterns(productionVerify, [
-    /if: env\.ENVIRONMENT == 'production'/,
+    /if:.*env\.ENVIRONMENT == 'production'/,
     /codesign --verify --deep --strict "\$production_app"/,
     /spctl --assess --type execute --verbose=2 "\$production_app"/,
     /xcrun stapler validate "\$production_app"/,
@@ -2440,7 +2449,7 @@ test('desktop staging publishes an exact signed prerelease and production stays 
     /spctl --assess --type open --context context:primary-signature/,
   ]);
   assertPatterns(stagingUpload, [
-    /if: env\.ENVIRONMENT == 'staging'/,
+    /if:.*env\.ENVIRONMENT == 'staging'/,
     /desktop-staging-/,
     /staging-mac\.yml/,
     /retention-days: 7/,
@@ -2502,7 +2511,7 @@ test('desktop staging publishes an exact signed prerelease and production stays 
   );
   assert.doesNotMatch(build, /Upload production desktop publish marker/);
   assertPatterns(marker, [
-    /needs: \[authorize-release, build\]/,
+    /needs: \[authorize-release, build, wait-for-deferred-desktop-quota, rebuild-deferred-desktop\]/,
     /runs-on: ubuntu-latest/,
     /actions: read/,
     /contents: read/,
@@ -2524,6 +2533,131 @@ test('desktop staging publishes an exact signed prerelease and production stays 
     /electron-builder publish|--publish always/
   );
   assert.match(desktopReleaseAssets, /releases\?per_page=100/);
+});
+
+test('desktop installation quota defer is visible and retried once', async t => {
+  const build = job(desktopWorkflow, 'build');
+  const retry = job(desktopWorkflow, 'rebuild-deferred-desktop');
+  const waiter = job(desktopWorkflow, 'wait-for-deferred-desktop-quota');
+  const marker = job(desktopWorkflow, 'record-production-publish');
+  const stepsOf = source => {
+    const start = source.indexOf('\n    steps:\n');
+    assert.ok(start >= 0);
+    return source.slice(start);
+  };
+  assert.equal(stepsOf(build), stepsOf(retry));
+  assert.match(build, /needs: \[authorize-release\]\n/);
+  assert.doesNotMatch(build, /DESKTOP_QUOTA_RETRY/);
+  assert.match(retry, /DESKTOP_QUOTA_RETRY: '1'/);
+  assert.match(
+    retry,
+    /needs: \[authorize-release, wait-for-deferred-desktop-quota\]/
+  );
+  assert.match(waiter, /quota_deferred == 'true'/);
+  assert.match(waiter, /wait_for" -gt 3900/);
+  assert.match(waiter, /outside the 3900s retry cap/);
+  assert.doesNotMatch(waiter, /gh api|actions: write/);
+  assert.match(marker, /always\(\)/);
+  assert.match(marker, /quota_deferred != 'true'/);
+  assert.equal(RELEASE_ASSET_READ_ATTEMPTS, 4);
+  assert.equal(RELEASE_ASSET_READ_MAX_WAIT_MS, 600_000);
+  assert.match(build, /--max-wait-seconds 600 --attempts 4/);
+  assert.match(build, /GH_API_HOLD_BUDGET_SECONDS: '600'/);
+  for (const stepName of [
+    'Prepare private production draft',
+    'Validate rolling staging prerelease',
+    'Publish staging desktop prerelease',
+    'Publish production desktop release',
+  ]) {
+    assert.match(
+      step(build, stepName),
+      /desktop-quota-defer-exit\.sh "\$status"/
+    );
+  }
+  assert.match(
+    step(build, 'Capture production publisher identity'),
+    /quota_deferred != 'true'/
+  );
+
+  const root = await mkdtemp(join(tmpdir(), 'jovie-desktop-quota-exit-'));
+  t.after(() => rm(root, { force: true, recursive: true }));
+  const script = new URL(
+    '../.github/scripts/desktop-quota-defer-exit.sh',
+    import.meta.url
+  );
+  const runExit = (status, env = {}) =>
+    spawnSync('bash', [script.pathname, String(status)], {
+      cwd: root,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        GITHUB_OUTPUT: join(root, 'output.txt'),
+        RELEASE_SHA: 'a'.repeat(40),
+        RUNNER_TEMP: root,
+        ...env,
+      },
+    });
+  await writeFile(join(root, 'output.txt'), '');
+  const passed = runExit(0);
+  assert.equal(passed.status, 0, passed.stderr);
+  assert.equal(await readFile(join(root, 'output.txt'), 'utf8'), '');
+
+  await writeFile(join(root, 'desktop-publish-quota-defer'), '1700003600\n');
+  const deferred = runExit(75);
+  assert.equal(deferred.status, 0, deferred.stderr);
+  assert.match(
+    await readFile(join(root, 'output.txt'), 'utf8'),
+    /quota_deferred=true\nquota_reset_epoch=1700003600\n/
+  );
+
+  const missingSentinel = runExit(75, { RUNNER_TEMP: join(root, 'absent') });
+  assert.equal(missingSentinel.status, 75);
+  assert.match(missingSentinel.stderr, /without an installation-quota defer sentinel/);
+
+  const retried = runExit(75, { DESKTOP_QUOTA_RETRY: '1' });
+  assert.equal(retried.status, 75);
+  assert.match(retried.stderr, /after the quota retry\. Not passing/);
+
+  const waiterRoot = await mkdtemp(join(tmpdir(), 'jovie-desktop-quota-wait-'));
+  t.after(() => rm(waiterRoot, { force: true, recursive: true }));
+  const mockBin = join(waiterRoot, 'bin');
+  await mkdir(mockBin);
+  const sleepLog = join(waiterRoot, 'sleep.log');
+  await writeFile(
+    join(mockBin, 'sleep'),
+    `#!/usr/bin/env bash
+printf '%s\\n' "$1" > "${sleepLog}"
+`,
+    { mode: 0o755 }
+  );
+  const waiterBody = shellStepBody(
+    desktopWorkflow,
+    'Sleep until the known installation reset'
+  );
+  const releaseSha = 'b'.repeat(40);
+  const runWaiter = resetEpoch =>
+    spawnSync('bash', ['-c', waiterBody], {
+      cwd: waiterRoot,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        GITHUB_STEP_SUMMARY: join(waiterRoot, 'summary.md'),
+        PATH: `${mockBin}:${process.env.PATH}`,
+        QUOTA_RESET_EPOCH: String(resetEpoch),
+        RELEASE_SHA: releaseSha,
+      },
+    });
+  const now = Math.floor(Date.now() / 1000);
+  const held = runWaiter(now + 30);
+  assert.equal(held.status, 0, held.stderr);
+  assert.match(held.stdout, new RegExp(`Reattempting desktop publication of ${releaseSha}`));
+  const slept = Number((await readFile(sleepLog, 'utf8')).trim());
+  assert.ok(slept >= 30 && slept <= 40, `Unexpected waiter sleep: ${slept}`);
+  await rm(sleepLog);
+  const tooFar = runWaiter(now + 4000);
+  assert.notEqual(tooFar.status, 0);
+  assert.match(tooFar.stderr, /outside the 3900s retry cap/);
+  await assert.rejects(readFile(sleepLog), { code: 'ENOENT' });
 });
 
 test('production publish proof separates the released generation from its workflow transport', async t => {
@@ -2585,6 +2719,30 @@ esac
                     name: 'Publish production desktop release',
                     status: 'completed',
                     conclusion: 'success',
+                  },
+                  {
+                    name: 'Capture production publisher identity',
+                    status: 'completed',
+                    conclusion: 'success',
+                  },
+                ],
+              },
+              {
+                id: publisherJobId + 1,
+                name: 'Publish production desktop release',
+                head_sha: workflowSha,
+                status: 'completed',
+                conclusion: 'success',
+                steps: [
+                  {
+                    name: 'Publish production desktop release',
+                    status: 'completed',
+                    conclusion: 'success',
+                  },
+                  {
+                    name: 'Capture production publisher identity',
+                    status: 'completed',
+                    conclusion: 'skipped',
                   },
                 ],
               },
