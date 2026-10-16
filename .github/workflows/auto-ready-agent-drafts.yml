@@ -125,10 +125,7 @@ jobs:
       cancel-in-progress: true
     runs-on: ubuntu-latest
     permissions:
-      # actions: write is the workflow token's cache scope, the same scope PR
-      # Size Guard uses. It is not an app-token permission and not a second
-      # installation token. The Jovie Bot token below is unchanged.
-      actions: write
+      actions: read
       checks: read
       contents: read
       issues: write
