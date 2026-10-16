@@ -110,12 +110,14 @@ describe('ChatLinkConfirmationCard', () => {
       />
     );
 
-    const confirm = document.querySelector(
-      '.system-b-chat-link-primary-action'
+    const confirm = screen.getByRole('button', { name: 'Add' });
+    expect(confirm).toHaveAttribute('data-variant', 'primary');
+    expect(confirm).toHaveAttribute('data-size', 'sm');
+    expect(confirm).toHaveClass(
+      'bg-btn-primary',
+      'text-btn-primary-foreground'
     );
-    expect(confirm?.className).toContain('--color-btn-primary-bg');
-    expect(confirm?.className).toContain('--color-btn-primary-hover');
-    expect(confirm?.className).not.toContain('linear-btn');
+    expect(confirm.className).not.toContain('linear-btn');
   });
 
   it('renders the mutation error in the canonical error token', async () => {

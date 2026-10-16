@@ -258,11 +258,7 @@ function ChatLinkConfirmationTask({
             size='sm'
             onClick={handleAdd}
             aria-disabled={busy || saved || state === 'canceled'}
-            className={cn(
-              'system-b-chat-link-primary-action w-20 whitespace-nowrap',
-              'border border-(--color-btn-primary-bg) bg-btn-primary text-btn-primary-foreground shadow-button-inset hover:border-(--color-btn-primary-hover) hover:bg-btn-primary-hover',
-              'aria-disabled:opacity-50 transition-colors'
-            )}
+            className='w-20 whitespace-nowrap'
           >
             {busy ? (
               <Loader2
@@ -280,7 +276,7 @@ function ChatLinkConfirmationTask({
             size='sm'
             onClick={handleDismiss}
             aria-disabled={busy || saved || unknown}
-            className='min-w-11 px-0 text-xs font-medium text-primary-token underline-offset-2'
+            className='min-w-11'
             data-testid={
               state === 'canceled' ? 'chat-link-dismiss-undo' : undefined
             }
