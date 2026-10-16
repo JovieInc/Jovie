@@ -30,6 +30,7 @@ const metrics = [
   'scroll',
 ];
 
+/** @param {(path: URL, encoding: 'utf8') => string} [read] */
 export function planningPolicyText(read = readFileSync) {
   const canon = read(
     new URL('../../canon/ENGINEERING.md', import.meta.url),
@@ -42,6 +43,7 @@ export function planningPolicyText(read = readFileSync) {
   return canon.slice(start, end).replaceAll('\r\n', '\n');
 }
 
+/** @param {(path: URL, encoding: 'utf8') => string} [read] */
 export function planningPolicyDigest(read = readFileSync) {
   return createHash('sha256').update(planningPolicyText(read)).digest('hex');
 }
@@ -98,7 +100,15 @@ export function planningRisks(diff = '') {
 }
 
 /** Field checks are not citation authentication or behavioral proof. Exceptions
- * cannot be authorized by any value supplied in this untrusted receipt. */
+ * cannot be authorized by any value supplied in this untrusted receipt.
+ * @param {{
+ *   body?: string,
+ *   diff?: string,
+ *   repository?: string,
+ *   head?: string,
+ *   policyDigest?: string,
+ * }} [options]
+ */
 export function evaluatePlanning({
   body = '',
   diff = '',
