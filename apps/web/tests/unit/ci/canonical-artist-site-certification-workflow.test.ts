@@ -76,12 +76,12 @@ describe('JOV-6572 canonical artist-site certification workflow', () => {
     );
     // Execute the server's exports with the workflow's step environment.
     // Missing inherited configuration must fail before the claim returns 500.
-    const render = (value: string) =>
+    const resolveWorkflowValue = (value: string) =>
       value.replace(/\$\{\{.*?\}\}/g, 'ci-fixture');
     const exports = journey?.run
       ?.split('\n')
       .filter(line => line.trimStart().startsWith('export '))
-      .map(render);
+      .map(resolveWorkflowValue);
     expect(exports?.length).toBeGreaterThan(0);
     const result = spawnSync(
       'bash',
@@ -97,9 +97,10 @@ describe('JOV-6572 canonical artist-site certification workflow', () => {
           ...Object.fromEntries(
             Object.entries(journey?.env ?? {}).map(([key, value]) => [
               key,
-              render(value),
+              resolveWorkflowValue(value),
             ])
           ),
+          NODE_ENV: 'test',
           PATH: process.env.PATH,
           JOVIE_TEST_NODE_BINARY: process.execPath,
         },
