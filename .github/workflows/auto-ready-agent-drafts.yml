@@ -125,7 +125,10 @@ jobs:
       cancel-in-progress: true
     runs-on: ubuntu-latest
     permissions:
-      actions: read
+      # actions: write is the workflow token's cache scope, the same scope PR
+      # Size Guard uses. It is not an app-token permission and not a second
+      # installation token. The Jovie Bot token below is unchanged.
+      actions: write
       checks: read
       contents: read
       issues: write
@@ -151,6 +154,14 @@ jobs:
       - name: Verify GitHub CLI
         run: gh --version
 
+      - name: Restore immutable head association
+        if: github.event_name == 'workflow_run' && github.event.workflow_run.head_sha != ''
+        continue-on-error: true
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: auto-ready-head-prs
+          key: auto-ready-head-prs-${{ github.event.workflow_run.head_sha }}
+
       - name: Undraft green-source CLEAN drafts
         id: green-source
         env:
@@ -158,6 +169,7 @@ jobs:
           REPO: ${{ github.repository }}
           GH_RETRY_ATTEMPTS: 8
           GH_RETRY_MAX_DELAY: 60
+          HEAD_PR_CACHE_DIR: ${{ github.workspace }}/auto-ready-head-prs
           TARGET_PR: ${{ github.event.inputs.pr_number || github.event.workflow_run.pull_requests[0].number || '' }}
           TARGET_HEAD: ${{ github.event.inputs.head_sha || github.event.workflow_run.head_sha || '' }}
           # Missed-event recovery rides only the PR Ready producer's wakes, one

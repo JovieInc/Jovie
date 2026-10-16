@@ -10,6 +10,7 @@ import {
   ADMISSION_CONTRACT_VERSION,
   buildLiveQueueAdmissionReceipt,
   classifyRequiredCheckPage,
+  clearAdmissionConditionalGetCache,
   isTransientAdmissionFailureMessage,
   isTransientApiError,
   MERGE_GROUP_ADMISSION_QUOTA_RECOVERY_MS,
@@ -215,6 +216,80 @@ describe('merge-group admission evidence', () => {
       }
     }
   );
+
+  it('treats an unchanged git ref 304 as the stored body', async () => {
+    clearAdmissionConditionalGetCache();
+    const directory = await mkdtemp(join(tmpdir(), 'merge-admission-etag-'));
+    const eventPath = join(directory, 'event.json');
+    const outputPath = join(directory, 'output.txt');
+    await writeFile(eventPath, JSON.stringify(event()), 'utf8');
+    let refCalls = 0;
+    const fetchImpl = vi.fn(async (url, init) => {
+      if (url.endsWith('/graphql')) {
+        return Response.json(liveQueuePayload([liveQueueNode()]));
+      }
+      if (url.includes('/git/ref/')) {
+        refCalls += 1;
+        if (refCalls === 1) {
+          expect(init.headers['If-None-Match']).toBeUndefined();
+          return Response.json(queueRef(), { headers: { etag: 'W/"ref-1"' } });
+        }
+        expect(init.headers['If-None-Match']).toBe('W/"ref-1"');
+        return new Response(null, { status: 304 });
+      }
+      const checkName = new URL(url).searchParams.get('check_name');
+      if (!checkName) throw new Error(`unexpected request ${url}`);
+      return Response.json(checkPage(checkName, 'completed', 'success').data);
+    });
+    const env = {
+      GH_TOKEN: 'test-token',
+      GITHUB_API_URL: 'https://api.github.test',
+      GITHUB_EVENT_PATH: eventPath,
+      GITHUB_OUTPUT: outputPath,
+      GITHUB_REPOSITORY: 'JovieInc/Jovie',
+      GITHUB_SHA: HEAD,
+    };
+    try {
+      await expect(
+        runAdmissionFromEnv(env, { fetchImpl })
+      ).resolves.toMatchObject({ admitted: true, pr: 123 });
+      expect(refCalls).toBe(2);
+    } finally {
+      clearAdmissionConditionalGetCache();
+      await rm(directory, { force: true, recursive: true });
+    }
+  });
+
+  it('fails closed when a 304 arrives with no stored body', async () => {
+    clearAdmissionConditionalGetCache();
+    const directory = await mkdtemp(join(tmpdir(), 'merge-admission-etag-304-'));
+    const eventPath = join(directory, 'event.json');
+    const outputPath = join(directory, 'output.txt');
+    await writeFile(eventPath, JSON.stringify(event()), 'utf8');
+    const fetchImpl = vi.fn(async url => {
+      if (url.endsWith('/graphql')) {
+        return Response.json(liveQueuePayload([liveQueueNode()]));
+      }
+      if (url.includes('/git/ref/')) return new Response(null, { status: 304 });
+      throw new Error(`unexpected request ${url}`);
+    });
+    const env = {
+      GH_TOKEN: 'test-token',
+      GITHUB_API_URL: 'https://api.github.test',
+      GITHUB_EVENT_PATH: eventPath,
+      GITHUB_OUTPUT: outputPath,
+      GITHUB_REPOSITORY: 'JovieInc/Jovie',
+      GITHUB_SHA: HEAD,
+    };
+    try {
+      await expect(runAdmissionFromEnv(env, { fetchImpl })).rejects.toThrow(
+        /GitHub API 304 for .+ without a stored body/
+      );
+    } finally {
+      clearAdmissionConditionalGetCache();
+      await rm(directory, { force: true, recursive: true });
+    }
+  });
 
   it('neutralizes a vanished queue ref end to end and stays fail-closed on other statuses', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'merge-admission-'));

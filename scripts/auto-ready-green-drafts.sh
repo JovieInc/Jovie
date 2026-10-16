@@ -256,15 +256,36 @@ undraft_if_eligible() {  # undraft_if_eligible <num> [expected-head]
 resolve_head_pr() {  # resolve_head_pr <sha>
   # One REST read of the PRs that own this exact commit, instead of listing
   # every open PR per event (the shared API budget is the bottleneck).
+  # The association for a SHA does not change. A later wake reads the cached
+  # numbers and spends no installation REST. Empty results are not cached.
   local sha="$1"
   [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || return 1
-  gh_retry api "repos/${REPO}/commits/${sha}/pulls" --jq "
+  local cache=""
+  if [[ -n "${HEAD_PR_CACHE_DIR:-}" ]]; then
+    cache="${HEAD_PR_CACHE_DIR}/${sha}"
+    if [[ -s "$cache" ]]; then
+      echo "  head-pr cache hit ${sha:0:12}" >&2
+      cat "$cache"
+      return 0
+    fi
+  fi
+  local numbers
+  numbers="$(
+    gh_retry api "repos/${REPO}/commits/${sha}/pulls" --jq "
       .[]
       | select(.state == \"open\")
       | select(.base.ref == \"main\")
       | select(((.head.sha // \"\") | ascii_downcase) == \"${sha}\")
       | .number
     "
+  )" || return 1
+  if [[ -n "$cache" && -n "$numbers" ]]; then
+    mkdir -p "$HEAD_PR_CACHE_DIR"
+    printf '%s\n' "$numbers" >"$cache"
+  fi
+  if [[ -n "$numbers" ]]; then
+    printf '%s\n' "$numbers"
+  fi
 }
 
 echo "=== AUTO-READY GREEN-SOURCE: event-driven undraft (no queue enroll) ==="

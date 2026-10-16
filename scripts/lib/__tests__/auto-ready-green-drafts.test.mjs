@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -504,23 +505,36 @@ esac
 `;
       writeFileSync(join(dir, 'gh'), fakeGh);
       chmodSync(join(dir, 'gh'), 0o755);
+      const spawnEnv = {
+        ...process.env,
+        PATH: `${dir}:${process.env.PATH}`,
+        DRY_RUN: '1',
+        MISSED_COHORT: '3',
+        RUN_OFFSET: '0',
+        TARGET_PR: '',
+        TARGET_HEAD: '',
+        GH_RETRY_ATTEMPTS: '1',
+        STATE_AFTER_FIRST_READ: '',
+        ...env,
+      };
+      if (env.HEAD_PR_CACHE_DIR) {
+        const cacheDir = join(dir, env.HEAD_PR_CACHE_DIR);
+        mkdirSync(cacheDir, { recursive: true });
+        spawnEnv.HEAD_PR_CACHE_DIR = cacheDir;
+        if (env.SEED_HEAD_PR && env.TARGET_HEAD) {
+          writeFileSync(
+            join(cacheDir, String(env.TARGET_HEAD).toLowerCase()),
+            `${env.SEED_HEAD_PR}\n`
+          );
+        }
+      }
+      delete spawnEnv.SEED_HEAD_PR;
       const result = spawnSync(
         'bash',
         [resolve(repoRoot, 'scripts/auto-ready-green-drafts.sh')],
         {
           encoding: 'utf8',
-          env: {
-            ...process.env,
-            PATH: `${dir}:${process.env.PATH}`,
-            DRY_RUN: '1',
-            MISSED_COHORT: '3',
-            RUN_OFFSET: '0',
-            TARGET_PR: '',
-            TARGET_HEAD: '',
-            GH_RETRY_ATTEMPTS: '1',
-            STATE_AFTER_FIRST_READ: '',
-            ...env,
-          },
+          env: spawnEnv,
         }
       );
       let calls = [];
@@ -649,6 +663,19 @@ esac
     expect(result.stdout).toContain('→ #20783');
     expect(result.calls.join('\n')).toContain(`commits/${head}/pulls`);
     expect(result.calls.join('\n')).not.toContain('pr list');
+  });
+
+  it('reuses a cached head association and skips the commit pulls read', () => {
+    const result = runController([listed({ number: 20783 })], {
+      TARGET_HEAD: head,
+      MISSED_COHORT: '0',
+      HEAD_PR_CACHE_DIR: 'head-prs',
+      SEED_HEAD_PR: '20783',
+    });
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('→ #20783');
+    expect(result.stderr).toContain('head-pr cache hit');
+    expect(result.calls.join('\n')).not.toContain(`commits/${head}/pulls`);
   });
 
   it('bounds a one-draft missed cohort to a single list plus one PR evaluation', () => {

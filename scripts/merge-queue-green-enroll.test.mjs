@@ -1230,7 +1230,7 @@ test('PR-target workflow receipts resolve only an exact same-repo source associa
     },
   });
   assert.equal(result.inventories.length, 1);
-  assert.deepEqual(result.gets, [7]);
+  assert.deepEqual(result.gets, []);
   assert.deepEqual(result.reads, [7]);
   assert.equal(result.mutations.length, 1);
 });
@@ -1288,9 +1288,38 @@ test('paginated commit associations enqueue each exact open main PR once', async
     },
   });
   assert.equal(result.inventories.length, 1);
-  assert.deepEqual(result.gets, [7, 8]);
+  assert.deepEqual(result.gets, []);
   assert.deepEqual(result.reads, [7, 8]);
   assert.equal(result.mutations.length, 2);
+});
+
+test('a green wake that already carries the head skips pulls.get', async () => {
+  const result = await fixture({
+    eventName: 'workflow_run',
+    payload: {
+      workflow_run: {
+        event: 'pull_request',
+        head_sha: sha,
+        pull_requests: [{ number: 7 }],
+      },
+    },
+  });
+  assert.deepEqual(result.gets, []);
+  assert.deepEqual(result.reads, [7]);
+  assert.equal(result.mutations.length, 1);
+  const mismatch = await fixture({
+    eventName: 'workflow_run',
+    payload: {
+      workflow_run: {
+        event: 'pull_request',
+        head_sha: 'b'.repeat(40),
+        pull_requests: [{ number: 7 }],
+      },
+    },
+  });
+  assert.deepEqual(mismatch.gets, []);
+  assert.deepEqual(mismatch.reads, [7]);
+  assert.deepEqual(mismatch.mutations, []);
 });
 
 test('duplicated automatic PR associations do not multiply live reads or enqueue mutations', async () => {
@@ -1307,42 +1336,63 @@ test('duplicated automatic PR associations do not multiply live reads or enqueue
   assert.equal(result.mutations.length, 1);
 });
 
-// GitHub keeps only one pending run per concurrency group, even when
-// cancel-in-progress is false. Evaluate the actual YAML expression so a
-// repository-wide group cannot silently replace another PR's final wake.
+// GitHub keeps only one pending run per concurrency group. Evaluate the
+// actual YAML expression so a repository-wide group cannot silently replace
+// another PR's final wake.
+function formatExpression(template, ...args) {
+  return template.replace(/\{(\d+)\}/g, (_whole, index) =>
+    String(args[Number(index)] ?? '')
+  );
+}
+
+function evalWorkflowExpr(expression, github) {
+  const js = expression
+    .replaceAll(
+      'github.event.pull_request.number',
+      'github.event.pull_request?.number'
+    )
+    .replaceAll(
+      'github.event.workflow_run.pull_requests[0].number',
+      'github.event.workflow_run?.pull_requests?.[0]?.number'
+    )
+    .replaceAll(
+      'github.event.workflow_run.head_sha',
+      'github.event.workflow_run?.head_sha'
+    )
+    .replaceAll(
+      'github.event.workflow_run.name',
+      'github.event.workflow_run?.name'
+    )
+    .replaceAll('github.event.workflow_run.id', 'github.event.workflow_run?.id')
+    .replaceAll(
+      'github.event.workflow_run.conclusion',
+      'github.event.workflow_run?.conclusion'
+    )
+    .replaceAll(
+      'github.event.workflow_run.event',
+      'github.event.workflow_run?.event'
+    );
+  return new Function(
+    'github',
+    'inputs',
+    'format',
+    `return (${js});`
+  )(github, github.inputs ?? {}, formatExpression);
+}
+
 function concurrencyGroup(github) {
   const group = workflow.concurrency.group;
-  return group.replace(/\$\{\{([\s\S]*?)\}\}/g, (_whole, expression) => {
-    const js = expression
-      .replaceAll(
-        'github.event.pull_request.number',
-        'github.event.pull_request?.number'
-      )
-      .replaceAll(
-        'github.event.workflow_run.pull_requests[0].number',
-        'github.event.workflow_run?.pull_requests?.[0]?.number'
-      )
-      .replaceAll(
-        'github.event.workflow_run.head_sha',
-        'github.event.workflow_run?.head_sha'
-      )
-      .replaceAll(
-        'github.event.workflow_run.name',
-        'github.event.workflow_run?.name'
-      )
-      .replaceAll(
-        'github.event.workflow_run.id',
-        'github.event.workflow_run?.id'
-      )
-      .replace(
-        /format\('\{0\}-\{1\}',\s*([^,]+?),\s*([^)]+?)\)/g,
-        '`${$1}-${$2}`'
-      );
-    return new Function('github', 'inputs', `return (${js});`)(
-      github,
-      github.inputs ?? {}
-    );
-  });
+  return group.replace(/\$\{\{([\s\S]*?)\}\}/g, (_whole, expression) =>
+    evalWorkflowExpr(expression, github)
+  );
+}
+
+function cancelInProgress(github) {
+  const value = workflow.concurrency['cancel-in-progress'];
+  if (typeof value !== 'string') return value;
+  const match = value.match(/^\$\{\{([\s\S]*)\}\}$/);
+  if (!match) return value;
+  return evalWorkflowExpr(match[1].trim(), github);
 }
 
 const wake = (number, id) => ({
@@ -1388,7 +1438,8 @@ test('same-PR wakes coalesce while unattributed receipts and manual reconciliati
     run_id: 1,
   };
   assert.equal(concurrencyGroup(label), concurrencyGroup(wake(7, 101)));
-  assert.equal(workflow.concurrency['cancel-in-progress'], false);
+  assert.equal(cancelInProgress(label), false);
+  assert.equal(cancelInProgress(wake(7, 101)), false);
   assert.equal(workflow.jobs.enroll['timeout-minutes'], 5);
   const sameHead = (id, name) => ({
     event_name: 'workflow_run',
@@ -1410,6 +1461,46 @@ test('same-PR wakes coalesce while unattributed receipts and manual reconciliati
     concurrencyGroup(sameHead(101, 'CI')),
     concurrencyGroup(sameHead(102, 'PR Size Guard'))
   );
+  const green = (id, name, number) => ({
+    event_name: 'workflow_run',
+    event: {
+      workflow_run: {
+        id,
+        name,
+        conclusion: 'success',
+        event: 'pull_request',
+        head_sha: 'a'.repeat(40),
+        pull_requests: number ? [{ number }] : [],
+      },
+    },
+    run_id: id + 1000,
+  });
+  assert.equal(concurrencyGroup(green(101, 'CI', 7)), concurrencyGroup(green(102, 'PR Size Guard', 7)));
+  assert.equal(
+    concurrencyGroup(green(101, 'CI')),
+    concurrencyGroup(green(102, 'Fork PR Gate'))
+  );
+  assert.notEqual(concurrencyGroup(green(101, 'CI', 7)), concurrencyGroup(label));
+  assert.notEqual(concurrencyGroup(green(101, 'CI', 7)), concurrencyGroup(green(102, 'CI', 8)));
+  assert.equal(cancelInProgress(green(101, 'CI', 7)), true);
+  assert.equal(cancelInProgress(green(101, 'CI')), true);
+  const mergeGroup = conclusion => ({
+    event_name: 'workflow_run',
+    event: {
+      workflow_run: {
+        id: 50,
+        name: 'CI',
+        conclusion,
+        event: 'merge_group',
+        head_sha: 'b'.repeat(40),
+        pull_requests: [],
+      },
+    },
+    run_id: 9,
+  });
+  assert.equal(cancelInProgress(mergeGroup('failure')), false);
+  assert.equal(cancelInProgress(mergeGroup('success')), false);
+  assert.notEqual(concurrencyGroup(green(101, 'CI', 7)), concurrencyGroup(mergeGroup('failure')));
 });
 
 function recoveryDeferred() {
