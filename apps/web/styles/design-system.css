@@ -1455,7 +1455,10 @@
   --noir-ion-text-muted: #9da2ac;
   /* Clears 4.5:1 on the selected row tint over surface-1 (JOV-7861). */
   --noir-ion-text-tertiary: #8c939e;
-  --noir-ion-text-disabled: #525d75;
+  /* Same OKLCH family as the retired #525d75 (oklch hue ~265.6), lightness
+     raised so the disabled token itself clears 4.5:1 on the dark shell —
+     disabled HUD controls (axe color-contrast, JOV-8484). */
+  --noir-ion-text-disabled: #77839d;
   --noir-ion-text-inverse: #020307;
   --noir-ion-ion: #11afff;
   --noir-ion-ion-solid: #11afff;
