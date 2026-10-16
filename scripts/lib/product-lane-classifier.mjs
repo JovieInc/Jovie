@@ -474,6 +474,11 @@ function changedRootScriptsSpareMacLane(
   return true;
 }
 
+/**
+ * @param {string} beforeSource
+ * @param {string} afterSource
+ * @param {{ desktopPackageJsonBefore?: string, desktopPackageJsonAfter?: string }} [desktopManifests]
+ */
 export function classifyPackageJsonChange(
   beforeSource,
   afterSource,
@@ -749,7 +754,7 @@ export function classifyLockfileChange(beforeSource, afterSource) {
 
 /**
  * @param {string[]} paths
- * @param {{ packageJsonBefore?: string, packageJsonAfter?: string, lockfileBefore?: string, lockfileAfter?: string, qualificationProfile?: 'full' | 'content-only' }} [options]
+ * @param {{ packageJsonBefore?: string, packageJsonAfter?: string, desktopPackageJsonBefore?: string, desktopPackageJsonAfter?: string, lockfileBefore?: string, lockfileAfter?: string, qualificationProfile?: 'full' | 'content-only' }} [options]
  */
 export function classifyProductLanes(
   paths,
