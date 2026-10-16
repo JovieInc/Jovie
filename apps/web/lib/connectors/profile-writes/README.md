@@ -1,10 +1,33 @@
 # Connector profile write receipts
 
 Authenticated server callers construct `createProfileWriteService(adapter)` from
-`ledger.server.ts`. The adapter supplies a versioned manifest with current terms,
-scope and rollback evidence. Only conditional restore adapters execute. Current
-DSP bio email destinations declare manual rollback; disabled API destinations
-declare unsupported rollback in the existing provider catalog and discovery API.
+`ledger.server.ts`. Adapters select `getProfileWriteManifest(destination)` from
+`manifest.ts`; they cannot maintain an independent capability map. The factory
+projects the destination registry into the ledger's versioned terms, scopes,
+evidence expiry, rate window and conditional restore contract.
+
+The credential-free `catalog` in `GET /api/dsp/bio-sync` represents every
+registered destination and all four fields, including provider documentation and aliases. The operator artist-profile inventory
+uses the same projection. Missing, undated, expired or invalid evidence and
+blocked/planned rollout never advertise an available write. The GET response is
+uncached so evidence expiry takes effect without a rebuild. Catalog readiness is
+not an account grant or permission to execute.
+
+Current DSP email paths have unsupported rollback and unverified write readiness;
+the catalog keeps them disabled. Ingestion sources do not imply outbound write
+permission. Add destination manifests in sorted order in
+`artist-profile-registry.ts`, projecting researched DSP policies from
+`dsp-profile-catalog.ts` and the existing connector contracts.
+`node scripts/artist-profile-conformance.mjs` checks the complete source tree for
+unmanifested adapters, DSP bio providers and ingestion destinations, and competing
+capability metadata. The existing CI source guards run it on source and queue
+heads. Profile mutations require conditional restore. DSP email-submission
+adapters select `getBioSubmissionManifest` from `destinations.ts` and use a
+canonical-source preview with manual rollback. Separate approval confirms the
+exact proposal; missing evidence blocks execution (JOV-8509). Receipts attest
+submission delivery. Legacy history uses `getBioSyncHistory`; receipt status is
+separate. Submission identity/transport derives from `DSP_PROFILE_CATALOG`;
+historical recipients and local field limits never grant delivery permission.
 
 Call `propose`, show the complete destination/before/desired proposal, then call
 `approve` with `confirmationFor(proposal)` from that explicit confirmation.

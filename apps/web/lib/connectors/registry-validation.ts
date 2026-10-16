@@ -3,11 +3,18 @@ import {
   ARTIST_PROFILE_FIELDS,
   artistProfileContractSchema,
 } from './artist-profile-contract';
-import { CONNECTOR_PROVIDER_IDS, type ConnectorDefinition } from './types';
+import { fileImportDefinitionSchema } from './file-import-contract';
+import {
+  CONNECTOR_MANIFEST_IDS,
+  CONNECTOR_PROVIDER_IDS,
+  type ConnectorDefinition,
+  type OAuthConnectorDefinition,
+} from './types';
 
-export const connectorDefinitionSchema = z
+export const oauthConnectorDefinitionSchema = z
   .strictObject({
     id: z.enum(CONNECTOR_PROVIDER_IDS),
+    transport: z.literal('oauth'),
     label: z.string().min(1),
     description: z.string().min(1),
     iconKey: z.enum(['mail', 'calendar', 'spotify', 'youtube']),
@@ -62,12 +69,17 @@ export const connectorDefinitionSchema = z
         }
       }
     }
-  }) satisfies z.ZodType<ConnectorDefinition>;
+  }) satisfies z.ZodType<OAuthConnectorDefinition>;
+
+export const connectorDefinitionSchema = z.discriminatedUnion('transport', [
+  oauthConnectorDefinitionSchema,
+  fileImportDefinitionSchema,
+]) satisfies z.ZodType<ConnectorDefinition>;
 
 export const connectorRegistrySchema = z
-  .record(z.enum(CONNECTOR_PROVIDER_IDS), connectorDefinitionSchema)
+  .record(z.enum(CONNECTOR_MANIFEST_IDS), connectorDefinitionSchema)
   .superRefine((registry, ctx) => {
-    for (const id of CONNECTOR_PROVIDER_IDS) {
+    for (const id of CONNECTOR_MANIFEST_IDS) {
       if (registry[id].id !== id)
         ctx.addIssue({
           code: 'custom',
@@ -80,7 +92,7 @@ export const connectorRegistrySchema = z
 /** Retain literal manifest types while validating all entries on module load. */
 export function validateConnectorRegistry<
   T extends Readonly<
-    Record<(typeof CONNECTOR_PROVIDER_IDS)[number], ConnectorDefinition>
+    Record<(typeof CONNECTOR_MANIFEST_IDS)[number], ConnectorDefinition>
   >,
 >(registry: T): T {
   connectorRegistrySchema.parse(registry);
