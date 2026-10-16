@@ -50,6 +50,34 @@ export function isAbortedNextRscPrefetch(input: {
   );
 }
 
+const SAME_ORIGIN_CSS_CHUNK_PATH_PATTERN = /^\/_next\/static\/chunks\/.*\.css$/;
+
+/**
+ * Same-origin stylesheet-chunk cancellation. Navigating between public
+ * screens cancels in-flight Next.js CSS chunks (resourceType `stylesheet`,
+ * URL under `/_next/static/chunks/*.css`) with the abort signal. Only the
+ * abort is diagnostic; a failed, refused, or non-chunk stylesheet load
+ * stays a real failure.
+ */
+export function isAbortedSameOriginStylesheetChunk(input: {
+  readonly errorText: string | undefined;
+  readonly resourceType: string;
+  readonly url?: string;
+}): boolean {
+  if (input.errorText !== ABORTED_REQUEST_ERROR) return false;
+  if (input.resourceType === 'stylesheet') return true;
+  if (input.url) {
+    try {
+      return SAME_ORIGIN_CSS_CHUNK_PATH_PATTERN.test(
+        new URL(input.url).pathname
+      );
+    } catch {
+      // A malformed URL is not a stylesheet chunk.
+    }
+  }
+  return false;
+}
+
 export type SameOriginRequestFailureKind =
   | 'aborted-image'
   | 'failed-request'
@@ -65,6 +93,7 @@ export function classifySameOriginRequestFailure(input: {
   if (!input.sameOrigin) return 'ignored';
   if (isDiagnosticAbortedImageRequest(input)) return 'aborted-image';
   if (isAbortedNextRscPrefetch(input)) return 'ignored';
+  if (isAbortedSameOriginStylesheetChunk(input)) return 'ignored';
   return 'failed-request';
 }
 
