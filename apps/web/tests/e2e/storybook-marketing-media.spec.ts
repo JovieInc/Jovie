@@ -53,7 +53,7 @@ for (const [story, selector] of Object.entries(stories)) {
         ).toBeHidden();
         expect(await page.locator(selector).boundingBox()).toEqual(box);
       }
-      await testInfo.attach(`${story}-${width}`, {
+      await testInfo.attach(`${story}-${width}.png`, {
         body: await page.screenshot(),
         contentType: 'image/png',
       });
