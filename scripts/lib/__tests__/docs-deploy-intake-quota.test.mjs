@@ -8,19 +8,19 @@ const PERMISSION = '{"message":"Resource not accessible by integration"}';
 /**
  * @param {number} status
  * @param {unknown} body
+ * @returns {Response}
  */
 function response(status, body) {
   const text = typeof body === 'string' ? body : JSON.stringify(body);
-  return {
-    ok: status >= 200 && status < 300,
+  return new Response(text, {
     status,
-    json: async () => (typeof body === 'string' ? JSON.parse(body) : body),
-    text: async () => text,
-  };
+    headers: { 'content-type': 'application/json' },
+  });
 }
 
 /**
  * @param {Record<string, { status: number, body: unknown }>} routes
+ * @returns {typeof fetch}
  */
 function fetchImpl(routes) {
   return async url => {
