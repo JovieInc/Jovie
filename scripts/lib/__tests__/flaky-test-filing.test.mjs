@@ -8,7 +8,7 @@ const retired = readFileSync(
 );
 
 describe('flaky-test filing remediation', () => {
-  it('keeps report runs bounded to superseding main completions', () => {
+  it('serializes signature writes and isolates main analysis from queue publication', () => {
     const triggers = retired
       .split('\non:\n', 2)[1]
       .split('\nconcurrency:', 1)[0];
@@ -16,11 +16,25 @@ describe('flaky-test filing remediation', () => {
       .split('\nconcurrency:\n', 2)[1]
       .split('\npermissions:', 1)[0];
 
-    expect(triggers).toContain('branches: [main]');
-    expect(triggers).not.toContain('gh-readonly-queue/main/**');
-    expect(concurrency).toContain('cancel-in-progress: true');
+    expect(triggers).toContain("branches: [main, 'gh-readonly-queue/main/**']");
+    expect(concurrency).toContain('cancel-in-progress: false');
+    expect(concurrency).toContain('github.event.workflow_run.event');
+    expect(concurrency).toContain("== 'merge_group' && 'queue' || 'analysis'");
+    expect(retired).toContain(
+      "github.event.workflow_run.head_branch == 'main'"
+    );
     expect(retired).not.toContain('collect-quarantine-evidence.mjs');
     expect(retired).not.toContain('quarantine-evidence.json');
+    expect(retired).toContain(
+      'node scripts/file-quarantine-clusters.mjs --report-only'
+    );
+    expect(retired).toContain(
+      "!cancelled() && steps.analyze.outputs.signature_quarantine_candidates != ''"
+    );
+    expect(retired).toContain('flake-issues.json');
+    expect(
+      retired.indexOf('File verified failure signatures in Linear')
+    ).toBeLessThan(retired.indexOf('Upload flakiness report'));
   });
 
   it('keeps GitHub issue filing retired', () => {
