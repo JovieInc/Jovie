@@ -1,11 +1,10 @@
 /**
  * ESLint rule to prevent direct app-level db.transaction() usage.
  *
- * Canonical policy: new application code should avoid direct transaction
- * calls and use sequential/batch operations or approved wrappers.
+ * Multi-statement business invariants use runAtomicDbOperation.
  *
  * Bad:  await db.transaction(async (tx) => { ... });
- * Good: await db.insert(table).values([item1, item2, item3]);
+ * Good: await runAtomicDbOperation(operation, options);
  */
 
 module.exports = {
@@ -17,11 +16,17 @@ module.exports = {
     },
     messages: {
       noTransaction:
-        'Direct db.transaction() usage is restricted. Use sequential/batch operations or an approved legacy wrapper.',
+        'Use runAtomicDbOperation for multi-statement invariants; direct transactions bypass certification.',
     },
     schema: [],
   },
   create(context) {
+    if (
+      context.filename
+        .replaceAll('\\', '/')
+        .endsWith('/lib/db/legacy-transaction.ts')
+    )
+      return {};
     return {
       CallExpression(node) {
         // Match: *.transaction( or db.transaction(
@@ -30,6 +35,26 @@ module.exports = {
           node.callee.property.type === 'Identifier' &&
           node.callee.property.name === 'transaction'
         ) {
+          // The canonical driver adapter owns checkout/release (including BEGIN
+          // failure). Permit only its client-bound forwarding call, not app
+          // transactions or other transaction calls in the connection module.
+          const receiver = node.callee.object;
+          if (
+            context.filename
+              .replaceAll('\\', '/')
+              .endsWith('/lib/db/client/connection.ts') &&
+            receiver.type === 'CallExpression' &&
+            receiver.callee.type === 'Identifier' &&
+            receiver.callee.name === 'createDbInstance' &&
+            receiver.arguments.length === 1 &&
+            node.arguments.length === 2 &&
+            [receiver.arguments[0], ...node.arguments].every(
+              (argument, index) =>
+                argument.type === 'Identifier' &&
+                argument.name === ['client', 'operation', 'config'][index]
+            )
+          )
+            return;
           // Check if the object is likely a db instance
           const objectName =
             node.callee.object.type === 'Identifier'
