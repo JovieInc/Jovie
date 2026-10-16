@@ -53,16 +53,27 @@ describe('JOV-6572 canonical artist-site certification workflow', () => {
   it('joins production-faithful, deployed-profile, and live revenue evidence', () => {
     expect(ci).toContain('id: canonical_journey');
     expect(ci).toContain('id: canonical_claim_contract');
+    expect(ci).toContain('id: canonical_waitlist');
     expect(ci).toContain('id: canonical_revenue');
     expect(ci).toContain('id: canonical_profile');
     expect(ci).toContain('scripts/m2-revenue-path-canary.ts');
     expect(ci).toContain('scripts/certify-artist-profile.ts');
     expect(ci).toContain('scripts/certify-canonical-artist-site.ts');
     expect(ci).toContain('lib/claim/finalize.test.ts');
+    const claimCommand = ci.slice(
+      ci.indexOf('id: canonical_claim_contract'),
+      ci.indexOf('id: canonical_waitlist')
+    );
+    expect(claimCommand).toContain('lib/claim/finalize.test.ts');
+    expect(claimCommand).not.toContain('waitlist-gating.test.ts');
     expect(ci).toContain('tests/unit/auth/waitlist-gating.test.ts');
+    expect(ci).toContain('lib/auth/canonical-user-state.test.ts');
+    expect(ci).toContain('tests/unit/lib/auth/access-route-matrix.test.ts');
     expect(ci).toContain('--source-revision "${{ github.sha }}"');
+    expect(ci).toContain('--waitlist-status "$WAITLIST_STATUS"');
     expect(ci).toContain('steps.canonical_journey.outcome');
     expect(ci).toContain('steps.canonical_claim_contract.outcome');
+    expect(ci).toContain('steps.canonical_waitlist.outcome');
     expect(ci).toContain('steps.canonical_revenue.outcome');
     expect(ci).toContain('steps.canonical_profile.outcome');
   });
@@ -90,6 +101,7 @@ describe('JOV-6572 canonical artist-site certification workflow', () => {
     );
     expect(step('canonical_journey')?.['continue-on-error']).toBe(true);
     expect(step('canonical_claim_contract')?.['continue-on-error']).toBe(true);
+    expect(step('canonical_waitlist')?.['continue-on-error']).toBe(true);
     expect(step('canonical_revenue')?.['continue-on-error']).toBe(true);
     expect(step('canonical_profile')?.['continue-on-error']).toBe(true);
     expect(step('canonical_certification')?.['continue-on-error']).toBeFalsy();

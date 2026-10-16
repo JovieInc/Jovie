@@ -56,6 +56,7 @@ function fixture(): CanonicalArtistSiteCliOptions {
     runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/42',
     goldenPathStatus: 'success',
     claimContractStatus: 'success',
+    waitlistStatus: 'success',
     m2Status: 'success',
     m2ReceiptPath,
     profileStatus: 'success',
@@ -101,6 +102,45 @@ describe('canonical artist-site certification CLI adapter', () => {
     expect(readFileSync(options.outputPath, 'utf8')).toContain(
       'RED — not safe to send an artist through'
     );
+  });
+
+  it('keeps waitlist admission green when the gate passes and the golden path does not', () => {
+    const certificate = certifyCanonicalArtistSite({
+      ...fixture(),
+      goldenPathStatus: 'failure',
+    });
+    const waitlist = certificate.checks.find(
+      check => check.id === 'waitlist_admission'
+    );
+
+    expect(certificate.status).toBe('RED');
+    expect(waitlist?.status).toBe('passed');
+    expect(waitlist?.detail).toBe(
+      'Only explicitly admitted artists crossed the waitlist gate.'
+    );
+    expect(certificate.failingChecks.map(check => check.id)).not.toContain(
+      'waitlist_admission'
+    );
+  });
+
+  it('fails waitlist admission when the gate does not pass', () => {
+    const certificate = certifyCanonicalArtistSite({
+      ...fixture(),
+      waitlistStatus: 'failure',
+    });
+    const waitlist = certificate.failingChecks.find(
+      check => check.id === 'waitlist_admission'
+    );
+
+    expect(waitlist?.status).toBe('failed');
+    expect(waitlist?.defectRef).toBe(
+      'canonical-artist-site-waitlist-admission'
+    );
+    expect(waitlist?.detail).toContain('Unadmitted artists');
+    expect(waitlist?.detail).not.toContain('Golden Path');
+    expect(
+      certificate.checks.find(check => check.id === 'claim_auth_intent')?.status
+    ).toBe('passed');
   });
 
   it('attributes a healthy unbound profile to the source revision', () => {
