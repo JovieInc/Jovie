@@ -1409,6 +1409,79 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     );
   });
 
+  it('does not bind the marketing artifact to web.public-profile from another screen (JOV-8068)', () => {
+    const priorArtifact = process.env.SCREEN_CERT_ARTIFACT_ID;
+    const priorName = process.env.SCREEN_CERT_MARKETING_ARTIFACT;
+    const priorPath = process.env.PATH;
+    const root = mkdtempSync(join(tmpdir(), 'screen-public-profile-binding-'));
+    const head = 'a'.repeat(40);
+    try {
+      writeFileSync(
+        join(root, 'gh'),
+        '#!/usr/bin/env node\nprocess.stderr.write("resolver offline\\n");process.exit(1);\n'
+      );
+      chmodSync(join(root, 'gh'), 0o755);
+      process.env.PATH = `${root}:${priorPath}`;
+      process.env.SCREEN_CERT_ARTIFACT_ID = '12049160869';
+      process.env.SCREEN_CERT_MARKETING_ARTIFACT =
+        'marketing-route-screenshots-' + head;
+      const targeted = runScreenCertification({
+        headSha: head,
+        changedFiles: ['apps/web/app/[username]/page.tsx'],
+        targetScreenIds: ['web.artists'],
+        proofRequests: [{ artifactId: 99, screenId: 'web.artists' }],
+      });
+      const targetedIssues = targeted.receipt.issues.join('\n');
+      assert.equal(
+        targetedIssues.includes('web.public-profile'),
+        false,
+        targetedIssues
+      );
+      assert.equal(
+        targetedIssues.includes('no registered marketing route binding'),
+        false,
+        targetedIssues
+      );
+      assert.deepEqual(
+        targeted.receipt.changedScreens.map(screen => screen.id),
+        ['web.artists']
+      );
+      const unbound = runScreenCertification({
+        headSha: head,
+        changedFiles: ['apps/web/app/[username]/page.tsx'],
+        artifactId: 12049160869,
+      });
+      const unboundIssues = unbound.receipt.issues.join('\n');
+      assert.match(
+        unboundIssues,
+        /missing exact-head proof for web\.public-profile/
+      );
+      assert.equal(
+        unboundIssues.includes('no registered marketing route binding'),
+        false,
+        unboundIssues
+      );
+      const marketing = runScreenCertification({
+        headSha: head,
+        changedFiles: ['apps/web/app/(home)/page.tsx'],
+        targetScreenIds: ['web.artists'],
+        proofRequests: [{ artifactId: 99, screenId: 'web.artists' }],
+      });
+      assert.deepEqual(
+        marketing.receipt.changedScreens.map(screen => screen.id).toSorted(),
+        ['web.artists', 'web.homepage']
+      );
+    } finally {
+      process.env.PATH = priorPath;
+      if (priorArtifact === undefined) delete process.env.SCREEN_CERT_ARTIFACT_ID;
+      else process.env.SCREEN_CERT_ARTIFACT_ID = priorArtifact;
+      if (priorName === undefined)
+        delete process.env.SCREEN_CERT_MARKETING_ARTIFACT;
+      else process.env.SCREEN_CERT_MARKETING_ARTIFACT = priorName;
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
   it('fails closed for invalid controlled artifact requests through the API and CLI', () => {
     for (const options of [
       {
