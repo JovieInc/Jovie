@@ -8987,6 +8987,7 @@ class EscalationQueueAuthorityTest(unittest.TestCase):
                 if fault in bad_summaries: summary.write_text(bad_summaries[fault])
 
             def owner(*args, **kwargs):
+                self.assertEqual(args, (7, "head-A", ("fix", "gate")))
                 self.assertEqual(kwargs, {"timeout": 30}); order.append("owner")
                 return fault == "owner"
 
@@ -9064,8 +9065,13 @@ class EscalationQueueAuthorityTest(unittest.TestCase):
                 self.assertEqual(after, expected); posted.assert_not_called()
             if fault in bad_summaries: self.assertEqual(summary.read_text(), bad_summaries[fault])
             else: self.assertEqual(json.loads(summary.read_text()), summary_expected)
+            after_target_custody = {"none", "cached-unknown", "unrelated-race", "summary-race", "only-exhausted",
+                                    "attempt-race", "pending-race", "late-CAS-race", "new-held", "corrupt-held",
+                                    "malformed-held", "revoked", "summary-write-fails", "changed-held-prescription",
+                                    *bad_summaries}
             self.assertEqual(order, [] if fault in {"pending-head", "cached-queued", "malformed-dossier", "empty-dossier", *malformed_history} else
-                             ["owner"] if fault == "owner" else ["owner", "target"])
+                             ["owner"] if fault == "owner" else
+                             ["owner", "target", "owner"] if fault in after_target_custody else ["owner", "target"])
 
     def test_refused_targets_retain_pending_history_and_claims(self):
         for fault in ("pending-head", "cached-queued", "owner", "queued", "unknown", "missing-queue", "unreadable",
