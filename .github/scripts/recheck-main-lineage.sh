@@ -30,18 +30,17 @@ emit() {
   fi
 }
 
-configure_git_auth() {
+git_main() {
+  local git_basic_auth
   if [ -n "${GH_TOKEN:-}" ] && [[ "$remote" == https://* ]]; then
-    # Git smart-HTTP accepts the Actions/App token only as the documented
-    # basic credential (x-access-token as username, token as password); a
-    # bearer scheme leaves git prompting for a username and exit 128 on the
-    # non-interactive runner (JOV-8495, staging run 38846794961). The
-    # URL-scoped key matches resolve-main-sha.sh's proven form, and
-    # GIT_TERMINAL_PROMPT=0 keeps any future auth regression fail-fast.
-    export GIT_CONFIG_COUNT=1
-    export GIT_CONFIG_KEY_0="http.https://github.com/.extraheader"
-    export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "${GH_TOKEN}" | base64 | tr -d '\n')"
-    export GIT_TERMINAL_PROMPT=0
+    git_basic_auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+    printf '::add-mask::%s\n' "$git_basic_auth" >&2
+    JOVIE_GIT_AUTH_HEADER="AUTHORIZATION: basic $git_basic_auth" \
+      GIT_TERMINAL_PROMPT=0 \
+      git -c "http.${remote}.extraheader=" \
+        --config-env="http.${remote}.extraheader=JOVIE_GIT_AUTH_HEADER" "$@"
+  else
+    GIT_TERMINAL_PROMPT=0 git "$@"
   fi
 }
 
@@ -77,8 +76,7 @@ read_main_sha() {
     return 1
   fi
   echo "::warning::REST main read failed ${context}; resolving main with git." >&2
-  configure_git_auth
-  if ! sha="$(git ls-remote "$remote" refs/heads/main | awk 'NR==1 { print $1 }')"; then
+  if ! sha="$(git_main ls-remote "$remote" refs/heads/main | awk 'NR==1 { print $1 }')"; then
     echo "::error::git could not resolve main ${context}." >&2
     return 1
   fi
@@ -87,7 +85,6 @@ read_main_sha() {
 
 git_lineage() {
   local current="$1"
-  configure_git_auth
   (
     set -euo pipefail
     work="$(mktemp -d)"
@@ -96,12 +93,12 @@ git_lineage() {
 
     judged() {
       local tip ancestor_status
-      tip="$(git -C "$work" rev-parse refs/heads/main)"
+      tip="$(git -C "$work" rev-parse refs/remotes/origin/main)"
       if [ "$tip" != "$current" ]; then
         echo "::error::main moved from ${current} to ${tip} while proving lineage ${context}." >&2
         exit 1
       fi
-      if git -C "$work" merge-base --is-ancestor "$expected" "$tip" 2>/dev/null; then
+      if git_main -C "$work" merge-base --is-ancestor "$expected" "$tip" 2>/dev/null; then
         printf 'ahead\n'
         exit 0
       else
@@ -119,13 +116,13 @@ git_lineage() {
     }
 
     for depth in 300 4000; do
-      git -C "$work" fetch --no-tags --filter=blob:none --depth="$depth" \
-        "$remote" 'refs/heads/main:refs/heads/main'
+      git_main -C "$work" fetch --no-tags --filter=blob:none --depth="$depth" \
+        "$remote" 'refs/heads/main:refs/remotes/origin/main'
       judged && exit 0
     done
 
-    git -C "$work" fetch --no-tags --filter=blob:none --deepen=8000 \
-      "$remote" 'refs/heads/main:refs/heads/main' || true
+    git_main -C "$work" fetch --no-tags --filter=blob:none --deepen=8000 \
+      "$remote" 'refs/heads/main:refs/remotes/origin/main' || true
     if judged; then
       exit 0
     fi
