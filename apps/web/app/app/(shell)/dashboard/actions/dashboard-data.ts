@@ -20,6 +20,7 @@ import { CACHE_TAGS, CACHE_TTL } from '@/lib/cache/tags';
 import { isMissingConnectorSchemaError } from '@/lib/connectors/schema-errors';
 import type { DbOrTransaction } from '@/lib/db';
 import { DB_CONFIG, isRetryableError } from '@/lib/db/client/retry';
+import { getDeepErrorMessage, unwrapPgError } from '@/lib/db/errors';
 import { getAvatarQualityForProfile } from '@/lib/db/queries/avatar-quality';
 import {
   dashboardQuery,
@@ -899,6 +900,40 @@ async function fetchDashboardBaseWithSession(
   };
 }
 
+/** Retry only this pure read after an idle-terminated setup has closed. */
+async function fetchAvatarQualityWithSession(
+  clerkUserId: string,
+  profileId: string
+): Promise<AvatarQuality> {
+  // This bounds retry admission, not connection acquisition or setup duration.
+  const retryDeadline = performance.now() + QUERY_TIMEOUTS.dashboard;
+  const read = () =>
+    withDbSessionTx(
+      async tx => {
+        // Wait for PostgreSQL cancellation; do not race SQL with a JS timer.
+        await setStatementTimeout(tx, QUERY_TIMEOUTS.api);
+        return getAvatarQualityForProfile(profileId, tx);
+      },
+      { clerkUserId }
+    );
+
+  try {
+    return await read();
+  } catch (error) {
+    const { code } = unwrapPgError(error);
+    const idleTermination = code
+      ? code === '25P03'
+      : /terminating connection due to idle-in-transaction timeout/i.test(
+          getDeepErrorMessage(error)
+        );
+    if (!idleTermination || performance.now() >= retryDeadline) throw error;
+
+    // The first wrapper has completed rollback/release. RLS reporting remains
+    // intact; only this side-effect-free avatar read gets one fresh attempt.
+    return read();
+  }
+}
+
 /**
  * Full dashboard data fetch. Calls the base fetch for user/profiles/settings,
  * then augments with slow supplementary queries (links, avatar, tipping).
@@ -957,9 +992,9 @@ async function fetchDashboardCoreWithSession(
       { clerkUserId }
     );
 
-    const avatarQuality = await withDbSessionTx(
-      async tx => getAvatarQualityForProfile(selected.id, tx),
-      { clerkUserId }
+    const avatarQuality = await fetchAvatarQualityWithSession(
+      clerkUserId,
+      selected.id
     ).catch((error: unknown) => {
       Sentry.captureException(error, {
         level: 'warning',
