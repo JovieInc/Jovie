@@ -66,6 +66,16 @@ interface MarkerJobStep {
 }
 type MarkerJob = ReturnType<typeof job> & { steps?: MarkerJobStep[] };
 
+// The verified-generation artifact stores this. The classifier does not read
+// terminalReason; admissibility comes from the attempt jobs and descendant proof.
+type VerifiedGenerationPayload = {
+  sha: string;
+  deploymentId: string;
+  controllerRun: string;
+  controllerAttempt: string;
+  terminalReason?: 'promoted' | 'skipped_superseded' | 'not_applicable';
+};
+
 function earlyCoalescedJobs() {
   return [
     job('Coalesce release wave', 1, 'completed', 'success'),
@@ -91,6 +101,12 @@ function primaryMarker(
     'skipped'
   )
 ) {
+  const payload: VerifiedGenerationPayload = {
+    sha,
+    deploymentId: 'dpl_primary123',
+    controllerRun: String(controllerRun),
+    controllerAttempt: '1',
+  };
   return {
     artifact: {
       id: 11,
@@ -98,12 +114,7 @@ function primaryMarker(
       expired: false,
       workflowRunId: controllerRun,
     },
-    payload: {
-      sha,
-      deploymentId: 'dpl_primary123',
-      controllerRun: String(controllerRun),
-      controllerAttempt: '1',
-    },
+    payload,
     attemptRun: run(1, status, conclusion),
     attemptJobs: [
       job(
@@ -656,10 +667,7 @@ describe('production marker attempt state', () => {
     const marker = primaryMarker('completed', 'success');
     marker.attemptRun.head_sha = head;
     for (const attemptJob of marker.attemptJobs) attemptJob.head_sha = head;
-    marker.payload = {
-      ...marker.payload,
-      terminalReason: 'skipped_superseded',
-    };
+    marker.payload.terminalReason = 'skipped_superseded';
 
     expect(
       classifyProductionMarkerEvidence(
