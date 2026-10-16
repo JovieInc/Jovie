@@ -446,13 +446,42 @@ describe.skipIf(!gh)('iOS TestFlight release authorization (real gh)', () => {
     const summary = join(root, 'summary');
     const dateLog = join(root, 'date.log');
     const dateBin = join(root, 'bin');
+    const layoutBin = join(root, 'macos-layout', 'bin');
+    const layoutUsrBin = join(root, 'macos-layout', 'usr', 'bin');
     mkdirSync(dateBin);
+    mkdirSync(layoutBin, { recursive: true });
+    mkdirSync(layoutUsrBin, { recursive: true });
+    const hostDate = execFileSync('bash', ['-c', 'command -v date'], {
+      encoding: 'utf8',
+    }).trim();
+    expect(hostDate).toMatch(/^\/[\w./-]+$/);
+    const fixtureDate = join(layoutBin, 'date');
+    writeFileSync(
+      fixtureDate,
+      `#!/usr/bin/env bash
+set -euo pipefail
+exec ${hostDate} "$@"
+`,
+      { mode: 0o755 }
+    );
     writeFileSync(summary, '');
     writeFileSync(
       join(dateBin, 'date'),
       `#!/usr/bin/env bash
 set -euo pipefail
 printf '%s\\n' "$*" >> "$DATE_LOG"
+resolve_real_date() {
+  local candidate candidates="\${DATE_CANDIDATES:-/bin/date:/usr/bin/date}"
+  local IFS=':'
+  for candidate in $candidates; do
+    if [ -n "$candidate" ] && [ -f "$candidate" ] && [ -x "$candidate" ]; then
+      printf '%s\\n' "$candidate"
+      return 0
+    fi
+  done
+  echo "date: no real date binary on DATE_CANDIDATES" >&2
+  return 1
+}
 has_d=0
 has_r=0
 prev=""
@@ -475,7 +504,9 @@ if [ "$has_r" -eq 1 ]; then
   node -e 'const epoch = Number(process.argv[1]); if (!Number.isFinite(epoch)) process.exit(1); process.stdout.write(new Date(epoch * 1000).toISOString().slice(0, 19) + "Z\\n");' "$epoch"
   exit 0
 fi
-exec /usr/bin/date "$@"
+real="$(resolve_real_date)" || exit 1
+printf 'resolved %s\\n' "$real" >> "$DATE_LOG"
+exec "$real" "$@"
 `,
       { mode: 0o755 }
     );
@@ -487,6 +518,7 @@ exec /usr/bin/date "$@"
         },
       },
       {
+        DATE_CANDIDATES: `${join(layoutUsrBin, 'date')}:${fixtureDate}`,
         DATE_LOG: dateLog,
         GITHUB_STEP_SUMMARY: summary,
         PATH: `${dateBin}:${process.env.PATH}`,
@@ -503,6 +535,9 @@ exec /usr/bin/date "$@"
     const dateCalls = readFileSync(dateLog, 'utf8');
     expect(dateCalls).toContain('-d ');
     expect(dateCalls).toContain('-r ');
+    expect(dateCalls).toContain(`resolved ${fixtureDate}`);
+    expect(dateCalls).not.toContain('/usr/bin/date');
+    expect(dateCalls).not.toContain(`resolved ${join(layoutUsrBin, 'date')}`);
   });
 
   it('keeps a permission 403 and a missing reset fatal', async () => {

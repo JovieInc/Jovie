@@ -1094,8 +1094,32 @@ set -euo pipefail
 if [ -n "\${MOCK_DATE_LOG:-}" ]; then
   printf '%s\\n' "$*" >> "$MOCK_DATE_LOG"
 fi
+# macOS runners ship date at /bin/date and have no /usr/bin/date. Search a
+# candidate list (DATE_CANDIDATES, else those two paths) instead of execing
+# a hardcoded /usr/bin/date. The shim directory is already first on PATH, so
+# a bare \`command -v date\` would find this script.
+resolve_real_date() {
+  local candidate candidates="\${DATE_CANDIDATES:-/bin/date:/usr/bin/date}"
+  local IFS=':'
+  for candidate in $candidates; do
+    if [ -n "$candidate" ] && [ -f "$candidate" ] && [ -x "$candidate" ]; then
+      printf '%s\\n' "$candidate"
+      return 0
+    fi
+  done
+  echo "date: no real date binary on DATE_CANDIDATES" >&2
+  return 1
+}
+exec_real_date() {
+  local real
+  real="$(resolve_real_date)" || exit 1
+  if [ -n "\${MOCK_DATE_LOG:-}" ]; then
+    printf 'resolved %s\\n' "$real" >> "$MOCK_DATE_LOG"
+  fi
+  exec "$real" "$@"
+}
 if [ "\${MOCK_DATE:-gnu}" != bsd ]; then
-  exec /usr/bin/date "$@"
+  exec_real_date "$@"
 fi
 has_d=0
 has_r=0
@@ -1119,7 +1143,7 @@ if [ "$has_r" -eq 1 ]; then
   node -e 'const epoch = Number(process.argv[1]); if (!Number.isFinite(epoch)) process.exit(1); process.stdout.write(new Date(epoch * 1000).toISOString().slice(0, 19) + "Z\\n");' "$epoch"
   exit 0
 fi
-exec /usr/bin/date "$@"
+exec_real_date "$@"
 `,
     { mode: 0o755 }
   );
@@ -1135,6 +1159,51 @@ exec /usr/bin/date "$@"
   const dateCalls = await readFile(dateLog, 'utf8');
   assert.match(dateCalls, /-d /);
   assert.match(dateCalls, /-r /);
+  assert.match(dateCalls, /resolved \/bin\/date/);
+  assert.doesNotMatch(dateCalls, /\/usr\/bin\/date/);
+
+  // macOS layout: /usr/bin/date is absent, so the shim must skip it and use
+  // the only executable candidate. The fixture wraps the host date captured
+  // before this shim is on PATH. Asserting the resolved path is the fixture
+  // keeps a Linux host that still has /usr/bin/date from passing a hardcoded
+  // exec of that binary.
+  const macDateLog = join(root, 'mac-date.log');
+  const layoutBin = join(root, 'macos-layout', 'bin');
+  const layoutUsrBin = join(root, 'macos-layout', 'usr', 'bin');
+  await mkdir(layoutBin, { recursive: true });
+  await mkdir(layoutUsrBin, { recursive: true });
+  const hostDate = execFileSync('bash', ['-c', 'command -v date'], {
+    encoding: 'utf8',
+  }).trim();
+  assert.match(hostDate, /^\/[\w./-]+$/);
+  const fixtureDate = join(layoutBin, 'date');
+  await writeFile(
+    fixtureDate,
+    `#!/usr/bin/env bash
+set -euo pipefail
+exec ${hostDate} "$@"
+`,
+    { mode: 0o755 }
+  );
+  await writeFile(output, 'authorized=true\nrelease_sha=already-set\n');
+  const macOnly = await run(directScript, {
+    DATE_CANDIDATES: `${join(layoutUsrBin, 'date')}:${fixtureDate}`,
+    MOCK_DATE: 'bsd',
+    MOCK_DATE_LOG: macDateLog,
+  });
+  assert.equal(macOnly.status, 0, macOnly.stderr);
+  assert.doesNotMatch(macOnly.stderr, /could not format the reset instant/);
+  assert.ok(macOnly.stdout.includes(`::warning::${sentence}`), macOnly.stdout);
+  assert.equal((await readFile(summary, 'utf8')).trim(), sentence);
+  const macDateCalls = await readFile(macDateLog, 'utf8');
+  assert.match(macDateCalls, /-d /);
+  assert.match(macDateCalls, /-r /);
+  assert.ok(macDateCalls.includes(`resolved ${fixtureDate}`), macDateCalls);
+  assert.doesNotMatch(macDateCalls, /\/usr\/bin\/date/);
+  assert.doesNotMatch(
+    macDateCalls,
+    new RegExp(`resolved ${join(layoutUsrBin, 'date').replaceAll('/', '\\/')}`)
+  );
 
   await writeFile(output, '');
   const denied = await run(directScript, {
