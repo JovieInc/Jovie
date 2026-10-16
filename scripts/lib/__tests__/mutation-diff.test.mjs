@@ -5,6 +5,7 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -13,8 +14,12 @@ import { pathToFileURL } from 'node:url';
 import { load } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
 import {
+  createTestSelector,
   findRelatedTests,
   HIGH_RISK_PREFIXES,
+  readExecutedTests,
+  readModuleSource,
+  readTargetExecution,
   renderSummary,
   resolveSpecifier,
   scoreMutants,
@@ -100,7 +105,13 @@ describe('findRelatedTests', () => {
       ['tests/unit/other.test.ts', "import '@/lib/cron/authz';"],
     ]);
 
-    expect(findRelatedTests('lib/cron/auth.ts', tests)).toEqual([
+    expect(
+      findRelatedTests(
+        'lib/cron/auth.ts',
+        tests,
+        new Map([['lib/cron/auth.ts', 'export const x = 1;']])
+      )
+    ).toEqual([
       'lib/cron/auth.test.ts',
       'tests/unit/actual.test.ts',
       'tests/unit/static.test.ts',
@@ -112,9 +123,13 @@ describe('findRelatedTests', () => {
       ['tests/unit/e.test.ts', "import { e } from '@/lib/entitlements';"],
     ]);
 
-    expect(findRelatedTests('lib/entitlements/index.ts', tests)).toEqual([
-      'tests/unit/e.test.ts',
-    ]);
+    expect(
+      findRelatedTests(
+        'lib/entitlements/index.ts',
+        tests,
+        new Map([['lib/entitlements/index.ts', 'export const e = 1;']])
+      )
+    ).toEqual(['tests/unit/e.test.ts']);
   });
 });
 
@@ -140,6 +155,7 @@ describe('scoreMutants', () => {
 describe('renderSummary', () => {
   it('reports scores, flags low files, and caps survivors', () => {
     const summary = renderSummary({
+      sources: ['lib/a.ts', 'lib/b.ts', 'lib/c.ts', 'lib/d.ts'],
       results: [
         {
           file: 'lib/a.ts',
@@ -165,15 +181,21 @@ describe('renderSummary', () => {
     expect(summary).toContain('…and 1 more');
     expect(summary).not.toContain('Survivors in `lib/b.ts`');
     expect(summary).toContain(
-      '### No test imports these files\n\n- `lib/c.ts`'
+      '### Selection failed: no runtime test import path\n\n- `lib/c.ts`'
     );
     expect(summary).toContain('### Skipped (file cap)\n\n- `lib/d.ts`');
   });
 
   it('says so when nothing high-risk changed', () => {
     expect(
-      renderSummary({ results: [], untested: [], skipped: [], lowScore: 60 })
-    ).toContain('No changed high-risk source files.');
+      renderSummary({
+        sources: [],
+        results: [],
+        untested: [],
+        skipped: [],
+        lowScore: 60,
+      })
+    ).toContain('Skipped: no applicable changed high-risk source files.');
   });
 });
 
@@ -205,7 +227,7 @@ describe('stryker.diff.config.mjs', () => {
     expect(config.testRunner).toBe('command');
     expect(config.plugins).toBeUndefined();
     expect(config.commandRunner.command).toMatch(
-      /vitest\.mjs run --config vitest\.config\.fast\.mts .* lib\/cron\/auth\.test\.ts$/u
+      /vitest\.mjs run --config vitest\.config\.fast\.mts .* 'lib\/cron\/auth\.test\.ts'$/u
     );
     expect(config.inPlace).toBe(true);
     expect(config.disableTypeChecks).toBe(false);
@@ -327,4 +349,508 @@ describe('mutation-diff.yml', () => {
     expect(result.ghCalls).toBe('');
     expect(result.output).toBe('files=apps/web/lib/cron/auth.ts\n');
   });
+});
+
+describe('runtime mutation import graph', () => {
+  const target = 'lib/auth/policy.ts';
+  const modules = new Map([
+    [target, 'export const allowed = false;'],
+    ['lib/env-rules.ts', "export { allowed } from '@/lib/auth/policy';"],
+    ['lib/barrel/index.ts', "export * from '../env-rules';"],
+    [
+      'lib/cycle.ts',
+      "export * from './cycle-two'; export * from './env-rules';",
+    ],
+    ['lib/cycle-two.ts', "export * from './cycle';"],
+  ]);
+
+  it('follows aliased, relative, re-export, index and cyclic runtime paths', () => {
+    const tests = new Map([
+      ['tests/static.test.ts', "import { allowed } from '@/lib/env-rules';"],
+      ['tests/dynamic.test.ts', "await import('../lib/barrel');"],
+      ['tests/require.test.ts', "const m = require('../lib/cycle.js');"],
+    ]);
+    expect(findRelatedTests(target, tests, modules)).toEqual(
+      [...tests.keys()].sort()
+    );
+  });
+
+  it('does not select comments, strings, type imports, or mock-only imports', () => {
+    const tests = new Map([
+      [
+        'tests/comments.test.ts',
+        "// import '@/lib/auth/policy';\nconst text = \"import '@/lib/auth/policy'\";",
+      ],
+      [
+        'tests/type.test.ts',
+        "import type { allowed } from '@/lib/auth/policy';",
+      ],
+      [
+        'tests/named-type.test.ts',
+        "import { type allowed } from '@/lib/auth/policy';",
+      ],
+      [
+        'tests/export-type.test.ts',
+        "export type { allowed } from '@/lib/auth/policy';",
+      ],
+      [
+        'tests/mock.test.ts',
+        "import { allowed } from '@/lib/auth/policy'; vi.mock('@/lib/auth/policy', () => ({}));",
+      ],
+      [
+        'tests/mock-dynamic.test.ts',
+        "vi.mock(import('@/lib/auth/policy'), () => ({}));",
+      ],
+      [
+        'tests/transitive-mock.test.ts',
+        "import '@/lib/env-rules'; vi.mock('@/lib/auth/policy', () => ({}));",
+      ],
+      [
+        'tests/facade-mock.test.ts',
+        "import '@/lib/env-rules'; vi.mock('@/lib/env-rules', () => ({}));",
+      ],
+    ]);
+    expect(findRelatedTests(target, tests, modules)).toEqual([]);
+  });
+
+  it('selects explicit actual imports inside partial mocks, including importOriginal', () => {
+    const tests = new Map([
+      [
+        'tests/actual.test.ts',
+        "vi.mock('@/lib/auth/policy', async () => ({ ...await vi.importActual<typeof import('@/lib/auth/policy')>('@/lib/auth/policy') }));",
+      ],
+      [
+        'tests/original.test.ts',
+        "vi.mock('@/lib/env-rules', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/env-rules')>(), other: vi.fn() })); import '@/lib/env-rules';",
+      ],
+    ]);
+    expect(findRelatedTests(target, tests, modules)).toEqual([...tests.keys()]);
+  });
+
+  it('caches source parsing across selected targets and rejects missing sources', () => {
+    const reads = [];
+    const select = createTestSelector(
+      new Map([['a.test.ts', "import '@/lib/env-rules';"]]),
+      path => {
+        reads.push(path);
+        return modules.get(path) ?? null;
+      }
+    );
+    expect(select(target)).toEqual(['a.test.ts']);
+    const prior = reads.length;
+    expect(select(target)).toEqual(['a.test.ts']);
+    expect(reads.length).toBe(prior);
+    expect(() => select('lib/auth/missing.ts')).toThrow(
+      'Mutation source is missing'
+    );
+  });
+
+  it('rejects aliases escaping apps/web', () => {
+    expect(resolveSpecifier('@/../../outside', 'test.test.ts')).toBeNull();
+  });
+});
+
+describe('mutation execution receipts', () => {
+  it.each([
+    [
+      { success: true, numPassedTests: 0, numFailedTests: 0 },
+      'zero passing tests',
+    ],
+    [
+      { success: false, numPassedTests: 1, numFailedTests: 1 },
+      'baseline failed',
+    ],
+    [{ success: true, numPassedTests: 2, numFailedTests: 0 }, null],
+  ])('requires a passing executed baseline: %j', (receipt, failure) => {
+    const root = mkdtempSync(join(tmpdir(), 'mutation-receipt-'));
+    try {
+      const path = join(root, 'receipt.json');
+      writeFileSync(path, JSON.stringify(receipt));
+      if (failure) expect(() => readExecutedTests(path)).toThrow(failure);
+      else expect(readExecutedTests(path)).toBe(2);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('retains selected scope when the harness fails before producing results', () => {
+    const summary = renderSummary({
+      sources: ['lib/stripe/retry.ts'],
+      results: [],
+      untested: [],
+      skipped: [],
+      lowScore: 60,
+      errors: [
+        { file: 'lib/stripe/retry.ts', reason: 'Stryker process failed' },
+      ],
+    });
+    expect(summary).toContain(
+      'Selected 1 high-risk source file(s); completed 0.'
+    );
+    expect(summary).toContain('`lib/stripe/retry.ts`: Stryker process failed');
+    expect(summary).not.toContain('no applicable');
+  });
+});
+
+describe('mutation CLI result semantics', () => {
+  /** @param {string} mode @param {string[]} [args] */
+  function runFixture(mode, args = []) {
+    const root = mkdtempSync(join(tmpdir(), 'mutation-cli-'));
+    /** @param {string} path @param {string} text */
+    const put = (path, text) => {
+      mkdirSync(join(root, path, '..'), { recursive: true });
+      writeFileSync(join(root, path), text);
+    };
+    try {
+      for (const path of [
+        'scripts/mutation-diff.mjs',
+        'scripts/lib/mutation-diff.mjs',
+      ]) {
+        put(path, readFileSync(join(repoRoot, path), 'utf8'));
+      }
+      symlinkSync(
+        join(repoRoot, 'node_modules'),
+        join(root, 'node_modules'),
+        'dir'
+      );
+      put('apps/web/lib/auth/policy.ts', 'export const allowed = true;');
+      put(
+        'apps/web/tests/policy.test.ts',
+        mode === 'unrelated'
+          ? 'export const nothing = true;'
+          : "import '@/lib/auth/policy';"
+      );
+      put(
+        'apps/web/node_modules/vitest/vitest.mjs',
+        `
+        import { mkdirSync, writeFileSync } from 'node:fs';
+        import { resolve } from 'node:path';
+        const path = process.argv[process.argv.indexOf('--outputFile') + 1];
+        writeFileSync(path, JSON.stringify({ success: true, numFailedTests: 0,
+          numPassedTests: process.env.FIXTURE_MODE === 'empty-tests' ? 0 : 1 }));
+        mkdirSync(process.env.STRYKER_COVERAGE_DIR, { recursive: true });
+        const count = process.env.FIXTURE_MODE === 'unexecuted-target' ? 0 : 1;
+        const coverage = process.env.FIXTURE_MODE === 'missing-target' ? {} : {
+          [resolve('lib/auth/policy.ts')]: { s: { 0: count }, f: { 0: count } }
+        };
+        writeFileSync(resolve(process.env.STRYKER_COVERAGE_DIR, 'coverage-final.json'), JSON.stringify(coverage));
+      `
+      );
+      put(
+        'apps/web/node_modules/.bin/stryker',
+        `#!/usr/bin/env node
+        const fs = require('node:fs');
+        if (process.env.FIXTURE_MODE === 'failed') process.exit(1);
+        if (process.env.FIXTURE_MODE === 'missing-report') process.exit(0);
+        const mutants = process.env.FIXTURE_MODE === 'zero-mutants' ? [] : [{
+          status: process.env.FIXTURE_MODE === 'invalid-mutants' ? 'CompileError' : 'Survived',
+          mutatorName: 'BooleanLiteral', replacement: 'false', location: { start: { line: 1 } }
+        }];
+        fs.writeFileSync(process.env.STRYKER_REPORT_FILE, JSON.stringify({ files: {
+          'lib/auth/policy.ts': { mutants }
+        }}));
+      `
+      );
+      chmodSync(join(root, 'apps/web/node_modules/.bin/stryker'), 0o755);
+      return spawnSync(
+        process.execPath,
+        [
+          join(root, 'scripts/mutation-diff.mjs'),
+          '--files',
+          'apps/web/lib/auth/policy.ts',
+          ...args,
+        ],
+        {
+          env: { ...process.env, FIXTURE_MODE: mode },
+          encoding: 'utf8',
+        }
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+
+  it('explicitly skips an inapplicable source without starting the harness', () => {
+    const run = runFixture('failed', [
+      '--files',
+      'apps/web/components/Label.tsx',
+    ]);
+    expect(run.status, run.stderr).toBe(0);
+    expect(run.stdout).toContain('Skipped: no applicable');
+  });
+
+  it.each([
+    ['unrelated', 'Selection failed: no runtime test import path'],
+    ['empty-tests', 'Vitest baseline executed zero passing tests'],
+    [
+      'unexecuted-target',
+      'V8 reports no executed target statements or functions',
+    ],
+    ['missing-target', 'V8 did not report the selected target'],
+    ['zero-mutants', 'Stryker generated zero mutants'],
+    ['invalid-mutants', 'Stryker reported zero valid mutants'],
+    ['missing-report', 'Stryker did not report the selected source'],
+    ['failed', 'Stryker process failed'],
+  ])('fails an incomplete selected run: %s', (mode, reason) => {
+    const run = runFixture(mode);
+    expect(run.status, run.stderr).toBe(1);
+    expect(run.stdout).toContain(reason);
+    expect(run.stdout).not.toContain('no applicable');
+  });
+
+  it('keeps a completed 0% score advisory and includes actual passed-test count', () => {
+    const run = runFixture('survived');
+    expect(run.status, run.stderr).toBe(0);
+    expect(run.stdout).toContain(
+      '| `lib/auth/policy.ts` | 0% (low) | 0 | 1 | 1 | 1 | 1/1 / 1/1 |'
+    );
+  });
+
+  it('does not let a zero file cap silently avoid selected work', () => {
+    const run = runFixture('survived', ['--max-files', '0']);
+    expect(run.status).toBe(1);
+    expect(run.stderr).toContain('--max-files must be a positive integer');
+  });
+});
+
+describe('selected runtime paths execute the real target', () => {
+  it('rejects a planted allow-all defect through every supported import pattern', () => {
+    const root = mkdtempSync(join(tmpdir(), 'mutation-graph-runtime-'));
+    const target = 'lib/auth/(shell)/[tenant]/policy.ts';
+    /** @param {string} path @param {string} text */
+    const put = (path, text) => {
+      mkdirSync(join(root, path, '..'), { recursive: true });
+      writeFileSync(join(root, path), text);
+    };
+    try {
+      symlinkSync(
+        join(repoRoot, 'node_modules'),
+        join(root, 'node_modules'),
+        'dir'
+      );
+      put('package.json', JSON.stringify({ type: 'module' }));
+      put(
+        target,
+        "export function allowed(value: string) { return value === 'safe'; }"
+      );
+      put(
+        'lib/facade.ts',
+        "export { allowed } from './auth/(shell)/[tenant]/policy';"
+      );
+      put('lib/barrel/index.ts', "export * from '../facade';");
+      put(
+        'vitest.config.fast.mts',
+        `export default {
+        root: ${JSON.stringify(root)},
+        resolve: { alias: { '@': ${JSON.stringify(root)} } },
+        test: { environment: 'node', include: ['tests/*.test.ts'], coverage: { thresholds: { lines: 100, branches: 100, functions: 100, statements: 100 } } }
+      };`
+      );
+      put(
+        'vitest.config.mutation.mjs',
+        readFileSync(
+          join(repoRoot, 'apps/web/vitest.config.mutation.mjs'),
+          'utf8'
+        )
+      );
+      const check =
+        "it('rejects unsafe origin', () => expect(allowed('unsafe')).toBe(false));";
+      const imports = new Map([
+        [
+          'tests/alias.test.ts',
+          "import { allowed } from '@/lib/auth/(shell)/[tenant]/policy';",
+        ],
+        [
+          'tests/do-mock.test.ts',
+          "import { allowed } from '@/lib/auth/(shell)/[tenant]/policy'; vi.doMock('@/lib/auth/(shell)/[tenant]/policy', () => ({ allowed: () => false }));",
+        ],
+        [
+          'tests/unmock.test.ts',
+          "vi.mock('@/lib/auth/(shell)/[tenant]/policy', () => ({ allowed: () => false })); vi.unmock('../lib/auth/(shell)/[tenant]/policy'); import { allowed } from '@/lib/auth/(shell)/[tenant]/policy';",
+        ],
+        [
+          'tests/quoted-spy.test.ts',
+          "vi.mock('@/lib/auth/(shell)/[tenant]/policy', { 'spy': true }); import { allowed } from '@/lib/auth/(shell)/[tenant]/policy';",
+        ],
+        [
+          'tests/spy.test.ts',
+          "vi.mock('@/lib/auth/(shell)/[tenant]/policy', { spy: true }); import { allowed } from '@/lib/auth/(shell)/[tenant]/policy';",
+        ],
+        [
+          'tests/relative.test.ts',
+          "import { allowed } from '../lib/auth/(shell)/[tenant]/policy.js';",
+        ],
+        ['tests/barrel.test.ts', "import { allowed } from '@/lib/barrel';"],
+        [
+          'tests/dynamic.test.ts',
+          "const { allowed } = await import('@/lib/facade');",
+        ],
+        [
+          'tests/require.test.ts',
+          "const { allowed } = require('../lib/auth/(shell)/[tenant]/policy.ts');",
+        ],
+        [
+          'tests/actual.test.ts',
+          "vi.mock('@/lib/auth/(shell)/[tenant]/policy', () => ({ allowed: () => false })); const { allowed } = await vi.importActual<typeof import('@/lib/auth/(shell)/[tenant]/policy')>('@/lib/auth/(shell)/[tenant]/policy');",
+        ],
+        [
+          'tests/original.test.ts',
+          "vi.mock('@/lib/facade', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/facade')>(), helper: vi.fn() })); import { allowed } from '@/lib/facade';",
+        ],
+      ]);
+      const tests = new Map();
+      for (const [path, contents] of imports) {
+        const text = `import { expect, it, vi } from 'vitest';\n${contents}\n${check}`;
+        tests.set(path, text);
+        put(path, text);
+      }
+      const mockOnly = 'tests/mock-only.test.ts';
+      const mockText = `import { expect, it, vi } from 'vitest';
+        vi.mock('@/lib/auth/(shell)/[tenant]/policy', () => ({ allowed: () => false }));
+        import { allowed } from '@/lib/auth/(shell)/[tenant]/policy'; ${check}`;
+      tests.set(mockOnly, mockText);
+      put(mockOnly, mockText);
+      const selected = createTestSelector(
+        tests,
+        readModuleSource(root)
+      )(target);
+      expect(selected).toEqual([...imports.keys()].sort());
+      const receipt = join(root, 'receipt.json');
+      const run = () =>
+        spawnSync(
+          process.execPath,
+          [
+            join(repoRoot, 'node_modules/vitest/vitest.mjs'),
+            'run',
+            '--config',
+            join(root, 'vitest.config.mutation.mjs'),
+            '--reporter',
+            'json',
+            '--outputFile',
+            receipt,
+            ...selected,
+          ],
+          {
+            cwd: root,
+            encoding: 'utf8',
+            timeout: 30_000,
+            env: {
+              ...process.env,
+              STRYKER_MUTATION_SOURCE: target,
+              STRYKER_COVERAGE_DIR: join(root, 'target-coverage'),
+            },
+          }
+        );
+      const baseline = run();
+      expect(baseline.status, baseline.stderr + baseline.stdout).toBe(0);
+      expect(readExecutedTests(receipt)).toBe(imports.size);
+      expect(
+        readTargetExecution(
+          join(root, 'target-coverage/coverage-final.json'),
+          join(root, target)
+        ).executedFunctions
+      ).toBeGreaterThan(0);
+      put(target, 'export function allowed(_value: string) { return true; }');
+      const defective = run();
+      expect(defective.status, defective.stderr + defective.stdout).toBe(1);
+      const report = JSON.parse(readFileSync(receipt, 'utf8'));
+      expect(report.numFailedTests).toBe(imports.size);
+      expect(report.numPassedTests).toBe(0);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('target V8 receipt rejects phantom runtime relationships', () => {
+  it.each(['dead-dynamic', 'setup-mock', 'helper-mock'])(
+    'does not confuse a passing test with executed target code: %s',
+    mode => {
+      const root = mkdtempSync(join(tmpdir(), 'mutation-target-execution-'));
+      const target = 'lib/auth/policy.ts';
+      const put = (path, text) => {
+        mkdirSync(join(root, path, '..'), { recursive: true });
+        writeFileSync(join(root, path), text);
+      };
+      try {
+        symlinkSync(
+          join(repoRoot, 'node_modules'),
+          join(root, 'node_modules'),
+          'dir'
+        );
+        put('package.json', JSON.stringify({ type: 'module' }));
+        put(
+          target,
+          "export function allowed(value: string) { return value === 'safe'; }"
+        );
+        const mock =
+          "import { vi } from 'vitest'; vi.mock('@/lib/auth/policy', () => ({ allowed: () => false }));";
+        put('tests/helper.ts', mock);
+        put('tests/setup.ts', mock);
+        put(
+          'vitest.config.fast.mts',
+          `export default {
+        root: ${JSON.stringify(root)}, resolve: { alias: { '@': ${JSON.stringify(root)} } },
+        test: { environment: 'node', include: ['tests/*.test.ts'],
+          setupFiles: ${JSON.stringify(mode === 'setup-mock' ? [join(root, 'tests/setup.ts')] : [])},
+          coverage: { thresholds: { lines: 100, branches: 100, functions: 100, statements: 100 } } }
+      };`
+        );
+        put(
+          'vitest.config.mutation.mjs',
+          readFileSync(
+            join(repoRoot, 'apps/web/vitest.config.mutation.mjs'),
+            'utf8'
+          )
+        );
+        const text =
+          mode === 'dead-dynamic'
+            ? "import { expect, it } from 'vitest'; async function neverCalled() { return import('@/lib/auth/policy'); } it('passes unrelated behavior', () => expect(2 + 2).toBe(4));"
+            : `import { expect, it } from 'vitest'; ${mode === 'helper-mock' ? "import './helper';" : ''} import { allowed } from '@/lib/auth/policy'; it('observes factory mock', () => expect(allowed('unsafe')).toBe(false));`;
+        put('tests/policy.test.ts', text);
+        const selected = createTestSelector(
+          new Map([['tests/policy.test.ts', text]]),
+          readModuleSource(root)
+        )(target);
+        expect(selected).toEqual(['tests/policy.test.ts']);
+        const receipt = join(root, 'tests.json');
+        const run = spawnSync(
+          process.execPath,
+          [
+            join(repoRoot, 'node_modules/vitest/vitest.mjs'),
+            'run',
+            '--config',
+            join(root, 'vitest.config.mutation.mjs'),
+            '--reporter',
+            'json',
+            '--outputFile',
+            receipt,
+            ...selected,
+          ],
+          {
+            cwd: root,
+            encoding: 'utf8',
+            timeout: 30_000,
+            env: {
+              ...process.env,
+              STRYKER_MUTATION_SOURCE: target,
+              STRYKER_COVERAGE_DIR: join(root, 'target-coverage'),
+            },
+          }
+        );
+        expect(run.status, run.stderr + run.stdout).toBe(0);
+        expect(readExecutedTests(receipt)).toBe(1);
+        expect(() =>
+          readTargetExecution(
+            join(root, 'target-coverage/coverage-final.json'),
+            join(root, target)
+          )
+        ).toThrow(
+          /V8 (?:reports no executed target|did not report the selected target)/u
+        );
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    }
+  );
 });

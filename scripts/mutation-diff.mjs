@@ -4,19 +4,23 @@
 //   node scripts/mutation-diff.mjs --base <sha> --head <sha>
 //   node scripts/mutation-diff.mjs --files apps/web/lib/cron/auth.ts
 //
-// Exits non-zero only when Stryker itself fails (a broken harness must not
+// Exits non-zero when selection or execution fails (a broken harness must not
 // look like a clean run). Scores below --low are flagged, never enforced.
 
 import { spawnSync } from 'node:child_process';
-import { appendFileSync, mkdirSync } from 'node:fs';
+import { appendFileSync, mkdirSync, rmSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import {
-  findRelatedTests,
+  createTestSelector,
+  readExecutedTests,
+  readModuleSource,
   readReportMutants,
+  readTargetExecution,
   readTestSources,
   renderSummary,
+  scoreMutants,
   selectHighRiskSources,
   WEB_ROOT,
 } from './lib/mutation-diff.mjs';
@@ -72,65 +76,137 @@ function capTests(source, tests, cap) {
 
 const maxFiles = Number(values['max-files']);
 const maxTests = Number(values['max-tests']);
+for (const [name, value] of [
+  ['max-files', maxFiles],
+  ['max-tests', maxTests],
+]) {
+  if (!Number.isSafeInteger(value) || value < 1) {
+    throw new Error(`--${name} must be a positive integer`);
+  }
+}
 const sources = selectHighRiskSources(changedPaths());
 const toRun = sources.slice(0, maxFiles);
 const skipped = sources.slice(maxFiles);
-const testSources = readTestSources(webRoot);
+const selectTests =
+  sources.length > 0
+    ? createTestSelector(readTestSources(webRoot), readModuleSource(webRoot))
+    : () => [];
 
 /** @type {import('./lib/mutation-diff.mjs').FileResult[]} */
 const results = [];
 /** @type {string[]} */
 const untested = [];
-/** @type {string[]} */
+/** @type {{ file: string, reason: string }[]} */
 const harnessErrors = [];
 
 for (const source of toRun) {
-  const related = findRelatedTests(source, testSources);
-  if (related.length === 0) {
-    untested.push(source);
-    continue;
-  }
-  const tests = capTests(source, related, maxTests);
-  if (values['list-only']) {
-    console.log(`${source}\n  ${tests.join('\n  ')}`);
-    continue;
-  }
-  const reportFile = `reports/mutation/diff/${source.replace(/[^\w.-]+/gu, '_')}.json`;
-  mkdirSync(join(webRoot, dirname(reportFile)), { recursive: true });
-  console.log(`\n▶ ${source} (${tests.length} test file(s))`);
-  const run = spawnSync(
-    join(webRoot, 'node_modules/.bin/stryker'),
-    ['run', 'stryker.diff.config.mjs', '--mutate', source],
-    {
-      cwd: webRoot,
-      stdio: 'inherit',
-      env: {
-        ...process.env,
-        STRYKER_TEST_FILES: tests.join(' '),
-        STRYKER_REPORT_FILE: reportFile,
-      },
+  try {
+    const related = selectTests(source);
+    if (related.length === 0) {
+      untested.push(source);
+      continue;
     }
-  );
-  const mutants = readReportMutants(join(webRoot, reportFile), source);
-  if (run.status !== 0 || !mutants) {
-    harnessErrors.push(source);
-    continue;
+    const tests = capTests(source, related, maxTests);
+    if (values['list-only']) {
+      console.log(`${source}\n  ${tests.join('\n  ')}`);
+      continue;
+    }
+    const reportFile = `reports/mutation/diff/${source.replace(/[^\w.-]+/gu, '_')}.json`;
+    const reportPath = join(webRoot, reportFile);
+    const testReceipt = `${reportPath}.tests.json`;
+    const coverageDir = `${reportPath}.coverage`;
+    mkdirSync(dirname(reportPath), { recursive: true });
+    // Never accept a stale successful report from a previous invocation.
+    rmSync(reportPath, { force: true });
+    rmSync(testReceipt, { force: true });
+    rmSync(coverageDir, { recursive: true, force: true });
+    console.log(`\n▶ ${source} (${tests.length} test file(s))`);
+    const baseline = spawnSync(
+      process.execPath,
+      [
+        './node_modules/vitest/vitest.mjs',
+        'run',
+        '--config',
+        'vitest.config.mutation.mjs',
+        '--bail',
+        '1',
+        '--passWithNoTests=false',
+        '--reporter',
+        'json',
+        '--outputFile',
+        testReceipt,
+        ...tests,
+      ],
+      {
+        cwd: webRoot,
+        stdio: 'inherit',
+        env: {
+          ...process.env,
+          STRYKER_MUTATION_SOURCE: source,
+          STRYKER_COVERAGE_DIR: coverageDir,
+        },
+      }
+    );
+    if (baseline.status !== 0)
+      throw new Error('Vitest baseline process failed');
+    const executedTests = readExecutedTests(testReceipt);
+    const targetExecution = readTargetExecution(
+      join(coverageDir, 'coverage-final.json'),
+      join(webRoot, source)
+    );
+    const run = spawnSync(
+      join(webRoot, 'node_modules/.bin/stryker'),
+      ['run', 'stryker.diff.config.mjs', '--mutate', source],
+      {
+        cwd: webRoot,
+        stdio: 'inherit',
+        env: {
+          ...process.env,
+          STRYKER_TEST_FILES: tests.join(' '),
+          STRYKER_REPORT_FILE: reportFile,
+        },
+      }
+    );
+    if (run.status !== 0) throw new Error('Stryker process failed');
+    const mutants = readReportMutants(reportPath, source);
+    if (!mutants) throw new Error('Stryker did not report the selected source');
+    if (mutants.length === 0) throw new Error('Stryker generated zero mutants');
+    if (scoreMutants(mutants).valid === 0)
+      throw new Error('Stryker reported zero valid mutants');
+    results.push({
+      file: source,
+      tests,
+      mutants,
+      executedTests,
+      targetExecution,
+    });
+  } catch (error) {
+    harnessErrors.push({
+      file: source,
+      reason: error instanceof Error ? error.message : String(error),
+    });
   }
-  results.push({ file: source, tests, mutants });
 }
 
 if (!values['list-only']) {
-  let summary = renderSummary({
+  const summary = renderSummary({
+    sources,
     results,
     untested,
     skipped,
     lowScore: Number(values.low),
+    errors: harnessErrors,
   });
-  if (harnessErrors.length > 0) {
-    summary += `\n### Stryker failed on\n\n${harnessErrors.map(file => `- \`${file}\``).join('\n')}\n`;
-  }
   console.log(`\n${summary}`);
   if (values.summary) appendFileSync(values.summary, summary);
 }
 
-process.exitCode = harnessErrors.length > 0 ? 1 : 0;
+if (values['list-only']) {
+  if (sources.length === 0)
+    console.log('Skipped: no applicable changed high-risk source files.');
+  for (const source of untested)
+    console.error(`Selection failed: ${source}: no runtime test import path`);
+  for (const error of harnessErrors)
+    console.error(`${error.file}: ${error.reason}`);
+}
+process.exitCode = harnessErrors.length > 0 || untested.length > 0 ? 1 : 0;
