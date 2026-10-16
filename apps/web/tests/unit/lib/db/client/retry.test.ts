@@ -257,7 +257,7 @@ describe('operation-aware retry safety', () => {
     expect(operation).toHaveBeenCalledTimes(1);
   });
 
-  it('does not admit another attempt after the retry window expires', async () => {
+  it('does not admit another attempt after the retry budget expires', async () => {
     const error = new Error('connection reset');
     const operation = vi.fn(async () => {
       await new Promise(resolve => setTimeout(resolve, 4900));
@@ -271,7 +271,7 @@ describe('operation-aware retry safety', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it('checks the retry window again after a delayed timer wakes', async () => {
+  it('checks the retry budget again after a delayed timer wakes', async () => {
     vi.spyOn(performance, 'now')
       .mockReturnValueOnce(0)
       .mockReturnValueOnce(0)
