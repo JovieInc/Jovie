@@ -325,6 +325,66 @@ class RouterLadderTest(unittest.TestCase):
                 result = remediation.classify_blocker(subject)
                 self.assertEqual(result["cls"], "fixable-by-model")
 
+    def test_negated_credentials_do_not_mask_positive_strategy_or_paths(self):
+        for extra in (
+            {"title": "Update pricing", "body": "No new credentials or permissions are changed."},
+            {"body": "No credentials change, but update pricing."},
+            {"body": "No new credentials or permissions are changed.",
+             "files": ["canon/strategy/pricing.md"]},
+        ):
+            with self.subTest(extra=extra):
+                self.assertEqual(remediation.classify_blocker(pr(**extra))["cls"],
+                                 "needs-human-decision")
+
+    def test_direct_permission_asks_cover_github_token_and_app_scopes(self):
+        for text in (
+            "Please add contents:write permission to GITHUB_TOKEN.",
+            "Grant workflows:write permission to the GitHub App.",
+            "Could we increase the GitHub App scopes?",
+        ):
+            with self.subTest(text=text):
+                subject = pr(reviewDecision="CHANGES_REQUESTED",
+                             reviewThreads=[{"author": "reviewer", "resolved": False, "body": text}])
+                self.assertEqual(remediation.classify_blocker(subject)["cls"],
+                                 "needs-human-decision")
+
+    def test_current_direct_credential_requests_keep_authority_gate(self):
+        for body in (
+            "Please create a new GitHub token for the monitor.",
+            "Please add the new credential to repository secrets.",
+            "Generate a new token for this workflow.",
+            "We need a new credential.",
+        ):
+            subject = pr(reviewDecision="CHANGES_REQUESTED", reviewSummaries=[
+                {"author": {"type": "User", "login": "reviewer"}, "body": body,
+                 "state": "CHANGES_REQUESTED", "reviewedHead": HEAD}])
+            self.assertEqual(remediation.classify_blocker(subject)["cls"], "needs-human-decision", body)
+
+    def test_review_assurances_and_examples_preserve_independent_positive_asks(self):
+        ordinary = (
+            "No new spend is required. Please add a regression test.",
+            "Add a test asserting that purchase a paid plan never runs.",
+            "No manual deploy is needed; add a regression test.",
+            'Add a test for the quoted request "Please create a new GitHub token".',
+            "Do not purchase a paid plan. Reuse the existing workflow token.",
+            "Please change the existing token header from Bearer to Basic.",
+        )
+        positive = (
+            "No new spend is required, but please purchase a paid plan.",
+            "Add a regression test; please add the new credential to repository secrets.",
+            "No manual deploy is needed. Please expand GitHub token permissions.",
+            "Please submit the App Store build.",
+            "Please perform the billing action.",
+            "Please change DNS.",
+            "Please update pricing.",
+        )
+        for body, expected in [(body, "fixable-by-model") for body in ordinary] + [
+                (body, "needs-human-decision") for body in positive]:
+            subject = pr(reviewDecision="CHANGES_REQUESTED", reviewSummaries=[
+                {"author": {"type": "User", "login": "reviewer"}, "body": body,
+                 "state": "CHANGES_REQUESTED", "reviewedHead": HEAD}])
+            self.assertEqual(remediation.classify_blocker(subject)["cls"], expected, body)
+
     def test_surface_and_hold_nag_dedupe(self):
         body = remediation.surface_body(pr(number=9), {"cls": "needs-human-decision", "subtype": "hold",
                                                        "evidence": ["wait"], "next_action": "tim-decides"}, "hold")

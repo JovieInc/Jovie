@@ -228,15 +228,14 @@ def _actionable(text: str) -> bool:
 
 def _strategy(pr: dict) -> bool:
     files = pr.get("files") or pr.get("paths") or pr.get("conflictFiles") or []
-    blob = " ".join([pr.get("title") or "", pr.get("body") or "", " ".join(str(item) for item in files)])
-    if not STRATEGY_TEXT.search(blob):
-        return False
-    # A negated policy mention ("No credentials or permissions are changed")
-    # is an ordinary repair's assurance, not strategy content.
-    for sentence in re.split(r"(?<=[.!?])\s+", blob):
-        if STRATEGY_TEXT.search(sentence) and not NEGATED_POLICY_TEXT.search(sentence):
-            return True
-    return False
+    # Protected paths are independent evidence; prose assurances cannot negate them.
+    if any(STRATEGY_TEXT.search(str(path)) for path in files):
+        return True
+    # Remove only the negated credential mention. A pricing/taste/strategy ask
+    # in the same sentence or a separate title still requires authority.
+    return any(STRATEGY_TEXT.search(NEGATED_POLICY_TEXT.sub("", text))
+               for text in (pr.get("title") or "", pr.get("body") or ""))
+
 
 def _held_reason(pr: dict, held: dict | None) -> str | None:
     entry = held or {}
@@ -270,6 +269,21 @@ def _green(pr: dict) -> bool:
     if not checks or _failing(pr) or _pending(pr):
         return False
     return all(_conclusion(check) in {"SUCCESS", "SKIPPED", "NEUTRAL"} for check in checks)
+
+
+def review_authority_ask(pr: dict) -> str | None:
+    """Only active human evidence can request an external authority action."""
+    rows = _unresolved(_threads(pr)) + list(pr.get("reviewSummaries") or [])
+    for row in rows:
+        if _bot(row) or row.get("outdated") or row.get("resolved"):
+            continue
+        if row.get("reviewedHead") not in (None, pr.get("headRefOid")):
+            continue
+        if row.get("state") in {"DISMISSED", "PENDING", "APPROVED"}:
+            continue
+        if ask := _human_category("review", str(row.get("body") or "")):
+            return ask
+    return None
 
 
 def classify_blocker(pr: dict, held: dict | None = None, attempts: dict | None = None,
@@ -309,8 +323,7 @@ def classify_blocker(pr: dict, held: dict | None = None, attempts: dict | None =
     # credentials, store submissions) inside an ordinary review; the same
     # detector the labeled-event path uses names it, so the ask surfaces as
     # tim-decides instead of being routed as prescribed implementation.
-    thread_blob = "\n".join(str(thread.get("body") or "") for thread in human_threads)
-    thread_ask = _human_category("review", thread_blob) if human_threads else None
+    thread_ask = review_authority_ask(pr)
     if human_review and not held_here and not stop_labels and not thread_ask \
             and not (pr.get("codeownersBlocked") or "codeowners" in labels):
         # Tim 2026-10-15: ordinary requested changes ship through the automated
@@ -327,10 +340,10 @@ def classify_blocker(pr: dict, held: dict | None = None, attempts: dict | None =
                            evidence, "apply-prescribed-fix")
         return blocker("fixable-by-model", "review",
                        evidence, "escalate")
-    if human_review and thread_ask:
+    if thread_ask:
         return blocker("needs-human-decision", "changes-requested",
-                       ["human changes requested",
-                        f"review thread carries a {thread_ask} decision"],
+                       ["current human review requires authority",
+                        f"review evidence carries a {thread_ask} decision"],
                        "tim-decides")
 
     if held_here and not _actionable(note):
@@ -1150,16 +1163,52 @@ def _human_category(key: str, blob: str) -> str | None:
     tokens = set(re.split(r"[\s:/]+", lowered.replace("-", " ")))
     text = blob.lower()
     if lowered == "review":
-        # Current direct asks to expand credentials/permissions need authority.
-        # Anchor the ask so quoted test examples and ordinary implementation
-        # feedback do not become new founder gates.
-        for sentence in re.split(r"[.!?\n]", text):
-            if re.match(
-                    r"^(?:(?:please|we need to)\s+|(?:should|can|may|could)\s+(?:we|you)\s+)?"
-                    r"(?:expand|increase|grant|elevate)\b", sentence.strip()) \
-                    and re.search(r"\b(?:token|credentials?|app)\b", sentence) \
-                    and re.search(r"\b(?:permissions?|scopes?)\b", sentence):
+        # Review prose contains fixtures, quotations and assurances. Only a
+        # current direct ask carries authority; independent positive clauses
+        # still count when the same review also states a negative assurance.
+        credential = r"\b(?:github[_ -]token|tokens?|credentials?|secrets?|api[ _-]?keys?|passwords?)\b"
+        for clause in re.split(r"[.!?;,\n]|\b(?:but|and)\b", text):
+            clause = re.sub(r"^\s*[-*]\s+", "", clause).strip()
+            if re.match(r"^(?:we|you|this|it)\s+(?:need|requires?)\s+(?:a\s+|an\s+|new\s+)*"
+                        + credential, clause):
                 return "env/DNS/secrets"
+            direct = re.match(
+                r"^(?:(?:please|we need to|you need to|we must|you must)\s+|"
+                r"(?:should|can|may|could)\s+(?:we|you)\s+)?"
+                r"(expand|increase|grant|elevate|add|enable|create|generate|issue|rotate|install|set|store|write|"
+                r"change|update|replace|purchase|buy|subscribe|spend|upgrade|raise|perform|complete|"
+                r"submit|accept|contact|ask|deploy|requires?|need)\b\s*(.*)$", clause)
+            if not direct:
+                continue
+            verb, subject = direct.groups()
+            if re.match(r"(?:(?:the|a|an)\s+)?(?:regression|tests?|coverage|fixture|example)\b", subject):
+                continue
+            if (verb in {"expand", "increase", "grant", "elevate", "add", "enable", "raise", "change"}
+                    and re.search(r"\b(?:github[_ -]token|tokens?|credentials?|app)\b", subject)
+                    and re.search(r"\b(?:permissions?|scopes?)\b", subject)):
+                return "env/DNS/secrets"
+            if re.search(credential, subject) and (
+                    verb in {"create", "generate", "issue", "rotate"}
+                    or (verb in {"add", "install", "set", "store", "write", "change", "update", "replace"}
+                        and re.search(r"\bnew\b|repository secrets|environment secrets", subject))):
+                return "env/DNS/secrets"
+            if (verb in {"purchase", "buy", "subscribe", "spend"}
+                    or (verb in {"upgrade", "increase", "raise"} and re.search(
+                        r"\b(?:paid|premium|plan|subscription|license|billing|spend|budget|credits?)\b", subject))):
+                return "spend"
+            if verb in {"submit", "accept", "complete"} and re.search(r"\b(?:app store|store submission|agreement)\b", subject):
+                return "store submission"
+            if re.search(r"billing[\s-]*actions?", subject):
+                return "billing action"
+            if re.search(r"manual[\s-]*deploy|\bmanually\b", subject):
+                return "manual deploy"
+            if re.search(r"outside[\s-]*humans?", subject):
+                return "outside human"
+            if re.search(r"\bdns\b|env\s*/\s*dns", subject):
+                return "env/DNS/secrets"
+            if STRATEGY_TEXT.search(subject) and not re.search(credential, subject):
+                return "strategy"
+        return None
     if lowered in {"asc-agreements", "asc-agreement"} or "store submission" in text or "store-submission" in lowered:
         return "store submission"
     if "spend" in tokens or re.search(r"\bspend\b", text):

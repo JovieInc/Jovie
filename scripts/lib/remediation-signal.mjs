@@ -9,6 +9,9 @@ export const GREEN_MARKER = '<!-- remediation-green -->';
 /** Lanes claim only this label, so a red signal must carry it to get worked. */
 export const AGENT_READY_LABEL = 'agent-ready';
 
+export const POSTDEPLOY_QUOTA_FINGERPRINT =
+  'github-quota-deferred-postdeploy-probes';
+
 const LOGIN_RE = /auth\.setup|authenticate|sign-?in|login/i;
 const TIMEOUT_RE = /timedout|timed\s*out|timeout/i;
 
@@ -18,6 +21,8 @@ export function remediationIntakeDisabled(env = process.env) {
 }
 
 export function remediationTitle(fingerprint) {
+  if (fingerprint === POSTDEPLOY_QUOTA_FINGERPRINT)
+    return `GitHub quota deferred post-deploy probes (${fingerprint})`;
   return `P0: ${fingerprint} is red (${fingerprint})`;
 }
 
@@ -145,15 +150,22 @@ export function decideAuthSmokeSignal(input = {}) {
   return { action: 'skip' };
 }
 
-export function decideMonitorSignal({ conclusion }) {
-  if (conclusion === 'success') return { action: 'green' };
+export function decideMonitorSignal({ conclusion, fingerprint = '' }) {
+  if (conclusion === 'success') {
+    return fingerprint === 'production-monitor-postdeploy-probes'
+      ? {
+          action: 'green',
+          fingerprints: [fingerprint, POSTDEPLOY_QUOTA_FINGERPRINT],
+        }
+      : { action: 'green' };
+  }
   if (conclusion === 'quota-deferred') {
     // Every hard quota needs a standing canary (infra guardrail #2): a
     // deferred post-deploy read must surface, not vanish into a green skip.
-    // It is not a production failure, so it files low priority, never red.
+    // The intake action files a low-priority quota canary, not a P0 outage.
     return {
       action: 'red',
-      fingerprint: 'github-quota-deferred-postdeploy-probes',
+      fingerprint: POSTDEPLOY_QUOTA_FINGERPRINT,
       detail:
         'Post-deploy probe reads deferred on GitHub installation quota; probes retried on the next Production Controller completion.',
     };
@@ -186,7 +198,7 @@ export async function fileRemediationSignal({
     fingerprint,
     title: remediationTitle(fingerprint),
     description: describeRemediation({ fingerprint, source, runUrl, detail }),
-    priority: 1,
+    priority: fingerprint === POSTDEPLOY_QUOTA_FINGERPRINT ? 3 : 1,
     createStateName: 'Todo',
     keepLabelIds: ready.ok && ready.id ? [ready.id] : [],
     reopenTerminal: true,

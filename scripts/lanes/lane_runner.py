@@ -3573,7 +3573,11 @@ def escalate_exhausted(host: Host, prs: list[dict], linear) -> None:
     def healthy(_name, spec):
         return provider_healthy(spec)
 
-    for pr in exhausted_prs(prs, attempts, held):
+    for candidate in exhausted_prs(prs, attempts, held):
+        pr = reconcile_fix_target(candidate)
+        if (pr is None or pr.get("state") != "OPEN" or pr.get("isInMergeQueue") is not False
+                or any(pr.get(key) != candidate.get(key) for key in ("headRefOid", "headRefName"))):
+            continue  # No rungs or budget changes without fresh complete authority.
         record = dict(attempts.get(str(pr["number"]), {}))
         classified = remediation.classify_blocker(pr, held.get(str(pr["number"])), record)
         _remember_class(data, pr, classified)
@@ -4437,13 +4441,9 @@ def review_excerpt(pr: dict, limit: int = 4000) -> str:
     """The reviewers' own words, so the fixer addresses what was asked, not what it guesses."""
     if pr.get("reviewDecision") != "CHANGES_REQUESTED" and "review" not in pr.get("eventKinds", ()):
         return ""
-    listed = sh(["gh", "api", f"repos/{REPO_SLUG}/pulls/{pr['number']}/comments?per_page=50", "--jq",
-                 '.[] | "- \\(.path):\\(.line // .original_line // 0) \\(.body | gsub("\\n"; " "))"'])
-    reviews = sh(["gh", "api", f"repos/{REPO_SLUG}/pulls/{pr['number']}/reviews?per_page=20", "--jq",
-                  '.[] | select(.state == "CHANGES_REQUESTED" or (.state == "COMMENTED" and (.body | length) > 0)) '
-                  '| "- review: \\(.body | gsub("\\n"; " "))"'])
-    text = "\n".join(part for part in ((reviews.stdout or "").strip(), (listed.stdout or "").strip()) if part)
-    return ("Reviewers requested changes:\n" + text)[:limit] if text else "Reviewers requested changes (no comment text readable)."
+    rows = list(pr.get("reviewSummaries") or []) + list(pr.get("reviewThreads") or [])
+    text = "\n".join(f"- {row['author']['login']}: {row['body']}" for row in rows if row.get("body"))
+    return ("Reviewers requested changes:\n" + text)[:limit] if text else "Reviewers requested changes (no active current-head comment text)."
 
 
 def render_fix_prompt(pr: dict, excerpt: str) -> str:
@@ -4537,7 +4537,13 @@ def resolve_generated_conflict(worktree: Path, branch: str, log, *, guard=lambda
 
 
 REPAIR_AUTHORITY_FIELDS = """number title body state mergedAt headRefName headRefOid url isDraft mergeStateStatus reviewDecision updatedAt
-isCrossRepository isInMergeQueue labels(first:100){pageInfo{hasNextPage} nodes{name}}"""
+isCrossRepository isInMergeQueue labels(first:100){pageInfo{hasNextPage} nodes{name}}
+latestOpinionatedReviews(first:100,writersOnly:false){totalCount pageInfo{hasNextPage}
+nodes{id state body submittedAt updatedAt author{__typename login} commit{oid}}}
+reviewThreads(first:100){totalCount pageInfo{hasNextPage} nodes{id isResolved isOutdated
+comments(first:100){totalCount pageInfo{hasNextPage}
+nodes{id body state outdated updatedAt author{__typename login}
+pullRequestReview{id state commit{oid}}}}}}"""
 REPAIR_CENSUS_FIELDS = """totalCount checkRunCount statusContextCount
 checkRunCountsByState{count state} statusContextCountsByState{count state}"""
 REPAIR_TARGET_FIELDS = REPAIR_AUTHORITY_FIELDS + """
@@ -4617,6 +4623,7 @@ def repair_negative_census_snapshot(pr: dict, live: dict) -> tuple:
             or any(state in {"EXPECTED", "PENDING"} for state in census[4])):
         raise ValueError("negative-census-predicate-unproved")
     authority["dependencyMetadataDigest"] = dependency_diff.metadata_digest(live)
+    authority["reviewAuthorityDigest"] = repair_review_authority(live)[2]
     return authority, census
 
 
@@ -4719,6 +4726,7 @@ def reconcile_fix_target(pr: dict) -> dict | None:
                          ("number", "state", "headRefOid", "headRefName", "isInMergeQueue",
                           "isCrossRepository", "isDraft", "mergeStateStatus", "reviewDecision", "labels")}
             ownership["dependencyMetadataDigest"] = normalized["dependencyMetadataDigest"]
+            ownership["reviewAuthorityDigest"] = normalized["reviewAuthorityDigest"]
             if anchor is not None and ownership != anchor:
                 return None  # Never splice checks across a head, queue, review or hold transition.
             anchor = ownership
@@ -4760,6 +4768,101 @@ def reconcile_fix_target(pr: dict) -> dict | None:
         return None
     except (OSError, subprocess.SubprocessError, ValueError, KeyError, IndexError, TypeError, AttributeError):
         return None
+
+
+def repair_review_authority(live: dict) -> tuple:
+    """Complete bounded current-head review evidence; never cached prose authority."""
+    def complete(connection):
+        rows = connection["nodes"]
+        if (connection["pageInfo"]["hasNextPage"] is not False
+                or type(connection["totalCount"]) is not int
+                or not isinstance(rows, list) or len(rows) > 100
+                or connection["totalCount"] != len(rows)
+                or any(not isinstance(row, dict) or not isinstance(row.get("id"), str)
+                       or not row["id"].strip() for row in rows)
+                or len({row["id"] for row in rows}) != len(rows)):
+            raise ValueError("repair-reviews-incomplete")
+        return rows
+
+    def actor(row, active):
+        value = row.get("author")
+        if value is None and not active:
+            return None
+        if (not isinstance(value, dict) or value.get("__typename") not in {"User", "Bot"}
+                or not isinstance(value.get("login"), str) or not value["login"].strip()):
+            raise ValueError("repair-review-actor-invalid")
+        return {"login": value["login"], "type": value["__typename"]}
+
+    def text(row, key):
+        value = row[key]
+        if not isinstance(value, str):
+            raise ValueError("repair-review-text-invalid")
+        return value
+
+    def flag(row, key):
+        value = row[key]
+        if type(value) is not bool:
+            raise ValueError("repair-review-flag-invalid")
+        return value
+
+    def commit(row, *, inactive=False):
+        provenance = row["commit"]
+        if provenance is None and inactive:
+            return None
+        value = provenance["oid"]
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("repair-reviewed-head-invalid")
+        return value
+
+    summaries, threads, raw_summaries, raw_threads, actors = [], [], [], [], set()
+    for row in complete(live["latestOpinionatedReviews"]):
+        state = row["state"]
+        if state not in {"APPROVED", "CHANGES_REQUESTED", "DISMISSED"}:
+            raise ValueError("repair-review-state-invalid")
+        reviewed = commit(row, inactive=state in {"APPROVED", "DISMISSED"})
+        active = state == "CHANGES_REQUESTED" and reviewed == live["headRefOid"]
+        who = actor(row, active)
+        if who:
+            key = (who["type"], who["login"].lower())
+            if key in actors:
+                raise ValueError("repair-review-actor-ambiguous")
+            actors.add(key)
+        normalized = {"id": row["id"], "state": state, "body": text(row, "body"),
+                      "submittedAt": text(row, "submittedAt"), "updatedAt": text(row, "updatedAt"),
+                      "author": who, "reviewedHead": reviewed}
+        raw_summaries.append(normalized)
+        if active:
+            summaries.append(normalized)
+    for thread in complete(live["reviewThreads"]):
+        resolved, outdated = flag(thread, "isResolved"), flag(thread, "isOutdated")
+        comments = []
+        for row in complete(thread["comments"]):
+            state, comment_outdated = row["state"], flag(row, "outdated")
+            review = row["pullRequestReview"]
+            if (state not in {"PENDING", "SUBMITTED"} or not isinstance(review, dict)
+                    or not isinstance(review.get("id"), str) or not review["id"].strip()
+                    or review.get("state") not in {"PENDING", "COMMENTED", "APPROVED",
+                                                  "CHANGES_REQUESTED", "DISMISSED"}):
+                raise ValueError("repair-inline-review-invalid")
+            inactive = (resolved or outdated or comment_outdated or state == "PENDING"
+                        or review["state"] in {"PENDING", "DISMISSED"})
+            reviewed = commit(review, inactive=inactive)
+            active = (not resolved and not outdated and not comment_outdated and state == "SUBMITTED"
+                      and review["state"] not in {"PENDING", "DISMISSED"} and reviewed == live["headRefOid"])
+            normalized = {"id": row["id"], "body": text(row, "body"), "state": state,
+                          "updatedAt": text(row, "updatedAt"), "author": actor(row, active),
+                          "outdated": comment_outdated, "reviewId": review["id"],
+                          "reviewState": review["state"], "reviewedHead": reviewed,
+                          "threadId": thread["id"], "resolved": resolved}
+            comments.append(normalized)
+            if active:
+                threads.append(normalized)
+        raw_threads.append({"id": thread["id"], "resolved": resolved, "outdated": outdated,
+                            "comments": sorted(comments, key=lambda row: row["id"])})
+    evidence = {"summaries": sorted(raw_summaries, key=lambda row: row["id"]),
+                "threads": sorted(raw_threads, key=lambda row: row["id"]), "complete": True}
+    digest = hashlib.sha256(json.dumps(evidence, sort_keys=True).encode()).hexdigest()
+    return summaries, threads, digest
 
 
 def repair_target_node(pr: dict, live) -> dict | None:
@@ -4810,6 +4913,9 @@ def repair_target_node(pr: dict, live) -> dict | None:
                             or (check["conclusion"] is not None and not isinstance(check["conclusion"], str))))):
                     return None
         fresh = {**pr, **live, "labels": labels["nodes"], "statusCheckRollup": checks}
+        summaries, threads, digest = repair_review_authority(live)
+        fresh.update(reviewSummaries=summaries, reviewThreads=threads, reviewAuthorityDigest=digest)
+        fresh.pop("latestOpinionatedReviews", None)
         fresh["dependencyMetadataDigest"] = dependency_diff.metadata_digest(live)
         fresh.pop("commits", None)
         return fresh
@@ -4951,6 +5057,8 @@ def require_fix_target(pr: dict, stage: str, *, worktree: Path | None = None, re
         if worktree is None or not repair_created_head(worktree, live["headRefOid"],
                                                        allow_local_progress=stage == "agent-running"):
             raise RepairStopped("target-head-superseded", live, stage)
+    if repair and remediation.review_authority_ask(live):
+        raise RepairStopped("target-review-requires-authority", live, stage)
     return live
 
 
