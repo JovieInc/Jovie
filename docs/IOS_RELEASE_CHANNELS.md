@@ -39,6 +39,56 @@ Timestamps and the earliest missing stage across this path are a Summer/Ovi
 observability surface (JOV-6738), not a workflow concern. A TestFlight stall
 must surface with evidence and never gate unrelated web/Mac/customer releases.
 
+## Bounded internal TestFlight release lease (JOV-8515)
+
+The serial `ios-testflight` lane pins one certified source while new main
+commits arrive. GitHub retains the latest pending generation, which compares
+the complete iOS delta from the last proven upload when it takes the lane.
+
+**Ship now:** certification is valid for at most 140 minutes after the exact
+`Production Verified` job completes. This is the existing critical-path budget:
+10 minutes authorization + 55 minutes simulator regression + 75 minutes beta.
+Rerunning or waiting for a runner never renews that deadline. Artifact retention
+is storage lifetime, not certificate validity. **Re-evaluate when:** actual
+capture/archive/upload receipts show this budget prevents forward progress.
+**Then:** review the measured bottleneck and policy together through normal PR
+checks before changing the bound.
+
+`.github/testflight-release-policy.json` on authoritative current main is the
+revocation authority. Maintainers use the normal reviewed PR/queue path to set
+`blocked`, add certified SHAs to `revokedSources`, or change the policy revision.
+Any policy digest change invalidates existing leases. Cancelling the active
+TestFlight run also stops its lease. No additional credentials or permissions
+are required.
+
+Admission, archive and the final boundary immediately before upload re-prove
+the exact source CI, controller attempt, Production Verified job and immutable
+marker. The source, controller transport, TestFlight transport and admission
+main must remain in current-main ancestry. The source must descend from prior
+uploaded/reserved sources. Rewrites, expiry, missing evidence, changed attempts,
+revocation and unknown API state fail closed.
+
+An immutable `testflight-upload-intent-<baseline>` artifact reserves each source before
+native work. The same source cannot be retried after an uncertain upload or a
+rerun, even if recording its final receipt failed. An expired/unreadable intent
+is an unresolved side effect, not permission to upload again. A successful
+upload source seals its predecessors and starts the next baseline bucket;
+validation follows successor buckets so late publication of an older receipt
+cannot hide newer reservations. A newer certified descendant may proceed. Existing simulator, signing, production configuration,
+security and binary integrity gates remain mandatory.
+
+The upload receipt's `sha` is the certified source. `transportSha` identifies
+the TestFlight workflow transport, while its embedded lease identifies the
+controller transport, exact CI/verification attempts, evidence IDs, policy
+digest and fixed expiry. Actions job `head_sha` authenticates transport and
+must never be substituted for the source stamped into the binary.
+
+A publisher-only rerun may preserve the successful beta and its binary
+attestation from a strictly earlier failed attempt. Reading that v2 receipt
+still requires the latest workflow to have succeeded and the exact earlier
+beta job to have succeeded. Legacy receipts retain the successful-attempt
+requirement; cancelled, timed-out, unknown and contradictory attempts fail closed.
+
 ## Provenance inside the app
 
 `AppBuildInfo` (`apps/ios/Jovie/Features/Settings/SettingsView.swift`) reports:
