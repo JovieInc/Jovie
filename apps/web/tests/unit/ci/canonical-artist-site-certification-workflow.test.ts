@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -29,6 +30,8 @@ const parsedCi = parseYaml(ci) as {
         name?: string;
         if?: string;
         'continue-on-error'?: boolean;
+        env?: Record<string, string>;
+        run?: string;
       }[];
     }
   >;
@@ -65,6 +68,44 @@ describe('JOV-6572 canonical artist-site certification workflow', () => {
     expect(ci).toContain('steps.canonical_claim_contract.outcome');
     expect(ci).toContain('steps.canonical_revenue.outcome');
     expect(ci).toContain('steps.canonical_profile.outcome');
+  });
+
+  it('supplies a claim-cookie signing key to the Golden Path server', () => {
+    const journey = parsedCi.jobs['ci-golden-path']?.steps?.find(
+      step => step.id === 'canonical_journey'
+    );
+    // Execute the server's exports with the workflow's step environment.
+    // Missing inherited configuration must fail before the claim returns 500.
+    const render = (value: string) =>
+      value.replace(/\$\{\{.*?\}\}/g, 'ci-fixture');
+    const exports = journey?.run
+      ?.split('\n')
+      .filter(line => line.trimStart().startsWith('export '))
+      .map(render);
+    expect(exports?.length).toBeGreaterThan(0);
+    const result = spawnSync(
+      'bash',
+      [
+        '--noprofile',
+        '--norc',
+        '-euc',
+        `${exports?.join('\n')}\nexec "$JOVIE_TEST_NODE_BINARY" -e 'require("node:crypto").createHmac("sha256", process.env.URL_ENCRYPTION_KEY).update("pending-claim-cookie").digest("hex")'`,
+      ],
+      {
+        encoding: 'utf8',
+        env: {
+          ...Object.fromEntries(
+            Object.entries(journey?.env ?? {}).map(([key, value]) => [
+              key,
+              render(value),
+            ])
+          ),
+          PATH: process.env.PATH,
+          JOVIE_TEST_NODE_BINARY: process.execPath,
+        },
+      }
+    );
+    expect(result.status, result.stderr).toBe(0);
   });
 
   it('always persists the certificate and fails the job on RED', () => {
