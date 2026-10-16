@@ -894,7 +894,7 @@ jobs:
         id: mutation-head
         env:
           GH_TOKEN: ${{ github.token }}
-          GH_API_HOLD_BUDGET_SECONDS: '240'
+          MAIN_LINEAGE_TRANSPORT: git
           EXPECTED_SHA: ${{ inputs.expected_sha }}
         run: |
           bash "$GITHUB_WORKSPACE/.github/scripts/recheck-main-lineage.sh" "at production mutation"
@@ -1313,7 +1313,7 @@ jobs:
         if: ${{ steps.mutation-head.outputs.is_current == 'true' && ((inputs.full_runtime_proof && steps.performance-gate.outcome == 'success') || (!inputs.full_runtime_proof && steps.performance-gate.outcome == 'skipped')) }}
         env:
           GH_TOKEN: ${{ github.token }}
-          GH_API_HOLD_BUDGET_SECONDS: '240'
+          MAIN_LINEAGE_TRANSPORT: git
           EXPECTED_MAIN_SHA: ${{ inputs.expected_sha }}
         run: |
           bash "$GITHUB_WORKSPACE/.github/scripts/recheck-main-lineage.sh" "before production promotion"

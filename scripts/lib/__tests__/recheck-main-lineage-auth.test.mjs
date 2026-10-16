@@ -19,11 +19,12 @@ const gate = resolve(
 const token = 'harness-token';
 const encoded = Buffer.from(`x-access-token:${token}`).toString('base64');
 
-/** @param {{ mode?: string, wrongToken?: boolean, denyFetch?: boolean }} [options] */
+/** @param {{ mode?: string, wrongToken?: boolean, denyFetch?: boolean, transport?: string }} [options] */
 async function recheck({
   mode = 'ahead',
   wrongToken = false,
   denyFetch = false,
+  transport = 'rest',
 } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'lineage-https-'));
   const seed = join(root, 'seed');
@@ -157,6 +158,7 @@ async function recheck({
         GITHUB_REPOSITORY: 'JovieInc/Jovie',
         GITHUB_OUTPUT: output,
         MAIN_LINEAGE_REMOTE: `https://127.0.0.1:${address.port}/repo.git`,
+        MAIN_LINEAGE_TRANSPORT: transport,
         GH_TOKEN: wrongToken ? 'wrong-fixture-token' : token,
         GIT_SSL_CAINFO: cert,
         GIT_TERMINAL_PROMPT: '0',
@@ -217,6 +219,36 @@ it.each(['exact', 'ahead', 'diverged'])(
       expect(
         result.gitRequests.some(r => r.path.endsWith('/git-upload-pack'))
       ).toBe(true);
+  }
+);
+
+it.each(['exact', 'ahead', 'diverged'])(
+  'proves %s lineage with git and zero installation REST calls',
+  async mode => {
+    const result = await recheck({ mode, transport: 'git' });
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.requests).toEqual([]);
+    expect(result.output).toBe(
+      mode === 'diverged'
+        ? `superseded_sha=${result.mainSha}\nis_current=false\n`
+        : 'is_current=true\n'
+    );
+    expect(result.gitRequests.length).toBeGreaterThan(0);
+    expect(result.gitRequests.every(request => request.authorized)).toBe(true);
+  }
+);
+
+it.each([
+  { wrongToken: true, transport: 'git' },
+  { denyFetch: true, transport: 'git' },
+])(
+  'git transport fails closed on HTTPS credential denial: %j',
+  async options => {
+    const result = await recheck(options);
+    expect(result.code).not.toBe(0);
+    expect(result.requests).toEqual([]);
+    expect(result.output).not.toContain('is_current=true');
+    expect(result.gitRequests.some(request => !request.authorized)).toBe(true);
   }
 );
 

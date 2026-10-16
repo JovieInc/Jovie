@@ -194,7 +194,7 @@ function getJobBlock(workflow, jobKey) {
   return block.join('\n');
 }
 
-function getStepRunScript(jobBlock, stepName) {
+function getStepText(jobBlock, stepName) {
   const lines = jobBlock.split('\n');
   const stepStart = lines.findIndex(
     line => line === `      - name: ${stepName}`
@@ -203,10 +203,13 @@ function getStepRunScript(jobBlock, stepName) {
   const stepEnd = lines.findIndex(
     (line, index) => index > stepStart && /^      - /.test(line)
   );
-  const stepLines = lines.slice(
-    stepStart,
-    stepEnd === -1 ? lines.length : stepEnd
-  );
+  return lines
+    .slice(stepStart, stepEnd === -1 ? lines.length : stepEnd)
+    .join('\n');
+}
+
+function getStepRunScript(jobBlock, stepName) {
+  const stepLines = getStepText(jobBlock, stepName).split('\n');
   const runStart = stepLines.findIndex(line => line === '        run: |');
   if (runStart < 0) throw new Error(`Missing run block: ${stepName}`);
   return stepLines
@@ -924,14 +927,11 @@ describe('forward-only release lineage', () => {
     ['staging-head', 'Resolve current main HEAD'],
     ['alias-staging', 'Recheck main immediately before staging alias'],
     ['production-head', 'Resolve current main HEAD'],
-    [
-      'promote-production',
-      'Recheck main immediately before production mutation',
-    ],
-    [
-      'promote-production',
-      'Recheck main immediately before production promotion',
-    ],
+  ];
+
+  const GIT_RECHECK_STEPS = [
+    'Recheck main immediately before production mutation',
+    'Recheck main immediately before production promotion',
   ];
 
   function stubLineageGh(bin) {
@@ -1083,27 +1083,42 @@ esac
     });
   }
 
-  it.each([
-    'Recheck main immediately before production mutation',
-    'Recheck main immediately before production promotion',
-  ])(
-    '%s proves lineage when the quota reset exceeds the wait budget',
+  it.each(GIT_RECHECK_STEPS)(
+    '%s proves lineage with git and does not call installation REST',
     stepName => {
+      const step = getStepText(
+        getJobBlock(RELEASE_WORKFLOW, 'promote-production'),
+        stepName
+      );
+      expect(step).toContain('MAIN_LINEAGE_TRANSPORT: git');
+      expect(step).not.toContain('GH_API_HOLD_BUDGET_SECONDS');
+      expect(step).not.toContain('gh-api-hold.sh');
+
       for (const mode of ['exact', 'ahead', 'diverged']) {
-        const current = runRateLimitedAlias(
-          mode,
+        const remote = makeLineageRemote(mode);
+        const expected = mode === 'exact' ? remote.tip : remote.base;
+        const current = runRecheck(
           'promote-production',
           stepName,
+          remote.tip,
+          'identical',
+          9,
           {
-            GH_API_HOLD_BUDGET_SECONDS: '240',
+            EXPECTED_SHA: expected,
+            EXPECTED_MAIN_SHA: expected,
+            MAIN_LINEAGE_REMOTE: remote.remote,
+            MAIN_LINEAGE_TRANSPORT: 'git',
             STUB_RATE_LIMIT_RESET: String(Math.floor(Date.now() / 1000) + 3600),
           }
         );
         expect(current.result.status, current.result.stderr).toBe(0);
-        expect(current.result.stderr).toContain('outside the 240s budget');
+        expect(current.attempts).toBe(0);
+        expect(current.result.stderr).not.toContain(
+          'API rate limit exceeded for installation'
+        );
         expect(current.outputs.is_current).toBe(String(mode !== 'diverged'));
         if (mode === 'diverged') {
-          expect(current.outputs.superseded_sha).toMatch(/^[0-9a-f]{40}$/);
+          expect(current.outputs.superseded_sha).toBe(remote.tip);
         } else {
           expect(current.outputs.superseded_sha).toBeUndefined();
         }
@@ -1111,25 +1126,44 @@ esac
     }
   );
 
-  it.each([
-    'Recheck main immediately before production mutation',
-    'Recheck main immediately before production promotion',
-  ])('%s fails closed when REST and git are unavailable', stepName => {
+  it.each(GIT_RECHECK_STEPS)(
+    '%s fails closed when git cannot prove lineage',
+    stepName => {
+      const current = runRecheck(
+        'promote-production',
+        stepName,
+        EXPECTED_SHA,
+        'identical',
+        9,
+        {
+          MAIN_LINEAGE_TRANSPORT: 'git',
+          MAIN_LINEAGE_REMOTE: join(tmpdir(), 'missing-lineage-remote'),
+          STUB_RATE_LIMIT_RESET: String(Math.floor(Date.now() / 1000) + 3600),
+        }
+      );
+      expect(current.result.status).not.toBe(0);
+      expect(current.attempts).toBe(0);
+      expect(current.outputs.is_current).toBeUndefined();
+      expect(current.outputs.superseded_sha).toBeUndefined();
+      expect(current.result.stderr).not.toContain('is_current=true');
+    }
+  );
+
+  it('rejects an unknown main-lineage transport', () => {
     const current = runRecheck(
       'promote-production',
-      stepName,
+      'Recheck main immediately before production mutation',
       EXPECTED_SHA,
       'identical',
-      9,
-      {
-        GH_API_HOLD_BUDGET_SECONDS: '240',
-        STUB_RATE_LIMIT_RESET: String(Math.floor(Date.now() / 1000) + 3600),
-        MAIN_LINEAGE_REMOTE: join(tmpdir(), 'missing-lineage-remote'),
-      }
+      0,
+      { MAIN_LINEAGE_TRANSPORT: 'skip' }
     );
     expect(current.result.status).not.toBe(0);
+    expect(current.attempts).toBe(0);
     expect(current.outputs.is_current).toBeUndefined();
-    expect(current.outputs.superseded_sha).toBeUndefined();
+    expect(current.result.stderr).toContain(
+      'MAIN_LINEAGE_TRANSPORT must be rest or git'
+    );
   });
 
   it('resolves an unchanged main through git when REST is rate limited', () => {
@@ -1319,7 +1353,9 @@ esac
         STUB_RATE_LIMIT_RESET: String(Math.floor(Date.now() / 1000) + 3600),
       });
       expect(current.result.status, current.result.stderr).toBe(0);
-      expect(current.result.stderr).toContain('outside the 240s budget');
+      expect(current.result.stderr).not.toContain(
+        'API rate limit exceeded for installation'
+      );
       expect(current.promoted).toBe(mode !== 'diverged');
       expect(current.outputs.promotion_sha).toBe(
         mode === 'diverged' ? remote.tip : expected
@@ -1344,28 +1380,32 @@ esac
   });
 
   it('promotes an exact or ancestor generation and reports the promoted SHA', () => {
-    const exact = runPromote(EXPECTED_SHA, 'identical');
-    expect(exact.result.status, exact.result.stderr).toBe(0);
-    expect(exact.promoted).toBe(true);
-    expect(exact.stagingAlias).toBe('dpl_staging_preview');
-    expect(exact.stagingRestored).toBe(true);
-    expect(exact.outputs.promotion_sha).toBe(EXPECTED_SHA);
-
-    const ancestor = runPromote(NEWER_SHA, 'ahead');
-    expect(ancestor.result.status, ancestor.result.stderr).toBe(0);
-    expect(ancestor.promoted).toBe(true);
-    expect(ancestor.stagingAlias).toBe('dpl_staging_preview');
-    expect(ancestor.stagingRestored).toBe(true);
-    expect(ancestor.outputs.promotion_sha).toBe(EXPECTED_SHA);
+    for (const mode of ['exact', 'ahead']) {
+      const remote = makeLineageRemote(mode);
+      const expected = mode === 'exact' ? remote.tip : remote.base;
+      const current = runPromote(remote.tip, 'identical', {
+        EXPECTED_MAIN_SHA: expected,
+        MAIN_LINEAGE_REMOTE: remote.remote,
+      });
+      expect(current.result.status, current.result.stderr).toBe(0);
+      expect(current.promoted).toBe(true);
+      expect(current.stagingAlias).toBe('dpl_staging_preview');
+      expect(current.stagingRestored).toBe(true);
+      expect(current.outputs.promotion_sha).toBe(expected);
+    }
   });
 
   it('yields without mutation when the generation left main lineage', () => {
-    const diverged = runPromote(NEWER_SHA, 'diverged');
+    const remote = makeLineageRemote('diverged');
+    const diverged = runPromote(remote.tip, 'diverged', {
+      EXPECTED_MAIN_SHA: remote.base,
+      MAIN_LINEAGE_REMOTE: remote.remote,
+    });
     expect(diverged.result.status, diverged.result.stderr).toBe(0);
     expect(diverged.promoted).toBe(false);
     expect(diverged.stagingAlias).toBe('dpl_staging_preview');
     expect(diverged.stagingRestored).toBe(false);
-    expect(diverged.outputs.promotion_sha).toBe(NEWER_SHA);
+    expect(diverged.outputs.promotion_sha).toBe(remote.tip);
   });
 });
 
