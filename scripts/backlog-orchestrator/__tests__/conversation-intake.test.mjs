@@ -78,6 +78,18 @@ describe('conversation issue reconciliation', () => {
     const cases = [
       { title: 'Archive my Telegram chats' },
       { title: 'Cleanup Telegram inbox', classification: 'jovie' },
+      {
+        title: 'Export Telegram messages',
+        classification: 'jovie',
+        description: 'Message contents: private-canary-omit-entirely',
+        conversationReceipt: { id: 'export-receipt' },
+      },
+      {
+        title: 'Export Telegram messages via webhook',
+        classification: 'jovie',
+        conversationReceipt: { id: 'webhook-export-receipt' },
+      },
+      { title: 'Update Telegram profile', classification: 'jovie' },
       { title: 'Local request', classification: 'personal' },
       { title: 'Company bug plus private task', classification: 'mixed' },
       { title: 'Local request', externalization: 'denied' },
