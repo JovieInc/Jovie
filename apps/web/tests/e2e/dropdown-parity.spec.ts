@@ -588,6 +588,9 @@ test.describe('Dropdown Parity — Noir Ion', () => {
     );
 
     await item.hover();
+    // duration-fast is 100ms. The icon hover test in this file already
+    // waits 200ms so it reads settled paint rather than the first frame.
+    await page.waitForTimeout(200);
 
     const bgAfterHover = await item.evaluate(
       el => globalThis.getComputedStyle(el).backgroundColor
