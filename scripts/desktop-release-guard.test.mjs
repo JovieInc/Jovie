@@ -1194,9 +1194,14 @@ printf '%s' "$MOCK_COMPARE_JSON"
     desktopWorkflow,
     'Revalidate authorized mainline source before packaging'
   );
-  const nextStep = rawBody.split('\n').findIndex(line => line.startsWith('      - '));
-  const body = (nextStep === -1 ? rawBody : rawBody.split('\n').slice(0, nextStep).join('\n'));
-  const run = async (env) => {
+  const nextStep = rawBody
+    .split('\n')
+    .findIndex(line => line.startsWith('      - '));
+  const body =
+    nextStep === -1
+      ? rawBody
+      : rawBody.split('\n').slice(0, nextStep).join('\n');
+  const run = async env => {
     for (const name of ['git.log', 'gh.log', 'sleep.log']) {
       await rm(join(root, name), { force: true });
     }
@@ -1221,17 +1226,24 @@ printf '%s' "$MOCK_COMPARE_JSON"
       },
     });
   };
-  const ghLog = async () => readFile(join(root, 'gh.log'), 'utf8').catch(() => '');
+  const ghLog = async () =>
+    readFile(join(root, 'gh.log'), 'utf8').catch(() => '');
 
   const sameTip = await run();
   assert.equal(sameTip.status, 0, sameTip.stderr);
-  assert.match(await readFile(join(root, 'git.log'), 'utf8'), new RegExp(releaseSha));
+  assert.match(
+    await readFile(join(root, 'git.log'), 'utf8'),
+    new RegExp(releaseSha)
+  );
   assert.doesNotMatch(await ghLog(), /commits\/main/);
 
   const ancestor = await run({ MOCK_MAIN_SHA: currentSha });
   assert.equal(ancestor.status, 0, ancestor.stderr);
   assert.match(await ghLog(), /compare\//);
-  assert.equal(await readFile(join(root, 'sleep.log'), 'utf8').catch(() => ''), '');
+  assert.equal(
+    await readFile(join(root, 'sleep.log'), 'utf8').catch(() => ''),
+    ''
+  );
 
   const diverged = await run({
     MOCK_COMPARE_JSON: JSON.stringify({ status: 'diverged', behind_by: 1 }),
