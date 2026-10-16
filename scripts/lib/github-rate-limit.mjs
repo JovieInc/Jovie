@@ -291,9 +291,13 @@ export async function runWithGitHubRetry(
     // gh 2.102 treats every GH_FORCE_TTY value, including 0, as a terminal
     // and then refuses application/zip. JSON calls still force tty off so
     // the body stays plain text. Zip calls must inherit a real file stdout.
+    // Fresh object so a zip call can drop GH_FORCE_TTY. Dot access is
+    // rejected: the spread collapses to `{ NO_COLOR: string }` under
+    // checkJs, and ProcessEnv is an index signature.
+    /** @type {NodeJS.ProcessEnv} */
     const childEnv = { ...env, NO_COLOR: '1' };
-    if (commandWantsFileStdout(command)) delete childEnv.GH_FORCE_TTY;
-    else childEnv.GH_FORCE_TTY = '0';
+    if (commandWantsFileStdout(command)) delete childEnv['GH_FORCE_TTY'];
+    else childEnv['GH_FORCE_TTY'] = '0';
     const outcome = await run(command, childEnv);
     if (outcome.code === 0) return { ...outcome, kind: NONE, deferred: false };
     // gh prints HTTP error bodies on stdout and the summary on stderr.
