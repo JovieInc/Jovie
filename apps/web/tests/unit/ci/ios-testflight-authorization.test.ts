@@ -398,57 +398,84 @@ describe.skipIf(!gh)('iOS TestFlight release authorization (real gh)', () => {
       path: 'actions/workflows/production-controller.yml',
       message: 'API rate limit exceeded for installation',
     };
-    const firstRead = await authorize({ quota: installation });
+    const summary = join(tempRoot('jovie-testflight-summary-'), 'summary');
+    writeFileSync(summary, '');
+    const firstRead = await authorize(
+      { quota: installation },
+      { GITHUB_STEP_SUMMARY: summary }
+    );
+    const resetEpoch = /resets at (\d+)/.exec(firstRead.stderr)?.[1];
+    const resetIso = new Date(Number(resetEpoch) * 1000)
+      .toISOString()
+      .replace(/\.\d{3}Z$/, 'Z');
+    const sentence = `Installation quota resets at ${resetIso}. Deferring TestFlight publication of ${RELEASE} to the next reconciliation. No release was authorized.`;
     expect(firstRead.code, firstRead.stderr).toBe(0);
     expect(firstRead.outputs.authorized).toBe('false');
     expect(firstRead.outputs.release_sha).toBe('');
     expect(firstRead.stderr).toContain('outside the 480s budget');
-    expect(firstRead.stdout).toContain(
-      'Deferring TestFlight publication to the next reconciliation'
-    );
-    expect(firstRead.stdout).toContain('No release was authorized');
+    expect(firstRead.stdout).toContain(`::warning::${sentence}`);
+    expect(readFileSync(summary, 'utf8').trim()).toBe(sentence);
     expect(firstRead.requests.some(path => path.includes('rate_limit'))).toBe(
       true
     );
 
-    const afterProof = await authorize({
-      quota: {
-        path: 'actions/workflows/ios-testflight.yml',
-        message: 'API rate limit exceeded for installation',
+    writeFileSync(summary, '');
+    const afterProof = await authorize(
+      {
+        quota: {
+          path: 'actions/workflows/ios-testflight.yml',
+          message: 'API rate limit exceeded for installation',
+        },
       },
-    });
+      { GITHUB_STEP_SUMMARY: summary }
+    );
+    const laterEpoch = /resets at (\d+)/.exec(afterProof.stderr)?.[1];
+    const laterIso = new Date(Number(laterEpoch) * 1000)
+      .toISOString()
+      .replace(/\.\d{3}Z$/, 'Z');
+    const laterSentence = `Installation quota resets at ${laterIso}. Deferring TestFlight publication of ${RELEASE} to the next reconciliation. No release was authorized.`;
     expect(afterProof.code, afterProof.stderr).toBe(0);
     expect(afterProof.outputs.authorized).toBe('false');
     expect(afterProof.outputs.release_sha).toBe('');
-    expect(afterProof.stdout).toContain('No release was authorized');
+    expect(afterProof.stdout).toContain(`::warning::${laterSentence}`);
+    expect(readFileSync(summary, 'utf8').trim()).toBe(laterSentence);
   });
 
   it('keeps a permission 403 and a missing reset fatal', async () => {
-    const denied = await authorize({
-      quota: {
-        path: 'actions/workflows/production-controller.yml',
-        message: 'Resource not accessible by integration',
+    const summary = join(tempRoot('jovie-testflight-summary-'), 'summary');
+    writeFileSync(summary, '');
+    const denied = await authorize(
+      {
+        quota: {
+          path: 'actions/workflows/production-controller.yml',
+          message: 'Resource not accessible by integration',
+        },
       },
-    });
+      { GITHUB_STEP_SUMMARY: summary }
+    );
     expect(denied.code).toBe(1);
     expect(denied.outputs.authorized).toBe('false');
+    expect(denied.stdout).not.toContain('::warning::');
     expect(denied.stdout).not.toContain('Deferring TestFlight publication');
+    expect(readFileSync(summary, 'utf8')).toBe('');
     expect(denied.requests.some(path => path.includes('rate_limit'))).toBe(
       false
     );
 
-    const missingReset = await authorize({
-      quota: {
-        path: 'actions/workflows/production-controller.yml',
-        message: 'API rate limit exceeded for installation',
-        resetInSeconds: null,
+    const missingReset = await authorize(
+      {
+        quota: {
+          path: 'actions/workflows/production-controller.yml',
+          message: 'API rate limit exceeded for installation',
+          resetInSeconds: null,
+        },
       },
-    });
+      { GITHUB_STEP_SUMMARY: summary }
+    );
     expect(missingReset.code).toBe(1);
     expect(missingReset.stderr).toContain('no x-ratelimit-reset');
-    expect(missingReset.stdout).not.toContain(
-      'Deferring TestFlight publication'
-    );
+    expect(missingReset.stdout).not.toContain('::warning::');
+    expect(readFileSync(summary, 'utf8')).toBe('');
   });
 
   it('authorizes the exact verified current main as the first release', async () => {

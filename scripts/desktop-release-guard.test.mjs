@@ -984,8 +984,16 @@ test('desktop authorizer defers when the installation reset is outside the budge
   );
   const mockBin = join(root, 'bin');
   const output = join(root, 'github-output');
+  const summary = join(root, 'step-summary');
+  const deferredSha = 'd'.repeat(40);
+  const resetEpoch = Math.floor(Date.now() / 1000) + 10_000;
+  const resetIso = new Date(resetEpoch * 1000)
+    .toISOString()
+    .replace(/\.\d{3}Z$/, 'Z');
+  const sentence = `Installation quota resets at ${resetIso}. Deferring desktop publication of ${deferredSha} to the next reconciliation. No release was authorized.`;
   await mkdir(mockBin);
   await writeFile(output, 'authorized=true\nrelease_sha=already-set\n');
+  await writeFile(summary, '');
   await writeFile(
     join(mockBin, 'gh'),
     `#!/usr/bin/env bash
@@ -1008,41 +1016,38 @@ exit 1
 `,
     { mode: 0o755 }
   );
-  const run = async env => {
+  const run = async (script, env) => {
     await rm(join(root, 'desktop-authorize-quota-defer'), { force: true });
-    return spawnSync(
-      'bash',
-      [
-        '-c',
-        `set -euo pipefail\n${helper}\ngh api repos/JovieInc/Jovie/actions/runs/1`,
-      ],
-      {
-        encoding: 'utf8',
-        env: {
-          ...process.env,
-          GH_API_HOLD_BUDGET_SECONDS: '240',
-          GH_API_RETRY_SECONDS: '0',
-          GITHUB_OUTPUT: output,
-          MOCK_ERROR:
-            'gh: API rate limit exceeded for installation. (HTTP 403)',
-          MOCK_RESET: String(Math.floor(Date.now() / 1000) + 10_000),
-          PATH: `${mockBin}:${process.env.PATH}`,
-          RUNNER_TEMP: root,
-          ...env,
-        },
-      }
-    );
+    await rm(join(root, 'desktop-authorize-quota-reset'), { force: true });
+    await writeFile(summary, '');
+    return spawnSync('bash', ['-c', script], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        GH_API_HOLD_BUDGET_SECONDS: '240',
+        GH_API_RETRY_SECONDS: '0',
+        GITHUB_OUTPUT: output,
+        GITHUB_STEP_SUMMARY: summary,
+        MOCK_ERROR: 'gh: API rate limit exceeded for installation. (HTTP 403)',
+        MOCK_RESET: String(resetEpoch),
+        PATH: `${mockBin}:${process.env.PATH}`,
+        RUNNER_TEMP: root,
+        ...env,
+      },
+    });
   };
+  const directScript = `set -euo pipefail\n${helper}\nrelease_sha=${deferredSha}\ngh api repos/JovieInc/Jovie/actions/runs/1`;
+  const substitutedScript = `set -euo pipefail\n${helper}\nrelease_sha=${deferredSha}\nout="$(gh api repos/JovieInc/Jovie/actions/runs/1)"\necho SHOULD_NOT_RUN\nprintf '%s' "$out"\n`;
 
-  const deferred = await run();
+  const deferred = await run(directScript);
   assert.equal(deferred.status, 0, deferred.stderr);
   assert.match(deferred.stderr, /outside the 240s budget/);
   assert.match(deferred.stderr, /Not passing/);
-  assert.match(
-    deferred.stdout,
-    /Deferring desktop publication to the next reconciliation/
+  assert.ok(
+    deferred.stdout.includes(`::warning::${sentence}`),
+    deferred.stdout
   );
-  assert.match(deferred.stdout, /No release was authorized/);
+  assert.equal((await readFile(summary, 'utf8')).trim(), sentence);
   const outputs = Object.fromEntries(
     (await readFile(output, 'utf8'))
       .trim()
@@ -1059,34 +1064,15 @@ exit 1
   assert.equal(outputs.already_released, 'false');
   assert.doesNotMatch(deferred.stdout, /"ok":true/);
 
-  await rm(join(root, 'desktop-authorize-quota-defer'), { force: true });
   await writeFile(output, 'authorized=true\nrelease_sha=already-set\n');
-  const substituted = spawnSync(
-    'bash',
-    [
-      '-c',
-      `set -euo pipefail\n${helper}\nout="$(gh api repos/JovieInc/Jovie/actions/runs/1)"\necho SHOULD_NOT_RUN\nprintf '%s' "$out"\n`,
-    ],
-    {
-      encoding: 'utf8',
-      env: {
-        ...process.env,
-        GH_API_HOLD_BUDGET_SECONDS: '240',
-        GH_API_RETRY_SECONDS: '0',
-        GITHUB_OUTPUT: output,
-        MOCK_ERROR: 'gh: API rate limit exceeded for installation. (HTTP 403)',
-        MOCK_RESET: String(Math.floor(Date.now() / 1000) + 10_000),
-        PATH: `${mockBin}:${process.env.PATH}`,
-        RUNNER_TEMP: root,
-      },
-    }
-  );
+  const substituted = await run(substitutedScript);
   assert.equal(substituted.status, 0, substituted.stderr);
   assert.doesNotMatch(substituted.stdout, /SHOULD_NOT_RUN/);
-  assert.match(
-    substituted.stdout,
-    /Deferring desktop publication to the next reconciliation/
+  assert.ok(
+    substituted.stdout.includes(`::warning::${sentence}`),
+    substituted.stdout
   );
+  assert.equal((await readFile(summary, 'utf8')).trim(), sentence);
   const substitutedOutputs = Object.fromEntries(
     (await readFile(output, 'utf8'))
       .trim()
@@ -1101,18 +1087,21 @@ exit 1
   assert.equal(substitutedOutputs.release_sha, '');
 
   await writeFile(output, '');
-  const denied = await run({
+  const denied = await run(directScript, {
     MOCK_ERROR: 'gh: Resource not accessible by integration (HTTP 403)',
   });
   assert.equal(denied.status, 1);
+  assert.doesNotMatch(denied.stdout, /::warning::/);
   assert.doesNotMatch(denied.stdout, /Deferring desktop publication/);
+  assert.equal((await readFile(summary, 'utf8')).trim(), '');
   assert.doesNotMatch(denied.stderr, /Holding /);
 
   await writeFile(output, '');
-  const missingReset = await run({ MOCK_RESET: 'missing' });
+  const missingReset = await run(directScript, { MOCK_RESET: 'missing' });
   assert.equal(missingReset.status, 1);
   assert.match(missingReset.stderr, /no x-ratelimit-reset/);
-  assert.doesNotMatch(missingReset.stdout, /Deferring desktop publication/);
+  assert.doesNotMatch(missingReset.stdout, /::warning::/);
+  assert.equal((await readFile(summary, 'utf8')).trim(), '');
 });
 
 test('production publication waits out GitHub quota and preserves fail-closed provenance', async t => {

@@ -162,20 +162,11 @@ jobs:
               if grep -Eq 'outside the .*budget' "$RUNNER_TEMP/desktop-gh-api-err" &&
                 grep -q 'Not passing' "$RUNNER_TEMP/desktop-gh-api-err"; then
                 cat "$RUNNER_TEMP/desktop-gh-api-err" >&2
-                : > "$RUNNER_TEMP/desktop-authorize-quota-defer"
+                record_desktop_quota_defer "$RUNNER_TEMP/desktop-gh-api-err"
                 # A direct call can exit here. A command substitution only
                 # returns, and the ERR trap finishes the defer.
                 if [ "${BASH_SUBSHELL:-0}" -eq 0 ]; then
-                  {
-                    echo "release_sha="
-                    echo "environment="
-                    echo "baseline_sha="
-                    echo "authorized=false"
-                    echo "manual=false"
-                    echo "staging_auto=false"
-                    echo "already_released=false"
-                  } >> "$GITHUB_OUTPUT"
-                  echo "::notice::Installation quota resets outside this Authorize budget. Deferring desktop publication to the next reconciliation. No release was authorized."
+                  finish_desktop_quota_defer
                   exit 0
                 fi
                 return 1
@@ -201,19 +192,52 @@ jobs:
           # A command substitution fails the assignment under set -e before
           # the next command, so ERR owns that defer. DEBUG owns a later
           # explicit exit after a handled failure. A permission 403 and a
-          # missing reset leave no sentinel and stay fatal.
+          # missing reset leave no sentinel and stay fatal. Both traps publish
+          # the same warning and step summary as a direct defer.
+          record_desktop_quota_defer() {
+            local reset_epoch reset_iso
+            reset_epoch="$(sed -n 's/.*GitHub rate limit resets at \([0-9][0-9]*\).*/\1/p' "$1" | head -n 1)"
+            reset_iso="$(date -u -d "@${reset_epoch}" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || true)"
+            if ! [[ "$reset_iso" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]]; then
+              echo "::error::Installation quota defer could not format the reset instant." >&2
+              exit 1
+            fi
+            printf '%s\n' "$reset_iso" > "$RUNNER_TEMP/desktop-authorize-quota-reset"
+            : > "$RUNNER_TEMP/desktop-authorize-quota-defer"
+          }
+          announce_desktop_quota_defer() {
+            local reset_iso deferred_sha line
+            reset_iso="$(head -n 1 "$RUNNER_TEMP/desktop-authorize-quota-reset")"
+            deferred_sha="${release_sha:-}"
+            if ! [[ "$deferred_sha" =~ ^[0-9a-f]{40}$ ]]; then
+              deferred_sha="${TRIGGER_HEAD_SHA:-}"
+            fi
+            if ! [[ "$deferred_sha" =~ ^[0-9a-f]{40}$ ]]; then
+              deferred_sha="${MANUAL_SHA:-}"
+            fi
+            if ! [[ "$deferred_sha" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "::error::Installation quota defer has no release candidate SHA." >&2
+              exit 1
+            fi
+            line="Installation quota resets at ${reset_iso}. Deferring desktop publication of ${deferred_sha} to the next reconciliation. No release was authorized."
+            printf '%s\n' "$line" >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning::${line}"
+          }
+          finish_desktop_quota_defer() {
+            {
+              echo "release_sha="
+              echo "environment="
+              echo "baseline_sha="
+              echo "authorized=false"
+              echo "manual=false"
+              echo "staging_auto=false"
+              echo "already_released=false"
+            } >> "$GITHUB_OUTPUT"
+            announce_desktop_quota_defer
+          }
           defer_desktop_authorize_for_quota() {
             if [ -f "$RUNNER_TEMP/desktop-authorize-quota-defer" ]; then
-              {
-                echo "release_sha="
-                echo "environment="
-                echo "baseline_sha="
-                echo "authorized=false"
-                echo "manual=false"
-                echo "staging_auto=false"
-                echo "already_released=false"
-              } >> "$GITHUB_OUTPUT"
-              echo "::notice::Installation quota resets outside this Authorize budget. Deferring desktop publication to the next reconciliation. No release was authorized."
+              finish_desktop_quota_defer
               exit 0
             fi
           }
