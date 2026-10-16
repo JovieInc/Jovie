@@ -118,7 +118,13 @@ function runtimeImports(path, contents) {
     ts.ScriptTarget.Latest,
     true
   );
-  if (tree.parseDiagnostics.length > 0) {
+  // The pinned compiler exposes this parser result at runtime, but omits it
+  // from SourceFile's public type. Fail closed if that runtime shape changes.
+  const diagnostics =
+    /** @type {ts.SourceFile & { parseDiagnostics?: readonly ts.Diagnostic[] }} */ (
+      tree
+    ).parseDiagnostics;
+  if (!Array.isArray(diagnostics) || diagnostics.length > 0) {
     throw new Error(`Cannot parse mutation import graph: ${path}`);
   }
   /** @type {{ specifier: string, actual: boolean }[]} */

@@ -58,10 +58,12 @@ function changedPaths() {
 
 const maxFiles = Number(values['max-files']);
 const maxTests = Number(values['max-tests']);
-for (const [name, value] of [
+/** @type {[string, number][]} */
+const caps = [
   ['max-files', maxFiles],
   ['max-tests', maxTests],
-]) {
+];
+for (const [name, value] of caps) {
   if (!Number.isSafeInteger(value) || value < 1) {
     throw new Error(`--${name} must be a positive integer`);
   }
