@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { DSP_BIO_PROVIDERS } from '@/lib/dsp-bio-sync/providers';
+import {
+  DSP_BIO_PROVIDERS,
+  getBioProvider,
+} from '@/lib/dsp-bio-sync/providers';
 import {
   confirmationFor,
   type DestinationSnapshot,
@@ -143,6 +146,46 @@ function fixture() {
 }
 
 describe('immutable connector write receipts', () => {
+  it('keeps a discarded four-field preview inert without approval', async () => {
+    const f = fixture();
+    Object.assign(f.manifest, {
+      fields: ['bio', 'bioLink', 'image', 'website'],
+    });
+    f.setState({
+      ...f.state(),
+      values: {
+        bio: 'Original bio',
+        bioLink: null,
+        image: null,
+        website: null,
+      },
+    });
+    const before = f.state();
+    const preview = await f.service.propose({
+      userId,
+      destination,
+      desired: {
+        bio: 'Preview bio',
+        bioLink: 'https://example.test/artist',
+        image: 'https://example.test/image.jpg',
+        website: 'https://example.test',
+      },
+    });
+    expect(Object.keys(preview.desired)).toEqual([
+      'bio',
+      'bioLink',
+      'image',
+      'website',
+    ]);
+    // Discarding the preview gives no approval or execution authority.
+    await expect(f.service.execute(userId, preview.id)).rejects.toThrow(
+      'approval-required'
+    );
+    expect(f.state()).toEqual(before);
+    expect(f.write).not.toHaveBeenCalled();
+    expect(f.rows.map(row => row.phase)).toEqual(['proposal']);
+  });
+
   it('persists attributable start and outcome evidence and restores only via a newly approved proposal', async () => {
     const f = fixture();
     const { proposal, approval } = await f.approved();
@@ -506,7 +549,8 @@ describe('immutable connector write receipts', () => {
   );
 
   it('marks all existing bio destinations without a proven restore path', () => {
-    for (const provider of Object.values(DSP_BIO_PROVIDERS)) {
+    for (const id of Object.keys(DSP_BIO_PROVIDERS)) {
+      const provider = getBioProvider(id)!;
       expect(provider.rollback).toBe(
         provider.method === 'email' ? 'manual' : 'unsupported'
       );

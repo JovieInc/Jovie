@@ -17,6 +17,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { getArtistProfileCatalog } from '@/lib/connectors/artist-profile-catalog';
 import { CopyFloorViolationError } from '@/lib/copy/outbound-floor';
 import { getOwnedProfile } from '@/lib/dsp-bio-sync/ownership';
 import { getEnabledBioProviders } from '@/lib/dsp-bio-sync/providers';
@@ -171,11 +172,15 @@ export async function GET() {
 
     const enabledCount = getEnabledBioProviders().length;
 
-    return NextResponse.json({
-      success: true,
-      providers,
-      enabledCount,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        providers,
+        enabledCount,
+        catalog: getArtistProfileCatalog(),
+      },
+      { headers: { 'Cache-Control': 'no-store' } }
+    );
   } catch (error) {
     await captureError('DSP Bio Sync providers list failed', error, {
       route: '/api/dsp/bio-sync',

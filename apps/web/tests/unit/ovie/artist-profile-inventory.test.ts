@@ -24,5 +24,12 @@ describe('Public Artist Profile inventory', () => {
     const report = renderArtistProfileInventory(caps);
     expect(report).toContain('Recommended certification order');
     expect(report).toContain('must-sell');
+    expect(report).toContain('Artist-profile connector catalog');
+    expect(report).toContain(
+      '| spotify | bio_link | unknown | blocked | missing |'
+    );
+    expect(report).toContain(
+      '| youtube | website | unknown | blocked | missing |'
+    );
   });
 });

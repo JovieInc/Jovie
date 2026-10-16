@@ -102,6 +102,9 @@ const evidence = z.union([
       .min(1)
       .readonly(),
     refs: z.array(reference).min(1).readonly(),
+    /** Undated evidence stays visible but cannot advertise an available operation. */
+    verifiedAt: z.iso.datetime().optional(),
+    expiresAt: z.iso.datetime().optional(),
   }),
   unavailable,
 ]);

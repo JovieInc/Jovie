@@ -7,7 +7,7 @@ import { unsupportedApiBioSync } from './service';
 describe('DSP bio API sync', () => {
   it('keeps API providers disabled and out of the enabled set', () => {
     const enabled = getEnabledBioProviders();
-    expect(enabled.length).toBeGreaterThan(0);
+    expect(enabled).toEqual([]);
     expect(enabled.every(([, provider]) => provider.method !== 'api')).toBe(
       true
     );
