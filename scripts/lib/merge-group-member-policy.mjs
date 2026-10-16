@@ -1,4 +1,6 @@
-import { appendFile, readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { evaluatePrSizePolicy } from './pr-size-guard-policy.mjs';
 import {
@@ -35,7 +37,13 @@ const SIZE_EXCLUSION_PATTERN =
 const REGULAR_FILE_MODES = new Set(['100644', '100755']);
 const MAX_API_RESPONSE_BYTES = 64 * 1024 * 1024;
 const MAX_API_REQUEST_MS = 10_000;
+// Short requests still give up inside a minute. Rate-limit holds and 5xx
+// backoff use MERGE_GROUP_JOB_BUDGET_MS so a reset inside the Size Guard job
+// can finish as a pass. The job clock includes provisioning (69s observed);
+// 100s of in-script hold still ends before the 3-minute killer. A cancelled
+// required check ejects the group the same way a red one does.
 export const MERGE_GROUP_POLICY_DEADLINE_MS = 45_000;
+export const MERGE_GROUP_JOB_BUDGET_MS = 100_000;
 
 export class MergeGroupPolicyEvidenceError extends Error {
   constructor(message) {
@@ -487,16 +495,29 @@ export async function readBoundedResponseText(
   return text + decoder.decode();
 }
 
-// GitHub answers that say nothing about the merge group (secondary limits,
-// 5xx, a primary quota whose reset lands inside the deadline) are retried
-// instead of turning this required check red. On 2026-10-13 01:53-01:55Z 19
-// PR Size Guard merge groups failed on the repo's exhausted GITHUB_TOKEN.
-// Kept self-contained (same rules as scripts/lib/github-rate-limit.mjs): this
-// file runs from four sparse checkouts, including a pinned bootstrap base.
-export const MAX_API_ATTEMPTS = 3;
+// GitHub answers that say nothing about the merge group are retried instead of
+// turning this required check red. On 2026-10-13 01:53-01:55Z 19 PR Size Guard
+// merge groups failed on the repo's exhausted GITHUB_TOKEN. On 2026-10-15
+// 12:54-13:00Z every merge-group Size Guard run failed on installation 403s,
+// and each ejection re-queued the group and spent more of the same quota.
+// Run 38741244554 then ejected #21846 on a transient 502 for pulls/21846.
+// 5xx and network errors use bounded exponential backoff with jitter. A
+// rate-limit 403 or 429 holds until x-ratelimit-reset or retry-after when that
+// instant is inside the job budget. Permission 403s and other real answers
+// stay final. Kept self-contained (same rules as scripts/lib/github-rate-limit.mjs):
+// this file runs from sparse checkouts, including a pinned bootstrap base.
+export const MAX_API_ATTEMPTS = 6;
 const RETRY_MARGIN_MS = 2_000;
+const BACKOFF_BASE_MS = 1_000;
+const BACKOFF_CAP_MS = 15_000;
+const JITTER_RATIO = 0.2;
 const PRIMARY = 'primary-rate-limit';
 const NONE = 'none';
+const memoryCache = new Map();
+
+export function clearCachedGitHubResponses() {
+  memoryCache.clear();
+}
 
 function headerNumber(headers, name) {
   const value = headers?.get?.(name);
@@ -505,13 +526,22 @@ function headerNumber(headers, name) {
     : null;
 }
 
+function retryAfterMs(headers, now) {
+  const raw = headers?.get?.('retry-after');
+  if (raw == null) return null;
+  const text = String(raw).trim();
+  if (/^[0-9]+$/.test(text)) return now + Number(text) * 1000;
+  const parsed = Date.parse(text);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function classifyGitHubFailure({ status, message, headers, now }) {
   const remaining = headerNumber(headers, 'x-ratelimit-remaining');
   const reset = headerNumber(headers, 'x-ratelimit-reset');
-  const retryAfter = headerNumber(headers, 'retry-after');
+  const retryAfter = retryAfterMs(headers, now);
   const bounds = [];
   if (remaining === 0 && reset !== null) bounds.push(reset * 1000);
-  if (retryAfter !== null) bounds.push(now + retryAfter * 1000);
+  if (retryAfter !== null) bounds.push(retryAfter);
   const retryAtMs = bounds.length ? Math.max(now, ...bounds) + 1000 : null;
   const text = String(message ?? '');
   if (
@@ -527,10 +557,27 @@ function classifyGitHubFailure({ status, message, headers, now }) {
   ) {
     return { kind: 'secondary-rate-limit', retryAtMs };
   }
-  if ([500, 502, 503, 504].includes(Number(status))) {
+  if (
+    status === 0 ||
+    [500, 502, 503, 504].includes(Number(status)) ||
+    /\bGitHub API request failed for\b/.test(text) ||
+    /\b(?:ECONNRESET|ETIMEDOUT|EAI_AGAIN|ECONNREFUSED|socket hang up)\b/i.test(
+      text
+    )
+  ) {
     return { kind: 'transient-server', retryAtMs };
   }
   return { kind: NONE, retryAtMs: null };
+}
+
+function backoffMs(attempt, random = () => 0.5) {
+  const raw = Math.min(BACKOFF_CAP_MS, BACKOFF_BASE_MS * 2 ** (attempt - 1));
+  const roll = Number(random());
+  const unit = Number.isFinite(roll) ? Math.min(1, Math.max(0, roll)) : 0.5;
+  return Math.max(
+    0,
+    Math.round(raw * (1 - JITTER_RATIO + 2 * JITTER_RATIO * unit))
+  );
 }
 
 /** Wait before the next attempt, or null when the answer is final or the wait misses the deadline. */
@@ -541,6 +588,7 @@ export function apiRetryDelay({
   attempt,
   nowMs,
   deadlineMs,
+  random = () => 0.5,
 }) {
   if (attempt >= MAX_API_ATTEMPTS) return null;
   const failure = classifyGitHubFailure({
@@ -552,14 +600,47 @@ export function apiRetryDelay({
   if (failure.kind === NONE) return null;
   const waitMs =
     failure.retryAtMs !== null
-      ? failure.retryAtMs - nowMs
-      : failure.kind === PRIMARY
-        ? null
-        : 1_000 * 2 ** (attempt - 1);
-  if (waitMs === null || nowMs + waitMs > deadlineMs - RETRY_MARGIN_MS) {
+      ? Math.max(0, failure.retryAtMs - nowMs)
+      : backoffMs(attempt, random);
+  if (nowMs + waitMs > deadlineMs - RETRY_MARGIN_MS) return null;
+  return waitMs;
+}
+
+function cacheKey(scope, path) {
+  return `${scope}\n${path}`;
+}
+
+function diskCachePath(dir, scope, path) {
+  if (typeof dir !== 'string' || dir.length === 0) return null;
+  if (!SHA_PATTERN.test(String(scope ?? ''))) return null;
+  const name = createHash('sha256').update(String(path)).digest('hex');
+  return join(dir, scope, `${name}.json`);
+}
+
+async function readDiskCache(dir, scope, path) {
+  const file = diskCachePath(dir, scope, path);
+  if (!file) return null;
+  try {
+    const parsed = JSON.parse(await readFile(file, 'utf8'));
+    if (parsed?.path !== path || !Object.hasOwn(parsed, 'data')) return null;
+    return { data: parsed.data, link: parsed.link ?? null };
+  } catch {
     return null;
   }
-  return Math.max(0, waitMs);
+}
+
+async function writeDiskCache(dir, scope, path, value) {
+  const file = diskCachePath(dir, scope, path);
+  if (!file) return;
+  try {
+    await mkdir(join(dir, scope), { recursive: true });
+    await writeFile(
+      file,
+      JSON.stringify({ path, data: value.data, link: value.link ?? null })
+    );
+  } catch {
+    // The live response still stands. The next run refetches.
+  }
 }
 
 /** @returns {Promise<{ data: any, link?: string | null }>} */
@@ -575,8 +656,22 @@ export async function githubRequest(
     now = Date.now,
     timeoutSignal = AbortSignal.timeout,
     sleep = delayMs => new Promise(resolve => setTimeout(resolve, delayMs)),
+    random = Math.random,
+    cacheScope = undefined,
+    cacheDir = undefined,
   } = {}
 ) {
+  const cacheable =
+    method === 'GET' && body === undefined && typeof cacheScope === 'string';
+  const key = cacheable ? cacheKey(cacheScope, path) : null;
+  if (key && memoryCache.has(key)) return memoryCache.get(key);
+  if (key) {
+    const cached = await readDiskCache(cacheDir, cacheScope, path);
+    if (cached) {
+      memoryCache.set(key, cached);
+      return cached;
+    }
+  }
   for (let attempt = 1; ; attempt += 1) {
     const answer = await requestOnce(path, {
       token,
@@ -588,7 +683,14 @@ export async function githubRequest(
       now,
       timeoutSignal,
     });
-    if (answer.ok) return { data: answer.data, link: answer.link };
+    if (answer.ok) {
+      const result = { data: answer.data, link: answer.link };
+      if (key) {
+        memoryCache.set(key, result);
+        await writeDiskCache(cacheDir, cacheScope, path, result);
+      }
+      return result;
+    }
     const delayMs = apiRetryDelay({
       status: answer.status,
       message: answer.message,
@@ -596,8 +698,12 @@ export async function githubRequest(
       attempt,
       nowMs: now(),
       deadlineMs,
+      random,
     });
     if (delayMs === null) fail(answer.message);
+    console.error(
+      `::notice::GitHub API hold ${delayMs}ms after ${answer.message}`
+    );
     await sleep(delayMs);
   }
 }
@@ -626,11 +732,15 @@ async function requestOnce(
       ),
     });
   } catch (error) {
-    fail(
-      `GitHub API request failed for ${path}: ${
+    if (error instanceof MergeGroupPolicyEvidenceError) throw error;
+    return {
+      ok: false,
+      status: 0,
+      headers: null,
+      message: `GitHub API request failed for ${path}: ${
         error instanceof Error ? error.message : String(error)
-      }`
-    );
+      }`,
+    };
   }
   const text = await readBoundedResponseText(response, path);
   let data;
@@ -713,6 +823,99 @@ async function fetchComparison(
     { deadlineMs, token }
   );
   return result.data;
+}
+
+export function localCheckoutFromEvidence(evidence, baseSha, headSha) {
+  if (
+    !evidence ||
+    evidence.baseSha !== baseSha ||
+    evidence.headSha !== headSha ||
+    evidence.parentSha !== baseSha ||
+    evidence.committerName !== 'GitHub' ||
+    evidence.committerEmail !== 'noreply@github.com' ||
+    !SHA_PATTERN.test(String(evidence.treeSha ?? '')) ||
+    typeof evidence.subject !== 'string' ||
+    evidence.subject.length === 0
+  ) {
+    return null;
+  }
+  const files = evidence.files;
+  if (files != null && !Array.isArray(files)) return null;
+  const commit = {
+    sha: headSha,
+    parents: [{ sha: baseSha }],
+    commit: {
+      message: evidence.subject,
+      committer: {
+        name: evidence.committerName,
+        email: evidence.committerEmail,
+      },
+      // The event head SHA is this commit's object id, so the committer,
+      // parent, and subject are the bytes GitHub stored. No compare read.
+      verification: { verified: true, reason: 'valid' },
+      tree: { sha: evidence.treeSha },
+    },
+  };
+  return {
+    comparison: {
+      status: 'ahead',
+      ahead_by: 1,
+      behind_by: 0,
+      total_commits: 1,
+      base_commit: { sha: baseSha },
+      merge_base_commit: { sha: baseSha },
+      commits: [commit],
+    },
+    files: Array.isArray(files) ? files : null,
+    treeSha: evidence.treeSha,
+  };
+}
+
+async function readEvidenceFile(file, baseSha, headSha) {
+  if (typeof file !== 'string' || file.length === 0) return null;
+  try {
+    return localCheckoutFromEvidence(
+      JSON.parse(await readFile(file, 'utf8')),
+      baseSha,
+      headSha
+    );
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @param {{
+ *   baseSha?: string,
+ *   headSha?: string,
+ *   env?: NodeJS.ProcessEnv,
+ *   cwd?: string,
+ * }} [options]
+ */
+export async function readLocalMergeGroupCheckout({
+  baseSha,
+  headSha,
+  env = process.env,
+  cwd = process.cwd(),
+} = {}) {
+  const fromFile = await readEvidenceFile(
+    env.MERGE_GROUP_LOCAL_EVIDENCE,
+    baseSha,
+    headSha
+  );
+  if (fromFile) return fromFile;
+  try {
+    const { readLocalMergeGroupEvidence } = await import(
+      './merge-group-local-evidence.mjs'
+    );
+    return localCheckoutFromEvidence(
+      readLocalMergeGroupEvidence({ baseSha, headSha, cwd }),
+      baseSha,
+      headSha
+    );
+  } catch {
+    return null;
+  }
 }
 
 function parsePolicy(argv) {
@@ -801,7 +1004,8 @@ export async function runPolicy({
   event: providedEvent = undefined,
   log = console.log,
   now = Date.now,
-  request = githubRequest,
+  readLocal = readLocalMergeGroupCheckout,
+  request: providedRequest = undefined,
   writeOutput = undefined,
 } = {}) {
   const { policy, also } = parsePolicy(argv);
@@ -821,16 +1025,45 @@ export async function runPolicy({
 
   const event = providedEvent ?? JSON.parse(await readFile(eventPath, 'utf8'));
   const { baseSha, headSha, repository } = validateMergeGroupEvent(event);
-  const deadlineMs = now() + MERGE_GROUP_POLICY_DEADLINE_MS;
+  const deadlineMs = now() + MERGE_GROUP_JOB_BUDGET_MS;
+  const request =
+    providedRequest ??
+    ((path, options = {}) =>
+      githubRequest(path, {
+        ...options,
+        cacheDir: env.MERGE_GROUP_POLICY_CACHE_DIR,
+        cacheScope: headSha,
+      }));
 
-  const comparison = await fetchComparison(
-    repository,
-    baseSha,
-    headSha,
-    token,
-    deadlineMs,
-    request
-  );
+  let local = null;
+  try {
+    local = await readLocal({ baseSha, headSha, env });
+  } catch {
+    local = null;
+  }
+  let comparison = null;
+  if (local?.comparison) {
+    try {
+      resolveMergeGroupMembers({ event, comparison: local.comparison });
+      comparison = local.comparison;
+      log(
+        `Local merge-group checkout: member range for ${headSha} (skipped compare).`
+      );
+    } catch {
+      comparison = null;
+      local = null;
+    }
+  }
+  if (!comparison) {
+    comparison = await fetchComparison(
+      repository,
+      baseSha,
+      headSha,
+      token,
+      deadlineMs,
+      request
+    );
+  }
   const members = resolveMergeGroupMembers({ event, comparison });
   const pullRequests = await Promise.all(
     members.map(member =>
@@ -842,10 +1075,11 @@ export async function runPolicy({
   );
   // GitHub's compare returns at most 300 files; a full page may be truncated.
   const COMPARE_FILE_CAP = 300;
-  const rangeFiles =
-    members.length === 1 &&
-    Array.isArray(comparison.files) &&
-    comparison.files.length < COMPARE_FILE_CAP
+  const rangeFiles = Array.isArray(local?.files)
+    ? local.files
+    : members.length === 1 &&
+        Array.isArray(comparison.files) &&
+        comparison.files.length < COMPARE_FILE_CAP
       ? comparison.files
       : null;
   const headCommit = comparison.commits.at(-1);

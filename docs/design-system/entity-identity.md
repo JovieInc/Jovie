@@ -57,3 +57,32 @@ identity consumer guard prevents known route-local media implementations from
 returning. Storybook/Playwright captures cover desktop, tablet and phone, light
 and dark, with fixed geometry through an actual failed image request. These are
 local rendered receipts and do not imply deployed or authenticated acceptance.
+
+## Reference and review scope (JOV-8019)
+
+A token's `kind:id` is identity; its stored label is historical, untrusted display
+text. Layout remains appropriate to its surface. No mention grants a capability.
+
+| Surface | Semantic owner | Scope and behavior |
+| --- | --- | --- |
+| User and assistant transcript | `TokenizedText`, `AssistantMessageText`, `EntityResolutionProvider` | Current profile's release/event query projection; current title replaces the wire label. Missing, invalidated, failed or wrong-profile reads show `Unavailable reference` without artwork. Cache-only resolution does not attest current authorization before a server read. |
+| Inline preview | `EntityChipPopover`, compact `EntityCard` | Metadata must match both kind and id. Unsupported/unresolved references have no open action. Escape returns focus to the trigger; the transcript and existing composer stay mounted. |
+| Work inspector and Ask Jovie | `WorkInspectorActions`, `open-chat-with-prompt` | Existing Overview/Files and explicit work/revision prompt remain the owners. The full structured composer-scope contract is tracked in JOV-8391. |
+| Server prompt | `entity-hydration.ts` | Resolve releases by exact id in the turn's authorized catalog. A track id is never a release id. Linked Spotify artist id, rather than a matching name, establishes self-reference. Unknown labels supply no identity or action target. |
+| Ovie list and judgment rail | Certification inventory and `CertificationDetailRail` | Stable domain/subject row id plus kernel evidence digest. Notes and decisions carry that exact target to the existing mutation. |
+| Ovie evidence walkthrough | `CertificationWalkthrough` | Capture row/digest/artifact when opened. Refresh or selection changes cannot replace reviewed proof or comments; stale scope blocks decisions. Failed proof blocks certification. |
+| Durable decision | Existing certification decision API/kernel | Client checks supplement server authorization, evidence-digest validation and durable receipt semantics. One in-flight request; retries of the same prepared decision retain its action id. Viewed, commented, approved and dispatched remain distinct. |
+
+Ship now: reference disclosure and review-target safety on the existing paths.
+Re-evaluate when JOV-8391 supplies cold authorized resolution, structured removable
+composer scope and exact shipping-build receipts. Then certify both complete
+Jovie/Ovie proof slices with JOV-7710/JOV-7713, including applicable native adapters.
+No external source was copied; no Macro/AGPL source is introduced.
+
+Regression owners: `EntityReferences.contract.test.tsx` covers renamed/long titles,
+missing art, unavailable reads, profile shifts, mismatched identity, preview focus,
+draft/caret, unsent file and scroll preservation. Ovie workspace/walkthrough tests
+cover cross-object/digest rejection, retained comments/proof, preview failures,
+duplicate submission and reconnect. These are local component contracts, not
+shipping-build, browser-layout or native certification. The existing AM-019
+assurance row indexes the detectors; rendered and native evidence is still owed.

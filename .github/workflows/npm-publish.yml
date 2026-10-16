@@ -478,7 +478,7 @@ jobs:
           if (
             typeof contract.openapi !== 'string' ||
             !contract.openapi.startsWith('3.') ||
-            contract.info?.title !== 'Jovie Artist API'
+            contract.info?.title !== 'Jovie Public API'
           ) {
             throw new Error('Freshly installed CLI did not return the Jovie OpenAPI contract.');
           }

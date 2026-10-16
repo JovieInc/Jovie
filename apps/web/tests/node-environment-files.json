@@ -800,7 +800,6 @@
   "tests/unit/inbox/",
   "tests/unit/investors/fundraising-registry.test.ts",
   "tests/unit/ios/apple-app-site-association.test.ts",
-  "tests/unit/ladygaga-seed.test.ts",
   "tests/unit/lib/accent-palette.test.ts",
   "tests/unit/lib/action-capabilities.test.ts",
   "tests/unit/lib/admin/",

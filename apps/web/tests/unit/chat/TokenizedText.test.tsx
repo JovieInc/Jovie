@@ -25,7 +25,8 @@ describe('TokenizedText', () => {
     );
 
     const chip = screen.getByTestId('entity-chip');
-    expect(chip).toHaveTextContent('Take Me Over');
+    expect(chip).toHaveTextContent('Unavailable reference');
+    expect(screen.queryByText('Take Me Over')).toBeNull();
     expect(chip).toHaveAttribute('data-entity-kind', 'release');
     expect(chip).toHaveAttribute('data-entity-tone', 'onDark');
     expect(screen.queryByText('@release:rel_1[Take Me Over]')).toBeNull();

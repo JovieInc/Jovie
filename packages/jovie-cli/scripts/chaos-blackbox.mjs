@@ -743,12 +743,14 @@ if (values.prod) {
     });
     check(failures, full.code === 0, `docs llms --full exit ${full.code}`);
     const api = await run(['api', 'openapi', '--json'], { limitMs: 60_000 });
+    failures.push(...contract(api));
+    check(failures, api.code === 0, `api openapi exit ${api.code}`);
     try {
       const contractJson = JSON.parse(api.stdout);
       check(
         failures,
         String(contractJson.openapi).startsWith('3.') &&
-          contractJson.info?.title === 'Jovie Artist API',
+          contractJson.info?.title === 'Jovie Public API',
         'prod OpenAPI contract changed'
       );
     } catch {

@@ -4,13 +4,15 @@ A quick reference for what we do on each high-traffic platform. Detection = link
 
 | Platform | Detection & Normalization | Scraping / Ingestion | Recursive Crawl | Notes |
 | --- | --- | --- | --- | --- |
-| Linktree | ✅ Supported | ✅ Single-page scrape via `lib/ingestion/strategies/linktree.ts` | 🚫 Not enabled | HTML-only fetch; stays on profile page. |
+| Linktree | ✅ Supported | 🚫 Unavailable | 🚫 Disabled | Core HTML fetch and import jobs removed; an official API integration is required. |
 | Beacons | ✅ Supported | ✅ Single-page scrape via `lib/ingestion/strategies/beacons.ts` | 🚫 Not enabled | Skips internal Beacons hosts; profile-only fetch. |
 | Laylo | ✅ Supported | ✅ Single-page scrape via `lib/ingestion/strategies/laylo.ts` | 🚫 Not enabled | Uses public profile fetch; no secondary requests. |
 | YouTube | ✅ Supported | ✅ About-page scrape via `lib/ingestion/strategies/youtube.ts` | 🚫 Not enabled | Channel/about fetch only; no playlist/video crawling. |
 | Stan (stan.store) | ⚠️ Fallback only | 🚫 Not available | 🚫 Not available | No dedicated detection/ingestion yet; treated as generic website. |
 | Twitch | ✅ Detection & normalization only | 🚫 Not available (policy) | 🚫 Not available (policy) | Bot-protected; keep to detection-classification for now. |
 | OnlyFans | ✅ Detection & normalization only | 🚫 Not available (policy) | 🚫 Not available (policy) | Auth/bot-protected; detection-only to avoid scraping. |
+
+Linktree and Instagram URLs remain valid social links. Core ingestion does not fetch their HTML or derive profile metadata from it; legacy imports fail explicitly, and discovered links do not schedule these imports. Shared scraper configuration tables retain other providers and historical rows.
 
 ## Policy: Twitch & OnlyFans are detection-only
 

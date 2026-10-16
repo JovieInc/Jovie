@@ -13,12 +13,9 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAdminPeopleRightPanel } from '@/components/features/admin/AdminPeopleRightPanelProvider';
 import { toast } from '@/components/feedback';
-import {
-  DrawerSection,
-  EntityHeader,
-  EntitySidebarShell,
-} from '@/components/molecules/drawer';
+import { DrawerSection, EntityHeader } from '@/components/molecules/drawer';
 import { PersonCell } from '@/components/organisms/table/atoms/PersonCell';
+import { AdminDetailRail } from '@/features/admin/layout/AdminDetailRail';
 import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { AdminTableSubheader } from '@/features/admin/table/AdminTableHeader';
 import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
@@ -407,16 +404,14 @@ function ContactDetailPanel({
   }, [certification]);
 
   return (
-    <EntitySidebarShell
+    <AdminDetailRail
       isOpen={Boolean(contact)}
-      width={440}
       ariaLabel='Customer identity certification'
       data-testid='admin-contact-detail-panel'
       scrollStrategy='shell'
       onClose={onClose}
       headerMode='minimal'
       hideMinimalHeaderBar
-      entityHeaderSurface='flat'
       isEmpty={!contact}
       emptyMessage='Select a customer to inspect discovered evidence.'
       entityHeader={
@@ -549,7 +544,7 @@ function ContactDetailPanel({
           </DrawerSection>
         </>
       ) : null}
-    </EntitySidebarShell>
+    </AdminDetailRail>
   );
 }
 

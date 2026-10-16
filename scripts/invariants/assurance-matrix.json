@@ -1322,9 +1322,12 @@
       "whatCanGoWrong": "A control works from one state only, open without close, stale state after hydration, pointer/keyboard desync, lost focus, hidden/inert control after transition, double-bound handlers.",
       "covers": ["ui:ownership-registry", "ui:app-screens"],
       "owner": "design-system",
-      "sources": ["JOV-7713", "JOV-7207", "JOV-7201"],
+      "sources": ["JOV-7201", "JOV-7207", "JOV-7713", "JOV-8019"],
       "invalidatesOn": [
         "apps/web/components/atoms/RailToggleButton.tsx",
+        "apps/web/components/features/admin/certifications",
+        "apps/web/components/jovie/components/EntityChipPopover.tsx",
+        "apps/web/components/jovie/components/EntityResolutionProvider.tsx",
         "apps/web/components/molecules/sidebar-collapse-button",
         "apps/web/components/organisms/sidebar",
         "apps/web/hooks/useSidebarKeyboardShortcut.ts"
@@ -1375,26 +1378,36 @@
         "authority": ["apps/web/data/designSystem/interactionRegistry.ts"],
         "detectors": [
           {
-            "ref": "apps/web/tests/e2e/storybook-overlay-collisions.spec.ts",
-            "enforcement": "path-selected-blocking"
-          },
-          {
-            "ref": "apps/web/components/atoms/RailToggleButton.test.tsx",
+            "ref": "apps/ovie/scripts/app-shell-invariants.test.mjs",
             "enforcement": "merge-group-blocking"
-          },
-          {
-            "ref": "apps/web/tests/unit/design-system/reversible-control-certification.test.tsx",
-            "enforcement": "merge-group-blocking",
-            "deliberateRed": "apps/web/tests/unit/design-system/reversible-control-certification.test.tsx",
-            "liveStatus": "green"
           },
           {
             "ref": "apps/ovie/scripts/desktop-sidebar-contract.test.mjs",
             "enforcement": "merge-group-blocking"
           },
           {
-            "ref": "apps/ovie/scripts/app-shell-invariants.test.mjs",
+            "ref": "apps/web/components/atoms/RailToggleButton.test.tsx",
             "enforcement": "merge-group-blocking"
+          },
+          {
+            "ref": "apps/web/components/features/admin/certifications/OvieCertificationsWorkspace.test.tsx",
+            "enforcement": "merge-group-blocking",
+            "deliberateRed": "apps/web/components/features/admin/certifications/OvieCertificationsWorkspace.test.tsx"
+          },
+          {
+            "ref": "apps/web/components/jovie/components/EntityReferences.contract.test.tsx",
+            "enforcement": "merge-group-blocking",
+            "deliberateRed": "apps/web/components/jovie/components/EntityReferences.contract.test.tsx"
+          },
+          {
+            "ref": "apps/web/tests/e2e/storybook-overlay-collisions.spec.ts",
+            "enforcement": "path-selected-blocking"
+          },
+          {
+            "ref": "apps/web/tests/unit/design-system/reversible-control-certification.test.tsx",
+            "enforcement": "merge-group-blocking",
+            "deliberateRed": "apps/web/tests/unit/design-system/reversible-control-certification.test.tsx",
+            "liveStatus": "green"
           }
         ],
         "requiredEvidence": ["web-desktop", "web-mobile", "macos-electron"],
