@@ -3702,6 +3702,24 @@ class VerifyAndLandRevocationTest(unittest.TestCase):
             self.assertEqual(json.loads((host.state / "requeue.json").read_text()), {"7": "abc"})
 
 
+class ShippingOriginIngestTest(unittest.TestCase):
+    def test_deferred_transport_is_importable_in_the_release_selftest(self):
+        import shipping_origin
+
+        state = Path("/synthetic-origin-state")
+        result = {"accepted": ["restored"], "rejected": [], "errors": []}
+        with patch.object(shipping_origin, "collect", return_value=result) as collect:
+            self.assertEqual(lane.collect_shipping_origin(state), result)
+        collect.assert_called_once_with(state)
+
+    def test_transport_failure_stays_visible_to_dispatch(self):
+        import shipping_origin
+
+        with patch.object(shipping_origin, "collect", side_effect=RuntimeError("transport unavailable")):
+            with self.assertRaisesRegex(RuntimeError, "transport unavailable"):
+                lane.collect_shipping_origin(Path("/synthetic-origin-state"))
+
+
 class DispatchTest(unittest.TestCase):
     def setUp(self):
         disk = patch.object(lane.disk_guard, "free_pct", return_value=50.0)
