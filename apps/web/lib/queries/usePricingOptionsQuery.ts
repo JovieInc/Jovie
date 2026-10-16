@@ -70,11 +70,16 @@ async function fetchPricingOptions({
  * retry on its own.
  */
 export const pricingOptionsQueryOptions = {
-  queryKey: queryKeys.billing.pricingOptions(),
+  // Read the key when the query is created. Evaluating it while this module
+  // loads makes every `@/lib/queries` import crash under the partial
+  // `queryKeys` mocks that other suites install.
+  get queryKey() {
+    return queryKeys.billing.pricingOptions();
+  },
   queryFn: fetchPricingOptions,
   ...STABLE_CACHE,
   retry: createClassifiedRetry(0),
-} as const;
+};
 
 export function usePricingOptionsQuery(options?: { enabled?: boolean }) {
   const { enabled = true } = options ?? {};
