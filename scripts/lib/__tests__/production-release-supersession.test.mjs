@@ -326,10 +326,11 @@ function releaseExpressions(overrides = {}) {
 
 function runReleaseResult(overrides = {}, boundarySha = NEWER_SHA, env = {}) {
   const fixture = makeFixture('release-result-');
+  stubGitMain(fixture.bin);
   stubCommand(
     fixture.bin,
     'gh',
-    '#!/bin/sh\nprintf "%s\\n" "$STUB_MAIN_SHA"\n'
+    '#!/bin/sh\nif [ "${STUB_REST_DENIED:-0}" = 1 ]; then echo "API rate limit exceeded for installation" >&2; exit 1; fi\nprintf "%s\\n" "$STUB_MAIN_SHA"\n'
   );
   const script = materialize(
     getStepRunScript(
@@ -346,6 +347,7 @@ function runReleaseResult(overrides = {}, boundarySha = NEWER_SHA, env = {}) {
       Buffer.from(DEPLOYMENT_URL).toString('base64'),
     PREVIOUS_PRODUCTION_DEPLOYMENT_ID: 'dpl_previous_generation',
     STUB_MAIN_SHA: boundarySha,
+    RESOLVE_MAIN_RETRY_SECONDS: '0',
     ...env,
   });
   return { result, outputs: parseOutputs(fixture.output) };
@@ -611,6 +613,13 @@ describe('production release supersession execution', () => {
       released: 'true',
       superseded_before_promotion: 'false',
     });
+  });
+
+  it('preserves the exact release receipt through Git when REST is exhausted', () => {
+    const released = runReleaseResult({}, NEWER_SHA, { STUB_REST_DENIED: '1' });
+    expect(released.result.status, released.result.stderr).toBe(0);
+    expect(released.outputs.released).toBe('true');
+    expect(released.outputs.superseded_before_promotion).toBe('false');
   });
 
   it('keeps a proven pre-promotion supersession neutral after exact prior gates', () => {
@@ -1275,8 +1284,6 @@ esac
         env: {
           ...process.env,
           EXPECTED_MAIN_SHA: EXPECTED_SHA,
-          STUB_MAIN_ATTEMPTS: join(fixture.root, 'main-attempts'),
-          STUB_MAIN_FAILURES: '0',
           GH_TOKEN: 'stub',
           GITHUB_OUTPUT: fixture.output,
           GITHUB_REPOSITORY: 'JovieInc/Jovie',
@@ -1286,6 +1293,8 @@ esac
           STUB_COMPARE_STATUS: compareStatus,
           STUB_DEPLOY_ID: DEPLOYMENT_ID,
           STUB_MAIN_SHA: mainSha,
+          STUB_MAIN_ATTEMPTS: join(fixture.root, 'main-attempts'),
+          STUB_MAIN_FAILURES: '0',
           STUB_PROMOTED: promoted,
           STUB_STAGING_ALIAS: stagingAlias,
           STUB_STAGING_RESTORE: stagingRestore,
@@ -1366,6 +1375,38 @@ esac
     expect(diverged.stagingAlias).toBe('dpl_staging_preview');
     expect(diverged.stagingRestored).toBe(false);
     expect(diverged.outputs.promotion_sha).toBe(NEWER_SHA);
+  });
+
+  it.each(['exact', 'ahead', 'diverged'])(
+    'proves %s lineage at the final mutation boundary when REST is exhausted',
+    mode => {
+      const remote = makeLineageRemote(mode);
+      const expected = mode === 'exact' ? remote.tip : remote.base;
+      const result = runPromote(remote.tip, 'ahead', {
+        EXPECTED_MAIN_SHA: expected,
+        MAIN_LINEAGE_REMOTE: remote.remote,
+        STUB_COMPARE_FAILURES: '1',
+        STUB_MAIN_FAILURES: '9',
+      });
+      expect(result.result.status, result.result.stderr).toBe(0);
+      expect(result.promoted).toBe(mode !== 'diverged');
+      expect(result.outputs.promotion_sha).toBe(
+        mode === 'diverged' ? remote.tip : expected
+      );
+    }
+  );
+
+  it('refuses the final mutation when neither REST nor Git can prove lineage', () => {
+    const result = runPromote(NEWER_SHA, 'ahead', {
+      MAIN_LINEAGE_REMOTE: join(tmpdir(), 'missing-lineage-remote'),
+      STUB_MAIN_FAILURES: '9',
+    });
+    expect(result.result.status).not.toBe(0);
+    expect(result.promoted).toBe(false);
+    expect(result.outputs.promotion_sha).toBeUndefined();
+    expect(result.outputs.failure_subtype).toBe(
+      'production_promotion_state_invalid'
+    );
   });
 });
 

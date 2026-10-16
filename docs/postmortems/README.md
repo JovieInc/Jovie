@@ -10,6 +10,7 @@ Tim is never required.
 
 | Date | Incident | Failure classes | Status |
 | --- | --- | --- | --- |
+| 2026-10-16 | [Production lineage checks failed on the shared REST quota](2026-10-16-production-lineage-rest-quota.md) | `pre-merge-parity-gap`, `serial-layer-discovery` | draft |
 | 2026-10-16 | [Verified TestFlight sources starved while main advanced](2026-10-16-testflight-main-advance-starvation.md) | `non-convergent-control-loop`, `pre-merge-parity-gap`, `green-by-implication` | draft |
 | 2026-10-14 | [Onboarding mount claim opened checkout before a terminal decision](2026-10-14-onboarding-premature-checkout.md) | `escaped-defect` | reviewed |
 | 2026-10-02 | [PR recovery stopped converging](2026-10-02-pr-recovery-stall.md) | `non-convergent-control-loop`, `pre-merge-parity-gap` | draft |

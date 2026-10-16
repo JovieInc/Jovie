@@ -4182,6 +4182,9 @@ describe('production promotion exact-artifact contract', () => {
     expect(finalCurrentStep).toContain(
       'bash "$GITHUB_WORKSPACE/.github/scripts/recheck-main-lineage.sh" "before production promotion"'
     );
+    expect(finalCurrentStep).not.toContain(
+      'Refusing stale production promotion'
+    );
     expect(promoteStep).toContain(
       "if: ${{ steps.final-current.outputs.is_current == 'true' }}"
     );
