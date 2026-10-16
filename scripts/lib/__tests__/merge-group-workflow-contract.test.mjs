@@ -396,7 +396,7 @@ describe('merge_group workflow contract', () => {
       true
     );
     expect(GREEN_ENROLL_WORKFLOW).toContain(
-      'types: [labeled, unlabeled, reopened, ready_for_review, synchronize]'
+      'types: [converted_to_draft, labeled, unlabeled, reopened, ready_for_review, synchronize]'
     );
     expect(getJobBlock(GREEN_ENROLL_WORKFLOW, 'enroll')).toContain(
       "(github.event_name != 'pull_request_target' || github.event.pull_request.draft == false)"
