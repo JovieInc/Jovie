@@ -35,6 +35,45 @@ export const applyMarkdownTemplate = (raw: string): string => {
   return raw.replaceAll(/\{\{\s*LEGAL_ENTITY_NAME\s*\}\}/g, LEGAL_ENTITY_NAME);
 };
 
+const SCROLLABLE_TABLE_REGION_LABEL = 'Scrollable table';
+
+/**
+ * Wrap each rendered markdown table in a keyboard-focusable scroll region.
+ *
+ * Legal/document tables are styled `display: block; overflow-x: auto`, so on
+ * narrow viewports they become horizontally scrollable containers. axe rule
+ * `scrollable-region-focusable` requires such regions to be reachable and
+ * scrollable by keyboard; a `tabindex="0"` wrapper with a label is the
+ * minimal accessible contract (the sanitizer keeps both attributes).
+ */
+export const wrapMarkdownTablesInFocusableRegions = (html: string): string => {
+  let result = '';
+  let index = 0;
+
+  while (index < html.length) {
+    const tableStart = html.indexOf('<table>', index);
+    if (tableStart === -1) {
+      result += html.slice(index);
+      break;
+    }
+
+    const tableEnd = html.indexOf('</table>', tableStart);
+    if (tableEnd === -1) {
+      // Malformed input without a closing tag: leave the remainder untouched.
+      result += html.slice(index);
+      break;
+    }
+
+    result += html.slice(index, tableStart);
+    result += `<div tabindex="0" role="region" aria-label="${SCROLLABLE_TABLE_REGION_LABEL}">`;
+    result += html.slice(tableStart, tableEnd + '</table>'.length);
+    result += '</div>';
+    index = tableEnd + '</table>'.length;
+  }
+
+  return result;
+};
+
 export async function getMarkdownDocument(
   relativePath: string
 ): Promise<MarkdownDocument> {
@@ -76,8 +115,14 @@ export async function createMarkdownDocument(
   const transformed = await processor.run(ast);
   const htmlResult = processor.stringify(transformed as never);
 
+  // Wrap tables in focusable scroll regions before sanitizing; the sanitizer
+  // keeps tabindex/role/aria-label, so the wrapped regions survive intact.
+  const withFocusableTables = wrapMarkdownTablesInFocusableRegions(
+    htmlResult.toString()
+  );
+
   // Sanitize HTML server-side so downstream readers can remain server components.
-  const sanitizedHtml = sanitizeServerHtml(htmlResult.toString());
+  const sanitizedHtml = sanitizeServerHtml(withFocusableTables);
 
   return {
     html: sanitizedHtml,

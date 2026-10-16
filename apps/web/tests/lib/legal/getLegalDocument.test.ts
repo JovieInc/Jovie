@@ -22,6 +22,21 @@ describe('getLegalDocument', () => {
     expect(doc.html).toContain('<code>jv_cc</code>');
   });
 
+  it('renders every cookie policy table inside a focusable scroll region', async () => {
+    // Regression: axe scrollable-region-focusable flagged the /legal/cookies
+    // cookie tables as scrollable but not keyboard-focusable (JOV-8068).
+    const doc = await getLegalDocument('cookies');
+
+    const regionOpen =
+      '<div tabindex="0" role="region" aria-label="Scrollable table">';
+    const regionCount = doc.html.split(regionOpen).length - 1;
+    const tableCount = doc.html.split('<table>').length - 1;
+
+    expect(tableCount).toBeGreaterThan(0);
+    expect(regionCount).toBe(tableCount);
+    expect(doc.html).toContain('<code>jovie_lead_attribution</code>');
+  });
+
   it('keeps legal routes fully static', async () => {
     const layout = await import('@/app/(dynamic)/legal/layout');
     const routeModules = await Promise.all([

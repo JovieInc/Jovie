@@ -65,6 +65,46 @@ describe('createMarkdownDocument', () => {
     expect(doc.html).toContain('type="checkbox"');
   });
 
+  it('wraps every table in a focusable scroll region (axe scrollable-region-focusable)', async () => {
+    const md = [
+      '| Cookie Name | Purpose |',
+      '| --- | --- |',
+      '| `jv_cc` | Stores consent preferences |',
+      '',
+      '| Provider | Category |',
+      '| --- | --- |',
+      '| `jovie_lead_attribution` | Essential |',
+    ].join('\n');
+    const doc = await createMarkdownDocument(md);
+
+    const regionOpen =
+      '<div tabindex="0" role="region" aria-label="Scrollable table">';
+    expect(doc.html.split(regionOpen).length - 1).toBe(2);
+    expect(doc.html).toContain(`${regionOpen}<table>`);
+    expect(doc.html).toContain('</table></div>');
+    expect(doc.html).toContain('<code>jovie_lead_attribution</code>');
+    // No bare tables outside a focusable region.
+    expect(doc.html.replaceAll(`${regionOpen}<table>`, '')).not.toContain(
+      '<table>'
+    );
+  });
+
+  it('keeps focusable table regions intact after sanitization', async () => {
+    const md = [
+      '| Name | Link |',
+      '| --- | --- |',
+      '| Bad | <a href="javascript:alert(1)" onclick="alert(2)">Unsafe</a> |',
+    ].join('\n');
+    const doc = await createMarkdownDocument(md);
+
+    expect(doc.html).toContain(
+      '<div tabindex="0" role="region" aria-label="Scrollable table"><table>'
+    );
+    expect(doc.html).toContain('</table></div>');
+    expect(doc.html).not.toContain('javascript:');
+    expect(doc.html).not.toContain('onclick');
+  });
+
   it('sanitizes dangerous HTML inside GFM table and task list output', async () => {
     const md = [
       '| Name | Link |',
