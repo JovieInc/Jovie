@@ -115,7 +115,19 @@ jobs:
           echo "::notice::Staging lineage $EXPECTED_SHA outcome=$outcome replacement=$replacement_sha"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
         if: steps.lineage.outputs.outcome == 'not_applicable'
-        with: {ref: "${{ github.event.workflow_run.head_sha }}", fetch-depth: 0, persist-credentials: false}
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+          # Sparse patterns from the resolver checkout stay on this workspace.
+          # Omitting them here left staging-lane-carryover.mjs off disk
+          # (run 38828092050). History stays complete; the worktree is the
+          # import closure the routing step actually loads.
+          sparse-checkout: |
+            .github/scripts/staging-lane-carryover.mjs
+            scripts/lib/production-lane-range.mjs
+            scripts/lib/product-lane-classifier.mjs
+          sparse-checkout-cone-mode: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v4.4.0
         if: steps.lineage.outputs.outcome == 'not_applicable'
         with: {node-version: 24.21.0}

@@ -307,6 +307,18 @@ jobs:
             .scopedAdmission.surface == "production-web" and
             .scopedAdmission.allowed == true
           ' "$RUNNER_TEMP/fleet-admission.json" >/dev/null
+      - name: Checkout the rate-limit hold from main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # This job's primary checkout is the release SHA. Its copy of the
+          # hold still piped artifact zips, and gh refused application/zip
+          # (runs 38828724154 and 38829734233). Load the default-branch hold,
+          # which writes zip bytes to a file and still waits out a reset.
+          ref: ${{ github.sha }}
+          path: .rate-limit-hold
+          sparse-checkout: scripts/lib/github-rate-limit.mjs
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
       - name: Hold installation reads through a rate-limit reset
         shell: bash
         run: |
@@ -320,13 +332,16 @@ jobs:
           # already near the 21000-character expression cap.
           real_gh="$(command -v gh)"
           echo "REAL_GH=${real_gh}" >> "$GITHUB_ENV"
+          hold="$GITHUB_WORKSPACE/.rate-limit-hold/scripts/lib/github-rate-limit.mjs"
+          test -f "$hold"
+          echo "RATE_LIMIT_HOLD=${hold}" >> "$GITHUB_ENV"
           shim="$RUNNER_TEMP/gh-rate-limit-bin"
           mkdir -p "$shim"
           cat > "$shim/gh" << 'EOF'
           #!/bin/bash
           set -euo pipefail
           if [[ "${1:-}" == "api" && "${2:-}" != "rate_limit" ]]; then
-            exec node "$GITHUB_WORKSPACE/scripts/lib/github-rate-limit.mjs" run --max-wait-seconds 1500 --attempts 4 -- "$REAL_GH" "$@"
+            exec node "$RATE_LIMIT_HOLD" run --max-wait-seconds 1500 --attempts 4 -- "$REAL_GH" "$@"
           fi
           exec "$REAL_GH" "$@"
           EOF
