@@ -123,6 +123,44 @@ class ClassifierFixtureTest(unittest.TestCase):
                       files=["canon/strategy/theses.md"])
         self.assertEqual(remediation.classify_blocker(strategy)["cls"], "needs-human-decision")
 
+    def test_review_routing_preserves_explicit_stops_and_real_decisions(self):
+        """Independent re-review counterexamples (#21932, 2026-10-16): an
+        explicit stop label, a negated policy statement in an ordinary repair,
+        and a real founder decision inside a review thread must all keep their
+        gates; only ordinary actionable feedback rides the automated ladder."""
+        # An explicit stop label outranks the review-fix ladder: the early
+        # human_review return must not swallow a do-not-merge hold.
+        stopped = pr(number=21933, reviewDecision="CHANGES_REQUESTED",
+                     labels=[{"name": "do-not-merge"}],
+                     holdNote={"author": "itstimwhite",
+                               "body": "hold pending external review"})
+        stop_cls = remediation.classify_blocker(stopped)
+        self.assertEqual(stop_cls["cls"], "needs-human-decision")
+        self.assertEqual(stop_cls["next_action"], "tim-decides")
+        # An ordinary repair that states what it did NOT touch ("No
+        # credentials or permissions are changed") is assurance, not a
+        # founder decision surface; a positive credential/pricing change
+        # still keeps the gate.
+        negative = pr(number=21934, reviewDecision="CHANGES_REQUESTED",
+                      body="Fix the CI auth format. No credentials or permissions are changed.")
+        self.assertEqual(remediation.classify_blocker(negative)["cls"], "fixable-by-model")
+        positive = pr(number=21935, reviewDecision="CHANGES_REQUESTED",
+                      body="Rotate the production credential and update the pricing table")
+        self.assertEqual(remediation.classify_blocker(positive)["cls"], "needs-human-decision")
+        # A current unresolved human thread carrying a real spend decision
+        # surfaces the ask instead of routing it as prescribed implementation.
+        spend = pr(number=21936, reviewDecision="CHANGES_REQUESTED",
+                   reviewThreads=[{"resolved": False, "author": "itstimwhite",
+                                   "body": "Should we purchase a paid plan before implementation?"}])
+        spend_cls = remediation.classify_blocker(spend)
+        self.assertEqual(spend_cls["cls"], "needs-human-decision")
+        self.assertTrue(any("spend" in line for line in spend_cls["evidence"]))
+        # An ordinary engineering ask in the same position stays fixable.
+        ordinary = pr(number=21937, reviewDecision="CHANGES_REQUESTED",
+                      reviewThreads=[{"resolved": False, "author": "itstimwhite",
+                                      "body": "replace `bearer` with the documented Basic form"}])
+        self.assertEqual(remediation.classify_blocker(ordinary)["cls"], "fixable-by-model")
+
     def test_lockfile_only_and_main_red_and_events(self):
         lock = pr(mergeStateStatus="DIRTY", conflictFiles=["pnpm-lock.yaml"])
         self.assertEqual(remediation.classify_blocker(lock)["subtype"], "lockfile-only")
