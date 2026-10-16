@@ -146,6 +146,10 @@ describe('Shared fenced-attempt coverage contract', () => {
   it('runs existing fenced-attempt and lane regressions in the real structural selector', () => {
     const command = STRUCTURAL_PYTHON_REGRESSION_COMMANDS[0];
     expect(command).toContain('scripts/tests/test_execution_attempt.py');
+    expect(command).toContain('scripts/tests/test_backlog_admission.py');
+    expect(command).toContain(
+      '*/scripts/lanes/backlog_admission.py" --fail-under=90'
+    );
     expect(command).toContain('scripts/tests/test_remediation.py');
     expect(command).toContain(
       '*/scripts/lanes/remediation.py" --fail-under=85'
