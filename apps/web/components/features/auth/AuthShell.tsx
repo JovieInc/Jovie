@@ -47,6 +47,7 @@ import {
   sanitizeMobileReturnRoute,
 } from '@/lib/mobile/auth-return';
 import { logger } from '@/lib/utils/logger';
+import { preserveAuthTouchOwnership } from './constants';
 import { EmailCodeAuthForm } from './EmailCodeAuthForm';
 import { GoogleOneTap } from './GoogleOneTap';
 
@@ -389,6 +390,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
         data-auth-shell-ready='true'
         data-auth-shell-hydrated={hasHydrated ? 'true' : 'false'}
         data-auth-shell-providers='0'
+        onTouchEndCapture={preserveAuthTouchOwnership}
         className='relative min-h-72'
       >
         <AuthOAuthStartSurface
@@ -415,6 +417,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
   return (
     <div
       data-auth-shell-mode={mode}
+      onTouchEndCapture={preserveAuthTouchOwnership}
       data-auth-shell-intent={intent}
       data-auth-shell-compact={compact ? 'true' : undefined}
       data-auth-shell-ready='true'
@@ -470,7 +473,7 @@ function AuthQuietBackLink({ href, label }: Readonly<AuthShellBackLink>) {
     <Link
       href={href}
       data-auth-shell-back
-      className='mb-4 self-start rounded-sm text-sm text-secondary-token underline-offset-2 transition-colors hover:text-primary-token hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
+      className='auth-quiet-target focus-ring-themed mb-2 self-start rounded-sm text-sm text-secondary-token underline-offset-2 transition-colors hover:text-primary-token hover:underline'
     >
       {label}
     </Link>
@@ -495,11 +498,11 @@ function AuthShellIdentity({
       <Link
         href={APP_ROUTES.HOME}
         aria-label='Go to homepage' // ui-casing-allow: matches AuthLayout logo link
-        className='mb-4 inline-flex rounded-sm text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
+        className='auth-quiet-target focus-ring-themed mb-2 rounded-sm text-primary-token'
       >
         <BrandLogo size='chrome' tone='white' aria-hidden />
       </Link>
-      <h1 className='text-xl font-semibold leading-tight tracking-tight text-primary-token'>
+      <h1 className='max-w-full wrap-anywhere text-xl font-semibold leading-tight tracking-tight text-primary-token'>
         {getAuthShellHeading(intent, claimHandle)}
       </h1>
     </div>
@@ -566,7 +569,7 @@ function AuthOAuthStartSurface({
       {hasProviders ? (
         <fieldset
           data-auth-provider-slots
-          className='grid grid-cols-1 gap-1.5'
+          className='grid grid-cols-1 gap-3'
           aria-busy={providersBusy ? 'true' : undefined}
         >
           <legend className='sr-only'>Social sign-in options</legend>
@@ -647,7 +650,7 @@ function AuthModeSwitchLink({
 }>) {
   const isSignUp = mode === 'sign-up';
   const className =
-    'focus-ring-themed rounded-sm text-primary-token underline underline-offset-2';
+    'auth-quiet-target focus-ring-themed rounded-sm text-primary-token underline underline-offset-2';
   const troubleHref = APP_ROUTES.SUPPORT;
 
   return (
@@ -700,7 +703,7 @@ function AuthLegalText({ mode }: Readonly<{ mode: AuthShellMode }>) {
       <span data-auth-legal-prefix className='block'>
         By {mode === 'sign-up' ? 'signing up' : 'continuing'}, you agree to our
       </span>{' '}
-      <span data-auth-legal-links className='block whitespace-nowrap'>
+      <span data-auth-legal-links className='block'>
         <Link
           href={termsHref}
           className='focus-ring-themed whitespace-nowrap rounded-md py-0.5 text-primary-token underline underline-offset-2 transition-colors hover:text-primary-token'

@@ -1,9 +1,10 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import {
   AuthProviderButtonSlot,
   AuthProviderButtonSlots,
 } from '@/components/features/auth/AuthProviderButtons';
+import { preserveAuthTouchOwnership } from '@/components/features/auth/constants';
 import { getEnabledAuthOAuthProviders } from '@/lib/auth/oauth-providers';
 
 describe('AuthProviderButtonSlots', () => {
@@ -36,48 +37,35 @@ describe('AuthProviderButtonSlots', () => {
     expect(
       screen.getByRole('button', { name: 'Continue with Google' })
     ).toBeEnabled();
-    expect(
-      screen.getByRole('button', { name: 'Continue with Google' }).className
-    ).toContain('bg-transparent');
-    expect(
-      screen.getByRole('button', { name: 'Continue with Google' }).className
-    ).toContain('h-7');
-    expect(
-      screen.getByRole('button', { name: 'Continue with Google' }).className
-    ).toContain('min-h-7');
-    expect(
-      screen.getByRole('button', { name: 'Continue with Google' }).className
-    ).toContain('gap-(--space-2)');
-    expect(
-      screen.getByRole('button', { name: 'Continue with Google' }).className
-    ).not.toContain('--linear-gap-');
-    expect(
-      screen.getByRole('button', { name: 'Continue with Google' }).className
-    ).not.toContain('--linear-shadow-button');
-    expect(
-      screen.getByRole('button', { name: 'Continue with Google' }).className
-    ).not.toContain('--linear-button-height-md');
+    expect(screen.getByRole('button').querySelector('img')).toHaveAttribute(
+      'src',
+      '/auth/google-logo.svg'
+    );
   });
 
-  it('balances Apple and Google on the same dark 28/44 treatment and official Google G', () => {
-    const { container } = render(
-      <>
+  it('cancels touches retargeted from whitespace while accepting owned points', () => {
+    render(
+      <div onTouchEndCapture={preserveAuthTouchOwnership}>
         <AuthProviderButtonSlot disabled={false} provider='apple' />
-        <AuthProviderButtonSlot disabled={false} provider='google' />
-      </>
+      </div>
     );
-    for (const name of [
-      'Continue with Apple',
-      'Continue with Google',
-    ] as const) {
-      const className = screen.getByRole('button', { name }).className;
-      expect(className).toContain('h-7');
-      expect(className).toContain('before:h-11');
-      expect(className).toContain('bg-transparent');
-    }
-    expect(
-      container.querySelector('[data-auth-google-icon="full-color"]')
-    ).not.toBeNull();
-    expect(container.querySelector('path[fill="#4285F4"]')).not.toBeNull();
+    const button = screen.getByRole('button');
+    expect(button.querySelector('img')).toHaveAttribute(
+      'src',
+      '/auth/apple-logo.svg'
+    );
+    const touch = { changedTouches: [{ clientX: 10, clientY: 10 }] };
+    Object.defineProperty(document, 'elementFromPoint', {
+      configurable: true,
+      value: () => document.body,
+    });
+    expect(fireEvent.touchEnd(button, touch)).toBe(false);
+    Object.defineProperty(document, 'elementFromPoint', {
+      configurable: true,
+      value: () => button,
+    });
+    expect(fireEvent.touchEnd(button, touch)).toBe(true);
+    expect(fireEvent.touchEnd(button, { changedTouches: [] })).toBe(true);
+    delete (document as Partial<Document>).elementFromPoint;
   });
 });
