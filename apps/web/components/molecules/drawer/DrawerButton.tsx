@@ -32,7 +32,7 @@ export interface DrawerButtonProps
 // #07080a (~3.13:1). Idle secondary text (#a0a5af) already clears 4.5:1;
 // it has to paint immediately. JOV-8068.
 export const DRAWER_BUTTON_CLASSNAME =
-  'border font-caption tracking-tight shadow-none transition-[background-color,border-color] duration-subtle focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-2 focus-visible:ring-ring/20';
+  'border font-caption tracking-tight shadow-none transition-surface duration-subtle focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-2 focus-visible:ring-ring/20';
 
 export const DrawerButton = React.forwardRef<
   HTMLButtonElement,

@@ -65,11 +65,12 @@ describe('DrawerButton', () => {
     expect(button.className).toContain('text-secondary-token');
     expect(button.className).toContain('bg-surface-0');
 
-    const transition = button.className.match(/transition-\[([^\]]+)\]/);
-    expect(transition?.[1].split(',')).toEqual([
-      'background-color',
-      'border-color',
-    ]);
+    expect(button).toHaveClass('transition-surface', 'duration-subtle');
+    expect(
+      button.className
+        .split(/\s+/)
+        .filter(name => name.startsWith('transition-'))
+    ).toEqual(['transition-surface']);
 
     const shell = '#07080a';
     // Axe reported 3.13 for this ink; the engine measures 3.138.
