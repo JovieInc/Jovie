@@ -65,6 +65,19 @@ jobs:
             scripts/lib/changed-test-coverage.mjs
             scripts/lib/blog-content-ci.mjs
             scripts/run-affected-tests.mjs
+            scripts/ci-fast-lanes.mjs
+            scripts/design-conformance-paths.mjs
+            scripts/lib/ci-repo-lanes.mjs
+            scripts/lib/test-file-dependencies.mjs
+            scripts/invariants/scanned-paths.mjs
+            scripts/invariants/design-surfaces.mjs
+            scripts/invariants/product-reference-coherence.mjs
+            scripts/invariants/registry.mjs
+            scripts/invariants/done-sprint-invariants.mjs
+            scripts/invariants/ios-web-no-scroll-jank.mjs
+            scripts/invariants/latency-sensitive-execution-paths.mjs
+            scripts/invariants/latency-sensitive-execution-allowlist.json
+            scripts/invariants/overlay-layer-contract.mjs
             scripts/lib/upsert-pr-comment.sh
           sparse-checkout-cone-mode: false
 
@@ -546,6 +559,19 @@ jobs:
             scripts/lib/changed-test-coverage.mjs
             scripts/lib/blog-content-ci.mjs
             scripts/run-affected-tests.mjs
+            scripts/ci-fast-lanes.mjs
+            scripts/design-conformance-paths.mjs
+            scripts/lib/ci-repo-lanes.mjs
+            scripts/lib/test-file-dependencies.mjs
+            scripts/invariants/scanned-paths.mjs
+            scripts/invariants/design-surfaces.mjs
+            scripts/invariants/product-reference-coherence.mjs
+            scripts/invariants/registry.mjs
+            scripts/invariants/done-sprint-invariants.mjs
+            scripts/invariants/ios-web-no-scroll-jank.mjs
+            scripts/invariants/latency-sensitive-execution-paths.mjs
+            scripts/invariants/latency-sensitive-execution-allowlist.json
+            scripts/invariants/overlay-layer-contract.mjs
           sparse-checkout-cone-mode: false
       - name: Download immutable patch artifact
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -950,6 +976,19 @@ jobs:
             scripts/lib/changed-test-coverage.mjs
             scripts/lib/blog-content-ci.mjs
             scripts/run-affected-tests.mjs
+            scripts/ci-fast-lanes.mjs
+            scripts/design-conformance-paths.mjs
+            scripts/lib/ci-repo-lanes.mjs
+            scripts/lib/test-file-dependencies.mjs
+            scripts/invariants/scanned-paths.mjs
+            scripts/invariants/design-surfaces.mjs
+            scripts/invariants/product-reference-coherence.mjs
+            scripts/invariants/registry.mjs
+            scripts/invariants/done-sprint-invariants.mjs
+            scripts/invariants/ios-web-no-scroll-jank.mjs
+            scripts/invariants/latency-sensitive-execution-paths.mjs
+            scripts/invariants/latency-sensitive-execution-allowlist.json
+            scripts/invariants/overlay-layer-contract.mjs
             scripts/lib/upsert-pr-comment.sh
           sparse-checkout-cone-mode: false
       - name: Resolve terminal outcome from typed job states

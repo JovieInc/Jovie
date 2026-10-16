@@ -211,12 +211,9 @@ describe('marketing route health contract', () => {
     );
     expect(waitlist?.renderedSections).toEqual([
       expect.objectContaining({
-        componentPath: 'apps/web/components/features/auth/AuthLayout.tsx',
-        sectionId: 'hero',
-      }),
-      expect.objectContaining({
         componentPath: 'apps/web/components/features/auth/AuthShell.tsx',
         sectionId: 'capture',
+        variantId: 'email-only',
       }),
     ]);
   });

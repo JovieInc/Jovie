@@ -91,6 +91,8 @@ describe('pay landing System B source contract', () => {
       'marketing-hero-dock',
       'marketing-hero-dock--inset'
     );
+    expect(dock).toHaveAttribute('data-testid', 'marketing-section-hero');
+    expect(dock).toHaveAttribute('data-marketing-variant', 'split-claim-card');
     expect(dock?.querySelector(':scope > .hero-glow')).not.toBeNull();
   });
 
