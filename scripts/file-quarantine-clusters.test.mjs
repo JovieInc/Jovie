@@ -15,7 +15,7 @@ const now = Date.parse('2026-10-03T12:00:00Z'),
   headSha = 'a'.repeat(40),
   hash = 'b'.repeat(64);
 const file = 'apps/web/tests/unit/example.test.ts';
-/** @typedef {{schemaVersion:number,complete?:boolean,run?:Record<string,unknown>,executions?:Array<Record<string,unknown>>,entries?:unknown[]}} RetryReport */
+/** @typedef {{schemaVersion:number,complete?:boolean,run?:Record<string,unknown>,executions?:Array<Record<string,unknown>>,entries?:unknown[],flaky?:Array<{file:string,name:string,retryCount:number}>}} RetryReport */
 const ledger = {
   schemaVersion: 1,
   retryBudget: {
@@ -339,8 +339,10 @@ test('filing and recurrence errors remain visible and source drift prevents writ
         throw new Error('source drift');
       };
     if (kind === 'upsert') f.options.upsert = async () => ({ ok: false });
-    if (kind === 'inventory') f.options.list = async () => ({ ok: false });
-    if (kind === 'comment') f.options.comment = async () => ({ ok: false });
+    if (kind === 'inventory')
+      f.options.list = async () => ({ ok: false, comments: [] });
+    if (kind === 'comment')
+      f.options.comment = async () => ({ ok: false, id: '' });
     await assert.rejects(fileReportedFlakeClusters(f.options));
     if (kind === 'lease') assert.equal(f.created.size, 0);
   }
