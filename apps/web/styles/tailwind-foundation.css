@@ -195,6 +195,11 @@
   max-height: calc(100dvh - var(--space-4));
 }
 
+/* Surface chrome eases while text paints immediately for accessible contrast. */
+@utility transition-surface {
+  transition-property: background-color, border-color;
+}
+
 /* Canonical allocation transition shared by sidebar, inspector, and drawers. */
 @utility transition-shell-rail-allocation {
   transition-property: flex-basis, width, border-width, opacity, transform;

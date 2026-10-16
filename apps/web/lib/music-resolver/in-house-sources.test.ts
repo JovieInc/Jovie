@@ -539,4 +539,25 @@ describe('createDefaultInHouseSources', () => {
     expect(result?.metadata?.releaseGroups).toHaveLength(25);
     expect(result?.links).toEqual([]);
   });
+
+  it.each([true, false])(
+    'preserves the explicit browse completeness receipt (%s) in resolver metadata',
+    async complete => {
+      mocks.getMusicBrainzArtist.mockResolvedValue({
+        id: MBID,
+        name: 'Artist',
+        releaseGroupsComplete: complete,
+        'release-groups': Array.from(
+          { length: complete ? 27 : 2 },
+          (_, index) => ({
+            id: String(index),
+            title: 'Catalog group',
+          })
+        ),
+      });
+      const result = await createDefaultInHouseSources().artistByMbid(MBID);
+      expect(result?.metadata?.releaseGroupsComplete).toBe(complete);
+      expect(result?.metadata?.releaseGroups).toHaveLength(complete ? 27 : 2);
+    }
+  );
 });

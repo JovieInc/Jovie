@@ -15,7 +15,11 @@ import { RIGHT_RAIL_KEYBOARD_SHORTCUT_BARE } from '@/hooks/useRightRailKeyboardS
  * This intentionally stays an icon control rather than another identity
  * surface: the sidebar footer owns the account/avatar entry.
  */
-export function ArtistProfileRailToggle() {
+export function ArtistProfileRailToggle({
+  previewTrigger = true,
+}: {
+  readonly previewTrigger?: boolean;
+}) {
   const { selectedProfile } = useDashboardData();
   const { isOpen, isPreview, isPinned, toggle } = usePreviewPanelState();
 
@@ -29,6 +33,7 @@ export function ArtistProfileRailToggle() {
       controlsId='shell-artist-profile-rail'
       open={isOpen}
       pinned={isPinned}
+      previewTrigger={previewTrigger}
       openLabel={
         isPreview ? `Pin ${primaryName} profile` : `Hide ${primaryName} profile`
       }

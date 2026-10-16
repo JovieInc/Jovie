@@ -13,6 +13,21 @@ protocol PushDeviceServicing: Sendable {
 
 extension APIClient: PushDeviceServicing {}
 
+enum DistributionPushWalletCapability {
+  static let infoKey = "JOVIEDistributionPushWallet"
+
+  /// Release archives set this to NO until the App Store profile can sign
+  /// Push and Wallet. A missing key stays enabled so Debug and tests keep
+  /// the current behavior. An unsubstituted build setting is disabled.
+  static func isEnabled(infoValue: String?) -> Bool {
+    infoValue == "YES" || infoValue == nil
+  }
+
+  static func isEnabled(bundle: Bundle = .main) -> Bool {
+    isEnabled(infoValue: bundle.object(forInfoDictionaryKey: infoKey) as? String)
+  }
+}
+
 @MainActor
 struct PushNotificationSystem {
   var authorizationStatus: @MainActor () async -> UNAuthorizationStatus
@@ -48,13 +63,17 @@ final class PushNotificationManager: PushNotificationCoordinating {
   private var ownership: NativeSessionOwnership?
   private let system: PushNotificationSystem
   private let defaults: UserDefaults
+  private let remoteNotificationsAvailable: Bool
 
   init(
     system: PushNotificationSystem? = nil,
-    defaults: UserDefaults = .standard
+    defaults: UserDefaults = .standard,
+    remoteNotificationsAvailable: Bool? = nil
   ) {
     self.system = system ?? .live
     self.defaults = defaults
+    self.remoteNotificationsAvailable =
+      remoteNotificationsAvailable ?? DistributionPushWalletCapability.isEnabled()
   }
 
   func configure(apiClient: any PushDeviceServicing) {
@@ -62,6 +81,9 @@ final class PushNotificationManager: PushNotificationCoordinating {
   }
 
   func activate() async {
+    // Registering without aps-environment fails the archive's runtime path
+    // and would prompt for a notification permission this build cannot use.
+    guard remoteNotificationsAvailable else { return }
     let context = NativeSessionTokenStore.captureSessionContext()
     let operation = UUID()
     epoch = operation

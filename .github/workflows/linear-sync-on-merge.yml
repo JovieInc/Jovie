@@ -53,6 +53,10 @@ jobs:
         with:
           # Always the default branch: a replayed event must not run an
           # older closer revision from its merge commit.
+          # pull_request runs this file from the PR merge ref, whose
+          # sparse-checkout can lag main. The writer loads
+          # github-installation-quota.mjs dynamically and stays
+          # fail-closed when that checkout omitted it.
           ref: ${{ github.event.repository.default_branch }}
           fetch-depth: 1
           persist-credentials: false
@@ -61,6 +65,7 @@ jobs:
             .github/ci-harness/manifest.json
             .github/scripts/production-marker-state.mjs
             scripts/lib/linear-sync-on-merge.mjs
+            scripts/lib/github-installation-quota.mjs
             scripts/lib/validation-lifecycle.mjs
             scripts/lib/validation-sync.mjs
             scripts/lib/escaped-defect-closure.mjs
@@ -89,10 +94,22 @@ jobs:
           key: linear-sync-github-v1-${{ github.run_id }}
           restore-keys: linear-sync-github-v1-
 
+      # The sweep cursor is the next issue identifier, not a GitHub read.
+      # A unique key per run keeps the save, and the prefix restores the
+      # newest cursor so a rate limit resumes instead of restarting.
+      - name: Restore sweep cursor
+        if: github.event_name != 'pull_request'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .linear-sync-cursor
+          key: linear-sync-cursor-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: linear-sync-cursor-v1-
+
       - name: Evaluate the validation lifecycle
         id: evaluate
         env:
           LINEAR_SYNC_GITHUB_CACHE_DIR: .linear-sync-github-cache
+          LINEAR_SYNC_CURSOR_DIR: .linear-sync-cursor
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
@@ -110,3 +127,10 @@ jobs:
         with:
           path: .linear-sync-github-cache
           key: ${{ steps.evaluate.outputs.github_cache_key }}
+
+      - name: Save sweep cursor
+        if: ${{ !cancelled() && github.event_name != 'pull_request' && hashFiles('.linear-sync-cursor/cursor.json') != '' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .linear-sync-cursor
+          key: linear-sync-cursor-v1-${{ github.run_id }}-${{ github.run_attempt }}

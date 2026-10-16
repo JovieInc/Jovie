@@ -8,10 +8,12 @@ function Harness({
   side,
   resetKey = 'home',
   enabled = true,
+  previewTrigger,
 }: {
   side: 'left' | 'right';
   resetKey?: string;
   enabled?: boolean;
+  previewTrigger?: boolean;
 }) {
   const [pinned, setPinned] = useState(false);
   const { isPreview, isFloating, dismissPreview } = useRailPreview({
@@ -26,6 +28,7 @@ function Harness({
         type='button'
         data-testid='trigger'
         data-rail-toggle={side}
+        data-rail-preview-trigger={previewTrigger}
         onClick={() => {
           dismissPreview();
           setPinned(v => !v);
@@ -54,6 +57,19 @@ afterEach(() => vi.useRealTimers());
 describe.each(['left', 'right'] as const)(
   '%s shared transient rail owner',
   side => {
+    it('keeps an in-content manual control reachable until explicit activation', () => {
+      render(<Harness side={side} previewTrigger={false} />);
+      const trigger = screen.getByTestId('trigger');
+      const rail = screen.getByTestId('rail');
+      fireEvent.pointerOver(trigger);
+      expect(rail).toHaveAttribute('data-preview', 'false');
+      act(() => trigger.focus());
+      expect(rail).toHaveAttribute('data-preview', 'false');
+      fireEvent.click(trigger);
+      expect(rail).toHaveAttribute('data-pinned', 'true');
+      expect(trigger).toHaveFocus();
+    });
+
     it('bridges pointer travel, dismisses after grace and never changes pinned intent', () => {
       vi.useFakeTimers();
       render(<Harness side={side} />);

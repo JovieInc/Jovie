@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { gateway, generateText } from '@/lib/ai/sdk';
 import { buildAiTelemetry } from '@/lib/ai/telemetry';
 import { getSessionContext } from '@/lib/auth/session';
+import { ownedConversationCondition } from '@/lib/chat/conversation-access';
 import { sanitizeConversationTitle } from '@/lib/chat/title';
 import { conversationTitleSource } from '@/lib/chat/title-source';
 import {
@@ -33,7 +34,7 @@ interface RouteParams {
 async function maybeGenerateTitle(
   conversationId: string,
   messages: ChatPersistenceMessage[],
-  identity: { userId?: string | null; creatorProfileId: string }
+  identity: { userId: string; creatorProfileId: string }
 ): Promise<void> {
   const userMessage = messages.find(m => m.role === 'user');
   const { text: titleSource, deterministic } = conversationTitleSource(
@@ -47,8 +48,12 @@ async function maybeGenerateTitle(
       .set({ title })
       .where(
         and(
-          eq(chatConversations.id, conversationId),
-          eq(chatConversations.creatorProfileId, identity.creatorProfileId),
+          ownedConversationCondition({
+            conversationId,
+            userId: identity.userId,
+            creatorProfileId: identity.creatorProfileId,
+            audience: 'customer',
+          }),
           isNull(chatConversations.title)
         )
       );
@@ -103,7 +108,7 @@ async function maybeGenerateTitle(
 export async function POST(req: Request, { params }: RouteParams) {
   try {
     const { id: conversationId } = await params;
-    const { profile, clerkUserId } = await getSessionContext({
+    const { user, profile } = await getSessionContext({
       requireProfile: true,
     });
 
@@ -122,10 +127,12 @@ export async function POST(req: Request, { params }: RouteParams) {
       })
       .from(chatConversations)
       .where(
-        and(
-          eq(chatConversations.id, conversationId),
-          eq(chatConversations.creatorProfileId, profile.id)
-        )
+        ownedConversationCondition({
+          conversationId,
+          userId: user.id,
+          creatorProfileId: profile.id,
+          audience: 'customer',
+        })
       )
       .limit(1);
 
@@ -208,7 +215,7 @@ export async function POST(req: Request, { params }: RouteParams) {
       scheduleAfter(async () => {
         try {
           await maybeGenerateTitle(conversationId, messagesToInsert, {
-            userId: clerkUserId,
+            userId: user.id,
             creatorProfileId: profile.id,
           });
         } catch (error) {

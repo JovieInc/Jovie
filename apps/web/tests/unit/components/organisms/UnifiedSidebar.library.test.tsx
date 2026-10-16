@@ -70,31 +70,24 @@ vi.mock('@/components/organisms/user-button', () => ({
   },
 }));
 
-vi.mock('@/components/atoms/UpdateAvailablePill', () => ({
-  UpdateAvailablePill: () => (
-    <button type='button' data-testid='update-available-pill'>
-      Update
-    </button>
-  ),
-}));
-
-vi.mock('@/components/organisms/whats-new/WhatsNewBanner', () => ({
-  WhatsNewBanner: (props: {
-    readonly enabled: boolean;
-    readonly collapsed?: boolean;
-  }) => (
-    <div
-      data-testid='sidebar-whats-new'
-      data-enabled={String(props.enabled)}
-      data-collapsed={String(Boolean(props.collapsed))}
-    />
-  ),
-}));
-
-vi.mock('@/components/organisms/SidebarBottomNowPlayingBridge', () => ({
-  SidebarBottomNowPlayingBridge: (props: { readonly collapsed?: boolean }) => {
-    nowPlayingBridgePropsMock(props);
-    return <div data-testid='sidebar-now-playing-bridge' />;
+vi.mock('@/components/organisms/SidebarDockBridge', () => ({
+  SidebarDockBridge: (props: {
+    readonly collapsed: boolean;
+    readonly children: (status: undefined) => React.ReactNode;
+  }) => {
+    nowPlayingBridgePropsMock({ collapsed: props.collapsed });
+    return (
+      <>
+        <div data-sidebar-dock='true' className='shrink-0'>
+          <button type='button' data-testid='update-available-pill'>
+            Update
+          </button>
+          <div data-testid='sidebar-whats-new' />
+          <div data-testid='sidebar-now-playing-bridge' />
+        </div>
+        {props.children(undefined)}
+      </>
+    );
   },
 }));
 
@@ -343,8 +336,6 @@ describe('UnifiedSidebar library route', () => {
     expect(whatsNew.compareDocumentPosition(nowPlaying)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
     );
-    expect(whatsNew).toHaveAttribute('data-enabled', 'false');
-    expect(whatsNew).toHaveAttribute('data-collapsed', 'false');
   });
 
   it('keeps the unified user panel available on settings routes', () => {
@@ -684,19 +675,18 @@ describe('UnifiedSidebar library route', () => {
     expect(screen.queryByTestId('operator-lists-nav')).not.toBeInTheDocument();
   });
 
-  it('renders founder lists only inside the Ovie operator navigation', async () => {
+  it('renders founder lists in the Ovie sidebar outside the canonical landmark', async () => {
     renderUnifiedSidebar({ pathname: APP_ROUTES.ADMIN_OPS, section: 'ov' });
     const operatorNavigation = screen.getByRole('navigation', {
       name: 'OV Navigation',
     });
     // Lazy chunk: the lists block is split out of creator routes.
-    const lists =
-      await within(operatorNavigation).findByTestId('operator-lists-nav');
-    // Between Workspaces and Utilities, matching Pen STAGING Neq0A.
+    const lists = await screen.findByTestId('operator-lists-nav');
+    expect(operatorNavigation).not.toContainElement(lists);
     const labels = within(operatorNavigation)
-      .getAllByText(/^(Workspaces|Lists|Utilities)$/)
+      .getAllByText(/^(Workspaces|Utilities)$/)
       .map(node => node.textContent);
-    expect(labels).toEqual(['Workspaces', 'Lists', 'Utilities']);
+    expect(labels).toEqual(['Workspaces', 'Utilities']);
     expect(lists).toBeInTheDocument();
 
     renderUnifiedSidebar({ pathname: APP_ROUTES.CHAT, section: 'dashboard' });

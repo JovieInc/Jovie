@@ -2,6 +2,10 @@ import 'server-only';
 import { randomUUID } from 'node:crypto';
 import type { UIMessage, UIMessageChunk } from 'ai';
 import {
+  buildPostSelectionWritingBrief,
+  type PostSelectionWritingBriefResult,
+} from '@/lib/chat/post-selection-writing-brief';
+import {
   type AccessDecision,
   decideOnboardingAccess,
 } from '@/lib/chat/tools/onboarding-access-eval';
@@ -727,7 +731,9 @@ export async function decideFallbackTurn(
 
 const SPOTIFY_ARTIST_ID = /^[0-9A-Za-z]{22}$/;
 
-interface ServerArtistConfirmation {
+export interface ServerArtistConfirmation {
+  /** Server-only context for JOV-8409; never a client tool-history field. */
+  readonly writingBrief: PostSelectionWritingBriefResult;
   readonly historyMessage: UIMessage;
   readonly chunks: readonly UIMessageChunk[];
 }
@@ -756,6 +762,11 @@ export async function confirmSelectedArtist(
   const toolCallId = randomUUID();
   const input = { spotifyArtistId };
   return {
+    writingBrief: buildPostSelectionWritingBrief({
+      selection: output,
+      state,
+      disclosureAuthority: 'public_enrichment_only',
+    }),
     historyMessage: {
       id: `server-artist-confirmation-${toolCallId}`,
       role: 'assistant',

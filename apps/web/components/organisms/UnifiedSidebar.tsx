@@ -6,11 +6,10 @@ import { ArrowLeft } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Fragment, type PropsWithChildren, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { AskJovieMark } from '@/components/ask-jovie/AskJovie';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
-import { UpdateAvailablePill } from '@/components/atoms/UpdateAvailablePill';
 import { SidebarCollapseButton } from '@/components/molecules/sidebar-collapse-button';
 import { WorkspaceSelector } from '@/components/molecules/WorkspaceSelector';
 import {
@@ -45,7 +44,6 @@ import { useProfileData } from '@/hooks/useProfileData';
 import { APP_SHELL_WORKSPACES } from '@/lib/app-shell/workspaces';
 import { BRAND_WORDMARKS, type BrandVariant } from '@/lib/brand/tokens';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
-import { env } from '@/lib/env-client';
 import { useAppFlag } from '@/lib/flags/client';
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
 import { cn } from '@/lib/utils';
@@ -56,8 +54,7 @@ import {
   OPERATOR_NAV_SECTIONS,
 } from './operator-navigation';
 import { IdentitySwitcher } from './ProfileSwitcher';
-import { SidebarBottomNowPlayingBridge } from './SidebarBottomNowPlayingBridge';
-import { WhatsNewBanner } from './whats-new/WhatsNewBanner';
+import { SidebarDockBridge } from './SidebarDockBridge';
 
 // Founder-only (OV) block: split out so creator routes never ship it.
 const OperatorListsNav = dynamic(() =>
@@ -99,13 +96,10 @@ function SettingsNavGroup({
 /** Dedicated operator navigation; customer DashboardNav stays customer-only. */
 function OperatorNavigation({ pathname }: { readonly pathname: string }) {
   return (
-    <nav
-      aria-label='OV Navigation'
-      className='flex flex-1 flex-col gap-4 overflow-y-auto pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
-    >
-      {OPERATOR_NAV_SECTIONS.map(section => (
-        <Fragment key={section.label}>
-          <div>
+    <div className='flex flex-1 flex-col gap-4 overflow-y-auto pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
+      <nav aria-label='OV Navigation' className='flex flex-col gap-4'>
+        {OPERATOR_NAV_SECTIONS.map(section => (
+          <div key={section.label}>
             <span className={cn(OPERATOR_NAV_GROUP_LABEL, SHELL_RAIL_LABEL)}>
               {section.label}
             </span>
@@ -117,13 +111,12 @@ function OperatorNavigation({ pathname }: { readonly pathname: string }) {
               }
             />
           </div>
-          {/* Founder lists sit between Workspaces and Utilities (Pen Neq0A). */}
-          {section.label === 'Workspaces' ? (
-            <OperatorListsNav pathname={pathname} />
-          ) : null}
-        </Fragment>
-      ))}
-    </nav>
+        ))}
+      </nav>
+      {/* Dynamic list hrefs stay outside the canonical OV landmark so the
+          registry link set remains exact. */}
+      <OperatorListsNav pathname={pathname} />
+    </div>
   );
 }
 
@@ -352,18 +345,6 @@ function SidebarHeaderNav({
   );
 }
 
-/** Bottom-owned shell slot for transient entity cards and status banners. */
-export function SidebarDock({ children }: PropsWithChildren) {
-  return (
-    <div
-      data-sidebar-dock='true'
-      className='flex shrink-0 flex-col gap-1 overflow-visible'
-    >
-      {children}
-    </div>
-  );
-}
-
 /**
  * UnifiedSidebar - Single sidebar component for all post-auth sections
  *
@@ -375,31 +356,18 @@ export function UnifiedSidebar({
   variant = 'jovie',
   headerOwnsCollapsedToggle = false,
 }: UnifiedSidebarProps) {
-  const { identities, isAdmin: canSwitchWorkspaces } = useDashboardData();
+  const { identities, isAdmin: canSwitchWorkspaces, user } = useDashboardData();
   const sidebarOverride = useShellSidebarOverride();
   const { state: sidebarState } = useSidebar();
-  const isElectron = useIsElectronRuntime();
   const pathname = usePathname();
   const isDemoRoute = isDemoRoutePath(pathname);
   const isInSettings = section === 'settings';
   const isOperatorSection = section === 'admin' || section === 'ov';
   const isRouteSidebar = isInSettings || sidebarOverride !== null;
   const hasMultipleIdentities = identities.length >= 2;
-  // Read the bridge synchronously so the desktop update listener mounts on
-  // the first committed sidebar render. Electron emits update events once;
-  // waiting for the effect-backed runtime hook would miss a boot-time event.
 
   const { profileHref } = useProfileData(section !== 'ov');
   const isSidebarCollapsed = sidebarState === 'closed';
-  const showWhatsNew =
-    !env.IS_TEST && !env.IS_E2E && (isElectron || section === 'ov');
-  const ambientDock = (
-    <SidebarDock>
-      {isSidebarCollapsed ? null : <UpdateAvailablePill />}
-      <WhatsNewBanner enabled={showWhatsNew} collapsed={isSidebarCollapsed} />
-      <SidebarBottomNowPlayingBridge collapsed={isSidebarCollapsed} />
-    </SidebarDock>
-  );
 
   return (
     <Sidebar
@@ -462,12 +430,19 @@ export function UnifiedSidebar({
       </SidebarContent>
 
       <SidebarFooter className='mt-auto gap-0 border-t border-subtle px-0 pt-(--space-2-5) pb-(--space-3-5) [&_[data-slot=common-dropdown-trigger]]:min-h-8'>
-        {ambientDock}
-        <SidebarIdentityGroup
-          calm={!isRouteSidebar}
-          profileHref={section === 'ov' ? undefined : profileHref}
-          label={section === 'ov' ? 'Account' : undefined}
-        />
+        <SidebarDockBridge
+          userId={user?.id ?? ''}
+          collapsed={isSidebarCollapsed}
+        >
+          {dockStatus => (
+            <SidebarIdentityGroup
+              calm={!isRouteSidebar}
+              profileHref={section === 'ov' ? undefined : profileHref}
+              dockStatus={dockStatus}
+              label={section === 'ov' ? 'Account' : undefined}
+            />
+          )}
+        </SidebarDockBridge>
       </SidebarFooter>
     </Sidebar>
   );

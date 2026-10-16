@@ -12,6 +12,7 @@ import { NextResponse } from 'next/server';
 import { getSessionErrorResponse } from '@/app/api/chat/session-error-response';
 import { APP_ROUTES } from '@/constants/routes';
 import { getSessionContext, withDbSessionTx } from '@/lib/auth/session';
+import { ownedConversationCondition } from '@/lib/chat/conversation-access';
 import { chatConversations, chatMessages } from '@/lib/db/schema/chat';
 import { discogReleases, discogReleaseTracks } from '@/lib/db/schema/content';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
@@ -77,7 +78,13 @@ export async function POST(request: Request) {
             id: chatConversations.id,
           })
           .from(chatConversations)
-          .where(eq(chatConversations.creatorProfileId, profile.id))
+          .where(
+            ownedConversationCondition({
+              userId: user.id,
+              creatorProfileId: profile.id,
+              audience: 'customer',
+            })
+          )
           .orderBy(desc(chatConversations.updatedAt))
           .limit(1);
 

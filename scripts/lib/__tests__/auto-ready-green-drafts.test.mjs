@@ -230,6 +230,16 @@ describe('green-source draft classifier', () => {
     ).toMatchObject({ eligible: false, reason: 'checks:parity' });
   });
 
+  it('does not park an otherwise green draft on a stale lane-fix-red', () => {
+    expect(GREEN_SOURCE_HOLD_LABELS).not.toContain('lane-fix-red');
+    expect(
+      classifyGreenSourceDraft(draft({ labels: ['lane-fix-red'] }))
+    ).toEqual({
+      eligible: true,
+      reason: 'green-source-clean',
+    });
+  });
+
   it('never undrafts a parked draft or one carrying an admission stop label', () => {
     expect(classifyGreenSourceDraft(draft({ parkedDraft: true }))).toEqual({
       eligible: false,
@@ -309,6 +319,11 @@ describe('green-source controller contract', () => {
     expect(workflow).toContain(
       'group: auto-ready-green-source-${{ github.event.inputs.pr_number'
     );
+    const greenSource = workflow.slice(workflow.indexOf('\n  green-source:'));
+    expect(greenSource).toContain('cancel-in-progress: true');
+    expect(
+      greenSource.indexOf('Debounce repeated source completions')
+    ).toBeLessThan(greenSource.indexOf('actions/create-github-app-token@'));
     expect(workflow).toContain('RUN_OFFSET: ${{ github.run_number }}');
     expect(workflow).toContain('scripts/auto-ready-green-drafts.sh');
     expect(workflow).toContain("github.event_name == 'workflow_dispatch'");
@@ -321,7 +336,7 @@ describe('green-source controller contract', () => {
 
   it('mints a short-lived Jovie App token for green-source mutations', () => {
     expect(workflow).toContain(
-      'actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1'
+      'actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510'
     );
     expect(workflow).toContain(
       'GH_TOKEN: ${{ steps.app-token.outputs.token }}'

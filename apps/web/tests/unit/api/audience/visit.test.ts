@@ -763,6 +763,10 @@ describe('POST /api/audience/visit', () => {
       })
     );
     expect(audienceMemberInsert).not.toHaveProperty('latestReferrerUrl');
+    expect(mockDoesTableExist).toHaveBeenCalledWith('audience_referrers');
+    expect(
+      insertedValues.some(value => value.url === 'https://example.com/profile')
+    ).toBe(false);
     expect(mockRecordAudienceEvent).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({

@@ -14,6 +14,9 @@ committed baseline lives in [drift-ledger.json](./drift-ledger.json).
   12 (`design-drift-ledger`). Growth is WARN for the first release. Unreadable
   inputs are FAIL. See [GOVERNANCE.md](./GOVERNANCE.md).
 
+The [October 15 baseline review](./DRIFT_LEDGER_BASELINE_REVIEW.md) attributes
+the accepted growth to source changes and reconciles all signal deltas.
+
 Signals per file:
 
 - **Raw palette:** Tailwind palette colour utilities such as `text-amber-700`,
@@ -35,93 +38,100 @@ route's graph. Imports from `packages/*` are out of scope.
 <!-- drift-ledger:start -->
 | Aggregate | Count |
 |---|---:|
-| Routes scanned | 105 |
-| Files counted (route-owned or shared layer) | 676 |
-| Raw Tailwind palette utilities and hex colors | 255 |
-| Arbitrary values | 250 |
-| Raw `<button>` tags | 101 |
+| Routes scanned | 112 |
+| Files counted (route-owned or shared layer) | 727 |
+| Raw Tailwind palette utilities and hex colors | 237 |
+| Arbitrary values | 241 |
+| Raw `<button>` tags | 109 |
 | Legacy `--linear-*` tokens | 86 |
-| Visible 44/48px controls (`h-11`, `h-12`, `size-*`) | 19 |
-| Danger alias utilities (`error`, `destructive`, `red`) | 171 |
+| Visible 44/48px controls (`h-11`, `h-12`, `size-*`) | 22 |
+| Danger alias utilities (`error`, `destructive`, `red`) | 181 |
 | Registry entries with `penRootId: null` | 14 |
 | Status pill, badge, dot, and glyph components | 9 |
 | Entity header components | 1 |
-| Rail components | 11 |
+| Rail components | 13 |
 
 | Shared design-system layers reached by routes | Count |
 |---|---:|
-| Files counted (route-owned or shared layer) | 281 |
-| Raw Tailwind palette utilities and hex colors | 191 |
-| Arbitrary values | 210 |
-| Raw `<button>` tags | 60 |
-| Legacy `--linear-*` tokens | 42 |
+| Files counted (route-owned or shared layer) | 345 |
+| Raw Tailwind palette utilities and hex colors | 219 |
+| Arbitrary values | 342 |
+| Raw `<button>` tags | 65 |
+| Legacy `--linear-*` tokens | 61 |
 | Visible 44/48px controls (`h-11`, `h-12`, `size-*`) | 21 |
-| Danger alias utilities (`error`, `destructive`, `red`) | 38 |
+| Danger alias utilities (`error`, `destructive`, `red`) | 42 |
 
 | Registry | Entries | `penRootId: null` |
 |---|---:|---:|
 | appScreens | 7 | 4 |
 | componentRegistry | 11 | 10 |
 
-Routes with at least one signal: 57 of 105.
+Routes with at least one signal: 64 of 112.
 
 | Route | Files | Raw palette | Arbitrary | Raw button | --linear-* | 44/48px | Danger alias |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| `/app` | 81 | 67 | 42 | 17 | 10 | 1 | 8 |
+| `/app` | 83 | 67 | 42 | 21 | 10 | 0 | 23 |
 | `/app/admin/activity` | 16 | 25 | 6 | 1 | 0 | 0 | 3 |
 | `/app/admin/agent-runs/[id]` | 3 | 0 | 1 | 0 | 0 | 0 | 1 |
-| `/app/admin/certifications` | 19 | 28 | 6 | 1 | 0 | 0 | 6 |
-| `/app/admin/chat` | 132 | 54 | 25 | 25 | 1 | 3 | 25 |
-| `/app/admin/costs` | 15 | 25 | 8 | 1 | 0 | 0 | 3 |
-| `/app/admin/feature-registry` | 15 | 25 | 6 | 1 | 0 | 0 | 3 |
-| `/app/admin/features` | 17 | 25 | 6 | 1 | 0 | 0 | 3 |
-| `/app/admin/growth` | 58 | 25 | 9 | 2 | 2 | 0 | 32 |
-| `/app/admin/hud` | 50 | 41 | 75 | 2 | 4 | 1 | 25 |
+| `/app/admin/certifications` | 22 | 27 | 6 | 1 | 0 | 0 | 7 |
+| `/app/admin/chat` | 134 | 51 | 25 | 23 | 1 | 4 | 27 |
+| `/app/admin/chat-playground` | 79 | 40 | 18 | 16 | 1 | 0 | 24 |
+| `/app/admin/costs` | 17 | 25 | 6 | 1 | 0 | 0 | 4 |
+| `/app/admin/feature-registry` | 22 | 27 | 6 | 1 | 0 | 0 | 7 |
+| `/app/admin/features` | 19 | 25 | 6 | 1 | 0 | 0 | 4 |
+| `/app/admin/growth` | 60 | 25 | 9 | 2 | 2 | 0 | 33 |
+| `/app/admin/hud` | 55 | 27 | 71 | 2 | 4 | 1 | 25 |
+| `/app/admin/inbox` | 9 | 0 | 0 | 0 | 0 | 0 | 2 |
+| `/app/admin/integrations` | 144 | 51 | 27 | 23 | 1 | 5 | 29 |
 | `/app/admin/investors` | 15 | 25 | 9 | 1 | 2 | 0 | 3 |
 | `/app/admin/investors/links` | 14 | 25 | 6 | 1 | 0 | 1 | 8 |
 | `/app/admin/investors/settings` | 3 | 0 | 2 | 0 | 0 | 0 | 4 |
 | `/app/admin/investors/updates` | 3 | 0 | 0 | 0 | 0 | 0 | 1 |
-| `/app/admin/needs-you` | 14 | 37 | 6 | 1 | 0 | 0 | 8 |
-| `/app/admin/operations` | 16 | 25 | 6 | 1 | 0 | 0 | 3 |
-| `/app/admin/people` | 105 | 91 | 17 | 3 | 6 | 2 | 34 |
-| `/app/admin/platform-connections` | 10 | 9 | 7 | 1 | 0 | 0 | 1 |
-| `/app/admin/presence` | 17 | 25 | 6 | 1 | 0 | 0 | 7 |
+| `/app/admin/lists` | 13 | 25 | 6 | 1 | 0 | 0 | 3 |
+| `/app/admin/lists/[id]` | 16 | 25 | 6 | 1 | 0 | 0 | 3 |
+| `/app/admin/lists/views/[viewId]` | 14 | 25 | 6 | 1 | 0 | 0 | 3 |
+| `/app/admin/needs-you` | 15 | 25 | 6 | 1 | 0 | 0 | 5 |
+| `/app/admin/operations` | 19 | 25 | 6 | 1 | 0 | 0 | 6 |
+| `/app/admin/outbound` | 22 | 25 | 6 | 1 | 0 | 0 | 5 |
+| `/app/admin/people` | 110 | 91 | 17 | 4 | 6 | 2 | 29 |
+| `/app/admin/platform-connections` | 12 | 9 | 7 | 1 | 0 | 0 | 2 |
+| `/app/admin/presence` | 22 | 25 | 6 | 1 | 0 | 0 | 7 |
 | `/app/admin/revenue-lift` | 3 | 0 | 3 | 0 | 0 | 0 | 0 |
 | `/app/admin/screenshots` | 3 | 0 | 1 | 0 | 6 | 0 | 0 |
-| `/app/admin/share-studio` | 13 | 25 | 9 | 1 | 0 | 0 | 3 |
-| `/app/admin/shipping` | 8 | 0 | 0 | 0 | 0 | 0 | 3 |
+| `/app/admin/share-studio` | 16 | 25 | 9 | 2 | 0 | 0 | 3 |
+| `/app/admin/shipping` | 10 | 0 | 0 | 0 | 0 | 0 | 4 |
 | `/app/admin/wiki` | 7 | 26 | 0 | 0 | 0 | 0 | 0 |
 | `/app/calendar` | 34 | 25 | 7 | 3 | 0 | 0 | 3 |
-| `/app/chat` | 192 | 102 | 62 | 42 | 11 | 5 | 31 |
-| `/app/chat/[id]` | 191 | 102 | 62 | 42 | 11 | 5 | 31 |
+| `/app/chat` | 193 | 99 | 62 | 40 | 11 | 5 | 34 |
+| `/app/chat/[id]` | 194 | 99 | 62 | 40 | 11 | 5 | 34 |
 | `/app/chats` | 29 | 25 | 6 | 2 | 0 | 0 | 3 |
-| `/app/contacts` | 82 | 41 | 13 | 9 | 2 | 1 | 4 |
+| `/app/contacts` | 83 | 41 | 13 | 9 | 2 | 1 | 4 |
 | `/app/dashboard/earnings` | 24 | 25 | 6 | 2 | 0 | 0 | 3 |
 | `/app/dashboard/release-plan` | 3 | 9 | 0 | 0 | 23 | 0 | 0 |
-| `/app/dashboard/releases` | 115 | 58 | 41 | 33 | 25 | 2 | 14 |
+| `/app/dashboard/releases` | 119 | 58 | 41 | 38 | 25 | 6 | 14 |
 | `/app/dashboard/releases/[releaseId]/downloads` | 12 | 26 | 7 | 2 | 0 | 0 | 6 |
-| `/app/dashboard/releases/[releaseId]/tasks` | 52 | 31 | 8 | 11 | 2 | 1 | 7 |
+| `/app/dashboard/releases/[releaseId]/tasks` | 53 | 31 | 8 | 11 | 2 | 1 | 7 |
 | `/app/earnings` | 24 | 25 | 6 | 2 | 0 | 0 | 3 |
 | `/app/insights` | 32 | 25 | 8 | 2 | 2 | 0 | 3 |
-| `/app/jovie-work` | 27 | 25 | 6 | 2 | 0 | 0 | 5 |
-| `/app/library` | 114 | 58 | 41 | 33 | 25 | 2 | 14 |
+| `/app/library` | 118 | 58 | 41 | 38 | 25 | 6 | 14 |
+| `/app/links` | 26 | 25 | 6 | 3 | 0 | 0 | 3 |
 | `/app/lyrics/[trackId]` | 26 | 25 | 6 | 2 | 0 | 0 | 3 |
-| `/app/presence` | 49 | 25 | 7 | 7 | 0 | 1 | 9 |
-| `/app/releases/[releaseId]/tasks` | 52 | 31 | 8 | 11 | 2 | 1 | 7 |
-| `/app/settings/account` | 45 | 25 | 15 | 2 | 0 | 0 | 12 |
+| `/app/presence` | 53 | 25 | 7 | 6 | 0 | 2 | 10 |
+| `/app/releases/[releaseId]/tasks` | 53 | 31 | 8 | 11 | 2 | 1 | 7 |
+| `/app/settings/account` | 47 | 25 | 17 | 2 | 0 | 0 | 11 |
 | `/app/settings/admin` | 23 | 25 | 6 | 2 | 0 | 0 | 3 |
-| `/app/settings/analytics` | 35 | 25 | 6 | 2 | 0 | 0 | 4 |
-| `/app/settings/artist-profile` | 81 | 74 | 46 | 10 | 10 | 2 | 12 |
-| `/app/settings/audience` | 39 | 28 | 10 | 3 | 0 | 0 | 7 |
-| `/app/settings/billing` | 30 | 25 | 8 | 2 | 0 | 0 | 4 |
-| `/app/settings/connectors` | 29 | 25 | 6 | 2 | 0 | 0 | 4 |
-| `/app/settings/contacts` | 39 | 25 | 7 | 2 | 0 | 0 | 4 |
-| `/app/settings/data-privacy` | 30 | 25 | 6 | 2 | 0 | 0 | 3 |
-| `/app/settings/payments` | 26 | 25 | 8 | 2 | 0 | 0 | 4 |
-| `/app/settings/retargeting-ads` | 3 | 0 | 1 | 0 | 0 | 2 | 0 |
-| `/app/settings/touring` | 34 | 26 | 6 | 4 | 0 | 0 | 3 |
-| `/app/settings/usage` | 30 | 25 | 9 | 2 | 0 | 0 | 6 |
-| `/app/tasks` | 73 | 39 | 73 | 28 | 30 | 4 | 13 |
-| `/app/tour-dates` | 36 | 36 | 7 | 3 | 0 | 1 | 7 |
+| `/app/settings/analytics` | 37 | 25 | 8 | 2 | 0 | 0 | 4 |
+| `/app/settings/audience` | 41 | 28 | 11 | 3 | 0 | 0 | 7 |
+| `/app/settings/billing` | 32 | 25 | 10 | 2 | 0 | 0 | 4 |
+| `/app/settings/connectors` | 31 | 25 | 8 | 2 | 0 | 0 | 5 |
+| `/app/settings/contacts` | 41 | 25 | 9 | 2 | 0 | 0 | 4 |
+| `/app/settings/data-privacy` | 32 | 25 | 8 | 2 | 0 | 0 | 3 |
+| `/app/settings/payments` | 28 | 25 | 10 | 2 | 0 | 0 | 4 |
+| `/app/settings/profile` | 84 | 74 | 48 | 10 | 10 | 1 | 13 |
+| `/app/settings/referral` | 6 | 0 | 2 | 0 | 0 | 0 | 0 |
+| `/app/settings/touring` | 36 | 26 | 8 | 4 | 0 | 0 | 3 |
+| `/app/settings/usage` | 32 | 25 | 8 | 2 | 0 | 0 | 3 |
+| `/app/tasks` | 74 | 39 | 73 | 29 | 30 | 5 | 12 |
+| `/app/tour-dates` | 36 | 36 | 7 | 3 | 0 | 0 | 7 |
 | `/app/youtube` | 24 | 25 | 6 | 2 | 0 | 0 | 3 |
 <!-- drift-ledger:end -->

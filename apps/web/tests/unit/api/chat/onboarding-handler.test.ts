@@ -1012,6 +1012,90 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     expect(hoisted.executeChatTurnMock).toHaveBeenCalledTimes(1);
   });
 
+  it.each(['https://example.com/file.png', 'http://127.0.0.1/file.png'])(
+    'rejects an unsafe onboarding attachment before chat dispatch: %s',
+    async url => {
+      hoisted.checkGateForUserMock.mockResolvedValue(false);
+      const { tryHandleAnonymousOnboardingChat } = await import(
+        '@/app/api/chat/onboarding-handler'
+      );
+      const result = await tryHandleAnonymousOnboardingChat(
+        makeRequest({
+          mode: 'onboarding',
+          messages: [
+            {
+              ...userMessage('Review this image'),
+              parts: [
+                { type: 'text', text: 'Review this image' },
+                { type: 'file', mediaType: 'image/png', url },
+              ],
+            },
+          ],
+        }),
+        'req-attachment'
+      );
+      expect(result?.status).toBe(400);
+      await expect(result?.json()).resolves.toMatchObject({
+        errorCode: 'INVALID_MESSAGES',
+        requestId: 'req-attachment',
+      });
+      expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
+      expect(hoisted.dbInsertMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    null,
+    { type: 'text', text: 42 },
+    { type: 'file', mediaType: 'image/png' },
+  ])('returns 400 for malformed onboarding parts %j', async part => {
+    const { tryHandleAnonymousOnboardingChat } = await import(
+      '@/app/api/chat/onboarding-handler'
+    );
+    const result = await tryHandleAnonymousOnboardingChat(
+      makeRequest({
+        mode: 'onboarding',
+        messages: [{ ...userMessage('hi'), parts: [part] }],
+      }),
+      'req-malformed'
+    );
+    expect(result?.status).toBe(400);
+    expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'https://test-store.public.blob.vercel-storage.com/file.png',
+    'data:image/png;base64,iVBORw0KGgo=',
+  ])('preserves supported onboarding attachments: %s', async url => {
+    hoisted.checkGateForUserMock.mockResolvedValue(false);
+    hoisted.executeChatTurnMock.mockResolvedValue({
+      streamResult: { toUIMessageStreamResponse: () => new Response('ok') },
+      selectedModel: 'test',
+      systemPrompt: '',
+      toolNames: [],
+      modelMessages: [],
+    });
+    const { tryHandleAnonymousOnboardingChat } = await import(
+      '@/app/api/chat/onboarding-handler'
+    );
+    const parts = [
+      { type: 'text', text: 'Review this image' },
+      { type: 'file', mediaType: 'image/png', url },
+    ];
+    const result = await tryHandleAnonymousOnboardingChat(
+      makeRequest({
+        mode: 'onboarding',
+        messages: [{ ...userMessage('hi'), parts }],
+      }),
+      'req-upload'
+    );
+    expect(result?.status).toBe(200);
+    expect(hoisted.executeChatTurnMock).toHaveBeenCalledTimes(1);
+    expect(
+      hoisted.executeChatTurnMock.mock.calls[0][0].uiMessages[0].parts
+    ).toEqual(parts);
+  });
+
   it('returns 400 when the messages array is missing', async () => {
     const { tryHandleAnonymousOnboardingChat } = await import(
       '@/app/api/chat/onboarding-handler'
@@ -1846,6 +1930,141 @@ describe('tryHandleAnonymousOnboardingChat', () => {
       expect(body.errorCode).toBe('RATE_LIMITED');
       expect(body.retryAfter).toBeGreaterThan(0);
       expect(body.retryAfter).toBeLessThanOrEqual(61);
+    });
+  });
+
+  describe('nightly QA Turnstile gate enforcement (JOV-8500)', () => {
+    // Mirrors the nightly QA server env: E2E mode compiled in, NODE_ENV=test,
+    // VERCEL_ENV=development. The nightly canary probes an anonymous first
+    // message with no token and requires 403 TURNSTILE_REQUIRED — the same
+    // contract as the deploy canary (canary-health-gate.yml).
+    function stubNightlyQaEnv() {
+      vi.resetModules();
+      stubRuntimeEnv({ nodeEnv: 'test' });
+      vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
+      vi.stubEnv('E2E_REQUIRE_TURNSTILE_GATE', '1');
+      vi.stubEnv('NEXT_PUBLIC_CLERK_MOCK', '1');
+    }
+
+    it('disarms the E2E bypass so an anonymous first message reaches the Turnstile gate', async () => {
+      stubNightlyQaEnv();
+      hoisted.isTurnstileConfiguredMock.mockReturnValue(true);
+      hoisted.verifyTurnstileTokenMock.mockResolvedValue({
+        success: false,
+        reason: 'missing_token',
+      });
+
+      const { tryHandleAnonymousOnboardingChat } = await import(
+        '@/app/api/chat/onboarding-handler'
+      );
+      const req = makeRequest({
+        mode: 'onboarding',
+        messages: [userMessage('hi')],
+      });
+      const result = await tryHandleAnonymousOnboardingChat(
+        req,
+        'req-jov8500-gate'
+      );
+
+      expect(result?.status).toBe(403);
+      await expect(result?.json()).resolves.toMatchObject({
+        errorCode: 'TURNSTILE_REQUIRED',
+      });
+      expect(hoisted.verifyTurnstileTokenMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the gate fail-closed (503 TURNSTILE_NOT_CONFIGURED) when keys are missing', async () => {
+      stubNightlyQaEnv();
+      hoisted.isTurnstileConfiguredMock.mockReturnValue(false);
+
+      const { tryHandleAnonymousOnboardingChat } = await import(
+        '@/app/api/chat/onboarding-handler'
+      );
+      const req = makeRequest({
+        mode: 'onboarding',
+        messages: [userMessage('hi')],
+      });
+      const result = await tryHandleAnonymousOnboardingChat(
+        req,
+        'req-jov8500-unconfigured'
+      );
+
+      expect(result?.status).toBe(503);
+      await expect(result?.json()).resolves.toMatchObject({
+        errorCode: 'TURNSTILE_NOT_CONFIGURED',
+      });
+      expect(hoisted.verifyTurnstileTokenMock).not.toHaveBeenCalled();
+    });
+
+    it('leaves the E2E bypass armed when the enforcement env is not set', async () => {
+      vi.resetModules();
+      stubRuntimeEnv({ nodeEnv: 'test' });
+      vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
+      vi.stubEnv('NEXT_PUBLIC_CLERK_MOCK', '1');
+      hoisted.checkGateForUserMock.mockResolvedValue(true);
+      hoisted.executeChatTurnMock.mockResolvedValue({
+        streamResult: {
+          toUIMessageStreamResponse: ({
+            headers,
+          }: {
+            headers: Record<string, string>;
+          }) => new Response('ok', { status: 200, headers }),
+        },
+        selectedModel: 'anthropic/claude-haiku-4-5-20251001',
+        systemPrompt: '',
+        toolNames: [],
+        modelMessages: [],
+      });
+
+      const { tryHandleAnonymousOnboardingChat } = await import(
+        '@/app/api/chat/onboarding-handler'
+      );
+      const req = makeRequest({
+        mode: 'onboarding',
+        messages: [userMessage('hi')],
+      });
+      const result = await tryHandleAnonymousOnboardingChat(
+        req,
+        'req-jov8500-bypass'
+      );
+
+      // Without the enforcement env the bypass still skips the gate entirely.
+      expect(hoisted.isTurnstileConfiguredMock).not.toHaveBeenCalled();
+      expect(hoisted.verifyTurnstileTokenMock).not.toHaveBeenCalled();
+      expect(result?.status).toBe(200);
+    });
+
+    it('does not unlock the gate on Vercel preview — secure env enforces with or without the flag', async () => {
+      vi.resetModules();
+      stubRuntimeEnv({ nodeEnv: 'test', vercelEnv: 'preview' });
+      vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
+      vi.stubEnv('E2E_REQUIRE_TURNSTILE_GATE', '1');
+      vi.stubEnv('NEXT_PUBLIC_CLERK_MOCK', '1');
+      hoisted.isTurnstileConfiguredMock.mockReturnValue(true);
+      hoisted.verifyTurnstileTokenMock.mockResolvedValue({
+        success: false,
+        reason: 'missing_token',
+      });
+
+      const { tryHandleAnonymousOnboardingChat } = await import(
+        '@/app/api/chat/onboarding-handler'
+      );
+      const req = makeRequest({
+        mode: 'onboarding',
+        messages: [userMessage('hi')],
+      });
+      const result = await tryHandleAnonymousOnboardingChat(
+        req,
+        'req-jov8500-preview'
+      );
+
+      // On Vercel preview the bypass was never armed (isSecureTurnstileEnvironment),
+      // so the flag cannot change behavior: the gate runs and challenges.
+      expect(result?.status).toBe(403);
+      await expect(result?.json()).resolves.toMatchObject({
+        errorCode: 'TURNSTILE_REQUIRED',
+      });
+      expect(hoisted.verifyTurnstileTokenMock).toHaveBeenCalledTimes(1);
     });
   });
 

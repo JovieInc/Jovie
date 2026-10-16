@@ -100,6 +100,19 @@ describe('lane Python qualification coverage', () => {
   it.each([
     ['lane source', ['scripts/lanes/hyperagent_lane.py']],
     ['attempt regression', ['scripts/tests/test_execution_attempt.py']],
+    ['qualification safety source', ['scripts/lanes/qualification_guard.py']],
+    [
+      'qualification safety regression',
+      ['scripts/tests/test_qualification_guard.py'],
+    ],
+    [
+      'remediation repair',
+      [
+        'scripts/lanes/remediation.py',
+        'scripts/lanes/lane_runner.py',
+        'scripts/tests/test_lane_runner.py',
+      ],
+    ],
     ['merge reader', ['scripts/lanes/merge_evidence.py']],
     ['HUD regression', ['scripts/tests/test_hud.py']],
     ['falsy inputs', [null, false, '', 'scripts/lanes/execution_attempt.py']],
@@ -167,6 +180,57 @@ describe('lane Python qualification coverage', () => {
       }
     }
   );
+});
+
+describe('remediation coverage selection', () => {
+  const repair = [
+    'scripts/lanes/remediation.py',
+    'scripts/lanes/lane_runner.py',
+    'scripts/tests/test_lane_runner.py',
+  ];
+  it.each([
+    ['source alone', ['scripts/lanes/remediation.py']],
+    ['standalone regression', ['scripts/tests/test_remediation.py']],
+    ['actual repair signature', repair],
+  ])(
+    'selects the enforced lane qualifier for %s without unrelated web shards',
+    (_, files) => {
+      const plan = buildAffectedTestPlan(files);
+      expect(plan.mode).toBe('selected');
+      expect(plan.lanePythonCoverage).toBe(true);
+      expect(plan.selectedTests).toEqual([]);
+      const commands = buildSelectedTestCommands(plan, '1');
+      expect(commands).toContainEqual([
+        'env',
+        ['CI=true', 'bash', '-c', STRUCTURAL_PYTHON_REGRESSION_COMMANDS[0]],
+      ]);
+    }
+  );
+  it.each([
+    'scripts/tests/test_remediation.py',
+    'scripts/tests/test_lane_runner.py',
+  ])(
+    'retains full fallback when required behavioral evidence %s is unavailable',
+    missing => {
+      const plan = buildAffectedTestPlan(repair, {
+        isFileAvailable: path => path !== missing,
+      });
+      expect(plan.mode).toBe('full');
+      expect(plan.fallbackReason).toBe(
+        'remediation coverage proof is unavailable'
+      );
+      expect(plan.lanePythonCoverage).toBe(true);
+    }
+  );
+  it.each([
+    'scripts/lanes/unknown-new.py',
+    'apps/web/lib/unknown-control-peer.ts',
+    'package.json',
+  ])('preserves full fallback for unrelated or global peer %s', peer => {
+    const plan = buildAffectedTestPlan([...repair, peer]);
+    expect(plan.mode).toBe('full');
+    expect(plan.lanePythonCoverage).toBe(true);
+  });
 });
 
 describe('merge evidence coverage selection', () => {

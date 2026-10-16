@@ -30,6 +30,11 @@ export interface AppShellFrameProps {
    * fill and JovieChat deferring its own gradient layer.
    */
   readonly chatAmbientGradient?: boolean;
+  /**
+   * Suspense placeholder. Must not reuse the live landmark id or frame
+   * attribute, or a still-mounted fallback collides with the resolved shell.
+   */
+  readonly placeholder?: boolean;
 }
 
 /**
@@ -60,10 +65,12 @@ export const AppShellFrame = memo(function AppShellFrame({
   containerClassName,
   composerFocusActive = false,
   chatAmbientGradient = false,
+  placeholder = false,
 }: Readonly<AppShellFrameProps>) {
   return (
     <div
-      data-app-shell-frame='true'
+      data-app-shell-frame={placeholder ? undefined : 'true'}
+      data-app-shell-placeholder={placeholder ? 'true' : undefined}
       data-composer-focus={composerFocusActive ? 'true' : undefined}
       className={cn(
         'relative flex h-full w-full flex-col overflow-hidden bg-(--linear-bg-page)',
@@ -121,7 +128,7 @@ export const AppShellFrame = memo(function AppShellFrame({
               className='flex min-h-0 min-w-0 flex-1 flex-col'
             >
               <main
-                id='main-content'
+                id={placeholder ? undefined : 'main-content'}
                 className={cn(
                   // The header and route column live on this one raised plane.
                   // Do not use a translucent recessed well here: it makes the

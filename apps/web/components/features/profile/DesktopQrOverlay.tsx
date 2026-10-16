@@ -1,4 +1,5 @@
 'use client';
+// @coverage-via apps/web/tests/unit/DesktopQrOverlay.test.tsx
 
 import { Smartphone, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -8,6 +9,24 @@ import { PROFILE_Z } from '@/lib/profile/z-index-constants';
 
 interface DesktopQrOverlayProps {
   readonly handle: string;
+}
+
+function resolveDesktopQrPresentation(handle: string): {
+  mode: 'hidden' | 'icon' | 'open';
+  url: string;
+} {
+  const isMdUp = globalThis.matchMedia('(min-width: 768px)').matches;
+  const hasFinePointer = globalThis.matchMedia('(any-pointer: fine)').matches;
+  if (!isMdUp || !hasFinePointer) {
+    return { mode: 'hidden', url: '' };
+  }
+
+  const payMode =
+    new URLSearchParams(globalThis.location.search).get('mode') === 'pay';
+  return {
+    mode: payMode ? 'open' : 'icon',
+    url: `${globalThis.location.origin}/${handle}`,
+  };
 }
 
 export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
@@ -47,17 +66,9 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
   useEffect(() => {
     if (typeof globalThis.matchMedia !== 'function') return;
 
-    const isMdUp = globalThis.matchMedia('(min-width: 768px)').matches;
-    const hasFinePointer = globalThis.matchMedia('(any-pointer: fine)').matches;
-
-    if (!isMdUp || !hasFinePointer) {
-      setMode('hidden');
-      setUrl('');
-      return;
-    }
-
-    setMode('icon');
-    setUrl(`${globalThis.location.origin}/${handle}`);
+    const presentation = resolveDesktopQrPresentation(handle);
+    setMode(presentation.mode);
+    setUrl(presentation.url);
   }, [handle]);
 
   // React to viewport resizes: show on desktop if not dismissed, hide on mobile
@@ -68,17 +79,9 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
     const mqlPointer = globalThis.matchMedia('(any-pointer: fine)');
 
     const onChange = (_e: MediaQueryListEvent | MediaQueryList) => {
-      const isMdUp = mqlMd.matches;
-      const hasFinePointer = mqlPointer.matches;
-
-      if (!isMdUp || !hasFinePointer) {
-        setMode('hidden');
-        setUrl('');
-        return;
-      }
-
-      setMode('icon');
-      setUrl(`${globalThis.location.origin}/${handle}`);
+      const presentation = resolveDesktopQrPresentation(handle);
+      setMode(presentation.mode);
+      setUrl(presentation.url);
     };
 
     // Initial sync in case state drifted
@@ -151,9 +154,7 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
             variant='surface'
             onClick={reopen}
             ariaLabel='Open On Phone'
-            className='group backdrop-blur-sm'
           >
-            <span className='pointer-events-none absolute inset-0 rounded-full opacity-0 transition-opacity duration-slower group-hover:opacity-100 bg-[radial-gradient(80%_60%_at_50%_0%,rgba(255,255,255,0.35),transparent_60%)]' />
             <Smartphone className='relative h-5 w-5' aria-hidden='true' />
           </CircleIconButton>
         </div>

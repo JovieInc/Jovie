@@ -754,6 +754,42 @@ test('a queue-breaker restore is fenced against revocation and a new hold', asyn
   assert.deepEqual(held.labelRemovals, []);
 });
 
+test('does not remove lane-fix-red and does not enroll while the label remains', async () => {
+  for (const mergeStateStatus of [
+    'CLEAN',
+    'HAS_HOOKS',
+    'UNSTABLE',
+    'BLOCKED',
+  ]) {
+    const result = await fixture({
+      roster: [{ ...candidate(1), labels: [{ name: 'lane-fix-red' }] }],
+      readCurrentSnapshot: () => ({
+        ...current(1),
+        mergeStateStatus,
+        labels: {
+          pageInfo: { hasNextPage: false },
+          nodes: [{ name: 'lane-fix-red' }],
+        },
+      }),
+    });
+    assert.deepEqual(result.labelRemovals, [], mergeStateStatus);
+    assert.deepEqual(result.mutations, [], mergeStateStatus);
+  }
+});
+
+test('enrolls a required-green head once lane-fix-red is gone', async () => {
+  const result = await fixture({
+    roster: [{ ...candidate(1), labels: [] }],
+    readCurrentSnapshot: () => ({
+      ...current(1),
+      mergeStateStatus: 'CLEAN',
+      labels: { pageInfo: { hasNextPage: false }, nodes: [] },
+    }),
+  });
+  assert.deepEqual(result.labelRemovals, []);
+  assert.deepEqual(result.mutations, [{ id: 'PR_1', oid: sha }]);
+});
+
 test('a hold released after a manual dequeue re-enrolls the same head; check failures never do', async () => {
   const removal = reason => ({
     timelineItems: { nodes: [{ createdAt: '2026-10-02T13:00:00Z', reason }] },
@@ -770,8 +806,14 @@ test('a hold released after a manual dequeue re-enrolls the same head; check fai
     1
   );
   assert.equal(await enqueued(removal('manual')), 0);
+  // lane-fix-red is a machine block, so removing it after a manual dequeue
+  // is an explicit release of that same head.
   assert.equal(
     await enqueued({ ...removal('manual'), ...release('lane-fix-red') }),
+    1
+  );
+  assert.equal(
+    await enqueued({ ...removal('FAILED_CHECKS'), ...release('lane-fix-red') }),
     0
   );
   assert.equal(
@@ -884,6 +926,7 @@ test('a blocking label on a queued PR dequeues only that PR', () => {
     'incident',
     'do-not-merge',
     'queue-poison',
+    'lane-fix-red',
   ]) {
     assert.ok(job.if.includes(`"${label}"`), label);
   }
@@ -1254,8 +1297,20 @@ function concurrencyGroup(github) {
         'github.event.workflow_run?.pull_requests?.[0]?.number'
       )
       .replaceAll(
+        'github.event.workflow_run.head_sha',
+        'github.event.workflow_run?.head_sha'
+      )
+      .replaceAll(
+        'github.event.workflow_run.name',
+        'github.event.workflow_run?.name'
+      )
+      .replaceAll(
         'github.event.workflow_run.id',
         'github.event.workflow_run?.id'
+      )
+      .replace(
+        /format\('\{0\}-\{1\}',\s*([^,]+?),\s*([^)]+?)\)/g,
+        '`${$1}-${$2}`'
       );
     return new Function('github', 'inputs', `return (${js});`)(
       github,
@@ -1309,6 +1364,26 @@ test('same-PR wakes coalesce while unattributed receipts and manual reconciliati
   assert.equal(concurrencyGroup(label), concurrencyGroup(wake(7, 101)));
   assert.equal(workflow.concurrency['cancel-in-progress'], false);
   assert.equal(workflow.jobs.enroll['timeout-minutes'], 5);
+  const sameHead = (id, name) => ({
+    event_name: 'workflow_run',
+    event: {
+      workflow_run: {
+        id,
+        name,
+        head_sha: 'a'.repeat(40),
+        pull_requests: [],
+      },
+    },
+    run_id: id + 1000,
+  });
+  assert.equal(
+    concurrencyGroup(sameHead(101, 'CI')),
+    concurrencyGroup(sameHead(102, 'CI'))
+  );
+  assert.notEqual(
+    concurrencyGroup(sameHead(101, 'CI')),
+    concurrencyGroup(sameHead(102, 'PR Size Guard'))
+  );
 });
 
 function recoveryDeferred() {
@@ -1538,6 +1613,7 @@ for (const label of [
   'incident',
   'do-not-merge',
   'queue-poison',
+  'lane-fix-red',
 ]) {
   test(`dequeues the unchanged queued head while ${label} is still present`, async () => {
     const result = await dequeueFixture({

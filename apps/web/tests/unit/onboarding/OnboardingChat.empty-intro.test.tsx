@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import type { UIMessage } from 'ai';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { OnboardingChat } from '@/components/features/onboarding/OnboardingChat';
 import { ONBOARDING_ENTRY_TITLE } from '@/lib/onboarding/empty-state';
 
@@ -96,12 +96,17 @@ vi.mock('@/components/features/onboarding/OnboardingToolArtifacts', () => ({
 vi.mock('@/components/jovie/components', () => ({
   ChatEmptyStateComposerRegion: ({
     above,
+    alignAbove,
     children,
   }: {
     readonly above?: React.ReactNode;
+    readonly alignAbove?: 'top' | 'bottom';
     readonly children: React.ReactNode;
   }) => (
-    <div data-testid='chat-empty-state-composer-region'>
+    <div
+      data-testid='chat-empty-state-composer-region'
+      data-align-above={alignAbove}
+    >
       {above}
       {children}
     </div>
@@ -147,6 +152,9 @@ describe('OnboardingChat empty intro', () => {
     });
     expect(chatMocks.sendMessage).not.toHaveBeenCalled();
     expect(activity).not.toHaveBeenCalled();
+    expect(
+      screen.getByTestId('chat-empty-state-composer-region')
+    ).toHaveAttribute('data-align-above', 'top');
   });
 
   beforeEach(() => {
@@ -156,6 +164,10 @@ describe('OnboardingChat empty intro', () => {
     chatMocks.onError = undefined;
     chatMocks.errorMetadata = {};
     process.env.NODE_ENV = 'development';
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('shows welcome intro on a blank /start visit', () => {
@@ -170,7 +182,7 @@ describe('OnboardingChat empty intro', () => {
     expect(screen.queryByTestId('onboarding-starter-suggestions')).toBeNull();
   });
 
-  it('shows a compact processing state for a validated starter handoff', () => {
+  it('keeps a validated starter as a draft while verification is pending', () => {
     process.env.NODE_ENV = 'test';
     render(
       <OnboardingChat
@@ -183,9 +195,66 @@ describe('OnboardingChat empty intro', () => {
       />
     );
 
-    expect(screen.getByText('Getting this ready')).toBeTruthy();
+    expect(
+      screen.getByRole('heading', { name: 'Your first message' })
+    ).toBeTruthy();
+    expect(screen.queryByText('Your message is on its way.')).toBeNull();
     expect(screen.queryByTestId('onboarding-start-ambient-mark')).toBeNull();
     expect(screen.queryByTestId('onboarding-starter-suggestions')).toBeNull();
+  });
+
+  it('sizes pending starter guidance once without announcing or submitting it', async () => {
+    vi.stubEnv('NODE_ENV', 'test');
+    const onTurnstileRequired = vi.fn();
+    const props = {
+      starterHandoff: { kind: 'prompt' as const, prompt: 'Claim my page' },
+      turnstileHasSiteKey: true,
+      turnstileStatus: 'loading' as const,
+      turnstileToken: null,
+      onTurnstileRequired,
+    };
+    const { rerender } = render(
+      <OnboardingChat {...props} turnstilePanel={<span hidden />} />
+    );
+
+    const sizingCopy = screen.getByTestId(
+      'onboarding-verification-instruction-size'
+    );
+    expect(sizingCopy).toHaveAttribute('aria-hidden', 'true');
+    expect(sizingCopy).toHaveClass('invisible', 'pointer-events-none');
+    expect(sizingCopy).not.toHaveAttribute('role');
+    expect(sizingCopy).not.toHaveAttribute('aria-live');
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(chatMocks.sendMessage).not.toHaveBeenCalled();
+    await waitFor(() => expect(onTurnstileRequired).toHaveBeenCalledOnce());
+
+    const instruction = onTurnstileRequired.mock.calls[0][0];
+    expect(instruction).toEqual(sizingCopy.textContent);
+    rerender(
+      <OnboardingChat
+        {...props}
+        turnstilePanel={<p role='status'>{instruction}</p>}
+      />
+    );
+    expect(screen.getAllByRole('status')).toHaveLength(1);
+    expect(screen.getByRole('status')).toHaveTextContent(instruction);
+    expect(
+      screen.getByRole('heading', { name: 'Your first message' })
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Your message is on its way.')).toBeNull();
+    expect(chatMocks.sendMessage).not.toHaveBeenCalled();
+
+    rerender(
+      <OnboardingChat
+        {...props}
+        turnstileHasSiteKey={false}
+        turnstilePanel={<span hidden />}
+      />
+    );
+    expect(
+      screen.queryByTestId('onboarding-verification-instruction-size')
+    ).toBeNull();
+    expect(chatMocks.sendMessage).not.toHaveBeenCalled();
   });
 
   it('keeps a handle entry on its value screen and never auto-sends the claim draft (JOV-7753)', async () => {

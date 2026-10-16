@@ -222,7 +222,7 @@ describe('ui-feel cli gate', () => {
 
 describe('ui-feel rule wiring', () => {
   it.skipIf(!RULE_PRESENT)(
-    'collectViolations counts the shipped rule over real sources',
+    'committed baseline matches current debt without regression headroom',
     async () => {
       const rule = loadUiFeelRule();
       expect(rule).toBeTruthy();
@@ -230,7 +230,7 @@ describe('ui-feel rule wiring', () => {
       expect(violations.length).toBeGreaterThan(0);
       const counts = countByCheck(violations);
       const baseline = readBaseline();
-      expect(regressions(counts, baseline)).toEqual([]);
+      expect(counts).toEqual(baseline);
     },
     300_000
   );

@@ -61,15 +61,19 @@ export function YouTubeMerchRelationshipEditor({
     if (!profileId) return;
     setIsSaving(true);
     try {
-      const response = await fetch('/api/library/relationships', {
-        method,
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          creatorProfileId: profileId,
-          videoId,
-          merchCardId,
-        }),
-      });
+      const payload = { creatorProfileId: profileId, videoId, merchCardId };
+      const response = await fetch(
+        method === 'DELETE'
+          ? `/api/library/relationships?${new URLSearchParams(payload)}`
+          : '/api/library/relationships',
+        method === 'DELETE'
+          ? { method }
+          : {
+              method,
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify(payload),
+            }
+      );
       const result = (await response.json()) as {
         relationship?: LibraryRelationshipView;
         error?: string;

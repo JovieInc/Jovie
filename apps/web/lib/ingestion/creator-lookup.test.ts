@@ -22,7 +22,6 @@ vi.mock('./strategies/youtube', () => ({
 }));
 vi.mock('./strategies/instagram', () => ({
   validateInstagramUrl: hoisted.instagramValidate,
-  fetchInstagramDocument: hoisted.instagramFetch,
   extractInstagram: hoisted.instagramExtract,
 }));
 vi.mock('./strategies/tiktok', () => ({
@@ -32,7 +31,6 @@ vi.mock('./strategies/tiktok', () => ({
 }));
 vi.mock('./strategies/linktree', () => ({
   validateLinktreeUrl: hoisted.linktreeValidate,
-  fetchLinktreeDocument: hoisted.linktreeFetch,
   extractLinktree: hoisted.linktreeExtract,
 }));
 
@@ -60,14 +58,7 @@ describe('lookupCreator', () => {
       input: 'https://youtube.com/@creator',
       normalized: 'https://www.youtube.com/@creator/about',
     },
-    {
-      platform: 'instagram',
-      validate: hoisted.instagramValidate,
-      fetchDocument: hoisted.instagramFetch,
-      extract: hoisted.instagramExtract,
-      input: 'https://instagram.com/creator',
-      normalized: 'https://www.instagram.com/creator',
-    },
+
     {
       platform: 'tiktok',
       validate: hoisted.tiktokValidate,
@@ -75,14 +66,6 @@ describe('lookupCreator', () => {
       extract: hoisted.tiktokExtract,
       input: 'https://tiktok.com/@creator',
       normalized: 'https://www.tiktok.com/@creator',
-    },
-    {
-      platform: 'linktree',
-      validate: hoisted.linktreeValidate,
-      fetchDocument: hoisted.linktreeFetch,
-      extract: hoisted.linktreeExtract,
-      input: 'https://linktr.ee/creator',
-      normalized: 'https://linktr.ee/creator',
     },
   ])('extracts public $platform fields without persistence', async testCase => {
     testCase.validate.mockReturnValue(testCase.normalized);
@@ -105,14 +88,28 @@ describe('lookupCreator', () => {
       links: [{ url: 'https://creator.example' }],
     });
     expect(testCase.fetchDocument).toHaveBeenCalledWith(testCase.normalized);
-    if (testCase.platform === 'linktree') {
-      expect(testCase.extract).toHaveBeenCalledWith('<html>profile</html>', {
-        includeContactEmail: false,
-      });
-    } else {
-      expect(testCase.extract).toHaveBeenCalledWith('<html>profile</html>');
-    }
+    expect(testCase.extract).toHaveBeenCalledWith('<html>profile</html>');
   });
+
+  it.each([
+    {
+      validate: hoisted.instagramValidate,
+      url: 'https://www.instagram.com/creator',
+    },
+    { validate: hoisted.linktreeValidate, url: 'https://linktr.ee/creator' },
+  ])(
+    'rejects retired sources before their extractors run ($url)',
+    async ({ validate, url }) => {
+      validate.mockReturnValue(url);
+      await expect(lookupCreator(url)).rejects.toMatchObject({
+        code: 'SOCIAL_HTML_DISABLED',
+      });
+      expect(hoisted.instagramFetch).not.toHaveBeenCalled();
+      expect(hoisted.linktreeFetch).not.toHaveBeenCalled();
+      expect(hoisted.instagramExtract).not.toHaveBeenCalled();
+      expect(hoisted.linktreeExtract).not.toHaveBeenCalled();
+    }
+  );
 
   it('returns null without fetching when the URL is unsupported', async () => {
     await expect(

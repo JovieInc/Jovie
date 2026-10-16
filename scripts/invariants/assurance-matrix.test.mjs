@@ -5,17 +5,24 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  assuranceMatrixDigest,
+  assuranceMatrixEntryDigest,
   assuranceMatrixReceipt,
   blindSpotsByFailureClass,
+  formatAssuranceMatrixEntryDigests,
   invalidatedRows,
   matrixFindings,
   readAssuranceMatrix,
+  readAssuranceMatrixEntryDigests,
   rowCertification,
   UI_FAILURE_CLASSES,
   uiAssuranceReport,
   uiEvidenceRequirements,
   validateAssuranceMatrix,
+  validateAssuranceMatrixEntryDigests,
+  validateAssuranceMatrixPolicy,
 } from './assurance-matrix.mjs';
+import { readInvariantRegistry } from './registry.mjs';
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -178,7 +185,94 @@ describe('assurance matrix (JOV-6064)', () => {
     mutated.rows[0].owner = 'operations';
     const changed = assuranceMatrixReceipt(mutated);
     assert.notEqual(receipt.digest, changed.digest);
-    assert.equal(receipt.matrixRevision, '2026-10-13.1');
+    assert.equal(receipt.matrixRevision, '2026-10-15.1');
+  });
+});
+
+describe('assurance matrix entry digests', () => {
+  function row(matrix, id) {
+    return matrix.rows.find(item => item.id === id);
+  }
+
+  function refresh(digests, id, value) {
+    return digests.map(entry =>
+      entry.id === id
+        ? { id, digest: assuranceMatrixEntryDigest(value) }
+        : entry
+    );
+  }
+
+  it('accepts the checked-in per-entry digests and rejects a whole-file digest', () => {
+    const matrix = healthy();
+    const recorded = readAssuranceMatrixEntryDigests();
+    assert.equal(
+      formatAssuranceMatrixEntryDigests(matrix),
+      `${recorded.map(entry => JSON.stringify({ id: entry.id, digest: entry.digest })).join('\n')}\n`
+    );
+    assert.deepEqual(validateAssuranceMatrixEntryDigests(matrix, recorded), []);
+    assert.deepEqual(
+      validateAssuranceMatrixPolicy(readInvariantRegistry()),
+      []
+    );
+    const retired = clone(readInvariantRegistry());
+    retired.invariants.find(
+      item => item.id === 'JOV-INV-037'
+    ).policy.value.matrixDigest = assuranceMatrixDigest(matrix);
+    assert.ok(
+      validateAssuranceMatrixPolicy(retired).includes(
+        'matrix-digest:whole-file-retired'
+      )
+    );
+  });
+
+  it('fails the changed entry when its digest line is left stale', () => {
+    const matrix = healthy();
+    const recorded = readAssuranceMatrixEntryDigests();
+    row(matrix, 'AM-001').owner = 'operations';
+    const errors = validateAssuranceMatrixEntryDigests(matrix, recorded);
+    assert.deepEqual(errors, ['matrix-digest:mismatch:row:AM-001']);
+    const refreshed = refresh(recorded, 'row:AM-001', row(matrix, 'AM-001'));
+    assert.deepEqual(
+      validateAssuranceMatrixEntryDigests(matrix, refreshed),
+      []
+    );
+  });
+
+  it('keeps a merge of two independently refreshed entries valid', () => {
+    const base = healthy();
+    const recorded = readAssuranceMatrixEntryDigests();
+    const left = clone(base);
+    const right = clone(base);
+    row(left, 'AM-001').owner = 'left-owner';
+    row(right, 'AM-004').owner = 'right-owner';
+    const merged = clone(base);
+    row(merged, 'AM-001').owner = 'left-owner';
+    row(merged, 'AM-004').owner = 'right-owner';
+    const mergedDigests = refresh(
+      refresh(recorded, 'row:AM-001', row(left, 'AM-001')),
+      'row:AM-004',
+      row(right, 'AM-004')
+    );
+
+    assert.deepEqual(
+      validateAssuranceMatrixEntryDigests(merged, mergedDigests),
+      []
+    );
+    assert.notEqual(assuranceMatrixDigest(left), assuranceMatrixDigest(merged));
+    assert.notEqual(
+      assuranceMatrixDigest(right),
+      assuranceMatrixDigest(merged)
+    );
+    assert.ok(
+      validateAssuranceMatrixEntryDigests(merged, recorded).includes(
+        'matrix-digest:mismatch:row:AM-001'
+      )
+    );
+    assert.ok(
+      validateAssuranceMatrixEntryDigests(merged, recorded).includes(
+        'matrix-digest:mismatch:row:AM-004'
+      )
+    );
   });
 });
 

@@ -1,17 +1,15 @@
 'use client';
 
+import { Button, IconButton } from '@jovie/ui';
 import type { LucideIcon } from 'lucide-react';
 import { ArrowDown, Sparkles, X } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
-const EASE_CINEMATIC = 'var(--ease-drawer)';
-const DURATION_CINEMATIC = 420;
-
 /**
  * InstallBanner — slim sidebar announcement card with title + description +
  * primary CTA + dismiss. Slides open/closed by collapsing `max-height` and
- * fading opacity on the cinematic shell curve, so toggling is symmetric.
+ * fading opacity on the normal shell curve, so toggling is symmetric.
  *
  * Pure presentational. Caller owns the `open` flag and the dismiss callback.
  * Defaults reproduce shell-v1's "Get Jovie for desktop" copy; consumers
@@ -56,27 +54,29 @@ export function InstallBanner({
   return (
     <div
       aria-hidden={!open}
-      className={cn('shrink-0 overflow-hidden px-2', className)}
+      inert={!open || undefined}
+      className={cn('shrink-0 overflow-hidden', className)}
       style={{
         maxHeight: open ? 140 : 0,
         opacity: open ? 1 : 0,
-        transition: `max-height ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, opacity ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
+        transition:
+          'max-height var(--duration-normal) var(--ease-out), opacity var(--duration-normal) var(--ease-out)',
       }}
     >
-      <div className='relative rounded-xl border border-(--app-shell-border) bg-(--surface-1)/60 backdrop-blur-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_6px_18px_rgba(0,0,0,0.28)] px-3 pt-3 pb-3 mb-2'>
-        <button
-          type='button'
+      <div className='relative rounded-md border border-subtle bg-sidebar p-2'>
+        <IconButton
+          size='sm'
           onClick={onDismiss}
-          aria-label='Dismiss Prompt'
-          className='absolute top-1.5 right-1.5 h-5 w-5 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-subtle ease-subtle'
+          ariaLabel='Dismiss Prompt'
+          className='absolute right-1 top-1'
         >
           <X className='h-3 w-3' strokeWidth={2.25} />
-        </button>
-        <div className='flex items-center gap-1.5 mb-1 pr-5'>
+        </IconButton>
+        <div className='flex items-center gap-1.5 mb-1 pr-7'>
           <Icon
             className={cn(
               'h-3 w-3 shrink-0',
-              iconClassName ?? 'text-cyan-300/85'
+              iconClassName ?? 'text-secondary-token'
             )}
             strokeWidth={2.25}
           />
@@ -87,15 +87,16 @@ export function InstallBanner({
         <p className='text-2xs text-tertiary-token leading-snug mb-2.5'>
           {description}
         </p>
-        <button
-          type='button'
+        <Button
+          size='sm'
+          variant='secondary'
           onClick={onCta}
           disabled={ctaDisabled}
-          className='w-full inline-flex items-center justify-center gap-1.5 h-7 rounded-full text-xs font-medium bg-white dark:bg-surface-1 text-black dark:text-white hover:brightness-110 transition-[filter,background-color,color] duration-subtle ease-subtle disabled:cursor-not-allowed disabled:opacity-60'
+          className='w-full'
         >
           {ctaLabel}
           {CtaIcon ? <CtaIcon className='h-3 w-3' strokeWidth={2.5} /> : null}
-        </button>
+        </Button>
       </div>
     </div>
   );

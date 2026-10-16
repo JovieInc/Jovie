@@ -6,8 +6,12 @@ import { join } from 'node:path';
 import test from 'node:test';
 import {
   expectedDesktopAssetNames,
+  GitHubClient,
   parseArgs,
+  planReleaseAssetReadHold,
   prepare,
+  RELEASE_ASSET_READ_ATTEMPTS,
+  RELEASE_ASSET_READ_MAX_WAIT_MS,
   releaseMetadataUpdate,
   uploadAndPublish,
   validateReleaseAssets,
@@ -111,6 +115,7 @@ function fakeClient({
     throw new Error(`Release not found: ${tag}`);
   };
   client.recoverableStagingDraft = async () => null;
+  client.recoverableProductionDraft = async () => null;
   client.createDraft = async ({ environment, releaseSha, version }) => {
     client.release = {
       ...releaseFixture(environment, version, releaseSha),
@@ -628,6 +633,134 @@ test('published roll failures remain safe and rerunnable', async t => {
   }
 });
 
+function productionRecoveryFixture() {
+  const releaseSha = '43414c7da0e53f1b47cda7e562c2b43de4c386f7';
+  const version = '26.10.0';
+  const orphan = {
+    ...releaseFixture('production', version, releaseSha),
+    id: 401449487,
+    tag_name: 'untagged-4342acff1e28ec4b6d16',
+  };
+  const client = fakeClient({ mainSha: releaseSha, release: orphan });
+  client.recoverableProductionDraft = async input => {
+    assert.deepEqual(input, { releaseSha, version });
+    return structuredClone(orphan);
+  };
+  client.createDraft = async () => assert.fail('must reuse the existing draft');
+  client.retargetEmptyDraft = async () => assert.fail('must not retarget');
+  return {
+    client,
+    orphan,
+    input: {
+      client,
+      environment: 'production',
+      installedVersion: version,
+      releaseSha,
+      version,
+    },
+  };
+}
+
+test('production prepare recovers the authorized placeholder draft without creating or retargeting', async () => {
+  const { client, orphan, input } = productionRecoveryFixture();
+  const { releaseSha, version } = input;
+  const calls = [];
+  client.releaseById = async id => {
+    calls.push(id);
+    return structuredClone(client.release);
+  };
+  const update = client.updateReleaseMetadata;
+  client.updateReleaseMetadata = async input => {
+    assert.deepEqual(calls, [orphan.id], 'fresh read must precede mutation');
+    assert.equal(input.releaseId, orphan.id);
+    return update(input);
+  };
+
+  await prepare(input);
+
+  assert.deepEqual(calls, [orphan.id, orphan.id]);
+  assert.equal(client.metadataUpdateCalls, 1);
+  assert.equal(client.release.id, orphan.id);
+  assert.equal(client.release.tag_name, `v${version}`);
+  assert.equal(client.release.target_commitish, releaseSha);
+  assert.equal(client.release.draft, true);
+  assert.deepEqual(client.release.assets, []);
+  assert.deepEqual(client.events, [`retarget:${version}:${releaseSha}`]);
+});
+
+test('production recovery revalidates a fresh same-ID private empty authorized draft before mutation', async () => {
+  for (const changed of [
+    null,
+    { id: 401449488 },
+    { tag_name: 'v26.10.0' },
+    { name: '26.9.16' },
+    { target_commitish: OLD_SHA },
+    { draft: false },
+    { prerelease: true },
+    { published_at: '2026-10-02T00:00:00Z' },
+    { assets: null },
+    { assets: [{ id: 1 }] },
+  ]) {
+    const { client, orphan, input } = productionRecoveryFixture();
+    client.releaseById = async () => changed && { ...orphan, ...changed };
+    await assert.rejects(prepare(input), /production/);
+    assert.equal(client.metadataUpdateCalls, 0);
+    assert.deepEqual(client.events, []);
+  }
+});
+
+test('production recovery requires strict same-ID exact-tag private empty readback after normalization', async () => {
+  for (const changed of [
+    null,
+    { id: 401449488 },
+    { tag_name: 'untagged-4342acff1e28ec4b6d16' },
+    { name: '26.9.16' },
+    { target_commitish: OLD_SHA },
+    { draft: false },
+    { prerelease: true },
+    { published_at: '2026-10-02T00:00:00Z' },
+    { assets: null },
+    { assets: [{ id: 1 }] },
+  ]) {
+    const { client, orphan, input } = productionRecoveryFixture();
+    let reads = 0;
+    client.releaseById = async () => {
+      reads += 1;
+      return reads === 1
+        ? structuredClone(orphan)
+        : changed && { ...client.release, ...changed };
+    };
+    await assert.rejects(prepare(input), /production|Release|release/);
+    assert.equal(client.metadataUpdateCalls, 1);
+    assert.equal(reads, 2);
+    assert.deepEqual(client.events, [
+      `retarget:${input.version}:${input.releaseSha}`,
+    ]);
+  }
+});
+
+test('production prepare preserves exact-tag drafts from older sources and skips recovery for exact matches', async () => {
+  const { input } = productionRecoveryFixture();
+  const client = fakeClient({
+    mainSha: input.releaseSha,
+    release: releaseFixture('production', input.version, OLD_SHA),
+  });
+  client.recoverableProductionDraft = async () =>
+    assert.fail('tag already exists');
+  client.retargetEmptyDraft = async () =>
+    assert.fail('must not retarget older source');
+  const before = structuredClone(client.release);
+  await assert.rejects(
+    prepare({ ...input, client }),
+    /not the authorized commit/
+  );
+  assert.deepEqual(client.release, before);
+  client.release.target_commitish = input.releaseSha;
+  await prepare({ ...input, client });
+  assert.equal(client.metadataUpdateCalls, 0);
+  assert.deepEqual(client.events, []);
+});
+
 test('production keeps immutable version tags and never uses rolling mutations', async t => {
   const releaseSha = 'c'.repeat(40);
   const version = '26.8.1';
@@ -724,6 +857,277 @@ test('production publishes forward-only when main advances past the verified gen
     /not a trusted ancestor/
   );
   assert.equal(diverged.release.draft, true);
+});
+
+const INSTALLATION_QUOTA =
+  '{"message":"API rate limit exceeded for installation"}';
+
+function quotaResponse(status, body, headers = {}) {
+  return new Response(body, { status, headers });
+}
+
+test('release-asset read holds an installation 403 until x-ratelimit-reset', () => {
+  const nowMs = 1_700_000_000_000;
+  const reset = Math.floor(nowMs / 1000) + 30;
+  const headers = {
+    'x-ratelimit-remaining': '0',
+    'x-ratelimit-reset': String(reset),
+  };
+  const waitMs = planReleaseAssetReadHold({
+    attempt: 1,
+    body: INSTALLATION_QUOTA,
+    deadlineMs: nowMs + RELEASE_ASSET_READ_MAX_WAIT_MS,
+    headers,
+    nowMs,
+    status: 403,
+  });
+  assert.equal(waitMs, reset * 1000 + 1000 - nowMs);
+  assert.equal(
+    planReleaseAssetReadHold({
+      attempt: 1,
+      body: '{"message":"Resource not accessible by integration"}',
+      deadlineMs: nowMs + RELEASE_ASSET_READ_MAX_WAIT_MS,
+      headers: { 'x-ratelimit-remaining': '0' },
+      nowMs,
+      status: 403,
+    }),
+    null
+  );
+  assert.equal(
+    planReleaseAssetReadHold({
+      attempt: 1,
+      body: INSTALLATION_QUOTA,
+      deadlineMs: nowMs + RELEASE_ASSET_READ_MAX_WAIT_MS,
+      headers: null,
+      nowMs,
+      status: 403,
+    }),
+    null
+  );
+  assert.equal(
+    planReleaseAssetReadHold({
+      attempt: 1,
+      body: INSTALLATION_QUOTA,
+      deadlineMs: nowMs + RELEASE_ASSET_READ_MAX_WAIT_MS,
+      headers: {
+        'x-ratelimit-remaining': '0',
+        'x-ratelimit-reset': String(Math.floor(nowMs / 1000) + 3600),
+      },
+      nowMs,
+      status: 403,
+    }),
+    null
+  );
+  assert.equal(
+    planReleaseAssetReadHold({
+      attempt: RELEASE_ASSET_READ_ATTEMPTS,
+      body: INSTALLATION_QUOTA,
+      deadlineMs: nowMs + RELEASE_ASSET_READ_MAX_WAIT_MS,
+      headers,
+      nowMs,
+      status: 403,
+    }),
+    null
+  );
+  assert.equal(RELEASE_ASSET_READ_ATTEMPTS, 4);
+  assert.equal(RELEASE_ASSET_READ_MAX_WAIT_MS, 600_000);
+  assert.equal(
+    planReleaseAssetReadHold({
+      attempt: 1,
+      deadlineMs: nowMs + RELEASE_ASSET_READ_MAX_WAIT_MS,
+      nowMs,
+    }),
+    null
+  );
+});
+
+test('existing release tag read survives one installation 403 and does not create another draft', async () => {
+  const releaseSha = 'c'.repeat(40);
+  const version = '26.10.5';
+  const nowMs = 1_700_000_000_000;
+  const reset = Math.floor(nowMs / 1000) + 30;
+  const release = {
+    ...releaseFixture('production', version, releaseSha),
+    assets: [],
+  };
+  const calls = [];
+  const sleeps = [];
+  const fetchImpl = async url => {
+    calls.push(String(url));
+    if (calls.length === 1) {
+      return quotaResponse(403, INSTALLATION_QUOTA, {
+        'x-ratelimit-remaining': '0',
+        'x-ratelimit-reset': String(reset),
+      });
+    }
+    return quotaResponse(200, JSON.stringify(release));
+  };
+  const client = new GitHubClient({
+    repository: 'JovieInc/Jovie',
+    token: 'test-token',
+    fetchImpl,
+    now: () => nowMs,
+    sleep: async ms => {
+      sleeps.push(ms);
+    },
+    log: () => {},
+  });
+
+  const found = await client.releaseByTag(`v${version}`, true);
+  assert.equal(found.id, release.id);
+  assert.equal(found.target_commitish, releaseSha);
+  assert.deepEqual(
+    calls.map(url => url.endsWith(`/releases/tags/v${version}`)),
+    [true, true]
+  );
+  assert.deepEqual(sleeps, [reset * 1000 + 1000 - nowMs]);
+
+  client.releaseOrDraftByTag = async () => found;
+  client.createDraft = async () => {
+    throw new Error('must not create a second draft');
+  };
+  await prepare({
+    client,
+    environment: 'production',
+    installedVersion: version,
+    releaseSha,
+    version,
+  });
+});
+
+test('release-asset read fails closed on permission, exhausted budget, mutations, and a missing release', async () => {
+  const nowMs = 1_700_000_000_000;
+  const reset = Math.floor(nowMs / 1000) + 30;
+  const cases = [
+    {
+      label: 'permission 403',
+      responses: [
+        quotaResponse(
+          403,
+          '{"message":"Resource not accessible by integration"}'
+        ),
+      ],
+      method: 'GET',
+      error: /failed \(403\)/,
+    },
+    {
+      label: 'reset outside the existing budget',
+      responses: [
+        quotaResponse(403, INSTALLATION_QUOTA, {
+          'x-ratelimit-remaining': '0',
+          'x-ratelimit-reset': String(Math.floor(nowMs / 1000) + 3600),
+        }),
+      ],
+      method: 'GET',
+      error: /failed \(403\)/,
+    },
+    {
+      label: 'installation 403 without x-ratelimit-reset',
+      responses: [quotaResponse(403, INSTALLATION_QUOTA)],
+      method: 'GET',
+      error: /failed \(403\)/,
+    },
+    {
+      label: 'mutation is not retried',
+      responses: [
+        quotaResponse(403, INSTALLATION_QUOTA, {
+          'x-ratelimit-remaining': '0',
+          'x-ratelimit-reset': String(reset),
+        }),
+      ],
+      method: 'POST',
+      error: /POST /,
+    },
+    {
+      label: 'attempt cap stays fatal',
+      responses: Array.from({ length: RELEASE_ASSET_READ_ATTEMPTS }, () =>
+        quotaResponse(403, INSTALLATION_QUOTA, {
+          'x-ratelimit-remaining': '0',
+          'x-ratelimit-reset': String(reset),
+        })
+      ),
+      method: 'GET',
+      error: /failed \(403\)/,
+    },
+  ];
+
+  for (const scenario of cases) {
+    let index = 0;
+    const sleeps = [];
+    const client = new GitHubClient({
+      repository: 'JovieInc/Jovie',
+      token: 'test-token',
+      fetchImpl: async () => {
+        const response = scenario.responses[index];
+        index += 1;
+        if (!response)
+          throw new Error(`${scenario.label} fetched past its script`);
+        return response.clone();
+      },
+      now: () => nowMs,
+      sleep: async ms => {
+        sleeps.push(ms);
+      },
+      log: () => {},
+    });
+    await assert.rejects(
+      client.request('/repos/JovieInc/Jovie/releases/tags/v26.10.5', {
+        method: scenario.method,
+      }),
+      scenario.error,
+      scenario.label
+    );
+    assert.equal(
+      index,
+      scenario.responses.length,
+      `${scenario.label} call count`
+    );
+    if (scenario.label === 'attempt cap stays fatal') {
+      assert.equal(sleeps.length, RELEASE_ASSET_READ_ATTEMPTS - 1);
+    } else {
+      assert.deepEqual(sleeps, [], scenario.label);
+    }
+  }
+
+  const missing = new GitHubClient({
+    repository: 'JovieInc/Jovie',
+    token: 'test-token',
+    fetchImpl: async url =>
+      String(url).includes('/releases/tags/')
+        ? quotaResponse(404, '{"message":"Not Found"}')
+        : quotaResponse(200, '[]'),
+    now: () => nowMs,
+    log: () => {},
+  });
+  assert.equal(await missing.releaseByTag('v26.10.5', true), null);
+  await assert.rejects(
+    missing.releaseOrDraftByTag('v26.10.5'),
+    /Release not found: v26.10.5/
+  );
+
+  const defaults = new GitHubClient({
+    repository: 'JovieInc/Jovie',
+    token: 'test-token',
+    fetchImpl: async url => {
+      if (String(url).endsWith('/empty'))
+        return new Response(null, { status: 204 });
+      if (String(url).startsWith('https://uploads.example/asset')) {
+        return new Response(Uint8Array.from([1, 2, 3]));
+      }
+      throw new Error(`unexpected ${url}`);
+    },
+  });
+  await defaults.sleep(0);
+  defaults.log('release read defaults stay on the installation-quota path');
+  assert.equal(await defaults.request('https://uploads.example/empty'), null);
+  assert.deepEqual(
+    [
+      ...(await defaults.request('https://uploads.example/asset', {
+        raw: true,
+      })),
+    ],
+    [1, 2, 3]
+  );
 });
 
 test('parseArgs accepts equals-form values without consuming the next token', () => {

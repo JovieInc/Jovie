@@ -44,6 +44,41 @@ function coverage(hits = [1, 1, 1]) {
 }
 
 describe('changed test coverage', () => {
+  it('covers the metrics evidence producer without enrolling neighboring test utilities', () => {
+    const utility = 'apps/web/tests/e2e/utils/performance-test-utils.ts';
+    const test = 'apps/web/tests/unit/e2e/performance-test-utils.test.ts';
+    expect(isCoverageSourcePath(utility)).toBe(true);
+    for (const excluded of [
+      'apps/web/tests/e2e/utils/smoke-test-utils.ts',
+      'apps/web/tests/e2e/profile-performance.spec.ts',
+      test,
+    ])
+      expect(isCoverageSourcePath(excluded)).toBe(false);
+    expect(
+      planChangedLineCoverage({
+        files: [utility],
+        testFiles: [
+          {
+            path: test,
+            source:
+              "import { measureWebVitals } from '@/tests/e2e/utils/performance-test-utils';",
+          },
+        ],
+      })
+    ).toMatchObject({
+      applicable: true,
+      coverageInclude: ['tests/e2e/utils/performance-test-utils.ts'],
+      relatedTests: ['tests/unit/e2e/performance-test-utils.test.ts'],
+    });
+    expect(
+      evaluateChangedLineCoverage({
+        changedLines: new Map([[utility, new Set([181])]]),
+        coverage: {},
+        repoRoot: '/repo',
+      })
+    ).toMatchObject({ ok: false, missingFiles: [utility] });
+  });
+
   it('parses exact new-side lines from zero-context Git hunks', () => {
     const changed = parseChangedLines(`diff --git a/${path} b/${path}
 --- a/${path}

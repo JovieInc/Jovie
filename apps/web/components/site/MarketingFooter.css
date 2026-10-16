@@ -39,7 +39,7 @@
   line-height: 1.45;
   letter-spacing: 0;
   color: var(--mf-text-secondary);
-  transition: color 150ms ease;
+  transition: color var(--duration-subtle) var(--ease-subtle);
   border-radius: 4px;
 }
 
@@ -128,7 +128,7 @@
   line-height: 1.45;
   letter-spacing: 0;
   color: var(--mf-text-tertiary);
-  transition: color 150ms ease;
+  transition: color var(--duration-subtle) var(--ease-subtle);
   border-radius: 4px;
 }
 

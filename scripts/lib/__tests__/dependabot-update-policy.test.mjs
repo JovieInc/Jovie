@@ -1,6 +1,7 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
+import { load } from 'js-yaml';
 import { describe, expect, it, vi } from 'vitest';
 import {
   classifyDependabotEventPayload,
@@ -23,6 +24,7 @@ const VITEST_MANIFEST_PATHS = [
   'package.json',
   'apps/console/package.json',
   'apps/eve-pilot/package.json',
+  'apps/macos/package.json',
   'apps/ovie/package.json',
   'apps/web/package.json',
   'packages/action-contracts/package.json',
@@ -30,6 +32,7 @@ const VITEST_MANIFEST_PATHS = [
   'packages/auth-routing/package.json',
   'packages/copy/package.json',
   'packages/jovie-cli/package.json',
+  'packages/release-channel-contracts/package.json',
   'packages/ui/package.json',
 ];
 
@@ -516,6 +519,57 @@ describe('Dependabot discovery contract', () => {
     }
   });
 
+  it.each([
+    [
+      '/apps/eve-pilot',
+      [
+        { 'dependency-name': '@fastify/busboy', versions: ['2.1.1'] },
+        { 'dependency-name': 'sprintf-js', versions: ['1.1.3'] },
+        { 'dependency-name': 'undici', versions: ['5.28.4', '5.29.0'] },
+      ],
+    ],
+    [
+      '/scripts/security/deepsec',
+      [
+        { 'dependency-name': 'protobufjs', versions: ['7.6.4'] },
+        { 'dependency-name': 'undici', versions: ['8.5.0'] },
+      ],
+    ],
+  ])(
+    'limits security ignores in %s to the upstream-blocked versions',
+    (directory, ignores) => {
+      const parsed = load(CONFIG);
+      if (
+        typeof parsed !== 'object' ||
+        parsed === null ||
+        !('updates' in parsed) ||
+        !Array.isArray(parsed.updates)
+      ) {
+        throw new Error('dependabot.yml must declare an updates array');
+      }
+      const entries = parsed.updates.filter(
+        entry =>
+          entry['package-ecosystem'] === 'npm' && entry.directory === directory
+      );
+      expect(entries).toHaveLength(1);
+      expect(entries[0]['open-pull-requests-limit']).toBe(0);
+      expect(entries[0].ignore).toEqual(ignores);
+    }
+  );
+
+  it('keeps the standalone scanner undici override compatible with npm ci', () => {
+    const directory = resolve(REPO_ROOT, 'scripts/security/deepsec');
+    const manifest = JSON.parse(
+      readFileSync(resolve(directory, 'package.json'), 'utf8')
+    );
+    const lockfile = JSON.parse(
+      readFileSync(resolve(directory, 'package-lock.json'), 'utf8')
+    );
+    expect(manifest.overrides['undici@^7.16.0']).toBe(
+      lockfile.packages['node_modules/undici'].version
+    );
+  });
+
   it('routes framework majors instead of silently ignoring them', () => {
     for (const dependency of ['next', 'react', 'react-dom']) {
       expect(CONFIG).not.toMatch(
@@ -576,4 +630,39 @@ describe('Dependabot npm grouping (JOV-6837)', () => {
       expectedVersion
     );
   });
+
+  it.each(['pnpm-lock.yaml', 'apps/eve-pilot/pnpm-lock.yaml'])(
+    'keeps direct Vitest family specifiers and resolutions aligned in %s',
+    path => {
+      const expectedVersion = JSON.parse(
+        readFileSync(resolve(REPO_ROOT, 'package.json'), 'utf8')
+      ).devDependencies.vitest;
+      const lockfile = load(readFileSync(resolve(REPO_ROOT, path), 'utf8'));
+      if (
+        typeof lockfile !== 'object' ||
+        lockfile === null ||
+        !('importers' in lockfile) ||
+        typeof lockfile.importers !== 'object' ||
+        lockfile.importers === null
+      ) {
+        throw new Error(`${path} must declare lockfile importers`);
+      }
+
+      for (const [importer, manifest] of Object.entries(lockfile.importers)) {
+        const dependencies = {
+          ...manifest.dependencies,
+          ...manifest.devDependencies,
+        };
+        for (const [name, dependency] of Object.entries(dependencies)) {
+          if (name === 'vitest' || name.startsWith('@vitest/')) {
+            const context = `${path}: ${importer}: ${name}`;
+            expect(dependency.specifier, context).toBe(expectedVersion);
+            expect(dependency.version.split('(')[0], context).toBe(
+              expectedVersion
+            );
+          }
+        }
+      }
+    }
+  );
 });

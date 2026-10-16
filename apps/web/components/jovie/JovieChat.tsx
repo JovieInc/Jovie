@@ -31,6 +31,7 @@ import {
 } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import {
+  type ChatEmptyStateAction,
   getChatEmptyStateFirstName,
   resolveChatEmptyStateInsight,
 } from './chat-empty-greeting';
@@ -68,6 +69,8 @@ import type { JovieChatProps } from './types';
 const VIRTUALIZATION_THRESHOLD =
   CHAT_TRANSCRIPT_WINDOW.virtualizeAfterMessageCount;
 const CHAT_PICKER_THREAD_CLEARANCE = 'min(620px, calc(100vh - 8rem))';
+// Match the insights fetch deadline without waiting through query retries.
+const EMPTY_NEXT_STEP_TIMEOUT_MS = 10_000;
 
 function findLastAssistantIndex(
   messages: readonly { id: string; role: string }[]
@@ -91,8 +94,6 @@ export function JovieChat({
   displayName,
   avatarUrl,
   username,
-  isFirstSession = false,
-  isProfileComplete = false,
   chatMode,
   ovieHomeBriefing,
   ambientOwnedByShell = false,
@@ -374,6 +375,7 @@ export function JovieChat({
       measureChatTranscriptRow(el, scrollContainerRef.current),
   });
   const shouldVirtualizeMessages = messages.length > VIRTUALIZATION_THRESHOLD;
+  const [virtualizedMinHeight, setVirtualizedMinHeight] = useState(0);
 
   const scrollToBottom = useCallback(
     (behavior: ScrollBehavior = 'smooth') => {
@@ -425,6 +427,16 @@ export function JovieChat({
       return;
     }
 
+    const scrollport = scrollContainerRef.current;
+    // A 0px scrollport cannot place the tail in the virtual window. Leave the
+    // latch unset so the layout pass below can scroll once the height is real.
+    if (
+      shouldVirtualizeMessages &&
+      (!scrollport || scrollport.clientHeight === 0)
+    ) {
+      return;
+    }
+
     initialConversationScrollRef.current = conversationKey;
     setStuckToBottom(true);
     const frame = requestAnimationFrame(() => scrollToBottom('auto'));
@@ -440,6 +452,9 @@ export function JovieChat({
     messages.length,
     scrollToBottom,
     setStuckToBottom,
+    shouldVirtualizeMessages,
+    scrollContainerRef,
+    virtualizedMinHeight,
   ]);
 
   const lastAssistantIndex = findLastAssistantIndex(messages);
@@ -531,22 +546,104 @@ export function JovieChat({
   const chatEmptyStateFirstName = getChatEmptyStateFirstName(displayName);
   const showEmptyGreeting =
     !showThreadView && !showOvieBriefing && !composerHasIntent;
-  const { data: insightsSummary } = useInsightsSummaryQuery({
+  const {
+    data: insightsSummary,
+    isLoading: insightsLoading,
+    isError: insightsError,
+    isEnabled: insightsEnabled,
+  } = useInsightsSummaryQuery({
     enabled: showEmptyGreeting,
   });
-  const topActiveInsightTitle =
-    insightsSummary?.insights.find(insight => insight.status === 'active')
-      ?.title ?? null;
-  const chatEmptyStateInsight = resolveChatEmptyStateInsight({
-    topInsightTitle: topActiveInsightTitle,
-    isProfileComplete,
-    isFirstSession,
-  });
+  // Commit one next step per empty session. Refetches must not swap the user's
+  // visible task, and a failed query must not turn cached prose into a win.
+  const [emptyNextStep, setEmptyNextStep] = useState<{
+    readonly action: ChatEmptyStateAction | null;
+  } | null>(null);
+  useEffect(() => {
+    // An enabled query can have no data before its request starts. Wait for
+    // that summary, but a disabled or failed query can use the fallback now.
+    const insightsUnavailable = insightsEnabled === false || insightsError;
+    const insightsSettled =
+      insightsUnavailable ||
+      (!insightsLoading && insightsSummary !== undefined);
+    if (showThreadView) {
+      setEmptyNextStep(null);
+    } else if (showEmptyGreeting && insightsSettled && !emptyNextStep) {
+      setEmptyNextStep({
+        action: insightsUnavailable
+          ? null
+          : resolveChatEmptyStateInsight(insightsSummary?.insights ?? []),
+      });
+    }
+  }, [
+    showThreadView,
+    showEmptyGreeting,
+    insightsLoading,
+    insightsError,
+    insightsEnabled,
+    insightsSummary,
+    emptyNextStep,
+  ]);
+  useEffect(() => {
+    if (!showEmptyGreeting || emptyNextStep) return;
+    // Keep one deadline for this visible wait; query updates must not restart it.
+    const timer = setTimeout(() => {
+      setEmptyNextStep({ action: null });
+    }, EMPTY_NEXT_STEP_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [showEmptyGreeting, emptyNextStep]);
+  const selectedEmptyAction = emptyNextStep?.action;
+  const currentEmptyInsight = insightsSummary?.insights.find(
+    insight => insight.id === selectedEmptyAction?.insightId
+  );
+  const activeEmptyAction = currentEmptyInsight
+    ? resolveChatEmptyStateInsight([currentEmptyInsight])
+    : null;
+  const usableEmptyAction =
+    activeEmptyAction?.prompt === selectedEmptyAction?.prompt
+      ? selectedEmptyAction
+      : null;
+  useEffect(() => {
+    if (!selectedEmptyAction) return;
+    // Expiration is a material context change, even with an idle query cache.
+    const timer = setTimeout(
+      () => {
+        setEmptyNextStep({ action: null });
+      },
+      Math.min(
+        2_147_483_647,
+        Math.max(0, selectedEmptyAction.expiresAt - Date.now())
+      )
+    );
+    return () => clearTimeout(timer);
+  }, [selectedEmptyAction]);
+  const handleEmptyNextStep = useCallback(
+    (prompt: string) => {
+      if (
+        !usableEmptyAction ||
+        usableEmptyAction.prompt !== prompt ||
+        usableEmptyAction.expiresAt <= Date.now() ||
+        draft.getSnapshot().trim() ||
+        composerPickerOpen ||
+        chipTray.chips.length > 0
+      )
+        return;
+      setInput(prompt);
+      inputRef.current?.focus();
+    },
+    [
+      usableEmptyAction,
+      draft,
+      composerPickerOpen,
+      chipTray.chips.length,
+      setInput,
+      inputRef,
+    ]
+  );
   const shouldReservePickerClearance = showBottomComposer && composerPickerOpen;
   const messageViewportPaddingBottom = shouldReservePickerClearance
     ? CHAT_PICKER_THREAD_CLEARANCE
     : undefined;
-  const [virtualizedMinHeight, setVirtualizedMinHeight] = useState(0);
   const scrollThreadToBottom = useCallback(() => {
     const scrollContainer = scrollContainerRef.current;
     if (!scrollContainer) return;
@@ -866,19 +963,25 @@ export function JovieChat({
                 ) : (
                   <ChatEmptyStateComposerRegion
                     stableDocked
+                    fullBleed
+                    alignAbove='center'
                     above={
                       showEmptyGreeting ? (
                         <ChatEmptyStateGreeting
                           firstName={chatEmptyStateFirstName}
-                          insight={chatEmptyStateInsight}
+                          action={usableEmptyAction}
+                          isLoading={!emptyNextStep}
+                          onSelectAction={handleEmptyNextStep}
                         />
                       ) : undefined
                     }
                   >
-                    {composerSurface}
-                    {inlineChatError ? (
-                      <div className='mt-3 w-full'>{inlineChatError}</div>
-                    ) : null}
+                    <div className={CHAT_CONTENT_SHELL_CLASSNAME}>
+                      {composerSurface}
+                      {inlineChatError ? (
+                        <div className='mt-3 w-full'>{inlineChatError}</div>
+                      ) : null}
+                    </div>
                   </ChatEmptyStateComposerRegion>
                 )}
               </div>

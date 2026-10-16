@@ -1,7 +1,9 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MoneyVisibilityProvider } from '@/lib/workspace-lock/money-visibility';
 import { EarningsTab } from './EarningsTab';
+
+const queryState = vi.hoisted(() => ({ loading: false, empty: false }));
 
 vi.mock('next/image', () => ({
   default: (props: Record<string, unknown>) => <img alt='' {...props} />,
@@ -43,16 +45,18 @@ vi.mock('@/lib/queries', async importOriginal => {
   return {
     ...mod,
     useEarningsQuery: () => ({
-      isLoading: false,
-      data: {
-        stats: {
-          totalRevenueCents: 12345,
-          totalTips: 7,
-          averageTipCents: 1764,
-          totalTippers: 5,
-        },
-        tippers: [],
-      },
+      isLoading: queryState.loading,
+      data: queryState.empty
+        ? undefined
+        : {
+            stats: {
+              totalRevenueCents: 12345,
+              totalTips: 7,
+              averageTipCents: 1764,
+              totalTippers: 5,
+            },
+            tippers: [],
+          },
     }),
   };
 });
@@ -66,6 +70,11 @@ function renderTab({ moneyHidden = false }: { moneyHidden?: boolean } = {}) {
 }
 
 describe('EarningsTab', () => {
+  beforeEach(() => {
+    queryState.loading = false;
+    queryState.empty = false;
+  });
+
   it('renders money stat values when money visibility is on', () => {
     renderTab();
     expect(screen.getByText('Total Revenue')).toBeTruthy();
@@ -77,5 +86,22 @@ describe('EarningsTab', () => {
     expect(screen.queryByText('$123.45')).toBeNull();
     expect(screen.getAllByText('•••').length).toBeGreaterThan(0);
     expect(screen.getByText('7')).toBeTruthy();
+  });
+
+  it('uses three compact loading cards before stats arrive', () => {
+    queryState.loading = true;
+    const { container } = renderTab();
+    expect(screen.queryByText('Total Revenue')).toBeNull();
+    expect(container.querySelectorAll('[aria-hidden="true"].p-3')).toHaveLength(
+      3
+    );
+  });
+
+  it('retains zero fallbacks when earnings stats are absent', () => {
+    queryState.empty = true;
+    renderTab();
+    expect(screen.getAllByText('$0.00')).toHaveLength(2);
+    expect(screen.getByText('0')).toBeInTheDocument();
+    expect(screen.getAllByRole('term')).toHaveLength(3);
   });
 });

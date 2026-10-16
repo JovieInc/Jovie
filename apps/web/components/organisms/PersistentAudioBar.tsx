@@ -113,6 +113,8 @@ export function PersistentAudioBar() {
   // always matches the rendered dock.
   const fullPlayerExpandRequests = useFullAudioPlayerExpandRequests();
   const lastNonLyricsPathRef = useRef<string>(APP_ROUTES.LIBRARY);
+  const lyricsInvokerRef = useRef<HTMLElement | null>(null);
+  const wasLyricsRouteRef = useRef(isLyricsRoutePath(pathname));
   const currentPathWithSearch = useMemo(() => {
     if (!pathname) return APP_ROUTES.LIBRARY;
 
@@ -151,6 +153,29 @@ export function PersistentAudioBar() {
       lastNonLyricsPathRef.current = currentPathWithSearch;
     }
   }, [currentPathWithSearch, pathname]);
+
+  useEffect(() => {
+    const wasLyrics = wasLyricsRouteRef.current;
+    const isLyrics = isLyricsRoutePath(pathname);
+    wasLyricsRouteRef.current = isLyrics;
+    if (!wasLyrics || isLyrics) return;
+
+    const invoker = lyricsInvokerRef.current;
+    lyricsInvokerRef.current = null;
+    const candidates = [
+      invoker,
+      ...document.querySelectorAll<HTMLElement>(
+        '[data-shell-audio-surface] button, [data-mobile-audio-surface] button'
+      ),
+    ];
+    for (const element of candidates) {
+      if (!element?.isConnected || element.closest('[inert]')) continue;
+      element.focus({ preventScroll: true });
+      // Native focus rejects hidden/disabled targets without depending on a
+      // newer visibility API. Continue to a usable control when it does.
+      if (document.activeElement === element) break;
+    }
+  }, [pathname]);
 
   const handleToggle = useCallback(() => {
     if (playbackState.playbackStatus === 'loading') return;
@@ -193,6 +218,11 @@ export function PersistentAudioBar() {
       handleCloseLyrics();
       return;
     }
+    lyricsInvokerRef.current =
+      document.activeElement instanceof HTMLElement &&
+      document.activeElement !== document.body
+        ? document.activeElement
+        : null;
     router.push(
       buildLyricsRoute(playbackState.activeTrackId, {
         from: currentPathWithSearch,
@@ -264,6 +294,14 @@ export function PersistentAudioBar() {
       }
 
       if (event.key === ' ' && plainKey) {
+        // Native controls own Space activation; the global transport shortcut
+        // must not swallow a focused button's click (or a link's scroll).
+        if (
+          event.target instanceof Element &&
+          event.target.closest('button, a[href], [role="button"], summary')
+        ) {
+          return;
+        }
         event.preventDefault();
         handleToggle();
         return;
@@ -298,11 +336,47 @@ export function PersistentAudioBar() {
       return;
     }
 
+    const focusedElement = document.activeElement;
+    const focusedSurface = focusedElement?.closest(
+      '[data-shell-audio-surface]'
+    );
+    const targetSurface = compactPlayerVisible
+      ? 'sidebar-compact'
+      : 'persistent-expanded';
+    const transferFocus =
+      !canvasTransport &&
+      focusedSurface &&
+      focusedSurface.getAttribute('data-shell-audio-surface') !== targetSurface;
+
     setAudioChromeSnapshot({
       activeTrackId,
       compactPlayerVisible: canvasTransport ? false : compactPlayerVisible,
       fullPlayerVisible: canvasTransport ? true : !compactPlayerVisible,
     });
+
+    if (!transferFocus) return;
+    // The sibling mini commits its inert state from the snapshot. Hand off on
+    // the next paint, independently of the reveal animation, and cancel stale
+    // requests when intent changes. Never steal focus moved elsewhere meanwhile.
+    const frame = requestAnimationFrame(() => {
+      if (
+        document.activeElement !== focusedElement &&
+        document.activeElement !== document.body
+      ) {
+        return;
+      }
+      const surface = document.querySelector(
+        `[data-shell-audio-surface="${targetSurface}"]`
+      );
+      const target =
+        surface?.querySelector<HTMLButtonElement>(
+          compactPlayerVisible
+            ? 'button[aria-label="Show Player"]'
+            : 'button[aria-label="Hide Player"]'
+        ) ?? surface?.querySelector<HTMLButtonElement>('button');
+      target?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(frame);
   }, [activeTrackId, compactPlayerVisible, hasActiveTrack, canvasTransport]);
 
   useEffect(() => {
@@ -439,7 +513,7 @@ export function PersistentAudioBar() {
         className
       )}
     >
-      <div className='flex items-center gap-3'>
+      <div className='flex flex-wrap items-center gap-x-3 gap-y-2 sm:flex-nowrap'>
         {/* Artwork */}
         {playbackState.artworkUrl && !imgError ? (
           <ArtworkFrame size={36} className='h-9 w-9 shrink-0 bg-surface-2'>
@@ -460,7 +534,7 @@ export function PersistentAudioBar() {
         )}
 
         {/* Track info */}
-        <div className='min-w-0 shrink-0 w-30 lg:w-45'>
+        <div className='min-w-0 flex-1 sm:w-30 sm:flex-none lg:w-45'>
           <TruncatedText
             lines={1}
             className='text-xs font-caption leading-[1.2] text-primary-token'
@@ -480,7 +554,7 @@ export function PersistentAudioBar() {
         </div>
 
         {/* Seek area */}
-        <div className='flex flex-1 items-center gap-2 min-w-0'>
+        <div className='order-last flex w-full min-w-0 flex-none items-center gap-2 sm:order-none sm:w-auto sm:flex-1'>
           <span className='text-3xs tabular-nums text-quaternary-token shrink-0 w-8 text-right'>
             {currentTimeFormatted}
           </span>
