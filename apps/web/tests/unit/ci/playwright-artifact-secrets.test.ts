@@ -158,6 +158,7 @@ const markdownAllowedJobs = new Set([
   'ci.yml:ci-smoke-required',
   'ci.yml:ci-storybook-surfaces',
   'ci.yml:ci-visual-snapshot-compare',
+  'e2e-full-matrix.yml:e2e-full-matrix',
   'nightly-testing-agent.yml:report',
   'postdeploy-probes.yml:auth-smoke',
   'production-controller.yml:ci-post-deploy-auth-smoke',
@@ -1816,6 +1817,47 @@ ${fixtureCheckout}
       path: join(workspace, 'error-context.md'),
       category: 'unknown-binary',
     });
+    write(join(workspace, 'trace.zip'), 'not-a-real-zip');
+    write(join(workspace, 'capture.webm'), 'not-a-real-video');
+    expect(
+      inspectPlaywrightArtifacts(
+        ['trace.zip', 'capture.webm'],
+        {},
+        { workspace, allowMarkdown: true }
+      )
+    ).toEqual(
+      expect.arrayContaining([
+        {
+          path: join(workspace, 'trace.zip'),
+          category: 'forbidden-container',
+        },
+        {
+          path: join(workspace, 'capture.webm'),
+          category: 'forbidden-container',
+        },
+      ])
+    );
+  });
+
+  it('scans full-matrix error context without allowing containers or images', () => {
+    const source = readFileSync(
+      join(workflowsRoot, 'e2e-full-matrix.yml'),
+      'utf8'
+    );
+    const job = jobBlock(source, 'e2e-full-matrix');
+    const run = stepBlock(job, 'Run E2E tests (${{ matrix.browser }})');
+    const upload = stepBlock(
+      job,
+      'Upload failure results or filtered public review captures'
+    );
+
+    expect(run).toContain("PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'");
+    expect(run).toContain("PLAYWRIGHT_ARTIFACT_REPORT_PATHS: 'true'");
+    expect(upload).toContain("allow-markdown: 'true'");
+    expect(upload).not.toMatch(/allow-images:\s*'true'/);
+    expect(markdownAllowedJobs.has('e2e-full-matrix.yml:e2e-full-matrix')).toBe(
+      true
+    );
   });
 
   it.each(

@@ -266,6 +266,12 @@ jobs:
           # Retain decoded public review captures only for this exact filtered run.
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter == 'tests/e2e/profile/public-profile-cta-identity.spec.ts' }}
           PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter == 'tests/e2e/profile/public-profile-cta-identity.spec.ts' }}
+          # Failed attempts leave error-context.md. Scan and redact that
+          # markdown; without this flag the guard counts it as unknown-binary
+          # and poisons the producer. Containers (.zip, .webm, .html) stay
+          # forbidden. Redacted relative paths name any file that still fails.
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
+          PLAYWRIGHT_ARTIFACT_REPORT_PATHS: 'true'
           NODE_ENV: test
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
@@ -302,6 +308,7 @@ jobs:
           retention-days: 7
           allow-images: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter == 'tests/e2e/profile/public-profile-cta-identity.spec.ts' }}
           public-images: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter == 'tests/e2e/profile/public-profile-cta-identity.spec.ts' }}
+          allow-markdown: 'true'
 
       - name: Cleanup Clerk E2E test users
         if: ${{ always() && steps.neon-branch.outcome == 'success' }}
