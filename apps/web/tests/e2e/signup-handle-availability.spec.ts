@@ -1,10 +1,63 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, type Page, test } from '@playwright/test';
+import { test as baseTest, expect, type Page } from '@playwright/test';
 import { USERNAME_MAX_LENGTH } from '@/lib/validation/client-username';
+
+const test = baseTest.extend({
+  context: async ({ context }, runTest, info) => {
+    const attempted: { method: string; path: string }[] = [];
+    const completed: { method: string; path: string }[] = [];
+    context.on('request', r => {
+      if (!['GET', 'HEAD', 'OPTIONS'].includes(r.method()))
+        attempted.push({ method: r.method(), path: new URL(r.url()).pathname });
+    });
+    context.on('requestfinished', r => {
+      if (!['GET', 'HEAD', 'OPTIONS'].includes(r.method()))
+        completed.push({ method: r.method(), path: new URL(r.url()).pathname });
+    });
+    await context.route('**/*', route =>
+      ['GET', 'HEAD', 'OPTIONS'].includes(route.request().method())
+        ? route.continue()
+        : route.abort('internetdisconnected')
+    );
+    try {
+      await runTest(context);
+    } finally {
+      await info.attach('write-census', {
+        body: JSON.stringify({ attempted, completed }),
+        contentType: 'application/json',
+      });
+      expect(completed, 'No HTTP write may complete').toEqual([]);
+      const mode =
+        /^maximum handle transport (empty|email|apple|google) at (390|768|1440)px ([12])x @smoke$/.exec(
+          info.title
+        )?.[1];
+      const path =
+        mode === 'email'
+          ? '/api/auth/email-otp/send-verification-otp'
+          : '/api/auth/sign-in/social';
+      const expected =
+        mode && mode !== 'empty'
+          ? [
+              { method: 'POST', path },
+              { method: 'POST', path },
+            ]
+          : [];
+      expect(
+        attempted.filter(
+          x => x.path === '/api/auth' || x.path.startsWith('/api/auth/')
+        ),
+        'Only declared transport attempts may occur'
+      ).toEqual(expected);
+    }
+  },
+});
 
 // JOV-8350: advisory GET response handling, never account/handle allocation.
 // The write fence also makes this selector safe for exact-deployment replay.
-test.use({ storageState: { cookies: [], origins: [] } });
+test.use({
+  storageState: { cookies: [], origins: [] },
+  serviceWorkers: 'block',
+});
 test.beforeEach(async ({ context, baseURL }) => {
   expect(baseURL).toBeDefined();
   await context.addCookies([
@@ -371,7 +424,7 @@ for (const width of [390, 768, 1440]) {
           await page.setViewportSize({ width, height: 1000 });
           await page.emulateMedia({ reducedMotion });
           for (const fixture of [fixtures[4], fixtures[0], fixtures[1]]) {
-            await page.context().unrouteAll({ behavior: 'wait' });
+            await page.context().unroute('**/api/**');
             let release!: () => void;
             const pending = new Promise<void>(resolve => {
               release = resolve;
@@ -698,7 +751,7 @@ for (const width of [390, 768, 1440]) {
 
     // Compare against the existing passing HTML-error presentation. Pending
     // reflow is measured separately under JOV-6538, never silently certified.
-    await page.context().unrouteAll({ behavior: 'wait' });
+    await page.context().unroute('**/api/**');
     const controlEvidence = await intercept(page, fixtures[4]);
     await page.goto('/signup?handle=JovieDogfood&redirect_url=%2Fstart', {
       waitUntil: 'domcontentloaded',

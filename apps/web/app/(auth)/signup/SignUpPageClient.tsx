@@ -172,7 +172,7 @@ function SignUpClaimDataPersistence() {
   };
 
   return (
-    <div className='mb-4 grid text-center text-app text-secondary-token'>
+    <div className='mb-4 grid grid-cols-1 text-center text-app text-secondary-token'>
       {/* Intrinsic, inaccessible copies reserve the widest/tallest result
           before hydration without adding stale text to the live output. */}
       {Object.entries(messages).map(([state, message]) => (
