@@ -14,15 +14,11 @@ test.use({ storageState: { cookies: [], origins: [] } });
 
 const AUTH_MODAL_TIMEOUT = 30_000;
 
-function expectedDialogName(mode: 'signin' | 'signup') {
-  const clerkUnavailable =
-    process.env.E2E_USE_TEST_AUTH_BYPASS === '1' ||
-    process.env.NEXT_PUBLIC_CLERK_MOCK === '1';
-
-  if (clerkUnavailable) {
-    return 'Authentication unavailable';
-  }
-
+function renderedDialogName(
+  mode: 'signin' | 'signup',
+  authUnavailable: boolean
+) {
+  if (authUnavailable) return 'Authentication unavailable';
   return mode === 'signin' ? 'Log in to Jovie' : 'Continue to Jovie';
 }
 
@@ -63,7 +59,9 @@ async function prepareHomepage(page: import('@playwright/test').Page) {
 
 async function openRequestAccess(page: import('@playwright/test').Page) {
   // Homepage conversion lock keeps Request access off `/`. The intercepted
-  // signup modal still opens from the shared marketing-header CTA.
+  // signup modal opens from the shared marketing-header CTA. Pricing also
+  // renders a plan link with the same name that goes to /waitlist; that
+  // link is not this surface.
   await blockAnalytics(page);
   await page.goto(APP_ROUTES.PRICING, {
     waitUntil: 'domcontentloaded',
@@ -71,14 +69,9 @@ async function openRequestAccess(page: import('@playwright/test').Page) {
   });
   await waitForHydration(page, { timeout: AUTH_MODAL_TIMEOUT });
 
-  const requestAccess = page.getByRole('link', { name: /^request access$/i });
-  if (
-    await requestAccess
-      .first()
-      .isVisible()
-      .catch(() => false)
-  ) {
-    await requestAccess.first().click({
+  const headerCta = page.locator('a.marketing-glass-header__cta:visible');
+  if (await headerCta.isVisible().catch(() => false)) {
+    await headerCta.click({
       noWaitAfter: true,
       timeout: AUTH_MODAL_TIMEOUT,
     });
@@ -86,7 +79,7 @@ async function openRequestAccess(page: import('@playwright/test').Page) {
   }
 
   await page.getByRole('button', { name: 'Open menu' }).click();
-  await requestAccess.first().click({
+  await page.locator('a.marketing-glass-header__cta:visible').click({
     noWaitAfter: true,
     timeout: AUTH_MODAL_TIMEOUT,
   });
@@ -156,7 +149,7 @@ test.describe('Intercepted auth modal', () => {
       timeout: AUTH_MODAL_TIMEOUT,
     });
     await expect(page.getByRole('dialog')).toHaveAccessibleName(
-      expectedDialogName('signin')
+      renderedDialogName('signin', await isAuthUnavailable(page))
     );
   });
 
@@ -169,7 +162,7 @@ test.describe('Intercepted auth modal', () => {
       timeout: AUTH_MODAL_TIMEOUT,
     });
     await expect(page.getByRole('dialog')).toHaveAccessibleName(
-      expectedDialogName('signup')
+      renderedDialogName('signup', await isAuthUnavailable(page))
     );
     await expectSharedAuthSurface(page);
   });
@@ -183,7 +176,7 @@ test.describe('Intercepted auth modal', () => {
       timeout: AUTH_MODAL_TIMEOUT,
     });
     await expect(page.getByRole('dialog')).toHaveAccessibleName(
-      expectedDialogName('signup')
+      renderedDialogName('signup', await isAuthUnavailable(page))
     );
     await expectSharedAuthSurface(page);
   });
