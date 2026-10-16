@@ -647,7 +647,13 @@ function productionRecoveryFixture() {
   return {
     client,
     orphan,
-    input: { client, environment: 'production', releaseSha, version },
+    input: {
+      client,
+      environment: 'production',
+      installedVersion: version,
+      releaseSha,
+      version,
+    },
   };
 }
 
