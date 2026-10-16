@@ -36,18 +36,26 @@ export class ProfileWriteService {
       throw new Error('unauthorized-destination');
   }
 
-  private checkManifest() {
+  private checkManifest(preview = false) {
     const manifest = this.adapter.manifest;
-    if (manifest.rollback !== 'conditional-restore') {
+    const submission = manifest.operation === 'email-submission';
+    if (
+      submission
+        ? manifest.rollback !== 'manual'
+        : manifest.rollback !== 'conditional-restore'
+    ) {
       throw new Error(`rollback-${manifest.rollback}`);
     }
+    // Unverified email destinations may be previewed, but cannot be approved or run.
+    if (preview && submission) return;
     if (
       !manifest.version ||
       !manifest.termsApproved ||
       !manifest.evidenceRef ||
       !(Date.parse(manifest.evidenceExpiresAt) > this.now().getTime()) ||
       !Number.isSafeInteger(manifest.rateLimitWindowSeconds) ||
-      manifest.rateLimitWindowSeconds < 1
+      manifest.rateLimitWindowSeconds < 1 ||
+      (submission && (!manifest.recipient || !manifest.maxBioLength))
     )
       throw new Error('unverified-manifest');
   }
@@ -90,7 +98,7 @@ export class ProfileWriteService {
     desired: ProfileValues;
   }): Promise<ProfileWriteProposal> {
     await this.authorize(input.userId, input.destination);
-    this.checkManifest();
+    this.checkManifest(true);
     const before = safeSnapshot(await this.adapter.read(input.destination));
     return this.saveProposal(
       input.userId,
@@ -109,6 +117,13 @@ export class ProfileWriteService {
     rollbackOf: string | null
   ) {
     const desired = safeValues(values);
+    if (
+      this.adapter.manifest.operation === 'email-submission' &&
+      (Object.keys(desired).length !== 1 ||
+        !desired.bio?.trim() ||
+        desired.bio.length > (this.adapter.manifest.maxBioLength ?? 0))
+    )
+      throw new Error('invalid-submission-bio');
     if (
       Object.keys(desired).some(
         field =>
@@ -131,6 +146,12 @@ export class ProfileWriteService {
       before,
       desired,
       rollbackOf,
+      ...(this.adapter.manifest.operation
+        ? {
+            operation: this.adapter.manifest.operation,
+            recipient: this.adapter.manifest.recipient,
+          }
+        : {}),
       manifestVersion: this.adapter.manifest.version,
       manifestDigest: digest(this.adapter.manifest),
       evidenceRef: this.adapter.manifest.evidenceRef,
@@ -156,6 +177,14 @@ export class ProfileWriteService {
 
   private checkProposal(proposal: ProfileWriteProposal) {
     this.checkManifest();
+    safeValues(proposal.desired);
+    if (
+      Object.keys(proposal.desired).some(
+        field =>
+          !this.adapter.manifest.fields.includes(field as keyof ProfileValues)
+      )
+    )
+      throw new Error('unsupported-profile-field');
     if (
       proposal.manifestVersion !== this.adapter.manifest.version ||
       proposal.manifestDigest !== digest(this.adapter.manifest) ||
@@ -259,12 +288,33 @@ export class ProfileWriteService {
           expectedVersion: proposal.before.version,
           values: structuredClone(proposal.desired),
           idempotencyKey: started.idempotencyKey,
+          manifestDigest: proposal.manifestDigest,
         })
       );
       providerReceipt = redactProviderReceipt(writeResult.receipt);
     } catch {
       // Transport failure gives no mutation identity, even if readback changed.
       writeResult = null;
+    }
+    if (proposal.operation === 'email-submission') {
+      const outcome = this.receipt(
+        proposal,
+        'outcome',
+        writeResult?.status === 'applied'
+          ? 'submitted'
+          : writeResult?.status === 'rejected'
+            ? 'failed'
+            : 'unknown',
+        {
+          approvalId: approval.id,
+          providerReceipt,
+          startedAt: started.startedAt,
+          reason: writeResult ? null : 'provider-result-unknown',
+        }
+      );
+      if (!(await this.ledger.append(outcome)))
+        throw new Error('outcome-not-stored');
+      return outcome;
     }
     let after: ProfileWriteReceipt['after'] = null;
     try {
@@ -301,6 +351,8 @@ export class ProfileWriteService {
 
   async proposeRollback(userId: string, proposalId: string) {
     const original = await this.load(userId, proposalId);
+    if (original.operation === 'email-submission')
+      throw new Error('rollback-manual');
     this.checkManifest();
     const outcome = await this.ledger.get(userId, proposalId, 'outcome');
     if (

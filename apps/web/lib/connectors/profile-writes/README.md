@@ -2,9 +2,11 @@
 
 Authenticated server callers construct `createProfileWriteService(adapter)` from
 `ledger.server.ts`. The adapter supplies a versioned manifest with current terms,
-scope and rollback evidence. Only conditional restore adapters execute. Current
-DSP bio email destinations declare manual rollback; disabled API destinations
-declare unsupported rollback in the existing provider catalog and discovery API.
+scope and rollback evidence. Mutations require conditional restore. DSP
+`email-submission` proposals use a canonical-source before snapshot and manual
+rollback; receipts attest submission only. Initial requests only preview, and
+separate approval confirms the exact proposal. Missing evidence blocks execution
+(JOV-8509). Legacy history uses `getBioSyncHistory`; new status uses receipts.
 
 Call `propose`, show the complete destination/before/desired proposal, then call
 `approve` with `confirmationFor(proposal)` from that explicit confirmation.
