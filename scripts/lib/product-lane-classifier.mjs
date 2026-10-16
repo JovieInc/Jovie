@@ -588,8 +588,11 @@ export function classifyPackageJsonChange(
     );
   });
   // JOV-6113: a root script the Mac lane cannot run must not queue macos-15.
-  // Web stays selected. Missing desktop evidence or an ambiguous command keeps Mac.
+  // Web stays selected. A dependency or other non-script edit still installs
+  // on that runner, so mixed edits keep Mac. Missing desktop evidence or an
+  // ambiguous command keeps Mac too.
   if (
+    !hasNonScriptChanges &&
     !changesIosCommand &&
     changedRootScriptsSpareMacLane(
       beforeScripts,

@@ -376,6 +376,26 @@ describe('product lane classifier', () => {
       ).selectedLanes
     ).toEqual(JS);
     // Dependency edits still select Mac, with or without desktop evidence.
+    // A CI-only script edit beside a dependency edit does too: the Mac
+    // runner installs that manifest.
+    expect(
+      pkg(
+        {
+          scripts: {
+            'run-outcome:check': 'node scripts/evals/outcome.test.mjs',
+          },
+          devDependencies: { turbo: '1' },
+        },
+        {
+          scripts: {
+            'run-outcome:check':
+              'node scripts/evals/outcome.test.mjs && node scripts/evals/extra.test.mjs',
+          },
+          devDependencies: { turbo: '2' },
+        },
+        desktop
+      ).selectedLanes
+    ).toEqual(JS);
     expect(
       pkg(
         { devDependencies: { turbo: '1' } },
