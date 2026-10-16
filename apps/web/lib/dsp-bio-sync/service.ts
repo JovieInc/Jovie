@@ -1,429 +1,223 @@
-/**
- * DSP Bio Sync Service
- *
- * Orchestrates pushing artist bio updates to DSPs.
- * - For email-based DSPs: sends a professional bio update request email via Resend
- * - For API-based DSPs: calls the DSP's API (stubbed for future OAuth integration)
- *
- * All sync attempts are tracked in the dsp_bio_sync_requests table.
- */
-
-import { and, desc, eq } from 'drizzle-orm';
+import 'server-only';
+import { and, desc, sql as drizzleSql, eq } from 'drizzle-orm';
+import { withDbSessionTx } from '@/lib/auth/session';
+import {
+  confirmationFor,
+  digest,
+  type ProfileWriteLedger,
+  type ProfileWriteProposal,
+} from '@/lib/connectors/profile-writes/contract';
+import {
+  getBioSubmissionManifest,
+  getProfileDestination,
+} from '@/lib/connectors/profile-writes/destinations';
+import { profileWriteLedger } from '@/lib/connectors/profile-writes/ledger.server';
+import { ProfileWriteService } from '@/lib/connectors/profile-writes/service';
 import { assertCustomerVoiceFloor } from '@/lib/copy/outbound-floor';
 import { db } from '@/lib/db';
-import {
-  type DspBioSyncMetadata,
-  dspBioSyncRequests,
-} from '@/lib/db/schema/dsp-bio-sync';
+import { connectorWriteReceipts } from '@/lib/db/schema/connector-write-receipts';
+import { dspBioSyncRequests } from '@/lib/db/schema/dsp-bio-sync';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-import {
-  type DspBioUpdateTemplateData,
-  getDspBioUpdateEmail,
-} from '@/lib/email/templates/dsp-bio-update';
-import { captureError } from '@/lib/error-tracking';
 import { ResendEmailProvider } from '@/lib/notifications/providers/resend';
-import {
-  type DspBioProvider,
-  getBioProvider,
-  getEnabledBioProviders,
-} from './providers';
-
-// ============================================================================
-// Types
-// ============================================================================
+import { createBioSubmissionAdapter } from './adapter';
 
 export interface BioSyncRequest {
+  userId: string;
   creatorProfileId: string;
-  /** Specific DSP IDs to sync to, or undefined to sync to all enabled DSPs */
+  /** Specific DSP IDs, or all confirmed targets when omitted. */
   providerIds?: string[];
   /** The bio text to push. If omitted, uses the current bio from creator_profiles */
   bioText?: string;
 }
-
 export interface BioSyncResult {
   providerId: string;
-  method: 'api' | 'email';
-  status: 'sent' | 'failed' | 'unsupported';
-  syncRequestId: string;
-  error?: string;
+  status: 'pending' | 'unsupported';
+  proposal?: ProfileWriteProposal;
+  confirmation?: string;
 }
-
 export interface BioSyncResponse {
   success: boolean;
   results: BioSyncResult[];
-  /** Number of DSPs where bio was successfully sent */
-  sentCount: number;
-  /** Number of DSPs where bio sync failed */
-  failedCount: number;
+  pendingCount: number;
 }
 
-/** Minimal profile fields required for DSP bio sync operations. */
-interface BioSyncProfile {
-  id: string;
-  bio: string | null;
-  displayName: string | null;
-  username: string;
-  spotifyId: string | null;
-  spotifyUrl: string | null;
-}
-
-// ============================================================================
-// Service
-// ============================================================================
-
-const emailProvider = new ResendEmailProvider();
-
-/**
- * Process a single DSP provider bio sync, handling both email and API methods.
- * Catches and records failures as tracking records.
- */
-async function syncSingleProvider(params: {
-  profile: BioSyncProfile;
-  providerId: string;
-  provider: DspBioProvider;
-  match: typeof dspArtistMatches.$inferSelect | undefined;
-  bioText: string;
-  creatorProfileId: string;
-}): Promise<BioSyncResult> {
-  const { profile, providerId, provider, match, bioText, creatorProfileId } =
-    params;
-
-  try {
-    if (provider.method === 'email') {
-      return await syncBioViaEmail({
-        profile,
-        providerId,
-        provider,
-        match,
-        bioText,
-      });
-    }
-    if (provider.method === 'api') {
-      return unsupportedApiBioSync(providerId, provider.displayName);
-    }
-    return {
-      providerId,
-      method: provider.method,
-      status: 'unsupported',
-      syncRequestId: '',
-    };
-  } catch (error) {
-    await captureError(
-      `[dsp-bio-sync] Failed to sync bio to ${providerId}`,
-      error,
-      { creatorProfileId, providerId }
-    );
-
-    const errorMessage =
-      error instanceof Error ? error.message : 'Unknown error';
-    const errorDetail = error instanceof Error ? error.stack : String(error);
-
-    const [syncRequest] = await db
-      .insert(dspBioSyncRequests)
-      .values({
-        creatorProfileId,
-        providerId,
-        method: provider.method,
-        status: 'failed',
-        bioText,
-        error: errorMessage,
-        metadata: {
-          bioSnapshot: bioText,
-          errorDetail,
-        } satisfies DspBioSyncMetadata,
+/** A confirmed match is an email submission target, never an OAuth connection. */
+export async function createDspBioWriteService(
+  userId: string,
+  profileId: string,
+  providerId: string
+) {
+  const load = async () => {
+    const [row] = await db
+      .select({
+        bio: creatorProfiles.bio,
+        displayName: creatorProfiles.displayName,
+        username: creatorProfiles.username,
+        spotifyId: creatorProfiles.spotifyId,
+        spotifyUrl: creatorProfiles.spotifyUrl,
+        matchId: dspArtistMatches.id,
+        externalArtistId: dspArtistMatches.externalArtistId,
+        externalArtistUrl: dspArtistMatches.externalArtistUrl,
       })
-      .returning({ id: dspBioSyncRequests.id });
-
-    return {
-      providerId,
-      method: provider.method,
-      status: 'failed',
-      syncRequestId: syncRequest.id,
-      error: errorMessage,
-    };
-  }
+      .from(creatorProfiles)
+      .innerJoin(
+        dspArtistMatches,
+        eq(dspArtistMatches.creatorProfileId, creatorProfiles.id)
+      )
+      .where(
+        and(
+          eq(creatorProfiles.id, profileId),
+          eq(creatorProfiles.userId, userId),
+          eq(dspArtistMatches.providerId, providerId),
+          eq(dspArtistMatches.status, 'confirmed')
+        )
+      )
+      .limit(1);
+    if (!row?.externalArtistId) throw new Error('confirmed-target-required');
+    return { ...row, externalArtistId: row.externalArtistId };
+  };
+  const current = await load();
+  const destination = {
+    creatorProfileId: profileId,
+    providerId,
+    connectorAccountId: current.matchId,
+    destinationAccountId: current.externalArtistId,
+  };
+  const ledger: ProfileWriteLedger = {
+    ...profileWriteLedger,
+    async authorize(actor, target, scopes) {
+      const context = await load();
+      return (
+        actor === userId &&
+        target.creatorProfileId === profileId &&
+        scopes.length === 0 &&
+        target.providerId === providerId &&
+        target.connectorAccountId === context.matchId &&
+        target.destinationAccountId === context.externalArtistId
+      );
+    },
+  };
+  const adapter = createBioSubmissionAdapter({
+    manifest: () => getBioSubmissionManifest(providerId),
+    load,
+    send: message => new ResendEmailProvider().sendEmail(message),
+  });
+  return {
+    destination,
+    bio: current.bio,
+    service: new ProfileWriteService(ledger, adapter),
+  };
 }
 
-/**
- * Sync an artist's bio to one or more DSPs.
- *
- * For each targeted DSP:
- * 1. Looks up the artist's external ID/URL on that DSP
- * 2. Creates a tracking record in dsp_bio_sync_requests
- * 3. Sends the bio update via email or API
- * 4. Updates the tracking record with the result
- */
+/** Initial requests only persist an exact preview; no execution is reachable here. */
 export async function syncBioToDsps(
   request: BioSyncRequest
 ): Promise<BioSyncResponse> {
-  const { creatorProfileId, providerIds } = request;
-
-  // Fetch the creator profile (only the fields needed for bio sync)
-  const [profile] = await db
-    .select({
-      id: creatorProfiles.id,
-      bio: creatorProfiles.bio,
-      displayName: creatorProfiles.displayName,
-      username: creatorProfiles.username,
-      spotifyId: creatorProfiles.spotifyId,
-      spotifyUrl: creatorProfiles.spotifyUrl,
-    })
-    .from(creatorProfiles)
-    .where(eq(creatorProfiles.id, creatorProfileId))
-    .limit(1);
-
-  if (!profile) {
-    throw new Error(`Creator profile not found: ${creatorProfileId}`);
-  }
-
-  const bioText = request.bioText ?? profile.bio;
-  if (!bioText?.trim()) {
-    throw new Error('No bio text provided and profile has no existing bio');
-  }
-
-  // Copy floor (canon/VOICE.md, JOV-6616): the bio ships in the customer's
-  // voice to DSPs; refuse to send text that breaks a blocking floor rule.
-  assertCustomerVoiceFloor(bioText, 'dsp-bio-sync');
-
-  // Determine which DSPs to target
-  const targetProviders = providerIds
-    ? providerIds
-        .map(id => [id, getBioProvider(id)] as const)
-        .filter((entry): entry is [string, DspBioProvider] => {
-          return entry[1]?.enabled === true;
-        })
-    : getEnabledBioProviders();
-
-  if (targetProviders.length === 0) {
-    return {
-      success: true,
-      results: [],
-      sentCount: 0,
-      failedCount: 0,
-    };
-  }
-
-  // Fetch confirmed DSP matches for this profile (for external IDs/URLs)
-  const dspMatches = await db
-    .select()
-    .from(dspArtistMatches)
-    .where(
-      and(
-        eq(dspArtistMatches.creatorProfileId, creatorProfileId),
-        eq(dspArtistMatches.status, 'confirmed')
-      )
-    );
-
-  const matchesByProvider = new Map(dspMatches.map(m => [m.providerId, m]));
-
-  // Process each DSP
+  const targets =
+    request.providerIds ??
+    (
+      await db
+        .select({ id: dspArtistMatches.providerId })
+        .from(dspArtistMatches)
+        .where(
+          and(
+            eq(dspArtistMatches.creatorProfileId, request.creatorProfileId),
+            eq(dspArtistMatches.status, 'confirmed')
+          )
+        )
+    ).map(match => match.id);
+  const ids = [...new Set(targets)];
   const results: BioSyncResult[] = [];
-
-  for (const [providerId, provider] of targetProviders) {
-    const match = matchesByProvider.get(providerId);
-    const result = await syncSingleProvider({
-      profile,
-      providerId,
-      provider,
-      match,
-      bioText,
-      creatorProfileId,
+  for (const providerId of ids) {
+    if (getProfileDestination(providerId)?.method !== 'email') {
+      results.push({ providerId, status: 'unsupported' });
+      continue;
+    }
+    const {
+      service,
+      destination,
+      bio: sourceBio,
+    } = await createDspBioWriteService(
+      request.userId,
+      request.creatorProfileId,
+      providerId
+    );
+    const bio = request.bioText ?? sourceBio;
+    assertCustomerVoiceFloor(bio ?? '', 'dsp-bio-sync');
+    const proposal = await service.propose({
+      userId: request.userId,
+      destination,
+      desired: { bio },
     });
-    results.push(result);
+    results.push({
+      providerId,
+      status: 'pending',
+      proposal,
+      confirmation: confirmationFor(proposal),
+    });
   }
-
-  const sentCount = results.filter(r => r.status === 'sent').length;
-  const failedCount = results.filter(r => r.status === 'failed').length;
-
   return {
-    success: failedCount === 0,
+    success: true,
     results,
-    sentCount,
-    failedCount,
+    pendingCount: results.filter(result => result.status === 'pending').length,
   };
 }
 
-// ============================================================================
-// Email-based sync
-// ============================================================================
-
-interface SyncParams {
-  profile: BioSyncProfile;
+export async function approveBioSync(input: {
+  userId: string;
+  creatorProfileId: string;
   providerId: string;
-  provider: DspBioProvider;
-  match: typeof dspArtistMatches.$inferSelect | undefined;
-  bioText: string;
+  proposalId: string;
+  confirmation: string;
+}) {
+  const { service } = await createDspBioWriteService(
+    input.userId,
+    input.creatorProfileId,
+    input.providerId
+  );
+  // The immutable approval binds destination + field + exact value. A duplicate cannot dispatch.
+  await service.approve(input.userId, input.proposalId, input.confirmation);
+  return service.execute(input.userId, input.proposalId);
 }
 
-async function syncBioViaEmail(params: SyncParams): Promise<BioSyncResult> {
-  const { profile, providerId, provider, match, bioText } = params;
-
-  if (!provider.supportEmail) {
-    const [syncRequest] = await db
-      .insert(dspBioSyncRequests)
-      .values({
-        creatorProfileId: profile.id,
-        providerId,
-        method: 'email',
-        status: 'unsupported',
-        bioText,
-        error: `No support email configured for ${provider.displayName}`,
-        metadata: { bioSnapshot: bioText } satisfies DspBioSyncMetadata,
-      })
-      .returning({ id: dspBioSyncRequests.id });
-
-    return {
-      providerId,
-      method: 'email',
-      status: 'unsupported',
-      syncRequestId: syncRequest.id,
-      error: `No support email configured for ${provider.displayName}`,
-    };
-  }
-
-  // Create pending tracking record
-  const [syncRequest] = await db
-    .insert(dspBioSyncRequests)
-    .values({
-      creatorProfileId: profile.id,
-      providerId,
-      method: 'email',
-      status: 'sending',
-      bioText,
-      metadata: {
-        sentToEmail: provider.supportEmail,
-        bioSnapshot: bioText,
-      } satisfies DspBioSyncMetadata,
-    })
-    .returning({ id: dspBioSyncRequests.id });
-
-  // Build email template data
-  const templateData: DspBioUpdateTemplateData = {
-    artistName: profile.displayName || profile.username,
-    username: profile.username,
-    dspDisplayName: provider.displayName,
-    externalArtistId: match?.externalArtistId,
-    externalArtistUrl: match?.externalArtistUrl,
-    bioText,
-    spotifyId: profile.spotifyId,
-    spotifyUrl: profile.spotifyUrl,
-  };
-
-  const emailContent = getDspBioUpdateEmail(templateData);
-
-  // Send via Resend
-  const result = await emailProvider.sendEmail({
-    to: provider.supportEmail,
-    subject: emailContent.subject,
-    text: emailContent.text,
-    html: emailContent.html,
-  });
-
-  if (result.status === 'sent') {
-    // Update tracking record to sent
-    await db
-      .update(dspBioSyncRequests)
-      .set({
-        status: 'sent',
-        sentAt: new Date(),
-        metadata: {
-          sentToEmail: provider.supportEmail,
-          providerMessageId: result.detail,
-          bioSnapshot: bioText,
-        } satisfies DspBioSyncMetadata,
-        updatedAt: new Date(),
-      })
-      .where(eq(dspBioSyncRequests.id, syncRequest.id));
-
-    return {
-      providerId,
-      method: 'email',
-      status: 'sent',
-      syncRequestId: syncRequest.id,
-    };
-  }
-
-  // Email failed
-  await db
-    .update(dspBioSyncRequests)
-    .set({
-      status: 'failed',
-      error: result.error ?? 'Email send failed',
-      metadata: {
-        sentToEmail: provider.supportEmail,
-        errorDetail: result.error,
-        bioSnapshot: bioText,
-      } satisfies DspBioSyncMetadata,
-      updatedAt: new Date(),
-    })
-    .where(eq(dspBioSyncRequests.id, syncRequest.id));
-
-  return {
-    providerId,
-    method: 'email',
-    status: 'failed',
-    syncRequestId: syncRequest.id,
-    error: result.error ?? 'Email send failed',
-  };
-}
-
-// ============================================================================
-// API-based sync (stub for future OAuth integration)
-// ============================================================================
-
-/** API bio sync stays hidden until OAuth exists. Do not persist a coming-soon row. */
-export function unsupportedApiBioSync(
-  providerId: string,
-  displayName: string
-): BioSyncResult {
-  return {
-    providerId,
-    method: 'api',
-    status: 'unsupported',
-    syncRequestId: '',
-    error: `${displayName} bio sync is not available yet`,
-  };
-}
-
-// ============================================================================
-// Query helpers
-// ============================================================================
-
-/**
- * Get the latest bio sync status for each DSP for a creator profile.
- */
-export async function getBioSyncStatus(creatorProfileId: string) {
-  const requests = await db
+/** Legacy records remain readable, but never supply current execution status. */
+export async function getBioSyncHistory(creatorProfileId: string) {
+  return db
     .select()
     .from(dspBioSyncRequests)
     .where(eq(dspBioSyncRequests.creatorProfileId, creatorProfileId))
     .orderBy(desc(dspBioSyncRequests.createdAt));
+}
 
-  // Group by provider, keeping only the latest per provider
-  const latestByProvider = new Map<
-    string,
-    typeof dspBioSyncRequests.$inferSelect
-  >();
-  for (const req of requests) {
-    if (!latestByProvider.has(req.providerId)) {
-      latestByProvider.set(req.providerId, req);
-    }
-  }
-
-  // Build response with provider metadata
-  return Array.from(latestByProvider.entries()).map(
-    ([providerId, syncRequest]) => {
-      const provider = getBioProvider(providerId);
-      return {
-        providerId,
-        displayName: provider?.displayName ?? providerId,
-        method: syncRequest.method,
-        status: syncRequest.status,
-        lastSyncedAt: syncRequest.sentAt,
-        lastError: syncRequest.error,
-        createdAt: syncRequest.createdAt,
-      };
-    }
+export async function getBioSyncStatus(
+  creatorProfileId: string,
+  userId: string
+) {
+  const rows = await withDbSessionTx(
+    async tx =>
+      tx
+        .select({ receipt: connectorWriteReceipts.receipt })
+        .from(connectorWriteReceipts)
+        .where(
+          and(
+            eq(connectorWriteReceipts.userId, userId),
+            drizzleSql`${connectorWriteReceipts.receipt}->'proposal'->>'creatorProfileId' = ${creatorProfileId}`
+          )
+        )
+        .orderBy(desc(connectorWriteReceipts.recordedAt)),
+    { clerkUserId: userId }
   );
+  const latest = new Map<string, (typeof rows)[number]['receipt']>();
+  for (const { receipt } of rows)
+    if (!latest.has(receipt.proposal.providerId))
+      latest.set(receipt.proposal.providerId, receipt);
+  return Array.from(latest, ([providerId, receipt]) => ({
+    providerId,
+    status: receipt.result,
+    proposalId: receipt.proposal.id,
+    receiptId: receipt.id,
+    recordedAt: receipt.recordedAt,
+    payloadSha256: digest(receipt.proposal.desired),
+  }));
 }
