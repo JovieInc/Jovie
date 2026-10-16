@@ -4,8 +4,8 @@
 structured JSON with an explicit owner mapping. JSON has `columns: string[]`
 and `rows: string[][]`; numeric cells must remain exact decimal strings.
 There is no vendor layout detection, OAuth flow, API access, or PDF/OCR parser.
-The approved provider list comes from `DISTRIBUTOR_MANIFESTS`; RouteNote uses
-the same mapping path as AWAL, UnitedMasters, and the other approved providers.
+The approved provider list comes from `DISTRIBUTOR_MANIFESTS`; all approved
+providers use the same explicit mapping path.
 The manifests retain their unverified-layout and unavailable-capability status.
 
 The server supplies the authenticated financial owner's ID. Validate a new
