@@ -24,7 +24,7 @@ test('the hot flakiness report stays fast and never runs the recovery writer', (
     readFileSync('.github/workflows/test-flakiness-report.yml', 'utf8')
   );
   assert.equal(fast.on.workflow_run.branches[0], 'main');
-  assert.equal(fast.concurrency['cancel-in-progress'], true);
+  assert.equal(fast.concurrency['cancel-in-progress'], false);
   assert.ok(!JSON.stringify(fast).includes('collect-quarantine-evidence.mjs'));
   assert.ok(!existsSync('.github/workflows/quarantine-recovery.yml'));
 });
