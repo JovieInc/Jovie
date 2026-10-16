@@ -188,8 +188,11 @@ describe('Product Screenshots provenance', () => {
       'apps/web/data/marketing/routes.ts',
       'apps/web/lib/agent-os/visual-qa/index.ts',
       'apps/web/tests/visual-qa/spec.ts',
+      'apps/web/styles/tailwind-foundation.css',
+      'apps/web/styles/theme/tokens.css',
     ])
       expect(triggersOn(path), path).toBe(true);
+    expect(triggersOn('apps/web/styles.css')).toBe(false);
     // Escaped brackets match the literal route segment only.
     expect(triggersOn('apps/web/app/u/page.tsx')).toBe(false);
     expect(
