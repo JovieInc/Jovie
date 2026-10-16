@@ -1147,10 +1147,14 @@ def label_backlog(sh=run, disabled: set[str] | None = None, kinds=("conflict", "
 
 # ---------------------------------------------------------------- lane side (runs on Gem)
 
-def queued_prs(lane, kinds) -> list[dict]:
+def queued_prs(lane, kinds, *, inventory: list[dict] | None = None) -> list[dict]:
     """Select event labels from the shared inventory; claims still reread their target."""
     summary = getattr(lane, "open_prs_summary", None)
-    if callable(summary):
+    if inventory is not None:
+        prs = inventory
+        if any(pr.get("labelsComplete") is not True for pr in prs):
+            raise RuntimeError("event-label-inventory-incomplete")
+    elif callable(summary):
         # FIX and TICK workers already share this aggregate inventory with admission.
         # Full per-check censuses under distinct queue keys exhaust the same GitHub
         # installation budget. Actual claim and publication fences remain fresh.
