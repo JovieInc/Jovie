@@ -436,7 +436,7 @@ describe('canonical artist-profile field sources', () => {
     );
   });
 
-  it('uses only active website links in stable profile order without mutating sources', () => {
+  it('leaves multiple active website candidates unavailable without mutating sources', () => {
     const socialLinks = [
       { ...website, id: 'rejected', state: 'rejected' as const, sort_order: 0 },
       { ...website, id: 'inactive', is_active: false, sort_order: 0 },
@@ -455,7 +455,7 @@ describe('canonical artist-profile field sources', () => {
     const original = [...socialLinks];
     expect(
       ARTIST_PROFILE_FIELD_ACCESSORS.website({ profile, socialLinks })
-    ).toBe('https://a.example.com');
+    ).toBeNull();
     expect(socialLinks).toEqual(original);
   });
 
