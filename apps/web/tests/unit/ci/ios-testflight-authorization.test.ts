@@ -1122,6 +1122,9 @@ describe('certified TestFlight checkout isolation', () => {
     step => step.name === 'Checkout exact authorized main'
   );
   const pin = steps.find(step => step.id === 'pin');
+  const admitCheckout = steps.find(
+    step => step.name === 'Checkout pinned release guard'
+  );
 
   it('keeps transport sparse state out of the certified root checkout', () => {
     expect(bootstrap?.with).toMatchObject({
@@ -1134,6 +1137,13 @@ describe('certified TestFlight checkout isolation', () => {
     expect(authorizeStep?.run).toContain(
       '$GITHUB_WORKSPACE/.testflight-bootstrap/.github/scripts/gh-api-hold.sh'
     );
+    expect(String(admitCheckout?.with?.['sparse-checkout'])).toContain(
+      '.github/scripts/testflight-release-lease.mjs'
+    );
+    expect(String(admitCheckout?.with?.['sparse-checkout'])).toContain(
+      '.github/scripts/gh-api-hold.sh'
+    );
+    expect(pin?.env?.GH_API_HOLD_BUDGET_SECONDS).toBe('480');
     expect(source?.with?.ref).toBe(
       '${{ steps.authorize.outputs.release_sha }}'
     );
@@ -1336,6 +1346,16 @@ describe('iOS TestFlight job graph', () => {
       expect(beta?.if).toContain(condition);
     const betaRuns = (beta?.steps ?? []).map(step => step.run ?? '').join('\n');
     expect(betaRuns).toContain('bundle exec fastlane ios beta');
+    const upload = beta?.steps?.find(
+      step => step.name === 'Upload internal TestFlight build'
+    );
+    expect(upload?.env?.GH_API_HOLD_BUDGET_SECONDS).toBe('600');
+    const guardCheckout = beta?.steps?.find(
+      step => step.name === 'Checkout pinned release guard'
+    );
+    expect(String(guardCheckout?.with?.['sparse-checkout'])).toContain(
+      '.github/scripts/gh-api-hold.sh'
+    );
     // The Xcode suite already ran in full-regression; beta must not repeat it.
     expect(betaRuns).not.toContain('fastlane ios ios_tests');
     expect(JSON.stringify(beta)).not.toContain(
@@ -1359,7 +1379,13 @@ describe('iOS TestFlight release routing and lane', () => {
     const called = join(root, 'called');
     writeFileSync(
       guard,
-      `import {writeFileSync} from 'node:fs'; writeFileSync(process.env.FIXTURE_CALLED, process.argv[2]); process.exit(Number(process.env.FIXTURE_GUARD_STATUS));`
+      `import {writeFileSync} from 'node:fs';
+writeFileSync(process.env.FIXTURE_CALLED, process.argv[2]);
+const status = Number(process.env.FIXTURE_GUARD_STATUS);
+if (status !== 0) {
+  console.error('::error::TestFlight lease rejected: fixture denial');
+  process.exit(status);
+}`
     );
     const script = `
       def default_platform(*)\nend
@@ -1380,12 +1406,22 @@ describe('iOS TestFlight release routing and lane', () => {
     const fastfile = resolve(repoRoot, 'fastlane/Fastfile');
     execFileSync('ruby', ['-e', script, fastfile], { env, stdio: 'pipe' });
     expect(readFileSync(called, 'utf8')).toBe('upload');
-    expect(() =>
+    let denial = '';
+    try {
       execFileSync('ruby', ['-e', script, fastfile], {
         env: { ...env, FIXTURE_GUARD_STATUS: '1' },
         stdio: 'pipe',
-      })
-    ).toThrow();
+      });
+    } catch (error) {
+      const thrown = error as { stderr?: Buffer; message?: string };
+      denial = `${thrown.stderr?.toString() ?? ''}\n${thrown.message ?? ''}`;
+    }
+    expect(denial).toContain(
+      'TestFlight certified release lease failed final validation'
+    );
+    expect(denial).toContain(
+      '::error::TestFlight lease rejected: fixture denial'
+    );
   });
   it('classifies TestFlight release inputs into the iOS lane', async () => {
     const { classifyProductLanes } = (await import(
