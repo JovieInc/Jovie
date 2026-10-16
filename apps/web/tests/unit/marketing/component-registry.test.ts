@@ -1001,12 +1001,15 @@ describe('current-main Pen source contracts (JOV-4961)', () => {
       status: 'active',
       exemplar: { route: '/artist-profiles', section: 'outcomes' },
     });
-    for (const unsupported of [
-      '3-large',
-      '4-equal',
-      '6-compact',
-      'icon-list',
-    ]) {
+    expect(variant('feature-grid', '3-large')).toMatchObject({
+      status: 'active',
+      exemplar: { route: '/artist-notifications', section: 'benefits' },
+    });
+    expect(variant('feature-grid', '4-equal')).toMatchObject({
+      status: 'active',
+      exemplar: { route: '/pay', section: 'use-cases' },
+    });
+    for (const unsupported of ['6-compact', 'icon-list']) {
       expect(variant('feature-grid', unsupported)?.status).toBe('unproven');
     }
   });
@@ -1506,9 +1509,7 @@ it('binds priority pages and acquisition occurrences to their declared variant o
     '/youtube-thumbnails',
   ]) {
     const route = MARKETING_ROUTE_MANIFEST.find(entry => entry.url === url)!;
-    expect(route.bindingEvidence.status).toBe(
-      url === '/youtube-thumbnails' ? 'unverified' : 'verified'
-    );
+    expect(route.bindingEvidence.status).toBe('verified');
     for (const binding of route.renderedSections) {
       expect(binding.kind).toBe('approved-section');
       if (binding.kind !== 'approved-section')

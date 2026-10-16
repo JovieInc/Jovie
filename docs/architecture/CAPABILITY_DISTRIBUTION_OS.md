@@ -110,6 +110,13 @@ and state `verified`, `unknown` or `unsupported`. An unknown required dimension
 blocks qualification. The company asset projection references profiles without
 copying their mutable rules.
 
+Registered assessment profile: [`pap` — Personal Agent Protocol](PAP_PROTOCOL_PROFILE.md)
+(protocol class, revision 1, JOV-7960). Its dated evidence and admission gates
+belong to this channel-profile design. JOV-7312 owns its eventual declarative
+projection; the collection/compiler remains proposed at this source revision.
+Registration does not enable an adapter, certify interoperability or create a
+marketplace listing.
+
 The compiler accepts immutable capability and profile snapshots. It returns
 `compatible`, `incompatible`, `transformation_required`, `certification_required`
 or `blocked`, plus stable reason codes and the input digests. Schema or rendering

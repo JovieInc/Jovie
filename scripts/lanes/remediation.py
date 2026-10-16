@@ -84,6 +84,14 @@ STRATEGY_TEXT = re.compile(
     r"canon/strategy|founder strategy|pricing|taste\b|credential",
     re.IGNORECASE,
 )
+# An ordinary engineering repair frequently states what it did NOT touch
+# ("No credentials or permissions are changed"); a negated credential/secret
+# mention is assurance, not a founder decision surface (JOV-8495 re-review).
+NEGATED_POLICY_TEXT = re.compile(
+    r"\bno\s+(?:new\s+)?(?:credentials?|secrets?|tokens?|permissions?|scopes?)\b"
+    r"|\b(?:without|not)\s+(?:changing|touching|adding)\s+(?:any\s+)?(?:credentials?|secrets?|permissions?)",
+    re.IGNORECASE,
+)
 ACTIONABLE_FIX = re.compile(
     r"computeRatePercent|use `|replace `|change `|fix:|add (?:the |a )?(?:story|test|colocated)|"
     r"@coverage-via|remove [`']?hold",
@@ -220,8 +228,13 @@ def _actionable(text: str) -> bool:
 
 def _strategy(pr: dict) -> bool:
     files = pr.get("files") or pr.get("paths") or pr.get("conflictFiles") or []
-    blob = " ".join([pr.get("title") or "", pr.get("body") or "", " ".join(str(item) for item in files)])
-    return bool(STRATEGY_TEXT.search(blob))
+    # Protected paths are independent evidence; prose assurances cannot negate them.
+    if any(STRATEGY_TEXT.search(str(path)) for path in files):
+        return True
+    # Remove only the negated credential mention. A pricing/taste/strategy ask
+    # in the same sentence or a separate title still requires authority.
+    return any(STRATEGY_TEXT.search(NEGATED_POLICY_TEXT.sub("", text))
+               for text in (pr.get("title") or "", pr.get("body") or ""))
 
 
 def _held_reason(pr: dict, held: dict | None) -> str | None:
@@ -258,6 +271,21 @@ def _green(pr: dict) -> bool:
     return all(_conclusion(check) in {"SUCCESS", "SKIPPED", "NEUTRAL"} for check in checks)
 
 
+def review_authority_ask(pr: dict) -> str | None:
+    """Only active human evidence can request an external authority action."""
+    rows = _unresolved(_threads(pr)) + list(pr.get("reviewSummaries") or [])
+    for row in rows:
+        if _bot(row) or row.get("outdated") or row.get("resolved"):
+            continue
+        if row.get("reviewedHead") not in (None, pr.get("headRefOid")):
+            continue
+        if row.get("state") in {"DISMISSED", "PENDING", "APPROVED"}:
+            continue
+        if ask := _human_category("review", str(row.get("body") or "")):
+            return ask
+    return None
+
+
 def classify_blocker(pr: dict, held: dict | None = None, attempts: dict | None = None,
                      main_rollup=None) -> dict:
     """One blocker class from the reconcile fields the lanes already read."""
@@ -287,13 +315,37 @@ def classify_blocker(pr: dict, held: dict | None = None, attempts: dict | None =
             why.append("sensitive-surface")
         return blocker("needs-human-decision", reason or "human-gate", why, "tim-decides")
 
+    held_here = bool(labels & {"hold", "gated", "incident", "do-not-merge", "tim-hold", "tim:hold", "hold:tim"})
+    stop_labels = bool(labels & {"needs-human", "do-not-merge", "tim-hold", "tim:hold", "hold:tim"})
     human_review = pr.get("reviewDecision") == "CHANGES_REQUESTED" and (
         bool(human_threads) or not bot_threads)
-    if human_review:
+    # A current human thread can carry a real founder decision (spend, billing,
+    # credentials, store submissions) inside an ordinary review; the same
+    # detector the labeled-event path uses names it, so the ask surfaces as
+    # tim-decides instead of being routed as prescribed implementation.
+    thread_ask = review_authority_ask(pr)
+    if human_review and not held_here and not stop_labels and not thread_ask \
+            and not (pr.get("codeownersBlocked") or "codeowners" in labels):
+        # Tim 2026-10-15: ordinary requested changes ship through the automated
+        # review-fix ladder; only a human gate (strategy/taste/credential) waits.
+        # The fix prompt already embeds the reviewers' own words (review_excerpt),
+        # so an actionable review is a prescribed fix, not a founder decision.
+        # Explicit stop labels and holds still outrank this branch below.
+        evidence = ["human changes requested"]
+        if human_threads:
+            evidence.append("unresolved human review thread")
+        if held is not None and _actionable(
+                "\n".join(str(line) for line in (held.get("evidence") or []))):
+            return blocker("fixable-by-model", "human-hold",
+                           evidence, "apply-prescribed-fix")
+        return blocker("fixable-by-model", "review",
+                       evidence, "escalate")
+    if thread_ask:
         return blocker("needs-human-decision", "changes-requested",
-                       ["human changes requested"], "tim-decides")
+                       ["current human review requires authority",
+                        f"review evidence carries a {thread_ask} decision"],
+                       "tim-decides")
 
-    held_here = bool(labels & {"hold", "gated", "incident", "do-not-merge", "tim-hold", "tim:hold", "hold:tim"})
     if held_here and not _actionable(note):
         return blocker("needs-human-decision", "hold",
                        [note[:240] or "human hold without a fix"], "tim-decides")
@@ -1110,9 +1162,64 @@ def _human_category(key: str, blob: str) -> str | None:
     lowered = key.lower()
     tokens = set(re.split(r"[\s:/]+", lowered.replace("-", " ")))
     text = blob.lower()
+    if lowered == "review":
+        # Review prose contains fixtures, quotations and assurances. Only a
+        # current direct ask carries authority; independent positive clauses
+        # still count when the same review also states a negative assurance.
+        credential = r"\b(?:github[_ -]token|tokens?|credentials?|secrets?|api[ _-]?keys?|passwords?)\b"
+        for clause in re.split(r"[.!?;,\n]|\b(?:but|and)\b", text):
+            clause = re.sub(r"^\s*[-*]\s+", "", clause).strip()
+            if re.match(r"^(?:we|you|this|it)\s+(?:need|requires?)\s+(?:a\s+|an\s+|new\s+)*"
+                        + credential, clause):
+                return "env/DNS/secrets"
+            direct = re.match(
+                r"^(?:(?:please|we need to|you need to|we must|you must)\s+|"
+                r"(?:should|can|may|could)\s+(?:we|you)\s+)?"
+                r"(expand|increase|grant|elevate|add|enable|create|generate|issue|rotate|install|set|store|write|"
+                r"change|update|replace|purchase|buy|subscribe|spend|upgrade|raise|perform|complete|"
+                r"submit|accept|contact|ask|deploy|requires?|need)\b\s*(.*)$", clause)
+            if not direct:
+                continue
+            verb, subject = direct.groups()
+            # Inspect the engineering object before purpose clauses mention
+            # credentials or operations; independent positive asks stay separate.
+            object_text = re.split(r"\b(?:for|to|so|that)\b", subject, maxsplit=1)[0].strip()
+            if (re.match(r"(?:(?:the|a|an)\s+)?(?:regression|tests?|coverage|fixture|example)\b", subject)
+                    or re.search(r"\b(?:regression|tests?|coverage|fixtures?|examples?|retry|retries)$", object_text)):
+                continue
+            if (verb in {"expand", "increase", "grant", "elevate", "add", "enable", "raise", "change"}
+                    and re.search(r"\b(?:github[_ -]token|tokens?|credentials?|app)\b", subject)
+                    and re.search(r"\b(?:permissions?|scopes?)\b", subject)):
+                return "env/DNS/secrets"
+            if re.search(credential, subject) and (
+                    verb in {"create", "generate", "issue", "rotate"}
+                    or (verb in {"add", "install", "set", "store", "write", "change", "update", "replace"}
+                        and re.search(r"\bnew\b|repository secrets|environment secrets", subject))):
+                return "env/DNS/secrets"
+            if (verb in {"purchase", "buy", "subscribe", "spend"}
+                    or (verb in {"upgrade", "increase", "raise"} and re.search(
+                        r"\b(?:paid|premium|plan|subscription|license|billing|spend|budget|credits?)\b", subject))):
+                return "spend"
+            if verb in {"submit", "accept", "complete"} and re.search(r"\b(?:app store|store submission|agreement)\b", subject):
+                return "store submission"
+            if re.search(r"billing[\s-]*actions?", subject):
+                return "billing action"
+            if (re.search(r"manual[\s-]*deploy", subject)
+                    or (verb == "deploy" and re.search(r"\bmanually\b", subject))):
+                return "manual deploy"
+            if re.search(r"outside[\s-]*humans?", subject):
+                return "outside human"
+            if re.search(r"\bdns\b|env\s*/\s*dns", subject):
+                return "env/DNS/secrets"
+            if STRATEGY_TEXT.search(subject) and not re.search(credential, subject):
+                return "strategy"
+        return None
     if lowered in {"asc-agreements", "asc-agreement"} or "store submission" in text or "store-submission" in lowered:
         return "store submission"
     if "spend" in tokens or re.search(r"\bspend\b", text):
+        return "spend"
+    if re.search(r"\b(?:purchase|buy(?:ing)?| subscrib\w*)\b.{0,40}\b(?:paid?|premium|plan|tier|subscription|license)\b"
+                 r"|\b(?:paid?|premium|subscription|license)\b.{0,40}\b(?:plan|tier)\b", text):
         return "spend"
     if re.search(r"billing[\s-]*actions?", text) or "billing-action" in lowered or "billing-actions" in lowered:
         return "billing action"

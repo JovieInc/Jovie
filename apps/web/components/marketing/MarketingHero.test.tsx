@@ -407,6 +407,28 @@ describe('MarketingHero source-backed default story', () => {
     const img = hero.querySelector('.marketing-hero-photo img');
     expect(img).toHaveStyle({ opacity: '0.2' });
   });
+
+  it('stamps a landing-mode hero when the route declares a variant', () => {
+    render(
+      <MarketingHero
+        eyebrow='Eyebrow'
+        headingId='stamped-landing-heading'
+        title='Landing title'
+        body='Landing body'
+        media={<div>Media</div>}
+        testId='stamped-landing-hero'
+        sectionVariant='left-none'
+        sectionOwner='apps/web/app/(marketing)/example/page.tsx'
+      />
+    );
+
+    const hero = screen.getByTestId('stamped-landing-hero');
+    expect(hero).toHaveAttribute('data-marketing-variant', 'left-none');
+    expect(hero).toHaveAttribute(
+      'data-marketing-owner',
+      'apps/web/app/(marketing)/example/page.tsx'
+    );
+  });
 });
 
 describe('MarketingHero photo stacking', () => {

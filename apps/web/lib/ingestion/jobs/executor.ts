@@ -21,7 +21,7 @@ function resolveSourcePlatform(
 
 /**
  * Generic job executor that handles the common workflow for all ingestion jobs.
- * This reduces duplication across processLinktreeJob, processLayloJob, etc.
+ * This reduces duplication across processBeaconsJob, processLayloJob, etc.
  */
 export async function executeIngestionJob<TPayload extends BaseJobPayload>(
   tx: DbOrTransaction,

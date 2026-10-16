@@ -1,21 +1,22 @@
 /**
  * Beacons Document Fetching
  *
- * Handles fetching Beacons.ai profile pages with proper error handling.
+ * Rejects core HTML reads until an isolated provider is configured.
  */
 
-import { ExtractionError, type FetchOptions, fetchDocument } from '../base';
+import { disabledSocialHtmlDocument } from '@/lib/ingestion/social-html-policy';
+import { ExtractionError } from '../base';
 import { BEACONS_CONFIG } from './config';
 import { validateBeaconsUrl } from './validation';
 
 /**
- * Fetches a Beacons.ai profile document with proper error handling.
+ * Validates a Beacons profile URL, then fails closed before any network read.
  *
- * @throws {ExtractionError} On fetch failure, timeout, or invalid response
+ * @throws {ExtractionError} INVALID_URL or SOCIAL_HTML_DISABLED
  */
 export async function fetchBeaconsDocument(
   sourceUrl: string,
-  timeoutMs = BEACONS_CONFIG.defaultTimeoutMs
+  _timeoutMs = BEACONS_CONFIG.defaultTimeoutMs
 ): Promise<string> {
   // Validate URL first
   const validatedUrl = validateBeaconsUrl(sourceUrl);
@@ -23,17 +24,5 @@ export async function fetchBeaconsDocument(
     throw new ExtractionError('Invalid Beacons.ai URL', 'INVALID_URL');
   }
 
-  const options: FetchOptions = {
-    timeoutMs,
-    maxRetries: 2,
-    userAgent: 'jovie-link-ingestion/1.0 (+https://jov.ie)',
-    headers: {
-      // Beacons may serve different content based on Accept header
-      Accept: 'text/html,application/xhtml+xml',
-    },
-    allowedHosts: BEACONS_CONFIG.validHosts,
-  };
-
-  const result = await fetchDocument(validatedUrl, options);
-  return result.html;
+  return disabledSocialHtmlDocument();
 }

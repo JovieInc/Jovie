@@ -24,6 +24,8 @@ import {
   expectedDesktopAssetNames,
   fetchRecoverableStagingDraft,
   prepare,
+  RELEASE_ASSET_READ_ATTEMPTS,
+  RELEASE_ASSET_READ_MAX_WAIT_MS,
   releaseMetadataUpdate,
   selectRecoverableStagingDraft,
   validateReleaseAssets,
@@ -838,9 +840,13 @@ test('desktop publishing follows verified production instead of raw main pushes'
   assertPatterns(desktopWorkflow, [
     /workflows: \[Production Controller\]/,
     /^  workflow_dispatch:\n/m,
-    /group: desktop-release-publisher/,
+    /group: desktop-release-publisher-\$\{\{ github\.event\.workflow_run\.head_sha \|\| github\.sha \}\}/,
     /cancel-in-progress: false/,
+    /A superseded observer that exits before publish does not own the SHA/,
+    /--max-wait-seconds 600 --attempts 4/,
   ]);
+  assert.equal(RELEASE_ASSET_READ_ATTEMPTS, 4);
+  assert.equal(RELEASE_ASSET_READ_MAX_WAIT_MS, 600_000);
   assert.doesNotMatch(desktopWorkflow, /^  push:\n/m);
 });
 
@@ -880,7 +886,8 @@ test('desktop authorizer cross-proves exact Production Verified evidence', () =>
     /\[ "\$\{verified_skipped:-0\}" = "1" \]/,
     /controller yielded the release lease/,
     /production-generation-verified-\$expected_sha/,
-    /repos\/\$REPOSITORY\/commits\/main/,
+    /\$RUNNER_TEMP\/resolve-main-sha\.sh/,
+    /\$RUNNER_TEMP\/gh-api-hold\.sh/,
   ]);
   assert.equal(proof.match(/' <<<"\$jobs_json"\)"$/gm)?.length, 2);
   assert.doesNotMatch(proof, /TRIGGER_RUN_NAME/);
@@ -906,6 +913,10 @@ test('desktop authorizer retries transient GitHub API failures', async t => {
   const helper = proof.slice(helperStart, helperEnd);
   const root = await mkdtemp(join(tmpdir(), 'jovie-desktop-gh-retry-'));
   t.after(() => rm(root, { force: true, recursive: true }));
+  await copyFile(
+    new URL('../.github/scripts/gh-api-hold.sh', import.meta.url),
+    join(root, 'gh-api-hold.sh')
+  );
   const mockBin = join(root, 'bin');
   const counter = join(root, 'attempts');
   await mkdir(mockBin);
@@ -1010,6 +1021,24 @@ fi
 `,
     { mode: 0o755 }
   );
+  await mkdir(join(root, '.github/scripts'), { recursive: true });
+  await copyFile(
+    new URL('../.github/scripts/resolve-main-sha.sh', import.meta.url),
+    join(root, '.github/scripts/resolve-main-sha.sh')
+  );
+  await writeFile(
+    join(mockBin, 'git'),
+    `#!/usr/bin/env bash
+set -euo pipefail
+if [ "$1" = ls-remote ]; then
+  printf '%s\\trefs/heads/main\\n' "$MOCK_MAIN_SHA"
+  exit 0
+fi
+printf 'unexpected git: %s\\n' "$*" >&2
+exit 64
+`,
+    { mode: 0o755 }
+  );
   await writeFile(
     join(mockBin, 'node'),
     `#!/usr/bin/env bash
@@ -1050,6 +1079,7 @@ globalThis.setTimeout = (callback, ms) => {
         MOCK_ERROR: 'gh: API rate limit exceeded for installation. (HTTP 403)',
         MOCK_FAILURES: '1',
         MOCK_FAIL_ENDPOINT: 'commits/main',
+        MOCK_MAIN_SHA: currentSha,
         MOCK_REAL_NODE: process.execPath,
         MOCK_RESET_SECONDS: '90',
         NODE_OPTIONS: `--import=${join(root, 'no-sleep.mjs')}`,
@@ -1060,18 +1090,24 @@ globalThis.setTimeout = (callback, ms) => {
     });
   };
   const published = () => readFile(join(root, 'published'));
-  for (const endpoint of ['commits/main', 'compare/']) {
-    const recovered = await run({ MOCK_FAIL_ENDPOINT: endpoint });
-    assert.equal(recovered.status, 0, recovered.stderr);
-    await published();
-    assert.equal((await readFile(join(root, 'attempts'), 'utf8')).trim(), '2');
-    const wait = Number((await readFile(join(root, 'sleeps'), 'utf8')).trim());
-    assert.ok(wait >= 90_000 && wait <= 91_000, `Unexpected wait: ${wait}`);
-  }
+  // Installation 403 on GET /commits/main is not the main SHA read anymore.
+  const shaRead = await run({ MOCK_FAIL_ENDPOINT: 'commits/main' });
+  assert.equal(shaRead.status, 0, shaRead.stderr);
+  await published();
+  await assert.rejects(readFile(join(root, 'attempts')), { code: 'ENOENT' });
+  const recovered = await run({ MOCK_FAIL_ENDPOINT: 'compare/' });
+  assert.equal(recovered.status, 0, recovered.stderr);
+  await published();
+  assert.equal((await readFile(join(root, 'attempts'), 'utf8')).trim(), '2');
+  const wait = Number((await readFile(join(root, 'sleeps'), 'utf8')).trim());
+  assert.ok(wait >= 90_000 && wait <= 91_000, `Unexpected wait: ${wait}`);
   for (const overrides of [
-    { MOCK_RESET_SECONDS: '3600' },
-    { MOCK_FAILURES: '4' },
-    { MOCK_ERROR: 'gh: Resource not accessible by integration (HTTP 403)' },
+    { MOCK_FAIL_ENDPOINT: 'compare/', MOCK_RESET_SECONDS: '3600' },
+    { MOCK_FAIL_ENDPOINT: 'compare/', MOCK_FAILURES: '4' },
+    {
+      MOCK_FAIL_ENDPOINT: 'compare/',
+      MOCK_ERROR: 'gh: Resource not accessible by integration (HTTP 403)',
+    },
   ]) {
     const failed = await run(overrides);
     assert.notEqual(failed.status, 0, failed.stderr);
@@ -1086,6 +1122,156 @@ globalThis.setTimeout = (callback, ms) => {
   assert.notEqual(untrusted.status, 0);
   assert.match(untrusted.stdout, /not a trusted ancestor/);
   await assert.rejects(published(), { code: 'ENOENT' });
+});
+
+test('packaging revalidation survives an installation 403 on commits/main', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'jovie-desktop-revalidate-'));
+  t.after(() => rm(root, { force: true, recursive: true }));
+  const releaseSha = 'a'.repeat(40);
+  const currentSha = 'b'.repeat(40);
+  const mockBin = join(root, 'bin');
+  await mkdir(join(root, '.github/scripts'), { recursive: true });
+  await mkdir(mockBin);
+  for (const name of ['resolve-main-sha.sh', 'gh-api-hold.sh']) {
+    await copyFile(
+      new URL(`../.github/scripts/${name}`, import.meta.url),
+      join(root, '.github/scripts', name)
+    );
+  }
+  await writeFile(
+    join(mockBin, 'git'),
+    `#!/usr/bin/env bash
+set -euo pipefail
+if [ "$1" = ls-remote ]; then
+  printf '%s\\tls-remote\\n' "$MOCK_MAIN_SHA" >> "$MOCK_GIT_LOG"
+  printf '%s\\trefs/heads/main\\n' "$MOCK_MAIN_SHA"
+  exit 0
+fi
+printf 'unexpected git: %s\\n' "$*" >&2
+exit 64
+`,
+    { mode: 0o755 }
+  );
+  await writeFile(
+    join(mockBin, 'sleep'),
+    `#!/usr/bin/env bash
+printf '%s\\n' "$1" >> "$MOCK_SLEEP_LOG"
+`,
+    { mode: 0o755 }
+  );
+  await writeFile(
+    join(mockBin, 'gh'),
+    `#!/usr/bin/env bash
+set -euo pipefail
+endpoint=""
+for arg in "$@"; do
+  case "$arg" in
+    repos/*|rate_limit) endpoint="$arg" ;;
+  esac
+done
+printf '%s\\n' "$endpoint" >> "$MOCK_GH_LOG"
+if [ "$endpoint" = rate_limit ]; then
+  printf '%s\\n' "$MOCK_RESET"
+  exit 0
+fi
+if [[ "$endpoint" == *commits/main* ]]; then
+  echo "$MOCK_ERROR" >&2
+  exit 1
+fi
+if [ "\${MOCK_COMPARE_FAIL:-}" = 1 ]; then
+  echo "$MOCK_ERROR" >&2
+  exit 1
+fi
+printf '%s' "$MOCK_COMPARE_JSON"
+`,
+    { mode: 0o755 }
+  );
+  const ahead = JSON.stringify({
+    status: 'ahead',
+    base_commit: { sha: releaseSha },
+    merge_base_commit: { sha: releaseSha },
+    ahead_by: 1,
+    behind_by: 0,
+    commits: [{ sha: currentSha }],
+  });
+  const rawBody = shellStepBody(
+    desktopWorkflow,
+    'Revalidate authorized mainline source before packaging'
+  );
+  const nextStep = rawBody
+    .split('\n')
+    .findIndex(line => line.startsWith('      - '));
+  const body =
+    nextStep === -1
+      ? rawBody
+      : rawBody.split('\n').slice(0, nextStep).join('\n');
+  const run = async env => {
+    for (const name of ['git.log', 'gh.log', 'sleep.log']) {
+      await rm(join(root, name), { force: true });
+    }
+    return spawnSync('bash', ['-c', body], {
+      cwd: root,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        GH_API_HOLD_BUDGET_SECONDS: '600',
+        GH_TOKEN: 'test-token',
+        MOCK_COMPARE_JSON: ahead,
+        MOCK_ERROR: 'gh: API rate limit exceeded for installation. (HTTP 403)',
+        MOCK_GH_LOG: join(root, 'gh.log'),
+        MOCK_GIT_LOG: join(root, 'git.log'),
+        MOCK_MAIN_SHA: releaseSha,
+        MOCK_RESET: String(Math.floor(Date.now() / 1000) + 3600),
+        MOCK_SLEEP_LOG: join(root, 'sleep.log'),
+        PATH: `${mockBin}:${process.env.PATH}`,
+        RELEASE_SHA: releaseSha,
+        REPOSITORY: 'JovieInc/Jovie',
+        ...env,
+      },
+    });
+  };
+  const ghLog = async () =>
+    readFile(join(root, 'gh.log'), 'utf8').catch(() => '');
+
+  const sameTip = await run();
+  assert.equal(sameTip.status, 0, sameTip.stderr);
+  assert.match(
+    await readFile(join(root, 'git.log'), 'utf8'),
+    new RegExp(releaseSha)
+  );
+  assert.doesNotMatch(await ghLog(), /commits\/main/);
+
+  const ancestor = await run({ MOCK_MAIN_SHA: currentSha });
+  assert.equal(ancestor.status, 0, ancestor.stderr);
+  assert.match(await ghLog(), /compare\//);
+  assert.equal(
+    await readFile(join(root, 'sleep.log'), 'utf8').catch(() => ''),
+    ''
+  );
+
+  const diverged = await run({
+    MOCK_COMPARE_JSON: JSON.stringify({ status: 'diverged', behind_by: 1 }),
+    MOCK_MAIN_SHA: currentSha,
+  });
+  assert.notEqual(diverged.status, 0);
+  assert.match(diverged.stdout, /not a trusted ancestor/);
+
+  const exhausted = await run({
+    MOCK_COMPARE_FAIL: '1',
+    MOCK_MAIN_SHA: currentSha,
+  });
+  assert.notEqual(exhausted.status, 0);
+  assert.match(exhausted.stderr, /outside the 600s budget/);
+  assert.match(exhausted.stderr, /Not passing/);
+
+  const denied = await run({
+    MOCK_COMPARE_FAIL: '1',
+    MOCK_ERROR: 'gh: Resource not accessible by integration (HTTP 403)',
+    MOCK_MAIN_SHA: currentSha,
+  });
+  assert.notEqual(denied.status, 0);
+  assert.doesNotMatch(denied.stderr, /Holding /);
+  assert.doesNotMatch(denied.stdout, /not a trusted ancestor/);
 });
 
 test('desktop authorizer accepts an exact successful recovered production marker', () => {
@@ -1712,13 +1898,18 @@ test('automatic desktop publishing stamps production-impacting source before rel
     /JOVIE_BOT_APP_ID/,
     /JOVIE_BOT_PRIVATE_KEY/,
     /ref: \$\{\{ needs\.authorize-release\.outputs\.release_sha \}\}/,
-    /repos\/\$REPOSITORY\/commits\/main/,
+    /\.github\/scripts\/resolve-main-sha\.sh/,
+    /\.github\/scripts\/gh-api-hold\.sh/,
     /node scripts\/version-stamp\.mjs/,
     /node scripts\/version-check\.mjs/,
     /cursor\/stable-desktop-publish-/,
     /gh pr create/,
-    /--add-label "merge-queue"/,
   ]);
+  // ci-release/legacy-merge-queue-label: the `merge-queue` label is never
+  // added, interpreted, or retained — native GitHub queue state is
+  // authoritative (docs/ci/CI_RELEASE_INCIDENTS.md). The stamp step must not
+  // re-add the retired label after `gh pr create`.
+  assert.doesNotMatch(stamp, /gh pr edit [^\n]*--add-label "merge-queue"/);
 });
 
 test('desktop staging publishes an exact signed prerelease and production stays separately proven', () => {
@@ -1761,7 +1952,7 @@ test('desktop staging publishes an exact signed prerelease and production stays 
     /dist\/staging-mac\.yml/,
   ]);
   assertPatterns(publish, [
-    /repos\/\$\{\{ github\.repository \}\}\/commits\/main/,
+    /\.github\/scripts\/resolve-main-sha\.sh/,
     /desktop-release-assets\.mjs upload-and-publish/,
     /--dist "apps\/desktop\/dist"/,
   ]);
@@ -1825,7 +2016,7 @@ test('desktop staging publishes an exact signed prerelease and production stays 
   ]);
   assert.doesNotMatch(stagingUpload, /desktop-production-published|GH_TOKEN/);
   assert.ok(
-    publish.indexOf('commits/main') <
+    publish.indexOf('resolve-main-sha.sh') <
       publish.indexOf('desktop-release-assets.mjs upload-and-publish')
   );
   assert.ok(
@@ -1898,6 +2089,11 @@ esac
 `
   );
   await chmod(join(mockBin, 'gh'), 0o755);
+  await mkdir(join(root, '.github/scripts'), { recursive: true });
+  await copyFile(
+    new URL('../.github/scripts/gh-api-hold.sh', import.meta.url),
+    join(root, '.github/scripts/gh-api-hold.sh')
+  );
 
   const result = spawnSync(
     'bash',
@@ -2280,6 +2476,29 @@ esac
 `
   );
   await chmod(join(mockBin, 'gh'), 0o755);
+  const realGit = execFileSync('bash', ['-lc', 'command -v git'], {
+    encoding: 'utf8',
+  }).trim();
+  await writeFile(
+    join(mockBin, 'git'),
+    `#!/usr/bin/env bash
+set -euo pipefail
+if [ "$1" = ls-remote ] && [[ " $* " == *" refs/heads/main "* ]]; then
+  printf '%s\\trefs/heads/main\\n' "$MOCK_MAIN_SHA"
+  exit 0
+fi
+exec ${JSON.stringify(realGit)} "$@"
+`,
+    { mode: 0o755 }
+  );
+  const runnerTemp = join(root, 'runner-temp');
+  await mkdir(join(runnerTemp, '.github/scripts'), { recursive: true });
+  await mkdir(join(root, '.github/scripts'), { recursive: true });
+  for (const name of ['resolve-main-sha.sh', 'gh-api-hold.sh']) {
+    const source = new URL(`../.github/scripts/${name}`, import.meta.url);
+    await copyFile(source, join(runnerTemp, name));
+    await copyFile(source, join(root, '.github/scripts', name));
+  }
   const ahead = JSON.stringify({
     status: 'ahead',
     base_commit: { sha: releaseSha },
@@ -2307,6 +2526,7 @@ esac
         MOCK_MAIN_VERSION: '26.9.15',
         PATH: `${mockBin}:${process.env.PATH}`,
         REPOSITORY: 'JovieInc/Jovie',
+        RUNNER_TEMP: runnerTemp,
         ...env,
       },
     });

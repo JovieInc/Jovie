@@ -6,7 +6,8 @@
   "types": "./index.ts",
   "exports": {
     ".": "./index.ts",
-    "./transport": "./transport.ts"
+    "./transport": "./transport.ts",
+    "./writing-quality": "./writing-quality.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

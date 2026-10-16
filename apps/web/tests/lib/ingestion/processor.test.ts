@@ -8,11 +8,6 @@ import {
 import { ExtractionError } from '@/lib/ingestion/strategies/base';
 
 // Mock the strategies
-vi.mock('@/lib/ingestion/strategies/linktree', () => ({
-  fetchLinktreeDocument: vi.fn(),
-  extractLinktree: vi.fn(),
-}));
-
 vi.mock('@/lib/ingestion/strategies/beacons', () => ({
   fetchBeaconsDocument: vi.fn(),
   extractBeacons: vi.fn(),
@@ -100,6 +95,14 @@ describe('Ingestion Processor', () => {
 
       expect(rateLimitedDelay).toBeGreaterThanOrEqual(30000);
       expect(rateLimitedDelay).toBeLessThan(33000);
+    });
+
+    it('treats retired social HTML imports as permanent failures', () => {
+      expect(
+        determineJobFailure(
+          new ExtractionError('Disabled', 'SOCIAL_HTML_DISABLED')
+        )
+      ).toEqual({ message: 'Disabled', reason: 'permanent' });
     });
 
     it('marks rate-limited errors as retryable with dedicated reason', () => {

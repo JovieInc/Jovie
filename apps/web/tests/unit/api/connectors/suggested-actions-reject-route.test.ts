@@ -164,4 +164,21 @@ describe('YouTube candidate reject route', () => {
     expect(response.status).toBe(401);
     expect(hoisted.select).not.toHaveBeenCalled();
   });
+
+  it('returns not-found when Postgres rejects a non-uuid action id', async () => {
+    const invalidUuid = Object.assign(
+      new Error('invalid input syntax for type uuid: "fake-id-000"'),
+      { code: '22P02' }
+    );
+    hoisted.selectLimit.mockRejectedValueOnce(invalidUuid);
+
+    const response = await POST(request(), {
+      params: Promise.resolve({ id: 'fake-id-000' }),
+    });
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({ error: 'not-found' });
+    expect(hoisted.captureError).not.toHaveBeenCalled();
+    expect(hoisted.update).not.toHaveBeenCalled();
+  });
 });

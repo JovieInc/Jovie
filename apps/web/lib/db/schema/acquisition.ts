@@ -9,9 +9,11 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
+import type { AgentIntent } from '@/lib/acquisition/agent-intent';
 import { users } from './auth';
 
 export interface AcquisitionFirstTouch {
+  agentIntent?: AgentIntent;
   /**
    * Normalized channel bucket. `campaign`/`referral`/`direct` come from the
    * signed first-touch envelope; `unknown` means no usable evidence existed

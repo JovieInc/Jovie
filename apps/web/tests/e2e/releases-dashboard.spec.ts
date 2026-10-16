@@ -35,7 +35,7 @@ async function resolveReleasesSurface(
     return 'mobile';
   }
 
-  const desktopRows = page.locator('tbody tr');
+  const desktopRows = page.locator('tbody tr, [data-shell-release-row]');
   if (
     await desktopRows
       .first()
@@ -70,6 +70,11 @@ async function getFirstReleaseTrigger(
       return firstCell;
     }
     return taggedRow;
+  }
+
+  const shellRow = page.locator('[data-shell-release-row]').first();
+  if ((await shellRow.count()) > 0) {
+    return shellRow;
   }
 
   const firstRow = page.locator('tbody tr').first();
@@ -332,12 +337,15 @@ test.describe('Releases dashboard', () => {
           timeout: TIMEOUTS.ELEMENT_CHECK,
         }
       );
+      // /app/releases aliases the shell catalog. Tracks/Releases tabs belong
+      // to the retired matrix switcher; the canonical surface is this listbox.
+      const releaseList = page.getByRole('listbox', { name: 'Releases' });
+      await expect(releaseList).toBeVisible({
+        timeout: TIMEOUTS.ELEMENT_CHECK,
+      });
       await expect(
-        page.getByRole('tab', { name: 'Tracks' }).first()
+        releaseList.locator('[data-shell-release-row]').first()
       ).toBeVisible({ timeout: TIMEOUTS.ELEMENT_CHECK });
-      await expect(
-        page.getByRole('tab', { name: 'Releases' }).first()
-      ).toHaveAttribute('aria-selected', 'true');
     } else {
       await expect(page.getByTestId('mobile-release-list')).toBeVisible({
         timeout: TIMEOUTS.ELEMENT_CHECK,
@@ -347,7 +355,7 @@ test.describe('Releases dashboard', () => {
     const releaseRows =
       surface === 'mobile'
         ? page.locator('[data-testid^="mobile-release-row-"]')
-        : page.locator('tbody tr');
+        : page.locator('tbody tr, [data-shell-release-row]');
     const rowCount = await releaseRows.count();
     expect(rowCount).toBeGreaterThan(0);
   });

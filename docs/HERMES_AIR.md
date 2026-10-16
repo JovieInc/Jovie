@@ -1,8 +1,19 @@
-# Hermes-Air Operator Runbook
+# Hermes-Air historical operator reference
 
 > Symphony is the shipping lanes harness (`scripts/lanes/README.md`). The Symphony Elixir control plane is retired from Jovie; paths written `symphony-control/...` live in the private repo JovieInc/symphony-control (full history).
 
-Day-to-day operations for the always-on Hermes gateway running on the dedicated 16 GB MacBook Air. For the operating contract and invariants, read `.claude/rules/hermes-air.md`.
+**Superseded:** Hermes is retired; the Air's current role is the Mac lane in
+[the operating contract](../.claude/rules/hermes-air.md). The setup, restart,
+cron, and recovery commands below are historical evidence, not executable
+operational guidance. Do not use them to reactivate Hermes, a Fable/OpenClaw
+loop, or nightly `deterministic-tracker.ts` learning. Do not perform a full
+Hermes dispatch-log sweep. A new runtime decision needs fresh authorization and
+source/runtime evidence under the current fleet contract.
+
+Learning follows [causal event delivery](quality/EVENT_DRIVEN_LEARNING.md),
+evidence thresholds, and relevant pending jobs through existing owners. The
+current Mac runner, dogfood verifier, and unrelated monitoring retain their
+contracts. Private voice activation remains separately disabled.
 
 ## What This Machine Is
 

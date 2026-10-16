@@ -121,6 +121,46 @@ describe('EntityResolutionProvider', () => {
     expect(result.current.ref?.meta?.kind).toBe('release');
   });
 
+  it('withholds private artwork and titles after invalidation until a successful scoped read', async () => {
+    const client = new QueryClient();
+    const key = queryKeys.releases.matrix('p1');
+    client.setQueryData(key, [
+      makeRelease('rel_private', { title: 'Private work' }),
+    ]);
+    const { result } = renderHook(
+      () => useEntityResolution('release', 'rel_private'),
+      {
+        wrapper: wrapperWithClient(client, 'p1'),
+      }
+    );
+    expect(result.current.ref?.thumbnail).toBe('https://example.com/cover.jpg');
+    await act(async () => {
+      await client.invalidateQueries({ queryKey: key });
+    });
+    expect(result.current.ref).toBeUndefined();
+    await act(async () => {
+      client
+        .getQueryCache()
+        .find({ queryKey: key })
+        ?.setState({
+          status: 'error',
+          error: new Error('Access revoked'),
+          errorUpdateCount: 1,
+        });
+    });
+    expect(result.current.ref).toBeUndefined();
+    await act(async () => {
+      client.setQueryData(key, [
+        makeRelease('rel_private', {
+          title: 'Current permitted title',
+          artworkUrl: undefined,
+        }),
+      ]);
+    });
+    expect(result.current.ref?.label).toBe('Current permitted title');
+    expect(result.current.ref?.thumbnail).toBeUndefined();
+  });
+
   it('refreshes release chips when the cached matrix key updates', async () => {
     const client = new QueryClient();
     const { result } = renderHook(

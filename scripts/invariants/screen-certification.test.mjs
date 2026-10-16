@@ -14,7 +14,10 @@ import { dirname, join, resolve } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { crc32 } from 'node:zlib';
-import { readProductReferenceOwner } from './product-reference-coherence.mjs';
+import {
+  readProductReferenceOwner,
+  screenNeedsProductReferences,
+} from './product-reference-coherence.mjs';
 import { readInvariantRegistry } from './registry.mjs';
 import {
   classifyScreenPath,
@@ -145,6 +148,37 @@ function findings(patch, screen = gated()[0]) {
 }
 
 describe('JOV-INV-018 screen-certification/v2', () => {
+  it('decides product-reference membership without loading typescript', () => {
+    assert.equal(screenNeedsProductReferences('web.presence'), true);
+    assert.equal(screenNeedsProductReferences('web.library'), true);
+    assert.equal(screenNeedsProductReferences('web.public-profile'), false);
+    const script = `
+      import { Module } from 'node:module';
+      const load = Module._load;
+      Module._load = function(request, parent, isMain) {
+        if (request === 'typescript') {
+          const error = new Error("Cannot find module 'typescript'");
+          error.code = 'MODULE_NOT_FOUND';
+          throw error;
+        }
+        return load.call(this, request, parent, isMain);
+      };
+      const { evaluateScreenProof, SCREEN_REGISTRY } = await import(${JSON.stringify(join(ROOT, 'scripts/invariants/screen-certification.mjs'))});
+      const screen = SCREEN_REGISTRY.find(entry => entry.id === 'web.public-profile');
+      const findings = evaluateScreenProof(
+        { schema: 'screen-browser-proof/v1' },
+        { screen, headSha: '${'a'.repeat(40)}' }
+      );
+      if (!findings.some(finding => finding.includes('browser-owned-input'))) process.exit(2);
+    `;
+    const result = spawnSync(
+      process.execPath,
+      ['--input-type=module', '-e', script],
+      { cwd: ROOT, encoding: 'utf8' }
+    );
+    assert.equal(result.status, 0, result.stderr);
+  });
+
   it('rejects stale product names, versions, destinations, locales, and disabled-feature screenshot claims', () => {
     const screen = SCREEN_REGISTRY.find(entry => entry.id === 'web.presence');
     const current = readProductReferenceOwner().getProductProjection({
@@ -1122,6 +1156,65 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     }
   });
 
+  it('captures web.onboarding-checkout through the test-auth session', () => {
+    const workflow = readFileSync(
+      join(ROOT, '.github/workflows/screenshots.yml'),
+      'utf8'
+    );
+    const publicSpec = readFileSync(
+      join(
+        ROOT,
+        'apps/web/tests/product-screenshots/public-screens-proof.spec.ts'
+      ),
+      'utf8'
+    );
+    const checkoutSpec = readFileSync(
+      join(
+        ROOT,
+        'apps/web/tests/product-screenshots/onboarding-checkout-screen-proof.spec.ts'
+      ),
+      'utf8'
+    );
+    assert.equal(
+      SCREEN_PROOF_ROUTES['web.onboarding-checkout'],
+      '/onboarding/checkout'
+    );
+    assert.doesNotMatch(publicSpec, /web\.onboarding-checkout/);
+    assert.match(checkoutSpec, /\/api\/dev\/test-auth\/enter/);
+    assert.match(
+      checkoutSpec,
+      /expect\(finalUrl\.pathname\)\.toBe\(proofRoute\)/
+    );
+    assert.match(checkoutSpec, /expect\(finalUrl\.search\)\.toBe\(''\)/);
+    assert.match(checkoutSpec, /expect\(finalUrl\.hash\)\.toBe\(''\)/);
+    assert.match(
+      workflow,
+      /tests\/product-screenshots\/onboarding-checkout-screen-proof\.spec\.ts/
+    );
+    // The status assertion names the route. Runs 38885464809 and 38887532509
+    // both failed this line with 404 and no path.
+    assert.match(
+      publicSpec,
+      /expect\(\s*response\?\.status\(\),\s*`\$\{screen\.screenId\} \$\{screen\.route\}`\s*\)\.toBe\(\s*200\s*\)/
+    );
+    // Checkout starts another Playwright process. It must not run until the
+    // public-screen proofs are uploaded: the default output directory is
+    // test-results/, and emptying it deletes those bundles.
+    const checkoutCapture = workflow.indexOf(
+      'Capture onboarding checkout screen proof'
+    );
+    const marketingUpload = workflow.indexOf(
+      'Upload marketing-solutions screen proof'
+    );
+    const aboutUpload = workflow.indexOf(
+      'Upload public-profile-about screen proof'
+    );
+    assert.ok(marketingUpload > 0);
+    assert.ok(aboutUpload > 0);
+    assert.ok(checkoutCapture > marketingUpload);
+    assert.ok(checkoutCapture > aboutUpload);
+  });
+
   it('keeps the /artists producer identity synchronized with the trusted resolver (JOV-7125)', () => {
     const workflow = readFileSync(
       join(ROOT, '.github/workflows/screenshots.yml'),
@@ -1909,6 +2002,56 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       assert.match(
         rejected.findings.join('\n'),
         /required browser measurements are unavailable/
+      );
+    } finally {
+      process.env.PATH = priorPath;
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  it('accepts Next catch-all sources for web.smartlink-release and still rejects traversal', () => {
+    const root = mkdtempSync(join(tmpdir(), 'screen-resolver-catchall-'));
+    const priorPath = process.env.PATH;
+    try {
+      const screen = SCREEN_REGISTRY.find(
+        entry => entry.id === 'web.smartlink-release'
+      );
+      assert.ok(screen);
+      assert.ok(screen.sources.some(source => source.includes('[...slug]')));
+      const gh = join(root, 'gh');
+      writeFileSync(gh, '#!/bin/sh\nexit 1\n');
+      chmodSync(gh, 0o755);
+      process.env.PATH = `${root}:${priorPath}`;
+      const context = {
+        headSha: HEAD,
+        screenId: screen.id,
+        sourcePaths: [...screen.sources],
+        viewports: [...screen.viewports],
+      };
+      const accepted = resolveTrustedScreenProof({
+        artifactId: 12045112840,
+        context,
+      });
+      assert.equal(accepted.proof, null);
+      assert.match(
+        accepted.findings.join('\n'),
+        /controlled GitHub artifact resolver is unavailable/
+      );
+      assert.doesNotMatch(
+        accepted.findings.join('\n'),
+        /controlled resolver request is invalid/
+      );
+
+      const traversed = resolveTrustedScreenProof({
+        artifactId: 12045112840,
+        context: {
+          ...context,
+          sourcePaths: ['apps/web/app/[username]/../../secrets.txt'],
+        },
+      });
+      assert.match(
+        traversed.findings.join('\n'),
+        /controlled resolver request is invalid/
       );
     } finally {
       process.env.PATH = priorPath;
@@ -2912,6 +3055,240 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       );
     } finally {
       rmSync(artifactRoot, { force: true, recursive: true });
+    }
+  });
+
+  it('emits a public profile candidate when device records are still UNKNOWN (JOV-7846)', () => {
+    const artifactRoot = mkdtempSync(join(tmpdir(), 'screen-proof-profile-'));
+    try {
+      const bundle = join(artifactRoot, 'bundle');
+      mkdirSync(bundle);
+      writeFileSync(join(bundle, 'desktop.png'), 'candidate desktop bytes');
+      writeFileSync(join(bundle, 'mobile.png'), 'candidate mobile bytes');
+      const screen = SCREEN_REGISTRY.find(
+        entry => entry.id === 'web.public-profile'
+      );
+      assert.ok(screen);
+      const measurements = {
+        capturedAt: '2026-09-03T00:00:00.000Z',
+        viewports: screen.viewports.map(id => ({
+          id,
+          decision: 'pass',
+          rendered: true,
+          axe: { violations: 0 },
+          overflow: { maxHorizontalPx: 0 },
+          interaction: { passed: true },
+          cls: { value: 0 },
+        })),
+        activeFlow: { disclosure: false },
+        historyProof: { separate: true, path: 'docs/VISUAL_TESTING_POLICY.md' },
+        visibleActions: ['Get updates'],
+      };
+      const proof = emitScreenProof({
+        screenId: screen.id,
+        headSha: HEAD,
+        runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/123456789',
+        bundle: 'bundle',
+        measurements,
+        artifactRoot,
+        producerRunId: 123456789,
+        producerRunAttempt: 2,
+        producerJobId: 987654321,
+        environment: 'local-production-build',
+      });
+      assert.equal(proof.screenId, 'web.public-profile');
+      assert.equal(proof.browserOwnedInput, undefined);
+      const cell = 'get-updates/android-chrome/android-current-portrait';
+      assert.throws(
+        () =>
+          emitScreenProof({
+            screenId: screen.id,
+            headSha: HEAD,
+            runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/123456789',
+            bundle: 'bundle',
+            measurements: {
+              ...measurements,
+              browserOwnedInput: {
+                records: [{ cellId: cell }, { cellId: cell }],
+              },
+            },
+            artifactRoot,
+            producerRunId: 123456789,
+            producerRunAttempt: 2,
+            producerJobId: 987654321,
+            environment: 'local-production-build',
+          }),
+        /BLOCKED: device evidence missing or duplicate/
+      );
+    } finally {
+      rmSync(artifactRoot, { force: true, recursive: true });
+    }
+  });
+
+  it('certifies a trusted public profile capture while device evidence is UNKNOWN', () => {
+    const root = mkdtempSync(join(tmpdir(), 'screen-profile-device-unknown-'));
+    const priorPath = process.env.PATH;
+    const priorDiffBase = process.env.SCREEN_CERT_DIFF_BASE;
+    try {
+      const head = spawnSync('git', ['rev-parse', 'HEAD'], {
+        cwd: ROOT,
+        encoding: 'utf8',
+      }).stdout.trim();
+      const screen = SCREEN_REGISTRY.find(
+        entry => entry.id === 'web.public-profile'
+      );
+      assert.ok(screen);
+      const image = readFileSync(
+        join(ROOT, 'docs/screenshots/gem-symphony-hud-430x90.png')
+      );
+      const images = screen.viewports.map(id => [
+        `screenshots/${id}.png`,
+        image,
+      ]);
+      const now = Date.now();
+      const iso = offset => new Date(now + offset).toISOString();
+      const proofRoute = SCREEN_PROOF_ROUTES['web.public-profile'];
+      const buildProof = browserOwnedInput => ({
+        schema: SCREEN_BROWSER_PROOF_SCHEMA,
+        producer: 'external-render-runner',
+        status: 'unverified-candidate',
+        certificationStatus: 'not-certified',
+        screenId: screen.id,
+        headSha: head,
+        tier: 'rendered-evidence',
+        runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/77/attempts/3',
+        producerRunId: 77,
+        producerRunAttempt: 3,
+        producerJobId: 99,
+        environment: 'local-production-build',
+        sourcePaths: [...screen.sources].sort(),
+        capturedAt: iso(-60_000),
+        artifactDigest: `sha256:${'0'.repeat(64)}`,
+        activeFlow: { disclosure: false },
+        historyProof: { separate: true, path: 'docs/VISUAL_TESTING_POLICY.md' },
+        visibleActions: ['Get updates'],
+        ...(browserOwnedInput ? { browserOwnedInput } : {}),
+        viewports: screen.viewports.map(id => ({
+          id,
+          requestedRoute: proofRoute,
+          finalUrl: `http://localhost:3000${proofRoute}`,
+          decision: 'pass',
+          rendered: true,
+          axe: { violations: 0 },
+          overflow: { maxHorizontalPx: 0 },
+          interaction: { passed: true },
+          cls: { value: 0 },
+          contrast: { passed: true },
+          runtime: {
+            consoleErrors: 0,
+            pageErrors: 0,
+            failedResponses: 0,
+            failedRequests: 0,
+          },
+        })),
+      });
+      const publish = browserOwnedInput => {
+        const proof = buildProof(browserOwnedInput);
+        const digest = createHash('sha256');
+        for (const [name, bytes] of images) {
+          digest.update(name);
+          digest.update('\0');
+          digest.update(bytes);
+          digest.update('\0');
+        }
+        proof.artifactDigest = `sha256:${digest.digest('hex')}`;
+        writeFileSync(join(root, 'screen-proof.json'), JSON.stringify(proof));
+        for (const [name, bytes] of images) {
+          mkdirSync(dirname(join(root, name)), { recursive: true });
+          writeFileSync(join(root, name), bytes);
+        }
+        writeProofZip(root, [
+          'screen-proof.json',
+          ...images.map(([name]) => name),
+        ]);
+        const zip = readFileSync(join(root, 'proof.zip'));
+        writeFileSync(
+          join(root, 'records.json'),
+          JSON.stringify({
+            artifact: {
+              id: 42,
+              name: screenProofArtifactName(screen.id),
+              expired: false,
+              digest: sha256(zip),
+              created_at: iso(-30_000),
+              workflow_run: { id: 77 },
+            },
+            run: {
+              id: 77,
+              run_attempt: 3,
+              repository: { full_name: 'JovieInc/Jovie' },
+              head_branch: 'main',
+              head_sha: head,
+              path: '.github/workflows/screenshots.yml',
+              event: 'push',
+              conclusion: 'success',
+            },
+            jobs: {
+              jobs: [
+                {
+                  id: 99,
+                  name: 'Generate Screenshots',
+                  run_id: 77,
+                  run_attempt: 3,
+                  head_sha: head,
+                  conclusion: 'success',
+                  started_at: iso(-90_000),
+                  completed_at: iso(-10_000),
+                },
+              ],
+            },
+          })
+        );
+        return proof;
+      };
+      const gh = join(root, 'gh');
+      writeFileSync(
+        gh,
+        `#!/usr/bin/env node\nconst fs=require('node:fs');const p=process.argv.at(-1);const r=JSON.parse(fs.readFileSync(${JSON.stringify(join(root, 'records.json'))}));if(p.endsWith('/zip'))process.stdout.write(fs.readFileSync(${JSON.stringify(join(root, 'proof.zip'))}));else process.stdout.write(JSON.stringify(p.includes('/artifacts/')?r.artifact:p.includes('/attempts/')?r.jobs:r.run));`
+      );
+      chmodSync(gh, 0o755);
+      process.env.PATH = `${root}:${priorPath}`;
+      process.env.SCREEN_CERT_DIFF_BASE = 'c'.repeat(40);
+      const proof = publish(undefined);
+      const result = runScreenCertification({
+        headSha: head,
+        changedFiles: ['apps/web/app/[username]/page.tsx'],
+        proofRequests: [{ artifactId: 42, screenId: screen.id }],
+      });
+      assert.equal(result.ok, true, result.receipt.issues.join('\n'));
+      assert.equal(result.receipt.certified, true);
+      assert.deepEqual(result.receipt.changedScreens, [
+        {
+          id: 'web.public-profile',
+          verdict: 'pass',
+          findings: [],
+          deviceEvidence: 'UNKNOWN',
+          artifactDigest: proof.artifactDigest,
+          rendererRunUrl: proof.runUrl,
+        },
+      ]);
+      const cell = 'get-updates/android-chrome/android-current-portrait';
+      publish({ records: [{ cellId: cell }, { cellId: cell }] });
+      const blocked = runScreenCertification({
+        headSha: head,
+        changedFiles: ['apps/web/app/[username]/page.tsx'],
+        proofRequests: [{ artifactId: 42, screenId: screen.id }],
+      });
+      assert.equal(blocked.ok, false);
+      assert.match(
+        blocked.receipt.issues.join('\n'),
+        /BLOCKED: device evidence missing or duplicate/
+      );
+    } finally {
+      process.env.PATH = priorPath;
+      if (priorDiffBase === undefined) delete process.env.SCREEN_CERT_DIFF_BASE;
+      else process.env.SCREEN_CERT_DIFF_BASE = priorDiffBase;
+      rmSync(root, { force: true, recursive: true });
     }
   });
 

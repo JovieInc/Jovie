@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { ARTIST_VISIBILITY_OFFER } from '@/lib/config/plan-prices';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 
 const { mockCachedAuth, mockCachedCurrentUser } = vi.hoisted(() => ({
@@ -24,6 +25,10 @@ vi.mock('@/lib/stripe/customer-sync', () => ({
 }));
 
 vi.mock('@/lib/stripe/config', () => ({
+  getPriceMappingDetails: (id: string) =>
+    id === 'price_visibility'
+      ? { offerCapabilities: ARTIST_VISIBILITY_OFFER.pro.capabilities }
+      : null,
   isLegacyFanSendPrice: (id: string | null | undefined) =>
     id === 'legacy-price',
 }));
@@ -66,6 +71,7 @@ describe('getCurrentUserEntitlements', () => {
       canFilterSelfFromAnalytics: false,
       canAccessAdPixels: false,
       canAccessInbox: false,
+      canAutoCreateLinks: false,
       canBeVerified: false,
       aiCanUseTools: true,
       canCreateManualReleases: true,
@@ -222,6 +228,7 @@ describe('getCurrentUserEntitlements', () => {
       canFilterSelfFromAnalytics: false,
       canAccessAdPixels: false,
       canAccessInbox: false,
+      canAutoCreateLinks: false,
       canBeVerified: false,
       aiCanUseTools: true,
       canCreateManualReleases: true,
@@ -297,6 +304,7 @@ describe('getCurrentUserEntitlements', () => {
       canFilterSelfFromAnalytics: true,
       canAccessAdPixels: true,
       canAccessInbox: true,
+      canAutoCreateLinks: false,
       canBeVerified: true,
       aiCanUseTools: true,
       canCreateManualReleases: true,
@@ -463,6 +471,7 @@ describe('getCurrentUserEntitlements', () => {
       canFilterSelfFromAnalytics: true,
       canAccessAdPixels: true,
       canAccessInbox: true,
+      canAutoCreateLinks: false,
       canBeVerified: true,
       aiCanUseTools: true,
       canCreateManualReleases: true,
@@ -872,5 +881,63 @@ describe('getCurrentUserEntitlements', () => {
     );
     expect(callOrder.indexOf('admin_start')).toBeLessThan(firstEnd);
     expect(callOrder.indexOf('billing_start')).toBeLessThan(firstEnd);
+  });
+});
+
+describe('exact-offer automation for authenticated entry points', () => {
+  it.each([
+    ['pro', 'price_visibility', true, 'sub_active', true],
+    ['pro', 'legacy-price', true, 'sub_active', false],
+    ['max', 'price_visibility', true, 'sub_active', false],
+    ['trial', 'price_visibility', true, 'sub_active', false],
+    ['free', 'price_visibility', true, 'sub_active', false],
+    ['unknown', 'price_visibility', true, 'sub_active', false],
+    ['pro', 'price_visibility', false, 'sub_active', false],
+    ['pro', 'price_visibility', true, null, false],
+  ] as const)(
+    'resolves %s / %s / active=%s / subscription=%s',
+    async (plan, stripePriceId, isPro, stripeSubscriptionId, allowed) => {
+      mockCachedAuth.mockResolvedValue({ userId: 'user_123', has: () => true });
+      mockCachedCurrentUser.mockResolvedValue(null);
+      mockIsAdmin.mockResolvedValue(true);
+      mockGetUserBillingInfo.mockResolvedValue({
+        success: true,
+        data: {
+          userId: 'user_123',
+          email: '',
+          isPro,
+          plan,
+          stripePriceId,
+          stripeSubscriptionId,
+          trialEndsAt: new Date('2099-01-01'),
+        },
+      });
+      const result = await getCurrentUserEntitlements();
+      expect(result.canAutoCreateLinks).toBe(allowed);
+      expect(result.canCreateManualReleases).toBe(true);
+      expect(result.canSendNotifications).toBe(
+        plan === 'trial' || stripePriceId === 'legacy-price'
+      );
+    }
+  );
+
+  it('rechecks an effective downgrade on the next request', async () => {
+    mockCachedAuth.mockResolvedValue({ userId: 'user_123' });
+    mockCachedCurrentUser.mockResolvedValue(null);
+    mockIsAdmin.mockResolvedValue(false);
+    const data = {
+      userId: 'user_123',
+      plan: 'pro',
+      isPro: true,
+      stripePriceId: 'price_visibility',
+      stripeSubscriptionId: 'sub_active',
+    };
+    mockGetUserBillingInfo.mockResolvedValue({ success: true, data });
+    expect((await getCurrentUserEntitlements()).canAutoCreateLinks).toBe(true);
+    mockGetUserBillingInfo.mockResolvedValue({
+      success: true,
+      data: { ...data, isPro: false, plan: 'free' },
+    });
+    expect((await getCurrentUserEntitlements()).canAutoCreateLinks).toBe(false);
   });
 });

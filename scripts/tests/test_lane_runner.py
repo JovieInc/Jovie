@@ -30,6 +30,11 @@ from types import SimpleNamespace
 
 os.environ["LANES_EXECUTION_BACKEND"] = "local-test"
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "scripts/lanes"))
+import git_housekeeping  # noqa: E402
+
+git_housekeeping.install_process_fixture_env()
+git_housekeeping.install_isolated_tempdirs()
 SPEC = importlib.util.spec_from_file_location("lane_runner", ROOT / "scripts/lanes/lane_runner.py")
 lane = importlib.util.module_from_spec(SPEC)
 sys.modules["lane_runner"] = lane
@@ -40,10 +45,20 @@ SPEC.loader.exec_module(lane)
 # these unit tests must neither depend on host capacity nor sweep host caches.
 _disk_capacity_fixture = patch.object(lane.disk_guard, "free_pct", return_value=50.0)
 _devin_free_fixture = patch.object(lane.devin_free_policy, "admission_open", return_value=True)
+# These lifecycle fixtures have synthetic heads/trees. Real checkout safety and
+# command-entry refusal are exercised in test_qualification_guard.py.
+_qualification_fixture = patch.object(lane.qualification_guard, "check",
+    return_value={"fixtureSha256": "synthetic-isolated-checkout"})
+_qualification_prepare_fixture = patch.object(lane.qualification_guard, "prepare_checkout",
+    return_value={"fixtureSha256": "synthetic-isolated-checkout"})
 def setUpModule():
+    _qualification_prepare_fixture.start()
     _disk_capacity_fixture.start()
     _devin_free_fixture.start()
+    _qualification_fixture.start()
 def tearDownModule():
+    _qualification_prepare_fixture.stop()
+    _qualification_fixture.stop()
     _devin_free_fixture.stop()
     _disk_capacity_fixture.stop()
 
@@ -86,6 +101,8 @@ def repair_target_page(pr, **overrides):
     checks = [{"__typename": "CheckRun", **check} for check in pr.get("statusCheckRollup", [])]
     live = {"state": "OPEN", "isDraft": False, "isCrossRepository": False, "isInMergeQueue": False,
             "mergeStateStatus": "BLOCKED", "reviewDecision": None,
+            "latestOpinionatedReviews": {"totalCount": 0, "pageInfo": {"hasNextPage": False}, "nodes": []},
+            "reviewThreads": {"totalCount": 0, "pageInfo": {"hasNextPage": False}, "nodes": []},
             **pr, "labels": {"pageInfo": {"hasNextPage": False}, "nodes": pr.get("labels", [])},
             "commits": {"nodes": [{"commit": {"oid": pr["headRefOid"], "statusCheckRollup": {
                 "contexts": {"pageInfo": {"hasNextPage": False}, "nodes": checks}}}}]}, **overrides}
@@ -655,8 +672,10 @@ class DependencyOnlyGateTest(unittest.TestCase):
                    "headRefName": "dependabot/npm_and_yarn/radix-tabs", "labels": [], "state": "OPEN"}
 
     def git(self, *args):
+        # Fixture commits must not detach maintenance. The structural lane runs
+        # Git 2.55, whose default is to keep writing `.git/objects` after commit returns.
         return subprocess.run(["git", *args], cwd=self.repo, check=True, capture_output=True,
-                              text=True).stdout.strip()
+                              text=True, env=git_housekeeping.apply_fixture_env(os.environ)).stdout.strip()
 
     def write(self, path, value):
         target = self.repo / path
@@ -866,7 +885,7 @@ class DependencyOnlyGateTest(unittest.TestCase):
                 calls = []
                 def shell(args, **kwargs):
                     calls.append(args)
-                    if args[:2] == ["git", "fetch"]:
+                    if args[:6] == ["git", "-c", "core.hooksPath=" + os.devnull, "-c", "core.fsmonitor=false", "fetch"]:
                         return SimpleNamespace(returncode=0, stdout="", stderr="")
                     if args[0] == "git":
                         return subprocess.run(args, cwd=self.repo, capture_output=True, text=True)
@@ -902,7 +921,7 @@ class DependencyOnlyGateTest(unittest.TestCase):
         calls = []
         def shell(args, **kwargs):
             calls.append(args)
-            if args[:2] == ["git", "fetch"]:
+            if args[:6] == ["git", "-c", "core.hooksPath=" + os.devnull, "-c", "core.fsmonitor=false", "fetch"]:
                 return SimpleNamespace(returncode=0, stdout="", stderr="")
             if args[0] == "git":
                 return subprocess.run(args, cwd=self.repo, capture_output=True, text=True)
@@ -954,6 +973,20 @@ class GateTest(unittest.TestCase):
                    self.change("apps/web/lib/profile/catalog.ts", 112),
                    self.change("apps/web/lib/profile/catalog.test.ts", 180)]
         self.assertEqual(lane.gate_rules(changes), [])
+
+    def test_generated_inventory_is_excluded_but_source_and_tests_keep_the_size_cap(self):
+        generated = self.change("docs/product/generated/artist-launch-inventory.json", 7336)
+        code = self.change("scripts/artist-launch-contract.mjs", 1000)
+        tests = self.change("scripts/artist-launch-contract.test.mjs", 500)
+        self.assertEqual(lane.gate_rules([generated, code, tests]), [])
+        tests.added += 1
+        self.assertEqual(lane.gate_rules([generated, code, tests]), ["diff-too-large:1501"])
+        for path in ["apps/web/lib/generated/unsafe.ts", "scripts/generated/task.mjs"]:
+            with self.subTest(path=path):
+                self.assertEqual(lane.gate_rules([self.change(path)]), ["code-change-without-test"])
+        for path in ["docs/product/generated-notes.md", "scripts/generated-helper.mjs"]:
+            with self.subTest(path=path):
+                self.assertIn("diff-too-large:2501", lane.gate_rules([self.change(path, 2000), tests]))
 
     def test_sensitive_diff_uses_the_smaller_review_cap(self):
         changes = [self.change("apps/web/lib/a.ts", 400), self.change("apps/web/lib/a.test.ts", 101)]
@@ -3681,6 +3714,24 @@ class VerifyAndLandRevocationTest(unittest.TestCase):
             self.assertEqual(json.loads((host.state / "requeue.json").read_text()), {"7": "abc"})
 
 
+class ShippingOriginIngestTest(unittest.TestCase):
+    def test_deferred_transport_is_importable_in_the_release_selftest(self):
+        import shipping_origin
+
+        state = Path("/synthetic-origin-state")
+        result = {"accepted": ["restored"], "rejected": [], "errors": []}
+        with patch.object(shipping_origin, "collect", return_value=result) as collect:
+            self.assertEqual(lane.collect_shipping_origin(state), result)
+        collect.assert_called_once_with(state)
+
+    def test_transport_failure_stays_visible_to_dispatch(self):
+        import shipping_origin
+
+        with patch.object(shipping_origin, "collect", side_effect=RuntimeError("transport unavailable")):
+            with self.assertRaisesRegex(RuntimeError, "transport unavailable"):
+                lane.collect_shipping_origin(Path("/synthetic-origin-state"))
+
+
 class DispatchTest(unittest.TestCase):
     def setUp(self):
         disk = patch.object(lane.disk_guard, "free_pct", return_value=50.0)
@@ -3696,7 +3747,7 @@ class DispatchTest(unittest.TestCase):
         self.corpus_tick = corpus.start()
         self.addCleanup(corpus.stop)
 
-        origins = patch.object(lane.shipping_origin, "collect", return_value={"accepted": [], "rejected": [], "errors": []})
+        origins = patch.object(lane, "collect_shipping_origin", return_value={"accepted": [], "rejected": [], "errors": []})
         self.origin_collect = origins.start()
         self.addCleanup(origins.stop)
 
@@ -4135,7 +4186,8 @@ class WorktreePublicationTest(unittest.TestCase):
 
     def git(self, cwd, *args):
         return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True,
-                              check=True, timeout=10).stdout.strip()
+                              check=True, timeout=10,
+                              env=git_housekeeping.apply_fixture_env(os.environ)).stdout.strip()
 
     def candidate(self, *, detached=False, unpublished=True):
         args = ["--detach"] if detached else ["-b", "candidate"]
@@ -5806,6 +5858,8 @@ class FixRedTest(unittest.TestCase):
         self.assertEqual(linear.comments, [])
 
     def test_escalation_pass_never_overwrites_a_repair_that_ended_meanwhile(self):
+        fresh = patch.object(lane, "reconcile_fix_target", side_effect=lambda pr: {"state": "OPEN", "isInMergeQueue": False, **pr})
+        fresh.start(); self.addCleanup(fresh.stop)
         stuck = {**self.pr(number=7), "headRefName": "devin/jov-7-20260928000000",
                  "isDraft": False, "mergeStateStatus": "DIRTY", "title": "stuck one"}
         with tempfile.TemporaryDirectory() as tmp:
@@ -5831,6 +5885,8 @@ class FixRedTest(unittest.TestCase):
             self.assertEqual(rows["7"]["escalations"][0]["rung"], "update-branch")
 
     def test_exhausted_heads_get_one_terminal_disposition_not_queue_inventory(self):
+        fresh = patch.object(lane, "reconcile_fix_target", side_effect=lambda pr: {"state": "OPEN", "isInMergeQueue": False, **pr})
+        fresh.start(); self.addCleanup(fresh.stop)
         stuck = {**self.pr(number=7), "headRefName": "devin/jov-7-20260928000000",
                  "isDraft": False, "mergeStateStatus": "DIRTY", "title": "stuck one"}
         attempts = {"7": {"sha": "h1", "count": lane.MAX_FIX_ATTEMPTS}}
@@ -5886,6 +5942,8 @@ class FixRedTest(unittest.TestCase):
                              lane.MAX_FIX_ATTEMPTS)
 
     def test_terminal_disposition_dedupes_on_the_issue_when_local_flag_is_lost(self):
+        fresh = patch.object(lane, "reconcile_fix_target", side_effect=lambda pr: {"state": "OPEN", "isInMergeQueue": False, **pr})
+        fresh.start(); self.addCleanup(fresh.stop)
         stuck = {**self.pr(number=19246), "headRefName": "devin/jov-46-20260928000000",
                  "isDraft": False, "mergeStateStatus": "DIRTY", "title": "stuck"}
         real = lane.sh
@@ -6294,6 +6352,11 @@ class UpdateTest(unittest.TestCase):
             env = lane.selftest_env(Path("/scratch"))
         self.assertFalse(set(knobs) & set(env))
         self.assertEqual((env["PATH"], env["LANES_SELFTEST"], env["LANES_STATE"]), ("/bin", "1", "/scratch"))
+        pairs = [(env[f"GIT_CONFIG_KEY_{i}"], env[f"GIT_CONFIG_VALUE_{i}"])
+                 for i in range(int(env["GIT_CONFIG_COUNT"]))]
+        self.assertIn(("maintenance.auto", "false"), pairs)
+        self.assertIn(("maintenance.autoDetach", "false"), pairs)
+        self.assertIn(("gc.auto", "0"), pairs)
 
     def test_release_selftest_never_sees_host_credentials_or_home(self):
         secrets = {"GH_TOKEN": "ghs_live", "GITHUB_TOKEN": "ghs_live", "LINEAR_API_KEY": "lin_live",
@@ -6497,6 +6560,59 @@ class UpdateTest(unittest.TestCase):
                 self.assertEqual(lane.guarded_main(["prove-staging", str(staging)]), 1)
             proved.assert_not_called()
             self.assertEqual(out.getvalue().strip(), "release-bundle-incomplete")
+
+    def test_staged_entrypoint_bootstraps_a_new_imported_extra_from_an_older_archive(self):
+        # PR21839 added shipping_origin outside scripts/lanes. The old installer
+        # cannot archive that new extra; importing it before bootstrap deadlocks updates.
+        with tempfile.TemporaryDirectory() as tmp, self.clean_env():
+            tmp = Path(tmp).resolve()
+            repo, staging = tmp / "repo", tmp / "staging"
+            shutil.copytree(ROOT / "scripts/lanes", repo / "scripts/lanes",
+                            ignore=shutil.ignore_patterns("__pycache__", ".mesh-runtime"))
+            for relative in [*lane.RELEASE_EXTRAS, *lane.LANE_TESTS]:
+                target = repo / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(ROOT / relative, target)
+            self.git("init", "-q", cwd=repo)
+            self.git("add", "-A", cwd=repo)
+            self.git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "release", cwd=repo)
+            self.git("update-ref", "refs/remotes/origin/main", "HEAD", cwd=repo)
+            older_extras = [relative for relative in lane.RELEASE_EXTRAS
+                            if relative != "scripts/shipping_origin.py"]
+            archive = subprocess.run(["git", "archive", "HEAD", "scripts/lanes",
+                                      *older_extras, *lane.LANE_TESTS], cwd=repo,
+                                     capture_output=True, check=True).stdout
+            staging.mkdir()
+            subprocess.run(["tar", "-x", "-C", str(staging)], input=archive, check=True)
+            driver = r"""
+import importlib.util
+import sys
+from pathlib import Path
+from unittest.mock import patch
+staging, repo, state = map(Path, sys.argv[1:])
+extra = staging / "scripts/shipping_origin.py"
+assert not extra.exists(), "fixture must reproduce the older archive"
+spec = importlib.util.spec_from_file_location("staged_bootstrap_fixture", staging / "scripts/lanes/lane_runner.py")
+module = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = module
+spec.loader.exec_module(module)
+host = module.Host(state=state, repo=repo)
+assert module.complete_staged_bundle(host, staging) is None
+assert extra.read_bytes() == (repo / "scripts/shipping_origin.py").read_bytes()
+import shipping_origin
+result = {"accepted": ["restored"], "rejected": [], "errors": []}
+with patch.object(shipping_origin, "collect", return_value=result) as collect:
+    assert module.collect_shipping_origin(state) == result
+    collect.assert_called_once_with(state)
+"""
+            env = {key: value for key, value in os.environ.items()
+                   if key not in {"PYTHONPATH", "PYTHONHOME"}}
+            result = subprocess.run([sys.executable, "-B", "-c", driver,
+                                     str(staging), str(repo), str(tmp / "state")],
+                                    cwd=tmp, env=env, capture_output=True, text=True, timeout=30)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual((staging / "scripts/shipping_origin.py").read_bytes(),
+                             (repo / "scripts/shipping_origin.py").read_bytes())
 
     def test_prove_staging_names_the_refusal_and_the_cli_reports_it(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -7593,6 +7709,156 @@ class RepairCheckOverflowDiagnosticTest(unittest.TestCase):
             self.assertEqual(receipts, [])
 
 
+class RepairReviewAuthorityTest(unittest.TestCase):
+    def target(self):
+        return RepairQueueAuthorityTest().target()
+
+    def connection(self, rows):
+        return {"totalCount": len(rows), "pageInfo": {"hasNextPage": False}, "nodes": rows}
+
+    def summary(self, **extra):
+        return {"id": "review-1", "state": "CHANGES_REQUESTED",
+                "body": "Please add contents:write permission to GITHUB_TOKEN.",
+                "submittedAt": "2026-10-16T05:00:00Z", "updatedAt": "2026-10-16T05:00:00Z",
+                "author": {"__typename": "User", "login": "reviewer"}, "commit": {"oid": "h1"}, **extra}
+
+    def comment(self, **extra):
+        return {"id": "comment-1", "state": "SUBMITTED", "outdated": False,
+                "body": "Please purchase a paid plan.", "updatedAt": "2026-10-16T05:00:00Z",
+                "author": {"__typename": "User", "login": "reviewer"},
+                "pullRequestReview": {"id": "review-1", "state": "CHANGES_REQUESTED",
+                                      "commit": {"oid": "h1"}}, **extra}
+
+    def live(self, summaries=None, comments=None):
+        page = repair_target_page(self.target())
+        live = page["data"]["repository"]["pullRequest"]
+        live.update(reviewDecision="CHANGES_REQUESTED",
+                    latestOpinionatedReviews=self.connection(summaries or []),
+                    reviewThreads=self.connection([] if comments is None else [
+                        {"id": "thread-1", "isResolved": False, "isOutdated": False,
+                         "comments": self.connection(comments)}]))
+        return live
+
+    def normalize(self, live):
+        return lane.repair_target_node(self.target(), live)
+
+    def test_summary_only_ask_uses_actual_fresh_projection_and_stops_execution(self):
+        fresh = self.normalize(self.live([self.summary()]))
+        self.assertEqual(lane.remediation.classify_blocker(fresh)["cls"], "needs-human-decision")
+        with patch.object(lane, "reconcile_fix_target", return_value=fresh):
+            with self.assertRaisesRegex(lane.RepairStopped, "target-review-requires-authority"):
+                lane.require_fix_target(self.target(), "before-execution-claim", repair=True)
+
+    def test_old_approved_dismissed_and_bot_summaries_do_not_request_human_authority(self):
+        for extra in ({"commit": {"oid": "old-head"}}, {"state": "APPROVED"},
+                      {"state": "DISMISSED"}, {"author": {"__typename": "Bot", "login": "review-bot"}}):
+            with self.subTest(extra=extra):
+                fresh = self.normalize(self.live([self.summary(**extra)]))
+                self.assertIsNotNone(fresh)
+                self.assertIsNone(lane.remediation.review_authority_ask(fresh))
+        target = {**self.target(), "reviewSummaries": [{"body": "Please buy a paid plan."}],
+                  "reviewThreads": [{"body": "Please add token permissions."}]}
+        fresh = lane.repair_target_node(target, self.live())
+        self.assertEqual(fresh["reviewSummaries"], [])
+        self.assertEqual(fresh["reviewThreads"], [])
+
+    def test_human_reply_keeps_its_actor_under_a_bot_created_thread(self):
+        bot = self.comment(id="bot-root", author={"__typename": "Bot", "login": "helper"},
+                           body="Fix the Git Basic header format.")
+        human = self.comment(id="human-reply")
+        fresh = self.normalize(self.live(comments=[bot, human]))
+        self.assertEqual([row["author"]["type"] for row in fresh["reviewThreads"]], ["Bot", "User"])
+        self.assertEqual(lane.remediation.review_authority_ask(fresh), "spend")
+        self.assertIn("purchase a paid plan", lane.review_excerpt(fresh))
+        for mutate in ("resolved", "outdated", "comment-outdated", "dismissed", "pending", "old-head"):
+            live = self.live(comments=[human])
+            thread = live["reviewThreads"]["nodes"][0]
+            comment = thread["comments"]["nodes"][0]
+            if mutate == "resolved": thread["isResolved"] = True
+            elif mutate == "outdated": thread["isOutdated"] = True
+            elif mutate == "comment-outdated": comment["outdated"] = True
+            elif mutate == "dismissed": comment["pullRequestReview"]["state"] = "DISMISSED"
+            elif mutate == "pending": comment["state"] = "PENDING"
+            else: comment["pullRequestReview"]["commit"]["oid"] = "old-head"
+            fresh = self.normalize(live)
+            self.assertEqual(fresh["reviewThreads"], [], mutate)
+
+    def test_missing_ambiguous_or_incomplete_evidence_never_inherits_cached_authority(self):
+        mutations = [
+            lambda live: live.pop("latestOpinionatedReviews"),
+            lambda live: live.pop("reviewThreads"),
+            lambda live: live["latestOpinionatedReviews"]["pageInfo"].update(hasNextPage=True),
+            lambda live: live["latestOpinionatedReviews"].update(totalCount=2),
+            lambda live: live["latestOpinionatedReviews"]["nodes"][0].update(author=None),
+            lambda live: live["latestOpinionatedReviews"]["nodes"][0].update(commit=None),
+            lambda live: live["reviewThreads"]["nodes"][0].update(isResolved=None),
+            lambda live: live["reviewThreads"]["nodes"][0]["comments"]["pageInfo"].update(hasNextPage=True),
+            lambda live: live["reviewThreads"]["nodes"][0]["comments"]["nodes"][0].update(author=None),
+            lambda live: live["reviewThreads"]["nodes"][0]["comments"]["nodes"][0].update(pullRequestReview=None),
+        ]
+        for index, mutate in enumerate(mutations):
+            live = self.live([self.summary()], [self.comment()])
+            mutate(live)
+            self.assertIsNone(self.normalize(live), index)
+
+    def test_same_head_review_edits_cannot_splice_check_pages(self):
+        helper = RepairCheckPaginationTest()
+        for mutation in ("unchanged", "summary-edit", "approved", "dismissed", "resolved", "outdated", "reply"):
+            pages = [helper.page(), helper.page(100, 1, more=False)]
+            for page in pages:
+                live = page["data"]["repository"]["pullRequest"]
+                evidence = self.live([self.summary()], [self.comment()])
+                live.update(latestOpinionatedReviews=evidence["latestOpinionatedReviews"],
+                            reviewThreads=evidence["reviewThreads"])
+            live = pages[1]["data"]["repository"]["pullRequest"]
+            if mutation == "summary-edit": live["latestOpinionatedReviews"]["nodes"][0]["body"] = "Changed ask."
+            elif mutation in {"approved", "dismissed"}:
+                live["latestOpinionatedReviews"]["nodes"][0]["state"] = mutation.upper()
+            elif mutation == "resolved": live["reviewThreads"]["nodes"][0]["isResolved"] = True
+            elif mutation == "outdated": live["reviewThreads"]["nodes"][0]["isOutdated"] = True
+            elif mutation == "reply":
+                thread = live["reviewThreads"]["nodes"][0]
+                thread["comments"] = self.connection([self.comment(), self.comment(id="reply-2")])
+            result, _ = helper.read(pages)
+            self.assertEqual(result is not None, mutation == "unchanged", mutation)
+
+    def test_nullable_historical_provenance_is_inactive_but_unknown_active_head_refuses(self):
+        for state in ("APPROVED", "DISMISSED"):
+            fresh = self.normalize(self.live([self.summary(state=state, commit=None)]))
+            self.assertIsNotNone(fresh)
+            self.assertEqual(fresh["reviewSummaries"], [])
+        for status in ("resolved", "dismissed"):
+            live = self.live(comments=[self.comment()])
+            thread = live["reviewThreads"]["nodes"][0]
+            review = thread["comments"]["nodes"][0]["pullRequestReview"]
+            review["commit"] = None
+            if status == "resolved": thread["isResolved"] = True
+            else: review["state"] = "DISMISSED"
+            fresh = self.normalize(live)
+            self.assertIsNotNone(fresh)
+            self.assertEqual(fresh["reviewThreads"], [])
+        self.assertIsNone(self.normalize(self.live([self.summary(commit=None)])))
+        comment = self.comment()
+        comment["pullRequestReview"]["commit"] = None
+        self.assertIsNone(self.normalize(self.live(comments=[comment])))
+
+    def test_fresh_escalation_authority_does_not_use_cached_review_or_charge_a_rung(self):
+        target = {**self.target(), "mergeStateStatus": "DIRTY"}
+        for fresh in (None, self.normalize(self.live([self.summary()]))):
+            with tempfile.TemporaryDirectory() as tmp:
+                host = lane.Host(state=Path(tmp))
+                record = {"5": {"sha": "h1", "count": lane.MAX_FIX_ATTEMPTS}}
+                path = host.state / "fix-attempts.json"
+                path.write_text(json.dumps(record))
+                with patch.object(lane, "reconcile_fix_target", return_value=fresh), \
+                     patch.object(lane, "load_providers", return_value={}), \
+                     patch.object(lane, "_surface_exhausted") as surface:
+                    lane.escalate_exhausted(host, [target], FakeLinear([]))
+                after = json.loads(path.read_text())["5"]
+                self.assertEqual(after.get("count"), lane.MAX_FIX_ATTEMPTS)
+                self.assertEqual(after.get("escalations", []), [])
+
+
 class RepairQueueAuthorityTest(unittest.TestCase):
     def target(self):
         return {"number": 5, "headRefName": "devin/jov-1-20260926t0900", "headRefOid": "h1",
@@ -8077,7 +8343,7 @@ class LifecycleOwnershipTest(unittest.TestCase):
                 patch.object(lane.worktree_sweep, "maybe_spawn"), \
                 patch.object(lane, "ensure_full_history"), \
                 patch.object(lane, "claim_remediation_events"), \
-                patch.object(lane.shipping_origin, "collect", return_value={}), \
+                patch.object(lane, "collect_shipping_origin", return_value={}), \
                 patch.object(lane, "provider_healthy", return_value=True), \
                 patch.object(lane.pr_events, "tick"), \
                 patch.object(lane.reason_lane, "tick"), \
@@ -9017,6 +9283,40 @@ class TerminalPublicationTest(unittest.TestCase):
 
 
 class PublicationBundlePrerequisitesTest(unittest.TestCase):
+    def test_ops_delivery_cli_rechecks_from_only_declared_release_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bundle = Path(tmp)
+            for name in ["scripts/lanes/ops-report.mjs", *lane.RELEASE_EXTRAS]:
+                destination = bundle / name
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(ROOT / name, destination)
+            script = bundle / "scripts/lanes/ops-report.mjs"
+            current = {
+                "domain": "company", "producer": "Symphony", "currentOwner": "symphony-lanes-doctor",
+                "observedState": "disk usage needs inspection", "blocker": "UNKNOWN",
+                "nextAction": "inspect disk usage", "rootCause": None,
+                "evidence": {"observedAt": datetime.now(timezone.utc).isoformat(), "source": "synthetic doctor fixture"},
+                "destination": {"adapter": "linear-issue", "target": "Symphony doctor: archive fixture"},
+            }
+            prepared = subprocess.run(["node", str(script)], cwd=bundle, input=json.dumps(current),
+                                      capture_output=True, text=True, timeout=10)
+            self.assertEqual(prepared.returncode, 0, prepared.stderr)
+            report = json.loads(prepared.stdout)
+            self.assertEqual(report["review"]["reviewStatus"], "missing-source-receipt")
+            self.assertEqual(report["decision"], "approved-template")
+            for tampered in (False, True):
+                with self.subTest(tampered=tampered):
+                    candidate = {**report, "message": "edited after review"} if tampered else report
+                    verified = subprocess.run(["node", str(script), "--verify"], cwd=bundle,
+                                              input=json.dumps({"preparedReport": candidate, "currentInput": current}),
+                                              capture_output=True, text=True, timeout=10)
+                    if tampered:
+                        self.assertNotEqual(verified.returncode, 0)
+                        self.assertIn("review invalidated before delivery", verified.stderr)
+                    else:
+                        self.assertEqual(verified.returncode, 0, verified.stderr)
+                        self.assertEqual(json.loads(verified.stdout), {"verified": True})
+
     def test_promotion_metrics_imports_from_only_declared_release_files(self):
         # Import from a standalone bundle so checkout files cannot hide missing dependencies.
         with tempfile.TemporaryDirectory() as tmp:

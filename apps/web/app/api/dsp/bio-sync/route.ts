@@ -1,43 +1,41 @@
-/**
- * POST /api/dsp/bio-sync
- *
- * Triggers bio sync to one or more DSPs for a creator profile.
- * For DSPs that support API updates, pushes directly.
- * For DSPs that only support email, sends a professional bio update
- * request email to the DSP's artist support team on behalf of the artist.
- *
- * Authentication: Required (creator must own the profile)
- *
- * GET /api/dsp/bio-sync
- *
- * Returns the list of supported DSP bio sync providers with their
- * capabilities (API vs email, enabled status, etc.).
- */
-
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { getArtistProfileCatalog } from '@/lib/connectors/artist-profile-catalog';
 import { CopyFloorViolationError } from '@/lib/copy/outbound-floor';
 import { getOwnedProfile } from '@/lib/dsp-bio-sync/ownership';
-import { getEnabledBioProviders } from '@/lib/dsp-bio-sync/providers';
-import { syncBioToDsps } from '@/lib/dsp-bio-sync/service';
+import {
+  DSP_BIO_PROVIDERS,
+  getEnabledBioProviders,
+} from '@/lib/dsp-bio-sync/providers';
+import { approveBioSync, syncBioToDsps } from '@/lib/dsp-bio-sync/service';
 import { captureError } from '@/lib/error-tracking';
 
 // ============================================================================
 // Request Schema
 // ============================================================================
 
-const bioSyncRequestSchema = z.object({
-  profileId: z.string().uuid(),
-  /** Optional: specific DSP IDs to sync to. If omitted, syncs to all enabled DSPs. */
-  providerIds: z.array(z.string().min(1)).optional(),
-  /** Optional: override bio text. If omitted, uses the current bio from the profile. */
-  bioText: z
-    .string()
-    .min(1, 'Bio text cannot be empty')
-    .max(5000, 'Bio text is too long (max 5000 characters)')
-    .optional(),
-});
+const bioSyncRequestSchema = z.union([
+  z.strictObject({
+    action: z.literal('propose').optional(),
+    profileId: z.string().uuid(),
+    /** Optional: specific destinations to preview. */
+    providerIds: z.array(z.string().min(1)).min(1).max(7).optional(),
+    /** Optional: override bio text. If omitted, uses the current bio from the profile. */
+    bioText: z
+      .string()
+      .min(1, 'Bio text cannot be empty')
+      .max(5000, 'Bio text is too long (max 5000 characters)')
+      .optional(),
+  }),
+  z.strictObject({
+    action: z.literal('approve'),
+    profileId: z.string().uuid(),
+    providerId: z.string().min(1),
+    proposalId: z.string().uuid(),
+    confirmation: z.string().regex(/^[a-f0-9]{64}$/),
+  }),
+]);
 
 // ============================================================================
 // POST Handler - Trigger bio sync
@@ -66,7 +64,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { profileId, providerIds, bioText } = parsed.data;
+    const { profileId } = parsed.data;
 
     // Verify user owns this profile
     const ownership = await getOwnedProfile(profileId, userId);
@@ -95,7 +93,22 @@ export async function POST(request: Request) {
       );
     }
 
-    // Ensure there's a bio to sync
+    if (parsed.data.action === 'approve') {
+      const receipt = await approveBioSync({
+        userId,
+        creatorProfileId: profileId,
+        providerId: parsed.data.providerId,
+        proposalId: parsed.data.proposalId,
+        confirmation: parsed.data.confirmation,
+      });
+      return NextResponse.json({
+        success: receipt.result === 'submitted',
+        receipt,
+      });
+    }
+
+    const { providerIds, bioText } = parsed.data;
+    // Ensure there's a bio to preview
     const effectiveBio = bioText ?? profile.bio;
     if (!effectiveBio?.trim()) {
       return NextResponse.json(
@@ -107,25 +120,15 @@ export async function POST(request: Request) {
       );
     }
 
-    // Execute bio sync
+    // Persist previews only; explicit approval is a separate request.
     const result = await syncBioToDsps({
+      userId,
       creatorProfileId: profileId,
       providerIds,
       bioText,
     });
 
-    return NextResponse.json({
-      success: result.success,
-      sentCount: result.sentCount,
-      failedCount: result.failedCount,
-      results: result.results.map(r => ({
-        providerId: r.providerId,
-        method: r.method,
-        status: r.status,
-        syncRequestId: r.syncRequestId,
-        error: r.error,
-      })),
-    });
+    return NextResponse.json(result, { status: 202 });
   } catch (error) {
     if (error instanceof CopyFloorViolationError) {
       return NextResponse.json(
@@ -137,6 +140,28 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+
+    if (
+      error instanceof Error &&
+      [
+        'already-approved',
+        'approval-required',
+        'confirmed-target-required',
+        'confirmation-mismatch',
+        'stale-proposal',
+        'unauthorized-destination',
+        'unverified-manifest',
+      ].includes(error.message)
+    )
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 409 }
+      );
+    if (error instanceof Error && error.message === 'invalid-submission-bio')
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 400 }
+      );
 
     await captureError('DSP Bio Sync failed', error, {
       route: '/api/dsp/bio-sync',
@@ -158,23 +183,19 @@ export async function POST(request: Request) {
 
 export async function GET() {
   try {
-    const providers = getEnabledBioProviders().map(([id, provider]) => ({
-      id,
-      displayName: provider.displayName,
-      method: provider.method,
-      enabled: provider.enabled,
-      notes: provider.notes,
-      artistPortalUrl: provider.artistPortalUrl,
-      maxBioLength: provider.maxBioLength,
-    }));
-
+    const providers = Object.entries(DSP_BIO_PROVIDERS).map(
+      ([id, provider]) => ({ id, ...provider })
+    );
     const enabledCount = getEnabledBioProviders().length;
-
-    return NextResponse.json({
-      success: true,
-      providers,
-      enabledCount,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        providers,
+        enabledCount,
+        catalog: getArtistProfileCatalog(),
+      },
+      { headers: { 'Cache-Control': 'no-store' } }
+    );
   } catch (error) {
     await captureError('DSP Bio Sync providers list failed', error, {
       route: '/api/dsp/bio-sync',

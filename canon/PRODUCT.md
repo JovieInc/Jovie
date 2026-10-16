@@ -2,7 +2,7 @@
 
 Status: Canon
 Inherits: [`OPERATING_SYSTEM.md`](./OPERATING_SYSTEM.md)
-Last updated: 2026-09-26
+Last updated: 2026-10-15
 
 Product exists to increase customer value delivered per week.
 
@@ -59,6 +59,30 @@ If these fields cannot be answered, the next product task is evidence gathering.
 3. Retention behavior outranks stated intent.
 4. Activation blockers outrank polish unless polish is the activation blocker.
 5. A shipped, measured experiment beats a perfect roadmap.
+
+---
+
+## YouTube first; APIs/MCPs are a core product line
+
+**EVENT:** Tim White's September 3, 2026 lock ([JOV-5891](https://linear.app/jovie/issue/JOV-5891))
+makes APIs/MCPs a core Jovie product line serving the same artist outcome.
+The #1 priority remains `youtube-artist-closed-loop-mvp-v1`
+([JOV-5881](https://linear.app/jovie/issue/JOV-5881)): regularly uploading music
+artists connect a YouTube channel, improve titles/descriptions/thumbnails, and
+insert Jovie links. Use official APIs only. The homepage stays person-first
+“Find me”; this line does not turn it into a waitlist or API-docs entry point.
+
+Continue the existing agent-native, MCP action, API/CLI, connector-directory,
+and Tim-channel dogfood workstream. The API and CLI share the MCP contract;
+there is no second SKU. Sume is the GTM analog (MCP from Pro), not the ICP
+analog; do not copy its phone farm. No spend or outbound is authorized by this
+lock.
+
+The [strategy thesis](strategy/theses/2026-09-03-apis-mcps-core-not-first.md)
+records the existing issue owners and falsifiable proof: one Tim-channel
+YouTube optimization via Jovie MCP/CLI, without the GUI, with a dogfood PASS
+receipt under [JOV-5883](https://linear.app/jovie/issue/JOV-5883). Source or
+unit-test success alone does not establish that product outcome.
 
 ---
 
@@ -188,6 +212,7 @@ Do not optimize for:
 
 | Date | Change | Source |
 |---|---|---|
+| 2026-10-15 | Recorded September 3 lock: YouTube artist loop first; APIs/MCPs are a core line on the same contract and workstream. | Tim White / JOV-5891 |
 | 2026-09-26 | "Opinions: outcomes over knobs" rules and capability classification (table-stakes / outcome-deepening / configurability held / taste). | Tim White |
 | 2026-08-28 | Continuous-optimization doctrine, learning hierarchy, safe transfer, and objective hierarchy. | Tim White / JOV-4045 |
 | 2026-07-17 | Created as domain canon under `/canon`. | Tim White |

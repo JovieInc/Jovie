@@ -8,6 +8,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import time
@@ -755,6 +756,7 @@ class ReconcileTest(unittest.TestCase):
         tracker = doctor.Tracker(FakeLinear(), "gem")
         with (mock.patch.object(tracker, "_remediation_label_id", return_value=None),
               mock.patch.object(tracker, "contradict_invariant"),
+              mock.patch.object(doctor, "verify_ops_report", side_effect=lambda prepared, *_: prepared) as verify,
               mock.patch.object(doctor, "prepare_ops_report", return_value=reviewed) as prepare):
             state = doctor.reconcile({"disk-low": "4% free"}, {}, tracker, 1_000_000.0,
                                      {"disk-low": condition})
@@ -763,6 +765,7 @@ class ReconcileTest(unittest.TestCase):
         self.assertEqual(created[0]["description"], reviewed["message"])
         self.assertEqual(len(created), 1)
         prepare.assert_called_once()
+        verify.assert_called_once_with(reviewed, "disk-low", "4% free", condition, "gem", tracker.title("disk-low"))
         self.assertEqual(state["conditions"]["disk-low"]["writingReview"], reviewed["review"])
         self.assertEqual(state["conditions"]["disk-low"]["writingDecision"], "approved-template")
 
@@ -899,6 +902,78 @@ class ReconcileTest(unittest.TestCase):
         doctor.Tracker(linear, "gem").contradict_invariant(event)
         self.assertEqual(linear.moves, [("owner", "Triage")])
         self.assertIn("gem:provider-idle:devin:2", linear.comments[0][1])
+
+
+class OpsReportDeliveryTest(unittest.TestCase):
+    def setUp(self):
+        self.condition = {
+            "condition": "disk-low", "state": "active", "owner": "symphony-lanes-doctor",
+            "source": {"producer": "scripts/lanes/doctor.py", "observedAt": doctor.now_iso()},
+            "nextAction": "inspect disk usage", "generation": 1,
+        }
+        self.target = "Symphony doctor: disk-low (test-host)"
+        self.source = mock.patch.object(doctor, "_source_version", return_value="UNKNOWN")
+        self.source.start()
+        self.addCleanup(self.source.stop)
+
+    def prepare(self):
+        prepared = doctor.prepare_ops_report("disk-low", "4% free", self.condition, "test-host", self.target)
+        self.assertEqual(prepared["review"]["reviewStatus"], "missing-source-receipt")
+        return prepared
+
+    def verify(self, prepared, condition=None, target=None):
+        return doctor.verify_ops_report(prepared, "disk-low", "4% free", condition or self.condition,
+                                        "test-host", target or self.target)
+
+    def test_real_cli_checks_exact_delivery_without_model_calls(self):
+        prepared = self.prepare()
+        self.assertIs(self.verify(prepared), prepared)
+        for field, value in (("message", "edited after review"), ("audience", "changed audience"),
+                             ("destination", {"adapter": "linear-issue", "target": "other"})):
+            with self.subTest(field=field):
+                result = self.verify({**prepared, field: value})
+                self.assertEqual(result["review"]["reviewStatus"], "emergency-reviewer-unavailable")
+                self.assertNotIn("edited after review", result["message"])
+        stale = {**self.condition, "source": {**self.condition["source"], "observedAt": "2000-01-01T00:00:00Z"}}
+        for condition, target in ((stale, None), (None, "changed issue")):
+            result = self.verify(prepared, condition, target)
+            self.assertEqual(result["review"]["reviewStatus"], "emergency-reviewer-unavailable")
+        self.assertNotIn("4% free", json.dumps(prepared["review"]))
+
+    def test_reviewer_outage_keeps_preapproved_emergency_notice_available(self):
+        with mock.patch.object(doctor.subprocess, "run", side_effect=subprocess.TimeoutExpired("node", 20)) as run:
+            prepared = doctor.prepare_ops_report("disk-low", "4% free", self.condition, "test-host", self.target)
+            result = self.verify({**prepared, "message": "edited emergency notice"})
+        run.assert_called_once()
+        self.assertEqual(result["review"]["reviewStatus"], "emergency-reviewer-unavailable")
+        self.assertIn("Root cause: UNKNOWN", result["message"])
+        self.assertNotIn("edited emergency notice", result["message"])
+
+    def test_linear_adapter_rechecks_after_prepare_and_preserves_duplicate_lookup(self):
+        created = []
+
+        class FakeLinear:
+            def gql(self, query, variables):
+                if "title:{eq:$t}" in query:
+                    return {"issues": {"nodes": [{"id": "iss-1"}] if created else []}}
+                if "teams(filter" in query:
+                    return {"teams": {"nodes": [{"id": "team", "states": {"nodes": [
+                        {"id": "triage", "name": "Triage"}]}, "labels": {"nodes": []}}]}}
+                if "issueCreate" in query:
+                    created.append(variables["i"])
+                    return {"issueCreate": {"issue": {"id": "iss-1"}}}
+                raise AssertionError(query)
+
+        tracker = doctor.Tracker(FakeLinear(), "test-host")
+        tampered = {**self.prepare(), "message": "edited after review"}
+        with (mock.patch.object(tracker, "_remediation_label_id", return_value=None),
+              mock.patch.object(doctor, "prepare_ops_report", return_value=tampered) as prepare):
+            for _ in range(2):
+                self.assertEqual(tracker.open("disk-low", "4% free", self.condition), "iss-1")
+        prepare.assert_called_once()
+        self.assertEqual(len(created), 1)
+        self.assertIn("Symphony emergency notice", created[0]["description"])
+        self.assertNotIn("edited after review", created[0]["description"])
 
 
 class TransitionAcknowledgmentTest(unittest.TestCase):
@@ -1286,6 +1361,9 @@ class RunnablePoolTest(unittest.TestCase):
                     mock.patch.object(lane, "load_providers", return_value=providers), \
                     mock.patch.object(lane, "Linear", return_value=tracker), \
                     mock.patch.object(lane, "in_flight_issues", return_value=frozenset({"JOV-OWNED"})), \
+                    mock.patch.object(lane, "open_hotspot_holds", return_value={}), \
+                    mock.patch.object(lane, "held_back_issues", return_value=frozenset()), \
+                    mock.patch.object(lane, "overlap_inventory", return_value=([], [])), \
                     mock.patch.object(lane, "load_github_env"), \
                     mock.patch.object(lane, "read_new_issue_budget", side_effect=lambda name, slots: lane.new_issue_budget(name, slots, [])), \
                     mock.patch.object(lane, "graphql_budget", return_value=None):
@@ -1524,6 +1602,9 @@ class AdmissionBackpressureTest(unittest.TestCase):
                     mock.patch.object(lane, "load_providers", return_value=providers), \
                     mock.patch.object(lane, "load_github_env"), \
                     mock.patch.object(lane, "in_flight_issues", return_value=frozenset()), \
+                    mock.patch.object(lane, "open_hotspot_holds", return_value={}), \
+                    mock.patch.object(lane, "held_back_issues", return_value=frozenset()), \
+                    mock.patch.object(lane, "overlap_inventory", return_value=([], [])), \
                     mock.patch.object(lane, "graphql_budget", return_value=None), \
                     mock.patch.object(lane, "read_new_issue_budget", side_effect=lambda name, slots: lane.new_issue_budget(name, slots, inventory)):
                 observed = doctor.observe(host, lane, SimpleNamespace(status=lambda: {}), now=10000)
@@ -2015,6 +2096,167 @@ class StatusFeedContractTest(unittest.TestCase):
             published = json.loads((Path(tmp) / "lanes-status.json").read_text())
             self.assertEqual((published["schema"], published["at"]), ("symphony-lanes-status/v1", feed["at"]))
 
+
+
+class WorkerCensusParityTest(unittest.TestCase):
+    def fixture(self, stack, host, lane, issues, inventory=([], [])):
+        providers = {"codex": {"label": "codex", "slots": 1}}
+        client = mock.Mock()
+        client.lane_issues.return_value = issues
+        for name, value in {
+            "Linear": client, "load_providers": providers, "load_github_env": None,
+            "in_flight_issues": frozenset(),
+            "open_hotspot_holds": {"scripts/lanes/lane_runner.py": 21724},
+            "held_back_issues": frozenset({"JOV-HELD"}), "overlap_inventory": inventory,
+        }.items():
+            stack.enter_context(mock.patch.object(lane, name, return_value=value))
+        return {"codex": {"slots": 1, "base": 1, "running": 0}}
+
+    def test_hotspot_and_preserved_only_pools_match_the_worker_and_keep_ready_neighbors(self):
+        from contextlib import ExitStack
+        lane = load("lane_runner")
+        issue = lambda key, path: lane.Issue(key, key, "Task", path, 1, "2026-01-01T00:00:00Z", [])
+        hot = issue("JOV-HOT", "scripts/lanes/lane_runner.py")
+        held = issue("JOV-HELD", "docs/preserved.md")
+        good = issue("JOV-GOOD", "docs/available.md")
+        with tempfile.TemporaryDirectory() as tmp, ExitStack() as stack:
+            host = lane.Host(state=Path(tmp), linear_env=Path(tmp) / "none")
+            capacity = self.fixture(stack, host, lane, [hot, held])
+            qualified, _, _, rejected, details = doctor.qualified_pool(host, lane, capacity, 10000)
+            self.assertEqual(qualified, {"codex": []})
+            self.assertEqual(rejected["codex"], {"hotspot-held": 1, "preserved-or-recovery-held": 1})
+            self.assertEqual(details["JOV-HOT"], "hotspot-held:scripts/lanes/lane_runner.py#21724")
+            lane.Linear.return_value.lane_issues.return_value = [hot, held, good]
+            qualified = doctor.qualified_pool(host, lane, capacity, 10000)[0]
+            picked = lane.pick_issue([hot, held, good], {}, now=10000, provider="codex",
+                                     holds=lane.open_hotspot_holds(), held_back=lane.held_back_issues(host))
+            self.assertEqual(qualified["codex"], [picked])
+            self.assertIs(picked, good)
+            self.assertEqual(list(host.state.iterdir()), [], "census cannot reserve or write telemetry")
+
+    def test_unavailable_file_ownership_is_unknown_and_blocked_preview_is_not_eligible(self):
+        from contextlib import ExitStack
+        lane = load("lane_runner")
+        issue = lane.Issue("id", "JOV-GOOD", "Task", "docs/available.md", 1, "2026-01-01T00:00:00Z", [])
+        with tempfile.TemporaryDirectory() as tmp, ExitStack() as stack:
+            host = lane.Host(state=Path(tmp), linear_env=Path(tmp) / "none")
+            capacity = self.fixture(stack, host, lane, [issue], inventory=None)
+            with self.assertRaisesRegex(RuntimeError, "file-overlap ownership unreadable"):
+                doctor.qualified_pool(host, lane, capacity, 10000)
+            lane.overlap_inventory.return_value = ([], [])
+            with mock.patch.object(doctor.file_overlap, "admission_policy", return_value={"allowed": False}), \
+                    mock.patch.object(doctor.file_overlap, "record_admission") as record:
+                qualified, _, _, rejected, _ = doctor.qualified_pool(host, lane, capacity, 10000)
+            self.assertEqual(qualified["codex"], [])
+            self.assertEqual(rejected["codex"], {"file-overlap-held": 1})
+            record.assert_not_called()
+
+    def test_preview_and_worker_use_identical_overlap_policy_but_only_worker_records(self):
+        overlap = doctor.file_overlap
+        issue = SimpleNamespace(identifier="JOV-GOOD")
+        with mock.patch.object(overlap, "guard_mode", return_value="flag"), \
+                mock.patch.object(overlap, "predict_issue_files", return_value={"files": ["x"], "source": "fixture"}), \
+                mock.patch.object(overlap, "classify_pair", return_value={"policyAction": "sequence"}), \
+                mock.patch.object(overlap, "record_admission") as record:
+            args = (issue, [{"number": 7, "files": ["x"]}], [], lambda _: {})
+            preview = overlap.admission_policy(*args)
+            record.assert_not_called()
+            self.assertEqual(overlap.admission_decisions("host", "lane", *args), preview)
+            record.assert_called_once_with("host", "lane", issue, preview["decisions"])
+
+
+class ProviderPayloadCensusTest(unittest.TestCase):
+    def process(self, proc, pid, name, cwd, args=None):
+        entry = proc / str(pid)
+        entry.mkdir(parents=True)
+        (entry / "comm").write_text(name)
+        (entry / "cmdline").write_bytes(b"\0".join(value.encode() for value in (args or ["/bin/" + name, "exec"])))
+        (entry / "cwd").symlink_to(cwd, target_is_directory=True)
+        (entry / "stat").write_text(str(pid) + " (" + name + ") " + " ".join(["S", "1"] + ["0"] * 17 + ["100", "0"]))
+        return entry
+
+    def test_native_payloads_are_separate_from_workers_and_unrelated_or_login_processes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp) / "state"
+            cwd = state / "worktrees/native-run"
+            cwd.mkdir(parents=True)
+            proc = Path(tmp) / "proc"
+            self.process(proc, 12, "codex", cwd)
+            self.process(proc, 13, "grok", cwd, ["/bin/grok", "--prompt-file", "prompt.md"])
+            self.process(proc, 14, "codex", cwd, ["/bin/codex", "login", "status"])
+            self.process(proc, 15, "codex", Path(tmp))
+            result = doctor.provider_payloads(state, ["codex", "grok", "devin"], proc)
+            self.assertEqual((result["codex"]["running"], result["codex"]["pids"]), (1, [12]))
+            self.assertEqual(result["grok"]["running"], 1)
+            self.assertIsNone(result["devin"]["running"])
+
+    def test_missing_probe_and_live_unreadable_identity_stay_unknown(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.assertIsNone(doctor.provider_payloads(root, ["codex"], root / "missing")["codex"]["running"])
+            cwd = root / "worktrees/run"
+            cwd.mkdir(parents=True)
+            proc = root / "proc"
+            entry = self.process(proc, 12, "codex", cwd)
+            (entry / "stat").unlink()
+            self.assertIsNone(doctor.provider_payloads(root, ["codex"], proc)["codex"]["running"])
+
+    def test_pid_reuse_is_unknown_instead_of_a_payload(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cwd = root / "worktrees/run"
+            cwd.mkdir(parents=True)
+            proc = root / "proc"
+            entry = self.process(proc, 12, "codex", cwd)
+            stat = (entry / "stat").read_text()
+            original = Path.read_text
+            calls = []
+            def read(path, *args, **kwargs):
+                if path == entry / "stat":
+                    calls.append(path)
+                    return stat if len(calls) == 1 else stat.replace("100", "101")
+                return original(path, *args, **kwargs)
+            with mock.patch.object(Path, "read_text", read):
+                result = doctor.provider_payloads(root, ["codex"], proc)
+            self.assertFalse(result["codex"]["known"])
+            self.assertIsNone(result["codex"]["running"])
+
+    def test_invalid_process_name_is_unknown_without_aborting_observation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cwd = root / "worktrees/run"
+            cwd.mkdir(parents=True)
+            proc = root / "proc"
+            entry = self.process(proc, 12, "codex", cwd)
+            (entry / "comm").write_bytes(b"\xff")
+            result = doctor.provider_payloads(root, ["codex", "grok"], proc)
+            self.assertIsNone(result["codex"]["running"])
+            self.assertIsNone(result["grok"]["running"])
+
+    def test_binding_payloads_share_the_host_census_but_unmanaged_neighbors_do_not(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            binding = root / "bindings/logyourbody/worktrees/run"
+            other = root / "bindings/logyourbody/unmanaged"
+            binding.mkdir(parents=True)
+            other.mkdir()
+            proc = root / "proc"
+            self.process(proc, 12, "codex", binding)
+            self.process(proc, 13, "grok", binding, ["/bin/grok", "--prompt-file", "prompt.md"])
+            self.process(proc, 14, "codex", other)
+            result = doctor.provider_payloads(root, ["codex", "grok"], proc)
+            self.assertEqual(result["codex"]["pids"], [12])
+            self.assertEqual(result["grok"]["pids"], [13])
+
+    def test_grok_models_is_health_even_inside_a_managed_worktree(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cwd = root / "worktrees/run"
+            cwd.mkdir(parents=True)
+            proc = root / "proc"
+            self.process(proc, 12, "grok", cwd, ["/bin/grok", "models"])
+            result = doctor.provider_payloads(root, ["grok"], proc)
+            self.assertEqual(result["grok"]["running"], 0)
 
 if __name__ == "__main__":
     unittest.main()

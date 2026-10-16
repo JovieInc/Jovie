@@ -8,6 +8,7 @@ import {
   evaluateGrowthLearning,
   GROWTH_LEARNING_INVARIANT_ID,
 } from '../invariants/growth-learning-policy.mjs';
+import { assertEventDrivenLearning } from '../lib/learning-trigger.mjs';
 
 // Consumer binding for JOV-INV-028: validate growth intake before projection.
 
@@ -21,14 +22,23 @@ export const DEFAULT_AUDIT_PATH = path.join(
 );
 export const CANONICAL_REGISTRY_PATH = 'canon/invariants.jsonl';
 export const STEWARDSHIP_SCHEMA = 'jovie-invariant-stewardship-audit/v1';
-export const GROWTH_LEARNING_INTAKE_SCHEMA = 'jovie-growth-learning-intake/v1';
+export const GROWTH_LEARNING_INTAKE_SCHEMA = 'jovie-growth-learning-intake/v2';
+const LEGACY_GROWTH_LEARNING_INTAKE_SCHEMA = 'jovie-growth-learning-intake/v1';
 export const GROWTH_LEARNING_SOURCE_REVISION_DIGEST_ALGORITHM =
   'sha256:sorted-source-id-ref-revision/v1';
 
 const GROWTH_LEARNING_PERIOD_PATTERN = /^\d{4}-W(?:0[1-9]|[1-4]\d|5[0-3])$/;
 const GROWTH_LEARNING_DIGEST_PATTERN = /^sha256:[a-f0-9]{64}$/;
-const GROWTH_LEARNING_DEDUPE_PATTERN =
+const LEGACY_GROWTH_LEARNING_DEDUPE_PATTERN =
   /^growth-learning:\d{4}-W(?:0[1-9]|[1-4]\d|5[0-3]):sha256:[a-f0-9]{64}$/;
+const GROWTH_LEARNING_DEDUPE_PATTERN =
+  /^growth-learning:v2:sha256:[a-f0-9]{64}:sha256:[a-f0-9]{64}$/;
+const GROWTH_LEARNING_EVENT_KINDS = new Set([
+  'evidence-threshold-crossed',
+  'exception',
+  'pending-job',
+  'terminal-result',
+]);
 const GROWTH_LEARNING_MAX_SOURCES = 5;
 const GROWTH_LEARNING_MAX_PROPOSALS = 1;
 
@@ -94,6 +104,7 @@ function notPresentGrowthLearning() {
   return {
     invariantId: GROWTH_LEARNING_INVARIANT_ID,
     status: 'not-present',
+    admissionEligible: false,
     records: 0,
     dedupeKey: null,
     errors: [],
@@ -121,6 +132,34 @@ function computeSourceRevisionDigest(records) {
     .digest('hex')}`;
 }
 
+/** Identity uses the producer's stable event/revision, never delivery time. */
+export function growthLearningEventDedupeKey(
+  causalEvent,
+  sourceRevisionDigest
+) {
+  if (
+    !GROWTH_LEARNING_EVENT_KINDS.has(causalEvent?.kind) ||
+    ![causalEvent?.id, causalEvent?.sourceRevision].every(
+      value =>
+        typeof value === 'string' &&
+        value.trim().length > 0 &&
+        value.length <= 200
+    ) ||
+    !GROWTH_LEARNING_DIGEST_PATTERN.test(sourceRevisionDigest ?? '')
+  )
+    return null;
+  const eventDigest = createHash('sha256')
+    .update(
+      JSON.stringify([
+        causalEvent.kind,
+        causalEvent.id,
+        causalEvent.sourceRevision,
+      ])
+    )
+    .digest('hex');
+  return `growth-learning:v2:sha256:${eventDigest}:${sourceRevisionDigest}`;
+}
+
 /**
  * Validate the optional growth-learning intake carried by the existing
  * evidence-only stewardship snapshot. This is preparation/validation only:
@@ -128,7 +167,7 @@ function computeSourceRevisionDigest(records) {
  */
 export function validateGrowthLearningIntake(
   intake,
-  { now = new Date() } = {}
+  { now = new Date(), eventName = process.env.GITHUB_EVENT_NAME } = {}
 ) {
   if (intake === undefined) return notPresentGrowthLearning();
 
@@ -142,14 +181,39 @@ export function validateGrowthLearningIntake(
     };
   }
 
-  if (intake.schemaVersion !== GROWTH_LEARNING_INTAKE_SCHEMA) {
+  const historical =
+    intake.schemaVersion === LEGACY_GROWTH_LEARNING_INTAKE_SCHEMA;
+  if (!historical) {
+    try {
+      assertEventDrivenLearning(eventName);
+    } catch {
+      return {
+        ...notPresentGrowthLearning(),
+        status: 'invalid',
+        errors: ['growth-learning-scheduled-intake-retired'],
+      };
+    }
+  }
+  if (!historical && intake.schemaVersion !== GROWTH_LEARNING_INTAKE_SCHEMA) {
     errors.push('growth-learning-intake-schema-invalid');
   }
   if (intake.authority !== 'evidence-only') {
     errors.push('growth-learning-intake-authority-invalid');
   }
-  if (!GROWTH_LEARNING_PERIOD_PATTERN.test(intake.period ?? '')) {
+  if (historical && !GROWTH_LEARNING_PERIOD_PATTERN.test(intake.period ?? '')) {
     errors.push('growth-learning-period-invalid');
+  }
+  if (!historical && intake.period !== undefined) {
+    errors.push('growth-learning-period-retired');
+  }
+  if (
+    !historical &&
+    !growthLearningEventDedupeKey(
+      intake.causalEvent,
+      intake.sourceRevisionDigest
+    )
+  ) {
+    errors.push('growth-learning-causal-event-invalid');
   }
   if (!GROWTH_LEARNING_DIGEST_PATTERN.test(intake.sourceDigest ?? '')) {
     errors.push('growth-learning-source-digest-invalid');
@@ -192,6 +256,18 @@ export function validateGrowthLearningIntake(
       }
       sourceCount += Array.isArray(record?.sources) ? record.sources.length : 0;
 
+      // Weekly receipts are display-only. Do not re-evaluate stale proposals
+      // into a fresh admission, including after a restart or calendar change.
+      if (historical) {
+        results.push({
+          id: recordId,
+          eligible: false,
+          causalCertification: 'not-certified',
+          nextAction: 'historical-only',
+          warnings: ['legacy-weekly-receipt'],
+        });
+        continue;
+      }
       let result;
       try {
         result = evaluateGrowthLearning(record, { now });
@@ -227,11 +303,15 @@ export function validateGrowthLearningIntake(
     }
   }
 
-  const expectedDedupeKey =
-    GROWTH_LEARNING_PERIOD_PATTERN.test(intake.period ?? '') &&
-    GROWTH_LEARNING_DIGEST_PATTERN.test(intake.sourceRevisionDigest ?? '')
+  const expectedDedupeKey = historical
+    ? GROWTH_LEARNING_PERIOD_PATTERN.test(intake.period ?? '') &&
+      GROWTH_LEARNING_DIGEST_PATTERN.test(intake.sourceRevisionDigest ?? '')
       ? `growth-learning:${intake.period}:${intake.sourceRevisionDigest}`
-      : null;
+      : null
+    : growthLearningEventDedupeKey(
+        intake.causalEvent,
+        intake.sourceRevisionDigest
+      );
   if (intake.dedupeKey !== expectedDedupeKey) {
     errors.push('growth-learning-dedupe-key-invalid');
   }
@@ -240,7 +320,10 @@ export function validateGrowthLearningIntake(
   } else {
     const priorKeys = new Set();
     for (const key of intake.priorDedupeKeys) {
-      if (!GROWTH_LEARNING_DEDUPE_PATTERN.test(key ?? '')) {
+      if (
+        !GROWTH_LEARNING_DEDUPE_PATTERN.test(key ?? '') &&
+        !LEGACY_GROWTH_LEARNING_DEDUPE_PATTERN.test(key ?? '')
+      ) {
         errors.push(`growth-learning-prior-dedupe-key-invalid:${key}`);
       }
       if (priorKeys.has(key)) {
@@ -258,9 +341,15 @@ export function validateGrowthLearningIntake(
     status:
       errors.length > 0
         ? 'invalid'
-        : intake.records?.length
-          ? 'validated'
-          : 'empty',
+        : historical
+          ? 'historical'
+          : intake.records?.length
+            ? 'validated'
+            : 'empty',
+    admissionEligible:
+      !historical &&
+      errors.length === 0 &&
+      results.some(result => result.eligible),
     records: Array.isArray(intake.records) ? intake.records.length : 0,
     dedupeKey: intake.dedupeKey ?? null,
     errors: [...new Set(errors)],

@@ -102,6 +102,19 @@ describe('ReleasesPageClient skeleton behavior', () => {
 
     expect(screen.queryByTestId('release-table-skeleton')).toBeNull();
     expect(screen.getByTestId('shell-releases-view')).toBeInTheDocument();
+    expect(screen.queryByTestId('library-surface')).not.toBeInTheDocument();
+  });
+
+  it('renders the releases matrix for the releases alias instead of the asset library', () => {
+    useReleasesQueryMock.mockReturnValue({
+      data: [{ id: 'r1' }],
+      isError: false,
+    });
+
+    render(<ReleaseCatalogPageClient view='list' />);
+
+    expect(screen.getByTestId('shell-releases-view')).toBeInTheDocument();
+    expect(screen.queryByTestId('library-surface')).not.toBeInTheDocument();
   });
 
   it('keeps the releases view mounted when populated data is present', async () => {

@@ -69,14 +69,11 @@ const ALLOWED_PATH_FRAGMENTS = [
 // rawDuration check; transition:all / will-change:all still run everywhere.
 const GRANDFATHERED_PATH_FRAGMENTS = [
   '/app/(home)/home.css',
-  '/app/(marketing)/changelog/changelog-editorial.css',
   '/app/globals.css',
   '/components/marketing/ProductScreenshotFrame.css',
   '/components/marketing/artist-profile/ArtistProfileLandingPage.css',
   '/components/marketing/artist-profile/captureShared.css',
   '/components/marketing/homepage-v2/HomepageV2Route.css',
-  '/components/organisms/HeaderNav.css',
-  '/components/site/MarketingFooter.css',
 ];
 
 const RAW_MS_DURATION_REGEX = /\b\d+ms\b/;

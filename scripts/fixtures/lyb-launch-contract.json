@@ -1,0 +1,184 @@
+{
+  "schema": "lyb-launch-contract/v1",
+  "sourceIssue": "JOV-6013",
+  "product": "lyb",
+  "repository": "JovieInc/LogYourBody",
+  "source": {
+    "sha": "b95b34da12c3f933e413b6f37b7ad503d2974151",
+    "nativeRegistry": "apps/ios/LogYourBody/DesignSystem/Theme.swift#WorldClassScreen",
+    "nativeNavigation": [
+      "apps/ios/LogYourBody/Views/MainTabView.swift",
+      "apps/ios/LogYourBody/Views/MainTabViewPolicies.swift"
+    ],
+    "webRegistry": "apps/web/src/app/**/page.tsx"
+  },
+  "promise": {
+    "audience": "People whose appearance is materially tied to their work: actors, models, musicians, and creators.",
+    "headline": "Your body-composition goal, planned around your next date.",
+    "explanation": "Set an outcome and a date. LogYourBody follows your photos and measurements, spots drift, and gives you one next action.",
+    "initialWedge": "GLP-1 + DEXA",
+    "requiredInputs": ["constraints", "outcome", "outcomeDate"],
+    "optionalInputs": ["dexa", "glp1Disclosure", "healthKit", "progressPhoto"]
+  },
+  "primarySurfaces": [
+    "ios.screen.photoTimeline",
+    "ios.screen.stats",
+    "ios.screen.chat"
+  ],
+  "requiredPaths": [
+    {
+      "id": "launch.baseline",
+      "tier": "simulator_interaction",
+      "requiredCaptures": ["baseline-manual"]
+    },
+    {
+      "id": "launch.deadline",
+      "tier": "simulator_interaction",
+      "requiredCaptures": ["outcome-date"]
+    },
+    {
+      "id": "launch.deadline-replan",
+      "tier": "service_integration",
+      "requiredCaptures": []
+    },
+    {
+      "id": "launch.directive",
+      "tier": "simulator_interaction",
+      "requiredCaptures": ["next-action"]
+    },
+    {
+      "id": "launch.drift",
+      "tier": "service_integration",
+      "requiredCaptures": []
+    },
+    {
+      "id": "launch.memory-isolation",
+      "tier": "service_integration",
+      "requiredCaptures": []
+    },
+    {
+      "id": "launch.navigation",
+      "tier": "simulator_interaction",
+      "requiredCaptures": ["launch-navigation"]
+    },
+    {
+      "id": "launch.promise",
+      "tier": "simulator_interaction",
+      "requiredCaptures": ["launch-promise"]
+    },
+    {
+      "id": "launch.recovery",
+      "tier": "simulator_interaction",
+      "requiredCaptures": ["launch-recovery"]
+    },
+    {
+      "id": "launch.return",
+      "tier": "simulator_interaction",
+      "requiredCaptures": ["return-next-action"]
+    },
+    {
+      "id": "launch.safety",
+      "tier": "service_integration",
+      "requiredCaptures": []
+    },
+    {
+      "id": "launch.stats",
+      "tier": "simulator_interaction",
+      "requiredCaptures": ["launch-stats"]
+    },
+    {
+      "id": "launch.timeline",
+      "tier": "simulator_interaction",
+      "requiredCaptures": ["launch-timeline"]
+    }
+  ],
+  "surfaces": {
+    "ios.mode.legacyFullDashboardBeta": "delete",
+    "ios.mode.photoTimelineHUD": "launch",
+    "ios.mode.weightLoggerMVP": "delete",
+    "ios.prototype.composerLoggingSelector": "hide",
+    "ios.screen.activeSessions": "launch",
+    "ios.screen.addProgressPhoto": "launch",
+    "ios.screen.appleHealth": "launch",
+    "ios.screen.biometricLock": "launch",
+    "ios.screen.bodyFatMethod": "repair",
+    "ios.screen.bodyFatValue": "launch",
+    "ios.screen.bodyScoreIntro": "repair",
+    "ios.screen.bodyScoreReveal": "repair",
+    "ios.screen.bugReport": "launch",
+    "ios.screen.calculation": "launch",
+    "ios.screen.chat": "repair",
+    "ios.screen.chooseHomeView": "delete",
+    "ios.screen.completeProfile": "repair",
+    "ios.screen.confirmImportedData": "launch",
+    "ios.screen.dailyReminder": "launch",
+    "ios.screen.deleteAccount": "launch",
+    "ios.screen.editProfile": "launch",
+    "ios.screen.email": "hide",
+    "ios.screen.exportData": "launch",
+    "ios.screen.firstProgressPhoto": "repair",
+    "ios.screen.glp1CheckIn": "repair",
+    "ios.screen.height": "launch",
+    "ios.screen.home": "repair",
+    "ios.screen.importPhotos": "hide",
+    "ios.screen.integrations": "launch",
+    "ios.screen.launch": "repair",
+    "ios.screen.legalConsent": "launch",
+    "ios.screen.logBodyFat": "launch",
+    "ios.screen.logWeight": "launch",
+    "ios.screen.metricDetail": "launch",
+    "ios.screen.paywall": "launch",
+    "ios.screen.photoTimeline": "launch",
+    "ios.screen.planUnavailable": "repair",
+    "ios.screen.privacyAndData": "launch",
+    "ios.screen.restorePurchases": "launch",
+    "ios.screen.settings": "launch",
+    "ios.screen.sexAtBirth": "launch",
+    "ios.screen.shareBodyScore": "hide",
+    "ios.screen.signIn": "launch",
+    "ios.screen.stats": "repair",
+    "ios.screen.syncDetails": "launch",
+    "ios.screen.trackingAndGoals": "repair",
+    "ios.screen.verifyAccount": "hide",
+    "ios.screen.visualEstimate": "hide",
+    "ios.screen.weight": "launch",
+    "ios.screen.whatsNew": "hide",
+    "ios.sheet.dexaImport": "launch",
+    "ios.sheet.trainingLiveSession": "hide",
+    "ios.sheet.voiceSetReview": "hide",
+    "web:/": "repair",
+    "web:/about": "hide",
+    "web:/blog": "hide",
+    "web:/blog/[slug]": "hide",
+    "web:/blog/tag/[tag]": "hide",
+    "web:/brand": "hide",
+    "web:/careers": "hide",
+    "web:/changelog": "hide",
+    "web:/dashboard": "delete",
+    "web:/delete-account": "launch",
+    "web:/download": "launch",
+    "web:/download/android": "delete",
+    "web:/download/ios": "launch",
+    "web:/health-disclosure": "launch",
+    "web:/import": "delete",
+    "web:/landing": "delete",
+    "web:/log": "delete",
+    "web:/mobile": "delete",
+    "web:/onboarding": "delete",
+    "web:/photos": "delete",
+    "web:/privacy": "launch",
+    "web:/security": "launch",
+    "web:/settings": "launch",
+    "web:/settings/account": "launch",
+    "web:/settings/data-export": "launch",
+    "web:/settings/notifications": "hide",
+    "web:/settings/preferences": "hide",
+    "web:/settings/profile": "hide",
+    "web:/settings/subscription": "launch",
+    "web:/signin": "repair",
+    "web:/signup": "repair",
+    "web:/steps": "delete",
+    "web:/support": "launch",
+    "web:/terms": "launch"
+  }
+}

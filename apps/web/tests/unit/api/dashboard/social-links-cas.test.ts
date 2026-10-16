@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   getCachedAuth: vi.fn(),
   profileLeftJoin: vi.fn(),
   selections: [] as Record<string, unknown>[],
+  confirmationReceipts: [] as { metadata: Record<string, unknown> }[],
   eq: vi.fn((left, right) => ({ left, right })),
   and: vi.fn((...conditions: unknown[]) => ({ conditions })),
   state: {
@@ -66,6 +67,7 @@ const mockDb = vi.hoisted(() => ({
       leftJoin: mocks.profileLeftJoin.mockReturnThis(),
       where: vi.fn().mockReturnThis(),
       limit: vi.fn(async () => {
+        if ('metadata' in selection) return mocks.confirmationReceipts;
         if ('internalUserId' in selection) {
           return [
             {
@@ -113,7 +115,14 @@ const mockDb = vi.hoisted(() => ({
   insert: vi.fn((table: unknown) => {
     if (table !== socialLinks) {
       return {
-        values: vi.fn().mockResolvedValue([]),
+        values: vi.fn(
+          async (values: { metadata?: Record<string, unknown> }) => {
+            if (values.metadata) {
+              mocks.confirmationReceipts.push({ metadata: values.metadata });
+            }
+            return [];
+          }
+        ),
       };
     }
 
@@ -236,9 +245,82 @@ describe('social link compare-and-swap routes', () => {
     };
     mocks.getCachedAuth.mockResolvedValue({ userId: 'internal-user-1' });
     mocks.selections = [];
+    mocks.confirmationReceipts = [];
     mocks.concurrentCreateWins = false;
     mocks.transactionTail = Promise.resolve();
     resetBarriers();
+  });
+
+  it('replays a lost acknowledgement without a second write, sync or audit', async () => {
+    const { POST } = await import('@/app/api/chat/confirm-link/route');
+    const body = {
+      profileId: PROFILE_ID,
+      platform: 'instagram',
+      url: 'https://instagram.com/newer',
+      normalizedUrl: 'https://instagram.com/newer',
+      requestId: 'confirmation-1',
+      expectedVersion: 1,
+    };
+    const request = (overrides = {}) =>
+      POST(
+        new Request('http://localhost/api/chat/confirm-link', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...body, ...overrides }),
+        })
+      );
+    const [first, duplicate] = await Promise.all([request(), request()]);
+    expect(first.status).toBe(200);
+    expect(duplicate.status).toBe(200);
+    const result = await first.json();
+    expect(await duplicate.json()).toEqual({ ...result, replayed: true });
+    expect(result.receipt).toEqual({
+      scopeId: PROFILE_ID,
+      requestId: body.requestId,
+      objectId: LINK_ID,
+      revision: 2,
+      durability: 'remote',
+    });
+    expect(await (await request({ reconcile: true })).json()).toEqual({
+      ...result,
+      replayed: true,
+    });
+    expect(mockDb.update).toHaveBeenCalledTimes(1);
+    expect(mocks.syncPrimaryMusicUrls).toHaveBeenCalledTimes(1);
+    expect(mocks.confirmationReceipts).toHaveLength(1);
+    const conflict = await request({
+      normalizedUrl: 'https://instagram.com/other',
+    });
+    expect(conflict.status).toBe(409);
+    expect(mockDb.update).toHaveBeenCalledTimes(1);
+    mocks.getCachedAuth.mockResolvedValue({ userId: 'another-user' });
+    expect((await request({ reconcile: true })).status).toBe(403);
+  });
+
+  it('reconciles an absent receipt without executing a mutation', async () => {
+    const { POST } = await import('@/app/api/chat/confirm-link/route');
+    const response = await POST(
+      new Request('http://localhost/api/chat/confirm-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          profileId: PROFILE_ID,
+          platform: 'instagram',
+          url: 'https://instagram.com/newer',
+          normalizedUrl: 'https://instagram.com/newer',
+          requestId: 'confirmation-1',
+          reconcile: true,
+        }),
+      })
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      success: false,
+      acknowledged: false,
+    });
+    expect(mockDb.update).not.toHaveBeenCalled();
+    expect(mockDb.insert).not.toHaveBeenCalled();
+    expect(mocks.syncPrimaryMusicUrls).not.toHaveBeenCalled();
   });
 
   it('authorizes a post-cutover profile by app user UUID without joining legacy Clerk identity', async () => {
