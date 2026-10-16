@@ -885,7 +885,7 @@ class DependencyOnlyGateTest(unittest.TestCase):
                 calls = []
                 def shell(args, **kwargs):
                     calls.append(args)
-                    if args[:2] == ["git", "fetch"]:
+                    if args[:6] == ["git", "-c", "core.hooksPath=" + os.devnull, "-c", "core.fsmonitor=false", "fetch"]:
                         return SimpleNamespace(returncode=0, stdout="", stderr="")
                     if args[0] == "git":
                         return subprocess.run(args, cwd=self.repo, capture_output=True, text=True)
@@ -921,7 +921,7 @@ class DependencyOnlyGateTest(unittest.TestCase):
         calls = []
         def shell(args, **kwargs):
             calls.append(args)
-            if args[:2] == ["git", "fetch"]:
+            if args[:6] == ["git", "-c", "core.hooksPath=" + os.devnull, "-c", "core.fsmonitor=false", "fetch"]:
                 return SimpleNamespace(returncode=0, stdout="", stderr="")
             if args[0] == "git":
                 return subprocess.run(args, cwd=self.repo, capture_output=True, text=True)
