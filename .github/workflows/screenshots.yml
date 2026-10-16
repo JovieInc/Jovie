@@ -923,7 +923,7 @@ jobs:
             --producer-job-id="$PRODUCER_JOB_ID" \
             --environment=local-production-build
 
-      - name: Upload onboarding-checkout screen proof
+      - name: Upload onboarding checkout screen proof
         id: onboarding-checkout-proof
         uses: ./.github/actions/upload-safe-playwright-artifact
         with:
