@@ -48,6 +48,12 @@ export default defineConfig({
   forbidOnly: true,
   retries: 1, // One retry in case of flaky image loads
   workers: 1,
+  // Playwright empties outputDir at the start of every invocation. Screen
+  // proofs live under test-results/screen-browser-proof-*, so this directory
+  // has to stay a sibling. Using test-results itself deleted the
+  // marketing-solutions and public-profile-about bundles when the checkout
+  // producer ran before their uploads.
+  outputDir: 'test-results/playwright-output',
   reporter: [['line']],
 
   timeout: 120_000,

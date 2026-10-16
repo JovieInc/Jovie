@@ -1191,6 +1191,28 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       workflow,
       /tests\/product-screenshots\/onboarding-checkout-screen-proof\.spec\.ts/
     );
+    // The status assertion names the route. Runs 38885464809 and 38887532509
+    // both failed this line with 404 and no path.
+    assert.match(
+      publicSpec,
+      /expect\(\s*response\?\.status\(\),\s*`\$\{screen\.screenId\} \$\{screen\.route\}`\s*\)\.toBe\(\s*200\s*\)/
+    );
+    // Checkout starts another Playwright process. It must not run until the
+    // public-screen proofs are uploaded: the default output directory is
+    // test-results/, and emptying it deletes those bundles.
+    const checkoutCapture = workflow.indexOf(
+      'Capture onboarding checkout screen proof'
+    );
+    const marketingUpload = workflow.indexOf(
+      'Upload marketing-solutions screen proof'
+    );
+    const aboutUpload = workflow.indexOf(
+      'Upload public-profile-about screen proof'
+    );
+    assert.ok(marketingUpload > 0);
+    assert.ok(aboutUpload > 0);
+    assert.ok(checkoutCapture > marketingUpload);
+    assert.ok(checkoutCapture > aboutUpload);
   });
 
   it('keeps the /artists producer identity synchronized with the trusted resolver (JOV-7125)', () => {
