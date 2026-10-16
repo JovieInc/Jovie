@@ -259,6 +259,12 @@ jobs:
           surface: production-web
           mutation: promote-staged-web-release
           risk-lane: ${{ steps.risk.outputs.risk_lane }}
+      - name: Fail closed when fleet deployment is blocked
+        if: always() && steps.policy.outcome == 'success' && steps.policy.outputs.deployment_allowed != 'true'
+        shell: bash
+        run: |
+          echo "::error::Fleet gate blocked production deployment (mode=${{ steps.policy.outputs.mode }}). The authorize step stayed green while Production Release was skipped."
+          exit 2
 
   authorize-production:
     name: Authorize exact main CI evidence

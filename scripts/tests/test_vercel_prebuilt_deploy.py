@@ -43,6 +43,24 @@ def test_staging_controller_is_independent_and_exact_sha() -> None:
     assert "https://staging.jov.ie/api/health/build-info" in production
 
 
+def test_blocked_fleet_deployment_fails_the_production_controller() -> None:
+    """A denied production deploy must fail Authorize fleet deployment state.
+
+    Exit 0 with deployment_allowed=false skipped Production Release and left
+    the controller green. The wrapper fails the deployment consumer, and the
+    job still fails if that step is ever reported success without authority.
+    """
+    production = (REPO_ROOT / ".github/workflows/production-controller.yml").read_text()
+    job = production.split("  fleet-promotion:", 1)[1].split("  authorize-production:", 1)[0]
+    assert "continue-on-error:" not in job
+    assert "Fail closed when fleet deployment is blocked" in job
+    assert "steps.policy.outputs.deployment_allowed != 'true'" in job
+    wrapper = (REPO_ROOT / "scripts/fleet-gate/evaluate-fleet-gate.sh").read_text()
+    assert 'consumer" == "deployment" && "$deployment_allowed" != "true"' in wrapper
+    assert "Fleet gate blocked production deployment" in wrapper
+    assert "fleet-gate.scoped allowed=$scoped_allowed" in wrapper
+
+
 def test_staging_lineage_receipt_accepts_merge_group_provenance(tmp_path: Path) -> None:
     """JOV-7182: release.json provenance is the merge-queue proof run, not the
     main push run. When CI is re-run or evidence came from merge_group, the
