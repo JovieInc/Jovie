@@ -344,9 +344,7 @@ test.describe('Dropdown Parity — Noir Ion', () => {
 
   // ─── Icon ────────────────────────────────────────────────────────────────
 
-  test('icon: 16×16px size and Lucide stroke 2', async ({
-    page,
-  }) => {
+  test('icon: 16×16px size and Lucide stroke 2', async ({ page }) => {
     const icon = page
       .locator('[data-testid="menu-normal"] [data-testid="item-normal"] svg')
       .first();
