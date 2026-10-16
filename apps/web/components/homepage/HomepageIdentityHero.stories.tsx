@@ -10,6 +10,7 @@ const meta = {
       <RenderedFamily
         name='homepage-identity-hero'
         owner='HomepageIdentityHero'
+        keyboardTargetSelector='button[data-testid="homepage-primary-cta"]'
         interactive
       >
         <Story />
