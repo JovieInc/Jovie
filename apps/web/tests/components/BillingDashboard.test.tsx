@@ -198,6 +198,31 @@ describe('BillingDashboard', () => {
     expect(screen.getByText('Retry')).toBeInTheDocument();
   });
 
+  it('renders the error banner when pricing fails while billing status is still loading', async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation(
+      (url: string) => {
+        if (String(url).includes('/api/stripe/pricing-options')) {
+          return Promise.resolve(
+            new Response('unavailable', {
+              status: 503,
+              statusText: 'Service Unavailable',
+            })
+          );
+        }
+        return new Promise(() => {});
+      }
+    );
+
+    renderBillingDashboard();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('billing-error-state')).toBeInTheDocument();
+    });
+    expect(
+      screen.getByText('Billing is temporarily unavailable')
+    ).toBeInTheDocument();
+  });
+
   it('renders plan comparison grid with Free, Pro, and Max columns', async () => {
     mockFetchResponses({
       '/api/billing/status': BILLING_STATUS_FREE,

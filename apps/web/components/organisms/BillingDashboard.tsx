@@ -39,8 +39,12 @@ const BillingDashboardContent = memo(function BillingDashboardContent() {
   const historyQuery = useBillingHistoryQuery();
   const cancelMutation = useCancelSubscriptionMutation();
 
-  const isLoading = billingQuery.isLoading || pricingQuery.isLoading;
-  const hasError = Boolean(billingQuery.error || pricingQuery.error);
+  // A failed sibling must not stay behind the other query's skeleton.
+  // Pricing 503s while billing status is still inside its deadline, and
+  // `isLoading` is true for the whole pair until both settle.
+  const hasError = billingQuery.isError || pricingQuery.isError;
+  const isLoading =
+    !hasError && (billingQuery.isLoading || pricingQuery.isLoading);
 
   useEffect(() => {
     if (hasError && !isLoading) {
