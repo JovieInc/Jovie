@@ -22,6 +22,12 @@ test('the complete current source tree conforms', () => {
 });
 for (const [name, path, source, expected] of [
   [
+    'competing field write metadata beside a registered adapter',
+    'connectors/spotify/profile.ts',
+    "import type { ProfileWriteAdapter } from '../profile-writes/contract'; import { getProfileWriteManifest } from '../profile-writes/manifest'; export const adapter: ProfileWriteAdapter = { manifest: getProfileWriteManifest('spotify') }; const alternate = { bio: { write: 'supported' as const } };",
+    'competing capability metadata write',
+  ],
+  [
     'malformed provider source',
     'dsp-bio-sync/providers.ts',
     'export const DSP_BIO_PROVIDERS = { broken: ;',

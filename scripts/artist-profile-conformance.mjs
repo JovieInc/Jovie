@@ -188,8 +188,14 @@ export function checkArtistProfileConformance(sources) {
       if (!ts.isPropertyAssignment(node) && !ts.isPropertyDeclaration(node))
         return;
       const name = node.name.getText(tree).replace(/['"]/g, '');
-      const value = node.initializer;
+      let value = node.initializer;
       if (!value) return;
+      while (
+        ts.isAsExpression(value) ||
+        ts.isSatisfiesExpression(value) ||
+        ts.isParenthesizedExpression(value)
+      )
+        value = value.expression;
       const literal =
         ts.isStringLiteral(value) ||
         ts.isNumericLiteral(value) ||
@@ -202,18 +208,27 @@ export function checkArtistProfileConformance(sources) {
         literal &&
         [
           'artistProfile',
+          'authorization',
+          'availability',
           'capabilities',
+          'confirmation',
+          'constraints',
           'enabled',
           'evidenceExpiresAt',
           'evidenceRef',
           'fields',
           'maxBioLength',
+          'preview',
           'rateLimit',
           'rateLimitWindowSeconds',
+          'read',
           'requiredScopes',
           'rollback',
+          'support',
+          'supports',
           'supportsWrite',
           'termsApproved',
+          'write',
           'writeSupported',
         ].includes(name)
       )
