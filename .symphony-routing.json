@@ -1,0 +1,29 @@
+{
+  "schema": "symphony-routing/v1",
+  "issue": "JOV-4151",
+  "modelId": "codex-luna",
+  "model": "gpt-5.6-luna",
+  "escalation": false,
+  "fallback": null,
+  "classification": {
+    "risk": "low",
+    "complexity": "low",
+    "capabilities": [
+      "mechanical",
+      "code"
+    ],
+    "reasons": [
+      "capabilities=mechanical,code",
+      "risk=low",
+      "complexity=low"
+    ]
+  },
+  "candidates": [],
+  "capacity": {
+    "accounts": 4,
+    "ready": 0,
+    "active": null,
+    "readable": true
+  },
+  "fingerprint": "9062055f630968f00760c94a"
+}
