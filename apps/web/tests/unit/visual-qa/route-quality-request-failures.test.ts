@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   classifySameOriginRequestFailure,
   formatRequestFailure,
+  isAbortedNextRscPrefetch,
   isDiagnosticAbortedImageRequest,
 } from '../../visual-qa/aborted-image-request';
 
@@ -95,5 +96,83 @@ describe('classifySameOriginRequestFailure', () => {
         sameOrigin: false,
       })
     ).toBe('ignored');
+  });
+
+  it('ignores same-origin Next.js RSC prefetch aborts', () => {
+    expect(
+      isAbortedNextRscPrefetch({
+        errorText: 'net::ERR_ABORTED',
+        url: `${ORIGIN}/product?_rsc=5CB68i4pnAekjehf`,
+      })
+    ).toBe(true);
+    expect(
+      classifySameOriginRequestFailure({
+        errorText: 'net::ERR_ABORTED',
+        resourceType: 'fetch',
+        sameOrigin: true,
+        url: `${ORIGIN}/pricing?_rsc=RUAe2X0j7vp0IAZ6`,
+      })
+    ).toBe('ignored');
+    expect(
+      classifySameOriginRequestFailure({
+        errorText: 'net::ERR_ABORTED',
+        headers: { RSC: '1' },
+        resourceType: 'fetch',
+        sameOrigin: true,
+        url: `${ORIGIN}/pricing`,
+      })
+    ).toBe('ignored');
+    expect(
+      classifySameOriginRequestFailure({
+        errorText: 'net::ERR_ABORTED',
+        headers: { accept: 'text/x-component, */*' },
+        resourceType: 'xhr',
+        sameOrigin: true,
+        url: `${ORIGIN}/product`,
+      })
+    ).toBe('ignored');
+  });
+
+  it('keeps non-RSC aborts and non-abort RSC failures', () => {
+    expect(
+      classifySameOriginRequestFailure({
+        errorText: 'net::ERR_ABORTED',
+        resourceType: 'stylesheet',
+        sameOrigin: true,
+        url: `${ORIGIN}/_next/static/chunks/app.css`,
+      })
+    ).toBe('failed-request');
+    expect(
+      classifySameOriginRequestFailure({
+        errorText: 'net::ERR_ABORTED',
+        headers: { 'next-router-prefetch': '1' },
+        resourceType: 'document',
+        sameOrigin: true,
+        url: `${ORIGIN}/product`,
+      })
+    ).toBe('failed-request');
+    expect(
+      classifySameOriginRequestFailure({
+        errorText: 'net::ERR_ABORTED',
+        resourceType: 'fetch',
+        sameOrigin: true,
+        url: `${ORIGIN}/product/_rsc`,
+      })
+    ).toBe('failed-request');
+    for (const errorText of [
+      'net::ERR_CONNECTION_REFUSED',
+      'net::ERR_FAILED',
+      undefined,
+    ]) {
+      expect(
+        classifySameOriginRequestFailure({
+          errorText,
+          headers: { rsc: '1', accept: 'text/x-component' },
+          resourceType: 'fetch',
+          sameOrigin: true,
+          url: `${ORIGIN}/product?_rsc=5CB68i4pnAekjehf`,
+        })
+      ).toBe('failed-request');
+    }
   });
 });
