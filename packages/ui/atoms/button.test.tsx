@@ -642,6 +642,32 @@ describe('Button', () => {
     expect(screen.getByRole('button')).toBeDisabled();
   });
 
+  it('keeps disabled label color on the readable disabled token, not an opacity fade', () => {
+    // JOV-8484: aria-disabled:opacity-[0.5] composites the label against the
+    // surface (e.g. #a0a5af on #07080a collapses to ~#54565c = 2.7:1), which
+    // fails axe color-contrast on real screens. Disabled buttons must instead
+    // render at full opacity with the dedicated disabled-token text color.
+    const source = readFileSync(
+      path.join(process.cwd(), 'atoms/button.tsx'),
+      {
+        encoding: 'utf8',
+      }
+    );
+
+    const baseClasses = /cva\(\s*'([^']+)'/.exec(source)?.[1] ?? '';
+    expect(baseClasses).toContain(
+      'aria-disabled:text-(--color-text-disabled-token)'
+    );
+    expect(baseClasses).not.toContain('aria-disabled:opacity-');
+
+    render(<Button disabled>Off</Button>);
+    const btn = screen.getByRole('button');
+    expect(btn.className).not.toMatch(/aria-disabled:opacity-/);
+    expect(btn.className).toContain(
+      'aria-disabled:text-(--color-text-disabled-token)'
+    );
+  });
+
   it.each([undefined, 'spinner'] as const)(
     'preserves legacy loading for presentation %s',
     pendingPresentation => {
