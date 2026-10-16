@@ -48,7 +48,7 @@ describe('EntitySidebarShell', () => {
       </EntitySidebarShell>
     );
 
-    const close = screen.getByRole('button', { name: 'Close', exact: true });
+    const close = screen.getByRole('button', { name: 'Close' });
     fireEvent.click(close);
     expect(onClose).toHaveBeenCalledOnce();
     expect(close.closest('[data-testid="entity-header"]')).toHaveClass(
@@ -68,9 +68,7 @@ describe('EntitySidebarShell', () => {
         <div>Inspector content</div>
       </EntitySidebarShell>
     );
-    expect(
-      screen.queryByRole('button', { name: 'Close', exact: true })
-    ).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Close' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'More actions' })).toBeNull();
   });
 
@@ -92,7 +90,7 @@ describe('EntitySidebarShell', () => {
         <div>Track content</div>
       </EntitySidebarShell>
     );
-    const close = screen.getAllByRole('button', { name: 'Close', exact: true });
+    const close = screen.getAllByRole('button', { name: 'Close' });
     expect(close).toHaveLength(1);
     fireEvent.click(close[0]);
     expect(onClose).toHaveBeenCalledOnce();
@@ -115,7 +113,7 @@ describe('EntitySidebarShell', () => {
       </EntitySidebarShell>
     );
     expect(screen.queryByText('Unavailable identity')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Close', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(onClose).toHaveBeenCalledOnce();
   });
 
@@ -135,7 +133,7 @@ describe('EntitySidebarShell', () => {
       </EntitySidebarShell>
     );
     expect(screen.getByText('Entity identity')).toBeInTheDocument();
-    const close = screen.getAllByRole('button', { name: 'Close', exact: true });
+    const close = screen.getAllByRole('button', { name: 'Close' });
     expect(close).toHaveLength(1);
     fireEvent.click(close[0]);
     expect(onClose).toHaveBeenCalledOnce();
