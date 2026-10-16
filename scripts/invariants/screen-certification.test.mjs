@@ -1468,7 +1468,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
         proofRequests: [{ artifactId: 99, screenId: 'web.artists' }],
       });
       assert.deepEqual(
-        marketing.receipt.changedScreens.map(screen => screen.id).toSorted(),
+        [...marketing.receipt.changedScreens.map(screen => screen.id)].sort(),
         ['web.artists', 'web.homepage']
       );
       // Run 38909991473 applied the marketing zip (12049743189) to
@@ -1512,7 +1512,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
         /web\.homepage: trusted producer artifact 12049160869 is not acceptable/
       );
       assert.deepEqual(
-        checkout.receipt.changedScreens.map(screen => screen.id).toSorted(),
+        [...checkout.receipt.changedScreens.map(screen => screen.id)].sort(),
         ['web.homepage', 'web.onboarding-checkout']
       );
     } finally {
