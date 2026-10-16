@@ -1,5 +1,5 @@
 {
-  "id": "ac938f79-fa82-4f8f-80ee-0f7f987bb48c",
+  "id": "4825cf5c-7ef8-49f9-ba18-edc0f16d8016",
   "prevId": "531f07a9-51c3-460d-a97c-ae8aca6f0f5b",
   "version": "7",
   "dialect": "postgresql",
@@ -2896,18 +2896,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "legacy_key": {
-          "name": "legacy_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "legacy_payload": {
-          "name": "legacy_payload",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
         "label": {
           "name": "label",
           "type": "text",
@@ -3017,27 +3005,6 @@
         }
       },
       "indexes": {
-        "audience_actions_member_legacy_key_unique": {
-          "name": "audience_actions_member_legacy_key_unique",
-          "columns": [
-            {
-              "expression": "audience_member_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "legacy_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "audience_actions_creator_profile_id_timestamp_idx": {
           "name": "audience_actions_creator_profile_id_timestamp_idx",
           "columns": [
@@ -3753,173 +3720,6 @@
           "tableTo": "creator_profiles",
           "columnsFrom": [
             "creator_profile_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.audience_projection_snapshots": {
-      "name": "audience_projection_snapshots",
-      "schema": "",
-      "columns": {
-        "audience_member_id": {
-          "name": "audience_member_id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "original": {
-          "name": "original",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "audience_projection_snapshots_audience_member_id_audience_members_id_fk": {
-          "name": "audience_projection_snapshots_audience_member_id_audience_members_id_fk",
-          "tableFrom": "audience_projection_snapshots",
-          "tableTo": "audience_members",
-          "columnsFrom": [
-            "audience_member_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.audience_referrers": {
-      "name": "audience_referrers",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "audience_member_id": {
-          "name": "audience_member_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "url": {
-          "name": "url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "source": {
-          "name": "source",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "legacy_key": {
-          "name": "legacy_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "legacy_payload": {
-          "name": "legacy_payload",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "timestamp": {
-          "name": "timestamp",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "now()"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "audience_referrers_member_legacy_key_unique": {
-          "name": "audience_referrers_member_legacy_key_unique",
-          "columns": [
-            {
-              "expression": "audience_member_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "legacy_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "audience_referrers_member_ts_idx": {
-          "name": "audience_referrers_member_ts_idx",
-          "columns": [
-            {
-              "expression": "audience_member_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "timestamp",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "audience_referrers_audience_member_id_audience_members_id_fk": {
-          "name": "audience_referrers_audience_member_id_audience_members_id_fk",
-          "tableFrom": "audience_referrers",
-          "tableTo": "audience_members",
-          "columnsFrom": [
-            "audience_member_id"
           ],
           "columnsTo": [
             "id"
@@ -8290,6 +8090,132 @@
           "onUpdate": "no action"
         }
       },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.connector_write_receipts": {
+      "name": "connector_write_receipts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "proposal_id": {
+          "name": "proposal_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "connector_account_id": {
+          "name": "connector_account_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "phase": {
+          "name": "phase",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rate_key": {
+          "name": "rate_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "receipt": {
+          "name": "receipt",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "recorded_at": {
+          "name": "recorded_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "connector_write_receipts_phase_uniq": {
+          "name": "connector_write_receipts_phase_uniq",
+          "columns": [
+            {
+              "expression": "proposal_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "phase",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "connector_write_receipts_rate_uniq": {
+          "name": "connector_write_receipts_rate_uniq",
+          "columns": [
+            {
+              "expression": "rate_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "connector_write_receipts_user_account_idx": {
+          "name": "connector_write_receipts_user_account_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "connector_account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "recorded_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},

@@ -211,6 +211,7 @@ export {
   type NewCodingAgentRun,
   selectCodingAgentRunSchema,
 } from './coding-agent-runs';
+export { connectorWriteReceipts } from './connector-write-receipts';
 // AI Connectors (v1)
 export {
   type AgentRun,

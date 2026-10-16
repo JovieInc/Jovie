@@ -1,6 +1,10 @@
+import { chmodSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   classifyGitHubFailure,
+  commandWantsFileStdout,
   isGitHubInfrastructureFailure,
   NONE,
   PRIMARY,
@@ -206,6 +210,47 @@ describe('runWithGitHubRetry', () => {
     });
     expect(result).toMatchObject({ code: 1, deferred: false, kind: NONE });
     expect(calls).toHaveLength(1);
+  });
+
+  it('gives gh a file for artifact zip bodies', async () => {
+    expect(
+      commandWantsFileStdout([
+        'gh',
+        'api',
+        'repos/JovieInc/Jovie/actions/artifacts/1/zip',
+      ])
+    ).toBe(true);
+    expect(
+      commandWantsFileStdout([
+        'gh',
+        'api',
+        'repos/JovieInc/Jovie/compare/a...b',
+      ])
+    ).toBe(false);
+    const dir = mkdtempSync(join(tmpdir(), 'gh-zip-'));
+    const bin = join(dir, 'gh.mjs');
+    writeFileSync(
+      bin,
+      [
+        'import { fstatSync } from "node:fs";',
+        'const fifo = (fstatSync(1).mode & 0o170000) === 0o010000;',
+        'if (fifo) {',
+        '  process.stderr.write("refusing to output binary content (application/zip)\\n");',
+        '  process.exit(1);',
+        '}',
+        'process.stdout.write(Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x7a]));',
+        '',
+      ].join('\n')
+    );
+    chmodSync(bin, 0o755);
+    const result = await runWithGitHubRetry(
+      [process.execPath, bin, 'api', 'repos/o/r/actions/artifacts/9/zip'],
+      { attempts: 1, maxWaitMs: 0, log: () => {} }
+    );
+    expect(result.code).toBe(0);
+    expect(Buffer.from(result.stdout)).toEqual(
+      Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x7a])
+    );
   });
 
   it('backs off transient 5xx up to the attempt cap', async () => {

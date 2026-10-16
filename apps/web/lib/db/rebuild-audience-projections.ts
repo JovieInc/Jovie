@@ -1,6 +1,7 @@
 import { and, asc, sql as drizzleSql, eq, gt } from 'drizzle-orm';
 import { z } from 'zod';
 import type { DbOrTransaction } from '@/lib/db';
+import { hasUnownedAudienceRelationship } from '@/lib/db/queries/analytics';
 import {
   type HistoryEvent,
   type Payload,
@@ -112,19 +113,15 @@ async function rebuildMember(
   const relationships = [...actions, ...actionInserts].filter(
     row => row.sourceLinkId || row.clickEventId
   );
-  if (relationships.length) {
-    const result = await tx.execute<{ invalid: string }>(drizzleSql`
-      SELECT count(*)::text AS invalid FROM jsonb_to_recordset(
-        ${JSON.stringify(relationships.map(row => ({ source: row.sourceLinkId, click: row.clickEventId })))}::jsonb
-      ) AS relation(source uuid, click uuid)
-      WHERE (source IS NOT NULL AND NOT EXISTS (
-        SELECT 1 FROM audience_source_links WHERE id = source AND creator_profile_id = ${member.creatorProfileId}::uuid
-      )) OR (click IS NOT NULL AND NOT EXISTS (
-        SELECT 1 FROM click_events WHERE id = click AND creator_profile_id = ${member.creatorProfileId}::uuid
-      ))
-    `);
-    if (result.rows[0]?.invalid !== '0')
-      throw new Error('Historical relationship ownership mismatch');
+  if (
+    relationships.length &&
+    (await hasUnownedAudienceRelationship(
+      tx,
+      member.creatorProfileId,
+      relationships
+    ))
+  ) {
+    throw new Error('Historical relationship ownership mismatch');
   }
   const firstText = (projection: Payload[], key: string) =>
     typeof projection[0]?.[key] === 'string'

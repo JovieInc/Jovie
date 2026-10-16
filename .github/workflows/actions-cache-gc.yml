@@ -49,6 +49,7 @@ jobs:
           sparse-checkout: |
             scripts/lib/actions-cache-gc.mjs
             scripts/lib/actions-cache-supersede.mjs
+            scripts/lib/github-installation-quota.mjs
           sparse-checkout-cone-mode: false
 
       - name: Setup Node.js

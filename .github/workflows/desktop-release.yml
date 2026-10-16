@@ -1130,7 +1130,10 @@ jobs:
           ref: main
           path: origin-policy
           persist-credentials: false
-          sparse-checkout: scripts/lanes
+          sparse-checkout: |
+            scripts/shipping_origin.py
+            scripts/lanes
+          sparse-checkout-cone-mode: false
 
       - name: Create deterministic desktop release stamp PR
         env:

@@ -116,14 +116,14 @@ No existing event IDs, times, properties/context or relationships are rewritten.
 Historical action `sourceLinkId` / `clickEventId` are validated against the member's
 profile before insertion; existing normalized relationships receive the same
 check. Missing legacy action labels can use the seed's `action` string without
-rewriting its raw shape. Missing referrer times become NULL: migration 0140 only
+rewriting its raw shape. Missing referrer times become NULL: migration 0141 only
 relaxes nullability, never converts or rewrites existing instants (JOV-3063).
 
 Rebuild reads normalized events plus the retained original and current fallback.
 The original snapshot stays immutable; later JSONB-only `/api/track` initial
 referrers and the visit route's missing-table fallback are imported on the next
 pass. Registering `audienceReferrers` in the schema barrel repairs generation;
-0140 tolerates the table already created by 0030. Existing compatibility writers
+0141 tolerates the table already created by 0030. Existing compatibility writers
 and readers stay enabled. Projections select timestamp descending, NULLs last,
 then UUID ascending; retain five actions and three referrers and rebuild their
 scalar label/URL. Older overflow remains in normalized history and raw snapshots.
