@@ -1071,7 +1071,7 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     }
   );
 
-  it('JOV-8580: declines another avatar attempt after the read admission window expires', async () => {
+  it('JOV-8580: declines another avatar attempt after the read retry budget expires', async () => {
     const clock = vi.spyOn(performance, 'now').mockReturnValue(0);
     setupFailures.set(2, () => {
       clock.mockReturnValue(9000);
