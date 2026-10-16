@@ -2034,28 +2034,35 @@ private final class PushLifecycleHarness {
   let suiteName: String
   let defaults: UserDefaults
   let service = PushLifecycleService()
+  let remoteNotificationsAvailable: Bool
   var registerCount = 0
   var unregisterCount = 0
+  var permissionCount = 0
   var status: @MainActor () async -> UNAuthorizationStatus = { .authorized }
   var permission: @MainActor () async throws -> Bool = { true }
   lazy var manager: PushNotificationManager = {
     let manager = PushNotificationManager(
       system: PushNotificationSystem(
         authorizationStatus: { [unowned self] in await self.status() },
-        requestAuthorization: { [unowned self] in try await self.permission() },
+        requestAuthorization: { [unowned self] in
+          self.permissionCount += 1
+          return try await self.permission()
+        },
         register: { [unowned self] in self.registerCount += 1 },
         unregister: { [unowned self] in self.unregisterCount += 1 }
       ),
-      defaults: defaults
+      defaults: defaults,
+      remoteNotificationsAvailable: remoteNotificationsAvailable
     )
     manager.configure(apiClient: service)
     return manager
   }()
 
-  init() {
+  init(remoteNotificationsAvailable: Bool = true) {
     let name = "PushLifecycleTests-\(UUID().uuidString)"
     suiteName = name
     defaults = UserDefaults(suiteName: name)!
+    self.remoteNotificationsAvailable = remoteNotificationsAvailable
   }
   func cleanup() { defaults.removePersistentDomain(forName: suiteName) }
   var storedToken: String? { defaults.string(forKey: Self.tokenKey) }
@@ -2073,6 +2080,33 @@ private final class PushLifecycleHarness {
 @Suite(.serialized)
 @MainActor
 struct PushNotificationManagerTests {
+  @Test func releaseBuildWithoutPushEntitlementDoesNotRegisterOrPrompt() async throws {
+    try await withNativeSessionTokenStoreTestIsolation { @MainActor in
+      let harness = PushLifecycleHarness(remoteNotificationsAvailable: false)
+      defer { harness.cleanup() }
+      _ = try harness.saveSession()
+      harness.status = { .notDetermined }
+      await harness.manager.activate()
+      await harness.manager.didRegister(deviceToken: Data([0xAA]))
+      #expect(harness.permissionCount == 0)
+      #expect(harness.registerCount == 0)
+      #expect(harness.unregisterCount == 0)
+      #expect(harness.storedToken == nil)
+      #expect(await harness.service.requests().uploads.isEmpty)
+    }
+  }
+
+  @Test func distributionPushWalletFlagDisablesOnlyAnExplicitNo() {
+    #expect(DistributionPushWalletCapability.isEnabled(infoValue: "YES"))
+    #expect(DistributionPushWalletCapability.isEnabled(infoValue: nil))
+    #expect(!DistributionPushWalletCapability.isEnabled(infoValue: "NO"))
+    #expect(
+      !DistributionPushWalletCapability.isEnabled(
+        infoValue: "$(JOVIE_DISTRIBUTION_PUSH_WALLET)"
+      )
+    )
+  }
+
   @Test(arguments: [false, true])
   func staleOwnedDeactivationCannotCancelReplacementRegistration(emptyClaim: Bool) async throws {
     try await withNativeSessionTokenStoreTestIsolation { @MainActor in
