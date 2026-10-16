@@ -113,6 +113,19 @@ describe('launch page System B source contract', () => {
     }
   });
 
+  it('lets the hero title scale below 48px on narrow phones', () => {
+    const source = extractLaunchCss(
+      readFileSync(resolve(process.cwd(), designSystemPath), 'utf8')
+    );
+    const heroTitleRule =
+      source.match(/\.system-b-launch-hero-title\s*\{[^}]+\}/)?.[0] ?? '';
+
+    expect(heroTitleRule).toContain('text-wrap: balance;');
+    expect(heroTitleRule).toMatch(
+      /font-size:\s*clamp\(\s*var\(--text-3xl\),\s*13cqi,/
+    );
+  });
+
   it('makes the mobile audience overflow region keyboard focusable', () => {
     const source = readFileSync(resolve(process.cwd(), pageSourcePath), 'utf8');
 

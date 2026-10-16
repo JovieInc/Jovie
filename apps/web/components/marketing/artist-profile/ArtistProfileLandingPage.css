@@ -414,7 +414,7 @@ body:has(.system-b-launch-page) .marketing-glass-header__cta:focus-visible {
   margin: var(--space-5) 0 0;
   color: var(--system-b-text-primary);
   font-size: clamp(
-    var(--text-5xl),
+    var(--text-3xl),
     13cqi,
     calc(var(--text-5xl) + var(--space-8))
   );
