@@ -1,4 +1,4 @@
-import { spawn, spawnSync } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import {
   chmodSync,
@@ -9,6 +9,7 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
+import { createServer as createHttpsServer } from 'node:https';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -1577,4 +1578,223 @@ describe('controller starvation bound', () => {
       'if [ "$current_main_sha" != "$EXPECTED_SHA" ]; then\n            record_receipt "superseded"'
     );
   });
+});
+
+describe('staging Git HTTPS authentication (JOV-8026)', () => {
+  const gate = resolve(
+    import.meta.dirname,
+    '../../../.github/scripts/recheck-main-lineage.sh'
+  );
+  const token = 'harness-token';
+  const encoded = Buffer.from(`x-access-token:${token}`).toString('base64');
+
+  /** @param {{ mode?: string, wrongToken?: boolean, denyFetch?: boolean }} [options] */
+  async function recheck({
+    mode = 'ahead',
+    wrongToken = false,
+    denyFetch = false,
+  } = {}) {
+    const root = mkdtempSync(join(tmpdir(), 'lineage-https-'));
+    const seed = join(root, 'seed');
+    const output = join(root, 'output');
+    const trace = join(root, 'trace');
+    const key = join(root, 'key');
+    const cert = join(root, 'cert');
+    const gitEnv = {
+      PATH: process.env.PATH,
+      GIT_CONFIG_GLOBAL: '/dev/null',
+      GIT_CONFIG_NOSYSTEM: '1',
+      GIT_AUTHOR_NAME: 'Lineage fixture',
+      GIT_AUTHOR_EMAIL: 'fixture@example.invalid',
+      GIT_COMMITTER_NAME: 'Lineage fixture',
+      GIT_COMMITTER_EMAIL: 'fixture@example.invalid',
+    };
+    /** @param {...string} args */
+    const git = (...args) =>
+      execFileSync('git', args, { env: gitEnv, encoding: 'utf8' }).trim();
+    /** @type {{ path: string, authorized: boolean }[]} */
+    const requests = [];
+    let advertisements = 0;
+    let server;
+    try {
+      mkdirSync(seed);
+      git('init', '-q', '-b', 'main', seed);
+      git('-C', seed, 'commit', '--allow-empty', '-qm', 'base');
+      const base = git('-C', seed, 'rev-parse', 'HEAD');
+      if (mode === 'ahead')
+        git('-C', seed, 'commit', '--allow-empty', '-qm', 'child');
+      if (mode === 'diverged') {
+        git('-C', seed, 'checkout', '-q', '--orphan', 'rewritten');
+        git('-C', seed, 'commit', '--allow-empty', '-qm', 'rewrite');
+        git('-C', seed, 'branch', '-M', 'main');
+      }
+      const expected =
+        mode === 'exact' ? git('-C', seed, 'rev-parse', 'HEAD') : base;
+      git('clone', '-q', '--bare', seed, join(root, 'repo.git'));
+      // Ephemeral fixture identity, trusted only by this test's Git processes.
+      execFileSync(
+        'openssl',
+        [
+          'req',
+          '-x509',
+          '-newkey',
+          'rsa:2048',
+          '-nodes',
+          '-days',
+          '1',
+          '-subj',
+          '/CN=127.0.0.1',
+          '-addext',
+          'subjectAltName=IP:127.0.0.1',
+          '-keyout',
+          key,
+          '-out',
+          cert,
+        ],
+        { stdio: 'ignore' }
+      );
+      server = createHttpsServer(
+        { key: readFileSync(key), cert: readFileSync(cert) },
+        async (req, res) => {
+          const url = new URL(req.url ?? '/', 'https://127.0.0.1');
+          if (url.pathname.endsWith('/info/refs')) advertisements++;
+          const authHeaders = req.rawHeaders
+            .filter((_, i) => i % 2 === 0)
+            .filter(name => name.toLowerCase() === 'authorization');
+          const authorized =
+            authHeaders.length === 1 &&
+            /^basic /i.test(req.headers.authorization ?? '') &&
+            req.headers.authorization?.slice(6) === encoded &&
+            !(denyFetch && advertisements > 1);
+          requests.push({ path: url.pathname, authorized });
+          if (!authorized) {
+            res.writeHead(401, { 'www-authenticate': 'Basic realm="fixture"' });
+            res.end();
+            return;
+          }
+          const chunks = [];
+          for await (const chunk of req) chunks.push(chunk);
+          const input = Buffer.concat(chunks);
+          const backend = spawnSync('git', ['http-backend'], {
+            input,
+            env: {
+              ...gitEnv,
+              GIT_PROJECT_ROOT: root,
+              GIT_HTTP_EXPORT_ALL: '1',
+              REQUEST_METHOD: req.method,
+              PATH_INFO: url.pathname,
+              QUERY_STRING: url.search.slice(1),
+              CONTENT_TYPE: req.headers['content-type'] ?? '',
+              CONTENT_LENGTH: String(input.length),
+              REMOTE_USER: 'fixture',
+            },
+          });
+          const separator = backend.stdout.indexOf('\r\n\r\n');
+          if (backend.status || separator < 0) {
+            res.writeHead(500);
+            res.end();
+            return;
+          }
+          let status = 200;
+          /** @type {Record<string, string>} */
+          const headers = {};
+          for (const line of backend.stdout
+            .subarray(0, separator)
+            .toString()
+            .split('\r\n')) {
+            const colon = line.indexOf(':');
+            const name = line.slice(0, colon);
+            const value = line.slice(colon + 1).trim();
+            if (name.toLowerCase() === 'status')
+              status = Number(value.split(' ')[0]);
+            else headers[name] = value;
+          }
+          res.writeHead(status, headers);
+          res.end(backend.stdout.subarray(separator + 4));
+        }
+      );
+      await new Promise(done =>
+        server.listen(0, '127.0.0.1', () => done(null))
+      );
+      const address = /** @type {import('node:net').AddressInfo} */ (
+        server.address()
+      );
+      const credential = wrongToken ? 'wrong-fixture-token' : token;
+      const result = await runWithRealGh({
+        script: 'bash "$LINEAGE_GATE" "at staging alias"',
+        env: {
+          ...gitEnv,
+          LINEAGE_GATE: gate,
+          EXPECTED_SHA: expected,
+          GITHUB_REPOSITORY: 'JovieInc/Jovie',
+          GITHUB_OUTPUT: output,
+          MAIN_LINEAGE_REMOTE: `https://127.0.0.1:${address.port}/repo.git`,
+          GH_TOKEN: credential,
+          GIT_SSL_CAINFO: cert,
+          GIT_TERMINAL_PROMPT: '0',
+          GIT_TRACE: trace,
+          // Preserve inherited settings and clear an inherited generic auth header.
+          GIT_CONFIG_COUNT: '2',
+          GIT_CONFIG_KEY_0: 'init.defaultBranch',
+          GIT_CONFIG_VALUE_0: 'main',
+          GIT_CONFIG_KEY_1: 'http.extraheader',
+          GIT_CONFIG_VALUE_1: 'AUTHORIZATION: inherited-fixture',
+          NO_PROXY: '127.0.0.1',
+          no_proxy: '127.0.0.1',
+        },
+        route: () => ({
+          status: 403,
+          body: { message: 'API rate limit exceeded for installation.' },
+        }),
+      });
+      const logs = (result.stdout + result.stderr).replace(
+        /::add-mask::[^\n]*\n/g,
+        ''
+      );
+      const argv = readFileSync(trace, 'utf8');
+      for (const secret of [
+        credential,
+        Buffer.from(`x-access-token:${credential}`).toString('base64'),
+      ]) {
+        expect(logs).not.toContain(secret);
+        expect(argv).not.toContain(secret);
+      }
+      return {
+        ...result,
+        gitRequests: requests,
+        output: existsSync(output) ? readFileSync(output, 'utf8') : '',
+      };
+    } finally {
+      if (server) await new Promise(done => server.close(() => done(null)));
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+
+  it.each(['exact', 'ahead', 'diverged'])(
+    'proves %s lineage through authenticated HTTPS when REST is exhausted',
+    async mode => {
+      const result = await recheck({ mode });
+      expect(result.code, result.stderr).toBe(0);
+      expect(result.output).toBe(`is_current=${mode !== 'diverged'}\n`);
+      expect(result.requests.length).toBe(mode === 'exact' ? 1 : 2);
+      expect(result.gitRequests.length).toBeGreaterThan(0);
+      expect(result.gitRequests.every(r => r.authorized)).toBe(true);
+      if (mode !== 'exact')
+        expect(
+          result.gitRequests.some(r => r.path.endsWith('/git-upload-pack'))
+        ).toBe(true);
+    }
+  );
+
+  it.each([{ wrongToken: true }, { denyFetch: true }])(
+    'fails closed on HTTPS credential denial: %j',
+    async options => {
+      const result = await recheck(options);
+      expect(result.code).not.toBe(0);
+      expect(result.output).not.toContain('is_current=true');
+      expect(result.gitRequests.some(r => !r.authorized)).toBe(true);
+      if (options.denyFetch)
+        expect(result.gitRequests.some(r => r.authorized)).toBe(true);
+    }
+  );
 });
