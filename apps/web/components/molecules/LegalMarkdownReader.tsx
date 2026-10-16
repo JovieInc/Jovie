@@ -29,26 +29,16 @@ const LEGAL_MARKDOWN_STYLES = cn(
   '[&_code]:rounded-md [&_code]:bg-neutral-100 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[0.92em] [&_code]:text-neutral-900 dark:[&_code]:bg-white/10 dark:[&_code]:text-neutral-100',
   '[&_pre]:my-7 [&_pre]:max-w-full [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:border [&_pre]:border-neutral-200 [&_pre]:bg-neutral-950 [&_pre]:p-4 [&_pre]:focus-visible:outline-2 [&_pre]:focus-visible:outline-offset-2 [&_pre]:focus-visible:outline-neutral-950 dark:[&_pre]:border-white/10 dark:[&_pre]:bg-black dark:[&_pre]:focus-visible:outline-white',
   '[&_pre_code]:block [&_pre_code]:min-w-max [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:text-app [&_pre_code]:leading-6 [&_pre_code]:text-neutral-100',
-  '[&_table]:my-7 [&_table]:block [&_table]:w-full [&_table]:max-w-full [&_table]:overflow-x-auto [&_table]:border-separate [&_table]:border-spacing-0 [&_table]:text-left [&_table]:text-sm [&_table]:focus-visible:outline-2 [&_table]:focus-visible:outline-offset-2 [&_table]:focus-visible:outline-neutral-950 dark:[&_table]:focus-visible:outline-white',
+  // Tables live inside a tabindex=0 scroll-region wrapper (see
+  // wrapMarkdownTablesInFocusableRegions): the wrapper owns scrolling,
+  // margins, and a visible focus ring; the table itself stays a plain table.
+  '[&_div:has(>table)]:my-7 [&_div:has(>table)]:w-full [&_div:has(>table)]:max-w-full [&_div:has(>table)]:overflow-x-auto [&_div:has(>table)]:rounded-lg [&_div:has(>table)]:focus-visible:outline-2 [&_div:has(>table)]:focus-visible:outline-offset-2 [&_div:has(>table)]:focus-visible:outline-neutral-950 dark:[&_div:has(>table)]:focus-visible:outline-white',
+  '[&_table]:w-full [&_table]:border-separate [&_table]:border-spacing-0 [&_table]:text-left [&_table]:text-sm',
   '[&_th]:min-w-[12rem] [&_th]:border-b [&_th]:border-neutral-300 [&_th]:bg-neutral-50 [&_th]:px-3 [&_th]:py-2 [&_th]:font-medium [&_th]:text-neutral-950 dark:[&_th]:border-white/15 dark:[&_th]:bg-white/5 dark:[&_th]:text-white',
   '[&_td]:min-w-[12rem] [&_td]:border-b [&_td]:border-neutral-200 [&_td]:px-3 [&_td]:py-2.5 [&_td]:align-top [&_td]:text-neutral-600 dark:[&_td]:border-white/10 dark:[&_td]:text-neutral-400',
   '[&_tr:last-child_td]:border-b-0',
   '[&_hr]:my-10 [&_hr]:border-0 [&_hr]:border-t [&_hr]:border-neutral-200 dark:[&_hr]:border-white/10'
 );
-
-/**
- * Wide legal tables and code blocks scroll horizontally. Axe requires that
- * scroll container to be keyboard-reachable. Existing tabindex values stay.
- */
-export function focusLegalScrollRegions(html: string): string {
-  return html.replace(
-    /<(table|pre)\b([^>]*?)>/gi,
-    (match, tag: string, attrs: string) => {
-      if (/\btabindex\s*=/i.test(` ${attrs}`)) return match;
-      return `<${tag}${attrs} tabindex="0">`;
-    }
-  );
-}
 
 export function LegalMarkdownReader({
   html,
@@ -61,7 +51,7 @@ export function LegalMarkdownReader({
       <div
         className={LEGAL_MARKDOWN_STYLES}
         // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML sanitized server-side in createMarkdownDocument
-        dangerouslySetInnerHTML={{ __html: focusLegalScrollRegions(html) }}
+        dangerouslySetInnerHTML={{ __html: html }}
       />
     </article>
   );
