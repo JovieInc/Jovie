@@ -146,12 +146,15 @@ wait_for_boot() {
   wait "$boot_pid"
 }
 
-# Launch bounds stay inside the 15-minute screenshot step. A hung simctl
-# launch still fails the capture after the last attempt.
-readonly IOS_SCREENSHOT_LAUNCH_TIMEOUT_CAP=90
+# main calls each iPhone capture directly, so the first non-zero capture
+# stops the script under set -e. Caps keep that one exhausted capture inside
+# the 15-minute screenshot step after prepare_device's existing boot.
+readonly IOS_SCREENSHOT_LAUNCH_TIMEOUT_CAP=60
 readonly IOS_SCREENSHOT_LAUNCH_ATTEMPTS_CAP=3
-readonly IOS_SCREENSHOT_LAUNCH_BOOT_TIMEOUT_CAP=60
-readonly IOS_SCREENSHOT_LAUNCH_RETRY_DELAY_CAP=10
+readonly IOS_SCREENSHOT_LAUNCH_BOOT_TIMEOUT_CAP=45
+readonly IOS_SCREENSHOT_LAUNCH_BOOT_COMMAND_TIMEOUT_CAP=30
+readonly IOS_SCREENSHOT_LAUNCH_TERMINATE_TIMEOUT_CAP=20
+readonly IOS_SCREENSHOT_LAUNCH_RETRY_DELAY_CAP=5
 
 require_bounded_integer() {
   local label="$1"
@@ -168,6 +171,7 @@ require_bounded_integer() {
 ensure_booted_for_launch() {
   local udid="$1"
   local timeout_seconds="${IOS_SCREENSHOT_LAUNCH_BOOT_TIMEOUT:-30}"
+  local boot_command_timeout="${IOS_SCREENSHOT_LAUNCH_BOOT_COMMAND_TIMEOUT:-15}"
   local boot_log
 
   require_bounded_integer \
@@ -175,9 +179,15 @@ ensure_booted_for_launch() {
     "$timeout_seconds" \
     1 \
     "$IOS_SCREENSHOT_LAUNCH_BOOT_TIMEOUT_CAP" || return 1
+  require_bounded_integer \
+    IOS_SCREENSHOT_LAUNCH_BOOT_COMMAND_TIMEOUT \
+    "$boot_command_timeout" \
+    1 \
+    "$IOS_SCREENSHOT_LAUNCH_BOOT_COMMAND_TIMEOUT_CAP" || return 1
 
   # `simctl boot` is idempotent and exits non-zero when the device is already up.
-  run_with_timeout "${IOS_SCREENSHOT_BOOT_COMMAND_TIMEOUT:-120}" xcrun simctl boot "$udid" >/dev/null 2>&1 || true
+  # This is shorter than prepare_device's boot command; bootstatus is the wait.
+  run_with_timeout "$boot_command_timeout" xcrun simctl boot "$udid" >/dev/null 2>&1 || true
 
   mkdir -p "$OUTPUT_DIR"
   boot_log="$OUTPUT_DIR/launch-bootstatus-$udid.log"
@@ -195,6 +205,9 @@ launch_for_capture() {
   local attempts="${IOS_SCREENSHOT_LAUNCH_ATTEMPTS:-3}"
   local timeout_seconds="${IOS_SCREENSHOT_LAUNCH_TIMEOUT:-45}"
   local retry_delay="${IOS_SCREENSHOT_LAUNCH_RETRY_DELAY:-2}"
+  local terminate_timeout="${IOS_SCREENSHOT_LAUNCH_TERMINATE_TIMEOUT:-15}"
+  local boot_timeout="${IOS_SCREENSHOT_LAUNCH_BOOT_TIMEOUT:-30}"
+  local boot_command_timeout="${IOS_SCREENSHOT_LAUNCH_BOOT_COMMAND_TIMEOUT:-15}"
   local attempt=1
   local launch_status=0
 
@@ -213,6 +226,21 @@ launch_for_capture() {
     "$retry_delay" \
     0 \
     "$IOS_SCREENSHOT_LAUNCH_RETRY_DELAY_CAP" || return 1
+  require_bounded_integer \
+    IOS_SCREENSHOT_LAUNCH_TERMINATE_TIMEOUT \
+    "$terminate_timeout" \
+    1 \
+    "$IOS_SCREENSHOT_LAUNCH_TERMINATE_TIMEOUT_CAP" || return 1
+  require_bounded_integer \
+    IOS_SCREENSHOT_LAUNCH_BOOT_TIMEOUT \
+    "$boot_timeout" \
+    1 \
+    "$IOS_SCREENSHOT_LAUNCH_BOOT_TIMEOUT_CAP" || return 1
+  require_bounded_integer \
+    IOS_SCREENSHOT_LAUNCH_BOOT_COMMAND_TIMEOUT \
+    "$boot_command_timeout" \
+    1 \
+    "$IOS_SCREENSHOT_LAUNCH_BOOT_COMMAND_TIMEOUT_CAP" || return 1
 
   while (( attempt <= attempts )); do
     echo "Launch attempt ${attempt}/${attempts} for ${name} (timeout ${timeout_seconds}s)."
@@ -235,7 +263,7 @@ launch_for_capture() {
       echo "simctl launch failed on attempt ${attempt}/${attempts} for ${name} (status ${launch_status}, bound ${timeout_seconds}s)."
     fi
 
-    run_with_timeout "${IOS_SCREENSHOT_TERMINATE_TIMEOUT:-15}" xcrun simctl terminate "$udid" "$BUNDLE_ID" >/dev/null 2>&1 || true
+    run_with_timeout "$terminate_timeout" xcrun simctl terminate "$udid" "$BUNDLE_ID" >/dev/null 2>&1 || true
     if (( attempt < attempts )); then
       sleep "$retry_delay"
     fi

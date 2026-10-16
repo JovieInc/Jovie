@@ -43,9 +43,18 @@ test('screenshot launch is a longer bounded retry that still fails closed', () =
   assert.match(captureSource, /xcrun simctl bootstatus "\$udid" -b/);
   assert.match(captureSource, /IOS_SCREENSHOT_LAUNCH_TIMEOUT:-45/);
   assert.match(captureSource, /IOS_SCREENSHOT_LAUNCH_ATTEMPTS:-3/);
-  assert.match(captureSource, /IOS_SCREENSHOT_LAUNCH_TIMEOUT_CAP=90/);
+  assert.match(captureSource, /IOS_SCREENSHOT_LAUNCH_TIMEOUT_CAP=60/);
   assert.match(captureSource, /IOS_SCREENSHOT_LAUNCH_ATTEMPTS_CAP=3/);
-  assert.match(captureSource, /IOS_SCREENSHOT_LAUNCH_BOOT_TIMEOUT_CAP=60/);
+  assert.match(captureSource, /IOS_SCREENSHOT_LAUNCH_BOOT_TIMEOUT_CAP=45/);
+  assert.match(captureSource, /IOS_SCREENSHOT_LAUNCH_BOOT_COMMAND_TIMEOUT_CAP=30/);
+  assert.match(captureSource, /IOS_SCREENSHOT_LAUNCH_TERMINATE_TIMEOUT_CAP=20/);
+  assert.doesNotMatch(
+    captureSource.slice(
+      captureSource.indexOf('ensure_booted_for_launch()'),
+      captureSource.indexOf('launch_for_capture()')
+    ),
+    /IOS_SCREENSHOT_BOOT_COMMAND_TIMEOUT/
+  );
   assert.match(
     captureSource,
     /Unable to launch \$\{BUNDLE_ID\} on \$\{udid\} for \$\{name\} after \$\{attempts\} attempts\./
@@ -74,6 +83,7 @@ test('screenshot launch is a longer bounded retry that still fails closed', () =
     iosWorkflowSource,
     /JOVIE_IOS_XCODEBUILD_TIMEOUT_SECONDS: "1680"/
   );
+  assert.match(iosWorkflowSource, /path: artifacts\/ios-screenshots\/\*\.png/);
 });
 
 function runLaunch(mode, env = {}) {
@@ -179,6 +189,68 @@ test('a hung simctl launch is killed at the bound and retried', () => {
   assert.match(
     result.output,
     /Unable to launch ie\.jov\.Jovie on SIM-1 for 00-loading after 2 attempts\./
+  );
+});
+
+test('a failed launch aborts the caller under set -e', () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'jovie-screenshot-errexit-'));
+  const bin = path.join(root, 'bin');
+  const out = path.join(root, 'out');
+  const log = path.join(root, 'xcrun.log');
+  mkdirSync(bin, { recursive: true });
+  writeFileSync(path.join(bin, 'xcrun'), xcrunStub, { mode: 0o755 });
+  try {
+    const result = spawnSync(
+      'bash',
+      [
+        '-lc',
+        [
+          'set -euo pipefail',
+          'source "$CAPTURE_SCRIPT"',
+          'mkdir -p "$OUTPUT_DIR"',
+          'launch_for_capture "$UDID" "$NAME" -ui-testing-splash',
+          'echo SENTINEL',
+        ].join('\n'),
+      ],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          CAPTURE_SCRIPT: captureScript,
+          IOS_SCREENSHOT_DIR: out,
+          UDID: 'SIM-1',
+          NAME: '00-loading',
+          MODE: 'always-fail',
+          LOG: log,
+          PATH: `${bin}:${process.env.PATH}`,
+          IOS_SCREENSHOT_LAUNCH_TIMEOUT: '1',
+          IOS_SCREENSHOT_LAUNCH_BOOT_TIMEOUT: '1',
+          IOS_SCREENSHOT_LAUNCH_BOOT_COMMAND_TIMEOUT: '1',
+          IOS_SCREENSHOT_LAUNCH_ATTEMPTS: '1',
+          IOS_SCREENSHOT_LAUNCH_RETRY_DELAY: '0',
+          IOS_SCREENSHOT_LAUNCH_TERMINATE_TIMEOUT: '1',
+        },
+      }
+    );
+    const output = `${result.stdout}\n${result.stderr}`;
+    assert.notEqual(result.status, 0, output);
+    assert.doesNotMatch(output, /SENTINEL/);
+    assert.match(output, /after 1 attempts/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('launch rejects an unbounded boot command before touching the simulator', () => {
+  const result = runLaunch('always-fail', {
+    IOS_SCREENSHOT_LAUNCH_BOOT_COMMAND_TIMEOUT: '120',
+    IOS_SCREENSHOT_BOOT_COMMAND_TIMEOUT: '120',
+  });
+  assert.notEqual(result.status, 0, result.output);
+  assert.equal(result.log, '');
+  assert.match(
+    result.output,
+    /IOS_SCREENSHOT_LAUNCH_BOOT_COMMAND_TIMEOUT must be an integer from 1 to 30/
   );
 });
 
