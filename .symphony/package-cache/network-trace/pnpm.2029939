@@ -1,0 +1,5 @@
+--- SIGPIPE {si_signo=SIGPIPE, si_code=SI_USER, si_pid=2029939, si_uid=1000} ---
+--- SIGPIPE {si_signo=SIGPIPE, si_code=SI_USER, si_pid=2029939, si_uid=1000} ---
+--- SIGPIPE {si_signo=SIGPIPE, si_code=SI_USER, si_pid=2029939, si_uid=1000} ---
+--- SIGPIPE {si_signo=SIGPIPE, si_code=SI_USER, si_pid=2029939, si_uid=1000} ---
++++ exited with 1 +++
