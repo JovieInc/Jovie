@@ -22,13 +22,30 @@ const SHA256_DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/;
 const BASE64_SHA512_PATTERN = /^[A-Za-z0-9+/]{86}==$/;
 // Same budget the production publish step already passes to
 // github-rate-limit.mjs (`--attempts 4 --max-wait-seconds 600`). Installation
-// 403s on prepare, publish, and recover wait until x-ratelimit-reset when that
-// instant is inside the budget. A reset past the budget defers the generation.
-// Permission failures, a missing reset, and the attempt cap stay fatal.
-// Nothing here lengthens the wait or turns a 403 into a published release.
+// 403s wait until x-ratelimit-reset inside that window. Production prepare
+// keeps JOV-8374's defer: a known reset past the window warns and returns
+// without claiming prepared=true. Publish and recover defer that same reset
+// with exit 75 so the quota waiter can retry this generation once. A missing
+// reset is learned from GET /rate_limit. Permission failures, an unproven
+// reset, verification, and the attempt cap stay fatal. Nothing here lengthens
+// the wait or turns a 403 into a published release.
 export const RELEASE_ASSET_READ_ATTEMPTS = 4;
 export const RELEASE_ASSET_READ_MAX_WAIT_MS = 600_000;
 export const DESKTOP_QUOTA_DEFER_EXIT = 75;
+
+/** Known production-prepare reset past the read budget. JOV-8374. */
+export class ReleaseAssetQuotaDeferred extends Error {
+  /** @param {number} resetAtMs */
+  constructor(resetAtMs) {
+    const resetAt = new Date(resetAtMs).toISOString();
+    super(
+      `Installation quota resets at ${resetAt}, beyond the release read budget.`
+    );
+    this.name = 'ReleaseAssetQuotaDeferred';
+    this.resetAt = resetAt;
+    this.resetAtMs = resetAtMs;
+  }
+}
 
 /**
  * @param {number} resetEpoch
@@ -838,7 +855,7 @@ export class GitHubClient {
     now = Date.now,
     log = null,
     releaseSha = '',
-    deferOutsideBudget = true,
+    quotaMode = 'prepare',
   }) {
     invariant(
       /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository),
@@ -853,7 +870,7 @@ export class GitHubClient {
       sleep || (ms => new Promise(resolve => setTimeout(resolve, ms)));
     this.now = now;
     this.releaseSha = releaseSha;
-    this.deferOutsideBudget = deferOutsideBudget;
+    this.quotaMode = quotaMode;
     this.log =
       log ||
       (message =>
@@ -912,9 +929,11 @@ export class GitHubClient {
       if (!response.ok) {
         const body = await response.text();
         const nowMs = this.now();
+        const holdable = method === 'GET' || this.quotaMode === 'publish';
         let quotaReset = null;
-        if (isInstallationQuota403(body, response.status)) {
-          const classification = classifyGitHubFailure({
+        let classification = null;
+        if (holdable && isInstallationQuota403(body, response.status)) {
+          classification = classifyGitHubFailure({
             status: response.status,
             message: body,
             headers: response.headers,
@@ -927,15 +946,17 @@ export class GitHubClient {
             quotaReset = await this.readCoreQuota();
           }
         }
-        const decision = decideReleaseAssetQuotaHold({
-          attempt,
-          body,
-          deadlineMs,
-          headers: response.headers,
-          nowMs,
-          status: response.status,
-          quotaReset,
-        });
+        const decision = holdable
+          ? decideReleaseAssetQuotaHold({
+              attempt,
+              body,
+              deadlineMs,
+              headers: response.headers,
+              nowMs,
+              status: response.status,
+              quotaReset,
+            })
+          : { action: 'fail' };
         if (decision.action === 'wait') {
           this.log(
             `installation quota on ${method} ${url}; holding ${Math.ceil(decision.waitMs / 1000)}s for x-ratelimit-reset (attempt ${attempt}/${RELEASE_ASSET_READ_ATTEMPTS}).`
@@ -943,11 +964,21 @@ export class GitHubClient {
           await this.sleep(decision.waitMs);
           continue;
         }
-        if (decision.action === 'defer' && this.deferOutsideBudget) {
+        if (decision.action === 'defer' && this.quotaMode === 'publish') {
           throw new DesktopReleaseQuotaDeferred(
             decision.resetEpoch,
             this.releaseSha
           );
+        }
+        if (
+          decision.action === 'defer' &&
+          this.quotaMode === 'prepare' &&
+          method === 'GET'
+        ) {
+          const resetAtMs =
+            classification?.retryAtMs ??
+            (quotaReset ? quotaReset.resetMs + 1000 : null);
+          if (resetAtMs != null) throw new ReleaseAssetQuotaDeferred(resetAtMs);
         }
         const quotaContext = isInstallationQuota403(body, response.status)
           ? ` [x-ratelimit-remaining=${response.headers.get('x-ratelimit-remaining') ?? 'missing'} x-ratelimit-reset=${response.headers.get('x-ratelimit-reset') ?? 'missing'}]`
@@ -1741,7 +1772,12 @@ async function main() {
     repository,
     token,
     releaseSha,
-    deferOutsideBudget: command !== 'verify-published',
+    quotaMode:
+      command === 'upload-and-publish'
+        ? 'publish'
+        : command === 'verify-published'
+          ? 'verify'
+          : 'prepare',
   });
   const common = {
     client,
@@ -1754,7 +1790,45 @@ async function main() {
 
   if (command === 'prepare') {
     if (common.output) await writeOutputs(common.output, { prepared: false });
-    await prepare(common);
+    try {
+      await prepare(common);
+    } catch (error) {
+      // JOV-8374: only production draft preparation yields. Staging prepare,
+      // upload, and verification must not turn unavailable proof into success.
+      if (
+        environment !== 'production' ||
+        !(error instanceof ReleaseAssetQuotaDeferred)
+      ) {
+        throw error;
+      }
+      if (process.env.DESKTOP_QUOTA_RETRY === '1') {
+        process.stderr.write(
+          `::error::Desktop publication of ${releaseSha} deferred again after the quota retry. Not passing.\n`
+        );
+        throw new Error(
+          `Desktop publication of ${releaseSha} deferred again after the quota retry. Not passing.`
+        );
+      }
+      const message = `Installation quota resets at ${error.resetAt}. Deferring desktop preparation of ${releaseSha} to the next reconciliation. No desktop release was published.`;
+      process.stderr.write(`::warning::github-quota-deferred: ${message}\n`);
+      if (process.env.GITHUB_STEP_SUMMARY) {
+        await appendFile(process.env.GITHUB_STEP_SUMMARY, `${message}\n`);
+      }
+      const resetEpoch = Math.floor(error.resetAtMs / 1000);
+      if (common.output) {
+        await appendFile(
+          common.output,
+          `quota_deferred=true\nquota_reset_epoch=${resetEpoch}\n`
+        );
+      }
+      if (process.env.RUNNER_TEMP) {
+        await writeFile(
+          join(process.env.RUNNER_TEMP, 'desktop-publish-quota-defer'),
+          `${resetEpoch}\n`
+        );
+      }
+      return;
+    }
     if (common.output) await writeOutputs(common.output, { prepared: true });
   } else if (command === 'upload-and-publish') {
     invariant(args.dist, '--dist is required.');
