@@ -35,6 +35,7 @@ import {
   latestLifecycleStatusKey,
   lifecycleStatusKey,
   parseValidationReceipts,
+  receiptMatchesAcceptanceEpisode,
 } from './validation-lifecycle.mjs';
 
 // Long-running issues collect many linked pull requests (JOV-7707 had more
@@ -814,8 +815,9 @@ export async function reconcileValidation(ctx) {
     issue.identifier
   ).filter(
     receipt =>
-      receipt.kind !== 'outcome' ||
-      Date.parse(receipt.recordedAt) > outcomeCutoff
+      receiptMatchesAcceptanceEpisode(receipt, issue.receiptNotBefore) &&
+      (receipt.kind !== 'outcome' ||
+        Date.parse(receipt.recordedAt) > outcomeCutoff)
   );
   const parentOutcome = ctx.parentReason
     ? recordedReceipts
@@ -1006,10 +1008,10 @@ export async function reconcileValidation(ctx) {
         `Linear team has no ${decision.target} state for ${issue.identifier}`
       );
     }
-    // Another writer may have moved the issue while facts were read. Apply
-    // only from the state this decision was made against.
+    // Recheck the server preimage, not just the state: an intervening reopen
+    // can return to the same state with a new acceptance episode.
     if ((await ctx.linear.readStateId(issue.id)) !== issue.state.id) {
-      ctx.log(`${issue.identifier} moved during evaluation; no write`);
+      ctx.log(`${issue.identifier} changed during evaluation; no write`);
       return {
         action: 'skip',
         identifier: issue.identifier,
