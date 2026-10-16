@@ -16,6 +16,7 @@ import { buildProtectedAuthRedirectUrl } from '@/lib/auth/build-auth-route-url';
 import { isCentralAuthPassThroughRoute } from '@/lib/auth/central-auth-routing';
 import { buildFinalResponse } from '@/lib/auth/final-response';
 import { captureError } from '@/lib/error-tracking';
+import { isRenderFixtureEnabled } from '@/lib/render-fixture-policy';
 import { resolveLegacyRootPathRedirect } from '@/lib/routing/legacy-root-path-redirects';
 import {
   analyzeHost,
@@ -302,8 +303,15 @@ export async function handleProxyRequest(
 
       // Check if path requires authentication
       const needsAuth = pathInfo.isProtectedPath;
+      // Screenshot CI renders the registered checkout screen with no session.
+      // The page only takes that branch when isRenderFixtureEnabled() is
+      // true; this proxy redirect runs first, so the same gate has to admit
+      // the request or capture lands on /signin. VERCEL_ENV=production stays
+      // closed, and other protected routes stay behind sign-in.
+      const checkoutFixturePass =
+        pathname === APP_ROUTES.ONBOARDING_CHECKOUT && isRenderFixtureEnabled();
 
-      if (needsAuth) {
+      if (needsAuth && !checkoutFixturePass) {
         const authUrl = new URL(
           buildProtectedAuthRedirectUrl(
             '/signin',
