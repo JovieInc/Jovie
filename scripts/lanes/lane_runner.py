@@ -3728,10 +3728,16 @@ def terminal_prs(prs: list[dict], attempts: dict, held: dict) -> list[dict]:
     for pr in prs:
         head, record = pr.get("headRefOid"), attempts.get(str(pr.get("number"))) or {}
         labels = {label.lower() for label in pr_events.label_names(pr)}
+        hold = held.get(str(pr.get("number")))
+        if hold and hold.get("sha") == head:
+            # Exhaustion is the condition this exit repairs. Preserve the underlying
+            # gate evidence so a secret-file or empty-diff hold still blocks a sync.
+            hold = {**hold, "evidence": [line for line in hold.get("evidence") or []
+                                        if not str(line).startswith("fix-exhausted")]}
         if not isinstance(head, str) or not head or not isinstance(record, dict) \
                 or labels & pr_events.HOLD_LABELS or pr.get("isInMergeQueue") is not False \
                 or pr.get("isCrossRepository") is not False \
-                or not pr_events.fixable_hold(held.get(str(pr["number"])), head):
+                or not pr_events.fixable_hold(hold, head):
             continue  # holds, queued heads, forks and diff-policy holds have other owners
         spent = pr_events.spent(record, head, MAX_FIX_ATTEMPTS)
         unchanged = not record.get("count") or pr_events.same_generation(record, head)
