@@ -468,6 +468,7 @@ export {
 export {
   type PricingOption,
   type PricingOptionsResponse,
+  pricingOptionsQueryOptions,
   usePricingOptionsQuery,
 } from './usePricingOptionsQuery';
 export { useProfileMonetizationSummary } from './useProfileMonetizationSummary';
