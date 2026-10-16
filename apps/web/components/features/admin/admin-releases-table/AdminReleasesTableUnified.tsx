@@ -14,7 +14,7 @@ import {
   Tag,
   User,
 } from 'lucide-react';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import {
   createMultiFieldFilterFn,
   PAGE_TOOLBAR_END_GROUP_CLASS,
@@ -30,6 +30,7 @@ import type { AdminReleaseRow } from '@/lib/admin/types';
 import {
   type AdminReleasesSort,
   useAdminReleasesInfiniteQuery,
+  useStartImpersonationMutation,
 } from '@/lib/queries';
 import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
@@ -243,7 +244,10 @@ function createColumns(): ColumnDef<AdminReleaseRow, unknown>[] {
   ] as ColumnDef<AdminReleaseRow, unknown>[];
 }
 
-function getContextMenuItems(release: AdminReleaseRow) {
+function getContextMenuItems(
+  release: AdminReleaseRow,
+  startImpersonation: (targetUserId: string) => void
+) {
   const items = [
     {
       id: 'view-release',
@@ -271,12 +275,7 @@ function getContextMenuItems(release: AdminReleaseRow) {
       id: 'impersonate',
       label: 'Impersonate',
       icon: <AlertTriangle className='size-3.5' />,
-      onClick: () => {
-        globalThis.open(
-          `/api/admin/impersonate?userId=${release.artistUserId}`,
-          '_blank'
-        );
-      },
+      onClick: () => startImpersonation(release.artistUserId ?? ''),
     });
   }
 
@@ -308,6 +307,18 @@ export function AdminReleasesTableUnified({
       pageSize,
       initialData: { rows: initialReleases, total },
     });
+  const { mutate: startImpersonation } = useStartImpersonationMutation();
+  const handleStartImpersonation = useCallback(
+    (targetUserId: string) => {
+      startImpersonation(
+        { targetUserId },
+        {
+          onSuccess: () => globalThis.location.assign(APP_ROUTES.DASHBOARD),
+        }
+      );
+    },
+    [startImpersonation]
+  );
 
   const allReleases = useMemo(
     () => data?.pages.flatMap(page => page.rows) ?? initialReleases,
@@ -350,7 +361,7 @@ export function AdminReleasesTableUnified({
           enableFiltering={clientFilter !== undefined}
           globalFilterFn={releaseFilterFn}
           getContextMenuItems={(row: AdminReleaseRow) =>
-            getContextMenuItems(row)
+            getContextMenuItems(row, handleStartImpersonation)
           }
           hasNextPage={hasNextPage ?? false}
           isFetchingNextPage={isFetchingNextPage}

@@ -21,7 +21,7 @@ import {
   User,
 } from 'lucide-react';
 import { parseAsString, parseAsStringLiteral, useQueryStates } from 'nuqs';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import {
   PAGE_TOOLBAR_END_GROUP_CLASS,
   PAGE_TOOLBAR_META_TEXT_CLASS,
@@ -44,7 +44,10 @@ import {
   adminAssetTypes,
   adminAssetVerifiedFilters,
 } from '@/lib/nuqs';
-import { useAdminAssetsInfiniteQuery } from '@/lib/queries';
+import {
+  useAdminAssetsInfiniteQuery,
+  useStartImpersonationMutation,
+} from '@/lib/queries';
 import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 
@@ -237,7 +240,10 @@ function createColumns(): ColumnDef<AdminAssetRow, unknown>[] {
   ] as ColumnDef<AdminAssetRow, unknown>[];
 }
 
-function getContextMenuItems(asset: AdminAssetRow) {
+function getContextMenuItems(
+  asset: AdminAssetRow,
+  startImpersonation: (targetUserId: string) => void
+) {
   const items = [];
 
   if (asset.href) {
@@ -270,12 +276,7 @@ function getContextMenuItems(asset: AdminAssetRow) {
       id: 'impersonate',
       label: 'Impersonate',
       icon: <AlertTriangle className='size-3.5' />,
-      onClick: () => {
-        globalThis.open(
-          `/api/admin/impersonate?userId=${asset.ownerUserId}`,
-          '_blank'
-        );
-      },
+      onClick: () => startImpersonation(asset.ownerUserId ?? ''),
     });
   }
 
@@ -302,6 +303,18 @@ export function AdminAssetsTable({
       pageSize,
       initialData: { rows: initialAssets, total },
     });
+  const { mutate: startImpersonation } = useStartImpersonationMutation();
+  const handleStartImpersonation = useCallback(
+    (targetUserId: string) => {
+      startImpersonation(
+        { targetUserId },
+        {
+          onSuccess: () => globalThis.location.assign(APP_ROUTES.DASHBOARD),
+        }
+      );
+    },
+    [startImpersonation]
+  );
 
   // Filter changes write to the URL (shallow: false → server re-render).
   const [, setFilters] = useQueryStates(
@@ -403,7 +416,9 @@ export function AdminAssetsTable({
           columns={columns}
           getRowId={(row: AdminAssetRow) => `${row.assetType}:${row.id}`}
           emptyState={emptyState}
-          getContextMenuItems={(row: AdminAssetRow) => getContextMenuItems(row)}
+          getContextMenuItems={(row: AdminAssetRow) =>
+            getContextMenuItems(row, handleStartImpersonation)
+          }
           hasNextPage={hasNextPage ?? false}
           isFetchingNextPage={isFetchingNextPage}
           onLoadMore={fetchNextPage}

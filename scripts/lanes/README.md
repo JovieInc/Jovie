@@ -24,6 +24,7 @@ The harness, not the model, owns:
 | Concern | Where |
 |---|---|
 | Claim (serialised, `flock`), one PR per issue across hosts (GitHub is the truth), priority aging after each 24h wait | `worker()`, `pick_issue()`, `in_flight_issues()` |
+| Execution attempts: stable action phases fence boundary replay. The dual-format reader supports immutable candidate ownership and terminal recovery; its incompatible writer remains disabled pending verified reader/writer readiness. Enabled recovery publishes only the reserved winner and seals unknown boundaries without another attempt or grant | `execution_attempt.py` |
 | One open PR per issue: branch or `linear-issue-id` marker; an unreadable PR list claims nothing | `in_flight_issues()` |
 | No open-PR ceiling (Tim 2026-10-12): new-issue intake is bounded only by real limits in autoscale (compute, credits, quotas); `new_issue_budget()` reports counts, never refuses | `new_issue_budget()` |
 | Workstreams: one classifier for intake and backlog (`ws:<key>` label override, else ordered rules); exact normalized-title duplicates admit only the oldest (`duplicate-candidate:<JOV>`); order = explicit dispatch-next in the admitted pool → tier (urgent or CI/Symphony-throughput) → aged priority → workstream rank → age | `workstreams.py`, `pool_rejections()`, `admission_order()` |
@@ -61,6 +62,21 @@ The harness, not the model, owns:
 | Cost-aware routing: one capability floor per issue (`routing.json`), then the cheapest available `(lane, model)` route that clears it by effective cost; every claim is logged with its rationale | `remediation.route_issue()`, `issue_router()`, `runs/routing.jsonl` |
 | Guarded sensitive work: auth/billing/infra labels route only to Codex at `xhigh`; 500-line cap, canonical security/boundary gates, and independent `llm-review` run before enrollment | `pick_issue()`, `gate_pr()`, `sensitive_review()` |
 | Stop revokes publication: a kill writes `runs/publication-revocations.jsonl` before the kill is acked, and every irreversible boundary (push, PR open, label, enqueue) revalidates it — revoked branches never ship (JOV-5060) | `run_agent(on_kill=)`, `revoke_publication()`, `require_publishable()` |
+
+Execution receipts retain `jovie-execution-attempt/v1`. The default production and CLI
+writer still emits legacy numeric status chains; self-update cannot activate the new
+wire format. `IMMUTABLE_WRITER_ENABLED` is checked in as false, with no environment or
+caller override. The upgraded reader also validates candidate-linked receipts, while
+a disabled writer refuses to extend them. Enabling the writer requires a separately
+reviewed source change after every participating reader and writer is drained, updated
+and verified ready; JOV-8293 remains open for that activation and runtime outcome.
+Enabled recovery reserves an existing `failed_unknown` disposition before projecting
+an unknown boundary, so helper crashes and repeated retries remain held. Boundary IDs
+bind existing dispatch, handoff, repair and adoption phases within the original fence;
+duplicate or changed-cost reuse is held, and distinct intended phases charge normally.
+Legacy common-source-SHA reservations have no owner proof and remain held for
+authoritative reconciliation. Source merge is preparatory and does not repair or
+certify the running coordinator.
 
 Event-driven: a worker that finishes re-execs the current release and pulls the next
 issue. The minute timer only restarts idle lanes and applies updates; it never signals a
@@ -484,6 +500,9 @@ space is under that same floor, so a sweep and a refill never fight. Disk-cleanu
 must leave `~/.cache/jovie` and the pnpm store (`pnpm store path`) alone; use
 `scripts/agent/worktree-new --drain` to reclaim pool space. Tests and
 `JOVIE_WORKTREE_POOL=0` never touch the pool.
+Per-slot directory locks span claim/move and recycle/ready publication; stale fill
+and disk drain skip owned slots. Abandoned claims remain in place for their owner
+because marker age does not prove source publication or safe retirement.
 
 Finished worktrees go back instead of being deleted (JOV-7723): `remove_worktree()` keeps
 its idle, clean and published checks, then `worktree_pool.recycle()` detaches HEAD at
