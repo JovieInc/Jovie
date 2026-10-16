@@ -16,12 +16,17 @@ fixture change requires a separately reviewed policy update.
 For a read-only observation, invoke the helper from the installed release:
 
 ```sh
-python3 "$trusted_release/qualification_guard.py" --repo "$candidate" --head "$exact_head"
+python3 -I "$trusted_release/qualification_guard.py" --repo "$candidate" --head "$exact_head"
 ```
 
 A manual qualification launcher must import that same trusted helper and use
-`load_checked_runner(candidate, exact_head)` before loading the runner. The
-returned runner is loaded beside the trusted helper, never from the candidate.
+`load_checked_runner(candidate, exact_head)` before loading the runner.
+Use a dedicated isolated Python interpreter (`python3 -I`) so startup imports
+also exclude candidate paths. The returned runner and its dependencies come from
+the trusted release and interpreter libraries. Cached candidate modules and
+cached siblings from another release are refused; import-path quarantine remains
+in effect for later lazy imports. Git safety observations disable implicit
+promisor fetching, so missing local objects hold without executing a remote helper.
 The launcher retains the native exact-head reservation and exclusive checkout
 ownership, and rechecks safety immediately before candidate commands. A passing
 observation is a bounded source check, not a lease or a qualification result.
