@@ -1416,12 +1416,11 @@ jobs:
         env:
           EXPECTED_COMMIT_SHA: ${{ inputs.expected_sha }}
           GH_TOKEN: ${{ github.token }}
-          GH_API_HOLD_BUDGET_SECONDS: '600'
           GITHUB_REPOSITORY: ${{ github.repository }}
         shell: bash
         run: |
           set -euo pipefail
-          current_main="$(bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
+          current_main="$(bash "$GITHUB_WORKSPACE/.github/scripts/resolve-main-sha.sh" "$GITHUB_REPOSITORY")"
           [[ "$current_main" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Could not resolve exact main after staging mutation."
             exit 1
@@ -1615,7 +1614,6 @@ jobs:
           EXPECTED_COMMIT_SHA: ${{ inputs.expected_sha }}
           EXPECTED_DEPLOYMENT_ID: ${{ needs.deploy-staging.outputs.deploy_id }}
           GH_TOKEN: ${{ github.token }}
-          GH_API_HOLD_BUDGET_SECONDS: '600'
           GITHUB_REPOSITORY: ${{ github.repository }}
           STAGING_REFRESH_OUTCOME: ${{ steps.reassert.outputs.staging_refresh_outcome }}
           SOURCE_CI_COMPLETED_AT: ${{ github.event.workflow_run.updated_at }}
@@ -1624,7 +1622,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          current_main="$(bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
+          current_main="$(bash "$GITHUB_WORKSPACE/.github/scripts/resolve-main-sha.sh" "$GITHUB_REPOSITORY")"
           [[ "$current_main" =~ ^[0-9a-f]{40}$ ]] || exit 1
           latency_seconds=$(( $(date -u +%s) - $(date -u -d "$SOURCE_CI_COMPLETED_AT" +%s) ))
           slo_state=within_target
