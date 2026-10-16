@@ -1,9 +1,21 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { RenderedFamily } from '@/.storybook/rendered-family';
 import { HomepageIdentityHero } from './HomepageIdentityHero';
 
 const meta = {
   title: 'Marketing/HomepageIdentityHero',
   component: HomepageIdentityHero,
+  decorators: [
+    Story => (
+      <RenderedFamily
+        name='homepage-identity-hero'
+        owner='HomepageIdentityHero'
+        interactive
+      >
+        <Story />
+      </RenderedFamily>
+    ),
+  ],
   parameters: {
     layout: 'fullscreen',
     docs: {
