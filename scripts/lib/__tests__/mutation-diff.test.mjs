@@ -370,9 +370,11 @@ describe('runtime mutation import graph', () => {
       ['tests/dynamic.test.ts', "await import('../lib/barrel');"],
       ['tests/require.test.ts', "const m = require('../lib/cycle.js');"],
     ]);
-    expect(findRelatedTests(target, tests, modules)).toEqual(
-      [...tests.keys()].sort()
-    );
+    expect(findRelatedTests(target, tests, modules)).toEqual([
+      'tests/static.test.ts',
+      'tests/dynamic.test.ts',
+      'tests/require.test.ts',
+    ]);
   });
 
   it('does not select comments, strings, type imports, or mock-only imports', () => {
@@ -514,12 +516,25 @@ describe('mutation CLI result semantics', () => {
         'dir'
       );
       put('apps/web/lib/auth/policy.ts', 'export const allowed = true;');
-      put(
-        'apps/web/tests/policy.test.ts',
-        mode === 'unrelated'
-          ? 'export const nothing = true;'
-          : "import '@/lib/auth/policy';"
-      );
+      if (mode === 'distance-cap') {
+        put('apps/web/lib/near.ts', "export { allowed } from './auth/policy';");
+        put('apps/web/lib/far.ts', "export { allowed } from './near';");
+        put(
+          'apps/web/app/auth/generic.test.ts',
+          "import { allowed } from '@/lib/far';"
+        );
+        put(
+          'apps/web/tests/unit/lib/env/better-auth-origin.test.ts',
+          "import { allowed } from '@/lib/near';"
+        );
+      } else {
+        put(
+          'apps/web/tests/policy.test.ts',
+          mode === 'unrelated'
+            ? 'export const nothing = true;'
+            : "import '@/lib/auth/policy';"
+        );
+      }
       put(
         'apps/web/node_modules/vitest/vitest.mjs',
         `
@@ -604,6 +619,15 @@ describe('mutation CLI result semantics', () => {
     expect(run.stdout).toContain(
       '| `lib/auth/policy.ts` | 0% (low) | 0 | 1 | 1 | 1 | 1/1 / 1/1 |'
     );
+  });
+
+  it('keeps the nearest meaningful transitive suite ahead of broad auth routes under a cap', () => {
+    const run = runFixture('distance-cap', ['--list-only', '--max-tests', '1']);
+    expect(run.status, run.stderr).toBe(0);
+    expect(run.stdout).toContain(
+      'tests/unit/lib/env/better-auth-origin.test.ts'
+    );
+    expect(run.stdout).not.toContain('app/auth/generic.test.ts');
   });
 
   it('does not let a zero file cap silently avoid selected work', () => {
@@ -714,7 +738,7 @@ describe('selected runtime paths execute the real target', () => {
         tests,
         readModuleSource(root)
       )(target);
-      expect(selected).toEqual([...imports.keys()].sort());
+      expect([...selected].sort()).toEqual([...imports.keys()].sort());
       const receipt = join(root, 'receipt.json');
       const run = () =>
         spawnSync(

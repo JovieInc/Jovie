@@ -259,6 +259,7 @@ function runtimeImports(path, contents) {
 /**
  * Cache the runtime import graph once for all changed files. Traversal stays
  * within apps/web and follows local aliases, relative imports and re-exports.
+ * Nearest runtime paths rank first, then dedicated suites at the same depth.
  * This selects candidate tests; Stryker still measures their effectiveness.
  * @param {Map<string, string>} testSources
  * @param {(path: string) => string | null} [readModule]
@@ -312,21 +313,32 @@ export function createTestSelector(
           .filter(path => !unmocked.has(path))
       );
       const visited = new Set();
-      /** @param {string} path */
-      const reaches = path => {
-        if (path === sourcePath) return true;
-        if (visited.has(path)) return false;
-        visited.add(path);
-        for (const edge of module(path)?.imports ?? []) {
-          const target = resolveModule(edge.specifier, path);
-          if (!target || (mocked.has(target) && !edge.actual)) continue;
-          if (reaches(target)) return true;
+      const pending = [{ path: testPath, distance: 0 }];
+      for (let index = 0; index < pending.length; index++) {
+        const current = pending[index];
+        if (visited.has(current.path)) continue;
+        visited.add(current.path);
+        if (current.path === sourcePath) {
+          related.push({ path: testPath, distance: current.distance });
+          break;
         }
-        return false;
-      };
-      if (reaches(testPath)) related.push(testPath);
+        for (const edge of module(current.path)?.imports ?? []) {
+          const target = resolveModule(edge.specifier, current.path);
+          if (!target || (mocked.has(target) && !edge.actual)) continue;
+          pending.push({ path: target, distance: current.distance + 1 });
+        }
+      }
     }
-    return related.sort();
+    const stem = posix.basename(stripModuleSuffix(sourcePath));
+    const dedicated = path => (posix.basename(path).startsWith(stem) ? 0 : 1);
+    return related
+      .sort(
+        (a, b) =>
+          a.distance - b.distance ||
+          dedicated(a.path) - dedicated(b.path) ||
+          a.path.localeCompare(b.path)
+      )
+      .map(test => test.path);
   };
 }
 

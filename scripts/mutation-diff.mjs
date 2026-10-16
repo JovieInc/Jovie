@@ -9,7 +9,7 @@
 
 import { spawnSync } from 'node:child_process';
 import { appendFileSync, mkdirSync, rmSync } from 'node:fs';
-import { basename, dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import {
@@ -56,24 +56,6 @@ function changedPaths() {
   return diff.stdout.split('\n').filter(Boolean);
 }
 
-/**
- * Prefer tests whose path names the source file or its directory (the
- * dedicated suites), then the rest, up to the cap.
- * @param {string} source
- * @param {string[]} tests
- * @param {number} cap
- */
-function capTests(source, tests, cap) {
-  const stem = basename(source).replace(/\.(?:ts|tsx)$/u, '');
-  const area = basename(dirname(source)).replace(/s$/u, '');
-  /** @param {string} test */
-  const rank = test =>
-    (basename(test).startsWith(stem) ? 0 : 2) - (test.includes(area) ? 1 : 0);
-  return [...tests]
-    .sort((a, b) => rank(a) - rank(b) || a.localeCompare(b))
-    .slice(0, cap);
-}
-
 const maxFiles = Number(values['max-files']);
 const maxTests = Number(values['max-tests']);
 for (const [name, value] of [
@@ -106,7 +88,8 @@ for (const source of toRun) {
       untested.push(source);
       continue;
     }
-    const tests = capTests(source, related, maxTests);
+    // Preserve nearest-import ranking when applying the bounded test budget.
+    const tests = related.slice(0, maxTests);
     if (values['list-only']) {
       console.log(`${source}\n  ${tests.join('\n  ')}`);
       continue;
