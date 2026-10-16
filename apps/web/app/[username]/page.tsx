@@ -576,7 +576,10 @@ async function ArtistPageContent({
       {isPublicNoAuthSmoke ? null : (
         <>
           <DesktopQrOverlayClient handle={artist.handle} />
-          <AskJovieWidget username={artist.handle} artistName={artist.name} />
+          {/* JOV-6571 keeps broad AI off the canonical artist-site journey. */}
+          {!isProofProfile && (
+            <AskJovieWidget username={artist.handle} artistName={artist.name} />
+          )}
         </>
       )}
     </>
