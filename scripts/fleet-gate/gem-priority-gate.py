@@ -19,6 +19,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import time
@@ -818,6 +819,28 @@ def observe_main(repo: str) -> dict[str, Any]:
         }
 
 
+def native_user_bus_environment(home: Path, *, runtime_root: Path = Path("/run/user")) -> dict[str, str]:
+    """Supply the existing same-user bus when a service runner lacks login context."""
+    env = dict(os.environ)
+    uid = os.geteuid()
+    runtime = runtime_root / str(uid)
+    canonical = {"XDG_RUNTIME_DIR": str(runtime),
+                 "DBUS_SESSION_BUS_ADDRESS": "unix:path=" + str(runtime / "bus")}
+    # Never redirect an explicitly different context or cross a user boundary.
+    if any(env.get(key) and env[key] != value for key, value in canonical.items()):
+        raise ValueError("native controller user bus identity mismatch")
+    if all(env.get(key) == value for key, value in canonical.items()):
+        return env
+    if home.stat().st_uid != uid:
+        raise ValueError("native controller user identity mismatch")
+    directory, socket = runtime.lstat(), (runtime / "bus").lstat()
+    if (not stat.S_ISDIR(directory.st_mode) or directory.st_uid != uid
+            or directory.st_mode & 0o022
+            or not stat.S_ISSOCK(socket.st_mode) or socket.st_uid != uid):
+        raise ValueError("native controller user bus unavailable")
+    return {**env, **canonical}
+
+
 def observe_native_controller(state_dir: Path, now: datetime) -> dict[str, Any]:
     """Observe the installed lanes runtime; a retired HTTP endpoint is not authority."""
     failed = {"status": "failed", "kind": "native-lanes", "source": "native-runtime",
@@ -872,7 +895,8 @@ def observe_native_controller(state_dir: Path, now: datetime) -> dict[str, Any]:
         unit_read = subprocess.run(
             ["systemctl", "--user", "show", "jovie-lanes.service", "jovie-lanes.timer",
              "--property=Id,ActiveState,SubState,Result,ExecMainStatus,ExecStart,FragmentPath,Unit"],
-            capture_output=True, text=True, check=True, timeout=5)
+            capture_output=True, text=True, check=True, timeout=5,
+            env=native_user_bus_environment(home))
         units = {}
         for block in unit_read.stdout.strip().split("\n\n"):
             fields = dict(line.split("=", 1) for line in block.splitlines() if "=" in line)
