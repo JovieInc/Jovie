@@ -2,6 +2,7 @@ import { type Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
 import { Suspense } from 'react';
 import { loadPublicReleaseCredits } from '@/app/[username]/[slug]/_lib/data';
+import { isScreenCertSmartLinkProfileRequest } from '@/app/[username]/[slug]/_lib/screen-cert-fixture';
 
 // No `export const dynamic` here — the parent layout sets `revalidate: 3600`
 // (ISR). The public profile route must stay ISR-cacheable; avoid any Dynamic
@@ -114,6 +115,14 @@ interface ArtistPageContentProps {
   readonly initialMode: ProfileMode;
   readonly username: string;
   readonly profileResult: PublicProfileLoaderResult;
+}
+
+function ScreenCertFixtureProfilePage() {
+  return (
+    <main>
+      <h1 className='text-balance'>Screen Cert Fixture</h1>
+    </main>
+  );
 }
 
 function assertValidProfileUsername(username: string) {
@@ -583,6 +592,10 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
     return <UnfazedProfileClient />;
   }
 
+  if (isScreenCertSmartLinkProfileRequest(username)) {
+    return <ScreenCertFixtureProfilePage />;
+  }
+
   await enforceCanonicalPublicProfileUsername(username);
 
   // Resolve a missing/private profile before the page-level Suspense boundary
@@ -618,6 +631,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (username.toLowerCase() === 'unfazed') {
     return {
       title: 'Unfazed | Jovie',
+      robots: { index: false, follow: false },
+    };
+  }
+
+  if (isScreenCertSmartLinkProfileRequest(username)) {
+    return {
+      title: 'Screen Cert Fixture | Jovie',
       robots: { index: false, follow: false },
     };
   }

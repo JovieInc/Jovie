@@ -1951,6 +1951,56 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     }
   });
 
+  it('accepts Next catch-all sources for web.smartlink-release and still rejects traversal', () => {
+    const root = mkdtempSync(join(tmpdir(), 'screen-resolver-catchall-'));
+    const priorPath = process.env.PATH;
+    try {
+      const screen = SCREEN_REGISTRY.find(
+        entry => entry.id === 'web.smartlink-release'
+      );
+      assert.ok(screen);
+      assert.ok(screen.sources.some(source => source.includes('[...slug]')));
+      const gh = join(root, 'gh');
+      writeFileSync(gh, '#!/bin/sh\nexit 1\n');
+      chmodSync(gh, 0o755);
+      process.env.PATH = `${root}:${priorPath}`;
+      const context = {
+        headSha: HEAD,
+        screenId: screen.id,
+        sourcePaths: [...screen.sources],
+        viewports: [...screen.viewports],
+      };
+      const accepted = resolveTrustedScreenProof({
+        artifactId: 12045112840,
+        context,
+      });
+      assert.equal(accepted.proof, null);
+      assert.match(
+        accepted.findings.join('\n'),
+        /controlled GitHub artifact resolver is unavailable/
+      );
+      assert.doesNotMatch(
+        accepted.findings.join('\n'),
+        /controlled resolver request is invalid/
+      );
+
+      const traversed = resolveTrustedScreenProof({
+        artifactId: 12045112840,
+        context: {
+          ...context,
+          sourcePaths: ['apps/web/app/[username]/../../secrets.txt'],
+        },
+      });
+      assert.match(
+        traversed.findings.join('\n'),
+        /controlled resolver request is invalid/
+      );
+    } finally {
+      process.env.PATH = priorPath;
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
   it('fails resolver requests with specific reasons: forged, stale, wrong-build, incomplete, unavailable', () => {
     const root = mkdtempSync(join(tmpdir(), 'screen-resolver-fail-'));
     const priorPath = process.env.PATH;
