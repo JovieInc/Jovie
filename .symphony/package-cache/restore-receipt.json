@@ -1,0 +1,63 @@
+{
+  "archive": {
+    "mountSource": "/dev/nvme1n1p1",
+    "ownership": {
+      "device": 66306,
+      "gid": 0,
+      "group": "root",
+      "inode": 37362437,
+      "mode": "0o444",
+      "owner": "root",
+      "path": "/srv/git/symphony-package-cache/jovie/node-22.23.2-pnpm-9.15.4-lock-55ec0692b737708a-cache-aa4f9540354d946c.tar",
+      "uid": 0
+    },
+    "path": "/srv/git/symphony-package-cache/jovie/node-22.23.2-pnpm-9.15.4-lock-55ec0692b737708a-cache-aa4f9540354d946c.tar",
+    "sha256": "d1eb55f78fb2a79d6a15d80f6c2ed70ed87c580291356dee2dff5e900c379342"
+  },
+  "commandPolicy": {
+    "agentInstallOrFetchAllowed": false,
+    "agentWorkspaceStoreCreationAllowed": false,
+    "trustedHookOnly": true
+  },
+  "issue": "JOV-5995",
+  "recordedAt": "2026-09-06T17:38:23.369134Z",
+  "repo": "JovieInc/Jovie",
+  "restore": {
+    "command": "pnpm install --offline --frozen-lockfile --ignore-scripts --store-dir <private-store>",
+    "elapsedMs": 12474,
+    "lifecycleScripts": "disabled",
+    "networkProof": {
+      "afInetEvents": 0,
+      "tool": "strace",
+      "traceDirectory": "/home/timwhite/symphony-elixir-workspaces/JOV-5995/.symphony/package-cache/network-trace"
+    },
+    "nodeModulesPath": "/home/timwhite/symphony-elixir-workspaces/JOV-5995/node_modules",
+    "privateStorePath": "/home/timwhite/symphony-elixir-workspaces/JOV-5995/.symphony/package-cache/pnpm-store",
+    "serialized": true
+  },
+  "schema": "symphony-nvme-package-cache-restore/v1",
+  "sourceSha": "276c3b39fd643827dc556d1f14381acafbb1747a",
+  "toolchain": {
+    "arch": "x86_64",
+    "cacheKey": "aa4f9540354d946c8d87f3e2519d064c3169512564806afcf378b7d4483105c5",
+    "lockfileSha256": "55ec0692b737708aacb2d5d3a3d970366c661286e91005157b44b2d372864672",
+    "nodeVersion": "22.23.2",
+    "platform": "linux",
+    "pnpmVersion": "9.15.4",
+    "workspaceFileSha256": "a44a810c60e53213e6d3720322c545cb93c523a5ed8b68e27bdf031c66fc87b9"
+  },
+  "workspace": {
+    "mountSource": "/dev/mapper/ubuntu--vg-ubuntu--lv",
+    "ownership": {
+      "device": 64512,
+      "gid": 1000,
+      "group": "timwhite",
+      "inode": 28747579,
+      "mode": "0o775",
+      "owner": "timwhite",
+      "path": "/home/timwhite/symphony-elixir-workspaces/JOV-5995",
+      "uid": 1000
+    },
+    "path": "/home/timwhite/symphony-elixir-workspaces/JOV-5995"
+  }
+}
