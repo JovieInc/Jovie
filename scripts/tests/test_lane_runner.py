@@ -3704,6 +3704,24 @@ class VerifyAndLandRevocationTest(unittest.TestCase):
             self.assertEqual(json.loads((host.state / "requeue.json").read_text()), {"7": "abc"})
 
 
+class ShippingOriginIngestTest(unittest.TestCase):
+    def test_deferred_transport_is_importable_in_the_release_selftest(self):
+        import shipping_origin
+
+        state = Path("/synthetic-origin-state")
+        result = {"accepted": ["restored"], "rejected": [], "errors": []}
+        with patch.object(shipping_origin, "collect", return_value=result) as collect:
+            self.assertEqual(lane.collect_shipping_origin(state), result)
+        collect.assert_called_once_with(state)
+
+    def test_transport_failure_stays_visible_to_dispatch(self):
+        import shipping_origin
+
+        with patch.object(shipping_origin, "collect", side_effect=RuntimeError("transport unavailable")):
+            with self.assertRaisesRegex(RuntimeError, "transport unavailable"):
+                lane.collect_shipping_origin(Path("/synthetic-origin-state"))
+
+
 class DispatchTest(unittest.TestCase):
     def setUp(self):
         disk = patch.object(lane.disk_guard, "free_pct", return_value=50.0)
@@ -3719,7 +3737,7 @@ class DispatchTest(unittest.TestCase):
         self.corpus_tick = corpus.start()
         self.addCleanup(corpus.stop)
 
-        origins = patch.object(lane.shipping_origin, "collect", return_value={"accepted": [], "rejected": [], "errors": []})
+        origins = patch.object(lane, "collect_shipping_origin", return_value={"accepted": [], "rejected": [], "errors": []})
         self.origin_collect = origins.start()
         self.addCleanup(origins.stop)
 
@@ -6533,6 +6551,59 @@ class UpdateTest(unittest.TestCase):
             proved.assert_not_called()
             self.assertEqual(out.getvalue().strip(), "release-bundle-incomplete")
 
+    def test_staged_entrypoint_bootstraps_a_new_imported_extra_from_an_older_archive(self):
+        # PR21839 added shipping_origin outside scripts/lanes. The old installer
+        # cannot archive that new extra; importing it before bootstrap deadlocks updates.
+        with tempfile.TemporaryDirectory() as tmp, self.clean_env():
+            tmp = Path(tmp).resolve()
+            repo, staging = tmp / "repo", tmp / "staging"
+            shutil.copytree(ROOT / "scripts/lanes", repo / "scripts/lanes",
+                            ignore=shutil.ignore_patterns("__pycache__", ".mesh-runtime"))
+            for relative in [*lane.RELEASE_EXTRAS, *lane.LANE_TESTS]:
+                target = repo / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(ROOT / relative, target)
+            self.git("init", "-q", cwd=repo)
+            self.git("add", "-A", cwd=repo)
+            self.git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "release", cwd=repo)
+            self.git("update-ref", "refs/remotes/origin/main", "HEAD", cwd=repo)
+            older_extras = [relative for relative in lane.RELEASE_EXTRAS
+                            if relative != "scripts/shipping_origin.py"]
+            archive = subprocess.run(["git", "archive", "HEAD", "scripts/lanes",
+                                      *older_extras, *lane.LANE_TESTS], cwd=repo,
+                                     capture_output=True, check=True).stdout
+            staging.mkdir()
+            subprocess.run(["tar", "-x", "-C", str(staging)], input=archive, check=True)
+            driver = r"""
+import importlib.util
+import sys
+from pathlib import Path
+from unittest.mock import patch
+staging, repo, state = map(Path, sys.argv[1:])
+extra = staging / "scripts/shipping_origin.py"
+assert not extra.exists(), "fixture must reproduce the older archive"
+spec = importlib.util.spec_from_file_location("staged_bootstrap_fixture", staging / "scripts/lanes/lane_runner.py")
+module = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = module
+spec.loader.exec_module(module)
+host = module.Host(state=state, repo=repo)
+assert module.complete_staged_bundle(host, staging) is None
+assert extra.read_bytes() == (repo / "scripts/shipping_origin.py").read_bytes()
+import shipping_origin
+result = {"accepted": ["restored"], "rejected": [], "errors": []}
+with patch.object(shipping_origin, "collect", return_value=result) as collect:
+    assert module.collect_shipping_origin(state) == result
+    collect.assert_called_once_with(state)
+"""
+            env = {key: value for key, value in os.environ.items()
+                   if key not in {"PYTHONPATH", "PYTHONHOME"}}
+            result = subprocess.run([sys.executable, "-B", "-c", driver,
+                                     str(staging), str(repo), str(tmp / "state")],
+                                    cwd=tmp, env=env, capture_output=True, text=True, timeout=30)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual((staging / "scripts/shipping_origin.py").read_bytes(),
+                             (repo / "scripts/shipping_origin.py").read_bytes())
+
     def test_prove_staging_names_the_refusal_and_the_cli_reports_it(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp = Path(tmp).resolve()
@@ -8262,7 +8333,7 @@ class LifecycleOwnershipTest(unittest.TestCase):
                 patch.object(lane.worktree_sweep, "maybe_spawn"), \
                 patch.object(lane, "ensure_full_history"), \
                 patch.object(lane, "claim_remediation_events"), \
-                patch.object(lane.shipping_origin, "collect", return_value={}), \
+                patch.object(lane, "collect_shipping_origin", return_value={}), \
                 patch.object(lane, "provider_healthy", return_value=True), \
                 patch.object(lane.pr_events, "tick"), \
                 patch.object(lane.reason_lane, "tick"), \

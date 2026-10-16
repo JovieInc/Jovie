@@ -1,0 +1,34 @@
+--- a/dist/build/templates/app-page-runtime.js
++++ b/dist/build/templates/app-page-runtime.js
+@@ -1366,6 +1366,14 @@
+                     }
+                     for (let [key, value] of Object.entries(headers)){
+                         if (typeof value === 'undefined') continue;
++                        // ISR miss renders already set singleton headers, then this
++                        // replay appends them again (vercel/next.js#82117, #99576).
++                        // Location must stay a single field or clients join the
++                        // duplicates into an unusable target.
++                        if (key.toLowerCase() === 'location' || key.toLowerCase() === 'x-nextjs-stale-time') {
++                            res.setHeader(key, value);
++                            continue;
++                        }
+                         if (Array.isArray(value)) {
+                             for (const v of value){
+                                 res.appendHeader(key, v);
+--- a/dist/esm/build/templates/app-page-runtime.js
++++ b/dist/esm/build/templates/app-page-runtime.js
+@@ -1385,6 +1385,14 @@
+                     }
+                     for (let [key, value] of Object.entries(headers)){
+                         if (typeof value === 'undefined') continue;
++                        // ISR miss renders already set singleton headers, then this
++                        // replay appends them again (vercel/next.js#82117, #99576).
++                        // Location must stay a single field or clients join the
++                        // duplicates into an unusable target.
++                        if (key.toLowerCase() === 'location' || key.toLowerCase() === 'x-nextjs-stale-time') {
++                            res.setHeader(key, value);
++                            continue;
++                        }
+                         if (Array.isArray(value)) {
+                             for (const v of value){
+                                 res.appendHeader(key, v);

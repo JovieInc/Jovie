@@ -50,32 +50,25 @@ export function isAbortedNextRscPrefetch(input: {
   );
 }
 
-const SAME_ORIGIN_CSS_CHUNK_PATH_PATTERN = /^\/_next\/static\/chunks\/.*\.css$/;
+const NEXT_STATIC_CSS_CHUNK = /^\/_next\/static\/chunks\/.+\.css$/;
 
 /**
- * Same-origin stylesheet-chunk cancellation. Navigating between public
- * screens cancels in-flight Next.js CSS chunks (resourceType `stylesheet`,
- * URL under `/_next/static/chunks/*.css`) with the abort signal. Only the
- * abort is diagnostic; a failed, refused, or non-chunk stylesheet load
- * stays a real failure.
+ * Next.js discovers a prefetched route's CSS while the RSC flight is in
+ * flight, then Chromium aborts those `<link rel="stylesheet">` loads when
+ * navigation cancels the prefetch. Only that abort is expected. A chunk
+ * that fails for any other reason, and any aborted stylesheet outside
+ * `/_next/static/chunks/`, stays on the request-failure gate.
  */
-export function isAbortedSameOriginStylesheetChunk(input: {
+export function isAbortedNextStaticCssChunk(input: {
   readonly errorText: string | undefined;
-  readonly resourceType: string;
   readonly url?: string;
 }): boolean {
-  if (input.errorText !== ABORTED_REQUEST_ERROR) return false;
-  if (input.resourceType === 'stylesheet') return true;
-  if (input.url) {
-    try {
-      return SAME_ORIGIN_CSS_CHUNK_PATH_PATTERN.test(
-        new URL(input.url).pathname
-      );
-    } catch {
-      // A malformed URL is not a stylesheet chunk.
-    }
+  if (input.errorText !== ABORTED_REQUEST_ERROR || !input.url) return false;
+  try {
+    return NEXT_STATIC_CSS_CHUNK.test(new URL(input.url).pathname);
+  } catch {
+    return false;
   }
-  return false;
 }
 
 export type SameOriginRequestFailureKind =
@@ -93,7 +86,7 @@ export function classifySameOriginRequestFailure(input: {
   if (!input.sameOrigin) return 'ignored';
   if (isDiagnosticAbortedImageRequest(input)) return 'aborted-image';
   if (isAbortedNextRscPrefetch(input)) return 'ignored';
-  if (isAbortedSameOriginStylesheetChunk(input)) return 'ignored';
+  if (isAbortedNextStaticCssChunk(input)) return 'ignored';
   return 'failed-request';
 }
 
