@@ -110,6 +110,7 @@ function fixture() {
   const api = route => {
     const path = route.replace(`repos/${REPOSITORY}/`, '');
     if (path === 'commits/main') return { sha: main };
+    if (path === 'actions/artifacts/5') return artifacts[0];
     if (path.startsWith('contents/'))
       return {
         encoding: 'base64',
@@ -735,3 +736,25 @@ test('shipped CLI uses real gh and unzip for admission and the final actual Git 
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+for (const authority of ['controller', 'CI', 'workflow', 'artifact'])
+  test(`${authority} revocation during collection rejects final upload validation`, () => {
+    const f = fixture();
+    const original = f.input.api;
+    let changed = false;
+    f.input.api = route => {
+      if (!changed && route.includes('name=testflight-upload-intent-')) {
+        changed = true;
+        if (authority === 'controller') f.controller.run_attempt = 2;
+        if (authority === 'CI') f.table.get('actions/runs/60').run_attempt = 2;
+        if (authority === 'workflow')
+          f.table.get('actions/workflows/ci.yml').state = 'disabled_manually';
+        if (authority === 'artifact') f.artifacts[0].expired = true;
+      }
+      return original(route);
+    };
+    assert.throws(
+      () => validateLease(f.input),
+      /changed during|revoked during/
+    );
+  });

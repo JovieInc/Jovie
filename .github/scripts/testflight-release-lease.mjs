@@ -369,6 +369,40 @@ export function validateLease({
     'missing or duplicate exact upload intent'
   );
   // A run's latest record may change during collection. Bind the attempt again.
+  for (const [id, attempt] of [
+    [controllerRun, controllerAttempt],
+    [title[2], title[3]],
+  ]) {
+    const latest = api(`${base}/actions/runs/${id}`);
+    assert(
+      latest.id === Number(id) &&
+        latest.run_attempt === Number(attempt) &&
+        latest.status === 'completed' &&
+        latest.conclusion === 'success',
+      'certification authority changed during validation'
+    );
+  }
+  for (const [path, expected] of [
+    ['ios-testflight.yml', workflow],
+    ['production-controller.yml', controllerWorkflow],
+    ['ci.yml', ciWorkflow],
+  ]) {
+    const latest = api(`${base}/actions/workflows/${path}`);
+    assert(
+      latest.id === expected.id &&
+        latest.path === expected.path &&
+        latest.state === 'active',
+      'certification workflow revoked during validation'
+    );
+  }
+  const finalArtifact = api(`${base}/actions/artifacts/${artifact.id}`);
+  assert(
+    finalArtifact.id === artifact.id &&
+      finalArtifact.name === artifact.name &&
+      finalArtifact.expired === false &&
+      finalArtifact.workflow_run?.id === Number(controllerRun),
+    'production marker revoked during validation'
+  );
   const finalMain = api(`${base}/commits/main`).sha;
   ancestor(main, finalMain);
   const finalPolicyFile = api(`${base}/contents/${POLICY}?ref=${finalMain}`);
