@@ -308,6 +308,7 @@ export function OnboardingCheckoutClient({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           priceId: currentPriceId,
+          humanConfirmed: true,
           returnTo,
           source: 'onboarding',
         }),

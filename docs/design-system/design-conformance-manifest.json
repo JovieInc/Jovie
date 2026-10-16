@@ -76,7 +76,7 @@
     {
       "id": "atom.switch",
       "state": "source-bound",
-      "revision": 1,
+      "revision": 2,
       "platforms": ["web"],
       "source": "packages/ui/atoms/switch.tsx",
       "tokenSources": ["packages/ui/theme/tokens.ts"],

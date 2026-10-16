@@ -1,4 +1,8 @@
+import '@/styles/system-b-app.css';
+import { Button } from '@jovie/ui/atoms/button';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useState } from 'react';
+import { TOOL_STATUS_PARTS } from './fixtures/tool-status';
 import { ToolPartsRenderer } from './tool-ui';
 import type { MessagePart } from './types';
 
@@ -85,4 +89,71 @@ export const LibraryOpportunitiesError: Story = {
   args: {
     parts: libraryErrorParts,
   },
+};
+
+/** Manual event injection: stream result and persistence are separate transitions. */
+function ReceiptTransitions() {
+  const [stage, setStage] = useState<keyof typeof TOOL_STATUS_PARTS>('working');
+  const [active, setActive] = useState(true);
+  return (
+    <div className='w-full space-y-4'>
+      <div className='flex flex-wrap gap-2'>
+        {(
+          [
+            'working',
+            'unconfirmed',
+            'succeeded',
+            'failed',
+            'cancelled',
+            'pending',
+          ] as const
+        ).map(state => (
+          <Button
+            key={state}
+            type='button'
+            variant='ghost'
+            size='sm'
+            className='text-xs text-secondary-token focus-ring-themed'
+            onClick={() => {
+              setStage(state);
+              setActive(state === 'working' || state === 'unconfirmed');
+            }}
+          >
+            {state}
+          </Button>
+        ))}
+        <Button
+          type='button'
+          variant='ghost'
+          size='sm'
+          className='text-xs text-secondary-token focus-ring-themed'
+          onClick={() => setActive(false)}
+        >
+          Interrupt
+        </Button>
+      </div>
+      <ToolPartsRenderer
+        parts={TOOL_STATUS_PARTS[stage]}
+        variant='chat'
+        isStreaming={active}
+      />
+      <p
+        data-testid='status-layout-sentinel'
+        className='text-xs text-secondary-token'
+      >
+        Your next message stays here.
+      </p>
+    </div>
+  );
+}
+
+export const ReceiptLifecycle: Story = { render: () => <ReceiptTransitions /> };
+export const PersistedStatus: Story = {
+  args: { parts: TOOL_STATUS_PARTS.succeeded },
+};
+export const ApprovalStatus: Story = {
+  args: { parts: TOOL_STATUS_PARTS.pending },
+};
+export const UnconfirmedStatus: Story = {
+  args: { parts: TOOL_STATUS_PARTS.unconfirmed },
 };

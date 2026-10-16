@@ -1822,7 +1822,8 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(verified).toContain('authSmoke: $auth_smoke');
     expect(verified).toContain('did not complete successfully');
     expect(verified).not.toContain('concurrency:');
-    expect(verified).toContain('repos/${{ github.repository }}/commits/main');
+    expect(verified).toContain('.github/scripts/resolve-main-sha.sh');
+    expect(verified).not.toContain('commits/main');
     expect(verified).toContain('verify-production-alias.sh');
     expect(verified).toContain('superseded by $current_sha');
     expect(verified).toContain(
@@ -4375,7 +4376,8 @@ describe('production promotion exact-artifact contract', () => {
     expect(verified).not.toContain('neutral with no notification');
     expect(verified).toContain('Finalize exact current release generation');
     expect(verified).toContain('Notify exact verified production generation');
-    expect(verified.match(/commits\/main/g)).toHaveLength(3);
+    expect(verified).not.toContain('commits/main');
+    expect(verified.match(/resolve-main-sha\.sh/g)).toHaveLength(3);
     // JOV-4442: marker payload is write-through in finalize (no separate write step).
     const finalizeStep = getStepBlock(
       verified,
@@ -5555,5 +5557,34 @@ esac
         expect(result.output).not.toContain('recovery_required=true');
       }
     }, 30_000);
+  });
+});
+
+describe('full matrix authenticated release fixtures', () => {
+  it('seeds the prepared ready persona before browser tests on full runs', () => {
+    const workflow = readFileSync(
+      resolve(
+        import.meta.dirname,
+        '../../../../../.github/workflows/e2e-full-matrix.yml'
+      ),
+      'utf8'
+    );
+    const job = getJobBlock(workflow, 'e2e-full-matrix');
+    const seedStep = getStepBlock(job, 'Seed authenticated release fixtures');
+    expect(seedStep).toContain('seed:test-data --ready-creator-releases-only');
+    expect(seedStep).toContain(
+      'DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}'
+    );
+    expect(seedStep).toContain("E2E_USE_TEST_AUTH_BYPASS: '1'");
+    expect(seedStep).toContain(
+      "github.event_name == 'push' || github.event.inputs.test_filter == ''"
+    );
+    const seedIndex = job.indexOf(
+      '- name: Seed authenticated release fixtures'
+    );
+    expect(seedIndex).toBeGreaterThan(
+      job.indexOf('- name: Start standalone E2E server')
+    );
+    expect(seedIndex).toBeLessThan(job.indexOf('- name: Run E2E tests'));
   });
 });

@@ -246,6 +246,24 @@ function stubCommand(bin, name, source) {
   chmodSync(path, 0o755);
 }
 
+function stubGitMain(bin) {
+  stubCommand(
+    bin,
+    'git',
+    `#!/bin/sh
+case "$*" in
+  *ls-remote*)
+    printf '%s\\trefs/heads/main\\n' "$STUB_MAIN_SHA"
+    ;;
+  *)
+    echo "unexpected git: $*" >&2
+    exit 2
+    ;;
+esac
+`
+  );
+}
+
 function parseOutputs(path) {
   const values = {};
   for (const line of readFileSync(path, 'utf8').trim().split('\n')) {
@@ -358,6 +376,7 @@ function runControllerVerify(
   const fixture = makeFixture('controller-verify-');
   const aliasMarker = join(fixture.root, 'alias-called');
   const doneSprintMarker = join(fixture.root, 'done-sprint-called');
+  stubGitMain(fixture.bin);
   stubCommand(
     fixture.bin,
     'gh',
@@ -442,6 +461,7 @@ function runFinalize(overrides = {}, boundarySha = NEWER_SHA) {
     join(fixture.root, 'release-lineage/release-risk-receipt.json'),
     '{"latency":{"mergeAt":"2026-10-03T00:00:00Z","targetP95Seconds":1800},"ovie":{},"certificationPacket":null}'
   );
+  stubGitMain(fixture.bin);
   stubCommand(
     fixture.bin,
     'gh',
@@ -1412,28 +1432,37 @@ describe('controller main read resilience', () => {
   function runCoalesce(mainFailures) {
     const fixture = makeFixture('coalesce-');
     const attempts = join(fixture.root, 'main-attempts');
+    const restLog = join(fixture.root, 'rest-log');
     stubCommand(
       fixture.bin,
-      'gh',
+      'git',
       `#!/bin/sh
 case "$*" in
-  *graphql*)
-    echo "unexpected merge-queue read" >&2
-    exit 2
-    ;;
-  *commits/main*)
+  *ls-remote*)
     n=0
     [ -f "$STUB_MAIN_ATTEMPTS" ] && n="$(cat "$STUB_MAIN_ATTEMPTS")"
     n=$((n + 1))
     printf '%s' "$n" > "$STUB_MAIN_ATTEMPTS"
     if [ "$n" -le "$STUB_MAIN_FAILURES" ]; then
-      echo "gh: API rate limit already exceeded for site ID installation." >&2
+      echo "git ls-remote failed" >&2
       exit 1
     fi
-    printf '%s\\n' "$STUB_MAIN_SHA"
+    printf '%s\\trefs/heads/main\\n' "$STUB_MAIN_SHA"
     ;;
-  *) printf '%s\\n' "$STUB_MAIN_SHA" ;;
+  *)
+    echo "unexpected git: $*" >&2
+    exit 2
+    ;;
 esac
+`
+    );
+    stubCommand(
+      fixture.bin,
+      'gh',
+      `#!/bin/sh
+printf '%s\\n' "$*" >> "$STUB_REST_LOG"
+echo "unexpected REST main read" >&2
+exit 9
 `
     );
     const script = getStepRunScript(
@@ -1443,27 +1472,31 @@ esac
     const result = runScript(script, fixture, {
       EXPECTED_SHA,
       FIXED_WINDOW_SECONDS_REPLACED: '60',
-      GH_API_RETRY_SECONDS: '0',
       GITHUB_STEP_SUMMARY: join(fixture.root, 'step-summary'),
       PRODUCTION_STARVATION_SECONDS: '5400',
       REPOSITORY: 'JovieInc/Jovie',
+      RESOLVE_MAIN_BUDGET_SECONDS: '5',
+      RESOLVE_MAIN_RETRY_SECONDS: '0',
       STUB_MAIN_SHA: EXPECTED_SHA,
       STUB_MAIN_ATTEMPTS: attempts,
       STUB_MAIN_FAILURES: String(mainFailures),
+      STUB_REST_LOG: restLog,
     });
     return {
       attempts: existsSync(attempts)
         ? Number(readFileSync(attempts, 'utf8'))
         : 0,
+      rest: existsSync(restLog) ? readFileSync(restLog, 'utf8') : '',
       outputs: parseOutputs(fixture.output),
       result,
     };
   }
 
-  it('recovers from a transient API failure and proceeds at once on a current SHA', () => {
+  it('resolves main with git and does not spend a REST read', () => {
     const run = runCoalesce(1);
     expect(run.result.status, run.result.stderr).toBe(0);
     expect(run.attempts).toBe(2);
+    expect(run.rest).toBe('');
     expect(run.outputs.is_current).toBe('true');
     expect(run.outputs.decision).toBe('proceed');
     expect(run.outputs.wait_seconds).toBe('0');
@@ -1475,7 +1508,57 @@ esac
     expect(run.result.status).toBe(1);
     expect(run.attempts).toBe(3);
     expect(run.outputs.is_current).toBe('false');
-    expect(run.result.stderr).toContain('API rate limit already exceeded');
+    expect(run.result.stderr).toContain(
+      'Could not resolve refs/heads/main for JovieInc/Jovie via git ls-remote.'
+    );
+  });
+
+  it('holds a REST main read until reset and refuses one outside the budget', () => {
+    const script = resolve(REPO_ROOT, '.github/scripts/resolve-main-sha.sh');
+    const runResolve = (resetOffset, budget) => {
+      const fixture = makeFixture('resolve-main-');
+      const calls = join(fixture.root, 'gh-calls');
+      const reset = Math.floor(Date.now() / 1000) + resetOffset;
+      stubCommand(fixture.bin, 'git', '#!/bin/sh\nexit 1\n');
+      stubCommand(
+        fixture.bin,
+        'gh',
+        `#!/bin/sh
+n=0
+[ -f "$STUB_CALLS" ] && n="$(cat "$STUB_CALLS")"
+n=$((n + 1))
+printf '%s' "$n" > "$STUB_CALLS"
+if [ "$n" -eq 1 ]; then
+  printf 'HTTP/2 403\\r\\nx-ratelimit-remaining: 0\\r\\nx-ratelimit-reset: ${reset}\\r\\n\\r\\n{"message":"API rate limit exceeded for installation"}\\n'
+  exit 1
+fi
+printf 'HTTP/2 200\\r\\n\\r\\n{"sha":"%s"}\\n' "$STUB_MAIN_SHA"
+`
+      );
+      return spawnSync('bash', [script, 'JovieInc/Jovie'], {
+        encoding: 'utf8',
+        timeout: 15_000,
+        env: {
+          ...process.env,
+          GH_TOKEN: 'test-token',
+          PATH: `${fixture.bin}${delimiter}${process.env.PATH || ''}`,
+          RESOLVE_MAIN_BUDGET_SECONDS: String(budget),
+          RESOLVE_MAIN_RETRY_SECONDS: '0',
+          STUB_CALLS: calls,
+          STUB_MAIN_SHA: EXPECTED_SHA,
+        },
+      });
+    };
+
+    const held = runResolve(1, 30);
+    expect(held.status, held.stderr).toBe(0);
+    expect(held.stdout.trim()).toBe(EXPECTED_SHA);
+    expect(held.stderr).toContain('Holding');
+
+    const refused = runResolve(10_000, 5);
+    expect(refused.status).toBe(1);
+    expect(refused.stdout.trim()).toBe('');
+    expect(refused.stderr).toContain('outside the 5s budget');
   });
 });
 
@@ -1484,9 +1567,8 @@ describe('controller starvation bound', () => {
     const coalesce = getJobBlock(CONTROLLER_WORKFLOW, 'coalesce-production');
     const authorize = getJobBlock(CONTROLLER_WORKFLOW, 'authorize-production');
     expect(coalesce).toContain("PRODUCTION_STARVATION_SECONDS: '5400'");
-    expect(coalesce).toContain(
-      'sparse-checkout: .github/scripts/release-lineage-gate.sh'
-    );
+    expect(coalesce).toContain('.github/scripts/release-lineage-gate.sh');
+    expect(coalesce).toContain('.github/scripts/resolve-main-sha.sh');
     expect(
       coalesce.match(/release-lineage-gate\.sh/g)?.length ?? 0
     ).toBeGreaterThanOrEqual(2);

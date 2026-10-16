@@ -4,11 +4,9 @@ import {
   canonicalIdentity,
   detectPlatform,
 } from '@/lib/utils/platform-detection';
-import { isBeaconsUrl, validateBeaconsUrl } from './strategies/beacons';
 import { validateLayloUrl } from './strategies/laylo';
 import { isTikTokUrl, validateTikTokUrl } from './strategies/tiktok';
 import { isTwitterUrl, validateTwitterUrl } from './strategies/twitter';
-import { isYouTubeChannelUrl } from './strategies/youtube';
 import type { ExtractionResult } from './types';
 
 /**
@@ -16,8 +14,6 @@ import type { ExtractionResult } from './types';
  */
 type SupportedRecursiveJobType =
   | 'import_laylo'
-  | 'import_youtube'
-  | 'import_beacons'
   | 'import_tiktok'
   | 'import_twitter';
 
@@ -26,8 +22,6 @@ type SupportedRecursiveJobType =
  */
 const MAX_DEPTH_BY_JOB_TYPE: Record<SupportedRecursiveJobType, number> = {
   import_laylo: 3,
-  import_youtube: 1,
-  import_beacons: 3,
   import_tiktok: 2,
   import_twitter: 2,
 };
@@ -39,17 +33,6 @@ const MAX_DEPTH_BY_JOB_TYPE: Record<SupportedRecursiveJobType, number> = {
 function classifyLink(
   url: string
 ): { jobType: SupportedRecursiveJobType; sourceUrl: string } | null {
-  // YouTube
-  if (isYouTubeChannelUrl(url)) {
-    return { jobType: 'import_youtube', sourceUrl: url };
-  }
-
-  // Beacons
-  const validatedBeacons = validateBeaconsUrl(url);
-  if (validatedBeacons && isBeaconsUrl(validatedBeacons)) {
-    return { jobType: 'import_beacons', sourceUrl: validatedBeacons };
-  }
-
   // Laylo
   const validatedLaylo = validateLayloUrl(url);
   if (validatedLaylo) {

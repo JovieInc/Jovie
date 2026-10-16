@@ -80,7 +80,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
-          sparse-checkout: .github/scripts/release-lineage-gate.sh
+          sparse-checkout: |
+            .github/scripts/release-lineage-gate.sh
+            .github/scripts/resolve-main-sha.sh
           sparse-checkout-cone-mode: false
           persist-credentials: false
       - name: Evaluate event-driven supersession
@@ -95,11 +97,9 @@ jobs:
           # queued behind it. Still-queued ancestors yield regardless, so a
           # stale backlog drains to the newest queued generation.
           PRODUCTION_STARVATION_SECONDS: '5400'
-          # A transient GitHub API failure (rate limit, 5xx) must not kill a
-          # release wave: each API read retries a bounded number of times
-          # (three attempts) before failing closed, well inside the 5-minute
-          # job budget.
-          GH_API_RETRY_SECONDS: '15'
+          # Main is resolved over the git protocol. A REST fallback may hold
+          # until x-ratelimit-reset only when that instant is inside this budget.
+          RESOLVE_MAIN_BUDGET_SECONDS: '90'
           # Retired fixed release-wave window; receipts record time saved
           # against it.
           FIXED_WINDOW_SECONDS_REPLACED: '60'
@@ -153,25 +153,6 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
           }
 
-          # Bounded retry for GitHub API reads: a transient rate limit or 5xx
-          # must not fail the release wave, but a persistent failure still
-          # fails closed so supersession evidence is never guessed.
-          gh_api() {
-            local attempt
-            for attempt in 1 2 3; do
-              if gh api "$@" > "$RUNNER_TEMP/gh-api-out.json" 2> "$RUNNER_TEMP/gh-api-err.log"; then
-                cat "$RUNNER_TEMP/gh-api-out.json"
-                return 0
-              fi
-              if [ "$attempt" -lt 3 ]; then
-                echo "::warning::gh api attempt $attempt failed ($(head -n 1 "$RUNNER_TEMP/gh-api-err.log")); retrying in ${GH_API_RETRY_SECONDS}s." >&2
-                sleep "$GH_API_RETRY_SECONDS"
-              fi
-            done
-            cat "$RUNNER_TEMP/gh-api-err.log" >&2
-            return 1
-          }
-
           [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Controller expected SHA must be a full commit."
             exit 1
@@ -181,7 +162,7 @@ jobs:
           # marked superseded, naming its replacement. Supersession is
           # monotonic because main only moves forward and idempotent because
           # no mutation has started for this lineage.
-          current_main_sha="$(gh_api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
+          current_main_sha="$(bash "$GITHUB_WORKSPACE/.github/scripts/resolve-main-sha.sh" "$REPOSITORY")"
           [[ "$current_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Could not resolve exact current main during release supersession."
             exit 1
@@ -326,6 +307,46 @@ jobs:
             .scopedAdmission.surface == "production-web" and
             .scopedAdmission.allowed == true
           ' "$RUNNER_TEMP/fleet-admission.json" >/dev/null
+      - name: Checkout the rate-limit hold from main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # This job's primary checkout is the release SHA. Its copy of the
+          # hold still piped artifact zips, and gh refused application/zip
+          # (runs 38828724154 and 38829734233). Load the default-branch hold,
+          # which writes zip bytes to a file and still waits out a reset.
+          ref: ${{ github.sha }}
+          path: .rate-limit-hold
+          sparse-checkout: scripts/lib/github-rate-limit.mjs
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: Hold installation reads through a rate-limit reset
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Compare and artifact reads in the next step 403'd at
+          # 2026-10-15 21:48Z (run 38811356851) after main was already
+          # resolved. Retry those reads until x-ratelimit-reset when that fits
+          # this 35-minute job. A later reset still fails closed. The wait
+          # lives in github-rate-limit.mjs, not a workflow sleep (JOV-INV-042).
+          # Keep this step free of GitHub expressions. The next run block is
+          # already near the 21000-character expression cap.
+          real_gh="$(command -v gh)"
+          echo "REAL_GH=${real_gh}" >> "$GITHUB_ENV"
+          hold="$GITHUB_WORKSPACE/.rate-limit-hold/scripts/lib/github-rate-limit.mjs"
+          test -f "$hold"
+          echo "RATE_LIMIT_HOLD=${hold}" >> "$GITHUB_ENV"
+          shim="$RUNNER_TEMP/gh-rate-limit-bin"
+          mkdir -p "$shim"
+          cat > "$shim/gh" << 'EOF'
+          #!/bin/bash
+          set -euo pipefail
+          if [[ "${1:-}" == "api" && "${2:-}" != "rate_limit" ]]; then
+            exec node "$RATE_LIMIT_HOLD" run --max-wait-seconds 1500 --attempts 4 -- "$REAL_GH" "$@"
+          fi
+          exec "$REAL_GH" "$@"
+          EOF
+          chmod +x "$shim/gh"
+          echo "$shim" >> "$GITHUB_PATH"
       - name: Cross-prove exact successful push CI
         id: authorize
         env:
@@ -393,7 +414,7 @@ jobs:
             exit 1
           fi
 
-          current_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
+          current_main_sha="$(bash "$GITHUB_WORKSPACE/.github/scripts/resolve-main-sha.sh" "$REPOSITORY")"
           [[ "$current_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Could not resolve exact current main while authorizing production."
             exit 1
@@ -754,7 +775,7 @@ jobs:
               echo "staging_verified=true" >> "$GITHUB_OUTPUT"
             fi
 
-            final_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
+            final_main_sha="$(bash "$GITHUB_WORKSPACE/.github/scripts/resolve-main-sha.sh" "$REPOSITORY")"
             [[ "$final_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
               echo "::error::Could not resolve exact main at the production authorization boundary."
               exit 1
@@ -1143,7 +1164,7 @@ jobs:
           {
             echo "superseded_before_marker=false"
           } >> "$GITHUB_OUTPUT"
-          current_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
+          current_sha="$(bash "$GITHUB_WORKSPACE/.github/scripts/resolve-main-sha.sh" "${{ github.repository }}")"
           [[ "$current_sha" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Could not resolve an exact current main SHA."
             exit 1
@@ -1254,7 +1275,7 @@ jobs:
           # Main can advance while setup runs. The workflow-level production
           # lease prevents a same-SHA rerun from mutating canonical production;
           # recheck main immediately before reading the canonical alias.
-          boundary_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
+          boundary_sha="$(bash "$GITHUB_WORKSPACE/.github/scripts/resolve-main-sha.sh" "${{ github.repository }}")"
           if [[ ! "$boundary_sha" =~ ^[0-9a-f]{40}$ ]]; then
             echo "::error::Could not resolve exact main at the canonical verification boundary."
             exit 1
@@ -1309,7 +1330,7 @@ jobs:
           # bind proof gathered while this controller still holds the production
           # FIFO. Marker write-through happens in this same step so successful
           # verification cannot complete without local marker bytes. JOV-4442.
-          boundary_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
+          boundary_sha="$(bash "$GITHUB_WORKSPACE/.github/scripts/resolve-main-sha.sh" "${{ github.repository }}")"
           if [[ ! "$boundary_sha" =~ ^[0-9a-f]{40}$ ]]; then
             echo "::error::Could not resolve exact main at the finalization boundary."
             exit 1

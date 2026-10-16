@@ -1,4 +1,5 @@
 'use client';
+// @coverage-via apps/web/tests/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView.test.tsx
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -987,48 +988,53 @@ export function ShellReleasesView({
         data-testid='shell-releases-view'
         surfaceMode='table'
       >
-        <ReleaseStateBanners
-          rows={rows}
-          appleMusicMatches={appleMusicMatches}
-          isAppleMusicEligibilityLoading={isAppleMusicEligibilityLoading}
-          showImportProgress={showImportProgress}
-          showReleasesTable={rows.length > 0}
-          artistName={artistName}
-          importedCount={importedCount}
-          totalCount={totalCount}
-          isAppleMusicConnected={isAmConnected}
-          isImporting={isImporting}
-          isSpotifyConnected={isConnected}
-          isPro={isPro}
-          canAccessFutureReleases={canAccessFutureReleases}
-          releasedCount={releasedCount}
-          unreleasedCount={unreleasedCount}
-          onAppleMusicMatchStatusChange={handleMatchStatusChange}
-        />
+        <div
+          className='flex min-h-0 flex-1 flex-col'
+          data-testid='releases-matrix'
+        >
+          <ReleaseStateBanners
+            rows={rows}
+            appleMusicMatches={appleMusicMatches}
+            isAppleMusicEligibilityLoading={isAppleMusicEligibilityLoading}
+            showImportProgress={showImportProgress}
+            showReleasesTable={rows.length > 0}
+            artistName={artistName}
+            importedCount={importedCount}
+            totalCount={totalCount}
+            isAppleMusicConnected={isAmConnected}
+            isImporting={isImporting}
+            isSpotifyConnected={isConnected}
+            isPro={isPro}
+            canAccessFutureReleases={canAccessFutureReleases}
+            releasedCount={releasedCount}
+            unreleasedCount={unreleasedCount}
+            onAppleMusicMatchStatusChange={handleMatchStatusChange}
+          />
 
-        <div className='flex-1 min-h-0 overflow-y-auto'>
-          {!shouldGateListPaint && (
-            <ReleasesListContent
-              showEmptyState={showEmptyState}
-              showConnectedEmptyState={showConnectedEmptyState}
-              visibleReleases={visibleReleases}
-              selectedReleaseId={selectedReleaseId}
-              pills={pills}
-              canCreateManualReleases={canCreateManualReleases}
-              isSyncing={isSyncing}
-              actionMenusByReleaseId={actionMenusByReleaseId}
-              contextMenuItemsByReleaseId={contextMenuItemsByReleaseId}
-              isSmartLinkLocked={isSmartLinkLocked}
-              getSmartLinkLockReason={getSmartLinkLockReason}
-              getSyncStatus={getSyncStatus}
-              onConnectSpotify={() => setSpotifySearchOpen(true)}
-              onNewRelease={handleNewRelease}
-              onSync={handleSync}
-              onSelect={handleSelect}
-              onClearFilters={handleClearFilters}
-              listboxRef={listboxRef}
-            />
-          )}
+          <div className='flex-1 min-h-0 overflow-y-auto'>
+            {!shouldGateListPaint && (
+              <ReleasesListContent
+                showEmptyState={showEmptyState}
+                showConnectedEmptyState={showConnectedEmptyState}
+                visibleReleases={visibleReleases}
+                selectedReleaseId={selectedReleaseId}
+                pills={pills}
+                canCreateManualReleases={canCreateManualReleases}
+                isSyncing={isSyncing}
+                actionMenusByReleaseId={actionMenusByReleaseId}
+                contextMenuItemsByReleaseId={contextMenuItemsByReleaseId}
+                isSmartLinkLocked={isSmartLinkLocked}
+                getSmartLinkLockReason={getSmartLinkLockReason}
+                getSyncStatus={getSyncStatus}
+                onConnectSpotify={() => setSpotifySearchOpen(true)}
+                onNewRelease={handleNewRelease}
+                onSync={handleSync}
+                onSelect={handleSelect}
+                onClearFilters={handleClearFilters}
+                listboxRef={listboxRef}
+              />
+            )}
+          </div>
         </div>
       </PageShell>
 

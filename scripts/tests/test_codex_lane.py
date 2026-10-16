@@ -11,6 +11,7 @@ import json
 import os
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from unittest.mock import ANY, patch
@@ -19,6 +20,29 @@ from pathlib import Path
 from contextlib import redirect_stdout
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def read_ready_pid(path: Path, deadline: float) -> int | None:
+    """Wait until `path` holds a pid.
+
+    The metadata child used to create the ready file and then write the pid.
+    A reader that returns on existence can observe an empty file
+    (`int('')` raises ValueError). Publication is an atomic replace; this wait
+    still accepts only a parseable pid and fails closed when the deadline passes.
+    """
+    while True:
+        try:
+            text = path.read_text().strip()
+        except OSError:
+            text = ""
+        if text:
+            try:
+                return int(text)
+            except ValueError:
+                pass
+        if time.monotonic() >= deadline:
+            return None
+        time.sleep(0.01)
 SPEC = importlib.util.spec_from_file_location("codex_lane", ROOT / "scripts/lanes/codex_lane.py")
 codex = importlib.util.module_from_spec(SPEC)
 sys.modules["codex_lane"] = codex
@@ -458,7 +482,10 @@ for line in sys.stdin:
         self.cli.write_text(f'''#!{sys.executable}
 import os, time
 from pathlib import Path
-Path({str(ready)!r}).write_text(str(os.getpid()))
+ready = Path({str(ready)!r})
+pending = ready.with_name(ready.name + '.tmp')
+pending.write_text(str(os.getpid()))
+os.replace(pending, ready)
 time.sleep(30)
 ''')
         self.cli.chmod(0o755)
@@ -473,11 +500,8 @@ m.reconcile(1_000_000, 0)
                                         stdout=codex.subprocess.DEVNULL, stderr=codex.subprocess.DEVNULL)
         child = None
         try:
-            deadline = time.monotonic() + 5
-            while not ready.exists() and time.monotonic() < deadline:
-                time.sleep(.01)
-            self.assertTrue(ready.exists(), 'metadata process did not start')
-            child = int(ready.read_text())
+            child = read_ready_pid(ready, time.monotonic() + 5)
+            self.assertIsNotNone(child, 'metadata process did not publish its pid')
             parent.kill()
             parent.wait(timeout=2)
             self.assertIsNone(codex.lease('current-login'), 'live child lost inherited account lease')
@@ -498,6 +522,20 @@ m.reconcile(1_000_000, 0)
                 time.sleep(.01)
         self.assertIsNotNone(handle, 'drained metadata process kept account lease')
         handle.close()
+
+    def test_ready_pid_waits_until_the_file_is_parseable(self):
+        ready = self.root / 'metadata-child.pid'
+        ready.write_text('')
+
+        def publish():
+            time.sleep(0.05)
+            pending = ready.with_name(ready.name + '.tmp')
+            pending.write_text('4242')
+            os.replace(pending, ready)
+
+        threading.Thread(target=publish, daemon=True).start()
+        self.assertEqual(read_ready_pid(ready, time.monotonic() + 2), 4242)
+        self.assertIsNone(read_ready_pid(self.root / 'missing.pid', time.monotonic()))
 
     def test_concurrent_corruption_before_final_merge_is_preserved(self):
         def corrupt_after_metadata(_):
