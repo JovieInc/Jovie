@@ -51,10 +51,13 @@ for (const viewport of [
           () => document.documentElement.scrollWidth <= innerWidth
         )
       ).toBe(true);
-      await testInfo.attach(`security-check-${nextState}-${viewport.width}`, {
-        body: await page.getByTestId('recovery-surface').screenshot(),
-        contentType: 'image/png',
-      });
+      await testInfo.attach(
+        `security-check-${nextState}-${viewport.width}.png`,
+        {
+          body: await page.getByTestId('recovery-surface').screenshot(),
+          contentType: 'image/png',
+        }
+      );
       if (nextState === 'interactive' || nextState === 'error') {
         await expect(page.getByTestId('recovery-surface')).toHaveScreenshot(
           `security-check-${nextState}-${viewport.width}.png`
