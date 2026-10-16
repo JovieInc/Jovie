@@ -1427,13 +1427,21 @@ describe('JOV-INV-018 screen-certification/v2', () => {
         'marketing-route-screenshots-' + head;
       const targeted = runScreenCertification({
         headSha: head,
-        changedFiles: ['apps/web/app/[username]/page.tsx'],
+        changedFiles: [
+          'apps/web/app/[username]/page.tsx',
+          'apps/web/app/onboarding/checkout/page.tsx',
+        ],
         targetScreenIds: ['web.artists'],
         proofRequests: [{ artifactId: 99, screenId: 'web.artists' }],
       });
       const targetedIssues = targeted.receipt.issues.join('\n');
       assert.equal(
         targetedIssues.includes('web.public-profile'),
+        false,
+        targetedIssues
+      );
+      assert.equal(
+        targetedIssues.includes('web.onboarding-checkout'),
         false,
         targetedIssues
       );
