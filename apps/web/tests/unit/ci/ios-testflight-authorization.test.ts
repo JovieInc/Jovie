@@ -441,6 +441,70 @@ describe.skipIf(!gh)('iOS TestFlight release authorization (real gh)', () => {
     expect(readFileSync(summary, 'utf8').trim()).toBe(laterSentence);
   });
 
+  it('formats a deferred reset with BSD date when GNU -d is rejected', async () => {
+    const root = tempRoot('jovie-testflight-bsd-date-');
+    const summary = join(root, 'summary');
+    const dateLog = join(root, 'date.log');
+    const dateBin = join(root, 'bin');
+    mkdirSync(dateBin);
+    writeFileSync(summary, '');
+    writeFileSync(
+      join(dateBin, 'date'),
+      `#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\\n' "$*" >> "$DATE_LOG"
+has_d=0
+has_r=0
+prev=""
+epoch=""
+for arg in "$@"; do
+  if [ "$arg" = "-d" ]; then
+    has_d=1
+  fi
+  if [ "$prev" = "-r" ]; then
+    has_r=1
+    epoch="$arg"
+  fi
+  prev="$arg"
+done
+if [ "$has_d" -eq 1 ]; then
+  echo "date: illegal option -- d" >&2
+  exit 1
+fi
+if [ "$has_r" -eq 1 ]; then
+  node -e 'const epoch = Number(process.argv[1]); if (!Number.isFinite(epoch)) process.exit(1); process.stdout.write(new Date(epoch * 1000).toISOString().slice(0, 19) + "Z\\n");' "$epoch"
+  exit 0
+fi
+exec /usr/bin/date "$@"
+`,
+      { mode: 0o755 }
+    );
+    const result = await authorize(
+      {
+        quota: {
+          path: 'actions/workflows/production-controller.yml',
+          message: 'API rate limit exceeded for installation',
+        },
+      },
+      {
+        DATE_LOG: dateLog,
+        GITHUB_STEP_SUMMARY: summary,
+        PATH: `${dateBin}:${process.env.PATH}`,
+      }
+    );
+    const resetEpoch = /resets at (\d+)/.exec(result.stderr)?.[1];
+    const resetIso =
+      new Date(Number(resetEpoch) * 1000).toISOString().slice(0, 19) + 'Z';
+    const sentence = `Installation quota resets at ${resetIso}. Deferring TestFlight publication of ${RELEASE} to the next reconciliation. No release was authorized.`;
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.stderr).not.toContain('could not format the reset instant');
+    expect(result.stdout).toContain(`::warning::${sentence}`);
+    expect(readFileSync(summary, 'utf8').trim()).toBe(sentence);
+    const dateCalls = readFileSync(dateLog, 'utf8');
+    expect(dateCalls).toContain('-d ');
+    expect(dateCalls).toContain('-r ');
+  });
+
   it('keeps a permission 403 and a missing reset fatal', async () => {
     const summary = join(tempRoot('jovie-testflight-summary-'), 'summary');
     writeFileSync(summary, '');

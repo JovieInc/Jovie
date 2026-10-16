@@ -1086,6 +1086,56 @@ exit 1
   assert.equal(substitutedOutputs.authorized, 'false');
   assert.equal(substitutedOutputs.release_sha, '');
 
+  const dateLog = join(root, 'date.log');
+  await writeFile(
+    join(mockBin, 'date'),
+    `#!/usr/bin/env bash
+set -euo pipefail
+if [ -n "\${MOCK_DATE_LOG:-}" ]; then
+  printf '%s\\n' "$*" >> "$MOCK_DATE_LOG"
+fi
+if [ "\${MOCK_DATE:-gnu}" != bsd ]; then
+  exec /usr/bin/date "$@"
+fi
+has_d=0
+has_r=0
+prev=""
+epoch=""
+for arg in "$@"; do
+  if [ "$arg" = "-d" ]; then
+    has_d=1
+  fi
+  if [ "$prev" = "-r" ]; then
+    has_r=1
+    epoch="$arg"
+  fi
+  prev="$arg"
+done
+if [ "$has_d" -eq 1 ]; then
+  echo "date: illegal option -- d" >&2
+  exit 1
+fi
+if [ "$has_r" -eq 1 ]; then
+  node -e 'const epoch = Number(process.argv[1]); if (!Number.isFinite(epoch)) process.exit(1); process.stdout.write(new Date(epoch * 1000).toISOString().slice(0, 19) + "Z\\n");' "$epoch"
+  exit 0
+fi
+exec /usr/bin/date "$@"
+`,
+    { mode: 0o755 }
+  );
+  await writeFile(output, 'authorized=true\nrelease_sha=already-set\n');
+  const bsd = await run(directScript, {
+    MOCK_DATE: 'bsd',
+    MOCK_DATE_LOG: dateLog,
+  });
+  assert.equal(bsd.status, 0, bsd.stderr);
+  assert.doesNotMatch(bsd.stderr, /could not format the reset instant/);
+  assert.ok(bsd.stdout.includes(`::warning::${sentence}`), bsd.stdout);
+  assert.equal((await readFile(summary, 'utf8')).trim(), sentence);
+  const dateCalls = await readFile(dateLog, 'utf8');
+  assert.match(dateCalls, /-d /);
+  assert.match(dateCalls, /-r /);
+
   await writeFile(output, '');
   const denied = await run(directScript, {
     MOCK_ERROR: 'gh: Resource not accessible by integration (HTTP 403)',
