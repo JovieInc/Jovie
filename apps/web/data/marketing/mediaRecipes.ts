@@ -5,22 +5,35 @@
  * dark-glass product frame, compact glass module, soft editorial
  * background, coherent flowing-accent background — plus the typed
  * source / safe-area / motion / output axes with runtime validation.
- * Values are copied from current Pen→code sources. Do not invent new
- * taste here.
+ * The v3 request resolves current primitives; legacy chrome extraction
+ * metadata remains compatible with existing header exports. No new taste.
  *
  * Visual standard: newer-hero / premium bar.
  * Bloom lock: gbrain:design/jovie-newer-hero-bloom-b-founder-locked-2026-09-17
  */
 
+import { z } from 'zod';
+import {
+  EDITORIAL_BACKGROUND_FLOW,
+  EDITORIAL_BACKGROUND_SOFT,
+} from './editorialBackgrounds';
+import { JOVIE_IMAGE_COLOR_POLICY } from './imageColorPolicy';
+import {
+  MARKETING_MEDIA_INPUTS,
+  MARKETING_MEDIA_PRESENTATION_REVISION,
+  MARKETING_MEDIA_REFERENCE_REVIEW,
+  MARKETING_MEDIA_TOKEN_REVISION,
+} from './mediaReferences';
+
 export const JOVIE_MARKETING_MEDIA_RECIPE_SCHEMA =
-  'jovie-marketing-media-recipe/v2';
-export const JOVIE_MARKETING_MEDIA_RECIPE_VERSION = 'approved-chrome-v2';
+  'jovie-marketing-media-recipe/v3';
+export const JOVIE_MARKETING_MEDIA_RECIPE_VERSION = 'registered-media-v3';
 
 export const MARKETING_MEDIA_RECIPE_IDS = [
-  'dark-glass',
   'compact-glass',
-  'soft-editorial-background',
+  'dark-glass',
   'flowing-accent',
+  'soft-editorial-background',
 ] as const;
 
 export type MarketingMediaRecipeId =
@@ -29,6 +42,8 @@ export type MarketingMediaRecipeId =
 export type MarketingMediaRecipeKind = 'surface' | 'background';
 
 export type MarketingMediaRecipeFindingCode =
+  | 'invalid-media-request'
+  | 'stale-media-source'
   | 'unknown-media-recipe'
   | 'invented-media-taste'
   | 'unapproved-export-recipe'
@@ -75,32 +90,19 @@ export interface MarketingMediaRecipeDecision {
  * these three source kinds; there is no free-form source, no
  * generator-supplied approval booleans, and no free-form colors.
  */
-export type MarketingMediaSource =
-  | MarketingMediaRealCaptureSource
-  | MarketingMediaRegisteredLivePresentationSource
-  | MarketingMediaGeneratedArtworkSource;
-
-export interface MarketingMediaRealCaptureSource {
-  readonly kind: 'real-capture';
-  /** Must be a registered screenshot scenario id with a public export. */
-  readonly scenarioId: string;
-  /** Revision (manifest gitSha/capturedAt) of the capture actually used. */
-  readonly sourceRevision: string;
-}
-
-export interface MarketingMediaRegisteredLivePresentationSource {
-  readonly kind: 'registered-live-presentation';
-  /** Must be a registered screenshot scenario id (the live surface shown). */
-  readonly scenarioId: string;
-  readonly sourceRevision: string;
-}
-
-export interface MarketingMediaGeneratedArtworkSource {
-  readonly kind: 'generated-artwork';
-  /** Approved generated artwork master id. */
-  readonly assetId: string;
-  readonly sourceRevision: string;
-}
+export type MarketingMediaSource = MarketingMediaRecipeInput['source'];
+export type MarketingMediaRealCaptureSource = Extract<
+  MarketingMediaSource,
+  { kind: 'real-capture' }
+>;
+export type MarketingMediaRegisteredLivePresentationSource = Extract<
+  MarketingMediaSource,
+  { kind: 'registered-live-presentation' }
+>;
+export type MarketingMediaGeneratedArtworkSource = Extract<
+  MarketingMediaSource,
+  { kind: 'generated-artwork' }
+>;
 
 export type MarketingMediaSafeAreaPolicyId =
   | 'full-bleed-editorial'
@@ -131,15 +133,136 @@ export interface MarketingMediaAccentReference {
   readonly hex: string;
 }
 
-export interface MarketingMediaRecipeInput {
-  readonly recipeId: string;
-  readonly source: MarketingMediaSource;
-  /** Canonical accent reference the recipe's chromatic core derives from. */
-  readonly accent: MarketingMediaAccentReference;
-  readonly safeArea: MarketingMediaSafeAreaPolicyId;
-  readonly motion: MarketingMediaMotionPolicy;
-  readonly output: MarketingMediaOutputProfile;
-}
+/** Validated request axes; input identifiers resolve only in the source-owned registry. */
+const SourceRevision = z.string().trim().min(1, 'Source revision is required');
+const SourceHash = z
+  .string()
+  .regex(/^[a-f0-9]{64}$/, 'Use the registered SHA-256');
+export const MarketingMediaRecipeInputSchema = z
+  .object({
+    recipeId: z.enum(MARKETING_MEDIA_RECIPE_IDS),
+    source: z.discriminatedUnion('kind', [
+      z
+        .object({
+          kind: z.literal('real-capture'),
+          scenarioId: z.string(),
+          sourceRevision: SourceRevision,
+          assetHash: SourceHash,
+        })
+        .strict(),
+      z
+        .object({
+          kind: z.literal('registered-live-presentation'),
+          presentationId: z.string(),
+          sourceRevision: SourceRevision,
+          assetHash: SourceHash,
+        })
+        .strict(),
+      z
+        .object({
+          kind: z.literal('generated-artwork'),
+          assetId: z.string(),
+          sourceRevision: SourceRevision,
+          assetHash: SourceHash,
+        })
+        .strict(),
+    ]),
+    treatment: z.enum(['compact-glass', 'dark-glass', 'flow', 'soft']),
+    accent: z.enum(['ion', 'ultra', 'pulse']),
+    behavior: z
+      .object({
+        motion: z.literal('static'),
+        fallback: z.enum(['opaque-shell', 'plain-canvas']),
+      })
+      .strict(),
+    layout: z
+      .object({
+        sectionId: z.enum(['feature-split', 'spec-wall']),
+        safeArea: z.enum(['device-frame-inset', 'full-bleed-editorial']),
+        focal: z.literal('source-owned'),
+      })
+      .strict(),
+    delivery: z
+      .object({
+        profile: z.enum(['marketing-web', 'social-card']),
+        tokenRevision: z.literal(MARKETING_MEDIA_TOKEN_REVISION),
+      })
+      .strict(),
+  })
+  .strict();
+export type MarketingMediaRecipeInput = z.infer<
+  typeof MarketingMediaRecipeInputSchema
+>;
+
+/**
+ * Runtime presentation axis. CSS/material values stay in the existing primitive,
+ * never in generator input. Legacy chrome extractions below remain compatibility
+ * metadata for the header export; they do not define product-frame geometry.
+ */
+export const MARKETING_MEDIA_PRESENTATIONS = {
+  'compact-glass': {
+    treatment: 'compact-glass',
+    component: 'CompactGlassCaptureDemo',
+    owner: 'components/marketing/artist-profile/captureShared.css',
+    references: ['23', '14'],
+    accent: 'ion',
+    safeArea: 'device-frame-inset',
+    fallback: 'opaque-shell',
+    radius: '--radius-3xl',
+    border: '--noir-ion-border-subtle',
+    material: '--system-b-cinematic-black',
+    reflection: '--color-text-primary-token',
+    composition: {
+      fit: 'contain',
+      insets: { desktop: '--space-6', mobile: '--space-4' },
+    },
+  },
+  'dark-glass': {
+    treatment: 'dark-glass',
+    component: 'ProductScreenshotFrame',
+    owner: 'components/marketing/ProductScreenshotFrame.css',
+    references: ['22', '14'],
+    accent: 'ion',
+    safeArea: 'device-frame-inset',
+    fallback: 'opaque-shell',
+    radius: '--radius-xl',
+    border: '--noir-ion-border-subtle',
+    material: '--noir-ion-shell',
+    reflection: '--noir-ion-text-primary',
+    composition: {
+      fit: 'contain',
+      insets: { desktop: '--space-6', mobile: '--space-4' },
+    },
+  },
+  'flowing-accent': {
+    treatment: 'flow',
+    component: 'MarketingEditorialBackground',
+    owner: EDITORIAL_BACKGROUND_FLOW.source.css,
+    references: ['18', '24'],
+    accent: 'ion',
+    safeArea: 'full-bleed-editorial',
+    fallback: 'plain-canvas',
+    radius: null,
+    border: null,
+    material: '--color-bg-base',
+    reflection: null,
+    composition: EDITORIAL_BACKGROUND_FLOW.composition,
+  },
+  'soft-editorial-background': {
+    treatment: 'soft',
+    component: 'MarketingEditorialBackground',
+    owner: EDITORIAL_BACKGROUND_SOFT.source.css,
+    references: ['18', '21', '5'],
+    accent: 'ultra',
+    safeArea: 'full-bleed-editorial',
+    fallback: 'plain-canvas',
+    radius: null,
+    border: null,
+    material: '--color-bg-base',
+    reflection: null,
+    composition: EDITORIAL_BACKGROUND_SOFT.composition,
+  },
+} as const;
 
 export const MARKETING_MEDIA_RECIPE_FOUNDER_LOCK = {
   visualStandard: 'newer-hero / premium bar',
@@ -362,8 +485,16 @@ export const MARKETING_MEDIA_RECIPE_SOURCE_MATRIX: Readonly<
 > = {
   'dark-glass': ['real-capture', 'registered-live-presentation'],
   'compact-glass': ['real-capture', 'registered-live-presentation'],
-  'soft-editorial-background': ['real-capture', 'generated-artwork'],
-  'flowing-accent': ['real-capture', 'generated-artwork'],
+  'soft-editorial-background': [
+    'real-capture',
+    'registered-live-presentation',
+    'generated-artwork',
+  ],
+  'flowing-accent': [
+    'real-capture',
+    'registered-live-presentation',
+    'generated-artwork',
+  ],
 };
 
 /** Canonical accent each recipe's chromatic core derives from. */
@@ -590,112 +721,174 @@ export function auditMarketingMediaRecipeDecision(
  * resolves through the locked recipes above.
  */
 export function validateMarketingMediaRecipeInput(
-  input: MarketingMediaRecipeInput,
-  knownScenarioIds: ReadonlySet<string>
+  input: unknown
 ): readonly MarketingMediaRecipeFinding[] {
-  const findings: MarketingMediaRecipeFinding[] = [];
-
-  if (!isApprovedMarketingMediaRecipeId(input.recipeId)) {
-    findings.push(
+  const parsed = MarketingMediaRecipeInputSchema.safeParse(input);
+  if (!parsed.success)
+    return parsed.error.issues.map(issue =>
       finding(
-        'unknown-media-recipe',
-        input.recipeId,
-        'Recipe must be one of the four registered recipes.'
+        'invalid-media-request',
+        issue.path.join('.'),
+        `${issue.message}. Select a registered source/recipe and supply every typed axis.`
       )
     );
-    return findings;
-  }
-  const recipeId = input.recipeId;
-
-  const allowedSourceKinds = MARKETING_MEDIA_RECIPE_SOURCE_MATRIX[recipeId];
-  if (!allowedSourceKinds.includes(input.source.kind)) {
+  const value = parsed.data;
+  const recipe = MARKETING_MEDIA_PRESENTATIONS[value.recipeId];
+  const findings: MarketingMediaRecipeFinding[] = [];
+  if (
+    !MARKETING_MEDIA_RECIPE_SOURCE_MATRIX[value.recipeId].includes(
+      value.source.kind
+    )
+  ) {
     findings.push(
       finding(
         'unsupported-recipe-source-combination',
-        recipeId,
-        `${recipeId} supports ${allowedSourceKinds.join(' / ')} sources; ${input.source.kind} is not a supported combination.`
+        value.recipeId,
+        'Product frames require a real capture or registered product presentation; generated UI is prohibited.'
       )
     );
   }
-
-  if (
-    input.source.kind === 'real-capture' ||
-    input.source.kind === 'registered-live-presentation'
-  ) {
-    if (!knownScenarioIds.has(input.source.scenarioId)) {
-      findings.push(
-        finding(
-          'unapproved-media-source-input',
-          input.source.scenarioId,
-          `Scenario ${input.source.scenarioId} is not a registered screenshot scenario.`
-        )
-      );
-    }
-  }
-
-  if (!input.source.sourceRevision.trim()) {
+  const id =
+    value.source.kind === 'real-capture'
+      ? value.source.scenarioId
+      : value.source.kind === 'generated-artwork'
+        ? value.source.assetId
+        : value.source.presentationId;
+  const source = MARKETING_MEDIA_INPUTS.find(
+    entry => entry.id === id && entry.kind === value.source.kind
+  );
+  if (!source || !source.recipes.includes(value.recipeId)) {
     findings.push(
       finding(
-        'missing-media-source-revision',
-        recipeId,
-        'Source revision (manifest gitSha/capturedAt or asset revision) is required so an old receipt cannot approve a changed artifact.'
+        'unapproved-media-source-input',
+        id,
+        'Register this owned or permissioned source for this recipe in mediaReferences.ts before use.'
+      )
+    );
+  } else if (
+    source.revision !== value.source.sourceRevision ||
+    source.hash !== value.source.assetHash
+  ) {
+    findings.push(
+      finding(
+        'stale-media-source',
+        id,
+        'Source revision/hash differs from the registered input. Recapture and review the exact changed artifact.'
       )
     );
   }
-
-  if (!isCanonicalMarketingMediaAccent(recipeId, input.accent)) {
+  if (value.accent !== recipe.accent)
     findings.push(
       finding(
         'noncanonical-media-accent',
-        recipeId,
-        `Accent must derive from the canonical ${MARKETING_MEDIA_RECIPE_ACCENTS[recipeId].token} (${MARKETING_MEDIA_RECIPE_ACCENTS[recipeId].hex}).`
+        value.recipeId,
+        `Use the registered ${recipe.accent} scene anchor; keep protected artwork and UI status colors truthful.`
       )
     );
-  }
-
-  if (input.safeArea !== MARKETING_MEDIA_RECIPE_SAFE_AREAS[recipeId]) {
+  if (value.treatment !== recipe.treatment)
+    findings.push(
+      finding(
+        'invented-media-taste',
+        value.recipeId,
+        `Use treatment ${recipe.treatment} with this recipe.`
+      )
+    );
+  if (value.layout.safeArea !== recipe.safeArea)
     findings.push(
       finding(
         'missing-safe-area-policy',
-        recipeId,
-        `Safe-area policy for ${recipeId} is ${MARKETING_MEDIA_RECIPE_SAFE_AREAS[recipeId]}; ${input.safeArea} does not match.`
+        value.recipeId,
+        `Use ${recipe.safeArea}; resolve focal and mobile/desktop safe areas from the source owner.`
       )
     );
-  }
-
-  if (
-    input.motion.fallback !== MARKETING_MEDIA_RECIPE_MOTION_FALLBACKS[recipeId]
-  ) {
+  if (value.behavior.fallback !== recipe.fallback)
     findings.push(
       finding(
         'missing-motion-fallback-policy',
-        recipeId,
-        `Motion fallback for ${recipeId} is ${MARKETING_MEDIA_RECIPE_MOTION_FALLBACKS[recipeId]}; ${input.motion.fallback} does not match.`
+        value.recipeId,
+        `Use the static ${recipe.fallback} fallback, preserving geometry.`
       )
     );
-  }
-
   if (
-    !MARKETING_MEDIA_RECIPE_OUTPUT_PROFILES[recipeId].includes(input.output.id)
-  ) {
+    !MARKETING_MEDIA_RECIPE_OUTPUT_PROFILES[value.recipeId].includes(
+      value.delivery.profile
+    )
+  )
     findings.push(
       finding(
         'unsupported-output-profile',
-        recipeId,
-        `Output profile ${input.output.id} is not supported for ${recipeId}.`
+        value.recipeId,
+        'Select an output profile supported by this recipe.'
       )
     );
-  }
-
   return findings;
 }
 
-function isCanonicalMarketingMediaAccent(
-  recipeId: MarketingMediaRecipeId,
-  accent: MarketingMediaAccentReference
-): boolean {
-  const canonical = MARKETING_MEDIA_RECIPE_ACCENTS[recipeId];
-  return accent.token === canonical.token && accent.hex === canonical.hex;
+/** Source-owned starting point for existing approved fixtures; no commercial copy. */
+export function createMarketingMediaRecipeInput(
+  recipeId: MarketingMediaRecipeId
+): MarketingMediaRecipeInput {
+  const source = MARKETING_MEDIA_INPUTS.find(entry =>
+    entry.recipes.includes(recipeId)
+  );
+  if (!source) throw new Error(`No registered input for ${recipeId}`);
+  const presentation = MARKETING_MEDIA_PRESENTATIONS[recipeId];
+  const base = { sourceRevision: source.revision, assetHash: source.hash };
+  return {
+    recipeId,
+    source:
+      source.kind === 'real-capture'
+        ? { kind: source.kind, scenarioId: source.id, ...base }
+        : source.kind === 'generated-artwork'
+          ? { kind: source.kind, assetId: source.id, ...base }
+          : { kind: source.kind, presentationId: source.id, ...base },
+    treatment: presentation.treatment,
+    accent: presentation.accent,
+    behavior: { motion: 'static', fallback: presentation.fallback },
+    layout: {
+      sectionId: 'feature-split',
+      safeArea: presentation.safeArea,
+      focal: 'source-owned',
+    },
+    delivery: {
+      profile: 'marketing-web',
+      tokenRevision: MARKETING_MEDIA_TOKEN_REVISION,
+    },
+  };
+}
+
+/** Common seam for components, prompt presets, exports and review. No module execution. */
+export function resolveMarketingMediaRequest(input: unknown) {
+  const findings = validateMarketingMediaRecipeInput(input);
+  if (findings.length) return { ok: false as const, findings };
+  const request = MarketingMediaRecipeInputSchema.parse(input);
+  const presentation = MARKETING_MEDIA_PRESENTATIONS[request.recipeId];
+  const scene = JOVIE_IMAGE_COLOR_POLICY.scenePalette.find(
+    entry => entry.role === request.accent
+  );
+  return {
+    ok: true as const,
+    request,
+    presentation,
+    scene,
+    provenance: {
+      schema: JOVIE_MARKETING_MEDIA_RECIPE_SCHEMA,
+      recipeVersion: JOVIE_MARKETING_MEDIA_RECIPE_VERSION,
+      tokenRevision: MARKETING_MEDIA_TOKEN_REVISION,
+      referenceReview: MARKETING_MEDIA_REFERENCE_REVIEW.id,
+      presentationRevision: MARKETING_MEDIA_PRESENTATION_REVISION,
+      sourceRevision: request.source.sourceRevision,
+      assetHash: request.source.assetHash,
+    },
+    // Canonical serialized request, not a caller-supplied approval flag.
+    identity: JSON.stringify([
+      JOVIE_MARKETING_MEDIA_RECIPE_VERSION,
+      request,
+      presentation,
+      MARKETING_MEDIA_REFERENCE_REVIEW.id,
+      MARKETING_MEDIA_PRESENTATION_REVISION,
+    ]),
+  };
 }
 
 export function resolveMarketingMediaRecipeForExport(input: {
@@ -729,21 +922,17 @@ export function resolveMarketingMediaRecipeForExport(input: {
 }
 
 export function formatMarketingMediaRecipesForPrompt(): string {
-  const dark = DARK_GLASS_MEDIA_RECIPE;
-  const compact = COMPACT_GLASS_MEDIA_RECIPE;
-  const editorial = SOFT_EDITORIAL_BACKGROUND_MEDIA_RECIPE;
-  const flow = FLOWING_ACCENT_MEDIA_RECIPE;
-
   return [
     `Jovie Marketing Media Recipes ${JOVIE_MARKETING_MEDIA_RECIPE_VERSION} (${JOVIE_MARKETING_MEDIA_RECIPE_SCHEMA})`,
-    `Visual standard: ${MARKETING_MEDIA_RECIPE_FOUNDER_LOCK.visualStandard}.`,
-    `Bloom lock: ${MARKETING_MEDIA_RECIPE_FOUNDER_LOCK.bloomTreatment} (${MARKETING_MEDIA_RECIPE_FOUNDER_LOCK.bloomDecisionRef}).`,
     `Approved recipes: ${MARKETING_MEDIA_RECIPE_IDS.join(', ')}.`,
-    `dark-glass (large dark-glass product frame): Pen ${dark.source.penContractId} → ${dark.source.masterId} ${dark.source.presentation} bar. Optical grid ${dark.opticalGridPx.outer}/${dark.opticalGridPx.pill}/${dark.opticalGridPx.cta}/${dark.opticalGridPx.chromeMark}. Height ${dark.geometry.heightRem}rem (${dark.geometry.heightPx}px). Material ${dark.material.backdropFilter} over ${dark.material.shell}. Dark shell ${dark.material.darkShellHex} on ${dark.material.darkCanvasHex}.`,
-    `compact-glass (compact glass module): ${compact.material.backdropFilter} over ${compact.material.shell}. Radius ${compact.geometry.radius}, min-height ${compact.geometry.minHeightRem}rem. Quiet inset hairlines, no uniform haze.`,
-    `soft-editorial-background (soft editorial background): light well ${editorial.field.width} × ${editorial.field.height} radial ellipse at ${editorial.field.centerPosition}, opacity ${editorial.field.opacity}, blur ${editorial.field.blurPx}px (${editorial.field.blurToken}). Off-center illumination, dark negative space, no crossing sweeps.`,
-    `flowing-accent (coherent flowing-accent background): electric seam ${flow.seam.viewBox} with ${flow.seam.accentToken} ${flow.seam.accentHex}. Bloom B ${flow.bloom.blurPx}px blur at opacity ${flow.bloom.opacity} using ${flow.bloom.backgroundToken} ${flow.bloom.backgroundRgba}. Reduced motion: ${flow.seam.reducedMotion}.`,
-    `Source kinds: ${Object.keys(MARKETING_MEDIA_RECIPE_SOURCE_MATRIX).length} recipes with locked source combinations; real product text and controls stay legible in every surface recipe.`,
-    `Never: invent a fifth recipe, a new glass mix, or a different bloom.`,
+    ...MARKETING_MEDIA_RECIPE_IDS.map(
+      id => `${id}: ${JSON.stringify(MARKETING_MEDIA_PRESENTATIONS[id])}`
+    ),
+    `Reference review: ${JSON.stringify(MARKETING_MEDIA_REFERENCE_REVIEW)}.`,
+    `Validate every source, treatment, behavior, layout and delivery axis with resolveMarketingMediaRequest. Tokens: ${MARKETING_MEDIA_TOKEN_REVISION}.`,
+    'One canonical accent anchors the chromatic core, not the geometric center. Keep off-center illumination and dark negative space. Use Scene Palette v1 falloff; do not recolor protected artwork, faces, marks, evidence or UI status colors.',
+    'Glass has nonuniform transmission, asymmetric light, crisp quiet borders and legible real product content. No bevels, plastic volume, uniform haze, redundant labels or clipped foreground.',
+    'Flow direction: one dominant curved sweep with cooperating echoes. Full-bleed backgrounds preserve source-owned safe areas at each breakpoint. Dense spec grids are valid in spec-wall, never a default hero.',
+    'Never: invent a fifth recipe, free-form colors, imports, scripts or approval booleans. Reference preference is scoped inspiration, not master certification or redistribution rights.',
   ].join('\n');
 }

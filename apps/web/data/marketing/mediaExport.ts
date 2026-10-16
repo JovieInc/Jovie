@@ -21,9 +21,16 @@ import {
   formatMarketingMediaRecipesForPrompt,
   isApprovedMarketingMediaRecipeId,
   JOVIE_MARKETING_MEDIA_RECIPE_VERSION,
+  MARKETING_MEDIA_PRESENTATIONS,
   MARKETING_MEDIA_RECIPES,
   type MarketingMediaRecipeId,
+  type MarketingMediaRecipeInput,
+  resolveMarketingMediaRequest,
 } from './mediaRecipes';
+import {
+  MARKETING_MEDIA_PRESENTATION_REVISION,
+  MARKETING_MEDIA_TOKEN_REVISION,
+} from './mediaReferences';
 
 export const MARKETING_MEDIA_EXPORT_SCHEMA = 'jovie-marketing-media-export/v1';
 
@@ -102,6 +109,15 @@ export const MARKETING_MEDIA_EXPORT_FIXTURES: readonly MarketingMediaExportFixtu
       accentToken: MARKETING_MEDIA_RECIPES['dark-glass'].material.shellToken,
       componentId: 'apps/web/components/site/MarketingHeader.css',
     },
+    ...Object.entries(MARKETING_MEDIA_PRESENTATIONS).map(
+      ([recipeId, presentation]) => ({
+        id: `recipe-${recipeId}`,
+        label: recipeId,
+        recipeId: recipeId as MarketingMediaRecipeId,
+        accentToken: `--noir-ion-${presentation.accent}`,
+        componentId: 'apps/web/components/marketing/MarketingMedia.tsx',
+      })
+    ),
   ] as const;
 
 export function getMarketingMediaExportFixture(
@@ -112,6 +128,7 @@ export function getMarketingMediaExportFixture(
 
 export interface MarketingMediaExportRequest {
   readonly fixtureId: string;
+  readonly recipeInput?: MarketingMediaRecipeInput;
   readonly sourceRevision: string;
   readonly recipeId: string;
   readonly accentToken: string;
@@ -122,6 +139,7 @@ export interface MarketingMediaExportRequest {
 }
 
 export type MarketingMediaExportFindingCode =
+  | 'invalid-media-recipe-input'
   | 'unknown-fixture'
   | 'unknown-media-recipe'
   | 'fixture-recipe-mismatch'
@@ -156,6 +174,27 @@ export function validateMarketingMediaExportRequest(
   request: MarketingMediaExportRequest
 ): readonly MarketingMediaExportFinding[] {
   const findings: MarketingMediaExportFinding[] = [];
+
+  if (request.recipeInput || request.fixtureId.startsWith('recipe-')) {
+    const resolved = resolveMarketingMediaRequest(request.recipeInput);
+    if (!resolved.ok)
+      findings.push(
+        ...resolved.findings.map(item =>
+          finding('invalid-media-recipe-input', item.subject, item.message)
+        )
+      );
+    else if (
+      resolved.request.recipeId !== request.recipeId ||
+      resolved.request.source.sourceRevision !== request.sourceRevision
+    )
+      findings.push(
+        finding(
+          'invalid-media-recipe-input',
+          request.fixtureId,
+          'Export recipe and source revision must match the validated recipe input.'
+        )
+      );
+  }
 
   const fixture = getMarketingMediaExportFixture(request.fixtureId);
   if (!fixture) {
@@ -275,6 +314,12 @@ export function computeMarketingMediaExportCacheKey(
   // field value that happens to contain the delimiter can never collide with
   // a different field split.
   return JSON.stringify([
+    request.recipeInput
+      ? resolveMarketingMediaRequest(request.recipeInput)
+      : null,
+    MARKETING_MEDIA_PRESENTATION_REVISION,
+    MARKETING_MEDIA_TOKEN_REVISION,
+    request.fallbackPolicy,
     request.fixtureId,
     request.sourceRevision,
     request.recipeId,
@@ -312,12 +357,30 @@ export interface MarketingMediaExportReceipt {
 }
 
 function computeReceiptDigest(
-  outputs: readonly MarketingMediaExportOutputReceipt[]
+  receipt: Omit<
+    MarketingMediaExportReceipt,
+    'receiptDigest' | 'approved' | 'approvalEvidenceId'
+  >
 ): string {
-  return outputs
-    .map(output => `${output.profile}:${output.assetHash}`)
-    .toSorted()
-    .join('|');
+  return JSON.stringify([
+    receipt.schema,
+    receipt.cacheKey,
+    receipt.fixtureId,
+    receipt.sourceRevision,
+    receipt.recipeId,
+    receipt.recipeVersion,
+    receipt.tokenPolicyVersion,
+    receipt.rendererVersion,
+    [...receipt.outputs].sort((a, b) => a.profile.localeCompare(b.profile)),
+  ]);
+}
+
+function hasCurrentApproval(receipt: MarketingMediaExportReceipt): boolean {
+  return (
+    receipt.approved &&
+    Boolean(receipt.approvalEvidenceId?.trim()) &&
+    receipt.receiptDigest === computeReceiptDigest(receipt)
+  );
 }
 
 export type MarketingMediaExportOutputResult =
@@ -388,7 +451,7 @@ export function executeMarketingMediaExportRequest(
 
   if (
     existingReceipt &&
-    existingReceipt.approved &&
+    hasCurrentApproval(existingReceipt) &&
     existingReceipt.cacheKey === cacheKey &&
     requestedProfiles.every(profile =>
       existingReceipt.outputs.some(output => output.profile === profile)
@@ -406,7 +469,7 @@ export function executeMarketingMediaExportRequest(
   const canCarryForward =
     request.fallbackPolicy === 'retain-last-approved' &&
     existingReceipt !== undefined &&
-    existingReceipt.approved &&
+    hasCurrentApproval(existingReceipt) &&
     existingReceipt.fixtureId === request.fixtureId &&
     existingReceipt.recipeId === request.recipeId;
 
@@ -437,7 +500,7 @@ export function executeMarketingMediaExportRequest(
     }
   }
 
-  const receipt: MarketingMediaExportReceipt = {
+  const receiptContent: Omit<MarketingMediaExportReceipt, 'receiptDigest'> = {
     schema: MARKETING_MEDIA_EXPORT_SCHEMA,
     cacheKey,
     fixtureId: request.fixtureId,
@@ -447,8 +510,12 @@ export function executeMarketingMediaExportRequest(
     tokenPolicyVersion: request.tokenPolicyVersion,
     rendererVersion: request.rendererVersion,
     outputs,
-    receiptDigest: computeReceiptDigest(outputs),
     approved: false,
+  };
+
+  const receipt: MarketingMediaExportReceipt = {
+    ...receiptContent,
+    receiptDigest: computeReceiptDigest(receiptContent),
   };
 
   if (executionFindings.length === 0) {
@@ -480,7 +547,10 @@ export function approveMarketingMediaExportReceipt(
   receipt: MarketingMediaExportReceipt,
   evidence: MarketingMediaExportApprovalEvidence
 ): MarketingMediaExportApprovalResult {
-  if (evidence.approvedReceiptDigest !== receipt.receiptDigest) {
+  if (
+    evidence.approvedReceiptDigest !== receipt.receiptDigest ||
+    receipt.receiptDigest !== computeReceiptDigest(receipt)
+  ) {
     return {
       ok: false,
       findings: [
