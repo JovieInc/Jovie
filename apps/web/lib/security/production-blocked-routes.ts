@@ -30,9 +30,10 @@ export const PRODUCTION_BLOCKED_PAGE_EXACT = [
 ] as const;
 
 /**
- * Production builds used by the Product Screenshots workflow still capture a
- * few legacy experiment fixtures. Keep the inventory exact so the proxy can
- * allow only screenshot automation without reopening all /exp routes.
+ * Production builds used by the Product Screenshots workflow still capture
+ * exact catalog fixtures. Keep the inventory exact so the proxy can allow
+ * only those pathnames for local screenshot automation, without reopening
+ * other /demo or /exp routes. Query strings are not part of the match.
  */
 export const PRODUCT_SCREENSHOT_CAPTURE_PAGE_PATHS = [
   '/exp/shell-v1',
@@ -44,6 +45,18 @@ export const PRODUCT_SCREENSHOT_CAPTURE_PAGE_PATHS = [
   '/demo/showcase/releases',
   '/demo/showcase/settings',
   '/demo/showcase/release-tracked-links',
+  '/demo/showcase/release-landing',
+  '/demo/showcase/release-presave',
+  '/demo/showcase/release-tasks',
+  '/demo/showcase/tim-white-profile',
+  '/demo/showcase/music-ai-command',
+  '/demo/showcase/shell-lyrics',
+  '/demo/showcase/shell-library',
+  '/demo/showcase/shell-track',
+  '/demo/showcase/onboarding-handle',
+  '/demo/showcase/onboarding-dsp',
+  '/demo/showcase/onboarding-profile-review',
+  '/demo/showcase/public-profile',
 ] as const;
 
 /**
