@@ -939,6 +939,10 @@ describe('forward-only release lineage', () => {
       bin,
       'gh',
       `#!/bin/sh
+if [ -n "\${STUB_RATE_LIMIT_RESET:-}" ] && [ "$2" = "rate_limit" ]; then
+  printf '%s\\n' "$STUB_RATE_LIMIT_RESET"
+  exit 0
+fi
 case "$*" in
   *compare/*)
     if [ "\${STUB_COMPARE_FAILURES:-0}" -gt 0 ]; then
@@ -1058,12 +1062,18 @@ esac
     return { remote: src, base, tip: git(['rev-parse', 'HEAD']) };
   }
 
-  function runRateLimitedAlias(mode) {
+  function runRateLimitedStagingRecheck(
+    mode,
+    jobKey = 'alias-staging',
+    env = {}
+  ) {
     const remote = makeLineageRemote(mode);
     const expected = mode === 'exact' ? remote.tip : remote.base;
     return runRecheck(
-      'alias-staging',
-      'Recheck main immediately before staging alias',
+      jobKey,
+      jobKey === 'staging-head'
+        ? 'Resolve current main HEAD'
+        : 'Recheck main immediately before staging alias',
       remote.tip,
       'identical',
       9,
@@ -1072,26 +1082,73 @@ esac
         EXPECTED_MAIN_SHA: expected,
         MAIN_LINEAGE_REMOTE: remote.remote,
         STUB_COMPARE_FAILURES: '1',
+        ...env,
       }
     );
   }
 
+  it.each([
+    ['exact', 'true'],
+    ['ahead', 'true'],
+    ['diverged', 'false'],
+  ])(
+    'rechecks %s staging main through git when the REST reset exceeds the job budget',
+    (mode, isCurrent) => {
+      const current = runRateLimitedStagingRecheck(mode, 'staging-head', {
+        GH_API_HOLD_BUDGET_SECONDS: '60',
+        STUB_RATE_LIMIT_RESET: String(Math.floor(Date.now() / 1000) + 3600),
+      });
+      expect(current.result.status, current.result.stderr).toBe(0);
+      expect(current.result.stderr).toContain('outside the 60s budget');
+      expect(current.result.stderr).toContain('resolving main with git');
+      expect(current.outputs.is_current).toBe(isCurrent);
+    }
+  );
+
+  it('fails the staging recheck closed when both REST and git are unavailable', () => {
+    const unavailable = runRecheck(
+      'staging-head',
+      'Resolve current main HEAD',
+      EXPECTED_SHA,
+      'identical',
+      9,
+      {
+        GH_API_HOLD_BUDGET_SECONDS: '60',
+        MAIN_LINEAGE_REMOTE: join(tmpdir(), 'missing-lineage-remote'),
+        STUB_RATE_LIMIT_RESET: String(Math.floor(Date.now() / 1000) + 3600),
+      }
+    );
+    expect(unavailable.result.status).toBe(1);
+    expect(unavailable.result.stderr).toContain('outside the 60s budget');
+    expect(unavailable.result.stderr).toContain('git could not resolve main');
+    expect(unavailable.outputs.is_current).toBeUndefined();
+  });
+
+  it('checks out both scripts needed by the staging lineage recheck', () => {
+    const job = getJobBlock(RELEASE_WORKFLOW, 'staging-head');
+    expect(job).toContain('ref: ${{ inputs.expected_sha }}');
+    expect(job).toContain('persist-credentials: false');
+    expect(job).toMatch(
+      /sparse-checkout: \|\n\s+\.github\/scripts\/gh-api-hold\.sh\n\s+\.github\/scripts\/recheck-main-lineage\.sh/
+    );
+  });
+
   it('resolves an unchanged main through git when REST is rate limited', () => {
-    const current = runRateLimitedAlias('exact');
+    const current = runRateLimitedStagingRecheck('exact');
     expect(current.result.status, current.result.stderr).toBe(0);
     expect(current.attempts).toBe(2);
     expect(current.outputs.is_current).toBe('true');
   });
 
   it('keeps the staging alias when rate-limited REST still has an ancestor main', () => {
-    const current = runRateLimitedAlias('ahead');
+    const current = runRateLimitedStagingRecheck('ahead');
     expect(current.result.status, current.result.stderr).toBe(0);
     expect(current.attempts).toBe(3);
     expect(current.outputs.is_current).toBe('true');
   });
 
   it('yields the staging alias when rate-limited REST shows main left the release', () => {
-    const current = runRateLimitedAlias('diverged');
+    const current = runRateLimitedStagingRecheck('diverged');
     expect(current.result.status, current.result.stderr).toBe(0);
     expect(current.attempts).toBe(3);
     expect(current.outputs.is_current).toBe('false');
