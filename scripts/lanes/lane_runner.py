@@ -642,10 +642,11 @@ PATH_HINT = re.compile(
     r"(?<![\w/.-])[\w@()\[\].-]*(?:/[\w@()\[\].-]+)*\.(?:py|tsx?|mjs|cjs|jsx?|json|ya?ml|swift|sql|css)(?![\w/])")
 
 
-def predicted_touch(issue: Issue) -> frozenset[str]:
+def predicted_touch(issue: Issue, target_files: dict | None = None, now: float | None = None) -> frozenset[str]:
     """Paths the issue names (title or description), else its workstream's hotspots."""
     hints = frozenset(match.group(0) for match in PATH_HINT.finditer(f"{issue.title}\n{issue.description}"))
-    return hints or AREA_HOTSPOTS.get(workstreams.classify(issue.title, issue.labels), frozenset())
+    witnessed = pr_events.target_issue_files(issue, target_files, now, REPO_SLUG) if not hints else None
+    return hints or frozenset(witnessed or ()) or AREA_HOTSPOTS.get(workstreams.classify(issue.title, issue.labels), frozenset())
 
 
 def hotspot_holds(prs: list[dict]) -> dict[str, int]:
@@ -676,7 +677,8 @@ def held_hotspot(touch: frozenset[str], holds: dict[str, int]) -> tuple[str, int
     return None
 
 
-def pool_rejections(issues: list[Issue], holds: dict[str, int] | None = None) -> dict[str, str]:
+def pool_rejections(issues: list[Issue], holds: dict[str, int] | None = None,
+                    target_files: dict | None = None, now: float | None = None) -> dict[str, str]:
     """Pool-level admission (JOV-5555): exact normalized-title duplicates are one unit of
     work. Non-canonical members are rejected; the canonical (oldest) one stays admissible.
     JOV-7708: an issue whose predicted touch set hits a hotspot an open PR holds waits
@@ -684,7 +686,7 @@ def pool_rejections(issues: list[Issue], holds: dict[str, int] | None = None) ->
     rejected = {identifier: "duplicate-candidate:" + canonical
                 for identifier, canonical in workstreams.duplicate_of(issues).items()}
     for issue in issues:
-        if holds and issue.identifier not in rejected and (hit := held_hotspot(predicted_touch(issue), holds)):
+        if holds and issue.identifier not in rejected and (hit := held_hotspot(predicted_touch(issue, target_files, now), holds)):
             rejected[issue.identifier] = f"hotspot-held:{hit[0]}#{hit[1]}"
     return rejected
 
@@ -714,7 +716,8 @@ def admission_order(issue: Issue, now: float) -> tuple:
 def pick_issue(issues: list[Issue], failures: dict, now: float | None = None,
                in_flight: frozenset[str] = frozenset(), provider: str | None = None,
                holds: dict[str, int] | None = None,
-               held_back: frozenset[str] = frozenset(), route=None) -> Issue | None:
+               held_back: frozenset[str] = frozenset(), route=None,
+               target_files: dict | None = None) -> Issue | None:
     """Symphony orders by tier, aged priority, workstream rank, then age (admission_order).
 
     Waiting work gains one priority level per day until it reaches P1, preventing a
@@ -725,7 +728,7 @@ def pick_issue(issues: list[Issue], failures: dict, now: float | None = None,
     """
     now = time.time() if now is None else now
     in_flight = frozenset(identifier.lower() for identifier in in_flight)
-    duplicates = pool_rejections(issues, holds)
+    duplicates = pool_rejections(issues, holds, target_files, now)
     eligible = [issue for issue in issues
                 if issue.identifier not in duplicates
                 and issue.identifier not in held_back
@@ -6684,6 +6687,13 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
     # Publication can await canonical policy and native queue reads. Keep those
     # outside the global claim lock, then refresh inventory for ordinary admission.
     requeue_verified(host, lane_prs(name))
+    # Scope-only evidence is optional. Never fetch it while holding claim.lock or
+    # let an unavailable witness displace repair/adopt/labeled priority.
+    try:
+        target_files = pr_events.capture_target_file_witnesses(
+            THIS, _SUMMARY.get("prs", []), _SUMMARY.get("sourceAt"))
+    except Exception:
+        target_files = {}  # Optional scope evidence cannot strand an authorized repair.
     claim = Locked(host.state / "claim.lock", blocking=True)
     # The claim lock serializes the scan, so the shared cache fill happens once. A rate
     # limit skips the API for every worker until the cooldown file expires.
@@ -6749,22 +6759,31 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
             overlap_inventory_rows = overlap_inventory(host, linear)
             overlap_unreadable = overlap_inventory_rows is None
             overlap_prs, overlap_tasks = overlap_inventory_rows or ([], [])
+            target_files = pr_events.revalidate_target_file_witnesses(target_files, overlap_prs,
+                                                                      repository=REPO_SLUG)
             router = issue_router(host, name)
             while pool and not overlap_unreadable:
                 issue = design_gate.pick_build_issue(
                     pool, failures, in_flight=in_flight, provider=name,
                     pick=lambda *args, **kwargs: pick_issue(*args, holds=holds, held_back=held_back,
-                                                            route=router, **kwargs),
+                                                            route=router, target_files=target_files, **kwargs),
                     linear=linear, repo=host.repo)
                 if issue is None:
                     break
                 admission = file_overlap.admission_decisions(
-                    host, THIS, issue, overlap_prs, overlap_tasks, workstreams.classify)
+                    host, THIS, issue, overlap_prs, overlap_tasks, workstreams.classify,
+                    target_files=target_files)
                 if not admission["allowed"]:
                     overlap_blocked = True
                     rejected = issue.identifier
                     issue = None
                     pool = [candidate for candidate in pool if candidate.identifier != rejected]
+                    continue
+                # Design selection may wait. Recheck the pure hotspot predicate at the
+                # claim boundary so scope expiry cannot admit a now-unknown target.
+                if held_hotspot(predicted_touch(issue, target_files), holds):
+                    pool = [candidate for candidate in pool if candidate.identifier != issue.identifier]
+                    issue = None
                     continue
                 overlap_prediction = admission
                 route_decision = router.decisions.get(issue.identifier) if router else None
