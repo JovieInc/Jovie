@@ -65,15 +65,19 @@ const ALIASES = Object.freeze([
 /**
  * Pick the changed files this lane mutates.
  * @param {string[]} changedPaths repo-relative paths
+ * @param {(path: string) => string | null} [readModule] apps/web-relative reader
  * @returns {string[]} apps/web-relative source paths
  */
-export function selectHighRiskSources(changedPaths) {
+export function selectHighRiskSources(changedPaths, readModule) {
   const selected = new Set();
   for (const path of changedPaths) {
     if (!path.startsWith(`${WEB_ROOT}/`)) continue;
     const webPath = path.slice(WEB_ROOT.length + 1);
     if (!SOURCE_EXTENSION.test(webPath) || NON_SOURCE.test(webPath)) continue;
     if (HIGH_RISK_PREFIXES.some(prefix => webPath.startsWith(prefix))) {
+      const contents = readModule?.(webPath);
+      if (typeof contents === 'string' && !hasRuntimeSource(webPath, contents))
+        continue;
       selected.add(webPath);
     }
   }
@@ -106,12 +110,11 @@ function stripModuleSuffix(path) {
 }
 
 /**
- * Parse runtime module edges, never comments, strings, or type-only imports.
- * Mock barriers apply per test; importActual/importOriginal load real code.
+ * Parse source with the pinned compiler, rejecting incomplete parser evidence.
  * @param {string} path
  * @param {string} contents
  */
-function runtimeImports(path, contents) {
+function parseModule(path, contents) {
   const tree = ts.createSourceFile(
     path,
     contents,
@@ -127,6 +130,63 @@ function runtimeImports(path, contents) {
   if (!Array.isArray(diagnostics) || diagnostics.length > 0) {
     throw new Error(`Cannot parse mutation import graph: ${path}`);
   }
+  return tree;
+}
+
+/**
+ * Skip only source proven to contain erased TypeScript declarations. Unknown,
+ * missing, or malformed source remains selected and fails the normal harness.
+ * Inline type specifiers can retain import side effects, so stay selected.
+ * @param {string} path
+ * @param {string} contents
+ */
+function hasRuntimeSource(path, contents) {
+  let tree;
+  try {
+    tree = parseModule(path, contents);
+  } catch {
+    return true;
+  }
+  return tree.statements.some(statement => {
+    if (
+      ts.isTypeAliasDeclaration(statement) ||
+      ts.isInterfaceDeclaration(statement) ||
+      ts.isEmptyStatement(statement) ||
+      ((ts.isVariableStatement(statement) ||
+        ts.isFunctionDeclaration(statement) ||
+        ts.isClassDeclaration(statement) ||
+        ts.isEnumDeclaration(statement) ||
+        ts.isModuleDeclaration(statement)) &&
+        ts
+          .getModifiers(statement)
+          ?.some(modifier => modifier.kind === ts.SyntaxKind.DeclareKeyword))
+    )
+      return false;
+    if (ts.isImportDeclaration(statement))
+      return !statement.importClause?.isTypeOnly;
+    if (ts.isImportEqualsDeclaration(statement)) return !statement.isTypeOnly;
+    if (ts.isExportDeclaration(statement)) {
+      const clause = statement.exportClause;
+      return !(
+        statement.isTypeOnly ||
+        (!statement.moduleSpecifier &&
+          clause &&
+          ts.isNamedExports(clause) &&
+          clause.elements.length === 0)
+      );
+    }
+    return true;
+  });
+}
+
+/**
+ * Parse runtime module edges, never comments, strings, or type-only imports.
+ * Mock barriers apply per test; importActual/importOriginal load real code.
+ * @param {string} path
+ * @param {string} contents
+ */
+function runtimeImports(path, contents) {
+  const tree = parseModule(path, contents);
   /** @type {{ specifier: string, actual: boolean }[]} */
   const imports = [];
   /** @type {string[]} */

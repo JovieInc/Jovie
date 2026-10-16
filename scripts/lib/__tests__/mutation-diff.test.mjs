@@ -51,6 +51,43 @@ const mutant = (status, line = 1) => ({
 });
 
 describe('selectHighRiskSources', () => {
+  it.each([
+    '// Only comments\n',
+    'export type AuthMethod = "email" | "google"; export interface Actor { id: string }',
+    'import type { Actor } from "./actor"; export type { Actor };',
+    'import type Actor = require("./actor");',
+    'export declare const actor: string; declare global { interface Window { actor: string } }',
+    'export declare function allowed(value: string): boolean;',
+    'export declare class Actor { id: string }',
+    'export declare enum Role { Admin }',
+    'export {}; ;',
+  ])('skips source containing only erased declarations: %s', contents => {
+    expect(
+      selectHighRiskSources(['apps/web/lib/auth/types.ts'], () => contents)
+    ).toEqual([]);
+  });
+
+  it.each([
+    'export type Actor = string; export const allowed = true;',
+    'import "./setup"; export interface Actor { id: string }',
+    'import {} from "./setup";',
+    'import { type Actor } from "./actor";',
+    'export { type Actor } from "./actor";',
+    'export {} from "./setup";',
+    'export { allowed } from "./policy";',
+    'export * from "./policy";',
+    'export enum Role { Admin }',
+    'export namespace Roles { export const admin = true; }',
+    'export abstract class Actor {}',
+    'export type Broken = ;',
+    'declare export { allowed } from "./policy";',
+    null,
+  ])('retains runtime or unknown source: %s', contents => {
+    expect(
+      selectHighRiskSources(['apps/web/lib/auth/policy.ts'], () => contents)
+    ).toEqual(['lib/auth/policy.ts']);
+  });
+
   it('keeps changed high-risk apps/web source and drops everything else', () => {
     expect(
       selectHighRiskSources([
@@ -515,7 +552,18 @@ describe('mutation CLI result semantics', () => {
         join(root, 'node_modules'),
         'dir'
       );
-      put('apps/web/lib/auth/policy.ts', 'export const allowed = true;');
+      if (mode !== 'missing-source') {
+        put(
+          'apps/web/lib/auth/policy.ts',
+          mode === 'type-only'
+            ? 'export type AuthMethod = "email" | "google"; export interface Actor { id: string }'
+            : mode === 'malformed-source'
+              ? 'export type Broken = ;'
+              : mode === 'mixed-unrelated'
+                ? 'export type Actor = string; export const allowed = true;'
+                : 'export const allowed = true;'
+        );
+      }
       if (mode === 'distance-cap') {
         put('apps/web/lib/near.ts', "export { allowed } from './auth/policy';");
         put('apps/web/lib/far.ts', "export { allowed } from './near';");
@@ -530,7 +578,7 @@ describe('mutation CLI result semantics', () => {
       } else {
         put(
           'apps/web/tests/policy.test.ts',
-          mode === 'unrelated'
+          mode === 'unrelated' || mode === 'mixed-unrelated'
             ? 'export const nothing = true;'
             : "import '@/lib/auth/policy';"
         );
@@ -541,6 +589,7 @@ describe('mutation CLI result semantics', () => {
         import { mkdirSync, writeFileSync } from 'node:fs';
         import { resolve } from 'node:path';
         const path = process.argv[process.argv.indexOf('--outputFile') + 1];
+        if (process.env.FIXTURE_MODE === 'type-only') throw new Error('type-only source reached harness');
         writeFileSync(path, JSON.stringify({ success: true, numFailedTests: 0,
           numPassedTests: process.env.FIXTURE_MODE === 'empty-tests' ? 0 : 1 }));
         mkdirSync(process.env.STRYKER_COVERAGE_DIR, { recursive: true });
@@ -594,8 +643,18 @@ describe('mutation CLI result semantics', () => {
     expect(run.stdout).toContain('Skipped: no applicable');
   });
 
+  it('skips a type-only high-risk file before test discovery or harness execution', () => {
+    const run = runFixture('type-only');
+    expect(run.status, run.stderr).toBe(0);
+    expect(run.stdout).toContain('Skipped: no applicable');
+    expect(run.stdout).not.toContain('Selected 1');
+  });
+
   it.each([
     ['unrelated', 'Selection failed: no runtime test import path'],
+    ['mixed-unrelated', 'Selection failed: no runtime test import path'],
+    ['malformed-source', 'Cannot parse mutation import graph'],
+    ['missing-source', 'Mutation source is missing'],
     ['empty-tests', 'Vitest baseline executed zero passing tests'],
     [
       'unexecuted-target',

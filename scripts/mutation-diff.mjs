@@ -68,12 +68,13 @@ for (const [name, value] of caps) {
     throw new Error(`--${name} must be a positive integer`);
   }
 }
-const sources = selectHighRiskSources(changedPaths());
+const readModule = readModuleSource(webRoot);
+const sources = selectHighRiskSources(changedPaths(), readModule);
 const toRun = sources.slice(0, maxFiles);
 const skipped = sources.slice(maxFiles);
 const selectTests =
   sources.length > 0
-    ? createTestSelector(readTestSources(webRoot), readModuleSource(webRoot))
+    ? createTestSelector(readTestSources(webRoot), readModule)
     : () => [];
 
 /** @type {import('./lib/mutation-diff.mjs').FileResult[]} */
