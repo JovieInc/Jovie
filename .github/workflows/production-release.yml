@@ -4,8 +4,8 @@ name: Production Release
 # accountable-writer: Symphony
 # capability-gap: Forward-only release lineage must prove that an authorized SHA
 #   is still an ancestor of main. Jobs check out the release SHA, not main.
-#   The staging-alias recheck uses the compare API, then git, when REST is
-#   unavailable. The other rechecks still read lineage through the compare API.
+#   Staging-alias and production mutation rechecks use the compare API, then
+#   authenticated git, when REST is unavailable. Earlier head checks use REST.
 # revisit-trigger: Revisit when the controller carries lineage on its own
 #   workflow_run payload or promotion moves to a webhook-dispatched writer.
 
@@ -897,20 +897,7 @@ jobs:
           GH_API_HOLD_BUDGET_SECONDS: '240'
           EXPECTED_SHA: ${{ inputs.expected_sha }}
         run: |
-          set -euo pipefail
-          current_sha="$(bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
-          [[ "$current_sha" =~ ^[0-9a-f]{40}$ ]] || {
-            echo "::error::GitHub returned an invalid main HEAD at production mutation."
-            exit 1
-          }
-          if [ "$current_sha" != "$EXPECTED_SHA" ] &&
-            [ "$(bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" api "repos/${{ github.repository }}/compare/${EXPECTED_SHA}...${current_sha}" --jq '.status // empty')" != "ahead" ]; then
-            echo "::notice::Release $EXPECTED_SHA left main's lineage (main is $current_sha) at production mutation."
-            echo "superseded_sha=$current_sha" >> "$GITHUB_OUTPUT"
-            echo "is_current=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "is_current=true" >> "$GITHUB_OUTPUT"
-          fi
+          bash "$GITHUB_WORKSPACE/.github/scripts/recheck-main-lineage.sh" "at production mutation"
       # This is deliberately a restore-only cache by default. The cache is a
       # Next compiler/build cache, never a Vercel deployment artifact. Writes
       # require the repository variable JOVIE_PRODUCTION_NEXT_CACHE_SAVE=true
@@ -1329,20 +1316,7 @@ jobs:
           GH_API_HOLD_BUDGET_SECONDS: '240'
           EXPECTED_MAIN_SHA: ${{ inputs.expected_sha }}
         run: |
-          set -euo pipefail
-          current_main_sha="$(bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
-          if [[ ! "$current_main_sha" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "::error::Could not resolve an exact main HEAD immediately before production promotion."
-            exit 1
-          fi
-          if [[ "$current_main_sha" != "$EXPECTED_MAIN_SHA" ]] &&
-            [ "$(bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" api "repos/${{ github.repository }}/compare/${EXPECTED_MAIN_SHA}...${current_main_sha}" --jq '.status // empty')" != "ahead" ]; then
-            echo "::notice::Release $EXPECTED_MAIN_SHA left main's lineage (main is $current_main_sha) after its staged production build; skipping production mutation."
-            echo "superseded_sha=$current_main_sha" >> "$GITHUB_OUTPUT"
-            echo "is_current=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "is_current=true" >> "$GITHUB_OUTPUT"
+          bash "$GITHUB_WORKSPACE/.github/scripts/recheck-main-lineage.sh" "before production promotion"
 
       - name: Security gate before production promotion
         if: ${{ steps.final-current.outputs.is_current == 'true' }}

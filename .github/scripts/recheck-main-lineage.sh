@@ -166,6 +166,7 @@ current="$(read_main_sha)" || exit 1
 lineage="$(compare_status "$current")" || exit 1
 if [ "$lineage" != "identical" ] && [ "$lineage" != "ahead" ]; then
   echo "::notice::Release ${expected} left main's lineage (main is ${current}) ${context}."
+  emit superseded_sha "$current"
   emit is_current false
 else
   emit is_current true

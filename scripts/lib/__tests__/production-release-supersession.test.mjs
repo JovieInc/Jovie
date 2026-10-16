@@ -940,6 +940,14 @@ describe('forward-only release lineage', () => {
       'gh',
       `#!/bin/sh
 case "$*" in
+  *rate_limit*)
+    if [ -n "\${STUB_RATE_LIMIT_RESET:-}" ]; then
+      printf '%s\\n' "$STUB_RATE_LIMIT_RESET"
+      exit 0
+    fi
+    ;;
+esac
+case "$*" in
   *compare/*)
     if [ "\${STUB_COMPARE_FAILURES:-0}" -gt 0 ]; then
       echo "gh: API rate limit exceeded for installation." >&2
@@ -1058,23 +1066,71 @@ esac
     return { remote: src, base, tip: git(['rev-parse', 'HEAD']) };
   }
 
-  function runRateLimitedAlias(mode) {
+  function runRateLimitedAlias(
+    mode,
+    jobKey = 'alias-staging',
+    stepName = 'Recheck main immediately before staging alias',
+    extraEnv = {}
+  ) {
     const remote = makeLineageRemote(mode);
     const expected = mode === 'exact' ? remote.tip : remote.base;
-    return runRecheck(
-      'alias-staging',
-      'Recheck main immediately before staging alias',
-      remote.tip,
+    return runRecheck(jobKey, stepName, remote.tip, 'identical', 9, {
+      EXPECTED_SHA: expected,
+      EXPECTED_MAIN_SHA: expected,
+      MAIN_LINEAGE_REMOTE: remote.remote,
+      STUB_COMPARE_FAILURES: '1',
+      ...extraEnv,
+    });
+  }
+
+  it.each([
+    'Recheck main immediately before production mutation',
+    'Recheck main immediately before production promotion',
+  ])(
+    '%s proves lineage when the quota reset exceeds the wait budget',
+    stepName => {
+      for (const mode of ['exact', 'ahead', 'diverged']) {
+        const current = runRateLimitedAlias(
+          mode,
+          'promote-production',
+          stepName,
+          {
+            GH_API_HOLD_BUDGET_SECONDS: '240',
+            STUB_RATE_LIMIT_RESET: String(Math.floor(Date.now() / 1000) + 3600),
+          }
+        );
+        expect(current.result.status, current.result.stderr).toBe(0);
+        expect(current.result.stderr).toContain('outside the 240s budget');
+        expect(current.outputs.is_current).toBe(String(mode !== 'diverged'));
+        if (mode === 'diverged') {
+          expect(current.outputs.superseded_sha).toMatch(/^[0-9a-f]{40}$/);
+        } else {
+          expect(current.outputs.superseded_sha).toBeUndefined();
+        }
+      }
+    }
+  );
+
+  it.each([
+    'Recheck main immediately before production mutation',
+    'Recheck main immediately before production promotion',
+  ])('%s fails closed when REST and git are unavailable', stepName => {
+    const current = runRecheck(
+      'promote-production',
+      stepName,
+      EXPECTED_SHA,
       'identical',
       9,
       {
-        EXPECTED_SHA: expected,
-        EXPECTED_MAIN_SHA: expected,
-        MAIN_LINEAGE_REMOTE: remote.remote,
-        STUB_COMPARE_FAILURES: '1',
+        GH_API_HOLD_BUDGET_SECONDS: '240',
+        STUB_RATE_LIMIT_RESET: String(Math.floor(Date.now() / 1000) + 3600),
+        MAIN_LINEAGE_REMOTE: join(tmpdir(), 'missing-lineage-remote'),
       }
     );
-  }
+    expect(current.result.status).not.toBe(0);
+    expect(current.outputs.is_current).toBeUndefined();
+    expect(current.outputs.superseded_sha).toBeUndefined();
+  });
 
   it('resolves an unchanged main through git when REST is rate limited', () => {
     const current = runRateLimitedAlias('exact');
@@ -1176,7 +1232,7 @@ exit 1
     );
   });
 
-  function runPromote(mainSha, compareStatus) {
+  function runPromote(mainSha, compareStatus, extraEnv = {}) {
     const fixture = makeFixture('lineage-promote-');
     stubLineageGh(fixture.bin);
     const promoted = join(fixture.root, 'promoted');
@@ -1219,6 +1275,8 @@ esac
         env: {
           ...process.env,
           EXPECTED_MAIN_SHA: EXPECTED_SHA,
+          STUB_MAIN_ATTEMPTS: join(fixture.root, 'main-attempts'),
+          STUB_MAIN_FAILURES: '0',
           GH_TOKEN: 'stub',
           GITHUB_OUTPUT: fixture.output,
           GITHUB_REPOSITORY: 'JovieInc/Jovie',
@@ -1235,6 +1293,7 @@ esac
           VERCEL_ORG_ID: 'team_stub',
           VERCEL_PROJECT_ID: 'prj_stub',
           VERCEL_TOKEN: 'stub',
+          ...extraEnv,
         },
       }
     );
@@ -1246,6 +1305,43 @@ esac
       stagingRestored: existsSync(stagingRestore),
     };
   }
+
+  it.each(['exact', 'ahead', 'diverged'])(
+    'the promotion controller proves %s lineage after REST quota exhaustion',
+    mode => {
+      const remote = makeLineageRemote(mode);
+      const expected = mode === 'exact' ? remote.tip : remote.base;
+      const current = runPromote(remote.tip, 'identical', {
+        EXPECTED_MAIN_SHA: expected,
+        MAIN_LINEAGE_REMOTE: remote.remote,
+        STUB_MAIN_FAILURES: '9',
+        STUB_COMPARE_FAILURES: '1',
+        STUB_RATE_LIMIT_RESET: String(Math.floor(Date.now() / 1000) + 3600),
+      });
+      expect(current.result.status, current.result.stderr).toBe(0);
+      expect(current.result.stderr).toContain('outside the 240s budget');
+      expect(current.promoted).toBe(mode !== 'diverged');
+      expect(current.outputs.promotion_sha).toBe(
+        mode === 'diverged' ? remote.tip : expected
+      );
+      expect(current.outputs.is_current).toBeUndefined();
+    }
+  );
+
+  it('refuses production mutation when REST and git cannot prove lineage', () => {
+    const current = runPromote(EXPECTED_SHA, 'identical', {
+      STUB_MAIN_FAILURES: '9',
+      STUB_RATE_LIMIT_RESET: String(Math.floor(Date.now() / 1000) + 3600),
+      MAIN_LINEAGE_REMOTE: join(tmpdir(), 'missing-lineage-remote'),
+    });
+    expect(current.result.status).not.toBe(0);
+    expect(current.promoted).toBe(false);
+    expect(current.outputs.promotion_sha).toBeUndefined();
+    expect(current.outputs.failure_subtype).toBe(
+      'production_promotion_state_invalid'
+    );
+    expect(current.outputs.is_current).toBeUndefined();
+  });
 
   it('promotes an exact or ancestor generation and reports the promoted SHA', () => {
     const exact = runPromote(EXPECTED_SHA, 'identical');
