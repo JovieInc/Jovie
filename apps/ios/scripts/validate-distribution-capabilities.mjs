@@ -178,6 +178,47 @@ export function provisioningProfileDirectories(home = process.env.HOME ?? '') {
   );
 }
 
+function commandDetail(error) {
+  const stderr =
+    error && typeof error.stderr?.toString === 'function'
+      ? error.stderr.toString().trim()
+      : '';
+  const message = error instanceof Error ? error.message : String(error);
+  return [stderr, message].filter(Boolean).join(' ').slice(0, 400);
+}
+
+/**
+ * `security cms` reads the default keychain. Fastlane's temp keychain makes
+ * that fail, and the old lookup reported the failure as "not installed".
+ * OpenSSL verifies the CMS blob without a keychain.
+ * @param {string} filePath
+ * @param {typeof execFileSync} [runCommand]
+ */
+export function decodeProvisioningProfile(filePath, runCommand = execFileSync) {
+  const attempts = [
+    ['security', ['cms', '-D', '-i', filePath]],
+    [
+      'openssl',
+      ['cms', '-inform', 'DER', '-verify', '-noverify', '-in', filePath],
+    ],
+  ];
+  const failures = [];
+  for (const [command, args] of attempts) {
+    try {
+      const decoded = runCommand(command, args, { encoding: 'utf8' });
+      if (typeof decoded === 'string' && decoded.includes('<plist')) {
+        return decoded;
+      }
+      failures.push(`${command} ${args[0]} returned no plist`);
+    } catch (error) {
+      failures.push(`${command} ${args[0]} failed: ${commandDetail(error)}`);
+    }
+  }
+  throw new Error(
+    `Could not decode provisioning profile ${filePath}. ${failures.join(' | ')}`
+  );
+}
+
 export function readPlist(filePath) {
   const bytes = readFileSync(filePath);
   const head = plistText(bytes.subarray(0, 256));
@@ -187,18 +228,7 @@ export function readPlist(filePath) {
     head.startsWith('<dict') ||
     head.startsWith('{');
   if (filePath.endsWith('.mobileprovision') && !textual) {
-    let decoded;
-    try {
-      decoded = execFileSync('security', ['cms', '-D', '-i', filePath], {
-        encoding: 'utf8',
-      });
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error);
-      throw new Error(
-        `Could not decode provisioning profile ${filePath}. ${detail}`
-      );
-    }
-    return parsePlist(decoded);
+    return parsePlist(decodeProvisioningProfile(filePath));
   }
   const text = bytes.toString('utf8');
   if (text.trimStart().startsWith('{')) return JSON.parse(text);
@@ -358,7 +388,7 @@ function searchDirectories(options) {
 /**
  * @param {string} directory
  * @param {string} name
- * @param {{ seen: number, decoded: number, failures: string[] }} report
+ * @param {{ seen: number, decoded: number, failures: string[], names: string[] }} report
  */
 function findProfiles(directory, name, report) {
   if (!existsSync(directory)) return [];
@@ -370,6 +400,9 @@ function findProfiles(directory, name, report) {
     try {
       const plist = readPlist(fullPath);
       report.decoded += 1;
+      if (typeof plist?.Name === 'string' && plist.Name.length > 0) {
+        report.names.push(plist.Name);
+      }
       if (plist?.Name === name) matches.push({ path: fullPath, plist });
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
@@ -412,7 +445,7 @@ function resolveProfile(options) {
     }
   }
 
-  const report = { seen: 0, decoded: 0, failures: [] };
+  const report = { seen: 0, decoded: 0, failures: [], names: [] };
   const matches = [];
   for (const directory of directories) {
     matches.push(...findProfiles(directory, name, report));
@@ -423,7 +456,13 @@ function resolveProfile(options) {
       `Capability mismatch: found ${matches.length} provisioning profiles named "${name}". Archive was not started.`
     );
   }
-  if (report.decoded === 0 && report.failures.length > 0) {
+  if (report.decoded > 0) {
+    const decodedNames = report.names.map(decodedName => `"${decodedName}"`);
+    throw new Error(
+      `Capability mismatch: provisioning profile name does not match "${name}". Decoded ${decodedNames.join(', ') || '(no Name)'}.`
+    );
+  }
+  if (report.failures.length > 0) {
     throw new Error(
       `Capability mismatch: provisioning profile "${name}" is installed but could not be decoded, so entitlements cannot be compared before archive. ${report.failures.join(' ')}`
     );
