@@ -3,7 +3,10 @@ import {
   type ArtistProfileField,
   unknownArtistProfileContract,
 } from './artist-profile-contract';
-import { CONNECTOR_REGISTRY } from './registry';
+import {
+  DSP_PROFILE_CATALOG,
+  type DspProfileDestination,
+} from './dsp-profile-catalog';
 
 export interface ArtistProfileDestinationManifest {
   readonly label: string;
@@ -14,13 +17,41 @@ export interface ArtistProfileDestinationManifest {
     Record<ArtistProfileField, { readonly maxLength: number }>
   >;
   readonly recovery: 'manual' | 'unsupported';
+  readonly aliases?: readonly string[];
+  readonly documentation?: Pick<
+    DspProfileDestination,
+    'apiFields' | 'authorization' | 'evidence' | 'quota' | 'termsApi'
+  >;
+}
+
+function fromDsp(
+  destination: DspProfileDestination,
+  sources: ArtistProfileDestinationManifest['sources']
+): ArtistProfileDestinationManifest {
+  return {
+    label: destination.label,
+    sources,
+    rollout: destination.availability,
+    profile: destination.artistProfile,
+    constraints: {},
+    recovery: 'unsupported',
+    aliases:
+      destination.legacyBioProviderId === destination.id
+        ? []
+        : [destination.legacyBioProviderId],
+    documentation: {
+      apiFields: destination.apiFields,
+      authorization: destination.authorization,
+      evidence: destination.evidence,
+      quota: destination.quota,
+      termsApi: destination.termsApi,
+    },
+  };
 }
 
 function unverified(
   label: string,
-  sources: ArtistProfileDestinationManifest['sources'],
-  maxBioLength?: number,
-  recovery: ArtistProfileDestinationManifest['recovery'] = 'unsupported'
+  sources: ArtistProfileDestinationManifest['sources']
 ): ArtistProfileDestinationManifest {
   return {
     label,
@@ -29,8 +60,8 @@ function unverified(
     profile: unknownArtistProfileContract(
       'Artist-profile authorization, API terms and operation evidence have not been verified.'
     ),
-    constraints: maxBioLength ? { bio: { maxLength: maxBioLength } } : {},
-    recovery,
+    constraints: {},
+    recovery: 'unsupported',
   };
 }
 
@@ -40,30 +71,21 @@ function unverified(
  * No connection records, credentials, account IDs or provider clients belong here.
  */
 export const ARTIST_PROFILE_DESTINATIONS = {
-  amazon_music: unverified('Amazon Music', ['dsp_bio'], undefined, 'manual'),
-  apple_music: unverified('Apple Music', ['dsp_bio'], undefined, 'manual'),
+  amazon_music: fromDsp(DSP_PROFILE_CATALOG.amazon_music, ['dsp_bio']),
+  apple_music: fromDsp(DSP_PROFILE_CATALOG.apple_music, ['dsp_bio']),
   beacons: unverified('Beacons', ['ingestion']),
-  deezer: unverified('Deezer', ['dsp_bio'], undefined, 'manual'),
+  deezer: fromDsp(DSP_PROFILE_CATALOG.deezer, ['dsp_bio']),
   instagram: unverified('Instagram', ['ingestion']),
   laylo: unverified('Laylo', ['ingestion']),
   linktree: unverified('Linktree', ['ingestion']),
-  soundcloud: {
-    ...unverified('SoundCloud', ['dsp_bio', 'ingestion'], 4000),
-    rollout: 'planned',
-  },
-  spotify: {
-    ...unverified('Spotify', ['connector', 'dsp_bio'], 1500, 'manual'),
-    profile: CONNECTOR_REGISTRY.spotify.artistProfile,
-  },
-  tidal: unverified('TIDAL', ['dsp_bio'], undefined, 'manual'),
+  soundcloud: fromDsp(DSP_PROFILE_CATALOG.soundcloud, ['dsp_bio', 'ingestion']),
+  spotify: fromDsp(DSP_PROFILE_CATALOG.spotify, ['connector', 'dsp_bio']),
+  tidal: fromDsp(DSP_PROFILE_CATALOG.tidal, ['dsp_bio']),
   tiktok: unverified('TikTok', ['ingestion']),
   twitter: unverified('Twitter', ['ingestion']),
-  youtube: {
-    ...unverified('YouTube', ['connector', 'ingestion']),
-    profile: CONNECTOR_REGISTRY.youtube.artistProfile,
-  },
-  youtube_music: {
-    ...unverified('YouTube Music', ['dsp_bio'], 5000),
-    rollout: 'planned',
-  },
+  youtube: fromDsp(DSP_PROFILE_CATALOG.youtube, [
+    'connector',
+    'dsp_bio',
+    'ingestion',
+  ]),
 } as const satisfies Record<string, ArtistProfileDestinationManifest>;

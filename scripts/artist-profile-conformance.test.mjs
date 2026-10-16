@@ -12,6 +12,7 @@ const fixtureSources = new Map(
     [
       'connectors/artist-profile-registry.ts',
       'connectors/registry.ts',
+      'connectors/dsp-profile-catalog.ts',
       'dsp-bio-sync/providers.ts',
     ].some(suffix => path === `${prefix}${suffix}`)
   )
@@ -20,6 +21,12 @@ test('the complete current source tree conforms', () => {
   assert.deepEqual(checkArtistProfileConformance(sources), []);
 });
 for (const [name, path, source, expected] of [
+  [
+    'malformed provider source',
+    'dsp-bio-sync/providers.ts',
+    'export const DSP_BIO_PROVIDERS = { broken: ;',
+    'invalid source syntax',
+  ],
   [
     'untyped profile adapter',
     'connectors/new-social/profile.ts',

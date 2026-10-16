@@ -2081,7 +2081,11 @@ describe('source-read guard selection', () => {
     ],
     [
       'apps/web/app/api/cron/example/route.test.ts',
-      ['merge-group-unit-guards', 'node-environment-files'],
+      [
+        'artist-launch-contract',
+        'merge-group-unit-guards',
+        'node-environment-files',
+      ],
     ],
     [
       'apps/web/eslint-rules/rule.test.js',
@@ -2117,7 +2121,11 @@ describe('source-read guard selection', () => {
     ],
     [
       'apps/web/app/(marketing)/download/page.tsx',
-      ['merge-group-unit-guards', 'static-revalidate-policy'],
+      [
+        'artist-launch-contract',
+        'merge-group-unit-guards',
+        'static-revalidate-policy',
+      ],
     ],
     [
       'apps/web/tests/unit/marketing/static-revalidate-policy.test.ts',
@@ -2189,6 +2197,7 @@ describe('source-read guard selection', () => {
     const all = SOURCE_GUARDS.map(guard => guard.id);
     // Manual dispatch runs web Unit Tests and structural, which carry the rest.
     expect(selected('workflow_dispatch', ['README.md'])).toEqual([
+      'artist-launch-contract',
       'artist-profile-conformance',
       'ci-schedule-inventory',
     ]);
@@ -2196,6 +2205,7 @@ describe('source-read guard selection', () => {
     expect(selected('pull_request', null)).toEqual(all);
     expect(selected('pull_request', [])).toEqual(all);
     expect(selected('merge_group', null)).toEqual([
+      'artist-launch-contract',
       'artist-profile-conformance',
       'ci-schedule-inventory',
     ]);
@@ -2203,15 +2213,14 @@ describe('source-read guard selection', () => {
 
   it('points every guard at a test file that exists', () => {
     for (const guard of SOURCE_GUARDS) {
-      if (guard.id === 'artist-profile-conformance') {
-        expect(guard.command).toContain(
-          'node scripts/artist-profile-conformance.mjs'
-        );
+      if (
+        ['artist-launch-contract', 'artist-profile-conformance'].includes(
+          guard.id
+        )
+      ) {
+        expect(guard.command).toContain('node scripts/artist-');
         expect(
-          readFileSync(
-            join(REPO_ROOT, 'scripts/artist-profile-conformance.test.mjs'),
-            'utf8'
-          )
+          readFileSync(join(REPO_ROOT, `scripts/${guard.id}.test.mjs`), 'utf8')
         ).toContain("from 'node:test'");
         continue;
       }

@@ -7,16 +7,17 @@ projects the destination registry into the ledger's versioned terms, scopes,
 evidence expiry, rate window and conditional restore contract.
 
 The credential-free `catalog` in `GET /api/dsp/bio-sync` represents every
-registered destination and all four fields. The operator artist-profile inventory
+registered destination and all four fields, including provider documentation and aliases. The operator artist-profile inventory
 uses the same projection. Missing, undated, expired or invalid evidence and
 blocked/planned rollout never advertise an available write. The GET response is
 uncached so evidence expiry takes effect without a rebuild. Catalog readiness is
 not an account grant or permission to execute.
 
-Current DSP email paths have manual recovery and unverified write readiness;
+Current DSP email paths have unsupported rollback and unverified write readiness;
 the catalog keeps them disabled. Ingestion sources do not imply outbound write
 permission. Add destination manifests in sorted order in
-`artist-profile-registry.ts`, retaining connector field policies in `registry.ts`.
+`artist-profile-registry.ts`, projecting researched DSP policies from
+`dsp-profile-catalog.ts` and the existing connector contracts.
 `node scripts/artist-profile-conformance.mjs` checks the complete source tree for
 unmanifested adapters, DSP bio providers and ingestion destinations, and competing
 capability metadata. The existing CI source guards run it on source and queue

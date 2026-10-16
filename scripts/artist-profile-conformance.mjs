@@ -8,6 +8,7 @@ import ts from 'typescript';
 const LIB = 'apps/web/lib/';
 const REGISTRY = `${LIB}connectors/artist-profile-registry.ts`;
 const DSP = `${LIB}dsp-bio-sync/providers.ts`;
+const DSP_CATALOG = `${LIB}connectors/dsp-profile-catalog.ts`;
 const INGESTION = `${LIB}ingestion/strategies/`;
 const CORE = new Set([
   `${LIB}connectors/profile-writes/contract.ts`,
@@ -35,8 +36,17 @@ function declaration(tree, name) {
 
 export function checkArtistProfileConformance(sources) {
   const errors = [];
-  const parse = (path, source) =>
-    ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true);
+  const parse = (path, source) => {
+    const tree = ts.createSourceFile(
+      path,
+      source,
+      ts.ScriptTarget.Latest,
+      true
+    );
+    if (tree.parseDiagnostics.length)
+      errors.push(`${path}: invalid source syntax`);
+    return tree;
+  };
   const registryTree = parse(REGISTRY, sources.get(REGISTRY) ?? '');
   const registry = declaration(registryTree, 'ARTIST_PROFILE_DESTINATIONS');
   if (!registry) return ['Missing artist-profile destination registry'];
@@ -62,7 +72,19 @@ export function checkArtistProfileConformance(sources) {
   };
   const dspTree = parse(DSP, sources.get(DSP) ?? '');
   const dsp = declaration(dspTree, 'DSP_BIO_PROVIDERS');
-  if (!dsp) errors.push(`${DSP}: missing DSP transport inventory`);
+  if (!dsp && !sources.get(DSP)?.includes('Object.values(DSP_PROFILE_CATALOG)'))
+    errors.push(`${DSP}: missing DSP transport inventory`);
+  const dspCatalogTree = parse(DSP_CATALOG, sources.get(DSP_CATALOG) ?? '');
+  const dspCatalog = declaration(dspCatalogTree, 'DSP_PROFILE_CATALOG');
+  if (!dsp && !dspCatalog)
+    errors.push(`${DSP_CATALOG}: missing DSP destination manifests`);
+  for (const entry of dspCatalog?.properties ?? []) {
+    requireManifest(
+      entry.name?.getText(dspCatalogTree).replace(/['\"]/g, ''),
+      'dsp_bio',
+      DSP_CATALOG
+    );
+  }
   for (const entry of dsp?.properties ?? []) {
     requireManifest(
       entry.name?.getText(dspTree).replace(/['"]/g, ''),

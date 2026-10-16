@@ -92,7 +92,11 @@ function ready(): ArtistProfileDestinationManifest {
 describe('credential-free artist-profile catalog', () => {
   it('represents every destination and field, preserving policies and blocking unverified writes', () => {
     const catalog = getArtistProfileCatalog(now);
-    expect(catalog.destinations).toHaveLength(14);
+    expect(catalog.destinations).toHaveLength(13);
+    const youtube = catalog.destinations.find(item => item.id === 'youtube');
+    expect(youtube?.aliases).toEqual(['youtube_music']);
+    expect(youtube?.fields[0].documentation?.field.write).toBe('documented');
+    expect(youtube?.fields[0].write.available).toBe(false);
     for (const destination of catalog.destinations) {
       expect(destination.fields.map(field => field.name)).toEqual([
         'bio',
@@ -121,8 +125,7 @@ describe('credential-free artist-profile catalog', () => {
     expect(getEnabledBioProviders()).toEqual([]);
     expect(getBioProvider('spotify')).toMatchObject({
       enabled: false,
-      rollback: 'manual',
-      maxBioLength: 1500,
+      rollback: 'unsupported',
     });
     expect(getBioProvider('absent')).toBeUndefined();
   });

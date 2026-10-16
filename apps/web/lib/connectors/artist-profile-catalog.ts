@@ -85,11 +85,21 @@ export function projectArtistProfileDestination(
       recovery: manifest.recovery,
       termsApi: policy.termsApi,
       evidence: { ...policy.evidence, freshness: evidenceFreshness },
+      documentation: manifest.documentation
+        ? {
+            field: manifest.documentation.apiFields[name],
+            authorization: manifest.documentation.authorization,
+            rateLimit: manifest.documentation.quota,
+            termsApi: manifest.documentation.termsApi,
+            evidence: manifest.documentation.evidence,
+          }
+        : null,
     };
   });
   return {
     id,
     label: manifest.label,
+    aliases: [...(manifest.aliases ?? [])],
     sources: [...manifest.sources],
     rollout: manifest.rollout,
     fields,

@@ -551,9 +551,8 @@ describe('immutable connector write receipts', () => {
   it('marks all existing bio destinations without a proven restore path', () => {
     for (const id of Object.keys(DSP_BIO_PROVIDERS)) {
       const provider = getBioProvider(id)!;
-      expect(provider.rollback).toBe(
-        provider.method === 'email' ? 'manual' : 'unsupported'
-      );
+      expect(provider.enabled).toBe(false);
+      expect(provider.rollback).toBe('unsupported');
     }
   });
 

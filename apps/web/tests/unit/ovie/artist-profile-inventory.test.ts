@@ -26,10 +26,10 @@ describe('Public Artist Profile inventory', () => {
     expect(report).toContain('must-sell');
     expect(report).toContain('Artist-profile connector catalog');
     expect(report).toContain(
-      '| spotify | bio_link | unknown | blocked | missing |'
+      '| spotify | bio_link | unsupported | blocked | undated |'
     );
     expect(report).toContain(
-      '| youtube | website | unknown | blocked | missing |'
+      '| youtube | website | unsupported | blocked | undated |'
     );
   });
 });
