@@ -45,6 +45,7 @@ const deps = {
       album('new', 'New Single', '2026-09-01'),
     ],
     total: 2,
+    complete: true,
   })) as never,
   checkHealth: vi.fn(async (urls: readonly string[]) =>
     urls.map(url => ({ url, status: 'ok' as const }))
@@ -53,6 +54,18 @@ const deps = {
 };
 
 describe('link drift server', () => {
+  const loadBioPage = () =>
+    mockLimit
+      .mockResolvedValueOnce([
+        {
+          linktreeUrl: 'https://bio.example/a',
+          allLinks: [{ url: `https://open.spotify.com/track/${TRACK}` }],
+          updatedAt: new Date('2026-03-31T00:00:00.000Z'),
+        },
+      ])
+      .mockResolvedValueOnce([{ spotifyId: null, spotifyUrl: null }])
+      .mockResolvedValueOnce([]);
+
   beforeEach(() => {
     mockLimit.mockReset();
     deps.checkHealth.mockClear();
@@ -81,16 +94,7 @@ describe('link drift server', () => {
   });
 
   it('emits a dated, sourced drift fact for a stored bio page', async () => {
-    mockLimit
-      .mockResolvedValueOnce([
-        {
-          linktreeUrl: 'https://bio.example/a',
-          allLinks: [{ url: `https://open.spotify.com/track/${TRACK}` }],
-          updatedAt: new Date('2026-03-31T00:00:00.000Z'),
-        },
-      ])
-      .mockResolvedValueOnce([{ spotifyId: null, spotifyUrl: null }])
-      .mockResolvedValueOnce([]);
+    loadBioPage();
     const artifact = await runLinkDriftStep('profile-1', deps);
     expect(artifact.empty).toBeUndefined();
     expect(artifact.facts).toEqual([
@@ -103,6 +107,48 @@ describe('link drift server', () => {
         observedAt: '2026-10-04T00:00:00.000Z',
       },
     ]);
+  });
+
+  it('keeps partial and noncomparable catalogs unknown', async () => {
+    for (const response of [
+      {
+        albums: [album('old', 'Old Single', '2025-03-14')],
+        total: 2,
+        complete: false,
+        issue: 'Spotify artist album pagination stopped early',
+      },
+      { albums: [], total: 0, complete: true },
+      {
+        albums: [album('undated', 'Undated', 'unknown')],
+        total: 1,
+        complete: true,
+      },
+      {
+        albums: [
+          album('old', 'Old Single', '2025-03-14'),
+          album('undated', 'Undated', 'unknown'),
+        ],
+        total: 2,
+        complete: true,
+      },
+      {
+        albums: [
+          album('old', 'Old Single', '2025-03-14'),
+          album('new', 'New Single', '2026-09-01'),
+          album('undated', 'Undated', 'unknown'),
+        ],
+        total: 3,
+        complete: true,
+      },
+    ]) {
+      loadBioPage();
+      const artifact = await runLinkDriftStep('profile-1', {
+        ...deps,
+        getArtistAlbums: vi.fn(async () => response) as never,
+      });
+      expect(artifact.summary).toContain('release drift is unknown');
+      expect(artifact.summary).not.toContain('match your latest release');
+    }
   });
 
   it('runs empty, so the slot hides, without a stored bio page', async () => {

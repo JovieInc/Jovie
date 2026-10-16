@@ -59,7 +59,7 @@ vi.mock('@/lib/db', () => ({
 
 const mockGetSpotifyArtistAlbums = vi
   .fn()
-  .mockResolvedValue({ albums: [], total: 0 });
+  .mockResolvedValue({ albums: [], total: 0, complete: true });
 const mockGetSpotifyAlbums = vi.fn().mockResolvedValue([]);
 const mockGetSpotifyTracks = vi.fn().mockResolvedValue([]);
 const mockSafeParse = vi.fn((id: unknown) => ({
@@ -174,7 +174,11 @@ describe('spotify-import', () => {
     );
     vi.mocked(processRecordingArtistCredits).mockReset().mockResolvedValue([]);
     // Reset default mock implementations
-    mockGetSpotifyArtistAlbums.mockResolvedValue({ albums: [], total: 0 });
+    mockGetSpotifyArtistAlbums.mockResolvedValue({
+      albums: [],
+      total: 0,
+      complete: true,
+    });
     mockGetSpotifyAlbums.mockResolvedValue([]);
     mockGetSpotifyTracks.mockResolvedValue([]);
     mockGetBestSpotifyImage.mockReturnValue('https://example.com/image.jpg');
@@ -234,6 +238,7 @@ describe('spotify-import', () => {
       mockGetSpotifyArtistAlbums.mockResolvedValueOnce({
         albums: [],
         total: 0,
+        complete: true,
       });
 
       const { importReleasesFromSpotify } = await import(
@@ -251,6 +256,37 @@ describe('spotify-import', () => {
         'profile-123',
         '6Ghvu1VvMGScGpOUJBAHNH'
       );
+    });
+
+    it('does not treat an incomplete empty catalog as a clean import', async () => {
+      mockGetSpotifyArtistAlbums.mockResolvedValueOnce({
+        albums: [],
+        total: 12,
+        complete: false,
+        issue: 'Spotify artist album pagination stopped early',
+      });
+
+      const { importReleasesFromSpotify } = await import(
+        '@/lib/discography/spotify-import'
+      );
+      const result = await importReleasesFromSpotify(
+        'profile-123',
+        '6Ghvu1VvMGScGpOUJBAHNH'
+      );
+
+      expect(result).toMatchObject({
+        success: false,
+        imported: 0,
+        updated: 0,
+        failed: 0,
+        total: 12,
+      });
+      expect(result.errors[0]).toContain('0 of 12 albums observed');
+      expect(result.errors[0]).toContain('pagination stopped early');
+      expect(mockReconcileCreditedArtistProfiles).not.toHaveBeenCalled();
+      expect(mockUpsertRelease).not.toHaveBeenCalled();
+      expect(mockUpsertRecording).not.toHaveBeenCalled();
+      expect(mockDbUpdate).not.toHaveBeenCalled();
     });
 
     it('keeps catalog import available and reports reconciliation failures', async () => {
@@ -290,6 +326,7 @@ describe('spotify-import', () => {
       mockGetSpotifyArtistAlbums.mockResolvedValueOnce({
         albums: manyAlbums,
         total: manyAlbums.length,
+        complete: true,
       });
 
       const { importReleasesFromSpotify } = await import(
@@ -336,6 +373,7 @@ describe('spotify-import', () => {
       mockGetSpotifyArtistAlbums.mockResolvedValueOnce({
         albums: [],
         total: 0,
+        complete: true,
       });
 
       const { importReleasesFromSpotify } = await import(
@@ -378,6 +416,7 @@ describe('spotify-import', () => {
       mockGetSpotifyArtistAlbums.mockResolvedValueOnce({
         albums: [],
         total: 0,
+        complete: true,
       });
 
       const { importReleasesFromSpotify } = await import(
@@ -399,6 +438,7 @@ describe('spotify-import', () => {
       mockGetSpotifyArtistAlbums.mockResolvedValueOnce({
         albums: [],
         total: 0,
+        complete: true,
       });
 
       const { importReleasesFromSpotify } = await import(
@@ -421,6 +461,7 @@ describe('spotify-import', () => {
       mockGetSpotifyArtistAlbums.mockResolvedValueOnce({
         albums: [],
         total: 0,
+        complete: true,
       });
 
       const { importReleasesFromSpotify } = await import(
@@ -560,6 +601,7 @@ describe('spotify-import', () => {
         mockGetSpotifyArtistAlbums.mockResolvedValue({
           albums: [album],
           total: 1,
+          complete: true,
         });
         mockGetSpotifyAlbums.mockResolvedValue([
           {
@@ -753,6 +795,7 @@ describe('spotify-import', () => {
       mockGetSpotifyArtistAlbums.mockResolvedValueOnce({
         albums: [sparseEdition, enrichedEdition],
         total: 2,
+        complete: true,
       });
       mockGetSpotifyAlbums.mockResolvedValueOnce([
         {
@@ -837,6 +880,7 @@ describe('spotify-import', () => {
       mockGetSpotifyArtistAlbums.mockResolvedValueOnce({
         albums: [album],
         total: 1,
+        complete: true,
       });
       mockGetSpotifyAlbums.mockResolvedValueOnce([
         {
@@ -896,6 +940,7 @@ describe('spotify-import', () => {
           },
         ],
         total: 1,
+        complete: true,
       });
 
       mockGetSpotifyAlbums.mockResolvedValueOnce([
@@ -994,6 +1039,7 @@ describe('spotify-import', () => {
           },
         ],
         total: 1,
+        complete: true,
       });
 
       mockGetSpotifyAlbums.mockResolvedValueOnce([
@@ -1097,6 +1143,7 @@ describe('spotify-import', () => {
           },
         ],
         total: 1,
+        complete: true,
       });
 
       mockGetSpotifyAlbums.mockResolvedValueOnce([
@@ -1199,6 +1246,7 @@ describe('spotify-import', () => {
           },
         ],
         total: 1,
+        complete: true,
       });
 
       mockGetSpotifyAlbums.mockResolvedValueOnce([
@@ -1302,6 +1350,7 @@ describe('spotify-import', () => {
           },
         ],
         total: 1,
+        complete: true,
       });
 
       mockGetSpotifyAlbums.mockResolvedValueOnce([
@@ -1373,6 +1422,7 @@ describe('spotify-import', () => {
           },
         ],
         total: 1,
+        complete: true,
       });
 
       const fullImage = {

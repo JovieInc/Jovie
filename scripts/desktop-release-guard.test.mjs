@@ -892,6 +892,70 @@ test('desktop authorizer cross-proves exact Production Verified evidence', () =>
   );
 });
 
+test('desktop authorizer retries transient GitHub API failures', async t => {
+  const proof = shellStepBody(
+    desktopWorkflow,
+    'Cross-prove exact production evidence'
+  );
+  const helperStart = proof.indexOf('gh() {');
+  const helperEnd = proof.indexOf('\n\nif [ "$EVENT_NAME"', helperStart);
+  assert.ok(
+    helperStart >= 0 && helperEnd > helperStart,
+    'missing bounded GitHub API retry helper'
+  );
+  const helper = proof.slice(helperStart, helperEnd);
+  const root = await mkdtemp(join(tmpdir(), 'jovie-desktop-gh-retry-'));
+  t.after(() => rm(root, { force: true, recursive: true }));
+  const mockBin = join(root, 'bin');
+  const counter = join(root, 'attempts');
+  await mkdir(mockBin);
+  await writeFile(
+    join(mockBin, 'gh'),
+    `#!/usr/bin/env bash
+set -euo pipefail
+count=0
+if [ -f "$MOCK_GH_COUNTER" ]; then read -r count < "$MOCK_GH_COUNTER"; fi
+count=$((count + 1))
+printf '%s\n' "$count" > "$MOCK_GH_COUNTER"
+if [ "$count" -le "$MOCK_GH_FAILURES" ]; then
+  echo 'gh: Server Error (HTTP 502)' >&2
+  exit 1
+fi
+printf '%s\n' '{"ok":true}'
+`,
+    { mode: 0o755 }
+  );
+
+  const run = failures =>
+    spawnSync(
+      'bash',
+      ['-c', `set -euo pipefail\n${helper}\ngh api repos/JovieInc/Jovie`],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          GH_API_RETRY_SECONDS: '0',
+          MOCK_GH_COUNTER: counter,
+          MOCK_GH_FAILURES: String(failures),
+          PATH: `${mockBin}:${process.env.PATH}`,
+          RUNNER_TEMP: root,
+        },
+      }
+    );
+
+  const recovered = run(1);
+  assert.equal(recovered.status, 0, recovered.stderr);
+  assert.equal(recovered.stdout.trim(), '{"ok":true}');
+  assert.equal((await readFile(counter, 'utf8')).trim(), '2');
+  assert.match(recovered.stderr, /HTTP 502.*retrying/s);
+
+  await writeFile(counter, '0\n');
+  const exhausted = run(3);
+  assert.equal(exhausted.status, 1);
+  assert.equal((await readFile(counter, 'utf8')).trim(), '3');
+  assert.match(exhausted.stderr, /HTTP 502/);
+});
+
 test('desktop authorizer accepts an exact successful recovered production marker', () => {
   const proof = step(
     job(desktopWorkflow, 'authorize-release'),

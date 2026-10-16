@@ -7,6 +7,7 @@ import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { dspCatalogScans } from '@/lib/db/schema/dsp-catalog-scan';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { getBoundSpotifyArtistId } from '@/lib/dsp-enrichment/catalog-scan-target';
 import { processCatalogScanStandalone } from '@/lib/dsp-enrichment/jobs/catalog-scan';
 
 const triggerScanSchema = z.object({
@@ -36,12 +37,23 @@ export async function POST(request: Request) {
     .select({ id: creatorProfiles.id })
     .from(creatorProfiles)
     .innerJoin(users, eq(users.id, creatorProfiles.userId))
-    .where(and(eq(creatorProfiles.id, profileId), eq(users.clerkId, userId)))
+    .where(and(eq(creatorProfiles.id, profileId), eq(users.id, userId)))
     .limit(1);
 
   if (!profile) {
     return NextResponse.json(
       { error: 'Profile not found or not authorized' },
+      { status: 403 }
+    );
+  }
+
+  const boundArtistId = await getBoundSpotifyArtistId(db, profileId);
+  if (!boundArtistId || boundArtistId !== spotifyArtistId) {
+    return NextResponse.json(
+      {
+        error:
+          'Spotify artist does not match this profile’s verified connection',
+      },
       { status: 403 }
     );
   }
@@ -54,6 +66,7 @@ export async function POST(request: Request) {
       and(
         eq(dspCatalogScans.creatorProfileId, profileId),
         eq(dspCatalogScans.providerId, 'spotify'),
+        eq(dspCatalogScans.externalArtistId, spotifyArtistId),
         or(
           eq(dspCatalogScans.status, 'pending'),
           eq(dspCatalogScans.status, 'running')
@@ -83,6 +96,7 @@ export async function POST(request: Request) {
       and(
         eq(dspCatalogScans.creatorProfileId, profileId),
         eq(dspCatalogScans.providerId, 'spotify'),
+        eq(dspCatalogScans.externalArtistId, spotifyArtistId),
         eq(dspCatalogScans.status, 'completed')
       )
     )

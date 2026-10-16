@@ -14,9 +14,9 @@ import {
   PRODUCTION_CERTIFICATION_BLOCKER,
   PUBLIC_CONTRACT_BLOCKER,
   SAME_NAME_LEASE_BLOCKER,
-  SOCIALBLADE_ACCESS_BLOCKER,
   SOCIALBLADE_HISTORY_BLOCKER,
   SOCIALBLADE_OPAQUE_BLOCKER,
+  SOCIALBLADE_RIGHTS_BLOCKER,
   STORY_ENGINE_BLOCKER,
 } from './permissions';
 import { SOCIALBLADE_DOC_URL, SOCIALBLADE_ROWS } from './socialblade-rows';
@@ -247,21 +247,23 @@ export function buildCatalog(): readonly CatalogEntry[] {
 
   const socialblade = SOCIALBLADE_ROWS.map(row => {
     const status: ParityStatus =
-      row.kind === 'grade' || row.kind === 'sbrank'
+      row.kind === 'grade' ||
+      row.kind === 'sbrank' ||
+      (row.kind === 'top-filter' && row.key === 'sbrank')
         ? 'vendor-only-opaque-metric'
-        : row.kind === 'history-downgrade'
+        : row.kind === 'history'
           ? 'historical-coverage-gap'
-          : 'access-blocked';
+          : 'rights-blocked';
     const blocker =
       status === 'vendor-only-opaque-metric'
         ? SOCIALBLADE_OPAQUE_BLOCKER
         : status === 'historical-coverage-gap'
           ? SOCIALBLADE_HISTORY_BLOCKER
-          : SOCIALBLADE_ACCESS_BLOCKER;
+          : SOCIALBLADE_RIGHTS_BLOCKER;
     return blockedEntry(
-      `socialblade:${row.platform}:${row.kind}`,
+      `socialblade:${row.platform}:${row.kind}:${row.key}`,
       'socialblade',
-      `${row.platform} ${row.kind}`,
+      `${row.platform} ${row.capability}`,
       SOCIALBLADE_DOC_URL,
       status,
       blocker

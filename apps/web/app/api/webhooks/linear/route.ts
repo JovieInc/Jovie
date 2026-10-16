@@ -6,7 +6,7 @@
  * Bridges signed Linear changes to bounded GitHub repository_dispatch events:
  * CodeRabbit plan comments become `linear_plan_ready`; JOV Issue changes in
  * Triage become `linear_triage_assess` for a trusted exact-issue reread;
- * validation receipt comments on JOV issues become `linear_validation_receipt`
+ * validation receipts and terminal founder work results on JOV issues become `linear_validation_receipt`
  * (Linear Sync on Merge re-evaluates the lifecycle); a JOV issue that gains
  * a Quality Gap Finder input label (post-mortem action or escaped defect), or
  * closes while carrying one, becomes `quality-gap-scan`. These are the events
@@ -28,6 +28,7 @@
  */
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { extractWorkBlocks } from '@jovie/agent-transport-contracts/work-order';
 import { NextRequest, NextResponse } from 'next/server';
 
 import { env } from '@/lib/env-server';
@@ -190,8 +191,21 @@ function isJovTriageIssueChange(payload: LinearWebhookPayload): boolean {
 function isValidationReceiptComment(payload: LinearWebhookPayload): boolean {
   if (payload.type !== 'Comment' || payload.action !== 'create') return false;
   const comment = payload.data as LinearCommentData | undefined;
+  const body = comment?.body ?? '';
+  // This requests a trusted reread only. The lifecycle still validates the
+  // order revision/digest, episode, actor and artifact before accepting it.
+  const founderResult = extractWorkBlocks(body).results.some(result => {
+    if (!result || typeof result !== 'object') return false;
+    const actor = Reflect.get(result, 'actor');
+    return (
+      Reflect.get(result, 'phase') === 'terminal' &&
+      actor &&
+      typeof actor === 'object' &&
+      Reflect.get(actor, 'class') === 'founder-decision'
+    );
+  });
   return (
-    VALIDATION_RECEIPT_MARKER.test(comment?.body ?? '') &&
+    (VALIDATION_RECEIPT_MARKER.test(body) || founderResult) &&
     Boolean(comment?.issue?.id) &&
     JOV_IDENTIFIER.test(comment?.issue?.identifier ?? '')
   );

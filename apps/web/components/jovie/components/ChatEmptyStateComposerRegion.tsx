@@ -111,6 +111,7 @@ export function ChatEmptyStateComposerRegion({
   hideWelcomeHeader = false,
   stableDocked = false,
   showDockedWelcome = false,
+  alignAbove = 'bottom',
   onSelectSample,
 }: {
   readonly above?: ReactNode;
@@ -125,6 +126,8 @@ export function ChatEmptyStateComposerRegion({
    * the centered welcome (Just ask + sample) instead of blank space.
    */
   readonly showDockedWelcome?: boolean;
+  /** Growing conversation turns keep their position; task suggestions dock by default. */
+  readonly alignAbove?: 'bottom' | 'top';
   readonly onSelectSample?: (prompt: string) => void;
 }) {
   const showWelcomeHeader = !above && !hideWelcomeHeader;
@@ -153,7 +156,8 @@ export function ChatEmptyStateComposerRegion({
           {above ? (
             <div
               className={cn(
-                'mt-auto flex shrink-0 flex-col',
+                'flex shrink-0 flex-col',
+                alignAbove === 'top' ? 'mt-0' : 'mt-auto',
                 fullBleed && 'min-h-full'
               )}
               data-empty-chat-suggestions='true'

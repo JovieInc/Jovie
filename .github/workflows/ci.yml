@@ -6354,12 +6354,12 @@ jobs:
     name: Golden Path (manual)
     environment: Preview – jovie
     # Launch-gate job (JOV-3758): full signup -> onboarding -> music import -> live
-    # public profile -> Stripe checkout journey against REAL Clerk + an ephemeral
+    # public profile -> Stripe checkout journey against real Better Auth + an ephemeral
     # Manual golden-path evidence uses the isolated Neon branch.
     # Unlike ci-e2e-smoke this must NOT set NEXT_PUBLIC_CLERK_MOCK or
-    # E2E_USE_TEST_AUTH_BYPASS — those make golden-path.spec.ts self-skip.
-    # Path-triggered (not always-on): the spec has a 600s timeout, so always-on would
-    # blow the CI budget and churn the Clerk dev-instance 100-user cap.
+    # E2E_USE_TEST_AUTH_BYPASS — required mode fails closed if either is present.
+    # Path-triggered (not always-on): the spec has a 900s timeout, so always-on would
+    # blow the CI budget and churn the external Spotify/Stripe fixtures.
     needs: [ci-path-changes, ci-risk-classifier, ci-build-public, neon-db]
     if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' && needs.neon-db.result == 'success' }}
     runs-on: ubuntu-latest
@@ -6566,6 +6566,7 @@ jobs:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           E2E_TEST_MODE: '1'
           E2E_FAST_ONBOARDING: '1'
+          GOLDEN_PATH_REQUIRED: '1'
           BETTER_AUTH_URL: http://localhost:3250
           NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3250
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}

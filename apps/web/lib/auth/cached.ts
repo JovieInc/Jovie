@@ -1,7 +1,12 @@
 import 'server-only';
 
 import { cache } from 'react';
-import { getAppUserByBetterAuthId } from '@/lib/auth/app-user';
+import { getImpersonationState } from '@/lib/admin/impersonation';
+import {
+  type AppUser,
+  getAppUserByBetterAuthId,
+  getAppUserById,
+} from '@/lib/auth/app-user';
 import {
   buildDevTestAuthCurrentUser,
   getCachedDevTestAuthSession,
@@ -38,6 +43,8 @@ interface AuthResult {
   userId: string | null;
   sessionId: string | null;
   orgId: string | null;
+  /** Present only during impersonation; always the authenticated admin. */
+  actorUserId?: string;
 }
 
 interface NullAuthResult {
@@ -130,17 +137,45 @@ async function readBetterAuthSession(mode: SessionRead): Promise<AuthResult> {
   }
 }
 
+function isUsableImpersonationTarget(
+  user: AppUser | null
+): user is AppUser & { betterAuthUserId: string; email: string } {
+  return Boolean(
+    user?.betterAuthUserId &&
+      user.email &&
+      !checkUserStatus(user.userStatus, user.deletedAt).isBlocked
+  );
+}
+
+async function resolveEffectiveAuth(result: AuthResult): Promise<AuthResult> {
+  if (!result.userId) return result;
+
+  const state = await getImpersonationState(result.userId);
+  if (!state) return result;
+
+  const target = await getAppUserById(state.effectiveUserId);
+  if (!isUsableImpersonationTarget(target)) return result;
+
+  await attachSentryContext(target.id);
+  return {
+    ...result,
+    userId: target.id,
+    actorUserId: result.userId,
+  };
+}
+
 async function resolveRequestAuth(mode: SessionRead): Promise<AuthResult> {
   const slot = freshAuthSlot();
   if (slot.settled) return slot.result;
 
   const bypassSession = await getCachedDevTestAuthSession();
   if (bypassSession) {
-    const result: AuthResult = {
+    const baseResult: AuthResult = {
       userId: bypassSession.dbUserId,
       sessionId: `sess_test_bypass_${bypassSession.dbUserId}`,
       orgId: null,
     };
+    const result = await resolveEffectiveAuth(baseResult);
     await attachSentryContext(result.userId);
     if (mode === 'fresh') {
       slot.settled = true;
@@ -149,7 +184,7 @@ async function resolveRequestAuth(mode: SessionRead): Promise<AuthResult> {
     return result;
   }
 
-  const result = await readBetterAuthSession(mode);
+  const result = await resolveEffectiveAuth(await readBetterAuthSession(mode));
   if (mode === 'fresh') {
     slot.settled = true;
     slot.result = result;
@@ -206,7 +241,7 @@ export const getCachedCurrentUser = cache(
         id: `bypass_email_${bypassUser.id}`,
         emailAddress,
       };
-      return {
+      const currentUser: JovieUser = {
         id: bypassUser.id,
         emailAddresses: [emailEntry],
         primaryEmailAddress: emailEntry,
@@ -216,6 +251,17 @@ export const getCachedCurrentUser = cache(
         lastName: bypassUser.lastName ?? null,
         username: bypassUser.username ?? null,
       };
+      const state = await getImpersonationState(bypassSession.dbUserId);
+      if (!state) return currentUser;
+
+      const target = await getAppUserById(state.effectiveUserId);
+      return isUsableImpersonationTarget(target)
+        ? toJovieUser({
+            id: target.betterAuthUserId,
+            email: target.email,
+            name: target.name ?? target.email,
+          })
+        : currentUser;
     }
 
     try {
@@ -233,7 +279,7 @@ export const getCachedCurrentUser = cache(
         return null;
       }
 
-      return toJovieUser({
+      const currentUser = toJovieUser({
         id: session.user.id,
         email: session.user.email,
         name: session.user.name,
@@ -241,6 +287,17 @@ export const getCachedCurrentUser = cache(
         username:
           (session.user as { username?: string | null }).username ?? null,
       });
+      const state = await getImpersonationState(appUser.id);
+      if (!state) return currentUser;
+
+      const target = await getAppUserById(state.effectiveUserId);
+      return isUsableImpersonationTarget(target)
+        ? toJovieUser({
+            id: target.betterAuthUserId,
+            email: target.email,
+            name: target.name ?? target.email,
+          })
+        : currentUser;
     } catch (error) {
       if (isMissingAuthRequestContext(error)) {
         return null;

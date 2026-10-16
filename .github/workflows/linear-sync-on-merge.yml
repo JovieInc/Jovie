@@ -59,6 +59,7 @@ jobs:
           sparse-checkout: |
             .nvmrc
             .github/ci-harness/manifest.json
+            .github/scripts/production-marker-state.mjs
             scripts/lib/linear-sync-on-merge.mjs
             scripts/lib/validation-lifecycle.mjs
             scripts/lib/validation-sync.mjs
@@ -99,6 +100,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_BODY: ${{ github.event.pull_request.body }}
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          LINEAR_VALIDATION_ISSUE: ${{ github.event.client_payload.issue_identifier }}
         run: node scripts/lib/linear-sync-on-merge.mjs
 
       # Main-scoped only: a pull_request (merge) run restores but never saves.

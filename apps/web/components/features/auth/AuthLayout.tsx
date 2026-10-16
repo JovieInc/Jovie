@@ -58,7 +58,7 @@ interface AuthLayoutInnerProps {
   readonly showcaseVariant: 'page' | 'image-only';
   readonly chrome: 'default' | 'splash-b';
   readonly isKeyboardVisible: boolean;
-  readonly formRef: React.RefObject<HTMLElement | null>;
+  readonly formRef: React.RefObject<HTMLDivElement | null>;
 }
 
 function AuthFormColumn({
@@ -122,7 +122,7 @@ function AuthFormColumn({
         </h1>
       ) : null}
 
-      <main
+      <div
         ref={formRef}
         id='auth-form'
         tabIndex={-1}
@@ -131,7 +131,7 @@ function AuthFormColumn({
         <div className={cn('mx-auto w-full', AUTH_FORM_MAX_WIDTH_CLASS)}>
           {children}
         </div>
-      </main>
+      </div>
 
       {showFooterPrompt && !isKeyboardVisible ? (
         <p className='mt-3 text-center text-app font-normal text-white/58 animate-in fade-in-0 duration-subtle'>
@@ -205,7 +205,7 @@ export function AuthLayout({
 }: Readonly<AuthLayoutProps>) {
   const { isKeyboardVisible } = useMobileKeyboard();
   const { signOut } = useAuthSafe();
-  const formRef = useRef<HTMLElement>(null);
+  const formRef = useRef<HTMLDivElement>(null);
   const isSplashB = chrome === 'splash-b';
   const isSplitVariant = layoutVariant === 'split' && !isSplashB;
 
@@ -244,12 +244,13 @@ export function AuthLayout({
       )}
     >
       {showSkipLink ? (
-        <Link
+        // Native fragment navigation transfers focus even in this fixed shell.
+        <a
           href='#auth-form'
           className='sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:rounded-md focus:border focus:border-subtle focus:bg-surface-1 focus:px-4 focus:py-2 focus:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-0'
         >
           Skip to form
-        </Link>
+        </a>
       ) : null}
 
       {showLogo && isSplitVariant ? (

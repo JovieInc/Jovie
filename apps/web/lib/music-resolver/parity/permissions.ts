@@ -80,12 +80,12 @@ export const CHARTMETRIC_SCORE_BLOCKER: Blocker = {
     'A credentialed read is separately approved and the value is displayed as Chartmetric Score.',
 };
 
-export const SOCIALBLADE_ACCESS_BLOCKER: Blocker = {
+export const SOCIALBLADE_RIGHTS_BLOCKER: Blocker = {
   failure:
-    'Social Blade Business API requires a client id and prepaid token. Do not call it, including zero-credit samples.',
-  owner: 'Social Blade account owner',
+    'Social Blade Developer Terms section 3.1 prohibit using API data in another product or a similar service. Public discovery samples do not grant product rights.',
+  owner: 'JOV-7824 / Social Blade account owner',
   reviewTrigger:
-    'A server-side client id and token exist and a local test exercises a shipped client without spending credits.',
+    'Written permission covers Jovie product, API, CLI, MCP, retention and comparative use, or an independently permitted platform source replaces the vendor data.',
 };
 
 export const SOCIALBLADE_OPAQUE_BLOCKER: Blocker = {
@@ -98,10 +98,10 @@ export const SOCIALBLADE_OPAQUE_BLOCKER: Blocker = {
 
 export const SOCIALBLADE_HISTORY_BLOCKER: Blocker = {
   failure:
-    'Social Blade history archive and vault auto-downgrade when the requested depth is unavailable.',
-  owner: 'Social Blade',
+    'Requested archive depth can auto-downgrade, returned rows do not identify the granted history tier, and no permitted independent archive currently proves equivalent coverage.',
+  owner: 'JOV-7824 / JOV-7829',
   reviewTrigger:
-    'A credentialed statistics call returns an explicit history depth without auto-downgrade.',
+    'A permitted source returns actual samples with explicit coverage, gaps, buckets and freshness for the requested tier.',
 };
 
 export const SAME_NAME_LEASE_BLOCKER: Blocker = {

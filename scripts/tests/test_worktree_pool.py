@@ -146,6 +146,162 @@ class PoolTest(unittest.TestCase):
         self.assertTrue((self.pool() / "slot-moving").exists())
         self.assertEqual(len(pool_mod.ready_slots(self.pool())), 1)
 
+    def test_old_ready_claim_survives_fill_and_drain_between_rename_and_move(self):
+        self.fill()
+        slot = pool_mod.ready_slots(self.pool())[0]
+        marker = self.pool() / f"{slot.name}{pool_mod.READY}"
+        old = time.time() - 3600
+        os.utime(marker, (old, old))
+        original_rename = os.rename
+        interleaved = []
+
+        def fill_after_claim(source, dest, *args, **kwargs):
+            result = original_rename(source, dest, *args, **kwargs)
+            if Path(source) == marker:
+                interleaved.extend(self.fill(size=0))
+                interleaved.extend(pool_mod.drain(self.repo, self.root))
+            return result
+
+        with patch.object(os, "rename", side_effect=fill_after_claim):
+            source = pool_mod.take(self.repo, self.out / "claimed", "feat/claimed", "main", root=self.root)
+        self.assertEqual(source, "pool", interleaved)
+        self.assertEqual(interleaved, [])
+        self.assertEqual((self.out / "claimed" / "a.txt").read_text(), "one\n")
+        self.assertEqual(git(self.out / "claimed", "branch", "--show-current"), "feat/claimed")
+
+    def test_slow_claim_is_owned_even_after_the_timestamp_grace(self):
+        self.fill()
+        slot = pool_mod.ready_slots(self.pool())[0]
+        original_run = pool_mod.run
+        interleaved = []
+
+        def fill_before_move(args, **kwargs):
+            if args[:3] == ["git", "worktree", "move"] and args[-2] == str(slot):
+                future = time.time() + pool_mod.CLAIM_GRACE_S + 60
+                with patch.object(pool_mod.time, "time", return_value=future):
+                    interleaved.extend(self.fill(size=0))
+            return original_run(args, **kwargs)
+
+        with patch.object(pool_mod, "run", side_effect=fill_before_move):
+            source = pool_mod.take(self.repo, self.out / "slow", "feat/slow", "main", root=self.root)
+        self.assertEqual(source, "pool", interleaved)
+        self.assertEqual(interleaved, [])
+
+    def test_filler_process_cannot_remove_a_slot_owned_by_the_taker(self):
+        self.fill()
+        slot = pool_mod.ready_slots(self.pool())[0]
+        old = time.time() - 3600
+        os.utime(self.pool() / f"{slot.name}{pool_mod.READY}", (old, old))
+        original_run = pool_mod.run
+        child_results = []
+        child_code = """
+import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+import worktree_pool
+print(worktree_pool.fill(Path(sys.argv[2]), size=0, base="main", warm=False, root=Path(sys.argv[3])))
+"""
+
+        def run_filler_before_move(args, **kwargs):
+            if args[:3] == ["git", "worktree", "move"] and args[-2] == str(slot):
+                result = subprocess.run([sys.executable, "-c", child_code, str(ROOT / "scripts/lanes"),
+                                         str(self.repo), str(self.root)], capture_output=True,
+                                        text=True, check=True, timeout=15)
+                child_results.append(result.stdout.strip())
+            return original_run(args, **kwargs)
+
+        with patch.object(pool_mod, "run", side_effect=run_filler_before_move):
+            source = pool_mod.take(self.repo, self.out / "process", "feat/process", "main", root=self.root)
+        self.assertEqual(source, "pool")
+        self.assertEqual(child_results, ["[]"])
+        self.assertIn(str(self.out / "process"), git(self.repo, "worktree", "list", "--porcelain"))
+
+    def test_unverified_slot_ownership_preserves_pool_source(self):
+        self.fill()
+        slot = pool_mod.ready_slots(self.pool())[0]
+        original_flock = fcntl.flock
+
+        def deny_slot(handle, operation):
+            if isinstance(handle, int):
+                raise OSError("slot ownership unavailable")
+            return original_flock(handle, operation)
+
+        with patch.object(fcntl, "flock", side_effect=deny_slot):
+            self.assertEqual(pool_mod.take(self.repo, self.out / "fallback", "feat/fallback", "main",
+                                           root=self.root), "fresh")
+            self.assertEqual(pool_mod.drain(self.repo, self.root), [])
+            old = time.time() - pool_mod.SLOT_MAX_AGE_S - 60
+            os.utime(self.pool() / f"{slot.name}{pool_mod.READY}", (old, old))
+            self.assertEqual(self.fill(size=0), [])
+        self.assertTrue(slot.is_dir())
+        self.assertEqual((slot / "a.txt").read_text(), "one\n")
+
+    def test_slot_replacement_during_ownership_proof_is_not_admitted(self):
+        slot = self.out / "replaced"
+        slot.mkdir()
+        original_flock = fcntl.flock
+        replacement = self.out / "original"
+
+        def replace_after_lock(handle, operation):
+            original_flock(handle, operation)
+            slot.rename(replacement)
+            slot.mkdir()
+            (slot / "source.txt").write_text("new owner")
+
+        with patch.object(fcntl, "flock", side_effect=replace_after_lock):
+            with pool_mod.slot_lease(slot) as owned:
+                self.assertFalse(owned)
+        self.assertEqual((slot / "source.txt").read_text(), "new owner")
+        self.assertTrue(replacement.is_dir())
+
+    def test_fresh_claim_uses_claim_time_after_an_old_ready_marker(self):
+        self.fill()
+        slot = pool_mod.ready_slots(self.pool())[0]
+        old = time.time() - 3600
+        os.utime(self.pool() / f"{slot.name}{pool_mod.READY}", (old, old))
+        with pool_mod.slot_lease(slot) as owned:
+            self.assertTrue(owned)
+            self.assertTrue(pool_mod.claim(slot))
+        self.assertTrue(pool_mod.recently_claimed(slot, time.time()))
+        self.assertEqual(self.fill(size=0), [])
+        self.assertTrue(slot.is_dir())
+
+    def test_abandoned_claim_preserves_dirty_and_unpublished_source(self):
+        for dirty in (True, False):
+            with self.subTest(dirty=dirty):
+                self.fill()
+                slot = pool_mod.ready_slots(self.pool())[0]
+                self.assertTrue(pool_mod.claim(slot))
+                (slot / "a.txt").write_text("unpublished work\n")
+                if not dirty:
+                    git(slot, "commit", "-qam", "unpublished")
+                head = git(slot, "rev-parse", "HEAD")
+                old = time.time() - pool_mod.CLAIM_GRACE_S - 60
+                os.utime(self.pool() / f"{slot.name}{pool_mod.CLAIMED}", (old, old))
+                actions = self.fill(size=0)
+                self.assertIn(f"preserved abandoned claim {slot.name}", actions)
+                self.assertEqual((slot / "a.txt").read_text(), "unpublished work\n")
+                self.assertEqual(git(slot, "rev-parse", "HEAD"), head)
+
+    def test_recycle_owns_moved_slot_until_ready_marker_is_published(self):
+        path = self.finished("publishing")
+        original_touch = Path.touch
+        interleaved = []
+
+        def fill_before_ready(marker, *args, **kwargs):
+            if marker.suffix == pool_mod.READY:
+                interleaved.extend(self.fill(size=0))
+            return original_touch(marker, *args, **kwargs)
+
+        with patch.object(Path, "touch", fill_before_ready):
+            name = pool_mod.recycle(self.repo, path, "main", root=self.root)
+        self.assertIsNotNone(name)
+        slot = self.pool() / name
+        self.assertEqual(interleaved, [])
+        self.assertEqual(pool_mod.ready_slots(self.pool()), [slot])
+        self.assertEqual((slot / "node_modules/dep.js").read_text(), "installed")
+        self.assertIn(str(slot), git(self.repo, "worktree", "list", "--porcelain"))
+
     def test_one_filler_at_a_time(self):
         pool = self.pool()
         pool.mkdir(parents=True)

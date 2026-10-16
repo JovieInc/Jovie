@@ -543,9 +543,15 @@ const ISSUE_FIELDS = `
       nodes { body createdAt }
       pageInfo { hasNextPage endCursor }
     }
-    children(first: 50) { nodes { identifier state { type } } }
+    children(first: 50) {
+      nodes { identifier completedAt canceledAt state { type } }
+      pageInfo { hasNextPage }
+    }
     attachments(first: 50) { nodes { url } }
-    history(first: 100) { nodes { fromState { type } toState { type } } }
+    history(first: 100) {
+      nodes { createdAt fromState { type } toState { type } }
+      pageInfo { hasNextPage endCursor }
+    }
     team { states { nodes { id name type } } }`;
 
 const ISSUE_QUERY = `query IssueLifecycle($issueId: String!) {
@@ -566,13 +572,22 @@ const ISSUE_STATE_QUERY = `query IssueLifecycleState($issueId: String!) {
   issue(id: $issueId) { id state { id name } }
 }`;
 
+const HISTORY_PAGE_QUERY = `query IssueLifecycleHistory($issueId: String!, $after: String!) {
+  issue(id: $issueId) {
+    history(first: 100, after: $after) {
+      nodes { createdAt fromState { type } toState { type } }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
+}`;
+
 const SWEEP_QUERY = `query LifecycleSweep($states: [String!]!, $after: String) {
   issues(
     first: 50
     after: $after
     filter: { team: { key: { eq: "JOV" } }, state: { name: { in: $states } } }
   ) {
-    nodes { identifier updatedAt state { name } attachments(first: 50) { nodes { url } } }
+    nodes { identifier updatedAt state { name } attachments(first: 50) { nodes { url } } children(first: 1) { nodes { identifier } } labels(first: 50) { nodes { name } } }
     pageInfo { hasNextPage endCursor }
   }
 }`;
@@ -596,6 +611,42 @@ async function readLifecycleIssue(fetchImpl, apiKey, lookupId) {
   });
   const raw = data.issue;
   if (!raw || typeof raw !== 'object') return null;
+  const history = [];
+  let historyPage = raw.history;
+  for (let page = 0; ; page += 1) {
+    if (
+      !Array.isArray(historyPage?.nodes) ||
+      typeof historyPage?.pageInfo?.hasNextPage !== 'boolean'
+    ) {
+      throw new Error(`Malformed lifecycle history for ${raw.identifier}`);
+    }
+    history.push(...historyPage.nodes);
+    if (!historyPage.pageInfo.hasNextPage) break;
+    if (page >= MAX_COMMENT_PAGES || !historyPage.pageInfo.endCursor) {
+      throw new Error(
+        `Lifecycle history for ${raw.identifier} exceeds the read bound`
+      );
+    }
+    const more = await linearGraphql(fetchImpl, apiKey, HISTORY_PAGE_QUERY, {
+      issueId: raw.id,
+      after: historyPage.pageInfo.endCursor,
+    });
+    historyPage = more.issue?.history;
+  }
+  const reopens = history.filter(
+    entry =>
+      entry?.fromState?.type === 'completed' &&
+      typeof entry?.toState?.type === 'string' &&
+      entry.toState.type !== 'completed'
+  );
+  const reopenTimes = reopens.map(entry =>
+    Date.parse(String(entry.createdAt ?? ''))
+  );
+  const receiptNotBefore = reopenTimes.some(time => !Number.isFinite(time))
+    ? null
+    : reopenTimes.length > 0
+      ? new Date(Math.max(...reopenTimes)).toISOString()
+      : undefined;
   const comments = [...(raw.comments?.nodes ?? [])];
   let pageInfo = raw.comments?.pageInfo;
   for (
@@ -627,6 +678,30 @@ async function readLifecycleIssue(fetchImpl, apiKey, lookupId) {
   const childNodes = Array.isArray(raw.children?.nodes)
     ? raw.children.nodes
     : [];
+  if (
+    !Array.isArray(raw.children?.nodes) ||
+    raw.children?.pageInfo?.hasNextPage !== false
+  ) {
+    throw new Error(
+      `Child delivery evidence for ${raw.identifier} is incomplete`
+    );
+  }
+  const childDeliveryTimes = childNodes
+    .filter(child => ['completed', 'canceled'].includes(child?.state?.type))
+    .map(child =>
+      Date.parse(
+        String(
+          child.state.type === 'completed'
+            ? child.completedAt
+            : child.canceledAt
+        )
+      )
+    );
+  if (childDeliveryTimes.some(time => !Number.isFinite(time))) {
+    throw new Error(
+      `Child delivery timestamp for ${raw.identifier} is unknown`
+    );
+  }
   return {
     ...snapshot,
     state: {
@@ -645,13 +720,15 @@ async function readLifecycleIssue(fetchImpl, apiKey, lookupId) {
       )
       .map(child => String(child?.identifier ?? '').toUpperCase())
       .filter(Boolean),
-    reopenedAfterDone: (raw.history?.nodes ?? []).some(
-      /** @param {any} entry */
-      entry =>
-        entry?.fromState?.type === 'completed' &&
-        typeof entry?.toState?.type === 'string' &&
-        entry.toState.type !== 'completed'
-    ),
+    reopenedAfterDone: reopens.length > 0,
+    receiptNotBefore,
+    ...(childDeliveryTimes.length > 0
+      ? {
+          outcomeNotBefore: new Date(
+            Math.max(...childDeliveryTimes)
+          ).toISOString(),
+        }
+      : {}),
     attachmentUrls: (raw.attachments?.nodes ?? [])
       .map(node => String(node?.url ?? ''))
       .filter(Boolean),
@@ -790,6 +867,7 @@ function loadJson(root, path) {
  *   readonly allowlist?: ReadonlySet<string>,
  *   readonly harnessManifest?: unknown,
  *   readonly assuranceMatrix?: unknown,
+ *   readonly verifyMarker?: (sha: string, controllerWorkflowId: number) => Promise<boolean> | boolean,
  * }} [options]
  */
 export async function syncLinearIssueOnMerge(options = {}) {
@@ -832,6 +910,7 @@ export async function syncLinearIssueOnMerge(options = {}) {
     github,
     repository,
     versionUrl: env.PRODUCTION_VERSION_URL,
+    verifyMarker: options.verifyMarker,
   });
   const root = env.GITHUB_WORKSPACE ?? process.cwd();
   const harnessManifest =
@@ -848,7 +927,12 @@ export async function syncLinearIssueOnMerge(options = {}) {
   }
 
   const lookups = [];
-  if (sweep) {
+  const receiptIssue = String(env.LINEAR_VALIDATION_ISSUE ?? '').toUpperCase();
+  if (sweep && IDENTIFIER_RE.test(receiptIssue)) {
+    // A receipt for parent-only commissioning work need not have a PR.
+    // Read exactly its canonical record; the evaluator still owns admission.
+    lookups.push(receiptIssue);
+  } else if (sweep) {
     /** @type {{ identifier: string, updatedAt: string }[]} */
     const found = [];
     let after = null;
@@ -869,6 +953,10 @@ export async function syncLinearIssueOnMerge(options = {}) {
         // into the lifecycle or interpreting age/status as completion.
         if (
           ['In Progress', 'In Review'].includes(node.state?.name) &&
+          !(node.children?.nodes?.length > 0) &&
+          !(node.labels?.nodes ?? []).some(label =>
+            /epic|commission/i.test(label?.name ?? '')
+          ) &&
           !(node.attachments?.nodes ?? []).some(attachment =>
             String(attachment.url ?? '')
               .toLowerCase()

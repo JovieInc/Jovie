@@ -30,6 +30,7 @@ import {
   NO_UI_MATRIX,
   REPO,
   receiptComment,
+  validClosure,
 } from './fixtures/validation-world.mjs';
 
 const MERGE_URL = 'https://github.com/JovieInc/Jovie/pull/18275';
@@ -109,6 +110,7 @@ function mergeEvent(fetchImpl, number, identifier = 'JOV-1', env = {}) {
     fetchImpl,
     harnessManifest: HARNESS_MANIFEST,
     assuranceMatrix: NO_UI_MATRIX,
+    verifyMarker: () => true,
     log: () => {},
   });
 }
@@ -119,11 +121,340 @@ function sweep(fetchImpl) {
     fetchImpl,
     harnessManifest: HARNESS_MANIFEST,
     assuranceMatrix: NO_UI_MATRIX,
+    verifyMarker: () => true,
     log: () => {},
   });
 }
 
 describe('linear sync on merge', () => {
+  it.each(['completed', 'canceled'])(
+    'holds unknown %s child delivery timestamps',
+    async type => {
+      const { world, fetchImpl } = createWorld();
+      const issue = world.issues['JOV-1'];
+      issue.state = 'In Progress';
+      issue.attachments = [];
+      issue.children = [['JOV-2', type, null]];
+      issue.comments.push(receiptComment('JOV-1', {}, '2026-10-03T15:00:00Z'));
+      await expect(sweep(fetchImpl)).rejects.toThrow(
+        'Child delivery timestamp'
+      );
+      expect(world.updates).toEqual([]);
+    }
+  );
+
+  it('holds partial child delivery evidence without accepting the parent outcome', async () => {
+    const { world, fetchImpl } = createWorld();
+    const issue = world.issues['JOV-1'];
+    issue.state = 'In Progress';
+    issue.children = [['JOV-2', 'completed']];
+    issue.comments.push(receiptComment('JOV-1', {}, '2026-10-03T15:00:00Z'));
+    const partial = intercept(fetchImpl, async (url, body, next) => {
+      if (
+        String(url) === 'https://api.linear.app/graphql' &&
+        body?.query?.includes('IssueLifecycle(')
+      ) {
+        const response = await next();
+        const payload = await response.json();
+        payload.data.issue.children.pageInfo.hasNextPage = true;
+        return json(payload);
+      }
+      return undefined;
+    });
+    await expect(sweep(partial)).rejects.toThrow('Child delivery evidence');
+    expect(world.updates).toEqual([]);
+  });
+
+  it.each([false, true])(
+    'requires a fresh parent outcome after child delivery (parent PR=%s)',
+    async hasPull => {
+      const { world, fetchImpl } = createWorld();
+      const issue = world.issues['JOV-1'];
+      issue.state = 'In Progress';
+      issue.attachments = hasPull ? issue.attachments : [];
+      issue.children = [['JOV-2', 'started']];
+      issue.comments.push(receiptComment('JOV-1', {}, '2026-10-03T13:00:00Z'));
+      await sweep(fetchImpl);
+      expect(issue.state).toBe('In Progress');
+      issue.children = [['JOV-2', 'completed', '2026-10-03T14:00:00Z']];
+      await sweep(fetchImpl);
+      expect(issue.state).toBe(hasPull ? 'Validating' : 'In Progress');
+      issue.comments.push(receiptComment('JOV-1', {}, '2026-10-03T15:00:00Z'));
+      await sweep(fetchImpl);
+      expect(issue.state).toBe('Done');
+    }
+  );
+
+  it('retains a parent without its own outcome, then closes from fresh verified proof without inventing a parent PR', async () => {
+    const { world, fetchImpl } = createWorld();
+    const issue = world.issues['JOV-1'];
+    issue.state = 'In Progress';
+    issue.children = [['JOV-2', 'completed']];
+    issue.attachments = [];
+    await sweep(fetchImpl);
+    expect(issue.state).toBe('In Progress');
+    issue.comments.push(receiptComment('JOV-1', {}, '2026-10-03T13:00:00Z'));
+    await sweep(fetchImpl);
+    await sweep(fetchImpl);
+    expect(issue.state).toBe('Done');
+    expect(world.updates).toEqual(['JOV-1:Done']);
+    expect(issue.comments.at(-1).body).toContain('Binding outcome:');
+  });
+
+  it('does not let an ordinary unmerged issue use a recorded outcome to bypass source delivery', async () => {
+    const { world, fetchImpl } = createWorld();
+    const issue = world.issues['JOV-1'];
+    issue.attachments = [];
+    issue.comments.push(receiptComment('JOV-1', {}, '2026-10-03T13:00:00Z'));
+    await mergeEvent(fetchImpl, 0);
+    expect(world.updates).toEqual([]);
+  });
+
+  it.each([
+    ['open child', { children: [['JOV-2', 'started']] }, {}, 'In Progress'],
+    ['failed outcome', {}, { status: 'fail' }, 'Rework'],
+    ['outcome build not deployed', {}, { sha: MAIN[3] }, 'Merging'],
+    [
+      'reopened episode',
+      {
+        history: [
+          {
+            createdAt: '2026-10-03T14:00:00Z',
+            fromState: { type: 'completed' },
+            toState: { type: 'started' },
+          },
+        ],
+      },
+      {},
+      'In Progress',
+    ],
+  ])(
+    'retains the parent gate for %s',
+    async (_name, changes, proof, expected) => {
+      const { world, fetchImpl } = createWorld();
+      const issue = world.issues['JOV-1'];
+      Object.assign(
+        issue,
+        {
+          state: 'In Progress',
+          attachments: [],
+          children: [['JOV-2', 'completed']],
+        },
+        changes
+      );
+      issue.comments.push(
+        receiptComment('JOV-1', proof, '2026-10-03T13:00:00Z')
+      );
+      await sweep(fetchImpl);
+      expect(issue.state).toBe(expected);
+    }
+  );
+
+  it('does not fall back to an old parent pass when its latest evidence is malformed', async () => {
+    const { world, fetchImpl } = createWorld();
+    const issue = world.issues['JOV-1'];
+    Object.assign(issue, {
+      state: 'In Progress',
+      attachments: [],
+      children: [['JOV-2', 'completed']],
+    });
+    issue.comments.push(receiptComment('JOV-1', {}, '2026-10-03T13:00:00Z'));
+    issue.comments.push({
+      body: '<!-- validation-receipt:v1\n{broken}\n-->',
+      createdAt: '2026-10-03T14:00:00Z',
+    });
+    await sweep(fetchImpl);
+    expect(issue.state).toBe('Validating');
+    expect(issue.comments.at(-1).body).toContain('malformed');
+  });
+
+  it('targets a parent-only commissioning receipt and preserves its proof across unrelated forward generations', async () => {
+    const { world, fetchImpl } = createWorld({ served: MAIN[4].slice(0, 7) });
+    const issue = world.issues['JOV-1'];
+    Object.assign(issue, {
+      title: 'Commission the paid merch loop',
+      state: 'In Progress',
+      attachments: [],
+    });
+    issue.comments.push(receiptComment('JOV-1', {}, '2026-10-03T13:00:00Z'));
+    const exact = intercept(fetchImpl, (_url, body) => {
+      if (body?.query?.includes('LifecycleSweep'))
+        throw new Error('receipt should target its exact issue');
+      return null;
+    });
+    await syncLinearIssueOnMerge({
+      env: {
+        ...BASE_ENV,
+        LIFECYCLE_MODE: 'sweep',
+        LINEAR_VALIDATION_ISSUE: 'JOV-1',
+      },
+      fetchImpl: exact,
+      harnessManifest: HARNESS_MANIFEST,
+      assuranceMatrix: NO_UI_MATRIX,
+      verifyMarker: () => true,
+      log: () => {},
+    });
+    expect(issue.state).toBe('Done');
+    expect(issue.comments.at(-1).body).toContain(MAIN[2]);
+  });
+  it('does not reuse an earlier episode receipt and converges after fresh proof', async () => {
+    const { world, fetchImpl } = createWorld();
+    const issue = world.issues['JOV-1'];
+    issue.state = 'Validating';
+    issue.history = [
+      {
+        createdAt: '2026-10-03T14:00:00Z',
+        fromState: { type: 'completed' },
+        toState: { type: 'started' },
+      },
+      {
+        createdAt: '2026-10-03T12:00:00Z',
+        fromState: { type: 'completed' },
+        toState: { type: 'started' },
+      },
+    ];
+    issue.comments.push(receiptComment('JOV-1', {}, '2026-10-03T13:00:00Z'));
+    await sweep(fetchImpl);
+    expect(issue.state).toBe('Validating');
+    expect(world.updates).toEqual([]);
+    issue.comments.push(receiptComment('JOV-1', {}, '2026-10-03T15:00:00Z'));
+    await sweep(fetchImpl);
+    await sweep(fetchImpl);
+    expect(issue.state).toBe('Done');
+    expect(world.updates).toEqual(['JOV-1:Done']);
+  });
+
+  it('cannot close a reopened episode when its server timestamp is unreadable', async () => {
+    const { world, fetchImpl } = createWorld();
+    const issue = world.issues['JOV-1'];
+    issue.state = 'Validating';
+    issue.history = [
+      { fromState: { type: 'completed' }, toState: { type: 'started' } },
+    ];
+    issue.comments.push(receiptComment('JOV-1', {}, '2026-10-03T15:00:00Z'));
+    await sweep(fetchImpl);
+    expect(issue.state).toBe('Validating');
+    expect(world.updates).toEqual([]);
+    expect(issue.comments.at(-1).body).toMatch(/episode.*unknown/i);
+  });
+
+  it('does not reuse an escaped-defect closure from before the current episode', async () => {
+    const { world, fetchImpl } = createWorld();
+    const issue = world.issues['JOV-1'];
+    issue.state = 'Validating';
+    issue.labels = ['escaped-defect'];
+    issue.history = [
+      {
+        createdAt: '2026-10-03T14:00:00Z',
+        fromState: { type: 'completed' },
+        toState: { type: 'started' },
+      },
+    ];
+    issue.description = validClosure('JOV-1', MAIN[2]);
+    issue.comments.push(receiptComment('JOV-1', {}, '2026-10-03T15:00:00Z'));
+    await sweep(fetchImpl);
+    expect(issue.state).toBe('Validating');
+    expect(world.updates).toEqual([]);
+    issue.comments.push({
+      body: validClosure('JOV-1', MAIN[2]),
+      createdAt: '2026-10-03T15:01:00Z',
+    });
+    await sweep(fetchImpl);
+    expect(issue.state).toBe('Done');
+    expect(world.updates).toEqual(['JOV-1:Done']);
+  });
+
+  it('reads a later history page before deciding which receipt belongs to this episode', async () => {
+    const { world, fetchImpl } = createWorld();
+    const issue = world.issues['JOV-1'];
+    issue.state = 'Validating';
+    issue.comments.push(receiptComment('JOV-1', {}, '2026-10-03T13:00:00Z'));
+    const paged = intercept(fetchImpl, async (_url, body, next) => {
+      if (body?.query?.includes('IssueLifecycleHistory')) {
+        expect(body.query).toContain('createdAt');
+        expect(body.variables.after).toBe('h1');
+        return json({
+          data: {
+            issue: {
+              history: {
+                nodes: [
+                  {
+                    createdAt: '2026-10-03T14:00:00Z',
+                    fromState: { type: 'completed' },
+                    toState: { type: 'started' },
+                  },
+                ],
+                pageInfo: { hasNextPage: false, endCursor: null },
+              },
+            },
+          },
+        });
+      }
+      if (!body?.query?.includes('IssueLifecycle(')) return null;
+      expect(body.query).toContain('createdAt fromState');
+      const response = await (await next()).json();
+      response.data.issue.history = {
+        nodes: [],
+        pageInfo: { hasNextPage: true, endCursor: 'h1' },
+      };
+      return json(response);
+    });
+    await sweep(paged);
+    expect(issue.state).toBe('Validating');
+    expect(world.updates).toEqual([]);
+  });
+
+  it.each([
+    null,
+    {},
+    { nodes: [] },
+    { nodes: [], pageInfo: { hasNextPage: true } },
+  ])('fails closed on incomplete history %j', async history => {
+    const { world, fetchImpl } = createWorld();
+    const incomplete = intercept(fetchImpl, async (_url, body, next) => {
+      if (!body?.query?.includes('IssueLifecycle(')) return null;
+      const response = await (await next()).json();
+      response.data.issue.history = history;
+      return json(response);
+    });
+    await expect(mergeEvent(incomplete, 101)).rejects.toThrow(
+      /history.*JOV-1/i
+    );
+    expect(world.updates).toEqual([]);
+  });
+
+  it('bounds a non-terminating history read without changing state', async () => {
+    const { world, fetchImpl } = createWorld();
+    let pages = 0;
+    const endless = intercept(fetchImpl, async (_url, body, next) => {
+      if (body?.query?.includes('IssueLifecycleHistory')) {
+        pages += 1;
+        return json({
+          data: {
+            issue: {
+              history: {
+                nodes: [],
+                pageInfo: { hasNextPage: true, endCursor: `h${pages}` },
+              },
+            },
+          },
+        });
+      }
+      if (!body?.query?.includes('IssueLifecycle(')) return null;
+      const response = await (await next()).json();
+      response.data.issue.history.pageInfo = {
+        hasNextPage: true,
+        endCursor: 'h0',
+      };
+      return json(response);
+    });
+    await expect(mergeEvent(endless, 101)).rejects.toThrow(
+      /history.*exceeds the read bound/
+    );
+    expect(pages).toBe(10);
+    expect(world.updates).toEqual([]);
+  });
+
   it('enters the validation lifecycle for a Summer-bound bot merge', async () => {
     const body = '<!-- summer-issue-bind -->\nJOV-1\ntaskKey:abc';
     expect(
@@ -356,7 +687,11 @@ describe('linear sync on merge', () => {
     expect((await mergeEvent(fetchImpl, 101)).action).toBe('hold');
     world.issues['JOV-1'].children = [['JOV-2', 'completed']];
     world.issues['JOV-1'].history = [
-      { fromState: { type: 'completed' }, toState: { type: 'started' } },
+      {
+        createdAt: '2026-10-03T11:00:00Z',
+        fromState: { type: 'completed' },
+        toState: { type: 'started' },
+      },
     ];
     await mergeEvent(fetchImpl, 101);
     expect(world.issues['JOV-1'].state).toBe('Validating');
@@ -509,6 +844,7 @@ describe('linear sync on merge', () => {
           PR_BODY: '<!-- linear-issue-identifier:JOV-1 -->',
         },
         fetchImpl,
+        verifyMarker: () => true,
         log: () => {},
       });
       expect(world.issues['JOV-1'].state).toBe(expected);

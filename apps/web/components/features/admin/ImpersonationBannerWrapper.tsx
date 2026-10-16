@@ -2,6 +2,7 @@ import {
   getImpersonationState,
   isImpersonationEnabled,
 } from '@/lib/admin/impersonation';
+import { getFreshAuth } from '@/lib/auth/cached';
 import { ImpersonationBanner } from './ImpersonationBanner';
 
 /**
@@ -21,7 +22,9 @@ export async function ImpersonationBannerWrapper() {
   }
 
   // Check for active impersonation
-  const state = await getImpersonationState();
+  const auth = await getFreshAuth();
+  const adminUserId = auth.actorUserId ?? auth.userId;
+  const state = adminUserId ? await getImpersonationState(adminUserId) : null;
   if (!state) {
     return null;
   }

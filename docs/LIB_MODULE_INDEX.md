@@ -9,7 +9,7 @@
 | Module | Purpose | Key Exports |
 |--------|---------|-------------|
 | `auth/` | Authentication gate, session management, Clerk identity sync | `requireAuth`, `getCachedAuth`, `syncEmailFromClerk` |
-| `admin/` | Admin role verification (database-backed), impersonation, audit logging | `requireAdmin`, `isAdmin`, `startImpersonation`, `getEffectiveClerkId` |
+| `admin/` | Admin role verification (database-backed), impersonation, audit logging | `requireAdmin`, `isAdmin`, `startImpersonation`, `getEffectiveUserId` |
 | `entitlements/` | Plan entitlement registry (free/founding/pro/growth) and server-side resolution | `ENTITLEMENT_REGISTRY`, `getCurrentUserEntitlements`, `getCreatorEntitlements` |
 | `cookies/` | Server-side cookie helpers for user preferences | `getListenPreference`, `setListenPreference` |
 

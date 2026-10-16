@@ -2810,6 +2810,32 @@ class WorkerTest(unittest.TestCase):
         self.assertFalse(lane.failures_path(self.host).exists())
         self.assertEqual(self.execs, [])
 
+    def test_pr_recovery_hold_filters_every_selector_and_keeps_fresh_work_eligible(self):
+        blocked = {"number": 7, "headRefOid": "a" * 40}
+        fresh = {"number": 8, "headRefOid": "b" * 40}
+        lane.note_recovery_handoff(self.host, f"pr:7:{blocked['headRefOid']}")
+        seen = []
+        def check(prs):
+            seen.append([pr["number"] for pr in prs])
+            self.assertNotIn(7, seen[-1])
+        def event(host, module, name, prs):
+            check(prs)
+        def escalation(host, name, prs):
+            check(prs)
+        def polling(host, name, prs):
+            check(prs)
+            return fresh
+        with patch.object(lane, "fix_candidates", return_value=[blocked, fresh]), \
+                patch.object(lane, "lane_prs", return_value=[blocked]), \
+                patch.object(lane.pr_events, "queued_prs", return_value=[blocked]), \
+                patch.object(lane.pr_events, "claim_event_pr", side_effect=event), \
+                patch.object(lane, "claim_escalation_pr", side_effect=escalation), \
+                patch.object(lane, "claim_red_pr", side_effect=polling), \
+                patch.object(lane, "fix_red_pr") as repair:
+            self.assertEqual(lane.worker(self.host, "devin"), 0)
+        self.assertEqual(seen, [[], [8], [8]])
+        self.assertEqual(repair.call_args.args[-1], fresh)
+
     def test_recovery_handoff_keeps_an_accountable_disposition_without_spending_retries(self):
         handoff = lane.RecoveryHandoff("preserved-issue-needs-execution-reconciliation", Path("/retained"), "JOV-3")
         lane.run_issue = lambda *args: {"verdict": "recovery-handoff", "recovery": handoff.evidence}
@@ -4270,6 +4296,177 @@ class TerminalRevisitTest(unittest.TestCase):
             {"name": "lint", "conclusion": "SUCCESS", "detailsUrl": "https://x/actions/runs/33/job/4"}])
         self.assertTrue(lane._rerun_failed(pr))
         self.assertEqual([args[3] for args in self.calls if args[:3] == ["gh", "run", "rerun"]], ["11", "22"])
+
+
+class PrRecoveryCooldownTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.host = lane.Host(state=Path(self.tmp.name), repo=Path(self.tmp.name))
+        self.pr = {"number": 7, "headRefOid": "a" * 40, "headRefName": "codex/jov-7-20261014",
+                   "state": "OPEN", "isDraft": False, "isCrossRepository": False,
+                   "isInMergeQueue": False, "mergeStateStatus": "DIRTY", "labels": []}
+        self.path = self.host.state / "worktrees" / "retained"
+        self.path.mkdir(parents=True)
+        self.marker = self.path / lane.disk_guard.PRESERVED_REPAIR
+        self.marker.write_text("{}")
+        self.key = f"pr:7:{self.pr['headRefOid']}"
+
+    def test_same_head_recovery_is_refused_before_charge_and_claim(self):
+        lane.note_recovery_handoff(self.host, self.key)
+        with patch.object(lane, "load_providers", return_value={"codex": {}}), \
+                patch.object(lane, "claimed_elsewhere", return_value=False), \
+                patch.object(lane, "reconcile_fix_target", return_value=self.pr), \
+                patch.object(lane.pr_events, "charge_reentry", return_value=True) as charge, \
+                patch.object(lane, "post_claim") as claim:
+            self.assertIsNone(lane.claim_red_pr(self.host, "codex", [self.pr]))
+        charge.assert_not_called()
+        claim.assert_not_called()
+
+    def test_cooldown_written_during_fresh_event_read_is_rechecked_before_claim(self):
+        pr = {**self.pr, "eventKinds": ["conflict"]}
+        def fresh(target):
+            lane.note_recovery_handoff(self.host, self.key)
+            return target
+        with patch.object(lane, "load_providers", return_value={"codex": {}}), \
+                patch.object(lane, "claimed_elsewhere", return_value=False), \
+                patch.object(lane, "reconcile_fix_target", side_effect=fresh) as read, \
+                patch.object(lane.pr_events, "charge_reentry", return_value=True) as charge, \
+                patch.object(lane, "post_claim") as claim, patch.object(lane, "run_agent") as model:
+            self.assertIsNone(lane.pr_events.claim_event_pr(self.host, lane, "codex", [pr]))
+        read.assert_called_once()
+        charge.assert_not_called()
+        claim.assert_not_called()
+        model.assert_not_called()
+        self.assertFalse((self.host.state / "fix-attempts.json").exists())
+
+    def test_malformed_refund_evidence_does_not_raise_or_create_a_hold(self):
+        for value in (None, [], "bad", *({"sha": self.pr["headRefOid"], "repairVerdict": "recovery-handoff",
+                                          "noWorkRefund": refund} for refund in ([], "bad", {"at": "bad"}, {"reason": [], "at": 1000},
+                                                                 {"reason": "preserved-target-needs-reconciliation", "at": 10 ** 400}))):
+            with self.subTest(value=value):
+                (self.host.state / "fix-attempts.json").write_text(json.dumps({"7": value}))
+                self.assertFalse(lane.pr_recovery_held(self.host, self.pr, now=1001))
+
+    def test_malformed_cooldown_holds_only_its_head_without_starving_fresh_work(self):
+        fresh = {**self.pr, "number": 8, "headRefOid": "b" * 40}
+        for until in (10 ** 400, float("inf"), None, "bad"):
+            with self.subTest(until=str(until)[:20]):
+                lane.handoff_cooldown_path(self.host).write_text(json.dumps({self.key: {"until": until}}))
+                self.assertTrue(lane.pr_recovery_held(self.host, self.pr, now=1001))
+                self.assertFalse(lane.pr_recovery_held(self.host, fresh, now=1001))
+                with patch("time.time", return_value=1001), \
+                        patch.object(lane, "load_providers", return_value={"codex": {}}), \
+                        patch.object(lane, "claimed_elsewhere", return_value=False), \
+                        patch.object(lane, "reconcile_fix_target", return_value=fresh), \
+                        patch.object(lane.pr_events, "charge_reentry", return_value=True) as charge, \
+                        patch.object(lane, "post_claim") as claim:
+                    self.assertEqual(lane.claim_red_pr(self.host, "codex", [self.pr, fresh]), fresh)
+                self.assertEqual(charge.call_args.args[2], fresh)
+                claim.assert_called_once_with(8, fresh["headRefOid"], "fix")
+
+    def test_cooldown_has_new_head_expiry_and_reconciliation_exits(self):
+        lane.note_recovery_handoff(self.host, self.key, now=1000, preserved=self.path)
+        self.assertTrue(lane.pr_recovery_held(self.host, self.pr, now=1001))
+        self.assertFalse(lane.pr_recovery_held(self.host, {**self.pr, "headRefOid": "b" * 40}, now=1001))
+        self.assertFalse(lane.pr_recovery_held(self.host, self.pr, now=1300))
+        self.marker.unlink()
+        self.assertFalse(lane.pr_recovery_held(self.host, self.pr, now=1001))
+
+    def test_reentry_can_claim_after_new_head_expiry_or_safe_reconciliation(self):
+        for exit_kind in ("new-head", "expiry", "reconciled"):
+            with self.subTest(exit_kind=exit_kind):
+                lane.handoff_cooldown_path(self.host).unlink(missing_ok=True)
+                self.marker.write_text("{}")
+                lane.note_recovery_handoff(self.host, self.key, now=1000, preserved=self.path)
+                pr = {**self.pr, "headRefOid": "b" * 40} if exit_kind == "new-head" else self.pr
+                if exit_kind == "reconciled":
+                    self.marker.unlink()
+                with patch("time.time", return_value=1300 if exit_kind == "expiry" else 1001), \
+                        patch.object(lane, "load_providers", return_value={"codex": {}}), \
+                        patch.object(lane, "claimed_elsewhere", return_value=False), \
+                        patch.object(lane, "reconcile_fix_target", return_value=pr), \
+                        patch.object(lane.pr_events, "charge_reentry", return_value=True) as charge, \
+                        patch.object(lane, "post_claim") as claim:
+                    self.assertEqual(lane.claim_red_pr(self.host, "codex", [pr]), pr)
+                charge.assert_called_once()
+                claim.assert_called_once_with(pr["number"], pr["headRefOid"], "fix")
+
+    def test_recent_existing_no_work_refund_is_held_without_changing_its_count(self):
+        record = {"sha": self.pr["headRefOid"], "count": 0, "endedAt": 1000,
+                  "repairVerdict": "recovery-handoff",
+                  "noWorkRefund": {"reason": "preserved-target-needs-reconciliation", "at": 1000}}
+        path = self.host.state / "fix-attempts.json"
+        path.write_text(json.dumps({"7": record}))
+        before = path.read_bytes()
+        self.assertTrue(lane.pr_recovery_held(self.host, self.pr, now=1001))
+        self.assertFalse(lane.pr_recovery_held(self.host, self.pr, now=1300))
+        self.assertFalse(lane.pr_recovery_held(self.host, {**self.pr, "headRefOid": "b" * 40}, now=1001))
+        self.assertEqual(path.read_bytes(), before)
+
+    def test_refund_remains_correct_and_repeated_handoffs_use_existing_backoff(self):
+        attempts = self.host.state / "fix-attempts.json"
+        bank = self.host.state / "codex-accounts.json"
+        bank.write_text('{"fixture":{"credits":17}}')
+        for index in (1, 2):
+            attempts.write_text(json.dumps({"7": {"sha": self.pr["headRefOid"], "count": 1}}))
+            receipt = {"verdict": "recovery-handoff", "reasons": ["preserved-target-needs-reconciliation"],
+                       "recovery": {"worktree": str(self.path)}, "runId": f"run-{index}",
+                       "branch": self.pr["headRefName"], "headBefore": self.pr["headRefOid"]}
+            with patch("time.time", return_value=1000):
+                lane.end_local_fix_attempt(self.host, self.pr, receipt)
+            record = json.loads(attempts.read_text())["7"]
+            self.assertEqual(record["count"], 0)
+            self.assertEqual(receipt["attemptRefunded"], "preserved-target-needs-reconciliation")
+            row = json.loads(lane.handoff_cooldown_path(self.host).read_text())[self.key]
+            self.assertEqual(row["count"], index)
+            self.assertEqual(row["until"], 1000 + lane.HANDOFF_BACKOFF_S * 2 ** (index - 1))
+        self.assertEqual(bank.read_text(), '{"fixture":{"credits":17}}')
+
+    def test_cooldown_write_failure_cannot_lose_the_refund_or_ledger_receipt(self):
+        attempts = self.host.state / "fix-attempts.json"
+        attempts.write_text(json.dumps({"7": {"sha": self.pr["headRefOid"], "count": 1, "at": 900}}))
+        cooldown = lane.handoff_cooldown_path(self.host)
+        cooldown.write_text(json.dumps({self.key: {"count": 1, "until": 900}}))
+        write = lane.update_json
+        def fail_cooldown(path, change):
+            if path == cooldown:
+                record = json.loads(attempts.read_text())["7"]
+                self.assertEqual((record["count"], record["endedAt"]), (0, 1000))
+                self.assertEqual(record["noWorkRefund"]["reason"], "preserved-target-needs-reconciliation")
+                raise OSError("fixture cooldown write failure")
+            return write(path, change)
+        with patch("time.time", return_value=1000), patch.object(lane, "update_json", side_effect=fail_cooldown), \
+                patch.object(lane, "require_fix_target", return_value=self.pr), \
+                patch.object(lane, "execution_coordination", return_value=None), \
+                patch.object(lane, "retire_published_preserved", return_value=[]), \
+                patch.object(lane, "preserved_run",
+                             side_effect=lane.RecoveryHandoff("preserved-target-needs-reconciliation", self.path)), \
+                patch.object(lane, "archive_unresumable_preserved", return_value=None), \
+                patch.object(lane.execution_attempt, "claim") as claim, patch.object(lane, "run_agent") as model:
+            receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+        record = json.loads(attempts.read_text())["7"]
+        self.assertEqual((record["count"], record["endedAt"], record["repairRunId"]), (0, 1000, receipt["runId"]))
+        self.assertEqual(receipt["attemptRefunded"], "preserved-target-needs-reconciliation")
+        self.assertEqual(receipt["handoffCooldownError"], "OSError")
+        self.assertFalse(lane.pr_events.in_flight(record, self.pr, 1001))
+        ledger = [json.loads(row) for row in (self.host.state / "runs/ledger.jsonl").read_text().splitlines()]
+        self.assertEqual(ledger, [receipt])
+        self.assertEqual(ledger[0]["result"]["commit"], None)
+        claim.assert_not_called()
+        model.assert_not_called()
+        self.assertTrue(lane.pr_recovery_held(self.host, self.pr, now=1001))
+        self.assertFalse(lane.pr_recovery_held(self.host, self.pr, now=1300))
+        self.assertEqual(json.loads(cooldown.read_text())[self.key], {"count": 1, "until": 900})
+
+    def test_unknown_or_foreign_preserved_path_does_not_clear_the_cooldown(self):
+        lane.note_recovery_handoff(self.host, self.key, now=1000, preserved=self.path)
+        with patch.object(lane.Path, "lstat", side_effect=PermissionError):
+            self.assertTrue(lane.pr_recovery_held(self.host, self.pr, now=1001))
+        data = json.loads(lane.handoff_cooldown_path(self.host).read_text())
+        data[self.key]["preserved"] = str(self.host.state / "outside")
+        lane.handoff_cooldown_path(self.host).write_text(json.dumps(data))
+        self.assertTrue(lane.pr_recovery_held(self.host, self.pr, now=1001))
 
 
 class PreservedRecoveryTest(unittest.TestCase):
@@ -5987,7 +6184,7 @@ class UpdateTest(unittest.TestCase):
         self.assertFalse(set(secrets) & set(env))
         self.assertEqual((env["HOME"], env["PATH"]), ("/scratch/home", "/usr/bin"))
 
-    def test_mesh_dependency_root_falls_back_to_an_installed_pool_slot(self):
+    def test_mesh_dependency_roots_falls_back_to_an_installed_pool_slot(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp = Path(tmp).resolve()
             repo, pool = tmp / "repo", tmp / "pool"
@@ -6001,13 +6198,144 @@ class UpdateTest(unittest.TestCase):
             (pool / "slot-b.ready").write_text("")
             host = lane.Host(state=tmp / "state", repo=repo)
             with patch.object(lane.worktree_pool, "pool_dir", return_value=pool):
-                self.assertEqual(lane.mesh_dependency_root(host), slot)
+                self.assertEqual(lane.mesh_dependency_roots(host), [slot])
                 for pin in lane.MESH_DEPENDENCY_PINS:
                     (repo / pin).parent.mkdir(parents=True)
                     (repo / pin).write_text("{}")
-                self.assertEqual(lane.mesh_dependency_root(host), repo, "an installed host repo wins")
+                self.assertEqual(lane.mesh_dependency_roots(host), [repo, slot], "an installed host repo stays first")
             with patch.object(lane.worktree_pool, "pool_dir", return_value=tmp / "missing"):
-                self.assertIsNone(lane.mesh_dependency_root(lane.Host(state=tmp / "state", repo=tmp / "bare")))
+                self.assertEqual(lane.mesh_dependency_roots(lane.Host(state=tmp / "state", repo=tmp / "bare")), [])
+
+    def mesh_dependency_fixture(self, tmp):
+        repo, slot, staging = tmp / "repo", tmp / "pool/slot-a", tmp / "staging"
+        staging.mkdir()
+        (staging / "pnpm-lock.yaml").write_text("staged lock")
+        for root, lock in ((repo, "old lock"), (slot, "staged lock")):
+            for pin in lane.MESH_DEPENDENCY_PINS:
+                (root / pin).parent.mkdir(parents=True)
+                (root / pin).write_text("{}")
+            (root / "pnpm-lock.yaml").write_text(lock)
+            (root / "node_modules/.pnpm").mkdir(parents=True)
+            (root / "node_modules/.pnpm/lock.yaml").write_text(lock)
+        return lane.Host(state=tmp / "state", repo=repo), slot, staging
+
+    def test_staged_proof_uses_matching_pool_instead_of_stale_host(self):
+        # Installed package files alone previously made a stale host win, so the
+        # exact-pin compiler refused every release despite a restored pool slot.
+        with tempfile.TemporaryDirectory() as tmp:
+            host, slot, staging = self.mesh_dependency_fixture(Path(tmp).resolve())
+            replies = [subprocess.CompletedProcess([], 0, stdout="", stderr="")] * 2
+            with patch.object(lane.worktree_pool, "ready_slots", return_value=[slot]), \
+                    patch.object(lane.worktree_pool, "pool_dir", return_value=slot.parent), \
+                    patch.object(lane.worktree_pool, "node_env", return_value={"PATH": os.defpath}), \
+                    patch.object(lane.lifecycle, "run", side_effect=replies) as run:
+                self.assertIsNone(lane.prove_staging(host, staging))
+            self.assertEqual(run.call_args_list[0].args[0][-2:], [str(staging), str(slot)])
+            self.assertEqual(run.call_args_list[1].args[0],
+                             [sys.executable, "-m", "unittest", "-q", *lane.LANE_TESTS])
+
+    def test_mesh_dependency_preference_requires_both_source_and_restored_locks(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host, slot, staging = self.mesh_dependency_fixture(Path(tmp).resolve())
+            restored = slot / "node_modules/.pnpm/lock.yaml"
+            with patch.object(lane.worktree_pool, "ready_slots", return_value=[slot]), \
+                    patch.object(lane.worktree_pool, "pool_dir", return_value=slot.parent):
+                self.assertEqual(lane.mesh_dependency_roots(host, staging), [slot, host.repo])
+                for stale in ("old lock", None):
+                    with self.subTest(restored=stale):
+                        if stale is None:
+                            restored.unlink()
+                        else:
+                            restored.write_text(stale)
+                        self.assertEqual(lane.mesh_dependency_roots(host, staging), [host.repo, slot],
+                                         "unrestored pool must not displace the compiler-checked fallback")
+                restored.write_text("staged lock")
+                (slot / "pnpm-lock.yaml").write_text("different product lock")
+                self.assertEqual(lane.mesh_dependency_roots(host, staging), [host.repo, slot])
+                (slot / "pnpm-lock.yaml").write_text("staged lock")
+                for name in ("pnpm-lock.yaml", "node_modules/.pnpm/lock.yaml"):
+                    (host.repo / name).write_text("staged lock")
+                self.assertEqual(lane.mesh_dependency_roots(host, staging), [host.repo, slot],
+                                 "an exactly restored host remains preferred")
+                (staging / "pnpm-lock.yaml").unlink()
+                self.assertEqual(lane.mesh_dependency_roots(host, staging), [host.repo, slot])
+
+    def test_staged_proof_tries_compatible_pool_after_unrelated_lock_churn(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host, slot, staging = self.mesh_dependency_fixture(Path(tmp).resolve())
+            (staging / "pnpm-lock.yaml").write_text("staged lock plus unrelated dependency")
+            replies = [subprocess.CompletedProcess([], 1, stdout="", stderr="pin mismatch"),
+                       subprocess.CompletedProcess([], 0, stdout="", stderr=""),
+                       subprocess.CompletedProcess([], 0, stdout="", stderr="")]
+            with patch.object(lane.worktree_pool, "ready_slots", return_value=[slot]), \
+                    patch.object(lane.worktree_pool, "pool_dir", return_value=slot.parent), \
+                    patch.object(lane.worktree_pool, "node_env", return_value={"PATH": os.defpath}), \
+                    patch.object(lane.lifecycle, "run", side_effect=replies) as run:
+                self.assertIsNone(lane.prove_staging(host, staging))
+            self.assertEqual([call.args[0][-1] for call in run.call_args_list[:2]],
+                             [str(host.repo), str(slot)])
+            self.assertEqual(run.call_args_list[2].args[0][1:4], ["-m", "unittest", "-q"])
+
+    def test_staged_compiler_holds_pool_lease_against_competing_take(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host, slot, staging = self.mesh_dependency_fixture(Path(tmp).resolve())
+            calls = []
+
+            def run(argv, **kwargs):
+                calls.append(argv)
+                if argv[0] == "node":
+                    # A real maintained take must skip the leased slot and use
+                    # its fresh-worktree path, without claiming or moving it.
+                    with patch.object(lane.worktree_pool, "enabled", return_value=True), \
+                            patch.object(lane.worktree_pool, "same_volume", return_value=True), \
+                            patch.object(lane.worktree_pool, "claim") as claim:
+                        fresh = unittest.mock.Mock(return_value=subprocess.CompletedProcess([], 0))
+                        self.assertEqual(lane.worktree_pool.take(host.repo, Path(tmp) / "other", None,
+                                                               sh=fresh), "fresh")
+                        claim.assert_not_called()
+                        fresh.assert_called_once()
+                return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+            with patch.object(lane.worktree_pool, "ready_slots", return_value=[slot]), \
+                    patch.object(lane.worktree_pool, "pool_dir", return_value=slot.parent), \
+                    patch.object(lane.worktree_pool, "node_env", return_value={"PATH": os.defpath}), \
+                    patch.object(lane.lifecycle, "run", side_effect=run):
+                self.assertIsNone(lane.prove_staging(host, staging))
+            self.assertEqual(len(calls), 2)
+            with lane.worktree_pool.slot_lease(slot) as owned:
+                self.assertTrue(owned, "compilation releases the pool lease")
+
+    def test_staged_proof_never_reuses_output_from_a_failed_candidate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host, slot, staging = self.mesh_dependency_fixture(Path(tmp).resolve())
+            (staging / "pnpm-lock.yaml").write_text("unrelated lock churn")
+
+            def fail(argv, **kwargs):
+                (staging / "scripts/lanes/.mesh-runtime").mkdir(parents=True)
+                return subprocess.CompletedProcess(argv, 1, stdout="", stderr="partial build")
+
+            with patch.object(lane.worktree_pool, "ready_slots", return_value=[slot]), \
+                    patch.object(lane.worktree_pool, "pool_dir", return_value=slot.parent), \
+                    patch.object(lane.worktree_pool, "node_env", return_value={"PATH": os.defpath}), \
+                    patch.object(lane.lifecycle, "run", side_effect=fail) as run, \
+                    contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(lane.prove_staging(host, staging), "mesh runtime dependency closure failed")
+            self.assertEqual(run.call_count, 1, "neither fallback nor release tests may reuse a partial build")
+
+    def test_staged_proof_skips_a_pool_slot_already_owned_by_a_worker(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host, slot, staging = self.mesh_dependency_fixture(Path(tmp).resolve())
+            replies = [subprocess.CompletedProcess([], 1, stdout="", stderr="pin mismatch")]
+            with lane.worktree_pool.slot_lease(slot) as owned:
+                self.assertTrue(owned)
+                with patch.object(lane.worktree_pool, "ready_slots", return_value=[slot]), \
+                        patch.object(lane.worktree_pool, "pool_dir", return_value=slot.parent), \
+                        patch.object(lane.worktree_pool, "node_env", return_value={"PATH": os.defpath}), \
+                        patch.object(lane.lifecycle, "run", side_effect=replies) as run, \
+                        contextlib.redirect_stderr(io.StringIO()):
+                    self.assertEqual(lane.prove_staging(host, staging), "mesh runtime dependency closure failed")
+                self.assertEqual(run.call_count, 1, "busy slot is skipped and the host still faces pin checks")
+                self.assertEqual(run.call_args.args[0][-1], str(host.repo))
 
     def test_staged_proof_completes_a_bundle_an_older_installer_archived(self):
         # 2026-10-11: the installed installer lacked test_lifecycle.py in LANE_TESTS, so every
@@ -9261,7 +9589,7 @@ class OperatorInstallerGlueTest(unittest.TestCase):
         replies = [subprocess.CompletedProcess([], 0, stdout="", stderr=""),
                    subprocess.CompletedProcess([], 1, stdout="", stderr=stderr),
                    subprocess.CompletedProcess([], 1, stdout="", stderr=stderr)]
-        with patch.object(lane, "mesh_dependency_root", return_value=self.host.repo), \
+        with patch.object(lane, "mesh_dependency_roots", return_value=[self.host.repo]), \
                 patch.object(lane.worktree_pool, "node_env", return_value={"PATH": os.defpath}), \
                 patch.object(lane.lifecycle, "run", side_effect=replies) as run, contextlib.redirect_stderr(io.StringIO()) as console:
             self.assertEqual(lane.prove_staging(self.host, stage), "release tests failed")
@@ -9285,7 +9613,7 @@ class OperatorInstallerGlueTest(unittest.TestCase):
         replies = [subprocess.CompletedProcess([], 0, stdout="", stderr=""),
                    subprocess.CompletedProcess([], 1, stdout="", stderr=flaky),
                    subprocess.CompletedProcess([], 0, stdout="", stderr="")]
-        with patch.object(lane, "mesh_dependency_root", return_value=self.host.repo), \
+        with patch.object(lane, "mesh_dependency_roots", return_value=[self.host.repo]), \
                 patch.object(lane.worktree_pool, "node_env", return_value={"PATH": os.defpath}), \
                 patch.object(lane.lifecycle, "run", side_effect=replies) as run, contextlib.redirect_stderr(io.StringIO()):
             self.assertIsNone(lane.prove_staging(self.host, stage))
@@ -9314,7 +9642,7 @@ class OperatorInstallerGlueTest(unittest.TestCase):
         stderr = b"FAIL: test_partial (scripts.tests.test_fixture.Example)\n" + b"x" * 4000
         replies = [subprocess.CompletedProcess([], 0, stdout="", stderr=""),
                    subprocess.TimeoutExpired("fixture", lane.UPDATE_TEST_TIMEOUT_S, stderr=stderr)]
-        with patch.object(lane, "mesh_dependency_root", return_value=self.host.repo), \
+        with patch.object(lane, "mesh_dependency_roots", return_value=[self.host.repo]), \
                 patch.object(lane.worktree_pool, "node_env", return_value={"PATH": os.defpath}), \
                 patch.object(lane.lifecycle, "run", side_effect=replies):
             self.assertEqual(lane.prove_staging(self.host, stage), f"self-test timeout {lane.UPDATE_TEST_TIMEOUT_S}s")
@@ -9337,7 +9665,7 @@ class OperatorInstallerGlueTest(unittest.TestCase):
             return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
 
         try:
-            with patch.object(lane, "mesh_dependency_root", return_value=self.host.repo), \
+            with patch.object(lane, "mesh_dependency_roots", return_value=[self.host.repo]), \
                     patch.object(lane.worktree_pool, "node_env", return_value={"PATH": os.defpath}), \
                     patch.object(lane.lifecycle, "run", side_effect=run), \
                     contextlib.redirect_stderr(io.StringIO()) as console:

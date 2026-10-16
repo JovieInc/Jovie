@@ -24,6 +24,7 @@ The harness, not the model, owns:
 | Concern | Where |
 |---|---|
 | Claim (serialised, `flock`), one PR per issue across hosts (GitHub is the truth), priority aging after each 24h wait | `worker()`, `pick_issue()`, `in_flight_issues()` |
+| Execution attempts: stable action phases fence boundary replay. The dual-format reader supports immutable candidate ownership and terminal recovery; its incompatible writer remains disabled pending verified reader/writer readiness. Enabled recovery publishes only the reserved winner and seals unknown boundaries without another attempt or grant | `execution_attempt.py` |
 | One open PR per issue: branch or `linear-issue-id` marker; an unreadable PR list claims nothing | `in_flight_issues()` |
 | No open-PR ceiling (Tim 2026-10-12): new-issue intake is bounded only by real limits in autoscale (compute, credits, quotas); `new_issue_budget()` reports counts, never refuses | `new_issue_budget()` |
 | Workstreams: one classifier for intake and backlog (`ws:<key>` label override, else ordered rules); exact normalized-title duplicates admit only the oldest (`duplicate-candidate:<JOV>`); order = explicit dispatch-next in the admitted pool → tier (urgent or CI/Symphony-throughput) → aged priority → workstream rank → age | `workstreams.py`, `pool_rejections()`, `admission_order()` |
@@ -61,6 +62,21 @@ The harness, not the model, owns:
 | Cost-aware routing: one capability floor per issue (`routing.json`), then the cheapest available `(lane, model)` route that clears it by effective cost; every claim is logged with its rationale | `remediation.route_issue()`, `issue_router()`, `runs/routing.jsonl` |
 | Guarded sensitive work: auth/billing/infra labels route only to Codex at `xhigh`; 500-line cap, canonical security/boundary gates, and independent `llm-review` run before enrollment | `pick_issue()`, `gate_pr()`, `sensitive_review()` |
 | Stop revokes publication: a kill writes `runs/publication-revocations.jsonl` before the kill is acked, and every irreversible boundary (push, PR open, label, enqueue) revalidates it — revoked branches never ship (JOV-5060) | `run_agent(on_kill=)`, `revoke_publication()`, `require_publishable()` |
+
+Execution receipts retain `jovie-execution-attempt/v1`. The default production and CLI
+writer still emits legacy numeric status chains; self-update cannot activate the new
+wire format. `IMMUTABLE_WRITER_ENABLED` is checked in as false, with no environment or
+caller override. The upgraded reader also validates candidate-linked receipts, while
+a disabled writer refuses to extend them. Enabling the writer requires a separately
+reviewed source change after every participating reader and writer is drained, updated
+and verified ready; JOV-8293 remains open for that activation and runtime outcome.
+Enabled recovery reserves an existing `failed_unknown` disposition before projecting
+an unknown boundary, so helper crashes and repeated retries remain held. Boundary IDs
+bind existing dispatch, handoff, repair and adoption phases within the original fence;
+duplicate or changed-cost reuse is held, and distinct intended phases charge normally.
+Legacy common-source-SHA reservations have no owner proof and remain held for
+authoritative reconciliation. Source merge is preparatory and does not repair or
+certify the running coordinator.
 
 Event-driven: a worker that finishes re-execs the current release and pulls the next
 issue. The minute timer only restarts idle lanes and applies updates; it never signals a
@@ -255,8 +271,11 @@ done each, no labels), skipping titles that already exist under the epic, verifi
 `issueCreate` readback, comments a summary and leaves the epic In Progress. An epic with open
 children is not decomposed: the children carry the work. Remote lanes (hyperagent) never take
 epics. The dispatch reconcile pass (`epics.reconcile`, every 15 minutes on
-`LANES_RECONCILE_OWNER`, default `gem`) moves an epic to Done with a comment once every child is
-terminal and at least one is Done, moves a Todo epic with open children to In Progress, and
+`LANES_RECONCILE_OWNER`, default `gem`) requests parent validation once every child is
+terminal and at least one is Done. Child delivery never closes the parent: the canonical
+validation lifecycle requires the parent's own current outcome receipt and verified
+production build, plus any other required acceptance evidence. Reconcile moves a Todo epic
+with open children to In Progress, and
 expires stale `hold` labels (one filtered read per kind, no per-issue reads, at most 10 writes
 per kind per pass).
 
@@ -457,19 +476,34 @@ provider's credits: codex is capped at running plus unleased login runs.
 The kill switch is `SYMPHONY_AUTOSCALE=0`. Missing, stale or corrupt input fails safe to base;
 an unknown GitHub budget never exceeds base; a disabled lane stays at 0.
 
-When growth is blocked only by a real limit, `capacity_limit.py` names it after the spawn loop
-of the same tick. It maps the hold to a resource: `host-cpu`, `host-memory`, `host-disk`,
-`codex-accounts`, `codex-credits`, `claude-credits` or `github-api-quota`. A resource is
-published after 3 consecutive binding ticks and cleared after 3 clear ticks. The local record
+After the spawn loop, `capacity_limit.py` reports measured host pressure,
+a typed Codex quota cooldown, or a measured GitHub growth guard. Configured
+worker ceilings and login seats do not establish a provider hard limit; native
+lease occupancy, authentication holds and burst-rate holds remain distinct local
+evidence. Generic cooldown markers cannot prove exhausted credits. The doctor
+describes quota attribution as existing cooldown policy, not a live quota probe.
+
+A capacity record requires positive current eligible-pool or maintenance demand.
+The local record preserves eligible demand separately from reported waiting,
+configured seats separately from native leases, each source observation timestamp,
+and unknown delivered/marginal throughput. CPU/memory observations come from the
+autoscale sample, provider/quota observations retain their doctor/account source
+time, and disk is identified as the current tick input. Three distinct fresh
+source observations bind or clear a resource; cached polls, stale, future and
+out-of-order samples do not advance hysteresis. Unknown demand cannot prove a clear.
+Pressure jitter refreshes local evidence without another ping; release replay uses
+the latest supported measurement and its original time.
+
 `capacity-limit.json` (`symphony-lanes-capacity-limit/v1`) feeds the status feed's
-`capacityLimit`. Each change is also POSTed once to Summer as a signed
-`jovie.capacity-limit/v1` record (`limited`, or `cleared` once). The signature is Ed25519 over
-the triage client's canonical JSON. The key is read from `~/.config/symphony/summer-bottleneck*.env`
-on every send and is never put into the service env, which agents inherit. Each release install
-replays the current state once. There is no heartbeat. An undelivered record is retried on the
-next tick, and a failed POST never touches dispatch. Software holds are never sent as a
-capacity limit; they set `bottleneckFound` locally. Those holds are: current failures, stale
-doctor, unknown measurements, unhealthy, and a cooldown without provider bank evidence.
+`capacityLimit`. Changes use the existing strict `jovie.capacity-limit/v1` signed
+wire contract (`limited` or `cleared`), with observation time in `needs` and episode
+start in `since`. Signing and credential loading are unchanged. There is no
+heartbeat. Supported undelivered records retry on the next tick with the same
+delivery ID; an obsolete unsupported limit is suppressed. Failed delivery never
+changes dispatch. Software and unknown-measurement holds set `bottleneckFound`
+locally. Recommendations use existing authorised capacity first: a snapshot
+cannot establish paid-capacity ROI or that shipping is causally capped. No allocator,
+admission ceiling, account scope, service, or purchasing policy changes here.
 
 ## Worktree pool and shared caches (JOV-7705)
 
@@ -484,6 +518,9 @@ space is under that same floor, so a sweep and a refill never fight. Disk-cleanu
 must leave `~/.cache/jovie` and the pnpm store (`pnpm store path`) alone; use
 `scripts/agent/worktree-new --drain` to reclaim pool space. Tests and
 `JOVIE_WORKTREE_POOL=0` never touch the pool.
+Per-slot directory locks span claim/move and recycle/ready publication; stale fill
+and disk drain skip owned slots. Abandoned claims remain in place for their owner
+because marker age does not prove source publication or safe retirement.
 
 Finished worktrees go back instead of being deleted (JOV-7723): `remove_worktree()` keeps
 its idle, clean and published checks, then `worktree_pool.recycle()` detaches HEAD at

@@ -2,6 +2,7 @@ import 'server-only';
 
 import { and, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db';
+import { runLegacyDbTransaction } from '@/lib/db/legacy-transaction';
 import {
   profileSearchProviderHealth,
   profileSearchQueries,
@@ -114,7 +115,7 @@ const dependencies: ProfileSearchRunnerDependencies = {
   },
   loadSurfaces,
   async completeSuccess({ attemptId, queryId, response, results }) {
-    await db.transaction(async tx => {
+    await runLegacyDbTransaction(async tx => {
       if (results.length > 0) {
         await tx.insert(profileSearchResults).values(
           results.map(result => ({
@@ -164,7 +165,7 @@ const dependencies: ProfileSearchRunnerDependencies = {
   async completeFailure({ attemptId, queryId, code, message }) {
     const retryDelay =
       code === 'budget_exhausted' ? 15 * 60 * 1000 : 24 * 60 * 60 * 1000;
-    await db.transaction(async tx => {
+    await runLegacyDbTransaction(async tx => {
       await tx
         .update(profileSearchRuns)
         .set({

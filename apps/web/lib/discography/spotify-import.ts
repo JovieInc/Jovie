@@ -417,11 +417,19 @@ export async function importReleasesFromSpotify(
           getEffectiveMaxReleasesPerImport(maxReleases);
 
         // 1. Fetch all albums from Spotify
-        const { albums: spotifyAlbums, total: spotifyTotal } =
-          await getSpotifyArtistAlbums(spotifyArtistId, {
-            includeGroups,
-            market,
-          });
+        const artistCatalog = await getSpotifyArtistAlbums(spotifyArtistId, {
+          includeGroups,
+          market,
+        });
+        const { albums: spotifyAlbums, total: spotifyTotal } = artistCatalog;
+        result.total = Math.min(spotifyTotal, maxReleasesPerImport);
+
+        if (!artistCatalog.complete || spotifyAlbums.length !== spotifyTotal) {
+          result.errors.push(
+            `Spotify artist catalog is incomplete (${spotifyAlbums.length} of ${spotifyTotal} albums observed): ${artistCatalog.issue ?? 'pagination did not account for every album'}. No releases were imported.`
+          );
+          return result;
+        }
 
         if (spotifyAlbums.length === 0) {
           await reconcileCollaboratorProfilesBestEffort(
@@ -437,7 +445,6 @@ export async function importReleasesFromSpotify(
 
         // Safety limit: cap number of releases
         const albumsToImport = spotifyAlbums.slice(0, maxReleasesPerImport);
-        result.total = Math.min(spotifyTotal, maxReleasesPerImport);
         if (spotifyAlbums.length > maxReleasesPerImport) {
           captureWarning('Spotify import truncated due to limit', {
             totalReleases: spotifyAlbums.length,

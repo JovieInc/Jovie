@@ -43,11 +43,90 @@ const CONTROLLER_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/production-controller.yml'),
   'utf8'
 );
+const PUBLIC_PROFILE_ALIAS_GRADUATION = JSON.parse(
+  readFileSync(
+    resolve(REPO_ROOT, 'docs/performance/public-profile-alias-graduation.json'),
+    'utf8'
+  )
+);
 const EXPECTED_SHA = 'a'.repeat(40);
 const NEWER_SHA = 'b'.repeat(40);
 const DEPLOYMENT_ID = 'dpl_exact_generation';
 const DEPLOYMENT_URL = 'https://jovie-exact-generation-jovie.vercel.app';
 const tempRoots = [];
+
+describe('public-profile alias graduation policy', () => {
+  it('proves the bounded production decision from exactly 14 controller jobs', () => {
+    const receipt = PUBLIC_PROFILE_ALIAS_GRADUATION;
+    const { policy, result, runs, selection } = receipt;
+
+    expect(receipt.schema).toBe('jovie-public-profile-alias-graduation/v1');
+    expect(receipt.surface).toBe('production-canonical-alias');
+    expect(selection.windowSize).toBe(policy.requiredConsecutiveRuns);
+    expect(runs).toHaveLength(selection.windowSize);
+    expect(new Set(runs.map(run => run.controllerRunId)).size).toBe(
+      selection.windowSize
+    );
+    expect(new Set(runs.map(run => run.jobId)).size).toBe(selection.windowSize);
+    expect(policy.samplesPerRoute).toBe(5);
+    expect(policy.p95Estimator).toBe('nearest-rank');
+    expect(policy.trackingIssue).toBe('JOV-8338');
+    expect(receipt.measuredAt).toBe(runs[0].completedAt);
+
+    for (const [index, run] of runs.entries()) {
+      const observedP95Ms = Math.max(...Object.values(run.routeP95Ms));
+      expect(run.observedP95Ms).toBe(observedP95Ms);
+      expect(run.qualifies).toBe(observedP95Ms <= policy.thresholdMs);
+      expect(run.headSha).toMatch(/^[0-9a-f]{40}$/);
+      expect(run.jobUrl).toBe(
+        `https://github.com/JovieInc/Jovie/actions/runs/${run.controllerRunId}/job/${run.jobId}`
+      );
+      if (index > 0) {
+        expect(Date.parse(runs[index - 1].completedAt)).toBeGreaterThan(
+          Date.parse(run.completedAt)
+        );
+      }
+    }
+
+    const qualifyingRuns = runs.filter(run => run.qualifies).length;
+    const firstMiss = runs.findIndex(run => !run.qualifies);
+    const consecutiveQualifyingRuns =
+      firstMiss === -1 ? runs.length : firstMiss;
+    expect(result.qualifyingRunsInWindow).toBe(qualifyingRuns);
+    expect(result.consecutiveQualifyingRuns).toBe(consecutiveQualifyingRuns);
+    expect(result.graduated).toBe(
+      consecutiveQualifyingRuns >= policy.requiredConsecutiveRuns
+    );
+    expect(result.decision).toBe(result.graduated ? 'block' : 'warn');
+    expect(policy.currentEnforcement).toBe(result.decision);
+
+    const measuredAt = Date.parse(receipt.measuredAt);
+    const nextReviewAt = Date.parse(policy.nextReviewAt);
+    expect(nextReviewAt).toBeGreaterThan(measuredAt);
+    expect(nextReviewAt).toBeGreaterThan(Date.now());
+    expect(nextReviewAt - measuredAt).toBeLessThanOrEqual(
+      7 * 24 * 60 * 60 * 1000
+    );
+  });
+
+  it('keeps staging independent and bounds the production warning', () => {
+    const staging = getJobBlock(RELEASE_WORKFLOW, 'promote-production');
+    const production = getJobBlock(
+      RELEASE_WORKFLOW,
+      'production-public-profile-alias-gate'
+    );
+
+    expect(staging).toContain('Staging policy is independent');
+    expect(staging).toContain('Recheck by 2026-10-21 under JOV-8338');
+    expect(production).toContain(
+      'docs/performance/public-profile-alias-graduation.json'
+    );
+    expect(production).toContain('current streak of 1/14');
+    expect(production).toContain('no later than 2026-10-21 (JOV-8338)');
+    expect(production).toContain('performance_status=warn');
+    expect(production).not.toContain('JOV-4854');
+  });
+});
 
 describe('production verification admission', () => {
   const job = getJobBlock(CONTROLLER_WORKFLOW, 'production-verified');
@@ -756,15 +835,39 @@ describe('forward-only release lineage', () => {
       'gh',
       `#!/bin/sh
 case "$*" in
-  *compare/*) printf '%s\\n' "$STUB_COMPARE_STATUS" ;;
-  *) printf '%s\\n' "$STUB_MAIN_SHA" ;;
+  *compare/*)
+    if [ "\${STUB_COMPARE_FAILURES:-0}" -gt 0 ]; then
+      echo "gh: API rate limit exceeded for installation." >&2
+      exit 1
+    fi
+    printf '%s\\n' "$STUB_COMPARE_STATUS"
+    ;;
+  *)
+    n=0
+    [ -f "$STUB_MAIN_ATTEMPTS" ] && n="$(cat "$STUB_MAIN_ATTEMPTS")"
+    n=$((n + 1))
+    printf '%s' "$n" > "$STUB_MAIN_ATTEMPTS"
+    if [ "$n" -le "$STUB_MAIN_FAILURES" ]; then
+      echo "gh: API rate limit exceeded for installation." >&2
+      exit 1
+    fi
+    printf '%s\\n' "$STUB_MAIN_SHA"
+    ;;
 esac
 `
     );
   }
 
-  function runRecheck(jobKey, stepName, mainSha, compareStatus) {
+  function runRecheck(
+    jobKey,
+    stepName,
+    mainSha,
+    compareStatus,
+    mainFailures = 0,
+    extraEnv = {}
+  ) {
     const fixture = makeFixture('lineage-recheck-');
+    const attempts = join(fixture.root, 'main-attempts');
     stubLineageGh(fixture.bin);
     const script = materialize(
       getStepRunScript(getJobBlock(RELEASE_WORKFLOW, jobKey), stepName),
@@ -773,10 +876,21 @@ esac
     const result = runScript(script, fixture, {
       EXPECTED_SHA,
       EXPECTED_MAIN_SHA: EXPECTED_SHA,
+      GITHUB_REPOSITORY: 'JovieInc/Jovie',
+      STUB_COMPARE_FAILURES: '0',
       STUB_COMPARE_STATUS: compareStatus,
+      STUB_MAIN_ATTEMPTS: attempts,
+      STUB_MAIN_FAILURES: String(mainFailures),
       STUB_MAIN_SHA: mainSha,
+      ...extraEnv,
     });
-    return { result, outputs: parseOutputs(fixture.output) };
+    return {
+      attempts: existsSync(attempts)
+        ? Number(readFileSync(attempts, 'utf8'))
+        : 0,
+      result,
+      outputs: parseOutputs(fixture.output),
+    };
   }
 
   it.each(RECHECK_STEPS)(
@@ -798,6 +912,98 @@ esac
     },
     30_000
   );
+
+  function makeLineageRemote(mode) {
+    const root = mkdtempSync(join(tmpdir(), 'lineage-remote-'));
+    tempRoots.push(root);
+    const src = join(root, 'src');
+    mkdirSync(src);
+    const git = args => {
+      const result = spawnSync('git', args, {
+        cwd: src,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          GIT_AUTHOR_NAME: 'Lineage',
+          GIT_AUTHOR_EMAIL: 'lineage@example.com',
+          GIT_COMMITTER_NAME: 'Lineage',
+          GIT_COMMITTER_EMAIL: 'lineage@example.com',
+        },
+      });
+      if (result.status !== 0) {
+        throw new Error(`${args.join(' ')}\n${result.stderr || result.stdout}`);
+      }
+      return result.stdout.trim();
+    };
+    git(['init', '-q', '-b', 'main']);
+    writeFileSync(join(src, 'file'), 'base\n');
+    git(['add', 'file']);
+    git(['commit', '-qm', 'base']);
+    const base = git(['rev-parse', 'HEAD']);
+    if (mode === 'ahead') {
+      writeFileSync(join(src, 'file'), 'child\n');
+      git(['commit', '-qam', 'child']);
+    } else if (mode === 'diverged') {
+      git(['checkout', '-q', '--orphan', 'rewritten']);
+      writeFileSync(join(src, 'other'), 'other\n');
+      git(['add', 'other']);
+      git(['commit', '-qm', 'rewritten']);
+      git(['branch', '-M', 'main']);
+    }
+    return { remote: src, base, tip: git(['rev-parse', 'HEAD']) };
+  }
+
+  function runRateLimitedAlias(mode) {
+    const remote = makeLineageRemote(mode);
+    const expected = mode === 'exact' ? remote.tip : remote.base;
+    return runRecheck(
+      'alias-staging',
+      'Recheck main immediately before staging alias',
+      remote.tip,
+      'identical',
+      9,
+      {
+        EXPECTED_SHA: expected,
+        EXPECTED_MAIN_SHA: expected,
+        MAIN_LINEAGE_REMOTE: remote.remote,
+        STUB_COMPARE_FAILURES: '1',
+      }
+    );
+  }
+
+  it('resolves an unchanged main through git when REST is rate limited', () => {
+    const current = runRateLimitedAlias('exact');
+    expect(current.result.status, current.result.stderr).toBe(0);
+    expect(current.attempts).toBe(1);
+    expect(current.outputs.is_current).toBe('true');
+  });
+
+  it('keeps the staging alias when rate-limited REST still has an ancestor main', () => {
+    const current = runRateLimitedAlias('ahead');
+    expect(current.result.status, current.result.stderr).toBe(0);
+    expect(current.attempts).toBe(1);
+    expect(current.outputs.is_current).toBe('true');
+  });
+
+  it('yields the staging alias when rate-limited REST shows main left the release', () => {
+    const current = runRateLimitedAlias('diverged');
+    expect(current.result.status, current.result.stderr).toBe(0);
+    expect(current.outputs.is_current).toBe('false');
+  });
+
+  it('fails closed when the pre-alias main read stays unavailable', () => {
+    const unavailable = runRecheck(
+      'alias-staging',
+      'Recheck main immediately before staging alias',
+      EXPECTED_SHA,
+      'identical',
+      9,
+      { MAIN_LINEAGE_REMOTE: join(tmpdir(), 'missing-lineage-remote') }
+    );
+    expect(unavailable.result.status).toBe(1);
+    expect(unavailable.attempts).toBe(1);
+    expect(unavailable.outputs.is_current).toBeUndefined();
+  });
 
   function runPromote(mainSha, compareStatus) {
     const fixture = makeFixture('lineage-promote-');

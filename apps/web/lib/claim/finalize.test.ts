@@ -88,8 +88,13 @@ function createTxMock(selectResultsQueue: unknown[][]) {
   const fromMock = vi.fn((_table: unknown) => ({ where: selectWhereMock }));
   const selectMock = vi.fn((_columns: unknown) => ({ from: fromMock }));
 
+  const updateReturningMock = vi.fn((_columns: unknown) =>
+    Promise.resolve([{ id: 'profile-1' }])
+  );
   const updateWhereMock = vi.fn((_condition: unknown) =>
-    Promise.resolve(undefined)
+    Object.assign(Promise.resolve(undefined), {
+      returning: updateReturningMock,
+    })
   );
   const updateSetMock = vi.fn((_payload: Record<string, unknown>) => ({
     where: updateWhereMock,
@@ -130,6 +135,7 @@ function createTxMock(selectResultsQueue: unknown[][]) {
     updateMock,
     updateSetMock,
     updateWhereMock,
+    updateReturningMock,
     insertMock,
     insertValuesMock,
     onConflictDoUpdateMock,
@@ -620,7 +626,7 @@ describe('claimPrebuiltProfileForUser', () => {
       eqCalls.filter(
         ([col, value]) => col === creatorProfiles.userId && value === 'user-1'
       )
-    ).toHaveLength(2);
+    ).toHaveLength(3);
     expect(eqCalls).toContainEqual([creatorProfiles.isClaimed, false]);
     // Cardinality, not just presence: the conflict-guard select emits an
     // identical ne(id, 'profile-1'); the release UPDATE must emit a second
@@ -803,7 +809,7 @@ describe('reservePrebuiltProfileForUser', () => {
       eqCalls.filter(
         ([col, value]) => col === creatorProfiles.userId && value === 'user-1'
       )
-    ).toHaveLength(2);
+    ).toHaveLength(3);
     expect(eqCalls).toContainEqual([creatorProfiles.isClaimed, false]);
     // Cardinality, not just presence — see the claim-side twin test.
     expect(

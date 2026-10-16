@@ -17,6 +17,7 @@ the release it started with and the next issue runs on the new one.
 from __future__ import annotations
 
 import argparse
+from contextlib import nullcontext
 import fcntl
 import hashlib
 import math
@@ -149,7 +150,7 @@ RED = frozenset({"FAILURE", "TIMED_OUT", "STARTUP_FAILURE"})
 # JOV-7690: a recovery-handoff run does no work, so the issue backs off exponentially
 # (5 min doubling to 6 h) instead of being re-claimed on the next reexec. Linear hears
 # about the first handoff and once more at HANDOFF_COMMENT_AT, never once per loop.
-HANDOFF_BACKOFF_S = 300
+HANDOFF_BACKOFF_S = pr_events.HANDOFF_BACKOFF_S
 HANDOFF_BACKOFF_CAP_S = 6 * 3600
 HANDOFF_COMMENT_AT = 3
 PRESERVED_RUN_NAME = re.compile(r"^\d{8}T\d{6}Z-(?P<issue>[A-Z]+-\d+)-")
@@ -2444,9 +2445,9 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue) -> dict:
                     raise OSError("Hyperagent transport unavailable")
                 prompt = render_prompt(issue, branch, context_pack(issue), provider="hyperagent")
                 (runs / f"{run_id}.prompt.md").write_text(prompt)
-                def boundary(spend, mutations):
+                def boundary(spend, mutations, phase):
                     execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
-                                               {"spend": spend, "mutations": mutations}, coordination=coordination)
+                                               {"spend": spend, "mutations": mutations}, coordination=coordination, boundary_id=phase)
                 def find_pr(number):
                     result = sh(["gh", "pr", "view", str(number), "--repo", REPO_SLUG, "--json",
                                  "number,url,state,title,body,headRefName,headRefOid"])
@@ -2454,14 +2455,14 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue) -> dict:
                         raise RuntimeError("PR read unavailable")
                     return json.loads(result.stdout)
                 def gate(pr):
-                    boundary(0, 1)
+                    boundary(0, 1, "hyperagent-adopt")
                     # Existing adoption owns its isolated checkout, diff policy,
                     # canonical checks and native queue; no second PR is created.
                     return adopt_pr(host, "hyperagent", pr)
                 receipt["offer"]["accepted"] = True
                 receipt.update(hyperagent_lane.run(spec, issue.identifier, claimed["fencingToken"], branch, prompt,
                     evidence, api["mcp_call"], find_pr, gate, timeout=host.agent_timeout,
-                    before_dispatch=lambda: boundary(1, 1), refresh=refresh))
+                    before_dispatch=lambda: boundary(1, 1, "hyperagent-create"), refresh=refresh))
                 if receipt["verdict"] != "remote-held":
                     result = "succeeded" if receipt["verdict"] in ("landing", "verified-not-queued", "held", "gate-timeout") else "failed_unknown"
                     receipt["execution"] = execution_attempt.finish(runs / "execution-attempts.jsonl", ident,
@@ -2570,7 +2571,7 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
                  "gbrain": brain_context, "branch": branch})]
             started = time.time()
             execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
-                                       {"spend": 1, "mutations": 1}, coordination=coordination)
+                                       {"spend": 1, "mutations": 1}, coordination=coordination, boundary_id="issue-dispatch")
             agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file), "cwd": str(worktree),
                                                        "provider_receipt": str(provider_evidence),
                                                        "model": str(spec.get("model"))}),
@@ -2598,7 +2599,7 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
                                  "reason": "provider-error"})
                 note_failover(host, current, nxt_name, "provider-error")
                 execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
-                                           {"spend": 1, "mutations": 1}, coordination=coordination)
+                                           {"spend": 1, "mutations": 1}, coordination=coordination, boundary_id=f"issue-handoff:{len(handoffs)}")
                 agent = run_agent(template(nxt_spec["cmd"], {"prompt": handoff_prompt, "prompt_file": str(handoff_file),
                                                              "cwd": str(worktree),
                                                              "provider_receipt": str(provider_evidence),
@@ -4763,7 +4764,9 @@ def unworked_fix_attempt(receipt: dict) -> str | None:
 
 def end_local_fix_attempt(host: Host, pr: dict, receipt: dict) -> None:
     """Release the host-local claim without fabricating an attempt when called directly."""
+    handoff = False
     def finish(attempts: dict) -> None:
+        nonlocal handoff
         attempt = attempts.get(str(pr["number"]))
         if not attempt or attempt.get("sha") != pr.get("headRefOid"):
             return
@@ -4778,7 +4781,17 @@ def end_local_fix_attempt(host: Host, pr: dict, receipt: dict) -> None:
             attempt["noWorkRefund"] = {"reason": refund[:120], "runId": receipt.get("runId"),
                                        "at": time.time()}
             receipt["attemptRefunded"] = refund[:120]
+            handoff = receipt.get("verdict") == "recovery-handoff"
     update_json(host.state / "fix-attempts.json", finish)
+    if handoff:
+        try:
+            path = (receipt.get("recovery") or {}).get("worktree")
+            note_recovery_handoff(host, f"pr:{pr['number']}:{pr['headRefOid']}",
+                                  preserved=Path(path) if isinstance(path, str) and path else None)
+        except Exception as exc:
+            # The durable refund itself supplies the short hold if this best-effort
+            # cooldown write fails. Its failure must not discard the terminal receipt.
+            receipt["handoffCooldownError"] = type(exc).__name__
 
 
 # Consecutive unreadable target snapshots the in-run guard tolerates (~90s at its 30s cadence).
@@ -4859,8 +4872,9 @@ def handoff_cooldown_path(host: Host) -> Path:
     return host.state / "handoff-cooldown.json"
 
 
-def note_recovery_handoff(host: Host, identifier: str, now: float | None = None) -> dict:
-    """Count one recovery-handoff for an issue and start its capped exponential cooldown."""
+def note_recovery_handoff(host: Host, identifier: str, now: float | None = None, *,
+                          preserved: Path | None = None) -> dict:
+    """Count one recovery-handoff and start its capped exponential cooldown."""
     now = time.time() if now is None else now
     noted: dict = {}
 
@@ -4869,9 +4883,18 @@ def note_recovery_handoff(host: Host, identifier: str, now: float | None = None)
         count = int(row.get("count") or 0) + 1
         until = now + min(HANDOFF_BACKOFF_S * 2 ** (count - 1), HANDOFF_BACKOFF_CAP_S)
         data[identifier] = {"count": count, "until": until}
+        try:
+            if preserved is not None and (preserved / disk_guard.PRESERVED_REPAIR).exists():
+                data[identifier]["preserved"] = str(preserved)
+        except OSError:
+            pass  # Unknown context retains the timed hold; it never authorizes cleanup.
         noted.update(count=count, until=until, comment=count in (1, HANDOFF_COMMENT_AT))
     update_json(handoff_cooldown_path(host), bump)
     return noted
+
+
+def pr_recovery_held(host: Host, pr: dict, now: float | None = None) -> bool:
+    return pr_events.pr_recovery_held(host, pr, now)
 
 
 def held_back_issues(host: Host, now: float | None = None) -> frozenset[str]:
@@ -5102,7 +5125,7 @@ def retire_published_preserved(host: Host, number: int) -> list[str]:
 # logged 1,606 recovery-handoff runs for 9 PRs (#20840 alone 694) on such checkouts, so
 # those PRs got no repair at all. A fresh handoff still waits for its owner; one nobody
 # reconciled within PRESERVED_ARCHIVE_AFTER_S is archived so the PR can be repaired again.
-UNRESUMABLE_PRESERVED = frozenset({"preserved-head-superseded", "preserved-target-needs-reconciliation"})
+UNRESUMABLE_PRESERVED = pr_events.UNRESUMABLE_PRESERVED
 PRESERVED_ARCHIVE_REF = "refs/jovie-preserved/"
 PRESERVED_ARCHIVE_AFTER_S = 6 * 3600
 
@@ -5344,7 +5367,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
             resolved_generated = False
             if pr.get("mergeStateStatus") == "DIRTY":
                 execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
-                                           {"spend": 0, "mutations": 1}, coordination=coordination)
+                                           {"spend": 0, "mutations": 1}, coordination=coordination, boundary_id="repair-generated-conflict")
                 resolved_generated = resolve_generated_conflict(worktree, pr["headRefName"], log, guard=boundary)
             agent = None
             if resolved_generated:
@@ -5362,7 +5385,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                     {"pr": json.dumps(pr, sort_keys=True), "rendered_context": prompt})]
                 boundary("before-agent")
                 execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
-                                           {"spend": 1, "mutations": 1}, coordination=coordination)
+                                           {"spend": 1, "mutations": 1}, coordination=coordination, boundary_id="repair-dispatch")
                 agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file),
                                                          "cwd": str(worktree),
                                                          "provider_receipt": str(provider_evidence),
@@ -6020,7 +6043,8 @@ def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict |
     providers = load_providers()
     order, now = pr_events.cost_order(providers), time.time()
     disabled = set(providers) - set(order)
-    prs = [pr for pr in prs if pr_events.may_take(name, pr, attempts.get(str(pr["number"]), {}), order, now)]
+    prs = [pr for pr in prs if not pr_recovery_held(host, pr, now)
+           and pr_events.may_take(name, pr, attempts.get(str(pr["number"]), {}), order, now)]
     pr = red_pr(prs, attempts, held)
     # A head another host is fixing is skipped (no attempt charged); the next red PR is ours.
     while pr:
@@ -6411,14 +6435,15 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
         # A remote-only lane (Hyperagent) cannot repair a local checkout: it only claims issues,
         # and the local lanes repair its PRs like any orphan (`repairs: false`).
         local = spec.get("repairs") is not False
-        candidates = fix_candidates(name) if local else []
+        candidates = [pr for pr in fix_candidates(name) if not pr_recovery_held(host, pr)] if local else []
         # Reclaimed abandoned drafts (the only non-lane drafts among the fix candidates) are
         # gated and readied like this lane's own drafts. Derived from the one cached scan so
         # no extra inventory read happens per worker pass.
-        lane_owned = lane_prs(name) if local else []
+        lane_owned = [pr for pr in lane_prs(name) if not pr_recovery_held(host, pr)] if local else []
         owned_numbers = {pr["number"] for pr in lane_owned}
         prs = lane_owned + [pr for pr in candidates if pr.get("isDraft") and pr["number"] not in owned_numbers]
-        events = pr_events.queued_prs(THIS, pr_events.FIX_KINDS) if local else []
+        events = [pr for pr in pr_events.queued_prs(THIS, pr_events.FIX_KINDS)
+                  if not pr_recovery_held(host, pr)] if local else []
         red = local and (pr_events.claim_event_pr(host, THIS, name, events)
                          or claim_escalation_pr(host, name, candidates)
                          or claim_red_pr(host, name, candidates)) or None
@@ -7180,21 +7205,36 @@ MESH_DEPENDENCY_PINS = ("apps/desktop/node_modules/esbuild/package.json",
                         "packages/agent-transport-contracts/node_modules/zod/package.json")
 
 
-def mesh_dependency_root(host: Host) -> Path | None:
-    """The host repo when it is installed; otherwise the newest ready worktree-pool slot that
-    is. The Mac lanes repo is a bare source checkout with no node_modules, so every release
-    since 2026-10-09 was refused ("mesh runtime dependency closure failed") and no lane fix
-    reached that host. Pool slots are installed from origin/main, the same lock the staging
-    bundle carries."""
+def mesh_dependency_roots(host: Host, source_root: Path | None = None) -> list[Path]:
+    """Prefer dependencies restored from the staged lock, then the existing compatible
+    host/pool fallback. The runtime compiler still validates every exact dependency pin."""
     def installed(root: Path) -> bool:
         return all((root / pin).is_file() for pin in MESH_DEPENDENCY_PINS)
-    if installed(host.repo):
-        return host.repo
+    try:
+        source_lock = (source_root / "pnpm-lock.yaml").read_bytes() if source_root else None
+    except OSError:
+        source_lock = None
+
+    def restored_for_source(root: Path) -> bool:
+        if source_lock is None:
+            return False
+        try:
+            return all((root / name).read_bytes() == source_lock
+                       for name in ("pnpm-lock.yaml", "node_modules/.pnpm/lock.yaml"))
+        except OSError:
+            return False
+
+    host_installed = installed(host.repo)
     try:
         slots = worktree_pool.ready_slots(worktree_pool.pool_dir(host.repo))
     except (OSError, subprocess.CalledProcessError):
         slots = []
-    return next((slot for slot in slots if installed(slot)), None)
+    installed_slots = [slot for slot in slots if installed(slot)]
+    # A retained product checkout can differ in unrelated lock entries while its
+    # mesh pins remain compatible; only the compiler may admit that fallback.
+    candidates = ([host.repo] if host_installed else []) + installed_slots
+    matching = [root for root in candidates if restored_for_source(root)]
+    return matching + [root for root in candidates if root not in matching]
 
 
 def retain_selftest_diagnostic(staging: Path, stderr, returncode, *, timed_out=False, leftovers=0) -> None:
@@ -7253,16 +7293,32 @@ def prove_staging(host: Host, staging: Path) -> str | None:
     # Raw ports import workspace TypeScript/Zod. Compile from the immutable
     # archive with the host repo's existing identical pins before activation;
     # no dependency installation or running-worker mutation is permitted.
-    dependency_root = mesh_dependency_root(host) or host.repo
-    try:
-        runtime = lifecycle.run(["node", str(staging / "scripts/lanes/mesh-runtime-bundle.mjs"),
-                                 str(staging.resolve()), str(dependency_root.resolve())],
-                                cwd=staging, capture_output=True, text=True, timeout=60,
-                                env=worktree_pool.node_env(staging))
-    except subprocess.TimeoutExpired:
-        return "mesh runtime closure timeout"
-    if runtime.returncode != 0:
-        print(runtime.stderr[-2000:], file=sys.stderr)
+    runtime = None
+    for dependency_root in mesh_dependency_roots(host, staging) or [host.repo]:
+        # Pool take/fill/recycle share this inode lease. Retain it until the
+        # compiler has finished reading dependencies, without claiming the slot.
+        lease = nullcontext(True) if dependency_root == host.repo else worktree_pool.slot_lease(dependency_root)
+        with lease as owned:
+            if not owned:
+                continue
+            try:
+                runtime = lifecycle.run(["node", str(staging / "scripts/lanes/mesh-runtime-bundle.mjs"),
+                                         str(staging.resolve()), str(dependency_root.resolve())],
+                                        cwd=staging, capture_output=True, text=True, timeout=60,
+                                        env=worktree_pool.node_env(staging))
+            except subprocess.TimeoutExpired:
+                return "mesh runtime closure timeout"
+            if runtime.returncode == 0:
+                break
+            generated = staging / "scripts/lanes/.mesh-runtime"
+            if generated.exists() or generated.is_symlink():
+                # Exclusive generated writes are not replayable after a partial
+                # build. Preserve that refusal rather than reuse its output.
+                print(runtime.stderr[-2000:], file=sys.stderr)
+                return "mesh runtime dependency closure failed"
+    else:
+        if runtime is not None:
+            print(runtime.stderr[-2000:], file=sys.stderr)
         return "mesh runtime dependency closure failed"
     # ~60 s on an idle host; simulator/xcodebuild load from other sessions (load avg ~600 on
     # 2026-09-28) pushed it past 300 s, so every release was refused and fixes never landed.

@@ -15,6 +15,16 @@ vi.mock('@/lib/stripe/client', () => ({
 vi.mock('@/lib/db', () => ({
   db: { insert: mockInsert, select: mockSelect, update: mockUpdate },
 }));
+vi.mock('@/lib/ingestion/session', () => ({
+  withSystemIngestionSession: vi.fn(
+    (operation: (tx: Record<string, unknown>) => unknown) =>
+      operation({
+        insert: mockInsert,
+        select: mockSelect,
+        update: mockUpdate,
+      })
+  ),
+}));
 vi.mock('@/lib/merch/orders', () => ({
   handleMerchCheckoutCompleted: mockHandleCheckout,
   handleMerchChargeRefunded: vi.fn(),

@@ -40,8 +40,64 @@ import {
   stripGitFetchNoise,
   structuralConcurrency,
   structuralLocks,
+  VALIDATION_LIFECYCLE_COVERAGE_COMMAND,
   webCiContractTestsCommand,
 } from '../../ci-fast-lanes.mjs';
+
+it('enforces lifecycle coverage through the real structural selector', async () => {
+  // The coverage command is an operations-lane part. A merge group narrows
+  // CI_PRODUCT_LANES to the diff (web-only for an e2e spec) and the structural
+  // jobs set split modes the parent deletes before spawning this suite.
+  const previous = {
+    CI_PRODUCT_LANES: process.env.CI_PRODUCT_LANES,
+    CI_FAST_STRUCTURAL_PYTEST: process.env.CI_FAST_STRUCTURAL_PYTEST,
+    CI_FAST_STRUCTURAL_WEB: process.env.CI_FAST_STRUCTURAL_WEB,
+  };
+  const collect = async () => {
+    const commands = [];
+    await runStructural({
+      execute: command => {
+        commands.push(command);
+        return { code: 0, output: '' };
+      },
+    });
+    return commands.filter(
+      command => command === VALIDATION_LIFECYCLE_COVERAGE_COMMAND
+    );
+  };
+  try {
+    delete process.env.CI_FAST_STRUCTURAL_PYTEST;
+    delete process.env.CI_FAST_STRUCTURAL_WEB;
+    process.env.CI_PRODUCT_LANES = 'ios,mac,web,operations,cross-product';
+    expect(await collect()).toHaveLength(1);
+    process.env.CI_PRODUCT_LANES = 'web';
+    expect(await collect()).toHaveLength(0);
+  } finally {
+    for (const [name, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  }
+  for (const test of [
+    'validation-lifecycle',
+    'validation-sync',
+    'linear-sync-on-merge',
+    'founder-taste-order',
+  ]) {
+    expect(VALIDATION_LIFECYCLE_COVERAGE_COMMAND).toContain(
+      `lib/__tests__/${test}.test.mjs`
+    );
+  }
+  expect(VALIDATION_LIFECYCLE_COVERAGE_COMMAND).toContain(
+    '--coverage.thresholds.perFile=true'
+  );
+  expect(VALIDATION_LIFECYCLE_COVERAGE_COMMAND).toContain(
+    '--coverage.thresholds.lines=90'
+  );
+  expect(VALIDATION_LIFECYCLE_COVERAGE_COMMAND).toContain(
+    '--coverage.thresholds.branches=75'
+  );
+});
 
 describe('Shared fenced-attempt coverage contract', () => {
   it('runs existing fenced-attempt and lane regressions in the real structural selector', () => {
