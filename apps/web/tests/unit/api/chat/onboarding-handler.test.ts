@@ -2034,24 +2034,16 @@ describe('tryHandleAnonymousOnboardingChat', () => {
       expect(result?.status).toBe(200);
     });
 
-    it('is inert on Vercel production/preview even when set', async () => {
+    it('does not unlock the gate on Vercel preview — secure env enforces with or without the flag', async () => {
       vi.resetModules();
       stubRuntimeEnv({ nodeEnv: 'test', vercelEnv: 'preview' });
       vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
       vi.stubEnv('E2E_REQUIRE_TURNSTILE_GATE', '1');
       vi.stubEnv('NEXT_PUBLIC_CLERK_MOCK', '1');
-      hoisted.executeChatTurnMock.mockResolvedValue({
-        streamResult: {
-          toUIMessageStreamResponse: ({
-            headers,
-          }: {
-            headers: Record<string, string>;
-          }) => new Response('ok', { status: 200, headers }),
-        },
-        selectedModel: 'anthropic/claude-haiku-4-5-20251001',
-        systemPrompt: '',
-        toolNames: [],
-        modelMessages: [],
+      hoisted.isTurnstileConfiguredMock.mockReturnValue(true);
+      hoisted.verifyTurnstileTokenMock.mockResolvedValue({
+        success: false,
+        reason: 'missing_token',
       });
 
       const { tryHandleAnonymousOnboardingChat } = await import(
@@ -2066,9 +2058,13 @@ describe('tryHandleAnonymousOnboardingChat', () => {
         'req-jov8500-preview'
       );
 
-      // The bypass stays armed on Vercel; the gate was never consulted.
-      expect(hoisted.verifyTurnstileTokenMock).not.toHaveBeenCalled();
-      expect(result?.status).toBe(200);
+      // On Vercel preview the bypass was never armed (isSecureTurnstileEnvironment),
+      // so the flag cannot change behavior: the gate runs and challenges.
+      expect(result?.status).toBe(403);
+      await expect(result?.json()).resolves.toMatchObject({
+        errorCode: 'TURNSTILE_REQUIRED',
+      });
+      expect(hoisted.verifyTurnstileTokenMock).toHaveBeenCalledTimes(1);
     });
   });
 
