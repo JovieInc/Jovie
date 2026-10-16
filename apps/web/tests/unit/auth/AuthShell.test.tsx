@@ -471,7 +471,7 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     render(<AuthShell mode='sign-up' />);
     const terms = screen.getByRole('link', { name: 'Terms of Service' });
     const privacy = screen.getByRole('link', { name: 'Privacy Policy' });
-    const signIn = screen.getByRole('link', { name: 'Sign in', exact: true });
+    const signIn = screen.getByRole('link', { name: /^Sign in$/ });
     const google = await screen.findByRole('button', { name: /google/i });
     await user.click(google);
     expect(google).toBeDisabled();
@@ -489,9 +489,7 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     expect(await screen.findByRole('alert')).toBeVisible();
     expect(screen.getByRole('link', { name: 'Terms of Service' })).toBe(terms);
     expect(screen.getByRole('link', { name: 'Privacy Policy' })).toBe(privacy);
-    expect(screen.getByRole('link', { name: 'Sign in', exact: true })).toBe(
-      signIn
-    );
+    expect(screen.getByRole('link', { name: /^Sign in$/ })).toBe(signIn);
     expect(terms).toHaveFocus();
     expect(google).toBeEnabled();
     expect(signInSocialMock).toHaveBeenCalledTimes(1);
