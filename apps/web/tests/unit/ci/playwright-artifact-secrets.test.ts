@@ -1854,6 +1854,7 @@ ${fixtureCheckout}
     expect(run).toContain("PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'");
     expect(run).toContain("PLAYWRIGHT_ARTIFACT_REPORT_PATHS: 'true'");
     expect(upload).toContain("allow-markdown: 'true'");
+    expect(upload).toContain("diagnostic-paths: 'true'");
     expect(upload).not.toMatch(/allow-images:\s*'true'/);
     expect(markdownAllowedJobs.has('e2e-full-matrix.yml:e2e-full-matrix')).toBe(
       true
@@ -2832,6 +2833,9 @@ ${fixtureCheckout}
       'utf8'
     );
     expect(action).toMatch(/\[\[ -f "\$producer_root\/current"/);
+    expect(action).toContain(
+      'Refusing upload: the Playwright producer stage is blocked after an unsafe artifact finding.'
+    );
     expect(action).toMatch(/\[\[ -d "\$source_root"/);
     expect(action).toMatch(/public-images:/);
     expect(action).toMatch(/PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES/);

@@ -309,6 +309,7 @@ jobs:
           allow-images: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter == 'tests/e2e/profile/public-profile-cta-identity.spec.ts' }}
           public-images: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter == 'tests/e2e/profile/public-profile-cta-identity.spec.ts' }}
           allow-markdown: 'true'
+          diagnostic-paths: 'true'
 
       - name: Cleanup Clerk E2E test users
         if: ${{ always() && steps.neon-branch.outcome == 'success' }}
