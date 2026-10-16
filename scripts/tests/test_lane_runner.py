@@ -240,9 +240,9 @@ class SelectionTest(unittest.TestCase):
             route=lambda task: {"chosen": {"lane": "devin" if task is target else "codex"}}), other)
 
     def test_dispatch_next_without_pool_admission_keeps_default_order(self):
-        unadmitted = issue("JOV-PIN", priority=4, labels=["dispatch-next"])
-        urgent = issue("JOV-URGENT", priority=1)
-        self.assertIs(lane.pick_issue([unadmitted, urgent], {}, now=10000), urgent)
+        unadmitted = issue("JOV-PIN", priority=2, labels=["dispatch-next"])
+        other = issue("JOV-OTHER", priority=2, created="2026-08-31T00:00:00Z")
+        self.assertIs(lane.pick_issue([unadmitted, other], {}, now=10000), other)
 
     def test_rejection_reasons_match_final_worker_admission(self):
         red = issue("JOV-RED")

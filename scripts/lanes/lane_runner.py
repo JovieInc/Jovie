@@ -174,7 +174,7 @@ SWEEP_EVERY_S = 1800
 PROVIDER_COOLDOWN_S = 900
 WORKTREE_INSTALL = ["pnpm", "install", "--frozen-lockfile", "--prefer-offline",
                     "--package-import-method=hardlink"]
-# Waiting work gains one priority level per day, capped at urgent. This preserves
+# Non-urgent waiting work gains one effective level per day within its band. This preserves
 # urgent-first admission while guaranteeing that a sustained P1 stream cannot
 # starve older work forever.
 PRIORITY_AGING_S = 24 * 3600
@@ -716,9 +716,10 @@ def pick_issue(issues: list[Issue], failures: dict, now: float | None = None,
                holds: dict[str, int] | None = None,
                held_back: frozenset[str] = frozenset(), route=None,
                target_files: dict | None = None) -> Issue | None:
-    """Symphony orders by tier, aged priority, workstream rank, then age (admission_order).
+    """Symphony orders explicit Urgent first, then designation/tier, aged priority,
+    workstream rank and age (admission_order).
 
-    Waiting work gains one priority level per day until it reaches P1, preventing a
+    Non-urgent waiting work gains one effective priority level per day, preventing a
     sustained stream of newer urgent work from starving older work. Excluded work,
     3x failures, retry backoff, issues with an open lane PR, duplicate candidates and
     issues aimed at a held hotspot (pool_rejections) remain ineligible, as do issues
