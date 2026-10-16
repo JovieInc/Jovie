@@ -265,6 +265,7 @@ async function authorize(world: World, env: Record<string, string> = {}) {
       ...workflowRunEnv(),
       ...env,
       GITHUB_OUTPUT: output,
+      GITHUB_WORKSPACE: repoRoot,
       RUNNER_TEMP: root,
     },
     route: routes(world),

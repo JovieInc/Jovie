@@ -328,8 +328,8 @@ describe.skipIf(!gh)(
           env: {
             PATH: `${bin}:${process.env.PATH ?? ''}`,
             GITHUB_OUTPUT: output,
-            GITHUB_REPOSITORY: 'JovieInc/Jovie',
             GITHUB_WORKSPACE: repoRoot,
+            GITHUB_REPOSITORY: 'JovieInc/Jovie',
             EXPECTED_COMMIT_SHA: SHA,
             RESOLVE_MAIN_BUDGET_SECONDS: '0',
             RESOLVE_MAIN_RETRY_SECONDS: '0',
@@ -345,8 +345,8 @@ describe.skipIf(!gh)(
         env: {
           PATH: `${bin}:${process.env.PATH ?? ''}`,
           GITHUB_OUTPUT: '/dev/null',
-          GITHUB_REPOSITORY: 'JovieInc/Jovie',
           GITHUB_WORKSPACE: repoRoot,
+          GITHUB_REPOSITORY: 'JovieInc/Jovie',
           RESOLVE_MAIN_BUDGET_SECONDS: '0',
           RESOLVE_MAIN_RETRY_SECONDS: '0',
         },
@@ -433,7 +433,7 @@ describe.skipIf(!gh)(
   { timeout: 60_000 },
   () => {
     const resultJob = job('release-result');
-    const resultStep = resultJob.steps[0] as Step;
+    const resultStep = step(resultJob, 'Resolve release result');
     type Needs = Record<
       string,
       { result?: string; outputs?: Record<string, string> }
@@ -480,6 +480,7 @@ describe.skipIf(!gh)(
         }),
         env: {
           GITHUB_OUTPUT: output,
+          GITHUB_WORKSPACE: repoRoot,
           EXPECTED_SHA: SHA,
           PROMOTION_SHA: promote.promotion_sha ?? '',
           PRODUCTION_DEPLOYMENT_ID: promote.production_deployment_id ?? '',

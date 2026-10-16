@@ -24,11 +24,32 @@ err="$(mktemp)"
 out="$(mktemp)"
 trap 'rm -f "$err" "$out"' EXIT
 
+# A PATH shim that wraps this script must set GH_API_HOLD_BIN to the real
+# gh binary. Otherwise the shim and this script call each other.
+gh_bin="${GH_API_HOLD_BIN:-gh}"
+
+invoke_gh() {
+  local arg zip=0
+  for arg in "$@"; do
+    case "${arg%%\?*}" in
+      */zip) zip=1 ;;
+    esac
+  done
+  # gh 2.102 treats every GH_FORCE_TTY value, including 0, as a terminal and
+  # refuses application/zip. Zip reads inherit a real file stdout. JSON reads
+  # keep the caller's tty setting.
+  if [ "$zip" -eq 1 ]; then
+    env -u GH_FORCE_TTY "$gh_bin" "$@"
+    return
+  fi
+  "$gh_bin" "$@"
+}
+
 run_gh() {
   : >"$err"
   : >"$out"
   set +e
-  gh "$@" >"$out" 2>"$err"
+  invoke_gh "$@" >"$out" 2>"$err"
   status=$?
   set -e
 }
@@ -48,7 +69,7 @@ fi
 # GET /rate_limit does not spend the bucket it reports, including while that
 # bucket is empty. The reset instant is x-ratelimit-reset for the core resource.
 set +e
-reset="$(gh api rate_limit --jq '.resources.core.reset // empty' 2>/dev/null)"
+reset="$("$gh_bin" api rate_limit --jq '.resources.core.reset // empty' 2>/dev/null)"
 reset_status=$?
 set -e
 now="$(date +%s)"

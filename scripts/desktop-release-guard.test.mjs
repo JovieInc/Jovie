@@ -913,6 +913,10 @@ test('desktop authorizer retries transient GitHub API failures', async t => {
   const helper = proof.slice(helperStart, helperEnd);
   const root = await mkdtemp(join(tmpdir(), 'jovie-desktop-gh-retry-'));
   t.after(() => rm(root, { force: true, recursive: true }));
+  await copyFile(
+    new URL('../.github/scripts/gh-api-hold.sh', import.meta.url),
+    join(root, 'gh-api-hold.sh')
+  );
   const mockBin = join(root, 'bin');
   const counter = join(root, 'attempts');
   await mkdir(mockBin);
@@ -2085,6 +2089,11 @@ esac
 `
   );
   await chmod(join(mockBin, 'gh'), 0o755);
+  await mkdir(join(root, '.github/scripts'), { recursive: true });
+  await copyFile(
+    new URL('../.github/scripts/gh-api-hold.sh', import.meta.url),
+    join(root, '.github/scripts/gh-api-hold.sh')
+  );
 
   const result = spawnSync(
     'bash',

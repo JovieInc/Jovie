@@ -4177,7 +4177,7 @@ describe('production promotion exact-artifact contract', () => {
       'bash .github/scripts/promote-production-deployment.sh'
     );
     const resolveMainIndex = finalCurrentStep.indexOf(
-      'current_main_sha="$(gh api "repos/${{ github.repository }}/commits/main"'
+      'current_main_sha="$(bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" api "repos/${{ github.repository }}/commits/main"'
     );
     const compareMainIndex = finalCurrentStep.indexOf(
       'if [[ "$current_main_sha" != "$EXPECTED_MAIN_SHA" ]]'
@@ -4900,7 +4900,7 @@ describe('production promotion exact-artifact contract', () => {
       'queued|in_progress|pending|requested|waiting)'
     );
     expect(healthEvaluation).toContain(
-      'gh api "repos/$REPOSITORY/actions/runs/$controller_id"'
+      'bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" api "repos/$REPOSITORY/actions/runs/$controller_id"'
     );
     expect(healthEvaluation).toContain('changed_controller_run');
     expect(healthEvaluation).toContain(
@@ -4988,7 +4988,7 @@ describe('production promotion exact-artifact contract', () => {
     }
 
     const listingFilterMatch =
-      /controller_runs="\$\(gh api[\s\S]*?jq -e '\n([\s\S]*?)\n\s+' >\/dev\/null <<<"\$controller_runs"/.exec(
+      /controller_runs="\$\(bash "\$GITHUB_WORKSPACE\/\.github\/scripts\/gh-api-hold\.sh" api[\s\S]*?jq -e '\n([\s\S]*?)\n\s+' >\/dev\/null <<<"\$controller_runs"/.exec(
         health
       );
     expect(listingFilterMatch).not.toBeNull();
@@ -5025,7 +5025,7 @@ describe('production promotion exact-artifact contract', () => {
     }
 
     const predeployFilterMatch =
-      /controller_jobs="\$\(gh api[\s\S]*?if jq -e --argjson run_id "\$controller_id" --arg sha "\$current_sha" '\n([\s\S]*?)\n\s+' >\/dev\/null <<<"\$controller_jobs"; then/.exec(
+      /controller_jobs="\$\(bash "\$GITHUB_WORKSPACE\/\.github\/scripts\/gh-api-hold\.sh" api[\s\S]*?if jq -e --argjson run_id "\$controller_id" --arg sha "\$current_sha" '\n([\s\S]*?)\n\s+' >\/dev\/null <<<"\$controller_jobs"; then/.exec(
         healthEvaluation
       );
     expect(predeployFilterMatch).not.toBeNull();
@@ -5422,9 +5422,13 @@ describe('production marker recovery workflow (JOV-4965)', () => {
     expect(preserve).toContain(
       '[.artifacts[] | select(.expired == true) | .id] | .[]'
     );
+    expect(validate).toContain('gh-api-hold.sh');
+    expect(preserve).toContain('gh-api-hold.sh');
+    expect(confirm).toContain('gh-api-hold.sh');
     expect(preserve).toContain(
       'gh api -X DELETE "repos/$REPO/actions/artifacts/$artifact_id"'
     );
+    expect(workflow).not.toContain('gh_read api -X DELETE');
     expect(workflow).toContain(
       'name: production-generation-verified-${{ env.EXPECTED_SHA }}'
     );
@@ -5535,6 +5539,7 @@ esac
             FIXTURES: root,
             GITHUB_OUTPUT: output,
             EXPECTED_SHA: deployed,
+            GITHUB_WORKSPACE: repoRoot,
             EXPECTED_DEPLOYMENT_ID: 'dpl_recovery123',
             SOURCE_CONTROLLER_RUN: '37144574062',
             SOURCE_CONTROLLER_ATTEMPT: '1',
@@ -5562,6 +5567,54 @@ esac
           'is not an exact completed Production Controller attempt'
         );
         expect(result.output).not.toContain('recovery_required=true');
+      }
+    }, 30_000);
+
+    it('fails closed on a permission 403 without admitting recovery', () => {
+      const parsed = parseYaml(
+        readFileSync(productionMarkerRecoveryWorkflowPath, 'utf8')
+      ) as {
+        jobs: Record<string, { steps: Array<{ name?: string; run?: string }> }>;
+      };
+      const script = parsed.jobs['recover-marker'].steps.find(
+        step => step.name === 'Validate bounded recovery request'
+      )?.run;
+      const root = mkdtempSync(resolve(tmpdir(), 'marker-admission-deny-'));
+      try {
+        const bin = resolve(root, 'bin');
+        mkdirSync(bin);
+        writeFileSync(
+          resolve(bin, 'gh'),
+          `#!/usr/bin/env bash
+echo "Resource not accessible by integration" >&2
+exit 1
+`
+        );
+        chmodSync(resolve(bin, 'gh'), 0o700);
+        const output = resolve(root, 'output');
+        writeFileSync(output, '');
+        const result = spawnSync('bash', ['-c', script!], {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${bin}:${process.env.PATH ?? ''}`,
+            GITHUB_OUTPUT: output,
+            GITHUB_WORKSPACE: repoRoot,
+            EXPECTED_SHA: 'd'.repeat(40),
+            EXPECTED_DEPLOYMENT_ID: 'dpl_recovery123',
+            SOURCE_CONTROLLER_RUN: '37144574062',
+            SOURCE_CONTROLLER_ATTEMPT: '1',
+            REPO: 'JovieInc/Jovie',
+            REQUEST_MODE: 'workflow_dispatch',
+          },
+        });
+        expect(result.status, result.stderr).not.toBe(0);
+        expect(result.stderr).not.toMatch(/Holding /);
+        expect(readFileSync(output, 'utf8')).not.toContain(
+          'recovery_required=true'
+        );
+      } finally {
+        rmSync(root, { force: true, recursive: true });
       }
     }, 30_000);
   });
