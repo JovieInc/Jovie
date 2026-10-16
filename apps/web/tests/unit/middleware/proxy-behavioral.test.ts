@@ -722,7 +722,7 @@ describe('proxy.ts middleware', () => {
       }
     });
 
-    it('lets anonymous /onboarding/checkout render when the screenshot fixture is admitted', async () => {
+    it('keeps anonymous /onboarding/checkout behind sign-in when the screenshot fixture is admitted', async () => {
       const previous = snapshotFixtureEnv();
       clearFixtureEnv();
       process.env.CI = 'true';
@@ -733,8 +733,11 @@ describe('proxy.ts middleware', () => {
         });
         const res = await callMiddleware(req);
 
-        expect(res.status).toBeLessThan(300);
-        expect(res.headers.get('location')).toBeNull();
+        expect(res.status).toBe(307);
+        expect(isRedirectTo(res, '/signin')).toBe(true);
+        expect(res.headers.get('location')).toContain(
+          'redirect_url=%2Fonboarding%2Fcheckout'
+        );
       } finally {
         restoreFixtureEnv(previous);
       }
