@@ -375,9 +375,9 @@ class SelectionTest(unittest.TestCase):
         )
         return task
 
-    def test_recorded_route_comparison_is_not_a_live_price_change(self):
+    def test_uncertified_route_comparison_retains_the_existing_hold(self):
         task = self.pricing_comparison_issue()
-        self.assertEqual(lane.pick_issue([task], {}, provider="codex"), task)
+        self.assertIsNone(lane.pick_issue([task], {}, provider="codex"))
 
     def test_route_observation_cannot_mask_a_requested_mutation(self):
         task = self.pricing_comparison_issue()
@@ -386,6 +386,8 @@ class SelectionTest(unittest.TestCase):
             "Change it to $199.",
             "Set that amount to 199.",
             "Lower it to 199.",
+            "Reduce that amount to 199.",
+            "Bump that amount to 199.",
             "Synchronize that amount with the paid plan.",
             "Update the footer label.",  # Ambiguous mutation context stays conservative.
             "Rotate production credentials.",
@@ -418,13 +420,14 @@ class SelectionTest(unittest.TestCase):
                 task.description = description
                 self.assertIsNone(lane.pick_issue([task], {}, provider="codex"))
 
-    def test_recorded_reference_preserves_sensitive_provider_and_explicit_label_policy(self):
-        task = self.pricing_comparison_issue()
-        task.labels.append("infra")
-        self.assertIsNone(lane.pick_issue([task], {}, provider="grok"))
-        self.assertEqual(lane.pick_issue([task], {}, provider="codex"), task)
-        task.labels.append("hold")
-        self.assertIsNone(lane.pick_issue([task], {}, provider="codex"))
+    def test_plural_production_prices_are_held(self):
+        task = issue("JOV-9", labels=["agent-ready"])
+        task.title = "Update annual plan"
+        for description in ("Change live prices.", "Reduce production prices.",
+                            "Adjust prices in prod."):
+            with self.subTest(description=description):
+                task.description = description
+                self.assertIsNone(lane.pick_issue([task], {}, provider="codex"))
 
 
 class WorkstreamAdmissionTest(unittest.TestCase):

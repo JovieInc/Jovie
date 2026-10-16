@@ -555,26 +555,8 @@ def issue_is_sensitive(issue: Issue) -> bool:
 
 
 def issue_hits_red_line(issue: Issue) -> bool:
-    text = f"{issue.title}\n\n{issue.description}"
-    # A Markdown destination is evidence, not an instruction. Keep its visible
-    # label so e.g. "Change live [pricing](...)" still hits the same policy.
-    text = re.sub(r"\]\(\s*<?https?://[^\s)]+>?\s*\)", "]", text)
-    # Only a recorded design comparison qualifies here. Imperative route
-    # references and ambiguous price-change context retain the original hold.
-    safe_spans = []
-    mutations = (r"\b(?:chang|updat|set|rais|lower|repric|charg|adjust|modif|replac|"
-                 r"writ|appl|overwrit|cop|sync|match|fix|mak|increas|decreas)\w*\b|"
-                 r"[$€£]|\b(?:USD|EUR|GBP)\b")
-    if not re.search(mutations, text, re.IGNORECASE):
-        reference = (
-            r"\bcomparing\s+live\s+\[(?:https?://)?(?:[a-z0-9-]+\.)+[a-z]{2,63}/pricing\]"
-            r"\s+at\s+\d{3,4}\s+on\s+\d{4}-\d{2}-\d{2}"
-            r"\s+against\s+Pen's\s+canonical\s+[a-z0-9]+(?:\s+and\s+[a-z0-9]+)?\."
-        )
-        safe_spans = [match.span() for match in re.finditer(reference, text, re.IGNORECASE)]
+    text = f"{issue.title}\n{issue.description}"
     for match in SENSITIVE_RED_LINES.finditer(text):
-        if any(start <= match.start() and match.end() <= end for start, end in safe_spans):
-            continue
         # Public-page schema fixtures are test data, not live plan prices.
         # Only exempt this complete reference, never the whole issue.
         if (re.fullmatch(r"live\s+`/pricing", match.group(0), re.IGNORECASE)
