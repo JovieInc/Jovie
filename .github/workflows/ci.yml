@@ -352,12 +352,19 @@ jobs:
   # Successful root for every CI event, with one-shot proof only for push:main.
   # Queue-proven SHAs reuse their exact merge_group gate and skip every duplicate
   # fallback lane. Direct/admin main commits run the complete fallback contract
-  # below. API errors fail main pushes; other events emit neutral defaults so a
-  # skipped ancestor cannot cascade through Path Changes into every source gate.
+  # below. API errors fail main pushes. An installation rate-limit 403 holds
+  # until x-ratelimit-reset inside this job; past that cap the step stays
+  # green only as rate_limit_hold (queue_proven false), never as proof. Other
+  # events emit neutral defaults so a skipped ancestor cannot cascade through
+  # Path Changes into every source gate.
   main-queue-provenance:
     name: Main Queue Provenance
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    # 55 minutes stays under the one-hour installation token. The jobs-list
+    # read waits until x-ratelimit-reset inside a 50-minute cap, leaving five
+    # minutes for checkout and the retry. A reset past that cap is a visible
+    # rate_limit_hold. A hard cancel would skip the fallback contract.
+    timeout-minutes: 55
     outputs:
       is_current: ${{ steps.verified.outputs.is_current || steps.neutral.outputs.is_current }}
       queue_proven: ${{ steps.verified.outputs.queue_proven || steps.neutral.outputs.queue_proven }}

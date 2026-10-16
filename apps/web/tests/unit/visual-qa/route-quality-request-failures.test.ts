@@ -3,7 +3,7 @@ import {
   classifySameOriginRequestFailure,
   formatRequestFailure,
   isAbortedNextRscPrefetch,
-  isAbortedNextStaticCssChunk,
+  isAbortedNextStaticChunk,
   isDiagnosticAbortedImageRequest,
 } from '../../visual-qa/aborted-image-request';
 
@@ -134,14 +134,22 @@ describe('classifySameOriginRequestFailure', () => {
     ).toBe('ignored');
   });
 
-  it('ignores aborted Next.js static CSS chunks cancelled with a prefetch', () => {
+  it('ignores aborted Next.js static CSS and JS chunks cancelled with a prefetch', () => {
     const url = `${ORIGIN}/_next/static/chunks/3pzix5p8t1bdp.css`;
     expect(
-      isAbortedNextStaticCssChunk({
+      isAbortedNextStaticChunk({
         errorText: 'net::ERR_ABORTED',
         url,
       })
     ).toBe(true);
+    expect(
+      classifySameOriginRequestFailure({
+        errorText: 'net::ERR_ABORTED',
+        resourceType: 'script',
+        sameOrigin: true,
+        url: `${ORIGIN}/_next/static/chunks/3mpw_jkarupyb.js`,
+      })
+    ).toBe('ignored');
     expect(
       classifySameOriginRequestFailure({
         errorText: 'net::ERR_ABORTED',
@@ -162,7 +170,7 @@ describe('classifySameOriginRequestFailure', () => {
     // `<link rel="stylesheet">` load is a navigation cancellation wherever
     // the URL points, including outside the chunk path and with no URL.
     expect(
-      isAbortedNextStaticCssChunk({
+      isAbortedNextStaticChunk({
         errorText: 'net::ERR_ABORTED',
         resourceType: 'stylesheet',
         url: `${ORIGIN}/styles/app.css`,
@@ -191,7 +199,15 @@ describe('classifySameOriginRequestFailure', () => {
         errorText: 'net::ERR_ABORTED',
         resourceType: 'script',
         sameOrigin: true,
-        url: `${ORIGIN}/_next/static/chunks/app.js`,
+        url: `${ORIGIN}/scripts/app.js`,
+      })
+    ).toBe('failed-request');
+    expect(
+      classifySameOriginRequestFailure({
+        errorText: 'net::ERR_FAILED',
+        resourceType: 'script',
+        sameOrigin: true,
+        url: `${ORIGIN}/_next/static/chunks/3mpw_jkarupyb.js`,
       })
     ).toBe('failed-request');
     expect(

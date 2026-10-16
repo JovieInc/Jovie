@@ -2,14 +2,17 @@
 # Run `gh "$@"` and, only for a GitHub rate-limit response, hold until
 # x-ratelimit-reset when that instant is inside the budget.
 #
-# The budget is the smaller of GH_API_HOLD_BUDGET_SECONDS (default 90, the
-# same window as resolve-main-sha.sh) and GH_API_HOLD_TOKEN_CAP_SECONDS
-# (default 3000, under the one-hour installation token). A reset outside that
-# window exits non-zero. A non-rate-limit error exits non-zero. Exit 0 happens
-# only after `gh` itself succeeds, so a 403 never passes as an empty result.
+# The budget is the smaller of GH_API_HOLD_BUDGET_SECONDS and
+# GH_API_HOLD_TOKEN_CAP_SECONDS. Both default to 3000s, under the one-hour
+# installation token and long enough to reach a primary-limit reset. A job
+# shorter than that must set GH_API_HOLD_BUDGET_SECONDS below its timeout
+# (resolve-main-sha.sh keeps its own 90s default for five-minute jobs).
+# A reset outside the window exits non-zero. A non-rate-limit error exits
+# non-zero. Exit 0 happens only after `gh` itself succeeds, so a 403 never
+# passes as an empty result.
 set -euo pipefail
 
-budget="${GH_API_HOLD_BUDGET_SECONDS:-90}"
+budget="${GH_API_HOLD_BUDGET_SECONDS:-3000}"
 token_cap="${GH_API_HOLD_TOKEN_CAP_SECONDS:-3000}"
 if [ "$budget" -gt "$token_cap" ]; then
   budget="$token_cap"

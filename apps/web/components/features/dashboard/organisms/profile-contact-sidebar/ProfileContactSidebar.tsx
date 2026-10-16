@@ -264,13 +264,16 @@ export function ProfileContactSidebar() {
   const { previewData, setPreviewData } = usePreviewPanelData();
   const { selectedProfile } = useDashboardData();
 
-  // Rail mode: 'view' is the deliberately compact, read-only chat summary;
-  // 'edit' remains available for legacy deep links while Connections is the
-  // canonical management workspace.
-  const [mode, setMode] = useState<'view' | 'edit'>('view');
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  // Rail mode: 'view' is the deliberately compact, read-only chat summary.
+  // A `tab` deep link (social, music, earn, about) opens the editor. The
+  // bare chat rail stays in view. Connections remains the canonical workspace.
+  const requestedTab = resolveCategoryFromTab(searchParams.get('tab'));
+  const [mode, setMode] = useState<'view' | 'edit'>(
+    requestedTab ? 'edit' : 'view'
+  );
   const { data: monetizationSummary } = useProfileMonetizationSummary(
     Boolean(selectedProfile)
   );
@@ -514,11 +517,11 @@ export function ProfileContactSidebar() {
 
   useEffect(() => {
     const requestedCategory = resolveCategoryFromTab(searchParams.get('tab'));
-    if (
-      requestedCategory &&
-      requestedCategory !== selectedCategoryRef.current
-    ) {
-      setSelectedCategory(requestedCategory);
+    if (requestedCategory) {
+      setMode('edit');
+      if (requestedCategory !== selectedCategoryRef.current) {
+        setSelectedCategory(requestedCategory);
+      }
     }
 
     if (
@@ -852,6 +855,18 @@ export function ProfileContactSidebar() {
   const handleViewAnalytics = useCallback(() => {
     router.push(APP_ROUTES.AUDIENCE);
   }, [router]);
+
+  const leaveEditMode = useCallback(() => {
+    setMode('view');
+    const nextParams = new URLSearchParams(searchParams.toString());
+    if (!nextParams.has('tab') && !nextParams.has('addLink')) return;
+    nextParams.delete('tab');
+    nextParams.delete('addLink');
+    const nextSearch = nextParams.toString();
+    router.replace(`${pathname}${nextSearch ? `?${nextSearch}` : ''}`, {
+      scroll: false,
+    });
+  }, [pathname, router, searchParams]);
 
   const handleManageConnections = useCallback(
     (destination: string) => {
@@ -1262,7 +1277,7 @@ export function ProfileContactSidebar() {
           previewData={previewData}
           profileUrl={profileUrl}
           onClose={close}
-          onDone={() => setMode('view')}
+          onDone={leaveEditMode}
           overflowActions={overflowActions}
         />
       }

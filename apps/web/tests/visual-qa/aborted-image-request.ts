@@ -50,21 +50,19 @@ export function isAbortedNextRscPrefetch(input: {
   );
 }
 
-const NEXT_STATIC_CSS_CHUNK = /^\/_next\/static\/chunks\/.+\.css$/;
+const NEXT_STATIC_CHUNK = /^\/_next\/static\/chunks\/.+\.(?:css|js)$/;
 
 /**
- * Next.js discovers a prefetched route's CSS while the RSC flight is in
- * flight, then Chromium aborts those `<link rel="stylesheet">` loads when
- * navigation cancels the prefetch. Only that abort is expected: a chunk
- * that fails for any other reason, and any aborted request outside the
- * same-origin CSS surfaces below, stays on the request-failure gate.
- * The abort counts on either CSS evidence shape: a `stylesheet`
- * resourceType (the `<link rel="stylesheet">` navigation cancellation,
- * wherever the URL points), or a URL under `/_next/static/chunks/`
- * ending in `.css` (Playwright sometimes reports the cancellation with
- * a non-stylesheet resourceType).
+ * Next.js discovers a prefetched route's CSS and JS while the RSC flight is
+ * in flight, then Chromium aborts those chunk loads when navigation cancels
+ * the prefetch. Only that abort is expected. A `stylesheet` resourceType
+ * is CSS evidence wherever the URL points, including when no URL is given.
+ * Otherwise, the URL must match `/_next/static/chunks/*.{css,js}`.
+ * Same-origin filtering happens in classifySameOriginRequestFailure;
+ * non-abort failures and aborted requests without either evidence shape
+ * stay on the request-failure gate.
  */
-export function isAbortedNextStaticCssChunk(input: {
+export function isAbortedNextStaticChunk(input: {
   readonly errorText: string | undefined;
   readonly resourceType?: string;
   readonly url?: string;
@@ -73,7 +71,7 @@ export function isAbortedNextStaticCssChunk(input: {
   if (input.resourceType === 'stylesheet') return true;
   if (!input.url) return false;
   try {
-    return NEXT_STATIC_CSS_CHUNK.test(new URL(input.url).pathname);
+    return NEXT_STATIC_CHUNK.test(new URL(input.url).pathname);
   } catch {
     return false;
   }
@@ -94,7 +92,7 @@ export function classifySameOriginRequestFailure(input: {
   if (!input.sameOrigin) return 'ignored';
   if (isDiagnosticAbortedImageRequest(input)) return 'aborted-image';
   if (isAbortedNextRscPrefetch(input)) return 'ignored';
-  if (isAbortedNextStaticCssChunk(input)) return 'ignored';
+  if (isAbortedNextStaticChunk(input)) return 'ignored';
   return 'failed-request';
 }
 
