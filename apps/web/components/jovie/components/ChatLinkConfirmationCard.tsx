@@ -228,28 +228,30 @@ function ChatLinkConfirmationTask({
   return (
     <ChatToolSurface className='system-b-chat-link-card system-b-chat-link-card-add @container'>
       <div
-        className='grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3 @sm:grid-cols-[auto_minmax(0,1fr)_auto]'
+        className='flex flex-wrap items-center gap-3'
         data-task-state={state}
       >
-        <span className='system-b-chat-link-card-icon system-b-chat-link-card-icon-add'>
-          <SocialIcon
-            platform={normalizeSocialPlatform(platform.icon)}
-            className='h-5 w-5 shrink-0'
-            aria-hidden
-          />
-        </span>
-        <div className='min-w-0 flex-1'>
-          <p className='text-sm font-medium text-primary-token'>
-            {platform.name}
-          </p>
-          <p
-            className='truncate text-xs text-tertiary-token'
-            title={normalizedUrl}
-          >
-            {normalizedUrl}
-          </p>
+        <div className='flex min-w-0 flex-1 basis-full items-center gap-3 @sm:basis-0'>
+          <span className='system-b-chat-link-card-icon system-b-chat-link-card-icon-add'>
+            <SocialIcon
+              platform={normalizeSocialPlatform(platform.icon)}
+              className='h-5 w-5 shrink-0'
+              aria-hidden
+            />
+          </span>
+          <div className='min-w-0 flex-1'>
+            <p className='text-sm font-medium text-primary-token'>
+              {platform.name}
+            </p>
+            <p
+              className='truncate text-xs text-tertiary-token'
+              title={normalizedUrl}
+            >
+              {normalizedUrl}
+            </p>
+          </div>
         </div>
-        <div className='col-span-2 flex flex-wrap items-center justify-end gap-1.5 @sm:col-span-1'>
+        <div className='ml-auto flex max-w-full flex-wrap items-center justify-end gap-1.5'>
           <Button
             type='button'
             variant='primary'
