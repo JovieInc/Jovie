@@ -12,7 +12,7 @@
  */
 
 import { z } from 'zod';
-import { DSP_PROFILE_CATALOG } from './dsp-profile-catalog';
+import { ARTIST_PROFILE_CATALOG } from './artist-profile-catalog';
 import { validateConnectorRegistry } from './registry-validation';
 import { SPOTIFY_OAUTH_SCOPES } from './spotify/scopes';
 import {
@@ -129,7 +129,7 @@ export const CONNECTOR_REGISTRY = validateConnectorRegistry({
     description: 'Read playlists and publish playlists you approve.',
     iconKey: 'spotify',
     oauthBundle: 'spotify',
-    artistProfile: DSP_PROFILE_CATALOG.spotify.artistProfile,
+    artistProfile: ARTIST_PROFILE_CATALOG.spotify.artistProfile,
     oauthScopes: [...SPOTIFY_OAUTH_SCOPES],
     oauthScopeLabels: [
       'View Account Email',
@@ -175,7 +175,7 @@ export const CONNECTOR_REGISTRY = validateConnectorRegistry({
       'Import videos into Work and apply thumbnail changes you approve. Comment reply sending is disabled.',
     iconKey: 'youtube',
     oauthBundle: 'youtube',
-    artistProfile: DSP_PROFILE_CATALOG.youtube.artistProfile,
+    artistProfile: ARTIST_PROFILE_CATALOG.youtube.artistProfile,
     oauthScopes: YOUTUBE_OAUTH_SCOPES,
     oauthScopeLabels: [
       'Read Channel Data',
