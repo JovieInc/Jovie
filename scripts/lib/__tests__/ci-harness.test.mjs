@@ -414,7 +414,7 @@ describe('ci-harness manifest', () => {
     expect(action).not.toContain('secrets.');
   });
 
-  it('authenticates production observer signals before applying their release policy', () => {
+  describe('authenticated production observer release policies', () => {
     const fixture = JSON.parse(
       readFileSync(
         resolve(
@@ -426,6 +426,7 @@ describe('ci-harness manifest', () => {
     );
     const workflows = [
       {
+        name: 'authenticates and pins a distinct certified TestFlight source',
         job: 'authorize-release',
         path: '.github/workflows/ios-testflight.yml',
         workflowIdentityMarker: 'production_controller_workflow="$(gh api',
@@ -434,6 +435,7 @@ describe('ci-harness manifest', () => {
         pinnedSource: true,
       },
       {
+        name: 'neutralizes only well-formed superseded production observer signals',
         job: 'authorize-release',
         path: '.github/workflows/desktop-release.yml',
         workflowIdentityMarker: 'workflow_record="$(gh api',
@@ -443,7 +445,7 @@ describe('ci-harness manifest', () => {
       },
     ];
 
-    for (const observer of workflows) {
+    it.each(workflows)('$name', observer => {
       const workflow = readFileSync(resolve(REPO_ROOT, observer.path), 'utf8');
       const authorize = extractWorkflowJobBlock(workflow, observer.job);
       const selectorStartMarker = observer.selectorStart;
@@ -554,7 +556,7 @@ describe('ci-harness manifest', () => {
         expect(authorize).toContain(
           "should_release: ${{ steps.pin.outputs.lease != '' && steps.select.outputs.should_release == 'true' }}"
         );
-        continue;
+        return;
       }
 
       // Desktop retains its existing supersession policy.
@@ -584,7 +586,7 @@ describe('ci-harness manifest', () => {
       expect(authorize.slice(neutralIndex)).toContain(
         '[ "$verified_count" = "1" ]'
       );
-    }
+    });
   });
 
   it('keeps build and layout in one hosted merge-group workspace', () => {
