@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -27,6 +28,7 @@ const parsedCi = parseYaml(ci) as {
       steps?: readonly {
         id?: string;
         name?: string;
+        run?: string;
         if?: string;
         'continue-on-error'?: boolean;
       }[];
@@ -38,6 +40,7 @@ describe('JOV-6572 canonical artist-site certification workflow', () => {
   it('runs the exact approved profile and outbound journey on the daily lane', () => {
     const command = packageJson.scripts['test:e2e:golden-path:ci'];
     expect(command).toContain('claim-prebuilt.smoke.spec.ts');
+    expect(command).toContain('golden-path-home-welcome.spec.ts');
     expect(command).toContain('golden-path.spec.ts');
     expect(command).toContain('start-entry-continuity.spec.ts');
     expect(command).toContain('GOLDEN_PATH_REQUIRED=1');
@@ -48,6 +51,36 @@ describe('JOV-6572 canonical artist-site certification workflow', () => {
       1440
     );
     expect(nightly).toContain('workflow run ci.yml');
+  });
+
+  it('signs pending claim cookies with an ephemeral key before the server starts', () => {
+    const journey = parsedCi.jobs['ci-golden-path']?.steps?.find(
+      step => step.id === 'canonical_journey'
+    )?.run;
+    const keySetup = journey
+      ?.split('\n')
+      .find(line => line.trimStart().startsWith('export URL_ENCRYPTION_KEY='));
+    expect(keySetup).toBeDefined();
+    expect(journey!.indexOf(keySetup!)).toBeLessThan(
+      journey!.indexOf('PORT=3250 node')
+    );
+    const probe = spawnSync(
+      'bash',
+      [
+        '--noprofile',
+        '--norc',
+        '-euc',
+        `${keySetup}
+      node -e 'if (!/^[a-f0-9]{64}$/.test(process.env.URL_ENCRYPTION_KEY ?? "")) process.exit(1)'
+    `,
+      ],
+      {
+        encoding: 'utf8',
+        env: { ...process.env, BASH_ENV: '', URL_ENCRYPTION_KEY: '' },
+      }
+    );
+    expect(probe.stderr).toBe('');
+    expect(probe.status).toBe(0);
   });
 
   it('joins production-faithful, deployed-profile, and live revenue evidence', () => {
