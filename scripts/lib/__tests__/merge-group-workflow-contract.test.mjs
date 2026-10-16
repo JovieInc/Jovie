@@ -26,7 +26,10 @@ import {
   EXACT_HEAD_COVERAGE_STEP_TIMEOUT,
 } from '../changed-test-coverage.mjs';
 import { MERGE_GROUP_ADMISSION_WAIT_MS } from '../merge-group-admission.mjs';
-import { MERGE_GROUP_POLICY_DEADLINE_MS } from '../merge-group-member-policy.mjs';
+import {
+  MERGE_GROUP_JOB_BUDGET_MS,
+  MERGE_GROUP_POLICY_DEADLINE_MS,
+} from '../merge-group-member-policy.mjs';
 import { NATIVE_QUEUE_POLICY } from '../merge-queue-guard.mjs';
 import { resolveRealGh, runWithRealGh } from '../real-gh-harness.mjs';
 import {
@@ -504,6 +507,11 @@ describe('merge_group workflow contract', () => {
     expect(sizeGuard).toContain('--policy=size');
     expect(sizeGuard).toContain('--policy=size --also=fork');
     expect(MERGE_GROUP_POLICY_DEADLINE_MS).toBeLessThan(60_000);
+    // Holds share the Size Guard job clock, which already includes provisioning.
+    expect(MERGE_GROUP_JOB_BUDGET_MS).toBeGreaterThan(
+      MERGE_GROUP_POLICY_DEADLINE_MS
+    );
+    expect(MERGE_GROUP_JOB_BUDGET_MS).toBeLessThanOrEqual(100_000);
     // A still-running required check must be able to finish: the helper
     // polls for minutes, and the job timeout leaves >=90s for setup so the
     // helper's pending diagnostic (not a hard cancel) is the failure mode.
@@ -2745,14 +2753,21 @@ ${selectedGateScript}`,
       0,
       POSTDEPLOY_PROBES_WORKFLOW.indexOf('\njobs:')
     );
-    expect(header).not.toContain('workflow_run:');
+    const workflow = /** @type {{ on: { workflow_run: unknown } }} */ (
+      load(POSTDEPLOY_PROBES_WORKFLOW)
+    );
+    expect(workflow.on.workflow_run).toEqual({
+      workflows: ['Production Controller'],
+      types: ['completed'],
+      branches: ['main'],
+    });
     expect(header).toMatch(/^  workflow_dispatch:\s*$/m);
     expect(header).not.toMatch(/^  (pull_request|push|merge_group|schedule):/m);
 
-    // Read-only evidence must never hold the deploy lease; coalescing keeps
-    // only the newest probe run during drains.
+    // Read-only evidence never holds the deploy lease. Active probes finish
+    // during drains while pending completions coalesce to the latest target.
     expect(header).toContain('group: postdeploy-probes');
-    expect(header).toContain('cancel-in-progress: true');
+    expect(header).toContain('cancel-in-progress: false');
     expect(header).toContain('contents: read');
     expect(header).toContain('actions: read');
     expect(POSTDEPLOY_PROBES_WORKFLOW).not.toContain(

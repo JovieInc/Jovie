@@ -162,6 +162,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
     state = host.state
     tick = read_json(state / "tick.json", {})
     ledger_evidence = shipping_attribution.read_ledger(state / "runs" / "ledger.jsonl")
+    ledger_evidence["remoteIngest"] = tick.get("shippingOriginIngest")
     all_receipts = ledger_evidence["rows"]
     receipts = [receipt for receipt in all_receipts
                 if (ended := age_s(receipt.get("endedAt"), now)) is not None and ended <= 86400]

@@ -1,5 +1,5 @@
 {
-  "$comment": "Measured inventory only; radius detector activation follows in a separate change.",
+  "$comment": "Active shrink-only radius gate in concentric-radius-contract.test.ts. Growth fails; lower the committed count when drift is removed. The files field records the measured inventory.",
   "$provenance": {
     "sourceSha": "75034f8539e0b039fb2ec8ff33c0102598d86198",
     "detectorSha256": "74f94d09f6074eb1fe5088e11fd2008eeecb8ecfaea4c161160152ef5f13bc83"

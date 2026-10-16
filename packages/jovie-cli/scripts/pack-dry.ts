@@ -163,7 +163,7 @@ async function runInstalledCriticalCommand(
       url: request.url,
     });
     response.writeHead(200, { 'Content-Type': 'application/json' });
-    response.end('{"openapi":"3.1.0","info":{"title":"Jovie Artist API"}}');
+    response.end('{"openapi":"3.1.0","info":{"title":"Jovie Public API"}}');
   });
 
   await new Promise<void>((resolvePromise, reject) => {

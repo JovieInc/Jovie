@@ -1,7 +1,10 @@
+import '@/styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { type ReactNode, useEffect, useState } from 'react';
+import { fixtureInventory } from '@/lib/ovie/certifications/fixtures';
 import type { OvieInbox as Inbox } from '@/lib/ovie/inbox';
+import { projectOvieInbox } from '@/lib/ovie/inbox';
 import { OvieInbox } from './OvieInbox';
 
 const pending: Inbox = {
@@ -94,4 +97,8 @@ export const IncompleteCoverage: Story = {
     cases: [],
     issues: ['Customer inventory is not connected.'],
   }),
+};
+
+export const Certification: Story = {
+  decorators: withInbox(projectOvieInbox([], [], fixtureInventory())),
 };

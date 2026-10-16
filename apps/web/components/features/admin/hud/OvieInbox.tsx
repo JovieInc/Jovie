@@ -10,6 +10,7 @@ import {
   inboxDecisionRequest,
 } from '@/lib/ovie/inbox';
 import { FREQUENT_CACHE } from '@/lib/queries/cache-strategies';
+import { CertificationReviewCard } from '../certifications/CertificationReviewCard';
 
 const FOUNDER_NOTE_TARGET = {
   type: 'founder-note',
@@ -136,35 +137,43 @@ export function OvieInbox({ caseId }: { readonly caseId?: string }) {
             </div>
           ) : item ? (
             <article data-testid='ovie-inbox-decision' key={item.id}>
-              <h3 className='text-balance text-app font-medium text-primary-token'>
-                {item.title}
-              </h3>
-              <p className='mt-2 whitespace-pre-wrap text-app text-secondary-token'>
-                {item.body}
-              </p>
-              <p className='mt-3 text-app text-secondary-token'>
-                {item.recommendation}
-              </p>
-              <ul className='mt-3 space-y-1'>
-                {item.evidence
-                  .filter(
-                    ref =>
-                      /^https?:\/\//u.test(ref) ||
-                      ref.startsWith('/api/admin/hud/visual-qa/')
-                  )
-                  .map(ref => (
-                    <li key={ref}>
-                      <a
-                        className='break-all text-xs underline'
-                        href={ref}
-                        target='_blank'
-                        rel='noopener noreferrer'
-                      >
-                        View evidence: {ref}
-                      </a>
-                    </li>
-                  ))}
-              </ul>
+              {item.certification ? (
+                <CertificationReviewCard {...item.certification} />
+              ) : (
+                <>
+                  <h3 className='text-balance text-app font-medium text-primary-token'>
+                    {item.title}
+                  </h3>
+                  <p className='mt-2 whitespace-pre-wrap text-app text-secondary-token'>
+                    {item.body}
+                  </p>
+                  <p className='mt-3 text-app text-secondary-token'>
+                    {item.recommendation}
+                  </p>
+                </>
+              )}
+              {item.certification ? null : (
+                <ul className='mt-3 space-y-1'>
+                  {item.evidence
+                    .filter(
+                      ref =>
+                        /^https?:\/\//u.test(ref) ||
+                        ref.startsWith('/api/admin/hud/visual-qa/')
+                    )
+                    .map(ref => (
+                      <li key={ref}>
+                        <a
+                          className='break-all text-xs underline'
+                          href={ref}
+                          target='_blank'
+                          rel='noopener noreferrer'
+                        >
+                          View evidence: {ref}
+                        </a>
+                      </li>
+                    ))}
+                </ul>
+              )}
               {item.decisionTarget ? (
                 <div className='mt-4 space-y-3'>
                   <label
@@ -190,7 +199,9 @@ export function OvieInbox({ caseId }: { readonly caseId?: string }) {
                     >
                       {item.decisionTarget.kind === 'linear'
                         ? 'Mark done'
-                        : 'Approve'}
+                        : item.decisionTarget.kind === 'certification'
+                          ? 'Certify'
+                          : 'Approve'}
                     </DrawerButton>
                     <DrawerButton
                       type='button'

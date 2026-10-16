@@ -1,5 +1,8 @@
 import { REDIRECT_ONLY_PUBLIC_ROUTES } from '@/lib/canonical-surface-drift';
-import type { CanonicalSurfaceDefinition } from '@/lib/canonical-surfaces';
+import {
+  CANONICAL_SURFACES,
+  type CanonicalSurfaceDefinition,
+} from '@/lib/canonical-surfaces';
 
 export const CANONICAL_SURFACE_REDIRECT_FIXTURE_TEST_ID =
   'canonical-surface-redirect-fixture';
@@ -17,6 +20,7 @@ export const CANONICAL_SURFACE_REDIRECT_FIXTURE_RED_STYLE = {
  */
 export const CANONICAL_SURFACE_REDIRECT_DRIFT_DEFINITION = {
   id: 'homepage',
+  outcomeMission: CANONICAL_SURFACES[0].outcomeMission,
   label: 'Redirect Surfaces',
   liveRoutes: [...REDIRECT_ONLY_PUBLIC_ROUTES],
   reviewRoute: '/ai',

@@ -27,6 +27,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isMissingDeviceEvidence } from './browser-owned-input.mjs';
 import {
   evaluateScreenProof,
   hashArtifactBytes,
@@ -162,7 +163,8 @@ export function emitScreenProof({
   const findings = evaluateScreenProof(proof, { screen, headSha }).filter(
     finding =>
       finding !==
-      'trusted external browser producer integration is unavailable; supplied proof cannot certify'
+        'trusted external browser producer integration is unavailable; supplied proof cannot certify' &&
+      !isMissingDeviceEvidence(finding)
   );
   if (findings.length > 0) {
     throw new Error(

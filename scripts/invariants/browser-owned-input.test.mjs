@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { test } from 'node:test';
 import {
   browserInputFindings,
@@ -7,11 +8,15 @@ import {
   INPUT_MATRIX,
   INPUT_SCHEMA,
   inputCells,
+  isMissingDeviceEvidence,
   semanticFindings,
   transitionFindings,
 } from './browser-owned-input.mjs';
-import { auditScreens } from './screen-audit.mjs';
-import { evaluateScreenProof } from './screen-certification.mjs';
+import { auditScreens, remediationPlans } from './screen-audit.mjs';
+import {
+  evaluateScreenProof,
+  SCREEN_REGISTRY,
+} from './screen-certification.mjs';
 
 const HEAD = 'a'.repeat(40);
 const screenId = 'web.public-profile';
@@ -396,6 +401,25 @@ test('certification and screen-audit both block a green resting profile lacking 
       f => f.includes('browser-owned-input') && f.includes('UNKNOWN')
     )
   );
+  assert.ok(
+    findings
+      .filter(f => f.startsWith('browser-owned-input'))
+      .every(isMissingDeviceEvidence)
+  );
+  const duplicated = browserInputFindings(
+    {
+      records: [
+        { cellId: 'get-updates/android-chrome/android-current-portrait' },
+        { cellId: 'get-updates/android-chrome/android-current-portrait' },
+      ],
+    },
+    { screenId, headSha: HEAD }
+  );
+  assert.ok(
+    duplicated.some(
+      f => f.includes(': BLOCKED:') && !isMissingDeviceEvidence(f)
+    )
+  );
   const ledger = auditScreens({
     registry: [screen],
     headSha: HEAD,
@@ -404,5 +428,209 @@ test('certification and screen-audit both block a green resting profile lacking 
   assert.equal(ledger.screens[0].verdict, 'red');
   assert.ok(
     ledger.screens[0].findings.some(f => f.includes('browser-owned-input'))
+  );
+});
+
+const ARTIST_PAY_SOURCES = [
+  'apps/web/app/[username]/pay/page.tsx',
+  'apps/web/components/features/profile/views/PayView.tsx',
+  'apps/web/components/features/profile/views/ProfileIntentPage.tsx',
+  'apps/web/components/organisms/PaySection.tsx',
+];
+const BROWSER_EMAIL_FIELD =
+  /(?:type|autoComplete|autocomplete|inputMode|inputmode)\s*=\s*['"]email['"]/;
+
+test('artist pay owes browser-owned email evidence only when its surface hosts that field', () => {
+  const hosted = ARTIST_PAY_SOURCES.some(path =>
+    BROWSER_EMAIL_FIELD.test(readFileSync(path, 'utf8'))
+  );
+  const bound = INPUT_MATRIX.journeys.some(
+    journey =>
+      journey.fields.includes('email') &&
+      journey.screens.includes('web.artist-pay')
+  );
+  assert.equal(bound, hosted);
+  if (hosted) return;
+  assert.deepEqual(inputCells('web.artist-pay'), []);
+  assert.deepEqual(
+    browserInputFindings(undefined, {
+      screenId: 'web.artist-pay',
+      headSha: HEAD,
+    }),
+    []
+  );
+  const pay = auditScreens({
+    registry: [
+      {
+        id: 'web.artist-pay',
+        platform: 'web',
+        owner: 'artist-pay',
+        sources: ['apps/web/app/[username]/pay/page.tsx'],
+        viewports: ['desktop', 'mobile'],
+      },
+    ],
+    headSha: HEAD,
+  });
+  assert.equal(pay.screens[0].producer, 'none');
+  assert.equal(pay.screens[0].verdict, 'uncovered');
+  assert.deepEqual(pay.screens[0].findings, []);
+  assert.equal(
+    remediationPlans(pay).some(
+      plan => plan.fingerprint === 'screen-audit:web.artist-pay'
+    ),
+    false
+  );
+});
+
+const WEB_AUTH_SOURCES = [
+  'apps/web/app/(auth)',
+  'apps/web/app/@auth',
+  'apps/web/app/auth-return',
+  'apps/web/app/desktop-auth',
+  'apps/web/app/mobile-auth-return',
+  'apps/web/components/features/auth',
+];
+const HOSTED_PASSWORD_FIELD =
+  /(?:type|autoComplete|autocomplete)\s*=\s*['"](?:password|current-password|new-password|username)['"]/;
+const HOSTED_WEBAUTHN_FIELD =
+  /(?:autoComplete|autocomplete)\s*=\s*['"][^'"]*webauthn[^'"]*['"]/;
+const HOSTED_EMAIL_FIELD =
+  /(?:type|autoComplete|autocomplete|inputMode|inputmode)\s*=\s*['"]email['"]/;
+const HOSTED_OTP_FIELD =
+  /(?:autoComplete|autocomplete)\s*=\s*['"]one-time-code['"]/;
+
+function webAuthSources(dir, found = []) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) webAuthSources(path, found);
+    else if (
+      /\.(?:ts|tsx)$/.test(entry.name) &&
+      !/\.(?:test|stories)\.(?:ts|tsx)$/.test(entry.name)
+    )
+      found.push(path);
+  }
+  return found;
+}
+
+function webAuthHosts(pattern) {
+  return WEB_AUTH_SOURCES.flatMap(dir => webAuthSources(dir)).some(path =>
+    pattern.test(readFileSync(path, 'utf8'))
+  );
+}
+
+test('web auth device cells follow fields the auth routes actually host', () => {
+  const hosted = {
+    'auth-credentials': webAuthHosts(HOSTED_PASSWORD_FIELD),
+    'auth-email': webAuthHosts(HOSTED_EMAIL_FIELD),
+    'auth-otp': webAuthHosts(HOSTED_OTP_FIELD),
+    'auth-passkey': webAuthHosts(HOSTED_WEBAUTHN_FIELD),
+  };
+  for (const [id, present] of Object.entries(hosted)) {
+    const bound = INPUT_MATRIX.journeys.some(
+      journey => journey.id === id && journey.screens.includes('web.auth')
+    );
+    assert.equal(bound, present, id);
+  }
+  const findings = browserInputFindings(undefined, {
+    screenId: 'web.auth',
+    headSha: HEAD,
+  });
+  assert.equal(
+    findings.filter(
+      finding =>
+        finding.includes('auth-credentials/') ||
+        finding.includes('auth-passkey/')
+    ).length,
+    0
+  );
+  assert.ok(
+    findings.some(
+      finding =>
+        finding.startsWith('browser-owned-input auth-email/') &&
+        isMissingDeviceEvidence(finding)
+    )
+  );
+  assert.ok(
+    findings.some(
+      finding =>
+        finding.startsWith('browser-owned-input auth-otp/') &&
+        isMissingDeviceEvidence(finding)
+    )
+  );
+  const auth = auditScreens({
+    registry: [
+      {
+        id: 'web.auth',
+        platform: 'web',
+        owner: 'browser-input-assurance',
+        sources: WEB_AUTH_SOURCES,
+        viewports: ['desktop', 'mobile'],
+      },
+    ],
+    headSha: HEAD,
+  });
+  assert.equal(auth.screens[0].producer, 'none');
+  assert.equal(auth.screens[0].verdict, 'red');
+  assert.ok(
+    auth.screens[0].findings.every(
+      finding =>
+        isMissingDeviceEvidence(finding) &&
+        (finding.includes('auth-email/') || finding.includes('auth-otp/'))
+    )
+  );
+  const plan = remediationPlans(auth).find(
+    item => item.fingerprint === 'screen-audit:web.auth'
+  );
+  assert.ok(plan);
+  assert.equal(plan.description.includes('auth-credentials/'), false);
+  assert.equal(plan.description.includes('auth-passkey/'), false);
+  assert.equal(plan.description.includes('auth-email/'), true);
+  assert.equal(plan.description.includes('auth-otp/'), true);
+});
+
+const HOSTED_TEL_FIELD =
+  /(?:type|autoComplete|autocomplete|inputMode|inputmode)\s*=\s*['"]tel['"]/;
+
+test('settings shell owes account-contact cells only when it hosts email and tel', () => {
+  const screen = SCREEN_REGISTRY.find(entry => entry.id === 'web.settings');
+  assert.ok(screen);
+  const sources = screen.sources.map(path => readFileSync(path, 'utf8'));
+  const hosted =
+    sources.some(source => HOSTED_EMAIL_FIELD.test(source)) &&
+    sources.some(source => HOSTED_TEL_FIELD.test(source));
+  const bound = INPUT_MATRIX.journeys.some(
+    journey =>
+      journey.id === 'account-contact' &&
+      journey.screens.includes('web.settings')
+  );
+  assert.equal(bound, hosted);
+  const accountContact = browserInputFindings(undefined, {
+    screenId: 'web.settings',
+    headSha: HEAD,
+  }).filter(finding => finding.includes('account-contact/'));
+  if (hosted) {
+    assert.equal(accountContact.length, 16);
+    assert.ok(accountContact.every(isMissingDeviceEvidence));
+    return;
+  }
+  assert.deepEqual(accountContact, []);
+  assert.equal(
+    inputCells('web.settings').some(cell =>
+      cell.id.startsWith('account-contact/')
+    ),
+    false
+  );
+  const settings = auditScreens({
+    registry: [screen],
+    headSha: HEAD,
+  });
+  assert.equal(settings.screens[0].producer, 'none');
+  assert.equal(settings.screens[0].verdict, 'uncovered');
+  assert.deepEqual(settings.screens[0].findings, []);
+  assert.equal(
+    remediationPlans(settings).some(
+      plan => plan.fingerprint === 'screen-audit:web.settings'
+    ),
+    false
   );
 });

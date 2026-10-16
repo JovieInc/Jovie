@@ -1,6 +1,6 @@
 # LYB MVP cut line
 
-**Contract version:** `lyb-mvp-cut-line:v1`
+**Contract version:** `lyb-mvp-cut-line:v2`
 **Source issue:** JOV-6067
 **Parent governor:** JOV-6065 (LYB 30-day $5k MRR objective governor — all launch
 work ranks against it)
@@ -8,6 +8,10 @@ work ranks against it)
 serves that offer; it does not redefine it)
 **Downstream contracts:** JOV-6069 (activation/retention), JOV-6071 (launch
 surface), JOV-6073 (health trust boundary), JOV-6074 (design-partner loop)
+
+The [JOV-6013 launch contract](lyb-launch-contract.md) owns the audience,
+dated-outcome promise, surface inventory, and certification fixture. It
+supersedes broader launch scope in this document's earlier revision.
 
 The MVP is the smallest product that can earn and retain paid users inside the
 30-day governor window. Every launch feature below carries a causal link to
@@ -30,13 +34,13 @@ objective-governor override evidence (JOV-6065).
 
 | # | Launch feature | Causal link |
 |---|---|---|
-| 1 | **Opinionated coach loop** — the coach gives one directive at a time and adapts it, rather than offering a menu of options. | **Purchase + retention.** The paid outcome JOV-6066 prices is "a coach that tells me what to do," not a tracker. The opinionated loop is the product being sold and the reason to return. |
+| 1 | **Dated outcome + opinionated Jovi coach loop** — persist the user's outcome, date, and constraints; work backward and give one next action; detect drift and adapt it. | **Purchase + retention.** People whose appearance is part of their work need control around dates. A generic directive without a saved outcome/date does not deliver that promise. |
 | 2 | **Isolated health memory** — per-user health context stored and scoped for LYB only, never blended into other Jovie data or other users. | **Safety invariant + retention.** Coaching quality depends on remembered context; health data isolation is a non-negotiable trust boundary (JOV-6073). Cannot be retrofit after launch. |
-| 3 | **DEXA / body-composition workflow** — intake, storage, and coaching-visible interpretation of DEXA or equivalent body-comp data. | **Purchase + retention.** This is the measurable outcome anchor for the ICP: the paid promise is a body-composition result, and DEXA is the objective yardstick that makes progress legible and worth paying for. |
+| 3 | **Available body-composition signals** — minimal manual logging and optional HealthKit, photos, or DEXA intake, with provenance and uncertainty. | **Activation + retention.** A manual baseline must reach first value without a scan, medication disclosure, photo, or connection. GLP-1 + DEXA is the initial wedge, not the identity. |
 | 4 | **GLP-1-aware coaching boundaries** — where a user is on a GLP-1 (or similar), the coach adjusts recommendations and stays inside explicit safety rails rather than generic hypertrophy advice. | **Safety invariant + purchase.** A material share of the launch ICP is GLP-1-adjacent; wrong advice here is a health-trust breach, not a UX bug. Required by the trust boundary in JOV-6073. |
-| 5 | **Progress / history context** — the coach and the user can see what was prescribed, what was done, and what changed. | **Activation + retention.** Without history the coach restarts every session, first value never lands, and there is no visible streak or trend to return for. |
-| 6 | **Basic training / nutrition / check-in adjustment loop** — periodic check-in (daily or weekly cadence) that reads adherence and adjusts the plan. | **Retention.** This is the repeat-value engine: the reason a paid user comes back is that the plan changes based on what they actually did. Feeds the JOV-6069 retention contract. |
-| 7 | **Reliable daily / weekly return surface** — one dependable place the user returns to for today's directive and check-in. No novelty, no breadth. | **Retention.** Repeat value requires a habitual surface; a flaky or fragmented return path silently kills the 30-day retention the governor measures. |
+| 5 | **Swipeable visual timeline** — dated photos and measurements with honest empty states. | **Activation + retention.** The user can understand what changed without founder explanation. |
+| 6 | **Stats/body score** — progress against the dated outcome, separating measured, estimated, stale, and unknown values. | **Activation + retention.** Makes status and drift legible without false precision. |
+| 7 | **Reliable return and adjustment loop** — timeline, stats, and coach retain the dated goal and next action; check-ins adjust it within the health boundary. | **Retention.** Existing cadence is served inside these surfaces. Training libraries, workout tracking, and voice/live-session UI add no launch surface. |
 | 8 | **One landing page, one demo, one checkout path** — a single way to understand the offer and pay. | **Purchase.** Defined fully by JOV-6071; listed here because the MVP is not demoable end-to-end without a paid account path. |
 
 ## Deferred (cannot consume launch capacity without governor override)
@@ -66,11 +70,12 @@ advice, or ops work that writes product code.
 ## End-to-end demo bar
 
 The MVP is demoable when one real user on a paid account can: land on the single
-launch page, check out, complete onboarding into the coach loop, submit DEXA /
-body-comp data, receive an opinionated directive, check in, and return to see
-adjusted coaching with progress history — with GLP-1 boundaries visibly held
-where applicable. Founder-run steps behind the scenes count toward the demo;
-broken safety boundaries do not.
+launch page, check out, save an outcome/date/constraints, enter an available
+baseline, see the timeline and stats, receive one directive, check in, and
+return to adjusted coaching against the dated goal. DEXA, photos, GLP-1
+disclosure, and HealthKit remain optional. Safety boundaries hold throughout.
+Founder-run steps behind the scenes count toward the demo; broken safety
+boundaries do not. LYB-183 owns the app implementation of this contract.
 
 ## Notes on evidence
 

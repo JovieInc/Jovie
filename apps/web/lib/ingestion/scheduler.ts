@@ -59,6 +59,13 @@ export function determineJobFailure(error: unknown): {
   message: string;
   reason: JobFailureReason;
 } {
+  if (
+    error instanceof ExtractionError &&
+    error.code === 'SOCIAL_HTML_DISABLED'
+  ) {
+    return { message: error.message, reason: 'permanent' };
+  }
+
   if (error instanceof ExtractionError && error.code === 'RATE_LIMITED') {
     return { message: error.message, reason: 'rate_limited' };
   }

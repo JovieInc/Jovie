@@ -206,6 +206,7 @@ function packetProjection(
     row: normalizeKernelCertificationRow({
       domain: file.domain,
       surface: file.surface,
+      owner: file.owner,
       packet: file.packet,
       admission,
       decisions,

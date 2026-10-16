@@ -72,6 +72,7 @@ describe('GET /api/mobile/v1/chat/conversations', () => {
     expect(hoisted.listMobileConversationsMock).toHaveBeenCalledWith({
       creatorProfileId: 'profile_123',
       limit: 5,
+      userId: 'user_123',
       workspace: 'customer',
     });
     await expect(response.json()).resolves.toEqual({
@@ -117,6 +118,7 @@ describe('GET /api/mobile/v1/chat/conversations', () => {
     expect(hoisted.listMobileConversationsMock).toHaveBeenCalledWith({
       creatorProfileId: 'profile_123',
       limit: 20,
+      userId: 'user_123',
       workspace: 'ov',
     });
     await expect(allowed.json()).resolves.toMatchObject({
@@ -164,6 +166,14 @@ describe('GET /api/mobile/v1/chat/conversations/[id]', () => {
     );
 
     expect(response.status).toBe(200);
+    expect(hoisted.getMobileConversationDetailMock).toHaveBeenCalledWith({
+      audience: 'customer',
+      before: null,
+      conversationId: 'conv_1',
+      creatorProfileId: 'profile_123',
+      limit: 100,
+      userId: 'user_123',
+    });
     await expect(response.json()).resolves.toEqual({
       conversation: {
         id: 'conv_1',

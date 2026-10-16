@@ -1,15 +1,8 @@
 import type { ExtractionResult } from '@/lib/ingestion/types';
+import { disabledSocialHtmlDocument } from './social-html-policy';
 import { ExtractionError } from './strategies/base';
-import {
-  extractInstagram,
-  fetchInstagramDocument,
-  validateInstagramUrl,
-} from './strategies/instagram';
-import {
-  extractLinktree,
-  fetchLinktreeDocument,
-  validateLinktreeUrl,
-} from './strategies/linktree';
+import { validateInstagramUrl } from './strategies/instagram';
+import { validateLinktreeUrl } from './strategies/linktree';
 import {
   extractTikTok,
   fetchTikTokDocument,
@@ -51,7 +44,7 @@ const STRATEGIES: readonly CreatorLookupStrategy[] = [
   {
     platform: 'instagram',
     validate: validateInstagramUrl,
-    extract: async url => extractInstagram(await fetchInstagramDocument(url)),
+    extract: async () => disabledSocialHtmlDocument(),
   },
   {
     platform: 'tiktok',
@@ -61,10 +54,7 @@ const STRATEGIES: readonly CreatorLookupStrategy[] = [
   {
     platform: 'linktree',
     validate: validateLinktreeUrl,
-    extract: async url =>
-      extractLinktree(await fetchLinktreeDocument(url), {
-        includeContactEmail: false,
-      }),
+    extract: async () => disabledSocialHtmlDocument(),
   },
 ];
 

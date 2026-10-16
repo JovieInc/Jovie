@@ -10,16 +10,24 @@ import { CallerCancellationError } from '@/lib/resilience/caller-cancellation';
 import { logger } from '@/lib/utils/logger';
 import { musicBrainzCircuitBreaker } from '../circuit-breakers';
 import type { MusicBrainzArtist, MusicBrainzRecording } from '../types';
+import {
+  collectMusicBrainzCatalog,
+  type MusicBrainzCatalogQuery,
+  type MusicBrainzCatalogResult,
+} from './musicbrainz-catalog';
 
 const MUSICBRAINZ_API_BASE = 'https://musicbrainz.org/ws/2';
 const USER_AGENT = 'Jovie/1.0.0 (https://jov.ie)';
 const REQUEST_TIMEOUT_MS = 10_000;
+const MAX_RESPONSE_BYTES = 2_000_000;
+const MAX_RETRY_DELAY_MS = 5000;
 
 export class MusicBrainzError extends Error {
   constructor(
     message: string,
     public readonly statusCode?: number,
-    public readonly errorCode?: string
+    public readonly errorCode?: string,
+    public readonly retryAfterMs?: number
   ) {
     super(message);
     this.name = 'MusicBrainzError';
@@ -33,9 +41,12 @@ function isNonRetryableError(error: unknown): boolean {
   if (error instanceof CallerCancellationError) return true;
   if (error instanceof MusicBrainzError) {
     return (
-      error.statusCode === 404 ||
-      error.statusCode === 400 ||
-      error.statusCode === 429
+      (error.statusCode !== undefined &&
+        error.statusCode >= 400 &&
+        error.statusCode < 500 &&
+        error.statusCode !== 408) ||
+      error.errorCode === 'INVALID_RESPONSE' ||
+      error.errorCode === 'RESPONSE_TOO_LARGE'
     );
   }
   return false;
@@ -49,24 +60,128 @@ function calculateBackoffDelay(attempt: number, baseDelayMs: number): number {
 
 async function withRetry<T>(
   fn: () => Promise<T>,
+  signal?: AbortSignal,
   maxRetries = DEFAULT_MAX_RETRIES,
   baseDelayMs = DEFAULT_BASE_DELAY_MS
 ): Promise<T> {
   let lastError: Error | null = null;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
+      if (signal?.aborted) throw new CallerCancellationError();
       return await fn();
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
       if (isNonRetryableError(error)) throw error;
       if (attempt >= maxRetries) throw lastError;
       // Bounded retry backoff required by MusicBrainz API terms of use (1 req/sec).
-      // Max total delay is ~5s across all retries — safe within serverless limits.
-      const delayMs = calculateBackoffDelay(attempt, baseDelayMs);
-      await new Promise(resolve => setTimeout(resolve, delayMs));
+      // Each wait is capped at 5s; at most two retries acquire fresh quota.
+      const delayMs = Math.max(
+        calculateBackoffDelay(attempt, baseDelayMs),
+        error instanceof MusicBrainzError ? (error.retryAfterMs ?? 0) : 0
+      );
+      // Long provider cooldowns belong to durable scheduling, not a request wait.
+      if (delayMs > MAX_RETRY_DELAY_MS) throw lastError;
+      await waitForMusicBrainz(delayMs, signal);
     }
   }
   throw lastError ?? new Error('Unknown retry failure');
+}
+
+function waitForMusicBrainz(
+  delayMs: number,
+  signal?: AbortSignal
+): Promise<void> {
+  if (signal?.aborted) return Promise.reject(new CallerCancellationError());
+  return new Promise((resolve, reject) => {
+    const abort = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', abort);
+      reject(new CallerCancellationError());
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', abort);
+      resolve();
+    }, delayMs);
+    signal?.addEventListener('abort', abort, { once: true });
+  });
+}
+
+function retryAfterMs(response: Response): number | undefined {
+  const value = response.headers.get('retry-after')?.trim();
+  if (!value) return undefined;
+  const delay = /^\d+$/.test(value)
+    ? Number(value) * 1000
+    : /^[A-Za-z]{3},/.test(value)
+      ? Date.parse(value) - Date.now()
+      : NaN;
+  return Number.isFinite(delay) && delay >= 0 ? delay : undefined;
+}
+
+/** Bound decoded bytes even when Content-Length is missing or misleading. */
+async function readMusicBrainzJson<T>(
+  response: Response,
+  signal: AbortSignal
+): Promise<T> {
+  if (Number(response.headers.get('content-length')) > MAX_RESPONSE_BYTES) {
+    throw new MusicBrainzError(
+      'MusicBrainz response too large',
+      undefined,
+      'RESPONSE_TOO_LARGE'
+    );
+  }
+  const reader = response.body?.getReader();
+  if (!reader)
+    throw new MusicBrainzError(
+      'Empty MusicBrainz response',
+      undefined,
+      'INVALID_RESPONSE'
+    );
+  const cancel = () => {
+    void reader.cancel().catch(() => {});
+  };
+  signal.addEventListener('abort', cancel, { once: true });
+  try {
+    const decoder = new TextDecoder();
+    let bytes = 0;
+    let text = '';
+    for (;;) {
+      signal.throwIfAborted();
+      const { done, value } = await reader.read();
+      signal.throwIfAborted();
+      if (done) break;
+      bytes += value.byteLength;
+      if (bytes > MAX_RESPONSE_BYTES) {
+        throw new MusicBrainzError(
+          'MusicBrainz response too large',
+          undefined,
+          'RESPONSE_TOO_LARGE'
+        );
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+    let payload: unknown;
+    try {
+      payload = JSON.parse(text + decoder.decode());
+    } catch {
+      throw new MusicBrainzError(
+        'Malformed MusicBrainz JSON',
+        undefined,
+        'INVALID_RESPONSE'
+      );
+    }
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      throw new MusicBrainzError(
+        'Invalid MusicBrainz JSON object',
+        undefined,
+        'INVALID_RESPONSE'
+      );
+    }
+    return payload as T;
+  } finally {
+    signal.removeEventListener('abort', cancel);
+    cancel();
+    reader.releaseLock();
+  }
 }
 
 async function musicBrainzRequest<T>(
@@ -89,7 +204,7 @@ async function musicBrainzRequest<T>(
     waitMs > 0 &&
     waitMs <= 1100
   ) {
-    await new Promise(resolve => setTimeout(resolve, waitMs));
+    await waitForMusicBrainz(waitMs, signal);
     if (signal?.aborted) throw new CallerCancellationError();
     limitResult = await musicBrainzLookupLimiter.limit('musicbrainz:global');
   }
@@ -98,25 +213,30 @@ async function musicBrainzRequest<T>(
     throw new MusicBrainzError(
       limitResult.reason ?? 'Rate limit exceeded',
       429,
-      'RATE_LIMITED'
+      'RATE_LIMITED',
+      Math.max(0, limitResult.reset.getTime() - Date.now())
     );
   }
 
   const url = `${MUSICBRAINZ_API_BASE}${endpoint}${endpoint.includes('?') ? '&' : '?'}fmt=json`;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const requestSignal = signal
+    ? AbortSignal.any([controller.signal, signal])
+    : controller.signal;
+  let response: Response | undefined;
   try {
-    const response = await fetch(url, {
+    response = await fetch(url, {
+      cache: 'no-store',
       headers: { Accept: 'application/json', 'User-Agent': USER_AGENT },
-      signal: signal
-        ? AbortSignal.any([controller.signal, signal])
-        : controller.signal,
+      signal: requestSignal,
     });
     if (response.status === 503 || response.status === 429) {
       throw new MusicBrainzError(
         'Rate limit exceeded',
         response.status,
-        'RATE_LIMITED'
+        'RATE_LIMITED',
+        retryAfterMs(response)
       );
     }
     if (!response.ok) {
@@ -126,13 +246,16 @@ async function musicBrainzRequest<T>(
       );
     }
     onResponse?.(response);
-    const payload = (await response.json()) as T;
+    const payload = await readMusicBrainzJson<T>(response, requestSignal);
     if (signal?.aborted) throw new CallerCancellationError();
     return payload;
   } catch (error) {
     if (error instanceof MusicBrainzError) throw error;
     if (signal?.aborted) throw new CallerCancellationError();
-    if (error instanceof Error && error.name === 'AbortError') {
+    if (
+      controller.signal.aborted ||
+      (error instanceof Error && error.name === 'AbortError')
+    ) {
       throw new MusicBrainzError('Request timeout', undefined, 'TIMEOUT');
     }
     throw new MusicBrainzError(
@@ -140,11 +263,43 @@ async function musicBrainzRequest<T>(
     );
   } finally {
     clearTimeout(timeoutId);
+    if (response?.body && !response.body.locked)
+      void response.body.cancel().catch(() => {});
   }
 }
 
-async function executeWithCircuitBreaker<T>(fn: () => Promise<T>): Promise<T> {
-  return musicBrainzCircuitBreaker.execute(() => withRetry(fn));
+async function executeWithCircuitBreaker<T>(
+  fn: () => Promise<T>,
+  signal?: AbortSignal
+): Promise<T> {
+  return musicBrainzCircuitBreaker.execute(() => withRetry(fn, signal));
+}
+
+/** Uses the existing distributed quota and breaker; no vendor or new cache. */
+export async function browseMusicBrainzCatalog(
+  options: MusicBrainzCatalogQuery
+): Promise<MusicBrainzCatalogResult> {
+  const deadline = AbortSignal.timeout(30_000);
+  const signal = options.signal
+    ? AbortSignal.any([options.signal, deadline])
+    : deadline;
+  try {
+    return await collectMusicBrainzCatalog({ ...options, signal }, endpoint =>
+      executeWithCircuitBreaker(
+        () => musicBrainzRequest<unknown>(endpoint, true, signal),
+        signal
+      )
+    );
+  } catch (error) {
+    if (deadline.aborted && !options.signal?.aborted) {
+      throw new MusicBrainzError(
+        'Catalog traversal timeout',
+        undefined,
+        'TIMEOUT'
+      );
+    }
+    throw error;
+  }
 }
 
 export async function lookupMusicBrainzByIsrc(
@@ -191,7 +346,8 @@ export async function bulkLookupMusicBrainzByIsrc(
 export async function getMusicBrainzArtist(
   mbid: string,
   options: {
-    includeReleaseGroups?: boolean;
+    includeReleaseGroups?: boolean | 'all';
+    maxCatalogPages?: number;
     waitForQuota?: boolean;
     signal?: AbortSignal;
   } = {}
@@ -199,17 +355,22 @@ export async function getMusicBrainzArtist(
   if (!isMusicBrainzId(mbid)) return null;
   const normalizedId = mbid.toLowerCase();
   let response: Response | undefined;
+  let artist: MusicBrainzArtist;
   try {
-    const artist = await executeWithCircuitBreaker(async () => {
+    const includes =
+      options.includeReleaseGroups === 'all'
+        ? 'aliases+url-rels'
+        : `aliases+tags+genres+url-rels${options.includeReleaseGroups ? '+release-groups' : ''}`;
+    artist = await executeWithCircuitBreaker(async () => {
       return musicBrainzRequest<MusicBrainzArtist>(
-        `/artist/${normalizedId}?inc=aliases+tags+genres+url-rels${options.includeReleaseGroups ? '+release-groups' : ''}`,
+        `/artist/${normalizedId}?inc=${includes}`,
         options.waitForQuota,
         options.signal,
         value => {
           response = value;
         }
       );
-    });
+    }, options.signal);
     const responseId = musicBrainzResponseId(response, normalizedId, 'artist');
     if (!responseId || artist.id !== responseId || !artist.name?.trim()) {
       throw new MusicBrainzError(
@@ -218,13 +379,28 @@ export async function getMusicBrainzArtist(
         'INVALID_RESPONSE'
       );
     }
-    return artist;
   } catch (error) {
     if (error instanceof MusicBrainzError && error.statusCode === 404) {
       return null;
     }
     throw error;
   }
+  if (options.includeReleaseGroups === 'all') {
+    const catalog = await browseMusicBrainzCatalog({
+      entity: 'release-group',
+      by: 'artist',
+      mbid: artist.id,
+      maxPages: options.maxCatalogPages,
+      signal: options.signal,
+    });
+    return {
+      ...artist,
+      'release-groups': [...catalog.items],
+      releaseGroupsComplete: catalog.complete,
+    };
+  }
+  // This Jovie receipt must never be accepted from a raw upstream payload.
+  return { ...artist, releaseGroupsComplete: undefined };
 }
 
 export function isMusicBrainzId(value: string): boolean {
@@ -279,12 +455,14 @@ export async function lookupMusicBrainzArtistsByUrl(
   }
   let response: UrlRelations & { urls?: UrlRelations[] };
   try {
-    response = await executeWithCircuitBreaker(() =>
-      musicBrainzRequest(
-        `/url?${resources.map(value => `resource=${encodeURIComponent(value)}`).join('&')}&inc=artist-rels`,
-        false,
-        signal
-      )
+    response = await executeWithCircuitBreaker(
+      () =>
+        musicBrainzRequest(
+          `/url?${resources.map(value => `resource=${encodeURIComponent(value)}`).join('&')}&inc=artist-rels`,
+          false,
+          signal
+        ),
+      signal
     );
   } catch (error) {
     if (error instanceof MusicBrainzError && error.statusCode === 404)

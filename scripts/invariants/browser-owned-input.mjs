@@ -281,3 +281,13 @@ export function browserInputFindings(evidence, context) {
         `browser-owned-input ${row.id}: ${row.status}: ${row.findings.join(', ')}`
     );
 }
+
+/** A missing real-device record. Duplicates and incomplete records are BLOCKED
+ * and do not match. Device commissioning stays JOV-8387; the audit ledger
+ * stays red. The rendered screenshot candidate does not. */
+const MISSING_DEVICE_EVIDENCE =
+  /^browser-owned-input \S+: UNKNOWN: device evidence missing or duplicate$/;
+
+export function isMissingDeviceEvidence(finding) {
+  return MISSING_DEVICE_EVIDENCE.test(finding);
+}
