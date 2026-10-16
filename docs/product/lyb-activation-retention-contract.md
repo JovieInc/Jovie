@@ -1,6 +1,6 @@
 # LYB activation and retention contract
 
-**Contract version:** `lyb-activation-retention:v1`
+**Contract version:** `lyb-activation-retention:v2`
 
 **Source issue:** JOV-6069
 
@@ -14,6 +14,12 @@
 **Evidence note:** GBrain keyword and semantic lookup returned no matching pages
 (`gbrain-no-results`). Linear and the dependency PRs are the source evidence.
 
+**Launch scope:** [JOV-6013](lyb-launch-contract.md) owns the dated-outcome
+promise and three primary surfaces. The event names and retention cadence
+below stay stable; mandatory training history and DEXA are not launch gates.
+Historical `v1` receipts retain their original meaning; new launch directives
+carry `v2` and reference the dated outcome rather than reinterpreting old events.
+
 ## Decision
 
 LYB has one activation event:
@@ -25,8 +31,9 @@ The event name is `lyb.coaching_directive_delivered`. A directive qualifies only
 when its durable receipt references:
 
 - the user and paid LYB account;
-- the completed onboarding/baseline record, including goal, training history,
-  available body-composition evidence, and relevant constraints;
+- the completed onboarding/baseline record, including outcome, outcome date,
+  available body-composition evidence, and relevant constraints (training
+  history is optional context);
 - the persisted directive shown to the user; and
 - server-observed `occurred_at`, contract version, app version, and an
   idempotency key.

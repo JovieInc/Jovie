@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DashboardPay } from './DashboardPay';
@@ -105,6 +105,19 @@ describe('DashboardPay', () => {
     expect(screen.getByText('QR Scans')).toBeInTheDocument();
     expect(screen.getByText('Link Clicks')).toBeInTheDocument();
     expect(screen.getByText('Total Visits')).toBeInTheDocument();
+    for (const [label, value, description] of [
+      ['QR Scans', '12', 'Fans who scanned your QR'],
+      ['Link Clicks', '30', 'Fans who clicked your link'],
+      ['Total Visits', '42', 'QR + link combined'],
+    ]) {
+      const metric = within(
+        screen.getByRole('region', { name: `${label} Metric` })
+      );
+      expect(metric.getByRole('term')).toHaveTextContent(label);
+      expect(
+        metric.getAllByRole('definition').map(node => node.textContent)
+      ).toEqual([value, description]);
+    }
     expect(
       screen.getByText(/artist-handle\/pay\?source=link/)
     ).toBeInTheDocument();

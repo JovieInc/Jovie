@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { FileAudio2, Paperclip } from 'lucide-react';
 import {
   type ComponentProps,
@@ -153,6 +154,22 @@ function MainPlaneReopenHarness() {
 }
 
 describe('CmdKPalette', () => {
+  it('opens Contacts exactly once when its result is clicked', async () => {
+    const onOpenChange = vi.fn();
+    pushMock.mockClear();
+    render(<MainPlaneHarness onOpenChange={onOpenChange} />);
+    fireEvent.change(screen.getByRole('combobox'), {
+      target: { value: 'Contacts' },
+    });
+    await userEvent.setup().click(
+      screen.getByRole('option', {
+        name: segmentedAccessibleName('Contacts', 'Open your contacts.', '⌘1'),
+      })
+    );
+    expect(pushMock).toHaveBeenCalledExactlyOnceWith(APP_ROUTES.CONTACTS);
+    expect(onOpenChange).toHaveBeenCalledExactlyOnceWith(false);
+  });
+
   it('dismisses Search from a non-form control without taking its other keys', () => {
     const onOpenChange = vi.fn();
     pushMock.mockClear();

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ExtractionError } from '@/lib/ingestion/strategies/base';
+import { expectPublicOpenApiResponse } from '@/tests/utils/public-openapi';
 
 const hoisted = vi.hoisted(() => ({
   limit: vi.fn(),
@@ -29,9 +30,13 @@ vi.mock('@/lib/error-tracking', () => ({
 
 const { GET } = await import('./route');
 
-function get(url?: string) {
+async function get(url?: string) {
   const query = url ? `?url=${encodeURIComponent(url)}` : '';
-  return GET(new Request(`https://jov.ie/api/agents/creator-lookup${query}`));
+  return expectPublicOpenApiResponse(
+    '/api/agents/creator-lookup',
+    'get',
+    await GET(new Request(`https://jov.ie/api/agents/creator-lookup${query}`))
+  );
 }
 
 describe('GET /api/agents/creator-lookup', () => {

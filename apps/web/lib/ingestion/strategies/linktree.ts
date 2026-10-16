@@ -13,7 +13,6 @@ export {
   ExtractionError,
   extractLinktree,
   extractLinktreeHandle,
-  fetchLinktreeDocument,
   isLinktreeUrl,
   isValidHandle,
   LINKTREE_CONFIG,

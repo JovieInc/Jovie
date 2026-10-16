@@ -71,7 +71,7 @@ async function assertAction(
 for (const route of [
   {
     path: '/voice',
-    hero: 'voice-hero-section',
+    hero: 'marketing-section-hero',
     primary: 'voice-hero-primary-cta',
     href: '/pricing',
   },

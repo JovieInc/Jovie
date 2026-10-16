@@ -87,11 +87,9 @@ export const ADMIN_SETTINGS_TOOL_IDS = [
   'presence',
   'activity',
   'investors',
-  'feature_registry',
   'share_studio',
   'costs',
   'revenue_lift',
-  'features',
 ] as const satisfies readonly AdminWorkspaceId[];
 
 export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
@@ -212,13 +210,6 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     section: 'utilities',
   },
   {
-    id: 'feature_registry',
-    label: 'Feature Registry',
-    href: APP_ROUTES.ADMIN_FEATURE_REGISTRY,
-    description: 'Founder review packets for canonical product capabilities',
-    section: 'utilities',
-  },
-  {
     id: 'costs',
     label: 'Costs',
     href: APP_ROUTES.ADMIN_COSTS,
@@ -239,13 +230,6 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     label: 'Share Studio',
     href: APP_ROUTES.ADMIN_SHARE_STUDIO,
     description: 'Preview story assets, payloads, and tracked share outputs',
-    section: 'utilities',
-  },
-  {
-    id: 'features',
-    label: 'Features',
-    href: APP_ROUTES.ADMIN_FEATURES,
-    description: 'Runtime feature flags with per-environment toggles',
     section: 'utilities',
   },
 ] as const;

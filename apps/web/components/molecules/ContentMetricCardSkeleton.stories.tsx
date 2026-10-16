@@ -18,3 +18,12 @@ export const Default: Story = {};
 export const WithoutSubtitle: Story = {
   args: { showIcon: false, showSubtitle: false },
 };
+export const IconChip: Story = {
+  args: { layout: 'icon-chip' },
+};
+export const CompactIconChip: Story = {
+  args: { layout: 'icon-chip', density: 'compact', showSubtitle: false },
+};
+export const InlineIconChip: Story = {
+  args: { layout: 'icon-chip-inline', showSubtitle: false },
+};

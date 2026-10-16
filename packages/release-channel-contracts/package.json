@@ -1,12 +1,13 @@
 {
   "name": "@jovie/release-channel-contracts",
-  "version": "26.10.4",
+  "version": "26.10.6",
   "private": true,
   "type": "module",
   "main": "./index.ts",
   "types": "./index.ts",
   "exports": {
-    ".": "./index.ts"
+    ".": "./index.ts",
+    "./dogfood-exposure": "./dogfood-exposure.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

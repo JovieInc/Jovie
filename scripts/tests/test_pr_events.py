@@ -508,6 +508,79 @@ class RelayTest(unittest.TestCase):
         self.assertEqual(exhausted.made("gh", "api", "-X", "POST"), [],
                          "a terminal head never gets another repair signal")
 
+    def test_required_green_success_clears_stale_lane_fix_red_and_a_red_head_keeps_it(self):
+        def success(status, **extra):
+            view = pr(branch="cursor/fix", sha="h1", merge=status, labels=["lane-fix-red"],
+                      state="OPEN", **extra)
+            shell = Shell({("gh", "pr", "view"): view})
+            run = {"event": "pull_request", "conclusion": "success", "head_sha": "h1",
+                   "pull_requests": [{"number": 5}]}
+            return events.relay("workflow_run", {"workflow_run": run}, shell, set()), shell
+
+        for status in ("CLEAN", "HAS_HOOKS", "UNSTABLE"):
+            added, shell = success(status)
+            self.assertEqual(added, [(5, "cleared-red")], status)
+            delete = ["gh", "api", "-X", "DELETE",
+                      f"repos/{events.REPO}/issues/5/labels/lane-fix-red"]
+            self.assertIn(delete, shell.calls, status)
+            self.assertFalse(events.gh_read_only(delete), status)
+            self.assertEqual(shell.made("gh", "api", "-X", "POST"), [], status)
+        for status in ("BLOCKED", "DIRTY", "BEHIND", "UNKNOWN"):
+            added, shell = success(status)
+            self.assertEqual(added, [], status)
+            self.assertEqual(shell.made("gh", "api", "-X", "DELETE"), [], status)
+        missing = pr(branch="cursor/fix", sha="h1", labels=["lane-fix-red"], state="OPEN")
+        missing.pop("mergeStateStatus")
+        shell = Shell({("gh", "pr", "view"): missing})
+        run = {"event": "pull_request", "conclusion": "success", "head_sha": "h1",
+               "pull_requests": [{"number": 5}]}
+        self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, shell, set()), [])
+        self.assertEqual(shell.made("gh", "api", "-X", "DELETE"), [])
+
+    def test_a_stale_success_and_a_red_event_do_not_clear_lane_fix_red(self):
+        view = pr(branch="cursor/fix", sha="new", merge="CLEAN", labels=["lane-fix-red"], state="OPEN")
+        stale = {"event": "pull_request", "conclusion": "success", "head_sha": "old",
+                 "pull_requests": [{"number": 5}]}
+        shell = Shell({("gh", "pr", "view"): view})
+        self.assertEqual(events.relay("workflow_run", {"workflow_run": stale}, shell, set()), [])
+        self.assertEqual(shell.made("gh", "api", "-X", "DELETE"), [])
+        red = {"event": "pull_request", "conclusion": "failure", "head_sha": "new",
+               "pull_requests": [{"number": 5}]}
+        labeled = Shell({("gh", "pr", "view"): view})
+        self.assertEqual(events.relay("workflow_run", {"workflow_run": red}, labeled, set()), [])
+        self.assertEqual(labeled.made("gh", "api", "-X", "DELETE"), [])
+        self.assertEqual(labeled.made("gh", "api", "-X", "POST"), [])
+
+    def test_a_failed_delete_leaves_lane_fix_red_in_place(self):
+        view = pr(branch="cursor/fix", sha="h1", merge="CLEAN", labels=["lane-fix-red"], state="OPEN")
+        shell = Shell({("gh", "pr", "view"): view, ("gh", "api", "-X", "DELETE"): (1, "")})
+        run = {"event": "pull_request", "conclusion": "success", "head_sha": "h1",
+               "pull_requests": [{"number": 5}]}
+        self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, shell, set()), [])
+        self.assertEqual(len(shell.made("gh", "api", "-X", "DELETE")), 1)
+
+    def test_a_green_lane_draft_drops_lane_fix_red_and_can_still_be_marked_green(self):
+        view = pr(draft=True, merge="CLEAN", labels=["lane-fix-red"], state="OPEN", sha="h1")
+        shell = Shell({("gh", "pr", "view"): view})
+        run = {"event": "pull_request", "conclusion": "success", "head_sha": "h1",
+               "pull_requests": [{"number": 5}]}
+        self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, shell, set()),
+                         [(5, "cleared-red"), (5, "green")])
+
+    def test_a_push_clears_required_green_heads_and_keeps_red_ones(self):
+        rows = [
+            pr(number=5, branch="cursor/fix", merge="CLEAN", labels=["lane-fix-red"], state="OPEN"),
+            pr(number=6, branch="cursor/other", merge="BLOCKED", labels=["Lane-Fix-Red"], state="OPEN"),
+            pr(number=7, branch="cursor/closed", merge="CLEAN", labels=["lane-fix-red"], state="CLOSED"),
+            pr(number=8, branch="cursor/fork", merge="HAS_HOOKS", labels=["lane-fix-red"], state="OPEN",
+               isCrossRepository=True),
+        ]
+        shell = Shell({("gh", "pr", "list"): rows})
+        self.assertEqual(events.relay("push", {}, shell, set()), [(5, "cleared-red")])
+        self.assertEqual(shell.made("gh", "api", "-X", "DELETE"),
+                         [["gh", "api", "-X", "DELETE",
+                           f"repos/{events.REPO}/issues/5/labels/lane-fix-red"]])
+
     def test_a_failure_hold_dequeue_is_relayed_and_a_plain_hand_dequeue_is_not(self):
         view = {"state": "OPEN", "isDraft": False, "headRefName": "codex/jov-6577-20261012t075744",
                 "headRefOid": "h7", "isCrossRepository": False, "labels": []}

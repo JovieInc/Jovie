@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ExtractionError } from '@/lib/ingestion/strategies/base';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { coreSocialHtmlFetchBlockMessage } from '@/lib/ingestion/social-html-policy';
 import {
   extractBeacons,
   extractBeaconsHandle,
@@ -354,72 +354,51 @@ describe('Beacons Strategy', () => {
   });
 
   describe('fetchBeaconsDocument', () => {
-    beforeEach(() => {
-      vi.useFakeTimers();
-      vi.stubGlobal('fetch', vi.fn());
-    });
-
-    afterEach(async () => {
-      // Run any pending timers before cleanup to avoid unhandled rejections
-      await vi.runAllTimersAsync();
-      vi.useRealTimers();
+    afterEach(() => {
+      vi.unstubAllEnvs();
       vi.unstubAllGlobals();
     });
 
-    it('throws ExtractionError for invalid URL', async () => {
+    it('rejects invalid hosts before fetching', async () => {
+      const fetchMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
       await expect(
         fetchBeaconsDocument('https://example.com/user')
-      ).rejects.toThrow(ExtractionError);
+      ).rejects.toMatchObject({
+        code: 'INVALID_URL',
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
     });
 
-    it('throws ExtractionError for reserved paths', async () => {
+    it('rejects reserved paths before fetching', async () => {
+      const fetchMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
       await expect(
         fetchBeaconsDocument('https://beacons.ai/login')
-      ).rejects.toThrow(ExtractionError);
+      ).rejects.toMatchObject({
+        code: 'INVALID_URL',
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
     });
 
-    it('throws ExtractionError on 404', async () => {
-      // Use mockResolvedValue (not Once) to handle all retry attempts
-      vi.mocked(fetch).mockResolvedValue({
-        ok: false,
-        status: 404,
-        statusText: 'Not Found',
-        url: 'https://beacons.ai/username',
-        headers: new Headers(),
-      } as Response);
-
-      await expect(
-        fetchBeaconsDocument('https://beacons.ai/username')
-      ).rejects.toThrow(ExtractionError);
-    });
-
-    it('throws ExtractionError on 429 rate limit', async () => {
-      // Use mockResolvedValue (not Once) to handle all retry attempts
-      vi.mocked(fetch).mockResolvedValue({
-        ok: false,
-        status: 429,
-        statusText: 'Too Many Requests',
-        url: 'https://beacons.ai/username',
-        headers: new Headers(),
-      } as Response);
-
-      await expect(
-        fetchBeaconsDocument('https://beacons.ai/username')
-      ).rejects.toThrow(ExtractionError);
-    });
-
-    it('returns HTML on success', async () => {
-      const mockHtml = '<html><body>Test</body></html>';
-      vi.mocked(fetch).mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        text: () => Promise.resolve(mockHtml),
-        url: 'https://beacons.ai/username',
-        headers: new Headers({ 'content-type': 'text/html' }),
-      } as Response);
-
-      const result = await fetchBeaconsDocument('https://beacons.ai/username');
-      expect(result).toBe(mockHtml);
-    });
+    it.each(['false', 'true'])(
+      'fails closed without fetching when isolated provider flag is %s',
+      async flag => {
+        vi.stubEnv('FEATURE_SOCIAL_HTML_ISOLATED_PROVIDER', flag);
+        const fetchMock = vi.fn();
+        vi.stubGlobal('fetch', fetchMock);
+        for (const url of [
+          'https://beacons.ai/username',
+          'https://www.beacons.ai/username',
+          'https://beacons.page/username',
+        ]) {
+          await expect(fetchBeaconsDocument(url)).rejects.toMatchObject({
+            code: 'SOCIAL_HTML_DISABLED',
+            message: coreSocialHtmlFetchBlockMessage(),
+          });
+        }
+        expect(fetchMock).not.toHaveBeenCalled();
+      }
+    );
   });
 });

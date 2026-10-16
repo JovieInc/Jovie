@@ -1,7 +1,11 @@
+import type { CertificationInboxCard } from '@/lib/agent-os/certification-inbox';
 import type { DesignProposal } from '@/lib/agent-os/design-lab/types';
 import type { VisualQaReviewRun } from '@/lib/agent-os/visual-qa/review';
 import type { TimActionsResponse } from '@/lib/hud/linear-actions';
-import type { OvieCertificationInventory } from './certifications/types';
+import type {
+  OvieCertificationInventory,
+  OvieCertificationRow,
+} from './certifications/types';
 import {
   INTERACTION_CASE_CONTRACT,
   type InteractionCase,
@@ -23,6 +27,10 @@ export type InboxDecisionTarget =
 export interface OvieInboxCase extends InteractionCase {
   readonly decisionTarget: InboxDecisionTarget | null;
   readonly body: string;
+  readonly certification?: {
+    readonly row: OvieCertificationRow;
+    readonly card: CertificationInboxCard | null;
+  };
 }
 
 export interface OvieInbox {
@@ -92,21 +100,24 @@ export function projectOvieInbox(
       decisionTarget: { kind: 'summer', id: card.id },
     });
   }
-  for (const row of (inventory?.rows ?? []).filter(
-    item =>
-      item.state === 'review_ready' &&
-      inventory?.queue.needsYou.some(
-        candidate =>
-          candidate.subject.id === item.subject.id &&
-          candidate.decisionEvidenceDigest === item.decision.evidenceDigest
-      )
-  )) {
+  for (const row of inventory?.rows ?? []) {
+    const judgment = inventory?.queue.needsYou.find(
+      candidate =>
+        candidate.domain ===
+          (row.domain === 'marketing_components'
+            ? 'marketing_component'
+            : row.domain) &&
+        candidate.subject.id === row.subject.id &&
+        candidate.decisionEvidenceDigest === row.decision.evidenceDigest
+    );
+    if (row.state !== 'review_ready' || !judgment) continue;
     cases.push({
       ...pending,
       state:
         row.decision.available && row.decision.evidenceDigest
           ? 'needs_you'
           : 'waiting',
+      certification: { row, card: judgment.card },
       id: `certification:${row.id}`,
       kind: 'certification',
       source: {

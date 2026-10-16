@@ -162,6 +162,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
     state = host.state
     tick = read_json(state / "tick.json", {})
     ledger_evidence = shipping_attribution.read_ledger(state / "runs" / "ledger.jsonl")
+    ledger_evidence["remoteIngest"] = tick.get("shippingOriginIngest")
     all_receipts = ledger_evidence["rows"]
     receipts = [receipt for receipt in all_receipts
                 if (ended := age_s(receipt.get("endedAt"), now)) is not None and ended <= 86400]
@@ -950,8 +951,7 @@ def _emergency_ops_report(key: str, text: str, condition: dict, host_name: str, 
     }
 
 
-def prepare_ops_report(key: str, text: str, condition: dict, host_name: str, target: str) -> dict:
-    """Prepare, but never send, one company-scoped report through the Jev observation seam."""
+def _ops_report_input(key: str, text: str, condition: dict, target: str) -> dict:
     source = condition.get("source") or {}
     observed_at = source.get("observedAt") or "UNKNOWN"
     source_version = _source_version()
@@ -967,7 +967,7 @@ def prepare_ops_report(key: str, text: str, condition: dict, host_name: str, tar
         proof["recurrence"].update(status="PROVEN", receipt=condition.get("idempotencyKey") or "UNKNOWN")
     else:
         proof["recurrence"].update(status="NOT_APPLICABLE", receipt="NOT_APPLICABLE")
-    payload = {
+    return {
         "domain": "company",
         "producer": "Symphony",
         "currentOwner": condition.get("owner"),
@@ -980,6 +980,11 @@ def prepare_ops_report(key: str, text: str, condition: dict, host_name: str, tar
         "proofTiers": proof,
         "destination": {"adapter": "linear-issue", "target": target},
     }
+
+
+def prepare_ops_report(key: str, text: str, condition: dict, host_name: str, target: str) -> dict:
+    """Prepare, but never send, one company-scoped report through the Jev observation seam."""
+    payload = _ops_report_input(key, text, condition, target)
     try:
         result = subprocess.run(
             ["node", str(OPS_REPORT_SCRIPT)], cwd=REPO_ROOT, input=json.dumps(payload),
@@ -993,6 +998,27 @@ def prepare_ops_report(key: str, text: str, condition: dict, host_name: str, tar
         return prepared
     except (OSError, ValueError, subprocess.SubprocessError):
         return _emergency_ops_report(key, text, condition, host_name, target)
+
+
+def verify_ops_report(prepared: dict, key: str, text: str, condition: dict,
+                      host_name: str, target: str) -> dict:
+    """Recheck the actual Linear payload; unavailable review uses the existing emergency notice."""
+    review = prepared.get("review") if isinstance(prepared, dict) else None
+    if isinstance(review, dict) and review.get("reviewStatus") == "emergency-reviewer-unavailable":
+        return _emergency_ops_report(key, text, condition, host_name, target)
+    try:
+        result = subprocess.run(
+            ["node", str(OPS_REPORT_SCRIPT), "--verify"], cwd=REPO_ROOT,
+            input=json.dumps({"preparedReport": prepared,
+                              "currentInput": _ops_report_input(key, text, condition, target)}),
+            capture_output=True, text=True, timeout=5, check=False,
+            env={**os.environ, "JOVIE_AGENT_PROFILE": "no_agent"})
+        if result.returncode != 0 or json.loads(result.stdout) != {"verified": True}:
+            raise ValueError("ops delivery review invalidated")
+        return prepared
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return _emergency_ops_report(key, text, condition, host_name, target)
+
 
 class Tracker:
     """Linear Triage issues, one per alert key, reused within the cool-off."""
@@ -1096,6 +1122,7 @@ class Tracker:
                            "(`tick.json`, `runs/ledger.jsonl`, `doctor.json`).")
             if condition:
                 prepared = prepare_ops_report(key, text, condition, self.host, self.title(key))
+                prepared = verify_ops_report(prepared, key, text, condition, self.host, self.title(key))
                 description = prepared["message"]
                 self.last_writing_report = prepared
             data = self.linear.gql(

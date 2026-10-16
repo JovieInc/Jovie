@@ -51,6 +51,7 @@ export const DEMAND_JUDGE_WEIGHTS = {
   assetCompounding: 8,
   implementationCost: -12,
   ongoingCost: -8,
+  outcomePenalty: -30,
   fragmentationRisk: -10,
 } as const;
 
@@ -96,6 +97,11 @@ const CONTEXT_DIMENSIONS: readonly {
     key: 'ongoingCost',
     dimension: 'ongoing-cost',
     note: 'ongoing data/provider/maintenance cost',
+  },
+  {
+    key: 'outcomePenalty',
+    dimension: 'outcome-history',
+    note: 'mature prediction misses for this capability/job',
   },
   {
     key: 'fragmentationRisk',
@@ -228,8 +234,12 @@ export function judgeCluster(
   } else {
     disposition = scoreDisposition(judgedScore);
     // Context may lift but never demote below the disposition the raw
-    // evidence earned; heavy downside escalates instead of quietly sliding.
-    if (dispositionRank(disposition) < dispositionRank(cluster.disposition)) {
+    // evidence earned, unless observed misses justify demotion. Heavy
+    // implementation downside still escalates instead of quietly sliding.
+    if (
+      clamp01(context.outcomePenalty) === 0 &&
+      dispositionRank(disposition) < dispositionRank(cluster.disposition)
+    ) {
       disposition = cluster.disposition;
     }
   }

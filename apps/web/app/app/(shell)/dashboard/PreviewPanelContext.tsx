@@ -138,10 +138,17 @@ export function PreviewPanelProvider({
 
   // Surface change (dashboard ↔ chat ↔ artist-profile settings) resets the
   // rail to closed — it only opens from an explicit user action afterward.
+  // `?panel=profile` is that explicit action: the scope reset used to close
+  // the rail after ChatPageClient opened it, so the deep link never stuck.
   const previousScopeRef = useRef(scope);
   useEffect(() => {
     if (previousScopeRef.current === scope) return;
     previousScopeRef.current = scope;
+    const panel = new URLSearchParams(globalThis.location.search).get('panel');
+    if (scope === 'chat' && panel === 'profile') {
+      setIsOpen(true);
+      return;
+    }
     setIsOpen(false);
     setPreviewData(null);
   }, [scope]);

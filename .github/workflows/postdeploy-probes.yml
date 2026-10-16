@@ -1,4 +1,10 @@
 name: Post-Deploy Probes
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Symphony
+# necessary-trust-boundary: Observe completed controller attempts and the
+#   landed immutable deployment without holding production mutation authority.
+# removal-trigger: Delete once in-band probes prove drain coverage; review
+#   this compatibility exception by the dated expiry decision below.
 
 # Additive post-deploy evidence for controller generations whose in-lease
 # probes never ran. The production controller gates its immutable-URL probes on
@@ -7,8 +13,15 @@ name: Post-Deploy Probes
 # every generation is superseded inside that window, so the probes go dark
 # exactly when velocity is highest. This workflow re-probes the landed
 # canonical production deployment — production health, not release candidacy —
-# only when an operator explicitly dispatches this compatibility fallback.
-# compatibility-expiry: 2026-10-31; delete after in-band probes cover drains.
+# after each completed controller run that lacks exact in-lease probe evidence.
+# This is landed-build health evidence, never Production Verified or a signal
+# to clear a release freeze (JOV-7195).
+# compatibility-expiry: 2026-11-30 PT.
+# Decision 2026-10-15 (JOV-8081) — Ship now: restore automatic read-only
+# coverage, removed by JOV-5940. Re-evaluate when: a high-velocity main day
+# proves automatic smoke/Lighthouse receipts, or by 2026-11-30 PT. Then:
+# delete this fallback only after in-band probes demonstrably survive drains;
+# otherwise record a new dated expiry decision. JOV-4146 owns extraction.
 #
 # Hard boundaries (do not relax):
 # - Read-only evidence. No production mutation, no marker writes, no rollback.
@@ -19,17 +32,23 @@ name: Post-Deploy Probes
 #   CI-attempt + Main Release Ready contract is untouched.
 
 on:
+  # CI -> Staging Controller -> Production Controller -> probes: the third
+  # and final workflow_run hop. Do not add downstream workflow_run consumers.
+  workflow_run:
+    workflows: [Production Controller]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
   actions: read
 
-# Probes are read-only against an immutable deployment URL, so only the newest
-# run carries relevant evidence. Coalescing is safe and bounds drain queues.
+# Finish active probes even during drains so repeated controller completions
+# cannot starve evidence. GitHub coalesces pending runs to one latest follow-up.
 concurrency:
   group: postdeploy-probes
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   resolve-target:
@@ -283,22 +302,28 @@ jobs:
             exit 1
           }
 
-          # Expand the deployed prefix inside this repository, then prove that
-          # exact commit is on main. GitHub rejects ambiguous or foreign SHAs.
-          commit_json="$(gh api "repos/$REPOSITORY/commits/$deployed_sha")"
-          commit_sha="$(jq -r '.sha // ""' <<<"$commit_json")"
+          # Resolve the deployed prefix and prove ancestry through git, outside
+          # the shared REST quota (JOV-8495). Fetch main into an isolated object
+          # store so a shallow checkout or stale local refs cannot supply proof.
+          # No checkout is needed; omit blobs to keep the history read small.
+          commit_history="$(mktemp -d)"
+          trap 'rm -rf "$commit_history"' EXIT
+          git init -q "$commit_history"
+          git -C "$commit_history" \
+            -c "http.extraheader=AUTHORIZATION: bearer $GH_TOKEN" \
+            fetch --quiet --no-tags --filter=blob:none \
+            "https://github.com/$REPOSITORY.git" \
+            refs/heads/main:refs/heads/main
+          commit_sha="$(git -C "$commit_history" rev-parse --verify "$deployed_sha^{commit}")" || {
+            echo "::error::Deployed commit identity did not resolve uniquely in main history."
+            exit 1
+          }
           [[ "$commit_sha" =~ ^[0-9a-f]{40}$ ]] &&
             [[ "$commit_sha" == "$deployed_sha"* ]] || {
             echo "::error::Deployed commit identity did not resolve uniquely in this repository."
             exit 1
           }
-          comparison_json="$(gh api "repos/$REPOSITORY/compare/$commit_sha...main")"
-          jq -e --arg sha "$commit_sha" '
-            type == "object" and
-            (.status == "ahead" or .status == "identical") and
-            .base_commit.sha == $sha and
-            .merge_base_commit.sha == $sha
-          ' >/dev/null <<<"$comparison_json" || {
+          git -C "$commit_history" merge-base --is-ancestor "$commit_sha" refs/heads/main || {
             echo "::error::Canonical production commit is not an ancestor of main."
             exit 1
           }
@@ -567,7 +592,7 @@ jobs:
   remediation:
     name: File post-deploy probe remediation
     needs: [resolve-target, smoke, auth-smoke, lighthouse]
-    if: ${{ always() && needs.resolve-target.outputs.should_probe == 'true' }}
+    if: ${{ always() && (needs.resolve-target.result == 'failure' || needs.resolve-target.outputs.should_probe == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
@@ -584,15 +609,15 @@ jobs:
           REMEDIATION_MODE: monitor
           REMEDIATION_FINGERPRINT: production-monitor-postdeploy-probes
           REMEDIATION_SOURCE: postdeploy-probes.yml
-          REMEDIATION_CONCLUSION: ${{ (needs.smoke.result == 'failure' || needs.auth-smoke.result == 'failure' || needs.lighthouse.result == 'failure') && 'failure' || 'success' }}
-          REMEDIATION_DETAIL: smoke=${{ needs.smoke.result }} auth-smoke=${{ needs.auth-smoke.result }} lighthouse=${{ needs.lighthouse.result }}
+          REMEDIATION_CONCLUSION: ${{ (needs.resolve-target.result == 'success' && needs.smoke.result == 'success' && needs.auth-smoke.result == 'success' && needs.lighthouse.result == 'success') && 'success' || 'failure' }}
+          REMEDIATION_DETAIL: resolve=${{ needs.resolve-target.result }} sha=${{ needs.resolve-target.outputs.commit_sha }} deployment=${{ needs.resolve-target.outputs.deployment_id }} smoke=${{ needs.smoke.result }} auth-smoke=${{ needs.auth-smoke.result }} lighthouse=${{ needs.lighthouse.result }}; landed-build evidence only, never release or freeze recovery proof (JOV-7195)
           REMEDIATION_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: node scripts/remediation-signal-intake.mjs
 
   notify-failure:
     name: Alert on post-deploy probe failure
     needs: [resolve-target, smoke, auth-smoke, lighthouse]
-    if: ${{ always() && needs.resolve-target.outputs.should_probe == 'true' && (needs.smoke.result == 'failure' || needs.lighthouse.result == 'failure' || needs.auth-smoke.result == 'failure') }}
+    if: ${{ always() && (needs.resolve-target.result == 'failure' || (needs.resolve-target.outputs.should_probe == 'true' && (needs.smoke.result != 'success' || needs.lighthouse.result != 'success' || needs.auth-smoke.result != 'success'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -609,11 +634,16 @@ jobs:
           author_name: 'Post-Deploy Probes'
           custom_payload: |
             {
-              "text": "Landed production post-deploy probes failed",
+              "text": "Landed production post-deploy probes failed or evidence is missing (not release-freeze recovery proof)",
               "attachments": [
                 {
                   "color": "danger",
                   "fields": [
+                    {
+                      "title": "Resolve target",
+                      "value": "${{ needs.resolve-target.result }}",
+                      "short": true
+                    },
                     {
                       "title": "Smoke",
                       "value": "${{ needs.smoke.result }}",

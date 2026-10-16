@@ -123,7 +123,7 @@ function assertPublishWorkflowContract(source: string): void {
   expect(source).toContain('"$PACKAGE_NAME@$RELEASE_VERSION"');
   expect(source).toContain('"$installed_cli" --version');
   expect(source).toContain('"$installed_cli" api openapi');
-  expect(source).toContain("contract.info?.title !== 'Jovie Artist API'");
+  expect(source).toContain("contract.info?.title !== 'Jovie Public API'");
   // JOV-7714: publish only bytes that passed the black-box chaos matrix.
   expect(source).toContain('needs: [chaos-tarball, chaos-matrix]');
   expect(source).toContain('os: [ubuntu-latest, macos-latest, windows-latest]');
@@ -236,6 +236,42 @@ describe('npm provenance workflow', () => {
     ],
   ])('fails closed when the %s is weakened', (_, unsafeWorkflow) => {
     expect(() => assertPublishWorkflowContract(unsafeWorkflow)).toThrow();
+  });
+});
+
+describe('published CLI OpenAPI readback (JOV-7915)', () => {
+  it.each([
+    ['current public contract', '3.1.0', 'Jovie Public API', 0],
+    ['unrelated API', '3.1.0', 'Other API', 1],
+    ['unsupported OpenAPI version', '2.0', 'Jovie Public API', 1],
+    ['missing metadata', '3.1.0', undefined, 1],
+  ])('validates the %s', (_, openapi, title, expected) => {
+    const directory = mkdtempSync(resolve(tmpdir(), 'jovie-openapi-readback-'));
+    try {
+      const path = resolve(directory, 'openapi.json');
+      writeFileSync(path, JSON.stringify({ openapi, info: { title } }));
+      // Execute the workflow's actual validator rather than a duplicate.
+      const validator = workflow.match(
+        /const contract = JSON\.parse\(readFileSync\(process\.env\.OPENAPI_PATH, 'utf8'\)\);[\s\S]*?(?=\n {10}NODE)/
+      )?.[0];
+      expect(validator).toBeDefined();
+      const result = spawnSync(
+        process.execPath,
+        [
+          '--input-type=module',
+          '-e',
+          `import { readFileSync } from 'node:fs';\n${validator}`,
+        ],
+        {
+          encoding: 'utf8',
+          timeout: 10_000,
+          env: { ...process.env, OPENAPI_PATH: path },
+        }
+      );
+      expect(result.status, result.stdout + result.stderr).toBe(expected);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });
 

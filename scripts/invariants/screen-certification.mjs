@@ -13,6 +13,10 @@ import {
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  browserInputFindings,
+  isMissingDeviceEvidence,
+} from './browser-owned-input.mjs';
+import {
   screenNeedsProductReferences,
   validateProductReferenceSnapshot,
 } from './product-reference-coherence.mjs';
@@ -150,6 +154,10 @@ export const SCREEN_PROOF_ROUTES = Object.freeze({
   'web.brand': '/brand',
   'web.report': '/report',
   'web.start': '/start',
+  // JOV-8068: the checkout page is registered and auth-gated. The
+  // isRenderFixtureEnabled branch on that page is the rendered producer;
+  // production deployments fail closed and keep the sign-in redirect.
+  'web.onboarding-checkout': '/onboarding/checkout',
   // /solutions/* registers the whole (marketing)/solutions directory;
   // /solutions/artists is the family's declared concrete health-check path.
   'web.marketing-solutions': '/solutions/artists',
@@ -265,8 +273,9 @@ web.app-shell|web|app-shell|apps/web/app/app/(shell)/layout.tsx|desktop,mobile
 web.money|web|screen.money|apps/web/app/app/money/page.tsx,apps/web/app/app/money/layout.tsx|desktop,mobile
 web.exp-library-v1|web|exp-library-v1|apps/web/app/exp/library-v1/page.tsx|desktop,mobile
 web.exp-right-rail-shotgun|web|exp-right-rail-shotgun|apps/web/app/exp/right-rail-shotgun/page.tsx|desktop,mobile
-web.public-profile|web|public-profile|apps/web/app/[username]/page.tsx,apps/web/app/[username]/layout.tsx|desktop,mobile
+web.public-profile|web|public-profile|apps/web/app/[username]/page.tsx,apps/web/app/[username]/layout.tsx,apps/web/components/features/profile/artist-notifications-cta/,apps/web/components/features/profile/subscribe/|desktop,mobile
 web.public-profile-about|web|public-profile|apps/web/app/[username]/about/page.tsx|desktop,mobile
+web.auth|web|browser-input-assurance|apps/web/app/(auth)/,apps/web/app/@auth/,apps/web/app/auth-return/,apps/web/app/desktop-auth/,apps/web/app/mobile-auth-return/,apps/web/components/features/auth/|desktop,mobile
 web.artist-pay|web|artist-pay|apps/web/app/[username]/pay/page.tsx|desktop,mobile
 web.profile-mode-render|web|profile-mode-render|apps/web/app/[username]/profile-mode-render/|desktop,mobile
 web.release-landing|web|release-landing|apps/web/app/r/[slug]/page.tsx,apps/web/app/r/[slug]/ReleaseLandingPage.tsx|desktop,mobile
@@ -339,7 +348,6 @@ ios.teleprompter|ios|ios-teleprompter|apps/ios/Jovie/Features/Teleprompter/|comp
 ios.inbox|ios|ios-inbox|apps/ios/Jovie/Features/Inbox/|compact
 macos-electron.ovie-door|macos-electron|ovie|apps/desktop/src/ovie-door.ts|desktop|x|Product-surface implementation owned by Ovie
 macos-electron.auth-security|macos-electron|auth-security|apps/desktop/src/desktop-auth-security.ts|desktop|x|Auth/security lane is out of scope
-web.auth|web|auth-security|apps/web/app/(auth)/,apps/web/app/@auth/,apps/web/app/auth-return/,apps/web/app/desktop-auth/,apps/web/app/mobile-auth-return/|desktop,mobile|x|Auth/security lane is out of scope
 macos.menu-monitor|macos-electron|macos-menu-monitor|apps/macos/MenuMonitor/|desktop|x|MenuMonitor is out of scope
 ios.auth|ios|auth-security|apps/ios/Jovie/Features/Auth/|compact|x|Auth/security lane is out of scope
 ios.shell|ios|ios-shell|apps/ios/Jovie/Features/AppShell/|compact|x|iOS shell lane is out of scope
@@ -594,6 +602,12 @@ export function evaluateScreenProof(proof, { screen, headSha }) {
       })
     );
   }
+  findings.push(
+    ...browserInputFindings(proof.browserOwnedInput, {
+      screenId: screen.id,
+      headSha,
+    })
+  );
   const proofHead =
     typeof proof.headSha === 'string' ? proof.headSha.toLowerCase() : '';
   if (!headSha || proofHead !== headSha.toLowerCase()) {
@@ -1176,15 +1190,24 @@ export function evaluateChangedScreens({
       screen,
       headSha,
     });
-    if (findings.length > 0)
-      issues.push(`${screen.id}: ${findings.join('; ')}`);
+    // Missing real-device records stay UNKNOWN on the audit ledger (JOV-8387).
+    // They do not reject a rendered screenshot candidate. BLOCKED records do.
+    const blocking = findings.filter(
+      finding => !isMissingDeviceEvidence(finding)
+    );
+    const commissioning = findings.length - blocking.length;
+    if (blocking.length > 0)
+      issues.push(`${screen.id}: ${blocking.join('; ')}`);
     changedScreens.push({
       id: screen.id,
-      verdict: findings.length === 0 ? 'pass' : 'block',
-      findings,
+      verdict: blocking.length === 0 ? 'pass' : 'block',
+      findings: blocking,
+      ...(blocking.length === 0 && commissioning > 0
+        ? { deviceEvidence: 'UNKNOWN' }
+        : {}),
       // Renderer provenance + immutable artifact identity ride the receipt
       // for every certified screen.
-      ...(findings.length === 0
+      ...(blocking.length === 0
         ? { artifactDigest: proof.artifactDigest, rendererRunUrl: proof.runUrl }
         : {}),
     });

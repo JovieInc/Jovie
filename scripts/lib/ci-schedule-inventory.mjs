@@ -22,6 +22,7 @@ export const EVIDENCE_DRIVEN_WORKFLOWS = Object.freeze([
   '.github/workflows/e2e-full-matrix.yml',
   '.github/workflows/nightly-testing-agent.yml',
   '.github/workflows/nightly-tests.yml',
+  '.github/workflows/quality-gap-finder.yml',
   // security.yml intentionally keeps a weekly upstream-advisory baseline
   // (JOV-7565): dependency/OSV advisories publish on their own clock, so a
   // purely causal trigger can miss new findings on unchanged source.

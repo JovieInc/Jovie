@@ -11,7 +11,7 @@ import {
   type GatewayRequestPolicy,
   gatewayTransport,
   type JudgeTransport,
-} from './judge';
+} from './judge.ts';
 
 // Subscription CLIs carry frontier judges; the gateway carries allowlisted ones.
 // Codex now ships inside ChatGPT.app; env overrides win, then the bundled CLI, then PATH.
@@ -49,7 +49,7 @@ function runCli(
   });
   if (result.status !== 0)
     throw new Error(
-      `${bin} exited ${result.status}: ${(result.stderr ?? '').slice(0, 160)}`
+      `${bin} exited ${result.status}: ${(result.stderr ?? '').slice(-1000)}`
     );
   return result.stdout;
 }
@@ -64,6 +64,10 @@ export function routedTransport(
     : undefined;
   const send: JudgeTransport = async request => {
     const [family, name = ''] = request.model.split('/');
+    if (request.webSearch && family !== 'openai')
+      throw new Error(
+        'Live research requires the OpenAI subscription transport.'
+      );
     const input = `${request.system}\n\n${request.prompt}`;
     if (family === 'anthropic') {
       // Claude CLI model ids use dashes: claude-opus-5.5 -> claude-opus-5-5.
@@ -85,10 +89,12 @@ export function routedTransport(
     if (family === 'openai') {
       const dir = mkdtempSync(join(tmpdir(), 'copy-judge-'));
       try {
-        runCli(
+        const events = runCli(
           CODEX_BIN,
           [
+            ...(request.webSearch ? ['--search'] : []),
             'exec',
+            ...(request.webSearch ? ['--json'] : []),
             // User/repo hooks (e.g. a Stop hook) hang non-interactive exec.
             '-c',
             'features.hooks=false',
@@ -97,8 +103,7 @@ export function routedTransport(
             '--skip-git-repo-check',
             '--sandbox',
             'read-only',
-            '-m',
-            name,
+            ...(name === 'default' ? [] : ['-m', name]),
             '-o',
             join(dir, 'out.txt'),
             '-',
@@ -106,6 +111,23 @@ export function routedTransport(
           input,
           dir
         );
+        if (
+          request.webSearch &&
+          !events.split('\n').some(line => {
+            try {
+              const event = JSON.parse(line);
+              return (
+                event.type === 'item.completed' &&
+                event.item?.type === 'web_search'
+              );
+            } catch {
+              return false;
+            }
+          })
+        )
+          throw new Error(
+            'Research returned no completed live web search receipt.'
+          );
         return readFileSync(join(dir, 'out.txt'), 'utf8');
       } finally {
         rmSync(dir, { recursive: true, force: true });

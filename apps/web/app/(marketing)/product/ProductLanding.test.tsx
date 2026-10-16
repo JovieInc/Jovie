@@ -160,7 +160,7 @@ describe('ProductLanding locked hero (DESIGN_READY 2026-09-17)', () => {
     // JOV-7230: Pen dClrT/DbI9f closes /product on the two-line "See what
     // shows up / when people search for you." headline plus the canonical
     // handle-search action — not a "Claim your Jovie" link button.
-    const close = screen.getByTestId('product-close');
+    const close = screen.getByTestId('marketing-section-cta');
     expect(close.tagName).toBe('SECTION');
     expect(close).toHaveAttribute('data-marketing-variant', 'editorial-search');
 

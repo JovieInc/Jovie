@@ -48,6 +48,7 @@ export {
 } from './deezer';
 // MusicBrainz Provider
 export {
+  browseMusicBrainzCatalog,
   bulkLookupMusicBrainzByIsrc,
   getMusicBrainzArtist,
   getMusicBrainzStats,

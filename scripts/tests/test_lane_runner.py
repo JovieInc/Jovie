@@ -30,6 +30,11 @@ from types import SimpleNamespace
 
 os.environ["LANES_EXECUTION_BACKEND"] = "local-test"
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "scripts/lanes"))
+import git_housekeeping  # noqa: E402
+
+git_housekeeping.install_process_fixture_env()
+git_housekeeping.install_isolated_tempdirs()
 SPEC = importlib.util.spec_from_file_location("lane_runner", ROOT / "scripts/lanes/lane_runner.py")
 lane = importlib.util.module_from_spec(SPEC)
 sys.modules["lane_runner"] = lane
@@ -106,7 +111,7 @@ class ContextManifestTest(unittest.TestCase):
     def test_manifest_binds_exact_prompt_and_inputs_without_copying_private_content(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "issue.prompt.md"
-            inputs = {"issue": "private issue", "gbrain": "prior private decision", "branch": "devin/jov-1"}
+            inputs = {"issue": "private issue", "gbrain": "prior private decision", "branch": "devin/jov-1", "prior_attempts": "previous attempt"}
             first = lane.write_agent_prompt(path, "exact prompt\n", "issue", "devin", inputs)
             body = Path(first["path"]).read_bytes()
             receipt = json.loads(body)
@@ -127,7 +132,7 @@ class ContextManifestTest(unittest.TestCase):
     def test_missing_context_and_drift_are_explicit_nonblocking_findings(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "issue.prompt.md"
-            inputs = {"issue": "task", "gbrain": "", "branch": "codex/jov-1"}
+            inputs = {"issue": "task", "gbrain": "", "branch": "codex/jov-1", "prior_attempts": ""}
             receipt = lane.write_agent_prompt(path, "prompt", "issue", "codex", inputs)
             self.assertEqual(json.loads(Path(receipt["path"]).read_text())["inputs"]["gbrain"]["status"], "unavailable")
             with patch.object(lane, "HERE", Path(tmp)):
@@ -540,6 +545,99 @@ class PromptTest(unittest.TestCase):
         self.assertEqual(lane.context_pack(issue(), run=boom), "")
 
 
+class SessionContinuityTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.host = lane.Host(state=Path(self.tmp.name))
+        self.runs = self.host.state / "runs"
+        self.runs.mkdir()
+        self.task = issue("JOV-4302", labels=["ws:memory-gbrain"])
+        self.linear = Mock()
+        self.linear.gql.return_value = {"issue": {"comments": {
+            "nodes": [{"id": "comment-1", "createdAt": "2026-10-14T12:00:00Z",
+                       "body": "Jovie session handoff: fix exists at abc123; runtime still stale."}],
+            "pageInfo": {"hasNextPage": False}}}}
+
+    def write_runs(self, rows):
+        (self.runs / "ledger.jsonl").write_text("\n".join(json.dumps(row) for row in rows))
+
+    def row(self, **changes):
+        return {"schema": "jovie-lane-run/v1", "repository": lane.REPO_SLUG,
+                "runId": "prior-run", "issue": self.task.identifier,
+                "startedAt": "2026-10-14T11:00:00Z", "verdict": "held",
+                "branch": "codex/prior-attempt", "headSha": "abc123", "prUrl": "https://example.com/pr/1",
+                "reasons": ["runtime-stale"], **changes}
+
+    def test_fresh_session_retrieves_prior_attempt_and_handoff_without_gbrain(self):
+        self.write_runs([self.row()])
+        recalled = lane.prior_attempts_context(self.host, self.linear, self.task)
+        prompt = lane.render_prompt(self.task, "codex/new-session", "", prior_attempts=recalled)
+        for evidence in ("prior-run", "abc123", "runtime-stale", "comment-1", "fix exists at abc123"):
+            self.assertIn(evidence, prompt)
+        self.assertIn("GBrain unavailable", prompt)
+        self.assertIn("git log", prompt)
+        self.assertIn("why it reverted", prompt)
+        self.assertIn("Jovie session handoff", prompt)
+        self.assertIn("Never copy secrets", prompt)
+        self.linear.gql.assert_called_once()
+        self.assertIn("comments(first:5,orderBy:createdAt)", self.linear.gql.call_args.args[0])
+        self.assertEqual(self.linear.gql.call_args.args[1], {"id": self.task.id})
+
+    def test_same_area_history_is_reused_but_other_repositories_and_unrelated_runs_are_excluded(self):
+        self.write_runs([self.row(issue="JOV-1", runId="same-area", workstream="memory-gbrain"),
+                         self.row(issue="JOV-2", runId="unrelated", workstream="native-apps"),
+                         self.row(repository="Other/Repo", runId="foreign"),
+                         self.row(repository=None, runId="unknown-repository"),
+                         self.row(runId="same-issue")])
+        recalled = lane.prior_attempts_context(self.host, self.linear, self.task)
+        self.assertIn("same-area", recalled)
+        self.assertIn("same-issue", recalled)
+        for omitted in ("unrelated", "foreign", "unknown-repository"):
+            self.assertNotIn(omitted, recalled)
+        self.assertLess(recalled.index("same-issue"), recalled.index("same-area"))
+
+    def test_bounds_and_corrupt_rows_do_not_hide_the_latest_matching_attempt(self):
+        rows = [self.row(runId=f"attempt-{i}", reasons=["x" * 2000]) for i in range(20)]
+        self.write_runs(rows)
+        path = self.runs / "ledger.jsonl"
+        path.write_bytes(b"x" * 300000 + b"\n{}\nnull\ninvalid\n" + path.read_bytes())
+        self.linear.gql.return_value["issue"]["comments"]["nodes"] = [
+            {"id": str(i), "createdAt": "2026-10-14", "body": "y" * 10000} for i in range(5)]
+        self.linear.gql.return_value["issue"]["comments"]["pageInfo"]["hasNextPage"] = True
+        recalled = lane.prior_attempts_context(self.host, self.linear, self.task)
+        self.assertIn("attempt-19", recalled)
+        self.assertNotIn('"attempt-15"', recalled)
+        self.assertIn("older comments omitted", recalled)
+        self.assertLessEqual(len(recalled), lane.PRIOR_ATTEMPTS_CHARS)
+        self.assertNotIn("x" * 1000, recalled)
+        self.assertNotIn("y" * 1000, recalled)
+
+    def test_large_receipts_cannot_crowd_out_cross_host_handoffs(self):
+        self.write_runs([self.row(**{key: "z" * 5000 for key in
+                         ("runId", "startedAt", "endedAt", "branch", "headSha", "prUrl", "verdict")},
+                         reasons=["z" * 5000] * 3) for _ in range(4)])
+        recalled = lane.prior_attempts_context(self.host, self.linear, self.task)
+        self.assertIn("comment-1", recalled)
+        self.assertIn("runtime still stale", recalled)
+        self.assertLessEqual(len(recalled), lane.PRIOR_ATTEMPTS_CHARS)
+
+    def test_missing_and_unavailable_are_distinct_and_never_expose_exception_text(self):
+        self.linear.gql.side_effect = RuntimeError("private credential")
+        recalled = lane.prior_attempts_context(self.host, self.linear, self.task)
+        self.assertIn("local history unavailable", recalled)
+        self.assertIn("Linear history unavailable", recalled)
+        self.assertNotIn("private credential", recalled)
+        self.write_runs([])
+        self.linear.gql.side_effect = None
+        self.linear.gql.return_value = {"issue": {"comments": {"nodes": [], "pageInfo": {"hasNextPage": False}}}}
+        recalled = lane.prior_attempts_context(self.host, self.linear, self.task)
+        self.assertIn("no matching attempts in bounded ledger tail", recalled)
+        self.assertIn("no comments", recalled)
+        self.linear.gql.return_value = {"issue": None}
+        self.assertIn("Linear history unavailable", lane.prior_attempts_context(self.host, self.linear, self.task))
+
+
 class DependencyOnlyGateTest(unittest.TestCase):
     """Actual git blobs distinguish version chores from source/configuration changes."""
     def setUp(self):
@@ -562,8 +660,10 @@ class DependencyOnlyGateTest(unittest.TestCase):
                    "headRefName": "dependabot/npm_and_yarn/radix-tabs", "labels": [], "state": "OPEN"}
 
     def git(self, *args):
+        # Fixture commits must not detach maintenance. The structural lane runs
+        # Git 2.55, whose default is to keep writing `.git/objects` after commit returns.
         return subprocess.run(["git", *args], cwd=self.repo, check=True, capture_output=True,
-                              text=True).stdout.strip()
+                              text=True, env=git_housekeeping.apply_fixture_env(os.environ)).stdout.strip()
 
     def write(self, path, value):
         target = self.repo / path
@@ -861,6 +961,20 @@ class GateTest(unittest.TestCase):
                    self.change("apps/web/lib/profile/catalog.ts", 112),
                    self.change("apps/web/lib/profile/catalog.test.ts", 180)]
         self.assertEqual(lane.gate_rules(changes), [])
+
+    def test_generated_inventory_is_excluded_but_source_and_tests_keep_the_size_cap(self):
+        generated = self.change("docs/product/generated/artist-launch-inventory.json", 7336)
+        code = self.change("scripts/artist-launch-contract.mjs", 1000)
+        tests = self.change("scripts/artist-launch-contract.test.mjs", 500)
+        self.assertEqual(lane.gate_rules([generated, code, tests]), [])
+        tests.added += 1
+        self.assertEqual(lane.gate_rules([generated, code, tests]), ["diff-too-large:1501"])
+        for path in ["apps/web/lib/generated/unsafe.ts", "scripts/generated/task.mjs"]:
+            with self.subTest(path=path):
+                self.assertEqual(lane.gate_rules([self.change(path)]), ["code-change-without-test"])
+        for path in ["docs/product/generated-notes.md", "scripts/generated-helper.mjs"]:
+            with self.subTest(path=path):
+                self.assertIn("diff-too-large:2501", lane.gate_rules([self.change(path, 2000), tests]))
 
     def test_sensitive_diff_uses_the_smaller_review_cap(self):
         changes = [self.change("apps/web/lib/a.ts", 400), self.change("apps/web/lib/a.test.ts", 101)]
@@ -1980,6 +2094,22 @@ class RunIssueTest(unittest.TestCase):
         self.assertEqual(context["provider"], "devin")
         self.assertEqual(context["prompt"]["sha256"], hashlib.sha256(prompt.encode()).hexdigest())
         self.assertEqual(self.ledger()[0]["contextManifests"], receipt["contextManifests"])
+
+    def test_prior_session_context_reaches_spawned_prompt_and_bound_manifest(self):
+        lane.verify_and_land = lambda *a, **k: {"verdict": "landing", "pr": 9, "reasons": []}
+        task = issue("JOV-4302", labels=["ws:memory-gbrain"])
+        previous = {"schema": "jovie-lane-run/v1", "repository": lane.REPO_SLUG,
+                    "issue": task.identifier, "runId": "earlier-session", "headSha": "prior-sha"}
+        runs = self.host.state / "runs"
+        runs.mkdir()
+        (runs / "ledger.jsonl").write_text(json.dumps(previous) + "\n")
+        with patch.object(lane, "run_agent", return_value=SimpleNamespace(returncode=0)) as agent:
+            receipt = lane.run_issue(self.host, "codex", {"cmd": ["agent", "{prompt_file}"]}, FakeLinear([]), task)
+        prompt = Path(agent.call_args.args[0][1]).read_text()
+        self.assertIn("earlier-session", prompt)
+        context = json.loads(Path(receipt["contextManifests"][0]["path"]).read_text())
+        self.assertEqual(context["inputs"]["prior_attempts"]["status"], "present")
+        self.assertEqual(receipt["workstream"], "memory-gbrain")
 
     def test_unknown_pr_readback_preserves_source_and_failed_unknown_attempt(self):
         lane.verify_and_land = lambda *a, **k: {"verdict": "pr-readback-pending", "reasons": ["pr-inventory-unavailable"],
@@ -3587,6 +3717,10 @@ class DispatchTest(unittest.TestCase):
         self.corpus_tick = corpus.start()
         self.addCleanup(corpus.stop)
 
+        origins = patch.object(lane.shipping_origin, "collect", return_value={"accepted": [], "rejected": [], "errors": []})
+        self.origin_collect = origins.start()
+        self.addCleanup(origins.stop)
+
     def test_coding_dispatch_continues_when_coordinator_reasoning_and_alerts_are_unavailable(self):
         # Summer/Gateway failure affects optional reasoning and observability, not
         # the independently admitted coding lane. Keep all existing disk/slot gates.
@@ -3611,7 +3745,14 @@ class DispatchTest(unittest.TestCase):
                 "actions": {"delivery": {"key": "delivery", "kind": "comments", "status": "failed",
                                          "nextAt": 123, "createdAt": 100}},
             })
+            self.origin_collect.side_effect = RuntimeError("origin transport unavailable")
             self.assertEqual(lane.dispatch(host), 0)
+            tick = json.loads((host.state / "tick.json").read_text())
+            if os.environ.get("LANES_SELFTEST"):
+                self.origin_collect.assert_not_called()
+            else:
+                self.origin_collect.assert_called_once_with(host.state)
+                self.assertIn("origin transport unavailable", tick["shippingOriginIngest"]["errors"][0])
             self.assertEqual(spawn.call_count, 1)
             self.assertEqual(spawn.call_args.args[0][-1], "codex")
             self.corpus_tick.assert_called_once_with(host.state)
@@ -4015,7 +4156,8 @@ class WorktreePublicationTest(unittest.TestCase):
 
     def git(self, cwd, *args):
         return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True,
-                              check=True, timeout=10).stdout.strip()
+                              check=True, timeout=10,
+                              env=git_housekeeping.apply_fixture_env(os.environ)).stdout.strip()
 
     def candidate(self, *, detached=False, unpublished=True):
         args = ["--detach"] if detached else ["-b", "candidate"]
@@ -6174,6 +6316,11 @@ class UpdateTest(unittest.TestCase):
             env = lane.selftest_env(Path("/scratch"))
         self.assertFalse(set(knobs) & set(env))
         self.assertEqual((env["PATH"], env["LANES_SELFTEST"], env["LANES_STATE"]), ("/bin", "1", "/scratch"))
+        pairs = [(env[f"GIT_CONFIG_KEY_{i}"], env[f"GIT_CONFIG_VALUE_{i}"])
+                 for i in range(int(env["GIT_CONFIG_COUNT"]))]
+        self.assertIn(("maintenance.auto", "false"), pairs)
+        self.assertIn(("maintenance.autoDetach", "false"), pairs)
+        self.assertIn(("gc.auto", "0"), pairs)
 
     def test_release_selftest_never_sees_host_credentials_or_home(self):
         secrets = {"GH_TOKEN": "ghs_live", "GITHUB_TOKEN": "ghs_live", "LINEAR_API_KEY": "lin_live",
@@ -6499,7 +6646,7 @@ class UpdateTest(unittest.TestCase):
 
 class ManagedMeshArchiveTest(unittest.TestCase):
     def test_managed_archive_retains_exact_verified_portable_closure(self):
-        required = [".nvmrc", "pnpm-lock.yaml", "packages/agent-transport-contracts/work-order.ts",
+        required = ["scripts/shipping_origin.py", ".nvmrc", "pnpm-lock.yaml", "packages/agent-transport-contracts/work-order.ts",
                     "scripts/backlog-orchestrator/summer-triage-assessment-client.mjs"]
         self.assertTrue(set(required) <= set(lane.RELEASE_EXTRAS))
         if os.environ.get("LANES_SELFTEST") != "1":
@@ -7957,6 +8104,7 @@ class LifecycleOwnershipTest(unittest.TestCase):
                 patch.object(lane.worktree_sweep, "maybe_spawn"), \
                 patch.object(lane, "ensure_full_history"), \
                 patch.object(lane, "claim_remediation_events"), \
+                patch.object(lane.shipping_origin, "collect", return_value={}), \
                 patch.object(lane, "provider_healthy", return_value=True), \
                 patch.object(lane.pr_events, "tick"), \
                 patch.object(lane.reason_lane, "tick"), \
@@ -8896,6 +9044,40 @@ class TerminalPublicationTest(unittest.TestCase):
 
 
 class PublicationBundlePrerequisitesTest(unittest.TestCase):
+    def test_ops_delivery_cli_rechecks_from_only_declared_release_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bundle = Path(tmp)
+            for name in ["scripts/lanes/ops-report.mjs", *lane.RELEASE_EXTRAS]:
+                destination = bundle / name
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(ROOT / name, destination)
+            script = bundle / "scripts/lanes/ops-report.mjs"
+            current = {
+                "domain": "company", "producer": "Symphony", "currentOwner": "symphony-lanes-doctor",
+                "observedState": "disk usage needs inspection", "blocker": "UNKNOWN",
+                "nextAction": "inspect disk usage", "rootCause": None,
+                "evidence": {"observedAt": datetime.now(timezone.utc).isoformat(), "source": "synthetic doctor fixture"},
+                "destination": {"adapter": "linear-issue", "target": "Symphony doctor: archive fixture"},
+            }
+            prepared = subprocess.run(["node", str(script)], cwd=bundle, input=json.dumps(current),
+                                      capture_output=True, text=True, timeout=10)
+            self.assertEqual(prepared.returncode, 0, prepared.stderr)
+            report = json.loads(prepared.stdout)
+            self.assertEqual(report["review"]["reviewStatus"], "missing-source-receipt")
+            self.assertEqual(report["decision"], "approved-template")
+            for tampered in (False, True):
+                with self.subTest(tampered=tampered):
+                    candidate = {**report, "message": "edited after review"} if tampered else report
+                    verified = subprocess.run(["node", str(script), "--verify"], cwd=bundle,
+                                              input=json.dumps({"preparedReport": candidate, "currentInput": current}),
+                                              capture_output=True, text=True, timeout=10)
+                    if tampered:
+                        self.assertNotEqual(verified.returncode, 0)
+                        self.assertIn("review invalidated before delivery", verified.stderr)
+                    else:
+                        self.assertEqual(verified.returncode, 0, verified.stderr)
+                        self.assertEqual(json.loads(verified.stdout), {"verified": True})
+
     def test_promotion_metrics_imports_from_only_declared_release_files(self):
         # Import from a standalone bundle so checkout files cannot hide missing dependencies.
         with tempfile.TemporaryDirectory() as tmp:

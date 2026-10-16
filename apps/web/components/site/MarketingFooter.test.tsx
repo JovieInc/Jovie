@@ -181,6 +181,26 @@ describe('MarketingFooter', () => {
     );
   });
 
+  it('gives pricing the canonical full footer while its page owns the closing CTA', () => {
+    mockUsePathname.mockReturnValue('/pricing');
+
+    render(<MarketingFooter />);
+
+    expect(screen.getByTestId('marketing-footer')).toHaveAttribute(
+      'data-footer-variant',
+      'expanded'
+    );
+    expect(screen.getByRole('heading', { name: 'Product' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Connect' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Privacy' })).toHaveAttribute(
+      'href',
+      '/legal/privacy'
+    );
+    expect(
+      screen.queryByTestId('marketing-footer-cta')
+    ).not.toBeInTheDocument();
+  });
+
   it('keeps the legacy /artist-profile route on the minimal homepage footer treatment', () => {
     mockUsePathname.mockReturnValue('/artist-profile');
 

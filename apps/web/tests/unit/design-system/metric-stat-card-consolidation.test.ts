@@ -8,7 +8,31 @@ function readAppSource(relativePath: string): string {
   return readFileSync(resolve(APP_ROOT, relativePath), 'utf8');
 }
 
+function expectSharedIconMetrics(source: string) {
+  expect(source).toContain(
+    "import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';"
+  );
+  expect(source).toContain("layout='icon-chip");
+  expect(source).not.toMatch(
+    /\b(?:function\s+|(?:const|let)\s+)(?:StatCard|MetricCard)\b/
+  );
+}
+
 describe('metric and stat card consolidation source contract', () => {
+  it.each([
+    'components/features/admin/WaitlistMetrics.tsx',
+    'components/features/dashboard/dashboard-pay/DashboardPay.tsx',
+    'components/features/dashboard/organisms/EarningsTab.tsx',
+  ])('keeps residual icon-chip metrics on the shared owner: %s', path => {
+    expectSharedIconMetrics(readAppSource(path));
+  });
+
+  it('rejects a reintroduced local metric even alongside the shared owner (deliberate red)', () => {
+    const drift = `${readAppSource('components/features/admin/WaitlistMetrics.tsx')}
+      const StatCard = memo(function StatCard() { return <div />; });`;
+    expect(() => expectSharedIconMetrics(drift)).toThrow();
+  });
+
   it('keeps dashboard analytics stat cards on the content metric card owner', () => {
     const source = readAppSource(
       'components/features/dashboard/dashboard-analytics/DashboardAnalytics.tsx'
