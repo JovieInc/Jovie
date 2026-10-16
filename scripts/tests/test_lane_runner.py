@@ -9044,6 +9044,40 @@ class TerminalPublicationTest(unittest.TestCase):
 
 
 class PublicationBundlePrerequisitesTest(unittest.TestCase):
+    def test_ops_delivery_cli_rechecks_from_only_declared_release_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bundle = Path(tmp)
+            for name in ["scripts/lanes/ops-report.mjs", *lane.RELEASE_EXTRAS]:
+                destination = bundle / name
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(ROOT / name, destination)
+            script = bundle / "scripts/lanes/ops-report.mjs"
+            current = {
+                "domain": "company", "producer": "Symphony", "currentOwner": "symphony-lanes-doctor",
+                "observedState": "disk usage needs inspection", "blocker": "UNKNOWN",
+                "nextAction": "inspect disk usage", "rootCause": None,
+                "evidence": {"observedAt": datetime.now(timezone.utc).isoformat(), "source": "synthetic doctor fixture"},
+                "destination": {"adapter": "linear-issue", "target": "Symphony doctor: archive fixture"},
+            }
+            prepared = subprocess.run(["node", str(script)], cwd=bundle, input=json.dumps(current),
+                                      capture_output=True, text=True, timeout=10)
+            self.assertEqual(prepared.returncode, 0, prepared.stderr)
+            report = json.loads(prepared.stdout)
+            self.assertEqual(report["review"]["reviewStatus"], "missing-source-receipt")
+            self.assertEqual(report["decision"], "approved-template")
+            for tampered in (False, True):
+                with self.subTest(tampered=tampered):
+                    candidate = {**report, "message": "edited after review"} if tampered else report
+                    verified = subprocess.run(["node", str(script), "--verify"], cwd=bundle,
+                                              input=json.dumps({"preparedReport": candidate, "currentInput": current}),
+                                              capture_output=True, text=True, timeout=10)
+                    if tampered:
+                        self.assertNotEqual(verified.returncode, 0)
+                        self.assertIn("review invalidated before delivery", verified.stderr)
+                    else:
+                        self.assertEqual(verified.returncode, 0, verified.stderr)
+                        self.assertEqual(json.loads(verified.stdout), {"verified": True})
+
     def test_promotion_metrics_imports_from_only_declared_release_files(self):
         # Import from a standalone bundle so checkout files cannot hide missing dependencies.
         with tempfile.TemporaryDirectory() as tmp:
