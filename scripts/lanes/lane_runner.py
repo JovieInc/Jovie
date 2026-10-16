@@ -105,8 +105,8 @@ SENSITIVE_REVIEWABLE_LINES = 500
 SENSITIVE_RED_LINES = re.compile(
     r"\b(?:rotate|rotation|revoke|revocation)\b.{0,40}\b(?:secret|credential|token|key)s?\b|"
     r"\b(?:secret|credential|token|key)s?\b.{0,40}\b(?:rotate|rotation|revoke|revocation)\b|"
-    r"\b(?:live|production|prod)\b.{0,40}\b(?:price|pricing)\b|"
-    r"\b(?:price|pricing)\b.{0,40}\b(?:live|production|prod)\b",
+    r"\b(?:live|production|prod)\b.{0,40}\b(?:prices?|pricing)\b|"
+    r"\b(?:prices?|pricing)\b.{0,40}\b(?:live|production|prod)\b",
     re.IGNORECASE,
 )
 MAX_FAILURES = 3
@@ -556,7 +556,26 @@ def issue_is_sensitive(issue: Issue) -> bool:
 
 def issue_hits_red_line(issue: Issue) -> bool:
     text = f"{issue.title}\n{issue.description}"
+    # A Markdown destination is evidence, not an instruction. Keep its visible
+    # label so e.g. "Change live [pricing](...)" still hits the same policy.
+    text = re.sub(r"\]\(\s*<?https?://[^\s)]+>?\s*\)", "]", text)
+    objects = r"(?:secret|credential|token|key)s?"
+    safe_spans = [match.span() for pattern in (
+        # Exempt only the exact prohibited action, never its clause or issue.
+        rf"\b(?:do not|must not|never)\s+(?:rotate|revoke)\s+"
+        rf"(?:(?:any|other|the|production|project|api)\s+)*{objects}"
+        rf"(?:\s*/\s*{objects})*\b(?=\s*(?:[.;\n]|$))",
+        rf"\bno\s+{objects}\s+(?:rotation|revocation)"
+        rf"(?:\s+or\s+new\s+grants)?(?:\s+(?:is|are)\s+authorized)?"
+        rf"\b(?=\s*(?:[.;\n]|$))",
+        # Comparing a rendered route does not request a price mutation. A
+        # separate requested mutation, even in this sentence, remains denied.
+        r"\b(?:compare|comparing|inspect|inspecting|verify|verifying|validate|validating)"
+        r"\s+(?:the\s+)?live\s+(?:\[[^\]\n]*?/pricing\]|`/pricing`|/pricing)"
+    ) for match in re.finditer(pattern, text, re.IGNORECASE)]
     for match in SENSITIVE_RED_LINES.finditer(text):
+        if any(start <= match.start() and match.end() <= end for start, end in safe_spans):
+            continue
         # Public-page schema fixtures are test data, not live plan prices.
         # Only exempt this complete reference, never the whole issue.
         if (re.fullmatch(r"live\s+`/pricing", match.group(0), re.IGNORECASE)

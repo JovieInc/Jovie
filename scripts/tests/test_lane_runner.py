@@ -361,6 +361,51 @@ class SelectionTest(unittest.TestCase):
         task.description = "Change live `/pricing` schema fixture and pricing to $199"
         self.assertIsNone(lane.pick_issue([task], {}, provider="codex"))
 
+    def test_negative_constraints_and_read_only_route_evidence_do_not_request_mutation(self):
+        task = issue("JOV-7863", labels=["agent-ready"])
+        task.title = "Marketing header and compact footer layout"
+        evidence = (
+            "Compare [design](https://linear.app/jovie/issue/JOV-6180/certify-against-live-pen), "
+            "comparing live [jov.ie/pricing](<http://jov.ie/pricing>) at 1440."
+        )
+        for constraint in (
+            "Do not rotate secrets/credentials.",
+            "Never revoke production API keys.",
+            "No credential rotation or new grants are authorized.",
+            "Verify the live `/pricing` layout.",
+            evidence,
+        ):
+            with self.subTest(constraint=constraint):
+                task.description = constraint
+                self.assertEqual(lane.pick_issue([task], {}, provider="codex"), task)
+
+    def test_safe_reference_does_not_hide_requested_price_or_credential_changes(self):
+        task = issue("JOV-7863", labels=["agent-ready"])
+        task.title = "Marketing header and compact footer layout"
+        for instruction in (
+            "Change live [pricing](https://jov.ie/pricing) to $199",
+            "Change live [jov.ie/pricing](https://jov.ie/pricing) to $199",
+            "Compare live /pricing and change production prices to $199",
+            "Do not rotate secrets, but revoke production keys",
+            "No credential rotation; rotate the production token",
+            "Do not rotate credentials unless the login fails",
+            "No token revocation except for stale sessions",
+            "Rotate production credentials",
+        ):
+            for prefix in ("", "Do not rotate secrets/credentials.\nCompare live /pricing.\n"):
+                with self.subTest(instruction=instruction, prefix=prefix):
+                    task.description = prefix + instruction
+                    self.assertIsNone(lane.pick_issue([task], {}, provider="codex"))
+
+    def test_text_exemptions_preserve_sensitive_provider_and_explicit_label_policy(self):
+        task = issue("JOV-7863", labels=["infra"])
+        task.title = "Verify public page layout"
+        task.description = "Do not rotate secrets/credentials."
+        self.assertIsNone(lane.pick_issue([task], {}, provider="grok"))
+        self.assertEqual(lane.pick_issue([task], {}, provider="codex"), task)
+        task.labels.append("hold")
+        self.assertIsNone(lane.pick_issue([task], {}, provider="codex"))
+
 
 class WorkstreamAdmissionTest(unittest.TestCase):
     """JOV-7514 / JOV-5555 / JOV-7423: one workstream rule for intake and backlog."""
