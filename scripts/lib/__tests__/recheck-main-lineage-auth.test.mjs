@@ -34,7 +34,7 @@ const workflow =
     )
   );
 
-/** @param {{ mode?: string, wrongToken?: boolean, denyFetch?: boolean, job?: string, step?: string, compareOnly?: boolean }} [options] */
+/** @param {{ mode?: string, wrongToken?: boolean, denyFetch?: boolean, job?: string, step?: string, compareOnly?: boolean, transport?: string }} [options] */
 async function recheck({
   mode = 'ahead',
   wrongToken = false,
@@ -42,6 +42,7 @@ async function recheck({
   job,
   step,
   compareOnly = false,
+  transport,
 } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'lineage-https-'));
   const seed = join(root, 'seed');
@@ -171,6 +172,8 @@ async function recheck({
     const workflowStep = workflowJob?.steps.find(s => s.name === step);
     if (job && !workflowStep)
       throw new Error(`Missing workflow boundary: ${job} / ${step}`);
+    const lineageTransport =
+      transport ?? workflowStep?.env?.MAIN_LINEAGE_TRANSPORT ?? 'rest';
     let workspace = repoRoot;
     const checkout = workflowJob?.steps.find(s =>
       s.uses?.startsWith('actions/checkout@')
@@ -201,6 +204,7 @@ async function recheck({
         GITHUB_WORKSPACE: workspace,
         GITHUB_OUTPUT: output,
         MAIN_LINEAGE_REMOTE: `https://127.0.0.1:${address.port}/repo.git`,
+        MAIN_LINEAGE_TRANSPORT: lineageTransport,
         GH_TOKEN: wrongToken ? 'wrong-fixture-token' : token,
         GIT_SSL_CAINFO: cert,
         GIT_TERMINAL_PROMPT: '0',
@@ -277,10 +281,13 @@ it.each(['exact', 'ahead', 'diverged'])(
   }
 );
 
-const releaseChecks = [
+const restLineageChecks = [
   ['release-head', 'Resolve current main HEAD'],
   ['staging-head', 'Resolve current main HEAD'],
   ['production-head', 'Resolve current main HEAD'],
+];
+
+const gitLineageChecks = [
   ['promote-production', 'Recheck main immediately before production mutation'],
   [
     'promote-production',
@@ -288,7 +295,7 @@ const releaseChecks = [
   ],
 ];
 
-it.each(releaseChecks)(
+it.each(restLineageChecks)(
   '%s / %s proves an ancestor when the installation reset exceeds its budget',
   async (job, step) => {
     const result = await recheck({ job, step });
@@ -302,34 +309,84 @@ it.each(releaseChecks)(
   }
 );
 
-it.each(releaseChecks.slice(3))(
+it.each(gitLineageChecks)(
+  '%s / %s proves an ancestor with git and zero installation REST calls',
+  async (job, step) => {
+    const result = await recheck({ job, step });
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.requests).toEqual([]);
+    expect(result.output).toContain('is_current=true\n');
+    expect(
+      result.gitRequests.some(r => r.path.endsWith('/git-upload-pack'))
+    ).toBe(true);
+    expect(result.gitRequests.every(r => r.authorized)).toBe(true);
+  }
+);
+
+it.each(gitLineageChecks)(
   '%s / %s yields a proven rewrite and preserves the superseding SHA',
   async (job, step) => {
     const result = await recheck({ job, step, mode: 'diverged' });
     expect(result.code, result.stderr).toBe(0);
+    expect(result.requests).toEqual([]);
     expect(result.output).toContain('is_current=false\n');
     expect(result.output).toContain(`superseded_sha=${result.current}\n`);
   }
 );
 
-it.each(releaseChecks.slice(3))(
+it.each(gitLineageChecks)(
   '%s / %s cannot authorize mutation when Git ancestry is unreadable',
   async (job, step) => {
     const result = await recheck({ job, step, denyFetch: true });
     expect(result.code).not.toBe(0);
+    expect(result.requests).toEqual([]);
     expect(result.output).not.toContain('is_current=');
   }
 );
 
 it('proves production ancestry when only REST compare is exhausted', async () => {
-  const [job, step] = releaseChecks[4];
-  const result = await recheck({ job, step, compareOnly: true });
+  const result = await recheck({
+    job: 'production-head',
+    step: 'Resolve current main HEAD',
+    compareOnly: true,
+  });
   expect(result.code, result.stderr).toBe(0);
   expect(result.output).toContain('is_current=true\n');
+  expect(result.requests.some(r => r.includes('compare/'))).toBe(true);
   expect(
     result.gitRequests.some(r => r.path.endsWith('/git-upload-pack'))
   ).toBe(true);
 });
+
+it.each(['exact', 'ahead', 'diverged'])(
+  'proves %s lineage with git and zero installation REST calls',
+  async mode => {
+    const result = await recheck({ mode, transport: 'git' });
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.requests).toEqual([]);
+    expect(result.output).toBe(
+      mode === 'diverged'
+        ? `superseded_sha=${result.mainSha}\nis_current=false\n`
+        : 'is_current=true\n'
+    );
+    expect(result.gitRequests.length).toBeGreaterThan(0);
+    expect(result.gitRequests.every(request => request.authorized)).toBe(true);
+  }
+);
+
+it.each([
+  { wrongToken: true, transport: 'git' },
+  { denyFetch: true, transport: 'git' },
+])(
+  'git transport fails closed on HTTPS credential denial: %j',
+  async options => {
+    const result = await recheck(options);
+    expect(result.code).not.toBe(0);
+    expect(result.requests).toEqual([]);
+    expect(result.output).not.toContain('is_current=true');
+    expect(result.gitRequests.some(request => !request.authorized)).toBe(true);
+  }
+);
 
 it.each([{ wrongToken: true }, { denyFetch: true }])(
   'fails closed on HTTPS credential denial: %j',
