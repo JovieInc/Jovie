@@ -21,6 +21,11 @@ on:
   schedule:
     - cron: '41 * * * *'
   workflow_dispatch:
+    inputs:
+      observations_only:
+        description: Evaluate registered validation observations without legacy Sentry status mutations
+        type: boolean
+        default: false
 
 permissions: {}
 
@@ -65,6 +70,21 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          SENTRY_RECURRENCE_OBSERVATIONS_ONLY: ${{ inputs.observations_only && '1' || '' }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
-        run: node scripts/sentry-autofix-recurrence.mjs
+        run: |
+          git rev-parse HEAD > "$RUNNER_TEMP/sentry-recurrence-source-revision.txt"
+          node scripts/sentry-autofix-recurrence.mjs | tee "$RUNNER_TEMP/sentry-recurrence-observation.json"
+
+      - name: Preserve the bounded observation receipt
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sentry-recurrence-observation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/sentry-recurrence-observation.json
+            ${{ runner.temp }}/sentry-recurrence-source-revision.txt
+          retention-days: 14
+          if-no-files-found: warn

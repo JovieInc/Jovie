@@ -78,6 +78,13 @@ describe('Sentry autofix workflow contract', () => {
     );
     expect(RECURRENCE).toContain('node scripts/sentry-autofix-recurrence.mjs');
     expect(RECURRENCE).toContain('secrets.SENTRY_AUTH_TOKEN');
+    expect(RECURRENCE).toContain(
+      'LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}'
+    );
+    expect(RECURRENCE).toContain('observations_only:');
+    expect(RECURRENCE).toContain('SENTRY_RECURRENCE_OBSERVATIONS_ONLY:');
+    expect(RECURRENCE).toContain('sentry-recurrence-source-revision.txt');
+    expect(RECURRENCE).toContain('sentry-recurrence-observation.json');
   });
 
   it('keeps recurrence off the production-mutation lease with a cost and permission boundary', () => {
