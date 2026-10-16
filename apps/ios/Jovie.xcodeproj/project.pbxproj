@@ -194,6 +194,8 @@
 		4C2C97BF3A0B42C58A62529F /* AppShellView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppShellView.swift; sourceTree = "<group>"; };
 		4C8753F36E077F69D925EE26 /* APIClientTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = APIClientTests.swift; sourceTree = "<group>"; };
 		535ED5D3D849F7B0F9DBB0E9 /* Jovie.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = Jovie.entitlements; sourceTree = "<group>"; };
+		A0E57D1A0000000000000001 /* JovieDistribution.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = JovieDistribution.entitlements; sourceTree = "<group>"; };
+		A0E57D1A0000000000000002 /* JovieDistributionCapabilities.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = JovieDistributionCapabilities.entitlements; sourceTree = "<group>"; };
 		549B9163EF50F377CA1A4C5B /* JovieTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JovieTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		5615484B29C6B6E26EE5E92B /* IntentNavigationStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = IntentNavigationStoreTests.swift; sourceTree = "<group>"; };
 		611EE527D20DC6F6872CBF33 /* JovieUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JovieUITests.swift; sourceTree = "<group>"; };
@@ -599,6 +601,8 @@
 				D24EEA621BFC0D5C4F57065C /* Configuration.local.plist */,
 				2E13A897DB2C3D06E845EC58 /* Info.plist */,
 				535ED5D3D849F7B0F9DBB0E9 /* Jovie.entitlements */,
+				A0E57D1A0000000000000001 /* JovieDistribution.entitlements */,
+				A0E57D1A0000000000000002 /* JovieDistributionCapabilities.entitlements */,
 				B53DAA4BCC9D40A3A2C1552B /* PrivacyInfo.xcprivacy */,
 			);
 			name = Jovie;
@@ -993,7 +997,7 @@
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGNING_REQUIRED = NO;
-				CODE_SIGN_ENTITLEMENTS = Jovie/Jovie.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Jovie/JovieDistribution.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEFINES_MODULE = YES;
@@ -1002,6 +1006,7 @@
 				INFOPLIST_FILE = Jovie/Info.plist;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				JOVIE_DISTRIBUTION_PUSH_WALLET = NO;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = ie.jov.Jovie;
@@ -1031,6 +1036,7 @@
 				DEVELOPMENT_TEAM = "";
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = Jovie/Info.plist;
+				JOVIE_DISTRIBUTION_PUSH_WALLET = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
