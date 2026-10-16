@@ -120,7 +120,7 @@ interface ArtistPageContentProps {
 function ScreenCertFixtureProfilePage() {
   return (
     <main>
-      <h1>Screen Cert Fixture</h1>
+      <h1 className='text-balance'>Screen Cert Fixture</h1>
     </main>
   );
 }
