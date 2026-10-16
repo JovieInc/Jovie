@@ -5,15 +5,23 @@ import {
 } from '@/lib/connectors/profile-writes/destinations';
 
 export type BioSyncMethod = 'api' | 'email';
+
 export interface DspBioProvider {
+  /** Human-readable DSP name */
   displayName: string;
+  /** How bio updates are submitted to this DSP */
   method: BioSyncMethod;
-  /** Legacy shape only; historical recipients are not advertised as verified. */
+  /** Support email address for email-based updates */
   supportEmail?: string;
+  /** Whether this provider is currently enabled for bio sync */
   enabled: boolean;
+  /** Email requests cannot prove a destination snapshot or conditional restore. */
   rollback: 'manual' | 'unsupported';
+  /** Notes about the integration status */
   notes: string;
+  /** URL for the DSP's artist portal (for reference/linking) */
   artistPortalUrl: string;
+  /** Max bio character length enforced by this DSP (if known) */
   maxBioLength: number;
 }
 
@@ -46,6 +54,7 @@ export const DSP_BIO_PROVIDERS: Record<string, DspBioProvider> =
       },
     ])
   );
+
 /**
  * Get all providers that support bio sync (enabled only).
  */

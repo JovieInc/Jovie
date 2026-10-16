@@ -123,7 +123,7 @@ async function preview() {
 async function approve(p: Awaited<ReturnType<typeof preview>>) {
   return approveBioSync({
     ...req,
-    providerId: 'spotify',
+    providerId: p.providerId,
     proposalId: p.id,
     confirmation: confirmationFor(p),
   });
@@ -153,11 +153,30 @@ describe('consented DSP bio submissions', () => {
     );
   });
 
-  it('blocks approval without current evidence', async () => {
-    const p = await preview();
-    await expect(approve(p)).rejects.toThrow('unverified-manifest');
-    expect(f.send).not.toHaveBeenCalled();
-  });
+  it.each([false, true])(
+    'blocks unverified delivery for default and explicit targets (%j)',
+    async explicit => {
+      const ids = ['amazon_music', 'apple_music', 'deezer', 'spotify', 'tidal'];
+      const providerIds = explicit ? ids : undefined;
+      if (!explicit) {
+        f.select.mockReturnValueOnce({
+          from: () => ({ where: async () => ids.map(id => ({ id })) }),
+        });
+      }
+      const response = await syncBioToDsps({ ...req, providerIds });
+      expect(response.pendingCount).toBe(ids.length);
+      expect(response.results.map(result => result.providerId)).toEqual(ids);
+      for (const result of response.results) {
+        expect(result.status).toBe('pending');
+        await expect(approve(result.proposal!)).rejects.toThrow(
+          'unverified-manifest'
+        );
+      }
+      expect(f.rows).toHaveLength(ids.length);
+      expect(f.rows.every(row => row.phase === 'proposal')).toBe(true);
+      expect(f.send).not.toHaveBeenCalled();
+    }
+  );
 
   it('does not prepare or send unsupported API methods', async () => {
     const response = await syncBioToDsps({

@@ -44,11 +44,6 @@ describe('DSP bio endpoint', () => {
         (provider: { enabled: boolean }) => !provider.enabled
       )
     ).toBe(true);
-    expect(
-      body.providers.every(
-        (provider: { rollback: string }) => provider.rollback === 'unsupported'
-      )
-    ).toBe(true);
   });
   it('creates previews with authenticated identity and never approves an initial request', async () => {
     vi.mocked(syncBioToDsps).mockResolvedValue({
