@@ -1,1 +1,281 @@
-aW1wb3J0IHsKICBmaW5kTGluZWFyTGFiZWxJZCwKICBub3RlRmluZ2VycHJpbnRlZElzc3VlR3JlZW4sCiAgcmVtZWRpYXRpb25LZXksCiAgdXBzZXJ0TGluZWFySXNzdWVCeVRpdGxlRmluZ2VycHJpbnQsCn0gZnJvbSAnLi9saW5lYXItaXNzdWUtaW50YWtlLm1qcyc7CgpleHBvcnQgY29uc3QgR1JFRU5fTUFSS0VSID0gJzwhLS0gcmVtZWRpYXRpb24tZ3JlZW4gLS0+JzsKLyoqIExhbmVzIGNsYWltIG9ubHkgdGhpcyBsYWJlbCwgc28gYSByZWQgc2lnbmFsIG11c3QgY2FycnkgaXQgdG8gZ2V0IHdvcmtlZC4gKi8KZXhwb3J0IGNvbnN0IEFHRU5UX1JFQURZX0xBQkVMID0gJ2FnZW50LXJlYWR5JzsKCmNvbnN0IExPR0lOX1JFID0gL2F1dGhcLnNldHVwfGF1dGhlbnRpY2F0ZXxzaWduLT9pbnxsb2dpbi9pOwpjb25zdCBUSU1FT1VUX1JFID0gL3RpbWVkb3V0fHRpbWVkXHMqb3V0fHRpbWVvdXQvaTsKCi8qKiBGaWxpbmcgaXMgb24gdW5sZXNzIHRoaXMgZXhhY3Qga2lsbCBzd2l0Y2ggaXMgc2V0LiBVbnNldCBkb2VzIG5vdCBkcnktcnVuLiAqLwpleHBvcnQgZnVuY3Rpb24gcmVtZWRpYXRpb25JbnRha2VEaXNhYmxlZChlbnYgPSBwcm9jZXNzLmVudikgewogIHJldHVybiBlbnYuUkVNRURJQVRJT05fSU5UQUtFX0RJU0FCTEVEID09PSAnMSc7Cn0KCmV4cG9ydCBmdW5jdGlvbiByZW1lZGlhdGlvblRpdGxlKGZpbmdlcnByaW50KSB7CiAgcmV0dXJuIGBQMDogJHtmaW5nZXJwcmludH0gaXMgcmVkICgke2ZpbmdlcnByaW50fSlgOwp9CgpleHBvcnQgZnVuY3Rpb24gZGVzY3JpYmVSZW1lZGlhdGlvbih7IGZpbmdlcnByaW50LCBzb3VyY2UsIHJ1blVybCwgZGV0YWlsIH0pIHsKICByZXR1cm4gWwogICAgYFNvdXJjZS13b3JrZmxvdzogJHtzb3VyY2V9YCwKICAgICcnLAogICAgJyMjIEV2aWRlbmNlJywKICAgIGRldGFpbD8udHJpbSgpIHx8ICdSZWQgcnVuLiBTZWUgdGhlIGxpbmtlZCB3b3JrZmxvdyBmb3IgbG9ncy4nLAogICAgJycsCiAgICAnIyMgUnVuJywKICAgIHJ1blVybCB8fCAnKHJ1biB1cmwgdW5hdmFpbGFibGUpJywKICAgICcnLAogICAgYExhYmVsOiAke3JlbWVkaWF0aW9uS2V5KGZpbmdlcnByaW50KX1gLAogIF0uam9pbignXG4nKTsKfQoKZnVuY3Rpb24gd2Fsa1N1aXRlKHN1aXRlLCBoaXRzKSB7CiAgY29uc3QgcHJlZml4ID0gYCR7c3VpdGU/LmZpbGUgPz8gJyd9ICR7c3VpdGU/LnRpdGxlID8/ICcnfWA7CiAgZm9yIChjb25zdCBzcGVjIG9mIHN1aXRlPy5zcGVjcyA/PyBbXSkgewogICAgY29uc3QgdGl0bGUgPSBgJHtwcmVmaXh9ICR7c3BlYz8udGl0bGUgPz8gJyd9YC50cmltKCk7CiAgICBmb3IgKGNvbnN0IHRlc3Qgb2Ygc3BlYz8udGVzdHMgPz8gW10pIHsKICAgICAgZm9yIChjb25zdCByZXN1bHQgb2YgdGVzdD8ucmVzdWx0cyA/PyBbXSkgewogICAgICAgIGNvbnN0IG1lc3NhZ2UgPSBTdHJpbmcocmVzdWx0Py5lcnJvcj8ubWVzc2FnZSA/PyAnJyk7CiAgICAgICAgY29uc3QgdGltZWRPdXQgPQogICAgICAgICAgcmVzdWx0Py5zdGF0dXMgPT09ICd0aW1lZE91dCcgfHwgVElNRU9VVF9SRS50ZXN0KG1lc3NhZ2UpOwogICAgICAgIGlmICh0aW1lZE91dCAmJiBMT0dJTl9SRS50ZXN0KGAke3RpdGxlfVxuJHttZXNzYWdlfWApKSBoaXRzLnB1c2godGl0bGUpOwogICAgICB9CiAgICB9CiAgfQogIGZvciAoY29uc3QgY2hpbGQgb2Ygc3VpdGU/LnN1aXRlcyA/PyBbXSkgd2Fsa1N1aXRlKGNoaWxkLCBoaXRzKTsKfQoKZXhwb3J0IGZ1bmN0aW9uIGxvZ2luVGltZW91dEhpdHMocmVwb3J0KSB7CiAgY29uc3QgaGl0cyA9IFtdOwogIGZvciAoY29uc3Qgc3VpdGUgb2YgcmVwb3J0Py5zdWl0ZXMgPz8gW10pIHdhbGtTdWl0ZShzdWl0ZSwgaGl0cyk7CiAgcmV0dXJuIGhpdHM7Cn0KCmV4cG9ydCBmdW5jdGlvbiB0ZXh0SGFzTG9naW5UaW1lb3V0KHRleHQpIHsKICAvLyBEZXYtc2VydmVyIHJvdXRlIGxvZ3MgKGBbV2ViU2VydmVyXSBHRVQgL3NpZ25pbiAyMDBgKSBhcmUgbm90IGxvZ2luCiAgLy8gZXZpZGVuY2UgYnV0IGludGVybGVhdmUgd2l0aCB1bnJlbGF0ZWQgdGVzdCB0aW1lb3V0czsgZHJvcCB0aGVtIHNvIHRoZQogIC8vIHNsaWRpbmcgd2luZG93IGNhbid0IHBhaXIgYSByb3V0ZSBoaXQgd2l0aCBhIHN0cmF5IGBUaW1lb3V0OmAgbGluZS4KICBjb25zdCBsaW5lcyA9IFN0cmluZyh0ZXh0ID8/ICcnKQogICAgLnNwbGl0KCdcbicpCiAgICAuZmlsdGVyKGxpbmUgPT4gIWxpbmUuaW5jbHVkZXMoJ1tXZWJTZXJ2ZXJdJykpOwogIGZvciAobGV0IGkgPSAwOyBpIDwgbGluZXMubGVuZ3RoOyBpICs9IDEpIHsKICAgIGNvbnN0IHdpbmRvdyA9IGxpbmVzLnNsaWNlKGksIGkgKyAxMikuam9pbignXG4nKTsKICAgIGlmIChMT0dJTl9SRS50ZXN0KHdpbmRvdykgJiYgVElNRU9VVF9SRS50ZXN0KHdpbmRvdykpIHJldHVybiB0cnVlOwogIH0KICByZXR1cm4gZmFsc2U7Cn0KCmV4cG9ydCBmdW5jdGlvbiBpc0xvZ2luVGltZW91dCh7IHRleHQgPSAnJywgcmVwb3J0ID0gbnVsbCB9ID0ge30pIHsKICByZXR1cm4gbG9naW5UaW1lb3V0SGl0cyhyZXBvcnQpLmxlbmd0aCA+IDAgfHwgdGV4dEhhc0xvZ2luVGltZW91dCh0ZXh0KTsKfQoKZXhwb3J0IGZ1bmN0aW9uIGRlY2lkZUxvZ2luU2lnbmFsKHsKICBjb25jbHVzaW9uLAogIGV2aWRlbmNlVGV4dCA9ICcnLAogIHJlcG9ydCA9IG51bGwsCn0pIHsKICBpZiAoIWNvbmNsdXNpb24gfHwgY29uY2x1c2lvbiA9PT0gJ3NraXBwZWQnKSByZXR1cm4geyBhY3Rpb246ICdza2lwJyB9OwogIGlmIChjb25jbHVzaW9uID09PSAnc3VjY2VzcycpIHsKICAgIHJldHVybiB7IGFjdGlvbjogJ2dyZWVuJywgZmluZ2VycHJpbnRzOiBbJ2UyZS1sb2dpbi10aW1lb3V0J10gfTsKICB9CiAgLy8gQ2FuY2VsbGVkIHJ1bnMgYXJlIHN1cGVyc2VkZWQgYnkgdGhlIGNvbmN1cnJlbmN5IGdyb3VwJ3MgbmV3ZXIgcnVuLCB3aGljaAogIC8vIGZpbGVzIGl0cyBvd24gc2lnbmFsOyBzaHV0ZG93bi1pbmR1Y2VkIHRpbWVvdXRzIGFyZSBub3QgbG9naW4gZXZpZGVuY2UuCiAgaWYgKAogICAgY29uY2x1c2lvbiA9PT0gJ2ZhaWx1cmUnICYmCiAgICBpc0xvZ2luVGltZW91dCh7IHRleHQ6IGV2aWRlbmNlVGV4dCwgcmVwb3J0IH0pCiAgKSB7CiAgICBjb25zdCBoaXRzID0gbG9naW5UaW1lb3V0SGl0cyhyZXBvcnQpOwogICAgcmV0dXJuIHsKICAgICAgYWN0aW9uOiAncmVkJywKICAgICAgZmluZ2VycHJpbnQ6ICdlMmUtbG9naW4tdGltZW91dCcsCiAgICAgIGRldGFpbDogaGl0cy5sZW5ndGgKICAgICAgICA/IGBMb2dpbiB0aW1lb3V0IGluOiAke2hpdHMuc2xpY2UoMCwgNSkuam9pbignOyAnKX1gCiAgICAgICAgOiAnTG9naW4gdGltZW91dCBldmlkZW5jZSBpbiB0aGUgUGxheXdyaWdodCBsb2cuJywKICAgIH07CiAgfQogIHJldHVybiB7IGFjdGlvbjogJ3NraXAnIH07Cn0KCi8qKiBAcGFyYW0ge3sgam9iUmVzdWx0Pzogc3RyaW5nLCBhdXRoU3RhdHVzPzogc3RyaW5nLCBsb2dpblRpbWVvdXQ/OiBib29sZWFuIHwgc3RyaW5nIH19IFtpbnB1dF0gKi8KZXhwb3J0IGZ1bmN0aW9uIGRlY2lkZUF1dGhTbW9rZVNpZ25hbChpbnB1dCA9IHt9KSB7CiAgY29uc3Qgam9iUmVzdWx0ID0gaW5wdXQuam9iUmVzdWx0OwogIGNvbnN0IGF1dGhTdGF0dXMgPSBpbnB1dC5hdXRoU3RhdHVzID8/ICcnOwogIGNvbnN0IGxvZ2luVGltZW91dCA9IGlucHV0LmxvZ2luVGltZW91dDsKICBpZiAoCiAgICAham9iUmVzdWx0IHx8CiAgICBqb2JSZXN1bHQgPT09ICdza2lwcGVkJyB8fAogICAgYXV0aFN0YXR1cyA9PT0gJ25vdC1jb25maWd1cmVkJwogICkgewogICAgcmV0dXJuIHsgYWN0aW9uOiAnc2tpcCcgfTsKICB9CiAgaWYgKGpvYlJlc3VsdCA9PT0gJ3N1Y2Nlc3MnICYmIGF1dGhTdGF0dXMgPT09ICdwYXNzZWQnKSB7CiAgICByZXR1cm4gewogICAgICBhY3Rpb246ICdncmVlbicsCiAgICAgIGZpbmdlcnByaW50czogWydlMmUtbG9naW4tdGltZW91dCcsICdwcm9kdWN0aW9uLW1vbml0b3ItYXV0aC1zbW9rZSddLAogICAgfTsKICB9CiAgY29uc3QgdGltZWRPdXQgPQogICAgam9iUmVzdWx0ID09PSAnY2FuY2VsbGVkJyB8fAogICAgbG9naW5UaW1lb3V0ID09PSB0cnVlIHx8CiAgICBsb2dpblRpbWVvdXQgPT09ICd0cnVlJzsKICBpZiAodGltZWRPdXQpIHsKICAgIHJldHVybiB7CiAgICAgIGFjdGlvbjogJ3JlZCcsCiAgICAgIGZpbmdlcnByaW50OiAnZTJlLWxvZ2luLXRpbWVvdXQnLAogICAgICBkZXRhaWw6CiAgICAgICAgam9iUmVzdWx0ID09PSAnY2FuY2VsbGVkJwogICAgICAgICAgPyAnUG9zdC1kZXBsb3kgYXV0aCBzbW9rZSBqb2IgdGltZWQgb3V0LicKICAgICAgICAgIDogJ1Bvc3QtZGVwbG95IGF1dGggc21va2UgcmVwb3J0ZWQgYSBsb2dpbiB0aW1lb3V0LicsCiAgICB9OwogIH0KICBpZiAoam9iUmVzdWx0ID09PSAnZmFpbHVyZScpIHsKICAgIHJldHVybiB7CiAgICAgIGFjdGlvbjogJ3JlZCcsCiAgICAgIGZpbmdlcnByaW50OiAncHJvZHVjdGlvbi1tb25pdG9yLWF1dGgtc21va2UnLAogICAgICBkZXRhaWw6CiAgICAgICAgJ1Bvc3QtZGVwbG95IGF1dGggc21va2UgZmFpbGVkIHdpdGhvdXQgYSBsb2dpbi10aW1lb3V0IGNsYXNzaWZpY2F0aW9uLicsCiAgICB9OwogIH0KICByZXR1cm4geyBhY3Rpb246ICdza2lwJyB9Owp9CgpleHBvcnQgZnVuY3Rpb24gZGVjaWRlTW9uaXRvclNpZ25hbCh7IGNvbmNsdXNpb24gfSkgewogIGlmIChjb25jbHVzaW9uID09PSAnc3VjY2VzcycpIHJldHVybiB7IGFjdGlvbjogJ2dyZWVuJyB9OwogIGlmIChjb25jbHVzaW9uID09PSAncXVvdGEtZGVmZXJyZWQnKSB7CiAgICAvLyBFdmVyeSBoYXJkIHF1b3RhIG5lZWRzIGEgc3RhbmRpbmcgY2FuYXJ5IChpbmZyYSBndWFyZHJhaWwgIzIpOiBhCiAgICAvLyBkZWZlcnJlZCBwb3N0LWRlcGxveSByZWFkIG11c3Qgc3VyZmFjZSwgbm90IHZhbmlzaCBpbnRvIGEgZ3JlZW4gc2tpcC4KICAgIC8vIEl0IGlzIG5vdCBhIHByb2R1Y3Rpb24gZmFpbHVyZSwgc28gaXQgZmlsZXMgbG93IHByaW9yaXR5LCBuZXZlciByZWQuCiAgICByZXR1cm4gewogICAgICBhY3Rpb246ICdyZWQnLAogICAgICBmaW5nZXJwcmludDogJ2dpdGh1Yi1xdW90YS1kZWZlcnJlZC1wb3N0ZGVwbG95LXByb2JlcycsCiAgICAgIGRldGFpbDoKICAgICAgICAnUG9zdC1kZXBsb3kgcHJvYmUgcmVhZHMgZGVmZXJyZWQgb24gR2l0SHViIGluc3RhbGxhdGlvbiBxdW90YTsgcHJvYmVzIHJldHJpZWQgb24gdGhlIG5leHQgUHJvZHVjdGlvbiBDb250cm9sbGVyIGNvbXBsZXRpb24uJywKICAgIH07CiAgfQogIGlmIChjb25jbHVzaW9uID09PSAnZmFpbHVyZScgfHwgY29uY2x1c2lvbiA9PT0gJ2NhbmNlbGxlZCcpCiAgICByZXR1cm4geyBhY3Rpb246ICdyZWQnIH07CiAgcmV0dXJuIHsgYWN0aW9uOiAnc2tpcCcgfTsKfQoKLyoqIFN0ZWFkeSBncmVlbiBza2lwcyBMaW5lYXIuIFRoZSBmaXJzdCBncmVlbiBhZnRlciBhIHJlY29yZGVkIHJlZCBzdGlsbCByZXNvbHZlcy4gKi8KZXhwb3J0IGZ1bmN0aW9uIGdhdGVTdGVhZHlHcmVlbihkZWNpc2lvbiwgcHJldmlvdXMsIGVuYWJsZWQpIHsKICBpZiAoZW5hYmxlZCAhPT0gJzEnIHx8IGRlY2lzaW9uPy5hY3Rpb24gIT09ICdncmVlbicpIHJldHVybiBkZWNpc2lvbjsKICBpZiAocHJldmlvdXMgPT09ICdyZWQnKSByZXR1cm4gZGVjaXNpb247CiAgcmV0dXJuIHsgYWN0aW9uOiAnc2tpcCcsIHJlYXNvbjogJ3N0ZWFkeV9ncmVlbicgfTsKfQoKZXhwb3J0IGFzeW5jIGZ1bmN0aW9uIGZpbGVSZW1lZGlhdGlvblNpZ25hbCh7CiAgZmluZ2VycHJpbnQsCiAgc291cmNlLAogIHJ1blVybCwKICBkZXRhaWwsCiAgYXBpS2V5LAogIGZldGNoSW1wbCwKfSkgewogIC8vIEEgbWlzc2luZyByZWFkeSBsYWJlbCBtdXN0IG5vdCBkcm9wIHRoZSBQMCBpdHNlbGYuCiAgY29uc3QgcmVhZHkgPSBhcGlLZXkKICAgID8gYXdhaXQgZmluZExpbmVhckxhYmVsSWQoeyBuYW1lOiBBR0VOVF9SRUFEWV9MQUJFTCwgYXBpS2V5LCBmZXRjaEltcGwgfSkKICAgIDogeyBvazogZmFsc2UgfTsKICByZXR1cm4gdXBzZXJ0TGluZWFySXNzdWVCeVRpdGxlRmluZ2VycHJpbnQoewogICAgZmluZ2VycHJpbnQsCiAgICB0aXRsZTogcmVtZWRpYXRpb25UaXRsZShmaW5nZXJwcmludCksCiAgICBkZXNjcmlwdGlvbjogZGVzY3JpYmVSZW1lZGlhdGlvbih7IGZpbmdlcnByaW50LCBzb3VyY2UsIHJ1blVybCwgZGV0YWlsIH0pLAogICAgcHJpb3JpdHk6IDEsCiAgICBjcmVhdGVTdGF0ZU5hbWU6ICdUb2RvJywKICAgIGtlZXBMYWJlbElkczogcmVhZHkub2sgJiYgcmVhZHkuaWQgPyBbcmVhZHkuaWRdIDogW10sCiAgICByZW9wZW5UZXJtaW5hbDogdHJ1ZSwKICAgIGFwaUtleSwKICAgIGZldGNoSW1wbCwKICB9KTsKfQoKZXhwb3J0IGFzeW5jIGZ1bmN0aW9uIHJlc29sdmVSZW1lZGlhdGlvblNpZ25hbCh7CiAgZmluZ2VycHJpbnQsCiAgc291cmNlLAogIHJ1blVybCwKICBhcGlLZXksCiAgZmV0Y2hJbXBsLAp9KSB7CiAgY29uc3Qgc291cmNlTGluZSA9IGBTb3VyY2Utd29ya2Zsb3c6ICR7c291cmNlfWA7CiAgcmV0dXJuIG5vdGVGaW5nZXJwcmludGVkSXNzdWVHcmVlbih7CiAgICBmaW5nZXJwcmludCwKICAgIHNvdXJjZSwKICAgIGNvbW1lbnRNYXJrZXI6IEdSRUVOX01BUktFUiwKICAgIGNvbW1lbnQ6IGAke0dSRUVOX01BUktFUn1cbiR7c291cmNlTGluZX0gaXMgZ3JlZW4uXG5SdW46ICR7cnVuVXJsIHx8ICcocnVuIHVybCB1bmF2YWlsYWJsZSknfWAsCiAgICBhcGlLZXksCiAgICBmZXRjaEltcGwsCiAgfSk7Cn0KCmNvbnN0IFRSQU5TSUVOVF9GQUlMVVJFX1JFID0gL18odHJhbnNwb3J0fDVcZFxkKSQvOwoKLyoqCiAqIExpbmVhciBmaWxpbmcgY2FuIGhpdCBzaG9ydC1saXZlZCB1cHN0cmVhbSA1eHgvdHJhbnNwb3J0IHJlc2V0czsgb25seSB0aG9zZQogKiByZWFzb25zIGFyZSB3b3J0aCByZXRyeWluZyBpbnNpZGUgdGhlIGludGFrZSBqb2IncyB0aW1lb3V0LgogKi8KZXhwb3J0IGZ1bmN0aW9uIGlzVHJhbnNpZW50UmVtZWRpYXRpb25GYWlsdXJlKHJlc3VsdCkgewogIHJldHVybiAhcmVzdWx0Py5vayAmJiBUUkFOU0lFTlRfRkFJTFVSRV9SRS50ZXN0KFN0cmluZyhyZXN1bHQ/LnJlYXNvbiA/PyAnJykpOwp9CgovKiogQHBhcmFtIHthbnl9IGRlY2lzaW9uIEBwYXJhbSB7YW55fSBbY29udGV4dF0gKi8KZXhwb3J0IGFzeW5jIGZ1bmN0aW9uIGFwcGx5UmVtZWRpYXRpb25EZWNpc2lvbihkZWNpc2lvbiA9IHt9LCBjb250ZXh0ID0ge30pIHsKICBjb25zdCB7IGZpbmdlcnByaW50LCBzb3VyY2UsIHJ1blVybCwgZGV0YWlsLCBhcGlLZXksIGZldGNoSW1wbCB9ID0gY29udGV4dDsKICBpZiAoIWRlY2lzaW9uIHx8IGRlY2lzaW9uLmFjdGlvbiA9PT0gJ3NraXAnKSB7CiAgICByZXR1cm4geyBvazogdHJ1ZSwgYWN0aW9uOiAnc2tpcCcgfTsKICB9CiAgaWYgKGRlY2lzaW9uLmFjdGlvbiA9PT0gJ3JlZCcpIHsKICAgIGNvbnN0IGtleSA9IGRlY2lzaW9uLmZpbmdlcnByaW50IHx8IGZpbmdlcnByaW50OwogICAgY29uc3QgZmlsZWQgPSBhd2FpdCBmaWxlUmVtZWRpYXRpb25TaWduYWwoewogICAgICBmaW5nZXJwcmludDoga2V5LAogICAgICBzb3VyY2UsCiAgICAgIHJ1blVybCwKICAgICAgZGV0YWlsOiBkZWNpc2lvbi5kZXRhaWwgfHwgZGV0YWlsLAogICAgICBhcGlLZXksCiAgICAgIGZldGNoSW1wbCwKICAgIH0pOwogICAgcmV0dXJuIHsgLi4uZmlsZWQsIGZpbmdlcnByaW50OiBrZXkgfTsKICB9CiAgY29uc3Qga2V5cyA9IGRlY2lzaW9uLmZpbmdlcnByaW50cyA/PyBbZmluZ2VycHJpbnRdOwogIGNvbnN0IHJlc3VsdHMgPSBbXTsKICBmb3IgKGNvbnN0IGtleSBvZiBrZXlzKSB7CiAgICBjb25zdCByZXNvbHZlZCA9IGF3YWl0IHJlc29sdmVSZW1lZGlhdGlvblNpZ25hbCh7CiAgICAgIGZpbmdlcnByaW50OiBrZXksCiAgICAgIHNvdXJjZSwKICAgICAgcnVuVXJsLAogICAgICBhcGlLZXksCiAgICAgIGZldGNoSW1wbCwKICAgIH0pOwogICAgcmVzdWx0cy5wdXNoKHsgLi4ucmVzb2x2ZWQsIGZpbmdlcnByaW50OiBrZXkgfSk7CiAgICBpZiAoIXJlc29sdmVkLm9rKSByZXR1cm4geyBvazogZmFsc2UsIGFjdGlvbjogJ2dyZWVuJywgcmVzdWx0cyB9OwogIH0KICByZXR1cm4geyBvazogdHJ1ZSwgYWN0aW9uOiAnZ3JlZW4nLCByZXN1bHRzIH07Cn0KCmNvbnN0IGRlZmF1bHRTbGVlcCA9IG1zID0+IG5ldyBQcm9taXNlKHJlc29sdmUgPT4gc2V0VGltZW91dChyZXNvbHZlLCBtcykpOwoKLyoqCiAqIFJldHJ5IHRyYW5zaWVudCBMaW5lYXIgdXBzdHJlYW0gZmFpbHVyZXMgYmVmb3JlIGxldHRpbmcgdGhlIGludGFrZSBmYWlsLgogKiBQZXJtYW5lbnQgZmFpbHVyZXMgKG1pc3Npbmcga2V5LCA0eHgsIEdyYXBoUUwgZXJyb3JzKSByZXR1cm4gaW1tZWRpYXRlbHkuCiAqLwpleHBvcnQgYXN5bmMgZnVuY3Rpb24gYXBwbHlSZW1lZGlhdGlvbkRlY2lzaW9uV2l0aFJldHJ5KAogIGRlY2lzaW9uID0ge30sCiAgY29udGV4dCA9IHt9LAogIHsgYXR0ZW1wdHMgPSAzLCBkZWxheXNNcyA9IFs1XzAwMCwgMTVfMDAwXSwgc2xlZXAgPSBkZWZhdWx0U2xlZXAgfSA9IHt9CikgewogIGxldCByZXN1bHQgPSBhd2FpdCBhcHBseVJlbWVkaWF0aW9uRGVjaXNpb24oZGVjaXNpb24sIGNvbnRleHQpOwogIGZvciAoCiAgICBsZXQgaSA9IDA7CiAgICBpIDwgYXR0ZW1wdHMgLSAxICYmIGlzVHJhbnNpZW50UmVtZWRpYXRpb25GYWlsdXJlKHJlc3VsdCk7CiAgICBpICs9IDEKICApIHsKICAgIGF3YWl0IHNsZWVwKGRlbGF5c01zW01hdGgubWluKGksIGRlbGF5c01zLmxlbmd0aCAtIDEpXSk7CiAgICByZXN1bHQgPSBhd2FpdCBhcHBseVJlbWVkaWF0aW9uRGVjaXNpb24oZGVjaXNpb24sIGNvbnRleHQpOwogIH0KICByZXR1cm4gcmVzdWx0Owp9Cg==
+import {
+  findLinearLabelId,
+  noteFingerprintedIssueGreen,
+  remediationKey,
+  upsertLinearIssueByTitleFingerprint,
+} from './linear-issue-intake.mjs';
+
+export const GREEN_MARKER = '<!-- remediation-green -->';
+/** Lanes claim only this label, so a red signal must carry it to get worked. */
+export const AGENT_READY_LABEL = 'agent-ready';
+
+const LOGIN_RE = /auth\.setup|authenticate|sign-?in|login/i;
+const TIMEOUT_RE = /timedout|timed\s*out|timeout/i;
+
+/** Filing is on unless this exact kill switch is set. Unset does not dry-run. */
+export function remediationIntakeDisabled(env = process.env) {
+  return env.REMEDIATION_INTAKE_DISABLED === '1';
+}
+
+export function remediationTitle(fingerprint) {
+  return `P0: ${fingerprint} is red (${fingerprint})`;
+}
+
+export function describeRemediation({ fingerprint, source, runUrl, detail }) {
+  return [
+    `Source-workflow: ${source}`,
+    '',
+    '## Evidence',
+    detail?.trim() || 'Red run. See the linked workflow for logs.',
+    '',
+    '## Run',
+    runUrl || '(run url unavailable)',
+    '',
+    `Label: ${remediationKey(fingerprint)}`,
+  ].join('\n');
+}
+
+function walkSuite(suite, hits) {
+  const prefix = `${suite?.file ?? ''} ${suite?.title ?? ''}`;
+  for (const spec of suite?.specs ?? []) {
+    const title = `${prefix} ${spec?.title ?? ''}`.trim();
+    for (const test of spec?.tests ?? []) {
+      for (const result of test?.results ?? []) {
+        const message = String(result?.error?.message ?? '');
+        const timedOut =
+          result?.status === 'timedOut' || TIMEOUT_RE.test(message);
+        if (timedOut && LOGIN_RE.test(`${title}\n${message}`)) hits.push(title);
+      }
+    }
+  }
+  for (const child of suite?.suites ?? []) walkSuite(child, hits);
+}
+
+export function loginTimeoutHits(report) {
+  const hits = [];
+  for (const suite of report?.suites ?? []) walkSuite(suite, hits);
+  return hits;
+}
+
+export function textHasLoginTimeout(text) {
+  // Dev-server route logs (`[WebServer] GET /signin 200`) are not login
+  // evidence but interleave with unrelated test timeouts; drop them so the
+  // sliding window can't pair a route hit with a stray `Timeout:` line.
+  const lines = String(text ?? '')
+    .split('\n')
+    .filter(line => !line.includes('[WebServer]'));
+  for (let i = 0; i < lines.length; i += 1) {
+    const window = lines.slice(i, i + 12).join('\n');
+    if (LOGIN_RE.test(window) && TIMEOUT_RE.test(window)) return true;
+  }
+  return false;
+}
+
+export function isLoginTimeout({ text = '', report = null } = {}) {
+  return loginTimeoutHits(report).length > 0 || textHasLoginTimeout(text);
+}
+
+export function decideLoginSignal({
+  conclusion,
+  evidenceText = '',
+  report = null,
+}) {
+  if (!conclusion || conclusion === 'skipped') return { action: 'skip' };
+  if (conclusion === 'success') {
+    return { action: 'green', fingerprints: ['e2e-login-timeout'] };
+  }
+  // Cancelled runs are superseded by the concurrency group's newer run, which
+  // files its own signal; shutdown-induced timeouts are not login evidence.
+  if (
+    conclusion === 'failure' &&
+    isLoginTimeout({ text: evidenceText, report })
+  ) {
+    const hits = loginTimeoutHits(report);
+    return {
+      action: 'red',
+      fingerprint: 'e2e-login-timeout',
+      detail: hits.length
+        ? `Login timeout in: ${hits.slice(0, 5).join('; ')}`
+        : 'Login timeout evidence in the Playwright log.',
+    };
+  }
+  return { action: 'skip' };
+}
+
+/** @param {{ jobResult?: string, authStatus?: string, loginTimeout?: boolean | string }} [input] */
+export function decideAuthSmokeSignal(input = {}) {
+  const jobResult = input.jobResult;
+  const authStatus = input.authStatus ?? '';
+  const loginTimeout = input.loginTimeout;
+  if (
+    !jobResult ||
+    jobResult === 'skipped' ||
+    authStatus === 'not-configured'
+  ) {
+    return { action: 'skip' };
+  }
+  if (jobResult === 'success' && authStatus === 'passed') {
+    return {
+      action: 'green',
+      fingerprints: ['e2e-login-timeout', 'production-monitor-auth-smoke'],
+    };
+  }
+  const timedOut =
+    jobResult === 'cancelled' ||
+    loginTimeout === true ||
+    loginTimeout === 'true';
+  if (timedOut) {
+    return {
+      action: 'red',
+      fingerprint: 'e2e-login-timeout',
+      detail:
+        jobResult === 'cancelled'
+          ? 'Post-deploy auth smoke job timed out.'
+          : 'Post-deploy auth smoke reported a login timeout.',
+    };
+  }
+  if (jobResult === 'failure') {
+    return {
+      action: 'red',
+      fingerprint: 'production-monitor-auth-smoke',
+      detail:
+        'Post-deploy auth smoke failed without a login-timeout classification.',
+    };
+  }
+  return { action: 'skip' };
+}
+
+export function decideMonitorSignal({ conclusion }) {
+  if (conclusion === 'success') return { action: 'green' };
+  if (conclusion === 'quota-deferred') {
+    // Every hard quota needs a standing canary (infra guardrail #2): a
+    // deferred post-deploy read must surface, not vanish into a green skip.
+    // It is not a production failure, so it files low priority, never red.
+    return {
+      action: 'red',
+      fingerprint: 'github-quota-deferred-postdeploy-probes',
+      detail:
+        'Post-deploy probe reads deferred on GitHub installation quota; probes retried on the next Production Controller completion.',
+    };
+  }
+  if (conclusion === 'failure' || conclusion === 'cancelled')
+    return { action: 'red' };
+  return { action: 'skip' };
+}
+
+/** Steady green skips Linear. The first green after a recorded red still resolves. */
+export function gateSteadyGreen(decision, previous, enabled) {
+  if (enabled !== '1' || decision?.action !== 'green') return decision;
+  if (previous === 'red') return decision;
+  return { action: 'skip', reason: 'steady_green' };
+}
+
+export async function fileRemediationSignal({
+  fingerprint,
+  source,
+  runUrl,
+  detail,
+  apiKey,
+  fetchImpl,
+}) {
+  // A missing ready label must not drop the P0 itself.
+  const ready = apiKey
+    ? await findLinearLabelId({ name: AGENT_READY_LABEL, apiKey, fetchImpl })
+    : { ok: false };
+  return upsertLinearIssueByTitleFingerprint({
+    fingerprint,
+    title: remediationTitle(fingerprint),
+    description: describeRemediation({ fingerprint, source, runUrl, detail }),
+    priority: 1,
+    createStateName: 'Todo',
+    keepLabelIds: ready.ok && ready.id ? [ready.id] : [],
+    reopenTerminal: true,
+    apiKey,
+    fetchImpl,
+  });
+}
+
+export async function resolveRemediationSignal({
+  fingerprint,
+  source,
+  runUrl,
+  apiKey,
+  fetchImpl,
+}) {
+  const sourceLine = `Source-workflow: ${source}`;
+  return noteFingerprintedIssueGreen({
+    fingerprint,
+    source,
+    commentMarker: GREEN_MARKER,
+    comment: `${GREEN_MARKER}\n${sourceLine} is green.\nRun: ${runUrl || '(run url unavailable)'}`,
+    apiKey,
+    fetchImpl,
+  });
+}
+
+const TRANSIENT_FAILURE_RE = /_(transport|5\d\d)$/;
+
+/**
+ * Linear filing can hit short-lived upstream 5xx/transport resets; only those
+ * reasons are worth retrying inside the intake job's timeout.
+ */
+export function isTransientRemediationFailure(result) {
+  return !result?.ok && TRANSIENT_FAILURE_RE.test(String(result?.reason ?? ''));
+}
+
+/** @param {any} decision @param {any} [context] */
+export async function applyRemediationDecision(decision = {}, context = {}) {
+  const { fingerprint, source, runUrl, detail, apiKey, fetchImpl } = context;
+  if (!decision || decision.action === 'skip') {
+    return { ok: true, action: 'skip' };
+  }
+  if (decision.action === 'red') {
+    const key = decision.fingerprint || fingerprint;
+    const filed = await fileRemediationSignal({
+      fingerprint: key,
+      source,
+      runUrl,
+      detail: decision.detail || detail,
+      apiKey,
+      fetchImpl,
+    });
+    return { ...filed, fingerprint: key };
+  }
+  const keys = decision.fingerprints ?? [fingerprint];
+  const results = [];
+  for (const key of keys) {
+    const resolved = await resolveRemediationSignal({
+      fingerprint: key,
+      source,
+      runUrl,
+      apiKey,
+      fetchImpl,
+    });
+    results.push({ ...resolved, fingerprint: key });
+    if (!resolved.ok) return { ok: false, action: 'green', results };
+  }
+  return { ok: true, action: 'green', results };
+}
+
+const defaultSleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * Retry transient Linear upstream failures before letting the intake fail.
+ * Permanent failures (missing key, 4xx, GraphQL errors) return immediately.
+ */
+export async function applyRemediationDecisionWithRetry(
+  decision = {},
+  context = {},
+  { attempts = 3, delaysMs = [5_000, 15_000], sleep = defaultSleep } = {}
+) {
+  let result = await applyRemediationDecision(decision, context);
+  for (
+    let i = 0;
+    i < attempts - 1 && isTransientRemediationFailure(result);
+    i += 1
+  ) {
+    await sleep(delaysMs[Math.min(i, delaysMs.length - 1)]);
+    result = await applyRemediationDecision(decision, context);
+  }
+  return result;
+}
