@@ -151,9 +151,13 @@ def project_backlog_admission(packet, *, now, canonical_state_path, _ordering_on
         hold("issue-preimage-changed", ISSUE_OWNER, {key: issue.get(key) for key in IDENTITY_FIELDS},
              "Reassess the current issue identity, version and explicit priority.")
     fresh(issue, "issue", ISSUE_OWNER)
+    allowed_states = {"Backlog": "backlog"}
+    if _ordering_only:
+        allowed_states["Todo"] = "unstarted"
     if (not isinstance(issue.get("id"), str) or not issue["id"] or not isinstance(identifier, str)
             or not re.fullmatch(r"JOV-\d+", identifier)
-            or {"Backlog": "backlog", **({"Todo": "unstarted"} if _ordering_only else {})}.get(issue.get("state")) != issue.get("stateType") or not isinstance(issue.get("updatedAt"), str)
+            or not isinstance(issue.get("state"), str) or issue["state"] not in allowed_states
+            or allowed_states[issue["state"]] != issue.get("stateType") or not isinstance(issue.get("updatedAt"), str)
             or _epoch(issue.get("updatedAt")) is None or type(issue.get("priority")) is not int
             or issue["priority"] not in (1, 2, 3, 4) or issue.get("labelsComplete") is not True):
         hold("issue-not-a-complete-backlog-candidate", ISSUE_OWNER, "Identity/state/version/priority/labels must be complete.",

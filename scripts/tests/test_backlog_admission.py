@@ -105,6 +105,22 @@ class ProjectionTest(unittest.TestCase):
                 candidate = packet(); candidate["issue"][key] = value
                 self.assertHeld(candidate, "issue-not-a-complete-backlog-candidate")
 
+    def test_unknown_states_hold_and_todo_is_only_valid_in_ordering_projection(self):
+        for state in ("Unknown", None, {}, []):
+            with self.subTest(state=state):
+                value = packet()
+                value["issue"]["state"] = value["expected"]["state"] = state
+                value["issue"]["stateType"] = None
+                self.assertHeld(value, "issue-not-a-complete-backlog-candidate")
+        value = packet()
+        value["issue"]["state"] = value["expected"]["state"] = "Todo"
+        value["issue"]["stateType"] = "unstarted"
+        self.assertHeld(value, "issue-not-a-complete-backlog-candidate")
+        result = admission.project_backlog_admission(value, now=NOW, canonical_state_path=STATE, _ordering_only=True)
+        self.assertTrue(result["allowed"])
+        self.assertFalse(result["authorizesTransition"])
+        self.assertFalse(result["authorizesDispatch"])
+
     def test_every_join_is_fresh_and_future_or_missing_stamps_hold(self):
         for name in ("issue", "dependencies", "custody", "runtime", "attemptHistory"):
             for stamp in (NOW - admission.MAX_AGE_S - 1, NOW + 1, None, "unknown"):
