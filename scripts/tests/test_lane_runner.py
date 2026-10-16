@@ -372,6 +372,8 @@ class SelectionTest(unittest.TestCase):
             "Do not rotate secrets/credentials.",
             "Never revoke production API keys.",
             "No credential rotation or new grants are authorized.",
+            "Do not rotate credentials. No token revocation.",
+            "Do not rotate credentials; no token revocation.",
             "Verify the live `/pricing` layout.",
             evidence,
         ):
@@ -390,6 +392,13 @@ class SelectionTest(unittest.TestCase):
             "No credential rotation; rotate the production token",
             "Do not rotate credentials unless the login fails",
             "No token revocation except for stale sessions",
+            "Unless the login fails, do not rotate credentials.",
+            "If the login works, do not revoke production tokens.",
+            "Unless the login fails,\ndo not rotate credentials.",
+            "If the login fails:\n\nDo not rotate credentials.",
+            "Compare live [revoke API keys /pricing](https://jov.ie/pricing).",
+            "Verify live [change production prices /pricing](https://jov.ie/pricing).",
+            "Compare live [rotation of secrets /pricing](https://jov.ie/pricing).",
             "Rotate production credentials",
         ):
             for prefix in ("", "Do not rotate secrets/credentials.\nCompare live /pricing.\n"):

@@ -555,24 +555,36 @@ def issue_is_sensitive(issue: Issue) -> bool:
 
 
 def issue_hits_red_line(issue: Issue) -> bool:
-    text = f"{issue.title}\n{issue.description}"
+    text = f"{issue.title}\n\n{issue.description}"
     # A Markdown destination is evidence, not an instruction. Keep its visible
     # label so e.g. "Change live [pricing](...)" still hits the same policy.
     text = re.sub(r"\]\(\s*<?https?://[^\s)]+>?\s*\)", "]", text)
     objects = r"(?:secret|credential|token|key)s?"
-    safe_spans = [match.span() for pattern in (
-        # Exempt only the exact prohibited action, never its clause or issue.
-        rf"\b(?:do not|must not|never)\s+(?:rotate|revoke)\s+"
+    prohibition = (
+        rf"(?:(?:do not|must not|never)\s+(?:rotate|revoke)\s+"
         rf"(?:(?:any|other|the|production|project|api)\s+)*{objects}"
-        rf"(?:\s*/\s*{objects})*\b(?=\s*(?:[.;\n]|$))",
-        rf"\bno\s+{objects}\s+(?:rotation|revocation)"
+        rf"(?:\s*/\s*{objects})*|"
+        rf"no\s+{objects}\s+(?:rotation|revocation)"
         rf"(?:\s+or\s+new\s+grants)?(?:\s+(?:is|are)\s+authorized)?"
-        rf"\b(?=\s*(?:[.;\n]|$))",
-        # Comparing a rendered route does not request a price mutation. A
-        # separate requested mutation, even in this sentence, remains denied.
+        rf")"
+    )
+    safe_spans = []
+    # Interpret only isolated, unconditional prohibitions. Conditions elsewhere
+    # in the issue may qualify a denial; leave those ambiguous requests held.
+    if not re.search(r"\b(?:if|unless|except|until|without|when|once|provided|after|before|while)\b", text, re.IGNORECASE):
+        for paragraph in re.finditer(r"[^\n]+(?:\n(?![ \t]*\n)[^\n]+)*", text):
+            if re.fullmatch(rf"\s*(?:[-*]\s+)?{prohibition}"
+                            rf"(?:\s*[.;]\s*(?:[-*]\s+)?{prohibition})*\s*[.;]?\s*",
+                            paragraph.group(0), re.IGNORECASE):
+                safe_spans.append(paragraph.span())
+    # A literal rendered route is evidence. Free-form link labels can contain
+    # instructions, so they must not create a span covering another red line.
+    route_reference = (
         r"\b(?:compare|comparing|inspect|inspecting|verify|verifying|validate|validating)"
-        r"\s+(?:the\s+)?live\s+(?:\[[^\]\n]*?/pricing\]|`/pricing`|/pricing)"
-    ) for match in re.finditer(pattern, text, re.IGNORECASE)]
+        r"\s+(?:the\s+)?live\s+(?:\[(?:(?:https?://)?(?:[a-z0-9-]+\.)+[a-z]{2,63})?"
+        r"/pricing\]|`/pricing`|/pricing)"
+    )
+    safe_spans.extend(match.span() for match in re.finditer(route_reference, text, re.IGNORECASE))
     for match in SENSITIVE_RED_LINES.finditer(text):
         if any(start <= match.start() and match.end() <= end for start, end in safe_spans):
             continue
