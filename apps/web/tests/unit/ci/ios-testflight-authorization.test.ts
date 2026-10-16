@@ -674,6 +674,10 @@ describe.skipIf(!gh)(
           RUN_ID: '90',
           RUN_ATTEMPT: String(publisherAttempt),
           LEASE: JSON.stringify(binaryAttestation(source, NEWER, 90).lease),
+          GITHUB_WORKSPACE: repoRoot,
+          GH_API_HOLD_BUDGET_SECONDS: String(
+            step?.env?.GH_API_HOLD_BUDGET_SECONDS
+          ),
           RUNNER_TEMP: root,
         },
         route: routes({
@@ -785,6 +789,101 @@ describe.skipIf(!gh)(
       const wrongBinary = await record(binaryAttestation(OLDER, NEWER, 90));
       expect(wrongBinary.code).toBe(1);
     });
+  }
+);
+
+describe.skipIf(!gh)(
+  'TestFlight archive rate-limit preflight (real gh)',
+  () => {
+    async function preflight(
+      mode: 'success' | 'permission' | 'budget' | 'malformed'
+    ) {
+      const root = tempRoot('jovie-testflight-archive-hold-');
+      const tools = join(root, '.testflight-tools/.github/scripts');
+      mkdirSync(tools, { recursive: true });
+      writeFileSync(
+        join(tools, 'gh-api-hold.sh'),
+        readFileSync(resolve(repoRoot, '.github/scripts/gh-api-hold.sh'))
+      );
+      const guard = join(root, 'guard.mjs');
+      const probe = join(root, 'guard-called');
+      writeFileSync(
+        guard,
+        "import {writeFileSync} from 'node:fs'; writeFileSync(process.env.GUARD_PROBE, process.argv[2]);"
+      );
+      const step = workflow.jobs.beta.steps?.find(
+        step => step.name === 'Revalidate certified lease before archive'
+      );
+      const lease = JSON.stringify({ sourceSha: RELEASE, transportSha: NEWER });
+      const result = await runWithRealGh({
+        script: String(step?.run).replaceAll('${{ github.repository }}', REPO),
+        env: {
+          GITHUB_WORKSPACE: root,
+          GH_API_HOLD_BUDGET_SECONDS: String(
+            step?.env?.GH_API_HOLD_BUDGET_SECONDS
+          ),
+          TESTFLIGHT_LEASE: lease,
+          TESTFLIGHT_LEASE_PATH: join(root, 'lease.json'),
+          TESTFLIGHT_GUARD_PATH: guard,
+          GUARD_PROBE: probe,
+        },
+        route: path => {
+          if (path === `repos/${REPO}/commits/main`) {
+            if (mode === 'permission')
+              return {
+                status: 403,
+                body: { message: 'Resource not accessible by integration' },
+              };
+            if (mode === 'budget')
+              return {
+                status: 403,
+                body: { message: 'API rate limit exceeded' },
+              };
+            return { body: { sha: mode === 'malformed' ? 'invalid' : NEWER } };
+          }
+          if (path.startsWith('rate_limit'))
+            return {
+              body: {
+                resources: {
+                  core: { reset: Math.floor(Date.now() / 1000) + 10000 },
+                },
+              },
+            };
+          return null;
+        },
+      });
+      return { ...result, root, probe, lease };
+    }
+
+    it('preserves the held main read and still invokes the lease guard after main advances', async () => {
+      const result = await preflight('success');
+      expect(result.code, result.stderr).toBe(0);
+      expect(readFileSync(result.probe, 'utf8')).toBe('archive');
+      expect(readFileSync(join(result.root, 'lease.json'), 'utf8').trim()).toBe(
+        result.lease
+      );
+      expect(
+        result.requests.filter(path => path.endsWith('/commits/main'))
+      ).toHaveLength(1);
+    });
+
+    it.each(['permission', 'budget', 'malformed'] as const)(
+      'fails closed before the lease guard for %s evidence',
+      async mode => {
+        const result = await preflight(mode);
+        expect(result.code).not.toBe(0);
+        expect(() => readFileSync(result.probe)).toThrow();
+        expect(
+          result.requests.filter(path => path.endsWith('/commits/main'))
+        ).toHaveLength(1);
+        if (mode === 'permission')
+          expect(
+            result.requests.some(path => path.startsWith('rate_limit'))
+          ).toBe(false);
+        if (mode === 'budget')
+          expect(result.stderr).toContain('outside the 600s budget');
+      }
+    );
   }
 );
 
