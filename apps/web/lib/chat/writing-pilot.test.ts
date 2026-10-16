@@ -1,3 +1,4 @@
+import { WRITING_QUALITY_RUBRIC_VERSION } from '@jovie/copy/writing-quality';
 import { generateText, streamText, tool, type UIMessage } from 'ai';
 import { MockLanguageModelV3 } from 'ai/test';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -205,7 +206,7 @@ function review(): WritingPilotReview {
     receipt: {
       schema: 'jev-writing-quality/v1',
       status: 'evaluated',
-      rubricVersion: '2026-09-26.1',
+      rubricVersion: WRITING_QUALITY_RUBRIC_VERSION,
       calibrationVersion: 'provisional-2026-09-26',
       findings: [
         {

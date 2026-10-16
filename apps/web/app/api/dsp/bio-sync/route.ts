@@ -162,6 +162,7 @@ export async function GET() {
       id,
       displayName: provider.displayName,
       method: provider.method,
+      rollback: provider.rollback,
       enabled: provider.enabled,
       notes: provider.notes,
       artistPortalUrl: provider.artistPortalUrl,

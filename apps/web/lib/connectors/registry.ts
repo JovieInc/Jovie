@@ -12,6 +12,8 @@
  */
 
 import { z } from 'zod';
+import { unknownArtistProfileContract } from './artist-profile-contract';
+import { validateConnectorRegistry } from './registry-validation';
 import { SPOTIFY_OAUTH_SCOPES } from './spotify/scopes';
 import {
   CONNECTOR_PROVIDER_IDS,
@@ -49,7 +51,7 @@ export const GOOGLE_OAUTH_SCOPE = {
   userinfoEmail: 'https://www.googleapis.com/auth/userinfo.email',
 } as const;
 
-export const CONNECTOR_REGISTRY = {
+export const CONNECTOR_REGISTRY = validateConnectorRegistry({
   [CONNECTOR_PROVIDERS.gmail]: {
     id: CONNECTOR_PROVIDERS.gmail,
     label: 'Gmail',
@@ -66,6 +68,7 @@ export const CONNECTOR_REGISTRY = {
     webhookHandler: null,
     displayOrder: 1,
     accountScope: 'user',
+    artistProfile: null,
     platforms: ['web', 'mac'],
     capabilities: [
       {
@@ -99,6 +102,7 @@ export const CONNECTOR_REGISTRY = {
     webhookHandler: null,
     displayOrder: 2,
     accountScope: 'user',
+    artistProfile: null,
     platforms: ['web', 'mac'],
     capabilities: [
       {
@@ -125,6 +129,9 @@ export const CONNECTOR_REGISTRY = {
     description: 'Read playlists and publish playlists you approve.',
     iconKey: 'spotify',
     oauthBundle: 'spotify',
+    artistProfile: unknownArtistProfileContract(
+      'Artist-profile API readiness has not been verified.'
+    ),
     oauthScopes: [...SPOTIFY_OAUTH_SCOPES],
     oauthScopeLabels: [
       'View Account Email',
@@ -170,6 +177,9 @@ export const CONNECTOR_REGISTRY = {
       'Import videos into Work and apply thumbnail changes you approve. Comment reply sending is disabled.',
     iconKey: 'youtube',
     oauthBundle: 'youtube',
+    artistProfile: unknownArtistProfileContract(
+      'Artist-profile API readiness has not been verified.'
+    ),
     oauthScopes: YOUTUBE_OAUTH_SCOPES,
     oauthScopeLabels: [
       'Read Channel Data',
@@ -218,7 +228,7 @@ export const CONNECTOR_REGISTRY = {
       },
     ],
   },
-} as const satisfies Record<ConnectorProviderId, ConnectorDefinition>;
+} as const satisfies Record<ConnectorProviderId, ConnectorDefinition>);
 
 /** Providers that share the Google OAuth authorize/callback/disconnect flow. */
 export const GOOGLE_CONNECTOR_PROVIDERS = CONNECTOR_PROVIDER_IDS.filter(

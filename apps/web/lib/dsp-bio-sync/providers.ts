@@ -20,6 +20,8 @@ export interface DspBioProvider {
   supportEmail?: string;
   /** Whether this provider is currently enabled for bio sync */
   enabled: boolean;
+  /** Email requests cannot prove a destination snapshot or conditional restore. */
+  rollback: 'manual' | 'unsupported';
   /** Notes about the integration status */
   notes: string;
   /** URL for the DSP's artist portal (for reference/linking) */
@@ -40,6 +42,7 @@ export const DSP_BIO_PROVIDERS: Record<string, DspBioProvider> = {
     method: 'email',
     supportEmail: 'artists@spotify.com',
     enabled: true,
+    rollback: 'manual',
     notes:
       'Spotify for Artists API does not support bio updates. Bios are typically updated through the distributor or Spotify for Artists dashboard. Email requests are accepted for verified artists.',
     artistPortalUrl: 'https://artists.spotify.com',
@@ -50,6 +53,7 @@ export const DSP_BIO_PROVIDERS: Record<string, DspBioProvider> = {
     method: 'email',
     supportEmail: 'musicpartners@apple.com',
     enabled: true,
+    rollback: 'manual',
     notes:
       'Apple Music for Artists does not expose a bio update API. Bios are submitted through the distributor or via Apple Music for Artists support.',
     artistPortalUrl: 'https://artists.apple.com',
@@ -59,6 +63,7 @@ export const DSP_BIO_PROVIDERS: Record<string, DspBioProvider> = {
     method: 'email',
     supportEmail: 'amazonmusicforartists@amazon.com',
     enabled: true,
+    rollback: 'manual',
     notes:
       'Amazon Music for Artists portal allows manual bio updates. Email support is available for bulk or programmatic updates.',
     artistPortalUrl: 'https://artists.amazonmusic.com',
@@ -68,6 +73,7 @@ export const DSP_BIO_PROVIDERS: Record<string, DspBioProvider> = {
     method: 'email',
     supportEmail: 'artists@tidal.com',
     enabled: true,
+    rollback: 'manual',
     notes:
       'TIDAL does not have a public API for bio updates. Artist bios are updated via support email or through the distributor.',
     artistPortalUrl: 'https://artists.tidal.com',
@@ -77,6 +83,7 @@ export const DSP_BIO_PROVIDERS: Record<string, DspBioProvider> = {
     method: 'email',
     supportEmail: 'artists@deezer.com',
     enabled: true,
+    rollback: 'manual',
     notes:
       'Deezer does not have a public API for artist bio updates. Requests are sent to the Deezer for Artists support team.',
     artistPortalUrl: 'https://artists.deezer.com',
@@ -85,6 +92,7 @@ export const DSP_BIO_PROVIDERS: Record<string, DspBioProvider> = {
     displayName: 'SoundCloud',
     method: 'api',
     enabled: false,
+    rollback: 'unsupported',
     notes:
       'SoundCloud API supports profile description updates via PUT /me with OAuth. Requires user to connect their SoundCloud account.',
     artistPortalUrl: 'https://soundcloud.com',
@@ -94,6 +102,7 @@ export const DSP_BIO_PROVIDERS: Record<string, DspBioProvider> = {
     displayName: 'YouTube Music',
     method: 'api',
     enabled: false,
+    rollback: 'unsupported',
     notes:
       'YouTube Data API v3 supports channel description updates via channels.update. Requires user to grant YouTube OAuth access with channel.update scope.',
     artistPortalUrl: 'https://artists.youtube.com',

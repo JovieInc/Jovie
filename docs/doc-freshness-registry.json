@@ -343,12 +343,16 @@
     },
     "CLAUDE.md": {
       "owner": "@itstimwhite",
-      "claim": "The top-level router implements the company constitution without replacing it.",
-      "documentSha256": "8a34aa0ffe385bdc1ee2872e0f6a22df21d6a860dfcb224d2c150e951e7dcafa",
+      "claim": "The top-level router inherits the constitution and routes personal/mixed requests to private intake before task tools.",
+      "documentSha256": "ae1f036397e84f62d025bf03e41e501e32e465b6588a4284c3cd51000bbce116",
       "sources": [
         {
           "path": "canon/OPERATING_SYSTEM.md",
           "sha256": "405911b953ba432a2ef6d41efc69633ed330ba80a5d577865fe7027e9baf08f5"
+        },
+        {
+          "path": "scripts/backlog-orchestrator/private-task.mjs",
+          "sha256": "46e9fd81de86670fca59bf19d113786428b7b189f758cad75e682bb8d68924a1"
         }
       ]
     },
@@ -472,11 +476,26 @@
     "docs/writing/SURFACE_COVERAGE.md": {
       "owner": "@itstimwhite",
       "claim": "Writing surface completeness is validated by the existing invariant consumer.",
-      "documentSha256": "1a1cf51249295ae88a750bc3a30254aec871c686ca555d01fe3f1d4583d0af68",
+      "documentSha256": "13afd3227d7edeb5277b2b7e9d5a343cd8ed67f0d5bf9769535f0f9f6ccf4391",
       "sources": [
         {
           "path": "scripts/invariants/writing-surfaces.mjs",
           "sha256": "91356a21ccf5164603191080d6fb3e4e03d7455b8d58ad0c08c5651965143145"
+        }
+      ]
+    },
+    "scripts/backlog-orchestrator/PRIVATE_WORKFLOWS.md": {
+      "owner": "@itstimwhite",
+      "claim": "Conversation intake denies personal/mixed externalization, resumes a private non-secret record, limits escalation, and verifies a live Telegram delivery receipt before completion.",
+      "documentSha256": "760a2fc32a4a4d7c0741e318f7c824444c572fe0dc83c531438d188e770a92a5",
+      "sources": [
+        {
+          "path": "scripts/backlog-orchestrator/conversation-intake.mjs",
+          "sha256": "134b25472d8fe35a7fb299fc2cee917e51210564b09516b01c08da2f724f7d9b"
+        },
+        {
+          "path": "scripts/backlog-orchestrator/private-task.mjs",
+          "sha256": "46e9fd81de86670fca59bf19d113786428b7b189f758cad75e682bb8d68924a1"
         }
       ]
     }
