@@ -4574,6 +4574,40 @@ class TerminalRevisitTest(unittest.TestCase):
         prs = [self.pr(n) for n in range(1, 6)]
         self.assertEqual(lane.revisit_terminal_prs(self.host, prs, now=TERMINAL_NOW), [4, 5, 3])
 
+    def test_exhaustion_hold_allows_conflicted_head_recovery_without_refunding_attempts(self):
+        # JOV-8533: #21824 had this terminal hold and never reached partial_main_sync.
+        attempts = {"21824": {"sha": "h21824", "count": 1, "escalated": True,
+                              "pushedHead": "h21824"}}
+        held = {"21824": lane.pr_events.held_record(
+            "h21824", ["fix-exhausted", "fix-exhausted", "diff-too-large:1503"])}
+        self.write("fix-attempts.json", attempts)
+        self.write("held.json", held)
+        pr = self.pr(21824, isDraft=True, mergeStateStatus="DIRTY",
+                     labels=[{"name": "lane-fix-exhausted"}])
+        for synced in (False, True):
+            with self.subTest(synced=synced):
+                self.calls.clear()
+                with patch.object(lane, "partial_main_sync", return_value="clean-main" if synced else None) as sync:
+                    self.assertEqual(lane.revisit_terminal_prs(self.host, [pr], now=TERMINAL_NOW), [21824])
+                sync.assert_called_once_with(self.host, pr)
+                lifts = [args[4] for args in self.calls if args[:4] == ["gh", "api", "-X", "DELETE"]]
+                self.assertEqual(lifts, [f"repos/{lane.REPO_SLUG}/issues/21824/labels/lane-fix-exhausted"] if synced else [])
+                visit = json.loads((self.host.state / "terminal-revisits.json").read_text())["21824"]
+                self.assertEqual((visit["action"], visit["ok"]), ("partial-main-sync", synced))
+                self.assertEqual(json.loads((self.host.state / "fix-attempts.json").read_text()), attempts)
+                self.assertEqual(json.loads((self.host.state / "held.json").read_text()), held)
+                self.main = "m2"
+
+    def test_exhaustion_does_not_mask_nonfixable_policy_holds(self):
+        for evidence in ("secret-like-file-changed", "empty-diff"):
+            with self.subTest(evidence=evidence):
+                pr = self.pr(1, labels=[{"name": "lane-fix-exhausted"}])
+                held = {"1": lane.pr_events.held_record("h1", ["fix-exhausted", evidence])}
+                self.assertEqual(lane.terminal_prs([pr], {}, held), [])
+                # A hold on an older generation cannot block the current head.
+                self.assertEqual(lane.terminal_prs([{**pr, "headRefOid": "new-head"}], {}, held),
+                                 [{**pr, "headRefOid": "new-head"}])
+
     def test_partial_main_sync_merges_the_newest_conflict_free_main_commit(self):
         repo = Path(self.temp.name) / "repo"
         repo.mkdir()
