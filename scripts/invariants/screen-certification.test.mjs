@@ -1105,7 +1105,6 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       'web.brand',
       'web.report',
       'web.start',
-      'web.onboarding-checkout',
       'web.marketing-solutions',
       'web.public-profile-about',
     ];
@@ -1155,6 +1154,43 @@ describe('JOV-INV-018 screen-certification/v2', () => {
         `${screenId} must be certified from its own artifact in the certify job`
       );
     }
+  });
+
+  it('captures web.onboarding-checkout through the test-auth session', () => {
+    const workflow = readFileSync(
+      join(ROOT, '.github/workflows/screenshots.yml'),
+      'utf8'
+    );
+    const publicSpec = readFileSync(
+      join(
+        ROOT,
+        'apps/web/tests/product-screenshots/public-screens-proof.spec.ts'
+      ),
+      'utf8'
+    );
+    const checkoutSpec = readFileSync(
+      join(
+        ROOT,
+        'apps/web/tests/product-screenshots/onboarding-checkout-screen-proof.spec.ts'
+      ),
+      'utf8'
+    );
+    assert.equal(
+      SCREEN_PROOF_ROUTES['web.onboarding-checkout'],
+      '/onboarding/checkout'
+    );
+    assert.doesNotMatch(publicSpec, /web\.onboarding-checkout/);
+    assert.match(checkoutSpec, /\/api\/dev\/test-auth\/enter/);
+    assert.match(
+      checkoutSpec,
+      /expect\(finalUrl\.pathname\)\.toBe\(proofRoute\)/
+    );
+    assert.match(checkoutSpec, /expect\(finalUrl\.search\)\.toBe\(''\)/);
+    assert.match(checkoutSpec, /expect\(finalUrl\.hash\)\.toBe\(''\)/);
+    assert.match(
+      workflow,
+      /tests\/product-screenshots\/onboarding-checkout-screen-proof\.spec\.ts/
+    );
   });
 
   it('keeps the /artists producer identity synchronized with the trusted resolver (JOV-7125)', () => {
@@ -1944,6 +1980,56 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       assert.match(
         rejected.findings.join('\n'),
         /required browser measurements are unavailable/
+      );
+    } finally {
+      process.env.PATH = priorPath;
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  it('accepts Next catch-all sources for web.smartlink-release and still rejects traversal', () => {
+    const root = mkdtempSync(join(tmpdir(), 'screen-resolver-catchall-'));
+    const priorPath = process.env.PATH;
+    try {
+      const screen = SCREEN_REGISTRY.find(
+        entry => entry.id === 'web.smartlink-release'
+      );
+      assert.ok(screen);
+      assert.ok(screen.sources.some(source => source.includes('[...slug]')));
+      const gh = join(root, 'gh');
+      writeFileSync(gh, '#!/bin/sh\nexit 1\n');
+      chmodSync(gh, 0o755);
+      process.env.PATH = `${root}:${priorPath}`;
+      const context = {
+        headSha: HEAD,
+        screenId: screen.id,
+        sourcePaths: [...screen.sources],
+        viewports: [...screen.viewports],
+      };
+      const accepted = resolveTrustedScreenProof({
+        artifactId: 12045112840,
+        context,
+      });
+      assert.equal(accepted.proof, null);
+      assert.match(
+        accepted.findings.join('\n'),
+        /controlled GitHub artifact resolver is unavailable/
+      );
+      assert.doesNotMatch(
+        accepted.findings.join('\n'),
+        /controlled resolver request is invalid/
+      );
+
+      const traversed = resolveTrustedScreenProof({
+        artifactId: 12045112840,
+        context: {
+          ...context,
+          sourcePaths: ['apps/web/app/[username]/../../secrets.txt'],
+        },
+      });
+      assert.match(
+        traversed.findings.join('\n'),
+        /controlled resolver request is invalid/
       );
     } finally {
       process.env.PATH = priorPath;

@@ -295,9 +295,25 @@ test('repository class-action registry covers every recurring class', () => {
       'green-by-implication',
       'non-convergent-control-loop',
       'pre-merge-parity-gap',
+      'serial-layer-discovery',
       'silent-production-staleness',
     ]
   );
+});
+
+test('recurring serial-layer failures fail review without their class action', () => {
+  const documents = readPostmortemDocuments(REPO_ROOT);
+  const registry = readClassActionRegistry(REPO_ROOT);
+  delete registry['serial-layer-discovery'];
+  const report = buildReviewReport({
+    documents,
+    classActionRegistry: registry,
+    generatedAt: new Date('2026-10-16T00:00:00Z'),
+  });
+  assert.equal(report.verification.patternReviewPassed, false);
+  assert.deepEqual(report.summary.recurringWithoutAction, [
+    'serial-layer-discovery',
+  ]);
 });
 
 test('GBrain mirror is only complete after digest-bound readback', async () => {

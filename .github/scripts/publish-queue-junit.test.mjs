@@ -7,6 +7,7 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -198,16 +199,49 @@ test('real ZIP members stream as XML without artifact-controlled extraction', ()
     rmSync(root, { recursive: true, force: true });
   }
 });
-test('uncommissioned publication CLI stops before any remote access', () => {
+test('unbound publication CLI stops before any remote access', () => {
   const result = spawnSync(
     process.execPath,
     ['.github/scripts/publish-queue-junit.mjs'],
     {
       encoding: 'utf8',
-      env: { ...process.env, QUARANTINE_AUTO_HEAL_ENABLED: 'false' },
+      env: {
+        ...process.env,
+        GITHUB_EVENT_NAME: 'workflow_dispatch',
+        QUEUE_JUNIT_RUN_ID: '',
+      },
     }
   );
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /publication is disabled/);
+  assert.match(result.stderr, /publication requires a completed CI run/);
   assert.equal(result.stdout, '');
+});
+
+test('the existing report publishes trusted queue evidence and keeps secrets off producer checkouts', () => {
+  const { load } = createRequire(import.meta.url)('js-yaml');
+  const workflow = load(
+    readFileSync('.github/workflows/test-flakiness-report.yml', 'utf8')
+  );
+  assert.ok(
+    workflow.on.workflow_run.branches.includes('gh-readonly-queue/main/**')
+  );
+  const publisher = workflow.jobs['publish-queue-results'];
+  assert.match(publisher.if, /workflow_id == 178737329/);
+  assert.match(publisher.if, /event == 'merge_group'/);
+  assert.match(publisher.if, /head_repository.full_name == github.repository/);
+  assert.ok(!publisher.if.includes('QUARANTINE_AUTO_HEAL_ENABLED'));
+  const checkout = publisher.steps.find(step =>
+    step.uses?.startsWith('actions/checkout@')
+  );
+  assert.equal(checkout.with['persist-credentials'], false);
+  assert.equal(checkout.with.ref, undefined); // Trusted workflow revision, never artifact source.
+  const upload = publisher.steps.find(step =>
+    step.uses?.startsWith('codecov/test-results-action@')
+  );
+  assert.match(upload.if, /reports.outputs.upload == 'true'/);
+  assert.equal(
+    upload.with.override_commit,
+    '${{ steps.reports.outputs.head_sha }}'
+  );
+  assert.equal(upload.with.fail_ci_if_error, true);
 });

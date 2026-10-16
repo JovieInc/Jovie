@@ -4176,19 +4176,12 @@ describe('production promotion exact-artifact contract', () => {
     expect(promoteStep).toContain(
       'bash .github/scripts/promote-production-deployment.sh'
     );
-    const resolveMainIndex = finalCurrentStep.indexOf(
-      'current_main_sha="$(bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" api "repos/${{ github.repository }}/commits/main"'
-    );
-    const compareMainIndex = finalCurrentStep.indexOf(
-      'if [[ "$current_main_sha" != "$EXPECTED_MAIN_SHA" ]]'
-    );
     expect(finalCurrentStep).toContain(
       'EXPECTED_MAIN_SHA: ${{ inputs.expected_sha }}'
     );
-    expect(resolveMainIndex).toBeGreaterThanOrEqual(0);
-    expect(compareMainIndex).toBeGreaterThan(resolveMainIndex);
-    expect(finalCurrentStep).toContain('echo "is_current=false"');
-    expect(finalCurrentStep).toContain('exit 0');
+    expect(finalCurrentStep).toContain(
+      'bash "$GITHUB_WORKSPACE/.github/scripts/recheck-main-lineage.sh" "before production promotion"'
+    );
     expect(finalCurrentStep).not.toContain(
       'Refusing stale production promotion'
     );
@@ -4280,11 +4273,14 @@ describe('production promotion exact-artifact contract', () => {
       'promotion_sha: ${{ steps.promote.outputs.promotion_sha || steps.final-current.outputs.superseded_sha || steps.mutation-head.outputs.superseded_sha }}'
     );
     expect(mutationHead).toContain(
-      'echo "superseded_sha=$current_sha" >> "$GITHUB_OUTPUT"'
+      'bash "$GITHUB_WORKSPACE/.github/scripts/recheck-main-lineage.sh" "at production mutation"'
     );
-    expect(promoteJob).toContain(
-      'echo "superseded_sha=$current_main_sha" >> "$GITHUB_OUTPUT"'
+    const lineageScript = readFileSync(
+      resolve(repoRoot, '.github/scripts/recheck-main-lineage.sh'),
+      'utf8'
     );
+    expect(lineageScript).toContain('emit superseded_sha "$current"');
+    expect(promotionScript).toContain('"$superseded_sha" >> "$GITHUB_OUTPUT"');
     expect(promoteJob).not.toMatch(/^      production_deployment_url:/m);
     expect(promoteJob).not.toContain(
       'is_current: ${{ steps.promote.outputs.is_current }}'
@@ -4341,12 +4337,16 @@ describe('production promotion exact-artifact contract', () => {
     );
     const result = getJobBlock(reusable, 'release-result');
 
-    expect(finalCurrent).toContain(
-      'if [[ ! "$current_main_sha" =~ ^[0-9a-f]{40}$ ]]'
+    expect(finalCurrent).toContain('recheck-main-lineage.sh');
+    const lineageScript = readFileSync(
+      resolve(repoRoot, '.github/scripts/recheck-main-lineage.sh'),
+      'utf8'
     );
-    expect(finalCurrent).toContain('exit 1');
-    expect(finalCurrent).toContain('echo "is_current=false"');
-    expect(finalCurrent).toContain('exit 0');
+    expect(lineageScript).toContain('current="$(read_main_sha)" || exit 1');
+    expect(lineageScript).toContain(
+      'lineage="$(compare_status "$current")" || exit 1'
+    );
+    expect(lineageScript).toContain('emit is_current false');
     expect(result).toContain(
       'PROMOTION_SHA: ${{ needs.promote-production.outputs.promotion_sha }}'
     );

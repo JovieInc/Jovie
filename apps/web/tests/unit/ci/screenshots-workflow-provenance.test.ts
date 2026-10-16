@@ -137,6 +137,7 @@ const screenSources: Record<string, string> = {
   'web.hud-isolated': 'apps/web/app/hud/page.tsx',
   'web.tasks': 'apps/web/app/app/(shell)/tasks/page.tsx',
   'web.contacts': 'apps/web/app/app/(shell)/contacts/page.tsx',
+  'web.onboarding-checkout': 'apps/web/app/onboarding/checkout/page.tsx',
 };
 
 describe('Product Screenshots provenance', () => {

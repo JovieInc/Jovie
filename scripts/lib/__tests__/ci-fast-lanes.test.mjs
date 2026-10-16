@@ -84,10 +84,15 @@ it('enforces lifecycle coverage through the real structural selector', async () 
   // The coverage command is an operations-lane part. A merge group narrows
   // CI_PRODUCT_LANES to the diff (web-only for an e2e spec) and the structural
   // jobs set split modes the parent deletes before spawning this suite.
+  // workflow_dispatch keeps that selector off the live checkout. A docs-only
+  // pull_request selects neither product nor control lanes, skips structural
+  // before CI_PRODUCT_LANES applies, and caches that skip for later tests.
   const previous = {
+    GITHUB_EVENT_NAME: process.env.GITHUB_EVENT_NAME,
     CI_PRODUCT_LANES: process.env.CI_PRODUCT_LANES,
     CI_FAST_STRUCTURAL_PYTEST: process.env.CI_FAST_STRUCTURAL_PYTEST,
     CI_FAST_STRUCTURAL_WEB: process.env.CI_FAST_STRUCTURAL_WEB,
+    CI_FAST_SKIP_STRUCTURAL: process.env.CI_FAST_SKIP_STRUCTURAL,
   };
   const collect = async () => {
     const commands = [];
@@ -102,8 +107,10 @@ it('enforces lifecycle coverage through the real structural selector', async () 
     );
   };
   try {
+    process.env.GITHUB_EVENT_NAME = 'workflow_dispatch';
     delete process.env.CI_FAST_STRUCTURAL_PYTEST;
     delete process.env.CI_FAST_STRUCTURAL_WEB;
+    delete process.env.CI_FAST_SKIP_STRUCTURAL;
     process.env.CI_PRODUCT_LANES = 'ios,mac,web,operations,cross-product';
     expect(await collect()).toHaveLength(1);
     process.env.CI_PRODUCT_LANES = 'web';

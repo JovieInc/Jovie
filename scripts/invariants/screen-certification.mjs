@@ -154,9 +154,11 @@ export const SCREEN_PROOF_ROUTES = Object.freeze({
   'web.brand': '/brand',
   'web.report': '/report',
   'web.start': '/start',
-  // JOV-8068: the checkout page is registered and auth-gated. The
-  // isRenderFixtureEnabled branch on that page is the rendered producer;
-  // production deployments fail closed and keep the sign-in redirect.
+  // JOV-8068: auth-gated checkout. The screenshot producer enters through
+  // the test-auth session (onboarding-checkout-screen-proof.spec.ts), then
+  // the page's isRenderFixtureEnabled branch renders without the noop
+  // database. Signed-out requests, including production, redirect to
+  // /signin.
   'web.onboarding-checkout': '/onboarding/checkout',
   // /solutions/* registers the whole (marketing)/solutions directory;
   // /solutions/artists is the family's declared concrete health-check path.
