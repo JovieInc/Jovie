@@ -7,6 +7,9 @@ scope and rollback evidence. Mutations require conditional restore. DSP
 rollback; receipts attest submission only. Initial requests only preview, and
 separate approval confirms the exact proposal. Missing evidence blocks execution
 (JOV-8509). Legacy history uses `getBioSyncHistory`; new status uses receipts.
+Submission identities and historical transports derive from `DSP_PROFILE_CATALOG`.
+Historical recipients and field limits are submission configuration, not evidence
+of provider permission or write readiness.
 
 Call `propose`, show the complete destination/before/desired proposal, then call
 `approve` with `confirmationFor(proposal)` from that explicit confirmation.

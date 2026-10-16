@@ -8,6 +8,8 @@ export type BioSyncMethod = 'api' | 'email';
 export interface DspBioProvider {
   displayName: string;
   method: BioSyncMethod;
+  /** Legacy shape only; historical recipients are not advertised as verified. */
+  supportEmail?: string;
   enabled: boolean;
   rollback: 'manual' | 'unsupported';
   notes: string;
@@ -15,7 +17,10 @@ export interface DspBioProvider {
   maxBioLength: number;
 }
 
-/** Compatibility projection; the shared catalog owns capabilities. */
+/**
+ * Compatibility projection of the canonical DSP catalog. Historical transport
+ * metadata grants no delivery permission; current submission evidence is required.
+ */
 export const DSP_BIO_PROVIDERS: Record<string, DspBioProvider> =
   Object.fromEntries(
     Object.entries(PROFILE_DESTINATION_REGISTRY).map(([id, destination]) => [
@@ -29,7 +34,9 @@ export const DSP_BIO_PROVIDERS: Record<string, DspBioProvider> =
             canExecuteBioSubmission(getBioSubmissionManifest(id))
           );
         },
-        rollback: destination.method === 'email' ? 'manual' : 'unsupported',
+        get rollback(): DspBioProvider['rollback'] {
+          return this.enabled ? 'manual' : 'unsupported';
+        },
         notes:
           destination.method === 'email'
             ? 'Submission requires current terms evidence and explicit approval.'

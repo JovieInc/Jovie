@@ -36,11 +36,17 @@ const post = (body: unknown) =>
 describe('DSP bio endpoint', () => {
   it('discovers blocked capabilities from the shared catalog', async () => {
     const body = await (await GET()).json();
+    expect(body.success).toBe(true);
     expect(body.enabledCount).toBe(0);
     expect(body.providers).toHaveLength(7);
     expect(
       body.providers.every(
         (provider: { enabled: boolean }) => !provider.enabled
+      )
+    ).toBe(true);
+    expect(
+      body.providers.every(
+        (provider: { rollback: string }) => provider.rollback === 'unsupported'
       )
     ).toBe(true);
   });

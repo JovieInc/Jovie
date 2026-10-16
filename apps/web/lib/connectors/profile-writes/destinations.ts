@@ -1,3 +1,4 @@
+import { DSP_PROFILE_CATALOG } from '@/lib/connectors/dsp-profile-catalog';
 import type { ProfileWriteManifest } from './contract';
 
 /** Shared catalog. Historical addresses are hints, never terms evidence. */
@@ -8,48 +9,35 @@ interface Destination {
   portal: string;
   maxBioLength: number;
 }
-function email(
-  label: string,
-  recipient: string,
-  portal: string,
-  maxBioLength = 5000
-): Destination {
-  return { label, method: 'email', recipient, portal, maxBioLength };
-}
-export const PROFILE_DESTINATION_REGISTRY: Record<string, Destination> = {
-  amazon_music: email(
-    'Amazon Music',
-    'amazonmusicforartists@amazon.com',
-    'https://artists.amazonmusic.com'
-  ),
-  apple_music: email(
-    'Apple Music',
-    'musicpartners@apple.com',
-    'https://artists.apple.com'
-  ),
-  deezer: email('Deezer', 'artists@deezer.com', 'https://artists.deezer.com'),
-  soundcloud: {
-    label: 'SoundCloud',
-    method: 'api',
-    recipient: '',
-    portal: 'https://soundcloud.com',
-    maxBioLength: 4000,
-  },
-  spotify: email(
-    'Spotify',
-    'artists@spotify.com',
-    'https://artists.spotify.com',
-    1500
-  ),
-  tidal: email('TIDAL', 'artists@tidal.com', 'https://artists.tidal.com'),
-  youtube_music: {
-    label: 'YouTube Music',
-    method: 'api',
-    recipient: '',
-    portal: 'https://artists.youtube.com',
+/** Submission configuration only; identity and transport come from the catalog. */
+const BIO_SUBMISSION_CONFIG: Record<
+  string,
+  { recipient: string; maxBioLength: number }
+> = {
+  amazon_music: {
+    recipient: 'amazonmusicforartists@amazon.com',
     maxBioLength: 5000,
   },
+  apple_music: { recipient: 'musicpartners@apple.com', maxBioLength: 5000 },
+  deezer: { recipient: 'artists@deezer.com', maxBioLength: 5000 },
+  soundcloud: { recipient: '', maxBioLength: 4000 },
+  spotify: { recipient: 'artists@spotify.com', maxBioLength: 1500 },
+  tidal: { recipient: 'artists@tidal.com', maxBioLength: 5000 },
+  youtube_music: { recipient: '', maxBioLength: 5000 },
 };
+
+export const PROFILE_DESTINATION_REGISTRY: Record<string, Destination> =
+  Object.fromEntries(
+    Object.values(DSP_PROFILE_CATALOG).map(destination => [
+      destination.legacyBioProviderId,
+      {
+        label: destination.label,
+        method: destination.transport.legacyBio,
+        portal: destination.artistPortalUrl,
+        ...BIO_SUBMISSION_CONFIG[destination.legacyBioProviderId],
+      },
+    ])
+  );
 
 export function getProfileDestination(providerId: string) {
   return Object.hasOwn(PROFILE_DESTINATION_REGISTRY, providerId)

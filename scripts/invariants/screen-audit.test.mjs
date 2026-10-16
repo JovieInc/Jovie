@@ -528,4 +528,40 @@ fi
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it('binds web.onboarding-checkout to a proof route that can go green (JOV-8068)', () => {
+    assert.deepEqual(screenProducer('web.onboarding-checkout'), {
+      kind: 'proof-route',
+      route: '/onboarding/checkout',
+    });
+    const passingProof = {
+      screenId: 'web.onboarding-checkout',
+      viewports: ['desktop', 'mobile'].map(id => ({
+        id,
+        rendered: true,
+        axe: { violations: 0 },
+        overflow: { maxHorizontalPx: 0 },
+        cls: { value: 0 },
+        interaction: { passed: true },
+        contrast: { passed: true },
+        runtime: {},
+      })),
+    };
+    const ledger = auditScreens({
+      registry: [
+        {
+          id: 'web.onboarding-checkout',
+          platform: 'web',
+          owner: 'onboarding-checkout',
+          sources: ['apps/web/app/onboarding/checkout/page.tsx'],
+          viewports: ['desktop', 'mobile'],
+        },
+      ],
+      proofs: new Map([['web.onboarding-checkout', passingProof]]),
+      headSha: 'c5cf1c76aa2b7be30d283a46de914c5b23de0140',
+    });
+    assert.equal(ledger.schema, 'screen-audit/v1');
+    assert.equal(ledger.screens[0].verdict, 'green');
+    assert.equal(ledger.screens[0].producer, 'proof-route');
+  });
 });

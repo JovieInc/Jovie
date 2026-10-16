@@ -1,0 +1,76 @@
+◇ injected env (0) from .env.test
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.fast.mts:16:41). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+Both esbuild and oxc options were set. oxc options will be used and esbuild options will be ignored. The following esbuild options were set: `{ target: 'esnext', format: 'esm' }`
+
+ RUN  v5.0.4 /workspace/apps/web
+
+ ✓ |node| tests/unit/api/onboarding/claim.test.ts > POST /api/onboarding/claim — race, idempotency, failure paths > returns 401 when unauthenticated 5ms
+ ✓ |node| tests/unit/api/onboarding/claim.test.ts > POST /api/onboarding/claim — race, idempotency, failure paths > returns 401 when a Better Auth session has no provisioned app user 2ms
+ ✓ |node| tests/unit/api/onboarding/claim.test.ts > POST /api/onboarding/claim — race, idempotency, failure paths > returns {claimed: 0} (no-op) when no onboarding session cookie 1ms
+ ✓ |node| tests/unit/api/onboarding/claim.test.ts > POST /api/onboarding/claim — race, idempotency, failure paths > clears cookie and returns {claimed:0} when no unclaimed conversations for session 1ms
+ ✓ |node| tests/unit/api/onboarding/claim.test.ts > POST /api/onboarding/claim — race, idempotency, failure paths > recovers the durable waitlist receipt after a committed response is lost 5ms
+ ✓ |node| tests/unit/api/onboarding/claim.test.ts > POST /api/onboarding/claim — race, idempotency, failure paths > recovers an approved handoff and materializes checkout after a response is lost 2ms
+ ✓ |node| tests/unit/api/onboarding/claim.test.ts > POST /api/onboarding/claim — race, idempotency, failure paths > claims the single (most recent) candidate, writes audit, clears cookie, returns claimed count 1ms
+ ✓ |node| tests/unit/api/onboarding/claim.test.ts > POST /api/onboarding/claim — race, idempotency, failure paths > persists a waitlist decision, returns its durable receipt, and reserves the handle on a hidden profile 1ms
+ ✓ |node| tests/unit/api/onboarding/claim.test.ts > POST /api/onboarding/claim — race, idempotency, failure paths > reports Spotify identity conflict without a false profile receipt (pending=true) 2ms
+ ✓ |node| tests/unit/api/onboarding/claim.test.ts > POST /api/onboarding/claim — race, idempotency, failure paths > reports Spotify identity conflict without a false profile receipt (pending=false) 1ms
+ ✓ |node| tests/unit/api/onboarding/claim.test.ts > POST /api/onboarding/claim — race, idempotency, failure paths > keeps a repeated recovered claim conflict at 409 and preserves recovery context 1ms
+ ✓ |node| tests/unit/api/onboarding/claim.test.ts > POST /api/onboarding/claim — race, idempotency, failure paths > keeps a repeated race claim conflict at 409 and preserves recovery context 1ms
+ ✓ |node| tests/unit/api/onboarding/claim.test.ts > POST /api/onboarding/claim — race, idempotency, failure paths > still returns the waitlist receipt when handle reservation fails 1ms
+ ✓ |node| tests/unit/api/onboarding/claim.test.ts > POST /api/onboarding/claim — race, idempotency, failure paths > claims ownership but defers the handoff when the interview has no terminal decision (JOV-8068) 1ms
+ ✓ |node| tests/unit/api/onboarding/claim.test.ts > POST /api/onboarding/claim — race, idempotency, failure paths > treats a needs_more_info decision as non-terminal: claim only, no handoff 1ms
+ ✓ |node| tests/unit/api/onboarding/claim.test.ts > POST /api/onboarding/claim — race, idempotency, failure paths > never unlocks checkout when an instant-access materialization is skipped 1ms
+ ✓ |node| tests/unit/api/onboarding/claim.test.ts > POST /api/onboarding/claim — race, idempotency, failure paths > recovers an already-claimed interview still in progress without a handoff 1ms
+ ✓ |node| tests/unit/api/onboarding/claim.test.ts > POST /api/onboarding/claim — race, idempotency, failure paths > refuses to consume the transcript when the current gate is on but durable artist data is missing 1ms
+ ✓ |node| tests/unit/api/onboarding/claim.test.ts > POST /api/onboarding/claim — race, idempotency, failure paths > uses the confirmed Spotify profile when the visitor skips social attachment 1ms
+ ✓ |node| tests/unit/api/onboarding/claim.test.ts > POST /api/onboarding/claim — race, idempotency, failure paths > continues profile onboarding when the canonical writer returns approved access 1ms
+ ✓ |node| tests/unit/api/onboarding/claim.test.ts > POST /api/onboarding/claim — race, idempotency, failure paths > continues profile onboarding when the user already passed the waitlist gate 1ms
+ ✓ |node| tests/unit/api/onboarding/claim.test.ts > POST /api/onboarding/claim — race, idempotency, failure paths > fails closed after ownership claim and leaves the cookie for a retry when the durable write fails 1ms
+ ✓ |node| tests/unit/api/onboarding/claim.test.ts > POST /api/onboarding/claim — race, idempotency, failure paths > handles multiple candidates: claims primary (recency order), detaches siblings, writes audit with discarded list 1ms
+ ✓ |node| tests/unit/api/onboarding/claim.test.ts > POST /api/onboarding/claim — race, idempotency, failure paths > idempotent on concurrent claim race: CAS returns 0 rows → soft success with alreadyClaimed, clears cookie once a terminal handoff resolves 1ms
+ ✓ |node| tests/unit/api/onboarding/claim.test.ts > POST /api/onboarding/claim — race, idempotency, failure paths > rejects a concurrent claim owned by a different authenticated user before writing waitlist data 1ms
+ ✓ |node| tests/unit/api/onboarding/claim.test.ts > POST /api/onboarding/claim — race, idempotency, failure paths > returns 409 SESSION_ALREADY_CLAIMED on unique constraint violation (session claimed by different user) 1ms
+ ✓ |node| tests/unit/api/onboarding/claim.test.ts > POST /api/onboarding/claim — race, idempotency, failure paths > returns 500 and captures on unexpected error 1ms
+ ✓ |node| tests/unit/api/onboarding/claim.test.ts > claim route invariants (property tests for recency, idempotency, data races, 409) > recency ordering: primary is always the most recently created (or undefined) 16ms
+ ✓ |node| tests/unit/api/onboarding/claim.test.ts > claim route invariants (property tests for recency, idempotency, data races, 409) > idempotent pick: pick(pick(xs)) shape equals pick(xs) for the primary/others split 9ms
+ ✓ |node| tests/unit/api/onboarding/claim.test.ts > claim route invariants (property tests for recency, idempotency, data races, 409) > failure path safety: empty candidates always yields zero others, never throws on pick 2ms
+ ✓ |node| tests/unit/api/onboarding/claim.test.ts > claim route invariants (property tests for recency, idempotency, data races, 409) > recency with timestamp ties: primary time is a maximum (covers sort in recency ordering) 4ms
+ ✓ |node| tests/unit/api/onboarding/claim.test.ts > claim route invariants (property tests for recency, idempotency, data races, 409) > 409 error classification (data race to different user): messages with "unique" or idx string yield 409 SESSION_ALREADY_CLAIMED (property over varied error strings) 8ms
+ ✓ |jsdom| tests/components/features/onboarding/useOnboardingClaim.test.tsx > useOnboardingClaim > does not reclaim or redirect a restored account-owned conversation on mount or later turns 21ms
+ ✓ |jsdom| tests/components/features/onboarding/useOnboardingClaim.test.tsx > useOnboardingClaim > keeps conflict recovery available while a later claim check is pending 14ms
+ ✓ |jsdom| tests/components/features/onboarding/useOnboardingClaim.test.tsx > useOnboardingClaim > keeps an identity conflict recoverable without checkout or a false reservation (pending=true) 8ms
+ ✓ |jsdom| tests/components/features/onboarding/useOnboardingClaim.test.tsx > useOnboardingClaim > keeps an identity conflict recoverable without checkout or a false reservation (pending=false) 7ms
+ ✓ |jsdom| tests/components/features/onboarding/useOnboardingClaim.test.tsx > useOnboardingClaim > retries a signed-in dev user claim after completed chat activity 22ms
+ ✓ |jsdom| tests/components/features/onboarding/useOnboardingClaim.test.tsx > useOnboardingClaim > stays on /start when the claim returns ownership without a terminal handoff (JOV-8068): {"claimed":1} 7ms
+ ✓ |jsdom| tests/components/features/onboarding/useOnboardingClaim.test.tsx > useOnboardingClaim > stays on /start when the claim returns ownership without a terminal handoff (JOV-8068): {"claimed":0,"alreadyClaimed":true} 3ms
+ ✓ |jsdom| tests/components/features/onboarding/useOnboardingClaim.test.tsx > useOnboardingClaim > stays on /start when the claim returns ownership without a terminal handoff (JOV-8068): {"claimed":1,"profile":{"profileId":null,"handle":null,"status":"skipped"}} 3ms
+ ✓ |jsdom| tests/components/features/onboarding/useOnboardingClaim.test.tsx > useOnboardingClaim > claims on mount without navigating, then hands off once the server reports readyForCheckout 6ms
+ ✓ |jsdom| tests/components/features/onboarding/useOnboardingClaim.test.tsx > useOnboardingClaim > fires exactly one POST /api/onboarding/claim per claimTrigger value (JOV-2203 dedupe guard) 4ms
+ ✓ |jsdom| tests/components/features/onboarding/useOnboardingClaim.test.tsx > useOnboardingClaim > fails closed on 403 ownership rejection without navigating to checkout 3ms
+ ✓ |jsdom| tests/components/features/onboarding/useOnboardingClaim.test.tsx > useOnboardingClaim > routes to the waitlist receipt only when the claim returns a durable entry id 2ms
+ ✓ |jsdom| tests/components/features/onboarding/useOnboardingClaim.test.tsx > useOnboardingClaim > keeps missing durable artist data in the same /start conversation 3ms
+ ✓ |jsdom| tests/components/features/onboarding/useOnboardingClaim.test.tsx > useOnboardingClaim > retries claim after the next natural-language turn when artist identity was missing 5ms
+ ✓ |jsdom| tests/components/features/onboarding/useOnboardingClaim.test.tsx > useOnboardingClaim > fails closed without navigation when the waitlist write returns no receipt 3ms
+ ✓ |jsdom| tests/components/features/onboarding/useOnboardingClaim.test.tsx > useOnboardingClaim > fires exactly one POST per unique claimTrigger and does not fire again for the same trigger after completion 59ms
+ ✓ |node| app/onboarding/checkout/page.test.ts > renders the screen-cert fixture only outside production (JOV-8068) 3ms
+ ✓ |node| app/onboarding/checkout/page.test.ts > keeps the checkout fixture closed on a production deployment (JOV-8068) 2ms
+ ✓ |node| app/onboarding/checkout/page.test.ts > rejects explicit unsupported interval year before checkout 1ms
+ ✓ |node| app/onboarding/checkout/page.test.ts > rejects explicit unsupported interval annual before checkout 1ms
+ ✓ |node| app/onboarding/checkout/page.test.ts > rejects explicit unsupported interval weekly before checkout 0ms
+ ✓ |node| app/onboarding/checkout/page.test.ts > rejects stale annual cookie after onboarding 0ms
+ ✓ |node| app/onboarding/checkout/page.test.ts > rejects retired Max instead of silently purchasing Pro 0ms
+ ✓ |node| app/onboarding/checkout/page.test.ts > passes only the current monthly price to checkout 6ms
+ ✓ |node| app/onboarding/checkout/page.test.ts > never renders the organic upsell without a live claimed profile (JOV-8068): null 1ms
+ ✓ |node| app/onboarding/checkout/page.test.ts > never renders the organic upsell without a live claimed profile (JOV-8068): {"selectedProfile":{"id":"11111111-1111-4111-8111-111111111111","displayName":"Test Artist","username":"testartist","avatarUrl":null,"spotifyFollowers":null,"isPublic":true,"isClaimed":false,"onboardingCompletedAt":"2026-10-01T00:00:00.000Z"}} 0ms
+ ✓ |node| app/onboarding/checkout/page.test.ts > still serves explicit paid intent without a live profile 0ms
+ ✓ |node| app/onboarding/checkout/page.test.ts > records offer seen and renders for a first-time claimed artist 1ms
+ ✓ |node| app/onboarding/checkout/page.test.ts > shows the offer exactly once: a prior receipt skips the upsell 1ms
+ ✓ |node| app/onboarding/checkout/page.test.ts > still serves artist-initiated paid intent even after the offer was seen 1ms
+
+ Test Files  3 passed (3)
+      Tests  62 passed (62)
+   Start at  02:22:14
+   Duration  1.25s (import 48%, transform 19%, environment 19%, tests 10%, setup 4%, worker 1%)
+

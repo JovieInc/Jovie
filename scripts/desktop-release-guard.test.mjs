@@ -24,6 +24,8 @@ import {
   expectedDesktopAssetNames,
   fetchRecoverableStagingDraft,
   prepare,
+  RELEASE_ASSET_READ_ATTEMPTS,
+  RELEASE_ASSET_READ_MAX_WAIT_MS,
   releaseMetadataUpdate,
   selectRecoverableStagingDraft,
   validateReleaseAssets,
@@ -838,9 +840,13 @@ test('desktop publishing follows verified production instead of raw main pushes'
   assertPatterns(desktopWorkflow, [
     /workflows: \[Production Controller\]/,
     /^  workflow_dispatch:\n/m,
-    /group: desktop-release-publisher/,
+    /group: desktop-release-publisher-\$\{\{ github\.event\.workflow_run\.head_sha \|\| github\.sha \}\}/,
     /cancel-in-progress: false/,
+    /A superseded observer that exits before publish does not own the SHA/,
+    /--max-wait-seconds 600 --attempts 4/,
   ]);
+  assert.equal(RELEASE_ASSET_READ_ATTEMPTS, 4);
+  assert.equal(RELEASE_ASSET_READ_MAX_WAIT_MS, 600_000);
   assert.doesNotMatch(desktopWorkflow, /^  push:\n/m);
 });
 
