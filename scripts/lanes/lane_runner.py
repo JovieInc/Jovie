@@ -2084,11 +2084,11 @@ class Linear:
         if not isinstance(result, dict) or not isinstance(result.get("commentCreate"), dict) or result["commentCreate"].get("success") is not True: raise RuntimeError("linear: comment not delivered")
 
 
-def linear_optional(step, *args):
+def linear_optional(step, *args, **kwargs):
     """A Linear-dependent side task (escalation, labeled events, sweep). A rate limit skips
     it for this pass; issue intake continues from the local mirror."""
     try:
-        return step(*args)
+        return step(*args, **kwargs)
     except LinearRateLimited:
         return None
 
@@ -3593,7 +3593,8 @@ def _surface_exhausted(host: Host, pr: dict, record: dict, classified: dict, rea
         data["escalating"] = [item for item in data["escalating"] if item != number]
 
 
-def escalate_exhausted(host: Host, prs: list[dict], linear) -> None:
+def escalate_exhausted(host: Host, prs: list[dict], linear, *, model_only=False,
+                       joined_rungs: frozenset[int] = frozenset()) -> None:
     """Deterministic rungs, then a stronger lane, then one surface (JOV-7540 / JOV-7089).
 
     Default off (`LANES_ESCALATION_STUCK_PRS`). Stuck-PR detection is
@@ -3617,19 +3618,82 @@ def escalate_exhausted(host: Host, prs: list[dict], linear) -> None:
     def healthy(_name, spec):
         return provider_healthy(spec)
 
+    try:
+        preserved = maintenance_preserved(host.state) if model_only else set()
+    except (OSError, ValueError):
+        return  # Optional repair-floor observation cannot weaken custody.
     for candidate in exhausted_prs(prs, attempts, held):
+        if model_only and (candidate["number"] in preserved
+                           or publication_revocation(host, candidate.get("headRefName"))):
+            continue
         pr = reconcile_fix_target(candidate)
         if (pr is None or pr.get("state") != "OPEN" or pr.get("isInMergeQueue") is not False
                 or any(pr.get(key) != candidate.get(key) for key in ("headRefOid", "headRefName"))):
             continue  # No rungs or budget changes without fresh complete authority.
         record = dict(attempts.get(str(pr["number"]), {}))
+        if pr["number"] in joined_rungs:
+            # The selector may have refused this newly joined draft because a
+            # different host owns it. Idle disposition is not a second claim path.
+            # Refresh exact-head custody before any rerun, label or disposition.
+            try:
+                if claimed_elsewhere(pr["number"], pr["headRefOid"], ("fix", "gate"), timeout=30):
+                    continue
+                fresh_attempts = maintenance_json(path, missing={})
+                fresh_held = maintenance_json(held_path(host), missing={})
+                ended = _rung_stamp(record.get("endedAt"))
+                owned = LANE_BRANCH.match(pr["headRefName"])
+                pending = record.get("pendingEscalation") or {}
+                if not isinstance(pending, dict) or type(pr.get("isDraft")) is not bool \
+                        or pr.get("isCrossRepository") is not False or (pr["isDraft"] and not owned):
+                    continue
+                disabled = {name for name, spec in providers.items() if isinstance(spec, dict)
+                            and (not spec.get("enabled", True) or spec.get("repairs") is False)}
+                transfer = bool(pr.get("isDraft") and owned
+                                and owned["lane"] not in {pending.get("lane"), *disabled})
+                if transfer and (owned["lane"] not in providers or record.get("lane") != owned["lane"]
+                                 or pending.get("head") != pr["headRefOid"]
+                                 or pr["headRefOid"] not in (record.get("sha"), record.get("pushedHead"))
+                                 or record.get("repairBranch") != pr["headRefName"]
+                                 or _rung_stamp(record.get("at")) is None
+                                 or ended is None or ended < _rung_stamp(record["at"])):
+                    continue
+                if not isinstance(fresh_attempts, dict) or fresh_attempts.get(str(pr["number"])) != record \
+                        or not isinstance(fresh_held, dict) or fresh_held.get(str(pr["number"])) != held.get(str(pr["number"])) \
+                        or (ended is None and (record.get("endedAt") is not None or transfer)) \
+                        or (ended is not None and ended > time.time()) \
+                        or pr_events.in_flight(record, {"headRefOid": record.get("sha")}, time.time()) \
+                        or pr["number"] in maintenance_preserved(host.state) or pr_recovery_held(host, pr) \
+                        or publication_revocation(host, pr["headRefName"]):
+                    continue
+            except (OSError, ValueError):
+                continue
+        if model_only:
+            try:
+                fresh_held = maintenance_json(held_path(host), missing={})
+                ended = _rung_stamp(record.get("endedAt"))
+                if not isinstance(fresh_held, dict) or fresh_held.get(str(pr["number"])) != held.get(str(pr["number"])) \
+                        or (ended is None and pr["number"] not in joined_rungs) \
+                        or (ended is not None and ended > now) \
+                        or pr["number"] in maintenance_preserved(host.state) \
+                        or pr_recovery_held(host, pr) or publication_revocation(host, pr["headRefName"]) \
+                        or pr_events.in_flight(record, {"headRefOid": record.get("sha")}, now):
+                    continue
+            except (OSError, ValueError):
+                continue
         classified = remediation.classify_blocker(pr, held.get(str(pr["number"])), record)
         _remember_class(data, pr, classified)
         if not remediation.escalation_enabled():
+            if model_only:
+                continue
             _legacy_terminal(host, pr, record, held, linear, attempts)
             continue
         plan = remediation.plan_ladder(classified, record, providers, now, pr["headRefOid"],
                                        healthy=healthy, cooled=cooled)
+        if model_only and plan.get("action") != "model":
+            # A repair-floor seat may refresh model authority without Linear.
+            # Terminal disposition must wait for the ordinary client's receipt;
+            # never set its sticky escalated latch without that transition.
+            continue
         if plan["action"] == "update-branch":
             outcome = pr_events.sync_main(host, THIS, pr, now, terminal_ok=True)
             record = remediation.append_rung(record, rung="update-branch", lane=None, cls=classified["cls"],
@@ -4375,6 +4439,164 @@ def note_event_outcome(host: Host, issue, verdict: str) -> None:
         save_escalation(host, data)
 
 
+def _rung_result(state, reason, *, transfer=False):
+    return {"state": state, "reason": reason, "crossLaneDraft": transfer}
+
+
+def _rung_stamp(value):
+    if type(value) in (int, float):
+        return value if math.isfinite(value) and value > 0 else None
+    if isinstance(value, str):
+        try:
+            stamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            if stamp.tzinfo is not None:
+                return _rung_stamp(stamp.timestamp())
+        except (ValueError, OverflowError, OSError):
+            pass
+    return None
+
+
+def pending_rung_disposition(pr, record, name, providers, now, *, classified,
+                             caps_allow, plan_ladder, top_rung_used, active_previous_attempt,
+                             recovery_block=None):
+    """Return eligible/blocked/unknown for a local pending rung, without mutation.
+
+    Same-lane/disabled-owner draft handling retains the existing scope and the
+    legacy optional pending head. The only new scope is an enabled native lane's
+    draft explicitly routed to another lane. That exception requires an exact
+    pending head, ended original attempt and current canonical route authority.
+
+    `active_previous_attempt` comes from the maintained in_flight check against
+    the *recorded* head; a changed remote head must not hide its original lease.
+    `recovery_block` is the caller's existing preserved/revoked/custody reason.
+    None means that caller's local preflight has not found such a hold; it does
+    not attest to remote ownership. All live claim fences remain mandatory.
+    """
+    if not isinstance(pr, dict) or not isinstance(record, dict) or not isinstance(providers, dict):
+        return _rung_result("unknown", "rung-input-unreadable")
+    if _rung_stamp(now) is None or type(active_previous_attempt) is not bool:
+        return _rung_result("unknown", "rung-time-or-lease-unknown")
+    spec = providers.get(name)
+    if not isinstance(spec, dict) or not spec.get("enabled", True) or spec.get("repairs") is False:
+        return _rung_result("blocked", "rung-provider-disabled")
+    if recovery_block:
+        return _rung_result("blocked", str(recovery_block))
+    count = record.get("count", 0)
+    if type(count) is not int or count < 0:
+        return _rung_result("unknown", "rung-accounting-malformed")
+    for field in ("escalations", "priorEscalations"):
+        rows = record.get(field, [])
+        if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+            return _rung_result("unknown", "rung-accounting-malformed")
+        # Canonical caps count both histories and use their latest model stamp.
+        # Malformed stamps cannot be silently interpreted as old/no cooldown.
+        if any(row.get("kind") == "model" and
+               (_rung_stamp(row.get("at")) is None or _rung_stamp(row["at"]) > now) for row in rows):
+            return _rung_result("unknown", "rung-model-time-unknown")
+    pending = record.get("pendingEscalation")
+    if not isinstance(pending, dict) or pending.get("lane") != name:
+        return _rung_result("blocked", "rung-not-routed")
+    if not isinstance(pending.get("dossier"), str) or not pending["dossier"].strip():
+        return _rung_result("unknown", "rung-dossier-unreadable")
+    head, branch = pr.get("headRefOid"), pr.get("headRefName")
+    if not isinstance(head, str) or not head.strip() or not isinstance(branch, str) or not branch:
+        return _rung_result("unknown", "rung-target-unreadable")
+    if any(type(pr.get(key)) is not bool for key in ("isDraft", "isCrossRepository", "isInMergeQueue")):
+        return _rung_result("unknown", "rung-target-unreadable")
+    # Maintained cached inventory is an OPEN-only query and may omit state.
+    if pr.get("state", "OPEN") != "OPEN" or pr["isCrossRepository"] or pr["isInMergeQueue"]:
+        return _rung_result("blocked", "rung-target-out-of-scope")
+    if pending.get("head") not in (None, head):
+        return _rung_result("blocked", "rung-head-changed")
+    if active_previous_attempt:
+        return _rung_result("blocked", "rung-previous-attempt-active")
+    if not isinstance(classified, dict) or classified.get("cls") not in {"fixable-by-model", "needs-rebase", "flaky-infra"} \
+            or classified.get("subtype") == "main-red":
+        return _rung_result("blocked", "rung-current-blocker-not-model")
+    if any(pending.get(key) != classified.get(key) for key in ("cls", "subtype")):
+        return _rung_result("blocked", "rung-blocker-changed")
+    try:
+        authority = caps_allow(record, head, now)
+    except Exception:
+        return _rung_result("unknown", "rung-cap-authority-unreadable")
+    if not isinstance(authority, tuple) or len(authority) != 2 or type(authority[0]) is not bool:
+        return _rung_result("unknown", "rung-cap-authority-unreadable")
+    if not authority[0]:
+        return _rung_result("blocked", authority[1] or "rung-cap-refused")
+    if pending.get("topRung") is True:
+        try:
+            used = top_rung_used(record, head)
+        except Exception:
+            return _rung_result("unknown", "rung-top-authority-unreadable")
+        if type(used) is not bool:
+            return _rung_result("unknown", "rung-top-authority-unreadable")
+        if used:
+            return _rung_result("blocked", "ladder-exhausted")
+    owned = LANE_BRANCH.match(branch)
+    disabled = {lane for lane, provider in providers.items() if isinstance(provider, dict)
+                and (not provider.get("enabled", True) or provider.get("repairs") is False)}
+    transfer = bool(pr["isDraft"] and owned and owned["lane"] not in {name, *disabled})
+    if pr["isDraft"] and not owned:
+        return _rung_result("blocked", "rung-foreign-draft")
+    if transfer:
+        if owned["lane"] not in providers or record.get("lane") != owned["lane"]:
+            return _rung_result("blocked", "rung-draft-owner-unproven")
+        if pending.get("head") != head:
+            return _rung_result("blocked", "rung-draft-exact-head-required")
+        ended = _rung_stamp(record.get("endedAt"))
+        started = _rung_stamp(record.get("at"))
+        if ended is None or ended > now or started is None or ended < started:
+            return _rung_result("blocked", "rung-draft-previous-attempt-not-ended")
+        if head not in (record.get("sha"), record.get("pushedHead")) \
+                or record.get("repairBranch") != branch:
+            return _rung_result("blocked", "rung-draft-attempt-target-changed")
+        try:
+            plan = plan_ladder(classified, record, providers, now, head)
+        except Exception:
+            return _rung_result("unknown", "rung-route-authority-unreadable")
+        if not isinstance(plan, dict):
+            return _rung_result("unknown", "rung-route-authority-unreadable")
+        if plan.get("action") != "model" or plan.get("lane") != name \
+                or type(pending.get("topRung")) is not bool \
+                or plan.get("topRung") is not pending["topRung"]:
+            return _rung_result("blocked", "rung-draft-canonical-route-changed")
+    return _rung_result("eligible", "pending-model-rung", transfer=transfer)
+
+
+def pending_rung_candidates(host: Host, name: str, inventory: list[dict]) -> list[dict]:
+    """Only existing routed rungs may cross the ordinary lane-draft boundary."""
+    try:
+        attempts = maintenance_json(host.state / "fix-attempts.json", missing={})
+        if not isinstance(attempts, dict):
+            return []
+        preserved = maintenance_preserved(host.state)
+    except (OSError, ValueError):
+        return []
+    return [pr for pr in inventory if pr["number"] not in preserved
+            and isinstance(record := attempts.get(str(pr["number"])), dict)
+            and isinstance(pending := record.get("pendingEscalation"), dict)
+            and pending.get("lane") == name and pending.get("head") == pr.get("headRefOid")
+            and not pr_recovery_held(host, pr)]
+
+
+def rung_blocker(pr: dict, record: dict, entry: dict) -> dict | None:
+    """Exhaustion permits its own bounded rung, never a stronger integrity hold."""
+    evidence = entry.get("evidence") or []
+    if not isinstance(evidence, list) or (entry.get("reason") is not None
+                                        and not isinstance(entry["reason"], str)):
+        return None
+    evidence = [line for line in evidence if not str(line).startswith("fix-exhausted")]
+    reason = entry.get("reason")
+    if not reason or reason == "fix-exhausted":
+        reason = pr_events.held_reason(evidence)[0]
+    policy_entry = {**entry, "evidence": evidence, "reason": reason}
+    action = next((action for _, code, action in pr_events.HELD_REASONS if code == reason), None)
+    if not pr_events.fixable_hold(policy_entry, pr["headRefOid"]) or (
+            entry.get("sha") == pr["headRefOid"] and action and action not in pr_events.FIXABLE_ACTIONS):
+        return None
+    return remediation.classify_blocker(pr, policy_entry, record)
+
+
 def claim_escalation_pr(host: Host, name: str, prs: list[dict]) -> dict | None:
     """Under claim.lock: validate a pending model rung before charging its separate budget."""
     path = host.state / "fix-attempts.json"
@@ -4386,7 +4608,6 @@ def claim_escalation_pr(host: Host, name: str, prs: list[dict]) -> dict | None:
     except (OSError, ValueError):
         return None
     providers = load_providers()
-    disabled = set(providers) - set(pr_events.cost_order(providers))
     for key, record in attempts.items():
         if not isinstance(record, dict):
             continue
@@ -4411,30 +4632,19 @@ def claim_escalation_pr(host: Host, name: str, prs: list[dict]) -> dict | None:
             live = require_fix_target(pr, "before-escalation-claim", repair=True)
         except RepairStopped:
             continue
-        owned = LANE_BRANCH.match(live.get("headRefName", ""))
-        if live.get("headRefName") != pr["headRefName"] or live.get("isCrossRepository") is not False \
-                or (live.get("isDraft") and not (owned and owned.group("lane") in {name, *disabled})):
+        if live.get("headRefName") != pr["headRefName"] or live.get("isCrossRepository") is not False:
             continue
         holds = {label.lower() for label in pr_events.label_names(live)} & pr_events.HOLD_LABELS
         prior_holds = {label.lower() for label in pr_events.label_names(pr)} & pr_events.HOLD_LABELS
         # Exhaustion has its own authorized rung, but does not erase a stronger
         # same-head hold (including legacy rows lacking normalized reason fields).
-        evidence = entry.get("evidence") or []
-        if not isinstance(evidence, list) or (entry.get("reason") is not None and not isinstance(entry["reason"], str)):
-            continue
-        evidence = [line for line in evidence if not str(line).startswith("fix-exhausted")]
-        reason = entry.get("reason")
-        if not reason or reason == "fix-exhausted":
-            reason = pr_events.held_reason(evidence)[0]
-        policy_entry = {**entry, "evidence": evidence, "reason": reason}
-        action = next((action for _, code, action in pr_events.HELD_REASONS if code == reason), None)
-        if not pr_events.fixable_hold(policy_entry, live["headRefOid"]) \
-                or (entry.get("sha") == live["headRefOid"] and action and action not in pr_events.FIXABLE_ACTIONS):
-            continue
-        classified = remediation.classify_blocker(live, policy_entry, record)
-        if classified["cls"] not in {"fixable-by-model", "needs-rebase", "flaky-infra"} \
-                or classified.get("subtype") == "main-red" \
-                or pending.get("cls") != classified["cls"] or pending.get("subtype") != classified.get("subtype"):
+        classified = rung_blocker(live, record, entry)
+        rung = pending_rung_disposition(
+            live, record, name, providers, time.time(), classified=classified,
+            caps_allow=remediation.caps_allow, plan_ladder=remediation.plan_ladder,
+            top_rung_used=remediation.top_rung_used,
+            active_previous_attempt=pr_events.in_flight(record, {"headRefOid": record.get("sha")}, time.time()))
+        if rung["state"] != "eligible":
             continue
         # Preserve the canonical prescribed-fix exception, never extending it to a
         # new hold or altered prescription. Auxiliary holdNote is still cached.
@@ -6489,7 +6699,7 @@ def worker(host: Host, name: str) -> int:
 MAINTENANCE_MISSING = object()
 
 
-def maintenance_json(path, *, dir_fd=None, limit=1024 * 1024, missing=MAINTENANCE_MISSING):
+def maintenance_json(path, *, dir_fd=None, limit=1024 * 1024, missing=MAINTENANCE_MISSING, json_lines=False):
     """Bounded optional local evidence: refuse special files and symlinks."""
     try:
         fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW, dir_fd=dir_fd)
@@ -6503,7 +6713,7 @@ def maintenance_json(path, *, dir_fd=None, limit=1024 * 1024, missing=MAINTENANC
             raw = handle.read(limit + 1)
         if len(raw) > limit:
             raise ValueError("maintenance-state-too-large")
-        return json.loads(raw)
+        return [json.loads(line) for line in raw.splitlines() if line.strip()] if json_lines else json.loads(raw)
     finally:
         os.close(fd)
 
@@ -6556,6 +6766,14 @@ def record_maintenance_demand(host: Host, name: str, prs: list[dict], candidates
     """
     now, pending_count = time.time(), None
     source_at = _SUMMARY.get("sourceAt")
+    dispositions, unknown_reasons, eligible_kinds = {}, {}, {}
+    ordinary_pending = None
+
+    def disposition(number, reason):
+        dispositions[str(number)] = reason
+
+    def unknown(reason):
+        unknown_reasons[reason] = unknown_reasons.get(reason, 0) + 1
     try:
         if not _SUMMARY["readable"] or type(source_at) not in (int, float) \
                 or not 0 <= now - source_at <= MAINTENANCE_DEMAND_MAX_AGE_S:
@@ -6576,7 +6794,15 @@ def record_maintenance_demand(host: Host, name: str, prs: list[dict], candidates
         # Withhold it from this cheap demand hint; never touch or qualify that work.
         preserved = maintenance_preserved(host.state)
         eligible, unknown_rows = set(), 0
-        rows = {pr["number"]: pr for pr in best_per_issue([*prs, *candidates, *events])}
+        rung_rows = [pr for pr in _SUMMARY["prs"]
+                     if isinstance(record := attempts.get(str(pr["number"])), dict)
+                     and isinstance(pending := record.get("pendingEscalation"), dict)
+                     and pending.get("lane") == name]
+        revocations = maintenance_json(revocations_path(host), missing=[], json_lines=True)
+        if not isinstance(revocations, list) or any(not isinstance(row, dict) for row in revocations):
+            raise ValueError("maintenance-revocations-unknown")
+        revoked = {row.get("branch") for row in revocations if row.get("schema") == PUBLICATION_REVOCATION_SCHEMA}
+        rows = {pr["number"]: pr for pr in best_per_issue([*prs, *candidates, *events, *rung_rows])}
         current = {pr["number"]: pr for pr in _SUMMARY["prs"]}
         event_rows = {pr["number"]: pr for pr in events}
         adopt_numbers = {pr["number"] for pr in prs}
@@ -6591,8 +6817,14 @@ def record_maintenance_demand(host: Host, name: str, prs: list[dict], candidates
                 remote_active = any(key[:2] == (number, pr["headRefOid"]) and row.get("active")
                                     and 0 <= now - row["at"] <= SUMMARY_TTL_S
                                     for key, row in _CLAIM_OBSERVATIONS.items())
-                if number in selected or number in preserved or remote_active or not pr_events.in_scope(pr, "red", disabled) \
-                        or pr.get("isInMergeQueue") or (pr.get("headRefName") or "").startswith("dependabot/"):
+                blocked = ("selected" if number in selected else
+                           "preserved-reconciliation-required" if number in preserved else
+                           "remote-owned" if remote_active else
+                           "publication-revoked" if pr.get("headRefName") in revoked else
+                           "queued" if pr.get("isInMergeQueue") else
+                           "dependabot" if (pr.get("headRefName") or "").startswith("dependabot/") else None)
+                if blocked:
+                    disposition(number, blocked)
                     continue
                 attempt = attempts.get(str(number), {})
                 entry = held.get(str(number), {})
@@ -6615,8 +6847,29 @@ def record_maintenance_demand(host: Host, name: str, prs: list[dict], candidates
                               or ("at" in entry and (type(entry["at"]) not in (int, float)
                                                      or not math.isfinite(entry["at"]) or entry["at"] <= 0))):
                     raise ValueError("maintenance-hold-unknown")
-                if pr_events.preservation_reason(pr, attempt, MAX_FIX_ATTEMPTS, held=entry, now=now, allow_reentry=True) \
-                        or pr_events.in_flight(attempt, pr, now):
+                if isinstance(attempt.get("pendingEscalation"), dict) and attempt["pendingEscalation"].get("lane") == name:
+                    rung = pending_rung_disposition(
+                        pr, attempt, name, providers, now, classified=rung_blocker(pr, attempt, entry),
+                        caps_allow=remediation.caps_allow, plan_ladder=remediation.plan_ladder,
+                        top_rung_used=remediation.top_rung_used,
+                        active_previous_attempt=pr_events.in_flight(attempt, {"headRefOid": attempt.get("sha")}, now))
+                    if rung["state"] == "eligible" and provider_may_run(name, "fix"):
+                        eligible.add(number)
+                        eligible_kinds[str(number)] = "escalation"
+                        disposition(number, "eligible-escalation")
+                    else:
+                        disposition(number, rung["reason"])
+                        if rung["state"] == "unknown":
+                            unknown_rows += 1
+                            unknown(rung["reason"])
+                    continue
+                if not pr_events.in_scope(pr, "red", disabled):
+                    disposition(number, "outside-repair-scope")
+                    continue
+                preserved_reason = pr_events.preservation_reason(
+                    pr, attempt, MAX_FIX_ATTEMPTS, held=entry, now=now, allow_reentry=True)
+                if preserved_reason or pr_events.in_flight(attempt, pr, now):
+                    disposition(number, preserved_reason or "attempt-in-flight")
                     continue
                 kinds = [kind for kind in event_rows.get(number, {}).get("eventKinds", [])
                          if kind in pr_events.FIX_KINDS and pr_events.PREFIX + kind in pr_events.label_names(pr)]
@@ -6629,22 +6882,32 @@ def record_maintenance_demand(host: Host, name: str, prs: list[dict], candidates
                 if provider_may_run(name, "fix") and pr_events.may_take(name, pr, attempt, order, now) \
                         and (red_pr([pr], attempts, held) or event_work):
                     eligible.add(number)
+                    eligible_kinds[str(number)] = "repair"
+                    disposition(number, "eligible-repair")
                 elif number in adopt_numbers and provider_may_run(name, "adopt") and unverified_pr(
                         [pr], snapshots["verified.json"], snapshots["requeue.json"]) \
                         and not gate_disposition(pr, held, attempts):
                     eligible.add(number)
-            except ValueError:
+                    eligible_kinds[str(number)] = "adopt"
+                    disposition(number, "eligible-adopt")
+                else:
+                    disposition(number, "no-current-ordinary-repair")
+            except ValueError as error:
+                disposition(number, str(error))
+                unknown(str(error))
                 # One stale or racing row (two caches, different TTLs) must not erase the
                 # demand every other PR proves; eligible is then a lower bound (2026-10-11).
                 unknown_rows += 1
+        ordinary_pending = sum(kind != "escalation" for kind in eligible_kinds.values()) if not unknown_rows else None
         if eligible:
             pending_count = len(eligible)
         elif not unknown_rows and _SUMMARY["readable"] and 0 <= now - _SUMMARY["at"] <= MAINTENANCE_DEMAND_MAX_AGE_S \
                 and not _SUMMARY["prs"] and not rows:
             # A complete empty repository inventory proves no PR maintenance.
             pending_count = 0
-    except Exception:
-        pass  # Optional observation must not interrupt an already selected unit.
+    except Exception as error:
+        reason = str(error) if isinstance(error, ValueError) else "maintenance-observation-" + type(error).__name__
+        unknown(reason)
     path = host.state / "maintenance-demand.json"
     temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
     try:
@@ -6656,6 +6919,16 @@ def record_maintenance_demand(host: Host, name: str, prs: list[dict], candidates
         data["schema"] = "symphony-lanes-maintenance-demand/v1"
         data.setdefault("lanes", {})[name] = {"observedAt": source_at if type(source_at) in (int, float) else now,
                                              "pending": pending_count,
+                                             "ordinaryPrPending": ordinary_pending,
+                                             "byKind": {kind: list(eligible_kinds.values()).count(kind)
+                                                        for kind in sorted(set(eligible_kinds.values()))},
+                                             "blockedByReason": {reason: list(dispositions.values()).count(reason)
+                                                                 for reason in sorted(set(dispositions.values()))
+                                                                 if not reason.startswith("eligible-")},
+                                             "unknownByReason": unknown_reasons,
+                                             "dispositions": dict(list(dispositions.items())[:64]),
+                                             "projectionComplete": False,
+                                             "unmeasuredClasses": ["labeled-remediation-events"],
                                              "semantics": "pre-claim demand; fresh admission required"}
         temporary.write_text(json.dumps(data))
         os.replace(temporary, path)
@@ -6698,6 +6971,10 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
             THIS, _SUMMARY.get("prs", []), _SUMMARY.get("sourceAt"))
     except Exception:
         target_files = {}  # Optional scope evidence cannot strand an authorized repair.
+    # Pin the already complete scan before waiting for claim.lock. A later
+    # mutable summary is not provenance for cross-provider draft scope.
+    rung_inventory = json.loads(json.dumps({key: _SUMMARY.get(key)
+                                           for key in ("readable", "sourceAt", "prs")}))
     claim = Locked(host.state / "claim.lock", blocking=True)
     # The claim lock serializes the scan, so the shared cache fill happens once. A rate
     # limit skips the API for every worker until the cooldown file expires.
@@ -6720,8 +6997,16 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
         prs = lane_owned + [pr for pr in candidates if pr.get("isDraft") and pr["number"] not in owned_numbers]
         events = [pr for pr in pr_events.queued_prs(THIS, pr_events.FIX_KINDS)
                   if not pr_recovery_held(host, pr)] if local else []
+        source_at = rung_inventory.get("sourceAt")
+        rung_inventory_valid = (rung_inventory.get("readable") is True
+                                and type(source_at) in (int, float) and math.isfinite(source_at)
+                                and 0 <= time.time() - source_at <= MAINTENANCE_DEMAND_MAX_AGE_S
+                                and isinstance(rung_inventory.get("prs"), list))
+        rung_candidates = pending_rung_candidates(host, name, rung_inventory["prs"]) \
+            if local and rung_inventory_valid else []
         red = local and (pr_events.claim_event_pr(host, THIS, name, events)
-                         or claim_escalation_pr(host, name, candidates)
+                         or claim_escalation_pr(host, name, list({pr["number"]: pr
+                                                               for pr in candidates + rung_candidates}.values()))
                          or claim_red_pr(host, name, candidates)) or None
         adopt = None if red or not local or not provider_may_run(name, "adopt") \
             else claim_adoptable_pr(host, name, prs, candidates)
@@ -6733,11 +7018,15 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
                 pass  # Demand telemetry cannot prevent this selected repair.
         # Existing-PR admission uses fresh GitHub/attempt authority. Do not make
         # its selection or execution depend on credentials or optional Linear work.
-        if not (red or adopt) and not maintenance_only:
-            linear = Linear(host.linear_env)
+        if not (red or adopt):
+            if not maintenance_only:
+                linear = Linear(host.linear_env)
             if local:
                 linear_optional(escalate_exhausted, host,
-                                list({pr["number"]: pr for pr in candidates + events}.values()), linear)
+                                list({pr["number"]: pr for pr in candidates + events + rung_candidates}.values()), linear,
+                                **({"model_only": True} if maintenance_only else {}),
+                                **({"joined_rungs": frozenset(pr["number"] for pr in rung_candidates)}
+                                   if rung_candidates else {}))
         labeled = None if red or adopt or not local or maintenance_only \
             else linear_optional(claim_labeled_event, host, name, linear)
         issue = labeled

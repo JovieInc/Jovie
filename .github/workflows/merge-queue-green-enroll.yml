@@ -38,7 +38,7 @@ on:
   # an unchanged head never earns a second CI flight), so this is the wake
   # that admits an already-green head. Sole ready_for_review subscriber.
   pull_request_target:
-    types: [labeled, unlabeled, reopened, ready_for_review, synchronize]
+    types: [converted_to_draft, labeled, unlabeled, reopened, ready_for_review, synchronize]
   # Event-driven reconciliation (JOV-7589): every landing on main re-scans the
   # roster (re-enrolls green heads whose dequeue left no wake) and re-checks
   # hold receipts, so neither waits on a timer. Pushes coalesce into the one
@@ -593,6 +593,57 @@ jobs:
               }
             }
             core.info(`enqueued=${enqueued}`);
+
+  # Conversion to draft does not remove GitHub's native queue entry. Reuse the
+  # existing exact-head/entry guard under the same admission owner, even during
+  # a queue freeze. Never run PR code or grant new installation permissions.
+  dequeue-draft:
+    name: Dequeue an exact draft head
+    if: github.event_name == 'pull_request_target' && github.event.action == 'converted_to_draft'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout trusted queue policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          sparse-checkout: |
+            .nvmrc
+            scripts/merge-queue-backend.mjs
+            scripts/lib/merge-queue-guard.mjs
+            scripts/lib/pre-land-changelog.mjs
+            scripts/version-fanout-guard.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Set up pinned Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Generate Jovie Bot dequeue token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Reconcile only the event's current draft queue entry
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          import { reconcileDraftQueueEntry } from './scripts/merge-queue-backend.mjs';
+          console.log(JSON.stringify(await reconcileDraftQueueEntry({
+            event: JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8')),
+            repository: process.env.GITHUB_REPOSITORY,
+          })));
+          NODE
 
   # Hold contract (scripts/hold-contract.mjs, jovie-hold/v1): every stop label
   # (hold, gated, incident, do-not-merge, tim-hold variants) needs a receipt

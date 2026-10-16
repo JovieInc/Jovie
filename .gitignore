@@ -237,6 +237,9 @@ apps/desktop/src/*
 !apps/desktop/src/ovie-browser-recovery.ts
 !apps/desktop/src/nightly-update-launch-agent.ts
 !apps/desktop/src/navigation-coordinator.ts
+!apps/desktop/src/application-route-boundary.ts
+!apps/desktop/src/application-routes.json
+!apps/desktop/src/mac-support.json
 !apps/desktop/src/window-state-store.ts
 !apps/desktop/src/desktop-launch-readiness.ts
 !apps/desktop/src/startup-maintenance.ts
