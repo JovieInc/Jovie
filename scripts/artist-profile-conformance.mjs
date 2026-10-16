@@ -25,7 +25,9 @@ function object(node) {
     return object(node.expression);
   return ts.isObjectLiteralExpression(node) ? node : null;
 }
+/** @returns {import('typescript').ObjectLiteralExpression | undefined} */
 function declaration(tree, name) {
+  /** @type {import('typescript').ObjectLiteralExpression | undefined} */
   let value;
   walk(tree, node => {
     if (ts.isVariableDeclaration(node) && node.name.getText(tree) === name)
@@ -43,7 +45,11 @@ export function checkArtistProfileConformance(sources) {
       ts.ScriptTarget.Latest,
       true
     );
-    if (tree.parseDiagnostics.length)
+    if (
+      !('parseDiagnostics' in tree) ||
+      !Array.isArray(tree.parseDiagnostics) ||
+      tree.parseDiagnostics.length
+    )
       errors.push(`${path}: invalid source syntax`);
     return tree;
   };
