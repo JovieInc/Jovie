@@ -1,4 +1,8 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { copyFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 import {
   checkArtistProfileConformance,
@@ -7,6 +11,24 @@ import {
 
 const prefix = 'apps/web/lib/';
 const sources = readArtistProfileSources(process.cwd());
+test('trusted archived checker resolves tooling from and audits the source checkout', () => {
+  const temporary = mkdtempSync(join(tmpdir(), 'profile-conformance-trusted-'));
+  try {
+    const checker = join(temporary, 'artist-profile-conformance.mjs');
+    copyFileSync(
+      new URL('./artist-profile-conformance.mjs', import.meta.url),
+      checker
+    );
+    const result = spawnSync(process.execPath, [checker], {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.match(result.stdout, /Artist-profile registry conformance passed/);
+  } finally {
+    rmSync(temporary, { recursive: true, force: true });
+  }
+});
 const fixtureSources = new Map(
   [...sources].filter(([path]) =>
     [

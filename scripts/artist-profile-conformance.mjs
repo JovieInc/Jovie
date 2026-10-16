@@ -1,9 +1,13 @@
 #!/usr/bin/env node
 /** Cheap whole-tree admission check; registry consumers cannot invent readiness. */
 import { readdirSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import ts from 'typescript';
+
+/** Resolve installed tooling from the audited checkout, including when this file is archived from trusted main. */
+/** @type {typeof import('typescript')} */
+const ts = createRequire(resolve(process.cwd(), 'package.json'))('typescript');
 
 const LIB = 'apps/web/lib/';
 const REGISTRY = `${LIB}connectors/artist-profile-registry.ts`;

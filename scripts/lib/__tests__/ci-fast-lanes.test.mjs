@@ -2213,11 +2213,16 @@ describe('source-read guard selection', () => {
 
   it('points every guard at a test file that exists', () => {
     for (const guard of SOURCE_GUARDS) {
-      if (
-        ['artist-launch-contract', 'artist-profile-conformance'].includes(
-          guard.id
-        )
-      ) {
+      if (guard.id === 'artist-profile-conformance') {
+        expect(guard.command).toContain(
+          join(REPO_ROOT, 'scripts/artist-profile-conformance.mjs')
+        );
+        expect(guard.command).toContain(
+          join(REPO_ROOT, 'scripts/artist-profile-conformance.test.mjs')
+        );
+        continue;
+      }
+      if (guard.id === 'artist-launch-contract') {
         expect(guard.command).toContain('node scripts/artist-');
         expect(
           readFileSync(join(REPO_ROOT, `scripts/${guard.id}.test.mjs`), 'utf8')

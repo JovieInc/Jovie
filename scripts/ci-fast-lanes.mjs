@@ -124,8 +124,8 @@ export const SOURCE_GUARDS = Object.freeze([
   }),
   Object.freeze({
     id: 'artist-profile-conformance',
-    command:
-      'node scripts/artist-profile-conformance.mjs && node --test --test-isolation=none scripts/artist-profile-conformance.test.mjs',
+    // Source Validation loads this module from trusted main; older heads may lack these files.
+    command: `node ${shellQuote(fileURLToPath(new URL('./artist-profile-conformance.mjs', import.meta.url)))} && node --test --test-isolation=none ${shellQuote(fileURLToPath(new URL('./artist-profile-conformance.test.mjs', import.meta.url)))}`,
     inputs:
       /^(?:apps\/web\/lib\/|scripts\/(?:artist-profile-conformance|ci-fast-lanes))/u,
     prOnly: false,
