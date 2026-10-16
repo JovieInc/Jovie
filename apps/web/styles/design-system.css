@@ -2072,12 +2072,12 @@
 @media (prefers-reduced-transparency: reduce) {
   :where(.profile-liquid-glass-nav) {
     border-color: var(--profile-dock-solid-border);
-    background: var(--profile-dock-solid-bg);
+    background: var(--profile-dock-solid-bg) !important;
     box-shadow: var(--profile-dock-shadow);
     --tw-backdrop-blur: initial;
     --tw-backdrop-saturate: initial;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
   }
 
   :where(.profile-liquid-glass-nav)::after {
@@ -2100,16 +2100,19 @@
 }
 
 /* Keep the nav class outside :where() here so the deterministic hooks outrank
-   Tailwind's backdrop utility custom properties even if layer order changes. */
+   Tailwind's backdrop utility custom properties even if layer order changes.
+   !important is required: an unlayered decorative blur beats a normal
+   declaration that the compiler places in a layer, so the computed
+   backdrop-filter stayed blur(24px) saturate(1.8) after these hooks matched. */
 :root[data-reduced-transparency="true"] .profile-liquid-glass-nav,
 :root.high-contrast .profile-liquid-glass-nav {
   border-color: var(--profile-dock-solid-border);
-  background: var(--profile-dock-solid-bg);
+  background: var(--profile-dock-solid-bg) !important;
   box-shadow: var(--profile-dock-shadow);
   --tw-backdrop-blur: initial;
   --tw-backdrop-saturate: initial;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 :root[data-reduced-transparency="true"] .profile-liquid-glass-nav::after,
