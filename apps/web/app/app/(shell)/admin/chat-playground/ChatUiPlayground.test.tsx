@@ -6,8 +6,7 @@ import { ToolPartsRenderer } from '@/components/jovie/tool-ui';
 import type { MessagePart } from '@/components/jovie/types';
 
 const { confirmLink } = vi.hoisted(() => ({ confirmLink: vi.fn() }));
-vi.mock('@/lib/queries', async importOriginal => ({
-  ...(await importOriginal<typeof import('@/lib/queries')>()),
+vi.mock('@/lib/queries/useConfirmChatLinkMutation', () => ({
   useConfirmChatLinkMutation: () => ({ mutate: confirmLink }),
 }));
 
@@ -53,7 +52,9 @@ describe('ChatUiPlayground', () => {
     const proposal = within(screen.getByLabelText('Interactive Proposal'));
     await user.click(proposal.getByRole('button', { name: 'Add' }));
     expect(confirmLink).not.toHaveBeenCalled();
-    expect(proposal.getByText('Spotify link added')).toBeInTheDocument();
+    expect(
+      proposal.getByRole('status', { name: 'Link Confirmation' })
+    ).toHaveTextContent('Preview complete. Nothing was saved.');
   });
   it('uses the canonical running tool presentation without an unsupported summary', async () => {
     const user = userEvent.setup();

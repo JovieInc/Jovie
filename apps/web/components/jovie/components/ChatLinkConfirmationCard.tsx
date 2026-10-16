@@ -257,7 +257,7 @@ function ChatLinkConfirmationTask({
             onClick={handleAdd}
             aria-disabled={busy || saved || state === 'canceled'}
             className={cn(
-              'system-b-chat-link-primary-action w-[6.5em] whitespace-nowrap',
+              'system-b-chat-link-primary-action w-20 whitespace-nowrap',
               'border border-(--color-btn-primary-bg) bg-btn-primary text-btn-primary-foreground shadow-button-inset hover:border-(--color-btn-primary-hover) hover:bg-btn-primary-hover',
               'aria-disabled:opacity-50 transition-colors'
             )}
