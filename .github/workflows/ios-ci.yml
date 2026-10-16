@@ -83,14 +83,14 @@ jobs:
 
       - name: Test iOS release configuration scripts
         run: |
-          node --test .github/scripts/testflight-release-lease.test.mjs \
-          apps/ios/scripts/write-configuration.test.mjs \
+          node --test apps/ios/scripts/write-configuration.test.mjs \
           apps/ios/scripts/capture-screenshots.test.mjs \
           apps/ios/scripts/run-xcodebuild.test.mjs \
           apps/ios/scripts/validate-wallet-release-env.test.mjs \
           apps/ios/scripts/validate-testflight-env.test.mjs \
           apps/ios/scripts/validate-testflight-artifact.test.mjs \
-          apps/ios/scripts/settings-style-guard.test.mjs
+          apps/ios/scripts/settings-style-guard.test.mjs \
+          .github/scripts/testflight-release-lease.test.mjs
 
       - name: Ensure iOS local configuration exists
         run: bash apps/ios/scripts/ensure-configuration.sh
