@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import {
   mkdirSync,
   mkdtempSync,
@@ -308,13 +308,29 @@ async function authorize(world: World, env: Record<string, string> = {}) {
   const root = tempRoot('jovie-testflight-authorize-');
   const output = join(root, 'output');
   writeFileSync(output, '');
+  const bootstrap = authorizeJob.steps?.find(
+    step => step.name === 'Checkout the rate-limit hold'
+  );
+  const bootstrapDirectory = join(
+    root,
+    String(bootstrap?.with?.path || ''),
+    '.github/scripts'
+  );
+  mkdirSync(bootstrapDirectory, { recursive: true });
+  writeFileSync(
+    join(bootstrapDirectory, 'gh-api-hold.sh'),
+    readFileSync(resolve(repoRoot, '.github/scripts/gh-api-hold.sh'))
+  );
   const result = await runWithRealGh({
     script: String(authorizeStep?.run),
     env: {
       ...workflowRunEnv(),
       ...env,
       GITHUB_OUTPUT: output,
-      GITHUB_WORKSPACE: repoRoot,
+      GITHUB_WORKSPACE: root,
+      GH_API_HOLD_BUDGET_SECONDS: String(
+        authorizeStep?.env?.GH_API_HOLD_BUDGET_SECONDS
+      ),
       RUNNER_TEMP: root,
     },
     route: routes(world),
@@ -886,6 +902,86 @@ describe.skipIf(!gh)(
     );
   }
 );
+
+describe('certified TestFlight checkout isolation', () => {
+  const steps = authorizeJob.steps ?? [];
+  const bootstrap = steps.find(
+    step => step.name === 'Checkout the rate-limit hold'
+  );
+  const source = steps.find(
+    step => step.name === 'Checkout exact authorized main'
+  );
+  const pin = steps.find(step => step.id === 'pin');
+
+  it('keeps transport sparse state out of the certified root checkout', () => {
+    expect(bootstrap?.with).toMatchObject({
+      ref: '${{ github.sha }}',
+      path: '.testflight-bootstrap',
+      'persist-credentials': false,
+      'sparse-checkout': '.github/scripts/gh-api-hold.sh',
+      'sparse-checkout-cone-mode': false,
+    });
+    expect(authorizeStep?.run).toContain(
+      '$GITHUB_WORKSPACE/.testflight-bootstrap/.github/scripts/gh-api-hold.sh'
+    );
+    expect(source?.with?.ref).toBe(
+      '${{ steps.authorize.outputs.release_sha }}'
+    );
+    expect(source?.with?.path).toBeUndefined();
+    expect(source?.with?.['sparse-checkout']).toBeUndefined();
+    expect(steps.indexOf(bootstrap!)).toBeLessThan(
+      steps.indexOf(authorizeStep!)
+    );
+    expect(steps.indexOf(authorizeStep!)).toBeLessThan(steps.indexOf(source!));
+  });
+
+  function runPin(fastfile: string | null) {
+    const root = tempRoot('jovie-testflight-pin-checkout-');
+    const guardDirectory = join(root, '.testflight-tools/.github/scripts');
+    mkdirSync(guardDirectory, { recursive: true });
+    const probe = join(root, 'guard-called');
+    writeFileSync(
+      join(guardDirectory, 'testflight-release-lease.mjs'),
+      "import {writeFileSync} from 'node:fs'; writeFileSync(process.env.GUARD_PROBE, process.argv[2]);"
+    );
+    if (fastfile !== null) {
+      mkdirSync(join(root, 'fastlane'));
+      writeFileSync(join(root, 'fastlane/Fastfile'), fastfile);
+    }
+    const output = join(root, 'output');
+    writeFileSync(output, '');
+    // The probe isolates caller choreography; the real guard CLI's authority,
+    // expiry and replay checks remain covered by its own execution suite.
+    const result = spawnSync('bash', ['-c', String(pin?.run)], {
+      cwd: root,
+      encoding: 'utf8',
+      env: { ...fixtureEnv(), GITHUB_OUTPUT: output, GUARD_PROBE: probe },
+    });
+    return { ...result, probe, outputs: readOutputs(output) };
+  }
+
+  it('rejects an incomplete checkout before it can look like an old certified source', () => {
+    const result = runPin(null);
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain('checkout is missing fastlane/Fastfile');
+    expect(() => readFileSync(result.probe)).toThrow();
+    expect(result.outputs.lease).toBeUndefined();
+  });
+
+  it('still stands down a complete legacy source without the final guard', () => {
+    const result = runPin('# legacy Fastfile');
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain('predates the bounded upload guard');
+    expect(() => readFileSync(result.probe)).toThrow();
+    expect(result.outputs.lease).toBeUndefined();
+  });
+
+  it('invokes the lease guard when the complete certified source contains it', () => {
+    const result = runPin('TESTFLIGHT_GUARD_PATH');
+    expect(result.status, result.stderr).toBe(0);
+    expect(readFileSync(result.probe, 'utf8')).toBe('admit');
+  });
+});
 
 describe('iOS TestFlight release selection', () => {
   function gitRepo() {
