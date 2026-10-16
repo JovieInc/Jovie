@@ -700,7 +700,6 @@ jobs:
             web.brand \
             web.report \
             web.start \
-            web.onboarding-checkout \
             web.marketing-solutions \
             web.public-profile-about; do
             SUFFIX="${SCREEN#*.}"
@@ -882,6 +881,47 @@ jobs:
           allow-images: true
           public-images: true
           diagnostic-paths: true
+
+      # Auth-gated. Signed-out /onboarding/checkout 307s to /signin, so this
+      # producer enters through the test-auth session and then requires the
+      # final pathname to be exactly /onboarding/checkout.
+      - name: Capture onboarding checkout screen proof
+        timeout-minutes: 10
+        run: |
+          pnpm exec playwright test \
+            tests/product-screenshots/onboarding-checkout-screen-proof.spec.ts \
+            --config=playwright.config.screenshots.ts \
+            --project=screenshots \
+            --workers=1
+        env:
+          BASE_URL: http://localhost:3000
+          SCREEN_PROOF_OUTPUT_DIR: test-results/screen-browser-proof-onboarding-checkout
+          SCREEN_PROOF_MEASUREMENTS: test-results/screen-browser-proof-onboarding-checkout-measurements.json
+
+      - name: Bind onboarding checkout proof to producer provenance
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PRODUCER_JOB_ID="$(gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs?per_page=100" \
+            --jq '.jobs[] | select(.name == "Generate Screenshots") | .id' | head -n 1)"
+          if ! [[ "$PRODUCER_JOB_ID" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::Could not resolve the current producer job ID."
+            exit 1
+          fi
+          node scripts/invariants/screen-proof-emit.mjs \
+            --screen=web.onboarding-checkout \
+            --head-sha="$GITHUB_SHA" \
+            --run-url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}" \
+            --bundle=apps/web/test-results/screen-browser-proof-onboarding-checkout \
+            --measurements=apps/web/test-results/screen-browser-proof-onboarding-checkout-measurements.json \
+            --out=apps/web/test-results/screen-browser-proof-onboarding-checkout/screen-proof.json \
+            --artifact-root="$GITHUB_WORKSPACE" \
+            --producer-run-id="$GITHUB_RUN_ID" \
+            --producer-run-attempt="$GITHUB_RUN_ATTEMPT" \
+            --producer-job-id="$PRODUCER_JOB_ID" \
+            --environment=local-production-build
 
       - name: Upload onboarding-checkout screen proof
         id: onboarding-checkout-proof

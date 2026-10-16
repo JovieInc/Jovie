@@ -1105,7 +1105,6 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       'web.brand',
       'web.report',
       'web.start',
-      'web.onboarding-checkout',
       'web.marketing-solutions',
       'web.public-profile-about',
     ];
@@ -1155,6 +1154,43 @@ describe('JOV-INV-018 screen-certification/v2', () => {
         `${screenId} must be certified from its own artifact in the certify job`
       );
     }
+  });
+
+  it('captures web.onboarding-checkout through the test-auth session', () => {
+    const workflow = readFileSync(
+      join(ROOT, '.github/workflows/screenshots.yml'),
+      'utf8'
+    );
+    const publicSpec = readFileSync(
+      join(
+        ROOT,
+        'apps/web/tests/product-screenshots/public-screens-proof.spec.ts'
+      ),
+      'utf8'
+    );
+    const checkoutSpec = readFileSync(
+      join(
+        ROOT,
+        'apps/web/tests/product-screenshots/onboarding-checkout-screen-proof.spec.ts'
+      ),
+      'utf8'
+    );
+    assert.equal(
+      SCREEN_PROOF_ROUTES['web.onboarding-checkout'],
+      '/onboarding/checkout'
+    );
+    assert.doesNotMatch(publicSpec, /web\.onboarding-checkout/);
+    assert.match(checkoutSpec, /\/api\/dev\/test-auth\/enter/);
+    assert.match(
+      checkoutSpec,
+      /expect\(finalUrl\.pathname\)\.toBe\(proofRoute\)/
+    );
+    assert.match(checkoutSpec, /expect\(finalUrl\.search\)\.toBe\(''\)/);
+    assert.match(checkoutSpec, /expect\(finalUrl\.hash\)\.toBe\(''\)/);
+    assert.match(
+      workflow,
+      /tests\/product-screenshots\/onboarding-checkout-screen-proof\.spec\.ts/
+    );
   });
 
   it('keeps the /artists producer identity synchronized with the trusted resolver (JOV-7125)', () => {
