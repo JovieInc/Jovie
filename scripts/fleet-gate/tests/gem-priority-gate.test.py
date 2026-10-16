@@ -5200,5 +5200,144 @@ class PublicTrustDiagnosticsTest(unittest.TestCase):
         self.assertEqual(result["reason"], "capacity-evidence-trust-context-unavailable")
 
 
+class NativeControllerObservationTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.home = pathlib.Path(self.tmp.name)
+        self.state = self.home / ".local/state/jovie-lanes"
+        self.revision, self.tree = "a" * 40, "b" * 40
+        self.objects = {"scripts/lanes": self.tree}
+        self.digest = hashlib.sha256(json.dumps(self.objects, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        self.release = self.state / "releases" / self.digest / "scripts/lanes"
+        self.release.mkdir(parents=True)
+        (self.state / "current").symlink_to(self.release, target_is_directory=True)
+        self.manifest = {"schema": "jovie-lane-release-bundle/v1", "sourceCommit": self.revision,
+                         "bundleDigest": self.digest, "objects": self.objects}
+        self.runner = b"# immutable native runner\n"
+        (self.release / "lane_runner.py").write_bytes(self.runner)
+        self.blob = hashlib.sha1(b"blob " + str(len(self.runner)).encode() + b"\0" + self.runner).hexdigest()
+        self.now = MODULE.parse_time("2026-10-16T15:30:00Z")
+        self.tick = {"at": "2026-10-16T15:29:50Z", "release": self.tree[:7], "error": None}
+        self.service = {"Id": "jovie-lanes.service", "ActiveState": "inactive", "SubState": "dead",
+                        "Result": "success", "ExecMainStatus": "0",
+                        "ExecStart": ("{ path=/bin/bash ; argv[]=/bin/bash -c python3 "
+                                      + str(self.state / "current/lane_runner.py") + " update; python3 "
+                                      + str(self.state / "current/codex_lane.py")
+                                      + " reconcile --if-due 3600; exec python3 "
+                                      + str(self.state / "current/lane_runner.py")
+                                      + " dispatch ; ignore_errors=no ; start_time=[fixture] ; }"),
+                        "FragmentPath": str(self.home / ".config/systemd/user/jovie-lanes.service")}
+        self.timer = {"Id": "jovie-lanes.timer", "ActiveState": "active", "SubState": "waiting",
+                      "Result": "success", "Unit": "jovie-lanes.service",
+                      "FragmentPath": str(self.home / ".config/systemd/user/jovie-lanes.timer")}
+        self.identities = [self.tree, self.blob]
+        self.write_receipts()
+
+    def write_receipts(self):
+        (self.release / ".release.json").write_text(json.dumps(self.manifest))
+        (self.state / "tick.json").write_text(json.dumps(self.tick))
+
+    def command(self, args, **kwargs):
+        if args[0] == "git":
+            self.assertEqual(args[-2:], [self.revision + ":scripts/lanes", self.revision + ":scripts/lanes/lane_runner.py"])
+            output = "\n".join(self.identities) + "\n"
+        elif args[:3] == ["systemctl", "--user", "show"]:
+            self.assertEqual(args[3:5], ["jovie-lanes.service", "jovie-lanes.timer"])
+            output = "\n\n".join("\n".join(k + "=" + v for k, v in row.items()) for row in [self.service, self.timer])
+        else:
+            self.fail("unexpected controller observation command")
+        return subprocess.CompletedProcess(args, 0, output, "")
+
+    def observe(self):
+        with mock.patch.object(MODULE.subprocess, "run", side_effect=self.command), \
+                mock.patch.object(MODULE.urllib.request, "urlopen") as http:
+            result = MODULE.observe_controller("http://127.0.0.1:4041/api/v1/state",
+                                               now=self.now, native_state_dir=self.state)
+        http.assert_not_called()
+        return result
+
+    def test_cli_defaults_to_the_canonical_native_state(self):
+        with mock.patch.object(sys, "argv", ["gem-priority-gate.py"]), \
+                mock.patch.object(MODULE.Path, "home", return_value=self.home):
+            self.assertEqual(MODULE.parse_args().native_controller_state_dir, self.state)
+
+    def test_native_service_tick_and_committed_release_bind_controller_health(self):
+        result = self.observe()
+        self.assertEqual(result["status"], "green")
+        self.assertEqual(result["kind"], "native-lanes")
+        self.assertEqual(result["sourceCommit"], self.revision)
+        self.assertEqual(result["bundleDigest"], self.digest)
+        self.assertEqual(result["tickAt"], self.tick["at"])
+        self.assertNotIn("activeRuns", result)  # Worker permits are not provider payloads.
+        self.service.update(ActiveState="activating", SubState="start")
+        self.assertEqual(self.observe()["status"], "green")
+
+    def test_missing_failed_or_stale_tick_never_falls_back_to_retired_http(self):
+        for changes in ({"at": "2026-10-16T15:19:59Z"}, {"at": "2026-10-16T15:30:31Z"},
+                        {"at": None}, {"at": "2026-10-16T15:29:50"}, {"at": "2026-10-16+15:29"}, {"release": self.revision[:7]}, {"error": "controller failed"}):
+            with self.subTest(changes=changes):
+                old = self.tick.copy(); self.tick.update(changes); self.write_receipts()
+                self.assertEqual(self.observe()["status"], "failed")
+                self.tick = old
+        (self.state / "tick.json").unlink()
+        self.assertEqual(self.observe()["status"], "failed")
+
+    def test_failed_stopped_or_unbound_service_remains_failed(self):
+        for target, changes in ((self.service, {"Result": "exit-code"}),
+                                (self.service, {"ExecMainStatus": "1"}),
+                                (self.service, {"ActiveState": "failed"}),
+                                (self.service, {"ExecStart": "unrelated command"}),
+                                (self.service, {"FragmentPath": "/tmp/unverified.service"}),
+                                (self.timer, {"ActiveState": "inactive"}),
+                                (self.timer, {"FragmentPath": "/tmp/unverified.timer"}),
+                                (self.timer, {"Unit": "unrelated.service"}),
+                                (self.service, {"SubState": "failed"}),
+                                (self.service, {"ExecStart": self.service["ExecStart"].replace("path=/bin/bash", "path=/bin/echo")})):
+            with self.subTest(changes=changes):
+                old = target.copy(); target.update(changes)
+                self.assertEqual(self.observe()["status"], "failed")
+                target.clear(); target.update(old)
+
+    def test_missing_or_unknown_service_state_cannot_count_as_healthy(self):
+        for unknown in (False, True):
+            with self.subTest(unknown=unknown):
+                saved = self.service.copy()
+                self.service.pop("ActiveState", None)
+                self.service.pop("SubState", None)
+                if unknown:
+                    self.service["ActiveState"] = "unknown"
+                self.assertEqual(self.observe()["status"], "failed")
+                self.service = saved
+
+    def test_release_manifest_and_installed_runner_must_match_git_source(self):
+        self.identities = ["c" * 40, self.blob]
+        self.assertEqual(self.observe()["status"], "failed")
+        self.identities = [self.tree, "c" * 40]
+        self.assertEqual(self.observe()["status"], "failed")
+        self.identities = [self.tree, self.blob]
+        self.manifest["bundleDigest"] = "0" * 64; self.write_receipts()
+        self.assertEqual(self.observe()["status"], "failed")
+        self.manifest["bundleDigest"] = self.digest; self.write_receipts()
+        (self.release / "lane_runner.py").write_bytes(b"changed runner")
+        self.assertEqual(self.observe()["status"], "failed")
+
+    def test_release_switch_during_observation_is_unknown_not_green(self):
+        command = self.command
+        def switch(args, **kwargs):
+            result = command(args, **kwargs)
+            if args[0] == "systemctl":
+                (self.state / "tick.json").write_text(json.dumps({**self.tick, "at": "2026-10-16T15:29:59Z"}))
+            return result
+        with mock.patch.object(MODULE.subprocess, "run", side_effect=switch):
+            self.assertEqual(MODULE.observe_native_controller(self.state, self.now)["status"], "failed")
+
+    def test_unavailable_native_evidence_never_grants_health(self):
+        for failure in (subprocess.TimeoutExpired("systemctl", 5), subprocess.CalledProcessError(1, "git")):
+            with self.subTest(failure=type(failure).__name__), \
+                    mock.patch.object(MODULE.subprocess, "run", side_effect=failure):
+                self.assertEqual(MODULE.observe_native_controller(self.state, self.now)["status"], "failed")
+
+
 if __name__ == "__main__":
     unittest.main()
