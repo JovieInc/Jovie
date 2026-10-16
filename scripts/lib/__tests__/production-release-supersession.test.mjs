@@ -496,11 +496,27 @@ function runFinalize(overrides = {}, boundarySha = NEWER_SHA) {
 function runStagingStep(stepName, mainSha, env = {}) {
   const fixture = makeFixture('staging-refresh-');
   const aliasMarker = join(fixture.root, 'alias-called');
+  const restMarker = join(fixture.root, 'rest-called');
+  stubGitMain(fixture.bin);
   stubCommand(
     fixture.bin,
     'gh',
-    '#!/bin/sh\nprintf "%s\\n" "$STUB_MAIN_SHA"\n'
+    `#!/bin/sh
+printf '%s\\n' "$*" >> "$STUB_REST_MARKER"
+if [ "\${STUB_MAIN_API_STATUS:-0}" != 0 ]; then
+  echo 'gh: API rate limit exceeded for installation. (HTTP 403)' >&2
+  exit "$STUB_MAIN_API_STATUS"
+fi
+printf '%s\\n' "$STUB_MAIN_SHA"
+`
   );
+  if (env.STUB_MAIN_GIT_STATUS) {
+    stubCommand(
+      fixture.bin,
+      'git',
+      '#!/bin/sh\nexit "$STUB_MAIN_GIT_STATUS"\n'
+    );
+  }
   const vercel = join(fixture.root, 'node_modules/.bin/vercel');
   mkdirSync(dirname(vercel), { recursive: true });
   writeFileSync(
@@ -523,21 +539,34 @@ function runStagingStep(stepName, mainSha, env = {}) {
     DEPLOYMENT_URL_B64: Buffer.from(DEPLOYMENT_URL).toString('base64'),
     EXPECTED_COMMIT_SHA: EXPECTED_SHA,
     EXPECTED_DEPLOYMENT_ID: DEPLOYMENT_ID,
+    GH_TOKEN: 'test-token',
     GITHUB_REPOSITORY: 'JovieInc/Jovie',
     PROMOTION_RESULT: 'success',
     PROMOTION_SHA: EXPECTED_SHA,
     ROLLBACK_RESULT: 'skipped',
+    RESOLVE_MAIN_BUDGET_SECONDS: '0',
+    RESOLVE_MAIN_RETRY_SECONDS: '0',
     SOURCE_CI_RUN_ATTEMPT: '1',
     SOURCE_CI_RUN_ID: '9876',
     SOURCE_CI_COMPLETED_AT: new Date(Date.now() - 1_000).toISOString(),
     STAGING_REFRESH_OUTCOME:
       mainSha === EXPECTED_SHA ? 'current' : 'superseded_after_mutation',
     STUB_ALIAS_MARKER: aliasMarker,
+    STUB_REST_MARKER: restMarker,
     STUB_MAIN_SHA: mainSha,
     ...env,
   });
   return {
     aliasCalled: existsSync(aliasMarker),
+    restCalled: existsSync(restMarker),
+    receipt: existsSync(join(fixture.root, 'staging-deployment-receipt.json'))
+      ? JSON.parse(
+          readFileSync(
+            join(fixture.root, 'staging-deployment-receipt.json'),
+            'utf8'
+          )
+        )
+      : null,
     receiptExists: existsSync(
       join(fixture.root, 'staging-deployment-receipt.json')
     ),
@@ -730,6 +759,62 @@ describe('production release supersession execution', () => {
     expect(receipt.outputs.deployed).toBe('true');
     expect(receipt.receiptExists).toBe(true);
   });
+
+  it.each([
+    [EXPECTED_SHA, 'current'],
+    [NEWER_SHA, 'superseded_after_mutation'],
+  ])(
+    'classifies %s without a REST read when the installation is rate-limited',
+    (sha, outcome) => {
+      for (const step of [
+        'Classify staging generation after mutation',
+        'Write typed staging deployment receipt',
+      ]) {
+        const staging = runStagingStep(step, sha, {
+          STUB_MAIN_API_STATUS: '1',
+        });
+        expect(staging.result.status, staging.result.stderr).toBe(0);
+        expect(staging.outputs.staging_refresh_outcome).toBe(outcome);
+        expect(staging.restCalled).toBe(false);
+        expect(staging.aliasCalled).toBe(false);
+        if (step === 'Write typed staging deployment receipt') {
+          expect(staging.outputs.deployed).toBe('true');
+          expect(staging.receipt).toMatchObject({
+            sha: EXPECTED_SHA,
+            currentMainSha: sha,
+            deploymentId: DEPLOYMENT_ID,
+            state: outcome,
+          });
+        } else {
+          expect(staging.receipt).toBeNull();
+        }
+      }
+    }
+  );
+
+  it.each([
+    ['unreadable main', NEWER_SHA, { STUB_MAIN_GIT_STATUS: '1' }],
+    ['malformed main', 'not-a-sha', {}],
+  ])(
+    'fails staging receipt closed for %s when REST is rate-limited',
+    (_, sha, env) => {
+      for (const step of [
+        'Classify staging generation after mutation',
+        'Write typed staging deployment receipt',
+      ]) {
+        const staging = runStagingStep(step, sha, {
+          STUB_MAIN_API_STATUS: '1',
+          ...env,
+        });
+        expect(staging.result.status).toBe(1);
+        expect(staging.outputs.staging_refresh_outcome).toBeUndefined();
+        expect(staging.outputs.deployed).toBeUndefined();
+        expect(staging.restCalled).toBe(true);
+        expect(staging.aliasCalled).toBe(false);
+        expect(staging.receipt).toBeNull();
+      }
+    }
+  );
 
   it('ignores production state when classifying a staging generation', () => {
     const proof = { PROMOTION_SHA: NEWER_SHA };

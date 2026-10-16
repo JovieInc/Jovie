@@ -1393,7 +1393,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          current_main="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
+          current_main="$(bash "$GITHUB_WORKSPACE/.github/scripts/resolve-main-sha.sh" "$GITHUB_REPOSITORY")"
           [[ "$current_main" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Could not resolve exact main after staging mutation."
             exit 1
@@ -1595,7 +1595,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          current_main="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
+          current_main="$(bash "$GITHUB_WORKSPACE/.github/scripts/resolve-main-sha.sh" "$GITHUB_REPOSITORY")"
           [[ "$current_main" =~ ^[0-9a-f]{40}$ ]] || exit 1
           latency_seconds=$(( $(date -u +%s) - $(date -u -d "$SOURCE_CI_COMPLETED_AT" +%s) ))
           slo_state=within_target
