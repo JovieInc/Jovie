@@ -87,10 +87,30 @@ jobs:
       should_release: ${{ steps.select.outputs.should_release }}
       should_stamp: ${{ steps.select.outputs.should_stamp }}
     steps:
+      - name: Checkout quota-safe mainline resolvers
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          path: mainline-resolvers
+          persist-credentials: false
+          sparse-checkout: |
+            .github/scripts/resolve-main-sha.sh
+            .github/scripts/gh-api-hold.sh
+          sparse-checkout-cone-mode: false
+
+      - name: Stage mainline resolvers outside the release checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp mainline-resolvers/.github/scripts/resolve-main-sha.sh "$RUNNER_TEMP/resolve-main-sha.sh"
+          cp mainline-resolvers/.github/scripts/gh-api-hold.sh "$RUNNER_TEMP/gh-api-hold.sh"
+          rm -rf mainline-resolvers
+
       - name: Cross-prove exact production evidence
         id: authorize
         env:
           GH_API_RETRY_SECONDS: 2
+          GH_API_HOLD_BUDGET_SECONDS: '240'
           GH_TOKEN: ${{ github.token }}
           EVENT_NAME: ${{ github.event_name }}
           DESKTOP_RUN_ATTEMPT: ${{ github.run_attempt }}
@@ -256,7 +276,10 @@ jobs:
           fi
 
           echo "environment=$environment" >> "$GITHUB_OUTPUT"
-          current_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
+          # git ls-remote does not spend the installation REST budget. The
+          # ancestry compare still has to prove forward-only lineage, so that
+          # read holds until x-ratelimit-reset inside this 10-minute job.
+          current_main_sha="$(bash "$RUNNER_TEMP/resolve-main-sha.sh" "$REPOSITORY")"
           [[ "$current_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Could not resolve exact current main for desktop authorization."
             exit 1
@@ -269,7 +292,7 @@ jobs:
             # advanced past still publishes. Exact-SHA supersession starved
             # production desktop from 26.9.14 onward (2026-09-21..26) because
             # the merge queue lands faster than the controller verifies.
-            mainline_compare="$(gh api \
+            mainline_compare="$(bash "$RUNNER_TEMP/gh-api-hold.sh" api \
               "repos/$REPOSITORY/compare/$release_sha...$current_main_sha")"
             jq -e --arg release "$release_sha" --arg current "$current_main_sha" '
               type == "object" and
@@ -1143,6 +1166,7 @@ jobs:
       - name: Create deterministic desktop release stamp PR
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_API_HOLD_BUDGET_SECONDS: '240'
           RELEASE_SHA: ${{ needs.authorize-release.outputs.release_sha }}
           REPOSITORY: ${{ github.repository }}
         shell: bash
@@ -1157,13 +1181,13 @@ jobs:
           # case the next verified generation publishes it.
           stamp_lineage_is_current() {
             local current_main_sha mainline_compare main_version
-            current_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
+            current_main_sha="$(bash .github/scripts/resolve-main-sha.sh "$REPOSITORY")"
             [[ "$current_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
               echo "::error::Could not resolve exact current main for the desktop release stamp."
               exit 1
             }
             [ "$current_main_sha" = "$RELEASE_SHA" ] && return 0
-            mainline_compare="$(gh api \
+            mainline_compare="$(bash .github/scripts/gh-api-hold.sh api \
               "repos/$REPOSITORY/compare/$RELEASE_SHA...$current_main_sha")"
             jq -e --arg release "$RELEASE_SHA" --arg current "$current_main_sha" '
               type == "object" and
@@ -1293,13 +1317,24 @@ jobs:
       - name: Revalidate authorized mainline source before packaging
         env:
           GH_TOKEN: ${{ github.token }}
+          # The packaging job is 45 minutes. 600s matches the production
+          # publisher hold and leaves the Electron build its runtime. A reset
+          # past this budget fails closed; it is not a pass.
+          GH_API_HOLD_BUDGET_SECONDS: '600'
+          REPOSITORY: ${{ github.repository }}
         shell: bash
         run: |
           set -euo pipefail
-          current_main_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
+          # ls-remote is the main SHA. GET /commits/main is the same fact and
+          # was the installation 403 that stopped packaging (run 38876599684).
+          current_main_sha="$(bash .github/scripts/resolve-main-sha.sh "$REPOSITORY")"
+          [[ "$current_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::Could not resolve exact current main before desktop packaging."
+            exit 1
+          }
           if [ "$current_main_sha" != "$RELEASE_SHA" ]; then
-            mainline_compare="$(gh api \
-              "repos/${{ github.repository }}/compare/$RELEASE_SHA...$current_main_sha")"
+            mainline_compare="$(bash .github/scripts/gh-api-hold.sh api \
+              "repos/$REPOSITORY/compare/$RELEASE_SHA...$current_main_sha")"
             jq -e --arg release "$RELEASE_SHA" --arg current "$current_main_sha" '
               type == "object" and
               .status == "ahead" and
@@ -1582,13 +1617,19 @@ jobs:
         if: env.ENVIRONMENT == 'staging'
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_API_HOLD_BUDGET_SECONDS: '600'
+          REPOSITORY: ${{ github.repository }}
         shell: bash
         run: |
           set -euo pipefail
-          current_main_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
+          current_main_sha="$(bash .github/scripts/resolve-main-sha.sh "$REPOSITORY")"
+          [[ "$current_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::Could not resolve exact current main before staging publication."
+            exit 1
+          }
           if [ "$current_main_sha" != "$RELEASE_SHA" ]; then
-            mainline_compare="$(gh api \
-              "repos/${{ github.repository }}/compare/$RELEASE_SHA...$current_main_sha")"
+            mainline_compare="$(bash .github/scripts/gh-api-hold.sh api \
+              "repos/$REPOSITORY/compare/$RELEASE_SHA...$current_main_sha")"
             jq -e --arg release "$RELEASE_SHA" --arg current "$current_main_sha" '
               type == "object" and
               .status == "ahead" and
@@ -1683,7 +1724,11 @@ jobs:
               exit 1
             }
           done
-          current_main_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
+          current_main_sha="$(bash .github/scripts/resolve-main-sha.sh "${{ github.repository }}")"
+          [[ "$current_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::Could not resolve exact current main before publication."
+            exit 1
+          }
           if [ "$current_main_sha" != "$RELEASE_SHA" ]; then
             mainline_compare="$(gh api \
               "repos/${{ github.repository }}/compare/$RELEASE_SHA...$current_main_sha")"
