@@ -34,7 +34,7 @@ const test = base.extend<{
       try {
         await runTest();
       } finally {
-        await testInfo.attach('auth-target-write-census', {
+        await testInfo.attach('auth-target-write-census.json', {
           body: JSON.stringify({
             attempted,
             completed,
