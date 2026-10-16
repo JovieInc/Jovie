@@ -182,6 +182,8 @@ describe('production marker attempt state', () => {
   ])(
     'executes the production reader CLI with %s retry evidence',
     async failureMode => {
+      const previousForceTty = process.env.GH_FORCE_TTY;
+      process.env.GH_FORCE_TTY = '1';
       const marker = normalRerunMarker();
       if (failureMode === 'pending') {
         marker.attemptRun.status = 'in_progress';
@@ -274,6 +276,15 @@ describe('production marker attempt state', () => {
           expect(
             calls.filter(call => call.includes('/artifacts?'))
           ).toHaveLength(6);
+          const zipCalls = processRunner.mock.calls.filter(
+            call =>
+              call[0] === 'gh' && String(call[1]?.[1] ?? '').endsWith('/zip')
+          );
+          expect(zipCalls.length).toBeGreaterThan(0);
+          for (const call of zipCalls) {
+            expect(call[2]?.env?.GH_FORCE_TTY).toBeUndefined();
+            expect(typeof call[2]?.stdio?.[1]).toBe('number');
+          }
         }
         expect(
           calls.every(
@@ -285,6 +296,8 @@ describe('production marker attempt state', () => {
           calls.some(call => /--method| -X |enqueue|\/statuses/.test(call))
         ).toBe(false);
       } finally {
+        if (previousForceTty === undefined) delete process.env.GH_FORCE_TTY;
+        else process.env.GH_FORCE_TTY = previousForceTty;
         process.argv = argv;
         output.mockRestore();
         processRunner.mockReset();
@@ -636,6 +649,32 @@ describe('production marker attempt state', () => {
         )
       ).toMatchObject({ state: 'manual', reason: 'invalid_context' });
     }
+  });
+
+  it('keeps a promoted-then-superseded generation verified on its descendant controller head', () => {
+    const head = 'b'.repeat(40);
+    const marker = primaryMarker('completed', 'success');
+    marker.attemptRun.head_sha = head;
+    for (const attemptJob of marker.attemptJobs) attemptJob.head_sha = head;
+    marker.payload = {
+      ...marker.payload,
+      terminalReason: 'skipped_superseded',
+    };
+
+    expect(
+      classifyProductionMarkerEvidence(
+        evidence({
+          markers: [marker],
+          descendantHeads: [head],
+          recoveryArtifacts: [],
+        })
+      )
+    ).toMatchObject({
+      state: 'verified',
+      reason: 'exact_attempt_verified',
+      controllerAttempt: 1,
+      deploymentId: 'dpl_primary123',
+    });
   });
 
   describe('post-verification publication failure (JOV-7724)', () => {

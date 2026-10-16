@@ -627,6 +627,9 @@ jobs:
                 --repo "$REPOSITORY" \
                 --controller-workflow-id "$controller_workflow_id")"
               deployed_marker_state="$(jq -r '.state // empty' <<<"$deployed_marker_json")"
+              deployed_marker_reason="$(jq -r '.reason // empty' <<<"$deployed_marker_json")"
+              deployed_marker_detail="$(jq -r '.detail // empty' <<<"$deployed_marker_json")"
+              echo "Deployed production marker $deployed_sha classified as $deployed_marker_state ($deployed_marker_reason)."
               case "$deployed_marker_state" in
                 verified)
                   jq -e '
@@ -644,7 +647,11 @@ jobs:
                   echo "::warning::Bootstrapping the release range from exact canonical live SHA $deployed_sha; the new target still requires the full production path and its own durable marker."
                   ;;
                 *)
-                  echo "::error::Canonical production marker state is not admissible as a release base ($deployed_marker_state)."
+                  echo "::error::Canonical production marker state is not admissible as a release base ($deployed_marker_state: $deployed_marker_reason)."
+                  if [ -n "$deployed_marker_detail" ] && [ "$deployed_marker_detail" != "$deployed_marker_reason" ]; then
+                    deployed_marker_detail_line="$(printf '%s' "$deployed_marker_detail" | tr '\n' ' ')"
+                    echo "::error::$deployed_marker_detail_line"
+                  fi
                   exit 1
                   ;;
               esac

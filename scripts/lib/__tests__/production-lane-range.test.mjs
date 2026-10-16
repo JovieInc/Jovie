@@ -587,6 +587,9 @@ describe('production lane range', () => {
       'Bootstrapping the release range from exact canonical live SHA'
     );
     expect(productionController).toContain(
+      'Canonical production marker state is not admissible as a release base ($deployed_marker_state: $deployed_marker_reason).'
+    );
+    expect(productionController).toContain(
       'if $lanes == "none" then [] else ($lanes | split(",")) end'
     );
     expect(productionController).toContain(

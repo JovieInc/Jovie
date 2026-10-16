@@ -1,7 +1,14 @@
 #!/usr/bin/env node
 
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  closeSync,
+  mkdtempSync,
+  openSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -909,21 +916,68 @@ function withProducerActivationEvidence(args, result) {
     : result;
 }
 
+function ghWantsFileStdout(args) {
+  return args.some(
+    arg => typeof arg === 'string' && /\/zip$/.test(arg.split('?')[0])
+  );
+}
+
+function spawnFailure(command, args, result) {
+  const stderr = Buffer.isBuffer(result.stderr)
+    ? result.stderr.toString('utf8')
+    : result.stderr;
+  throw new Error(
+    `${command} ${args.join(' ')} failed: ${stderr || 'unknown error'}`
+  );
+}
+
 function run(command, args, options = {}) {
-  const result = spawnSync(command, args, {
-    encoding: options.binary ? undefined : 'utf8',
-    maxBuffer: 32 * 1024 * 1024,
-    ...options,
-  });
-  if (result.status !== 0) {
-    const stderr = Buffer.isBuffer(result.stderr)
-      ? result.stderr.toString('utf8')
-      : result.stderr;
-    throw new Error(
-      `${command} ${args.join(' ')} failed: ${stderr || 'unknown error'}`
-    );
+  // gh 2.102 treats every GH_FORCE_TTY value, including 0, as a terminal and
+  // refuses application/zip. A pipe is not a sufficient substitute: write the
+  // body to a file and drop the variable. JSON reads keep the caller env.
+  if (!ghWantsFileStdout(args)) {
+    const result = spawnSync(command, args, {
+      encoding: options.binary ? undefined : 'utf8',
+      maxBuffer: 32 * 1024 * 1024,
+    });
+    if (result.status !== 0) spawnFailure(command, args, result);
+    return result.stdout;
   }
-  return result.stdout;
+  const env = { ...process.env };
+  delete env.GH_FORCE_TTY;
+  const file = join(
+    tmpdir(),
+    `jovie-gh-zip-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.bin`
+  );
+  const fd = openSync(file, 'w');
+  let result;
+  try {
+    result = spawnSync(command, args, {
+      env,
+      maxBuffer: 32 * 1024 * 1024,
+      stdio: ['ignore', fd, 'pipe'],
+    });
+  } finally {
+    closeSync(fd);
+  }
+  let stdout = Buffer.alloc(0);
+  try {
+    stdout = readFileSync(file);
+  } finally {
+    rmSync(file, { force: true });
+  }
+  // Reader doubles return the body on stdout and do not write the fd.
+  if (
+    stdout.length === 0 &&
+    result.stdout != null &&
+    result.stdout.length > 0
+  ) {
+    stdout = Buffer.isBuffer(result.stdout)
+      ? result.stdout
+      : Buffer.from(String(result.stdout));
+  }
+  if (result.status !== 0) spawnFailure(command, args, result);
+  return stdout;
 }
 
 function ghJson(endpoint) {
@@ -1215,6 +1269,13 @@ function main() {
       );
     }
   }
+  const detail =
+    result.detail && result.detail !== result.reason
+      ? ` ${String(result.detail).replace(/\s+/g, ' ').slice(0, 500)}`
+      : '';
+  process.stderr.write(
+    `production-marker-state ${result.state} ${result.reason}${detail}\n`
+  );
   process.stdout.write(`${JSON.stringify(result)}\n`);
 }
 
