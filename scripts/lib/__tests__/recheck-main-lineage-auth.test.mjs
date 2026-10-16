@@ -21,12 +21,18 @@ const gate = resolve(
 const token = 'harness-token';
 const encoded = Buffer.from(`x-access-token:${token}`).toString('base64');
 const repoRoot = resolve(import.meta.dirname, '../../..');
-const workflow = load(
-  readFileSync(
-    join(repoRoot, '.github/workflows/production-release.yml'),
-    'utf8'
-  )
-);
+
+/** @typedef {{ name?: string, uses?: string, run?: string, env?: Record<string, string>, with?: { 'sparse-checkout'?: string } }} WorkflowStep */
+
+const workflow =
+  /** @type {{ jobs: Record<string, { steps: WorkflowStep[] }> }} */ (
+    load(
+      readFileSync(
+        join(repoRoot, '.github/workflows/production-release.yml'),
+        'utf8'
+      )
+    )
+  );
 
 /** @param {{ mode?: string, wrongToken?: boolean, denyFetch?: boolean, job?: string, step?: string, compareOnly?: boolean }} [options] */
 async function recheck({
