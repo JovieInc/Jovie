@@ -3,12 +3,12 @@
   Do not edit manually — changes are overwritten on the next scheduled run.
 -->
 
-> Latest workflow run: [GitHub Actions](https://github.com/JovieInc/Jovie/actions/runs/38960101923)
+> Latest workflow run: [GitHub Actions](https://github.com/JovieInc/Jovie/actions/runs/38968913934)
 
 # Nightly Testing Agent — Daily Report
 
 Repo: jovie
-Generated: 2026-10-16T20:28:38.858Z
+Generated: 2026-10-16T21:44:00.747Z
 Workflow conclusion: success
 
 ## Evidence warnings
@@ -18,10 +18,10 @@ Workflow conclusion: success
 
 | Lane | Total | Passed | Failed | Flaky | Skipped |
 |---|---:|---:|---:|---:|---:|
-| unit | 10781 | 10752 | 0 | 0 | 29 |
-| unit | 9026 | 9023 | 0 | 0 | 3 |
-| unit | 8726 | 8708 | 0 | 0 | 18 |
-| unit | 8624 | 8616 | 0 | 0 | 8 |
+| unit | 8788 | 8786 | 0 | 0 | 2 |
+| unit | 10941 | 10903 | 0 | 0 | 38 |
+| unit | 8912 | 8903 | 0 | 0 | 9 |
+| unit | 8639 | 8630 | 0 | 0 | 9 |
 
 ## Selected Targets
 
