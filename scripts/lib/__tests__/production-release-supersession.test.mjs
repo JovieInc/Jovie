@@ -1141,6 +1141,57 @@ esac
     expect(current.outputs.superseded_sha).toBeUndefined();
   });
 
+  it.each([
+    ['exact', 'true'],
+    ['ahead', 'true'],
+    ['diverged', 'false'],
+  ])(
+    'rechecks %s staging main through git when the REST reset exceeds the job budget',
+    (mode, isCurrent) => {
+      const current = runRateLimitedAlias(
+        mode,
+        'staging-head',
+        'Resolve current main HEAD',
+        {
+          GH_API_HOLD_BUDGET_SECONDS: '60',
+          STUB_RATE_LIMIT_RESET: String(Math.floor(Date.now() / 1000) + 3600),
+        }
+      );
+      expect(current.result.status, current.result.stderr).toBe(0);
+      expect(current.result.stderr).toContain('outside the 60s budget');
+      expect(current.result.stderr).toContain('resolving main with git');
+      expect(current.outputs.is_current).toBe(isCurrent);
+    }
+  );
+
+  it('fails the staging recheck closed when both REST and git are unavailable', () => {
+    const unavailable = runRecheck(
+      'staging-head',
+      'Resolve current main HEAD',
+      EXPECTED_SHA,
+      'identical',
+      9,
+      {
+        GH_API_HOLD_BUDGET_SECONDS: '60',
+        MAIN_LINEAGE_REMOTE: join(tmpdir(), 'missing-lineage-remote'),
+        STUB_RATE_LIMIT_RESET: String(Math.floor(Date.now() / 1000) + 3600),
+      }
+    );
+    expect(unavailable.result.status).toBe(1);
+    expect(unavailable.result.stderr).toContain('outside the 60s budget');
+    expect(unavailable.result.stderr).toContain('git could not resolve main');
+    expect(unavailable.outputs.is_current).toBeUndefined();
+  });
+
+  it('checks out both scripts needed by the staging lineage recheck', () => {
+    const job = getJobBlock(RELEASE_WORKFLOW, 'staging-head');
+    expect(job).toContain('ref: ${{ inputs.expected_sha }}');
+    expect(job).toContain('persist-credentials: false');
+    expect(job).toMatch(
+      /sparse-checkout: \|\n\s+\.github\/scripts\/gh-api-hold\.sh\n\s+\.github\/scripts\/recheck-main-lineage\.sh/
+    );
+  });
+
   it('resolves an unchanged main through git when REST is rate limited', () => {
     const current = runRateLimitedAlias('exact');
     expect(current.result.status, current.result.stderr).toBe(0);
