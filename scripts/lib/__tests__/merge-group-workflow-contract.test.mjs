@@ -2872,18 +2872,35 @@ ${selectedGateScript}`,
       'EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$deployment_url"'
     );
     expect(resolve).toContain('EXPECTED_VERCEL_ENVIRONMENT=production');
+    // Trigger evidence stays on GitHub REST and defers when that quota is exhausted.
+    expect(resolve).toContain('source scripts/ci/gh-api-or-defer.sh');
+    expect(resolve).toContain("steps.trigger.outputs.quota_deferred != 'true'");
     // Commit identity and main ancestry must survive shared REST quota exhaustion.
     expect(resolve).toContain('commit_history="$(mktemp -d)"');
     expect(resolve).toContain('git init -q "$commit_history"');
     expect(resolve).toContain('fetch --quiet --no-tags --filter=blob:none');
     expect(resolve).toContain('"https://github.com/$REPOSITORY.git"');
-    expect(resolve).toContain('refs/heads/main:refs/heads/main');
+    expect(resolve).toContain('refs/heads/main:refs/remotes/origin/main');
+    expect(resolve).toContain('::add-mask::$git_basic_auth');
+    expect(resolve).toContain('-c http.extraheader=');
+    expect(resolve).toContain(
+      '--config-env="http.https://github.com/$REPOSITORY.git.extraheader=JOVIE_GIT_AUTH_HEADER"'
+    );
+    expect(resolve).toContain('GIT_TERMINAL_PROMPT=0');
+    expect(resolve).toContain('unset git_basic_auth');
+    expect(resolve).not.toContain('http.extraheader=AUTHORIZATION: bearer');
     expect(resolve).toContain('rev-parse --verify "$deployed_sha^{commit}"');
     expect(resolve).toContain(
-      'merge-base --is-ancestor "$commit_sha" refs/heads/main'
+      'merge-base --is-ancestor "$commit_sha" refs/remotes/origin/main'
     );
     expect(resolve).not.toContain('gh api "repos/$REPOSITORY/commits/');
     expect(resolve).not.toContain('gh api "repos/$REPOSITORY/compare/');
+    expect(resolve).not.toContain(
+      'read_github_json "repos/$REPOSITORY/commits/'
+    );
+    expect(resolve).not.toContain(
+      'read_github_json "repos/$REPOSITORY/compare/'
+    );
     expect(resolve).toContain(
       'Canonical production commit is not an ancestor of main.'
     );
