@@ -2,6 +2,18 @@ import { spawn } from 'node:child_process';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
+/**
+ * @typedef {Pick<import('node:child_process').ChildProcess, 'kill'> & Pick<import('node:events').EventEmitter, 'on'> & {
+ *   stdin: import('node:stream').Writable,
+ *   stdout: import('node:stream').Readable,
+ *   stderr: import('node:stream').Readable
+ * }} GuardChild
+ * @typedef {{stdio: ['pipe', 'pipe', 'pipe'], shell: false}} GuardSpawnOptions
+ * @typedef {(command: string, args: string[], options: GuardSpawnOptions) => GuardChild} GuardSpawn
+ * @typedef {Error & {code: string, effect: 'unknown',
+ *   observation?: {holds: {owner: string}[]}, reason?: string}} NativeBacklogGuardError
+ */
+
 const SCHEMA = 'jovie.backlog-writer-guard/v1';
 const OBSERVATION_SCHEMA = 'jovie.backlog-admission-observation/v1';
 const PREPARE_TIMEOUT_MS = 75_000;
@@ -33,7 +45,11 @@ const priorityIsValid = value =>
   Number.isInteger(value) && value >= 0 && value <= 4;
 
 function unknown(code, frame) {
-  const error = Object.assign(new Error(code), { code, effect: 'unknown' });
+  /** @type {NativeBacklogGuardError} */
+  const error = Object.assign(new Error(code), {
+    code,
+    effect: /** @type {const} */ ('unknown'),
+  });
   if (frame?.observation) error.observation = frame.observation;
   if (frame?.reason) error.reason = frame.reason;
   return error;
@@ -85,6 +101,8 @@ function freeze(value) {
  * Private transport for the installed read guard. This module never writes
  * Linear, journals admission, reserves work or interprets provider drain.
  * Dependency injection is in-process only; no CLI, packet or path override.
+ * @param {{identifier?: string, issueId?: string, expectedState?: string, expectedLinearUpdatedAt?: string | null}} delivery
+ * @param {{spawnImpl?: GuardSpawn, now?: () => number}} [dependencies]
  */
 export async function openNativeBacklogGuard(
   delivery,

@@ -49,21 +49,38 @@ const frame = (phase, details = {}) => ({
   ...details,
 });
 
+class FixtureChild extends EventEmitter {
+  stdout = new PassThrough();
+  stderr = new PassThrough();
+  stdin = new Writable();
+  controls = [];
+  kills = [];
+  /** @type {number | undefined} */
+  expiresAt;
+  send(value) {
+    return this.stdout.write(`${JSON.stringify(value)}\n`);
+  }
+  /** @param {number | null} [code] */
+  exit(code = 0) {
+    this.stdout.end();
+    this.emit('close', code, null);
+  }
+  kill(signal) {
+    this.kills.push(signal);
+    this.exit(null);
+    return true;
+  }
+  spawn = () => this;
+  calls = () => 0;
+}
+
+/** @param {{prepare?: ReturnType<typeof frame> | null, onControl?: (control: {op: string, nonce: string}, child: FixtureChild) => void, endCloses?: boolean}} [options] */
 function fakeProcess({
   prepare = frame('prepared'),
   onControl,
   endCloses = true,
 } = {}) {
-  const child = new EventEmitter();
-  child.stdout = new PassThrough();
-  child.stderr = new PassThrough();
-  child.controls = [];
-  child.kills = [];
-  child.send = value => child.stdout.write(`${JSON.stringify(value)}\n`);
-  child.exit = (code = 0) => {
-    child.stdout.end();
-    child.emit('close', code, null);
-  };
+  const child = new FixtureChild();
   child.stdin = new Writable({
     write(chunk, _encoding, done) {
       const control = JSON.parse(chunk.toString());
@@ -113,8 +130,19 @@ async function opened(t, options = {}, deps = {}) {
   return { child, guard };
 }
 
+/** @param {unknown} error @returns {error is import('../native-backlog-guard.mjs').NativeBacklogGuardError} */
+function isUnknown(error) {
+  return (
+    error instanceof Error &&
+    'effect' in error &&
+    error.effect === 'unknown' &&
+    'code' in error &&
+    typeof error.code === 'string'
+  );
+}
+
 function unknownCode(code) {
-  return error => error.code === code && error.effect === 'unknown';
+  return error => isUnknown(error) && error.code === code;
 }
 
 test('real private child completes fragmented preparation, lock checks and verified release', async t => {
@@ -202,6 +230,7 @@ test('real child EOF, wrong nonce, priority drift and coalesced output fail clos
       }
     `;
     let calls = 0;
+    /** @type {Awaited<ReturnType<typeof openNativeBacklogGuard>> | undefined} */
     let guard;
     await assert.rejects(
       async () => {
@@ -217,7 +246,7 @@ test('real child EOF, wrong nonce, priority drift and coalesced output fail clos
         });
         await guard.lock();
       },
-      error => error.effect === 'unknown'
+      error => isUnknown(error)
     );
     await guard?.close();
     assert.equal(calls, 1);
@@ -260,11 +289,11 @@ test('invalid bindings never spawn or accept executable path and environment ove
       openNativeBacklogGuard(
         { ...delivery(), ...change },
         {
+          ...{ guardPath: '/tmp/untrusted', env: { AUTH: 'untrusted' } },
           spawnImpl() {
             calls++;
+            throw Error('must not spawn');
           },
-          guardPath: '/tmp/untrusted',
-          env: { AUTH: 'untrusted' },
         }
       ),
       unknownCode('native-backlog-guard-binding-invalid')
@@ -279,6 +308,7 @@ test('invalid bindings never spawn or accept executable path and environment ove
     }),
     error =>
       unknownCode('native-backlog-guard-spawn-failed')(error) &&
+      error instanceof Error &&
       !error.message.includes('private')
   );
 });
@@ -321,6 +351,8 @@ test('named held custody is negative evidence and never a lock grant', async () 
   await assert.rejects(
     openNativeBacklogGuard(delivery(), { spawnImpl: child.spawn }),
     error => {
+      assert.ok(isUnknown(error));
+      assert.ok(error.observation);
       assert.equal(error.observation.holds[0].owner, 'incumbent');
       assert.equal(error.reason, 'canonical-claim-lock-busy');
       return unknownCode('native-backlog-guard-held')(error);
@@ -361,7 +393,7 @@ test('revalidation drift, wrong nonce and changed canonical inode/expiry are fat
         );
       },
     });
-    await assert.rejects(guard.lock(), error => error.effect === 'unknown');
+    await assert.rejects(guard.lock(), error => isUnknown(error));
     assert.equal(guard.signal.aborted, true);
     assert.equal(child.calls(), 1);
   }
@@ -436,7 +468,7 @@ test('malformed, oversized, partial and unsolicited/coalesced data never produce
       spawnImpl: child.spawn,
     });
     child.stdout.write(raw);
-    await assert.rejects(pending, error => error.effect === 'unknown');
+    await assert.rejects(pending, error => isUnknown(error));
     assert.equal(child.calls(), 1);
   }
   const partial = fakeProcess({ prepare: null });
@@ -445,7 +477,7 @@ test('malformed, oversized, partial and unsolicited/coalesced data never produce
   });
   partial.stdout.write('{"phase":');
   partial.exit(0);
-  await assert.rejects(pending, error => error.effect === 'unknown');
+  await assert.rejects(pending, error => isUnknown(error));
 });
 
 test('child death, stream error and unverified release cannot become successful completion', async t => {
@@ -459,7 +491,7 @@ test('child death, stream error and unverified release cannot become successful 
     action(child);
     await assert.rejects(
       guard.lock(),
-      error => error.effect === 'unknown' && !error.message.includes('private')
+      error => isUnknown(error) && !error.message.includes('private')
     );
     assert.equal(guard.signal.aborted, true);
   }
@@ -485,7 +517,7 @@ test('child death, stream error and unverified release cannot become successful 
       },
     });
     await guard.lock();
-    await assert.rejects(guard.finish(), error => error.effect === 'unknown');
+    await assert.rejects(guard.finish(), error => isUnknown(error));
   }
 });
 
@@ -503,7 +535,7 @@ test('concurrent control, close, and repeated operations never retry or release 
   await rejected;
   await guard.close();
   await guard.close();
-  await assert.rejects(guard.finish(), error => error.effect === 'unknown');
+  await assert.rejects(guard.finish(), error => isUnknown(error));
   assert.equal(child.calls(), 1);
   assert.equal(child.controls.length, 1);
 });
