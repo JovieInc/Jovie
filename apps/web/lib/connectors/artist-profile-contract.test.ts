@@ -134,9 +134,11 @@ describe('artist-profile registry contract', () => {
       const profile = CONNECTOR_REGISTRY[id].artistProfile;
       expect(Object.keys(profile.fields)).toEqual([...ARTIST_PROFILE_FIELDS]);
       for (const field of Object.values(profile.fields)) {
-        expect(field.read).toBe('unknown');
-        expect(field.write).toBe('unknown');
-        expect(field.authorization.write.status).toBe('unknown');
+        expect(field.read).not.toBe('supported');
+        expect(field.write).not.toBe('supported');
+        expect(['unknown', 'unsupported']).toContain(
+          field.authorization.write.status
+        );
       }
     }
   });

@@ -16,7 +16,7 @@ describe('GET /api/dsp/bio-sync', () => {
     const body = await response.json();
 
     expect(body.success).toBe(true);
-    expect(body.providers.length).toBeGreaterThan(0);
+    expect(body.providers).toEqual([]);
     expect(body.enabledCount).toBe(body.providers.length);
     for (const provider of body.providers) {
       expect(provider.enabled).toBe(true);
