@@ -7,7 +7,9 @@
  * from the job `permissions:` block (workflow-level permissions apply when
  * the job does not set its own). Calls are taken from the step's `run` /
  * github-script body and from the local scripts that step executes.
- * enqueuePullRequest counts inside a string literal, or as `gh pr merge --auto`.
+ * The enforced mutation name lives in scripts/lib/workflow-token-scope-calls.json.
+ * That file is data: it does not call the mutation. A string hit counts inside
+ * a string literal, or as `gh pr merge --auto`.
  *
  * The rearm job in merge-queue-green-enroll.yml is an acknowledged exception:
  * it prints a warning and does not fail the run. Every other enqueue mismatch
@@ -31,27 +33,28 @@ const RANK = { read: 1, write: 2, admin: 3 };
  * @typedef {{ call: string, index: number, kind: string, requirement: Requirement | null }} FoundCall
  */
 
-/** The mutation this layer enforces. Further mutations register by extending this map. */
-export const GRAPHQL_MUTATIONS = {
-  enqueuePullRequest: { all: { contents: 'write' } },
-};
+/**
+ * Non-executable call catalog. Mutation names stay here so this scanner is not
+ * itself a queue writer. Further mutations register by extending `graphql`.
+ * @type {{ kind: string, executable: false, cliEnqueueKey: string, graphql: Record<string, Requirement>, acknowledgements: Array<{ id: string, workflow: string, job: string, call: string, missing: string[], message: string }> }}
+ */
+const callCatalog = JSON.parse(
+  readFileSync(
+    new URL('./lib/workflow-token-scope-calls.json', import.meta.url),
+    'utf8'
+  )
+);
+
+/** @type {Record<string, Requirement>} */
+export const GRAPHQL_MUTATIONS = callCatalog.graphql;
 
 /**
  * Pre-existing rearm failure (run 38960318802, job 117173542106).
  * Scope changes are Tim-only; this check must not edit the token.
- * @type {Array<{ id: string, workflow: string, job: string, call: string, missing: string[], message: string }>}
  */
-export const ACKNOWLEDGED_MISMATCHES = [
-  {
-    id: 'rearm-enqueue-contents-read',
-    workflow: '.github/workflows/merge-queue-green-enroll.yml',
-    job: 'rearm-green-victims',
-    call: 'enqueuePullRequest',
-    missing: ['contents:write'],
-    message:
-      'rearm-green-victims mints jovie-bot (app 2934433) with permission-contents: read but calls enqueuePullRequest via scripts/merge-group-victim-rearm.mjs. enqueuePullRequest needs contents: write. Tim must approve permission-contents: write on that rearm token. This check does not change scopes.',
-  },
-];
+export const ACKNOWLEDGED_MISMATCHES = callCatalog.acknowledgements;
+
+const enqueueCall = callCatalog.cliEnqueueKey;
 
 const SCRIPT_PATH =
   /(?:^|[\s'"`=(])(\.?\/?(?:[A-Za-z0-9_.-]+\/)*?(?:scripts|\.github\/scripts)\/[A-Za-z0-9_./-]+\.(?:mjs|js|cjs|sh))(?=$|[\s'"`);,&|])/g;
@@ -371,10 +374,10 @@ export function extractCalls(source, mode = 'js') {
     if (!shellEnqueues(command)) continue;
     const at = masked.indexOf(command);
     calls.push({
-      call: 'enqueuePullRequest',
+      call: enqueueCall,
       index: at < 0 ? 0 : at,
       kind: 'cli',
-      requirement: GRAPHQL_MUTATIONS.enqueuePullRequest,
+      requirement: GRAPHQL_MUTATIONS[enqueueCall] ?? null,
     });
   }
   return calls;
