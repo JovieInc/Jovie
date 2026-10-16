@@ -625,36 +625,9 @@ jobs:
               deployed_marker_json="$(node .github/scripts/production-marker-state.mjs \
                 --sha "$deployed_sha" \
                 --repo "$REPOSITORY" \
-                --controller-workflow-id "$controller_workflow_id")"
+                --controller-workflow-id "$controller_workflow_id" \
+                --release-base "$EXPECTED_SHA")" || exit 1
               deployed_marker_state="$(jq -r '.state // empty' <<<"$deployed_marker_json")"
-              deployed_marker_reason="$(jq -r '.reason // empty' <<<"$deployed_marker_json")"
-              deployed_marker_detail="$(jq -r '.detail // empty' <<<"$deployed_marker_json")"
-              echo "Deployed production marker $deployed_sha classified as $deployed_marker_state ($deployed_marker_reason)."
-              case "$deployed_marker_state" in
-                verified)
-                  jq -e '
-                    (.deploymentId | type == "string" and test("^dpl_[A-Za-z0-9]+$"))
-                  ' >/dev/null <<<"$deployed_marker_json" || {
-                    echo "::error::Canonical production marker lacks an exact deployment ID."
-                    exit 1
-                  }
-                  ;;
-                none)
-                  if [ "$deployed_sha" = "$EXPECTED_SHA" ]; then
-                    echo "::error::Current production cannot bootstrap its own missing verified marker."
-                    exit 1
-                  fi
-                  echo "::warning::Bootstrapping the release range from exact canonical live SHA $deployed_sha; the new target still requires the full production path and its own durable marker."
-                  ;;
-                *)
-                  echo "::error::Canonical production marker state is not admissible as a release base ($deployed_marker_state: $deployed_marker_reason)."
-                  if [ -n "$deployed_marker_detail" ] && [ "$deployed_marker_detail" != "$deployed_marker_reason" ]; then
-                    deployed_marker_detail_line="$(printf '%s' "$deployed_marker_detail" | tr '\n' ' ')"
-                    echo "::error::$deployed_marker_detail_line"
-                  fi
-                  exit 1
-                  ;;
-              esac
             fi
 
             lane_range_json="$RUNNER_TEMP/production-lane-range.json"

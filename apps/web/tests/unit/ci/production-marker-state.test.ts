@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  admitReleaseBase,
   classifyProducerCoalescence,
   classifyProductionMarkerEvidence,
   normalizeProductionJobs,
@@ -682,6 +683,80 @@ describe('production marker attempt state', () => {
       reason: 'exact_attempt_verified',
       controllerAttempt: 1,
       deploymentId: 'dpl_primary123',
+    });
+  });
+
+  it('prints the classifier reason when a deployed marker cannot be a release base', () => {
+    const deployed = sha;
+    const release = 'b'.repeat(40);
+    expect(
+      admitReleaseBase(
+        {
+          state: 'manual',
+          reason: 'evidence_api_error',
+          detail: 'refusing to output binary content\n(application/zip)',
+        },
+        deployed,
+        release
+      )
+    ).toEqual({
+      ok: false,
+      errors: [
+        'Canonical production marker state is not admissible as a release base (manual: evidence_api_error).',
+        'refusing to output binary content (application/zip)',
+      ],
+    });
+    expect(
+      admitReleaseBase(
+        {
+          state: 'manual',
+          reason: 'duplicate_primary_marker',
+          detail: 'duplicate_primary_marker',
+        },
+        deployed,
+        release
+      ).errors
+    ).toEqual([
+      'Canonical production marker state is not admissible as a release base (manual: duplicate_primary_marker).',
+    ]);
+    expect(
+      admitReleaseBase(
+        {
+          state: 'verified',
+          reason: 'exact_attempt_verified',
+          deploymentId: 'dpl_primary123',
+        },
+        deployed,
+        release
+      )
+    ).toEqual({ ok: true, errors: [] });
+    expect(
+      admitReleaseBase(
+        {
+          state: 'verified',
+          reason: 'exact_attempt_verified',
+          deploymentId: 'not-applicable',
+        },
+        deployed,
+        release
+      ).ok
+    ).toBe(false);
+    expect(
+      admitReleaseBase(
+        { state: 'none', reason: 'no_marker' },
+        deployed,
+        deployed
+      ).ok
+    ).toBe(false);
+    expect(
+      admitReleaseBase(
+        { state: 'none', reason: 'no_marker' },
+        deployed,
+        release
+      )
+    ).toMatchObject({
+      ok: true,
+      warning: expect.stringContaining(deployed),
     });
   });
 

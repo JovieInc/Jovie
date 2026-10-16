@@ -1257,6 +1257,47 @@ function inspectOnline(args) {
   return withProducerActivationEvidence(args, result);
 }
 
+function annotationDetail(result) {
+  if (!result?.detail || result.detail === result.reason) return '';
+  return String(result.detail).replace(/\s+/g, ' ').slice(0, 500);
+}
+
+// Release-base admission stays here so the authorize run block stays under
+// GitHub's 21000-character expression cap. verified and a foreign `none`
+// may proceed; every other state fails closed with the classifier reason.
+export function admitReleaseBase(result, deployedSha, releaseSha) {
+  if (result?.state === 'verified') {
+    if (!/^dpl_[A-Za-z0-9]+$/.test(String(result.deploymentId ?? ''))) {
+      return {
+        ok: false,
+        errors: ['Canonical production marker lacks an exact deployment ID.'],
+      };
+    }
+    return { ok: true, errors: [] };
+  }
+  if (result?.state === 'none') {
+    if (deployedSha === releaseSha) {
+      return {
+        ok: false,
+        errors: [
+          'Current production cannot bootstrap its own missing verified marker.',
+        ],
+      };
+    }
+    return {
+      ok: true,
+      errors: [],
+      warning: `Bootstrapping the release range from exact canonical live SHA ${deployedSha}; the new target still requires the full production path and its own durable marker.`,
+    };
+  }
+  const errors = [
+    `Canonical production marker state is not admissible as a release base (${result?.state}: ${result?.reason}).`,
+  ];
+  const detail = annotationDetail(result);
+  if (detail) errors.push(detail);
+  return { ok: false, errors };
+}
+
 function main() {
   const args = parseArgs(process.argv.slice(2));
   let result;
@@ -1274,13 +1315,22 @@ function main() {
       );
     }
   }
-  const detail =
-    result.detail && result.detail !== result.reason
-      ? ` ${String(result.detail).replace(/\s+/g, ' ').slice(0, 500)}`
-      : '';
+  const detail = annotationDetail(result);
   process.stderr.write(
-    `production-marker-state ${result.state} ${result.reason}${detail}\n`
+    `production-marker-state ${result.state} ${result.reason}${detail ? ` ${detail}` : ''}\n`
   );
+  if (args['release-base']) {
+    const admission = admitReleaseBase(result, args.sha, args['release-base']);
+    if (admission.warning) {
+      process.stderr.write(`::warning::${admission.warning}\n`);
+    }
+    for (const error of admission.errors) {
+      process.stderr.write(`::error::${error}\n`);
+    }
+    process.stdout.write(`${JSON.stringify(result)}\n`);
+    if (!admission.ok) process.exitCode = 1;
+    return;
+  }
   process.stdout.write(`${JSON.stringify(result)}\n`);
 }
 
