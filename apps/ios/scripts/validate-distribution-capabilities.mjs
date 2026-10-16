@@ -21,10 +21,14 @@ export const DEBUG_ENTITLEMENTS = 'Jovie/Jovie.entitlements';
 export const TIM_PORTAL_STEP =
   'Tim must enable Push Notifications and Wallet on App ID ie.jov.Jovie, associate Pass Type ID pass.ie.jov.profile, and regenerate the match AppStore profile.';
 
-const PROFILE_DIRECTORY = path.join(
-  process.env.HOME ?? '',
-  'Library/Developer/Xcode/UserData/Provisioning Profiles'
-);
+/** Xcode 16+ installs into UserData. Older match/Xcode copies use MobileDevice. */
+export const PROVISIONING_PROFILE_DIRECTORY_SUFFIXES = [
+  'Library/Developer/Xcode/UserData/Provisioning Profiles',
+  'Library/MobileDevice/Provisioning Profiles',
+];
+
+const PROFILE_UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const defaultRepoRoot = path.resolve(scriptDir, '../../..');
@@ -73,14 +77,33 @@ export function parsePlist(xml) {
       return false;
     }
     if (source.startsWith('<integer>', index)) {
-      const end = source.indexOf('</integer>', index);
-      const value = Number(source.slice(index + '<integer>'.length, end));
-      index = end + '</integer>'.length;
-      return value;
+      return Number(parseTaggedText('integer'));
     }
+    if (source.startsWith('<real', index))
+      return Number(parseTaggedText('real'));
+    // Decoded .mobileprovision files carry CreationDate/ExpirationDate and
+    // DeveloperCertificates before Name. Skipping those types drops the profile.
+    if (source.startsWith('<date', index)) return parseTaggedText('date');
+    if (source.startsWith('<data', index)) return parseTaggedText('data');
     throw new Error(
       `Unsupported plist value near ${JSON.stringify(source.slice(index, index + 48))}`
     );
+  }
+
+  function parseTaggedText(tag) {
+    if (
+      source.startsWith(`<${tag}/>`, index) ||
+      source.startsWith(`<${tag} />`, index)
+    ) {
+      index = source.indexOf('>', index) + 1;
+      return '';
+    }
+    const open = source.indexOf('>', index);
+    const close = source.indexOf(`</${tag}>`, open + 1);
+    if (open < 0 || close < 0) throw new Error(`Unclosed plist ${tag}`);
+    const value = decodeXml(source.slice(open + 1, close)).trim();
+    index = close + `</${tag}>`.length;
+    return value;
   }
 
   function parseString() {
@@ -142,14 +165,42 @@ export function parsePlist(xml) {
   return parseValue();
 }
 
+function plistText(bytes) {
+  return bytes
+    .toString('utf8')
+    .replace(/^\uFEFF/, '')
+    .trimStart();
+}
+
+export function provisioningProfileDirectories(home = process.env.HOME ?? '') {
+  return PROVISIONING_PROFILE_DIRECTORY_SUFFIXES.map(suffix =>
+    path.join(home, suffix)
+  );
+}
+
 export function readPlist(filePath) {
-  if (filePath.endsWith('.mobileprovision')) {
-    const decoded = execFileSync('security', ['cms', '-D', '-i', filePath], {
-      encoding: 'utf8',
-    });
+  const bytes = readFileSync(filePath);
+  const head = plistText(bytes.subarray(0, 256));
+  const textual =
+    head.startsWith('<?xml') ||
+    head.startsWith('<plist') ||
+    head.startsWith('<dict') ||
+    head.startsWith('{');
+  if (filePath.endsWith('.mobileprovision') && !textual) {
+    let decoded;
+    try {
+      decoded = execFileSync('security', ['cms', '-D', '-i', filePath], {
+        encoding: 'utf8',
+      });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `Could not decode provisioning profile ${filePath}. ${detail}`
+      );
+    }
     return parsePlist(decoded);
   }
-  const text = readFileSync(filePath, 'utf8');
+  const text = bytes.toString('utf8');
   if (text.trimStart().startsWith('{')) return JSON.parse(text);
   return parsePlist(text);
 }
@@ -257,37 +308,129 @@ function profileHasPushAndWallet(profile) {
   );
 }
 
-function findProfiles(directory, name) {
+function profileEnvironment(options) {
+  return options.env ?? process.env;
+}
+
+function explicitProfilePath(options) {
+  if (options.profilePath) return options.profilePath;
+  const env = profileEnvironment(options);
+  return env.JOVIE_PROVISIONING_PROFILE || null;
+}
+
+function sighProfilePaths(env, profileName) {
+  const named = [];
+  const other = [];
+  for (const [key, value] of Object.entries(env)) {
+    if (!value || !key.startsWith('sigh_') || !key.endsWith('_profile-path')) {
+      continue;
+    }
+    const nameKey = `${key.slice(0, -'_profile-path'.length)}_profile-name`;
+    const entry = { path: value, name: env[nameKey] ?? null };
+    if (entry.name === profileName) named.push(entry);
+    else other.push(entry);
+  }
+  return [...named, ...other];
+}
+
+function sighProfileUuids(env) {
+  const uuids = [];
+  for (const [key, value] of Object.entries(env)) {
+    if (!key.startsWith('sigh_') || !value) continue;
+    if (
+      key.includes('_profile-') ||
+      key.endsWith('_team-id') ||
+      key.endsWith('_certificate-name')
+    ) {
+      continue;
+    }
+    if (PROFILE_UUID.test(value)) uuids.push(value);
+  }
+  return uuids;
+}
+
+function searchDirectories(options) {
+  if (options.profileDirectory) return [options.profileDirectory];
+  const env = profileEnvironment(options);
+  return provisioningProfileDirectories(options.home ?? env.HOME ?? '');
+}
+
+/**
+ * @param {string} directory
+ * @param {string} name
+ * @param {{ seen: number, decoded: number, failures: string[] }} report
+ */
+function findProfiles(directory, name, report) {
   if (!existsSync(directory)) return [];
   const matches = [];
   for (const entry of readdirSync(directory)) {
     if (!entry.endsWith('.mobileprovision')) continue;
+    report.seen += 1;
     const fullPath = path.join(directory, entry);
     try {
       const plist = readPlist(fullPath);
+      report.decoded += 1;
       if (plist?.Name === name) matches.push({ path: fullPath, plist });
-    } catch {
-      // Ignore profiles security cannot decode.
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      report.failures.push(`${fullPath}: ${detail}`);
     }
   }
   return matches;
 }
 
 function resolveProfile(options) {
-  if (options.profilePath) {
-    return { path: options.profilePath, plist: readPlist(options.profilePath) };
+  const explicit = explicitProfilePath(options);
+  if (explicit) {
+    return { path: explicit, plist: readPlist(explicit) };
   }
   if (!options.requireProfile) return null;
-  const directory = options.profileDirectory ?? PROFILE_DIRECTORY;
-  const matches = findProfiles(directory, options.profileName ?? PROFILE_NAME);
+
+  const env = profileEnvironment(options);
+  const name = options.profileName ?? PROFILE_NAME;
+  const directories = searchDirectories(options);
+  const installedSigh = sighProfilePaths(env, name).filter(entry =>
+    existsSync(entry.path)
+  );
+  if (installedSigh.length > 1) {
+    throw new Error(
+      `Capability mismatch: match exported ${installedSigh.length} provisioning profile paths. Archive was not started.`
+    );
+  }
+  if (installedSigh.length === 1) {
+    return {
+      path: installedSigh[0].path,
+      plist: readPlist(installedSigh[0].path),
+    };
+  }
+
+  for (const uuid of sighProfileUuids(env)) {
+    for (const directory of directories) {
+      const fullPath = path.join(directory, `${uuid}.mobileprovision`);
+      if (!existsSync(fullPath)) continue;
+      return { path: fullPath, plist: readPlist(fullPath) };
+    }
+  }
+
+  const report = { seen: 0, decoded: 0, failures: [] };
+  const matches = [];
+  for (const directory of directories) {
+    matches.push(...findProfiles(directory, name, report));
+  }
   if (matches.length === 1) return matches[0];
   if (matches.length > 1) {
     throw new Error(
-      `Capability mismatch: found ${matches.length} provisioning profiles named "${options.profileName ?? PROFILE_NAME}". Archive was not started.`
+      `Capability mismatch: found ${matches.length} provisioning profiles named "${name}". Archive was not started.`
     );
   }
+  if (report.decoded === 0 && report.failures.length > 0) {
+    throw new Error(
+      `Capability mismatch: provisioning profile "${name}" is installed but could not be decoded, so entitlements cannot be compared before archive. ${report.failures.join(' ')}`
+    );
+  }
+  const searched = directories.join(', ');
   throw new Error(
-    `Capability mismatch: provisioning profile "${options.profileName ?? PROFILE_NAME}" is not installed, so entitlements cannot be compared before archive.`
+    `Capability mismatch: provisioning profile "${name}" is not installed, so entitlements cannot be compared before archive. Searched ${searched}.`
   );
 }
 
@@ -321,6 +464,8 @@ function mustContain(entitlements, label) {
  *   repoRoot?: string,
  *   profilePath?: string,
  *   profileDirectory?: string,
+ *   home?: string,
+ *   env?: Record<string, string | undefined>,
  *   requireProfile?: boolean,
  *   profileName?: string,
  * }} [options]
@@ -519,9 +664,6 @@ function readArgs(argv) {
     } else {
       throw new Error(`Unknown argument ${arg}`);
     }
-  }
-  if (process.env.JOVIE_PROVISIONING_PROFILE) {
-    options.profilePath = process.env.JOVIE_PROVISIONING_PROFILE;
   }
   return options;
 }
