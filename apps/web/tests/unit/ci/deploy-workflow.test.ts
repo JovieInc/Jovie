@@ -4275,6 +4275,9 @@ describe('production promotion exact-artifact contract', () => {
     expect(mutationHead).toContain(
       'bash "$GITHUB_WORKSPACE/.github/scripts/recheck-main-lineage.sh" "at production mutation"'
     );
+    expect(mutationHead).toContain('MAIN_LINEAGE_TRANSPORT: git');
+    expect(mutationHead).not.toContain('GH_API_HOLD_BUDGET_SECONDS');
+    expect(mutationHead).not.toContain('gh-api-hold.sh');
     const lineageScript = readFileSync(
       resolve(repoRoot, '.github/scripts/recheck-main-lineage.sh'),
       'utf8'
@@ -4338,6 +4341,9 @@ describe('production promotion exact-artifact contract', () => {
     const result = getJobBlock(reusable, 'release-result');
 
     expect(finalCurrent).toContain('recheck-main-lineage.sh');
+    expect(finalCurrent).toContain('MAIN_LINEAGE_TRANSPORT: git');
+    expect(finalCurrent).not.toContain('GH_API_HOLD_BUDGET_SECONDS');
+    expect(finalCurrent).not.toContain('gh-api-hold.sh');
     const lineageScript = readFileSync(
       resolve(repoRoot, '.github/scripts/recheck-main-lineage.sh'),
       'utf8'

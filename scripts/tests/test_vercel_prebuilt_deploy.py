@@ -820,27 +820,81 @@ exit 0
     return fake_vercel
 
 
+def _promotion_lineage_remote(tmp_path: Path, mode: str) -> tuple[Path, str, str]:
+    """Build a local main the git-only promotion recheck can prove.
+
+    The controller no longer asks `gh` for main. `exact` keeps the release SHA
+    equal to main. `diverged` rewrites main so the release SHA is no longer an
+    ancestor and the controller must yield the observed tip.
+    """
+    src = tmp_path / "lineage-src"
+    src.mkdir()
+    env = {
+        **os.environ,
+        "GIT_AUTHOR_NAME": "Lineage",
+        "GIT_AUTHOR_EMAIL": "lineage@example.com",
+        "GIT_COMMITTER_NAME": "Lineage",
+        "GIT_COMMITTER_EMAIL": "lineage@example.com",
+    }
+
+    def git(*args: str) -> str:
+        result = subprocess.run(
+            ["git", *args],
+            cwd=src,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout.strip()
+
+    git("init", "-q", "-b", "main")
+    (src / "file").write_text("base\n")
+    git("add", "file")
+    git("commit", "-qm", "base")
+    base = git("rev-parse", "HEAD")
+    if mode == "diverged":
+        git("checkout", "-q", "--orphan", "rewritten")
+        (src / "other").write_text("other\n")
+        git("add", "other")
+        git("commit", "-qm", "rewritten")
+        git("branch", "-M", "main")
+    elif mode != "exact":
+        raise ValueError(f"unknown lineage mode: {mode}")
+    tip = git("rev-parse", "HEAD")
+    expected = tip if mode == "exact" else base
+    return src, expected, tip
+
+
 def _run_promotion_controller(
-    tmp_path: Path, scenario: str, *, main_sha: str | None = None
+    tmp_path: Path, scenario: str, *, lineage: str = "exact"
 ) -> subprocess.CompletedProcess[str]:
     fake_vercel = _write_fake_promotion_vercel(tmp_path)
+    remote, expected_main_sha, main_sha = _promotion_lineage_remote(
+        tmp_path, lineage
+    )
+    (tmp_path / "lineage-expected").write_text(expected_main_sha)
+    (tmp_path / "lineage-tip").write_text(main_sha)
+    # Git transport must not fall back to a stub SHA. A call here fails closed.
     fake_gh = tmp_path / "gh"
     fake_gh.write_text(
         "#!/usr/bin/env bash\n"
         "set -euo pipefail\n"
-        "printf '%s\\n' \"${FAKE_MAIN_SHA}\"\n"
+        "printf '%s\\n' \"$*\" >> \"$GH_CALL_LOG\"\n"
+        "echo 'promotion lineage must not call gh' >&2\n"
+        "exit 1\n"
     )
     fake_gh.chmod(0o755)
-    expected_main_sha = "a" * 40
     env = {
         **os.environ,
         "FAKE_SCENARIO": scenario,
         "PRODUCTION_DEPLOYMENT_ID": "dpl_target",
         "EXPECTED_MAIN_SHA": expected_main_sha,
-        "FAKE_MAIN_SHA": main_sha or expected_main_sha,
         "GITHUB_REPOSITORY": "jovie/jovie",
         "GH_TOKEN": "github-token",
         "GH_CLI": str(fake_gh),
+        "GH_CALL_LOG": str(tmp_path / "gh-calls"),
+        "MAIN_LINEAGE_REMOTE": str(remote),
         "PRODUCTION_PROMOTION_POLL_SECONDS": "0",
         "PRODUCTION_PROMOTION_SETTLE_ATTEMPTS": "4",
         "PRODUCTION_PROMOTION_CLEANUP_ATTEMPTS": "2",
@@ -919,7 +973,7 @@ def test_promotion_controller_rejects_foreign_rollout_without_mutation(
     outputs = (tmp_path / "github-output").read_text()
     assert "previous_production_deployment_id=dpl_previous" in outputs
     assert "previous_production_deployment_url=" not in outputs
-    assert f"promotion_sha={'a' * 40}" in outputs
+    assert f"promotion_sha={(tmp_path / 'lineage-expected').read_text()}" in outputs
     assert "is_current=" not in outputs
     assert "failure_subtype=production_promotion_foreign_rollout" in outputs
 
@@ -927,16 +981,18 @@ def test_promotion_controller_rejects_foreign_rollout_without_mutation(
 def test_promotion_controller_emits_observed_newer_sha_without_mutation(
     tmp_path: Path,
 ) -> None:
-    newer_sha = "b" * 40
-    result = _run_promotion_controller(
-        tmp_path, "standard", main_sha=newer_sha
-    )
+    result = _run_promotion_controller(tmp_path, "standard", lineage="diverged")
 
     assert result.returncode == 0, result.stdout + result.stderr
     calls = (tmp_path / "vercel-calls").read_text()
     assert "promote dpl_target" not in calls
+    expected = (tmp_path / "lineage-expected").read_text()
+    newer_sha = (tmp_path / "lineage-tip").read_text()
+    assert newer_sha != expected
+    assert len(newer_sha) == 40
     outputs = (tmp_path / "github-output").read_text()
     assert f"promotion_sha={newer_sha}" in outputs
+    assert f"promotion_sha={expected}" not in outputs
     assert "is_current=" not in outputs
 
 

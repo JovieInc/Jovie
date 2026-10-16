@@ -3,7 +3,6 @@ set -euo pipefail
 
 deploy_id="${PRODUCTION_DEPLOYMENT_ID:-}"
 vercel_cli="${VERCEL_CLI:-./node_modules/.bin/vercel}"
-gh_cli="${GH_CLI:-gh}"
 expected_main_sha="${EXPECTED_MAIN_SHA:-}"
 repository="${GITHUB_REPOSITORY:-}"
 poll_seconds="${PRODUCTION_PROMOTION_POLL_SECONDS:-5}"
@@ -367,12 +366,13 @@ echo "Current production deployment before promotion: $previous_id ($previous_ur
 
 # Main may advance while the staged production artifact is inspected. Bind the
 # mutation inside this controller, immediately after authoritative Vercel state
-# discovery and before any promote/rollout command.
+# discovery and before any promote/rollout command. Lineage is git ls-remote
+# plus merge-base, so an exhausted installation quota cannot block promotion.
+# Unproven ancestry still fails closed. A proven rewind yields.
 lineage_output="$(mktemp)"
-# Keep boolean evidence local: Doppler can mask it across job outputs. The
-# shared recheck proves ancestry with authenticated git if REST stays exhausted.
-if ! GITHUB_OUTPUT="$lineage_output" GH_CLI="$gh_cli" \
-  GH_API_HOLD_BUDGET_SECONDS="${GH_API_HOLD_BUDGET_SECONDS:-240}" \
+# Keep boolean evidence local: Doppler can mask it across job outputs.
+if ! GITHUB_OUTPUT="$lineage_output" \
+  MAIN_LINEAGE_TRANSPORT=git \
   EXPECTED_SHA="$expected_main_sha" \
   bash "$(dirname "$0")/recheck-main-lineage.sh" "inside production promotion"; then
   rm -f "$lineage_output"
