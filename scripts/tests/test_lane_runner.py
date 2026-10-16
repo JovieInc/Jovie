@@ -361,55 +361,66 @@ class SelectionTest(unittest.TestCase):
         task.description = "Change live `/pricing` schema fixture and pricing to $199"
         self.assertIsNone(lane.pick_issue([task], {}, provider="codex"))
 
-    def test_negative_constraints_and_read_only_route_evidence_do_not_request_mutation(self):
+    def pricing_comparison_issue(self):
         task = issue("JOV-7863", labels=["agent-ready"])
-        task.title = "Marketing header and compact footer layout"
-        evidence = (
-            "Compare [design](https://linear.app/jovie/issue/JOV-6180/certify-against-live-pen), "
-            "comparing live [jov.ie/pricing](<http://jov.ie/pricing>) at 1440."
+        task.title = 'Marketing header shows "Request access" and /pricing renders the compact footer'
+        task.description = (
+            "Found in the studio header/footer certification pass "
+            "([JOV-6180](https://linear.app/jovie/issue/JOV-6180/certify-against-live-pen)), "
+            "comparing live [jov.ie/pricing](<http://jov.ie/pricing>) at 1440 on 2026-10-04 "
+            "against Pen's canonical eoUUU and CCDnQ.\n\n"
+            "The /pricing header CTA reads Request access. Every claim enters /start. "
+            "Marketing pages must render the full SEO footer. Acceptance asserts the "
+            "header label, destination and full footer at 1440 and 390."
         )
-        for constraint in (
-            "Do not rotate secrets/credentials.",
-            "Never revoke production API keys.",
-            "No credential rotation or new grants are authorized.",
-            "Do not rotate credentials. No token revocation.",
-            "Do not rotate credentials; no token revocation.",
-            "Verify the live `/pricing` layout.",
-            evidence,
-        ):
-            with self.subTest(constraint=constraint):
-                task.description = constraint
-                self.assertEqual(lane.pick_issue([task], {}, provider="codex"), task)
+        return task
 
-    def test_safe_reference_does_not_hide_requested_price_or_credential_changes(self):
-        task = issue("JOV-7863", labels=["agent-ready"])
-        task.title = "Marketing header and compact footer layout"
+    def test_recorded_route_comparison_is_not_a_live_price_change(self):
+        task = self.pricing_comparison_issue()
+        self.assertEqual(lane.pick_issue([task], {}, provider="codex"), task)
+
+    def test_route_observation_cannot_mask_a_requested_mutation(self):
+        task = self.pricing_comparison_issue()
+        evidence = task.description
         for instruction in (
-            "Change live [pricing](https://jov.ie/pricing) to $199",
-            "Change live [jov.ie/pricing](https://jov.ie/pricing) to $199",
-            "Compare live /pricing and change production prices to $199",
-            "Do not rotate secrets, but revoke production keys",
-            "No credential rotation; rotate the production token",
-            "Do not rotate credentials unless the login fails",
-            "No token revocation except for stale sessions",
-            "Unless the login fails, do not rotate credentials.",
-            "If the login works, do not revoke production tokens.",
-            "Unless the login fails,\ndo not rotate credentials.",
-            "If the login fails:\n\nDo not rotate credentials.",
-            "Compare live [revoke API keys /pricing](https://jov.ie/pricing).",
-            "Verify live [change production prices /pricing](https://jov.ie/pricing).",
-            "Compare live [rotation of secrets /pricing](https://jov.ie/pricing).",
-            "Rotate production credentials",
+            "Change it to $199.",
+            "Set that amount to 199.",
+            "Lower it to 199.",
+            "Synchronize that amount with the paid plan.",
+            "Update the footer label.",  # Ambiguous mutation context stays conservative.
+            "Rotate production credentials.",
+            "Revoke production API keys.",
+            "Change live production prices.",
         ):
-            for prefix in ("", "Do not rotate secrets/credentials.\nCompare live /pricing.\n"):
-                with self.subTest(instruction=instruction, prefix=prefix):
-                    task.description = prefix + instruction
+            for description in (instruction + "\n\n" + evidence, evidence + "\n\n" + instruction):
+                with self.subTest(instruction=instruction, prefix=description.startswith(instruction)):
+                    task.description = description
                     self.assertIsNone(lane.pick_issue([task], {}, provider="codex"))
 
-    def test_text_exemptions_preserve_sensitive_provider_and_explicit_label_policy(self):
-        task = issue("JOV-7863", labels=["infra"])
-        task.title = "Verify public page layout"
-        task.description = "Do not rotate secrets/credentials."
+    def test_generic_references_and_credential_negation_keep_the_existing_hold(self):
+        task = issue("JOV-7863", labels=["agent-ready"])
+        task.title = "Marketing header and compact footer layout"
+        for description in (
+            "Inspect live /pricing, then change it to $199.",
+            "Compare live `/pricing`, then change it to $199.",
+            "Compare live [revoke API keys /pricing](https://jov.ie/pricing).",
+            "Verify live [change production prices /pricing](https://jov.ie/pricing).",
+            "Change live [pricing](https://jov.ie/pricing) to $199.",
+            "Change live [jov.ie/pricing](https://jov.ie/pricing) to $199.",
+            "Do not rotate credentials.",
+            "Do not rotate credentials. No token revocation.",
+            "Unless the login fails, do not rotate credentials.",
+            "Unless the login fails,\ndo not rotate credentials.",
+            "In the event of an outage:\n\nDo not rotate credentials.",
+            "Only during deployment:\n\nDo not rotate credentials.",
+        ):
+            with self.subTest(description=description):
+                task.description = description
+                self.assertIsNone(lane.pick_issue([task], {}, provider="codex"))
+
+    def test_recorded_reference_preserves_sensitive_provider_and_explicit_label_policy(self):
+        task = self.pricing_comparison_issue()
+        task.labels.append("infra")
         self.assertIsNone(lane.pick_issue([task], {}, provider="grok"))
         self.assertEqual(lane.pick_issue([task], {}, provider="codex"), task)
         task.labels.append("hold")

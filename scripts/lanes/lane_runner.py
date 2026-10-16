@@ -559,32 +559,19 @@ def issue_hits_red_line(issue: Issue) -> bool:
     # A Markdown destination is evidence, not an instruction. Keep its visible
     # label so e.g. "Change live [pricing](...)" still hits the same policy.
     text = re.sub(r"\]\(\s*<?https?://[^\s)]+>?\s*\)", "]", text)
-    objects = r"(?:secret|credential|token|key)s?"
-    prohibition = (
-        rf"(?:(?:do not|must not|never)\s+(?:rotate|revoke)\s+"
-        rf"(?:(?:any|other|the|production|project|api)\s+)*{objects}"
-        rf"(?:\s*/\s*{objects})*|"
-        rf"no\s+{objects}\s+(?:rotation|revocation)"
-        rf"(?:\s+or\s+new\s+grants)?(?:\s+(?:is|are)\s+authorized)?"
-        rf")"
-    )
+    # Only a recorded design comparison qualifies here. Imperative route
+    # references and ambiguous price-change context retain the original hold.
     safe_spans = []
-    # Interpret only isolated, unconditional prohibitions. Conditions elsewhere
-    # in the issue may qualify a denial; leave those ambiguous requests held.
-    if not re.search(r"\b(?:if|unless|except|until|without|when|once|provided|after|before|while)\b", text, re.IGNORECASE):
-        for paragraph in re.finditer(r"[^\n]+(?:\n(?![ \t]*\n)[^\n]+)*", text):
-            if re.fullmatch(rf"\s*(?:[-*]\s+)?{prohibition}"
-                            rf"(?:\s*[.;]\s*(?:[-*]\s+)?{prohibition})*\s*[.;]?\s*",
-                            paragraph.group(0), re.IGNORECASE):
-                safe_spans.append(paragraph.span())
-    # A literal rendered route is evidence. Free-form link labels can contain
-    # instructions, so they must not create a span covering another red line.
-    route_reference = (
-        r"\b(?:compare|comparing|inspect|inspecting|verify|verifying|validate|validating)"
-        r"\s+(?:the\s+)?live\s+(?:\[(?:(?:https?://)?(?:[a-z0-9-]+\.)+[a-z]{2,63})?"
-        r"/pricing\]|`/pricing`|/pricing)"
-    )
-    safe_spans.extend(match.span() for match in re.finditer(route_reference, text, re.IGNORECASE))
+    mutations = (r"\b(?:chang|updat|set|rais|lower|repric|charg|adjust|modif|replac|"
+                 r"writ|appl|overwrit|cop|sync|match|fix|mak|increas|decreas)\w*\b|"
+                 r"[$€£]|\b(?:USD|EUR|GBP)\b")
+    if not re.search(mutations, text, re.IGNORECASE):
+        reference = (
+            r"\bcomparing\s+live\s+\[(?:https?://)?(?:[a-z0-9-]+\.)+[a-z]{2,63}/pricing\]"
+            r"\s+at\s+\d{3,4}\s+on\s+\d{4}-\d{2}-\d{2}"
+            r"\s+against\s+Pen's\s+canonical\s+[a-z0-9]+(?:\s+and\s+[a-z0-9]+)?\."
+        )
+        safe_spans = [match.span() for match in re.finditer(reference, text, re.IGNORECASE)]
     for match in SENSITIVE_RED_LINES.finditer(text):
         if any(start <= match.start() and match.end() <= end for start, end in safe_spans):
             continue
