@@ -45,10 +45,20 @@ SPEC.loader.exec_module(lane)
 # these unit tests must neither depend on host capacity nor sweep host caches.
 _disk_capacity_fixture = patch.object(lane.disk_guard, "free_pct", return_value=50.0)
 _devin_free_fixture = patch.object(lane.devin_free_policy, "admission_open", return_value=True)
+# These lifecycle fixtures have synthetic heads/trees. Real checkout safety and
+# command-entry refusal are exercised in test_qualification_guard.py.
+_qualification_fixture = patch.object(lane.qualification_guard, "check",
+    return_value={"fixtureSha256": "synthetic-isolated-checkout"})
+_qualification_prepare_fixture = patch.object(lane.qualification_guard, "prepare_checkout",
+    return_value={"fixtureSha256": "synthetic-isolated-checkout"})
 def setUpModule():
+    _qualification_prepare_fixture.start()
     _disk_capacity_fixture.start()
     _devin_free_fixture.start()
+    _qualification_fixture.start()
 def tearDownModule():
+    _qualification_prepare_fixture.stop()
+    _qualification_fixture.stop()
     _devin_free_fixture.stop()
     _disk_capacity_fixture.stop()
 

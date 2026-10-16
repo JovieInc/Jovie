@@ -67,6 +67,7 @@ import worktree_pool  # noqa: E402  (pre-installed worktree pool, JOV-7705)
 import reason_lane  # noqa: E402
 import yc_corpus  # noqa: E402
 import design_gate  # noqa: E402  (IA-first admission for UI and landing work)
+import qualification_guard  # noqa: E402
 import dependency_diff  # noqa: E402  (immutable dependency-version chore evidence)
 import bindings  # noqa: E402  (extra Linear team -> repo bindings, e.g. LYB)
 import epics  # noqa: E402  (epic decomposition/closure and the expiring hold)
@@ -119,7 +120,8 @@ LANE_TESTS = ["scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_a
               "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
               "scripts/tests/test_gh_app_token.py", "scripts/tests/test_linear_app_token.py",
-              "scripts/tests/test_disk_guard.py", "scripts/tests/test_continuity_clock.py",
+              "scripts/tests/test_disk_guard.py", "scripts/tests/test_qualification_guard.py",
+              "scripts/tests/test_continuity_clock.py",
               "scripts/tests/test_worktree_sweep.py", "scripts/tests/test_service_census.py",
               "scripts/tests/test_worktree_pool.py",
               "scripts/tests/test_design_gate.py",
@@ -2860,7 +2862,8 @@ def gate_slot(host: Host) -> tuple[Locked, float]:
 GATE_RESULT_SCHEMA = "jovie.lane-gate-result/v1"
 def gate_policy_digest() -> str:
     return hashlib.sha256(Path(__file__).read_bytes() + b"\0dependency_diff\0" +
-                          Path(dependency_diff.__file__).read_bytes()).hexdigest()
+                          Path(dependency_diff.__file__).read_bytes() + b"\0qualification_guard\0" +
+                          Path(qualification_guard.__file__).read_bytes()).hexdigest()
 
 
 GATE_POLICY_DIGEST = gate_policy_digest()
@@ -3012,6 +3015,14 @@ def gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool = False,
             claim.lock.release()
 
 
+def require_qualification_checkout(pr: dict, worktree: Path, stage: str) -> dict:
+    """A failed safety observation is a deferral, never completed gate evidence."""
+    try:
+        return qualification_guard.check(worktree, pr["headRefOid"])
+    except qualification_guard.CheckoutHeld as error:
+        raise RepairStopped(f"qualification-safety:{error}", pr, stage) from error
+
+
 def _gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool, claim: GateClaim, *, result: dict) -> dict:
     """The independent gate for one PR head: diff rules, the canonical repo gate, then land."""
     revoked = publication_revocation(host, pr.get("headRefName"))
@@ -3020,13 +3031,18 @@ def _gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool, claim: 
                 "verdict": "revoked",
                 "reasons": [f"publication-revoked:{revoked.get('reason', '?')}"],
                 "revocation": revoked}
-    for command in (["git", "fetch", "-q", "origin", f"pull/{pr['number']}/head"],
-                    ["git", "checkout", "-q", "--detach", pr["headRefOid"]]):
-        if sh(command, cwd=worktree, log=log).returncode != 0:
-            raise RepairStopped("gate-checkout-failed", pr, "before-gate-checks")
+    # Fetch may invoke local reference hooks; qualification must not execute them.
+    if sh(["git", "-c", "core.hooksPath=" + os.devnull, "-c", "core.fsmonitor=false",
+           "fetch", "-q", "origin", f"pull/{pr['number']}/head"], cwd=worktree, log=log).returncode != 0:
+        raise RepairStopped("gate-checkout-failed", pr, "before-gate-checks")
+    try:
+        qualification_guard.prepare_checkout(worktree, pr["headRefOid"])
+    except qualification_guard.CheckoutHeld as error:
+        raise RepairStopped(f"qualification-safety:{error}", pr, "before-gate-checks") from error
     checked_head = sh(["git", "rev-parse", "HEAD"], cwd=worktree)
     if checked_head.returncode or checked_head.stdout.strip() != pr["headRefOid"]:
         raise RepairStopped("gate-checkout-head-mismatch", pr, "before-gate-checks")
+    result["qualificationSafety"] = require_qualification_checkout(pr, worktree, "before-gate-checks")
     numstat = sh(["git", "diff", "--numstat", "origin/main...HEAD"], cwd=worktree).stdout
     changes = parse_numstat(numstat)
     reasons, versions = gate_assessment(changes, SENSITIVE_REVIEWABLE_LINES if sensitive else MAX_REVIEWABLE_LINES,
@@ -3045,6 +3061,7 @@ def _gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool, claim: 
         try:
             for command in commands:
                 require_gate_command_authority(host, pr, worktree, "before-gate-command", sensitive)
+                result["qualificationSafety"] = require_qualification_checkout(pr, worktree, "before-gate-command")
                 try:
                     ran = sh(command, cwd=worktree, timeout=host.gate_timeout, log=log, stream=True,
                              pass_fds=(claim.lock.handle.fileno(), seat.handle.fileno()))
@@ -3064,6 +3081,7 @@ def _gate_pr(host: Host, pr: dict, worktree: Path, log, sensitive: bool, claim: 
                                  if re.search(r"(?i)error|fail|missing|expected|✗|×", line)][-40:]
             if sensitive and not reasons:
                 require_gate_command_authority(host, pr, worktree, "before-sensitive-review", sensitive)
+                result["qualificationSafety"] = require_qualification_checkout(pr, worktree, "before-sensitive-review")
                 passed, review_reasons = sensitive_review(host, pr, worktree, log,
                     pass_fds=(claim.lock.handle.fileno(), *([seat.handle.fileno()] if seat else [])))
                 if not passed:
