@@ -19,12 +19,14 @@ import { withDbSessionTx } from '@/lib/auth/session';
 import { CACHE_TAGS, CACHE_TTL } from '@/lib/cache/tags';
 import { isMissingConnectorSchemaError } from '@/lib/connectors/schema-errors';
 import { type DbOrTransaction, doesTableExist } from '@/lib/db';
+import { DB_CONFIG, isRetryableError } from '@/lib/db/client/retry';
 import { getAvatarQualityForProfile } from '@/lib/db/queries/avatar-quality';
 import {
   dashboardQuery,
   isPostgresTimeoutError,
   isQueryTimeoutError,
   QUERY_TIMEOUTS,
+  setStatementTimeout,
 } from '@/lib/db/query-timeout';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
 import { userSettings, users } from '@/lib/db/schema/auth';
@@ -67,6 +69,7 @@ import {
   UNKNOWN_AVATAR_QUALITY,
 } from '@/lib/profile/avatar-quality';
 import { calculateRequiredProfileCompletion } from '@/lib/profile/completion';
+import { executeWithRetry } from '@/lib/resilience/primitives';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 import { isMissingTourDatesConfirmationStatusError } from '@/lib/tour-dates/queries';
 import { mapSocialLinkExistence } from './social-link-utils';
@@ -212,7 +215,7 @@ type BioLinkActivationEventType =
   (typeof BIO_LINK_ACTIVATION_EVENT_TYPES)[number];
 
 async function buildBioLinkActivation(
-  tx: DbOrTransaction,
+  clerkUserId: string,
   profile: Pick<CreatorProfile, 'id' | 'onboardingCompletedAt'>
 ): Promise<BioLinkActivation | null> {
   const windowEndsAt = getBioLinkActivationWindowEnd(
@@ -236,31 +239,47 @@ async function buildBioLinkActivation(
   );
 
   if (hasDistributionEventsTable) {
-    const eventRows = await dashboardQuery(
+    // Schema discovery may acquire a different pooled connection. Finish it
+    // before opening the RLS transaction so it cannot idle while waiting.
+    const eventRows = await executeWithRetry(
       () =>
-        tx
-          .select({
-            createdAt: creatorDistributionEvents.createdAt,
-            eventType: creatorDistributionEvents.eventType,
-          })
-          .from(creatorDistributionEvents)
-          .where(
-            and(
-              eq(creatorDistributionEvents.creatorProfileId, profile.id),
-              eq(
-                creatorDistributionEvents.platform,
-                INSTAGRAM_DISTRIBUTION_PLATFORM
-              ),
-              inArray(
-                creatorDistributionEvents.eventType,
-                BIO_LINK_ACTIVATION_EVENT_TYPES
+        withDbSessionTx(
+          async tx => {
+            // Await PostgreSQL cancellation instead of racing a JS timer against
+            // SQL that could still be running when Drizzle queues COMMIT/ROLLBACK.
+            await setStatementTimeout(tx, QUERY_TIMEOUTS.dashboard);
+            return tx
+              .select({
+                createdAt: creatorDistributionEvents.createdAt,
+                eventType: creatorDistributionEvents.eventType,
+              })
+              .from(creatorDistributionEvents)
+              .where(
+                and(
+                  eq(creatorDistributionEvents.creatorProfileId, profile.id),
+                  eq(
+                    creatorDistributionEvents.platform,
+                    INSTAGRAM_DISTRIBUTION_PLATFORM
+                  ),
+                  inArray(
+                    creatorDistributionEvents.eventType,
+                    BIO_LINK_ACTIVATION_EVENT_TYPES
+                  )
+                )
               )
-            )
-          )
-          .orderBy(asc(creatorDistributionEvents.createdAt)),
-      'Creator distribution events query',
-      { db: tx }
+              .orderBy(asc(creatorDistributionEvents.createdAt));
+          },
+          { clerkUserId }
+        ),
+      {
+        maxRetries: 1,
+        baseDelayMs: DB_CONFIG.retryDelay,
+        isRetryable: error =>
+          isRetryableError(error) && !isPostgresTimeoutError(error),
+      }
     ).catch((error: unknown) => {
+      // The transaction wrapper has completed rollback/release before a
+      // tolerated failure becomes fallback data or another read is attempted.
       if (isMissingCreatorDistributionEventsTableError(error)) {
         Sentry.logger.warn(
           '[Dashboard] creator_distribution_events table missing; skipping activation lookup',
@@ -964,9 +983,9 @@ async function fetchDashboardCoreWithSession(
       { clerkUserId }
     );
 
-    const bioLinkActivation = await withDbSessionTx(
-      async tx => buildBioLinkActivation(tx, selected),
-      { clerkUserId }
+    const bioLinkActivation = await buildBioLinkActivation(
+      clerkUserId,
+      selected
     );
 
     const hasMusicLinks = linkCounts.hasMusicLinks;

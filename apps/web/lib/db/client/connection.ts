@@ -15,7 +15,7 @@
  * Scripts in apps/web/scripts/ are exempt since they run standalone.
  */
 
-import { neonConfig, Pool } from '@neondatabase/serverless';
+import { neonConfig, Pool, type PoolClient } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-serverless';
 import ws from 'ws';
 import { env, isTestEnv } from '@/lib/env-server';
@@ -260,8 +260,26 @@ export function initializeDb(): DbType {
   const recordPoolPeak = () => {
     _poolPeak = Math.max(_poolPeak, pool.totalCount);
   };
+  // The driver removes the pool's idle error listener on checkout. A server
+  // disconnect between transaction queries otherwise emits an unhandled error.
+  // Keep query rejection/rollback with the driver; observe this event only.
+  const onCheckedOutClientError = (err: Error) => {
+    _poolConnectionErrors += 1;
+    logDbError(
+      'client_error',
+      err,
+      { event: 'pool_checked_out_error' },
+      { asBreadcrumb: true }
+    );
+  };
   pool.on('connect', recordPoolPeak);
-  pool.on('acquire', recordPoolPeak);
+  pool.on('acquire', (client: PoolClient) => {
+    recordPoolPeak();
+    client.on('error', onCheckedOutClientError);
+  });
+  pool.on('release', (_error: Error | undefined, client: PoolClient) => {
+    client.removeListener('error', onCheckedOutClientError);
+  });
 
   _pool = pool;
 
