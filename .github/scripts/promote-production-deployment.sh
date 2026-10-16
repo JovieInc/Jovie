@@ -368,7 +368,11 @@ echo "Current production deployment before promotion: $previous_id ($previous_ur
 # Main may advance while the staged production artifact is inspected. Bind the
 # mutation inside this controller, immediately after authoritative Vercel state
 # discovery and before any promote/rollout command.
-current_main_sha="$($gh_cli api "repos/$repository/commits/main" --jq '.sha // empty')"
+hold_script="${GH_API_HOLD_SCRIPT:-$(cd "$(dirname "$0")" && pwd)/gh-api-hold.sh}"
+# This read sits after the staged production artifact is already built, inside
+# a 60-minute job. 240s is the largest wait that still leaves the promote
+# itself room. A later reset fails closed.
+current_main_sha="$(GH_API_HOLD_BIN="$gh_cli" GH_API_HOLD_BUDGET_SECONDS="${GH_API_HOLD_BUDGET_SECONDS:-240}" bash "$hold_script" api "repos/$repository/commits/main" --jq '.sha // empty')"
 if [[ ! "$current_main_sha" =~ ^[0-9a-f]{40}$ ]]; then
   echo "Unable to resolve exact main immediately before production mutation." >&2
   write_failure production_promotion_state_invalid
@@ -377,7 +381,7 @@ fi
 # Forward-only lineage: an authorized SHA that is still an ancestor of main is
 # promoted even though main advanced; only a rewind or force-push yields.
 if [ "$current_main_sha" != "$expected_main_sha" ] &&
-  [ "$($gh_cli api "repos/$repository/compare/${expected_main_sha}...${current_main_sha}" --jq '.status // empty')" != "ahead" ]; then
+  [ "$(GH_API_HOLD_BIN="$gh_cli" GH_API_HOLD_BUDGET_SECONDS="${GH_API_HOLD_BUDGET_SECONDS:-240}" bash "$hold_script" api "repos/$repository/compare/${expected_main_sha}...${current_main_sha}" --jq '.status // empty')" != "ahead" ]; then
   if [ -n "${GITHUB_OUTPUT:-}" ]; then
     printf 'promotion_sha=%s\n' "$current_main_sha" >> "$GITHUB_OUTPUT"
   fi

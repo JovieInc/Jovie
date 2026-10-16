@@ -204,7 +204,8 @@ it.each(['exact', 'ahead', 'diverged'])(
     const result = await recheck({ mode });
     expect(result.code, result.stderr).toBe(0);
     expect(result.output).toBe(`is_current=${mode !== 'diverged'}\n`);
-    expect(result.requests.length).toBe(mode === 'exact' ? 1 : 2);
+    // commits/main (and compare) each take one rate_limit probe before git.
+    expect(result.requests.length).toBe(mode === 'exact' ? 2 : 4);
     expect(result.gitRequests.length).toBeGreaterThan(0);
     expect(result.gitRequests.every(r => r.authorized)).toBe(true);
     if (mode !== 'exact')

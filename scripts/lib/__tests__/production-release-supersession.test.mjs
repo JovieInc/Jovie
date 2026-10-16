@@ -994,20 +994,21 @@ esac
   it('resolves an unchanged main through git when REST is rate limited', () => {
     const current = runRateLimitedAlias('exact');
     expect(current.result.status, current.result.stderr).toBe(0);
-    expect(current.attempts).toBe(1);
+    expect(current.attempts).toBe(2);
     expect(current.outputs.is_current).toBe('true');
   });
 
   it('keeps the staging alias when rate-limited REST still has an ancestor main', () => {
     const current = runRateLimitedAlias('ahead');
     expect(current.result.status, current.result.stderr).toBe(0);
-    expect(current.attempts).toBe(1);
+    expect(current.attempts).toBe(3);
     expect(current.outputs.is_current).toBe('true');
   });
 
   it('yields the staging alias when rate-limited REST shows main left the release', () => {
     const current = runRateLimitedAlias('diverged');
     expect(current.result.status, current.result.stderr).toBe(0);
+    expect(current.attempts).toBe(3);
     expect(current.outputs.is_current).toBe('false');
   });
 
@@ -1021,8 +1022,73 @@ esac
       { MAIN_LINEAGE_REMOTE: join(tmpdir(), 'missing-lineage-remote') }
     );
     expect(unavailable.result.status).toBe(1);
-    expect(unavailable.attempts).toBe(1);
+    expect(unavailable.attempts).toBe(2);
     expect(unavailable.outputs.is_current).toBeUndefined();
+  });
+
+  it('retries an installation 403 inside the budget and refuses a permission 403', () => {
+    const fixture = makeFixture('lineage-hold-');
+    const attempts = join(fixture.root, 'attempts');
+    writeFileSync(attempts, '0');
+    stubCommand(
+      fixture.bin,
+      'gh',
+      `#!/bin/sh
+case "$*" in
+  *rate_limit*)
+    date +%s
+    exit 0
+    ;;
+esac
+n="$(cat "$STUB_ATTEMPTS")"
+n=$((n + 1))
+printf '%s' "$n" > "$STUB_ATTEMPTS"
+if [ "$n" -eq 1 ]; then
+  echo "API rate limit exceeded for installation" >&2
+  exit 1
+fi
+printf '%s\\n' "$STUB_MAIN_SHA"
+`
+    );
+    const script = materialize(
+      getStepRunScript(
+        getJobBlock(RELEASE_WORKFLOW, 'alias-staging'),
+        'Recheck main immediately before staging alias'
+      ),
+      { 'github.repository': 'JovieInc/Jovie' }
+    );
+    const held = runScript(script, fixture, {
+      EXPECTED_SHA,
+      GH_API_HOLD_BUDGET_SECONDS: '30',
+      GITHUB_REPOSITORY: 'JovieInc/Jovie',
+      MAIN_LINEAGE_REMOTE: join(tmpdir(), 'missing-lineage-remote'),
+      STUB_ATTEMPTS: attempts,
+      STUB_MAIN_SHA: EXPECTED_SHA,
+    });
+    expect(held.status, held.stderr).toBe(0);
+    expect(readFileSync(fixture.output, 'utf8')).toContain('is_current=true');
+    expect(held.stderr).toContain('Holding');
+    expect(Number(readFileSync(attempts, 'utf8'))).toBe(2);
+
+    const deniedFixture = makeFixture('lineage-permission-');
+    stubCommand(
+      deniedFixture.bin,
+      'gh',
+      `#!/bin/sh
+echo "gh: Resource not accessible by integration" >&2
+exit 1
+`
+    );
+    const denied = runScript(script, deniedFixture, {
+      EXPECTED_SHA,
+      GITHUB_REPOSITORY: 'JovieInc/Jovie',
+      MAIN_LINEAGE_REMOTE: join(tmpdir(), 'missing-lineage-remote'),
+    });
+    expect(denied.status).not.toBe(0);
+    expect(denied.stderr).not.toMatch(/Holding /);
+    expect(readFileSync(deniedFixture.output, 'utf8')).not.toContain(
+      'is_current=true'
+    );
   });
 
   function runPromote(mainSha, compareStatus) {
@@ -1257,6 +1323,7 @@ if (args[0] === 'api') {
           GH_REPO: 'JovieInc/Jovie',
           RUNNER_TEMP: fixture.root,
           GITHUB_OUTPUT: fixture.output,
+          GITHUB_WORKSPACE: REPO_ROOT,
         },
         route: path => {
           if (
@@ -1341,7 +1408,10 @@ if (args[0] === 'api') {
     ]);
     const firstPageOnly = discover(
       {},
-      script.replace('gh api --paginate --slurp', 'gh api --slurp')
+      script.replace(
+        'bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" api --paginate --slurp',
+        'bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" api --slurp'
+      )
     );
     expect(firstPageOnly.result.status, firstPageOnly.result.stderr).toBe(0);
     expect(firstPageOnly.outputs.risk_lane).toBe('unknown');

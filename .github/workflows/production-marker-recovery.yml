@@ -61,6 +61,8 @@ jobs:
       REPO: ${{ github.repository }}
       REQUEST_MODE: ${{ github.event_name }}
       PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
+      # 30-minute job. A reset past this budget fails closed.
+      GH_API_HOLD_BUDGET_SECONDS: '1200'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -74,6 +76,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          gh_read() {
+            bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" "$@"
+          }
           echo "recovery_required=false" >> "$GITHUB_OUTPUT"
           echo "fleet_refresh_required=false" >> "$GITHUB_OUTPUT"
           [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] || {
@@ -96,12 +101,12 @@ jobs:
           # main's head when it started, which can be a descendant of the
           # generation it deployed. Bind that head only with the same strict
           # ancestry proof production-marker-state uses (JOV-7724).
-          run_json="$(gh api \
+          run_json="$(gh_read api \
             "repos/$REPO/actions/runs/$SOURCE_CONTROLLER_RUN/attempts/$SOURCE_CONTROLLER_ATTEMPT")"
           bound_head="$EXPECTED_SHA"
           run_head="$(jq -r '.head_sha // empty' <<<"$run_json")"
           if [ "$run_head" != "$EXPECTED_SHA" ] && [[ "$run_head" =~ ^[0-9a-f]{40}$ ]]; then
-            if gh api "repos/$REPO/compare/$EXPECTED_SHA...$run_head" |
+            if gh_read api "repos/$REPO/compare/$EXPECTED_SHA...$run_head" |
               jq -e '.status == "ahead" and .behind_by == 0' >/dev/null; then
               bound_head="$run_head"
               echo "::notice::Source controller head $run_head descends from $EXPECTED_SHA."
@@ -129,7 +134,7 @@ jobs:
           # The generation is recoverable only while it still owns production:
           # promotion and the Sentry gate must have passed, and the centralized
           # rollback must have been skipped — never executed.
-          jobs_json="$(gh api \
+          jobs_json="$(gh_read api \
             "repos/$REPO/actions/runs/$SOURCE_CONTROLLER_RUN/attempts/$SOURCE_CONTROLLER_ATTEMPT/jobs?per_page=100")"
           recoverable_jobs=false
           if jq -e --arg sha "$bound_head" '
@@ -164,7 +169,7 @@ jobs:
           for marker_name in \
             "production-generation-verified-$EXPECTED_SHA" \
             "production-generation-verified-recovery-$EXPECTED_SHA"; do
-            expired_ids="$(gh api \
+            expired_ids="$(gh_read api \
               "repos/$REPO/actions/artifacts?name=$marker_name&per_page=100" \
               --jq '[.artifacts[] | select(.expired == true) | .id] | .[]')"
             for artifact_id in $expired_ids; do
@@ -176,7 +181,7 @@ jobs:
           for marker_name in \
             "production-generation-verified-$EXPECTED_SHA" \
             "production-generation-verified-recovery-$EXPECTED_SHA"; do
-            existing="$(gh api \
+            existing="$(gh_read api \
               "repos/$REPO/actions/artifacts?name=$marker_name&per_page=100" \
               --jq '[.artifacts[] | select(.expired == false)] | length')"
             if [ "$existing" != "0" ]; then
@@ -185,7 +190,7 @@ jobs:
             fi
           done
           if [ "$existing_markers" != "0" ]; then
-            controller_workflow_id="$(gh api \
+            controller_workflow_id="$(gh_read api \
               "repos/$REPO/actions/workflows/production-controller.yml" \
               --jq '.id')"
             [[ "$controller_workflow_id" =~ ^[1-9][0-9]*$ ]] || {
@@ -343,6 +348,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          gh_read() {
+            bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" "$@"
+          }
           echo "marker_upload_required=false" >> "$GITHUB_OUTPUT"
           # Re-read durable truth at the write boundary. The original
           # controller upload may become visible while the bounded probes run;
@@ -354,7 +362,7 @@ jobs:
           for marker_name in \
             "production-generation-verified-$EXPECTED_SHA" \
             "production-generation-verified-recovery-$EXPECTED_SHA"; do
-            existing="$(gh api \
+            existing="$(gh_read api \
               "repos/$REPO/actions/artifacts?name=$marker_name&per_page=100" \
               --jq '[.artifacts[] | select(.expired == false)] | length')"
             if [ "$existing" != "0" ]; then
@@ -363,7 +371,7 @@ jobs:
             fi
           done
           if [ "$existing_markers" != "0" ]; then
-            controller_workflow_id="$(gh api \
+            controller_workflow_id="$(gh_read api \
               "repos/$REPO/actions/workflows/production-controller.yml" \
               --jq '.id')"
             [[ "$controller_workflow_id" =~ ^[1-9][0-9]*$ ]] || {
@@ -400,7 +408,7 @@ jobs:
           for marker_name in \
             "production-generation-verified-$EXPECTED_SHA" \
             "production-generation-verified-recovery-$EXPECTED_SHA"; do
-            expired_ids="$(gh api \
+            expired_ids="$(gh_read api \
               "repos/$REPO/actions/artifacts?name=$marker_name&per_page=100" \
               --jq '[.artifacts[] | select(.expired == true) | .id] | .[]')"
             for artifact_id in $expired_ids; do
@@ -449,8 +457,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          gh_read() {
+            bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" "$@"
+          }
           marker_name="production-generation-verified-$EXPECTED_SHA"
-          artifacts_json="$(gh api \
+          artifacts_json="$(gh_read api \
             "repos/$REPO/actions/runs/${{ github.run_id }}/artifacts?name=$marker_name&per_page=100")"
           jq -e \
             --arg marker_name "$marker_name" \
@@ -470,7 +481,7 @@ jobs:
           archive="$RUNNER_TEMP/recovered-marker.zip"
           extracted="$RUNNER_TEMP/recovered-marker-upload"
           mkdir -p "$extracted"
-          gh api "repos/$REPO/actions/artifacts/$artifact_id/zip" > "$archive"
+          gh_read api "repos/$REPO/actions/artifacts/$artifact_id/zip" > "$archive"
           unzip -q "$archive" -d "$extracted"
           cmp --silent \
             "$RUNNER_TEMP/production-generation-verified.json" \

@@ -82,10 +82,18 @@ jobs:
     outputs:
       is_current: ${{ steps.head.outputs.is_current }}
     steps:
+      - name: Checkout the rate-limit hold
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.expected_sha }}
+          persist-credentials: false
+          sparse-checkout: .github/scripts/gh-api-hold.sh
+          sparse-checkout-cone-mode: false
       - name: Resolve current main HEAD
         id: head
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_API_HOLD_BUDGET_SECONDS: '60'
           EXPECTED_SHA: ${{ inputs.expected_sha }}
         run: |
           set -euo pipefail
@@ -93,7 +101,7 @@ jobs:
             echo "::error::expected_sha must be a full commit SHA."
             exit 1
           }
-          current_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
+          current_sha="$(bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
           [[ "$current_sha" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::GitHub returned an invalid main HEAD."
             exit 1
@@ -106,7 +114,7 @@ jobs:
           # mid-pipeline). Stale generations still yield at the controller's
           # coalesce/authorize boundary before any work starts.
           if [ "$current_sha" != "$EXPECTED_SHA" ] &&
-            [ "$(gh api "repos/${{ github.repository }}/compare/${EXPECTED_SHA}...${current_sha}" --jq '.status // empty')" != "ahead" ]; then
+            [ "$(bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" api "repos/${{ github.repository }}/compare/${EXPECTED_SHA}...${current_sha}" --jq '.status // empty')" != "ahead" ]; then
             echo "::notice::Release $EXPECTED_SHA left main's lineage (main is $current_sha) before lease work began."
             echo "is_current=false" >> "$GITHUB_OUTPUT"
           else
@@ -535,20 +543,28 @@ jobs:
     outputs:
       is_current: ${{ steps.head.outputs.is_current }}
     steps:
+      - name: Checkout the rate-limit hold
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.expected_sha }}
+          persist-credentials: false
+          sparse-checkout: .github/scripts/gh-api-hold.sh
+          sparse-checkout-cone-mode: false
       - name: Resolve current main HEAD
         id: head
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_API_HOLD_BUDGET_SECONDS: '60'
           EXPECTED_SHA: ${{ inputs.expected_sha }}
         run: |
           set -euo pipefail
-          current_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
+          current_sha="$(bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
           [[ "$current_sha" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::GitHub returned an invalid main HEAD before staging alias."
             exit 1
           }
           if [ "$current_sha" != "$EXPECTED_SHA" ] &&
-            [ "$(gh api "repos/${{ github.repository }}/compare/${EXPECTED_SHA}...${current_sha}" --jq '.status // empty')" != "ahead" ]; then
+            [ "$(bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" api "repos/${{ github.repository }}/compare/${EXPECTED_SHA}...${current_sha}" --jq '.status // empty')" != "ahead" ]; then
             echo "::notice::Release $EXPECTED_SHA left main's lineage (main is $current_sha) before staging alias."
             echo "is_current=false" >> "$GITHUB_OUTPUT"
           else
@@ -577,6 +593,7 @@ jobs:
         id: head
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_API_HOLD_BUDGET_SECONDS: '600'
           EXPECTED_SHA: ${{ inputs.expected_sha }}
         run: |
           bash "$GITHUB_WORKSPACE/.github/scripts/recheck-main-lineage.sh" "at staging alias"
@@ -726,20 +743,28 @@ jobs:
     outputs:
       is_current: ${{ steps.head.outputs.is_current }}
     steps:
+      - name: Checkout the rate-limit hold
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.expected_sha }}
+          persist-credentials: false
+          sparse-checkout: .github/scripts/gh-api-hold.sh
+          sparse-checkout-cone-mode: false
       - name: Resolve current main HEAD
         id: head
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_API_HOLD_BUDGET_SECONDS: '60'
           EXPECTED_SHA: ${{ inputs.expected_sha }}
         run: |
           set -euo pipefail
-          current_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
+          current_sha="$(bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
           [[ "$current_sha" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::GitHub returned an invalid main HEAD before production mutation."
             exit 1
           }
           if [ "$current_sha" != "$EXPECTED_SHA" ] &&
-            [ "$(gh api "repos/${{ github.repository }}/compare/${EXPECTED_SHA}...${current_sha}" --jq '.status // empty')" != "ahead" ]; then
+            [ "$(bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" api "repos/${{ github.repository }}/compare/${EXPECTED_SHA}...${current_sha}" --jq '.status // empty')" != "ahead" ]; then
             echo "::notice::Release $EXPECTED_SHA left main's lineage (main is $current_sha) before production mutation."
             echo "is_current=false" >> "$GITHUB_OUTPUT"
           else
@@ -869,16 +894,17 @@ jobs:
         id: mutation-head
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_API_HOLD_BUDGET_SECONDS: '240'
           EXPECTED_SHA: ${{ inputs.expected_sha }}
         run: |
           set -euo pipefail
-          current_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
+          current_sha="$(bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
           [[ "$current_sha" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::GitHub returned an invalid main HEAD at production mutation."
             exit 1
           }
           if [ "$current_sha" != "$EXPECTED_SHA" ] &&
-            [ "$(gh api "repos/${{ github.repository }}/compare/${EXPECTED_SHA}...${current_sha}" --jq '.status // empty')" != "ahead" ]; then
+            [ "$(bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" api "repos/${{ github.repository }}/compare/${EXPECTED_SHA}...${current_sha}" --jq '.status // empty')" != "ahead" ]; then
             echo "::notice::Release $EXPECTED_SHA left main's lineage (main is $current_sha) at production mutation."
             echo "superseded_sha=$current_sha" >> "$GITHUB_OUTPUT"
             echo "is_current=false" >> "$GITHUB_OUTPUT"
@@ -1300,16 +1326,17 @@ jobs:
         if: ${{ steps.mutation-head.outputs.is_current == 'true' && ((inputs.full_runtime_proof && steps.performance-gate.outcome == 'success') || (!inputs.full_runtime_proof && steps.performance-gate.outcome == 'skipped')) }}
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_API_HOLD_BUDGET_SECONDS: '240'
           EXPECTED_MAIN_SHA: ${{ inputs.expected_sha }}
         run: |
           set -euo pipefail
-          current_main_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
+          current_main_sha="$(bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
           if [[ ! "$current_main_sha" =~ ^[0-9a-f]{40}$ ]]; then
             echo "::error::Could not resolve an exact main HEAD immediately before production promotion."
             exit 1
           fi
           if [[ "$current_main_sha" != "$EXPECTED_MAIN_SHA" ]] &&
-            [ "$(gh api "repos/${{ github.repository }}/compare/${EXPECTED_MAIN_SHA}...${current_main_sha}" --jq '.status // empty')" != "ahead" ]; then
+            [ "$(bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" api "repos/${{ github.repository }}/compare/${EXPECTED_MAIN_SHA}...${current_main_sha}" --jq '.status // empty')" != "ahead" ]; then
             echo "::notice::Release $EXPECTED_MAIN_SHA left main's lineage (main is $current_main_sha) after its staged production build; skipping production mutation."
             echo "superseded_sha=$current_main_sha" >> "$GITHUB_OUTPUT"
             echo "is_current=false" >> "$GITHUB_OUTPUT"
@@ -1389,11 +1416,12 @@ jobs:
         env:
           EXPECTED_COMMIT_SHA: ${{ inputs.expected_sha }}
           GH_TOKEN: ${{ github.token }}
+          GH_API_HOLD_BUDGET_SECONDS: '600'
           GITHUB_REPOSITORY: ${{ github.repository }}
         shell: bash
         run: |
           set -euo pipefail
-          current_main="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
+          current_main="$(bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
           [[ "$current_main" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Could not resolve exact main after staging mutation."
             exit 1
@@ -1587,6 +1615,7 @@ jobs:
           EXPECTED_COMMIT_SHA: ${{ inputs.expected_sha }}
           EXPECTED_DEPLOYMENT_ID: ${{ needs.deploy-staging.outputs.deploy_id }}
           GH_TOKEN: ${{ github.token }}
+          GH_API_HOLD_BUDGET_SECONDS: '600'
           GITHUB_REPOSITORY: ${{ github.repository }}
           STAGING_REFRESH_OUTCOME: ${{ steps.reassert.outputs.staging_refresh_outcome }}
           SOURCE_CI_COMPLETED_AT: ${{ github.event.workflow_run.updated_at }}
@@ -1595,7 +1624,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          current_main="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
+          current_main="$(bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
           [[ "$current_main" =~ ^[0-9a-f]{40}$ ]] || exit 1
           latency_seconds=$(( $(date -u +%s) - $(date -u -d "$SOURCE_CI_COMPLETED_AT" +%s) ))
           slo_state=within_target
@@ -2158,11 +2187,19 @@ jobs:
       sentry_gate_status: ${{ steps.result.outputs.sentry_gate_status }}
       oauth_gate_status: ${{ steps.result.outputs.oauth_gate_status }}
     steps:
+      - name: Checkout the rate-limit hold
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.expected_sha }}
+          persist-credentials: false
+          sparse-checkout: .github/scripts/gh-api-hold.sh
+          sparse-checkout-cone-mode: false
       - name: Resolve release result
         id: result
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_API_HOLD_BUDGET_SECONDS: '60'
           EXPECTED_SHA: ${{ inputs.expected_sha }}
           PROMOTION_SHA: ${{ needs.promote-production.outputs.promotion_sha }}
           PRODUCTION_DEPLOYMENT_ID: ${{ needs.promote-production.outputs.production_deployment_id }}
@@ -2322,7 +2359,7 @@ jobs:
           # Exact promotion identity and all release gates have passed. A newer
           # main generation must not erase that completed older-generation fact;
           # controller probes remain bound to this immutable deployment and SHA.
-          boundary_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
+          boundary_sha="$(bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
           [[ "$boundary_sha" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Could not resolve exact main at the release-result boundary."
             exit 1

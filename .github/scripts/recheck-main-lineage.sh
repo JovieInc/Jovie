@@ -14,6 +14,7 @@ expected="${EXPECTED_SHA:-${EXPECTED_MAIN_SHA:-}}"
 repository="${GITHUB_REPOSITORY:-${REPOSITORY:-}}"
 remote="${MAIN_LINEAGE_REMOTE:-https://github.com/${repository}.git}"
 gh_cli="${GH_CLI:-gh}"
+hold_script="${GH_API_HOLD_SCRIPT:-$(cd "$(dirname "$0")" && pwd)/gh-api-hold.sh}"
 
 [[ "$expected" =~ ^[0-9a-f]{40}$ ]] || {
   echo "::error::expected_sha must be a full commit SHA." >&2
@@ -48,10 +49,17 @@ gh_capture() {
   local err output status
   err="$(mktemp)"
   set +e
-  output="$("$gh_cli" api "$@" 2>"$err")"
+  # Hold an installation 403 until x-ratelimit-reset when that instant is
+  # inside GH_API_HOLD_BUDGET_SECONDS. A missing reset, a reset outside the
+  # budget, or any other error still returns non-zero. Callers then prove the
+  # SHA with git or fail closed. A rate-limit body is never an empty success.
+  output="$(GH_API_HOLD_BIN="$gh_cli" bash "$hold_script" api "$@" 2>"$err")"
   status=$?
   set -e
   if [ "$status" -eq 0 ]; then
+    # Keep the hold warning visible. A successful retry is still a rate-limit
+    # event, and dropping stderr would hide it.
+    cat "$err" >&2
     printf '%s\n' "$output"
     rm -f "$err"
     return 0
