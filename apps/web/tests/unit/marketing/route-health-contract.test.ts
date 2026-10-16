@@ -192,7 +192,7 @@ describe('marketing route health contract', () => {
 
     for (const [url, selector] of [
       ['/pay', '[data-testid="pay-hero"]'],
-      ['/support', '[data-testid="support-hero"]'],
+      ['/support', '[data-testid="marketing-section-hero"]'],
       ['/waitlist', '#auth-form'],
     ] as const) {
       expect(

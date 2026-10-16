@@ -448,4 +448,68 @@ describe('ChatThreadMessages virtualized window', () => {
       screen.getAllByTestId('thread-row').map(row => row.textContent)
     ).toEqual(['m4', 'm5']);
   });
+
+  it('keeps a zero-size scrollport on the virtual path', () => {
+    const messages = Array.from({ length: 6 }, (_, index) => ({
+      id: `m${index}`,
+      role: index % 2 ? ('assistant' as const) : ('user' as const),
+      parts: [],
+    }));
+    const virtualizer = {
+      getVirtualItems: () => [],
+      measureElement: () => undefined,
+    } as unknown as Virtualizer<HTMLDivElement, Element>;
+    render(
+      <ChatThreadMessages
+        messages={messages}
+        shouldVirtualizeMessages
+        virtualizer={virtualizer}
+        virtualizedMessageViewportHeight={0}
+        virtualizedMinHeight={0}
+        messageViewportPaddingBottom={undefined}
+        totalSizeRef={() => undefined}
+        bottomSentinelRef={() => undefined}
+        isStreaming={false}
+        lastAssistantIndex={5}
+        knownMessageIds={new Set<string>()}
+        inlineChatError={null}
+        isStuckToBottom
+        onScrollToBottom={() => undefined}
+      />
+    );
+    expect(screen.queryAllByTestId('thread-row')).toHaveLength(0);
+  });
+
+  it('mounts the transcript when a sized scrollport has no virtual rows', () => {
+    const messages = Array.from({ length: 6 }, (_, index) => ({
+      id: `m${index}`,
+      role: index % 2 ? ('assistant' as const) : ('user' as const),
+      parts: [],
+    }));
+    const virtualizer = {
+      getVirtualItems: () => [],
+      measureElement: () => undefined,
+    } as unknown as Virtualizer<HTMLDivElement, Element>;
+    render(
+      <ChatThreadMessages
+        messages={messages}
+        shouldVirtualizeMessages
+        virtualizer={virtualizer}
+        virtualizedMessageViewportHeight={480}
+        virtualizedMinHeight={480}
+        messageViewportPaddingBottom={undefined}
+        totalSizeRef={() => undefined}
+        bottomSentinelRef={() => undefined}
+        isStreaming={false}
+        lastAssistantIndex={5}
+        knownMessageIds={new Set<string>()}
+        inlineChatError={null}
+        isStuckToBottom
+        onScrollToBottom={() => undefined}
+      />
+    );
+    expect(
+      screen.getAllByTestId('thread-row').map(row => row.textContent)
+    ).toEqual(['m0', 'm1', 'm2', 'm3', 'm4', 'm5']);
+  });
 });

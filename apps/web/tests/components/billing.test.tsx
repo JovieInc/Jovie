@@ -189,7 +189,7 @@ describe('Billing Components', () => {
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ priceId }),
+            body: JSON.stringify({ priceId, humanConfirmed: true }),
             signal: expect.anything(),
           })
         );

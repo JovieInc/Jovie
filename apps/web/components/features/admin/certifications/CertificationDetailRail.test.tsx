@@ -14,6 +14,10 @@ vi.mock('@/hooks/useBreakpoint', () => ({
   useBreakpointDown: () => false,
 }));
 
+const target = {
+  rowId: fixtureRow('signup').id,
+  evidenceDigest: fixtureRow('signup').decision.evidenceDigest,
+};
 const onDecide = vi.fn();
 const onClose = vi.fn();
 
@@ -44,6 +48,11 @@ describe('CertificationDetailRail', () => {
     expect(
       screen.getByText('Select a certification to review its evidence.')
     ).toBeInTheDocument();
+    expect(
+      screen
+        .getByTestId('certification-detail-rail')
+        .querySelector('[data-surface-variant="flat"]')
+    ).not.toBeNull();
   });
 
   it('opens with the entity header, evidence links, history, and source', () => {
@@ -71,6 +80,9 @@ describe('CertificationDetailRail', () => {
     expect(screen.getByTestId('certification-history')).toBeInTheDocument();
     expect(screen.getByText('JovieInc/Jovie@abcdef0')).toBeInTheDocument();
     expect(screen.queryByTestId('certification-blockers')).toBeNull();
+    expect(screen.getByTestId('certification-evidence')).not.toHaveAttribute(
+      'data-surface-variant'
+    );
   });
 
   it('opens an existing public proof ref from the evidence list', () => {
@@ -115,7 +127,7 @@ describe('CertificationDetailRail', () => {
   it('certifies in one activation and requires a note to request changes', () => {
     renderRail();
     fireEvent.click(screen.getByRole('button', { name: 'Certify' }));
-    expect(onDecide).toHaveBeenCalledWith('approved', null);
+    expect(onDecide).toHaveBeenCalledWith('approved', null, target);
 
     const requestChanges = screen.getByRole('button', {
       name: 'Request Changes',
@@ -128,7 +140,8 @@ describe('CertificationDetailRail', () => {
     fireEvent.click(requestChanges);
     expect(onDecide).toHaveBeenLastCalledWith(
       'changes_requested',
-      'Fix the empty state'
+      'Fix the empty state',
+      target
     );
   });
 
@@ -139,7 +152,7 @@ describe('CertificationDetailRail', () => {
     const dialog = await screen.findByRole('dialog');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Reject' }));
     await vi.waitFor(() =>
-      expect(onDecide).toHaveBeenCalledWith('rejected', null)
+      expect(onDecide).toHaveBeenCalledWith('rejected', null, target)
     );
   });
 

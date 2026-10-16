@@ -14,6 +14,7 @@ export async function GET(request: Request) {
     }
 
     const conversations = await listMobileConversations({
+      userId: session.userId,
       creatorProfileId: session.profile.id,
       limit: session.limit,
       workspace: session.workspace,

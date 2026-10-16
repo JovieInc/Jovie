@@ -82,13 +82,19 @@ export function installBrowserChatProbe({
         : input instanceof URL
           ? input.href
           : input.url;
-    if (
-      probe.fetchStartedMs === undefined &&
-      new URL(url, window.location.origin).pathname === '/api/chat'
-    ) {
+    const isChatPost =
+      new URL(url, window.location.origin).pathname === '/api/chat';
+    if (probe.fetchStartedMs === undefined && isChatPost) {
       probe.fetchStartedMs = performance.now() - probe.start;
     }
-    return originalFetch(input, init);
+    const response = originalFetch(input, init);
+    if (!isChatPost) return response;
+    return response.then(resolved => {
+      if (probe.dataReadyMs === undefined) {
+        probe.dataReadyMs = performance.now() - probe.start;
+      }
+      return resolved;
+    });
   };
 
   // Read the actual message rows after a paint opportunity. Body text can

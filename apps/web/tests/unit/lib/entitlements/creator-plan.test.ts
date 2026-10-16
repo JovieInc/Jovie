@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ARTIST_VISIBILITY_OFFER } from '@/lib/config/plan-prices';
 import {
   canCreatorSendNotifications,
   getBatchCreatorEntitlements,
   getCreatorEntitlements,
+  getCreatorEntitlementsWithOwner,
   getCreatorOwnerUserId,
   getCreatorPlanEntitlements,
 } from '@/lib/entitlements/creator-plan';
@@ -40,6 +42,10 @@ vi.mock('@/lib/db', () => ({
 }));
 
 vi.mock('@/lib/stripe/config', () => ({
+  getPriceMappingDetails: (id: string) =>
+    id === 'price_visibility'
+      ? { offerCapabilities: ARTIST_VISIBILITY_OFFER.pro.capabilities }
+      : null,
   isLegacyFanSendPrice: (id: string | null | undefined) =>
     id === 'legacy-price',
 }));
@@ -384,4 +390,128 @@ describe('getCreatorOwnerUserId', () => {
     limitMock.mockRejectedValueOnce(new Error('offline'));
     await expect(getCreatorOwnerUserId('artist')).rejects.toThrow('offline');
   });
+});
+
+describe('exact-offer automation for background workers', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('uses claimed billing authority without inheriting an entitled legacy owner', async () => {
+    installQueryResult([
+      {
+        claimedUserId: 'free-owner',
+        claimedPlan: 'free',
+        claimedIsPro: false,
+        legacyUserId: 'paid-owner',
+        legacyPlan: 'pro',
+        legacyIsPro: true,
+        legacyStripePriceId: 'price_visibility',
+        legacyStripeSubscriptionId: 'sub_active',
+      },
+    ]);
+    expect(
+      (await getCreatorEntitlements('profile')).entitlements.booleans
+        .canAutoCreateLinks
+    ).toBe(false);
+  });
+
+  it('revalidates claimed billing on each job and preserves legacy fan sending separately', async () => {
+    const row = {
+      claimedUserId: 'owner',
+      claimedPlan: 'pro',
+      claimedIsPro: true,
+      claimedStripePriceId: 'price_visibility',
+      claimedStripeSubscriptionId: 'sub_active',
+    };
+    installQueryResult([row]);
+    expect(
+      (await getCreatorEntitlements('profile')).entitlements.booleans
+        .canAutoCreateLinks
+    ).toBe(true);
+    installQueryResult([{ ...row, claimedIsPro: false }]);
+    expect(
+      (await getCreatorEntitlements('profile')).entitlements.booleans
+        .canAutoCreateLinks
+    ).toBe(false);
+    const legacy = getCreatorPlanEntitlements('pro', 'legacy-price', {
+      isPro: true,
+      stripeSubscriptionId: 'sub_active',
+    });
+    expect(legacy.booleans.canAutoCreateLinks).toBe(false);
+    expect(legacy.booleans.canSendNotifications).toBe(true);
+  });
+
+  it('resolves exact-offer eligibility identically for batched claimed and legacy owners', async () => {
+    installBatchQueryResults(
+      [
+        {
+          creatorProfileId: 'paid',
+          claimedUserId: 'paid-owner',
+          legacyUserId: 'free-owner',
+        },
+        {
+          creatorProfileId: 'legacy',
+          claimedUserId: null,
+          legacyUserId: 'paid-owner',
+        },
+        {
+          creatorProfileId: 'free',
+          claimedUserId: 'free-owner',
+          legacyUserId: 'paid-owner',
+        },
+        {
+          creatorProfileId: 'revoked',
+          claimedUserId: 'revoked-owner',
+          legacyUserId: null,
+        },
+      ],
+      [
+        {
+          id: 'paid-owner',
+          plan: 'pro',
+          isPro: true,
+          stripePriceId: 'price_visibility',
+          stripeSubscriptionId: 'sub_active',
+        },
+        { id: 'free-owner', plan: 'free', isPro: false },
+        {
+          id: 'revoked-owner',
+          plan: 'pro',
+          isPro: false,
+          stripePriceId: 'price_visibility',
+          stripeSubscriptionId: 'sub_old',
+        },
+      ]
+    );
+    const result = await getBatchCreatorEntitlements([
+      'paid',
+      'legacy',
+      'free',
+      'revoked',
+      'missing',
+    ]);
+    for (const [profile, value] of result) {
+      expect(value.entitlements.booleans.canAutoCreateLinks).toBe(
+        profile === 'paid' || profile === 'legacy'
+      );
+    }
+  });
+});
+
+it('returns entitlement and owner from one snapshot for autonomous actions', async () => {
+  vi.clearAllMocks();
+  installQueryResult([
+    {
+      claimedUserId: 'claimed-owner',
+      claimedPlan: 'pro',
+      claimedIsPro: true,
+      claimedStripePriceId: 'price_visibility',
+      claimedStripeSubscriptionId: 'sub_active',
+      legacyUserId: 'other-owner',
+      legacyPlan: 'free',
+    },
+  ]);
+  const result = await getCreatorEntitlementsWithOwner('profile');
+  expect(result.ownerUserId).toBe('claimed-owner');
+  expect(result.entitlements.booleans.canAutoCreateLinks).toBe(true);
+  expect(selectMock).toHaveBeenCalledTimes(1);
 });

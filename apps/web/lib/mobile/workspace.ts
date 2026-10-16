@@ -2,6 +2,10 @@ import 'server-only';
 
 import { NextResponse } from 'next/server';
 import { isAdmin } from '@/lib/admin/roles';
+import {
+  OV_CONVERSATION_TITLE_PREFIX,
+  titleForConversationAudience,
+} from '@/lib/chat/conversation-access';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { requireMobileProfileSession } from '@/lib/mobile/session-auth';
 import type { AppShellMode } from '@/types/app-shell';
@@ -10,7 +14,7 @@ export type MobileWorkspaceParseResult =
   | { readonly ok: true; readonly workspace: AppShellMode }
   | { readonly ok: false };
 
-export const MOBILE_OV_CONVERSATION_TITLE_PREFIX = 'OV | ';
+export const MOBILE_OV_CONVERSATION_TITLE_PREFIX = OV_CONVERSATION_TITLE_PREFIX;
 
 export function parseMobileWorkspace(
   value: string | null | undefined
@@ -32,9 +36,7 @@ export function isOvConversationTitle(
 
 export function withOvConversationTitle(title: string | null): string {
   const base = title?.trim() || 'Summer';
-  return base.startsWith(MOBILE_OV_CONVERSATION_TITLE_PREFIX)
-    ? base
-    : `${MOBILE_OV_CONVERSATION_TITLE_PREFIX}${base}`;
+  return titleForConversationAudience(base, 'ov');
 }
 
 export type MobileWorkspaceAccess =
@@ -66,6 +68,7 @@ export async function requireMobileWorkspaceSession(
 ): Promise<
   | {
       readonly profile: MobileProfileSession['profile'];
+      readonly userId: string;
       readonly workspace: AppShellMode;
       readonly url: URL;
       readonly limit: number;
@@ -95,6 +98,7 @@ export async function requireMobileWorkspaceSession(
 
   return {
     profile: auth.profile,
+    userId: auth.userId,
     workspace: workspace.workspace,
     url,
     limit: Number.isFinite(parsed) ? parsed : defaultLimit,

@@ -12,16 +12,14 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
-import {
-  DrawerSection,
-  EntitySidebarShell,
-} from '@/components/molecules/drawer';
+import { DrawerSection } from '@/components/molecules/drawer';
 import {
   MediaCanvasViewer,
   MediaThumb,
 } from '@/components/organisms/media-canvas/MediaCanvasViewer';
 import { TableEmptyState } from '@/components/organisms/table';
 import { useRegisterHeaderActions } from '@/contexts/HeaderActionsContext';
+import { AdminDetailRail } from '@/features/admin/layout/AdminDetailRail';
 import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
@@ -431,14 +429,12 @@ export function FounderReviewRegistry({
     const needsWorkReady = note.trim().length > 0;
 
     return (
-      <EntitySidebarShell
+      <AdminDetailRail
         isOpen
         ariaLabel={`${selected.title} certification details`}
         title={selected.title}
         headerMode='minimal'
         scrollStrategy='shell'
-        workspaceSurface='flat'
-        footerSurface='flat'
         data-testid='founder-review-detail-rail'
         footer={
           <div className='space-y-2'>
@@ -618,7 +614,7 @@ export function FounderReviewRegistry({
             </p>
           </div>
         </div>
-      </EntitySidebarShell>
+      </AdminDetailRail>
     );
   }, [
     clearDraft,

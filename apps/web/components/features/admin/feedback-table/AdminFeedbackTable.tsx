@@ -13,7 +13,6 @@ import {
   DrawerSection,
   DrawerSurfaceCard,
   EntityHeader,
-  EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { EmptyState } from '@/components/molecules/EmptyState';
 import {
@@ -23,6 +22,7 @@ import {
   rowState,
 } from '@/components/organisms/table';
 import { convertContextMenuItems } from '@/components/organisms/table/molecules/TableContextMenu';
+import { AdminDetailRail } from '@/features/admin/layout/AdminDetailRail';
 import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { AdminTableSubheader } from '@/features/admin/table/AdminTableHeader';
 import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
@@ -212,9 +212,8 @@ function AdminFeedbackDetailPanel({
     : [];
 
   return (
-    <EntitySidebarShell
+    <AdminDetailRail
       isOpen={Boolean(selected)}
-      width={560}
       ariaLabel='Feedback details'
       scrollStrategy='shell'
       onClose={onClose}
@@ -225,7 +224,7 @@ function AdminFeedbackDetailPanel({
       emptyMessage='Select a feedback row to view details.'
       entityHeader={
         selected ? (
-          <DrawerSurfaceCard variant='card' className='overflow-hidden'>
+          <DrawerSurfaceCard variant='flat' className='overflow-hidden'>
             <div className='p-3.5'>
               <EntityHeader
                 eyebrow='Feedback'
@@ -263,7 +262,7 @@ function AdminFeedbackDetailPanel({
     >
       {selected ? (
         <>
-          <DrawerSection title='User' className='space-y-1.5' surface='card'>
+          <DrawerSection title='User' className='space-y-1.5' surface='plain'>
             <div className='space-y-1'>
               <DrawerPropertyRow
                 label='User'
@@ -287,7 +286,7 @@ function AdminFeedbackDetailPanel({
             title='Feedback'
             collapsible={false}
             className='space-y-1.5'
-            surface='card'
+            surface='plain'
           >
             <div className='rounded-md bg-surface-0 px-2.5 py-2 text-xs leading-[19px] whitespace-pre-wrap text-primary-token'>
               {selected.message}
@@ -298,7 +297,7 @@ function AdminFeedbackDetailPanel({
             title='Context'
             collapsible={false}
             className='space-y-1.5'
-            surface='card'
+            surface='plain'
           >
             <div className='overflow-auto rounded-md bg-surface-0 p-0'>
               <pre className='p-2.5 text-3xs leading-4 text-secondary-token'>
@@ -308,7 +307,7 @@ function AdminFeedbackDetailPanel({
           </DrawerSection>
         </>
       ) : null}
-    </EntitySidebarShell>
+    </AdminDetailRail>
   );
 }
 

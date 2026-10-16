@@ -41,6 +41,7 @@ export interface WorkspaceTabsSurfaceProps<
    * headers above tabbed admin workspaces.
    */
   readonly headerless?: boolean;
+  readonly layout?: 'document' | 'workspace';
   readonly children: ReactNode;
 }
 
@@ -59,6 +60,7 @@ export function WorkspaceTabsSurface<
   clearOnPrimaryChange = [],
   actions,
   headerless = false,
+  layout = 'document',
   children,
 }: Readonly<WorkspaceTabsSurfaceProps<TPrimary, TSecondary>>) {
   const pathname = usePathname();
@@ -106,6 +108,11 @@ export function WorkspaceTabsSurface<
     buildHrefWithParam,
   ]);
 
+  const wrapperClassName =
+    layout === 'workspace'
+      ? 'flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-hidden'
+      : 'space-y-4';
+
   const shouldShowPrimaryControl = primaryOptions.length > 1;
   const shouldShowTabControls = shouldShowPrimaryControl || secondaryControl;
 
@@ -114,14 +121,14 @@ export function WorkspaceTabsSurface<
   // no tabs to show, omit the card entirely — the surface has nothing to
   // contribute beyond the children.
   if (headerless && !shouldShowTabControls) {
-    return <div className='space-y-4'>{children}</div>;
+    return <div className={wrapperClassName}>{children}</div>;
   }
 
   return (
-    <div className='space-y-4'>
+    <div className={wrapperClassName}>
       {headerless ? (
         shouldShowTabControls ? (
-          <div className='border-b border-(--app-shell-frame-seam) pb-3'>
+          <div className='shrink-0 border-b border-(--app-shell-frame-seam) pb-3'>
             <div className='flex flex-col gap-3'>
               {shouldShowPrimaryControl ? (
                 <LinkedTabBar

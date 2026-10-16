@@ -357,9 +357,9 @@
       "remainingScope": "Certified local source; continuous perceptual refinement is owned by JOV-8101.",
       "evidence": {
         "kind": "certification",
-        "at": "2026-10-15T08:24:03Z",
+        "at": "2026-10-15T16:40:00Z",
         "ref": "docs/screenshots/jov-8097/README.md",
-        "sourceDigest": "e0d583b1c9d2a8979b644a97b972b919181b49c8906a7968ac44906dbc68439b"
+        "sourceDigest": "6b67c9b31ac0494fd8e98afbfea6cc4ba5b57c102f4e01ed38ec04ac04d96d49"
       },
       "sources": ["apps/web/app/(marketing)/pricing/page.tsx"]
     },
