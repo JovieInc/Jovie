@@ -1179,6 +1179,7 @@ export function ProfileContactSidebar() {
         workspaceSurface='raised'
         headerMode='minimal'
         hideMinimalHeaderBar
+        showMobileDismissal
         contentBleed
       >
         {emailSignatureModal}
@@ -1248,6 +1249,7 @@ export function ProfileContactSidebar() {
         workspaceSurface='raised'
         headerMode='minimal'
         hideMinimalHeaderBar
+        showMobileDismissal
         contentBleed
       >
         {emailSignatureModal}

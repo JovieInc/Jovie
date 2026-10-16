@@ -197,16 +197,25 @@ def qualified_pool(host, lane, capacity: dict, now: float) -> tuple[dict, int, d
     if inventory is None:
         raise RuntimeError("file-overlap ownership unreadable; runnable pool unknown")
     overlap_prs, overlap_tasks = inventory
+    try:
+        target_files = lane.pr_events.capture_target_file_witnesses(
+            lane, overlap_prs, lane._SUMMARY.get("sourceAt"))
+    except Exception:
+        target_files = {}  # Unknown witness retains the ordinary conservative prediction.
     specs = lane.load_providers()
     candidates = {name: linear.lane_issues(specs[name]["label"])
                   for name, seats in capacity.items() if seats["slots"] > 0}
+    # Confirmation and candidate reads happen after observe() sampled now.
+    scope_now = max(now, time.time())
+    target_files = lane.pr_events.revalidate_target_file_witnesses(target_files, overlap_prs, scope_now,
+                                                                  lane.REPO_SLUG)
     qualified, rejected = {}, {}
     rejected_issues = {}
     for name in capacity:
         qualified[name], rejected[name] = [], {}
         # Work the router sends to another lane is not this lane's idle capacity (JOV-7706).
         route = lane.issue_router(host, name, specs) if hasattr(lane, "issue_router") else None
-        duplicates = lane.pool_rejections(candidates.get(name, []), holds)
+        duplicates = lane.pool_rejections(candidates.get(name, []), holds, target_files, scope_now)
         for issue in candidates.get(name, []):
             # Census key stays bounded: one bucket for all duplicate candidates.
             reason = duplicates.get(issue.identifier)
@@ -218,7 +227,7 @@ def qualified_pool(host, lane, capacity: dict, now: float) -> tuple[dict, int, d
                 reason = lane.admission_rejection(issue, failures, now, in_flight, name, route)
             if reason is None:
                 decision = file_overlap.admission_policy(
-                    issue, overlap_prs, overlap_tasks, lane.workstreams.classify)
+                    issue, overlap_prs, overlap_tasks, lane.workstreams.classify, target_files, scope_now)
                 if not decision["allowed"]:
                     reason = "file-overlap-held"
             if reason is None:

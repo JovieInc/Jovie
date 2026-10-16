@@ -70,6 +70,24 @@ class IncidentPolicyTest(unittest.TestCase):
 
 
 class PredictionAndAdmissionTest(unittest.TestCase):
+    def test_fresh_target_files_align_overlap_with_worker_and_expire_conservatively(self):
+        import lane_runner
+        number = 21824; fingerprint = f"remediation:pr-{number}-conflict"
+        issue = SimpleNamespace(identifier="JOV-8536", title=f"PR #{number} has carried lane-fix-exhausted for more than 24h ({fingerprint})",
+            description=f"https://github.com/JovieInc/Jovie/pull/{number}\nFingerprint: `{fingerprint}`", labels=[fingerprint])
+        witness = {number: {"schema": overlap.pr_events.TARGET_FILES_SCHEMA, "source": "graphql-inline",
+            "repository": "JovieInc/Jovie", "number": number, "state": "OPEN", "headRefOid": "a"*40,
+            "baseRefName": "main", "baseRefOid": "b"*40, "baseTipOid": "c"*40,
+            "paths": ["apps/web/lib/profile.ts"], "totalCount": 1,
+            "observedAt": 9998, "sourceAt": 9999, "confirmedAt": 10000}}
+        prediction = overlap.predict_issue_files(issue, workstreams.classify, witness, 10000)
+        self.assertEqual(prediction, {"files": ["apps/web/lib/profile.ts"], "source": "target-pr-files"})
+        self.assertEqual(set(prediction["files"]), lane_runner.predicted_touch(issue, witness, 10000))
+        self.assertEqual(overlap.admission_policy(issue, [], [], workstreams.classify, witness, 10000)["source"], "target-pr-files")
+        self.assertEqual(overlap.predict_issue_files(issue, workstreams.classify, witness, 10061)["source"], "workstream:symphony-throughput")
+        issue.description += " Edit scripts/lanes/lane_runner.py."
+        self.assertEqual(overlap.predict_issue_files(issue, workstreams.classify, witness, 10000)["source"], "issue-declared-paths")
+
     def test_default_only_flags_overlap(self):
         # Tim 2026-10-12: no plain `hold` + disabled auto-merge unless enforcement is asked for.
         with patch.dict(os.environ, {}, clear=False):

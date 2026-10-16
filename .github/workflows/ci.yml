@@ -6525,6 +6525,11 @@ jobs:
           export CLERK_SECRET_KEY="${{ secrets.CLERK_SECRET_KEY }}"
           export SESSION_SECRET="${{ secrets.SESSION_SECRET }}"
           export FLAGS_SECRET="${{ secrets.FLAGS_SECRET }}"
+          # Pending claim cookies need a signing key on this isolated server.
+          # Generate it per run; no production claim context is shared here.
+          # Assign and export separately so a failed openssl is not masked (SC2155).
+          URL_ENCRYPTION_KEY="$(openssl rand -base64 32)"
+          export URL_ENCRYPTION_KEY
           export SPOTIFY_CLIENT_ID="${{ secrets.SPOTIFY_CLIENT_ID }}"
           export SPOTIFY_CLIENT_SECRET="${{ secrets.SPOTIFY_CLIENT_SECRET }}"
           export MUSICFETCH_API_TOKEN="${{ secrets.MUSICFETCH_API_TOKEN }}"
@@ -6614,7 +6619,12 @@ jobs:
       - name: Verify premade claim ownership contracts
         id: canonical_claim_contract
         continue-on-error: true
-        run: pnpm --filter=@jovie/web exec vitest run --config=vitest.config.mts lib/claim/finalize.test.ts 'tests/unit/app/[username]/claim/route.test.ts' tests/unit/app/claim-token-route.test.ts tests/unit/api/onboarding/claim.test.ts tests/unit/auth/waitlist-gating.test.ts --pool=forks --maxWorkers=1
+        run: pnpm --filter=@jovie/web exec vitest run --config=vitest.config.mts lib/claim/finalize.test.ts 'tests/unit/app/[username]/claim/route.test.ts' tests/unit/app/claim-token-route.test.ts tests/unit/api/onboarding/claim.test.ts --pool=forks --maxWorkers=1
+
+      - name: Verify waitlist admission
+        id: canonical_waitlist
+        continue-on-error: true
+        run: pnpm --filter=@jovie/web exec vitest run --config=vitest.config.mts lib/auth/canonical-user-state.test.ts tests/unit/auth/waitlist-gating.test.ts tests/unit/lib/auth/access-route-matrix.test.ts --pool=forks --maxWorkers=1
 
       - name: Probe live canonical Tim White profile
         id: canonical_profile
@@ -6630,12 +6640,28 @@ jobs:
         env:
           CERT_DIR: ${{ runner.temp }}/canonical-artist-site
           CLAIM_CONTRACT_STATUS: ${{ steps.canonical_claim_contract.outcome || 'skipped' }}
+          GH_TOKEN: ${{ github.token }}
           JOURNEY_STATUS: ${{ steps.canonical_journey.outcome || 'skipped' }}
           M2_STATUS: ${{ steps.canonical_revenue.outcome || 'skipped' }}
           PROFILE_STATUS: ${{ steps.canonical_profile.outcome || 'skipped' }}
+          WAITLIST_STATUS: ${{ steps.canonical_waitlist.outcome || 'skipped' }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          pnpm --filter=@jovie/web exec tsx scripts/certify-canonical-artist-site.ts --candidate-id "acquisition:premade-artist-profile:tim-white:${{ github.run_id }}-${{ github.run_attempt }}" --run-id "${{ github.run_id }}-${{ github.run_attempt }}" --source-revision "${{ github.sha }}" --run-url "$RUN_URL" --golden-path-status "$JOURNEY_STATUS" --claim-contract-status "$CLAIM_CONTRACT_STATUS" --m2-status "$M2_STATUS" --m2-receipt "$CERT_DIR/m2-receipt.json" --profile-status "$PROFILE_STATUS" --profile-result "$CERT_DIR/profile-result.json" --output "$CERT_DIR/certificate.json"
+          # Checkout is depth 1 and has no credentials. Read ancestors from the
+          # commits API. Actions runs bash -e, which ignores failures inside an
+          # if test, so a page failure sets failed and clears the file. Binding
+          # then falls back to exact SHA equality and the receipt is still written.
+          HISTORY="$CERT_DIR/source-history.txt"
+          mkdir -p "$CERT_DIR"
+          : > "$HISTORY"
+          failed=0
+          for page in 1 2 3 4 5; do
+            gh api "repos/${{ github.repository }}/commits?sha=${{ github.sha }}&per_page=100&page=${page}" --jq '.[].sha' >> "$HISTORY" || failed=1
+          done
+          if [ "$failed" -ne 0 ]; then
+            : > "$HISTORY"
+          fi
+          pnpm --filter=@jovie/web exec tsx scripts/certify-canonical-artist-site.ts --candidate-id "acquisition:premade-artist-profile:tim-white:${{ github.run_id }}-${{ github.run_attempt }}" --run-id "${{ github.run_id }}-${{ github.run_attempt }}" --source-revision "${{ github.sha }}" --run-url "$RUN_URL" --golden-path-status "$JOURNEY_STATUS" --claim-contract-status "$CLAIM_CONTRACT_STATUS" --waitlist-status "$WAITLIST_STATUS" --m2-status "$M2_STATUS" --m2-receipt "$CERT_DIR/m2-receipt.json" --profile-status "$PROFILE_STATUS" --profile-result "$CERT_DIR/profile-result.json" --source-history "$CERT_DIR/source-history.txt" --output "$CERT_DIR/certificate.json"
 
       - name: Upload canonical artist-site certification
         if: ${{ always() }}

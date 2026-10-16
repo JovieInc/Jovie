@@ -21,3 +21,8 @@ export const Reversible: Story = {
     await expect(button).toHaveAttribute('aria-pressed', 'false');
   },
 };
+
+export const ManualReversible: Story = {
+  ...Reversible,
+  args: { previewTrigger: false },
+};

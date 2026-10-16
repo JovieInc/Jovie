@@ -369,6 +369,7 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     vi.resetModules();
     vi.clearAllMocks();
     captureExceptionMock.mockReset();
+    loggerWarnMock.mockReset();
     const { doesTableExist } = await import('@/lib/db');
     vi.mocked(doesTableExist).mockReset().mockResolvedValue(false);
     outcomes.length = 0;
@@ -418,7 +419,7 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     expect(capturedCascadeErrors()).toEqual([]);
 
     // Isolation mechanism: 1 base transaction + 3 supplementary reads; absent distribution table opens none.
-    expect(withDbSessionTxMock).toHaveBeenCalledTimes(4);
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
   });
 
   it('degrades the Inbox count read log-only on connector schema drift (JOV-5160)', async () => {
@@ -470,7 +471,7 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       width: 1024,
       height: 1024,
     });
-    expect(withDbSessionTxMock).toHaveBeenCalledTimes(4);
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
   });
 
   it('degrades the Inbox tour-dates count log-only on statement timeout (JOV-5754)', async () => {
@@ -524,7 +525,7 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       width: 1024,
       height: 1024,
     });
-    expect(withDbSessionTxMock).toHaveBeenCalledTimes(4);
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
   });
 
   it('still reports genuine Inbox count failures to Sentry', async () => {
@@ -560,7 +561,7 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
         }),
       })
     );
-    expect(withDbSessionTxMock).toHaveBeenCalledTimes(4);
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
   });
 
   it('confines an avatar-quality failure — tipping stats still load', async () => {
@@ -599,7 +600,7 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       })
     );
     expect(capturedCascadeErrors()).toEqual([]);
-    expect(withDbSessionTxMock).toHaveBeenCalledTimes(4);
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
   });
 
   it('degrades a tipping click-count timeout without emitting a Sentry issue (JOV-4458)', async () => {
@@ -642,13 +643,10 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       expect.stringContaining('tipping stats query timed out')
     );
     expect(capturedCascadeErrors()).toEqual([]);
-    expect(withDbSessionTxMock).toHaveBeenCalledTimes(4);
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
   });
 
   it('confines a tipping-stats failure — bio-link activation still resolves', async () => {
-    const { doesTableExist } = await import('@/lib/db');
-    vi.mocked(doesTableExist).mockResolvedValue(true);
-
     const realTippingError = new Error('boom: tips aggregate failed');
     const activationDate = new Date('2026-07-21T12:00:00.000Z');
     outcomes.push(
@@ -686,15 +684,89 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
   });
 
-  it('checks distribution schema before opening a transaction and waits for SQL cancellation before fallback', async () => {
+  it('JOV-8574: loads activation events without a request-path schema probe', async () => {
+    const { doesTableExist } = await import('@/lib/db');
+    vi.mocked(doesTableExist).mockRejectedValue(
+      new Error('tableExists timeout after 15000ms')
+    );
+    const activatedAt = new Date('2026-07-21T12:00:00.000Z');
+    outcomes.push(
+      ok([userRow]),
+      ok([dashboardProfile]),
+      ok([{ sidebarCollapsed: false }]),
+      ok([{ count: 0 }]),
+      ok([{ count: 0 }]),
+      ok([{ hasLinks: true, hasMusicLinks: true }]),
+      ok([{ width: 1024, height: 1024 }]),
+      ok([{ totalReceived: 100, monthReceived: 50, tipsSubmitted: 2 }]),
+      ok([{ total: 3, qr: 1, link: 2 }]),
+      ok([{ createdAt: activatedAt, eventType: 'activated' }])
+    );
+
+    const { getDashboardData } = await import(
+      '@/app/app/(shell)/dashboard/actions/dashboard-data'
+    );
+    const result = await getDashboardData();
+
+    expect(doesTableExist).not.toHaveBeenCalled();
+    expect(result.bioLinkActivation?.activatedAt).toBe(
+      activatedAt.toISOString()
+    );
+    expect(result.dashboardLoadError).toBeUndefined();
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+    expect(txStates.every(state => state.closed)).toBe(true);
+  });
+
+  it('JOV-8574: rolls back a missing distribution table before returning activation fallback', async () => {
+    const { doesTableExist } = await import('@/lib/db');
+    const missingTable = Object.assign(
+      new Error('relation creator_distribution_events does not exist'),
+      { code: '42P01' }
+    );
+    loggerWarnMock.mockImplementation(message => {
+      if (
+        String(message).includes('creator_distribution_events table missing')
+      ) {
+        expect(txStates.at(-1)?.rolledBack).toBe(true);
+        expect(txStates.at(-1)?.closed).toBe(true);
+      }
+    });
+    outcomes.push(
+      ok([userRow]),
+      ok([dashboardProfile]),
+      ok([{ sidebarCollapsed: false }]),
+      ok([{ count: 0 }]),
+      ok([{ count: 0 }]),
+      ok([{ hasLinks: true, hasMusicLinks: true }]),
+      ok([{ width: 1024, height: 1024 }]),
+      ok([{ totalReceived: 100, monthReceived: 50, tipsSubmitted: 2 }]),
+      ok([{ total: 3, qr: 1, link: 2 }]),
+      fail(new Error('Failed query', { cause: missingTable }))
+    );
+
+    const { getDashboardData } = await import(
+      '@/app/app/(shell)/dashboard/actions/dashboard-data'
+    );
+    const result = await getDashboardData();
+
+    expect(doesTableExist).not.toHaveBeenCalled();
+    expect(result.bioLinkActivation?.activatedAt).toBeNull();
+    expect(result.dashboardLoadError).toBeUndefined();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      expect.stringContaining('creator_distribution_events table missing'),
+      expect.anything()
+    );
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+    expect(capturedCascadeErrors()).toEqual([]);
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
+    expect(txStates.every(state => state.closed)).toBe(true);
+  });
+
+  it('waits for SQL cancellation before activation fallback without probing schema', async () => {
     const { doesTableExist } = await import('@/lib/db');
     const { dashboardQuery, setStatementTimeout } = await import(
       '@/lib/db/query-timeout'
     );
-    vi.mocked(doesTableExist).mockImplementation(async () => {
-      expect(txStates.every(state => state.closed)).toBe(true);
-      return true;
-    });
     const error = Object.assign(
       new Error('canceling statement due to statement timeout'),
       { code: '57014' }
@@ -735,11 +807,10 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     expect(captureExceptionMock).toHaveBeenCalledWith(error, expect.anything());
     expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
     expect(txStates.every(state => state.closed)).toBe(true);
+    expect(doesTableExist).not.toHaveBeenCalled();
   });
 
   it('retries a dropped distribution connection once on a fresh transaction after cleanup', async () => {
-    const { doesTableExist } = await import('@/lib/db');
-    vi.mocked(doesTableExist).mockResolvedValue(true);
     const activatedAt = new Date('2026-07-21T12:00:00.000Z');
     outcomes.push(
       ok([userRow]),
@@ -810,6 +881,6 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     });
     expect(result.dashboardLoadError).toBeUndefined();
     expect(captureExceptionMock).not.toHaveBeenCalled();
-    expect(withDbSessionTxMock).toHaveBeenCalledTimes(4);
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
   });
 });

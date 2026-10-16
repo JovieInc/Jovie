@@ -172,7 +172,43 @@ export function selectRecoverableStagingDraft(releases) {
   return release;
 }
 
-export async function fetchRecoverableStagingDraft(
+export function selectRecoverableProductionDraft(
+  releases,
+  { releaseSha, version }
+) {
+  releaseSpec('production', version);
+  invariant(SHA_PATTERN.test(releaseSha), 'Release SHA is malformed.');
+  invariant(Array.isArray(releases), 'GitHub releases are malformed.');
+  const candidates = releases.filter(
+    release =>
+      UNTAGGED_RELEASE_PATTERN.test(release?.tag_name || '') &&
+      release.name === version &&
+      release.target_commitish === releaseSha
+  );
+  invariant(
+    candidates.length <= 1,
+    'Multiple recoverable production drafts exist.'
+  );
+  const release = candidates[0] || null;
+  if (!release) return null;
+  invariant(
+    Number.isInteger(release.id) && release.id > 0,
+    'Recoverable production draft ID is malformed.'
+  );
+  invariant(
+    release.draft === true &&
+      release.prerelease === false &&
+      release.published_at === null,
+    'Recoverable production release must be a private nonprerelease draft.'
+  );
+  invariant(
+    Array.isArray(release.assets) && release.assets.length === 0,
+    'Recoverable production draft must be empty.'
+  );
+  return release;
+}
+
+async function fetchReleaseInventory(
   request,
   { maxPages = MAX_RELEASE_PAGES, pageSize = RELEASE_PAGE_SIZE } = {}
 ) {
@@ -195,11 +231,24 @@ export async function fetchRecoverableStagingDraft(
     );
     releases.push(...batch);
     if (batch.length < pageSize) {
-      return selectRecoverableStagingDraft(releases);
+      return releases;
     }
   }
   throw new Error(
     `GitHub release inventory exceeds the ${maxPages}-page safety bound.`
+  );
+}
+
+export async function fetchRecoverableStagingDraft(request, options) {
+  return selectRecoverableStagingDraft(
+    await fetchReleaseInventory(request, options)
+  );
+}
+
+export async function fetchRecoverableProductionDraft(request, input, options) {
+  return selectRecoverableProductionDraft(
+    await fetchReleaseInventory(request, options),
+    input
   );
 }
 
@@ -752,6 +801,13 @@ export class GitHubClient {
     );
   }
 
+  async recoverableProductionDraft(input) {
+    return fetchRecoverableProductionDraft(
+      path => this.request(`/repos/${this.repository}/releases${path}`),
+      input
+    );
+  }
+
   async releaseById(releaseId) {
     return this.request(`/repos/${this.repository}/releases/${releaseId}`);
   }
@@ -1040,6 +1096,35 @@ export async function prepare({
 }) {
   const spec = releaseSpec(environment, version);
   let release = await client.releaseOrDraftByTag(spec.tag, true);
+  if (environment === 'production' && !release) {
+    const input = { releaseSha, version };
+    const recoverable = await client.recoverableProductionDraft(input);
+    if (recoverable) {
+      const releaseId = recoverable.id;
+      const fresh = await client.releaseById(releaseId);
+      invariant(
+        fresh?.id === releaseId &&
+          selectRecoverableProductionDraft([fresh], input) === fresh,
+        'Recoverable production draft changed before normalization.'
+      );
+      await updateRelease(client, fresh, environment, releaseSha, version);
+      release = await client.releaseById(releaseId);
+      invariant(
+        release?.id === releaseId &&
+          release.published_at === null &&
+          Array.isArray(release.assets) &&
+          release.assets.length === 0,
+        'Recovered production draft identity or empty private state changed.'
+      );
+      validateReleaseEnvelope({
+        environment,
+        release,
+        releaseSha,
+        version,
+        draft: true,
+      });
+    }
+  }
   if (environment === 'staging') {
     assertStagingVersionTransition({ installedVersion, version });
     if (!release) {
@@ -1083,7 +1168,10 @@ export async function prepare({
 
   if (!release) {
     release = await client.createDraft({ environment, releaseSha, version });
-  } else if (release.target_commitish !== releaseSha) {
+  } else if (
+    environment === 'staging' &&
+    release.target_commitish !== releaseSha
+  ) {
     invariant(
       release.draft === true &&
         Array.isArray(release.assets) &&

@@ -434,14 +434,12 @@ Before merging any PR that introduces background/scheduled work, verify:
 
 ## Build Before You Build (Prior-Art Gate)
 
-Before scoping infrastructure, tooling, or re-implementing a known software category (visual regression, scheduling, queues, auth, parsing, charts, date handling, state management, etc.), run the prior-art gate (gstack ETHOS §2):
-
-1. **Name the category** ("this is a visual-regression differ").
-2. **Scan prior art (~5 min):** existing stack feature? standard OSS lib? SaaS/API? Note licenses.
-3. **Decide adopt > wrap > build.** Build only for core differentiation or when every candidate fails a stated hard requirement.
-4. **Record on the issue/plan:** category · candidates + links + license · adopt/wrap/build + why. Infra/tooling without this section is not ready.
-
-**Precedence:** §2 (Search Before Building) runs before §1 (Boil the Lake). Completeness governs how thoroughly you finish what you've *decided* to build — never justifies rebuilding off-the-shelf solutions.
+Use the single [capability sourcing and IA policy](../../canon/ENGINEERING.md#capability-sourcing-and-ia-integration)
+before new or expanded commodity mechanisms or visible UI. Record/reuse the
+scoped decision in the existing issue plan/workpad and PR; renew invalidated
+assumptions. Missing research access creates a bounded research task. Apply the
+same policy to sub-capabilities and provider-owned lifecycles. New diagnostics
+remain nonblocking until shadow qualification; existing safety gates stay active.
 
 ## Documentation Index
 

@@ -4275,6 +4275,9 @@ describe('production promotion exact-artifact contract', () => {
     expect(mutationHead).toContain(
       'bash "$GITHUB_WORKSPACE/.github/scripts/recheck-main-lineage.sh" "at production mutation"'
     );
+    expect(mutationHead).toContain('MAIN_LINEAGE_TRANSPORT: git');
+    expect(mutationHead).not.toContain('GH_API_HOLD_BUDGET_SECONDS');
+    expect(mutationHead).not.toContain('gh-api-hold.sh');
     const lineageScript = readFileSync(
       resolve(repoRoot, '.github/scripts/recheck-main-lineage.sh'),
       'utf8'
@@ -4338,6 +4341,9 @@ describe('production promotion exact-artifact contract', () => {
     const result = getJobBlock(reusable, 'release-result');
 
     expect(finalCurrent).toContain('recheck-main-lineage.sh');
+    expect(finalCurrent).toContain('MAIN_LINEAGE_TRANSPORT: git');
+    expect(finalCurrent).not.toContain('GH_API_HOLD_BUDGET_SECONDS');
+    expect(finalCurrent).not.toContain('gh-api-hold.sh');
     const lineageScript = readFileSync(
       resolve(repoRoot, '.github/scripts/recheck-main-lineage.sh'),
       'utf8'
@@ -4800,6 +4806,11 @@ describe('production promotion exact-artifact contract', () => {
     expect(cronGapMinutes(workflowTriggers(cost)).max).toBeLessThanOrEqual(15);
     expect(cost).toContain('name: Production – jovie');
     expect(cost).toContain('curl --fail --silent --show-error');
+    expect(
+      cost.match(
+        /curl --fail --silent --show-error \\\n\s+--retry 3 --retry-delay 2 --retry-all-errors --connect-timeout 10 --max-time 20/g
+      )
+    ).toHaveLength(3);
     expect(cost).toContain('name: Prepare Linear-only anomaly receipt');
     expect(cost).toContain(
       'Linear is canonical; GitHub Issue creation is retired.'
