@@ -143,6 +143,7 @@ function requiredEnv(name) {
   return value;
 }
 
+/** @returns {Promise<any>} */
 async function githubApi(
   path,
   {
@@ -344,18 +345,6 @@ function writeSummary(lines) {
  * rate-limit response holds until x-ratelimit-reset inside the job and token
  * cap. Past that cap the result is rate_limit_hold with queueProven false.
  * That is not proof. Every other REST error fails closed.
- * @param {{
- *   repository: string,
- *   sha: string,
- *   token: string,
- *   apiUrl?: string,
- *   fetchImpl?: typeof fetch,
- *   resolveMain?: typeof resolveMainSha,
- *   now?: () => number,
- *   sleep?: (ms: number) => Promise<unknown>,
- *   budgetMs?: number,
- *   jobTimeoutMs?: number,
- * }} input
  */
 export async function checkMainQueueProvenance({
   repository,

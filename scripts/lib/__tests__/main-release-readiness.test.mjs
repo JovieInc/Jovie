@@ -435,7 +435,7 @@ esac
       sha: SHA,
       token: 'token',
       apiUrl: 'https://api.github.test',
-      fetchImpl,
+      fetchImpl: /** @type {any} */ (fetchImpl),
       resolveMain: async () => SHA,
       now: () => 0,
       sleep: async () => {
@@ -472,14 +472,16 @@ esac
       repository: 'JovieInc/Jovie',
       sha: SHA,
       token: 'token',
-      fetchImpl: async () => ({
-        ok: false,
-        status: 403,
-        headers: { get: () => null },
-        async text() {
-          return 'Resource not accessible by integration';
-        },
-      }),
+      fetchImpl: /** @type {any} */ (
+        async () => ({
+          ok: false,
+          status: 403,
+          headers: { get: () => null },
+          async text() {
+            return 'Resource not accessible by integration';
+          },
+        })
+      ),
       resolveMain: async () => SHA,
       now: () => 0,
       sleep: async () => {
@@ -492,14 +494,16 @@ esac
       repository: 'JovieInc/Jovie',
       sha: SHA,
       token: 'token',
-      fetchImpl: async () => ({
-        ok: false,
-        status: 403,
-        headers: { get: () => null },
-        async text() {
-          return 'API rate limit exceeded for installation';
-        },
-      }),
+      fetchImpl: /** @type {any} */ (
+        async () => ({
+          ok: false,
+          status: 403,
+          headers: { get: () => null },
+          async text() {
+            return 'API rate limit exceeded for installation';
+          },
+        })
+      ),
       resolveMain: async () => SHA,
       now: () => 0,
       sleep: async () => {
@@ -544,20 +548,22 @@ esac
         repository: 'JovieInc/Jovie',
         sha: SHA,
         token: 'token',
-        fetchImpl: async () => ({
-          ok: false,
-          status: 403,
-          headers: {
-            get(name) {
-              if (name === 'x-ratelimit-remaining') return '0';
-              if (name === 'x-ratelimit-reset') return String(resetSeconds);
-              return null;
+        fetchImpl: /** @type {any} */ (
+          async () => ({
+            ok: false,
+            status: 403,
+            headers: {
+              get(name) {
+                if (name === 'x-ratelimit-remaining') return '0';
+                if (name === 'x-ratelimit-reset') return String(resetSeconds);
+                return null;
+              },
             },
-          },
-          async text() {
-            return 'API rate limit exceeded for installation';
-          },
-        }),
+            async text() {
+              return 'API rate limit exceeded for installation';
+            },
+          })
+        ),
         resolveMain: async () => SHA,
         now: () => now,
         sleep: async () => {
@@ -628,6 +634,7 @@ exit 0
 `
         );
         chmodSync(join(root, 'gh'), 0o755);
+        /** @type {NodeJS.ProcessEnv} */
         const env = {
           ...process.env,
           PATH: `${root}${delimiter}${process.env.PATH}`,
