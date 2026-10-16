@@ -1629,6 +1629,17 @@ describe('merge_group workflow contract', () => {
     );
     expect(authorize).toContain('github-rate-limit.mjs');
     expect(authorize).toContain('"$shim" >> "$GITHUB_PATH"');
+    // The release checkout predates the file-stdout hold. The shim must
+    // load the default-branch copy or artifact zips stay on a pipe.
+    expect(authorize).toContain('path: .rate-limit-hold');
+    expect(authorize).toContain('ref: ${{ github.sha }}');
+    expect(authorize).toContain(
+      'hold="$GITHUB_WORKSPACE/.rate-limit-hold/scripts/lib/github-rate-limit.mjs"'
+    );
+    expect(authorize).toContain('exec node "$RATE_LIMIT_HOLD"');
+    expect(authorize).not.toContain(
+      'node "$GITHUB_WORKSPACE/scripts/lib/github-rate-limit.mjs"'
+    );
     const proof = authorize.slice(
       authorize.indexOf('Cross-prove exact successful push CI')
     );

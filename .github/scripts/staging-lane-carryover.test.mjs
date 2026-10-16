@@ -156,6 +156,54 @@ test('historical CI failure or missing receipt stays fail-closed', () => {
     /no exact passing Web receipt/
   );
 });
+test('not_applicable checkout materializes the carryover import closure', () => {
+  const workflow = readFileSync(
+    '.github/workflows/staging-controller.yml',
+    'utf8'
+  );
+  const marker = "if: steps.lineage.outputs.outcome == 'not_applicable'";
+  const checkout = workflow.slice(workflow.indexOf(marker));
+  const sparse = checkout.match(/sparse-checkout: \|\n((?: {12}.+\n)+)/);
+  assert.ok(sparse, 'not_applicable checkout must list its sparse paths');
+  const paths = sparse[1]
+    .trim()
+    .split('\n')
+    .map(line => line.trim());
+  const root = mkdtempSync(join(tmpdir(), 'stage-carryover-sparse-'));
+  try {
+    for (const path of paths) {
+      const target = join(root, path);
+      mkdirSync(resolve(target, '..'), { recursive: true });
+      writeFileSync(target, readFileSync(path));
+    }
+    const loaded = spawnSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        "await import('./.github/scripts/staging-lane-carryover.mjs')",
+      ],
+      { cwd: root, encoding: 'utf8' }
+    );
+    assert.equal(loaded.status, 0, loaded.stderr);
+    rmSync(join(root, 'scripts/lib/product-lane-classifier.mjs'));
+    const incomplete = spawnSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        "await import('./.github/scripts/staging-lane-carryover.mjs')",
+      ],
+      { cwd: root, encoding: 'utf8' }
+    );
+    assert.notEqual(incomplete.status, 0);
+    assert.match(incomplete.stderr, /ERR_MODULE_NOT_FOUND/);
+    assert.match(incomplete.stderr, /product-lane-classifier\.mjs/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('controller preserves sealed CI routing and consumes the qualified carryover outcome', () => {
   const workflow = readFileSync(
     '.github/workflows/staging-controller.yml',
