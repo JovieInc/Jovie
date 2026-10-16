@@ -64,8 +64,9 @@ export default async function OnboardingCheckoutPage({
 }>) {
   // JOV-8068 screen-audit producer. Screenshot CI admits this branch
   // (PUBLIC_NOAUTH_SMOKE, not a production deployment) so the registered
-  // checkout screen can render without a session. VERCEL_ENV=production
-  // fails closed inside isRenderFixtureEnabled and keeps the auth gate.
+  // checkout screen can render without a session. The proxy applies the
+  // same isRenderFixtureEnabled() gate before its sign-in redirect.
+  // VERCEL_ENV=production fails closed and keeps the auth gate.
   if (isRenderFixtureEnabled()) {
     const pricing = resolvePriceIds('pro');
     return (

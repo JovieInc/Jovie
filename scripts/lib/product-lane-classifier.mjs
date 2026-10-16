@@ -164,7 +164,7 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
     'ios-product',
     'ios',
     ['ios'],
-    /^(apps\/ios\/|fastlane\/|Gemfile$|Gemfile\.lock$|scripts\/ios-best-practices-lint\.sh$|\.github\/workflows\/ios-(ci|testflight|signing-bootstrap)\.yml$)/,
+    /^(apps\/ios\/|fastlane\/|Gemfile$|Gemfile\.lock$|scripts\/ios-best-practices-lint\.sh$|\.github\/workflows\/ios-(ci|testflight|signing-bootstrap)\.yml$|\.github\/scripts\/testflight-release-lease(?:\.test)?\.mjs$|\.github\/testflight-release-policy\.json$)/,
   ],
   [
     'mac-product',

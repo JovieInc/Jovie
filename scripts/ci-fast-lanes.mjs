@@ -550,6 +550,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/invariants/virtual-models.test.mjs',
   'scripts/invariants/writing-surfaces.test.mjs',
   'scripts/ios-ci-cache-contract.test.mjs',
+  '.github/scripts/testflight-release-lease.test.mjs',
   'scripts/inbound-loop/inbound-loop.test.mjs',
   'scripts/lanes/ops-report.test.mjs',
   'scripts/merge-queue-green-enroll.test.mjs',
