@@ -77,7 +77,11 @@ jobs:
       (github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter != ''))
     environment: Preview – jovie
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # Shard 1 was cancelled at 60 minutes. The auth modal waited on homepage
+    # controls that the conversion lock removed, and the serial contrast
+    # inventory never started. Locators now match the live entry points;
+    # this limit lets the remaining shard finish.
+    timeout-minutes: 120
     env:
       E2E_FULL_MATRIX: '1'
       PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
@@ -205,6 +209,14 @@ jobs:
           # Required by the production server for pending-claim and
           # lead-attribution cookies; without it claim routes 500.
           URL_ENCRYPTION_KEY: e2e-full-matrix-url-encryption-key
+
+      - name: Seed authenticated release fixtures
+        if: ${{ github.event_name == 'push' || github.event.inputs.test_filter == '' }}
+        run: pnpm --filter=@jovie/web run seed:test-data --ready-creator-releases-only
+        env:
+          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          NODE_ENV: test
+          E2E_USE_TEST_AUTH_BYPASS: '1'
 
       - name: Setup Playwright (Chromium)
         if: matrix.browser == 'chromium'

@@ -1105,6 +1105,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       'web.brand',
       'web.report',
       'web.start',
+      'web.onboarding-checkout',
       'web.marketing-solutions',
       'web.public-profile-about',
     ];

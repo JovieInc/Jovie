@@ -1,8 +1,7 @@
 import { createHash } from 'node:crypto';
 import { canonical } from './canonical-json.mjs';
 
-// Process-local qualification. A JSON assertion or a comment marker cannot mint
-// replay evidence. The evidence owner must rerun compilation before promotion.
+// Process-local only. Promotion must rerun compilation; JSON cannot mint it.
 const qualified = new WeakMap();
 export const compilationDigest = value =>
   createHash('sha256').update(canonical(value)).digest('hex');

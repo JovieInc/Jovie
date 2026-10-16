@@ -35,9 +35,7 @@ export function paths(values) {
   }
 }
 
-/** No checkout, shell interpolation, candidate import, network or credentials.
- * git show reads regular blobs only, including ancestor symlink rejection.
- */
+/** git show of regular blobs only, rejecting symlinks. No shell or network. */
 export function readReplaySource(repoRoot, revision, path) {
   check(SHA.test(revision), 'invalid-source-revision');
   paths([path]);
@@ -56,9 +54,8 @@ export function readReplaySource(repoRoot, revision, path) {
   return run(['show', `${revision}:${path}`]);
 }
 
-/** Evidence-suite labels come from the independent evidence owner. Each port
- * runs its existing executable validator/fixture/method, not a proof assertion
- * from the request. A passing repaired example alone is insufficient.
+/** Evidence-owner ports run existing validators, not request assertions.
+ * A passing repaired example alone is not proof.
  */
 export async function replayLessonArtifact(
   request,
@@ -117,8 +114,7 @@ export async function replayLessonArtifact(
       'executable-method-required'
     );
   }
-  // Reuse the registry's full binding validation, including production consumers
-  // and deliberate-red references. No parallel invariant inventory is written.
+  // Reuse full registry validation, including consumers and deliberate reds.
   const registry = readInvariantRegistry(environment.repoRoot);
   const validation = validateInvariantRegistry(registry, {
     repoRoot: environment.repoRoot,
@@ -191,8 +187,7 @@ export async function replayLessonArtifact(
       causeKey: result.causeKey ?? null,
     });
   }
-  // Controls exercise both the repair's false positives and the predicate's
-  // boundary. Broad claims owe every named sibling, with a fixed upper bound.
+  // Controls cover false positives, the predicate edge, and named siblings.
   check(
     controls.some(row => lessonApplies(request.applicability, row)) &&
       controls.some(row => !lessonApplies(request.applicability, row)),
@@ -217,8 +212,7 @@ export async function replayLessonArtifact(
   };
 }
 
-/** Finite, exact applicability; arbitrary code, regex and wildcard claims are
- * intentionally unsupported. New dimensions require the existing owner. */
+/** Exact fields only. Code, regex, and wildcards are unsupported. */
 export function lessonApplies(predicate, context) {
   return (
     predicate.tenantId === context.tenantId &&

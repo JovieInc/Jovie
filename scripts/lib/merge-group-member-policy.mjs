@@ -1211,6 +1211,12 @@ export async function runPolicy({
   }
 
   if (policy === 'size') {
+    // Bytes come from the checkout evidence (`git ls-tree -r -l` in
+    // merge-group-local-evidence.mjs). This process must not spawn git.
+    // The git/trees read is only the fallback when that object is not local.
+    // githubRequest already holds a rate-limit 403 until x-ratelimit-reset
+    // when the reset is inside this job's budget. A rate limit that still
+    // escapes, with nothing measured, fails closed.
     if (local?.tracked) {
       logTrackedPayload(enforceTrackedBudget(local.tracked), log);
     } else {
@@ -1227,7 +1233,6 @@ export async function runPolicy({
         logTrackedPayload(payload, log);
       } catch (error) {
         if (!(error instanceof MergeGroupPolicyRateLimitError)) throw error;
-        // The byte budget was not measured. Do not pass the size check.
         log(
           `::notice::PR Size Guard refused a GitHub rate limit with no local tree byte count: ${error.message}`
         );

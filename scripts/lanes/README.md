@@ -269,7 +269,10 @@ Lane reads paginate the Todo pool (up to `LANE_ISSUE_PAGES` × 100).
 Gem has no inbound webhook, so `.github/workflows/lane-fix-relay.yml` turns each GitHub signal
 into a label on the exact PR: CI failure `lane-fix-red`, merge-queue removal `lane-fix-dequeued`,
 a push to main that leaves the PR conflicting `lane-fix-conflict`, requested changes or a human
-review comment `lane-fix-review`, green CI on a lane draft `lane-fix-green`. Every worker pass
+review comment `lane-fix-review`, green CI on a lane draft `lane-fix-green`.
+The same relay deletes a stale `lane-fix-red` once that head is required-green
+(CLEAN, HAS_HOOKS, or UNSTABLE), using the workflow token that applied the label.
+Every worker pass
 does one label search and takes a queued PR ahead of the rest of its work. Labels are consumed
 on claim, or when the PR's own state no longer backs them. A PR whose attempts are spent keeps
 its label, so the PR shows why it is waiting. The dispatch tick handles `green` (ready +
@@ -384,6 +387,62 @@ health is recorded under `ycCorpus` in `tick.json`; it never silently converts a
 A release self-test (`LANES_SELFTEST`) never schedules the refresh, and its default fetch and `gbrain`
 helpers refuse to run there; every self-test process carries a per-run `JOVIE_SELFTEST_RUN` marker and
 `prove_staging` stops any still running when the tests end (`leftoverProcesses` in the diagnostic).
+
+### Bounded lesson analysis (JOV-8420)
+
+[`runLessonAnalysis`](../lib/lesson-analysis.mjs) consumes a sealed reasoning
+WorkOrder after event-driven admission (JOV-8419). It reconstructs the ordered
+attempt graph from sanitized, revision-bound development evidence and returns
+evidence-linked findings plus `target`, `no-change`, or `held`. It grants no
+implementation or promotion authority. JOV-8421 owns compilation.
+
+The existing transport/certification owners supply `environment.routes`,
+`routesVersion`, `certify(route)` and `dispatch(call)`. These are trusted owner
+adapters, never callbacks or capability claims supplied by a model. `certify`
+projects an authenticated current `jovie.certification/v1` receipt: exact route
+ID and tuple digest, certified capabilities and risk ceiling, policy version,
+evidence reference and expiry. Unavailable routes are omitted by that owner.
+This boundary does not mint certificates or maintain another route registry.
+
+The governor's `routeByExpectedCost` selects both actors. Broad, ambiguous,
+control-plane, founder-invariant and repeated-escape lessons require certified
+`reasoning` + `frontier` capability. The existing generator-family exclusion
+policy selects an independent challenger; matching providers or exact models
+are also excluded. Both resolutions retain the exact tuple, governor/routes
+versions, certification receipt, and canonical WorkResult. The challenger sees
+the evidence and proposal, and answers its digest. Its challenge is retained.
+
+`dispatch` receives the sealed child WorkOrder, `toReasoningJob` intake, selected
+route, sanitized packet, output JSON schema, AbortSignal and limits. The owner
+must honor the exact route/schema/packet and enforce the spend, inference and
+zero-tool caps before execution; the legacy ranking lane alone does not satisfy
+this contract. It returns `{ result, output, resolvedTuple, usage }`, where
+`result` is that exact order's WorkResult and `usage` reports inference calls,
+tool calls, inference USD and tool USD. Two calls maximum, one per child order;
+the parent deadline and a maximum 15-minute wall limit apply. There is no local
+retry/failover. Aborted or unknown expense requires owner reconciliation before
+any redispatch under the existing idempotency/lease policy.
+
+Evidence must already be sanitized/authenticated by its source owner. Protected
+cases never enter model inputs; unsafe, cross-binding, wrong-revision or
+incomplete attempt evidence holds analysis. A causal claim needs an independent
+verification link joining a failed attempt to a verified success. Agreement or
+a successful retry alone supplies no causal proof. Missing routes, expiration,
+timeouts, exhausted limits, unsupported claims or disagreement return `held`
+with the original escalation owner/action. Implementation expense is excluded
+from the measured analysis expense. Event wiring and live commissioning remain
+with JOV-8419 and the JOV-2967 acceptance chain; these fixtures prove source
+behavior only.
+
+Ship now: expose this bounded owner boundary. Re-evaluate when admitted live
+events supply route/certificate and expense receipts. Then verify those receipts
+through the existing parent commissioning chain.
+
+Run the deterministic suite and coverage with installed pinned tools:
+
+```bash
+node --import tsx --test --test-isolation=none --experimental-test-coverage --test-coverage-include=scripts/lib/lesson-analysis.mjs scripts/lib/__tests__/lesson-analysis.test.mjs
+```
 
 ## Nothing fails silently
 

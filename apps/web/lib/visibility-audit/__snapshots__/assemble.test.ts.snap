@@ -88,11 +88,10 @@ No \`dsp_catalog_mismatches\` rows were supplied.
 
 ## Prioritized fixes
 
-Agentic fixes map to Pro submissions (MusicBrainz, AllMusic) and DSP bio sync. MusicBrainz authenticated edits stay mapped and not preparable.
+Each fix lists its provider or manual action. MusicBrainz authenticated edits stay mapped and not preparable.
 
 1. Create or confirm the MusicBrainz artist — submission \`musicbrainz_authenticated_edit\` (provider mapped, not in the current preparable set). The MBID → Wikidata QID → ISNI chain starts at MusicBrainz. No MBID is stored, so QID and ISNI cannot be resolved from MusicBrainz url-rels.
 4. Submit the artist to AllMusic — submission \`xperi_allmusic_email\` (provider ready). AllMusic is missing from DSP presence. Pro maps this to the Xperi / AllMusic submission provider.
-7. Sync artist bios to DSPs that are missing a profile link — DSP bio sync (apple_music, amazon_music, tidal, deezer). Enabled DSP bio sync has no stored link for: Apple Music, Amazon Music, TIDAL, Deezer.
 8. Add missing ad pixels — manual \`configure_ad_pixels\`. No pixel init was stored for: facebook, tiktok, google, twitter, snapchat, pinterest.
 9. Record Google page-1 ownership by hand — manual \`manual_search_ownership\`. Google page-1 ownership is a manual check while PROFILE_SEARCH_MONITORING is off. Record query, rank, URL, and whether the result is owned by the artist. This generator does not call SerpAPI.
 10. Spot-check answer-engine citations — manual \`manual_citation_spot_check\`. Answer-engine citation spot checks use the canonical question set. Paste manual results per engine. This generator does not query answer engines.

@@ -48,6 +48,7 @@ import * as laneCapacity from './lane-capacity.mjs';
 import * as linear from './linear-client.mjs';
 import * as ownershipInventory from './ownership-inventory.mjs';
 import * as planGate from './plan-gate.mjs';
+import { readPrivateConversationRequest } from './private-task.mjs';
 import * as reconciler from './reconcile.mjs';
 import * as reporter from './reporter.mjs';
 import * as researchGate from './research-gate.mjs';
@@ -170,7 +171,7 @@ Usage:
   node backlog-orchestrator.mjs intake-readiness      Classify changed intake work (always dry-run)
   node backlog-orchestrator.mjs backlog-reduction     Audit high-confidence duplicate reduction (dry-run)
   node backlog-orchestrator.mjs backlog-hygiene       Aged dedup + stale Sentry-only hygiene pass (dry-run)
-  node backlog-orchestrator.mjs reconcile-conversation --evidence-file=/path/request.json
+  node backlog-orchestrator.mjs reconcile-conversation --evidence-file=/private/request.json
   node backlog-orchestrator.mjs approve-research --issue=JOV-123 --evidence-file=/path/research.json
   node backlog-orchestrator.mjs report                Generate shadow report
 `);
@@ -184,6 +185,19 @@ Usage:
     process.exit(78);
   }
 
+  // Conversation privacy is decided before cache/Linear access or tool dispatch.
+  if (command === 'reconcile-conversation') {
+    const privateTaskDirectory = args
+      .find(a => a.startsWith('--private-state-dir='))
+      ?.slice('--private-state-dir='.length);
+    await runConversationReconciliation(
+      evidenceFile,
+      evidenceJson,
+      isDryRun,
+      privateTaskDirectory
+    );
+    return;
+  }
   const cache = loadCache();
 
   if (command === 'audit' || command === 'report') {
@@ -202,8 +216,6 @@ Usage:
     await runBacklogReduction(cache);
   } else if (command === 'backlog-hygiene') {
     await runBacklogHygiene(cache);
-  } else if (command === 'reconcile-conversation') {
-    await runConversationReconciliation(evidenceFile, evidenceJson, isDryRun);
   } else if (command === 'approve-plan') {
     await runApprovePlan(issueArg, evidenceFile, evidenceJson, isDryRun);
   } else if (command === 'approve-research') {
@@ -217,21 +229,21 @@ Usage:
 async function runConversationReconciliation(
   evidenceFile,
   evidenceJson,
-  isDryRun
+  isDryRun,
+  privateTaskDirectory
 ) {
-  if (!evidenceFile && !evidenceJson)
+  if (!evidenceFile || evidenceJson)
     throw new Error(
-      'reconcile-conversation requires --evidence-file or --evidence'
+      'reconcile-conversation requires a private evidence file; inline evidence is denied'
     );
-  const request = evidenceFile
-    ? JSON.parse(readFileSync(evidenceFile, 'utf8'))
-    : JSON.parse(evidenceJson);
+  const request = readPrivateConversationRequest(evidenceFile);
   const receipt = await reconcileConversationRequest({
     request,
     teamId: TEAM_CONFIGS[0].id,
     stateId: TEAM_FILE_CONFIG.states.triage,
     client: linear,
     dryRun: isDryRun,
+    privateTaskDirectory,
   });
   console.log(JSON.stringify(receipt, null, 2));
 }
@@ -2349,6 +2361,24 @@ if (
   realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))
 )
   main().catch(err => {
+    if (process.argv[2] === 'reconcile-conversation') {
+      console.error(
+        JSON.stringify({
+          schema: 'conversation-intake/blocked/v1',
+          status: 'blocked',
+          owner: 'operator',
+          retryBudget: 0,
+          blocker:
+            err.code === 'PRIVATE_TASK_LOCKED'
+              ? 'A concurrent or interrupted private writer holds the task lock.'
+              : 'Intake failed; private input and recovery state were not externalized.',
+          nextAction:
+            'Inspect the private request and durable recovery record locally.',
+        })
+      );
+      process.exitCode = 1;
+      return;
+    }
     const cooldown = linear.activeLinearCooldown(err);
     const deferred = process.argv[2] === 'remediate' && cooldown !== null;
     const receipt = {

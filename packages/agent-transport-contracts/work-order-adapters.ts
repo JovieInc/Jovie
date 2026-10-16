@@ -9,7 +9,7 @@ import {
   type TerminalState,
   WORK_RESULT_SCHEMA,
   type WorkResult,
-} from './work-order';
+} from './work-order.ts';
 
 /**
  * JOV-7703 adapters. Each maps a sealed WorkOrder onto an actor class's

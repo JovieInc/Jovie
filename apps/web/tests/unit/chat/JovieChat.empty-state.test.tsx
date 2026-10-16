@@ -200,6 +200,7 @@ const mockOpportunityQueryOptions = vi.fn();
 let mockInsightsLoading = false;
 let mockInsightsError = false;
 let mockInsightsPending = false;
+let mockInsightsEnabled = true;
 let mockInsightsSummary: {
   readonly insights: InsightResponse[];
   readonly totalActive: number;
@@ -233,6 +234,7 @@ vi.mock('@/lib/queries', () => ({
     data: mockInsightsPending ? undefined : mockInsightsSummary,
     isLoading: mockInsightsLoading,
     isError: mockInsightsError,
+    isEnabled: mockInsightsEnabled,
   }),
 }));
 
@@ -280,6 +282,7 @@ describe('JovieChat empty state', () => {
     mockInsightsLoading = false;
     mockInsightsError = false;
     mockInsightsPending = false;
+    mockInsightsEnabled = true;
     mockInsightsSummary = {
       insights: [],
       totalActive: 0,
@@ -456,8 +459,74 @@ describe('JovieChat empty state', () => {
     expect(
       screen.getByRole('button', { name: 'Draft This With Jovie' })
     ).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(10_000));
+    expect(
+      screen.getByRole('button', { name: 'Draft This With Jovie' })
+    ).toBeInTheDocument();
     vi.useRealTimers();
   });
+
+  it('offers profile review immediately when the insights query is disabled (JOV-8482)', () => {
+    mockInsightsEnabled = false;
+    mockInsightsPending = true;
+    renderWithQueryClient(
+      <JovieChat profileId='profile-1' displayName='Tim White' />
+    );
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(
+      screen.getByRole('link', { name: 'Review Your Profile' })
+    ).toHaveAttribute('href', '/app/chat?panel=profile');
+  });
+
+  it.each([false, true])(
+    'bounds the welcome wait with undefined data and isLoading=%s (JOV-8482)',
+    isLoading => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-10-14T20:00:00Z'));
+      try {
+        mockInsightsPending = true;
+        mockInsightsLoading = isLoading;
+        const { rerender } = renderWithQueryClient(
+          <JovieChat profileId='profile-1' displayName='Tim White' />
+        );
+        const greeting = screen.getByRole('heading');
+        const composer = screen.getByTestId('chat-input');
+        expect(screen.getByRole('status')).toHaveTextContent(
+          'Finding your next step'
+        );
+
+        act(() => vi.advanceTimersByTime(5_000));
+        mockInsightsLoading = !isLoading;
+        rerender(<JovieChat profileId='profile-1' displayName='Tim White' />);
+        act(() => vi.advanceTimersByTime(4_999));
+        expect(screen.getByRole('status')).toBeInTheDocument();
+        act(() => vi.advanceTimersByTime(1));
+        expect(screen.queryByRole('status')).toBeNull();
+        expect(
+          screen.getByRole('link', { name: 'Review Your Profile' })
+        ).toHaveAttribute('href', '/app/chat?panel=profile');
+        expect(screen.getByRole('heading')).toBe(greeting);
+        expect(screen.getByTestId('chat-input')).toBe(composer);
+
+        mockInsightsLoading = false;
+        mockInsightsPending = false;
+        mockInsightsSummary = {
+          insights: [actionableInsight()],
+          totalActive: 1,
+          lastGeneratedAt: null,
+        };
+        rerender(<JovieChat profileId='profile-1' displayName='Tim White' />);
+        expect(
+          screen.queryByRole('button', { name: 'Draft This With Jovie' })
+        ).toBeNull();
+        expect(
+          screen.getByRole('link', { name: 'Review Your Profile' })
+        ).toBeInTheDocument();
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+  );
 
   it('keeps one welcome through delayed resolution and freezes the resolved next step', () => {
     mockInsightsLoading = true;

@@ -35,7 +35,7 @@ async function resolveReleasesSurface(
     return 'mobile';
   }
 
-  const desktopRows = page.locator('tbody tr');
+  const desktopRows = page.locator('tbody tr, [data-shell-release-row]');
   if (
     await desktopRows
       .first()
@@ -70,6 +70,11 @@ async function getFirstReleaseTrigger(
       return firstCell;
     }
     return taggedRow;
+  }
+
+  const shellRow = page.locator('[data-shell-release-row]').first();
+  if ((await shellRow.count()) > 0) {
+    return shellRow;
   }
 
   const firstRow = page.locator('tbody tr').first();

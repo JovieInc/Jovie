@@ -69,7 +69,7 @@
       "$type": "color"
     },
     "text.disabled": {
-      "$value": "#525d75",
+      "$value": "#77839d",
       "$type": "color"
     },
     "border.subtle": {

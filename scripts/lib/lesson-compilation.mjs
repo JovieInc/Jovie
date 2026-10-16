@@ -69,10 +69,8 @@ function validateAnalysis(analysis) {
   );
 }
 
-/** The loader must verify the persisted analysis receipt using child 5's
- * existing capability/review controls. Neither a manifest nor model output can
- * provide this port, the target inventory, replay adapter or authorization.
- * No scheduler, registry, model call or promotion authority is introduced.
+/** Verify persisted analysis with existing review controls. The request cannot
+ * supply this port, the inventory, replay, authorization, or a new scheduler.
  */
 export async function compileLesson(requestInput, environment) {
   try {
@@ -272,8 +270,7 @@ export async function compileLesson(requestInput, environment) {
       replay,
     };
     const digest = compilationDigest(compilation);
-    // Existing writer/certification owner evaluates the exact candidate. This
-    // is required even for no-new-invariant and evaluation/authorization edits.
+    // Authorize the exact candidate, including no-new-invariant edits.
     const authorization = await environment.authorize({
       digest,
       head: request.candidateRevision,

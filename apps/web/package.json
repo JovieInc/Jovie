@@ -1,6 +1,6 @@
 {
   "name": "@jovie/web",
-  "version": "26.10.5",
+  "version": "26.10.6",
   "private": true,
   "sideEffects": false,
   "engines": {
@@ -57,6 +57,7 @@
     "next:proxy-guard": "node scripts/next-proxy-guard.mjs",
     "design-ci:judge-matrix": "tsx scripts/design-ci-judge-router.ts",
     "pre-push": "pnpm run next:proxy-guard && pnpm run tailwind:check && pnpm run typecheck",
+    "rebuild:audience-projections": "NODE_OPTIONS=--conditions=react-server tsx scripts/rebuild-audience-projections.ts",
     "ship": "pnpm run migration:guard && pnpm run migration:validate && pnpm run drizzle:migrate && pnpm run drizzle:check && pnpm run typecheck && pnpm run lint && pnpm run test",
     "ship:pr": "tsx scripts/ship-pr.ts",
     "check": "pnpm run validate && pnpm run build && pnpm run test",
@@ -65,6 +66,8 @@
     "evals": "bash scripts/run-deterministic-promptfoo-evals.sh eval",
     "evals:golden": "bash scripts/run-golden-eval-set-ci.sh",
     "evals:validate": "bash scripts/run-deterministic-promptfoo-evals.sh validate",
+    "promptfoo": "promptfoo",
+    "stryker": "stryker",
     "parity:music-resolver": "NODE_OPTIONS=--conditions=react-server tsx scripts/music-resolver-parity-eval.ts",
     "test:evals:deterministic": "node scripts/eval-lanes.mjs deterministic",
     "test:evals:live": "node scripts/eval-lanes.mjs live",
@@ -350,7 +353,6 @@
     "@storybook/addon-vitest": "10.6.2",
     "@storybook/nextjs-vite": "10.6.2",
     "@stryker-mutator/core": "10.0.0",
-    "@stryker-mutator/vitest-runner": "10.0.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@tanstack/react-query-devtools": "^5.104.2",
     "@testing-library/jest-dom": "^7.0.1",

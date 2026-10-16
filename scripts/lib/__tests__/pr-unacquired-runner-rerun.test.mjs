@@ -216,4 +216,7 @@ test('the relay skips the model-lane label only when a rerun was requested', () 
     relay.if,
     /^always\(\) && needs\.rerun-unacquired\.outputs\.requested != 'true' && \(/
   );
+  assert.match(relay.if, /"success"/);
+  assert.equal(relay.permissions.issues, 'write');
+  assert.equal(relay.permissions['pull-requests'], 'write');
 });
