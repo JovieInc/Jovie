@@ -4806,6 +4806,11 @@ describe('production promotion exact-artifact contract', () => {
     expect(cronGapMinutes(workflowTriggers(cost)).max).toBeLessThanOrEqual(15);
     expect(cost).toContain('name: Production – jovie');
     expect(cost).toContain('curl --fail --silent --show-error');
+    expect(
+      cost.match(
+        /curl --fail --silent --show-error \\\n\s+--retry 3 --retry-delay 2 --retry-all-errors --connect-timeout 10 --max-time 20/g
+      )
+    ).toHaveLength(3);
     expect(cost).toContain('name: Prepare Linear-only anomaly receipt');
     expect(cost).toContain(
       'Linear is canonical; GitHub Issue creation is retired.'
