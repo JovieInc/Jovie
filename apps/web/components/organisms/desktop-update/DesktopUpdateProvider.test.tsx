@@ -7,6 +7,7 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { banner } from '@/components/feedback/banner-store';
 import {
   availableUpdate as available,
   downloadingUpdate,
@@ -31,6 +32,7 @@ function ContextProbe() {
 }
 
 beforeEach(() => {
+  banner.dismiss();
   uninstallDesktopUpdateBridge();
   window.sessionStorage.clear();
   vi.stubGlobal(
@@ -95,6 +97,34 @@ describe('DesktopUpdateProvider', () => {
     expect(
       await screen.findByText('Downloading Jovie 26.9.17')
     ).toBeInTheDocument();
+  });
+
+  it('queues a passive update behind permission but permits explicit update recovery', async () => {
+    const { emit } = installBridge({ state: 'idle' });
+    render(
+      <DesktopUpdateProvider>
+        <ContextProbe />
+      </DesktopUpdateProvider>
+    );
+    act(() => {
+      banner.warning('Review notification permission', { id: 'permission' });
+      emit(available('26.10.16'));
+    });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(banner.getActiveBanner()?.id).toBe('permission');
+    act(() => banner.dismiss('permission'));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Later' }));
+    act(() => {
+      emit({ state: 'error', message: 'offline', retryable: true });
+      banner.error('Update failed', { id: 'sidebar-update-error' });
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Open modal' }));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(banner.getActiveBanner()?.id).toBe('desktop-update-modal');
+    expect(
+      banner.getBanners().some(item => item.id === 'sidebar-update-error')
+    ).toBe(true);
   });
 
   it('opens from the context trigger and retries after an error', async () => {

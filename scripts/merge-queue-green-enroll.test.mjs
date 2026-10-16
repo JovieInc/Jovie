@@ -949,6 +949,7 @@ test('wakes on completed Source Validation and on the push-to-main reconciliatio
   assert.ok(workflow.on.workflow_run.workflows.includes('Source Validation'));
   assert.deepEqual(workflow.on.workflow_run.types, ['completed']);
   assert.deepEqual(workflow.on.pull_request_target.types, [
+    'converted_to_draft',
     'labeled',
     'unlabeled',
     'reopened',
@@ -972,6 +973,31 @@ test('wakes on completed Source Validation and on the push-to-main reconciliatio
   );
   assert.ok(ready.on.workflow_run.workflows.includes('Source Validation'));
   assert.match(ready.jobs['green-source'].if, /source-validation\.yml/);
+});
+
+test('draft cleanup stays with the admission owner and trusted exact-head backend', () => {
+  const job = workflow.jobs['dequeue-draft'];
+  assert.match(job.if, /converted_to_draft/);
+  assert.doesNotMatch(job.if, /QUEUE_FREEZE/);
+  const checkout = job.steps.find(step =>
+    step.uses?.startsWith('actions/checkout@')
+  );
+  assert.equal(
+    checkout.with.ref,
+    '${{ github.event.repository.default_branch }}'
+  );
+  const cleanup = job.steps.find(step =>
+    step.run?.includes('reconcileDraftQueueEntry')
+  );
+  assert.equal(cleanup.env.GH_TOKEN, '${{ steps.app-token.outputs.token }}');
+  assert.match(cleanup.run, /GITHUB_EVENT_PATH/);
+  assert.doesNotMatch(
+    cleanup.run,
+    /enqueuePullRequest|pr ready|enablePullRequestAutoMerge/
+  );
+  const token = job.steps.find(step => step.id === 'app-token');
+  assert.equal(token.with['permission-pull-requests'], 'write');
+  assert.equal(token.with['permission-merge-queues'], undefined);
 });
 
 const retryFailure = {
