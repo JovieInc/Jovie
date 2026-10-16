@@ -503,9 +503,12 @@ export function validateLease({
   return lease;
 }
 
-function command(args, options = {}) {
+export function command(args, options = {}) {
   const { label = args[0], route = '', ...spawnOptions } = options;
-  const budget = Number(process.env.GH_API_HOLD_BUDGET_SECONDS);
+  const budget = Number(
+    spawnOptions.env?.GH_API_HOLD_BUDGET_SECONDS ??
+      process.env.GH_API_HOLD_BUDGET_SECONDS
+  );
   const timeout =
     args[0] === 'gh' &&
     args[1] === 'api' &&
@@ -520,21 +523,23 @@ function command(args, options = {}) {
     maxBuffer: 16 * 1024 * 1024,
     ...spawnOptions,
   });
-  if (result.status !== 0) {
-    const stderr = textOf(result.stderr);
-    for (const line of stderr.split('\n')) {
-      if (line.startsWith('::error::') || line.startsWith('::warning::'))
-        console.error(line);
-    }
+  const stderr = textOf(result.stderr);
+  for (const line of stderr.split('\n')) {
+    if (line.startsWith('::error::') || line.startsWith('::warning::'))
+      console.error(line);
   }
   // No raw provider output: it can include sensitive request headers.
   const kind =
     result.status === 0
       ? ''
-      : `; ${evidenceFailureKind(result.stderr, result.stdout, route)}`;
+      : evidenceFailureKind(result.stderr, result.stdout, route);
+  const annotation = stderr
+    .split('\n')
+    .find(line => line.startsWith('::error::GitHub rate limit'));
+  const detail = annotation ? `: ${annotation.slice('::error::'.length)}` : '';
   assert(
     result.status === 0,
-    `${label} evidence command failed (${result.status ?? 'unavailable'})${kind}`
+    `${label} evidence command failed (${result.status ?? 'unavailable'})${kind ? `; ${kind}` : ''}${detail}`
   );
   return result.stdout;
 }

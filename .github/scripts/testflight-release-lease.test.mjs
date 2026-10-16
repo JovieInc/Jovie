@@ -10,6 +10,7 @@ import {
   storedZip,
 } from '../../scripts/lib/real-gh-harness.mjs';
 import {
+  command,
   comparisonReady,
   evidenceFailureKind,
   evidenceInvocation,
@@ -297,7 +298,11 @@ test('compare transport failures are retryable and raw provider output is not cl
     'failed'
   );
   assert.equal(
-    evidenceFailureKind('API rate limit exceeded', ''),
+    evidenceFailureKind(
+      'gh: API rate limit exceeded for installation. (HTTP 403)\n',
+      '{"message":"API rate limit exceeded for installation."}',
+      'repos/JovieInc/Jovie/compare/aaa...bbb'
+    ),
     'rate limited'
   );
   assert.deepEqual(evidenceInvocation(['gh', 'api', 'repos/acme/commits/main']), [
@@ -325,6 +330,91 @@ test('compare transport failures are retryable and raw provider output is not cl
   );
   assert.equal(body.sha, 'a'.repeat(40));
   assert.equal(calls, 3);
+});
+
+test('installation quota exhaustion waits inside the budget and fails closed outside it', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'tf-hold-'));
+  const fake = join(dir, 'gh');
+  const state = join(dir, 'hits');
+  writeFileSync(
+    fake,
+    `#!/bin/bash
+set -euo pipefail
+if [[ "\${1:-}" == "api" && "\${2:-}" == "rate_limit" ]]; then
+  printf '%s\\n' "$RESET_EPOCH"
+  exit 0
+fi
+if [[ ! -f "$HOLD_STATE" ]]; then
+  : > "$HOLD_STATE"
+  printf '%s\\n' 'gh: API rate limit exceeded for installation. (HTTP 403)' >&2
+  printf '%s\\n' '{"message":"API rate limit exceeded for installation."}'
+  exit 1
+fi
+printf '%s\\n' '{"ok":true}'
+`,
+    { mode: 0o755 }
+  );
+  const envFor = reset => ({
+    ...process.env,
+    GH_API_HOLD_BIN: fake,
+    GH_API_HOLD_BUDGET_SECONDS: '30',
+    HOLD_STATE: state,
+    RESET_EPOCH: String(reset),
+  });
+  try {
+    const within = command(['gh', 'api', 'repos/JovieInc/Jovie/commits/main'], {
+      route: 'repos/JovieInc/Jovie/commits/main',
+      env: envFor(Math.floor(Date.now() / 1000) - 5),
+    });
+    assert.equal(within.trim(), '{"ok":true}');
+    rmSync(state, { force: true });
+    assert.throws(
+      () =>
+        command(['gh', 'api', 'repos/JovieInc/Jovie/commits/main'], {
+          route: 'repos/JovieInc/Jovie/commits/main',
+          env: envFor(Math.floor(Date.now() / 1000) + 10000),
+        }),
+      error => {
+        assert.match(error.message, /; rate limited: /);
+        assert.match(error.message, /outside the 30s budget/);
+        assert.match(error.message, /Not passing/);
+        assert.doesNotMatch(error.message, /rewound or diverged/);
+        assert.doesNotMatch(
+          error.message,
+          /API rate limit exceeded for installation/
+        );
+        return true;
+      }
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('upload does not retry an installation rate limit as an unfinished compare', () => {
+  const f = fixture();
+  const lease = validateLease(f.input);
+  f.reserve(lease);
+  let calls = 0;
+  f.input.api = () => {
+    calls += 1;
+    throw new Error(
+      'gh evidence command failed (1); rate limited: GitHub rate limit resets at 9, outside the 600s budget. Not passing.'
+    );
+  };
+  assert.throws(
+    () =>
+      validateLease({
+        ...f.input,
+        previous: lease,
+        phase: 'upload',
+        pause: () => {
+          throw new Error('quota exhaustion must not be retried');
+        },
+      }),
+    /outside the 600s budget/
+  );
+  assert.equal(calls, 1);
 });
 
 for (const [label, mutate] of [

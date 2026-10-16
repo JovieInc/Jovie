@@ -1336,6 +1336,16 @@ describe('iOS TestFlight job graph', () => {
       expect(beta?.if).toContain(condition);
     const betaRuns = (beta?.steps ?? []).map(step => step.run ?? '').join('\n');
     expect(betaRuns).toContain('bundle exec fastlane ios beta');
+    const upload = beta?.steps?.find(
+      step => step.name === 'Upload internal TestFlight build'
+    );
+    expect(upload?.env?.GH_API_HOLD_BUDGET_SECONDS).toBe('600');
+    const guardCheckout = beta?.steps?.find(
+      step => step.name === 'Checkout pinned release guard'
+    );
+    expect(String(guardCheckout?.with?.['sparse-checkout'])).toContain(
+      '.github/scripts/gh-api-hold.sh'
+    );
     // The Xcode suite already ran in full-regression; beta must not repeat it.
     expect(betaRuns).not.toContain('fastlane ios ios_tests');
     expect(JSON.stringify(beta)).not.toContain(
