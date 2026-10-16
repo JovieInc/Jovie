@@ -87,9 +87,21 @@ STRATEGY_TEXT = re.compile(
 # An ordinary engineering repair frequently states what it did NOT touch
 # ("No credentials or permissions are changed"); a negated credential/secret
 # mention is assurance, not a founder decision surface (JOV-8495 re-review).
+# A cost-impact list ("No new service, schedule, controller, credentials")
+# is the same assurance. Only a bare list item is removed; "rotate the
+# credential" and any pricing/taste/strategy ask in that sentence stay.
 NEGATED_POLICY_TEXT = re.compile(
     r"\bno\s+(?:new\s+)?(?:credentials?|secrets?|tokens?|permissions?|scopes?)\b"
     r"|\b(?:without|not)\s+(?:changing|touching|adding)\s+(?:any\s+)?(?:credentials?|secrets?|permissions?)",
+    re.IGNORECASE,
+)
+_NO_NEW_ASSURANCE = re.compile(r"\bno\s+new\b", re.IGNORECASE)
+_BARE_LIST_CREDENTIAL = re.compile(
+    r"(?<=,)\s*(?:and\s+|or\s+)?credentials?\b",
+    re.IGNORECASE,
+)
+_NON_CREDENTIAL_STRATEGY = re.compile(
+    r"canon/strategy|founder strategy|pricing|taste\b",
     re.IGNORECASE,
 )
 ACTIONABLE_FIX = re.compile(
@@ -226,6 +238,21 @@ def _actionable(text: str) -> bool:
     return bool(text and ACTIONABLE_FIX.search(text))
 
 
+def _strip_negated_policy(text: str) -> str:
+    """Remove assurance-only credential mentions, one sentence at a time."""
+    pieces = re.split(r"([.!\n])", text)
+    stripped = []
+    for index, piece in enumerate(pieces):
+        if index % 2 == 1:
+            stripped.append(piece)
+            continue
+        piece = NEGATED_POLICY_TEXT.sub("", piece)
+        if _NO_NEW_ASSURANCE.search(piece) and not _NON_CREDENTIAL_STRATEGY.search(piece):
+            piece = _BARE_LIST_CREDENTIAL.sub("", piece)
+        stripped.append(piece)
+    return "".join(stripped)
+
+
 def _strategy(pr: dict) -> bool:
     files = pr.get("files") or pr.get("paths") or pr.get("conflictFiles") or []
     # Protected paths are independent evidence; prose assurances cannot negate them.
@@ -233,7 +260,7 @@ def _strategy(pr: dict) -> bool:
         return True
     # Remove only the negated credential mention. A pricing/taste/strategy ask
     # in the same sentence or a separate title still requires authority.
-    return any(STRATEGY_TEXT.search(NEGATED_POLICY_TEXT.sub("", text))
+    return any(STRATEGY_TEXT.search(_strip_negated_policy(text))
                for text in (pr.get("title") or "", pr.get("body") or ""))
 
 
