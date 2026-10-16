@@ -38,9 +38,18 @@ describe('chat social add action System B source contract', () => {
         expect(source, `${sourcePath} leaked ${pattern}`).not.toMatch(pattern);
       }
 
-      expect(source).toContain('bg-btn-primary');
-      expect(source).toContain('text-btn-primary-foreground');
-      expect(source).toContain('hover:bg-btn-primary-hover');
+      if (sourcePath.endsWith('ChatLinkConfirmationCard.tsx')) {
+        // Canonical controls inherit their tokens; local color overrides are
+        // prohibited by the forced shadcn/no-restyle probe as well.
+        expect(source).toContain("from '@jovie/ui/atoms/button'");
+        expect(source).toContain("variant='primary'");
+        expect(source).not.toContain('bg-btn-primary');
+        expect(source).not.toContain('text-btn-primary-foreground');
+      } else {
+        expect(source).toContain('bg-btn-primary');
+        expect(source).toContain('text-btn-primary-foreground');
+        expect(source).toContain('hover:bg-btn-primary-hover');
+      }
     }
   });
 
