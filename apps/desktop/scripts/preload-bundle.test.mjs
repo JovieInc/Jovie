@@ -153,10 +153,10 @@ test('the production bundle command writes a sandbox-compatible preload', async 
   assert.match(source, /notifyAppBooted/);
   assert.match(source, /getBuildIdentity/);
 
-  const loadDocument = () => {
+  const loadDocument = argv => {
     const exposed = new Map();
     vm.runInNewContext(source, {
-      process: { platform: 'darwin', versions: { electron: '44.0.0' } },
+      process: { platform: 'darwin', argv, versions: { electron: '44.0.0' } },
       document: { documentElement: { dataset: {} } },
       require: () => ({
         contextBridge: {
@@ -168,6 +168,13 @@ test('the production bundle command writes a sandbox-compatible preload', async 
     return exposed.get('electronAPI');
   };
   const currentDocument = loadDocument();
+  assert.equal(currentDocument.windowRole, 'main');
+  assert.equal(currentDocument.navigationBoundaryVersion, 1);
+  assert.equal(loadDocument(['--jovie-auth-handoff']).windowRole, 'auth');
+  assert.equal(
+    loadDocument(['--jovie-profile-preview']).windowRole,
+    'profile-preview'
+  );
   assert.equal(currentDocument.getWorkState(), null);
   currentDocument.setWorkState({
     hasDraft: false,

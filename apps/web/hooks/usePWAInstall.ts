@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { isElectronRuntime } from '@/lib/desktop/electron-bridge';
+import { macCompatibility } from '@/lib/desktop/mac-compatibility';
 import {
   isSwEnabled,
   registerServiceWorker,
@@ -78,6 +79,7 @@ function isStandalone(): boolean {
 export function usePWAInstall() {
   const deferredPrompt = useRef<BeforeInstallPromptEvent | null>(null);
   const isElectron = isElectronRuntime();
+  const [platformAllowsPrompt, setPlatformAllowsPrompt] = useState(false);
   const [canPrompt, setCanPrompt] = useState(false);
   const [isInstalled, setIsInstalled] = useState(
     () => !isElectron && isStandalone()
@@ -90,45 +92,108 @@ export function usePWAInstall() {
 
   useEffect(() => {
     if (isElectronRuntime()) return;
-    if (isStandalone() || isDismissed()) return;
-
-    // iOS Safari doesn't fire beforeinstallprompt — detect it separately
-    if (isIOSSafari()) {
-      setCanPrompt(true);
-      return;
-    }
-
-    // Pick up an event that fired before this effect ran
-    if (_earlyPromptEvent) {
-      _earlyPromptEvent.preventDefault();
-      deferredPrompt.current = _earlyPromptEvent;
-      _earlyPromptEvent = null;
-      setCanPrompt(true);
-    }
-
+    let cancelled = false;
+    let eligible = false;
+    const controller = new AbortController();
+    const canOffer = () => !isStandalone() && !isDismissed();
+    const offer = () => {
+      if (eligible && canOffer() && (deferredPrompt.current || isIOSSafari()))
+        setCanPrompt(true);
+    };
     function onBeforeInstall(e: BeforeInstallPromptEvent) {
       e.preventDefault();
+      if (isElectronRuntime()) {
+        deferredPrompt.current = null;
+        setCanPrompt(false);
+        setPlatformAllowsPrompt(false);
+        return;
+      }
       deferredPrompt.current = e;
       _earlyPromptEvent = null;
-      setCanPrompt(true);
+      offer();
     }
-
     function onAppInstalled() {
       deferredPrompt.current = null;
       setCanPrompt(false);
       setIsInstalled(true);
     }
-
+    deferredPrompt.current = _earlyPromptEvent;
+    _earlyPromptEvent = null;
     window.addEventListener('beforeinstallprompt', onBeforeInstall);
     window.addEventListener('appinstalled', onAppInstalled);
 
+    async function resolveEligibility() {
+      let compatibility = macCompatibility(navigator);
+      // macOS browser UAs can be frozen. Client hints resolve the real OS on
+      // Chromium; absence/failure stays unknown and quiet, never "compatible".
+      if (compatibility === 'unknown') {
+        const hints = (
+          navigator as Navigator & {
+            userAgentData?: {
+              getHighEntropyValues(
+                keys: string[]
+              ): Promise<{ platformVersion?: string }>;
+            };
+          }
+        ).userAgentData;
+        try {
+          const result = await Promise.race([
+            hints?.getHighEntropyValues(['platformVersion']),
+            new Promise<undefined>(resolve => setTimeout(resolve, 1000)),
+          ]);
+          compatibility = macCompatibility(navigator, result?.platformVersion);
+        } catch {
+          /* Keep unknown; do not infer installation or compatibility. */
+        }
+      }
+      let allow = compatibility === 'other' || compatibility === 'incompatible';
+      if (!allow) {
+        const timeout = setTimeout(() => controller.abort(), 3000);
+        try {
+          const response = await fetch(
+            '/api/desktop/download?format=capabilities',
+            {
+              signal: controller.signal,
+            }
+          );
+          const result: unknown = response.ok ? await response.json() : null;
+          // Explicit unavailability preserves web fallback. Missing/malformed
+          // availability evidence never starts an installation advertisement.
+          allow =
+            typeof result === 'object' &&
+            result !== null &&
+            'available' in result &&
+            result.available === false;
+        } catch {
+          /* Availability unknown: remain quiet, without altering PWA data. */
+        } finally {
+          clearTimeout(timeout);
+        }
+      }
+      if (cancelled) return;
+      eligible = allow && !isElectronRuntime();
+      setPlatformAllowsPrompt(eligible);
+      offer();
+    }
+    void resolveEligibility();
     return () => {
+      cancelled = true;
+      controller.abort();
       window.removeEventListener('beforeinstallprompt', onBeforeInstall);
       window.removeEventListener('appinstalled', onAppInstalled);
     };
   }, []);
 
   const install = useCallback(async () => {
+    if (
+      isElectronRuntime() ||
+      !platformAllowsPrompt ||
+      isStandalone() ||
+      isDismissed()
+    ) {
+      setCanPrompt(false);
+      return;
+    }
     const prompt = deferredPrompt.current;
     if (!prompt) {
       // Prompt unavailable — hide the banner rather than leaving a dead button
@@ -154,7 +219,7 @@ export function usePWAInstall() {
       deferredPrompt.current = null;
       setCanPrompt(false);
     }
-  }, []);
+  }, [platformAllowsPrompt]);
 
   const dismiss = useCallback(() => {
     try {
@@ -165,5 +230,11 @@ export function usePWAInstall() {
     setCanPrompt(false);
   }, []);
 
-  return { canPrompt, isInstalled, isIOS, install, dismiss };
+  return {
+    canPrompt: !isElectron && platformAllowsPrompt && canPrompt,
+    isInstalled,
+    isIOS,
+    install,
+    dismiss,
+  };
 }

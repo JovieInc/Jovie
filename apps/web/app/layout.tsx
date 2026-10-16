@@ -4,6 +4,7 @@ import React from 'react';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { COMPANY_IDENTITY } from '@/data/companyIdentity';
 import { BRAND_ION_BLUE } from '@/lib/brand/tokens';
+import { DesktopRouteBoundary } from '@/lib/desktop/DesktopRouteBoundary';
 import './globals.css';
 // JOV-2145: HeaderNav.css is imported here so that the marketing-glass-header
 // visibility rules load on EVERY route, not just pages inside the (home) and
@@ -218,8 +219,10 @@ export default async function RootLayout({
   const content = (
     <>
       <AcquisitionCapture />
-      {children}
-      {auth}
+      <DesktopRouteBoundary>
+        {children}
+        {auth}
+      </DesktopRouteBoundary>
       {devToolbar}
       {shouldRenderCookieBanner ? <CookieBannerMount /> : null}
       <GoogleAnalytics />

@@ -1,0 +1,25 @@
+{
+  "application": [
+    "/account",
+    "/app",
+    "/artist-selection",
+    "/billing",
+    "/desktop-auth",
+    "/hud",
+    "/onboarding",
+    "/start"
+  ],
+  "authCallback": [
+    "/auth/callback",
+    "/auth/native-complete",
+    "/auth/native-return",
+    "/auth/ios/complete",
+    "/app/auth/callback",
+    "/signin/sso-callback",
+    "/signup/sso-callback",
+    "/sign-in/sso-callback",
+    "/sign-up/sso-callback",
+    "/sso-callback"
+  ],
+  "authUi": ["/signin", "/signup", "/sign-in", "/sign-up"]
+}
