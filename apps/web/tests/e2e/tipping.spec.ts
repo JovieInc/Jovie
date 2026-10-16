@@ -245,10 +245,12 @@ test.describe('Tipping MVP', () => {
           return;
         }
 
-        // Check that the QR code overlay is visible
-        const qrOverlay = page
-          .locator('div')
-          .filter({ hasText: 'Open On Phone' });
+        // The open card and its header row both contain "Open On Phone".
+        // The fixed card is the one that also holds the QR image.
+        const qrOverlay = page.locator('div.fixed').filter({
+          hasText: 'Open On Phone',
+          has: page.locator('img'),
+        });
         await expect(qrOverlay).toBeVisible({
           timeout: SMOKE_TIMEOUTS.VISIBILITY,
         });
