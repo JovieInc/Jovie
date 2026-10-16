@@ -35,6 +35,7 @@ const { resolveRealGh, runWithRealGh, storedZip } =
 
 type Step = {
   id?: string;
+  if?: string;
   name?: string;
   run?: string;
   uses?: string;
@@ -42,6 +43,7 @@ type Step = {
   with?: Record<string, unknown>;
 };
 type Job = {
+  outputs?: Record<string, string>;
   needs?: string[];
   if?: string;
   uses?: string;
@@ -58,7 +60,8 @@ type Workflow = {
 const repoRoot = resolve(import.meta.dirname, '../../../../..');
 const workflow = parseYaml(
   readFileSync(
-    resolve(repoRoot, '.github/workflows/ios-testflight.yml'),
+    process.env.TESTFLIGHT_WORKFLOW_PATH ||
+      resolve(repoRoot, '.github/workflows/ios-testflight.yml'),
     'utf8'
   )
 ) as Workflow;
@@ -119,6 +122,13 @@ const job = (name: string, sha: string, conclusion = 'success', id = 1) => ({
   head_sha: sha,
   status: 'completed',
   conclusion,
+  steps: [
+    {
+      name: 'Upload internal TestFlight build',
+      status: 'completed',
+      conclusion,
+    },
+  ],
 });
 
 const testflightRun = (id: number, sha: string, attempt = 1) => ({
@@ -150,6 +160,12 @@ type World = {
   testflightRuns?: Record<number, Record<string, unknown>>;
   testflightJobs?: Record<string, unknown[]>;
   legacyRuns?: Record<string, unknown>[];
+  binaries?: {
+    id: number;
+    runId: number;
+    attempt: number;
+    payload: Record<string, unknown>;
+  }[];
 };
 
 // Fixture GitHub API state. Every route the script may read is explicit;
@@ -176,6 +192,18 @@ function routes(world: World) {
       },
     ],
     ['commits/main', { sha: world.mainSha ?? RELEASE }],
+    [
+      `compare/${OLDER}...${RELEASE}`,
+      { status: 'ahead', merge_base_commit: { sha: OLDER } },
+    ],
+    [
+      `compare/${RELEASE}...${OLDER}`,
+      { status: 'behind', merge_base_commit: { sha: OLDER } },
+    ],
+    [
+      `compare/${RELEASE}...${NEWER}`,
+      { status: 'ahead', merge_base_commit: { sha: RELEASE } },
+    ],
     [
       `actions/artifacts?name=production-generation-verified-${RELEASE}&per_page=100`,
       { artifacts: world.productionMarkers ?? [] },
@@ -215,6 +243,24 @@ function routes(world: World) {
             : JSON.stringify(marker.marker),
       })
     );
+  for (const binary of world.binaries ?? []) {
+    table.set(`actions/runs/${binary.runId}/artifacts?per_page=100`, {
+      artifacts: [
+        {
+          id: binary.id,
+          name: `testflight-binary-${binary.attempt}`,
+          expired: false,
+          workflow_run: { id: binary.runId },
+        },
+      ],
+    });
+    table.set(
+      `actions/artifacts/${binary.id}/zip`,
+      storedZip({
+        'testflight-upload-attestation.json': JSON.stringify(binary.payload),
+      })
+    );
+  }
   for (const [id, run] of Object.entries(world.testflightRuns ?? {})) {
     table.set(`actions/runs/${id}`, run);
     table.set(`actions/runs/${id}/attempts/${run.run_attempt}`, run);
@@ -280,6 +326,27 @@ const validMarker = (sha: string, runId: number) => ({
   uploadJob: '9',
 });
 
+const binaryAttestation = (source: string, transport: string, run = 80) => ({
+  schema: 'jovie-testflight-binary/v1',
+  binarySha256: 'd'.repeat(64),
+  buildNumber: '44',
+  lease: {
+    schema: 'jovie-testflight-release-lease/v1',
+    repository: REPO,
+    sourceSha: source,
+    transportSha: transport,
+    workflowRun: String(run),
+    workflowAttempt: '1',
+  },
+});
+const attestedJob = (transport: string) => ({
+  ...job('Upload Internal TestFlight', transport, 'success', 9),
+  steps: [
+    { name: 'Upload internal TestFlight build' },
+    { name: 'Preserve exact uploaded binary attestation' },
+  ],
+});
+
 describe.skipIf(!gh)('iOS TestFlight release authorization (real gh)', () => {
   it('authorizes the exact verified current main as the first release', async () => {
     const result = await authorize({});
@@ -325,17 +392,25 @@ describe.skipIf(!gh)('iOS TestFlight release authorization (real gh)', () => {
     expect(impostor.code).toBe(1);
   });
 
-  it('stands down without releasing a superseded generation', async () => {
+  it('rejects contradictory source identity and allows a verified ancestor as main advances', async () => {
     const supersededController = await authorize({
       controllerRun: controllerRun({
         display_title: `Production Controller ${NEWER} from CI 78 attempt 1`,
       }),
     });
-    expect(supersededController.code).toBe(0);
+    expect(supersededController.code).toBe(1);
     expect(supersededController.outputs.authorized).toBe('false');
     const mainMoved = await authorize({ mainSha: NEWER });
     expect(mainMoved.code).toBe(0);
-    expect(mainMoved.outputs.authorized).toBe('false');
+    expect(mainMoved.outputs.authorized).toBe('true');
+    expect(mainMoved.outputs.release_sha).toBe(RELEASE);
+  });
+
+  it('pins the same verified source when main advances before admission', async () => {
+    const result = await authorize({ mainSha: NEWER });
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.outputs.authorized).toBe('true');
+    expect(result.outputs.release_sha).toBe(RELEASE);
   });
 
   it('requires exactly one successful Production Verified job for the SHA', async () => {
@@ -483,6 +558,157 @@ describe.skipIf(!gh)('iOS TestFlight release authorization (real gh)', () => {
   });
 });
 
+describe.skipIf(!gh)(
+  'iOS TestFlight source/transport receipts (real gh)',
+  () => {
+    it('recovers the certified source when beta succeeded but the first marker publisher failed', async () => {
+      const result = await authorize({
+        legacyRuns: [testflightRun(80, NEWER)],
+        testflightJobs: { '80/attempts/1': [attestedJob(NEWER)] },
+        binaries: [
+          {
+            id: 500,
+            runId: 80,
+            attempt: 1,
+            payload: binaryAttestation(OLDER, NEWER),
+          },
+        ],
+      });
+      expect(result.code, result.stderr).toBe(0);
+      expect(result.outputs.baseline_sha).toBe(OLDER);
+    });
+
+    it('rejects malformed beta step metadata instead of guessing a legacy source', async () => {
+      const beta = {
+        ...job('Upload Internal TestFlight', NEWER),
+        steps: undefined,
+      };
+      const result = await authorize({
+        legacyRuns: [testflightRun(80, NEWER)],
+        testflightJobs: { '80/attempts/1': [beta] },
+      });
+      expect(result.code).toBe(1);
+      expect(result.stdout).toContain('step provenance is unknown');
+    });
+
+    it('reads the uploaded source from a v2 marker while authenticating the transport job', async () => {
+      const binary = binaryAttestation(OLDER, NEWER, 70);
+      const marker = {
+        ...validMarker(OLDER, 70),
+        schema: 'jovie-testflight-upload/v2',
+        transportSha: NEWER,
+        ...{
+          lease: binary.lease,
+          binarySha256: binary.binarySha256,
+          buildNumber: binary.buildNumber,
+        },
+      };
+      const result = await authorize({
+        testflightMarkers: [{ id: 7, runId: 70, marker }],
+        testflightRuns: { 70: testflightRun(70, NEWER) },
+        testflightJobs: {
+          '70/attempts/1': [
+            job('Upload Internal TestFlight', NEWER, 'success', 9),
+          ],
+        },
+      });
+      expect(result.code, result.stderr).toBe(0);
+      expect(result.outputs.baseline_sha).toBe(OLDER);
+      const mismatch = await authorize({
+        testflightMarkers: [
+          {
+            id: 7,
+            runId: 70,
+            marker: {
+              ...marker,
+              lease: { ...binary.lease, sourceSha: RELEASE },
+            },
+          },
+        ],
+      });
+      expect(mismatch.code).toBe(1);
+      expect(mismatch.stdout).toContain(
+        'contradicts its source/transport attestation'
+      );
+    });
+
+    it('a late older marker cannot regress the greatest proven upload source', async () => {
+      const result = await authorize({
+        testflightMarkers: [
+          { id: 8, runId: 70, marker: validMarker(OLDER, 70) },
+          { id: 7, runId: 71, marker: validMarker(RELEASE, 71) },
+        ],
+        testflightRuns: {
+          70: testflightRun(70, OLDER),
+          71: testflightRun(71, RELEASE),
+        },
+        testflightJobs: {
+          '70/attempts/1': [
+            job('Upload Internal TestFlight', OLDER, 'success', 9),
+          ],
+          '71/attempts/1': [
+            job('Upload Internal TestFlight', RELEASE, 'success', 9),
+          ],
+        },
+      });
+      expect(result.code, result.stderr).toBe(0);
+      expect(result.outputs.already_released).toBe('true');
+    });
+
+    async function record(
+      binary: ReturnType<typeof binaryAttestation>,
+      betaSha = NEWER
+    ) {
+      const root = tempRoot('jovie-testflight-record-');
+      const step = workflow.jobs['record-upload'].steps?.find(step => step.run);
+      const result = await runWithRealGh({
+        script: String(step?.run),
+        env: {
+          REPOSITORY: REPO,
+          RELEASE_SHA: RELEASE,
+          TRANSPORT_SHA: NEWER,
+          RUN_ID: '90',
+          RUN_ATTEMPT: '1',
+          LEASE: JSON.stringify(binaryAttestation(RELEASE, NEWER, 90).lease),
+          RUNNER_TEMP: root,
+        },
+        route: routes({
+          testflightRuns: { 90: testflightRun(90, NEWER) },
+          testflightJobs: {
+            '90/attempts/1': [
+              job('Upload Internal TestFlight', betaSha, 'success', 9),
+            ],
+          },
+          binaries: [{ id: 500, runId: 90, attempt: 1, payload: binary }],
+        }),
+      });
+      return { ...result, path: join(root, 'testflight-upload-verified.json') };
+    }
+    it('records independent source and transport with the exact binary digest', async () => {
+      const result = await record(binaryAttestation(RELEASE, NEWER, 90));
+      expect(result.code, result.stderr).toBe(0);
+      expect(JSON.parse(readFileSync(result.path, 'utf8'))).toMatchObject({
+        schema: 'jovie-testflight-upload/v2',
+        sha: RELEASE,
+        transportSha: NEWER,
+        binarySha256: 'd'.repeat(64),
+        buildNumber: '44',
+        uploadJob: '9',
+        lease: { sourceSha: RELEASE, transportSha: NEWER },
+      });
+    });
+    it('refuses a source/job transport mismatch or a binary from another source', async () => {
+      const wrongJob = await record(
+        binaryAttestation(RELEASE, NEWER, 90),
+        RELEASE
+      );
+      expect(wrongJob.code).toBe(1);
+      const wrongBinary = await record(binaryAttestation(OLDER, NEWER, 90));
+      expect(wrongBinary.code).toBe(1);
+    });
+  }
+);
+
 describe('iOS TestFlight release selection', () => {
   function gitRepo() {
     const root = tempRoot('jovie-testflight-select-');
@@ -545,6 +771,19 @@ describe('iOS TestFlight release selection', () => {
     expect(select(root, { RELEASE_SHA: docsOnly })).toBe('true');
   });
 
+  it('catches up an intermediate iOS change when the latest pending generation changes only docs', () => {
+    const { root, commit } = gitRepo();
+    const uploaded = commit('apps/ios/App.swift');
+    const intermediate = commit('apps/ios/Next.swift');
+    const latestPending = commit('docs/latest-pending.md');
+    expect(
+      select(root, { RELEASE_SHA: latestPending, BASELINE_SHA: uploaded })
+    ).toBe('true');
+    expect(
+      select(root, { RELEASE_SHA: latestPending, BASELINE_SHA: intermediate })
+    ).toBe('false');
+  });
+
   it('refuses a baseline that is not an ancestor of the release', () => {
     const { root, commit } = gitRepo();
     const base = commit('apps/ios/A.swift');
@@ -556,6 +795,23 @@ describe('iOS TestFlight release selection', () => {
 });
 
 describe('iOS TestFlight job graph', () => {
+  it('reserves the nonhidden lease file only after admission and gates native jobs on that lease', () => {
+    const pin = authorizeJob.steps?.find(step => step.id === 'pin');
+    const reserve = authorizeJob.steps?.find(
+      step => step.name === 'Reserve immutable upload intent'
+    );
+    expect(pin?.env?.TESTFLIGHT_LEASE_PATH).toBe(
+      '${{ github.workspace }}/testflight-release-lease.json'
+    );
+    expect(reserve?.with?.path).toBe(pin?.env?.TESTFLIGHT_LEASE_PATH);
+    expect(reserve?.if).toBe("${{ steps.pin.outputs.lease != '' }}");
+    expect(authorizeJob.outputs?.should_release).toContain(
+      "steps.pin.outputs.lease != ''"
+    );
+    expect(workflow.jobs.beta.env?.TESTFLIGHT_LEASE_PATH).toBe(
+      pin?.env?.TESTFLIGHT_LEASE_PATH
+    );
+  });
   it('runs only after Production Controller on main, serialized and uncancelled', () => {
     expect(Object.keys(workflow.on).sort()).toEqual([
       'workflow_dispatch',
@@ -613,6 +869,40 @@ describe('iOS TestFlight job graph', () => {
 });
 
 describe('iOS TestFlight release routing and lane', () => {
+  it('the actual Fastfile invokes the final upload guard and propagates its denial', () => {
+    const root = tempRoot('jovie-testflight-fastfile-');
+    const guard = join(root, 'guard.mjs');
+    const called = join(root, 'called');
+    writeFileSync(
+      guard,
+      `import {writeFileSync} from 'node:fs'; writeFileSync(process.env.FIXTURE_CALLED, process.argv[2]); process.exit(Number(process.env.FIXTURE_GUARD_STATUS));`
+    );
+    const script = `
+      def default_platform(*)\nend
+      def opt_out_usage\nend
+      module UI
+        def self.user_error!(message)\nraise message\nend
+      end
+      eval(File.read(ARGV.fetch(0)).split("platform :ios do").first, TOPLEVEL_BINDING, ARGV.fetch(0))
+      verify_release_sha_is_current_main!
+    `;
+    const env = {
+      ...fixtureEnv(),
+      TESTFLIGHT_LEASE_PATH: join(root, 'lease.json'),
+      TESTFLIGHT_GUARD_PATH: guard,
+      FIXTURE_CALLED: called,
+      FIXTURE_GUARD_STATUS: '0',
+    };
+    const fastfile = resolve(repoRoot, 'fastlane/Fastfile');
+    execFileSync('ruby', ['-e', script, fastfile], { env, stdio: 'pipe' });
+    expect(readFileSync(called, 'utf8')).toBe('upload');
+    expect(() =>
+      execFileSync('ruby', ['-e', script, fastfile], {
+        env: { ...env, FIXTURE_GUARD_STATUS: '1' },
+        stdio: 'pipe',
+      })
+    ).toThrow();
+  });
   it('classifies TestFlight release inputs into the iOS lane', async () => {
     const { classifyProductLanes } = (await import(
       '../../../../../scripts/lib/product-lane-classifier.mjs'
