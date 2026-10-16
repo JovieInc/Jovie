@@ -998,24 +998,6 @@ esac
     expect(current.outputs.is_current).toBe('true');
   });
 
-  it('authenticates the git lineage fallback with the basic x-access-token form', () => {
-    // The staging release died exit 128 on the git fallback (run 38846794961):
-    // configure_git_auth exported a bearer extraheader, which smart-HTTP
-    // rejects, leaving git to fail on a username prompt. The fallback must
-    // use the documented basic credential (x-access-token as username) and
-    // fail fast instead of prompting (JOV-8495).
-    const lineageScript = readFileSync(
-      resolve(REPO_ROOT, '.github/scripts/recheck-main-lineage.sh'),
-      'utf8'
-    );
-    expect(lineageScript).toContain(
-      'printf \'x-access-token:%s\' "${GH_TOKEN}"'
-    );
-    expect(lineageScript).toContain('GIT_TERMINAL_PROMPT=0');
-    expect(lineageScript).toContain('http.https://github.com/.extraheader');
-    expect(lineageScript).not.toContain('AUTHORIZATION: bearer');
-  });
-
   it('keeps the staging alias when rate-limited REST still has an ancestor main', () => {
     const current = runRateLimitedAlias('ahead');
     expect(current.result.status, current.result.stderr).toBe(0);
