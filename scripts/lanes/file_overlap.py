@@ -63,7 +63,7 @@ def _issue_labels(issue) -> list[str]:
     return [str(value.get("name") if isinstance(value, dict) else value) for value in values]
 
 
-def predict_issue_files(issue, classify) -> dict:
+def predict_issue_files(issue, classify, target_files: dict | None = None, now: float | None = None) -> dict:
     """Declared paths win; otherwise use the deterministic workstream ownership map."""
     title = issue.get("title", "") if isinstance(issue, dict) else getattr(issue, "title", "")
     description = issue.get("description", "") if isinstance(issue, dict) else getattr(issue, "description", "")
@@ -82,6 +82,9 @@ def predict_issue_files(issue, classify) -> dict:
             declared.append(pattern)
     if declared:
         return {"files": declared, "source": "issue-declared-paths"}
+    witnessed = pr_events.target_issue_files(issue, target_files, now)
+    if witnessed is not None:
+        return {"files": witnessed, "source": "target-pr-files"}
     stream = classify(title, _issue_labels(issue))
     return {"files": list(WORKSTREAM_PATHS.get(stream, ())), "source": f"workstream:{stream}"}
 
@@ -327,10 +330,11 @@ def record_admission(host, lane, issue, decisions: list[dict]) -> None:
         _ledger(lane, host, decision, "file-overlap-admission")
 
 
-def admission_policy(issue, open_prs: list[dict], tasks: list[dict], classify) -> dict:
+def admission_policy(issue, open_prs: list[dict], tasks: list[dict], classify,
+                     target_files: dict | None = None, now: float | None = None) -> dict:
     """Pure worker admission preview; observations must not write overlap telemetry."""
     mode = guard_mode()
-    predicted = predict_issue_files(issue, classify)
+    predicted = predict_issue_files(issue, classify, target_files, now)
     identifier = getattr(issue, "identifier", None) or issue.get("identifier")
     candidate = {"kind": "task", "identifier": identifier, "files": predicted["files"]}
     decisions = []
@@ -351,8 +355,9 @@ def admission_policy(issue, open_prs: list[dict], tasks: list[dict], classify) -
             "files": predicted["files"], "source": predicted["source"], "decisions": decisions}
 
 
-def admission_decisions(host, lane, issue, open_prs: list[dict], tasks: list[dict], classify) -> dict:
-    result = admission_policy(issue, open_prs, tasks, classify)
+def admission_decisions(host, lane, issue, open_prs: list[dict], tasks: list[dict], classify,
+                        target_files: dict | None = None, now: float | None = None) -> dict:
+    result = admission_policy(issue, open_prs, tasks, classify, target_files, now)
     record_admission(host, lane, issue, result["decisions"])
     return result
 

@@ -542,6 +542,41 @@ class HotspotAdmissionTest(unittest.TestCase):
             self.assertEqual(lane.open_hotspot_holds(), {"scripts/lanes/hud.py": 5})
 
 
+class TargetFileAdmissionTest(unittest.TestCase):
+    def fixture(self, number=21824):
+        fingerprint = f"remediation:pr-{number}-conflict"
+        task = issue(f"JOV-{number}", labels=[fingerprint])
+        task.title = f"PR #{number} has carried lane-fix-exhausted for more than 24h ({fingerprint})"
+        task.description = f"https://github.com/JovieInc/Jovie/pull/{number}\nFingerprint: `{fingerprint}`"
+        row = {"schema": lane.pr_events.TARGET_FILES_SCHEMA, "source": "graphql-inline",
+               "repository": "JovieInc/Jovie", "number": number, "state": "OPEN", "headRefOid": "a"*40,
+               "baseRefName": "main", "baseRefOid": "b"*40, "baseTipOid": "c"*40,
+               "paths": [f"apps/web/lib/product-{number}.ts"], "totalCount": 1,
+               "observedAt": 9998, "sourceAt": 9999, "confirmedAt": 10000}
+        return task, {number: row}
+
+    def test_four_generated_cards_are_selected_by_public_worker_predicate(self):
+        holds = {"scripts/lanes/lane_runner.py": 21724}
+        for number in (21824, 21810, 21793, 21770):
+            with self.subTest(number=number):
+                task, witness = self.fixture(number)
+                self.assertIsNone(lane.pick_issue([task], {}, now=10000, holds=holds))
+                self.assertIs(lane.pick_issue([task], {}, now=10000, holds=holds, target_files=witness), task)
+                self.assertEqual(lane.predicted_touch(task, witness, 10000), frozenset(witness[number]["paths"]))
+
+    def test_declared_scope_real_hotspots_and_all_other_admission_guards_remain(self):
+        task, witness = self.fixture(); holds = {"scripts/lanes/lane_runner.py": 21724}
+        task.description += " Edit scripts/lanes/lane_runner.py."
+        self.assertIsNone(lane.pick_issue([task], {}, now=10000, holds=holds, target_files=witness))
+        task, witness = self.fixture(); witness[21824]["paths"] = ["scripts/lanes/lane_runner.py"]
+        self.assertIsNone(lane.pick_issue([task], {}, now=10000, holds=holds, target_files=witness))
+        task, witness = self.fixture()
+        for kwargs in ({"held_back": frozenset({task.identifier})}, {"in_flight": frozenset({task.identifier})}):
+            self.assertIsNone(lane.pick_issue([task], {}, now=10000, holds=holds, target_files=witness, **kwargs))
+        self.assertIsNone(lane.pick_issue([task], {task.identifier: 3}, now=10000, holds=holds, target_files=witness))
+        self.assertIsNone(lane.pick_issue([task], {}, now=10061, holds=holds, target_files=witness))
+
+
 class RebuildInFlightTest(unittest.TestCase):
     """JOV-7708: a parked PR the sweep requeued stays open but releases its issue."""
 
@@ -2760,6 +2795,75 @@ class MaintenanceDemandTest(unittest.TestCase):
 
 
 class WorkerTest(unittest.TestCase):
+    def test_target_confirmation_precedes_claim_lock_and_worker_rechecks_age_after_wait(self):
+        task, witness = TargetFileAdmissionTest().fixture()
+        self.linear.issues = [task]
+        original_locked = lane.Locked
+        seen = []
+        clock = [10000.0]
+        def capture(*args, **kwargs):
+            contender = original_locked(self.host.state / "claim.lock", blocking=False)
+            try:
+                self.assertTrue(contender.held, "confirmation ran inside claim.lock")
+            finally:
+                contender.release()
+            seen.append("confirmation")
+            return witness
+        def lock(path, *args, **kwargs):
+            if Path(path).name == "claim.lock":
+                self.assertEqual(seen, ["confirmation"])
+                clock[0] = 10061.0  # Simulate a blocked lock acquisition beyond the source TTL.
+            return original_locked(path, *args, **kwargs)
+        with patch.object(lane.pr_events, "capture_target_file_witnesses", side_effect=capture), \
+                patch.object(lane, "Locked", side_effect=lock), \
+                patch.object(lane.time, "time", side_effect=lambda: clock[0]), \
+                patch.object(lane, "open_hotspot_holds", return_value={"scripts/lanes/lane_runner.py": 21724}), \
+                patch.object(lane, "run_issue") as work:
+            lane.worker(self.host, "devin")
+        self.assertEqual(seen, ["confirmation"])
+        work.assert_not_called()
+        self.assertEqual(self.linear.moves, [])
+
+    def test_fresh_target_worker_dispatch_and_changed_inventory_fail_closed(self):
+        task, witness = TargetFileAdmissionTest().fixture()
+        row = witness[21824]
+        current = {**row, "baseRef": {"target": {"oid": row["baseTipOid"]}},
+                   "files": [{"path": path} for path in row["paths"]], "filesComplete": True,
+                   "inlineFilesEvidence": row}
+        self.linear.issues = [task]
+        for changed in (True, False):
+            with self.subTest(changed=changed):
+                inventory = [{**current, "headRefOid": "d"*40}] if changed else [current]
+                with patch.object(lane.pr_events, "capture_target_file_witnesses", return_value=witness), \
+                        patch.object(lane, "overlap_inventory", return_value=(inventory, [])), \
+                        patch.object(lane, "open_hotspot_holds", return_value={"scripts/lanes/lane_runner.py": 21724}), \
+                        patch.object(lane.time, "time", return_value=10000), \
+                        patch.object(lane, "run_issue", return_value={"verdict": "landing", "prUrl": "u"}) as work:
+                    lane.worker(self.host, "devin")
+                self.assertEqual(work.call_count, int(not changed))
+
+    def test_unknown_target_scope_keeps_adopt_and_labeled_work_ahead_of_pool(self):
+        for selected in ("adopt", "labeled"):
+            with self.subTest(selected=selected), \
+                    patch.object(lane.pr_events, "capture_target_file_witnesses", side_effect=RuntimeError("scope unavailable")), \
+                    patch.object(lane, "claim_adoptable_pr", return_value=SimpleNamespace(pr={"number": 8}) if selected == "adopt" else None), \
+                    patch.object(lane, "claim_labeled_event", return_value=issue("JOV-LABELED") if selected == "labeled" else None), \
+                    patch.object(lane, "adopt_pr") as adopt, \
+                    patch.object(lane, "run_issue", return_value={"verdict": "landing", "prUrl": "u"}) as work, \
+                    patch.object(lane, "read_new_issue_budget") as budget:
+                lane.worker(self.host, "devin")
+                self.assertEqual(adopt.call_count, int(selected == "adopt"))
+                self.assertEqual(work.call_count, int(selected == "labeled"))
+                if selected == "labeled": self.assertEqual(work.call_args.args[4].identifier, "JOV-LABELED")
+                budget.assert_not_called()
+
+    def test_missing_target_scope_never_displaces_existing_repair_priority(self):
+        with patch.object(lane.pr_events, "capture_target_file_witnesses", side_effect=RuntimeError("scope unavailable")), \
+                patch.object(lane, "claim_red_pr", return_value={"number": 21724}), \
+                patch.object(lane, "fix_red_pr") as repair, patch.object(lane, "run_issue") as new_work:
+            self.assertEqual(lane.worker(self.host, "devin"), 0)
+        repair.assert_called_once(); new_work.assert_not_called()
+
     def test_unknown_linear_inventory_releases_the_seat_without_claiming(self):
         with patch.object(self.linear, "lane_issues", side_effect=lane.LaneInventoryUnknown("linear-refresh-reserve-held")), \
                 patch.object(lane, "run_issue") as work:
