@@ -368,6 +368,9 @@ class RouterLadderTest(unittest.TestCase):
             'Add a test for the quoted request "Please create a new GitHub token".',
             "Do not purchase a paid plan. Reuse the existing workflow token.",
             "Please change the existing token header from Bearer to Basic.",
+            "Add a new test for the token refresh path.",
+            "Add a retry so users don't have to rerun this manually.",
+            "Update DNS parser tests.",
         )
         positive = (
             "No new spend is required, but please purchase a paid plan.",
@@ -377,13 +380,19 @@ class RouterLadderTest(unittest.TestCase):
             "Please perform the billing action.",
             "Please change DNS.",
             "Please update pricing.",
+            "Create a new token for tests.",
+            "Install a new credential for tests.",
+            "Deploy manually.",
+            "Please contact outside humans.",
+            "Add a new test for token refresh; please purchase a paid plan.",
         )
         for body, expected in [(body, "fixable-by-model") for body in ordinary] + [
                 (body, "needs-human-decision") for body in positive]:
-            subject = pr(reviewDecision="CHANGES_REQUESTED", reviewSummaries=[
-                {"author": {"type": "User", "login": "reviewer"}, "body": body,
-                 "state": "CHANGES_REQUESTED", "reviewedHead": HEAD}])
-            self.assertEqual(remediation.classify_blocker(subject)["cls"], expected, body)
+            with self.subTest(body=body):
+                subject = pr(reviewDecision="CHANGES_REQUESTED", reviewSummaries=[
+                    {"author": {"type": "User", "login": "reviewer"}, "body": body,
+                     "state": "CHANGES_REQUESTED", "reviewedHead": HEAD}])
+                self.assertEqual(remediation.classify_blocker(subject)["cls"], expected, body)
 
     def test_surface_and_hold_nag_dedupe(self):
         body = remediation.surface_body(pr(number=9), {"cls": "needs-human-decision", "subtype": "hold",
