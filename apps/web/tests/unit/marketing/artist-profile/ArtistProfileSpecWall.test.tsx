@@ -12,7 +12,14 @@ describe('ArtistProfileSpecWall', () => {
       <ArtistProfileSpecWall
         specWall={ARTIST_NOTIFICATIONS_COPY.specWall}
         tiles={ARTIST_NOTIFICATIONS_SPEC_TILES}
+        sectionId='spec-wall'
+        sectionVariant='5-screenshot-bento'
+        sectionOwner='apps/web/components/marketing/artist-profile/ArtistProfileSpecWall.tsx'
       />
+    );
+    expect(screen.getByTestId('marketing-section-spec-wall')).toHaveAttribute(
+      'data-marketing-variant',
+      '5-screenshot-bento'
     );
 
     expect(

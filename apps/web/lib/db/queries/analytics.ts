@@ -28,7 +28,12 @@ import {
   resolveRangeStartOrEpoch,
 } from '@/lib/analytics/time-range';
 import { getSessionContext, setupDbSession } from '@/lib/auth/session';
-import { db, doesTableExist, TABLE_NAMES } from '@/lib/db';
+import {
+  type DbOrTransaction,
+  db,
+  doesTableExist,
+  TABLE_NAMES,
+} from '@/lib/db';
 import { cacheQuery } from '@/lib/db/cache';
 import { apiQuery, dashboardQuery } from '@/lib/db/query-timeout';
 import {
@@ -751,4 +756,35 @@ export async function getCanonicalCustomerLinkOutcome(
     );
 
   return { count: Number(row?.count ?? 0), latestAt: row?.latest ?? null };
+}
+
+/**
+ * Tenant fence for historical audience relationships. A click or source link
+ * may be attached only when that row belongs to the member's creator profile.
+ * This is an existence check, not a metrics aggregate.
+ */
+export async function hasUnownedAudienceRelationship(
+  tx: DbOrTransaction,
+  creatorProfileId: string,
+  relationships: readonly {
+    readonly sourceLinkId: string | null;
+    readonly clickEventId: string | null;
+  }[]
+): Promise<boolean> {
+  const result = await tx.execute<{ invalid: string }>(drizzleSql`
+    SELECT count(*)::text AS invalid FROM jsonb_to_recordset(
+      ${JSON.stringify(
+        relationships.map(row => ({
+          source: row.sourceLinkId,
+          click: row.clickEventId,
+        }))
+      )}::jsonb
+    ) AS relation(source uuid, click uuid)
+    WHERE (source IS NOT NULL AND NOT EXISTS (
+      SELECT 1 FROM audience_source_links WHERE id = source AND creator_profile_id = ${creatorProfileId}::uuid
+    )) OR (click IS NOT NULL AND NOT EXISTS (
+      SELECT 1 FROM ${clickEvents} WHERE id = click AND creator_profile_id = ${creatorProfileId}::uuid
+    ))
+  `);
+  return result.rows[0]?.invalid !== '0';
 }

@@ -4,10 +4,10 @@ import { CHARTMETRIC_SCHEMA_SNAPSHOT } from './chartmetric-endpoints';
 import type { CatalogEntry, ParityRow } from './types';
 
 /** Audited discovery contracts; not a claim that the inventory is complete. */
-export const PARITY_TARGET_VERSION = '2026-10-15.2';
+export const PARITY_TARGET_VERSION = '2026-10-15.3';
 export const PARITY_TARGET_ROW_COUNT = 245;
 export const PARITY_TARGET_SHA256 =
-  '7d5c7c4fdea8c62461376657f7f43095697332e3ade1306d5498fb6f63268b16';
+  '9f76c63b79f88d02dabcf94b19c4c9adf049006a18e48ce629934a9d00487c03';
 
 export function sha256(bytes: string | Uint8Array): string {
   return createHash('sha256').update(bytes).digest('hex');

@@ -148,6 +148,11 @@ interface AuthShellProps {
   readonly claimHandle?: string;
   /** Quiet unboxed back. Compact/modal callers own their own back. */
   readonly back?: AuthShellBackLink | null;
+  /**
+   * Public waitlist stamps the signed-out form as the email capture census
+   * node. Other auth surfaces leave this unset.
+   */
+  readonly marketingCapture?: boolean;
 }
 
 /**
@@ -177,6 +182,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
     compact = false,
     claimHandle: claimHandleProp,
     back: backProp,
+    marketingCapture = false,
   } = props;
   const searchParams = useSearchParams();
   // `useAuthSafe` can resolve a cached Better Auth session synchronously in
@@ -413,6 +419,13 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
       data-auth-shell-compact={compact ? 'true' : undefined}
       data-auth-shell-ready='true'
       data-auth-shell-hydrated={hasHydrated ? 'true' : 'false'}
+      data-testid={marketingCapture ? 'marketing-section-capture' : undefined}
+      data-marketing-variant={marketingCapture ? 'email-only' : undefined}
+      data-marketing-owner={
+        marketingCapture
+          ? 'apps/web/components/features/auth/AuthShell.tsx'
+          : undefined
+      }
       className='relative min-h-96'
     >
       <GoogleOneTap

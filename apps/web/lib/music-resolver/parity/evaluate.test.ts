@@ -17,16 +17,18 @@ import { catalogHash, matchesTarget, PARITY_TARGET_SHA256 } from './target';
 import type { ParityRow } from './types';
 
 describe('music resolver parity eval', () => {
-  it('scores the shipped catalog without passing blocked or leased rows', async () => {
+  it('keeps unfinished assertion storage red without a fabricated lease', async () => {
     const report = await runParityEvaluation();
     expect(report.denominator).toBe(
       8 + 12 + CHARTMETRIC_ENDPOINT_COUNT + SOCIALBLADE_ROWS.length
     );
     expect(report.passing).toBe(REQUIRED_LOCAL_PASS_IDS.length);
-    expect(report.unblockedFailures).toEqual([]);
-    expect(report.exitCode).toBe(0);
+    expect(report.unblockedFailures.map(row => row.id)).toEqual([
+      'jovie:canonical-assertions',
+    ]);
+    expect(report.exitCode).toBe(1);
     expect(report.blocked.length).toBe(
-      report.denominator - REQUIRED_LOCAL_PASS_IDS.length
+      report.denominator - REQUIRED_LOCAL_PASS_IDS.length - 1
     );
 
     const coverage = report.rows.find(

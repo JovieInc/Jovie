@@ -1,13 +1,12 @@
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 
 export interface OwnedProfileResult {
   status: 'ok' | 'not_found' | 'forbidden';
   profile?: {
     id: string;
-    clerkId: string | null;
+    userId: string | null;
     bio: string | null;
   };
 }
@@ -19,11 +18,10 @@ export async function getOwnedProfile(
   const [profile] = await db
     .select({
       id: creatorProfiles.id,
-      clerkId: users.clerkId,
+      userId: creatorProfiles.userId,
       bio: creatorProfiles.bio,
     })
     .from(creatorProfiles)
-    .innerJoin(users, eq(users.id, creatorProfiles.userId))
     .where(eq(creatorProfiles.id, profileId))
     .limit(1);
 
@@ -31,7 +29,7 @@ export async function getOwnedProfile(
     return { status: 'not_found' };
   }
 
-  if (profile.clerkId !== userId) {
+  if (profile.userId !== userId) {
     return { status: 'forbidden' };
   }
 
