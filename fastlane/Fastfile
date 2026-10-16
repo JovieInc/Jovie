@@ -285,6 +285,12 @@ platform :ios do
       profile_name: profile_name
     )
 
+    # Compare Release entitlements with the profile match just installed.
+    # Gym's capability error is too late and too vague to act on.
+    sh(
+      "JOVIE_REQUIRE_DISTRIBUTION_PROFILE=1 bash #{repo_path("apps/ios/scripts/validate-distribution-capabilities.sh").shellescape}"
+    )
+
     signing_xcargs = [
       "CODE_SIGNING_ALLOWED=YES",
       "CODE_SIGNING_REQUIRED=YES",

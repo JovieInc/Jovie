@@ -800,8 +800,10 @@ Remediation-sweep also files ordinary labeled issues (`remediation:pr-<n>-hold`,
 stuck-PR ladder runs by default (Tim 2026-10-12: every exhausted head needs an automatic exit)
 while `LANES_ESCALATION` is on; `LANES_ESCALATION_STUCK_PRS=0` turns it off. Terminal heads
 (exhausted, escalated, `queue-poison`) also get a no-model main sync each time main moves, with
-no clock; the sync lifts `queue-poison`, and that removal is the boundary the poison count
-restarts from. A bot hold whose head moved past it is lifted at once
+no clock, on every local worker pass rather than only an idle one. The sync lifts
+`queue-poison` and `lane-fix-exhausted`: the new head is ordinary re-entry, and a green
+observation of the same exhausted head does not clear it. Poison removal is the boundary
+the poison count restarts from. A bot hold whose head moved past it is lifted at once
 (`LANES_STALE_HOLD_UNHOLD=0` keeps alert-only). An oversize diff goes to a repair lane that
 splits it into a stack instead of bug intake.
 

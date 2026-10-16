@@ -89,6 +89,7 @@ jobs:
           apps/ios/scripts/validate-wallet-release-env.test.mjs \
           apps/ios/scripts/validate-testflight-env.test.mjs \
           apps/ios/scripts/validate-testflight-artifact.test.mjs \
+          apps/ios/scripts/validate-distribution-capabilities.test.mjs \
           apps/ios/scripts/settings-style-guard.test.mjs \
           .github/scripts/testflight-release-lease.test.mjs
 

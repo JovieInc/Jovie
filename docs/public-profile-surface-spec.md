@@ -396,12 +396,15 @@ These labels are not translated in the initial implementation. Internationalizat
 
 ### 5.7 Missing Data Rules
 
+**EVENT: JOV-5189.** Missing tour dates change the Events panel content, not
+destination availability; §2.3 applies to compact and wide navigation.
+
 | Field | Behavior When Missing |
 |---|---|
 | Artist display name | Fall back to `@{username}` handle |
 | Artist avatar | Fall back to initials avatar (first letter of display name or handle) |
 | Artist bio | Omit bio section entirely (do not show a placeholder) |
-| Tour dates | Hide Events tab from tab bar |
+| Tour dates | Keep Events in compact and wide navigation; show the Events empty state (§2.3) |
 | Latest release | Show `ProfilePrimaryActionCard` default/empty variant (not a skeleton) |
 | Social links | Omit social icon row entirely |
 | Contact links | Omit contact trigger from More menu |

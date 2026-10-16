@@ -3713,7 +3713,7 @@ def _legacy_terminal(host: Host, pr: dict, record: dict, held: dict, linear, att
         pass
 
 
-# GitHub writes per idle pass; the rest go on the next pass (main moving is the trigger).
+# At most this many GitHub writes per worker pass. A visited head waits until main moves.
 TERMINAL_REVISITS_PER_PASS = 3
 TERMINAL_LABELS = frozenset({pr_events.PREFIX + pr_events.EXHAUSTED, pr_events.POISON_LABEL})
 
@@ -3749,6 +3749,9 @@ def revisit_terminal_prs(host: Host, prs: list[dict], now: float | None = None) 
     main moved past the base that failed, and the label's removal is the boundary
     `queue_ejections` counts from, so a defect that still fails re-poisons after two more
     ejections, whoever authored the PR (bots and Dependabot included).
+    `lane-fix-exhausted` lifts with the same successful sync. The new head is a new
+    generation, so the gate can admit it; a green observation of the exhausted head does
+    not. The fix loop re-applies the label if that generation exhausts again.
     A conflicted (DIRTY) head cannot take all of main without a model, but it can take the
     newest main commit that still merges cleanly (`partial_main_sync`, JOV-INV-043): that moves it as far
     as a deterministic merge can and gives the remaining conflict a fresh, smaller generation.
@@ -3790,8 +3793,11 @@ def revisit_terminal_prs(host: Host, prs: list[dict], now: float | None = None) 
         else:
             action = "update-branch"
             ok = pr_events.sync_main(host, THIS, pr, now, terminal_ok=True) == "synced"
-        if ok and pr_events.POISON_LABEL in pr_events.label_names(pr):
-            sh(["gh", "api", "-X", "DELETE", f"repos/{REPO_SLUG}/issues/{pr['number']}/labels/{pr_events.POISON_LABEL}"])
+        if ok:
+            present = set(pr_events.label_names(pr))
+            for label in (pr_events.POISON_LABEL, pr_events.PREFIX + pr_events.EXHAUSTED):
+                if label in present:
+                    sh(["gh", "api", "-X", "DELETE", f"repos/{REPO_SLUG}/issues/{pr['number']}/labels/{label}"])
         visit = {"at": now, "head": pr["headRefOid"], "main": main, "action": action, "ok": ok}
         update_json(path, lambda rows, key=str(pr["number"]), visit=visit: rows.update({key: visit}))
         pr_events.ledger(host, {"schema": "jovie-lane-run/v1", "kind": "terminal-revisit", "origin": AUTONOMOUS_ORIGIN,
@@ -6683,6 +6689,8 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
     # limit skips the API for every worker until the cooldown file expires.
     red = adopt = issue = route_decision = None
     rate_limited = inventory_unknown = False
+    local = False
+    candidates: list[dict] = []
     try:
         # Finish before starting: PRs a GitHub event queued, red PRs (any open PR in the repo),
         # then ungated lane drafts, then new issues.
@@ -6727,10 +6735,6 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
                 sweep_execution_statuses(host)
             except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
                 pass  # Retried on the next idle pass; it never blocks new work.
-            try:
-                revisit_terminal_prs(host, candidates)
-            except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
-                pass  # The exit is retried next idle pass; it never blocks new work.
         budget = None if red or adopt or labeled or maintenance_only else read_new_issue_budget(name, host.base_slots(name, spec.get("slots", 1)))
         blocked = budget is not None and not budget["allowed"]
         in_flight = None if red or adopt or blocked or labeled or maintenance_only else in_flight_issues()
@@ -6783,6 +6787,14 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
         rate_limited = red is None and adopt is None
     finally:
         claim.release()
+    # Every local pass, including one that just claimed a repair. An idle-only sync
+    # never ran while the fleet stayed busy, so exhausted heads sat behind main
+    # (JOV-8536). After the lock: the sync must not block the next claim.
+    if local:
+        try:
+            revisit_terminal_prs(host, candidates)
+        except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
+            pass  # Retried next pass; it never blocks the claimed repair.
     if rate_limited or inventory_unknown:
         record_idle_exit(host, name, "linear-rate-limited" if rate_limited else "linear-inventory-unknown")
         slot.release()
