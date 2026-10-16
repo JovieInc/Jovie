@@ -1723,8 +1723,12 @@ test('automatic desktop publishing stamps production-impacting source before rel
     /node scripts\/version-check\.mjs/,
     /cursor\/stable-desktop-publish-/,
     /gh pr create/,
-    /--add-label "merge-queue"/,
   ]);
+  // ci-release/legacy-merge-queue-label: the `merge-queue` label is never
+  // added, interpreted, or retained — native GitHub queue state is
+  // authoritative (docs/ci/CI_RELEASE_INCIDENTS.md). The stamp step must not
+  // re-add the retired label after `gh pr create`.
+  assert.doesNotMatch(stamp, /gh pr edit [^\n]*--add-label "merge-queue"/);
 });
 
 test('desktop staging publishes an exact signed prerelease and production stays separately proven', () => {
