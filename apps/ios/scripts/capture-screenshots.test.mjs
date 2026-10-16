@@ -97,7 +97,7 @@ function runLaunch(mode, env = {}) {
     const result = spawnSync(
       'bash',
       [
-        '-lc',
+        '-c',
         [
           'set -euo pipefail',
           'source "$CAPTURE_SCRIPT"',
@@ -203,7 +203,7 @@ test('a failed launch aborts the caller under set -e', () => {
     const result = spawnSync(
       'bash',
       [
-        '-lc',
+        '-c',
         [
           'set -euo pipefail',
           'source "$CAPTURE_SCRIPT"',
