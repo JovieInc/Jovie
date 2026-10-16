@@ -89,7 +89,7 @@ no literal `fetch` call for their paths.
 
 | Endpoint | Method | Auth | Purpose |
 |----------|--------|------|---------|
-| `/api/agents/creator-lookup` | GET | None (durable IP rate limit) | Read-only creator resolution (`@jovie/cli creator lookup <url|platform:handle>`, MCP `lookup_creator`): `exists:true` with the Jovie profile when the channel is already known, otherwise extracted fields with `exists:false` |
+| `/api/agents/creator-lookup` | GET | None (durable IP rate limit) | Read-only creator resolution (`@jovie/cli creator lookup <url|platform:handle>`, MCP `lookup_creator`): `exists:true` with an existing Jovie profile for a YouTube, Instagram, TikTok, or Linktree source; only YouTube channels support extraction with `exists:false`. Unmatched Instagram, TikTok, and Linktree inputs return `SOURCE_UNSUPPORTED`; Bandcamp and custom websites return `UNSUPPORTED_URL` |
 | `/api/agents/profiles` | POST | None (IP rate limit, `AGENT_PROFILE_CREATE` kill switch) | Create or find a claimable profile from a Spotify artist URL (`@jovie/cli profile create`) |
 | `/api/agents/feedback` | POST | None (IP rate limit) | Agent bug/feedback reports into `feedback_items` (source `agent_cli`) for Summer triage (`@jovie/cli report`, MCP `report_issue`) |
 

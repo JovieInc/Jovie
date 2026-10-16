@@ -47,6 +47,7 @@ function getStatusMessage(status: 'idle' | 'success' | 'error'): string {
   return '';
 }
 
+// @coverage-via apps/web/tests/unit/CopyToClipboardButton.test.tsx
 export function CopyToClipboardButton({
   relativePath,
   idleLabel = 'Copy URL',
@@ -60,16 +61,17 @@ export function CopyToClipboardButton({
   const notifications = useNotifications();
 
   const defaultOnSuccess = () => {
-    notifications.success('Link copied', { duration: 2000 });
+    if (iconName) notifications.success('Link copied', { duration: 2000 });
     track('profile_copy_url_click', { status: 'success' });
   };
 
   const defaultOnError = () => {
-    notifications.error('Failed to copy');
+    if (iconName) notifications.error('Failed to copy');
     track('profile_copy_url_click', { status: 'error' });
   };
 
-  const { copy, status, isSuccess, isError } = useClipboard({
+  const { copy, status, isCopying, isSuccess, isError } = useClipboard({
+    resetDelay: iconName ? 2000 : 0,
     onSuccess: onCopySuccess ?? defaultOnSuccess,
     onError: onCopyError ?? defaultOnError,
   });
@@ -96,6 +98,14 @@ export function CopyToClipboardButton({
         size='sm'
         onClick={handleCopy}
         className={className}
+        pendingPresentation={iconName ? 'spinner' : 'morph'}
+        actionState={isCopying ? 'pending' : status}
+        stateLabels={{
+          pending: 'Copying link',
+          success: successLabel,
+          error: errorLabel,
+          retry: 'Retry',
+        }}
       >
         {iconName ? (
           <>
@@ -107,13 +117,15 @@ export function CopyToClipboardButton({
             <span className='sr-only'>{currentLabel}</span>
           </>
         ) : (
-          currentLabel
+          idleLabel
         )}
       </Button>
 
-      <output className='sr-only' aria-live='polite'>
-        {getStatusMessage(status)}
-      </output>
+      {iconName && (
+        <output className='sr-only' aria-live='polite'>
+          {getStatusMessage(status)}
+        </output>
+      )}
     </div>
   );
 }

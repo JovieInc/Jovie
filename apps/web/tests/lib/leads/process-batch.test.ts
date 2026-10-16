@@ -54,6 +54,7 @@ vi.mock('@/lib/leads/constants', () => ({
   LINKTREE_FETCH_DELAY_MS: 0,
 }));
 
+import { ExtractionError } from '@/lib/ingestion/strategies/base';
 import { processLeadBatch } from '@/lib/leads/process-batch';
 
 describe('processLeadBatch — scrape retry', () => {
@@ -65,6 +66,19 @@ describe('processLeadBatch — scrape retry', () => {
     mockDb._updateSet.mockReturnValue({ where: mockDb._updateWhere });
     mockDb._updateWhere.mockReturnValue({ returning: mockDb._returning });
     mockDb._returning.mockResolvedValue([{ scrapeAttempts: 1 }]);
+  });
+
+  it('does not count disabled HTML access as a scrape attempt or disqualify the lead', async () => {
+    mockQualifyLead.mockRejectedValueOnce(
+      new ExtractionError('Disabled', 'SOCIAL_HTML_DISABLED')
+    );
+    mockDb._returning.mockResolvedValue([{ scrapeAttempts: 3 }]);
+
+    const result = await processLeadBatch(['lead-1'], 1);
+
+    expect(result.error).toBe(1);
+    expect(mockDb.update).not.toHaveBeenCalled();
+    expect(mockPipelineWarn).not.toHaveBeenCalled();
   });
 
   it('increments scrapeAttempts on qualification failure', async () => {

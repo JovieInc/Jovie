@@ -366,6 +366,31 @@ describe('Switch', () => {
       expect(switchElement).toHaveAttribute('aria-checked', 'true');
     });
 
+    it.each([false, true])(
+      'keeps focus and validation feedback when toggling an invalid switch initially checked=%s',
+      async checked => {
+        const onCheckedChange = vi.fn();
+        render(
+          <Switch
+            aria-label='Notifications'
+            aria-invalid='true'
+            defaultChecked={checked}
+            onCheckedChange={onCheckedChange}
+          />
+        );
+        const control = screen.getByRole('switch', { name: 'Notifications' });
+        const user = userEvent.setup();
+
+        await user.tab();
+        await user.keyboard(' ');
+
+        expect(onCheckedChange).toHaveBeenCalledWith(!checked);
+        expect(control).toHaveAttribute('aria-checked', String(!checked));
+        expect(control).toHaveAttribute('aria-invalid', 'true');
+        expect(control).toHaveFocus();
+      }
+    );
+
     it('is focusable', () => {
       render(<Switch aria-label='Toggle' />);
       const switchElement = screen.getByRole('switch');

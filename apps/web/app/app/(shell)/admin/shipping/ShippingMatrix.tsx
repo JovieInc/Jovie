@@ -12,8 +12,8 @@ import {
   DrawerSection,
   EntityHeader,
   EntityHeaderThumbnail,
-  EntitySidebarShell,
 } from '@/components/molecules/drawer';
+import { AdminDetailRail } from '@/features/admin/layout/AdminDetailRail';
 import {
   parseShippingCockpitProjection,
   type ShippingCockpitProjection,
@@ -360,21 +360,19 @@ export function ShippingRowRail({
   onClose,
 }: Readonly<{ readonly row: MatrixRow | null; readonly onClose: () => void }>) {
   return (
-    <EntitySidebarShell
+    <AdminDetailRail
       isOpen={Boolean(row)}
-      width={400}
       ariaLabel='Work item details'
       data-testid='shipping-row-rail'
       scrollStrategy='shell'
       onClose={onClose}
       headerMode='minimal'
-      entityHeaderSurface='flat'
       isEmpty={!row}
       emptyMessage='Select a work item to inspect it.'
       entityHeader={row ? <ShippingRowRailHeader row={row} /> : undefined}
     >
       {row ? <ShippingRowRailContent row={row} /> : null}
-    </EntitySidebarShell>
+    </AdminDetailRail>
   );
 }
 

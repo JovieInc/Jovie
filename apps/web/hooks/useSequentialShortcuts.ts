@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef } from 'react';
 import { KEYBOARD_SHORTCUTS } from '@/lib/keyboard-shortcuts';
-import { isFormElement } from '@/lib/utils/keyboard';
+import { isShellShortcutSuppressed } from '@/lib/utils/keyboard';
 
 /**
  * Configuration for sequential shortcuts hook
@@ -33,7 +33,10 @@ export function useSequentialShortcuts({
   onOpenShortcutsModal,
 }: UseSequentialShortcutsConfig = {}) {
   const router = useRouter();
-  const sequenceStartRef = useRef<string | null>(null);
+  const sequenceStartRef = useRef<{
+    key: string;
+    target: EventTarget | null;
+  } | null>(null);
   const sequenceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Clear sequence state
@@ -48,12 +51,10 @@ export function useSequentialShortcuts({
   // Handle keyboard events
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
-      if (!enabled) return;
-
-      // Ignore if typing in a form element
-      if (isFormElement(event.target)) return;
-
-      if (!event.key) return;
+      if (!enabled || isShellShortcutSuppressed(event) || !event.key) {
+        clearSequence();
+        return;
+      }
       const key = event.key.toLowerCase();
 
       // `?` (Shift+/) — Linear's single-key shortcut to open help.
@@ -62,8 +63,10 @@ export function useSequentialShortcuts({
         key === '?' &&
         !event.metaKey &&
         !event.ctrlKey &&
+        !event.altKey &&
         onOpenShortcutsModal
       ) {
+        clearSequence();
         event.preventDefault();
         onOpenShortcutsModal();
         return;
@@ -71,8 +74,14 @@ export function useSequentialShortcuts({
 
       // Handle modifier-based shortcuts first
       if (event.metaKey || event.ctrlKey) {
+        clearSequence();
         // Cmd/Ctrl + / opens shortcuts modal
-        if (key === '/' && onOpenShortcutsModal) {
+        if (
+          key === '/' &&
+          !event.altKey &&
+          !event.shiftKey &&
+          onOpenShortcutsModal
+        ) {
           event.preventDefault();
           onOpenShortcutsModal();
           return;
@@ -81,6 +90,19 @@ export function useSequentialShortcuts({
         // Cmd/Ctrl + B toggles sidebar (handled by useSidebarKeyboardShortcut)
         // Don't interfere with it here
         return;
+      }
+
+      if (event.altKey || event.shiftKey) {
+        clearSequence();
+        return;
+      }
+
+      const target = event.composedPath()[0] ?? event.target;
+      if (
+        sequenceStartRef.current &&
+        sequenceStartRef.current.target !== target
+      ) {
+        clearSequence();
       }
 
       // Handle sequential shortcuts
@@ -97,7 +119,7 @@ export function useSequentialShortcuts({
 
         if (startsSequence) {
           event.preventDefault();
-          sequenceStartRef.current = key;
+          sequenceStartRef.current = { key, target };
 
           // Set timeout to clear sequence
           sequenceTimeoutRef.current = setTimeout(() => {
@@ -108,13 +130,15 @@ export function useSequentialShortcuts({
       }
 
       // We're in a sequence, check for matching second key
-      const matchingShortcut = sequentialShortcuts.find(
+      const matches = sequentialShortcuts.filter(
         s =>
-          s.firstKey === sequenceStartRef.current &&
+          s.firstKey === sequenceStartRef.current?.key &&
           s.secondKey === key &&
           s.href
       );
 
+      // Ambiguous active bindings fail closed instead of using registration order.
+      const matchingShortcut = matches.length === 1 ? matches[0] : undefined;
       if (matchingShortcut?.href) {
         event.preventDefault();
         clearSequence();
@@ -132,8 +156,16 @@ export function useSequentialShortcuts({
     if (!enabled) return;
 
     globalThis.addEventListener('keydown', handleKeyDown);
+    globalThis.addEventListener('blur', clearSequence);
+    globalThis.addEventListener('compositionstart', clearSequence);
+    globalThis.addEventListener('focusin', clearSequence);
+    globalThis.addEventListener('pointerdown', clearSequence);
     return () => {
       globalThis.removeEventListener('keydown', handleKeyDown);
+      globalThis.removeEventListener('blur', clearSequence);
+      globalThis.removeEventListener('compositionstart', clearSequence);
+      globalThis.removeEventListener('focusin', clearSequence);
+      globalThis.removeEventListener('pointerdown', clearSequence);
       clearSequence();
     };
   }, [enabled, handleKeyDown, clearSequence]);

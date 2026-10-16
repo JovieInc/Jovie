@@ -1,5 +1,18 @@
 vi.mock('@/lib/ovie/privacy-lock/access', () => ({
-  requireOvieApiAccess: vi.fn(async () => null),
+  requireOvieApiAccess: mocks.requireOvieApiAccess,
+}));
+
+vi.mock('./target', () => ({
+  SUMMER_RECOVERY_TARGET: {
+    eventId: 'sum_aaaaaaaaaaaaaaaaaaaaaaaa',
+    deploymentId: 'dpl_original',
+    sessionId: 'wrun_existing',
+    clientTurnId: '00000000-0000-4000-8000-000000000001',
+    startIndex: 7,
+    dailySlot: 1,
+    utcDay: '2026-10-14',
+    admittedAt: '2026-10-14T18:55:45.649Z',
+  },
 }));
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -19,6 +32,7 @@ const mocks = vi.hoisted(() => ({
   getOvieOperatingStore: vi.fn(),
   getSessionContext: vi.fn(),
   loggerError: vi.fn(),
+  requireOvieApiAccess: vi.fn(),
 }));
 
 vi.mock('@/lib/auth/session', async importOriginal => ({
@@ -98,7 +112,7 @@ function durableTurn(
             eventId,
             sessionId: SUMMER_RECOVERY_TARGET.sessionId,
             turnId: 'turn_recovered',
-            nextStartIndex: 7,
+            nextStartIndex: 8,
           },
         }
       : {}),
@@ -107,16 +121,7 @@ function durableTurn(
 }
 
 function resultResponse(
-  overrides: Partial<{
-    eventId: string;
-    principalHash: string;
-    deploymentId: string;
-    sessionId: string;
-    turnId: string;
-    responseText: string;
-    status: 'completed' | 'failed';
-    nextStartIndex: number;
-  }> = {},
+  overrides: Readonly<Record<string, unknown>> = {},
   init: ResponseInit = {}
 ) {
   return Response.json(
@@ -128,10 +133,14 @@ function resultResponse(
         principalHash,
         deploymentId: SUMMER_RECOVERY_TARGET.deploymentId,
         sessionId: SUMMER_RECOVERY_TARGET.sessionId,
+        startIndex: SUMMER_RECOVERY_TARGET.startIndex,
+        dailySlot: SUMMER_RECOVERY_TARGET.dailySlot,
+        utcDay: SUMMER_RECOVERY_TARGET.utcDay,
+        admittedAt: SUMMER_RECOVERY_TARGET.admittedAt,
         turnId: 'turn_recovered',
         responseText: 'Recovered exact Summer response.',
         status: 'completed',
-        nextStartIndex: 7,
+        nextStartIndex: 8,
         model: 'zai/glm-5.3-flash',
         ...overrides,
       },
@@ -152,6 +161,7 @@ describe('GET /api/ovie/summer/reconcile', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.requireOvieApiAccess.mockResolvedValue(null);
     vi.stubEnv('VERCEL_ENV', 'production');
     vi.stubEnv('OVIE_SUMMER_FOUNDER_APP_USER_ID', founderUserId);
     store = new MemoryOperatingStore();
@@ -194,7 +204,7 @@ describe('GET /api/ovie/summer/reconcile', () => {
     );
     const session = await loadCurrentSummerSession(store);
     expect(session?.turns[0]).toMatchObject({
-      clientTurnId: `summer-reconcile:${SUMMER_RECOVERY_TARGET.eventId}`,
+      clientTurnId: SUMMER_RECOVERY_TARGET.clientTurnId,
       userText: '',
       assistantText: 'Recovered exact Summer response.',
       state: 'completed',
@@ -295,7 +305,11 @@ describe('GET /api/ovie/summer/reconcile', () => {
   it('does not persist an unavailable or unverified upstream result', async () => {
     mocks.fetchSummerShadow.mockResolvedValueOnce(
       Response.json(
-        { ok: false, code: 'turn_pending' },
+        {
+          ok: false,
+          code: 'turn_pending',
+          eventId: SUMMER_RECOVERY_TARGET.eventId,
+        },
         {
           status: 503,
           headers: { 'x-jovie-eve-deployment-id': currentDeploymentId },
@@ -328,6 +342,10 @@ describe('GET /api/ovie/summer/reconcile', () => {
     ['principalHash', { principalHash: 'b'.repeat(43) }],
     ['deploymentId', { deploymentId: 'dpl_foreign' }],
     ['sessionId', { sessionId: 'wrun_foreign' }],
+    ['startIndex', { startIndex: SUMMER_RECOVERY_TARGET.startIndex + 1 }],
+    ['dailySlot', { dailySlot: 2 }],
+    ['utcDay', { utcDay: '2026-10-15' }],
+    ['admittedAt', { admittedAt: '2026-10-14T18:55:46.649Z' }],
   ])('rejects %s binding drift without persistence', async (_field, drift) => {
     mocks.fetchSummerShadow.mockResolvedValue(resultResponse(drift));
 
@@ -343,6 +361,12 @@ describe('GET /api/ovie/summer/reconcile', () => {
   it.each([
     ['unsupported session identity', { sessionId: 'run_unknown' }],
     ['empty turn identity', { turnId: '' }],
+    ['backward result cursor', { nextStartIndex: 6 }],
+    ['unsafe result cursor', { nextStartIndex: Number.MAX_SAFE_INTEGER + 1 }],
+    ['unknown field', { unexpected: true }],
+    ['invalid admission date', { utcDay: 'yesterday' }],
+    ['invalid admission timestamp', { admittedAt: 'yesterday' }],
+    ['invalid daily slot', { dailySlot: 26 }],
   ])(
     'rejects %s as an invalid result without persistence',
     async (_field, drift) => {
@@ -362,7 +386,12 @@ describe('GET /api/ovie/summer/reconcile', () => {
     mocks.fetchSummerShadow.mockResolvedValue(
       resultResponse({ status: 'failed' })
     );
-    expect((await GET()).status).toBe(409);
+    const response = await GET();
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      code: 'summer_result_failed',
+    });
+    expect(mocks.getOvieOperatingStore).not.toHaveBeenCalled();
   });
 
   it('does not persist an empty completed response', async () => {
@@ -431,7 +460,310 @@ describe('GET /api/ovie/summer/reconcile', () => {
     const session = await loadCurrentSummerSession(store);
     expect(session?.turns.map(turn => turn.clientTurnId)).toEqual([
       'unrelated-concurrent-turn',
-      `summer-reconcile:${SUMMER_RECOVERY_TARGET.eventId}`,
+      SUMMER_RECOVERY_TARGET.clientTurnId,
+    ]);
+  });
+
+  it('accepts the documented legacy absence of the optional admission timestamp', async () => {
+    mocks.fetchSummerShadow.mockResolvedValueOnce(
+      resultResponse({ admittedAt: undefined })
+    );
+    expect((await GET()).status).toBe(200);
+  });
+
+  it('ignores caller-supplied target selectors', async () => {
+    await Reflect.apply(GET, undefined, [
+      new Request(
+        'https://jov.ie/api/ovie/summer/reconcile?eventId=sum_bbbbbbbbbbbbbbbbbbbbbbbb&deploymentId=dpl_foreign'
+      ),
+    ]);
+    expect(mocks.fetchSummerShadow.mock.calls[0]?.[0]).toBe(
+      `/ovie/v1/summer-shadow/conversation/events/${SUMMER_RECOVERY_TARGET.eventId}/result`
+    );
+    expect(mocks.fetchSummerShadow.mock.calls[0]?.[1]?.headers).toMatchObject({
+      'x-jovie-summer-deployment-id': SUMMER_RECOVERY_TARGET.deploymentId,
+    });
+  });
+
+  it.each([201, 503])(
+    'rejects a success envelope at status %s',
+    async status => {
+      mocks.fetchSummerShadow.mockResolvedValueOnce(
+        resultResponse({}, { status })
+      );
+      expect((await GET()).status).toBe(502);
+      expect(mocks.getOvieOperatingStore).not.toHaveBeenCalled();
+    }
+  );
+
+  it('denies the privacy lock before upstream or store access', async () => {
+    mocks.requireOvieApiAccess.mockResolvedValueOnce(
+      Response.json({ ok: false }, { status: 423 })
+    );
+    expect((await GET()).status).toBe(423);
+    expect(mocks.fetchSummerShadow).not.toHaveBeenCalled();
+    expect(mocks.getOvieOperatingStore).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'turn_pending',
+    'accepted_turn_unavailable',
+    'terminal_unavailable',
+    'conversation_result_unavailable',
+  ])('leaves %s unresolved without history writes', async code => {
+    mocks.fetchSummerShadow.mockResolvedValueOnce(
+      Response.json(
+        {
+          ok: false,
+          code,
+          ...(code === 'turn_pending'
+            ? { eventId: SUMMER_RECOVERY_TARGET.eventId }
+            : {}),
+        },
+        {
+          status: 503,
+          headers: { 'x-jovie-eve-deployment-id': currentDeploymentId },
+        }
+      )
+    );
+    const response = await GET();
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({
+      code: 'summer_result_pending',
+      upstreamCode: code,
+    });
+    expect(mocks.getOvieOperatingStore).not.toHaveBeenCalled();
+  });
+
+  it('surfaces terminal abandonment without a replacement input or history mutation', async () => {
+    mocks.fetchSummerShadow.mockResolvedValueOnce(
+      Response.json(
+        { ok: false, code: 'dispatch_abandoned' },
+        {
+          status: 410,
+          headers: { 'x-jovie-eve-deployment-id': currentDeploymentId },
+        }
+      )
+    );
+    const response = await GET();
+    expect(response.status).toBe(410);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      code: 'summer_dispatch_abandoned',
+    });
+    expect(mocks.fetchSummerShadow).toHaveBeenCalledOnce();
+    expect(mocks.fetchSummerShadow.mock.calls[0]?.[1]).toMatchObject({
+      method: 'GET',
+    });
+    expect(mocks.getOvieOperatingStore).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      410,
+      {
+        ok: false,
+        code: 'turn_pending',
+        eventId: SUMMER_RECOVERY_TARGET.eventId,
+      },
+    ],
+    [503, { ok: false, code: 'dispatch_abandoned' }],
+    [200, { ok: false, code: 'dispatch_abandoned' }],
+    [503, { ok: false, code: 'unknown_error' }],
+    [
+      503,
+      {
+        ok: false,
+        code: 'turn_pending',
+        eventId: 'sum_bbbbbbbbbbbbbbbbbbbbbbbb',
+      },
+    ],
+    [503, { ok: false, code: 'turn_pending' }],
+    [503, { ok: false, code: 'accepted_turn_unavailable', unexpected: true }],
+  ])(
+    'fails closed for status %s and an unverified error envelope',
+    async (status, body) => {
+      mocks.fetchSummerShadow.mockResolvedValueOnce(
+        Response.json(body, {
+          status,
+          headers: { 'x-jovie-eve-deployment-id': currentDeploymentId },
+        })
+      );
+      expect((await GET()).status).toBe(502);
+      expect(mocks.getOvieOperatingStore).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([200, 503])(
+    'bounds a stalled response body at status %s and cancels its reader',
+    async status => {
+      const body =
+        status === 200
+          ? await resultResponse().text()
+          : JSON.stringify({ ok: false, code: 'accepted_turn_unavailable' });
+      const cancel = vi.fn();
+      mocks.fetchSummerShadow.mockResolvedValueOnce(
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.enqueue(new TextEncoder().encode(body));
+            },
+            cancel,
+          }),
+          {
+            status,
+            headers: { 'x-jovie-eve-deployment-id': currentDeploymentId },
+          }
+        )
+      );
+      vi.useFakeTimers();
+      try {
+        const pending = GET();
+        await vi.advanceTimersByTimeAsync(5_001);
+        const response = await pending;
+        expect(response.status).toBe(502);
+        expect(mocks.getOvieOperatingStore).not.toHaveBeenCalled();
+        expect(cancel).toHaveBeenCalledOnce();
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+  );
+
+  it.each([200, 503])('rejects malformed JSON at status %s', async status => {
+    mocks.fetchSummerShadow.mockResolvedValueOnce(
+      new Response('{', {
+        status,
+        headers: { 'x-jovie-eve-deployment-id': currentDeploymentId },
+      })
+    );
+    expect((await GET()).status).toBe(502);
+    expect(mocks.getOvieOperatingStore).not.toHaveBeenCalled();
+  });
+
+  it.each([200, 503])(
+    'rejects a declared oversized body at status %s',
+    async status => {
+      mocks.fetchSummerShadow.mockResolvedValueOnce(
+        new Response('{}', {
+          status,
+          headers: {
+            'content-length': String(128 * 1024 + 1),
+            'x-jovie-eve-deployment-id': currentDeploymentId,
+          },
+        })
+      );
+      expect((await GET()).status).toBe(502);
+      expect(mocks.getOvieOperatingStore).not.toHaveBeenCalled();
+    }
+  );
+
+  it('rejects a missing response body', async () => {
+    mocks.fetchSummerShadow.mockResolvedValueOnce(
+      new Response(null, {
+        status: 200,
+        headers: { 'x-jovie-eve-deployment-id': currentDeploymentId },
+      })
+    );
+    expect((await GET()).status).toBe(502);
+    expect(mocks.getOvieOperatingStore).not.toHaveBeenCalled();
+  });
+
+  it('preserves an original pending input that appears during a CAS retry', async () => {
+    const backend = memoryRecordBackend();
+    const writer = new MemoryOperatingStore(backend);
+    const pending = {
+      ...durableTurn(SUMMER_RECOVERY_TARGET.clientTurnId, ''),
+      userText: 'Original user input',
+      correlationId: 'original-correlation',
+      state: 'pending',
+      eveCheckpoint: {
+        eventId: SUMMER_RECOVERY_TARGET.eventId,
+        sessionId: SUMMER_RECOVERY_TARGET.sessionId,
+        nextStartIndex: SUMMER_RECOVERY_TARGET.startIndex,
+      },
+    };
+    store = new InjectBeforeFirstDecisionCasStore(backend, async () => {
+      await appendSummerTurn(writer, pending);
+    });
+    mocks.getOvieOperatingStore.mockReturnValue(store);
+    expect((await GET()).status).toBe(200);
+    const turns = (await loadCurrentSummerSession(store))?.turns;
+    expect(turns).toHaveLength(1);
+    expect(turns?.[0]).toMatchObject({
+      clientTurnId: pending.clientTurnId,
+      userText: pending.userText,
+      correlationId: pending.correlationId,
+      createdAt: pending.createdAt,
+      turnIndex: 1,
+      state: 'completed',
+      assistantText: 'Recovered exact Summer response.',
+      eveReceipt: { eventId: SUMMER_RECOVERY_TARGET.eventId },
+    });
+  });
+
+  it.each(['pending-first', 'legacy-first', 'concurrent'])(
+    'holds distinct client/event owners without duplicating a receipt (%s)',
+    async order => {
+      const concurrent = order === 'concurrent';
+      const backend = memoryRecordBackend();
+      const writer = new MemoryOperatingStore(backend);
+      const pending = {
+        ...durableTurn(SUMMER_RECOVERY_TARGET.clientTurnId, ''),
+        userText: 'Original input',
+        state: 'pending',
+        eveCheckpoint: {
+          eventId: SUMMER_RECOVERY_TARGET.eventId,
+          sessionId: SUMMER_RECOVERY_TARGET.sessionId,
+          nextStartIndex: SUMMER_RECOVERY_TARGET.startIndex,
+        },
+      };
+      const legacy = durableTurn(
+        'legacy-client-turn',
+        'Recovered exact Summer response.',
+        SUMMER_RECOVERY_TARGET.eventId
+      );
+      if (order === 'legacy-first') await appendSummerTurn(writer, legacy);
+      await appendSummerTurn(writer, pending);
+      if (order === 'pending-first') await appendSummerTurn(writer, legacy);
+      store = concurrent
+        ? new InjectBeforeFirstDecisionCasStore(backend, async () => {
+            await appendSummerTurn(writer, legacy);
+          })
+        : writer;
+      mocks.getOvieOperatingStore.mockReturnValue(store);
+      const response = await GET();
+      expect(response.status).toBe(409);
+      await expect(response.json()).resolves.toMatchObject({
+        code: 'persisted_result_drift',
+      });
+      const ordered =
+        order === 'legacy-first' ? [legacy, pending] : [pending, legacy];
+      expect((await loadCurrentSummerSession(store))?.turns).toEqual(
+        ordered.map((turn, index) => ({ ...turn, turnIndex: index + 1 }))
+      );
+    }
+  );
+
+  it('preserves a conflicting pending checkpoint inserted during CAS', async () => {
+    const backend = memoryRecordBackend();
+    const writer = new MemoryOperatingStore(backend);
+    const pending = {
+      ...durableTurn(SUMMER_RECOVERY_TARGET.clientTurnId, ''),
+      state: 'pending',
+      eveCheckpoint: {
+        eventId: 'sum_bbbbbbbbbbbbbbbbbbbbbbbb',
+        sessionId: SUMMER_RECOVERY_TARGET.sessionId,
+        nextStartIndex: SUMMER_RECOVERY_TARGET.startIndex,
+      },
+    };
+    store = new InjectBeforeFirstDecisionCasStore(backend, async () => {
+      await appendSummerTurn(writer, pending);
+    });
+    mocks.getOvieOperatingStore.mockReturnValue(store);
+    expect((await GET()).status).toBe(409);
+    expect((await loadCurrentSummerSession(store))?.turns).toEqual([
+      { ...pending, turnIndex: 1 },
     ]);
   });
 

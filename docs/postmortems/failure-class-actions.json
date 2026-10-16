@@ -18,6 +18,11 @@
       "url": "https://linear.app/jovie/issue/JOV-8301/pm-classpre-merge-parity-gap-failure-class-hardening-across-deploy"
     },
     {
+      "failureClass": "serial-layer-discovery",
+      "issue": "JOV-8532",
+      "url": "https://linear.app/jovie/issue/JOV-8532/pm-classserial-layer-discovery-failure-class-hardening-across-release"
+    },
+    {
       "failureClass": "silent-production-staleness",
       "issue": "JOV-8300",
       "url": "https://linear.app/jovie/issue/JOV-8300/pm-classsilent-production-staleness-failure-class-hardening-across"

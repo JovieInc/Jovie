@@ -13,6 +13,8 @@ import { neon } from '@neondatabase/serverless';
 import { Redis } from '@upstash/redis';
 import { and, sql as drizzleSql, eq, not } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-http';
+import { DEFAULT_DEV_TEST_AUTH_EMAILS } from '@/lib/auth/dev-test-auth-identity';
+import { isTestAuthBypassEnabled } from '@/lib/auth/test-mode';
 import * as schema from '@/lib/db/schema';
 import { deriveConfirmationStatus } from '@/lib/events/confirmation-status';
 import { productionUpstashCredentials } from '@/lib/redis-store';
@@ -145,6 +147,7 @@ interface TestProfile {
 
 interface SeedTestDataOptions {
   readonly publicProfilesOnly?: boolean;
+  readonly readyCreatorReleasesOnly?: boolean;
 }
 
 function isConflictingCreatorProfileMatchError(
@@ -1972,11 +1975,47 @@ async function seedTracksForRelease(
   console.log(`      ✓ Ensured ${tracks.length} tracks`);
 }
 
+/** Seed the same owned active profile that the browser's ready persona uses. */
+export async function seedReadyCreatorReleaseFixtures(
+  db: ReturnType<typeof drizzle>
+) {
+  const [profile] = await db
+    .select({ id: creatorProfiles.id })
+    .from(users)
+    .innerJoin(
+      creatorProfiles,
+      and(
+        eq(creatorProfiles.id, users.activeProfileId),
+        eq(creatorProfiles.userId, users.id)
+      )
+    )
+    .where(eq(users.email, DEFAULT_DEV_TEST_AUTH_EMAILS['creator-ready']))
+    .limit(1);
+
+  if (!profile) {
+    throw new Error(
+      'Prepare the creator-ready persona before seeding releases'
+    );
+  }
+
+  await seedReleasesForProfile(db, profile.id);
+}
+
 export async function seedTestData(options: SeedTestDataOptions = {}) {
+  if (options.readyCreatorReleasesOnly && !isTestAuthBypassEnabled()) {
+    throw new Error(
+      'Ready creator release seeding requires local test auth bypass'
+    );
+  }
   console.log('🌱 Seeding test data for E2E smoke tests...');
 
   const { DATABASE_URL: databaseUrl } = getSeedEnv();
   if (!databaseUrl) {
+    if (options.readyCreatorReleasesOnly) {
+      throw new Error(
+        'DATABASE_URL is required to seed ready creator releases'
+      );
+    }
     console.warn('⚠ DATABASE_URL/DATABASE_URL_DIRECT not set, skipping seed');
     return { success: false, reason: 'no_database_url' };
   }
@@ -1991,6 +2030,13 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
   } as const;
 
   try {
+    if (options.readyCreatorReleasesOnly) {
+      await withSeedDatabaseRetry(
+        () => seedReadyCreatorReleaseFixtures(db),
+        seedRetryOptions
+      );
+      return { success: true };
+    }
     await withSeedDatabaseRetry(async () => {
       if (!options.publicProfilesOnly) {
         // Create E2E test user (for authenticated dashboard tests)
@@ -2425,7 +2471,11 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
 
 // Allow running directly via ts-node or similar
 if (require.main === module) {
-  seedTestData()
+  seedTestData({
+    readyCreatorReleasesOnly: process.argv.includes(
+      '--ready-creator-releases-only'
+    ),
+  })
     .then(() => {
       console.log('Done!');
       process.exit(0);

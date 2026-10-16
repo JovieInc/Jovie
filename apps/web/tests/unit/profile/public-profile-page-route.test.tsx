@@ -24,6 +24,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PublicProfileLoaderResult } from '@/app/[username]/_lib/public-profile-loader';
 import ArtistPage, { generateMetadata } from '@/app/[username]/page';
+import type { ProfileMode } from '@/components/features/profile/contracts';
+import { exposedDeferredSurfaces } from '../../../scripts/certify-artist-profile';
 
 const {
   getProfileAndLinksMock,
@@ -189,7 +191,12 @@ vi.mock('@/features/profile/DesktopQrOverlayClient', () => ({
   DesktopQrOverlayClient: () => createElement('noscript', null, 'qr-overlay'),
 }));
 vi.mock('@/components/features/ask-jovie/AskJovieWidget', () => ({
-  AskJovieWidget: () => createElement('noscript', null, 'ask-jovie'),
+  AskJovieWidget: () =>
+    createElement(
+      'button',
+      { type: 'button', 'data-ask-jovie-launcher': '' },
+      'Ask Jovie'
+    ),
 }));
 vi.mock('@/features/tracking/SignupFunnelBeacon', () => ({
   SignupFunnelBeacon: () => createElement('noscript', null, 'signup-beacon'),
@@ -278,8 +285,13 @@ const ERROR_RESULT: PublicProfileLoaderResult = {
 };
 
 /** Await the async page (redirect/404 throws propagate) and render nothing. */
-async function executeArtistPage(username: string): Promise<ReactNode> {
-  return ArtistPage({ params: Promise.resolve({ username }) });
+async function executeArtistPage(
+  username: string,
+  mode: ProfileMode = 'profile'
+): Promise<ReactNode> {
+  return ArtistPage({
+    params: Promise.resolve({ username, __profileMode: mode }),
+  });
 }
 
 /**
@@ -288,8 +300,11 @@ async function executeArtistPage(username: string): Promise<ReactNode> {
  * the async child directly (its own notFound()/redirect throws propagate),
  * and return its rendered element for static markup.
  */
-async function renderArtistPageContent(username: string): Promise<string> {
-  const pageTree = (await executeArtistPage(username)) as ReactElement<{
+async function renderArtistPageContent(
+  username: string,
+  mode: ProfileMode = 'profile'
+): Promise<string> {
+  const pageTree = (await executeArtistPage(username, mode)) as ReactElement<{
     children: ReactElement;
   }>;
   const child = pageTree.props.children as ReactElement<
@@ -326,10 +341,41 @@ describe('public profile page route behavior (JOV-5778)', () => {
 
     expect(html).toContain('static-artist-page');
     expect(html).toContain('Test Artist');
+    expect(exposedDeferredSurfaces(html)).toEqual(['broad_ai']);
     expect(notFoundMock).not.toHaveBeenCalled();
     expect(permanentRedirectMock).not.toHaveBeenCalled();
     expect(getProfileAndLinksMock).toHaveBeenCalledWith('testartist');
   });
+
+  describe.each([true, false])(
+    'canonical artist site (claimed=%s)',
+    claimed => {
+      it.each(['profile', 'listen', 'tour', 'about'] as const)(
+        'keeps deferred AI hidden in %s mode without removing artist content or QR',
+        async mode => {
+          getProfileAndLinksMock.mockResolvedValue({
+            ...OK_RESULT,
+            creatorClerkId: claimed ? 'user-1' : null,
+            profile: {
+              ...OK_RESULT.profile!,
+              username: 'tim',
+              username_normalized: 'tim',
+              display_name: 'Tim White',
+              is_claimed: claimed,
+            },
+          });
+
+          const html = await renderArtistPageContent('tim', mode);
+
+          expect(html).toContain('static-artist-page');
+          expect(html).toContain('Tim White');
+          expect(html).toContain('qr-overlay');
+          expect(html).not.toContain('Ask Jovie');
+          expect(exposedDeferredSurfaces(html)).toEqual([]);
+        }
+      );
+    }
+  );
 
   it('rejects usernames that fail the handle pattern with 404', async () => {
     await expect(executeArtistPage('not a handle!')).rejects.toThrow(

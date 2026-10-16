@@ -42,6 +42,21 @@ describe('design-taste-jury change-aware capture', () => {
     expect(plan.skipped).toContain('marketing-home-desktop');
   });
 
+  it('captures every scenario for a stylesheet-only diff', () => {
+    const changedFiles = [
+      'apps/web/styles/tailwind-foundation.css',
+      'apps/web/styles/theme/tokens.css',
+    ];
+
+    expect(isNonUiPush(changedFiles)).toBe(false);
+    expect(resolveAffectedScreenshotScenarioIds(changedFiles).size).toBe(
+      SCREENSHOT_SCENARIO_IDS.size
+    );
+    expect(
+      resolveAffectedScreenshotScenarioIds(['apps/web/styles.css']).size
+    ).toBe(0);
+  });
+
   it('uses device-mockup capture style for marketing surfaces', () => {
     const changedFiles = ['apps/web/app/(home)/page.tsx'];
     const plan = buildChangeAwareCapturePlan({ changedFiles });

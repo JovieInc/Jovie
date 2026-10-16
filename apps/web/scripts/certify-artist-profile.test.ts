@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 import {
   certifyArtistProfile,
+  exposedDeferredSurfaces,
   isDeclaredRedirect,
 } from './certify-artist-profile';
 
@@ -24,6 +25,23 @@ async function output() {
 const html = `<link rel="canonical" href="https://jov.ie/tim"><script type="application/ld+json">{"@graph":[{"@id":"https://jov.ie/tim#musicgroup","sameAs":["${TIM_WHITE_PROFILE.spotifyUrl}"]}]}</script><section data-testid="profile-aeo-content"><a href="/tim">Tim White</a><a href="/broken">other</a><a href="https://example.com/">external</a></section>`;
 
 describe('artist proof collector', () => {
+  it('treats the live pay control as the deferred tips surface', () => {
+    for (const marker of [
+      'pay-trigger',
+      'profile-mode-drawer-pay',
+      'profile-pay-recipient',
+      'tip-button',
+      'tip-drawer',
+    ]) {
+      expect(
+        exposedDeferredSurfaces(`<button data-testid="${marker}"></button>`)
+      ).toEqual(['tips']);
+    }
+    expect(
+      exposedDeferredSurfaces('<button data-testid="listen-trigger"></button>')
+    ).toEqual([]);
+  });
+
   it('persists raw evidence and failure receipts, probes only same-origin links and never follows redirects', async () => {
     const directory = await output();
     const fetcher = vi

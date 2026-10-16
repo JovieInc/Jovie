@@ -1025,9 +1025,10 @@ def test_deep_lanes_are_event_driven_and_bounded() -> None:
 
 
 def test_full_matrix_supersedes_stale_runs_cleanly() -> None:
-    """Main pushes outpace the serial matrix; only the freshest run should
-    survive, and supersession must be a workflow-level cancellation rather
-    than an external mid-test runner kill (JOV-7167, JOV-7569)."""
+    """Main pushes outpace the matrix. The in-progress run must finish and
+    report a real conclusion. GitHub keeps a single pending successor.
+    Path filters stay off so an external sweep cannot kill a non-member
+    mid-test (JOV-7167, JOV-7569). No cron: the lane stays evidence-driven."""
     workflow = (WORKFLOWS / "e2e-full-matrix.yml").read_text(encoding="utf-8")
 
     triggers = workflow.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
@@ -1038,9 +1039,11 @@ def test_full_matrix_supersedes_stale_runs_cleanly() -> None:
         "\njobs:\n", 1
     )[0]
     assert "paths:" not in push_trigger
+    assert "schedule:" not in triggers
     assert "group: e2e-full-matrix-" in concurrency
     assert "github.event_name" in concurrency
-    assert "cancel-in-progress: true" in concurrency
+    assert "cancel-in-progress: false" in concurrency
+    assert "cancel-in-progress: true" not in concurrency
 
 
 def test_nightly_unit_suite_fetches_storybook_provenance_history() -> None:

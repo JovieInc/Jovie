@@ -76,6 +76,19 @@ Work only in the provided repository copy. Do not touch any other path.
 
 The agent should be able to talk to Linear, either via a configured Linear MCP server or injected `linear_graphql` tool. If neither is present, treat that as blocked access: record it in the workpad and move the issue according to the workflow instead of asking a user to configure Linear.
 
+## Capability and IA decisions (JOV-INV-044)
+
+Use [the canonical sourcing and IA policy](canon/ENGINEERING.md#capability-sourcing-and-ia-integration)
+before new/expanded commodity or UI work. Extend this workflow's existing workpad
+and PR evidence with `planningDecisions` (field contract:
+`scripts/invariants/capability-planning.mjs`). Reuse valid scoped decisions;
+missing evidence/access creates bounded research via supported tools/trusted
+preparation, never a bespoke rewrite. Preserve decision references, versions,
+requirements/assumptions, source/head/policy binding and IA disposition through
+compaction and handoff, then revalidate on the current head. Research-ready and
+implementation-candidate are distinct. Diagnostics stay nonblocking; no new
+skill tree, package-install authority or founder gate is introduced.
+
 ## Default posture
 
 - Start by determining the ticket's current status, then follow the matching flow for that status.

@@ -1119,7 +1119,9 @@ export function classifyBlogContentForAffectedTests(base, head, options) {
 const LANE_PYTHON_COVERAGE_INPUTS = new Set([
   ...[
     'lane_runner',
+    'qualification_guard',
     'pr_events',
+    'remediation',
     'reason_lane',
     'doctor',
     'hud',
@@ -1203,6 +1205,17 @@ export function buildAffectedTestPlan(changedFiles, options) {
   const missingCodexCapacityProof =
     files.includes('scripts/lanes/codex_lane.py') &&
     !isFileAvailable('scripts/tests/test_codex_lane.py');
+  const missingRemediationProof =
+    files.some(file =>
+      [
+        'scripts/lanes/remediation.py',
+        'scripts/tests/test_remediation.py',
+      ].includes(file)
+    ) &&
+    ![
+      'scripts/tests/test_remediation.py',
+      'scripts/tests/test_lane_runner.py',
+    ].every(isFileAvailable);
   // Global/full early returns need the same command fields as focused plans.
   // Retain lane coverage even when an unrelated input requires the full suite.
   return {
@@ -1223,32 +1236,37 @@ export function buildAffectedTestPlan(changedFiles, options) {
             unknownPythonPeer ||
             missingMergeEvidenceProof ||
             missingDevinFreeProof ||
-            missingCodexCapacityProof
+            missingCodexCapacityProof ||
+            missingRemediationProof
               ? 'full'
               : plan.mode === 'none'
                 ? 'selected'
                 : plan.mode,
-          ...(missingCodexCapacityProof
+          ...(missingRemediationProof
             ? {
-                fallbackReason:
-                  'Codex subscription capacity coverage proof is unavailable',
+                fallbackReason: 'remediation coverage proof is unavailable',
               }
-            : missingDevinFreeProof
+            : missingCodexCapacityProof
               ? {
                   fallbackReason:
-                    'Devin Free expiry coverage proof is unavailable',
+                    'Codex subscription capacity coverage proof is unavailable',
                 }
-              : missingMergeEvidenceProof
+              : missingDevinFreeProof
                 ? {
                     fallbackReason:
-                      'merge evidence coverage proof is unavailable',
+                      'Devin Free expiry coverage proof is unavailable',
                   }
-                : unknownPythonPeer
+                : missingMergeEvidenceProof
                   ? {
                       fallbackReason:
-                        'unmapped Python peer mixed with lane coverage',
+                        'merge evidence coverage proof is unavailable',
                     }
-                  : {}),
+                  : unknownPythonPeer
+                    ? {
+                        fallbackReason:
+                          'unmapped Python peer mixed with lane coverage',
+                      }
+                    : {}),
         }
       : {}),
   };

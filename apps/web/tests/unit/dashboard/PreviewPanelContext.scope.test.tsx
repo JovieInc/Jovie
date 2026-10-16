@@ -71,6 +71,19 @@ describe('PreviewPanelProvider scope reset (JOV-7150)', () => {
     expect(screen.getByTestId('rail-open').textContent).toBe('false');
   });
 
+  it('opens the chat rail for the profile panel deep link', () => {
+    window.history.pushState({}, '', '/app/chat?panel=profile');
+    const { rerender } = renderShell('app-shell');
+
+    rerender(
+      <PreviewPanelProvider scope='chat'>
+        <RailProbe />
+      </PreviewPanelProvider>
+    );
+    expect(screen.getByTestId('rail-open').textContent).toBe('true');
+    window.history.pushState({}, '', '/');
+  });
+
   it('closes the rail when the surface scope changes to chat', () => {
     const { rerender } = renderShell('app-shell');
 

@@ -6,7 +6,12 @@ import {
   isPublicationPermitted,
   ROUTE_CAPABILITY_BINDINGS,
 } from '@/data/marketing/featureAvailability';
+import { AGENT_HANDOFF_DISCOVERY_PATH } from '@/lib/acquisition/agent-intent';
 import { PUBLIC_ARTIST_API_POLICY_URL } from '@/lib/api/v1/contract';
+import {
+  formatPublicPriceDisplay,
+  getPublicPriceClaim,
+} from '@/lib/billing/offer-truth';
 import {
   OVIE_MCP_RESOURCE_PATH,
   OVIE_OAUTH_AUTHORIZATION_SERVER_METADATA_PATH,
@@ -41,6 +46,7 @@ function buildFeatureAvailabilityLines(): string {
  * Names real public surfaces only — no invented OAuth scopes, keys, or unpublished capabilities.
  */
 export function buildSiteLlmsGuidance(): string {
+  const offer = getPublicPriceClaim('pro');
   return `## When to use ${APP_NAME}
 
 Use ${APP_NAME} when you need to complete one of these public jobs:
@@ -59,6 +65,7 @@ Do not use ${APP_NAME} for:
 
 ## ${APP_NAME} developer resources
 
+- [Agent offer and handoff](${BASE_URL}${AGENT_HANDOFF_DISCOVERY_PATH}) — ${formatPublicPriceDisplay(offer)}; ${offer.badge}. Signed handoff is attribution-only and requires human purchase confirmation
 - [Site identity](${BASE_URL}/llms.txt)
 - [Public API capability index](${BASE_URL}/api/v1) — \`GET ${BASE_URL}/api/v1\`; stable, non-enumerating contract discovery
 - [${APP_NAME} OpenAPI 3.1 spec](${BASE_URL}/openapi.json) — conventional spec URL; same contract as ${BASE_URL}/api/v1/openapi.json

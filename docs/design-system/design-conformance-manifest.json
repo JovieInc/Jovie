@@ -32,15 +32,19 @@
     {
       "id": "atom.button",
       "state": "source-bound",
-      "revision": 10,
+      "revision": 12,
       "platforms": ["web"],
       "source": "packages/ui/atoms/button.tsx",
       "contractSource": "packages/ui/atoms/button-contract.ts",
       "tokenSources": ["packages/ui/theme/tokens.ts"],
       "storySources": ["packages/ui/atoms/button.stories.tsx"],
-      "testSources": ["packages/ui/atoms/button.test.tsx"],
+      "testSources": [
+        "apps/web/tests/e2e/storybook-button-morph.spec.ts",
+        "packages/ui/atoms/button-morph.test.tsx",
+        "packages/ui/atoms/button.test.tsx"
+      ],
       "penRootId": "g3IC1",
-      "sourceDigest": "31b0bbbceedc3461dc06ec9dd3b0cf3f4f80aaebc6f35a69d2143428d83bc15e"
+      "sourceDigest": "ddf23c545d3ba0d4a42a651b24e044515a71bd9bcd5196d40e319c8f5315568b"
     },
     {
       "id": "atom.input",
@@ -72,14 +76,14 @@
     {
       "id": "atom.switch",
       "state": "source-bound",
-      "revision": 1,
+      "revision": 2,
       "platforms": ["web"],
       "source": "packages/ui/atoms/switch.tsx",
       "tokenSources": ["packages/ui/theme/tokens.ts"],
       "storySources": ["packages/ui/atoms/switch.stories.tsx"],
       "testSources": ["packages/ui/atoms/switch.test.tsx"],
       "penRootId": null,
-      "sourceDigest": "c9aa29440ce53b6fbea210a59ab906c8c4e777f3862a4310737742abbffdf328"
+      "sourceDigest": "18697a99bb430b33e2448100e784159c8edb3b7c317bf8f741e47f015f52f76f"
     },
     {
       "id": "atom.sheet",

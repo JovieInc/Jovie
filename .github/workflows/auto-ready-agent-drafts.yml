@@ -70,7 +70,7 @@ jobs:
     steps:
       - name: Generate short-lived Jovie App token
         id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           # Use the installation identity for the paired PR mutations.
           # Installation permissions stay unbounded here so commit and
@@ -116,11 +116,12 @@ jobs:
           startsWith(github.event.workflow_run.path, '.github/workflows/pr-size-guard.yml')
         )
       )
-    # One lane per PR (or head): a newer wake for the same PR supersedes the
-    # pending one, and wakes for different PRs never cancel each other.
+    # One lane per PR (or head). A newer completion cancels this run during the
+    # debounce, before the Jovie Bot token is minted. Different PRs never share
+    # a group. There is no workflow-level group: that dropped other PRs.
     concurrency:
       group: auto-ready-green-source-${{ github.event.inputs.pr_number || github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_sha || github.run_id }}
-      cancel-in-progress: false
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     permissions:
       actions: read
@@ -129,9 +130,13 @@ jobs:
       issues: write
       pull-requests: write
     steps:
+      - name: Debounce repeated source completions
+        if: github.event_name == 'workflow_run'
+        run: sleep 20
+
       - name: Generate short-lived Jovie App token
         id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}

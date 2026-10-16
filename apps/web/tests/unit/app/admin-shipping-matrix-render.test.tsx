@@ -34,6 +34,31 @@ vi.mock('@/app/app/(shell)/admin/ops/HudStatusPill', () => ({
   ),
 }));
 
+vi.mock('@/features/admin/layout/AdminDetailRail', () => ({
+  AdminDetailRail: ({
+    ariaLabel,
+    children,
+    entityHeader,
+    isOpen,
+    onClose,
+  }: {
+    ariaLabel: string;
+    children: ReactNode;
+    entityHeader?: ReactNode;
+    isOpen: boolean;
+    onClose: () => void;
+  }) =>
+    isOpen ? (
+      <aside aria-label={ariaLabel}>
+        {entityHeader}
+        {children}
+        <button type='button' onClick={onClose}>
+          Close details
+        </button>
+      </aside>
+    ) : null,
+}));
+
 vi.mock('@/components/molecules/drawer', () => ({
   DrawerPropertyRow: ({
     label,

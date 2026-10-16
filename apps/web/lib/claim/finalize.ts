@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, eq, ne } from 'drizzle-orm';
+import { and, eq, isNull, ne, or } from 'drizzle-orm';
 import type { DbOrTransaction } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import {
@@ -223,7 +223,7 @@ export async function reservePrebuiltProfileForUser(
 
   await releaseOtherReservedProfiles(tx, params.userId, profile.id);
 
-  await tx
+  const [updated] = await tx
     .update(creatorProfiles)
     .set({
       userId: params.userId,
@@ -231,7 +231,21 @@ export async function reservePrebuiltProfileForUser(
       isPublic: true,
       updatedAt: new Date(),
     })
-    .where(eq(creatorProfiles.id, profile.id));
+    .where(
+      and(
+        eq(creatorProfiles.id, profile.id),
+        eq(creatorProfiles.usernameNormalized, expectedUsername),
+        or(
+          isNull(creatorProfiles.userId),
+          eq(creatorProfiles.userId, params.userId)
+        )
+      )
+    )
+    .returning({ id: creatorProfiles.id });
+
+  if (!updated) {
+    throw new Error('[PROFILE_CONFLICT] This profile is no longer available.');
+  }
 
   await upsertUserActiveProfile(tx, params.userId, profile.id);
 
@@ -315,7 +329,7 @@ export async function claimPrebuiltProfileForUser(
       )
     : null;
 
-  await tx
+  const [updated] = await tx
     .update(creatorProfiles)
     .set({
       userId: params.userId,
@@ -329,7 +343,21 @@ export async function claimPrebuiltProfileForUser(
       ...(claimSettings ? { settings: claimSettings } : {}),
       updatedAt: now,
     })
-    .where(eq(creatorProfiles.id, profile.id));
+    .where(
+      and(
+        eq(creatorProfiles.id, profile.id),
+        eq(creatorProfiles.usernameNormalized, expectedUsername),
+        or(
+          isNull(creatorProfiles.userId),
+          eq(creatorProfiles.userId, params.userId)
+        )
+      )
+    )
+    .returning({ id: creatorProfiles.id });
+
+  if (!updated) {
+    throw new Error('[PROFILE_CONFLICT] This profile is no longer available.');
+  }
 
   await tx
     .insert(userProfileClaims)

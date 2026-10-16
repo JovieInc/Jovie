@@ -25,6 +25,10 @@ import {
 import { gateway, streamText } from '@/lib/ai/sdk';
 import { buildAiTelemetry } from '@/lib/ai/telemetry';
 import type { ChatAccountContext } from '@/lib/chat/account-context';
+import {
+  downloadChatAttachments,
+  validateChatMessageParts,
+} from '@/lib/chat/attachment-policy';
 import { buildReferencedEntitiesBlock } from '@/lib/chat/entity-hydration';
 import { resolveImportBioRestrictedTools } from '@/lib/chat/import-bio-turn-guard';
 import { retrieveKnowledgeContext } from '@/lib/chat/knowledge/retrieval';
@@ -57,6 +61,14 @@ import type {
   ChatTelemetry,
   ReleaseContext,
 } from '@/lib/chat/types';
+import {
+  prepareWritingPilot,
+  recordWritingPilotDraft,
+  type WritingPilotDraft,
+  type WritingPilotInput,
+  type WritingPilotResult,
+  writingPilotBounds,
+} from '@/lib/chat/writing-pilot';
 import {
   CHAT_MODEL_LIGHT,
   resolveRotatedChatModel,
@@ -200,6 +212,8 @@ export function buildCachedSystemMessages(
 }
 
 export interface ExecuteChatTurnInput {
+  /** Server-approved, post-confirmation text-only pilot. Never accept from request JSON. */
+  writingPilot?: WritingPilotInput;
   uiMessages: UIMessage[];
   /**
    * Required for `mode='app'` (authenticated artist chat). Ignored when
@@ -283,6 +297,8 @@ export interface ChatTurnFinishSignals {
 }
 
 export interface ExecuteChatTurnResult {
+  /** Invocation-local original writer record; absent for existing callers. */
+  writingDraft?: Promise<WritingPilotResult<WritingPilotDraft>>;
   /** The streamText result. Caller wraps with `.toUIMessageStreamResponse()`. */
   streamResult: ReturnType<typeof streamText>;
   /** Resolved model id (`anthropic/...`). Useful for parity assertions and traces. */
@@ -351,6 +367,19 @@ export async function executeChatTurn(
     );
   }
 
+  const writingPilot = input.writingPilot
+    ? prepareWritingPilot(input.writingPilot, {
+        requestId,
+        conversationId: resolvedConversationId,
+        mode,
+      })
+    : undefined;
+
+  for (const message of uiMessages) {
+    const partsError = validateChatMessageParts(message.parts);
+    if (partsError) throw new Error(partsError);
+  }
+
   const disclosureProbeText =
     lastUserText ?? extractLastUserText(uiMessages) ?? '';
   const blockedForDisclosure =
@@ -381,6 +410,7 @@ export async function executeChatTurn(
       artist: {
         displayName: artistContext.displayName,
         username: artistContext.username,
+        spotifyUrl: artistContext.spotifyUrl,
       },
     });
     const pinnedOpportunityBlock =
@@ -405,11 +435,15 @@ export async function executeChatTurn(
         }
       : parts;
   }
+  if (writingPilot) {
+    systemPromptParts = { ...systemPromptParts, dynamic: writingPilot.prompt };
+  }
   const systemPrompt = joinSystemPromptParts(systemPromptParts);
 
-  const modelMessages = pruneStaleToolHistory(
-    await convertToModelMessages(uiMessages)
-  );
+  // Approved context is sufficient for the pilot; never replay tools or approvals.
+  const modelMessages: ModelMessage[] = writingPilot
+    ? [{ role: 'user', content: 'Write the approved response.' }]
+    : pruneStaleToolHistory(await convertToModelMessages(uiMessages));
 
   // `forceLightModel` is the runtime lever (Statsig `ai_chat_force_light`)
   // that degrades the entire chat surface to the light model during a
@@ -472,44 +506,61 @@ export async function executeChatTurn(
       },
     });
   };
-  const rotatingModel = createRotatingGatewayLanguageModel({
-    models: gatewayRetryChain,
-    resolveModel: modelId => gateway(modelId),
-    onRotate: ({ from, to, error }) => {
-      telemetry?.setTags?.({
-        chat_model: to,
-        chat_gateway_rotated: 'true',
-      });
-      telemetry?.addBreadcrumb?.({
-        category: 'ai-chat',
-        message: 'gateway_provider_retry',
-        level: 'warning',
-        data: { from, to, requestId },
-      });
-      if (isGatewayBudgetExceededError(error)) {
-        reportGatewayBudgetExceeded(error);
-      }
-    },
-  });
+  const rotatingModel = writingPilot
+    ? gateway(selectedModel)
+    : {
+        ...createRotatingGatewayLanguageModel({
+          models: gatewayRetryChain,
+          resolveModel: modelId => gateway(modelId),
+          onRotate: ({ from, to, error }) => {
+            telemetry?.setTags?.({
+              chat_model: to,
+              chat_gateway_rotated: 'true',
+            });
+            telemetry?.addBreadcrumb?.({
+              category: 'ai-chat',
+              message: 'gateway_provider_retry',
+              level: 'warning',
+              data: { from, to, requestId },
+            });
+            if (isGatewayBudgetExceededError(error)) {
+              reportGatewayBudgetExceeded(error);
+            }
+          },
+        }),
+        // The retry wrapper must preserve Gateway's URL pass-through capability.
+        supportedUrls: gateway(selectedModel).supportedUrls,
+      };
 
-  const toolNames = Object.keys(tools).sort((a, b) => a.localeCompare(b));
+  const toolNames = writingPilot
+    ? []
+    : Object.keys(tools).sort((a, b) => a.localeCompare(b));
   const toolStepLimit = resolveChatToolStepLimit(
     planLimits.booleans.aiCanUseTools
   );
   const turnSignals = { toolStepCapExhausted: false };
 
-  const coreChatTrace = resolveCoreChatTrace({
-    harness: coreChatHarness,
-    input: {
-      requestId,
-      mode,
-      selectedModel,
-      toolNames,
-      userMessage: blockedForDisclosure ? null : disclosureProbeText || null,
-      signal,
-    },
-    blockedForDisclosure,
-  });
+  const coreChatTrace = writingPilot
+    ? Promise.resolve(
+        makeCoreChatResult(
+          { requestId },
+          { status: 'disabled', reason: 'feature_disabled' }
+        ).trace
+      )
+    : resolveCoreChatTrace({
+        harness: coreChatHarness,
+        input: {
+          requestId,
+          mode,
+          selectedModel,
+          toolNames,
+          userMessage: blockedForDisclosure
+            ? null
+            : disclosureProbeText || null,
+          signal,
+        },
+        blockedForDisclosure,
+      });
 
   void coreChatTrace.then(trace => {
     if (trace.status === 'disabled' && trace.reason === 'feature_disabled') {
@@ -562,23 +613,38 @@ export async function executeChatTurn(
       : (rotatingModel as unknown as LanguageModel),
     system: buildCachedSystemMessages(systemPromptParts),
     messages: modelMessages,
-    tools: blockedForDisclosure ? undefined : tools,
-    stopWhen: blockedForDisclosure ? undefined : stepCountIs(toolStepLimit),
-    prepareStep: blockedForDisclosure
-      ? undefined
-      : ({ steps, stepNumber }) => {
-          const restrictedTools = resolveImportBioRestrictedTools(
-            steps,
-            stepNumber
-          );
-          if (restrictedTools) {
-            return { activeTools: restrictedTools };
-          }
-          return {};
-        },
+    ...(writingPilot
+      ? {
+          ...writingPilotBounds(writingPilot.budget),
+          maxRetries: 0,
+          toolChoice: 'none' as const,
+        }
+      : {}),
+    experimental_download: writingPilot ? undefined : downloadChatAttachments,
+    tools: blockedForDisclosure || writingPilot ? undefined : tools,
+    stopWhen:
+      blockedForDisclosure || writingPilot
+        ? undefined
+        : stepCountIs(toolStepLimit),
+    prepareStep:
+      blockedForDisclosure || writingPilot
+        ? undefined
+        : ({ steps, stepNumber }) => {
+            const restrictedTools = resolveImportBioRestrictedTools(
+              steps,
+              stepNumber
+            );
+            if (restrictedTools) {
+              return { activeTools: restrictedTools };
+            }
+            return {};
+          },
     abortSignal: signal,
     providerOptions: {
-      gateway: { tags: ['feature:jovie-chat', `surface:${mode}`] },
+      gateway: {
+        ...(writingPilot ? { models: [] } : {}),
+        tags: ['feature:jovie-chat', `surface:${mode}`],
+      },
     },
     // JOV-3525: pace raw model deltas into a steady word-level reveal so the
     // client render cadence is smooth; pairs with useChat
@@ -676,6 +742,7 @@ export async function executeChatTurn(
 
       if (
         blockedForDisclosure ||
+        writingPilot ||
         !isChatToolStepCapExhausted(steps, toolStepLimit)
       ) {
         return;
@@ -759,6 +826,24 @@ export async function executeChatTurn(
     : wrapStreamResultWithLeakGuard(rawStreamResult);
 
   return {
+    ...(writingPilot
+      ? {
+          writingDraft: blockedForDisclosure
+            ? Promise.resolve({
+                ok: false as const,
+                code: 'draft_unavailable' as const,
+              })
+            : recordWritingPilotDraft({
+                prepared: writingPilot,
+                signal,
+                selectedModel,
+                systemPrompt,
+                text: streamResult.text,
+                response: streamResult.response,
+                providerMetadata: streamResult.providerMetadata,
+              }),
+        }
+      : {}),
     streamResult,
     selectedModel,
     systemPrompt,

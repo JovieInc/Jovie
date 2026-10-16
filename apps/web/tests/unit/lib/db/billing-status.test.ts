@@ -9,6 +9,11 @@ vi.mock('server-only', () => ({}));
 vi.mock('@/lib/db', () => ({
   db: { execute: mockDbExecute },
 }));
+vi.mock('@/lib/ingestion/session', () => ({
+  withSystemIngestionSession: vi.fn((operation: (tx: unknown) => unknown) =>
+    operation({ execute: mockDbExecute })
+  ),
+}));
 
 import {
   type AtomicBillingUpdateInput,

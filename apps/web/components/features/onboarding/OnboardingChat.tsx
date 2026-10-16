@@ -90,6 +90,8 @@ import {
   type ToolPart,
 } from './onboardingChatHelpers';
 
+const STARTER_VERIFICATION_INSTRUCTION = 'One quick check before we send';
+
 /**
  * Anonymous onboarding chat client (JOV-2132 PR 3).
  *
@@ -113,6 +115,8 @@ interface OnboardingChatProps {
   readonly turnstilePanel?: ReactNode;
   /** Whether the Turnstile security chrome should appear in the composer. */
   readonly turnstilePanelVisible?: boolean;
+  /** A resolved public key exists; this does not establish provider readiness. */
+  readonly turnstileHasSiteKey?: boolean;
   /** Requests the visible Turnstile panel when a send needs verification. */
   readonly onTurnstileRequired?: (message?: string) => void;
   /** Clears stale verification after the server rejects a token. */
@@ -566,9 +570,9 @@ function getDisplayMessages(
 }
 
 interface OnboardingFlowStatusProps {
-  readonly reserveTurnstileSpace?: boolean;
   readonly shouldShowTurnstileBanner: boolean;
   readonly turnstilePanel: ReactNode;
+  readonly sizeStarterInstruction: boolean;
 }
 
 function getOnboardingComposerPlaceholder(
@@ -582,17 +586,30 @@ function getOnboardingComposerPlaceholder(
 }
 
 function OnboardingFlowStatus({
-  reserveTurnstileSpace = false,
   shouldShowTurnstileBanner,
   turnstilePanel,
+  sizeStarterInstruction,
 }: OnboardingFlowStatusProps) {
   if (!shouldShowTurnstileBanner) return null;
 
   return (
     <div
-      className={reserveTurnstileSpace ? 'min-h-[10rem]' : undefined}
       data-testid='onboarding-flow-status'
+      className={cn(
+        sizeStarterInstruction &&
+          'grid grid-cols-1 [&>p[role=status]]:col-start-1 [&>p[role=status]]:row-start-1 [&:has([data-turnstile-mount=inline])>p[aria-hidden=true]]:hidden'
+      )}
     >
+      {/* Size the known instruction's text, never an unpainted provider frame. */}
+      {sizeStarterInstruction ? (
+        <p
+          aria-hidden='true'
+          className='invisible pointer-events-none mb-2 text-xs text-secondary-token col-start-1 row-start-1'
+          data-testid='onboarding-verification-instruction-size'
+        >
+          {STARTER_VERIFICATION_INSTRUCTION}
+        </p>
+      ) : null}
       {turnstilePanel}
     </div>
   );
@@ -701,7 +718,10 @@ function OnboardingMessageRegion({
   );
 
   return (
-    <ChatEmptyStateComposerRegion above={conversationAboveComposer}>
+    <ChatEmptyStateComposerRegion
+      alignAbove='top'
+      above={conversationAboveComposer}
+    >
       <div className='w-full' data-testid='onboarding-centered-composer'>
         {onboardingComposerSurface}
       </div>
@@ -720,6 +740,7 @@ export function OnboardingChat({
   entryProfile = null,
   turnstilePanel,
   turnstilePanelVisible = false,
+  turnstileHasSiteKey = false,
   turnstileStatus,
   turnstileToken,
   initialMessages = [],
@@ -880,7 +901,7 @@ export function OnboardingChat({
       if (!text || isBusy || localAutomationBypass === null) return;
       if (isAwaitingFirstToken) {
         setVerificationRequested(true);
-        onTurnstileRequired?.('One quick check before we send');
+        onTurnstileRequired?.(STARTER_VERIFICATION_INSTRUCTION);
         pendingVerifiedSubmitRef.current = true;
         pendingStarterPromptRef.current = null;
         hasAutoSubmittedStarterPromptRef.current = true;
@@ -1034,7 +1055,7 @@ export function OnboardingChat({
       if (!hasRequestedStarterVerificationRef.current) {
         hasRequestedStarterVerificationRef.current = true;
         setVerificationRequested(true);
-        onTurnstileRequired?.('One quick check before we send');
+        onTurnstileRequired?.(STARTER_VERIFICATION_INSTRUCTION);
       }
       return;
     }
@@ -1124,9 +1145,13 @@ export function OnboardingChat({
       verificationRequested);
   const flowStatus = shouldShowTurnstileBanner ? (
     <OnboardingFlowStatus
-      reserveTurnstileSpace={shouldReserveStarterVerification}
       shouldShowTurnstileBanner={shouldShowTurnstileBanner}
       turnstilePanel={turnstilePanel}
+      sizeStarterInstruction={
+        shouldReserveStarterVerification &&
+        turnstileHasSiteKey &&
+        (turnstileStatus === 'loading' || turnstileStatus === 'interactive')
+      }
     />
   ) : null;
 
@@ -1170,6 +1195,7 @@ export function OnboardingChat({
   const sendLocalError = chatError;
   const onboardingComposerSurface = (
     <div className='mx-auto w-full max-w-[45rem]'>
+      {flowStatus}
       {sendLocalError ? (
         <OnboardingMessageRecoveryRow
           chatError={sendLocalError}
@@ -1194,7 +1220,7 @@ export function OnboardingChat({
         ref={scrollContainerRef}
         onScroll={onScroll}
         className={cn(
-          'relative flex-1 overflow-y-auto px-4 pb-5 sm:px-6 lg:px-8',
+          'relative min-h-0 flex-1 overflow-y-auto px-4 pb-5 sm:px-6 lg:px-8',
           // Under the floating sign-in row, scrolled-away messages fade out
           // instead of hard-clipping at the panel edge (JOV-7192).
           headerOverlay ? 'pt-16 system-b-chat-thread-top-fade' : 'pt-5'
@@ -1211,7 +1237,6 @@ export function OnboardingChat({
             !shouldDockComposer && 'h-full justify-center'
           )}
         >
-          {flowStatus}
           <OnboardingMessageRegion
             composerPickerOpen={composerPickerOpen}
             displayMessages={displayMessages}

@@ -9,7 +9,6 @@ export const CANONICAL_ARTIST_SITE_REFERENCE = {
   artist: 'Tim White',
   profileUrl: 'https://jov.ie/tim',
 } as const;
-
 export const CANONICAL_ARTIST_SITE_CHECKS = [
   'identity_catalog',
   'profile_hierarchy',
@@ -25,7 +24,6 @@ export const CANONICAL_ARTIST_SITE_CHECKS = [
   'payment_entitlement',
   'immediate_value',
 ] as const;
-
 export type CanonicalArtistSiteCheckId =
   (typeof CANONICAL_ARTIST_SITE_CHECKS)[number];
 export type CanonicalArtistSiteLayer =
@@ -38,14 +36,12 @@ export type CanonicalArtistSiteReceiptStatus =
   | 'failed'
   | 'hidden'
   | 'not_applicable';
-
 interface CheckDefinition {
   readonly id: CanonicalArtistSiteCheckId;
   readonly layer: CanonicalArtistSiteLayer;
   readonly referenceRule: string;
   readonly hiddenAllowed: boolean;
 }
-
 const CHECK_SPEC = `
 identity_catalog identity Tim White identity and supported catalog stay truthful.
 profile_hierarchy experience Artist identity, current music, and Listen lead.
@@ -61,7 +57,6 @@ pro_handoff_199 revenue Eligible artists see a truthful, non-coercive $199/mo ha
 payment_entitlement revenue Checkout, verified entitlement, cancel, and failure states agree.
 immediate_value revenue Claim and verified payment each land in an honest next-value state.
 `.trim();
-
 export const CANONICAL_ARTIST_SITE_CHECK_DEFINITIONS: readonly CheckDefinition[] =
   CHECK_SPEC.split('\n').map(line => {
     const [id, layer, ...words] = line.split(' ');
@@ -72,14 +67,12 @@ export const CANONICAL_ARTIST_SITE_CHECK_DEFINITIONS: readonly CheckDefinition[]
       hiddenAllowed: id === 'deferred_surfaces',
     };
   });
-
 if (
   CANONICAL_ARTIST_SITE_CHECK_DEFINITIONS.map(check => check.id).join() !==
   CANONICAL_ARTIST_SITE_CHECKS.join()
 ) {
   throw new Error('canonical artist-site check spec drifted');
 }
-
 export interface CanonicalArtistSiteReceipt {
   readonly checkId: CanonicalArtistSiteCheckId;
   readonly candidateId: string;
@@ -91,7 +84,6 @@ export interface CanonicalArtistSiteReceipt {
   readonly evidence: readonly string[];
   readonly defectRef?: string;
 }
-
 export interface CanonicalArtistSiteCertificationInput {
   readonly candidateId: string;
   readonly runId: string;
@@ -102,14 +94,12 @@ export interface CanonicalArtistSiteCertificationInput {
   readonly cohortPromiseDependencies?: readonly CanonicalArtistSiteCheckId[];
   readonly receipts: readonly CanonicalArtistSiteReceipt[];
 }
-
 export interface CanonicalArtistSiteCheckResult extends CheckDefinition {
   readonly status: 'passed' | 'failed' | 'hidden' | 'not_applicable';
   readonly detail: string;
   readonly evidence: readonly string[];
   readonly defectRef: string | null;
 }
-
 export interface CanonicalArtistSiteCertification {
   readonly contract: typeof CANONICAL_ARTIST_SITE_CERTIFICATION_CONTRACT;
   readonly reference: typeof CANONICAL_ARTIST_SITE_REFERENCE;
@@ -127,11 +117,9 @@ export interface CanonicalArtistSiteCertification {
   readonly failingChecks: readonly CanonicalArtistSiteCheckResult[];
   readonly evidenceIntegrityFailures: readonly string[];
 }
-
 function validIdentityPart(value: string): boolean {
   return value.trim().length > 0 && value.length <= 200;
 }
-
 function receiptEnvelopeFailures(
   receipt: CanonicalArtistSiteReceipt,
   input: CanonicalArtistSiteCertificationInput
@@ -154,7 +142,6 @@ function receiptEnvelopeFailures(
     failures.push(`${receipt.checkId}: immutable evidence missing`);
   return failures;
 }
-
 export function evaluateCanonicalArtistSiteCertification(
   input: CanonicalArtistSiteCertificationInput
 ): CanonicalArtistSiteCertification {

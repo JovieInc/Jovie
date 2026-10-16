@@ -642,11 +642,22 @@ describe('Button', () => {
     expect(screen.getByRole('button')).toBeDisabled();
   });
 
-  it('renders spinner when loading', () => {
-    render(<Button loading>Load</Button>);
-    expect(screen.getByTestId('spinner')).toBeInTheDocument();
-    expect(screen.getByRole('button')).toHaveAttribute('aria-busy', 'true');
-  });
+  it.each([undefined, 'spinner'] as const)(
+    'preserves legacy loading for presentation %s',
+    pendingPresentation => {
+      render(
+        <Button loading pendingPresentation={pendingPresentation}>
+          Load
+        </Button>
+      );
+      expect(screen.getByTestId('spinner')).toBeInTheDocument();
+      expect(screen.getByRole('button')).toHaveAttribute('aria-busy', 'true');
+      expect(screen.getByRole('button')).toBeDisabled();
+      expect(screen.getByRole('button')).not.toHaveAttribute(
+        'data-pending-presentation'
+      );
+    }
+  );
 
   it('keeps the label mounted under an absolutely positioned spinner while loading', () => {
     render(<Button loading>Load</Button>);

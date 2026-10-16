@@ -1,7 +1,18 @@
 import 'server-only';
 import type { z } from 'zod';
 import { isAiGatewayAvailable } from '@/lib/ai/gateway-availability';
+import {
+  checkBetterAuthUrlOriginPolicy,
+  isAllowedBetterAuthHost as isAllowedAuthHost,
+  parseUrlHostname,
+  resolveBetterAuthUrlEnv as resolveAuthUrlEnv,
+} from '@/lib/auth/url-origin-policy';
 import { publicEnv } from '@/lib/env-public';
+import {
+  checkBetterAuthSecretPolicy,
+  checkStripeSecretFormatPolicy,
+  checkUrlEncryptionKeyPolicy,
+} from './env-configuration-policy';
 import type { ServerEnvSchema } from './env-server-schema';
 
 /**
@@ -52,32 +63,17 @@ function isLikelyVercelColdStart(): boolean {
  * Local/dev falls back to a non-production secret (see better-auth.ts).
  */
 const checkBetterAuthSecret: ValidationRule = ({ server, vercelEnv }) => {
-  if (vercelEnv !== 'production' && vercelEnv !== 'preview') {
-    return null;
-  }
-
-  const secret = server.BETTER_AUTH_SECRET;
-  if (!secret) {
-    if (isLikelyVercelColdStart()) {
-      return {
-        type: 'warning',
-        message:
-          'BETTER_AUTH_SECRET is missing (may be cold start timing issue)',
-      };
-    }
+  const issue = checkBetterAuthSecretPolicy({
+    secret: server.BETTER_AUTH_SECRET,
+    vercelEnv,
+  });
+  if (issue && !server.BETTER_AUTH_SECRET && isLikelyVercelColdStart()) {
     return {
-      type: 'critical',
-      message: 'BETTER_AUTH_SECRET is required for authentication',
+      type: 'warning',
+      message: 'BETTER_AUTH_SECRET is missing (may be cold start timing issue)',
     };
   }
-
-  if (secret.length < 32) {
-    return {
-      type: 'critical',
-      message: 'BETTER_AUTH_SECRET must be at least 32 characters',
-    };
-  }
-  return null;
+  return issue;
 };
 
 /**
@@ -85,137 +81,29 @@ const checkBetterAuthSecret: ValidationRule = ({ server, vercelEnv }) => {
  * Server base URL must match the deployed origin and never cross envs.
  * Does not log or include secret values.
  */
-const BETTER_AUTH_URL_HOSTS = {
-  production: new Set(['jov.ie', 'www.jov.ie']),
-  staging: new Set(['staging.jov.ie']),
-  local: new Set(['localhost', '127.0.0.1', '[::1]']),
-} as const;
-
-function parseUrlHostname(raw: string | undefined): string | null {
-  if (!raw?.trim()) return null;
-  try {
-    return new URL(raw).hostname.toLowerCase();
-  } catch {
-    return null;
-  }
-}
-
-function resolveBetterAuthUrlEnv(
-  vercelEnv: string
-): 'production' | 'staging' | 'local' | 'preview' {
-  if (vercelEnv === 'production') return 'production';
-  if (vercelEnv === 'preview') {
-    // Staging alias deploys use preview on Vercel but host staging.jov.ie.
-    const publicUrl = publicEnv.NEXT_PUBLIC_APP_URL;
-    const host = parseUrlHostname(publicUrl);
-    if (host && BETTER_AUTH_URL_HOSTS.staging.has(host)) return 'staging';
-    return 'preview';
-  }
-  return 'local';
+function resolveBetterAuthUrlEnv(vercelEnv: string) {
+  return resolveAuthUrlEnv(vercelEnv, publicEnv.NEXT_PUBLIC_APP_URL);
 }
 
 function isAllowedBetterAuthHost(
   hostname: string,
   envKind: 'production' | 'staging' | 'local' | 'preview'
-): boolean {
-  if (envKind === 'production') {
-    return BETTER_AUTH_URL_HOSTS.production.has(hostname);
-  }
-  if (envKind === 'staging') {
-    return BETTER_AUTH_URL_HOSTS.staging.has(hostname);
-  }
-  if (envKind === 'local') {
-    return (
-      BETTER_AUTH_URL_HOSTS.local.has(hostname) ||
-      hostname.endsWith('.localhost')
-    );
-  }
-  // Preview deployments: allow only exact Vercel-provided deployment or
-  // branch hosts. The global *.vercel.app namespace is attacker-controlled.
-  const vercelHosts = new Set(
-    [process.env.VERCEL_URL, process.env.VERCEL_BRANCH_URL]
-      .filter((host): host is string => Boolean(host))
-      .map(host => host.toLowerCase())
-  );
-  return vercelHosts.has(hostname);
+) {
+  return isAllowedAuthHost(hostname, envKind, [
+    process.env.VERCEL_URL,
+    process.env.VERCEL_BRANCH_URL,
+  ]);
 }
 
-/**
- * Validation rule: BETTER_AUTH_URL / NEXT_PUBLIC_BETTER_AUTH_URL must match
- * the environment origin and must not cross local/staging/production.
- */
-const checkBetterAuthUrlOrigin: ValidationRule = ({ server, vercelEnv }) => {
-  const envKind = resolveBetterAuthUrlEnv(vercelEnv);
-  const candidates: Array<{ label: string; value: string | undefined }> = [
-    { label: 'BETTER_AUTH_URL', value: server.BETTER_AUTH_URL },
-    {
-      label: 'NEXT_PUBLIC_BETTER_AUTH_URL',
-      value: publicEnv.NEXT_PUBLIC_BETTER_AUTH_URL,
-    },
-  ];
-
-  for (const { label, value } of candidates) {
-    if (!value?.trim()) {
-      // Optional in local/dev; production/preview secret check is separate.
-      // Public URL is optional when same-origin client derives base from window.
-      continue;
-    }
-
-    const hostname = parseUrlHostname(value);
-    if (!hostname) {
-      return {
-        type: 'critical',
-        message: `${label} is not a valid URL`,
-      };
-    }
-
-    // Cross-environment hard fails (never print the full URL with secrets).
-    const isProdHost = BETTER_AUTH_URL_HOSTS.production.has(hostname);
-    const isStagingHost = BETTER_AUTH_URL_HOSTS.staging.has(hostname);
-    const isLocalHost =
-      BETTER_AUTH_URL_HOSTS.local.has(hostname) ||
-      hostname.endsWith('.localhost');
-
-    if (envKind === 'production' && (isStagingHost || isLocalHost)) {
-      return {
-        type: 'critical',
-        message: `${label} host must be production (jov.ie), not ${hostname}`,
-      };
-    }
-    if (envKind === 'staging' && (isProdHost || isLocalHost)) {
-      return {
-        type: 'critical',
-        message: `${label} host must be staging (staging.jov.ie), not ${hostname}`,
-      };
-    }
-    if (envKind === 'local' && (isProdHost || isStagingHost)) {
-      return {
-        type: 'critical',
-        message: `${label} host must be local, not ${hostname}`,
-      };
-    }
-
-    if (!isAllowedBetterAuthHost(hostname, envKind)) {
-      return {
-        type: 'critical',
-        message: `${label} host ${hostname} is not allowed for this environment`,
-      };
-    }
-  }
-
-  // When both are set, they must resolve to the same origin host.
-  const serverHost = parseUrlHostname(server.BETTER_AUTH_URL);
-  const publicHost = parseUrlHostname(publicEnv.NEXT_PUBLIC_BETTER_AUTH_URL);
-  if (serverHost && publicHost && serverHost !== publicHost) {
-    return {
-      type: 'critical',
-      message:
-        'BETTER_AUTH_URL and NEXT_PUBLIC_BETTER_AUTH_URL hosts must match',
-    };
-  }
-
-  return null;
-};
+const checkBetterAuthUrlOrigin: ValidationRule = ({ server, vercelEnv }) =>
+  checkBetterAuthUrlOriginPolicy({
+    betterAuthUrl: server.BETTER_AUTH_URL,
+    publicBetterAuthUrl: publicEnv.NEXT_PUBLIC_BETTER_AUTH_URL,
+    publicAppUrl: publicEnv.NEXT_PUBLIC_APP_URL,
+    vercelEnv,
+    vercelUrl: process.env.VERCEL_URL,
+    vercelBranchUrl: process.env.VERCEL_BRANCH_URL,
+  });
 
 /**
  * Validation rule: Check database URL exists
@@ -233,15 +121,8 @@ const checkDatabaseUrl: ValidationRule = ({ server }) => {
 /**
  * Validation rule: Check Stripe secret key format
  */
-const checkStripeSecretFormat: ValidationRule = ({ server }) => {
-  if (server.STRIPE_SECRET_KEY && !server.STRIPE_SECRET_KEY.startsWith('sk_')) {
-    return {
-      type: 'error',
-      message: 'STRIPE_SECRET_KEY should start with sk_',
-    };
-  }
-  return null;
-};
+const checkStripeSecretFormat: ValidationRule = ({ server }) =>
+  checkStripeSecretFormatPolicy(server.STRIPE_SECRET_KEY);
 
 /**
  * Validation rule: Check Stripe publishable key format
@@ -286,27 +167,8 @@ const checkStripePairConsistency: ValidationRule = ({ server }) => {
 /**
  * Validation rule: Check URL encryption key in production/preview
  */
-const checkUrlEncryptionKey: ValidationRule = ({ server, vercelEnv }) => {
-  if (vercelEnv === 'production' || vercelEnv === 'preview') {
-    if (!server.URL_ENCRYPTION_KEY) {
-      return {
-        type: 'critical',
-        message:
-          'URL_ENCRYPTION_KEY is required in production/preview for secure link wrapping. Generate with: openssl rand -base64 32',
-      };
-    }
-    if (
-      server.URL_ENCRYPTION_KEY === 'default-key-change-in-production-32-chars'
-    ) {
-      return {
-        type: 'critical',
-        message:
-          'URL_ENCRYPTION_KEY is using the default value. Generate a secure key with: openssl rand -base64 32',
-      };
-    }
-  }
-  return null;
-};
+const checkUrlEncryptionKey: ValidationRule = ({ server, vercelEnv }) =>
+  checkUrlEncryptionKeyPolicy({ key: server.URL_ENCRYPTION_KEY, vercelEnv });
 
 /**
  * Validation rule: Warn when album art cannot authenticate to the AI Gateway.

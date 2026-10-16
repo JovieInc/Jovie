@@ -43,6 +43,13 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {};
 
 export const WithHeaderAction: Story = {
+  decorators: [
+    Story => (
+      <div className='max-w-sm'>
+        <Story />
+      </div>
+    ),
+  ],
   args: {
     headerAction: (
       <Button variant='secondary' size='sm'>

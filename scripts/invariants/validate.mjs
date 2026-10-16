@@ -115,6 +115,18 @@ process.stdout.write(
   `feedback-linkage-qualification: ${JSON.stringify(auditFeedbackLinkage())}\n`
 );
 
+// JOV-INV-044: failure-isolated shadow diagnostics, never joined to gate errors.
+try {
+  const { planningDiagnostic } = await import('./capability-planning.mjs');
+  process.stdout.write(
+    `capability-planning-qualification: ${JSON.stringify(planningDiagnostic({}))}\n`
+  );
+} catch (error) {
+  process.stdout.write(
+    `capability-planning-qualification: unavailable (nonblocking): ${error.message}\n`
+  );
+}
+
 const ok = errors.length === 0 && result.blockers.length === 0;
 
 if (!ok) {

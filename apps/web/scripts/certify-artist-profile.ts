@@ -39,7 +39,10 @@ function hasCanonicalArtistReturn(html: string, url: string): boolean {
 
 /** JOV-6571 hide rules that have a stable marker in artist-site HTML. */
 export const CANONICAL_DEFERRED_SURFACE_MARKERS = [
-  ['tips', /data-testid=["']tip-(?:button|drawer)["']/],
+  [
+    'tips',
+    /data-testid=["'](?:tip-(?:button|drawer)|pay-trigger|profile-mode-drawer-pay|profile-pay-recipient)["']/,
+  ],
   ['broad_ai', /data-ask-jovie-launcher|["']ask-jovie-(?:panel|trigger)["']/],
   ['operator_controls', /data-testid=["']operator-(?:banner|lists-nav)["']/],
 ] as const;

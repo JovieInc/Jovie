@@ -77,40 +77,38 @@ function description(certificate, key, runUrl) {
         .filter(ref => ref && !isValidRemediationKey(ref))
     ),
   ];
-  const lines = [
-    '## Source',
-    '- Current issue: JOV-6572',
-    `- Source run: ${runUrl || 'unknown'}`,
-    `- Candidate: ${certificate?.candidateId ?? 'unknown'}`,
-    `- Revision: ${certificate?.sourceRevision ?? 'unknown'}`,
-    '',
-    '## Follow-up',
-    `Canonical artist-site certification is red for ${key}.`,
-    '',
-    '## Why it matters',
-    'GREEN is required before a candidate enters the human review/send queue.',
-    '',
-    '## Classification',
-    'Required',
-    '',
-    '## Acceptance criteria',
-    'The next certification of this outbound journey is GREEN for this defect.',
-    '',
-    '## Dependency',
-    'None',
-  ];
+  const extras = [];
   if (related.length > 0)
-    lines.push('', `Related defect: ${related.join(', ')}`);
+    extras.push('', `Related defect: ${related.join(', ')}`);
   if (key === EVIDENCE_INTEGRITY_KEY) {
     for (const failure of certificate?.evidenceIntegrityFailures ?? []) {
-      lines.push(`- ${failure}`);
+      extras.push(`- ${failure}`);
     }
   }
   for (const check of checks) {
-    lines.push(`- ${check.id}: ${check.detail}`);
-    for (const evidence of check.evidence ?? []) lines.push(`  - ${evidence}`);
+    extras.push(`- ${check.id}: ${check.detail}`);
+    for (const evidence of check.evidence ?? []) extras.push(`  - ${evidence}`);
   }
-  return lines.join('\n');
+  return `## Source
+- Current issue: JOV-6572
+- Source run: ${runUrl || 'unknown'}
+- Candidate: ${certificate?.candidateId ?? 'unknown'}
+- Revision: ${certificate?.sourceRevision ?? 'unknown'}
+
+## Follow-up
+Canonical artist-site certification is red for ${key}.
+
+## Why it matters
+GREEN is required before a candidate enters the human review/send queue.
+
+## Classification
+Required
+
+## Acceptance criteria
+The next certification of this outbound journey is GREEN for this defect.
+
+## Dependency
+None${extras.length > 0 ? `\n${extras.join('\n')}` : ''}`;
 }
 
 export async function reportCanonicalArtistSiteCertification(

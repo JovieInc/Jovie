@@ -17,14 +17,19 @@ npx -y @jovie/cli creator lookup https://www.youtube.com/@creator --json
 npx -y @jovie/cli creator lookup youtube:@creator --json   # platform:handle works too
 \`\`\`
 
-Accepts a creator profile URL or \`platform:handle\` (youtube, instagram,
-tiktok, linktree). When Jovie already has a public profile for that channel,
-the result is \`{"exists":true,"username":...,"profileUrl":...}\` and no source
-page is fetched. Otherwise it is \`{"exists":false,"displayName":...,"bio":...,"avatarUrl":...,"links":[...]}\`
-extracted from the source. Instagram, TikTok, and Linktree sources fail with
+Use a YouTube channel URL or \`youtube:handle\` for extraction.
+Instagram, TikTok, and Linktree profile URLs or \`platform:handle\` inputs only
+resolve an existing Jovie profile. When Jovie already has a public profile for
+that channel, the result is \`{"exists":true,"username":...,"profileUrl":...}\`
+and no source page is fetched.
+
+Only YouTube channels support extraction. An unmatched YouTube channel returns
+\`{"exists":false,"displayName":...,"bio":...,"avatarUrl":...,"links":[...]}\`.
+Unmatched Instagram, TikTok, and Linktree inputs fail with
 \`SOURCE_UNSUPPORTED\` because Jovie does not read those pages from its servers;
-ask for the creator's YouTube channel instead. This command is read-only and
-never creates a Jovie profile.
+ask for the creator's YouTube channel instead. Bandcamp and custom websites
+return \`UNSUPPORTED_URL\`. This command is read-only and never creates a Jovie
+profile.
 
 ## Create a profile for an artist
 

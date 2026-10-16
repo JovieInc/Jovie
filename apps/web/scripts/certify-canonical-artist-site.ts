@@ -14,11 +14,14 @@ export interface CanonicalArtistSiteCliOptions {
   readonly runUrl: string;
   readonly goldenPathStatus: string;
   readonly claimContractStatus: string;
+  readonly waitlistStatus: string;
   readonly m2Status: string;
   readonly m2ReceiptPath: string;
   readonly profileStatus: string;
   readonly profileResultPath: string;
   readonly outputPath: string;
+  /** Newest-first SHAs from the certified revision. Empty means equality only. */
+  readonly sourceHistory?: readonly string[];
 }
 
 interface M2Receipt {
@@ -47,12 +50,65 @@ interface ProfileReport {
 }
 
 const REFERENCE_RELEASE_URL = 'https://jov.ie/tim/never-say-a-word';
+const COMMIT_SHA = /^[a-f0-9]{40}$/;
+
+export type DeployedRevisionBinding =
+  | 'same'
+  | 'ancestor'
+  | 'unrelated'
+  | 'unknown';
+
+/** One non-empty line per commit, newest first, as the commits API returns. */
+export function parseSourceHistory(text: string): readonly string[] {
+  return text
+    .split(/\r?\n/)
+    .map(line => line.trim().toLowerCase())
+    .filter(line => line.length > 0);
+}
+
+/**
+ * A live release is bound when it is the certified SHA, or an ancestor of it.
+ * Ancestry counts only when history starts with the certified SHA and later
+ * lists the live SHA. Empty, swapped, or non-SHA history stays unbound.
+ */
+export function classifyDeployedRevision(
+  sourceRevision: string,
+  deployedRevision: string | null | undefined,
+  history: readonly string[]
+): DeployedRevisionBinding {
+  const source = sourceRevision.trim().toLowerCase();
+  const deployed = deployedRevision?.trim().toLowerCase() ?? '';
+  if (!COMMIT_SHA.test(source) || !COMMIT_SHA.test(deployed)) return 'unknown';
+  if (source === deployed) return 'same';
+  const lineage = history.map(entry => entry.trim().toLowerCase());
+  if (lineage[0] === source && lineage.includes(deployed)) return 'ancestor';
+  return 'unrelated';
+}
 
 function required(argv: readonly string[], name: string): string {
   const index = argv.indexOf(name);
   const value = index >= 0 ? argv[index + 1] : undefined;
   if (!value || value.startsWith('--')) throw new Error(`${name} is required`);
   return value;
+}
+
+function optional(argv: readonly string[], name: string): string | undefined {
+  const index = argv.indexOf(name);
+  if (index < 0) return undefined;
+  const value = argv[index + 1];
+  if (!value || value.startsWith('--')) {
+    throw new Error(`${name} requires a value`);
+  }
+  return value;
+}
+
+function loadSourceHistory(path: string | undefined): readonly string[] {
+  if (!path) return [];
+  try {
+    return parseSourceHistory(readFileSync(resolve(path), 'utf8'));
+  } catch {
+    return [];
+  }
 }
 
 function parseOptions(argv: readonly string[]): CanonicalArtistSiteCliOptions {
@@ -63,11 +119,13 @@ function parseOptions(argv: readonly string[]): CanonicalArtistSiteCliOptions {
     runUrl: required(argv, '--run-url'),
     goldenPathStatus: required(argv, '--golden-path-status'),
     claimContractStatus: required(argv, '--claim-contract-status'),
+    waitlistStatus: required(argv, '--waitlist-status'),
     m2Status: required(argv, '--m2-status'),
     m2ReceiptPath: required(argv, '--m2-receipt'),
     profileStatus: required(argv, '--profile-status'),
     profileResultPath: required(argv, '--profile-result'),
     outputPath: required(argv, '--output'),
+    sourceHistory: loadSourceHistory(optional(argv, '--source-history')),
   };
 }
 
@@ -98,7 +156,13 @@ export function certifyCanonicalArtistSite(
   const deployedRevision = profileReport?.snapshot?.releaseSha ?? null;
   const profileHealthy =
     options.profileStatus === 'success' && profile?.failed === false;
-  const revisionBound = deployedRevision === options.sourceRevision;
+  const revisionRelation = classifyDeployedRevision(
+    options.sourceRevision,
+    deployedRevision,
+    options.sourceHistory ?? []
+  );
+  const revisionBound =
+    revisionRelation === 'same' || revisionRelation === 'ancestor';
   const profilePassed = profileHealthy && revisionBound;
   const exposedDeferred = profile?.exposedDeferredSurfaces;
   const boundDefect = (passesIgnoringRevision: boolean) =>
@@ -127,11 +191,13 @@ export function certifyCanonicalArtistSite(
   const claimEvidence = [`${options.runUrl}#premade-claim-contract`];
   const m2Evidence = [`${options.runUrl}#m2-revenue-path`];
   const journeyDetail = goldenPassed
-    ? 'Production build passed the exact prebuilt claim, real-auth, layout, and Stripe journey.'
+    ? 'Production build passed the prebuilt claim, real-auth golden path, start-entry continuity, and Stripe journey.'
     : 'Production-faithful Golden Path did not pass.';
   const revisionDetail = `Live profile revision ${deployedRevision ?? 'unknown'} is not ${options.sourceRevision}.`;
   const profileDetail = profilePassed
-    ? 'Live Tim White profile passed and is bound to this source revision.'
+    ? revisionRelation === 'ancestor'
+      ? `Live Tim White profile passed. Deployed revision ${deployedRevision ?? 'unknown'} is an ancestor of source revision ${options.sourceRevision}.`
+      : 'Live Tim White profile passed and is bound to this source revision.'
     : profileHealthy && !revisionBound
       ? revisionDetail
       : `Live Tim White profile failed or deployed ${deployedRevision ?? 'an unknown revision'} instead of ${options.sourceRevision}.`;
@@ -151,7 +217,7 @@ export function certifyCanonicalArtistSite(
     deferredPassed = true;
     deferredHidden = true;
     deferredDetail =
-      'Scanned markers were absent: tip-button, tip-drawer, ask-jovie launcher, operator-banner, and operator-lists-nav. Deep audience intelligence has no public marker.';
+      'Scanned markers were absent: pay-trigger, profile-mode-drawer-pay, profile-pay-recipient, tip-button, tip-drawer, ask-jovie launcher, operator-banner, and operator-lists-nav. Deep audience intelligence has no public marker.';
   } else if (profileHealthy && !revisionBound) {
     deferredDetail = revisionDetail;
     deferredDefect = 'canonical-artist-site-source-revision';
@@ -184,6 +250,11 @@ export function certifyCanonicalArtistSite(
   const claimOk = goldenPassed && claimContractPassed;
   const claimText = claimOk ? claimDetail : `${journeyDetail} ${claimDetail}`;
   const claimAndJourney = [...goldenEvidence, ...claimEvidence];
+  const waitlistPassed = options.waitlistStatus === 'success';
+  const waitlistDetail = waitlistPassed
+    ? 'Only explicitly admitted artists crossed the waitlist gate.'
+    : 'Waitlist admission did not pass. Unadmitted artists must stay outside the app shell.';
+  const waitlistEvidence = [`${options.runUrl}#waitlist-admission`];
   const profileAndJourney = [...profileEvidence, ...goldenEvidence];
   const identityOk = profilePassed && claimOk;
   const hierarchyOk = profilePassed && goldenPassed;
@@ -225,7 +296,13 @@ export function certifyCanonicalArtistSite(
       deferredDefect,
       deferredHidden
     ),
-    row('waitlist_admission', claimOk, claimText, claimAndJourney),
+    row(
+      'waitlist_admission',
+      waitlistPassed,
+      waitlistDetail,
+      waitlistEvidence,
+      'canonical-artist-site-waitlist-admission'
+    ),
     ...(
       [
         'claim_auth_intent',

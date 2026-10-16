@@ -123,8 +123,7 @@ export async function GET() {
       return NextResponse.json({ entries: [] }, { headers: CACHE_HEADERS });
     }
 
-    const { userId } = billingResult.data;
-    const auditResult = await getBillingAuditLog(userId, 50);
+    const auditResult = await getBillingAuditLog(50);
 
     if (!auditResult.success || !auditResult.data) {
       return NextResponse.json({ entries: [] }, { headers: CACHE_HEADERS });

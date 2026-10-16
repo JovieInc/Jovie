@@ -1,9 +1,9 @@
 import { inArray } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { verifyCronRequest } from '@/lib/cron/auth';
-import { db } from '@/lib/db';
 import { profilePhotos } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
+import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { logger } from '@/lib/utils/logger';
 import {
   buildOrphanedRecordsWhereClause,
@@ -36,19 +36,21 @@ export async function cleanupOrphanedPhotos(): Promise<{
     now.getTime() - UPLOADING_RECORD_MAX_AGE_HOURS * 60 * 60 * 1000
   );
 
-  const orphanedRecords = await db
-    .select({
-      id: profilePhotos.id,
-      status: profilePhotos.status,
-      blobUrl: profilePhotos.blobUrl,
-      smallUrl: profilePhotos.smallUrl,
-      mediumUrl: profilePhotos.mediumUrl,
-      largeUrl: profilePhotos.largeUrl,
-      createdAt: profilePhotos.createdAt,
-    })
-    .from(profilePhotos)
-    .where(buildOrphanedRecordsWhereClause(failedCutoff, stuckCutoff))
-    .limit(100);
+  const orphanedRecords = await withSystemIngestionSession(tx =>
+    tx
+      .select({
+        id: profilePhotos.id,
+        status: profilePhotos.status,
+        blobUrl: profilePhotos.blobUrl,
+        smallUrl: profilePhotos.smallUrl,
+        mediumUrl: profilePhotos.mediumUrl,
+        largeUrl: profilePhotos.largeUrl,
+        createdAt: profilePhotos.createdAt,
+      })
+      .from(profilePhotos)
+      .where(buildOrphanedRecordsWhereClause(failedCutoff, stuckCutoff))
+      .limit(100)
+  );
 
   if (orphanedRecords.length === 0) {
     return { deleted: 0, blobsDeleted: 0 };
@@ -67,7 +69,9 @@ export async function cleanupOrphanedPhotos(): Promise<{
 
   const recordIds = orphanedRecords.map(r => r.id);
   if (recordIds.length > 0) {
-    await db.delete(profilePhotos).where(inArray(profilePhotos.id, recordIds));
+    await withSystemIngestionSession(tx =>
+      tx.delete(profilePhotos).where(inArray(profilePhotos.id, recordIds))
+    );
   }
 
   logger.info(

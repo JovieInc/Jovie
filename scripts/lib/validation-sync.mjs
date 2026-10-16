@@ -6,6 +6,7 @@
  * files. Linear writes go through a port the merge-sync writer supplies.
  */
 
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   mkdirSync,
@@ -16,6 +17,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { uiEvidenceRequirements } from '../invariants/assurance-matrix.mjs';
 import { classifyCiRisk } from './ci-harness.mjs';
 import { evaluateEscapedDefectClosure } from './escaped-defect-closure.mjs';
@@ -57,6 +59,8 @@ const PRODUCTION_VERSION_URL = 'https://jov.ie/api/version';
  *   status: 'verified' | 'pending' | 'unknown',
  *   sha?: string,
  *   detail?: string,
+ *   containsBinding?: boolean,
+ *   previousVerifiedEntry?: boolean,
  * }} DeploymentFact
  * @typedef {{
  *   number: number,
@@ -87,18 +91,97 @@ export async function fetchWithRetry(fetchImpl, ...args) {
   }
 }
 
+/** Do not sleep inside a 15-minute sweep for a reset that is further out. */
+export const RATE_LIMIT_WAIT_CAP_MS = 8_000;
+
+/**
+ * @param {HttpResponse['headers']} headers
+ * @param {number} [now]
+ * @returns {number}
+ */
+export function headerRetryMs(headers, now = Date.now()) {
+  const retry = headers?.get?.('retry-after');
+  if (typeof retry === 'string' && /^\d+(\.\d+)?$/.test(retry.trim())) {
+    return Math.ceil(Number(retry) * 1000);
+  }
+  let best = 0;
+  for (const name of [
+    'x-ratelimit-reset',
+    'x-ratelimit-requests-reset',
+    'x-ratelimit-complexity-reset',
+  ]) {
+    const value = Number(headers?.get?.(name));
+    if (!Number.isFinite(value) || value <= 0) continue;
+    const epochMs = value < 1e11 ? value * 1000 : value;
+    const delta = epochMs - now;
+    if (delta > best) best = delta;
+  }
+  return best;
+}
+
+/**
+ * Wait only when the server named a delay inside the sweep budget. A reset
+ * that is already past the cap means persist the cursor instead of sleeping.
+ *
+ * @param {number} retryAfterMs
+ * @param {number} attempt
+ * @param {number} maxAttempts
+ * @returns {number | null}
+ */
+export function rateLimitWaitMs(retryAfterMs, attempt, maxAttempts) {
+  if (attempt >= maxAttempts) return null;
+  const hinted = Number(retryAfterMs);
+  // A missing reset can use a short backoff. Infinity / a far reset cannot:
+  // the caller persists the cursor instead of sleeping out the hour.
+  if (!Number.isFinite(hinted)) return null;
+  if (hinted > RATE_LIMIT_WAIT_CAP_MS) return null;
+  if (hinted > 0) return hinted;
+  return Math.min(2_000, 2 ** (attempt - 1) * 250);
+}
+
+/**
+ * @param {number | undefined} status
+ * @param {HttpResponse['headers']} headers
+ * @param {any} body
+ * @param {string} [path]
+ */
+export function githubStatusError(status, headers, body, path) {
+  const remaining = headers?.get?.('x-ratelimit-remaining');
+  const message = typeof body?.message === 'string' ? body.message : '';
+  const rateLimited =
+    status === 429 ||
+    ((status === 403 || status === 429) &&
+      (remaining === '0' || /rate limit/i.test(message)));
+  const retryAfterMs = rateLimited ? headerRetryMs(headers) : 0;
+  const forbidden = status === 403 && !rateLimited;
+  const where = path ? ` for ${path}` : '';
+  const detail = message ? `: ${message}` : '';
+  return Object.assign(
+    new Error(`GitHub HTTP ${status ?? 'error'}${where}${detail}`),
+    {
+      rateLimited,
+      forbidden,
+      retryAfterMs:
+        rateLimited && retryAfterMs <= 0
+          ? Number.POSITIVE_INFINITY
+          : retryAfterMs,
+    }
+  );
+}
+
 /**
  * @param {HttpFetch} fetchImpl
  * @param {string} token
  * @returns {GithubGet}
  */
-export function githubClient(fetchImpl, token) {
+export function githubClient(fetchImpl, token, sleep = defaultSleep) {
   return async path => {
     // Bounded retry for transient GitHub upstream failures: a 503 from
     // api.github.com used to fail the whole lifecycle evaluation (JOV-5143,
     // run 37818346153) even though the next sweep would have converged.
-    // Mirrors the Linear retry in linear-sync-on-merge.mjs: 4 attempts,
-    // exponential backoff; persistent errors and 4xx still throw.
+    // A primary quota 403 (remaining 0) is not retried past the sweep budget:
+    // the caller persists the cursor. A single inaccessible pull request is
+    // `forbidden` so the sweep can skip it.
     const maxAttempts = 4;
     /** @type {Error | null} */
     let lastError = null;
@@ -121,29 +204,34 @@ export function githubClient(fetchImpl, token) {
           link: response.headers?.get?.('link') ?? '',
         };
       }
-      lastError = new Error(
-        `GitHub HTTP ${response.status ?? 'error'} for ${path}`
+      const body = await response.json().catch(() => null);
+      lastError = githubStatusError(
+        response.status,
+        response.headers,
+        body,
+        path
       );
-      // An exhausted repo quota fails every later read in this sweep too:
-      // stop and defer the rest, like a Linear rate limit (2026-10-11 20:05Z
-      // turned one quota hit into 137 per-issue failures).
-      if (
-        (response.status === 403 || response.status === 429) &&
-        response.headers?.get?.('x-ratelimit-remaining') === '0'
-      ) {
-        Object.assign(lastError, { rateLimited: true });
-        throw lastError;
-      }
-      const retryable =
-        response.status === 429 ||
-        (typeof response.status === 'number' && response.status >= 500);
-      if (!retryable || attempt === maxAttempts) throw lastError;
-      // Exponential backoff, bounded for the 15-minute sweep budget.
-      const delayMs = Math.min(4_000, 2 ** (attempt - 1) * 250);
-      await new Promise(resolve => setTimeout(resolve, delayMs));
+      const flagged =
+        /** @type {{ rateLimited?: boolean, forbidden?: boolean, retryAfterMs?: number }} */ (
+          lastError
+        );
+      if (flagged.forbidden) throw lastError;
+      const wait = flagged.rateLimited
+        ? rateLimitWaitMs(flagged.retryAfterMs ?? 0, attempt, maxAttempts)
+        : response.status === 429 ||
+            (typeof response.status === 'number' && response.status >= 500)
+          ? Math.min(4_000, 2 ** (attempt - 1) * 250)
+          : null;
+      if (wait == null || attempt === maxAttempts) throw lastError;
+      await sleep(wait);
     }
     throw lastError ?? new Error(`GitHub request failed for ${path}`);
   };
+}
+
+/** @param {number} ms */
+function defaultSleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 const MERGED_PULL = /^repos\/[^/]+\/[^/]+\/pulls\/(\d+)$/;
@@ -151,6 +239,43 @@ const PULL_FILES = /^repos\/[^/]+\/[^/]+\/pulls\/(\d+)\/files\?/;
 const SHA_COMPARE =
   /^repos\/[^/]+\/[^/]+\/compare\/[0-9a-f]{40}\.\.\.[0-9a-f]{40}$/i;
 export const GITHUB_CACHE_KEEP = 4000;
+
+/**
+ * Reuse the release owner's complete byte/producer/attempt classifier.
+ * @param {{ repository: string, sha: string, controllerWorkflowId: number, execute?: (command: string, args: string[], options: { encoding: 'utf8', timeout: number }) => string | Buffer }} input
+ */
+export function inspectVerifiedProductionMarker({
+  repository,
+  sha,
+  controllerWorkflowId,
+  execute = execFileSync,
+}) {
+  const output = execute(
+    process.execPath,
+    [
+      fileURLToPath(
+        new URL(
+          '../../.github/scripts/production-marker-state.mjs',
+          import.meta.url
+        )
+      ),
+      '--repo',
+      repository,
+      '--sha',
+      sha,
+      '--controller-workflow-id',
+      String(controllerWorkflowId),
+    ],
+    { encoding: 'utf8', timeout: 45_000 }
+  );
+  const result = JSON.parse(String(output));
+  if (result?.state === 'verified') return true;
+  if (['none', 'pending', 'recovery_available'].includes(result?.state))
+    return false;
+  throw new Error(
+    `Production marker proof unavailable: ${result?.reason ?? 'malformed classifier output'}`
+  );
+}
 
 /**
  * Reads that can never change, kept across sweeps (actions/cache): a merged
@@ -265,6 +390,7 @@ export function boundGithubCache(dir, keep = GITHUB_CACHE_KEEP) {
  *   readonly github: GithubGet,
  *   readonly repository: string,
  *   readonly versionUrl?: string,
+ *   readonly verifyMarker?: (sha: string, controllerWorkflowId: number) => Promise<boolean> | boolean,
  * }} input
  */
 export function createProductionFacts(input) {
@@ -274,6 +400,7 @@ export function createProductionFacts(input) {
   const ancestry = new Map();
   /** @type {Promise<DeploymentFact> | null} */
   let served = null;
+  let controllerWorkflow = null;
 
   /** @param {string} sha */
   const hasVerifiedMarker = sha => {
@@ -281,24 +408,49 @@ export function createProductionFacts(input) {
     if (!markers.has(key)) {
       markers.set(
         key,
-        input
-          .github(
-            `repos/${input.repository}/actions/artifacts?name=production-generation-verified-${key}&per_page=100`
-          )
-          .then(({ body }) => {
+        (async () => {
+          let candidate = false;
+          for (const name of [
+            `production-generation-verified-${key}`,
+            `production-generation-verified-recovery-${key}`,
+          ]) {
+            const { body } = await input.github(
+              `repos/${input.repository}/actions/artifacts?name=${name}&per_page=100`
+            );
             if (!body || !Array.isArray(body.artifacts)) {
               throw new Error(
                 'GitHub returned malformed Production Verified markers'
               );
             }
-            return body.artifacts.some(
+            candidate ||= body.artifacts.some(
               /** @param {any} artifact */
               artifact =>
                 artifact?.expired === false &&
-                artifact?.name === `production-generation-verified-${key}` &&
+                artifact?.name === name &&
                 artifact?.workflow_run?.head_branch === 'main'
             );
-          })
+          }
+          if (!candidate) return false;
+          controllerWorkflow ??= input
+            .github(
+              `repos/${input.repository}/actions/workflows/production-controller.yml`
+            )
+            .then(({ body }) => {
+              if (!Number.isSafeInteger(body?.id) || body.id <= 0)
+                throw new Error(
+                  'Production controller workflow identity unavailable'
+                );
+              return body.id;
+            });
+          const controllerWorkflowId = await controllerWorkflow;
+          return input.verifyMarker
+            ? input.verifyMarker(key, controllerWorkflowId)
+            : inspectVerifiedProductionMarker({
+                repository: input.repository,
+                sha: key,
+                controllerWorkflowId,
+              });
+        })()
       );
     }
     return /** @type {Promise<boolean>} */ (markers.get(key));
@@ -453,10 +605,23 @@ export async function listMergedLinkedPulls(input) {
   }
   /** @type {MergedPull[]} */
   const merged = [];
+  /** @type {number[]} */
+  const unreadable = [];
   for (const number of selected) {
-    const { body } = await input.github(
-      `repos/${input.repository}/pulls/${number}`
-    );
+    let body;
+    try {
+      ({ body } = await input.github(
+        `repos/${input.repository}/pulls/${number}`
+      ));
+    } catch (error) {
+      // A permission 403 on one pull request must not fail the sweep. A rate
+      // limit still throws so the caller can persist the cursor and resume.
+      if (/** @type {{ forbidden?: boolean }} */ (error)?.forbidden) {
+        unreadable.push(number);
+        continue;
+      }
+      throw error;
+    }
     if (
       typeof body?.merged_at === 'string' &&
       /^[0-9a-f]{40}$/i.test(String(body?.merge_commit_sha ?? '')) &&
@@ -471,6 +636,14 @@ export async function listMergedLinkedPulls(input) {
         mergedAt: body.merged_at,
       });
     }
+  }
+  if (unreadable.length > 0) {
+    throw Object.assign(
+      new Error(
+        `GitHub HTTP 403 for repos/${input.repository}/pulls/${unreadable.join(',')}`
+      ),
+      { unreadable: true, forbidden: true }
+    );
   }
   return merged;
 }
@@ -585,6 +758,8 @@ export function selectStateId(name, states) {
  *   labels: string[],
  *   description: string,
  *   reopenedAfterDone?: boolean,
+ *   receiptNotBefore?: string | null,
+ *   outcomeNotBefore?: string,
  *   state: { id: string, name: string, type: string },
  *   states: { id?: string, name?: string, type?: string }[],
  *   commentRecords: { body: string, createdAt: string }[],
@@ -621,6 +796,36 @@ export function selectStateId(name, states) {
  */
 export async function reconcileValidation(ctx) {
   const { issue } = ctx;
+  // Server time, not producer-provided time, separates acceptance episodes.
+  // Description markers have no individual timestamp and must be re-recorded
+  // as a comment after reopening before they can close the new episode.
+  const cutoff = issue.reopenedAfterDone
+    ? Date.parse(issue.receiptNotBefore ?? '')
+    : -Infinity;
+  const currentComments = issue.commentRecords.filter(
+    comment => Date.parse(comment.createdAt) > cutoff
+  );
+  const outcomeCutoff = Math.max(
+    cutoff,
+    issue.outcomeNotBefore ? Date.parse(issue.outcomeNotBefore) : -Infinity
+  );
+  const recordedReceipts = parseValidationReceipts(
+    currentComments,
+    issue.identifier
+  ).filter(
+    receipt =>
+      receipt.kind !== 'outcome' ||
+      Date.parse(receipt.recordedAt) > outcomeCutoff
+  );
+  const parentOutcome = ctx.parentReason
+    ? recordedReceipts
+        .filter(
+          receipt =>
+            receipt.kind === 'outcome' && /^[0-9a-f]{40}$/.test(receipt.sha)
+        )
+        .sort((a, b) => Date.parse(a.recordedAt) - Date.parse(b.recordedAt))
+        .at(-1)
+    : null;
   const merged = await listMergedLinkedPulls({
     github: ctx.github,
     repository: ctx.repository,
@@ -630,7 +835,8 @@ export async function reconcileValidation(ctx) {
   });
   const escapedDefect = evaluateEscapedDefectClosure({
     ...issue,
-    comments: issue.commentRecords,
+    description: issue.reopenedAfterDone ? '' : issue.description,
+    comments: currentComments,
   });
   const files = await listMergedFiles({
     github: ctx.github,
@@ -644,6 +850,7 @@ export async function reconcileValidation(ctx) {
     parentReason: ctx.parentReason,
     escapedDefect: escapedDefect.applicable,
     uiEvidence: mergedUiEvidence(files, ctx.assuranceMatrix),
+    parentOutcome,
   });
   if (!manifest) {
     ctx.log(
@@ -661,24 +868,67 @@ export async function reconcileValidation(ctx) {
   /** @type {DeploymentFact} */
   let deployment = served;
   if (served.status !== 'unknown' && served.sha) {
-    if (!(await ctx.facts.contains(manifest.bindingSha, served.sha))) {
+    const containsBinding = await ctx.facts.contains(
+      manifest.bindingSha,
+      served.sha
+    );
+    deployment = { ...served, containsBinding };
+    if (!containsBinding) {
       deployment = {
         status: 'pending',
         sha: served.sha,
         detail: `served generation ${served.sha.slice(0, 12)} does not contain the merge yet`,
+        containsBinding: false,
       };
+    }
+  }
+
+  // Retain an established entry during forward marker lag only after
+  // rechecking the prior exact generation. A state name alone is not proof.
+  if (
+    issue.state.name === 'Validating' &&
+    deployment.status === 'pending' &&
+    deployment.containsBinding
+  ) {
+    for (const comment of [...currentComments].reverse()) {
+      if (!/<!--\s*validation-lifecycle:v1\b/.test(comment.body)) continue;
+      const previousSha =
+        /Verified production generation: ([0-9a-f]{40})\./.exec(
+          comment.body
+        )?.[1];
+      if (
+        previousSha &&
+        (await ctx.facts.contains(manifest.bindingSha, previousSha)) &&
+        (await ctx.facts.hasVerifiedMarker(previousSha))
+      ) {
+        deployment = { ...deployment, previousVerifiedEntry: true };
+        break;
+      }
     }
   }
 
   const receipts = [];
   for (const receipt of [
-    ...parseValidationReceipts(issue.commentRecords, issue.identifier),
+    ...recordedReceipts,
     ...tasteReceiptsFromResults(
       issue.description,
-      issue.commentRecords,
-      issue.identifier
+      currentComments,
+      issue.identifier,
+      issue.receiptNotBefore
     ),
   ]) {
+    if (receipt.status === 'invalid') {
+      const bindingTime =
+        merged.find(pull => pull.mergeSha.toLowerCase() === manifest.bindingSha)
+          ?.mergedAt ?? parentOutcome?.recordedAt;
+      receipts.push({
+        ...receipt,
+        containsBinding:
+          Date.parse(receipt.recordedAt) >= Date.parse(bindingTime ?? ''),
+        verifiedArtifact: false,
+      });
+      continue;
+    }
     const containsBinding = await ctx.facts.contains(
       manifest.bindingSha,
       receipt.sha
@@ -810,7 +1060,11 @@ export async function reconcileValidation(ctx) {
  */
 async function fileTasteOrder(ctx, manifest, deploymentSha) {
   const { issue } = ctx;
-  const orderId = tasteOrderId(issue.identifier, manifest.bindingSha);
+  const orderId = tasteOrderId(
+    issue.identifier,
+    manifest.bindingSha,
+    manifest.receiptNotBefore
+  );
   const filed = (/** @type {string} */ body) =>
     readTasteOrders(body, issue.identifier).some(
       entry => entry.order.orderId === orderId
@@ -833,6 +1087,7 @@ async function fileTasteOrder(ctx, manifest, deploymentSha) {
       manifest.required.find(entry => entry.kind === 'founder-taste')?.reason ??
       'a founder taste receipt is required',
     now: (ctx.now ?? (() => new Date()))().toISOString(),
+    episodeStartedAt: manifest.receiptNotBefore,
   });
   const body = `${current.trimEnd()}\n\n### Founder taste (JOV-7759)\n\n${renderTasteOrder(order)}\n`;
   if (!(await ctx.linear.setDescription(issue.id, body))) {

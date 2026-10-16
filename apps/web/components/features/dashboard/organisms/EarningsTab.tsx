@@ -16,6 +16,8 @@ import {
 import Image from 'next/image';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
+import { ContentMetricCardSkeleton } from '@/components/molecules/ContentMetricCardSkeleton';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { DrawerButton } from '@/components/molecules/drawer';
 import { TableEmptyState, UnifiedTable } from '@/components/organisms/table';
@@ -94,46 +96,6 @@ function formatDate(iso: string): string {
 // =============================================================================
 // Sub-components
 // =============================================================================
-
-interface StatCardProps {
-  readonly label: string;
-  readonly value: string;
-  readonly icon: React.ComponentType<{ className?: string }>;
-  readonly iconBg: string;
-  readonly iconColor: string;
-  /** Currency value — redacted when money visibility is off (JOV-6829). */
-  readonly isMoney?: boolean;
-}
-
-const StatCard = memo(function StatCard({
-  label,
-  value,
-  icon: Icon,
-  iconBg,
-  iconColor,
-  isMoney = false,
-}: StatCardProps) {
-  return (
-    <ContentSurfaceCard>
-      <div className='p-2.5'>
-        <div className='flex items-center gap-2'>
-          <div
-            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${iconBg}`}
-            aria-hidden='true'
-          >
-            <Icon className={`h-3.5 w-3.5 ${iconColor}`} />
-          </div>
-          <dt className='text-app font-caption text-secondary-token'>
-            {label}
-          </dt>
-        </div>
-        <dd className='mt-2 text-2xl font-semibold tabular-nums leading-none tracking-[-0.011em] text-primary-token'>
-          {isMoney ? <Money>{value}</Money> : value}
-        </dd>
-      </div>
-    </ContentSurfaceCard>
-  );
-});
 
 // -----------------------------------------------------------------------------
 
@@ -305,43 +267,41 @@ export function EarningsTab() {
       {isEarningsLoading ? (
         <div className='grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2'>
           {[1, 2, 3].map(i => (
-            <ContentSurfaceCard key={i}>
-              <div className='space-y-2 p-2.5'>
-                <div className='flex items-center gap-2'>
-                  <div className='h-7 w-7 rounded-md skeleton' />
-                  <div className='h-3 w-16 rounded-sm skeleton' />
-                </div>
-                <div className='h-7 w-20 rounded-md skeleton' />
-              </div>
-            </ContentSurfaceCard>
+            <ContentMetricCardSkeleton
+              key={i}
+              layout='icon-chip'
+              density='compact'
+              showSubtitle={false}
+            />
           ))}
         </div>
       ) : (
-        <dl className='grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2'>
-          <StatCard
+        <div className='grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2'>
+          <ContentMetricCard
+            layout='icon-chip'
+            density='compact'
             label='Total Revenue'
-            value={formatAmount(stats?.totalRevenueCents ?? 0)}
-            isMoney
+            value={<Money>{formatAmount(stats?.totalRevenueCents ?? 0)}</Money>}
             icon={DollarSign}
-            iconBg='bg-surface-1 border border-subtle'
-            iconColor='text-success'
+            tone='success'
           />
-          <StatCard
+          <ContentMetricCard
+            layout='icon-chip'
+            density='compact'
             label='Tips Received'
             value={String(stats?.totalTips ?? 0)}
             icon={Hash}
-            iconBg='bg-surface-1 border border-subtle'
-            iconColor='text-info'
+            tone='info'
           />
-          <StatCard
+          <ContentMetricCard
+            layout='icon-chip'
+            density='compact'
             label='Average Tip'
-            value={formatAmount(stats?.averageTipCents ?? 0)}
-            isMoney
+            value={<Money>{formatAmount(stats?.averageTipCents ?? 0)}</Money>}
             icon={TrendingUp}
-            iconBg='bg-surface-1 border border-subtle'
-            iconColor='text-accent'
+            tone='accent'
           />
-        </dl>
+        </div>
       )}
 
       {/* ── Tippers Table ──────────────────────────── */}

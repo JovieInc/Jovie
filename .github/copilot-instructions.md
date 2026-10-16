@@ -9,6 +9,9 @@ back; policy belongs in `AGENTS.md`, `canon/`, and `.claude/rules/*`.
 
 ## Non-negotiables
 
+- **Canonical intake**: Linear only. Never create, select, or infer backlog work
+  from GitHub Issues. Fail closed when Linear is unavailable; never fall back to
+  GitHub Issues. See [the Linear ownership contract](../.claude/rules/linear.md).
 - **Branch model:** small PRs from feature branches → `main`, landing through
   the native GitHub merge queue. There is NO `develop`/`preview`/`production`
   branch flow. See `docs/PR_FLOW.md` and `.github/MERGE_QUEUE.md`.

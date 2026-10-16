@@ -390,7 +390,7 @@ describe('Writer-owned PR promotion proof', () => {
 describe('Auto-Ready App-token workflow', () => {
   it('mints a short-lived Jovie App token and never mutates with GITHUB_TOKEN', () => {
     const tokenAction =
-      'actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1';
+      'actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510';
     expect(workflow).toContain(tokenAction);
     expect(workflow).toContain('id: app-token');
     expect(workflow).toContain('app-id: ${{ vars.JOVIE_BOT_APP_ID }}');

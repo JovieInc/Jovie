@@ -8,10 +8,13 @@ import {
   readAgentJson,
   reportAgentFailure,
 } from '@/lib/agent-acquisition/api';
+import {
+  MCP_SUPPORTED_PROTOCOL_VERSIONS,
+  negotiateMcpProtocolVersion,
+} from '@/lib/mcp/protocol';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-const VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26'];
 const messageSchema = z.object({
   jsonrpc: z.literal('2.0'),
   id: z.union([z.string().max(200), z.number().finite()]).optional(),
@@ -36,7 +39,10 @@ export async function POST(request: Request) {
     const blocked = await guardAgentRequest(request);
     if (blocked) return blocked;
     const version = request.headers.get('mcp-protocol-version');
-    if (version && !VERSIONS.includes(version))
+    if (
+      version &&
+      !MCP_SUPPORTED_PROTOCOL_VERSIONS.some(supported => supported === version)
+    )
       return rpcError(-32600, 'Unsupported MCP protocol version');
     const body = await readAgentJson(request);
     if (!body.ok)
@@ -63,11 +69,7 @@ export async function POST(request: Request) {
     const ok = (result: unknown) => agentJson({ jsonrpc: '2.0', id, result });
     if (method === 'initialize')
       return ok({
-        protocolVersion:
-          typeof params?.protocolVersion === 'string' &&
-          VERSIONS.includes(params.protocolVersion)
-            ? params.protocolVersion
-            : VERSIONS[0],
+        protocolVersion: negotiateMcpProtocolVersion(params?.protocolVersion),
         capabilities: { tools: {} },
         serverInfo: { name: 'jovie-artist-drafts', version: '1.0.0' },
         instructions:
