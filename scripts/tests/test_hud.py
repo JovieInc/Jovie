@@ -76,6 +76,8 @@ def model(**overrides) -> dict:
                    "fetchedAt": hud.utcnow().isoformat()},
         "system": {"load1": 1.2, "cores": 16, "diskFreePct": 3.1, "memAvailPct": 80},
     }
+    for account in base["local"]["codex"]["accounts"].values():
+        account["capacityLease"] = {"sources": {"capacity": {"observedAt": hud.utcnow().isoformat()}}}
     base.update(overrides)
     return base
 
@@ -464,8 +466,9 @@ class RenderTest(unittest.TestCase):
 
     def test_unknown_capacity_is_not_colored_healthy(self):
         value = model()
+        value["local"]["doctor"]["at"] = hud.utcnow().isoformat()
         value["local"]["doctor"]["capacity"] = {
-            "schema": "jovie.capacity-horizon/v1", "incidents": [],
+            "schema": "jovie.capacity-horizon/v1", "generatedAt": hud.utcnow().isoformat(), "incidents": [],
             "topBlocker": "capacity source missing",
             "leases": [{"alias": "current-login", "mode": "unknown", "freshness": {"status": "unknown"}}]}
         row = next(row for row in hud.render(value, 160, 45) if "current-login ?" in row)
@@ -510,16 +513,89 @@ class RenderTest(unittest.TestCase):
 
     def test_capacity_horizon_is_show_only_and_renders_source_gaps(self):
         value = model()
+        value["local"]["doctor"]["at"] = hud.utcnow().isoformat()
         value["local"]["doctor"]["capacity"] = {
-            "schema": "jovie.capacity-horizon/v1", "incidents": [], "topBlocker": "drain evidence stale",
+            "schema": "jovie.capacity-horizon/v1", "generatedAt": hud.utcnow().isoformat(),
+            "incidents": [], "topBlocker": "drain evidence stale",
             "leases": [{"alias": "alpha", "usableRemaining": 48, "bankedCount": 2, "mode": "fast",
                         "event": {"label": "natural reset", "countdownSeconds": 600},
                         "forecast": {"projectedUnused": None}, "route": {"selectedJob": "JOV-9"},
                         "freshness": {"status": "stale"}}]}
         text = "\n".join(plain(line) for line in hud.render(value, 160, 45))
         self.assertIn("CAPACITY HORIZON", text)
-        self.assertIn("alpha 48% · banked 2 · natural reset 10m · drain ? @ ? · unused ? · coverage 0 · FAST · JOV-9 · stale", text)
+        self.assertIn("alpha ? · banked ? · natural reset ? · drain ? @ ? · unused ? · coverage ? · UNKNOWN · selection unknown · stale", text)
         self.assertIn("show-only", text)
+
+    def test_capacity_horizon_ages_saved_receipts_and_account_observations(self):
+        now = hud.utcnow()
+        value = model()
+        feed = value["local"]["doctor"]
+        feed["at"] = now.isoformat()
+        feed["capacity"] = {
+            "schema": "jovie.capacity-horizon/v1", "generatedAt": now.isoformat(),
+            "leases": [{"alias": "alpha", "usableRemaining": 48, "bankedCount": 2, "mode": "normal",
+                        "event": {"label": "natural reset", "at": (now + hud.timedelta(seconds=600)).isoformat(),
+                                  "countdownSeconds": 99999},
+                        "forecast": {}, "route": {"selectedJob": "JOV-9"},
+                        "freshness": {"status": "fresh", "observedAt": now.isoformat()}}]}
+        with mock.patch.object(hud, "utcnow", return_value=now + hud.timedelta(seconds=60)):
+            row = next(line for line in hud.render(value, 200, 45) if "alpha 48%" in line)
+        self.assertIn("natural reset 9m", plain(row), "countdown uses the absolute source deadline")
+        self.assertIn(hud.rgb(hud.GREEN, "")[:-4], row)
+        for target, key in ((feed, "at"), (feed["capacity"], "generatedAt")):
+            for stamp in (None, "invalid", now.replace(tzinfo=None).isoformat(),
+                          (now + hud.timedelta(seconds=1)).isoformat(),
+                          (now - hud.timedelta(seconds=271)).isoformat()):
+                with self.subTest(key=key, stamp=stamp), mock.patch.object(hud, "utcnow", return_value=now):
+                    target[key] = stamp
+                    text = "\n".join(plain(line) for line in hud.render(value, 200, 45))
+                    self.assertIn("CAPACITY HORIZON  unknown", text)
+                    self.assertNotIn("alpha 48%", text)
+                    self.assertNotIn("NORMAL", text)
+            target[key] = now.isoformat()
+        freshness = feed["capacity"]["leases"][0]["freshness"]
+        for stamp, expected in ((None, "unknown"), ("invalid", "unknown"),
+                                (now.replace(tzinfo=None).isoformat(), "unknown"),
+                                ((now + hud.timedelta(seconds=61)).isoformat(), "contradictory"),
+                                ((now - hud.timedelta(seconds=7201)).isoformat(), "stale")):
+            with self.subTest(stamp=stamp), mock.patch.object(hud, "utcnow", return_value=now):
+                freshness["observedAt"] = stamp
+                frame = hud.render(value, 200, 45)
+                row = next(line for line in frame if "alpha ?" in line)
+                self.assertIn("UNKNOWN · selection unknown · " + expected, plain(row))
+                self.assertNotIn(hud.rgb(hud.GREEN, "")[:-4], row)
+                self.assertIn("top blocker: capacity source " + expected, "\n".join(plain(line) for line in frame))
+                self.assertNotIn("no material blocker", "\n".join(plain(line) for line in frame))
+
+    def test_capacity_horizon_unknown_deadline_is_not_a_saved_countdown(self):
+        now = hud.utcnow()
+        value = model()
+        value["local"]["doctor"].update(at=now.isoformat(), capacity={
+            "schema": "jovie.capacity-horizon/v1", "generatedAt": now.isoformat(),
+            "leases": [{"alias": "alpha", "mode": "normal", "event": {"countdownSeconds": 600},
+                        "freshness": {"status": "fresh", "observedAt": now.isoformat()}}]})
+        for stamp in (None, "bad", now.replace(tzinfo=None).isoformat()):
+            with self.subTest(stamp=stamp):
+                value["local"]["doctor"]["capacity"]["leases"][0]["event"]["at"] = stamp
+                row = next(plain(line) for line in hud.render(value, 200, 45) if "alpha ?" in line)
+                self.assertIn("source gap ?", row)
+                self.assertNotIn("10m", row)
+
+    def test_missing_horizon_cannot_bypass_account_source_freshness(self):
+        now = hud.utcnow()
+        for capacity in (None, {"schema": "retired-controller/v1"}):
+            for stamp, expected in ((None, "unknown"), ("bad", "unknown"),
+                                    ((now - hud.timedelta(seconds=7201)).isoformat(), "stale"),
+                                    ((now + hud.timedelta(seconds=61)).isoformat(), "contradictory")):
+                with self.subTest(capacity=capacity, stamp=stamp), mock.patch.object(hud, "utcnow", return_value=now):
+                    value = model()
+                    value["local"]["doctor"] = {"capacity": capacity}
+                    account = value["local"]["codex"]["accounts"]["alpha"]
+                    account["capacityLease"] = {"sources": {"capacity": {"observedAt": stamp}}}
+                    row = next(line for line in hud.render(value, 200, 45) if "alpha" in line)
+                    self.assertIn("? alpha capacity " + expected, plain(row))
+                    self.assertNotIn("48%", row)
+                    self.assertNotIn(hud.rgb(hud.GREEN, "")[:-4], row)
 
     def test_pipeline_attention_and_backlog_rows(self):
         value = model()
@@ -602,6 +678,16 @@ class RenderTest(unittest.TestCase):
                                                     "allowed": False, "reason": "over-budget"}}})
         self.assertEqual(hud.pool_hint("codex", value["local"]),
                          "new issues 0 · eligible 8/20 · PRs 14/6 over-budget")
+
+    def test_native_uncapped_pr_budget_is_readable_and_not_a_capacity_limit(self):
+        value = model()
+        value["local"]["doctor"].update(at=hud.utcnow().isoformat(), observed={
+            "poolByProvider": {"codex": 0}, "candidatePoolByProvider": {"codex": 27},
+            "eligiblePoolByProvider": {"codex": 0}, "rejectedByProvider": {"codex": {"sensitive-text": 16}},
+            "newIssueBudgetByProvider": {"codex": hud.lane.read_new_issue_budget("codex", 3)}})
+        hint = hud.pool_hint("codex", value["local"])
+        self.assertEqual(hint, "new issues 0 · eligible 0/27 · PR ceiling none · sensitive-text 16")
+        self.assertNotIn("None", hint)
 
     def test_new_issue_hint_separates_eligibility_budget_and_unknown(self):
         local = {"doctor": {"at": hud.utcnow().isoformat(), "admission": {

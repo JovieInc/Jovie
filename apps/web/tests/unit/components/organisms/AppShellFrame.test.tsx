@@ -195,6 +195,28 @@ describe('AppShellFrame', () => {
     ).toBeTruthy();
   });
 
+  it('drops the frame attribute from a hidden duplicate shell', () => {
+    render(
+      <>
+        <div
+          data-app-shell-frame='true'
+          data-testid='stale-shell-frame'
+          style={{ display: 'none' }}
+        />
+        <AppShellFrame
+          sidebar={<aside>Sidebar</aside>}
+          header={<header>Header</header>}
+          main={<div>Main Content</div>}
+        />
+      </>
+    );
+
+    expect(screen.getByTestId('stale-shell-frame')).not.toHaveAttribute(
+      'data-app-shell-frame'
+    );
+    expect(document.querySelectorAll('[data-app-shell-frame]')).toHaveLength(1);
+  });
+
   it('fills sidebar mount height so footer mt-auto can pin Settings (JOV-3960)', () => {
     render(
       <AppShellFrame

@@ -25,6 +25,10 @@ import {
   triggerNames,
   workflowTriggers,
 } from '../workflow-triggers.mjs';
+import {
+  buildWriterProofReceipt,
+  renderWriterProofReceipt,
+} from '../writer-owned-pr-promotion.mjs';
 
 const repoRoot = resolve(import.meta.dirname, '../../..');
 const fleetScript = readFileSync(
@@ -42,6 +46,25 @@ const workflow = readFileSync(
 
 const head = 'a'.repeat(40);
 const other = 'b'.repeat(40);
+
+function writerBody(
+  prNumber = 18001,
+  headSha = head,
+  writerLogin = 'itstimwhite'
+) {
+  return renderWriterProofReceipt(
+    buildWriterProofReceipt({
+      issueId: 'JOV-8355',
+      prNumber,
+      headSha,
+      writerLogin,
+      requiredTests: 'passed: managed regression tests',
+      reviewSweep: 'complete: review sweep',
+      ticketEvidence: 'attached: issue evidence',
+      prEvidence: 'attached: current-head evidence',
+    })
+  );
+}
 
 function greenChecks(overrides = []) {
   return [
@@ -66,11 +89,32 @@ function draft(overrides = {}) {
     title: 'fix(ci): restore green-source undraft',
     branch: 'cursor/auto-ready-green-drafts-eaa1',
     checks: greenChecks(),
+    authorLogin: 'itstimwhite',
+    body: writerBody(overrides.prNumber ?? 18001),
     ...overrides,
   };
 }
 
 describe('green-source draft classifier', () => {
+  it.each([
+    [
+      'writer-proof-proof-missing',
+      { body: 'Final qualification pending; author still working.' },
+    ],
+    ['writer-proof-head-mismatch', { body: writerBody(18001, other) }],
+    [
+      'writer-proof-writer-mismatch',
+      { body: writerBody(18001, head, 'another-writer') },
+    ],
+    ['writer-proof-pr-number-mismatch', { body: writerBody(18002) }],
+    ['author-unavailable', { authorLogin: undefined }],
+  ])('never treats green checks as writer intent: %s', (reason, overrides) => {
+    expect(classifyGreenSourceDraft(draft(overrides))).toEqual({
+      eligible: false,
+      reason,
+    });
+  });
+
   it('promotes only an open main draft that is CLEAN with required checks SUCCESS', () => {
     expect(classifyGreenSourceDraft(draft())).toEqual({
       eligible: true,
@@ -268,7 +312,7 @@ describe('green-source draft classifier', () => {
 
 describe('green-source controller contract', () => {
   it('undrafts only and never enrolls or enables auto-merge', () => {
-    expect(fleetScript).toContain('gh_retry pr ready "$n" -R "$REPO"');
+    expect(fleetScript).toContain('gh pr ready "$n" -R "$REPO"');
     expect(fleetScript).toContain('auto-ready-green-drafts.mjs');
     expect(fleetScript).toContain('mergeStateStatus');
     expect(fleetScript).toContain('PR Ready');
@@ -281,7 +325,7 @@ describe('green-source controller contract', () => {
 
   it('pins the exact live head and fail-closed restores draft on verification miss', () => {
     expect(fleetScript).toContain('before_mutation="$(read_state "$n"');
-    expect(fleetScript).toContain('gh_retry pr ready "$n" -R "$REPO" --undo');
+    expect(fleetScript).toContain('gh pr ready "$n" -R "$REPO" --undo');
     expect(fleetScript).toContain('17156');
     expect(fleetScript).not.toContain('17453');
     expect(fleetScript).not.toContain('17929');
@@ -289,7 +333,7 @@ describe('green-source controller contract', () => {
       'PROTECTED_PRS="$(node "$CLASSIFY_LIB" protected)"'
     );
     expect(fleetScript.indexOf('before_mutation="$(read_state')).toBeLessThan(
-      fleetScript.indexOf('gh_retry pr ready "$n" -R "$REPO" >/dev/null')
+      fleetScript.indexOf('gh pr ready "$n" -R "$REPO" >/dev/null')
     );
   });
 
@@ -405,7 +449,8 @@ describe('green-source shell controller (fake gh)', () => {
                   headRefOid: head,
                   headRefName: pr.headRefName,
                   baseRefName: pr.baseRefName,
-                  body: '',
+                  body: pr.body ?? writerBody(pr.number),
+                  author: { login: pr.authorLogin ?? 'itstimwhite' },
                   title: pr.title,
                   state: 'OPEN',
                   mergeable: pr.mergeable,
@@ -437,7 +482,19 @@ case "$1 $2" in
   "api graphql")
     n=""
     for a in "$@"; do [[ "$a" == number=* ]] && n="\${a#number=}"; done
-    jq -c --arg n "$n" '.[$n]' "$D/states.json" | emit ;;
+    count=0
+    [[ -f "$D/reads-$n" ]] && count="$(cat "$D/reads-$n")"
+    count=$((count + 1)); echo "$count" > "$D/reads-$n"
+    state="$(jq -c --arg n "$n" '.[$n]' "$D/states.json")"
+    if [[ "$count" -ge 2 && -n "\${STATE_AFTER_FIRST_READ:-}" ]]; then
+      state="$(jq --argjson patch "$STATE_AFTER_FIRST_READ" '.data.repository.pullRequest += $patch' <<<"$state")"
+    fi
+    emit <<<"$state" ;;
+  "pr ready")
+    draft=false
+    [[ " $* " == *" --undo "* ]] && draft=true
+    jq --arg n "$3" --argjson draft "$draft" '.[$n].data.repository.pullRequest.isDraft = $draft' "$D/states.json" > "$D/next.json"
+    mv "$D/next.json" "$D/states.json" ;;
   *)
     if [[ "$1" == "api" && "$2" == repos/*/commits/*/pulls ]]; then
       sha="\${2%/pulls}"; sha="\${sha##*/}"
@@ -461,6 +518,7 @@ esac
             TARGET_PR: '',
             TARGET_HEAD: '',
             GH_RETRY_ATTEMPTS: '1',
+            STATE_AFTER_FIRST_READ: '',
             ...env,
           },
         }
@@ -476,6 +534,52 @@ esac
       rmSync(dir, { recursive: true, force: true });
     }
   }
+
+  it('an active author without proof stays draft despite successful checks', () => {
+    const result = runController(
+      [listed({ body: 'Final qualification pending' })],
+      {
+        TARGET_PR: '20874',
+        TARGET_HEAD: head,
+        MISSED_COHORT: '0',
+        DRY_RUN: '0',
+      }
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('writer-proof-proof-missing');
+    expect(result.calls.some(call => call.startsWith('pr ready'))).toBe(false);
+  });
+
+  it.each([
+    ['a newer head', { headRefOid: other, body: writerBody(20874, other) }],
+    ['withdrawn proof', { body: '' }],
+    ['a different author', { author: { login: 'another-writer' } }],
+  ])('revalidates %s immediately before readiness', (_name, patch) => {
+    const result = runController([listed()], {
+      TARGET_PR: '20874',
+      TARGET_HEAD: head,
+      MISSED_COHORT: '0',
+      DRY_RUN: '0',
+      STATE_AFTER_FIRST_READ: JSON.stringify(patch),
+    });
+    expect(result.status).toBe(0);
+    expect(result.calls.some(call => call.startsWith('pr ready'))).toBe(false);
+  });
+
+  it('a writer-qualified exact current head reaches verified ready without queue writes', () => {
+    const result = runController([listed()], {
+      TARGET_PR: '20874',
+      TARGET_HEAD: head,
+      MISSED_COHORT: '0',
+      DRY_RUN: '0',
+    });
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('marked #20874 ready');
+    expect(
+      result.calls.filter(call => call.startsWith('pr ready'))
+    ).toHaveLength(1);
+    expect(result.calls.some(call => /enqueue|merge/.test(call))).toBe(false);
+  });
 
   it('evaluates the missed cohort instead of crashing in jq (regression)', () => {
     const result = runController([

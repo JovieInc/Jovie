@@ -548,6 +548,34 @@ def repair_hold(pr: dict, held: dict) -> str | None:
     return "held: " + clip(reason, 48)
 
 
+def timestamp_age(stamp, now: datetime) -> float | None:
+    try:
+        return (now - datetime.fromisoformat(stamp.replace("Z", "+00:00"))).total_seconds()
+    except (ValueError, TypeError, AttributeError):
+        return None
+
+
+def capacity_receipt_error(doctor: dict, capacity: dict, now: datetime) -> str | None:
+    # A saved producer verdict cannot outlive the native receipt that carries it.
+    for source, stamp in (("doctor", doctor.get("at")), ("capacity", capacity.get("generatedAt"))):
+        elapsed = timestamp_age(stamp, now)
+        if elapsed is None:
+            return source + " unread"
+        if not 0 <= elapsed <= 3 * REFRESH_REMOTE_S:
+            return source + " stale"
+    return None
+
+
+def capacity_freshness(row: dict, now: datetime) -> str:
+    freshness = row.get("freshness") or {}
+    status = freshness.get("status") or "unknown"
+    if status != "fresh":
+        return status
+    elapsed = timestamp_age(freshness.get("observedAt"), now)
+    # Match capacity_horizon's existing account observation contract; no policy change.
+    return "unknown" if elapsed is None else "contradictory" if elapsed < -60 else "stale" if elapsed > 7200 else "fresh"
+
+
 def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
     now = utcnow()
     local, linear, github, system = model["local"], model["linear"], model["github"], model["system"]
@@ -631,15 +659,22 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
     accounts = local["codex"]
     capacity = (local.get("doctor") or {}).get("capacity")
     if capacity and capacity.get("schema") == "jovie.capacity-horizon/v1":
+        capacity_error = capacity_receipt_error(local["doctor"], capacity, now)
         incidents = capacity.get("incidents") or []
+        leases = [] if capacity_error else capacity.get("leases") or []
+        source_gaps = sorted({capacity_freshness(row, now) for row in leases} - {"fresh"})
         lines.append(pad(rgb(FG, "CAPACITY HORIZON  ", bold=True) +
-                         rgb(RED if incidents else DIM,
-                             f"{len(capacity.get('leases') or [])} leases · {len(incidents)} incident(s) · show-only"), width))
-        for row in (capacity.get("leases") or [])[:4]:
+                         rgb(ORANGE if capacity_error else RED if incidents else DIM,
+                             f"unknown ({capacity_error}) · show-only" if capacity_error else
+                             f"{len(leases)} leases · {len(incidents)} reported incident(s) · show-only"), width))
+        for row in leases[:4]:
+            status = capacity_freshness(row, now)
+            known = status == "fresh"
             remaining = "?" if row.get("usableRemaining") is None else f"{row['usableRemaining']:g}%"
             banked = "?" if row.get("bankedCount") is None else str(row["bankedCount"])
             event = row.get("event") or {}
-            deadline = "?" if event.get("countdownSeconds") is None else dur(event["countdownSeconds"])
+            elapsed = timestamp_age(event.get("at"), now)
+            deadline = "?" if elapsed is None else dur(max(0, int(-elapsed)))
             forecast = row.get("forecast") or {}
             unused = "?" if forecast.get("projectedUnused") is None else f"{forecast['projectedUnused']:g}%"
             drain = forecast.get("completionP50At") or "?"
@@ -647,17 +682,26 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
             route = row.get("route") or {}
             job = route.get("selectedJob") or "no selected job"
             mode = str(row.get("mode") or "unknown").upper()
-            freshness = row.get("freshness") or {}
+            coverage = str(len(forecast.get("qualifiedWork") or []))
+            if not known:
+                remaining = banked = deadline = drain = rate = unused = coverage = "?"
+                mode, job = "UNKNOWN", "selection unknown"
             detail = (f"{row.get('alias', '?')} {remaining} · banked {banked} · {event.get('label', 'source gap')} "
-                      f"{deadline} · drain {drain} @ {rate} · unused {unused} · coverage {len(forecast.get('qualifiedWork') or [])} · {mode} · {job} · {freshness.get('status', 'unknown')}")
-            lines.append(pad("  " + rgb(RED if mode == "EMERGENCY" else GREEN if mode == "NORMAL" and freshness.get("status") == "fresh" else ORANGE, detail), width))
-        blocker = capacity.get("topBlocker") or "no material blocker"
-        lines.append(pad("  " + rgb(RED if incidents else DIM, f"top blocker: {blocker}"), width))
+                      f"{deadline} · drain {drain} @ {rate} · unused {unused} · coverage {coverage} · {mode} · {job} · {status}")
+            lines.append(pad("  " + rgb(RED if mode == "EMERGENCY" else GREEN if mode == "NORMAL" and known else ORANGE, detail), width))
+        blocker = f"unknown ({capacity_error})" if capacity_error else \
+            "capacity source " + ", ".join(source_gaps) if source_gaps else capacity.get("topBlocker") or "no material blocker"
+        lines.append(pad("  " + rgb(ORANGE if capacity_error or source_gaps else RED if incidents else DIM, f"top blocker: {blocker}"), width))
     elif accounts.get("error"):
         lines.append(pad(rgb(FG, "CODEX ACCOUNTS  ", bold=True) + rgb(RED, accounts["error"]), width))
     else:
         parts = []
         for name, row in accounts.get("accounts", {}).items():
+            source = ((row.get("capacityLease") or {}).get("sources") or {}).get("capacity") or {}
+            status = capacity_freshness({"freshness": {"status": "fresh", "observedAt": source.get("observedAt")}}, now)
+            if status != "fresh":
+                parts.append(rgb(ORANGE, f"? {name} capacity {status}" + (" · leased" if row["leased"] else "")))
+                continue
             remaining = "?" if row.get("remainingPercent") is None else f"{row['remainingPercent']}%"
             reset = "?" if row.get("naturalResetInS") is None else dur(row["naturalResetInS"])
             banked = "?" if row.get("bankedResetCount") is None else str(row["bankedResetCount"])
@@ -822,7 +866,7 @@ def pool_hint(name: str, local: dict) -> str:
         elapsed = (utcnow() - stamp).total_seconds()
         if elapsed < 0 or elapsed > 3 * REFRESH_REMOTE_S:
             return "new issues unknown (doctor stale)"
-    except (KeyError, TypeError, ValueError):
+    except (KeyError, TypeError, ValueError, AttributeError):
         return "new issues unknown (doctor unread)"
     if admission.get("error"):
         return "new issues unknown (" + admission["error"] + ")"
@@ -838,7 +882,14 @@ def pool_hint(name: str, local: dict) -> str:
         return "new issues unknown (admission unread)"
     reasons = (admission.get("rejectedByProvider") or {}).get(name) or {}
     distribution = ", ".join(f"{reason} {count}" for reason, count in sorted(reasons.items()))
-    capacity = f"PRs {budget['used']}/{budget['cap']} {budget['reason']}"
+    if budget.get("cap") is None and budget.get("allowed") is True:
+        capacity = "PR ceiling none"
+    elif budget.get("reason") == "provider-disabled":
+        capacity = "provider disabled"
+    else:
+        used = "?" if budget.get("used") is None else budget["used"]
+        cap = "?" if budget.get("cap") is None else budget["cap"]
+        capacity = f"PRs {used}/{cap} {budget['reason']}"
     return f"new issues {qualified} · eligible {eligible}/{candidates} · {capacity}" + (" · " + distribution if distribution else "")
 
 

@@ -131,6 +131,282 @@ function sweep(fetchImpl) {
 }
 
 describe('linear sync on merge', () => {
+  it.each([
+    'reopened episode',
+    'acceptance edit',
+    'new failed receipt',
+    'reopened episode without issue-version change',
+    'acceptance edit without issue-version change',
+    'new failed receipt without issue-version change',
+    'edited receipt without issue-version change',
+    'child reopen without issue-version change',
+    'child delivery without issue-version change',
+  ])('does not close from a changed Linear preimage: %s', async change => {
+    const { world, fetchImpl } = createWorld();
+    const issue = world.issues['JOV-1'];
+    issue.state = 'Validating';
+    issue.description = '- [ ] Verify the actual production outcome';
+    issue.children = [['JOV-2', 'completed', '2026-10-03T11:00:00Z']];
+    issue.comments.push(receiptComment('JOV-1', {}, '2026-10-03T11:30:00Z'));
+    let changed = false;
+    const racing = intercept(fetchImpl, async url => {
+      // The full issue preimage has already been read. Change it while
+      // GitHub facts are collected, before the existing state re-read.
+      if (!changed && url.includes('/pulls/101/files')) {
+        changed = true;
+        if (change.startsWith('reopened episode')) {
+          issue.state = 'Done';
+          issue.history.push({
+            createdAt: '2026-10-03T12:05:00Z',
+            fromState: { type: 'completed' },
+            toState: { type: 'started' },
+          });
+          issue.state = 'Validating';
+        } else if (change.startsWith('acceptance edit')) {
+          issue.description += '\n- [ ] Verify the new acceptance condition';
+        } else if (change.startsWith('child reopen')) {
+          issue.children = [['JOV-2', 'started']];
+        } else if (change.startsWith('edited receipt')) {
+          issue.comments[0].body = receiptComment('JOV-1', {
+            status: 'fail',
+          }).body;
+        } else {
+          issue.comments.push(
+            receiptComment('JOV-1', { status: 'fail' }, '2026-10-03T12:05:00Z')
+          );
+        }
+        if (!change.endsWith('without issue-version change')) {
+          issue.updatedAt = '2026-10-03T12:05:00Z';
+        }
+      }
+      return null;
+    });
+    const result = await mergeEvent(racing, 101);
+    expect(changed).toBe(true);
+    expect(result.action).toBe('skip');
+    expect(result.results).toEqual([
+      expect.objectContaining({ action: 'skip', target: null, comment: '' }),
+    ]);
+    expect(world.updates).toEqual([]);
+    expect(world.comments).toEqual([]);
+    expect(issue.state).toBe('Validating');
+  });
+
+  it('closes from a stable server preimage after the immediate state re-read', async () => {
+    const { world, fetchImpl } = createWorld();
+    world.issues['JOV-1'].state = 'Validating';
+    const queries = [];
+    const observed = intercept(fetchImpl, async (_url, body) => {
+      if (body?.query) queries.push(body.query);
+      return null;
+    });
+    expect((await mergeEvent(observed, 101)).action).toBe('moved');
+    expect(world.updates).toEqual(['JOV-1:Done']);
+    expect(queries.find(query => query.includes('IssueLifecycle('))).toContain(
+      'updatedAt'
+    );
+    const write = queries.findIndex(query =>
+      query.includes('SetLifecycleState')
+    );
+    expect(queries[write - 1]).toContain('IssueLifecycle(');
+    expect(queries[write - 1]).toContain('updatedAt');
+  });
+
+  it.each([
+    ['snapshot', undefined],
+    ['snapshot', 'not-a-server-time'],
+    ['prewrite', undefined],
+    ['prewrite', 'not-a-server-time'],
+  ])('fails closed on an unreadable %s version (%s)', async (stage, value) => {
+    const { world, fetchImpl } = createWorld();
+    let reads = 0;
+    const unreadable = intercept(fetchImpl, async (_url, body, next) => {
+      if (!body?.query?.includes('IssueLifecycle(')) return null;
+      reads += 1;
+      if (reads !== (stage === 'snapshot' ? 1 : 2)) return null;
+      const response = await (await next()).json();
+      response.data.issue.updatedAt = value;
+      return json(response);
+    });
+    await expect(mergeEvent(unreadable, 101)).rejects.toThrow(
+      /unreadable lifecycle preimage/i
+    );
+    expect(world.updates).toEqual([]);
+    expect(world.comments).toEqual([]);
+  });
+
+  it.each(['receipt comment', 'child reopen'])(
+    'detects a changed %s on a later prewrite page with the same issue version',
+    async changed => {
+      const { world, fetchImpl } = createWorld();
+      const issue = world.issues['JOV-1'];
+      issue.state = 'Validating';
+      issue.children = [
+        ['JOV-2', 'completed', '2026-10-03T11:00:00Z'],
+        ['JOV-3', 'completed', '2026-10-03T11:00:00Z'],
+      ];
+      issue.comments.push(
+        { body: 'Earlier owner note', createdAt: '2026-10-03T11:00:00Z' },
+        receiptComment('JOV-1', {}, '2026-10-03T11:30:00Z')
+      );
+      let reads = 0;
+      let pages = 0;
+      let remainder;
+      const paged = intercept(fetchImpl, async (_url, body, next) => {
+        if (body?.query?.includes('IssueLifecycle(')) {
+          reads += 1;
+          if (reads !== 2) return null;
+          const response = await (await next()).json();
+          const key = changed === 'receipt comment' ? 'comments' : 'children';
+          const nodes = response.data.issue[key].nodes;
+          remainder = nodes.slice(1).map(node =>
+            changed === 'receipt comment'
+              ? {
+                  ...node,
+                  body: receiptComment('JOV-1', { status: 'fail' }).body,
+                }
+              : { ...node, state: { type: 'started' }, completedAt: null }
+          );
+          response.data.issue[key] = {
+            nodes: nodes.slice(0, 1),
+            pageInfo: { hasNextPage: true, endCursor: 'prewrite-page' },
+          };
+          return json(response);
+        }
+        const query =
+          changed === 'receipt comment'
+            ? 'IssueLifecycleComments'
+            : 'IssueLifecycleChildren';
+        if (!body?.query?.includes(query)) return null;
+        pages += 1;
+        const key = changed === 'receipt comment' ? 'comments' : 'children';
+        return json({
+          data: {
+            issue: {
+              [key]: {
+                nodes: remainder,
+                pageInfo: { hasNextPage: false },
+              },
+            },
+          },
+        });
+      });
+      expect((await mergeEvent(paged, 101)).action).toBe('skip');
+      expect(reads).toBe(2);
+      expect(pages).toBe(1);
+      expect(world.updates).toEqual([]);
+      expect(world.comments).toEqual([]);
+      expect(issue.state).toBe('Validating');
+    }
+  );
+
+  it.each(['missing issue', 'missing comments', 'unreadable comment page'])(
+    'fails closed on an unreadable current preimage: %s',
+    async failure => {
+      const { world, fetchImpl } = createWorld();
+      let reads = 0;
+      const unreadable = intercept(fetchImpl, async (_url, body, next) => {
+        if (body?.query?.includes('IssueLifecycleComments')) {
+          return json({ data: {} });
+        }
+        if (!body?.query?.includes('IssueLifecycle(')) return null;
+        reads += 1;
+        if (reads !== 2) return null;
+        const response = await (await next()).json();
+        if (failure === 'missing issue') response.data.issue = null;
+        else if (failure === 'missing comments')
+          delete response.data.issue.comments;
+        else
+          response.data.issue.comments = {
+            nodes: [],
+            pageInfo: { hasNextPage: true, endCursor: 'unreadable' },
+          };
+        return json(response);
+      });
+      await expect(mergeEvent(unreadable, 101)).rejects.toThrow(
+        /unreadable lifecycle preimage/i
+      );
+      expect(world.updates).toEqual([]);
+      expect(world.comments).toEqual([]);
+    }
+  );
+
+  it('accepts the same semantic preimage in a different server list order', async () => {
+    const { world, fetchImpl } = createWorld();
+    const issue = world.issues['JOV-1'];
+    issue.state = 'Validating';
+    issue.labels = ['label-a', 'label-b'];
+    issue.children = [
+      ['JOV-2', 'completed', '2026-10-03T11:00:00Z'],
+      ['JOV-3', 'completed', '2026-10-03T11:00:00Z'],
+    ];
+    issue.comments.push(
+      { body: 'Earlier note', createdAt: '2026-10-03T11:00:00Z' },
+      receiptComment('JOV-1', {}, '2026-10-03T11:30:00Z')
+    );
+    let reads = 0;
+    const reordered = intercept(fetchImpl, async (_url, body, next) => {
+      if (!body?.query?.includes('IssueLifecycle(')) return null;
+      reads += 1;
+      if (reads !== 2) return null;
+      const response = await (await next()).json();
+      for (const key of ['labels', 'children', 'comments']) {
+        response.data.issue[key].nodes = [
+          ...response.data.issue[key].nodes,
+        ].reverse();
+      }
+      response.data.issue.team.states.nodes = [
+        ...response.data.issue.team.states.nodes,
+      ].reverse();
+      return json(response);
+    });
+    expect((await mergeEvent(reordered, 101)).action).toBe('moved');
+    expect(world.updates).toEqual(['JOV-1:Done']);
+  });
+
+  it('preserves receipt order when fail and pass share the same server timestamp', async () => {
+    const { world, fetchImpl } = createWorld();
+    const issue = world.issues['JOV-1'];
+    issue.state = 'Validating';
+    issue.description = '- [ ] Production outcome required';
+    issue.comments.push(
+      receiptComment('JOV-1', { status: 'fail' }, '2026-10-03T11:30:00Z'),
+      receiptComment('JOV-1', { status: 'pass' }, '2026-10-03T11:30:00Z')
+    );
+    let reads = 0;
+    const reversed = intercept(fetchImpl, async (_url, body, next) => {
+      if (!body?.query?.includes('IssueLifecycle(')) return null;
+      reads += 1;
+      if (reads !== 2) return null;
+      const response = await (await next()).json();
+      response.data.issue.comments.nodes = [
+        ...response.data.issue.comments.nodes,
+      ].reverse();
+      return json(response);
+    });
+    // The old snapshot selects pass; the current equal-time order selects
+    // fail. The preimage guard must defer instead of writing the old Done.
+    expect((await mergeEvent(reversed, 101)).action).toBe('skip');
+    expect(reads).toBe(2);
+    expect(world.updates).toEqual([]);
+    expect(world.comments).toEqual([]);
+    expect(issue.state).toBe('Validating');
+  });
+
+  it('does not add a complete preimage re-read for a kept issue', async () => {
+    const { world, fetchImpl } = createWorld();
+    world.issues['JOV-1'].state = 'Validating';
+    world.issues['JOV-1'].description = '- [ ] Outcome still required';
+    let reads = 0;
+    const counted = intercept(fetchImpl, async (_url, body) => {
+      if (body?.query?.includes('IssueLifecycle(')) reads += 1;
+      return null;
+    });
+    expect((await mergeEvent(counted, 101)).action).toBe('kept');
+    expect(reads).toBe(1);
+    expect(world.updates).toEqual([]);
+  });
+
   it.each(['completed', 'canceled'])(
     'holds unknown %s child delivery timestamps',
     async type => {
@@ -265,6 +541,40 @@ describe('linear sync on merge', () => {
     expect(issue.state).toBe('Done');
     expect(world.updates).toEqual(['JOV-1:Done']);
     expect(issue.comments.at(-1).body).toContain('Binding outcome:');
+  });
+
+  it('does not bind a parent to an old-episode outcome arriving after its reopen', async () => {
+    const { world, fetchImpl } = createWorld();
+    const issue = world.issues['JOV-1'];
+    issue.state = 'In Progress';
+    issue.attachments = [];
+    issue.children = [['JOV-2', 'completed', '2026-10-03T13:00:00Z']];
+    issue.history = [
+      {
+        createdAt: '2026-10-03T14:00:00Z',
+        fromState: { type: 'completed' },
+        toState: { type: 'started' },
+      },
+    ];
+    issue.comments.push(
+      receiptComment(
+        'JOV-1',
+        { episodeStartedAt: null },
+        '2026-10-03T15:00:00Z'
+      )
+    );
+    await sweep(fetchImpl);
+    expect(issue.state).toBe('In Progress');
+    expect(world.updates).toEqual([]);
+    issue.comments.push(
+      receiptComment(
+        'JOV-1',
+        { episodeStartedAt: '2026-10-03T10:00:00-04:00' },
+        '2026-10-03T16:00:00Z'
+      )
+    );
+    await sweep(fetchImpl);
+    expect(issue.state).toBe('Done');
   });
 
   it('does not let an ordinary unmerged issue use a recorded outcome to bypass source delivery', async () => {
@@ -1220,6 +1530,73 @@ describe('linear sync on merge', () => {
     await expect(
       recordValidationReceipt(['--issue', 'JOV-1'], { env })
     ).rejects.toThrow(/kind must be/);
+  });
+
+  it.each(['null', '2026-10-03T08:00:00-04:00'])(
+    'records an explicit CLI acceptance episode %s',
+    async episode => {
+      const body = await recordValidationReceipt(
+        [
+          '--issue',
+          'JOV-1',
+          '--kind',
+          'outcome',
+          '--status',
+          'fail',
+          '--sha',
+          MAIN[2],
+          '--evidence',
+          'https://example.test/event/1',
+          '--episode-started-at',
+          episode,
+        ],
+        {
+          env: { LINEAR_API_KEY: 'fixture' },
+          fetchImpl: async () =>
+            json({
+              data: {
+                issue: { id: 'uuid-1' },
+                commentCreate: { success: true },
+              },
+            }),
+        }
+      );
+      expect(body).toContain(
+        `"episodeStartedAt":${JSON.stringify(
+          episode === 'null' ? null : '2026-10-03T12:00:00.000Z'
+        )}`
+      );
+    }
+  );
+
+  it('rejects a malformed CLI episode before any external request', async () => {
+    let requested = false;
+    await expect(
+      recordValidationReceipt(
+        [
+          '--issue',
+          'JOV-1',
+          '--kind',
+          'outcome',
+          '--status',
+          'pass',
+          '--sha',
+          MAIN[2],
+          '--evidence',
+          'https://example.test/event/1',
+          '--episode-started-at',
+          'bad',
+        ],
+        {
+          env: { LINEAR_API_KEY: 'fixture' },
+          fetchImpl: async () => {
+            requested = true;
+            return json({ data: {} });
+          },
+        }
+      )
+    ).rejects.toThrow(/episode/);
+    expect(requested).toBe(false);
   });
 
   it('delegates every lifecycle event to the script with its dependencies', () => {

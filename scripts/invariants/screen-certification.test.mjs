@@ -400,10 +400,15 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       kindOf('apps/web/app/(dynamic)/start/layout.tsx'),
       'registered'
     );
+    assert.equal(
+      kindOf('apps/web/app/(dynamic)/start/loading.tsx'),
+      'registered'
+    );
     assert.equal(kindOf('apps/web/app/[username]/layout.tsx'), 'registered');
     const result = evaluateChangedScreens({
       changedFiles: [
         { path: 'apps/web/app/(dynamic)/start/layout.tsx', status: 'M' },
+        { path: 'apps/web/app/(dynamic)/start/loading.tsx', status: 'M' },
         { path: 'apps/web/app/[username]/layout.tsx', status: 'M' },
       ],
       headSha: HEAD,
@@ -4277,7 +4282,6 @@ describe('JOV-INV-018 screen-certification/v2', () => {
 
   it('rejects unregistered visible boundary, desktop renderer, and iOS screen paths', () => {
     const paths = [
-      'apps/web/app/(dynamic)/start/loading.tsx',
       'apps/web/app/billing/success/error.tsx',
       'apps/web/app/billing/success/not-found.tsx',
       'apps/desktop/src/renderer/App.tsx',
