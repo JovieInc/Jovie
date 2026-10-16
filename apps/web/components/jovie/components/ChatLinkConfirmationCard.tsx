@@ -1,10 +1,6 @@
 'use client';
 
 import { Button } from '@jovie/ui/atoms/button';
-import {
-  resolveTaskPersistence,
-  type TaskState,
-} from '@jovie/ui/lib/task-persistence';
 import { Check, Loader2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { usePreviewPanelContext } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
@@ -14,6 +10,10 @@ import {
   isProposalDismissed,
   undismissProposal,
 } from '@/lib/chat/proposal-dismiss-ledger';
+import {
+  resolveTaskPersistence,
+  type TaskState,
+} from '@/lib/chat/task-persistence';
 import { FetchError } from '@/lib/queries/fetch';
 import { useConfirmChatLinkMutation } from '@/lib/queries/useConfirmChatLinkMutation';
 import { cn } from '@/lib/utils';

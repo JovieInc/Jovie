@@ -7,9 +7,9 @@
  * by the AI chat assistant.
  */
 
-import type { TaskPersistenceReceipt } from '@jovie/ui/lib/task-persistence';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
+import type { TaskPersistenceReceipt } from '../chat/task-persistence';
 import { createMutationFn } from './fetch';
 import { queryKeys } from './keys';
 import { handleMutationError } from './mutation-utils';

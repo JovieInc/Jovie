@@ -14,10 +14,10 @@ area. Dedicated Work/library/table views remain. Account scope, task identity,
 draft, selection and composer survive temporary task transitions. Product
 taxonomy, navigation, data, permissions and native titlebars stay product-owned.
 
-The shared `@jovie/ui/lib/task-persistence` contract is presentation only. It
-does not accept generated code, URLs, components, actions or authority. Domain
-adapters validate complete receipts before passing them to presentation. Partial
-tool streams and successful proposal generation never acknowledge a mutation.
+The chat helper `lib/chat/task-persistence` is presentation only. It does not
+accept generated code, URLs, components, actions or authority. Domain adapters
+validate complete receipts before passing them to presentation. Partial tool
+streams and successful proposal generation never acknowledge a mutation.
 Voice, touch and keyboard must dispatch the same validated domain action.
 
 ## State and acknowledgement

@@ -19,12 +19,6 @@ import { surfaces, typography } from '@jovie/ui';
 
 The package is barrel-exported from `index.ts`. Sub-paths (`@jovie/ui/atoms/*`, `@jovie/ui/theme/*`) are also valid for tree-shake-sensitive code.
 
-`@jovie/ui/lib/task-persistence` distinguishes local and remote task receipts
-for a scoped request. Domain adapters retain authorization and persistence;
-the helper adds no store or action runtime. See the
-[adaptive task contract](../../docs/design-system/adaptive-task-contract.md)
-for the first consumer, ownership boundaries and qualification limits.
-
 ## Atoms
 
 Form: `Button` · `Input` · `InputGroup` · `Textarea` · `Checkbox` · `Switch` · `RadioGroup` · `Select` · `Field` · `Form` · `Label`
