@@ -1,10 +1,29 @@
 import { spawnSync } from 'node:child_process';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { existsSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 
-const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..');
-const BIOME_BIN = join(REPO_ROOT, 'node_modules/.bin/biome');
 const MANIFEST_STDIN_PATH = 'apps/web/screenshot-catalog/current/manifest.json';
+
+// Playwright loads this module from catalog.spec.ts as CommonJS. `import.meta`
+// makes that loader emit an ESM wrapper that throws `exports is not defined`
+// before Generate's catalog step can run.
+function repoRootFrom(start: string): string {
+  let dir = resolve(start);
+  for (let depth = 0; depth < 8; depth += 1) {
+    if (
+      existsSync(join(dir, 'biome.json')) &&
+      existsSync(join(dir, 'pnpm-workspace.yaml'))
+    ) {
+      return dir;
+    }
+    const parent = resolve(dir, '..');
+    if (parent === dir) break;
+    dir = parent;
+  }
+  throw new Error(
+    'screenshot catalog manifest formatter could not find the repo root'
+  );
+}
 
 /**
  * Serialize a screenshot catalog manifest the way Source Validation formats
@@ -13,12 +32,13 @@ const MANIFEST_STDIN_PATH = 'apps/web/screenshot-catalog/current/manifest.json';
  * biome-clean.
  */
 export function formatScreenshotCatalogManifest(value: unknown): string {
+  const repoRoot = repoRootFrom(process.cwd());
   const raw = `${JSON.stringify(value, null, 2)}\n`;
   const result = spawnSync(
-    BIOME_BIN,
+    join(repoRoot, 'node_modules/.bin/biome'),
     ['format', '--stdin-file-path', MANIFEST_STDIN_PATH],
     {
-      cwd: REPO_ROOT,
+      cwd: repoRoot,
       encoding: 'utf8',
       input: raw,
     }

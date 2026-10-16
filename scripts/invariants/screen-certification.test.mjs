@@ -1471,9 +1471,54 @@ describe('JOV-INV-018 screen-certification/v2', () => {
         marketing.receipt.changedScreens.map(screen => screen.id).toSorted(),
         ['web.artists', 'web.homepage']
       );
+      // Run 38909991473 applied the marketing zip (12049743189) to
+      // web.onboarding-checkout on every invocation because checkout
+      // sources had changed. SCREEN_CERT_ARTIFACT_ID above is that zip.
+      // Checkout keeps its dedicated producer artifact; homepage still
+      // uses the marketing zip.
+      const checkout = runScreenCertification({
+        headSha: head,
+        changedFiles: [
+          'apps/web/app/onboarding/checkout/page.tsx',
+          'apps/web/app/(home)/page.tsx',
+        ],
+        targetScreenIds: ['web.onboarding-checkout'],
+        proofRequests: [
+          {
+            artifactId: 12050661649,
+            screenId: 'web.onboarding-checkout',
+          },
+        ],
+      });
+      const checkoutIssues = checkout.receipt.issues.join('\n');
+      assert.match(
+        checkoutIssues,
+        /web\.onboarding-checkout: trusted producer artifact 12050661649 is not acceptable/
+      );
+      assert.equal(
+        checkoutIssues.includes(
+          'web.onboarding-checkout: trusted producer artifact 12049160869'
+        ),
+        false,
+        checkoutIssues
+      );
+      assert.equal(
+        checkoutIssues.includes('no registered marketing route binding'),
+        false,
+        checkoutIssues
+      );
+      assert.match(
+        checkoutIssues,
+        /web\.homepage: trusted producer artifact 12049160869 is not acceptable/
+      );
+      assert.deepEqual(
+        checkout.receipt.changedScreens.map(screen => screen.id).toSorted(),
+        ['web.homepage', 'web.onboarding-checkout']
+      );
     } finally {
       process.env.PATH = priorPath;
-      if (priorArtifact === undefined) delete process.env.SCREEN_CERT_ARTIFACT_ID;
+      if (priorArtifact === undefined)
+        delete process.env.SCREEN_CERT_ARTIFACT_ID;
       else process.env.SCREEN_CERT_ARTIFACT_ID = priorArtifact;
       if (priorName === undefined)
         delete process.env.SCREEN_CERT_MARKETING_ARTIFACT;

@@ -43,4 +43,16 @@ describe('formatScreenshotCatalogManifest', () => {
     expect(writer).toContain('formatScreenshotCatalogManifest(orderedEntries)');
     expect(writer).not.toContain('JSON.stringify(orderedEntries, null, 2)');
   });
+
+  it('stays free of import.meta so Playwright can load it as CommonJS', () => {
+    const source = readFileSync(
+      join(REPO_ROOT, 'apps/web/scripts/format-screenshot-catalog-manifest.ts'),
+      'utf8'
+    );
+    const executable = source
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/.*$/gm, '');
+    expect(executable).not.toContain('import.meta');
+    expect(executable).not.toContain('fileURLToPath');
+  });
 });
