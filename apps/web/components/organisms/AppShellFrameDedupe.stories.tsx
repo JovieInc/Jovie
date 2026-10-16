@@ -15,7 +15,7 @@ type Story = StoryObj<typeof meta>;
 
 export const HiddenDuplicate: Story = {
   render: () => (
-    <div className='min-h-40 bg-(--linear-bg-page) p-4 text-sm'>
+    <div className='min-h-40 bg-surface-0 p-4 text-sm'>
       <AppShellFrameDedupe />
       <div data-app-shell-frame='true' style={{ display: 'none' }}>
         Retained shell
@@ -29,7 +29,7 @@ export const HiddenDuplicate: Story = {
 
 export const SingleFrame: Story = {
   render: () => (
-    <div className='min-h-40 bg-(--linear-bg-page) p-4 text-sm'>
+    <div className='min-h-40 bg-surface-0 p-4 text-sm'>
       <AppShellFrameDedupe />
       <div data-app-shell-frame='true' className='h-24 w-full p-3'>
         A lone frame keeps data-app-shell-frame.
