@@ -56,8 +56,13 @@ on:
 permissions: {}
 
 concurrency:
+  # One publisher per commit. A second workflow_run for the same SHA queues
+  # here instead of spending another installation REST budget in parallel.
   # Never cancel in-flight notarization or a partially uploaded release.
-  group: desktop-release-publisher
+  # A superseded observer that exits before publish does not own the SHA;
+  # the matching generation still publishes, and already_released skips a
+  # second publish after the first one is proven.
+  group: desktop-release-publisher-${{ github.event.workflow_run.head_sha || github.sha }}
   cancel-in-progress: false
 
 jobs:

@@ -120,8 +120,20 @@ describe('credential-free artist-profile catalog', () => {
       }
     }
     expect(JSON.stringify(catalog)).not.toMatch(
-      /supportEmail|tokenHandler|providerAccountId|accessToken|refreshToken/
+      /recipient|supportEmail|tokenHandler|providerAccountId|accessToken|refreshToken/
     );
+    const submission = catalog.destinations.find(item => item.id === 'spotify')
+      ?.fields[0].submission;
+    expect(submission).toMatchObject({
+      operation: 'email-submission',
+      available: false,
+      preview: 'required',
+      confirmation: 'destination_field_value',
+      maxBioLength: 1500,
+      rollback: 'manual',
+      evidence: { freshness: 'missing' },
+    });
+    expect(submission?.blockingReason).toBeTruthy();
     expect(getEnabledBioProviders()).toEqual([]);
     expect(getBioProvider('spotify')).toMatchObject({
       enabled: false,

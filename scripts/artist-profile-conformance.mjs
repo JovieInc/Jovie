@@ -16,6 +16,7 @@ const DSP_CATALOG = `${LIB}connectors/dsp-profile-catalog.ts`;
 const INGESTION = `${LIB}ingestion/strategies/`;
 const CORE = new Set([
   `${LIB}connectors/profile-writes/contract.ts`,
+  `${LIB}connectors/profile-writes/destinations.ts`,
   `${LIB}connectors/profile-writes/manifest.ts`,
   `${LIB}connectors/profile-writes/service.ts`,
 ]);
@@ -82,7 +83,11 @@ export function checkArtistProfileConformance(sources) {
   };
   const dspTree = parse(DSP, sources.get(DSP) ?? '');
   const dsp = declaration(dspTree, 'DSP_BIO_PROVIDERS');
-  if (!dsp && !sources.get(DSP)?.includes('Object.values(DSP_PROFILE_CATALOG)'))
+  if (
+    !dsp &&
+    !sources.get(DSP)?.includes('Object.values(DSP_PROFILE_CATALOG)') &&
+    !sources.get(DSP)?.includes('Object.entries(PROFILE_DESTINATION_REGISTRY)')
+  )
     errors.push(`${DSP}: missing DSP transport inventory`);
   const dspCatalogTree = parse(DSP_CATALOG, sources.get(DSP_CATALOG) ?? '');
   const dspCatalog = declaration(dspCatalogTree, 'DSP_PROFILE_CATALOG');
@@ -185,20 +190,29 @@ export function checkArtistProfileConformance(sources) {
       if (
         ts.isImportDeclaration(node) &&
         ts.isStringLiteral(node.moduleSpecifier) &&
-        /(?:profile-writes\/manifest|\.\/manifest)$/.test(
+        /(?:profile-writes\/(?:manifest|destinations)|\.\/(?:manifest|destinations))$/.test(
           node.moduleSpecifier.text
         )
       ) {
         const bindings = node.importClause?.namedBindings;
         if (bindings && ts.isNamedImports(bindings))
           factoryImported ||= bindings.elements.some(
-            e => e.name.text === 'getProfileWriteManifest' && !e.propertyName
+            e =>
+              ['getProfileWriteManifest', 'getBioSubmissionManifest'].includes(
+                e.name.text
+              ) && !e.propertyName
           );
       }
-      if (!ts.isPropertyAssignment(node) && !ts.isPropertyDeclaration(node))
+      if (
+        !ts.isPropertyAssignment(node) &&
+        !ts.isPropertyDeclaration(node) &&
+        !ts.isGetAccessorDeclaration(node)
+      )
         return;
       const name = node.name.getText(tree).replace(/['"]/g, '');
-      let value = node.initializer;
+      let value = ts.isGetAccessorDeclaration(node)
+        ? node.body?.statements.find(ts.isReturnStatement)?.expression
+        : node.initializer;
       if (!value) return;
       while (
         ts.isAsExpression(value) ||
@@ -246,14 +260,22 @@ export function checkArtistProfileConformance(sources) {
       if (adapter && name === 'manifest') {
         if (
           !ts.isCallExpression(value) ||
-          value.expression.getText(tree) !== 'getProfileWriteManifest' ||
-          value.arguments.length !== 1 ||
-          !ts.isStringLiteral(value.arguments[0])
+          !['getProfileWriteManifest', 'getBioSubmissionManifest'].includes(
+            value.expression.getText(tree)
+          ) ||
+          value.arguments.length !== 1
         )
           errors.push(
             `${path}: adapter manifest must select getProfileWriteManifest(destination)`
           );
-        else requireManifest(value.arguments[0].text, 'connector', path);
+        else if (ts.isStringLiteral(value.arguments[0]))
+          requireManifest(
+            value.arguments[0].text,
+            value.expression.getText(tree) === 'getBioSubmissionManifest'
+              ? 'dsp_bio'
+              : 'connector',
+            path
+          );
       }
     });
     if (adapter && !factoryImported)

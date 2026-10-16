@@ -21,7 +21,13 @@ permission. Add destination manifests in sorted order in
 `node scripts/artist-profile-conformance.mjs` checks the complete source tree for
 unmanifested adapters, DSP bio providers and ingestion destinations, and competing
 capability metadata. The existing CI source guards run it on source and queue
-heads. Only conditional restore adapters execute.
+heads. Profile mutations require conditional restore. DSP email-submission
+adapters select `getBioSubmissionManifest` from `destinations.ts` and use a
+canonical-source preview with manual rollback. Separate approval confirms the
+exact proposal; missing evidence blocks execution (JOV-8509). Receipts attest
+submission delivery. Legacy history uses `getBioSyncHistory`; receipt status is
+separate. Submission identity/transport derives from `DSP_PROFILE_CATALOG`;
+historical recipients and local field limits never grant delivery permission.
 
 Call `propose`, show the complete destination/before/desired proposal, then call
 `approve` with `confirmationFor(proposal)` from that explicit confirmation.

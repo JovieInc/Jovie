@@ -475,8 +475,8 @@
     },
     "docs/writing/SURFACE_COVERAGE.md": {
       "owner": "@itstimwhite",
-      "claim": "Writing surface completeness is validated by the existing invariant consumer; the bounded post-selection brief uses server confirmation and public evidence.",
-      "documentSha256": "3cdacf9033ff74da47cb85ba3bc43ceddca9d94ca30bd0ef1b22e4dacb9be6e2",
+      "claim": "Writing surface completeness is validated by the existing invariant consumer; the bounded post-selection brief uses server confirmation and public evidence; the bounded ops pilot rechecks artifact bindings at its Linear adapter and remains advisory.",
+      "documentSha256": "08e2793e7acc54ab02942c7dea7c59c9f156a633f4c4e218b8ad22d06cca2eb4",
       "sources": [
         {
           "path": "apps/web/lib/chat/onboarding-script/engine.ts",
@@ -489,6 +489,14 @@
         {
           "path": "scripts/invariants/writing-surfaces.mjs",
           "sha256": "91356a21ccf5164603191080d6fb3e4e03d7455b8d58ad0c08c5651965143145"
+        },
+        {
+          "path": "scripts/lanes/doctor.py",
+          "sha256": "62c6939febf3586175d3bd867909d7fe3ef7bc9175ba7583b7dda921ddf0938a"
+        },
+        {
+          "path": "scripts/lanes/ops-report.mjs",
+          "sha256": "13f2edce9dc44a1aef3bf1180a32aa6b78bb2a23f26b95274b0e23820752327b"
         }
       ]
     },

@@ -44,6 +44,12 @@ test('the complete current source tree conforms', () => {
 });
 for (const [name, path, source, expected] of [
   [
+    'unregistered submission adapter',
+    'dsp-bio-sync/new-adapter.ts',
+    "import type { ProfileWriteAdapter } from '../connectors/profile-writes/contract'; import { getBioSubmissionManifest } from '../connectors/profile-writes/destinations'; const adapter: ProfileWriteAdapter = { get manifest() { return getBioSubmissionManifest('new_dsp'); } };",
+    'new_dsp lacks a dsp_bio manifest',
+  ],
+  [
     'competing field write metadata beside a registered adapter',
     'connectors/spotify/profile.ts',
     "import type { ProfileWriteAdapter } from '../profile-writes/contract'; import { getProfileWriteManifest } from '../profile-writes/manifest'; export const adapter: ProfileWriteAdapter = { manifest: getProfileWriteManifest('spotify') }; const alternate = { bio: { write: 'supported' as const } };",

@@ -8,8 +8,55 @@ import {
   ARTIST_PROFILE_DESTINATIONS,
   type ArtistProfileDestinationManifest,
 } from './artist-profile-registry';
+import { DSP_PROFILE_CATALOG } from './dsp-profile-catalog';
+import {
+  canExecuteBioSubmission,
+  getBioSubmissionManifest,
+} from './profile-writes/destinations';
 
 type FieldPolicy = ArtistProfileContract['fields'][ArtistProfileField];
+
+function bioSubmission(id: string, now: Date) {
+  const destination = Object.values(DSP_PROFILE_CATALOG).find(
+    item => item.id === id
+  );
+  if (destination?.transport.legacyBio !== 'email') return null;
+  const manifest = getBioSubmissionManifest(destination.legacyBioProviderId);
+  const expires = Date.parse(manifest.evidenceExpiresAt);
+  const available =
+    canExecuteBioSubmission(manifest, now.getTime()) &&
+    manifest.rollback === 'manual' &&
+    Boolean(manifest.recipient) &&
+    Boolean(manifest.maxBioLength);
+  return {
+    operation: manifest.operation,
+    available,
+    blockingReason: available
+      ? null
+      : 'Submission execution requirements are unverified.',
+    authorizationLabel:
+      'Authenticated profile owner with a confirmed DSP match',
+    maxBioLength: manifest.maxBioLength,
+    preview: 'required',
+    confirmation: 'destination_field_value',
+    rollback:
+      manifest.rollback === 'manual'
+        ? ('manual' as const)
+        : ('unsupported' as const),
+    rateLimitWindowSeconds: manifest.rateLimitWindowSeconds,
+    evidence: {
+      ref: manifest.evidenceRef || null,
+      expiresAt: manifest.evidenceExpiresAt || null,
+      freshness: !manifest.evidenceRef
+        ? 'missing'
+        : !Number.isFinite(expires)
+          ? 'invalid'
+          : expires > now.getTime()
+            ? 'fresh'
+            : 'stale',
+    },
+  };
+}
 
 function freshness(evidence: FieldPolicy['evidence'], now: number) {
   if (evidence.status !== 'documented') return 'missing' as const;
@@ -86,6 +133,7 @@ export function projectArtistProfileDestination(
       audit: policy.audit,
       rollback: policy.rollback,
       recovery: manifest.recovery,
+      submission: name === 'bio' ? bioSubmission(id, now) : null,
       termsApi: policy.termsApi,
       evidence: { ...policy.evidence, freshness: evidenceFreshness },
       documentation: manifest.documentation

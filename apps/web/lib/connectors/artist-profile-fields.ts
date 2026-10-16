@@ -18,23 +18,29 @@ interface ProfileSources {
   >[];
 }
 
+export function getArtistProfileWebsiteLinks(
+  socialLinks: ProfileSources['socialLinks']
+) {
+  return socialLinks.filter(
+    link =>
+      link.is_active &&
+      (link.state === undefined || link.state === 'active') &&
+      (link.platform === 'website' || link.platform_type === 'website')
+  );
+}
+
 /** Accessors only: outbound destination values never become new profile columns. */
 export const ARTIST_PROFILE_FIELD_ACCESSORS = {
   bio: ({ profile }) => profile.bio,
-  bio_link: ({ profile }) => buildProfileCanonicalUrl(profile),
+  bio_link: ({ profile }) =>
+    (profile.username_normalized ?? profile.username).trim()
+      ? buildProfileCanonicalUrl(profile)
+      : null,
   image: ({ profile }) => profile.avatar_url,
-  website: ({ socialLinks }) =>
-    socialLinks
-      .filter(
-        link =>
-          link.is_active &&
-          (link.state === undefined || link.state === 'active') &&
-          (link.platform === 'website' || link.platform_type === 'website')
-      )
-      .sort(
-        (left, right) =>
-          left.sort_order - right.sort_order || left.id.localeCompare(right.id)
-      )[0]?.url ?? null,
+  website: ({ socialLinks }) => {
+    const candidates = getArtistProfileWebsiteLinks(socialLinks);
+    return candidates.length === 1 ? candidates[0].url : null;
+  },
 } satisfies Record<
   ArtistProfileField,
   (sources: ProfileSources) => string | null
