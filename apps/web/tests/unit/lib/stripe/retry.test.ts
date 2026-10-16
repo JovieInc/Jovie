@@ -55,6 +55,11 @@ describe('isTransientStripeError', () => {
     { statusCode: '503' },
     { statusCode: 400 },
     new Error('Invalid card'),
+    Object.assign(new Error('Invalid request'), {
+      name: 'StripeInvalidRequestError',
+      type: 'StripeInvalidRequestError',
+      statusCode: 400,
+    }),
   ])('rejects permanent or malformed input %j', error => {
     expect(isTransientStripeError(error)).toBe(false);
   });
@@ -85,7 +90,11 @@ describe('withStripeRetry', () => {
   it.each([0, 1])(
     'preserves a permanent failure after %s transient failures',
     async transientFailures => {
-      const permanent = new Error('Invalid card');
+      const permanent = Object.assign(new Error('Invalid card'), {
+        name: 'StripeInvalidRequestError',
+        type: 'StripeInvalidRequestError',
+        statusCode: 400,
+      });
       const operation = vi.fn().mockRejectedValue(permanent);
       if (transientFailures) {
         operation.mockRejectedValueOnce({ type: 'StripeConnectionError' });
