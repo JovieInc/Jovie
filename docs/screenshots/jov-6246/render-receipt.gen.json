@@ -1,0 +1,138 @@
+{
+  "scope": "Local deterministic Storybook observation only; no visual master certification or production/runtime approval.",
+  "sourceContract": "apps/web/data/marketing/mediaRecipes.ts",
+  "referenceReview": "jov-6246-reference-review/2026-09-12/r1",
+  "results": [
+    {
+      "story": "large-glass",
+      "viewport": "desktop",
+      "width": 1440,
+      "height": 900,
+      "errors": [],
+      "violations": [],
+      "image": "large-glass-desktop.png",
+      "sha256": "23f8929cc7478a0e3620f2c28dea20f67bcd1ec31cb84ae927c6301609eb406b",
+      "errorGeometryStable": true,
+      "captureAboveReflection": true
+    },
+    {
+      "story": "large-glass",
+      "viewport": "tablet",
+      "width": 768,
+      "height": 1024,
+      "errors": [],
+      "violations": [],
+      "errorGeometryStable": true,
+      "captureAboveReflection": true
+    },
+    {
+      "story": "large-glass",
+      "viewport": "mobile",
+      "width": 390,
+      "height": 844,
+      "errors": [],
+      "violations": [],
+      "errorGeometryStable": true,
+      "captureAboveReflection": true
+    },
+    {
+      "story": "compact-glass",
+      "viewport": "desktop",
+      "width": 1440,
+      "height": 900,
+      "errors": [],
+      "violations": [],
+      "image": "compact-glass-desktop.png",
+      "sha256": "f9ae39edf0280a480c829ab803353241b4a30d9ecaa232b3dd5b79c3e981712e"
+    },
+    {
+      "story": "compact-glass",
+      "viewport": "tablet",
+      "width": 768,
+      "height": 1024,
+      "errors": [],
+      "violations": []
+    },
+    {
+      "story": "compact-glass",
+      "viewport": "mobile",
+      "width": 390,
+      "height": 844,
+      "errors": [],
+      "violations": [],
+      "image": "compact-glass-mobile.png",
+      "sha256": "c673794b0373632e4eb3dc029db494f92328b47d69387ccf089290431012e55b"
+    },
+    {
+      "story": "flow",
+      "viewport": "desktop",
+      "width": 1440,
+      "height": 900,
+      "errors": [],
+      "violations": [],
+      "image": "flow-desktop.png",
+      "sha256": "8a8c2ff375005c3bdf2450a39f24fe0c883532214b39ceb4a0fc147c7ad82acf",
+      "forcedColorsFallback": true
+    },
+    {
+      "story": "flow",
+      "viewport": "tablet",
+      "width": 768,
+      "height": 1024,
+      "errors": [],
+      "violations": [],
+      "forcedColorsFallback": true
+    },
+    {
+      "story": "flow",
+      "viewport": "mobile",
+      "width": 390,
+      "height": 844,
+      "errors": [],
+      "violations": [],
+      "image": "flow-mobile.png",
+      "sha256": "c760fef459053d02060d5d36bfdd9c6af2041a98ce757e3668cde207f2c844c7",
+      "forcedColorsFallback": true
+    },
+    {
+      "story": "soft",
+      "viewport": "desktop",
+      "width": 1440,
+      "height": 900,
+      "errors": [],
+      "violations": [],
+      "image": "soft-desktop.png",
+      "sha256": "886eb381f401f37a574bf3138e4834a7d65da9a1cda382dc9225838557299156",
+      "forcedColorsFallback": true
+    },
+    {
+      "story": "soft",
+      "viewport": "tablet",
+      "width": 768,
+      "height": 1024,
+      "errors": [],
+      "violations": [],
+      "forcedColorsFallback": true
+    },
+    {
+      "story": "soft",
+      "viewport": "mobile",
+      "width": 390,
+      "height": 844,
+      "errors": [],
+      "violations": [],
+      "image": "soft-mobile.png",
+      "sha256": "5c96ca1e663cd0dc1302356f093172748b6e9bd4f726e31bc27902514023148e",
+      "forcedColorsFallback": true
+    }
+  ],
+  "schema": "jovie.marketing-media-render-observation/v1",
+  "capturedAt": "2026-10-16T06:23:47.215493+00:00",
+  "sourceDigests": {
+    "apps/web/data/marketing/mediaRecipes.ts": "9b53d7ff7a04195621fbb505ae76e42003b29194d6fc073681a9d1690b2f3263",
+    "apps/web/data/marketing/mediaReferences.ts": "6a5d96c2d1d59f2b570727cc4c26aa474d508a9dce8ab319bd3f8802e0e20247",
+    "apps/web/components/marketing/MarketingMedia.tsx": "44553565729cafc4dbe0c18b1f6def033ae4d60ea3fe3ea78382e1c99a61f7e2"
+  },
+  "approvalScope": "none; deterministic local observation only",
+  "mobileEvidence": "Compact glass is the legible phone example. Desktop dashboard downsizing is a layout-only observation, not mobile visual certification. JOV-6247 owns responsive product focus; JOV-6251 owns master promotion."
+}

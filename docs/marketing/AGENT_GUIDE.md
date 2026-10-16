@@ -273,6 +273,29 @@ review, product truth, design-system fidelity, responsive accessibility, and
 asset consent. The asset generator cannot review its own output. Automated
 review admits work for human taste; it never substitutes for that decision.
 
+### Registered marketing media (JOV-6246)
+
+The executable owner is [`mediaRecipes.ts`](../../apps/web/data/marketing/mediaRecipes.ts):
+`resolveMarketingMediaRequest` validates independent source, treatment, behavior,
+layout and delivery axes before the static `MarketingMedia` dispatcher renders.
+Select a registered input with `createMarketingMediaRecipeInput`; generators cannot
+add sources, imports, scripts, colors or approvals. `mediaReferences.ts` owns the
+exact reference captures/hashes, scoped founder feedback, rights and source/token
+revisions. #21 and #5 retain unresolved provenance; third-party captures are never
+shipped. Existing chrome extraction metadata is compatibility data for header
+exports, not product-frame geometry. The current primitives own material values.
+
+`recipe-*` export fixtures require the same validated recipe input. Export receipts
+bind source, recipe, tokens, renderer and output bytes; changing any invalidates
+old evidence. The Storybook `Marketing/MediaRecipes` examples reuse approved
+capture content and the receiving `feature-split` shell. Local rendering is not
+visual certification. Master promotion/production rollout remains JOV-6251.
+
+EVENT: September 12 reference preference authorizes these bounded implementations,
+not unseen renders, redistribution or paid PR review. Ship now: static recipes on
+existing primitives. Re-evaluate when JOV-6251 supplies scoped master evidence.
+Then: promote only the exact reviewed artifact through existing release gates.
+
 ### Product callout assembly
 
 Select the medium from the communication goal first. The homepage editorial
