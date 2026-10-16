@@ -76,6 +76,8 @@ export {
   audienceActions,
   audienceBlocks,
   audienceMembers,
+  audienceProjectionSnapshots,
+  audienceReferrers,
   audienceSourceGroups,
   audienceSourceLinks,
   type ClickEvent,
