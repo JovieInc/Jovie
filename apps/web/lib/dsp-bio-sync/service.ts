@@ -7,10 +7,7 @@ import {
   type ProfileWriteLedger,
   type ProfileWriteProposal,
 } from '@/lib/connectors/profile-writes/contract';
-import {
-  getBioSubmissionManifest,
-  getProfileDestination,
-} from '@/lib/connectors/profile-writes/destinations';
+import { getProfileDestination } from '@/lib/connectors/profile-writes/destinations';
 import { profileWriteLedger } from '@/lib/connectors/profile-writes/ledger.server';
 import { ProfileWriteService } from '@/lib/connectors/profile-writes/service';
 import { assertCustomerVoiceFloor } from '@/lib/copy/outbound-floor';
@@ -99,7 +96,7 @@ export async function createDspBioWriteService(
     },
   };
   const adapter = createBioSubmissionAdapter({
-    manifest: () => getBioSubmissionManifest(providerId),
+    providerId,
     load,
     send: message => new ResendEmailProvider().sendEmail(message),
   });

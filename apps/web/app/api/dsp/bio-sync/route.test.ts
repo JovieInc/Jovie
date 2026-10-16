@@ -35,7 +35,23 @@ const post = (body: unknown) =>
   );
 describe('DSP bio endpoint', () => {
   it('discovers blocked capabilities from the shared catalog', async () => {
-    const body = await (await GET()).json();
+    const response = await GET();
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    const body = await response.json();
+    expect(body.catalog.destinations).toHaveLength(13);
+    for (const destination of body.catalog.destinations) {
+      expect(
+        destination.fields.map((field: { name: string }) => field.name)
+      ).toEqual(['bio', 'bio_link', 'image', 'website']);
+      expect(
+        destination.fields.every(
+          (field: { write: { available: boolean } }) => !field.write.available
+        )
+      ).toBe(true);
+    }
+    expect(JSON.stringify(body)).not.toMatch(
+      /recipient|supportEmail|providerAccountId|accessToken|refreshToken|tokenHandler/
+    );
     expect(body.success).toBe(true);
     expect(body.enabledCount).toBe(0);
     expect(body.providers).toHaveLength(7);
