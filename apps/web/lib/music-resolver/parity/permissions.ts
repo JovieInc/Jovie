@@ -119,17 +119,10 @@ export const SAME_NAME_LEASE_BLOCKER: Blocker = {
 
 export const CANONICAL_ASSERTION_BLOCKER: Blocker = {
   failure:
-    'The canonical assertion store lives on the leased identity resolver. This session does not open a second store.',
-  owner: 'JOV-7818',
-  reviewTrigger: 'PR #20549 merges and the assertion fields land with it.',
-  lease: {
-    issue: 'JOV-7818',
-    prs: [20549],
-    files: [
-      'apps/web/lib/music-resolver/in-house.ts',
-      'apps/web/lib/music-resolver/in-house-contracts.ts',
-    ],
-  },
+    'Revisioned assertion persistence and producer write/readback are unverified. Pure admission contracts do not prove a deployed ledger; PR #20549 is closed and unmerged.',
+  owner: 'JOV-8470 / JOV-8503',
+  reviewTrigger:
+    'Read-only deployed schema inspection identifies the ledger to reuse; revisioned persistence, producer coverage and canonical write/readback receipts land under JOV-8470.',
 };
 
 export const PUBLIC_CONTRACT_BLOCKER: Blocker = {

@@ -10,6 +10,7 @@ Tim is never required.
 
 | Date | Incident | Failure classes | Status |
 | --- | --- | --- | --- |
+| 2026-10-14 | [Onboarding mount claim opened checkout before a terminal decision](2026-10-14-onboarding-premature-checkout.md) | `escaped-defect` | reviewed |
 | 2026-10-02 | [PR recovery stopped converging](2026-10-02-pr-recovery-stall.md) | `non-convergent-control-loop`, `pre-merge-parity-gap` | draft |
 | 2026-09-28 | [Codex lane dispatch and attribution gap](2026-09-28-codex-lane-attribution-gap.md) | `green-by-implication`, `evidence-forgery-or-staleness` | draft |
 | 2026-09-27 | [Production freeze: SBOM step failed every promotion after #18879](2026-09-27-sbom-provenance-freeze.md) | `pre-merge-parity-gap`, `silent-production-staleness`, `green-by-implication` | draft |

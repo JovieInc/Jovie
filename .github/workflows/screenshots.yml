@@ -34,6 +34,7 @@ on:
       - 'apps/web/app/(marketing)/**'
       - 'apps/web/app/(home)/**'
       - 'apps/web/app/(dynamic)/**'
+      - 'apps/web/app/onboarding/checkout/**'
       - 'apps/web/app/demo/**'
       - 'apps/web/app/go/**'
       - 'apps/web/app/r/**'
@@ -100,6 +101,7 @@ jobs:
       brand-artifact-id: ${{ steps.brand-proof.outputs.artifact-id }}
       report-artifact-id: ${{ steps.report-proof.outputs.artifact-id }}
       start-artifact-id: ${{ steps.start-proof.outputs.artifact-id }}
+      onboarding-checkout-artifact-id: ${{ steps.onboarding-checkout-proof.outputs.artifact-id }}
       marketing-solutions-artifact-id: ${{ steps.marketing-solutions-proof.outputs.artifact-id }}
       public-profile-about-artifact-id: ${{ steps.public-profile-about-proof.outputs.artifact-id }}
       catalog-changed: ${{ steps.diff.outputs.changed }}
@@ -697,6 +699,7 @@ jobs:
             web.brand \
             web.report \
             web.start \
+            web.onboarding-checkout \
             web.marketing-solutions \
             web.public-profile-about; do
             SUFFIX="${SCREEN#*.}"
@@ -873,6 +876,21 @@ jobs:
             apps/web/test-results/screen-browser-proof-start/screen-proof.json
             apps/web/test-results/screen-browser-proof-start/screenshots/desktop.png
             apps/web/test-results/screen-browser-proof-start/screenshots/mobile.png
+          if-no-files-found: error
+          retention-days: 14
+          allow-images: true
+          public-images: true
+          diagnostic-paths: true
+
+      - name: Upload onboarding-checkout screen proof
+        id: onboarding-checkout-proof
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: screen-browser-proof-onboarding-checkout
+          path: |
+            apps/web/test-results/screen-browser-proof-onboarding-checkout/screen-proof.json
+            apps/web/test-results/screen-browser-proof-onboarding-checkout/screenshots/desktop.png
+            apps/web/test-results/screen-browser-proof-onboarding-checkout/screenshots/mobile.png
           if-no-files-found: error
           retention-days: 14
           allow-images: true
@@ -1224,6 +1242,7 @@ jobs:
             "web.brand|${{ needs.generate.outputs.brand-artifact-id }}" \
             "web.report|${{ needs.generate.outputs.report-artifact-id }}" \
             "web.start|${{ needs.generate.outputs.start-artifact-id }}" \
+            "web.onboarding-checkout|${{ needs.generate.outputs.onboarding-checkout-artifact-id }}" \
             "web.marketing-solutions|${{ needs.generate.outputs.marketing-solutions-artifact-id }}" \
             "web.public-profile-about|${{ needs.generate.outputs.public-profile-about-artifact-id }}"; do
             SCREEN="${ENTRY%%|*}"

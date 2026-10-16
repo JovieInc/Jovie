@@ -447,6 +447,7 @@ describe('OpportunityInboxPageClient', () => {
     expect(screen.getByTestId('opportunity-inbox-content')).toHaveClass(
       'system-b-opportunity-inbox-page'
     );
+    expect(screen.getByRole('textbox', { name: 'Notes' })).toBeVisible();
   });
 
   it('renders the inbox feed when cards are present', () => {

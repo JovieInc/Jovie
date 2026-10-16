@@ -4,6 +4,8 @@ import { createHash } from 'node:crypto';
 import { appendFile, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { isInstallationQuota403 } from './lib/github-installation-quota.mjs';
+import { classifyGitHubFailure, planRetry } from './lib/github-rate-limit.mjs';
 
 const API_VERSION = '2022-11-28';
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
@@ -18,6 +20,53 @@ const RELEASE_PAGE_SIZE = 100;
 const MAX_RELEASE_PAGES = 20;
 const SHA256_DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/;
 const BASE64_SHA512_PATTERN = /^[A-Za-z0-9+/]{86}==$/;
+// Same budget the production publish step already passes to
+// github-rate-limit.mjs (`--attempts 4 --max-wait-seconds 600`). A release
+// read holds only an installation 403 until x-ratelimit-reset inside that
+// window. Permission failures, a missing reset, and a reset past the window
+// stay fatal. Nothing here lengthens the wait or turns a 403 into success.
+export const RELEASE_ASSET_READ_ATTEMPTS = 4;
+export const RELEASE_ASSET_READ_MAX_WAIT_MS = 600_000;
+
+/**
+ * Wait before repeating a release-asset GET, or null when the answer is final.
+ * Only GitHub's installation-quota 403 is retryable. The wait is the existing
+ * primary-limit plan: until x-ratelimit-reset, inside the publish budget.
+ * @param {{
+ *   attempt: number,
+ *   body?: string,
+ *   deadlineMs: number,
+ *   headers?: Headers | Record<string, string> | null,
+ *   nowMs: number,
+ *   status?: number | null,
+ *   attempts?: number,
+ * }} input
+ * @returns {number | null}
+ */
+export function planReleaseAssetReadHold({
+  attempt,
+  body = '',
+  deadlineMs,
+  headers = null,
+  nowMs,
+  status = null,
+  attempts = RELEASE_ASSET_READ_ATTEMPTS,
+}) {
+  if (!isInstallationQuota403(body, status)) return null;
+  const classification = classifyGitHubFailure({
+    status,
+    message: body,
+    headers,
+    now: nowMs,
+  });
+  return planRetry({
+    classification,
+    attempt,
+    attempts,
+    nowMs,
+    deadlineMs,
+  });
+}
 
 function invariant(condition, message) {
   if (!condition) {
@@ -592,8 +641,15 @@ function retainedPublishedStagingAssetNames(oldFeedBuffer, release, version) {
   );
 }
 
-class GitHubClient {
-  constructor({ repository, token }) {
+export class GitHubClient {
+  constructor({
+    repository,
+    token,
+    fetchImpl = fetch,
+    sleep = null,
+    now = Date.now,
+    log = null,
+  }) {
     invariant(
       /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository),
       'GitHub repository is malformed.'
@@ -602,38 +658,68 @@ class GitHubClient {
     this.repository = repository;
     this.token = token;
     this.apiUrl = process.env.GITHUB_API_URL || 'https://api.github.com';
+    this.fetchImpl = fetchImpl;
+    this.sleep =
+      sleep || (ms => new Promise(resolve => setTimeout(resolve, ms)));
+    this.now = now;
+    this.log =
+      log ||
+      (message =>
+        process.stderr.write(`[desktop-release-assets] ${message}\n`));
   }
 
   async request(path, options = {}) {
     const url = path.startsWith('https://') ? path : `${this.apiUrl}${path}`;
     const { allowNotFound, raw, timeout, ...fetchOptions } = options;
-    const response = await fetch(url, {
-      ...fetchOptions,
-      headers: {
-        Accept: 'application/vnd.github+json',
-        Authorization: `Bearer ${this.token}`,
-        'User-Agent': 'jovie-desktop-release-proof',
-        'X-GitHub-Api-Version': API_VERSION,
-        ...options.headers,
-      },
-      redirect: 'follow',
-      signal: AbortSignal.timeout(timeout ?? 120_000),
-    });
-    if (allowNotFound && response.status === 404) {
-      return null;
+    const method = options.method || 'GET';
+    const deadlineMs = this.now() + RELEASE_ASSET_READ_MAX_WAIT_MS;
+    for (let attempt = 1; ; attempt += 1) {
+      const response = await this.fetchImpl(url, {
+        ...fetchOptions,
+        headers: {
+          Accept: 'application/vnd.github+json',
+          Authorization: `Bearer ${this.token}`,
+          'User-Agent': 'jovie-desktop-release-proof',
+          'X-GitHub-Api-Version': API_VERSION,
+          ...options.headers,
+        },
+        redirect: 'follow',
+        signal: AbortSignal.timeout(timeout ?? 120_000),
+      });
+      if (allowNotFound && response.status === 404) {
+        return null;
+      }
+      if (!response.ok) {
+        const body = await response.text();
+        const waitMs =
+          method === 'GET'
+            ? planReleaseAssetReadHold({
+                attempt,
+                body,
+                deadlineMs,
+                headers: response.headers,
+                nowMs: this.now(),
+                status: response.status,
+              })
+            : null;
+        if (waitMs !== null) {
+          this.log(
+            `installation quota on GET ${url}; holding ${Math.ceil(waitMs / 1000)}s for x-ratelimit-reset (attempt ${attempt}/${RELEASE_ASSET_READ_ATTEMPTS}).`
+          );
+          await this.sleep(waitMs);
+          continue;
+        }
+        throw new Error(
+          `GitHub API ${method} ${url} failed (${response.status}): ${body.slice(0, 500)}`
+        );
+      }
+      if (raw) {
+        return Buffer.from(await response.arrayBuffer());
+      }
+      return response.status === 204
+        ? null
+        : /** @type {any} */ (await response.json());
     }
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(
-        `GitHub API ${options.method || 'GET'} ${url} failed (${response.status}): ${body.slice(0, 500)}`
-      );
-    }
-    if (raw) {
-      return Buffer.from(await response.arrayBuffer());
-    }
-    return response.status === 204
-      ? null
-      : /** @type {any} */ (await response.json());
   }
 
   async releaseByTag(tag, allowNotFound = false) {

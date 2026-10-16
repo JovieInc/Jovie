@@ -103,6 +103,7 @@
   "lib/chat/message-text.test.ts",
   "lib/chat/model-rotation-store.test.ts",
   "lib/chat/pinned-opportunity.test.ts",
+  "lib/chat/product-response-pilot.test.ts",
   "lib/chat/prompt-disclosure-guard.test.ts",
   "lib/chat/prompts/onboarding.waitlist-receipt.test.ts",
   "lib/chat/title.test.ts",

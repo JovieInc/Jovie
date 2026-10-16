@@ -8,6 +8,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import time
@@ -755,6 +756,7 @@ class ReconcileTest(unittest.TestCase):
         tracker = doctor.Tracker(FakeLinear(), "gem")
         with (mock.patch.object(tracker, "_remediation_label_id", return_value=None),
               mock.patch.object(tracker, "contradict_invariant"),
+              mock.patch.object(doctor, "verify_ops_report", side_effect=lambda prepared, *_: prepared) as verify,
               mock.patch.object(doctor, "prepare_ops_report", return_value=reviewed) as prepare):
             state = doctor.reconcile({"disk-low": "4% free"}, {}, tracker, 1_000_000.0,
                                      {"disk-low": condition})
@@ -763,6 +765,7 @@ class ReconcileTest(unittest.TestCase):
         self.assertEqual(created[0]["description"], reviewed["message"])
         self.assertEqual(len(created), 1)
         prepare.assert_called_once()
+        verify.assert_called_once_with(reviewed, "disk-low", "4% free", condition, "gem", tracker.title("disk-low"))
         self.assertEqual(state["conditions"]["disk-low"]["writingReview"], reviewed["review"])
         self.assertEqual(state["conditions"]["disk-low"]["writingDecision"], "approved-template")
 
@@ -899,6 +902,78 @@ class ReconcileTest(unittest.TestCase):
         doctor.Tracker(linear, "gem").contradict_invariant(event)
         self.assertEqual(linear.moves, [("owner", "Triage")])
         self.assertIn("gem:provider-idle:devin:2", linear.comments[0][1])
+
+
+class OpsReportDeliveryTest(unittest.TestCase):
+    def setUp(self):
+        self.condition = {
+            "condition": "disk-low", "state": "active", "owner": "symphony-lanes-doctor",
+            "source": {"producer": "scripts/lanes/doctor.py", "observedAt": doctor.now_iso()},
+            "nextAction": "inspect disk usage", "generation": 1,
+        }
+        self.target = "Symphony doctor: disk-low (test-host)"
+        self.source = mock.patch.object(doctor, "_source_version", return_value="UNKNOWN")
+        self.source.start()
+        self.addCleanup(self.source.stop)
+
+    def prepare(self):
+        prepared = doctor.prepare_ops_report("disk-low", "4% free", self.condition, "test-host", self.target)
+        self.assertEqual(prepared["review"]["reviewStatus"], "missing-source-receipt")
+        return prepared
+
+    def verify(self, prepared, condition=None, target=None):
+        return doctor.verify_ops_report(prepared, "disk-low", "4% free", condition or self.condition,
+                                        "test-host", target or self.target)
+
+    def test_real_cli_checks_exact_delivery_without_model_calls(self):
+        prepared = self.prepare()
+        self.assertIs(self.verify(prepared), prepared)
+        for field, value in (("message", "edited after review"), ("audience", "changed audience"),
+                             ("destination", {"adapter": "linear-issue", "target": "other"})):
+            with self.subTest(field=field):
+                result = self.verify({**prepared, field: value})
+                self.assertEqual(result["review"]["reviewStatus"], "emergency-reviewer-unavailable")
+                self.assertNotIn("edited after review", result["message"])
+        stale = {**self.condition, "source": {**self.condition["source"], "observedAt": "2000-01-01T00:00:00Z"}}
+        for condition, target in ((stale, None), (None, "changed issue")):
+            result = self.verify(prepared, condition, target)
+            self.assertEqual(result["review"]["reviewStatus"], "emergency-reviewer-unavailable")
+        self.assertNotIn("4% free", json.dumps(prepared["review"]))
+
+    def test_reviewer_outage_keeps_preapproved_emergency_notice_available(self):
+        with mock.patch.object(doctor.subprocess, "run", side_effect=subprocess.TimeoutExpired("node", 20)) as run:
+            prepared = doctor.prepare_ops_report("disk-low", "4% free", self.condition, "test-host", self.target)
+            result = self.verify({**prepared, "message": "edited emergency notice"})
+        run.assert_called_once()
+        self.assertEqual(result["review"]["reviewStatus"], "emergency-reviewer-unavailable")
+        self.assertIn("Root cause: UNKNOWN", result["message"])
+        self.assertNotIn("edited emergency notice", result["message"])
+
+    def test_linear_adapter_rechecks_after_prepare_and_preserves_duplicate_lookup(self):
+        created = []
+
+        class FakeLinear:
+            def gql(self, query, variables):
+                if "title:{eq:$t}" in query:
+                    return {"issues": {"nodes": [{"id": "iss-1"}] if created else []}}
+                if "teams(filter" in query:
+                    return {"teams": {"nodes": [{"id": "team", "states": {"nodes": [
+                        {"id": "triage", "name": "Triage"}]}, "labels": {"nodes": []}}]}}
+                if "issueCreate" in query:
+                    created.append(variables["i"])
+                    return {"issueCreate": {"issue": {"id": "iss-1"}}}
+                raise AssertionError(query)
+
+        tracker = doctor.Tracker(FakeLinear(), "test-host")
+        tampered = {**self.prepare(), "message": "edited after review"}
+        with (mock.patch.object(tracker, "_remediation_label_id", return_value=None),
+              mock.patch.object(doctor, "prepare_ops_report", return_value=tampered) as prepare):
+            for _ in range(2):
+                self.assertEqual(tracker.open("disk-low", "4% free", self.condition), "iss-1")
+        prepare.assert_called_once()
+        self.assertEqual(len(created), 1)
+        self.assertIn("Symphony emergency notice", created[0]["description"])
+        self.assertNotIn("edited after review", created[0]["description"])
 
 
 class TransitionAcknowledgmentTest(unittest.TestCase):

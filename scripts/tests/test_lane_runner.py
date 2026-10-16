@@ -962,6 +962,20 @@ class GateTest(unittest.TestCase):
                    self.change("apps/web/lib/profile/catalog.test.ts", 180)]
         self.assertEqual(lane.gate_rules(changes), [])
 
+    def test_generated_inventory_is_excluded_but_source_and_tests_keep_the_size_cap(self):
+        generated = self.change("docs/product/generated/artist-launch-inventory.json", 7336)
+        code = self.change("scripts/artist-launch-contract.mjs", 1000)
+        tests = self.change("scripts/artist-launch-contract.test.mjs", 500)
+        self.assertEqual(lane.gate_rules([generated, code, tests]), [])
+        tests.added += 1
+        self.assertEqual(lane.gate_rules([generated, code, tests]), ["diff-too-large:1501"])
+        for path in ["apps/web/lib/generated/unsafe.ts", "scripts/generated/task.mjs"]:
+            with self.subTest(path=path):
+                self.assertEqual(lane.gate_rules([self.change(path)]), ["code-change-without-test"])
+        for path in ["docs/product/generated-notes.md", "scripts/generated-helper.mjs"]:
+            with self.subTest(path=path):
+                self.assertIn("diff-too-large:2501", lane.gate_rules([self.change(path, 2000), tests]))
+
     def test_sensitive_diff_uses_the_smaller_review_cap(self):
         changes = [self.change("apps/web/lib/a.ts", 400), self.change("apps/web/lib/a.test.ts", 101)]
         self.assertIn("diff-too-large:501", lane.gate_rules(changes, lane.SENSITIVE_REVIEWABLE_LINES))
@@ -9030,6 +9044,40 @@ class TerminalPublicationTest(unittest.TestCase):
 
 
 class PublicationBundlePrerequisitesTest(unittest.TestCase):
+    def test_ops_delivery_cli_rechecks_from_only_declared_release_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bundle = Path(tmp)
+            for name in ["scripts/lanes/ops-report.mjs", *lane.RELEASE_EXTRAS]:
+                destination = bundle / name
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(ROOT / name, destination)
+            script = bundle / "scripts/lanes/ops-report.mjs"
+            current = {
+                "domain": "company", "producer": "Symphony", "currentOwner": "symphony-lanes-doctor",
+                "observedState": "disk usage needs inspection", "blocker": "UNKNOWN",
+                "nextAction": "inspect disk usage", "rootCause": None,
+                "evidence": {"observedAt": datetime.now(timezone.utc).isoformat(), "source": "synthetic doctor fixture"},
+                "destination": {"adapter": "linear-issue", "target": "Symphony doctor: archive fixture"},
+            }
+            prepared = subprocess.run(["node", str(script)], cwd=bundle, input=json.dumps(current),
+                                      capture_output=True, text=True, timeout=10)
+            self.assertEqual(prepared.returncode, 0, prepared.stderr)
+            report = json.loads(prepared.stdout)
+            self.assertEqual(report["review"]["reviewStatus"], "missing-source-receipt")
+            self.assertEqual(report["decision"], "approved-template")
+            for tampered in (False, True):
+                with self.subTest(tampered=tampered):
+                    candidate = {**report, "message": "edited after review"} if tampered else report
+                    verified = subprocess.run(["node", str(script), "--verify"], cwd=bundle,
+                                              input=json.dumps({"preparedReport": candidate, "currentInput": current}),
+                                              capture_output=True, text=True, timeout=10)
+                    if tampered:
+                        self.assertNotEqual(verified.returncode, 0)
+                        self.assertIn("review invalidated before delivery", verified.stderr)
+                    else:
+                        self.assertEqual(verified.returncode, 0, verified.stderr)
+                        self.assertEqual(json.loads(verified.stdout), {"verified": True})
+
     def test_promotion_metrics_imports_from_only_declared_release_files(self):
         # Import from a standalone bundle so checkout files cannot hide missing dependencies.
         with tempfile.TemporaryDirectory() as tmp:

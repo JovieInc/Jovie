@@ -77,7 +77,11 @@ jobs:
       (github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter != ''))
     environment: Preview – jovie
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # Shard 1 was cancelled at 60 minutes. The auth modal waited on homepage
+    # controls that the conversion lock removed, and the serial contrast
+    # inventory never started. Locators now match the live entry points;
+    # this limit lets the remaining shard finish.
+    timeout-minutes: 120
     env:
       E2E_FULL_MATRIX: '1'
       PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'

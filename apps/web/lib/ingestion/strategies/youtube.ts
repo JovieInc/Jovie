@@ -1,10 +1,10 @@
+import { disabledSocialHtmlDocument } from '@/lib/ingestion/social-html-policy';
 import { detectPlatform, normalizeUrl } from '@/lib/utils/platform-detection';
 import type { ExtractionResult } from '../types';
 import {
   ExtractionError,
   extractScriptJson,
   type FetchOptions,
-  fetchDocument,
   type StrategyConfig,
 } from './base';
 
@@ -24,8 +24,6 @@ const CHANNEL_PATTERNS = [
 const MAX_URL_LENGTH = 2048;
 /** First path segment(s) that identify a channel; any trailing tab is ignored. */
 const CHANNEL_PATH = /^\/(@[^/?#]+|channel\/[^/?#]+|c\/[^/?#]+)(?:\/[^?#]*)?$/i;
-/** Channel /about pages run about 2.5 MB of inline JSON. */
-const YOUTUBE_MAX_RESPONSE_BYTES = 6_000_000;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -99,22 +97,13 @@ export function extractYouTubeHandle(url: string): string | null {
 
 export async function fetchYouTubeAboutDocument(
   sourceUrl: string,
-  options?: FetchOptions
+  _options?: FetchOptions
 ): Promise<string> {
   const validated = validateYouTubeChannelUrl(sourceUrl);
   if (!validated) {
     throw new ExtractionError('Invalid YouTube channel URL', 'INVALID_URL');
   }
-  const result = await fetchDocument(validated, {
-    ...options,
-    headers: {
-      Accept: 'text/html,application/xhtml+xml',
-      ...options?.headers,
-    },
-    allowedHosts: YOUTUBE_CONFIG.validHosts,
-    maxResponseBytes: options?.maxResponseBytes ?? YOUTUBE_MAX_RESPONSE_BYTES,
-  });
-  return result.html;
+  return disabledSocialHtmlDocument();
 }
 
 /**
