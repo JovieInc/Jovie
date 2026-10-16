@@ -962,6 +962,20 @@ class GateTest(unittest.TestCase):
                    self.change("apps/web/lib/profile/catalog.test.ts", 180)]
         self.assertEqual(lane.gate_rules(changes), [])
 
+    def test_generated_inventory_is_excluded_but_source_and_tests_keep_the_size_cap(self):
+        generated = self.change("docs/product/generated/artist-launch-inventory.json", 7336)
+        code = self.change("scripts/artist-launch-contract.mjs", 1000)
+        tests = self.change("scripts/artist-launch-contract.test.mjs", 500)
+        self.assertEqual(lane.gate_rules([generated, code, tests]), [])
+        tests.added += 1
+        self.assertEqual(lane.gate_rules([generated, code, tests]), ["diff-too-large:1501"])
+        for path in ["apps/web/lib/generated/unsafe.ts", "scripts/generated/task.mjs"]:
+            with self.subTest(path=path):
+                self.assertEqual(lane.gate_rules([self.change(path)]), ["code-change-without-test"])
+        for path in ["docs/product/generated-notes.md", "scripts/generated-helper.mjs"]:
+            with self.subTest(path=path):
+                self.assertIn("diff-too-large:2501", lane.gate_rules([self.change(path, 2000), tests]))
+
     def test_sensitive_diff_uses_the_smaller_review_cap(self):
         changes = [self.change("apps/web/lib/a.ts", 400), self.change("apps/web/lib/a.test.ts", 101)]
         self.assertIn("diff-too-large:501", lane.gate_rules(changes, lane.SENSITIVE_REVIEWABLE_LINES))

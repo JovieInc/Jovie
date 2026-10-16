@@ -115,6 +115,14 @@ export const MERGE_GROUP_GUARDS_COMMAND =
 
 export const SOURCE_GUARDS = Object.freeze([
   Object.freeze({
+    id: 'artist-launch-contract',
+    command:
+      'node scripts/artist-launch-contract.mjs --check && node --test --test-isolation=none scripts/artist-launch-contract.test.mjs',
+    inputs:
+      /^(?:apps\/web\/app\/|apps\/web\/components\/features\/(?:dashboard\/organisms\/|profile\/)|docs\/product\/(?:artist-launch-|generated\/artist-launch-inventory\.json$)|scripts\/artist-launch-|scripts\/ci-fast-lanes\.mjs$)/u,
+    prOnly: false,
+  }),
+  Object.freeze({
     // The repo-wide design-system, metrics-layer and locked Pen chrome
     // guards (~42s) ran only in ci-fast, i.e. merge groups: group pr-21458
     // (2026-10-13) was ejected because a PR added text-destructive to
