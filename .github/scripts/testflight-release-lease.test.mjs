@@ -324,8 +324,7 @@ test('an unfinished compare that never settles fails closed without calling it a
   const f = fixture();
   const original = f.input.api;
   f.input.api = route => {
-    if (route.includes('/compare/'))
-      return { message: 'diff is unavailable' };
+    if (route.includes('/compare/')) return { message: 'diff is unavailable' };
     return original(route);
   };
   assert.throws(
@@ -353,7 +352,11 @@ test('compare transport failures are retryable and raw provider output is not cl
     'temporarily unavailable'
   );
   assert.equal(
-    evidenceFailureKind('gh: HTTP 404\n', '', 'repos/JovieInc/Jovie/commits/main'),
+    evidenceFailureKind(
+      'gh: HTTP 404\n',
+      '',
+      'repos/JovieInc/Jovie/commits/main'
+    ),
     'failed'
   );
   assert.equal(
@@ -364,12 +367,15 @@ test('compare transport failures are retryable and raw provider output is not cl
     ),
     'rate limited'
   );
-  assert.deepEqual(evidenceInvocation(['gh', 'api', 'repos/acme/commits/main']), [
-    'bash',
-    evidenceInvocation(['gh', 'api', 'x'])[1],
-    'api',
-    'repos/acme/commits/main',
-  ]);
+  assert.deepEqual(
+    evidenceInvocation(['gh', 'api', 'repos/acme/commits/main']),
+    [
+      'bash',
+      evidenceInvocation(['gh', 'api', 'x'])[1],
+      'api',
+      'repos/acme/commits/main',
+    ]
+  );
   assert.deepEqual(evidenceInvocation(['git', 'rev-parse', 'HEAD']), [
     'git',
     'rev-parse',
@@ -380,7 +386,9 @@ test('compare transport failures are retryable and raw provider output is not cl
     () => {
       calls += 1;
       if (calls < 3) {
-        throw new Error('gh evidence command failed (1); temporarily unavailable');
+        throw new Error(
+          'gh evidence command failed (1); temporarily unavailable'
+        );
       }
       return { sha: 'a'.repeat(40) };
     },
