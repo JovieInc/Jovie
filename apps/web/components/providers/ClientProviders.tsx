@@ -2,7 +2,7 @@
 
 // @coverage-via apps/web/tests/components/providers/ClientProviders.interaction.test.tsx
 import { TooltipProvider } from '@jovie/ui';
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   JovieAuthDefaultsProvider,
   JovieAuthValuesProvider,
@@ -84,8 +84,21 @@ export function ClientProviders({
     );
   }
 
+  const initialUser = useMemo(
+    () =>
+      authBootstrap?.isAuthenticated
+        ? {
+            id: authBootstrap.userId,
+            email: authBootstrap.email,
+            name: authBootstrap.fullName,
+            username: authBootstrap.username,
+          }
+        : null,
+    [authBootstrap]
+  );
+
   return (
-    <JovieAuthValuesProvider>
+    <JovieAuthValuesProvider initialUser={initialUser}>
       <DesktopAppBootSignal />
       <DesktopNavigationBridge />
       {wrappedChildren}
