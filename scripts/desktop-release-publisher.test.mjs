@@ -6,6 +6,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import {
+  announceDesktopQuotaDeferral,
+  decideReleaseAssetQuotaHold,
+  DesktopReleaseQuotaDeferred,
   expectedDesktopAssetNames,
   GitHubClient,
   parseArgs,
@@ -14,6 +17,7 @@ import {
   RELEASE_ASSET_READ_ATTEMPTS,
   RELEASE_ASSET_READ_MAX_WAIT_MS,
   releaseMetadataUpdate,
+  reportDesktopReleaseFailure,
   uploadAndPublish,
   validateReleaseAssets,
 } from './desktop-release-assets.mjs';
@@ -905,6 +909,19 @@ test('release-asset read holds an installation 403 until x-ratelimit-reset', () 
     }),
     null
   );
+  const outside = decideReleaseAssetQuotaHold({
+    attempt: 1,
+    body: INSTALLATION_QUOTA,
+    deadlineMs: nowMs + RELEASE_ASSET_READ_MAX_WAIT_MS,
+    headers: {
+      'x-ratelimit-remaining': '0',
+      'x-ratelimit-reset': String(Math.floor(nowMs / 1000) + 3600),
+    },
+    nowMs,
+    status: 403,
+  });
+  assert.equal(outside.action, 'defer');
+  assert.equal(outside.resetEpoch, Math.floor(nowMs / 1000) + 3600);
   assert.equal(
     planReleaseAssetReadHold({
       attempt: 1,
@@ -989,15 +1006,15 @@ globalThis.fetch = async (url, options) => {
 `
   );
   for (const scenario of [
-    { mode: 'outside-budget', code: 0, prepared: 'false' },
+    { mode: 'outside-budget', code: 75, prepared: 'false' },
     { mode: 'retry', code: 0, prepared: 'true' },
     { mode: 'success', code: 0, prepared: 'true' },
     { mode: 'permission', code: 1 },
     { mode: 'missing-reset', code: 1 },
     { mode: 'attempt-cap', code: 1 },
-    { mode: 'mutation', code: 1 },
-    { mode: 'outside-budget', code: 1, environment: 'staging' },
-    { mode: 'outside-budget', code: 1, command: 'upload-and-publish' },
+    { mode: 'mutation', code: 75, prepared: 'false' },
+    { mode: 'outside-budget', code: 75, environment: 'staging', prepared: 'false' },
+    { mode: 'outside-budget', code: 75, command: 'upload-and-publish', defer: true },
     { mode: 'outside-budget', code: 1, command: 'verify-published' },
   ]) {
     for (const file of ['outputs', 'summary', 'calls', 'sleeps']) {
@@ -1048,12 +1065,14 @@ globalThis.fetch = async (url, options) => {
         .at(-1);
       assert.equal(prepared, `prepared=${scenario.prepared}`, label);
     }
-    if (scenario.prepared === 'false') {
+    if (scenario.prepared === 'false' || scenario.defer) {
       assert.match(result.stderr, /github-quota-deferred/);
-      assert.match(summary, /2023-11-14T23:13:21.000Z/);
+      assert.match(summary, /2023-11-14T23:13:20Z/);
       assert.ok(summary.includes(releaseSha), summary);
-      assert.match(summary, /No desktop release was published/);
-      assert.equal(calls.trim().split('\n').length, 1);
+      assert.match(summary, /No release was published/);
+      if (scenario.prepared === 'false' && scenario.mode !== 'mutation') {
+        assert.equal(calls.trim().split('\n').length, 1);
+      }
       assert.equal(sleeps, '');
     } else {
       assert.equal(summary, '', label);
@@ -1154,7 +1173,7 @@ test('release-asset read fails closed on permission, exhausted budget, mutations
         }),
       ],
       method: 'GET',
-      error: /beyond the release read budget/,
+      error: DesktopReleaseQuotaDeferred,
     },
     {
       label: 'installation 403 without x-ratelimit-reset',
@@ -1163,15 +1182,15 @@ test('release-asset read fails closed on permission, exhausted budget, mutations
       error: /failed \(403\)/,
     },
     {
-      label: 'mutation is not retried',
+      label: 'publish mutation defers when the reset is outside the budget',
       responses: [
         quotaResponse(403, INSTALLATION_QUOTA, {
           'x-ratelimit-remaining': '0',
-          'x-ratelimit-reset': String(reset),
+          'x-ratelimit-reset': String(Math.floor(nowMs / 1000) + 3600),
         }),
       ],
-      method: 'POST',
-      error: /POST /,
+      method: 'PATCH',
+      error: DesktopReleaseQuotaDeferred,
     },
     {
       label: 'attempt cap stays fatal',
@@ -1192,7 +1211,14 @@ test('release-asset read fails closed on permission, exhausted budget, mutations
     const client = new GitHubClient({
       repository: 'JovieInc/Jovie',
       token: 'test-token',
-      fetchImpl: async () => {
+      releaseSha: 'c'.repeat(40),
+      fetchImpl: async url => {
+        if (String(url).endsWith('/rate_limit')) {
+          return quotaResponse(
+            200,
+            JSON.stringify({ resources: { core: {} } })
+          );
+        }
         const response = scenario.responses[index];
         index += 1;
         if (!response)
@@ -1263,6 +1289,151 @@ test('release-asset read fails closed on permission, exhausted budget, mutations
     ],
     [1, 2, 3]
   );
+});
+
+test('publish and recover mutations wait out an installation 403 inside the budget', async () => {
+  const nowMs = 1_700_000_000_000;
+  const reset = Math.floor(nowMs / 1000) + 30;
+  const calls = [];
+  const sleeps = [];
+  const client = new GitHubClient({
+    repository: 'JovieInc/Jovie',
+    token: 'test-token',
+    releaseSha: 'c'.repeat(40),
+    fetchImpl: async url => {
+      calls.push(String(url));
+      if (calls.length === 1) {
+        return quotaResponse(403, INSTALLATION_QUOTA, {
+          'x-ratelimit-remaining': '0',
+          'x-ratelimit-reset': String(reset),
+        });
+      }
+      return quotaResponse(200, '{"id":7,"draft":true}');
+    },
+    now: () => nowMs,
+    sleep: async ms => {
+      sleeps.push(ms);
+    },
+    log: () => {},
+  });
+  const published = await client.request(
+    '/repos/JovieInc/Jovie/releases/7',
+    { method: 'PATCH' }
+  );
+  assert.equal(published.id, 7);
+  assert.equal(calls.length, 2);
+  assert.deepEqual(sleeps, [reset * 1000 + 1000 - nowMs]);
+});
+
+test('a release read learns the reset from GET /rate_limit when the 403 has no headers', async () => {
+  const nowMs = 1_700_000_000_000;
+  const reset = Math.floor(nowMs / 1000) + 30;
+  const calls = [];
+  const sleeps = [];
+  const client = new GitHubClient({
+    repository: 'JovieInc/Jovie',
+    token: 'test-token',
+    releaseSha: 'c'.repeat(40),
+    fetchImpl: async url => {
+      const target = String(url);
+      calls.push(target);
+      if (target.endsWith('/rate_limit')) {
+        return quotaResponse(
+          200,
+          JSON.stringify({
+            resources: { core: { remaining: 0, reset } },
+          })
+        );
+      }
+      if (calls.filter(item => item.includes('/releases/tags/')).length === 1) {
+        return quotaResponse(403, INSTALLATION_QUOTA);
+      }
+      return quotaResponse(200, '{"id":9,"tag_name":"v26.10.9"}');
+    },
+    now: () => nowMs,
+    sleep: async ms => {
+      sleeps.push(ms);
+    },
+    log: () => {},
+  });
+  const release = await client.releaseByTag('v26.10.9', true);
+  assert.equal(release.id, 9);
+  assert.equal(
+    calls.some(url => url.endsWith('/rate_limit')),
+    true
+  );
+  assert.deepEqual(sleeps, [reset * 1000 + 1000 - nowMs]);
+});
+
+test('outside-budget installation 403 defers with a warning and is retried later', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'jovie-desktop-quota-defer-'));
+  t.after(() => rm(root, { force: true, recursive: true }));
+  const releaseSha = 'd'.repeat(40);
+  const resetEpoch = 1_700_003_600;
+  const previous = {
+    output: process.env.GITHUB_OUTPUT,
+    summary: process.env.GITHUB_STEP_SUMMARY,
+    runner: process.env.RUNNER_TEMP,
+  };
+  process.env.GITHUB_OUTPUT = join(root, 'output.txt');
+  process.env.GITHUB_STEP_SUMMARY = join(root, 'summary.md');
+  process.env.RUNNER_TEMP = root;
+  t.after(() => {
+    if (previous.output === undefined) delete process.env.GITHUB_OUTPUT;
+    else process.env.GITHUB_OUTPUT = previous.output;
+    if (previous.summary === undefined) delete process.env.GITHUB_STEP_SUMMARY;
+    else process.env.GITHUB_STEP_SUMMARY = previous.summary;
+    if (previous.runner === undefined) delete process.env.RUNNER_TEMP;
+    else process.env.RUNNER_TEMP = previous.runner;
+  });
+  await writeFile(process.env.GITHUB_OUTPUT, '');
+  await writeFile(process.env.GITHUB_STEP_SUMMARY, '');
+  const error = new DesktopReleaseQuotaDeferred(resetEpoch, releaseSha);
+  const chunks = [];
+  const original = process.stderr.write;
+  process.stderr.write = chunk => {
+    chunks.push(String(chunk));
+    return true;
+  };
+  try {
+    assert.equal(await reportDesktopReleaseFailure(error), 75);
+  } finally {
+    process.stderr.write = original;
+  }
+  const sentence = `Installation quota resets at ${new Date(resetEpoch * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z')}. Deferring desktop publication of ${releaseSha} to the quota retry. No release was published.`;
+  assert.equal(chunks.join(''), `::warning::github-quota-deferred: ${sentence}\n`);
+  assert.equal((await readFile(process.env.GITHUB_STEP_SUMMARY, 'utf8')).trim(), sentence);
+  assert.match(await readFile(process.env.GITHUB_OUTPUT, 'utf8'), /quota_deferred=true/);
+  assert.match(
+    await readFile(process.env.GITHUB_OUTPUT, 'utf8'),
+    new RegExp(`quota_reset_epoch=${resetEpoch}`)
+  );
+  assert.equal(
+    (await readFile(join(root, 'desktop-publish-quota-defer'), 'utf8')).trim(),
+    String(resetEpoch)
+  );
+  assert.equal(
+    await announceDesktopQuotaDeferral({
+      releaseSha,
+      resetEpoch,
+      outputPath: '',
+      summaryPath: '',
+      runnerTemp: '',
+    }),
+    sentence
+  );
+  const missing = new DesktopReleaseQuotaDeferred(resetEpoch, '');
+  const missingChunks = [];
+  process.stderr.write = chunk => {
+    missingChunks.push(String(chunk));
+    return true;
+  };
+  try {
+    assert.equal(await reportDesktopReleaseFailure(missing), 1);
+  } finally {
+    process.stderr.write = original;
+  }
+  assert.match(missingChunks.join(''), /no release candidate SHA/);
 });
 
 test('parseArgs accepts equals-form values without consuming the next token', () => {
