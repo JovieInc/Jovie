@@ -11,7 +11,7 @@ import tempfile
 import unittest
 from unittest.mock import patch, Mock
 import sys
-from types import SimpleNamespace
+from types import SimpleNamespace, ModuleType
 from contextlib import ExitStack
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lanes"))
 
@@ -204,7 +204,7 @@ class GuardContractTest(unittest.TestCase):
             actual, proof = guard.load_checked_runner(self.repo, self.safe)
             self.assertIs(actual, runner)
             self.assertEqual(proof["head"], self.safe)
-            loader.assert_called_once_with()
+            loader.assert_called_once_with(self.repo)
 
     def test_candidate_runner_and_hook_cannot_touch_operator_sentinel(self):
         sentinel = self.sentinels[0]
@@ -252,7 +252,8 @@ class GuardContractTest(unittest.TestCase):
         prior = sys.modules.get("qualification_lane_runner")
         old_path = list(sys.path)
         try:
-            with patch.object(guard, "DEFAULT_POLICY", self.policy), patch.object(guard, "HERE", trusted):
+            with patch.dict(sys.modules), patch.object(guard, "DEFAULT_POLICY", self.policy), patch.object(guard, "HERE", trusted):
+                sys.modules.pop("lane_runner", None)
                 runner, proof = guard.load_checked_runner(self.repo, self.safe)
             self.assertEqual(runner.source, "trusted-sibling")
             self.assertEqual(proof["head"], self.safe)
@@ -263,6 +264,106 @@ class GuardContractTest(unittest.TestCase):
                 sys.modules.pop("qualification_lane_runner", None)
             else:
                 sys.modules["qualification_lane_runner"] = prior
+
+    def _import_fixture(self, source):
+        trusted = self.root / "trusted-import" / "runtime"
+        trusted.mkdir(parents=True)
+        (trusted / "lane_runner.py").write_text(source)
+        old_path = list(sys.path)
+        before = {name: sys.modules.get(name) for name in
+                  ("qualification_lane_runner", "qualification_fixture_dependency", "lane_runner")}
+        sys.modules.pop("lane_runner", None)
+        def restore():
+            sys.path[:] = old_path
+            for name, module in before.items():
+                if module is None:
+                    sys.modules.pop(name, None)
+                else:
+                    sys.modules[name] = module
+        self.addCleanup(restore)
+        return trusted
+
+    def test_trusted_loader_cannot_fall_back_to_candidate_dependency(self):
+        name = "qualification_fixture_dependency"
+        trusted = self._import_fixture("import " + name + "\n")
+        candidate_modules = self.repo / "candidate-modules"
+        candidate_modules.mkdir()
+        (candidate_modules / (name + ".py")).write_text(
+            "from pathlib import Path\nPath(" + repr(str(self.sentinels[0])) + ").write_text('TOUCHED')\n")
+        sys.path.insert(0, str(candidate_modules))
+        with patch.object(guard, "DEFAULT_POLICY", self.policy), patch.object(guard, "HERE", trusted):
+            with self.assertRaisesRegex(CheckoutHeld, "trusted-runner-unavailable"):
+                guard.load_checked_runner(self.repo, self.safe)
+
+    def test_trusted_loader_rejects_cached_candidate_file_and_namespace(self):
+        name = "qualification_fixture_dependency"
+        trusted = self._import_fixture("import " + name + "\n" + name + ".touch()\n")
+        for kind in ("file", "namespace"):
+            with self.subTest(kind=kind):
+                cached = ModuleType(name)
+                if kind == "file":
+                    cached.__file__ = str(self.repo / (name + ".py"))
+                else:
+                    cached.__path__ = [str(self.repo / name)]
+                cached.touch = lambda: self.sentinels[0].write_text("TOUCHED")
+                sys.modules[name] = cached
+                with patch.object(guard, "DEFAULT_POLICY", self.policy), patch.object(guard, "HERE", trusted):
+                    with self.assertRaisesRegex(CheckoutHeld, "cached-candidate-module"):
+                        guard.load_checked_runner(self.repo, self.safe)
+
+    def test_trusted_loader_rejects_cached_sibling_from_another_release(self):
+        name = "qualification_fixture_dependency"
+        trusted = self._import_fixture("import " + name + "\n" + name + ".touch()\n")
+        (trusted / (name + ".py")).write_text("def touch(): pass\n")
+        cached = ModuleType(name)
+        cached.__file__ = str(self.root / "old-release" / (name + ".py"))
+        cached.touch = lambda: self.sentinels[0].write_text("TOUCHED")
+        sys.modules[name] = cached
+        with patch.object(guard, "DEFAULT_POLICY", self.policy), patch.object(guard, "HERE", trusted):
+            with self.assertRaisesRegex(CheckoutHeld, "cached-release-module-mismatch"):
+                guard.load_checked_runner(self.repo, self.safe)
+
+    def test_trusted_loader_rejects_cached_runner_from_another_release(self):
+        trusted = self._import_fixture("source = 'trusted'\n")
+        cached = ModuleType("lane_runner")
+        cached.__file__ = str(self.root / "old-release/lane_runner.py")
+        sys.modules["lane_runner"] = cached
+        with patch.object(guard, "DEFAULT_POLICY", self.policy), patch.object(guard, "HERE", trusted):
+            with self.assertRaisesRegex(CheckoutHeld, "cached-release-module-mismatch:lane_runner"):
+                guard.load_checked_runner(self.repo, self.safe)
+
+    def test_trusted_loader_retains_quarantine_for_lazy_imports(self):
+        name = "qualification_fixture_dependency"
+        trusted = self._import_fixture("def later():\n    import " + name + "\n")
+        candidate_modules = self.repo / "candidate-modules"
+        candidate_modules.mkdir()
+        (candidate_modules / (name + ".py")).write_text(
+            "from pathlib import Path\nPath(" + repr(str(self.sentinels[0])) + ").write_text('TOUCHED')\n")
+        sys.path.insert(0, str(candidate_modules))
+        with patch.object(guard, "DEFAULT_POLICY", self.policy), patch.object(guard, "HERE", trusted):
+            runner, _proof = guard.load_checked_runner(self.repo, self.safe)
+            with self.assertRaises(ModuleNotFoundError):
+                runner.later()
+        self.assertNotIn(str(candidate_modules), sys.path)
+
+    def test_trusted_loader_allows_release_sibling_and_standard_library(self):
+        name = "qualification_fixture_dependency"
+        trusted = self._import_fixture("import fractions\nimport " + name + "\nanswer = " + name + ".answer\n")
+        (trusted / (name + ".py")).write_text("answer = 42\n")
+        with patch.object(guard, "DEFAULT_POLICY", self.policy), patch.object(guard, "HERE", trusted):
+            runner, _proof = guard.load_checked_runner(self.repo, self.safe)
+        self.assertEqual(runner.answer, 42)
+        self.assertEqual(Path(sys.modules[name].__file__).resolve(), trusted / (name + ".py"))
+
+    def test_trusted_runner_symlink_cannot_point_into_candidate(self):
+        trusted = self._import_fixture("# replaced below with synthetic symlink\n")
+        target = self.repo / "untrusted_runner.py"
+        target.write_text("from pathlib import Path\nPath(" + repr(str(self.sentinels[0])) + ").write_text('TOUCHED')\n")
+        (trusted / "lane_runner.py").unlink()
+        (trusted / "lane_runner.py").symlink_to(target)
+        with patch.object(guard, "DEFAULT_POLICY", self.policy), patch.object(guard, "HERE", trusted):
+            with self.assertRaisesRegex(CheckoutHeld, "trusted-runner-from-candidate"):
+                guard.load_checked_runner(self.repo, self.safe)
 
     def test_missing_trusted_runner_holds(self):
         trusted = self.root / "missing-release"
@@ -279,6 +380,24 @@ class GuardContractTest(unittest.TestCase):
         with patch.object(guard, "checked_checkout", side_effect=ValueError("malformed synthetic git response")):
             with self.assertRaisesRegex(CheckoutHeld, "checkout-observation-unverifiable"):
                 guard.check(self.repo, self.safe)
+
+    def test_missing_promisor_object_holds_without_invoking_remote_helper(self):
+        (self.repo / "other.txt").write_text("safe descendant\n")
+        head = self.commit("synthetic safe descendant before removing floor object")
+        helper_bin = self.home / "bin"
+        helper_bin.mkdir()
+        helper = helper_bin / "git-remote-qualification-fixture"
+        helper.write_text("#!/bin/sh\nprintf lazy-fetch-executed > '" + str(self.sentinels[0]) + "'\nexit 1\n")
+        helper.chmod(0o755)
+        self.git("config", "remote.fixture.url", "qualification-fixture::never-network")
+        self.git("config", "remote.fixture.promisor", "true")
+        self.git("config", "protocol.qualification-fixture.allow", "always")
+        obj = self.repo / ".git/objects" / self.safe[:2] / self.safe[2:]
+        self.assertTrue(obj.is_file(), "synthetic fixture must have loose floor object")
+        obj.unlink()
+        with patch.dict(os.environ, {"PATH": str(helper_bin) + os.pathsep + os.environ["PATH"]}):
+            with self.assertRaises(CheckoutHeld):
+                self.check(head)
 
     def test_inherited_alternate_index_cannot_hide_unsafe_staging(self):
         real_index = Path(self.git("rev-parse", "--path-format=absolute", "--git-path", "index"))

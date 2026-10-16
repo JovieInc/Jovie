@@ -42,7 +42,7 @@ def _checked_source(repo, expected_head, policy, *, current_checkout, run=subpro
         raise CheckoutHeld("checkout-unreadable") from error
     # Observe this checkout, not an inherited alternate index/object/ref graph.
     env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
-    env.update({"GIT_OPTIONAL_LOCKS": "0", "GIT_NO_REPLACE_OBJECTS": "1",
+    env.update({"GIT_OPTIONAL_LOCKS": "0", "GIT_NO_REPLACE_OBJECTS": "1", "GIT_NO_LAZY_FETCH": "1",
                 "GIT_GRAFT_FILE": os.devnull, "GIT_CONFIG_NOSYSTEM": "1",
                 "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_SYSTEM": os.devnull,
                 "GIT_TERMINAL_PROMPT": "0"})
@@ -129,7 +129,7 @@ def prepare_checkout(repo: Path, expected_head: str) -> dict:
         env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
         env.update({"GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull,
                     "GIT_CONFIG_SYSTEM": os.devnull, "GIT_TERMINAL_PROMPT": "0",
-                    "GIT_NO_REPLACE_OBJECTS": "1", "GIT_GRAFT_FILE": os.devnull})
+                    "GIT_NO_REPLACE_OBJECTS": "1", "GIT_NO_LAZY_FETCH": "1", "GIT_GRAFT_FILE": os.devnull})
         git = ["git", "-c", "core.hooksPath=" + os.devnull, "-c", "core.fsmonitor=false",
                "-C", str(repo)]
         filters = subprocess.run([*git, "config", "--get-regexp", r"^filter\..*\.(clean|smudge|process)$"],
@@ -147,14 +147,53 @@ def prepare_checkout(repo: Path, expected_head: str) -> dict:
         raise CheckoutHeld("checkout-preparation-unverifiable") from error
 
 
-def _load_runner():
+def _load_runner(repo):
     # Resolve the trusted release alongside this module, never the candidate repo.
-    spec = importlib.util.spec_from_file_location("qualification_lane_runner", HERE / "lane_runner.py")
+    candidate = Path(repo).resolve(strict=True)
+    try:
+        runner = (HERE / "lane_runner.py").resolve(strict=True)
+    except OSError as error:
+        raise CheckoutHeld("trusted-runner-unavailable") from error
+    def inside(path, root):
+        return path == root or root in path.parents
+    if inside(runner, candidate):
+        raise CheckoutHeld("trusted-runner-from-candidate")
+    trusted = {HERE.resolve(), runner.parent, runner.parent.parent}
+    # A parent used for sibling scripts must never expose a nested candidate.
+    trusted = {root for root in trusted if not inside(candidate, root) and not inside(root, candidate)}
+    version = f"python{sys.version_info.major}.{sys.version_info.minor}"
+    runtime = {Path(os.__file__).resolve().parent}
+    runtime.update(Path(prefix).resolve() / "lib" / version / "site-packages"
+                   for prefix in (sys.base_prefix, sys.prefix, sys.exec_prefix))
+    runtime = {root for root in runtime if not inside(root, candidate)}
+    for module in tuple(sys.modules.values()):
+        if module is None:
+            continue
+        attrs = vars(module)
+        spec = attrs.get("__spec__")
+        origins = [attrs.get("__file__"), getattr(spec, "origin", None)]
+        origins.extend(attrs.get("__path__", ()))
+        if any(isinstance(origin, str) and origin not in ("built-in", "frozen")
+               and inside(Path(origin).resolve(), candidate) for origin in origins):
+            raise CheckoutHeld("cached-candidate-module")
+    # Cached siblings bypass sys.path entirely. Accept only this same release.
+    for root in trusted:
+        for source in root.glob("*.py"):
+            if source.stem == "__init__":
+                continue
+            cached = sys.modules.get(source.stem)
+            if cached is not None and Path(vars(cached).get("__file__") or "").resolve() != source.resolve():
+                raise CheckoutHeld("cached-release-module-mismatch:" + source.stem)
+    # Keep quarantine after returning: trusted runner functions can import lazily.
+    sys.path[:] = [str(root) for root in dict.fromkeys((runner.parent, runner.parent.parent, HERE.resolve()))
+                  if root in trusted] + [str(Path(entry).resolve()) for entry in sys.path
+        if entry and any(inside(Path(entry).resolve(), root) for root in runtime)
+        and not inside(Path(entry).resolve(), candidate)]
+    spec = importlib.util.spec_from_file_location("qualification_lane_runner", runner)
     if spec is None or spec.loader is None:
         raise CheckoutHeld("trusted-runner-unavailable")
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
-    sys.path.insert(0, str(HERE))
     try:
         spec.loader.exec_module(module)
     except Exception as error:
@@ -167,7 +206,10 @@ def _load_runner():
 def load_checked_runner(repo: Path, expected_head: str):
     """Manual qualification entry: preflight before even the trusted runner import."""
     proof = check(repo, expected_head)
-    return _load_runner(), proof
+    try:
+        return _load_runner(repo), proof
+    except (OSError, ValueError, TypeError) as error:
+        raise CheckoutHeld("trusted-import-isolation-unverifiable") from error
 
 
 def main(argv=None) -> int:
