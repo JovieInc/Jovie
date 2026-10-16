@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import importlib.util
 import contextlib
+import copy
 import dataclasses
 import fcntl
 import concurrent.futures
@@ -2646,6 +2647,25 @@ class MaintenanceDemandTest(unittest.TestCase):
         self.assertIsNone(self.census([self.pr()], selected={7})["pending"])
         self.assertEqual(self.census([])["pending"], 0)
 
+    def test_census_reports_known_blockers_without_inventing_total_zero(self):
+        sample = self.census([self.pr(isInMergeQueue=True)])
+        self.assertIsNone(sample["pending"])
+        self.assertEqual(sample["ordinaryPrPending"], 0)
+        self.assertEqual(sample["blockedByReason"], {"queued": 1})
+        self.assertEqual(sample["dispositions"], {"7": "queued"})
+        self.assertEqual(sample["unknownByReason"], {})
+        self.assertFalse(sample["projectionComplete"])
+        self.assertIn("labeled-remediation-events", sample["unmeasuredClasses"])
+
+    def test_census_names_stale_inventory_and_retains_positive_lower_bound(self):
+        sample = self.census([self.pr()], readable=False)
+        self.assertEqual(sample["unknownByReason"], {"maintenance-inventory-unknown": 1})
+        sample = self.census([self.pr(), self.pr(8)], current=[self.pr(), self.pr(8, headRefOid="new")])
+        self.assertEqual(sample["pending"], 1)
+        self.assertIsNone(sample["ordinaryPrPending"])
+        self.assertEqual(sample["byKind"], {"repair": 1})
+        self.assertEqual(sample["unknownByReason"], {"maintenance-current-metadata-unknown": 1})
+
     def test_missing_test_is_repair_demand_but_not_adoption_permission(self):
         held = {"7": lane.pr_events.held_record("h7", ["code-change-without-test"])}
         (self.host.state / "held.json").write_text(json.dumps(held))
@@ -2827,6 +2847,37 @@ class MaintenanceDemandTest(unittest.TestCase):
 
 
 class WorkerTest(unittest.TestCase):
+    def test_pending_rung_join_uses_only_the_fresh_pinned_prelock_inventory(self):
+        for delay in (0, lane.MAINTENANCE_DEMAND_MAX_AGE_S + 1):
+            with self.subTest(delay=delay):
+                clock = [10000.0]
+                original = {"number": 7, "headRefOid": "original"}
+                changed = {"number": 7, "headRefOid": "later-global-value"}
+                summary = {"readable": True, "sourceAt": clock[0], "prs": [original]}
+                locked = lane.Locked
+                def acquire(path, *args, **kwargs):
+                    if Path(path).name == "claim.lock":
+                        summary["prs"] = [changed]
+                        clock[0] += delay
+                    return locked(path, *args, **kwargs)
+                with patch.object(lane, "_SUMMARY", summary), \
+                        patch.object(lane, "Locked", side_effect=acquire), \
+                        patch.object(lane.time, "time", side_effect=lambda: clock[0]), \
+                        patch.object(self.host, "intake_slots", return_value=0), \
+                        patch.object(lane.pr_events, "capture_target_file_witnesses", return_value={}), \
+                        patch.object(lane, "pending_rung_candidates", side_effect=lambda host, name, rows: rows) as join, \
+                        patch.object(lane, "claim_escalation_pr", return_value=None) as claim, \
+                        patch.object(lane, "record_maintenance_demand"), \
+                        patch.object(lane, "escalate_exhausted"):
+                    lane.worker(self.host, "devin")
+                if delay:
+                    join.assert_not_called()
+                    self.assertEqual(claim.call_args.args[2], [])
+                else:
+                    self.assertEqual(join.call_args.args[2], [original])
+                    self.assertEqual(claim.call_args.args[2], [original])
+                self.assertEqual(summary["prs"], [changed])
+
     def test_target_confirmation_precedes_claim_lock_and_worker_rechecks_age_after_wait(self):
         task, witness = TargetFileAdmissionTest().fixture()
         self.linear.issues = [task]
@@ -2942,8 +2993,12 @@ class WorkerTest(unittest.TestCase):
                 patch.object(lane, "Linear") as client, \
                 patch.object(lane, "claim_labeled_event") as event, \
                 patch.object(lane, "read_new_issue_budget") as budget, \
-                patch.object(lane, "run_issue") as new_work:
+                patch.object(lane, "run_issue") as new_work, \
+                patch.object(lane, "escalate_exhausted") as refresh:
             self.assertEqual(lane.worker(self.host, "devin"), 0)
+        refresh.assert_called_once()
+        self.assertIsNone(refresh.call_args.args[2])
+        self.assertTrue(refresh.call_args.kwargs["model_only"])
         client.assert_not_called()
         event.assert_not_called()
         budget.assert_not_called()
@@ -3090,7 +3145,7 @@ class WorkerTest(unittest.TestCase):
         lane.read_new_issue_budget = lambda name, slots: lane.new_issue_budget(name, slots, lane.lane_prs(name, fields=lane.LIGHT_PR_FIELDS))
         lane.in_flight_issues = lambda: frozenset()  # never GitHub from a unit test
         lane.fix_candidates = lambda name: []
-        lane.escalate_exhausted = lambda host, prs, linear: None
+        lane.escalate_exhausted = lambda host, prs, linear, **kwargs: None
         self.tmp = tempfile.TemporaryDirectory()
         self.host = lane.Host(state=Path(self.tmp.name), repo=Path(self.tmp.name), linear_env=Path("unused"))
         intake = patch.object(self.host, "intake_slots", return_value=1)
@@ -10856,3 +10911,317 @@ class RepositoryBindingTest(unittest.TestCase):
         gql = Mock(side_effect=AssertionError("no Linear read for another team's event"))
         self.assertIsNone(lane.claim_labeled_event(self.host, "codex", SimpleNamespace(gql=gql)))
         gql.assert_not_called()
+
+
+class PendingRungDispositionTest(unittest.TestCase):
+    def setUp(self):
+        self.env = patch.dict(os.environ, {"LANES_ESCALATION": "1", "LANES_ESCALATION_PER_HEAD": "2",
+                              "LANES_ESCALATION_PER_PR": "4", "LANES_ESCALATION_COOLDOWN_S": "1800"})
+        self.env.start()
+        self.addCleanup(self.env.stop)
+        self.now = 100000
+        self.providers = {"codex": {"enabled": True, "tier": 0}, "grok": {"enabled": True, "tier": 1}}
+        self.pr = {"number": 7, "state": "OPEN", "headRefOid": "head-A",
+                   "headRefName": "codex/jov-7-20261016", "isDraft": True,
+                   "isCrossRepository": False, "isInMergeQueue": False}
+        self.classified = {"cls": "needs-rebase", "subtype": "semantic", "next_action": "update-branch"}
+        self.record = {"sha": "head-A", "lane": "codex", "count": 2, "at": 100, "endedAt": 200,
+                       "repairBranch": self.pr["headRefName"], "repairVerdict": "fix-no-change",
+                       "escalations": [{"kind": "deterministic", "rung": "update-branch", "head": "head-A"}],
+                       "pendingEscalation": {"lane": "grok", "head": "head-A", "dossier": "existing evidence",
+                                             "cls": "needs-rebase", "subtype": "semantic", "topRung": False}}
+
+    def run_case(self, *, name="grok", **over):
+        args = {"classified": self.classified, "caps_allow": lane.remediation.caps_allow,
+                "plan_ladder": lane.remediation.plan_ladder, "top_rung_used": lane.remediation.top_rung_used,
+                "active_previous_attempt": False}
+        args.update(over)
+        before = copy.deepcopy((self.pr, self.record, self.providers, self.classified))
+        result = lane.pending_rung_disposition(self.pr, self.record, name, self.providers, self.now, **args)
+        self.assertEqual((self.pr, self.record, self.providers, self.classified), before)
+        return result
+
+    def test_exact_ended_native_draft_has_canonical_stronger_rung(self):
+        self.assertEqual(self.run_case(), {"state": "eligible", "reason": "pending-model-rung", "crossLaneDraft": True})
+        self.assertEqual(self.record["count"], 2)
+        self.assertEqual(len(self.record["escalations"]), 1)
+
+    def test_same_lane_optional_head_and_missing_ended_legacy_are_retained(self):
+        self.record["pendingEscalation"].update(lane="codex", head=None)
+        self.record.pop("endedAt")
+        self.assertEqual(self.run_case(name="codex")["state"], "eligible")
+        self.assertEqual(self.run_case(name="codex")["crossLaneDraft"], False)
+
+    def test_disabled_owner_retains_existing_scope(self):
+        self.providers["codex"]["enabled"] = False
+        self.record.pop("endedAt")
+        self.record["pendingEscalation"]["head"] = None
+        self.assertEqual(self.run_case()["state"], "eligible")
+        self.assertFalse(self.run_case()["crossLaneDraft"])
+
+    def test_uncertified_foreign_draft_stays_refused(self):
+        self.pr["headRefName"] = "manual/feature"
+        self.assertEqual(self.run_case()["reason"], "rung-foreign-draft")
+        self.pr["headRefName"] = "other/jov-7-20261016"
+        self.assertEqual(self.run_case()["reason"], "rung-draft-owner-unproven")
+
+    def test_cross_lane_requires_exact_ended_same_attempt(self):
+        cases = [(lambda: self.record["pendingEscalation"].update(head=None), "rung-draft-exact-head-required"),
+                 (lambda: self.record.pop("endedAt"), "rung-draft-previous-attempt-not-ended"),
+                 (lambda: self.record.update(endedAt=True), "rung-draft-previous-attempt-not-ended"),
+                 (lambda: self.record.update(endedAt=100001), "rung-draft-previous-attempt-not-ended"),
+                 (lambda: self.record.update(endedAt=99), "rung-draft-previous-attempt-not-ended"),
+                 (lambda: self.record.update(sha="head-B"), "rung-draft-attempt-target-changed"),
+                 (lambda: self.record.update(repairBranch="other/branch"), "rung-draft-attempt-target-changed"),
+                 (lambda: self.record.pop("repairBranch"), "rung-draft-attempt-target-changed")]
+        for change, reason in cases:
+            baseline = copy.deepcopy(self.record)
+            change()
+            with self.subTest(reason=reason): self.assertEqual(self.run_case()["reason"], reason)
+            self.record = baseline
+
+    def test_original_head_active_and_external_custody_are_preserved(self):
+        self.assertEqual(self.run_case(active_previous_attempt=True)["reason"], "rung-previous-attempt-active")
+        for reason in ("preserved-reconciliation-required", "publication-revoked", "secret-file", "ownership-unknown"):
+            with self.subTest(reason=reason): self.assertEqual(self.run_case(recovery_block=reason)["reason"], reason)
+
+    def test_current_target_class_and_prescription_must_agree(self):
+        for changes in ({"state": "MERGED"}, {"state": "CLOSED"}, {"isCrossRepository": True},
+                        {"isInMergeQueue": True}, {"headRefOid": "head-B"}):
+            before = self.pr.copy()
+            self.pr.update(changes)
+            with self.subTest(changes=changes): self.assertEqual(self.run_case()["state"], "blocked")
+            self.pr = before
+        for classification in ({"cls": "ready"}, {"cls": "needs-human-decision"},
+                               {"cls": "flaky-infra", "subtype": "main-red"},
+                               {"cls": "fixable-by-model", "subtype": "check"},
+                               {**self.classified, "subtype": "lockfile-only"}):
+            with self.subTest(classification=classification):
+                self.assertEqual(self.run_case(classified=classification)["state"], "blocked")
+
+    def test_canonical_caps_include_prior_heads_and_cooldown(self):
+        model = {"kind": "model", "head": "head-A", "lane": "grok", "at": 1000}
+        self.record["escalations"] += [model.copy(), model.copy()]
+        self.assertEqual(self.run_case()["reason"], "ladder-exhausted")
+        self.record["escalations"] = []
+        self.record["priorEscalations"] = [{**model, "head": f"old-{n}"} for n in range(4)]
+        self.assertEqual(self.run_case()["reason"], "ladder-exhausted")
+        self.record["priorEscalations"] = [{**model, "at": self.now - 100}]
+        self.assertEqual(self.run_case()["reason"], "cooldown")
+
+    def test_deterministic_precedence_and_route_change_refuse_transfer(self):
+        self.record["escalations"] = []
+        self.assertEqual(self.run_case()["reason"], "rung-draft-canonical-route-changed")
+        self.record["escalations"] = [{"kind": "deterministic", "rung": "update-branch", "head": "head-A"}]
+        self.record["pendingEscalation"]["topRung"] = True
+        self.assertEqual(self.run_case()["reason"], "rung-draft-canonical-route-changed")
+        self.providers["grok"]["enabled"] = False
+        self.assertEqual(self.run_case()["reason"], "rung-provider-disabled")
+
+    def test_one_top_rung_is_canonical_and_not_reusable(self):
+        self.record["escalations"].append({"kind": "model", "rung": "escalate", "head": "head-A",
+                                          "lane": "grok", "at": 1000, "topRung": False})
+        self.record["pendingEscalation"]["topRung"] = True
+        self.assertEqual(self.run_case()["state"], "eligible")
+        # Configuring a larger numeric cap cannot renew the one-top-rung rule.
+        with patch.dict(os.environ, {"LANES_ESCALATION_PER_HEAD": "9"}):
+            self.record["escalations"][-1]["topRung"] = True
+            self.assertEqual(self.run_case()["reason"], "ladder-exhausted")
+
+    def test_same_lane_stale_pending_cannot_repeat_spent_top_rung(self):
+        self.record["pendingEscalation"].update(lane="codex", topRung=True)
+        self.record["escalations"].append({"kind": "model", "head": "head-A", "lane": "codex",
+                                          "at": 1000, "topRung": True})
+        with patch.dict(os.environ, {"LANES_ESCALATION_PER_HEAD": "9"}):
+            self.assertEqual(self.run_case(name="codex")["reason"], "ladder-exhausted")
+
+    def test_old_foreign_draft_fixture_is_not_a_certified_transfer(self):
+        self.providers = {"devin": {"enabled": True, "tier": 0}, "codex": {"enabled": True, "tier": 1}}
+        self.pr["headRefName"] = "devin/jov-7648-20261003"
+        self.record.update(lane="devin")
+        self.record.pop("repairBranch")
+        self.record["pendingEscalation"].update(lane="codex")
+        self.assertEqual(self.run_case(name="codex")["reason"], "rung-draft-attempt-target-changed")
+
+    def test_malformed_accounting_and_unreadable_authority_never_become_permission(self):
+        for field, value in (("count", True), ("count", -1), ("escalations", "bad"),
+                             ("priorEscalations", [None]),
+                             ("escalations", [{"kind": "model", "at": float("nan")}]),
+                             ("escalations", [{"kind": "model", "at": self.now + 1}])):
+            original = self.record.get(field)
+            self.record[field] = value
+            with self.subTest(field=field, value=value): self.assertEqual(self.run_case()["state"], "unknown")
+            if original is None: self.record.pop(field)
+            else: self.record[field] = original
+        self.assertEqual(self.run_case(caps_allow=lambda *args: None)["state"], "unknown")
+        self.assertEqual(self.run_case(plan_ladder=lambda *args: None)["state"], "unknown")
+
+    def test_bad_or_missing_pending_and_metadata_never_count(self):
+        for field, value in (("dossier", " "), ("dossier", {}), ("head", "head-B"), ("lane", "codex")):
+            original = self.record["pendingEscalation"][field]
+            self.record["pendingEscalation"][field] = value
+            with self.subTest(field=field): self.assertNotEqual(self.run_case()["state"], "eligible")
+            self.record["pendingEscalation"][field] = original
+        self.pr.pop("isInMergeQueue")
+        self.assertEqual(self.run_case()["state"], "unknown")
+
+
+    def integration_pr(self):
+        return {**self.pr, "mergeStateStatus": "DIRTY", "labels": [], "statusCheckRollup": []}
+
+    def test_actual_claim_charges_one_separate_rung_and_preserves_spent_history(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp)); pr = self.integration_pr()
+            path = host.state / "fix-attempts.json"
+            path.write_text(json.dumps({"7": self.record, "8": {"keep": True}}))
+            before = copy.deepcopy(self.record)
+            with patch.object(lane, "load_providers", return_value=self.providers), \
+                    patch.object(lane, "claimed_elsewhere", return_value=False), \
+                    patch.object(lane, "reconcile_fix_target", return_value=pr), \
+                    patch.object(lane, "post_claim") as posted, \
+                    patch.object(lane, "sh", side_effect=AssertionError("no external mutation")), \
+                    patch.object(lane.time, "time", return_value=self.now):
+                selected = lane.claim_escalation_pr(host, "grok", [pr])
+                self.assertEqual(selected["dossier"], "existing evidence")
+                self.assertIsNone(lane.claim_escalation_pr(host, "grok", [pr]))
+            rows = json.loads(path.read_text()); after = rows["7"]
+            self.assertEqual(rows["8"], {"keep": True})
+            for key, value in before.items():
+                if key not in {"pendingEscalation", "escalations"}: self.assertEqual(after[key], value)
+            self.assertEqual(after["escalations"][:-1], before["escalations"])
+            self.assertEqual(after["escalations"][-1]["lane"], "grok")
+            self.assertEqual(after["escalations"][-1]["kind"], "model")
+            posted.assert_called_once_with(7, "head-A", "fix")
+
+    def test_certified_draft_still_requires_fresh_owner_target_and_publication_fences(self):
+        for fault in ("owner", "queued", "head", "revoked", "secret"):
+            with self.subTest(fault=fault), tempfile.TemporaryDirectory() as tmp:
+                host = lane.Host(state=Path(tmp)); pr = self.integration_pr(); live = copy.deepcopy(pr)
+                path = host.state / "fix-attempts.json"; path.write_text(json.dumps({"7": self.record}))
+                before = path.read_bytes()
+                if fault == "queued": live["isInMergeQueue"] = True
+                if fault == "head": live["headRefOid"] = "new-head"
+                if fault == "revoked": lane.revoke_publication(host, branch=pr["headRefName"], reason="fixture")
+                if fault == "secret":
+                    (host.state / "held.json").write_text(json.dumps({"7": lane.pr_events.held_record("head-A", ["secret-like-file-changed:file"])}))
+                with patch.object(lane, "load_providers", return_value=self.providers), \
+                        patch.object(lane, "claimed_elsewhere", return_value=fault == "owner"), \
+                        patch.object(lane, "reconcile_fix_target", return_value=live), \
+                        patch.object(lane, "post_claim") as posted, \
+                        patch.object(lane, "sh", side_effect=AssertionError("no external mutation")), \
+                        patch.object(lane.time, "time", return_value=self.now):
+                    self.assertIsNone(lane.claim_escalation_pr(host, "grok", [pr]))
+                self.assertEqual(path.read_bytes(), before); posted.assert_not_called()
+
+    def test_dedicated_inventory_join_and_census_find_rung_absent_from_polling(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp)); pr = self.integration_pr()
+            (host.state / "fix-attempts.json").write_text(json.dumps({"7": self.record}))
+            summary = {"at": self.now, "sourceAt": self.now, "readable": True, "prs": [pr]}
+            with patch.object(lane, "_SUMMARY", summary), \
+                    patch.object(lane, "load_providers", return_value=self.providers), \
+                    patch.object(lane.time, "time", return_value=self.now), \
+                    patch.object(lane, "sh", side_effect=AssertionError("no API or model")), \
+                    patch.object(lane, "claimed_elsewhere", side_effect=AssertionError("no remote claim in census")):
+                self.assertEqual(lane.pending_rung_candidates(host, "grok", [pr]), [pr])
+                lane.record_maintenance_demand(host, "grok", [], [], [], set())
+                sample = json.loads((host.state / "maintenance-demand.json").read_text())["lanes"]["grok"]
+                self.assertEqual(sample["pending"], 1)
+                self.assertEqual(sample["byKind"], {"escalation": 1})
+                self.assertEqual(sample["ordinaryPrPending"], 0)
+                lane.record_maintenance_demand(host, "grok", [], [], [], {7})
+                sample = json.loads((host.state / "maintenance-demand.json").read_text())["lanes"]["grok"]
+                self.assertIsNone(sample["pending"])
+                self.assertEqual(sample["blockedByReason"], {"selected": 1})
+
+    def test_preserved_or_revoked_rung_never_becomes_positive_demand(self):
+        for fault in ("preserved", "revoked"):
+            with self.subTest(fault=fault), tempfile.TemporaryDirectory() as tmp:
+                host = lane.Host(state=Path(tmp)); pr = self.integration_pr()
+                (host.state / "fix-attempts.json").write_text(json.dumps({"7": self.record}))
+                if fault == "preserved":
+                    path = host.state / "worktrees/run-PR7-codex-fix"; path.mkdir(parents=True)
+                    (path / lane.disk_guard.PRESERVED_REPAIR).write_text(json.dumps({"pr": 7}))
+                else: lane.revoke_publication(host, branch=pr["headRefName"], reason="fixture")
+                summary = {"at": self.now, "sourceAt": self.now, "readable": True, "prs": [pr]}
+                with patch.object(lane, "_SUMMARY", summary), \
+                        patch.object(lane, "load_providers", return_value=self.providers), \
+                        patch.object(lane.time, "time", return_value=self.now):
+                    lane.record_maintenance_demand(host, "grok", [], [], [], set())
+                sample = json.loads((host.state / "maintenance-demand.json").read_text())["lanes"]["grok"]
+                self.assertIsNone(sample["pending"])
+                reason = "preserved-reconciliation-required" if fault == "preserved" else "publication-revoked"
+                self.assertEqual(sample["blockedByReason"], {reason: 1})
+
+    def test_repair_floor_refreshes_only_model_authority_without_linear(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp)); pr = self.integration_pr()
+            pr.update(mergeStateStatus="BLOCKED", statusCheckRollup=[{"name": "source", "status": "COMPLETED", "conclusion": "FAILURE"}])
+            path = host.state / "fix-attempts.json"; path.write_text(json.dumps({"7": self.record}))
+            before = copy.deepcopy(self.record)
+            with patch.object(lane, "load_providers", return_value=self.providers), \
+                    patch.object(lane, "cooling", return_value=False), \
+                    patch.object(lane, "provider_healthy", return_value=True), \
+                    patch.object(lane, "reconcile_fix_target", return_value=pr), \
+                    patch.object(lane.pr_events, "add_label"), \
+                    patch.object(lane, "sh", side_effect=AssertionError("no new work or deterministic mutation")), \
+                    patch.object(lane.time, "time", return_value=self.now):
+                lane.escalate_exhausted(host, [pr], None, model_only=True)
+            after = json.loads(path.read_text())["7"]
+            self.assertEqual(after["pendingEscalation"]["cls"], "fixable-by-model")
+            self.assertEqual(after["pendingEscalation"]["subtype"], "check")
+            self.assertEqual(after["pendingEscalation"]["lane"], "grok")
+            self.assertEqual(after["pendingEscalation"]["head"], "head-A")
+            for key, value in before.items():
+                if key != "pendingEscalation": self.assertEqual(after[key], value)
+
+    def test_repair_floor_refresh_stops_on_fresh_custody_and_target_races(self):
+        for fault in ("active", "held", "preserved", "revoked", "head"):
+            with self.subTest(fault=fault), tempfile.TemporaryDirectory() as tmp:
+                host = lane.Host(state=Path(tmp)); pr = self.integration_pr()
+                pr.update(mergeStateStatus="BLOCKED", statusCheckRollup=[{"name": "source", "conclusion": "FAILURE"}])
+                record = copy.deepcopy(self.record)
+                if fault == "active": record.pop("endedAt"); record["at"] = self.now
+                path = host.state / "fix-attempts.json"; path.write_text(json.dumps({"7": record})); before = path.read_bytes()
+                def target(_):
+                    live = copy.deepcopy(pr)
+                    if fault == "held": (host.state / "held.json").write_text(json.dumps({"7": lane.pr_events.held_record("head-A", ["secret-like-file-changed:file"])}))
+                    if fault == "preserved":
+                        p = host.state / "worktrees/run-PR7-codex-fix"; p.mkdir(parents=True)
+                        (p / lane.disk_guard.PRESERVED_REPAIR).write_text(json.dumps({"pr": 7}))
+                    if fault == "revoked": lane.revoke_publication(host, branch=pr["headRefName"], reason="fixture")
+                    if fault == "head": live["headRefOid"] = "new-head"
+                    return live
+                with patch.object(lane, "load_providers", return_value=self.providers), \
+                        patch.object(lane, "cooling", return_value=False), \
+                        patch.object(lane, "provider_healthy", return_value=True), \
+                        patch.object(lane, "reconcile_fix_target", side_effect=target), \
+                        patch.object(lane.pr_events, "add_label") as label, \
+                        patch.object(lane, "sh", side_effect=AssertionError("no deterministic mutation")), \
+                        patch.object(lane.time, "time", return_value=self.now):
+                    lane.escalate_exhausted(host, [pr], None, model_only=True)
+                self.assertEqual(path.read_bytes(), before); label.assert_not_called()
+
+    def test_repair_floor_defers_terminal_latch_until_one_ordinary_disposition(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp)); pr = self.integration_pr(); pr["labels"] = [{"name": "tim-hold"}]
+            path = host.state / "fix-attempts.json"; path.write_text(json.dumps({"7": self.record})); before = path.read_bytes()
+            linear = FakeLinear([])
+            issue_row = {"id": "issue7", "identifier": "JOV-7", "state": {"type": "started"}, "comments": {"nodes": []}}
+            with patch.object(lane, "load_providers", return_value=self.providers), \
+                    patch.object(lane, "cooling", return_value=False), \
+                    patch.object(lane, "provider_healthy", return_value=True), \
+                    patch.object(lane, "reconcile_fix_target", return_value=pr), \
+                    patch.object(lane.pr_events, "linear_issue", return_value=issue_row), \
+                    patch.object(lane.pr_events, "add_label") as label, \
+                    patch.object(lane, "sh", return_value=SimpleNamespace(returncode=0, stdout="", stderr="")) as transport, \
+                    patch.object(lane.time, "time", return_value=self.now):
+                lane.escalate_exhausted(host, [pr], None, model_only=True)
+                self.assertEqual(path.read_bytes(), before); label.assert_not_called(); transport.assert_not_called()
+                lane.escalate_exhausted(host, [pr], linear)
+                lane.escalate_exhausted(host, [pr], linear)
+            self.assertEqual(transport.call_count, 1)
+            self.assertEqual(transport.call_args.args[0][:3], ["gh", "pr", "comment"])
+            self.assertTrue(json.loads(path.read_text())["7"]["escalated"])
+            self.assertEqual(linear.moves, [("issue7", "Backlog")])
+            self.assertEqual(len(linear.comments), 1)
