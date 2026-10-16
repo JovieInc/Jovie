@@ -25,8 +25,7 @@ import { dirname, join, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { planScorecardRateLimitWait } from './github-installation-quota.mjs';
 
-export const SCORECARD_ACTION_SHA =
-  'fa7117db83c52d787ae5a89f350999701505d78e';
+export const SCORECARD_ACTION_SHA = 'fa7117db83c52d787ae5a89f350999701505d78e';
 export const SCORECARD_IMAGE =
   'ghcr.io/ossf/scorecard-action@sha256:1e1481c65fc2407d3fd6ab18a23c741eb4d1c0d9359ebafc4b3ab13aa61d8627';
 export const SCORECARD_RESULTS_FILE = 'scorecard-results.sarif';
@@ -348,10 +347,7 @@ export async function waitForScorecardBuckets({
     } catch {
       resources = null;
     }
-    const elapsedSeconds = Math.max(
-      0,
-      Math.floor((now() - startedAt) / 1000)
-    );
+    const elapsedSeconds = Math.max(0, Math.floor((now() - startedAt) / 1000));
     const plan = planScorecardBuckets({
       nowSeconds: Math.floor(now() / 1000),
       resources,
@@ -455,11 +451,27 @@ export async function superviseScorecardRun({
 }
 
 /**
+ * Enough of a child process for the log watcher. Tests pass a fake.
+ * @typedef {{
+ *   on: (event: string, listener: (...args: unknown[]) => void) => void,
+ * }} ScorecardStream
+ * @typedef {{
+ *   stdout: ScorecardStream | null,
+ *   stderr: ScorecardStream | null,
+ *   on: (event: string, listener: (...args: unknown[]) => void) => void,
+ * }} ScorecardChild
+ */
+
+/**
  * @param {{
  *   env: NodeJS.ProcessEnv,
  *   attempt: number,
  *   run?: typeof capture,
- *   spawnChild?: typeof spawn,
+ *   spawnChild?: (
+ *     command: string,
+ *     args: readonly string[],
+ *     options: import('node:child_process').SpawnOptions,
+ *   ) => ScorecardChild,
  * }} input
  */
 export async function runScorecardContainer({
@@ -468,7 +480,6 @@ export async function runScorecardContainer({
   run = capture,
   spawnChild = spawn,
 }) {
-  const workspace = String(env.GITHUB_WORKSPACE ?? '');
   const home = join(
     String(env.RUNNER_TEMP || '/tmp'),
     'scorecard-credential-guard-home'
@@ -493,9 +504,7 @@ export async function runScorecardContainer({
         outcome => {
           if (outcome.code === 0) return true;
           const text = `${outcome.stderr}\n${outcome.stdout}`;
-          return /No such container|is not running|already stopped/i.test(
-            text
-          );
+          return /No such container|is not running|already stopped/i.test(text);
         },
         () => false
       );
@@ -604,8 +613,7 @@ export async function runScorecardCredentialGuard({
     removeResults:
       removeResults ?? (() => removePartialScorecardResults(workspace)),
     runAttempt:
-      runAttempt ??
-      (attempt => runScorecardContainer({ env, attempt, run })),
+      runAttempt ?? (attempt => runScorecardContainer({ env, attempt, run })),
   });
 }
 

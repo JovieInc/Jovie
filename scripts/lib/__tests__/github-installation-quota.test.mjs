@@ -1,4 +1,3 @@
-import { EventEmitter } from 'node:events';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -16,10 +15,10 @@ import {
   parseGoDurationSeconds,
   planPoisonedScorecardRetry,
   planScorecardBuckets,
+  runScorecardContainer,
   scorecardContainerEnv,
   scorecardDockerArgs,
   scorecardKillArgs,
-  runScorecardContainer,
   scorecardWaitFromLine,
   superviseScorecardRun,
   waitForScorecardBuckets,
@@ -231,9 +230,7 @@ describe('scorecard credential guard', () => {
       waitSeconds: parseGoDurationSeconds(incidentWait),
     });
     expect(
-      scorecardWaitFromLine(
-        'Retry-After header set. Waiting 12s to retry...'
-      )
+      scorecardWaitFromLine('Retry-After header set. Waiting 12s to retry...')
     ).toMatchObject({ kind: 'wait', waitSeconds: 12 });
     expect(
       scorecardWaitFromLine('Rate limit exceeded. Retrying...')
@@ -244,9 +241,9 @@ describe('scorecard credential guard', () => {
 
   it('waits the empty bucket and still proceeds on a last remaining point', () => {
     const open = resources(1);
-    expect(
-      planScorecardBuckets({ nowSeconds, resources: open })
-    ).toMatchObject({ action: 'proceed', waitSeconds: 0 });
+    expect(planScorecardBuckets({ nowSeconds, resources: open })).toMatchObject(
+      { action: 'proceed', waitSeconds: 0 }
+    );
 
     const codeSearchReset = nowSeconds + 40;
     const plan = planScorecardBuckets({
@@ -477,15 +474,62 @@ describe('scorecard credential guard', () => {
         return { code: 0, stdout: '', stderr: '' };
       },
       spawnChild: () => {
-        const child = new EventEmitter();
-        child.stdout = new EventEmitter();
-        child.stderr = new EventEmitter();
+        /** @type {Map<string, Array<(...args: unknown[]) => void>>} */
+        const listeners = new Map();
+        const stream = () => {
+          /** @type {Map<string, Array<(...args: unknown[]) => void>>} */
+          const streamListeners = new Map();
+          return {
+            /**
+             * @param {string} event
+             * @param {(...args: unknown[]) => void} listener
+             */
+            on(event, listener) {
+              const list = streamListeners.get(event) ?? [];
+              list.push(listener);
+              streamListeners.set(event, list);
+            },
+            /**
+             * @param {string} event
+             * @param {unknown[]} args
+             */
+            emit(event, ...args) {
+              for (const listener of streamListeners.get(event) ?? []) {
+                listener(...args);
+              }
+            },
+          };
+        };
+        const stdout = stream();
+        const stderr = stream();
+        const child = {
+          stdout,
+          stderr,
+          /**
+           * @param {string} event
+           * @param {(...args: unknown[]) => void} listener
+           */
+          on(event, listener) {
+            const list = listeners.get(event) ?? [];
+            list.push(listener);
+            listeners.set(event, list);
+          },
+          /**
+           * @param {string} event
+           * @param {unknown[]} args
+           */
+          emit(event, ...args) {
+            for (const listener of listeners.get(event) ?? []) {
+              listener(...args);
+            }
+          },
+        };
         setImmediate(() => {
-          child.stderr.emit(
+          stderr.emit(
             'data',
             Buffer.from('Rate limit exceeded. Waiting 31m15.')
           );
-          child.stderr.emit(
+          stderr.emit(
             'data',
             Buffer.from(`${incidentWait.slice('31m15.'.length)} to retry...\n`)
           );
