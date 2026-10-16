@@ -154,6 +154,10 @@ export const SCREEN_PROOF_ROUTES = Object.freeze({
   'web.brand': '/brand',
   'web.report': '/report',
   'web.start': '/start',
+  // JOV-8068: the checkout page is registered and auth-gated. The
+  // isRenderFixtureEnabled branch on that page is the rendered producer;
+  // production deployments fail closed and keep the sign-in redirect.
+  'web.onboarding-checkout': '/onboarding/checkout',
   // /solutions/* registers the whole (marketing)/solutions directory;
   // /solutions/artists is the family's declared concrete health-check path.
   'web.marketing-solutions': '/solutions/artists',
