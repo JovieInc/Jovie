@@ -55,7 +55,7 @@ describe('createMarkdownDocument', () => {
       '- [x] Essential cookies',
       '- [ ] Marketing cookies',
     ].join('\n');
-    const doc = await createMarkdownDocument(md);
+    const doc = await createMarkdownDocument(md, { focusableTables: true });
 
     expect(doc.html).toContain('<table tabindex="0"');
     expect(doc.html).toContain('<th>Cookie Name</th>');
@@ -74,7 +74,7 @@ describe('createMarkdownDocument', () => {
       '- [x] <span onclick="alert(3)">Checked</span>',
       '- [ ] <script>alert("x")</script>Unchecked',
     ].join('\n');
-    const doc = await createMarkdownDocument(md);
+    const doc = await createMarkdownDocument(md, { focusableTables: true });
 
     expect(doc.html).toContain('<table tabindex="0"');
     expect(doc.html).toContain('Unsafe');
@@ -94,7 +94,7 @@ describe('createMarkdownDocument', () => {
       '| --- | --- | --- |',
       '| `jovie_lead_attribution` | Stores claim-invite attribution | 30 days |',
     ].join('\n');
-    const doc = await createMarkdownDocument(md);
+    const doc = await createMarkdownDocument(md, { focusableTables: true });
 
     expect(doc.html).toContain(
       '<table tabindex="0" aria-label="Table: Cookie Name, Purpose, Duration">'
@@ -103,8 +103,16 @@ describe('createMarkdownDocument', () => {
 
   it('falls back to a generic accessible name for headerless tables', async () => {
     const md = ['|  |  |', '| --- | --- |', '| a | b |'].join('\n');
-    const doc = await createMarkdownDocument(md);
+    const doc = await createMarkdownDocument(md, { focusableTables: true });
 
     expect(doc.html).toContain('<table tabindex="0" aria-label="Data table">');
+  });
+
+  it('keeps tables plain for readers whose tables never scroll', async () => {
+    const md = ['| A | B |', '| --- | --- |', '| 1 | 2 |'].join('\n');
+    const doc = await createMarkdownDocument(md);
+
+    expect(doc.html).toContain('<table>');
+    expect(doc.html).not.toContain('tabindex');
   });
 });
