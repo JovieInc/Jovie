@@ -1,6 +1,12 @@
 import AxeBuilder from '@axe-core/playwright';
 import { test as baseTest, expect, type Page } from '@playwright/test';
 import { USERNAME_MAX_LENGTH } from '@/lib/validation/client-username';
+import {
+  expectAuthPendingStatusContained,
+  expectAuthStatusTextContained,
+  measureAuthPendingStatus,
+  measureAuthStatusText,
+} from './utils/auth-text-containment';
 
 const test = baseTest.extend({
   context: async ({ context }, runTest, info) => {
@@ -410,14 +416,31 @@ test('signup geometry detector rejects hidden and displaced email controls @smok
   expect(evidence.writes).toEqual([]);
 });
 
-for (const width of [390, 768, 1440]) {
+for (const width of [320, 390, 768, 1440]) {
   for (const reducedMotion of ['no-preference', 'reduce'] as const) {
-    for (const scale of ['normal', 'text-200', 'css-zoom-200'] as const) {
-      const handles =
-        width === 390 && reducedMotion === 'no-preference'
-          ? [handle, 'a'.repeat(USERNAME_MAX_LENGTH)]
-          : [handle];
+    for (const scale of [
+      'normal',
+      'text-200',
+      'text-elements-200',
+      'css-zoom-200',
+    ] as const) {
+      const handles = [handle, 'a'.repeat(USERNAME_MAX_LENGTH)];
       for (const statusHandle of handles) {
+        if (
+          width === 320 &&
+          (reducedMotion !== 'reduce' ||
+            scale !== 'text-elements-200' ||
+            statusHandle === handle)
+        )
+          continue;
+        if (scale === 'text-elements-200' && statusHandle === handle) continue;
+        if (
+          width > 390 &&
+          reducedMotion === 'no-preference' &&
+          statusHandle !== handle &&
+          scale !== 'text-elements-200'
+        )
+          continue;
         test(`signup status keeps surrounding controls stable at ${width}px ${scale} ${reducedMotion}${statusHandle === handle ? '' : ' maximum handle'} @smoke`, async ({
           page,
         }, testInfo) => {
@@ -443,6 +466,24 @@ for (const width of [390, 768, 1440]) {
                 document.documentElement.style.fontSize = '200%';
               if (scale === 'css-zoom-200')
                 document.documentElement.style.zoom = '2';
+              if (scale === 'text-elements-200') {
+                const styles = [
+                  ...document.querySelectorAll<HTMLElement>(
+                    '[data-auth-shell] *'
+                  ),
+                ].map(
+                  node =>
+                    [
+                      node,
+                      getComputedStyle(node).fontSize,
+                      getComputedStyle(node).lineHeight,
+                    ] as const
+                );
+                for (const [node, size, line] of styles) {
+                  node.style.fontSize = `${Number.parseFloat(size) * 2}px`;
+                  node.style.lineHeight = `${Number.parseFloat(line) * 2}px`;
+                }
+              }
             }, scale);
             await page.evaluate(() => document.fonts.ready);
             await expect.poll(() => evidence.delivered).toBeGreaterThan(0);
@@ -479,6 +520,18 @@ for (const width of [390, 768, 1440]) {
             await page.keyboard.press('Shift+ArrowLeft');
             const setupTrace = await settleConfiguration(page);
             await currentOutput(page);
+            await page.screenshot({
+              path: testInfo.outputPath(
+                'pending-status-' + fixture.state + '.png'
+              ),
+              fullPage: true,
+            });
+            await expectAuthPendingStatusContained(
+              await currentOutput(page),
+              testInfo,
+              statusHandle,
+              `status-${fixture.state}`
+            );
             const before = await authGeometry(page);
             const sampling = page.evaluate(async targets => {
               document.documentElement.dataset.geometrySampling = 'running';
@@ -633,6 +686,11 @@ for (const width of [390, 768, 1440]) {
             for (const frame of frames)
               expectStableGeometry(before, frame, fixture.state);
             expectStableGeometry(before, after!, `${fixture.state} after idle`);
+            await expectAuthStatusTextContained(
+              await currentOutput(page),
+              testInfo,
+              `status-${fixture.state}`
+            );
             expect(evidence.writes).toEqual([]);
             expect(
               evidence.handles.every(value => value === statusHandle)
@@ -642,6 +700,8 @@ for (const width of [390, 768, 1440]) {
       }
     }
   }
+  // The extra 320px neighbor covers enlarged continuous-handle geometry.
+  if (width === 320) continue;
   for (const reducedMotion of ['no-preference', 'reduce'] as const) {
     for (const fixture of fixtures) {
       // The full failure matrix runs normally; reduced motion covers a
@@ -822,5 +882,569 @@ for (const width of [390, 768, 1440]) {
     expect(controlEvidence.writes).toEqual([]);
     expect(evidence.delivered).toBeLessThanOrEqual(2);
     expect(evidence.handles.every(value => value === handle)).toBe(true);
+  });
+}
+
+async function scaleStatusText(page: Page, scale: number) {
+  await page.evaluate(scale => {
+    const styles = [
+      ...document.querySelectorAll<HTMLElement>('[data-auth-shell] *'),
+    ].map(
+      node =>
+        [
+          node,
+          getComputedStyle(node).fontSize,
+          getComputedStyle(node).lineHeight,
+        ] as const
+    );
+    for (const [node, size, line] of styles) {
+      node.style.fontSize = `${Number.parseFloat(size) * scale}px`;
+      node.style.lineHeight = `${Number.parseFloat(line) * scale}px`;
+    }
+  }, scale);
+}
+
+for (const reload of [false, true]) {
+  test(`maximum status glyph regression at 390px 2x ${reload ? 'reload' : 'idle'} @smoke`, async ({
+    page,
+  }, info) => {
+    await page.setViewportSize({ width: 390, height: 1000 });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    const maximum = 'a'.repeat(USERNAME_MAX_LENGTH);
+    const requests = await intercept(page, fixtures[4]);
+    await page.goto(
+      `/signup?${new URLSearchParams({ handle: maximum, redirect_url: '/start' })}`,
+      { waitUntil: 'domcontentloaded' }
+    );
+    await ready(page);
+    if (reload) {
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await ready(page);
+    }
+    const output = await settled(page);
+    await expect(output).toHaveText(messages.error.replaceAll(handle, maximum));
+    await scaleStatusText(page, 2);
+    await page.waitForTimeout(1000);
+    await expectAuthStatusTextContained(
+      output,
+      info,
+      reload ? 'reload' : 'idle'
+    );
+    await page.screenshot({
+      path: info.outputPath(reload ? 'reload-result.png' : 'idle-result.png'),
+      fullPage: true,
+    });
+    expect(requests.writes).toEqual([]);
+  });
+}
+
+test('status glyph containment detector rejects clipping and disappearance @smoke', async ({
+  page,
+}, info) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const message = `Couldn't check if @${'a'.repeat(USERNAME_MAX_LENGTH)} is available. You can still sign up and choose a handle.`;
+  await page.setContent(
+    `<style>.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}</style><div id="clip" style="width:800px;margin:32px"><div style="width:360px;min-height:500px"><output aria-busy="false" style="display:block;min-height:500px"><p style="font:32px/48px sans-serif;overflow-wrap:anywhere;margin:0">${message}</p></output></div></div>`
+  );
+  const output = page.getByRole('status');
+  const copy = output.locator('p');
+  await expectAuthStatusTextContained(output, info, 'wrapped-positive');
+  await copy.evaluate(node => {
+    node.style.transform = 'translateX(400px)';
+  });
+  expect(
+    (await measureAuthStatusText(output)).failures.some(
+      x => x.kind === 'outside-owner'
+    )
+  ).toBe(true);
+  await expect(
+    expectAuthStatusTextContained(output, info, 'displaced')
+  ).rejects.toThrow('Every settled status glyph');
+  await copy.evaluate(node => {
+    node.style.transform = '';
+  });
+  await page.locator('#clip').evaluate(node => {
+    node.style.width = '120px';
+    node.style.overflow = 'hidden';
+  });
+  expect(
+    (await measureAuthStatusText(output)).failures.some(
+      x => x.kind === 'ancestor-clipped'
+    )
+  ).toBe(true);
+  await expect(
+    expectAuthStatusTextContained(output, info, 'ancestor-clipped')
+  ).rejects.toThrow('Every settled status glyph');
+  await page.locator('#clip').evaluate(node => {
+    node.style.width = '800px';
+    node.style.overflow = '';
+  });
+  for (const style of ['opacity:0', 'color:transparent', 'visibility:hidden']) {
+    const before = await copy.getAttribute('style');
+    await copy.evaluate((node, style) => {
+      node.setAttribute('style', `${node.getAttribute('style')};${style}`);
+    }, style);
+    await expect(
+      expectAuthStatusTextContained(output, info, `hidden-${style}`)
+    ).rejects.toThrow('Every settled status glyph');
+    await copy.evaluate((node, before) => {
+      node.setAttribute('style', before!);
+    }, before);
+  }
+  await copy.evaluate(node => {
+    node.setAttribute('class', 'sr-only');
+  });
+  await expect(
+    expectAuthStatusTextContained(output, info, 'screen-reader-only')
+  ).rejects.toThrow('Every settled status glyph');
+  await copy.evaluate(node => {
+    node.setAttribute('class', '');
+  });
+  await expectAuthStatusTextContained(output, info, 'restored-positive');
+  await output.evaluate(node => node.remove());
+  await expect(
+    expectAuthStatusTextContained(output, info, 'removed')
+  ).rejects.toThrow();
+});
+
+test('pending status skeleton detector rejects clipping and disappearance @smoke', async ({
+  page,
+}, info) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.setContent(
+    `<style>.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}</style><div id="pending-clip" style="width:800px;margin:32px"><div style="width:360px;min-height:160px"><output aria-busy="true" aria-live="polite" aria-atomic="true" style="display:block;min-height:160px"><div style="width:176px;max-width:100%"><div data-slot="loading-skeleton" style="width:100%"><div data-slot="skeleton" aria-hidden="true" style="height:16px;width:100%;background:#ddd"></div></div></div><span class="sr-only">Checking if @pending is available...</span></output></div></div>`
+  );
+  const output = page.getByRole('status');
+  const leaf = output.locator('[data-slot="skeleton"]');
+  await expectAuthPendingStatusContained(
+    output,
+    info,
+    'pending',
+    'pending-positive'
+  );
+  await leaf.evaluate(node => {
+    node.style.transform = 'translateX(400px)';
+  });
+  expect((await measureAuthPendingStatus(output)).failures).toContain(
+    'outside-width-owner'
+  );
+  await expect(
+    expectAuthPendingStatusContained(
+      output,
+      info,
+      'pending',
+      'pending-displaced'
+    )
+  ).rejects.toThrow('Pending skeleton must');
+  await leaf.evaluate(node => {
+    node.style.transform = '';
+  });
+  await page.locator('#pending-clip').evaluate(node => {
+    node.style.width = '100px';
+    node.style.overflow = 'hidden';
+  });
+  expect((await measureAuthPendingStatus(output)).failures).toContain(
+    'ancestor-clipped'
+  );
+  await expect(
+    expectAuthPendingStatusContained(output, info, 'pending', 'pending-clipped')
+  ).rejects.toThrow('Pending skeleton must');
+  await page.locator('#pending-clip').evaluate(node => {
+    node.style.width = '800px';
+    node.style.overflow = '';
+  });
+  for (const style of [
+    'opacity:0',
+    'visibility:hidden',
+    'display:none',
+    'background:transparent',
+  ]) {
+    const before = await leaf.getAttribute('style');
+    await leaf.evaluate(
+      (node, style) =>
+        node.setAttribute('style', `${node.getAttribute('style')};${style}`),
+      style
+    );
+    await expect(
+      expectAuthPendingStatusContained(
+        output,
+        info,
+        'pending',
+        `pending-hidden-${style}`
+      )
+    ).rejects.toThrow('Pending skeleton must');
+    await leaf.evaluate(
+      (node, before) => node.setAttribute('style', before!),
+      before
+    );
+  }
+  const announcement = output.locator('.sr-only');
+  for (const attribute of ['aria-hidden', 'hidden']) {
+    await announcement.evaluate(
+      (node, attribute) => node.setAttribute(attribute, 'true'),
+      attribute
+    );
+    await expect(
+      expectAuthPendingStatusContained(
+        output,
+        info,
+        'pending',
+        `pending-announcement-${attribute}`
+      )
+    ).rejects.toThrow('Pending announcement must');
+    await announcement.evaluate(
+      (node, attribute) => node.removeAttribute(attribute),
+      attribute
+    );
+  }
+  await expectAuthPendingStatusContained(
+    output,
+    info,
+    'pending',
+    'pending-restored'
+  );
+  await leaf.evaluate(node => node.remove());
+  await expect(
+    expectAuthPendingStatusContained(output, info, 'pending', 'pending-removed')
+  ).rejects.toThrow('Pending skeleton must');
+});
+
+for (const width of [390, 768, 1440])
+  for (const scale of [1, 2])
+    for (const mode of ['empty', 'email', 'apple', 'google'] as const) {
+      test(`maximum handle transport ${mode} at ${width}px ${scale}x @smoke`, async ({
+        page,
+        context,
+      }, info) => {
+        await page.setViewportSize({ width, height: 1000 });
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+        const maximum = 'a'.repeat(USERNAME_MAX_LENGTH);
+        await intercept(page, fixtures[4]);
+        const attempts: string[] = [];
+        context.on('request', r => {
+          if (
+            !['GET', 'HEAD', 'OPTIONS'].includes(r.method()) &&
+            new URL(r.url()).pathname.startsWith('/api/auth/')
+          )
+            attempts.push(new URL(r.url()).pathname);
+        });
+        let release!: () => void;
+        const pending = new Promise<void>(resolve => {
+          release = resolve;
+        });
+        const endpoint =
+          mode === 'email'
+            ? '/api/auth/email-otp/send-verification-otp'
+            : '/api/auth/sign-in/social';
+        await page.route(`**${endpoint}`, async route => {
+          if (['GET', 'HEAD', 'OPTIONS'].includes(route.request().method()))
+            return route.fallback();
+          await pending;
+          return route.abort('internetdisconnected');
+        });
+        try {
+          await page.goto(
+            `/signup?${new URLSearchParams({ handle: maximum, redirect_url: '/start' })}`,
+            { waitUntil: 'domcontentloaded' }
+          );
+          await ready(page);
+          const output = await settled(page);
+          await expect(output).toHaveText(
+            messages.error.replaceAll(handle, maximum)
+          );
+          await scaleStatusText(page, scale);
+          await expectAuthStatusTextContained(
+            output,
+            info,
+            `transport-${mode}-before`
+          );
+          const email = page.getByRole('textbox', {
+            name: 'Email',
+            exact: true,
+          });
+          const originalNode = await email.elementHandle();
+          const submit = page.getByRole('button', {
+            name: 'Send sign-in code',
+            exact: true,
+          });
+          if (mode === 'empty') {
+            await submit.click();
+            await expect(page.locator('#auth-email-error')).toBeVisible();
+            expect(attempts).toEqual([]);
+          } else {
+            await email.fill('e2e+status-resize@example.com');
+            const providerName = `Continue with ${mode === 'apple' ? 'Apple' : 'Google'}`;
+            const action =
+              mode === 'email'
+                ? submit
+                : page.locator(`[data-auth-provider-slot="${mode}"]`);
+            if (mode !== 'email')
+              await expect(action).toHaveAccessibleName(providerName);
+            const error =
+              mode === 'email'
+                ? page.locator('#auth-email-error')
+                : page.locator('[data-auth-shell-mode]').getByRole('alert');
+            await action.click();
+            await expect.poll(() => attempts.length).toBe(1);
+            if (mode === 'email') await expect(email).toBeDisabled();
+            else {
+              await expect(action).toBeDisabled();
+              await expect(action).toHaveAccessibleName(
+                `${providerName} loading`
+              );
+            }
+            await expectAuthStatusTextContained(
+              output,
+              info,
+              `transport-${mode}-pending`
+            );
+            await page.keyboard.press('Enter');
+            await page.keyboard.press('Enter');
+            await page.evaluate(
+              () =>
+                new Promise<void>(resolve =>
+                  requestAnimationFrame(() =>
+                    requestAnimationFrame(() => resolve())
+                  )
+                )
+            );
+            expect(attempts).toEqual([endpoint]);
+            release();
+            await expect(error).toBeVisible();
+            await expect(action).toBeEnabled();
+            if (mode !== 'email')
+              await expect(action).toHaveAccessibleName(providerName);
+            await expectAuthStatusTextContained(
+              output,
+              info,
+              `transport-${mode}-error`
+            );
+            await action.click();
+            await expect.poll(() => attempts.length).toBe(2);
+            await expect(error).toBeVisible();
+            await expect(action).toBeEnabled();
+            if (mode !== 'email')
+              await expect(action).toHaveAccessibleName(providerName);
+            await expectAuthStatusTextContained(
+              output,
+              info,
+              `transport-${mode}-retry`
+            );
+            expect(attempts).toEqual([endpoint, endpoint]);
+            await expect(email).toHaveValue('e2e+status-resize@example.com');
+          }
+          await expect(email).toBeEditable();
+          expect(
+            await email.evaluate(
+              (node, original) => node === original,
+              originalNode
+            )
+          ).toBe(true);
+          await expect(submit).toBeEnabled();
+          for (const provider of ['Apple', 'Google'])
+            await expect(
+              page.getByRole('button', {
+                name: `Continue with ${provider}`,
+                exact: true,
+              })
+            ).toBeEnabled();
+          await expectAuthStatusTextContained(
+            output,
+            info,
+            `transport-${mode}`
+          );
+          await page.screenshot({
+            path: info.outputPath('transport-result.png'),
+            fullPage: true,
+          });
+        } catch (error) {
+          await page
+            .screenshot({
+              path: info.outputPath('transport-failure.png'),
+              fullPage: true,
+            })
+            .catch(() => {});
+          throw error;
+        } finally {
+          release();
+        }
+      });
+    }
+
+test('settled vertical reachability detector accepts scrolling and rejects clipping @smoke', async ({
+  page,
+}, info) => {
+  await page.setViewportSize({ width: 390, height: 500 });
+  const paragraphs = Array.from(
+    { length: 12 },
+    (_, index) =>
+      `<p style="margin:0;font:24px/32px sans-serif">Status segment ${index + 1} remains reachable.</p>`
+  ).join('');
+  await page.setContent(
+    `<div id="vertical-port" style="height:180px;width:320px;overflow-y:auto"><div style="width:300px"><output aria-busy="false" style="display:block">${paragraphs}</output><input aria-label="Probe focus" /></div></div>`
+  );
+  const output = page.getByRole('status');
+  const focus = page.getByRole('textbox', { name: 'Probe focus' });
+  await focus.focus();
+  const before = await page
+    .locator('#vertical-port')
+    .evaluate(node => node.scrollTop);
+  expect(before).toBeGreaterThan(0);
+  await expectAuthStatusTextContained(output, info, 'tall-scrollable-positive');
+  await expect(focus).toBeFocused();
+  expect(
+    await page.locator('#vertical-port').evaluate(node => node.scrollTop)
+  ).toBe(before);
+  for (const overflow of ['hidden', 'clip']) {
+    await page.locator('#vertical-port').evaluate((node, overflow) => {
+      node.scrollTop = 0;
+      node.style.overflowY = overflow;
+    }, overflow);
+    await expect(
+      expectAuthStatusTextContained(output, info, `unreachable-${overflow}`)
+    ).rejects.toThrow('Every settled status glyph');
+  }
+});
+
+test('pending vertical reachability detector accepts scrolling and rejects clipping @smoke', async ({
+  page,
+}, info) => {
+  await page.setViewportSize({ width: 390, height: 500 });
+  await page.setContent(
+    `<style>.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}</style><div id="vertical-port" style="height:180px;width:320px;overflow-y:auto"><div style="width:300px"><output aria-busy="true" aria-live="polite" aria-atomic="true" style="display:block;height:900px;padding-top:600px;box-sizing:border-box"><div style="width:176px;max-width:100%"><div data-slot="loading-skeleton" style="width:100%"><div data-slot="skeleton" aria-hidden="true" style="height:16px;width:100%;background:#ddd"></div></div></div><span class="sr-only">Checking if @pending is available...</span></output><input aria-label="Probe focus" /></div></div>`
+  );
+  const output = page.getByRole('status');
+  const focus = page.getByRole('textbox', { name: 'Probe focus' });
+  await focus.focus();
+  const before = await page
+    .locator('#vertical-port')
+    .evaluate(node => node.scrollTop);
+  expect(before).toBeGreaterThan(0);
+  await expectAuthPendingStatusContained(
+    output,
+    info,
+    'pending',
+    'tall-scrollable-positive'
+  );
+  await expect(focus).toBeFocused();
+  expect(
+    await page.locator('#vertical-port').evaluate(node => node.scrollTop)
+  ).toBe(before);
+  for (const overflow of ['hidden', 'clip']) {
+    await page.locator('#vertical-port').evaluate((node, overflow) => {
+      node.scrollTop = 0;
+      node.style.overflowY = overflow;
+    }, overflow);
+    await expect(
+      expectAuthPendingStatusContained(
+        output,
+        info,
+        'pending',
+        `unreachable-${overflow}`
+      )
+    ).rejects.toThrow('Pending skeleton must');
+  }
+});
+
+for (const kind of ['settled', 'pending'] as const) {
+  const effects =
+    kind === 'settled'
+      ? ['opacity', 'visibility', 'color', 'displaced']
+      : ['opacity', 'visibility', 'paint', 'displaced'];
+  for (const effect of effects) {
+    test(`scroll-reactive ${kind} ${effect} detector @smoke`, async ({
+      page,
+    }, info) => {
+      await page.setViewportSize({ width: 390, height: 500 });
+      const content =
+        kind === 'settled'
+          ? '<p id="reactive-target" style="margin:0;font:24px/32px sans-serif">Readable status</p>'
+          : '<div style="width:176px;max-width:100%"><div data-slot="loading-skeleton" style="width:100%"><div id="reactive-target" data-slot="skeleton" aria-hidden="true" style="height:16px;width:100%;background:#ddd"></div></div></div><span class="sr-only">Checking if @pending is available...</span>';
+      await page.setContent(
+        `<style>.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}</style><div id="vertical-port" style="height:180px;width:320px;overflow-y:auto"><div style="width:300px"><output aria-busy="${kind === 'pending'}" aria-live="polite" aria-atomic="true" style="display:block;height:900px;padding-top:600px;box-sizing:border-box">${content}</output><input aria-label="Probe focus" /></div></div>`
+      );
+      const output = page.getByRole('status');
+      await page.getByRole('textbox', { name: 'Probe focus' }).focus();
+      await page.evaluate(effect => {
+        const port = document.querySelector<HTMLElement>('#vertical-port')!;
+        const target = document.querySelector<HTMLElement>('#reactive-target')!;
+        port.addEventListener('scroll', () => {
+          const bounds = port.getBoundingClientRect();
+          const rect = target.getBoundingClientRect();
+          const entered =
+            rect.top >= bounds.top && rect.bottom <= bounds.bottom;
+          target.style.opacity = effect === 'opacity' && entered ? '0' : '1';
+          target.style.visibility =
+            effect === 'visibility' && entered ? 'hidden' : 'visible';
+          target.style.color =
+            effect === 'color' && entered ? 'transparent' : 'black';
+          target.style.background =
+            effect === 'paint' && entered ? 'transparent' : '#ddd';
+          target.style.transform =
+            effect === 'displaced' && entered ? 'translateX(600px)' : 'none';
+        });
+      }, effect);
+      const initial =
+        kind === 'settled'
+          ? await measureAuthStatusText(output)
+          : await measureAuthPendingStatus(output);
+      await info.attach('scroll-reactive-initial.json', {
+        body: JSON.stringify(initial),
+        contentType: 'application/json',
+      });
+      if (kind === 'settled')
+        await expect(
+          expectAuthStatusTextContained(output, info, `reactive-${effect}`)
+        ).rejects.toThrow('Every settled status glyph');
+      else
+        await expect(
+          expectAuthPendingStatusContained(
+            output,
+            info,
+            'pending',
+            `reactive-${effect}`
+          )
+        ).rejects.toThrow('Pending skeleton must');
+    });
+  }
+}
+
+for (const kind of ['settled', 'pending'] as const) {
+  test(`scroll-reactive ${kind} owner-y detector @smoke`, async ({
+    page,
+  }, info) => {
+    await page.setViewportSize({ width: 390, height: 500 });
+    const content =
+      kind === 'settled'
+        ? '<p id="owner-target" style="margin:0;font:24px/32px sans-serif">Readable status</p>'
+        : '<div style="width:176px;max-width:100%"><div data-slot="loading-skeleton" style="width:100%"><div id="owner-target" data-slot="skeleton" aria-hidden="true" style="height:16px;width:100%;background:#ddd"></div></div></div><span class="sr-only">Checking if @pending is available...</span>';
+    await page.setContent(
+      `<style>.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}</style><div id="vertical-port" style="height:180px;width:320px;overflow-y:auto"><div style="height:600px"></div><div style="width:300px;height:40px"><output aria-busy="${kind === 'pending'}" aria-live="polite" aria-atomic="true" style="display:block;height:40px">${content}</output></div><div style="height:600px"></div><input aria-label="Probe focus" /></div>`
+    );
+    const output = page.getByRole('status');
+    await page.getByRole('textbox', { name: 'Probe focus' }).focus();
+    await page.evaluate(() => {
+      const port = document.querySelector<HTMLElement>('#vertical-port')!;
+      const target = document.querySelector<HTMLElement>('#owner-target')!;
+      port.addEventListener('scroll', () => {
+        const bounds = port.getBoundingClientRect();
+        const rect = target.getBoundingClientRect();
+        const entered = rect.top >= bounds.top && rect.bottom <= bounds.bottom;
+        target.style.transform = entered ? 'translateY(-60px)' : 'none';
+      });
+    });
+    if (kind === 'settled')
+      await expect(
+        expectAuthStatusTextContained(output, info, 'reactive-owner-y')
+      ).rejects.toThrow('Every settled status glyph');
+    else
+      await expect(
+        expectAuthPendingStatusContained(
+          output,
+          info,
+          'pending',
+          'reactive-owner-y'
+        )
+      ).rejects.toThrow('Pending skeleton must');
   });
 }

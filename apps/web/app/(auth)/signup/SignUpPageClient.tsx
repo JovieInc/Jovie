@@ -172,7 +172,7 @@ function SignUpClaimDataPersistence() {
   };
 
   return (
-    <div className='mb-4 grid grid-cols-1 text-center text-app text-secondary-token'>
+    <div className='mb-4 grid grid-cols-1 wrap-anywhere text-center text-app text-secondary-token'>
       {/* Intrinsic, inaccessible copies reserve the widest/tallest result
           before hydration without adding stale text to the live output. */}
       {Object.entries(messages).map(([state, message]) => (
@@ -185,7 +185,7 @@ function SignUpClaimDataPersistence() {
         </p>
       ))}
       <output
-        className='col-start-1 row-start-1 grid items-center text-center text-app text-secondary-token'
+        className='col-start-1 row-start-1 grid grid-cols-1 items-center text-center text-app text-secondary-token'
         aria-live='polite'
         aria-atomic='true'
         aria-busy={status === 'checking'}
