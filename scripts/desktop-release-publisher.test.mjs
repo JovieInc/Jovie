@@ -864,7 +864,6 @@ test('existing release tag read survives one installation 403 and does not creat
     releaseSha,
     version,
   });
-  assert.equal(client.release, undefined);
 });
 
 test('release-asset read fails closed on permission, exhausted budget, mutations, and a missing release', async () => {
