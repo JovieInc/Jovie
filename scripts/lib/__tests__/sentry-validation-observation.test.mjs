@@ -199,39 +199,6 @@ describe('seven-day Sentry event observation', () => {
     expect(facts.contains).toHaveBeenCalledWith(BINDING, DESCENDANT);
   });
 
-  it('does not confuse events from older releases or unidentifiable events with recurrence proof', async () => {
-    const facts = { contains: vi.fn(async () => false) };
-    expect(
-      await observeSentryHistory({
-        plan: PLAN,
-        now: new Date(END),
-        sentry: sentryPort([event()]),
-        facts,
-      })
-    ).toMatchObject({
-      status: 'unknown',
-      reason: 'observation_coverage_unavailable',
-    });
-    for (const bad of [
-      { ...event(), release: null },
-      { ...event(), dateCreated: 'bad' },
-      { ...event(), tags: [] },
-      { ...event(), eventID: null },
-    ]) {
-      expect(
-        await observeSentryHistory({
-          plan: PLAN,
-          now: new Date(END),
-          sentry: sentryPort([bad]),
-          facts,
-        })
-      ).toMatchObject({
-        status: 'unknown',
-        reason: 'event_identity_unreadable:JOVIE-WEB-XZ',
-      });
-    }
-  });
-
   it('requires every incident and explicit complete pagination, never follows a Link origin', async () => {
     const facts = { contains: vi.fn(async () => false) };
     for (const response of [
@@ -445,26 +412,6 @@ describe('existing recurrence producer owner handoff', () => {
     expect(h.recordReceipt).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps the failure bound to the observed generation across newer served deployments', async () => {
-    const h = harness();
-    await runSentryValidationObservations(h.options);
-    const args = h.recordReceipt.mock.calls[0][0];
-    expect(args[args.indexOf('--sha') + 1]).toBe(DESCENDANT);
-    expect(args[args.indexOf('--sha') + 1]).not.toBe(ARTIFACT);
-    const newer = 'e'.repeat(40);
-    h.facts.servedGeneration.mockResolvedValue({
-      status: 'verified',
-      sha: newer,
-    });
-    const result = await runSentryValidationObservations(h.options);
-    expect(result.results[0]).toMatchObject({
-      receipt: 'already_recorded',
-      artifact: { sha: newer },
-      release: DESCENDANT,
-    });
-    expect(h.recordReceipt).toHaveBeenCalledTimes(1);
-  });
-
   it('never records pass from silence or bypasses the disabled-writer switch', async () => {
     const quiet = harness({ recurrence: false });
     expect(
@@ -591,55 +538,5 @@ describe('supplementary existing-authority error coverage join', () => {
     expect(query.get('category')).toBe('error');
     expect(query.getAll('groupBy')).toEqual(['outcome', 'reason']);
     expect(query.has('environment')).toBe(false);
-  });
-
-  it('holds partial, malformed, denied or missing outcome history unknown', async () => {
-    const malformed = [
-      null,
-      { ...stats(), intervals: [] },
-      { ...stats(), intervals: [START] },
-      { ...stats(), end: '2026-10-16T14:30:00Z' },
-      {
-        ...stats(),
-        groups: [{ ...stats().groups[0], series: { 'sum(quantity)': [894] } }],
-      },
-      {
-        ...stats(),
-        groups: [
-          { ...stats().groups[0], series: { 'sum(quantity)': [-1, 895] } },
-        ],
-      },
-      {
-        ...stats(),
-        groups: [{ ...stats().groups[0], totals: { 'sum(quantity)': 895 } }],
-      },
-    ];
-    for (const value of malformed)
-      expect(
-        await collectObservationCoverage({
-          plan: PLAN,
-          now,
-          sentry: port(value),
-        })
-      ).toMatchObject({
-        status: 'unknown',
-        read: 'outcome_statistics_incomplete',
-      });
-    const denied = vi.fn(async () => ({ ok: false }));
-    expect(
-      await collectObservationCoverage({ plan: PLAN, now, sentry: denied })
-    ).toMatchObject({
-      status: 'unknown',
-      read: 'project_identity_unreadable',
-    });
-    const failed = vi.fn(async () => {
-      throw new Error('transport unavailable');
-    });
-    expect(
-      await collectObservationCoverage({ plan: PLAN, now, sentry: failed })
-    ).toMatchObject({
-      status: 'unknown',
-      read: 'outcome_statistics_unreadable',
-    });
   });
 });

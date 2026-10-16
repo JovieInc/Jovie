@@ -56,6 +56,8 @@ jobs:
         with:
           node-version-file: .nvmrc
 
+      - uses: ./.github/actions/setup-doppler
+
       - name: Generate read/comment Jovie Bot token
         id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
@@ -70,13 +72,16 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
           SENTRY_RECURRENCE_OBSERVATIONS_ONLY: ${{ inputs.observations_only && '1' || '' }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
         run: |
+          set -euo pipefail
           git rev-parse HEAD > "$RUNNER_TEMP/sentry-recurrence-source-revision.txt"
-          node scripts/sentry-autofix-recurrence.mjs | tee "$RUNNER_TEMP/sentry-recurrence-observation.json"
+          doppler run --project jovie-web --config prd \
+            --only-secrets=LINEAR_API_KEY --no-fallback -- \
+            env -u DOPPLER_TOKEN node scripts/sentry-autofix-recurrence.mjs | tee "$RUNNER_TEMP/sentry-recurrence-observation.json"
 
       - name: Preserve the bounded observation receipt
         if: ${{ always() }}
