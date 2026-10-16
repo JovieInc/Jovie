@@ -139,7 +139,7 @@ for (const viewport of [
           .analyze();
         expect(axe.violations).toEqual([]);
         expect(errors).toEqual([]);
-        await testInfo.attach('component-measurements', {
+        await testInfo.attach('component-measurements.json', {
           body: JSON.stringify({
             ...metrics,
             interaction: { passed: true },
@@ -147,7 +147,7 @@ for (const viewport of [
           }),
           contentType: 'application/json',
         });
-        await testInfo.attach('rendered-state', {
+        await testInfo.attach('rendered-state.png', {
           body: await page.screenshot(),
           contentType: 'image/png',
         });
