@@ -23,64 +23,38 @@ import { getMarketingExportScenarios } from '@/lib/screenshots/registry';
 import manifest from '../../../screenshot-catalog/current/manifest.json';
 
 const base = createMarketingMediaRecipeInput('dark-glass');
+// Mutate one typed axis while keeping all unrelated registered fields intact.
+function withAxis(
+  axis: 'source' | 'behavior' | 'layout' | 'delivery',
+  fields: Record<string, unknown>
+) {
+  return { ...base, [axis]: { ...base[axis], ...fields } };
+}
+
 const negatives = {
   'absent request': null,
   'unknown recipe': { ...base, recipeId: 'neon' },
-  'unregistered asset': {
-    ...base,
-    source: {
-      ...base.source,
-      kind: 'generated-artwork',
-      scenarioId: undefined,
-      assetId: 'unreviewed',
-    },
-  },
-  'missing revision': {
-    ...base,
-    source: { ...base.source, sourceRevision: undefined },
-  },
-  'stale revision': {
-    ...base,
-    source: { ...base.source, sourceRevision: 'old' },
-  },
-  'changed pixels': {
-    ...base,
-    source: { ...base.source, assetHash: '0'.repeat(64) },
-  },
+  'unregistered asset': withAxis('source', {
+    kind: 'generated-artwork',
+    scenarioId: undefined,
+    assetId: 'unreviewed',
+  }),
+  'missing revision': withAxis('source', { sourceRevision: undefined }),
+  'stale revision': withAxis('source', { sourceRevision: 'old' }),
+  'changed pixels': withAxis('source', { assetHash: '0'.repeat(64) }),
   'unknown accent': { ...base, accent: '#abcdef' },
   'wrong anchor': { ...base, accent: 'ultra' },
   'wrong treatment': { ...base, treatment: 'flow' },
-  'missing fallback': { ...base, behavior: { motion: 'static' } },
-  'wrong fallback': {
-    ...base,
-    behavior: { motion: 'static', fallback: 'plain-canvas' },
-  },
-  'unsafe focal': {
-    ...base,
-    layout: { ...base.layout, focal: { x: 50, y: 50 } },
-  },
-  'wrong safe area': {
-    ...base,
-    layout: { ...base.layout, safeArea: 'full-bleed-editorial' },
-  },
-  'unknown delivery': {
-    ...base,
-    delivery: { ...base.delivery, profile: 'video' },
-  },
-  'old tokens': {
-    ...base,
-    delivery: { ...base.delivery, tokenRevision: 'old' },
-  },
+  'missing fallback': withAxis('behavior', { fallback: undefined }),
+  'wrong fallback': withAxis('behavior', { fallback: 'plain-canvas' }),
+  'unsafe focal': withAxis('layout', { focal: { x: 50, y: 50 } }),
+  'wrong safe area': withAxis('layout', { safeArea: 'full-bleed-editorial' }),
+  'unknown delivery': withAxis('delivery', { profile: 'video' }),
+  'old tokens': withAxis('delivery', { tokenRevision: 'old' }),
   'approval flag': { ...base, approved: true },
-  'module import': { ...base, source: { ...base.source, module: 'fs' } },
-  'script injection': {
-    ...base,
-    behavior: { ...base.behavior, script: 'alert(1)' },
-  },
-  'unknown capture': {
-    ...base,
-    source: { ...base.source, scenarioId: 'private-admin' },
-  },
+  'module import': withAxis('source', { module: 'fs' }),
+  'script injection': withAxis('behavior', { script: 'alert(1)' }),
+  'unknown capture': withAxis('source', { scenarioId: 'private-admin' }),
   'unsupported source': {
     ...base,
     source: {
