@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-16T20:07:25.165Z",
+  "generated_at": "2026-10-16T22:47:22.074Z",
   "surfaces": {
     "rls-access-control": {
       "coverage_pct": 77.6,
@@ -51,7 +51,7 @@
     },
     "api-routes-contract": {
       "coverage_pct": 74.8,
-      "branch_pct": 64.3,
+      "branch_pct": 64.4,
       "risk_score": 25,
       "status": "YELLOW"
     },
