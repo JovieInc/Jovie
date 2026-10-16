@@ -83,7 +83,8 @@ jobs:
 
       - name: Test iOS release configuration scripts
         run: |
-          node --test apps/ios/scripts/write-configuration.test.mjs \
+          node --test .github/scripts/testflight-release-lease.test.mjs \
+          apps/ios/scripts/write-configuration.test.mjs \
           apps/ios/scripts/capture-screenshots.test.mjs \
           apps/ios/scripts/run-xcodebuild.test.mjs \
           apps/ios/scripts/validate-wallet-release-env.test.mjs \
