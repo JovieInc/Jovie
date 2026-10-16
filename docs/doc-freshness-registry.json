@@ -475,9 +475,17 @@
     },
     "docs/writing/SURFACE_COVERAGE.md": {
       "owner": "@itstimwhite",
-      "claim": "The existing invariant consumer validates writing surface completeness; the bounded ops pilot rechecks artifact bindings at its Linear adapter and remains advisory.",
-      "documentSha256": "73b5cd57de3a9d21f5f2089168a7b83d959b25d7b0a197a032e30bf1ccd20bfe",
+      "claim": "Writing surface completeness is validated by the existing invariant consumer; the bounded post-selection brief uses server confirmation and public evidence; the bounded ops pilot rechecks artifact bindings at its Linear adapter and remains advisory.",
+      "documentSha256": "08e2793e7acc54ab02942c7dea7c59c9f156a633f4c4e218b8ad22d06cca2eb4",
       "sources": [
+        {
+          "path": "apps/web/lib/chat/onboarding-script/engine.ts",
+          "sha256": "2189bc254d59f0cba73b51c54d42da7b3950ca45cdbcb797346d637fd5e47b1f"
+        },
+        {
+          "path": "apps/web/lib/chat/post-selection-writing-brief.ts",
+          "sha256": "3d167c446ef4d8c22b7e58e16084b057b5c1192181ee345d680538e8837ad24f"
+        },
         {
           "path": "scripts/invariants/writing-surfaces.mjs",
           "sha256": "91356a21ccf5164603191080d6fb3e4e03d7455b8d58ad0c08c5651965143145"

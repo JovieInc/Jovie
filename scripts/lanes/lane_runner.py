@@ -178,6 +178,8 @@ WORKTREE_INSTALL = ["pnpm", "install", "--frozen-lockfile", "--prefer-offline",
 PRIORITY_AGING_S = 24 * 3600
 # Generated files do not count toward the reviewable-size cap.
 GENERATED = re.compile(r"(^|/)(drizzle/migrations/meta/|pnpm-lock\.yaml$|__snapshots__/|\.snap$)")
+# Match PR Size Guard for size only; executable generated code still requires tests.
+GENERATED_SIZE = re.compile(r"(^|/)generated/")
 # Test files: JS/TS conventions plus Python test_*.py and Xcode *Tests/ dirs.
 TEST_FILE = re.compile(r"(\.test\.|\.spec\.|/(?:tests?|__tests__|[^/]*Tests)/|(^|/)test_[^/]+\.py$)")
 DOC_FILE = re.compile(r"(\.mdx?c?$|^docs/|^canon/|\.txt$)")
@@ -1204,7 +1206,8 @@ def gate_assessment(changes: list[Change], max_reviewable_lines: int = MAX_REVIE
             failures.append("code-change-without-test")
     if "pnpm-lock.yaml" in paths and not any(p.endswith("package.json") for p in paths):
         failures.append("lockfile-without-manifest")
-    reviewable = sum(c.added + c.deleted for c in changes if not GENERATED.search(c.path))
+    reviewable = sum(c.added + c.deleted for c in changes
+                     if not GENERATED.search(c.path) and not GENERATED_SIZE.search(c.path))
     if reviewable > max_reviewable_lines:
         failures.append(f"diff-too-large:{reviewable}")
     return failures, versions
