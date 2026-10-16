@@ -15,6 +15,9 @@ import { formatDeprecationObservation } from '../deprecation-observation.mjs';
 import {
   COMMISSIONING_PARENT_ALLOWLIST,
   extractMergeIssueRef,
+  failureDisposition,
+  installationQuotaClassifierReady,
+  isInstallationQuota403,
   lifecycleHolds,
   listOpenPullRequests,
   parentHoldReason,
@@ -1249,11 +1252,86 @@ describe('linear sync on merge', () => {
       name => readFileSync(resolve(import.meta.dirname, '..', name), 'utf8')
     );
     for (const script of modules) {
-      for (const match of script.matchAll(/from '\.\/([a-z0-9-]+\.mjs)'/g)) {
+      for (const match of script.matchAll(
+        /(?:from '|import\(')\.\/([a-z0-9-]+\.mjs)'/g
+      )) {
         expect(workflow).toContain(`scripts/lib/${match[1]}`);
       }
     }
   });
+});
+
+// The file list from pull_request runs whose workflow ref predates the
+// quota module (run 38824244848). Those runs still check out main.
+const IN_FLIGHT_MERGE_SPARSE = [
+  '.nvmrc',
+  '.github/ci-harness/manifest.json',
+  '.github/scripts/production-marker-state.mjs',
+  'scripts/lib/linear-sync-on-merge.mjs',
+  'scripts/lib/validation-lifecycle.mjs',
+  'scripts/lib/validation-sync.mjs',
+  'scripts/lib/escaped-defect-closure.mjs',
+  'scripts/lib/founder-taste-order.mjs',
+  'scripts/lib/ci-harness.mjs',
+  'scripts/lib/remediation-signal.mjs',
+  'scripts/lib/deprecation-observation.mjs',
+  'scripts/lib/linear-issue-intake.mjs',
+  'scripts/lib/linear-cooldown.mjs',
+  'scripts/invariants/assurance-matrix.mjs',
+  'scripts/invariants/assurance-matrix.json',
+];
+
+it('classifies installation 403s when the quota module is in the checkout', () => {
+  expect(installationQuotaClassifierReady).toBe(true);
+  expect(
+    isInstallationQuota403('API rate limit exceeded for installation ID 9')
+  ).toBe(true);
+  expect(isInstallationQuota403('Resource not accessible by integration')).toBe(
+    false
+  );
+  expect(
+    failureDisposition(
+      'Linear Sync',
+      new Error('API rate limit exceeded for installation ID 9')
+    ).softFailed
+  ).toBe(true);
+});
+
+it('keeps installation 403s fatal when an in-flight sparse checkout omits the quota module', () => {
+  const repository = resolve(import.meta.dirname, '../../..');
+  const root = mkdtempSync(join(tmpdir(), 'linear-sync-old-sparse-'));
+  try {
+    for (const path of IN_FLIGHT_MERGE_SPARSE) {
+      const target = join(root, path);
+      mkdirSync(dirname(target), { recursive: true });
+      copyFileSync(join(repository, path), target);
+    }
+    const result = spawnSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        `globalThis.fetch = () => { throw new Error('unexpected network call'); };
+         const entry = await import(process.argv[1]);
+         const sentence = 'API rate limit exceeded for installation ID 1';
+         if (entry.installationQuotaClassifierReady !== false) process.exit(2);
+         if (entry.isInstallationQuota403(sentence) !== false) process.exit(3);
+         const disposition = entry.failureDisposition('Linear Sync', new Error(sentence));
+         if (disposition.softFailed !== false || disposition.code !== 1) process.exit(4);
+         if (typeof entry.syncLinearIssueOnMerge !== 'function') process.exit(5);`,
+        pathToFileURL(join(root, 'scripts/lib/linear-sync-on-merge.mjs')).href,
+      ],
+      { cwd: root, encoding: 'utf8', env: {}, timeout: 10_000 }
+    );
+    expect(result.error).toBeUndefined();
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    expect(result.stderr).toContain(
+      'github-installation-quota.mjs is absent from this sparse checkout'
+    );
+    expect(result.stderr).toContain('Installation 403s stay fatal');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 it('loads every transitive dependency from the workflow sparse checkout', () => {
@@ -1282,7 +1360,8 @@ it('loads every transitive dependency from the workflow sparse checkout', () => 
         '-e',
         `globalThis.fetch = () => { throw new Error('unexpected network call'); };
          const entry = await import(process.argv[1]);
-         if (typeof entry.syncLinearIssueOnMerge !== 'function') process.exit(1);`,
+         if (typeof entry.syncLinearIssueOnMerge !== 'function') process.exit(1);
+         if (entry.installationQuotaClassifierReady !== true) process.exit(2);`,
         pathToFileURL(join(root, 'scripts/lib/linear-sync-on-merge.mjs')).href,
       ],
       { cwd: root, encoding: 'utf8', env: {}, timeout: 10_000 }

@@ -29,7 +29,10 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-          sparse-checkout: scripts/lanes
+          sparse-checkout: |
+            scripts/shipping_origin.py
+            scripts/lanes
+          sparse-checkout-cone-mode: false
       - name: Generate read-only receipt token for both reporting repositories
         id: read-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0

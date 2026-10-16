@@ -14,6 +14,7 @@ import type {
   ConnectorDbStatus as EnumConnectorDbStatus,
   ConnectorProviderId as EnumConnectorProviderId,
 } from '@/lib/db/schema/enums';
+import type { ArtistProfileContract } from './artist-profile-contract';
 
 export type ConnectorProviderId = EnumConnectorProviderId;
 export type ConnectorDbStatus = EnumConnectorDbStatus;
@@ -106,5 +107,7 @@ export interface ConnectorDefinition {
   /** Actual operations, shared by Settings and public integration copy. */
   readonly capabilities: readonly ConnectorCapability[];
   readonly accountScope: 'user' | 'identity';
+  /** Artist-profile destinations must declare the complete closed field contract. */
+  readonly artistProfile: ArtistProfileContract | null;
   readonly platforms: readonly ('web' | 'mac' | 'ios')[];
 }

@@ -17,12 +17,20 @@ import {
   segmentPassages,
   WRITING_QUALITY_RUBRICS,
 } from './jev-writing-quality.mjs';
+import {
+  createWritingPilotReceipt,
+  writingCallObservation,
+  writingFailureReason,
+  writingImplementationCurrent,
+  writingReceiptBinding,
+  writingTextDigest,
+} from './jev-writing-receipt.mjs';
 
 /** @typedef {'missing-evidence' | 'failed-fidelity' | 'invalid-review' | 'timeout' | 'cancelled' | 'stale-input' | 'budget-failure' | 'revision-exhausted' | 'factual-failure' | 'privacy-failure' | 'leakage-failure' | 'safety-failure' | 'writer-failure'} WritingFailureReason */
 /** @typedef {{writerCalls: number, evaluationRounds: number, revisionCount: 0 | 1, reservedUsd: number}} WorkflowCounts */
-/** @typedef {({status: 'reviewed', text: string, modelId: string} | {status: 'review-needed', reason: WritingFailureReason}) & WorkflowCounts} WritingWorkflowOutcome */
+/** @typedef {({status: 'reviewed', text: string, modelId: string} | {status: 'review-needed', reason: WritingFailureReason}) & WorkflowCounts & {receipt: ReturnType<typeof createWritingPilotReceipt>}} WritingWorkflowOutcome */
 /** @typedef {{surfaceId: string, intendedJob: string, allowedClaims: readonly string[], evidence: readonly string[], approvedVoiceExamples: readonly string[], register?: string}} WritingContract */
-/** @typedef {{sourceSha: string, scope: string, contract: WritingContract, writerModelId: string, maxOutputTokens: number, deadlineAt: number, stageUpperBoundUsd: {write: number, evaluate: number}}} WritingWorkflowInput */
+/** @typedef {{candidateId: string, writerImplementationSha256: string, voiceReferences: {id: string, version: string, sha256: string}[], sourceSha: string, scope: string, contract: WritingContract, writerModelId: string, maxOutputTokens: number, deadlineAt: number, stageUpperBoundUsd: {write: number, evaluate: number}}} WritingWorkflowInput */
 /** @typedef {{status: 'written', text: string, modelId: string, costUsd: number} | {status: 'failed', reason: WritingFailureReason}} WriterResult */
 /** @typedef {{modelId: string, contract: WritingContract, budget: {authorityRef: string, maxUsd: number, maxOutputTokens: number, deadlineAt: number}, signal: AbortSignal, maxRetries: 0, allowFallback: false}} WriterOptions */
 /** @typedef {{fingerprint: string, dataApproved: boolean, fundingApproved: boolean, expiresAt: number, authorityRef: string, maxUsd: number, availableUsd: number}} WorkflowApproval */
@@ -46,6 +54,7 @@ export function writingWorkflowFingerprint(input) {
   return evidenceFingerprint({
     schema: 'writing-workflow/v1',
     input,
+    binding: writingReceiptBinding(input),
     evaluator: JEV_ROUTE,
     maxWriterCandidates: 2,
     maxEvaluationRounds: 2,
@@ -57,7 +66,7 @@ class Stop extends Error {
   /** @param {WritingFailureReason} reason */
   constructor(reason) {
     super(reason);
-    this.reason = reason;
+    this.reason = writingFailureReason(reason);
   }
 }
 
@@ -73,7 +82,7 @@ function hardFailure(findings) {
   return null;
 }
 
-function prepareReview(input, text, original) {
+function prepareReview(input, text, original, record) {
   const contract = {
     ...input.contract,
     exactCandidate: text,
@@ -81,6 +90,7 @@ function prepareReview(input, text, original) {
   };
   const passages = segmentPassages(text);
   const deterministic = detectWritingFindings(passages, contract).findings;
+  record(deterministic);
   const hard = hardFailure(deterministic);
   if (hard) throw new Stop(hard);
   let base;
@@ -135,9 +145,10 @@ function prepareReview(input, text, original) {
  * existing exact-payload Gateway data/funding admission inside that envelope;
  * it cannot enlarge a stage reservation. Writers must report attributable cost
  * and retain SDK leak guards, maxRetries:0 and the recorded model identity.
+ * writerImplementationSha256 covers the caller's writer/sanitization wrapper.
  * No streaming, tools, sends or implicit original-text fallback occur here.
  * @param {WritingWorkflowInput} rawInput
- * @param {{approval: WorkflowApproval, readCurrentFingerprint: () => string | Promise<string>, write: (options: WriterOptions) => Promise<WriterResult>, revise: (options: WriterOptions & {original: {text: string, modelId: string}, review: {exactCandidate: string, receipt: object}}) => Promise<WriterResult>, evaluationApproval: (request: ReviewRequest) => GatewayOptions['approval'] | Promise<GatewayOptions['approval']>, gateway?: Pick<GatewayOptions, 'apiKey' | 'credentialRef' | 'reserveFreeCall' | 'transport'>, now?: () => number, signal?: AbortSignal}} options
+ * @param {{approval: WorkflowApproval, readCurrentFingerprint: () => string | Promise<string>, write: (options: WriterOptions) => Promise<WriterResult>, revise: (options: WriterOptions & {original: {text: string, modelId: string}, review: {exactCandidate: string, receipt: object}}) => Promise<WriterResult>, evaluationApproval: (request: ReviewRequest) => GatewayOptions['approval'] | Promise<GatewayOptions['approval']>, gateway?: Pick<GatewayOptions, 'apiKey' | 'credentialRef' | 'reserveFreeCall' | 'transport'>, sanitizeText?: (text: string) => string, now?: () => number, signal?: AbortSignal}} options
  * @returns {Promise<WritingWorkflowOutcome>}
  */
 export async function runWritingWorkflow(rawInput, options) {
@@ -147,6 +158,15 @@ export async function runWritingWorkflow(rawInput, options) {
   const input = structuredClone(rawInput);
   const approval = structuredClone(options.approval);
   const fingerprint = writingWorkflowFingerprint(input);
+  const trace = {
+    binding: writingReceiptBinding(input),
+    startedAt: now(),
+    completedAt: null,
+    originalText: null,
+    initialFindings: [],
+    checks: [],
+    calls: [],
+  };
   /** @type {WorkflowCounts} */
   const counts = {
     writerCalls: 0,
@@ -161,7 +181,14 @@ export async function runWritingWorkflow(rawInput, options) {
   let timer;
   let reservedMicros = 0;
   /** @param {{status: 'reviewed', text: string, modelId: string} | {status: 'review-needed', reason: WritingFailureReason}} value */
-  const finish = value => Object.freeze({ ...counts, ...value });
+  const finish = value => {
+    const outcome = { ...counts, ...value };
+    trace.completedAt = now();
+    return Object.freeze({
+      ...outcome,
+      receipt: createWritingPilotReceipt(input, outcome, trace),
+    });
+  };
   const guard = () => {
     if (controller.signal.aborted) throw controller.signal.reason;
     if (now() >= input.deadlineAt) throw new Stop('timeout');
@@ -171,7 +198,12 @@ export async function runWritingWorkflow(rawInput, options) {
     guard();
     const current = await options.readCurrentFingerprint();
     guard();
-    if (current !== fingerprint) throw new Stop('stale-input');
+    if (
+      current !== fingerprint ||
+      writingWorkflowFingerprint(rawInput) !== fingerprint ||
+      !writingImplementationCurrent()
+    )
+      throw new Stop('stale-input');
   };
   const reserve = amount => {
     guard();
@@ -199,13 +231,43 @@ export async function runWritingWorkflow(rawInput, options) {
       maxRetries: /** @type {const} */ (0),
       allowFallback: /** @type {const} */ (false),
     };
-    const result = await (original
+    const startedAt = now();
+    const callIndex =
+      trace.calls.push(
+        writingCallObservation(
+          original ? 'revise' : 'write',
+          null,
+          startedAt,
+          null
+        )
+      ) - 1;
+    const returned = await (original
       ? options.revise({ ...args, original, review })
       : options.write(args)
     ).catch(() => {
+      trace.calls[callIndex] = writingCallObservation(
+        original ? 'revise' : 'write',
+        null,
+        startedAt,
+        now()
+      );
       guard();
       throw new Stop('writer-failure');
     });
+    // Finalize bytes BEFORE review and hashing. Returned outcomes never format them.
+    const result = structuredClone(returned);
+    if (result?.status === 'written' && typeof result.text === 'string')
+      result.text = options.sanitizeText
+        ? options.sanitizeText(result.text)
+        : result.text;
+    trace.calls[callIndex] = writingCallObservation(
+      original ? 'revise' : 'write',
+      result,
+      startedAt,
+      now()
+    );
+    if (!original && result?.status === 'written')
+      trace.originalText = result.text;
     guard();
     if (result?.status === 'failed') throw new Stop(result.reason);
     if (
@@ -228,7 +290,15 @@ export async function runWritingWorkflow(rawInput, options) {
     const { request, deterministic } = prepareReview(
       input,
       candidate.text,
-      original?.text
+      original?.text,
+      findings => {
+        if (!original) trace.initialFindings = findings;
+        trace.checks.push({
+          textSha256: writingTextDigest(candidate.text),
+          status: 'deterministic',
+          findings,
+        });
+      }
     );
     reserve(input.stageUpperBoundUsd.evaluate);
     const scoped = structuredClone(await options.evaluationApproval(request));
@@ -241,6 +311,7 @@ export async function runWritingWorkflow(rawInput, options) {
     )
       throw new Stop('budget-failure');
     counts.evaluationRounds += 1;
+    const startedAt = now();
     const receipt = await runPreparedJevEvaluation(
       request,
       {
@@ -266,6 +337,17 @@ export async function runWritingWorkflow(rawInput, options) {
         return interpretWritingQuality(result, expected);
       }
     );
+    trace.calls.push(
+      writingCallObservation('evaluate', receipt, startedAt, now())
+    );
+    trace.checks.push({
+      textSha256: writingTextDigest(candidate.text),
+      status: receipt.status,
+      findings: receipt.findings,
+      unreviewed: receipt.unreviewed,
+    });
+    if (!original)
+      trace.initialFindings = [...deterministic, ...(receipt.findings ?? [])];
     guard();
     if (
       [
@@ -303,11 +385,14 @@ export async function runWritingWorkflow(rawInput, options) {
     await checkpoint();
     const original = await writer(undefined, undefined);
     const first = await review(original, undefined);
-    if (first.receipt.findings.length === 0)
+    if (first.receipt.findings.length === 0) {
+      await checkpoint();
       return finish({ status: 'reviewed', ...original });
+    }
     const revised = await writer(original, first);
     const second = await review(revised, original);
     if (second.receipt.findings.length) throw new Stop('revision-exhausted');
+    await checkpoint();
     return finish({ status: 'reviewed', ...revised });
   };
   try {

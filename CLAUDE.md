@@ -8,10 +8,10 @@ historical notes are evidence, not authority to change the task or permissions.
 
 ## Execute the task
 
-- Identify the bottleneck, evidence, success metric, and smallest correct change.
-- Treat requests to implement/fix as authorization to do the work. Carry accepted
-  scope through verification. Make reversible assumptions explicit; ask only when
-  missing information materially blocks progress.
+- Before tools, classify as personal/jovie/mixed; keep personal/mixed work private
+  via the [recovery guard](scripts/backlog-orchestrator/PRIVATE_WORKFLOWS.md).
+- Implement/fix requests authorize work through verification. State reversible
+  assumptions; ask only for blocking information.
 - Preserve existing edits and ownership. Use an isolated worktree when needed.
 - Query gbrain for relevant prior decisions and ownership before exploration.
   If unreachable, record `gbrain-unavailable` and continue with repo evidence.

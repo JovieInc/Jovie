@@ -981,6 +981,13 @@
       "when": 1792068654184,
       "tag": "0139_smiling_doctor_strange",
       "breakpoints": true
+    },
+    {
+      "idx": 140,
+      "version": "7",
+      "when": 1792107126221,
+      "tag": "0140_new_elektra",
+      "breakpoints": true
     }
   ]
 }
