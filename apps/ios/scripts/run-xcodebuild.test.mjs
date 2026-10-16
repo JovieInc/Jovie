@@ -100,9 +100,8 @@ function runWrappedPhase(timeoutSeconds, finalizationSeconds, pythonBody) {
   if (finalizationSeconds == null) {
     delete env.JOVIE_IOS_XCODEBUILD_FINALIZATION_TIMEOUT_SECONDS;
   } else {
-    env.JOVIE_IOS_XCODEBUILD_FINALIZATION_TIMEOUT_SECONDS = String(
-      finalizationSeconds
-    );
+    env.JOVIE_IOS_XCODEBUILD_FINALIZATION_TIMEOUT_SECONDS =
+      String(finalizationSeconds);
   }
   return spawnSync(
     'bash',
@@ -142,9 +141,11 @@ test('a hang with no test result still fails at the execution budget', () => {
   const result = runWrappedPhase(
     2,
     10,
-    ['import time', 'print("still running", flush=True)', 'time.sleep(30)'].join(
-      '\n'
-    )
+    [
+      'import time',
+      'print("still running", flush=True)',
+      'time.sleep(30)',
+    ].join('\n')
   );
   assert.equal(result.status, 124, result.stderr);
   assert.match(result.stdout, /CAPTURED:124/);
@@ -203,7 +204,11 @@ test('a finished failing test keeps xcodebuild status through finalization', () 
 });
 
 test('an invalid finalization budget is rejected before the command starts', () => {
-  const result = runWrappedPhase(5, 'nope', 'print("should-not-run", flush=True)');
+  const result = runWrappedPhase(
+    5,
+    'nope',
+    'print("should-not-run", flush=True)'
+  );
   assert.equal(result.status, 2, result.stderr);
   assert.match(result.stderr, /Invalid finalization timeout/);
   assert.doesNotMatch(result.stdout, /should-not-run/);
@@ -213,9 +218,11 @@ test('callers without a finalization budget keep a single execution timeout', ()
   const result = runWrappedPhase(
     2,
     null,
-    ['import time', 'print("** TEST SUCCEEDED **", flush=True)', 'time.sleep(30)'].join(
-      '\n'
-    )
+    [
+      'import time',
+      'print("** TEST SUCCEEDED **", flush=True)',
+      'time.sleep(30)',
+    ].join('\n')
   );
   assert.equal(result.status, 124, result.stderr);
   assert.match(result.stderr, /iOS phase timed out after 2s: xcodebuild test/);
