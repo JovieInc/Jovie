@@ -7,9 +7,11 @@ Tracking: DB-AUDIT-20260913/04. `runAtomicDbOperation` evolves the audited rollb
 | Admin waitlist approval | Old profile unclaimed, target claimed, entry invited, audit inserted, user approved, token persisted, deduplicated invite job queued | After each of 7 writes |
 | Admin waitlist revocation | Profile unclaimed, entry/token revoked, audit inserted, user access removed | After each of 4 writes |
 
-[Real Postgres proof](../apps/web/tests/integration/atomic-operation.test.ts) calls production helpers against temporary fixture tables, compares full snapshots at every failure boundary, then verifies success and repeated-request reconciliation. It proves rollback, local identity/timeout cleanup and SQL cancellation; it does not certify production RLS roles, schema constraints, or the Neon transport.
+[Real Postgres proof](../apps/web/tests/integration/atomic-operation.test.ts) calls production helpers against temporary fixture tables, compares full snapshots at every failure boundary, then verifies success and repeated-request reconciliation. It proves rollback, local identity/timeout cleanup and SQL cancellation. Fixture tables do not certify production RLS roles or schema constraints.
 
-Run against a disposable loopback Postgres database named `jov6269_atomic`:
+The isolated Neon certification job runs this file. That job publishes a transaction-pooled `DATABASE_URL`, and PgBouncer transaction mode cannot keep temporary tables or show that transaction-local settings were cleared. The test opens the same ephemeral branch on its direct endpoint (the pooler host with `-pooler` removed, the same rewrite migrations use) with one session. That session still does not certify the application WebSocket pooler.
+
+Run locally against a disposable loopback Postgres database named `jov6269_atomic`:
 `ATOMIC_TEST_DATABASE_URL=postgres://postgres@127.0.0.1:55469/jov6269_atomic pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci.mts tests/integration/atomic-operation.test.ts`.
 
 Authentication/admin authorization precedes entry; cache invalidation follows commit. The existing ingestion job commits with the invite token, has a unique dedup key, and invite delivery uses a token-derived provider idempotency key in [email-jobs.ts](../apps/web/lib/waitlist/email-jobs.ts). Reconcile entry/token/job state after an ambiguous commit; delivery is not exactly once.

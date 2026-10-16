@@ -354,9 +354,10 @@ export function getInternalDb(): DbType | undefined {
 }
 
 /**
- * Set the internal database reference (for internal use)
+ * Set the internal database reference (for internal use).
+ * `undefined` clears an injected client without closing the process pool.
  */
-export function setInternalDb(db: DbType): void {
+export function setInternalDb(db: DbType | undefined): void {
   _db = db;
 }
 
