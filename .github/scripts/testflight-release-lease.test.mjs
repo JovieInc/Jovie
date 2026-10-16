@@ -9,7 +9,13 @@ import {
   runWithRealGh,
   storedZip,
 } from '../../scripts/lib/real-gh-harness.mjs';
-import { validateLease } from './testflight-release-lease.mjs';
+import {
+  comparisonReady,
+  evidenceFailureKind,
+  evidenceInvocation,
+  readEvidence,
+  validateLease,
+} from './testflight-release-lease.mjs';
 
 const SOURCE = 'a'.repeat(40);
 const CONTROLLER_HEAD = 'b'.repeat(40);
@@ -192,6 +198,133 @@ test('continuous merges preserve one certified source through archive and final 
       lease
     );
   }
+});
+
+test('an unfinished compare after main advances is retried and still not a rewind', () => {
+  const f = fixture();
+  const lease = validateLease(f.input);
+  f.reserve(lease);
+  f.moveMain(NEXT);
+  const original = f.input.api;
+  let unfinished = 2;
+  const pauses = [];
+  f.input.api = route => {
+    if (route.includes('/compare/') && unfinished > 0) {
+      unfinished -= 1;
+      return { message: 'Sorry, the diff is temporarily unavailable.' };
+    }
+    return original(route);
+  };
+  assert.deepEqual(
+    validateLease({
+      ...f.input,
+      previous: lease,
+      phase: 'upload',
+      pause: attempt => pauses.push(attempt),
+    }),
+    lease
+  );
+  assert.deepEqual(pauses, [1, 2]);
+  assert.equal(comparisonReady({ status: 'diverged' }), true);
+  assert.equal(
+    comparisonReady({ message: 'Sorry, the diff is temporarily unavailable.' }),
+    false
+  );
+});
+
+test('a settled diverged compare is still a rewind on the first read', () => {
+  const f = fixture();
+  const lease = validateLease(f.input);
+  f.reserve(lease);
+  const original = f.input.api;
+  let compares = 0;
+  f.input.api = route => {
+    if (route.includes('/compare/')) {
+      compares += 1;
+      return { status: 'diverged', merge_base_commit: { sha: NEXT } };
+    }
+    return original(route);
+  };
+  assert.throws(
+    () =>
+      validateLease({
+        ...f.input,
+        previous: lease,
+        phase: 'upload',
+        pause: () => {
+          throw new Error('settled divergence must not be retried');
+        },
+      }),
+    /release lineage rewound or diverged/
+  );
+  assert.equal(compares, 1);
+});
+
+test('an unfinished compare that never settles fails closed without calling it a rewind', () => {
+  const f = fixture();
+  const original = f.input.api;
+  f.input.api = route => {
+    if (route.includes('/compare/'))
+      return { message: 'diff is unavailable' };
+    return original(route);
+  };
+  assert.throws(
+    () =>
+      validateLease({
+        ...f.input,
+        comparisonAttempts: 2,
+        pause: () => {},
+      }),
+    error => {
+      assert.match(error.message, /release comparison was not ready/);
+      assert.doesNotMatch(error.message, /rewound or diverged/);
+      return true;
+    }
+  );
+});
+
+test('compare transport failures are retryable and raw provider output is not classified as success', () => {
+  assert.equal(
+    evidenceFailureKind(
+      'gh: HTTP 404\n',
+      '',
+      'repos/JovieInc/Jovie/compare/aaa...bbb'
+    ),
+    'temporarily unavailable'
+  );
+  assert.equal(
+    evidenceFailureKind('gh: HTTP 404\n', '', 'repos/JovieInc/Jovie/commits/main'),
+    'failed'
+  );
+  assert.equal(
+    evidenceFailureKind('API rate limit exceeded', ''),
+    'rate limited'
+  );
+  assert.deepEqual(evidenceInvocation(['gh', 'api', 'repos/acme/commits/main']), [
+    'bash',
+    evidenceInvocation(['gh', 'api', 'x'])[1],
+    'api',
+    'repos/acme/commits/main',
+  ]);
+  assert.deepEqual(evidenceInvocation(['git', 'rev-parse', 'HEAD']), [
+    'git',
+    'rev-parse',
+    'HEAD',
+  ]);
+  let calls = 0;
+  const body = readEvidence(
+    () => {
+      calls += 1;
+      if (calls < 3) {
+        throw new Error('gh evidence command failed (1); temporarily unavailable');
+      }
+      return { sha: 'a'.repeat(40) };
+    },
+    'repos/JovieInc/Jovie/commits/main',
+    { pause: () => {}, attempts: 4 }
+  );
+  assert.equal(body.sha, 'a'.repeat(40));
+  assert.equal(calls, 3);
 });
 
 for (const [label, mutate] of [

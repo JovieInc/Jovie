@@ -1359,7 +1359,13 @@ describe('iOS TestFlight release routing and lane', () => {
     const called = join(root, 'called');
     writeFileSync(
       guard,
-      `import {writeFileSync} from 'node:fs'; writeFileSync(process.env.FIXTURE_CALLED, process.argv[2]); process.exit(Number(process.env.FIXTURE_GUARD_STATUS));`
+      `import {writeFileSync} from 'node:fs';
+writeFileSync(process.env.FIXTURE_CALLED, process.argv[2]);
+const status = Number(process.env.FIXTURE_GUARD_STATUS);
+if (status !== 0) {
+  console.error('::error::TestFlight lease rejected: fixture denial');
+  process.exit(status);
+}`
     );
     const script = `
       def default_platform(*)\nend
@@ -1380,12 +1386,22 @@ describe('iOS TestFlight release routing and lane', () => {
     const fastfile = resolve(repoRoot, 'fastlane/Fastfile');
     execFileSync('ruby', ['-e', script, fastfile], { env, stdio: 'pipe' });
     expect(readFileSync(called, 'utf8')).toBe('upload');
-    expect(() =>
+    let denial = '';
+    try {
       execFileSync('ruby', ['-e', script, fastfile], {
         env: { ...env, FIXTURE_GUARD_STATUS: '1' },
         stdio: 'pipe',
-      })
-    ).toThrow();
+      });
+    } catch (error) {
+      const thrown = error as { stderr?: Buffer; message?: string };
+      denial = `${thrown.stderr?.toString() ?? ''}\n${thrown.message ?? ''}`;
+    }
+    expect(denial).toContain(
+      'TestFlight certified release lease failed final validation'
+    );
+    expect(denial).toContain(
+      '::error::TestFlight lease rejected: fixture denial'
+    );
   });
   it('classifies TestFlight release inputs into the iOS lane', async () => {
     const { classifyProductLanes } = (await import(

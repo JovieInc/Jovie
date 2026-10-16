@@ -10,7 +10,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const SHA = /^[0-9a-f]{40}$/;
 const ID = /^[1-9][0-9]*$/;
@@ -23,6 +23,75 @@ const CONTROLLER = '.github/workflows/production-controller.yml';
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
 };
+const HOLD = join(
+  fileURLToPath(new URL('.', import.meta.url)),
+  'gh-api-hold.sh'
+);
+const textOf = value =>
+  Buffer.isBuffer(value) ? value.toString('utf8') : String(value ?? '');
+
+// A compare response is settled only after GitHub finishes the diff. A main
+// SHA that landed seconds earlier often comes back without `status`. That is
+// not a rewind. `ahead` still has to name this commit as the merge base.
+export function comparisonReady(value) {
+  const status = value?.status;
+  if (status === 'diverged' || status === 'behind' || status === 'identical')
+    return true;
+  return (
+    status === 'ahead' && typeof value?.merge_base_commit?.sha === 'string'
+  );
+}
+
+export function evidenceFailureKind(stderr, stdout, route = '') {
+  const text = `${textOf(stderr)}\n${textOf(stdout)}`;
+  if (
+    /API rate limit|secondary rate limit|HTTP 429|x-ratelimit-remaining:\s*0/i.test(
+      text
+    )
+  )
+    return 'rate limited';
+  if (
+    /temporarily unavailable|diff is unavailable|try again later|still being generated/i.test(
+      text
+    )
+  )
+    return 'temporarily unavailable';
+  if (route.includes('/compare/') && /HTTP 404|HTTP 422/.test(text))
+    return 'temporarily unavailable';
+  return 'failed';
+}
+
+const transientEvidence = error =>
+  /temporarily unavailable/.test(error?.message ?? '');
+
+export function readEvidence(
+  api,
+  route,
+  { pause = () => {}, attempts = 12 } = {}
+) {
+  const compare = route.includes('/compare/');
+  const limit = compare ? attempts : Math.min(attempts, 4);
+  let last;
+  for (let attempt = 1; attempt <= limit; attempt++) {
+    try {
+      const body = api(route);
+      if (!compare || comparisonReady(body)) return body;
+      last = new Error('release comparison was not ready');
+    } catch (error) {
+      if (!transientEvidence(error)) throw error;
+      last = error;
+    }
+    if (attempt < limit) pause(attempt);
+  }
+  throw last;
+}
+
+export function evidenceInvocation(args, holdPath = HOLD) {
+  // gh-api-hold.sh invokes `gh "$@"`, so the `gh` token itself is not an argument.
+  if (args[0] === 'gh' && args[1] === 'api')
+    return ['bash', holdPath, ...args.slice(1)];
+  return [...args];
+}
 const digest = value =>
   createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const epoch = value => {
@@ -71,9 +140,13 @@ export function validateLease({
   previous = null,
   phase = 'admit',
   now = Date.now,
-  api,
+  api: rawApi,
+  pause = () => {},
+  comparisonAttempts = 12,
   readArtifact,
 }) {
+  const api = route =>
+    readEvidence(rawApi, route, { pause, attempts: comparisonAttempts });
   const clock = typeof now === 'function' ? now : () => now;
   assert(
     ['admit', 'archive', 'upload'].includes(phase),
@@ -431,16 +504,37 @@ export function validateLease({
 }
 
 function command(args, options = {}) {
-  const result = spawnSync(args[0], args.slice(1), {
+  const { label = args[0], route = '', ...spawnOptions } = options;
+  const budget = Number(process.env.GH_API_HOLD_BUDGET_SECONDS);
+  const timeout =
+    args[0] === 'gh' &&
+    args[1] === 'api' &&
+    Number.isFinite(budget) &&
+    budget > 0
+      ? budget * 1000 + 15000
+      : 30000;
+  const invocation = evidenceInvocation(args);
+  const result = spawnSync(invocation[0], invocation.slice(1), {
     encoding: 'utf8',
-    timeout: 30000,
+    timeout,
     maxBuffer: 16 * 1024 * 1024,
-    ...options,
+    ...spawnOptions,
   });
+  if (result.status !== 0) {
+    const stderr = textOf(result.stderr);
+    for (const line of stderr.split('\n')) {
+      if (line.startsWith('::error::') || line.startsWith('::warning::'))
+        console.error(line);
+    }
+  }
   // No raw provider output: it can include sensitive request headers.
+  const kind =
+    result.status === 0
+      ? ''
+      : `; ${evidenceFailureKind(result.stderr, result.stdout, route)}`;
   assert(
     result.status === 0,
-    `${args[0]} evidence command failed (${result.status ?? 'unavailable'})`
+    `${label} evidence command failed (${result.status ?? 'unavailable'})${kind}`
   );
   return result.stdout;
 }
@@ -465,7 +559,23 @@ export function runLease(env = process.env, phase = process.argv[2]) {
       baselineSha: env.BASELINE_SHA || '',
       previous,
       phase,
-      api: route => JSON.parse(command(['gh', 'api', route])),
+      pause: () => {
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 3000);
+      },
+      api: route => {
+        const stdout = command(['gh', 'api', route], { route });
+        const text = textOf(stdout).trim();
+        try {
+          return JSON.parse(text);
+        } catch (error) {
+          if (route.includes('/compare/')) {
+            throw new Error(
+              'gh evidence command failed (0); temporarily unavailable'
+            );
+          }
+          throw error;
+        }
+      },
       readArtifact: (id, name) => {
         const zip = join(directory, `${id}.zip`);
         writeFileSync(
@@ -490,8 +600,12 @@ export function runLease(env = process.env, phase = process.argv[2]) {
       writeFileSync(env.TESTFLIGHT_LEASE_PATH, `${JSON.stringify(lease)}\n`);
       appendFileSync(env.GITHUB_OUTPUT, `lease=${JSON.stringify(lease)}\n`);
     } else {
+      const checkout = env.GITHUB_WORKSPACE
+        ? { cwd: env.GITHUB_WORKSPACE }
+        : {};
       assert(
-        command(['git', 'rev-parse', 'HEAD']).trim() === lease.sourceSha,
+        command(['git', 'rev-parse', 'HEAD'], checkout).trim() ===
+          lease.sourceSha,
         'archive checkout differs from certified source'
       );
     }
