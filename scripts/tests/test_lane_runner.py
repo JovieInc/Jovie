@@ -361,6 +361,74 @@ class SelectionTest(unittest.TestCase):
         task.description = "Change live `/pricing` schema fixture and pricing to $199"
         self.assertIsNone(lane.pick_issue([task], {}, provider="codex"))
 
+    def pricing_comparison_issue(self):
+        task = issue("JOV-7863", labels=["agent-ready"])
+        task.title = 'Marketing header shows "Request access" and /pricing renders the compact footer'
+        task.description = (
+            "Found in the studio header/footer certification pass "
+            "([JOV-6180](https://linear.app/jovie/issue/JOV-6180/certify-against-live-pen)), "
+            "comparing live [jov.ie/pricing](<http://jov.ie/pricing>) at 1440 on 2026-10-04 "
+            "against Pen's canonical eoUUU and CCDnQ.\n\n"
+            "The /pricing header CTA reads Request access. Every claim enters /start. "
+            "Marketing pages must render the full SEO footer. Acceptance asserts the "
+            "header label, destination and full footer at 1440 and 390."
+        )
+        return task
+
+    def test_uncertified_route_comparison_retains_the_existing_hold(self):
+        task = self.pricing_comparison_issue()
+        self.assertIsNone(lane.pick_issue([task], {}, provider="codex"))
+
+    def test_route_observation_cannot_mask_a_requested_mutation(self):
+        task = self.pricing_comparison_issue()
+        evidence = task.description
+        for instruction in (
+            "Change it to $199.",
+            "Set that amount to 199.",
+            "Lower it to 199.",
+            "Reduce that amount to 199.",
+            "Bump that amount to 199.",
+            "Synchronize that amount with the paid plan.",
+            "Update the footer label.",  # Ambiguous mutation context stays conservative.
+            "Rotate production credentials.",
+            "Revoke production API keys.",
+            "Change live production prices.",
+        ):
+            for description in (instruction + "\n\n" + evidence, evidence + "\n\n" + instruction):
+                with self.subTest(instruction=instruction, prefix=description.startswith(instruction)):
+                    task.description = description
+                    self.assertIsNone(lane.pick_issue([task], {}, provider="codex"))
+
+    def test_generic_references_and_credential_negation_keep_the_existing_hold(self):
+        task = issue("JOV-7863", labels=["agent-ready"])
+        task.title = "Marketing header and compact footer layout"
+        for description in (
+            "Inspect live /pricing, then change it to $199.",
+            "Compare live `/pricing`, then change it to $199.",
+            "Compare live [revoke API keys /pricing](https://jov.ie/pricing).",
+            "Verify live [change production prices /pricing](https://jov.ie/pricing).",
+            "Change live [pricing](https://jov.ie/pricing) to $199.",
+            "Change live [jov.ie/pricing](https://jov.ie/pricing) to $199.",
+            "Do not rotate credentials.",
+            "Do not rotate credentials. No token revocation.",
+            "Unless the login fails, do not rotate credentials.",
+            "Unless the login fails,\ndo not rotate credentials.",
+            "In the event of an outage:\n\nDo not rotate credentials.",
+            "Only during deployment:\n\nDo not rotate credentials.",
+        ):
+            with self.subTest(description=description):
+                task.description = description
+                self.assertIsNone(lane.pick_issue([task], {}, provider="codex"))
+
+    def test_plural_production_prices_are_held(self):
+        task = issue("JOV-9", labels=["agent-ready"])
+        task.title = "Update annual plan"
+        for description in ("Change live prices.", "Reduce production prices.",
+                            "Adjust prices in prod."):
+            with self.subTest(description=description):
+                task.description = description
+                self.assertIsNone(lane.pick_issue([task], {}, provider="codex"))
+
 
 class WorkstreamAdmissionTest(unittest.TestCase):
     """JOV-7514 / JOV-5555 / JOV-7423: one workstream rule for intake and backlog."""

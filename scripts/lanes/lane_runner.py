@@ -105,8 +105,8 @@ SENSITIVE_REVIEWABLE_LINES = 500
 SENSITIVE_RED_LINES = re.compile(
     r"\b(?:rotate|rotation|revoke|revocation)\b.{0,40}\b(?:secret|credential|token|key)s?\b|"
     r"\b(?:secret|credential|token|key)s?\b.{0,40}\b(?:rotate|rotation|revoke|revocation)\b|"
-    r"\b(?:live|production|prod)\b.{0,40}\b(?:price|pricing)\b|"
-    r"\b(?:price|pricing)\b.{0,40}\b(?:live|production|prod)\b",
+    r"\b(?:live|production|prod)\b.{0,40}\b(?:prices?|pricing)\b|"
+    r"\b(?:prices?|pricing)\b.{0,40}\b(?:live|production|prod)\b",
     re.IGNORECASE,
 )
 MAX_FAILURES = 3
