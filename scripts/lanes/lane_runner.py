@@ -3641,9 +3641,26 @@ def escalate_exhausted(host: Host, prs: list[dict], linear, *, model_only=False,
                 fresh_attempts = maintenance_json(path, missing={})
                 fresh_held = maintenance_json(held_path(host), missing={})
                 ended = _rung_stamp(record.get("endedAt"))
+                owned = LANE_BRANCH.match(pr["headRefName"])
+                pending = record.get("pendingEscalation") or {}
+                if not isinstance(pending, dict) or type(pr.get("isDraft")) is not bool \
+                        or pr.get("isCrossRepository") is not False or (pr["isDraft"] and not owned):
+                    continue
+                disabled = {name for name, spec in providers.items() if isinstance(spec, dict)
+                            and (not spec.get("enabled", True) or spec.get("repairs") is False)}
+                transfer = bool(pr.get("isDraft") and owned
+                                and owned["lane"] not in {pending.get("lane"), *disabled})
+                if transfer and (owned["lane"] not in providers or record.get("lane") != owned["lane"]
+                                 or pending.get("head") != pr["headRefOid"]
+                                 or pr["headRefOid"] not in (record.get("sha"), record.get("pushedHead"))
+                                 or record.get("repairBranch") != pr["headRefName"]
+                                 or _rung_stamp(record.get("at")) is None
+                                 or ended is None or ended < _rung_stamp(record["at"])):
+                    continue
                 if not isinstance(fresh_attempts, dict) or fresh_attempts.get(str(pr["number"])) != record \
                         or not isinstance(fresh_held, dict) or fresh_held.get(str(pr["number"])) != held.get(str(pr["number"])) \
-                        or ended is None or ended > time.time() \
+                        or (ended is None and (record.get("endedAt") is not None or transfer)) \
+                        or (ended is not None and ended > time.time()) \
                         or pr_events.in_flight(record, {"headRefOid": record.get("sha")}, time.time()) \
                         or pr["number"] in maintenance_preserved(host.state) or pr_recovery_held(host, pr) \
                         or publication_revocation(host, pr["headRefName"]):
@@ -3655,7 +3672,8 @@ def escalate_exhausted(host: Host, prs: list[dict], linear, *, model_only=False,
                 fresh_held = maintenance_json(held_path(host), missing={})
                 ended = _rung_stamp(record.get("endedAt"))
                 if not isinstance(fresh_held, dict) or fresh_held.get(str(pr["number"])) != held.get(str(pr["number"])) \
-                        or ended is None or ended > now \
+                        or (ended is None and pr["number"] not in joined_rungs) \
+                        or (ended is not None and ended > now) \
                         or pr["number"] in maintenance_preserved(host.state) \
                         or pr_recovery_held(host, pr) or publication_revocation(host, pr["headRefName"]) \
                         or pr_events.in_flight(record, {"headRefOid": record.get("sha")}, now):
