@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 2,
+  "label": "",
+  "flaky": [],
+  "run": {
+    "repository": null,
+    "headSha": null,
+    "runId": null,
+    "runAttempt": null,
+    "event": null,
+    "job": null
+  },
+  "generatedAt": "2026-10-13T01:06:23.381Z",
+  "complete": true,
+  "executions": [
+    {
+      "file": "tests/unit/ovie/mcp-handler.test.ts",
+      "fileHash": "b0910be2b4c8ff19f68816b112ebf87d749c073f1dadf0d2e4ded668556e4834",
+      "executedCount": 1,
+      "skippedCount": 61,
+      "retryCount": 0,
+      "outcome": "clean",
+      "complete": false,
+      "failures": []
+    }
+  ]
+}
