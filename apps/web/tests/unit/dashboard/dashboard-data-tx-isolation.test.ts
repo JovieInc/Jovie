@@ -951,7 +951,7 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       rejectTimeout(timeout);
     }
     const result = await resultPromise;
-    expect(result.avatarQuality.status).toBe('unknown');
+    expect(result.avatarQuality?.status).toBe('unknown');
     expect(result.tippingStats.totalReceivedCents).toBe(100);
     expect(
       vi.mocked(setStatementTimeout).mock.calls.filter(([, ms]) => ms === 5000)
@@ -990,7 +990,7 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       ok([{ total: 3, qr: 1, link: 2 }])
     );
     const result = await getDashboardData();
-    expect(result.avatarQuality.status).toBe('unknown');
+    expect(result.avatarQuality?.status).toBe('unknown');
     expect(result.tippingStats.totalReceivedCents).toBe(100);
     expect(result.dashboardLoadError).toBeUndefined();
     expect(withDbSessionTxMock).toHaveBeenCalledTimes(6);
@@ -1064,7 +1064,7 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
         ok([{ total: 3, qr: 1, link: 2 }])
       );
       const result = await getDashboardData();
-      expect(result.avatarQuality.status).toBe('unknown');
+      expect(result.avatarQuality?.status).toBe('unknown');
       expect(result.tippingStats.totalReceivedCents).toBe(100);
       expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
       expect(txStates.every(state => state.closed)).toBe(true);
@@ -1096,7 +1096,7 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     );
     try {
       const result = await getDashboardData();
-      expect(result.avatarQuality.status).toBe('unknown');
+      expect(result.avatarQuality?.status).toBe('unknown');
       expect(result.tippingStats.totalReceivedCents).toBe(100);
       expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
     } finally {
