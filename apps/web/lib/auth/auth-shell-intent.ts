@@ -1,3 +1,4 @@
+import { regexes } from 'zod';
 import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 import {
   USERNAME_MAX_LENGTH,
@@ -103,26 +104,9 @@ export function isAuthEmailAddress(value: string): boolean {
   const atIndex = email.indexOf('@');
   if (atIndex <= 0 || atIndex !== email.lastIndexOf('@')) return false;
 
-  const local = email.slice(0, atIndex);
-  const domain = email.slice(atIndex + 1);
-  if (local.length > 64 || domain.length < 3) return false;
-  if (domain.startsWith('.') || domain.endsWith('.') || !domain.includes('.')) {
-    return false;
-  }
+  if (atIndex > 64) return false;
 
-  for (const char of email) {
-    if (char <= ' ') return false;
-  }
-
-  for (const char of domain) {
-    const isAlphaNumeric =
-      (char >= 'a' && char <= 'z') ||
-      (char >= 'A' && char <= 'Z') ||
-      (char >= '0' && char <= '9');
-    if (!(isAlphaNumeric || char === '.' || char === '-')) {
-      return false;
-    }
-  }
-
-  return true;
+  // Match Better Auth's z.email() policy and the browser email input grammar.
+  // The latter also bounds domain labels and rejects their edge hyphens.
+  return regexes.email.test(email) && regexes.html5Email.test(email);
 }

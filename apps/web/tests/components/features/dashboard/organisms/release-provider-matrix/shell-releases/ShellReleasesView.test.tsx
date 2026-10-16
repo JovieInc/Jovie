@@ -414,6 +414,7 @@ describe('ShellReleasesView', () => {
       spotifyConnected: true,
       initialImporting: true,
     });
+    expect(screen.getByTestId('releases-matrix')).toBeInTheDocument();
     const row = screen.getByRole('option', { name: /Lost in the Light/ });
     const progress = screen.getByTestId('spotify-import-progress-banner');
     const progressSlot = screen.getByTestId('release-import-progress-slot');

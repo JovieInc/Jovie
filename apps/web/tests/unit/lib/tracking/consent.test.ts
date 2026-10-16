@@ -7,6 +7,7 @@ import {
   isGPCEnabled,
   isMarketingAllowed,
   isTrackingAllowed,
+  rememberAcquisitionId,
   setConsentState,
 } from '@/lib/tracking/consent';
 
@@ -310,6 +311,27 @@ describe('tracking consent', () => {
       const id = getOrCreateSessionId();
       expect(localStorage.getItem('jv_session_id')).toBe(id);
     });
+  });
+
+  describe('rememberAcquisitionId', () => {
+    const acquisitionId = '7f5bb735-8e88-4d78-ae32-5228cc12a8bb';
+    it('retains the server identity for later events and revocation', () => {
+      rememberAcquisitionId(acquisitionId);
+      expect(localStorage.getItem('jovie_acquisition_id')).toBe(acquisitionId);
+      expect(document.cookie).toContain(`jv_acquisition_id=${acquisitionId}`);
+    });
+    it('does not adopt an id after consent was revoked', () => {
+      setConsentState('rejected');
+      rememberAcquisitionId(acquisitionId);
+      expect(localStorage.getItem('jovie_acquisition_id')).toBeNull();
+    });
+    it.each([undefined, 'malformed'])(
+      'ignores invalid server identities: %s',
+      value => {
+        rememberAcquisitionId(value);
+        expect(localStorage.getItem('jovie_acquisition_id')).toBeNull();
+      }
+    );
   });
 
   describe('clearConsentState', () => {

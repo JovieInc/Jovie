@@ -94,6 +94,36 @@ JOV-8428 owns product buffering and owner-routed connector/publisher slices;
 JOV-6414 owns canary admission and rollback. The product stream remains advisory;
 this repair does not activate semantic enforcement or establish deployed proof.
 
+The product runner lives in
+[`jev-product-response-pilot.mjs`](../../scripts/invariants/jev-product-response-pilot.mjs)
+(JOV-8413). A trusted runner injects `executeChatTurn`, `reviseWritingPilot`,
+the existing AI SDK stream serializers, `buildScriptedFallbackResponse`,
+`encodeToolEvents`, and `parseTokens`. It supplies the server confirmation part
+from `confirmSelectedArtist`, the approved writing brief and budget, and
+`evaluationOptions` for existing Gateway admission/freshness/free-call accounting.
+No application module imports this runner or its script-only evaluation SDK.
+
+The caller also supplies `evidence.withRun(key, work)`: an exclusive durable
+lock per key, including across processes, with detached JSON `load`/`save`
+snapshots. The runner saves the original, optional revision, review attempts and
+terminal receipt before creating a response. Identical saved inputs reuse that
+terminal outcome; an interrupted record becomes `review-needed` without another
+writer or judge call. Storage failure withholds delivery. Operator context and
+conversation history are excluded from judgment and saved artifacts.
+
+`reviewed` serializes exactly the receipt's artifact and the confirmed server
+chip. `review-needed` returns no response. An optional caller-approved text-only
+script turn, bound to its digest, authority and applicable failure reasons, uses
+the existing fallback serializer and the same server evidence. Neither writer
+candidate is fallback text. Entity/skill tokens require the app catalog resolver
+and are withheld in this selected-artist onboarding pilot.
+
+**Ship now:** runner-only observation with at most one revision and two review
+rounds. **Re-evaluate when:** JOV-8414 and JOV-8415 supply held-out quality and
+calibrated promotion evidence. **Then:** assess pilot promotion under those
+receipts. Production streaming remains `post-generation-advisory`; this runner
+adds no route, request option, recurring job or global chat gate.
+
 ## Bypass candidates
 
 Direct generation imports and connector sends that can deliver text without

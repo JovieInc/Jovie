@@ -1,6 +1,11 @@
 import { sql as drizzleSql } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import {
+  FIRST_TOUCH_COOKIE,
+  openFirstTouchEnvelope,
+} from '@/lib/acquisition/first-touch-envelope';
+import { toReceiptFirstTouch } from '@/lib/acquisition/first-touch-receipt';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { isVisualCaptureSyntheticAuthEnabled } from '@/lib/e2e/runtime';
@@ -55,19 +60,29 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ recorded: false, linked: false });
   }
 
+  const envelope = await openFirstTouchEnvelope(
+    request.cookies.get(FIRST_TOUCH_COOKIE)?.value
+  );
+  const signed = envelope?.agentIntent ? envelope : null;
   if (parsed.data.action === 'revoke') {
     await db.execute(drizzleSql`
       UPDATE acquisition_journeys
       SET consent_state = 'revoked', consent_revoked_at = now(), updated_at = now()
-      WHERE id = ${parsed.data.acquisitionId}::uuid
+      WHERE id = ${signed?.id ?? parsed.data.acquisitionId}::uuid
         AND consent_revoked_at IS NULL
     `);
     return NextResponse.json({ recorded: true, linked: false });
   }
 
   const { userId: authUserId } = await getCachedAuth();
-  const { acquisitionId, firstTouch, capturedAt } = parsed.data;
-  const firstTouchJson = JSON.stringify(firstTouch);
+  // Agent fields never come from a request body or unsigned query parameters.
+  const acquisitionId = signed?.id ?? parsed.data.acquisitionId;
+  const capturedAt = signed
+    ? new Date(signed.iat).toISOString()
+    : parsed.data.capturedAt;
+  const firstTouchJson = JSON.stringify(
+    signed ? toReceiptFirstTouch(signed) : parsed.data.firstTouch
+  );
 
   await db.execute(drizzleSql`
     WITH app_user AS (
@@ -112,5 +127,9 @@ export async function POST(request: NextRequest) {
       AND pe.user_id IS NULL
   `);
 
-  return NextResponse.json({ recorded: true, linked: Boolean(authUserId) });
+  return NextResponse.json({
+    recorded: true,
+    linked: Boolean(authUserId),
+    acquisitionId,
+  });
 }

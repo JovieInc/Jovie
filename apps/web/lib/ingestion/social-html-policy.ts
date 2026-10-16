@@ -9,12 +9,17 @@ import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
 import { ExtractionError } from '@/lib/ingestion/strategies/base/types';
 
 const SOCIAL_HTML_ROOTS = [
+  'beacons.ai',
+  'beacons.page',
   'instagram.com',
   'linktr.ee',
   'linktree.com',
-  'x.com',
-  'twitter.com',
+  'music.youtube.com',
   'tiktok.com',
+  'twitter.com',
+  'x.com',
+  'youtu.be',
+  'youtube.com',
 ] as const;
 
 const SOCIAL_HTML_PREFIXES = ['www.', 'm.', 'vm.', 'mobile.', 'l.'] as const;

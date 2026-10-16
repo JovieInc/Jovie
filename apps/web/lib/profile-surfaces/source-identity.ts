@@ -17,10 +17,6 @@ import {
   fetchDocument,
 } from '@/lib/ingestion/strategies/base';
 import {
-  extractYouTube,
-  fetchYouTubeAboutDocument,
-} from '@/lib/ingestion/strategies/youtube';
-import {
   MISSING_IDENTITY_PHOTO,
   type SourceIdentity,
 } from './presence-identity';
@@ -34,9 +30,6 @@ const PUBLIC_PAGE_HOSTS = new Set([
   'listen.tidal.com',
   'soundcloud.com',
   'www.soundcloud.com',
-  'www.youtube.com',
-  'youtube.com',
-  'music.youtube.com',
   'www.deezer.com',
   'deezer.com',
   'music.apple.com',
@@ -188,39 +181,11 @@ export async function readSourceIdentity(
           : MISSING_IDENTITY_PHOTO,
       };
     }
-    const isYouTubeChannel =
-      ['youtube.com', 'www.youtube.com'].includes(url.hostname) &&
-      /^\/(?:@[^/]+|channel\/[^/]+|c\/[^/]+)\/?$/.test(url.pathname);
-    const html = isYouTubeChannel
-      ? await fetchYouTubeAboutDocument(url.toString(), {
-          timeoutMs: 4000,
-          maxRetries: 0,
-        })
-      : (
-          await fetchDocument(url.toString(), {
-            timeoutMs: 4000,
-            maxRetries: 0,
-            allowedHosts: PUBLIC_PAGE_HOSTS,
-          })
-        ).html;
-    if (isYouTubeChannel) {
-      const channel = extractYouTube(html);
-      const avatar = httpsImage(channel.avatarUrl);
-      if (avatar)
-        return {
-          ...unavailable,
-          status: 'available',
-          displayName: channel.displayName ?? null,
-          photo: {
-            url: avatar,
-            kind: 'profile',
-            source: 'public_metadata',
-            verified: false,
-            observedAt,
-            freshness: 'current',
-          },
-        };
-    }
+    const { html } = await fetchDocument(url.toString(), {
+      timeoutMs: 4000,
+      maxRetries: 0,
+      allowedHosts: PUBLIC_PAGE_HOSTS,
+    });
     const ogImage = httpsImage(extractMetaContent(html, 'og:image'));
     const pageTitle = extractMetaContent(html, 'og:title')?.trim() || null;
     if (!ogImage && !pageTitle) return unavailable;

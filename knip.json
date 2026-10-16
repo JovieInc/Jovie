@@ -33,11 +33,9 @@
         "lib/db/schema/**"
       ],
       "ignoreDependencies": [
-        "@radix-ui/react-avatar",
         "@radix-ui/react-toggle",
         "@radix-ui/react-toggle-group",
         "@opentelemetry/sdk-trace-base",
-        "@sentry/node",
         "import-in-the-middle",
         "require-in-the-middle"
       ],

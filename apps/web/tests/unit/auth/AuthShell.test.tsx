@@ -517,4 +517,19 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     });
     expect(screen.getByRole('button', { name: /google/i })).toBeInTheDocument();
   });
+
+  it('stamps the waitlist email capture without marking other auth surfaces', () => {
+    const { rerender } = render(<AuthShell mode='sign-up' />);
+    expect(screen.queryByTestId('marketing-section-capture')).toBeNull();
+
+    rerender(<AuthShell mode='sign-up' marketingCapture />);
+    expect(screen.getByTestId('marketing-section-capture')).toHaveAttribute(
+      'data-marketing-variant',
+      'email-only'
+    );
+    expect(screen.getByTestId('marketing-section-capture')).toHaveAttribute(
+      'data-marketing-owner',
+      'apps/web/components/features/auth/AuthShell.tsx'
+    );
+  });
 });

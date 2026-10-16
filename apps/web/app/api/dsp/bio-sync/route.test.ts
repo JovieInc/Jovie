@@ -21,6 +21,7 @@ describe('GET /api/dsp/bio-sync', () => {
     for (const provider of body.providers) {
       expect(provider.enabled).toBe(true);
       expect(provider.method).not.toBe('api');
+      expect(provider.rollback).toBe('manual');
     }
   });
 });

@@ -1,0 +1,13 @@
+diff --git a/dist/server/loader.js b/dist/server/loader.js
+index bd749814ff1c5b73bc26cde7bb02fb2af76530dc..f8b20ac35af18621301a1bcff009696379e24cfd 100644
+--- a/dist/server/loader.js
++++ b/dist/server/loader.js
+@@ -39,7 +39,7 @@ const repository = await (async () => {
+     logger.warn(`Init git repository failed ${error.message}`);
+   }
+ })();
+-const GIT_ROOT = repository ? path.join(repository.path(), "..") : "";
++const GIT_ROOT = repository ? repository.workdir() : "";
+ const DEFAULT_TRANSFORMERS = transformerTwoslash({
+   renderer: twoslashRenderer(),
+   explicitTrigger: true

@@ -133,11 +133,11 @@
     ".claude/rules/hermes-air.md": {
       "owner": "@itstimwhite",
       "claim": "Current Mac lane uses the existing fleet authority; historical gateway sections remain explicitly retired.",
-      "documentSha256": "77dcfcaa02d92c21d8cf7c632c0f9c41c05412c3e2422f0f8c919e6a163ff56f",
+      "documentSha256": "df56a62aa2514d1dbd7ea8b7cdb5770173fcc92bb01dd1a71afffb62513285ce",
       "sources": [
         {
           "path": "canon/FLEET.md",
-          "sha256": "48ca3bca6148df9f8464757dfec689f42678ea6a31aa9082cccf38362ab5ca61"
+          "sha256": "367120e3b49f643034f7a721d71927fadadb9c44e0d4f156822d92060da89af6"
         }
       ]
     },
@@ -343,12 +343,16 @@
     },
     "CLAUDE.md": {
       "owner": "@itstimwhite",
-      "claim": "The top-level router implements the company constitution without replacing it.",
-      "documentSha256": "8a34aa0ffe385bdc1ee2872e0f6a22df21d6a860dfcb224d2c150e951e7dcafa",
+      "claim": "The top-level router inherits the constitution and routes personal/mixed requests to private intake before task tools.",
+      "documentSha256": "ae1f036397e84f62d025bf03e41e501e32e465b6588a4284c3cd51000bbce116",
       "sources": [
         {
           "path": "canon/OPERATING_SYSTEM.md",
           "sha256": "405911b953ba432a2ef6d41efc69633ed330ba80a5d577865fe7027e9baf08f5"
+        },
+        {
+          "path": "scripts/backlog-orchestrator/private-task.mjs",
+          "sha256": "46e9fd81de86670fca59bf19d113786428b7b189f758cad75e682bb8d68924a1"
         }
       ]
     },
@@ -371,11 +375,11 @@
     "DESIGN.md": {
       "owner": "@itstimwhite",
       "claim": "Operational design authority derives from company design canon.",
-      "documentSha256": "ed3d2b71cc8b63c55fd026281877c1a89c1480a32eb858b4f376c7df5687d7ad",
+      "documentSha256": "85a3b182f64fa861141e7d77d06c1ac12ccaa4296a2630a2d58f477a6296be6d",
       "sources": [
         {
           "path": "canon/DESIGN.md",
-          "sha256": "e3d010ed5edb9255880135b51208537fd1f38fce623d83b2dab2cd62b209e99d"
+          "sha256": "8a6b7095f7a50904b77c4c2b0599d1b9f4de4621ffe459d1488357a31476839f"
         }
       ]
     },
@@ -472,7 +476,7 @@
     "docs/writing/SURFACE_COVERAGE.md": {
       "owner": "@itstimwhite",
       "claim": "The existing invariant consumer validates writing surface completeness; the bounded ops pilot rechecks artifact bindings at its Linear adapter and remains advisory.",
-      "documentSha256": "12eceb13da0e67515100dae4c954fbcc9e0c6e7abf782f23596935621313e3e1",
+      "documentSha256": "73b5cd57de3a9d21f5f2089168a7b83d959b25d7b0a197a032e30bf1ccd20bfe",
       "sources": [
         {
           "path": "scripts/invariants/writing-surfaces.mjs",
@@ -485,6 +489,21 @@
         {
           "path": "scripts/lanes/ops-report.mjs",
           "sha256": "13f2edce9dc44a1aef3bf1180a32aa6b78bb2a23f26b95274b0e23820752327b"
+        }
+      ]
+    },
+    "scripts/backlog-orchestrator/PRIVATE_WORKFLOWS.md": {
+      "owner": "@itstimwhite",
+      "claim": "Conversation intake denies personal/mixed externalization, resumes a private non-secret record, limits escalation, and verifies a live Telegram delivery receipt before completion.",
+      "documentSha256": "760a2fc32a4a4d7c0741e318f7c824444c572fe0dc83c531438d188e770a92a5",
+      "sources": [
+        {
+          "path": "scripts/backlog-orchestrator/conversation-intake.mjs",
+          "sha256": "134b25472d8fe35a7fb299fc2cee917e51210564b09516b01c08da2f724f7d9b"
+        },
+        {
+          "path": "scripts/backlog-orchestrator/private-task.mjs",
+          "sha256": "46e9fd81de86670fca59bf19d113786428b7b189f758cad75e682bb8d68924a1"
         }
       ]
     }

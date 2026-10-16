@@ -398,7 +398,7 @@ test.describe('Tipping MVP', () => {
         }
 
         // Check that the back button is visible
-        const backButton = page.getByRole('button', {
+        const backButton = page.getByRole('link', {
           name: 'Back to profile',
         });
         await expect(backButton).toBeVisible({
