@@ -8,15 +8,16 @@ const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const RESOLVE_MAIN_SCRIPT = fileURLToPath(
   new URL('./resolve-main-sha.sh', import.meta.url)
 );
-// One hour, the lifetime of a GitHub App installation token. A retry after
-// that is a 401. Stay ten minutes under it, matching gh-api-hold.sh.
-export const INSTALLATION_TOKEN_LIFETIME_MS = 60 * 60 * 1000;
-export const INSTALLATION_TOKEN_MARGIN_MS = 10 * 60 * 1000;
-export const MAX_REST_HOLD_MS =
-  INSTALLATION_TOKEN_LIFETIME_MS - INSTALLATION_TOKEN_MARGIN_MS;
-// Main Queue Provenance timeout. Five minutes remain for checkout and the
-// retry after the longest hold.
-export const PROVENANCE_JOB_TIMEOUT_MINUTES = 55;
+// The Actions GITHUB_TOKEN lasts the hosted job (max 6 hours), not the
+// one-hour lifetime of a separately minted App installation token. A primary
+// installation window resets within 60 minutes. Waiting that reset and
+// retrying still authenticates, and the retry is what proves PR Ready.
+// Five extra minutes cover the +1s slack and clock skew. gh-api-hold.sh
+// uses the same 65-minute cap.
+export const PRIMARY_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
+export const MAX_REST_HOLD_MS = PRIMARY_RATE_LIMIT_WINDOW_MS + 5 * 60 * 1000;
+// Seventy-five minutes covers the full window plus checkout and the retry.
+export const PROVENANCE_JOB_TIMEOUT_MINUTES = 75;
 export const PROVENANCE_JOB_MARGIN_MS = 5 * 60 * 1000;
 export const DEFAULT_REST_BUDGET_MS = MAX_REST_HOLD_MS;
 const REST_ATTEMPTS = 4;
@@ -342,9 +343,11 @@ function writeSummary(lines) {
 /**
  * One-shot exact-SHA provenance check. This never polls the current run.
  * Main is resolved over git ls-remote. Superseded SHAs are neutral. A
- * rate-limit response holds until x-ratelimit-reset inside the job and token
- * cap. Past that cap the result is rate_limit_hold with queueProven false.
- * That is not proof. Every other REST error fails closed.
+ * rate-limit response holds until x-ratelimit-reset when that instant is
+ * inside this job. A full primary window fits, and the retry must still
+ * find an exact PR Ready job. Past the cap the result is rate_limit_hold
+ * with queueProven false. That is not proof. Every other REST error fails
+ * closed.
  */
 export async function checkMainQueueProvenance({
   repository,

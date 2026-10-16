@@ -353,18 +353,21 @@ jobs:
   # Queue-proven SHAs reuse their exact merge_group gate and skip every duplicate
   # fallback lane. Direct/admin main commits run the complete fallback contract
   # below. API errors fail main pushes. An installation rate-limit 403 holds
-  # until x-ratelimit-reset inside this job; past that cap the step stays
-  # green only as rate_limit_hold (queue_proven false), never as proof. Other
+  # until x-ratelimit-reset inside this job, including a full 60-minute
+  # primary window, then retries the jobs list and still requires exact
+  # PR Ready proof. Past that cap the step stays green only as
+  # rate_limit_hold (queue_proven false), never as proof. Other
   # events emit neutral defaults so a skipped ancestor cannot cascade through
   # Path Changes into every source gate.
   main-queue-provenance:
     name: Main Queue Provenance
     runs-on: ubuntu-latest
-    # 55 minutes stays under the one-hour installation token. The jobs-list
-    # read waits until x-ratelimit-reset inside a 50-minute cap, leaving five
-    # minutes for checkout and the retry. A reset past that cap is a visible
-    # rate_limit_hold. A hard cancel would skip the fallback contract.
-    timeout-minutes: 55
+    # 75 minutes covers a full primary installation window (60 minutes) plus
+    # checkout and the jobs-list retry. The Actions token lasts this hosted
+    # job, so the retry still authenticates and can prove PR Ready. A reset
+    # past the 65-minute hold is a visible rate_limit_hold. A hard cancel
+    # would skip the fallback contract.
+    timeout-minutes: 75
     outputs:
       is_current: ${{ steps.verified.outputs.is_current || steps.neutral.outputs.is_current }}
       queue_proven: ${{ steps.verified.outputs.queue_proven || steps.neutral.outputs.queue_proven }}
@@ -8206,7 +8209,10 @@ jobs:
     # main SHA is required after that class of ghost run.
     if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # Same 75-minute ceiling as provenance. The sealed-receipt reads hold
+    # until x-ratelimit-reset inside 65 minutes, then retry. The happy path
+    # still finishes in seconds.
+    timeout-minutes: 75
     outputs:
       release_authorized: ${{ steps.ready.outputs.release_authorized }}
       evidence_mode: ${{ steps.ready.outputs.evidence_mode }}
@@ -8347,19 +8353,30 @@ jobs:
           echo "evidence_mode=fallback" >> "$GITHUB_OUTPUT"
           echo "release_authorized=true" >> "$GITHUB_OUTPUT"
 
+      - name: Checkout quota-safe REST hold
+        if: ${{ steps.ready.outputs.release_authorized == 'true' }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: |
+            .github/scripts/gh-api-hold.sh
+          sparse-checkout-cone-mode: false
       - name: Resolve sealed product-lane release routing
         if: ${{ steps.ready.outputs.release_authorized == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_API_HOLD_BUDGET_SECONDS: '3900'
           EVIDENCE_MODE: ${{ steps.ready.outputs.evidence_mode }}
           PROOF_RUN_ID: ${{ needs.main-queue-provenance.outputs.proof_run_id }}
         run: |
           set -euo pipefail
+          gh_api() { bash .github/scripts/gh-api-hold.sh api "$@"; }
           source_run_id="$GITHUB_RUN_ID"
           [ "$EVIDENCE_MODE" != merge_group ] || source_run_id="$PROOF_RUN_ID"
           [[ "$source_run_id" =~ ^[1-9][0-9]*$ ]]
           prefix="product-lane-final-${GITHUB_SHA}-"
-          artifacts="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$source_run_id/artifacts?per_page=100")"
+          artifacts="$(gh_api "repos/$GITHUB_REPOSITORY/actions/runs/$source_run_id/artifacts?per_page=100")"
           artifact_id="$(jq -r --arg prefix "$prefix" '
             [.artifacts[] | select(.expired == false and (.name | startswith($prefix)))]
             | sort_by(.id) | last | .id // empty
@@ -8370,7 +8387,7 @@ jobs:
           }
           root="$RUNNER_TEMP/product-lane-release"
           mkdir -p "$root"
-          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id/zip" > "$root/receipt.zip"
+          gh_api "repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id/zip" > "$root/receipt.zip"
           unzip -q "$root/receipt.zip" -d "$root/source"
           jq -e --arg sha "$GITHUB_SHA" --arg run "$source_run_id" '
             .provenance.sha == $sha and .provenance.runId == $run and .aggregatePassed == true
