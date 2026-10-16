@@ -1457,6 +1457,7 @@ jobs:
             ${{ runner.os }}-electron-downloads-
 
       - name: Prepare private production draft
+        id: prepare-production
         if: env.ENVIRONMENT == 'production'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -1510,7 +1511,7 @@ jobs:
       # If MAC_CERTIFICATE_BASE64 is absent, this step no-ops and the build
       # continues unsigned (electron-builder will warn, not fail).
       - name: Import Apple Developer cert (macOS)
-        if: env.HAS_MAC_SIGNING_CREDENTIALS == 'true'
+        if: env.HAS_MAC_SIGNING_CREDENTIALS == 'true' && (env.ENVIRONMENT == 'staging' || steps.prepare-production.outputs.prepared == 'true')
         env:
           MAC_CERTIFICATE_BASE64: ${{ secrets.MAC_CERTIFICATE_BASE64 }}
           MAC_CERTIFICATE_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
@@ -1569,7 +1570,7 @@ jobs:
       # Accepts the secret either as raw PEM (-----BEGIN PRIVATE KEY-----) or
       # base64-encoded; whichever Tim pasted works.
       - name: Stage Apple API key (macOS)
-        if: env.HAS_APPLE_API_CREDENTIALS == 'true'
+        if: env.HAS_APPLE_API_CREDENTIALS == 'true' && (env.ENVIRONMENT == 'staging' || steps.prepare-production.outputs.prepared == 'true')
         env:
           APPLE_API_KEY_CONTENTS: ${{ secrets.APPLE_API_KEY }}
         run: |
@@ -1731,7 +1732,7 @@ jobs:
             --dist "apps/desktop/dist"
 
       - name: Package production desktop app
-        if: env.ENVIRONMENT == 'production'
+        if: env.ENVIRONMENT == 'production' && steps.prepare-production.outputs.prepared == 'true'
         env:
           JOVIE_DESKTOP_SOURCE_REVISION: ${{ env.RELEASE_SHA }}
           JOVIE_RELEASE_DMG: 'true'
@@ -1744,7 +1745,7 @@ jobs:
         run: pnpm --filter @jovie/desktop package:production
 
       - name: Verify production desktop artifact set
-        if: env.ENVIRONMENT == 'production'
+        if: env.ENVIRONMENT == 'production' && steps.prepare-production.outputs.prepared == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -1775,7 +1776,7 @@ jobs:
 
       - name: Publish production desktop release
         id: publish-production
-        if: env.ENVIRONMENT == 'production'
+        if: env.ENVIRONMENT == 'production' && steps.prepare-production.outputs.prepared == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -1832,7 +1833,7 @@ jobs:
 
       - name: Capture production publisher identity
         id: publisher-identity
-        if: env.ENVIRONMENT == 'production' || env.ENVIRONMENT == 'staging'
+        if: (env.ENVIRONMENT == 'production' && steps.prepare-production.outputs.prepared == 'true') || env.ENVIRONMENT == 'staging'
         env:
           PUBLISHED_SHA: ${{ steps.publish-staging.outputs.release_sha || steps.publish-production.outputs.release_sha }}
         run: |

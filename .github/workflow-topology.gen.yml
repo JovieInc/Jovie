@@ -1107,7 +1107,8 @@ nodes:
     category: remediation-dispatch
     authoritativeProducer: Lane Fix Relay
     authoritativeFor: []
-    allowedConsumers: []
+    allowedConsumers:
+      - Linear Sync on Merge
     triggeringStateTransition:
       - repository_dispatch
       - schedule
@@ -1394,6 +1395,9 @@ edges:
     to: Lane Fix Relay
     type: workflow_run
   - from: Production Controller
+    to: Linear Sync on Merge
+    type: workflow_run
+  - from: Sentry Autofix Recurrence
     to: Linear Sync on Merge
     type: workflow_run
   - from: Mac Lane

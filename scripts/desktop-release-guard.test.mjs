@@ -1405,6 +1405,33 @@ exec ${hostDate} "$@"
   assert.equal((await readFile(summary, 'utf8')).trim(), '');
 });
 
+test('production packaging and publisher identity require successful draft preparation', () => {
+  assert.match(
+    step(desktopWorkflow, 'Prepare private production draft'),
+    /id: prepare-production/
+  );
+  for (const name of [
+    'Import Apple Developer cert (macOS)',
+    'Stage Apple API key (macOS)',
+    'Package production desktop app',
+    'Verify production desktop artifact set',
+    'Publish production desktop release',
+    'Capture production publisher identity',
+  ]) {
+    const condition = step(desktopWorkflow, name).match(
+      /\n        if: (.+)/
+    )?.[1];
+    assert.ok(condition, `Missing condition for ${name}`);
+    assert.match(
+      condition,
+      /steps\.prepare-production\.outputs\.prepared == 'true'/
+    );
+  }
+  const marker = job(desktopWorkflow, 'record-production-publish');
+  assert.match(marker, /needs\.build\.outputs\.published_sha != ''/);
+  assert.match(marker, /needs\.build\.outputs\.publisher_attempt != ''/);
+});
+
 test('production publication waits out GitHub quota and preserves fail-closed provenance', async t => {
   const root = await mkdtemp(join(tmpdir(), 'jovie-desktop-publish-quota-'));
   t.after(() => rm(root, { force: true, recursive: true }));

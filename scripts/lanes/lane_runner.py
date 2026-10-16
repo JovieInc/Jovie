@@ -3593,7 +3593,8 @@ def _surface_exhausted(host: Host, pr: dict, record: dict, classified: dict, rea
         data["escalating"] = [item for item in data["escalating"] if item != number]
 
 
-def escalate_exhausted(host: Host, prs: list[dict], linear, *, model_only=False) -> None:
+def escalate_exhausted(host: Host, prs: list[dict], linear, *, model_only=False,
+                       joined_rungs: frozenset[int] = frozenset()) -> None:
     """Deterministic rungs, then a stronger lane, then one surface (JOV-7540 / JOV-7089).
 
     Default off (`LANES_ESCALATION_STUCK_PRS`). Stuck-PR detection is
@@ -3630,12 +3631,49 @@ def escalate_exhausted(host: Host, prs: list[dict], linear, *, model_only=False)
                 or any(pr.get(key) != candidate.get(key) for key in ("headRefOid", "headRefName"))):
             continue  # No rungs or budget changes without fresh complete authority.
         record = dict(attempts.get(str(pr["number"]), {}))
+        if pr["number"] in joined_rungs:
+            # The selector may have refused this newly joined draft because a
+            # different host owns it. Idle disposition is not a second claim path.
+            # Refresh exact-head custody before any rerun, label or disposition.
+            try:
+                if claimed_elsewhere(pr["number"], pr["headRefOid"], ("fix", "gate"), timeout=30):
+                    continue
+                fresh_attempts = maintenance_json(path, missing={})
+                fresh_held = maintenance_json(held_path(host), missing={})
+                ended = _rung_stamp(record.get("endedAt"))
+                owned = LANE_BRANCH.match(pr["headRefName"])
+                pending = record.get("pendingEscalation") or {}
+                if not isinstance(pending, dict) or type(pr.get("isDraft")) is not bool \
+                        or pr.get("isCrossRepository") is not False or (pr["isDraft"] and not owned):
+                    continue
+                disabled = {name for name, spec in providers.items() if isinstance(spec, dict)
+                            and (not spec.get("enabled", True) or spec.get("repairs") is False)}
+                transfer = bool(pr.get("isDraft") and owned
+                                and owned["lane"] not in {pending.get("lane"), *disabled})
+                if transfer and (owned["lane"] not in providers or record.get("lane") != owned["lane"]
+                                 or pending.get("head") != pr["headRefOid"]
+                                 or pr["headRefOid"] not in (record.get("sha"), record.get("pushedHead"))
+                                 or record.get("repairBranch") != pr["headRefName"]
+                                 or _rung_stamp(record.get("at")) is None
+                                 or ended is None or ended < _rung_stamp(record["at"])):
+                    continue
+                if not isinstance(fresh_attempts, dict) or fresh_attempts.get(str(pr["number"])) != record \
+                        or not isinstance(fresh_held, dict) or fresh_held.get(str(pr["number"])) != held.get(str(pr["number"])) \
+                        or (ended is None and (record.get("endedAt") is not None or transfer)) \
+                        or (ended is not None and ended > time.time()) \
+                        or pr_events.in_flight(record, {"headRefOid": record.get("sha")}, time.time()) \
+                        or pr["number"] in maintenance_preserved(host.state) or pr_recovery_held(host, pr) \
+                        or publication_revocation(host, pr["headRefName"]):
+                    continue
+            except (OSError, ValueError):
+                continue
         if model_only:
             try:
                 fresh_held = maintenance_json(held_path(host), missing={})
                 ended = _rung_stamp(record.get("endedAt"))
                 if not isinstance(fresh_held, dict) or fresh_held.get(str(pr["number"])) != held.get(str(pr["number"])) \
-                        or ended is None or ended > now \
+                        or (ended is None and pr["number"] not in joined_rungs) \
+                        or (ended is not None and ended > now) \
                         or pr["number"] in maintenance_preserved(host.state) \
                         or pr_recovery_held(host, pr) or publication_revocation(host, pr["headRefName"]) \
                         or pr_events.in_flight(record, {"headRefOid": record.get("sha")}, now):
@@ -6986,7 +7024,9 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
             if local:
                 linear_optional(escalate_exhausted, host,
                                 list({pr["number"]: pr for pr in candidates + events + rung_candidates}.values()), linear,
-                                **({"model_only": True} if maintenance_only else {}))
+                                **({"model_only": True} if maintenance_only else {}),
+                                **({"joined_rungs": frozenset(pr["number"] for pr in rung_candidates)}
+                                   if rung_candidates else {}))
         labeled = None if red or adopt or not local or maintenance_only \
             else linear_optional(claim_labeled_event, host, name, linear)
         issue = labeled

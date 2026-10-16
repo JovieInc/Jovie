@@ -166,8 +166,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-10-16T19:20:40.104Z",
-    "gitSha": "250fcc70005661d73e3675d89b8b246ba836e258",
+    "capturedAt": "2026-10-16T22:00:08.329Z",
+    "gitSha": "8b3b70178984cbf2d94ddcb98875387d1d5fcee5",
     "imagePath": "artist-profile-opinionated-section-desktop.png"
   },
   {

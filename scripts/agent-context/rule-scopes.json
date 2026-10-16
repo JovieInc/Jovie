@@ -12,12 +12,12 @@
   {
     "file": ".claude/rules/code-style.md",
     "paths": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "**/*.cjs"],
-    "bodySha256": "0254071855abaa85f3646a1e95249185316a56f129f009b5d92fc6d1dff2ef1d"
+    "bodySha256": "a5202f01bd3e41ca890979bb911ab35530e878b5ad7d57f502df7be874acc64d"
   },
   {
     "file": ".claude/rules/db.md",
     "paths": ["**/db/**", "**/drizzle/**", "**/migrations/**", "**/queries/**"],
-    "bodySha256": "4e1b3dc1066ae0ce224369eac942cbc97d07e4d30c518c47ec1885ff429688b0"
+    "bodySha256": "dd8a0de6daeb7b37b8507fd9c2f6ea6e19ada223aad91f1adf9ea7c612e0b8a1"
   },
   {
     "file": ".claude/rules/environment.md",

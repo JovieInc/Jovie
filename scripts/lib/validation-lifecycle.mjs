@@ -795,7 +795,7 @@ export function decideValidationTransition(input) {
     missing: [],
     failing: [],
     explanation: [
-      `Every required receipt passed on verified production generation ${String(input.deployment.sha ?? '').slice(0, 12)}.`,
+      `Every required receipt passed on its recorded verified artifact. Deployment generation ${String(input.deployment.sha ?? '').slice(0, 12)} is verified.`,
     ],
   };
 }

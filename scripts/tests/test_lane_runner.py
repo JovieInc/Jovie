@@ -2847,6 +2847,183 @@ class MaintenanceDemandTest(unittest.TestCase):
 
 
 class WorkerTest(unittest.TestCase):
+    def test_joined_idle_refresh_preserves_expired_same_lane_legacy_but_refuses_foreign_or_active(self):
+        # Real worker and every repair selector/classifier/planner. An expired
+        # legacy lease lacks endedAt; that is ordinary scope, not a new transfer.
+        cases = [("same-expired", "codex", False, True),
+                 ("foreign-missing-ended", "grok", False, False),
+                 ("same-active", "codex", True, False),
+                 ("same-expired-floor-model", "codex", False, False)]
+        cases += [(fault, "grok", False, False) for fault in (
+            "foreign-manual", "foreign-wrong-branch", "foreign-wrong-owner",
+            "foreign-reversed-lease", "foreign-missing-start", "foreign-fork", "foreign-missing-draft")]
+        for case, name, active, expected_rerun in cases:
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as tmp:
+                host = lane.Host(state=Path(tmp)); now = 100000.0
+                providers = {"codex": {"enabled": True, "tier": 0, "slots": 1},
+                             "grok": {"enabled": True, "tier": 1, "slots": 1}}
+                pr = {"number": 7, "state": "OPEN", "headRefOid": "head-A",
+                      "headRefName": "codex/jov-7-20261016", "isDraft": True,
+                      "isCrossRepository": False, "isInMergeQueue": False,
+                      "mergeStateStatus": "BLOCKED", "labels": [],
+                      "statusCheckRollup": [{"name": "test", "status": "COMPLETED",
+                          "conclusion": "TIMED_OUT",
+                          "detailsUrl": "https://github.com/JovieInc/Jovie/actions/runs/123"}]}
+                record = {"sha": "head-A", "lane": "codex", "count": 2,
+                          "at": now if active else 100, "repairBranch": pr["headRefName"],
+                          "repairVerdict": "fix-no-change",
+                          "escalations": [{"kind": "deterministic", "rung": "update-branch", "head": "head-A"}],
+                          "pendingEscalation": {"lane": name, "head": "head-A", "dossier": "existing evidence",
+                              "cls": "needs-rebase", "subtype": "semantic", "topRung": name == "codex"}}
+                if case.startswith("foreign-") and case != "foreign-missing-ended":
+                    record["endedAt"] = 200
+                if case == "foreign-manual":
+                    pr["headRefName"] = "manual/feature"; record["repairBranch"] = pr["headRefName"]
+                if case == "foreign-wrong-branch": record["repairBranch"] = "codex/jov-8-20261016"
+                if case == "foreign-wrong-owner": record["lane"] = "grok"
+                if case == "foreign-reversed-lease": record["at"] = 201
+                if case == "foreign-missing-start": record.pop("at")
+                if case == "foreign-fork": pr["isCrossRepository"] = True
+                if case == "foreign-missing-draft": pr.pop("isDraft")
+                floor_model = case == "same-expired-floor-model"
+                if floor_model: pr["statusCheckRollup"][0]["conclusion"] = "FAILURE"
+                path = host.state / "fix-attempts.json"; path.write_text(json.dumps({"7": record}))
+                ordinary = [pr] if name == "codex" else []
+                effects = []
+                def transport(args, **kwargs):
+                    self.assertEqual(args, ["gh", "run", "rerun", "123", "--failed", "--repo", "JovieInc/Jovie"])
+                    effects.append(args)
+                    return SimpleNamespace(returncode=0, stdout="", stderr="")
+                with contextlib.ExitStack() as stack:
+                    stack.enter_context(patch.dict(os.environ, {"LANES_ESCALATION": "1", "LANES_ESCALATION_STUCK_PRS": "1"}))
+                    stack.enter_context(patch.object(host, "intake_slots", return_value=0 if floor_model else 1))
+                    stack.enter_context(patch.object(lane, "load_providers", return_value=providers))
+                    stack.enter_context(patch.object(lane, "_SUMMARY", {"at": now, "sourceAt": now, "readable": True, "prs": [pr]}))
+                    stack.enter_context(patch.object(lane, "_CLAIM_OBSERVATIONS", {}))
+                    stack.enter_context(patch.object(lane.time, "time", return_value=now))
+                    event = stack.enter_context(patch.object(lane.pr_events, "claim_event_pr", wraps=self.saved[13]))
+                    escalation = stack.enter_context(patch.object(lane, "claim_escalation_pr", wraps=lane.claim_escalation_pr))
+                    polling = stack.enter_context(patch.object(lane, "claim_red_pr", wraps=self.saved[4]))
+                    stack.enter_context(patch.object(lane, "claim_adoptable_pr", wraps=self.saved[6]))
+                    planner = stack.enter_context(patch.object(lane, "escalate_exhausted", wraps=self.saved[11]))
+                    stack.enter_context(patch.object(lane, "fix_candidates", return_value=ordinary))
+                    stack.enter_context(patch.object(lane, "lane_prs", return_value=ordinary))
+                    stack.enter_context(patch.object(lane, "reconcile_fix_target", side_effect=lambda _: copy.deepcopy(pr)))
+                    stack.enter_context(patch.object(lane, "cooling", return_value=False))
+                    stack.enter_context(patch.object(lane, "provider_healthy", return_value=True))
+                    shell = stack.enter_context(patch.object(lane, "sh", side_effect=transport))
+                    stack.enter_context(patch.object(lane.pr_events, "conditional_page", return_value=[]))
+                    stack.enter_context(patch.object(lane.pr_events, "etag_cache_dir", return_value=None))
+                    labels = stack.enter_context(patch.object(lane.pr_events, "add_label"))
+                    stack.enter_context(patch.object(lane.pr_events, "capture_target_file_witnesses", return_value={}))
+                    stack.enter_context(patch.object(lane.pr_events, "cleanup_one_event"))
+                    stack.enter_context(patch.object(lane.disk_guard, "check", return_value={"admitted": True}))
+                    stack.enter_context(patch.object(lane.bindings, "work", return_value=None))
+                    stack.enter_context(patch.object(lane, "requeue_verified"))
+                    stack.enter_context(patch.object(lane, "record_maintenance_demand"))
+                    stack.enter_context(patch.object(lane, "publish_exhausted_repairs"))
+                    stack.enter_context(patch.object(lane, "sweep_execution_statuses"))
+                    stack.enter_context(patch.object(lane, "revisit_terminal_prs"))
+                    stack.enter_context(patch.object(lane, "read_new_issue_budget", return_value={"allowed": False, "reason": "fixture"}))
+                    new_work = stack.enter_context(patch.object(lane, "run_issue"))
+                    self.assertEqual(lane.worker(host, name), 0)
+                event.assert_called_once(); escalation.assert_called_once(); polling.assert_called_once()
+                planner.assert_called_once()
+                self.assertEqual(planner.call_args.kwargs.get("joined_rungs"), frozenset({7}))
+                self.assertEqual(len(effects), int(expected_rerun))
+                if floor_model: labels.assert_called_once_with(7, "escalating", shell)
+                else: labels.assert_not_called()
+                new_work.assert_not_called()
+                after = json.loads(path.read_text())["7"]
+                self.assertEqual(after["count"], record["count"])
+                if floor_model:
+                    self.assertEqual(after["pendingEscalation"]["lane"], "grok")
+                    self.assertEqual(after["pendingEscalation"]["cls"], "fixable-by-model")
+                    self.assertEqual(after["pendingEscalation"]["subtype"], "check")
+                    self.assertEqual(after["pendingEscalation"]["head"], "head-A")
+                    self.assertEqual({k: v for k, v in after.items() if k != "pendingEscalation"},
+                                     {k: v for k, v in record.items() if k != "pendingEscalation"})
+                else:
+                    self.assertEqual(after["pendingEscalation"], record["pendingEscalation"])
+                if "endedAt" not in record: self.assertNotIn("endedAt", after)
+                if expected_rerun:
+                    self.assertEqual(after["escalations"][:-1], record["escalations"])
+                    self.assertEqual(after["escalations"][-1]["rung"], "rerun")
+                elif not floor_model:
+                    self.assertEqual(after, record)
+
+    def test_joined_rung_idle_planner_respects_canonical_fix_gate_and_unknown_custody(self):
+        # Insert in WorkerTest. Preserve real worker, selector, classifier, planner,
+        # canonical claim parser, and real no-client mode; mock only I/O/unrelated work.
+        for owner in ("fix", "gate", "unreadable", "unowned"):
+            for floor in (False, True):
+                with self.subTest(owner=owner, maintenance_only=floor), tempfile.TemporaryDirectory() as tmp:
+                    host = lane.Host(state=Path(tmp))
+                    now = 100000.0
+                    providers = {"codex": {"enabled": True, "tier": 0, "slots": 1},
+                                 "grok": {"enabled": True, "tier": 1, "slots": 1}}
+                    pr = {"number": 7, "state": "OPEN", "headRefOid": "head-A",
+                          "headRefName": "codex/jov-7-20261016", "isDraft": True,
+                          "isCrossRepository": False, "isInMergeQueue": False,
+                          "mergeStateStatus": "BLOCKED", "labels": [],
+                          "statusCheckRollup": [{"name": "test", "status": "COMPLETED",
+                              "conclusion": "TIMED_OUT",
+                              "detailsUrl": "https://github.com/JovieInc/Jovie/actions/runs/123"}]}
+                    record = {"sha": "head-A", "lane": "codex", "count": 2, "at": 100,
+                              "endedAt": 200, "repairBranch": pr["headRefName"],
+                              "repairVerdict": "fix-no-change",
+                              "escalations": [{"kind": "deterministic", "rung": "update-branch", "head": "head-A"}],
+                              "pendingEscalation": {"lane": "grok", "head": "head-A", "dossier": "existing evidence",
+                                  "cls": "needs-rebase", "subtype": "semantic", "topRung": False}}
+                    path = host.state / "fix-attempts.json"
+                    path.write_text(json.dumps({"7": record}))
+                    comments = ([{"body": f"🤖 lane claim kind={owner} sha=head-A host=other-host at=1970-01-02T03:46:40Z"}]
+                                if owner in {"fix", "gate"} else [])
+                    effects = []
+                    def transport(args, **kwargs):
+                        if args[:3] == ["gh", "api", "--paginate"]:
+                            self.assertEqual(owner, "unreadable")
+                            return SimpleNamespace(returncode=1, stdout="", stderr="fixture-unreadable")
+                        self.assertEqual(args, ["gh", "run", "rerun", "123", "--failed", "--repo", "JovieInc/Jovie"])
+                        effects.append(args)
+                        return SimpleNamespace(returncode=0, stdout="", stderr="")
+                    summary = {"at": now, "sourceAt": now, "readable": True, "prs": [pr]}
+                    with contextlib.ExitStack() as stack:
+                        stack.enter_context(patch.dict(os.environ, {'LANES_ESCALATION': '1', 'LANES_ESCALATION_STUCK_PRS': '1'}))
+                        stack.enter_context(patch.object(host, 'intake_slots', return_value=0 if floor else 1))
+                        stack.enter_context(patch.object(lane, 'load_providers', return_value=providers))
+                        stack.enter_context(patch.object(lane, '_SUMMARY', summary))
+                        stack.enter_context(patch.object(lane, '_CLAIM_OBSERVATIONS', {}))
+                        stack.enter_context(patch.object(lane.time, 'time', return_value=now))
+                        planner = stack.enter_context(patch.object(lane, 'escalate_exhausted', wraps=self.saved[11]))
+                        stack.enter_context(patch.object(lane, 'reconcile_fix_target', side_effect=lambda _: copy.deepcopy(pr)))
+                        stack.enter_context(patch.object(lane, 'cooling', return_value=False))
+                        stack.enter_context(patch.object(lane, 'provider_healthy', return_value=True))
+                        stack.enter_context(patch.object(lane, 'sh', side_effect=transport))
+                        stack.enter_context(patch.object(lane.pr_events, 'conditional_page', return_value=None if owner == 'unreadable' else comments))
+                        stack.enter_context(patch.object(lane.pr_events, 'etag_cache_dir', return_value=None))
+                        labels = stack.enter_context(patch.object(lane.pr_events, 'add_label'))
+                        stack.enter_context(patch.object(lane.pr_events, 'capture_target_file_witnesses', return_value={}))
+                        stack.enter_context(patch.object(lane.pr_events, 'cleanup_one_event'))
+                        stack.enter_context(patch.object(lane.disk_guard, 'check', return_value={'admitted': True}))
+                        stack.enter_context(patch.object(lane.bindings, 'work', return_value=None))
+                        stack.enter_context(patch.object(lane, 'requeue_verified'))
+                        stack.enter_context(patch.object(lane, 'record_maintenance_demand'))
+                        stack.enter_context(patch.object(lane, 'publish_exhausted_repairs'))
+                        stack.enter_context(patch.object(lane, 'sweep_execution_statuses'))
+                        stack.enter_context(patch.object(lane, 'revisit_terminal_prs'))
+                        stack.enter_context(patch.object(lane, 'read_new_issue_budget', return_value={'allowed': False, 'reason': 'fixture'}))
+                        new_work = stack.enter_context(patch.object(lane, 'run_issue'))
+                        self.assertEqual(lane.worker(host, "grok"), 0)
+                    planner.assert_called_once()
+                    self.assertEqual(planner.call_args.kwargs.get("joined_rungs"), frozenset({7}))
+                    expected = [] if owner != "unowned" or floor else [
+                        ["gh", "run", "rerun", "123", "--failed", "--repo", "JovieInc/Jovie"]]
+                    self.assertEqual(effects, expected)
+                    labels.assert_not_called(); new_work.assert_not_called()
+                    if not expected:
+                        self.assertEqual(json.loads(path.read_text())["7"], record)
+
     def test_pending_rung_join_uses_only_the_fresh_pinned_prelock_inventory(self):
         for delay in (0, lane.MAINTENANCE_DEMAND_MAX_AGE_S + 1):
             with self.subTest(delay=delay):
