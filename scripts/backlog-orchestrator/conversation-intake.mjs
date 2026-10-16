@@ -1,5 +1,11 @@
 import { createHash } from 'node:crypto';
 
+import {
+  classifyConversationRequest,
+  externalizeConversationRequest,
+  resumePrivateTask,
+} from './private-task.mjs';
+
 export const CONVERSATION_RECONCILIATION_SCHEMA =
   'conversation-issue-reconciliation/v1';
 export const SAFE_MERGE_THRESHOLD = 0.82;
@@ -128,26 +134,6 @@ function rankedMatches(request, issues) {
     .sort((left, right) => right.score - left.score);
 }
 
-function privateRequest(request) {
-  const text = JSON.stringify(request);
-  const declared = /^(?:personal|mixed)$/i.test(request?.classification ?? '');
-  const telegram = /\b(?:telegram|telethon)\b/i.test(text);
-  const cleanup =
-    /\b(?:archiv\w*|clean\w*|chats?|dialogs?|login|session|phone)\b/i.test(
-      text
-    );
-  const credential =
-    /api[_ -]?hash|login[_ -]?code|phone[_ -]?code|\.session\b|session[_ -]?(?:file|string)|\b[a-f0-9]{32}\b|\+\d[\d ().-]{7,}\d/i.test(
-      text
-    );
-  return (
-    declared ||
-    request?.externalization === 'denied' ||
-    credential ||
-    (telegram && cleanup)
-  );
-}
-
 /**
  * Reconcile one conversation request before any issue creation. Ambiguous
  * matches fail closed for human review; only a materially different intent is
@@ -155,27 +141,24 @@ function privateRequest(request) {
  */
 export async function reconcileConversationRequest({
   request,
-  teamId,
-  stateId,
-  client,
+  teamId = undefined,
+  stateId = undefined,
+  client = undefined,
   dryRun = false,
+  privateTaskDirectory = undefined,
 }) {
-  // Before matching, hashing, links, prompts or any tracker call: retain no raw
-  // text, account identifiers, evidence URLs or arbitrary nested receipt fields.
-  if (privateRequest(request)) {
-    return {
-      schema: CONVERSATION_RECONCILIATION_SCHEMA,
-      classification: 'personal',
-      externalization: 'denied',
-      dispatchAllowed: false,
-      disposition: 'local_auth_required',
-      mutation: 'none',
-    };
-  }
+  const classification = classifyConversationRequest(request);
+  if (classification !== 'jovie')
+    return resumePrivateTask(request, {
+      directory: privateTaskDirectory,
+      dryRun,
+    });
+  if (!request.conversationReceipt?.id && !request.conversationReceipt?.url)
+    throw new Error('conversation receipt identity is required');
+  const key = receiptKey(request);
+  request = externalizeConversationRequest(request);
   if (!request?.title?.trim())
     throw new Error('conversation request title is required');
-  if (!request?.conversationReceipt?.url)
-    throw new Error('conversation receipt URL is required');
 
   const snapshot = await client.fetchTeamActiveIssueSnapshot(teamId);
   if (snapshot?.coverage?.complete !== true)
@@ -183,10 +166,11 @@ export async function reconcileConversationRequest({
 
   const matches = rankedMatches(request, snapshot.issues || []);
   const best = matches[0];
-  const key = receiptKey(request);
   const links = extractEvidenceLinks(request);
   const base = {
     schema: CONVERSATION_RECONCILIATION_SCHEMA,
+    classification,
+    externalization: 'sanitized',
     normalizedIntent: normalizeIntent(request.intent || request.title).join(
       ' '
     ),

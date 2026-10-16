@@ -1,6 +1,8 @@
 # Jovie
 
-A modern artist profile and link-in-bio platform built with Next.js, Clerk authentication, Neon PostgreSQL, and Drizzle ORM.
+Jovie helps artists who upload to YouTube regularly connect thumbnails, release planning, smart links, and a public profile where fans can opt in to hear from them again.
+
+The homepage and its authoring contracts follow [`youtube-artist-closed-loop-mvp-v1`](docs/marketing/YOUTUBE_ARTIST_MVP.md) (JOV-5885, under JOV-5881).
 
 [![CI](https://github.com/JovieInc/Jovie/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/JovieInc/Jovie/actions/workflows/ci.yml?query=branch%3Amain)
 [![CodeQL](https://github.com/JovieInc/Jovie/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/JovieInc/Jovie/actions/workflows/codeql.yml?query=branch%3Amain)

@@ -50,4 +50,31 @@ describe('nightly workflow residuals (JOV-8095)', () => {
     // ~11.5m; keep headroom over the measured 49.7m step duration.
     expect(timeout).toBeGreaterThanOrEqual(75);
   });
+
+  it('arms the onboarding Turnstile gate on the nightly QA server (JOV-8500)', () => {
+    const workflow = readFileSync(
+      resolve(repoRoot, '.github/workflows/nightly-tests.yml'),
+      'utf8'
+    );
+    const e2e = getJobBlock(workflow, 'e2e-tests');
+    const start = e2e.indexOf('- name: Start route QA bypass server');
+    const next = e2e.indexOf('- name: Run nightly route QA breadth pass');
+    const serverStep = e2e.slice(start, next);
+
+    // The probe hits the already-running standalone server, so the gate
+    // env belongs on this step.
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(next).toBeGreaterThan(start);
+    expect(serverStep).toContain('node .next/standalone/apps/web/server.js');
+    expect(serverStep).toContain("E2E_REQUIRE_TURNSTILE_GATE: '1'");
+    expect(serverStep).toContain(
+      'NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA'
+    );
+    expect(serverStep).toContain(
+      'TURNSTILE_SECRET_KEY: 1x0000000000000000000000000000000AA'
+    );
+    expect(serverStep).toContain(
+      'SESSION_SECRET: nightly-qa-onboarding-session-secret-0123456789abcdef'
+    );
+  });
 });

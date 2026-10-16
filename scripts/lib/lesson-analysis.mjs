@@ -18,6 +18,7 @@ import {
   JUDGE_INDEPENDENCE_POLICY_VERSION,
 } from '../../packages/copy/judge.ts';
 import { canonical } from './canonical-json.mjs';
+import { selectLearnedMethod } from './learned-method-selection.mjs';
 
 // Use the canonical contract package's pinned schema dependency.
 const { z } = await import(
@@ -363,6 +364,7 @@ export async function runLessonAnalysis(orderInput, request, environment) {
   let graph = null;
   let input;
   let challenge = null;
+  let firstAttemptedMethod = null;
   const finish = (disposition, reason, finding = null) => ({
     schema: LESSON_ANALYSIS_SCHEMA,
     orderId: order.orderId,
@@ -375,6 +377,7 @@ export async function runLessonAnalysis(orderInput, request, environment) {
     finding,
     challenge,
     resolutions: routes,
+    firstAttemptedMethod,
     policies: {
       analysis: LESSON_ANALYSIS_POLICY,
       independence: JUDGE_INDEPENDENCE_POLICY_VERSION,
@@ -442,31 +445,88 @@ export async function runLessonAnalysis(orderInput, request, environment) {
       certificates.set(row.id, cert);
       return true;
     });
-    const author = routeByExpectedCost(
+    const incumbent = routeByExpectedCost(
       job('author'),
       candidates,
       environment.routesVersion,
       environment.shadowPricing
     );
-    routes.push({
-      role: 'author',
-      receipt: author,
-      certification: certificates.get(author.selectedRoute.id),
-    });
-    const authorRoute = author.selectedRoute;
-    const eligibleModels = excludeGeneratorFamily(
-      candidates.map(row => row.tuple.model),
-      authorRoute.tuple.model
-    );
-    const challenger = routeByExpectedCost(
-      job('challenger'),
-      candidates.filter(
+    const challengerCandidates = authorRoute => {
+      const models = excludeGeneratorFamily(
+        candidates.map(row => row.tuple.model),
+        authorRoute.tuple.model
+      );
+      return candidates.filter(
         row =>
           row.id !== authorRoute.id &&
           row.tuple.provider !== authorRoute.tuple.provider &&
           row.tuple.model !== authorRoute.tuple.model &&
-          eligibleModels.includes(row.tuple.model)
-      ),
+          models.includes(row.tuple.model)
+      );
+    };
+    const learningContext = {
+      incumbent,
+      binding: input.binding,
+      workClass: input.workClass,
+      revision: input.work.revision,
+      routesVersion: environment.routesVersion,
+      permittedActions: order.permittedActions,
+      forbiddenActions: order.forbiddenActions,
+      now: clock,
+      canChallenge: route => {
+        try {
+          routeByExpectedCost(
+            job('challenger'),
+            challengerCandidates(route),
+            environment.routesVersion,
+            environment.shadowPricing
+          );
+          return true;
+        } catch (error) {
+          if (error instanceof NoCertifiedRouteError) return false;
+          throw error;
+        }
+      },
+    };
+    const selectLearning = async () => {
+      if (!environment.learning)
+        return selectLearnedMethod(learningContext, environment.learning);
+      const controller = new AbortController();
+      let timer;
+      try {
+        /** @type {Promise<never>} */
+        const timeout = new Promise((_, reject) => {
+          timer = setTimeout(
+            () => {
+              controller.abort();
+              reject(new Error('timed-out'));
+            },
+            Math.min(2_147_483_647, Math.max(1, deadline - clock()))
+          );
+        });
+        return await Promise.race([
+          selectLearnedMethod(
+            { ...learningContext, signal: controller.signal },
+            environment.learning
+          ),
+          timeout,
+        ]);
+      } finally {
+        clearTimeout(timer);
+      }
+    };
+    const selection = await selectLearning();
+    const author = selection.route;
+    routes.push({
+      role: 'author',
+      receipt: author,
+      certification: certificates.get(author.selectedRoute.id),
+      learning: selection.consumption,
+    });
+    const authorRoute = author.selectedRoute;
+    const challenger = routeByExpectedCost(
+      job('challenger'),
+      challengerCandidates(authorRoute),
       environment.routesVersion,
       environment.shadowPricing
     );
@@ -532,8 +592,36 @@ export async function runLessonAnalysis(orderInput, request, environment) {
       let reply;
       try {
         reply = await Promise.race([
-          Promise.resolve().then(() =>
-            environment.dispatch({
+          Promise.resolve().then(async () => {
+            if (role === 'author' && selection.consumption.selectedArtifact) {
+              const recheck = await selectLearning();
+              selection.consumption.recheck = recheck.consumption;
+              check(
+                recheck.consumption.receiptDigest ===
+                  selection.consumption.receiptDigest &&
+                  recheck.route.selectedRoute.id === route.selectedRoute.id,
+                'learned-method-no-longer-current'
+              );
+            }
+            check(
+              !controller.signal.aborted && clock() < deadline,
+              'timed-out'
+            );
+            const currentCert = certificationSchema.safeParse(
+              environment.certify?.(route.selectedRoute)
+            );
+            check(
+              currentCert.success &&
+                currentCert.data.status === 'certified' &&
+                digest(currentCert.data) ===
+                  digest(certificates.get(route.selectedRoute.id)),
+              'route-certification-expired'
+            );
+            firstAttemptedMethod ??= route.selectedRoute.id;
+            if (role === 'author')
+              selection.consumption.actualFirstAttemptedMethod =
+                route.selectedRoute.id;
+            return environment.dispatch({
               role,
               order: structuredClone(child),
               intake: toReasoningJob(child),
@@ -548,8 +636,8 @@ export async function runLessonAnalysis(orderInput, request, environment) {
                 maxOutputChars: input.limits.maxOutputChars,
                 deadline: child.budget.deadline,
               },
-            })
-          ),
+            });
+          }),
           new Promise((_, reject) => {
             timer = setTimeout(
               () => {
@@ -691,6 +779,7 @@ export async function runLessonAnalysis(orderInput, request, environment) {
                 'unbounded-or-unknown-usage',
                 'resolution-or-order-mismatch',
                 'route-certification-expired',
+                'learned-method-no-longer-current',
                 'analysis-incomplete',
                 'budget-or-cost-mismatch',
                 'output-budget-exhausted',

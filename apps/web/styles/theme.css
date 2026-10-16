@@ -27,6 +27,70 @@
   max-width: 360px;
 }
 
+/* In-flow targets reserve their own space; no invisible sibling overlap. */
+.auth-quiet-target {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+@font-face {
+  font-family: "Auth Google Sans";
+  src: url("/auth/google-sans.woff2") format("woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+
+/* Provider-owned colors, proportions and artwork are branded exceptions. */
+.auth-provider-button {
+  display: flex;
+  position: relative;
+  align-items: center;
+  min-height: max(44px, 3.1429em);
+  --auth-provider-paper: #fff;
+  --auth-provider-ink: #000;
+  background: var(--auth-provider-paper);
+  color: var(--auth-provider-ink);
+  overflow-wrap: anywhere;
+}
+
+.auth-provider-button[data-auth-provider-slot="apple"] {
+  min-height: max(44px, 2.32em);
+  border-radius: 6px;
+  overflow: hidden;
+  padding-right: 12px;
+  font:
+    400 1.1875rem / 1.15 system-ui,
+    sans-serif;
+}
+
+.auth-provider-button[data-auth-provider-slot="apple"] img {
+  width: auto;
+  height: 2.32em;
+  flex-shrink: 0;
+}
+
+.auth-provider-button[data-auth-provider-slot="google"] {
+  gap: 10px;
+  padding: 6px 12px;
+  border: 1px solid #747775;
+  border-radius: 4px;
+  --auth-provider-ink: #1f1f1f;
+  font:
+    500 0.875rem / 1.4286 "Auth Google Sans",
+    sans-serif;
+}
+
+.auth-provider-button[data-auth-provider-slot="google"] img {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
 .auth-form-stack-offset {
   padding-top: min(18vh, 7.5rem);
 }

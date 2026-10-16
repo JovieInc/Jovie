@@ -193,6 +193,9 @@ const TIM_WHITE_PROFILE_MOBILE_VARIANTS: readonly TimWhiteProfileMobileVariantWi
     { slug: 'contact', title: 'Contact', queryKey: 'mode' },
   ];
 
+// Every /demo or /exp pathname below must also be listed in
+// PRODUCT_SCREENSHOT_CAPTURE_PAGE_PATHS. Screenshot CI serves a production
+// build, and the proxy 404s any other debug route.
 export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
   ...defineScenarios('marketing', ADMIN_AND_INVESTOR, [
     {

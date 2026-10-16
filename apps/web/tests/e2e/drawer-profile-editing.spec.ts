@@ -12,7 +12,9 @@
  * 7. Artist can add a link via SidebarLinkInput
  * 8. Artist can remove a link and it disappears from the UI
  *
- * Navigate to /app/dashboard/profile to auto-open the preview panel.
+ * The chat rail without `tab` is the read-only summary. These tests open the
+ * editor through the existing `tab` deep link (`social`, `music`, `earn`,
+ * `about`) on the profile panel.
  *
  * @tag @drawer @profile @green
  */
@@ -33,17 +35,27 @@ const PROFILE_DRAWER_SCROLL_REGION_TEST_ID =
 const PROFILE_DRAWER_LOWER_SETTINGS_TEST_ID =
   'profile-contact-lower-settings-control';
 
+type ProfileEditorTab = 'social' | 'music' | 'earn' | 'about';
+
+function profileEditorPath(tab: ProfileEditorTab) {
+  return `${APP_ROUTES.CHAT_PROFILE_PANEL}&tab=${tab}`;
+}
+
+async function openProfileEditor(page: Page, tab: ProfileEditorTab) {
+  await page.goto(profileEditorPath(tab), {
+    waitUntil: 'domcontentloaded',
+    timeout: 90_000,
+  });
+  await waitForHydration(page);
+}
+
 async function assertDrawerScrollToShowLowerSettings(
   page: Page,
   viewport: Readonly<{ width: number; height: number }>
 ) {
   await page.setViewportSize(viewport);
 
-  await page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
-    waitUntil: 'domcontentloaded',
-    timeout: 90_000,
-  });
-  await waitForHydration(page);
+  await openProfileEditor(page, 'about');
 
   await page.getByRole('tab', { name: 'About' }).click();
 
@@ -113,11 +125,7 @@ test.describe('Profile drawer — tab rendering', () => {
   test('all four tabs render without crash', async ({ page }) => {
     await setupPageMonitoring(page);
 
-    await page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
-      waitUntil: 'domcontentloaded',
-      timeout: 90_000,
-    });
-    await waitForHydration(page);
+    await openProfileEditor(page, 'social');
 
     // All four tabs must be visible — if any tab crashes during render the
     // segment control would be absent or replaced by an error boundary.
@@ -136,11 +144,7 @@ test.describe('Profile drawer — tab rendering', () => {
   });
 
   test('Music tab renders DSP content area without crash', async ({ page }) => {
-    await page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
-      waitUntil: 'domcontentloaded',
-      timeout: 90_000,
-    });
-    await waitForHydration(page);
+    await openProfileEditor(page, 'social');
 
     await page.getByRole('tab', { name: 'Music' }).click();
     await page.waitForTimeout(500);
@@ -152,11 +156,7 @@ test.describe('Profile drawer — tab rendering', () => {
   });
 
   test('About tab renders bio section without crash', async ({ page }) => {
-    await page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
-      waitUntil: 'domcontentloaded',
-      timeout: 90_000,
-    });
-    await waitForHydration(page);
+    await openProfileEditor(page, 'social');
 
     await page.getByRole('tab', { name: 'About' }).click();
     await page.waitForTimeout(500);
@@ -191,11 +191,7 @@ test.describe('Profile drawer — tab rendering', () => {
       'Press photo upload/delete runs in the full suite only'
     );
 
-    await page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
-      waitUntil: 'domcontentloaded',
-      timeout: 90_000,
-    });
-    await waitForHydration(page);
+    await openProfileEditor(page, 'social');
 
     await page.getByRole('tab', { name: 'About' }).click();
     await page.waitForTimeout(500);
@@ -268,11 +264,7 @@ test.describe('Profile drawer — tab rendering', () => {
       }
     });
 
-    await page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
-      waitUntil: 'domcontentloaded',
-      timeout: 90_000,
-    });
-    await waitForHydration(page);
+    await openProfileEditor(page, 'social');
 
     // Click through all tabs 3× rapidly — exercises the tab state machine
     for (let round = 0; round < 3; round++) {
@@ -307,11 +299,7 @@ test.describe('Profile drawer — enriched link data', () => {
   test('Music tab contains Spotify link seeded during test setup', async ({
     page,
   }) => {
-    await page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
-      waitUntil: 'domcontentloaded',
-      timeout: 90_000,
-    });
-    await waitForHydration(page);
+    await openProfileEditor(page, 'social');
 
     await page.getByRole('tab', { name: 'Music' }).click();
     await page.waitForTimeout(1_000);
@@ -333,11 +321,7 @@ test.describe('Profile drawer — enriched link data', () => {
   test('Social tab does not throw when social links are empty', async ({
     page,
   }) => {
-    await page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
-      waitUntil: 'domcontentloaded',
-      timeout: 90_000,
-    });
-    await waitForHydration(page);
+    await openProfileEditor(page, 'social');
 
     await page.getByRole('tab', { name: 'Social' }).click();
     await page.waitForTimeout(500);
@@ -368,11 +352,7 @@ test.describe('Profile drawer — link add and remove', () => {
   test('artist can type a link URL into SidebarLinkInput and see platform suggestion', async ({
     page,
   }) => {
-    await page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
-      waitUntil: 'domcontentloaded',
-      timeout: 90_000,
-    });
-    await waitForHydration(page);
+    await openProfileEditor(page, 'social');
 
     // Switch to Social tab — SidebarLinkInput is visible here
     await page.getByRole('tab', { name: 'Social' }).click();
@@ -411,11 +391,7 @@ test.describe('Profile drawer — link add and remove', () => {
   test('removing a link via its delete action removes it from the UI', async ({
     page,
   }) => {
-    await page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
-      waitUntil: 'domcontentloaded',
-      timeout: 90_000,
-    });
-    await waitForHydration(page);
+    await openProfileEditor(page, 'social');
 
     // Check Music tab for any removable DSP link
     await page.getByRole('tab', { name: 'Music' }).click();

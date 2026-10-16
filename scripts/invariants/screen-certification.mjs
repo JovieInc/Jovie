@@ -154,6 +154,12 @@ export const SCREEN_PROOF_ROUTES = Object.freeze({
   'web.brand': '/brand',
   'web.report': '/report',
   'web.start': '/start',
+  // JOV-8068: auth-gated checkout. The screenshot producer enters through
+  // the test-auth session (onboarding-checkout-screen-proof.spec.ts), then
+  // the page's isRenderFixtureEnabled branch renders without the noop
+  // database. Signed-out requests, including production, redirect to
+  // /signin.
+  'web.onboarding-checkout': '/onboarding/checkout',
   // /solutions/* registers the whole (marketing)/solutions directory;
   // /solutions/artists is the family's declared concrete health-check path.
   'web.marketing-solutions': '/solutions/artists',
@@ -1103,6 +1109,14 @@ function evaluateDeliberateRed({ registry, headSha, fixtures }) {
   return { receipts, issues };
 }
 
+function screenHasMarketingRoute(screen) {
+  return (
+    isObject(screen) &&
+    typeof screen.id === 'string' &&
+    typeof SCREEN_MARKETING_ROUTES[screen.id] === 'string'
+  );
+}
+
 export function evaluateChangedScreens({
   changedFiles,
   registry = SCREEN_REGISTRY,
@@ -1164,6 +1178,18 @@ export function evaluateChangedScreens({
       continue;
     }
     const screen = classified.entry;
+    // A targeted invocation proves its own screen, plus marketing-bound
+    // changes that the shared marketing artifact can actually contain.
+    // Proof-route screens (public profile, artists, checkout, …) are
+    // certified by their own producer invocation. Requiring them here would
+    // bind them to the marketing zip, which has no route for them.
+    if (
+      targetScreenIds.length > 0 &&
+      !targetScreenIds.includes(screen.id) &&
+      !screenHasMarketingRoute(screen)
+    ) {
+      continue;
+    }
     if (seen.has(screen.id)) continue;
     seen.add(screen.id);
     screens.push(screen);
@@ -1315,8 +1341,12 @@ export function runScreenCertification(options = {}) {
     if (!wantsArtifact) {
       issues.push('controlled GitHub artifact resolver is unavailable');
     } else {
+      // The shared artifact is the marketing capture. Only screens with a
+      // registered marketing route can be proved from it. Applying it to a
+      // proof-route screen fails closed with "no registered marketing route
+      // binding" even when that screen's own producer artifact is valid.
       requested = routeArtifactRequests({
-        pendingScreens,
+        pendingScreens: pendingScreens.filter(screenHasMarketingRoute),
         requested,
         fallbackArtifactId: wantsArtifact,
       });

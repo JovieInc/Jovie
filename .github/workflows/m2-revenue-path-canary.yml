@@ -100,6 +100,7 @@ jobs:
               const failing = [
                 ...(result.checks ?? []).filter(c => c.status !== "pass").map(c => "check " + c.id),
                 ...(result.brokenInternalLinks ?? []).map(l => "link " + l.url + " " + l.status),
+                ...(result.brokenArtistLoops ?? []).map(l => "artist return " + l.url),
               ];
               let receipt = { steps: [] };
               try { receipt = JSON.parse(fs.readFileSync(receiptPath, "utf8")); } catch {}

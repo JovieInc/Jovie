@@ -340,7 +340,7 @@ class AdmissionTest(unittest.TestCase):
                                "2026-09-01T00:00:00Z", list(labels))
 
     def test_designated_buildable_issue_precedes_another_due_brief(self):
-        target = self.task("JOV-7896", "Repair account claim conversion", "body", 2,
+        target = self.task("JOV-7896", "Repair account claim conversion", "body", 1,
                            ["agent-ready", "dispatch-next", "devin"])
         held = self.task("JOV-4258", "Homepage hero", "no brief", 1, ["ws:ui-ia"])
         linear = FakeLinear([target, held])
@@ -352,6 +352,16 @@ class AdmissionTest(unittest.TestCase):
         self.assertIs(design_gate.pick_build_issue([held, target], {}, pick=self.lane.pick_issue,
                          linear=linear, provider="devin", now=NOW), held)
 
+    def test_current_urgent_precedes_lower_priority_designated_build(self):
+        target = self.task("JOV-LOW", "Repair account claim conversion", "body", 2,
+                           ["agent-ready", "dispatch-next", "devin"])
+        urgent = self.task("JOV-URGENT", "Homepage hero", "no brief", 1, ["ws:ui-ia"])
+        linear = FakeLinear([target, urgent])
+        self.assertIs(design_gate.pick_build_issue([target, urgent], {}, pick=self.lane.pick_issue,
+                      linear=linear, provider="devin", now=NOW), urgent)
+        self.assertEqual(linear.calls[0][1], {"id": urgent.id})
+        self.assertNotIn(target.id, json.dumps(linear.calls))
+
     def test_designation_preserves_whole_pool_duplicate_admission(self):
         canonical = self.task("JOV-1", "Repair account claim conversion", "body", 2, [])
         target = self.task("JOV-7896", canonical.title, "body", 2, ["agent-ready", "dispatch-next"])
@@ -360,7 +370,7 @@ class AdmissionTest(unittest.TestCase):
                       provider="devin", now=NOW), canonical)
 
     def test_designation_does_not_bypass_worker_admission(self):
-        target = self.task("JOV-7896", "Homepage hero", "no brief", 2,
+        target = self.task("JOV-7896", "Homepage hero", "no brief", 1,
                            ["agent-ready", "dispatch-next", "ws:ui-ia"])
         other = self.task("JOV-4258", "Homepage banner", "no brief", 1, ["ws:ui-ia"])
         # Remote-only lanes claim gated work too: the build run writes its own brief.

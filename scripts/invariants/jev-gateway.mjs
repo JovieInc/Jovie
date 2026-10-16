@@ -2,10 +2,6 @@
 
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import {
-  createGateway,
-  experimental_evaluate as evaluate,
-} from 'ai-evaluation';
 import { classifyJevShadow, evidenceFingerprint } from './jev-shadow.mjs';
 
 export const JEV_ROUTE = Object.freeze({
@@ -338,6 +334,10 @@ export async function evaluateThroughGateway(
   { apiKey, signal, fetch, freeOnly = false }
 ) {
   if (!apiKey?.trim()) throw new Error('Gateway credential unavailable');
+  const { createGateway, experimental_evaluate: evaluate } = await import(
+    'ai-evaluation'
+  );
+  signal?.throwIfAborted();
   const gateway = createGateway({
     apiKey,
     fetch,

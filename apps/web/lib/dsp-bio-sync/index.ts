@@ -19,4 +19,9 @@ export type {
   BioSyncResponse,
   BioSyncResult,
 } from './service';
-export { getBioSyncStatus, syncBioToDsps } from './service';
+export {
+  approveBioSync,
+  getBioSyncHistory,
+  getBioSyncStatus,
+  syncBioToDsps,
+} from './service';
