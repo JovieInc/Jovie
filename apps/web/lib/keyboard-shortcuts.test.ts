@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
+import { COMMANDS } from '@/lib/commands/registry';
 import {
   FOUNDER_DOOR_SHORTCUT,
   KEYBOARD_SHORTCUTS,
@@ -132,6 +133,36 @@ describe('keyboard-shortcuts definitions', () => {
       ).toBeUndefined();
       expect(NAV_SHORTCUTS.earnings).toBeUndefined();
     });
+  });
+
+  it('projects every admitted command sequence without label, target, or handler drift', () => {
+    const commands = COMMANDS.filter(
+      command => command.kind === 'nav' && command.keyboardShortcut
+    );
+    expect(commands).toHaveLength(6);
+    for (const command of commands) {
+      if (command.kind !== 'nav' || !command.keyboardShortcut)
+        throw new Error('Unresolved navigation owner');
+      const bindings = KEYBOARD_SHORTCUTS.filter(
+        shortcut => shortcut.commandId === command.id
+      );
+      expect(bindings).toHaveLength(1);
+      expect(bindings[0]).toMatchObject({
+        ...command.keyboardShortcut,
+        href: command.href,
+        keys: `${command.keyboardShortcut?.firstKey.toUpperCase()} then ${command.keyboardShortcut?.secondKey.toUpperCase()}`,
+        label: `Go to ${command.label.toLowerCase()}`,
+        isSequential: true,
+        decision: { status: 'required', binding: 'useSequentialShortcuts' },
+      });
+    }
+    for (const shortcut of KEYBOARD_SHORTCUTS.filter(
+      binding => binding.commandId
+    )) {
+      expect(commands.some(command => command.id === shortcut.commandId)).toBe(
+        true
+      );
+    }
   });
 
   describe('modifier shortcuts', () => {

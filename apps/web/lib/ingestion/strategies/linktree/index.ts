@@ -14,9 +14,6 @@ export type { ExtractLinktreeOptions } from './extraction';
 // Re-export extraction function
 export { extractLinktree } from './extraction';
 
-// Re-export fetch function
-export { fetchLinktreeDocument } from './fetch';
-
 // Re-export paid tier and verification detection
 export {
   detectLinktreePaidTier,

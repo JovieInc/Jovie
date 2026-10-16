@@ -148,24 +148,15 @@ async function mockChatBackend(page: Page) {
     );
     runIndex += 1;
 
-    await page.evaluate(() => {
-      const probeWindow = window as Window & {
-        __jovieChatPerformanceProbe?: {
-          dataReadyMs?: number;
-          start: number;
-        };
-      };
-      const probe = probeWindow.__jovieChatPerformanceProbe;
-      if (probe) {
-        probe.dataReadyMs = performance.now() - probe.start;
-      }
-    });
-
+    // Stamp dataReadyMs in the page's own fetch wrapper. page.evaluate inside
+    // this route deadlocks the in-flight chat POST, so the optimistic user
+    // bubble paints and the assistant reply never arrives.
     return route.fulfill({
       status: 200,
       contentType: 'text/event-stream; charset=utf-8',
       headers: {
         'cache-control': 'no-cache',
+        'x-vercel-ai-ui-message-stream': 'v1',
         'x-conversation-id': CONVERSATION_ID,
         'x-chat-turn-id': turnId,
       },

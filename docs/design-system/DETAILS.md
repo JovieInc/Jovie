@@ -379,9 +379,9 @@ prior anchors without a second theme provider).
 | Floating | `#232427` | `--color-bg-surface-3` | Modals, tooltips |
 | Text primary | `#F5F7FB` | `--color-text-primary-token` | Body / headings |
 | Text secondary | `#A0A5AF` | `--color-text-secondary-token` | Labels |
-| Text muted | `#8F95A0` | `--color-text-tertiary-token` | Meta |
+| Text muted | `#9DA2AC` | `--color-text-tertiary-token` | Meta |
 | Text tertiary | `#8C939E` | `--color-text-quaternary-token` | Placeholders |
-| Text disabled | `#525D75` | `--color-text-disabled-token` | Disabled |
+| Text disabled | `#77839D` | `--color-text-disabled-token` | Disabled |
 | Text inverse | `#020307` | `--linear-text-inverse` | On light CTAs |
 | Border subtle | `rgba(168,176,195,.10)` | `--color-border-subtle` | Dividers |
 | Border default | `rgba(168,176,195,.16)` | `--color-border-default` | Borders |
@@ -725,6 +725,62 @@ Avoid in new code; prefer the intent tokens above.
 
 **Reduced motion:** Respects `prefers-reduced-motion: reduce` — every
 duration token (subtle, cinematic, and raw scale) drops to 0ms automatically.
+
+---
+
+## pill-state-continuity
+
+The Button pilot is functional feedback under the existing motion policy.
+`pendingPresentation="morph"` opts text pills into a controlled
+`actionState="idle|pending|success|error"`; existing `loading` also supplies
+pending. Default buttons, Slot links and IconButton retain their presentation.
+`stateLabels` supplies localized pending, success, error and retry messages.
+
+| Transition | Purpose and geometry | Tokens | Suppressed motion |
+| --- | --- | --- | --- |
+| Idle → pending | Fade the label first; converge both round caps on the slot center. Center fill compresses independently; glyphs never scale. Final face is exactly 28×28 CSS px. | `--duration-fast` label/delay, `--duration-subtle` travel, `--ease-in-out` travel, `--ease-subtle` opacity | Keyboard: immediate substitution. Reduce Motion: centralized zero-duration tokens; static spinner ring. |
+| Pending → success | Replace the spinner with an opacity-only check; keep the circle when the destination replaces the action. | `--duration-subtle`, `--ease-subtle` | Immediate check; no bounce or re-expansion. |
+| Pending → error → retry | Reopen the same pill, expose Retry, announce the failure and keep native keyboard activation. | `--duration-subtle`, `--ease-in-out`; `--duration-fast` label | Immediate replacement in the same slot. |
+| Any → idle/new pending | Interrupt and retarget CSS transitions from their current paint. No completion or minimum progress timer. | Same tokens | Immediate substitution. |
+
+The native button reserves the larger idle/retry label footprint and an actual
+44px minimum hit container. Its focus ring stays on that container. A full-width
+CTA reserves its responsive width in every state; only the cap and fill transforms
+change. Labels truncate visually within narrow slots while retaining their full
+accessible name. Browser zoom scales the entire CSS geometry together.
+Round caps reuse variant fills; the three paint pieces omit inset shadows and
+border strokes to avoid internal seams. This opt-in presentation does not claim
+an existing idle Pen master; promotion needs the existing Pen owner's readback.
+
+Pending is semantic immediately and blocks repeat activation without disabling
+the focused native button. Only spinner presentation waits one resolved
+`--duration-subtle` token; dispatch never waits. One sibling live region owns
+loading/complete/error messages; spinner and painted labels are hidden from
+assistive technology. Do not add a toast announcing the same status.
+
+The caller owns authoritative operation truth and stale-result rejection. The
+production pilot is the text `CopyToClipboardButton`: `useClipboard` sets real
+pending immediately, locks duplicate writes and uses a generation guard for
+reset/new-request/unmount. Success stays a check until the next activation;
+failure remains an explicit Retry. Icon-only clipboard controls retain their
+current presentation. No success is inferred from elapsed time.
+
+Preview: `shadcn/Button → Pill State Choreography` exposes manual resolve/reject/
+reset inputs, plus `Action State Matrix` covers static states. The production
+component is also available at `Dashboard/Molecules/CopyToClipboardButton`.
+Vitest exercises semantics, timers and stale requests; the Storybook Playwright
+spec samples painted intermediate caps, centering, focus and stable bounds in
+both themes, RTL, narrow full-width slots and 200% scale. These local proofs are
+not production or physical Mobile Safari certification; [JOV-8394](https://linear.app/jovie/issue/JOV-8394)
+tracks those receipts through JOV-7713 and the coordinated Pen readback.
+[JOV-8395](https://linear.app/jovie/issue/JOV-8395) tracks the remaining family
+vocabulary after pilot acceptance. Expansion remains with the approved family
+owners, including JOV-8179 for segmented selection and JOV-8182 for tooltips.
+
+**Ship now:** opt-in Button and one truthful clipboard pilot. **Re-evaluate
+when:** JOV-7713 records production quality acceptance. **Then:** adopt the
+accepted family contracts in their existing owners; keep chat-motion and shell
+RailMotion as their current sources of truth.
 
 ---
 
@@ -1113,3 +1169,63 @@ owners handle fallbacks, accessible names and source-backed verification;
 density and layout remain supported variants. Provider provenance is not Jovie
 verification. See the [owner map and consumer contract](entity-identity.md).
 The executable `semantic-entity-identity` invariant lives in `canon/invariants.jsonl`.
+
+## DS_FOUNDATION_V1 canonical decisions
+
+Wave 0 of the DS_FOUNDATION_V1 consolidation locks in the following canonical
+semantic aliases. Downstream files and components should consume these instead
+of redefining them.
+
+- **Canonical public/marketing width = 1298px** (Linear.app parity).
+  Exposed as `--ds-public-content-max` and Tailwind class `max-w-public-content`.
+- **Prose exception = 680px** for long-form reading surfaces.
+  Exposed as `--ds-prose-max` and Tailwind class `max-w-prose-canonical`.
+- **Motion taxonomy:** two intents only.
+  - `subtle` — 150ms with `--ds-motion-subtle-easing`. Use for hover, focus,
+    color, icon swap, toast. Tailwind: `duration-subtle ease-subtle`.
+  - `cinematic` — 420ms with `--ds-motion-cinematic-easing`. Use for drawers,
+    modals, audio player open/close. Tailwind: `duration-cinematic ease-cinematic`.
+  - Raw durations and easings in route code are forbidden (enforced in Wave 4).
+- **Canonical button variants:** `primary`, `secondary`, `tertiary`, `ghost`,
+  and `link`. Destructive styling is a `destructive` prop, not a variant.
+- **Canonical text button size (Tim KEEP 2026-09-10):** `sm`,
+  `marketing`, `md`, and `lg` share one 28px visible ActionButton / product
+  CTA, weight 510, radius 999. Mobile wraps that 28px pill in a 44px tap
+  target. Not 32-in-44 and not density-32 on every size.
+  `icon` remains a distinct 36px square utility control with a 44px hit target.
+- **Touch targets (founder-locked 2026-08-20):** enlarge the hit **container**,
+  never the visible item. Compact controls keep their visual height; the 44px
+  floor is an invisible `::before`/`::after` (or wrapping hit area).
+- **Marketing O-mark (founder-locked 2026-08-12):** render the visible mark at
+  32px and align it to the same control geometry.
+
+See [`docs/DESIGN_TOKENS.md`](../DESIGN_TOKENS.md#ds_foundation_v1-canonical-decisions)
+for the canonical CSS + Tailwind references.
+
+---
+
+## Source-of-Truth File Map
+
+| File | Responsibility |
+|------|----------------|
+| `apps/web/design/ziawi-color-sot.json` | **Color SoT (`ziawi-color-sot-v1`)** — Pen node ZiaWI hex lock. React projects this file. |
+| `apps/web/design/oklch-palette.json` | **OKLCH projection of ZiaWI** — not a color root; hex must match `ziawi-color-sot-v1` |
+| `apps/web/design/tokens.json` | **Machine-readable base-token source** — compiler-owned brand, gray, and radius values plus explicit migration divergences; accent hexes project ZiaWI |
+| `apps/web/styles/generated/design-tokens.css` | **Generated base-token emitter** — CSS projection of `design/tokens.json`; never hand-edit |
+| `apps/web/styles/design-system.css` | **Live semantic emitter** — imports generated base tokens and projects unmigrated semantic/color properties; color hex must match ZiaWI |
+| `apps/web/styles/linear-tokens.css` | Marketing-specific Linear-extracted tokens |
+| `apps/web/styles/theme.css` | Feature accents & animations only |
+| `apps/web/app/globals.css` | Tailwind registration + shared utilities |
+| `apps/web/tailwind.config.js` | Tailwind v4 token mapping |
+| `apps/web/app/(marketing)/layout.tsx` | Marketing shell |
+| `apps/web/components/site/MarketingHeader.tsx` | Marketing header |
+| `apps/web/components/site/MarketingFooter.tsx` | Marketing footer |
+| `apps/web/components/features/auth/AuthLayout.tsx` | Product-funnel shell |
+| `apps/web/components/features/dashboard/dashboard-nav/config.ts` | Reviewed authenticated-shell navigation and rollout insertions |
+| `apps/web/components/shell/SidebarNavItem.tsx` | Canonical sidebar row and icon chrome |
+| `apps/web/components/organisms/table/molecules/PageToolbar.tsx` | Canonical workspace toolbar and action hierarchy |
+| `apps/web/components/homepage/*` | Homepage chat-intake implementation (System B) |
+| `apps/web/components/features/home/*` | Legacy marketing-home components (still used by `(marketing)/new/*`) |
+| `apps/web/app/(home)/layout.tsx` | Homepage shell — `PublicPageShell` |
+
+---

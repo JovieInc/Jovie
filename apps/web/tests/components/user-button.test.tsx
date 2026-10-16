@@ -260,6 +260,33 @@ describe('UserButton billing actions', () => {
     });
   });
 
+  it('keeps the menu actionable with collapsed dock status and names every badge', async () => {
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: { isPro: false, plan: null, hasStripeCustomer: false },
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    } as any);
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <UserButton
+        showUserInfo
+        dockStatus={{
+          label: "Update available · What's new · Playing: Never Say A Word",
+          badges: <span data-testid='dock-status'>↑</span>,
+        }}
+      />
+    );
+    const trigger = screen.getByRole('button', {
+      name: /Open user menu · Update available/,
+    });
+    expect(trigger).toContainElement(screen.getByTestId('dock-status'));
+    await user.click(trigger);
+    expect(await screen.findByRole('menu')).toBeVisible();
+    rerender(<UserButton showUserInfo />);
+    expect(screen.getByRole('menu')).toBeVisible();
+  });
+
   it('keeps the calm workspace identity and account menu together', async () => {
     mockUseBillingStatusQuery.mockReturnValue({
       data: { isPro: false, plan: null, hasStripeCustomer: false },

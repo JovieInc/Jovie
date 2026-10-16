@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { renderToString } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EmailCodeAuthForm } from './EmailCodeAuthForm';
@@ -79,6 +85,59 @@ beforeEach(() => {
 });
 
 describe('EmailCodeAuthForm', () => {
+  it.each([
+    '<script>@example.com',
+    'artist,name@example.com',
+    'artíst@example.com',
+    'artist@-example.com',
+    'artist@example-.com',
+    'artist..name@example.com',
+  ])('rejects %s accessibly before requesting an OTP', async email => {
+    renderForm();
+    const input = screen.getByRole('textbox', { name: 'Email' });
+    fireEvent.change(input, { target: { value: email } });
+    fireEvent.submit(input.closest('form') as HTMLFormElement);
+
+    expect(sendVerificationOtp).not.toHaveBeenCalled();
+    expect(trackFunnelStep).not.toHaveBeenCalled();
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      /that email address doesn’t look right/i
+    );
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(input).toHaveAccessibleDescription(
+      'That email address doesn’t look right. Check it and try again.'
+    );
+    expect(input).toBeEnabled();
+    expect(input).toHaveValue(email);
+  });
+
+  it('allows correcting a malformed mailbox to a plus address', async () => {
+    sendVerificationOtp.mockResolvedValueOnce({
+      data: { success: true },
+      error: null,
+    });
+    renderForm();
+    const input = screen.getByRole('textbox', { name: 'Email' });
+    const form = input.closest('form') as HTMLFormElement;
+    fireEvent.change(input, { target: { value: '<script>@example.com' } });
+    fireEvent.submit(form);
+    expect(sendVerificationOtp).not.toHaveBeenCalled();
+
+    fireEvent.change(input, { target: { value: 'e2e+jov8342@example.com' } });
+    fireEvent.submit(form);
+    await waitFor(() => expect(sendVerificationOtp).toHaveBeenCalledTimes(1));
+    expect(sendVerificationOtp).toHaveBeenCalledWith({
+      email: 'e2e+jov8342@example.com',
+      type: 'sign-in',
+    });
+    await waitFor(() =>
+      expect(
+        document.querySelector('[data-auth-email-code-step="code"]')
+      ).toBeTruthy()
+    );
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   it('records a signup auth_start, then an error step when the send fails', async () => {
     sendVerificationOtp.mockResolvedValueOnce({
       data: null,
@@ -204,6 +263,57 @@ describe('EmailCodeAuthForm', () => {
       ).toBeTruthy()
     );
     expect(locationAssign).not.toHaveBeenCalled();
+  });
+
+  it('preserves Change email through cooldown and resend without submitting a code', async () => {
+    vi.useFakeTimers();
+    try {
+      sendVerificationOtp
+        .mockResolvedValueOnce({ data: { success: true }, error: null })
+        .mockResolvedValueOnce({ data: { success: true }, error: null });
+      renderForm();
+      await act(async () => {
+        await submitEmail();
+      });
+      const change = screen.getByRole('button', { name: 'Change email' });
+      expect(change).toBeEnabled();
+      change.focus();
+      expect(change).toHaveFocus();
+      expect(screen.getByText('Resend in 30s')).toHaveAttribute(
+        'aria-live',
+        'polite'
+      );
+      expect(
+        screen.queryByRole('button', { name: 'Resend Verification Code' })
+      ).not.toBeInTheDocument();
+      expect(sendVerificationOtp).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(31_000);
+      });
+      expect(screen.getByRole('button', { name: 'Change email' })).toBe(change);
+      expect(change).toHaveFocus();
+      const resend = screen.getByRole('button', {
+        name: 'Resend Verification Code',
+      });
+      await act(async () => {
+        fireEvent.click(resend);
+      });
+      expect(sendVerificationOtp).toHaveBeenCalledTimes(2);
+      expect(screen.getByRole('button', { name: 'Change email' })).toBe(change);
+      expect(change).toHaveFocus();
+      expect(change).toBeEnabled();
+      fireEvent.click(change);
+      expect(screen.getByRole('textbox', { name: 'Email' })).toHaveValue(
+        'artist@example.com'
+      );
+      expect(
+        screen.queryByTestId('otp-autofill-input')
+      ).not.toBeInTheDocument();
+      expect(signInEmailOtp).not.toHaveBeenCalled();
+      expect(locationAssign).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('navigates to the redirect URL when verify succeeds', async () => {

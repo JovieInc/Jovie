@@ -81,9 +81,9 @@ export function CertificationWalkthrough({
   useEffect(() => {
     if (open && row) {
       // Query refreshes replace the row object every minute. Preserve the
-      // in-progress review for the same subject so a changed digest is shown
-      // as stale without discarding the founder's comments.
-      if (activeRowIdRef.current === row.id) return;
+      // in-progress review even if selection changes. A different subject or
+      // digest is stale; opening context never retargets prepared comments.
+      if (activeRowIdRef.current !== null) return;
       transcriberRef.current?.cancel();
       transcriberRef.current = null;
       setDictating(false);
@@ -194,7 +194,10 @@ export function CertificationWalkthrough({
       setSubmitting(true);
       setDecisionError(null);
       try {
-        const recorded = await onDecide(decision, notes);
+        const recorded = await onDecide(decision, notes, {
+          rowId: review.rowId,
+          evidenceDigest: review.evidenceDigest,
+        });
         if (recorded === false) {
           setDecisionError(
             'Decision was not saved. Your comments are kept. Try again.'
@@ -228,7 +231,7 @@ export function CertificationWalkthrough({
             </DialogPrimitive.Title>
             <DialogPrimitive.Description className='min-w-0 flex-1 truncate text-2xs text-tertiary-token'>
               {row
-                ? `${row.surface} · digest ${shortSha((review?.evidenceDigest ?? '').replace(/^sha256:/, ''))}`
+                ? `${review?.surface ?? row.surface} · digest ${shortSha((review?.evidenceDigest ?? '').replace(/^sha256:/, ''))}`
                 : ''}
             </DialogPrimitive.Description>
             <DialogPrimitive.Close asChild>

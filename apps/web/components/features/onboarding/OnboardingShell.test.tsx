@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { type ReactNode, useEffect } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   buildEntryProfileBuilderState,
   OnboardingShell,
@@ -34,6 +34,7 @@ const chatProps = vi.hoisted(() => ({
     onTurnstileRequired: (message?: string) => void;
     onTurnstileRejected: () => void;
     turnstileToken: string | null;
+    turnstileHasSiteKey: boolean;
   },
 }));
 
@@ -136,6 +137,27 @@ describe('OnboardingShell status', () => {
     chatProps.current = null;
     turnstileProps.current = null;
   });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it.each([
+    ['', false, false],
+    ['configured-public-key', false, true],
+    ['   ', false, false],
+    ['', true, true],
+  ] as const)(
+    'forwards resolved key availability for configured key %j and test mode %s',
+    (configuredKey, testMode, expected) => {
+      vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', configuredKey);
+      render(
+        <OnboardingShell sessionLabel='pending' turnstileTestMode={testMode} />
+      );
+
+      expect(chatProps.current?.turnstileHasSiteKey).toBe(expected);
+    }
+  );
 
   it.each([false, true])(
     'forwards the server-selected Turnstile test mode (%s) to the widget',

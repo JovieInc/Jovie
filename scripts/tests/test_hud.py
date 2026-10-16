@@ -497,6 +497,7 @@ class ManagedReleaseRestartTest(unittest.TestCase):
             state = Path(directory)
             old, new = state / "old", state / "new"
             shutil.copytree(ROOT / "scripts/lanes", old, ignore=shutil.ignore_patterns("__pycache__"))
+            shutil.copyfile(ROOT / "scripts/shipping_origin.py", state / "shipping_origin.py")
             new.mkdir()
             receipt = state / "executed.json"
             (new / "hud.py").write_text(

@@ -19,7 +19,7 @@
  * tight: one navigation per (route × viewport), no flaky waits.
  */
 
-import { type Page, test } from '@playwright/test';
+import { type BrowserContextOptions, type Page, test } from '@playwright/test';
 import { expect } from '../setup';
 import { getOverflowingElements } from '../utils/mobile-overflow';
 import {
@@ -155,6 +155,31 @@ async function assertBottomTabBarState(
   }
 }
 
+function publicProfileContextOptions(
+  testInfo: {
+    readonly project: {
+      readonly name: string;
+      readonly use: BrowserContextOptions;
+    };
+  },
+  viewport: {
+    readonly width: number;
+    readonly height: number;
+    readonly isMobile?: boolean;
+  }
+): BrowserContextOptions {
+  const mobile = viewport.isMobile === true;
+  return {
+    ...testInfo.project.use,
+    storageState: { cookies: [], origins: [] },
+    viewport: { width: viewport.width, height: viewport.height },
+    // Firefox rejects isMobile and hasTouch. The viewport still drives layout.
+    ...(testInfo.project.name === 'firefox' || !mobile
+      ? {}
+      : { isMobile: true, hasTouch: true }),
+  };
+}
+
 test.describe('Public profile responsive shell @regression', () => {
   test.setTimeout(120_000);
 
@@ -163,13 +188,9 @@ test.describe('Public profile responsive shell @regression', () => {
       test(`${viewport.label} ${route.id} renders without overflow`, async ({
         browser,
       }, testInfo) => {
-        const context = await browser.newContext({
-          ...testInfo.project.use,
-          storageState: { cookies: [], origins: [] },
-          viewport: { width: viewport.width, height: viewport.height },
-          isMobile: viewport.isMobile,
-          hasTouch: viewport.isMobile,
-        });
+        const context = await browser.newContext(
+          publicProfileContextOptions(testInfo, viewport)
+        );
         const page = await context.newPage();
         const label = `${viewport.label} ${route.id}`;
 
@@ -250,13 +271,13 @@ test.describe('Public profile redirect parity @regression', () => {
     test(`${link.id} resolves to the unified profile shell`, async ({
       browser,
     }, testInfo) => {
-      const context = await browser.newContext({
-        ...testInfo.project.use,
-        storageState: { cookies: [], origins: [] },
-        viewport: { width: 390, height: 844 },
-        isMobile: true,
-        hasTouch: true,
-      });
+      const context = await browser.newContext(
+        publicProfileContextOptions(testInfo, {
+          width: 390,
+          height: 844,
+          isMobile: true,
+        })
+      );
       const page = await context.newPage();
 
       try {
@@ -304,13 +325,13 @@ test.describe('Public profile redirect parity @regression', () => {
   test('alias deep links preserve mode and source through browser back and forward', async ({
     browser,
   }, testInfo) => {
-    const context = await browser.newContext({
-      ...testInfo.project.use,
-      storageState: { cookies: [], origins: [] },
-      viewport: { width: 390, height: 844 },
-      isMobile: true,
-      hasTouch: true,
-    });
+    const context = await browser.newContext(
+      publicProfileContextOptions(testInfo, {
+        width: 390,
+        height: 844,
+        isMobile: true,
+      })
+    );
     const page = await context.newPage();
 
     try {

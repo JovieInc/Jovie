@@ -24,6 +24,7 @@ import {
   recordOnboardingUpgradeOfferEvent,
 } from '@/lib/onboarding/upgrade-offer';
 import { loadClaimTimeProof } from '@/lib/proof/claim-time-proof.server';
+import { isRenderFixtureEnabled } from '@/lib/render-fixture-policy';
 import { OnboardingCheckoutClient } from './OnboardingCheckoutClient';
 
 /**
@@ -61,6 +62,31 @@ export default async function OnboardingCheckoutPage({
 }: Readonly<{
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }>) {
+  // JOV-8068 screen-audit producer. The authenticated screenshot proof
+  // enters through /api/dev/test-auth/enter, then this branch renders the
+  // registered checkout screen without the noop database. Signed-out
+  // requests never reach it: the proxy redirects them to /signin.
+  // VERCEL_ENV=production fails closed and keeps the auth gate.
+  if (isRenderFixtureEnabled()) {
+    const pricing = resolvePriceIds('pro');
+    return (
+      <OnboardingCheckoutClient
+        plan='pro'
+        profileId='11111111-1111-4111-8111-111111111111'
+        monthlyPriceId={pricing.monthlyPriceId || 'price_screen_cert_pro_month'}
+        annualPriceId={null}
+        monthlyAmount={pricing.monthlyAmount}
+        annualAmount={null}
+        displayName='Test Artist'
+        username='testartist'
+        avatarUrl={null}
+        spotifyFollowers={1200}
+        isDefaultUpsell
+        proofFindings={[]}
+      />
+    );
+  }
+
   // Verify authentication
   const authResult = await resolveUserState();
   if (

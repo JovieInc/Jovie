@@ -299,6 +299,12 @@ export const ServerEnvSchema = z.object({
   // Onboarding chat (anonymous session signing + bot challenge — JOV-2132)
   SESSION_SECRET: z.string().min(32).optional(),
   TURNSTILE_SECRET_KEY: z.string().optional(),
+  /**
+   * Nightly/QA-only (JOV-8500): '1' disarms the local E2E Turnstile bypass in
+   * the onboarding chat handler so the nightly canary can assert the bot gate
+   * returns 403 TURNSTILE_REQUIRED. Inert on Vercel production/preview.
+   */
+  E2E_REQUIRE_TURNSTILE_GATE: z.string().optional(),
 
   // Analytics
   ANALYTICS_RETENTION_DAYS: z.string().optional(),
@@ -647,6 +653,7 @@ export const ENV_KEYS = [
   'JOVIE_ALLOW_PRODUCTION_UPSTASH',
   'SESSION_SECRET',
   'TURNSTILE_SECRET_KEY',
+  'E2E_REQUIRE_TURNSTILE_GATE',
   'E2E_PROD_SIGNUP_EMAIL_BASE',
   'PRODUCTION_WAITLIST_CANARY_READ_TOKEN',
   'E2E_PROD_SIGNUP_PASSWORD',

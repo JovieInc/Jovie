@@ -90,13 +90,13 @@ describe('Ingestion Jobs', () => {
 
   describe('isSupportedIngestionUrl', () => {
     it('returns true for supported platforms', () => {
-      expect(isSupportedIngestionUrl('https://linktr.ee/username')).toBe(true);
+      expect(isSupportedIngestionUrl('https://linktr.ee/username')).toBe(false);
       expect(isSupportedIngestionUrl('https://beacons.ai/username')).toBe(true);
     });
 
-    it('returns true for Instagram and Twitter', () => {
+    it('rejects Instagram imports and preserves Twitter detection', () => {
       expect(isSupportedIngestionUrl('https://instagram.com/username')).toBe(
-        true
+        false
       );
       expect(isSupportedIngestionUrl('https://twitter.com/username')).toBe(
         true

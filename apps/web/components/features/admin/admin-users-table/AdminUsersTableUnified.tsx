@@ -609,7 +609,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
       >
         {() =>
           isMobile ? (
-            <div className='space-y-2 p-3'>
+            <div className='min-h-0 flex-1 space-y-2 overflow-auto p-3'>
               {users.length === 0 ? (
                 <ContentSurfaceCard className='flex flex-col items-center gap-3 bg-surface-0 px-4 py-10 text-center'>
                   <Users className='h-6 w-6' />

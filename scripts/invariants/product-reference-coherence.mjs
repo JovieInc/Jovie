@@ -105,13 +105,31 @@ export function validateProductReferenceSnapshot(
   return errors;
 }
 
-export function screenNeedsProductReferences(
-  screenId,
-  owner = readProductReferenceOwner()
-) {
-  return Object.values(owner.PRODUCT_ONTOLOGY).some(feature =>
-    feature.screenIds.includes(screenId)
+const SCREEN_ID_LIST = /screenIds:\s*\[([\s\S]*?)\]/g;
+
+/** Screen ids declared on the ontology. The certify job has no workspace
+ * install, so this must not load the TypeScript compiler. */
+export function productReferenceScreenIds(repoRoot = ROOT) {
+  const source = readFileSync(
+    resolve(repoRoot, PRODUCT_REFERENCE_SOURCE),
+    'utf8'
   );
+  const ids = new Set();
+  for (const match of source.matchAll(SCREEN_ID_LIST)) {
+    for (const id of match[1].matchAll(/['"](web\.[^'"]+)['"]/g)) {
+      ids.add(id[1]);
+    }
+  }
+  return ids;
+}
+
+export function screenNeedsProductReferences(screenId, owner) {
+  if (owner) {
+    return Object.values(owner.PRODUCT_ONTOLOGY).some(feature =>
+      feature.screenIds.includes(screenId)
+    );
+  }
+  return productReferenceScreenIds().has(screenId);
 }
 
 /** Narrow navigation-copy detector: technical Library types and operator Presence remain valid. */

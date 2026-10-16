@@ -156,6 +156,54 @@ test('historical CI failure or missing receipt stays fail-closed', () => {
     /no exact passing Web receipt/
   );
 });
+test('not_applicable checkout materializes the carryover import closure', () => {
+  const workflow = readFileSync(
+    '.github/workflows/staging-controller.yml',
+    'utf8'
+  );
+  const marker = "if: steps.lineage.outputs.outcome == 'not_applicable'";
+  const checkout = workflow.slice(workflow.indexOf(marker));
+  const sparse = checkout.match(/sparse-checkout: \|\n((?: {12}.+\n)+)/);
+  assert.ok(sparse, 'not_applicable checkout must list its sparse paths');
+  const paths = sparse[1]
+    .trim()
+    .split('\n')
+    .map(line => line.trim());
+  const root = mkdtempSync(join(tmpdir(), 'stage-carryover-sparse-'));
+  try {
+    for (const path of paths) {
+      const target = join(root, path);
+      mkdirSync(resolve(target, '..'), { recursive: true });
+      writeFileSync(target, readFileSync(path));
+    }
+    const loaded = spawnSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        "await import('./.github/scripts/staging-lane-carryover.mjs')",
+      ],
+      { cwd: root, encoding: 'utf8' }
+    );
+    assert.equal(loaded.status, 0, loaded.stderr);
+    rmSync(join(root, 'scripts/lib/product-lane-classifier.mjs'));
+    const incomplete = spawnSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        "await import('./.github/scripts/staging-lane-carryover.mjs')",
+      ],
+      { cwd: root, encoding: 'utf8' }
+    );
+    assert.notEqual(incomplete.status, 0);
+    assert.match(incomplete.stderr, /ERR_MODULE_NOT_FOUND/);
+    assert.match(incomplete.stderr, /product-lane-classifier\.mjs/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('controller preserves sealed CI routing and consumes the qualified carryover outcome', () => {
   const workflow = readFileSync(
     '.github/workflows/staging-controller.yml',
@@ -196,8 +244,13 @@ test('actual routing Bash handles no-op, stale generation, failed identity and w
       join(root, 'curl'),
       '#!/usr/bin/env node\nif(process.env.TEST_CURL_FAILURE)process.exit(7);process.stdout.write(process.env.TEST_IDENTITY);\n'
     );
+    writeFileSync(
+      join(root, 'git'),
+      '#!/bin/sh\ncase "$*" in\n  *ls-remote*) printf \'%s\\n\' "$TEST_MAIN" ;;\n  *) exec /usr/bin/git "$@" ;;\nesac\n'
+    );
     chmodSync(join(root, 'gh'), 0o755);
     chmodSync(join(root, 'curl'), 0o755);
+    chmodSync(join(root, 'git'), 0o755);
     for (const [initial, main, relation, failedCurl, good] of [
       ['proceed', '', '', '1', true],
       ['superseded', '', '', '1', true],
@@ -231,6 +284,7 @@ test('actual routing Bash handles no-op, stale generation, failed identity and w
           TEST_MAIN: main,
           TEST_RELATION: relation,
           TEST_CURL_FAILURE: failedCurl,
+          RESOLVE_MAIN_RETRY_SECONDS: '0',
           TEST_IDENTITY: JSON.stringify({
             commitSha: current,
             deploymentId: 'dpl_exactStage',
@@ -380,8 +434,13 @@ else{const row=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+'/routes.json'
       join(root, 'curl'),
       '#!/usr/bin/env node\nprocess.stdout.write(process.env.TEST_IDENTITY);\n'
     );
+    writeFileSync(
+      join(root, 'git'),
+      '#!/bin/sh\ncase "$*" in\n  *ls-remote*) printf \'%s\\n\' "$TEST_MAIN" ;;\n  *) exec /usr/bin/git "$@" ;;\nesac\n'
+    );
     chmodSync(join(root, 'gh'), 0o755);
     chmodSync(join(root, 'curl'), 0o755);
+    chmodSync(join(root, 'git'), 0o755);
     const env = {
       ...process.env,
       PATH: root + delimiter + process.env.PATH,
@@ -392,6 +451,7 @@ else{const row=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+'/routes.json'
       SOURCE_CI_RUN_ID: '37356737863',
       REPOSITORY: 'JovieInc/Jovie',
       TEST_MAIN: mainSha,
+      RESOLVE_MAIN_RETRY_SECONDS: '0',
       TEST_IDENTITY: JSON.stringify({
         commitSha: stagedSha,
         deploymentId: 'dpl_exactStage',

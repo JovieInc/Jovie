@@ -1,3 +1,7 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: Credential-free preparation executes only an allowlisted Dependabot diff; a separate trusted App writer commits the attested lockfile with expectedHeadOid.
+# removal-trigger: Remove when Dependabot keeps both the root workspace and isolated Eve lockfiles synchronized without a separate repair writer.
 name: Safe PR Remediation
 
 # Credential-free deterministic repair for proven repeatable lockfile drift on
@@ -228,7 +232,7 @@ jobs:
         run: printf '%s' "$PLAN_B64" | base64 --decode > "$RUNNER_TEMP/safe-remediation-plan.json"
       - name: Generate short-lived Jovie App writer token
         id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}

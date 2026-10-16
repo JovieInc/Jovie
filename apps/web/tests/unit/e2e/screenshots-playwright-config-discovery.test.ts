@@ -70,6 +70,12 @@ describe('screenshots Playwright config test discovery', () => {
     ).toEqual([]);
   });
 
+  it('keeps Playwright output beside the screen-proof bundles', () => {
+    const outputDir = String(config.outputDir ?? '');
+    expect(outputDir.endsWith('test-results/playwright-output')).toBe(true);
+    expect(outputDir.endsWith('test-results')).toBe(false);
+  });
+
   it('does not carry a testMatch entry for a spec that no longer exists', () => {
     const testMatch = config.testMatch;
     if (!Array.isArray(testMatch)) {

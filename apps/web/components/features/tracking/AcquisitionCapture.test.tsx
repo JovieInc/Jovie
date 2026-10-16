@@ -5,6 +5,7 @@ import { AcquisitionCapture } from './AcquisitionCapture';
 const consent = vi.hoisted(() => ({
   allowed: true,
   clearAcquisitionId: vi.fn(),
+  rememberAcquisitionId: vi.fn(),
   getOrCreateAcquisitionId: vi.fn(() => 'acq-123'),
   onChange: vi.fn(),
   unsubscribe: vi.fn(),
@@ -23,6 +24,7 @@ vi.mock('@/lib/env-public', () => ({
 
 vi.mock('@/lib/tracking/consent', () => ({
   clearAcquisitionId: consent.clearAcquisitionId,
+  rememberAcquisitionId: consent.rememberAcquisitionId,
   getOrCreateAcquisitionId: consent.getOrCreateAcquisitionId,
   isAnalyticsAllowed: () => consent.allowed,
 }));
@@ -80,6 +82,15 @@ describe('AcquisitionCapture', () => {
 
     unmount();
     expect(consent.unsubscribe).toHaveBeenCalledOnce();
+  });
+
+  it('adopts the server-verified handoff identity for subsequent events and revocation', async () => {
+    const acquisitionId = '7f5bb735-8e88-4d78-ae32-5228cc12a8bb';
+    vi.mocked(fetch).mockResolvedValue(Response.json({ acquisitionId }));
+    render(<AcquisitionCapture />);
+    await waitFor(() =>
+      expect(consent.rememberAcquisitionId).toHaveBeenCalledWith(acquisitionId)
+    );
   });
 
   it('clears the acquisition identity when consent is revoked', () => {

@@ -49,6 +49,28 @@ describe('jovie CLI', () => {
     );
   });
 
+  it.each([['--help'], ['--help', '--json'], ['skill']])(
+    'documents creator lookup source limits in %j',
+    async (...args) => {
+      const stdout = createOutput();
+      const fetch = createFetch('{}');
+      await expect(
+        runCli(args, { stdout: stdout.output, fetchImpl: fetch.fetchImpl })
+      ).resolves.toBe(0);
+      const content = args.includes('--json')
+        ? (JSON.parse(stdout.read()) as { content: string }).content
+        : stdout.read();
+      const text = content.replace(/\s+/g, ' ');
+      expect(text).toContain('Only YouTube channels support extraction');
+      expect(text).toContain('existing Jovie profile');
+      expect(text).toContain('Instagram, TikTok, and Linktree');
+      expect(text).toContain('SOURCE_UNSUPPORTED');
+      expect(text).toContain('Bandcamp and custom websites');
+      expect(text).toContain('UNSUPPORTED_URL');
+      expect(fetch.urls).toEqual([]);
+    }
+  );
+
   it('hides internal fleet commands from default help', async () => {
     const stdout = createOutput();
     await expect(runCli(['help'], { stdout: stdout.output })).resolves.toBe(0);

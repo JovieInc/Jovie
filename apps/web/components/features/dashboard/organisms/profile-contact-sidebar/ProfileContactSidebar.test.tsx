@@ -70,6 +70,8 @@ const mockState = vi.hoisted(() => ({
   selectedProfileId: 'profile-1',
   previewReady: true,
   routerPush: vi.fn(),
+  routerReplace: vi.fn(),
+  searchParams: new URLSearchParams(),
   destination: '/app/profiles',
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
@@ -77,8 +79,15 @@ const mockState = vi.hoisted(() => ({
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/app/dashboard/profile',
-  useRouter: () => ({ push: mockState.routerPush, replace: vi.fn() }),
-  useSearchParams: () => ({ get: () => null, toString: () => '' }),
+  useRouter: () => ({
+    push: mockState.routerPush,
+    replace: mockState.routerReplace,
+  }),
+  useSearchParams: () => ({
+    get: (key: string) => mockState.searchParams.get(key),
+    toString: () => mockState.searchParams.toString(),
+    has: (key: string) => mockState.searchParams.has(key),
+  }),
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
@@ -139,16 +148,19 @@ vi.mock('@/components/molecules/drawer', () => ({
     'data-testid': testId,
     id,
     onClose,
+    showMobileDismissal = false,
   }: {
     children: React.ReactNode;
     id?: string;
     onClose?: () => void;
+    showMobileDismissal?: boolean;
     'data-testid'?: string;
   }) => (
     <aside
       id={id}
       data-testid={testId}
       data-close-handler={onClose ? 'present' : 'none'}
+      data-mobile-dismissal={String(showMobileDismissal)}
     >
       {children}
     </aside>
@@ -356,7 +368,23 @@ vi.mock('@/features/dashboard/organisms/dsp-matches/hooks', () => ({
   }),
 }));
 
+function renderSidebar() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  queryClient.setQueryData(queryKeys.user.profile(), {
+    ...mockState.initialPreviewData,
+    id: mockState.selectedProfileId,
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <ProfileContactSidebar />
+    </QueryClientProvider>
+  );
+}
+
 function renderEditingSidebar() {
+  mockState.searchParams = new URLSearchParams();
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -452,16 +480,50 @@ describe('ProfileContactSidebar optimistic mutation sequencing', () => {
     mockState.removeCalls.length = 0;
     mockState.toastSuccess.mockReset();
     mockState.toastError.mockReset();
+    mockState.routerReplace.mockReset();
     mockState.useRealProfileMutation = false;
     mockState.selectedProfileId = 'profile-1';
     mockState.previewReady = true;
+    mockState.searchParams = new URLSearchParams();
     vi.unstubAllGlobals();
+  });
+
+  it('opens the editing tabs from a tab deep link without leaving the read-only summary as the default', () => {
+    mockState.searchParams = new URLSearchParams('tab=music');
+
+    renderSidebar();
+
+    expect(
+      screen.getByTestId('profile-contact-tabbed-card')
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Edit profile' })
+    ).not.toBeInTheDocument();
   });
 
   it('exposes a deterministic readiness marker for the open profile rail', () => {
     renderEditingSidebar();
 
     expect(screen.getByTestId('profile-contact-sidebar')).toBeInTheDocument();
+    expect(screen.getByTestId('profile-contact-sidebar')).toHaveAttribute(
+      'data-mobile-dismissal',
+      'false'
+    );
+  });
+
+  it('keeps explicit mobile dismissal in the read-only profile preview', () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <ProfileContactSidebar />
+      </QueryClientProvider>
+    );
+    expect(screen.getByTestId('profile-contact-sidebar')).toHaveAttribute(
+      'data-mobile-dismissal',
+      'true'
+    );
   });
 
   it('does not expose content readiness while the profile rail is a skeleton', () => {
@@ -482,6 +544,7 @@ describe('ProfileContactSidebar optimistic mutation sequencing', () => {
     const rail = screen.getByTestId('profile-contact-sidebar-skeleton');
     expect(rail).toHaveAttribute('id', 'shell-artist-profile-rail');
     expect(rail).toHaveAttribute('data-close-handler', 'present');
+    expect(rail).toHaveAttribute('data-mobile-dismissal', 'true');
     expect(
       screen.getByTestId('profile-contact-sidebar-skeleton')
     ).toBeInTheDocument();

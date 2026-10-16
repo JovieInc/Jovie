@@ -228,6 +228,57 @@ describe('UnifiedTable keyboard selection', () => {
     expect(onRowClick).not.toHaveBeenCalled();
   });
 
+  it('keeps schema column widths identical across loading, empty, and populated states', () => {
+    const sized: ColumnDef<Row, unknown>[] = [
+      {
+        accessorKey: 'name',
+        header: 'Name',
+        size: 220,
+        meta: { className: 'schema-name-col' },
+      },
+    ];
+    const { container, rerender } = render(
+      <UnifiedTable
+        data={[]}
+        columns={sized}
+        columnSizing='schema'
+        isLoading
+        enableVirtualization={false}
+      />
+    );
+
+    const expectSchemaColumn = () => {
+      const table = container.querySelector('table');
+      const column = container.querySelector('col');
+      expect(table).toHaveClass('table-fixed');
+      expect(column).toHaveClass('schema-name-col');
+      expect(column).toHaveStyle({ width: '220px' });
+    };
+
+    expectSchemaColumn();
+    expect(container.querySelector('tbody td')).toHaveClass('schema-name-col');
+
+    rerender(
+      <UnifiedTable
+        data={[]}
+        columns={sized}
+        columnSizing='schema'
+        enableVirtualization={false}
+      />
+    );
+    expectSchemaColumn();
+
+    rerender(
+      <UnifiedTable
+        data={data}
+        columns={sized}
+        columnSizing='schema'
+        enableVirtualization={false}
+      />
+    );
+    expectSchemaColumn();
+  });
+
   it('applies the 32px dense row geometry', () => {
     const { container } = render(
       <UnifiedTable

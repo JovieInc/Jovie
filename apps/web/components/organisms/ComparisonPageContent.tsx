@@ -25,6 +25,9 @@ export function ComparisonPageContent({
       <MarketingHero
         variant='left'
         className='marketing-hero-dock relative overflow-hidden'
+        testId='marketing-section-hero'
+        sectionVariant='left-none'
+        sectionOwner='apps/web/components/organisms/ComparisonPageContent.tsx'
       >
         <div className='absolute inset-0 -z-10' aria-hidden='true'>
           <Image
@@ -47,7 +50,11 @@ export function ComparisonPageContent({
       </MarketingHero>
 
       <MarketingContainer width='prose' className='pb-16'>
-        <section>
+        <section
+          data-testid='marketing-section-comparison'
+          data-marketing-variant='feature-matrix'
+          data-marketing-owner='apps/web/components/organisms/ComparisonPageContent.tsx'
+        >
           <h2 className='text-2xl font-semibold text-primary-token'>
             Feature Comparison
           </h2>
@@ -129,7 +136,11 @@ export function ComparisonPageContent({
       </MarketingContainer>
 
       <MarketingContainer width='prose' className='pb-16'>
-        <section>
+        <section
+          data-testid='marketing-section-cta'
+          data-marketing-variant='final-single-claim'
+          data-marketing-owner='apps/web/components/organisms/ComparisonPageContent.tsx'
+        >
           <h2 className='text-2xl font-semibold text-primary-token'>
             The Bottom Line
           </h2>
@@ -148,6 +159,7 @@ export function ComparisonPageContent({
 
       <FaqSection
         items={data.faq}
+        sectionVariant='objection-handler'
         headingClassName='text-2xl font-semibold tracking-tight text-primary-token'
       />
     </>

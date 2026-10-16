@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { useSidebar } from '@/components/organisms/sidebar';
 import { APP_ROUTES } from '@/constants/routes';
 import { NAVIGATION_DROP_OFF_MS } from '@/lib/tracking/navigation-telemetry';
 import {
@@ -31,6 +32,15 @@ function readWebSource(sourcePath: string): string {
     ? process.cwd()
     : resolve(process.cwd(), 'apps/web');
   return readFileSync(resolve(webRoot, sourcePath), 'utf8');
+}
+
+function CollapseFixture() {
+  const { toggleSidebar } = useSidebar();
+  return (
+    <button type='button' onClick={toggleSidebar}>
+      Toggle Fixture Rail
+    </button>
+  );
 }
 
 describe('Linear-scale density (founder lock 2026-09-25)', () => {
@@ -140,7 +150,10 @@ describe('DashboardNav route warming', () => {
     expect(newChat).toHaveAttribute('aria-busy', 'true');
     expect(newChat).toHaveAttribute('data-navigation-item-id', 'chat');
     expect(newChat).toHaveAttribute('data-navigation-pending', 'true');
-    expect(newChat).toHaveClass('size-6', 'rounded-full', 'opacity-70');
+    expect(newChat).toHaveClass('size-6', 'opacity-70');
+    expect(newChat.parentElement).toHaveAttribute(
+      'data-sidebar-history-header'
+    );
     expect(screen.getByTestId('authenticated-route-content')).toHaveTextContent(
       'Current route'
     );
@@ -326,6 +339,52 @@ describe('DashboardNav route warming', () => {
     expect(
       secondary?.querySelector('[data-navigation-item-id="inbox"]')
     ).not.toBeNull();
+  });
+
+  it('moves the one canonical action between history and compact access', () => {
+    const view = renderDashboardNav({ renderFn: render });
+    const expanded = screen.getByRole('link', { name: 'New Chat' });
+    expect(expanded).toHaveAttribute('href', APP_ROUTES.CHAT);
+    expect(expanded.parentElement).toHaveAttribute(
+      'data-sidebar-history-header'
+    );
+    expect(
+      document.querySelector(
+        '[data-sidebar-search-slot] a[aria-label="New Chat"]'
+      )
+    ).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Filter Unread Chats' })
+    ).toBeNull();
+    view.unmount();
+    renderDashboardNav({
+      renderFn: render,
+      sidebarProps: { defaultOpen: false },
+    });
+    const compact = screen.getByRole('link', { name: 'New Chat' });
+    expect(compact.closest('[data-sidebar-search-slot]')).not.toBeNull();
+    expect(compact).toHaveAttribute('href', expanded.getAttribute('href'));
+  });
+
+  it('preserves action focus when moving between expanded and compact slots', () => {
+    renderDashboardNav({ renderFn: render, children: <CollapseFixture /> });
+    const create = screen.getByRole('link', { name: 'New Chat' });
+    create.focus();
+    expect(create).toHaveFocus();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Toggle Fixture Rail' })
+    );
+    const compact = screen.getByRole('link', { name: 'New Chat' });
+    expect(compact.closest('[data-sidebar-search-slot]')).not.toBeNull();
+    expect(compact).toHaveFocus();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Toggle Fixture Rail' })
+    );
+    const expanded = screen.getByRole('link', { name: 'New Chat' });
+    expect(expanded.parentElement).toHaveAttribute(
+      'data-sidebar-history-header'
+    );
+    expect(expanded).toHaveFocus();
   });
 
   it('imports sidebar chrome from the modular sidebar specifier', () => {

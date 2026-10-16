@@ -252,6 +252,17 @@ describe('marketing route source invariants (manifest-driven)', () => {
     expect(product).toContain('components/site/MarketingTerminalCta.tsx');
   });
 
+  it('follows the waitlist auth layout without a marketing hero binding', () => {
+    const files = collectRouteSources(['app/waitlist/page.tsx']);
+    for (const file of [
+      'components/features/auth/AuthLayout.tsx',
+      'components/features/auth/AuthBrandPanel.tsx',
+      'components/atoms/AppIconButton.tsx',
+    ]) {
+      expect(files).toContain(file);
+    }
+  });
+
   it('detects each rule on a known-bad sample', () => {
     const samples: Record<string, string> = {
       'legacy-linear-type': "<p className='marketing-kicker'>Soon</p>",

@@ -50,6 +50,22 @@ async function resolveUnits(source: string): Promise<readonly unknown[]> {
   return Array.isArray(units) ? units : [];
 }
 
+it('loads the canonical browser-input matrix in jsdom', async () => {
+  const { INPUT_MATRIX } = await import(
+    pathToFileURL(join(REPO_ROOT, 'scripts/invariants/browser-owned-input.mjs'))
+      .href
+  );
+
+  expect(INPUT_MATRIX).toEqual(
+    JSON.parse(
+      readFileSync(
+        join(REPO_ROOT, 'scripts/invariants/browser-owned-input-matrix.json'),
+        'utf8'
+      )
+    )
+  );
+});
+
 describe('UI assurance inventory denominator (JOV-7713)', () => {
   const inventory = matrix.scope.requiredObjects.filter(
     item => item.kind === 'ui-inventory'

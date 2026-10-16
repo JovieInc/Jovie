@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { expectPublicOpenApiResponse } from '@/tests/utils/public-openapi';
 
 const hoisted = vi.hoisted(() => ({
   limit: vi.fn(),
@@ -16,13 +17,17 @@ vi.mock('@/lib/error-tracking', () => ({ captureError: vi.fn() }));
 
 const { POST } = await import('./route');
 
-function post(body: unknown) {
-  return POST(
-    new Request('https://jov.ie/api/agents/feedback', {
-      method: 'POST',
-      headers: { 'user-agent': 'jovie-cli/26.9.15' },
-      body: JSON.stringify(body),
-    })
+async function post(body: unknown) {
+  return expectPublicOpenApiResponse(
+    '/api/agents/feedback',
+    'post',
+    await POST(
+      new Request('https://jov.ie/api/agents/feedback', {
+        method: 'POST',
+        headers: { 'user-agent': 'jovie-cli/26.9.15' },
+        body: JSON.stringify(body),
+      })
+    )
   );
 }
 

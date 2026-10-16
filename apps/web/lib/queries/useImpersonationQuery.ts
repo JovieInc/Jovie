@@ -12,7 +12,7 @@ export interface ImpersonationState {
   enabled: boolean;
   isImpersonating: boolean;
   effectiveUserId?: string;
-  realAdminUserId?: string;
+  actorUserId?: string;
   timeRemainingMs?: number;
   timeRemainingMinutes?: number;
   expiresAt?: number;

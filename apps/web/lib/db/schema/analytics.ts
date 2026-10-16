@@ -4,6 +4,7 @@ import {
   boolean,
   check,
   date,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -88,6 +89,10 @@ export const audienceMembers = pgTable(
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
   table => ({
+    idProfileUnique: uniqueIndex('audience_members_id_profile_unique').on(
+      table.id,
+      table.creatorProfileId
+    ),
     creatorProfileFingerprintUnique: uniqueIndex(
       'audience_members_creator_profile_id_fingerprint_unique'
     ).on(table.creatorProfileId, table.fingerprint),
@@ -120,7 +125,7 @@ export const audienceMembers = pgTable(
   })
 );
 
-// Normalized audience referrer history (replaces JSONB referrer_history)
+// Event history; referrer_history remains a bounded compatibility projection.
 export const audienceReferrers = pgTable(
   'audience_referrers',
   {
@@ -130,14 +135,18 @@ export const audienceReferrers = pgTable(
       .references(() => audienceMembers.id, { onDelete: 'cascade' }),
     url: text('url').notNull(),
     source: text('source'),
-    timestamp: timestamp('timestamp', { withTimezone: true })
-      .defaultNow()
-      .notNull(),
+    legacyKey: text('legacy_key'),
+    legacyPayload: jsonb('legacy_payload').$type<Record<string, unknown>>(),
+    // Missing historical times remain NULL; existing instants are unchanged.
+    timestamp: timestamp('timestamp', { withTimezone: true }).defaultNow(),
     createdAt: timestamp('created_at', { withTimezone: true })
       .defaultNow()
       .notNull(),
   },
   table => ({
+    legacyKeyUnique: uniqueIndex(
+      'audience_referrers_member_legacy_key_unique'
+    ).on(table.audienceMemberId, table.legacyKey),
     memberTimestampIdx: index('audience_referrers_member_ts_idx').on(
       table.audienceMemberId,
       table.timestamp
@@ -170,7 +179,7 @@ export const publicProfileCaptureDismissals = pgTable(
   })
 );
 
-// Normalized audience action history (replaces JSONB latest_actions)
+// Authoritative live events; latest_actions remains a bounded detail projection.
 export const audienceActions = pgTable(
   'audience_actions',
   {
@@ -182,6 +191,8 @@ export const audienceActions = pgTable(
     audienceMemberId: uuid('audience_member_id')
       .notNull()
       .references(() => audienceMembers.id, { onDelete: 'cascade' }),
+    legacyKey: text('legacy_key'),
+    legacyPayload: jsonb('legacy_payload').$type<Record<string, unknown>>(),
     label: text('label').notNull(),
     emoji: text('emoji'),
     platform: text('platform'),
@@ -215,6 +226,14 @@ export const audienceActions = pgTable(
       .notNull(),
   },
   table => ({
+    legacyKeyUnique: uniqueIndex(
+      'audience_actions_member_legacy_key_unique'
+    ).on(table.audienceMemberId, table.legacyKey),
+    memberProfileFk: foreignKey({
+      name: 'audience_actions_member_profile_fk',
+      columns: [table.audienceMemberId, table.creatorProfileId],
+      foreignColumns: [audienceMembers.id, audienceMembers.creatorProfileId],
+    }).onDelete('cascade'),
     creatorProfileTimestampIdx: index(
       'audience_actions_creator_profile_id_timestamp_idx'
     ).on(table.creatorProfileId, table.timestamp),
@@ -229,6 +248,27 @@ export const audienceActions = pgTable(
       'audience_actions_event_type_timestamp_idx'
     ).on(table.eventType, table.timestamp),
   })
+);
+
+// Retained before the first rebuild; rollback does not depend on derived arrays.
+export const audienceProjectionSnapshots = pgTable(
+  'audience_projection_snapshots',
+  {
+    audienceMemberId: uuid('audience_member_id')
+      .primaryKey()
+      .references(() => audienceMembers.id, { onDelete: 'cascade' }),
+    original: jsonb('original')
+      .$type<{
+        latestActions: Record<string, unknown>[] | null;
+        referrerHistory: Record<string, unknown>[] | null;
+        latestActionLabel: string | null;
+        latestReferrerUrl: string | null;
+      }>()
+      .notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  }
 );
 
 // Creator-facing source/campaign buckets for trackable links and QR codes.
@@ -322,6 +362,7 @@ export const clickEvents = pgTable(
     country: text('country'),
     city: text('city'),
     deviceType: text('device_type'),
+    /** OS family for click analytics; null when detection is unavailable. */
     os: text('os'),
     browser: text('browser'),
     isBot: boolean('is_bot').notNull().default(false),

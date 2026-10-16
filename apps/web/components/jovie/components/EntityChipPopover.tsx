@@ -22,6 +22,7 @@ import {
 import type { EntityKind } from '@/lib/chat/tokens';
 import type { EntityRef } from '@/lib/commands/entities';
 import { cn } from '@/lib/utils';
+import { EntityChip, type EntityChipTone } from './EntityChip';
 import { ENTITY_KIND_ACCENT_VAR } from './entity-accent';
 
 const HOVER_OPEN_DELAY_MS = 200;
@@ -38,10 +39,11 @@ interface EntityChipPopoverProps {
   readonly kind: EntityKind;
   readonly id: string;
   readonly label: string;
-  /** Resolved entity data (when cache hit). When undefined, popover shows a minimal label-only body. */
+  /** Current scoped read-model data. Missing/mismatched data hides historical labels and actions. */
   readonly entity?: EntityRef;
   /** The presentational EntityChip rendered as the trigger. */
   readonly children: ReactNode;
+  readonly tone?: EntityChipTone;
 }
 
 /**
@@ -60,10 +62,14 @@ interface EntityChipPopoverProps {
 export function EntityChipPopover({
   kind,
   id,
-  label,
-  entity,
+  entity: candidate,
   children,
+  tone = 'onDark',
 }: EntityChipPopoverProps) {
+  // A caller cannot attach another object's metadata or capability to this id.
+  const entity =
+    candidate?.kind === kind && candidate.id === id ? candidate : undefined;
+  const label = entity?.label ?? 'Unavailable reference';
   const [open, setOpen] = useState(false);
   const openTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -76,7 +82,8 @@ export function EntityChipPopover({
       : kind === 'event'
         ? ('tour-date' as const)
         : null;
-  const canOpenEntityPanel = entityPanelKind !== null && entityPanel !== null;
+  const canOpenEntityPanel =
+    entity !== undefined && entityPanelKind !== null && entityPanel !== null;
   const canOpenProfilePreview =
     kind === 'artist' &&
     previewPanel !== null &&
@@ -144,7 +151,7 @@ export function EntityChipPopover({
   );
 
   const handleOpenEntityPanel = useCallback(() => {
-    if (!entityPanel || !entityPanelKind) return;
+    if (!canOpenEntityPanel || !entityPanel || !entityPanelKind) return;
     entityPanel.open({
       kind: entityPanelKind,
       id,
@@ -153,7 +160,7 @@ export function EntityChipPopover({
       focusKey,
     });
     setOpen(false);
-  }, [entityPanel, entityPanelKind, id, label, focusKey]);
+  }, [canOpenEntityPanel, entityPanel, entityPanelKind, id, label, focusKey]);
 
   const handleOpenProfilePreview = useCallback(() => {
     if (!previewPanel) return;
@@ -176,11 +183,20 @@ export function EntityChipPopover({
           className='system-b-entity-chip-trigger focus-ring'
           data-testid='entity-chip-popover-trigger'
         >
-          {children}
+          {entity ? (
+            children
+          ) : (
+            <EntityChip
+              data={{ kind, id, label }}
+              variant='transcript'
+              tone={tone}
+            />
+          )}
         </button>
       </PopoverTrigger>
       <PopoverContent
-        className='system-b-entity-chip-popover-content border-0 bg-transparent p-0 shadow-none'
+        className='w-68'
+        size='bare'
         side='top'
         sideOffset={6}
         align='start'

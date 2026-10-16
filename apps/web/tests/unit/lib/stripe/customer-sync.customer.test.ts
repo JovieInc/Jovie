@@ -66,6 +66,7 @@ vi.mock('@/lib/stripe/customer-sync/queries', () => ({
 vi.mock('drizzle-orm', () => ({
   and: vi.fn((...conditions: unknown[]) => ({ conditions, type: 'and' })),
   eq: vi.fn((left: unknown, right: unknown) => ({ left, right, type: 'eq' })),
+  isNull: vi.fn((column: unknown) => ({ column, type: 'isNull' })),
   sql: vi.fn((strings: unknown, ...values: unknown[]) => ({ strings, values })),
 }));
 
@@ -142,6 +143,7 @@ describe('ensureStripeCustomer', () => {
       conditions: [
         { left: mocks.usersTable.id, right: APP_USER_ID, type: 'eq' },
         { left: mocks.usersTable.billingVersion, right: 1, type: 'eq' },
+        { column: mocks.usersTable.stripeCustomerId, type: 'isNull' },
       ],
       type: 'and',
     });

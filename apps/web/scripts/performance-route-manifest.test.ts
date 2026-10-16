@@ -152,6 +152,16 @@ describe('performance route manifest', () => {
     expect(releases?.readySelectors.redirectDestinations).toEqual([
       '/app/library?view=releases',
     ]);
+    expect(releases?.readySelectors.content).toEqual([
+      '[data-testid="shell-releases-view"]',
+    ]);
+    expect(releases?.readySelectors.content).not.toContain(
+      '[data-testid="library-surface"]'
+    );
+    expect(
+      routes.find(route => route.id === 'creator-library')?.readySelectors
+        .content
+    ).toEqual(['[data-testid="library-surface"]']);
     expect(releaseTasks?.path).toBe('/app/releases/[releaseId]/tasks');
   });
 

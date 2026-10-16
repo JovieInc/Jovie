@@ -1119,6 +1119,7 @@ export function classifyBlogContentForAffectedTests(base, head, options) {
 const LANE_PYTHON_COVERAGE_INPUTS = new Set([
   ...[
     'lane_runner',
+    'qualification_guard',
     'pr_events',
     'remediation',
     'reason_lane',

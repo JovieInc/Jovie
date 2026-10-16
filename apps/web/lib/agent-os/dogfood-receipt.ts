@@ -18,6 +18,18 @@
  */
 
 import {
+  EXPOSURE_SCHEMA,
+  type ExpectedExposure,
+  type ExposureEvidence,
+  evaluateExposureEvidence,
+} from '@jovie/release-channel-contracts/dogfood-exposure';
+import {
+  type DogfoodMissionObservation,
+  dogfoodMissionObservationSchema,
+  missionObservationPasses,
+  type OutcomeDogfoodMission,
+} from '@/lib/agent-os/dogfood-mission';
+import {
   buildFleetInvocation,
   type FleetInvocationEvidence,
   type FleetInvocationInput,
@@ -114,10 +126,14 @@ export interface DogfoodReceipt {
   readonly blocker: string | null;
   readonly evidenceRefs: readonly string[];
   readonly invocation: FleetInvocationEvidence | null;
+  /** Absent on legacy/selector receipts; those remain regression evidence. */
+  readonly missionObservation?: DogfoodMissionObservation | null;
   readonly privacy: DogfoodReceiptPrivacy;
+  readonly exposure?: ExposureEvidence;
 }
 
 export interface DogfoodReceiptInput {
+  readonly exposure?: ExposureEvidence;
   readonly subjectId: string;
   readonly product: DogfoodProduct;
   readonly kind: DogfoodKind;
@@ -134,6 +150,7 @@ export interface DogfoodReceiptInput {
   readonly blocker?: string | null;
   readonly evidenceRefs?: readonly string[];
   readonly invocation?: FleetInvocationEvidence | null;
+  readonly missionObservation?: DogfoodMissionObservation | null;
   readonly privacy?: DogfoodReceiptPrivacy;
 }
 
@@ -223,6 +240,14 @@ export function validateDogfoodReceipt(value: unknown): string[] {
   ) {
     errors.push('evidenceRefs must be an array of non-empty strings');
   }
+  const exposure = value.exposure as ExposureEvidence | undefined;
+  const exposureDecision =
+    value.exposure !== undefined
+      ? evaluateReceiptExposure(
+          value as unknown as DogfoodReceipt,
+          exposure?.expected as ExpectedExposure
+        )
+      : null;
   // Legacy v1 receipts remain readable; command adapters always add this block.
   if (isRecord(value.invocation)) {
     const invocation = value.invocation as unknown as FleetInvocationEvidence;
@@ -230,7 +255,14 @@ export function validateDogfoodReceipt(value: unknown): string[] {
     errors.push(...invocationErrors);
     if (
       invocationErrors.length === 0 &&
-      (value.outcome !== 'passed' ||
+      ((value.outcome !== 'passed' &&
+        !(
+          value.outcome === 'blocked' &&
+          exposureDecision &&
+          exposureDecision.status !== 'PASS' &&
+          invocation.executionStatus === 'completed' &&
+          invocation.exitCode === 0
+        )) ||
         invocation.workaroundUsed ||
         invocation.bypassUsed ||
         invocation.canonicalComparison.status === 'mismatched') &&
@@ -240,6 +272,55 @@ export function validateDogfoodReceipt(value: unknown): string[] {
         'failed or frictional invocations require a defect fingerprint'
       );
     }
+  }
+  if (value.missionObservation != null) {
+    const parsed = dogfoodMissionObservationSchema.safeParse(
+      value.missionObservation
+    );
+    if (!parsed.success) {
+      errors.push(`missionObservation: ${parsed.error.message}`);
+    } else {
+      const observation = parsed.data;
+      const duration =
+        Date.parse(String(value.completedAt)) -
+        Date.parse(String(value.startedAt));
+      if (
+        !Number.isFinite(duration) ||
+        duration < 0 ||
+        observation.durationMs !== duration
+      ) {
+        errors.push('missionObservation.durationMs must match receipt timing');
+      }
+      if (
+        observation.checks.some(check =>
+          check.evidenceRefs.some(
+            ref =>
+              !Array.isArray(value.evidenceRefs) ||
+              !value.evidenceRefs.includes(ref)
+          )
+        )
+      ) {
+        errors.push(
+          'missionObservation evidence must be in receipt evidenceRefs'
+        );
+      }
+      if (
+        value.outcome === 'passed' &&
+        observation.purpose === 'capability' &&
+        !missionObservationPasses(observation)
+      ) {
+        errors.push(
+          'passed outcome requires correct completion with acceptable friction'
+        );
+      }
+    }
+  }
+  if (
+    value.outcome === 'passed' &&
+    exposureDecision &&
+    exposureDecision.status !== 'PASS'
+  ) {
+    errors.push(`exposure: ${exposureDecision.status}`);
   }
   checkPrivacy(value.privacy, errors);
   return errors;
@@ -252,9 +333,15 @@ export function isDogfoodReceipt(value: unknown): value is DogfoodReceipt {
 export function buildDogfoodReceipt(
   input: DogfoodReceiptInput
 ): DogfoodReceipt {
+  const exposureDecision = input.exposure
+    ? evaluateReceiptExposure(input, input.exposure.expected)
+    : null;
   const receipt: DogfoodReceipt = {
     actor: input.actor,
-    blocker: input.blocker ?? null,
+    blocker:
+      exposureDecision && exposureDecision.status !== 'PASS'
+        ? `${exposureDecision.status}: ${exposureDecision.reasons.join(', ')}`
+        : (input.blocker ?? null),
     commitSha: input.commitSha,
     completedAt: input.completedAt,
     deploymentId: input.deploymentId,
@@ -265,7 +352,12 @@ export function buildDogfoodReceipt(
     invocation: input.invocation ?? null,
     kind: input.kind,
     missionId: input.missionId,
-    outcome: input.outcome,
+    missionObservation: input.missionObservation ?? null,
+    outcome:
+      exposureDecision && exposureDecision.status !== 'PASS'
+        ? 'blocked'
+        : input.outcome,
+    ...(input.exposure ? { exposure: input.exposure } : {}),
     privacy: input.privacy ?? DOGFOOD_RECEIPT_NO_RETENTION,
     product: input.product,
     schema: JOVIE_DOGFOOD_RECEIPT_SCHEMA,
@@ -290,6 +382,7 @@ export interface DogfoodDeployBinding {
  * itself observed (outcome, timing, blocker, evidence).
  */
 export interface DogfoodMissionContext extends DogfoodDeployBinding {
+  readonly expectedExposure?: ExpectedExposure;
   readonly subjectId: string;
   readonly product: DogfoodProduct;
   readonly missionId: string;
@@ -302,10 +395,11 @@ export interface DogfoodMissionContext extends DogfoodDeployBinding {
 
 /**
  * Structural subset of the Playwright JSON reporter output a mission run
- * produces (`--reporter=json`). Only the aggregate stats are needed to decide
- * the mission outcome.
+ * produces (`--reporter=json`). Aggregate stats describe regression execution;
+ * outcome certification needs a separate goal observation.
  */
 export interface PlaywrightMissionReport {
+  readonly exposure?: ExposureEvidence;
   readonly stats?: {
     readonly expected?: number;
     readonly unexpected?: number;
@@ -348,6 +442,7 @@ export function dogfoodReceiptFromPlaywrightReport(
 
   return buildDogfoodReceipt({
     ...context,
+    exposure: bindMissionExposure(context, report.exposure),
     blocker,
     completedAt,
     driver: 'playwright',
@@ -360,6 +455,7 @@ export function dogfoodReceiptFromPlaywrightReport(
 
 /** One read-only command execution (MCP call or `@jovie/cli` invocation). */
 export interface DogfoodCommandRun {
+  readonly exposure?: ExposureEvidence;
   readonly invocation: FleetInvocationInput;
   readonly startedAt: string;
   readonly completedAt: string;
@@ -386,6 +482,7 @@ export function dogfoodReceiptFromCommandRun(
 
   return buildDogfoodReceipt({
     ...context,
+    exposure: bindMissionExposure(context, run.exposure),
     blocker,
     completedAt: run.completedAt,
     driver,
@@ -403,6 +500,7 @@ export function dogfoodReceiptFromCommandRun(
 
 /** Structural subset of `jovie-ios-dogfood/v1` report.json. */
 export interface IosDogfoodReport {
+  readonly exposure?: ExposureEvidence;
   readonly schema?: string;
   readonly verdict?: 'pass' | 'fail' | 'inconclusive';
   readonly run?: {
@@ -451,6 +549,7 @@ export function dogfoodReceiptFromIosReport(
 
   return buildDogfoodReceipt({
     ...context,
+    exposure: bindMissionExposure(context, report.exposure),
     blocker,
     completedAt: report.run?.finished_at ?? new Date().toISOString(),
     driver: 'xcuitest',
@@ -459,6 +558,53 @@ export function dogfoodReceiptFromIosReport(
     outcome,
     startedAt: report.run?.started_at ?? new Date().toISOString(),
   });
+}
+
+function evaluateReceiptExposure(
+  receipt: DogfoodReceiptInput,
+  expected: ExpectedExposure
+) {
+  const result = evaluateExposureEvidence(
+    expected,
+    receipt.exposure,
+    receipt.startedAt,
+    receipt.completedAt
+  );
+  if (result.status !== 'PASS') return result;
+  if (
+    expected.identity.product !== receipt.product ||
+    expected.identity.missionId !== receipt.missionId ||
+    expected.identity.actorRef !== receipt.actor
+  )
+    return {
+      status: 'BLOCKED_EXPOSURE' as const,
+      reasons: ['receipt_identity_mismatch'],
+      nextAction: 'none' as const,
+    };
+  if (
+    expected.artifact.buildId !== receipt.deploymentId ||
+    expected.artifact.sourceSha !== receipt.commitSha ||
+    expected.artifact.environment !== receipt.environment
+  )
+    return {
+      status: 'BLOCKED_BUILD' as const,
+      reasons: ['receipt_artifact_mismatch'],
+      nextAction: 'release_owner' as const,
+    };
+  return result;
+}
+
+function bindMissionExposure(
+  context: DogfoodMissionContext,
+  evidence?: ExposureEvidence
+): ExposureEvidence | undefined {
+  if (!context.expectedExposure) return evidence;
+  return {
+    schema: EXPOSURE_SCHEMA,
+    expected: context.expectedExposure,
+    observations: evidence?.observations ?? [],
+    invalidated: evidence?.invalidated ?? true,
+  };
 }
 
 export type DogfoodDriverClass = 'deterministic' | 'model_driven' | 'human';
@@ -488,8 +634,10 @@ export const DOGFOOD_RELIABILITY_RUNS = {
 } as const;
 
 export interface DogfoodMissionSpec {
+  readonly expectedExposure?: ExpectedExposure;
   readonly id: string;
   readonly required?: boolean;
+  readonly outcome?: OutcomeDogfoodMission['outcome'];
 }
 
 export interface MissionReliabilityResult {
@@ -510,6 +658,75 @@ export interface DogfoodReliabilityEvaluation extends DogfoodDeployBinding {
   readonly machineCertifiable: boolean;
 }
 
+export function dogfoodReceiptProvesOutcome(
+  receipt: DogfoodReceipt,
+  mission?: DogfoodMissionSpec
+): boolean {
+  return (
+    validateDogfoodReceipt(receipt).length === 0 &&
+    receipt.outcome === 'passed' &&
+    receipt.missionObservation != null &&
+    missionObservationPasses(
+      receipt.missionObservation,
+      mission?.outcome
+        ? { id: mission.id, outcome: mission.outcome }
+        : undefined
+    ) &&
+    (!receipt.invocation ||
+      (!receipt.invocation.workaroundUsed &&
+        !receipt.invocation.bypassUsed &&
+        receipt.invocation.canonicalComparison.status !== 'mismatched'))
+  );
+}
+
+/** Adapt an observed goal attempt, preserving completion even when quality fails. */
+export function dogfoodReceiptFromOutcomeMission(
+  mission: OutcomeDogfoodMission,
+  input: Omit<DogfoodReceiptInput, 'missionId' | 'outcome'> & {
+    readonly missionObservation: DogfoodMissionObservation;
+  }
+): DogfoodReceipt {
+  const observation = dogfoodMissionObservationSchema.parse(
+    input.missionObservation
+  );
+  const passed = missionObservationPasses(observation, mission);
+  return buildDogfoodReceipt({
+    ...input,
+    missionId: mission.id,
+    outcome: passed ? 'passed' : 'failed',
+    blocker: passed
+      ? null
+      : (input.blocker ??
+        `goal ${observation.goalCompletion}; correctness ${observation.correctness}; friction ${observation.friction.assessment}; mission requirements unmet`),
+    evidenceRefs: [
+      ...new Set([
+        ...(input.evidenceRefs ?? []),
+        ...observation.checks.flatMap(check => check.evidenceRefs),
+      ]),
+    ],
+  });
+}
+
+/** Outcome missions need goal proof; exposure-only missions need a green run plus exposure. */
+function runMeetsReliabilityRule(
+  run: DogfoodReceipt,
+  spec: DogfoodMissionSpec
+): boolean {
+  const exposurePasses =
+    !spec.expectedExposure ||
+    evaluateExposureEvidence(
+      spec.expectedExposure,
+      run.exposure,
+      run.startedAt,
+      run.completedAt
+    ).status === 'PASS';
+  if (!exposurePasses) return false;
+  if (spec.outcome || !spec.expectedExposure) {
+    return dogfoodReceiptProvesOutcome(run, spec);
+  }
+  return run.outcome === 'passed' && validateDogfoodReceipt(run).length === 0;
+}
+
 export function evaluateDogfoodReliability(
   receipts: readonly DogfoodReceipt[],
   binding: DogfoodDeployBinding,
@@ -525,9 +742,13 @@ export function evaluateDogfoodReliability(
     const spec: DogfoodMissionSpec =
       typeof mission === 'string' ? { id: mission } : mission;
     const required = spec.required ?? true;
-    const missionReceipts = onDeploy.filter(
-      receipt => receipt.missionId === spec.id
-    );
+    const missionReceipts = onDeploy.filter(receipt => {
+      if (receipt.missionId !== spec.id) return false;
+      // Exposure-scoped missions without an outcome definition certify
+      // executed runs. Outcome missions only admit capability observations.
+      if (spec.expectedExposure && !spec.outcome) return true;
+      return receipt.missionObservation?.purpose === 'capability';
+    });
 
     const byAgent = new Map<string, DogfoodReceipt[]>();
     for (const receipt of missionReceipts) {
@@ -558,7 +779,8 @@ export function evaluateDogfoodReliability(
           )
           .slice(0, rule.runs);
         return (
-          latest.filter(run => run.outcome === 'passed').length >= rule.passing
+          latest.filter(run => runMeetsReliabilityRule(run, spec)).length >=
+          rule.passing
         );
       })
       .map(([key]) => key)
@@ -575,9 +797,9 @@ export function evaluateDogfoodReliability(
   return {
     commitSha: binding.commitSha,
     deploymentId: binding.deploymentId,
-    machineCertifiable: results.every(
-      result => !result.required || result.status === 'reliable'
-    ),
+    machineCertifiable:
+      results.some(result => result.required) &&
+      results.every(result => !result.required || result.status === 'reliable'),
     missions: results,
   };
 }

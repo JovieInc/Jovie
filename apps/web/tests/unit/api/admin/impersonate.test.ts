@@ -121,7 +121,7 @@ describe('Admin Impersonate API', () => {
       mockRequireAdmin.mockResolvedValue(null);
       mockIsImpersonationEnabled.mockReturnValue(true);
       mockGetImpersonationState.mockResolvedValue({
-        realAdminUserId: 'admin-123',
+        actorUserId: 'admin-123',
         effectiveUserId: TARGET_USER_ID,
         issuedAt: Date.now() - 5 * 60 * 1000,
         expiresAt: Date.now() + 10 * 60 * 1000,
@@ -136,6 +136,7 @@ describe('Admin Impersonate API', () => {
       expect(data.enabled).toBe(true);
       expect(data.isImpersonating).toBe(true);
       expect(data.effectiveUserId).toBe(TARGET_USER_ID);
+      expect(data.actorUserId).toBe('admin-123');
       expect(mockGetImpersonationState).toHaveBeenCalledWith('admin-123');
       expect(data.timeRemainingMinutes).toBe(10);
     });
@@ -309,6 +310,7 @@ describe('Admin Impersonate API', () => {
       expect(response.status).toBe(200);
       expect(data.success).toBe(true);
       expect(data.effectiveUserId).toBe(TARGET_USER_ID);
+      expect(data.actorUserId).toBe('admin-123');
       expect(mockStartImpersonation).toHaveBeenCalledWith(
         'admin-123',
         TARGET_USER_ID,

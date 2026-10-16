@@ -17,6 +17,7 @@ const VIEWPORT_UTILITIES = {
   'max-h-overlay-viewport': 'max-height: calc(100dvh - var(--space-8));',
   'max-w-sheet-viewport': 'max-width: calc(100vw - var(--space-4));',
   'max-h-sheet-viewport': 'max-height: calc(100dvh - var(--space-4));',
+  'transition-surface': 'transition-property: background-color, border-color;',
   'scale-press': 'scale: var(--scale-press);',
   'bg-icon-button-frosted':
     'background-color: color-mix(in srgb, var(--color-surface-1) 84%, transparent);',

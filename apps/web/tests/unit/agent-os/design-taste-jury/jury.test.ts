@@ -53,6 +53,38 @@ describe('design-taste-jury consensus', () => {
     expect(consensus.findings).toEqual([]);
   });
 
+  it('unions criterion tags from every juror without duplicates', () => {
+    const consensus = jury.buildDesignTasteJuryConsensus({
+      runId: 'jury-run-criteria',
+      surfaceId: 'dashboard-insights',
+      verdicts: [
+        { jurorId: 'legacy', modelLabel: 'Legacy', findings: [tone] },
+        {
+          jurorId: 'a',
+          modelLabel: 'A',
+          findings: [
+            { ...tone, criteria: ['shadow-depth', 'optical-alignment'] },
+          ],
+        },
+        {
+          jurorId: 'b',
+          modelLabel: 'B',
+          findings: [
+            { ...tone, criteria: ['shadow-depth', 'stagger-animation'] },
+          ],
+        },
+      ],
+    });
+
+    expect(consensus.findings).toHaveLength(1);
+    expect(consensus.findings[0]).toMatchObject({
+      criteria: ['optical-alignment', 'shadow-depth', 'stagger-animation'],
+      disposition: 'taste',
+      objective: false,
+      voteCount: 3,
+    });
+  });
+
   it('has no built-in juror that invents verdicts', () => {
     expect(Object.keys(jury).sort()).toEqual([
       'buildDesignTasteJuryConsensus',

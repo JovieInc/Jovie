@@ -18,6 +18,7 @@ vi.mock('next/server', () => ({ after: mocks.after }));
 vi.mock('./summer-transport', () => ({ sendSummerFleetWake: mocks.sendWake }));
 vi.mock('@/lib/error-tracking', () => ({ captureError: mocks.captureError }));
 vi.mock('next/headers', () => ({
+  cookies: async () => ({ get: () => undefined }),
   headers: async () =>
     new Headers({ cookie: 'better-auth.session_data=stale' }),
 }));

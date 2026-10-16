@@ -58,6 +58,7 @@ interface VideosResponse {
       readonly categoryId?: string;
       readonly tags?: readonly string[];
       readonly defaultLanguage?: string;
+      readonly defaultAudioLanguage?: string;
       readonly thumbnails?: YouTubeThumbnailSet;
     };
     readonly contentDetails?: { readonly duration?: string };
@@ -92,12 +93,17 @@ async function authorizedJson<T>(
   accessToken: string,
   fetcher: ProviderFetch,
   context: string,
-  init?: { readonly method?: string; readonly body?: string }
+  init?: {
+    readonly method?: string;
+    readonly body?: string;
+    readonly etag?: string | null;
+  }
 ): Promise<T> {
   const response = await fetcher(url, {
     method: init?.method,
     headers: {
       Authorization: `Bearer ${accessToken}`,
+      ...(init?.etag ? { 'If-Match': init.etag } : {}),
       ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
     },
     body: init?.body,
@@ -438,11 +444,12 @@ function toSnippetRecord(item: VideoRow): YouTubeVideoSnippetRecord | null {
     id: item.id,
     etag: item.etag ?? null,
     snippet: {
-      title: item.snippet.title.trim() || 'Untitled video',
+      title: item.snippet.title,
       description: item.snippet.description ?? '',
       categoryId: item.snippet.categoryId ?? null,
       tags: item.snippet.tags,
       defaultLanguage: item.snippet.defaultLanguage,
+      defaultAudioLanguage: item.snippet.defaultAudioLanguage,
       channelId: item.snippet.channelId,
     },
   };
@@ -470,6 +477,8 @@ export function createYouTubeSnippetWriter(input: {
       return data.items?.[0] ? toSnippetRecord(data.items[0]) : null;
     },
     async updateVideo(update) {
+      if (!update.etag)
+        throw new YouTubeProviderError('Video version is unavailable', 412);
       const snippet = {
         title: update.snippet.title,
         description: update.snippet.description,
@@ -477,6 +486,9 @@ export function createYouTubeSnippetWriter(input: {
           ? { categoryId: update.snippet.categoryId }
           : {}),
         ...(update.snippet.tags ? { tags: update.snippet.tags } : {}),
+        ...(update.snippet.defaultAudioLanguage
+          ? { defaultAudioLanguage: update.snippet.defaultAudioLanguage }
+          : {}),
         ...(update.snippet.defaultLanguage
           ? { defaultLanguage: update.snippet.defaultLanguage }
           : {}),
@@ -488,6 +500,7 @@ export function createYouTubeSnippetWriter(input: {
         'YouTube video update',
         {
           method: 'PUT',
+          etag: update.etag,
           body: JSON.stringify({
             id: update.videoId,
             snippet,

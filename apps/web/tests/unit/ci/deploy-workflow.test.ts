@@ -519,6 +519,7 @@ describe('CI Storybook accessibility path gate', () => {
       'apps/web/.storybook/preview.tsx',
       'apps/web/app/globals.css',
       'apps/web/styles/theme.css',
+      'apps/web/styles/theme/tokens.css',
       'apps/web/tailwind.config.ts',
       'apps/web/postcss.config.mjs',
       'apps/web/package.json',
@@ -531,6 +532,12 @@ describe('CI Storybook accessibility path gate', () => {
         input
       ).toBe(0);
     }
+    expect(
+      spawnSync('grep', ['-q', '-E', visualPattern!], {
+        input: 'apps/web/styles.css',
+      }).status
+    ).toBe(1);
+    expect(visualWorkflow).toMatch(/- 'apps\/web\/styles\/\*\*'/);
   });
 });
 
@@ -1822,7 +1829,8 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(verified).toContain('authSmoke: $auth_smoke');
     expect(verified).toContain('did not complete successfully');
     expect(verified).not.toContain('concurrency:');
-    expect(verified).toContain('repos/${{ github.repository }}/commits/main');
+    expect(verified).toContain('.github/scripts/resolve-main-sha.sh');
+    expect(verified).not.toContain('commits/main');
     expect(verified).toContain('verify-production-alias.sh');
     expect(verified).toContain('superseded by $current_sha');
     expect(verified).toContain(
@@ -3269,7 +3277,46 @@ describe('CI E2E smoke workflow', () => {
     expect(billingHelper).toContain("'checkout.session.completed'");
     expect(billingHelper).toContain('duplicateCheckoutResponse');
     expect(billingHelper).toContain('invalidResponse.status()).toBe(400)');
-    expect(billingHelper).toContain('billingPortal.sessions.retrieve(');
+    expect(billingHelper).not.toContain('billingPortal.sessions.retrieve(');
+    expect(billingHelper).toContain('stripeClient.events.list(');
+    expect(billingHelper).toContain("type: 'billing_portal.session.created'");
+    expect(billingHelper).toContain(
+      "candidate.type === 'billing_portal.session.created'"
+    );
+    expect(billingHelper).toContain(
+      "candidate.data.object.object === 'billing_portal.session'"
+    );
+    expect(billingHelper).toContain(
+      'candidate.data.object.id === portalBody.sessionId'
+    );
+    expect(billingHelper).toContain(
+      'customerMatches: session.customer === customerId'
+    );
+    expect(billingHelper).toMatch(
+      /returnUrlMatches:\s*session\.return_url === expectedPortalReturnUrl/
+    );
+    expect(billingHelper).toContain(
+      'urlMatches: session.url === portalBody.url'
+    );
+    expect(billingHelper).toContain(
+      'eventIsTestMode: event.livemode === false'
+    );
+    expect(billingHelper).toContain(
+      'sessionIsTestMode: session.livemode === false'
+    );
+    const portalProofAssertion = billingHelper.match(
+      /expect\(portalProof\)\.toEqual\(\{([\s\S]*?)\}\);/
+    )?.[1];
+    expect(portalProofAssertion).toBeDefined();
+    for (const proof of [
+      'customerMatches',
+      'returnUrlMatches',
+      'urlMatches',
+      'eventIsTestMode',
+      'sessionIsTestMode',
+    ]) {
+      expect(portalProofAssertion).toMatch(new RegExp(`${proof}:\\s*true,`));
+    }
     expect(billingHelper).toContain('DELETE FROM ba_sessions');
     expect(billingHelper).toContain('deleteRunOwnedStripeCustomer(');
     expect(billingHelper).not.toContain('completeCardPayment(');
@@ -3335,6 +3382,34 @@ describe('CI E2E smoke workflow', () => {
       'tests/seed-test-data.ts'
     );
     expect(smokeJob).not.toContain('Export DATABASE_URL (main');
+  });
+
+  it('builds the golden-path challenge fixture with a public test key and real auth', () => {
+    const workflow = parseYaml(readFileSync(workflowPath, 'utf8')) as {
+      jobs: Record<
+        string,
+        {
+          env?: Record<string, string>;
+          steps: { name?: string; env?: Record<string, string> }[];
+        }
+      >;
+    };
+    const job = workflow.jobs['ci-golden-path']!;
+    const builds = job.steps.filter(
+      step => step.name === 'Build real-Clerk golden-path artifact'
+    );
+
+    expect(builds).toHaveLength(1);
+    expect(builds[0]?.env).toMatchObject({
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: '1x00000000000000000000AA',
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:
+        '${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}',
+      NEXT_PUBLIC_APP_URL: 'http://localhost:3250',
+      NEXT_PUBLIC_BETTER_AUTH_URL: 'http://localhost:3250',
+    });
+    expect(builds[0]?.env).not.toHaveProperty('NEXT_PUBLIC_E2E_MODE');
+    expect(builds[0]?.env).not.toHaveProperty('E2E_TEST_MODE');
+    expect(job.env).not.toHaveProperty('NEXT_PUBLIC_TURNSTILE_SITE_KEY');
   });
 
   it('pins Better Auth to the local standalone origin for smoke and golden-path jobs', () => {
@@ -4101,19 +4176,12 @@ describe('production promotion exact-artifact contract', () => {
     expect(promoteStep).toContain(
       'bash .github/scripts/promote-production-deployment.sh'
     );
-    const resolveMainIndex = finalCurrentStep.indexOf(
-      'current_main_sha="$(gh api "repos/${{ github.repository }}/commits/main"'
-    );
-    const compareMainIndex = finalCurrentStep.indexOf(
-      'if [[ "$current_main_sha" != "$EXPECTED_MAIN_SHA" ]]'
-    );
     expect(finalCurrentStep).toContain(
       'EXPECTED_MAIN_SHA: ${{ inputs.expected_sha }}'
     );
-    expect(resolveMainIndex).toBeGreaterThanOrEqual(0);
-    expect(compareMainIndex).toBeGreaterThan(resolveMainIndex);
-    expect(finalCurrentStep).toContain('echo "is_current=false"');
-    expect(finalCurrentStep).toContain('exit 0');
+    expect(finalCurrentStep).toContain(
+      'bash "$GITHUB_WORKSPACE/.github/scripts/recheck-main-lineage.sh" "before production promotion"'
+    );
     expect(finalCurrentStep).not.toContain(
       'Refusing stale production promotion'
     );
@@ -4205,11 +4273,17 @@ describe('production promotion exact-artifact contract', () => {
       'promotion_sha: ${{ steps.promote.outputs.promotion_sha || steps.final-current.outputs.superseded_sha || steps.mutation-head.outputs.superseded_sha }}'
     );
     expect(mutationHead).toContain(
-      'echo "superseded_sha=$current_sha" >> "$GITHUB_OUTPUT"'
+      'bash "$GITHUB_WORKSPACE/.github/scripts/recheck-main-lineage.sh" "at production mutation"'
     );
-    expect(promoteJob).toContain(
-      'echo "superseded_sha=$current_main_sha" >> "$GITHUB_OUTPUT"'
+    expect(mutationHead).toContain('MAIN_LINEAGE_TRANSPORT: git');
+    expect(mutationHead).not.toContain('GH_API_HOLD_BUDGET_SECONDS');
+    expect(mutationHead).not.toContain('gh-api-hold.sh');
+    const lineageScript = readFileSync(
+      resolve(repoRoot, '.github/scripts/recheck-main-lineage.sh'),
+      'utf8'
     );
+    expect(lineageScript).toContain('emit superseded_sha "$current"');
+    expect(promotionScript).toContain('"$superseded_sha" >> "$GITHUB_OUTPUT"');
     expect(promoteJob).not.toMatch(/^      production_deployment_url:/m);
     expect(promoteJob).not.toContain(
       'is_current: ${{ steps.promote.outputs.is_current }}'
@@ -4266,12 +4340,19 @@ describe('production promotion exact-artifact contract', () => {
     );
     const result = getJobBlock(reusable, 'release-result');
 
-    expect(finalCurrent).toContain(
-      'if [[ ! "$current_main_sha" =~ ^[0-9a-f]{40}$ ]]'
+    expect(finalCurrent).toContain('recheck-main-lineage.sh');
+    expect(finalCurrent).toContain('MAIN_LINEAGE_TRANSPORT: git');
+    expect(finalCurrent).not.toContain('GH_API_HOLD_BUDGET_SECONDS');
+    expect(finalCurrent).not.toContain('gh-api-hold.sh');
+    const lineageScript = readFileSync(
+      resolve(repoRoot, '.github/scripts/recheck-main-lineage.sh'),
+      'utf8'
     );
-    expect(finalCurrent).toContain('exit 1');
-    expect(finalCurrent).toContain('echo "is_current=false"');
-    expect(finalCurrent).toContain('exit 0');
+    expect(lineageScript).toContain('current="$(read_main_sha)" || exit 1');
+    expect(lineageScript).toContain(
+      'lineage="$(compare_status "$current")" || exit 1'
+    );
+    expect(lineageScript).toContain('emit is_current false');
     expect(result).toContain(
       'PROMOTION_SHA: ${{ needs.promote-production.outputs.promotion_sha }}'
     );
@@ -4308,7 +4389,8 @@ describe('production promotion exact-artifact contract', () => {
     expect(verified).not.toContain('neutral with no notification');
     expect(verified).toContain('Finalize exact current release generation');
     expect(verified).toContain('Notify exact verified production generation');
-    expect(verified.match(/commits\/main/g)).toHaveLength(3);
+    expect(verified).not.toContain('commits/main');
+    expect(verified.match(/resolve-main-sha\.sh/g)).toHaveLength(3);
     // JOV-4442: marker payload is write-through in finalize (no separate write step).
     const finalizeStep = getStepBlock(
       verified,
@@ -4724,6 +4806,11 @@ describe('production promotion exact-artifact contract', () => {
     expect(cronGapMinutes(workflowTriggers(cost)).max).toBeLessThanOrEqual(15);
     expect(cost).toContain('name: Production – jovie');
     expect(cost).toContain('curl --fail --silent --show-error');
+    expect(
+      cost.match(
+        /curl --fail --silent --show-error \\\n\s+--retry 3 --retry-delay 2 --retry-all-errors --connect-timeout 10 --max-time 20/g
+      )
+    ).toHaveLength(3);
     expect(cost).toContain('name: Prepare Linear-only anomaly receipt');
     expect(cost).toContain(
       'Linear is canonical; GitHub Issue creation is retired.'
@@ -4824,7 +4911,7 @@ describe('production promotion exact-artifact contract', () => {
       'queued|in_progress|pending|requested|waiting)'
     );
     expect(healthEvaluation).toContain(
-      'gh api "repos/$REPOSITORY/actions/runs/$controller_id"'
+      'bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" api "repos/$REPOSITORY/actions/runs/$controller_id"'
     );
     expect(healthEvaluation).toContain('changed_controller_run');
     expect(healthEvaluation).toContain(
@@ -4912,7 +4999,7 @@ describe('production promotion exact-artifact contract', () => {
     }
 
     const listingFilterMatch =
-      /controller_runs="\$\(gh api[\s\S]*?jq -e '\n([\s\S]*?)\n\s+' >\/dev\/null <<<"\$controller_runs"/.exec(
+      /controller_runs="\$\(bash "\$GITHUB_WORKSPACE\/\.github\/scripts\/gh-api-hold\.sh" api[\s\S]*?jq -e '\n([\s\S]*?)\n\s+' >\/dev\/null <<<"\$controller_runs"/.exec(
         health
       );
     expect(listingFilterMatch).not.toBeNull();
@@ -4949,7 +5036,7 @@ describe('production promotion exact-artifact contract', () => {
     }
 
     const predeployFilterMatch =
-      /controller_jobs="\$\(gh api[\s\S]*?if jq -e --argjson run_id "\$controller_id" --arg sha "\$current_sha" '\n([\s\S]*?)\n\s+' >\/dev\/null <<<"\$controller_jobs"; then/.exec(
+      /controller_jobs="\$\(bash "\$GITHUB_WORKSPACE\/\.github\/scripts\/gh-api-hold\.sh" api[\s\S]*?if jq -e --argjson run_id "\$controller_id" --arg sha "\$current_sha" '\n([\s\S]*?)\n\s+' >\/dev\/null <<<"\$controller_jobs"; then/.exec(
         healthEvaluation
       );
     expect(predeployFilterMatch).not.toBeNull();
@@ -5346,9 +5433,13 @@ describe('production marker recovery workflow (JOV-4965)', () => {
     expect(preserve).toContain(
       '[.artifacts[] | select(.expired == true) | .id] | .[]'
     );
+    expect(validate).toContain('gh-api-hold.sh');
+    expect(preserve).toContain('gh-api-hold.sh');
+    expect(confirm).toContain('gh-api-hold.sh');
     expect(preserve).toContain(
       'gh api -X DELETE "repos/$REPO/actions/artifacts/$artifact_id"'
     );
+    expect(workflow).not.toContain('gh_read api -X DELETE');
     expect(workflow).toContain(
       'name: production-generation-verified-${{ env.EXPECTED_SHA }}'
     );
@@ -5459,6 +5550,7 @@ esac
             FIXTURES: root,
             GITHUB_OUTPUT: output,
             EXPECTED_SHA: deployed,
+            GITHUB_WORKSPACE: repoRoot,
             EXPECTED_DEPLOYMENT_ID: 'dpl_recovery123',
             SOURCE_CONTROLLER_RUN: '37144574062',
             SOURCE_CONTROLLER_ATTEMPT: '1',
@@ -5488,5 +5580,82 @@ esac
         expect(result.output).not.toContain('recovery_required=true');
       }
     }, 30_000);
+
+    it('fails closed on a permission 403 without admitting recovery', () => {
+      const parsed = parseYaml(
+        readFileSync(productionMarkerRecoveryWorkflowPath, 'utf8')
+      ) as {
+        jobs: Record<string, { steps: Array<{ name?: string; run?: string }> }>;
+      };
+      const script = parsed.jobs['recover-marker'].steps.find(
+        step => step.name === 'Validate bounded recovery request'
+      )?.run;
+      const root = mkdtempSync(resolve(tmpdir(), 'marker-admission-deny-'));
+      try {
+        const bin = resolve(root, 'bin');
+        mkdirSync(bin);
+        writeFileSync(
+          resolve(bin, 'gh'),
+          `#!/usr/bin/env bash
+echo "Resource not accessible by integration" >&2
+exit 1
+`
+        );
+        chmodSync(resolve(bin, 'gh'), 0o700);
+        const output = resolve(root, 'output');
+        writeFileSync(output, '');
+        const result = spawnSync('bash', ['-c', script!], {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${bin}:${process.env.PATH ?? ''}`,
+            GITHUB_OUTPUT: output,
+            GITHUB_WORKSPACE: repoRoot,
+            EXPECTED_SHA: 'd'.repeat(40),
+            EXPECTED_DEPLOYMENT_ID: 'dpl_recovery123',
+            SOURCE_CONTROLLER_RUN: '37144574062',
+            SOURCE_CONTROLLER_ATTEMPT: '1',
+            REPO: 'JovieInc/Jovie',
+            REQUEST_MODE: 'workflow_dispatch',
+          },
+        });
+        expect(result.status, result.stderr).not.toBe(0);
+        expect(result.stderr).not.toMatch(/Holding /);
+        expect(readFileSync(output, 'utf8')).not.toContain(
+          'recovery_required=true'
+        );
+      } finally {
+        rmSync(root, { force: true, recursive: true });
+      }
+    }, 30_000);
+  });
+});
+
+describe('full matrix authenticated release fixtures', () => {
+  it('seeds the prepared ready persona before browser tests on full runs', () => {
+    const workflow = readFileSync(
+      resolve(
+        import.meta.dirname,
+        '../../../../../.github/workflows/e2e-full-matrix.yml'
+      ),
+      'utf8'
+    );
+    const job = getJobBlock(workflow, 'e2e-full-matrix');
+    const seedStep = getStepBlock(job, 'Seed authenticated release fixtures');
+    expect(seedStep).toContain('seed:test-data --ready-creator-releases-only');
+    expect(seedStep).toContain(
+      'DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}'
+    );
+    expect(seedStep).toContain("E2E_USE_TEST_AUTH_BYPASS: '1'");
+    expect(seedStep).toContain(
+      "github.event_name == 'push' || github.event.inputs.test_filter == ''"
+    );
+    const seedIndex = job.indexOf(
+      '- name: Seed authenticated release fixtures'
+    );
+    expect(seedIndex).toBeGreaterThan(
+      job.indexOf('- name: Start standalone E2E server')
+    );
+    expect(seedIndex).toBeLessThan(job.indexOf('- name: Run E2E tests'));
   });
 });

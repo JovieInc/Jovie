@@ -327,7 +327,8 @@ def record_admission(host, lane, issue, decisions: list[dict]) -> None:
         _ledger(lane, host, decision, "file-overlap-admission")
 
 
-def admission_decisions(host, lane, issue, open_prs: list[dict], tasks: list[dict], classify) -> dict:
+def admission_policy(issue, open_prs: list[dict], tasks: list[dict], classify) -> dict:
+    """Pure worker admission preview; observations must not write overlap telemetry."""
     mode = guard_mode()
     predicted = predict_issue_files(issue, classify)
     identifier = getattr(issue, "identifier", None) or issue.get("identifier")
@@ -346,9 +347,14 @@ def admission_decisions(host, lane, issue, open_prs: list[dict], tasks: list[dic
             decision["actionTaken"] = (
                 "flag" if mode == "flag" or decision["policyAction"] == "flag" else "block")
             decisions.append(decision)
-    record_admission(host, lane, issue, decisions)
     return {"allowed": not any(row["actionTaken"] == "block" for row in decisions),
             "files": predicted["files"], "source": predicted["source"], "decisions": decisions}
+
+
+def admission_decisions(host, lane, issue, open_prs: list[dict], tasks: list[dict], classify) -> dict:
+    result = admission_policy(issue, open_prs, tasks, classify)
+    record_admission(host, lane, issue, result["decisions"])
+    return result
 
 
 def reserve_task(state: Path, issue, prediction: dict) -> None:

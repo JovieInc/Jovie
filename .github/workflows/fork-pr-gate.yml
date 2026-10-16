@@ -1,3 +1,7 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: The trusted metadata-only controller uses the Jovie App identity to publish the required fork-approval status without executing PR code.
+# removal-trigger: Remove when native GitHub rules enforce collaborator approval for fork heads while allowing first-party and Dependabot heads without this App status.
 # Fork PR Gate
 #
 # PURPOSE: Prevents external/fork PRs from being merged without human approval.
@@ -73,7 +77,7 @@ jobs:
     steps:
       - name: Generate Jovie Bot token
         id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
@@ -109,7 +113,7 @@ jobs:
     steps:
       - name: Generate Jovie Bot token
         id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}

@@ -14,7 +14,12 @@ name: Merge Queue Green Enroll
 # Enqueues open, non-draft, same-repo PRs into main whose required checks are
 # green with no conflicts (mergeStateStatus CLEAN, HAS_HOOKS or UNSTABLE: an
 # UNSTABLE head only has a non-required check pending or red, which the
-# ruleset does not gate on), that carry no hold/gated/incident label. GitHub
+# ruleset does not gate on), that carry no hold/gated/incident label.
+# lane-fix-red stays blocking until the Lane Fix Relay deletes it. That relay
+# already applies the label with GITHUB_TOKEN (issues: write, pull-requests:
+# write). This job's app token cannot remove labels, so enroll never calls
+# removeLabel for lane-fix-red. A labeled head is not admitted; a red head
+# keeps the label. GitHub
 # recomputes mergeability lazily, so a read right after main moves returns
 # UNKNOWN; the controller re-reads it briefly instead of dropping the wake. It runs when a required-check workflow finishes on a PR, or a PR loses
 # a hold label, plus a reconciliation sweep on every push to main: a queue
@@ -55,8 +60,11 @@ permissions: {}
 
 concurrency:
   # A global pending slot loses another PR's final wake. Coalesce only wakes
-  # attributed to the same PR; association-free receipts retain their run ID.
-  group: merge-queue-green-enroll-${{ ((github.event_name == 'workflow_dispatch' && inputs.pr_number == '') || github.event_name == 'push') && 'reconcile' || inputs.pr_number || github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.id || github.run_id }}
+  # attributed to the same PR. An association-free receipt coalesces with the
+  # same workflow on the same head, and a different workflow keeps its own slot
+  # so a success cannot replace a failure hold. Receipts with no head stay on
+  # their run ID.
+  group: merge-queue-green-enroll-${{ ((github.event_name == 'workflow_dispatch' && inputs.pr_number == '') || github.event_name == 'push') && 'reconcile' || inputs.pr_number || github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || (github.event.workflow_run.head_sha && format('{0}-{1}', github.event.workflow_run.head_sha, github.event.workflow_run.name)) || github.event.workflow_run.id || github.run_id }}
   cancel-in-progress: false
 
 jobs:
@@ -108,7 +116,7 @@ jobs:
       # ungranted permission fails token mint before the hold is written.
       - name: Generate Jovie Bot failure-hold token
         id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
@@ -159,7 +167,7 @@ jobs:
 
       - name: Generate Jovie Bot token
         id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
@@ -185,12 +193,17 @@ jobs:
             const failurePolicy = await import(pathToFileURL(
               `${process.env.GITHUB_WORKSPACE}/scripts/merge-group-failure-hold.mjs`
             ));
-            // Single source: scripts/lib/admission-hold-labels.json (stop labels plus
-            // queue-poison, which the lanes add after two ejections and remove with their fix).
+            // Single source: scripts/lib/admission-hold-labels.json. Stop labels,
+            // queue-poison, and lane-fix-red skip the sweep. The Lane Fix Relay
+            // deletes a stale lane-fix-red; this token cannot remove labels.
             const holdLabels = JSON.parse(require('node:fs').readFileSync(
               `${process.env.GITHUB_WORKSPACE}/scripts/lib/admission-hold-labels.json`, 'utf8'
             ));
-            const BLOCKING = new Set([...holdLabels.stopHoldLabels, holdLabels.queuePoisonLabel]);
+            const BLOCKING = new Set([
+              ...holdLabels.stopHoldLabels,
+              holdLabels.queuePoisonLabel,
+              ...holdLabels.machineBlockLabels,
+            ]);
             const BREAKER_LABEL = 'queue-breaker';
             if (BLOCKING.size < 2) throw new Error('admission hold labels are unreadable');
             // Required checks green and no conflicts. UNSTABLE only adds a
@@ -619,7 +632,7 @@ jobs:
 
       - name: Generate Jovie Bot hold-contract token
         id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
@@ -642,14 +655,14 @@ jobs:
     if: >-
       github.event_name == 'pull_request_target' &&
       github.event.action == 'labeled' &&
-      contains(fromJSON('["hold","gated","incident","do-not-merge","tim-hold","tim:hold","hold:tim","queue-deferred","queue-poison"]'), github.event.label.name)
+      contains(fromJSON('["hold","gated","incident","do-not-merge","tim-hold","tim:hold","hold:tim","queue-deferred","queue-poison","lane-fix-red"]'), github.event.label.name)
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions: {}
     steps:
       - name: Generate Jovie Bot dequeue token
         id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
@@ -666,7 +679,7 @@ jobs:
             const sourceHead = context.payload.pull_request?.head?.sha;
             const rawLabel = context.payload.label?.name;
             const label = typeof rawLabel === 'string' ? rawLabel.toLowerCase() : null;
-            const blocking = new Set(['hold', 'gated', 'incident', 'do-not-merge', 'tim-hold', 'tim:hold', 'hold:tim', 'queue-deferred', 'queue-poison']);
+            const blocking = new Set(['hold', 'gated', 'incident', 'do-not-merge', 'tim-hold', 'tim:hold', 'hold:tim', 'queue-deferred', 'queue-poison', 'lane-fix-red']);
             if (!Number.isSafeInteger(number) || number <= 0 ||
                 typeof sourceHead !== 'string' || !/^[a-f0-9]{40}$/.test(sourceHead) || !blocking.has(label)) {
               core.info('Ignoring an incomplete blocking-label event');
@@ -738,7 +751,7 @@ jobs:
 
       - name: Generate Jovie Bot rearm token
         id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}

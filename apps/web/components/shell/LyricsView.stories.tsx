@@ -24,3 +24,16 @@ export const Default: Story = {
     onSeek: () => {},
   },
 };
+
+/** Route entry focuses the same region even when no lyrics are available. */
+export const EmptyFocused: Story = {
+  args: {
+    ...Default.args,
+    lines: [],
+    autoFocusView: true,
+  },
+};
+
+export const PopulatedFocused: Story = {
+  args: { ...Default.args, autoFocusView: true },
+};

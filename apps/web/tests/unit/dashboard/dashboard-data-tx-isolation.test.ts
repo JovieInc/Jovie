@@ -21,7 +21,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 type QueryOutcome = () => { rows?: unknown[]; error?: unknown };
 
-type TxState = { poisoned: boolean };
+type TxState = { poisoned: boolean; closed: boolean; rolledBack: boolean };
 
 const {
   captureExceptionMock,
@@ -32,7 +32,7 @@ const {
   withDbSessionTxMock,
 } = vi.hoisted(() => {
   const outcomes: QueryOutcome[] = [];
-  const txStates: Array<{ poisoned: boolean }> = [];
+  const txStates: TxState[] = [];
 
   function createAbortedTxError(): Error & { code?: string } {
     const error = new Error(
@@ -92,9 +92,20 @@ const {
 
   const withDbSessionTxMock = vi.fn(
     async (handler: (tx: unknown, userId: string) => Promise<unknown>) => {
-      const state: TxState = { poisoned: false };
+      const state: TxState = {
+        poisoned: false,
+        closed: false,
+        rolledBack: false,
+      };
       txStates.push(state);
-      return handler(createTx(state), 'user_123');
+      try {
+        return await handler(createTx(state), 'user_123');
+      } catch (error) {
+        state.rolledBack = true;
+        throw error;
+      } finally {
+        state.closed = true;
+      }
     }
   );
 
@@ -215,6 +226,7 @@ vi.mock('@/lib/db', () => ({
 
 vi.mock('@/lib/db/query-timeout', () => ({
   QUERY_TIMEOUTS: { dashboard: 8000, api: 5000, default: 5000 },
+  setStatementTimeout: vi.fn(async () => {}),
   // Mirrors the real wrapper: statement_timeout is applied on the target
   // client before the query — on a poisoned transaction that set_config is
   // the statement that fails, which is exactly the production fingerprint.
@@ -353,9 +365,12 @@ function capturedCascadeErrors(): unknown[] {
 }
 
 describe('dashboard data transaction isolation (JOV-4189)', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.resetModules();
     vi.clearAllMocks();
+    captureExceptionMock.mockReset();
+    const { doesTableExist } = await import('@/lib/db');
+    vi.mocked(doesTableExist).mockReset().mockResolvedValue(false);
     outcomes.length = 0;
     txStates.length = 0;
   });
@@ -402,8 +417,8 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     // ...and no statement_timeout 25P02 cascade was reported anywhere.
     expect(capturedCascadeErrors()).toEqual([]);
 
-    // Isolation mechanism: 1 base transaction + 4 per-read transactions.
-    expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
+    // Isolation mechanism: 1 base transaction + 3 supplementary reads; absent distribution table opens none.
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(4);
   });
 
   it('degrades the Inbox count read log-only on connector schema drift (JOV-5160)', async () => {
@@ -455,7 +470,7 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       width: 1024,
       height: 1024,
     });
-    expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(4);
   });
 
   it('degrades the Inbox tour-dates count log-only on statement timeout (JOV-5754)', async () => {
@@ -509,7 +524,7 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       width: 1024,
       height: 1024,
     });
-    expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(4);
   });
 
   it('still reports genuine Inbox count failures to Sentry', async () => {
@@ -545,7 +560,7 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
         }),
       })
     );
-    expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(4);
   });
 
   it('confines an avatar-quality failure — tipping stats still load', async () => {
@@ -584,7 +599,7 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       })
     );
     expect(capturedCascadeErrors()).toEqual([]);
-    expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(4);
   });
 
   it('degrades a tipping click-count timeout without emitting a Sentry issue (JOV-4458)', async () => {
@@ -627,7 +642,7 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       expect.stringContaining('tipping stats query timed out')
     );
     expect(capturedCascadeErrors()).toEqual([]);
-    expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(4);
   });
 
   it('confines a tipping-stats failure — bio-link activation still resolves', async () => {
@@ -671,6 +686,92 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
   });
 
+  it('checks distribution schema before opening a transaction and waits for SQL cancellation before fallback', async () => {
+    const { doesTableExist } = await import('@/lib/db');
+    const { dashboardQuery, setStatementTimeout } = await import(
+      '@/lib/db/query-timeout'
+    );
+    vi.mocked(doesTableExist).mockImplementation(async () => {
+      expect(txStates.every(state => state.closed)).toBe(true);
+      return true;
+    });
+    const error = Object.assign(
+      new Error('canceling statement due to statement timeout'),
+      { code: '57014' }
+    );
+    captureExceptionMock.mockImplementation(captured => {
+      if (captured === error) {
+        expect(txStates.at(-1)?.closed).toBe(true);
+        expect(txStates.at(-1)?.rolledBack).toBe(true);
+      }
+    });
+    outcomes.push(
+      ok([userRow]),
+      ok([dashboardProfile]),
+      ok([{ sidebarCollapsed: false }]),
+      ok([{ count: 0 }]),
+      ok([{ count: 0 }]),
+      ok([{ hasLinks: true, hasMusicLinks: true }]),
+      ok([{ width: 1024, height: 1024 }]),
+      ok([{ totalReceived: 100, monthReceived: 50, tipsSubmitted: 2 }]),
+      ok([{ total: 3, qr: 1, link: 2 }]),
+      fail(error)
+    );
+    const { getDashboardData } = await import(
+      '@/app/app/(shell)/dashboard/actions/dashboard-data'
+    );
+    const result = await getDashboardData();
+    expect(result.selectedProfile?.id).toBe('profile_1');
+    expect(result.bioLinkActivation?.activatedAt).toBeNull();
+    expect(result.dashboardLoadError).toBeUndefined();
+    expect(setStatementTimeout).toHaveBeenCalledWith(expect.anything(), 8000);
+    expect(
+      vi
+        .mocked(dashboardQuery)
+        .mock.calls.some(
+          call => call[1] === 'Creator distribution events query'
+        )
+    ).toBe(false);
+    expect(captureExceptionMock).toHaveBeenCalledWith(error, expect.anything());
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
+    expect(txStates.every(state => state.closed)).toBe(true);
+  });
+
+  it('retries a dropped distribution connection once on a fresh transaction after cleanup', async () => {
+    const { doesTableExist } = await import('@/lib/db');
+    vi.mocked(doesTableExist).mockResolvedValue(true);
+    const activatedAt = new Date('2026-07-21T12:00:00.000Z');
+    outcomes.push(
+      ok([userRow]),
+      ok([dashboardProfile]),
+      ok([{ sidebarCollapsed: false }]),
+      ok([{ count: 0 }]),
+      ok([{ count: 0 }]),
+      ok([{ hasLinks: true, hasMusicLinks: true }]),
+      ok([{ width: 1024, height: 1024 }]),
+      ok([{ totalReceived: 100, monthReceived: 50, tipsSubmitted: 2 }]),
+      ok([{ total: 3, qr: 1, link: 2 }]),
+      fail(new Error('server conn crashed?')),
+      () => {
+        expect(txStates.at(-2)?.closed).toBe(true);
+        expect(txStates.at(-2)?.poisoned).toBe(true);
+        expect(txStates.at(-2)?.rolledBack).toBe(true);
+        return { rows: [{ createdAt: activatedAt, eventType: 'activated' }] };
+      }
+    );
+    const { getDashboardData } = await import(
+      '@/app/app/(shell)/dashboard/actions/dashboard-data'
+    );
+    const result = await getDashboardData();
+    expect(result.bioLinkActivation?.activatedAt).toBe(
+      activatedAt.toISOString()
+    );
+    expect(result.dashboardLoadError).toBeUndefined();
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(6);
+    expect(txStates.every(state => state.closed)).toBe(true);
+  });
+
   it('happy path assembles full dashboard data across isolated reads', async () => {
     outcomes.push(
       ok([userRow]),
@@ -709,6 +810,6 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     });
     expect(result.dashboardLoadError).toBeUndefined();
     expect(captureExceptionMock).not.toHaveBeenCalled();
-    expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(4);
   });
 });
