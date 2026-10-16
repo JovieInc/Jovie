@@ -12,6 +12,7 @@ import {
   classifyRequiredCheckPage,
   isTransientAdmissionFailureMessage,
   isTransientApiError,
+  MERGE_GROUP_ADMISSION_QUOTA_RECOVERY_MS,
   MERGE_GROUP_ADMISSION_WAIT_MS,
   MergeGroupAdmissionError,
   normalizeLiveQueueEntriesPage,
@@ -1124,6 +1125,7 @@ describe('merge-group admission evidence', () => {
 
   it('defaults to a multi-minute admission budget', () => {
     expect(MERGE_GROUP_ADMISSION_WAIT_MS).toBe(360_000);
+    expect(MERGE_GROUP_ADMISSION_QUOTA_RECOVERY_MS).toBe(66 * 60 * 1000);
   });
 });
 
@@ -1542,8 +1544,8 @@ describe('HTTP quota scheduling and structured GraphQL errors', () => {
       { ...resetHeaders(120_000), 'x-ratelimit-remaining': '0x' },
     ],
     ['invalid response date', { 'retry-after': '120', date: 'invalid' }],
-    ['reset beyond budget', resetHeaders(400_000)],
-    ['insufficient request allowance', { 'retry-after': '350' }],
+    ['reset beyond budget', resetHeaders(70 * 60 * 1000)],
+    ['insufficient request allowance', { 'retry-after': '4000' }],
   ])('does not retry early for %s', async (_, headers) => {
     await withQuotaResponses(
       () => graphqlQuotaResponse(headers),
@@ -1576,11 +1578,11 @@ describe('HTTP quota scheduling and structured GraphQL errors', () => {
     }
   );
 
-  it('keeps all retries inside the original absolute deadline', async () => {
+  it('keeps quota retries inside the recovery budget', async () => {
     await withQuotaResponses(
       (_, state) =>
         graphqlQuotaResponse({
-          'retry-after': state.requests.length === 1 ? '339' : '20',
+          'retry-after': state.requests.length === 1 ? '339' : '3700',
         }),
       async state => {
         await expect(state.run()).rejects.toThrow(
@@ -1590,6 +1592,20 @@ describe('HTTP quota scheduling and structured GraphQL errors', () => {
         expect(state.requests[1].at).toBe(340_000);
         expect(state.sleeps).toEqual([340_000]);
         await state.noOutput();
+      }
+    );
+  });
+
+  it('holds a quota reset outside the check-poll window and inside the recovery budget', async () => {
+    await withQuotaResponses(
+      (_, state) => {
+        if (state.requests.length === 1) {
+          return graphqlQuotaResponse(resetHeaders(400_000));
+        }
+      },
+      async state => {
+        await expect(state.run()).resolves.toMatchObject({ admitted: true });
+        expect(state.sleeps[0]).toBe(401_000);
       }
     );
   });

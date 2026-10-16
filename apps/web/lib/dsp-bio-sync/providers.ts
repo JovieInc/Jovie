@@ -1,13 +1,7 @@
-/**
- * DSP Bio Sync Provider Registry
- *
- * Defines how each DSP handles artist bio updates:
- * - 'api': DSP has a writable API (requires OAuth or partnership)
- * - 'email': DSP only accepts bio updates via support email
- *
- * For email-based DSPs, we send a professionally formatted email on behalf
- * of the artist to the DSP's artist support team requesting the bio update.
- */
+import { projectArtistProfileDestination } from '@/lib/connectors/artist-profile-catalog';
+import { ARTIST_PROFILE_DESTINATIONS } from '@/lib/connectors/artist-profile-registry';
+import { DSP_PROFILE_CATALOG } from '@/lib/connectors/dsp-profile-catalog';
+import { PROFILE_DESTINATION_REGISTRY } from '@/lib/connectors/profile-writes/destinations';
 
 export type BioSyncMethod = 'api' | 'email';
 
@@ -20,86 +14,56 @@ export interface DspBioProvider {
   supportEmail?: string;
   /** Whether this provider is currently enabled for bio sync */
   enabled: boolean;
+  /** Email requests cannot prove a destination snapshot or conditional restore. */
+  rollback: 'manual' | 'unsupported';
   /** Notes about the integration status */
   notes: string;
   /** URL for the DSP's artist portal (for reference/linking) */
-  artistPortalUrl?: string;
+  artistPortalUrl: string;
   /** Max bio character length enforced by this DSP (if known) */
-  maxBioLength?: number;
+  maxBioLength: number;
+}
+
+function bioField(providerId: string) {
+  const destination = Object.values(DSP_PROFILE_CATALOG).find(
+    item => item.legacyBioProviderId === providerId
+  );
+  if (!destination) throw new Error('unregistered-profile-destination');
+  return projectArtistProfileDestination(
+    destination.id,
+    ARTIST_PROFILE_DESTINATIONS[destination.id]
+  ).fields[0];
 }
 
 /**
- * Registry of all DSPs and their bio update capabilities.
- *
- * API-based updates are stubbed for future OAuth integration.
- * Email-based updates use verified support addresses for each DSP.
+ * Compatibility projection of the canonical DSP catalog. Historical transport
+ * metadata grants no delivery permission; current submission evidence is required.
  */
-export const DSP_BIO_PROVIDERS: Record<string, DspBioProvider> = {
-  spotify: {
-    displayName: 'Spotify',
-    method: 'email',
-    supportEmail: 'artists@spotify.com',
-    enabled: true,
-    notes:
-      'Spotify for Artists API does not support bio updates. Bios are typically updated through the distributor or Spotify for Artists dashboard. Email requests are accepted for verified artists.',
-    artistPortalUrl: 'https://artists.spotify.com',
-    maxBioLength: 1500,
-  },
-  apple_music: {
-    displayName: 'Apple Music',
-    method: 'email',
-    supportEmail: 'musicpartners@apple.com',
-    enabled: true,
-    notes:
-      'Apple Music for Artists does not expose a bio update API. Bios are submitted through the distributor or via Apple Music for Artists support.',
-    artistPortalUrl: 'https://artists.apple.com',
-  },
-  amazon_music: {
-    displayName: 'Amazon Music',
-    method: 'email',
-    supportEmail: 'amazonmusicforartists@amazon.com',
-    enabled: true,
-    notes:
-      'Amazon Music for Artists portal allows manual bio updates. Email support is available for bulk or programmatic updates.',
-    artistPortalUrl: 'https://artists.amazonmusic.com',
-  },
-  tidal: {
-    displayName: 'TIDAL',
-    method: 'email',
-    supportEmail: 'artists@tidal.com',
-    enabled: true,
-    notes:
-      'TIDAL does not have a public API for bio updates. Artist bios are updated via support email or through the distributor.',
-    artistPortalUrl: 'https://artists.tidal.com',
-  },
-  deezer: {
-    displayName: 'Deezer',
-    method: 'email',
-    supportEmail: 'artists@deezer.com',
-    enabled: true,
-    notes:
-      'Deezer does not have a public API for artist bio updates. Requests are sent to the Deezer for Artists support team.',
-    artistPortalUrl: 'https://artists.deezer.com',
-  },
-  soundcloud: {
-    displayName: 'SoundCloud',
-    method: 'api',
-    enabled: false,
-    notes:
-      'SoundCloud API supports profile description updates via PUT /me with OAuth. Requires user to connect their SoundCloud account.',
-    artistPortalUrl: 'https://soundcloud.com',
-    maxBioLength: 4000,
-  },
-  youtube_music: {
-    displayName: 'YouTube Music',
-    method: 'api',
-    enabled: false,
-    notes:
-      'YouTube Data API v3 supports channel description updates via channels.update. Requires user to grant YouTube OAuth access with channel.update scope.',
-    artistPortalUrl: 'https://artists.youtube.com',
-    maxBioLength: 5000,
-  },
-} as const;
+export const DSP_BIO_PROVIDERS: Record<string, DspBioProvider> =
+  Object.fromEntries(
+    Object.entries(PROFILE_DESTINATION_REGISTRY).map(([id, destination]) => [
+      id,
+      {
+        displayName: destination.label,
+        method: destination.method,
+        get enabled() {
+          return bioField(id).submission?.available ?? false;
+        },
+        get rollback(): DspBioProvider['rollback'] {
+          const field = bioField(id);
+          return field.submission?.available
+            ? field.submission.rollback
+            : field.recovery;
+        },
+        notes:
+          destination.method === 'email'
+            ? 'Submission requires current terms evidence and explicit approval.'
+            : 'API bio updates are unsupported.',
+        artistPortalUrl: destination.portal,
+        maxBioLength: destination.maxBioLength,
+      },
+    ])
+  );
 
 /**
  * Get all providers that support bio sync (enabled only).
@@ -132,7 +96,9 @@ export function getApiBioProviders(): Array<[string, DspBioProvider]> {
  * Get a specific DSP bio provider config.
  */
 export function getBioProvider(providerId: string): DspBioProvider | undefined {
-  return DSP_BIO_PROVIDERS[providerId];
+  return Object.hasOwn(DSP_BIO_PROVIDERS, providerId)
+    ? DSP_BIO_PROVIDERS[providerId]
+    : undefined;
 }
 
 /**

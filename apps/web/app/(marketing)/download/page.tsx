@@ -155,11 +155,16 @@ export default function DownloadPage() {
       <script type='application/ld+json'>{FAQ_SCHEMA}</script>
       <script type='application/ld+json'>{BREADCRUMB_SCHEMA}</script>
 
-      <main
+      <div
         data-page='download'
         className='marketing-hero-dock marketing-hero-dock--inset overflow-x-clip bg-(--system-b-cinematic-black) text-(--system-b-text-primary)'
       >
-        <section aria-labelledby='download-hero-heading'>
+        <section
+          aria-labelledby='download-hero-heading'
+          data-testid='marketing-section-hero'
+          data-marketing-variant='split-screenshot-right'
+          data-marketing-owner='apps/web/app/(marketing)/download/page.tsx'
+        >
           <div className='relative flex min-h-svh flex-col overflow-hidden pt-28 sm:pt-32'>
             <MarketingHeroPhoto {...DOWNLOAD_HERO_PHOTO} />
             <MarketingContainer
@@ -261,7 +266,13 @@ export default function DownloadPage() {
           </div>
         </section>
 
-        <section className='border-y border-subtle bg-(--system-b-cinematic-black)'>
+        <section
+          className='border-y border-subtle bg-(--system-b-cinematic-black)'
+          data-testid='marketing-section-feature-grid'
+          data-marketing-variant='two-column-text'
+          data-marketing-owner='apps/web/app/(marketing)/download/page.tsx'
+          data-marketing-occurrence='platforms'
+        >
           <MarketingContainer width='page'>
             <div className='grid lg:grid-cols-2'>
               {PLATFORM_ROWS.map((platform, index) => {
@@ -323,36 +334,49 @@ export default function DownloadPage() {
           </MarketingContainer>
         </section>
 
-        <MarketingContainer width='page' className='py-20 sm:py-28 lg:py-32'>
-          <div className='grid gap-12 lg:grid-cols-2 lg:gap-20'>
-            <div>
-              <p className='homepage-section-eyebrow'>Release workflow</p>
-              <h2
-                data-wrap='editorial-title'
-                className='mt-4 text-pretty text-4xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-5xl'
-              >
-                Everything In Jovie, Closer.
-              </h2>
+        <section
+          data-testid='marketing-section-feature-grid'
+          data-marketing-variant='4-ledger'
+          data-marketing-owner='apps/web/app/(marketing)/download/page.tsx'
+          data-marketing-occurrence='workflow'
+        >
+          <MarketingContainer width='page' className='py-20 sm:py-28 lg:py-32'>
+            <div className='grid gap-12 lg:grid-cols-2 lg:gap-20'>
+              <div>
+                <p className='homepage-section-eyebrow'>Release workflow</p>
+                <h2
+                  data-wrap='editorial-title'
+                  className='mt-4 text-pretty text-4xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-5xl'
+                >
+                  Everything In Jovie, Closer.
+                </h2>
+              </div>
+              <div className='grid gap-x-10 gap-y-10 sm:grid-cols-2'>
+                {FEATURE_ROWS.map(row => (
+                  <section key={row.title}>
+                    <div className='mb-4 flex size-8 items-center justify-center rounded-full bg-surface-1/10 text-secondary-token'>
+                      <Check className='size-4' aria-hidden='true' />
+                    </div>
+                    <h3 className='text-pretty text-xl font-semibold tracking-normal text-(--system-b-text-primary)'>
+                      {row.title}
+                    </h3>
+                    <p className={`mt-3 text-mid leading-relaxed ${muted}`}>
+                      {row.body}
+                    </p>
+                  </section>
+                ))}
+              </div>
             </div>
-            <div className='grid gap-x-10 gap-y-10 sm:grid-cols-2'>
-              {FEATURE_ROWS.map(row => (
-                <section key={row.title}>
-                  <div className='mb-4 flex size-8 items-center justify-center rounded-full bg-surface-1/10 text-secondary-token'>
-                    <Check className='size-4' aria-hidden='true' />
-                  </div>
-                  <h3 className='text-xl font-semibold tracking-normal text-(--system-b-text-primary)'>
-                    {row.title}
-                  </h3>
-                  <p className={`mt-3 text-mid leading-relaxed ${muted}`}>
-                    {row.body}
-                  </p>
-                </section>
-              ))}
-            </div>
-          </div>
-        </MarketingContainer>
+          </MarketingContainer>
+        </section>
 
-        <section className='border-y border-subtle bg-(--system-b-cinematic-black)'>
+        <section
+          className='border-y border-subtle bg-(--system-b-cinematic-black)'
+          data-testid='marketing-section-feature-grid'
+          data-marketing-variant='3-large'
+          data-marketing-owner='apps/web/app/(marketing)/download/page.tsx'
+          data-marketing-occurrence='install-details'
+        >
           <MarketingContainer width='page' className='py-16 sm:py-20 lg:py-24'>
             <div className='grid gap-12 lg:grid-cols-2 lg:items-start'>
               <div>
@@ -419,6 +443,7 @@ export default function DownloadPage() {
         </section>
 
         <FaqSection
+          sectionVariant='objection-handler' /* copy-lint-allow: objection */
           items={FAQ_ITEMS}
           heading='Questions'
           headingClassName='text-4xl font-bold leading-tight tracking-normal text-(--system-b-text-primary)'
@@ -428,6 +453,7 @@ export default function DownloadPage() {
         />
 
         <MarketingFooterCta
+          sectionVariant='final-single-claim'
           title='Ready to install Jovie?'
           body='Download the Mac app today. The iPhone build stays internal while auth and TestFlight quality harden.'
           ctaLabel='Download for Mac'
@@ -459,7 +485,7 @@ export default function DownloadPage() {
             .
           </p>
         </MarketingContainer>
-      </main>
+      </div>
     </>
   );
 }

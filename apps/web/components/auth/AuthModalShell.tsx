@@ -87,11 +87,15 @@ export function AuthModalShell({
   // validated destination it degrades to dismissal instead of guessing.
   const handleBackControl = useCallback(() => {
     if (resolvedBackDestination) {
-      router.push(resolvedBackDestination);
+      // Soft push leaves the intercepted @auth dialog mounted when the
+      // destination is already the page underneath the modal. A full
+      // navigation drops that slot and still lands on the labeled
+      // destination, independent of history (JOV-6225).
+      window.location.assign(resolvedBackDestination);
       return;
     }
     dismiss();
-  }, [dismiss, resolvedBackDestination, router]);
+  }, [dismiss, resolvedBackDestination]);
 
   useModalFocusBoundary(dialogRef, true, {
     lockScroll: true,

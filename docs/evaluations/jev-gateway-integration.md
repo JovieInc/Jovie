@@ -147,6 +147,13 @@ stay unreviewed rather than passing; an all-empty answer set is
 `invalid-response`. Output is observation-mode only — no certification,
 approval, or publishing authority, and no compensating overall score.
 
+## Writing pilot readiness
+
+The [JOV-8415 readiness handoff](jev-writing-readiness.md) consumes exact
+surface calibration, held-out report and existing bounded-canary evidence.
+Its candidate result retains observation mode and grants no traffic or send
+authority; provisional JOV-3721 confidence floors cannot qualify it.
+
 ## Evidence and limits
 
 On 2026-09-19, existing FX/Doppler credits reported $27.741510768 before the

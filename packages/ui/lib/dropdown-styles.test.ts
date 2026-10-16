@@ -182,6 +182,7 @@ describe('dropdown-styles', () => {
       expect(MENU_ITEM_BASE).toContain('font-normal');
       expect(MENU_ITEM_BASE).toContain('py-1.5');
       expect(MENU_ITEM_BASE).toContain('gap-2');
+      expect(MENU_ITEM_BASE).toContain('hover:bg-(--color-bg-surface-1)');
     });
 
     it('menu rows use tokenized focus-visible rings', () => {
@@ -258,9 +259,12 @@ describe('dropdown-styles', () => {
       expect(MENU_LABEL_BASE).toContain('font-medium');
     });
 
-    it('MENU_SEPARATOR_BASE styles a horizontal rule', () => {
+    it('MENU_SEPARATOR_BASE paints a 1px fill', () => {
       expect(MENU_SEPARATOR_BASE).toContain('h-px');
       expect(MENU_SEPARATOR_BASE).toContain('my-1');
+      expect(MENU_SEPARATOR_BASE).toContain('border-0');
+      expect(MENU_SEPARATOR_BASE).toContain('bg-(--color-border-subtle)');
+      expect(MENU_SEPARATOR_BASE).not.toContain('border-t');
     });
 
     it('MENU_SHORTCUT_BASE uses ml-auto alignment', () => {

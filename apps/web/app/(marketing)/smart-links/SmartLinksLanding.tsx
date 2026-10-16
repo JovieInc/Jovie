@@ -35,6 +35,9 @@ export function SmartLinksLanding() {
       <section
         aria-labelledby='smart-links-title'
         className='marketing-hero-dock marketing-hero-dock--inset relative overflow-hidden py-14 sm:py-24'
+        data-testid='marketing-section-hero'
+        data-marketing-variant='split-screenshot-right'
+        data-marketing-owner='apps/web/app/(marketing)/smart-links/SmartLinksLanding.tsx'
       >
         <MarketingHeroPhoto {...SMART_LINKS_HERO_PHOTO} />
         <MarketingContainer width='page' className='relative z-3'>
@@ -82,6 +85,9 @@ export function SmartLinksLanding() {
         id='how-it-works'
         aria-labelledby='smart-links-how'
         className='border-t border-subtle py-16 sm:py-22'
+        data-testid='marketing-section-how-it-works'
+        data-marketing-variant='3-step-strip'
+        data-marketing-owner='apps/web/app/(marketing)/smart-links/SmartLinksLanding.tsx'
       >
         <MarketingContainer width='page'>
           <p className='homepage-section-eyebrow'>A THREE-BEAT HANDOFF</p>
@@ -113,6 +119,9 @@ export function SmartLinksLanding() {
       <section
         aria-labelledby='smart-links-cta'
         className='py-16 text-center sm:py-22'
+        data-testid='marketing-section-cta'
+        data-marketing-variant='included-single'
+        data-marketing-owner='apps/web/app/(marketing)/smart-links/SmartLinksLanding.tsx'
       >
         <MarketingContainer width='page'>
           <h2

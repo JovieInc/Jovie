@@ -17,17 +17,31 @@ jobs:
     runs-on: ubuntu-latest
     outputs: {exact_sha: "${{ steps.lineage.outputs.exact_sha }}", outcome: "${{ steps.routing.outputs.outcome }}"}
     steps:
+      - name: Checkout quota-safe main resolvers
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          sparse-checkout: |
+            .github/scripts/resolve-main-sha.sh
+            .github/scripts/gh-api-hold.sh
+          sparse-checkout-cone-mode: false
       - name: Fetch sealed product-lane release receipt
         env: {EXPECTED_SHA: "${{ github.event.workflow_run.head_sha }}", REPOSITORY: "${{ github.repository }}", SOURCE_CI_RUN_ID: "${{ github.event.workflow_run.id }}", SOURCE_CI_RUN_ATTEMPT: "${{ github.event.workflow_run.run_attempt }}", GH_TOKEN: "${{ github.token }}"}
         run: |
           set -euo pipefail
+          if [ ! -f "$RUNNER_TEMP/gh-api-hold.sh" ]; then
+            cp .github/scripts/gh-api-hold.sh "$RUNNER_TEMP/gh-api-hold.sh"
+            cp .github/scripts/resolve-main-sha.sh "$RUNNER_TEMP/resolve-main-sha.sh"
+          fi
+          gh_api() { bash "$RUNNER_TEMP/gh-api-hold.sh" api "$@"; }
           mkdir -p "$RUNNER_TEMP/product-lane-release"
           receipt_name="product-lane-release-${EXPECTED_SHA}-${SOURCE_CI_RUN_ATTEMPT}"
-          artifact_id="$(gh api \
+          artifact_id="$(gh_api \
             "repos/$REPOSITORY/actions/artifacts?name=$receipt_name&per_page=100" \
             --jq '[.artifacts[] | select(.expired == false)] | sort_by(.id) | last | .id // empty')"
           if [[ "$artifact_id" =~ ^[1-9][0-9]*$ ]]; then
-            gh api "repos/$REPOSITORY/actions/artifacts/$artifact_id/zip" \
+            gh_api "repos/$REPOSITORY/actions/artifacts/$artifact_id/zip" \
               > "$RUNNER_TEMP/product-lane-release/receipt.zip"
             unzip -q "$RUNNER_TEMP/product-lane-release/receipt.zip" \
               -d "$RUNNER_TEMP/product-lane-release"
@@ -42,6 +56,11 @@ jobs:
         env: {EXPECTED_SHA: "${{ github.event.workflow_run.head_sha }}", REPOSITORY: "${{ github.repository }}", SOURCE_CI_RUN_ID: "${{ github.event.workflow_run.id }}", SOURCE_CI_RUN_ATTEMPT: "${{ github.event.workflow_run.run_attempt }}", SOURCE_CI_WORKFLOW_PATH: "${{ github.event.workflow_run.path }}", SOURCE_CI_HEAD_BRANCH: "${{ github.event.workflow_run.head_branch }}", SOURCE_CI_HEAD_REPOSITORY: "${{ github.event.workflow_run.head_repository.full_name }}", GH_TOKEN: "${{ github.token }}"}
         run: |
           set -euo pipefail
+          if [ ! -f "$RUNNER_TEMP/gh-api-hold.sh" ]; then
+            cp .github/scripts/gh-api-hold.sh "$RUNNER_TEMP/gh-api-hold.sh"
+            cp .github/scripts/resolve-main-sha.sh "$RUNNER_TEMP/resolve-main-sha.sh"
+          fi
+          gh_api() { bash "$RUNNER_TEMP/gh-api-hold.sh" api "$@"; }
           [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] && [[ "$SOURCE_CI_RUN_ID" =~ ^[1-9][0-9]*$ ]] && [[ "$SOURCE_CI_RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]] && [ "$SOURCE_CI_WORKFLOW_PATH" = ".github/workflows/ci.yml" ] && [ "$SOURCE_CI_HEAD_BRANCH" = "main" ] && [ "$SOURCE_CI_HEAD_REPOSITORY" = "$REPOSITORY" ] || { echo "::error::Staging Controller received malformed exact-main CI evidence."; exit 1; }
           receipt="$RUNNER_TEMP/product-lane-release/release.json"
           receipt_missing=false
@@ -50,7 +69,7 @@ jobs:
           else
             receipt_missing=true
           fi
-          current_main="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
+          current_main="$(bash "$RUNNER_TEMP/resolve-main-sha.sh" "$REPOSITORY")"
           [[ "$current_main" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Could not resolve exact main before staging mutation."; exit 1; }
           outcome=proceed replacement_sha="$EXPECTED_SHA"
           if [ "$receipt_missing" = true ]; then
@@ -62,7 +81,7 @@ jobs:
               echo "::error::Current main CI attempt sealed no product-lane release receipt."
               exit 1
             fi
-            compare_status="$(gh api "repos/$REPOSITORY/compare/${EXPECTED_SHA}...${current_main}" --jq '.status // empty')"
+            compare_status="$(gh_api "repos/$REPOSITORY/compare/${EXPECTED_SHA}...${current_main}" --jq '.status // empty')"
             if [ "$compare_status" != ahead ]; then
               echo "::error::Unreceipted CI attempt $EXPECTED_SHA is not an ancestor of current main; supersession cannot be proven."
               exit 1
@@ -71,18 +90,18 @@ jobs:
           elif ! jq -e '.selectedLanes | index("web") != null' "$receipt" >/dev/null; then
             outcome=not_applicable
           elif [ "$current_main" != "$EXPECTED_SHA" ]; then
-            compare_status="$(gh api "repos/$REPOSITORY/compare/${EXPECTED_SHA}...${current_main}" --jq '.status // empty')"
+            compare_status="$(gh_api "repos/$REPOSITORY/compare/${EXPECTED_SHA}...${current_main}" --jq '.status // empty')"
             if [ "$compare_status" != ahead ]; then
               outcome=superseded replacement_sha="$current_main"
             else
-              newer_runs="$(gh api "repos/$REPOSITORY/actions/workflows/ci.yml/runs?branch=main&event=push&status=success&per_page=100")"
+              newer_runs="$(gh_api "repos/$REPOSITORY/actions/workflows/ci.yml/runs?branch=main&event=push&status=success&per_page=100")"
               while IFS=$'\t' read -r candidate_id candidate_attempt candidate_sha; do
                 [[ "$candidate_id" =~ ^[1-9][0-9]*$ ]] && [[ "$candidate_attempt" =~ ^[1-9][0-9]*$ ]] && [[ "$candidate_sha" =~ ^[0-9a-f]{40}$ ]] || continue
                 # A later CI run can replay an older SHA after a main rewind.
                 # Only a strict descendant may replace this staging generation.
-                replacement_status="$(gh api "repos/$REPOSITORY/compare/${EXPECTED_SHA}...${candidate_sha}" --jq '.status // empty')"
+                replacement_status="$(gh_api "repos/$REPOSITORY/compare/${EXPECTED_SHA}...${candidate_sha}" --jq '.status // empty')"
                 [ "$replacement_status" = ahead ] || continue
-                candidate_status="$(gh api "repos/$REPOSITORY/compare/${candidate_sha}...${current_main}" --jq '.status // empty')"
+                candidate_status="$(gh_api "repos/$REPOSITORY/compare/${candidate_sha}...${current_main}" --jq '.status // empty')"
                 [[ "$candidate_status" =~ ^(ahead|identical)$ ]] || continue
                 candidate_name="product-lane-release-${candidate_sha}-${candidate_attempt}"
                 if gh run download "$candidate_id" --repo "$REPOSITORY" --name "$candidate_name" --dir "$RUNNER_TEMP/product-lane-$candidate_id" && jq -e --arg sha "$candidate_sha" --arg run "$candidate_id" '.provenance.sha == $sha and .releaseRouting.sourceMainRunId == $run and .aggregatePassed == true and (.selectedLanes | index("web") != null)' "$RUNNER_TEMP/product-lane-$candidate_id/release.json" >/dev/null; then
@@ -96,7 +115,19 @@ jobs:
           echo "::notice::Staging lineage $EXPECTED_SHA outcome=$outcome replacement=$replacement_sha"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
         if: steps.lineage.outputs.outcome == 'not_applicable'
-        with: {ref: "${{ github.event.workflow_run.head_sha }}", fetch-depth: 0, persist-credentials: false}
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+          # Sparse patterns from the resolver checkout stay on this workspace.
+          # Omitting them here left staging-lane-carryover.mjs off disk
+          # (run 38828092050). History stays complete; the worktree is the
+          # import closure the routing step actually loads.
+          sparse-checkout: |
+            .github/scripts/staging-lane-carryover.mjs
+            scripts/lib/production-lane-range.mjs
+            scripts/lib/product-lane-classifier.mjs
+          sparse-checkout-cone-mode: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v4.4.0
         if: steps.lineage.outputs.outcome == 'not_applicable'
         with: {node-version: 24.21.0}
@@ -104,12 +135,17 @@ jobs:
         env: {INITIAL_OUTCOME: "${{ steps.lineage.outputs.outcome }}", EXPECTED_SHA: "${{ github.event.workflow_run.head_sha }}", SOURCE_CI_RUN_ID: "${{ github.event.workflow_run.id }}", REPOSITORY: "${{ github.repository }}", GH_TOKEN: "${{ github.token }}"}
         run: |
           set -euo pipefail
+          if [ ! -f "$RUNNER_TEMP/gh-api-hold.sh" ]; then
+            cp .github/scripts/gh-api-hold.sh "$RUNNER_TEMP/gh-api-hold.sh"
+            cp .github/scripts/resolve-main-sha.sh "$RUNNER_TEMP/resolve-main-sha.sh"
+          fi
+          gh_api() { bash "$RUNNER_TEMP/gh-api-hold.sh" api "$@"; }
           outcome="$INITIAL_OUTCOME"
           if [ "$outcome" = not_applicable ]; then
-            current_main="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
+            current_main="$(bash "$RUNNER_TEMP/resolve-main-sha.sh" "$REPOSITORY")"
             [[ "$current_main" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Current main identity is malformed."; exit 1; }
             if [ "$current_main" != "$EXPECTED_SHA" ]; then
-              relation="$(gh api "repos/$REPOSITORY/compare/${EXPECTED_SHA}...${current_main}" --jq '.status // empty')"
+              relation="$(gh_api "repos/$REPOSITORY/compare/${EXPECTED_SHA}...${current_main}" --jq '.status // empty')"
               [ "$relation" = ahead ] || { echo "::error::Staging carryover main is not on the source lineage."; exit 1; }
               outcome=superseded
               jq --arg replacement "$current_main" '.outcome="superseded" | .replacementSha=$replacement' "$RUNNER_TEMP/staging-lineage.json" > "$RUNNER_TEMP/staging-lineage-next.json"

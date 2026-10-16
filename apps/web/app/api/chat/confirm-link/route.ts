@@ -22,6 +22,29 @@ const confirmLinkSchema = chatToolSchema({
   url: httpUrlSchema,
   normalizedUrl: httpUrlSchema,
   expectedVersion: z.number().int().min(1).optional(),
+  requestId: z.string().min(1).max(128).optional(),
+  reconcile: z.boolean().optional(),
+});
+
+const confirmationReceiptSchema = chatToolSchema({
+  requestId: z.string(),
+  platform: z.string(),
+  normalizedUrl: z.string(),
+  expectedVersion: z.number().optional(),
+  result: z.object({
+    success: z.literal(true),
+    platform: z.string(),
+    linkId: z.string().uuid(),
+    version: z.number().int().positive(),
+    outcome: z.enum(['created', 'updated']),
+    receipt: z.object({
+      scopeId: z.string().uuid(),
+      requestId: z.string(),
+      objectId: z.string().uuid(),
+      revision: z.number().int().positive(),
+      durability: z.literal('remote'),
+    }),
+  }),
 });
 
 function linkVersionConflict(expectedVersion: number, currentVersion?: number) {
@@ -69,8 +92,21 @@ export async function POST(req: Request) {
     );
   }
 
-  const { profileId, platform, normalizedUrl, expectedVersion } =
-    parseResult.data;
+  const {
+    profileId,
+    platform,
+    normalizedUrl,
+    expectedVersion,
+    requestId,
+    reconcile,
+  } = parseResult.data;
+
+  if (reconcile && !requestId) {
+    return NextResponse.json(
+      { error: 'Request identity required' },
+      { status: 400, headers: NO_CACHE_HEADERS }
+    );
+  }
 
   const urlValidation = validateSocialLinkUrl(normalizedUrl);
   if (!urlValidation.valid) {
@@ -118,6 +154,52 @@ export async function POST(req: Request) {
           return NextResponse.json(
             { error: 'Unauthorized - not your profile' },
             { status: 403, headers: NO_CACHE_HEADERS }
+          );
+        }
+
+        // Reuse the existing audit row and platform lock. The receipt commits in
+        // the same transaction as the link; reconnect never repeats its effects.
+        if (requestId) {
+          const [record] = await tx
+            .select({ metadata: chatAuditLog.metadata })
+            .from(chatAuditLog)
+            .where(
+              and(
+                eq(chatAuditLog.creatorProfileId, profileId),
+                eq(chatAuditLog.userId, userId),
+                eq(chatAuditLog.field, 'social_links'),
+                drizzleSql`${chatAuditLog.metadata}->>'requestId' = ${requestId}`,
+                drizzleSql`${chatAuditLog.metadata}->>'platform' = ${detected.platform.id}`
+              )
+            )
+            .limit(1);
+          if (record) {
+            const prior = confirmationReceiptSchema.safeParse(record.metadata);
+            if (
+              !prior.success ||
+              prior.data.normalizedUrl !== detected.normalizedUrl ||
+              prior.data.expectedVersion !== expectedVersion
+            ) {
+              return NextResponse.json(
+                {
+                  error: 'Confirmation no longer matches this request',
+                  code: 'REQUEST_CONFLICT',
+                },
+                { status: 409, headers: NO_CACHE_HEADERS }
+              );
+            }
+            return NextResponse.json(
+              { ...prior.data.result, replayed: true },
+              {
+                headers: NO_CACHE_HEADERS,
+              }
+            );
+          }
+        }
+        if (reconcile) {
+          return NextResponse.json(
+            { success: false, acknowledged: false },
+            { headers: NO_CACHE_HEADERS }
           );
         }
 
@@ -224,6 +306,25 @@ export async function POST(req: Request) {
 
         await syncPrimaryMusicUrlsFromSocialLinks(tx, profileId);
 
+        const result = {
+          success: true as const,
+          platform: detected.platform.id,
+          linkId,
+          version: linkVersion,
+          outcome,
+          ...(requestId
+            ? {
+                receipt: {
+                  scopeId: profileId,
+                  requestId,
+                  objectId: linkId,
+                  revision: linkVersion,
+                  durability: 'remote' as const,
+                },
+              }
+            : {}),
+        };
+
         // Audit log
         const ipAddress = getClientIP(req);
         const userAgent = req.headers.get('user-agent');
@@ -240,20 +341,20 @@ export async function POST(req: Request) {
             url: detected.normalizedUrl,
             outcome,
           }),
+          metadata: requestId
+            ? {
+                requestId,
+                platform: detected.platform.id,
+                normalizedUrl: detected.normalizedUrl,
+                expectedVersion,
+                result,
+              }
+            : {},
           ipAddress: ipAddress ?? null,
           userAgent: userAgent ?? null,
         });
 
-        return NextResponse.json(
-          {
-            success: true,
-            platform: detected.platform.id,
-            linkId,
-            version: linkVersion,
-            outcome,
-          },
-          { headers: NO_CACHE_HEADERS }
-        );
+        return NextResponse.json(result, { headers: NO_CACHE_HEADERS });
       },
       { clerkUserId: userId }
     );

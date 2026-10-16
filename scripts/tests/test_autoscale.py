@@ -345,7 +345,7 @@ class AutoscaleTest(unittest.TestCase):
                     patch.object(lane, "provider_healthy", return_value=True), patch.object(lane, "ensure_full_history"), \
                     patch.object(lane.disk_guard, "check", return_value={"admitted": True, "freePct": 40}), \
                     patch.object(lane.subprocess, "Popen", side_effect=lambda args, **kw: spawned.append(args[-1])), \
-                    patch.object(lane.shipping_origin, "collect", return_value={}), \
+                    patch.object(lane, "collect_shipping_origin", return_value={}), \
                     patch.object(lane, "quota_pressure", return_value={"ok": True}), \
                     patch.object(lane.pr_events, "tick", return_value={}), patch.object(lane.reason_lane, "tick", return_value={}), \
                     patch.object(lane.yc_corpus, "tick", return_value={}), \

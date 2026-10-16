@@ -6,7 +6,7 @@ import { ArrowLeft } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Fragment, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { AskJovieMark } from '@/components/ask-jovie/AskJovie';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
@@ -96,13 +96,10 @@ function SettingsNavGroup({
 /** Dedicated operator navigation; customer DashboardNav stays customer-only. */
 function OperatorNavigation({ pathname }: { readonly pathname: string }) {
   return (
-    <nav
-      aria-label='OV Navigation'
-      className='flex flex-1 flex-col gap-4 overflow-y-auto pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
-    >
-      {OPERATOR_NAV_SECTIONS.map(section => (
-        <Fragment key={section.label}>
-          <div>
+    <div className='flex flex-1 flex-col gap-4 overflow-y-auto pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
+      <nav aria-label='OV Navigation' className='flex flex-col gap-4'>
+        {OPERATOR_NAV_SECTIONS.map(section => (
+          <div key={section.label}>
             <span className={cn(OPERATOR_NAV_GROUP_LABEL, SHELL_RAIL_LABEL)}>
               {section.label}
             </span>
@@ -114,13 +111,12 @@ function OperatorNavigation({ pathname }: { readonly pathname: string }) {
               }
             />
           </div>
-          {/* Founder lists sit between Workspaces and Utilities (Pen Neq0A). */}
-          {section.label === 'Workspaces' ? (
-            <OperatorListsNav pathname={pathname} />
-          ) : null}
-        </Fragment>
-      ))}
-    </nav>
+        ))}
+      </nav>
+      {/* Dynamic list hrefs stay outside the canonical OV landmark so the
+          registry link set remains exact. */}
+      <OperatorListsNav pathname={pathname} />
+    </div>
   );
 }
 

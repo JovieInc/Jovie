@@ -40,10 +40,14 @@ on:
 permissions: {}
 
 concurrency:
-  # Pushes to main supersede each other (only the newest conflict read matters);
-  # every other event is its own PR signal and must not be dropped.
-  group: lane-fix-relay-${{ github.event_name == 'push' && 'main' || github.run_id }}
-  cancel-in-progress: ${{ github.event_name == 'push' }}
+  # Pushes to main supersede each other. Repeated completions of one workflow
+  # for one PR share a slot, so a burst keeps a single pending run and the
+  # newer one cancels the waiter before a Jovie Bot token is minted. A second
+  # workflow, review, or deploy keeps its own slot.
+  # workflow_dispatch declares no inputs. event.inputs.pr_number is an
+  # actionlint error (object type {}) and ejected the merge group.
+  group: lane-fix-relay-${{ github.event_name == 'push' && 'push-main' || format('{0}-{1}-{2}', github.event_name, github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_sha || github.event.deployment.sha || 'unscoped', github.event.workflow_run.name || github.event.workflow_run.conclusion || github.event.review.state || github.event.action || 'signal') }}
+  cancel-in-progress: ${{ github.event_name == 'push' || github.event_name == 'workflow_run' }}
 
 jobs:
   # A pull_request job GitHub never handed to a hosted runner is cancelled after
@@ -83,10 +87,11 @@ jobs:
           GH_REPOSITORY: ${{ github.repository }}
         run: node scripts/pr-unacquired-runner-rerun.mjs
 
-  # A `green` signal only readies a lane draft (`<lane>/jov-<id>-<date>`, pr_events.in_scope),
-  # so success on any other branch is skipped before a runner starts: 129 of ~170 executed
-  # relays in the hour to 01:30Z on 2026-10-04 were such no-ops, each spending GITHUB_TOKEN quota
-  # that Merge Group Admission needs. pr_events.py still applies the exact LANE_BRANCH match.
+  # Success on every pull_request branch starts this job so a stale lane-fix-red
+  # can be deleted with this job's existing GITHUB_TOKEN (issues: write,
+  # pull-requests: write). `green` is still applied only to a lane draft
+  # (pr_events.in_scope). Non-lane successes skip the debounce sleep: they
+  # view one PR and delete only when that head is required-green.
   relay:
     name: Queue lane repair
     needs: rerun-unacquired
@@ -102,10 +107,7 @@ jobs:
       (github.event_name == 'pull_request_review_comment' && github.event.comment.user.type == 'User') ||
       contains(fromJSON('["push","workflow_dispatch"]'), github.event_name) ||
       (github.event.workflow_run.event == 'pull_request' &&
-       contains(fromJSON('["failure","timed_out","startup_failure"]'), github.event.workflow_run.conclusion)) ||
-      (github.event.workflow_run.event == 'pull_request' &&
-       github.event.workflow_run.conclusion == 'success' &&
-       contains(github.event.workflow_run.head_branch, '/jov-')) ||
+       contains(fromJSON('["failure","timed_out","startup_failure","success"]'), github.event.workflow_run.conclusion)) ||
       (github.event.workflow_run.head_branch == 'main' &&
        contains(fromJSON('["push","schedule","workflow_dispatch"]'), github.event.workflow_run.event) &&
        contains(fromJSON('["failure","timed_out","startup_failure","cancelled"]'), github.event.workflow_run.conclusion)))
@@ -121,6 +123,15 @@ jobs:
       # A hand dequeue counts only with the failure hold's receipt on the head (pr_events.failure_held).
       statuses: read
     steps:
+      - name: Debounce repeated workflow completions
+        # Lane-draft successes still settle a burst. A clear-only success on
+        # any other branch skips the sleep.
+        if: >-
+          github.event_name == 'workflow_run' &&
+          (github.event.workflow_run.conclusion != 'success' ||
+           contains(github.event.workflow_run.head_branch, '/jov-'))
+        run: sleep 20
+
       - name: Checkout trusted lane policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

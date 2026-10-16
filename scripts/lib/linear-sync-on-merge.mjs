@@ -38,6 +38,79 @@ import {
   reconcileValidation,
 } from './validation-sync.mjs';
 
+/**
+ * The three classifiers merge-mode needs from github-installation-quota.mjs.
+ * The full module also owns Scorecard waits; this writer only classifies.
+ * @typedef {{
+ *   failureDisposition: (
+ *     label: string,
+ *     error: unknown,
+ *   ) => { code: number, log: string, softFailed: boolean },
+ *   installationQuotaLog: (label: string) => string,
+ *   isInstallationQuota403: (text: unknown, status?: number | null) => boolean,
+ * }} InstallationQuotaClassifier
+ */
+
+/**
+ * pull_request merge runs use the workflow file from the PR merge ref and
+ * then check out main. A merge ref from before this module was added omits
+ * it from sparse-checkout. A static import then dies with ERR_MODULE_NOT_FOUND
+ * before any lifecycle write. Load it when the checkout has it. When it does
+ * not, installation 403s stay fatal: this is not a skip and not exit 0.
+ * Any other load error still throws.
+ * @returns {Promise<InstallationQuotaClassifier>}
+ */
+async function loadInstallationQuotaClassifier() {
+  try {
+    return await import('./github-installation-quota.mjs');
+  } catch (error) {
+    const code =
+      error && typeof error === 'object' && 'code' in error
+        ? String(error.code)
+        : '';
+    if (code !== 'ERR_MODULE_NOT_FOUND') throw error;
+    console.error(
+      'Linear Sync: scripts/lib/github-installation-quota.mjs is absent from this sparse checkout. Installation 403s stay fatal. This is not a successful skip.'
+    );
+    return {
+      failureDisposition(_label, failure) {
+        const stderr =
+          failure && typeof failure === 'object' && 'stderr' in failure
+            ? String(/** @type {{ stderr?: unknown }} */ (failure).stderr ?? '')
+            : '';
+        const message =
+          failure instanceof Error ? failure.message : String(failure ?? '');
+        const text = `${stderr}\n${message}`.trim();
+        return {
+          code: 1,
+          log: text || 'unknown failure',
+          softFailed: false,
+        };
+      },
+      installationQuotaLog(label) {
+        return `Linear Sync: installation-quota classifier unavailable for ${label}; installation 403s stay fatal`;
+      },
+      isInstallationQuota403() {
+        return false;
+      },
+    };
+  }
+}
+
+const installationQuota = await loadInstallationQuotaClassifier();
+
+/** True only when the checked-out classifier recognized an installation 403. */
+export const installationQuotaClassifierReady =
+  installationQuota.isInstallationQuota403(
+    'API rate limit exceeded for installation ID 1'
+  ) === true;
+
+export const {
+  failureDisposition,
+  installationQuotaLog,
+  isInstallationQuota403,
+} = installationQuota;
+
 export const LINEAR_API = 'https://api.linear.app/graphql';
 export const COMMISSIONING_PARENT_ALLOWLIST = new Set([
   'JOV-5853',
@@ -1109,7 +1182,11 @@ async function runSync(options) {
     options.harnessManifest ?? loadJson(root, CI_HARNESS_MANIFEST);
   const assuranceMatrix =
     options.assuranceMatrix ?? loadJson(root, ASSURANCE_MATRIX);
-  let openPulls = { pulls: /** @type {object[]} */ ([]), complete: true };
+  let openPulls = {
+    pulls: /** @type {object[]} */ ([]),
+    complete: true,
+  };
+  let openPullFailure = '';
   try {
     openPulls = await listOpenPullRequests({ fetchImpl, token, repository });
   } catch (error) {
@@ -1120,7 +1197,11 @@ async function runSync(options) {
       // Quota is already spent. Evaluating issues would 403 the first linked
       // pull (JOV-7355 → #19767 on 2026-10-15) and label that as a Linear
       // deferral. Leave the cursor where it is and let the next sweep resume.
-      // A merge event still fails closed so that one pull is not dropped.
+      // A merge event still fails closed unless the answer is specifically an
+      // installation 403, which the process exit soft-fails.
+      if (isInstallationQuota403(message)) {
+        log(installationQuotaLog('Linear Sync'));
+      }
       log(`Open pull request scan deferred: ${message}`);
       return {
         action: 'deferred',
@@ -1137,6 +1218,7 @@ async function runSync(options) {
     }
     log(`Open pull request scan failed: ${message}`);
     openPulls = { pulls: [], complete: false };
+    openPullFailure = message;
   }
 
   const lookups = [];
@@ -1211,6 +1293,7 @@ async function runSync(options) {
   const results = [];
   const failures = [];
   let deferredNote = '';
+  let deferredDetail = '';
   let cursorSaved = false;
   const deferAt = (lookupId, message) => {
     const source = message.startsWith('Linear')
@@ -1223,6 +1306,10 @@ async function runSync(options) {
     const resumeAt = lookups.indexOf(lookupId);
     const deferred = lookups.length - (resumeAt === -1 ? 0 : resumeAt);
     deferredNote = `${deferred} issue(s) deferred to the next sweep by the ${source} rate limit; resume at ${lookupId}`;
+    deferredDetail = message;
+    if (isInstallationQuota403(message)) {
+      log(installationQuotaLog('Linear Sync'));
+    }
     log(`Lifecycle evaluation deferred at ${lookupId}: ${message}`);
     log(deferredNote);
   };
@@ -1305,13 +1392,21 @@ async function runSync(options) {
   if (sweep && !cursorSaved) writeSweepCursor(cursorDir, '');
   const reasons = [...failures];
   if (!openPulls.complete) {
+    const detail =
+      openPullFailure && isInstallationQuota403(openPullFailure)
+        ? ` (${openPullFailure})`
+        : '';
     reasons.unshift(
-      'the open pull request scan failed, so issues were left in place'
+      `the open pull request scan failed${detail}, so issues were left in place`
     );
   }
   if (reasons.length > 0 || (deferredNote && !sweep)) {
+    const quotaDetail =
+      deferredDetail && isInstallationQuota403(deferredDetail)
+        ? deferredDetail
+        : '';
     throw new Error(
-      `Lifecycle evaluation failed: ${[...reasons, deferredNote].filter(Boolean).join('; ')}`
+      `Lifecycle evaluation failed: ${[...reasons, deferredNote, quotaDetail].filter(Boolean).join('; ')}`
     );
   }
   const first = results[0];
@@ -1381,9 +1476,9 @@ if (isDirectRun) {
       : syncLinearIssueOnMerge();
   run
     .catch(error => {
-      const message = error instanceof Error ? error.message : String(error);
-      console.error(message);
-      process.exitCode = 1;
+      const disposition = failureDisposition('Linear Sync', error);
+      console.error(disposition.log);
+      if (!disposition.softFailed) process.exitCode = disposition.code;
     })
     .finally(() => {
       // Save the immutable-read cache only when its content changed.

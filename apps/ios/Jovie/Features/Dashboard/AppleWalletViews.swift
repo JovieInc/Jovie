@@ -9,17 +9,37 @@ struct AppleWalletPassSheet: Identifiable {
 }
 
 enum AppleWalletControlAvailability: Equatable {
+  case capabilityUnavailable
   case serverUnavailable
   case deviceUnsupported
   case available
 
-  init(serverAvailable: Bool, deviceCanAddPasses: Bool) {
-    if !serverAvailable {
+  init(
+    serverAvailable: Bool,
+    deviceCanAddPasses: Bool,
+    distributionCapabilityEnabled: Bool = true
+  ) {
+    if !distributionCapabilityEnabled {
+      self = .capabilityUnavailable
+    } else if !serverAvailable {
       self = .serverUnavailable
     } else if !deviceCanAddPasses {
       self = .deviceUnsupported
     } else {
       self = .available
+    }
+  }
+
+  var statusMessage: String? {
+    switch self {
+    case .capabilityUnavailable:
+      return "Apple Wallet isn't available in this build."
+    case .serverUnavailable:
+      return "Apple Wallet isn't available for this profile yet."
+    case .deviceUnsupported:
+      return "Apple Wallet isn't available on this device."
+    case .available:
+      return nil
     }
   }
 }

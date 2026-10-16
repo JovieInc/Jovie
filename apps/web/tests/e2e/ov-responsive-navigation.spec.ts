@@ -76,7 +76,25 @@ async function customerNavigationContract(
             aria: Object.fromEntries(
               Array.from(node.attributes)
                 .filter(attribute => attribute.name.startsWith('aria-'))
-                .map(attribute => [attribute.name, attribute.value])
+                .map(attribute => {
+                  // React useId values differ across sessions. Keep the
+                  // control relationship, not the generated id string.
+                  if (
+                    attribute.name === 'aria-controls' ||
+                    attribute.name === 'aria-owns'
+                  ) {
+                    const target = node.ownerDocument.getElementById(
+                      attribute.value
+                    );
+                    if (!target) return [attribute.name, 'missing-target'];
+                    const label =
+                      target.getAttribute('aria-label') ??
+                      target.getAttribute('role') ??
+                      target.tagName.toLowerCase();
+                    return [attribute.name, `controls:${label}`];
+                  }
+                  return [attribute.name, attribute.value];
+                })
             ),
           })
         )
@@ -242,7 +260,8 @@ test.describe('OV responsive navigation exclusivity', () => {
       test.setTimeout(180_000);
       await page.setViewportSize(viewport);
       await enterPersona(page, 'admin', APP_ROUTES.OV);
-      await expect(page).toHaveURL(new RegExp(`${APP_ROUTES.OV}/?$`));
+      // /app/ov rewrites to /app/admin, which redirects to the HUD.
+      await expect(page).toHaveURL(new RegExp(`${APP_ROUTES.HUD}/?$`));
 
       const mobileNavigation = page.getByRole('navigation', {
         name: 'OV Mobile Navigation',
@@ -328,8 +347,13 @@ test.describe('OV responsive navigation exclusivity', () => {
         expect(new Set(await visibleHrefSet(desktopNavigation))).toEqual(
           new Set(ADMIN_NAV_REGISTRY.map(item => item.href))
         );
+        // Desktop OV has no page-level Sign Out. The control is the Account
+        // menu item, sentence case, inside the identity group.
+        const account = page.getByRole('group', { name: 'Account' });
+        await expect(account).toBeVisible();
+        await account.getByRole('button').click();
         await expect(
-          page.getByRole('button', { name: 'Sign Out' })
+          page.getByRole('menuitem', { name: 'Sign out' })
         ).toBeVisible();
       }
     });

@@ -29,7 +29,12 @@ const PAY_HERO_PHOTO = {
 
 function TipsHero() {
   return (
-    <section className='marketing-hero-dock marketing-hero-dock--inset relative overflow-hidden'>
+    <section
+      className='marketing-hero-dock marketing-hero-dock--inset relative overflow-hidden'
+      data-testid='marketing-section-hero'
+      data-marketing-variant='split-claim-card'
+      data-marketing-owner='apps/web/components/features/pay/PayLanding.tsx'
+    >
       <MarketingHeroPhoto {...PAY_HERO_PHOTO} />
       <div className='hero-glow pointer-events-none absolute inset-0' />
       <MarketingHero
@@ -93,7 +98,12 @@ const STEPS = [
 
 function HowItWorksSection() {
   return (
-    <section className='relative z-10 bg-surface-page pt-(--linear-section-pt-lg) pb-(--linear-section-pb-md)'>
+    <section
+      className='relative z-10 bg-surface-page pt-(--linear-section-pt-lg) pb-(--linear-section-pb-md)'
+      data-testid='marketing-section-how-it-works'
+      data-marketing-variant='3-step-strip'
+      data-marketing-owner='apps/web/components/features/pay/PayLanding.tsx'
+    >
       <MarketingContainer width='landing'>
         <div className='mx-auto max-w-300'>
           <div className='homepage-section-intro'>
@@ -167,7 +177,13 @@ const BENEFITS = [
 
 function BenefitsSection() {
   return (
-    <section className='relative z-10 bg-base pt-(--linear-section-pt-md) pb-(--linear-section-pb-md)'>
+    <section
+      className='relative z-10 bg-base pt-(--linear-section-pt-md) pb-(--linear-section-pb-md)'
+      data-testid='marketing-section-feature-grid'
+      data-marketing-variant='3-large'
+      data-marketing-owner='apps/web/components/features/pay/PayLanding.tsx'
+      data-marketing-occurrence='benefits'
+    >
       <MarketingContainer width='landing'>
         <div className='mx-auto max-w-300'>
           <div className='marketing-divider mb-14' />
@@ -229,7 +245,13 @@ const USE_CASES = [
 
 function SocialProofSection() {
   return (
-    <section className='relative z-10 bg-surface-page pt-(--linear-section-pt-md) pb-(--linear-section-pb-md)'>
+    <section
+      className='relative z-10 bg-surface-page pt-(--linear-section-pt-md) pb-(--linear-section-pb-md)'
+      data-testid='marketing-section-feature-grid'
+      data-marketing-variant='4-equal'
+      data-marketing-owner='apps/web/components/features/pay/PayLanding.tsx'
+      data-marketing-occurrence='use-cases'
+    >
       <MarketingContainer width='landing'>
         <div className='mx-auto max-w-300'>
           <div className='homepage-section-intro'>
@@ -277,7 +299,12 @@ function SocialProofSection() {
 
 function TipsFinalCTA() {
   return (
-    <section className='relative z-10 bg-surface-page pt-(--linear-section-pt-lg) pb-(--linear-section-pb-lg)'>
+    <section
+      className='relative z-10 bg-surface-page pt-(--linear-section-pt-lg) pb-(--linear-section-pb-lg)'
+      data-testid='marketing-section-cta'
+      data-marketing-variant='final-single-claim'
+      data-marketing-owner='apps/web/components/features/pay/PayLanding.tsx'
+    >
       <MarketingContainer width='landing'>
         <div className='marketing-divider mb-12' />
 

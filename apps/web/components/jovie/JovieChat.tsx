@@ -69,6 +69,8 @@ import type { JovieChatProps } from './types';
 const VIRTUALIZATION_THRESHOLD =
   CHAT_TRANSCRIPT_WINDOW.virtualizeAfterMessageCount;
 const CHAT_PICKER_THREAD_CLEARANCE = 'min(620px, calc(100vh - 8rem))';
+// Match the insights fetch deadline without waiting through query retries.
+const EMPTY_NEXT_STEP_TIMEOUT_MS = 10_000;
 
 function findLastAssistantIndex(
   messages: readonly { id: string; role: string }[]
@@ -548,6 +550,7 @@ export function JovieChat({
     data: insightsSummary,
     isLoading: insightsLoading,
     isError: insightsError,
+    isEnabled: insightsEnabled,
   } = useInsightsSummaryQuery({
     enabled: showEmptyGreeting,
   });
@@ -557,17 +560,17 @@ export function JovieChat({
     readonly action: ChatEmptyStateAction | null;
   } | null>(null);
   useEffect(() => {
-    // isLoading is false while data is still undefined (disabled, or the
-    // render before the in-flight summary arrives). Committing that gap as
-    // "no action" freezes the welcome on the profile link and drops the
-    // fixture that lands a moment later.
+    // An enabled query can have no data before its request starts. Wait for
+    // that summary, but a disabled or failed query can use the fallback now.
+    const insightsUnavailable = insightsEnabled === false || insightsError;
     const insightsSettled =
-      insightsError || (!insightsLoading && insightsSummary !== undefined);
+      insightsUnavailable ||
+      (!insightsLoading && insightsSummary !== undefined);
     if (showThreadView) {
       setEmptyNextStep(null);
     } else if (showEmptyGreeting && insightsSettled && !emptyNextStep) {
       setEmptyNextStep({
-        action: insightsError
+        action: insightsUnavailable
           ? null
           : resolveChatEmptyStateInsight(insightsSummary?.insights ?? []),
       });
@@ -577,9 +580,18 @@ export function JovieChat({
     showEmptyGreeting,
     insightsLoading,
     insightsError,
+    insightsEnabled,
     insightsSummary,
     emptyNextStep,
   ]);
+  useEffect(() => {
+    if (!showEmptyGreeting || emptyNextStep) return;
+    // Keep one deadline for this visible wait; query updates must not restart it.
+    const timer = setTimeout(() => {
+      setEmptyNextStep({ action: null });
+    }, EMPTY_NEXT_STEP_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [showEmptyGreeting, emptyNextStep]);
   const selectedEmptyAction = emptyNextStep?.action;
   const currentEmptyInsight = insightsSummary?.insights.find(
     insight => insight.id === selectedEmptyAction?.insightId

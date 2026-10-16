@@ -4,6 +4,8 @@ opt_out_usage
 require "shellwords"
 require "open3"
 require "time"
+require "json"
+require "digest"
 
 REPO_ROOT = File.expand_path("..", __dir__)
 IOS_PROJECT = File.join(REPO_ROOT, "apps/ios/Jovie.xcodeproj")
@@ -22,6 +24,12 @@ def require_env!(name)
 end
 
 def verify_release_sha_is_current_main!
+  if env_present?("TESTFLIGHT_LEASE_PATH")
+    guard = require_env!("TESTFLIGHT_GUARD_PATH")
+    _, status = Open3.capture2e("node", guard, "upload")
+    UI.user_error!("TestFlight certified release lease failed final validation") unless status.success?
+    return
+  end
   release_sha = require_env!("RELEASE_SHA")
   repository = require_env!("GITHUB_REPOSITORY")
   github_token = require_env!("GH_TOKEN")
@@ -277,6 +285,12 @@ platform :ios do
       profile_name: profile_name
     )
 
+    # Compare Release entitlements with the profile match just installed.
+    # Gym's capability error is too late and too vague to act on.
+    sh(
+      "JOVIE_REQUIRE_DISTRIBUTION_PROFILE=1 bash #{repo_path("apps/ios/scripts/validate-distribution-capabilities.sh").shellescape}"
+    )
+
     signing_xcargs = [
       "CODE_SIGNING_ALLOWED=YES",
       "CODE_SIGNING_REQUIRED=YES",
@@ -303,8 +317,8 @@ platform :ios do
       }
     )
 
-    # Archive work may overlap a newer main generation. Fail closed at the last
-    # safe boundary so a stale binary never reaches App Store Connect.
+    # Re-prove the pinned certificate, current policy, ancestry and immutable
+    # upload intent at the last safe boundary after archive work.
     verify_release_sha_is_current_main!
 
     upload_to_testflight(
@@ -316,5 +330,15 @@ platform :ios do
       distribute_external: false,
       changelog: ENV.fetch("TESTFLIGHT_CHANGELOG", "Internal iOS foundation build #{current_build_number}")
     )
+    if env_present?("TESTFLIGHT_LEASE_PATH")
+      # Written only after the existing upload/processing action succeeds.
+      attestation = {
+        schema: "jovie-testflight-binary/v1",
+        lease: JSON.parse(File.read(ENV.fetch("TESTFLIGHT_LEASE_PATH"))),
+        buildNumber: current_build_number.to_s,
+        binarySha256: Digest::SHA256.file(File.join(DEFAULT_ARTIFACT_DIR, "Jovie.ipa")).hexdigest
+      }
+      File.write(File.join(DEFAULT_ARTIFACT_DIR, "testflight-upload-attestation.json"), JSON.generate(attestation))
+    end
   end
 end

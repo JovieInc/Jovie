@@ -1584,7 +1584,7 @@ describe('current acquisition source inventory (JOV-4065)', () => {
         'apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.tsx'
       ),
     ]);
-    expect(entry.bindingEvidence.status).toBe('unverified');
+    expect(entry.bindingEvidence.status).toBe('verified');
     expect(bindings.map(binding => binding.variantId)).toEqual([
       'left-none',
       '3-step-strip',

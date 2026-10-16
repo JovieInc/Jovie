@@ -543,7 +543,9 @@ test.describe('Production Auth Smoke @production-smoke', () => {
       {
         navigationPath: APP_ROUTES.RELEASES,
         readyPath: APP_ROUTES.LIBRARY,
-        readyTestId: 'library-surface',
+        // /app/releases aliases to the releases matrix. The asset catalog's
+        // library-surface is not mounted for ?view=releases.
+        readyTestId: 'shell-releases-view',
         readyView: 'releases',
       },
     ];

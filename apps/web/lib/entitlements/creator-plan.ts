@@ -2,6 +2,7 @@ import 'server-only';
 
 import { aliasedTable, eq, inArray } from 'drizzle-orm';
 import { db, withRetry } from '@/lib/db';
+import { QUERY_TIMEOUTS } from '@/lib/db/query-timeout';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
 import { isLegacyFanSendPrice } from '@/lib/stripe/config';
@@ -129,7 +130,8 @@ export async function getCreatorEntitlementsWithOwner(
           .where(eq(creatorProfiles.id, creatorProfileId))
           .orderBy(userProfileClaims.userId)
           .limit(1),
-      `creatorEntitlements(${creatorProfileId})`
+      `creatorEntitlements(${creatorProfileId})`,
+      { operation: 'read', retryBudgetMs: QUERY_TIMEOUTS.api }
     );
 
     const ownerUserId = result?.claimedUserId ?? result?.legacyUserId ?? null;
