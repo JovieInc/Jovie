@@ -97,6 +97,10 @@ function fixture(rows = expected()) {
     },
   };
 }
+/** @param {unknown} error */
+const unknownEffect = error =>
+  error instanceof Error && 'effect' in error && error.effect === 'unknown';
+
 const held = code => error =>
   error.code === code &&
   error.effect === 'unknown' &&
@@ -365,11 +369,11 @@ test('incomplete, oversized or malformed connections never receive a partial com
     const f = fixture(actual);
     await assert.rejects(
       readBacklogCurrent(f.client, evidence()),
-      error => error.effect === 'unknown'
+      unknownEffect
     );
     assert.throws(
       () => criticalPreimagesMatch(actual, expected()),
-      error => error.effect === 'unknown'
+      unknownEffect
     );
     assert.equal(f.calls.length, 1);
   }
@@ -388,7 +392,7 @@ test('wrong, duplicate, extra and missing current identities fail before any usa
   ])
     await assert.rejects(
       readBacklogCurrent({ graphql: async () => response }, evidence()),
-      error => error.effect === 'unknown'
+      unknownEffect
     );
   assert.throws(
     () => criticalPreimagesMatch({ [id(1)]: row(1) }, expected()),
@@ -411,7 +415,7 @@ test('invalid native evidence and more than eight retained UUIDs never spend a q
     { ...evidence(), linearPreimagesObservedAt: NaN },
     evidence(null),
     evidence({}),
-    evidence([]),
+    { ...evidence(), linearPreimages: [] },
     evidence({ bad: row(1) }),
     evidence(duplicate),
     evidence(
@@ -434,7 +438,7 @@ test('invalid native evidence and more than eight retained UUIDs never spend a q
         },
         value
       ),
-      error => error.effect === 'unknown'
+      unknownEffect
     );
   assert.equal(calls, 0);
   await assert.rejects(
@@ -639,7 +643,7 @@ test('new urgent membership, removal, priority, owner, delegate and readiness ch
     const client = cohortClient([cohortPage(rows)]);
     await assert.rejects(
       assertCurrentCohort(client, retained, {}),
-      error => error.effect === 'unknown'
+      unknownEffect
     );
     assert.equal(client.calls.length, 1);
   }
@@ -757,7 +761,7 @@ test('new pages, cursor loops, malformed pages and partial labels never expand t
     const client = cohortClient([page]);
     await assert.rejects(
       assertCurrentCohort(client, cohortEvidence(), {}),
-      error => error.effect === 'unknown'
+      unknownEffect
     );
     assert.equal(client.calls.length, 1);
   }
@@ -807,10 +811,7 @@ test('invalid retained cohort evidence and out-of-scope actual rows stay held wi
     duplicate,
     partial,
   ])
-    await assert.rejects(
-      assertCurrentCohort(client, value, {}),
-      error => error.effect === 'unknown'
-    );
+    await assert.rejects(assertCurrentCohort(client, value, {}), unknownEffect);
   assert.equal(calls, 0);
   await assert.rejects(
     assertCurrentCohort({}, cohortEvidence(), {}),
