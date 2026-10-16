@@ -222,15 +222,33 @@ function assertPullNumber(prNumber) {
   return prNumber;
 }
 
-export function permissionDeniedRearm(prNumber) {
-  const number = assertPullNumber(prNumber);
-  const detail = `Rearm of #${number} denied: Resource not accessible by integration (enqueuePullRequest)`;
-  const error = new Error(`::error::${detail}`);
-  error.code = 'ENQUEUE_PERMISSION_DENIED';
-  error.prNumber = number;
-  error.annotation = `::error::${detail}`;
-  error.summary = detail;
-  return error;
+export class RearmPermissionError extends Error {
+  /**
+   * @param {number} prNumber
+   * @param {unknown} [cause]
+   */
+  constructor(prNumber, cause) {
+    const number = assertPullNumber(prNumber);
+    const detail = `Rearm of #${number} denied: Resource not accessible by integration (enqueuePullRequest)`;
+    super(
+      `::error::${detail}`,
+      cause === undefined ? undefined : { cause }
+    );
+    this.name = 'RearmPermissionError';
+    /** @type {'ENQUEUE_PERMISSION_DENIED'} */
+    this.code = 'ENQUEUE_PERMISSION_DENIED';
+    /** @type {number} */
+    this.prNumber = number;
+    /** @type {string} */
+    this.annotation = `::error::${detail}`;
+    /** @type {string} */
+    this.summary = detail;
+  }
+}
+
+/** @param {number} prNumber @param {unknown} [cause] */
+export function permissionDeniedRearm(prNumber, cause) {
+  return new RearmPermissionError(prNumber, cause);
 }
 
 export function enqueuePullRequestArgs({ nodeId, headOid }) {
@@ -266,9 +284,7 @@ export function enqueueVictim({ prNumber, nodeId, headOid, exec }) {
     raw = exec(args);
   } catch (error) {
     if (isIntegrationPermissionDenied(error)) {
-      const denied = permissionDeniedRearm(number);
-      denied.cause = error;
-      throw denied;
+      throw permissionDeniedRearm(number, error);
     }
     throw error;
   }
@@ -285,7 +301,7 @@ export function enqueueVictim({ prNumber, nodeId, headOid, exec }) {
 
 /** @returns {1} the step always fails; permission denials are annotated */
 export function surfaceRearmFailure(error, { writeError, writeSummary }) {
-  if (error?.code === 'ENQUEUE_PERMISSION_DENIED') {
+  if (error instanceof RearmPermissionError) {
     writeError(error.annotation);
     writeSummary(error.summary);
     return 1;
@@ -294,6 +310,14 @@ export function surfaceRearmFailure(error, { writeError, writeSummary }) {
   return 1;
 }
 
+/**
+ * @param {unknown} error
+ * @param {{
+ *   env?: { GITHUB_STEP_SUMMARY?: string },
+ *   stderr?: { write(line: string): void },
+ *   appendFile?: (path: string, data: string) => void,
+ * }} [io]
+ */
 export function commitRearmFailure(
   error,
   {

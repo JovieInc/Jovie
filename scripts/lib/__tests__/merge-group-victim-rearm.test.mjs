@@ -10,6 +10,7 @@ import {
   ENQUEUE_PULL_REQUEST_MUTATION,
   enqueueVictim,
   heldRevisionFromReceipt,
+  RearmPermissionError,
   implicatedPathsFromAnnotations,
   planVictimRearms,
   REARM_CAP,
@@ -337,15 +338,13 @@ test('a failed enqueue writes no receipt and leaves the cap unused', async () =>
           writes.push(receipt);
         },
         async enable() {
-          const error = new Error(
-            '::error::Rearm of #10 denied: Resource not accessible by integration (enqueuePullRequest)'
-          );
-          error.code = 'ENQUEUE_PERMISSION_DENIED';
-          throw error;
+          throw new RearmPermissionError(10);
         },
       }
     ),
-    error => error.code === 'ENQUEUE_PERMISSION_DENIED'
+    error =>
+      error instanceof RearmPermissionError &&
+      error.code === 'ENQUEUE_PERMISSION_DENIED'
   );
   assert.deepEqual(writes, []);
   const [next] = planVictimRearms({
@@ -513,7 +512,9 @@ test('a token that cannot enqueue names the PR and fails the step', () => {
         },
       }),
     error =>
-      error.code === 'ENQUEUE_PERMISSION_DENIED' && error.prNumber === 22127
+      error instanceof RearmPermissionError &&
+      error.code === 'ENQUEUE_PERMISSION_DENIED' &&
+      error.prNumber === 22127
   );
   const bodyDenied = enqueueVictim.bind(null, {
     prNumber: 22127,
@@ -532,7 +533,12 @@ test('a token that cannot enqueue names the PR and fails the step', () => {
       };
     },
   });
-  assert.throws(bodyDenied, error => error.code === 'ENQUEUE_PERMISSION_DENIED');
+  assert.throws(
+    bodyDenied,
+    error =>
+      error instanceof RearmPermissionError &&
+      error.code === 'ENQUEUE_PERMISSION_DENIED'
+  );
 
   const dir = mkdtempSync(join(tmpdir(), 'rearm-denied-'));
   const summaryPath = join(dir, 'summary.md');
