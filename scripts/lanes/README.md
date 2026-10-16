@@ -27,7 +27,7 @@ The harness, not the model, owns:
 | Execution attempts: stable action phases fence boundary replay. The dual-format reader supports immutable candidate ownership and terminal recovery; its incompatible writer remains disabled pending verified reader/writer readiness. Enabled recovery publishes only the reserved winner and seals unknown boundaries without another attempt or grant | `execution_attempt.py` |
 | One open PR per issue: branch or `linear-issue-id` marker; an unreadable PR list claims nothing | `in_flight_issues()` |
 | No open-PR ceiling (Tim 2026-10-12): new-issue intake is bounded only by real limits in autoscale (compute, credits, quotas); `new_issue_budget()` reports counts, never refuses | `new_issue_budget()` |
-| Workstreams: one classifier for intake and backlog (`ws:<key>` label override, else ordered rules); exact normalized-title duplicates admit only the oldest (`duplicate-candidate:<JOV>`); order = explicit dispatch-next in the admitted pool → tier (urgent or CI/Symphony-throughput) → aged priority → workstream rank → age | `workstreams.py`, `pool_rejections()`, `admission_order()` |
+| Workstreams: one classifier for intake and backlog (`ws:<key>` label override, else ordered rules); exact normalized-title duplicates admit only the oldest (`duplicate-candidate:<JOV>`); order = explicit Urgent → dispatch-next in the admitted pool → tier (aged or CI/Symphony-throughput) → aged priority → workstream rank → age | `workstreams.py`, `pool_rejections()`, `admission_order()` |
 | File-overlap admission: declared paths, then the workstream map, are compared with the cached open-PR inventory and In Progress lane tasks; hot control-plane and duplicate migration-number collisions wait, shared/generated files sequence, other overlaps flag | `file_overlap.py`, `overlap_inventory()` |
 | Hotspot admission (JOV-7708): an issue whose predicted touch set (named file paths, else its workstream area; Symphony-throughput = the lanes harness) hits a hotspot an open, non-parked PR holds waits as `hotspot-held:<path>#<pr>`. Hotspots = a static seed (lanes harness, `code-flags.ts`, command/product-truth registries, `node-environment-files.json`, `destructive-red-drift.baseline.json`) plus any file two open PRs touch; an unreadable file list admits ungated | `pool_rejections()`, `hotspot_holds()`, `open_hotspot_holds()` |
 | Sweep (every 30 min per lane): retire only explicitly labeled duplicates after live head, hold and queue revalidation; preserve unlabelled stale drafts | `sweep_lane_prs()` |
@@ -243,19 +243,20 @@ infrastructure first:
 `library-content` → `analytics-gtm` → `docs-changelog` → `lyb` → `memory-gbrain` →
 `general` → `human-decision`.
 
-`pick_issue()` orders candidates by `admission_order()`: an operator-designated
-`dispatch-next` issue carrying `agent-ready` is first among eligible new claims.
-Use it for the measured bottleneck (including binding CI or deployment work),
-clear a stale designation before replacing it, and verify the actual worker claim.
-It cannot interrupt active work or bypass repair-first, budget, routing, design,
-retry, duplicate, file-overlap or hotspot admission. Untagged aging is unchanged;
-multiple designations retain the existing priority/workstream/age tie-breakers.
-The Todo state filter consumes the designation when work starts. Otherwise tier 0 is urgent work
-(effective P1, including work aged to P1) or a compounding workstream (CI, Symphony
-throughput); then aged priority; then workstream rank; then age. Urgent-first and
-anti-starvation aging are preserved; a non-urgent CI or throughput fix runs ahead of
-non-urgent product work. The Linear backlog carries the same `ws:*` labels so new
-intake and existing work follow one rule.
+`pick_issue()` and the doctor share `admission_order()`. Current explicit Linear
+Urgent ranks before every lower-priority eligible unclaimed candidate, including
+aged CI work and `dispatch-next` (Tim, 2026-10-16; JOV-8022/JOV-7073). Only integer
+priority 1 is Urgent; missing and malformed priorities cannot acquire that status.
+Priority edits take effect on the next claim scan after the canonical Linear mirror
+receives them. Installed ingestion and actual claims require separate receipts.
+
+Within each explicit urgency band, an operator-designated `dispatch-next` issue
+carrying `agent-ready` is first. Otherwise tier 0 is aged priority 1 or compounding
+CI/Symphony throughput; tier 1 is other work. Aged priority, workstream rank and age
+break ties. Aging still prevents starvation among non-urgent work. Designation
+cannot interrupt active work or bypass repair-first, budget, routing, design,
+retry, duplicate, file-overlap or hotspot admission. Todo filtering consumes the
+designation when work starts; labels on Backlog do not establish admission.
 
 Duplicate identity is deliberately exact: titles equal after case, punctuation and
 conventional `bug:`/`P1:` prefixes are stripped (bracketed tags such as `[web-053]`
