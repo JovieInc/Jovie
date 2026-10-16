@@ -23,6 +23,7 @@ export default function StartLoading() {
       data-testid='start-loading-skeleton'
     >
       <AppShellFrame
+        placeholder
         sidebar={null}
         containerClassName='[color-scheme:dark]'
         contentClassName='overflow-hidden!'
