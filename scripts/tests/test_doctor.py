@@ -2112,6 +2112,40 @@ class WorkerCensusParityTest(unittest.TestCase):
             stack.enter_context(mock.patch.object(lane, name, return_value=value))
         return {"codex": {"slots": 1, "base": 1, "running": 0}}
 
+    def test_four_target_cards_have_worker_census_parity_without_writing_admission(self):
+        from contextlib import ExitStack
+        lane = load("lane_runner")
+        issues, witnesses = [], {}
+        for number in (21824, 21810, 21793, 21770):
+            fingerprint = f"remediation:pr-{number}-conflict"
+            issues.append(lane.Issue(str(number), f"JOV-{number}",
+                f"PR #{number} has carried lane-fix-exhausted for more than 24h ({fingerprint})",
+                f"https://github.com/JovieInc/Jovie/pull/{number}\nFingerprint: `{fingerprint}`",
+                2, "2026-01-01T00:00:00Z", [fingerprint]))
+            witnesses[number] = {"schema": lane.pr_events.TARGET_FILES_SCHEMA, "source": "graphql-inline",
+                "repository": "JovieInc/Jovie", "number": number, "state": "OPEN", "headRefOid": "a"*40,
+                "baseRefName": "main", "baseRefOid": "b"*40, "baseTipOid": "c"*40,
+                "paths": [f"apps/web/lib/product-{number}.ts"], "totalCount": 1,
+                "observedAt": 9998, "sourceAt": 9999, "confirmedAt": 10000}
+        with tempfile.TemporaryDirectory() as tmp, ExitStack() as stack:
+            host = lane.Host(state=Path(tmp), linear_env=Path(tmp) / "none")
+            current = [{**row, "baseRef": {"target": {"oid": row["baseTipOid"]}},
+                        "files": [{"path": path} for path in row["paths"]], "filesComplete": True,
+                        "inlineFilesEvidence": row} for row in witnesses.values()]
+            capacity = self.fixture(stack, host, lane, issues, inventory=(current, []))
+            stack.enter_context(mock.patch.object(lane.pr_events, "capture_target_file_witnesses", return_value=witnesses))
+            record = stack.enter_context(mock.patch.object(doctor.file_overlap, "record_admission"))
+            clock = stack.enter_context(mock.patch.object(doctor.time, "time", return_value=10001))
+            for row in witnesses.values():
+                row["confirmedAt"] = 10001  # Capture finished after the original observation time.
+            qualified = doctor.qualified_pool(host, lane, capacity, 10000)[0]["codex"]
+            self.assertEqual(qualified, issues)
+            self.assertIn(lane.pick_issue(issues, {}, now=10001, provider="codex",
+                holds=lane.open_hotspot_holds(), target_files=witnesses), qualified)
+            self.assertEqual(doctor.qualified_pool(host, lane, capacity, 10061)[0]["codex"], [])
+            record.assert_not_called()
+            self.assertEqual(list(host.state.iterdir()), [])
+
     def test_hotspot_and_preserved_only_pools_match_the_worker_and_keep_ready_neighbors(self):
         from contextlib import ExitStack
         lane = load("lane_runner")

@@ -175,9 +175,9 @@ class ContextManifestTest(unittest.TestCase):
 
 
 class SelectionTest(unittest.TestCase):
-    def test_dispatch_next_precedes_aged_product_and_compounding_work(self):
+    def test_dispatch_next_breaks_ties_inside_explicit_urgency(self):
         now = datetime(2026, 10, 5, tzinfo=timezone.utc).timestamp()
-        target = issue("JOV-7896", priority=2, created="2026-10-05T00:00:00Z",
+        target = issue("JOV-7896", priority=1, created="2026-10-05T00:00:00Z",
                        labels=["agent-ready", "dispatch-next"])
         target.title = "Repair account to claim conversion"
         old = issue("JOV-4258", priority=1, created="2026-09-01T00:00:00Z")
@@ -189,9 +189,41 @@ class SelectionTest(unittest.TestCase):
         target.labels.remove("dispatch-next")
         self.assertIs(lane.pick_issue([old, ci, target], {}, now=now), ci)
 
+    def test_explicit_urgent_precedes_aged_or_designated_lower_priority(self):
+        now = datetime(2026, 10, 16, tzinfo=timezone.utc).timestamp()
+        urgent = issue("JOV-URGENT", priority=1, created="2026-10-15T23:00:00Z")
+        low = issue("JOV-LOW", priority=4, created="2026-09-01T00:00:00Z",
+                    labels=["agent-ready", "dispatch-next", "ws:ci"])
+        for pool in ([low, urgent], [urgent, low]):
+            self.assertIs(lane.pick_issue(pool, {}, now=now), urgent)
+        # A fresh priority edit is consumed by the same picker without restart state.
+        low.priority = 1
+        self.assertIs(lane.pick_issue([urgent, low], {}, now=now), low)
+
+    def test_priority_edits_survive_replay_and_serialized_restart(self):
+        now = datetime(2026, 10, 16, tzinfo=timezone.utc).timestamp()
+        a = issue("JOV-A", priority=1, created="2026-10-15T23:00:00Z")
+        b = issue("JOV-B", priority=4, created="2026-09-01T00:00:00Z", labels=["ws:ci"])
+        for priority, expected in [(4, "JOV-A"), (1, "JOV-B"), (2, "JOV-A")]:
+            b.priority = priority
+            snapshot = json.dumps([dataclasses.asdict(a), dataclasses.asdict(b)])
+            for replay in range(3):
+                pool = [lane.Issue(**row) for row in json.loads(snapshot)]
+                self.assertEqual(lane.pick_issue(pool, {}, now=now).identifier, expected)
+                self.assertEqual(json.dumps([dataclasses.asdict(row) for row in pool]), snapshot)
+
+    def test_missing_or_invalid_priority_never_acquires_explicit_urgency(self):
+        now = datetime(2026, 10, 16, tzinfo=timezone.utc).timestamp()
+        urgent = issue("JOV-URGENT", priority=1, created="2026-10-15T23:00:00Z")
+        for priority in [None, 0, -1, 5, 99, True, False, "1", 1.0]:
+            with self.subTest(priority=priority):
+                invalid = issue("JOV-INVALID", priority=priority, created="2026-09-01T00:00:00Z",
+                                labels=["agent-ready", "dispatch-next", "ws:ci"])
+                self.assertIs(lane.pick_issue([invalid, urgent], {}, now=now), urgent)
+
     def test_dispatch_next_preserves_admission_and_lane_routing(self):
         now = 10000.0
-        target = issue("JOV-PIN", labels=["agent-ready", "dispatch-next"])
+        target = issue("JOV-PIN", priority=1, labels=["agent-ready", "dispatch-next"])
         other = issue("JOV-OTHER", priority=1)
         for kwargs, failures in [
             ({"in_flight": frozenset({"jov-pin"})}, {}),
@@ -208,9 +240,9 @@ class SelectionTest(unittest.TestCase):
             route=lambda task: {"chosen": {"lane": "devin" if task is target else "codex"}}), other)
 
     def test_dispatch_next_without_pool_admission_keeps_default_order(self):
-        unadmitted = issue("JOV-PIN", priority=4, labels=["dispatch-next"])
-        urgent = issue("JOV-URGENT", priority=1)
-        self.assertIs(lane.pick_issue([unadmitted, urgent], {}, now=10000), urgent)
+        unadmitted = issue("JOV-PIN", priority=2, labels=["dispatch-next"])
+        other = issue("JOV-OTHER", priority=2, created="2026-08-31T00:00:00Z")
+        self.assertIs(lane.pick_issue([unadmitted, other], {}, now=10000), other)
 
     def test_rejection_reasons_match_final_worker_admission(self):
         red = issue("JOV-RED")
@@ -252,10 +284,10 @@ class SelectionTest(unittest.TestCase):
         ], {}, now=now)
         self.assertEqual(picked.identifier, "JOV-1")
 
-    def test_aged_work_eventually_precedes_a_sustained_urgent_stream(self):
+    def test_aging_breaks_ties_within_nonurgent_work(self):
         now = datetime(2026, 9, 5, tzinfo=timezone.utc).timestamp()
         picked = lane.pick_issue([
-            issue("JOV-1", priority=1, created="2026-09-04T23:00:00Z"),
+            issue("JOV-1", priority=2, created="2026-09-04T23:00:00Z"),
             issue("JOV-4", priority=4, created="2026-09-01T00:00:00Z"),
         ], {}, now=now)
         self.assertEqual(picked.identifier, "JOV-4")
@@ -267,7 +299,7 @@ class SelectionTest(unittest.TestCase):
             issue("JOV-0", priority=0, created="2026-09-01T00:00:00Z"),
             issue("JOV-BAD", priority=0, created="not-a-date"),
         ], {}, now=now)
-        self.assertEqual(picked.identifier, "JOV-0")
+        self.assertEqual(picked.identifier, "JOV-1")
 
     def test_skips_excluded_and_exhausted_work_but_drains_the_shared_pool(self):
         picked = lane.pick_issue([
@@ -473,9 +505,9 @@ class WorkstreamAdmissionTest(unittest.TestCase):
         urgent = self.titled("JOV-1", "Sidebar jank on profile", priority=1, created="2026-10-01T23:00:00Z")
         ci = self.titled("JOV-2", "Stabilize flaky CI shard", priority=2, created="2026-10-01T22:00:00Z")
         self.assertEqual(lane.pick_issue([ci, urgent], {}, now=now).identifier, "JOV-1")
-        # Work that has aged to P1 joins the urgent band, where CI rank then leads.
+        # Aging never promotes a lower explicit priority above current Urgent.
         ci.created_at = "2026-09-30T22:00:00Z"
-        self.assertEqual(lane.pick_issue([urgent, ci], {}, now=now).identifier, "JOV-2")
+        self.assertEqual(lane.pick_issue([urgent, ci], {}, now=now).identifier, "JOV-1")
 
     def test_explicit_workstream_label_overrides_and_ranks(self):
         self.assertEqual(lane.workstreams.classify("Sidebar jank", ["ws:ci"]), "ci")
@@ -540,6 +572,41 @@ class HotspotAdmissionTest(unittest.TestCase):
         listed = json.dumps([self.open_pr(5, "scripts/lanes/hud.py")])
         with patch.object(lane, "sh", return_value=SimpleNamespace(returncode=0, stdout=listed, stderr="")):
             self.assertEqual(lane.open_hotspot_holds(), {"scripts/lanes/hud.py": 5})
+
+
+class TargetFileAdmissionTest(unittest.TestCase):
+    def fixture(self, number=21824):
+        fingerprint = f"remediation:pr-{number}-conflict"
+        task = issue(f"JOV-{number}", labels=[fingerprint])
+        task.title = f"PR #{number} has carried lane-fix-exhausted for more than 24h ({fingerprint})"
+        task.description = f"https://github.com/JovieInc/Jovie/pull/{number}\nFingerprint: `{fingerprint}`"
+        row = {"schema": lane.pr_events.TARGET_FILES_SCHEMA, "source": "graphql-inline",
+               "repository": "JovieInc/Jovie", "number": number, "state": "OPEN", "headRefOid": "a"*40,
+               "baseRefName": "main", "baseRefOid": "b"*40, "baseTipOid": "c"*40,
+               "paths": [f"apps/web/lib/product-{number}.ts"], "totalCount": 1,
+               "observedAt": 9998, "sourceAt": 9999, "confirmedAt": 10000}
+        return task, {number: row}
+
+    def test_four_generated_cards_are_selected_by_public_worker_predicate(self):
+        holds = {"scripts/lanes/lane_runner.py": 21724}
+        for number in (21824, 21810, 21793, 21770):
+            with self.subTest(number=number):
+                task, witness = self.fixture(number)
+                self.assertIsNone(lane.pick_issue([task], {}, now=10000, holds=holds))
+                self.assertIs(lane.pick_issue([task], {}, now=10000, holds=holds, target_files=witness), task)
+                self.assertEqual(lane.predicted_touch(task, witness, 10000), frozenset(witness[number]["paths"]))
+
+    def test_declared_scope_real_hotspots_and_all_other_admission_guards_remain(self):
+        task, witness = self.fixture(); holds = {"scripts/lanes/lane_runner.py": 21724}
+        task.description += " Edit scripts/lanes/lane_runner.py."
+        self.assertIsNone(lane.pick_issue([task], {}, now=10000, holds=holds, target_files=witness))
+        task, witness = self.fixture(); witness[21824]["paths"] = ["scripts/lanes/lane_runner.py"]
+        self.assertIsNone(lane.pick_issue([task], {}, now=10000, holds=holds, target_files=witness))
+        task, witness = self.fixture()
+        for kwargs in ({"held_back": frozenset({task.identifier})}, {"in_flight": frozenset({task.identifier})}):
+            self.assertIsNone(lane.pick_issue([task], {}, now=10000, holds=holds, target_files=witness, **kwargs))
+        self.assertIsNone(lane.pick_issue([task], {task.identifier: 3}, now=10000, holds=holds, target_files=witness))
+        self.assertIsNone(lane.pick_issue([task], {}, now=10061, holds=holds, target_files=witness))
 
 
 class RebuildInFlightTest(unittest.TestCase):
@@ -2760,6 +2827,75 @@ class MaintenanceDemandTest(unittest.TestCase):
 
 
 class WorkerTest(unittest.TestCase):
+    def test_target_confirmation_precedes_claim_lock_and_worker_rechecks_age_after_wait(self):
+        task, witness = TargetFileAdmissionTest().fixture()
+        self.linear.issues = [task]
+        original_locked = lane.Locked
+        seen = []
+        clock = [10000.0]
+        def capture(*args, **kwargs):
+            contender = original_locked(self.host.state / "claim.lock", blocking=False)
+            try:
+                self.assertTrue(contender.held, "confirmation ran inside claim.lock")
+            finally:
+                contender.release()
+            seen.append("confirmation")
+            return witness
+        def lock(path, *args, **kwargs):
+            if Path(path).name == "claim.lock":
+                self.assertEqual(seen, ["confirmation"])
+                clock[0] = 10061.0  # Simulate a blocked lock acquisition beyond the source TTL.
+            return original_locked(path, *args, **kwargs)
+        with patch.object(lane.pr_events, "capture_target_file_witnesses", side_effect=capture), \
+                patch.object(lane, "Locked", side_effect=lock), \
+                patch.object(lane.time, "time", side_effect=lambda: clock[0]), \
+                patch.object(lane, "open_hotspot_holds", return_value={"scripts/lanes/lane_runner.py": 21724}), \
+                patch.object(lane, "run_issue") as work:
+            lane.worker(self.host, "devin")
+        self.assertEqual(seen, ["confirmation"])
+        work.assert_not_called()
+        self.assertEqual(self.linear.moves, [])
+
+    def test_fresh_target_worker_dispatch_and_changed_inventory_fail_closed(self):
+        task, witness = TargetFileAdmissionTest().fixture()
+        row = witness[21824]
+        current = {**row, "baseRef": {"target": {"oid": row["baseTipOid"]}},
+                   "files": [{"path": path} for path in row["paths"]], "filesComplete": True,
+                   "inlineFilesEvidence": row}
+        self.linear.issues = [task]
+        for changed in (True, False):
+            with self.subTest(changed=changed):
+                inventory = [{**current, "headRefOid": "d"*40}] if changed else [current]
+                with patch.object(lane.pr_events, "capture_target_file_witnesses", return_value=witness), \
+                        patch.object(lane, "overlap_inventory", return_value=(inventory, [])), \
+                        patch.object(lane, "open_hotspot_holds", return_value={"scripts/lanes/lane_runner.py": 21724}), \
+                        patch.object(lane.time, "time", return_value=10000), \
+                        patch.object(lane, "run_issue", return_value={"verdict": "landing", "prUrl": "u"}) as work:
+                    lane.worker(self.host, "devin")
+                self.assertEqual(work.call_count, int(not changed))
+
+    def test_unknown_target_scope_keeps_adopt_and_labeled_work_ahead_of_pool(self):
+        for selected in ("adopt", "labeled"):
+            with self.subTest(selected=selected), \
+                    patch.object(lane.pr_events, "capture_target_file_witnesses", side_effect=RuntimeError("scope unavailable")), \
+                    patch.object(lane, "claim_adoptable_pr", return_value=SimpleNamespace(pr={"number": 8}) if selected == "adopt" else None), \
+                    patch.object(lane, "claim_labeled_event", return_value=issue("JOV-LABELED") if selected == "labeled" else None), \
+                    patch.object(lane, "adopt_pr") as adopt, \
+                    patch.object(lane, "run_issue", return_value={"verdict": "landing", "prUrl": "u"}) as work, \
+                    patch.object(lane, "read_new_issue_budget") as budget:
+                lane.worker(self.host, "devin")
+                self.assertEqual(adopt.call_count, int(selected == "adopt"))
+                self.assertEqual(work.call_count, int(selected == "labeled"))
+                if selected == "labeled": self.assertEqual(work.call_args.args[4].identifier, "JOV-LABELED")
+                budget.assert_not_called()
+
+    def test_missing_target_scope_never_displaces_existing_repair_priority(self):
+        with patch.object(lane.pr_events, "capture_target_file_witnesses", side_effect=RuntimeError("scope unavailable")), \
+                patch.object(lane, "claim_red_pr", return_value={"number": 21724}), \
+                patch.object(lane, "fix_red_pr") as repair, patch.object(lane, "run_issue") as new_work:
+            self.assertEqual(lane.worker(self.host, "devin"), 0)
+        repair.assert_called_once(); new_work.assert_not_called()
+
     def test_unknown_linear_inventory_releases_the_seat_without_claiming(self):
         with patch.object(self.linear, "lane_issues", side_effect=lane.LaneInventoryUnknown("linear-refresh-reserve-held")), \
                 patch.object(lane, "run_issue") as work:
@@ -4469,6 +4605,40 @@ class TerminalRevisitTest(unittest.TestCase):
                                                "3": {"at": TERMINAL_NOW - 30}})
         prs = [self.pr(n) for n in range(1, 6)]
         self.assertEqual(lane.revisit_terminal_prs(self.host, prs, now=TERMINAL_NOW), [4, 5, 3])
+
+    def test_exhaustion_hold_allows_conflicted_head_recovery_without_refunding_attempts(self):
+        # JOV-8533: #21824 had this terminal hold and never reached partial_main_sync.
+        attempts = {"21824": {"sha": "h21824", "count": 1, "escalated": True,
+                              "pushedHead": "h21824"}}
+        held = {"21824": lane.pr_events.held_record(
+            "h21824", ["fix-exhausted", "fix-exhausted", "diff-too-large:1503"])}
+        self.write("fix-attempts.json", attempts)
+        self.write("held.json", held)
+        pr = self.pr(21824, isDraft=True, mergeStateStatus="DIRTY",
+                     labels=[{"name": "lane-fix-exhausted"}])
+        for synced in (False, True):
+            with self.subTest(synced=synced):
+                self.calls.clear()
+                with patch.object(lane, "partial_main_sync", return_value="clean-main" if synced else None) as sync:
+                    self.assertEqual(lane.revisit_terminal_prs(self.host, [pr], now=TERMINAL_NOW), [21824])
+                sync.assert_called_once_with(self.host, pr)
+                lifts = [args[4] for args in self.calls if args[:4] == ["gh", "api", "-X", "DELETE"]]
+                self.assertEqual(lifts, [f"repos/{lane.REPO_SLUG}/issues/21824/labels/lane-fix-exhausted"] if synced else [])
+                visit = json.loads((self.host.state / "terminal-revisits.json").read_text())["21824"]
+                self.assertEqual((visit["action"], visit["ok"]), ("partial-main-sync", synced))
+                self.assertEqual(json.loads((self.host.state / "fix-attempts.json").read_text()), attempts)
+                self.assertEqual(json.loads((self.host.state / "held.json").read_text()), held)
+                self.main = "m2"
+
+    def test_exhaustion_does_not_mask_nonfixable_policy_holds(self):
+        for evidence in ("secret-like-file-changed", "empty-diff"):
+            with self.subTest(evidence=evidence):
+                pr = self.pr(1, labels=[{"name": "lane-fix-exhausted"}])
+                held = {"1": lane.pr_events.held_record("h1", ["fix-exhausted", evidence])}
+                self.assertEqual(lane.terminal_prs([pr], {}, held), [])
+                # A hold on an older generation cannot block the current head.
+                self.assertEqual(lane.terminal_prs([{**pr, "headRefOid": "new-head"}], {}, held),
+                                 [{**pr, "headRefOid": "new-head"}])
 
     def test_partial_main_sync_merges_the_newest_conflict_free_main_commit(self):
         repo = Path(self.temp.name) / "repo"

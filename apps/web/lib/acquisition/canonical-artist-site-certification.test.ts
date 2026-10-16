@@ -144,4 +144,20 @@ describe('canonical artist-site certification (JOV-6572)', () => {
     expect(result.status).toBe('RED');
     expect(result.evidenceIntegrityFailures.length).toBeGreaterThan(0);
   });
+
+  it('automatically turns a previously green path RED after a regression', () => {
+    expect(evaluateCanonicalArtistSiteCertification(input()).status).toBe(
+      'GREEN'
+    );
+    expect(
+      evaluateCanonicalArtistSiteCertification(
+        input({
+          receipts: patched('payment_entitlement', {
+            status: 'failed',
+            detail: 'Webhook did not grant the verified entitlement.',
+          }),
+        })
+      ).status
+    ).toBe('RED');
+  });
 });

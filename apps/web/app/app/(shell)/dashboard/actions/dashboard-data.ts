@@ -18,7 +18,7 @@ import { resolveUserState } from '@/lib/auth/gate';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { CACHE_TAGS, CACHE_TTL } from '@/lib/cache/tags';
 import { isMissingConnectorSchemaError } from '@/lib/connectors/schema-errors';
-import { type DbOrTransaction, doesTableExist } from '@/lib/db';
+import type { DbOrTransaction } from '@/lib/db';
 import { DB_CONFIG, isRetryableError } from '@/lib/db/client/retry';
 import { getAvatarQualityForProfile } from '@/lib/db/queries/avatar-quality';
 import {
@@ -234,94 +234,87 @@ async function buildBioLinkActivation(
     platform_opened: null,
   };
 
-  const hasDistributionEventsTable = await doesTableExist(
-    'creator_distribution_events'
-  );
-
-  if (hasDistributionEventsTable) {
-    // Schema discovery may acquire a different pooled connection. Finish it
-    // before opening the RLS transaction so it cannot idle while waiting.
-    const eventRows = await executeWithRetry(
-      () =>
-        withDbSessionTx(
-          async tx => {
-            // Await PostgreSQL cancellation instead of racing a JS timer against
-            // SQL that could still be running when Drizzle queues COMMIT/ROLLBACK.
-            await setStatementTimeout(tx, QUERY_TIMEOUTS.dashboard);
-            return tx
-              .select({
-                createdAt: creatorDistributionEvents.createdAt,
-                eventType: creatorDistributionEvents.eventType,
-              })
-              .from(creatorDistributionEvents)
-              .where(
-                and(
-                  eq(creatorDistributionEvents.creatorProfileId, profile.id),
-                  eq(
-                    creatorDistributionEvents.platform,
-                    INSTAGRAM_DISTRIBUTION_PLATFORM
-                  ),
-                  inArray(
-                    creatorDistributionEvents.eventType,
-                    BIO_LINK_ACTIVATION_EVENT_TYPES
-                  )
+  // Read the migrated table directly. A separate schema probe adds a cold
+  // connection round-trip; missing-table fallback already runs after cleanup.
+  const eventRows = await executeWithRetry(
+    () =>
+      withDbSessionTx(
+        async tx => {
+          // Await PostgreSQL cancellation instead of racing a JS timer against
+          // SQL that could still be running when Drizzle queues COMMIT/ROLLBACK.
+          await setStatementTimeout(tx, QUERY_TIMEOUTS.dashboard);
+          return tx
+            .select({
+              createdAt: creatorDistributionEvents.createdAt,
+              eventType: creatorDistributionEvents.eventType,
+            })
+            .from(creatorDistributionEvents)
+            .where(
+              and(
+                eq(creatorDistributionEvents.creatorProfileId, profile.id),
+                eq(
+                  creatorDistributionEvents.platform,
+                  INSTAGRAM_DISTRIBUTION_PLATFORM
+                ),
+                inArray(
+                  creatorDistributionEvents.eventType,
+                  BIO_LINK_ACTIVATION_EVENT_TYPES
                 )
               )
-              .orderBy(asc(creatorDistributionEvents.createdAt));
-          },
-          { clerkUserId }
-        ),
-      {
-        maxRetries: 1,
-        baseDelayMs: DB_CONFIG.retryDelay,
-        isRetryable: error =>
-          isRetryableError(error) && !isPostgresTimeoutError(error),
-      }
-    ).catch((error: unknown) => {
-      // The transaction wrapper has completed rollback/release before a
-      // tolerated failure becomes fallback data or another read is attempted.
-      if (isMissingCreatorDistributionEventsTableError(error)) {
-        Sentry.logger.warn(
-          '[Dashboard] creator_distribution_events table missing; skipping activation lookup',
-          { profileId: profile.id }
-        );
-        return [];
-      }
-
-      const migrationResult = handleMigrationErrors(error, {
-        userId: profile.id,
-        operation: 'creator_distribution_events',
-      });
-
-      if (!migrationResult.shouldRetry) {
-        return (migrationResult.fallbackData ?? []) as Array<{
-          createdAt: Date;
-          eventType: string;
-        }>;
-      }
-
-      const level =
-        isQueryTimeoutError(error) || isPostgresTimeoutError(error)
-          ? 'warning'
-          : 'error';
-
-      Sentry.captureException(error, {
-        level,
-        tags: {
-          query: 'creator_distribution_events',
-          context: 'dashboard_data_settled',
+            )
+            .orderBy(asc(creatorDistributionEvents.createdAt));
         },
-        extra: { profileId: profile.id },
-      });
+        { clerkUserId }
+      ),
+    {
+      maxRetries: 1,
+      baseDelayMs: DB_CONFIG.retryDelay,
+      isRetryable: error =>
+        isRetryableError(error) && !isPostgresTimeoutError(error),
+    }
+  ).catch((error: unknown) => {
+    // The transaction wrapper has completed rollback/release before a
+    // tolerated failure becomes fallback data or another read is attempted.
+    if (isMissingCreatorDistributionEventsTableError(error)) {
+      Sentry.logger.warn(
+        '[Dashboard] creator_distribution_events table missing; skipping activation lookup',
+        { profileId: profile.id }
+      );
       return [];
+    }
+
+    const migrationResult = handleMigrationErrors(error, {
+      userId: profile.id,
+      operation: 'creator_distribution_events',
     });
 
-    for (const eventRow of eventRows) {
-      const eventType = eventRow.eventType as BioLinkActivationEventType;
-      timestamps[eventType] ??= eventRow.createdAt;
+    if (!migrationResult.shouldRetry) {
+      return (migrationResult.fallbackData ?? []) as Array<{
+        createdAt: Date;
+        eventType: string;
+      }>;
     }
-  }
 
+    const level =
+      isQueryTimeoutError(error) || isPostgresTimeoutError(error)
+        ? 'warning'
+        : 'error';
+
+    Sentry.captureException(error, {
+      level,
+      tags: {
+        query: 'creator_distribution_events',
+        context: 'dashboard_data_settled',
+      },
+      extra: { profileId: profile.id },
+    });
+    return [];
+  });
+
+  for (const eventRow of eventRows) {
+    const eventType = eventRow.eventType as BioLinkActivationEventType;
+    timestamps[eventType] ??= eventRow.createdAt;
+  }
   return {
     activatedAt: serializeNullableDate(timestamps.activated),
     copiedAt: serializeNullableDate(timestamps.link_copied),

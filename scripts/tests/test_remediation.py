@@ -336,6 +336,33 @@ class RouterLadderTest(unittest.TestCase):
                 self.assertEqual(remediation.classify_blocker(pr(**extra))["cls"],
                                  "needs-human-decision")
 
+    def test_no_new_credential_list_is_assurance_not_a_human_gate(self):
+        """PR #21810 exhausted on a cost-impact list. "No new service, schedule,
+        controller, credentials" names what the change does not add. A positive
+        credential action or a pricing/taste ask in the same text still gates."""
+        assurance = (
+            "Cost impact: one bounded inventory scan only when the exact production "
+            "tag is missing. No new service, schedule, controller, credentials, or "
+            "paid capacity."
+        )
+        red = {"statusCheckRollup": [
+            {"name": "Source Validation", "status": "COMPLETED", "conclusion": "FAILURE"}]}
+        classified = remediation.classify_blocker(pr(
+            number=21810, body=assurance, mergeStateStatus="BLOCKED", **red))
+        self.assertEqual(classified["cls"], "fixable-by-model")
+        self.assertNotIn("strategy/pricing/credential/taste content", classified["evidence"])
+        for body in (
+            assurance + " Please update pricing.",
+            "No new service, but rotate the credential.",
+            "Publish the notes, credentials need rotation.",
+            "No new pricing page, credentials, and a rollout.",
+            "No new service, schedule, or credentials. Update pricing in the title.",
+        ):
+            with self.subTest(body=body):
+                self.assertEqual(
+                    remediation.classify_blocker(pr(number=21810, body=body, **red))["cls"],
+                    "needs-human-decision")
+
     def test_direct_permission_asks_cover_github_token_and_app_scopes(self):
         for text in (
             "Please add contents:write permission to GITHUB_TOKEN.",

@@ -12,6 +12,7 @@ import os
 import pathlib
 import re
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
@@ -5200,8 +5201,61 @@ class PublicTrustDiagnosticsTest(unittest.TestCase):
         self.assertEqual(result["reason"], "capacity-evidence-trust-context-unavailable")
 
 
+class NativeUserBusEnvironmentTest(unittest.TestCase):
+    def fixture(self, tmp):
+        home = pathlib.Path(tmp) / "home"; home.mkdir()
+        root = pathlib.Path(tmp) / "run"; root.mkdir()
+        runtime = root / str(os.geteuid()); runtime.mkdir(mode=0o700)
+        bus = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.addCleanup(bus.close)
+        bus.bind(str(runtime / "bus"))
+        return home, root, runtime
+
+    def test_service_runner_without_login_variables_uses_its_existing_owned_bus(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ, {"HOME": "fixture"}, clear=True):
+            home, root, runtime = self.fixture(tmp)
+            env = MODULE.native_user_bus_environment(home, runtime_root=root)
+            self.assertEqual(env["XDG_RUNTIME_DIR"], str(runtime))
+            self.assertEqual(env["DBUS_SESSION_BUS_ADDRESS"], "unix:path=" + str(runtime / "bus"))
+            self.assertEqual(env["HOME"], "fixture")
+            self.assertNotIn("XDG_RUNTIME_DIR", os.environ, "only the observation subprocess gets context")
+
+    def test_missing_or_non_socket_or_writable_runtime_never_manufactures_health(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ, {}, clear=True):
+            home, root, runtime = self.fixture(tmp)
+            (runtime / "bus").unlink()
+            with self.assertRaises(OSError): MODULE.native_user_bus_environment(home, runtime_root=root)
+            (runtime / "bus").write_text("not a socket")
+            with self.assertRaises(ValueError): MODULE.native_user_bus_environment(home, runtime_root=root)
+            (runtime / "bus").unlink(); (runtime / "bus").symlink_to(home)
+            with self.assertRaises(ValueError): MODULE.native_user_bus_environment(home, runtime_root=root)
+            (runtime / "bus").unlink()
+            other = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); self.addCleanup(other.close)
+            other.bind(str(runtime / "bus")); runtime.chmod(0o777)
+            with self.assertRaises(ValueError): MODULE.native_user_bus_environment(home, runtime_root=root)
+
+    def test_wrong_user_or_explicit_foreign_context_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ, {}, clear=True):
+            home, root, runtime = self.fixture(tmp)
+            with mock.patch.object(MODULE.os, "geteuid", return_value=os.geteuid()+1):
+                with self.assertRaises(ValueError): MODULE.native_user_bus_environment(home, runtime_root=root)
+            for key, value in (("XDG_RUNTIME_DIR", "/run/user/99999"),
+                               ("DBUS_SESSION_BUS_ADDRESS", "unix:path=/tmp/foreign-bus")):
+                with self.subTest(key=key), mock.patch.dict(os.environ, {key: value}):
+                    with self.assertRaises(ValueError): MODULE.native_user_bus_environment(home, runtime_root=root)
+
+    def test_existing_exact_context_is_preserved_without_creating_any_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home, root, runtime = self.fixture(tmp)
+            env = {"XDG_RUNTIME_DIR": str(runtime), "DBUS_SESSION_BUS_ADDRESS": "unix:path="+str(runtime / "bus")}
+            with mock.patch.dict(os.environ, env, clear=True):
+                self.assertEqual(MODULE.native_user_bus_environment(home, runtime_root=root), env)
+
+
 class NativeControllerObservationTest(unittest.TestCase):
     def setUp(self):
+        bus = mock.patch.object(MODULE, "native_user_bus_environment", return_value={"fixture": "user-bus"})
+        bus.start(); self.addCleanup(bus.stop)
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.home = pathlib.Path(self.tmp.name)
@@ -5243,6 +5297,7 @@ class NativeControllerObservationTest(unittest.TestCase):
             self.assertEqual(args[-2:], [self.revision + ":scripts/lanes", self.revision + ":scripts/lanes/lane_runner.py"])
             output = "\n".join(self.identities) + "\n"
         elif args[:3] == ["systemctl", "--user", "show"]:
+            self.assertEqual(kwargs["env"], {"fixture": "user-bus"})
             self.assertEqual(args[3:5], ["jovie-lanes.service", "jovie-lanes.timer"])
             output = "\n\n".join("\n".join(k + "=" + v for k, v in row.items()) for row in [self.service, self.timer])
         else:

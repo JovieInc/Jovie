@@ -90,10 +90,14 @@ test('screenshot launch is a longer bounded retry that still fails closed', () =
   const fullStepTimeout = iosWorkflowSource.match(
     /- name: Run full simulator regression[\s\S]*?timeout-minutes: ([0-9]+)/
   );
-  assert.equal(fullStepTimeout?.[1], '30');
+  assert.equal(fullStepTimeout?.[1], '39');
   assert.match(
     iosWorkflowSource,
-    /JOVIE_IOS_XCODEBUILD_TIMEOUT_SECONDS: "1680"/
+    /JOVIE_IOS_XCODEBUILD_TIMEOUT_SECONDS: "2040"/
+  );
+  assert.match(
+    iosWorkflowSource,
+    /JOVIE_IOS_XCODEBUILD_FINALIZATION_TIMEOUT_SECONDS: "180"/
   );
   assert.match(iosWorkflowSource, /path: artifacts\/ios-screenshots\/\*\.png/);
 });
