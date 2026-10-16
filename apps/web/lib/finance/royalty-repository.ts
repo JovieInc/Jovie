@@ -267,8 +267,10 @@ export async function purgeExpiredRoyaltySources(): Promise<number> {
         )
       )
       .limit(100);
-    if (expired.length > 0) {
-      await tx.delete(royaltySources).where(
+    if (expired.length === 0) return 0;
+    const deleted = await tx
+      .delete(royaltySources)
+      .where(
         and(
           eq(royaltySources.ownerUserId, owner),
           inArray(
@@ -276,8 +278,8 @@ export async function purgeExpiredRoyaltySources(): Promise<number> {
             expired.map(source => source.id)
           )
         )
-      );
-    }
-    return expired.length;
+      )
+      .returning({ id: royaltySources.id });
+    return deleted.length;
   });
 }

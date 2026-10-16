@@ -278,10 +278,16 @@ describe('authenticated royalty repository', () => {
     state.select
       .mockReturnValueOnce(query([{ active: true }]))
       .mockReturnValueOnce(query([{ id: sourceId }]));
-    const where = vi.fn().mockResolvedValue([]);
+    const returning = vi.fn().mockResolvedValue([{ id: sourceId }]);
+    const where = vi.fn().mockReturnValue({ returning });
     state.remove.mockReturnValue({ where });
     expect(await purgeExpiredRoyaltySources()).toBe(1);
     expect(where).toHaveBeenCalledOnce();
+    returning.mockResolvedValue([]);
+    state.select
+      .mockReturnValueOnce(query([{ active: true }]))
+      .mockReturnValueOnce(query([{ id: sourceId }]));
+    expect(await purgeExpiredRoyaltySources()).toBe(0);
     state.select
       .mockReturnValueOnce(query([{ active: true }]))
       .mockReturnValueOnce(query([]));
