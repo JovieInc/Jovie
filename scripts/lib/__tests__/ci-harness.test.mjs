@@ -414,7 +414,7 @@ describe('ci-harness manifest', () => {
     expect(action).not.toContain('secrets.');
   });
 
-  it('neutralizes only well-formed superseded production observer signals', () => {
+  it('authenticates production observer signals before applying their release policy', () => {
     const fixture = JSON.parse(
       readFileSync(
         resolve(
@@ -429,20 +429,29 @@ describe('ci-harness manifest', () => {
         job: 'authorize-release',
         path: '.github/workflows/ios-testflight.yml',
         workflowIdentityMarker: 'production_controller_workflow="$(gh api',
+        selectorStart: "controller_generation_selector=\"$(cat <<'JQ'\n",
+        selectorEnd: '\n          JQ\n          )"',
+        pinnedSource: true,
       },
       {
         job: 'authorize-release',
         path: '.github/workflows/desktop-release.yml',
         workflowIdentityMarker: 'workflow_record="$(gh api',
+        selectorStart: "controller_generation_selector='\n",
+        selectorEnd: "\n          '\n",
+        pinnedSource: false,
       },
     ];
 
     for (const observer of workflows) {
       const workflow = readFileSync(resolve(REPO_ROOT, observer.path), 'utf8');
       const authorize = extractWorkflowJobBlock(workflow, observer.job);
-      const selectorStartMarker = "controller_generation_selector='\n";
+      const selectorStartMarker = observer.selectorStart;
       const selectorStart = authorize.indexOf(selectorStartMarker);
-      const selectorEnd = authorize.indexOf("\n          '\n", selectorStart);
+      const selectorEnd = authorize.indexOf(
+        observer.selectorEnd,
+        selectorStart
+      );
 
       expect(selectorStart, observer.path).toBeGreaterThanOrEqual(0);
       expect(selectorEnd, observer.path).toBeGreaterThan(selectorStart);
@@ -495,6 +504,11 @@ describe('ci-harness manifest', () => {
         id: fixture.records.matching.id + 1,
       });
       expect(wrongRunIdentity.status, observer.path).not.toBe(0);
+      const wrongTransport = resolveGeneration({
+        ...fixture.records.matching,
+        head_sha: '0'.repeat(40),
+      });
+      expect(wrongTransport.status, observer.path).not.toBe(0);
 
       const workflowIdentity = authorize.indexOf(
         observer.workflowIdentityMarker
@@ -502,6 +516,48 @@ describe('ci-harness manifest', () => {
       const selectorIndex = authorize.indexOf(
         'controller_generation_selector='
       );
+
+      expect(workflowIdentity, observer.path).toBeGreaterThanOrEqual(0);
+      expect(workflowIdentity, observer.path).toBeLessThan(selectorIndex);
+      expect(authorize.slice(selectorIndex)).toContain(
+        '.name == "Production Verified"'
+      );
+      expect(authorize.slice(selectorIndex)).toContain(
+        '[ "$verified_count" = "1" ]'
+      );
+
+      if (observer.pinnedSource) {
+        // JOV-8515: TestFlight authenticates the transport above, then pins
+        // its separately certified mainline source through a bounded lease.
+        // The executable authorization suite covers each denial/interleaving.
+        const transportIndex = authorize.indexOf(
+          'controller_transport_sha="$release_sha"',
+          selectorIndex
+        );
+        const sourceIndex = authorize.indexOf(
+          'release_sha="$controller_generation"',
+          selectorIndex
+        );
+        const currentMainIndex = authorize.indexOf('current_main_sha=');
+        expect(transportIndex, observer.path).toBeGreaterThan(selectorIndex);
+        expect(sourceIndex, observer.path).toBeGreaterThan(transportIndex);
+        expect(currentMainIndex, observer.path).toBeGreaterThan(sourceIndex);
+        expect(authorize.slice(currentMainIndex)).toContain(
+          '.merge_base_commit.sha == $sha'
+        );
+        expect(authorize).not.toContain(
+          'if [ "$controller_generation" != "$release_sha" ]'
+        );
+        expect(authorize).toContain(
+          'node .testflight-tools/.github/scripts/testflight-release-lease.mjs admit'
+        );
+        expect(authorize).toContain(
+          "should_release: ${{ steps.pin.outputs.lease != '' && steps.select.outputs.should_release == 'true' }}"
+        );
+        continue;
+      }
+
+      // Desktop retains its existing supersession policy.
       const neutralIndex = authorize.indexOf(
         'if [ "$controller_generation" != "$release_sha" ]'
       );
@@ -516,8 +572,6 @@ describe('ci-harness manifest', () => {
         neutralIndex
       );
 
-      expect(workflowIdentity, observer.path).toBeGreaterThanOrEqual(0);
-      expect(workflowIdentity, observer.path).toBeLessThan(selectorIndex);
       expect(selectorIndex, observer.path).toBeLessThan(neutralIndex);
       expect(neutralIndex, observer.path).toBeLessThan(currentMainIndex);
       expect(neutralIndex, observer.path).toBeLessThan(jobsIndex);
