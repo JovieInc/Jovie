@@ -9,6 +9,7 @@ import {
   announceDesktopQuotaDeferral,
   decideReleaseAssetQuotaHold,
   DesktopReleaseQuotaDeferred,
+  ReleaseAssetQuotaDeferred,
   expectedDesktopAssetNames,
   GitHubClient,
   parseArgs,
@@ -986,7 +987,14 @@ globalThis.fetch = async (url, options) => {
   calls += 1;
   const mode = process.env.MOCK_MODE;
   const method = options.method || 'GET';
-  appendFileSync('calls', method + ' ' + new URL(url).pathname + '\\n');
+  const pathname = new URL(url).pathname;
+  appendFileSync('calls', method + ' ' + pathname + '\\n');
+  if (pathname === '/rate_limit') {
+    if (mode === 'quota-core') {
+      return Response.json({ resources: { core: { remaining: 0, reset: now / 1000 + 3600 } } });
+    }
+    return new Response('{}', { status: 404 });
+  }
   if (mode === 'mutation' && method === 'GET') {
     return new Response(url.includes('/tags/') ? '{}' : '[]', {
       status: url.includes('/tags/') ? 404 : 200,
@@ -995,7 +1003,7 @@ globalThis.fetch = async (url, options) => {
   if (mode === 'success' || (mode === 'retry' && calls > 1)) {
     return Response.json(${JSON.stringify(release)});
   }
-  const headers = mode === 'missing-reset' ? {} : {
+  const headers = mode === 'missing-reset' || mode === 'quota-core' ? {} : {
     'x-ratelimit-remaining': '0',
     'x-ratelimit-reset': String(now / 1000 + (mode === 'retry' || mode === 'attempt-cap' ? 30 : 3600)),
   };
@@ -1006,14 +1014,16 @@ globalThis.fetch = async (url, options) => {
 `
   );
   for (const scenario of [
-    { mode: 'outside-budget', code: 75, prepared: 'false' },
+    { mode: 'outside-budget', code: 0, prepared: 'false' },
+    { mode: 'quota-core', code: 0, prepared: 'false' },
     { mode: 'retry', code: 0, prepared: 'true' },
     { mode: 'success', code: 0, prepared: 'true' },
     { mode: 'permission', code: 1 },
     { mode: 'missing-reset', code: 1 },
     { mode: 'attempt-cap', code: 1 },
-    { mode: 'mutation', code: 75, prepared: 'false' },
-    { mode: 'outside-budget', code: 75, environment: 'staging', prepared: 'false' },
+    { mode: 'mutation', code: 1 },
+    { mode: 'outside-budget', code: 1, environment: 'staging' },
+    { mode: 'outside-budget', code: 1, retry: true },
     { mode: 'outside-budget', code: 75, command: 'upload-and-publish', defer: true },
     { mode: 'outside-budget', code: 1, command: 'verify-published' },
   ]) {
@@ -1047,6 +1057,7 @@ globalThis.fetch = async (url, options) => {
           GITHUB_OUTPUT: join(root, 'outputs'),
           GITHUB_STEP_SUMMARY: join(root, 'summary'),
           MOCK_MODE: scenario.mode,
+          ...(scenario.retry ? { DESKTOP_QUOTA_RETRY: '1' } : {}),
         },
       }
     );
@@ -1065,15 +1076,28 @@ globalThis.fetch = async (url, options) => {
         .at(-1);
       assert.equal(prepared, `prepared=${scenario.prepared}`, label);
     }
-    if (scenario.prepared === 'false' || scenario.defer) {
+    if (scenario.prepared === 'false') {
       assert.match(result.stderr, /github-quota-deferred/);
-      assert.match(summary, /2023-11-14T23:13:20Z/);
+      assert.match(summary, /2023-11-14T23:13:21\.000Z/);
+      assert.match(summary, /next reconciliation/);
       assert.ok(summary.includes(releaseSha), summary);
-      assert.match(summary, /No release was published/);
-      if (scenario.prepared === 'false' && scenario.mode !== 'mutation') {
+      assert.match(summary, /No desktop release was published/);
+      assert.match(outputs, /quota_deferred=true/);
+      assert.match(outputs, /quota_reset_epoch=\d+/);
+      if (scenario.mode !== 'quota-core') {
         assert.equal(calls.trim().split('\n').length, 1);
       }
       assert.equal(sleeps, '');
+    } else if (scenario.defer) {
+      assert.match(result.stderr, /github-quota-deferred/);
+      assert.match(summary, /quota retry/);
+      assert.match(summary, /No release was published/);
+      assert.match(outputs, /quota_deferred=true/);
+      assert.equal(sleeps, '');
+    } else if (scenario.retry) {
+      assert.match(result.stderr, /Not passing/);
+      assert.doesNotMatch(result.stderr, /github-quota-deferred/);
+      assert.equal(summary, '');
     } else {
       assert.equal(summary, '', label);
       assert.doesNotMatch(result.stderr, /github-quota-deferred/, label);
@@ -1173,7 +1197,7 @@ test('release-asset read fails closed on permission, exhausted budget, mutations
         }),
       ],
       method: 'GET',
-      error: DesktopReleaseQuotaDeferred,
+      error: ReleaseAssetQuotaDeferred,
     },
     {
       label: 'installation 403 without x-ratelimit-reset',
@@ -1190,6 +1214,7 @@ test('release-asset read fails closed on permission, exhausted budget, mutations
         }),
       ],
       method: 'PATCH',
+      quotaMode: 'publish',
       error: DesktopReleaseQuotaDeferred,
     },
     {
@@ -1212,6 +1237,7 @@ test('release-asset read fails closed on permission, exhausted budget, mutations
       repository: 'JovieInc/Jovie',
       token: 'test-token',
       releaseSha: 'c'.repeat(40),
+      quotaMode: scenario.quotaMode,
       fetchImpl: async url => {
         if (String(url).endsWith('/rate_limit')) {
           return quotaResponse(
@@ -1300,6 +1326,7 @@ test('publish and recover mutations wait out an installation 403 inside the budg
     repository: 'JovieInc/Jovie',
     token: 'test-token',
     releaseSha: 'c'.repeat(40),
+    quotaMode: 'publish',
     fetchImpl: async url => {
       calls.push(String(url));
       if (calls.length === 1) {
