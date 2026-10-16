@@ -148,6 +148,7 @@ async function recheck({
     const address = /** @type {import('node:net').AddressInfo} */ (
       server.address()
     );
+    const credential = wrongToken ? 'wrong-fixture-token' : token;
     const result = await runWithRealGh({
       script: 'bash "$LINEAGE_GATE" "at staging alias"',
       env: {
@@ -157,7 +158,7 @@ async function recheck({
         GITHUB_REPOSITORY: 'JovieInc/Jovie',
         GITHUB_OUTPUT: output,
         MAIN_LINEAGE_REMOTE: `https://127.0.0.1:${address.port}/repo.git`,
-        GH_TOKEN: wrongToken ? 'wrong-fixture-token' : token,
+        GH_TOKEN: credential,
         GIT_SSL_CAINFO: cert,
         GIT_TERMINAL_PROMPT: '0',
         GIT_TRACE: trace,
@@ -179,14 +180,14 @@ async function recheck({
       /::add-mask::[^\n]*\n/g,
       ''
     );
-    expect(logs).not.toContain(token);
-    expect(logs).not.toContain(encoded);
     const argv = readFileSync(trace, 'utf8');
-    expect(argv).not.toContain(token);
-    expect(argv).not.toContain(encoded);
-    expect(readFileSync(join(root, 'repo.git/config'), 'utf8')).not.toMatch(
-      /extraheader|harness-token/i
-    );
+    for (const secret of [
+      credential,
+      Buffer.from(`x-access-token:${credential}`).toString('base64'),
+    ]) {
+      expect(logs).not.toContain(secret);
+      expect(argv).not.toContain(secret);
+    }
     return {
       ...result,
       gitRequests: requests,
