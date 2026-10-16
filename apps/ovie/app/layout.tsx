@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import localFont from 'next/font/local';
 import { ResolvedClientProviders } from '@/components/providers/ResolvedClientProviders';
+import { DesktopRouteBoundary } from '@/lib/desktop/DesktopRouteBoundary';
 import '@/app/globals.css';
 import '@/styles/system-b-app.css';
 import './workspace.css';
@@ -23,7 +24,11 @@ export default function RootLayout({
   return (
     <html lang='en' className={inter.variable} suppressHydrationWarning>
       <body>
-        <ResolvedClientProviders>{children}</ResolvedClientProviders>
+        <ResolvedClientProviders>
+          <DesktopRouteBoundary fallback='/hud'>
+            {children}
+          </DesktopRouteBoundary>
+        </ResolvedClientProviders>
       </body>
     </html>
   );
