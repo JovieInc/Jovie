@@ -164,4 +164,14 @@ describe('YouTube candidate reject route', () => {
     expect(response.status).toBe(401);
     expect(hoisted.select).not.toHaveBeenCalled();
   });
+
+  it('returns 400 for a non-uuid action id before querying', async () => {
+    const response = await POST(request(), {
+      params: Promise.resolve({ id: 'fake-id-000' }),
+    });
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: 'invalid-id' });
+    expect(hoisted.select).not.toHaveBeenCalled();
+    expect(hoisted.update).not.toHaveBeenCalled();
+  });
 });

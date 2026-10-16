@@ -141,7 +141,7 @@ vi.mock('@/lib/youtube-library', () => ({
 import { POST } from '@/app/api/connectors/suggested-actions/[id]/approve/route';
 import { suggestedActions } from '@/lib/db/schema/connectors';
 
-const ACTION_ID = 'action-0000-0000-0000-000000000001';
+const ACTION_ID = '00000000-0000-4000-8000-000000000001';
 const USER_ID = 'user-0000-0000-0000-000000000001';
 
 const BOOKING_PAYLOAD = {
@@ -270,6 +270,17 @@ describe('POST /api/connectors/suggested-actions/[id]/approve (real handler)', (
     expect(mockRecoverOrphanedApprovedAction).not.toHaveBeenCalled();
     expect(mockEnqueueApprovedActionWorkflow).not.toHaveBeenCalled();
     expect(mockRecordInboxDecision).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a non-uuid action id before querying', async () => {
+    mockRequireAuth.mockResolvedValue({ userId: USER_ID, error: null });
+
+    const response = await POST(makeRequest(), makeParams('fake-id-000'));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: 'invalid-id' });
+    expect(mockDbSelect).not.toHaveBeenCalled();
+    expect(mockDbUpdate).not.toHaveBeenCalled();
   });
 
   it('approves via CAS with the exact update/where/returning shape and enqueues the workflow', async () => {

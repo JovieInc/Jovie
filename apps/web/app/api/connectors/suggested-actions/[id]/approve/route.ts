@@ -18,6 +18,7 @@
 import { and, eq } from 'drizzle-orm';
 import { revalidateTag } from 'next/cache';
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { requireAuth } from '@/lib/auth/require-auth';
 import { CACHE_TAGS } from '@/lib/cache/tags';
 import { recordInboxDecision } from '@/lib/connectors/inbox-decision';
@@ -70,10 +71,18 @@ async function reconcileYoutubeApproval(input: {
   }
 }
 
+const actionIdSchema = z.string().uuid();
+
 export async function POST(_request: Request, { params }: RouteParams) {
   const { id } = await params;
   const { userId, error } = await requireAuth();
   if (error) return error;
+  if (!actionIdSchema.safeParse(id).success) {
+    return NextResponse.json(
+      { error: 'invalid-id' },
+      { status: 400, headers: NO_STORE_HEADERS }
+    );
+  }
 
   try {
     const [candidate] = await db

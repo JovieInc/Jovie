@@ -11,6 +11,7 @@
 import { and, eq, ne } from 'drizzle-orm';
 import { revalidateTag } from 'next/cache';
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { requireAuth } from '@/lib/auth/require-auth';
 import { CACHE_TAGS } from '@/lib/cache/tags';
 import { recordInboxDecision } from '@/lib/connectors/inbox-decision';
@@ -35,10 +36,18 @@ interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
+const actionIdSchema = z.string().uuid();
+
 export async function POST(request: Request, { params }: RouteParams) {
   const { id } = await params;
   const { userId, error } = await requireAuth();
   if (error) return error;
+  if (!actionIdSchema.safeParse(id).success) {
+    return NextResponse.json(
+      { error: 'invalid-id' },
+      { status: 400, headers: NO_STORE_HEADERS }
+    );
+  }
 
   // Optional reject reason — never blocks the gesture (JOV-3934).
   let reason: string | null = null;
