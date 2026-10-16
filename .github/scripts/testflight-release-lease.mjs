@@ -67,7 +67,7 @@ const transientEvidence = error =>
 export function readEvidence(
   api,
   route,
-  { pause = () => {}, attempts = 12 } = {}
+  { pause = () => {}, attempts = 5 } = {}
 ) {
   const compare = route.includes('/compare/');
   const limit = compare ? attempts : Math.min(attempts, 4);
@@ -142,7 +142,7 @@ export function validateLease({
   now = Date.now,
   api: rawApi,
   pause = () => {},
-  comparisonAttempts = 12,
+  comparisonAttempts = 5,
   readArtifact,
 }) {
   const api = route =>

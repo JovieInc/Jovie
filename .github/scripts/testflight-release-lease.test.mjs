@@ -233,6 +233,65 @@ test('an unfinished compare after main advances is retried and still not a rewin
   );
 });
 
+test('a settled identical compare is not accepted as ahead', () => {
+  const f = fixture();
+  const lease = validateLease(f.input);
+  f.reserve(lease);
+  const original = f.input.api;
+  let compares = 0;
+  f.input.api = route => {
+    if (route.includes('/compare/')) {
+      compares += 1;
+      return { status: 'identical', merge_base_commit: { sha: NEXT } };
+    }
+    return original(route);
+  };
+  assert.throws(
+    () =>
+      validateLease({
+        ...f.input,
+        previous: lease,
+        phase: 'upload',
+        pause: () => {
+          throw new Error('settled identical must not be retried');
+        },
+      }),
+    /release lineage rewound or diverged/
+  );
+  assert.equal(compares, 1);
+  assert.equal(comparisonReady({ status: 'identical' }), true);
+});
+
+test('a permanent compare 404 fails closed within five attempts and is not a rewind', () => {
+  const f = fixture();
+  const original = f.input.api;
+  let compares = 0;
+  const pauses = [];
+  f.input.api = route => {
+    if (route.includes('/compare/')) {
+      compares += 1;
+      throw new Error(
+        'gh evidence command failed (1); temporarily unavailable'
+      );
+    }
+    return original(route);
+  };
+  assert.throws(
+    () =>
+      validateLease({
+        ...f.input,
+        pause: attempt => pauses.push(attempt),
+      }),
+    error => {
+      assert.match(error.message, /temporarily unavailable/);
+      assert.doesNotMatch(error.message, /rewound or diverged/);
+      return true;
+    }
+  );
+  assert.equal(compares, 5);
+  assert.deepEqual(pauses, [1, 2, 3, 4]);
+});
+
 test('a settled diverged compare is still a rewind on the first read', () => {
   const f = fixture();
   const lease = validateLease(f.input);
