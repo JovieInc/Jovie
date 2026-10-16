@@ -110,6 +110,29 @@ node -e 'process.stdout.write(process.env.URL_ENCRYPTION_KEY)'`,
     expect(ci).toContain('tests/unit/lib/auth/access-route-matrix.test.ts');
     expect(ci).toContain('--source-revision "${{ github.sha }}"');
     expect(ci).toContain('--waitlist-status "$WAITLIST_STATUS"');
+    const certify = ci.slice(
+      ci.indexOf('id: canonical_certification'),
+      ci.indexOf('Upload canonical artist-site certification')
+    );
+    expect(certify).toContain('GH_TOKEN: ${{ github.token }}');
+    expect(certify).toContain(
+      '--source-history "$CERT_DIR/source-history.txt"'
+    );
+    expect(certify).toContain(
+      'repos/${{ github.repository }}/commits?sha=${{ github.sha }}&per_page=100&page=${page}'
+    );
+    expect(certify).toContain('for page in 1 2 3 4 5; do');
+    expect(certify).toContain('>> "$HISTORY" || failed=1');
+    expect(certify).toContain(': > "$HISTORY"');
+    expect(certify).not.toContain('git fetch');
+    const certifyScript =
+      parsedCi.jobs['ci-golden-path']?.steps?.find(
+        step => step.id === 'canonical_certification'
+      )?.run ?? '';
+    expect(certifyScript.indexOf(': > "$HISTORY"')).toBeGreaterThan(-1);
+    expect(certifyScript.indexOf(': > "$HISTORY"')).toBeLessThan(
+      certifyScript.indexOf('scripts/certify-canonical-artist-site.ts')
+    );
     expect(ci).toContain('steps.canonical_journey.outcome');
     expect(ci).toContain('steps.canonical_claim_contract.outcome');
     expect(ci).toContain('steps.canonical_waitlist.outcome');

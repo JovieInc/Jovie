@@ -6640,13 +6640,28 @@ jobs:
         env:
           CERT_DIR: ${{ runner.temp }}/canonical-artist-site
           CLAIM_CONTRACT_STATUS: ${{ steps.canonical_claim_contract.outcome || 'skipped' }}
+          GH_TOKEN: ${{ github.token }}
           JOURNEY_STATUS: ${{ steps.canonical_journey.outcome || 'skipped' }}
           M2_STATUS: ${{ steps.canonical_revenue.outcome || 'skipped' }}
           PROFILE_STATUS: ${{ steps.canonical_profile.outcome || 'skipped' }}
           WAITLIST_STATUS: ${{ steps.canonical_waitlist.outcome || 'skipped' }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          pnpm --filter=@jovie/web exec tsx scripts/certify-canonical-artist-site.ts --candidate-id "acquisition:premade-artist-profile:tim-white:${{ github.run_id }}-${{ github.run_attempt }}" --run-id "${{ github.run_id }}-${{ github.run_attempt }}" --source-revision "${{ github.sha }}" --run-url "$RUN_URL" --golden-path-status "$JOURNEY_STATUS" --claim-contract-status "$CLAIM_CONTRACT_STATUS" --waitlist-status "$WAITLIST_STATUS" --m2-status "$M2_STATUS" --m2-receipt "$CERT_DIR/m2-receipt.json" --profile-status "$PROFILE_STATUS" --profile-result "$CERT_DIR/profile-result.json" --output "$CERT_DIR/certificate.json"
+          # Checkout is depth 1 and has no credentials. Read ancestors from the
+          # commits API. Actions runs bash -e, which ignores failures inside an
+          # if test, so a page failure sets failed and clears the file. Binding
+          # then falls back to exact SHA equality and the receipt is still written.
+          HISTORY="$CERT_DIR/source-history.txt"
+          mkdir -p "$CERT_DIR"
+          : > "$HISTORY"
+          failed=0
+          for page in 1 2 3 4 5; do
+            gh api "repos/${{ github.repository }}/commits?sha=${{ github.sha }}&per_page=100&page=${page}" --jq '.[].sha' >> "$HISTORY" || failed=1
+          done
+          if [ "$failed" -ne 0 ]; then
+            : > "$HISTORY"
+          fi
+          pnpm --filter=@jovie/web exec tsx scripts/certify-canonical-artist-site.ts --candidate-id "acquisition:premade-artist-profile:tim-white:${{ github.run_id }}-${{ github.run_attempt }}" --run-id "${{ github.run_id }}-${{ github.run_attempt }}" --source-revision "${{ github.sha }}" --run-url "$RUN_URL" --golden-path-status "$JOURNEY_STATUS" --claim-contract-status "$CLAIM_CONTRACT_STATUS" --waitlist-status "$WAITLIST_STATUS" --m2-status "$M2_STATUS" --m2-receipt "$CERT_DIR/m2-receipt.json" --profile-status "$PROFILE_STATUS" --profile-result "$CERT_DIR/profile-result.json" --source-history "$CERT_DIR/source-history.txt" --output "$CERT_DIR/certificate.json"
 
       - name: Upload canonical artist-site certification
         if: ${{ always() }}
