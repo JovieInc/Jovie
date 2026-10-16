@@ -774,6 +774,31 @@ describe('validation transition', () => {
     ).toBe('Done');
   });
 
+  it('describes receipt artifacts separately from the verified deployment generation', () => {
+    const manifest = manifestFor(
+      { description: 'validation-required: screen-audit' },
+      { parentReason: 'commissioning' }
+    );
+    const decision = decideValidationTransition({
+      state: { name: 'Validating', type: 'started' },
+      manifest,
+      holds: [],
+      deployment: { status: 'verified', sha: SHA_C },
+      receipts: [
+        receipt({ kind: 'outcome', sha: SHA_A }),
+        receipt({ kind: 'screen-audit', sha: SHA_B }),
+      ],
+    });
+    expect(decision.target).toBe('Done');
+    expect(decision.missing).toEqual([]);
+    expect(decision.explanation).toEqual([
+      `Every required receipt passed on its recorded verified artifact. Deployment generation ${SHA_C.slice(0, 12)} is verified.`,
+    ]);
+    expect(decision.explanation.join(' ')).not.toContain(
+      `Every required receipt passed on verified production generation ${SHA_C.slice(0, 12)}`
+    );
+  });
+
   it('routes a required failure to Rework, even before deployment', () => {
     const decision = decideValidationTransition({
       state: { name: 'Validating', type: 'started' },

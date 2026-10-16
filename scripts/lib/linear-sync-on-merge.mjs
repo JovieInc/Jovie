@@ -1222,6 +1222,12 @@ async function runSync(options) {
   const env = options.env ?? process.env;
   const log = options.log ?? (message => console.log(message));
   const sweep = env.LIFECYCLE_MODE === 'sweep';
+  const receiptIssue = String(env.LINEAR_VALIDATION_ISSUE ?? '').toUpperCase();
+  // Nonempty malformed targets have their own workflow concurrency group.
+  // They must never widen into parallel global sweeps or make external reads.
+  if (sweep && receiptIssue && !IDENTIFIER_RE.test(receiptIssue)) {
+    throw new Error('Malformed LINEAR_VALIDATION_ISSUE: expected JOV-<number>');
+  }
   const ref = extractMergeIssueRef({
     body: env.PR_BODY,
     headRef: env.HEAD_REF,
@@ -1303,7 +1309,6 @@ async function runSync(options) {
   }
 
   const lookups = [];
-  const receiptIssue = String(env.LINEAR_VALIDATION_ISSUE ?? '').toUpperCase();
   if (sweep && IDENTIFIER_RE.test(receiptIssue)) {
     // A receipt for parent-only commissioning work need not have a PR.
     // Read exactly its canonical record; the evaluator still owns admission.
@@ -1370,7 +1375,8 @@ async function runSync(options) {
   }
 
   const eventPull = sweep ? undefined : { number: Number(env.PR_NUMBER) };
-  const cursorDir = sweep ? env.LINEAR_SYNC_CURSOR_DIR : undefined;
+  const cursorDir =
+    sweep && !receiptIssue ? env.LINEAR_SYNC_CURSOR_DIR : undefined;
   const results = [];
   const failures = [];
   let deferredNote = '';
