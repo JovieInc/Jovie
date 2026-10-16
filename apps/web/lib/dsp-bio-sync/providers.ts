@@ -1,8 +1,7 @@
-import {
-  canExecuteBioSubmission,
-  getBioSubmissionManifest,
-  PROFILE_DESTINATION_REGISTRY,
-} from '@/lib/connectors/profile-writes/destinations';
+import { projectArtistProfileDestination } from '@/lib/connectors/artist-profile-catalog';
+import { ARTIST_PROFILE_DESTINATIONS } from '@/lib/connectors/artist-profile-registry';
+import { DSP_PROFILE_CATALOG } from '@/lib/connectors/dsp-profile-catalog';
+import { PROFILE_DESTINATION_REGISTRY } from '@/lib/connectors/profile-writes/destinations';
 
 export type BioSyncMethod = 'api' | 'email';
 
@@ -25,6 +24,17 @@ export interface DspBioProvider {
   maxBioLength: number;
 }
 
+function bioField(providerId: string) {
+  const destination = Object.values(DSP_PROFILE_CATALOG).find(
+    item => item.legacyBioProviderId === providerId
+  );
+  if (!destination) throw new Error('unregistered-profile-destination');
+  return projectArtistProfileDestination(
+    destination.id,
+    ARTIST_PROFILE_DESTINATIONS[destination.id]
+  ).fields[0];
+}
+
 /**
  * Compatibility projection of the canonical DSP catalog. Historical transport
  * metadata grants no delivery permission; current submission evidence is required.
@@ -37,13 +47,13 @@ export const DSP_BIO_PROVIDERS: Record<string, DspBioProvider> =
         displayName: destination.label,
         method: destination.method,
         get enabled() {
-          return (
-            destination.method === 'email' &&
-            canExecuteBioSubmission(getBioSubmissionManifest(id))
-          );
+          return bioField(id).submission?.available ?? false;
         },
         get rollback(): DspBioProvider['rollback'] {
-          return this.enabled ? 'manual' : 'unsupported';
+          const field = bioField(id);
+          return field.submission?.available
+            ? field.submission.rollback
+            : field.recovery;
         },
         notes:
           destination.method === 'email'
@@ -86,7 +96,9 @@ export function getApiBioProviders(): Array<[string, DspBioProvider]> {
  * Get a specific DSP bio provider config.
  */
 export function getBioProvider(providerId: string): DspBioProvider | undefined {
-  return DSP_BIO_PROVIDERS[providerId];
+  return Object.hasOwn(DSP_BIO_PROVIDERS, providerId)
+    ? DSP_BIO_PROVIDERS[providerId]
+    : undefined;
 }
 
 /**

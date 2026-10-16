@@ -3,7 +3,10 @@ import {
   digest,
   type ProfileWriteAdapter,
 } from '@/lib/connectors/profile-writes/contract';
-import { getProfileDestination } from '@/lib/connectors/profile-writes/destinations';
+import {
+  getBioSubmissionManifest,
+  getProfileDestination,
+} from '@/lib/connectors/profile-writes/destinations';
 import { assertCustomerVoiceFloor } from '@/lib/copy/outbound-floor';
 import { getDspBioUpdateEmail } from '@/lib/email/templates/dsp-bio-update';
 import { withTimeout } from '@/lib/resilience/primitives';
@@ -21,13 +24,13 @@ export interface BioSubmissionContext {
 }
 
 export function createBioSubmissionAdapter(input: {
-  manifest: () => ProfileWriteAdapter['manifest'];
+  providerId: string;
   load: () => Promise<BioSubmissionContext>;
   send: EmailProvider['sendEmail'];
 }): ProfileWriteAdapter {
   return {
     get manifest() {
-      return input.manifest();
+      return getBioSubmissionManifest(input.providerId);
     },
     async read() {
       const context = await input.load();
@@ -46,7 +49,7 @@ export function createBioSubmissionAdapter(input: {
           version: null,
           receipt: { statusCode: 412 },
         };
-      const manifest = input.manifest();
+      const manifest = getBioSubmissionManifest(input.providerId);
       if (digest(manifest) !== manifestDigest)
         throw new Error('stale-manifest');
       const destination = getProfileDestination(manifest.providerId);
