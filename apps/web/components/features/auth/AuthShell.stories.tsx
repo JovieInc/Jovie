@@ -1,12 +1,13 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { APP_ROUTES } from '@/constants/routes';
+import { AuthLayout } from './AuthLayout';
 import { AuthShell } from './AuthShell';
 
 const meta = {
   title: 'Auth/AuthShell',
   component: AuthShell,
   parameters: {
-    layout: 'padded',
+    layout: 'fullscreen',
     nextjs: {
       appDirectory: true,
       navigation: { pathname: '/signup' },
@@ -15,6 +16,13 @@ const meta = {
       uncoveredProps: ['compact', 'appearance', 'initialValues'],
     },
   },
+  decorators: [
+    Story => (
+      <AuthLayout formTitle='' showFormTitle={false} showFooterPrompt={false}>
+        <Story />
+      </AuthLayout>
+    ),
+  ],
 } satisfies Meta<typeof AuthShell>;
 
 export default meta;
@@ -34,5 +42,14 @@ export const SignIn: Story = {
   args: {
     mode: 'sign-in',
     suppressOneTap: false,
+  },
+};
+
+export const ClaimTargets: Story = {
+  args: { mode: 'sign-up', claimHandle: 'a'.repeat(30), suppressOneTap: true },
+  parameters: {
+    nextjs: {
+      navigation: { pathname: '/signup', query: { handle: 'a'.repeat(30) } },
+    },
   },
 };
