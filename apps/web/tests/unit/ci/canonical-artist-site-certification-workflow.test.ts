@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -53,34 +53,40 @@ describe('JOV-6572 canonical artist-site certification workflow', () => {
     expect(nightly).toContain('workflow run ci.yml');
   });
 
-  it('signs pending claim cookies with an ephemeral key before the server starts', () => {
+  it('provides an ephemeral signing key before starting the claim server (JOV-8550)', () => {
     const journey = parsedCi.jobs['ci-golden-path']?.steps?.find(
       step => step.id === 'canonical_journey'
-    )?.run;
-    const keySetup = journey
-      ?.split('\n')
-      .find(line => line.trimStart().startsWith('export URL_ENCRYPTION_KEY='));
-    expect(keySetup).toBeDefined();
-    expect(journey!.indexOf(keySetup!)).toBeLessThan(
-      journey!.indexOf('PORT=3250 node')
     );
-    const probe = spawnSync(
-      'bash',
-      [
-        '--noprofile',
-        '--norc',
-        '-euc',
-        `${keySetup}
-      node -e 'if (!/^[a-f0-9]{64}$/.test(process.env.URL_ENCRYPTION_KEY ?? "")) process.exit(1)'
-    `,
-      ],
-      {
-        encoding: 'utf8',
-        env: { ...process.env, BASH_ENV: '', URL_ENCRYPTION_KEY: '' },
-      }
+    const script = journey?.run ?? '';
+    const keySetup = script.match(
+      /^URL_ENCRYPTION_KEY="\$\(openssl rand -base64 32\)"\r?\nexport URL_ENCRYPTION_KEY$/m
+    )?.[0];
+    expect(
+      keySetup,
+      'Pending claim cookies require a runtime signing key'
+    ).toBeTruthy();
+    expect(script).not.toMatch(/^export [A-Z0-9_]+="?\$\(/m);
+    expect(script.indexOf(keySetup!)).toBeLessThan(
+      script.indexOf('PORT=3250 node .next/standalone/apps/web/server.js')
     );
-    expect(probe.stderr).toBe('');
-    expect(probe.status).toBe(0);
+    const generateKey = () =>
+      execFileSync(
+        'bash',
+        [
+          '-eu',
+          '-c',
+          `${keySetup}
+node -e 'process.stdout.write(process.env.URL_ENCRYPTION_KEY)'`,
+        ],
+        {
+          encoding: 'utf8',
+        }
+      ).trim();
+    const first = generateKey();
+    const second = generateKey();
+    expect(Buffer.from(first, 'base64')).toHaveLength(32);
+    expect(Buffer.from(second, 'base64')).toHaveLength(32);
+    expect(first).not.toBe(second);
   });
 
   it('joins production-faithful, deployed-profile, and live revenue evidence', () => {
