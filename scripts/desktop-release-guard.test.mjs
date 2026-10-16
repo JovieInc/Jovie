@@ -967,6 +967,154 @@ printf '%s\n' '{"ok":true}'
   assert.match(exhausted.stderr, /HTTP 502/);
 });
 
+test('desktop authorizer defers when the installation reset is outside the budget', async t => {
+  const proof = shellStepBody(
+    desktopWorkflow,
+    'Cross-prove exact production evidence'
+  );
+  const helperStart = proof.indexOf('gh() {');
+  const helperEnd = proof.indexOf('\n\nif [ "$EVENT_NAME"', helperStart);
+  assert.ok(helperStart >= 0 && helperEnd > helperStart);
+  const helper = proof.slice(helperStart, helperEnd);
+  const root = await mkdtemp(join(tmpdir(), 'jovie-desktop-quota-defer-'));
+  t.after(() => rm(root, { force: true, recursive: true }));
+  await copyFile(
+    new URL('../.github/scripts/gh-api-hold.sh', import.meta.url),
+    join(root, 'gh-api-hold.sh')
+  );
+  const mockBin = join(root, 'bin');
+  const output = join(root, 'github-output');
+  await mkdir(mockBin);
+  await writeFile(output, 'authorized=true\nrelease_sha=already-set\n');
+  await writeFile(
+    join(mockBin, 'gh'),
+    `#!/usr/bin/env bash
+set -euo pipefail
+endpoint=""
+for arg in "$@"; do
+  case "$arg" in
+    repos/*|rate_limit) endpoint="$arg" ;;
+  esac
+done
+if [ "$endpoint" = rate_limit ]; then
+  if [ "\${MOCK_RESET:-}" = missing ]; then
+    exit 0
+  fi
+  printf '%s\\n' "$MOCK_RESET"
+  exit 0
+fi
+echo "$MOCK_ERROR" >&2
+exit 1
+`,
+    { mode: 0o755 }
+  );
+  const run = async env => {
+    await rm(join(root, 'desktop-authorize-quota-defer'), { force: true });
+    return spawnSync(
+      'bash',
+      [
+        '-c',
+        `set -euo pipefail\n${helper}\ngh api repos/JovieInc/Jovie/actions/runs/1`,
+      ],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          GH_API_HOLD_BUDGET_SECONDS: '240',
+          GH_API_RETRY_SECONDS: '0',
+          GITHUB_OUTPUT: output,
+          MOCK_ERROR:
+            'gh: API rate limit exceeded for installation. (HTTP 403)',
+          MOCK_RESET: String(Math.floor(Date.now() / 1000) + 10_000),
+          PATH: `${mockBin}:${process.env.PATH}`,
+          RUNNER_TEMP: root,
+          ...env,
+        },
+      }
+    );
+  };
+
+  const deferred = await run();
+  assert.equal(deferred.status, 0, deferred.stderr);
+  assert.match(deferred.stderr, /outside the 240s budget/);
+  assert.match(deferred.stderr, /Not passing/);
+  assert.match(
+    deferred.stdout,
+    /Deferring desktop publication to the next reconciliation/
+  );
+  assert.match(deferred.stdout, /No release was authorized/);
+  const outputs = Object.fromEntries(
+    (await readFile(output, 'utf8'))
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map(line => {
+        const separator = line.indexOf('=');
+        return [line.slice(0, separator), line.slice(separator + 1)];
+      })
+  );
+  assert.equal(outputs.authorized, 'false');
+  assert.equal(outputs.release_sha, '');
+  assert.equal(outputs.environment, '');
+  assert.equal(outputs.already_released, 'false');
+  assert.doesNotMatch(deferred.stdout, /"ok":true/);
+
+  await rm(join(root, 'desktop-authorize-quota-defer'), { force: true });
+  await writeFile(output, 'authorized=true\nrelease_sha=already-set\n');
+  const substituted = spawnSync(
+    'bash',
+    [
+      '-c',
+      `set -euo pipefail\n${helper}\nout="$(gh api repos/JovieInc/Jovie/actions/runs/1)"\necho SHOULD_NOT_RUN\nprintf '%s' "$out"\n`,
+    ],
+    {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        GH_API_HOLD_BUDGET_SECONDS: '240',
+        GH_API_RETRY_SECONDS: '0',
+        GITHUB_OUTPUT: output,
+        MOCK_ERROR: 'gh: API rate limit exceeded for installation. (HTTP 403)',
+        MOCK_RESET: String(Math.floor(Date.now() / 1000) + 10_000),
+        PATH: `${mockBin}:${process.env.PATH}`,
+        RUNNER_TEMP: root,
+      },
+    }
+  );
+  assert.equal(substituted.status, 0, substituted.stderr);
+  assert.doesNotMatch(substituted.stdout, /SHOULD_NOT_RUN/);
+  assert.match(
+    substituted.stdout,
+    /Deferring desktop publication to the next reconciliation/
+  );
+  const substitutedOutputs = Object.fromEntries(
+    (await readFile(output, 'utf8'))
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map(line => {
+        const separator = line.indexOf('=');
+        return [line.slice(0, separator), line.slice(separator + 1)];
+      })
+  );
+  assert.equal(substitutedOutputs.authorized, 'false');
+  assert.equal(substitutedOutputs.release_sha, '');
+
+  await writeFile(output, '');
+  const denied = await run({
+    MOCK_ERROR: 'gh: Resource not accessible by integration (HTTP 403)',
+  });
+  assert.equal(denied.status, 1);
+  assert.doesNotMatch(denied.stdout, /Deferring desktop publication/);
+  assert.doesNotMatch(denied.stderr, /Holding /);
+
+  await writeFile(output, '');
+  const missingReset = await run({ MOCK_RESET: 'missing' });
+  assert.equal(missingReset.status, 1);
+  assert.match(missingReset.stderr, /no x-ratelimit-reset/);
+  assert.doesNotMatch(missingReset.stdout, /Deferring desktop publication/);
+});
+
 test('production publication waits out GitHub quota and preserves fail-closed provenance', async t => {
   const root = await mkdtemp(join(tmpdir(), 'jovie-desktop-publish-quota-'));
   t.after(() => rm(root, { force: true, recursive: true }));

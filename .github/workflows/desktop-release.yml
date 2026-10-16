@@ -152,13 +152,35 @@ jobs:
             fi
             local attempt
             for attempt in 1 2 3; do
-              # Installation 403s hold inside gh-api-hold.sh until reset, or
-              # fail closed outside the step budget. 408/5xx still retry here.
+              # Installation 403s hold inside gh-api-hold.sh until reset.
+              # A reset outside this job's budget defers the generation.
+              # A missing reset and a permission 403 stay fatal. 408/5xx retry.
               if GH_API_HOLD_BIN="$(command -v gh)" bash "$RUNNER_TEMP/gh-api-hold.sh" "$@" > "$RUNNER_TEMP/desktop-gh-api-out" 2> "$RUNNER_TEMP/desktop-gh-api-err"; then
                 cat "$RUNNER_TEMP/desktop-gh-api-out"
                 return 0
               fi
-              if grep -Eqi 'outside the|Not passing|API rate limit|x-ratelimit-remaining' \
+              if grep -Eq 'outside the .*budget' "$RUNNER_TEMP/desktop-gh-api-err" &&
+                grep -q 'Not passing' "$RUNNER_TEMP/desktop-gh-api-err"; then
+                cat "$RUNNER_TEMP/desktop-gh-api-err" >&2
+                : > "$RUNNER_TEMP/desktop-authorize-quota-defer"
+                # A direct call can exit here. A command substitution only
+                # returns, and the ERR trap finishes the defer.
+                if [ "${BASH_SUBSHELL:-0}" -eq 0 ]; then
+                  {
+                    echo "release_sha="
+                    echo "environment="
+                    echo "baseline_sha="
+                    echo "authorized=false"
+                    echo "manual=false"
+                    echo "staging_auto=false"
+                    echo "already_released=false"
+                  } >> "$GITHUB_OUTPUT"
+                  echo "::notice::Installation quota resets outside this Authorize budget. Deferring desktop publication to the next reconciliation. No release was authorized."
+                  exit 0
+                fi
+                return 1
+              fi
+              if grep -Eqi 'API rate limit|x-ratelimit-remaining' \
                 "$RUNNER_TEMP/desktop-gh-api-err"; then
                 cat "$RUNNER_TEMP/desktop-gh-api-err" >&2
                 return 1
@@ -176,6 +198,27 @@ jobs:
             cat "$RUNNER_TEMP/desktop-gh-api-err" >&2
             return 1
           }
+          # A command substitution fails the assignment under set -e before
+          # the next command, so ERR owns that defer. DEBUG owns a later
+          # explicit exit after a handled failure. A permission 403 and a
+          # missing reset leave no sentinel and stay fatal.
+          defer_desktop_authorize_for_quota() {
+            if [ -f "$RUNNER_TEMP/desktop-authorize-quota-defer" ]; then
+              {
+                echo "release_sha="
+                echo "environment="
+                echo "baseline_sha="
+                echo "authorized=false"
+                echo "manual=false"
+                echo "staging_auto=false"
+                echo "already_released=false"
+              } >> "$GITHUB_OUTPUT"
+              echo "::notice::Installation quota resets outside this Authorize budget. Deferring desktop publication to the next reconciliation. No release was authorized."
+              exit 0
+            fi
+          }
+          trap defer_desktop_authorize_for_quota ERR
+          trap defer_desktop_authorize_for_quota DEBUG
 
           if [ "$EVENT_NAME" = "workflow_run" ]; then
             [[ "$TRIGGER_RUN_ID" =~ ^[1-9][0-9]*$ ]] &&
@@ -284,8 +327,9 @@ jobs:
 
           echo "environment=$environment" >> "$GITHUB_OUTPUT"
           # git ls-remote does not spend the installation REST budget. The
-          # ancestry compare still has to prove forward-only lineage, so that
-          # read holds until x-ratelimit-reset inside this 10-minute job.
+          # ancestry compare still proves forward-only lineage. It uses the
+          # same hold as the other reads and defers when the reset is outside
+          # this job's budget.
           current_main_sha="$(bash "$RUNNER_TEMP/resolve-main-sha.sh" "$REPOSITORY")"
           [[ "$current_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Could not resolve exact current main for desktop authorization."
@@ -299,7 +343,7 @@ jobs:
             # advanced past still publishes. Exact-SHA supersession starved
             # production desktop from 26.9.14 onward (2026-09-21..26) because
             # the merge queue lands faster than the controller verifies.
-            mainline_compare="$(bash "$RUNNER_TEMP/gh-api-hold.sh" api \
+            mainline_compare="$(gh api \
               "repos/$REPOSITORY/compare/$release_sha...$current_main_sha")"
             jq -e --arg release "$release_sha" --arg current "$current_main_sha" '
               type == "object" and

@@ -78,12 +78,57 @@ jobs:
         run: |
           set -euo pipefail
           gh() {
-            if [ "${1:-}" = "api" ]; then
-              GH_API_HOLD_BIN="$(command -v gh)" bash "$GITHUB_WORKSPACE/.testflight-bootstrap/.github/scripts/gh-api-hold.sh" "$@"
+            if [ "${1:-}" != "api" ]; then
+              command gh "$@"
               return
             fi
-            command gh "$@"
+            local err
+            err="$(mktemp)"
+            if GH_API_HOLD_BIN="$(command -v gh)" bash "$GITHUB_WORKSPACE/.testflight-bootstrap/.github/scripts/gh-api-hold.sh" "$@" 2>"$err"; then
+              rm -f "$err"
+              return 0
+            fi
+            cat "$err" >&2
+            # A reset outside this job's budget defers. A missing reset and a
+            # permission 403 stay fatal. Do not treat the 403 body as success.
+            if grep -Eq 'outside the .*budget' "$err" && grep -q 'Not passing' "$err"; then
+              : > "$RUNNER_TEMP/testflight-authorize-quota-defer"
+              rm -f "$err"
+              if [ "${BASH_SUBSHELL:-0}" -eq 0 ]; then
+                {
+                  echo "release_sha="
+                  echo "baseline_sha="
+                  echo "authorized=false"
+                  echo "manual=false"
+                  echo "already_released=false"
+                } >> "$GITHUB_OUTPUT"
+                echo "::notice::Installation quota resets outside this Authorize budget. Deferring TestFlight publication to the next reconciliation. No release was authorized."
+                exit 0
+              fi
+              return 1
+            fi
+            rm -f "$err"
+            return 1
           }
+          # A command substitution fails the assignment under set -e before
+          # the next command, so ERR owns that defer. DEBUG owns a later
+          # explicit exit after a handled failure. A permission 403 and a
+          # missing reset leave no sentinel and stay fatal.
+          defer_testflight_authorize_for_quota() {
+            if [ -f "$RUNNER_TEMP/testflight-authorize-quota-defer" ]; then
+              {
+                echo "release_sha="
+                echo "baseline_sha="
+                echo "authorized=false"
+                echo "manual=false"
+                echo "already_released=false"
+              } >> "$GITHUB_OUTPUT"
+              echo "::notice::Installation quota resets outside this Authorize budget. Deferring TestFlight publication to the next reconciliation. No release was authorized."
+              exit 0
+            fi
+          }
+          trap defer_testflight_authorize_for_quota ERR
+          trap defer_testflight_authorize_for_quota DEBUG
           {
             echo "release_sha="
             echo "baseline_sha="

@@ -161,6 +161,11 @@ type World = {
   testflightAttempts?: Record<string, Record<string, unknown>>;
   testflightJobs?: Record<string, unknown[]>;
   legacyRuns?: Record<string, unknown>[];
+  quota?: {
+    path: string;
+    message: string;
+    resetInSeconds?: number | null;
+  };
   binaries?: {
     id: number;
     runId: number;
@@ -271,6 +276,27 @@ function routes(world: World) {
   for (const [key, jobs] of Object.entries(world.testflightJobs ?? {}))
     table.set(`actions/runs/${key}/jobs?per_page=100`, { jobs });
   return (path: string) => {
+    if (
+      world.quota &&
+      (path === 'rate_limit' || path.startsWith('rate_limit?'))
+    ) {
+      return {
+        body: {
+          resources: {
+            core: {
+              reset:
+                world.quota.resetInSeconds === null
+                  ? ''
+                  : Math.floor(Date.now() / 1000) +
+                    (world.quota.resetInSeconds ?? 10_000),
+            },
+          },
+        },
+      };
+    }
+    if (world.quota && path.includes(world.quota.path)) {
+      return { status: 403, body: { message: world.quota.message } };
+    }
     if (!path.startsWith(base)) return null;
     const rest = path.slice(base.length);
     return table.has(rest) ? { body: table.get(rest) as object } : null;
@@ -367,6 +393,64 @@ const attestedJob = (transport: string) => ({
 });
 
 describe.skipIf(!gh)('iOS TestFlight release authorization (real gh)', () => {
+  it('defers an installation 403 whose reset is outside the Authorize budget', async () => {
+    const installation = {
+      path: 'actions/workflows/production-controller.yml',
+      message: 'API rate limit exceeded for installation',
+    };
+    const firstRead = await authorize({ quota: installation });
+    expect(firstRead.code, firstRead.stderr).toBe(0);
+    expect(firstRead.outputs.authorized).toBe('false');
+    expect(firstRead.outputs.release_sha).toBe('');
+    expect(firstRead.stderr).toContain('outside the 480s budget');
+    expect(firstRead.stdout).toContain(
+      'Deferring TestFlight publication to the next reconciliation'
+    );
+    expect(firstRead.stdout).toContain('No release was authorized');
+    expect(firstRead.requests.some(path => path.includes('rate_limit'))).toBe(
+      true
+    );
+
+    const afterProof = await authorize({
+      quota: {
+        path: 'actions/workflows/ios-testflight.yml',
+        message: 'API rate limit exceeded for installation',
+      },
+    });
+    expect(afterProof.code, afterProof.stderr).toBe(0);
+    expect(afterProof.outputs.authorized).toBe('false');
+    expect(afterProof.outputs.release_sha).toBe('');
+    expect(afterProof.stdout).toContain('No release was authorized');
+  });
+
+  it('keeps a permission 403 and a missing reset fatal', async () => {
+    const denied = await authorize({
+      quota: {
+        path: 'actions/workflows/production-controller.yml',
+        message: 'Resource not accessible by integration',
+      },
+    });
+    expect(denied.code).toBe(1);
+    expect(denied.outputs.authorized).toBe('false');
+    expect(denied.stdout).not.toContain('Deferring TestFlight publication');
+    expect(denied.requests.some(path => path.includes('rate_limit'))).toBe(
+      false
+    );
+
+    const missingReset = await authorize({
+      quota: {
+        path: 'actions/workflows/production-controller.yml',
+        message: 'API rate limit exceeded for installation',
+        resetInSeconds: null,
+      },
+    });
+    expect(missingReset.code).toBe(1);
+    expect(missingReset.stderr).toContain('no x-ratelimit-reset');
+    expect(missingReset.stdout).not.toContain(
+      'Deferring TestFlight publication'
+    );
+  });
+
   it('authorizes the exact verified current main as the first release', async () => {
     const result = await authorize({});
     expect(result.code, result.stderr).toBe(0);
