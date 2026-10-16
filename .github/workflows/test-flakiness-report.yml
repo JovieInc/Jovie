@@ -1,19 +1,25 @@
 name: Test Flakiness Report
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Gem
-# capability-gap: Retry and quarantine artifacts exist only after each test workflow terminates; this read-only hop aggregates them without rerunning a suite.
+# capability-gap: Retry artifacts exist only after test workflows terminate; this hop clusters them, files Linear signatures and publishes bound queue results without rerunning a suite.
 # removal-trigger: Collapse this hop when each test producer emits the shared flakiness report and ratchet result in-band from the same exact artifacts.
 
 on:
   workflow_run:
     workflows: [CI, Changed-Evidence Test Suites, E2E Full Browser Matrix]
     types: [completed]
-    branches: [main]
+    branches: [main, 'gh-readonly-queue/main/**']
   workflow_dispatch:
+    inputs:
+      merge_group_run_id:
+        description: Completed merge-group CI run to publish (optional)
+        type: string
+        required: false
 
 concurrency:
-  group: test-flakiness-report
-  cancel-in-progress: true
+  # Serialize Linear writes; queue publication cannot replace main analysis.
+  group: test-flakiness-report-${{ github.event.workflow_run.event || github.event_name }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -22,10 +28,19 @@ permissions:
 jobs:
   analyze-flakiness:
     name: Analyze Test Flakiness
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.head_branch == 'main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Exercise retry-cluster and dependency-parity contracts
+        if: github.event_name == 'workflow_dispatch'
+        run: node --test scripts/file-quarantine-clusters.test.mjs .github/scripts/dependency-parity-evidence.test.mjs
 
       # Completed-run jobs/artifacts are immutable per (run id, attempt), so
       # each wake reads only runs it has not seen (JOV-7744).
@@ -75,6 +90,7 @@ jobs:
 
       - name: Check flaky-rate ratchet
         id: ratchet
+        if: ${{ !cancelled() && steps.analyze.outputs.flaky_count != '' }}
         env:
           FLAKY_COUNT: ${{ steps.analyze.outputs.flaky_count }}
         run: node .github/scripts/check-flaky-ratchet.js
@@ -89,12 +105,17 @@ jobs:
             flakiness-clusters.json
           retention-days: 90
 
-      # Per-signature Linear filing lives in quarantine-recovery.yml
-      # (scripts/file-quarantine-clusters.mjs): it dedupes by cluster
-      # fingerprint, one issue per flaky signature, comments on recurrence.
-      # The ratchet-red remediation filing below (flaky-test-filing-intake.mjs)
-      # covers the aggregate signal. Retired GitHub-issue filing steps were
-      # removed — Linear is the canonical tracker.
+      # Signals: a test failing then passing on retry is direct flake evidence.
+      # Cross-shard and queue-only failures are clustered diagnostic signals;
+      # neither alone authorizes quarantine. Three distinct successful retry
+      # attempts in 24h make a signature a candidate, never three shards.
+      # This positive-only filing path never collects clean recovery history
+      # or writes the ledger. A red analyzer/ratchet must still file evidence.
+      - name: File verified failure signatures in Linear
+        if: ${{ !cancelled() && steps.analyze.outputs.signature_quarantine_candidates != '' && steps.analyze.outputs.signature_quarantine_candidates != '0' }}
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+        run: node scripts/file-quarantine-clusters.mjs --report-only
 
       - name: File Linear remediation when the ratchet is red
         if: ${{ failure() && steps.ratchet.outcome == 'failure' }}
@@ -121,3 +142,42 @@ jobs:
             echo "- Retry rate: $RETRY_RATE%"
             echo "- Ratchet: $RATCHET_STATUS"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  publish-queue-results:
+    name: Publish verified merge-group test results
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.merge_group_run_id != '') ||
+      (github.event_name == 'workflow_run' &&
+      github.event.workflow_run.workflow_id == 178737329 &&
+      github.event.workflow_run.event == 'merge_group' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      contains(fromJSON('["success","failure"]'), github.event.workflow_run.conclusion))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Only the completed run's XML is read; producer source is never checked
+      # out with credentials. Publication is limited to failure-containing runs.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - name: Prepare verified failure-containing JUnit reports
+        id: reports
+        env:
+          GH_TOKEN: ${{ github.token }}
+          QUEUE_JUNIT_RUN_ID: ${{ inputs.merge_group_run_id }}
+        run: node .github/scripts/publish-queue-junit.mjs
+      - name: Publish queue results to Codecov
+        if: ${{ steps.reports.outputs.upload == 'true' }}
+        uses: codecov/test-results-action@0fa95f0e1eeaafde2c782583b36b28ad0d8c77d3 # v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ${{ steps.reports.outputs.files }}
+          disable_search: true
+          flags: mergegroup-unittests
+          override_commit: ${{ steps.reports.outputs.head_sha }}
+          override_branch: ${{ steps.reports.outputs.branch }}
+          override_build: ${{ steps.reports.outputs.run_id }}
+          fail_ci_if_error: true

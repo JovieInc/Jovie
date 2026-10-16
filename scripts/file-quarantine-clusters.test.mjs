@@ -1,7 +1,15 @@
 import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
 import { test } from 'node:test';
 import { buildQuarantineEvidence } from '../.github/scripts/collect-quarantine-evidence.mjs';
-import { fileQuarantineClusters } from './file-quarantine-clusters.mjs';
+import {
+  fileQuarantineClusters,
+  fileReportedFlakeClusters,
+} from './file-quarantine-clusters.mjs';
+
+const { retryFailureRecords, clusterFailureRecords } = createRequire(
+  import.meta.url
+)('../.github/scripts/analyze-test-flakiness.js');
 
 const now = Date.parse('2026-10-03T12:00:00Z'),
   headSha = 'a'.repeat(40),
@@ -172,5 +180,168 @@ test('source drift and unsuccessful or foreign Linear responses produce no issue
       });
     await assert.rejects(fileQuarantineClusters(f.options));
     if (kind === 'before') assert.equal(f.calls.length, 0);
+  }
+});
+
+async function filingFixture() {
+  const f = fixture();
+  for (const { artifacts } of f.bundles) {
+    const report = artifacts[0].reports[0];
+    report.flaky = [{ file, name: 'retries once', retryCount: 1 }];
+    report.executions[0].failures = [
+      {
+        name: 'retries once',
+        error: 'timeout on port 12345',
+        outcome: 'flaky',
+      },
+    ];
+  }
+  const records = await retryFailureRecords(f.bundles, now);
+  const clusters = clusterFailureRecords(records, now);
+  const created = new Map(),
+    comments = [],
+    plans = [];
+  const options = {
+    ...f.options,
+    clusters: { ...f.options.clusters, clusters },
+    upsert: async plan => {
+      plans.push(plan);
+      if (!created.has(plan.fingerprint))
+        created.set(plan.fingerprint, {
+          id: 'issue-id',
+          url: 'https://linear.app/jovie/issue/JOV-42',
+        });
+      return { ok: true, ...created.get(plan.fingerprint) };
+    },
+    list: async () => ({ ok: true, comments }),
+    comment: async plan => {
+      comments.push(plan);
+      return { ok: true, id: `comment-${comments.length}` };
+    },
+  };
+  return { ...f, records, created, comments, plans, options };
+}
+
+test('verified retry artifacts file one signature and idempotent recurrence comments without recovery history', async () => {
+  const f = await filingFixture();
+  assert.equal(f.records.length, 3);
+  const cluster = f.options.clusters.clusters[0];
+  assert.equal(cluster.quarantineCandidate, true);
+  delete f.options.report; // This path cannot write/release a ledger entry.
+  const result = await fileReportedFlakeClusters(f.options);
+  assert.deepEqual(result, {
+    [cluster.signature]: 'https://linear.app/jovie/issue/JOV-42',
+  });
+  await fileReportedFlakeClusters(f.options);
+  assert.equal(f.created.size, 1);
+  assert.equal(f.comments.length, 1);
+  assert.match(f.plans[0].description, /Owning area: example.test.ts/);
+  assert.match(f.plans[0].description, /First seen: 2026-10-03/);
+  assert.match(f.plans[0].description, /rolling 24h: 3/);
+  assert.match(f.plans[0].description, /actions\/runs\/3/);
+  assert.equal(f.plans[0].reopenTerminal, true);
+  cluster.flakyAttempts24h.push({
+    runId: 4,
+    runAttempt: 1,
+    runAt: new Date(now).toISOString(),
+  });
+  cluster.flakyRunAttempts24h++;
+  await fileReportedFlakeClusters(f.options);
+  assert.equal(f.created.size, 1);
+  assert.equal(f.comments.length, 2);
+});
+
+test('ten shard copies of one retry and terminal failures remain diagnostic, not filing candidates', async () => {
+  const f = await filingFixture();
+  const records = Array.from({ length: 10 }, (_, i) => ({
+    ...f.records[0],
+    artifactShard: String(i),
+  }));
+  for (const sample of [
+    records,
+    f.records.map(row => ({ ...row, kind: 'failure' })),
+  ]) {
+    const clusters = clusterFailureRecords(sample, now);
+    assert.equal(clusters.length, 1);
+    assert.equal(clusters[0].quarantineCandidate, false);
+    f.options.clusters.clusters = clusters;
+    assert.deepEqual(await fileReportedFlakeClusters(f.options), {});
+    assert.equal(f.created.size, 0);
+  }
+});
+
+test('partial, skipped, legacy and terminal execution receipts cannot create successful retry signatures', async () => {
+  for (const kind of ['partial', 'skipped', 'legacy', 'terminal']) {
+    const f = await filingFixture();
+    for (const { artifacts } of f.bundles) {
+      const report = artifacts[0].reports[0];
+      if (kind === 'partial') report.complete = false;
+      if (kind === 'skipped') report.executions[0].skippedCount = 1;
+      if (kind === 'legacy') report.schemaVersion = 1;
+      if (kind === 'terminal') report.executions[0].outcome = 'failed';
+    }
+    assert.deepEqual(await retryFailureRecords(f.bundles, now), [], kind);
+  }
+});
+
+test('missing recovered errors use an explicit test-specific signature and foreign artifacts are rejected', async () => {
+  const f = await filingFixture();
+  for (const { artifacts } of f.bundles)
+    artifacts[0].reports[0].executions[0].failures = [];
+  const records = await retryFailureRecords(f.bundles, now);
+  assert.equal(records.length, 3);
+  assert.match(records[0].error, /failure message unavailable/);
+  assert.equal(clusterFailureRecords(records, now).length, 1);
+  f.bundles[0].artifacts[0].reports[0].run.headSha = 'd'.repeat(40);
+  await assert.rejects(
+    retryFailureRecords(f.bundles, now),
+    /Unbound execution report/
+  );
+});
+
+test('malformed, stale, duplicate or foreign signature evidence fails before any Linear write', async () => {
+  for (const mutate of [
+    o => {
+      o.clusters.repository = 'foreign/repo';
+    },
+    o => {
+      o.clusters.headSha = 'd'.repeat(40);
+    },
+    o => {
+      o.clusters.generatedAt = '2026-10-01T00:00:00Z';
+    },
+    o => {
+      o.clusters.clusters[0].file = '../unsafe.test.ts';
+    },
+    o => {
+      o.clusters.clusters[0].flakyAttempts24h[0].runAt = '2026-10-01T00:00:00Z';
+    },
+    o => {
+      o.clusters.clusters[0].flakyAttempts24h[0] =
+        o.clusters.clusters[0].flakyAttempts24h[1];
+    },
+    o => {
+      o.clusters.clusters[0].flakyAttempts24h.pop();
+    },
+  ]) {
+    const f = await filingFixture();
+    mutate(f.options);
+    await assert.rejects(fileReportedFlakeClusters(f.options));
+    assert.equal(f.created.size, 0);
+  }
+});
+
+test('filing and recurrence errors remain visible and source drift prevents writes', async () => {
+  for (const kind of ['lease', 'upsert', 'inventory', 'comment']) {
+    const f = await filingFixture();
+    if (kind === 'lease')
+      f.options.lease = () => {
+        throw new Error('source drift');
+      };
+    if (kind === 'upsert') f.options.upsert = async () => ({ ok: false });
+    if (kind === 'inventory') f.options.list = async () => ({ ok: false });
+    if (kind === 'comment') f.options.comment = async () => ({ ok: false });
+    await assert.rejects(fileReportedFlakeClusters(f.options));
+    if (kind === 'lease') assert.equal(f.created.size, 0);
   }
 });
