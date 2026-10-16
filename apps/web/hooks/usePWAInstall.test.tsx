@@ -37,6 +37,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   Reflect.deleteProperty(navigator, 'userAgentData');
@@ -94,6 +95,37 @@ describe('Mac/PWA install policy', () => {
       expect(result.current.canPrompt).toBe(false);
     }
   );
+  it('stays quiet when the capability endpoint itself times out', async () => {
+    vi.useFakeTimers();
+    platform(mac);
+    vi.mocked(fetch).mockImplementation(
+      (_input, options) =>
+        new Promise((_resolve, reject) => {
+          options?.signal?.addEventListener(
+            'abort',
+            () => reject(new DOMException('Timed out', 'AbortError')),
+            { once: true }
+          );
+        })
+    );
+    const { result } = await mount();
+    const event = promptEvent();
+    act(() => {
+      window.dispatchEvent(event);
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(fetch).toHaveBeenCalledOnce();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3000);
+    });
+    vi.useRealTimers();
+    expect(vi.mocked(fetch).mock.calls[0][1]?.signal?.aborted).toBe(true);
+    expect(result.current.canPrompt).toBe(false);
+    await act(() => result.current.install());
+    expect(event.prompt).not.toHaveBeenCalled();
+  });
   it('retains web fallback when the supported native download is explicitly unavailable', async () => {
     platform(mac);
     vi.mocked(fetch).mockResolvedValue({

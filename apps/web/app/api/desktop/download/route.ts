@@ -16,9 +16,12 @@ export async function GET(request?: Request) {
     return NextResponse.json(
       {
         ...MAC_APP_SUPPORT,
-        available: release ? Boolean(release.mac?.url) : null,
+        // An empty/missing artifact (including a stale cached release) is not
+        // evidence that the supported Mac app has been withdrawn. This provider
+        // can confirm availability, but cannot authoritatively deny it.
+        available: release?.mac ? true : null,
       },
-      { status: release ? 200 : 503 }
+      { status: release?.mac ? 200 : 503 }
     );
   }
   if (release?.mac?.url) {
