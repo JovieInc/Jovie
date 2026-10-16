@@ -121,6 +121,25 @@ class ProjectionTest(unittest.TestCase):
         self.assertFalse(result["authorizesTransition"])
         self.assertFalse(result["authorizesDispatch"])
 
+    def test_attempt_decode_is_bounded_and_creator_checked_before_decode(self):
+        import base64
+        import zlib
+        value = packet()
+        row = status()
+        row["creator"] = {"login": "untrusted", "type": "User"}
+        value["attemptHistory"]["pages"] = [[row]]
+        with patch.object(admission, "_bounded_attempt_receipt", side_effect=AssertionError("untrusted decode")):
+            self.assertHeld(value, "canonical-attempt-history-unreadable")
+        packed = status()["target_url"].split("#jovie-execution=", 1)[1]
+        self.assertEqual(admission._bounded_attempt_receipt(packed), execution_attempt._unpack(packed))
+        def encode(raw):
+            return base64.urlsafe_b64encode(raw).decode().rstrip("=")
+        compressed = zlib.compress(b'{"a":1}')
+        for invalid in [execution_attempt._pack({"padding": "a" * 65537}), encode(compressed[:-1]),
+                        encode(compressed + b"trailing"), encode(zlib.compress(b"not-json")), "!invalid"]:
+            with self.subTest(invalid=invalid[:16]), self.assertRaises((ValueError, zlib.error)):
+                admission._bounded_attempt_receipt(invalid)
+
     def test_every_join_is_fresh_and_future_or_missing_stamps_hold(self):
         for name in ("issue", "dependencies", "custody", "runtime", "attemptHistory"):
             for stamp in (NOW - admission.MAX_AGE_S - 1, NOW + 1, None, "unknown"):

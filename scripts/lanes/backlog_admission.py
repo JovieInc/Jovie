@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 import math
 import hashlib
+import base64
 import json
 from pathlib import Path
 import re
@@ -93,6 +94,16 @@ def _hold(code, owner, evidence, next_action):
             "nextAction": next_action}
 
 
+def _bounded_attempt_receipt(value):
+    # Same canonical URL-safe zlib/JSON representation, bounded before parsing.
+    packed = base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
+    inflater = zlib.decompressobj()
+    raw = inflater.decompress(packed, 65537)
+    if len(raw) > 65536 or inflater.unconsumed_tail or not inflater.eof or inflater.unused_data:
+        raise ValueError("attempt-receipt-decoded-bound-or-incomplete")
+    return json.loads(raw)
+
+
 def _attempt_receipts(pages):
     receipts = {}
     for status in (status for page in pages for status in page):
@@ -100,9 +111,10 @@ def _attempt_receipts(pages):
         context = status.get("context")
         if not isinstance(context, str): raise ValueError("malformed-context")
         if not context.startswith("jovie-execution/"): continue
+        if not execution_attempt._trusted_creator(status.get("creator")): raise ValueError("untrusted-creator")
         target = status.get("target_url") or ""
         if not isinstance(target, str) or len(target) > 32768 or "#jovie-execution=" not in target: raise ValueError("missing-receipt")
-        row = execution_attempt._unpack(target.split("#jovie-execution=", 1)[1])
+        row = _bounded_attempt_receipt(target.split("#jovie-execution=", 1)[1])
         if (not isinstance(row, dict) or row.get("schema") != execution_attempt.SCHEMA
                 or not isinstance(row.get("workKey"), str)
                 or not re.fullmatch(r"[a-z][a-z0-9-]*:[a-f0-9]{64}", row["workKey"])
@@ -111,7 +123,6 @@ def _attempt_receipts(pages):
                 or row.get("identityDigest") != execution_attempt.digest({"workKey": row["workKey"], "generation": row["executionGeneration"]})
                 or context != "jovie-execution/" + str(row.get("identityDigest"))):
             raise ValueError("receipt-context-mismatch")
-        if not execution_attempt._trusted_creator(status.get("creator")): raise ValueError("untrusted-creator")
         receipts.setdefault(row["workKey"], []).append({"statusId": status.get("id"), "identityDigest": row.get("identityDigest"),
                            "generation": row.get("executionGeneration"), "event": row.get("event"), "terminalState": row.get("terminalState")})
     return receipts
