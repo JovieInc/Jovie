@@ -31,6 +31,45 @@ type HeadingNode = {
   };
 };
 
+type TableNode = {
+  children?: unknown[];
+  data?: {
+    hProperties?: {
+      [key: string]: unknown;
+    };
+    [key: string]: unknown;
+  };
+};
+
+// Readers render GitHub-flavored markdown tables as block-level scrollable
+// regions (overflow-x-auto at narrow viewports). A scrollable region that is
+// not keyboard-focusable fails axe's scrollable-region-focusable rule, so
+// give every table a sequential focus stop and an accessible name. The name
+// comes from the table's own header row so screen readers announce what the
+// table holds.
+function describeTableForAccessibility(node: TableNode): string {
+  const headerRow = Array.isArray(node.children)
+    ? (node.children[0] as TableNode | undefined)
+    : undefined;
+  const headerCells = Array.isArray(headerRow?.children)
+    ? (headerRow.children as TableNode[])
+    : [];
+  const headerText = headerCells
+    .map(cell => toString(cell as Parameters<typeof toString>[0]).trim())
+    .filter(Boolean)
+    .join(', ');
+  return headerText ? `Table: ${headerText}` : 'Data table';
+}
+
+function enrichTableForAccessibility(node: TableNode): void {
+  const data = node.data ?? {};
+  const hProperties = data.hProperties ?? {};
+  hProperties.tabIndex = 0;
+  hProperties.ariaLabel = describeTableForAccessibility(node);
+  data.hProperties = hProperties;
+  node.data = data;
+}
+
 export const applyMarkdownTemplate = (raw: string): string => {
   return raw.replaceAll(/\{\{\s*LEGAL_ENTITY_NAME\s*\}\}/g, LEGAL_ENTITY_NAME);
 };
@@ -71,6 +110,10 @@ export async function createMarkdownDocument(
     heading.data = data;
 
     toc.push({ id: headingId, title, level: heading.depth });
+  });
+
+  visit(ast, 'table', node => {
+    enrichTableForAccessibility(node as unknown as TableNode);
   });
 
   const transformed = await processor.run(ast);
