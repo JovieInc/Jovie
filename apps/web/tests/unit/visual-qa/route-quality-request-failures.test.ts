@@ -158,9 +158,16 @@ describe('classifySameOriginRequestFailure', () => {
         url: `${ORIGIN}/_next/static/chunks/app/page.css?v=1`,
       })
     ).toBe('ignored');
-  });
-
-  it('keeps non-RSC aborts and non-abort RSC failures', () => {
+    // The stylesheet resourceType is its own CSS evidence shape: an aborted
+    // `<link rel="stylesheet">` load is a navigation cancellation wherever
+    // the URL points, including outside the chunk path and with no URL.
+    expect(
+      isAbortedNextStaticCssChunk({
+        errorText: 'net::ERR_ABORTED',
+        resourceType: 'stylesheet',
+        url: `${ORIGIN}/styles/app.css`,
+      })
+    ).toBe(true);
     expect(
       classifySameOriginRequestFailure({
         errorText: 'net::ERR_ABORTED',
@@ -168,7 +175,17 @@ describe('classifySameOriginRequestFailure', () => {
         sameOrigin: true,
         url: `${ORIGIN}/styles/app.css`,
       })
-    ).toBe('failed-request');
+    ).toBe('ignored');
+    expect(
+      classifySameOriginRequestFailure({
+        errorText: 'net::ERR_ABORTED',
+        resourceType: 'stylesheet',
+        sameOrigin: true,
+      })
+    ).toBe('ignored');
+  });
+
+  it('keeps non-RSC aborts and non-abort RSC failures', () => {
     expect(
       classifySameOriginRequestFailure({
         errorText: 'net::ERR_ABORTED',
@@ -179,12 +196,26 @@ describe('classifySameOriginRequestFailure', () => {
     ).toBe('failed-request');
     expect(
       classifySameOriginRequestFailure({
-        errorText: 'net::ERR_CONNECTION_REFUSED',
-        resourceType: 'stylesheet',
+        errorText: 'net::ERR_ABORTED',
+        resourceType: 'fetch',
         sameOrigin: true,
-        url: `${ORIGIN}/_next/static/chunks/3pzix5p8t1bdp.css`,
+        url: `${ORIGIN}/_next/static/css/app.css`,
       })
     ).toBe('failed-request');
+    for (const errorText of [
+      'net::ERR_CONNECTION_REFUSED',
+      'net::ERR_FAILED',
+      undefined,
+    ]) {
+      expect(
+        classifySameOriginRequestFailure({
+          errorText,
+          resourceType: 'stylesheet',
+          sameOrigin: true,
+          url: `${ORIGIN}/_next/static/chunks/3pzix5p8t1bdp.css`,
+        })
+      ).toBe('failed-request');
+    }
     expect(
       classifySameOriginRequestFailure({
         errorText: 'net::ERR_ABORTED',
