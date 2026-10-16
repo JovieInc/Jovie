@@ -45,6 +45,9 @@ export const runtime = 'nodejs';
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 const DEDUPE_TTL_SECONDS = 6 * 60 * 60;
 const DISPATCH_TIMEOUT_MS = 4500;
+const LINEAR_ISSUE_READ_TIMEOUT_MS = 4500;
+const LINEAR_ISSUE_ID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_PROVIDER_EVENT_AGE_MS = 6 * 60 * 60 * 1000;
 const JOV_TEAM_ID = 'bdc09edc-f91c-4a06-b308-74b4fcf093f8';
 const JOV_TRIAGE_STATE_ID = '9844cfe6-6cf4-4347-842c-893a68f349b8';
@@ -89,6 +92,7 @@ interface LinearIssueData {
   updatedAt?: string;
   teamId?: string;
   team?: {
+    id?: string;
     key?: string;
   };
   state?: LinearIssueState;
@@ -103,6 +107,13 @@ interface LinearCommentUser {
 
 interface LinearCommentData {
   id?: string;
+  issueId?: string | null;
+  projectId?: string | null;
+  projectUpdateId?: string | null;
+  documentContentId?: string | null;
+  initiativeId?: string | null;
+  initiativeUpdateId?: string | null;
+  postId?: string | null;
   body?: string;
   issue?: LinearIssueData;
   user?: LinearCommentUser;
@@ -188,10 +199,10 @@ function isJovTriageIssueChange(payload: LinearWebhookPayload): boolean {
   );
 }
 
-function isValidationReceiptComment(payload: LinearWebhookPayload): boolean {
+function isValidationReceiptCandidate(payload: LinearWebhookPayload): boolean {
   if (payload.type !== 'Comment' || payload.action !== 'create') return false;
   const comment = payload.data as LinearCommentData | undefined;
-  const body = comment?.body ?? '';
+  const body = typeof comment?.body === 'string' ? comment.body : '';
   // This requests a trusted reread only. The lifecycle still validates the
   // order revision/digest, episode, actor and artifact before accepting it.
   const founderResult = extractWorkBlocks(body).results.some(result => {
@@ -204,11 +215,127 @@ function isValidationReceiptComment(payload: LinearWebhookPayload): boolean {
       Reflect.get(actor, 'class') === 'founder-decision'
     );
   });
+  return VALIDATION_RECEIPT_MARKER.test(body) || Boolean(founderResult);
+}
+
+function isValidationReceiptComment(payload: LinearWebhookPayload): boolean {
+  const comment = payload.data as LinearCommentData | undefined;
   return (
-    (VALIDATION_RECEIPT_MARKER.test(body) || founderResult) &&
+    isValidationReceiptCandidate(payload) &&
     Boolean(comment?.issue?.id) &&
     JOV_IDENTIFIER.test(comment?.issue?.identifier ?? '')
   );
+}
+
+/** Native Comment events carry issueId, not an expanded issue. Resolve only
+ * receipt wake candidates; comment content never supplies lifecycle identity. */
+async function hydrateValidationReceiptIssue(
+  payload: LinearWebhookPayload
+): Promise<boolean> {
+  const comment = payload.data as LinearCommentData;
+  const nonIssueParents = [
+    comment.projectId,
+    comment.projectUpdateId,
+    comment.documentContentId,
+    comment.initiativeId,
+    comment.initiativeUpdateId,
+    comment.postId,
+  ].filter(value => value !== undefined && value !== null);
+  if (nonIssueParents.length > 0) {
+    // Native comments can belong to a project, update, document or post.
+    // Ignore only a positively identified non-issue parent; conflicting or
+    // malformed identities must remain retryable, never guessed from content.
+    if (
+      (comment.issueId === null || comment.issueId === undefined) &&
+      !comment.issue &&
+      nonIssueParents.every(
+        parent => typeof parent === 'string' && LINEAR_ISSUE_ID.test(parent)
+      )
+    )
+      return false;
+    throw new Error('Linear Comment parent identity is ambiguous');
+  }
+  // Preserve the legacy expanded payload, including ignored non-JOV issues.
+  if (
+    comment.issueId === undefined &&
+    typeof comment.issue?.id === 'string' &&
+    comment.issue.id &&
+    typeof comment.issue.identifier === 'string' &&
+    comment.issue.identifier
+  )
+    return true;
+  const issueId = comment.issueId;
+  if (
+    typeof issueId !== 'string' ||
+    !LINEAR_ISSUE_ID.test(issueId) ||
+    (comment.issue?.id && comment.issue.id !== issueId)
+  ) {
+    throw new Error('Linear Comment issue identity is invalid');
+  }
+  const apiKey = env.LINEAR_API_KEY;
+  if (!apiKey) throw new Error('Linear issue reader is unconfigured');
+  const readIssue = async () => {
+    const response = await serverFetch('https://api.linear.app/graphql', {
+      method: 'POST',
+      headers: {
+        Authorization: apiKey,
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query:
+          'query LinearWebhookIssue($id: String!) { issue(id: $id) { id identifier updatedAt team { id key } } }',
+        variables: { id: issueId },
+      }),
+      redirect: 'error',
+      timeoutMs: LINEAR_ISSUE_READ_TIMEOUT_MS,
+      context: 'Linear webhook receipt issue read',
+    });
+    if (!response.ok) throw new Error('Linear issue read failed');
+    return response.json();
+  };
+  // serverFetch bounds transport; this deadline also bounds response decoding.
+  let deadline: ReturnType<typeof setTimeout> | undefined;
+  let result: {
+    errors?: unknown;
+    data?: { issue?: LinearIssueData | null };
+  } | null;
+  try {
+    result = await Promise.race([
+      readIssue(),
+      new Promise<never>((_, reject) => {
+        deadline = setTimeout(
+          () => reject(new Error('Linear issue read timed out')),
+          LINEAR_ISSUE_READ_TIMEOUT_MS
+        );
+      }),
+    ]);
+  } finally {
+    clearTimeout(deadline);
+  }
+  const issue = result?.data?.issue;
+  if (
+    (result?.errors !== undefined &&
+      (!Array.isArray(result.errors) || result.errors.length > 0)) ||
+    !issue ||
+    issue.id !== issueId ||
+    typeof issue.identifier !== 'string' ||
+    !/^[A-Z][A-Z0-9]*-[1-9]\d*$/.test(issue.identifier) ||
+    typeof issue.team?.id !== 'string' ||
+    !LINEAR_ISSUE_ID.test(issue.team.id) ||
+    typeof issue.team.key !== 'string' ||
+    (comment.issue?.identifier && comment.issue.identifier !== issue.identifier)
+  ) {
+    throw new Error('Linear issue read returned an invalid identity');
+  }
+  if (
+    issue.team.id !== JOV_TEAM_ID ||
+    issue.team.key !== 'JOV' ||
+    !JOV_IDENTIFIER.test(issue.identifier)
+  )
+    return false;
+  comment.issue = issue;
+  return true;
 }
 
 function isQualityGapInputChange(payload: LinearWebhookPayload): boolean {
@@ -324,6 +451,44 @@ export async function POST(request: NextRequest) {
     }
 
     const payload = JSON.parse(body) as LinearWebhookPayload;
+
+    // Check freshness before an authoritative read. Lookup failures are reads,
+    // never an ambiguous GitHub dispatch, and must leave the event retryable.
+    if (isValidationReceiptCandidate(payload)) {
+      const timestamp = providerTimestamp(payload);
+      if (payload.webhookTimestamp !== undefined && !timestamp) {
+        return NextResponse.json(
+          { error: 'Invalid provider timestamp' },
+          { status: 400, headers: NO_STORE_HEADERS }
+        );
+      }
+      if (staleProviderEvent(timestamp)) {
+        return NextResponse.json(
+          { received: true, ignored: true, reason: 'stale-provider-event' },
+          { headers: NO_STORE_HEADERS }
+        );
+      }
+      try {
+        if (!(await hydrateValidationReceiptIssue(payload))) {
+          return NextResponse.json(
+            { received: true, ignored: true },
+            { headers: NO_STORE_HEADERS }
+          );
+        }
+      } catch (error) {
+        await captureCriticalError(
+          'Linear webhook receipt issue read failed',
+          error,
+          {
+            route: '/api/webhooks/linear',
+          }
+        );
+        return NextResponse.json(
+          { error: 'Receipt issue lookup unavailable' },
+          { status: 503, headers: NO_STORE_HEADERS }
+        );
+      }
+    }
 
     const eventKind = classifyLinearEvent(payload);
     const isPlanReadyEvent = eventKind === 'plan';
