@@ -4555,6 +4555,65 @@ class TerminalRevisitTest(unittest.TestCase):
         held = self.pr(1, labels=[{"name": "hold"}])
         self.assertEqual(lane.pr_events.sync_main(self.host, lane, held, TERMINAL_NOW, terminal_ok=True), "held:hold")
 
+    def test_successful_terminal_sync_lifts_exhaustion_and_a_failed_sync_keeps_it(self):
+        self.write("fix-attempts.json", {"1": {"sha": "h1"}, "2": {"sha": "h2"}})
+
+        def shell(args, **kwargs):
+            self.calls.append(args)
+            if args[:2] == ["git", "ls-remote"]:
+                return SimpleNamespace(returncode=0, stdout=f"{self.main}\trefs/heads/main\n", stderr="")
+            if args[:4] == ["gh", "api", "-X", "PUT"] and args[4].endswith("/pulls/2/update-branch"):
+                return SimpleNamespace(returncode=1, stdout="", stderr="rejected")
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        lane.sh.side_effect = shell
+        exhausted = {"name": "lane-fix-exhausted"}
+        prs = [self.pr(1, labels=[exhausted, {"name": "queue-poison"}]), self.pr(2, labels=[exhausted])]
+        self.assertEqual(lane.revisit_terminal_prs(self.host, prs, now=TERMINAL_NOW), [1, 2])
+        lifts = [args[4] for args in self.calls if args[:4] == ["gh", "api", "-X", "DELETE"]]
+        self.assertEqual(lifts, [
+            f"repos/{lane.REPO_SLUG}/issues/1/labels/queue-poison",
+            f"repos/{lane.REPO_SLUG}/issues/1/labels/lane-fix-exhausted",
+        ])
+
+    def test_a_busy_local_pass_revisits_terminal_heads_after_the_claim_lock(self):
+        seen = {}
+
+        def revisit(host, candidates):
+            handle = open(host.state / "claim.lock", "a+")
+            try:
+                fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                seen["locked"] = True
+            else:
+                fcntl.flock(handle, fcntl.LOCK_UN)
+                seen["locked"] = False
+            finally:
+                handle.close()
+            seen["candidates"] = [pr["number"] for pr in candidates]
+
+        red = {"number": 21770, "headRefOid": "h21770"}
+        slot = SimpleNamespace(release=lambda: seen.setdefault("slot", True))
+        with patch.object(lane.disk_guard, "check", return_value={"admitted": True}), \
+                patch.object(lane.bindings, "work", return_value=None), \
+                patch.object(lane, "requeue_verified"), \
+                patch.object(lane, "lane_prs", return_value=[]), \
+                patch.object(lane, "fix_candidates", return_value=[red]), \
+                patch.object(lane, "pr_recovery_held", return_value=False), \
+                patch.object(lane.pr_events, "queued_prs", return_value=[]), \
+                patch.object(lane.pr_events, "claim_event_pr", return_value=None), \
+                patch.object(lane, "claim_escalation_pr", return_value=None), \
+                patch.object(lane, "claim_red_pr", return_value=red), \
+                patch.object(lane, "record_maintenance_demand"), \
+                patch.object(lane, "yield_deferred_requeues"), \
+                patch.object(lane, "fix_red_pr"), \
+                patch.object(lane, "reexec", return_value=0), \
+                patch.object(lane, "revisit_terminal_prs", side_effect=revisit):
+            self.assertEqual(
+                lane.worker_with_slot(self.host, "grok", {"repairs": True, "slots": 1}, slot), 0)
+        self.assertEqual(seen.get("candidates"), [21770])
+        self.assertIs(seen.get("locked"), False, "terminal sync must not hold the claim lock")
+
     def test_rerun_covers_every_failed_or_cancelled_run_once(self):
         pr = self.pr(1, statusCheckRollup=[
             {"name": "PR Ready", "conclusion": "FAILURE", "detailsUrl": "https://x/actions/runs/11/job/1"},
