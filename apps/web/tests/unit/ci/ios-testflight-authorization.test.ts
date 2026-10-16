@@ -161,6 +161,11 @@ type World = {
   testflightAttempts?: Record<string, Record<string, unknown>>;
   testflightJobs?: Record<string, unknown[]>;
   legacyRuns?: Record<string, unknown>[];
+  quota?: {
+    path: string;
+    message: string;
+    resetInSeconds?: number | null;
+  };
   binaries?: {
     id: number;
     runId: number;
@@ -271,6 +276,27 @@ function routes(world: World) {
   for (const [key, jobs] of Object.entries(world.testflightJobs ?? {}))
     table.set(`actions/runs/${key}/jobs?per_page=100`, { jobs });
   return (path: string) => {
+    if (
+      world.quota &&
+      (path === 'rate_limit' || path.startsWith('rate_limit?'))
+    ) {
+      return {
+        body: {
+          resources: {
+            core: {
+              reset:
+                world.quota.resetInSeconds === null
+                  ? ''
+                  : Math.floor(Date.now() / 1000) +
+                    (world.quota.resetInSeconds ?? 10_000),
+            },
+          },
+        },
+      };
+    }
+    if (world.quota && path.includes(world.quota.path)) {
+      return { status: 403, body: { message: world.quota.message } };
+    }
     if (!path.startsWith(base)) return null;
     const rest = path.slice(base.length);
     return table.has(rest) ? { body: table.get(rest) as object } : null;
@@ -367,6 +393,190 @@ const attestedJob = (transport: string) => ({
 });
 
 describe.skipIf(!gh)('iOS TestFlight release authorization (real gh)', () => {
+  it('defers an installation 403 whose reset is outside the Authorize budget', async () => {
+    const installation = {
+      path: 'actions/workflows/production-controller.yml',
+      message: 'API rate limit exceeded for installation',
+    };
+    const summary = join(tempRoot('jovie-testflight-summary-'), 'summary');
+    writeFileSync(summary, '');
+    const firstRead = await authorize(
+      { quota: installation },
+      { GITHUB_STEP_SUMMARY: summary }
+    );
+    const resetEpoch = /resets at (\d+)/.exec(firstRead.stderr)?.[1];
+    const resetIso = new Date(Number(resetEpoch) * 1000)
+      .toISOString()
+      .replace(/\.\d{3}Z$/, 'Z');
+    const sentence = `Installation quota resets at ${resetIso}. Deferring TestFlight publication of ${RELEASE} to the next reconciliation. No release was authorized.`;
+    expect(firstRead.code, firstRead.stderr).toBe(0);
+    expect(firstRead.outputs.authorized).toBe('false');
+    expect(firstRead.outputs.release_sha).toBe('');
+    expect(firstRead.stderr).toContain('outside the 480s budget');
+    expect(firstRead.stdout).toContain(`::warning::${sentence}`);
+    expect(readFileSync(summary, 'utf8').trim()).toBe(sentence);
+    expect(firstRead.requests.some(path => path.includes('rate_limit'))).toBe(
+      true
+    );
+
+    writeFileSync(summary, '');
+    const afterProof = await authorize(
+      {
+        quota: {
+          path: 'actions/workflows/ios-testflight.yml',
+          message: 'API rate limit exceeded for installation',
+        },
+      },
+      { GITHUB_STEP_SUMMARY: summary }
+    );
+    const laterEpoch = /resets at (\d+)/.exec(afterProof.stderr)?.[1];
+    const laterIso = new Date(Number(laterEpoch) * 1000)
+      .toISOString()
+      .replace(/\.\d{3}Z$/, 'Z');
+    const laterSentence = `Installation quota resets at ${laterIso}. Deferring TestFlight publication of ${RELEASE} to the next reconciliation. No release was authorized.`;
+    expect(afterProof.code, afterProof.stderr).toBe(0);
+    expect(afterProof.outputs.authorized).toBe('false');
+    expect(afterProof.outputs.release_sha).toBe('');
+    expect(afterProof.stdout).toContain(`::warning::${laterSentence}`);
+    expect(readFileSync(summary, 'utf8').trim()).toBe(laterSentence);
+  });
+
+  it('formats a deferred reset with BSD date when GNU -d is rejected', async () => {
+    const root = tempRoot('jovie-testflight-bsd-date-');
+    const summary = join(root, 'summary');
+    const dateLog = join(root, 'date.log');
+    const dateBin = join(root, 'bin');
+    const layoutBin = join(root, 'macos-layout', 'bin');
+    const layoutUsrBin = join(root, 'macos-layout', 'usr', 'bin');
+    mkdirSync(dateBin);
+    mkdirSync(layoutBin, { recursive: true });
+    mkdirSync(layoutUsrBin, { recursive: true });
+    const hostDate = execFileSync('bash', ['-c', 'command -v date'], {
+      encoding: 'utf8',
+    }).trim();
+    expect(hostDate).toMatch(/^\/[\w./-]+$/);
+    const fixtureDate = join(layoutBin, 'date');
+    writeFileSync(
+      fixtureDate,
+      `#!/usr/bin/env bash
+set -euo pipefail
+exec ${hostDate} "$@"
+`,
+      { mode: 0o755 }
+    );
+    writeFileSync(summary, '');
+    writeFileSync(
+      join(dateBin, 'date'),
+      `#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\\n' "$*" >> "$DATE_LOG"
+resolve_real_date() {
+  local candidate candidates="\${DATE_CANDIDATES:-/bin/date:/usr/bin/date}"
+  local IFS=':'
+  for candidate in $candidates; do
+    if [ -n "$candidate" ] && [ -f "$candidate" ] && [ -x "$candidate" ]; then
+      printf '%s\\n' "$candidate"
+      return 0
+    fi
+  done
+  echo "date: no real date binary on DATE_CANDIDATES" >&2
+  return 1
+}
+has_d=0
+has_r=0
+prev=""
+epoch=""
+for arg in "$@"; do
+  if [ "$arg" = "-d" ]; then
+    has_d=1
+  fi
+  if [ "$prev" = "-r" ]; then
+    has_r=1
+    epoch="$arg"
+  fi
+  prev="$arg"
+done
+if [ "$has_d" -eq 1 ]; then
+  echo "date: illegal option -- d" >&2
+  exit 1
+fi
+if [ "$has_r" -eq 1 ]; then
+  node -e 'const epoch = Number(process.argv[1]); if (!Number.isFinite(epoch)) process.exit(1); process.stdout.write(new Date(epoch * 1000).toISOString().slice(0, 19) + "Z\\n");' "$epoch"
+  exit 0
+fi
+real="$(resolve_real_date)" || exit 1
+printf 'resolved %s\\n' "$real" >> "$DATE_LOG"
+exec "$real" "$@"
+`,
+      { mode: 0o755 }
+    );
+    const result = await authorize(
+      {
+        quota: {
+          path: 'actions/workflows/production-controller.yml',
+          message: 'API rate limit exceeded for installation',
+        },
+      },
+      {
+        DATE_CANDIDATES: `${join(layoutUsrBin, 'date')}:${fixtureDate}`,
+        DATE_LOG: dateLog,
+        GITHUB_STEP_SUMMARY: summary,
+        PATH: `${dateBin}:${process.env.PATH}`,
+      }
+    );
+    const resetEpoch = /resets at (\d+)/.exec(result.stderr)?.[1];
+    const resetIso =
+      new Date(Number(resetEpoch) * 1000).toISOString().slice(0, 19) + 'Z';
+    const sentence = `Installation quota resets at ${resetIso}. Deferring TestFlight publication of ${RELEASE} to the next reconciliation. No release was authorized.`;
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.stderr).not.toContain('could not format the reset instant');
+    expect(result.stdout).toContain(`::warning::${sentence}`);
+    expect(readFileSync(summary, 'utf8').trim()).toBe(sentence);
+    const dateCalls = readFileSync(dateLog, 'utf8');
+    expect(dateCalls).toContain('-d ');
+    expect(dateCalls).toContain('-r ');
+    expect(dateCalls).toContain(`resolved ${fixtureDate}`);
+    expect(dateCalls).not.toContain('/usr/bin/date');
+    expect(dateCalls).not.toContain(`resolved ${join(layoutUsrBin, 'date')}`);
+  });
+
+  it('keeps a permission 403 and a missing reset fatal', async () => {
+    const summary = join(tempRoot('jovie-testflight-summary-'), 'summary');
+    writeFileSync(summary, '');
+    const denied = await authorize(
+      {
+        quota: {
+          path: 'actions/workflows/production-controller.yml',
+          message: 'Resource not accessible by integration',
+        },
+      },
+      { GITHUB_STEP_SUMMARY: summary }
+    );
+    expect(denied.code).toBe(1);
+    expect(denied.outputs.authorized).toBe('false');
+    expect(denied.stdout).not.toContain('::warning::');
+    expect(denied.stdout).not.toContain('Deferring TestFlight publication');
+    expect(readFileSync(summary, 'utf8')).toBe('');
+    expect(denied.requests.some(path => path.includes('rate_limit'))).toBe(
+      false
+    );
+
+    const missingReset = await authorize(
+      {
+        quota: {
+          path: 'actions/workflows/production-controller.yml',
+          message: 'API rate limit exceeded for installation',
+          resetInSeconds: null,
+        },
+      },
+      { GITHUB_STEP_SUMMARY: summary }
+    );
+    expect(missingReset.code).toBe(1);
+    expect(missingReset.stderr).toContain('no x-ratelimit-reset');
+    expect(missingReset.stdout).not.toContain('::warning::');
+    expect(readFileSync(summary, 'utf8')).toBe('');
+  });
+
   it('authorizes the exact verified current main as the first release', async () => {
     const result = await authorize({});
     expect(result.code, result.stderr).toBe(0);

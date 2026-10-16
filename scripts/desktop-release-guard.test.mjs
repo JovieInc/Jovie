@@ -967,6 +967,262 @@ printf '%s\n' '{"ok":true}'
   assert.match(exhausted.stderr, /HTTP 502/);
 });
 
+test('desktop authorizer defers when the installation reset is outside the budget', async t => {
+  const proof = shellStepBody(
+    desktopWorkflow,
+    'Cross-prove exact production evidence'
+  );
+  const helperStart = proof.indexOf('gh() {');
+  const helperEnd = proof.indexOf('\n\nif [ "$EVENT_NAME"', helperStart);
+  assert.ok(helperStart >= 0 && helperEnd > helperStart);
+  const helper = proof.slice(helperStart, helperEnd);
+  const root = await mkdtemp(join(tmpdir(), 'jovie-desktop-quota-defer-'));
+  t.after(() => rm(root, { force: true, recursive: true }));
+  await copyFile(
+    new URL('../.github/scripts/gh-api-hold.sh', import.meta.url),
+    join(root, 'gh-api-hold.sh')
+  );
+  const mockBin = join(root, 'bin');
+  const output = join(root, 'github-output');
+  const summary = join(root, 'step-summary');
+  const deferredSha = 'd'.repeat(40);
+  const resetEpoch = Math.floor(Date.now() / 1000) + 10_000;
+  const resetIso = new Date(resetEpoch * 1000)
+    .toISOString()
+    .replace(/\.\d{3}Z$/, 'Z');
+  const sentence = `Installation quota resets at ${resetIso}. Deferring desktop publication of ${deferredSha} to the next reconciliation. No release was authorized.`;
+  await mkdir(mockBin);
+  await writeFile(output, 'authorized=true\nrelease_sha=already-set\n');
+  await writeFile(summary, '');
+  await writeFile(
+    join(mockBin, 'gh'),
+    `#!/usr/bin/env bash
+set -euo pipefail
+endpoint=""
+for arg in "$@"; do
+  case "$arg" in
+    repos/*|rate_limit) endpoint="$arg" ;;
+  esac
+done
+if [ "$endpoint" = rate_limit ]; then
+  if [ "\${MOCK_RESET:-}" = missing ]; then
+    exit 0
+  fi
+  printf '%s\\n' "$MOCK_RESET"
+  exit 0
+fi
+echo "$MOCK_ERROR" >&2
+exit 1
+`,
+    { mode: 0o755 }
+  );
+  const run = async (script, env) => {
+    await rm(join(root, 'desktop-authorize-quota-defer'), { force: true });
+    await rm(join(root, 'desktop-authorize-quota-reset'), { force: true });
+    await writeFile(summary, '');
+    return spawnSync('bash', ['-c', script], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        GH_API_HOLD_BUDGET_SECONDS: '240',
+        GH_API_RETRY_SECONDS: '0',
+        GITHUB_OUTPUT: output,
+        GITHUB_STEP_SUMMARY: summary,
+        MOCK_ERROR: 'gh: API rate limit exceeded for installation. (HTTP 403)',
+        MOCK_RESET: String(resetEpoch),
+        PATH: `${mockBin}:${process.env.PATH}`,
+        RUNNER_TEMP: root,
+        ...env,
+      },
+    });
+  };
+  const directScript = `set -euo pipefail\n${helper}\nrelease_sha=${deferredSha}\ngh api repos/JovieInc/Jovie/actions/runs/1`;
+  const substitutedScript = `set -euo pipefail\n${helper}\nrelease_sha=${deferredSha}\nout="$(gh api repos/JovieInc/Jovie/actions/runs/1)"\necho SHOULD_NOT_RUN\nprintf '%s' "$out"\n`;
+
+  const deferred = await run(directScript);
+  assert.equal(deferred.status, 0, deferred.stderr);
+  assert.match(deferred.stderr, /outside the 240s budget/);
+  assert.match(deferred.stderr, /Not passing/);
+  assert.ok(
+    deferred.stdout.includes(`::warning::${sentence}`),
+    deferred.stdout
+  );
+  assert.equal((await readFile(summary, 'utf8')).trim(), sentence);
+  const outputs = Object.fromEntries(
+    (await readFile(output, 'utf8'))
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map(line => {
+        const separator = line.indexOf('=');
+        return [line.slice(0, separator), line.slice(separator + 1)];
+      })
+  );
+  assert.equal(outputs.authorized, 'false');
+  assert.equal(outputs.release_sha, '');
+  assert.equal(outputs.environment, '');
+  assert.equal(outputs.already_released, 'false');
+  assert.doesNotMatch(deferred.stdout, /"ok":true/);
+
+  await writeFile(output, 'authorized=true\nrelease_sha=already-set\n');
+  const substituted = await run(substitutedScript);
+  assert.equal(substituted.status, 0, substituted.stderr);
+  assert.doesNotMatch(substituted.stdout, /SHOULD_NOT_RUN/);
+  assert.ok(
+    substituted.stdout.includes(`::warning::${sentence}`),
+    substituted.stdout
+  );
+  assert.equal((await readFile(summary, 'utf8')).trim(), sentence);
+  const substitutedOutputs = Object.fromEntries(
+    (await readFile(output, 'utf8'))
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map(line => {
+        const separator = line.indexOf('=');
+        return [line.slice(0, separator), line.slice(separator + 1)];
+      })
+  );
+  assert.equal(substitutedOutputs.authorized, 'false');
+  assert.equal(substitutedOutputs.release_sha, '');
+
+  const dateLog = join(root, 'date.log');
+  await writeFile(
+    join(mockBin, 'date'),
+    `#!/usr/bin/env bash
+set -euo pipefail
+if [ -n "\${MOCK_DATE_LOG:-}" ]; then
+  printf '%s\\n' "$*" >> "$MOCK_DATE_LOG"
+fi
+# macOS runners ship date at /bin/date and have no /usr/bin/date. Search a
+# candidate list (DATE_CANDIDATES, else those two paths) instead of execing
+# a hardcoded /usr/bin/date. The shim directory is already first on PATH, so
+# a bare \`command -v date\` would find this script.
+resolve_real_date() {
+  local candidate candidates="\${DATE_CANDIDATES:-/bin/date:/usr/bin/date}"
+  local IFS=':'
+  for candidate in $candidates; do
+    if [ -n "$candidate" ] && [ -f "$candidate" ] && [ -x "$candidate" ]; then
+      printf '%s\\n' "$candidate"
+      return 0
+    fi
+  done
+  echo "date: no real date binary on DATE_CANDIDATES" >&2
+  return 1
+}
+exec_real_date() {
+  local real
+  real="$(resolve_real_date)" || exit 1
+  if [ -n "\${MOCK_DATE_LOG:-}" ]; then
+    printf 'resolved %s\\n' "$real" >> "$MOCK_DATE_LOG"
+  fi
+  exec "$real" "$@"
+}
+if [ "\${MOCK_DATE:-gnu}" != bsd ]; then
+  exec_real_date "$@"
+fi
+has_d=0
+has_r=0
+prev=""
+epoch=""
+for arg in "$@"; do
+  if [ "$arg" = "-d" ]; then
+    has_d=1
+  fi
+  if [ "$prev" = "-r" ]; then
+    has_r=1
+    epoch="$arg"
+  fi
+  prev="$arg"
+done
+if [ "$has_d" -eq 1 ]; then
+  echo "date: illegal option -- d" >&2
+  exit 1
+fi
+if [ "$has_r" -eq 1 ]; then
+  node -e 'const epoch = Number(process.argv[1]); if (!Number.isFinite(epoch)) process.exit(1); process.stdout.write(new Date(epoch * 1000).toISOString().slice(0, 19) + "Z\\n");' "$epoch"
+  exit 0
+fi
+exec_real_date "$@"
+`,
+    { mode: 0o755 }
+  );
+  await writeFile(output, 'authorized=true\nrelease_sha=already-set\n');
+  const bsd = await run(directScript, {
+    MOCK_DATE: 'bsd',
+    MOCK_DATE_LOG: dateLog,
+  });
+  assert.equal(bsd.status, 0, bsd.stderr);
+  assert.doesNotMatch(bsd.stderr, /could not format the reset instant/);
+  assert.ok(bsd.stdout.includes(`::warning::${sentence}`), bsd.stdout);
+  assert.equal((await readFile(summary, 'utf8')).trim(), sentence);
+  const dateCalls = await readFile(dateLog, 'utf8');
+  assert.match(dateCalls, /-d /);
+  assert.match(dateCalls, /-r /);
+  assert.match(dateCalls, /resolved \/bin\/date/);
+  assert.doesNotMatch(dateCalls, /\/usr\/bin\/date/);
+
+  // macOS layout: /usr/bin/date is absent, so the shim must skip it and use
+  // the only executable candidate. The fixture wraps the host date captured
+  // before this shim is on PATH. Asserting the resolved path is the fixture
+  // keeps a Linux host that still has /usr/bin/date from passing a hardcoded
+  // exec of that binary.
+  const macDateLog = join(root, 'mac-date.log');
+  const layoutBin = join(root, 'macos-layout', 'bin');
+  const layoutUsrBin = join(root, 'macos-layout', 'usr', 'bin');
+  await mkdir(layoutBin, { recursive: true });
+  await mkdir(layoutUsrBin, { recursive: true });
+  const hostDate = execFileSync('bash', ['-c', 'command -v date'], {
+    encoding: 'utf8',
+  }).trim();
+  assert.match(hostDate, /^\/[\w./-]+$/);
+  const fixtureDate = join(layoutBin, 'date');
+  await writeFile(
+    fixtureDate,
+    `#!/usr/bin/env bash
+set -euo pipefail
+exec ${hostDate} "$@"
+`,
+    { mode: 0o755 }
+  );
+  await writeFile(output, 'authorized=true\nrelease_sha=already-set\n');
+  const macOnly = await run(directScript, {
+    DATE_CANDIDATES: `${join(layoutUsrBin, 'date')}:${fixtureDate}`,
+    MOCK_DATE: 'bsd',
+    MOCK_DATE_LOG: macDateLog,
+  });
+  assert.equal(macOnly.status, 0, macOnly.stderr);
+  assert.doesNotMatch(macOnly.stderr, /could not format the reset instant/);
+  assert.ok(macOnly.stdout.includes(`::warning::${sentence}`), macOnly.stdout);
+  assert.equal((await readFile(summary, 'utf8')).trim(), sentence);
+  const macDateCalls = await readFile(macDateLog, 'utf8');
+  assert.match(macDateCalls, /-d /);
+  assert.match(macDateCalls, /-r /);
+  assert.ok(macDateCalls.includes(`resolved ${fixtureDate}`), macDateCalls);
+  assert.doesNotMatch(macDateCalls, /\/usr\/bin\/date/);
+  assert.doesNotMatch(
+    macDateCalls,
+    new RegExp(`resolved ${join(layoutUsrBin, 'date').replaceAll('/', '\\/')}`)
+  );
+
+  await writeFile(output, '');
+  const denied = await run(directScript, {
+    MOCK_ERROR: 'gh: Resource not accessible by integration (HTTP 403)',
+  });
+  assert.equal(denied.status, 1);
+  assert.doesNotMatch(denied.stdout, /::warning::/);
+  assert.doesNotMatch(denied.stdout, /Deferring desktop publication/);
+  assert.equal((await readFile(summary, 'utf8')).trim(), '');
+  assert.doesNotMatch(denied.stderr, /Holding /);
+
+  await writeFile(output, '');
+  const missingReset = await run(directScript, { MOCK_RESET: 'missing' });
+  assert.equal(missingReset.status, 1);
+  assert.match(missingReset.stderr, /no x-ratelimit-reset/);
+  assert.doesNotMatch(missingReset.stdout, /::warning::/);
+  assert.equal((await readFile(summary, 'utf8')).trim(), '');
+});
+
 test('production publication waits out GitHub quota and preserves fail-closed provenance', async t => {
   const root = await mkdtemp(join(tmpdir(), 'jovie-desktop-publish-quota-'));
   t.after(() => rm(root, { force: true, recursive: true }));
