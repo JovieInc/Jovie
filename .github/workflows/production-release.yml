@@ -4,8 +4,8 @@ name: Production Release
 # accountable-writer: Symphony
 # capability-gap: Forward-only release lineage must prove that an authorized SHA
 #   is still an ancestor of main. Jobs check out the release SHA, not main.
-#   The staging-alias recheck uses the compare API, then git, when REST is
-#   unavailable. The other rechecks still read lineage through the compare API.
+#   Head, staging-alias, and production mutation rechecks use the compare API,
+#   then authenticated git, when REST is unavailable.
 # revisit-trigger: Revisit when the controller carries lineage on its own
 #   workflow_run payload or promotion moves to a webhook-dispatched writer.
 
@@ -1277,7 +1277,8 @@ jobs:
           GH_API_HOLD_BUDGET_SECONDS: '240'
           EXPECTED_MAIN_SHA: ${{ inputs.expected_sha }}
         run: |
-          bash "$GITHUB_WORKSPACE/.github/scripts/recheck-main-lineage.sh" "after its staged production build"
+          bash "$GITHUB_WORKSPACE/.github/scripts/recheck-main-lineage.sh" "before production promotion"
+
       - name: Security gate before production promotion
         if: ${{ steps.final-current.outputs.is_current == 'true' }}
         env:

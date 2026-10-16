@@ -241,6 +241,7 @@ async function recheck({
       ...result,
       gitRequests: requests,
       current,
+      mainSha: current,
       output: existsSync(output) ? readFileSync(output, 'utf8') : '',
     };
   } finally {
@@ -255,7 +256,9 @@ it.each(['exact', 'ahead', 'diverged'])(
     const result = await recheck({ mode });
     expect(result.code, result.stderr).toBe(0);
     expect(result.output).toBe(
-      `${mode === 'diverged' ? `superseded_sha=${result.current}\n` : ''}is_current=${mode !== 'diverged'}\n`
+      mode === 'diverged'
+        ? `superseded_sha=${result.mainSha}\nis_current=false\n`
+        : 'is_current=true\n'
     );
     // commits/main (and compare) each take one rate_limit probe before git.
     expect(result.requests.length).toBe(mode === 'exact' ? 2 : 4);
