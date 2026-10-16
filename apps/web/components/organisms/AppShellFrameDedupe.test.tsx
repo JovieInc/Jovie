@@ -221,28 +221,13 @@ describe('AppShellFrameDedupe', () => {
     late.remove();
   });
 
-  it('drops duplicate test ids from a hidden shell when a painted copy still exposes them', () => {
-    const rectSpy = vi
-      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
-      .mockImplementation(function mockRect(this: HTMLElement) {
-        return this.closest('[data-hidden-shell]')
-          ? ({
-              ...paintedRect(),
-              width: 0,
-              height: 0,
-              bottom: 0,
-              right: 0,
-            } as DOMRect)
-          : paintedRect();
-      });
-
+  it('drops duplicate test ids from a hidden shell before the kept frame has a box', () => {
     render(
       <>
         <AppShellFrameDedupe />
         <div
           data-testid='stale-frame'
           data-app-shell-frame='true'
-          data-hidden-shell='true'
           style={{ display: 'none' }}
         >
           <section data-testid='tasks-workspace'>Hidden tasks</section>
@@ -266,7 +251,6 @@ describe('AppShellFrameDedupe', () => {
       'data-app-shell-frame',
       'true'
     );
-    rectSpy.mockRestore();
   });
 
   it('keeps duplicate test ids when every frame is painted', () => {

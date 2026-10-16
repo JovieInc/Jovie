@@ -53,8 +53,9 @@ function stripDuplicateTestIds(
  *  hidden copy. Drop the attribute from hidden copies only when a visible
  *  frame remains. Zero-size copies are dropped only once another frame has
  *  a painted box, so a pre-layout pass cannot strip every frame. Test ids
- *  such as `tasks-workspace` are removed from those copies only when a
- *  painted sibling still exposes the same id. */
+ *  such as `tasks-workspace` are removed from the copies we drop when a
+ *  kept sibling already exposes the same id, including before that sibling
+ *  has a painted box. */
 function releaseHiddenDuplicateFrames(): void {
   const frames = [
     ...document.querySelectorAll<HTMLElement>('[data-app-shell-frame]'),
@@ -68,13 +69,13 @@ function releaseHiddenDuplicateFrames(): void {
       ? frames.filter(frame => !painted.includes(frame))
       : nonLayoutHidden;
   if (drop.length === 0 || drop.length === frames.length) return;
-  if (painted.length > 0) {
-    const liveIds = new Set<string>();
-    for (const frame of painted) {
-      for (const id of collectTestIds(frame)) liveIds.add(id);
-    }
-    for (const frame of drop) stripDuplicateTestIds(frame, liveIds);
+  const dropSet = new Set(drop);
+  const liveIds = new Set<string>();
+  for (const frame of frames) {
+    if (dropSet.has(frame)) continue;
+    for (const id of collectTestIds(frame)) liveIds.add(id);
   }
+  for (const frame of drop) stripDuplicateTestIds(frame, liveIds);
   for (const frame of drop) frame.removeAttribute('data-app-shell-frame');
 }
 
