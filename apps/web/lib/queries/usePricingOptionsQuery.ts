@@ -70,7 +70,6 @@ async function fetchPricingOptions({
  * retry on its own.
  */
 export const pricingOptionsQueryOptions = {
-  queryKey: queryKeys.billing.pricingOptions(),
   queryFn: fetchPricingOptions,
   ...STABLE_CACHE,
   retry: createClassifiedRetry(0),
@@ -81,6 +80,7 @@ export function usePricingOptionsQuery(options?: { enabled?: boolean }) {
 
   return useQuery<PricingOptionsResponse, Error>({
     ...pricingOptionsQueryOptions,
+    queryKey: queryKeys.billing.pricingOptions(),
     enabled,
   });
 }

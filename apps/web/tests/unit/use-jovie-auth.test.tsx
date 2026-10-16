@@ -242,6 +242,35 @@ describe('useJovieAuth', () => {
     expect(result.current.auth.sessionId).toBe('ba_sess_1');
   });
 
+  it('clears the bootstrap user when the live session settles signed out', () => {
+    const sessionState = {
+      data: null,
+      isPending: true,
+      isRefetching: false,
+      error: null,
+      refetch: vi.fn(),
+    };
+    useSessionMock.mockReturnValue(sessionState);
+    const { result, rerender } = renderWithWrapper(({ children }) => (
+      <JovieAuthValuesProvider
+        initialUser={{ id: 'ba_seed', email: 'seed@jov.ie', name: 'Seed User' }}
+      >
+        {children}
+      </JovieAuthValuesProvider>
+    ));
+
+    expect(result.current.user.user?.id).toBe('ba_seed');
+    useSessionMock.mockReturnValue({ ...sessionState, isPending: false });
+    rerender();
+
+    expect(result.current.user.isLoaded).toBe(true);
+    expect(result.current.user.user).toBeNull();
+    expect(result.current.user.isSignedIn).toBe(false);
+    expect(result.current.auth.userId).toBeNull();
+    expect(result.current.auth.isSignedIn).toBe(false);
+    expect(result.current.session.isSignedIn).toBe(false);
+  });
+
   it('resolves getToken to null — cookie sessions need no client token', async () => {
     mockSignedInSession();
 

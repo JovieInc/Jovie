@@ -11,6 +11,7 @@
  */
 import { act, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { ClientAuthBootstrap } from '@/lib/auth/dev-test-auth-types';
 
 const { router } = vi.hoisted(() => ({ router: { push: vi.fn() } }));
 
@@ -28,8 +29,16 @@ vi.mock('@/hooks/useJovieAuth', () => ({
   JovieAuthDefaultsProvider: ({ children }: { children: React.ReactNode }) => (
     <div data-testid='jovie-auth-defaults'>{children}</div>
   ),
-  JovieAuthValuesProvider: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid='jovie-auth-values'>{children}</div>
+  JovieAuthValuesProvider: ({
+    children,
+    initialUser,
+  }: {
+    children: React.ReactNode;
+    initialUser?: { id: string } | null;
+  }) => (
+    <div data-testid='jovie-auth-values' data-user-id={initialUser?.id}>
+      {children}
+    </div>
   ),
 }));
 
@@ -165,6 +174,55 @@ describe('ClientProviders composition', () => {
   });
 
   describe('Better Auth provider path', () => {
+    it('updates the bootstrap user across signed-out and authenticated renders', () => {
+      const authBootstrap: ClientAuthBootstrap = {
+        isAuthenticated: true,
+        userId: 'bootstrap-user',
+        email: 'test@example.com',
+        username: 'testuser',
+        fullName: 'Test User',
+        isAdmin: false,
+        persona: 'creator',
+      };
+      const view = render(
+        <ClientProviders forceSignedOutDefaults>
+          <TestChild />
+        </ClientProviders>
+      );
+      expect(screen.getByTestId('jovie-auth-defaults')).toBeInTheDocument();
+
+      view.rerender(
+        <ClientProviders forceSignedOutDefaults authBootstrap={authBootstrap}>
+          <TestChild />
+        </ClientProviders>
+      );
+      expect(screen.getByTestId('jovie-auth-values')).toHaveAttribute(
+        'data-user-id',
+        'bootstrap-user'
+      );
+
+      view.rerender(
+        <ClientProviders
+          forceSignedOutDefaults
+          authBootstrap={{ ...authBootstrap, userId: 'replacement-user' }}
+        >
+          <TestChild />
+        </ClientProviders>
+      );
+      expect(screen.getByTestId('jovie-auth-values')).toHaveAttribute(
+        'data-user-id',
+        'replacement-user'
+      );
+
+      view.rerender(
+        <ClientProviders forceSignedOutDefaults>
+          <TestChild />
+        </ClientProviders>
+      );
+      expect(screen.getByTestId('jovie-auth-defaults')).toBeInTheDocument();
+      expect(screen.queryByTestId('jovie-auth-values')).not.toBeInTheDocument();
+    });
+
     it('wraps with JovieAuthDefaultsProvider when forced signed-out', () => {
       render(
         <ClientProviders forceSignedOutDefaults>

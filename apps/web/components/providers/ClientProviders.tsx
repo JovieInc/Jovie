@@ -74,16 +74,6 @@ export function ClientProviders({
     skipCoreProviders,
   });
 
-  if (forceSignedOutDefaults && !authBootstrap?.isAuthenticated) {
-    return (
-      <JovieAuthDefaultsProvider>
-        <DesktopAppBootSignal />
-        <DesktopNavigationBridge />
-        {wrappedChildren}
-      </JovieAuthDefaultsProvider>
-    );
-  }
-
   const initialUser = useMemo(
     () =>
       authBootstrap?.isAuthenticated
@@ -96,6 +86,16 @@ export function ClientProviders({
         : null,
     [authBootstrap]
   );
+
+  if (forceSignedOutDefaults && !authBootstrap?.isAuthenticated) {
+    return (
+      <JovieAuthDefaultsProvider>
+        <DesktopAppBootSignal />
+        <DesktopNavigationBridge />
+        {wrappedChildren}
+      </JovieAuthDefaultsProvider>
+    );
+  }
 
   return (
     <JovieAuthValuesProvider initialUser={initialUser}>

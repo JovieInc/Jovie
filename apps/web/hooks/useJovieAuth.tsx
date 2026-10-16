@@ -29,10 +29,9 @@ import { applyCacheScope } from '@/lib/queries/cache-isolation';
 // app-side cookies Clerk's client SDK could not see. Under Better Auth the
 // bypass mints REAL `ba_sessions` rows + session cookies, so a settled
 // `authClient.useSession()` observes them. The server-resolved bootstrap
-// user is still the initial user: the account menu must not stay a
-// button-less skeleton for the whole time that round-trip is pending or
-// when the client session fetch never settles. A live session user always
-// replaces that initial user.
+// user is still the initial user while that round-trip is pending. Once
+// the client session settles, its result is authoritative, including a
+// signed-out result.
 // ============================================================================
 
 interface JovieSignOutOptions {
@@ -156,7 +155,7 @@ export function JovieAuthValuesProvider({
   readonly children: ReactNode;
   /**
    * Server-resolved user for the dev-test bypass. Shown until
-   * `useSession()` returns its own user, so the account control is not a
+   * `useSession()` settles, so the account control is not a
    * skeleton with no button while that request is pending.
    */
   readonly initialUser?: BetterAuthSessionUser | null;
@@ -170,7 +169,8 @@ export function JovieAuthValuesProvider({
     // never flash loading states on revalidation. A server-resolved
     // initial user counts as loaded immediately.
     const sessionUser = data?.user ? toJovieUser(data.user) : null;
-    const seededUser = initialUser ? toJovieUser(initialUser) : null;
+    const seededUser =
+      isPending && initialUser ? toJovieUser(initialUser) : null;
     const user = sessionUser ?? seededUser;
     const isLoaded = !isPending || user !== null;
     const isSignedIn = user !== null;
