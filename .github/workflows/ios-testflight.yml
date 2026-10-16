@@ -53,6 +53,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
+          path: .testflight-bootstrap
           persist-credentials: false
           sparse-checkout: .github/scripts/gh-api-hold.sh
           sparse-checkout-cone-mode: false
@@ -78,7 +79,7 @@ jobs:
           set -euo pipefail
           gh() {
             if [ "${1:-}" = "api" ]; then
-              GH_API_HOLD_BIN="$(command -v gh)" bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" "$@"
+              GH_API_HOLD_BIN="$(command -v gh)" bash "$GITHUB_WORKSPACE/.testflight-bootstrap/.github/scripts/gh-api-hold.sh" "$@"
               return
             fi
             command gh "$@"
@@ -813,6 +814,11 @@ jobs:
           TESTFLIGHT_LEASE_PATH: ${{ github.workspace }}/testflight-release-lease.json
         run: |
           set -euo pipefail
+          # A missing file is an incomplete checkout, not an older source.
+          [ -f fastlane/Fastfile ] || {
+            echo "::error::Certified source checkout is missing fastlane/Fastfile."
+            exit 1
+          }
           # Older certified sources cannot execute the new final upload guard.
           # They must wait for a normally certified source containing this fix.
           if ! grep -q 'TESTFLIGHT_GUARD_PATH' fastlane/Fastfile; then
