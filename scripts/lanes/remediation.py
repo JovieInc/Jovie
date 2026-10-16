@@ -311,7 +311,8 @@ def classify_blocker(pr: dict, held: dict | None = None, attempts: dict | None =
     # tim-decides instead of being routed as prescribed implementation.
     thread_blob = "\n".join(str(thread.get("body") or "") for thread in human_threads)
     thread_ask = _human_category("review", thread_blob) if human_threads else None
-    if human_review and not held_here and not stop_labels and not thread_ask:
+    if human_review and not held_here and not stop_labels and not thread_ask \
+            and not (pr.get("codeownersBlocked") or "codeowners" in labels):
         # Tim 2026-10-15: ordinary requested changes ship through the automated
         # review-fix ladder; only a human gate (strategy/taste/credential) waits.
         # The fix prompt already embeds the reviewers' own words (review_excerpt),
@@ -1148,6 +1149,17 @@ def _human_category(key: str, blob: str) -> str | None:
     lowered = key.lower()
     tokens = set(re.split(r"[\s:/]+", lowered.replace("-", " ")))
     text = blob.lower()
+    if lowered == "review":
+        # Current direct asks to expand credentials/permissions need authority.
+        # Anchor the ask so quoted test examples and ordinary implementation
+        # feedback do not become new founder gates.
+        for sentence in re.split(r"[.!?\n]", text):
+            if re.match(
+                    r"^(?:(?:please|we need to)\s+|(?:should|can|may|could)\s+(?:we|you)\s+)?"
+                    r"(?:expand|increase|grant|elevate)\b", sentence.strip()) \
+                    and re.search(r"\b(?:token|credentials?|app)\b", sentence) \
+                    and re.search(r"\b(?:permissions?|scopes?)\b", sentence):
+                return "env/DNS/secrets"
     if lowered in {"asc-agreements", "asc-agreement"} or "store submission" in text or "store-submission" in lowered:
         return "store submission"
     if "spend" in tokens or re.search(r"\bspend\b", text):

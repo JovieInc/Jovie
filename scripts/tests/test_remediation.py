@@ -295,6 +295,36 @@ class RouterLadderTest(unittest.TestCase):
         finally:
             os.environ.pop("LANES_ESCALATION", None)
 
+    def test_review_preserves_required_codeowner_gate(self):
+        for extra in ({"codeownersBlocked": True}, {"labels": ["codeowners"]}):
+            with self.subTest(extra=extra):
+                subject = pr(reviewDecision="CHANGES_REQUESTED", **extra)
+                result = remediation.classify_blocker(subject)
+                self.assertEqual(result["cls"], "needs-human-decision")
+                self.assertEqual(result["subtype"], "codeowners")
+
+    def test_review_permission_expansion_is_not_ordinary_implementation(self):
+        subject = pr(
+            reviewDecision="CHANGES_REQUESTED",
+            reviewThreads=[{"author": "reviewer", "resolved": False,
+                            "body": "Expand the GitHub token permissions to include workflow writes."}])
+        result = remediation.classify_blocker(subject)
+        self.assertEqual(result["cls"], "needs-human-decision")
+        self.assertIn("decision", " ".join(result["evidence"]))
+
+    def test_review_reusing_existing_auth_does_not_ask_for_permission(self):
+        for text in (
+            "Reuse the existing workflow token in Basic form.",
+            "Do not expand token permissions; reuse the existing token.",
+            "Never grant additional App permissions. Add the regression test.",
+            'Add a regression for the quoted request "Expand the GitHub token permissions".',
+        ):
+            with self.subTest(text=text):
+                subject = pr(reviewDecision="CHANGES_REQUESTED",
+                             reviewThreads=[{"author": "reviewer", "resolved": False, "body": text}])
+                result = remediation.classify_blocker(subject)
+                self.assertEqual(result["cls"], "fixable-by-model")
+
     def test_surface_and_hold_nag_dedupe(self):
         body = remediation.surface_body(pr(number=9), {"cls": "needs-human-decision", "subtype": "hold",
                                                        "evidence": ["wait"], "next_action": "tim-decides"}, "hold")

@@ -2880,10 +2880,18 @@ ${selectedGateScript}`,
     expect(resolve).toContain('git init -q "$commit_history"');
     expect(resolve).toContain('fetch --quiet --no-tags --filter=blob:none');
     expect(resolve).toContain('"https://github.com/$REPOSITORY.git"');
-    expect(resolve).toContain('refs/heads/main:refs/heads/main');
+    expect(resolve).toContain('refs/heads/main:refs/remotes/origin/main');
+    expect(resolve).toContain('::add-mask::$git_basic_auth');
+    expect(resolve).toContain('-c http.extraheader=');
+    expect(resolve).toContain(
+      '--config-env="http.https://github.com/$REPOSITORY.git.extraheader=JOVIE_GIT_AUTH_HEADER"'
+    );
+    expect(resolve).toContain('GIT_TERMINAL_PROMPT=0');
+    expect(resolve).toContain('unset git_basic_auth');
+    expect(resolve).not.toContain('http.extraheader=AUTHORIZATION: bearer');
     expect(resolve).toContain('rev-parse --verify "$deployed_sha^{commit}"');
     expect(resolve).toContain(
-      'merge-base --is-ancestor "$commit_sha" refs/heads/main'
+      'merge-base --is-ancestor "$commit_sha" refs/remotes/origin/main'
     );
     expect(resolve).not.toContain('gh api "repos/$REPOSITORY/commits/');
     expect(resolve).not.toContain('gh api "repos/$REPOSITORY/compare/');
