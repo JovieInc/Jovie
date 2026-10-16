@@ -267,6 +267,40 @@ describe('linear sync on merge', () => {
     expect(issue.comments.at(-1).body).toContain('Binding outcome:');
   });
 
+  it('does not bind a parent to an old-episode outcome arriving after its reopen', async () => {
+    const { world, fetchImpl } = createWorld();
+    const issue = world.issues['JOV-1'];
+    issue.state = 'In Progress';
+    issue.attachments = [];
+    issue.children = [['JOV-2', 'completed', '2026-10-03T13:00:00Z']];
+    issue.history = [
+      {
+        createdAt: '2026-10-03T14:00:00Z',
+        fromState: { type: 'completed' },
+        toState: { type: 'started' },
+      },
+    ];
+    issue.comments.push(
+      receiptComment(
+        'JOV-1',
+        { episodeStartedAt: null },
+        '2026-10-03T15:00:00Z'
+      )
+    );
+    await sweep(fetchImpl);
+    expect(issue.state).toBe('In Progress');
+    expect(world.updates).toEqual([]);
+    issue.comments.push(
+      receiptComment(
+        'JOV-1',
+        { episodeStartedAt: '2026-10-03T10:00:00-04:00' },
+        '2026-10-03T16:00:00Z'
+      )
+    );
+    await sweep(fetchImpl);
+    expect(issue.state).toBe('Done');
+  });
+
   it('does not let an ordinary unmerged issue use a recorded outcome to bypass source delivery', async () => {
     const { world, fetchImpl } = createWorld();
     const issue = world.issues['JOV-1'];
@@ -1220,6 +1254,73 @@ describe('linear sync on merge', () => {
     await expect(
       recordValidationReceipt(['--issue', 'JOV-1'], { env })
     ).rejects.toThrow(/kind must be/);
+  });
+
+  it.each(['null', '2026-10-03T08:00:00-04:00'])(
+    'records an explicit CLI acceptance episode %s',
+    async episode => {
+      const body = await recordValidationReceipt(
+        [
+          '--issue',
+          'JOV-1',
+          '--kind',
+          'outcome',
+          '--status',
+          'fail',
+          '--sha',
+          MAIN[2],
+          '--evidence',
+          'https://example.test/event/1',
+          '--episode-started-at',
+          episode,
+        ],
+        {
+          env: { LINEAR_API_KEY: 'fixture' },
+          fetchImpl: async () =>
+            json({
+              data: {
+                issue: { id: 'uuid-1' },
+                commentCreate: { success: true },
+              },
+            }),
+        }
+      );
+      expect(body).toContain(
+        `"episodeStartedAt":${JSON.stringify(
+          episode === 'null' ? null : '2026-10-03T12:00:00.000Z'
+        )}`
+      );
+    }
+  );
+
+  it('rejects a malformed CLI episode before any external request', async () => {
+    let requested = false;
+    await expect(
+      recordValidationReceipt(
+        [
+          '--issue',
+          'JOV-1',
+          '--kind',
+          'outcome',
+          '--status',
+          'pass',
+          '--sha',
+          MAIN[2],
+          '--evidence',
+          'https://example.test/event/1',
+          '--episode-started-at',
+          'bad',
+        ],
+        {
+          env: { LINEAR_API_KEY: 'fixture' },
+          fetchImpl: async () => {
+            requested = true;
+            return json({ data: {} });
+          },
+        }
+      )
+    ).rejects.toThrow(/episode/);
+    expect(requested).toBe(false);
   });
 
   it('delegates every lifecycle event to the script with its dependencies', () => {

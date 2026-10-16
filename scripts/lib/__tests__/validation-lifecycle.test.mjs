@@ -341,6 +341,231 @@ describe('validation receipts', () => {
     ]);
   });
 
+  it.each([null, '2026-10-03T08:00:00-04:00'])(
+    'round-trips an explicit episode binding %s without changing legacy receipts',
+    episodeStartedAt => {
+      const bound = formatValidationReceipt({
+        issue: 'JOV-1',
+        kind: 'outcome',
+        status: 'fail',
+        sha: SHA_B,
+        evidence: 'https://example.test/event/1',
+        episodeStartedAt,
+      });
+      expect(
+        parseValidationReceipts(
+          [{ body: bound, createdAt: '2026-10-03T13:00:00Z' }],
+          'JOV-1'
+        )[0].episodeStartedAt
+      ).toBe(episodeStartedAt === null ? null : '2026-10-03T12:00:00.000Z');
+      expect(
+        parseValidationReceipts(
+          [{ body, createdAt: '2026-10-03T13:00:00Z' }],
+          'JOV-1'
+        )[0]
+      ).not.toHaveProperty('episodeStartedAt');
+    }
+  );
+
+  it.each(['bad', '', 123, {}, '2026-10-03'])(
+    'invalidates malformed explicit episode binding %j',
+    episodeStartedAt => {
+      const malformed = body.replace(
+        '"kind":"outcome"',
+        `"kind":"outcome","episodeStartedAt":${JSON.stringify(episodeStartedAt)}`
+      );
+      expect(
+        parseValidationReceipts(
+          [{ body: malformed, createdAt: '2026-10-03T13:00:00Z' }],
+          'JOV-1'
+        )
+      ).toMatchObject([{ kind: 'outcome', status: 'invalid' }]);
+      expect(() =>
+        formatValidationReceipt({
+          issue: 'JOV-1',
+          kind: 'outcome',
+          status: 'pass',
+          sha: SHA_B,
+          evidence: 'https://example.test/event/1',
+          episodeStartedAt: /** @type {any} */ (episodeStartedAt),
+        })
+      ).toThrow(/episode/);
+    }
+  );
+
+  it.each(['pass', 'fail'])(
+    'rejects an old-episode %s written after a racing server reopen',
+    status => {
+      const reopenedAt = '2026-10-03T12:00:00Z';
+      const manifest = manifestFor({
+        reopenedAfterDone: true,
+        receiptNotBefore: reopenedAt,
+      });
+      const decision = decideValidationTransition({
+        state: { name: 'Validating', type: 'started' },
+        manifest,
+        holds: [],
+        deployment: VERIFIED,
+        receipts: [
+          receipt({
+            status: /** @type {'pass' | 'fail'} */ (status),
+            episodeStartedAt: null,
+            recordedAt: '2026-10-03T12:00:01Z',
+          }),
+        ],
+      });
+      expect(decision.target).toBe('Validating');
+      expect(decision.missing).toContain('outcome');
+    }
+  );
+
+  it.each([
+    [null, 'sha'],
+    ['2026-10-02T08:00:00-04:00', 'sha'],
+    [null, 'evidence'],
+    [null, 'schema'],
+    [null, 'kind'],
+  ])(
+    'keeps an old episode binding %s when invalidating malformed %s',
+    (episodeStartedAt, malformedField) => {
+      const reopenedAt = '2026-10-03T12:00:00Z';
+      const current = formatValidationReceipt({
+        issue: 'JOV-1',
+        kind: 'outcome',
+        status: 'pass',
+        sha: SHA_B,
+        evidence: 'https://example.test/current/run',
+        episodeStartedAt: reopenedAt,
+      });
+      const malformed = formatValidationReceipt({
+        issue: 'JOV-1',
+        kind: 'outcome',
+        status: 'pass',
+        sha: SHA_B,
+        evidence: 'https://example.test/old/run',
+        episodeStartedAt,
+      }).replace(
+        new RegExp(`"${malformedField}":"[^"]*"`),
+        `"${malformedField}":""`
+      );
+      const parsed = parseValidationReceipts(
+        [
+          { body: current, createdAt: '2026-10-03T13:00:00Z' },
+          { body: malformed, createdAt: '2026-10-03T14:00:00Z' },
+        ],
+        'JOV-1'
+      );
+      expect(parsed[1]).toMatchObject({
+        status: 'invalid',
+        episodeStartedAt:
+          episodeStartedAt === null ? null : '2026-10-02T12:00:00.000Z',
+      });
+      const receipts = parsed.map(value =>
+        receipt({ ...value, verifiedArtifact: value.status !== 'invalid' })
+      );
+      expect(
+        currentReceiptsByKind(receipts, reopenedAt).get('outcome')?.status
+      ).toBe('pass');
+      expect(
+        decideValidationTransition({
+          state: { name: 'Validating', type: 'started' },
+          manifest: manifestFor({
+            reopenedAfterDone: true,
+            receiptNotBefore: reopenedAt,
+          }),
+          holds: [],
+          deployment: VERIFIED,
+          receipts,
+        }).target
+      ).toBe('Done');
+    }
+  );
+
+  it.each(['2026-10-03T08:00:00-04:00', 'unreadable'])(
+    'holds current proof when a malformed receipt has episode binding %s',
+    episodeStartedAt => {
+      const reopenedAt = '2026-10-03T12:00:00Z';
+      const current = formatValidationReceipt({
+        issue: 'JOV-1',
+        kind: 'outcome',
+        status: 'pass',
+        sha: SHA_B,
+        evidence: 'https://example.test/current/run',
+        episodeStartedAt: reopenedAt,
+      });
+      const malformed = current
+        .replace(`"sha":"${SHA_B}"`, '"sha":"bad"')
+        .replace(
+          '"episodeStartedAt":"2026-10-03T12:00:00.000Z"',
+          `"episodeStartedAt":"${episodeStartedAt}"`
+        );
+      const parsed = parseValidationReceipts(
+        [
+          { body: current, createdAt: '2026-10-03T13:00:00Z' },
+          { body: malformed, createdAt: '2026-10-03T14:00:00Z' },
+        ],
+        'JOV-1'
+      );
+      expect(parsed[1].status).toBe('invalid');
+      if (episodeStartedAt === 'unreadable')
+        expect(parsed[1]).not.toHaveProperty('episodeStartedAt');
+      else expect(parsed[1].episodeStartedAt).toBe('2026-10-03T12:00:00.000Z');
+      const receipts = parsed.map(value =>
+        receipt({ ...value, verifiedArtifact: value.status !== 'invalid' })
+      );
+      expect(
+        currentReceiptsByKind(receipts, reopenedAt).get('outcome')?.status
+      ).toBe('invalid');
+      const decision = decideValidationTransition({
+        state: { name: 'Validating', type: 'started' },
+        manifest: manifestFor({
+          reopenedAfterDone: true,
+          receiptNotBefore: reopenedAt,
+        }),
+        holds: [],
+        deployment: VERIFIED,
+        receipts,
+      });
+      expect(decision.target).toBe('Validating');
+      expect(decision.missing).toContain('outcome');
+    }
+  );
+
+  it('matches semantic current episode times, initial null and unbound legacy producers', () => {
+    const reopenedAt = '2026-10-03T12:00:00Z';
+    const bound = receipt({
+      episodeStartedAt: '2026-10-03T08:00:00-04:00',
+      recordedAt: '2026-10-03T12:00:01Z',
+    });
+    expect(currentReceiptsByKind([bound], reopenedAt).get('outcome')).toBe(
+      bound
+    );
+    expect(currentReceiptsByKind([bound]).has('outcome')).toBe(false);
+    expect(currentReceiptsByKind([bound], null).size).toBe(0);
+    expect(
+      currentReceiptsByKind(
+        [
+          receipt({
+            episodeStartedAt: '2026-10-02T12:00:00Z',
+            recordedAt: '2026-10-03T12:00:01Z',
+          }),
+        ],
+        reopenedAt
+      ).size
+    ).toBe(0);
+    expect(
+      currentReceiptsByKind([receipt({ episodeStartedAt: null })]).has(
+        'outcome'
+      )
+    ).toBe(true);
+    expect(
+      currentReceiptsByKind(
+        [receipt({ recordedAt: '2026-10-03T12:00:01Z' })],
+        reopenedAt
+      ).has('outcome')
+    ).toBe(true);
+  });
+
   it('carries a founder note on a rejection and bounds it', () => {
     const rejection = formatValidationReceipt({
       issue: 'JOV-1',

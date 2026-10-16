@@ -35,6 +35,7 @@ import {
   latestLifecycleStatusKey,
   lifecycleStatusKey,
   parseValidationReceipts,
+  receiptMatchesAcceptanceEpisode,
 } from './validation-lifecycle.mjs';
 
 // Long-running issues collect many linked pull requests (JOV-7707 had more
@@ -814,8 +815,9 @@ export async function reconcileValidation(ctx) {
     issue.identifier
   ).filter(
     receipt =>
-      receipt.kind !== 'outcome' ||
-      Date.parse(receipt.recordedAt) > outcomeCutoff
+      receiptMatchesAcceptanceEpisode(receipt, issue.receiptNotBefore) &&
+      (receipt.kind !== 'outcome' ||
+        Date.parse(receipt.recordedAt) > outcomeCutoff)
   );
   const parentOutcome = ctx.parentReason
     ? recordedReceipts

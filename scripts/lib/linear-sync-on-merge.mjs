@@ -1421,7 +1421,9 @@ async function runSync(options) {
 
 /**
  * Record an owner receipt: `receipt --issue JOV-1 --kind outcome --status pass
- * --sha <full sha> --evidence <url> [--note <text>]`. A founder-taste
+ * --sha <full sha> --evidence <url> [--note <text>]
+ * [--episode-started-at null|<server reopen timestamp>]`. Omit the episode flag
+ * only for existing unbound producers; null explicitly binds the initial episode. A founder-taste
  * rejection carries the founder's note into Rework.
  *
  * @param {readonly string[]} args
@@ -1439,6 +1441,14 @@ export async function recordValidationReceipt(args, options = {}) {
     sha: value('--sha'),
     evidence: value('--evidence'),
     note: value('--note'),
+    ...(args.includes('--episode-started-at')
+      ? {
+          episodeStartedAt:
+            value('--episode-started-at') === 'null'
+              ? null
+              : value('--episode-started-at'),
+        }
+      : {}),
   });
   const env = options.env ?? process.env;
   const apiKey = env.LINEAR_API_KEY ?? '';
