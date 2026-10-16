@@ -10,7 +10,7 @@ detection_gaps: [missing-invariant]
 replay_corpus: [scripts/lib/__tests__/recheck-main-lineage-auth.test.mjs]
 founder_rescues: 0
 incident_issue: JOV-7974
-actions: [JOV-7974]
+actions: [JOV-7974, JOV-8532]
 gbrain: ops/postmortems/2026-10-16-production-lineage-rest-quota
 ---
 
@@ -98,6 +98,7 @@ release-result preservation. Job timeouts and existing REST budgets stay fixed.
 | Issue | Control | Class | State | Live verification receipt |
 | --- | --- | --- | --- | --- |
 | JOV-7974 | Shared lineage fallback and workflow exhaustion regression | pre-merge-parity-gap | Source repair; independent landing pending | Local regression only; main/deployment outcome unverified |
+| [JOV-8532](https://linear.app/jovie/issue/JOV-8532) | Class-level hardening across packaging, lineage, promotion and later release gates | serial-layer-discovery | Backlog | pending |
 
 ## Open questions and unverified claims
 
