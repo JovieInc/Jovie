@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -27,6 +28,7 @@ const parsedCi = parseYaml(ci) as {
       steps?: readonly {
         id?: string;
         name?: string;
+        run?: string;
         if?: string;
         'continue-on-error'?: boolean;
       }[];
@@ -48,6 +50,39 @@ describe('JOV-6572 canonical artist-site certification workflow', () => {
       1440
     );
     expect(nightly).toContain('workflow run ci.yml');
+  });
+
+  it('provides an ephemeral signing key before starting the claim server (JOV-8550)', () => {
+    const journey = parsedCi.jobs['ci-golden-path']?.steps?.find(
+      step => step.id === 'canonical_journey'
+    );
+    const script = journey?.run ?? '';
+    const keyExport = script.match(/^export URL_ENCRYPTION_KEY=.+$/m)?.[0];
+    expect(
+      keyExport,
+      'Pending claim cookies require a runtime signing key'
+    ).toBeTruthy();
+    expect(script.indexOf(keyExport!)).toBeLessThan(
+      script.indexOf('PORT=3250 node .next/standalone/apps/web/server.js')
+    );
+    const generateKey = () =>
+      execFileSync(
+        'bash',
+        [
+          '-eu',
+          '-c',
+          `${keyExport}
+node -e 'process.stdout.write(process.env.URL_ENCRYPTION_KEY)'`,
+        ],
+        {
+          encoding: 'utf8',
+        }
+      ).trim();
+    const first = generateKey();
+    const second = generateKey();
+    expect(Buffer.from(first, 'base64')).toHaveLength(32);
+    expect(Buffer.from(second, 'base64')).toHaveLength(32);
+    expect(first).not.toBe(second);
   });
 
   it('joins production-faithful, deployed-profile, and live revenue evidence', () => {
