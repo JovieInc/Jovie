@@ -78,11 +78,18 @@ async function openRequestAccess(page: import('@playwright/test').Page) {
     return;
   }
 
+  // Below lg the glass header CTA is `hidden lg:flex`. The same signup
+  // action is the mobile panel's primary link. Pricing plan links share
+  // the Request access name and go to /waitlist, so this stays inside
+  // the menu and matches the signup href, not the label.
   await page.getByRole('button', { name: 'Open menu' }).click();
-  await page.locator('a.marketing-glass-header__cta:visible').click({
-    noWaitAfter: true,
-    timeout: AUTH_MODAL_TIMEOUT,
-  });
+  await page
+    .getByRole('navigation', { name: 'Mobile Navigation' })
+    .locator(`a[href="${APP_ROUTES.SIGNUP}"]`)
+    .click({
+      noWaitAfter: true,
+      timeout: AUTH_MODAL_TIMEOUT,
+    });
 }
 
 async function openInterceptedModal(
