@@ -1,5 +1,61 @@
 import { writeFile } from 'node:fs/promises';
-import { expect, type Page, test } from '@playwright/test';
+import { test as base, expect, type Page } from '@playwright/test';
+
+const test = base.extend<{
+  authTargetWriteFence: void;
+  expectedBlockedJourneySteps: number;
+}>({
+  expectedBlockedJourneySteps: [0, { option: true }],
+  authTargetWriteFence: [
+    async ({ context, expectedBlockedJourneySteps }, runTest, testInfo) => {
+      const attempted: { method: string; path: string }[] = [];
+      const completed: { method: string; path: string }[] = [];
+      context.on('request', request => {
+        if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method())) {
+          attempted.push({
+            method: request.method(),
+            path: new URL(request.url()).pathname,
+          });
+        }
+      });
+      context.on('requestfinished', request => {
+        if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method())) {
+          completed.push({
+            method: request.method(),
+            path: new URL(request.url()).pathname,
+          });
+        }
+      });
+      await context.route('**/*', route =>
+        ['GET', 'HEAD', 'OPTIONS'].includes(route.request().method())
+          ? route.continue()
+          : route.abort('internetdisconnected')
+      );
+      try {
+        await runTest();
+      } finally {
+        await testInfo.attach('auth-target-write-census.json', {
+          body: JSON.stringify({
+            attempted,
+            completed,
+            expectedBlockedJourneySteps,
+          }),
+          contentType: 'application/json',
+        });
+        expect(attempted).toEqual(
+          Array.from({ length: expectedBlockedJourneySteps }, () => ({
+            method: 'POST',
+            path: '/api/journey/step',
+          }))
+        );
+        expect(completed).toEqual([]);
+      }
+    },
+    { auto: true },
+  ],
+});
+
+test.use({ serviceWorkers: 'block' });
 
 const controls =
   '[data-auth-provider-slot], [data-auth-shell-back], [aria-label="Go to homepage"], [data-auth-mode-switch] a, [data-auth-email-code-step] button';
@@ -94,12 +150,39 @@ async function expectOwnedActivation(
     document.documentElement.dataset.authProbeEvents = '[]';
   });
   const point = await page.evaluate(
-    ({ x, y }) => {
+    ({ x, y, expectedOwner }) => {
       const hit = document.elementFromPoint(x, y);
       const control = hit?.closest('button,a');
+      const expected = document.querySelector(
+        `[data-probe-owner="${expectedOwner}"]`
+      );
+      const bounds = expected?.getBoundingClientRect();
+      const ancestors = [];
+      for (
+        let node = expected?.parentElement;
+        node;
+        node = node.parentElement
+      ) {
+        const r = node.getBoundingClientRect();
+        ancestors.push({
+          tag: node.tagName,
+          x: r.x,
+          y: r.y,
+          scroll: [node.scrollLeft, node.scrollTop],
+        });
+      }
       return {
         x,
         y,
+        expectedRect: bounds
+          ? {
+              x: bounds.x,
+              y: bounds.y,
+              width: bounds.width,
+              height: bounds.height,
+            }
+          : null,
+        ancestors,
         viewport: [innerWidth, innerHeight],
         scroll: [scrollX, scrollY],
         hit: hit?.tagName,
@@ -109,14 +192,29 @@ async function expectOwnedActivation(
           : null,
       };
     },
-    { x, y }
+    { x, y, expectedOwner }
   );
+  await page.evaluate(
+    sample => {
+      const samples = JSON.parse(
+        document.documentElement.dataset.authProbeSamples ?? '[]'
+      );
+      samples.push(sample);
+      document.documentElement.dataset.authProbeSamples =
+        JSON.stringify(samples);
+    },
+    { ...point, expectedOwner, touch: options.touch === true }
+  );
+  expect(x, 'activation is inside viewport').toBeGreaterThanOrEqual(0);
+  expect(y, 'activation is inside viewport').toBeGreaterThanOrEqual(0);
+  expect(x, 'activation is inside viewport').toBeLessThan(point.viewport[0]);
+  expect(y, 'activation is inside viewport').toBeLessThan(point.viewport[1]);
   if (expectedOwner === 'whitespace') {
-    expect(x).toBeGreaterThanOrEqual(0);
-    expect(y).toBeGreaterThanOrEqual(0);
-    expect(x).toBeLessThan(point.viewport[0]);
-    expect(y).toBeLessThan(point.viewport[1]);
     expect(point.owner, 'gap is free of controls').toBeNull();
+  } else {
+    expect(point.owner, 'fresh point hits the expected control').toBe(
+      expectedOwner
+    );
   }
   await activate(x, y);
   try {
@@ -432,9 +530,26 @@ async function proveTargets(page: Page) {
           getComputedStyle(element).boxShadow !== 'none'
       )
     ).toBe(true);
-    const r = (await geometry(page))[index];
-    for (const y of [r.y + 1, r.y + r.height - 1]) {
+    for (const edge of ['top', 'bottom']) {
       for (const activate of [mouse, tap]) {
+        await action.scrollIntoViewIfNeeded();
+        await action.evaluate(element =>
+          element.scrollIntoView({
+            block: 'center',
+            inline: 'nearest',
+            behavior: 'instant',
+          })
+        );
+        await page.evaluate(
+          () =>
+            new Promise<void>(resolve =>
+              requestAnimationFrame(() =>
+                requestAnimationFrame(() => resolve())
+              )
+            )
+        );
+        const r = (await geometry(page))[index];
+        const y = edge === 'top' ? r.y + 1 : r.y + r.height - 1;
         await expectOwnedActivation(
           page,
           activate,
@@ -468,17 +583,70 @@ async function proveTargets(page: Page) {
     const pair = page.locator(selector);
     if ((await pair.count()) !== 2) continue;
     await pair.first().scrollIntoViewIfNeeded();
-    const a = (await pair.nth(0).boundingBox())!;
-    const b = (await pair.nth(1).boundingBox())!;
-    const vertical = a.y + a.height <= b.y;
     for (const fraction of [0.25, 0.5, 0.75]) {
-      const x = vertical
-        ? a.x + a.width * fraction
-        : a.x + a.width + (b.x - a.x - a.width) * fraction;
-      const y = vertical
-        ? a.y + a.height + (b.y - a.y - a.height) * fraction
-        : a.y + a.height / 2;
       for (const activate of [mouse, tap]) {
+        await pair.first().scrollIntoViewIfNeeded();
+        await pair.first().evaluate(element =>
+          element.scrollIntoView({
+            block: 'center',
+            inline: 'nearest',
+            behavior: 'instant',
+          })
+        );
+        await page.evaluate(
+          () =>
+            new Promise<void>(resolve =>
+              requestAnimationFrame(() =>
+                requestAnimationFrame(() => resolve())
+              )
+            )
+        );
+        const a = (await pair.nth(0).boundingBox())!;
+        const b = (await pair.nth(1).boundingBox())!;
+        const vertical = a.y + a.height <= b.y;
+        const horizontal = a.x + a.width <= b.x;
+        const x = vertical
+          ? a.x + a.width * fraction
+          : a.x + a.width + (b.x - a.x - a.width) * fraction;
+        const y = vertical
+          ? a.y + a.height + (b.y - a.y - a.height) * fraction
+          : a.y + a.height / 2;
+        await page.evaluate(
+          sample => {
+            const samples = JSON.parse(
+              document.documentElement.dataset.authProbeSamples ?? '[]'
+            );
+            samples.push(sample);
+            document.documentElement.dataset.authProbeSamples =
+              JSON.stringify(samples);
+          },
+          {
+            kind: 'gap-preparation',
+            a,
+            b,
+            x,
+            y,
+            selector,
+            fraction,
+            touch: activate === tap,
+          }
+        );
+        expect(vertical || horizontal, 'gap members remain separated').toBe(
+          true
+        );
+        if (vertical) {
+          expect(y).toBeGreaterThan(a.y + a.height);
+          expect(y).toBeLessThan(b.y);
+          expect(x).toBeGreaterThanOrEqual(Math.max(a.x, b.x));
+          expect(x).toBeLessThanOrEqual(Math.min(a.x + a.width, b.x + b.width));
+        } else {
+          expect(x).toBeGreaterThan(a.x + a.width);
+          expect(x).toBeLessThan(b.x);
+          expect(y).toBeGreaterThanOrEqual(Math.max(a.y, b.y));
+          expect(y).toBeLessThanOrEqual(
+            Math.min(a.y + a.height, b.y + b.height)
+          );
+        }
         await expectOwnedActivation(page, activate, x, y, 'whitespace', {
           touch: activate === tap,
         });
@@ -493,6 +661,8 @@ for (const width of [320, 390, 768, 1440]) {
       viewport: { width, height: 900 },
       isMobile: width < 768,
       hasTouch: true,
+      // Two code-step fixtures emit auth_start telemetry; every write is aborted.
+      expectedBlockedJourneySteps: 2,
     });
     test('targets, ownership, focus and text scaling', async ({
       page,
@@ -782,4 +952,131 @@ test.describe('auth text clipping oracle legal presence', () => {
       });
     }
   }
+});
+
+const coordinateTest = test;
+
+type CoordinateScenario = 'stationary' | 'move' | 'suppress' | 'occlude-gap';
+interface CoordinateFixtureState {
+  clicks: number;
+  movement: number;
+  suppression: number;
+  gapMutation: number;
+}
+
+async function coordinateFixture(page: Page, scenario: CoordinateScenario) {
+  const pair = scenario === 'occlude-gap';
+  await page.setContent(
+    `<style>body{margin:0;height:2400px}a{position:absolute;top:160px;left:204px;width:240px;height:44px;display:block}a:focus-visible{box-shadow:0 0 0 2px blue}</style><a ${pair ? 'data-auth-provider-slot' : 'data-auth-shell-back'} href="#"><span>Back to profile</span></a>${pair ? '<a data-auth-provider-slot href="#" style="top:216px"><span>Other provider</span></a>' : ''}`
+  );
+  await page.evaluate(scenario => {
+    const state = { clicks: 0, movement: 0, suppression: 0, gapMutation: 0 };
+    const save = () => {
+      document.documentElement.dataset.coordinateFixture =
+        JSON.stringify(state);
+    };
+    save();
+    document.addEventListener(
+      'click',
+      event => {
+        state.clicks++;
+        if (scenario === 'suppress') {
+          state.suppression++;
+          event.preventDefault();
+          event.stopImmediatePropagation();
+        }
+        if (scenario === 'move' && !state.movement) {
+          state.movement++;
+          requestAnimationFrame(() => {
+            document.querySelector('a')!.style.top = '420px';
+          });
+        }
+        if (
+          scenario === 'occlude-gap' &&
+          !state.gapMutation &&
+          !(event.target as Element).closest('a,button')
+        ) {
+          state.gapMutation++;
+          requestAnimationFrame(() => {
+            const pair = document.querySelectorAll('a');
+            pair[0].style.top = '460px';
+            pair[1].style.top = '516px';
+            const occluder = document.createElement('button');
+            occluder.textContent = 'Unregistered gap control';
+            occluder.style.cssText =
+              'position:absolute;left:204px;top:504px;width:240px;height:12px;padding:0;border:0';
+            document.body.append(occluder);
+          });
+        }
+        save();
+      },
+      { capture: true }
+    );
+  }, scenario);
+}
+
+async function coordinateEvidence(page: Page) {
+  return page.evaluate(() => ({
+    state: JSON.parse(
+      document.documentElement.dataset.coordinateFixture ?? '{}'
+    ) as CoordinateFixtureState,
+    rectangles: [...document.querySelectorAll('a,button')].map(element => {
+      const r = element.getBoundingClientRect();
+      return { x: r.x, y: r.y, width: r.width, height: r.height };
+    }),
+  }));
+}
+
+coordinateTest.describe('auth coordinate freshness oracle', () => {
+  coordinateTest.use({
+    viewport: { width: 768, height: 1000 },
+    hasTouch: true,
+    serviceWorkers: 'block',
+  });
+
+  coordinateTest(
+    'keeps all four stationary control activations',
+    async ({ page }) => {
+      await coordinateFixture(page, 'stationary');
+      await proveTargets(page);
+      expect((await coordinateEvidence(page)).state.clicks).toBe(4);
+    }
+  );
+
+  coordinateTest(
+    'remeasures a control moved between native activations',
+    async ({ page }) => {
+      await coordinateFixture(page, 'move');
+      await proveTargets(page);
+      const evidence = await coordinateEvidence(page);
+      expect(evidence.state).toMatchObject({ clicks: 4, movement: 1 });
+      expect(evidence.rectangles[0].y).toBe(420);
+    }
+  );
+
+  coordinateTest(
+    'still rejects an observed suppressed control click',
+    async ({ page }) => {
+      await coordinateFixture(page, 'suppress');
+      await expect(proveTargets(page)).rejects.toThrow(
+        /fresh native activation must set data-auth-owner/
+      );
+      expect(
+        (await coordinateEvidence(page)).state.suppression
+      ).toBeGreaterThan(0);
+    }
+  );
+
+  coordinateTest(
+    'rejects a moved gap occupied by an unregistered control',
+    async ({ page }) => {
+      await coordinateFixture(page, 'occlude-gap');
+      await expect(proveTargets(page)).rejects.toThrow(
+        /gap is free of controls/
+      );
+      const evidence = await coordinateEvidence(page);
+      expect(evidence.state.gapMutation).toBe(1);
+      expect(evidence.rectangles.map(r => r.y)).toEqual([460, 516, 504]);
+    }
+  );
 });

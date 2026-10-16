@@ -50,22 +50,22 @@ export function isAbortedNextRscPrefetch(input: {
   );
 }
 
-const NEXT_STATIC_CSS_CHUNK = /^\/_next\/static\/chunks\/.+\.css$/;
+const NEXT_STATIC_CHUNK = /^\/_next\/static\/chunks\/.+\.(?:css|js)$/;
 
 /**
- * Next.js discovers a prefetched route's CSS while the RSC flight is in
- * flight, then Chromium aborts those `<link rel="stylesheet">` loads when
- * navigation cancels the prefetch. Only that abort is expected. A chunk
- * that fails for any other reason, and any aborted stylesheet outside
- * `/_next/static/chunks/`, stays on the request-failure gate.
+ * Next.js discovers a prefetched route's CSS and JS while the RSC flight is
+ * in flight, then Chromium aborts those chunk loads when navigation cancels
+ * the prefetch. Only that abort is expected. Any other failure, and any
+ * aborted script or stylesheet outside `/_next/static/chunks/*.{css,js}`,
+ * stays on the request-failure gate.
  */
-export function isAbortedNextStaticCssChunk(input: {
+export function isAbortedNextStaticChunk(input: {
   readonly errorText: string | undefined;
   readonly url?: string;
 }): boolean {
   if (input.errorText !== ABORTED_REQUEST_ERROR || !input.url) return false;
   try {
-    return NEXT_STATIC_CSS_CHUNK.test(new URL(input.url).pathname);
+    return NEXT_STATIC_CHUNK.test(new URL(input.url).pathname);
   } catch {
     return false;
   }
@@ -86,7 +86,7 @@ export function classifySameOriginRequestFailure(input: {
   if (!input.sameOrigin) return 'ignored';
   if (isDiagnosticAbortedImageRequest(input)) return 'aborted-image';
   if (isAbortedNextRscPrefetch(input)) return 'ignored';
-  if (isAbortedNextStaticCssChunk(input)) return 'ignored';
+  if (isAbortedNextStaticChunk(input)) return 'ignored';
   return 'failed-request';
 }
 
