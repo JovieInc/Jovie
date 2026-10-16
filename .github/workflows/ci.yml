@@ -6527,7 +6527,9 @@ jobs:
           export FLAGS_SECRET="${{ secrets.FLAGS_SECRET }}"
           # Pending claim cookies need a signing key on this isolated server.
           # Generate it per run; no production claim context is shared here.
-          export URL_ENCRYPTION_KEY="$(openssl rand -base64 32)"
+          # Assign and export separately so a failed openssl is not masked (SC2155).
+          URL_ENCRYPTION_KEY="$(openssl rand -base64 32)"
+          export URL_ENCRYPTION_KEY
           export SPOTIFY_CLIENT_ID="${{ secrets.SPOTIFY_CLIENT_ID }}"
           export SPOTIFY_CLIENT_SECRET="${{ secrets.SPOTIFY_CLIENT_SECRET }}"
           export MUSICFETCH_API_TOKEN="${{ secrets.MUSICFETCH_API_TOKEN }}"

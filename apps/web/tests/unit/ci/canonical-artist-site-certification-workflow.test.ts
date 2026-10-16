@@ -57,12 +57,15 @@ describe('JOV-6572 canonical artist-site certification workflow', () => {
       step => step.id === 'canonical_journey'
     );
     const script = journey?.run ?? '';
-    const keyExport = script.match(/^export URL_ENCRYPTION_KEY=.+$/m)?.[0];
+    const keySetup = script.match(
+      /^URL_ENCRYPTION_KEY="\$\(openssl rand -base64 32\)"\r?\nexport URL_ENCRYPTION_KEY$/m
+    )?.[0];
     expect(
-      keyExport,
+      keySetup,
       'Pending claim cookies require a runtime signing key'
     ).toBeTruthy();
-    expect(script.indexOf(keyExport!)).toBeLessThan(
+    expect(script).not.toMatch(/^export [A-Z0-9_]+="?\$\(/m);
+    expect(script.indexOf(keySetup!)).toBeLessThan(
       script.indexOf('PORT=3250 node .next/standalone/apps/web/server.js')
     );
     const generateKey = () =>
@@ -71,7 +74,7 @@ describe('JOV-6572 canonical artist-site certification workflow', () => {
         [
           '-eu',
           '-c',
-          `${keyExport}
+          `${keySetup}
 node -e 'process.stdout.write(process.env.URL_ENCRYPTION_KEY)'`,
         ],
         {
