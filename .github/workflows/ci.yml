@@ -6619,7 +6619,12 @@ jobs:
       - name: Verify premade claim ownership contracts
         id: canonical_claim_contract
         continue-on-error: true
-        run: pnpm --filter=@jovie/web exec vitest run --config=vitest.config.mts lib/claim/finalize.test.ts 'tests/unit/app/[username]/claim/route.test.ts' tests/unit/app/claim-token-route.test.ts tests/unit/api/onboarding/claim.test.ts tests/unit/auth/waitlist-gating.test.ts --pool=forks --maxWorkers=1
+        run: pnpm --filter=@jovie/web exec vitest run --config=vitest.config.mts lib/claim/finalize.test.ts 'tests/unit/app/[username]/claim/route.test.ts' tests/unit/app/claim-token-route.test.ts tests/unit/api/onboarding/claim.test.ts --pool=forks --maxWorkers=1
+
+      - name: Verify waitlist admission
+        id: canonical_waitlist
+        continue-on-error: true
+        run: pnpm --filter=@jovie/web exec vitest run --config=vitest.config.mts lib/auth/canonical-user-state.test.ts tests/unit/auth/waitlist-gating.test.ts tests/unit/lib/auth/access-route-matrix.test.ts --pool=forks --maxWorkers=1
 
       - name: Probe live canonical Tim White profile
         id: canonical_profile
@@ -6638,9 +6643,10 @@ jobs:
           JOURNEY_STATUS: ${{ steps.canonical_journey.outcome || 'skipped' }}
           M2_STATUS: ${{ steps.canonical_revenue.outcome || 'skipped' }}
           PROFILE_STATUS: ${{ steps.canonical_profile.outcome || 'skipped' }}
+          WAITLIST_STATUS: ${{ steps.canonical_waitlist.outcome || 'skipped' }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          pnpm --filter=@jovie/web exec tsx scripts/certify-canonical-artist-site.ts --candidate-id "acquisition:premade-artist-profile:tim-white:${{ github.run_id }}-${{ github.run_attempt }}" --run-id "${{ github.run_id }}-${{ github.run_attempt }}" --source-revision "${{ github.sha }}" --run-url "$RUN_URL" --golden-path-status "$JOURNEY_STATUS" --claim-contract-status "$CLAIM_CONTRACT_STATUS" --m2-status "$M2_STATUS" --m2-receipt "$CERT_DIR/m2-receipt.json" --profile-status "$PROFILE_STATUS" --profile-result "$CERT_DIR/profile-result.json" --output "$CERT_DIR/certificate.json"
+          pnpm --filter=@jovie/web exec tsx scripts/certify-canonical-artist-site.ts --candidate-id "acquisition:premade-artist-profile:tim-white:${{ github.run_id }}-${{ github.run_attempt }}" --run-id "${{ github.run_id }}-${{ github.run_attempt }}" --source-revision "${{ github.sha }}" --run-url "$RUN_URL" --golden-path-status "$JOURNEY_STATUS" --claim-contract-status "$CLAIM_CONTRACT_STATUS" --waitlist-status "$WAITLIST_STATUS" --m2-status "$M2_STATUS" --m2-receipt "$CERT_DIR/m2-receipt.json" --profile-status "$PROFILE_STATUS" --profile-result "$CERT_DIR/profile-result.json" --output "$CERT_DIR/certificate.json"
 
       - name: Upload canonical artist-site certification
         if: ${{ always() }}

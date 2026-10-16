@@ -14,6 +14,7 @@ export interface CanonicalArtistSiteCliOptions {
   readonly runUrl: string;
   readonly goldenPathStatus: string;
   readonly claimContractStatus: string;
+  readonly waitlistStatus: string;
   readonly m2Status: string;
   readonly m2ReceiptPath: string;
   readonly profileStatus: string;
@@ -63,6 +64,7 @@ function parseOptions(argv: readonly string[]): CanonicalArtistSiteCliOptions {
     runUrl: required(argv, '--run-url'),
     goldenPathStatus: required(argv, '--golden-path-status'),
     claimContractStatus: required(argv, '--claim-contract-status'),
+    waitlistStatus: required(argv, '--waitlist-status'),
     m2Status: required(argv, '--m2-status'),
     m2ReceiptPath: required(argv, '--m2-receipt'),
     profileStatus: required(argv, '--profile-status'),
@@ -184,6 +186,11 @@ export function certifyCanonicalArtistSite(
   const claimOk = goldenPassed && claimContractPassed;
   const claimText = claimOk ? claimDetail : `${journeyDetail} ${claimDetail}`;
   const claimAndJourney = [...goldenEvidence, ...claimEvidence];
+  const waitlistPassed = options.waitlistStatus === 'success';
+  const waitlistDetail = waitlistPassed
+    ? 'Only explicitly admitted artists crossed the waitlist gate.'
+    : 'Waitlist admission did not pass. Unadmitted artists must stay outside the app shell.';
+  const waitlistEvidence = [`${options.runUrl}#waitlist-admission`];
   const profileAndJourney = [...profileEvidence, ...goldenEvidence];
   const identityOk = profilePassed && claimOk;
   const hierarchyOk = profilePassed && goldenPassed;
@@ -225,7 +232,13 @@ export function certifyCanonicalArtistSite(
       deferredDefect,
       deferredHidden
     ),
-    row('waitlist_admission', claimOk, claimText, claimAndJourney),
+    row(
+      'waitlist_admission',
+      waitlistPassed,
+      waitlistDetail,
+      waitlistEvidence,
+      'canonical-artist-site-waitlist-admission'
+    ),
     ...(
       [
         'claim_auth_intent',
