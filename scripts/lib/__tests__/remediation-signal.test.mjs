@@ -1,1 +1,402 @@
-aW1wb3J0IHsgcmVhZEZpbGVTeW5jIH0gZnJvbSAnbm9kZTpmcyc7CmltcG9ydCB7IGRlc2NyaWJlLCBleHBlY3QsIGl0LCB2aSB9IGZyb20gJ3ZpdGVzdCc7CgppbXBvcnQgeyBjbGVhclJlbWVkaWF0aW9uTGFiZWxDYWNoZSB9IGZyb20gJy4uL2xpbmVhci1pc3N1ZS1pbnRha2UubWpzJzsKaW1wb3J0IHsKICBBR0VOVF9SRUFEWV9MQUJFTCwKICBhcHBseVJlbWVkaWF0aW9uRGVjaXNpb24sCiAgYXBwbHlSZW1lZGlhdGlvbkRlY2lzaW9uV2l0aFJldHJ5LAogIGRlY2lkZUF1dGhTbW9rZVNpZ25hbCwKICBkZWNpZGVMb2dpblNpZ25hbCwKICBkZWNpZGVNb25pdG9yU2lnbmFsLAogIGdhdGVTdGVhZHlHcmVlbiwKICBpc1RyYW5zaWVudFJlbWVkaWF0aW9uRmFpbHVyZSwKICByZW1lZGlhdGlvbkludGFrZURpc2FibGVkLAp9IGZyb20gJy4uL3JlbWVkaWF0aW9uLXNpZ25hbC5tanMnOwoKY29uc3Qgd29ya2Zsb3dzID0gewogIG5pZ2h0bHk6ICcuZ2l0aHViL3dvcmtmbG93cy9uaWdodGx5LXRlc3RzLnltbCcsCiAgbWF0cml4OiAnLmdpdGh1Yi93b3JrZmxvd3MvZTJlLWZ1bGwtbWF0cml4LnltbCcsCiAgY29udGludWl0eTogJy5naXRodWIvd29ya2Zsb3dzL3Byb2R1Y3Rpb24tY29udGludWl0eS55bWwnLAogIGNvbnRyb2xsZXI6ICcuZ2l0aHViL3dvcmtmbG93cy9wcm9kdWN0aW9uLWNvbnRyb2xsZXIueW1sJywKICBoZWFsdGg6ICcuZ2l0aHViL3dvcmtmbG93cy9wcm9kdWN0aW9uLWNvbnRyb2xsZXItaGVhbHRoLnltbCcsCiAgcmVsZWFzZTogJy5naXRodWIvd29ya2Zsb3dzL3Byb2R1Y3Rpb24tcmVsZWFzZS55bWwnLAogIHBvc3RkZXBsb3k6ICcuZ2l0aHViL3dvcmtmbG93cy9wb3N0ZGVwbG95LXByb2Jlcy55bWwnLAp9OwoKZGVzY3JpYmUoJ3JlbWVkaWF0aW9uSW50YWtlRGlzYWJsZWQnLCAoKSA9PiB7CiAgaXQoJ2ZpbGVzIHVubGVzcyB0aGUga2lsbCBzd2l0Y2ggaXMgZXhhY3RseSAxJywgKCkgPT4gewogICAgZXhwZWN0KHJlbWVkaWF0aW9uSW50YWtlRGlzYWJsZWQoe30pKS50b0JlKGZhbHNlKTsKICAgIGV4cGVjdCgKICAgICAgcmVtZWRpYXRpb25JbnRha2VEaXNhYmxlZCh7IFJFTUVESUFUSU9OX0lOVEFLRV9ESVNBQkxFRDogJzAnIH0pCiAgICApLnRvQmUoZmFsc2UpOwogICAgZXhwZWN0KAogICAgICByZW1lZGlhdGlvbkludGFrZURpc2FibGVkKHsgUkVNRURJQVRJT05fSU5UQUtFX0RJU0FCTEVEOiAnMScgfSkKICAgICkudG9CZSh0cnVlKTsKICB9KTsKfSk7CgpkZXNjcmliZSgnZGVjaWRlTG9naW5TaWduYWwnLCAoKSA9PiB7CiAgaXQoJ2ZpbGVzIGUyZS1sb2dpbi10aW1lb3V0IG9ubHkgZm9yIGEgbG9naW4gdGltZW91dCcsICgpID0+IHsKICAgIGNvbnN0IHJlcG9ydCA9IHsKICAgICAgc3VpdGVzOiBbCiAgICAgICAgewogICAgICAgICAgZmlsZTogJ2F1dGguc2V0dXAudHMnLAogICAgICAgICAgc3BlY3M6IFsKICAgICAgICAgICAgewogICAgICAgICAgICAgIHRpdGxlOiAnYXV0aGVudGljYXRlJywKICAgICAgICAgICAgICB0ZXN0czogW3sgcmVzdWx0czogW3sgc3RhdHVzOiAndGltZWRPdXQnIH1dIH1dLAogICAgICAgICAgICB9LAogICAgICAgICAgXSwKICAgICAgICB9LAogICAgICBdLAogICAgfTsKICAgIGV4cGVjdCgKICAgICAgZGVjaWRlTG9naW5TaWduYWwoeyBjb25jbHVzaW9uOiAnZmFpbHVyZScsIHJlcG9ydCB9KS5maW5nZXJwcmludAogICAgKS50b0JlKCdlMmUtbG9naW4tdGltZW91dCcpOwogICAgZXhwZWN0KAogICAgICBkZWNpZGVMb2dpblNpZ25hbCh7CiAgICAgICAgY29uY2x1c2lvbjogJ2ZhaWx1cmUnLAogICAgICAgIGV2aWRlbmNlVGV4dDogJ2F1dGguc2V0dXAudHNcblRlc3QgdGltZW91dCBvZiA5MDAwMG1zIGV4Y2VlZGVkJywKICAgICAgfSkuYWN0aW9uCiAgICApLnRvQmUoJ3JlZCcpOwogICAgZXhwZWN0KAogICAgICBkZWNpZGVMb2dpblNpZ25hbCh7CiAgICAgICAgY29uY2x1c2lvbjogJ2ZhaWx1cmUnLAogICAgICAgIGV2aWRlbmNlVGV4dDogJ2Rhc2hib2FyZC5zcGVjLnRzXG5leHBlY3RlZCBoZWFkaW5nJywKICAgICAgfSkuYWN0aW9uCiAgICApLnRvQmUoJ3NraXAnKTsKICAgIC8vIERldi1zZXJ2ZXIgcm91dGUgbG9ncyBtdXN0IG5vdCBwYWlyIHdpdGggYW4gdW5yZWxhdGVkIHRlc3QgdGltZW91dC4KICAgIGV4cGVjdCgKICAgICAgZGVjaWRlTG9naW5TaWduYWwoewogICAgICAgIGNvbmNsdXNpb246ICdmYWlsdXJlJywKICAgICAgICBldmlkZW5jZVRleHQ6CiAgICAgICAgICAnW1dlYlNlcnZlcl0gIEdFVCAvc2lnbmluIDIwMCBpbiA5MG1zXG5bV2ViU2VydmVyXSAgR0VUIC9zaWduaW4/cmVkaXJlY3RfdXJsPSUyRmFwcCUyRmNoYXQgMjAwIGluIDg5bXNcbmRhc2hib2FyZC5zcGVjLnRzXG5UaW1lb3V0OiAgNjAwMDBtcycsCiAgICAgIH0pLmFjdGlvbgogICAgKS50b0JlKCdza2lwJyk7CiAgICBleHBlY3QoZGVjaWRlTG9naW5TaWduYWwoeyBjb25jbHVzaW9uOiAnc3VjY2VzcycgfSkuYWN0aW9uKS50b0JlKCdncmVlbicpOwogICAgZXhwZWN0KGRlY2lkZUxvZ2luU2lnbmFsKHsgY29uY2x1c2lvbjogJ2NhbmNlbGxlZCcgfSkuYWN0aW9uKS50b0JlKCdza2lwJyk7CiAgICAvLyBBIGNhbmNlbGxlZCBydW4gbmV2ZXIgZmlsZXMsIGV2ZW4gd2l0aCBsb2dpbi10aW1lb3V0LWxvb2tpbmcgZXZpZGVuY2U6CiAgICAvLyBzaHV0ZG93biB0aW1lb3V0cyBhcmUgYXJ0aWZhY3RzIGFuZCB0aGUgc3VwZXJzZWRpbmcgcnVuIHJlcG9ydHMgaXRzZWxmLgogICAgZXhwZWN0KAogICAgICBkZWNpZGVMb2dpblNpZ25hbCh7CiAgICAgICAgY29uY2x1c2lvbjogJ2NhbmNlbGxlZCcsCiAgICAgICAgZXZpZGVuY2VUZXh0OiAnYXV0aC5zZXR1cC50c1xuVGVzdCB0aW1lb3V0IG9mIDkwMDAwbXMgZXhjZWVkZWQnLAogICAgICB9KS5hY3Rpb24KICAgICkudG9CZSgnc2tpcCcpOwogIH0pOwp9KTsKCmRlc2NyaWJlKCdkZWNpZGVBdXRoU21va2VTaWduYWwnLCAoKSA9PiB7CiAgaXQoJ3NwbGl0cyBhIGxvZ2luIHRpbWVvdXQgZnJvbSBvdGhlciBhdXRoLXNtb2tlIGZhaWx1cmVzJywgKCkgPT4gewogICAgZXhwZWN0KGRlY2lkZUF1dGhTbW9rZVNpZ25hbCh7IGpvYlJlc3VsdDogJ2NhbmNlbGxlZCcgfSkuZmluZ2VycHJpbnQpLnRvQmUoCiAgICAgICdlMmUtbG9naW4tdGltZW91dCcKICAgICk7CiAgICBleHBlY3QoCiAgICAgIGRlY2lkZUF1dGhTbW9rZVNpZ25hbCh7IGpvYlJlc3VsdDogJ2ZhaWx1cmUnLCBsb2dpblRpbWVvdXQ6ICdmYWxzZScgfSkKICAgICAgICAuZmluZ2VycHJpbnQKICAgICkudG9CZSgncHJvZHVjdGlvbi1tb25pdG9yLWF1dGgtc21va2UnKTsKICAgIGV4cGVjdCgKICAgICAgZGVjaWRlQXV0aFNtb2tlU2lnbmFsKHsKICAgICAgICBqb2JSZXN1bHQ6ICdzdWNjZXNzJywKICAgICAgICBhdXRoU3RhdHVzOiAnbm90LWNvbmZpZ3VyZWQnLAogICAgICB9KS5hY3Rpb24KICAgICkudG9CZSgnc2tpcCcpOwogICAgZXhwZWN0KAogICAgICBkZWNpZGVBdXRoU21va2VTaWduYWwoeyBqb2JSZXN1bHQ6ICdzdWNjZXNzJywgYXV0aFN0YXR1czogJ3Bhc3NlZCcgfSkKICAgICAgICAuZmluZ2VycHJpbnRzCiAgICApLnRvRXF1YWwoWydlMmUtbG9naW4tdGltZW91dCcsICdwcm9kdWN0aW9uLW1vbml0b3ItYXV0aC1zbW9rZSddKTsKICB9KTsKfSk7CgpkZXNjcmliZSgnZGVjaWRlTW9uaXRvclNpZ25hbCcsICgpID0+IHsKICBpdCgnbWFwcyBwcm9kdWN0aW9uIGNoZWNrIGNvbmNsdXNpb25zJywgKCkgPT4gewogICAgZXhwZWN0KGRlY2lkZU1vbml0b3JTaWduYWwoeyBjb25jbHVzaW9uOiAnZmFpbHVyZScgfSkuYWN0aW9uKS50b0JlKCdyZWQnKTsKICAgIGV4cGVjdChkZWNpZGVNb25pdG9yU2lnbmFsKHsgY29uY2x1c2lvbjogJ3N1Y2Nlc3MnIH0pLmFjdGlvbikudG9CZSgnZ3JlZW4nKTsKICAgIGV4cGVjdChkZWNpZGVNb25pdG9yU2lnbmFsKHsgY29uY2x1c2lvbjogJ3NraXBwZWQnIH0pLmFjdGlvbikudG9CZSgnc2tpcCcpOwogIH0pOwoKICBpdCgnZmlsZXMgYSBzdGFuZGluZyBjYW5hcnksIG5vdCBhIHByb2R1Y3Rpb24gZmFpbHVyZSwgb24gcXVvdGEgZGVmZXJyYWwnLCAoKSA9PiB7CiAgICAvLyBFdmVyeSBoYXJkIHF1b3RhIG5lZWRzIGEgc3RhbmRpbmcgY2FuYXJ5IChpbmZyYSBndWFyZHJhaWwgIzIpOiBhCiAgICAvLyBkZWZlcnJlZCBwb3N0LWRlcGxveSByZWFkIHN1cmZhY2VzIHVuZGVyIGl0cyBvd24gZmluZ2VycHJpbnQgaW5zdGVhZAogICAgLy8gb2YgdmFuaXNoaW5nIGludG8gYSBncmVlbiBza2lwIChKT1YtODQ5NSkuCiAgICBjb25zdCBkZWZlcnJlZCA9IGRlY2lkZU1vbml0b3JTaWduYWwoeyBjb25jbHVzaW9uOiAncXVvdGEtZGVmZXJyZWQnIH0pOwogICAgZXhwZWN0KGRlZmVycmVkLmFjdGlvbikudG9CZSgncmVkJyk7CiAgICBleHBlY3QoZGVmZXJyZWQuZmluZ2VycHJpbnQpLnRvQmUoCiAgICAgICdnaXRodWItcXVvdGEtZGVmZXJyZWQtcG9zdGRlcGxveS1wcm9iZXMnCiAgICApOwogICAgZXhwZWN0KGRlZmVycmVkLmRldGFpbCkudG9Db250YWluKCdpbnN0YWxsYXRpb24gcXVvdGEnKTsKICB9KTsKfSk7CgpkZXNjcmliZSgnZ2F0ZVN0ZWFkeUdyZWVuJywgKCkgPT4gewogIGl0KCdza2lwcyBMaW5lYXIgb24gc3RlYWR5IGdyZWVuIGFuZCBzdGlsbCBmaWxlcyBhIHJlZCcsIGFzeW5jICgpID0+IHsKICAgIGV4cGVjdChnYXRlU3RlYWR5R3JlZW4oeyBhY3Rpb246ICdncmVlbicgfSwgJycsICcxJykucmVhc29uKS50b0JlKAogICAgICAnc3RlYWR5X2dyZWVuJwogICAgKTsKICAgIGV4cGVjdChnYXRlU3RlYWR5R3JlZW4oeyBhY3Rpb246ICdncmVlbicgfSwgJ3JlZCcsICcxJykuYWN0aW9uKS50b0JlKAogICAgICAnZ3JlZW4nCiAgICApOwogICAgZXhwZWN0KGdhdGVTdGVhZHlHcmVlbih7IGFjdGlvbjogJ3JlZCcgfSwgJ2dyZWVuJywgJzEnKS5hY3Rpb24pLnRvQmUoJ3JlZCcpOwogICAgZXhwZWN0KGdhdGVTdGVhZHlHcmVlbih7IGFjdGlvbjogJ2dyZWVuJyB9LCAnZ3JlZW4nLCAnJykuYWN0aW9uKS50b0JlKAogICAgICAnZ3JlZW4nCiAgICApOwogICAgY29uc3QgZmV0Y2hJbXBsID0gdmkuZm4oKTsKICAgIGNvbnN0IHNraXBwZWQgPSBnYXRlU3RlYWR5R3JlZW4oeyBhY3Rpb246ICdncmVlbicgfSwgJ2dyZWVuJywgJzEnKTsKICAgIGF3YWl0IGV4cGVjdCgKICAgICAgYXBwbHlSZW1lZGlhdGlvbkRlY2lzaW9uKHNraXBwZWQsIHsgYXBpS2V5OiAnJywgZmV0Y2hJbXBsIH0pCiAgICApLnJlc29sdmVzLnRvRXF1YWwoeyBvazogdHJ1ZSwgYWN0aW9uOiAnc2tpcCcgfSk7CiAgICBleHBlY3QoZmV0Y2hJbXBsKS5ub3QudG9IYXZlQmVlbkNhbGxlZCgpOwogIH0pOwoKICBpdCgnZmFpbHMgY2xvc2VkIG9uIHJlZCB3aGVuIExpbmVhciBoYXMgbm8ga2V5JywgYXN5bmMgKCkgPT4gewogICAgY29uc3QgcmVzdWx0ID0gYXdhaXQgYXBwbHlSZW1lZGlhdGlvbkRlY2lzaW9uKAogICAgICB7IGFjdGlvbjogJ3JlZCcsIGZpbmdlcnByaW50OiAncHJvZHVjdGlvbi1tb25pdG9yLWNvbnRpbnVpdHknIH0sCiAgICAgIHsgc291cmNlOiAncHJvZHVjdGlvbi1jb250aW51aXR5LnltbCcsIGFwaUtleTogJycgfQogICAgKTsKICAgIGV4cGVjdCgncmVhc29uJyBpbiByZXN1bHQgJiYgcmVzdWx0LnJlYXNvbikudG9CZSgnbWlzc2luZ19saW5lYXJfYXBpX2tleScpOwogIH0pOwp9KTsKCmZ1bmN0aW9uIGxpbmVhclN0dWIoaXNzdWVOb2RlcykgewogIGNvbnN0IGNhbGxzID0gW107CiAgY29uc3QgZmV0Y2hJbXBsID0gdmkuZm4oYXN5bmMgKF91cmwsIGluaXQpID0+IHsKICAgIGNvbnN0IHBheWxvYWQgPSBKU09OLnBhcnNlKFN0cmluZyhpbml0LmJvZHkpKTsKICAgIGNhbGxzLnB1c2gocGF5bG9hZCk7CiAgICBjb25zdCByZXBseSA9IGRhdGEgPT4gbmV3IFJlc3BvbnNlKEpTT04uc3RyaW5naWZ5KHsgZGF0YSB9KSk7CiAgICBpZiAocGF5bG9hZC5xdWVyeS5pbmNsdWRlcygnRmluZFRlYW1MYWJlbCcpKSB7CiAgICAgIHJldHVybiByZXBseSh7CiAgICAgICAgdGVhbTogewogICAgICAgICAgbGFiZWxzOiB7IG5vZGVzOiBbeyBpZDogJ2xibC1yZWFkeScsIG5hbWU6IEFHRU5UX1JFQURZX0xBQkVMIH1dIH0sCiAgICAgICAgfSwKICAgICAgfSk7CiAgICB9CiAgICBpZiAocGF5bG9hZC5xdWVyeS5pbmNsdWRlcygnRmluZElzc3VlQnlGaW5nZXJwcmludCcpKSB7CiAgICAgIHJldHVybiByZXBseSh7CiAgICAgICAgdGVhbTogewogICAgICAgICAgc3RhdGVzOiB7CiAgICAgICAgICAgIG5vZGVzOiBbCiAgICAgICAgICAgICAgeyBpZDogJ3N0LXRvZG8nLCBuYW1lOiAnVG9kbycsIHR5cGU6ICd1bnN0YXJ0ZWQnIH0sCiAgICAgICAgICAgICAgeyBpZDogJ3N0LWJhY2tsb2cnLCBuYW1lOiAnQmFja2xvZycsIHR5cGU6ICdiYWNrbG9nJyB9LAogICAgICAgICAgICBdLAogICAgICAgICAgfSwKICAgICAgICAgIGxhYmVsczogewogICAgICAgICAgICBub2RlczogWwogICAgICAgICAgICAgIHsKICAgICAgICAgICAgICAgIGlkOiAnbGJsLWtleScsCiAgICAgICAgICAgICAgICBuYW1lOiAncmVtZWRpYXRpb246cHJvZHVjdGlvbi1tb25pdG9yLWNvbnRpbnVpdHknLAogICAgICAgICAgICAgIH0sCiAgICAgICAgICAgIF0sCiAgICAgICAgICB9LAogICAgICAgIH0sCiAgICAgICAgaXNzdWVzOiB7IG5vZGVzOiBpc3N1ZU5vZGVzIH0sCiAgICAgIH0pOwogICAgfQogICAgaWYgKHBheWxvYWQucXVlcnkuaW5jbHVkZXMoJ0ZpbmRJc3N1ZUJ5UmVtZWRpYXRpb25MYWJlbCcpKSB7CiAgICAgIHJldHVybiByZXBseSh7IGlzc3VlczogeyBub2RlczogW10gfSB9KTsKICAgIH0KICAgIGlmIChwYXlsb2FkLnF1ZXJ5LmluY2x1ZGVzKCdpc3N1ZUNyZWF0ZScpKSB7CiAgICAgIHJldHVybiByZXBseSh7CiAgICAgICAgaXNzdWVDcmVhdGU6IHsKICAgICAgICAgIHN1Y2Nlc3M6IHRydWUsCiAgICAgICAgICBpc3N1ZTogeyBpZDogJ25ldycsIGlkZW50aWZpZXI6ICdKT1YtMScsIHVybDogJ3UnIH0sCiAgICAgICAgfSwKICAgICAgfSk7CiAgICB9CiAgICBpZiAocGF5bG9hZC5xdWVyeS5pbmNsdWRlcygnaXNzdWVVcGRhdGUnKSkgewogICAgICByZXR1cm4gcmVwbHkoewogICAgICAgIGlzc3VlVXBkYXRlOiB7CiAgICAgICAgICBzdWNjZXNzOiB0cnVlLAogICAgICAgICAgaXNzdWU6IHsgaWQ6ICdvbGQnLCBpZGVudGlmaWVyOiAnSk9WLTInLCB1cmw6ICd1JyB9LAogICAgICAgIH0sCiAgICAgIH0pOwogICAgfQogICAgdGhyb3cgbmV3IEVycm9yKGB1bmV4cGVjdGVkIExpbmVhciBxdWVyeTogJHtwYXlsb2FkLnF1ZXJ5fWApOwogIH0pOwogIHJldHVybiB7IGNhbGxzLCBmZXRjaEltcGwgfTsKfQoKZGVzY3JpYmUoJ3JlZCByZW1lZGlhdGlvbiBpcyBhZ2VudC1yZWFkeScsICgpID0+IHsKICBjb25zdCByZWQgPSB7IGFjdGlvbjogJ3JlZCcsIGZpbmdlcnByaW50OiAncHJvZHVjdGlvbi1tb25pdG9yLWNvbnRpbnVpdHknIH07CiAgY29uc3QgY29udGV4dCA9IHJ1biA9PiAoewogICAgc291cmNlOiAncHJvZHVjdGlvbi1jb250aW51aXR5LnltbCcsCiAgICBydW5Vcmw6ICdodHRwczovL2dpdGh1Yi5jb20vSm92aWVJbmMvSm92aWUvYWN0aW9ucy9ydW5zLzEnLAogICAgYXBpS2V5OiAnbGluX3Rlc3QnLAogICAgZmV0Y2hJbXBsOiBydW4uZmV0Y2hJbXBsLAogIH0pOwoKICBpdCgnY3JlYXRlcyB0aGUgZGVkdXBlZCBQMCBpbiBUb2RvIHdpdGggYWdlbnQtcmVhZHkgYW5kIHRoZSBydW4gdXJsJywgYXN5bmMgKCkgPT4gewogICAgY2xlYXJSZW1lZGlhdGlvbkxhYmVsQ2FjaGUoKTsKICAgIGNvbnN0IHJ1biA9IGxpbmVhclN0dWIoW10pOwogICAgY29uc3QgcmVzdWx0ID0gYXdhaXQgYXBwbHlSZW1lZGlhdGlvbkRlY2lzaW9uKHJlZCwgY29udGV4dChydW4pKTsKICAgIGV4cGVjdChyZXN1bHQub2spLnRvQmUodHJ1ZSk7CiAgICBjb25zdCBjcmVhdGUgPSBydW4uY2FsbHMuZmluZChjYWxsID0+IGNhbGwucXVlcnkuaW5jbHVkZXMoJ2lzc3VlQ3JlYXRlJykpOwogICAgZXhwZWN0KGNyZWF0ZS52YXJpYWJsZXMuc3RhdGVJZCkudG9CZSgnc3QtdG9kbycpOwogICAgZXhwZWN0KGNyZWF0ZS52YXJpYWJsZXMubGFiZWxJZHMpLnRvRXF1YWwoCiAgICAgIGV4cGVjdC5hcnJheUNvbnRhaW5pbmcoWydsYmwtcmVhZHknLCAnbGJsLWtleSddKQogICAgKTsKICAgIGV4cGVjdChjcmVhdGUudmFyaWFibGVzLmRlc2NyaXB0aW9uKS50b0NvbnRhaW4oCiAgICAgICdodHRwczovL2dpdGh1Yi5jb20vSm92aWVJbmMvSm92aWUvYWN0aW9ucy9ydW5zLzEnCiAgICApOwogIH0pOwoKICBpdCgncmUtYWRkcyBhZ2VudC1yZWFkeSB3aGVuIGEgY2xvc2VkIHNpZ25hbCByZW9wZW5zJywgYXN5bmMgKCkgPT4gewogICAgY2xlYXJSZW1lZGlhdGlvbkxhYmVsQ2FjaGUoKTsKICAgIGNvbnN0IHJ1biA9IGxpbmVhclN0dWIoWwogICAgICB7CiAgICAgICAgaWQ6ICdvbGQnLAogICAgICAgIGlkZW50aWZpZXI6ICdKT1YtMicsCiAgICAgICAgdXJsOiAndScsCiAgICAgICAgdGl0bGU6CiAgICAgICAgICAnUDA6IHByb2R1Y3Rpb24tbW9uaXRvci1jb250aW51aXR5IGlzIHJlZCAocHJvZHVjdGlvbi1tb25pdG9yLWNvbnRpbnVpdHkpJywKICAgICAgICBzdGF0ZTogeyBpZDogJ3N0LWRvbmUnLCBuYW1lOiAnRG9uZScsIHR5cGU6ICdjb21wbGV0ZWQnIH0sCiAgICAgICAgbGFiZWxzOiB7CiAgICAgICAgICBub2RlczogWwogICAgICAgICAgICB7CiAgICAgICAgICAgICAgaWQ6ICdsYmwta2V5JywKICAgICAgICAgICAgICBuYW1lOiAncmVtZWRpYXRpb246cHJvZHVjdGlvbi1tb25pdG9yLWNvbnRpbnVpdHknLAogICAgICAgICAgICB9LAogICAgICAgICAgXSwKICAgICAgICB9LAogICAgICB9LAogICAgXSk7CiAgICBjb25zdCByZXN1bHQgPSBhd2FpdCBhcHBseVJlbWVkaWF0aW9uRGVjaXNpb24ocmVkLCBjb250ZXh0KHJ1bikpOwogICAgZXhwZWN0KHJlc3VsdCkudG9NYXRjaE9iamVjdCh7CiAgICAgIG9rOiB0cnVlLAogICAgICBhY3Rpb246ICd1cGRhdGVkJywKICAgICAgcmVvcGVuZWQ6IHRydWUsCiAgICB9KTsKICAgIGNvbnN0IHVwZGF0ZSA9IHJ1bi5jYWxscy5maW5kKGNhbGwgPT4gY2FsbC5xdWVyeS5pbmNsdWRlcygnaXNzdWVVcGRhdGUnKSk7CiAgICBleHBlY3QodXBkYXRlLnZhcmlhYmxlcy5pbnB1dC5zdGF0ZUlkKS50b0JlKCdzdC10b2RvJyk7CiAgICBleHBlY3QodXBkYXRlLnZhcmlhYmxlcy5pbnB1dC5sYWJlbElkcykudG9FcXVhbCgKICAgICAgZXhwZWN0LmFycmF5Q29udGFpbmluZyhbJ2xibC1yZWFkeScsICdsYmwta2V5J10pCiAgICApOwogICAgZXhwZWN0KHJ1bi5jYWxscy5zb21lKGNhbGwgPT4gY2FsbC5xdWVyeS5pbmNsdWRlcygnaXNzdWVDcmVhdGUnKSkpLnRvQmUoCiAgICAgIGZhbHNlCiAgICApOwogIH0pOwp9KTsKCmRlc2NyaWJlKCdhcHBseVJlbWVkaWF0aW9uRGVjaXNpb25XaXRoUmV0cnknLCAoKSA9PiB7CiAgY29uc3QgcmVkID0geyBhY3Rpb246ICdyZWQnLCBmaW5nZXJwcmludDogJ3Byb2R1Y3Rpb24tbW9uaXRvci1jb250aW51aXR5JyB9OwogIGNvbnN0IGNvbnRleHQgPSBmZXRjaEltcGwgPT4gKHsKICAgIHNvdXJjZTogJ3Byb2R1Y3Rpb24tY29udGludWl0eS55bWwnLAogICAgcnVuVXJsOiAnaHR0cHM6Ly9naXRodWIuY29tL0pvdmllSW5jL0pvdmllL2FjdGlvbnMvcnVucy8xJywKICAgIGFwaUtleTogJ2xpbl90ZXN0JywKICAgIGZldGNoSW1wbCwKICB9KTsKICBjb25zdCBub1NsZWVwID0gYXN5bmMgKCkgPT4ge307CgogIGl0KCdjbGFzc2lmaWVzIG9ubHkgdXBzdHJlYW0gcmVzZXRzIGFuZCA1eHggYXMgdHJhbnNpZW50JywgKCkgPT4gewogICAgZXhwZWN0KAogICAgICBpc1RyYW5zaWVudFJlbWVkaWF0aW9uRmFpbHVyZSh7IG9rOiBmYWxzZSwgcmVhc29uOiAnbGluZWFyX3VwZGF0ZV81MDMnIH0pCiAgICApLnRvQmUodHJ1ZSk7CiAgICBleHBlY3QoCiAgICAgIGlzVHJhbnNpZW50UmVtZWRpYXRpb25GYWlsdXJlKHsKICAgICAgICBvazogZmFsc2UsCiAgICAgICAgcmVhc29uOiAnbGluZWFyX3VwZGF0ZV90cmFuc3BvcnQnLAogICAgICB9KQogICAgKS50b0JlKHRydWUpOwogICAgZXhwZWN0KAogICAgICBpc1RyYW5zaWVudFJlbWVkaWF0aW9uRmFpbHVyZSh7IG9rOiBmYWxzZSwgcmVhc29uOiAnbGluZWFyX3VwZGF0ZV80MDAnIH0pCiAgICApLnRvQmUoZmFsc2UpOwogICAgZXhwZWN0KAogICAgICBpc1RyYW5zaWVudFJlbWVkaWF0aW9uRmFpbHVyZSh7CiAgICAgICAgb2s6IGZhbHNlLAogICAgICAgIHJlYXNvbjogJ21pc3NpbmdfbGluZWFyX2FwaV9rZXknLAogICAgICB9KQogICAgKS50b0JlKGZhbHNlKTsKICAgIGV4cGVjdChpc1RyYW5zaWVudFJlbWVkaWF0aW9uRmFpbHVyZSh7IG9rOiB0cnVlIH0pKS50b0JlKGZhbHNlKTsKICB9KTsKCiAgaXQoJ3JldHJpZXMgYSB0cmFuc2llbnQgTGluZWFyIDUwMyBhbmQgZmlsZXMgb24gdGhlIG5leHQgYXR0ZW1wdCcsIGFzeW5jICgpID0+IHsKICAgIGNsZWFyUmVtZWRpYXRpb25MYWJlbENhY2hlKCk7CiAgICBjb25zdCBpbm5lciA9IGxpbmVhclN0dWIoW10pOwogICAgbGV0IGNyZWF0ZUNhbGxzID0gMDsKICAgIGNvbnN0IGZldGNoSW1wbCA9IHZpLmZuKGFzeW5jICh1cmwsIGluaXQpID0+IHsKICAgICAgY29uc3QgcGF5bG9hZCA9IEpTT04ucGFyc2UoU3RyaW5nKGluaXQuYm9keSkpOwogICAgICBpZiAocGF5bG9hZC5xdWVyeS5pbmNsdWRlcygnaXNzdWVDcmVhdGUnKSkgewogICAgICAgIGNyZWF0ZUNhbGxzICs9IDE7CiAgICAgICAgaWYgKGNyZWF0ZUNhbGxzID09PSAxKSB7CiAgICAgICAgICByZXR1cm4gbmV3IFJlc3BvbnNlKCd1cHN0cmVhbSBjb25uZWN0IGVycm9yJywgeyBzdGF0dXM6IDUwMyB9KTsKICAgICAgICB9CiAgICAgIH0KICAgICAgcmV0dXJuIGlubmVyLmZldGNoSW1wbCh1cmwsIGluaXQpOwogICAgfSk7CiAgICBjb25zdCByZXN1bHQgPSBhd2FpdCBhcHBseVJlbWVkaWF0aW9uRGVjaXNpb25XaXRoUmV0cnkoCiAgICAgIHJlZCwKICAgICAgY29udGV4dChmZXRjaEltcGwpLAogICAgICB7IHNsZWVwOiBub1NsZWVwIH0KICAgICk7CiAgICBleHBlY3QocmVzdWx0Lm9rKS50b0JlKHRydWUpOwogICAgZXhwZWN0KGNyZWF0ZUNhbGxzKS50b0JlKDIpOwogIH0pOwoKICBpdCgnc3RvcHMgcmV0cnlpbmcgYWZ0ZXIgdGhlIGF0dGVtcHQgYnVkZ2V0JywgYXN5bmMgKCkgPT4gewogICAgY2xlYXJSZW1lZGlhdGlvbkxhYmVsQ2FjaGUoKTsKICAgIGNvbnN0IGlubmVyID0gbGluZWFyU3R1YihbXSk7CiAgICBjb25zdCBmZXRjaEltcGwgPSB2aS5mbihhc3luYyAodXJsLCBpbml0KSA9PiB7CiAgICAgIGNvbnN0IHBheWxvYWQgPSBKU09OLnBhcnNlKFN0cmluZyhpbml0LmJvZHkpKTsKICAgICAgaWYgKHBheWxvYWQucXVlcnkuaW5jbHVkZXMoJ2lzc3VlQ3JlYXRlJykpIHsKICAgICAgICByZXR1cm4gbmV3IFJlc3BvbnNlKCd1cHN0cmVhbSBjb25uZWN0IGVycm9yJywgeyBzdGF0dXM6IDUwMyB9KTsKICAgICAgfQogICAgICByZXR1cm4gaW5uZXIuZmV0Y2hJbXBsKHVybCwgaW5pdCk7CiAgICB9KTsKICAgIGNvbnN0IHJlc3VsdCA9IGF3YWl0IGFwcGx5UmVtZWRpYXRpb25EZWNpc2lvbldpdGhSZXRyeSgKICAgICAgcmVkLAogICAgICBjb250ZXh0KGZldGNoSW1wbCksCiAgICAgIHsgYXR0ZW1wdHM6IDIsIHNsZWVwOiBub1NsZWVwIH0KICAgICk7CiAgICBleHBlY3QocmVzdWx0Lm9rKS50b0JlKGZhbHNlKTsKICAgIGV4cGVjdCgncmVhc29uJyBpbiByZXN1bHQgJiYgcmVzdWx0LnJlYXNvbikudG9CZSgnbGluZWFyX2NyZWF0ZV81MDMnKTsKICAgIGV4cGVjdCgKICAgICAgZmV0Y2hJbXBsLm1vY2suY2FsbHMuZmlsdGVyKChbLCBpbml0XSkgPT4KICAgICAgICBTdHJpbmcoaW5pdC5ib2R5KS5pbmNsdWRlcygnaXNzdWVDcmVhdGUnKQogICAgICApCiAgICApLnRvSGF2ZUxlbmd0aCgyKTsKICB9KTsKCiAgaXQoJ2RvZXMgbm90IHJldHJ5IHBlcm1hbmVudCBmYWlsdXJlcycsIGFzeW5jICgpID0+IHsKICAgIGNvbnN0IGZldGNoSW1wbCA9IHZpLmZuKCk7CiAgICBjb25zdCByZXN1bHQgPSBhd2FpdCBhcHBseVJlbWVkaWF0aW9uRGVjaXNpb25XaXRoUmV0cnkoCiAgICAgIHJlZCwKICAgICAgeyAuLi5jb250ZXh0KGZldGNoSW1wbCksIGFwaUtleTogJycgfSwKICAgICAgeyBzbGVlcDogbm9TbGVlcCB9CiAgICApOwogICAgZXhwZWN0KHJlc3VsdC5vaykudG9CZShmYWxzZSk7CiAgICBleHBlY3QoJ3JlYXNvbicgaW4gcmVzdWx0ICYmIHJlc3VsdC5yZWFzb24pLnRvQmUoJ21pc3NpbmdfbGluZWFyX2FwaV9rZXknKTsKICAgIGV4cGVjdChmZXRjaEltcGwpLm5vdC50b0hhdmVCZWVuQ2FsbGVkKCk7CiAgfSk7Cn0pOwoKZGVzY3JpYmUoJ3dvcmtmbG93IHdpcmluZycsICgpID0+IHsKICBjb25zdCBib2RpZXMgPSBPYmplY3QuZnJvbUVudHJpZXMoCiAgICBPYmplY3QuZW50cmllcyh3b3JrZmxvd3MpLm1hcCgoW25hbWUsIHBhdGhdKSA9PiBbCiAgICAgIG5hbWUsCiAgICAgIHJlYWRGaWxlU3luYyhwYXRoLCAndXRmOCcpLAogICAgXSkKICApOwoKICBpdCgnd2lyZXMgZGV0ZWN0b3JzIGFuZCBnYXRlcyBvbmx5IHRoZSA1LW1pbnV0ZSBjb250aW51aXR5IHByb2JlJywgKCkgPT4gewogICAgZXhwZWN0KGJvZGllcy5uaWdodGx5KS50b0NvbnRhaW4oJ1JFTUVESUFUSU9OX01PREU6IGxvZ2luJyk7CiAgICBleHBlY3QoYm9kaWVzLm1hdHJpeCkudG9Db250YWluKCdlMmUtZnVsbC1tYXRyaXgueW1sOicpOwogICAgZXhwZWN0KGJvZGllcy5jb250cm9sbGVyKS50b0NvbnRhaW4oJ3Byb2R1Y3Rpb24tbW9uaXRvci1wb3N0LWRlcGxveS1zbW9rZScpOwogICAgZXhwZWN0KGJvZGllcy5jb250cm9sbGVyKS50b0NvbnRhaW4oJ1JFTUVESUFUSU9OX01PREU6IGF1dGgtc21va2UnKTsKICAgIGV4cGVjdChib2RpZXMuY29udHJvbGxlcikudG9Db250YWluKAogICAgICAncHJvZHVjdGlvbi1tb25pdG9yLWN1c3RvbWVyLWNoYW5nZWxvZycKICAgICk7CiAgICBleHBlY3QoYm9kaWVzLmhlYWx0aCkudG9Db250YWluKCdwcm9kdWN0aW9uLW1vbml0b3ItY29udHJvbGxlci1oZWFsdGgnKTsKICAgIGV4cGVjdChib2RpZXMucmVsZWFzZSkudG9Db250YWluKCdwcm9kdWN0aW9uLW1vbml0b3ItdmVyY2VsLWRlcGxveScpOwogICAgZXhwZWN0KGJvZGllcy5wb3N0ZGVwbG95KS50b0NvbnRhaW4oJ3Byb2R1Y3Rpb24tbW9uaXRvci1wb3N0ZGVwbG95LXByb2JlcycpOwogICAgZXhwZWN0KGJvZGllcy5jb250aW51aXR5KS50b0NvbnRhaW4oIlJFTUVESUFUSU9OX0dBVEVfU1RFQURZX0dSRUVOOiAnMSciKTsKICAgIGV4cGVjdChib2RpZXMuY29udGludWl0eSkudG9Db250YWluKCJSRU1FRElBVElPTl9GQUlMX09QRU46ICcxJyIpOwogICAgZXhwZWN0KGJvZGllcy5jb250aW51aXR5KS50b0NvbnRhaW4oJ3JlbWVkaWF0aW9uLWNvbnRpbnVpdHktc3RhdGUnKTsKICAgIGZvciAoY29uc3QgW25hbWUsIGJvZHldIG9mIE9iamVjdC5lbnRyaWVzKGJvZGllcykpIHsKICAgICAgZXhwZWN0KGJvZHkpLnRvQ29udGFpbignUkVNRURJQVRJT05fSU5UQUtFX0RJU0FCTEVEJyk7CiAgICAgIGV4cGVjdChib2R5KS5ub3QudG9Db250YWluKCdSRU1FRElBVElPTl9JTlRBS0VfRU5BQkxFRCcpOwogICAgICBpZiAobmFtZSAhPT0gJ2NvbnRpbnVpdHknKSB7CiAgICAgICAgZXhwZWN0KGJvZHkpLm5vdC50b0NvbnRhaW4oJ1JFTUVESUFUSU9OX0dBVEVfU1RFQURZX0dSRUVOJyk7CiAgICAgIH0KICAgIH0KICB9KTsKfSk7Cg==
+import { readFileSync } from 'node:fs';
+import { describe, expect, it, vi } from 'vitest';
+
+import { clearRemediationLabelCache } from '../linear-issue-intake.mjs';
+import {
+  AGENT_READY_LABEL,
+  applyRemediationDecision,
+  applyRemediationDecisionWithRetry,
+  decideAuthSmokeSignal,
+  decideLoginSignal,
+  decideMonitorSignal,
+  gateSteadyGreen,
+  isTransientRemediationFailure,
+  remediationIntakeDisabled,
+} from '../remediation-signal.mjs';
+
+const workflows = {
+  nightly: '.github/workflows/nightly-tests.yml',
+  matrix: '.github/workflows/e2e-full-matrix.yml',
+  continuity: '.github/workflows/production-continuity.yml',
+  controller: '.github/workflows/production-controller.yml',
+  health: '.github/workflows/production-controller-health.yml',
+  release: '.github/workflows/production-release.yml',
+  postdeploy: '.github/workflows/postdeploy-probes.yml',
+};
+
+describe('remediationIntakeDisabled', () => {
+  it('files unless the kill switch is exactly 1', () => {
+    expect(remediationIntakeDisabled({})).toBe(false);
+    expect(
+      remediationIntakeDisabled({ REMEDIATION_INTAKE_DISABLED: '0' })
+    ).toBe(false);
+    expect(
+      remediationIntakeDisabled({ REMEDIATION_INTAKE_DISABLED: '1' })
+    ).toBe(true);
+  });
+});
+
+describe('decideLoginSignal', () => {
+  it('files e2e-login-timeout only for a login timeout', () => {
+    const report = {
+      suites: [
+        {
+          file: 'auth.setup.ts',
+          specs: [
+            {
+              title: 'authenticate',
+              tests: [{ results: [{ status: 'timedOut' }] }],
+            },
+          ],
+        },
+      ],
+    };
+    expect(
+      decideLoginSignal({ conclusion: 'failure', report }).fingerprint
+    ).toBe('e2e-login-timeout');
+    expect(
+      decideLoginSignal({
+        conclusion: 'failure',
+        evidenceText: 'auth.setup.ts\nTest timeout of 90000ms exceeded',
+      }).action
+    ).toBe('red');
+    expect(
+      decideLoginSignal({
+        conclusion: 'failure',
+        evidenceText: 'dashboard.spec.ts\nexpected heading',
+      }).action
+    ).toBe('skip');
+    // Dev-server route logs must not pair with an unrelated test timeout.
+    expect(
+      decideLoginSignal({
+        conclusion: 'failure',
+        evidenceText:
+          '[WebServer]  GET /signin 200 in 90ms\n[WebServer]  GET /signin?redirect_url=%2Fapp%2Fchat 200 in 89ms\ndashboard.spec.ts\nTimeout:  60000ms',
+      }).action
+    ).toBe('skip');
+    expect(decideLoginSignal({ conclusion: 'success' }).action).toBe('green');
+    expect(decideLoginSignal({ conclusion: 'cancelled' }).action).toBe('skip');
+    // A cancelled run never files, even with login-timeout-looking evidence:
+    // shutdown timeouts are artifacts and the superseding run reports itself.
+    expect(
+      decideLoginSignal({
+        conclusion: 'cancelled',
+        evidenceText: 'auth.setup.ts\nTest timeout of 90000ms exceeded',
+      }).action
+    ).toBe('skip');
+  });
+});
+
+describe('decideAuthSmokeSignal', () => {
+  it('splits a login timeout from other auth-smoke failures', () => {
+    expect(decideAuthSmokeSignal({ jobResult: 'cancelled' }).fingerprint).toBe(
+      'e2e-login-timeout'
+    );
+    expect(
+      decideAuthSmokeSignal({ jobResult: 'failure', loginTimeout: 'false' })
+        .fingerprint
+    ).toBe('production-monitor-auth-smoke');
+    expect(
+      decideAuthSmokeSignal({
+        jobResult: 'success',
+        authStatus: 'not-configured',
+      }).action
+    ).toBe('skip');
+    expect(
+      decideAuthSmokeSignal({ jobResult: 'success', authStatus: 'passed' })
+        .fingerprints
+    ).toEqual(['e2e-login-timeout', 'production-monitor-auth-smoke']);
+  });
+});
+
+describe('decideMonitorSignal', () => {
+  it('maps production check conclusions', () => {
+    expect(decideMonitorSignal({ conclusion: 'failure' }).action).toBe('red');
+    expect(decideMonitorSignal({ conclusion: 'success' }).action).toBe('green');
+    expect(decideMonitorSignal({ conclusion: 'skipped' }).action).toBe('skip');
+  });
+
+  it('files a standing canary, not a production failure, on quota deferral', () => {
+    // Every hard quota needs a standing canary (infra guardrail #2): a
+    // deferred post-deploy read surfaces under its own fingerprint instead
+    // of vanishing into a green skip (JOV-8495).
+    const deferred = decideMonitorSignal({ conclusion: 'quota-deferred' });
+    expect(deferred.action).toBe('red');
+    expect(deferred.fingerprint).toBe(
+      'github-quota-deferred-postdeploy-probes'
+    );
+    expect(deferred.detail).toContain('installation quota');
+  });
+});
+
+describe('gateSteadyGreen', () => {
+  it('skips Linear on steady green and still files a red', async () => {
+    expect(gateSteadyGreen({ action: 'green' }, '', '1').reason).toBe(
+      'steady_green'
+    );
+    expect(gateSteadyGreen({ action: 'green' }, 'red', '1').action).toBe(
+      'green'
+    );
+    expect(gateSteadyGreen({ action: 'red' }, 'green', '1').action).toBe('red');
+    expect(gateSteadyGreen({ action: 'green' }, 'green', '').action).toBe(
+      'green'
+    );
+    const fetchImpl = vi.fn();
+    const skipped = gateSteadyGreen({ action: 'green' }, 'green', '1');
+    await expect(
+      applyRemediationDecision(skipped, { apiKey: '', fetchImpl })
+    ).resolves.toEqual({ ok: true, action: 'skip' });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('fails closed on red when Linear has no key', async () => {
+    const result = await applyRemediationDecision(
+      { action: 'red', fingerprint: 'production-monitor-continuity' },
+      { source: 'production-continuity.yml', apiKey: '' }
+    );
+    expect('reason' in result && result.reason).toBe('missing_linear_api_key');
+  });
+});
+
+function linearStub(issueNodes) {
+  const calls = [];
+  const fetchImpl = vi.fn(async (_url, init) => {
+    const payload = JSON.parse(String(init.body));
+    calls.push(payload);
+    const reply = data => new Response(JSON.stringify({ data }));
+    if (payload.query.includes('FindTeamLabel')) {
+      return reply({
+        team: {
+          labels: { nodes: [{ id: 'lbl-ready', name: AGENT_READY_LABEL }] },
+        },
+      });
+    }
+    if (payload.query.includes('FindIssueByFingerprint')) {
+      return reply({
+        team: {
+          states: {
+            nodes: [
+              { id: 'st-todo', name: 'Todo', type: 'unstarted' },
+              { id: 'st-backlog', name: 'Backlog', type: 'backlog' },
+            ],
+          },
+          labels: {
+            nodes: [
+              {
+                id: 'lbl-key',
+                name: 'remediation:production-monitor-continuity',
+              },
+            ],
+          },
+        },
+        issues: { nodes: issueNodes },
+      });
+    }
+    if (payload.query.includes('FindIssueByRemediationLabel')) {
+      return reply({ issues: { nodes: [] } });
+    }
+    if (payload.query.includes('issueCreate')) {
+      return reply({
+        issueCreate: {
+          success: true,
+          issue: { id: 'new', identifier: 'JOV-1', url: 'u' },
+        },
+      });
+    }
+    if (payload.query.includes('issueUpdate')) {
+      return reply({
+        issueUpdate: {
+          success: true,
+          issue: { id: 'old', identifier: 'JOV-2', url: 'u' },
+        },
+      });
+    }
+    throw new Error(`unexpected Linear query: ${payload.query}`);
+  });
+  return { calls, fetchImpl };
+}
+
+describe('red remediation is agent-ready', () => {
+  const red = { action: 'red', fingerprint: 'production-monitor-continuity' };
+  const context = run => ({
+    source: 'production-continuity.yml',
+    runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/1',
+    apiKey: 'lin_test',
+    fetchImpl: run.fetchImpl,
+  });
+
+  it('creates the deduped P0 in Todo with agent-ready and the run url', async () => {
+    clearRemediationLabelCache();
+    const run = linearStub([]);
+    const result = await applyRemediationDecision(red, context(run));
+    expect(result.ok).toBe(true);
+    const create = run.calls.find(call => call.query.includes('issueCreate'));
+    expect(create.variables.stateId).toBe('st-todo');
+    expect(create.variables.labelIds).toEqual(
+      expect.arrayContaining(['lbl-ready', 'lbl-key'])
+    );
+    expect(create.variables.description).toContain(
+      'https://github.com/JovieInc/Jovie/actions/runs/1'
+    );
+  });
+
+  it('re-adds agent-ready when a closed signal reopens', async () => {
+    clearRemediationLabelCache();
+    const run = linearStub([
+      {
+        id: 'old',
+        identifier: 'JOV-2',
+        url: 'u',
+        title:
+          'P0: production-monitor-continuity is red (production-monitor-continuity)',
+        state: { id: 'st-done', name: 'Done', type: 'completed' },
+        labels: {
+          nodes: [
+            {
+              id: 'lbl-key',
+              name: 'remediation:production-monitor-continuity',
+            },
+          ],
+        },
+      },
+    ]);
+    const result = await applyRemediationDecision(red, context(run));
+    expect(result).toMatchObject({
+      ok: true,
+      action: 'updated',
+      reopened: true,
+    });
+    const update = run.calls.find(call => call.query.includes('issueUpdate'));
+    expect(update.variables.input.stateId).toBe('st-todo');
+    expect(update.variables.input.labelIds).toEqual(
+      expect.arrayContaining(['lbl-ready', 'lbl-key'])
+    );
+    expect(run.calls.some(call => call.query.includes('issueCreate'))).toBe(
+      false
+    );
+  });
+});
+
+describe('applyRemediationDecisionWithRetry', () => {
+  const red = { action: 'red', fingerprint: 'production-monitor-continuity' };
+  const context = fetchImpl => ({
+    source: 'production-continuity.yml',
+    runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/1',
+    apiKey: 'lin_test',
+    fetchImpl,
+  });
+  const noSleep = async () => {};
+
+  it('classifies only upstream resets and 5xx as transient', () => {
+    expect(
+      isTransientRemediationFailure({ ok: false, reason: 'linear_update_503' })
+    ).toBe(true);
+    expect(
+      isTransientRemediationFailure({
+        ok: false,
+        reason: 'linear_update_transport',
+      })
+    ).toBe(true);
+    expect(
+      isTransientRemediationFailure({ ok: false, reason: 'linear_update_400' })
+    ).toBe(false);
+    expect(
+      isTransientRemediationFailure({
+        ok: false,
+        reason: 'missing_linear_api_key',
+      })
+    ).toBe(false);
+    expect(isTransientRemediationFailure({ ok: true })).toBe(false);
+  });
+
+  it('retries a transient Linear 503 and files on the next attempt', async () => {
+    clearRemediationLabelCache();
+    const inner = linearStub([]);
+    let createCalls = 0;
+    const fetchImpl = vi.fn(async (url, init) => {
+      const payload = JSON.parse(String(init.body));
+      if (payload.query.includes('issueCreate')) {
+        createCalls += 1;
+        if (createCalls === 1) {
+          return new Response('upstream connect error', { status: 503 });
+        }
+      }
+      return inner.fetchImpl(url, init);
+    });
+    const result = await applyRemediationDecisionWithRetry(
+      red,
+      context(fetchImpl),
+      { sleep: noSleep }
+    );
+    expect(result.ok).toBe(true);
+    expect(createCalls).toBe(2);
+  });
+
+  it('stops retrying after the attempt budget', async () => {
+    clearRemediationLabelCache();
+    const inner = linearStub([]);
+    const fetchImpl = vi.fn(async (url, init) => {
+      const payload = JSON.parse(String(init.body));
+      if (payload.query.includes('issueCreate')) {
+        return new Response('upstream connect error', { status: 503 });
+      }
+      return inner.fetchImpl(url, init);
+    });
+    const result = await applyRemediationDecisionWithRetry(
+      red,
+      context(fetchImpl),
+      { attempts: 2, sleep: noSleep }
+    );
+    expect(result.ok).toBe(false);
+    expect('reason' in result && result.reason).toBe('linear_create_503');
+    expect(
+      fetchImpl.mock.calls.filter(([, init]) =>
+        String(init.body).includes('issueCreate')
+      )
+    ).toHaveLength(2);
+  });
+
+  it('does not retry permanent failures', async () => {
+    const fetchImpl = vi.fn();
+    const result = await applyRemediationDecisionWithRetry(
+      red,
+      { ...context(fetchImpl), apiKey: '' },
+      { sleep: noSleep }
+    );
+    expect(result.ok).toBe(false);
+    expect('reason' in result && result.reason).toBe('missing_linear_api_key');
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+});
+
+describe('workflow wiring', () => {
+  const bodies = Object.fromEntries(
+    Object.entries(workflows).map(([name, path]) => [
+      name,
+      readFileSync(path, 'utf8'),
+    ])
+  );
+
+  it('wires detectors and gates only the 5-minute continuity probe', () => {
+    expect(bodies.nightly).toContain('REMEDIATION_MODE: login');
+    expect(bodies.matrix).toContain('e2e-full-matrix.yml:');
+    expect(bodies.controller).toContain('production-monitor-post-deploy-smoke');
+    expect(bodies.controller).toContain('REMEDIATION_MODE: auth-smoke');
+    expect(bodies.controller).toContain(
+      'production-monitor-customer-changelog'
+    );
+    expect(bodies.health).toContain('production-monitor-controller-health');
+    expect(bodies.release).toContain('production-monitor-vercel-deploy');
+    expect(bodies.postdeploy).toContain('production-monitor-postdeploy-probes');
+    expect(bodies.continuity).toContain("REMEDIATION_GATE_STEADY_GREEN: '1'");
+    expect(bodies.continuity).toContain("REMEDIATION_FAIL_OPEN: '1'");
+    expect(bodies.continuity).toContain('remediation-continuity-state');
+    for (const [name, body] of Object.entries(bodies)) {
+      expect(body).toContain('REMEDIATION_INTAKE_DISABLED');
+      expect(body).not.toContain('REMEDIATION_INTAKE_ENABLED');
+      if (name !== 'continuity') {
+        expect(body).not.toContain('REMEDIATION_GATE_STEADY_GREEN');
+      }
+    }
+  });
+});

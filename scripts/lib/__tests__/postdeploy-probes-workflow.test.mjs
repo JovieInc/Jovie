@@ -7,6 +7,7 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
+import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { runInNewContext } from 'node:vm';
@@ -44,7 +45,7 @@ const controller = {
 };
 
 /**
- * @param {{ event?: Record<string, string>, record?: Record<string, unknown>, jobs?: Record<string, unknown>[] | string, totalCount?: number, apiFailure?: boolean, rateLimit?: boolean }} [options]
+ * @param {{ event?: Record<string, string>, record?: Record<string, unknown>, jobs?: Record<string, unknown>[] | string, totalCount?: number, apiFailure?: boolean, rateLimit?: 'primary' | 'secondary', limitedRead?: number, transientFailure?: boolean }} [options]
  */
 async function decide({
   event = {},
@@ -53,6 +54,8 @@ async function decide({
   totalCount,
   apiFailure,
   rateLimit,
+  limitedRead = 1,
+  transientFailure,
 } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'postdeploy-trigger-'));
   const output = join(root, 'output');
@@ -81,6 +84,7 @@ async function decide({
       conclusion: 'skipped',
     },
   ];
+  let reads = 0;
   try {
     const result = await runWithRealGh({
       script: trigger.run,
@@ -100,12 +104,18 @@ async function decide({
         ...event,
       },
       route: path => {
-        if (rateLimit) {
+        reads += 1;
+        if (transientFailure && reads === 1) {
+          return { status: 503, body: { message: 'unavailable' } };
+        }
+        if (rateLimit && reads === limitedRead) {
           return {
             status: 403,
             body: {
               message:
-                'API rate limit exceeded for installation. If you reach out to GitHub Support for help, please include the request ID 980B:3C6EDF:1EF9221:648E828:6AD12A91 and timestamp 2026-10-15 19:33:37 UTC.',
+                rateLimit === 'secondary'
+                  ? 'You have exceeded a secondary rate limit. Please wait a few minutes.'
+                  : 'API rate limit exceeded for installation.',
             },
           };
         }
@@ -137,6 +147,7 @@ async function decide({
     return {
       ...result,
       shouldProbe: readFileSync(output, 'utf8').trim().split('\n').at(-1),
+      output: readFileSync(output, 'utf8'),
     };
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -197,14 +208,29 @@ describe('automatic landed production probes (JOV-8081)', () => {
     expect(result.shouldProbe).toBe('should_probe=false');
   });
 
-  it('defers an installation rate limit instead of failing the production monitor', async () => {
-    const result = await decide({ rateLimit: true });
+  it.each([
+    ['primary', 1],
+    ['primary', 2],
+    ['primary', 3],
+    ['secondary', 1],
+    ['secondary', 2],
+    ['secondary', 3],
+  ])('defers a %s quota limit on read %s', async (rateLimit, limitedRead) => {
+    const result = await decide({ rateLimit, limitedRead });
     expect(result.code, result.stderr).toBe(0);
     expect(result.shouldProbe).toBe('should_probe=false');
-    expect(result.stderr).toContain('GitHub primary-rate-limit');
+    expect(result.output).toContain('quota_deferred=true');
+    expect(result.stderr).toContain(`GitHub ${rateLimit}-rate-limit`);
     expect(result.stdout).not.toContain(
       'following up against landed production'
     );
+  });
+
+  it('retries a transient read and continues exact trigger verification', async () => {
+    const result = await decide({ transientFailure: true });
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.shouldProbe).toBe('should_probe=true');
+    expect(result.requests.filter(path => path.endsWith('production-controller.yml'))).toHaveLength(2);
   });
 
   it('retains explicit manual dispatch without requiring controller evidence', async () => {
@@ -215,9 +241,62 @@ describe('automatic landed production probes (JOV-8081)', () => {
   });
 });
 
+// Real Git smart HTTP with a non-secret Basic challenge. Only the transport
+// destination changes; the workflow's authentication commands run verbatim.
+async function gitHttpFixture(root, remote, env) {
+  const password = 'postdeploy-fixture-password';
+  const basic = `Basic ${Buffer.from(`x-access-token:${password}`).toString('base64')}`;
+  const requests = [];
+  const server = createServer(async (request, response) => {
+    const url = new URL(request.url, 'http://localhost');
+    requests.push({ path: url.pathname, authorization: request.headers.authorization });
+    if (request.headers.authorization?.toLowerCase() !== basic.toLowerCase()) {
+      response.writeHead(401, { 'www-authenticate': 'Basic realm="git fixture"' });
+      response.end('Authentication required');
+      return;
+    }
+    const chunks = [];
+    for await (const chunk of request) chunks.push(chunk);
+    const result = execFileSync('git', ['http-backend'], {
+      input: Buffer.concat(chunks),
+      env: {
+        ...env,
+        GIT_PROJECT_ROOT: root,
+        GIT_HTTP_EXPORT_ALL: '1',
+        PATH_INFO: url.pathname.replace(`/${repository}.git`, '/remote'),
+        QUERY_STRING: url.search.slice(1),
+        REQUEST_METHOD: request.method,
+        CONTENT_TYPE: request.headers['content-type'] ?? '',
+        CONTENT_LENGTH: request.headers['content-length'] ?? '',
+        REMOTE_USER: 'x-access-token',
+        GIT_PROTOCOL: request.headers['git-protocol'] ?? '',
+      },
+    });
+    const separator = result.indexOf('\r\n\r\n');
+    const headers = result.subarray(0, separator).toString().split('\r\n');
+    for (const header of headers) {
+      const colon = header.indexOf(':');
+      const name = header.slice(0, colon);
+      const value = header.slice(colon + 1).trim();
+      if (name === 'Status') response.statusCode = Number.parseInt(value, 10);
+      else response.setHeader(name, value);
+    }
+    response.end(result.subarray(separator + 4));
+  });
+  execFileSync('git', ['-C', remote, 'config', 'uploadpack.allowFilter', 'true'], { env });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  return {
+    password,
+    basic,
+    requests,
+    origin: `http://127.0.0.1:${server.address().port}`,
+    close: () => new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve())),
+  };
+}
+
 // Exercise the complete target step with real git history and the real gh
 // returning the production incident's 403. Only Vercel's network is stubbed.
-async function resolveTarget({ deployed = 'ancestor', metadata = '' } = {}) {
+async function resolveTarget({ deployed = 'ancestor', metadata = '', auth = 'basic' } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'postdeploy-target-'));
   const remote = join(root, 'remote');
   const workspace = join(root, 'workspace');
@@ -240,6 +319,7 @@ async function resolveTarget({ deployed = 'ancestor', metadata = '' } = {}) {
     }).trim();
   const executable = (path, script) =>
     writeFileSync(path, `#!/bin/sh\n${script}\n`, { mode: 0o755 });
+  let transport;
   try {
     git('init', '-q', '-b', 'main');
     git('commit', '--allow-empty', '-qm', 'ancestor');
@@ -319,11 +399,25 @@ async function resolveTarget({ deployed = 'ancestor', metadata = '' } = {}) {
 esac`
     );
     const output = join(root, 'output');
+    transport = await gitHttpFixture(root, remote, gitEnv);
+    let script = target.run.replaceAll('https://github.com/', `${transport.origin}/`);
+    if (auth === 'bearer') {
+      script = script.replace(/AUTHORIZATION: basic \$git_basic_auth|AUTHORIZATION: bearer \$GH_TOKEN/, 'AUTHORIZATION: bearer $GH_TOKEN');
+    }
+    if (auth === 'other-repo') {
+      script = script.replace(`"${transport.origin}/$REPOSITORY.git" \\\n`, `"${transport.origin}/Other/Repository.git" \\\n`);
+    }
+    // Inspect transient fetch configuration before the workflow cleans up its
+    // isolated history. No credential should be persisted even on failure.
+    script = script.replace("trap 'rm -rf \"$commit_history\"' EXIT", `trap 'cp "$commit_history/.git/config" "$FIXTURE_CONFIG"; rm -rf "$commit_history"' EXIT`);
+    const configPath = join(root, 'fetch-config');
     const result = await runWithRealGh({
-      script: `cd "$FIXTURE_WORKSPACE"\n${target.run}`,
+      script: `cd "$FIXTURE_WORKSPACE"\n${script}`,
       env: {
         PATH: `${bin}:${process.env.PATH}`,
         FIXTURE_WORKSPACE: workspace,
+        FIXTURE_CONFIG: configPath,
+        GH_TOKEN: auth === 'wrong-password' ? 'wrong-fixture-password' : transport.password,
         GITHUB_OUTPUT: output,
         REPOSITORY: repository,
         SHOULD_PROBE: 'true',
@@ -333,9 +427,11 @@ esac`
         VERCEL_PROJECT_ID: 'fixture',
         GIT_CONFIG_GLOBAL: '/dev/null',
         GIT_CONFIG_NOSYSTEM: '1',
-        GIT_CONFIG_COUNT: '1',
-        GIT_CONFIG_KEY_0: `url.file://${remote}.insteadOf`,
-        GIT_CONFIG_VALUE_0: `https://github.com/${repository}.git`,
+        GIT_CONFIG_COUNT: '2',
+        GIT_CONFIG_KEY_0: 'protocol.file.allow',
+        GIT_CONFIG_VALUE_0: 'never',
+        GIT_CONFIG_KEY_1: `http.${transport.origin}/${repository}.git.extraheader`,
+        GIT_CONFIG_VALUE_1: 'AUTHORIZATION: bearer inherited-fixture',
       },
       route: () => ({
         status: 403,
@@ -346,13 +442,40 @@ esac`
       ...result,
       output: readFileSync(output, 'utf8'),
       expectedSha: deployed === 'tip' ? tip : ancestor,
+      gitRequests: transport.requests,
+      basic: transport.basic,
+      password: transport.password,
+      config: deployed === 'malformed' ? '' : readFileSync(configPath, 'utf8'),
     };
   } finally {
+    if (transport) await transport.close();
     rmSync(root, { recursive: true, force: true });
   }
 }
 
 describe('landed production identity during GitHub quota exhaustion (JOV-8495)', () => {
+  it('uses scoped Basic authentication without persisting or logging credentials', async () => {
+    const result = await resolveTarget();
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.gitRequests.length).toBeGreaterThan(0);
+    expect(result.gitRequests.every(request => request.authorization?.toLowerCase() === result.basic.toLowerCase())).toBe(true);
+    const unmaskedOutput = result.stdout.replace(/^::add-mask::.*$/gm, '') + result.stderr;
+    for (const value of [result.password, result.basic.split(' ')[1]]) {
+      expect(unmaskedOutput).not.toContain(value);
+      expect(result.config).not.toContain(value);
+    }
+    expect(result.config).not.toMatch(/extraheader|credential|127\.0\.0\.1/i);
+  });
+
+  it.each(['bearer', 'wrong-password', 'other-repo'])('rejects %s authentication', async auth => {
+    const result = await resolveTarget({ auth });
+    expect(result.code).toBe(128);
+    expect(result.output).not.toContain('deployment_id=');
+    if (auth === 'other-repo') {
+      expect(result.gitRequests.every(request => request.path.startsWith('/Other/Repository.git') && !request.authorization)).toBe(true);
+    }
+    expect(result.config).not.toMatch(/extraheader|credential/i);
+  });
   it.each(['ancestor', 'full', 'tip'])(
     'resolves a deployed %s on main without REST quota',
     async deployed => {
