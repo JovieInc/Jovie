@@ -713,8 +713,10 @@ jobs:
             }
 
   # Runs only after the hold has dropped merge intent. A green PR dequeued by
-  # another member of the group, or by the base branch, gets squash auto-merge
-  # back on that same SHA. Two rearms per SHA; the enroll job is not involved.
+  # another member of the group, or by the base branch, is enqueued again on
+  # that same SHA via enqueuePullRequest (no --auto, no --squash). A token
+  # that still cannot enqueue names the PR with ::error:: and the step
+  # summary. Two rearms per SHA; the enroll job is not involved.
   rearm-green-victims:
     name: Rearm green merge-group victims
     needs: [hold-failed-revision]

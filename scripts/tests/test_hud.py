@@ -731,6 +731,46 @@ class LedgerSchemaTest(unittest.TestCase):
 
 
 class ManagedReleaseRestartTest(unittest.TestCase):
+    def test_live_redraw_preserves_the_last_console_column(self):
+        class StopLoop(Exception):
+            pass
+
+        width, height = 160, 45
+        sample = model()
+        stamp = hud.utcnow()
+        with mock.patch.object(hud, "utcnow", return_value=stamp):
+            expected = [plain(row) for row in hud.render(sample, width, height)]
+        output = io.StringIO()
+        with mock.patch.object(hud.lane, "Host", return_value=SimpleNamespace(state=Path('/unused'))), \
+                mock.patch.object(hud.lane, "load_github_env"), \
+                mock.patch.object(hud, "Remote"), \
+                mock.patch.object(hud, "current_hud", return_value=None), \
+                mock.patch.object(hud, "build_model", return_value=sample), \
+                mock.patch.object(hud, "utcnow", return_value=stamp), \
+                mock.patch.object(hud.sys, "stdout", output), \
+                mock.patch.object(hud.time, "sleep", side_effect=StopLoop):
+            with self.assertRaises(StopLoop):
+                hud.main(["--width", str(width), "--height", str(height)])
+
+        # tty1 keeps its cursor on the final cell while wrap is pending. EL
+        # after a full-width write therefore erases that cell, including Z or
+        # the end of a hold reason. Apply the emitted terminal controls rather
+        # than checking the pre-terminal render strings alone.
+        trace = output.getvalue().split("\x1b[H", 1)[1].split("\x1b[?25h", 1)[0]
+        screen, row, column = [["~"] * width for _ in range(height)], 0, 0
+        for token in re.split(r"(\x1b\[[0-9;?]*[A-Za-z]|\n)", trace):
+            if token == "\n":  # tty1's ONLCR advances to column one.
+                row, column = row + 1, 0
+            elif token == "\x1b[K":
+                start = min(column, width - 1)
+                screen[row][start:] = [" "] * (width - start)
+            elif not token.startswith("\x1b"):
+                for char in token:
+                    screen[row][min(column, width - 1)] = char
+                    column += 1
+        self.assertEqual(["".join(row) for row in screen], expected)
+        self.assertTrue(any(row[-1] != " " for row in expected))
+
     def test_symlink_launched_process_executes_the_new_release_and_preserves_flags(self):
         with tempfile.TemporaryDirectory() as directory:
             state = Path(directory)

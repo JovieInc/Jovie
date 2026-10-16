@@ -119,8 +119,106 @@ def test_canonical_repository_pr_metadata_and_live_ref_must_agree():
     repository, _ = attribution.resolve_origin_head("jovieinc/jovie", 7, "a" * 40, fetch=responses.__getitem__)
     assert repository == "JovieInc/Jovie"
     responses["repos/JovieInc/Jovie/git/ref/heads/feature%2Fwork"]["object"]["sha"] = "b" * 40
+    slept = []
     with pytest.raises(ValueError, match="head-mismatch"):
-        attribution.resolve_origin_head("jovieinc/jovie", 7, "a" * 40, fetch=responses.__getitem__)
+        attribution.resolve_origin_head("jovieinc/jovie", 7, "a" * 40, fetch=responses.__getitem__,
+                                        sleep=slept.append)
+    assert slept == list(attribution.ORIGIN_HEAD_RETRY_DELAYS)
+
+
+def test_force_push_read_lag_converges_without_accepting_a_stale_head():
+    """Run 38952636890: the pull head trailed the force-push by about 25s."""
+    expected, stale = "a" * 40, "b" * 40
+    pulls, refs = [], []
+
+    def fetch(endpoint):
+        if endpoint == "repos/jovieinc/jovie":
+            return {"full_name": "JovieInc/Jovie"}
+        if endpoint == "repos/JovieInc/Jovie/pulls/7":
+            pulls.append(1)
+            sha = expected if len(pulls) >= 2 else stale
+            return {"number": 7, "state": "open",
+                    "base": {"repo": {"full_name": "JovieInc/Jovie"}},
+                    "head": {"sha": sha, "ref": "screenshots/auto-update",
+                             "repo": {"full_name": "JovieInc/Jovie"}}}
+        if endpoint == "repos/JovieInc/Jovie/git/ref/heads/screenshots%2Fauto-update":
+            refs.append(1)
+            return {"object": {"sha": expected if len(refs) >= 2 else stale}}
+        raise AssertionError(endpoint)
+
+    slept = []
+    repository, pr = attribution.resolve_origin_head(
+        "jovieinc/jovie", 7, expected, fetch=fetch, sleep=slept.append)
+    assert repository == "JovieInc/Jovie"
+    assert pr["head"]["sha"] == expected
+    assert len(pulls) == 3 and len(refs) == 2
+    assert slept == list(attribution.ORIGIN_HEAD_RETRY_DELAYS[:2])
+    # The failed read was 23s before the pull updated. The wait has to cover that.
+    assert sum(attribution.ORIGIN_HEAD_RETRY_DELAYS) >= 30
+
+    def stuck(endpoint):
+        if endpoint == "repos/jovieinc/jovie":
+            return {"full_name": "JovieInc/Jovie"}
+        if endpoint == "repos/JovieInc/Jovie/pulls/7":
+            return {"number": 7, "state": "open",
+                    "base": {"repo": {"full_name": "JovieInc/Jovie"}},
+                    "head": {"sha": stale, "ref": "screenshots/auto-update",
+                             "repo": {"full_name": "JovieInc/Jovie"}}}
+        raise AssertionError(endpoint)
+
+    waited = []
+    with pytest.raises(ValueError, match="origin-receipt-head-mismatch"):
+        attribution.resolve_origin_head("jovieinc/jovie", 7, expected, fetch=stuck, sleep=waited.append)
+    assert waited == list(attribution.ORIGIN_HEAD_RETRY_DELAYS)
+    immediate = []
+    with pytest.raises(ValueError, match="origin-receipt-head-mismatch"):
+        attribution.resolve_origin_head("jovieinc/jovie", 7, expected, fetch=stuck, sleep=immediate.append,
+                                        attempts=1)
+    assert immediate == []
+
+    def wrong_pull(endpoint):
+        if endpoint == "repos/jovieinc/jovie":
+            return {"full_name": "JovieInc/Jovie"}
+        if endpoint == "repos/JovieInc/Jovie/pulls/7":
+            body = stuck(endpoint)
+            return {**body, "number": 8}
+        raise AssertionError(endpoint)
+
+    structural = []
+    with pytest.raises(ValueError, match="origin-receipt-head-mismatch"):
+        attribution.resolve_origin_head("jovieinc/jovie", 7, expected, fetch=wrong_pull,
+                                        sleep=structural.append)
+    assert structural == []
+
+
+def test_emit_waits_for_the_pushed_head_before_writing_the_receipt(monkeypatch, tmp_path):
+    expected, stale = "a" * 40, "b" * 40
+    pulls, refs, slept = [], [], []
+
+    def run(args, **_kwargs):
+        endpoint = args[-1]
+        if endpoint == "repos/JovieInc/Jovie":
+            body = {"full_name": "JovieInc/Jovie"}
+        elif endpoint == "repos/JovieInc/Jovie/pulls/7":
+            pulls.append(1)
+            sha = expected if len(pulls) >= 2 else stale
+            body = {"number": 7, "state": "open",
+                    "base": {"repo": {"full_name": "JovieInc/Jovie"}},
+                    "head": {"sha": sha, "ref": "screenshots/auto-update",
+                             "repo": {"full_name": "JovieInc/Jovie"}}}
+        elif endpoint == "repos/JovieInc/Jovie/git/ref/heads/screenshots%2Fauto-update":
+            refs.append(1)
+            body = {"object": {"sha": expected if len(refs) >= 2 else stale}}
+        else:
+            raise AssertionError(endpoint)
+        return subprocess.CompletedProcess(args, 0, stdout=json.dumps(body), stderr="")
+
+    monkeypatch.setattr(attribution.subprocess, "run", run)
+    monkeypatch.setattr(attribution.time, "sleep", slept.append)
+    path = origin.emit(payload(), tmp_path)
+    assert json.loads(path.read_text())["headSha"] == expected
+    assert len(pulls) == 3 and len(refs) == 2
+    assert slept == list(attribution.ORIGIN_HEAD_RETRY_DELAYS[:2])
 
 
 def test_archive_is_bounded_and_never_extracted():

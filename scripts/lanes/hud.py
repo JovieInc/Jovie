@@ -923,7 +923,9 @@ def main(argv=None) -> int:
                 sys.stdout.flush()
                 os.execv(sys.executable, [sys.executable, str(newer), *sys.argv[1:]])
             frame = render(build_model(host, remote), width, height)
-            sys.stdout.write("\x1b[H" + "\n".join(line + "\x1b[K" for line in frame))
+            # At full width the cursor remains on the final cell; clearing
+            # after writing erases that character while wrap is pending.
+            sys.stdout.write("\x1b[H" + "\n".join("\x1b[K" + line for line in frame))
             sys.stdout.flush()
             try:
                 (host.state / "hud.heartbeat").touch()  # the doctor raises hud-stale when this stops
