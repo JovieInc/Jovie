@@ -1,0 +1,45 @@
+{
+  "schema": "symphony-routing/v1",
+  "issue": "JOV-5594",
+  "modelId": "codex-sol",
+  "model": "gpt-5.6-sol",
+  "modelTier": "premium",
+  "reasoningEffort": "xhigh",
+  "usageClass": "premium-included",
+  "costClass": "subscription-included",
+  "quality": 88,
+  "qualityThreshold": 88,
+  "reason": "protected-risk-surface",
+  "escalation": false,
+  "fallback": null,
+  "classification": {
+    "risk": "high",
+    "complexity": "high",
+    "capabilities": [
+      "root-cause",
+      "architecture"
+    ],
+    "ambiguity": false,
+    "protectedSurface": true,
+    "baseTier": "premium",
+    "qualityThreshold": 88,
+    "primaryReason": "protected-risk-surface",
+    "reasons": [
+      "capabilities=root-cause,architecture",
+      "risk=high",
+      "complexity=high",
+      "baseTier=premium",
+      "qualityThreshold=88",
+      "reason=protected-risk-surface"
+    ]
+  },
+  "candidates": [],
+  "capacity": {
+    "accounts": 6,
+    "ready": 1,
+    "active": "tim-jov-ie",
+    "observedAt": "2026-09-05T18:00:05.459Z",
+    "readable": true
+  },
+  "fingerprint": "cfbbd693051769c3b5f17bc9"
+}
