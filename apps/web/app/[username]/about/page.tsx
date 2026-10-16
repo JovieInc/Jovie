@@ -1,5 +1,9 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import {
+  HOMEPAGE_PROFILE_PREVIEW_ARTIST,
+  HOMEPAGE_PROFILE_PREVIEW_CONTACTS,
+} from '@/components/features/home/homepage-profile-preview-fixture';
 import { BASE_URL } from '@/constants/app';
 import { AboutView } from '@/features/profile/views/AboutView';
 import { buildViewMetadata } from '@/features/profile/views/metadata';
@@ -22,14 +26,61 @@ import { getProfileAndLinks } from '../_lib/public-profile-loader';
 
 export const dynamic = 'force-dynamic';
 
+const RESERVED_CAPTURE_HANDLE = 'unfazed';
+
 interface Props {
   readonly params: Promise<{
     readonly username: string;
   }>;
 }
 
+function isReservedCaptureProfile(username: string): boolean {
+  return username.toLowerCase() === RESERVED_CAPTURE_HANDLE;
+}
+
+function reservedCaptureAboutArtist() {
+  return {
+    ...HOMEPAGE_PROFILE_PREVIEW_ARTIST,
+    name: 'Unfazed',
+    handle: RESERVED_CAPTURE_HANDLE,
+  };
+}
+
+function ReservedCaptureAboutPage() {
+  const artist = reservedCaptureAboutArtist();
+  return (
+    <ProfileIntentPage
+      mode='about'
+      artistName={artist.name}
+      artistHandle={artist.handle}
+    >
+      <AboutView
+        artist={artist}
+        genres={artist.genres}
+        pressPhotos={[]}
+        allowPhotoDownloads={false}
+        contacts={[...HOMEPAGE_PROFILE_PREVIEW_CONTACTS]}
+      />
+    </ProfileIntentPage>
+  );
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { username } = await params;
+
+  // Same reserved handle as /unfazed. Metadata must not wait on a database
+  // row that screenshot CI does not have, and must stay out of the index.
+  if (isReservedCaptureProfile(username)) {
+    return {
+      ...buildViewMetadata('about', {
+        artistName: 'Unfazed',
+        artistHandle: RESERVED_CAPTURE_HANDLE,
+        baseUrl: BASE_URL,
+      }),
+      robots: { index: false, follow: false },
+    };
+  }
+
   const result = await getProfileAndLinks(username);
 
   // Don't fabricate metadata for missing profiles — let notFound take over
@@ -48,6 +99,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function AboutPage({ params }: Props) {
   const { username } = await params;
+
+  // /unfazed is the reserved capture profile. The profile root renders it
+  // from a fixture with no database row; this about screen uses that same
+  // fixture so a noop DATABASE_URL still returns the registered page.
+  if (isReservedCaptureProfile(username)) {
+    return <ReservedCaptureAboutPage />;
+  }
+
   const result = await getProfileAndLinks(username);
 
   if (result.status !== 'ok' || !result.profile) {
