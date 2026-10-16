@@ -230,10 +230,7 @@ export class RearmPermissionError extends Error {
   constructor(prNumber, cause) {
     const number = assertPullNumber(prNumber);
     const detail = `Rearm of #${number} denied: Resource not accessible by integration (enqueuePullRequest)`;
-    super(
-      `::error::${detail}`,
-      cause === undefined ? undefined : { cause }
-    );
+    super(`::error::${detail}`, cause === undefined ? undefined : { cause });
     this.name = 'RearmPermissionError';
     /** @type {'ENQUEUE_PERMISSION_DENIED'} */
     this.code = 'ENQUEUE_PERMISSION_DENIED';

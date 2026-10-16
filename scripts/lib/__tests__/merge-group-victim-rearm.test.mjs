@@ -10,11 +10,11 @@ import {
   ENQUEUE_PULL_REQUEST_MUTATION,
   enqueueVictim,
   heldRevisionFromReceipt,
-  RearmPermissionError,
   implicatedPathsFromAnnotations,
   planVictimRearms,
   REARM_CAP,
   REARM_CONTEXT,
+  RearmPermissionError,
   trustedRearmRecords,
 } from '../../merge-group-victim-rearm.mjs';
 
@@ -468,11 +468,17 @@ test('rearm enqueues the verified head and does not request a merge strategy', (
   assert.equal(result.position, 2);
   assert.equal(calls.length, 1);
   const flat = calls[0].join('\n');
-  assert.match(flat, /enqueuePullRequest\(input:\{pullRequestId:\$id,expectedHeadOid:\$oid\}\)/);
+  assert.match(
+    flat,
+    /enqueuePullRequest\(input:\{pullRequestId:\$id,expectedHeadOid:\$oid\}\)/
+  );
   assert.match(flat, new RegExp(`id=PR_kwDOAbcd123`));
   assert.match(flat, new RegExp(`oid=${sha}`));
   assert.equal(flat.includes(ENQUEUE_PULL_REQUEST_MUTATION), true);
-  assert.doesNotMatch(flat, /--auto\b|--squash\b|enablePullRequestAutoMerge|mergeMethod/);
+  assert.doesNotMatch(
+    flat,
+    /--auto\b|--squash\b|enablePullRequestAutoMerge|mergeMethod/
+  );
   assert.throws(
     () =>
       enqueueVictim({
