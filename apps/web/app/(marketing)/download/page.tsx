@@ -220,7 +220,7 @@ export default function DownloadPage() {
                     </div>
                   </div>
                   <div
-                    className={`mt-6 flex flex-wrap gap-x-5 gap-y-2 text-app leading-5 ${soft}`}
+                    className={`mt-6 flex flex-wrap gap-x-6 gap-y-2 text-app leading-5 ${soft}`}
                   >
                     <span>Developer ID signed</span>
                     <span>Apple notarized</span>
