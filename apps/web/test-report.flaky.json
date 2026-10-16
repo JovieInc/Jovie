@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 2,
+  "label": "",
+  "flaky": [],
+  "run": {
+    "repository": null,
+    "headSha": null,
+    "runId": null,
+    "runAttempt": null,
+    "event": null,
+    "job": null
+  },
+  "generatedAt": "2026-10-13T02:18:58.566Z",
+  "complete": true,
+  "executions": [
+    {
+      "file": "tests/unit/design-system/one-primary-action-per-screen-v1.test.ts",
+      "fileHash": "53e80d4ac8c07c71820619b51c50816e38253f600bd65dd3c788191fe57349d8",
+      "executedCount": 2,
+      "skippedCount": 0,
+      "retryCount": 0,
+      "outcome": "clean",
+      "complete": true,
+      "failures": []
+    }
+  ]
+}
