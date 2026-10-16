@@ -84,6 +84,14 @@ STRATEGY_TEXT = re.compile(
     r"canon/strategy|founder strategy|pricing|taste\b|credential",
     re.IGNORECASE,
 )
+# An ordinary engineering repair frequently states what it did NOT touch
+# ("No credentials or permissions are changed"); a negated credential/secret
+# mention is assurance, not a founder decision surface (JOV-8495 re-review).
+NEGATED_POLICY_TEXT = re.compile(
+    r"\bno\s+(?:new\s+)?(?:credentials?|secrets?|tokens?|permissions?|scopes?)\b"
+    r"|\b(?:without|not)\s+(?:changing|touching|adding)\s+(?:any\s+)?(?:credentials?|secrets?|permissions?)",
+    re.IGNORECASE,
+)
 ACTIONABLE_FIX = re.compile(
     r"computeRatePercent|use `|replace `|change `|fix:|add (?:the |a )?(?:story|test|colocated)|"
     r"@coverage-via|remove [`']?hold",
@@ -221,8 +229,14 @@ def _actionable(text: str) -> bool:
 def _strategy(pr: dict) -> bool:
     files = pr.get("files") or pr.get("paths") or pr.get("conflictFiles") or []
     blob = " ".join([pr.get("title") or "", pr.get("body") or "", " ".join(str(item) for item in files)])
-    return bool(STRATEGY_TEXT.search(blob))
-
+    if not STRATEGY_TEXT.search(blob):
+        return False
+    # A negated policy mention ("No credentials or permissions are changed")
+    # is an ordinary repair's assurance, not strategy content.
+    for sentence in re.split(r"(?<=[.!?])\s+", blob):
+        if STRATEGY_TEXT.search(sentence) and not NEGATED_POLICY_TEXT.search(sentence):
+            return True
+    return False
 
 def _held_reason(pr: dict, held: dict | None) -> str | None:
     entry = held or {}
@@ -287,13 +301,22 @@ def classify_blocker(pr: dict, held: dict | None = None, attempts: dict | None =
             why.append("sensitive-surface")
         return blocker("needs-human-decision", reason or "human-gate", why, "tim-decides")
 
+    held_here = bool(labels & {"hold", "gated", "incident", "do-not-merge", "tim-hold", "tim:hold", "hold:tim"})
+    stop_labels = bool(labels & {"needs-human", "do-not-merge", "tim-hold", "tim:hold", "hold:tim"})
     human_review = pr.get("reviewDecision") == "CHANGES_REQUESTED" and (
         bool(human_threads) or not bot_threads)
-    if human_review:
+    # A current human thread can carry a real founder decision (spend, billing,
+    # credentials, store submissions) inside an ordinary review; the same
+    # detector the labeled-event path uses names it, so the ask surfaces as
+    # tim-decides instead of being routed as prescribed implementation.
+    thread_blob = "\n".join(str(thread.get("body") or "") for thread in human_threads)
+    thread_ask = _human_category("review", thread_blob) if human_threads else None
+    if human_review and not held_here and not stop_labels and not thread_ask:
         # Tim 2026-10-15: ordinary requested changes ship through the automated
         # review-fix ladder; only a human gate (strategy/taste/credential) waits.
         # The fix prompt already embeds the reviewers' own words (review_excerpt),
         # so an actionable review is a prescribed fix, not a founder decision.
+        # Explicit stop labels and holds still outrank this branch below.
         evidence = ["human changes requested"]
         if human_threads:
             evidence.append("unresolved human review thread")
@@ -303,8 +326,12 @@ def classify_blocker(pr: dict, held: dict | None = None, attempts: dict | None =
                            evidence, "apply-prescribed-fix")
         return blocker("fixable-by-model", "review",
                        evidence, "escalate")
+    if human_review and thread_ask:
+        return blocker("needs-human-decision", "changes-requested",
+                       ["human changes requested",
+                        f"review thread carries a {thread_ask} decision"],
+                       "tim-decides")
 
-    held_here = bool(labels & {"hold", "gated", "incident", "do-not-merge", "tim-hold", "tim:hold", "hold:tim"})
     if held_here and not _actionable(note):
         return blocker("needs-human-decision", "hold",
                        [note[:240] or "human hold without a fix"], "tim-decides")
@@ -1124,6 +1151,9 @@ def _human_category(key: str, blob: str) -> str | None:
     if lowered in {"asc-agreements", "asc-agreement"} or "store submission" in text or "store-submission" in lowered:
         return "store submission"
     if "spend" in tokens or re.search(r"\bspend\b", text):
+        return "spend"
+    if re.search(r"\b(?:purchase|buy(?:ing)?| subscrib\w*)\b.{0,40}\b(?:paid?|premium|plan|tier|subscription|license)\b"
+                 r"|\b(?:paid?|premium|subscription|license)\b.{0,40}\b(?:plan|tier)\b", text):
         return "spend"
     if re.search(r"billing[\s-]*actions?", text) or "billing-action" in lowered or "billing-actions" in lowered:
         return "billing action"
