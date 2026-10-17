@@ -13,7 +13,7 @@ import {
   TooltipShortcut,
 } from '@jovie/ui';
 import { Download, Loader2 } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { cn } from '@/lib/utils';
@@ -34,6 +34,8 @@ export interface ExportCSVButtonProps<T extends object> {
    * Can be async for lazy loading from an API.
    */
   readonly getData: () => T[] | Promise<T[]>;
+  /** Recheck current authority/consent after confirmation for protected exports. */
+  readonly revalidateBeforeDownload?: boolean;
   /**
    * Column configuration for CSV generation.
    * If not provided, all object keys will be used as columns.
@@ -92,6 +94,7 @@ export interface ExportCSVButtonProps<T extends object> {
 
 export function ExportCSVButton<T extends object>({
   getData,
+  revalidateBeforeDownload = false,
   columns,
   filename = 'export',
   disabled = false,
@@ -107,15 +110,24 @@ export function ExportCSVButton<T extends object>({
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [pendingData, setPendingData] = useState<T[] | null>(null);
+  const generation = useRef(0);
+  useEffect(
+    () => () => {
+      generation.current += 1;
+    },
+    []
+  );
   const { error: showError, success: showSuccess } = useNotifications();
 
   const handleOpenConfirmation = useCallback(async () => {
     if (isExporting || disabled) return;
 
     setIsExporting(true);
+    const requestGeneration = generation.current;
 
     try {
       const data = await Promise.resolve(getData());
+      if (generation.current !== requestGeneration) return;
 
       if (!data || data.length === 0) {
         showError('No data available to export');
@@ -125,11 +137,12 @@ export function ExportCSVButton<T extends object>({
       setPendingData(data);
       setIsDialogOpen(true);
     } catch (err) {
+      if (generation.current !== requestGeneration) return;
       const message =
         err instanceof Error ? err.message : 'Failed to prepare CSV export';
       showError(message);
     } finally {
-      setIsExporting(false);
+      if (generation.current === requestGeneration) setIsExporting(false);
     }
   }, [disabled, getData, isExporting, showError]);
 
@@ -137,27 +150,37 @@ export function ExportCSVButton<T extends object>({
     if (isExporting || disabled || !pendingData) return;
 
     setIsExporting(true);
+    const requestGeneration = generation.current;
 
     try {
-      const blob = toCSVBlob(pendingData, { columns });
+      const data = revalidateBeforeDownload
+        ? await Promise.resolve(getData())
+        : pendingData;
+      if (generation.current !== requestGeneration) return;
+      if (!data || data.length === 0) {
+        showError('No data available to export');
+        return;
+      }
+      const blob = toCSVBlob(data, { columns });
       const timestampedFilename = generateTimestampedFilename(filename, 'csv');
 
       downloadCSVBlob(blob, timestampedFilename);
-      showSuccess(
-        `Exported ${pendingData.length} rows to ${timestampedFilename}`
-      );
+      showSuccess(`Exported ${data.length} rows to ${timestampedFilename}`);
 
       setIsDialogOpen(false);
       setPendingData(null);
     } catch (err) {
+      if (generation.current !== requestGeneration) return;
       const message =
         err instanceof Error ? err.message : 'Failed to export CSV';
       showError(message);
     } finally {
-      setIsExporting(false);
+      if (generation.current === requestGeneration) setIsExporting(false);
     }
   }, [
     columns,
+    getData,
+    revalidateBeforeDownload,
     disabled,
     filename,
     isExporting,
