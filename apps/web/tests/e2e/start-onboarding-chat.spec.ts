@@ -342,7 +342,8 @@ test.describe('canonical /start onboarding chat', () => {
     expect(navigations.length).toBeLessThanOrEqual(3);
 
     await page.goto('/waitlist', { waitUntil: 'domcontentloaded' });
-    await expect(page).toHaveURL(/\/start(?:\?|$)/);
+    await expect(page).toHaveURL(/\/waitlist(?:\?|$)/);
+    await expect(page.locator('#auth-form')).toBeVisible();
   });
 
   test('first screen and root picker are visually stable', async ({ page }) => {

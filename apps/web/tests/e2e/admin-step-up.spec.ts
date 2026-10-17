@@ -28,10 +28,20 @@ import { smokeNavigateWithRetry } from './utils/smoke-test-utils';
 const PASSKEY_API = '**/api/auth/passkey';
 const STEP_UP_STATUS_API = '**/api/admin/step-up-status';
 
+function passkeyRpId(): string {
+  try {
+    return new URL(process.env.BASE_URL ?? 'http://localhost:3100').hostname;
+  } catch {
+    return 'localhost';
+  }
+}
+
+const PASSKEY_RP_ID = passkeyRpId();
+
 const AUTHENTICATE_OPTIONS = {
   challenge: 'ZmFrZS1jaGFsbGVuZ2U',
   timeout: 60_000,
-  rpId: 'localhost',
+  rpId: PASSKEY_RP_ID,
   allowCredentials: [],
   userVerification: 'preferred',
 };
@@ -75,7 +85,7 @@ function fakeAssertionScript(mode: 'resolve' | 'hang') {
 
 const REGISTER_OPTIONS = {
   challenge: 'ZmFrZS1jaGFsbGVuZ2U',
-  rp: { name: 'Jovie', id: 'localhost' },
+  rp: { name: 'Jovie', id: PASSKEY_RP_ID },
   user: { id: 'dXNlcg', name: 'admin@jovie.test', displayName: 'Admin' },
   pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
   timeout: 60_000,
