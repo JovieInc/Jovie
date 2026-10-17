@@ -856,30 +856,48 @@ export async function runCli() {
   if (!eventPath && !process.argv.includes('--sweep'))
     throw new Error('missing-event-file');
   const isSweep = process.argv.includes('--sweep');
-  // Throttle the catch-up sweep (2026-10-10): the workflow invokes `--sweep`
-  // under `if: always()` on every 5-minute tick + every main push on the
-  // shared Linear credential, which was the main consumer behind the
-  // remediator deferring RATE_LIMITED. Skip when the last successful sweep
-  // is fresher than the 30-minute floor; log the skip so the receipt trail
-  // shows the throttle, and persist the timestamp only after a clean run.
+  // Preserve the paid Triage catch-up's 30-minute floor on the shared Linear
+  // credential. Backlog discovery has its own bounded guarded operation and
+  // must still consume current urgency on the existing Fleet events.
   let sweepCacheFile = null;
+  let throttle = null;
   if (isSweep) {
     sweepCacheFile = runtimeState.assertsOutsideGitTree(
       runtimeState.resolveCacheFile({})
     );
-    const throttle = triageSweepThrottle({
+    throttle = triageSweepThrottle({
       lastOkAt: readSweepCache(sweepCacheFile)[SWEEP_THROTTLE_KEY],
       nowMs: Date.now(),
     });
-    if (throttle.skip) {
-      console.log(`triage-sweep skipped reason=${throttle.reason}`);
-      process.exitCode = 0;
-      return;
-    }
   }
   let receipt = isSweep
-    ? await assessTriageSweep()
+    ? throttle?.skip
+      ? {
+          schema: 'linear-triage-catch-up/v1',
+          observedAt: new Date().toISOString(),
+          triageSweep: {
+            status: 'throttled',
+            reason: throttle.reason,
+            inventoryObserved: false,
+          },
+          issueCount: 0,
+          assessed: 0,
+          deferred: 0,
+          failed: 0,
+          blocked: 0,
+          providerBlocked: 0,
+          wakeSymphony: false,
+          results: [],
+        }
+      : await assessTriageSweep()
     : await assessTriageEvent(JSON.parse(readFileSync(eventPath, 'utf8')));
+  // Backlog outcomes must neither renew a skipped Triage window nor erase a
+  // successful Triage assessment and repeat its paid work on the next event.
+  const triageSucceeded =
+    isSweep &&
+    !throttle?.skip &&
+    'failed' in receipt &&
+    Number(receipt.failed ?? 0) === 0;
   if (isSweep) {
     const backlog = await assessBacklogSweep(linear, requestSummerAssessment, {
       cacheFile: sweepCacheFile,
@@ -896,12 +914,7 @@ export async function runCli() {
     };
   }
   process.stdout.write(`${JSON.stringify(receipt)}\n`);
-  if (
-    isSweep &&
-    sweepCacheFile &&
-    'failed' in receipt &&
-    Number(receipt.failed ?? 0) === 0
-  ) {
+  if (triageSucceeded && sweepCacheFile) {
     const cache = readSweepCache(sweepCacheFile);
     cache[SWEEP_THROTTLE_KEY] = new Date().toISOString();
     writeSweepCache(sweepCacheFile, cache);

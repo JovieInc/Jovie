@@ -13,7 +13,6 @@ import {
   assessBacklogSweep as backlogSweepWithRealClient,
   escalationBlockOf,
   parseTriageEvent,
-  runCli,
   assessTriageSweep as sweepWithRealClient,
   triageSweepThrottle,
 } from '../triage-event-assess.mjs';
@@ -1292,33 +1291,273 @@ test('triageSweepThrottle skips only a fresh successful sweep and fails open', (
   );
 });
 
-test('the sweep CLI skips a fresh successful sweep without Linear access', async t => {
-  const directory = mkdtempSync(join(tmpdir(), 'triage-sweep-throttle-'));
+test('the real sweep CLI keeps Backlog active while Triage is throttled across restarts', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'triage-backlog-cli-'));
   const cacheFile = join(directory, 'cache.json');
-  const previousArgv = process.argv;
-  const previousCacheFile = process.env.JOVIE_ORCHESTRATOR_CACHE;
-  const previousExitCode = process.exitCode;
-  const logs = [];
-  t.mock.method(console, 'log', message => logs.push(String(message)));
-  try {
-    writeFileSync(
-      cacheFile,
-      JSON.stringify({ lastTriageSweepOkAt: new Date().toISOString() })
+  const bootstrap = join(directory, 'bootstrap.mjs');
+  const callsFile = join(directory, 'calls.json');
+  const lastOkAt = new Date(Date.now() - 10 * 60_000).toISOString();
+  writeFileSync(cacheFile, JSON.stringify({ lastTriageSweepOkAt: lastOkAt }));
+  writeFileSync(
+    bootstrap,
+    `
+    import { appendFileSync } from 'node:fs';
+    globalThis.fetch = async (url, init) => {
+      const request = JSON.parse(init.body);
+      if (process.env.CLI_TRIAGE_ALLOWED === 'true' &&
+          JSON.stringify(request.variables?.stateNames) === JSON.stringify(['Triage'])) {
+        appendFileSync(${JSON.stringify(callsFile)}, JSON.stringify(request) + '\\n');
+        return new Response(JSON.stringify({data: {team: {issues: {
+          nodes: [], pageInfo: {hasNextPage: false, endCursor: null}
+        }}}}), {status: 200, headers: {'Content-Type': 'application/json'}});
+      }
+      const states = request.variables?.filter?.state?.name?.in;
+      if (String(url) !== 'https://api.linear.app/graphql' ||
+          JSON.stringify(states) !== JSON.stringify(['Backlog', 'Todo']))
+        throw new Error('unexpected paid Triage or provider request');
+      appendFileSync(${JSON.stringify(callsFile)}, JSON.stringify(request) + '\\n');
+      if (process.env.CLI_BACKLOG_FAILURE === 'true')
+        throw new Error('fixture-private-transport-body');
+      return new Response(JSON.stringify({data: {issues: {
+        nodes: [], pageInfo: {hasNextPage: false, endCursor: null}
+      }}}), {status: 200, headers: {'Content-Type': 'application/json'}});
+    };
+  `
+  );
+  const run = (failed, allowTriage = false) =>
+    spawnSync(
+      process.execPath,
+      [
+        '--import',
+        bootstrap,
+        new URL('../triage-event-assess.mjs', import.meta.url).pathname,
+        '--sweep',
+      ],
+      {
+        encoding: 'utf8',
+        timeout: 10_000,
+        env: {
+          ...process.env,
+          HOME: directory,
+          LINEAR_API_KEY: 'fixture-key',
+          JOVIE_ORCHESTRATOR_CACHE: cacheFile,
+          CLI_BACKLOG_FAILURE: String(failed),
+          CLI_TRIAGE_ALLOWED: String(allowTriage),
+          LINEAR_COOLDOWN_STATE_DIR: join(directory, 'cooldown'),
+          LINEAR_BACKOFF_STATE_DIR: join(directory, 'legacy-cooldown'),
+        },
+      }
     );
-    process.argv = [process.execPath, 'triage-event-assess.mjs', '--sweep'];
-    process.env.JOVIE_ORCHESTRATOR_CACHE = cacheFile;
-
-    await runCli();
-
-    assert.equal(process.exitCode, 0);
-    assert.equal(logs.length, 1);
-    assert.match(logs[0], /^triage-sweep skipped reason=swept-0m-ago$/);
+  try {
+    for (const failed of [false, true, false]) {
+      const child = run(failed);
+      assert.equal(child.status, failed ? 1 : 0, child.stderr);
+      const receipt = JSON.parse(child.stdout);
+      assert.equal(receipt.triageSweep.status, 'throttled');
+      assert.equal(receipt.triageSweep.inventoryObserved, false);
+      assert.equal(receipt.backlog.failed, failed ? 1 : 0);
+      assert.equal(receipt.backlog.assessed, 0);
+      assert.equal(receipt.wakeSymphony, false);
+      assert.ok(
+        !JSON.stringify(receipt).includes('fixture-private-transport-body')
+      );
+      assert.equal(
+        JSON.parse(readFileSync(cacheFile, 'utf8')).lastTriageSweepOkAt,
+        lastOkAt
+      );
+    }
+    // A successful actual Triage census retains its timestamp even if Backlog
+    // fails, so the next event cannot repeat that Triage work or renew the floor.
+    const expired = new Date(Date.now() - 31 * 60_000).toISOString();
+    writeFileSync(cacheFile, JSON.stringify({ lastTriageSweepOkAt: expired }));
+    const failedBacklog = run(true, true);
+    assert.equal(failedBacklog.status, 1, failedBacklog.stderr);
+    assert.equal(JSON.parse(failedBacklog.stdout).backlog.failed, 1);
+    const completedTriageAt = JSON.parse(
+      readFileSync(cacheFile, 'utf8')
+    ).lastTriageSweepOkAt;
+    assert.ok(Date.parse(completedTriageAt) > Date.parse(expired));
+    const replay = run(true);
+    assert.equal(replay.status, 1, replay.stderr);
+    assert.equal(JSON.parse(replay.stdout).triageSweep.status, 'throttled');
+    assert.equal(
+      JSON.parse(readFileSync(cacheFile, 'utf8')).lastTriageSweepOkAt,
+      completedTriageAt
+    );
+    const calls = readFileSync(callsFile, 'utf8')
+      .trim()
+      .split('\n')
+      .map(line => JSON.parse(line));
+    assert.equal(calls.length, 6);
+    assert.equal(calls.filter(row => row.variables?.stateNames).length, 1);
+    assert.equal(
+      calls.filter(row => row.query.includes('issues(first:50')).length,
+      5
+    );
   } finally {
-    process.argv = previousArgv;
-    process.exitCode = previousExitCode;
-    if (previousCacheFile === undefined)
-      delete process.env.JOVIE_ORCHESTRATOR_CACHE;
-    else process.env.JOVIE_ORCHESTRATOR_CACHE = previousCacheFile;
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('the real throttled CLI preserves Backlog rotation and consumes a later urgency change', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'backlog-priority-cli-'));
+  const cacheFile = join(directory, 'cache.json');
+  const rowsFile = join(directory, 'rows.json');
+  const callsFile = join(directory, 'calls.jsonl');
+  const bootstrap = join(directory, 'bootstrap.mjs');
+  const lastOkAt = new Date(Date.now() - 10 * 60_000).toISOString();
+  const sentinel = { owner: 'preserved-fixture-field' };
+  const rows = Array.from({ length: 5 }, (_, index) => {
+    const digit = String(index + 1);
+    return {
+      id: `${digit.repeat(8)}-${digit.repeat(4)}-4${digit.repeat(3)}-8${digit.repeat(3)}-${digit.repeat(12)}`,
+      identifier: `JOV-${6500 + index}`,
+      title: 'Bounded compounding fixture',
+      description: null,
+      createdAt: BACKLOG_VERSION,
+      updatedAt: BACKLOG_VERSION,
+      priority: 2,
+      archivedAt: null,
+      state: { name: 'Backlog', type: 'backlog' },
+      assignee: null,
+      delegate: null,
+      parent: null,
+      labels: {
+        nodes: [
+          { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'agent-ready' },
+          { id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', name: 'dispatch-next' },
+        ],
+        pageInfo: { hasNextPage: false, endCursor: null },
+      },
+    };
+  });
+  writeFileSync(
+    cacheFile,
+    JSON.stringify({ lastTriageSweepOkAt: lastOkAt, sentinel })
+  );
+  writeFileSync(
+    bootstrap,
+    `
+    import { appendFileSync, readFileSync } from 'node:fs';
+    const rows = JSON.parse(readFileSync(${JSON.stringify(rowsFile)}, 'utf8'));
+    const record = value => appendFileSync(${JSON.stringify(callsFile)}, JSON.stringify(value) + '\\n');
+    globalThis.fetch = async (url, init) => {
+      const request = JSON.parse(init.body);
+      if (String(url) !== 'https://api.linear.app/graphql' || /\\bmutation\\b/.test(request.query)) {
+        record({kind: 'forbidden'});
+        throw new Error('unexpected provider or mutation');
+      }
+      const variables = request.variables ?? {};
+      const states = variables.filter?.state?.name?.in;
+      let data;
+      if (JSON.stringify(states) === JSON.stringify(['Backlog', 'Todo'])) {
+        record({kind: 'census'});
+        data = {issues: {nodes: rows, pageInfo: {hasNextPage: false, endCursor: null}}};
+      } else if (variables.teamKey === 'JOV' && Number.isInteger(variables.number)) {
+        const row = rows.find(value => value.identifier === 'JOV-' + variables.number);
+        if (!row) throw new Error('unexpected issue read');
+        record({kind: 'issue', identifier: row.identifier});
+        // A real fresh-read version hold prevents Summer or native admission.
+        data = {issues: {nodes: [{...row,
+          state: {...row.state, id: ${JSON.stringify(BACKLOG_ID)}},
+          updatedAt: new Date(Date.parse(row.updatedAt) + 1000).toISOString()
+        }]}};
+      } else {
+        record({kind: 'forbidden'});
+        throw new Error('unexpected paid Triage or other query');
+      }
+      return new Response(JSON.stringify({data}), {
+        status: 200, headers: {'Content-Type': 'application/json'}
+      });
+    };
+  `
+  );
+  const restart = () => {
+    writeFileSync(rowsFile, JSON.stringify(rows));
+    const child = spawnSync(
+      process.execPath,
+      [
+        '--import',
+        bootstrap,
+        new URL('../triage-event-assess.mjs', import.meta.url).pathname,
+        '--sweep',
+      ],
+      {
+        encoding: 'utf8',
+        timeout: 10_000,
+        env: {
+          ...process.env,
+          HOME: directory,
+          LINEAR_API_KEY: 'fixture-cli-priority-key',
+          JOVIE_ORCHESTRATOR_CACHE: cacheFile,
+          LINEAR_COOLDOWN_STATE_DIR: join(directory, 'cooldown'),
+          LINEAR_BACKOFF_STATE_DIR: join(directory, 'legacy-cooldown'),
+        },
+      }
+    );
+    assert.equal(child.status, 0, child.stderr);
+    assert.equal(child.stderr, '');
+    const receipt = JSON.parse(child.stdout);
+    assert.deepEqual(receipt.triageSweep, {
+      status: 'throttled',
+      reason: receipt.triageSweep.reason,
+      inventoryObserved: false,
+    });
+    assert.match(receipt.triageSweep.reason, /^swept-\d+m-ago$/);
+    assert.equal(receipt.backlog.issueCount, 5);
+    assert.equal(receipt.backlog.assessed, 3);
+    assert.equal(receipt.backlog.deferred, 2);
+    assert.equal(receipt.backlog.failed, 0);
+    assert.equal(receipt.issueCount, 5);
+    assert.equal(receipt.assessed, 3);
+    assert.equal(receipt.deferred, 2);
+    assert.equal(receipt.failed, 0);
+    assert.equal(receipt.wakeSymphony, false);
+    assert.deepEqual(receipt.results, receipt.backlog.results);
+    assert.ok(
+      receipt.results.every(
+        row =>
+          row.reason === 'backlog-event-version-changed' && row.mutations === 0
+      )
+    );
+    const cache = JSON.parse(readFileSync(cacheFile, 'utf8'));
+    assert.equal(cache.lastTriageSweepOkAt, lastOkAt);
+    assert.deepEqual(cache.sentinel, sentinel);
+    assert.match(cache.backlogSweepQueueDigest, /^[a-f0-9]{64}$/);
+    return { attempted: receipt.backlog.results.map(row => row.issue), cache };
+  };
+  try {
+    const first = restart();
+    assert.deepEqual(first.attempted, ['JOV-6500', 'JOV-6501', 'JOV-6502']);
+    assert.equal(first.cache.backlogSweepCursor, 3);
+    const second = restart();
+    assert.deepEqual(second.attempted, ['JOV-6503', 'JOV-6504', 'JOV-6500']);
+    assert.equal(second.cache.backlogSweepCursor, 1);
+    assert.equal(
+      second.cache.backlogSweepQueueDigest,
+      first.cache.backlogSweepQueueDigest
+    );
+    // Change urgency only: version and readiness remain unchanged. Priority
+    // itself must reset the durable cursor rather than skipping the new Urgent.
+    rows[4].priority = 1;
+    const changed = restart();
+    assert.deepEqual(changed.attempted, ['JOV-6504', 'JOV-6500', 'JOV-6501']);
+    assert.equal(changed.cache.backlogSweepCursor, 3);
+    assert.notEqual(
+      changed.cache.backlogSweepQueueDigest,
+      first.cache.backlogSweepQueueDigest
+    );
+    const calls = readFileSync(callsFile, 'utf8')
+      .trim()
+      .split('\n')
+      .map(line => JSON.parse(line));
+    assert.equal(calls.filter(row => row.kind === 'census').length, 3);
+    assert.deepEqual(
+      calls.filter(row => row.kind === 'issue').map(row => row.identifier),
+      [...first.attempted, ...second.attempted, ...changed.attempted]
+    );
+    assert.ok(calls.every(row => ['census', 'issue'].includes(row.kind)));
+  } finally {
     rmSync(directory, { recursive: true, force: true });
   }
 });
