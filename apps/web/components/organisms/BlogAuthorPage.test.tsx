@@ -21,7 +21,7 @@ const storybookMainSource = readWebSource('.storybook/main.ts');
 
 describe('BlogAuthorPage', () => {
   it('preserves the shipped author layout and article count grammar', () => {
-    const { rerender } = render(
+    const { container, rerender } = render(
       <BlogAuthorPage
         articleCount={1}
         authorHero={<h1>{TIM_WHITE_PROFILE.name}</h1>}
@@ -37,6 +37,13 @@ describe('BlogAuthorPage', () => {
       '1 article'
     );
     expect(screen.getByText('The Contact Problem')).toBeVisible();
+    const shells = container.querySelectorAll('[data-public-content-shell]');
+    expect(shells).toHaveLength(1);
+    expect(shells[0]).toHaveAttribute('data-public-content-width', 'page');
+    expect(shells[0]).toContainElement(
+      screen.getByRole('heading', { level: 1 })
+    );
+    expect(shells[0]).toContainElement(screen.getByRole('article'));
 
     rerender(
       <BlogAuthorPage
