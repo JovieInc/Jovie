@@ -326,6 +326,9 @@ for (const product of [
             expect(row.width).toBe(row.referenceWidth);
             expect(row.height).toBe(28);
           }
+          const navigationScrollTop = await nav.evaluate(
+            element => element.parentElement!.scrollTop
+          );
           const favorite = groups.getByRole('link', {
             name: 'Favorites',
             exact: true,
@@ -335,6 +338,11 @@ for (const product of [
           await expect(
             page.getByRole('button', { name: 'Expand sidebar', exact: true })
           ).toHaveAttribute('aria-expanded', 'false');
+          // Tooltip intent scrolls the lower group into view. Restore the
+          // captured viewport before comparing the original motion anchors.
+          await nav.evaluate((element, scrollTop) => {
+            element.parentElement!.scrollTop = scrollTop;
+          }, navigationScrollTop);
         }
         const opening = await readSidebarAnchors(page, 'Expand sidebar');
         captures.push(opening);
