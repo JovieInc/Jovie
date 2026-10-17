@@ -69,7 +69,7 @@ vi.mock('@/lib/rate-limit', async importOriginal => {
   };
 });
 
-import { GET } from '@/app/api/spotify/search/route';
+import { GET, type SpotifyArtistResult } from '@/app/api/spotify/search/route';
 
 describe('GET /api/spotify/search', () => {
   beforeEach(() => {
@@ -314,9 +314,9 @@ describe('GET /api/spotify/search', () => {
       },
     ]);
     mockAnnotateClaimedStatusWithMeta
-      .mockImplementationOnce(async (results: unknown[]) => ({
+      .mockImplementationOnce(async (results: SpotifyArtistResult[]) => ({
         degraded: false,
-        results: results.map((result: object) => ({
+        results: results.map(result => ({
           ...result,
           isClaimed: true,
         })),
