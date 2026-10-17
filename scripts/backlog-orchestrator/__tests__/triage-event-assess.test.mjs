@@ -985,7 +985,161 @@ test('requires authoritative mutation, comment and disposition readback before w
   }
 });
 
-test('catch-up recovers missed deliveries oldest first and preserves partial failures', async () => {
+test('Triage catch-up ranks current priority before its bound across restart and redelivery', async () => {
+  const rows = Array.from({ length: 25 }, (_, index) =>
+    issue({
+      id: `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
+      identifier: `JOV-${6500 + index}`,
+      priority: 3,
+      updatedAt: '2026-09-23T00:00:00.000Z',
+    })
+  );
+  rows.push(
+    issue({
+      identifier: 'JOV-8555',
+      priority: 2,
+      updatedAt: '2026-10-17T17:45:08.209Z',
+    }),
+    issue({
+      id: '078178ed-5ea0-43ae-9f4b-2eb60dc10859',
+      identifier: 'JOV-8556',
+      priority: 1,
+      updatedAt: '2026-10-17T17:45:09.000Z',
+    })
+  );
+  const requests = [];
+  const client = () => ({
+    fetchTeamTriageIssues: async () => structuredClone(rows),
+    fetchIssue: async identifier =>
+      structuredClone(rows.find(row => row.identifier === identifier)),
+    updateIssue: async () => {
+      throw Error('provider hold must never mutate');
+    },
+  });
+  const blocked = async delivery => {
+    requests.push(delivery);
+    return {
+      decision: 'existing-intake-reconcile',
+      escalation: {
+        status: 'provider-block',
+        code: 'reason-lane-model-capacity-cost-binding-unverified',
+      },
+    };
+  };
+  const snapshot = structuredClone(rows);
+  const first = await assessTriageSweep(client(), blocked);
+  assert.deepEqual(
+    requests.slice(0, 2).map(row => row.identifier),
+    ['JOV-8556', 'JOV-8555']
+  );
+  assert.equal(first.assessed, 25);
+  assert.equal(first.deferred, 2);
+  assert.equal(first.providerBlocked, 25);
+  assert.equal(first.wakeSymphony, false);
+  assert.ok(first.results.every(row => row.mutations === 0));
+  assert.deepEqual(rows, snapshot);
+
+  // A new consumer reads later Linear changes; no cached rank or new delivery identity.
+  rows[0] = { ...rows[0], priority: 1, updatedAt: '2026-10-17T18:00:00.000Z' };
+  rows.at(-1).priority = 4;
+  requests.length = 0;
+  await assessTriageSweep(client(), blocked, { maxIssues: 1 });
+  assert.equal(requests[0].identifier, 'JOV-6500');
+  assert.equal(
+    requests[0].deliveryId,
+    createHash('sha256')
+      .update(`catch-up:${rows[0].id}:${rows[0].updatedAt}`)
+      .digest('hex')
+  );
+  const identity = requests[0].deliveryId;
+  requests.length = 0;
+  await assessTriageSweep(client(), blocked, { maxIssues: 1 });
+  assert.equal(requests[0].deliveryId, identity);
+});
+
+test('Triage catch-up never ranks missing or malformed priority as Urgent', async t => {
+  for (const priority of [
+    0,
+    undefined,
+    null,
+    '1',
+    true,
+    -1,
+    1.5,
+    5,
+    NaN,
+    Infinity,
+  ]) {
+    await t.test(String(priority), async () => {
+      const unknown = issue({
+        priority,
+        updatedAt: '2026-09-23T00:00:00.000Z',
+      });
+      const low = issue({
+        id: '078178ed-5ea0-43ae-9f4b-2eb60dc10859',
+        identifier: 'JOV-6501',
+        priority: 4,
+      });
+      const calls = [];
+      const result = await assessTriageSweep(
+        {
+          fetchTeamTriageIssues: async () => [unknown, low],
+          fetchIssue: async identifier =>
+            identifier === low.identifier ? low : unknown,
+        },
+        async delivery => {
+          calls.push(delivery.identifier);
+          return { decision: 'urgent-investigation-required' };
+        },
+        { maxIssues: 1 }
+      );
+      assert.deepEqual(calls, ['JOV-6501']);
+      assert.equal(result.assessed, 1);
+      assert.equal(result.deferred, 1);
+      assert.equal(result.wakeSymphony, false);
+    });
+  }
+});
+
+test('Triage catch-up reranking preserves fresh state eligibility and never rewrites active work', async () => {
+  const older = issue({ priority: 3, updatedAt: '2026-09-23T00:00:00.000Z' });
+  const urgent = issue({
+    id: '078178ed-5ea0-43ae-9f4b-2eb60dc10859',
+    identifier: 'JOV-6501',
+    priority: 1,
+  });
+  const active = {
+    ...urgent,
+    state: { id: 'already-active', name: 'In Progress' },
+  };
+  const reads = [],
+    calls = [];
+  const result = await assessTriageSweep(
+    {
+      fetchTeamTriageIssues: async () => [older, urgent],
+      fetchIssue: async identifier => {
+        reads.push(identifier);
+        return identifier === urgent.identifier ? active : older;
+      },
+      updateIssue: async () => {
+        throw Error('must preserve active work');
+      },
+    },
+    async delivery => {
+      calls.push(delivery.identifier);
+      return { decision: 'urgent-investigation-required' };
+    }
+  );
+  assert.deepEqual(reads, ['JOV-6501', 'JOV-6500']);
+  assert.deepEqual(calls, ['JOV-6500']);
+  assert.equal(result.results[0].disposition, 'stale-event');
+  assert.ok(result.results.every(row => row.mutations === 0));
+  assert.equal(result.wakeSymphony, false);
+  assert.equal(result.failed, 0);
+  assert.equal(active.state.name, 'In Progress');
+});
+
+test('catch-up keeps oldest-first fairness within a priority tier and preserves partial failures', async () => {
   const first = issue({ updatedAt: '2026-09-23T00:00:00.000Z' });
   const second = issue({ identifier: 'JOV-6501' });
   const calls = [];
