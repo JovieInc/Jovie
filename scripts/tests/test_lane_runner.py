@@ -10745,6 +10745,29 @@ class OperatorInstallerGlueTest(unittest.TestCase):
             diagnostic = json.loads((stage / ".selftest-diagnostic.json").read_text())
             self.assertEqual(diagnostic["leftoverProcesses"], 1)
             self.assertIn("left 1 process(es) running", console.getvalue())
+        except lane.SelftestCleanupHeld:
+            # Keep the already-written typed observation before the fixture is removed.
+            # The original hold and real detached-child cleanup remain authoritative.
+            try:
+                cleanup = json.loads((stage / ".selftest-diagnostic.json").read_text()).get("cleanup", {})
+                observation = cleanup.get("observation") or {}
+                safe = {}
+                pid, start = observation.get("pid"), observation.get("start")
+                if type(pid) is int and pid > 0:
+                    safe["pid"] = pid
+                if isinstance(start, str) and start.startswith("linux:") and start[6:].isdecimal():
+                    safe["start"] = start
+                if observation.get("source") in {"proc-stat", "proc-environ", "proc-directory", "scope-owner"}:
+                    safe["source"] = observation["source"]
+                if type(observation.get("errno")) is int:
+                    safe["errno"] = observation["errno"]
+                digest = cleanup.get("sourceSha256")
+                if isinstance(digest, str) and len(digest) == 64 and set(digest) <= set("0123456789abcdef"):
+                    safe["sourceSha256"] = digest
+                print("selftest-cleanup-observation " + json.dumps(safe, sort_keys=True), file=sys.stderr)
+            except (OSError, ValueError, TypeError, AttributeError):
+                print("selftest-cleanup-observation unavailable", file=sys.stderr)
+            raise
         finally:
             for child in spawned:
                 if child.poll() is None:
@@ -10759,6 +10782,79 @@ class OperatorInstallerGlueTest(unittest.TestCase):
             self.assertEqual(first[lane.SELFTEST_RUN_ENV], inherited)
             self.assertEqual(second[lane.SELFTEST_RUN_ENV], inherited)
         self.assertEqual(lane.marked_processes(first_scope), {})
+
+
+class SelftestCleanupDiagnosticTest(unittest.TestCase):
+    """Fault-path proof for the real cleanup test's diagnostic retention only."""
+
+    def _observe_cleanup_hold(self, diagnostic):
+        original = lane.SelftestCleanupHeld("selftest-process-custody-unreadable")
+        with tempfile.TemporaryDirectory() as tmp:
+            case = OperatorInstallerGlueTest("test_selftest_leaves_zero_processes_even_detached_ones")
+            case.root = Path(tmp)
+            case.host = SimpleNamespace(repo=case.root)
+
+            def hold(host, stage):
+                if diagnostic is not None:
+                    payload = diagnostic if isinstance(diagnostic, bytes) else json.dumps(diagnostic).encode()
+                    (stage / ".selftest-diagnostic.json").write_bytes(payload)
+                raise original
+
+            with patch.object(lane, "prove_staging", side_effect=hold) as prove, \
+                    patch.object(subprocess, "Popen") as spawn, \
+                    patch.object(lane, "reap_selftest_processes") as reaper, \
+                    contextlib.redirect_stderr(io.StringIO()) as console:
+                with self.assertRaises(lane.SelftestCleanupHeld) as caught:
+                    case.test_selftest_leaves_zero_processes_even_detached_ones()
+            self.assertIs(caught.exception, original)
+            prove.assert_called_once_with(case.host, case.root / "stage")
+            spawn.assert_not_called()
+            reaper.assert_not_called()
+            return console.getvalue()
+
+    def test_retains_only_typed_safe_fields_and_original_hold(self):
+        for source in ("proc-stat", "proc-environ", "proc-directory", "scope-owner"):
+            with self.subTest(source=source):
+                safe = {"pid": 42, "start": "linux:12345", "source": source,
+                        "errno": 13, "sourceSha256": "a" * 64}
+                diagnostic = {"cleanup": {"sourceSha256": safe["sourceSha256"],
+                    "environment": {"SECRET": "private-environment"},
+                    "observation": {**safe, "command": "private-command", "marker": "private-marker",
+                                    "observedStart": "private-observed-start"}}}
+                output = self._observe_cleanup_hold(diagnostic)
+                self.assertEqual(output, "selftest-cleanup-observation " + json.dumps(safe, sort_keys=True) + "\n")
+                for secret in ("private-environment", "private-command", "private-marker", "private-observed-start"):
+                    self.assertNotIn(secret, output)
+
+    def test_invalid_field_types_are_excluded(self):
+        cases = (("pid", True), ("pid", 0), ("pid", -1), ("pid", "42"),
+                 ("start", 123), ("start", "darwin:123"), ("start", "linux:not-a-birth"),
+                 ("source", "private-command"), ("errno", True), ("errno", "13"),
+                 ("sourceSha256", "A" * 64), ("sourceSha256", "a" * 63),
+                 ("sourceSha256", 123))
+        for field, value in cases:
+            with self.subTest(field=field, value=value):
+                cleanup = {"observation": {field: value}}
+                if field == "sourceSha256":
+                    cleanup = {"sourceSha256": value, "observation": {}}
+                self.assertEqual(self._observe_cleanup_hold({"cleanup": cleanup}),
+                                 "selftest-cleanup-observation {}\n")
+
+    def test_unknown_errno_stays_unknown(self):
+        for observation in ({"pid": 42, "source": "proc-environ"},
+                            {"pid": 42, "source": "proc-environ", "errno": None}):
+            with self.subTest(observation=observation):
+                output = self._observe_cleanup_hold({"cleanup": {"observation": observation}})
+                safe = json.loads(output.removeprefix("selftest-cleanup-observation "))
+                self.assertEqual(safe, {"pid": 42, "source": "proc-environ"})
+                self.assertNotIn("errno", safe)
+
+    def test_missing_or_malformed_diagnostic_preserves_original_hold(self):
+        for diagnostic in (None, b"{broken", b"[]", {"cleanup": [1]},
+                           {"cleanup": {"observation": [1]}}):
+            with self.subTest(diagnostic=diagnostic):
+                self.assertEqual(self._observe_cleanup_hold(diagnostic),
+                                 "selftest-cleanup-observation unavailable\n")
 
 
 class RepositoryBindingTest(unittest.TestCase):
