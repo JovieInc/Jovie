@@ -1,0 +1,288 @@
+{
+  "schema": "jovie.browser-owned-input-matrix/v1",
+  "issue": "JOV-7846",
+  "owners": ["JOV-6061", "JOV-7201", "JOV-7713"],
+  "platformAuthority": "apps/web/lib/platform/supported-platforms.ts",
+  "certificationContract": "jovie.certification/v1",
+  "evidenceDefault": "UNKNOWN",
+  "deviceScript": "docs/quality/BROWSER_OWNED_INPUT.md",
+  "phases": [
+    "before-focus",
+    "focused",
+    "platform-ui-visible",
+    "value-filled",
+    "keyboard-dismissed",
+    "submit",
+    "back-retry"
+  ],
+  "semantics": {
+    "current-password": {
+      "types": ["password"],
+      "autocomplete": "current-password",
+      "inputmode": "text"
+    },
+    "email": {
+      "types": ["email"],
+      "autocomplete": "email",
+      "inputmode": "email"
+    },
+    "new-password": {
+      "types": ["password"],
+      "autocomplete": "new-password",
+      "inputmode": "text"
+    },
+    "one-time-code": {
+      "types": ["text", "tel"],
+      "autocomplete": "one-time-code",
+      "inputmode": "numeric"
+    },
+    "tel": {
+      "types": ["tel"],
+      "autocomplete": "tel",
+      "inputmode": "tel"
+    },
+    "username": {
+      "types": ["text", "email"],
+      "autocomplete": "username",
+      "inputmode": "text"
+    },
+    "webauthn": {
+      "types": ["text", "email"],
+      "autocomplete": "username webauthn",
+      "inputmode": "text"
+    }
+  },
+  "environments": [
+    {
+      "id": "android-chrome",
+      "platformRef": "web-chromium",
+      "support": "SUPPORTED",
+      "devices": ["android-current-portrait", "android-current-landscape"],
+      "ui": ["Gboard", "Google Password Manager"],
+      "scenarios": [
+        "back-dismiss",
+        "browser-chrome-resize",
+        "email-contact-autofill",
+        "keyboard",
+        "otp",
+        "passkey",
+        "saved-credential"
+      ]
+    },
+    {
+      "id": "android-samsung",
+      "platformRef": "web-chromium",
+      "support": "UNKNOWN",
+      "reason": "Samsung Internet version boundary is not declared by JOV-6061",
+      "devices": ["samsung-current-portrait"],
+      "ui": ["Samsung Keyboard", "Samsung Pass"],
+      "scenarios": [
+        "back-dismiss",
+        "browser-chrome-resize",
+        "email-contact-autofill",
+        "keyboard",
+        "otp",
+        "passkey",
+        "saved-credential"
+      ]
+    },
+    {
+      "id": "desktop-chrome",
+      "platformRef": "web-chromium",
+      "support": "SUPPORTED",
+      "devices": ["desktop-resize-zoom-text-scale"],
+      "ui": ["Google Password Manager", "1Password"],
+      "scenarios": [
+        "email-contact-autofill",
+        "otp",
+        "passkey",
+        "saved-credential",
+        "third-party-manager",
+        "zoom-resize"
+      ]
+    },
+    {
+      "id": "desktop-firefox",
+      "platformRef": "web-firefox",
+      "support": "SUPPORTED",
+      "devices": ["desktop-resize-zoom-text-scale"],
+      "ui": ["Firefox Password Manager", "1Password"],
+      "scenarios": [
+        "email-contact-autofill",
+        "otp",
+        "passkey",
+        "saved-credential",
+        "third-party-manager",
+        "zoom-resize"
+      ]
+    },
+    {
+      "id": "desktop-safari",
+      "platformRef": "web-webkit",
+      "support": "SUPPORTED",
+      "devices": ["desktop-resize-zoom-text-scale"],
+      "ui": ["iCloud Keychain", "1Password"],
+      "scenarios": [
+        "email-contact-autofill",
+        "hide-my-email",
+        "otp",
+        "passkey",
+        "saved-credential",
+        "third-party-manager",
+        "zoom-resize"
+      ]
+    },
+    {
+      "id": "ios-chrome",
+      "platformRef": "web-webkit",
+      "support": "SUPPORTED",
+      "devices": [
+        "iphone-small-portrait",
+        "iphone-current-portrait",
+        "iphone-current-landscape",
+        "ipad-portrait-resize"
+      ],
+      "ui": ["QuickType", "Google Password Manager", "iCloud Keychain"],
+      "scenarios": [
+        "browser-chrome-resize",
+        "email-contact-autofill",
+        "hide-my-email",
+        "keyboard",
+        "otp",
+        "passkey",
+        "saved-credential"
+      ]
+    },
+    {
+      "id": "ios-instagram",
+      "platformRef": "web-webkit",
+      "support": "UNKNOWN",
+      "reason": "Acquisition in-app browser version and autofill availability need physical-device verification",
+      "devices": ["iphone-small-portrait", "iphone-current-portrait"],
+      "ui": ["Instagram in-app browser", "QuickType"],
+      "scenarios": [
+        "browser-chrome-resize",
+        "email-contact-autofill",
+        "keyboard"
+      ]
+    },
+    {
+      "id": "ios-safari",
+      "platformRef": "web-webkit",
+      "support": "SUPPORTED",
+      "devices": [
+        "iphone-small-portrait",
+        "iphone-current-portrait",
+        "iphone-current-landscape",
+        "ipad-portrait-resize"
+      ],
+      "ui": ["QuickType", "Contacts", "Hide My Email", "iCloud Keychain"],
+      "scenarios": [
+        "browser-chrome-resize",
+        "email-contact-autofill",
+        "hide-my-email",
+        "keyboard",
+        "otp",
+        "passkey",
+        "saved-credential"
+      ]
+    }
+  ],
+  "journeys": [
+    {
+      "id": "account-contact",
+      "screens": ["web.contacts"],
+      "source": "apps/web/components/features/settings",
+      "fields": ["email", "tel"],
+      "scenarios": [
+        "email-contact-autofill",
+        "hide-my-email",
+        "third-party-manager"
+      ],
+      "evidence": "UNKNOWN"
+    },
+    {
+      "id": "auth-credentials",
+      "screens": [],
+      "source": "apps/web/components/features/auth/AuthShell.tsx",
+      "fields": ["username", "current-password", "new-password"],
+      "scenarios": ["saved-credential", "third-party-manager"],
+      "evidence": "BLOCKED",
+      "reason": "AuthShell never mounts a password or username field. No web.auth source hosts type=password or autocomplete current-password, new-password, or username, so these cells are not applicable."
+    },
+    {
+      "id": "auth-email",
+      "screens": ["web.auth"],
+      "source": "apps/web/components/features/auth/EmailCodeAuthForm.tsx",
+      "fields": ["email"],
+      "scenarios": [
+        "email-contact-autofill",
+        "hide-my-email",
+        "third-party-manager"
+      ],
+      "evidence": "UNKNOWN"
+    },
+    {
+      "id": "auth-otp",
+      "screens": ["web.auth"],
+      "source": "apps/web/components/features/auth/atoms/otp-input/OtpInput.tsx",
+      "fields": ["one-time-code"],
+      "scenarios": ["otp"],
+      "evidence": "UNKNOWN"
+    },
+    {
+      "id": "auth-passkey",
+      "screens": [],
+      "source": "apps/web/app/desktop-auth/DesktopAuthClient.tsx",
+      "fields": ["webauthn"],
+      "scenarios": ["passkey"],
+      "evidence": "BLOCKED",
+      "reason": "Passkey entry is a button that opens the platform chooser. No web.auth source hosts an input with autocomplete username webauthn, so the conditional-UI field contract is not applicable."
+    },
+    {
+      "id": "get-updates",
+      "screens": ["web.public-profile"],
+      "source": "apps/web/components/features/profile/artist-notifications-cta",
+      "fields": ["email"],
+      "scenarios": [
+        "email-contact-autofill",
+        "hide-my-email",
+        "third-party-manager"
+      ],
+      "evidence": "UNKNOWN"
+    },
+    {
+      "id": "get-updates-sms",
+      "screens": ["web.public-profile"],
+      "source": "apps/web/components/features/profile/artist-notifications-cta",
+      "fields": ["tel"],
+      "scenarios": ["email-contact-autofill"],
+      "evidence": "UNKNOWN"
+    },
+    {
+      "id": "payment-tip",
+      "screens": ["web.marketing-pay"],
+      "source": "apps/web/components/features/profile",
+      "fields": ["email"],
+      "scenarios": [
+        "email-contact-autofill",
+        "hide-my-email",
+        "third-party-manager"
+      ],
+      "evidence": "UNKNOWN"
+    }
+  ],
+  "historicalEscapes": [
+    {
+      "id": "get-updates-2026-10-04",
+      "issue": "JOV-7846",
+      "journey": "get-updates",
+      "observedAt": "2026-10-04",
+      "captureStatus": "BLOCKED",
+      "captureRef": null,
+      "corpusRef": "docs/screenshots/ui-escape-holdout/browser-owned-input.json",
+      "reason": "Founder report is present on the issue; original screenshot/recording is not attached. Synthetic detector replay is not the founder capture.",
+      "replayFixture": "scripts/invariants/browser-owned-input.test.mjs"
+    }
+  ]
+}

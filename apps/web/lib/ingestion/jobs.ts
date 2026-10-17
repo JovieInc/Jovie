@@ -11,17 +11,16 @@ import {
 } from '@/lib/utils/platform-detection';
 import {
   beaconsJobPayloadSchema,
-  instagramJobPayloadSchema,
   layloJobPayloadSchema,
-  linktreeJobPayloadSchema,
   tiktokJobPayloadSchema,
   twitterJobPayloadSchema,
   youtubeJobPayloadSchema,
 } from '@/lib/validation/schemas';
+import { disabledSocialHtmlDocument } from './social-html-policy';
 import { isBeaconsUrl, validateBeaconsUrl } from './strategies/beacons';
-import { isInstagramUrl, validateInstagramUrl } from './strategies/instagram';
+import { validateInstagramUrl } from './strategies/instagram';
 import { isLayloUrl } from './strategies/laylo';
-import { isLinktreeUrl } from './strategies/linktree';
+import { validateLinktreeUrl } from './strategies/linktree';
 import { isTikTokUrl, validateTikTokUrl } from './strategies/tiktok';
 import { isTwitterUrl, validateTwitterUrl } from './strategies/twitter';
 import {
@@ -84,65 +83,14 @@ async function insertJobWithDedup(
   return null;
 }
 
+/** Legacy HTML imports are unavailable without an official API integration. */
 export async function enqueueLinktreeIngestionJob(params: {
   creatorProfileId: string;
   sourceUrl: string;
   depth?: number;
 }): Promise<string | null> {
-  if (!isLinktreeUrl(params.sourceUrl)) {
-    return null;
-  }
-
-  const normalizedSource = normalizeUrl(params.sourceUrl);
-  const detected = detectPlatform(normalizedSource);
-  const dedupKey = canonicalIdentity({
-    platform: detected.platform,
-    normalizedUrl: detected.normalizedUrl,
-  });
-
-  const payload = linktreeJobPayloadSchema.parse({
-    creatorProfileId: params.creatorProfileId,
-    sourceUrl: detected.normalizedUrl,
-    dedupKey,
-    depth: params.depth ?? 0,
-  });
-
-  // Migration-safe dedup check: handles both indexed column AND legacy JSONB payload
-  // During migration window, existing records may have dedup_key = NULL
-  // After migration 0008 completes, all records will have dedup_key populated
-  const existing = await db
-    .select({ id: ingestionJobs.id })
-    .from(ingestionJobs)
-    .where(
-      and(
-        eq(ingestionJobs.jobType, 'import_linktree'),
-        drizzleSql`${ingestionJobs.payload} ->> 'creatorProfileId' = ${payload.creatorProfileId}`,
-        or(
-          // Check indexed column (fast path after migration)
-          eq(ingestionJobs.dedupKey, payload.dedupKey),
-          // Fallback: check JSONB payload for legacy records with NULL dedup_key
-          and(
-            isNull(ingestionJobs.dedupKey),
-            drizzleSql`${ingestionJobs.payload} ->> 'dedupKey' = ${payload.dedupKey}`
-          )
-        )
-      )
-    )
-    .limit(1);
-
-  if (existing.length > 0) {
-    return existing[0].id;
-  }
-
-  return insertJobWithDedup({
-    jobType: 'import_linktree',
-    payload,
-    dedupKey: payload.dedupKey,
-    status: 'pending',
-    runAt: new Date(),
-    priority: 0,
-    attempts: 0,
-  });
+  if (!validateLinktreeUrl(params.sourceUrl)) return null;
+  return disabledSocialHtmlDocument();
 }
 
 export async function enqueueInstagramIngestionJob(params: {
@@ -150,56 +98,8 @@ export async function enqueueInstagramIngestionJob(params: {
   sourceUrl: string;
   depth?: number;
 }): Promise<string | null> {
-  const validated = validateInstagramUrl(params.sourceUrl);
-  if (!validated || !isInstagramUrl(validated)) {
-    return null;
-  }
-
-  const normalizedSource = normalizeUrl(validated);
-  const detected = detectPlatform(normalizedSource);
-  const dedupKey = canonicalIdentity({
-    platform: detected.platform,
-    normalizedUrl: detected.normalizedUrl,
-  });
-
-  const payload = instagramJobPayloadSchema.parse({
-    creatorProfileId: params.creatorProfileId,
-    sourceUrl: detected.normalizedUrl,
-    dedupKey,
-    depth: params.depth ?? 0,
-  });
-
-  const existing = await db
-    .select({ id: ingestionJobs.id })
-    .from(ingestionJobs)
-    .where(
-      and(
-        eq(ingestionJobs.jobType, 'import_instagram'),
-        drizzleSql`${ingestionJobs.payload} ->> 'creatorProfileId' = ${payload.creatorProfileId}`,
-        or(
-          eq(ingestionJobs.dedupKey, payload.dedupKey),
-          and(
-            isNull(ingestionJobs.dedupKey),
-            drizzleSql`${ingestionJobs.payload} ->> 'dedupKey' = ${payload.dedupKey}`
-          )
-        )
-      )
-    )
-    .limit(1);
-
-  if (existing.length > 0) {
-    return existing[0].id;
-  }
-
-  return insertJobWithDedup({
-    jobType: 'import_instagram',
-    payload,
-    dedupKey: payload.dedupKey,
-    status: 'pending',
-    runAt: new Date(),
-    priority: 0,
-    attempts: 0,
-  });
+  if (!validateInstagramUrl(params.sourceUrl)) return null;
+  return disabledSocialHtmlDocument();
 }
 
 export async function enqueueTikTokIngestionJob(params: {

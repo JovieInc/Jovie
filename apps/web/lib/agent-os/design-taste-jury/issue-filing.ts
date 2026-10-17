@@ -1,8 +1,14 @@
 import { listDesignTasteBenchmarkReferences } from './benchmarks';
-import type { DesignTasteIssueFiling, DesignTasteJuryConsensus } from './types';
+import { DESIGN_TASTE_JURY_RUBRIC } from './rubric';
+import type {
+  DesignTasteIssueFiling,
+  DesignTasteJuryConsensus,
+  DesignTasteJuryCriterion,
+} from './types';
 
 function buildIssueBody(params: {
   readonly findingSummary: string;
+  readonly criteria: readonly DesignTasteJuryCriterion[];
   readonly surfaceId: string;
   readonly disposition: 'ship' | 'taste';
   readonly referenceComps: ReturnType<
@@ -24,6 +30,16 @@ function buildIssueBody(params: {
     '## Finding',
     params.findingSummary,
     '',
+    ...(params.criteria.length > 0
+      ? [
+          '## Rubric criteria',
+          ...params.criteria.map(
+            criterion =>
+              `- ${DESIGN_TASTE_JURY_RUBRIC[criterion].name} (${criterion})`
+          ),
+          '',
+        ]
+      : []),
     '## Classification',
     params.disposition === 'ship' ? 'Objective / ship' : 'Taste / Tim queue',
     '',
@@ -45,11 +61,13 @@ export function buildIssueFilingsFromConsensus(
   );
 
   return consensus.findings.map(finding => {
+    const criteria = finding.criteria ?? [];
     const disposition = finding.objective ? 'ship' : finding.disposition;
     const queue = disposition === 'ship' ? 'visual-qa' : 'tim-taste';
 
     return {
       id: `${consensus.runId}:${consensus.surfaceId}:${finding.id}`,
+      criteria,
       disposition,
       title:
         disposition === 'ship'
@@ -57,6 +75,7 @@ export function buildIssueFilingsFromConsensus(
           : `Taste review: ${finding.summary}`,
       body: buildIssueBody({
         findingSummary: finding.summary,
+        criteria,
         surfaceId: consensus.surfaceId,
         disposition,
         referenceComps,

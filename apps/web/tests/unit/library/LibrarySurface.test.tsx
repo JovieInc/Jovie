@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { TooltipProvider } from '@jovie/ui';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   fireEvent,
   render,
@@ -231,12 +232,14 @@ function renderLibrary(
   props: Partial<ComponentProps<typeof LibrarySurface>> = {}
 ) {
   return render(
-    <TooltipProvider>
-      <RightPanelProvider>
-        <LibrarySurface assets={assets} {...props} />
-        <RightPanelOutlet />
-      </RightPanelProvider>
-    </TooltipProvider>
+    <QueryClientProvider client={new QueryClient()}>
+      <TooltipProvider>
+        <RightPanelProvider>
+          <LibrarySurface assets={assets} {...props} />
+          <RightPanelOutlet />
+        </RightPanelProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
   );
 }
 
@@ -1057,6 +1060,55 @@ describe('LibrarySurface', () => {
     expect(screen.getByTestId('library-asset-drawer')).toHaveAttribute(
       'aria-hidden',
       'true'
+    );
+  });
+
+  it('opens YouTube Related work with the merch editor visible by default', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        Response.json({
+          snapshot: { thumbnails: [], metrics: [], experiments: [] },
+        })
+      )
+    );
+    renderLibrary(
+      [
+        buildAsset({
+          id: 'youtube-video-1',
+          title: 'Tour video',
+          itemKind: 'video',
+          catalogType: 'media',
+          source: { provider: 'youtube', canonicalId: 'video-1' },
+        }),
+        buildAsset({
+          id: 'merch-card-1',
+          title: 'Tour hoodie',
+          itemKind: 'merch',
+          source: { provider: 'merch', canonicalId: 'merch-1' },
+        }),
+      ],
+      {
+        profileId: '11111111-1111-4111-8111-111111111111',
+      }
+    );
+    clickGridView();
+
+    fireEvent.click(screen.getByRole('button', { name: 'View Tour video' }));
+
+    const drawer = within(screen.getByTestId('library-asset-drawer'));
+    expect(drawer.getByRole('tab', { name: 'Overview' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    expect(drawer.getByText('Related work')).toBeVisible();
+    expect(drawer.getByRole('combobox')).toBeVisible();
+    expect(drawer.getByRole('button', { name: 'Tag' })).toBeVisible();
+    expect(drawer.getByRole('button', { name: 'Tag' })).toBeDisabled();
+    await waitFor(() =>
+      expect(
+        drawer.queryByText('Loading test history...')
+      ).not.toBeInTheDocument()
     );
   });
 

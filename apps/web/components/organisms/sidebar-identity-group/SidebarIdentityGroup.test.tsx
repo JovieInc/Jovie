@@ -25,13 +25,21 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('@/components/organisms/user-button', () => ({
-  UserButton: (props: { readonly profileHref?: string }) => (
+  UserButton: (props: {
+    readonly profileHref?: string;
+    readonly dockStatus?: {
+      readonly label: string;
+      readonly badges: ReactNode;
+    };
+  }) => (
     <button
       type='button'
       data-testid='user-button'
+      aria-label={props.dockStatus?.label}
       data-slot='common-dropdown-trigger'
     >
       Tim White
+      {props.dockStatus?.badges}
       {props.profileHref ? (
         <span data-testid='user-button-profile-href'>{props.profileHref}</span>
       ) : null}
@@ -105,6 +113,22 @@ function getTabbableActions(group: HTMLElement) {
 describe('SidebarIdentityGroup', () => {
   beforeEach(() => {
     pathnameMock.mockReturnValue('/app');
+  });
+
+  it('forwards collapsed dock badges and status to the compact user control', () => {
+    render(
+      <SidebarIdentityGroup
+        calm
+        profileHref={undefined}
+        dockStatus={{
+          label: "Update available · What's new",
+          badges: <span data-testid='dock-badge' />,
+        }}
+      />
+    );
+    expect(
+      screen.getByRole('button', { name: "Update available · What's new" })
+    ).toContainElement(screen.getByTestId('dock-badge'));
   });
 
   it('renders exactly one identity group with sibling identity and Public Profile actions', () => {

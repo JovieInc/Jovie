@@ -9,6 +9,19 @@ the suite is hermetic; tests that need a knob set it via patch.dict.
 """
 
 import os
+import sys
+from pathlib import Path
+
+_LANES = Path(__file__).resolve().parents[1] / "lanes"
+if str(_LANES) not in sys.path:
+    sys.path.insert(0, str(_LANES))
+import git_housekeeping  # noqa: E402
+
+# Git 2.55 detaches maintenance after commit. The structural lane's pytest
+# process must not inherit that default, and each TemporaryDirectory must be
+# private to this pid and wait out a writer before rmdir.
+git_housekeeping.install_process_fixture_env()
+git_housekeeping.install_isolated_tempdirs()
 
 _SCRUB_PREFIXES = ("LANES_", "SYMPHONY_")
 _SCRUB_EXACT = {

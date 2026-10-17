@@ -131,7 +131,10 @@ describe('onboarding sign-in placement', () => {
       expect(container.textContent ?? '').not.toMatch(
         /verif|browser check|human/i
       );
-      expect(screen.getByText('Your message is on its way.')).toBeTruthy();
+      expect(screen.queryByText('Your message is on its way.')).toBeNull();
+      expect(
+        screen.getByRole('heading', { name: 'Your first message' })
+      ).toBeTruthy();
     }
   );
 });

@@ -51,6 +51,9 @@ const time = value =>
   typeof value === 'string' && Number.isFinite(Date.parse(value))
     ? Date.parse(value)
     : null;
+// Reject parent-directory traversal as its own path segment. A substring
+// check treats Next.js catch-all sources (`[...slug]`, `[[...slug]]`) as
+// traversal and makes `web.smartlink-release` an invalid resolver request.
 const paths = value =>
   Array.isArray(value) &&
   value.every(
@@ -58,7 +61,7 @@ const paths = value =>
       typeof path === 'string' &&
       path &&
       !path.startsWith('/') &&
-      !path.includes('..')
+      !path.split('/').includes('..')
   )
     ? [...new Set(value)].sort()
     : null;
@@ -300,6 +303,7 @@ function decodeMarketingProof(bytes, context, meta) {
       producerJobId: meta.jobId,
       capturedAt: new Date(capturedAt).toISOString(),
       artifactDigest: bundleDigest(captures),
+      browserOwnedInput: measured.get(context.viewports[0])?.browserOwnedInput,
       viewports: context.viewports.map(id => ({
         id,
         decision: 'pass',

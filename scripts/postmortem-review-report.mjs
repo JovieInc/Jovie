@@ -1,8 +1,10 @@
 #!/usr/bin/env node
-/** Read-only Linear reconciliation and GBrain mirror report for scheduled runs. */
+
+/** On-demand read-only Linear reconciliation and GBrain mirror report. */
 
 import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { assertEventDrivenLearning } from './lib/learning-trigger.mjs';
 import { parseFrontmatter } from './postmortem-linkage-check.mjs';
 import {
   buildReviewReport,
@@ -26,6 +28,7 @@ function parseArgs(argv) {
 }
 
 async function main() {
+  assertEventDrivenLearning();
   const args = parseArgs(process.argv.slice(2));
   const repoRoot = args.root ? resolve(args.root) : process.cwd();
   const documents = readPostmortemDocuments(repoRoot);

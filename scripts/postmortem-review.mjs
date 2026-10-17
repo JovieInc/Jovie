@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+
 /**
  * Summer post-mortem review loop (JOV-6690).
  *
@@ -11,6 +12,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { assertEventDrivenLearning } from './lib/learning-trigger.mjs';
 import {
   findLinearLabelId,
   upsertLinearIssueByTitleFingerprint,
@@ -738,6 +740,7 @@ function parseArgs(argv) {
 }
 
 async function main() {
+  assertEventDrivenLearning();
   const args = parseArgs(process.argv.slice(2));
   const repoRoot = args.root ? resolve(args.root) : REPO_ROOT;
   const documents = readPostmortemDocuments(repoRoot);

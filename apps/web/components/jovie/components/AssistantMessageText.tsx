@@ -84,12 +84,9 @@ interface AssistantEntityMentionProps {
   readonly label: string;
 }
 
-function AssistantEntityMention({
-  kind,
-  id,
-  label,
-}: AssistantEntityMentionProps) {
+function AssistantEntityMention({ kind, id }: AssistantEntityMentionProps) {
   const { ref: resolved } = useEntityResolution(kind, id);
+  const label = resolved?.label ?? 'Unavailable reference';
 
   return (
     <EntityChipPopover kind={kind} id={id} label={label} entity={resolved}>

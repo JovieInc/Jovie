@@ -26,6 +26,10 @@ It classifies verified requirements, editorial recipes and measurement hypothese
 Reuse the existing claim/copy/SEO contracts; practitioner advice is not a new
 ranking law or permission to fabricate proof.
 
+## Homepage scope
+
+For `/`, JOV-5885 supersedes the generic identity brief with [the YouTube artist MVP](YOUTUBE_ARTIST_MVP.md) and `apps/web/data/homepageYoutubeMvp.ts`. Find me stays; machine surface evidence precedes Tim Taste. Atoms stay canonical.
+
 ## The 4-step procedure
 
 ### 1. Receive a Brief

@@ -25,13 +25,12 @@ describe('ToolPartsRenderer tool failure presentation', () => {
       />
     );
 
-    const row = screen.getByTestId('tool-status-row');
+    const row = screen.getByRole('alert');
     expect(row.getAttribute('data-tool-state')).toBe('failed');
-    expect(
-      screen.getByText('Retouch is not provisioned for this account.')
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/Ask Jovie for a manual workaround/i)
-    ).toBeInTheDocument();
+    expect(row).toHaveAttribute('data-operation-status', 'failed');
+    expect(row).toHaveTextContent(
+      'Retouch is not provisioned for this account.'
+    );
+    expect(row).toHaveTextContent(/Ask Jovie for a manual workaround/i);
   });
 });

@@ -26,6 +26,24 @@ describe('Eve installation contract', () => {
     expect(lockfile).toContain(`  vitest@${vitestPin}:`);
   });
 
+  it('installs Vitest and coverage with matching reciprocal peer pins', () => {
+    const readInstalledPackage = (name: string) =>
+      JSON.parse(
+        readFileSync(
+          resolve(pilotRoot, 'node_modules', name, 'package.json'),
+          'utf8'
+        )
+      ) as { version: string; peerDependencies: Record<string, string> };
+    const vitest = readInstalledPackage('vitest');
+    const coverage = readInstalledPackage('@vitest/coverage-v8');
+
+    expect(coverage.version).toBe(vitest.version);
+    expect(coverage.peerDependencies.vitest).toBe(vitest.version);
+    expect(vitest.peerDependencies['@vitest/coverage-v8']).toBe(
+      coverage.version
+    );
+  });
+
   it('keeps runtime pins synchronized and bundled docs discoverable', () => {
     const packageJson = JSON.parse(
       readFileSync(resolve(pilotRoot, 'package.json'), 'utf8')

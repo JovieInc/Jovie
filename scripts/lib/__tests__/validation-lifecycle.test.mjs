@@ -11,6 +11,7 @@ import {
   lifecycleStatusKey,
   outcomeAcceptanceReasons,
   parseValidationReceipts,
+  RECORDED_RECEIPT_KINDS,
   selectBindingPull,
 } from '../validation-lifecycle.mjs';
 
@@ -87,6 +88,34 @@ describe('validation manifest', () => {
     expect(manifest.bindingSha).toBe(SHA_A);
   });
 
+  it('honors an explicit machine audit without inferred UI rows', () => {
+    const manifest = manifestFor({
+      description: 'validation-required: screen-audit',
+    });
+    expect(manifest.required.map(entry => entry.kind)).toEqual([
+      'deployment',
+      'screen-audit',
+    ]);
+    expect(
+      decideValidationTransition({
+        state: STARTED,
+        manifest,
+        holds: [],
+        deployment: VERIFIED,
+        receipts: [],
+      }).target
+    ).toBe('Validating');
+    expect(
+      decideValidationTransition({
+        state: STARTED,
+        manifest,
+        holds: [],
+        deployment: VERIFIED,
+        receipts: [receipt({ kind: 'screen-audit' })],
+      }).target
+    ).toBe('Done');
+  });
+
   it.each([
     [
       'commissioning parent',
@@ -146,6 +175,139 @@ describe('validation manifest', () => {
       outcomeAcceptanceReasons({ description: '## Acceptance\n- [x] Done' })
     ).toEqual([]);
     expect(outcomeAcceptanceReasons({ description: '' })).toEqual([]);
+  });
+
+  it('requires the authored plain acceptance paragraph that closed JOV-8618 early', () => {
+    const description =
+      "Acceptance: reproduce the old request failure; prove the repaired request and paginated continuation; detect descendant recurrence for each accepted alias; keep incomplete pagination, malformed identity, transport failures and missing positive coverage UNKNOWN. Run the repository's actual changed-path tests with current coverage and unchanged floors, ordinary protected landing, then verify a genuine subsequent existing-clock artifact uses the repaired source. A passing workflow or empty history must not close [JOV-4312](https://linear.app/jovie/issue/JOV-4312/sentry-alert-hygiene-synthetic-e2eplaywright-failures-captured-as-prod) or erase [JOV-8523](https://linear.app/jovie/issue/JOV-8523/error-server-conn-crashed)'s failed seven-day lineage.";
+    const manifest = manifestFor({ description });
+    expect(outcomeAcceptanceReasons({ description })).toEqual([
+      'acceptance section names evidence a deploy cannot prove',
+    ]);
+    expect(manifest.required.map(entry => entry.kind)).toEqual([
+      'deployment',
+      'outcome',
+    ]);
+    const base = {
+      state: { name: 'Merging', type: 'started' },
+      manifest,
+      holds: [],
+      deployment: VERIFIED,
+    };
+    expect(decideValidationTransition({ ...base, receipts: [] }).target).toBe(
+      'Validating'
+    );
+    expect(
+      decideValidationTransition({
+        ...base,
+        receipts: [receipt({ verifiedArtifact: false })],
+      }).target
+    ).toBe('Validating');
+    expect(
+      decideValidationTransition({
+        ...base,
+        receipts: [receipt({ status: 'fail' })],
+      }).target
+    ).toBe('Rework');
+    expect(
+      decideValidationTransition({ ...base, receipts: [receipt({})] }).target
+    ).toBe('Done');
+  });
+
+  it.each([
+    'Acceptance: verify the actual existing-clock artifact.',
+    'Acceptance criteria: retain the native outcome proof.',
+    'Acceptance evidence:\n\n- Record the actual customer outcome.',
+    'Acceptance checks:\nThe physical actor must complete the observation.',
+    'Completion: verify the independent producer.',
+    'Evaluation / completion: retain the real result.',
+    'Success criteria: verify a real observation.',
+    'Exit criteria: positive coverage is established.',
+    'Definition of done: native execution is observed.',
+    'Done when: the actual producer has completed.',
+    'Done means: the actual producer has completed.',
+    'Verification: UNKNOWN is still missing evidence.',
+    'Proof: evidence has not yet been recorded.',
+    '  aCcEpTaNcE : verify actual evidence.',
+    'Acceptance:\n- [x] Source repaired\n- Further observation is required.',
+    'Acceptance: - [x] Source repaired\n- Further observation is required.',
+  ])('keeps explicit plain acceptance open: %s', description => {
+    expect(outcomeAcceptanceReasons({ description })).toContain(
+      'acceptance section names evidence a deploy cannot prove'
+    );
+  });
+
+  it.each([
+    'A discussion of acceptance: this prose is not a section.',
+    'Acceptance testing remains useful.',
+    'Acceptance status: previously accepted.',
+    'Pre-acceptance: a separate status.',
+    '> Acceptance: quoted text is not the author section.',
+    '"Acceptance: an example string"',
+    '    Acceptance: indented code is an example.',
+    '```text\nAcceptance: a literal example\n```',
+    '~~~~text\nAcceptance: a literal example\n~~~~',
+    '~~~~text\n```\nAcceptance: still inside the tilde literal\n~~~~',
+    '````text\n```\nAcceptance: a shorter marker does not close the literal\n````',
+    '```text\n```not-a-close\nAcceptance: still inside the literal\n```',
+    'Acceptance:\n- [x] Verified\n- [X] Accepted\n\n## Notes\nFree text.',
+    'Acceptance: - [x] Verified\n\n**Notes**\nFree text.',
+    'Acceptance:\n\n## Notes\nNo authored criteria.',
+    'Owner: existing lifecycle owner.\nScope: an ordinary implementation.',
+  ])(
+    'does not invent an outcome from a literal, checked or absent section: %s',
+    description => {
+      expect(outcomeAcceptanceReasons({ description })).toEqual([]);
+    }
+  );
+
+  it('retains plain acceptance after a closed literal example and across a reopen episode', () => {
+    const reopenedAt = '2026-10-03T13:00:00Z';
+    const manifest = manifestFor({
+      description:
+        '```text\nAcceptance: literal\n```\nAcceptance: verify the current native artifact.',
+      reopenedAfterDone: true,
+      receiptNotBefore: reopenedAt,
+    });
+    const base = { state: STARTED, manifest, holds: [], deployment: VERIFIED };
+    const old = receipt({
+      recordedAt: '2026-10-03T14:00:00Z',
+      episodeStartedAt: null,
+    });
+    const fresh = receipt({
+      recordedAt: '2026-10-03T14:00:00Z',
+      episodeStartedAt: reopenedAt,
+    });
+    expect(
+      decideValidationTransition({ ...base, receipts: [old] }).target
+    ).toBe('Validating');
+    expect(
+      decideValidationTransition({ ...base, receipts: [fresh] }).target
+    ).toBe('Done');
+    expect(
+      manifest.required.find(entry => entry.kind === 'outcome')?.reason
+    ).toContain('acceptance section names evidence a deploy cannot prove');
+  });
+
+  it('keeps already completed acceptance historical after plain-section detection', () => {
+    const manifest = manifestFor({
+      description: 'Acceptance: verify a real subsequent native artifact.',
+    });
+    expect(manifest.required.map(entry => entry.kind)).toContain('outcome');
+    expect(
+      decideValidationTransition({
+        state: { name: 'Done', type: 'completed' },
+        manifest,
+        holds: [],
+        deployment: VERIFIED,
+        receipts: [],
+      })
+    ).toEqual({
+      target: null,
+      missing: [],
+      failing: [],
+      explanation: [],
+    });
   });
 
   it('adds the JOV-7201 dual closure for escaped defects', () => {
@@ -244,6 +406,50 @@ describe('validation manifest', () => {
 });
 
 describe('validation receipts', () => {
+  it.each(['outcome', 'screen-audit', 'human-certification', 'founder-taste'])(
+    'requires %s proof from the current episode',
+    kind => {
+      const manifest = manifestFor({
+        reopenedAfterDone: true,
+        receiptNotBefore: '2026-10-03T13:00:00Z',
+        description: `validation-required: ${kind}`,
+      });
+      const old = receipt({ kind });
+      const fresh = receipt({ kind, recordedAt: '2026-10-03T14:00:00Z' });
+      const base = {
+        state: STARTED,
+        manifest,
+        holds: [],
+        deployment: VERIFIED,
+      };
+      const currentOutcome = receipt({
+        kind: 'outcome',
+        recordedAt: '2026-10-03T14:00:00Z',
+      });
+      expect(
+        decideValidationTransition({
+          ...base,
+          receipts: [old, ...(kind === 'outcome' ? [] : [currentOutcome])],
+        }).target
+      ).toBe('Validating');
+      expect(
+        decideValidationTransition({
+          ...base,
+          receipts: [fresh, currentOutcome],
+        }).target
+      ).toBe('Done');
+      expect(
+        decideValidationTransition({
+          ...base,
+          receipts: [
+            receipt({ ...old, status: 'fail' }),
+            fresh,
+            currentOutcome,
+          ],
+        }).target
+      ).toBe('Done');
+    }
+  );
   const body = formatValidationReceipt({
     issue: 'jov-1',
     kind: 'outcome',
@@ -266,6 +472,231 @@ describe('validation receipts', () => {
         recordedAt: '2026-10-03T12:00:00.000Z',
       },
     ]);
+  });
+
+  it.each([null, '2026-10-03T08:00:00-04:00'])(
+    'round-trips an explicit episode binding %s without changing legacy receipts',
+    episodeStartedAt => {
+      const bound = formatValidationReceipt({
+        issue: 'JOV-1',
+        kind: 'outcome',
+        status: 'fail',
+        sha: SHA_B,
+        evidence: 'https://example.test/event/1',
+        episodeStartedAt,
+      });
+      expect(
+        parseValidationReceipts(
+          [{ body: bound, createdAt: '2026-10-03T13:00:00Z' }],
+          'JOV-1'
+        )[0].episodeStartedAt
+      ).toBe(episodeStartedAt === null ? null : '2026-10-03T12:00:00.000Z');
+      expect(
+        parseValidationReceipts(
+          [{ body, createdAt: '2026-10-03T13:00:00Z' }],
+          'JOV-1'
+        )[0]
+      ).not.toHaveProperty('episodeStartedAt');
+    }
+  );
+
+  it.each(['bad', '', 123, {}, '2026-10-03'])(
+    'invalidates malformed explicit episode binding %j',
+    episodeStartedAt => {
+      const malformed = body.replace(
+        '"kind":"outcome"',
+        `"kind":"outcome","episodeStartedAt":${JSON.stringify(episodeStartedAt)}`
+      );
+      expect(
+        parseValidationReceipts(
+          [{ body: malformed, createdAt: '2026-10-03T13:00:00Z' }],
+          'JOV-1'
+        )
+      ).toMatchObject([{ kind: 'outcome', status: 'invalid' }]);
+      expect(() =>
+        formatValidationReceipt({
+          issue: 'JOV-1',
+          kind: 'outcome',
+          status: 'pass',
+          sha: SHA_B,
+          evidence: 'https://example.test/event/1',
+          episodeStartedAt: /** @type {any} */ (episodeStartedAt),
+        })
+      ).toThrow(/episode/);
+    }
+  );
+
+  it.each(['pass', 'fail'])(
+    'rejects an old-episode %s written after a racing server reopen',
+    status => {
+      const reopenedAt = '2026-10-03T12:00:00Z';
+      const manifest = manifestFor({
+        reopenedAfterDone: true,
+        receiptNotBefore: reopenedAt,
+      });
+      const decision = decideValidationTransition({
+        state: { name: 'Validating', type: 'started' },
+        manifest,
+        holds: [],
+        deployment: VERIFIED,
+        receipts: [
+          receipt({
+            status: /** @type {'pass' | 'fail'} */ (status),
+            episodeStartedAt: null,
+            recordedAt: '2026-10-03T12:00:01Z',
+          }),
+        ],
+      });
+      expect(decision.target).toBe('Validating');
+      expect(decision.missing).toContain('outcome');
+    }
+  );
+
+  it.each([
+    [null, 'sha'],
+    ['2026-10-02T08:00:00-04:00', 'sha'],
+    [null, 'evidence'],
+    [null, 'schema'],
+    [null, 'kind'],
+  ])(
+    'keeps an old episode binding %s when invalidating malformed %s',
+    (episodeStartedAt, malformedField) => {
+      const reopenedAt = '2026-10-03T12:00:00Z';
+      const current = formatValidationReceipt({
+        issue: 'JOV-1',
+        kind: 'outcome',
+        status: 'pass',
+        sha: SHA_B,
+        evidence: 'https://example.test/current/run',
+        episodeStartedAt: reopenedAt,
+      });
+      const malformed = formatValidationReceipt({
+        issue: 'JOV-1',
+        kind: 'outcome',
+        status: 'pass',
+        sha: SHA_B,
+        evidence: 'https://example.test/old/run',
+        episodeStartedAt,
+      }).replace(
+        new RegExp(`"${malformedField}":"[^"]*"`),
+        `"${malformedField}":""`
+      );
+      const parsed = parseValidationReceipts(
+        [
+          { body: current, createdAt: '2026-10-03T13:00:00Z' },
+          { body: malformed, createdAt: '2026-10-03T14:00:00Z' },
+        ],
+        'JOV-1'
+      );
+      expect(parsed[1]).toMatchObject({
+        status: 'invalid',
+        episodeStartedAt:
+          episodeStartedAt === null ? null : '2026-10-02T12:00:00.000Z',
+      });
+      const receipts = parsed.map(value =>
+        receipt({ ...value, verifiedArtifact: value.status !== 'invalid' })
+      );
+      expect(
+        currentReceiptsByKind(receipts, reopenedAt).get('outcome')?.status
+      ).toBe('pass');
+      expect(
+        decideValidationTransition({
+          state: { name: 'Validating', type: 'started' },
+          manifest: manifestFor({
+            reopenedAfterDone: true,
+            receiptNotBefore: reopenedAt,
+          }),
+          holds: [],
+          deployment: VERIFIED,
+          receipts,
+        }).target
+      ).toBe('Done');
+    }
+  );
+
+  it.each(['2026-10-03T08:00:00-04:00', 'unreadable'])(
+    'holds current proof when a malformed receipt has episode binding %s',
+    episodeStartedAt => {
+      const reopenedAt = '2026-10-03T12:00:00Z';
+      const current = formatValidationReceipt({
+        issue: 'JOV-1',
+        kind: 'outcome',
+        status: 'pass',
+        sha: SHA_B,
+        evidence: 'https://example.test/current/run',
+        episodeStartedAt: reopenedAt,
+      });
+      const malformed = current
+        .replace(`"sha":"${SHA_B}"`, '"sha":"bad"')
+        .replace(
+          '"episodeStartedAt":"2026-10-03T12:00:00.000Z"',
+          `"episodeStartedAt":"${episodeStartedAt}"`
+        );
+      const parsed = parseValidationReceipts(
+        [
+          { body: current, createdAt: '2026-10-03T13:00:00Z' },
+          { body: malformed, createdAt: '2026-10-03T14:00:00Z' },
+        ],
+        'JOV-1'
+      );
+      expect(parsed[1].status).toBe('invalid');
+      if (episodeStartedAt === 'unreadable')
+        expect(parsed[1]).not.toHaveProperty('episodeStartedAt');
+      else expect(parsed[1].episodeStartedAt).toBe('2026-10-03T12:00:00.000Z');
+      const receipts = parsed.map(value =>
+        receipt({ ...value, verifiedArtifact: value.status !== 'invalid' })
+      );
+      expect(
+        currentReceiptsByKind(receipts, reopenedAt).get('outcome')?.status
+      ).toBe('invalid');
+      const decision = decideValidationTransition({
+        state: { name: 'Validating', type: 'started' },
+        manifest: manifestFor({
+          reopenedAfterDone: true,
+          receiptNotBefore: reopenedAt,
+        }),
+        holds: [],
+        deployment: VERIFIED,
+        receipts,
+      });
+      expect(decision.target).toBe('Validating');
+      expect(decision.missing).toContain('outcome');
+    }
+  );
+
+  it('matches semantic current episode times, initial null and unbound legacy producers', () => {
+    const reopenedAt = '2026-10-03T12:00:00Z';
+    const bound = receipt({
+      episodeStartedAt: '2026-10-03T08:00:00-04:00',
+      recordedAt: '2026-10-03T12:00:01Z',
+    });
+    expect(currentReceiptsByKind([bound], reopenedAt).get('outcome')).toBe(
+      bound
+    );
+    expect(currentReceiptsByKind([bound]).has('outcome')).toBe(false);
+    expect(currentReceiptsByKind([bound], null).size).toBe(0);
+    expect(
+      currentReceiptsByKind(
+        [
+          receipt({
+            episodeStartedAt: '2026-10-02T12:00:00Z',
+            recordedAt: '2026-10-03T12:00:01Z',
+          }),
+        ],
+        reopenedAt
+      ).size
+    ).toBe(0);
+    expect(
+      currentReceiptsByKind([receipt({ episodeStartedAt: null })]).has(
+        'outcome'
+      )
+    ).toBe(true);
+    expect(
+      currentReceiptsByKind(
+        [receipt({ recordedAt: '2026-10-03T12:00:01Z' })],
+        reopenedAt
+      ).has('outcome')
+    ).toBe(true);
   });
 
   it('carries a founder note on a rejection and bounds it', () => {
@@ -329,28 +760,32 @@ describe('validation receipts', () => {
     );
   });
 
-  it('ignores receipts for another issue, computed kinds, and malformed bodies', () => {
+  it('ignores other issues and computed kinds but retains malformed evidence as unknown', () => {
     const forged = body.replace('"kind":"outcome"', '"kind":"deployment"');
     const other = body.replace('JOV-1', 'JOV-2');
     expect(COMPUTED_RECEIPT_KINDS).toContain('deployment');
-    expect(
-      parseValidationReceipts(
-        [
-          { body: forged, createdAt: '2026-10-03T12:00:00Z' },
-          { body: other, createdAt: '2026-10-03T12:00:00Z' },
-          { body, createdAt: 'not a time' },
-          {
-            body: '<!-- validation-receipt:v1\n{not json}\n-->',
-            createdAt: '2026-10-03T12:00:00Z',
-          },
-          {
-            body: '<!-- validation-receipt:v1\n"text"\n-->',
-            createdAt: '2026-10-03T12:00:00Z',
-          },
-        ],
-        'JOV-1'
-      )
-    ).toEqual([]);
+    const parsed = parseValidationReceipts(
+      [
+        { body: forged, createdAt: '2026-10-03T12:00:00Z' },
+        { body: other, createdAt: '2026-10-03T12:00:00Z' },
+        { body, createdAt: 'not a time' },
+        {
+          body: '<!-- validation-receipt:v1\n{not json}\n-->',
+          createdAt: '2026-10-03T12:00:00Z',
+        },
+        {
+          body: '<!-- validation-receipt:v1\n"text"\n-->',
+          createdAt: '2026-10-03T12:00:00Z',
+        },
+      ],
+      'JOV-1'
+    );
+    expect(parsed).toHaveLength(8);
+    expect(parsed.every(receipt => receipt.status === 'invalid')).toBe(true);
+    expect(parsed.map(receipt => receipt.kind)).toEqual([
+      ...RECORDED_RECEIPT_KINDS,
+      ...RECORDED_RECEIPT_KINDS,
+    ]);
   });
 
   it.each([
@@ -472,6 +907,31 @@ describe('validation transition', () => {
     ).toBe('Done');
   });
 
+  it('describes receipt artifacts separately from the verified deployment generation', () => {
+    const manifest = manifestFor(
+      { description: 'validation-required: screen-audit' },
+      { parentReason: 'commissioning' }
+    );
+    const decision = decideValidationTransition({
+      state: { name: 'Validating', type: 'started' },
+      manifest,
+      holds: [],
+      deployment: { status: 'verified', sha: SHA_C },
+      receipts: [
+        receipt({ kind: 'outcome', sha: SHA_A }),
+        receipt({ kind: 'screen-audit', sha: SHA_B }),
+      ],
+    });
+    expect(decision.target).toBe('Done');
+    expect(decision.missing).toEqual([]);
+    expect(decision.explanation).toEqual([
+      `Every required receipt passed on its recorded verified artifact. Deployment generation ${SHA_C.slice(0, 12)} is verified.`,
+    ]);
+    expect(decision.explanation.join(' ')).not.toContain(
+      `Every required receipt passed on verified production generation ${SHA_C.slice(0, 12)}`
+    );
+  });
+
   it('routes a required failure to Rework, even before deployment', () => {
     const decision = decideValidationTransition({
       state: { name: 'Validating', type: 'started' },
@@ -533,6 +993,29 @@ describe('lifecycle status comment', () => {
       missing: ['outcome'],
       failing: [],
     });
+    expect(
+      lifecycleStatusKey({
+        target: 'Validating',
+        manifest,
+        missing: ['outcome'],
+        failing: [],
+        completionHolds: [],
+      })
+    ).toBe(key);
+    const held = {
+      target: 'Validating',
+      manifest,
+      missing: ['outcome'],
+      failing: [],
+      completionHolds: ['JOV-2 is Merging', 'JOV-3 is Rework'],
+    };
+    expect(lifecycleStatusKey(held)).not.toBe(key);
+    expect(
+      lifecycleStatusKey({
+        ...held,
+        completionHolds: [...held.completionHolds].reverse(),
+      })
+    ).toBe(lifecycleStatusKey(held));
     expect(
       lifecycleStatusKey({
         target: 'Validating',

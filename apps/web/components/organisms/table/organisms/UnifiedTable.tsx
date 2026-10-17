@@ -68,6 +68,8 @@ export interface UnifiedTableProps<TData extends RowData> {
    * Column definitions (TanStack Table format)
    */
   readonly columns: ColumnDef<TData, unknown>[];
+  /** Schema widths remain identical across loading, empty, and populated states. */
+  readonly columnSizing?: 'auto' | 'schema';
 
   /**
    * Loading state
@@ -450,6 +452,7 @@ function HiddenHeaderSortStatus({
 function UnifiedTableContent<TData extends RowData>({
   data,
   columns,
+  columnSizing = 'auto',
   isLoading = false,
   emptyState,
   rowSelection,
@@ -888,8 +891,13 @@ function UnifiedTableContent<TData extends RowData>({
     return () => observer.disconnect();
   }, [sentinel, scrollRoot, onLoadMore, hasNextPage, isFetchingNextPage]);
 
-  // Calculate column count for skeleton
-  const columnCount = useMemo(() => columns.length, [columns]);
+  const visibleColumns = table.getVisibleLeafColumns();
+  const columnCount = visibleColumns.length;
+  const leafColumns = table.getAllLeafColumns();
+  const loadingColumnConfig = visibleColumns.map(column => ({
+    ...skeletonColumnConfig?.[leafColumns.indexOf(column)],
+    className: column.columnDef.meta?.className,
+  }));
 
   // Sort provenance for hidden-header tables: with no <thead> there is no
   // visible indication that rows are sorted, so render a sticky status bar.
@@ -910,8 +918,22 @@ function UnifiedTableContent<TData extends RowData>({
   // Common table styles
   const tableClassName = cn(
     'w-full border-separate border-spacing-0 text-app',
+    columnSizing === 'schema' && 'table-fixed',
     className
   );
+
+  const columnGroup =
+    columnSizing === 'schema' ? (
+      <colgroup>
+        {table.getVisibleLeafColumns().map(column => (
+          <col
+            key={column.id}
+            className={column.columnDef.meta?.className}
+            style={{ width: column.getSize() }}
+          />
+        ))}
+      </colgroup>
+    ) : null;
 
   const loadMoreBody = onLoadMore ? (
     <tbody>
@@ -959,6 +981,7 @@ function UnifiedTableContent<TData extends RowData>({
           <caption className='sr-only'>
             {caption ?? 'Loading table data'}
           </caption>
+          {columnGroup}
           {!hideHeader && (
             <UnifiedTableHeader
               headerGroups={table.getHeaderGroups()}
@@ -968,7 +991,7 @@ function UnifiedTableContent<TData extends RowData>({
           <LoadingTableBody
             rows={loadingRowCount}
             columns={columnCount}
-            columnConfig={skeletonColumnConfig}
+            columnConfig={loadingColumnConfig}
             rowHeight={`${resolvedRowHeight}px`}
           />
         </table>
@@ -990,6 +1013,7 @@ function UnifiedTableContent<TData extends RowData>({
           style={{ minWidth, ...tableRowModeStyle(rowMode) }}
         >
           <caption className='sr-only'>{caption ?? 'Empty table'}</caption>
+          {columnGroup}
           {!hideHeader && (
             <UnifiedTableHeader
               headerGroups={table.getHeaderGroups()}
@@ -1025,6 +1049,7 @@ function UnifiedTableContent<TData extends RowData>({
             <caption className='sr-only'>
               {caption ?? 'Grouped table data'}
             </caption>
+            {columnGroup}
             {!hideHeader && (
               <UnifiedTableHeader
                 headerGroups={table.getHeaderGroups()}
@@ -1036,7 +1061,7 @@ function UnifiedTableContent<TData extends RowData>({
               observeGroupHeader={observeGroupHeader}
               visibleGroupIndex={visibleGroupIndex}
               stickyOffset={stickyOffset}
-              columns={columns.length}
+              columns={columnCount}
               renderRow={renderGroupedRow}
             />
             {loadMoreBody}
@@ -1060,6 +1085,7 @@ function UnifiedTableContent<TData extends RowData>({
           style={{ minWidth, ...tableRowModeStyle(rowMode) }}
         >
           <caption className='sr-only'>{caption ?? 'Data table'}</caption>
+          {columnGroup}
           {!hideHeader && (
             <UnifiedTableHeader
               headerGroups={table.getHeaderGroups()}

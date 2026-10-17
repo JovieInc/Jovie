@@ -76,6 +76,9 @@ def subscription_profiles() -> dict:
         raise ValueError("subscription profiles malformed") from None
     if not isinstance(profiles, dict) or len(profiles) != 2 or CURRENT_LOGIN not in profiles:
         raise ValueError("subscription pool requires current-login and one additional profile")
+    primary_limit = os.cpu_count()
+    if type(primary_limit) is not int or primary_limit <= 0:
+        raise ValueError("subscription compute capacity unavailable")
     result, homes, identities = {}, set(), set()
     current_home = Path(os.environ.get("CODEX_HOME", Path.home() / ".codex")).resolve()
     for name, profile in profiles.items():
@@ -89,7 +92,7 @@ def subscription_profiles() -> dict:
         home = str(Path(home).resolve())
         if not Path(home).is_dir():
             raise ValueError("subscription home unavailable")
-        if type(slots) is not int or not 1 <= slots <= (3 if name == CURRENT_LOGIN else 1):
+        if type(slots) is not int or not 1 <= slots <= (primary_limit if name == CURRENT_LOGIN else 1):
             raise ValueError("subscription slot limit invalid")
         if not isinstance(identity, str) or not re.fullmatch(r"[0-9a-f]{64}", identity):
             raise ValueError("subscription identity binding invalid")
@@ -234,12 +237,12 @@ class LaunchEvidence:
     """Allowlisted identity from verified CLIs' first, pre-prompt startup header.
 
     Codex 0.147.0 JSON thread.started exposes only thread_id. The verified
-    0.144.6/0.147.0 human header (exec/src/event_processor_with_human_output.rs)
+    0.144.6/0.147.0/0.162.1 human header (exec/src/event_processor_with_human_output.rs)
     reports the thread/start model/provider and configured reasoning effort.
     This is CLI launch evidence, never provider attestation or generated text.
     A different format/version stays unknown until its contract is verified.
     """
-    VERSIONS = {"0.144.6", "0.147.0"}
+    VERSIONS = {"0.144.6", "0.147.0", "0.162.1"}
     KEYS = ("workdir", "model", "provider", "approval", "sandbox",
             "reasoning effort", "reasoning summaries", "session id")
     REQUIRED = {"workdir", "model", "provider", "approval", "sandbox", "session id"}
@@ -1239,7 +1242,7 @@ def main(argv=None) -> int:
         print(json.dumps(report, indent=1))
         return 0
     print(f"codex accounts available: {len(report['available'])}/{report['count']}")
-    return 0 if report["available"] else 1
+    return 0 if any(row["available"] for row in report["accounts"].values()) else 1
 
 
 if __name__ == "__main__":

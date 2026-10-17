@@ -129,6 +129,10 @@ vi.mock('drizzle-orm', () => ({
   asc: vi.fn(),
   eq: vi.fn(),
   inArray: vi.fn(),
+  isNull: vi.fn(),
+  like: vi.fn(),
+  notLike: vi.fn(),
+  or: vi.fn(),
   sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({
     strings,
     values,
@@ -151,7 +155,8 @@ describe('chat turn service', () => {
           clientTurnId: 'client-turn-1',
           status: 'streaming',
         },
-      ]);
+      ])
+      .mockResolvedValueOnce([{ id: 'conv-1' }]);
     hoisted.insertReturningMock.mockResolvedValueOnce([]);
 
     const { reserveChatTurn } = await import('@/lib/chat/turns');
@@ -164,6 +169,7 @@ describe('chat turn service', () => {
       userMessage: 'Generate album art',
       userId: 'user-1',
       creatorProfileId: 'profile-1',
+      audience: 'customer',
     });
 
     expect(result.outcome).toBe('duplicate_in_progress');
@@ -171,14 +177,16 @@ describe('chat turn service', () => {
   });
 
   it('detects duplicate first turns before creating another conversation', async () => {
-    hoisted.selectLimitMock.mockResolvedValueOnce([
-      {
-        id: 'turn-1',
-        conversationId: 'conv-existing',
-        clientTurnId: 'client-turn-1',
-        status: 'reserved',
-      },
-    ]);
+    hoisted.selectLimitMock
+      .mockResolvedValueOnce([
+        {
+          id: 'turn-1',
+          conversationId: 'conv-existing',
+          clientTurnId: 'client-turn-1',
+          status: 'reserved',
+        },
+      ])
+      .mockResolvedValueOnce([{ id: 'conv-existing' }]);
 
     const { reserveChatTurn } = await import('@/lib/chat/turns');
     const result = await reserveChatTurn({
@@ -190,10 +198,40 @@ describe('chat turn service', () => {
       userMessage: 'Generate album art',
       userId: 'user-1',
       creatorProfileId: 'profile-1',
+      audience: 'customer',
     });
 
     expect(result.outcome).toBe('duplicate_in_progress');
     expect(result.conversationId).toBe('conv-existing');
+    expect(hoisted.insertMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a client-turn replay from another conversation audience', async () => {
+    hoisted.selectLimitMock
+      .mockResolvedValueOnce([
+        {
+          id: 'turn-1',
+          conversationId: 'conv-ov',
+          clientTurnId: 'client-turn-1',
+          status: 'completed',
+        },
+      ])
+      .mockResolvedValueOnce([]);
+
+    const { reserveChatTurn } = await import('@/lib/chat/turns');
+    await expect(
+      reserveChatTurn({
+        conversationId: null,
+        clientTurnId: 'client-turn-1',
+        clientMessageId: 'client-message-1',
+        source: 'typed',
+        toolIntent: null,
+        userMessage: 'Show me the result',
+        userId: 'user-1',
+        creatorProfileId: 'profile-1',
+        audience: 'customer',
+      })
+    ).rejects.toThrow('Conversation not found or unauthorized');
     expect(hoisted.insertMock).not.toHaveBeenCalled();
   });
 
@@ -217,6 +255,7 @@ describe('chat turn service', () => {
       userMessage: 'Generate album art',
       userId: 'user-1',
       creatorProfileId: 'profile-1',
+      audience: 'customer',
     });
 
     expect(result.outcome).toBe('reserved');
@@ -264,6 +303,7 @@ describe('chat turn service', () => {
       userMessage,
       userId: 'user-1',
       creatorProfileId: 'profile-1',
+      audience: 'customer',
     });
     expect(hoisted.insertValuesMock.mock.calls[0][0]).toEqual(
       expect.objectContaining({
@@ -300,6 +340,7 @@ describe('chat turn service', () => {
       userMessage: 'Start planning my release',
       userId: 'user-9',
       creatorProfileId: 'profile-9',
+      audience: 'customer',
     });
 
     expect(result.outcome).toBe('reserved');
@@ -333,6 +374,7 @@ describe('chat turn service', () => {
       userMessage: 'Hi',
       userId: 'user-8',
       creatorProfileId: 'profile-8',
+      audience: 'customer',
     });
 
     expect(result.outcome).toBe('reserved');
@@ -359,6 +401,7 @@ describe('chat turn service', () => {
       userMessage: 'Hi Jovie',
       userId: 'user-2',
       creatorProfileId: 'profile-2',
+      audience: 'customer',
     });
 
     expect(result.outcome).toBe('reserved');

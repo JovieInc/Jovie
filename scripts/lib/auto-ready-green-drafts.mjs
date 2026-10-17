@@ -2,10 +2,9 @@
 /**
  * Green-source draft undraft authorization.
  *
- * Writer-owned proof (jovie-writer-pr-proof/v1) remains a separate, manual
- * recovery path in auto-ready-agent-drafts.sh. This classifier restores the
- * July event-driven wake: an open main draft may enter the ready pool only
- * when required source checks are SUCCESS and mergeability is CLEAN.
+ * Every wake requires persisted writer-owned proof for the live author and
+ * exact head, as well as successful required checks and clean mergeability.
+ * Green source checks alone never express the active writer's readiness.
  *
  * This path never enables native auto-merge and never enrolls the merge
  * queue. Auto-Enroll / jovie-bot own admission after ready_for_review.
@@ -13,8 +12,14 @@
 
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { ADMISSION_BLOCKING_LABELS } from './admission-hold-labels.mjs';
-import { hasControlledProofMarker } from './auto-ready-provenance.mjs';
+import {
+  ADMISSION_BLOCKING_LABELS,
+  MACHINE_BLOCK_LABELS,
+} from './admission-hold-labels.mjs';
+import {
+  classifyAutoReadyPromotion,
+  hasControlledProofMarker,
+} from './auto-ready-provenance.mjs';
 import { classifyQueueCheckBlockers } from './pr-check-failures.mjs';
 import { WRITER_PROMOTION_HOLD_LABELS } from './writer-owned-pr-promotion.mjs';
 
@@ -28,13 +33,16 @@ export const TIM_HOLD_LABELS = Object.freeze([
   'hold:tim',
 ]);
 
-// Every canonical admission stop label (hold, queue-deferred, ...) also keeps
-// a draft parked: undrafting a held PR only wakes work green enroll must skip.
+const MACHINE_BLOCKS = new Set(MACHINE_BLOCK_LABELS);
+
+// Stop labels and queue-poison park a draft: undrafting them only wakes work
+// green enroll must skip. lane-fix-red is cleared by the Lane Fix Relay once
+// required checks are green, so it must not park an otherwise-ready draft.
 export const GREEN_SOURCE_HOLD_LABELS = Object.freeze([
   ...new Set([
     ...WRITER_PROMOTION_HOLD_LABELS,
     ...TIM_HOLD_LABELS,
-    ...ADMISSION_BLOCKING_LABELS,
+    ...ADMISSION_BLOCKING_LABELS.filter(label => !MACHINE_BLOCKS.has(label)),
   ]),
 ]);
 
@@ -129,6 +137,17 @@ export function classifyGreenSourceDraft(input = {}) {
   if (expectedHead && expectedHead !== head) {
     return { eligible: false, reason: 'moved-head' };
   }
+
+  if (typeof input.authorLogin !== 'string' || !input.authorLogin.trim()) {
+    return { eligible: false, reason: 'author-unavailable' };
+  }
+  const proof = classifyAutoReadyPromotion({
+    authorLogin: input.authorLogin,
+    body: input.body,
+    headSha: head,
+    prNumber: number,
+  });
+  if (!proof.eligible) return proof;
 
   const mergeable = String(input.mergeable ?? '').toUpperCase();
   if (mergeable !== 'MERGEABLE') {

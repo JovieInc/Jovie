@@ -11,7 +11,11 @@ import { buildReferencedEntitiesBlock } from '@/lib/chat/entity-hydration';
 import { serializeEntity } from '@/lib/chat/tokens';
 import type { ReleaseContext } from '@/lib/chat/types';
 
-const ARTIST = { displayName: 'Luna Waves', username: 'lunawaves' } as const;
+const ARTIST = {
+  displayName: 'Luna Waves',
+  username: 'lunawaves',
+  spotifyUrl: 'https://open.spotify.com/artist/art_self',
+} as const;
 
 function ownedRelease(overrides?: Partial<ReleaseContext>): ReleaseContext {
   return {
@@ -62,14 +66,15 @@ describe('buildReferencedEntitiesBlock', () => {
     expect(block?.toLowerCase()).toContain('never another artist');
   });
 
-  it('resolves @track tokens against the owned release catalog too', () => {
+  it('does not resolve a track id as a release even when ids collide', () => {
     const block = buildReferencedEntitiesBlock({
       userTexts: [tokenText('track', 'rel_revival_001', 'Revival')],
       ownedReleases: [ownedRelease()],
       artist: ARTIST,
     });
 
-    expect(block?.toLowerCase()).toContain("this artist's own catalog");
+    expect(block).toContain('unavailable or unsupported');
+    expect(block).not.toContain('own catalog');
   });
 
   it('does not claim ownership for a release id not in the catalog', () => {
@@ -80,11 +85,11 @@ describe('buildReferencedEntitiesBlock', () => {
     });
 
     expect(block).toBeDefined();
-    expect(block).toContain('"Someone Else Song"');
+    expect(block).not.toContain('Someone Else Song');
     // Not described with the owned-release framing — only the neutral
     // "do not assert who it belongs to" guidance.
     expect(block?.toLowerCase()).not.toContain('treat any reference to it');
-    expect(block?.toLowerCase()).toContain('do not assert who it belongs to');
+    expect(block).toContain('Do not infer identity');
   });
 
   it('recognises an @artist token that matches the user own identity', () => {
@@ -95,6 +100,28 @@ describe('buildReferencedEntitiesBlock', () => {
     });
 
     expect(block?.toLowerCase()).toContain('this is the user');
+  });
+
+  it('never treats a matching title or artist label as identity', () => {
+    const block = buildReferencedEntitiesBlock({
+      userTexts: ['@artist:someone_else[Luna Waves] @release:gone[Revival]'],
+      ownedReleases: [ownedRelease()],
+      artist: ARTIST,
+    });
+    expect(block).not.toContain('this is the user');
+    expect(block).not.toContain('own catalog');
+    expect(block).not.toContain('Luna Waves');
+    expect(block).not.toContain('Revival');
+  });
+
+  it('uses the current title and exact id after a rename', () => {
+    const block = buildReferencedEntitiesBlock({
+      userTexts: ['@release:rel_revival_001[Private former title]'],
+      ownedReleases: [ownedRelease({ title: 'Current title' })],
+      artist: ARTIST,
+    });
+    expect(block).toContain('release:rel_revival_001 "Current title"');
+    expect(block).not.toContain('Private former title');
   });
 
   it('de-duplicates repeated references to the same entity', () => {

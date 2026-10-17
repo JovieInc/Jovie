@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { SOURCE_GUARDS, selectSourceGuards } from '../../ci-fast-lanes.mjs';
 import { selectScriptContracts } from '../script-contract-affected.mjs';
+import { testsAffectedBy } from '../test-file-dependencies.mjs';
 
 const ROOT = join(import.meta.dirname, '../../..');
 
@@ -74,6 +75,24 @@ test('other diffs run only contracts whose derived reads they touch', () => {
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('root DESIGN.md and ./design-sections.json select the instruction contract', () => {
+  const contract = 'scripts/agent-context/check.test.mjs';
+  assert.deepEqual(testsAffectedBy([contract], ['DESIGN.md'], ROOT), [
+    contract,
+  ]);
+  assert.deepEqual(
+    testsAffectedBy(
+      [contract],
+      ['scripts/agent-context/design-sections.json'],
+      ROOT
+    ),
+    [contract]
+  );
+  const selected = selectScriptContracts(['DESIGN.md'], { root: ROOT });
+  assert.equal(selected.full, false);
+  assert.ok(selected.node.includes(contract));
 });
 
 test('is a PR-only source guard resolved beside ci-fast-lanes', () => {

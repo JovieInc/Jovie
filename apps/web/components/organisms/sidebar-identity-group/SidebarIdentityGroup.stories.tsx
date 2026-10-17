@@ -124,3 +124,12 @@ export const WithoutPublicProfile: Story = {
   ...Expanded,
   args: { profileHref: undefined },
 };
+
+export const DockStatus: Story = {
+  args: {
+    dockStatus: {
+      label: "Update available · What's new",
+      badges: <span aria-hidden='true'>↑ ·</span>,
+    },
+  },
+};

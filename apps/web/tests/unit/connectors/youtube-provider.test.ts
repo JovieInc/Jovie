@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   createYouTubeLibraryProvider,
+  createYouTubeSnippetWriter,
   listOwnedYouTubeChannels,
   YouTubeProviderError,
 } from '@/lib/connectors/youtube/provider';
@@ -418,4 +419,38 @@ describe('YouTube Library provider', () => {
       ['video-7'],
     ]);
   });
+});
+
+it('uses conditional snippet writes and retains title, tags, category and language', async () => {
+  const snippet = {
+    defaultAudioLanguage: 'en',
+    title: '  Original title  ',
+    description: 'Credits',
+    categoryId: '10',
+    tags: ['music'],
+    defaultLanguage: 'en',
+    channelId: 'owned',
+  };
+  const fetcher = vi.fn(async () =>
+    jsonResponse({ id: 'video', etag: 'v2', snippet })
+  );
+  const writer = createYouTubeSnippetWriter({ accessToken: 'token', fetcher });
+  const record = await writer.updateVideo({
+    videoId: 'video',
+    etag: 'v1',
+    snippet,
+  });
+  expect(record.snippet).toEqual(snippet);
+  expect(fetcher).toHaveBeenCalledWith(
+    expect.any(URL),
+    expect.objectContaining({
+      method: 'PUT',
+      headers: expect.objectContaining({ 'If-Match': 'v1' }),
+      body: expect.stringContaining('Original title'),
+    })
+  );
+  await expect(
+    writer.updateVideo({ videoId: 'video', etag: null, snippet })
+  ).rejects.toMatchObject({ status: 412 });
+  expect(fetcher).toHaveBeenCalledTimes(1);
 });

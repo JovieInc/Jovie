@@ -112,9 +112,11 @@ test.describe('Profile Drawers - Mobile Open/Close Lifecycle', () => {
     await expect(page.getByTestId('profile-pay-recipient')).toContainText(
       'Pay Tim White'
     );
-    await expect(page.getByTestId('profile-pay-recipient')).toContainText(
-      '@tim via Venmo'
-    );
+    // JOV-6567 moved the Venmo method onto the pay dial. The recipient line
+    // is the handle only.
+    await expect(
+      page.getByTestId('profile-pay-recipient').locator('p').nth(1)
+    ).toHaveText('@tim');
 
     await closeDrawer(page);
 

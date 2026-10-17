@@ -823,13 +823,6 @@ const SCRAPER_CONFIGS_SEED = [
     enabled: true,
   },
   {
-    network: 'instagram',
-    strategy: 'browser' as const,
-    maxConcurrency: 2,
-    maxJobsPerMinute: 10,
-    enabled: true,
-  },
-  {
     network: 'twitter',
     strategy: 'api' as const,
     maxConcurrency: 3,

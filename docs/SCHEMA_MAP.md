@@ -28,6 +28,7 @@ All schema files live in `apps/web/lib/db/schema/`. Import tables and types from
 
 | Schema File | Tables | Key Relations |
 |-------------|--------|---------------|
+| `connector-write-receipts.ts` | `connectorWriteReceipts` | Append-only profile write/rollback proposal, approval, start and outcome evidence; tenant-scoped, no cascading FKs; unique proposal phase and destination rate window |
 | `connectors.ts` | `connectorAccounts`, `connectorSyncStates`, `externalObjects`, `webhookDeliveries`, `contextFacts`, `agentRuns`, `suggestedActions`, `workflowRuns` | `connectorAccounts.userId` → `users`; `connectorSyncStates.connectorAccountId` → `connectorAccounts`; `contextFacts.userId` → `users`; `suggestedActions.agentRunId` → `agentRuns` |
 
 Token read/write must go through `apps/web/lib/connectors/token-vault.ts` — never write `encryptedAccessToken`/`encryptedRefreshToken` directly.
@@ -57,11 +58,15 @@ Token read/write must go through `apps/web/lib/connectors/token-vault.ts` — ne
 | `library-presence.ts` | `libraryPresenceFindings`, `libraryRightsholderEvidence` | Post-release repair/collision queue and observed/attested rights evidence. Songview/MLC stay `observed`. Seeded Tim findings are queue inputs only |
 | `promo-downloads.ts` | `promoDownloads`, `promoDownloadEvents` | Active files require `rightsControlAttested` plus actor/timestamp; existing files fail closed until re-attested |
 
+Content and audience compatibility state, writers, backfills and removal gates:
+[legacy model transitions](db/legacy-model-transitions.md). Coexisting tables are
+not evidence of parity or permission to drop historical rows.
+
 ### Analytics & Tracking
 
 | Schema File | Tables | Key Relations |
 |-------------|--------|---------------|
-| `analytics.ts` | `clickEvents`, `audienceMembers`, `tips`, `notificationSubscriptions`, `dailyProfileViews` | `clickEvents.providerLinkId` → `providerLinks`; `tips.creatorProfileId` → `creatorProfiles` |
+| `analytics.ts` | `audienceActions`, `audienceMembers`, `audienceProjectionSnapshots`, `audienceReferrers`, `audienceSourceGroups`, `audienceSourceLinks`, `clickEvents`, `dailyProfileViews`, `notificationSubscriptions`, `serverAnalyticsEvents`, `tips` | `clickEvents.providerLinkId` → `providerLinks`; `tips.creatorProfileId` → `creatorProfiles` |
 | `pixels.ts` | `creatorPixels`, `pixelEvents` | `creatorPixels.creatorProfileId` → `creatorProfiles`; `pixelEvents.creatorPixelId` → `creatorPixels` |
 | `insights.ts` | `aiInsights`, `insightGenerationRuns` | `aiInsights.creatorProfileId` → `creatorProfiles` |
 | `ai-crawler-analytics.ts` | `aiCrawlerAnalyticsSnapshots` | `creatorProfileId` → `creatorProfiles`; 30-day Cloudflare AI-crawl aggregates per profile |

@@ -175,7 +175,7 @@ describe('cached auth utilities', () => {
         deletedAt: null,
       });
       mockGetImpersonationState.mockResolvedValue({
-        realAdminUserId: 'user_admin',
+        actorUserId: 'user_admin',
         effectiveUserId: 'user_target',
       });
       mockGetAppUserById.mockResolvedValue({
@@ -332,7 +332,7 @@ describe('cached auth utilities', () => {
         deletedAt: null,
       });
       mockGetImpersonationState.mockResolvedValue({
-        realAdminUserId: 'user_admin',
+        actorUserId: 'user_admin',
         effectiveUserId: 'user_target',
       });
       mockGetAppUserById.mockResolvedValue({

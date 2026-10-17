@@ -36,7 +36,7 @@ describe('SupportPageContent', () => {
     ]) {
       expect(heading).not.toHaveClass(residue);
     }
-    expect(screen.getByTestId('support-hero')).toHaveAttribute(
+    expect(screen.getByTestId('marketing-section-hero')).toHaveAttribute(
       'aria-labelledby',
       'support-hero-heading'
     );
@@ -50,7 +50,7 @@ describe('SupportPageContent', () => {
       'Still Need Help?',
     ]);
     expect(screen.getAllByRole('article')).toHaveLength(2);
-    expect(screen.getAllByTestId('support-cta')).toHaveLength(1);
+    expect(screen.getAllByTestId('marketing-section-cta')).toHaveLength(1);
     for (const action of screen
       .getAllByRole('link')
       .filter(link =>

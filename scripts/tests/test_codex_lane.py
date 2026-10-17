@@ -11,6 +11,7 @@ import json
 import os
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from unittest.mock import ANY, patch
@@ -19,6 +20,29 @@ from pathlib import Path
 from contextlib import redirect_stdout
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def read_ready_pid(path: Path, deadline: float) -> int | None:
+    """Wait until `path` holds a pid.
+
+    The metadata child used to create the ready file and then write the pid.
+    A reader that returns on existence can observe an empty file
+    (`int('')` raises ValueError). Publication is an atomic replace; this wait
+    still accepts only a parseable pid and fails closed when the deadline passes.
+    """
+    while True:
+        try:
+            text = path.read_text().strip()
+        except OSError:
+            text = ""
+        if text:
+            try:
+                return int(text)
+            except ValueError:
+                pass
+        if time.monotonic() >= deadline:
+            return None
+        time.sleep(0.01)
 SPEC = importlib.util.spec_from_file_location("codex_lane", ROOT / "scripts/lanes/codex_lane.py")
 codex = importlib.util.module_from_spec(SPEC)
 sys.modules["codex_lane"] = codex
@@ -458,7 +482,10 @@ for line in sys.stdin:
         self.cli.write_text(f'''#!{sys.executable}
 import os, time
 from pathlib import Path
-Path({str(ready)!r}).write_text(str(os.getpid()))
+ready = Path({str(ready)!r})
+pending = ready.with_name(ready.name + '.tmp')
+pending.write_text(str(os.getpid()))
+os.replace(pending, ready)
 time.sleep(30)
 ''')
         self.cli.chmod(0o755)
@@ -473,11 +500,8 @@ m.reconcile(1_000_000, 0)
                                         stdout=codex.subprocess.DEVNULL, stderr=codex.subprocess.DEVNULL)
         child = None
         try:
-            deadline = time.monotonic() + 5
-            while not ready.exists() and time.monotonic() < deadline:
-                time.sleep(.01)
-            self.assertTrue(ready.exists(), 'metadata process did not start')
-            child = int(ready.read_text())
+            child = read_ready_pid(ready, time.monotonic() + 5)
+            self.assertIsNotNone(child, 'metadata process did not publish its pid')
             parent.kill()
             parent.wait(timeout=2)
             self.assertIsNone(codex.lease('current-login'), 'live child lost inherited account lease')
@@ -498,6 +522,20 @@ m.reconcile(1_000_000, 0)
                 time.sleep(.01)
         self.assertIsNotNone(handle, 'drained metadata process kept account lease')
         handle.close()
+
+    def test_ready_pid_waits_until_the_file_is_parseable(self):
+        ready = self.root / 'metadata-child.pid'
+        ready.write_text('')
+
+        def publish():
+            time.sleep(0.05)
+            pending = ready.with_name(ready.name + '.tmp')
+            pending.write_text('4242')
+            os.replace(pending, ready)
+
+        threading.Thread(target=publish, daemon=True).start()
+        self.assertEqual(read_ready_pid(ready, time.monotonic() + 2), 4242)
+        self.assertIsNone(read_ready_pid(self.root / 'missing.pid', time.monotonic()))
 
     def test_concurrent_corruption_before_final_merge_is_preserved(self):
         def corrupt_after_metadata(_):
@@ -937,6 +975,186 @@ class SubscriptionPoolTest(Isolated):
         self.clock = patch.object(codex.time, "time", return_value=self.NOW)
         self.clock.start()
         self.addCleanup(self.clock.stop)
+        compute = patch.object(codex.os, "cpu_count", return_value=8)
+        compute.start()
+        self.addCleanup(compute.stop)
+
+    def primary_slots(self, count):
+        profiles = {name: dict(profile) for name, profile in self.profiles.items()}
+        profiles["current-login"]["slots"] = count
+        return patch.dict(os.environ, {"CODEX_LANE_SUBSCRIPTION_PROFILES": json.dumps(profiles),
+                                       "CODEX_LANE_LOGIN_SLOTS": str(count)})
+
+    def test_explicit_primary_seats_accept_known_compute_without_a_fixed_three_ceiling(self):
+        for count in (1, 3, 4, 8):
+            with self.subTest(count=count), self.primary_slots(count):
+                self.assertEqual(codex.login_slots("current-login"), count)
+                self.assertEqual(codex.login_slots("lyb-pro"), 1)
+
+    def test_unknown_or_insufficient_compute_refuses_the_pool_before_any_lease(self):
+        for cpus in (None, 0, -1, True, 4.0, "4", 3):
+            with self.subTest(cpus=cpus), self.primary_slots(4), \
+                    patch.object(codex.os, "cpu_count", return_value=cpus), \
+                    patch.object(codex, "update_state", side_effect=AssertionError("no binding write")):
+                with self.assertRaises(ValueError):
+                    codex.lease("current-login")
+
+    def test_primary_seat_types_bounds_and_configuration_agreement_remain_strict(self):
+        for count in (0, -1, True, 4.0, "4", 9, 10**100):
+            with self.subTest(count=count), self.primary_slots(count):
+                with self.assertRaises(ValueError):
+                    codex.subscription_profiles()
+        with self.primary_slots(4), patch.dict(os.environ, {"CODEX_LANE_LOGIN_SLOTS": "3"}):
+            with self.assertRaisesRegex(ValueError, "slots must remain unchanged"):
+                codex.subscription_profiles()
+
+    def test_four_primary_flocks_and_one_exclusive_extra_share_existing_lock_namespace(self):
+        with self.primary_slots(4):
+            self.reconcile()
+            handles = [codex.lease("current-login") for _ in range(4)] + [codex.lease("lyb-pro")]
+            try:
+                self.assertTrue(all(handles))
+                self.assertIsNone(codex.lease("current-login"))
+                self.assertIsNone(codex.lease("lyb-pro"))
+                self.assertEqual([Path(handle.name).name for handle in handles],
+                                 ["current-login.lock", "current-login.1.lock", "current-login.2.lock",
+                                  "current-login.3.lock", "lyb-pro.lock"])
+                with patch.dict(os.environ, {"CODEX_LANE_AUTH_MODE": "current-login"}):
+                    self.assertIsNone(codex.lease("current-login"))
+            finally:
+                for handle in handles:
+                    if handle is not None:
+                        handle.close()
+            self.assertEqual([len(codex._slot_paths(name)) for name in self.profiles], [4, 1])
+
+    def test_widened_primary_quota_bank_stops_execution_and_all_new_primary_picks(self):
+        with self.primary_slots(4):
+            self.reconcile()
+            value = self.snapshot("current-login")
+            value["rateLimits"]["rateLimits"]["primary"]["usedPercent"] = 100
+            handle = codex.lease("current-login")
+            with patch.object(codex, "current_subscription_snapshot", return_value=value), \
+                    patch.object(codex.subprocess, "Popen", side_effect=AssertionError("no depleted execution")):
+                self.assertEqual(codex.run_account("current-login", handle, ["fake"], "fixture",
+                                                  self.tmp.name, self.NOW),
+                                 (codex.NO_ACCOUNT_EXIT, "limit", self.NOW + 7200))
+            self.assertTrue(handle.closed)
+            state = codex.read_state()
+            self.assertEqual(codex.pick(state, self.NOW, ["current-login"]), (None, None))
+            self.assertTrue(codex.available("lyb-pro", state, self.NOW))
+            self.assertEqual(state["current-login"]["exhaustedUntil"], self.NOW + 7200)
+
+    def test_primary_seat_capacity_never_bypasses_native_global_or_provider_admission(self):
+        from scripts.lanes import lane_runner as runner
+        with self.primary_slots(4):
+            self.reconcile()
+            host = runner.Host(repo=Path(self.tmp.name), state=Path(self.tmp.name) / "worker-state")
+            occupied = [runner.Locked(host.state / "slots" / f"codex.{index}.lock", False)
+                        for index in range(4)]
+            other = runner.Locked(host.state / "slots/grok.0.lock", False)
+            for lock in [*occupied, other]:
+                self.assertTrue(lock.held)
+                self.addCleanup(lambda lock=lock: lock.release() if not lock.handle.closed else None)
+            providers = {"codex": {"enabled": True, "slots": 5}, "grok": {"enabled": True, "slots": 1}}
+            def admitted(_host, name, _spec, slot, **_):
+                self.assertEqual(name, "codex")
+                self.assertTrue(slot.held)
+                self.assertEqual(sum(runner.occupied_worker_slots(host).values()), 5)
+                account = codex.lease("current-login")
+                self.assertIsNotNone(account)
+                account.close()
+                return 0
+            with patch.object(runner, "load_providers", return_value=providers), \
+                    patch.object(host, "slots", return_value=5) as provider_cap, \
+                    patch.object(host, "intake_slots", return_value=5), \
+                    patch.object(runner.autoscale, "host_ceiling", return_value=5) as global_cap, \
+                    patch.object(runner, "worker_with_slot", side_effect=admitted) as work:
+                self.assertEqual(runner.worker(host, "codex"), 0)  # Other providers consume the same ceiling.
+                work.assert_not_called()
+                other.release()
+                global_cap.return_value = 4
+                self.assertEqual(runner.worker(host, "codex"), 0)
+                work.assert_not_called()
+                global_cap.return_value = 5
+                provider_cap.return_value = 4
+                self.assertEqual(runner.worker(host, "codex"), 0)
+                work.assert_not_called()
+                provider_cap.return_value = 5
+                self.assertEqual(runner.worker(host, "codex"), 0)
+                work.assert_called_once()
+
+
+    @patch.object(codex, "current_login_available", return_value=True)
+    def test_health_keeps_eligible_fully_leased_subscriptions_healthy(self, _login):
+        self.reconcile()
+        handles = [codex.lease("current-login") for _ in range(3)] + [codex.lease("lyb-pro")]
+        try:
+            self.assertTrue(all(handles))
+            before = codex.read_state()
+            report = codex.status()
+            self.assertEqual(report["available"], [])
+            self.assertTrue(all(row["available"] and row["freeSlots"] == 0
+                                for row in report["accounts"].values()))
+            with redirect_stdout(io.StringIO()):
+                self.assertEqual(codex.main(["health"]), 0)
+            self.assertEqual(codex.read_state(), before)
+            self.assertEqual(codex.status(), report)
+        finally:
+            for handle in handles:
+                if handle is not None:
+                    handle.close()
+
+    @patch.object(codex, "current_login_available", return_value=True)
+    def test_health_rejects_unverified_stale_banked_and_depleted_accounts(self, _login):
+        self.reconcile()
+        verified = codex.read_state()
+        mutations = {
+            "unknown": lambda row: row.pop("subscriptionIdentityVerifiedAt"),
+            "stale": lambda row: row.update(subscriptionIdentityVerifiedAt=self.NOW - codex.LEDGER_CADENCE_S),
+            "binding": lambda row: row.update(subscriptionBinding="unknown"),
+            "auth": lambda row: row.update(lastKind="auth", exhaustedUntil=self.NOW + 60),
+            "quota": lambda row: row.update(lastKind="limit", exhaustedUntil=self.NOW + 60),
+            "depleted": lambda row: row["capacityLease"]["usableCapacityRemaining"]["primary"].update(remainingPercent=0),
+            "expired": lambda row: row["capacityLease"]["usableCapacityRemaining"]["primary"].update(resetsAt=self.NOW),
+            "missing-capacity": lambda row: row.pop("capacityLease"),
+        }
+        for reason, mutate in mutations.items():
+            with self.subTest(reason=reason):
+                state = json.loads(json.dumps(verified))
+                for name in self.profiles:
+                    mutate(state[name])
+                codex.write_state(state)
+                with redirect_stdout(io.StringIO()):
+                    self.assertEqual(codex.main(["health"]), 1)
+                self.assertEqual(codex.status()["available"], [])
+                self.assertEqual(codex.read_state(), state)
+
+    @patch.object(codex, "current_login_available", return_value=True)
+    def test_health_accepts_busy_eligible_account_when_free_account_is_stale(self, _login):
+        self.reconcile()
+        state = codex.read_state()
+        state["current-login"]["subscriptionIdentityVerifiedAt"] = self.NOW - codex.LEDGER_CADENCE_S
+        codex.write_state(state)
+        handle = codex.lease("lyb-pro")
+        self.assertIsNotNone(handle)
+        try:
+            report = codex.status()
+            self.assertEqual(report["available"], [])
+            self.assertFalse(report["accounts"]["current-login"]["available"])
+            self.assertEqual(report["accounts"]["current-login"]["freeSlots"], 3)
+            self.assertTrue(report["accounts"]["lyb-pro"]["available"])
+            self.assertEqual(report["accounts"]["lyb-pro"]["freeSlots"], 0)
+            with redirect_stdout(io.StringIO()):
+                self.assertEqual(codex.main(["health"]), 0)
+        finally:
+            handle.close()
+
+    @patch.object(codex, "current_login_available", return_value=True)
+    def test_health_without_accounts_fails(self, _login):
+        self.reconcile()
+        _login.return_value = False
+        with redirect_stdout(io.StringIO()):
+            self.assertEqual(codex.main(["health"]), 1)
 
     def snapshot(self, name):
         value = current_snapshot(self.NOW)
@@ -1261,6 +1479,35 @@ class LaunchIdentityTest(Isolated):
         self.assertEqual(row["cliVersion"], "0.144.6")
         self.assertEqual(row["cliReported"]["model"], "gpt-5.6-sol")
         self.assertFalse(row["providerAttested"])
+
+    def test_latest_verified_cli_header_has_explicit_version_provenance(self):
+        # rust-v0.162.1 exec/src/event_processor_with_human_output.rs preserves
+        # the pre-prompt header contract; this is CLI evidence, not attestation.
+        row, result = self.invoke(self.header(version="0.162.1", model="gpt-6.1-sol"))
+        self.assertEqual(result, (0, "ok", None))
+        self.assertEqual(row["identityState"], "reported")
+        self.assertEqual(row["cliVersion"], "0.162.1")
+        self.assertEqual(row["cliReported"], {"model": "gpt-6.1-sol", "provider": "openai",
+                                             "reasoningEffort": "xhigh", "sessionId": self.SESSION})
+        self.assertEqual(row["requested"]["model"], "configured-alias")
+        self.assertEqual(row["provenance"], "codex-cli-startup-header")
+        self.assertFalse(row["providerAttested"])
+        self.assertIsNone(row["usage"])
+        self.assertIsNone(row["costUsd"])
+
+    def test_latest_cli_still_rejects_unknown_versions_and_malformed_identity(self):
+        header = self.header(version="0.162.1")
+        cases = [header.replace("v0.162.1", "v0.162.2"),
+                 header.replace("session id: " + self.SESSION, "session id: invalid"),
+                 header.replace("provider: openai", "provider: openai SECRET"),
+                 header.replace("--------\nuser\n", "--------\n"),
+                 "codex\n" + header]
+        for index, output in enumerate(cases):
+            with self.subTest(index=index):
+                row, _ = self.invoke(output)
+                self.assertEqual(row["identityState"], "unknown")
+                self.assertIsNone(row["cliReported"])
+                self.assertFalse(row["providerAttested"])
 
     def test_missing_malformed_or_incomplete_startup_stays_unknown(self):
         cases = ["", "codex\n" + self.header(),

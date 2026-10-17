@@ -16,6 +16,10 @@ import math
 import os
 from pathlib import Path
 import re
+import subprocess
+import sys
+import time
+from urllib.parse import quote
 
 ATTRIBUTION_SCHEMA = "jovie-company-shipping-attribution/v1"
 ORIGIN_RECEIPT_SCHEMA = "jovie-shipping-origin/v1"
@@ -39,6 +43,12 @@ PROJECTS = (
     {"channel": "Jovie", "repository": "JovieInc/Jovie", "instrumented": True},
     {"channel": "LogYourBody", "repository": "JovieInc/LogYourBody", "instrumented": True},
 )
+# Pull and git-ref reads lag a force-push. Run 38952636890 logged the push of
+# 1d86ad82 at 19:26:58Z, failed the head check at 19:27:00Z, and the pull's
+# updated_at reached that SHA at 19:27:23Z. Wait that window out, then still
+# reject a head that never converges. Delays are the sleeps between reads.
+ORIGIN_HEAD_READ_ATTEMPTS = 8
+ORIGIN_HEAD_RETRY_DELAYS = (2, 4, 8, 8, 8, 8, 8)
 
 
 def _object(value):
@@ -282,12 +292,14 @@ def project_report(project: dict, evidence: dict, ledger: dict, generated_at: fl
     until = (window or {}).get("until")
     age = generated_at - until if isinstance(until, (int, float)) and math.isfinite(until) else None
     historical = age is not None and age > 36 * 3600
+    remote_ingest = ledger.get("remoteIngest")
+    ingest_complete = not (isinstance(remote_ingest, dict) and remote_ingest.get("errors"))
     return {
         "channel": project["channel"], "repository": repository, "instrumented": instrumented,
         "window": {"since": (window or {}).get("since"), "until": until, "halfOpen": True},
         "denominatorComplete": complete, "incompleteReason": None if complete else
         (evidence.get("reason") if isinstance(evidence, dict) else "merge-window-not-read"),
-        "attributionEvidenceComplete": complete and instrumented and ledger.get("complete") is True,
+        "attributionEvidenceComplete": complete and instrumented and ledger.get("complete") is True and ingest_complete,
         "mergeCount": denominator,
         "coverage": coverage,
         "byConfidence": dict(sorted(by_confidence.items())) if complete and instrumented else None,
@@ -302,6 +314,7 @@ def project_report(project: dict, evidence: dict, ledger: dict, generated_at: fl
                       "ageSeconds": round(max(0, age), 3) if age is not None else None,
                       "ledgerObservedAt": ledger.get("observedAt")},
         "receiptStream": {k: ledger.get(k) for k in ("complete", "reason", "corruptRows")},
+        "remoteIngest": remote_ingest,
         "pullRequests": rows,
     }
 
@@ -327,12 +340,68 @@ def validate_origin_receipt(receipt: dict) -> None:
         raise ValueError(error or "invalid-origin-receipt")
 
 
+def resolve_origin_head(repository: str, number: int, expected_head: str, *, fetch=None,
+                        sleep=None, attempts=None) -> tuple[str, dict]:
+    """Read canonical GitHub identity; caller assertions alone never establish a head.
+
+    A just-pushed SHA can be missing from the pull and the git ref for a short
+    window. Poll until both equal ``expected_head``. Repository, pull number,
+    and base repo mismatches are rejected on the first read. A head that is
+    still different after the bounded wait is still a mismatch.
+    """
+    def remote(endpoint):
+        result = subprocess.run(["gh", "api", endpoint], capture_output=True, text=True,
+                                timeout=20, check=True)
+        return json.loads(result.stdout)
+    read = fetch or remote
+    pause = sleep or time.sleep
+    tries = ORIGIN_HEAD_READ_ATTEMPTS if attempts is None else attempts
+    canonical = read(f"repos/{repository}")["full_name"]
+    if canonical not in {project["repository"] for project in PROJECTS}:
+        raise ValueError("origin-repository-not-allowed")
+    for attempt in range(max(tries, 0)):
+        pr = read(f"repos/{canonical}/pulls/{number}")
+        if (type(pr.get("number")) is not int or pr["number"] != number
+                or _object(_object(pr.get("base")).get("repo")).get("full_name") != canonical):
+            raise ValueError("origin-receipt-head-mismatch")
+        matched = _object(pr.get("head")).get("sha") == expected_head
+        if matched and pr.get("state") == "open":
+            head = pr["head"]
+            ref = read(f"repos/{head['repo']['full_name']}/git/ref/heads/{quote(head['ref'], safe='')}")
+            matched = _object(ref.get("object")).get("sha") == expected_head
+        if matched:
+            return canonical, pr
+        if attempt + 1 >= tries:
+            break
+        print(f"origin head {str(expected_head)[:12]} not converged for pull {number} "
+              f"(attempt {attempt + 1}/{tries})", file=sys.stderr)
+        pause(ORIGIN_HEAD_RETRY_DELAYS[min(attempt, len(ORIGIN_HEAD_RETRY_DELAYS) - 1)])
+    raise ValueError("origin-receipt-head-mismatch")
+
+
 def append_origin_receipt(path: Path, receipt: dict) -> None:
     """Append a manual/external origin receipt without changing execution authority."""
     validate_origin_receipt(receipt)
     Path(path).parent.mkdir(parents=True, exist_ok=True)
-    with Path(path).open("a") as handle:
+    with Path(path).open("a+") as handle:
         fcntl.flock(handle, fcntl.LOCK_EX)
+        handle.seek(0)
+        for raw in handle:
+            if not raw.strip():
+                continue
+            try:
+                row = json.loads(raw)
+            except ValueError:
+                raise OSError("origin-ledger-corrupt") from None
+            if not isinstance(row, dict):
+                raise OSError("origin-ledger-corrupt")
+            if (row.get("schema") == ORIGIN_RECEIPT_SCHEMA and
+                    (row.get("repository"), row.get("pr"), row.get("headSha")) ==
+                    (receipt["repository"], receipt["pr"], receipt["headSha"])):
+                fields = ("method", "initiator", "provider", "model", "linearIssue")
+                if any(row.get(key) != receipt.get(key) for key in fields):
+                    raise ValueError("conflicting-origin-receipt")
+                raise ValueError("duplicate-origin-receipt")
         handle.write(json.dumps(receipt, separators=(",", ":")) + "\n")
         handle.flush()
         os.fsync(handle.fileno())
@@ -361,6 +430,9 @@ def main(argv=None) -> int:
                "method": args.method, "initiator": args.initiator, "provider": args.provider,
                "model": args.model, "executionHost": args.execution_host, "runId": args.run_id,
                "linearIssue": args.linear_issue, "evidenceUrl": args.evidence_url}
+    validate_origin_receipt(receipt)
+    receipt["repository"], _ = resolve_origin_head(args.repository, args.pr, args.head_sha)
+    receipt["receiptId"] = f"origin:{receipt['repository']}:{args.pr}:{args.head_sha}"
     append_origin_receipt(args.ledger, receipt)
     print(json.dumps({"receiptId": receipt["receiptId"], "ledger": str(args.ledger)}))
     return 0

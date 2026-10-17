@@ -83,7 +83,7 @@ describe('SidebarThreadsSection', () => {
 
     expect(
       screen.getByRole('button', { name: 'New Chat' }).querySelector('svg')
-    ).toHaveClass('h-3', 'w-3', 'text-accent-teal!');
+    ).toHaveClass('size-3.5');
   });
 
   it('reserves the trailing action track and ellipsizes the full title', () => {
@@ -279,7 +279,7 @@ describe('SidebarThreadsSection', () => {
     expect(onSelect).toHaveBeenCalledWith('draft-thread');
   });
 
-  it('shows a new chat empty-state action when no chats are available', () => {
+  it('keeps creation in the history heading when no chats are available', () => {
     const onNewThread = vi.fn();
 
     render(
@@ -296,34 +296,49 @@ describe('SidebarThreadsSection', () => {
       name: 'New Chat',
     });
 
-    expect(newThreadButton).toHaveClass('h-6', 'hover:bg-sidebar-accent/70');
+    expect(newThreadButton).toHaveClass(
+      'h-6',
+      'w-6',
+      'before:h-11',
+      'before:w-11'
+    );
+    expect(newThreadButton.parentElement).toHaveAttribute(
+      'data-sidebar-history-header'
+    );
     expect(newThreadButton).not.toHaveClass('h-auto', 'hover:bg-transparent');
     fireEvent.click(newThreadButton);
     expect(onNewThread).toHaveBeenCalledTimes(1);
   });
 
-  // JOV-6181: the empty-state New Chat create pill hugs its label in an
-  // auto-sized track — a terminal fade here sheared the trailing "t" with
-  // rail space free. This is the one spot the label still renders as text.
-  it('keeps the New Chat empty-state pill label off the terminal fade', () => {
-    render(
-      <SidebarThreadsSection
-        threads={[]}
-        activeThreadId={null}
-        onNewThread={vi.fn()}
-        collapsed={false}
-      />
-    );
-
-    const label = screen.getByText('New Chat');
-    expect(label.className).not.toContain('mask-image');
-    expect(label.className).not.toContain('-webkit-mask-image');
-
-    const pill = screen.getByRole('button', { name: 'New Chat' });
-    const pillClasses = pill.className.split(/\s+/);
-    expect(pillClasses).toContain('w-fit');
-    expect(pillClasses).not.toContain('w-full');
-  });
+  it.each(['idle', 'loading', 'error'] as const)(
+    'keeps the canonical creation slot in empty %s history without a duplicate row',
+    state => {
+      render(
+        <SidebarThreadsSection
+          calm
+          threads={[]}
+          activeThreadId={null}
+          state={state}
+          newThreadAction={
+            <a href={APP_ROUTES.CHAT} aria-label='New Chat'>
+              +
+            </a>
+          }
+          onNewThread={vi.fn()}
+          collapsed={false}
+        />
+      );
+      const create = screen.getByRole('link', { name: 'New Chat' });
+      expect(create.parentElement).toHaveAttribute(
+        'data-sidebar-history-header'
+      );
+      expect(screen.queryByRole('button', { name: 'New Chat' })).toBeNull();
+      expect(screen.queryByText('New Chat')).toBeNull();
+      expect(
+        screen.queryByRole('button', { name: 'Filter Unread Chats' })
+      ).toBeNull();
+    }
+  );
 
   it('keeps loading and error rows on the same reserved geometry', () => {
     const onRetry = vi.fn();
@@ -418,7 +433,7 @@ describe('SidebarThreadsSection', () => {
 describe('founder-locked calm sidebar history', () => {
   afterEach(() => vi.useRealTimers());
 
-  it('groups real conversations into Today and Earlier and filters unread chats', () => {
+  it('groups read and unread conversations into Today and Earlier with one creation action', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-09-12T12:00:00'));
     const current: SidebarThread[] = [
@@ -437,11 +452,13 @@ describe('founder-locked calm sidebar history', () => {
         calm
         threads={current}
         activeThreadId={null}
+        onNewThread={vi.fn()}
         collapsed={false}
       />
     );
-    const filter = screen.getByRole('button', { name: 'Filter Unread Chats' });
-    expect(filter.querySelector('svg')).not.toBeNull();
+    const create = screen.getByRole('button', { name: 'New Chat' });
+    expect(create.querySelector('svg')).not.toBeNull();
+    expect(create.parentElement).toHaveAttribute('data-sidebar-history-header');
     expect(screen.getByText('Today')).toBeInTheDocument();
     expect(screen.getByText('Earlier')).toBeInTheDocument();
     expect(screen.getByText('2m')).toHaveAttribute(
@@ -452,10 +469,11 @@ describe('founder-locked calm sidebar history', () => {
       'href',
       APP_ROUTES.CHATS
     );
-    fireEvent.click(filter);
     expect(screen.getByText('Release rollout')).toBeInTheDocument();
-    expect(screen.queryByText('Pitch tasks')).not.toBeInTheDocument();
-    expect(filter).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('Pitch tasks')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Filter Unread Chats' })
+    ).toBeNull();
   });
 
   it('retains retry and context actions and hides history when collapsed', () => {

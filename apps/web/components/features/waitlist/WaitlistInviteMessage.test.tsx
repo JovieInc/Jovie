@@ -1,8 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
-import type { ComponentProps } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import WaitlistRouteLayout from '@/app/waitlist/layout';
 import { WaitlistInviteMessage } from './WaitlistInviteMessage';
 import storyMeta, { Web213MissingToken } from './WaitlistInviteMessage.stories';
 
@@ -22,7 +23,28 @@ const MISSING_TOKEN_TITLE = 'Invite link missing';
 const MISSING_TOKEN_BODY =
   'This invite link is missing its secure token. Open the latest invite email and try again.';
 
+vi.mock('@/components/providers/ResolvedClientProviders', () => ({
+  ResolvedClientProviders: ({ children }: { readonly children: ReactNode }) =>
+    children,
+}));
+
 describe('WaitlistInviteMessage', () => {
+  it('inherits one main landmark from the actual waitlist route', async () => {
+    render(
+      await WaitlistRouteLayout({
+        children: (
+          <WaitlistInviteMessage
+            title={MISSING_TOKEN_TITLE}
+            body={MISSING_TOKEN_BODY}
+          />
+        ),
+      })
+    );
+
+    expect(screen.getAllByRole('main')).toHaveLength(1);
+    expect(screen.getByRole('main')).toHaveTextContent(MISSING_TOKEN_TITLE);
+  });
+
   it('renders the shipped missing-token recovery state', () => {
     render(
       <WaitlistInviteMessage

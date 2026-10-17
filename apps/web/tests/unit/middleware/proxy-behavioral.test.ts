@@ -4,10 +4,7 @@
  * Tests routing behavior that proxy.ts owns:
  * - Cookie banner geo-detection and cookie-setting
  * - Auth redirects for unauthenticated users on protected paths
- * - Auth redirects for authenticated users on auth pages
- * - Circuit breaker for redirect loops
  * - Bot detection on sensitive API paths
- * - Clerk FAPI proxy rewrites
  *
  * Does NOT test /app/* auth/onboarding gating (owned by app-layer layouts).
  *
@@ -39,12 +36,6 @@ const mocks = vi.hoisted(() => ({
   buildReportToHeader: vi.fn().mockReturnValue(''),
   buildReportingEndpointsHeader: vi.fn().mockReturnValue(''),
   getCspReportUri: vi.fn().mockReturnValue(null),
-  resolveClerkKeys: vi.fn().mockReturnValue({
-    publishableKey: 'pk_test_real-key-123',
-    secretKey: 'sk_test_real-key-456',
-    status: 'ok',
-  }),
-  isStagingHost: vi.fn().mockReturnValue(false),
   isClerkRequiredPath: vi.fn().mockReturnValue(false),
   shouldBypassClerkForRequest: vi.fn().mockReturnValue(true),
   isTestAuthBypassEnabled: vi.fn().mockReturnValue(true),
@@ -91,10 +82,6 @@ vi.mock('@/lib/security/csp-reporting', () => ({
   buildReportToHeader: mocks.buildReportToHeader,
   buildReportingEndpointsHeader: mocks.buildReportingEndpointsHeader,
   getCspReportUri: mocks.getCspReportUri,
-}));
-vi.mock('@/lib/auth/staging-clerk-keys', () => ({
-  resolveClerkKeys: mocks.resolveClerkKeys,
-  isStagingHost: mocks.isStagingHost,
 }));
 vi.mock('@/lib/auth/clerk-middleware-bypass', () => ({
   isClerkRequiredPath: mocks.isClerkRequiredPath,
@@ -188,21 +175,41 @@ async function callMiddleware(
   return result as NextResponse;
 }
 
+function snapshotFixtureEnv() {
+  return {
+    CI: process.env.CI,
+    NEXT_PUBLIC_E2E_MODE: process.env.NEXT_PUBLIC_E2E_MODE,
+    PUBLIC_NOAUTH_SMOKE: process.env.PUBLIC_NOAUTH_SMOKE,
+    VERCEL_ENV: process.env.VERCEL_ENV,
+  };
+}
+
+function clearFixtureEnv() {
+  delete process.env.CI;
+  delete process.env.NEXT_PUBLIC_E2E_MODE;
+  delete process.env.PUBLIC_NOAUTH_SMOKE;
+  delete process.env.VERCEL_ENV;
+}
+
+function restoreFixtureEnv(previous: ReturnType<typeof snapshotFixtureEnv>) {
+  for (const [key, value] of Object.entries(previous)) {
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
+  }
+}
+
 function resetMocks() {
   for (const mock of Object.values(mocks)) {
     if (typeof mock.mockClear === 'function') mock.mockClear();
   }
   // Re-apply defaults (mockClear keeps implementations, just clears call history)
-  mocks.resolveClerkKeys.mockReturnValue({
-    publishableKey: 'pk_test_real-key-123',
-    secretKey: 'sk_test_real-key-456',
-    status: 'ok',
-  });
   mocks.resolveTestBypassUserId.mockReturnValue(null);
   mocks.isCookieBannerRequired.mockReturnValue(false);
   mocks.getUserState.mockResolvedValue(null);
   mocks.isKnownActiveUser.mockReturnValue(false);
-  mocks.isStagingHost.mockReturnValue(false);
   mocks.checkProfileVisitorBlocked.mockResolvedValue(false);
   mocks.getAudienceBlockIpFromHeaders.mockReturnValue('masked-ip');
   mocks.createBotResponse.mockReturnValue(undefined);
@@ -698,6 +705,79 @@ describe('proxy.ts middleware', () => {
       );
     });
 
+    it('redirects anonymous /onboarding/checkout to sign-in outside the screenshot fixture', async () => {
+      const previous = snapshotFixtureEnv();
+      clearFixtureEnv();
+      try {
+        const req = createUnauthenticatedRequest({
+          pathname: APP_ROUTES.ONBOARDING_CHECKOUT,
+        });
+        const res = await callMiddleware(req);
+
+        expect(res.status).toBeGreaterThanOrEqual(300);
+        expect(res.status).toBeLessThan(400);
+        expect(isRedirectTo(res, '/signin')).toBe(true);
+      } finally {
+        restoreFixtureEnv(previous);
+      }
+    });
+
+    it('keeps anonymous /onboarding/checkout behind sign-in when the screenshot fixture is admitted', async () => {
+      const previous = snapshotFixtureEnv();
+      clearFixtureEnv();
+      process.env.CI = 'true';
+      process.env.PUBLIC_NOAUTH_SMOKE = '1';
+      try {
+        const req = createUnauthenticatedRequest({
+          pathname: APP_ROUTES.ONBOARDING_CHECKOUT,
+        });
+        const res = await callMiddleware(req);
+
+        expect(res.status).toBe(307);
+        expect(isRedirectTo(res, '/signin')).toBe(true);
+        expect(res.headers.get('location')).toContain(
+          'redirect_url=%2Fonboarding%2Fcheckout'
+        );
+      } finally {
+        restoreFixtureEnv(previous);
+      }
+    });
+
+    it('keeps anonymous /onboarding/checkout behind sign-in on a production deployment', async () => {
+      const previous = snapshotFixtureEnv();
+      clearFixtureEnv();
+      process.env.CI = 'true';
+      process.env.PUBLIC_NOAUTH_SMOKE = '1';
+      process.env.VERCEL_ENV = 'production';
+      try {
+        const req = createUnauthenticatedRequest({
+          pathname: APP_ROUTES.ONBOARDING_CHECKOUT,
+        });
+        const res = await callMiddleware(req);
+
+        expect(res.status).toBeGreaterThanOrEqual(300);
+        expect(res.status).toBeLessThan(400);
+        expect(isRedirectTo(res, '/signin')).toBe(true);
+      } finally {
+        restoreFixtureEnv(previous);
+      }
+    });
+
+    it('does not open other protected routes when the screenshot fixture is admitted', async () => {
+      const previous = snapshotFixtureEnv();
+      clearFixtureEnv();
+      process.env.CI = 'true';
+      process.env.PUBLIC_NOAUTH_SMOKE = '1';
+      try {
+        const req = createUnauthenticatedRequest({ pathname: '/app' });
+        const res = await callMiddleware(req);
+
+        expect(isRedirectTo(res, '/signin')).toBe(true);
+      } finally {
+        restoreFixtureEnv(previous);
+      }
+    });
+
     it('redirects unauthenticated GET /onboarding to /start before rendering', async () => {
       const req = createUnauthenticatedRequest({
         pathname: '/onboarding',
@@ -858,240 +938,6 @@ describe('proxy.ts middleware', () => {
     });
   });
 
-  describe.skip('private-origin Clerk handling (retired: Better Auth cookie path)', () => {
-    it('keeps Clerk middleware enabled for authenticated mobile APIs on localhost', async () => {
-      mocks.isTestAuthBypassEnabled.mockReturnValue(false);
-      mocks.shouldBypassClerkForRequest.mockReturnValue(false);
-
-      const req = createUnauthenticatedRequest({
-        pathname: '/api/mobile/v1/me',
-        headers: {
-          'x-forwarded-host': 'localhost:3000',
-          'x-forwarded-proto': 'http',
-        },
-      });
-
-      const res = await callMiddleware(req);
-
-      expect(res.status).toBeLessThan(300);
-      expect(mocks.shouldBypassClerkForRequest).toHaveBeenCalledWith(
-        expect.objectContaining({
-          allowAuthRouteBypass: true,
-          forceBypass: false,
-          pathname: '/api/mobile/v1/me',
-        })
-      );
-    });
-
-    it('forces Clerk bypass for local public no-auth smoke requests', async () => {
-      const previousSmoke = process.env.PUBLIC_NOAUTH_SMOKE;
-      process.env.PUBLIC_NOAUTH_SMOKE = '1';
-      mocks.isTestAuthBypassEnabled.mockReturnValue(false);
-      mocks.shouldBypassClerkForRequest.mockReturnValueOnce(true);
-
-      try {
-        const req = createUnauthenticatedRequest({
-          pathname: '/api/chat',
-          method: 'POST',
-          hostname: '127.0.0.1',
-          headers: {
-            'x-forwarded-host': '127.0.0.1:3102',
-            'x-forwarded-proto': 'http',
-          },
-        });
-
-        const res = await callMiddleware(req);
-
-        expect(res.status).toBeLessThan(300);
-        expect(mocks.shouldBypassClerkForRequest).toHaveBeenCalledWith(
-          expect.objectContaining({
-            allowAuthRouteBypass: true,
-            forceBypass: true,
-            pathname: '/api/chat',
-          })
-        );
-        expect(mocks.clerkMiddleware).not.toHaveBeenCalled();
-      } finally {
-        if (previousSmoke === undefined) {
-          delete process.env.PUBLIC_NOAUTH_SMOKE;
-        } else {
-          process.env.PUBLIC_NOAUTH_SMOKE = previousSmoke;
-        }
-      }
-    });
-  });
-
-  describe.skip('staging Clerk contract (retired: Better Auth cookie path)', () => {
-    it('fails closed on staging auth routes when staging Clerk keys are missing', async () => {
-      mocks.isStagingHost.mockReturnValue(true);
-      mocks.resolveClerkKeys.mockReturnValue({
-        publishableKey: undefined,
-        secretKey: undefined,
-        status: 'staging_missing',
-      });
-
-      const req = createUnauthenticatedRequest({
-        hostname: 'staging.jov.ie',
-        pathname: '/signup',
-      });
-      const res = await callMiddleware(req);
-
-      expect(res.status).toBe(200);
-      expect(mocks.clerkMiddleware).not.toHaveBeenCalled();
-    });
-
-    it('renders auth routes on production runtime when Clerk keys are missing', async () => {
-      mocks.isStagingHost.mockReturnValue(true);
-      mocks.resolveClerkKeys.mockReturnValue({
-        publishableKey: undefined,
-        secretKey: undefined,
-        status: 'staging_missing',
-      });
-      const originalNodeEnv = process.env.NODE_ENV;
-
-      try {
-        process.env.NODE_ENV = 'production';
-
-        const req = createUnauthenticatedRequest({
-          hostname: 'staging.jov.ie',
-          pathname: '/signup',
-        });
-        const res = await callMiddleware(req);
-
-        expect(res.status).toBe(200);
-        expect(mocks.clerkMiddleware).not.toHaveBeenCalled();
-      } finally {
-        process.env.NODE_ENV = originalNodeEnv;
-      }
-    });
-
-    it('returns 503 for protected staging routes when staging Clerk keys are missing', async () => {
-      mocks.isStagingHost.mockReturnValue(true);
-      mocks.resolveClerkKeys.mockReturnValue({
-        publishableKey: undefined,
-        secretKey: undefined,
-        status: 'staging_missing',
-      });
-      const originalNodeEnv = process.env.NODE_ENV;
-
-      try {
-        process.env.NODE_ENV = 'production';
-
-        const req = createUnauthenticatedRequest({
-          hostname: 'staging.jov.ie',
-          pathname: '/app',
-        });
-        const res = await callMiddleware(req);
-
-        expect(res.status).toBe(503);
-        expect(mocks.clerkMiddleware).not.toHaveBeenCalled();
-      } finally {
-        process.env.NODE_ENV = originalNodeEnv;
-      }
-    });
-
-    it('returns 503 (not a signin redirect) when staging Clerk middleware throws on a protected path (JOV-1902)', async () => {
-      // Regression test: when staging Clerk middleware throws (e.g., due to a
-      // transient domain allowlist check failure or JWT validation error), protected
-      // paths like /onboarding must NOT silently fall back to handleRequest(null),
-      // which would produce a redirect loop:
-      //   /onboarding → /signin?redirect_url=%2Fonboarding → OAuth → /onboarding → …
-      //
-      // The fix: the catch block mirrors !selectedMiddleware logic and returns 503
-      // for protected paths instead of calling handleRequest(req, null).
-      mocks.isStagingHost.mockReturnValue(true);
-      mocks.resolveClerkKeys.mockReturnValue({
-        publishableKey: 'pk_test_staging-key',
-        secretKey: 'sk_test_staging-key',
-        status: 'ok',
-      });
-      mocks.clerkMiddleware.mockImplementation(() => async () => {
-        throw new Error('Clerk staging domain not in allowlist');
-      });
-
-      const req = createUnauthenticatedRequest({
-        hostname: 'staging.jov.ie',
-        pathname: '/onboarding/checkout',
-      });
-      const res = await callMiddleware(req);
-
-      // Must return 503, NOT redirect to /signin?redirect_url=%2Fonboarding%2Fcheckout
-      expect(res.status).toBe(503);
-      expect(isRedirectTo(res, '/signin')).toBe(false);
-    });
-
-    it('falls back to unauthenticated handling when staging Clerk throws on a public path', async () => {
-      // Public (non-protected, non-auth-required) paths may still be rendered
-      // when the staging middleware throws — they don't require auth.
-      mocks.isStagingHost.mockReturnValue(true);
-      mocks.resolveClerkKeys.mockReturnValue({
-        publishableKey: 'pk_test_staging-key',
-        secretKey: 'sk_test_staging-key',
-        status: 'ok',
-      });
-      mocks.clerkMiddleware.mockImplementation(() => async () => {
-        throw new Error('Clerk staging domain not in allowlist');
-      });
-
-      const req = createUnauthenticatedRequest({
-        hostname: 'staging.jov.ie',
-        pathname: '/',
-      });
-      const res = await callMiddleware(req);
-
-      // Public paths pass through (200) — they don't require authentication
-      expect(res.status).toBeLessThan(300);
-    });
-
-    it('falls back to unauthenticated handling when staging Clerk throws on an auth page', async () => {
-      // Auth pages (/signin, /signup) are treated as public for the staging
-      // error fallback so the "Auth unavailable" UI can still render.
-      mocks.isStagingHost.mockReturnValue(true);
-      mocks.resolveClerkKeys.mockReturnValue({
-        publishableKey: 'pk_test_staging-key',
-        secretKey: 'sk_test_staging-key',
-        status: 'ok',
-      });
-      mocks.clerkMiddleware.mockImplementation(() => async () => {
-        throw new Error('Clerk staging domain not in allowlist');
-      });
-
-      const req = createUnauthenticatedRequest({
-        hostname: 'staging.jov.ie',
-        pathname: '/signin',
-      });
-      const res = await callMiddleware(req);
-
-      // Auth pages pass through (200) even when Clerk throws on staging
-      expect(res.status).toBeLessThan(300);
-    });
-
-    it('returns 503 (not a signin redirect) when staging Clerk middleware throws on /app', async () => {
-      // Extends the JOV-1902 regression: /app is also a protected path that must not
-      // redirect to /signin when the staging Clerk middleware throws — otherwise a
-      // fully authenticated user hitting /app would be bounced to /signin infinitely.
-      mocks.isStagingHost.mockReturnValue(true);
-      mocks.resolveClerkKeys.mockReturnValue({
-        publishableKey: 'pk_test_staging-key',
-        secretKey: 'sk_test_staging-key',
-        status: 'ok',
-      });
-      mocks.clerkMiddleware.mockImplementation(() => async () => {
-        throw new Error('Clerk staging domain not in allowlist');
-      });
-
-      const req = createUnauthenticatedRequest({
-        hostname: 'staging.jov.ie',
-        pathname: '/app',
-      });
-      const res = await callMiddleware(req);
-
-      // Must return 503, NOT a redirect to /signin
-      expect(res.status).toBe(503);
-      expect(isRedirectTo(res, '/signin')).toBe(false);
-    });
-  });
-
   describe('auth redirects for authenticated users (proxy no longer owns auth-page user-state redirects)', () => {
     it.each([
       APP_ROUTES.AUTH_START,
@@ -1112,72 +958,6 @@ describe('proxy.ts middleware', () => {
         expect(mocks.getUserState).not.toHaveBeenCalled();
       }
     );
-
-    it.skip('redirects authenticated user on /signin to /app (retired: page/shell owns this redirect)', async () => {
-      mocks.getUserState.mockResolvedValue(USER_STATES.active);
-
-      const req = createAuthenticatedRequest('clerk_user_1', {
-        pathname: '/signin',
-      });
-      const res = await callMiddleware(req);
-
-      expect(res.status).toBeGreaterThanOrEqual(300);
-      expect(isRedirectTo(res, '/app')).toBe(true);
-    });
-
-    it.skip('redirects authenticated user on /signup to /app (retired: page/shell owns this redirect)', async () => {
-      mocks.getUserState.mockResolvedValue(USER_STATES.active);
-
-      const req = createAuthenticatedRequest('clerk_user_1', {
-        pathname: '/signup',
-      });
-      const res = await callMiddleware(req);
-
-      expect(res.status).toBeGreaterThanOrEqual(300);
-      expect(isRedirectTo(res, '/app')).toBe(true);
-    });
-
-    it.skip('redirects authenticated user with needsWaitlist on /signin to /waitlist (retired: page/shell owns this redirect)', async () => {
-      mocks.getUserState.mockResolvedValue(USER_STATES.needsWaitlist);
-
-      const req = createAuthenticatedRequest('clerk_user_1', {
-        pathname: '/signin',
-      });
-      const res = await callMiddleware(req);
-
-      expect(res.status).toBeGreaterThanOrEqual(300);
-      expect(isRedirectTo(res, '/waitlist')).toBe(true);
-    });
-
-    it.skip('redirects authenticated user with needsOnboarding on /signin to /start (retired: page/shell owns this redirect)', async () => {
-      mocks.getUserState.mockResolvedValue(USER_STATES.needsOnboarding);
-
-      const req = createAuthenticatedRequest('clerk_user_1', {
-        pathname: '/signin',
-      });
-      const res = await callMiddleware(req);
-
-      expect(res.status).toBeGreaterThanOrEqual(300);
-      expect(isRedirectTo(res, '/start')).toBe(true);
-    });
-
-    it.skip('returns approved invite recipients from /signin to the invite redemption page (retired: page/shell owns this redirect)', async () => {
-      mocks.getUserState.mockResolvedValue(USER_STATES.needsOnboarding);
-      const redirectUrl = '/waitlist/invite?token=secure-token';
-
-      const req = createAuthenticatedRequest('clerk_user_1', {
-        pathname: '/signin',
-        searchParams: { redirect_url: redirectUrl },
-      });
-      const res = await callMiddleware(req);
-
-      expect(res.status).toBeGreaterThanOrEqual(300);
-      const location = res.headers.get('location');
-      expect(location).toBeTruthy();
-      const locationUrl = new URL(location ?? '', 'https://localhost');
-      expect(locationUrl.pathname).toBe('/waitlist/invite');
-      expect(locationUrl.searchParams.get('token')).toBe('secure-token');
-    });
 
     it('lets needsOnboarding users redeem waitlist invite links', async () => {
       mocks.getUserState.mockResolvedValue(USER_STATES.needsOnboarding);
@@ -1207,18 +987,6 @@ describe('proxy.ts middleware', () => {
       expect(res.headers.get('x-middleware-rewrite')).toBeNull();
     });
 
-    it.skip('redirects active user away from /waitlist to /app (retired: page/shell owns this redirect)', async () => {
-      mocks.getUserState.mockResolvedValue(USER_STATES.active);
-
-      const req = createAuthenticatedRequest('clerk_user_1', {
-        pathname: '/waitlist',
-      });
-      const res = await callMiddleware(req);
-
-      expect(res.status).toBeGreaterThanOrEqual(300);
-      expect(isRedirectTo(res, '/app')).toBe(true);
-    });
-
     it('redirects active users from legacy /onboarding to /start', async () => {
       mocks.getUserState.mockResolvedValue(USER_STATES.active);
 
@@ -1232,20 +1000,6 @@ describe('proxy.ts middleware', () => {
       expect(res.status).toBeLessThan(400);
       expect(isRedirectTo(res, '/start')).toBe(true);
       expect(res.headers.get('location')).toContain('handle=artist');
-    });
-
-    it.skip('redirects authenticated needsOnboarding users from / to /start without bouncing through /app (JOV-2454) (retired: page/shell owns this redirect)', async () => {
-      mocks.getUserState.mockResolvedValue(USER_STATES.needsOnboarding);
-
-      const req = createAuthenticatedRequest('clerk_user_1', {
-        pathname: '/',
-      });
-      const res = await callMiddleware(req);
-
-      expect(res.status).toBeGreaterThanOrEqual(300);
-      expect(res.status).toBeLessThan(400);
-      expect(isRedirectTo(res, '/start')).toBe(true);
-      expect(isRedirectTo(res, '/app')).toBe(false);
     });
 
     it('redirects authenticated legacy earnings deep links to artist profile pay', async () => {
@@ -1314,117 +1068,6 @@ describe('proxy.ts middleware', () => {
 
       expect(res.status).toBeLessThan(300);
       expect(isRedirectTo(res, APP_ROUTES.DASHBOARD)).toBe(false);
-    });
-  });
-
-  // ==========================================================================
-  // Circuit Breaker
-  // ==========================================================================
-  describe.skip('circuit breaker (retired: proxy no longer owns user-state redirects)', () => {
-    it('redirects to /start and increments redirect count', async () => {
-      mocks.getUserState.mockResolvedValue(USER_STATES.needsOnboarding);
-
-      const req = createAuthenticatedRequest('clerk_user_1', {
-        pathname: '/pricing',
-      });
-      const res = await callMiddleware(req);
-
-      expect(res.status).toBeGreaterThanOrEqual(300);
-      expect(res.status).toBeLessThan(400);
-      expect(isRedirectTo(res, '/start')).toBe(true);
-
-      const cookies = getResponseCookies(res);
-      expect(cookies.jovie_redirect_count).toBe('1');
-    });
-
-    it('increments redirect count on subsequent redirects', async () => {
-      mocks.getUserState.mockResolvedValue(USER_STATES.needsOnboarding);
-
-      const req = createAuthenticatedRequest('clerk_user_1', {
-        pathname: '/pricing',
-        cookies: { jovie_redirect_count: '2' },
-      });
-      const res = await callMiddleware(req);
-
-      const cookies = getResponseCookies(res);
-      expect(cookies.jovie_redirect_count).toBe('3');
-    });
-
-    it('breaks the loop at count >= 3', async () => {
-      mocks.getUserState.mockResolvedValue(USER_STATES.needsOnboarding);
-
-      const req = createAuthenticatedRequest('clerk_user_1', {
-        pathname: '/pricing',
-        cookies: { jovie_redirect_count: '3' },
-      });
-      const res = await callMiddleware(req);
-
-      expect(res.status).toBeLessThan(300);
-      expect(mocks.captureWarning).toHaveBeenCalledWith(
-        expect.stringContaining('circuit breaker'),
-        expect.any(Error),
-        expect.objectContaining({ redirectCount: 3 })
-      );
-    });
-
-    it('lets request through when onboarding_complete cookie is set', async () => {
-      mocks.getUserState.mockResolvedValue(USER_STATES.needsOnboarding);
-
-      const req = createAuthenticatedRequest('clerk_user_1', {
-        pathname: '/pricing',
-        cookies: { jovie_onboarding_complete: '1' },
-      });
-      const res = await callMiddleware(req);
-
-      expect(res.status).toBeLessThan(300);
-    });
-
-    it('redirects needsWaitlist user from /pricing to /waitlist and increments count', async () => {
-      mocks.getUserState.mockResolvedValue(USER_STATES.needsWaitlist);
-
-      const req = createAuthenticatedRequest('clerk_user_1', {
-        pathname: '/pricing',
-      });
-      const res = await callMiddleware(req);
-
-      expect(res.status).toBeGreaterThanOrEqual(300);
-      expect(res.status).toBeLessThan(400);
-      expect(isRedirectTo(res, '/waitlist')).toBe(true);
-
-      const cookies = getResponseCookies(res);
-      expect(cookies.jovie_redirect_count).toBe('1');
-    });
-
-    it('treats a tampered jovie_redirect_count cookie (NaN) as 0 (defense in depth)', async () => {
-      mocks.getUserState.mockResolvedValue(USER_STATES.needsOnboarding);
-
-      const req = createAuthenticatedRequest('clerk_user_1', {
-        pathname: '/pricing',
-        cookies: { jovie_redirect_count: 'NaN' },
-      });
-      const res = await callMiddleware(req);
-
-      // Cookie was unparseable → treat as 0 and increment to 1, NOT NaN+1.
-      expect(isRedirectTo(res, '/start')).toBe(true);
-      const cookies = getResponseCookies(res);
-      expect(cookies.jovie_redirect_count).toBe('1');
-    });
-
-    it('breaks needsWaitlist rewrite loop at count >= 3 (JOV-2161 regression guard)', async () => {
-      mocks.getUserState.mockResolvedValue(USER_STATES.needsWaitlist);
-
-      const req = createAuthenticatedRequest('clerk_user_1', {
-        pathname: '/pricing',
-        cookies: { jovie_redirect_count: '3' },
-      });
-      const res = await callMiddleware(req);
-
-      expect(res.status).toBeLessThan(300);
-      expect(mocks.captureWarning).toHaveBeenCalledWith(
-        expect.stringContaining('circuit breaker'),
-        expect.any(Error),
-        expect.objectContaining({ target: '/waitlist', redirectCount: 3 })
-      );
     });
   });
 
@@ -1521,279 +1164,6 @@ describe('proxy.ts middleware', () => {
       await callMiddleware(req);
 
       expect(mocks.createBotResponse).not.toHaveBeenCalled();
-    });
-  });
-
-  // ==========================================================================
-  // Banned User Rewrite
-  // ==========================================================================
-  describe.skip('banned user handling (retired: shell layout owns ban gating)', () => {
-    it('rewrites banned user to /unavailable on non-/app paths', async () => {
-      mocks.getUserState.mockResolvedValue(USER_STATES.banned);
-
-      const req = createAuthenticatedRequest('clerk_user_1', {
-        pathname: '/pricing',
-      });
-      const res = await callMiddleware(req);
-
-      // Rewrite, not redirect — URL bar stays on /pricing
-      const rewriteUrl = res.headers.get('x-middleware-rewrite');
-      expect(rewriteUrl).toBeTruthy();
-      expect(new URL(rewriteUrl!).pathname).toBe('/unavailable');
-    });
-
-    it('rewrites banned user on marketing pages', async () => {
-      mocks.getUserState.mockResolvedValue(USER_STATES.banned);
-
-      const req = createAuthenticatedRequest('clerk_user_1', {
-        pathname: '/about',
-      });
-      const res = await callMiddleware(req);
-
-      const rewriteUrl = res.headers.get('x-middleware-rewrite');
-      expect(rewriteUrl).toBeTruthy();
-      expect(new URL(rewriteUrl!).pathname).toBe('/unavailable');
-    });
-  });
-
-  // ==========================================================================
-  // Clerk FAPI Proxy (vercel.json must NOT have clerk rewrites)
-  // ==========================================================================
-  describe.skip('Clerk FAPI proxy (retired: Better Auth, no Clerk FAPI proxy)', () => {
-    it('does not have clerk rewrites — middleware fetch proxy handles this', async () => {
-      const { readFile } = await import('node:fs/promises');
-      const { resolve } = await import('node:path');
-      const raw = await readFile(
-        resolve(process.cwd(), '../../vercel.json'),
-        'utf8'
-      );
-      const cfg = JSON.parse(raw) as {
-        rewrites?: Array<{ source: string; destination: string }>;
-      };
-      const rewrites = cfg.rewrites ?? [];
-      const clerkRewrites = rewrites.filter(r => r.source.includes('clerk'));
-      expect(clerkRewrites).toEqual([]);
-    });
-
-    it('routes staging Clerk proxy traffic to the staging FAPI host', async () => {
-      const stagingFapiHost = 'staging-fapi.clerk.example';
-      const productionFapiHost = 'production-fapi.clerk.example';
-      const previousPublishableKey =
-        process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-
-      try {
-        process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = `pk_live_${Buffer.from(`${productionFapiHost}$`).toString('base64')}`;
-        mocks.resolveClerkKeys.mockReturnValue({
-          publishableKey: `pk_live_${Buffer.from(`${stagingFapiHost}$`).toString('base64')}`,
-          secretKey: 'sk_live_staging_example',
-          status: 'ok',
-        });
-
-        const req = createUnauthenticatedRequest({
-          hostname: 'staging.jov.ie',
-          pathname: '/__clerk/v1/client',
-        });
-        const res = await callMiddleware(req);
-
-        expect(res.status).toBe(200);
-        expect(mocks.fetch).toHaveBeenCalledTimes(1);
-        const [targetUrl, init] = mocks.fetch.mock.calls[0] as [
-          string,
-          RequestInit,
-        ];
-
-        expect(targetUrl).toBe(`https://${stagingFapiHost}/v1/client`);
-        expect(init.method).toBe('GET');
-        expect(init.redirect).toBe('manual');
-        const headers = init.headers as Headers;
-        // Host is intentionally NOT forwarded — fetch() sets it from the
-        // target URL, and manual override breaks Edge fetch on POST bodies
-        // (root cause of Apple OAuth form_post 502s).
-        expect(headers.get('host')).toBeNull();
-        expect(headers.get('origin')).toBe(`https://${stagingFapiHost}`);
-      } finally {
-        if (previousPublishableKey === undefined) {
-          delete process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-        } else {
-          process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY =
-            previousPublishableKey;
-        }
-      }
-    });
-
-    it('handles upstream 3xx redirects via NextResponse.redirect (avoids middleware crash on streamed redirect bodies)', async () => {
-      // Reproduces the staging Google OAuth bug: FAPI returns 301 for
-      // /v1/oauth_callback, and the proxy must turn that into a clean
-      // middleware-compliant redirect instead of streaming the upstream
-      // Response (which crashes Vercel Edge with an opaque 500).
-      const stagingFapiHost = 'clerk.staging.jov.ie';
-      const previousPublishableKey =
-        process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-
-      try {
-        process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = `pk_live_${Buffer.from('production-fapi.clerk.example$').toString('base64')}`;
-        mocks.resolveClerkKeys.mockReturnValue({
-          publishableKey: `pk_live_${Buffer.from(`${stagingFapiHost}$`).toString('base64')}`,
-          secretKey: 'sk_live_staging_example',
-          status: 'ok',
-        });
-
-        const upstreamLocation = `https://${stagingFapiHost}/v1/oauth_callback?err_code=authorization_invalid`;
-        const upstreamCookie =
-          '__cf_bm=abc123; path=/; domain=.clerk.staging.jov.ie; HttpOnly; Secure; SameSite=None';
-        mocks.fetch.mockResolvedValueOnce(
-          new Response(null, {
-            status: 301,
-            headers: {
-              location: upstreamLocation,
-              'set-cookie': upstreamCookie,
-              'content-encoding': 'gzip',
-            },
-          })
-        );
-
-        const req = createUnauthenticatedRequest({
-          hostname: 'staging.jov.ie',
-          pathname: '/__clerk/v1/oauth_callback',
-          searchParams: { state: 'test', code: 'test' },
-        });
-        const res = await callMiddleware(req);
-
-        expect(res.status).toBe(301);
-        expect(res.headers.get('location')).toBe(
-          `https://staging.jov.ie/__clerk/v1/oauth_callback?err_code=authorization_invalid`
-        );
-        // Set-Cookie from upstream is forwarded so __cf_bm survives the proxy hop.
-        const setCookies =
-          res.headers.getSetCookie?.() ??
-          res.headers.get('set-cookie')?.split(/,(?=[^;]+=)/) ??
-          [];
-        expect(setCookies.join('\n')).toContain('__cf_bm=abc123');
-      } finally {
-        if (previousPublishableKey === undefined) {
-          delete process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-        } else {
-          process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY =
-            previousPublishableKey;
-        }
-      }
-    });
-
-    it('rewrites FAPI-relative Location headers to absolute proxy URLs (Apple OAuth form_post redirect)', async () => {
-      // Apple's OAuth form_post callback flow makes FAPI return a 302 to a
-      // *relative* path like `/v1/oauth_callback?code=...&state=...`.
-      // NextResponse.redirect requires an absolute URL; passing the relative
-      // path through threw "URL is malformed". The proxy must resolve the
-      // relative path against our /__clerk proxy origin.
-      const stagingFapiHost = 'clerk.staging.jov.ie';
-      const previousPublishableKey =
-        process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-
-      try {
-        process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = `pk_live_${Buffer.from('production-fapi.clerk.example$').toString('base64')}`;
-        mocks.resolveClerkKeys.mockReturnValue({
-          publishableKey: `pk_live_${Buffer.from(`${stagingFapiHost}$`).toString('base64')}`,
-          secretKey: 'sk_live_staging_example',
-          status: 'ok',
-        });
-
-        // FAPI returns a Location header with a relative path (no scheme).
-        mocks.fetch.mockResolvedValueOnce(
-          new Response(null, {
-            status: 302,
-            headers: {
-              location: '/v1/oauth_callback?code=abc123&state=def456',
-            },
-          })
-        );
-
-        const req = createUnauthenticatedRequest({
-          hostname: 'staging.jov.ie',
-          pathname: '/__clerk/v1/oauth_callback',
-          method: 'POST',
-        });
-        const res = await callMiddleware(req);
-
-        expect(res.status).toBe(302);
-        expect(res.headers.get('location')).toBe(
-          'https://staging.jov.ie/__clerk/v1/oauth_callback?code=abc123&state=def456'
-        );
-      } finally {
-        if (previousPublishableKey === undefined) {
-          delete process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-        } else {
-          process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY =
-            previousPublishableKey;
-        }
-      }
-    });
-
-    it('passes through upstream non-redirect 3xx-adjacent responses (e.g. 304) without rewriting Location', async () => {
-      // Sanity: 200 path still streams (covered above by /v1/client). This
-      // covers the edge where upstream 3xx has no Location header — the proxy
-      // should fall through to the streaming path.
-      const stagingFapiHost = 'clerk.staging.jov.ie';
-      const previousPublishableKey =
-        process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-
-      try {
-        process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = `pk_live_${Buffer.from('production-fapi.clerk.example$').toString('base64')}`;
-        mocks.resolveClerkKeys.mockReturnValue({
-          publishableKey: `pk_live_${Buffer.from(`${stagingFapiHost}$`).toString('base64')}`,
-          secretKey: 'sk_live_staging_example',
-          status: 'ok',
-        });
-
-        mocks.fetch.mockResolvedValueOnce(new Response(null, { status: 304 }));
-
-        const req = createUnauthenticatedRequest({
-          hostname: 'staging.jov.ie',
-          pathname: '/__clerk/v1/environment',
-        });
-        const res = await callMiddleware(req);
-
-        expect(res.status).toBe(304);
-      } finally {
-        if (previousPublishableKey === undefined) {
-          delete process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-        } else {
-          process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY =
-            previousPublishableKey;
-        }
-      }
-    });
-
-    it('returns 503 for staging Clerk proxy traffic when staging keys are missing', async () => {
-      const previousPublishableKey =
-        process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-
-      try {
-        process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = `pk_live_${Buffer.from('production-fapi.clerk.example$').toString('base64')}`;
-        mocks.resolveClerkKeys.mockReturnValue({
-          publishableKey: undefined,
-          secretKey: undefined,
-          status: 'staging_missing',
-        });
-
-        const req = createUnauthenticatedRequest({
-          hostname: 'staging.jov.ie',
-          pathname: '/__clerk/v1/client',
-        });
-        const res = await callMiddleware(req);
-
-        expect(res.status).toBe(503);
-        expect(mocks.fetch).not.toHaveBeenCalled();
-        await expect(res.json()).resolves.toEqual({
-          error: 'Clerk proxy unavailable: missing or invalid publishable key',
-        });
-      } finally {
-        if (previousPublishableKey === undefined) {
-          delete process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-        } else {
-          process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY =
-            previousPublishableKey;
-        }
-      }
     });
   });
 

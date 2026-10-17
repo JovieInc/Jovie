@@ -499,14 +499,18 @@ export async function materializeClaimedOnboardingProfile({
     claimCohort = getAccountMetricCohort(owner?.email);
 
     // "Manage as owner" claim row — only after verified ownership above.
-    await db
-      .insert(userProfileClaims)
-      .values({
-        userId: verifiedUserId,
-        creatorProfileId: profileId,
-        role: 'owner',
-      })
-      .onConflictDoNothing();
+    await withDbSessionTx(
+      tx =>
+        tx
+          .insert(userProfileClaims)
+          .values({
+            userId: verifiedUserId,
+            creatorProfileId: profileId,
+            role: 'owner',
+          })
+          .onConflictDoNothing(),
+      { clerkUserId: verifiedUserId }
+    );
   }
 
   await db

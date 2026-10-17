@@ -266,6 +266,7 @@ export const ChatMessage = memo(function ChatMessage({
 
               {renderTools ? (
                 <ToolPartsRenderer
+                  isStreaming={isStreaming}
                   parts={parts}
                   profileId={profileId}
                   variant={toolVariant}

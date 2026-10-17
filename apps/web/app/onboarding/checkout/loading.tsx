@@ -6,6 +6,11 @@ import { AuthPageSkeleton } from '@/features/auth';
  */
 export default function OnboardingCheckoutLoading() {
   return (
-    <AuthPageSkeleton formTitle='Upgrade your profile' showFormTitle={false} />
+    <main id='main-content'>
+      <AuthPageSkeleton
+        formTitle='Upgrade your profile'
+        showFormTitle={false}
+      />
+    </main>
   );
 }

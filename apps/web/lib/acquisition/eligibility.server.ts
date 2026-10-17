@@ -22,6 +22,12 @@ import { serverFetch } from '@/lib/http/server-fetch';
 import { getRedis } from '@/lib/redis';
 import { logger } from '@/lib/utils/logger';
 import {
+  COMMERCE_DECISION_PROJECTION_CONTRACT,
+  type CommerceDecisionProjection,
+  type CommerceEvidenceKind,
+  projectCommerceDecisions,
+} from './commerce-decision';
+import {
   ACQUISITION_ELIGIBILITY_CONTRACT,
   type AcquisitionEligibility,
   type ConeEvidence,
@@ -84,6 +90,8 @@ export interface FunnelSnapshot {
 export interface AcquisitionEligibilityReport extends AcquisitionEligibility {
   /** Current funnel counts/dropoffs, so planners diagnose before adding traffic. */
   readonly funnel: FunnelSnapshot | null;
+  /** Redacted commerce matrix, selected rail evidence and canary state. */
+  readonly commerce: CommerceDecisionProjection;
 }
 
 export interface AcquisitionEligibilityDeps {
@@ -93,6 +101,8 @@ export interface AcquisitionEligibilityDeps {
   readonly readPublicProfileCanary: () => Promise<CanaryReport | null>;
   readonly readWorkflowRun: (workflowFile: string) => Promise<WorkflowRunRead>;
   readonly readFunnel: () => Promise<FounderFunnelData>;
+  /** Existing matrix/decision owner; absent or malformed evidence fails closed. */
+  readonly readCommerceDecision: () => Promise<unknown>;
 }
 
 /**
@@ -189,10 +199,16 @@ export const defaultAcquisitionEligibilityDeps: AcquisitionEligibilityDeps = {
   readPublicProfileCanary: getPublicProfileCanaryStatus,
   readWorkflowRun: readLatestMainWorkflowRun,
   readFunnel: () => getFounderFunnelData('30d'),
+  // JOV-8214/JOV-8215 own the upstream receipt. Until it exists, expose the
+  // known offer/candidate rail but keep every commerce gate UNKNOWN.
+  readCommerceDecision: async () => null,
 };
 
-function errorDetail(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+function errorDetail(_error: unknown): string {
+  // Upstream exceptions can embed bearer tokens, provider/customer ids,
+  // payment references or PII. The surrounding evidence source already says
+  // which read failed, so the projection deliberately exposes no raw message.
+  return 'upstream error';
 }
 
 async function revenuePathEvidence(
@@ -205,7 +221,7 @@ async function revenuePathEvidence(
         const step = receipt.steps.find(item => item.name === name);
         const base = {
           maxAgeMs: LIVE_MAX_AGE_MS,
-          ref: receipt.repro,
+          ref: null,
           requirement: M2_STEP_REQUIREMENTS[name],
           source: `m2-revenue-path:live#${name}`,
         };
@@ -217,12 +233,9 @@ async function revenuePathEvidence(
             status: 'unknown' as const,
           };
         }
-        const fallbackDetail = step.ok
-          ? 'Step passed.'
-          : 'Step failed without detail.';
         return {
           ...base,
-          detail: step.detail ?? fallbackDetail,
+          detail: step.ok ? 'Step passed.' : 'Step failed.',
           observedAt: step.finishedAt,
           status: step.ok ? ('green' as const) : ('red' as const),
         };
@@ -267,7 +280,7 @@ async function canaryEvidence(
       ...base,
       detail: report.pass
         ? `${report.checks.length} checks passed.`
-        : `Failed: ${failed.map(check => check.detail ?? check.name).join('; ')}`,
+        : `${failed.length} of ${report.checks.length} checks failed.`,
       observedAt: report.runAt,
       status: report.pass ? 'green' : 'red',
     };
@@ -319,9 +332,9 @@ async function workflowEvidence(
     }
     return {
       ...base,
-      detail: `Latest completed main run concluded ${conclusion ?? 'without a conclusion'} at ${read.run.headSha?.slice(0, 12) ?? 'unknown sha'}.`,
+      detail: `Latest completed main run concluded ${conclusion ?? 'without a conclusion'}.`,
       observedAt: read.run.createdAt,
-      ref: read.run.url,
+      ref: null,
       status,
     };
   } catch (error) {
@@ -349,7 +362,7 @@ async function funnelEvidence(
     const funnel: FunnelSnapshot = {
       biggestDropOffKey: data.biggestDropOffKey,
       definitionVersion: data.definitionVersion,
-      errors: data.errors,
+      errors: data.errors.length > 0 ? ['Funnel source reported errors.'] : [],
       stages: data.stages.map(stage => ({
         conversionRate: stage.conversionRate,
         count: stage.count,
@@ -364,7 +377,7 @@ async function funnelEvidence(
         ...base,
         detail: healthy
           ? `${data.definitionVersion}: ${data.stages.length} stages, internal and test accounts excluded.`
-          : `Funnel read degraded: ${data.errors.join('; ') || 'no stages returned'}.`,
+          : `Funnel read degraded: ${data.errors.length} source error(s), ${data.stages.length} stage(s).`,
         observedAt: deps.now().toISOString(),
         status: healthy ? 'green' : 'unknown',
       },
@@ -383,12 +396,95 @@ async function funnelEvidence(
   }
 }
 
+const COMMERCE_REQUIREMENTS: Record<CommerceEvidenceKind, ConeRequirementId> = {
+  'selected-rail': 'selected_rail',
+  'jov-6258-preflight': 'jov6258_preflight',
+  'handoff-correlation': 'handoff_correlation',
+  'payment-journey': 'payment_journey',
+  reversal: 'reversal',
+};
+
+async function commerceDecisionEvidence(
+  deps: AcquisitionEligibilityDeps,
+  now: Date
+): Promise<{
+  projection: CommerceDecisionProjection;
+  evidence: readonly ConeEvidence[];
+}> {
+  let source: unknown = null;
+  try {
+    source = await deps.readCommerceDecision();
+  } catch {
+    // Reader errors are not reflected because they may contain credentials or
+    // provider identifiers. The redacted fallback says only that evidence is
+    // unavailable and keeps every gate closed.
+  }
+  const projection = projectCommerceDecisions(source, now);
+  const decision = projection.matrix.find(
+    item => item.offer === projection.acquisitionOffer
+  );
+  const evidence = Object.entries(COMMERCE_REQUIREMENTS).map(
+    ([kind, requirement]) => {
+      const item = decision?.evidence.find(entry => entry.kind === kind);
+      let status = item?.status ?? 'unknown';
+      if (kind === 'selected-rail') {
+        if (
+          decision?.accessState === 'partner-gated' ||
+          decision?.accessState === 'unsupported'
+        ) {
+          status = 'red';
+        } else if (decision?.accessState !== 'supported' || !decision.rail) {
+          status = 'unknown';
+        }
+      }
+      return {
+        requirement,
+        source: `commerce-decision:${kind}`,
+        status,
+        observedAt: item?.observedAt ?? null,
+        maxAgeMs: item?.freshnessBudgetMs ?? DAILY_WORKFLOW_MAX_AGE_MS,
+        ref: null,
+        detail:
+          status === 'green'
+            ? 'Current redacted commerce evidence is present.'
+            : 'Required redacted commerce evidence is not currently green.',
+      } satisfies ConeEvidence;
+    }
+  );
+  const canaryStatus: ConeEvidence['status'] =
+    decision?.canary.result === 'passed'
+      ? 'green'
+      : decision?.canary.result === 'failed'
+        ? 'red'
+        : 'unknown';
+  return {
+    projection,
+    evidence: [
+      ...evidence,
+      {
+        requirement: 'commerce_canary',
+        source: 'commerce-decision:canary',
+        status: canaryStatus,
+        observedAt: decision?.canary.observedAt ?? null,
+        maxAgeMs:
+          decision?.canary.freshnessBudgetMs ?? DAILY_WORKFLOW_MAX_AGE_MS,
+        ref: null,
+        detail:
+          canaryStatus === 'green'
+            ? 'The bounded commerce canary passed with current evidence.'
+            : 'The bounded commerce canary has not produced a current pass.',
+      },
+    ],
+  };
+}
+
 /** Compose current cone evidence into ACQUISITION_ELIGIBLE. Never throws. */
 export async function computeAcquisitionEligibility(
   deps: AcquisitionEligibilityDeps = defaultAcquisitionEligibilityDeps
 ): Promise<AcquisitionEligibilityReport> {
   try {
-    const [m2, auth, profile, m2Workflow, goldenPath, funnel] =
+    const now = deps.now();
+    const [m2, auth, profile, m2Workflow, goldenPath, funnel, commerce] =
       await Promise.all([
         revenuePathEvidence(deps),
         canaryEvidence(
@@ -408,6 +504,7 @@ export async function computeAcquisitionEligibility(
           deps
         ),
         funnelEvidence(deps),
+        commerceDecisionEvidence(deps, now),
       ]);
     return {
       ...evaluateAcquisitionEligibility({
@@ -418,18 +515,22 @@ export async function computeAcquisitionEligibility(
           m2Workflow,
           goldenPath,
           funnel.evidence,
+          ...commerce.evidence,
         ],
-        now: deps.now(),
+        now,
       }),
       funnel: funnel.funnel,
+      commerce: commerce.projection,
     };
   } catch (error) {
+    const now = deps.now();
     return {
       ...unknownAcquisitionEligibility(
-        deps.now(),
+        now,
         `Cone evidence could not be composed: ${errorDetail(error)}`
       ),
       funnel: null,
+      commerce: projectCommerceDecisions(null, now),
     };
   }
 }
@@ -440,7 +541,9 @@ function isCachedReport(value: unknown): value is AcquisitionEligibilityReport {
     value !== null &&
     (value as { contract?: unknown }).contract ===
       ACQUISITION_ELIGIBILITY_CONTRACT &&
-    typeof (value as { eligible?: unknown }).eligible === 'boolean'
+    typeof (value as { eligible?: unknown }).eligible === 'boolean' &&
+    (value as { commerce?: { contract?: unknown } }).commerce?.contract ===
+      COMMERCE_DECISION_PROJECTION_CONTRACT
   );
 }
 

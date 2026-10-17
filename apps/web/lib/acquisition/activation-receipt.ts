@@ -1,17 +1,15 @@
 import 'server-only';
 
+import { isNull } from 'drizzle-orm';
 import { cookies } from 'next/headers';
 import { db } from '@/lib/db';
-import {
-  type AcquisitionFirstTouch,
-  acquisitionJourneys,
-} from '@/lib/db/schema/acquisition';
+import { acquisitionJourneys } from '@/lib/db/schema/acquisition';
 import { captureError } from '@/lib/error-tracking';
 import {
   FIRST_TOUCH_COOKIE,
-  type FirstTouchEnvelope,
   openFirstTouchEnvelope,
 } from './first-touch-envelope';
+import { toReceiptFirstTouch } from './first-touch-receipt';
 
 /**
  * Passive-attribution consent state. The envelope holds only allowlisted,
@@ -22,33 +20,11 @@ import {
 const PASSIVE_CONSENT_STATE = 'passive_attribution';
 const PASSIVE_IDENTITY_SCOPE = 'pre_auth_first_party_cookie';
 
-function toReceiptFirstTouch(
-  envelope: FirstTouchEnvelope | null
-): AcquisitionFirstTouch {
-  if (!envelope) {
-    // Missing, expired, or tampered evidence is represented explicitly as
-    // unknown — never backfilled into a stronger claim.
-    return { channel: 'unknown', source: 'unknown' };
-  }
-
-  const utm = envelope.utm ?? {};
-  return {
-    channel: envelope.channel,
-    source: utm.utm_source ?? (envelope.ref ? 'referral' : 'direct'),
-    medium: utm.utm_medium,
-    campaign: utm.utm_campaign,
-    term: utm.utm_term,
-    content: utm.utm_content,
-    referrer: envelope.ref,
-    routeKind: envelope.route?.kind,
-    landingPath: envelope.route?.slug ? `/${envelope.route.slug}` : undefined,
-  };
-}
-
 /**
  * Attach the passive first-touch envelope to the durable activation
  * receipt — exactly once per app user, enforced by the
- * `acquisition_journeys_user_id_unique` index and `onConflictDoNothing`.
+ * `acquisition_journeys_user_id_unique` index. An anonymous capture with the
+ * same signed id can be linked, but another user cannot take it over.
  * Repeat activations (returning users, extra profiles, mobile + web) are
  * idempotent no-ops.
  *
@@ -79,7 +55,17 @@ export async function attachFirstTouchReceipt(
         capturedAt: envelope ? new Date(envelope.iat) : now,
         linkedAt: now,
       })
-      .onConflictDoNothing()
+      .onConflictDoUpdate({
+        target: acquisitionJourneys.id,
+        set: {
+          userId: appUserId,
+          linkedAt: now,
+          ...(envelope?.agentIntent
+            ? { firstTouch: toReceiptFirstTouch(envelope) }
+            : {}),
+        },
+        setWhere: isNull(acquisitionJourneys.userId),
+      })
       .returning({ id: acquisitionJourneys.id });
 
     return rows.length > 0;

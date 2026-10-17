@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createRef } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -140,6 +140,37 @@ describe('FounderReviewStack', () => {
       'aria-busy',
       'true'
     );
+  });
+
+  it.each([{ isComposing: true }, { keyCode: 229 }, { repeat: true }])(
+    'does not record a decision during protected input %j',
+    async input => {
+      const { onApprove, onReject } = renderStack();
+      const control = screen.getByRole('button', {
+        name: 'Review Current Opportunity',
+      });
+      control.focus();
+      fireEvent.keyDown(control, { key: 'ArrowRight', ...input });
+      fireEvent.keyDown(control, { key: 'ArrowLeft', ...input });
+      await Promise.resolve();
+      expect(hoisted.createReview).not.toHaveBeenCalled();
+      expect(onApprove).not.toHaveBeenCalled();
+      expect(onReject).not.toHaveBeenCalled();
+    }
+  );
+
+  it('does not record a second decision while the active card is pending', async () => {
+    const { onApprove, onReject } = renderStack({ pendingActionId: CARD.id });
+    const control = screen.getByRole('button', {
+      name: 'Review Current Opportunity',
+    });
+    expect(control).toBeDisabled();
+    fireEvent.keyDown(control, { key: 'ArrowRight' });
+    fireEvent.keyDown(control, { key: 'ArrowLeft' });
+    await Promise.resolve();
+    expect(hoisted.createReview).not.toHaveBeenCalled();
+    expect(onApprove).not.toHaveBeenCalled();
+    expect(onReject).not.toHaveBeenCalled();
   });
 
   it('renders a YouTube thumbnail candidate with reject and approve candidate actions', async () => {

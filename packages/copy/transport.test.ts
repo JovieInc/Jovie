@@ -70,6 +70,38 @@ describe('routedTransport', () => {
     expect(routedTransport('test-key').available?.('zai/glm-5.3')).toBe(true);
   });
 
+  it('requires a completed live-search receipt for research and forwards the search flags', async () => {
+    const { routedTransport } = await import('./transport');
+    const send = routedTransport();
+    await expect(
+      send({ ...request('openai/gpt-5.6-sol'), webSearch: true })
+    ).rejects.toThrow(/no completed live web search/);
+    await expect(
+      send({ ...request('anthropic/claude-opus-5.5'), webSearch: true })
+    ).rejects.toThrow(/OpenAI subscription/);
+    writeFileSync(
+      join(bin, 'codex'),
+      `#!/bin/sh
+if [ "$1" = "--version" ]; then echo 1; exit 0; fi
+printf '%s\\n' "$@" > '${join(bin, 'args')}'
+while [ $# -gt 0 ]; do if [ "$1" = "-o" ]; then out="$2"; fi; shift; done
+cat > /dev/null
+echo codex-reply > "$out"
+echo 'not-json'
+echo '{"type":"item.completed","item":{"type":"web_search"}}'
+`
+    );
+    expect(
+      (await send({ ...request('openai/gpt-5.6-sol'), webSearch: true })).trim()
+    ).toBe('codex-reply');
+    const { readFileSync } = await import('node:fs');
+    expect(readFileSync(join(bin, 'args'), 'utf8')).toContain(
+      '--search\nexec\n--json'
+    );
+    await send({ ...request('openai/default'), webSearch: true });
+    expect(readFileSync(join(bin, 'args'), 'utf8')).not.toContain('-m\n');
+  });
+
   it('forwards Gateway policy without applying it to subscription CLIs', async () => {
     const fetch = vi.fn(
       async (_url: string, _options: RequestInit) =>

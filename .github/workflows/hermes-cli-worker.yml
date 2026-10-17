@@ -1,3 +1,7 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Symphony
+# capability-gap: A hosted dispatch bridges validated CLI task payloads to the self-hosted worker; its App identity publishes verified changes under the payload path allowlist.
+# removal-trigger: Remove when the coding orchestrator runs these validated CLI payloads directly on the worker with the same path allowlist and verification contract.
 name: Hermes CLI Worker
 
 on:
@@ -53,7 +57,7 @@ jobs:
     steps:
       - name: Generate Jovie Bot token
         id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}

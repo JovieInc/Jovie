@@ -1,44 +1,6 @@
 import { AlertCircle, CheckCircle2, MailCheck, UserPlus2 } from 'lucide-react';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import type { WaitlistMetrics as WaitlistMetricsType } from '@/lib/admin/types';
-import { cn } from '@/lib/utils';
-
-interface MetricCardProps {
-  readonly label: string;
-  readonly value: number;
-  readonly icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
-  readonly colorClass: string;
-  readonly bgClass: string;
-}
-
-function MetricCard({
-  label,
-  value,
-  icon: Icon,
-  colorClass,
-  bgClass,
-}: MetricCardProps) {
-  return (
-    <ContentSurfaceCard className='flex items-center gap-3 bg-surface-0 px-4 py-3.5'>
-      <div
-        className={cn(
-          'flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
-          bgClass
-        )}
-      >
-        <Icon className={cn('h-4 w-4', colorClass)} aria-hidden />
-      </div>
-      <div className='min-w-0'>
-        <p className='text-app font-semibold tracking-normal text-secondary-token'>
-          {label}
-        </p>
-        <p className='text-mid font-semibold leading-tight tabular-nums text-primary-token'>
-          {value.toLocaleString()}
-        </p>
-      </div>
-    </ContentSurfaceCard>
-  );
-}
 
 interface WaitlistMetricsProps {
   readonly metrics: WaitlistMetricsType;
@@ -50,33 +12,33 @@ export function WaitlistMetrics({ metrics }: WaitlistMetricsProps) {
       className='grid gap-3 sm:grid-cols-4'
       data-testid='admin-waitlist-content'
     >
-      <MetricCard
+      <ContentMetricCard
+        layout='icon-chip-inline'
         label='Waitlisted'
-        value={metrics.waitlisted}
+        value={metrics.waitlisted.toLocaleString()}
         icon={UserPlus2}
-        colorClass='text-accent'
-        bgClass='bg-accent/10'
+        tone='accent'
       />
-      <MetricCard
+      <ContentMetricCard
+        layout='icon-chip-inline'
         label='Invited'
-        value={metrics.invited}
+        value={metrics.invited.toLocaleString()}
         icon={MailCheck}
-        colorClass='text-secondary-token'
-        bgClass='bg-secondary/10'
+        tone='secondary'
       />
-      <MetricCard
+      <ContentMetricCard
+        layout='icon-chip-inline'
         label='Signed Up'
-        value={metrics.signedUp}
+        value={metrics.signedUp.toLocaleString()}
         icon={CheckCircle2}
-        colorClass='text-success-token'
-        bgClass='bg-success/10'
+        tone='success'
       />
-      <MetricCard
+      <ContentMetricCard
+        layout='icon-chip-inline'
         label='Email Failures'
-        value={metrics.emailFailures}
+        value={metrics.emailFailures.toLocaleString()}
         icon={AlertCircle}
-        colorClass='text-destructive'
-        bgClass='bg-destructive/10'
+        tone='error'
       />
     </div>
   );

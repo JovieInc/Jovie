@@ -6,6 +6,7 @@ import {
   clearAcquisitionId,
   getOrCreateAcquisitionId,
   isAnalyticsAllowed,
+  rememberAcquisitionId,
 } from '@/lib/tracking/consent';
 
 const FIRST_TOUCH_KEY = 'jovie_acquisition_first_touch_v1';
@@ -51,7 +52,13 @@ export function AcquisitionCapture() {
             capturedAt: new Date().toISOString(),
             firstTouch: JSON.parse(stored),
           }),
-        }).catch(() => undefined);
+        })
+          .then(async response => {
+            if (!response.ok) return;
+            const result = await response.json();
+            rememberAcquisitionId(result.acquisitionId);
+          })
+          .catch(() => undefined);
       } catch {
         // Restricted storage contexts remain unattributed.
       }

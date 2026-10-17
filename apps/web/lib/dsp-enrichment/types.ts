@@ -254,6 +254,8 @@ export interface MusicBrainzArtist {
   relations?: MusicBrainzRelation[];
   isnis?: string[];
   ipis?: string[];
+  /** Jovie browse receipt; absent on an ordinary embedded artist response. */
+  releaseGroupsComplete?: boolean;
   'release-groups'?: Array<{
     id: string;
     title: string;

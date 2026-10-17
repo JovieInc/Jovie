@@ -79,6 +79,11 @@ test.describe('Prebuilt profile claim flow @smoke', () => {
 
     const fixtureReady = await assertPrebuiltClaimFixture();
     if (!fixtureReady) {
+      if (process.env.E2E_TEST_MODE === '1') {
+        throw new Error(
+          `Required Golden Path fixture is missing for unclaimed ${E2E_PREBUILT_CLAIM_USERNAME} with claim token + releases`
+        );
+      }
       test.skip(
         true,
         `Seed fixture missing for unclaimed ${E2E_PREBUILT_CLAIM_USERNAME} with claim token + releases`

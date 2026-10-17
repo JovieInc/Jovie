@@ -213,7 +213,7 @@ export function isShareableAcrossProfileSwitch(queryKey: QueryKey): boolean {
     return false;
   }
   if (root === 'chat') {
-    return queryKey[1] === 'conversations' || queryKey[1] === 'usage';
+    return queryKey[1] === 'usage';
   }
   if (root === 'user') {
     return queryKey[1] === 'settings';

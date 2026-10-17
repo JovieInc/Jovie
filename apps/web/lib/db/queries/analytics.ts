@@ -28,7 +28,12 @@ import {
   resolveRangeStartOrEpoch,
 } from '@/lib/analytics/time-range';
 import { getSessionContext, setupDbSession } from '@/lib/auth/session';
-import { db, doesTableExist, TABLE_NAMES } from '@/lib/db';
+import {
+  type DbOrTransaction,
+  db,
+  doesTableExist,
+  TABLE_NAMES,
+} from '@/lib/db';
 import { cacheQuery } from '@/lib/db/cache';
 import { apiQuery, dashboardQuery } from '@/lib/db/query-timeout';
 import {
@@ -149,6 +154,7 @@ export async function getUserDashboardAnalytics(
               referrer: string | null;
               count: number;
             }>;
+            top_operating_systems: JsonArray<{ os: string; count: number }>;
             total_views: AggregateValue;
             unique_views: AggregateValue;
             unique_users: AggregateValue;
@@ -169,13 +175,13 @@ export async function getUserDashboardAnalytics(
           const result = await db.execute<AggRow>(
             drizzleSql`
             with base_events as (
-              select created_at, link_id, link_type, city, country, referrer
+              select created_at, link_id, link_type, city, country, referrer, os
               from ${clickEvents}
               where ${clickEvents.creatorProfileId} = ${creatorProfile.id}
                 and ${clickEvents.isBot} = false
             ),
             ranged_events as (
-              select link_id, link_type, city, country, referrer
+              select link_id, link_type, city, country, referrer, os
               from base_events
               where created_at >= ${sqlTimestamp(startDate)}
             ),
@@ -220,6 +226,25 @@ export async function getUserDashboardAnalytics(
                 and coalesce(r->>'url', r->>'source') is not null
               group by coalesce(r->>'url', r->>'source')
               order by count desc
+              limit 5
+            ),
+            operating_system_clicks as (
+              select case lower(trim(os))
+                when 'ios' then 'iOS'
+                when 'android' then 'Android'
+                when 'macos' then 'macOS'
+                when 'windows' then 'Windows'
+                when 'linux' then 'Linux'
+                when 'web' then 'Unknown'
+                else coalesce(nullif(trim(os), ''), 'Unknown')
+              end as os
+              from ranged_events
+            ),
+            top_operating_systems as (
+              select os, count(*) as count
+              from operating_system_clicks
+              group by os
+              order by count desc, os
               limit 5
             ),
             top_links as (
@@ -273,7 +298,8 @@ export async function getUserDashboardAnalytics(
               coalesce((select json_agg(row_to_json(c)) from top_cities c), '[]'::json) as top_cities,
               coalesce((select json_agg(row_to_json(c)) from top_countries c), '[]'::json) as top_countries,
               coalesce((select json_agg(row_to_json(r)) from top_referrers r), '[]'::json) as top_referrers,
-              coalesce((select json_agg(row_to_json(l)) from top_links l), '[]'::json) as top_links
+              coalesce((select json_agg(row_to_json(l)) from top_links l), '[]'::json) as top_links,
+              coalesce((select json_agg(row_to_json(o)) from top_operating_systems o), '[]'::json) as top_operating_systems
             ;
           `
           );
@@ -395,6 +421,9 @@ export async function getUserDashboardAnalytics(
         referrer: row.referrer ?? '',
         count: Number(row.count),
       })),
+      top_operating_systems: parseJsonArray<{ os: string; count: number }>(
+        aggregates?.top_operating_systems ?? []
+      ).map(row => ({ os: row.os, count: Number(row.count) })),
       top_links: parseJsonArray<{
         id: string | null;
         url: string | null;
@@ -727,4 +756,35 @@ export async function getCanonicalCustomerLinkOutcome(
     );
 
   return { count: Number(row?.count ?? 0), latestAt: row?.latest ?? null };
+}
+
+/**
+ * Tenant fence for historical audience relationships. A click or source link
+ * may be attached only when that row belongs to the member's creator profile.
+ * This is an existence check, not a metrics aggregate.
+ */
+export async function hasUnownedAudienceRelationship(
+  tx: DbOrTransaction,
+  creatorProfileId: string,
+  relationships: readonly {
+    readonly sourceLinkId: string | null;
+    readonly clickEventId: string | null;
+  }[]
+): Promise<boolean> {
+  const result = await tx.execute<{ invalid: string }>(drizzleSql`
+    SELECT count(*)::text AS invalid FROM jsonb_to_recordset(
+      ${JSON.stringify(
+        relationships.map(row => ({
+          source: row.sourceLinkId,
+          click: row.clickEventId,
+        }))
+      )}::jsonb
+    ) AS relation(source uuid, click uuid)
+    WHERE (source IS NOT NULL AND NOT EXISTS (
+      SELECT 1 FROM audience_source_links WHERE id = source AND creator_profile_id = ${creatorProfileId}::uuid
+    )) OR (click IS NOT NULL AND NOT EXISTS (
+      SELECT 1 FROM ${clickEvents} WHERE id = click AND creator_profile_id = ${creatorProfileId}::uuid
+    ))
+  `);
+  return result.rows[0]?.invalid !== '0';
 }

@@ -14,8 +14,10 @@
 import type { FounderCertificationDecisionKind } from '@/lib/agent-os/certification';
 import {
   DOGFOOD_PRODUCTS,
+  type DogfoodMissionSpec,
   type DogfoodProduct,
   type DogfoodReceipt,
+  dogfoodReceiptProvesOutcome,
   evaluateDogfoodReliability,
 } from '@/lib/agent-os/dogfood-receipt';
 import {
@@ -75,7 +77,7 @@ export interface MetricsSubject {
   readonly product: DogfoodProduct;
   readonly riskClass: CertificationRiskClass;
   /** Missions the identity's assurance profile requires (spec section 4). */
-  readonly requiredMissions: readonly { id: string; required?: boolean }[];
+  readonly requiredMissions: readonly DogfoodMissionSpec[];
   /** The subject's current deploy binding; receipts must match it to count. */
   readonly deploy: { commitSha: string; deploymentId: string } | null;
   /** Confidence tier assigned when the subject entered `human_window`. */
@@ -365,7 +367,12 @@ function dogfoodKindCoverage(facts: ScopeFacts): MetricValue {
         .filter(
           receipt =>
             receipt.subjectId === subject.id &&
-            receipt.outcome === 'passed' &&
+            dogfoodReceiptProvesOutcome(
+              receipt,
+              subject.requiredMissions.find(
+                mission => mission.id === receipt.missionId
+              )
+            ) &&
             (subject.deploy === null ||
               (receipt.commitSha === subject.deploy.commitSha &&
                 receipt.deploymentId === subject.deploy.deploymentId))
@@ -392,6 +399,7 @@ function driverReliability(
     if (!knownGood.has(receipt.deploymentId)) continue;
     const bucket = byDriver.get(receipt.driver) ?? { passed: 0, total: 0 };
     bucket.total += 1;
+    // Execution reliability is a regression signal, separate from outcome confidence.
     if (receipt.outcome === 'passed') bucket.passed += 1;
     byDriver.set(receipt.driver, bucket);
   }
