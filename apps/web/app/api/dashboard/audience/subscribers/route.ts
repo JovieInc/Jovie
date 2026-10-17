@@ -1,11 +1,9 @@
 import {
   and,
-  desc,
   sql as drizzleSql,
   eq,
   gt,
   inArray,
-  isNotNull,
   isNull,
   or,
 } from 'drizzle-orm';
@@ -13,8 +11,8 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getExactProfileAccess } from '@/lib/auth/profile-access';
 import { withDbSessionTx } from '@/lib/auth/session';
+import { listEmailSubscriberExportCandidates } from '@/lib/db/queries/analytics';
 import { verifyProfileOwnership } from '@/lib/db/queries/shared';
-import { notificationSubscriptions } from '@/lib/db/schema/analytics';
 import {
   categorySubscriptions,
   emailSuppressions,
@@ -308,64 +306,11 @@ export async function POST(request: Request) {
             { status: 403, headers: NO_STORE_HEADERS }
           );
         }
-        // Resolve selected identities within this profile, then load their latest
-        // state including revoked duplicates before intersecting immutable IDs.
-        const selected = selectedIds
-          ? await tx
-              .select({ email: notificationSubscriptions.email })
-              .from(notificationSubscriptions)
-              .where(
-                and(
-                  eq(notificationSubscriptions.creatorProfileId, profileId),
-                  eq(notificationSubscriptions.channel, 'email'),
-                  inArray(notificationSubscriptions.id, selectedIds)
-                )
-              )
-          : null;
-        const selectedEmails = selected
-          ? [
-              ...new Set(
-                selected.flatMap(row =>
-                  row.email ? [row.email.trim().toLowerCase()] : []
-                )
-              ),
-            ]
-          : null;
-        if (selectedEmails?.length === 0) {
-          return NextResponse.json({ rows: [] }, { headers: NO_STORE_HEADERS });
-        }
-        const rows = await tx
-          .select({
-            id: notificationSubscriptions.id,
-            email: notificationSubscriptions.email,
-            name: notificationSubscriptions.name,
-            countryCode: notificationSubscriptions.countryCode,
-            channel: notificationSubscriptions.channel,
-            createdAt: notificationSubscriptions.createdAt,
-            confirmedAt: notificationSubscriptions.confirmedAt,
-            unsubscribedAt: notificationSubscriptions.unsubscribedAt,
-            artistEmailOptInAt: notificationSubscriptions.artistEmailOptInAt,
-            artistEmailOptOutAt: notificationSubscriptions.artistEmailOptOutAt,
-          })
-          .from(notificationSubscriptions)
-          .where(
-            and(
-              eq(notificationSubscriptions.creatorProfileId, profileId),
-              eq(notificationSubscriptions.channel, 'email'),
-              isNotNull(notificationSubscriptions.email),
-              selectedEmails
-                ? inArray(
-                    drizzleSql`lower(trim(${notificationSubscriptions.email}))`,
-                    selectedEmails
-                  )
-                : undefined
-            )
-          )
-          .orderBy(
-            desc(notificationSubscriptions.createdAt),
-            desc(notificationSubscriptions.id)
-          )
-          .limit(10001);
+        const rows = await listEmailSubscriberExportCandidates(
+          tx,
+          profileId,
+          selectedIds
+        );
         if (rows.length > 10000) {
           return NextResponse.json(
             { error: 'Select fewer subscribers to export.' },

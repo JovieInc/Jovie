@@ -259,6 +259,14 @@ describe('server-authorized subscriber export', () => {
     expect(await response.json()).toEqual({ rows: [] });
   });
 
+  it('returns no records for selected IDs absent from the authorized profile', async () => {
+    queue[1] = [];
+    expect(
+      await (await invoke({ profileId, selectedIds: [otherId] })).json()
+    ).toEqual({ rows: [] });
+    expect(mocks.select).toHaveBeenCalledTimes(2);
+  });
+
   it('returns an empty eligible result without reading suppression tables', async () => {
     queue[1] = [];
     const response = await invoke();

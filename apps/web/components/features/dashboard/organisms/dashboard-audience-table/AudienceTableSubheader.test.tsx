@@ -6,7 +6,7 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
-import type { ReactElement, ReactNode } from 'react';
+import type { ComponentProps, ReactElement, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AudienceMember } from '@/types';
 import { AudienceTableSubheader } from './AudienceTableSubheader';
@@ -91,6 +91,19 @@ const readBlob = (blob: Blob) =>
     reader.readAsText(blob);
   });
 
+function renderSubscribers(
+  overrides: Partial<ComponentProps<typeof AudienceTableSubheader>> = {}
+) {
+  return render(
+    <AudienceTableSubheader
+      {...base}
+      mode='subscribers'
+      profileId={profileId}
+      {...overrides}
+    />
+  );
+}
+
 describe('subscriber export preparation', () => {
   afterEach(() => vi.unstubAllGlobals());
   beforeEach(() => {
@@ -101,13 +114,7 @@ describe('subscriber export preparation', () => {
 
   it('revalidates selected subscribers on the server and downloads only its exact CSV', async () => {
     fetchMock.mockResolvedValue(response());
-    render(
-      <AudienceTableSubheader
-        {...base}
-        mode='subscribers'
-        profileId={profileId}
-      />
-    );
+    renderSubscribers();
     fireEvent.click(exportButton());
     fireEvent.click(
       await screen.findByRole('button', { name: 'Download CSV' })
@@ -131,13 +138,7 @@ describe('subscriber export preparation', () => {
       ok: false,
       json: async () => ({ error: 'Export requires a paid entitlement.' }),
     });
-    render(
-      <AudienceTableSubheader
-        {...base}
-        mode='subscribers'
-        profileId={profileId}
-      />
-    );
+    renderSubscribers();
     fireEvent.click(exportButton());
     await waitFor(() =>
       expect(error).toHaveBeenCalledWith('Export requires a paid entitlement.')
@@ -147,15 +148,13 @@ describe('subscriber export preparation', () => {
   });
 
   it('disables subscriber export without an immutable profile binding', () => {
-    render(<AudienceTableSubheader {...base} mode='subscribers' />);
+    renderSubscribers({ profileId: undefined });
     expect(exportButton()).toBeDisabled();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('preserves the existing general audience export without a server request', async () => {
-    render(
-      <AudienceTableSubheader {...base} mode='members' profileId={profileId} />
-    );
+    renderSubscribers({ mode: 'members' });
     fireEvent.click(exportButton());
     fireEvent.click(
       await screen.findByRole('button', { name: 'Download CSV' })
@@ -193,13 +192,7 @@ describe('subscriber export preparation', () => {
     },
   ])('creates no file for $failure', async ({ reply }) => {
     fetchMock.mockImplementation(reply);
-    render(
-      <AudienceTableSubheader
-        {...base}
-        mode='subscribers'
-        profileId={profileId}
-      />
-    );
+    renderSubscribers();
     fireEvent.click(exportButton());
     await waitFor(() => expect(error).toHaveBeenCalledOnce());
     expect(download).not.toHaveBeenCalled();
@@ -208,13 +201,7 @@ describe('subscriber export preparation', () => {
 
   it('invalidates a prepared confirmation when the active profile changes', async () => {
     fetchMock.mockResolvedValue(response());
-    const { rerender } = render(
-      <AudienceTableSubheader
-        {...base}
-        mode='subscribers'
-        profileId={profileId}
-      />
-    );
+    const { rerender } = renderSubscribers();
     fireEvent.click(exportButton());
     await screen.findByRole('button', { name: 'Download CSV' });
     rerender(
@@ -234,13 +221,7 @@ describe('subscriber export preparation', () => {
           resolveCheck = resolve;
         })
     );
-    const { rerender } = render(
-      <AudienceTableSubheader
-        {...base}
-        mode='subscribers'
-        profileId={profileId}
-      />
-    );
+    const { rerender } = renderSubscribers();
     fireEvent.click(exportButton());
     rerender(
       <AudienceTableSubheader {...base} mode='subscribers' profileId={rowId} />
