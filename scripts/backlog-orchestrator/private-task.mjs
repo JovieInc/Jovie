@@ -96,8 +96,24 @@ export function classifyConversationRequest(request) {
   )
     throw new Error('Invalid conversation classification');
   const text = requestText(request);
+  const companyWebhook =
+    declared === 'jovie' && /\bwebhooks?\b/i.test(request.title);
+  const telegramAccount =
+    /\b(?:archiv\w*|clean\w*|chats?|dialogs?|login|session|phone|export\w*|messages?|contacts?|groups?|channels?)\b/i.test(
+      text
+    );
+  const privateTelegram =
+    /\b(?:telegram|telethon)\b/i.test(text) &&
+    (!companyWebhook || telegramAccount);
+  const credential =
+    /api[_ -]?hash|login[_ -]?code|phone[_ -]?code|\.session\b|session[_ -]?(?:file|string)|\b[a-f0-9]{32}\b|\+\d[\d ().-]{7,}\d/i.test(
+      text
+    );
   const personal =
-    /\b(telegram|personal|private account|my (?:account|inbox|phone|messages)|login code|otp|phone number)\b/i.test(
+    request.externalization === 'denied' ||
+    credential ||
+    privateTelegram ||
+    /\b(personal|private account|my (?:account|inbox|phone|messages)|login code|otp|phone number)\b/i.test(
       text
     );
   // Source URLs and quoted history cannot declare company scope.

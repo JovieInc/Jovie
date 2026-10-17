@@ -177,8 +177,56 @@ class WorktreeTest(unittest.TestCase):
 
 
 class CheckTest(unittest.TestCase):
+    def setUp(self):
+        # These tests model disk pressure, not the operator's actual cleanup scope.
+        self.cleanup = tempfile.TemporaryDirectory()
+        self.addCleanup(self.cleanup.cleanup)
+        scratch = Path(self.cleanup.name)
+        derived = guard.sweep_derived_data
+        isolated = [
+            patch.object(guard, "runner_roots", return_value=[]),
+            patch.object(guard, "retired_workspace_roots", return_value=[]),
+            patch.object(guard, "log_dirs", side_effect=lambda host: [host.state / "runs"]),
+            patch.object(guard.worktree_pool, "shed", return_value=[]),
+            patch.object(guard.shutil, "which", return_value=None),
+            patch.object(guard, "sweep_derived_data",
+                         side_effect=lambda now, report: derived(now, report, root=scratch / "DerivedData")),
+        ]
+        for isolation in isolated:
+            isolation.start()
+            self.addCleanup(isolation.stop)
+
     def host(self, tmp):
         return SimpleNamespace(state=Path(tmp), repo=Path(tmp))
+
+    def test_low_disk_fixture_preserves_an_operator_workspace(self):
+        # A synthetic low-disk host must not inherit real cleanup roots. Reproduce
+        # the escaped sweep with a fake operator home, never the developer's HOME.
+        import worktree_sweep
+
+        with tempfile.TemporaryDirectory() as tmp:
+            scratch = Path(tmp)
+            home = scratch / "operator-home"
+            retained = make_tree(home / "symphony-elixir-workspaces/JOV-1",
+                                 [".git", "source.txt"], age_s=24 * 3600)
+            state = scratch / "state"
+            state.mkdir()
+
+            def run(args, **kwargs):
+                output = "origin\n" if "remote" in args else "0\n" if "rev-list" in args else ""
+                return SimpleNamespace(returncode=0, stdout=output, stderr="")
+
+            with patch.object(Path, "home", return_value=home), \
+                    patch.object(guard, "free_pct", return_value=10.0), \
+                    patch.object(guard, "RETIRED_WORKSPACE_ABSOLUTE", []), \
+                    patch.object(guard, "mount_points", return_value=set()), \
+                    patch.object(guard.git_housekeeping, "quiesce"), \
+                    patch.object(guard, "sweep_derived_data"), \
+                    patch.object(guard, "sweep_runner_work"), \
+                    patch.object(guard, "sweep_worktree_pool"), \
+                    patch.object(guard.shutil, "which", return_value=None):
+                guard.check(self.host(state), run=run, now=NOW, sweep=True)
+            self.assertEqual((retained / "source.txt").read_text(), "x")
 
     def test_healthy_disk_sweeps_nothing(self):
         saved = guard.free_pct

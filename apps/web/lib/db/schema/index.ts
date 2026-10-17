@@ -76,6 +76,8 @@ export {
   audienceActions,
   audienceBlocks,
   audienceMembers,
+  audienceProjectionSnapshots,
+  audienceReferrers,
   audienceSourceGroups,
   audienceSourceLinks,
   type ClickEvent,
@@ -1335,6 +1337,12 @@ export {
   type RiderSection,
   type RiderVisibility,
 } from './riders';
+// Owner-isolated royalty evidence
+export {
+  royaltySources,
+  royaltyStatementLines,
+  royaltyStatementVersions,
+} from './royalties';
 // Sender (Email Quotas, Sending Reputation, Send Attribution)
 export {
   type CreatorEmailQuota,

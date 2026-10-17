@@ -66,17 +66,18 @@
     },
     ".claude/rules/code-style.md": {
       "owner": "@itstimwhite",
-      "claim": "Engineering conventions inherit the engineering canon and executable lint boundaries; internal PR review is advisory and CodeRabbit is optional supplementary evidence.",
-      "documentSha256": "37d1ab1df6c3c7b495c2924c8af284457cfe24c70528b7f01ce871cc6ec02a5c",
+      "claim": "The Prior-Art Gate projects canonical capability sourcing and IA policy; the existing internal reviewer is advisory.",
+      "documentSha256": "ff6c6731ea175aabb7e2fa14476e0138b552b3cce50efb230405d309860bf923",
       "sources": [
         {
           "path": "canon/ENGINEERING.md",
-          "sha256": "ef3b80900618e178419090a8ee322d646d81e8f952ceb14a9372b1ac79e9c120"
+          "section": "## Capability sourcing and IA integration",
+          "sha256": "c38946331cba8c71293a3205dac01cbefc4d9facbdd477bfa50b6078008185a9"
         },
         {
           "path": ".github/workflows/README.md",
           "section": "## Internal PR Review (advisory)",
-          "sha256": "08986dd49baac364e92bd05a395df1af3d2aad974bc911df8de9407f686525cb"
+          "sha256": "81772cf10e4eb82809d3b3eb6ba291c27b5a6e3d3c135fd8ff4a7e8ee7725dff"
         }
       ]
     },
@@ -344,7 +345,7 @@
     "CLAUDE.md": {
       "owner": "@itstimwhite",
       "claim": "The top-level router inherits the constitution and routes personal/mixed requests to private intake before task tools.",
-      "documentSha256": "ae1f036397e84f62d025bf03e41e501e32e465b6588a4284c3cd51000bbce116",
+      "documentSha256": "375c8ef4d8ad65c06aef6bb63b2159fe44790ba5ee3499ebbccf8c76c8dd9e31",
       "sources": [
         {
           "path": "canon/OPERATING_SYSTEM.md",
@@ -353,6 +354,11 @@
         {
           "path": "scripts/backlog-orchestrator/private-task.mjs",
           "sha256": "46e9fd81de86670fca59bf19d113786428b7b189f758cad75e682bb8d68924a1"
+        },
+        {
+          "path": "canon/ENGINEERING.md",
+          "section": "## Capability sourcing and IA integration",
+          "sha256": "c38946331cba8c71293a3205dac01cbefc4d9facbdd477bfa50b6078008185a9"
         }
       ]
     },
@@ -380,6 +386,25 @@
         {
           "path": "canon/DESIGN.md",
           "sha256": "8a6b7095f7a50904b77c4c2b0599d1b9f4de4621ffe459d1488357a31476839f"
+        }
+      ]
+    },
+    "canon/ENGINEERING.md": {
+      "owner": "@itstimwhite",
+      "claim": "Capability sourcing and IA policy is projected through shared task packets and trusted advisory review; diagnostic field checks do not certify semantics/runtime or blocking promotion.",
+      "documentSha256": "91b7b17bf2192ed5d879c3dc3e20dba3f70b0f3412eb4d0768829d55444f9c1a",
+      "sources": [
+        {
+          "path": "scripts/invariants/capability-planning.mjs",
+          "sha256": "7f72f2f4bc09235a61f3b22708775ce81f67418ff46affaba69afbce1c40adca"
+        },
+        {
+          "path": ".github/scripts/internal-pr-review.mjs",
+          "sha256": "dd0d20dfda2ed9724335435c45ae8e2dbc37d8292865e512aaaa4f9a2257890e"
+        },
+        {
+          "path": "scripts/lanes/lane_runner.py",
+          "sha256": "89557bdcddf29d9ea00df85491243d00cffd2a8cca4335e3768f4f9866592f6a"
         }
       ]
     },
@@ -475,12 +500,28 @@
     },
     "docs/writing/SURFACE_COVERAGE.md": {
       "owner": "@itstimwhite",
-      "claim": "Writing surface completeness is validated by the existing invariant consumer.",
-      "documentSha256": "13afd3227d7edeb5277b2b7e9d5a343cd8ed67f0d5bf9769535f0f9f6ccf4391",
+      "claim": "Writing surface completeness is validated by the existing invariant consumer; the bounded post-selection brief uses server confirmation and public evidence; the bounded ops pilot rechecks artifact bindings at its Linear adapter and remains advisory.",
+      "documentSha256": "08e2793e7acc54ab02942c7dea7c59c9f156a633f4c4e218b8ad22d06cca2eb4",
       "sources": [
+        {
+          "path": "apps/web/lib/chat/onboarding-script/engine.ts",
+          "sha256": "2189bc254d59f0cba73b51c54d42da7b3950ca45cdbcb797346d637fd5e47b1f"
+        },
+        {
+          "path": "apps/web/lib/chat/post-selection-writing-brief.ts",
+          "sha256": "3d167c446ef4d8c22b7e58e16084b057b5c1192181ee345d680538e8837ad24f"
+        },
         {
           "path": "scripts/invariants/writing-surfaces.mjs",
           "sha256": "91356a21ccf5164603191080d6fb3e4e03d7455b8d58ad0c08c5651965143145"
+        },
+        {
+          "path": "scripts/lanes/doctor.py",
+          "sha256": "62c6939febf3586175d3bd867909d7fe3ef7bc9175ba7583b7dda921ddf0938a"
+        },
+        {
+          "path": "scripts/lanes/ops-report.mjs",
+          "sha256": "13f2edce9dc44a1aef3bf1180a32aa6b78bb2a23f26b95274b0e23820752327b"
         }
       ]
     },

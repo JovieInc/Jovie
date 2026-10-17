@@ -135,14 +135,18 @@ export const audienceReferrers = pgTable(
       .references(() => audienceMembers.id, { onDelete: 'cascade' }),
     url: text('url').notNull(),
     source: text('source'),
-    timestamp: timestamp('timestamp', { withTimezone: true })
-      .defaultNow()
-      .notNull(),
+    legacyKey: text('legacy_key'),
+    legacyPayload: jsonb('legacy_payload').$type<Record<string, unknown>>(),
+    // Missing historical times remain NULL; existing instants are unchanged.
+    timestamp: timestamp('timestamp', { withTimezone: true }).defaultNow(),
     createdAt: timestamp('created_at', { withTimezone: true })
       .defaultNow()
       .notNull(),
   },
   table => ({
+    legacyKeyUnique: uniqueIndex(
+      'audience_referrers_member_legacy_key_unique'
+    ).on(table.audienceMemberId, table.legacyKey),
     memberTimestampIdx: index('audience_referrers_member_ts_idx').on(
       table.audienceMemberId,
       table.timestamp
@@ -187,6 +191,8 @@ export const audienceActions = pgTable(
     audienceMemberId: uuid('audience_member_id')
       .notNull()
       .references(() => audienceMembers.id, { onDelete: 'cascade' }),
+    legacyKey: text('legacy_key'),
+    legacyPayload: jsonb('legacy_payload').$type<Record<string, unknown>>(),
     label: text('label').notNull(),
     emoji: text('emoji'),
     platform: text('platform'),
@@ -220,6 +226,9 @@ export const audienceActions = pgTable(
       .notNull(),
   },
   table => ({
+    legacyKeyUnique: uniqueIndex(
+      'audience_actions_member_legacy_key_unique'
+    ).on(table.audienceMemberId, table.legacyKey),
     memberProfileFk: foreignKey({
       name: 'audience_actions_member_profile_fk',
       columns: [table.audienceMemberId, table.creatorProfileId],
@@ -239,6 +248,27 @@ export const audienceActions = pgTable(
       'audience_actions_event_type_timestamp_idx'
     ).on(table.eventType, table.timestamp),
   })
+);
+
+// Retained before the first rebuild; rollback does not depend on derived arrays.
+export const audienceProjectionSnapshots = pgTable(
+  'audience_projection_snapshots',
+  {
+    audienceMemberId: uuid('audience_member_id')
+      .primaryKey()
+      .references(() => audienceMembers.id, { onDelete: 'cascade' }),
+    original: jsonb('original')
+      .$type<{
+        latestActions: Record<string, unknown>[] | null;
+        referrerHistory: Record<string, unknown>[] | null;
+        latestActionLabel: string | null;
+        latestReferrerUrl: string | null;
+      }>()
+      .notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  }
 );
 
 // Creator-facing source/campaign buckets for trackable links and QR codes.

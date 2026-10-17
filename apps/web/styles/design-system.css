@@ -917,6 +917,28 @@
     flex: 1 1 0%;
     min-height: 0;
   }
+
+  /* The phone card is a fixed height and the dock is absolute, so column
+     margin alone still left the scroll border box on the card bottom (the
+     dock then covered the last ~42px). Cap the column itself. Mobile overflow
+     mode stays in the max-width block above and is unchanged. */
+  [data-testid="profile-compact-surface"]:not(
+    [data-presentation="embedded"]
+  ):has(> .profile-floating-tab-bar) > .profile-content-column {
+    flex: 1 1 auto;
+    height: calc(100% - var(--profile-bottom-nav-height));
+    max-height: calc(100% - var(--profile-bottom-nav-height));
+    min-height: 0;
+    margin-bottom: 0;
+  }
+
+  [data-testid="profile-compact-surface"]:not(
+      [data-presentation="embedded"]
+    ):has(> .profile-floating-tab-bar)
+    .profile-content-scroll-region {
+    max-height: 100%;
+    min-height: 0;
+  }
 }
 
 /* Mobile home: the identity header and the rail share one scroll region.
@@ -1455,7 +1477,10 @@
   --noir-ion-text-muted: #9da2ac;
   /* Clears 4.5:1 on the selected row tint over surface-1 (JOV-7861). */
   --noir-ion-text-tertiary: #8c939e;
-  --noir-ion-text-disabled: #525d75;
+  /* Same OKLCH family as the retired #525d75 (oklch hue ~265.6), lightness
+     raised so the disabled token itself clears 4.5:1 on the dark shell —
+     disabled HUD controls (axe color-contrast, JOV-8484). */
+  --noir-ion-text-disabled: #77839d;
   --noir-ion-text-inverse: #020307;
   --noir-ion-ion: #11afff;
   --noir-ion-ion-solid: #11afff;
@@ -2069,12 +2094,12 @@
 @media (prefers-reduced-transparency: reduce) {
   :where(.profile-liquid-glass-nav) {
     border-color: var(--profile-dock-solid-border);
-    background: var(--profile-dock-solid-bg);
+    background: var(--profile-dock-solid-bg) !important;
     box-shadow: var(--profile-dock-shadow);
     --tw-backdrop-blur: initial;
     --tw-backdrop-saturate: initial;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
   }
 
   :where(.profile-liquid-glass-nav)::after {
@@ -2097,16 +2122,19 @@
 }
 
 /* Keep the nav class outside :where() here so the deterministic hooks outrank
-   Tailwind's backdrop utility custom properties even if layer order changes. */
+   Tailwind's backdrop utility custom properties even if layer order changes.
+   !important is required: an unlayered decorative blur beats a normal
+   declaration that the compiler places in a layer, so the computed
+   backdrop-filter stayed blur(24px) saturate(1.8) after these hooks matched. */
 :root[data-reduced-transparency="true"] .profile-liquid-glass-nav,
 :root.high-contrast .profile-liquid-glass-nav {
   border-color: var(--profile-dock-solid-border);
-  background: var(--profile-dock-solid-bg);
+  background: var(--profile-dock-solid-bg) !important;
   box-shadow: var(--profile-dock-shadow);
   --tw-backdrop-blur: initial;
   --tw-backdrop-saturate: initial;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 :root[data-reduced-transparency="true"] .profile-liquid-glass-nav::after,

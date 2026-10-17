@@ -68,6 +68,13 @@ export interface WebAiHealthReceipt {
   readonly results: readonly WebAiHealthProbeResult[];
 }
 
+/**
+ * Same object for every structured surface. A surface name in the prompt
+ * made pitches diverge into a different object than insights and packaging.
+ */
+const STRUCTURED_HEALTH_PROMPT =
+  'Return JSON {"response":"healthy"} and no other text.';
+
 export const WEB_AI_HEALTH_PROBES: readonly WebAiHealthProbeDefinition[] = [
   {
     surface: 'web_chat',
@@ -79,13 +86,13 @@ export const WEB_AI_HEALTH_PROBES: readonly WebAiHealthProbeDefinition[] = [
     surface: 'insights',
     model: INSIGHT_MODEL,
     mode: 'structured',
-    prompt: 'Return the health signal healthy for the insights surface.',
+    prompt: STRUCTURED_HEALTH_PROMPT,
   },
   {
     surface: 'pitches',
     model: PITCH_MODEL,
     mode: 'structured',
-    prompt: 'Return the health signal healthy for the pitches surface.',
+    prompt: STRUCTURED_HEALTH_PROMPT,
   },
   {
     surface: 'titles',
@@ -97,18 +104,24 @@ export const WEB_AI_HEALTH_PROBES: readonly WebAiHealthProbeDefinition[] = [
     surface: 'packaging',
     model: PACKAGING_INTELLIGENCE_MODEL,
     mode: 'structured',
-    prompt: 'Return the health signal healthy for the packaging surface.',
+    prompt: STRUCTURED_HEALTH_PROMPT,
   },
 ] as const;
 
+const HEALTH_RESPONSE_MAX = 200;
+
 const healthObjectSchema = z.object({
-  response: z.string().min(1).max(40),
+  response: z.string().min(1).max(HEALTH_RESPONSE_MAX),
 });
 
 const PROBE_TIMEOUT_MS = 30_000;
 // GLM-5.3 always reasons, and Gateway counts reasoning against this ceiling.
 // Keep the probe cheap while leaving enough room for final text/JSON output.
 const PROBE_MAX_OUTPUT_TOKENS = 1_024;
+// Structured JSON shares that ceiling with reasoning. 1,024 tokens let the
+// pitches probe finish with no schema-valid object (JOV-8442) while the same
+// model still answered the text probes. Match the insight generator ceiling.
+const STRUCTURED_PROBE_MAX_OUTPUT_TOKENS = 4_096;
 
 export type ExecuteWebAiHealthProbe = (
   definition: WebAiHealthProbeDefinition
@@ -143,22 +156,82 @@ function collectStringLeaves(value: unknown, depth = 0): string[] {
   );
 }
 
+function noObjectFailureKind(message: string): string {
+  if (message.includes('did not return a response')) return 'no_response';
+  if (message.includes('could not parse')) return 'unparseable';
+  if (message.includes('did not match schema')) return 'schema_mismatch';
+  return 'object';
+}
+
 function errorFingerprint(error: unknown): string {
   if (!error || typeof error !== 'object') return typeof error;
 
   const candidate = error as {
     readonly name?: unknown;
+    readonly message?: unknown;
     readonly status?: unknown;
     readonly statusCode?: unknown;
+    readonly finishReason?: unknown;
   };
   const name =
     typeof candidate.name === 'string' && candidate.name.trim()
       ? candidate.name.trim()
       : 'Error';
   const status = candidate.status ?? candidate.statusCode;
-  return typeof status === 'number' || typeof status === 'string'
-    ? `${name}:${status}`
-    : name;
+  if (typeof status === 'number' || typeof status === 'string') {
+    return `${name}:${status}`;
+  }
+  if (name !== 'AI_NoObjectGeneratedError') return name;
+
+  const message =
+    typeof candidate.message === 'string' ? candidate.message : '';
+  const finishReason =
+    typeof candidate.finishReason === 'string' && candidate.finishReason.trim()
+      ? candidate.finishReason.trim()
+      : 'unknown';
+  return `${name}:${noObjectFailureKind(message)}:${finishReason}`;
+}
+
+function isNoObjectGeneratedError(error: unknown): boolean {
+  return error instanceof Error && error.name === 'AI_NoObjectGeneratedError';
+}
+
+/**
+ * Pull a short `response` string out of fenced or extra-field JSON.
+ * Returns null when the model did not produce an object, so a real
+ * structured-output failure still fails the probe. Model text never
+ * leaves this function except as the repaired JSON the schema accepts.
+ */
+export function repairWebAiHealthObjectText(text: string): string | null {
+  const withoutFence = text.replaceAll(/```(?:json)?/gi, '').trim();
+  const start = withoutFence.indexOf('{');
+  const end = withoutFence.lastIndexOf('}');
+  if (start === -1 || end <= start) return null;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(withoutFence.slice(start, end + 1));
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return null;
+  }
+
+  const record = parsed as Record<string, unknown>;
+  const preferred =
+    typeof record.response === 'string' ? record.response : undefined;
+  const fallback =
+    preferred ??
+    Object.values(record).find(
+      (value): value is string =>
+        typeof value === 'string' && value.trim().length > 0
+    );
+  if (typeof fallback !== 'string') return null;
+
+  const response = fallback.trim().slice(0, HEALTH_RESPONSE_MAX);
+  if (!response) return null;
+  return JSON.stringify({ response });
 }
 
 function containsForbiddenSignal(value: unknown): boolean {
@@ -243,11 +316,27 @@ export async function executeWebAiHealthProbe(
     return result.text;
   }
 
-  const result = await generateObject({
-    ...common,
-    schema: healthObjectSchema,
-  });
-  return result.object.response;
+  const generateHealthObject = () =>
+    generateObject({
+      ...common,
+      maxOutputTokens: STRUCTURED_PROBE_MAX_OUTPUT_TOKENS,
+      schema: healthObjectSchema,
+      schemaName: 'WebAiHealthSignal',
+      schemaDescription:
+        'One field, response, containing a short health status.',
+      repairText: async ({ text }) => repairWebAiHealthObjectText(text),
+    });
+
+  try {
+    const result = await generateHealthObject();
+    return result.object.response;
+  } catch (error) {
+    // The first structured attempt can finish with reasoning and no object.
+    // Transport and allowlist errors still fail immediately.
+    if (!isNoObjectGeneratedError(error)) throw error;
+    const result = await generateHealthObject();
+    return result.object.response;
+  }
 }
 
 export async function runWebAiHealth(input?: {

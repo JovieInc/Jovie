@@ -100,6 +100,11 @@ describe('lane Python qualification coverage', () => {
   it.each([
     ['lane source', ['scripts/lanes/hyperagent_lane.py']],
     ['attempt regression', ['scripts/tests/test_execution_attempt.py']],
+    ['qualification safety source', ['scripts/lanes/qualification_guard.py']],
+    [
+      'qualification safety regression',
+      ['scripts/tests/test_qualification_guard.py'],
+    ],
     [
       'remediation repair',
       [

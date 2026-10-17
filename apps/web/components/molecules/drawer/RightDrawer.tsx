@@ -229,6 +229,8 @@ function useMobileDrawerFocus(
   useModalFocusBoundary(drawerRef, isMobile && isOpen && isActive, {
     restoreFocus: false,
   });
+
+  return triggerRef;
 }
 
 function hasOpenModalDialog(exclude: HTMLElement | null) {
@@ -285,7 +287,6 @@ export function RightDrawer({
   // opacity/travel stage with the width give-back, instead of snapping to
   // `invisible` at frame one. `data-rail-phase` is the certification hook.
   const railPhase = useRailMotionPhase(isOpen);
-  useRailFocusReturn(asideRef, !isOpen && !isMobile, 'right');
 
   // Suppress the width/opacity transition on first paint so the panel appears
   // at its final size instead of animating in on hydration. The transition
@@ -299,7 +300,13 @@ export function RightDrawer({
 
   // Prevent background scroll when mobile drawer is open
   useBodyScrollLock(isOpen && isActiveMobileDrawer, isMobile);
-  useMobileDrawerFocus(asideRef, isOpen, isMobile, isActiveMobileDrawer);
+  const mobileTriggerRef = useMobileDrawerFocus(
+    asideRef,
+    isOpen,
+    isMobile,
+    isActiveMobileDrawer
+  );
+  useRailFocusReturn(asideRef, !isOpen, 'right', mobileTriggerRef);
 
   // Handle keyboard events at the document level when drawer is open
   useEffect(() => {

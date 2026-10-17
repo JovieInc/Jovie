@@ -11,10 +11,13 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { JEV_ROUTE } from '../invariants/jev-gateway.mjs';
 import {
   detectWritingFindings,
+  prepareWritingQualityRequest,
   runWritingQualityEvaluation,
   segmentPassages,
+  WRITING_QUALITY_SCHEMA,
 } from '../invariants/jev-writing-quality.mjs';
 import { readWritingSurfacesRegistry } from '../invariants/writing-surfaces.mjs';
 
@@ -275,15 +278,18 @@ function deterministicFindings(report, candidate) {
   return detectWritingFindings(segmentPassages(candidate), contract).findings;
 }
 
-function acceptedSemanticReview(receipt) {
+function currentSemanticReview(receipt, input, nowMs) {
   return (
+    receipt?.schema === WRITING_QUALITY_SCHEMA &&
     receipt?.status === 'evaluated' &&
+    receipt.requestFingerprint ===
+      prepareWritingQualityRequest(input).fingerprint &&
     Array.isArray(receipt.findings) &&
-    receipt.findings.length === 0 &&
     Array.isArray(receipt.unreviewed) &&
-    receipt.unreviewed.length === 0 &&
-    hasText(receipt.resolvedModel) &&
-    Number.isFinite(receipt.completedAt)
+    receipt.resolvedModel === JEV_ROUTE.model &&
+    Number.isFinite(receipt.completedAt) &&
+    receipt.completedAt <= nowMs &&
+    nowMs - receipt.completedAt <= MAX_EVIDENCE_AGE_MS
   );
 }
 
@@ -310,6 +316,8 @@ function deliveryReview(report, message, detail) {
 }
 
 function prepared(report, message, detail) {
+  if (detail.outcome === 'approved-template')
+    message = `Writing review: unreviewed; approved factual template.\n\n${message}`;
   const review = deliveryReview(report, message, detail);
   return Object.freeze({
     report,
@@ -404,15 +412,13 @@ export async function prepareOpsReportDelivery(
   }
 
   let candidate = template;
-  let receipt = await review(
-    evaluationInput(report, candidate),
-    reviewOptions(evaluationInput(report, candidate))
-  );
+  let candidateInput = evaluationInput(report, candidate);
+  let receipt = await review(candidateInput, reviewOptions(candidateInput));
   let revisionCount = 0;
   if (
-    receipt?.status === 'evaluated' &&
-    receipt.findings?.length &&
-    !receipt.unreviewed?.length &&
+    currentSemanticReview(receipt, candidateInput, now()) &&
+    receipt.findings.length &&
+    !receipt.unreviewed.length &&
     typeof revise === 'function'
   ) {
     revisionCount = 1;
@@ -432,17 +438,24 @@ export async function prepareOpsReportDelivery(
       !PRODUCTION_CLAIM.test(revised)
     ) {
       candidate = revised;
-      const revisedInput = evaluationInput(report, candidate, template);
-      receipt = await review(revisedInput, reviewOptions(revisedInput));
+      candidateInput = evaluationInput(report, candidate, template);
+      receipt = await review(candidateInput, reviewOptions(candidateInput));
     } else {
       receipt = { status: 'revision-fidelity-failed' };
     }
   }
 
-  if (!acceptedSemanticReview(receipt)) {
+  if (
+    !currentSemanticReview(receipt, candidateInput, now()) ||
+    receipt.findings.length ||
+    receipt.unreviewed.length
+  ) {
     return prepared(report, template, {
       outcome: 'approved-template',
-      reviewStatus: receipt?.status ?? 'missing-review',
+      reviewStatus:
+        receipt?.status === 'evaluated'
+          ? 'unreviewed'
+          : (receipt?.status ?? 'missing-review'),
       revisionCount,
       resolvedModel: NOT_APPLICABLE,
       reviewedAt: new Date(now()).toISOString(),
@@ -461,17 +474,46 @@ export async function prepareOpsReportDelivery(
 
 /** Exact message/destination/evidence/policy/model must still match at send time. */
 export function verifyOpsReportDelivery(preparedReport, currentInput, options) {
+  const nowMs = (options?.now ?? Date.now)();
   const current = buildOpsReport(currentInput, options);
-  const expected = preparedReport.review.bindings;
+  const review = preparedReport?.review;
+  const expected = review?.bindings;
+  const reviewedAt = Date.parse(review?.reviewedAt);
+  if (
+    review?.schema !== OPS_REPORT_REVIEW_SCHEMA ||
+    review.mode !== 'observation' ||
+    !expected ||
+    review.outcome !== preparedReport.decision ||
+    !['observed', 'approved-template', 'review-queue'].includes(
+      review.outcome
+    ) ||
+    typeof review.reviewedAt !== 'string' ||
+    !Number.isFinite(reviewedAt) ||
+    reviewedAt > nowMs ||
+    nowMs - reviewedAt > MAX_EVIDENCE_AGE_MS ||
+    (review.outcome !== 'review-queue' &&
+      current.deterministicIssues.length > 0) ||
+    (review.outcome === 'observed'
+      ? expected.resolvedModel !== JEV_ROUTE.model ||
+        review.reviewStatus !== 'evaluated'
+      : expected.resolvedModel !== NOT_APPLICABLE) ||
+    preparedReport.audience !== current.audience ||
+    fingerprint(preparedReport.destination) !== fingerprint(current.destination)
+  )
+    throw new Error('ops report review invalidated before delivery');
   const actual = {
     messageSha256: sha256(preparedReport.message),
     audience: current.audience,
     destination: current.destination,
     evidenceFingerprint: current.evidenceFingerprint,
     policyVersion: current.policyVersion,
-    resolvedModel: expected.resolvedModel,
+    resolvedModel:
+      review.outcome === 'observed' ? JEV_ROUTE.model : NOT_APPLICABLE,
   };
-  if (fingerprint(actual) !== preparedReport.review.reviewDigest) {
+  if (
+    fingerprint(actual) !== review.reviewDigest ||
+    fingerprint(expected) !== review.reviewDigest
+  ) {
     throw new Error('ops report review invalidated before delivery');
   }
   return true;
@@ -481,8 +523,9 @@ export function verifyOpsReportDelivery(preparedReport, currentInput, options) {
 export async function deliverOpsReport(
   preparedReport,
   currentInput,
-  { send, dedupe = new Set(), now = Date.now }
+  { send, dedupe = new Set(), now = Date.now, signal = undefined }
 ) {
+  signal?.throwIfAborted();
   verifyOpsReportDelivery(preparedReport, currentInput, { now });
   if (dedupe.has(preparedReport.idempotencyKey)) {
     return Object.freeze({ outcome: 'suppressed-duplicate' });
@@ -496,6 +539,11 @@ export async function deliverOpsReport(
 
 async function main() {
   const input = JSON.parse(readFileSync(0, 'utf8'));
+  if (process.argv[2] === '--verify') {
+    verifyOpsReportDelivery(input.preparedReport, input.currentInput);
+    process.stdout.write('{"verified":true}\n');
+    return;
+  }
   const result = await prepareOpsReportDelivery(input);
   verifyOpsReportDelivery(result, input);
   process.stdout.write(`${JSON.stringify(result)}\n`);

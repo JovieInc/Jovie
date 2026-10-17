@@ -18,6 +18,55 @@ import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 const STABLE_ARTIST_ROUTE =
   /^\/artists\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
+const TIM_WHITE_REFERENCE_RELEASE = new URL(
+  '/tim/never-say-a-word',
+  TIM_WHITE_PROFILE.publicProfileUrl
+).href;
+
+function hasCanonicalArtistReturn(html: string, url: string): boolean {
+  const dom = new JSDOM(html, { url });
+  const found = [...dom.window.document.querySelectorAll('a[href]')].some(
+    link =>
+      new URL(link.getAttribute('href') ?? '', url).href ===
+        TIM_WHITE_PROFILE.publicProfileUrl &&
+      (link.getAttribute('aria-label') ===
+        `Back to ${TIM_WHITE_PROFILE.name}` ||
+        link.textContent?.trim() === `Back to ${TIM_WHITE_PROFILE.name}`)
+  );
+  dom.window.close();
+  return found;
+}
+
+/** JOV-6571 hide rules that have a stable marker in artist-site HTML. */
+export const CANONICAL_DEFERRED_SURFACE_MARKERS = [
+  [
+    'tips',
+    /data-testid=["'](?:tip-(?:button|drawer)|pay-trigger|profile-mode-drawer-pay|profile-pay-recipient)["']/,
+  ],
+  ['broad_ai', /data-ask-jovie-launcher|["']ask-jovie-(?:panel|trigger)["']/],
+  ['operator_controls', /data-testid=["']operator-(?:banner|lists-nav)["']/],
+] as const;
+
+export function exposedDeferredSurfaces(html: string): string[] {
+  return CANONICAL_DEFERRED_SURFACE_MARKERS.flatMap(([id, pattern]) =>
+    pattern.test(html) ? [id] : []
+  );
+}
+
+async function referenceReleaseFields(
+  response: Response,
+  pageUrl: string,
+  surfaces: Set<string>
+): Promise<{ canonicalArtistReturn?: boolean }> {
+  if (pageUrl !== TIM_WHITE_REFERENCE_RELEASE) {
+    await response.body?.cancel();
+    return {};
+  }
+  const html = await response.text();
+  for (const surfaceId of exposedDeferredSurfaces(html))
+    surfaces.add(surfaceId);
+  return { canonicalArtistReturn: hasCanonicalArtistReturn(html, pageUrl) };
+}
 
 /**
  * Redirects the codebase declares on purpose: the stable `/artists/:id`
@@ -78,6 +127,7 @@ export async function certifyArtistProfile(
     redirect: 'manual',
   });
   const html = await response.text();
+  const deferredSurfaceIds = new Set(exposedDeferredSurfaces(html));
   const dom = new JSDOM(html, { url: TIM_WHITE_PROFILE.publicProfileUrl });
   const inspection = inspectArtistProfile({
     document: dom.window.document,
@@ -119,6 +169,7 @@ export async function certifyArtistProfile(
     observedAt: string;
     redirectedTo?: string;
     finalStatus?: number | null;
+    canonicalArtistReturn?: boolean;
   }[] = [];
   const origin = new URL(snapshot.profileUrl).origin;
   const handle = new URL(snapshot.profileUrl).pathname.slice(1);
@@ -132,7 +183,6 @@ export async function certifyArtistProfile(
               signal: AbortSignal.timeout(15_000),
               redirect: 'manual',
             });
-            await result.body?.cancel();
             const location = result.headers.get('location');
             if (
               result.status >= 300 &&
@@ -140,6 +190,7 @@ export async function certifyArtistProfile(
               location &&
               isDeclaredRedirect(new URL(url), handle)
             ) {
+              await result.body?.cancel();
               const target = new URL(location, url);
               if (target.origin !== origin) {
                 return {
@@ -154,19 +205,28 @@ export async function certifyArtistProfile(
                 signal: AbortSignal.timeout(15_000),
                 redirect: 'manual',
               });
-              await final.body?.cancel();
               return {
                 url,
                 status: result.status,
                 observedAt: new Date().toISOString(),
                 redirectedTo: target.href,
                 finalStatus: final.status,
+                ...(await referenceReleaseFields(
+                  final,
+                  target.href,
+                  deferredSurfaceIds
+                )),
               };
             }
             return {
               url,
               status: result.status,
               observedAt: new Date().toISOString(),
+              ...(await referenceReleaseFields(
+                result,
+                url,
+                deferredSurfaceIds
+              )),
             };
           } catch {
             return { url, status: null, observedAt: new Date().toISOString() };
@@ -224,12 +284,17 @@ export async function certifyArtistProfile(
     brokenInternalLinks: linkChecks.filter(
       check => check.status === 404 || check.status === 410
     ),
+    brokenArtistLoops: linkChecks.filter(
+      check => check.canonicalArtistReturn === false
+    ),
+    exposedDeferredSurfaces: [...deferredSurfaceIds].sort(),
     elapsedMs: report.elapsedMs,
     failed:
       snapshot.checks.some(check => check.status !== 'pass') ||
       linkChecks.some(
         check => check.status !== 200 && check.finalStatus !== 200
-      ),
+      ) ||
+      linkChecks.some(check => check.canonicalArtistReturn === false),
   };
 }
 if (

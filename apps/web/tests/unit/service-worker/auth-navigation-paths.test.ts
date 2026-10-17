@@ -31,4 +31,9 @@ describe('auth navigation path policy', () => {
       expect(swSource).toContain(`'${prefix}'`);
     }
   });
+
+  it('does not respondWith a raw fetch for auth navigations or other requests', () => {
+    expect(swSource).not.toContain('event.respondWith(fetch(event.request))');
+    expect(swSource).toContain('caches.match(OFFLINE_PAGE)');
+  });
 });

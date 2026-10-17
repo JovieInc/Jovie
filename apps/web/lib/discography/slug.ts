@@ -7,6 +7,7 @@
 
 import { and, eq, ne } from 'drizzle-orm';
 import { db, withRetry } from '@/lib/db';
+import { QUERY_TIMEOUTS } from '@/lib/db/query-timeout';
 import {
   contentSlugRedirects,
   discogRecordings,
@@ -314,7 +315,8 @@ export async function findRedirectByOldSlug(
             )
           )
           .limit(1),
-      `findRedirectByOldSlug(${creatorProfileId}:${oldSlug})`
+      `findRedirectByOldSlug(${creatorProfileId}:${oldSlug})`,
+      { operation: 'read', retryBudgetMs: QUERY_TIMEOUTS.api }
     );
 
     if (!redirect) return null;

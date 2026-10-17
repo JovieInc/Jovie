@@ -396,7 +396,7 @@ describe('merge_group workflow contract', () => {
       true
     );
     expect(GREEN_ENROLL_WORKFLOW).toContain(
-      'types: [labeled, unlabeled, reopened, ready_for_review, synchronize]'
+      'types: [converted_to_draft, labeled, unlabeled, reopened, ready_for_review, synchronize]'
     );
     expect(getJobBlock(GREEN_ENROLL_WORKFLOW, 'enroll')).toContain(
       "(github.event_name != 'pull_request_target' || github.event.pull_request.draft == false)"
@@ -1627,16 +1627,17 @@ describe('merge_group workflow contract', () => {
       PRODUCTION_CONTROLLER_WORKFLOW,
       'authorize-production'
     );
-    expect(authorize).toContain('github-rate-limit.mjs');
+    expect(authorize).toContain('.github/scripts/gh-api-hold.sh');
     expect(authorize).toContain('"$shim" >> "$GITHUB_PATH"');
-    // The release checkout predates the file-stdout hold. The shim must
-    // load the default-branch copy or artifact zips stay on a pipe.
+    // The release checkout is not the hold. The shim loads the default-branch
+    // copy, which writes zip bytes to a file and unsets GH_FORCE_TTY.
     expect(authorize).toContain('path: .rate-limit-hold');
     expect(authorize).toContain('ref: ${{ github.sha }}');
     expect(authorize).toContain(
-      'hold="$GITHUB_WORKSPACE/.rate-limit-hold/scripts/lib/github-rate-limit.mjs"'
+      'hold="$GITHUB_WORKSPACE/.rate-limit-hold/.github/scripts/gh-api-hold.sh"'
     );
-    expect(authorize).toContain('exec node "$RATE_LIMIT_HOLD"');
+    expect(authorize).toContain('GH_API_HOLD_BUDGET_SECONDS:-1500');
+    expect(authorize).toContain('exec bash "$GH_API_HOLD_SCRIPT"');
     expect(authorize).not.toContain(
       'node "$GITHUB_WORKSPACE/scripts/lib/github-rate-limit.mjs"'
     );
@@ -2872,18 +2873,35 @@ ${selectedGateScript}`,
       'EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$deployment_url"'
     );
     expect(resolve).toContain('EXPECTED_VERCEL_ENVIRONMENT=production');
+    // Trigger evidence stays on GitHub REST and defers when that quota is exhausted.
+    expect(resolve).toContain('source scripts/ci/gh-api-or-defer.sh');
+    expect(resolve).toContain("steps.trigger.outputs.quota_deferred != 'true'");
     // Commit identity and main ancestry must survive shared REST quota exhaustion.
     expect(resolve).toContain('commit_history="$(mktemp -d)"');
     expect(resolve).toContain('git init -q "$commit_history"');
     expect(resolve).toContain('fetch --quiet --no-tags --filter=blob:none');
     expect(resolve).toContain('"https://github.com/$REPOSITORY.git"');
-    expect(resolve).toContain('refs/heads/main:refs/heads/main');
+    expect(resolve).toContain('refs/heads/main:refs/remotes/origin/main');
+    expect(resolve).toContain('::add-mask::$git_basic_auth');
+    expect(resolve).toContain('-c http.extraheader=');
+    expect(resolve).toContain(
+      '--config-env="http.https://github.com/$REPOSITORY.git.extraheader=JOVIE_GIT_AUTH_HEADER"'
+    );
+    expect(resolve).toContain('GIT_TERMINAL_PROMPT=0');
+    expect(resolve).toContain('unset git_basic_auth');
+    expect(resolve).not.toContain('http.extraheader=AUTHORIZATION: bearer');
     expect(resolve).toContain('rev-parse --verify "$deployed_sha^{commit}"');
     expect(resolve).toContain(
-      'merge-base --is-ancestor "$commit_sha" refs/heads/main'
+      'merge-base --is-ancestor "$commit_sha" refs/remotes/origin/main'
     );
     expect(resolve).not.toContain('gh api "repos/$REPOSITORY/commits/');
     expect(resolve).not.toContain('gh api "repos/$REPOSITORY/compare/');
+    expect(resolve).not.toContain(
+      'read_github_json "repos/$REPOSITORY/commits/'
+    );
+    expect(resolve).not.toContain(
+      'read_github_json "repos/$REPOSITORY/compare/'
+    );
     expect(resolve).toContain(
       'Canonical production commit is not an ancestor of main.'
     );
