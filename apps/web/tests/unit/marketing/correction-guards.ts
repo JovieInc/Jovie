@@ -1,3 +1,5 @@
+// Test-only repo scanner. Sync filesystem reads stay under tests/ so
+// JOV-INV-031 does not treat them as request-path thread-blocking I/O.
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -66,7 +68,7 @@ type KeyDiff = {
 };
 
 export function repoRootFromModule(): string {
-  return resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
+  return resolve(dirname(fileURLToPath(import.meta.url)), '../../../../../');
 }
 
 export function diffKeys(

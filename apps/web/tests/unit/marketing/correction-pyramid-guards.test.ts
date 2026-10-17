@@ -13,13 +13,14 @@ import {
   LOCKED_HOMEPAGE_H1,
   listCorrectionFiles,
   PHRASE_AND_NAME_ROOTS,
+  repoRootFromModule,
   scanBannedNames,
   scanBannedPhrases,
   scanRawJsx,
   stripComments,
   tightenBaseline,
   type WarnBaseline,
-} from '@/lib/marketing/correction-guards';
+} from './correction-guards';
 
 const webRoot = path.resolve(__dirname, '../../..');
 const repoRoot = path.resolve(webRoot, '../..');
@@ -62,6 +63,7 @@ describe('correction pyramid guards', () => {
       'apps/web/components/marketing',
       'apps/web/components/site',
     ]);
+    expect(repoRootFromModule()).toBe(repoRoot);
     const files = listCorrectionFiles(repoRoot, PHRASE_AND_NAME_ROOTS);
     expect(files).toContain('apps/web/app/(home)/page.tsx');
     expect(files).toContain('apps/web/data/homepageIdentityCopy.ts');
