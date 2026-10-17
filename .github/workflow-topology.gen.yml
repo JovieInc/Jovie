@@ -1212,7 +1212,7 @@ nodes:
       - schedule
       - workflow_dispatch
     terminalReceipt: job:docs-deploy-jovie
-    jobCount: 6
+    jobCount: 7
   - name: Test Coverage Audit
     path: .github/workflows/test-coverage-audit.yml
     active: true

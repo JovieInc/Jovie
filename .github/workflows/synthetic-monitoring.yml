@@ -329,6 +329,171 @@ jobs:
           echo "Marking job as failed because synthetic status is '${{ steps.test-results.outputs.test_status }}'"
           exit 1
 
+  exact-artifact-revenue-spine:
+    name: Exact-artifact revenue spine (Daily)
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.schedule == '47 7 * * *' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Install Doppler CLI
+        uses: ./.github/actions/setup-doppler
+
+      - name: Bind the attempt to the exact production deployment
+        env:
+          EXACT_ARTIFACT_DIR: ${{ runner.temp }}/exact-artifact
+        run: |
+          set -euo pipefail
+          mkdir -p "$EXACT_ARTIFACT_DIR"
+          code="$(curl --silent --show-error --connect-timeout 10 --max-time 20 --max-filesize 32768 \
+            -o "$EXACT_ARTIFACT_DIR/build-info.json" -w '%{http_code}' \
+            https://jov.ie/api/health/build-info || true)"
+          if [ "$code" != 200 ]; then
+            echo '{}' > "$EXACT_ARTIFACT_DIR/build-info.json"
+          fi
+          echo "Exact production binding probe: HTTP ${code}"
+
+      - name: Run the controlled exact-artifact journey
+        id: journey
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          EXACT_ARTIFACT_DIR: ${{ runner.temp }}/exact-artifact
+        run: |
+          set +e
+          if [ -f apps/web/scripts/run-exact-artifact-journey.ts ]; then
+            doppler run --project jovie-web --config prd --no-fallback -- \
+              env -u DOPPLER_TOKEN pnpm --filter @jovie/web exec tsx \
+                scripts/run-exact-artifact-journey.ts \
+                --base-url https://jov.ie \
+                --output "$EXACT_ARTIFACT_DIR/journey.json" \
+                > "$EXACT_ARTIFACT_DIR/producer.log" 2>&1
+            status=$?
+          else
+            status=78
+          fi
+          set -e
+          echo "status=${status}" >> "$GITHUB_OUTPUT"
+          echo "Journey producer exit status: ${status}"
+
+      - name: Persist one private receipt and create its redacted projection
+        id: receipt
+        if: ${{ always() }}
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          EXACT_ARTIFACT_DIR: ${{ runner.temp }}/exact-artifact
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set +e
+          doppler run --project jovie-web --config prd \
+            --only-secrets=BLOB_READ_WRITE_TOKEN,LINEAR_API_KEY --no-fallback -- \
+            env -u DOPPLER_TOKEN node scripts/exact-artifact-synthetic.mjs finalize \
+              --result "$EXACT_ARTIFACT_DIR/journey.json" \
+              --build-info "$EXACT_ARTIFACT_DIR/build-info.json" \
+              --public "$EXACT_ARTIFACT_DIR/public-receipt.json" \
+              --attempt-id "${{ github.run_id }}-${{ github.run_attempt }}" \
+              --event "${{ github.event_name }}" \
+              --run-url "$RUN_URL" \
+              --producer-status "${{ steps.journey.outputs.status }}"
+          finalize_status=$?
+          if [ ! -s "$EXACT_ARTIFACT_DIR/public-receipt.json" ]; then
+            env -u BLOB_READ_WRITE_TOKEN -u LINEAR_API_KEY \
+              node scripts/exact-artifact-synthetic.mjs finalize \
+                --result "$EXACT_ARTIFACT_DIR/journey.json" \
+                --build-info "$EXACT_ARTIFACT_DIR/build-info.json" \
+                --public "$EXACT_ARTIFACT_DIR/public-receipt.json" \
+                --attempt-id "${{ github.run_id }}-${{ github.run_attempt }}" \
+                --event "${{ github.event_name }}" \
+                --run-url "$RUN_URL" \
+                --producer-status "${{ steps.journey.outputs.status }}" \
+                --public-only true
+            finalize_status=$?
+          fi
+          rm -f "$EXACT_ARTIFACT_DIR/journey.json" "$EXACT_ARTIFACT_DIR/producer.log"
+          exit "$finalize_status"
+
+      - name: Evaluate the configured soak window
+        id: soak
+        if: ${{ always() }}
+        continue-on-error: true
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          EXACT_ARTIFACT_DIR: ${{ runner.temp }}/exact-artifact
+          SOAK_DAYS: ${{ vars.EXACT_ARTIFACT_SOAK_DAYS || '7' }}
+        run: |
+          doppler run --project jovie-web --config prd \
+            --only-secrets=BLOB_READ_WRITE_TOKEN --no-fallback -- \
+            env -u DOPPLER_TOKEN node scripts/exact-artifact-synthetic.mjs soak \
+              --days "$SOAK_DAYS" \
+              --public "$EXACT_ARTIFACT_DIR/soak-evidence.json" || \
+            env -u BLOB_READ_WRITE_TOKEN \
+              node scripts/exact-artifact-synthetic.mjs soak \
+                --days "$SOAK_DAYS" \
+                --public "$EXACT_ARTIFACT_DIR/soak-evidence.json"
+
+      - name: Upload redacted receipt and soak evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: exact-artifact-public-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/exact-artifact/public-receipt.json
+            ${{ runner.temp }}/exact-artifact/soak-evidence.json
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Alert once for a new or reopened root cause
+        if: ${{ always() && steps.receipt.outputs.outcome != 'success' && steps.receipt.outputs.alert_action != 'updated' }}
+        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
+        with:
+          status: custom
+          channel: '#alerts-production'
+          author_name: 'Exact-artifact synthetic'
+          custom_payload: |
+            {
+              "text": "Exact-artifact production path ${{ steps.receipt.outputs.path_status }}",
+              "attachments": [{
+                "color": "danger",
+                "fields": [
+                  {"title": "Classification", "value": ${{ toJSON(steps.receipt.outputs.classification) }}, "short": true},
+                  {"title": "Root cause", "value": ${{ toJSON(steps.receipt.outputs.root_cause_fingerprint) }}, "short": false},
+                  {"title": "Canonical incident", "value": ${{ toJSON(steps.receipt.outputs.incident_url || 'Linear intake unavailable') }}, "short": false},
+                  {"title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View redacted receipt>", "short": false}
+                ]
+              }]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Record redacted daily summary
+        if: ${{ always() }}
+        env:
+          EXACT_ARTIFACT_DIR: ${{ runner.temp }}/exact-artifact
+        run: |
+          if [ -s "$EXACT_ARTIFACT_DIR/public-receipt.json" ]; then
+            jq '{receiptId, buildSha, deploymentId, attemptId, authMethod, transitions, outcome, finalCleanupState, classification, pathStatus, rootCauseFingerprint, privateReceipt}' \
+              "$EXACT_ARTIFACT_DIR/public-receipt.json" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -s "$EXACT_ARTIFACT_DIR/soak-evidence.json" ]; then
+            jq '{status, windowDays, attempts, successfulAttempts, successRate, missingDays, completionEvidence}' \
+              "$EXACT_ARTIFACT_DIR/soak-evidence.json" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Fail when the controlled path is not proven healthy
+        if: ${{ always() && steps.receipt.outputs.outcome != 'success' }}
+        run: |
+          echo "Exact-artifact outcome: ${{ steps.receipt.outputs.outcome || 'unknown' }}"
+          exit 1
+
   web-ai-health:
     name: Web AI Health (Daily)
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.schedule == '47 7 * * *' }}
