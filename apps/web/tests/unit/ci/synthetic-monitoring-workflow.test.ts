@@ -204,6 +204,31 @@ describe('synthetic monitoring workflow parser', () => {
     }
   });
 
+  it('skips the production onboarding robot with a logged warning and no auth bypass', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const step = getStepBlock(
+      workflow,
+      'Run Onboarding Robot Full Synthetic (JOV-2681)'
+    );
+
+    expect(step).toContain(
+      'synthetic-robot-auth-unavailable: production has no auth bypass for the onboarding robot.'
+    );
+    expect(step).toContain(
+      '::warning title=Onboarding robot skipped::${reason}'
+    );
+    expect(step).toContain('robot_skip_reason=${reason}');
+    expect(step).not.toContain('onboarding-robot.full.spec.ts');
+    expect(step).not.toContain('/api/dev/test-auth/session');
+    expect(step).not.toContain('DOPPLER_TOKEN');
+    expect(workflow).toContain(
+      'ROBOT_SKIP_REASON: ${{ steps.onboarding-robot.outputs.robot_skip_reason }}'
+    );
+    expect(workflow).toContain(
+      'robotSkipReason: process.env.ROBOT_SKIP_REASON'
+    );
+  });
+
   it('runs the five-surface Web AI health probe once daily through production cron auth', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
 

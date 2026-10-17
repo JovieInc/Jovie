@@ -60,12 +60,15 @@ permissions: {}
 
 concurrency:
   # A global pending slot loses another PR's final wake. Coalesce only wakes
-  # attributed to the same PR. An association-free receipt coalesces with the
-  # same workflow on the same head, and a different workflow keeps its own slot
-  # so a success cannot replace a failure hold. Receipts with no head stay on
-  # their run ID.
-  group: merge-queue-green-enroll-${{ ((github.event_name == 'workflow_dispatch' && inputs.pr_number == '') || github.event_name == 'push') && 'reconcile' || inputs.pr_number || github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || (github.event.workflow_run.head_sha && format('{0}-{1}', github.event.workflow_run.head_sha, github.event.workflow_run.name)) || github.event.workflow_run.id || github.run_id }}
-  cancel-in-progress: false
+  # attributed to the same PR. Successful pull_request completions share one
+  # cancellable slot per PR (or head, when the receipt has no PR number) so
+  # Source Validation, Fork PR Gate, and PR Size Guard do not each mint a
+  # token. That slot is distinct from pull_request_target, so a green wake
+  # cannot cancel a draft dequeue. Failure holds, merge-group receipts, and
+  # association-free non-success receipts keep a per-workflow slot. A success
+  # must not replace a failure hold. Receipts with no head stay on their run ID.
+  group: merge-queue-green-enroll-${{ ((github.event_name == 'workflow_dispatch' && inputs.pr_number == '') || github.event_name == 'push') && 'reconcile' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event != 'merge_group' && format('success-{0}', github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_sha || github.event.workflow_run.id)) || inputs.pr_number || github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || (github.event.workflow_run.head_sha && format('{0}-{1}', github.event.workflow_run.head_sha, github.event.workflow_run.name)) || github.event.workflow_run.id || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event != 'merge_group' }}
 
 jobs:
   hold-failed-revision:
@@ -150,6 +153,16 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Debounce repeated green wakes
+        # The newer success cancels this run during the sleep, before the
+        # Jovie Bot token is minted. Failure holds and merge-group receipts
+        # do not sleep.
+        if: >-
+          github.event_name == 'workflow_run' &&
+          github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.event != 'merge_group'
+        run: sleep 20
+
       - name: Checkout trusted failure policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -235,6 +248,10 @@ jobs:
               });
             } else {
               let numbers = [];
+              const associatedByNumber = new Map();
+              // A merge-group head_sha is the synthetic queue commit. Keep
+              // pulls.get on that path so the candidate carries the source head.
+              let sourceHeadSha = '';
               if (context.eventName === 'workflow_dispatch') {
                 numbers = [dispatchedPr];
               } else if (context.eventName === 'pull_request_target') {
@@ -254,26 +271,56 @@ jobs:
                   });
                   numbers = [parsed.prNumber];
                 }
+                if (run.event !== 'merge_group' && /^[a-f0-9]{40}$/.test(run.head_sha || '')) {
+                  sourceHeadSha = run.head_sha;
+                }
                 // PR-target workflow receipts can omit their pull_requests association.
                 // Resolve only the exact source SHA and branch, never a fallback full scan.
                 // GET /repos/{owner}/{repo}/commits/{commit_sha}/pulls is
                 // repos.listPullRequestsAssociatedWithCommit. github.rest.commits
                 // does not exist, so calling it throws before any enqueue.
-                if (numbers.length === 0 && /^[a-f0-9]{40}$/.test(run.head_sha || '') && run.head_branch) {
+                if (numbers.length === 0 && sourceHeadSha && run.head_branch) {
                   const pages = await github.paginate(github.rest.repos.listPullRequestsAssociatedWithCommit, {
-                    owner, repo, commit_sha: run.head_sha, per_page: 100,
+                    owner, repo, commit_sha: sourceHeadSha, per_page: 100,
                   });
                   const associated = Array.isArray(pages) ? pages : [];
-                  numbers = associated.flatMap(pr => {
-                    if (!pr || pr.state !== 'open' || pr.base?.ref !== 'main') return [];
-                    if (pr.head?.sha !== run.head_sha || pr.head?.ref !== run.head_branch) return [];
-                    if (pr.head?.repo?.full_name !== `${owner}/${repo}`) return [];
-                    return validNumber(pr.number) ? [pr.number] : [];
-                  });
+                  numbers = [];
+                  for (const pr of associated) {
+                    if (!pr || pr.state !== 'open' || pr.base?.ref !== 'main') continue;
+                    if (pr.head?.sha !== sourceHeadSha || pr.head?.ref !== run.head_branch) continue;
+                    if (pr.head?.repo?.full_name !== `${owner}/${repo}`) continue;
+                    if (!validNumber(pr.number) || associatedByNumber.has(pr.number)) continue;
+                    numbers.push(pr.number);
+                    associatedByNumber.set(pr.number, pr);
+                  }
                 }
               }
               prs = [];
               for (const number of new Set(numbers)) {
+                const known = associatedByNumber.get(number);
+                if (known) {
+                  // The association payload is already the open main candidate.
+                  // pulls.get would repeat that REST read.
+                  prs.push({
+                    ...known,
+                    draft: known.draft === true,
+                    labels: Array.isArray(known.labels) ? known.labels : [],
+                  });
+                  continue;
+                }
+                if (sourceHeadSha) {
+                  // GraphQL readPr is the admission proof and checks this SHA.
+                  // The event already supplied it, so pulls.get is not a proof.
+                  prs.push({
+                    number,
+                    draft: false,
+                    state: 'open',
+                    base: { ref: 'main' },
+                    head: { sha: sourceHeadSha, repo: { full_name: `${owner}/${repo}` } },
+                    labels: [],
+                  });
+                  continue;
+                }
                 const { data } = await github.rest.pulls.get({ owner, repo, pull_number: number });
                 if (data.state === 'open' && data.base.ref === 'main') prs.push(data);
               }
