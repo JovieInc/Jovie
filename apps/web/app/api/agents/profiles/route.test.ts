@@ -225,6 +225,22 @@ describe('POST /api/agents/profiles', () => {
     }
   );
 
+  it('does not ingest when a full candidate window could conceal a private row', async () => {
+    hoisted.selectRows = [
+      Array.from({ length: 10 }, (_, index) => ({
+        username: `tmoc9mm7xfvx02${index}`,
+        isPublic: true,
+        isClaimed: false,
+      })),
+    ];
+    hoisted.ingest.mockResolvedValue(
+      Response.json({ profile: { username: 'replacement_fixture' } })
+    );
+    const res = await post({ url: SPOTIFY_URL });
+    expect(res.status).toBe(404);
+    expect(hoisted.ingest).not.toHaveBeenCalled();
+  });
+
   it('prefers the claimed profile among publicly eligible duplicates', async () => {
     hoisted.selectRows = [
       [

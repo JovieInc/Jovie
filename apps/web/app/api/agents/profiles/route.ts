@@ -23,6 +23,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const bodySchema = z.object({ url: z.url().max(500) }).strict();
+const MAX_PROFILE_CANDIDATES = 10;
 
 function fail(
   status: number,
@@ -143,7 +144,7 @@ export async function POST(request: Request) {
       .from(creatorProfiles)
       .where(eq(creatorProfiles.spotifyId, spotify.spotifyId))
       .orderBy(asc(creatorProfiles.createdAt))
-      .limit(10);
+      .limit(MAX_PROFILE_CANDIDATES);
     const [existing] = candidates
       .filter(canExposeProfile)
       .sort(
@@ -157,8 +158,12 @@ export async function POST(request: Request) {
     }
 
     // Anonymous reuse must not disclose an unpublished identity or create a
-    // replacement that circumvents its owner's publication choice.
-    if (candidates.some(candidate => candidate.isPublic !== true)) {
+    // replacement that circumvents its owner's publication choice. A full
+    // candidate window cannot prove there is no private match beyond the cap.
+    if (
+      candidates.length === MAX_PROFILE_CANDIDATES ||
+      candidates.some(candidate => candidate.isPublic !== true)
+    ) {
       return fail(404, 'ARTIST_NOT_FOUND', 'Spotify artist not found.');
     }
 
