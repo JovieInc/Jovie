@@ -38,6 +38,7 @@ vi.mock('@/lib/db/schema/profiles', () => ({
     spotifyId: 'spotifyId',
     spotifyPopularity: 'spotifyPopularity',
     username: 'username',
+    settings: 'settings',
   },
 }));
 
@@ -121,5 +122,31 @@ describe('featured creator avatar fallbacks', () => {
       '/avatars/default-user.png',
       expect.objectContaining({ height: 256, width: 256 })
     );
+  });
+  it('re-reads discovery consent for featured, pinned, and VIP search outputs', async () => {
+    const row = {
+      id: 'secret-id',
+      username: 'secret-choice',
+      displayName: 'Secret Choice',
+      spotifyId: 'spotify-id',
+      settings: { searchable: true },
+    };
+    const {
+      getFeaturedCreators,
+      getCreatorByHandle,
+      getFeaturedCreatorsForSearch,
+    } = await import('@/lib/featured-creators');
+    mockSelectRows([row]);
+    expect(await getFeaturedCreators()).toHaveLength(1);
+    expect(await getCreatorByHandle('secret-choice')).toMatchObject({
+      handle: 'secret-choice',
+    });
+    expect(await getFeaturedCreatorsForSearch()).toHaveProperty(
+      'secret choice'
+    );
+    mockSelectRows([{ ...row, settings: { searchable: false } }]);
+    expect(await getFeaturedCreators()).toEqual([]);
+    expect(await getCreatorByHandle('secret-choice')).toBeNull();
+    expect(await getFeaturedCreatorsForSearch()).toEqual({});
   });
 });

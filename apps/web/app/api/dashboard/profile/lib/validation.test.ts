@@ -21,3 +21,31 @@ describe('dashboard profile username updates', () => {
     ).toBe(true);
   });
 });
+
+describe('owner searchability choice validation', () => {
+  it.each([true, false])(
+    'accepts the explicit boolean choice %s',
+    searchable => {
+      expect(
+        ProfileUpdateSchema.parse({ settings: { searchable } }).settings
+      ).toEqual({ searchable });
+    }
+  );
+
+  it('does not insert a discovery choice when saving unrelated profile settings', () => {
+    const parsed = ProfileUpdateSchema.parse({
+      settings: { marketing_emails: false },
+    });
+    expect(parsed.settings).toEqual({ marketing_emails: false });
+    expect(Object.hasOwn(parsed.settings ?? {}, 'searchable')).toBe(false);
+  });
+
+  it.each([null, 'false', 1, [], {}])(
+    'rejects a malformed searchability choice %s',
+    searchable => {
+      expect(
+        ProfileUpdateSchema.safeParse({ settings: { searchable } }).success
+      ).toBe(false);
+    }
+  );
+});

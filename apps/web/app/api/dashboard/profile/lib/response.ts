@@ -52,20 +52,36 @@ export interface FinalizeProfileResponseParams {
   updatedProfile: (typeof creatorProfiles)['$inferSelect'];
   oldUsernameNormalized: string | null;
   clerkUserId: string;
+  privacyChanged?: boolean;
 }
 
 export async function finalizeProfileResponse({
   updatedProfile,
   oldUsernameNormalized,
   clerkUserId,
+  privacyChanged = false,
 }: FinalizeProfileResponseParams) {
   if (updatedProfile.usernameNormalized !== oldUsernameNormalized) {
     await invalidateUsernameChange(
       updatedProfile.usernameNormalized,
       oldUsernameNormalized
     );
+    if (privacyChanged)
+      await invalidateProfileCache(
+        updatedProfile.usernameNormalized,
+        oldUsernameNormalized,
+        { privacyChanged: true }
+      );
   } else {
-    await invalidateProfileCache(updatedProfile.usernameNormalized);
+    if (privacyChanged) {
+      await invalidateProfileCache(
+        updatedProfile.usernameNormalized,
+        undefined,
+        { privacyChanged: true }
+      );
+    } else {
+      await invalidateProfileCache(updatedProfile.usernameNormalized);
+    }
     await invalidateHomepageCache();
   }
 

@@ -512,18 +512,46 @@ describe('artists directory catalog (JOV-6126)', () => {
 });
 
 describe('artists directory connection recovery (JOV-6868)', () => {
+  it('fails closed after a warm public result when the next storage read fails', async () => {
+    vi.stubEnv('DATABASE_URL', 'postgres://test');
+    mockDbSelectBatches([[makeCatalogRow(0)], new Error('read unavailable')]);
+    expect(await loadArtistsDirectoryProfiles()).toMatchObject({
+      profiles: [{ username: 'artist0' }],
+    });
+    expect(await loadArtistsDirectoryProfiles()).toEqual({
+      status: 'unavailable',
+    });
+    expect(cacheEntries.size).toBe(0);
+  });
+
+  it('updates both listing and count after consent is withdrawn without cache invalidation', async () => {
+    vi.stubEnv('DATABASE_URL', 'postgres://test');
+    const listed = makeCatalogRow(0);
+    const unlisted = { ...listed, settings: { searchable: false } };
+    mockDbSelectBatches([[listed], [listed], [unlisted], [unlisted]]);
+    expect(await loadArtistsDirectoryCount()).toBe(1);
+    expect(await loadArtistsDirectoryProfiles()).toMatchObject({
+      profiles: [{ username: 'artist0' }],
+    });
+    expect(await loadArtistsDirectoryCount()).toBe(0);
+    expect(await loadArtistsDirectoryProfiles()).toMatchObject({
+      profiles: [],
+    });
+  });
+
   function connectionTimeout() {
     return new Error('Failed query: select creator_profiles', {
       cause: new Error('Connection terminated due to connection timeout'),
     });
   }
 
-  it('retries a nested connection failure and caches the recovered profile page', async () => {
+  it('retries a nested connection failure and reads consent again on the next request', async () => {
     vi.stubEnv('DATABASE_URL', 'postgres://test');
     vi.useFakeTimers();
     const chain = mockDbSelectBatches([
       connectionTimeout(),
       [makeCatalogRow(0)],
+      [{ ...makeCatalogRow(0), settings: { searchable: false } }],
     ]);
     const pending = loadArtistsDirectoryProfiles();
     await vi.runAllTimersAsync();
@@ -533,8 +561,11 @@ describe('artists directory connection recovery (JOV-6868)', () => {
       profiles: [{ username: 'artist0' }],
       nextCursor: null,
     });
-    expect(await loadArtistsDirectoryProfiles()).toEqual(result);
-    expect(chain.reads).toBe(2);
+    expect(await loadArtistsDirectoryProfiles()).toMatchObject({
+      status: 'ok',
+      profiles: [],
+    });
+    expect(chain.reads).toBe(3);
     expect(captureException).not.toHaveBeenCalled();
   });
 
@@ -570,7 +601,7 @@ describe('artists directory connection recovery (JOV-6868)', () => {
     expect(chain.reads).toBe(2);
   });
 
-  it('keeps cursor pages isolated in the success cache', async () => {
+  it('keeps cursor pages isolated and does not reuse prior public results', async () => {
     vi.stubEnv('DATABASE_URL', 'postgres://test');
     const chain = mockDbSelectBatches([
       [makeCatalogRow(0)],
@@ -582,8 +613,11 @@ describe('artists directory connection recovery (JOV-6868)', () => {
     );
     expect(first).toMatchObject({ profiles: [{ username: 'artist0' }] });
     expect(next).toMatchObject({ profiles: [{ username: 'artist1' }] });
-    expect(await loadArtistsDirectoryProfiles()).toEqual(first);
-    expect(chain.reads).toBe(2);
+    expect(await loadArtistsDirectoryProfiles()).toMatchObject({
+      status: 'ok',
+      profiles: [],
+    });
+    expect(chain.reads).toBe(3);
   });
 
   it('retries the count but never caches null after an exhausted connection failure', async () => {
@@ -604,11 +638,11 @@ describe('artists directory connection recovery (JOV-6868)', () => {
     const recovered = loadArtistsDirectoryCount();
     await vi.runAllTimersAsync();
     expect(await recovered).toBe(1);
-    expect(await loadArtistsDirectoryCount()).toBe(1);
-    expect(chain.reads).toBe(4);
+    expect(await loadArtistsDirectoryCount()).toBe(0);
+    expect(chain.reads).toBe(5);
   });
 
-  it('caches successful empty results while missing configuration stays uncached', async () => {
+  it('keeps empty results fresh while missing configuration fails closed', async () => {
     vi.stubEnv('DATABASE_URL', undefined);
     expect(await loadArtistsDirectoryProfiles()).toEqual({
       status: 'unavailable',
@@ -626,6 +660,6 @@ describe('artists directory connection recovery (JOV-6868)', () => {
       });
       expect(await loadArtistsDirectoryCount()).toBe(0);
     }
-    expect(chain.reads).toBe(2);
+    expect(chain.reads).toBe(4);
   });
 });

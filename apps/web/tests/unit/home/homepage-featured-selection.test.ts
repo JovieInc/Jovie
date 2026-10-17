@@ -142,7 +142,7 @@ describe('homepage featured selection', () => {
       includeClaimedFeaturedCandidates: true,
     });
 
-    expect(result.pinnedCreator.handle).toBe('tim');
+    expect(result.pinnedCreator?.handle).toBe('tim');
     expect(result.creators.map(creator => creator.handle)).toEqual([
       'tim',
       'claimed-dj',
@@ -192,5 +192,15 @@ describe('homepage featured selection', () => {
     expect(result.claimedFeaturedCandidates).toEqual([]);
     expect(mockDoesTableExist).not.toHaveBeenCalled();
     expect(mockDbSelect).not.toHaveBeenCalled();
+  });
+  it('does not resurrect an unlisted or unavailable pinned profile using a static fallback', async () => {
+    mockGetCreatorByHandle.mockResolvedValue(null);
+    mockGetFeaturedCreators.mockResolvedValue([]);
+    const { resolveHomepageFeaturedCreators } = await import(
+      '@/lib/homepage-featured-selection'
+    );
+    const result = await resolveHomepageFeaturedCreators();
+    expect(result.pinnedCreator).toBeNull();
+    expect(result.creators).toEqual([]);
   });
 });

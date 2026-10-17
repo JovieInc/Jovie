@@ -1,5 +1,5 @@
 import { and, eq } from 'drizzle-orm';
-import { revalidateTag, unstable_cache } from 'next/cache';
+import { revalidateTag } from 'next/cache';
 import { db, doesTableExist, TABLE_NAMES } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError, captureWarning } from '@/lib/error-tracking';
@@ -109,6 +109,7 @@ async function queryFeaturedCreators(): Promise<FeaturedCreator[]> {
       .select({
         id: creatorProfiles.id,
         username: creatorProfiles.username,
+        settings: creatorProfiles.settings,
         displayName: creatorProfiles.displayName,
         bio: creatorProfiles.bio,
         avatarUrl: creatorProfiles.avatarUrl,
@@ -234,14 +235,8 @@ async function queryFeaturedCreators(): Promise<FeaturedCreator[]> {
   }
 }
 
-export const getFeaturedCreators = unstable_cache(
-  queryFeaturedCreators,
-  ['featured-creators'],
-  {
-    revalidate: 60 * 60 * 24, // Reduced from 7 days to 1 day to prevent long cache poisoning
-    tags: ['featured-creators'],
-  }
-);
+// Read current discovery consent; stale cache entries cannot authorize a listing.
+export const getFeaturedCreators = queryFeaturedCreators;
 
 /**
  * Fetch a single creator by handle for pinned profile display.
@@ -269,6 +264,7 @@ async function queryCreatorByHandle(
       .select({
         id: creatorProfiles.id,
         username: creatorProfiles.username,
+        settings: creatorProfiles.settings,
         displayName: creatorProfiles.displayName,
         bio: creatorProfiles.bio,
         avatarUrl: creatorProfiles.avatarUrl,
@@ -302,6 +298,7 @@ async function queryCreatorByHandle(
         {
           handle: row.username,
           displayName: row.displayName,
+          settings: row.settings,
           isPublic: true,
         },
         { requirePublication: true }
@@ -371,14 +368,8 @@ async function queryCreatorByHandle(
   }
 }
 
-export const getCreatorByHandle = unstable_cache(
-  queryCreatorByHandle,
-  ['creator-by-handle'],
-  {
-    revalidate: 60 * 60 * 24,
-    tags: ['featured-creators'],
-  }
-);
+// Read current discovery consent; stale cache entries cannot authorize a listing.
+export const getCreatorByHandle = queryCreatorByHandle;
 
 /**
  * Query featured creators for search VIP prioritization.
@@ -393,6 +384,7 @@ async function queryFeaturedCreatorsForSearch(): Promise<VipArtistLookup> {
   const data = await db
     .select({
       username: creatorProfiles.username,
+      settings: creatorProfiles.settings,
       spotifyId: creatorProfiles.spotifyId,
       displayName: creatorProfiles.displayName,
       avatarUrl: creatorProfiles.avatarUrl,
@@ -437,17 +429,10 @@ async function queryFeaturedCreatorsForSearch(): Promise<VipArtistLookup> {
 }
 
 /**
- * Cached function to get VIP artists for search prioritization.
- * Cache duration: 1 hour (shorter than featured creators since search is more dynamic)
+ * VIP prioritization reads current consent on each search request.
  */
-export const getFeaturedCreatorsForSearch = unstable_cache(
-  queryFeaturedCreatorsForSearch,
-  ['featured-creators-search'],
-  {
-    revalidate: 60 * 60, // 1 hour
-    tags: ['featured-creators'],
-  }
-);
+// Read current discovery consent; stale cache entries cannot authorize a listing.
+export const getFeaturedCreatorsForSearch = queryFeaturedCreatorsForSearch;
 
 /**
  * Invalidates the featured creators cache.

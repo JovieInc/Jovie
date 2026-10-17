@@ -345,3 +345,63 @@ describe('JOV-6126 reopen: unresolved platform IDs and empty profiles', () => {
     expect(isPublicProfileDiscoveryEligible(emptyProfile)).toBe(true);
   });
 });
+
+describe('explicit profile searchability', () => {
+  const identity = {
+    handle: 'realartist',
+    displayName: 'Real Artist',
+    isPublic: true,
+  };
+
+  it('preserves legacy discovery when no owner choice has been stored', () => {
+    for (const settings of [undefined, null, {}, { marketing_emails: false }]) {
+      expect(
+        filterPublicDiscoveryIdentities([{ ...identity, settings }])
+      ).toHaveLength(1);
+    }
+  });
+
+  it('keeps unlisted profiles out of discovery without denying their direct public identity', () => {
+    const unlisted = { ...identity, settings: { searchable: false } };
+    expect(filterPublicDiscoveryIdentities([unlisted])).toEqual([]);
+    expect(isPublicProfileDiscoveryEligible(unlisted)).toBe(true);
+    expect(
+      getPublicProfileDiscoveryExclusionReason(unlisted, {
+        requireSearchability: true,
+      })
+    ).toBe('unlisted');
+  });
+
+  it.each([null, 'false', 0, 1, [], {}])(
+    'fails closed on an invalid explicit searchability value %s',
+    searchable => {
+      expect(
+        filterPublicDiscoveryIdentities([
+          { ...identity, settings: { searchable } },
+        ])
+      ).toEqual([]);
+    }
+  );
+
+  it.each(['invalid', true, false, 0, 1, []])(
+    'fails closed on malformed settings %s',
+    settings => {
+      expect(
+        filterPublicDiscoveryIdentities([{ ...identity, settings }])
+      ).toEqual([]);
+    }
+  );
+
+  it('lists an explicitly searchable public profile but never a private one', () => {
+    expect(
+      filterPublicDiscoveryIdentities([
+        { ...identity, settings: { searchable: true } },
+      ])
+    ).toHaveLength(1);
+    expect(
+      filterPublicDiscoveryIdentities([
+        { ...identity, isPublic: false, settings: { searchable: true } },
+      ])
+    ).toEqual([]);
+  });
+});
