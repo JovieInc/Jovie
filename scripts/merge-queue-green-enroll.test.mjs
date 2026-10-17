@@ -1372,12 +1372,11 @@ function evalWorkflowExpr(expression, github) {
       'github.event.workflow_run.event',
       'github.event.workflow_run?.event'
     );
-  return new Function(
-    'github',
-    'inputs',
-    'format',
-    `return (${js});`
-  )(github, github.inputs ?? {}, formatExpression);
+  return new Function('github', 'inputs', 'format', `return (${js});`)(
+    github,
+    github.inputs ?? {},
+    formatExpression
+  );
 }
 
 function concurrencyGroup(github) {
@@ -1475,13 +1474,22 @@ test('same-PR wakes coalesce while unattributed receipts and manual reconciliati
     },
     run_id: id + 1000,
   });
-  assert.equal(concurrencyGroup(green(101, 'CI', 7)), concurrencyGroup(green(102, 'PR Size Guard', 7)));
+  assert.equal(
+    concurrencyGroup(green(101, 'CI', 7)),
+    concurrencyGroup(green(102, 'PR Size Guard', 7))
+  );
   assert.equal(
     concurrencyGroup(green(101, 'CI')),
     concurrencyGroup(green(102, 'Fork PR Gate'))
   );
-  assert.notEqual(concurrencyGroup(green(101, 'CI', 7)), concurrencyGroup(label));
-  assert.notEqual(concurrencyGroup(green(101, 'CI', 7)), concurrencyGroup(green(102, 'CI', 8)));
+  assert.notEqual(
+    concurrencyGroup(green(101, 'CI', 7)),
+    concurrencyGroup(label)
+  );
+  assert.notEqual(
+    concurrencyGroup(green(101, 'CI', 7)),
+    concurrencyGroup(green(102, 'CI', 8))
+  );
   assert.equal(cancelInProgress(green(101, 'CI', 7)), true);
   assert.equal(cancelInProgress(green(101, 'CI')), true);
   const mergeGroup = conclusion => ({
@@ -1500,7 +1508,10 @@ test('same-PR wakes coalesce while unattributed receipts and manual reconciliati
   });
   assert.equal(cancelInProgress(mergeGroup('failure')), false);
   assert.equal(cancelInProgress(mergeGroup('success')), false);
-  assert.notEqual(concurrencyGroup(green(101, 'CI', 7)), concurrencyGroup(mergeGroup('failure')));
+  assert.notEqual(
+    concurrencyGroup(green(101, 'CI', 7)),
+    concurrencyGroup(mergeGroup('failure'))
+  );
 });
 
 function recoveryDeferred() {

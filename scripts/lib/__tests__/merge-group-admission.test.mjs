@@ -262,7 +262,9 @@ describe('merge-group admission evidence', () => {
 
   it('fails closed when a 304 arrives with no stored body', async () => {
     clearAdmissionConditionalGetCache();
-    const directory = await mkdtemp(join(tmpdir(), 'merge-admission-etag-304-'));
+    const directory = await mkdtemp(
+      join(tmpdir(), 'merge-admission-etag-304-')
+    );
     const eventPath = join(directory, 'event.json');
     const outputPath = join(directory, 'output.txt');
     await writeFile(eventPath, JSON.stringify(event()), 'utf8');
