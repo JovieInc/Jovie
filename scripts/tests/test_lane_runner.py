@@ -9846,6 +9846,54 @@ class TerminalPublicationTest(unittest.TestCase):
 
 
 class PublicationBundlePrerequisitesTest(unittest.TestCase):
+    def test_backlog_fleet_policy_loads_from_only_declared_release_files(self):
+        # A checkout or inherited PYTHONPATH must not hide missing installed extras.
+        with tempfile.TemporaryDirectory() as tmp:
+            bundle = Path(tmp).resolve()
+            shutil.copytree(ROOT / "scripts/lanes", bundle / "scripts/lanes",
+                            ignore=shutil.ignore_patterns("__pycache__", ".mesh-runtime"))
+            for name in lane.RELEASE_EXTRAS:
+                destination = bundle / name
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(ROOT / name, destination)
+            driver = r"""
+import json
+import sys
+from pathlib import Path
+bundle = Path(sys.argv[1])
+sys.path.insert(0, str(bundle / "scripts/lanes"))
+import backlog_admission
+# Exercise the actual policy reader without constructing authenticated transports.
+reader = object.__new__(backlog_admission._NativeReads)
+reader.current = bundle / "scripts/lanes"
+seconds = reader.fleet_max_age()
+print(json.dumps({"seconds": seconds, "reader": backlog_admission.__file__,
+                  "contract": sys.modules["gem_gate_contract"].__file__}))
+"""
+            def probe():
+                return subprocess.run([sys.executable, "-I", "-B", "-c", driver, str(bundle)],
+                                      cwd=bundle, capture_output=True, text=True, timeout=10)
+            result = probe()
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(json.loads(result.stdout), {
+                "seconds": 600.0,
+                "reader": str(bundle / "scripts/lanes/backlog_admission.py"),
+                "contract": str(bundle / "scripts/fleet-gate/gem_gate_contract.py"),
+            })
+            for missing in ("scoped_admission.py", "gem_gate_contract.py"):
+                with self.subTest(missing=missing):
+                    removed = bundle / "scripts/fleet-gate" / missing
+                    withheld = removed.with_suffix(".withheld")
+                    removed.rename(withheld)
+                    try:
+                        result = probe()
+                    finally:
+                        withheld.rename(removed)
+                    self.assertNotEqual(result.returncode, 0)
+                    error = "FileNotFoundError" if missing == "scoped_admission.py" else "ModuleNotFoundError"
+                    self.assertIn(error, result.stderr)
+                    self.assertIn(Path(missing).stem, result.stderr)
+
     def test_ops_delivery_cli_rechecks_from_only_declared_release_files(self):
         with tempfile.TemporaryDirectory() as tmp:
             bundle = Path(tmp)
