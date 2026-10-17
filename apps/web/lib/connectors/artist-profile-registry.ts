@@ -49,14 +49,19 @@ function fromDsp(
   };
 }
 
-/** Social entries stay planned: checked-in parsers do not authorize remote reads or writes. */
+/**
+ * Social entries stay planned: checked-in parsers do not authorize remote
+ * reads or writes. Pass `sources` here; the admission scan reads category
+ * literals from each destination initializer and does not enter this helper.
+ */
 function fromSocial(
-  id: Exclude<keyof typeof SOCIAL_PROFILE_CATALOG, 'youtube'>
+  id: Exclude<keyof typeof SOCIAL_PROFILE_CATALOG, 'youtube'>,
+  sources: ArtistProfileDestinationManifest['sources']
 ): ArtistProfileDestinationManifest {
   const destination = SOCIAL_PROFILE_CATALOG[id];
   return {
     label: destination.label,
-    sources: ['ingestion'],
+    sources,
     rollout: destination.availability,
     profile: destination.artistProfile,
     constraints: {},
@@ -72,16 +77,16 @@ function fromSocial(
 export const ARTIST_PROFILE_DESTINATIONS = {
   amazon_music: fromDsp(DSP_PROFILE_CATALOG.amazon_music, ['dsp_bio']),
   apple_music: fromDsp(DSP_PROFILE_CATALOG.apple_music, ['dsp_bio']),
-  beacons: fromSocial('beacons'),
+  beacons: fromSocial('beacons', ['ingestion']),
   deezer: fromDsp(DSP_PROFILE_CATALOG.deezer, ['dsp_bio']),
-  instagram: fromSocial('instagram'),
-  laylo: fromSocial('laylo'),
-  linktree: fromSocial('linktree'),
+  instagram: fromSocial('instagram', ['ingestion']),
+  laylo: fromSocial('laylo', ['ingestion']),
+  linktree: fromSocial('linktree', ['ingestion']),
   soundcloud: fromDsp(DSP_PROFILE_CATALOG.soundcloud, ['dsp_bio', 'ingestion']),
   spotify: fromDsp(DSP_PROFILE_CATALOG.spotify, ['connector', 'dsp_bio']),
   tidal: fromDsp(DSP_PROFILE_CATALOG.tidal, ['dsp_bio']),
-  tiktok: fromSocial('tiktok'),
-  twitter: fromSocial('twitter'),
+  tiktok: fromSocial('tiktok', ['ingestion']),
+  twitter: fromSocial('twitter', ['ingestion']),
   youtube: fromDsp(DSP_PROFILE_CATALOG.youtube, [
     'connector',
     'dsp_bio',
