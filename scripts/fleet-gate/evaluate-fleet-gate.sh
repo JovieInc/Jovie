@@ -259,13 +259,20 @@ fi
 
 echo "Fleet gate evaluated (state=$state consumer=$consumer consumer_rc=$gate_rc work_allowed=$work_out new_issue_intake_allowed=$new_issue_intake_allowed deployment_allowed=$deployment_allowed mode=$mode promotion_mode=$promotion_mode receipt_age_seconds=${receipt_age_seconds:-unknown} capacity_accepted=$capacity_accepted capacity_max_concurrent=$capacity_max_concurrent)."
 
+# Promotion reasons and scoped blockers are different decisions. A parked
+# controller prints controller-failure and production-deployment-unbound while
+# scoped admission still allows a catch-up deploy. The step log has to show
+# the blockers that actually set deployment_allowed.
+scoped_blockers="$(jq -r '[.scopedAdmission.relevantBlockers[]? | (.signal // "unknown") + ":" + (.status // "unknown")] | join(";")' "$admission" 2>/dev/null || true)"
+echo "fleet-gate.scoped allowed=$scoped_allowed mode=$scoped_mode blockers=[$scoped_blockers] reason=$scoped_reason"
+
 # JOV-8000 follow-up 26: machine-readable promotion diagnostics right after the
 # summary line. The persisted receipt lives only on the Gem host (auth-gated for
 # every remote reader), so promotionMode=blocked previously surfaced with NO
 # reasons and NO signal detail in the step log — a 15-hour diagnosis loop. These
 # lines make the step log self-sufficient: the promotion mode with its reason
 # codes, then each signal that feeds promotionMode with its status and a
-# redacted first-200-char error excerpt. Logging only: zero behavior change.
+# redacted first-200-char error excerpt.
 promotion_reasons="$(jq -r '[.reasons[]? | .code] | join(";")' "$receipt" 2>/dev/null)"
 echo "fleet-gate.promotion mode=$promotion_mode reasons=[$promotion_reasons]"
 emit_gate_signal() {
@@ -290,4 +297,12 @@ emit_gate_signal queue '.signals.queue'
 emit_gate_signal closure-health '.signals.closureHealth'
 emit_gate_signal concurrency '.signals.concurrency.gem'
 emit_gate_signal independent-review '.signals.independentReview'
+
+# Fleet refresh stays exit 0 so an amber observation can still publish.
+# A deployment denial must fail the Production Controller step. Exit 0 here
+# skipped Production Release while the workflow stayed green (JOV-8539).
+if [[ "$consumer" == "deployment" && "$deployment_allowed" != "true" ]]; then
+  echo "::error::Fleet gate blocked production deployment (mode=$mode blockers=[$scoped_blockers] reason=$scoped_reason)." >&2
+  exit 2
+fi
 exit 0

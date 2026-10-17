@@ -366,6 +366,8 @@ test('installed CLI composition writes and reads back scoped evidence through th
   const old = process.env.LINEAR_COOLDOWN_STATE_DIR;
   process.env.LINEAR_COOLDOWN_STATE_DIR = join(dir, 'cooldown');
   let unavailable = false;
+  let markerVerified = false;
+  const markerReads = [];
   const fetchImpl = async (input, init) => {
     const url = String(input);
     let payload;
@@ -395,19 +397,44 @@ test('installed CLI composition writes and reads back scoped evidence through th
           },
         ],
       };
+    else if (url.endsWith('/actions/workflows/production-controller.yml'))
+      payload = { id: 456 };
     else if (url.includes('/commits/')) payload = { sha: SHA };
     else if (url.includes('/compare/')) payload = { status: 'ahead' };
     else payload = (await options.github(url)).body;
     return new Response(JSON.stringify(payload), { status: 200 });
   };
+  const verification = {
+    verifyMarker: (sha, controllerWorkflowId) => {
+      markerReads.push({ sha, controllerWorkflowId });
+      return markerVerified;
+    },
+  };
   try {
+    const rejected = await runDeprecationClearance(
+      [logPath, sourcePath],
+      { LINEAR_API_KEY: 'test-key', GH_TOKEN: 'test-github' },
+      fetchImpl,
+      verification
+    );
+    assert.equal(
+      rejected.results[0].reason,
+      'build-is-not-current-verified-production'
+    );
+    assert.equal(state.writes.length, 0);
+    markerVerified = true;
     const result = await runDeprecationClearance(
       [logPath, sourcePath],
       { LINEAR_API_KEY: 'test-key', GH_TOKEN: 'test-github' },
-      fetchImpl
+      fetchImpl,
+      verification
     );
     assert.equal(result.results[0].status, 'green');
     assert.equal(state.writes.length, 1);
+    assert.deepEqual(markerReads, [
+      { sha: SHA, controllerWorkflowId: 456 },
+      { sha: SHA, controllerWorkflowId: 456 },
+    ]);
     unavailable = true;
     await assert.rejects(
       runDeprecationClearance(

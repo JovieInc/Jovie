@@ -45,6 +45,7 @@ describe('chat performance fixtures', () => {
 type Probe = {
   start: number;
   fetchStartedMs?: number;
+  dataReadyMs?: number;
   firstFeedbackMs?: number;
   usableStateMs?: number;
   renderToInteractiveMs?: number;
@@ -113,6 +114,7 @@ describe('chat performance presentation probe (synthetic DOM/clock)', () => {
     now = 1007;
     await window.fetch('/api/chat');
     expect(probe.fetchStartedMs).toBe(7);
+    expect(probe.dataReadyMs).toBe(7);
 
     const hidden = row('chat-user-bubble', 'Sent message');
     hidden.style.display = 'none';

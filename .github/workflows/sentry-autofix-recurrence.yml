@@ -21,6 +21,11 @@ on:
   schedule:
     - cron: '41 * * * *'
   workflow_dispatch:
+    inputs:
+      observations_only:
+        description: Evaluate registered validation observations without legacy Sentry status mutations
+        type: boolean
+        default: false
 
 permissions: {}
 
@@ -51,9 +56,11 @@ jobs:
         with:
           node-version-file: .nvmrc
 
+      - uses: ./.github/actions/setup-doppler
+
       - name: Generate read/comment Jovie Bot token
         id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
@@ -65,6 +72,24 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          SENTRY_RECURRENCE_OBSERVATIONS_ONLY: ${{ inputs.observations_only && '1' || '' }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
-        run: node scripts/sentry-autofix-recurrence.mjs
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD > "$RUNNER_TEMP/sentry-recurrence-source-revision.txt"
+          doppler run --project jovie-web --config prd \
+            --only-secrets=LINEAR_API_KEY --no-fallback -- \
+            env -u DOPPLER_TOKEN node scripts/sentry-autofix-recurrence.mjs | tee "$RUNNER_TEMP/sentry-recurrence-observation.json"
+
+      - name: Preserve the bounded observation receipt
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sentry-recurrence-observation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/sentry-recurrence-observation.json
+            ${{ runner.temp }}/sentry-recurrence-source-revision.txt
+          retention-days: 14
+          if-no-files-found: warn

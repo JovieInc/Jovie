@@ -1744,12 +1744,51 @@ async function runGraphqlMutation(runner, query, variables, description) {
   );
 }
 
+// The existing admission workflow owns this wake. Event state is discovery;
+// the helper re-reads draft/head/entry before any native mutation.
+/**
+ * @param {NonNullable<Parameters<typeof dequeuePullRequest>[0]> & {
+ *   event?: { action?: string, repository?: { full_name?: string },
+ *     pull_request?: { number?: number, draft?: boolean,
+ *       head?: { sha?: string, repo?: { full_name?: string } } } }
+ * }} [input]
+ */
+export async function reconcileDraftQueueEntry({
+  event,
+  repository = DEFAULT_REPOSITORY,
+  ...options
+} = {}) {
+  const pr = event?.pull_request;
+  const sourceHead = pr?.head?.sha;
+  if (
+    event?.action !== 'converted_to_draft' ||
+    event?.repository?.full_name !== repository ||
+    pr?.head?.repo?.full_name !== repository ||
+    pr?.draft !== true ||
+    typeof pr?.number !== 'number' ||
+    !Number.isSafeInteger(pr.number) ||
+    pr.number <= 0 ||
+    typeof sourceHead !== 'string' ||
+    !/^[0-9a-f]{40}$/.test(sourceHead)
+  ) {
+    return { changed: false, skipped: true, reason: 'not-draft-event' };
+  }
+  return dequeuePullRequest({
+    ...options,
+    repository,
+    number: pr.number,
+    expectedHeadOid: sourceHead,
+    requireDraft: true,
+  });
+}
+
 /**
  * @param {{
  *   backend?: string,
  *   repository?: string,
  *   number?: string | number,
  *   expectedHeadOid?: string,
+ *   requireDraft?: boolean,
  *   runner?: (args: any) => Promise<{ code: number, stdout: string, stderr: string }>,
  *   mutationRunner?: (args: any) => Promise<{ code: number, stdout: string, stderr: string }>,
  * }} [input]
@@ -1759,6 +1798,7 @@ export async function dequeuePullRequest({
   repository = DEFAULT_REPOSITORY,
   number,
   expectedHeadOid,
+  requireDraft = false,
   runner = createGhRunner(),
   mutationRunner = runner,
 } = {}) {
@@ -1766,6 +1806,12 @@ export async function dequeuePullRequest({
   const parsedNumber = parsePullRequestNumber(number);
   const expectedHead =
     expectedHeadOid == null ? null : parseExpectedHeadOid(expectedHeadOid);
+  if (requireDraft && expectedHead === null) {
+    throw backendError(
+      'expected_head_required',
+      'Draft cleanup requires an exact source head'
+    );
+  }
   const mutationActor =
     await assertCanonicalNativeMutationActor(mutationRunner);
   const stateOptions = {
@@ -1792,6 +1838,19 @@ export async function dequeuePullRequest({
     return {
       backend: resolvedBackend,
       changed: false,
+      mutationActor,
+      state: before,
+    };
+  }
+
+  const noLongerDraft = state =>
+    requireDraft && (state.state !== 'OPEN' || state.isDraft !== true);
+  if (noLongerDraft(before)) {
+    return {
+      backend: resolvedBackend,
+      changed: false,
+      skipped: true,
+      reason: 'not-open-draft',
       mutationActor,
       state: before,
     };
@@ -1844,6 +1903,17 @@ export async function dequeuePullRequest({
         state: mutationBefore,
       };
     }
+    if (noLongerDraft(mutationBefore)) {
+      return {
+        backend: resolvedBackend,
+        changed: false,
+        skipped: true,
+        reason: 'not-open-draft',
+        mutationActor,
+        guardedQueueEntry,
+        state: mutationBefore,
+      };
+    }
   }
 
   const mutationErrors = [];
@@ -1876,6 +1946,13 @@ export async function dequeuePullRequest({
     );
   }
   if (current.autoMergeRequest !== null) {
+    if (noLongerDraft(current)) {
+      throw backendError(
+        'dequeue_draft_raced',
+        'Draft cleanup cannot disable replacement readiness',
+        { expectedHeadOid: expectedHead, guardedQueueEntry, state: current }
+      );
+    }
     try {
       await runGraphqlMutation(
         mutationRunner,

@@ -5,6 +5,10 @@ severity: sev1
 detected: 2026-09-23T19:50Z
 repaired: 2026-09-26T22:45Z
 failure_classes: [silent-production-staleness, pre-merge-parity-gap, serial-layer-discovery, non-convergent-control-loop, green-by-implication, privileged-recovery-only, unowned-incident]
+detectable_before_human: true
+detection_gaps: [false-green, missing-invariant, missing-join, missing-remediator, missing-signal]
+replay_corpus: [docs/postmortems/2026-09-26-production-freeze.md#timeline-utc]
+founder_rescues: 1
 incident_issue: JOV-6621
 actions: [JOV-6684, JOV-6685, JOV-6686, JOV-6687, JOV-6688, JOV-6689, JOV-6690, JOV-5934]
 gbrain: ops/postmortems/2026-09-26-production-freeze
@@ -156,7 +160,12 @@ Two independent mechanisms, in sequence:
 | [JOV-5934](https://linear.app/jovie/issue/JOV-5934) | Exact-SHA lineage ledger, no skipped-as-green | `green-by-implication` | In Review (existing) | pending |
 | [JOV-6688](https://linear.app/jovie/issue/JOV-6688) | Sanctioned break-glass promote | `privileged-recovery-only` | Backlog | pending |
 | [JOV-6689](https://linear.app/jovie/issue/JOV-6689) | CI: incident closure requires a post-mortem | `unowned-incident` | In Review | pending |
-| [JOV-6690](https://linear.app/jovie/issue/JOV-6690) | Summer review, GBrain mirror, weekly class review | `unowned-incident` | Backlog | pending |
+| [JOV-6690](https://linear.app/jovie/issue/JOV-6690) | Summer review, GBrain mirror, weekly class review | `unowned-incident` | verified | [2026-10-14 injected end-to-end review](reports/2026-10-14-weekly-failure-class-review.json) |
+
+After the [2026-10-16 recurrence](2026-10-16-production-lineage-rest-quota.md),
+[JOV-8532](https://linear.app/jovie/issue/JOV-8532) owns class-level
+`serial-layer-discovery` hardening across release stages. Its live verification
+remains pending.
 
 ## Runbook until the controls ship
 

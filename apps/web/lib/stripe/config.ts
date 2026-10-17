@@ -34,6 +34,8 @@ export interface PriceMapping {
   legacy?: boolean;
   /** Product-specific checkout prices stay out of the general pricing grid. */
   listed?: boolean;
+  /** Exact offer grants; legacy plan aliases do not inherit these. */
+  offerCapabilities?: typeof ARTIST_VISIBILITY_OFFER.pro.capabilities;
 }
 
 const toMappingRecord = (
@@ -56,6 +58,7 @@ const buildActivePriceMappings = (): Record<string, PriceMapping> => {
       currency: ARTIST_VISIBILITY_OFFER.pro.currency,
       interval: ARTIST_VISIBILITY_OFFER.pro.interval,
       description: ARTIST_VISIBILITY_OFFER.pro.displayName,
+      offerCapabilities: ARTIST_VISIBILITY_OFFER.pro.capabilities,
     },
   ];
 

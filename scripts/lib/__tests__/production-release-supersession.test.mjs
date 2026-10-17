@@ -43,11 +43,90 @@ const CONTROLLER_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/production-controller.yml'),
   'utf8'
 );
+const PUBLIC_PROFILE_ALIAS_GRADUATION = JSON.parse(
+  readFileSync(
+    resolve(REPO_ROOT, 'docs/performance/public-profile-alias-graduation.json'),
+    'utf8'
+  )
+);
 const EXPECTED_SHA = 'a'.repeat(40);
 const NEWER_SHA = 'b'.repeat(40);
 const DEPLOYMENT_ID = 'dpl_exact_generation';
 const DEPLOYMENT_URL = 'https://jovie-exact-generation-jovie.vercel.app';
 const tempRoots = [];
+
+describe('public-profile alias graduation policy', () => {
+  it('proves the bounded production decision from exactly 14 controller jobs', () => {
+    const receipt = PUBLIC_PROFILE_ALIAS_GRADUATION;
+    const { policy, result, runs, selection } = receipt;
+
+    expect(receipt.schema).toBe('jovie-public-profile-alias-graduation/v1');
+    expect(receipt.surface).toBe('production-canonical-alias');
+    expect(selection.windowSize).toBe(policy.requiredConsecutiveRuns);
+    expect(runs).toHaveLength(selection.windowSize);
+    expect(new Set(runs.map(run => run.controllerRunId)).size).toBe(
+      selection.windowSize
+    );
+    expect(new Set(runs.map(run => run.jobId)).size).toBe(selection.windowSize);
+    expect(policy.samplesPerRoute).toBe(5);
+    expect(policy.p95Estimator).toBe('nearest-rank');
+    expect(policy.trackingIssue).toBe('JOV-8338');
+    expect(receipt.measuredAt).toBe(runs[0].completedAt);
+
+    for (const [index, run] of runs.entries()) {
+      const observedP95Ms = Math.max(...Object.values(run.routeP95Ms));
+      expect(run.observedP95Ms).toBe(observedP95Ms);
+      expect(run.qualifies).toBe(observedP95Ms <= policy.thresholdMs);
+      expect(run.headSha).toMatch(/^[0-9a-f]{40}$/);
+      expect(run.jobUrl).toBe(
+        `https://github.com/JovieInc/Jovie/actions/runs/${run.controllerRunId}/job/${run.jobId}`
+      );
+      if (index > 0) {
+        expect(Date.parse(runs[index - 1].completedAt)).toBeGreaterThan(
+          Date.parse(run.completedAt)
+        );
+      }
+    }
+
+    const qualifyingRuns = runs.filter(run => run.qualifies).length;
+    const firstMiss = runs.findIndex(run => !run.qualifies);
+    const consecutiveQualifyingRuns =
+      firstMiss === -1 ? runs.length : firstMiss;
+    expect(result.qualifyingRunsInWindow).toBe(qualifyingRuns);
+    expect(result.consecutiveQualifyingRuns).toBe(consecutiveQualifyingRuns);
+    expect(result.graduated).toBe(
+      consecutiveQualifyingRuns >= policy.requiredConsecutiveRuns
+    );
+    expect(result.decision).toBe(result.graduated ? 'block' : 'warn');
+    expect(policy.currentEnforcement).toBe(result.decision);
+
+    const measuredAt = Date.parse(receipt.measuredAt);
+    const nextReviewAt = Date.parse(policy.nextReviewAt);
+    expect(nextReviewAt).toBeGreaterThan(measuredAt);
+    expect(nextReviewAt).toBeGreaterThan(Date.now());
+    expect(nextReviewAt - measuredAt).toBeLessThanOrEqual(
+      7 * 24 * 60 * 60 * 1000
+    );
+  });
+
+  it('keeps staging independent and bounds the production warning', () => {
+    const staging = getJobBlock(RELEASE_WORKFLOW, 'promote-production');
+    const production = getJobBlock(
+      RELEASE_WORKFLOW,
+      'production-public-profile-alias-gate'
+    );
+
+    expect(staging).toContain('Staging policy is independent');
+    expect(staging).toContain('Recheck by 2026-10-21 under JOV-8338');
+    expect(production).toContain(
+      'docs/performance/public-profile-alias-graduation.json'
+    );
+    expect(production).toContain('current streak of 1/14');
+    expect(production).toContain('no later than 2026-10-21 (JOV-8338)');
+    expect(production).toContain('performance_status=warn');
+    expect(production).not.toContain('JOV-4854');
+  });
+});
 
 describe('production verification admission', () => {
   const job = getJobBlock(CONTROLLER_WORKFLOW, 'production-verified');
@@ -115,7 +194,7 @@ function getJobBlock(workflow, jobKey) {
   return block.join('\n');
 }
 
-function getStepRunScript(jobBlock, stepName) {
+function getStepText(jobBlock, stepName) {
   const lines = jobBlock.split('\n');
   const stepStart = lines.findIndex(
     line => line === `      - name: ${stepName}`
@@ -124,10 +203,13 @@ function getStepRunScript(jobBlock, stepName) {
   const stepEnd = lines.findIndex(
     (line, index) => index > stepStart && /^      - /.test(line)
   );
-  const stepLines = lines.slice(
-    stepStart,
-    stepEnd === -1 ? lines.length : stepEnd
-  );
+  return lines
+    .slice(stepStart, stepEnd === -1 ? lines.length : stepEnd)
+    .join('\n');
+}
+
+function getStepRunScript(jobBlock, stepName) {
+  const stepLines = getStepText(jobBlock, stepName).split('\n');
   const runStart = stepLines.findIndex(line => line === '        run: |');
   if (runStart < 0) throw new Error(`Missing run block: ${stepName}`);
   return stepLines
@@ -165,6 +247,24 @@ function stubCommand(bin, name, source) {
   const path = join(bin, name);
   writeFileSync(path, source);
   chmodSync(path, 0o755);
+}
+
+function stubGitMain(bin) {
+  stubCommand(
+    bin,
+    'git',
+    `#!/bin/sh
+case "$*" in
+  *ls-remote*)
+    printf '%s\\trefs/heads/main\\n' "$STUB_MAIN_SHA"
+    ;;
+  *)
+    echo "unexpected git: $*" >&2
+    exit 2
+    ;;
+esac
+`
+  );
 }
 
 function parseOutputs(path) {
@@ -229,10 +329,11 @@ function releaseExpressions(overrides = {}) {
 
 function runReleaseResult(overrides = {}, boundarySha = NEWER_SHA, env = {}) {
   const fixture = makeFixture('release-result-');
+  stubGitMain(fixture.bin);
   stubCommand(
     fixture.bin,
     'gh',
-    '#!/bin/sh\nprintf "%s\\n" "$STUB_MAIN_SHA"\n'
+    '#!/bin/sh\nif [ "${STUB_REST_DENIED:-0}" = 1 ]; then echo "API rate limit exceeded for installation" >&2; exit 1; fi\nprintf "%s\\n" "$STUB_MAIN_SHA"\n'
   );
   const script = materialize(
     getStepRunScript(
@@ -249,6 +350,7 @@ function runReleaseResult(overrides = {}, boundarySha = NEWER_SHA, env = {}) {
       Buffer.from(DEPLOYMENT_URL).toString('base64'),
     PREVIOUS_PRODUCTION_DEPLOYMENT_ID: 'dpl_previous_generation',
     STUB_MAIN_SHA: boundarySha,
+    RESOLVE_MAIN_RETRY_SECONDS: '0',
     ...env,
   });
   return { result, outputs: parseOutputs(fixture.output) };
@@ -279,6 +381,7 @@ function runControllerVerify(
   const fixture = makeFixture('controller-verify-');
   const aliasMarker = join(fixture.root, 'alias-called');
   const doneSprintMarker = join(fixture.root, 'done-sprint-called');
+  stubGitMain(fixture.bin);
   stubCommand(
     fixture.bin,
     'gh',
@@ -363,6 +466,7 @@ function runFinalize(overrides = {}, boundarySha = NEWER_SHA) {
     join(fixture.root, 'release-lineage/release-risk-receipt.json'),
     '{"latency":{"mergeAt":"2026-10-03T00:00:00Z","targetP95Seconds":1800},"ovie":{},"certificationPacket":null}'
   );
+  stubGitMain(fixture.bin);
   stubCommand(
     fixture.bin,
     'gh',
@@ -397,11 +501,27 @@ function runFinalize(overrides = {}, boundarySha = NEWER_SHA) {
 function runStagingStep(stepName, mainSha, env = {}) {
   const fixture = makeFixture('staging-refresh-');
   const aliasMarker = join(fixture.root, 'alias-called');
+  const restMarker = join(fixture.root, 'rest-called');
+  stubGitMain(fixture.bin);
   stubCommand(
     fixture.bin,
     'gh',
-    '#!/bin/sh\nprintf "%s\\n" "$STUB_MAIN_SHA"\n'
+    `#!/bin/sh
+printf '%s\\n' "$*" >> "$STUB_REST_MARKER"
+if [ "\${STUB_MAIN_API_STATUS:-0}" != 0 ]; then
+  echo 'gh: API rate limit exceeded for installation. (HTTP 403)' >&2
+  exit "$STUB_MAIN_API_STATUS"
+fi
+printf '%s\\n' "$STUB_MAIN_SHA"
+`
   );
+  if (env.STUB_MAIN_GIT_STATUS) {
+    stubCommand(
+      fixture.bin,
+      'git',
+      '#!/bin/sh\nexit "$STUB_MAIN_GIT_STATUS"\n'
+    );
+  }
   const vercel = join(fixture.root, 'node_modules/.bin/vercel');
   mkdirSync(dirname(vercel), { recursive: true });
   writeFileSync(
@@ -424,21 +544,34 @@ function runStagingStep(stepName, mainSha, env = {}) {
     DEPLOYMENT_URL_B64: Buffer.from(DEPLOYMENT_URL).toString('base64'),
     EXPECTED_COMMIT_SHA: EXPECTED_SHA,
     EXPECTED_DEPLOYMENT_ID: DEPLOYMENT_ID,
+    GH_TOKEN: 'test-token',
     GITHUB_REPOSITORY: 'JovieInc/Jovie',
     PROMOTION_RESULT: 'success',
     PROMOTION_SHA: EXPECTED_SHA,
     ROLLBACK_RESULT: 'skipped',
+    RESOLVE_MAIN_BUDGET_SECONDS: '0',
+    RESOLVE_MAIN_RETRY_SECONDS: '0',
     SOURCE_CI_RUN_ATTEMPT: '1',
     SOURCE_CI_RUN_ID: '9876',
     SOURCE_CI_COMPLETED_AT: new Date(Date.now() - 1_000).toISOString(),
     STAGING_REFRESH_OUTCOME:
       mainSha === EXPECTED_SHA ? 'current' : 'superseded_after_mutation',
     STUB_ALIAS_MARKER: aliasMarker,
+    STUB_REST_MARKER: restMarker,
     STUB_MAIN_SHA: mainSha,
     ...env,
   });
   return {
     aliasCalled: existsSync(aliasMarker),
+    restCalled: existsSync(restMarker),
+    receipt: existsSync(join(fixture.root, 'staging-deployment-receipt.json'))
+      ? JSON.parse(
+          readFileSync(
+            join(fixture.root, 'staging-deployment-receipt.json'),
+            'utf8'
+          )
+        )
+      : null,
     receiptExists: existsSync(
       join(fixture.root, 'staging-deployment-receipt.json')
     ),
@@ -483,6 +616,13 @@ describe('production release supersession execution', () => {
       released: 'true',
       superseded_before_promotion: 'false',
     });
+  });
+
+  it('preserves the exact release receipt through Git when REST is exhausted', () => {
+    const released = runReleaseResult({}, NEWER_SHA, { STUB_REST_DENIED: '1' });
+    expect(released.result.status, released.result.stderr).toBe(0);
+    expect(released.outputs.released).toBe('true');
+    expect(released.outputs.superseded_before_promotion).toBe('false');
   });
 
   it('keeps a proven pre-promotion supersession neutral after exact prior gates', () => {
@@ -632,6 +772,62 @@ describe('production release supersession execution', () => {
     expect(receipt.receiptExists).toBe(true);
   });
 
+  it.each([
+    [EXPECTED_SHA, 'current'],
+    [NEWER_SHA, 'superseded_after_mutation'],
+  ])(
+    'classifies %s without a REST read when the installation is rate-limited',
+    (sha, outcome) => {
+      for (const step of [
+        'Classify staging generation after mutation',
+        'Write typed staging deployment receipt',
+      ]) {
+        const staging = runStagingStep(step, sha, {
+          STUB_MAIN_API_STATUS: '1',
+        });
+        expect(staging.result.status, staging.result.stderr).toBe(0);
+        expect(staging.outputs.staging_refresh_outcome).toBe(outcome);
+        expect(staging.restCalled).toBe(false);
+        expect(staging.aliasCalled).toBe(false);
+        if (step === 'Write typed staging deployment receipt') {
+          expect(staging.outputs.deployed).toBe('true');
+          expect(staging.receipt).toMatchObject({
+            sha: EXPECTED_SHA,
+            currentMainSha: sha,
+            deploymentId: DEPLOYMENT_ID,
+            state: outcome,
+          });
+        } else {
+          expect(staging.receipt).toBeNull();
+        }
+      }
+    }
+  );
+
+  it.each([
+    ['unreadable main', NEWER_SHA, { STUB_MAIN_GIT_STATUS: '1' }],
+    ['malformed main', 'not-a-sha', {}],
+  ])(
+    'fails staging receipt closed for %s when REST is rate-limited',
+    (_, sha, env) => {
+      for (const step of [
+        'Classify staging generation after mutation',
+        'Write typed staging deployment receipt',
+      ]) {
+        const staging = runStagingStep(step, sha, {
+          STUB_MAIN_API_STATUS: '1',
+          ...env,
+        });
+        expect(staging.result.status).toBe(1);
+        expect(staging.outputs.staging_refresh_outcome).toBeUndefined();
+        expect(staging.outputs.deployed).toBeUndefined();
+        expect(staging.restCalled).toBe(true);
+        expect(staging.aliasCalled).toBe(false);
+        expect(staging.receipt).toBeNull();
+      }
+    }
+  );
+
   it('ignores production state when classifying a staging generation', () => {
     const proof = { PROMOTION_SHA: NEWER_SHA };
     const reassert = runStagingStep(
@@ -740,14 +936,11 @@ describe('forward-only release lineage', () => {
     ['staging-head', 'Resolve current main HEAD'],
     ['alias-staging', 'Recheck main immediately before staging alias'],
     ['production-head', 'Resolve current main HEAD'],
-    [
-      'promote-production',
-      'Recheck main immediately before production mutation',
-    ],
-    [
-      'promote-production',
-      'Recheck main immediately before production promotion',
-    ],
+  ];
+
+  const GIT_RECHECK_STEPS = [
+    'Recheck main immediately before production mutation',
+    'Recheck main immediately before production promotion',
   ];
 
   function stubLineageGh(bin) {
@@ -756,15 +949,47 @@ describe('forward-only release lineage', () => {
       'gh',
       `#!/bin/sh
 case "$*" in
-  *compare/*) printf '%s\\n' "$STUB_COMPARE_STATUS" ;;
-  *) printf '%s\\n' "$STUB_MAIN_SHA" ;;
+  *rate_limit*)
+    if [ -n "\${STUB_RATE_LIMIT_RESET:-}" ]; then
+      printf '%s\\n' "$STUB_RATE_LIMIT_RESET"
+      exit 0
+    fi
+    ;;
+esac
+case "$*" in
+  *compare/*)
+    if [ "\${STUB_COMPARE_FAILURES:-0}" -gt 0 ]; then
+      echo "gh: API rate limit exceeded for installation." >&2
+      exit 1
+    fi
+    printf '%s\\n' "$STUB_COMPARE_STATUS"
+    ;;
+  *)
+    n=0
+    [ -f "$STUB_MAIN_ATTEMPTS" ] && n="$(cat "$STUB_MAIN_ATTEMPTS")"
+    n=$((n + 1))
+    printf '%s' "$n" > "$STUB_MAIN_ATTEMPTS"
+    if [ "$n" -le "$STUB_MAIN_FAILURES" ]; then
+      echo "gh: API rate limit exceeded for installation." >&2
+      exit 1
+    fi
+    printf '%s\\n' "$STUB_MAIN_SHA"
+    ;;
 esac
 `
     );
   }
 
-  function runRecheck(jobKey, stepName, mainSha, compareStatus) {
+  function runRecheck(
+    jobKey,
+    stepName,
+    mainSha,
+    compareStatus,
+    mainFailures = 0,
+    extraEnv = {}
+  ) {
     const fixture = makeFixture('lineage-recheck-');
+    const attempts = join(fixture.root, 'main-attempts');
     stubLineageGh(fixture.bin);
     const script = materialize(
       getStepRunScript(getJobBlock(RELEASE_WORKFLOW, jobKey), stepName),
@@ -773,10 +998,21 @@ esac
     const result = runScript(script, fixture, {
       EXPECTED_SHA,
       EXPECTED_MAIN_SHA: EXPECTED_SHA,
+      GITHUB_REPOSITORY: 'JovieInc/Jovie',
+      STUB_COMPARE_FAILURES: '0',
       STUB_COMPARE_STATUS: compareStatus,
+      STUB_MAIN_ATTEMPTS: attempts,
+      STUB_MAIN_FAILURES: String(mainFailures),
       STUB_MAIN_SHA: mainSha,
+      ...extraEnv,
     });
-    return { result, outputs: parseOutputs(fixture.output) };
+    return {
+      attempts: existsSync(attempts)
+        ? Number(readFileSync(attempts, 'utf8'))
+        : 0,
+      result,
+      outputs: parseOutputs(fixture.output),
+    };
   }
 
   it.each(RECHECK_STEPS)(
@@ -799,7 +1035,298 @@ esac
     30_000
   );
 
-  function runPromote(mainSha, compareStatus) {
+  function makeLineageRemote(mode) {
+    const root = mkdtempSync(join(tmpdir(), 'lineage-remote-'));
+    tempRoots.push(root);
+    const src = join(root, 'src');
+    mkdirSync(src);
+    const git = args => {
+      const result = spawnSync('git', args, {
+        cwd: src,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          GIT_AUTHOR_NAME: 'Lineage',
+          GIT_AUTHOR_EMAIL: 'lineage@example.com',
+          GIT_COMMITTER_NAME: 'Lineage',
+          GIT_COMMITTER_EMAIL: 'lineage@example.com',
+        },
+      });
+      if (result.status !== 0) {
+        throw new Error(`${args.join(' ')}\n${result.stderr || result.stdout}`);
+      }
+      return result.stdout.trim();
+    };
+    git(['init', '-q', '-b', 'main']);
+    writeFileSync(join(src, 'file'), 'base\n');
+    git(['add', 'file']);
+    git(['commit', '-qm', 'base']);
+    const base = git(['rev-parse', 'HEAD']);
+    if (mode === 'ahead') {
+      writeFileSync(join(src, 'file'), 'child\n');
+      git(['commit', '-qam', 'child']);
+    } else if (mode === 'diverged') {
+      git(['checkout', '-q', '--orphan', 'rewritten']);
+      writeFileSync(join(src, 'other'), 'other\n');
+      git(['add', 'other']);
+      git(['commit', '-qm', 'rewritten']);
+      git(['branch', '-M', 'main']);
+    }
+    return { remote: src, base, tip: git(['rev-parse', 'HEAD']) };
+  }
+
+  function runRateLimitedAlias(
+    mode,
+    jobKey = 'alias-staging',
+    stepName = 'Recheck main immediately before staging alias',
+    extraEnv = {}
+  ) {
+    const remote = makeLineageRemote(mode);
+    const expected = mode === 'exact' ? remote.tip : remote.base;
+    return runRecheck(jobKey, stepName, remote.tip, 'identical', 9, {
+      EXPECTED_SHA: expected,
+      EXPECTED_MAIN_SHA: expected,
+      MAIN_LINEAGE_REMOTE: remote.remote,
+      STUB_COMPARE_FAILURES: '1',
+      ...extraEnv,
+    });
+  }
+
+  it.each(GIT_RECHECK_STEPS)(
+    '%s proves lineage with git and does not call installation REST',
+    stepName => {
+      const step = getStepText(
+        getJobBlock(RELEASE_WORKFLOW, 'promote-production'),
+        stepName
+      );
+      expect(step).toContain('MAIN_LINEAGE_TRANSPORT: git');
+      expect(step).not.toContain('GH_API_HOLD_BUDGET_SECONDS');
+      expect(step).not.toContain('gh-api-hold.sh');
+
+      for (const mode of ['exact', 'ahead', 'diverged']) {
+        const remote = makeLineageRemote(mode);
+        const expected = mode === 'exact' ? remote.tip : remote.base;
+        const current = runRecheck(
+          'promote-production',
+          stepName,
+          remote.tip,
+          'identical',
+          9,
+          {
+            EXPECTED_SHA: expected,
+            EXPECTED_MAIN_SHA: expected,
+            MAIN_LINEAGE_REMOTE: remote.remote,
+            MAIN_LINEAGE_TRANSPORT: 'git',
+            STUB_RATE_LIMIT_RESET: String(Math.floor(Date.now() / 1000) + 3600),
+          }
+        );
+        expect(current.result.status, current.result.stderr).toBe(0);
+        expect(current.attempts).toBe(0);
+        expect(current.result.stderr).not.toContain(
+          'API rate limit exceeded for installation'
+        );
+        expect(current.outputs.is_current).toBe(String(mode !== 'diverged'));
+        if (mode === 'diverged') {
+          expect(current.outputs.superseded_sha).toBe(remote.tip);
+        } else {
+          expect(current.outputs.superseded_sha).toBeUndefined();
+        }
+      }
+    }
+  );
+
+  it.each(GIT_RECHECK_STEPS)(
+    '%s fails closed when git cannot prove lineage',
+    stepName => {
+      const current = runRecheck(
+        'promote-production',
+        stepName,
+        EXPECTED_SHA,
+        'identical',
+        9,
+        {
+          MAIN_LINEAGE_TRANSPORT: 'git',
+          MAIN_LINEAGE_REMOTE: join(tmpdir(), 'missing-lineage-remote'),
+          STUB_RATE_LIMIT_RESET: String(Math.floor(Date.now() / 1000) + 3600),
+        }
+      );
+      expect(current.result.status).not.toBe(0);
+      expect(current.attempts).toBe(0);
+      expect(current.outputs.is_current).toBeUndefined();
+      expect(current.outputs.superseded_sha).toBeUndefined();
+      expect(current.result.stderr).not.toContain('is_current=true');
+    }
+  );
+
+  it('rejects an unknown main-lineage transport', () => {
+    const current = runRecheck(
+      'promote-production',
+      'Recheck main immediately before production mutation',
+      EXPECTED_SHA,
+      'identical',
+      0,
+      { MAIN_LINEAGE_TRANSPORT: 'skip' }
+    );
+    expect(current.result.status).not.toBe(0);
+    expect(current.attempts).toBe(0);
+    expect(current.outputs.is_current).toBeUndefined();
+    expect(current.result.stderr).toContain(
+      'MAIN_LINEAGE_TRANSPORT must be rest or git'
+    );
+  });
+
+  it.each([
+    ['exact', 'true'],
+    ['ahead', 'true'],
+    ['diverged', 'false'],
+  ])(
+    'rechecks %s staging main through git when the REST reset exceeds the job budget',
+    (mode, isCurrent) => {
+      const current = runRateLimitedAlias(
+        mode,
+        'staging-head',
+        'Resolve current main HEAD',
+        {
+          GH_API_HOLD_BUDGET_SECONDS: '60',
+          STUB_RATE_LIMIT_RESET: String(Math.floor(Date.now() / 1000) + 3600),
+        }
+      );
+      expect(current.result.status, current.result.stderr).toBe(0);
+      expect(current.result.stderr).toContain('outside the 60s budget');
+      expect(current.result.stderr).toContain('resolving main with git');
+      expect(current.outputs.is_current).toBe(isCurrent);
+    }
+  );
+
+  it('fails the staging recheck closed when both REST and git are unavailable', () => {
+    const unavailable = runRecheck(
+      'staging-head',
+      'Resolve current main HEAD',
+      EXPECTED_SHA,
+      'identical',
+      9,
+      {
+        GH_API_HOLD_BUDGET_SECONDS: '60',
+        MAIN_LINEAGE_REMOTE: join(tmpdir(), 'missing-lineage-remote'),
+        STUB_RATE_LIMIT_RESET: String(Math.floor(Date.now() / 1000) + 3600),
+      }
+    );
+    expect(unavailable.result.status).toBe(1);
+    expect(unavailable.result.stderr).toContain('outside the 60s budget');
+    expect(unavailable.result.stderr).toContain('git could not resolve main');
+    expect(unavailable.outputs.is_current).toBeUndefined();
+  });
+
+  it('checks out both scripts needed by the staging lineage recheck', () => {
+    const job = getJobBlock(RELEASE_WORKFLOW, 'staging-head');
+    expect(job).toContain('ref: ${{ inputs.expected_sha }}');
+    expect(job).toContain('persist-credentials: false');
+    expect(job).toMatch(
+      /sparse-checkout: \|\n\s+\.github\/scripts\/gh-api-hold\.sh\n\s+\.github\/scripts\/recheck-main-lineage\.sh/
+    );
+  });
+
+  it('resolves an unchanged main through git when REST is rate limited', () => {
+    const current = runRateLimitedAlias('exact');
+    expect(current.result.status, current.result.stderr).toBe(0);
+    expect(current.attempts).toBe(2);
+    expect(current.outputs.is_current).toBe('true');
+  });
+
+  it('keeps the staging alias when rate-limited REST still has an ancestor main', () => {
+    const current = runRateLimitedAlias('ahead');
+    expect(current.result.status, current.result.stderr).toBe(0);
+    expect(current.attempts).toBe(3);
+    expect(current.outputs.is_current).toBe('true');
+  });
+
+  it('yields the staging alias when rate-limited REST shows main left the release', () => {
+    const current = runRateLimitedAlias('diverged');
+    expect(current.result.status, current.result.stderr).toBe(0);
+    expect(current.attempts).toBe(3);
+    expect(current.outputs.is_current).toBe('false');
+  });
+
+  it('fails closed when the pre-alias main read stays unavailable', () => {
+    const unavailable = runRecheck(
+      'alias-staging',
+      'Recheck main immediately before staging alias',
+      EXPECTED_SHA,
+      'identical',
+      9,
+      { MAIN_LINEAGE_REMOTE: join(tmpdir(), 'missing-lineage-remote') }
+    );
+    expect(unavailable.result.status).toBe(1);
+    expect(unavailable.attempts).toBe(2);
+    expect(unavailable.outputs.is_current).toBeUndefined();
+  });
+
+  it('retries an installation 403 inside the budget and refuses a permission 403', () => {
+    const fixture = makeFixture('lineage-hold-');
+    const attempts = join(fixture.root, 'attempts');
+    writeFileSync(attempts, '0');
+    stubCommand(
+      fixture.bin,
+      'gh',
+      `#!/bin/sh
+case "$*" in
+  *rate_limit*)
+    date +%s
+    exit 0
+    ;;
+esac
+n="$(cat "$STUB_ATTEMPTS")"
+n=$((n + 1))
+printf '%s' "$n" > "$STUB_ATTEMPTS"
+if [ "$n" -eq 1 ]; then
+  echo "API rate limit exceeded for installation" >&2
+  exit 1
+fi
+printf '%s\\n' "$STUB_MAIN_SHA"
+`
+    );
+    const script = materialize(
+      getStepRunScript(
+        getJobBlock(RELEASE_WORKFLOW, 'alias-staging'),
+        'Recheck main immediately before staging alias'
+      ),
+      { 'github.repository': 'JovieInc/Jovie' }
+    );
+    const held = runScript(script, fixture, {
+      EXPECTED_SHA,
+      GH_API_HOLD_BUDGET_SECONDS: '30',
+      GITHUB_REPOSITORY: 'JovieInc/Jovie',
+      MAIN_LINEAGE_REMOTE: join(tmpdir(), 'missing-lineage-remote'),
+      STUB_ATTEMPTS: attempts,
+      STUB_MAIN_SHA: EXPECTED_SHA,
+    });
+    expect(held.status, held.stderr).toBe(0);
+    expect(readFileSync(fixture.output, 'utf8')).toContain('is_current=true');
+    expect(held.stderr).toContain('Holding');
+    expect(Number(readFileSync(attempts, 'utf8'))).toBe(2);
+
+    const deniedFixture = makeFixture('lineage-permission-');
+    stubCommand(
+      deniedFixture.bin,
+      'gh',
+      `#!/bin/sh
+echo "gh: Resource not accessible by integration" >&2
+exit 1
+`
+    );
+    const denied = runScript(script, deniedFixture, {
+      EXPECTED_SHA,
+      GITHUB_REPOSITORY: 'JovieInc/Jovie',
+      MAIN_LINEAGE_REMOTE: join(tmpdir(), 'missing-lineage-remote'),
+    });
+    expect(denied.status).not.toBe(0);
+    expect(denied.stderr).not.toMatch(/Holding /);
+    expect(readFileSync(deniedFixture.output, 'utf8')).not.toContain(
+      'is_current=true'
+    );
+  });
+
+  function runPromote(mainSha, compareStatus, extraEnv = {}) {
     const fixture = makeFixture('lineage-promote-');
     stubLineageGh(fixture.bin);
     const promoted = join(fixture.root, 'promoted');
@@ -851,6 +1378,8 @@ esac
           STUB_COMPARE_STATUS: compareStatus,
           STUB_DEPLOY_ID: DEPLOYMENT_ID,
           STUB_MAIN_SHA: mainSha,
+          STUB_MAIN_ATTEMPTS: join(fixture.root, 'main-attempts'),
+          STUB_MAIN_FAILURES: '0',
           STUB_PROMOTED: promoted,
           STUB_STAGING_ALIAS: stagingAlias,
           STUB_STAGING_RESTORE: stagingRestore,
@@ -858,6 +1387,7 @@ esac
           VERCEL_ORG_ID: 'team_stub',
           VERCEL_PROJECT_ID: 'prj_stub',
           VERCEL_TOKEN: 'stub',
+          ...extraEnv,
         },
       }
     );
@@ -870,29 +1400,104 @@ esac
     };
   }
 
-  it('promotes an exact or ancestor generation and reports the promoted SHA', () => {
-    const exact = runPromote(EXPECTED_SHA, 'identical');
-    expect(exact.result.status, exact.result.stderr).toBe(0);
-    expect(exact.promoted).toBe(true);
-    expect(exact.stagingAlias).toBe('dpl_staging_preview');
-    expect(exact.stagingRestored).toBe(true);
-    expect(exact.outputs.promotion_sha).toBe(EXPECTED_SHA);
+  it.each(['exact', 'ahead', 'diverged'])(
+    'the promotion controller proves %s lineage after REST quota exhaustion',
+    mode => {
+      const remote = makeLineageRemote(mode);
+      const expected = mode === 'exact' ? remote.tip : remote.base;
+      const current = runPromote(remote.tip, 'identical', {
+        EXPECTED_MAIN_SHA: expected,
+        MAIN_LINEAGE_REMOTE: remote.remote,
+        STUB_MAIN_FAILURES: '9',
+        STUB_COMPARE_FAILURES: '1',
+        STUB_RATE_LIMIT_RESET: String(Math.floor(Date.now() / 1000) + 3600),
+      });
+      expect(current.result.status, current.result.stderr).toBe(0);
+      expect(current.result.stderr).not.toContain(
+        'API rate limit exceeded for installation'
+      );
+      expect(current.promoted).toBe(mode !== 'diverged');
+      expect(current.outputs.promotion_sha).toBe(
+        mode === 'diverged' ? remote.tip : expected
+      );
+      expect(current.outputs.is_current).toBeUndefined();
+    }
+  );
 
-    const ancestor = runPromote(NEWER_SHA, 'ahead');
-    expect(ancestor.result.status, ancestor.result.stderr).toBe(0);
-    expect(ancestor.promoted).toBe(true);
-    expect(ancestor.stagingAlias).toBe('dpl_staging_preview');
-    expect(ancestor.stagingRestored).toBe(true);
-    expect(ancestor.outputs.promotion_sha).toBe(EXPECTED_SHA);
+  it('refuses production mutation when REST and git cannot prove lineage', () => {
+    const current = runPromote(EXPECTED_SHA, 'identical', {
+      STUB_MAIN_FAILURES: '9',
+      STUB_RATE_LIMIT_RESET: String(Math.floor(Date.now() / 1000) + 3600),
+      MAIN_LINEAGE_REMOTE: join(tmpdir(), 'missing-lineage-remote'),
+    });
+    expect(current.result.status).not.toBe(0);
+    expect(current.promoted).toBe(false);
+    expect(current.outputs.promotion_sha).toBeUndefined();
+    expect(current.outputs.failure_subtype).toBe(
+      'production_promotion_state_invalid'
+    );
+    expect(current.outputs.is_current).toBeUndefined();
+  });
+
+  it('promotes an exact or ancestor generation and reports the promoted SHA', () => {
+    for (const mode of ['exact', 'ahead']) {
+      const remote = makeLineageRemote(mode);
+      const expected = mode === 'exact' ? remote.tip : remote.base;
+      const current = runPromote(remote.tip, 'identical', {
+        EXPECTED_MAIN_SHA: expected,
+        MAIN_LINEAGE_REMOTE: remote.remote,
+      });
+      expect(current.result.status, current.result.stderr).toBe(0);
+      expect(current.promoted).toBe(true);
+      expect(current.stagingAlias).toBe('dpl_staging_preview');
+      expect(current.stagingRestored).toBe(true);
+      expect(current.outputs.promotion_sha).toBe(expected);
+    }
   });
 
   it('yields without mutation when the generation left main lineage', () => {
-    const diverged = runPromote(NEWER_SHA, 'diverged');
+    const remote = makeLineageRemote('diverged');
+    const diverged = runPromote(remote.tip, 'diverged', {
+      EXPECTED_MAIN_SHA: remote.base,
+      MAIN_LINEAGE_REMOTE: remote.remote,
+    });
     expect(diverged.result.status, diverged.result.stderr).toBe(0);
     expect(diverged.promoted).toBe(false);
     expect(diverged.stagingAlias).toBe('dpl_staging_preview');
     expect(diverged.stagingRestored).toBe(false);
-    expect(diverged.outputs.promotion_sha).toBe(NEWER_SHA);
+    expect(diverged.outputs.promotion_sha).toBe(remote.tip);
+  });
+
+  it.each(['exact', 'ahead', 'diverged'])(
+    'proves %s lineage at the final mutation boundary when REST is exhausted',
+    mode => {
+      const remote = makeLineageRemote(mode);
+      const expected = mode === 'exact' ? remote.tip : remote.base;
+      const result = runPromote(remote.tip, 'ahead', {
+        EXPECTED_MAIN_SHA: expected,
+        MAIN_LINEAGE_REMOTE: remote.remote,
+        STUB_COMPARE_FAILURES: '1',
+        STUB_MAIN_FAILURES: '9',
+      });
+      expect(result.result.status, result.result.stderr).toBe(0);
+      expect(result.promoted).toBe(mode !== 'diverged');
+      expect(result.outputs.promotion_sha).toBe(
+        mode === 'diverged' ? remote.tip : expected
+      );
+    }
+  );
+
+  it('refuses the final mutation when neither REST nor Git can prove lineage', () => {
+    const result = runPromote(NEWER_SHA, 'ahead', {
+      MAIN_LINEAGE_REMOTE: join(tmpdir(), 'missing-lineage-remote'),
+      STUB_MAIN_FAILURES: '9',
+    });
+    expect(result.result.status).not.toBe(0);
+    expect(result.promoted).toBe(false);
+    expect(result.outputs.promotion_sha).toBeUndefined();
+    expect(result.outputs.failure_subtype).toBe(
+      'production_promotion_state_invalid'
+    );
   });
 });
 
@@ -1031,6 +1636,7 @@ if (args[0] === 'api') {
           GH_REPO: 'JovieInc/Jovie',
           RUNNER_TEMP: fixture.root,
           GITHUB_OUTPUT: fixture.output,
+          GITHUB_WORKSPACE: REPO_ROOT,
         },
         route: path => {
           if (
@@ -1115,7 +1721,10 @@ if (args[0] === 'api') {
     ]);
     const firstPageOnly = discover(
       {},
-      script.replace('gh api --paginate --slurp', 'gh api --slurp')
+      script.replace(
+        'bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" api --paginate --slurp',
+        'bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" api --slurp'
+      )
     );
     expect(firstPageOnly.result.status, firstPageOnly.result.stderr).toBe(0);
     expect(firstPageOnly.outputs.risk_lane).toBe('unknown');
@@ -1206,28 +1815,37 @@ describe('controller main read resilience', () => {
   function runCoalesce(mainFailures) {
     const fixture = makeFixture('coalesce-');
     const attempts = join(fixture.root, 'main-attempts');
+    const restLog = join(fixture.root, 'rest-log');
     stubCommand(
       fixture.bin,
-      'gh',
+      'git',
       `#!/bin/sh
 case "$*" in
-  *graphql*)
-    echo "unexpected merge-queue read" >&2
-    exit 2
-    ;;
-  *commits/main*)
+  *ls-remote*)
     n=0
     [ -f "$STUB_MAIN_ATTEMPTS" ] && n="$(cat "$STUB_MAIN_ATTEMPTS")"
     n=$((n + 1))
     printf '%s' "$n" > "$STUB_MAIN_ATTEMPTS"
     if [ "$n" -le "$STUB_MAIN_FAILURES" ]; then
-      echo "gh: API rate limit already exceeded for site ID installation." >&2
+      echo "git ls-remote failed" >&2
       exit 1
     fi
-    printf '%s\\n' "$STUB_MAIN_SHA"
+    printf '%s\\trefs/heads/main\\n' "$STUB_MAIN_SHA"
     ;;
-  *) printf '%s\\n' "$STUB_MAIN_SHA" ;;
+  *)
+    echo "unexpected git: $*" >&2
+    exit 2
+    ;;
 esac
+`
+    );
+    stubCommand(
+      fixture.bin,
+      'gh',
+      `#!/bin/sh
+printf '%s\\n' "$*" >> "$STUB_REST_LOG"
+echo "unexpected REST main read" >&2
+exit 9
 `
     );
     const script = getStepRunScript(
@@ -1237,27 +1855,31 @@ esac
     const result = runScript(script, fixture, {
       EXPECTED_SHA,
       FIXED_WINDOW_SECONDS_REPLACED: '60',
-      GH_API_RETRY_SECONDS: '0',
       GITHUB_STEP_SUMMARY: join(fixture.root, 'step-summary'),
       PRODUCTION_STARVATION_SECONDS: '5400',
       REPOSITORY: 'JovieInc/Jovie',
+      RESOLVE_MAIN_BUDGET_SECONDS: '5',
+      RESOLVE_MAIN_RETRY_SECONDS: '0',
       STUB_MAIN_SHA: EXPECTED_SHA,
       STUB_MAIN_ATTEMPTS: attempts,
       STUB_MAIN_FAILURES: String(mainFailures),
+      STUB_REST_LOG: restLog,
     });
     return {
       attempts: existsSync(attempts)
         ? Number(readFileSync(attempts, 'utf8'))
         : 0,
+      rest: existsSync(restLog) ? readFileSync(restLog, 'utf8') : '',
       outputs: parseOutputs(fixture.output),
       result,
     };
   }
 
-  it('recovers from a transient API failure and proceeds at once on a current SHA', () => {
+  it('resolves main with git and does not spend a REST read', () => {
     const run = runCoalesce(1);
     expect(run.result.status, run.result.stderr).toBe(0);
     expect(run.attempts).toBe(2);
+    expect(run.rest).toBe('');
     expect(run.outputs.is_current).toBe('true');
     expect(run.outputs.decision).toBe('proceed');
     expect(run.outputs.wait_seconds).toBe('0');
@@ -1269,7 +1891,57 @@ esac
     expect(run.result.status).toBe(1);
     expect(run.attempts).toBe(3);
     expect(run.outputs.is_current).toBe('false');
-    expect(run.result.stderr).toContain('API rate limit already exceeded');
+    expect(run.result.stderr).toContain(
+      'Could not resolve refs/heads/main for JovieInc/Jovie via git ls-remote.'
+    );
+  });
+
+  it('holds a REST main read until reset and refuses one outside the budget', () => {
+    const script = resolve(REPO_ROOT, '.github/scripts/resolve-main-sha.sh');
+    const runResolve = (resetOffset, budget) => {
+      const fixture = makeFixture('resolve-main-');
+      const calls = join(fixture.root, 'gh-calls');
+      const reset = Math.floor(Date.now() / 1000) + resetOffset;
+      stubCommand(fixture.bin, 'git', '#!/bin/sh\nexit 1\n');
+      stubCommand(
+        fixture.bin,
+        'gh',
+        `#!/bin/sh
+n=0
+[ -f "$STUB_CALLS" ] && n="$(cat "$STUB_CALLS")"
+n=$((n + 1))
+printf '%s' "$n" > "$STUB_CALLS"
+if [ "$n" -eq 1 ]; then
+  printf 'HTTP/2 403\\r\\nx-ratelimit-remaining: 0\\r\\nx-ratelimit-reset: ${reset}\\r\\n\\r\\n{"message":"API rate limit exceeded for installation"}\\n'
+  exit 1
+fi
+printf 'HTTP/2 200\\r\\n\\r\\n{"sha":"%s"}\\n' "$STUB_MAIN_SHA"
+`
+      );
+      return spawnSync('bash', [script, 'JovieInc/Jovie'], {
+        encoding: 'utf8',
+        timeout: 15_000,
+        env: {
+          ...process.env,
+          GH_TOKEN: 'test-token',
+          PATH: `${fixture.bin}${delimiter}${process.env.PATH || ''}`,
+          RESOLVE_MAIN_BUDGET_SECONDS: String(budget),
+          RESOLVE_MAIN_RETRY_SECONDS: '0',
+          STUB_CALLS: calls,
+          STUB_MAIN_SHA: EXPECTED_SHA,
+        },
+      });
+    };
+
+    const held = runResolve(1, 30);
+    expect(held.status, held.stderr).toBe(0);
+    expect(held.stdout.trim()).toBe(EXPECTED_SHA);
+    expect(held.stderr).toContain('Holding');
+
+    const refused = runResolve(10_000, 5);
+    expect(refused.status).toBe(1);
+    expect(refused.stdout.trim()).toBe('');
+    expect(refused.stderr).toContain('outside the 5s budget');
   });
 });
 
@@ -1278,9 +1950,8 @@ describe('controller starvation bound', () => {
     const coalesce = getJobBlock(CONTROLLER_WORKFLOW, 'coalesce-production');
     const authorize = getJobBlock(CONTROLLER_WORKFLOW, 'authorize-production');
     expect(coalesce).toContain("PRODUCTION_STARVATION_SECONDS: '5400'");
-    expect(coalesce).toContain(
-      'sparse-checkout: .github/scripts/release-lineage-gate.sh'
-    );
+    expect(coalesce).toContain('.github/scripts/release-lineage-gate.sh');
+    expect(coalesce).toContain('.github/scripts/resolve-main-sha.sh');
     expect(
       coalesce.match(/release-lineage-gate\.sh/g)?.length ?? 0
     ).toBeGreaterThanOrEqual(2);

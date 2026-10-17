@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, IconButton } from '@jovie/ui';
 import { AudioLines, Pause, Play, X } from 'lucide-react';
 import Image from 'next/image';
 import React from 'react';
@@ -9,7 +9,6 @@ import {
   ArtworkFrame,
 } from '@/components/atoms/ArtworkFrame';
 import { cn } from '@/lib/utils';
-import { IconBtn } from './IconBtn';
 import type { NowPlayingTrack } from './SidebarNowPlaying';
 import { Tooltip } from './Tooltip';
 
@@ -175,15 +174,16 @@ export const SidebarBottomNowPlaying = React.memo(
           </div>
         )}
         {onDismiss ? (
-          <IconBtn
-            label='Dismiss Player'
-            onClick={onDismiss}
-            tooltipSide='top'
-            tone='ghost'
-            className='shrink-0'
-          >
-            <X aria-hidden='true' className='size-3.5' strokeWidth={2.25} />
-          </IconBtn>
+          <Tooltip label='Dismiss Player' side='top'>
+            <IconButton
+              size='sm'
+              ariaLabel='Dismiss Player'
+              onClick={onDismiss}
+              className='shrink-0'
+            >
+              <X aria-hidden='true' className='size-3.5' strokeWidth={2.25} />
+            </IconButton>
+          </Tooltip>
         ) : null}
       </div>
     );

@@ -1,0 +1,195 @@
+#!/usr/bin/env bash
+# Decide whether EXPECTED_SHA is still on main (exact, or an ancestor).
+#
+# REST compare is exact, but this read runs after the rest of the release has
+# already spent the shared GitHub App installation quota. A primary 403
+# ("API rate limit exceeded for installation") does not recover inside the
+# job, so that failure resolves main through the git protocol instead. A read
+# that still cannot be proven exits non-zero. A proven rewind or rewrite
+# yields with is_current=false.
+set -euo pipefail
+
+context="${1:-before continuing}"
+expected="${EXPECTED_SHA:-${EXPECTED_MAIN_SHA:-}}"
+repository="${GITHUB_REPOSITORY:-${REPOSITORY:-}}"
+remote="${MAIN_LINEAGE_REMOTE:-https://github.com/${repository}.git}"
+gh_cli="${GH_CLI:-gh}"
+hold_script="${GH_API_HOLD_SCRIPT:-$(cd "$(dirname "$0")" && pwd)/gh-api-hold.sh}"
+# rest: try installation REST, then git. git: ls-remote plus merge-base only.
+# The production mutation recheck uses git so an exhausted installation
+# quota cannot block promotion. git still fails closed when ancestry is
+# unproven. It never treats a missing read as current.
+transport="${MAIN_LINEAGE_TRANSPORT:-rest}"
+if [ "$transport" != "rest" ] && [ "$transport" != "git" ]; then
+  echo "::error::MAIN_LINEAGE_TRANSPORT must be rest or git." >&2
+  exit 1
+fi
+
+[[ "$expected" =~ ^[0-9a-f]{40}$ ]] || {
+  echo "::error::expected_sha must be a full commit SHA." >&2
+  exit 1
+}
+[[ "$repository" =~ ^[^/]+/[^/]+$ ]] || {
+  echo "::error::GITHUB_REPOSITORY must be owner/name." >&2
+  exit 1
+}
+
+emit() {
+  if [ -n "${GITHUB_OUTPUT:-}" ]; then
+    printf '%s=%s\n' "$1" "$2" >> "$GITHUB_OUTPUT"
+  fi
+}
+
+git_main() {
+  local git_basic_auth
+  if [ -n "${GH_TOKEN:-}" ] && [[ "$remote" == https://* ]]; then
+    git_basic_auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+    printf '::add-mask::%s\n' "$git_basic_auth" >&2
+    JOVIE_GIT_AUTH_HEADER="AUTHORIZATION: basic $git_basic_auth" \
+      GIT_TERMINAL_PROMPT=0 \
+      git -c "http.${remote}.extraheader=" \
+        --config-env="http.${remote}.extraheader=JOVIE_GIT_AUTH_HEADER" "$@"
+  else
+    GIT_TERMINAL_PROMPT=0 git "$@"
+  fi
+}
+
+gh_capture() {
+  local err output status
+  err="$(mktemp)"
+  set +e
+  # Hold an installation 403 until x-ratelimit-reset when that instant is
+  # inside GH_API_HOLD_BUDGET_SECONDS. A missing reset, a reset outside the
+  # budget, or any other error still returns non-zero. Callers then prove the
+  # SHA with git or fail closed. A rate-limit body is never an empty success.
+  output="$(GH_API_HOLD_BIN="$gh_cli" bash "$hold_script" api "$@" 2>"$err")"
+  status=$?
+  set -e
+  if [ "$status" -eq 0 ]; then
+    # Keep the hold warning visible. A successful retry is still a rate-limit
+    # event, and dropping stderr would hide it.
+    cat "$err" >&2
+    printf '%s\n' "$output"
+    rm -f "$err"
+    return 0
+  fi
+  cat "$err" >&2
+  rm -f "$err"
+  return 1
+}
+
+read_main_sha() {
+  local sha status
+  if [ "$transport" = "git" ]; then
+    if ! sha="$(git_main ls-remote "$remote" refs/heads/main | awk 'NR==1 { print $1 }')" \
+      || ! [[ "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+      echo "::error::git could not resolve main ${context}." >&2
+      return 1
+    fi
+    printf '%s\n' "$sha"
+    return 0
+  fi
+  set +e
+  sha="$(gh_capture "repos/${repository}/commits/main" --jq '.sha // empty')"
+  status=$?
+  set -e
+  if [ "$status" -eq 0 ] && [[ "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+    printf '%s\n' "$sha"
+    return 0
+  fi
+  if [ "$status" -eq 0 ]; then
+    echo "::error::GitHub returned an invalid main HEAD ${context}." >&2
+    return 1
+  fi
+  echo "::warning::REST main read failed ${context}; resolving main with git." >&2
+  if ! sha="$(git_main ls-remote "$remote" refs/heads/main | awk 'NR==1 { print $1 }')"; then
+    echo "::error::git could not resolve main ${context}." >&2
+    return 1
+  fi
+  printf '%s\n' "$sha"
+}
+
+git_lineage() {
+  local current="$1"
+  (
+    set -euo pipefail
+    work="$(mktemp -d)"
+    trap 'rm -rf "$work"' EXIT
+    git init -q "$work"
+
+    judged() {
+      local tip ancestor_status
+      tip="$(git -C "$work" rev-parse refs/remotes/origin/main)"
+      if [ "$tip" != "$current" ]; then
+        echo "::error::main moved from ${current} to ${tip} while proving lineage ${context}." >&2
+        exit 1
+      fi
+      if git_main -C "$work" merge-base --is-ancestor "$expected" "$tip" 2>/dev/null; then
+        printf 'ahead\n'
+        exit 0
+      else
+        ancestor_status=$?
+      fi
+      if [ "$(git -C "$work" rev-parse --is-shallow-repository)" != "true" ]; then
+        printf 'diverged\n'
+        exit 0
+      fi
+      if [ "$ancestor_status" -ne 1 ] && [ "$ancestor_status" -ne 128 ]; then
+        echo "::error::git could not compare ${expected} with ${current} ${context}." >&2
+        exit 1
+      fi
+      return 1
+    }
+
+    for depth in 300 4000; do
+      git_main -C "$work" fetch --no-tags --filter=blob:none --depth="$depth" \
+        "$remote" 'refs/heads/main:refs/remotes/origin/main'
+      judged && exit 0
+    done
+
+    git_main -C "$work" fetch --no-tags --filter=blob:none --deepen=8000 \
+      "$remote" 'refs/heads/main:refs/remotes/origin/main' || true
+    if judged; then
+      exit 0
+    fi
+    echo "::error::Could not prove whether ${expected} is still on main (${current}) ${context}; git history is still shallow." >&2
+    exit 1
+  )
+}
+
+compare_status() {
+  local current="$1" status api_status
+  if [ "$current" = "$expected" ]; then
+    printf 'identical\n'
+    return 0
+  fi
+  if [ "$transport" = "git" ]; then
+    git_lineage "$current"
+    return
+  fi
+  set +e
+  status="$(gh_capture "repos/${repository}/compare/${expected}...${current}" --jq '.status // empty')"
+  api_status=$?
+  set -e
+  if [ "$api_status" -eq 0 ]; then
+    printf '%s\n' "$status"
+    return 0
+  fi
+  echo "::warning::REST compare failed ${context}; proving ancestry with git." >&2
+  git_lineage "$current"
+}
+
+current="$(read_main_sha)" || exit 1
+[[ "$current" =~ ^[0-9a-f]{40}$ ]] || {
+  echo "::error::GitHub returned an invalid main HEAD ${context}." >&2
+  exit 1
+}
+
+lineage="$(compare_status "$current")" || exit 1
+if [ "$lineage" != "identical" ] && [ "$lineage" != "ahead" ]; then
+  echo "::notice::Release ${expected} left main's lineage (main is ${current}) ${context}."
+  emit superseded_sha "$current"
+  emit is_current false
+else
+  emit is_current true
+fi

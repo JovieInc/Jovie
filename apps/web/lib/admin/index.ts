@@ -11,10 +11,10 @@ export type {
 } from './impersonation';
 export {
   endImpersonation,
-  getEffectiveClerkId,
+  getActorUserId,
+  getEffectiveUserId,
   getImpersonationState,
   getImpersonationTimeRemaining,
-  getRealAdminClerkId,
   IMPERSONATION_COOKIE,
   ImpersonationError,
   isImpersonating,

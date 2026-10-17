@@ -391,6 +391,7 @@ export {
   type ImpersonationState,
   useEndImpersonationMutation,
   useImpersonationQuery,
+  useStartImpersonationMutation,
 } from './useImpersonationQuery';
 // Ingest profile mutation
 export {
@@ -467,6 +468,7 @@ export {
 export {
   type PricingOption,
   type PricingOptionsResponse,
+  pricingOptionsQueryOptions,
   usePricingOptionsQuery,
 } from './usePricingOptionsQuery';
 export { useProfileMonetizationSummary } from './useProfileMonetizationSummary';

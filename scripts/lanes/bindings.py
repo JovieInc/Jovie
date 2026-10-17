@@ -657,7 +657,12 @@ def run(lane, host, binding: Binding, name: str, spec: dict, *, issue=None, pr=N
     receipt = {"schema": "jovie-lane-run/v1", "binding": binding.key, "repository": binding.slug,
                "gate": binding.gate, "kind": "binding-repair" if pr is not None else "binding-issue",
                "runId": run_id, "provider": name, "model": spec.get("model"), "branch": branch,
-               "worktree": str(worktree), "origin": lane.AUTONOMOUS_ORIGIN, "startedAt": lane.now_iso(),
+               "worktree": str(worktree), "origin": lane.AUTONOMOUS_ORIGIN,
+               "executionHost": lane.HOST, "initiator": "symphony",
+               "attribution": {"category": "autonomous-remediation" if pr is not None else "autonomous-created",
+                               **({"provider": name} if pr is not None else
+                                  {"originProvider": name, "finalProvider": name})},
+               "startedAt": lane.now_iso(),
                **({"issue": issue.identifier, "linearIssueId": issue.id} if issue is not None else
                   {"pr": pr["number"], "headBefore": pr["headRefOid"]})}
     with open(runs / f"{run_id}.log", "w") as log:
@@ -731,7 +736,12 @@ def publish(lane, binding: Binding, branch: str, worktree: Path, git, *, issue=N
     url = (created.stdout or "").strip().splitlines()[-1:] if created.returncode == 0 else []
     if not url:
         return {"verdict": "failed", "reasons": ["pr-create-failed"], "headSha": git("rev-parse", "HEAD")}
-    return {"verdict": "pr-opened", "prUrl": url[0], "headSha": git("rev-parse", "HEAD")}
+    match = re.fullmatch(rf"https://github\.com/{re.escape(binding.slug)}/pull/(\d+)", url[0])
+    if not match:
+        return {"verdict": "failed", "reasons": ["pr-create-readback-invalid"],
+                "headSha": git("rev-parse", "HEAD")}
+    return {"verdict": "pr-opened", "pr": int(match.group(1)), "prUrl": url[0],
+            "headSha": git("rev-parse", "HEAD")}
 
 
 def _publish_repair(lane, branch: str, worktree: Path, git, pr: dict) -> dict:

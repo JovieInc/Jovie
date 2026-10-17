@@ -4,7 +4,9 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -12,6 +14,7 @@ import { delimiter, join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
+  realGhOnlyDirectory,
   realGhVersion,
   resolveRealGh,
   runWithRealGh,
@@ -37,7 +40,7 @@ const currentFetch = dedent(
 );
 // The #20164 form that reached main and broke staging (fixed by #20347).
 const brokenFetch = currentFetch.replace(
-  /artifact_id="\$\(gh api \\\n[^\n]*\n[^\n]*\)"/,
+  /artifact_id="\$\(gh_api \\\n[^\n]*\n[^\n]*\)"/,
   `artifact_id="$(gh api "repos/$REPOSITORY/actions/runs/$SOURCE_CI_RUN_ID/artifacts?per_page=100" \\
   --jq --arg name "$receipt_name" \\
   '[.artifacts[] | select(.expired == false and .name == $name)] | sort_by(.id) | last | .id // empty')"`
@@ -98,6 +101,82 @@ function env(root, extra = {}) {
     ...extra,
   };
 }
+
+describe('real gh directory selection', () => {
+  it('refuses a directory that cannot occupy one PATH entry', () => {
+    const root = workspace();
+    const bin = join(root, `real${delimiter}cli`);
+    mkdirSync(bin);
+    const binary = join(bin, 'gh');
+    writeFileSync(binary, 'binary fixture');
+    chmodSync(binary, 0o755);
+    expect(realGhOnlyDirectory(binary, 'darwin')).toBeNull();
+  });
+
+  it('resolves a symlink to the canonical CLI-only directory', () => {
+    const root = workspace();
+    const bin = join(root, 'bin');
+    mkdirSync(bin);
+    const binary = join(bin, 'gh');
+    writeFileSync(binary, 'binary fixture');
+    chmodSync(binary, 0o755);
+    const link = join(root, 'gh');
+    symlinkSync(binary, link);
+    expect(realGhOnlyDirectory(link, 'darwin')).toBe(realpathSync(bin));
+  });
+
+  it('refuses a canonical executable with a different name', () => {
+    const bin = workspace();
+    const binary = join(bin, 'other-cli');
+    writeFileSync(binary, 'binary fixture');
+    chmodSync(binary, 0o755);
+    expect(realGhOnlyDirectory(binary, 'darwin')).toBeNull();
+  });
+
+  it('refuses a non-executable file and a directory named gh', () => {
+    const bin = workspace();
+    const binary = join(bin, 'gh');
+    writeFileSync(binary, 'binary fixture');
+    chmodSync(binary, 0o644);
+    expect(realGhOnlyDirectory(binary, 'darwin')).toBeNull();
+    rmSync(binary);
+    mkdirSync(binary);
+    expect(realGhOnlyDirectory(binary, 'darwin')).toBeNull();
+  });
+
+  it('falls back when its executable directory cannot be enumerated', () => {
+    const bin = workspace();
+    const binary = join(bin, 'gh');
+    writeFileSync(binary, 'binary fixture');
+    chmodSync(binary, 0o755);
+    chmodSync(bin, 0o111);
+    try {
+      expect(realGhOnlyDirectory(binary, 'darwin')).toBeNull();
+    } finally {
+      chmodSync(bin, 0o755);
+    }
+  });
+
+  it('uses only a canonical CLI-only directory on macOS', () => {
+    const bin = workspace();
+    const binary = join(bin, 'gh');
+    writeFileSync(binary, 'binary fixture');
+    chmodSync(binary, 0o755);
+    expect(realGhOnlyDirectory(binary, 'darwin')).toBe(realpathSync(bin));
+    expect(realGhOnlyDirectory(binary, 'linux')).toBeNull();
+    writeFileSync(join(bin, 'node'), 'other executable');
+    expect(realGhOnlyDirectory(binary, 'darwin')).toBeNull();
+  });
+
+  it('never selects a script wrapper or missing executable directory', () => {
+    const bin = workspace();
+    const binary = join(bin, 'gh');
+    writeFileSync(binary, '#!/bin/sh\nexit 0\n');
+    chmodSync(binary, 0o755);
+    expect(realGhOnlyDirectory(binary, 'darwin')).toBeNull();
+    expect(realGhOnlyDirectory(join(bin, 'missing'), 'darwin')).toBeNull();
+  });
+});
 
 describe.skipIf(!gh)('staging receipt fetch under the real gh CLI', () => {
   it('records the exercised boundary version', () => {
@@ -164,6 +243,45 @@ describe.skipIf(!gh)('staging receipt fetch under the real gh CLI', () => {
       'GET repos/JovieInc/Jovie/actions/artifacts/8/zip',
     ]);
   });
+
+  it('keeps caller overrides for other executables while running the installed gh', async () => {
+    const root = workspace();
+    const bin = join(root, 'bin');
+    mkdirSync(bin);
+    writeFileSync(join(bin, 'gh'), '#!/bin/sh\nexit 88\n');
+    writeFileSync(join(bin, 'node'), '#!/bin/sh\nprintf "caller node\\n"\n');
+    chmodSync(join(bin, 'gh'), 0o755);
+    chmodSync(join(bin, 'node'), 0o755);
+    const run = await runWithRealGh({
+      script: 'set -e\ngh --version\nnode',
+      env: { PATH: `${bin}${delimiter}${process.env.PATH}` },
+      route: () => null,
+      gh,
+    });
+    expect(run.code, run.stderr).toBe(0);
+    expect(run.stdout).toContain(realGhVersion(gh));
+    expect(run.stdout).toContain('caller node');
+    expect(run.requests).toEqual([]);
+  });
+
+  it.skipIf(!gh || !realGhOnlyDirectory(gh))(
+    'reuses and preserves the installed macOS executable on success and failure',
+    async () => {
+      const canonical = realpathSync(gh);
+      for (const code of [0, 7]) {
+        const run = await runWithRealGh({
+          script: `command -v gh\ngh --version\nexit ${code}`,
+          route: () => null,
+          gh,
+        });
+        expect(run.stdout.split('\n')[0]).toBe(canonical);
+        expect(run.code, run.stderr).toBe(code);
+        expect(existsSync(canonical)).toBe(true);
+        expect(realGhVersion(gh)).toMatch(/^gh version /);
+        expect(run.requests).toEqual([]);
+      }
+    }
+  );
 
   it('proves a permissive fake would have falsely passed #20164', async () => {
     const root = workspace();

@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest';
-
+import { atomicDbContext } from '@/lib/db/atomic-context';
 import {
   classifyDatabaseEndpoint,
   db,
   evaluateFleetConnectionBudget,
+  getDb,
   resolvePoolConfig,
   resolvePoolMax,
   resolveStatementTimeoutMs,
@@ -60,6 +61,18 @@ describe('db proxy', () => {
       .readMarker;
 
     expect(readMarker()).toBe('expected-context');
+  });
+
+  it('rejects direct, indirect, and captured global methods inside atomic work', () => {
+    setInternalDb({ select: () => 'ordinary read' } as unknown as DbType);
+    const captured = db.select;
+    expect(captured()).toBe('ordinary read');
+    atomicDbContext.run({ actorId: 'trusted-user' }, () => {
+      expect(() => db.select()).toThrow('transaction handle');
+      expect(() => captured()).toThrow('transaction handle');
+      expect(() => getDb()).toThrow('transaction handle');
+    });
+    expect(db.select()).toBe('ordinary read');
   });
 
   it('uses a single pooled connection in test env', () => {

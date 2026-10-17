@@ -130,6 +130,7 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+      pull-requests: read
     steps:
       - name: Checkout trusted main writer
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -144,12 +145,13 @@ jobs:
           path: ${{ runner.temp }}/pin-sync
       - name: Generate short-lived Jovie App writer token
         id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
           permission-contents: write
       - name: Commit the synced files at the exact head
+        id: commit
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           BRANCH: ${{ needs.prepare.outputs.branch }}
@@ -159,3 +161,21 @@ jobs:
           node policy/scripts/dependabot-pin-sync.mjs commit \
             --repo "$GITHUB_REPOSITORY" --branch "$BRANCH" --head "$HEAD_SHA" \
             --root "$RUNNER_TEMP/pin-sync" --files "$FILES"
+
+      - name: Emit origin for the published pin-sync head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+          HEAD_SHA: ${{ steps.commit.outputs.head_sha }}
+        run: |
+          python3 policy/scripts/shipping_origin.py emit-automation \
+            --pr "$PR_NUMBER" --head-sha "$HEAD_SHA"
+
+      - name: Retain immutable origin payload
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: shipping-origin-v1
+          path: ${{ runner.temp }}/shipping-origin/*.json
+          if-no-files-found: ignore
+          retention-days: 30

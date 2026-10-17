@@ -45,7 +45,7 @@ export async function GET(request: Request) {
       eq(creatorProfiles.id, dspCatalogScans.creatorProfileId)
     )
     .innerJoin(users, eq(users.id, creatorProfiles.userId))
-    .where(and(eq(dspCatalogScans.id, scanId), eq(users.clerkId, userId)))
+    .where(and(eq(dspCatalogScans.id, scanId), eq(users.id, userId)))
     .limit(1);
 
   if (!scan) {
@@ -53,7 +53,15 @@ export async function GET(request: Request) {
   }
 
   // Check for stale-running scan and auto-fail if needed (after ownership verified)
-  await recoverStaleScan(db, scanId);
+  if (await recoverStaleScan(db, scanId)) {
+    return NextResponse.json({
+      scan: {
+        ...scan,
+        status: 'failed',
+        error: 'Scan timed out after 5 minutes',
+      },
+    });
+  }
 
   return NextResponse.json({ scan });
 }

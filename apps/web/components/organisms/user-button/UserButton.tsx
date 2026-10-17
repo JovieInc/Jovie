@@ -28,6 +28,7 @@ import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { DesktopReleaseIdentity } from '@/components/organisms/DesktopTitlebar';
 import { SHELL_RAIL_STAGE } from '@/components/shell/rail-motion';
+import { Tooltip } from '@/components/shell/Tooltip';
 import { APP_ROUTES } from '@/constants/routes';
 import { useKeyboardShortcutsSafe } from '@/contexts/KeyboardShortcutsContext';
 import { DESKTOP_UPDATE_COPY } from '@/data/supportDesktopUpdateCopy';
@@ -507,6 +508,7 @@ export function UserButton({
   showUserInfo = false,
   calm = false,
   trigger,
+  dockStatus,
 }: UserButtonProps) {
   const pathname = usePathname();
   const showWorkspaceLock = getCurrentAppShellWorkspace(pathname).id === 'ov';
@@ -694,8 +696,11 @@ export function UserButton({
     (showUserInfo ? (
       <button
         type='button'
+        aria-label={
+          dockStatus ? `Open user menu · ${dockStatus.label}` : undefined
+        }
         className={cn(
-          'group/user-button flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1 text-left transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:p-0',
+          'relative group/user-button flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1 text-left transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:p-0',
           // Founder lock 2026-09-25: single compact 32px row — 20px avatar,
           // name only (no workspace subtitle line). The 44px touch target is
           // an invisible hit container, not the visible row height (DS
@@ -704,6 +709,7 @@ export function UserButton({
             'relative h-8 px-0.5 gap-(--space-2-5) before:absolute before:inset-x-0 before:top-1/2 before:h-11 before:-translate-y-1/2 before:content-[""]'
         )}
       >
+        {dockStatus?.badges}
         <Avatar
           src={userImageUrl}
           alt={displayName || 'User avatar'}
@@ -756,18 +762,32 @@ export function UserButton({
       </Button>
     ));
 
+  const dropdown = (
+    <CommonDropdown
+      variant='dropdown'
+      items={dropdownItems}
+      trigger={triggerElement}
+      align={trigger || showUserInfo ? 'start' : 'end'}
+      open={isMenuOpen}
+      onOpenChange={setIsMenuOpen}
+      contentClassName={USER_MENU_CONTENT_CLASS}
+      maxHeight={USER_MENU_MAX_HEIGHT}
+    />
+  );
+
   return (
     <div data-testid='user-button-loaded' className='contents'>
-      <CommonDropdown
-        variant='dropdown'
-        items={dropdownItems}
-        trigger={triggerElement}
-        align={trigger || showUserInfo ? 'start' : 'end'}
-        open={isMenuOpen}
-        onOpenChange={setIsMenuOpen}
-        contentClassName={USER_MENU_CONTENT_CLASS}
-        maxHeight={USER_MENU_MAX_HEIGHT}
-      />
+      <Tooltip
+        label={dockStatus?.label ?? 'Open user menu'}
+        side='right'
+        open={dockStatus ? undefined : false}
+      >
+        <span
+          className={cn('inline-flex min-w-0', showUserInfo && 'w-full flex-1')}
+        >
+          {dropdown}
+        </span>
+      </Tooltip>
       <DashboardFeedbackModal
         isOpen={isFeedbackOpen}
         onClose={() => setIsFeedbackOpen(false)}

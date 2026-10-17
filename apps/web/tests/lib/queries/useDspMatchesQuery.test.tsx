@@ -46,6 +46,28 @@ const createMockMatch = (overrides: Partial<DspMatch> = {}): DspMatch => ({
 });
 
 describe('useDspMatchesQuery', () => {
+  it('prefers measured zero to uninspected confidence and retains all-unknown providers', () => {
+    const unknown = createMockMatch({
+      id: 'unknown',
+      confidenceScore: null,
+      confidenceBreakdown: null,
+    });
+    const zero = createMockMatch({ id: 'zero', confidenceScore: 0 });
+    for (const matches of [
+      [unknown, zero],
+      [zero, unknown],
+    ]) {
+      expect(getBestMatchPerProvider(matches).get('apple_music')?.id).toBe(
+        'zero'
+      );
+    }
+    const allUnknown = getBestMatchPerProvider([
+      unknown,
+      { ...unknown, id: 'unknown-2' },
+    ]);
+    expect(allUnknown.get('apple_music')?.confidenceScore).toBeNull();
+    expect(allUnknown.get('apple_music')?.id).toBe('unknown');
+  });
   let queryClient: QueryClient;
 
   const wrapper = ({ children }: { children: ReactNode }) => (

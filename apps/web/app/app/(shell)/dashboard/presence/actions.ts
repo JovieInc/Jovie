@@ -11,6 +11,7 @@ import { dspCatalogMismatches } from '@/lib/db/schema/dsp-catalog-scan';
 import type { DspMatchConfidenceBreakdown } from '@/lib/db/schema/dsp-enrichment';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { getDspArtistImageUrl } from '@/lib/dsp-enrichment/artist-image';
 import type { DspMatchStatus, DspProviderId } from '@/lib/dsp-enrichment/types';
 import { PROVIDER_DOMAINS } from '@/lib/dsp-registry';
 import { captureError } from '@/lib/error-tracking';
@@ -70,7 +71,7 @@ function buildDspPresenceData(
       providerId: match.providerId as DspProviderId,
       externalArtistName: match.externalArtistName,
       externalArtistUrl: match.externalArtistUrl,
-      externalArtistImageUrl: match.externalArtistImageUrl,
+      externalArtistImageUrl: getDspArtistImageUrl(match),
       confidenceScore:
         match.confidenceScore == null ? null : Number(match.confidenceScore),
       confidenceBreakdown: match.confidenceBreakdown,

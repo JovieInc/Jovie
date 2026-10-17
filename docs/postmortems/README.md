@@ -10,6 +10,10 @@ Tim is never required.
 
 | Date | Incident | Failure classes | Status |
 | --- | --- | --- | --- |
+| 2026-10-16 | [Desktop draft preparation failed on installation quota](2026-10-16-desktop-draft-quota.md) | `pre-merge-parity-gap`, `serial-layer-discovery` | draft |
+| 2026-10-16 | [Production lineage checks failed on the shared REST quota](2026-10-16-production-lineage-rest-quota.md) | `pre-merge-parity-gap`, `serial-layer-discovery` | draft |
+| 2026-10-16 | [Verified TestFlight sources starved while main advanced](2026-10-16-testflight-main-advance-starvation.md) | `non-convergent-control-loop`, `pre-merge-parity-gap`, `green-by-implication` | draft |
+| 2026-10-14 | [Onboarding mount claim opened checkout before a terminal decision](2026-10-14-onboarding-premature-checkout.md) | `escaped-defect` | reviewed |
 | 2026-10-02 | [PR recovery stopped converging](2026-10-02-pr-recovery-stall.md) | `non-convergent-control-loop`, `pre-merge-parity-gap` | draft |
 | 2026-09-28 | [Codex lane dispatch and attribution gap](2026-09-28-codex-lane-attribution-gap.md) | `green-by-implication`, `evidence-forgery-or-staleness` | draft |
 | 2026-09-27 | [Production freeze: SBOM step failed every promotion after #18879](2026-09-27-sbom-provenance-freeze.md) | `pre-merge-parity-gap`, `silent-production-staleness`, `green-by-implication` | draft |
@@ -89,6 +93,10 @@ severity: sev1 | sev2 | sev3
 detected: 2026-09-23T21:37Z
 repaired: 2026-09-26T22:45Z
 failure_classes: [silent-production-staleness]
+detectable_before_human: false
+detection_gaps: [missing-signal, missing-invariant]
+replay_corpus: [docs/postmortems/2026-09-26-production-freeze.md#timeline-utc]
+founder_rescues: 0
 incident_issue: JOV-XXXX | none
 actions: [JOV-XXXX]
 gbrain: ops/postmortems/2026-09-26-production-freeze
@@ -124,7 +132,9 @@ improvement loop and bottleneck ranking (JOV-5817).
 2. **Class, not instance.** A control that protects only the one file or
    workflow that failed is incomplete. The action must name every similar
    surface it covers, or state why none exist.
-3. **Weekly pattern review.** Group all post-mortems by `failure_classes`. A
+3. **Review patterns on evidence delivery.** Group post-mortems by `failure_classes`
+   when a post-mortem revision lands, a relevant action/defect becomes terminal,
+   or new exception evidence arrives. A
    class seen twice or more gets one class-level hardening issue, linked from
    each post-mortem. Report counts and time-to-detect trends in the
    improvement loop.
@@ -136,6 +146,30 @@ improvement loop and bottleneck ranking (JOV-5817).
    red fixture, or the invariant test failed on the old code. Merging the
    change is not enough. The action row records the receipt. The post-mortem
    moves to `controls-verified`, then `closed`.
+5. **Detection learning.** Every review emits a JOV-7084 `DetectionGap`:
+   whether objective evidence existed before human discovery, the missing or
+   failed detection capability, the real incident replay, and the founder
+   rescue count. Recurring classes and rescues enter JOV-5817's capability
+   expansion ranking. A local fix without a generalized detector/invariant is
+   incomplete.
+
+The deterministic runner is `pnpm postmortem:review`. Post-mortem merges invoke
+it through the existing Quality Gap Finder event path. Shipping SLO retains
+its monitoring clock but no longer invokes learning or post-mortem review;
+scheduled calls to the review commands are rejected before scans or writes.
+Historical weekly reports remain evidence, never a new admission.
+GBrain outages buffer the report and retry on the next relevant event or an
+explicit repair run; only a read-back verified mirror is reported as mirrored.
+
+**Ship now:** preserve the deterministic event path and the recurring-class
+threshold of two; retire weekly and nightly learning entry points.
+**Re-evaluate when:** event delivery fails or supplies changed evidence, a
+confidence/value threshold crosses, source evidence is revised, or a relevant
+pending job needs the accumulated evidence. **Then:** let the existing evidence
+owner reconsider that bounded case with deduplication and current authority.
+Elapsed time alone does not trigger learning. See
+[event-driven learning](../quality/EVENT_DRIVEN_LEARNING.md) for source identity
+and the shared compiler's pending acceptance.
 
 ## Keep it light
 

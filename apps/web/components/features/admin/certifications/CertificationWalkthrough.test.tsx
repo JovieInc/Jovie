@@ -14,6 +14,11 @@ import {
 import type { OvieCertificationRow } from '@/lib/ovie/certifications/types';
 import { CertificationWalkthrough } from './CertificationWalkthrough';
 
+const target = {
+  rowId: fixtureRow('signup-golden-path').id,
+  evidenceDigest: fixtureRow('signup-golden-path').decision.evidenceDigest,
+};
+
 const mocks = vi.hoisted(() => ({
   transcriber: {
     isSupported: true,
@@ -39,7 +44,8 @@ function renderWalkthrough(
     onOpenChange?: (open: boolean) => void;
     onDecide?: (
       decision: 'approved' | 'changes_requested' | 'rejected',
-      notes: string | null
+      notes: string | null,
+      target: { rowId: string; evidenceDigest: string | null }
     ) => Promise<boolean | void>;
     pendingDecision?: 'approved' | 'changes_requested' | 'rejected' | null;
   } = {}
@@ -148,11 +154,13 @@ describe('CertificationWalkthrough', () => {
 
     expect(onDecide).toHaveBeenCalledWith(
       'changes_requested',
-      expect.stringContaining('Maybe the headline wraps weirdly?')
+      expect.stringContaining('Maybe the headline wraps weirdly?'),
+      target
     );
     expect(onDecide).toHaveBeenCalledWith(
       'changes_requested',
-      expect.stringContaining('ambiguous')
+      expect.stringContaining('ambiguous'),
+      target
     );
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
@@ -165,7 +173,7 @@ describe('CertificationWalkthrough', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Certify' }));
     });
 
-    expect(onDecide).toHaveBeenCalledWith('approved', null);
+    expect(onDecide).toHaveBeenCalledWith('approved', null, target);
   });
 
   it('blocks decisions when the evidence digest moved during review', () => {
@@ -216,12 +224,12 @@ describe('CertificationWalkthrough', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Certify' }));
     });
 
-    expect(onDecide).toHaveBeenCalledWith('approved', null);
+    expect(onDecide).toHaveBeenCalledWith('approved', null, target);
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
     expect(screen.getByTestId('certification-walkthrough')).toBeInTheDocument();
   });
 
-  it('loads proof again when switching to a different review with the same image URL', () => {
+  it('keeps comments and exact proof when selection changes instead of retargeting', () => {
     const row = fixtureRow('first-review');
     const props = {
       row,
@@ -231,18 +239,20 @@ describe('CertificationWalkthrough', () => {
       pendingDecision: null,
     };
     const { rerender } = rtlRender(<CertificationWalkthrough {...props} />);
-    const firstImage = screen.getByTestId('walkthrough-image');
-    fireEvent.load(firstImage);
-    expect(screen.getByRole('button', { name: 'Certify' })).toBeEnabled();
+    const image = screen.getByTestId('walkthrough-image');
+    fireEvent.load(image);
+    dictate('Keep these comments on the first review');
     rerender(
       <CertificationWalkthrough {...props} row={fixtureRow('second-review')} />
     );
-    const nextImage = screen.getByTestId('walkthrough-image');
-    expect(nextImage).not.toBe(firstImage);
-    expect(nextImage).toHaveAttribute('src', firstImage.getAttribute('src'));
-    expect(screen.getByRole('button', { name: 'Certify' })).toBeDisabled();
-    fireEvent.load(nextImage);
-    expect(screen.getByRole('button', { name: 'Certify' })).toBeEnabled();
+    expect(screen.getByTestId('walkthrough-image')).toBe(image);
+    expect(
+      screen.getByText('Keep these comments on the first review')
+    ).toBeInTheDocument();
+    expect(screen.getByText(row.subject.title)).toBeInTheDocument();
+    expect(screen.getByTestId('walkthrough-stale')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Certify' }));
+    expect(props.onDecide).not.toHaveBeenCalled();
   });
 
   it('waits for video data, then blocks a playback error', () => {

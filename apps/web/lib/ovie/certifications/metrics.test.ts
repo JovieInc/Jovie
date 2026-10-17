@@ -3,6 +3,7 @@ import {
   buildDogfoodReceipt,
   type DogfoodReceipt,
 } from '@/lib/agent-os/dogfood-receipt';
+import { expectedExposure } from '../../../../../packages/release-channel-contracts/test-fixtures/dogfood-exposure';
 import {
   CERTIFICATION_METRICS_CONTRACT,
   type CertificationMetricsInput,
@@ -37,7 +38,7 @@ function subject(overrides: Partial<MetricsSubject> = {}): MetricsSubject {
 }
 
 function receipt(overrides: Partial<DogfoodReceipt> = {}): DogfoodReceipt {
-  return buildDogfoodReceipt({
+  const input = {
     subjectId: 'sub-1',
     product: 'jov',
     kind: 'ui_agent',
@@ -52,6 +53,35 @@ function receipt(overrides: Partial<DogfoodReceipt> = {}): DogfoodReceipt {
     completedAt: '2026-09-28T10:05:00.000Z',
     outcome: 'passed',
     ...overrides,
+  } as const;
+  return buildDogfoodReceipt({
+    ...input,
+    evidenceRefs: ['artifact:result-state'],
+    missionObservation: {
+      purpose: 'capability',
+      method: 'goal_driven',
+      missionRevision: 1,
+      goalCompletion: 'completed',
+      correctness: 'correct',
+      resultingState: 'The intended result persists after a fresh read.',
+      checks: [
+        {
+          criterion: 'saved result',
+          status: 'passed',
+          evidenceRefs: ['artifact:result-state'],
+        },
+      ],
+      friction: { assessment: 'acceptable', details: [] },
+      recovery: { retries: 0, details: [] },
+      durationMs: Date.parse(input.completedAt) - Date.parse(input.startedAt),
+      resources: {
+        status: 'not_applicable',
+        reason: 'No metered service used.',
+      },
+    },
+    ...('missionObservation' in overrides
+      ? { missionObservation: overrides.missionObservation }
+      : {}),
   });
 }
 
@@ -68,6 +98,7 @@ function input(overrides: Partial<CertificationMetricsInput> = {}) {
     roster: [],
     receipts: [],
     knownGoodDeploymentIds: [],
+    qualityReceipts: null,
     ...overrides,
   });
 }
@@ -76,6 +107,7 @@ describe('computeCertificationMetrics', () => {
   it('reports the contract and every lane with null metrics on empty input', () => {
     const result = input();
     expect(result.contract).toBe(CERTIFICATION_METRICS_CONTRACT);
+    expect(result.qualityScoreboard.source.status).toBe('disconnected');
     expect(Object.keys(result.lanes).sort()).toEqual(['jov', 'lyb', 'ovie']);
     const jov = result.lanes.jov;
     expect(jov.founderBlockingMinutes).toBe(0);
@@ -224,6 +256,53 @@ describe('computeCertificationMetrics', () => {
       value: 0.5,
       sampleSize: 2,
     });
+  });
+
+  it('separates execution success from acceptable customer outcomes', () => {
+    const good = receipt();
+    const frictional: DogfoodReceipt = {
+      ...good,
+      outcome: 'failed',
+      missionObservation: {
+        ...good.missionObservation!,
+        friction: {
+          assessment: 'unacceptable',
+          details: ['Needed repeated restarts.'],
+        },
+      },
+    };
+    const result = input({
+      subjects: [
+        subject({ deploy: DEPLOY, requiredMissions: [{ id: 'm-1' }] }),
+      ],
+      receipts: [good, { ...good, missionObservation: null }, frictional],
+      knownGoodDeploymentIds: [DEPLOY.deploymentId],
+    });
+    expect(result.lanes.jov.machineCertifiableCoverage.value).toBe(0);
+    expect(result.lanes.jov.driverReliability.playwright).toEqual({
+      value: 2 / 3,
+      sampleSize: 3,
+    });
+    const regressionOnly = input({
+      subjects: [subject({ deploy: DEPLOY })],
+      receipts: [{ ...good, missionObservation: null }],
+    });
+    expect(regressionOnly.lanes.jov.dogfoodKindCoverage.value).toBe(0);
+  });
+
+  it('projects legacy green runs as a coverage gap for exposure-scoped missions', () => {
+    const result = input({
+      subjects: [
+        subject({
+          deploy: DEPLOY,
+          requiredMissions: [
+            { id: 'm-1', expectedExposure: expectedExposure() },
+          ],
+        }),
+      ],
+      receipts: [receipt(), receipt(), receipt()],
+    });
+    expect(result.lanes.jov.machineCertifiableCoverage.value).toBe(0);
   });
 
   it('averages distinct passing dogfood kinds per identity', () => {

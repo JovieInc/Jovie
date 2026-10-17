@@ -37,7 +37,7 @@ import {
   UserRound,
 } from 'lucide-react';
 import { motion, useSpring, useTransform, useVelocity } from 'motion/react';
-import { type ReactNode, useEffect, useRef } from 'react';
+import { type ReactNode, useEffect, useLayoutEffect, useRef } from 'react';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { TAB_BAR_INTERNAL_SAFE_AREA_PADDING } from '@/lib/profile/nav-constants';
 import {
@@ -46,6 +46,7 @@ import {
 } from '@/lib/profile/route-config';
 import { cn } from '@/lib/utils';
 import type { ProfilePrimaryTab } from '../contracts';
+import { syncProfileNavGlassFallback } from './profile-glass-fallback';
 
 const TAB_ICONS: Readonly<Record<BottomTabKey, LucideIcon>> = {
   profile: House,
@@ -206,6 +207,13 @@ export function BottomTabBar({
   const visibleTabs = getPermittedPublicProfileNavigation();
   const columnCount = visibleTabs.length;
   const reducedMotion = useReducedMotion();
+  const navRef = useRef<HTMLElement>(null);
+
+  useLayoutEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+    return syncProfileNavGlassFallback(nav);
+  }, []);
   const activeIndex = isMenuOpen
     ? -1
     : visibleTabs.findIndex(tab => tab.id === activeTab);
@@ -221,9 +229,10 @@ export function BottomTabBar({
     >
       {aboveNav}
       <nav
+        ref={navRef}
         aria-label='Profile Navigation'
         data-testid='profile-bottom-nav'
-        className='profile-liquid-glass-nav h-8 rounded-full border px-1'
+        className='profile-liquid-glass-nav h-8 rounded-full border px-px'
       >
         <div
           className='profile-liquid-glass-nav__grid relative -my-1.5 grid h-11 items-center'

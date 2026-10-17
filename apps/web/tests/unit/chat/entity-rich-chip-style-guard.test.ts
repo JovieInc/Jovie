@@ -103,7 +103,11 @@ describe('entity rich chip System B style guard', () => {
     ].join('\n');
 
     expect(popoverSource).toContain('system-b-entity-chip-trigger');
-    expect(popoverSource).toContain('system-b-entity-chip-popover-content');
+    expect(popoverSource).toContain("from '@jovie/ui'");
+    expect(popoverSource).toContain("size='bare'");
+    expect(popoverSource).not.toContain(
+      'border-0 bg-transparent p-0 shadow-none'
+    );
     expect(popoverSource).toContain(
       "from '@/components/organisms/entity-card'"
     );

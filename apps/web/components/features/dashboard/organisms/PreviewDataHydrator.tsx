@@ -91,6 +91,7 @@ export function PreviewDataHydrator({
       username: canonicalUsername,
       displayName: selectedProfile.displayName ?? canonicalUsername,
       avatarUrl: selectedProfile.avatarUrl ?? null,
+      isVerified: selectedProfile.isVerified === true,
       bio: selectedProfile.bio ?? null,
       genres: selectedProfile.genres ?? null,
       location: selectedProfile.location ?? null,

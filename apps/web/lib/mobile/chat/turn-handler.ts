@@ -145,7 +145,9 @@ export async function handleMobileChatTurn(
   if (parsed.conversationId) {
     const existing = await getMobileConversationDetail({
       conversationId: parsed.conversationId,
+      userId: session.user.id,
       creatorProfileId: profileId,
+      audience: 'customer',
       limit: 1,
     });
     if (existing && isOvConversationTitle(existing.conversation.title)) {
@@ -165,6 +167,7 @@ export async function handleMobileChatTurn(
     userMessage: parsed.text,
     userId: session.user.id,
     creatorProfileId: profileId,
+    audience: 'customer',
   });
 
   if (reservation.outcome === 'duplicate_in_progress') {
@@ -323,7 +326,9 @@ export async function handleMobileChatTurn(
 
   const conversationDetail = await getMobileConversationDetail({
     conversationId: reservation.conversationId,
+    userId: session.user.id,
     creatorProfileId: profileId,
+    audience: 'customer',
     limit: 12,
   });
 

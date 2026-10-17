@@ -3,27 +3,19 @@ import { describe, expect, it } from 'vitest';
 import { DrawerEntityAvatar } from './DrawerEntityAvatar';
 
 describe('DrawerEntityAvatar', () => {
-  it('keeps a concentric 56px frame around a flat 48px media thumb', () => {
+  it('uses a circular canonical 56px person thumbnail', () => {
     render(<DrawerEntityAvatar name='Alex Rivera' testId='entity-avatar' />);
-
     const frame = screen.getByTestId('entity-avatar');
-    const media = frame.firstElementChild;
-
-    expect(frame).toHaveAttribute('data-entity-avatar');
-    expect(frame).toHaveClass(
-      'size-14',
-      'p-1',
-      'rounded-[calc(var(--radius-lg)+var(--space-1))]',
-      'ring-1',
-      'shadow-none'
+    expect(frame).toHaveAttribute(
+      'data-entity-header-thumbnail-variant',
+      'person'
     );
-    expect(media).toHaveClass(
-      'size-12',
-      'rounded-lg',
-      'outline-(--linear-border-subtle)',
-      'shadow-none'
-    );
+    expect(frame).toHaveClass('rounded-full');
+    expect(frame).toHaveStyle({ width: '56px', height: '56px' });
     expect(frame).toHaveTextContent('AR');
+    expect(
+      screen.getByRole('img', { name: 'Alex Rivera' })
+    ).toBeInTheDocument();
   });
 
   it('falls back to initials when the image cannot load', () => {

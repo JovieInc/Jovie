@@ -1,5 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import Link from 'next/link';
 import { fn } from 'storybook/test';
+import { RenderedFamily } from '@/.storybook/rendered-family';
+import { Icon } from '@/components/atoms/Icon';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   type SidebarThread,
   SidebarThreadsSection,
@@ -26,7 +30,7 @@ const meta = {
   title: 'Shell/SidebarThreadsSection',
   component: SidebarThreadsSection,
   parameters: {
-    layout: 'centered',
+    layout: 'fullscreen',
     jovie: { uncoveredProps: ['e'] },
   },
   args: {
@@ -37,8 +41,16 @@ const meta = {
   },
   decorators: [
     Story => (
-      <div className='w-60 bg-sidebar p-3'>
-        <Story />
+      <div className='w-full max-w-60 bg-sidebar'>
+        <RenderedFamily
+          name='SidebarThreadsSection'
+          owner='SidebarThreadsSection'
+          interactive
+        >
+          <div className='p-3'>
+            <Story />
+          </div>
+        </RenderedFamily>
       </div>
     ),
   ],
@@ -55,6 +67,7 @@ export const NewChatEmpty: Story = {
     activeThreadId: null,
     collapsed: false,
     tight: true,
+    calm: true,
     onNewThread: fn(),
   },
 };
@@ -62,6 +75,7 @@ export const NewChatEmpty: Story = {
 export const CalmLongTitles: Story = {
   args: {
     calm: true,
+    onNewThread: fn(),
     threads: threads.map((thread, index) => ({
       ...thread,
       title:
@@ -71,5 +85,20 @@ export const CalmLongTitles: Story = {
       unread: index === 1,
     })),
     onThreadContextMenu: fn(),
+  },
+};
+
+export const CanonicalCreation: Story = {
+  args: {
+    calm: true,
+    newThreadAction: (
+      <Link
+        href={APP_ROUTES.CHAT}
+        aria-label='New Chat'
+        className='flex size-6 items-center justify-center rounded-md text-sidebar-muted hover:bg-sidebar-accent focus-ring-themed'
+      >
+        <Icon name='Plus' className='size-3.5' aria-hidden='true' />
+      </Link>
+    ),
   },
 };

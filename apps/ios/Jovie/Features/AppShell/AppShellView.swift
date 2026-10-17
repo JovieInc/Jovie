@@ -1,5 +1,6 @@
 import AVKit
 import JovieKit
+import StoreKit
 import SwiftUI
 
 enum AppShellTab: Equatable, Hashable, CaseIterable {
@@ -191,6 +192,10 @@ struct AppShellView<
   @State private var entityContext: EntityContextItem?
   @State private var lastEntityContext: EntityContextItem?
   @State private var intentStore = IntentNavigationStore.shared
+  @State private var reviewOpportunity: AppReview.Opportunity?
+  @GestureState private var isReviewInteractionActive = false
+  @Environment(\.requestReview) private var requestReview
+  @Environment(\.scenePhase) private var scenePhase
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 #if DEBUG
   @State private var didExposeInteractiveRailProgressForUITest = false
@@ -542,6 +547,45 @@ struct AppShellView<
       guard voiceCaptureTrigger > 0, chatEnabled else { return }
       openTalkOverlay()
     }
+    .task(id: reviewTaskID) {
+      guard canConsiderReview, let opportunity = reviewOpportunity else { return }
+      // Presentation settling only. Eligibility is shared semantic policy,
+      // independent of screen names, launches, sessions, or release counts.
+      do { try await Task.sleep(for: .seconds(2)) } catch { return }
+      guard !Task.isCancelled, canConsiderReview else { return }
+      JovieNativeReview.coordinator.consider(
+        opportunity,
+        context: AppReview.Context(
+          now: .now, isAppStoreBuild: AppBuildInfo.current().provenance == .appStore,
+          isForegroundActive: scenePhase == .active, hasExperiencedValue: true,
+          isQuietMoment: canConsiderReview, isOnline: !isOffline,
+          hasBlockingActivity: !canConsiderReview
+        )
+      ) { requestReview() }
+      reviewOpportunity = nil
+    }
+    .simultaneousGesture(
+      DragGesture(minimumDistance: 0)
+        .updating($isReviewInteractionActive) { _, active, _ in active = true }
+    )
+    .onChange(of: scenePhase) { _, phase in
+      // Never carry a pending prompt across background/lock and surprise the
+      // person on their next launch. A new achieved-value receipt can qualify.
+      if phase != .active { reviewOpportunity = nil }
+    }
+  }
+
+  private var canConsiderReview: Bool {
+    scenePhase == .active && !isOffline && workspaceMode == .jovie && !isReviewInteractionActive
+      && !isShowingSettings && !isShowingDrawer && !isShowingRightRail
+      && !isRailGestureActive && drawerDragOffset == 0 && railDragOffset == 0
+      && !isKeyboardVisible && chatDraft.isEmpty && !isShowingTalkOverlay
+      && teleprompterProposal == nil && entityContext == nil
+      && videoPlaybackAsset == nil && publicProfileBrowserItem == nil && !isShowingProfileQR
+  }
+
+  private var reviewTaskID: String {
+    "\(reviewOpportunity?.id ?? ""):\(canConsiderReview)"
   }
 
   // Elevated content plane: toolbar + page ride together so the drawer
@@ -736,10 +780,15 @@ struct AppShellView<
     if ProcessInfo.processInfo.arguments.contains("-ui-testing-teleprompter") {
       viewModel.contentMode = .prompt
     }
-    viewModel.onSaved = { _ in
+    viewModel.onSaved = { record in
       self.teleprompterProposal = nil
       self.libraryHome = LibraryLandingPolicy.homeAfterSavingVlog()
       self.selectTab(.library)
+      // onSaved runs only after the recording and local session save succeed.
+      // The opaque recording ID remains local; no transcript/media is exported.
+      self.reviewOpportunity = AppReview.Opportunity(
+        id: record.id.uuidString, moment: .completedWorkflow, achievedAt: .now
+      )
     }
     return viewModel
   }
@@ -1191,4 +1240,15 @@ struct AppShellView<
     .padding(.vertical, JovieSpacing.small)
     .background(JovieColor.backgroundBase.opacity(0.96))
   }
+}
+
+@MainActor
+private enum JovieNativeReview {
+  // Installation-wide fatigue survives account changes and normal relaunches.
+  // UserDefaults is local best-effort persistence; Apple's own display limit
+  // remains authoritative even after reinstall or an abrupt process failure.
+  static let coordinator = AppReview.Coordinator(
+    load: { UserDefaults.standard.data(forKey: "jovie.app-review.v1") },
+    save: { UserDefaults.standard.set($0, forKey: "jovie.app-review.v1") }
+  )
 }

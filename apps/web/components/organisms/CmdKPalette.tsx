@@ -8,7 +8,7 @@
  *   - nav → router.push(href)
  *   - skill → router.push(/app/chat?skill=<id>) — chat picks up the chip
  *   - entity (release) → its detail surface (currently `/.../tasks`)
- *   - entity (artist/track) → no-op (no detail page yet)
+ *   - entities without a destination are excluded (chat slash can reference them)
  *   - additional-section item (e.g. recent chat) → caller-handled via
  *     `onAdditionalSelect`
  */
@@ -138,7 +138,10 @@ function useCmdkData(profileId: string, query: string, open: boolean) {
     if (!open) artistSearchClear();
   }, [open, artistSearchClear]);
   const artistEntities = useMemo<EntityRef[]>(
-    () => artistSearch.results.map(artistResultToEntityRef),
+    () =>
+      artistSearch.results
+        .map(artistResultToEntityRef)
+        .filter(entity => resolveEntityHref(entity) !== null),
     [artistSearch.results]
   );
 
@@ -567,7 +570,7 @@ export function CmdKPalette({
           Command palette
         </DialogPrimitive.Title>
         <DialogPrimitive.Description className='sr-only'>
-          Search routes, skills, releases, artists, and recent conversations.
+          Search routes, skills, releases, and recent conversations.
         </DialogPrimitive.Description>
         <div
           className='mx-auto flex h-full w-full max-w-3xl flex-col'

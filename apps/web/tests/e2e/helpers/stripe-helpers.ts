@@ -32,6 +32,16 @@ export interface CheckoutSessionResult {
   url: string;
 }
 
+export interface CheckoutSessionContext {
+  source?: 'onboarding' | 'youtube_thumbnails';
+  returnTo?: string;
+  claimId?: string;
+  runId?: string;
+  candidateId?: string;
+  offerVersion?: string;
+  firstTouch?: string;
+}
+
 export interface CardDetails {
   number: string;
   exp: string;
@@ -184,26 +194,30 @@ export async function ensureUserIsFree(page: Page, stripeClient: Stripe) {
 /** Create a Stripe checkout session via the app's API. */
 export async function createCheckoutSession(
   page: Page,
-  priceId: string
+  priceId: string,
+  context: CheckoutSessionContext = {}
 ): Promise<CheckoutSessionResult> {
-  const response = await page.evaluate(async price => {
-    const res = await fetch('/api/stripe/checkout', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ priceId: price }),
-    });
+  const response = await page.evaluate(
+    async input => {
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(input),
+      });
 
-    let body: Record<string, unknown> = {};
-    try {
-      body = await res.json();
-    } catch (error) {
-      console.warn('Failed to parse checkout response', error);
-    }
+      let body: Record<string, unknown> = {};
+      try {
+        body = await res.json();
+      } catch (error) {
+        console.warn('Failed to parse checkout response', error);
+      }
 
-    return { ok: res.ok, status: res.status, body };
-  }, priceId);
+      return { ok: res.ok, status: res.status, body };
+    },
+    { priceId, ...context }
+  );
 
   expect(response.ok).toBeTruthy();
   expect(response.body.sessionId).toBeTruthy();
@@ -348,6 +362,7 @@ export async function materializeTestCheckoutCompletion(
       default_payment_method: paymentMethod.id,
       payment_behavior: 'error_if_incomplete',
       metadata: {
+        ...session.metadata,
         clerk_user_id: options.appUserId,
         checkout_session_id: session.id,
       },

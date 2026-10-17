@@ -25,6 +25,7 @@ import {
   FF_OVERRIDES_KEY,
 } from '@/lib/flags/overrides';
 import { setTestAuthBypassSession } from '../helpers/auth';
+import { chatComposerInputLocator } from './utils/smoke-test-utils';
 
 async function forceChatJankMonitor(page: Page) {
   const overrides = JSON.stringify({
@@ -74,9 +75,7 @@ test('chat page renders with jank monitor flag forced on', async ({ page }) => {
   await expect(page.locator('[data-testid="onboarding-chat"]')).toHaveCount(0);
 
   // Composer should be interactive
-  const composer = page
-    .getByPlaceholder(/ask jovie|ask a follow-up|chat message/i)
-    .first();
+  const composer = chatComposerInputLocator(page);
   await expect(composer).toBeVisible({ timeout: 15_000 });
   await composer.click();
   await composer.fill('hello from the jank smoke test');

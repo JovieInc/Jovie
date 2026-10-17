@@ -6,9 +6,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AdminReleaseRow } from '@/lib/admin/types';
 import { AdminReleasesTableUnified } from './AdminReleasesTableUnified';
 
-const { mockUseAdminReleasesInfiniteQuery } = vi.hoisted(() => ({
-  mockUseAdminReleasesInfiniteQuery: vi.fn(),
-}));
+const { mockStartImpersonation, mockUseAdminReleasesInfiniteQuery } =
+  vi.hoisted(() => ({
+    mockStartImpersonation: vi.fn(),
+    mockUseAdminReleasesInfiniteQuery: vi.fn(),
+  }));
 
 vi.mock('@/components/organisms/table', () => ({
   TABLE_CELL_MULTILINE_CONTENT_CLASSNAME: 'whitespace-normal',
@@ -33,6 +35,7 @@ vi.mock('@/features/admin/table/AdminDataTable', () => ({
   AdminDataTable: ({
     columns,
     data,
+    getContextMenuItems,
     getRowId,
   }: {
     readonly columns: Array<{
@@ -43,6 +46,11 @@ vi.mock('@/features/admin/table/AdminDataTable', () => ({
       readonly id?: string;
     }>;
     readonly data: AdminReleaseRow[];
+    readonly getContextMenuItems?: (row: AdminReleaseRow) => {
+      readonly id: string;
+      readonly label: string;
+      readonly onClick: () => void;
+    }[];
     readonly getRowId: (row: AdminReleaseRow) => string;
   }) => {
     const artistColumn = columns.find(column => column.id === 'artist');
@@ -59,6 +67,11 @@ vi.mock('@/features/admin/table/AdminDataTable', () => ({
         {data.map(row => (
           <div key={getRowId(row)}>
             {artistColumn?.cell?.({ row: { original: row } })}
+            {getContextMenuItems?.(row).map(item => (
+              <button type='button' key={item.id} onClick={item.onClick}>
+                {item.label}
+              </button>
+            ))}
           </div>
         ))}
       </div>
@@ -92,6 +105,7 @@ vi.mock('@/features/admin/table/AdminTableShell', () => ({
 
 vi.mock('@/lib/queries', () => ({
   useAdminReleasesInfiniteQuery: mockUseAdminReleasesInfiniteQuery,
+  useStartImpersonationMutation: () => ({ mutate: mockStartImpersonation }),
 }));
 
 const release: AdminReleaseRow = {
@@ -194,6 +208,25 @@ describe('AdminReleasesTableUnified artist identity rows', () => {
     expect(image).not.toBeNull();
     expect(image).toHaveAttribute('src', 'https://cdn.jov.ie/alpha.jpg');
     expect(image).toHaveAttribute('alt', '');
+  });
+
+  it('starts impersonation with the release owner user ID', () => {
+    render(
+      <AdminReleasesTableUnified
+        releases={[release]}
+        pageSize={20}
+        total={1}
+        search=''
+        sort='release_date_desc'
+      />
+    );
+
+    screen.getByRole('button', { name: 'Impersonate' }).click();
+
+    expect(mockStartImpersonation).toHaveBeenCalledWith(
+      { targetUserId: 'user-alpha' },
+      expect.objectContaining({ onSuccess: expect.any(Function) })
+    );
   });
 
   it('routes table API imports through the v9 compat adapter', () => {

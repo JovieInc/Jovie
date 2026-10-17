@@ -216,9 +216,9 @@ describe('AdminContactsTable', () => {
     ).not.toBeNull();
     fireEvent.click(screen.getByTestId('admin-contact-row'));
 
-    expect(
-      await screen.findByTestId('admin-contact-detail-panel')
-    ).toBeVisible();
+    const panel = await screen.findByTestId('admin-contact-detail-panel');
+    expect(panel).toBeVisible();
+    expect(panel.querySelector('[data-surface-variant="flat"]')).not.toBeNull();
     expect(await screen.findByText(/system ·/)).toBeVisible();
 
     fireEvent.click(screen.getByRole('button', { name: 'Approve' }));

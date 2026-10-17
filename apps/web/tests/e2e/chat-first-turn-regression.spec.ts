@@ -10,6 +10,7 @@
 
 import { expect, type Page, test } from '@playwright/test';
 import { setTestAuthBypassSession } from '../helpers/auth';
+import { chatComposerInputLocator } from './utils/smoke-test-utils';
 
 const UNAVAILABLE_MESSAGE =
   'Album art generation is temporarily unavailable. I can still help you draft a cover concept, album-art brief, or visual direction you can use with a designer or generator.';
@@ -136,9 +137,7 @@ test('new thread album-art unavailable state survives refresh', async ({
     page.getByRole('button', { name: 'Generate album art' })
   ).toHaveCount(0);
 
-  const composer = page
-    .getByPlaceholder(/ask jovie|ask a follow-up|chat message/i)
-    .first();
+  const composer = chatComposerInputLocator(page);
   await composer.fill('Generate album art for my latest release.');
   await page.getByRole('button', { name: /send message/i }).click();
 

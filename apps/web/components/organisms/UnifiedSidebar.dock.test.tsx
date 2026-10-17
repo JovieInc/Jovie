@@ -1,6 +1,6 @@
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { SidebarDock } from './UnifiedSidebar';
+import { SidebarDock } from '@/components/shell/SidebarDock';
 
 describe('SidebarDock', () => {
   it('keeps navigation row offsets stable when bottom-owned content enters', () => {
@@ -11,7 +11,7 @@ describe('SidebarDock', () => {
             One
           </button>
         </nav>
-        <SidebarDock />
+        <SidebarDock userId='one' />
       </div>
     );
     const row = getByTestId('nav-row');
@@ -24,9 +24,7 @@ describe('SidebarDock', () => {
             One
           </button>
         </nav>
-        <SidebarDock>
-          <div className='h-14'>Now playing</div>
-        </SidebarDock>
+        <SidebarDock userId='one' update={{ state: 'ready', version: '2' }} />
       </div>
     );
 

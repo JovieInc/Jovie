@@ -4,13 +4,36 @@
  * Core artist lookup and creation functions.
  */
 
-import { eq, or } from 'drizzle-orm';
-import { admitArtistIdentity } from '@/lib/canonical/artist-identity';
+import { and, eq, isNull, or } from 'drizzle-orm';
+import {
+  ARTIST_IDENTITY_CONTRACT_VERSION,
+  ARTIST_IDENTITY_FIELD,
+  admitArtistIdentity,
+} from '@/lib/canonical/artist-identity';
 import { SemanticContractError } from '@/lib/canonical/semantic-contract';
 import { type DbOrTransaction, db } from '@/lib/db';
 import { type Artist, artists, type NewArtist } from '@/lib/db/schema/content';
 import { normalizeArtistName } from '../artist-parser';
 import type { FindOrCreateArtistInput } from './types';
+
+const providerIdFields = [
+  'appleMusicId',
+  'deezerId',
+  'musicbrainzId',
+  'spotifyId',
+] as const;
+
+function quarantineIdentity(code: string): never {
+  throw new SemanticContractError({
+    field: ARTIST_IDENTITY_FIELD,
+    contractVersion: ARTIST_IDENTITY_CONTRACT_VERSION,
+    status: 'quarantined',
+    rejections: [
+      { code, detail: 'Artist identity requires explicit reconciliation' },
+    ],
+    provenance: { producer: 'discography/find-or-create-artist@2' },
+  });
+}
 
 /**
  * Find an artist by any external ID or normalized name
@@ -47,13 +70,24 @@ export async function findArtist(
 
   // Try external IDs first
   if (conditions.length > 0) {
-    const [found] = await database
+    const matches = await database
       .select()
       .from(artists)
       .where(or(...conditions))
-      .limit(1);
+      .limit(2);
 
-    if (found) return found;
+    if (matches.length > 1) quarantineIdentity('conflicting_provider_mappings');
+    const found = matches[0];
+    if (found) {
+      if (
+        providerIdFields.some(
+          field => input[field] && found[field] && input[field] !== found[field]
+        )
+      ) {
+        quarantineIdentity('conflicting_provider_identity');
+      }
+      return found;
+    }
   }
 
   // A supplied external ID is an identity boundary. If it does not match,
@@ -67,13 +101,14 @@ export async function findArtist(
   // external identity at all.
   if (input.name) {
     const normalized = normalizeArtistName(input.name);
-    const [found] = await database
+    const matches = await database
       .select()
       .from(artists)
       .where(eq(artists.nameNormalized, normalized))
-      .limit(1);
+      .limit(2);
 
-    return found ?? null;
+    if (matches.length > 1) quarantineIdentity('ambiguous_artist_name');
+    return matches[0] ?? null;
   }
 
   return null;
@@ -82,7 +117,7 @@ export async function findArtist(
 /**
  * Find or create an artist
  *
- * First tries to find by external IDs, then by normalized name.
+ * Resolves compatible external IDs; names are used only without external IDs.
  * If not found, creates a new artist record.
  *
  * @param input - Artist data for find/create
@@ -93,6 +128,9 @@ export async function findOrCreateArtist(
   tx?: DbOrTransaction
 ): Promise<Artist> {
   const database = tx ?? db;
+  // Resolution evidence never authorizes a profile/ownership binding.
+  if (input.creatorProfileId)
+    quarantineIdentity('profile_binding_not_authorized');
 
   // JOV-6543: canonical admission for the provider-backed identity. An
   // implausible observation (URL/serialized name, malformed provider ID) is
@@ -107,7 +145,7 @@ export async function findOrCreateArtist(
       deezerId: input.deezerId,
     },
     {
-      producer: 'discography/find-or-create-artist@1',
+      producer: 'discography/find-or-create-artist@2',
       confidence: input.isAutoCreated === false ? 'user_certified' : 'imported',
     }
   );
@@ -117,32 +155,17 @@ export async function findOrCreateArtist(
   const identity = admission.canonical;
 
   // Try to find existing artist
-  const existing = await findArtist(
-    {
-      spotifyId: input.spotifyId,
-      appleMusicId: input.appleMusicId,
-      musicbrainzId: input.musicbrainzId,
-      deezerId: input.deezerId,
-      name: input.name,
-    },
-    tx
-  );
+  const existing = await findArtist(identity, tx);
 
   if (existing) {
     // Update with any new external IDs we have (only fill in missing fields)
     const updates: Partial<NewArtist> = {};
-    const fieldsToMerge = [
-      'spotifyId',
-      'appleMusicId',
-      'musicbrainzId',
-      'deezerId',
-      'imageUrl',
-      'creatorProfileId',
-    ] as const;
+    const fieldsToMerge = [...providerIdFields, 'imageUrl'] as const;
+    const enrichment = { ...identity, imageUrl: input.imageUrl };
 
     for (const field of fieldsToMerge) {
-      if (input[field] && !existing[field]) {
-        updates[field] = input[field];
+      if (enrichment[field] && !existing[field]) {
+        updates[field] = enrichment[field];
       }
     }
 
@@ -151,10 +174,37 @@ export async function findOrCreateArtist(
       const [updated] = await database
         .update(artists)
         .set(updates)
-        .where(eq(artists.id, existing.id))
+        .where(
+          and(
+            eq(artists.id, existing.id),
+            // Compare the identity snapshot and every slot being filled in SQL.
+            // A competing import or correction must never be overwritten.
+            ...providerIdFields.map(field =>
+              existing[field] === null
+                ? isNull(artists[field])
+                : eq(artists[field], existing[field])
+            ),
+            ...fieldsToMerge
+              .filter(field => updates[field] !== undefined)
+              .map(field => isNull(artists[field]))
+          )
+        )
         .returning();
 
-      return updated ?? existing;
+      if (updated) return updated;
+      // An identical delivery may have filled these slots first. Read back
+      // the exact mapping; a different value requires a new observation.
+      const current = await findArtist(identity, tx);
+      if (
+        current?.id === existing.id &&
+        fieldsToMerge.every(
+          field =>
+            updates[field] === undefined || current[field] === updates[field]
+        )
+      ) {
+        return current;
+      }
+      quarantineIdentity('stale_identity_observation');
     }
 
     return existing;
@@ -175,7 +225,7 @@ export async function findOrCreateArtist(
     artistType: input.artistType ?? 'person',
     isAutoCreated: input.isAutoCreated ?? true,
     matchConfidence: input.matchConfidence ?? null,
-    creatorProfileId: input.creatorProfileId ?? null,
+    creatorProfileId: null,
     createdAt: now,
     updatedAt: now,
   };
@@ -191,16 +241,7 @@ export async function findOrCreateArtist(
   // Another import may have inserted the same unique provider identity while
   // this request was in flight. Resolve that exact identity after the
   // conflict; never choose a same-name row as the winner.
-  const raced = await findArtist(
-    {
-      spotifyId: input.spotifyId,
-      appleMusicId: input.appleMusicId,
-      musicbrainzId: input.musicbrainzId,
-      deezerId: input.deezerId,
-      name: input.name,
-    },
-    tx
-  );
+  const raced = await findArtist(identity, tx);
   if (raced) return raced;
 
   throw new Error('Artist could not be created or resolved');

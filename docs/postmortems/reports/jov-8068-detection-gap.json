@@ -1,0 +1,28 @@
+{
+  "schema": "jovie.detection-gap/v1",
+  "compilerIssue": "JOV-7084",
+  "originatingIssue": "JOV-8068",
+  "compiledBy": "scripts/postmortem-review.mjs#reviewPostmortem",
+  "compiledAt": "2026-10-16T02:21:28.126Z",
+  "detectionGap": {
+    "schema": "jovie.detection-gap/v1",
+    "source": "docs/postmortems/2026-10-14-onboarding-premature-checkout.md",
+    "detectableBeforeHuman": false,
+    "gapClasses": [
+      "missing-invariant"
+    ],
+    "replayCorpus": [
+      "apps/web/tests/components/features/onboarding/useOnboardingClaim.test.tsx"
+    ],
+    "founderRescues": 0,
+    "compilerIssue": "JOV-7084",
+    "complete": true,
+    "errors": []
+  },
+  "review": {
+    "id": "2026-10-14-onboarding-premature-checkout",
+    "status": "reviewed",
+    "errors": [],
+    "closureEligible": false
+  }
+}

@@ -99,6 +99,7 @@ export const connectorAccounts = pgTable(
       .defaultNow(),
   },
   t => [
+    uniqueIndex('connector_accounts_user_id_unique').on(t.userId, t.id),
     uniqueIndex('connector_accounts_user_provider_account_uniq').on(
       t.userId,
       t.provider,

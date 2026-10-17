@@ -45,6 +45,10 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
     'Sub-tool reached from Investors workspace actions',
   '/app/ov/investors/updates':
     'Sub-tool reached from Investors workspace actions',
+  [APP_ROUTES.ADMIN_FEATURE_REGISTRY]:
+    'Compatibility entry renders the canonical Certifications workspace filtered to capabilities',
+  [APP_ROUTES.ADMIN_FEATURES]:
+    'Operational incident controls retained for direct admin access; founder reviews use Certifications',
   '/app/ov/hud':
     'Operator HUD workspace reached from the default /hud rewrite into the OV app shell',
   '/app/ov/inbox':

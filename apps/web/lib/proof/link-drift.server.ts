@@ -129,11 +129,22 @@ export async function buildLinkDriftInput(
     }
   }
 
-  const catalog = artistId
-    ? (
-        await getArtistAlbums(artistId, { includeGroups: ['album', 'single'] })
-      ).albums.map(toRelease)
+  const artistCatalog = artistId
+    ? await getArtistAlbums(artistId, { includeGroups: ['album', 'single'] })
+    : null;
+  const catalogComplete =
+    artistCatalog?.complete === true &&
+    artistCatalog.albums.length === artistCatalog.total;
+  const observedCatalog =
+    catalogComplete && artistCatalog ? artistCatalog.albums.map(toRelease) : [];
+  const catalog = observedCatalog.every(release =>
+    Number.isFinite(Date.parse(release.releaseDate))
+  )
+    ? observedCatalog
     : [];
+  const catalogHasComparableRelease = catalog.some(
+    release => Date.parse(release.releaseDate) <= Date.parse(now)
+  );
 
   const healthUrls = source.bioLinks
     .map(link => link.url)
@@ -154,7 +165,7 @@ export async function buildLinkDriftInput(
     catalogSource: artistId
       ? `https://open.spotify.com/artist/${artistId}`
       : 'no Spotify artist',
-    catalogFetchedAt: artistId ? now : null,
+    catalogFetchedAt: catalogHasComparableRelease ? now : null,
     linkedReleases,
     dspProfiles: source.dspProfiles ?? [],
     health,
@@ -277,9 +288,15 @@ export async function runLinkDriftStep(
   const input = await buildLinkDriftInput(source, deps);
   const findings = detectLinkDrift(input);
   if (findings.length === 0) {
+    const summary =
+      input.catalogFetchedAt === null
+        ? input.catalogSource === 'no Spotify artist'
+          ? 'Spotify release drift could not be checked because no artist profile is linked.'
+          : 'Spotify release drift is unknown because no complete, comparable artist catalog is available.'
+        : 'Your bio links match your latest release and resolve.';
     return {
       title: 'Link check',
-      summary: 'Your bio links match your latest release and resolve.',
+      summary,
       facts: [],
       empty: true,
     };

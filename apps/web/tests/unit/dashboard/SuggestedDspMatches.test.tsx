@@ -99,7 +99,7 @@ function createMatch(
     externalArtistName: string;
     externalArtistUrl: string | null;
     externalArtistImageUrl: string | null;
-    confidenceScore: number;
+    confidenceScore: number | null;
     matchingIsrcCount: number;
     status: string;
   }> = {}
@@ -172,6 +172,32 @@ describe('SuggestedDspMatches', () => {
       screen.getAllByTestId('dsp-icon-deezer').length
     ).toBeGreaterThanOrEqual(1);
   });
+
+  it.each([null, 0])(
+    'distinguishes unmeasured confidence from a measured zero (%s)',
+    confidenceScore => {
+      mockUseDspMatchesQuery.mockReturnValue({
+        data: [
+          createMatch({
+            confidenceScore,
+            matchingIsrcCount: 0,
+            externalArtistImageUrl: null,
+          }),
+        ],
+        isLoading: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+      render(<SuggestedDspMatches profileId='profile-1' />);
+      if (confidenceScore === null)
+        expect(
+          screen.queryByTestId('confidence-badge')
+        ).not.toBeInTheDocument();
+      else
+        expect(screen.getByTestId('confidence-badge')).toHaveTextContent('0%');
+      expect(screen.queryByText(/tracks verified/)).not.toBeInTheDocument();
+    }
+  );
 
   it('renders nothing while loading (regression: JOV-4159 / #13821 flash-then-collapse)', () => {
     // Zero matches is the common resolution, so rendering a skeleton during
@@ -332,6 +358,44 @@ describe('SuggestedDspMatches', () => {
     expect(screen.queryByText('Artist 5')).not.toBeInTheDocument();
     // Show more button
     expect(screen.getByText('Show 3 more')).toBeInTheDocument();
+  });
+
+  it('keeps measured zero visible before the five-row cap when unknowns arrive first', () => {
+    const unknowns = [
+      'spotify',
+      'apple_music',
+      'tidal',
+      'soundcloud',
+      'deezer',
+    ].map((providerId, index) =>
+      createMatch({
+        id: `unknown-${index}`,
+        providerId,
+        externalArtistName: `Unknown ${index}`,
+        confidenceScore: null,
+      })
+    );
+    mockUseDspMatchesQuery.mockReturnValue({
+      data: [
+        ...unknowns,
+        createMatch({
+          id: 'measured-zero',
+          providerId: 'youtube_music',
+          externalArtistName: 'Measured Zero',
+          confidenceScore: 0,
+        }),
+      ],
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    render(<SuggestedDspMatches profileId='profile-1' />);
+    const items = screen.getAllByRole('listitem');
+    expect(items).toHaveLength(5);
+    expect(items[0]).toHaveTextContent('Measured Zero');
+    expect(screen.queryByText('Unknown 4')).not.toBeInTheDocument();
+    expect(screen.getAllByTestId('confidence-badge')).toHaveLength(1);
+    expect(screen.getByTestId('confidence-badge')).toHaveTextContent('0%');
   });
 
   it('reveals remaining suggestions when "Show more" is clicked', async () => {

@@ -45,6 +45,22 @@ describe('ComparisonPageContent', () => {
       screen.getByRole('link', { name: 'Claim my free profile' })
     ).toHaveAttribute('href', '/signup?plan=free');
     expect(screen.getAllByRole('button')).toHaveLength(data.faq.length);
+    expect(screen.getByTestId('marketing-section-hero')).toHaveAttribute(
+      'data-marketing-variant',
+      'left-none'
+    );
+    expect(screen.getByTestId('marketing-section-comparison')).toHaveAttribute(
+      'data-marketing-variant',
+      'feature-matrix'
+    );
+    expect(screen.getByTestId('marketing-section-cta')).toHaveAttribute(
+      'data-marketing-variant',
+      'final-single-claim'
+    );
+    expect(screen.getByTestId('marketing-section-faq')).toHaveAttribute(
+      'data-marketing-variant',
+      'objection-handler'
+    );
   });
 
   it('keeps the feature matrix scroll region keyboard focusable', () => {

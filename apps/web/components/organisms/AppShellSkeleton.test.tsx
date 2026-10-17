@@ -26,4 +26,15 @@ describe('AppShellSkeleton', () => {
 
     expect(container.querySelector('.bg-sidebar')).toBeNull();
   });
+
+  it('does not reuse the live shell landmark while the fallback is mounted', () => {
+    const { container } = render(<AppShellSkeleton />);
+
+    expect(container.querySelector('#main-content')).toBeNull();
+    expect(container.querySelector('[data-app-shell-frame]')).toBeNull();
+    expect(
+      container.querySelector('[data-app-shell-placeholder="true"]')
+    ).toBeTruthy();
+    expect(container.querySelector('main')).toBeTruthy();
+  });
 });

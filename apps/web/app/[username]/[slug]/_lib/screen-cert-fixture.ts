@@ -19,10 +19,30 @@
  * Never import this module from a non-fixture code path, and never widen the
  * admission check beyond the exact reserved username.
  */
+import {
+  isRenderFixtureEnabled,
+  type RenderFixtureEnv,
+} from '@/lib/render-fixture-policy';
 import type { getContentBySlug, getCreatorByUsername } from './data';
 
 /** Exact reserved handle — see `public-profile-identity-policy.ts`. */
 export const SCREEN_CERT_SMARTLINK_USERNAME = 'jovie-screen-fixture';
+
+/**
+ * Profile-root admission for the reserved smart-link fixture handle.
+ * The release page links to `/${handle}`, and the capture server prefetches
+ * that RSC. Without this gate the noop database 404s the prefetch.
+ */
+export function isScreenCertSmartLinkProfileRequest(
+  username: string,
+  env?: RenderFixtureEnv
+): boolean {
+  return (
+    username.trim().toLowerCase() === SCREEN_CERT_SMARTLINK_USERNAME &&
+    isRenderFixtureEnabled(env)
+  );
+}
+
 export const SCREEN_CERT_SMARTLINK_RELEASE_SLUG = 'screen-cert-release';
 export const SCREEN_CERT_SMARTLINK_TRACK_SLUG = 'screen-cert-track';
 

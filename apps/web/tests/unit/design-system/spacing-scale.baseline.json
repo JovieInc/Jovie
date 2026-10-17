@@ -1,20 +1,20 @@
 {
   "$comment": "Trusted main inventory; conservative spacing enforcement is active. Lower ceilings when drift is removed, never raise them. Strict inventory remains report-only. Preserve approved component styling.",
   "$provenance": {
-    "sourceSha": "75034f8539e0b039fb2ec8ff33c0102598d86198",
-    "detectorSha256": "f3366e5b40737f5233787c55efe00459b9d98fab40ee4c2d826bd9f7cea62b87"
+    "sourceSha": "42da8944eaf3ad1815d98f4ae20212210e6ff94e",
+    "detectorSha256": "85e16e193411ad97972a9cc6d029ea9b62a73b5e526dfbc7019493856a6cdc7d"
   },
   "conservative": {
     "armed": true,
-    "count": 664,
+    "count": 654,
     "perFamily": {
       "marketing": 86,
-      "web-shell": 264,
-      "web-other": 305,
+      "web-shell": 253,
+      "web-other": 304,
       "packages/ui": 11
     },
     "perUtility": {
-      "gap-2.5": 79,
+      "gap-2.5": 78,
       "gap-3.5": 14,
       "gap-x-2.5": 1,
       "mb-2.5": 9,
@@ -22,8 +22,8 @@
       "mt-3.5": 2,
       "mx-2.5": 1,
       "my-2.5": 1,
-      "p-2.5": 32,
-      "p-3.5": 22,
+      "p-2.5": 30,
+      "p-3.5": 21,
       "pb-2.5": 11,
       "pb-3.5": 1,
       "pl-2.5": 2,
@@ -31,10 +31,10 @@
       "pr-2.5": 3,
       "pr-3.5": 2,
       "pt-2.5": 8,
-      "px-2.5": 229,
+      "px-2.5": 222,
       "px-3.5": 43,
       "py-2.5": 120,
-      "py-3.5": 29,
+      "py-3.5": 28,
       "space-y-2.5": 32,
       "space-y-3.5": 3
     }

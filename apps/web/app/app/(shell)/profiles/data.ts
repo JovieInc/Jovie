@@ -300,6 +300,7 @@ export async function loadProfilesWorkspaceData(input: {
       externalArtistUrl: dspArtistMatches.externalArtistUrl,
       externalArtistName: dspArtistMatches.externalArtistName,
       externalArtistImageUrl: dspArtistMatches.externalArtistImageUrl,
+      matchSource: dspArtistMatches.matchSource,
       updatedAt: dspArtistMatches.updatedAt,
     })
     .from(dspArtistMatches)
@@ -374,6 +375,7 @@ export async function loadProfilesWorkspaceData(input: {
         kind: surface.kind,
         artistAvatarUrl: profileRows[0]?.avatarUrl ?? null,
         connectorImageUrl: dspMatch?.externalArtistImageUrl ?? null,
+        connectorMatchSource: dspMatch?.matchSource ?? null,
         metadata: surface.metadata,
         observedAt,
       }),

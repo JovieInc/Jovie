@@ -7,6 +7,8 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { validateFounderCalibrationPolicy } from './founder-calibration.mjs';
+
 export const GATE_INTEGRITY_INVARIANT_ID = 'JOV-INV-034';
 export const GATE_INTEGRITY_SCHEMA = 'jovie-gate-integrity/v1';
 export const CERTIFICATION_CONTRACT = 'jovie.certification/v1';
@@ -132,6 +134,11 @@ export function validateGateIntegrityPolicy(registry) {
     )
       errors.push(`certificate:${defect}:detector-missing`);
   }
+  errors.push(
+    ...validateFounderCalibrationPolicy().map(
+      error => `founder-calibration:${error}`
+    )
+  );
   return errors;
 }
 

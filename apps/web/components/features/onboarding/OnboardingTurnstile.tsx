@@ -1,7 +1,6 @@
 'use client';
 
 // @coverage-via apps/web/tests/unit/onboarding/OnboardingTurnstile.test.tsx
-import { Skeleton } from '@jovie/ui';
 import { useReducedMotion } from 'motion/react';
 import Script from 'next/script';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
@@ -24,8 +23,9 @@ import { isOnboardingLocalAutomationBypassRuntime } from './onboardingAutomation
  *
  * The visible "Security Check" panel, the headings, the "Verified" celebration
  * beat, and the misconfig wall were removed (JOV-3563). The only thing this
- * component ever shows is the bare Cloudflare widget itself, and ONLY when
- * Cloudflare genuinely requires interaction. Hard failures (error / timeout /
+ * challenge UI is the bare Cloudflare widget itself, and ONLY after a real
+ * interactive challenge paints. A send waiting for a token gets one compact
+ * instruction above the composer, never an empty widget card. Hard failures (error / timeout /
  * unsupported / unconfigured) and expiry surface through `onStateChange`, which
  * `OnboardingShell` routes to a single compact toast — never an inline card.
  * Expiry/timeout silently re-issue so an in-progress chat is never re-walled.
@@ -150,8 +150,6 @@ export function OnboardingTurnstile({
     !hasStaticBypass && localAutomationBypass === null;
   const awaitingSendVerification =
     Boolean(instruction) && state.status === 'loading';
-  void reducedMotion;
-  void focusSignal;
 
   useEffect(() => {
     setLocalAutomationBypass(isOnboardingLocalAutomationBypassRuntime());
@@ -350,12 +348,18 @@ export function OnboardingTurnstile({
   ]);
 
   useEffect(() => {
-    if (!focusSignal || !containerRef.current) return;
+    if (
+      !focusSignal ||
+      !containerRef.current ||
+      state.status !== 'interactive' ||
+      !interactiveChallengeVisible
+    )
+      return;
     containerRef.current.scrollIntoView({
       block: 'nearest',
       behavior: reducedMotion ? 'auto' : 'smooth',
     });
-  }, [focusSignal, reducedMotion]);
+  }, [focusSignal, reducedMotion, state.status, interactiveChallengeVisible]);
 
   // Expiry/timeout silently re-issue a token so an in-progress chat is never
   // re-walled with a visible challenge. A fresh execute pass usually resolves
@@ -407,17 +411,25 @@ export function OnboardingTurnstile({
     return null;
   }
 
-  // Interactive challenges and send-while-loading both reserve inline space.
-  // The silent happy path keeps a sized off-screen mount so execute mode can
+  // A requested send does not reveal an unpainted provider frame.
+  // The silent path keeps a sized off-screen mount so execute mode can
   // actually run (zero-height containers can stall token minting in prod).
   const showInteractiveWidget =
     Boolean(siteKey) &&
-    (state.status === 'interactive' || awaitingSendVerification);
-  const showWidgetContent =
-    interactiveChallengeVisible || awaitingSendVerification;
+    state.status === 'interactive' &&
+    interactiveChallengeVisible;
 
   return (
     <>
+      {awaitingSendVerification ? (
+        <p
+          className='mb-2 text-xs text-secondary-token'
+          role='status'
+          aria-live='polite'
+        >
+          {instruction}
+        </p>
+      ) : null}
       {siteKey ? (
         <Script
           src='https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
@@ -437,20 +449,12 @@ export function OnboardingTurnstile({
           data-turnstile-status={state.status}
           aria-hidden={showInteractiveWidget ? undefined : 'true'}
         >
-          {showInteractiveWidget && !showWidgetContent ? (
-            <Skeleton
-              aria-hidden='true'
-              data-testid='onboarding-turnstile-widget-skeleton'
-              rounded='md'
-              className='pointer-events-none absolute inset-1.5'
-            />
-          ) : null}
           <div
             ref={containerRef}
             id={`cf-turnstile-${widgetDomId}`}
             className={cn(
               'relative min-h-16',
-              showWidgetContent ? '[&>div]:visible' : '[&>div]:invisible'
+              showInteractiveWidget ? '[&>div]:visible' : '[&>div]:invisible'
             )}
           />
         </div>

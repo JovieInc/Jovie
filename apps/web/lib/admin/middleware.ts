@@ -34,13 +34,14 @@ export async function requireAdmin(options?: {
   const readAuth = options?.session === 'fresh' ? getFreshAuth : getCachedAuth;
   const auth = await readAuth();
   const { userId } = auth;
+  const adminUserId = auth.actorUserId ?? userId;
 
   // User not authenticated. This is routine traffic (unauth hits to admin
   // routes) — not an actionable signal, so we record a breadcrumb for
   // audit correlation but do not emit a Sentry event. The authenticated-
   // but-not-admin case below remains a captureWarning since that IS worth
   // surfacing.
-  if (!userId) {
+  if (!adminUserId) {
     Sentry.addBreadcrumb({
       category: 'admin',
       level: 'info',
@@ -53,10 +54,10 @@ export async function requireAdmin(options?: {
   }
 
   // Check admin status
-  const userIsAdmin = await isAdmin(userId);
+  const userIsAdmin = await isAdmin(adminUserId);
 
   // Mask user ID for logging to prevent PII exposure
-  const maskedUserId = maskUserIdForLog(userId);
+  const maskedUserId = maskUserIdForLog(adminUserId);
 
   if (!userIsAdmin) {
     // Log unauthorized access attempt with masked ID
@@ -72,8 +73,8 @@ export async function requireAdmin(options?: {
 
   try {
     await assertOviePrivacyUnlocked(
-      auth.userId && auth.sessionId
-        ? { userId: auth.userId, sessionId: auth.sessionId }
+      adminUserId && auth.sessionId
+        ? { userId: adminUserId, sessionId: auth.sessionId }
         : undefined
     );
   } catch (error) {
@@ -99,7 +100,8 @@ export async function requireAdmin(options?: {
  * @returns Promise<boolean> - True if user is admin
  */
 export async function checkIsAdmin(): Promise<boolean> {
-  const { userId } = await getCachedAuth();
-  if (!userId) return false;
-  return isAdmin(userId);
+  const auth = await getCachedAuth();
+  const adminUserId = auth.actorUserId ?? auth.userId;
+  if (!adminUserId) return false;
+  return isAdmin(adminUserId);
 }

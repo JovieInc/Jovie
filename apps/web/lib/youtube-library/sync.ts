@@ -21,6 +21,7 @@ import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import { classifyYouTubeVideo } from './classify';
 import { resolveReleaseLink } from './isrc';
+import { canRefreshYouTubeChannel } from './refresh-authority';
 import {
   drizzleYouTubeLibraryRepository,
   type YouTubeLibraryRepository,
@@ -219,10 +220,21 @@ export interface SyncChannelVideosResult {
 export async function syncChannelVideos(
   input: SyncChannelVideosInput
 ): Promise<SyncChannelVideosResult> {
+  return syncChannelVideosWithAuthority(input);
+}
+
+// Only the scheduler supplies this guard. Public manual-sync input cannot
+// select an initiator or grant autonomous authority.
+async function syncChannelVideosWithAuthority(
+  input: SyncChannelVideosInput,
+  beforeEffect?: () => Promise<void>
+): Promise<SyncChannelVideosResult> {
   const repo = input.repo ?? drizzleYouTubeLibraryRepository;
   const now = input.now ?? new Date();
   const windows = input.windows ?? DEFAULT_WINDOWS;
   const { creatorProfileId, channelId, provider } = input;
+
+  await beforeEffect?.();
 
   const [incoming, existing] = await Promise.all([
     input.incoming
@@ -237,10 +249,11 @@ export async function syncChannelVideos(
   const upsertRows = incoming.map(v =>
     buildVideoUpsertRow(v, creatorProfileId, now)
   );
-  const pkByVideoId =
-    upsertRows.length > 0
-      ? await repo.upsertVideos(upsertRows)
-      : new Map<string, string>();
+  let pkByVideoId = new Map<string, string>();
+  if (upsertRows.length > 0) {
+    await beforeEffect?.();
+    pkByVideoId = await repo.upsertVideos(upsertRows);
+  }
 
   // 2. Thumbnail history.
   const existingPks = existing.map(v => v.id);
@@ -268,15 +281,18 @@ export async function syncChannelVideos(
     thumbnailInserts.push(...plan.inserts);
   }
   if (thumbnailInserts.length > 0) {
+    await beforeEffect?.();
     await repo.insertThumbnailVersions(thumbnailInserts);
   }
   if (relabelIds.length > 0) {
+    await beforeEffect?.();
     await repo.relabelThumbnailVersions(relabelIds, 'previous');
   }
 
   // 3. Metric snapshots (same window+range refreshes in place; new ranges append).
   let snapshotsUpserted = 0;
   if (windows.length > 0 && incoming.length > 0) {
+    await beforeEffect?.();
     const metrics = await provider.fetchVideoMetrics(
       channelId,
       incoming.map(v => v.videoId),
@@ -284,6 +300,7 @@ export async function syncChannelVideos(
     );
     const snapshotRows = buildSnapshotRows(metrics, pkByVideoId, now);
     if (snapshotRows.length > 0) {
+      await beforeEffect?.();
       await repo.upsertMetricSnapshots(snapshotRows);
       snapshotsUpserted = snapshotRows.length;
     }
@@ -296,6 +313,7 @@ export async function syncChannelVideos(
     incoming,
     existingByVideoId,
     pkByVideoId,
+    beforeEffect,
   });
 
   const inserted = incoming.filter(
@@ -314,6 +332,7 @@ export async function syncChannelVideos(
 }
 
 interface SyncReleaseLinksContext {
+  readonly beforeEffect?: () => Promise<void>;
   readonly repo: YouTubeLibraryRepository;
   readonly creatorProfileId: string;
   readonly incoming: readonly YouTubeChannelVideo[];
@@ -379,6 +398,7 @@ async function syncReleaseLinks(ctx: SyncReleaseLinksContext): Promise<number> {
   }
 
   if (linkRows.length > 0) {
+    await ctx.beforeEffect?.();
     await repo.insertReleaseLinks(linkRows);
   }
   return linkRows.length;
@@ -400,7 +420,10 @@ export interface RunScheduledRefreshesResult {
   readonly reason?: string;
   readonly synced?: number;
   readonly failed?: number;
+  readonly denied?: number;
 }
+
+class ScheduledRefreshRevokedError extends Error {}
 
 /**
  * Re-sync every channel whose last sync is older than 24h (or never ran).
@@ -420,17 +443,39 @@ export async function runScheduledRefreshes(
   const channels = await repo.listStaleChannels(cutoff);
   let synced = 0;
   let failed = 0;
+  let denied = 0;
   for (const channel of channels) {
+    const beforeEffect = async () => {
+      if (!(await canRefreshYouTubeChannel(channel))) {
+        throw new ScheduledRefreshRevokedError();
+      }
+    };
     try {
-      await syncChannelVideos({
-        creatorProfileId: channel.creatorProfileId,
-        channelId: channel.channelId,
-        provider: input.provider,
-        now,
-        repo,
-      });
+      await syncChannelVideosWithAuthority(
+        {
+          creatorProfileId: channel.creatorProfileId,
+          channelId: channel.channelId,
+          provider: input.provider,
+          now,
+          repo,
+        },
+        beforeEffect
+      );
       synced++;
+      logger.info('[youtube-library] scheduled refresh completed', {
+        ...channel,
+        initiator: 'scheduled-youtube-refresh',
+      });
     } catch (error) {
+      if (error instanceof ScheduledRefreshRevokedError) {
+        denied++;
+        logger.info('[youtube-library] scheduled refresh denied', {
+          ...channel,
+          initiator: 'scheduled-youtube-refresh',
+          reason: 'entitlement-or-connection-revoked',
+        });
+        continue;
+      }
       failed++;
       logger.error('[youtube-library] scheduled refresh failed', {
         channelId: channel.channelId,
@@ -442,5 +487,5 @@ export async function runScheduledRefreshes(
       });
     }
   }
-  return { skipped: false, synced, failed };
+  return { skipped: false, synced, failed, denied };
 }

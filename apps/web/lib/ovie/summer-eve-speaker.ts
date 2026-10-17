@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import {
+  type CompanyStateReadback,
+  readCompanyStateCache,
+} from '@/lib/ovie/company-state.server';
 import { ovieSummerTurnId } from '@/lib/ovie/summer-conversation';
 import type { SummerFailureHop } from '@/lib/ovie/summer-failure';
 import { resolveSummerEveCallerOrigin } from '@/lib/ovie/summer-production-pin';
@@ -45,6 +49,12 @@ const PENDING_RECOVERY_TEXT =
 const BLOCKING_RECOVERY_TEXT =
   'Summer is still finishing an earlier turn. This message was not sent; wait for that turn to finish, then retry.';
 
+function companyStateContext(readback: CompanyStateReadback | null) {
+  if (!readback) return null;
+  const { sourcePayloads: _payloads, ...snapshot } = readback.snapshot;
+  return { ...snapshot, cache: readback.cache };
+}
+
 async function verifiedDeploymentId(
   response: Response,
   expected: string,
@@ -76,31 +86,54 @@ function boundedMigrationHistory(
   return bounded;
 }
 
-async function body(response: Response): Promise<Record<string, unknown>> {
+async function body(
+  response: Response,
+  signal?: AbortSignal
+): Promise<Record<string, unknown>> {
   const declaredLength = response.headers.get('content-length');
-  if (declaredLength && Number(declaredLength) > MAX_RESPONSE_BYTES)
+  if (declaredLength && Number(declaredLength) > MAX_RESPONSE_BYTES) {
+    void response.body?.cancel().catch(() => {});
     throw new Error('oversized_summer_response');
-  const reader = response.body?.getReader();
-  const decoder = new TextDecoder();
-  let bytes = 0;
-  let text = '';
-  if (reader) {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      bytes += value.byteLength;
-      if (bytes > MAX_RESPONSE_BYTES) {
-        await reader.cancel().catch(() => {});
-        throw new Error('oversized_summer_response');
-      }
-      text += decoder.decode(value, { stream: true });
-    }
-    text += decoder.decode();
   }
-  const value: unknown = JSON.parse(text);
-  if (!value || typeof value !== 'object' || Array.isArray(value))
-    throw new Error('invalid_summer_response');
-  return value as Record<string, unknown>;
+  const reader = response.body?.getReader();
+  let finished = false;
+  let interrupt!: () => void;
+  const interrupted = new Promise<never>((_resolve, reject) => {
+    interrupt = () => reject(new Error('summer_response_interrupted'));
+  });
+  // The fetch helper bounds headers only. Bound finite JSON consumption too.
+  const timeout = setTimeout(interrupt, 45_000);
+  signal?.addEventListener('abort', interrupt, { once: true });
+  if (signal?.aborted) interrupt();
+  try {
+    const read = async (): Promise<Record<string, unknown>> => {
+      const decoder = new TextDecoder();
+      let bytes = 0;
+      let text = '';
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          bytes += value.byteLength;
+          if (bytes > MAX_RESPONSE_BYTES)
+            throw new Error('oversized_summer_response');
+          text += decoder.decode(value, { stream: true });
+        }
+        text += decoder.decode();
+      }
+      finished = true;
+      const value: unknown = JSON.parse(text);
+      if (!value || typeof value !== 'object' || Array.isArray(value))
+        throw new Error('invalid_summer_response');
+      return value as Record<string, unknown>;
+    };
+    return await Promise.race([read(), interrupted]);
+  } finally {
+    clearTimeout(timeout);
+    signal?.removeEventListener('abort', interrupt);
+    if (!finished) void reader?.cancel().catch(() => {});
+    reader?.releaseLock();
+  }
 }
 
 /** Summer will never run these event ids (summer-config#119: abandoned dispatch). */
@@ -131,7 +164,8 @@ function failureHopFor(
 }
 
 export function createEveSummerSpeaker(
-  fetchShadow = fetchSummerShadow
+  fetchShadow = fetchSummerShadow,
+  readCompanyState = readCompanyStateCache
 ): SummerSpeaker {
   return {
     id: 'summer',
@@ -151,6 +185,12 @@ export function createEveSummerSpeaker(
         let deploymentId = admittedDeploymentId;
         const refreshDeploymentId = async () =>
           (await resolveSummerEveCallerOrigin({ refresh: true })).deploymentId;
+        let companyState: ReturnType<typeof companyStateContext> = null;
+        try {
+          companyState = companyStateContext(await readCompanyState());
+        } catch {
+          // A missing cache is explicit context, never a reason to fan out.
+        }
         const rawBody = JSON.stringify({
           eventId,
           conversationId: 'summer-session-current',
@@ -158,6 +198,7 @@ export function createEveSummerSpeaker(
           principalHash: input.principalHash,
           deploymentId,
           message: input.userText,
+          companyState,
           history: input.previousEveEventId
             ? []
             : boundedMigrationHistory(input.history),
@@ -175,7 +216,7 @@ export function createEveSummerSpeaker(
           deploymentId,
           refreshDeploymentId
         );
-        let admission = await body(response);
+        let admission = await body(response, input.signal);
         if (response.status === 409 && admission.code === 'conversation_busy') {
           const blocking = blockingEventSchema.safeParse(
             admission.blockingEvent
@@ -204,7 +245,7 @@ export function createEveSummerSpeaker(
             deploymentId,
             refreshDeploymentId
           );
-          const blockingTerminal = await body(blockingResponse);
+          const blockingTerminal = await body(blockingResponse, input.signal);
           if (!blockingResponse.ok) {
             yield {
               type: 'notice',
@@ -231,7 +272,7 @@ export function createEveSummerSpeaker(
             deploymentId,
             refreshDeploymentId
           );
-          admission = await body(response);
+          admission = await body(response, input.signal);
         }
         const recoverableAdmission =
           admission.code === 'dispatch_unknown' ||
@@ -285,7 +326,7 @@ export function createEveSummerSpeaker(
           deploymentId,
           refreshDeploymentId
         );
-        const terminal = await body(terminalResponse);
+        const terminal = await body(terminalResponse, input.signal);
         if (!terminalResponse.ok) {
           if (
             terminal.code === 'turn_pending' ||

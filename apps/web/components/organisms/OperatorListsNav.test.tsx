@@ -62,8 +62,20 @@ describe('OperatorListsNav', () => {
     expect(screen.getByRole('list', { name: 'Smart Views' })).toContainElement(
       screen.getByRole('link', { name: 'Favorites' })
     );
+    expect(screen.getByRole('button', { name: 'New List' })).toHaveClass('h-7');
+    expect(collab).toHaveClass('h-7');
     expect(screen.getByLabelText('12 creators')).toHaveTextContent('12');
     expect(screen.getByLabelText('4 creators')).toHaveTextContent('4');
+  });
+
+  it('stages group text without collapsing the navigation allocation', () => {
+    renderNav();
+    for (const name of ['Lists', 'Smart Views']) {
+      const label = screen.getByText(name);
+      expect(label).toHaveClass('group-data-[collapsible=icon]:max-w-0');
+      expect(label).not.toHaveClass('group-data-[collapsible=icon]:max-h-0');
+      expect(label).not.toHaveClass('group-data-[collapsible=icon]:mb-0');
+    }
   });
 
   it('creates a list inline with Enter and cancels with Escape', () => {

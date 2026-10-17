@@ -21,7 +21,8 @@ import {
   getImageBufferMetadata,
   processPressPhotoBufferToSizes,
 } from '@/app/api/images/upload/lib/image-processing';
-import { db } from '@/lib/db';
+import { withDbSessionTx } from '@/lib/auth/session';
+import { type DbOrTransaction, db } from '@/lib/db';
 import {
   creatorAvatarCandidates,
   creatorProfiles,
@@ -37,6 +38,13 @@ import { logger } from '@/lib/utils/logger';
 const MAX_PRESS_PHOTOS = 6;
 const IMAGE_DOWNLOAD_TIMEOUT_MS = 10_000;
 const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
+
+function withUserSession<T>(
+  clerkUserId: string,
+  operation: (tx: DbOrTransaction) => Promise<T>
+) {
+  return withDbSessionTx(operation, { clerkUserId });
+}
 
 /** Allowed CDN hostnames for DSP image downloads (SSRF protection) */
 const ALLOWED_IMAGE_HOSTS = new Set([
@@ -341,7 +349,7 @@ export async function ingestDspPressPhotos(
       return result;
     }
 
-    await db.transaction(async tx => {
+    await withUserSession(clerkUserId, async tx => {
       const [lockedProfile] = await tx
         .select({ id: creatorProfiles.id })
         .from(creatorProfiles)

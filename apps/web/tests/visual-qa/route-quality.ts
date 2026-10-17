@@ -238,8 +238,10 @@ export function collectBrowserErrors(
     const errorText = request.failure()?.errorText;
     const kind = classifySameOriginRequestFailure({
       errorText,
+      headers: request.headers(),
       resourceType: request.resourceType(),
       sameOrigin: url.startsWith(origin),
+      url,
     });
     if (kind === 'ignored') return;
     const detail = formatRequestFailure(url, errorText);

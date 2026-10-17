@@ -167,11 +167,11 @@ export const COMMANDS: readonly CommandSpec[] = [
     path: ['creator', 'lookup'],
     tool: 'lookup_creator',
     summary:
-      'Resolve a creator to their existing Jovie profile, or extract public fields from a YouTube channel. Accepts a profile URL or platform:handle (youtube, instagram, tiktok, linktree); Instagram, TikTok, and Linktree only resolve existing profiles. Never creates a profile.',
+      'Resolve an existing Jovie profile from a YouTube, Instagram, TikTok, or Linktree URL or platform:handle. Only YouTube channels support extraction; unmatched Instagram, TikTok, and Linktree inputs return SOURCE_UNSUPPORTED. Bandcamp and custom websites return UNSUPPORTED_URL. Never creates a profile.',
     arg: {
       name: 'url-or-handle',
       description:
-        'Creator profile URL or platform:handle, e.g. youtube:@creator',
+        'YouTube channel URL or youtube:handle; Instagram, TikTok, or Linktree profile URL or platform:handle for existing Jovie profiles only. Other sites are unsupported.',
     },
     readOnly: true,
     run: (input, options) => lookupCreator(required(input), options),

@@ -8,8 +8,11 @@ import {
   assertOnboardingRobotCleanupTarget,
   buildOnboardingRobotHandle,
   buildOnboardingRobotRunId,
+  buildProductionOnboardingRobotUserId,
   isLocalOnboardingRobotEmail,
   isProductionOnboardingRobotEmail,
+  SYNTHETIC_ROBOT_AUTH_UNAVAILABLE_MARKER,
+  syntheticRobotAuthUnavailableReason,
 } from '@/tests/e2e/helpers/onboarding-robot';
 
 describe('onboarding funnel event contract', () => {
@@ -99,5 +102,79 @@ describe('onboarding robot guardrails', () => {
         { E2E_PROD_SIGNUP_EMAIL_BASE: 'test-google@jov.ie' }
       )
     ).toThrow(/Refusing to clean up non-robot onboarding email/);
+  });
+
+  it('cleans up only the production robot id bound to that run', () => {
+    const runId = 'or-jov-2681';
+    const clerkUserId = buildProductionOnboardingRobotUserId(runId);
+    const target = {
+      clerkUserId,
+      email: 'test-google+onboarding-robot-or-jov-2681@jov.ie',
+      handle: buildOnboardingRobotHandle(runId, clerkUserId),
+      runId,
+    };
+    const env = { E2E_PROD_SIGNUP_EMAIL_BASE: 'test-google@jov.ie' };
+
+    expect(clerkUserId).toBe('ba_robot_or-jov-2681');
+    expect(() => assertOnboardingRobotCleanupTarget(target, env)).not.toThrow();
+
+    expect(() =>
+      assertOnboardingRobotCleanupTarget(
+        { ...target, clerkUserId: 'ba_robot_or-other-run' },
+        env
+      )
+    ).toThrow(/Refusing cleanup for non-robot user id/);
+    expect(() =>
+      assertOnboardingRobotCleanupTarget(
+        { ...target, clerkUserId: 'ba_robot_or-jov-2681-extra' },
+        env
+      )
+    ).toThrow(/Refusing cleanup for non-robot user id/);
+    expect(() =>
+      assertOnboardingRobotCleanupTarget(
+        {
+          ...target,
+          clerkUserId: 'ba:11111111-1111-4111-8111-111111111111',
+        },
+        env
+      )
+    ).toThrow(/Refusing cleanup for non-robot user id/);
+    expect(() =>
+      assertOnboardingRobotCleanupTarget(
+        {
+          ...target,
+          clerkUserId: '11111111-1111-4111-8111-111111111111',
+        },
+        env
+      )
+    ).toThrow(/Refusing cleanup for non-robot user id/);
+    expect(() => buildProductionOnboardingRobotUserId('manual')).toThrow(
+      /non-robot run id/
+    );
+  });
+
+  it('names the production robot auth skip and leaves other targets runnable', () => {
+    const production = syntheticRobotAuthUnavailableReason({
+      BASE_URL: 'https://jov.ie/',
+      E2E_ENVIRONMENT: 'production',
+    });
+    const preview = syntheticRobotAuthUnavailableReason({
+      BASE_URL: 'https://preview.jov.ie',
+      E2E_ENVIRONMENT: 'preview',
+    });
+
+    expect(production).toContain(SYNTHETIC_ROBOT_AUTH_UNAVAILABLE_MARKER);
+    expect(production).toContain('no auth bypass');
+    expect(
+      syntheticRobotAuthUnavailableReason({
+        PLAYWRIGHT_TEST_BASE_URL: 'https://jov.ie',
+      })
+    ).toBe(production);
+    expect(preview).toBeNull();
+    expect(
+      syntheticRobotAuthUnavailableReason({
+        BASE_URL: 'http://localhost:3100',
+      })
+    ).toBeNull();
   });
 });

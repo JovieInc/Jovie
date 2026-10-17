@@ -78,7 +78,11 @@ function latestRailProps() {
   if (!panel) throw new Error('no rail registered');
   return panel.props as {
     row: { id: string } | null;
-    onDecide: (kind: string, notes: string | null) => Promise<boolean | void>;
+    onDecide: (
+      kind: string,
+      notes: string | null,
+      target: { rowId: string; evidenceDigest: string | null }
+    ) => Promise<boolean | void>;
     onWalkthrough?: () => void;
     decisionError: string | null;
   };
@@ -100,6 +104,71 @@ describe('OvieCertificationsWorkspace', () => {
     mocks.panels.length = 0;
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date(FIXTURE_NOW));
+  });
+
+  it.each(['url', 'entry'])(
+    'opens a focused domain view from %s using the canonical table',
+    source => {
+      vi.spyOn(navigation, 'useSearchParams').mockReturnValue(
+        new URLSearchParams(
+          source === 'url' ? 'domain=public_profiles' : ''
+        ) as ReturnType<typeof navigation.useSearchParams>
+      );
+      mockQuery({ data: fixtureInventory() });
+      render(
+        <OvieCertificationsWorkspace
+          initialDomain={source === 'entry' ? 'public_profiles' : 'all'}
+        />
+      );
+      expect(screen.getByText('Public Profile')).toBeInTheDocument();
+      expect(
+        screen.queryByText('Flow signup-golden-path')
+      ).not.toBeInTheDocument();
+    }
+  );
+
+  it('filters owner and blockers together and clears all filters', async () => {
+    const inventory = fixtureInventory();
+    mockQuery({
+      data: {
+        ...inventory,
+        rows: inventory.rows.map((row, index) => ({
+          ...row,
+          owner: index === 0 ? 'Summer' : null,
+        })),
+      },
+    });
+    render(<OvieCertificationsWorkspace />);
+    fireEvent.pointerDown(
+      screen.getByRole('button', { name: 'Certification Filters' }),
+      { button: 0, ctrlKey: false }
+    );
+    fireEvent.click(
+      await screen.findByRole('menuitemradio', { name: 'Summer' })
+    );
+    expect(screen.getByText('Flow signup-golden-path')).toBeInTheDocument();
+    expect(screen.queryByText('Flow claim-profile')).not.toBeInTheDocument();
+    fireEvent.pointerDown(
+      screen.getByRole('button', { name: 'Certification Filters' }),
+      { button: 0, ctrlKey: false }
+    );
+    fireEvent.click(
+      await screen.findByRole('menuitemradio', { name: 'Current Revision' })
+    );
+    expect(screen.getByText('Flow signup-golden-path')).toBeInTheDocument();
+    fireEvent.pointerDown(
+      screen.getByRole('button', { name: 'Certification Filters' }),
+      { button: 0, ctrlKey: false }
+    );
+    fireEvent.click(
+      await screen.findByRole('menuitemradio', { name: 'Has Blockers' })
+    );
+    expect(
+      screen.getByText('No items match these filters')
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Clear Filters' }));
+    expect(screen.getByText('Flow signup-golden-path')).toBeInTheDocument();
+    expect(screen.getByText('Flow claim-profile')).toBeInTheDocument();
   });
 
   it('keeps the live detail rail stable when its host renders the registered panel', async () => {
@@ -259,7 +328,12 @@ describe('OvieCertificationsWorkspace', () => {
     fireEvent.click(screen.getByText('Flow signup-golden-path'));
     expect(latestRailProps().row?.id).toBe('flows:signup-golden-path');
 
-    await act(() => latestRailProps().onDecide('approved', null));
+    await act(() =>
+      latestRailProps().onDecide('approved', null, {
+        rowId: inventory.rows[0].id,
+        evidenceDigest: inventory.rows[0].decision.evidenceDigest,
+      })
+    );
     expect(mocks.mutateAsync).toHaveBeenCalledWith({
       rowId: 'flows:signup-golden-path',
       evidenceDigest: inventory.rows[0]?.decision.evidenceDigest,
@@ -268,6 +342,65 @@ describe('OvieCertificationsWorkspace', () => {
       actionId: expect.any(String),
     });
     expect(mocks.toastSuccess).toHaveBeenCalledWith('Certified');
+  });
+
+  it('rejects cross-object and stale-digest submissions from a prepared review', async () => {
+    const inventory = fixtureInventory();
+    mockQuery({ data: inventory });
+    render(<OvieCertificationsWorkspace />);
+    fireEvent.click(screen.getByText('Flow signup-golden-path'));
+    const target = {
+      rowId: inventory.rows[0].id,
+      evidenceDigest: inventory.rows[0].decision.evidenceDigest,
+    };
+    await act(() =>
+      latestRailProps().onDecide('approved', null, {
+        ...target,
+        rowId: 'other:object',
+      })
+    );
+    await act(() =>
+      latestRailProps().onDecide('approved', null, {
+        ...target,
+        evidenceDigest: 'superseded',
+      })
+    );
+    expect(mocks.mutateAsync).not.toHaveBeenCalled();
+    expect(latestRailProps().decisionError).toContain('scope changed');
+  });
+
+  it('deduplicates simultaneous submissions and reuses the receipt key after reconnect', async () => {
+    const inventory = fixtureInventory();
+    mockQuery({ data: inventory });
+    let reject!: (error: Error) => void;
+    mocks.mutateAsync.mockImplementationOnce(
+      () =>
+        new Promise((_resolve, rejectPromise) => {
+          reject = rejectPromise;
+        })
+    );
+    render(<OvieCertificationsWorkspace />);
+    fireEvent.click(screen.getByText('Flow signup-golden-path'));
+    const target = {
+      rowId: inventory.rows[0].id,
+      evidenceDigest: inventory.rows[0].decision.evidenceDigest,
+    };
+    let pending!: Promise<boolean | void>;
+    act(() => {
+      pending = latestRailProps().onDecide('approved', null, target);
+    });
+    await act(() => latestRailProps().onDecide('approved', null, target));
+    expect(mocks.mutateAsync).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      reject(new Error('Disconnected'));
+      await pending;
+    });
+    mocks.mutateAsync.mockResolvedValue({ row: inventory.rows[0] });
+    await act(() => latestRailProps().onDecide('approved', null, target));
+    expect(mocks.mutateAsync).toHaveBeenCalledTimes(2);
+    expect(mocks.mutateAsync.mock.calls[1][0]).toEqual(
+      mocks.mutateAsync.mock.calls[0][0]
+    );
   });
 
   it('deep-links to the evidence rail when ?row= is present', () => {
@@ -366,7 +499,12 @@ describe('OvieCertificationsWorkspace', () => {
     render(<OvieCertificationsWorkspace />);
 
     fireEvent.click(screen.getByText('Flow signup-golden-path'));
-    await act(() => latestRailProps().onDecide('rejected', 'nope'));
+    await act(() =>
+      latestRailProps().onDecide('rejected', 'nope', {
+        rowId: fixtureInventory().rows[0].id,
+        evidenceDigest: fixtureInventory().rows[0].decision.evidenceDigest,
+      })
+    );
     expect(latestRailProps().row?.id).toBe('flows:signup-golden-path');
     expect(latestRailProps().decisionError).toBe('The evidence changed.');
   });

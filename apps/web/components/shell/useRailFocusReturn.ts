@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/organisms/RightDrawer.interaction.test.tsx
+
 import { type RefObject, useEffect, useRef } from 'react';
 
 export function isAvailable(element: HTMLElement): boolean {
@@ -22,7 +24,8 @@ export function isAvailable(element: HTMLElement): boolean {
 export function useRailFocusReturn(
   ref: RefObject<HTMLElement | null>,
   hidden: boolean,
-  side: 'left' | 'right'
+  side: 'left' | 'right',
+  preferredTargetRef?: RefObject<HTMLElement | null>
 ) {
   const ownedFocus = useRef(false);
   const wasHidden = useRef(hidden);
@@ -48,10 +51,18 @@ export function useRailFocusReturn(
     )
       return;
 
-    const target = Array.from(
-      document.querySelectorAll<HTMLElement>(`[data-rail-toggle="${side}"]`)
-    ).find(isAvailable);
+    // A mobile modal remembers its actual opener. A registered rail control
+    // is the fallback when a desktop rail closes across a breakpoint.
+    const preferred = preferredTargetRef?.current;
+    const target =
+      preferred && isAvailable(preferred)
+        ? preferred
+        : Array.from(
+            document.querySelectorAll<HTMLElement>(
+              `[data-rail-toggle="${side}"]`
+            )
+          ).find(isAvailable);
     target?.focus({ preventScroll: true });
     ownedFocus.current = false;
-  }, [hidden, ref, side]);
+  }, [hidden, ref, side, preferredTargetRef]);
 }

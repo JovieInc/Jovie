@@ -8,6 +8,7 @@ import { Artist } from '@/types/db';
 export interface ProfilePreviewProps {
   readonly username: string;
   readonly displayName: string;
+  readonly isVerified?: boolean;
   readonly avatarUrl?: string | null;
   readonly links: Array<{
     readonly id: string;
@@ -23,6 +24,7 @@ export function ProfilePreview({
   username,
   displayName,
   avatarUrl,
+  isVerified = false,
   links,
   className,
 }: ProfilePreviewProps) {
@@ -44,7 +46,7 @@ export function ProfilePreview({
     youtube_url: undefined,
     venmo_handle: undefined,
     published: true,
-    is_verified: false,
+    is_verified: isVerified,
     is_featured: false,
     marketing_opt_out: false,
     created_at: new Date().toISOString(),

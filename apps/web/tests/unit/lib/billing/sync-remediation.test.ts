@@ -11,6 +11,14 @@ vi.mock('@/lib/db', () => ({
     insert: vi.fn(() => ({ values: mockInsertValues })),
   },
 }));
+vi.mock('@/lib/ingestion/session', () => ({
+  withSystemIngestionSession: vi.fn((operation: (tx: unknown) => unknown) =>
+    operation({
+      select: mockSelect,
+      insert: vi.fn(() => ({ values: mockInsertValues })),
+    })
+  ),
+}));
 vi.mock('@/lib/env-server', () => ({ env: envState }));
 vi.mock('@/lib/utils/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },

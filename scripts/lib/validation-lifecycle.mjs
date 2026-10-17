@@ -47,7 +47,7 @@ export const RECORDED_RECEIPT_KINDS = Object.freeze([
 const TASTE_JUDGMENTS = new Set(['taste', 'mixed']);
 const MAX_NOTE_LENGTH = 2000;
 
-const RECEIPT_MARKER = /<!--\s*validation-receipt:v1\s*\n?([\s\S]*?)\n?\s*-->/g;
+const RECEIPT_MARKER = /<!--\s*validation-receipt:v1\s*\n?([\s\S]*?)(?:-->|$)/g;
 const STATUS_MARKER = /<!--\s*validation-lifecycle:v1\s+([0-9a-f]{16})\s*-->/;
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 const IDENTIFIER_RE = /^JOV-\d+$/i;
@@ -68,6 +68,9 @@ const COMMISSIONING_HEADING = /^#{1,6}\s.*commission/im;
 // evidence", "Acceptance checks" and "Evaluation / completion" sections.
 const ACCEPTANCE_SECTION =
   /^\s*(?:#{1,6}\s+|\*\*)\s*(?:acceptance|completion|evaluation|success criteria|exit criteria|definition of done|done (?:when|means)|verification|proof)\b/i;
+// Plain authored labels require a colon; incidental prose is not a section.
+const PLAIN_ACCEPTANCE_SECTION =
+  /^[ \t]{0,3}(?:acceptance(?:[ \t]+(?:criteria|evidence|checks))?|completion(?:[ \t]+(?:criteria|evidence|checks))?|evaluation(?:[ \t]*\/[ \t]*completion)?|success[ \t]+criteria|exit[ \t]+criteria|definition[ \t]+of[ \t]+done|done[ \t]+(?:when|means)|verification|proof)[ \t]*:/i;
 // A `#` heading or a bold-only line (`**Notes**`) ends a section.
 const ANY_HEADING = /^\s*(?:#{1,6}\s|\*\*[^*]+\*\*:?\s*$)/;
 const CHECKED_BOX = /^\s*[-*] \[[xX]\]/;
@@ -159,15 +162,36 @@ export function outcomeAcceptanceReasons(issue, parentReason = '') {
  */
 function hasOpenAcceptanceSection(description) {
   const lines = description.split('\n');
+  let plainFence = '';
   for (const [index, line] of lines.entries()) {
-    if (!ACCEPTANCE_SECTION.test(line)) continue;
-    // `**Acceptance:** text` carries its criteria on the same line.
-    const inline = line
-      .replace(ACCEPTANCE_SECTION, '')
-      .replace(/^[^*]*\*\*\s*:?/, '')
-      .replace(/^\s*:/, '')
-      .trim();
-    if (!/^#/.test(line.trim()) && inline.length > 0) return true;
+    // Plain labels inside a fenced literal are examples, not authored criteria.
+    // Keep the existing Markdown-heading interpretation unchanged.
+    const fence = /^[ \t]{0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+    if (fence) {
+      if (!plainFence) plainFence = fence[1];
+      else if (
+        fence[1][0] === plainFence[0] &&
+        fence[1].length >= plainFence.length &&
+        !fence[2].trim()
+      )
+        plainFence = '';
+    }
+    const plain = !plainFence && PLAIN_ACCEPTANCE_SECTION.exec(line);
+    if (!ACCEPTANCE_SECTION.test(line) && !plain) continue;
+    // Both `**Acceptance:** text` and `Acceptance: text` carry inline criteria.
+    const inline = plain
+      ? line.slice(plain[0].length).trim()
+      : line
+          .replace(ACCEPTANCE_SECTION, '')
+          .replace(/^[^*]*\*\*\s*:?/, '')
+          .replace(/^\s*:/, '')
+          .trim();
+    if (
+      !/^#/.test(line.trim()) &&
+      inline.length > 0 &&
+      !(plain && CHECKED_BOX.test(inline))
+    )
+      return true;
     for (const next of lines.slice(index + 1)) {
       if (ANY_HEADING.test(next)) break;
       if (next.trim() && !CHECKED_BOX.test(next)) return true;
@@ -200,10 +224,13 @@ function hasOpenAcceptanceSection(description) {
  *   issue: string,
  *   bindingSha: string,
  *   bindingPull: string,
+ *   bindingKind?: 'merge' | 'outcome',
  *   mergedPulls: string[],
  *   riskLevel: string,
  *   required: RequiredReceipt[],
  *   uiEvidence?: UiEvidence[],
+ *   receiptNotBefore?: string | null,
+ *   outcomeNotBefore?: string,
  * }} ValidationManifest
  */
 
@@ -239,23 +266,37 @@ export function selectBindingPull(pulls) {
  *     readonly labels?: readonly string[],
  *     readonly description?: string,
  *     readonly reopenedAfterDone?: boolean,
+ *     readonly receiptNotBefore?: string | null,
+ *     readonly outcomeNotBefore?: string,
  *   },
  *   readonly mergedPulls: readonly MergedPull[],
  *   readonly risk: RiskSummary | null,
  *   readonly parentReason?: string,
  *   readonly escapedDefect?: boolean,
  *   readonly uiEvidence?: readonly UiEvidence[] | null,
+ *   readonly parentOutcome?: ValidationReceipt | null,
  * }} input
  * @returns {ValidationManifest | null}
  */
 export function deriveValidationManifest(input) {
   const binding = selectBindingPull(input.mergedPulls);
-  if (!binding) return null;
+  const outcomeBinding =
+    !binding &&
+    input.parentReason &&
+    input.parentOutcome?.kind === 'outcome' &&
+    FULL_SHA.test(input.parentOutcome.sha)
+      ? input.parentOutcome
+      : null;
+  if (!binding && !outcomeBinding) return null;
+  const bindingSha = binding?.mergeSha ?? outcomeBinding.sha;
+  const bindingRef = binding?.url ?? outcomeBinding.evidence;
   /** @type {RequiredReceipt[]} */
   const required = [
     {
       kind: 'deployment',
-      reason: 'a verified production generation contains the merge',
+      reason: binding
+        ? 'a verified production generation contains the merge'
+        : 'a verified production generation contains the parent outcome artifact',
     },
   ];
   if (input.escapedDefect) {
@@ -267,6 +308,11 @@ export function deriveValidationManifest(input) {
   }
   const outcome = outcomeAcceptanceReasons(input.issue, input.parentReason);
   if (outcome.length > 0) {
+    if (input.issue.outcomeNotBefore) {
+      outcome.push(
+        `record outcome after child delivery at ${input.issue.outcomeNotBefore}`
+      );
+    }
     required.push({ kind: 'outcome', reason: outcome.join('; ') });
   }
   const riskLevel = input.risk?.riskLevel ?? 'unknown';
@@ -316,6 +362,15 @@ export function deriveValidationManifest(input) {
       reason: `UI change invalidates ${describe(machine)}; the screen-audit ledger (JOV-7713) must show every changed screen green on the exact production build`,
     });
   }
+  if (
+    !required.some(entry => entry.kind === 'screen-audit') &&
+    declaredRequirements(input.issue.description ?? '').includes('screen-audit')
+  ) {
+    required.push({
+      kind: 'screen-audit',
+      reason: 'the issue declares validation-required: screen-audit',
+    });
+  }
   if (taste.length > 0) {
     required.push({
       kind: 'founder-taste',
@@ -336,13 +391,20 @@ export function deriveValidationManifest(input) {
   return {
     schema: VALIDATION_MANIFEST_SCHEMA,
     issue: input.issue.identifier.toUpperCase(),
-    bindingSha: binding.mergeSha.toLowerCase(),
-    bindingPull: binding.url,
+    bindingSha: bindingSha.toLowerCase(),
+    bindingPull: bindingRef,
+    ...(!binding ? { bindingKind: 'outcome' } : {}),
     mergedPulls: [...input.mergedPulls]
       .sort((left, right) => left.number - right.number)
       .map(pull => pull.url),
     riskLevel,
     required,
+    ...(input.issue.reopenedAfterDone
+      ? { receiptNotBefore: input.issue.receiptNotBefore ?? null }
+      : {}),
+    ...(input.issue.outcomeNotBefore
+      ? { outcomeNotBefore: input.issue.outcomeNotBefore }
+      : {}),
     ...(uiEvidence && uiEvidence.length > 0
       ? {
           uiEvidence: uiEvidence.map(entry => ({
@@ -359,18 +421,50 @@ export function deriveValidationManifest(input) {
 /**
  * @typedef {{
  *   kind: string,
- *   status: 'pass' | 'fail',
+ *   status: 'pass' | 'fail' | 'invalid',
  *   sha: string,
  *   evidence: string,
  *   note?: string,
+ *   episodeStartedAt?: string | null,
  *   recordedAt: string,
  * }} ValidationReceipt
  */
 
+/** @param {unknown} value @returns {value is string} */
+function validEpisodeTimestamp(value) {
+  return (
+    typeof value === 'string' &&
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(
+      value
+    ) &&
+    Number.isFinite(Date.parse(value))
+  );
+}
+
+/**
+ * An explicit episode is independent of the comment creation time: an old
+ * producer can finish its write after the server has reopened the issue.
+ * Unbound legacy receipts retain their existing server-time semantics.
+ * `receiptNotBefore` is undefined for the initial episode, null when unreadable.
+ * @param {{ readonly episodeStartedAt?: string | null }} receipt
+ * @param {string | null} [receiptNotBefore]
+ * @returns {boolean}
+ */
+export function receiptMatchesAcceptanceEpisode(receipt, receiptNotBefore) {
+  if (!Object.hasOwn(receipt, 'episodeStartedAt')) return true;
+  if (receipt.episodeStartedAt === null) return receiptNotBefore === undefined;
+  return (
+    validEpisodeTimestamp(receipt.episodeStartedAt) &&
+    validEpisodeTimestamp(receiptNotBefore) &&
+    Date.parse(receipt.episodeStartedAt) === Date.parse(receiptNotBefore)
+  );
+}
+
 /**
  * Read recorded receipts from issue comments. The time is the comment's
  * server timestamp, never a value the producer wrote. Receipts for another
- * issue, computed kinds, or malformed bodies are ignored.
+ * issue or computed kinds are ignored. Malformed evidence invalidates the
+ * affected kind (all recorded kinds if unreadable) until a later correction.
  *
  * @param {readonly { body?: string, createdAt?: string }[]} comments
  * @param {string} identifier
@@ -385,13 +479,52 @@ export function parseValidationReceipts(comments, identifier) {
     if (Number.isNaN(Date.parse(recordedAt))) continue;
     for (const match of String(comment?.body ?? '').matchAll(RECEIPT_MARKER)) {
       let parsed;
+      const invalidate = (kinds = RECORDED_RECEIPT_KINDS) => {
+        // An invalid old-episode payload must not supersede current proof.
+        // Unreadable episode bindings still invalidate conservatively.
+        const episodeBinding =
+          parsed &&
+          typeof parsed === 'object' &&
+          !Array.isArray(parsed) &&
+          Object.hasOwn(parsed, 'episodeStartedAt') &&
+          (parsed.episodeStartedAt === null ||
+            validEpisodeTimestamp(parsed.episodeStartedAt))
+            ? {
+                episodeStartedAt:
+                  parsed.episodeStartedAt === null
+                    ? null
+                    : new Date(parsed.episodeStartedAt).toISOString(),
+              }
+            : {};
+        for (const kind of kinds)
+          receipts.push({
+            kind,
+            status: 'invalid',
+            sha: '',
+            evidence: 'malformed validation receipt',
+            ...episodeBinding,
+            recordedAt,
+          });
+      };
       try {
+        if (!match[0].endsWith('-->')) throw new Error('unterminated receipt');
         parsed = JSON.parse(match[1]);
       } catch {
+        invalidate();
         continue;
       }
-      if (!parsed || typeof parsed !== 'object') continue;
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        invalidate();
+        continue;
+      }
+      if (parsed.issue && String(parsed.issue).toUpperCase() !== issue)
+        continue;
+      if (!parsed.issue || !parsed.kind) {
+        invalidate();
+        continue;
+      }
       const kind = String(parsed.kind ?? '');
+      if (!RECORDED_RECEIPT_KINDS.includes(kind)) continue;
       const status = String(parsed.status ?? '');
       const sha = String(parsed.sha ?? '').toLowerCase();
       if (
@@ -401,8 +534,12 @@ export function parseValidationReceipts(comments, identifier) {
         (status !== 'pass' && status !== 'fail') ||
         !FULL_SHA.test(sha) ||
         typeof parsed.evidence !== 'string' ||
-        parsed.evidence.trim().length < 8
+        parsed.evidence.trim().length < 8 ||
+        (Object.hasOwn(parsed, 'episodeStartedAt') &&
+          parsed.episodeStartedAt !== null &&
+          !validEpisodeTimestamp(parsed.episodeStartedAt))
       ) {
+        invalidate([kind]);
         continue;
       }
       const note =
@@ -415,6 +552,14 @@ export function parseValidationReceipts(comments, identifier) {
         sha,
         evidence: parsed.evidence.trim(),
         ...(note ? { note } : {}),
+        ...(Object.hasOwn(parsed, 'episodeStartedAt')
+          ? {
+              episodeStartedAt:
+                parsed.episodeStartedAt === null
+                  ? null
+                  : new Date(parsed.episodeStartedAt).toISOString(),
+            }
+          : {}),
         recordedAt,
       });
     }
@@ -433,6 +578,7 @@ export function parseValidationReceipts(comments, identifier) {
  *   sha: string,
  *   evidence: string,
  *   note?: string,
+ *   episodeStartedAt?: string | null,
  * }} receipt
  * @returns {string}
  */
@@ -460,6 +606,16 @@ export function formatValidationReceipt(receipt) {
       `receipt note must be at most ${MAX_NOTE_LENGTH} characters`
     );
   }
+  const hasEpisodeBinding = Object.hasOwn(receipt, 'episodeStartedAt');
+  if (
+    hasEpisodeBinding &&
+    receipt.episodeStartedAt !== null &&
+    !validEpisodeTimestamp(receipt.episodeStartedAt)
+  ) {
+    throw new Error(
+      'receipt episodeStartedAt must be null or a valid timestamp'
+    );
+  }
   const payload = {
     schema: VALIDATION_RECEIPT_SCHEMA,
     issue: receipt.issue.toUpperCase(),
@@ -468,6 +624,14 @@ export function formatValidationReceipt(receipt) {
     sha: receipt.sha.toLowerCase(),
     evidence: receipt.evidence.trim(),
     ...(note ? { note } : {}),
+    ...(hasEpisodeBinding
+      ? {
+          episodeStartedAt:
+            receipt.episodeStartedAt === null
+              ? null
+              : new Date(String(receipt.episodeStartedAt)).toISOString(),
+        }
+      : {}),
   };
   return [
     `Validation receipt: ${payload.kind} ${payload.status} for ${payload.sha.slice(0, 12)}. Evidence: ${payload.evidence}`,
@@ -482,6 +646,8 @@ export function formatValidationReceipt(receipt) {
  *   status: 'verified' | 'pending' | 'unknown',
  *   sha?: string,
  *   detail?: string,
+ *   containsBinding?: boolean,
+ *   previousVerifiedEntry?: boolean,
  * }} DeploymentFact
  * @typedef {ValidationReceipt & {
  *   containsBinding: boolean,
@@ -496,13 +662,24 @@ export function formatValidationReceipt(receipt) {
  * must run again on the new generation.
  *
  * @param {readonly ResolvedReceipt[]} receipts
+ * @param {string | null} [receiptNotBefore]
  * @returns {Map<string, ResolvedReceipt>}
  */
-export function currentReceiptsByKind(receipts) {
+export function currentReceiptsByKind(receipts, receiptNotBefore) {
   /** @type {Map<string, ResolvedReceipt>} */
   const latest = new Map();
+  const cutoff =
+    receiptNotBefore === undefined
+      ? -Infinity
+      : Date.parse(receiptNotBefore ?? '');
+  if (Number.isNaN(cutoff)) return latest;
   for (const receipt of receipts) {
-    if (!receipt.containsBinding) continue;
+    if (
+      !receipt.containsBinding ||
+      !receiptMatchesAcceptanceEpisode(receipt, receiptNotBefore) ||
+      !(Date.parse(receipt.recordedAt) > cutoff)
+    )
+      continue;
     const previous = latest.get(receipt.kind);
     if (
       !previous ||
@@ -522,6 +699,7 @@ export function currentReceiptsByKind(receipts) {
  *   readonly state: { name: string, type: string },
  *   readonly manifest: ValidationManifest,
  *   readonly holds: readonly string[],
+ *   readonly completionHolds?: readonly string[],
  *   readonly deployment: DeploymentFact,
  *   readonly receipts: readonly ResolvedReceipt[],
  *   readonly escapedDefect?: { ok: boolean, errors: readonly string[] },
@@ -548,7 +726,20 @@ export function decideValidationTransition(input) {
       explanation: [...input.holds],
     };
   }
-  const current = currentReceiptsByKind(input.receipts);
+  if (input.manifest.receiptNotBefore === null) {
+    return {
+      target: null,
+      missing: ['outcome'],
+      failing: [],
+      explanation: [
+        'The reopened episode boundary is unknown; re-read complete Linear history before accepting receipts.',
+      ],
+    };
+  }
+  const current = currentReceiptsByKind(
+    input.receipts,
+    input.manifest.receiptNotBefore
+  );
   const requiredKinds = input.manifest.required.map(entry => entry.kind);
   const failing = requiredKinds
     .map(kind => current.get(kind))
@@ -579,7 +770,12 @@ export function decideValidationTransition(input) {
   }
   if (input.deployment.status !== 'verified') {
     return {
-      target: LIFECYCLE_STATES.merging,
+      target:
+        input.state.name === LIFECYCLE_STATES.validating &&
+        input.deployment.containsBinding === true &&
+        input.deployment.previousVerifiedEntry === true
+          ? LIFECYCLE_STATES.validating
+          : LIFECYCLE_STATES.merging,
       missing: ['deployment'],
       failing: [],
       explanation: [
@@ -604,17 +800,22 @@ export function decideValidationTransition(input) {
     if (receipt?.status === 'pass' && receipt.verifiedArtifact) continue;
     missing.push(entry.kind);
     explanation.push(
-      receipt?.status === 'pass'
-        ? `${entry.kind}: the passing receipt names ${receipt.sha.slice(0, 12)}, which is not a verified production generation`
-        : `${entry.kind}: no current receipt (${entry.reason})`
+      receipt?.status === 'invalid'
+        ? `${entry.kind}: latest receipt is malformed; record corrected evidence before completion`
+        : receipt?.status === 'pass'
+          ? `${entry.kind}: the passing receipt names ${receipt.sha.slice(0, 12)}, which is not a verified production generation`
+          : `${entry.kind}: no current receipt (${entry.reason})`
     );
   }
-  if (missing.length > 0) {
+  // Prerequisite holds prevent acceptance, while a required failure above
+  // must still reach Rework and deployment keeps its own entry semantics.
+  const completionHolds = input.completionHolds ?? [];
+  if (missing.length > 0 || completionHolds.length > 0) {
     return {
       target: LIFECYCLE_STATES.validating,
       missing,
       failing: [],
-      explanation,
+      explanation: [...explanation, ...completionHolds],
     };
   }
   return {
@@ -622,7 +823,7 @@ export function decideValidationTransition(input) {
     missing: [],
     failing: [],
     explanation: [
-      `Every required receipt passed on verified production generation ${String(input.deployment.sha ?? '').slice(0, 12)}.`,
+      `Every required receipt passed on its recorded verified artifact. Deployment generation ${String(input.deployment.sha ?? '').slice(0, 12)} is verified.`,
     ],
   };
 }
@@ -636,6 +837,7 @@ export function decideValidationTransition(input) {
  *   manifest: ValidationManifest,
  *   missing: readonly string[],
  *   failing: readonly ResolvedReceipt[],
+ *   completionHolds?: readonly string[],
  *   deploymentSha?: string,
  * }} input
  * @returns {string}
@@ -646,8 +848,13 @@ export function lifecycleStatusKey(input) {
       JSON.stringify({
         target: input.target,
         binding: input.manifest.bindingSha,
+        episode: input.manifest.receiptNotBefore,
+        outcomeAfter: input.manifest.outcomeNotBefore,
         required: input.manifest.required.map(entry => entry.kind),
         missing: [...input.missing].sort(),
+        ...(input.completionHolds?.length
+          ? { completionHolds: [...input.completionHolds].sort() }
+          : {}),
         failing: input.failing
           .map(receipt => `${receipt.kind}:${receipt.sha}`)
           .sort(),
@@ -696,7 +903,7 @@ export function formatLifecycleComment(input) {
       : `Validation lifecycle kept ${input.identifier} in ${input.from}.`;
   const lines = [
     moved,
-    `Binding merge: ${input.manifest.bindingPull} (${input.manifest.bindingSha}).`,
+    `Binding ${input.manifest.bindingKind === 'outcome' ? 'outcome' : 'merge'}: ${input.manifest.bindingPull} (${input.manifest.bindingSha}).`,
   ];
   if (input.deploymentSha) {
     lines.push(`Verified production generation: ${input.deploymentSha}.`);

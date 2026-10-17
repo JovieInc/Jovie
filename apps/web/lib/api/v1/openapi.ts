@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { BASE_URL } from '@/constants/app';
 import {
+  PUBLIC_AGENT_PATHS,
+  PUBLIC_AGENT_SCHEMAS,
+} from '../public-agent-openapi';
+import {
   PUBLIC_ARTIST_API_INDEX_URL,
   PUBLIC_ARTIST_API_OPENAPI_URL,
   PUBLIC_ARTIST_API_POLICY_LINK,
@@ -14,26 +18,31 @@ import {
   PUBLIC_ARTIST_API_VERSIONING_POLICY,
 } from './contract';
 
-type JsonSchema = {
-  readonly type?: 'object' | 'array' | 'string' | 'integer' | 'boolean';
+export type JsonSchema = {
+  readonly type?: string | readonly string[];
   readonly format?: string;
+  readonly description?: string;
   readonly nullable?: boolean;
   readonly required?: readonly string[];
   readonly properties?: Readonly<Record<string, JsonSchema>>;
   readonly items?: JsonSchema;
-  readonly enum?: readonly string[];
+  readonly enum?: readonly (string | number | boolean | null)[];
+  readonly oneOf?: readonly JsonSchema[];
+  readonly anyOf?: readonly JsonSchema[];
+  readonly additionalProperties?: boolean | JsonSchema;
+  readonly minLength?: number;
+  readonly maxLength?: number;
+  readonly minimum?: number;
+  readonly maximum?: number;
+  readonly pattern?: string;
   readonly examples?: readonly (string | number | boolean)[];
   readonly $ref?: string;
 };
 
-type OpenApiResponse = {
+export type OpenApiResponse = {
   readonly description: string;
   readonly headers?: Readonly<Record<string, OpenApiHeader>>;
-  readonly content: {
-    readonly 'application/json': {
-      readonly schema: JsonSchema;
-    };
-  };
+  readonly content: Readonly<Record<string, { readonly schema: JsonSchema }>>;
 };
 
 type OpenApiHeader = {
@@ -112,10 +121,15 @@ const API_SERVICE_HEADERS: Readonly<Record<string, OpenApiHeader>> = {
   },
 };
 
-type OpenApiOperation = {
+export type OpenApiOperation = {
   readonly operationId: string;
   readonly summary: string;
   readonly description?: string;
+  readonly security?: readonly Readonly<Record<string, readonly string[]>>[];
+  readonly requestBody?: {
+    readonly required: boolean;
+    readonly content: Readonly<Record<string, { readonly schema: JsonSchema }>>;
+  };
   readonly parameters?: readonly OpenApiParameter[];
   readonly responses: Readonly<Record<string, OpenApiResponse>>;
 };
@@ -138,7 +152,7 @@ type OpenApiParameter = {
 export const API_VERSIONING_POLICY = PUBLIC_ARTIST_API_VERSIONING_POLICY;
 
 /**
- * Canonical OpenAPI 3.1 document for the public artist API.
+ * Canonical OpenAPI 3.1 document for public artist and CLI/MCP resources.
  *
  * Served at both:
  * - `/api/v1/openapi.json` (canonical)
@@ -162,7 +176,9 @@ export type ArtistOpenApiDocument = {
     readonly description: string;
     readonly url: string;
   };
-  readonly paths: Readonly<Record<string, { readonly get: OpenApiOperation }>>;
+  readonly paths: Readonly<
+    Record<string, Partial<Record<'get' | 'post', OpenApiOperation>>>
+  >;
   readonly components: {
     readonly schemas: Readonly<Record<string, JsonSchema>>;
   };
@@ -172,10 +188,10 @@ export type ArtistOpenApiDocument = {
 export const ARTIST_OPENAPI_DOCUMENT: ArtistOpenApiDocument = {
   openapi: '3.1.0',
   info: {
-    title: 'Jovie Artist API',
+    title: 'Jovie Public API',
     version: '1.0.0',
     description:
-      'Anonymous, read-only API for public Jovie profiles. The stable /api/v1 capability index is a machine-verifiable 200 surface; profile data is served by GET /api/v1/{username}. No API key, OAuth token, or write endpoint is required or supported. Versioning and deprecation policy: URL-versioned /api/v1; additive changes remain in v1, breaking changes use a new URL version. See the canonical policy page before any retirement. Active v1 does not emit Deprecation or Sunset headers; RFC 9745 Deprecation and RFC 8594 Sunset apply only after a genuinely retired version has a dated migration policy.',
+      'Anonymous public resources used by the Jovie CLI and MCP server. The /api/v1 Artist API is read-only. Agent routes support creator lookup, Spotify profile creation, and bug/feedback reports; /api/music/mcp supports public music reads. No login or API key is required. Agent failures use error.code, exposed by the CLI/MCP as apiCode. Profile creation is feature-gated and may return FEATURE_DISABLED. The x-jovie-versioning policy applies to /api/v1: additive changes remain in v1, breaking changes use a new URL version. Unversioned agent routes are documented here without inheriting the Artist API lifecycle or quota. Active v1 does not emit Deprecation or Sunset headers; RFC 9745 Deprecation and RFC 8594 Sunset apply only after a dated retirement decision.',
     contact: { url: `${BASE_URL}/llms.txt` },
   },
   servers: [{ url: BASE_URL, description: 'Production API origin' }],
@@ -185,6 +201,7 @@ export const ARTIST_OPENAPI_DOCUMENT: ArtistOpenApiDocument = {
   },
   'x-jovie-versioning': API_VERSIONING_POLICY,
   paths: {
+    ...PUBLIC_AGENT_PATHS,
     '/api/v1': {
       get: {
         operationId: 'getArtistApiIndex',
@@ -273,6 +290,7 @@ export const ARTIST_OPENAPI_DOCUMENT: ArtistOpenApiDocument = {
   },
   components: {
     schemas: {
+      ...PUBLIC_AGENT_SCHEMAS,
       ArtistApiIndex: {
         type: 'object',
         required: [

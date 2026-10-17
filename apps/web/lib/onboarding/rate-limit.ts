@@ -14,7 +14,6 @@ import {
   checkOnboardingRateLimit,
   formatTimeRemaining,
   generalLimiter,
-  handleCheckLimiter,
 } from '@/lib/rate-limit';
 
 const RATE_LIMIT_ERROR_PREFIX = `[${OnboardingErrorCode.RATE_LIMITED}] `;
@@ -61,30 +60,6 @@ export async function enforceOnboardingRateLimit({
       isIpLimit
         ? `Too many onboarding attempts from this network. Please try again in ${timeRemaining}.`
         : `Too many onboarding attempts. Please try again in ${timeRemaining}.`
-    );
-    throw onboardingErrorToError(error);
-  }
-}
-
-/**
- * Enforce rate limits for handle availability checks.
- *
- * Rate limits:
- * - 30 checks per IP per minute (Redis-backed, persistent)
- *
- * More lenient than onboarding to allow for UI feedback,
- * but still prevents enumeration attacks.
- */
-export async function enforceHandleCheckRateLimit(ip: string): Promise<void> {
-  const key = `ip:${ip}`;
-
-  // Try the Redis-backed limiter first
-  const result = await handleCheckLimiter.limit(key);
-
-  if (!result.success) {
-    const error = createOnboardingError(
-      OnboardingErrorCode.RATE_LIMITED,
-      'Too many handle checks. Please wait a moment before trying again.'
     );
     throw onboardingErrorToError(error);
   }
