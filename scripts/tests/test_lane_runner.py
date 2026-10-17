@@ -10287,6 +10287,9 @@ class RemediationEventRecoveryTest(unittest.TestCase):
         lane.save_escalation(self.host, {'events': {'delivery-stalled': event}})
         self.issue['state'] = {'type': state, 'name': 'Done' if state == 'completed' else state}
         self.issue['updatedAt'] = stamp
+        # The ordinary mirror observes the same canonical completion. Its normal
+        # reconciliation closes the prior issue claim before a proven recurrence.
+        lane.linear_sync.apply(self.host.state, 'JOV', [self.issue])
         lane.claim_remediation_events(self.host, self.linear)
         return lane.load_escalation(self.host)['events']['delivery-stalled']
 
@@ -10515,6 +10518,9 @@ class RemediationEventRecoveryTest(unittest.TestCase):
     def test_structural_generations_reject_old_callbacks_when_local_clock_repeats_or_rolls_back(self):
         for clocks in ((10000, 10000, 10000), (10000, 9999, 10000)):
             with self.subTest(clocks=clocks):
+                # Each clock history has its own durable claim ledger.
+                root = Path(self.tmp.name) / f'clocks-{clocks[1]}'
+                self.host = lane.Host(state=root, repo=root)
                 lane.save_escalation(self.host, {'events': {}})
                 previous = []
                 for index, clock in enumerate(clocks):
