@@ -262,6 +262,8 @@ web.demo-video|web|marketing-demo-video|apps/web/app/(marketing)/demo/video/page
 web.demovideo|web|marketing-demovideo|apps/web/app/(marketing)/demovideo/page.tsx|desktop,mobile
 web.waitlist-invite|web|marketing-waitlist-invite|apps/web/app/waitlist/invite/page.tsx|desktop,mobile
 web.legal-shell|web|legal-shell|apps/web/app/(dynamic)/legal/layout.tsx|desktop,mobile
+web.legal-loading|web|legal-shell|apps/web/app/(dynamic)/legal/loading.tsx|desktop,mobile
+web.legal-error|web|legal-shell|apps/web/app/(dynamic)/legal/error.tsx|desktop,mobile
 web.legal-privacy|web|legal-privacy|apps/web/app/(dynamic)/legal/privacy/|desktop,mobile
 web.legal-terms|web|legal-terms|apps/web/app/(dynamic)/legal/terms/|desktop,mobile
 web.legal-cookies|web|legal-cookies|apps/web/app/(dynamic)/legal/cookies/|desktop,mobile

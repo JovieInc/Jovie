@@ -28,11 +28,11 @@ describe('DocToolbar', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Download PDF' }));
     expect(print).toHaveBeenCalledOnce();
-    fireEvent(globalThis, new Event('afterprint'));
+    globalThis.dispatchEvent(new Event('afterprint'));
     expect(document.title).toBe('Reading a policy');
 
     document.title = 'Another document';
-    fireEvent(globalThis, new Event('afterprint'));
+    globalThis.dispatchEvent(new Event('afterprint'));
     expect(document.title).toBe('Another document');
   });
 });
