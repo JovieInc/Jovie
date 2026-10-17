@@ -65,7 +65,9 @@ function sentryPort(events = []) {
           body: {
             group: {
               id: String(
-                [...sources, 'JOVIE-WEB-AB'].indexOf(path.split('/').at(-2)) + 1
+                [...sources, 'JOVIE-WEB-AB', 'JOVIE-WEB-QH'].indexOf(
+                  path.split('/').at(-2)
+                ) + 1
               ),
               shortId: path.split('/').at(-2),
             },
@@ -901,7 +903,7 @@ function harness({
             issues: {
               nodes: [
                 {
-                  identifier: 'JOV-8523',
+                  identifier: (registeredIssue ?? issue()).identifier,
                   description: (registeredIssue ?? issue()).description,
                 },
               ],
@@ -1407,6 +1409,251 @@ describe('supplementary existing-authority error coverage join', () => {
     ).toMatchObject({
       status: 'unknown',
       read: 'outcome_statistics_unreadable',
+    });
+  });
+});
+
+describe('authored synthetic alert-hygiene observation contract', () => {
+  const plan = {
+    ...PLAN,
+    issue: 'JOV-4312',
+    start: '2026-10-17T00:00:00Z',
+    end: '2026-10-19T00:00:00Z',
+    incidents: [{ shortId: 'JOVIE-WEB-QH' }],
+  };
+  const registered = (value = plan) => ({
+    ...issue(value),
+    identifier: value.issue,
+    comments: [
+      {
+        body: marker('validation-manifest', {
+          schema: 'jovie.validation-manifest/v1',
+          issue: value.issue,
+          bindingSha: BINDING,
+        }),
+        createdAt: value.start,
+      },
+    ],
+  });
+
+  it('accepts the authored full48h QH window without changing the seven-day default', () => {
+    expect(inspectObservationIssue(registered())).toMatchObject({
+      status: 'registered',
+      plan,
+    });
+    expect(MINIMUM_OBSERVATION_MS).toBe(7 * 24 * 60 * 60 * 1000);
+    for (const value of [
+      { ...plan, end: '2026-10-18T23:59:59.999Z' },
+      { ...plan, issue: 'JOV-9000' },
+      { ...PLAN, end: '2026-10-18T14:22:48Z' },
+    ]) {
+      expect(inspectObservationIssue(registered(value)).status).toBe('unknown');
+    }
+  });
+
+  it('rejects substituting another incident or organization for the authored QH denominator', () => {
+    for (const value of [
+      { ...plan, incidents: [{ shortId: 'JOVIE-WEB-OTHER' }] },
+      { ...plan, organization: 'other-org' },
+      {
+        ...plan,
+        incidents: [...plan.incidents, { shortId: 'JOVIE-WEB-OTHER' }],
+      },
+    ]) {
+      expect(inspectObservationIssue(registered(value))).toMatchObject({
+        status: 'unknown',
+        reason: 'incident_acceptance_changed',
+      });
+    }
+  });
+
+  it('preserves episode fences for the shorter authored contract', () => {
+    const value = registered();
+    value.history = [
+      {
+        fromState: { type: 'completed' },
+        toState: { type: 'started' },
+        createdAt: '2026-10-17T01:00:00Z',
+      },
+    ];
+    expect(inspectObservationIssue(value).reason).toBe(
+      'stale_acceptance_episode'
+    );
+  });
+
+  it('keeps native empty full48h history unknown and detects a real-format descendant recurrence', async () => {
+    const sentry = events =>
+      vi.fn(async path =>
+        path.includes('/shortids/')
+          ? {
+              ok: true,
+              body: { group: { id: '7603287323', shortId: 'JOVIE-WEB-QH' } },
+            }
+          : { ok: true, body: events, link: link(false) }
+      );
+    const input = {
+      plan,
+      now: new Date(plan.end),
+      facts: { contains: async () => true },
+    };
+    expect(
+      await observeSentryHistory({ ...input, sentry: sentry([]) })
+    ).toMatchObject({
+      status: 'unknown',
+      reason: 'observation_coverage_unavailable',
+    });
+    expect(
+      await observeSentryHistory({ ...input, sentry: sentry([event()]) })
+    ).toMatchObject({
+      status: 'fail',
+      source: 'JOVIE-WEB-QH',
+      release: DESCENDANT,
+    });
+  });
+
+  it('hands a native-format48h recurrence to the same canonical writer with exact release and episode', async () => {
+    const h = harness({ registeredIssue: registered() });
+    const result = await runSentryValidationObservations({
+      ...h.options,
+      now: new Date(plan.end),
+    });
+    expect(result.results[0]).toMatchObject({
+      issue: 'JOV-4312',
+      status: 'fail',
+      receipt: 'verified',
+      window: { start: plan.start, end: plan.end },
+      episodeStartedAt: null,
+      release: DESCENDANT,
+    });
+    const args = h.recordReceipt.mock.calls[0][0];
+    expect(args[args.indexOf('--issue') + 1]).toBe('JOV-4312');
+    expect(args[args.indexOf('--sha') + 1]).toBe(DESCENDANT);
+    expect(args[args.indexOf('--episode-started-at') + 1]).toBe('null');
+  });
+
+  it('retains the whole48h deadline and never writes a receipt for a pending quiet window', async () => {
+    const h = harness({ registeredIssue: registered(), recurrence: false });
+    const result = await runSentryValidationObservations({
+      ...h.options,
+      now: new Date(Date.parse(plan.end) - 1),
+    });
+    expect(result.results[0]).toMatchObject({
+      issue: 'JOV-4312',
+      status: 'pending',
+      earliestCompletion: plan.end,
+      window: { start: plan.start, end: plan.end },
+    });
+    expect(h.recordReceipt).not.toHaveBeenCalled();
+  });
+
+  it('cannot infer a historical post-deploy start from current verified artifact ancestry', async () => {
+    const past = {
+      ...plan,
+      start: '2026-10-12T00:00:00Z',
+      end: '2026-10-14T00:00:00Z',
+    };
+    const current = registered(past);
+    current.comments[0].createdAt = '2026-10-17T00:00:00Z';
+    const h = harness({ registeredIssue: current, recurrence: false });
+    const result = await runSentryValidationObservations({
+      ...h.options,
+      now: new Date(plan.end),
+    });
+    expect(result.results[0]).toMatchObject({
+      artifact: { status: 'verified', sha: ARTIFACT },
+      status: 'unknown',
+      coverage: {
+        status: 'unknown',
+        gaps: expect.arrayContaining([
+          'post_deployment_window_start_unavailable',
+        ]),
+      },
+    });
+    expect(h.recordReceipt).not.toHaveBeenCalled();
+  });
+
+  it('collects real-format project loss evidence while retaining all hygiene positive-proof gaps', async () => {
+    const now = new Date('2026-10-17T02:00:00Z');
+    const sentry = vi.fn(async path =>
+      path.startsWith('/projects/')
+        ? { ok: true, body: { id: '4510479236792320', slug: 'jovie-web' } }
+        : {
+            ok: true,
+            body: {
+              start: plan.start,
+              end: now.toISOString(),
+              intervals: [plan.start, '2026-10-17T01:00:00Z'],
+              groups: [
+                {
+                  by: { outcome: 'client_discard', reason: 'network_error' },
+                  series: { 'sum(quantity)': [1, 2] },
+                  totals: { 'sum(quantity)': 3 },
+                },
+              ],
+            },
+          }
+    );
+    const result = await collectObservationCoverage({ plan, now, sentry });
+    expect(result).toMatchObject({
+      status: 'unknown',
+      read: 'verified_project_aggregate',
+      requested: { start: plan.start, end: now.toISOString() },
+      outcomes: [
+        { outcome: 'client_discard', reason: 'network_error', total: 3 },
+      ],
+    });
+    expect(result.gaps).toEqual(
+      expect.arrayContaining([
+        'retention_unavailable',
+        'production_error_attribution_unavailable',
+        'synthetic_workload_unavailable',
+        'post_deployment_window_start_unavailable',
+        'synthetic_ci_failure_visibility_unavailable',
+        'production_error_gate_evidence_unavailable',
+        'unattributed_error_delivery_loss',
+      ])
+    );
+    expect(result.gaps).not.toContain(
+      'authenticated_contacts_exposure_unavailable'
+    );
+    const query = new URL('https://sentry.io' + sentry.mock.calls[1][0])
+      .searchParams;
+    expect(query.get('project')).toBe('4510479236792320');
+    expect(query.has('environment')).toBe(false);
+  });
+
+  it('cannot certify a full quiet48h aggregate as continued synthetic workload or retention', async () => {
+    const hours = 48;
+    const sentry = vi.fn(async path =>
+      path.startsWith('/projects/')
+        ? { ok: true, body: { id: '4510479236792320', slug: 'jovie-web' } }
+        : {
+            ok: true,
+            body: {
+              start: plan.start,
+              end: plan.end,
+              groups: [],
+              intervals: Array.from({ length: hours }, (_, i) =>
+                new Date(Date.parse(plan.start) + i * 3600000).toISOString()
+              ),
+            },
+          }
+    );
+    expect(
+      await collectObservationCoverage({
+        plan,
+        now: new Date('2026-10-20T00:00:00Z'),
+        sentry,
+      })
+    ).toMatchObject({
+      status: 'unknown',
+      read: 'verified_project_aggregate',
+      requested: { end: new Date(plan.end).toISOString() },
+      gaps: expect.arrayContaining([
+        'retention_unavailable',
+        'synthetic_workload_unavailable',
+        'post_deployment_window_start_unavailable',
+      ]),
     });
   });
 });

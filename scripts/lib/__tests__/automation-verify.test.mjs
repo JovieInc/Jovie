@@ -813,6 +813,48 @@ describe('affected-test selector inventory', () => {
 });
 
 describe('structural control stage execution', () => {
+  it('measures authored observation contracts in the canonical control stage', () => {
+    const [nativeControl] = buildControlCoverageCommands();
+    const nativeArguments = nativeControl[1];
+    if (!Array.isArray(nativeArguments)) {
+      throw new TypeError('Expected native control command arguments');
+    }
+    expect(buildControlTestCommands()[2]).toEqual(nativeControl);
+    expect(nativeControl[1]).toEqual(
+      expect.arrayContaining([
+        'lib/__tests__/sentry-validation-observation.test.mjs',
+        '--coverage.include=lib/sentry-validation-observation.mjs',
+        '--coverage.thresholds.perFile=true',
+        '--coverage.thresholds.lines=85',
+        '--coverage.thresholds.branches=75',
+        '--coverage.thresholds.functions=82',
+      ])
+    );
+    expect(
+      nativeArguments.filter(
+        argument =>
+          argument === 'lib/__tests__/sentry-validation-observation.test.mjs'
+      )
+    ).toHaveLength(1);
+  });
+
+  it('propagates an authored observation coverage failure before later control stages', async () => {
+    const visited = [];
+    const status = await runControlTestCommands(async (command, args) => {
+      visited.push([command, args]);
+      return args.includes(
+        '--coverage.include=lib/sentry-validation-observation.mjs'
+      )
+        ? runCommandStatus(process.execPath, ['-e', 'process.exit(32)'], {
+            bufferOutput: true,
+            logger: () => {},
+          })
+        : 0;
+    }, 1);
+    expect(status).toBe(32);
+    expect(visited).toEqual(buildControlTestCommands().slice(0, 3));
+  });
+
   it('enforces coverage for public CLI artifact routing in the canonical control stage', () => {
     const [nativeControl] = buildControlCoverageCommands();
     expect(nativeControl[1]).toContain(

@@ -3243,6 +3243,21 @@ it('selects and enforces offline failure behavior coverage for module-only and t
   }
 });
 
+it('selects hosted structural coverage for doctor census fixture-only edits', () => {
+  const pattern = structuralControlPattern();
+  const selected = spawnSync('grep', ['-qE', pattern], {
+    input: 'scripts/tests/test_design_gate.py\n',
+  });
+  expect(selected.status).toBe(0);
+  expect(STRUCTURAL_PYTHON_REGRESSION_COMMANDS[0]).toContain(
+    'scripts/tests/test_design_gate.py'
+  );
+  const unrelated = spawnSync('grep', ['-qE', pattern], {
+    input: 'README.md\n',
+  });
+  expect(unrelated.status).toBe(1);
+});
+
 it('reads structural control paths from data, one alternative per line (JOV-6837)', () => {
   const decision = WORKFLOW.slice(
     WORKFLOW.indexOf('- name: Decide structural lane'),
