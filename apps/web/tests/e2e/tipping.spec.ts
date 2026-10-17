@@ -399,25 +399,19 @@ test.describe('Tipping MVP', () => {
           return;
         }
 
-        // Check that the back button is visible
-        const backButton = page.getByRole('link', {
-          name: 'Back to profile',
-        });
+        // Pay is a drawer subview. Back returns to the profile menu.
+        const backButton = page.getByTestId('profile-drawer-back-button');
         await expect(backButton).toBeVisible({
           timeout: SMOKE_TIMEOUTS.VISIBILITY,
         });
+        await expect(backButton).toHaveAccessibleName('Back');
 
-        // Click the back button
         await backButton.click();
 
-        // Verify we're back on the profile page
-        await page.waitForURL('**/testartist', {
-          timeout: SMOKE_TIMEOUTS.URL_STABLE,
-        });
-
-        // Check that we're on the profile page (tip button is visible)
-        const tipButton = page.getByRole('link', { name: 'Tip' });
-        await expect(tipButton).toBeVisible({
+        await expect(
+          page.getByRole('heading', { name: 'Pay', exact: true })
+        ).toHaveCount(0);
+        await expect(page.getByRole('menuitem', { name: 'Pay' })).toBeVisible({
           timeout: SMOKE_TIMEOUTS.VISIBILITY,
         });
       });

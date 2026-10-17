@@ -70,6 +70,7 @@ describe('DesktopQrOverlay', () => {
       expect.stringContaining('api.qrserver.com')
     );
     expect(qrCode.getAttribute('src')).toContain('testartist');
+    expect(qrCode.closest('[popover="manual"]')).not.toBeNull();
     window.history.pushState({}, '', '/');
   });
 
