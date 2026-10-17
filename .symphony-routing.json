@@ -1,0 +1,29 @@
+{
+  "schema": "symphony-routing/v1",
+  "issue": "JOV-5232",
+  "modelId": "codex-terra",
+  "model": "gpt-5.6-terra",
+  "escalation": false,
+  "fallback": null,
+  "classification": {
+    "risk": "high",
+    "complexity": "high",
+    "capabilities": [
+      "architecture",
+      "code"
+    ],
+    "reasons": [
+      "capabilities=architecture,code",
+      "risk=high",
+      "complexity=high"
+    ]
+  },
+  "candidates": [],
+  "capacity": {
+    "accounts": 4,
+    "ready": 1,
+    "active": null,
+    "readable": true
+  },
+  "fingerprint": "5f73e13470c5bbbde4af547a"
+}
