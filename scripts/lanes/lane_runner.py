@@ -137,7 +137,7 @@ LANE_TESTS = ["scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_a
 # PROMOTION line (JOV-6836).
 RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/fleet-gate/gem-priority-gate.py", "scripts/fleet-gate/closure_health.py",
                   "scripts/fleet-gate/gem_gate_contract.py", "scripts/fleet-gate/summer_ci_audit.py",
-                  "scripts/fleet-gate/symphony_proof_context.py",
+                  "scripts/fleet-gate/symphony_proof_context.py", "scripts/fleet-gate/scoped_admission.py",
                   "scripts/promotion-loss-metrics.mjs", "scripts/merge-group-failure-hold.mjs",
                   "scripts/lib/merge-group-admission.mjs",
                   "scripts/lib/source-admission-policy.mjs", "scripts/lib/merge-group-member-policy.mjs",
