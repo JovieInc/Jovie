@@ -1338,11 +1338,13 @@ test('the real sweep CLI keeps Backlog active while Triage is throttled across r
         timeout: 10_000,
         env: {
           ...process.env,
+          HOME: directory,
           LINEAR_API_KEY: 'fixture-key',
           JOVIE_ORCHESTRATOR_CACHE: cacheFile,
           CLI_BACKLOG_FAILURE: String(failed),
           CLI_TRIAGE_ALLOWED: String(allowTriage),
           LINEAR_COOLDOWN_STATE_DIR: join(directory, 'cooldown'),
+          LINEAR_BACKOFF_STATE_DIR: join(directory, 'legacy-cooldown'),
         },
       }
     );
