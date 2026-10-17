@@ -120,17 +120,16 @@ jobs:
         continue-on-error: true
 
       - name: Run Onboarding Robot Full Synthetic (JOV-2681)
-        env:
-          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
-          BASE_URL: https://jov.ie
-          PLAYWRIGHT_TEST_BASE_URL: https://jov.ie
-          E2E_SKIP_WEB_SERVER: '1'
-          E2E_SYNTHETIC_MODE: 'true'
-          E2E_ENVIRONMENT: production
-          SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/onboarding-robot-full-results.json
+        id: onboarding-robot
         run: |
-          doppler run --preserve-env -- node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/onboarding-robot.full.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/onboarding-robot-full
-        continue-on-error: true
+          reason="synthetic-robot-auth-unavailable: production has no auth bypass for the onboarding robot."
+          echo "::warning title=Onboarding robot skipped::${reason}"
+          {
+            echo "### Onboarding robot"
+            echo "${reason}"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "robot_skip_reason=${reason}" >> "$GITHUB_OUTPUT"
+          exit 0
 
       - name: Run Legacy OTP Signup Canary (gated, JOV-2446 cutover)
         # Skip this step entirely once Layer A is proven green and the Clerk
@@ -193,7 +192,7 @@ jobs:
         if: always()
         run: |
           echo "The production waitlist canary reuses one exact reserved identity and never deletes it."
-          echo "Onboarding robot cleanup is scoped by exact robot email, Clerk user id, run id, and generated handle."
+          echo "Onboarding robot cleanup is scoped by exact robot email, run id, generated handle, and either a Clerk user_ id or the exact ba_robot_<run-id> id."
           echo "No broad production Clerk cleanup script is run from this workflow."
 
       - name: Parse test results
@@ -202,6 +201,7 @@ jobs:
         env:
           LEGACY_CANARY_ENABLED: ${{ vars.E2E_PROD_LEGACY_CANARY != '0' && steps.synthetic-secrets.outputs.otp_available == 'true' && '1' || '0' }}
           OTP_SKIP_REASON: ${{ steps.synthetic-secrets.outputs.otp_skip_reason }}
+          ROBOT_SKIP_REASON: ${{ steps.onboarding-robot.outputs.robot_skip_reason }}
         run: |
           node <<'NODE'
           const fs = require('node:fs');
@@ -215,6 +215,7 @@ jobs:
           const result = parseSyntheticTestResults({
             resultFiles: DEFAULT_RESULT_FILES(legacyCanaryEnabled),
             otpSkipReason: process.env.OTP_SKIP_REASON,
+            robotSkipReason: process.env.ROBOT_SKIP_REASON,
           });
 
           for (const warning of result.testWarnings) {

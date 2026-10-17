@@ -1,6 +1,9 @@
 const fs = require('node:fs');
 
-const OPTIONAL_OTP_SKIP_MARKER = 'synthetic-otp-unavailable';
+const OTP_SKIP_MARKER = 'synthetic-otp-unavailable';
+const ROBOT_SKIP_MARKER = 'synthetic-robot-auth-unavailable';
+const ACKNOWLEDGED_SKIP_MARKERS = [OTP_SKIP_MARKER, ROBOT_SKIP_MARKER];
+const ROBOT_RESULT_NAME = 'onboarding-robot-full';
 
 const DEFAULT_RESULT_FILES = (
   legacyCanaryEnabled,
@@ -56,20 +59,26 @@ function collectSpecs(suites = [], source, required = true) {
   return specs;
 }
 
-function optionalOtpSkipText(testCase) {
+function acknowledgedSkipText(testCase) {
   const chunks = [];
   const push = value => {
-    if (typeof value === 'string' && value.includes(OPTIONAL_OTP_SKIP_MARKER)) {
-      chunks.push(value.replace(/\s+/g, ' ').trim());
+    if (typeof value !== 'string') return;
+    if (!ACKNOWLEDGED_SKIP_MARKERS.some(marker => value.includes(marker))) {
+      return;
     }
+    chunks.push(value.replace(/\s+/g, ' ').trim());
   };
-  for (const annotation of testCase.annotations ?? [])
+
+  for (const annotation of testCase.annotations ?? []) {
     push(annotation?.description);
+  }
   for (const result of testCase.results ?? []) {
     push(result.error?.message);
-    for (const annotation of result.annotations ?? [])
+    for (const annotation of result.annotations ?? []) {
       push(annotation?.description);
+    }
   }
+
   return chunks[0] ?? '';
 }
 
@@ -80,7 +89,7 @@ function classifySyntheticTests(tests) {
       (testCase.results ?? []).some(result => result.status === 'skipped')
   );
   const requiredSkipped = skipped.filter(
-    ({ required, testCase }) => required && !optionalOtpSkipText(testCase)
+    ({ required, testCase }) => required && !acknowledgedSkipText(testCase)
   );
   const warnings = tests.flatMap(({ source, spec, testCase }) => {
     const logged = (testCase.results ?? []).flatMap(result =>
@@ -89,9 +98,9 @@ function classifySyntheticTests(tests) {
         .filter(text => text.includes('[Synthetic][warning]'))
         .map(text => `${source}: ${spec.title}: ${text.trim()}`)
     );
-    const otpSkip = optionalOtpSkipText(testCase);
-    return otpSkip
-      ? [...logged, `${source}: ${spec.title}: ${otpSkip}`]
+    const acknowledgedSkip = acknowledgedSkipText(testCase);
+    return acknowledgedSkip
+      ? [...logged, `${source}: ${spec.title}: ${acknowledgedSkip}`]
       : logged;
   });
   const flaky = tests.filter(({ testCase }) => testCase.status === 'flaky');
@@ -130,13 +139,20 @@ function resolveSyntheticTestStatus({
   return 'error';
 }
 
-function loadSyntheticResultSpecs(resultFiles, fileSystem = fs) {
+function loadSyntheticResultSpecs(
+  resultFiles,
+  fileSystem = fs,
+  acknowledgedMissingNames = new Set()
+) {
   const specs = [];
   const missingResults = [];
 
   for (const resultFile of resultFiles) {
     if (!fileSystem.existsSync(resultFile.path)) {
-      if (resultFile.required !== false) {
+      if (
+        resultFile.required !== false &&
+        !acknowledgedMissingNames.has(resultFile.name)
+      ) {
         missingResults.push(
           `${resultFile.name}: Test results file not found (${resultFile.path})`
         );
@@ -174,18 +190,35 @@ function loadSyntheticResultSpecs(resultFiles, fileSystem = fs) {
   return { specs, missingResults };
 }
 
+function trimReason(reason) {
+  return typeof reason === 'string' ? reason.trim() : '';
+}
+
+function appendUniqueWarning(warnings, reason) {
+  if (!reason || warnings.includes(reason)) return warnings;
+  return [...warnings, reason];
+}
+
 function parseSyntheticTestResults({
   resultFiles,
   fileSystem = fs,
   otpSkipReason = '',
+  robotSkipReason = '',
 } = {}) {
   const resolvedResultFiles =
     resultFiles ??
     DEFAULT_RESULT_FILES(process.env.LEGACY_CANARY_ENABLED === '1');
+  const otpReason = trimReason(otpSkipReason);
+  const robotReason = trimReason(robotSkipReason);
+  const robotSkipAcknowledged = robotReason.includes(ROBOT_SKIP_MARKER);
+  const acknowledgedMissingNames = robotSkipAcknowledged
+    ? new Set([ROBOT_RESULT_NAME])
+    : new Set();
 
   const { specs, missingResults } = loadSyntheticResultSpecs(
     resolvedResultFiles,
-    fileSystem
+    fileSystem,
+    acknowledgedMissingNames
   );
   const tests = specs.flatMap(({ source, required, spec }) =>
     (spec.tests ?? []).map(testCase => ({
@@ -197,9 +230,10 @@ function parseSyntheticTestResults({
   );
   const { skipped, requiredSkipped, warnings, flaky, failed, passed } =
     classifySyntheticTests(tests);
-  const skipReason =
-    typeof otpSkipReason === 'string' ? otpSkipReason.trim() : '';
-  const testWarnings = skipReason ? [...warnings, skipReason] : warnings;
+  const testWarnings = appendUniqueWarning(
+    appendUniqueWarning(warnings, otpReason),
+    robotSkipAcknowledged ? robotReason : ''
+  );
   const testStatus = resolveSyntheticTestStatus({
     tests,
     missingResults,
@@ -255,6 +289,7 @@ function formatGithubOutput(result) {
 }
 
 module.exports = {
+  ACKNOWLEDGED_SKIP_MARKERS,
   DEFAULT_RESULT_FILES,
   classifySyntheticTests,
   collectSpecs,

@@ -147,6 +147,10 @@ RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/fleet-gate/gem-priority
                   "scripts/merge-queue-backend.mjs", "scripts/lib/merge-queue-guard.mjs",
                   ".nvmrc", "pnpm-lock.yaml", "packages/agent-transport-contracts/work-order.ts",
                   "scripts/backlog-orchestrator/summer-triage-assessment-client.mjs",
+                  "scripts/backlog-orchestrator/admission-disposition.mjs",
+                  "scripts/backlog-orchestrator/admission-policy.mjs",
+                  "scripts/backlog-orchestrator/ownership-inventory.mjs",
+                  "scripts/backlog-orchestrator/ownership-inventory.json",
                   # The doctor CLI must prepare/recheck deterministic receipts in an
                   # immutable release without checkout files or installed SDKs.
                   "packages/copy/lint.ts", "packages/copy/rules.ts", "packages/copy/writing-quality.ts",

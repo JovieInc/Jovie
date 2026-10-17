@@ -17,6 +17,11 @@
   --marketing-glass-gutter: var(--space-6);
   --marketing-glass-text: var(--noir-ion-text-primary);
   --marketing-glass-muted: var(--noir-ion-text-muted);
+  /* The reserved main offset is the header border box, including the 1px
+     rim. A shorter optical row left a 7px gap under legal pages. */
+  box-sizing: border-box;
+  height: var(--public-shell-header-offset);
+  min-height: var(--public-shell-header-offset);
 }
 
 /* Shared docked material for every marketing presentation
@@ -86,11 +91,9 @@
 
 .marketing-glass-header[data-presentation="marketing-glass"]
   .marketing-glass-header__shell {
-  min-height: calc(
-    var(--marketing-glass-height) +
-    var(--marketing-glass-top) *
-    2
-  );
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 0;
   padding-block: var(--marketing-glass-top);
   padding-inline: var(--marketing-glass-gutter) !important;
 }
@@ -126,6 +129,7 @@
 .marketing-glass-header[data-presentation="marketing-glass"]
   .marketing-glass-header__text-link::before {
   position: absolute;
+  z-index: 1;
   top: 50%;
   left: 50%;
   width: 100%;
@@ -134,6 +138,10 @@
   min-height: 2.75rem;
   content: "";
   translate: -50% -50%;
+  /* An empty pseudo is not a hit target, so the expanded Customers edge
+     fell through to the shell. */
+  background-color: transparent;
+  pointer-events: auto;
 }
 
 /* Keep navigation centered at normal size, but reserve space for account

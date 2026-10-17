@@ -14,6 +14,7 @@ import { dirname, join, resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
   ACQUISITION_CERTIFICATION_COMMAND,
+  ASSURANCE_MATRIX_COVERAGE_COMMAND,
   affectsWebTestTypecheck,
   BILLING_COVERAGE_COMMAND,
   BILLING_PROVENANCE_COVERAGE_COMMAND,
@@ -35,6 +36,9 @@ import {
   runBiome,
   runCopyGate,
   runEslintServerBoundaries,
+  runStructural,
+  SCRIPT_CONTRACT_NODE_COMMAND,
+  SCRIPT_CONTRACT_NODE_TESTS,
   SOURCE_GUARDS_COMMAND,
   STRUCTURAL_PYTEST_FILES,
   STRUCTURAL_PYTEST_SHARD_COMMANDS,
@@ -106,6 +110,57 @@ function jobBlock(jobId, nextJobId) {
 }
 
 describe('ci-fast bounded parallel workflow', () => {
+  it('discovers assurance behavior tests and executes them once with structural coverage', async () => {
+    const test = 'scripts/invariants/assurance-matrix.test.mjs';
+    expect(SCRIPT_CONTRACT_NODE_TESTS).toContain(test);
+    expect(SCRIPT_CONTRACT_NODE_COMMAND).toContain(
+      ASSURANCE_MATRIX_COVERAGE_COMMAND
+    );
+    expect(SCRIPT_CONTRACT_NODE_COMMAND.split(test)).toHaveLength(2);
+    const selectedCommands = [];
+    vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
+    vi.stubEnv('CI_PRODUCT_LANES', 'operations');
+    vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
+    vi.stubEnv('CI_FAST_STRUCTURAL_PYTEST', '');
+    vi.stubEnv('CI_FAST_STRUCTURAL_WEB', '');
+    vi.stubEnv('CI_FAST_STRUCTURAL_ABORT_STATUS_FILE', '');
+    try {
+      const selected = await runStructural({
+        execute: command => {
+          selectedCommands.push(command);
+          return { code: 0, output: '' };
+        },
+        stop: () => false,
+        concurrency: 1,
+      });
+      expect(selected.code).toBe(0);
+      expect(
+        selectedCommands.filter(command =>
+          command.includes(ASSURANCE_MATRIX_COVERAGE_COMMAND)
+        )
+      ).toHaveLength(1);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+    const [command, ...args] = ASSURANCE_MATRIX_COVERAGE_COMMAND.split(' ');
+    expect(command).toBe('node');
+    expect(args).toContain('--test-coverage-lines=90');
+    expect(args).toContain('--test-coverage-branches=55');
+    expect(args).toContain('--test-coverage-functions=100');
+    const result = spawnSync(process.execPath, args, {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      timeout: 60_000,
+    });
+    expect(result.error).toBeUndefined();
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    expect(result.stdout).toMatch(/tests 29\b/u);
+    expect(result.stdout).toMatch(/pass 29\b/u);
+    expect(result.stdout).toMatch(/fail 0\b/u);
+    expect(result.stdout).toContain('assurance-matrix.mjs');
+    expect(result.stdout).toContain('coverage report');
+  }, 90_000);
+
   it.each(
     STRUCTURAL_PYTHON_REGRESSION_COMMANDS.flatMap((command, index) =>
       [

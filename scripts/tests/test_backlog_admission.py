@@ -265,7 +265,6 @@ class ProjectionTest(unittest.TestCase):
         self.assertFalse(project(None)["allowed"])
 
 
-
 def linear_row(identifier="JOV-6641", identity="fixture", state="Backlog"):
     row = {"id": identity, "identifier": identifier, "title": "Bounded CI behavior", "description": "Reuse existing native predicates",
            "priority": 2, "updatedAt": VERSION, "createdAt": VERSION, "state": {"name": state, "type": "backlog" if state == "Backlog" else "completed"},
@@ -276,7 +275,33 @@ def linear_row(identifier="JOV-6641", identity="fixture", state="Backlog"):
     return row
 
 
-class BoundedReadParsingTest(unittest.TestCase):
+class ReadBoundaryTest(unittest.TestCase):
+    def reads(self):
+        reads = object.__new__(admission._NativeReads)
+        reads.linear = SimpleNamespace(admit=lambda cost: True, gql=lambda query, variables: {"issue": linear_row()})
+        return reads
+
+    def test_runtime_bootstrap_uses_installed_release_validator_and_existing_transports(self):
+        import lane_runner as lane
+        with tempfile.TemporaryDirectory() as tmp:
+            current = Path(tmp).resolve() / ("a" * 64) / "scripts/lanes"; current.mkdir(parents=True)
+            (current / ".release.json").write_text(json.dumps({"schema": "jovie-lane-release-bundle/v1", "bundleDigest": "a" * 64}))
+            state = current.parent.parent.parent
+            with patch.object(lane, "__file__", str(current / "lane_runner.py")), \
+                 patch.object(lane.lifecycle, "validate_release") as validate, patch.object(lane, "Linear") as linear, \
+                 patch.object(lane, "load_github_env") as load, \
+                 patch.object(admission._NativeReads, "gh", return_value={"ref": "refs/heads/main", "object": {"type": "commit", "sha": "d" * 40}}):
+                reads = admission._NativeReads(current, state)
+                validate.assert_called_once(); linear.assert_called_once(); load.assert_called_once()
+                fleet = current.parent / "fleet-gate"; fleet.mkdir()
+                (fleet / "scoped_admission.py").write_text("from datetime import timedelta\nMAX_AGE=timedelta(minutes=10)\n")
+                self.assertEqual(reads.fleet_max_age(), 600)
+                (current / ".release.json").write_text(json.dumps({"schema": "jovie-lane-release-bundle/v1", "bundleDigest": "changed"}))
+                with self.assertRaisesRegex(admission.Unavailable, "installed-release-bundle-mismatch"): reads.validate_runtime()
+                (current / ".release.json").write_text("{}")
+                with self.assertRaisesRegex(admission.Unavailable, "canonical-file-schema"): reads.validate_runtime()
+            with self.assertRaisesRegex(admission.Unavailable, "native-module-not-installed"): admission._NativeReads(current, state)
+
     def test_bounded_pagination_is_complete_and_rechecks_first_page(self):
         calls = []
         pages = {1: [1, 2], 2: [3]}
@@ -294,7 +319,6 @@ class BoundedReadParsingTest(unittest.TestCase):
         with self.assertRaisesRegex(admission.Unavailable, "paged-history-changed"):
             admission._paged(lambda n: next(values), limit=2)
 
-
     def test_inverse_blocks_and_outgoing_blocked_by_are_deduplicated(self):
         row = linear_row()
         row["relations"]["nodes"] = [{"id": "r1", "type": "blocks", "relatedIssue": {"id": "child"}},
@@ -303,6 +327,186 @@ class BoundedReadParsingTest(unittest.TestCase):
         self.assertEqual(admission._dependency_ids(row), ["dep"])
         row["inverseRelations"]["nodes"][0]["issue"] = {}
         with self.assertRaises(admission.Unavailable): admission._dependency_ids(row)
+
+    def test_native_transport_preserves_budget_and_rejects_errors(self):
+        reads = self.reads()
+        self.assertIn("issue", reads.query("query{}", {}))
+        reads.linear.gql = lambda *args: {"data": {"ok": True}}
+        self.assertEqual(reads.query("query{}", {}), {"ok": True})
+        reads.linear.admit = lambda cost: False
+        with self.assertRaisesRegex(admission.Unavailable, "linear-native-budget-held"): reads.query("query{}", {})
+        reads.linear.admit = lambda cost: True
+        for value in (None, {"errors": ["failure"]}):
+            reads.linear.gql = lambda *args: value
+            with self.assertRaises(admission.Unavailable): reads.query("query{}", {})
+        with patch.object(subprocess, "run", return_value=SimpleNamespace(returncode=0, stdout='{"ok":true}')) as run:
+            self.assertTrue(reads.gh("repos/JovieInc/Jovie/pulls")["ok"])
+            self.assertEqual(run.call_args.args[0][2:5], ["-X", "GET", "repos/JovieInc/Jovie/pulls"])
+        with patch.object(subprocess, "run", return_value=SimpleNamespace(returncode=1, stdout="")):
+            with self.assertRaises(admission.Unavailable): reads.gh("fixture")
+
+    def test_global_cohort_reads_all_priority_tiers_without_priority_inflation_and_fails_closed(self):
+        reads = self.reads(); row = linear_row()
+        row["labels"]["nodes"].append({"id":"designation", "name":"dispatch-next"})
+        calls = []
+        def query(text, variables):
+            calls.append(variables)
+            self.assertIn('includeArchived:false', text)
+            return {"issues": {"nodes": [deepcopy(row)], "pageInfo": {"hasNextPage": False}}}
+        reads.query = query
+        self.assertEqual(reads.cohort(), [row])
+        filters = calls[0]["filter"]
+        self.assertIn({"priority": {"eq": 1}}, filters["or"])
+        self.assertIn({"labels": {"some": {"name": {"eq": "P0"}}}}, filters["or"])
+        self.assertIn({"and": [{"priority": {"eq": 2}}, {"labels": {"some": {"name": {"eq": "agent-ready"}}}},
+                               {"labels": {"some": {"name": {"eq": "dispatch-next"}}}}]}, filters["or"])
+        row["priority"] = 0
+        row["labels"]["nodes"].append({"id":"p0", "name":"P0"})
+        self.assertEqual(reads.cohort()[0]["priority"], 0)
+        row["labels"]["pageInfo"]["hasNextPage"] = True
+        complete = deepcopy(row); complete["labels"]["pageInfo"]["hasNextPage"] = False
+        with patch.object(reads, "issue", return_value=complete) as full:
+            self.assertEqual(reads.cohort(), [complete]); full.assert_called_once_with("fixture")
+        row["labels"]["pageInfo"]["hasNextPage"] = False
+        for page in ({}, {"nodes": None, "pageInfo": {"hasNextPage": False}},
+                     {"nodes": [{}], "pageInfo": {"hasNextPage": False}},
+                     {"nodes": [row, row], "pageInfo": {"hasNextPage": False}},
+                     {"nodes": [{**row, "labels": {"nodes": None}}], "pageInfo": {"hasNextPage": False}},
+                     {"nodes": [], "pageInfo": {"hasNextPage": True, "endCursor": None}}):
+            reads.query = lambda *args: {"issues": page}
+            with self.subTest(page=page), self.assertRaises(admission.Unavailable): reads.cohort()
+        def pages(text, variables):
+            return {"issues": {"nodes": [row] if variables["after"] is None else [],
+                               "pageInfo": {"hasNextPage": variables["after"] is None, "endCursor": "cursor"}}}
+        reads.query = pages
+        self.assertEqual(reads.cohort(), [row])
+        with patch.object(admission, "MAX_PAGES", 1), self.assertRaisesRegex(admission.Unavailable, "global-cohort-pagination-bound"):
+            reads.cohort()
+
+    def test_full_linear_read_batches_complete_connections_and_bounds_remaining_pages(self):
+        reads = self.reads(); core = linear_row(); calls = []
+        reads.query = lambda text, variables: calls.append(text) or {"issue": deepcopy(core)}
+        self.assertEqual(reads.issue("fixture"), core)
+        self.assertEqual(len(calls), 1)
+        self.assertTrue(all(name + "(first:50)" in calls[0] for name in admission.CONNECTIONS))
+        self.assertEqual(reads.issue("fixture", full=False), core)
+        for connection in ({"nodes": None},
+                           {"nodes": [{"id": "x"}, {"id": "x"}], "pageInfo": {"hasNextPage": False}},
+                           {"nodes": [], "pageInfo": {"hasNextPage": True, "endCursor": None}}):
+            reads.query = lambda text, variables: {"issue": {**deepcopy(core), "labels": connection}}
+            with self.subTest(connection=connection), self.assertRaises(admission.Unavailable): reads.issue("fixture")
+        reads.query = lambda *args: {"issue": None}
+        with self.assertRaises(admission.Unavailable): reads.issue("fixture")
+        def multipage(text, variables):
+            if "after" not in variables:
+                row = deepcopy(core)
+                row["labels"] = {"nodes": [{"id": "x", "name": "first"}], "pageInfo": {"hasNextPage": True, "endCursor": "cursor"}}
+                return {"issue": row}
+            return {"issue": {"updatedAt": VERSION, "labels": {"nodes": [{"id": "y", "name": "second"}], "pageInfo": {"hasNextPage": False}}}}
+        reads.query = multipage
+        self.assertEqual(len(reads.issue("fixture")["labels"]["nodes"]), 2)
+        with patch.object(admission, "MAX_PAGES", 1), self.assertRaisesRegex(admission.Unavailable, "linear-pagination-bound"):
+            reads.issue("fixture")
+        reads.query = lambda text, variables: {"issue": {"updatedAt": "changed"}} if "after" in variables else multipage(text, variables)
+        with self.assertRaisesRegex(admission.Unavailable, "linear-issue-changed-during-pagination"): reads.issue("fixture")
+
+    def test_complete_native_pr_reader_and_canonical_history_are_reused_without_cache_writes(self):
+        import lane_runner as lane
+        reads = self.reads(); reads.lane = lane
+        pr = {"number": 5, "headRefOid": "a" * 40, "headRefName": "codex/jov-6641", "baseRefName": "main", "baseRefOid": "b" * 40,
+              "state": "OPEN", "labels": [], "isDraft": False, "files": [{"path": "apps/web/lib/example.ts"}],
+              "labelsComplete": True, "filesComplete": True, "inlineFilesEvidence": {"source": "protected fixture"}}
+        raw = {"number": 5, "head": {"sha": "a" * 40, "ref": "codex/jov-6641"}, "base": {"sha": "b" * 40, "ref": "main"},
+               "state": "open", "labels": [], "draft": False}
+        reads.pr_metadata = lambda: [[deepcopy(raw)]]
+        def native(proxy, report):
+            report["complete"] = True
+            self.assertIsNone(lane.pr_events.pr_files_cache(pr))
+            return [deepcopy(pr)]
+        with patch.object(lane.pr_events, "open_prs_state", side_effect=native), \
+             patch.object(lane.pr_events, "_valid_target_file_evidence", return_value=True):
+            self.assertEqual(reads.open_prs()[0]["files"], pr["files"])
+            raw["head"]["sha"] = "changed"
+            with self.assertRaisesRegex(admission.Unavailable, "github-open-pr-set-changed"): reads.open_prs()
+            raw["head"]["sha"] = "a" * 40
+            pr["filesComplete"] = False
+            with self.assertRaisesRegex(admission.Unavailable, "native-open-pr-scope-incomplete"): reads.open_prs()
+            pr["filesComplete"] = True
+        with patch.object(lane.pr_events, "open_prs_state", return_value=None), self.assertRaises(admission.Unavailable): reads.open_prs()
+        with patch.object(lane.pr_events, "open_prs_state", side_effect=native), \
+             patch.object(lane.pr_events, "_valid_target_file_evidence", return_value=False), self.assertRaisesRegex(admission.Unavailable, "inline-scope-unavailable"):
+            reads.open_prs()
+        reads.gh = lambda endpoint: []
+        with patch.object(execution_attempt, "_gh", return_value=[[]]) as gh:
+            self.assertEqual(reads.history(), [[]]); self.assertEqual(gh.call_args.args[1], "GET")
+        for pages in ([], [None], [[]] * 101):
+            with patch.object(execution_attempt, "_gh", return_value=pages), self.assertRaises(admission.Unavailable): reads.history()
+        with patch.object(execution_attempt, "_gh", return_value=[[status()]]), self.assertRaisesRegex(admission.Unavailable, "paged-history-changed"):
+            reads.history()
+        self.assertEqual(reads._read_gh_command(["gh", "api", "repos/JovieInc/Jovie/pulls"]).returncode, 1)
+        with patch.object(subprocess, "run", return_value=SimpleNamespace(returncode=0)) as run:
+            reads._read_gh_command(["gh", "api", "graphql"], timeout=120)
+            self.assertEqual(run.call_args.kwargs["timeout"], 30)
+
+    def test_installed_custody_helper_requires_bound_transitive_files_and_valid_output(self):
+        reads = self.reads()
+        with tempfile.TemporaryDirectory() as tmp:
+            reads.current = Path(tmp).resolve() / "scripts/lanes"; reads.current.mkdir(parents=True)
+            with self.assertRaisesRegex(admission.Unavailable, "interpreter-unavailable"): reads.ownership(linear_row())
+            base = reads.current.parent / "backlog-orchestrator"; base.mkdir()
+            for name in ("admission-disposition.mjs", "admission-policy.mjs", "ownership-inventory.mjs", "ownership-inventory.json"):
+                (base / name).write_text("fixture")
+            output = {"ownership": {"status": "unowned"}, "founder": False, "founderComments": []}
+            with patch.object(subprocess, "run", return_value=SimpleNamespace(returncode=0, stdout=json.dumps(output))) as run:
+                self.assertEqual(reads.ownership(linear_row()), output)
+                self.assertIn('classifyAdmissionDisposition', run.call_args.args[0][-1])
+            for output in (SimpleNamespace(returncode=1, stdout=""), SimpleNamespace(returncode=0, stdout='{}')):
+                with patch.object(subprocess, "run", return_value=output), self.assertRaises(admission.Unavailable): reads.ownership(linear_row())
+
+    def test_dependency_acceptance_needs_owner_binding_actual_merge_and_identical_current_blobs(self):
+        reads = self.reads(); row = linear_row("JOV-6640", "dep", "Done")
+        merge, head, reviewed, current = (c * 40 for c in "abcd")
+        path = "apps/web/lib/agent-os/dogfood-receipt.ts"
+        row["comments"]["nodes"] = [{"id": "binding", "body": f"source binding correction https://github.com/JovieInc/Jovie/pull/19037 `{merge}` `{head}` reviewed current source `{reviewed}` `{path}`"}]
+        reads.ownership = lambda issue: {"founderComments": ["binding"]}
+        reads.host = SimpleNamespace(repo=Path("/canonical/repo"))
+        reads.gh = lambda endpoint: ({"ref": "refs/heads/main", "object": {"type": "commit", "sha": current}} if endpoint.endswith("git/ref/heads/main")
+                                    else [{"filename": path}] if "/files?" in endpoint else {"merged": True, "merge_commit_sha": merge, "head": {"sha": head}})
+        def git(command, **kwargs):
+            if "rev-parse" in command and command[-1] == "origin/main": return SimpleNamespace(returncode=0, stdout=current)
+            if "merge-base" in command: return SimpleNamespace(returncode=0, stdout="")
+            return SimpleNamespace(returncode=0, stdout="blob\nblob\n")
+        with patch.object(subprocess, "run", side_effect=git):
+            result = reads.acceptance(row)
+            self.assertEqual(result["mergeSha"], merge)
+            self.assertEqual(result["sourceSha"], current)
+        with patch.object(subprocess, "run", return_value=SimpleNamespace(returncode=0, stdout=current)):
+            self.assertIsNone(reads.acceptance(row))
+        with patch.object(subprocess, "run", side_effect=lambda command, **kwargs:
+                          SimpleNamespace(returncode=0, stdout="e" * 40 if command[-1] == "origin/main" else "")):
+            with self.assertRaisesRegex(admission.Unavailable, "local-origin-main-not-current-canonical"): reads.acceptance(row)
+        reads.gh = lambda endpoint: {"merged": False}
+        self.assertIsNone(reads.acceptance(row))
+        row["comments"]["nodes"][0]["body"] = "Done docs-only receipt"
+        self.assertIsNone(reads.acceptance(row))
+
+    def test_canonical_main_is_complete_fresh_and_immutable_across_remote_revalidation(self):
+        ref = {"ref": "refs/heads/main", "object": {"type": "commit", "sha": "d" * 40}}
+        for malformed in (None, [], {}, {"ref": "refs/heads/main", "object": {"type": "tag", "sha": "d" * 40}},
+                          {"ref": "refs/heads/main", "object": {"type": "commit", "sha": "bad"}}):
+            with self.subTest(remote=malformed):
+                reads = self.reads(); reads.gh = lambda endpoint: malformed
+                with self.assertRaisesRegex(admission.Unavailable, "canonical-main-read-unavailable"): reads.canonical_main()
+        with patch.object(admission.time, "time", return_value=NOW):
+            reads = self.reads(); values = [ref, {**ref, "object": {"type": "commit", "sha": "e" * 40}}]
+            reads.gh = lambda endpoint: values.pop(0)
+            self.assertEqual(reads.canonical_main(), "d" * 40)
+            self.assertEqual(reads.canonical_main(), "d" * 40)
+            with self.assertRaisesRegex(admission.Unavailable, "canonical-main-changed"): reads.canonical_main(revalidate=True)
+            self.assertEqual(reads._main_observed_at, NOW)
+            with patch.object(admission.time, "time", return_value=NOW + 61):
+                with self.assertRaisesRegex(admission.Unavailable, "canonical-main-observation-stale"): reads.canonical_main(revalidate=True)
+
 
 
 if __name__ == "__main__":
