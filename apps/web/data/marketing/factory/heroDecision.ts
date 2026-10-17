@@ -261,8 +261,8 @@ export const HERO_ROUTE_INTENTS: readonly HeroRouteIntent[] = [
   },
   {
     url: '/card',
-    input: { useCase: 'aha-capture', captureId: 'jovie-card-preview' },
-    why: 'product evidence is a framed screenshot',
+    input: { useCase: 'informational' },
+    why: 'planned Card announcement uses text until an approved Wallet capture exists',
   },
   {
     url: '/smart-links',
