@@ -1521,6 +1521,8 @@ const SENTRY_AUTOFIX_RECURRENCE_LANE = [
   '.github/workflows/sentry-autofix-recurrence.yml',
   '.github/workflows/sentry-autofix.yml',
   'scripts/sentry-autofix-recurrence.mjs',
+  'scripts/lib/sentry-validation-observation.mjs',
+  'scripts/lib/__tests__/sentry-validation-observation.test.mjs',
   'scripts/lib/__tests__/sentry-autofix-recurrence.test.mjs',
   'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
   'scripts/tests/test_agent_workflow_hygiene.py',
@@ -2013,14 +2015,33 @@ describe('automation-verify affected scope', () => {
       {
         mode: 'selected',
         selectedTests: [],
-        pythonUnittestTests: ['scripts/tests/test_agent_workflow_hygiene.py'],
+        pythonTests: ['scripts/tests/test_agent_workflow_hygiene.py'],
+        pythonUnittestTests: [],
         scriptVitestTests: [
           'scripts/lib/__tests__/sentry-autofix-recurrence.test.mjs',
+          'scripts/lib/__tests__/sentry-validation-observation.test.mjs',
           'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
           'scripts/lib/__tests__/automation-verify.test.mjs',
         ],
         nodeTests: ['scripts/typecheck-scripts.mjs'],
       }
+    );
+    const plan = buildAffectedTestPlan([
+      'scripts/lib/sentry-validation-observation.mjs',
+      'scripts/lib/__tests__/sentry-validation-observation.test.mjs',
+    ]);
+    expect(plan.mode).toBe('selected');
+    const commands = buildSelectedTestCommands(plan, '1');
+    expect(commands).toContainEqual([
+      'python3',
+      ['-m', 'pytest', 'scripts/tests/test_agent_workflow_hygiene.py', '-q'],
+    ]);
+    expect(commands.flatMap(([, args]) => args)).toEqual(
+      expect.arrayContaining([
+        'lib/__tests__/sentry-validation-observation.test.mjs',
+        '--coverage.include=lib/sentry-validation-observation.mjs',
+        '--coverage.include=sentry-autofix-recurrence.mjs',
+      ])
     );
     expect(
       buildAffectedTestPlan([
