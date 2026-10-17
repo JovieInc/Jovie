@@ -214,7 +214,12 @@ describe('factory section requests', () => {
       'blog-feed',
     ]);
     expect(report.registryGaps[1]?.evidence).toEqual(
-      expect.arrayContaining([expect.stringContaining('not source-backed')])
+      expect.arrayContaining([
+        expect.stringContaining('no LANDING_PAGE_FAMILIES family lists it'),
+      ])
+    );
+    expect(report.registryGaps[1]?.evidence.join('\n')).not.toContain(
+      'not source-backed'
     );
 
     const seoPage = resolveComposition(

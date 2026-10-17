@@ -80,6 +80,14 @@ const approvedVariantBinding = (
 ): RenderedSectionBinding =>
   approvedBinding(componentPath, sectionId, variantId, occurrenceId);
 
+/** Layout opt-in from MarketingEmailSignup on the public product pages. */
+const productUpdatesCapture = approvedVariantBinding(
+  'apps/web/app/(marketing)/changelog/ChangelogEmailSignup.tsx',
+  'capture',
+  'email-only',
+  'product-updates'
+);
+
 /**
  * Product evidence kind (JOV-6917, invariant `product-page-shows-product`):
  * the canonical product UI a product route must render.
@@ -624,6 +632,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'cta',
         'final-single-claim'
       ),
+      productUpdatesCapture,
     ],
     bindingEvidence: {
       status: 'verified',
@@ -677,6 +686,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'cta',
         'final-single-claim'
       ),
+      productUpdatesCapture,
     ],
     bindingEvidence: {
       status: 'verified',
@@ -723,6 +733,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'cta',
         'final-single-claim'
       ),
+      productUpdatesCapture,
     ],
     bindingEvidence: {
       status: 'verified',
@@ -809,6 +820,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'cta',
         'included-single'
       ),
+      productUpdatesCapture,
     ],
     bindingEvidence: {
       status: 'verified',
@@ -850,6 +862,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'cta',
         'included-single'
       ),
+      productUpdatesCapture,
     ],
     bindingEvidence: {
       status: 'verified',
@@ -1055,6 +1068,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'cta',
         'final-dual-path'
       ),
+      productUpdatesCapture,
     ],
     bindingEvidence: {
       status: 'verified',
@@ -1094,6 +1108,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'cta',
         'final-single-claim'
       ),
+      productUpdatesCapture,
     ],
     bindingEvidence: {
       status: 'verified',
@@ -1123,6 +1138,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'cta',
         'final-single-claim'
       ),
+      productUpdatesCapture,
     ],
     bindingEvidence: {
       status: 'verified',
@@ -1211,6 +1227,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'cta',
         'final-single-claim'
       ),
+      productUpdatesCapture,
     ],
     bindingEvidence: {
       status: 'verified',
@@ -1369,6 +1386,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'blog-feed',
         'featured-grid'
       ),
+      productUpdatesCapture,
     ],
     bindingEvidence: {
       status: 'verified',
@@ -1393,6 +1411,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'blog-feed',
         'category-filtered-grid'
       ),
+      productUpdatesCapture,
     ],
     bindingEvidence: {
       status: 'verified',
