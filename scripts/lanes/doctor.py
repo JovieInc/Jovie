@@ -1518,33 +1518,140 @@ def _autoscale_block(host) -> dict:
 PRIMARY_FLAG = Path.home() / ".config/jovie-lanes/primary"
 
 
+PUBLIC_FEED_MAX_BYTES = 256 * 1024
+STATUS_DETAIL_NAME = "lanes-status-details.json"
+
+
+def public_status_projection(feed: dict, full_text: str) -> str:
+    """Keep operational fields whole; detailed attribution lives in the same gist."""
+    def identity(value, limit):
+        return value if isinstance(value, str) and len(value) <= limit else None
+
+    evidence = {
+        "fileName": STATUS_DETAIL_NAME,
+        "sha256": hashlib.sha256(full_text.encode("utf-8")).hexdigest(),
+        "bytes": len(full_text.encode("utf-8")),
+        "at": identity(feed.get("at"), 64),
+        "host": identity(feed.get("host"), 64),
+        "release": identity(feed.get("release"), 128),
+        "binding": "declared-feed-identity",
+    }
+    public = json.loads(full_text)
+    attribution = public.get("shippingAttribution")
+    projects = attribution.get("projects") if isinstance(attribution, dict) else None
+    if isinstance(projects, list):
+        for index, project in enumerate(projects):
+            if isinstance(project, dict) and isinstance(project.get("pullRequests"), list):
+                rows = project.pop("pullRequests")
+                # Absence with an explicit locator is not an empty evidence array.
+                project["pullRequestsRef"] = {
+                    "recordCount": len(rows),
+                    "jsonPointer": f"/shippingAttribution/projects/{index}/pullRequests",
+                }
+    public["publicProjection"] = {
+        "schema": "symphony-lanes-public-projection/v1", "fullEvidence": evidence,
+    }
+    text = json.dumps(public, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+    if len(text.encode("utf-8")) <= PUBLIC_FEED_MAX_BYTES:
+        return text
+    # Never trim operational ownership/hold/attempt arrays to pretend they fit.
+    # Existing schema-checking readers reject this as unknown, not an empty fleet.
+    return json.dumps({
+        "schema": "symphony-lanes-status-unavailable/v1", "status": "unavailable",
+        "reason": "essential-public-feed-exceeds-byte-limit",
+        "requiredBytes": len(text.encode("utf-8")), "maxBytes": PUBLIC_FEED_MAX_BYTES,
+        "fullEvidence": evidence,
+    }, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+
+
 def publish_status(host, lane, feed: dict, tracking_issue: str = "JOV-6637") -> str | None:
-    """Keep one secret gist current with the status feed; create it once and announce its URL.
-    Only the primary host (flag file ~/.config/jovie-lanes/primary) publishes, so a second
-    host running the same release never creates a second feed."""
+    """Publish one bounded status view plus complete evidence in the existing gist."""
     if not PRIMARY_FLAG.exists():
         return None
+    deadline = time.monotonic() + 60
     path = host.state / "status-gist.json"
-    record = read_json(path, {})
+    record = json.loads(path.read_text()) if path.exists() else {}
+    if not isinstance(record, dict):
+        raise RuntimeError("status-gist-record-unavailable")
+    full_text = json.dumps(feed, indent=1, ensure_ascii=False, allow_nan=False)
     body = host.state / "lanes-status.json"
-    body.write_text(json.dumps(feed, indent=1))
+    body.write_text(full_text, encoding="utf-8")
+    if body.read_bytes() != full_text.encode("utf-8"):
+        raise RuntimeError("status-feed-evidence-readback-changed")
+    public_text = public_status_projection(feed, full_text)
+    packet = {"files": {
+        "lanes-status.json": {"content": public_text},
+        STATUS_DETAIL_NAME: {"content": full_text},
+    }}
+    packet_path = host.state / "lanes-status-publish.json"
+    created_now = not record.get("url")
+    if created_now:
+        if record:
+            raise RuntimeError("status-gist-creation-reconcile-required")
+        packet.update({"description": "Symphony lanes status (written every tick by doctor.py)", "public": False})
+    elif not isinstance(record.get("id"), str) or not re.fullmatch(r"[a-f0-9]{1,64}", record["id"]):
+        raise RuntimeError("status-gist-record-unavailable")
+    packet_text = json.dumps(packet, ensure_ascii=False, allow_nan=False)
+    packet_path.write_text(packet_text, encoding="utf-8")
     lane.load_github_env()
-    if not record.get("url"):
-        created = lifecycle.run(["gh", "gist", "create", "--desc", "Symphony lanes status (written every tick by doctor.py)",
-                                  "--filename", "lanes-status.json", str(body)], capture_output=True, text=True, timeout=60)
-        url = (created.stdout or "").strip().splitlines()[-1] if created.returncode == 0 and created.stdout.strip() else None
-        if not url:
-            return None
-        record = {"url": url, "id": url.rstrip("/").split("/")[-1], "createdAt": now_iso()}
-        path.write_text(json.dumps(record))
+
+    def api(endpoint, method, input_path=None):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise RuntimeError("status-gist-deadline-exceeded")
+        args = ["gh", "api", endpoint, "--method", method]
+        if input_path is not None:
+            args.extend(["--input", str(input_path)])
+        result = lifecycle.run(args, capture_output=True, text=True, timeout=remaining)
+        if result.returncode != 0:
+            raise RuntimeError("status-gist-publish-unconfirmed")
+        return result
+
+    if created_now:
+        # An uncertain create must not create another gist on the next tick.
+        path.write_text(json.dumps({
+            "creationAttemptedAt": now_iso(),
+            "payloadSha256": hashlib.sha256(packet_text.encode("utf-8")).hexdigest(),
+        }), encoding="utf-8")
+        result = api("gists", "POST", packet_path)
         try:
-            lane.Linear(host.linear_env).comment(tracking_issue and _issue_id(lane, host, tracking_issue),
-                                                  f"🤖 doctor: lanes status feed (raw JSON, refreshed every tick): {url}/raw/lanes-status.json")
+            created = json.loads(result.stdout)
+            if (not isinstance(created.get("id"), str) or not re.fullmatch(r"[a-f0-9]{1,64}", created["id"]) or
+                    not isinstance(created.get("html_url"), str) or not created["html_url"]):
+                raise ValueError("missing gist identity")
+            record = {"url": created["html_url"], "id": created["id"], "createdAt": now_iso()}
+        except (ValueError, AttributeError):
+            raise RuntimeError("status-gist-create-unconfirmed") from None
+        # Retain the known identity even if subsequent readback is unavailable.
+        path.write_text(json.dumps(record), encoding="utf-8")
+    else:
+        api(f"gists/{record['id']}", "PATCH", packet_path)
+
+    result = api(f"gists/{record['id']}", "GET")
+    try:
+        stored = json.loads(result.stdout)
+        files = stored.get("files")
+        if stored.get("id") != record["id"] or not isinstance(files, dict):
+            raise ValueError("gist identity mismatch")
+        for name, expected in packet["files"].items():
+            actual = files.get(name)
+            if not isinstance(actual, dict) or actual.get("truncated") is not False or actual.get("content") != expected["content"]:
+                raise ValueError("incomplete or changed gist evidence")
+    except (ValueError, AttributeError):
+        raise RuntimeError("status-gist-readback-unconfirmed") from None
+    record.update({
+        "verifiedAt": now_iso(),
+        "fullEvidenceSha256": hashlib.sha256(full_text.encode("utf-8")).hexdigest(),
+        "publicFeedSha256": hashlib.sha256(public_text.encode("utf-8")).hexdigest(),
+    })
+    path.write_text(json.dumps(record), encoding="utf-8")
+    if created_now:
+        try:
+            lane.Linear(host.linear_env).comment(
+                tracking_issue and _issue_id(lane, host, tracking_issue),
+                f"🤖 doctor: lanes status feed (raw JSON, refreshed every tick): {record['url']}/raw/lanes-status.json")
         except Exception:
             pass
-        return url
-    lifecycle.run(["gh", "gist", "edit", record["id"], "--filename", "lanes-status.json", str(body)],
-                   capture_output=True, text=True, timeout=60)
     return record["url"]
 
 

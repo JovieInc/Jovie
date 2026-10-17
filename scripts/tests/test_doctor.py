@@ -6,6 +6,7 @@ Run with:
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import json
 import os
 import subprocess
@@ -1635,7 +1636,85 @@ class AdmissionBackpressureTest(unittest.TestCase):
                 self.assertNotIn("pool-empty", result["alerts"])
 
 
+
+class _GistApiFake:
+    """A stored gist with independent write and GET responses; never calls GitHub."""
+
+    def __init__(self, gist_id="abc123"):
+        self.gist_id = gist_id
+        self.files = {}
+        self.calls = []
+        self.write_count = 0
+        self.fail_write = False
+        self.ambiguous_create = False
+        self.readback_mode = None
+        self.after_write = lambda: None
+
+    def __call__(self, args, **kwargs):
+        self.calls.append((list(args), kwargs.get("timeout")))
+        if args[1] == "gist":  # The pre-fix transport is a valid deliberate-red control.
+            self.write_count += 1
+            self.files["lanes-status.json"] = Path(args[-1]).read_text()
+            self.after_write()
+            return SimpleNamespace(returncode=1 if self.fail_write else 0,
+                                   stdout="" if self.ambiguous_create or args[2] == "edit"
+                                   else f"https://gist.example/{self.gist_id}", stderr="")
+        method = args[args.index("--method") + 1]
+        if method != "GET":
+            self.write_count += 1
+            packet = json.loads(Path(args[args.index("--input") + 1]).read_text())
+            if self.fail_write:
+                return SimpleNamespace(returncode=1, stdout="", stderr="synthetic write failure")
+            self.files.update({name: row["content"] for name, row in packet["files"].items()})
+            self.after_write()
+            if method == "POST" and self.ambiguous_create:
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+        files = {name: {"content": content, "truncated": False} for name, content in self.files.items()}
+        if method == "GET" and self.readback_mode == "changed":
+            files["lanes-status-details.json"]["content"] += "\n"
+        if method == "GET" and self.readback_mode == "truncated":
+            files["lanes-status-details.json"]["truncated"] = True
+        return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({
+            "id": self.gist_id, "html_url": f"https://gist.example/{self.gist_id}", "files": files,
+        }))
+
+
 class PublishTest(unittest.TestCase):
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.state = Path(tmp.name)
+        self.host = SimpleNamespace(state=self.state)
+        self.lane = SimpleNamespace(load_github_env=mock.Mock())
+        primary = self.state / "primary"
+        primary.touch()
+        primary_patch = mock.patch.object(doctor, "PRIMARY_FLAG", primary)
+        primary_patch.start()
+        self.addCleanup(primary_patch.stop)
+        self.api = _GistApiFake()
+        api_patch = mock.patch.object(doctor.lifecycle, "run", self.api)
+        api_patch.start()
+        self.addCleanup(api_patch.stop)
+        self.record = self.state / "status-gist.json"
+        self.record.write_text(json.dumps({"url": "https://gist.example/abc123", "id": "abc123"}))
+
+    def feed(self, row_count=400):
+        return {
+            "schema": "symphony-lanes-status/v1", "at": "2026-10-17T18:00:00Z",
+            "host": "gem", "release": "a" * 40, "running": 2, "idle": 1, "pool": None,
+            "lanes": {"codex": {"running": 2, "slots": 3}}, "alerts": {"source-unknown": "held"},
+            "conditions": {"source-unknown": {"owner": "existing-owner", "attempt": "b" * 64,
+                                               "effect": "unknown", "readback": None}},
+            "remediation": {"held": [{"issue": "JOV-1", "attempt": "c" * 64, "notSent": None}]},
+            "shippingAttribution": {
+                "schema": "jovie-shipping-attribution/v1", "complete": False, "mergeCount": None,
+                "projects": [{"repository": "JovieInc/Jovie", "denominatorComplete": True,
+                              "attributionEvidenceComplete": False, "unknownCount": row_count,
+                              "pullRequests": [{"prNumber": i + 1, "origin": {"confidence": "unknown"},
+                                                "diagnostic": "x" * 1024} for i in range(row_count)]}],
+            },
+        }
+
     def test_only_the_primary_host_publishes(self):
         saved = doctor.PRIMARY_FLAG
         with tempfile.TemporaryDirectory() as tmp:
@@ -1644,8 +1723,113 @@ class PublishTest(unittest.TestCase):
             try:
                 self.assertIsNone(doctor.publish_status(host, None, {"x": 1}))
                 self.assertFalse((Path(tmp) / "lanes-status.json").exists(), "a non-primary host writes nothing")
+                self.assertEqual(self.api.calls, [])
             finally:
                 doctor.PRIMARY_FLAG = saved
+
+    def test_growth_keeps_public_bytes_bounded_and_full_evidence_verifiable(self):
+        feed = self.feed()
+        self.assertGreater(len(json.dumps(feed).encode()), 256 * 1024)
+        self.assertEqual(doctor.publish_status(self.host, self.lane, feed), "https://gist.example/abc123")
+        public_text = self.api.files["lanes-status.json"]
+        self.assertLessEqual(len(public_text.encode("utf-8")), 256 * 1024)
+        public = json.loads(public_text)
+        self.assertEqual(public["schema"], feed["schema"])
+        for key in ("at", "release", "lanes", "pool", "alerts", "conditions", "remediation"):
+            self.assertEqual(public[key], feed[key], key)
+        detail = self.api.files["lanes-status-details.json"]
+        self.assertEqual(json.loads(detail), feed)
+        self.assertEqual((self.state / "lanes-status.json").read_text(), detail)
+        proof = public["publicProjection"]["fullEvidence"]
+        self.assertEqual(proof["fileName"], "lanes-status-details.json")
+        self.assertEqual(proof["sha256"], hashlib.sha256(detail.encode()).hexdigest())
+        self.assertEqual(proof["bytes"], len(detail.encode()))
+        self.assertEqual((proof["at"], proof["release"]), (feed["at"], feed["release"]))
+        project = public["shippingAttribution"]["projects"][0]
+        self.assertNotIn("pullRequests", project, "omitted detail must never masquerade as an empty array")
+        self.assertEqual(project["pullRequestsRef"]["recordCount"], 400)
+        self.assertEqual(project["pullRequestsRef"]["jsonPointer"], "/shippingAttribution/projects/0/pullRequests")
+        self.assertIs(project["attributionEvidenceComplete"], False)
+        self.assertIsNone(public["shippingAttribution"]["mergeCount"])
+        self.assertEqual(self.api.write_count, 1)
+        self.assertEqual(len(self.api.calls), 2, "one atomic write and one independent readback")
+
+    def test_essential_oversize_is_explicit_unavailable_without_fake_empty_counts(self):
+        feed = self.feed(0)
+        feed["conditions"]["source-unknown"]["evidence"] = "x" * (256 * 1024)
+        doctor.publish_status(self.host, self.lane, feed)
+        public = json.loads(self.api.files["lanes-status.json"])
+        self.assertLessEqual(len(self.api.files["lanes-status.json"].encode()), 256 * 1024)
+        self.assertEqual(public["status"], "unavailable")
+        self.assertEqual(public["reason"], "essential-public-feed-exceeds-byte-limit")
+        self.assertNotEqual(public["schema"], "symphony-lanes-status/v1")
+        for key in ("running", "idle", "pool", "lanes", "alerts", "conditions"):
+            self.assertNotIn(key, public, "refusal cannot manufacture a healthy empty fleet")
+        self.assertEqual(json.loads(self.api.files["lanes-status-details.json"]), feed)
+
+    def test_utf8_limit_counts_bytes_and_preserves_full_multibyte_evidence(self):
+        feed = self.feed(0)
+        feed["conditions"]["source-unknown"]["evidence"] = "界" * 100_000
+        self.assertLess(len(json.dumps(feed, ensure_ascii=False, separators=(",", ":"))), 256 * 1024)
+        doctor.publish_status(self.host, self.lane, feed)
+        self.assertEqual(json.loads(self.api.files["lanes-status.json"])["status"], "unavailable")
+        self.assertEqual(json.loads(self.api.files["lanes-status-details.json"]), feed)
+
+    def test_unknown_attribution_is_not_rewritten_to_empty_detail(self):
+        feed = self.feed(0)
+        feed["shippingAttribution"]["projects"][0]["pullRequests"] = None
+        doctor.publish_status(self.host, self.lane, feed)
+        public = json.loads(self.api.files["lanes-status.json"])
+        self.assertIsNone(public["shippingAttribution"]["projects"][0]["pullRequests"])
+        self.assertIs(public["shippingAttribution"]["complete"], False)
+
+    def test_failed_publication_does_not_report_a_successful_feed(self):
+        self.api.fail_write = True
+        with self.assertRaises(RuntimeError):
+            doctor.publish_status(self.host, self.lane, self.feed(0))
+        self.assertEqual(len(self.api.calls), 1)
+
+    def test_changed_or_incomplete_readback_cannot_certify_full_evidence(self):
+        for mode in ("changed", "truncated"):
+            with self.subTest(mode=mode):
+                self.api.readback_mode = mode
+                with self.assertRaises(RuntimeError):
+                    doctor.publish_status(self.host, self.lane, self.feed(0))
+
+    def test_create_keeps_one_identity_after_unknown_or_unverified_effect(self):
+        self.record.unlink()
+        self.api.ambiguous_create = True
+        with self.assertRaises(RuntimeError):
+            doctor.publish_status(self.host, self.lane, self.feed(0))
+        with self.assertRaises(RuntimeError):
+            doctor.publish_status(self.host, self.lane, self.feed(0))
+        self.assertEqual(self.api.write_count, 1, "unknown create is reconcile-required, never another gist")
+
+    def test_known_create_with_unverified_readback_reuses_the_same_gist(self):
+        self.record.unlink()
+        self.api.readback_mode = "truncated"
+        with self.assertRaises(RuntimeError):
+            doctor.publish_status(self.host, self.lane, self.feed(0))
+        self.assertEqual(json.loads(self.record.read_text())["id"], self.api.gist_id)
+        self.api.readback_mode = None
+        doctor.publish_status(self.host, self.lane, self.feed(0))
+        methods = [args[args.index("--method") + 1] for args, _timeout in self.api.calls]
+        self.assertEqual(methods, ["POST", "GET", "PATCH", "GET"])
+
+    def test_foreign_resource_path_is_refused_before_any_github_effect(self):
+        self.record.write_text(json.dumps({"url": "https://gist.example/abc123", "id": "../user"}))
+        with self.assertRaises(RuntimeError):
+            doctor.publish_status(self.host, self.lane, self.feed(0))
+        self.assertEqual(self.api.calls, [])
+
+    def test_existing_publication_deadline_covers_write_and_readback(self):
+        clock = {"now": 0}
+        self.api.after_write = lambda: clock.update(now=61)
+        with mock.patch.object(doctor.time, "monotonic", side_effect=lambda: clock["now"]):
+            with self.assertRaises(RuntimeError):
+                doctor.publish_status(self.host, self.lane, self.feed(0))
+        self.assertEqual(len(self.api.calls), 1)
+        self.assertLessEqual(self.api.calls[0][1], 60)
 
 
 class DeliveryTest(unittest.TestCase):
@@ -2089,9 +2273,9 @@ class StatusFeedContractTest(unittest.TestCase):
             stamp = datetime.fromisoformat(feed["at"].replace("Z", "+00:00"))
             self.assertLess(abs(time.time() - stamp.timestamp()), 60)
             with mock.patch.object(doctor, "PRIMARY_FLAG", Path(tmp) / "primary"), \
-                    mock.patch.object(doctor.lifecycle, "run", return_value=SimpleNamespace(returncode=0, stdout="", stderr="")):
+                    mock.patch.object(doctor.lifecycle, "run", _GistApiFake("abc123")):
                 (Path(tmp) / "primary").write_text("")
-                (Path(tmp) / "status-gist.json").write_text(json.dumps({"url": "https://gist.example/x", "id": "x"}))
+                (Path(tmp) / "status-gist.json").write_text(json.dumps({"url": "https://gist.example/abc123", "id": "abc123"}))
                 doctor.publish_status(host, SimpleNamespace(load_github_env=lambda: None), feed)
             published = json.loads((Path(tmp) / "lanes-status.json").read_text())
             self.assertEqual((published["schema"], published["at"]), ("symphony-lanes-status/v1", feed["at"]))
