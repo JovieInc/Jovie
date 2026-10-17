@@ -723,7 +723,9 @@ class LabeledEventTest(unittest.TestCase):
         import tempfile
         from pathlib import Path
         from unittest.mock import patch
-        with tempfile.TemporaryDirectory() as tmp, patch.object(runner, "provider_healthy", return_value=True):
+        with tempfile.TemporaryDirectory() as tmp, patch.object(runner, "provider_healthy", return_value=True), \
+                patch.dict(os.environ, {"LANES_EXECUTION_BACKEND": "cache-fixture"}), \
+                patch.object(runner, "SHARED_CACHE_DIR", Path(tmp) / "cache"):
             host = type("Host", (), {"state": Path(tmp)})()
             runner.claim_remediation_events(host, Linear())
             runner.claim_remediation_events(host, Linear())
@@ -750,7 +752,7 @@ class LabeledEventTest(unittest.TestCase):
             self.assertTrue(released["events"]["musicfetch-quota"]["release"])
             self.assertIsNone(released["events"]["musicfetch-quota"]["lane"])
         reads = [query for query in calls if isinstance(query, str) and "startsWith" in query]
-        self.assertEqual(len(reads), 2)
+        self.assertEqual(len(reads), 1)  # Planning and selection share the same complete cache fill.
         self.assertIn('"JOV"', reads[0])
         self.assertIn('"LYB"', reads[0])
         self.assertEqual(sum(isinstance(query, str) and "issue(id:" in query for query in calls), 2)
@@ -851,7 +853,7 @@ class CompleteEventInventoryTest(unittest.TestCase):
                 return result
         with patch.object(self.runner, "shared", side_effect=lambda key, ttl, fetch: fetch()) as cache:
             result = self.runner.fetch_labeled_events(Linear())
-            self.assertEqual(cache.call_args.args[0], "remediation-events-v2")
+            self.assertEqual(cache.call_args.args[0], "remediation-events-v3-priority")
         return result, calls
 
     def test_reads_beyond_first_hundred_without_duplicate_ids(self):
@@ -882,16 +884,22 @@ class CompleteEventInventoryTest(unittest.TestCase):
         calls = []
         class Linear:
             def gql(self, query, variables):
+                if "updatedAt priority state" not in query:
+                    raise AssertionError("Current remediation inventory must request canonical priority")
                 calls.append(variables["after"])
-                return {"issues": {"nodes": [{"id": "new"}], "pageInfo": {"hasNextPage": False}}}
+                return {"issues": {"nodes": [{"id": "new", "priority": 1}], "pageInfo": {"hasNextPage": False}}}
         with tempfile.TemporaryDirectory() as tmp, \
                 patch.dict(os.environ, {"LANES_EXECUTION_BACKEND": "cache-fixture"}), \
                 patch.object(self.runner, "SHARED_CACHE_DIR", Path(tmp)):
             (Path(tmp) / "remediation-events.json").write_text(json.dumps({"at": __import__('time').time(), "value": [{"id": "old"}]}))
-            self.assertEqual(self.runner.fetch_labeled_events(Linear()), [{"id": "new"}])
-            self.assertEqual(self.runner.fetch_labeled_events(Linear()), [{"id": "new"}])
+            previous = Path(tmp) / "remediation-events-v2.json"
+            previous.write_text(json.dumps({"at": __import__('time').time(), "value": [{"id": "old-no-priority"}]}))
+            prior_bytes = previous.read_bytes()
+            self.assertEqual(self.runner.fetch_labeled_events(Linear()), [{"id": "new", "priority": 1}])
+            self.assertEqual(self.runner.fetch_labeled_events(Linear()), [{"id": "new", "priority": 1}])
             self.assertEqual(calls, [None])
-            self.assertTrue((Path(tmp) / "remediation-events-v2.json").exists())
+            self.assertTrue((Path(tmp) / "remediation-events-v3-priority.json").exists())
+            self.assertEqual(previous.read_bytes(), prior_bytes)
 
     def test_incomplete_read_cannot_plan_events_or_write_state(self):
         import tempfile

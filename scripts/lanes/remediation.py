@@ -35,7 +35,7 @@ LABEL_PREFIX = "remediation:"
 LABELED_EVENT_QUERY = (
     'query($after:String){issues(first:100,after:$after,filter:{team:{key:{in:["JOV","LYB"]}},'
     'labels:{name:{startsWith:"remediation:"}}}){pageInfo{hasNextPage endCursor} nodes{id identifier title description '
-    'url createdAt updatedAt state{name type} team{key states{nodes{id name type}}} '
+    'url createdAt updatedAt priority state{name type} team{key states{nodes{id name type}}} '
     'labels{nodes{id name}}}}}'
 )
 EVENT_INVENTORY_PAGES = 20
