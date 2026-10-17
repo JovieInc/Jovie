@@ -10525,6 +10525,86 @@ class RemediationEventRecoveryTest(unittest.TestCase):
         self.assertEqual(claimed.identifier, self.issue['identifier'])
         self.assertEqual(lane.load_escalation(self.host)['events']['later-ci-control'], before)
 
+    def test_cached_priority_edit_is_consumed_without_rewriting_event_ownership(self):
+        later = self.priority_pair(3, 4)
+        lane.claim_remediation_events(self.host, self.linear)
+        lane.claim_remediation_events(self.host, self.linear)
+        before = lane.load_escalation(self.host)
+        binding = lane._event_start_claim('later-ci-control', before['events']['later-ci-control'])
+        later['priority'] = 1
+        self.host = lane.Host(state=self.host.state, repo=self.host.repo)
+        claimed = lane.claim_labeled_event(self.host, 'codex', self.linear)
+        self.assertEqual(claimed.identifier, later['identifier'])
+        self.assertEqual(claimed.priority, 1)
+        current = lane.load_escalation(self.host)
+        self.assertEqual(current['events']['delivery-stalled'], before['events']['delivery-stalled'])
+        self.assertEqual(lane._event_start_claim('later-ci-control', current['events']['later-ci-control']), binding)
+
+    def test_missing_or_changed_cached_identity_cannot_authorize_a_start(self):
+        self.issue['priority'] = 1
+        lane.claim_remediation_events(self.host, self.linear)
+        before = lane.load_escalation(self.host)
+        moved = {**self.issue, 'identifier': 'JOV-99'}
+        foreign = {**self.issue, 'team': {'key': 'LYB'}}
+        for inventory in [[], [moved], [foreign]]:
+            with self.subTest(inventory=inventory), \
+                    patch.object(lane, 'fetch_labeled_events', return_value=inventory), \
+                    patch.object(self.linear, 'gql', wraps=self.linear.gql) as remote:
+                self.assertIsNone(lane.claim_labeled_event(self.host, 'codex', self.linear))
+                remote.assert_not_called()
+                self.assertEqual(lane.load_escalation(self.host), before)
+
+    def test_unavailable_complete_inventory_keeps_owned_event_unchanged(self):
+        lane.claim_remediation_events(self.host, self.linear)
+        before = lane.load_escalation(self.host)
+        with patch.object(lane, 'fetch_labeled_events', side_effect=RuntimeError('remediation-inventory-unreadable')), \
+                patch.object(self.linear, 'gql', wraps=self.linear.gql) as remote:
+            with self.assertRaisesRegex(RuntimeError, 'remediation-inventory-unreadable'):
+                lane.claim_labeled_event(self.host, 'codex', self.linear)
+            remote.assert_not_called()
+        self.assertEqual(lane.load_escalation(self.host), before)
+
+    def test_priority_upgrade_preserves_an_accepted_pending_delivery_preimage(self):
+        self.issue['priority'] = 1
+        lane.claim_remediation_events(self.host, self.linear)
+        lane.claim_remediation_events(self.host, self.linear)
+        data = lane.load_escalation(self.host)
+        legacy = data['events']['delivery-stalled']
+        legacy.pop('priority', None)
+        legacy.pop('createdAt', None)
+        lane.save_escalation(self.host, data)
+        journal = lane._event_delivery_state(self.host)
+        plan = {'events': data['events'], 'comments': [{'id': self.issue['id'], 'body': 'Owned receipt'}]}
+        lane._queue_event_delivery(journal, plan, [self.issue], {'delivery-stalled'}, time.time())
+        lane._save_event_delivery(self.host, journal)
+        original_intent = copy.deepcopy(next(iter(journal['actions'].values())))
+        original_owner = copy.deepcopy(legacy)
+        comments = {}
+        original = self.linear.gql
+        def gql(query, variables):
+            if query.startswith('query') and 'comment(' in query:
+                return {'comment': comments.get(variables['id'])}
+            if query.startswith('mutation') and 'commentCreate' in query:
+                item = variables['i']
+                comments[item['id']] = {'id': item['id'], 'body': item['body'],
+                                         'issue': {'id': item['issueId']}}
+                return {'commentCreate': {'success': True}}
+            return original(query, variables)
+        self.linear.gql = gql
+        report = lane.claim_remediation_events(self.host, self.linear)
+        action = next(iter(lane._event_delivery_state(self.host)['actions'].values()))
+        current_owner = lane.load_escalation(self.host)['events']['delivery-stalled']
+        changed = {key: (original_owner.get(key), current_owner.get(key))
+                   for key in original_owner.keys() | current_owner.keys()
+                   if original_owner.get(key) != current_owner.get(key)}
+        self.assertEqual(report['deliveryAcknowledged'], 1, {'action': action, 'changed': changed})
+        self.assertEqual(changed, {})
+        self.assertEqual(action['status'], 'acknowledged')
+        self.assertEqual(action['commentId'], original_intent['commentId'])
+        self.assertEqual(action['deadline'], original_intent['deadline'])
+        self.assertEqual(action['expectedEvent'], original_intent['expectedEvent'])
+        self.assertEqual(len(comments), 1)
+
     def test_priority_does_not_revive_exhausted_labeled_attempts(self):
         self.priority_pair(4, 1)
         lane.claim_remediation_events(self.host, self.linear)
