@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
+import { renderToString } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
@@ -181,10 +182,58 @@ describe('signup page', () => {
       );
     });
 
-    expect(
-      await screen.findByText('@testhandle is available. Sign up to claim it.')
-    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        screen.getByText('@testhandle is available. Sign up to claim it.')
+      ).toBeVisible();
+    });
     expect(sessionStorage.getItem('pendingClaim')).toBeNull();
+  });
+
+  it('reserves the handle status slot in server markup before hydration', () => {
+    searchParamsState.value = 'handle=LongArtistNameForFocus';
+
+    const markup = renderToString(<SignUpPageClient />);
+
+    expect(markup).toContain('data-testid="signup-handle-status"');
+    expect(markup).toContain('data-availability-state="initial"');
+    expect(markup).toContain('aria-live="polite"');
+  });
+
+  it('keeps one accessible status region from checking through completion', async () => {
+    searchParamsState.value = 'handle=StableArtist';
+    let resolveFetch!: (value: {
+      json: () => Promise<{ available: boolean }>;
+    }) => void;
+    fetchMock.mockReturnValueOnce(
+      new Promise(resolve => {
+        resolveFetch = resolve;
+      })
+    );
+
+    render(<SignUpPageClient />);
+
+    const status = screen.getByTestId('signup-handle-status');
+    await waitFor(() => {
+      expect(status).toHaveAttribute('data-availability-state', 'checking');
+    });
+    expect(status).toHaveAttribute('aria-live', 'polite');
+    expect(status).toHaveAttribute('aria-atomic', 'true');
+    expect(status).toHaveAttribute('aria-busy', 'true');
+    expect(
+      screen.getByText('Checking if @stableartist is available...')
+    ).toBeInTheDocument();
+
+    resolveFetch({ json: async () => ({ available: true }) });
+
+    await waitFor(() => {
+      expect(status).toHaveAttribute('data-availability-state', 'available');
+    });
+    expect(screen.getByTestId('signup-handle-status')).toBe(status);
+    expect(status).toHaveAttribute('aria-busy', 'false');
+    expect(
+      screen.getByText('@stableartist is available. Sign up to claim it.')
+    ).toBeVisible();
   });
 
   it('shows the oauth compatibility banner and removes only oauth_error from the URL', async () => {
@@ -368,11 +417,13 @@ describe('signup page', () => {
 
     render(<SignUpPageClient />);
 
-    expect(
-      await screen.findByText(
-        '@takenhandle is already taken. You can pick another handle after signing up.'
-      )
-    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          '@takenhandle is already taken. You can pick another handle after signing up.'
+        )
+      ).toBeVisible();
+    });
   });
 
   it('renders the fallback state when handle availability lookup fails', async () => {
@@ -381,11 +432,13 @@ describe('signup page', () => {
 
     render(<SignUpPageClient />);
 
-    expect(
-      await screen.findByText(
-        "Couldn't check if @brokenhandle is available. You can still sign up and choose a handle."
-      )
-    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          "Couldn't check if @brokenhandle is available. You can still sign up and choose a handle."
+        )
+      ).toBeVisible();
+    });
   });
 
   it('shows the access denied oauth banner without losing redirect params', async () => {

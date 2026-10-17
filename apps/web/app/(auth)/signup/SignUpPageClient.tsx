@@ -1,6 +1,6 @@
 'use client';
 
-import { Skeleton } from '@jovie/ui';
+import { LoadingSkeleton } from '@jovie/ui';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
@@ -43,6 +43,29 @@ import {
   useShouldRenderDesktopAuthHandoff,
 } from '../DesktopAuthRouteHandoff';
 
+type HandleAvailability = 'checking' | 'available' | 'taken' | 'error' | null;
+
+const TERMINAL_HANDLE_AVAILABILITY_STATES = [
+  'available',
+  'taken',
+  'error',
+] as const;
+
+function getHandleAvailabilityMessage(
+  availability: Exclude<HandleAvailability, 'checking' | null>,
+  normalizedHandle: string
+): string {
+  if (availability === 'available') {
+    return `@${normalizedHandle} is available. Sign up to claim it.`;
+  }
+
+  if (availability === 'taken') {
+    return `@${normalizedHandle} is already taken. You can pick another handle after signing up.`;
+  }
+
+  return `Couldn't check if @${normalizedHandle} is available. You can still sign up and choose a handle.`;
+}
+
 /**
  * Persist pre-signup claim data from the homepage hero into sessionStorage,
  * and display a handle availability banner when a handle param is present.
@@ -50,9 +73,7 @@ import {
 function SignUpClaimDataPersistence() {
   const searchParams = useSearchParams();
   const handle = searchParams.get('handle');
-  const [availability, setAvailability] = useState<
-    'checking' | 'available' | 'taken' | 'error' | null
-  >(null);
+  const [availability, setAvailability] = useState<HandleAvailability>(null);
 
   useEffect(() => {
     const spotifyUrl = searchParams.get('spotify_url');
@@ -128,38 +149,37 @@ function SignUpClaimDataPersistence() {
 
   const normalizedHandle = useMemo(() => handle?.toLowerCase() ?? '', [handle]);
 
-  if (!handle || !availability) return null;
+  if (!handle || handle.length < 3) return null;
 
   return (
     <output
-      className='mb-4 block text-center text-app text-secondary-token'
+      data-testid='signup-handle-status'
+      data-availability-state={availability ?? 'initial'}
+      className='mb-4 grid items-center text-center text-app text-secondary-token'
       aria-live='polite'
+      aria-atomic='true'
+      aria-busy={availability === 'checking'}
     >
-      {availability === 'checking' && (
-        <div className='flex items-center justify-center lg:justify-start'>
-          <Skeleton />
-          <span className='sr-only'>
-            Checking if @{normalizedHandle} is available...
-          </span>
+      <div
+        aria-hidden={availability !== 'checking'}
+        className={`col-start-1 row-start-1 flex items-center justify-center lg:justify-start ${availability === 'checking' ? '' : 'invisible'}`}
+      >
+        <div className='w-44 max-w-full'>
+          <LoadingSkeleton announce={false} height='h-4' />
         </div>
-      )}
-      {availability === 'available' && (
-        <p className='text-app font-book text-primary-token'>
-          @{normalizedHandle} is available. Sign up to claim it.
+        <span className='sr-only'>
+          Checking if @{normalizedHandle} is available...
+        </span>
+      </div>
+      {TERMINAL_HANDLE_AVAILABILITY_STATES.map(state => (
+        <p
+          key={state}
+          aria-hidden={availability !== state}
+          className={`col-start-1 row-start-1 break-words text-app font-book ${state === 'available' ? 'text-primary-token' : 'text-secondary-token'} ${availability === state ? '' : 'invisible'}`}
+        >
+          {getHandleAvailabilityMessage(state, normalizedHandle)}
         </p>
-      )}
-      {availability === 'taken' && (
-        <p className='text-app font-book text-secondary-token'>
-          @{normalizedHandle} is already taken. You can pick another handle
-          after signing up.
-        </p>
-      )}
-      {availability === 'error' && (
-        <p className='text-app font-book text-secondary-token'>
-          Couldn&apos;t check if @{normalizedHandle} is available. You can still
-          sign up and choose a handle.
-        </p>
-      )}
+      ))}
     </output>
   );
 }
