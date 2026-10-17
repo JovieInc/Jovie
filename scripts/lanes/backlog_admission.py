@@ -280,15 +280,21 @@ class _PreparedGuard:
         return project_backlog_admission(value, now=time.time(), canonical_state_path=self.canonical_state_path,
                                          _ordering_only=ordering)
 
+    def _readiness_hold(self, row):
+        if row["state"]["name"] == "Backlog" and "agent-ready" not in _as_native(self._native.lane, row).labels:
+            return _hold("backlog-readiness-not-established", ISSUE_OWNER, row["identifier"],
+                         "Existing Summer readiness owner must qualify the work before canonical Backlog admission.")
+        return None
+
     def _cheap_hold(self, row):
         native = _as_native(self._native.lane, row)
         if row.get("archivedAt"):
             return _hold("parent-or-archived", ISSUE_OWNER, row["identifier"], "Preserve the parent contract and advance its actual leaf owner.")
         if type(row.get("priority")) is not int or row["priority"] not in (1, 2, 3, 4):
             return _hold("priority-invalid", ISSUE_OWNER, row["identifier"], "The existing priority owner must supply a valid explicit tier; no Urgent value is inferred.")
-        if row["state"]["name"] == "Backlog" and "agent-ready" not in native.labels:
-            return _hold("backlog-readiness-not-established", ISSUE_OWNER, row["identifier"],
-                         "Existing Summer readiness owner must qualify the work before canonical Backlog admission.")
+        readiness = self._readiness_hold(row)
+        if readiness:
+            return readiness
         work_key = execution_attempt.identity("linear-work", {"issue": row["identifier"], "outcome": "draft-pr"}, {})["workKey"]
         if work_key in self._reads.attempts:
             return _hold("existing-attempt-reentry-owner-hold", ATTEMPT_OWNER, row["identifier"], "Use the existing certified reentry owner; preserve prior custody.")
@@ -326,6 +332,13 @@ class _PreparedGuard:
             if str(current.resolve()) != self._binding["installedPath"]:
                 raise Unavailable("installed-runtime-changed")
             row = self._reads.issue(self.issue_id)
+            # Urgent/P0 cohort membership ranks work; it does not establish the
+            # readiness required of both the selected issue and predecessors.
+            readiness = self._readiness_hold(row)
+            if readiness:
+                self._observation = _observation(self._identifier, [readiness],
+                                                 {"statePath": self.canonical_state_path, "observedAt": self._started, "readOnly": True})
+                return self.observation
             selected = _as_native(self._native.lane, row)
             rank_now = time.time()
             rank = (self._native.lane.admission_order(selected, rank_now), selected.id)

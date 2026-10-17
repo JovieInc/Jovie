@@ -750,13 +750,14 @@ class NativeJoinTest(unittest.TestCase):
 
 class PreparedContextTest(unittest.TestCase):
     @contextmanager
-    def context(self, others=(), *, native_holds=(), projection_mutator=None):
+    def context(self, others=(), *, native_holds=(), projection_mutator=None, selected_mutator=None):
         import lane_runner as lane
         with tempfile.TemporaryDirectory() as tmp, patch.object(admission.time, "time", return_value=NOW):
             state = Path(tmp).resolve() / ".local/state/jovie-lanes"
             current = state / "releases" / ("a" * 64) / "scripts/lanes"; current.mkdir(parents=True)
             (state / "current").symlink_to(current)
             selected = linear_row(identity="selected")
+            if selected_mutator: selected_mutator(selected)
             rows = {row["id"]: deepcopy(row) for row in [selected, *others]}
             reads = SimpleNamespace(lane=lane, state=state, current=current, prs=[], pages=[[]],
                                     cohort=lambda: [deepcopy(rows[key]) for key in sorted(rows) if rows[key]["state"]["name"] in ("Backlog", "Todo")],
@@ -797,6 +798,74 @@ class PreparedContextTest(unittest.TestCase):
         row["state"] = {"name": state, "type": "unstarted" if state == "Todo" else "backlog"}
         if not ready: row["labels"]["nodes"] = []
         return row
+
+    def test_selected_urgent_or_p0_without_readiness_holds_before_projection(self):
+        for priority, labels in [(1, []), (3, ["P0"]), (1, ["agent-ready-ish"]),
+                                 (1, ["P0", "dispatch-next"])]:
+            def unready(row):
+                row["priority"] = priority
+                row["labels"]["nodes"] = [{"id": str(i), "name": label} for i, label in enumerate(labels)]
+            with self.subTest(priority=priority, labels=labels), \
+                 patch.object(execution_attempt, "_gh", side_effect=AssertionError("unexpected network")), \
+                 patch.object(execution_attempt, "claim", side_effect=AssertionError("unexpected claim")), \
+                 self.context(selected_mutator=unready) as (ctx, reads, rows, project):
+                for result in (ctx.observation, ctx.revalidate(), ctx.assert_bound()):
+                    self.assertFalse(result["allowed"])
+                    self.assertEqual(result["holds"][0]["code"], "backlog-readiness-not-established")
+                    self.assertEqual(result["holds"][0]["owner"], admission.ISSUE_OWNER)
+                    self.assertTrue(result["holds"][0]["nextAction"])
+                    self.assertFalse(result["authorizesTransition"])
+                    self.assertFalse(result["authorizesDispatch"])
+                project.assert_not_called()
+
+    def test_ready_selected_urgent_and_p0_still_require_all_existing_projection_gates(self):
+        for priority, labels in [(1, ["agent-ready"]), (3, ["P0", "agent-ready"])]:
+            def ready(row):
+                row["priority"] = priority
+                row["labels"]["nodes"] = [{"id": str(i), "name": label} for i, label in enumerate(labels)]
+            for failure in (None, "custody", "dependency", "attempt", "resource"):
+                def gated(value, row):
+                    if failure == "custody": value["custody"]["holders"] = [{"owner": "Incumbent"}]
+                    if failure == "dependency": value["dependencies"]["complete"] = False
+                    if failure == "attempt": value["attemptHistory"]["pages"] = [[status()]]
+                    if failure == "resource": value["runtime"]["resources"]["freeSlots"] = 0
+                with self.subTest(priority=priority, failure=failure), \
+                     self.context(selected_mutator=ready, projection_mutator=gated) as (ctx, reads, rows, project):
+                    self.assertEqual(ctx.observation["allowed"], failure is None)
+                    self.assertFalse(ctx.observation["authorizesTransition"])
+                    self.assertFalse(ctx.observation["authorizesDispatch"])
+                    self.assertGreater(project.call_count, 0)
+
+    def test_readiness_change_requires_fresh_preparation_and_never_reuses_old_version(self):
+        with self.context() as (ctx, reads, rows, project):
+            self.assertTrue(ctx.observation["allowed"])
+            rows["selected"]["labels"]["nodes"] = []
+            rows["selected"]["updatedAt"] = "2026-10-16T19:47:00Z"
+            self.assertFalse(ctx.revalidate()["allowed"])
+            with patch.object(reads, "cohort", side_effect=AssertionError("network under lock")), \
+                 patch.object(reads, "issue", side_effect=AssertionError("network under lock")), \
+                 patch.object(reads, "gh", side_effect=AssertionError("network under lock")):
+                self.assertFalse(ctx.assert_bound()["allowed"])
+            rows["selected"]["labels"]["nodes"] = [{"id": "restored", "name": "agent-ready"}]
+            rows["selected"]["updatedAt"] = "2026-10-16T19:48:00Z"
+            self.assertFalse(ctx.revalidate()["allowed"])
+            fresh = admission._PreparedGuard(Path(ctx.canonical_state_path), "JOV-6641", reads=reads,
+                        row=rows["selected"], binding=ctx._binding, started=NOW)
+            self.assertTrue(fresh.observation["allowed"])
+            self.assertFalse(fresh.observation["authorizesDispatch"])
+
+    def test_retained_selected_readiness_tampering_holds_at_local_prewrite_fence(self):
+        with self.context() as (ctx, reads, rows, project):
+            self.assertTrue(ctx.observation["allowed"])
+            ctx._row["labels"]["nodes"] = []
+            with patch.object(reads, "cohort", side_effect=AssertionError("network under lock")), \
+                 patch.object(reads, "issue", side_effect=AssertionError("network under lock")), \
+                 patch.object(reads, "gh", side_effect=AssertionError("network under lock")):
+                result = ctx.assert_bound()
+            self.assertFalse(result["allowed"])
+            self.assertEqual(result["holds"][0]["evidence"], "retained-cohort-binding-changed")
+            self.assertFalse(result["authorizesTransition"])
+            self.assertFalse(result["authorizesDispatch"])
 
     def test_eligible_urgent_backlog_fences_high_candidate(self):
         for state in ("Backlog",):
