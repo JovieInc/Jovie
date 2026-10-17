@@ -1973,6 +1973,40 @@ describe('tryHandleAnonymousOnboardingChat', () => {
       expect(hoisted.verifyTurnstileTokenMock).toHaveBeenCalledTimes(1);
     });
 
+    it('honors a per-request E2E header without disarming the rest of the matrix', async () => {
+      vi.resetModules();
+      stubRuntimeEnv({ nodeEnv: 'test' });
+      vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
+      vi.stubEnv('E2E_REQUIRE_TURNSTILE_GATE', '');
+      vi.stubEnv('NEXT_PUBLIC_CLERK_MOCK', '1');
+      hoisted.isTurnstileConfiguredMock.mockReturnValue(true);
+      hoisted.verifyTurnstileTokenMock.mockResolvedValue({
+        success: false,
+        reason: 'missing_token',
+      });
+
+      const { tryHandleAnonymousOnboardingChat } = await import(
+        '@/app/api/chat/onboarding-handler'
+      );
+      const req = makeRequest(
+        {
+          mode: 'onboarding',
+          messages: [userMessage('hi')],
+        },
+        '',
+        { 'x-jovie-e2e-require-turnstile': '1' }
+      );
+      const result = await tryHandleAnonymousOnboardingChat(
+        req,
+        'req-matrix-turnstile-header'
+      );
+
+      expect(result?.status).toBe(403);
+      await expect(result?.json()).resolves.toMatchObject({
+        errorCode: 'TURNSTILE_REQUIRED',
+      });
+    });
+
     it('keeps the gate fail-closed (503 TURNSTILE_NOT_CONFIGURED) when keys are missing', async () => {
       stubNightlyQaEnv();
       hoisted.isTurnstileConfiguredMock.mockReturnValue(false);

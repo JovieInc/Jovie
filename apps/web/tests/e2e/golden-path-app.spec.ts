@@ -183,7 +183,7 @@ test.describe('Golden Path: Core App Flows', { tag: '@golden-path' }, () => {
       retries: 2,
     });
     await waitForHydration(page);
-    await expect(page).toHaveURL(/\/app\/releases/, {
+    await expect(page).toHaveURL(/\/app\/library\?[^#]*\bview=releases\b/, {
       timeout: 15_000,
     });
     // Verify no error page
@@ -200,7 +200,7 @@ test.describe('Golden Path: Core App Flows', { tag: '@golden-path' }, () => {
       retries: 2,
     });
     await waitForHydration(page);
-    await expect(page).toHaveURL(/\/app\/dashboard\/audience/, {
+    await expect(page).toHaveURL(/\/app\/contacts\?[^#]*\btab=audience\b/, {
       timeout: 15_000,
     });
     await expect(page.locator('text=Something went wrong')).not.toBeVisible({
