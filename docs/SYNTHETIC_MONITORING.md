@@ -12,7 +12,7 @@ The production suite is split by responsibility:
 - `synthetic-auth-ui.spec.ts` validates that Google/Apple SSO buttons, the intentional email/identifier auth surface, and provider handoff initiation are healthy.
 - `synthetic-golden-path.spec.ts` validates the public front-door signup journey.
 - `synthetic-production-waitlist.spec.ts` reuses one reserved production email-OTP identity, proves the waitlist traversal and scoped durable receipt, and never deletes production identity data.
-- `onboarding-robot.full.spec.ts` validates app behavior after Clerk authentication: profile creation, dashboard load, public profile load, welcome-chat continuity, and exact cleanup.
+- `onboarding-robot.full.spec.ts` validates app behavior after authentication outside production. The production synthetic does not run it.
 - `public-profile-smoke.spec.ts` validates the public profile rendering baseline.
 - `/api/cron/web-ai-health` runs one tiny real production Gateway turn for web chat, insights, pitches, titles, and packaging. Its daily workflow receipt classifies forbidden-model, empty-stream, placeholder-saved, and request failures without retaining model output.
 
@@ -31,7 +31,7 @@ The primary test covers the complete front-door journey:
 
 ### Onboarding Robot
 
-The onboarding robot is a QA sentinel for the shipped onboarding path, not an activation optimizer. It does not automate Google or Apple provider UI. Production runs create a scoped synthetic Clerk user, authenticate with a Clerk sign-in token, complete `/onboarding`, and clean up only the exact robot user from that run.
+The onboarding robot is a QA sentinel for the shipped onboarding path, not an activation optimizer. It does not automate Google or Apple provider UI. Non-production runs create a scoped synthetic user, complete `/onboarding`, and clean up only the exact robot user from that run. The production synthetic does not run this spec: production has no auth bypass, and `/api/dev/test-auth/session` stays blocked.
 
 Production robot runs do not clear broad onboarding rate-limit keys. Rate-limit clearing remains limited to non-production/local recovery paths.
 
@@ -43,7 +43,7 @@ Coverage:
 4. **Dashboard load** - verifies `/app` loads and emits `dashboard_loaded`.
 5. **Public profile load** - verifies `/<handle>` returns a successful response and no not-found/error copy.
 6. **Welcome-chat continuity** - verifies `/api/onboarding/welcome-chat` returns an app chat route.
-7. **Scoped cleanup** - removes only the exact robot user, generated handle/profile, and matching Clerk user id.
+7. **Scoped cleanup** - removes only the exact robot user, generated handle/profile, and the id for that run. Local runs use a Clerk `user_` id. Production runs use exactly `ba_robot_<run-id>`.
 
 The fast PR smoke, `onboarding-robot.smoke.spec.ts`, runs separately through the desktop smoke manifest and only verifies anonymous `/start` chat health plus event emission.
 
@@ -262,7 +262,7 @@ Doppler Error: the following secrets you are trying to include do not exist in y
 
 Playwright never starts, so `apps/web/test-results/synthetic-production-waitlist-results.json` is never written. The parser treats that missing required file as `error` and fails the job. The same six names were missing on [run 36431588956](https://github.com/JovieInc/Jovie/actions/runs/36431588956) (2026-09-28).
 
-The onboarding robot on the same run skips with annotation `Clerk testing setup was not successful`. Production robot auth is enabled only when `E2E_SYNTHETIC_MODE=true` and `E2E_PROD_SIGNUP_EMAIL_BASE` is set. The full `doppler run` for that step also lacked the email base, so the required skip is the same missing secret. The parser counts that required skip as a failure.
+The onboarding robot on that run skipped with `Clerk testing setup was not successful`, and the parser counted the skip as a failure. JOV-6813 now keeps the robot out of the production synthetic. The workflow step logs `::warning title=Onboarding robot skipped::` with `synthetic-robot-auth-unavailable: production has no auth bypass for the onboarding robot.` The parser records that warning and does not treat the missing robot results file as a silent pass. A robot result that is present and fails, or that skips without this marker, still fails the job. Every other suite still fails on a real error, a missing results file, or any other required skip. This does not add a production auth bypass or unblock `/api/dev/test-auth/session`.
 
 `workers/canary-otp/README.md` already records the provisioning order and that the Doppler GitHub sync 100-secret cap (JOV-7237) blocks adding these values. JOV-6813 still requires a passing scheduled run. A `workflow_dispatch` from this checkout would stay red until `jovie-web/prd` contains the six names. Five consecutive green deep runs were not produced.
 
@@ -276,7 +276,7 @@ Signup readiness, the SEO/AEO ratchet, Layer A auth UI, the golden path, public 
 - That retained Better Auth identity and its waitlist receipt are never deleted by synthetic monitoring
 - The canary reasserts the supported waitlist traversal idempotently and records a run-bound, redacted durable receipt
 - Onboarding robot accounts use the `+onboarding-robot-<run-id>` suffix and Clerk public metadata `role=synthetic_onboarding_robot`
-- Onboarding robot cleanup requires an exact robot email, Clerk `user_` id, `or-` run id, and generated `jor...` handle before touching the database or Clerk
+- Onboarding robot cleanup requires an exact robot email, an `or-` run id, and a generated `jor...` handle. The id must be a Clerk `user_` id or exactly `ba_robot_<run-id>` for that same run. Any other id, including a real Better Auth `ba:<uuid>` or UUID, is refused before the database is touched.
 
 ### Production Considerations
 

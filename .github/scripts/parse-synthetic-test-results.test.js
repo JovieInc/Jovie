@@ -329,6 +329,178 @@ test('parseSyntheticTestResults ignores optional legacy OTP results when absent'
   assert.equal(result.totalTests, 4);
 });
 
+const ROBOT_SKIP_REASON =
+  'synthetic-robot-auth-unavailable: production has no auth bypass for the onboarding robot.';
+
+function passingSyntheticFiles() {
+  return {
+    'apps/web/test-results/synthetic-auth-ui-results.json': JSON.stringify(
+      buildPlaywrightReport([
+        { title: 'shows SSO buttons', status: 'expected' },
+      ])
+    ),
+    'apps/web/test-results/synthetic-golden-path-results.json': JSON.stringify(
+      buildPlaywrightReport([{ title: 'loads homepage', status: 'expected' }])
+    ),
+    'apps/web/test-results/public-profile-smoke-results.json': JSON.stringify(
+      buildPlaywrightReport([
+        { title: 'renders public profile', status: 'expected' },
+      ])
+    ),
+  };
+}
+
+const REQUIRED_SYNTHETIC_FILES = [
+  {
+    name: 'synthetic-auth-ui',
+    path: 'apps/web/test-results/synthetic-auth-ui-results.json',
+    required: true,
+  },
+  {
+    name: 'synthetic-golden-path',
+    path: 'apps/web/test-results/synthetic-golden-path-results.json',
+    required: true,
+  },
+  {
+    name: 'onboarding-robot-full',
+    path: 'apps/web/test-results/onboarding-robot-full-results.json',
+    required: true,
+  },
+  {
+    name: 'public-profile-smoke',
+    path: 'apps/web/test-results/public-profile-smoke-results.json',
+    required: true,
+  },
+];
+
+test('parseSyntheticTestResults records a missing production robot as a warning', () => {
+  const result = parseSyntheticTestResults({
+    resultFiles: REQUIRED_SYNTHETIC_FILES,
+    fileSystem: createMemoryFileSystem(passingSyntheticFiles()),
+    robotSkipReason: ROBOT_SKIP_REASON,
+  });
+
+  assert.equal(result.testStatus, 'passed');
+  assert.equal(result.passedTests, 3);
+  assert.equal(
+    result.testWarnings.some(warning => warning.includes(ROBOT_SKIP_REASON)),
+    true
+  );
+  assert.equal(
+    result.failedTests.some(line => line.includes('onboarding-robot-full')),
+    false
+  );
+});
+
+test('parseSyntheticTestResults still fails other suites when the robot skip is logged', () => {
+  const files = passingSyntheticFiles();
+  files['apps/web/test-results/synthetic-golden-path-results.json'] =
+    JSON.stringify(
+      buildPlaywrightReport([{ title: 'loads homepage', status: 'unexpected' }])
+    );
+
+  const result = parseSyntheticTestResults({
+    resultFiles: REQUIRED_SYNTHETIC_FILES,
+    fileSystem: createMemoryFileSystem(files),
+    robotSkipReason: ROBOT_SKIP_REASON,
+  });
+
+  assert.equal(result.testStatus, 'failed');
+  assert.deepEqual(result.failedTests, [
+    'synthetic-golden-path: loads homepage',
+  ]);
+  assert.equal(
+    result.testWarnings.some(warning => warning.includes(ROBOT_SKIP_REASON)),
+    true
+  );
+});
+
+test('parseSyntheticTestResults keeps an unmarked robot skip as a failure', () => {
+  const files = passingSyntheticFiles();
+  files['apps/web/test-results/onboarding-robot-full-results.json'] =
+    JSON.stringify(
+      buildPlaywrightReport([
+        {
+          title:
+            'creates a profile, verifies dashboard/public profile, and cleans up',
+          status: 'skipped',
+        },
+      ])
+    );
+
+  const result = parseSyntheticTestResults({
+    resultFiles: REQUIRED_SYNTHETIC_FILES,
+    fileSystem: createMemoryFileSystem(files),
+    robotSkipReason: ROBOT_SKIP_REASON,
+  });
+
+  assert.equal(result.testStatus, 'failed');
+  assert.equal(
+    result.failedTests.includes(
+      'onboarding-robot-full: creates a profile, verifies dashboard/public profile, and cleans up'
+    ),
+    true
+  );
+});
+
+test('parseSyntheticTestResults records a marked robot skip annotation as a warning', () => {
+  const files = passingSyntheticFiles();
+  files['apps/web/test-results/onboarding-robot-full-results.json'] =
+    JSON.stringify({
+      suites: [
+        {
+          specs: [
+            {
+              title:
+                'creates a profile, verifies dashboard/public profile, and cleans up',
+              tests: [
+                {
+                  status: 'skipped',
+                  annotations: [
+                    { type: 'skip', description: ROBOT_SKIP_REASON },
+                  ],
+                  results: [],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+  const result = parseSyntheticTestResults({
+    resultFiles: REQUIRED_SYNTHETIC_FILES,
+    fileSystem: createMemoryFileSystem(files),
+    robotSkipReason: ROBOT_SKIP_REASON,
+  });
+
+  assert.equal(result.testStatus, 'passed');
+  assert.equal(result.skippedTests, 1);
+  assert.equal(
+    result.testWarnings.some(warning =>
+      warning.includes('synthetic-robot-auth-unavailable')
+    ),
+    true
+  );
+});
+
+test('parseSyntheticTestResults does not waive a missing robot file without the marker', () => {
+  const result = parseSyntheticTestResults({
+    resultFiles: REQUIRED_SYNTHETIC_FILES,
+    fileSystem: createMemoryFileSystem(passingSyntheticFiles()),
+    robotSkipReason: 'robot skipped for another reason',
+  });
+
+  assert.equal(result.testStatus, 'error');
+  assert.equal(
+    result.failedTests.some(line =>
+      line.includes('onboarding-robot-full: Test results file not found')
+    ),
+    true
+  );
+  assert.equal(result.testWarnings.length, 0);
+});
+
 test('formatGithubOutput emits a JSON-safe failed_tests_slack line', () => {
   const { formatGithubOutput } = require('./parse-synthetic-test-results');
 

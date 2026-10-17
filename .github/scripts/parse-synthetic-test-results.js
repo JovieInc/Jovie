@@ -1,5 +1,8 @@
 const fs = require('node:fs');
 
+const ACKNOWLEDGED_SKIP_MARKERS = ['synthetic-robot-auth-unavailable'];
+const ROBOT_RESULT_NAME = 'onboarding-robot-full';
+
 const DEFAULT_RESULT_FILES = (
   legacyCanaryEnabled,
   chatCanaryEnabled = false
@@ -54,21 +57,50 @@ function collectSpecs(suites = [], source, required = true) {
   return specs;
 }
 
+function acknowledgedSkipText(testCase) {
+  const chunks = [];
+  const push = value => {
+    if (typeof value !== 'string') return;
+    if (!ACKNOWLEDGED_SKIP_MARKERS.some(marker => value.includes(marker))) {
+      return;
+    }
+    chunks.push(value.replace(/\s+/g, ' ').trim());
+  };
+
+  for (const annotation of testCase.annotations ?? []) {
+    push(annotation?.description);
+  }
+  for (const result of testCase.results ?? []) {
+    push(result.error?.message);
+    for (const annotation of result.annotations ?? []) {
+      push(annotation?.description);
+    }
+  }
+
+  return chunks[0] ?? '';
+}
+
 function classifySyntheticTests(tests) {
   const skipped = tests.filter(
     ({ testCase }) =>
       testCase.status === 'skipped' ||
       (testCase.results ?? []).some(result => result.status === 'skipped')
   );
-  const requiredSkipped = skipped.filter(({ required }) => required);
-  const warnings = tests.flatMap(({ source, spec, testCase }) =>
-    (testCase.results ?? []).flatMap(result =>
+  const requiredSkipped = skipped.filter(
+    ({ required, testCase }) => required && !acknowledgedSkipText(testCase)
+  );
+  const warnings = tests.flatMap(({ source, spec, testCase }) => {
+    const logged = (testCase.results ?? []).flatMap(result =>
       [...(result.stdout ?? []), ...(result.stderr ?? [])]
         .map(entry => entry.text ?? '')
         .filter(text => text.includes('[Synthetic][warning]'))
         .map(text => `${source}: ${spec.title}: ${text.trim()}`)
-    )
-  );
+    );
+    const acknowledgedSkip = acknowledgedSkipText(testCase);
+    return acknowledgedSkip
+      ? [...logged, `${source}: ${spec.title}: ${acknowledgedSkip}`]
+      : logged;
+  });
   const flaky = tests.filter(({ testCase }) => testCase.status === 'flaky');
   const failed = tests.filter(
     ({ testCase }) => testCase.status === 'unexpected'
@@ -105,13 +137,20 @@ function resolveSyntheticTestStatus({
   return 'error';
 }
 
-function loadSyntheticResultSpecs(resultFiles, fileSystem = fs) {
+function loadSyntheticResultSpecs(
+  resultFiles,
+  fileSystem = fs,
+  acknowledgedMissingNames = new Set()
+) {
   const specs = [];
   const missingResults = [];
 
   for (const resultFile of resultFiles) {
     if (!fileSystem.existsSync(resultFile.path)) {
-      if (resultFile.required !== false) {
+      if (
+        resultFile.required !== false &&
+        !acknowledgedMissingNames.has(resultFile.name)
+      ) {
         missingResults.push(
           `${resultFile.name}: Test results file not found (${resultFile.path})`
         );
@@ -149,14 +188,27 @@ function loadSyntheticResultSpecs(resultFiles, fileSystem = fs) {
   return { specs, missingResults };
 }
 
-function parseSyntheticTestResults({ resultFiles, fileSystem = fs } = {}) {
+function parseSyntheticTestResults({
+  resultFiles,
+  fileSystem = fs,
+  robotSkipReason = '',
+} = {}) {
   const resolvedResultFiles =
     resultFiles ??
     DEFAULT_RESULT_FILES(process.env.LEGACY_CANARY_ENABLED === '1');
+  const skipReason =
+    typeof robotSkipReason === 'string' ? robotSkipReason.trim() : '';
+  const robotSkipAcknowledged = ACKNOWLEDGED_SKIP_MARKERS.some(marker =>
+    skipReason.includes(marker)
+  );
+  const acknowledgedMissingNames = robotSkipAcknowledged
+    ? new Set([ROBOT_RESULT_NAME])
+    : new Set();
 
   const { specs, missingResults } = loadSyntheticResultSpecs(
     resolvedResultFiles,
-    fileSystem
+    fileSystem,
+    acknowledgedMissingNames
   );
   const tests = specs.flatMap(({ source, required, spec }) =>
     (spec.tests ?? []).map(testCase => ({
@@ -168,6 +220,10 @@ function parseSyntheticTestResults({ resultFiles, fileSystem = fs } = {}) {
   );
   const { skipped, requiredSkipped, warnings, flaky, failed, passed } =
     classifySyntheticTests(tests);
+  const testWarnings =
+    robotSkipAcknowledged && !warnings.includes(skipReason)
+      ? [...warnings, skipReason]
+      : warnings;
   const testStatus = resolveSyntheticTestStatus({
     tests,
     missingResults,
@@ -193,10 +249,10 @@ function parseSyntheticTestResults({ resultFiles, fileSystem = fs } = {}) {
     passedTests: passed.length,
     flakyTests: flaky.length,
     skippedTests: skipped.length,
-    warningCount: warnings.length,
+    warningCount: testWarnings.length,
     testStatus,
     failedTests,
-    testWarnings: warnings,
+    testWarnings,
   };
 }
 
@@ -223,6 +279,7 @@ function formatGithubOutput(result) {
 }
 
 module.exports = {
+  ACKNOWLEDGED_SKIP_MARKERS,
   DEFAULT_RESULT_FILES,
   classifySyntheticTests,
   collectSpecs,
