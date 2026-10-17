@@ -166,12 +166,16 @@
     },
     ".claude/rules/linear.md": {
       "owner": "@itstimwhite",
-      "claim": "Issue closure behavior is implemented by the existing merge synchronizer.",
-      "documentSha256": "8ec6b7b5551e8b1acc8325927f68eb366510817c5b095f7e8edfcf51cf7a1978",
+      "claim": "Issue closure uses the existing merge synchronizer; literal observation registrations use the maintained inspector with complete current binding and episode history.",
+      "documentSha256": "cd1bdb0f8c77605807980013ccc7eb37a4c882f43f2696fee289ae1adfe140b0",
       "sources": [
         {
           "path": "scripts/lib/linear-sync-on-merge.mjs",
-          "sha256": "00c2eb0bbe938ff5552ba168d7889cf10c724846e200b55646834fd69b19513d"
+          "sha256": "55ae102c0547d154a549ee73e2f54e798666420aae1ac1011c95b616f21a140e"
+        },
+        {
+          "path": "scripts/lib/sentry-validation-observation.mjs",
+          "sha256": "ca426cad8d486d9904acbde2255fa8875640f345bb13712daf5c7a950084c476"
         }
       ]
     },
