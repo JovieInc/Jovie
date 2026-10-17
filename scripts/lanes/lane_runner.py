@@ -3050,6 +3050,8 @@ def gate_admission(host: Host, *, staging: bool = False):
     defers to an admitted qualifier; a new qualifier defers to staging before
     starting heavy work. This does not attest custody of arbitrary SSH arrivals.
     """
+    if not staging and lifecycle.draining(host.state):
+        raise lifecycle.AdmissionHeld("operator requested natural controller drain")
     admission = Locked(host.state / "locks" / "gate-admission.lock", blocking=False)
     seats = []
     try:
@@ -8556,6 +8558,8 @@ def verify_generated_runtime(proven: Path, existing: Path) -> None:
 
 
 def install_release(host: Host, *, operator=None) -> int:
+    if operator is None and lifecycle.draining(host.state):
+        raise lifecycle.AdmissionHeld("operator requested natural controller drain")
     if operator is not None:
         if not isinstance(operator, lifecycle.OperatorGuard) or operator.state != host.state.resolve():
             raise lifecycle.AdmissionHeld("operator installation owner differs")
@@ -8597,8 +8601,10 @@ def install_release(host: Host, *, operator=None) -> int:
             # without the subcommand is proven by this copy, as before.
             try:
                 if operator is not None:
-                    proof = operator.prove_staging(staging.resolve(), host.repo, timeout=60 + UPDATE_TEST_TIMEOUT_S,
-                                                   pass_fds=proof_fds)
+                    # The operator's canonical EX/drain protocol fences new
+                    # launches even after its parent dies. Never pass that EX
+                    # owner to the private proof or replace its durable drain.
+                    proof = operator.prove_staging(staging.resolve(), host.repo, timeout=60 + UPDATE_TEST_TIMEOUT_S)
                 else:
                     proof = lifecycle.run([sys.executable, str(staging / "scripts/lanes/lane_runner.py"),
                                            "prove-staging", str(staging)],

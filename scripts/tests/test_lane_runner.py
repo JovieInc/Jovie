@@ -8584,6 +8584,24 @@ class StagingGateAdmissionTest(unittest.TestCase):
         self.assertTrue(seat.held)
         seat.release()
 
+    def test_retained_operator_drain_defers_qualification_and_direct_normal_update(self):
+        self.host.state.mkdir()
+        drain = self.host.state / "lifecycle-drain.json"
+        drain.write_text('{"operationId":"retained-owned-operator"}')
+        with patch.object(lane.time, "sleep") as sleep, \
+                patch.object(lane, "fetch_release_source") as fetch:
+            with self.assertRaisesRegex(lane.RepairStopped, "natural controller drain"):
+                lane.gate_slot(self.host)
+            with self.assertRaisesRegex(lane.lifecycle.AdmissionHeld, "natural controller drain"):
+                lane.install_release(self.host)
+            sleep.assert_not_called()
+            fetch.assert_not_called()
+        self.assertFalse((self.host.state / "slots").exists())
+        self.assertTrue(drain.exists(), "admission never clears an operator's retained fence")
+        drain.unlink()  # private fixture operator explicitly completes its own disposition
+        seat, _ = lane.gate_slot(self.host)
+        seat.release()
+
     def test_qualifiers_keep_existing_parallel_seats(self):
         first, _ = lane.gate_slot(self.host)
         second, _ = lane.gate_slot(self.host)
