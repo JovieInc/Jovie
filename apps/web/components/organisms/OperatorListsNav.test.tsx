@@ -92,6 +92,22 @@ describe('OperatorListsNav', () => {
     ).toBeInTheDocument();
   });
 
+  it('expands a collapsed rail before entering a new list name', () => {
+    const onOpenChange = vi.fn();
+    render(
+      <TooltipProvider>
+        <SidebarProvider open={false} onOpenChange={onOpenChange}>
+          <OperatorListsNav pathname='/app/ov/hud' />
+        </SidebarProvider>
+      </TooltipProvider>
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'New List' }));
+    expect(onOpenChange).toHaveBeenCalledWith(true);
+    expect(
+      screen.getByRole('textbox', { name: 'New List Name' })
+    ).toHaveFocus();
+  });
+
   it('still offers New list before any data loads', () => {
     mocks.data = undefined;
     renderNav();
