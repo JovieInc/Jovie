@@ -8,7 +8,6 @@ import {
 import { verifySummerOidcRequest } from '@/lib/ovie/summer-oidc.server';
 
 export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
 
 /** Cache-only company truth for ordinary Summer questions. */
 export async function GET(request: Request): Promise<NextResponse> {
