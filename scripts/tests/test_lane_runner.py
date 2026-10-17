@@ -8554,6 +8554,201 @@ class RepairQueueAuthorityTest(unittest.TestCase):
             self.assertNotIn("execution", receipt)
             self.assertEqual(json.loads((host.state / "fix-attempts.json").read_text())["5"]["count"], 1)
 
+class StagingGateAdmissionTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(prefix="staging-gate-admission-")
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.host = lane.Host(state=self.root / "state", repo=self.root / "repo", gate_slots=2)
+
+    def test_admitted_qualifier_defers_staging_and_partial_reservations_are_released(self):
+        active = lane.Locked(self.host.state / "slots/gate.1.lock", blocking=False)
+        try:
+            with self.assertRaisesRegex(lane.lifecycle.AdmissionHeld, "release-proof-gate-active"):
+                with lane.gate_admission(self.host, staging=True):
+                    self.fail("staging overlapped an admitted qualifier")
+            other, _ = lane.gate_slot(self.host)
+            self.assertTrue(other.held)
+            other.release()
+        finally:
+            active.release()
+        with lane.gate_admission(self.host, staging=True) as locks:
+            self.assertEqual(len(locks), 3)
+
+    def test_staging_defers_a_new_qualifier_without_waiting_or_consuming_a_seat(self):
+        with lane.gate_admission(self.host, staging=True), patch.object(lane.time, "sleep") as sleep:
+            with self.assertRaisesRegex(lane.RepairStopped, "gate-admission-busy"):
+                lane.gate_slot(self.host)
+            sleep.assert_not_called()
+        seat, _ = lane.gate_slot(self.host)
+        self.assertTrue(seat.held)
+        seat.release()
+
+    def test_retained_operator_drain_defers_qualification_and_direct_normal_update(self):
+        self.host.state.mkdir()
+        drain = self.host.state / "lifecycle-drain.json"
+        drain.write_text('{"operationId":"retained-owned-operator"}')
+        with patch.object(lane.time, "sleep") as sleep, \
+                patch.object(lane, "fetch_release_source") as fetch:
+            with self.assertRaisesRegex(lane.RepairStopped, "natural controller drain"):
+                lane.gate_slot(self.host)
+            with self.assertRaisesRegex(lane.lifecycle.AdmissionHeld, "natural controller drain"):
+                lane.install_release(self.host)
+            sleep.assert_not_called()
+            fetch.assert_not_called()
+        self.assertFalse((self.host.state / "slots").exists())
+        self.assertTrue(drain.exists(), "admission never clears an operator's retained fence")
+        drain.unlink()  # private fixture operator explicitly completes its own disposition
+        seat, _ = lane.gate_slot(self.host)
+        seat.release()
+
+    def test_qualifiers_keep_existing_parallel_seats(self):
+        first, _ = lane.gate_slot(self.host)
+        second, _ = lane.gate_slot(self.host)
+        try:
+            self.assertNotEqual(first.handle.name, second.handle.name)
+            with self.assertRaisesRegex(lane.lifecycle.AdmissionHeld, "release-proof-gate-active"):
+                with lane.gate_admission(self.host, staging=True):
+                    self.fail("active seats were ignored")
+        finally:
+            first.release()
+            second.release()
+
+    def test_failure_releases_reservations_and_old_receipts_do_not_block_replay(self):
+        original = RuntimeError("owned proof failed")
+        with self.assertRaises(RuntimeError) as caught:
+            with lane.gate_admission(self.host, staging=True):
+                raise original
+        self.assertIs(caught.exception, original)
+        for _ in range(2):
+            with lane.gate_admission(self.host, staging=True) as locks:
+                self.assertTrue(all(lock.held for lock in locks))
+
+    def test_concurrent_staging_and_qualification_admit_only_one_operation(self):
+        start, release = threading.Barrier(2), threading.Event()
+
+        def attempt(staging):
+            start.wait(timeout=10)
+            try:
+                if staging:
+                    with lane.gate_admission(self.host, staging=True):
+                        self.assertTrue(release.wait(timeout=10))
+                else:
+                    seat, _ = lane.gate_slot(self.host)
+                    try:
+                        self.assertTrue(release.wait(timeout=10))
+                    finally:
+                        seat.release()
+                return "admitted"
+            except (lane.lifecycle.AdmissionHeld, lane.RepairStopped) as error:
+                return str(error)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            futures = [executor.submit(attempt, staging) for staging in (False, True)]
+            try:
+                done, _ = concurrent.futures.wait(futures, timeout=10,
+                                                 return_when=concurrent.futures.FIRST_COMPLETED)
+                self.assertEqual(len(done), 1, "one operation must defer without waiting for the other")
+                self.assertIn(next(iter(done)).result(), {"gate-admission-busy", "release-proof-gate-active"})
+            finally:
+                release.set()
+            self.assertEqual(sum(future.result() == "admitted" for future in futures), 1)
+
+    def test_active_qualification_preserves_refused_stage_before_any_archive_or_cleanup(self):
+        bundle = {"bundleDigest": "b" * 64, "sourceCommit": "a" * 40}
+        stage = self.host.state / "releases" / ("." + bundle["bundleDigest"] + ".tmp")
+        stage.mkdir(parents=True)
+        retained = stage / "original-diagnostic"
+        retained.write_text("retained refusal")
+        refusal = self.host.state / "update-refused.json"
+        refusal.write_text(json.dumps({"tree": "older", "at": 1, "why": "original refusal"}))
+        before = refusal.read_bytes()
+        seat, _ = lane.gate_slot(self.host)
+        try:
+            with patch.object(lane, "fetch_release_source", return_value=SimpleNamespace(returncode=0)), \
+                    patch.object(lane, "release_identity", return_value=bundle), \
+                    patch.object(lane.lifecycle, "run") as run:
+                with self.assertRaisesRegex(lane.lifecycle.AdmissionHeld, "release-proof-gate-active"):
+                    lane.install_release(self.host)
+                run.assert_not_called()
+            self.assertEqual(retained.read_text(), "retained refusal")
+            self.assertEqual(refusal.read_bytes(), before)
+            self.assertFalse((self.host.state / "current").exists())
+        finally:
+            seat.release()
+
+    def test_real_custody_exception_is_not_retried_or_converted_to_a_test_failure(self):
+        bundle = {"bundleDigest": "b" * 64, "sourceCommit": "a" * 40}
+        original = lane.SelftestCleanupHeld("selftest-process-custody-unreadable")
+        calls = []
+
+        def run(argv, **kwargs):
+            calls.append(argv)
+            if "prove-staging" in argv:
+                fds = kwargs["pass_fds"]
+                paths = [self.host.state / "locks/gate-admission.lock",
+                         *(self.host.state / "slots" / f"gate.{i}.lock" for i in range(2))]
+                self.assertEqual([(os.fstat(fd).st_dev, os.fstat(fd).st_ino) for fd in fds],
+                                 [(path.stat().st_dev, path.stat().st_ino) for path in paths])
+                raise original
+            return subprocess.CompletedProcess(argv, 0, stdout=b"fixture archive", stderr=b"")
+
+        with patch.object(lane, "fetch_release_source", return_value=SimpleNamespace(returncode=0)), \
+                patch.object(lane, "release_identity", return_value=bundle), \
+                patch.object(lane.lifecycle, "run", side_effect=run):
+            with self.assertRaises(lane.SelftestCleanupHeld) as caught:
+                lane.install_release(self.host)
+        self.assertIs(caught.exception, original)
+        self.assertEqual(sum("prove-staging" in call for call in calls), 1)
+        self.assertFalse((self.host.state / "update-refused.json").exists())
+        self.assertFalse((self.host.state / "current").exists())
+        with lane.gate_admission(self.host, staging=True):
+            pass
+
+    @unittest.skipUnless(sys.platform == "linux", "Linux inherited flock lifetime")
+    def test_launcher_death_keeps_staging_reserved_until_its_inherited_child_exits(self):
+        ready, finish = self.root / "ready", self.root / "finish"
+        child_code = ("import pathlib,time; "
+                      f"pathlib.Path({str(ready)!r}).write_text('ready'); "
+                      f"finish=pathlib.Path({str(finish)!r}); "
+                      "deadline=time.monotonic()+30\n"
+                      "while not finish.exists() and time.monotonic()<deadline: time.sleep(.01)\n")
+        worker_code = (f"import sys,os,subprocess; sys.path.insert(0,{str(ROOT / 'scripts/lanes')!r}); "
+                       "import lane_runner as lane; from pathlib import Path; "
+                       f"host=lane.Host(state=Path({str(self.host.state)!r}),gate_slots=2)\n"
+                       "with lane.gate_admission(host,staging=True) as locks:\n"
+                       f" child=subprocess.Popen([sys.executable,'-c',{child_code!r}], "
+                       "pass_fds=tuple(lock.handle.fileno() for lock in locks), "
+                       "stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)\n"
+                       " os._exit(0)\n")
+        worker = subprocess.Popen([sys.executable, "-c", worker_code], stderr=subprocess.PIPE, text=True)
+        try:
+            _, error = worker.communicate(timeout=15)
+            self.assertEqual(worker.returncode, 0, error)
+            deadline = time.monotonic() + 15
+            while not ready.exists() and time.monotonic() < deadline:
+                time.sleep(.01)
+            self.assertTrue(ready.exists())
+            with self.assertRaisesRegex(lane.RepairStopped, "gate-admission-busy"):
+                lane.gate_slot(self.host)
+            with self.assertRaisesRegex(lane.lifecycle.AdmissionHeld, "gate-admission-busy"):
+                with lane.gate_admission(self.host, staging=True):
+                    self.fail("launcher death released a surviving proof child")
+        finally:
+            finish.touch()
+            if worker.poll() is None:
+                worker.communicate(timeout=15)
+        deadline = time.monotonic() + 15
+        while True:
+            try:
+                with lane.gate_admission(self.host, staging=True):
+                    break
+            except lane.lifecycle.AdmissionHeld:
+                if time.monotonic() >= deadline:
+                    self.fail("naturally exited child left an unreclaimable reservation")
+                time.sleep(.01)
+
+
 class LifecycleOwnershipTest(unittest.TestCase):
     # Hang guards, not latency budgets: every wait below polls a readiness
     # file or lock and returns as soon as it flips (well under 1s when idle).
@@ -10459,7 +10654,7 @@ class OperatorInstallerGlueTest(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory(prefix="operator-installer-glue-")
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name).resolve()
-        self.host = SimpleNamespace(state=self.root / "state", repo=self.root / "repo")
+        self.host = SimpleNamespace(state=self.root / "state", repo=self.root / "repo", gate_slots=2)
         self.host.state.mkdir()
         self.host.repo.mkdir()
         self.environment = patch.dict(os.environ, {"PATH": os.defpath}, clear=True)
