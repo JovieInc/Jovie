@@ -9,6 +9,7 @@ import importlib.util
 import contextlib
 import copy
 import dataclasses
+import errno
 import fcntl
 import concurrent.futures
 import io
@@ -13098,6 +13099,109 @@ class SelftestCleanupScopeTest(unittest.TestCase):
         self.stack.enter_context(patch.object(lane, "_selftest_process_row", new=self.direct_identity_reader))
         self.stack.enter_context(patch.object(lane, "process_snapshot", return_value={100: self.rows[100]}))
         return receipt
+
+    def test_esrch_during_birth_read_is_absent_after_proc_directory_disappears(self):
+        self.real_birth_fixture()
+        self.stat_fixture(201, 2000)
+        entry = self.proc / "201"
+        real_read = Path.read_text
+        def exited(path, *args, **kwargs):
+            if path == entry / "stat":
+                path.unlink()
+                entry.rmdir()
+                raise ProcessLookupError(errno.ESRCH, "fixture exited during stat read")
+            return real_read(path, *args, **kwargs)
+        with patch.object(lane, "process_snapshot", return_value={100: self.rows[100], 201: (1, 201, "S", "rounded")}), \
+             patch.object(Path, "read_text", new=exited):
+            self.assertEqual(lane._selftest_process_rows(), {100: (1, 100, "S", "linux:1000")})
+        self.assertFalse(entry.exists())
+        self.pidfd.assert_not_called(); self.send.assert_not_called(); self.kill.assert_not_called()
+
+    def test_esrch_with_live_or_reused_directory_never_invents_birth_or_cleanup_authority(self):
+        receipt = self.real_birth_fixture()
+        self.member(201)
+        entry = self.proc / "201"
+        real_read = Path.read_text
+        for replacement_birth in (2000, 2001):
+            with self.subTest(replacement_birth=replacement_birth):
+                receipt.pop("diagnostic", None)
+                self.stat_fixture(201, 2000)
+                def unreadable(path, *args, **kwargs):
+                    if path == entry / "stat":
+                        self.stat_fixture(201, replacement_birth)
+                        raise ProcessLookupError(errno.ESRCH, "fixture has no readable birth")
+                    return real_read(path, *args, **kwargs)
+                with patch.object(Path, "read_text", new=unreadable):
+                    with self.assertRaisesRegex(lane.SelftestCleanupHeld, "selftest-process-birth-unavailable"):
+                        lane.reap_selftest_processes(receipt)
+                self.assertEqual(receipt["diagnostic"]["observation"], {
+                    "pid": 201, "source": "proc-stat", "errorCode": "selftest-process-birth-unavailable", "errno": errno.ESRCH})
+                self.assertEqual(receipt["diagnostic"]["outcome"], "held")
+                self.assertTrue(entry.exists())
+        self.pidfd.assert_not_called(); self.send.assert_not_called(); self.kill.assert_not_called()
+
+    def test_esrch_during_initial_or_final_directory_observation_requires_confirmed_absence(self):
+        real_stat = Path.stat
+        for failure_at in (1, 2):
+            with self.subTest(failure_at=failure_at):
+                self.stat_fixture(201, 2000)
+                entry = self.proc / "201"
+                observations = 0
+                def exited(path, *args, **kwargs):
+                    nonlocal observations
+                    if path == entry:
+                        observations += 1
+                        if observations == failure_at:
+                            (entry / "stat").unlink()
+                            entry.rmdir()
+                            raise ProcessLookupError(errno.ESRCH, "fixture exited during directory observation")
+                    return real_stat(path, *args, **kwargs)
+                with patch.object(Path, "stat", new=exited):
+                    self.assertIsNone(self.direct_identity_reader(entry, 201, os.getuid()))
+                self.assertFalse(entry.exists())
+        self.pidfd.assert_not_called(); self.send.assert_not_called(); self.kill.assert_not_called()
+
+    def test_esrch_followup_unreadable_directory_remains_held(self):
+        self.stat_fixture(201, 2000)
+        entry = self.proc / "201"
+        real_stat, real_read = Path.stat, Path.read_text
+        for error in (PermissionError(errno.EACCES, "fixture denied"), ProcessLookupError(errno.ESRCH, "fixture unknown")):
+            with self.subTest(errno=error.errno):
+                observations = 0
+                def unavailable(path, *args, **kwargs):
+                    nonlocal observations
+                    if path == entry:
+                        observations += 1
+                        if observations > 1:
+                            raise error
+                    return real_stat(path, *args, **kwargs)
+                def unreadable(path, *args, **kwargs):
+                    if path == entry / "stat":
+                        raise ProcessLookupError(errno.ESRCH, "fixture birth unavailable")
+                    return real_read(path, *args, **kwargs)
+                with patch.object(Path, "stat", new=unavailable), patch.object(Path, "read_text", new=unreadable):
+                    with self.assertRaisesRegex(lane.SelftestCleanupHeld, "selftest-process-birth-unavailable") as held:
+                        self.direct_identity_reader(entry, 201, os.getuid())
+                self.assertEqual(held.exception.observation["errno"], error.errno)
+                self.assertNotIn("start", held.exception.observation)
+        self.pidfd.assert_not_called(); self.send.assert_not_called(); self.kill.assert_not_called()
+
+    def test_permission_denied_birth_stays_held_even_if_directory_later_disappears(self):
+        self.stat_fixture(201, 2000)
+        entry = self.proc / "201"
+        real_read = Path.read_text
+        def denied(path, *args, **kwargs):
+            if path == entry / "stat":
+                path.unlink()
+                entry.rmdir()
+                raise PermissionError(errno.EACCES, "fixture denied")
+            return real_read(path, *args, **kwargs)
+        with patch.object(Path, "read_text", new=denied):
+            with self.assertRaisesRegex(lane.SelftestCleanupHeld, "selftest-process-birth-unavailable") as held:
+                self.direct_identity_reader(entry, 201, os.getuid())
+        self.assertEqual(held.exception.observation["errno"], errno.EACCES)
+        self.assertNotIn("start", held.exception.observation)
+        self.pidfd.assert_not_called(); self.send.assert_not_called(); self.kill.assert_not_called()
 
     def test_pid_born_between_inventory_and_proc_scan_is_observed_and_reaped(self):
         receipt = self.real_birth_fixture()
