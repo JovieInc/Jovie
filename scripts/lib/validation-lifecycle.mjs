@@ -675,6 +675,7 @@ export function currentReceiptsByKind(receipts, receiptNotBefore) {
  *   readonly state: { name: string, type: string },
  *   readonly manifest: ValidationManifest,
  *   readonly holds: readonly string[],
+ *   readonly completionHolds?: readonly string[],
  *   readonly deployment: DeploymentFact,
  *   readonly receipts: readonly ResolvedReceipt[],
  *   readonly escapedDefect?: { ok: boolean, errors: readonly string[] },
@@ -782,12 +783,15 @@ export function decideValidationTransition(input) {
           : `${entry.kind}: no current receipt (${entry.reason})`
     );
   }
-  if (missing.length > 0) {
+  // Prerequisite holds prevent acceptance, while a required failure above
+  // must still reach Rework and deployment keeps its own entry semantics.
+  const completionHolds = input.completionHolds ?? [];
+  if (missing.length > 0 || completionHolds.length > 0) {
     return {
       target: LIFECYCLE_STATES.validating,
       missing,
       failing: [],
-      explanation,
+      explanation: [...explanation, ...completionHolds],
     };
   }
   return {
@@ -809,6 +813,7 @@ export function decideValidationTransition(input) {
  *   manifest: ValidationManifest,
  *   missing: readonly string[],
  *   failing: readonly ResolvedReceipt[],
+ *   completionHolds?: readonly string[],
  *   deploymentSha?: string,
  * }} input
  * @returns {string}
@@ -823,6 +828,9 @@ export function lifecycleStatusKey(input) {
         outcomeAfter: input.manifest.outcomeNotBefore,
         required: input.manifest.required.map(entry => entry.kind),
         missing: [...input.missing].sort(),
+        ...(input.completionHolds?.length
+          ? { completionHolds: [...input.completionHolds].sort() }
+          : {}),
         failing: input.failing
           .map(receipt => `${receipt.kind}:${receipt.sha}`)
           .sort(),
