@@ -273,6 +273,12 @@ review, product truth, design-system fidelity, responsive accessibility, and
 asset consent. The asset generator cannot review its own output. Automated
 review admits work for human taste; it never substitutes for that decision.
 
+### Registered marketing media (JOV-6246)
+
+Use [`mediaRecipes.ts`](../../apps/web/data/marketing/mediaRecipes.ts) for validated static rendering and export; `mediaReferences.ts` owns inputs, rights and revisions, including unresolved #21/#5. Generators cannot add sources, imports, scripts, colors or approvals. Receipts bind exact source, recipe, tokens, renderer and output; changes invalidate old approval evidence.
+
+September 12 reference feedback and local Storybook observations grant no master certification, redistribution rights or paid PR review; third-party captures stay excluded. JOV-6251 retains master promotion and production rollout through existing release gates. The executable contract and current primitives own the remaining details.
+
 ### Product callout assembly
 
 Select the medium from the communication goal first. The homepage editorial

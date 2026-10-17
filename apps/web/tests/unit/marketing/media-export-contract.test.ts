@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   approveMarketingMediaExportReceipt,
   computeMarketingMediaExportCacheKey,
+  createMarketingMediaRecipeInput,
   executeMarketingMediaExportRequest,
   formatMarketingMediaExportRequestForPrompt,
   MARKETING_MEDIA_EXPORT_FIXTURES,
@@ -68,7 +69,11 @@ describe('marketing media export contract (JOV-6250)', () => {
     ]);
     expect(result.receipt.approved).toBe(false);
     expect(result.receipt.recipeId).toBe('dark-glass');
-    expect(result.receipt.receiptDigest).toContain('still:hash-still');
+    expect(JSON.parse(result.receipt.receiptDigest).at(-1)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ profile: 'still', assetHash: 'hash-still' }),
+      ])
+    );
     expect(produceOutput).toHaveBeenCalledTimes(3);
   });
 
@@ -419,5 +424,54 @@ describe('marketing media export contract (JOV-6250)', () => {
     );
     expect(flowingPrompt).toContain('Flow direction');
     expect(flowingPrompt).toContain('Never: invent a fifth recipe');
+  });
+});
+
+describe('exact artifact approval (JOV-6246)', () => {
+  it('routes registered recipe fixtures through the common request validator', () => {
+    const recipeInput = createMarketingMediaRecipeInput('dark-glass');
+    const request = baseRequest({
+      fixtureId: 'recipe-dark-glass',
+      sourceRevision: recipeInput.source.sourceRevision,
+      recipeInput,
+      accentToken: '--noir-ion-ion',
+      outputProfiles: ['still'],
+    });
+    expect(validateMarketingMediaExportRequest(request)).toEqual([]);
+    expect(
+      validateMarketingMediaExportRequest({
+        ...request,
+        recipeInput: undefined,
+      }).length
+    ).toBeGreaterThan(0);
+    expect(
+      validateMarketingMediaExportRequest({ ...request, sourceRevision: 'old' })
+        .length
+    ).toBeGreaterThan(0);
+  });
+
+  it('rejects old evidence after outputs or source/token/recipe metadata change', () => {
+    const result = executeMarketingMediaExportRequest({
+      request: baseRequest({ outputProfiles: ['still'] }),
+      produceOutput: () => okOutput(),
+    });
+    if (result.status !== 'executed') throw new Error('expected an export');
+    const receipt = result.receipt;
+    const evidence = {
+      approvedReceiptDigest: receipt.receiptDigest,
+      approvalEvidenceId: 'scoped-review-1',
+    };
+    for (const change of [
+      { outputs: [{ ...receipt.outputs[0], assetHash: 'new-pixels' }] },
+      { sourceRevision: 'new-source' },
+      { tokenPolicyVersion: 'new-tokens' },
+      { recipeVersion: 'new-recipe' },
+      { rendererVersion: 'new-renderer' },
+    ])
+      expect(
+        approveMarketingMediaExportReceipt({ ...receipt, ...change }, evidence)
+          .ok
+      ).toBe(false);
+    expect(approveMarketingMediaExportReceipt(receipt, evidence).ok).toBe(true);
   });
 });
