@@ -5,12 +5,16 @@
  * coverage producer supplies those facts, this path never emits a pass.
  */
 import { recordValidationReceipt } from './linear-sync-on-merge.mjs';
-import { formatValidationReceipt } from './validation-lifecycle.mjs';
+import {
+  formatValidationReceipt,
+  parseValidationReceipts,
+} from './validation-lifecycle.mjs';
 import { createProductionFacts, githubClient } from './validation-sync.mjs';
 
 export const OBSERVATION_SCHEMA = 'jovie.sentry-observation/v1';
 export const MINIMUM_OBSERVATION_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_PAGES = 10;
+const MAX_PREDECESSORS = 20;
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 const LINEAR_API = 'https://api.linear.app/graphql';
 const SENTRY_API = 'https://sentry.io/api/0';
@@ -18,10 +22,12 @@ const SENTRY_API = 'https://sentry.io/api/0';
 /** @typedef {{ schema: string, issue: string, bindingSha: string, organization: string,
  * episodeStartedAt: string | null, start: string, end: string,
  * incidents: { shortId: string, issueId?: string }[],
- * }} ObservationPlan */
+ * originalObservation?: ObservationPlan }} ObservationPlan */
 /** @typedef {{ status: 'unknown', reason: string }} UnknownObservation */
 /** @typedef {UnknownObservation | { status: 'pending', reason: string, earliestCompletion?: string }
  * | { status: 'fail', reason: string, source: string, release: string, evidence: string }} ObservationResult */
+/** @typedef {{sha: string, evidence: string, recordedAt: string, bindingSha: string,
+ * window: {start: string, end: string}, previous?: PredecessorFailure}} PredecessorFailure */
 /** @typedef {{ servedGeneration: () => Promise<{status: string, sha?: string}>,
  * contains: (base: string, head: string) => Promise<boolean> }} ObservationFacts */
 
@@ -40,9 +46,11 @@ function markers(body, name) {
  * Inspect the complete, current server history before using a registration.
  * @returns {UnknownObservation | {status: 'registered', reason?: never, plan: ObservationPlan,
  * comments: {body: string, createdAt: string}[], episodeStartedAt: string | null,
- * }}
+ * predecessorFailure?: PredecessorFailure}}
  */
-export function inspectObservationIssue(issue) {
+export function inspectObservationIssue(issue, depth = 0) {
+  if (depth > MAX_PREDECESSORS)
+    return unknown('observation_predecessor_history_too_deep');
   try {
     const comments = [...issue.comments].sort(
       (a, b) => date(a.createdAt) - date(b.createdAt)
@@ -77,6 +85,7 @@ export function inspectObservationIssue(issue) {
     );
     const latestManifest = manifests.at(-1);
     const manifest = latestManifest?.manifest;
+    let predecessorFailure;
     if (
       manifest?.issue !== issue.identifier ||
       manifest?.bindingSha !== plan.bindingSha
@@ -103,22 +112,193 @@ export function inspectObservationIssue(issue) {
     ) {
       return unknown('invalid_observation_registration');
     }
+    // Successors retain the immutable first registration and each failed
+    // predecessor in server comments. Historical manifests, receipts and
+    // positive generation ancestry fence a new full window; never reset it.
     if (issue.identifier === 'JOV-8523') {
+      const originalWindow =
+        date(plan.start) === date('2026-10-16T14:22:48Z') &&
+        date(plan.end) >= date('2026-10-23T14:22:48Z');
       const required = ['JOVIE-WEB-XZ', 'JOVIE-WEB-S7', 'JOVIE-WEB-8D'];
+      const preserves = predecessor =>
+        predecessor.incidents.every(source =>
+          plan.incidents.some(
+            current =>
+              current.shortId === source.shortId &&
+              (!source.issueId || current.issueId === source.issueId)
+          )
+        );
       if (
-        date(plan.start) !== date('2026-10-16T14:22:48Z') ||
-        date(plan.end) < date('2026-10-23T14:22:48Z') ||
         required.some(
           id => !plan.incidents.some(source => source.shortId === id)
         )
       )
         return unknown('incident_acceptance_changed');
+      if (originalWindow) {
+        if (plan.originalObservation !== undefined)
+          return unknown('invalid_observation_provenance');
+      } else {
+        const original = plan.originalObservation;
+        if (
+          !original ||
+          original.originalObservation !== undefined ||
+          original.issue !== plan.issue ||
+          original.organization !== plan.organization ||
+          date(original.start) !== date('2026-10-16T14:22:48Z') ||
+          date(original.end) < date('2026-10-23T14:22:48Z') ||
+          date(plan.end) - date(plan.start) <
+            date(original.end) - date(original.start)
+        )
+          return unknown('incident_acceptance_changed');
+        let boundary = episodeStartedAt;
+        const priorManifest = manifests
+          .filter(
+            record => date(record.recordedAt) < date(latestManifest.recordedAt)
+          )
+          .at(-1);
+        const sameEpisodeRepair =
+          original.episodeStartedAt === episodeStartedAt ||
+          (episodeStartedAt &&
+            priorManifest &&
+            date(priorManifest.recordedAt) >= date(episodeStartedAt));
+        if (sameEpisodeRepair) {
+          // Rework retains its episode. Validate the immediately preceding
+          // registered window rather than requiring its binding to remain the
+          // immutable first repair forever. Each recursive boundary decreases.
+          boundary = latestManifest.recordedAt;
+          const priorComments = comments.filter(
+            comment => date(comment.createdAt) < date(boundary)
+          );
+          if (
+            !priorManifest ||
+            manifest.schema !== 'jovie.validation-manifest/v1' ||
+            priorManifest.manifest.schema !== 'jovie.validation-manifest/v1'
+          )
+            return unknown('repair_manifest_provenance_unavailable');
+          const priorBinding = priorManifest.manifest.bindingSha;
+          if (
+            typeof priorBinding !== 'string' ||
+            priorBinding.toLowerCase() === plan.bindingSha.toLowerCase() ||
+            date(plan.start) < date(boundary)
+          )
+            return unknown('repair_window_precedes_new_binding');
+          const retainedPredecessors = priorComments.flatMap(comment =>
+            markers(comment.body, 'sentry-observation')
+              .filter(
+                candidate =>
+                  candidate.bindingSha === priorBinding &&
+                  candidate.episodeStartedAt === episodeStartedAt
+              )
+              .map(candidate => ({
+                plan: candidate,
+                recordedAt: comment.createdAt,
+              }))
+          );
+          const latestRetainedPredecessor = retainedPredecessors.at(-1);
+          // Preserve the latest plan content, but an identical later archive
+          // cannot erase an earlier server-timestamped registration.
+          const retainedPredecessor =
+            latestRetainedPredecessor &&
+            retainedPredecessors.find(
+              candidate =>
+                JSON.stringify(candidate.plan) ===
+                JSON.stringify(latestRetainedPredecessor.plan)
+            );
+          if (!retainedPredecessor)
+            return unknown('predecessor_observation_provenance_unavailable');
+          const predecessor = inspectObservationIssue(
+            {
+              ...issue,
+              description: `<!-- sentry-observation:v1\n${JSON.stringify(retainedPredecessor.plan)}\n-->`,
+              comments: priorComments,
+              history: issue.history.filter(
+                entry => date(entry.createdAt) < date(boundary)
+              ),
+            },
+            depth + 1
+          );
+          if (
+            predecessor.status !== 'registered' ||
+            (priorBinding !== original.bindingSha &&
+              JSON.stringify(predecessor.plan.originalObservation) !==
+                JSON.stringify(original)) ||
+            date(plan.end) - date(plan.start) <
+              date(predecessor.plan.end) - date(predecessor.plan.start) ||
+            !preserves(predecessor.plan)
+          )
+            return unknown('predecessor_observation_provenance_unavailable');
+          const eventEvidence = new RegExp(
+            `^https://${plan.organization}\\.sentry\\.io/issues/[0-9]+/events/[a-f0-9]{32}/?$`,
+            'i'
+          );
+          const failure = parseValidationReceipts(
+            priorComments,
+            issue.identifier
+          )
+            .filter(
+              receipt =>
+                receipt.kind === 'outcome' &&
+                Object.hasOwn(receipt, 'episodeStartedAt') &&
+                receipt.episodeStartedAt === episodeStartedAt &&
+                date(receipt.recordedAt) >= date(predecessor.plan.start)
+            )
+            .at(-1);
+          if (
+            !failure ||
+            failure.status !== 'fail' ||
+            date(failure.recordedAt) < date(retainedPredecessor.recordedAt) ||
+            !eventEvidence.test(failure.evidence)
+          )
+            return unknown('failed_observation_provenance_unavailable');
+          predecessorFailure = {
+            sha: failure.sha,
+            evidence: failure.evidence,
+            recordedAt: failure.recordedAt,
+            bindingSha: predecessor.plan.bindingSha,
+            window: {
+              start: predecessor.plan.start,
+              end: predecessor.plan.end,
+            },
+            ...(predecessor.predecessorFailure
+              ? { previous: predecessor.predecessorFailure }
+              : {}),
+          };
+        }
+        if (!boundary) return unknown('incident_acceptance_changed');
+        const retainedOriginal = comments.find(
+          comment =>
+            date(comment.createdAt) < date(boundary) &&
+            markers(comment.body, 'sentry-observation').some(
+              candidate =>
+                JSON.stringify(candidate) === JSON.stringify(original)
+            )
+        );
+        const originalIssue = retainedOriginal && {
+          ...issue,
+          description: `<!-- sentry-observation:v1\n${JSON.stringify(original)}\n-->`,
+          comments: comments.filter(
+            comment =>
+              date(comment.createdAt) <= date(retainedOriginal.createdAt)
+          ),
+          history: issue.history.filter(
+            entry => date(entry.createdAt) <= date(retainedOriginal.createdAt)
+          ),
+        };
+        if (
+          !originalIssue ||
+          inspectObservationIssue(originalIssue, depth + 1).status !==
+            'registered' ||
+          !preserves(original)
+        )
+          return unknown('original_observation_provenance_unavailable');
+      }
     }
     return {
       status: 'registered',
       plan,
       comments,
       episodeStartedAt,
+      ...(predecessorFailure ? { predecessorFailure } : {}),
     };
   } catch {
     return unknown('observation_registration_unreadable');
@@ -520,6 +700,34 @@ export async function runSentryValidationObservations({
           window: { start: plan.start, end: plan.end },
           incidents: plan.incidents.map(source => ({ ...source })),
         };
+        if (registration.predecessorFailure) {
+          const originalBinding = plan.originalObservation?.bindingSha;
+          let successorBinding = plan.bindingSha;
+          let validAncestry = true;
+          /** @type {PredecessorFailure | undefined} */
+          let failure = registration.predecessorFailure;
+          while (failure) {
+            if (
+              !originalBinding ||
+              failure.sha.toLowerCase() === successorBinding.toLowerCase() ||
+              !(await facts.contains(originalBinding, failure.sha)) ||
+              !(await facts.contains(failure.bindingSha, failure.sha)) ||
+              !(await facts.contains(failure.sha, successorBinding))
+            ) {
+              validAncestry = false;
+              break;
+            }
+            successorBinding = failure.bindingSha;
+            failure = failure.previous;
+          }
+          if (!validAncestry) {
+            results.push({
+              ...context,
+              ...unknown('repair_binding_not_after_failed_generation'),
+            });
+            continue;
+          }
+        }
         if (!(await facts.contains(plan.bindingSha, artifact.sha))) {
           results.push({
             ...context,
@@ -562,7 +770,9 @@ export async function runSentryValidationObservations({
         if (
           current.state?.name !== 'Validating' ||
           rechecked.status !== 'registered' ||
-          JSON.stringify(rechecked.plan) !== JSON.stringify(plan)
+          JSON.stringify(rechecked.plan) !== JSON.stringify(plan) ||
+          JSON.stringify(rechecked.predecessorFailure) !==
+            JSON.stringify(registration.predecessorFailure)
         ) {
           results.push({
             ...context,
@@ -603,7 +813,9 @@ export async function runSentryValidationObservations({
         const finalRegistration = inspectObservationIssue(readback);
         if (
           finalRegistration.status !== 'registered' ||
-          JSON.stringify(finalRegistration.plan) !== JSON.stringify(plan)
+          JSON.stringify(finalRegistration.plan) !== JSON.stringify(plan) ||
+          JSON.stringify(finalRegistration.predecessorFailure) !==
+            JSON.stringify(registration.predecessorFailure)
         ) {
           results.push({
             ...context,
