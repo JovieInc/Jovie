@@ -1,5 +1,6 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import type { UIMessage } from 'ai';
+import { forwardRef } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { OnboardingChat } from '@/components/features/onboarding/OnboardingChat';
 import { ONBOARDING_ENTRY_TITLE } from '@/lib/onboarding/empty-state';
@@ -8,7 +9,13 @@ const chatMocks = vi.hoisted(() => ({
   messages: [] as Array<{
     id: string;
     role: 'user' | 'assistant';
-    parts: Array<{ type: 'text'; text: string }>;
+    parts: Array<{
+      type: string;
+      text?: string;
+      toolCallId?: string;
+      state?: string;
+      output?: Record<string, unknown>;
+    }>;
   }>,
   sendMessage: vi.fn(),
   setMessages: vi.fn(),
@@ -111,7 +118,18 @@ vi.mock('@/components/jovie/components', () => ({
       {children}
     </div>
   ),
-  ChatInput: () => <div data-testid='chat-input' />,
+  ChatInput: forwardRef<HTMLTextAreaElement, { readonly placeholder?: string }>(
+    function MockChatInput({ placeholder }, ref) {
+      return (
+        <textarea
+          ref={ref}
+          aria-label='Chat Message Input'
+          data-testid='chat-input'
+          placeholder={placeholder}
+        />
+      );
+    }
+  ),
   ChatMessage: ({
     parts,
   }: {
@@ -178,8 +196,39 @@ describe('OnboardingChat empty intro', () => {
     expect(screen.getByTestId('onboarding-empty-intro')).toBeTruthy();
     expect(screen.getByTestId('onboarding-start-ambient-mark')).toBeTruthy();
     expect(screen.getByText(ONBOARDING_ENTRY_TITLE)).toBeTruthy();
+    expect(screen.getByRole('textbox')).toHaveAttribute(
+      'placeholder',
+      'Artist, release, or link...'
+    );
     expect(screen.queryByTestId('onboarding-sign-in-skip')).toBeNull();
     expect(screen.queryByTestId('onboarding-starter-suggestions')).toBeNull();
+  });
+
+  it('follows the active artist card in the composer placeholder', () => {
+    chatMocks.messages = [
+      {
+        id: 'picker',
+        role: 'assistant',
+        parts: [
+          {
+            type: 'tool-searchSpotifyArtist',
+            toolCallId: 'picker',
+            state: 'output-available',
+            output: { action: 'open_artist_picker', query: 'Artist' },
+          },
+        ],
+      },
+    ];
+
+    render(
+      <OnboardingChat turnstileToken='token' turnstileStatus='verified' />
+    );
+
+    expect(screen.getByRole('textbox')).toHaveAttribute(
+      'placeholder',
+      'Pick an artist above or type a different name…'
+    );
+    expect(screen.queryByTestId('onboarding-empty-intro')).toBeNull();
   });
 
   it('keeps a validated starter as a draft while verification is pending', () => {
