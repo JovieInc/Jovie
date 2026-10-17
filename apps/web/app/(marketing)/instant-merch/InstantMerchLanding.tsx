@@ -137,7 +137,7 @@ export function InstantMerchLanding() {
                 <p className='text-xs font-mono text-tertiary-token'>
                   0{index + 1}
                 </p>
-                <h3 className='mt-3 text-lg font-medium text-primary-token'>
+                <h3 className='mt-3 text-balance text-lg font-medium text-primary-token'>
                   {step.title}
                 </h3>
                 <p className='mt-2 text-sm leading-6 text-secondary-token'>
