@@ -239,12 +239,17 @@ class BoundContextSessionTest(unittest.TestCase):
         source = repo / "scripts/lanes"
         source.mkdir(parents=True)
         (source / "lane_runner.py").write_text("# qualified fixture source\n")
+        policy = repo / "scripts/fleet-gate/scoped_admission.py"
+        policy.parent.mkdir(); policy.write_text("# qualified fixture fleet policy\n")
         subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
         tree = subprocess.run(["git", "-C", str(repo), "write-tree"], check=True,
                               capture_output=True, text=True).stdout.strip()
         oid = subprocess.run(["git", "-C", str(repo), "rev-parse", tree + ":scripts/lanes"],
                              check=True, capture_output=True, text=True).stdout.strip()
-        objects = {"scripts/lanes": oid}
+        objects = {"scripts/lanes": oid,
+                   "scripts/fleet-gate/scoped_admission.py": subprocess.run(
+                       ["git", "-C", str(repo), "rev-parse", tree + ":scripts/fleet-gate/scoped_admission.py"],
+                       check=True, capture_output=True, text=True).stdout.strip()}
         manifest = {"schema": "jovie-lane-release-bundle/v1", "sourceCommit": "a" * 40,
                     "objects": objects, "bundleDigest": hashlib.sha256(json.dumps(
                         objects, sort_keys=True, separators=(",", ":")).encode()).hexdigest()}
@@ -253,6 +258,8 @@ class BoundContextSessionTest(unittest.TestCase):
         self.current.mkdir(parents=True)
         self.source = self.current / "lane_runner.py"
         self.source.write_bytes((source / "lane_runner.py").read_bytes())
+        installed_policy = self.current.parent / "fleet-gate/scoped_admission.py"
+        installed_policy.parent.mkdir(); installed_policy.write_bytes(policy.read_bytes())
         for name, text in [(".release.json", json.dumps(manifest)),
                            (".bundle", manifest["bundleDigest"]), (".tree", oid)]:
             (self.current / name).write_text(text)

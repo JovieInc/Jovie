@@ -7014,8 +7014,10 @@ class UpdateTest(unittest.TestCase):
             with patch.object(lane.worktree_pool, "ready_slots", return_value=[slot]), \
                     patch.object(lane.worktree_pool, "pool_dir", return_value=slot.parent), \
                     patch.object(lane.worktree_pool, "node_env", return_value={"PATH": os.defpath}), \
-                    patch.object(lane.lifecycle, "run", side_effect=replies) as run:
+                    patch.object(lane.lifecycle, "run", side_effect=replies) as run, \
+                    patch.object(lane, "reap_selftest_processes", return_value=0) as cleanup_reaper:
                 self.assertIsNone(lane.prove_staging(host, staging))
+            cleanup_reaper.assert_called_once()
             self.assertEqual([call.args[0][-1] for call in run.call_args_list[:2]],
                              [str(host.repo), str(slot)])
             self.assertEqual(run.call_args_list[2].args[0][1:4], ["-m", "unittest", "-q"])
@@ -7043,8 +7045,10 @@ class UpdateTest(unittest.TestCase):
             with patch.object(lane.worktree_pool, "ready_slots", return_value=[slot]), \
                     patch.object(lane.worktree_pool, "pool_dir", return_value=slot.parent), \
                     patch.object(lane.worktree_pool, "node_env", return_value={"PATH": os.defpath}), \
-                    patch.object(lane.lifecycle, "run", side_effect=run):
+                    patch.object(lane.lifecycle, "run", side_effect=run), \
+                    patch.object(lane, "reap_selftest_processes", return_value=0) as cleanup_reaper:
                 self.assertIsNone(lane.prove_staging(host, staging))
+            cleanup_reaper.assert_called_once()
             self.assertEqual(len(calls), 2)
             with lane.worktree_pool.slot_lease(slot) as owned:
                 self.assertTrue(owned, "compilation releases the pool lease")
@@ -7235,8 +7239,29 @@ with patch.object(shipping_origin, "collect", return_value=result) as collect:
                 for rel in ["apps/desktop/node_modules", "packages/agent-transport-contracts/node_modules"]:
                     (clone / rel).parent.mkdir(parents=True, exist_ok=True)
                     (clone / rel).symlink_to((ROOT / rel).resolve(), target_is_directory=True)
-                with patch.object(lane.time, "time", return_value=refused["at"] + lane.UPDATE_RETRY_S + 1):
+                # Run the real staged installer/selector, but keep this private
+                # installation fixture out of the persistent host's /proc census.
+                # Dedicated cleanup tests exercise actual process custody below.
+                real_run, private_proofs = lane.lifecycle.run, []
+                driver = (
+                    "import sys; from pathlib import Path; from unittest.mock import patch\n"
+                    "sys.path.insert(0, str(Path(sys.argv[1]).parent))\n"
+                    "import lane_runner\n"
+                    "assert Path(lane_runner.__file__).resolve() == Path(sys.argv[1]).resolve()\n"
+                    "with patch.object(lane_runner, 'reap_selftest_processes', return_value=0):\n"
+                    "    sys.exit(lane_runner.main(sys.argv[2:]))\n"
+                )
+
+                def private_proof(argv, *args, **kwargs):
+                    if len(argv) > 2 and argv[2] == "prove-staging":
+                        private_proofs.append(argv)
+                        argv = [argv[0], "-c", driver, *argv[1:]]
+                    return real_run(argv, *args, **kwargs)
+
+                with patch.object(lane.time, "time", return_value=refused["at"] + lane.UPDATE_RETRY_S + 1), \
+                        patch.object(lane.lifecycle, "run", side_effect=private_proof):
                     self.assertEqual(lane.update(host), 0)
+                self.assertEqual(len(private_proofs), 1)
                 current = (host.state / "current").resolve()
                 self.assertTrue((current / "lane_runner.py").exists())
                 self.assertTrue((current.parent / "promotion-loss-metrics.mjs").exists())  # HUD PROMOTION line
@@ -10627,8 +10652,11 @@ class OperatorInstallerGlueTest(unittest.TestCase):
                    subprocess.CompletedProcess([], 1, stdout="", stderr=stderr)]
         with patch.object(lane, "mesh_dependency_roots", return_value=[self.host.repo]), \
                 patch.object(lane.worktree_pool, "node_env", return_value={"PATH": os.defpath}), \
-                patch.object(lane.lifecycle, "run", side_effect=replies) as run, contextlib.redirect_stderr(io.StringIO()) as console:
+                patch.object(lane.lifecycle, "run", side_effect=replies) as run, \
+                patch.object(lane, "reap_selftest_processes", return_value=0) as cleanup_reaper, \
+                contextlib.redirect_stderr(io.StringIO()) as console:
             self.assertEqual(lane.prove_staging(self.host, stage), "release tests failed")
+        self.assertEqual(cleanup_reaper.call_count, 2)
         self.assertEqual(run.call_args_list[1].args[0], [sys.executable, "-m", "unittest", "-q", *lane.LANE_TESTS])
         self.assertEqual(run.call_args_list[2].args[0],
                          [sys.executable, "-m", "unittest", "-q", "scripts.tests.test_fixture.Example.test_bound"])
@@ -10651,8 +10679,11 @@ class OperatorInstallerGlueTest(unittest.TestCase):
                    subprocess.CompletedProcess([], 0, stdout="", stderr="")]
         with patch.object(lane, "mesh_dependency_roots", return_value=[self.host.repo]), \
                 patch.object(lane.worktree_pool, "node_env", return_value={"PATH": os.defpath}), \
-                patch.object(lane.lifecycle, "run", side_effect=replies) as run, contextlib.redirect_stderr(io.StringIO()):
+                patch.object(lane.lifecycle, "run", side_effect=replies) as run, \
+                patch.object(lane, "reap_selftest_processes", return_value=0) as cleanup_reaper, \
+                contextlib.redirect_stderr(io.StringIO()):
             self.assertIsNone(lane.prove_staging(self.host, stage))
+        self.assertEqual(cleanup_reaper.call_count, 2)
         retry = run.call_args_list[2]
         self.assertEqual(retry.args[0], [sys.executable, "-m", "unittest", "-q", "scripts.tests.test_hud.LedgerSchemaTest.test_ledger"])
         self.assertEqual(retry.kwargs["cwd"], stage)
@@ -10714,6 +10745,29 @@ class OperatorInstallerGlueTest(unittest.TestCase):
             diagnostic = json.loads((stage / ".selftest-diagnostic.json").read_text())
             self.assertEqual(diagnostic["leftoverProcesses"], 1)
             self.assertIn("left 1 process(es) running", console.getvalue())
+        except lane.SelftestCleanupHeld:
+            # Keep the already-written typed observation before the fixture is removed.
+            # The original hold and real detached-child cleanup remain authoritative.
+            try:
+                cleanup = json.loads((stage / ".selftest-diagnostic.json").read_text()).get("cleanup", {})
+                observation = cleanup.get("observation") or {}
+                safe = {}
+                pid, start = observation.get("pid"), observation.get("start")
+                if type(pid) is int and pid > 0:
+                    safe["pid"] = pid
+                if isinstance(start, str) and start.startswith("linux:") and start[6:].isdecimal():
+                    safe["start"] = start
+                if observation.get("source") in {"proc-stat", "proc-environ", "proc-directory", "scope-owner"}:
+                    safe["source"] = observation["source"]
+                if type(observation.get("errno")) is int:
+                    safe["errno"] = observation["errno"]
+                digest = cleanup.get("sourceSha256")
+                if isinstance(digest, str) and len(digest) == 64 and set(digest) <= set("0123456789abcdef"):
+                    safe["sourceSha256"] = digest
+                print("selftest-cleanup-observation " + json.dumps(safe, sort_keys=True), file=sys.stderr)
+            except (OSError, ValueError, TypeError, AttributeError):
+                print("selftest-cleanup-observation unavailable", file=sys.stderr)
+            raise
         finally:
             for child in spawned:
                 if child.poll() is None:
@@ -10728,6 +10782,79 @@ class OperatorInstallerGlueTest(unittest.TestCase):
             self.assertEqual(first[lane.SELFTEST_RUN_ENV], inherited)
             self.assertEqual(second[lane.SELFTEST_RUN_ENV], inherited)
         self.assertEqual(lane.marked_processes(first_scope), {})
+
+
+class SelftestCleanupDiagnosticTest(unittest.TestCase):
+    """Fault-path proof for the real cleanup test's diagnostic retention only."""
+
+    def _observe_cleanup_hold(self, diagnostic):
+        original = lane.SelftestCleanupHeld("selftest-process-custody-unreadable")
+        with tempfile.TemporaryDirectory() as tmp:
+            case = OperatorInstallerGlueTest("test_selftest_leaves_zero_processes_even_detached_ones")
+            case.root = Path(tmp)
+            case.host = SimpleNamespace(repo=case.root)
+
+            def hold(host, stage):
+                if diagnostic is not None:
+                    payload = diagnostic if isinstance(diagnostic, bytes) else json.dumps(diagnostic).encode()
+                    (stage / ".selftest-diagnostic.json").write_bytes(payload)
+                raise original
+
+            with patch.object(lane, "prove_staging", side_effect=hold) as prove, \
+                    patch.object(subprocess, "Popen") as spawn, \
+                    patch.object(lane, "reap_selftest_processes") as reaper, \
+                    contextlib.redirect_stderr(io.StringIO()) as console:
+                with self.assertRaises(lane.SelftestCleanupHeld) as caught:
+                    case.test_selftest_leaves_zero_processes_even_detached_ones()
+            self.assertIs(caught.exception, original)
+            prove.assert_called_once_with(case.host, case.root / "stage")
+            spawn.assert_not_called()
+            reaper.assert_not_called()
+            return console.getvalue()
+
+    def test_retains_only_typed_safe_fields_and_original_hold(self):
+        for source in ("proc-stat", "proc-environ", "proc-directory", "scope-owner"):
+            with self.subTest(source=source):
+                safe = {"pid": 42, "start": "linux:12345", "source": source,
+                        "errno": 13, "sourceSha256": "a" * 64}
+                diagnostic = {"cleanup": {"sourceSha256": safe["sourceSha256"],
+                    "environment": {"SECRET": "private-environment"},
+                    "observation": {**safe, "command": "private-command", "marker": "private-marker",
+                                    "observedStart": "private-observed-start"}}}
+                output = self._observe_cleanup_hold(diagnostic)
+                self.assertEqual(output, "selftest-cleanup-observation " + json.dumps(safe, sort_keys=True) + "\n")
+                for secret in ("private-environment", "private-command", "private-marker", "private-observed-start"):
+                    self.assertNotIn(secret, output)
+
+    def test_invalid_field_types_are_excluded(self):
+        cases = (("pid", True), ("pid", 0), ("pid", -1), ("pid", "42"),
+                 ("start", 123), ("start", "darwin:123"), ("start", "linux:not-a-birth"),
+                 ("source", "private-command"), ("errno", True), ("errno", "13"),
+                 ("sourceSha256", "A" * 64), ("sourceSha256", "a" * 63),
+                 ("sourceSha256", 123))
+        for field, value in cases:
+            with self.subTest(field=field, value=value):
+                cleanup = {"observation": {field: value}}
+                if field == "sourceSha256":
+                    cleanup = {"sourceSha256": value, "observation": {}}
+                self.assertEqual(self._observe_cleanup_hold({"cleanup": cleanup}),
+                                 "selftest-cleanup-observation {}\n")
+
+    def test_unknown_errno_stays_unknown(self):
+        for observation in ({"pid": 42, "source": "proc-environ"},
+                            {"pid": 42, "source": "proc-environ", "errno": None}):
+            with self.subTest(observation=observation):
+                output = self._observe_cleanup_hold({"cleanup": {"observation": observation}})
+                safe = json.loads(output.removeprefix("selftest-cleanup-observation "))
+                self.assertEqual(safe, {"pid": 42, "source": "proc-environ"})
+                self.assertNotIn("errno", safe)
+
+    def test_missing_or_malformed_diagnostic_preserves_original_hold(self):
+        for diagnostic in (None, b"{broken", b"[]", {"cleanup": [1]},
+                           {"cleanup": {"observation": [1]}}):
+            with self.subTest(diagnostic=diagnostic):
+                self.assertEqual(self._observe_cleanup_hold(diagnostic),
+                                 "selftest-cleanup-observation unavailable\n")
 
 
 class RepositoryBindingTest(unittest.TestCase):

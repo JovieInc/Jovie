@@ -439,6 +439,10 @@ class _NativeReads:
         manifest = _json_file(self.current / ".release.json", "jovie-lane-release-bundle/v1")
         if manifest.get("bundleDigest") != self.current.parent.parent.name:
             raise Unavailable("installed-release-bundle-mismatch")
+        objects = manifest.get("objects")
+        policy = objects.get("scripts/fleet-gate/scoped_admission.py") if isinstance(objects, dict) else None
+        if not isinstance(policy, str) or not re.fullmatch(r"[a-f0-9]{40}", policy):
+            raise Unavailable("installed-fleet-policy-not-manifest-bound")
         self.lane.lifecycle.validate_release(self.current.parent.parent, manifest)
         if getattr(self, "_main_sha", None) is not None:
             if not 0 <= time.time() - self._main_observed_at <= MAX_AGE_S:
