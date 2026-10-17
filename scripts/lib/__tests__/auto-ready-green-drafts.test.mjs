@@ -505,6 +505,7 @@ esac
 `;
       writeFileSync(join(dir, 'gh'), fakeGh);
       chmodSync(join(dir, 'gh'), 0o755);
+      /** @type {NodeJS.ProcessEnv} */
       const spawnEnv = {
         ...process.env,
         PATH: `${dir}:${process.env.PATH}`,
