@@ -17,7 +17,7 @@ the release it started with and the next issue runs on the new one.
 from __future__ import annotations
 
 import argparse
-from contextlib import nullcontext
+from contextlib import contextmanager, nullcontext
 import fcntl
 import hashlib
 import importlib
@@ -3042,6 +3042,33 @@ def verify_and_land(host: Host, issue: Issue, branch: str, worktree: Path, log, 
     return gate_pr(host, pr, worktree, log, sensitive=sensitive)
 
 
+@contextmanager
+def gate_admission(host: Host, *, staging: bool = False):
+    """Serialize seat admission with a non-waiting release proof reservation.
+
+    Staging owns every existing gate seat until its proof helper drains. It
+    defers to an admitted qualifier; a new qualifier defers to staging before
+    starting heavy work. This does not attest custody of arbitrary SSH arrivals.
+    """
+    if not staging and lifecycle.draining(host.state):
+        raise lifecycle.AdmissionHeld("operator requested natural controller drain")
+    admission = Locked(host.state / "locks" / "gate-admission.lock", blocking=False)
+    seats = []
+    try:
+        if not admission.held:
+            raise lifecycle.AdmissionHeld("gate-admission-busy")
+        if staging:
+            for index in range(host.gate_slots):
+                seat = Locked(host.state / "slots" / f"gate.{index}.lock", blocking=False)
+                seats.append(seat)
+                if not seat.held:
+                    raise lifecycle.AdmissionHeld("release-proof-gate-active")
+        yield (admission, *seats)
+    finally:
+        for lock in reversed([admission, *seats]):
+            lock.release()
+
+
 def gate_slot(host: Host) -> tuple[Locked, float]:
     """One of `gate_slots` host-wide gate seats; waits (polling) until one is free.
 
@@ -3050,11 +3077,15 @@ def gate_slot(host: Host) -> tuple[Locked, float]:
     """
     started = time.time()
     while True:
-        for index in range(host.gate_slots):
-            lock = Locked(host.state / "slots" / f"gate.{index}.lock", blocking=False)
-            if lock.held:
-                return lock, time.time() - started
-            lock.release()
+        try:
+            with gate_admission(host):
+                for index in range(host.gate_slots):
+                    lock = Locked(host.state / "slots" / f"gate.{index}.lock", blocking=False)
+                    if lock.held:
+                        return lock, time.time() - started
+                    lock.release()
+        except lifecycle.AdmissionHeld as error:
+            raise RepairStopped(str(error), None, "before-gate-seat") from error
         time.sleep(15)
 
 
@@ -8527,6 +8558,8 @@ def verify_generated_runtime(proven: Path, existing: Path) -> None:
 
 
 def install_release(host: Host, *, operator=None) -> int:
+    if operator is None and lifecycle.draining(host.state):
+        raise lifecycle.AdmissionHeld("operator requested natural controller drain")
     if operator is not None:
         if not isinstance(operator, lifecycle.OperatorGuard) or operator.state != host.state.resolve():
             raise lifecycle.AdmissionHeld("operator installation owner differs")
@@ -8548,58 +8581,63 @@ def install_release(host: Host, *, operator=None) -> int:
         print(f"lane update backing off: tree {tree[:7]} was refused {refused.get('why')}", file=sys.stderr)
         return 1
     if operator is not None or not release.exists():
-        staging = host.state / "releases" / f".{tree}.tmp"
-        if operator is None:
-            shutil.rmtree(staging, ignore_errors=True)
-        elif staging.exists() or staging.is_symlink():
-            raise lifecycle.AdmissionHeld("operator proof staging already exists; reconcile its owner")
-        staging.mkdir(parents=True, mode=0o700)
-        archive = lifecycle.run(["git", "archive", bundle["sourceCommit"], "scripts/lanes", *RELEASE_EXTRAS, *LANE_TESTS],
-                                 cwd=host.repo, capture_output=True, check=True)
-        lifecycle.run(["tar", "-x", "-C", str(staging)], input=archive.stdout, check=True)
-        def refuse(why: str) -> int:
-            refused_path.write_text(json.dumps({"tree": tree, "at": time.time(), "why": why}))
-            return 1
-        # The staged tree proves itself with its own installer code. On 2026-10-10 the Mac
-        # refused every release for a day because the *installed* installer chose a bare
-        # dependency root; the fix was on main but could never run. An older staged tree
-        # without the subcommand is proven by this copy, as before.
-        try:
-            if operator is not None:
-                proof = operator.prove_staging(staging.resolve(), host.repo, timeout=60 + UPDATE_TEST_TIMEOUT_S)
+        with gate_admission(host, staging=True) as leases:
+            proof_fds = tuple(lock.handle.fileno() for lock in leases)
+            staging = host.state / "releases" / f".{tree}.tmp"
+            if operator is None:
+                shutil.rmtree(staging, ignore_errors=True)
+            elif staging.exists() or staging.is_symlink():
+                raise lifecycle.AdmissionHeld("operator proof staging already exists; reconcile its owner")
+            staging.mkdir(parents=True, mode=0o700)
+            archive = lifecycle.run(["git", "archive", bundle["sourceCommit"], "scripts/lanes", *RELEASE_EXTRAS, *LANE_TESTS],
+                                     cwd=host.repo, capture_output=True, check=True)
+            lifecycle.run(["tar", "-x", "-C", str(staging)], input=archive.stdout, check=True)
+            def refuse(why: str) -> int:
+                refused_path.write_text(json.dumps({"tree": tree, "at": time.time(), "why": why}))
+                return 1
+            # The staged tree proves itself with its own installer code. On 2026-10-10 the Mac
+            # refused every release for a day because the *installed* installer chose a bare
+            # dependency root; the fix was on main but could never run. An older staged tree
+            # without the subcommand is proven by this copy, as before.
+            try:
+                if operator is not None:
+                    # The operator's canonical EX/drain protocol fences new
+                    # launches even after its parent dies. Never pass that EX
+                    # owner to the private proof or replace its durable drain.
+                    proof = operator.prove_staging(staging.resolve(), host.repo, timeout=60 + UPDATE_TEST_TIMEOUT_S)
+                else:
+                    proof = lifecycle.run([sys.executable, str(staging / "scripts/lanes/lane_runner.py"),
+                                           "prove-staging", str(staging)],
+                                          cwd=staging, capture_output=True, text=True,
+                                          timeout=60 + UPDATE_TEST_TIMEOUT_S, pass_fds=proof_fds,
+                                          env={**os.environ, "LANES_STATE": str(host.state), "LANES_REPO": str(host.repo)})
+            except subprocess.TimeoutExpired:
+                refuse(f"self-test timeout {UPDATE_TEST_TIMEOUT_S}s")
+                raise
+            if operator is None and proof.returncode == 2 and "invalid choice" in proof.stderr:
+                why = prove_staging(host, staging)
             else:
-                proof = lifecycle.run([sys.executable, str(staging / "scripts/lanes/lane_runner.py"),
-                                       "prove-staging", str(staging)],
-                                      cwd=staging, capture_output=True, text=True,
-                                      timeout=60 + UPDATE_TEST_TIMEOUT_S,
-                                      env={**os.environ, "LANES_STATE": str(host.state), "LANES_REPO": str(host.repo)})
-        except subprocess.TimeoutExpired:
-            refuse(f"self-test timeout {UPDATE_TEST_TIMEOUT_S}s")
-            raise
-        if operator is None and proof.returncode == 2 and "invalid choice" in proof.stderr:
-            why = prove_staging(host, staging)
-        else:
-            why = None if proof.returncode == 0 else (proof.stdout.strip().splitlines() or ["staging proof failed"])[-1]
-            if why and proof.stderr:
-                print(proof.stderr[-2000:], file=sys.stderr)
-        if why:
-            print(f"lane update refused: {why}", file=sys.stderr)
-            return refuse(why)
-        (staging / "scripts/lanes/.tree").write_text(bundle["objects"]["scripts/lanes"])
-        (staging / "scripts/lanes/.bundle").write_text(tree)
-        (staging / "scripts/lanes/.release.json").write_text(json.dumps(bundle, sort_keys=True))
-        if operator is not None:
-            operator.validate()
-            lifecycle.validate_release(staging, bundle)
-            verify_generated_runtime(staging, release if release.exists() else staging)
-        if operator is not None and release.exists():
-            # Retain the fresh proof artifact without rewriting the running tree.
-            retained = host.state / "releases" / f".{tree}.proof-{operator.request['operationId']}"
-            if retained.exists() or retained.is_symlink():
-                raise lifecycle.AdmissionHeld("operator proof receipt already exists")
-            staging.rename(retained)
-        else:
-            staging.rename(release)
+                why = None if proof.returncode == 0 else (proof.stdout.strip().splitlines() or ["staging proof failed"])[-1]
+                if why and proof.stderr:
+                    print(proof.stderr[-2000:], file=sys.stderr)
+            if why:
+                print(f"lane update refused: {why}", file=sys.stderr)
+                return refuse(why)
+            (staging / "scripts/lanes/.tree").write_text(bundle["objects"]["scripts/lanes"])
+            (staging / "scripts/lanes/.bundle").write_text(tree)
+            (staging / "scripts/lanes/.release.json").write_text(json.dumps(bundle, sort_keys=True))
+            if operator is not None:
+                operator.validate()
+                lifecycle.validate_release(staging, bundle)
+                verify_generated_runtime(staging, release if release.exists() else staging)
+            if operator is not None and release.exists():
+                # Retain the fresh proof artifact without rewriting the running tree.
+                retained = host.state / "releases" / f".{tree}.proof-{operator.request['operationId']}"
+                if retained.exists() or retained.is_symlink():
+                    raise lifecycle.AdmissionHeld("operator proof receipt already exists")
+                staging.rename(retained)
+            else:
+                staging.rename(release)
     if operator is not None:
         operator.validate()
         lifecycle.validate_release(release.resolve(), bundle)
