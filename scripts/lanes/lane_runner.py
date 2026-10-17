@@ -4583,12 +4583,12 @@ def claim_remediation_events(host: Host, linear) -> dict:
             "eventsHuman": summary["eventsHuman"], "eventsExhausted": summary["eventsExhausted"], **delivery}
 
 
-def _labeled_event_issue(row: dict, description: str = "", event_claim: dict | None = None) -> Issue:
-    priority = row.get("priority")
+def _labeled_event_issue(row: dict, canonical: dict, description: str = "", event_claim: dict | None = None) -> Issue:
+    priority = canonical.get("priority")
     priority = priority if type(priority) is int and 1 <= priority <= 4 else 0
     return Issue(row.get("issueId"), row.get("identifier") or row.get("issueId"),
                  row.get("title") or "", description, priority,
-                 row.get("createdAt") or "", list(row.get("labels") or []), event_claim)
+                 canonical.get("createdAt") or "", list(row.get("labels") or []), event_claim)
 
 
 def claim_labeled_event(host: Host, name: str, linear) -> Issue | None:
@@ -4611,16 +4611,25 @@ def claim_labeled_event(host: Host, name: str, linear) -> Issue | None:
             continue
         if linear_sync.claim_status(host.state, row["issueId"]) == "active":
             continue  # Ordinary and labeled generations share the same incumbent issue owner.
-        waiting.append((fingerprint, row))
-    # Reuse ordinary intake ordering after the unchanged local eligibility gates.
-    waiting.sort(key=lambda item: admission_order(_labeled_event_issue(item[1]), now))
-    for fingerprint, row in waiting:
-        if linear_sync.claim_status(host.state, row["issueId"]) == "active":
-            continue  # Recheck shared custody before any remote start operation.
         deliveries = _event_delivery_state(host)["actions"].values()
         if any(action["kind"] == "reopens" and action["ownerIssueId"] == row["issueId"]
                and action["status"] not in {"acknowledged", "superseded"} for action in deliveries):
             continue  # A planned reopen is not an accepted remote issue state.
+        waiting.append((fingerprint, row))
+    if not waiting:
+        return None
+    # Join the same complete shared inventory; no per-issue API read or event-row
+    # rewrite may invalidate an accepted delivery's exact owner preimage.
+    canonical = {issue["id"]: issue for issue in fetch_labeled_events(linear)}
+    waiting = [(fingerprint, row) for fingerprint, row in waiting
+               if row["issueId"] in canonical
+               and canonical[row["issueId"]].get("identifier") == row.get("identifier")
+               and (canonical[row["issueId"]].get("team") or {}).get("key") == "JOV"]
+    waiting.sort(key=lambda item: admission_order(
+        _labeled_event_issue(item[1], canonical[item[1]["issueId"]]), now))
+    for fingerprint, row in waiting:
+        if linear_sync.claim_status(host.state, row["issueId"]) == "active":
+            continue  # Recheck shared custody before any remote start operation.
         started = row.get("startedStateId")
         if started:
             delivery = row.setdefault("startDelivery", {"attempts": 0, "status": "pending", "nextAt": now,
@@ -4685,7 +4694,7 @@ def claim_labeled_event(host: Host, name: str, linear) -> Issue | None:
         dossier = row.get("dossier") or ""
         if dossier:
             description = dossier + "\n\n" + description
-        return _labeled_event_issue(row, description, _event_start_claim(fingerprint, row))
+        return _labeled_event_issue(row, canonical[row["issueId"]], description, _event_start_claim(fingerprint, row))
     return None
 
 

@@ -1346,8 +1346,6 @@ def _absorb_event(row: dict, issue: dict, fingerprint: str) -> None:
     row["team"] = (issue.get("team") or {}).get("key")
     row["title"] = issue.get("title") or ""
     row["description"] = issue.get("description") or ""
-    row["priority"] = issue.get("priority")
-    row["createdAt"] = issue.get("createdAt")
     row["labels"] = [node.get("name") if isinstance(node, dict) else str(node) for node in _label_nodes(issue)]
     todo, started = _state_id(issue, "Todo"), _state_id(issue, "In Progress")
     if todo:

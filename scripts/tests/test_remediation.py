@@ -723,7 +723,9 @@ class LabeledEventTest(unittest.TestCase):
         import tempfile
         from pathlib import Path
         from unittest.mock import patch
-        with tempfile.TemporaryDirectory() as tmp, patch.object(runner, "provider_healthy", return_value=True):
+        with tempfile.TemporaryDirectory() as tmp, patch.object(runner, "provider_healthy", return_value=True), \
+                patch.dict(os.environ, {"LANES_EXECUTION_BACKEND": "cache-fixture"}), \
+                patch.object(runner, "SHARED_CACHE_DIR", Path(tmp) / "cache"):
             host = type("Host", (), {"state": Path(tmp)})()
             runner.claim_remediation_events(host, Linear())
             runner.claim_remediation_events(host, Linear())
@@ -750,7 +752,7 @@ class LabeledEventTest(unittest.TestCase):
             self.assertTrue(released["events"]["musicfetch-quota"]["release"])
             self.assertIsNone(released["events"]["musicfetch-quota"]["lane"])
         reads = [query for query in calls if isinstance(query, str) and "startsWith" in query]
-        self.assertEqual(len(reads), 2)
+        self.assertEqual(len(reads), 1)  # Planning and selection share the same complete cache fill.
         self.assertIn('"JOV"', reads[0])
         self.assertIn('"LYB"', reads[0])
         self.assertEqual(sum(isinstance(query, str) and "issue(id:" in query for query in calls), 2)
