@@ -1510,7 +1510,7 @@ function planAffectedTests(
         '--coverage.include=lib/founder-taste-order.mjs',
         '--coverage.reporter=text',
         '--coverage.reporter=json-summary',
-        '--coverage.thresholds.perFile=true',
+        '--coverage.thresholds.perFile',
         '--coverage.thresholds.lines=85',
         '--coverage.thresholds.statements=85',
         '--coverage.thresholds.functions=80',

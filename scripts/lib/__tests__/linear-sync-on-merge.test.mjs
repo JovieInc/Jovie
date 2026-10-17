@@ -1335,6 +1335,32 @@ describe('linear sync on merge', () => {
     ).toBe(false);
   });
 
+  it('matches explicit PR identifiers exactly when deciding closure holds', () => {
+    const issue = { identifier: 'JOV-8616', issueId: 'uuid-8616' };
+    const pull = { title: 'lifecycle repair', headRef: 'feature/no-ticket' };
+    expect(
+      pullRequestLinksIssue(
+        {
+          ...pull,
+          body: '<!-- linear-issue-identifier:JOV-86160 -->\n<!-- linear-issue-identifier:jov-8616 -->',
+        },
+        issue
+      )
+    ).toBe(true);
+    expect(
+      pullRequestLinksIssue(
+        { ...pull, body: '<!-- linear-issue-identifier:JOV-86160 -->' },
+        issue
+      )
+    ).toBe(false);
+    expect(
+      pullRequestLinksIssue(
+        { ...pull, body: '<!-- linear-issue-id:uuid-unrelated -->' },
+        issue
+      )
+    ).toBe(false);
+  });
+
   it('holds JOV-6586 while later stack layers are open, ignoring the merging PR', () => {
     const issue = JOV_6586_ISSUE;
     const held = lifecycleHolds({

@@ -10,6 +10,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { parseCLI } from 'vitest/node';
 import {
   ACQUISITION_CERTIFICATION_COMMAND,
   BILLING_PROVENANCE_COVERAGE_COMMAND,
@@ -131,9 +132,20 @@ it('enforces lifecycle coverage through the real structural selector', async () 
       `lib/__tests__/${test}.test.mjs`
     );
   }
-  expect(VALIDATION_LIFECYCLE_COVERAGE_COMMAND).toContain(
-    '--coverage.thresholds.perFile=true'
-  );
+  // An explicit '=true' becomes a string in Vitest 5 and silently checks
+  // aggregate coverage. Exercise its actual parser at this runner boundary.
+  expect(
+    parseCLI(VALIDATION_LIFECYCLE_COVERAGE_COMMAND.replace(/^pnpm exec /u, ''))
+      .options.coverage
+  ).toMatchObject({
+    thresholds: {
+      perFile: true,
+      lines: 90,
+      statements: 90,
+      branches: 75,
+      functions: 85,
+    },
+  });
   expect(VALIDATION_LIFECYCLE_COVERAGE_COMMAND).toContain(
     '--coverage.thresholds.lines=90'
   );
