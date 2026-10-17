@@ -102,6 +102,11 @@ test.describe('Artist Profiles Landing', () => {
 
   test('hero renders with headline and CTAs', async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 1440, height: 900 });
+    await expect(
+      page
+        .getByTestId('artist-profile-section-hero')
+        .getByText(ARTIST_PROFILE_COPY.hero.subhead, { exact: true })
+    ).toBeVisible();
     const claimLink = page
       .getByRole('link', {
         name: /claim your profile/i,
@@ -164,6 +169,11 @@ test.describe('Artist Profiles Landing', () => {
 
   test('hero stays intact on mobile', async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 390, height: 844 });
+    await expect(
+      page
+        .getByTestId('artist-profile-section-hero')
+        .getByText(ARTIST_PROFILE_COPY.hero.subhead, { exact: true })
+    ).toBeVisible();
 
     await expect(
       page.getByRole('heading', {
