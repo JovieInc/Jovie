@@ -89,6 +89,23 @@ installElectronRuntimeMarker();
 
 contextBridge.exposeInMainWorld('electronAPI', {
   platform: process.platform,
+  navigationBoundaryVersion: 1,
+  windowRole: process.argv?.includes('--jovie-profile-preview')
+    ? 'profile-preview'
+    : process.argv?.includes('--jovie-auth-handoff')
+      ? 'auth'
+      : 'main',
+  routeNavigation: (url: string) =>
+    ipcRenderer.invoke('desktop-route-navigation', url),
+  onNavigationError: (callback: (url: string) => void) => {
+    if (typeof callback !== 'function') return () => undefined;
+    const listener = (_: unknown, url: unknown) => {
+      if (typeof url === 'string') callback(url);
+    };
+    ipcRenderer.on('desktop-navigation-error', listener);
+    return () =>
+      ipcRenderer.removeListener('desktop-navigation-error', listener);
+  },
   electronVersion: process.versions.electron,
   getBuildIdentity: () => ipcRenderer.invoke(GET_BUILD_IDENTITY_CHANNEL),
   setWorkState: (state: unknown) => {
@@ -223,7 +240,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }>;
   },
   setDesktopPasskeyState: (update: 'enrolled' | 'dismissed' | 'reset') => {
-    return ipcRenderer.invoke(SET_DESKTOP_PASSKEY_STATE_CHANNEL, update) as Promise<{
+    return ipcRenderer.invoke(
+      SET_DESKTOP_PASSKEY_STATE_CHANNEL,
+      update
+    ) as Promise<{
       ok: boolean;
       reason?: string;
     }>;
@@ -291,11 +311,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
    * as in-app navigation — deep links land on the right screen, unsafe URLs
    * just focus the window.
    */
-  showNotification: (payload: {
-    title: string;
-    body?: string;
-    url?: string;
-  }) =>
+  showNotification: (payload: { title: string; body?: string; url?: string }) =>
     ipcRenderer.invoke(DESKTOP_NOTIFICATION_CHANNEL, payload) as Promise<{
       ok: boolean;
       reason?: string;
