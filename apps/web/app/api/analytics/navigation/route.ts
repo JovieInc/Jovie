@@ -28,6 +28,14 @@ function unavailableResponse() {
   );
 }
 
+function isDisposableE2ETelemetry(error: unknown): boolean {
+  return (
+    process.env.NEXT_PUBLIC_E2E_MODE === '1' &&
+    (error instanceof NavigationTelemetryStoreUnavailableError ||
+      error instanceof NavigationTelemetryPrivacyUnavailableError)
+  );
+}
+
 export async function POST(request: Request): Promise<NextResponse> {
   const { userId } = await getCachedAuth();
   if (!userId) {
@@ -70,6 +78,9 @@ export async function POST(request: Request): Promise<NextResponse> {
     await recordNavigationTelemetryBatch(events, { contributorId: userId });
     return new NextResponse(null, { status: 204 });
   } catch (error) {
+    if (isDisposableE2ETelemetry(error)) {
+      return new NextResponse(null, { status: 204 });
+    }
     if (
       error instanceof NavigationTelemetryStoreUnavailableError ||
       error instanceof NavigationTelemetryPrivacyUnavailableError
