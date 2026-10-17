@@ -93,10 +93,10 @@ const creatorRoutes = [
   {
     path: APP_ROUTES.AUDIENCE,
     name: 'Audience',
-    kind: 'render',
+    kind: 'redirect',
     surface: 'creator',
     authRole: 'user',
-    contentSelector: '[data-testid="dashboard-audience-client"]',
+    acceptedDestinations: [APP_ROUTES.CONTACTS_AUDIENCE],
     requiresUserButton: true,
     performanceBudgetMs: CREATOR_DEFAULT_BUDGET_MS,
   },
@@ -126,12 +126,10 @@ const creatorRoutes = [
   {
     path: APP_ROUTES.RELEASES,
     name: 'Releases',
-    kind: 'render',
+    kind: 'redirect',
     surface: 'creator',
     authRole: 'user',
-    contentSelector: '[data-testid="releases-matrix"]',
-    contentFallbackSelector:
-      '[data-testid="releases-empty-state-enriching"], :text-matches("connect spotify|finding your music|no releases", "i")',
+    acceptedDestinations: [`${APP_ROUTES.LIBRARY}?view=releases`],
     requiresUserButton: true,
     performanceBudgetMs: CREATOR_DEFAULT_BUDGET_MS,
   },
