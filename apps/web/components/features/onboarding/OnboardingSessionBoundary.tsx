@@ -5,6 +5,7 @@ import type { UIMessage } from 'ai';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { useJovieAuth } from '@/hooks/useJovieAuth';
+import { ONBOARDING_COMPOSER_DRAFT_KEY } from '@/lib/onboarding/session-keys';
 import { OnboardingShell, type OnboardingShellProps } from './OnboardingShell';
 
 interface Snapshot {
@@ -37,6 +38,8 @@ export function OnboardingSessionBoundary(props: OnboardingShellProps) {
     actionIdentity.current = identity;
   }, [identity]);
   const initialIdentity = useRef<string | null>(null);
+  const entryRoute =
+    props.entrySurface === 'waitlist' ? APP_ROUTES.WAITLIST : APP_ROUTES.START;
 
   useEffect(() => {
     if (!identity) return;
@@ -101,10 +104,15 @@ export function OnboardingSessionBoundary(props: OnboardingShellProps) {
       });
       if (!response.ok) throw new Error('action failed');
       if (actionIdentity.current !== owner) return;
-      if (action === 'logout') await signOut({ redirectUrl: APP_ROUTES.START });
+      if (action === 'logout') await signOut({ redirectUrl: entryRoute });
       else {
         // Remove URL handoffs too: reload must not resubmit the old starter.
-        globalThis.history.replaceState(null, '', APP_ROUTES.START);
+        try {
+          globalThis.sessionStorage?.removeItem(ONBOARDING_COMPOSER_DRAFT_KEY);
+        } catch {
+          // Restart remains valid when browser storage is unavailable.
+        }
+        globalThis.history.replaceState(null, '', entryRoute);
         setRevision(current => current + 1);
       }
     } catch {
@@ -163,26 +171,32 @@ export function OnboardingSessionBoundary(props: OnboardingShellProps) {
   }
   const allowHandoff = loaded.allowHandoff;
   return (
-    <OnboardingShell
-      {...props}
-      key={`${identity}:${revision}:${loaded.snapshot.conversationId ?? 'new'}`}
-      isSignedIn={isSignedIn}
-      intentId={allowHandoff ? props.intentId : undefined}
-      starterHandoff={allowHandoff ? props.starterHandoff : null}
-      entryProfile={allowHandoff ? props.entryProfile : null}
-      initialMessages={loaded.snapshot.messages}
-      conversationId={loaded.snapshot.conversationId}
-      resumeOwnedConversation={loaded.snapshot.owned}
-      onRestart={() => {
-        void runAction('restart');
-      }}
-      onLogout={() => {
-        void runAction('logout');
-      }}
-      onBusyChange={setChatBusy}
-      controlsDisabled={chatBusy}
-      actionPending={actionPending}
-      actionError={actionError}
-    />
+    <div
+      className='contents'
+      data-testid='onboarding-session-boundary'
+      data-restore-state='restored'
+    >
+      <OnboardingShell
+        {...props}
+        key={`${identity}:${revision}:${loaded.snapshot.conversationId ?? 'new'}`}
+        isSignedIn={isSignedIn}
+        intentId={allowHandoff ? props.intentId : undefined}
+        starterHandoff={allowHandoff ? props.starterHandoff : null}
+        entryProfile={allowHandoff ? props.entryProfile : null}
+        initialMessages={loaded.snapshot.messages}
+        conversationId={loaded.snapshot.conversationId}
+        resumeOwnedConversation={loaded.snapshot.owned}
+        onRestart={() => {
+          void runAction('restart');
+        }}
+        onLogout={() => {
+          void runAction('logout');
+        }}
+        onBusyChange={setChatBusy}
+        controlsDisabled={chatBusy}
+        actionPending={actionPending}
+        actionError={actionError}
+      />
+    </div>
   );
 }

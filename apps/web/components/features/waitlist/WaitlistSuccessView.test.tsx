@@ -31,7 +31,7 @@ describe('WaitlistSuccessView', () => {
         level: 1,
         name: "We Couldn't Verify Your Request",
       })
-    ).toBeVisible();
+    ).toBeInTheDocument();
     expect(screen.queryByText("You're on the list")).toBeNull();
     expect(screen.queryByTestId('waitlist-next-steps')).toBeNull();
   });
@@ -40,20 +40,20 @@ describe('WaitlistSuccessView', () => {
     const { container } = render(<WaitlistSuccessView />);
 
     expect(
-      container.querySelector('[data-auth-chrome="splash-b"]')
+      container.querySelector('[data-app-shell-frame="true"]')
     ).not.toBeNull();
+    expect(screen.getByRole('heading', { name: 'Chat' })).toBeVisible();
     expect(
       screen.getByRole('heading', { level: 1, name: "You're on the list" })
-    ).toBeVisible();
+    ).toBeInTheDocument();
     expect(
       screen.getByText(
-        "We're opening Jovie in waves. Your request is saved. Come back to /start when your spot opens."
+        "We're opening Jovie in waves. Your request is saved. Return here to check status while access is pending."
       )
     ).toBeVisible();
     expect(screen.getByTestId('waitlist-next-steps').children).toHaveLength(3);
-    expect(
-      screen.getByRole('link', { name: 'Resume At Start' })
-    ).toHaveAttribute('href', '/start');
+    expect(screen.queryByTestId('waitlist-resume-start')).toBeNull();
+    expect(container.textContent).not.toContain('/start');
   });
 
   it('shows the held jov.ie handle when a reservation profile exists', () => {
@@ -61,10 +61,10 @@ describe('WaitlistSuccessView', () => {
 
     expect(
       screen.getByRole('heading', { level: 1, name: "You're on the list" })
-    ).toBeVisible();
+    ).toBeInTheDocument();
     expect(
       screen.getByText(
-        "jov.ie/tim is yours. Your name and profile are reserved, and we'll email you the moment your spot opens."
+        "jov.ie/tim is held for this request. Your draft profile stays private while access is pending, and we'll email you when your spot opens."
       )
     ).toBeVisible();
     expect(screen.queryByText(/Request saved\./)).toBeNull();
@@ -75,7 +75,7 @@ describe('WaitlistSuccessView', () => {
 
     expect(
       screen.getByText(
-        "We're opening Jovie in waves. Your request is saved. Come back to /start when your spot opens."
+        "We're opening Jovie in waves. Your request is saved. Return here to check status while access is pending."
       )
     ).toBeVisible();
     expect(screen.queryByText(/jov\.ie\//)).toBeNull();
@@ -94,12 +94,12 @@ describe('WaitlistSuccessView', () => {
       value: height,
     });
 
-    render(<WaitlistSuccessView />);
+    render(<WaitlistSuccessView proCheckoutPriceId='price_pro_monthly' />);
 
-    const resume = screen.getByRole('link', { name: 'Resume At Start' });
-    expect(resume).toHaveAttribute('data-size', 'lg');
-    expect(resume).toHaveClass('h-auto', 'min-h-7');
-    expect(resume).toHaveClass(
+    const checkout = screen.getByTestId('waitlist-start-pro-checkout');
+    expect(checkout).toHaveAttribute('data-size', 'lg');
+    expect(checkout).toHaveClass('h-auto', 'min-h-7');
+    expect(checkout).toHaveClass(
       'before:h-full',
       'before:min-h-11',
       'before:min-w-11'

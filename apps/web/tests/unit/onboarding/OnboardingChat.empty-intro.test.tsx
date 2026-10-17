@@ -1,4 +1,10 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import type { UIMessage } from 'ai';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OnboardingChat } from '@/components/features/onboarding/OnboardingChat';
@@ -106,7 +112,23 @@ vi.mock('@/components/jovie/components', () => ({
       {children}
     </div>
   ),
-  ChatInput: () => <div data-testid='chat-input' />,
+  ChatInput: ({
+    onChange,
+    placeholder,
+    value,
+  }: {
+    readonly onChange: (value: string) => void;
+    readonly placeholder: string;
+    readonly value: string;
+  }) => (
+    <textarea
+      aria-label='Message Jovie'
+      data-testid='chat-input'
+      onChange={event => onChange(event.target.value)}
+      placeholder={placeholder}
+      value={value}
+    />
+  ),
   ChatMessage: ({
     parts,
   }: {
@@ -155,6 +177,7 @@ describe('OnboardingChat empty intro', () => {
     chatMocks.status = 'ready';
     chatMocks.onError = undefined;
     chatMocks.errorMetadata = {};
+    sessionStorage.clear();
     process.env.NODE_ENV = 'development';
   });
 
@@ -168,6 +191,50 @@ describe('OnboardingChat empty intro', () => {
     expect(screen.getByText(ONBOARDING_ENTRY_TITLE)).toBeTruthy();
     expect(screen.queryByTestId('onboarding-sign-in-skip')).toBeNull();
     expect(screen.queryByTestId('onboarding-starter-suggestions')).toBeNull();
+  });
+
+  it('opens /waitlist as a docked Chat destination with private-draft copy', () => {
+    render(
+      <OnboardingChat
+        entrySurface='waitlist'
+        funnelSurface='waitlist_chat'
+        turnstileToken='token'
+        turnstileStatus='verified'
+      />
+    );
+
+    expect(
+      screen.getByText(/Nothing goes public until you claim it/)
+    ).toBeVisible();
+    expect(screen.getByTestId('onboarding-composer-dock')).toBeVisible();
+    expect(screen.queryByTestId('onboarding-empty-intro')).toBeNull();
+    expect(
+      screen.getByRole('region', { name: 'Jovie Waitlist Chat' })
+    ).toBeVisible();
+  });
+
+  it('restores an unsent composer draft across the verified-auth transition', async () => {
+    const first = render(
+      <OnboardingChat
+        entrySurface='waitlist'
+        turnstileToken='token'
+        turnstileStatus='verified'
+      />
+    );
+    fireEvent.change(screen.getByLabelText('Message Jovie'), {
+      target: { value: 'My unreleased single comes out Friday' },
+    });
+    first.unmount();
+
+    render(
+      <OnboardingChat turnstileToken='token' turnstileStatus='verified' />
+    );
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Message Jovie')).toHaveValue(
+        'My unreleased single comes out Friday'
+      )
+    );
   });
 
   it('shows a compact processing state for a validated starter handoff', () => {

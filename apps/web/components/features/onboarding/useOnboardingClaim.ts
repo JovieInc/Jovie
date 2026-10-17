@@ -9,7 +9,10 @@ import {
   markSignupFirstValuePending,
   trackFunnelStep,
 } from '@/lib/analytics/signup-funnel-client';
-import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
+import {
+  ONBOARDING_FUNNEL_EVENTS,
+  type OnboardingFunnelSurface,
+} from '@/lib/onboarding/funnel-events';
 
 /**
  * Auto-claim the anonymous onboarding conversation when the visitor
@@ -68,7 +71,8 @@ const RETRY_DELAY_MS = 1_500;
 
 export function useOnboardingClaim(
   claimTrigger = 0,
-  enabled = true
+  enabled = true,
+  funnelSurface: OnboardingFunnelSurface = 'start_chat'
 ): ClaimStatus {
   const { isLoaded, isSignedIn } = useAuthSafe();
   const router = useRouter();
@@ -163,7 +167,7 @@ export function useOnboardingClaim(
         });
         if (body.errorCode === 'WAITLIST_SAVE_FAILED') {
           track(ONBOARDING_FUNNEL_EVENTS.WAITLIST_SAVE_FAILED, {
-            surface: 'start_chat',
+            surface: funnelSurface,
             duration_ms: Date.now() - startedAt,
             http_status: response.status,
             attempt,
@@ -185,7 +189,7 @@ export function useOnboardingClaim(
         claimedRef.current = true;
         setStatus('claimed');
         track(ONBOARDING_FUNNEL_EVENTS.AUTH_COMPLETED, {
-          surface: 'start_chat',
+          surface: funnelSurface,
         });
         if (body.waitlist?.entryId) {
           trackFunnelStep({
@@ -196,7 +200,7 @@ export function useOnboardingClaim(
             reason: 'waitlisted',
           });
           track(ONBOARDING_FUNNEL_EVENTS.WAITLISTED, {
-            surface: 'start_chat',
+            surface: funnelSurface,
             entry_id: body.waitlist.entryId,
             status: body.waitlist.status,
             outcome: body.waitlist.outcome,
@@ -222,7 +226,7 @@ export function useOnboardingClaim(
         // Missing durable artist/social identity. Stay in this /start
         // conversation and retry after the next natural-language turn.
         track(ONBOARDING_FUNNEL_EVENTS.WAITLIST_INTAKE_REQUIRED, {
-          surface: 'start_chat',
+          surface: funnelSurface,
           duration_ms: Date.now() - startedAt,
         });
         markTriggerCompleted();
@@ -254,7 +258,7 @@ export function useOnboardingClaim(
     // The router closure value is always current for the navigate-on-claim
     // path because navigation only happens after a successful fetch response,
     // long after any router reference churn would have settled.
-  }, [claimTrigger, enabled, isLoaded, isSignedIn]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [claimTrigger, enabled, funnelSurface, isLoaded, isSignedIn]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return status;
 }

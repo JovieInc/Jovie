@@ -78,6 +78,7 @@ beforeEach(() => {
   mocks.auth.userId = 'account-a';
   mocks.fetch.mockResolvedValue(snapshot());
   vi.stubGlobal('fetch', mocks.fetch);
+  sessionStorage.clear();
 });
 
 describe('onboarding identity boundary', () => {
@@ -108,6 +109,10 @@ describe('onboarding identity boundary', () => {
     });
     expect(mocks.fetch).toHaveBeenCalledTimes(1);
     expect(mocks.fetch.mock.calls[0][0]).toBe('/api/onboarding/conversation');
+    expect(screen.getByTestId('onboarding-session-boundary')).toHaveAttribute(
+      'data-restore-state',
+      'restored'
+    );
   });
   it('hides old history immediately on account switch and ignores the former account response', async () => {
     const { rerender } = render(
@@ -205,6 +210,24 @@ describe('onboarding identity boundary', () => {
       expect(mocks.auth.signOut).toHaveBeenCalledWith({ redirectUrl: '/start' })
     );
     expect(mocks.fetch.mock.calls[1][1].body).toContain('"action":"logout"');
+  });
+  it('keeps waitlist logout on the intentional entry route', async () => {
+    mocks.fetch
+      .mockResolvedValueOnce(snapshot())
+      .mockResolvedValueOnce(Response.json({ success: true }));
+    render(
+      <OnboardingSessionBoundary
+        entrySurface='waitlist'
+        sessionLabel='pending'
+      />
+    );
+    await screen.findByText('Saved artist progress');
+    fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
+    await waitFor(() =>
+      expect(mocks.auth.signOut).toHaveBeenCalledWith({
+        redirectUrl: '/waitlist',
+      })
+    );
   });
   it('exposes an SSR-visible restore-state marker while loading and on failure', async () => {
     mocks.fetch.mockRejectedValueOnce(new Error('offline'));

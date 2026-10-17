@@ -186,14 +186,14 @@ describe('marketing route health contract', () => {
     ).toMatchObject({
       path: '/waitlist',
       expected: 'page',
-      allowsAuthShell: true,
+      allowsAuthShell: false,
       requiresSharedChrome: false,
     });
 
     for (const [url, selector] of [
       ['/pay', '[data-testid="pay-hero"]'],
       ['/support', '[data-testid="support-hero"]'],
-      ['/waitlist', '#auth-form'],
+      ['/waitlist', '[data-testid="onboarding-session-boundary"]'],
     ] as const) {
       expect(
         MARKETING_EXACT_PUBLIC_ROUTE_TARGETS.find(target => target.url === url)
@@ -209,16 +209,8 @@ describe('marketing route health contract', () => {
     const waitlist = MARKETING_ROUTE_MANIFEST.find(
       entry => entry.url === '/waitlist'
     );
-    expect(waitlist?.renderedSections).toEqual([
-      expect.objectContaining({
-        componentPath: 'apps/web/components/features/auth/AuthLayout.tsx',
-        sectionId: 'hero',
-      }),
-      expect.objectContaining({
-        componentPath: 'apps/web/components/features/auth/AuthShell.tsx',
-        sectionId: 'capture',
-      }),
-    ]);
+    expect(waitlist?.renderedSections).toEqual([]);
+    expect(waitlist?.bindingEvidence.status).toBe('unverified');
   });
 
   it('generates one disposition inventory from the canonical route manifest', () => {

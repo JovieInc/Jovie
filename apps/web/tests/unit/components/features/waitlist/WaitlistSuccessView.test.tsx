@@ -34,9 +34,9 @@ describe('WaitlistSuccessView canary analytics receipt', () => {
     expect(mockTrack).toHaveBeenCalledWith('waitlist_confirmation_viewed', {
       surface: 'waitlist_receipt',
       outcome: 'pending',
-      variantIdentity: 'waitlist-front-door:splash-b:v1',
+      variantIdentity: 'waitlist-front-door:chat-first:v1',
       platform: 'web',
-      contentVariant: 'splash-b',
+      contentVariant: 'chat-first',
     });
     expect(request).not.toHaveBeenCalled();
   });

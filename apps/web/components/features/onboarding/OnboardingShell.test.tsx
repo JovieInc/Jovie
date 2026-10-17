@@ -8,13 +8,16 @@ import {
 
 vi.mock('@/components/organisms/AppShellFrame', () => ({
   AppShellFrame: ({
+    header,
     main,
     rightPanel,
   }: {
+    readonly header?: ReactNode;
     readonly main: ReactNode;
     readonly rightPanel?: ReactNode;
   }) => (
     <>
+      <div data-testid='onboarding-shell-header'>{header}</div>
       <div data-testid='onboarding-shell-main'>{main}</div>
       <div data-testid='onboarding-shell-overlay'>{rightPanel}</div>
     </>
@@ -34,6 +37,8 @@ const chatProps = vi.hoisted(() => ({
     onTurnstileRequired: (message?: string) => void;
     onTurnstileRejected: () => void;
     turnstileToken: string | null;
+    entrySurface?: 'start' | 'waitlist';
+    funnelSurface?: 'start_chat' | 'waitlist_chat';
   },
 }));
 
@@ -91,11 +96,13 @@ const claimState = vi.hoisted(() => ({
   value: 'error',
   trigger: 0,
   enabled: true,
+  surface: 'start_chat',
 }));
 vi.mock('@/components/features/onboarding/useOnboardingClaim', () => ({
-  useOnboardingClaim: (trigger: number, enabled: boolean) => {
+  useOnboardingClaim: (trigger: number, enabled: boolean, surface: string) => {
     claimState.trigger = trigger;
     claimState.enabled = enabled;
+    claimState.surface = surface;
     return claimState.value;
   },
 }));
@@ -132,6 +139,7 @@ describe('OnboardingShell status', () => {
   beforeEach(() => {
     claimState.value = 'error';
     claimState.trigger = 0;
+    claimState.surface = 'start_chat';
     builderState.current = null;
     chatProps.current = null;
     turnstileProps.current = null;
@@ -262,6 +270,28 @@ describe('OnboardingShell status', () => {
       'data-header-overlay',
       'true'
     );
+  });
+
+  it('renders the canonical Chat header and route-attributed handoff for waitlist entry', () => {
+    render(
+      <OnboardingShell
+        entrySurface='waitlist'
+        sessionLabel='pending'
+        signInHref='/signin?redirect_url=%2Fwaitlist'
+      />
+    );
+
+    expect(screen.getByRole('heading', { name: 'Chat' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute(
+      'href',
+      '/signin?redirect_url=%2Fwaitlist'
+    );
+    expect(chatProps.current).toMatchObject({
+      entrySurface: 'waitlist',
+      funnelSurface: 'waitlist_chat',
+      headerOverlay: false,
+    });
+    expect(claimState.surface).toBe('waitlist_chat');
   });
 
   it('shows the side profile preview for a non-artist with a public profile (JOV-3379)', () => {

@@ -12,9 +12,9 @@ export const HOMEPAGE_REQUEST_ACCESS_STARTER_PROMPT =
  */
 export const PUBLIC_WAITLIST_URL = APP_ROUTES.SIGNUP;
 
-/** Stable variant identity for the splash-B waitlist-first handoff. */
+/** Stable variant identity for the canonical chat-first waitlist handoff. */
 export const WAITLIST_FRONT_DOOR_VARIANT_ID =
-  'waitlist-front-door:splash-b:v1' as const;
+  'waitlist-front-door:chat-first:v1' as const;
 
 export const WAITLIST_FRONT_DOOR_EVENTS = {
   PAGE_VIEW: 'waitlist_front_door_viewed',
@@ -24,7 +24,7 @@ export const WAITLIST_FRONT_DOOR_EVENTS = {
 export const WAITLIST_FRONT_DOOR_CONTEXT = {
   variantIdentity: WAITLIST_FRONT_DOOR_VARIANT_ID,
   platform: 'web',
-  contentVariant: 'splash-b',
+  contentVariant: 'chat-first',
 } as const;
 
 export function buildHomepageStartHref(starterPrompt?: string): string {

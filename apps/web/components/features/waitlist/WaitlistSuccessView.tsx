@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect } from 'react';
+import { DashboardHeader } from '@/components/features/dashboard/organisms/DashboardHeader';
+import { AppShellFrame } from '@/components/organisms/AppShellFrame';
+import { SidebarProvider } from '@/components/organisms/sidebar';
 import { WAITLIST_FRONT_DOOR_CONTEXT } from '@/data/homepageFrontDoorCta';
-import { AuthLayout } from '@/features/auth';
 import { track } from '@/lib/analytics';
 import {
   PRODUCTION_WAITLIST_CANARY_RUN_HEADER,
@@ -61,20 +63,29 @@ export function WaitlistSuccessView({
   }, [outcome]);
 
   return (
-    <AuthLayout
-      formTitle='Request Access'
-      showFormTitle={false}
-      showFooterPrompt={false}
-      layoutVariant='stack'
-      chrome='splash-b'
-    >
-      <WaitlistOutcomeView
-        outcome={outcome}
-        onRetry={onRetry}
-        email={email}
-        reservedHandle={reservedHandle}
-        proCheckoutPriceId={proCheckoutPriceId}
+    <SidebarProvider defaultOpen={false}>
+      <AppShellFrame
+        sidebar={null}
+        header={
+          <DashboardHeader breadcrumbs={[{ label: 'Chat' }]} transparent />
+        }
+        chatAmbientGradient
+        containerClassName='[color-scheme:dark]'
+        main={
+          <div className='flex min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8'>
+            <div className='mx-auto w-full max-w-[44rem]'>
+              <WaitlistOutcomeView
+                outcome={outcome}
+                onRetry={onRetry}
+                email={email}
+                reservedHandle={reservedHandle}
+                proCheckoutPriceId={proCheckoutPriceId}
+                presentation='chat'
+              />
+            </div>
+          </div>
+        }
       />
-    </AuthLayout>
+    </SidebarProvider>
   );
 }

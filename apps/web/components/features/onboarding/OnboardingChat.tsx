@@ -42,7 +42,11 @@ import {
   widgetEventDisplayText,
 } from '@/lib/chat/onboarding-script/widget-events';
 import { useAppFlag } from '@/lib/flags/client';
-import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
+import {
+  ONBOARDING_FUNNEL_EVENTS,
+  type OnboardingFunnelSurface,
+} from '@/lib/onboarding/funnel-events';
+import { ONBOARDING_COMPOSER_DRAFT_KEY } from '@/lib/onboarding/session-keys';
 import { parseSocialLinkInput } from '@/lib/onboarding/social-link-parse';
 import type { StartEntryHandoff } from '@/lib/onboarding/start-entry-handoff';
 import {
@@ -103,6 +107,10 @@ interface OnboardingChatProps {
   readonly conversationId?: string | null;
   readonly interactionDisabled?: boolean;
   readonly onBusyChange?: (busy: boolean) => void;
+  /** Route-owned presentation; waitlist starts as a docked chat workspace. */
+  readonly entrySurface?: 'start' | 'waitlist';
+  /** Stable funnel attribution for this route. */
+  readonly funnelSurface?: OnboardingFunnelSurface;
   /** ID for a homepage-captured starter prompt stored in localStorage. */
   readonly intentId?: string;
   /** Turnstile token from the widget. Required on first message. */
@@ -134,6 +142,17 @@ interface OnboardingChatProps {
    */
   readonly headerOverlay?: boolean;
 }
+
+const WAITLIST_WELCOME_MESSAGE: UIMessage = {
+  id: 'waitlist-welcome',
+  role: 'assistant',
+  parts: [
+    {
+      type: 'text',
+      text: "Hey, I'm Jovie. Tell me what you're working on and I'll build a private draft profile from what you share. Nothing goes public until you claim it.",
+    },
+  ],
+};
 
 class OnboardingChatTransport extends DefaultChatTransport<UIMessage> {
   private readonly turnstileState: { token: string | null };
@@ -710,6 +729,8 @@ function OnboardingMessageRegion({
 }
 
 export function OnboardingChat({
+  entrySurface = 'start',
+  funnelSurface = 'start_chat',
   headerOverlay = false,
   intentId,
   onConversationActivity,
@@ -772,6 +793,18 @@ export function OnboardingChat({
   const setComposerInput = useCallback((nextInput: string) => {
     latestInputRef.current = nextInput;
     setInput(nextInput);
+    try {
+      if (nextInput) {
+        globalThis.sessionStorage?.setItem(
+          ONBOARDING_COMPOSER_DRAFT_KEY,
+          nextInput
+        );
+      } else {
+        globalThis.sessionStorage?.removeItem(ONBOARDING_COMPOSER_DRAFT_KEY);
+      }
+    } catch {
+      // Storage may be unavailable in privacy-restricted browser contexts.
+    }
   }, []);
 
   const focusComposer = useCallback(() => {
@@ -781,6 +814,18 @@ export function OnboardingChat({
   useEffect(() => {
     setLocalAutomationBypass(isOnboardingLocalAutomationBypassRuntime());
   }, []);
+
+  useEffect(() => {
+    if (latestInputRef.current) return;
+    try {
+      const savedDraft = globalThis.sessionStorage?.getItem(
+        ONBOARDING_COMPOSER_DRAFT_KEY
+      );
+      if (savedDraft) setComposerInput(savedDraft);
+    } catch {
+      // Keep the in-memory composer usable when storage cannot be read.
+    }
+  }, [setComposerInput]);
 
   useEffect(() => {
     if (isTurnstileTokenUsable(turnstileToken, turnstileStatus)) {
@@ -860,7 +905,14 @@ export function OnboardingChat({
     !isTurnstileTokenUsable(turnstileToken, turnstileStatus);
   const lastMessage = messages[messages.length - 1];
   const shouldShowThinking = isBusy && lastMessage?.role === 'user';
-  const displayMessages = getDisplayMessages(messages, shouldShowThinking);
+  const conversationDisplayMessages = getDisplayMessages(
+    messages,
+    shouldShowThinking
+  );
+  const displayMessages =
+    entrySurface === 'waitlist'
+      ? [WAITLIST_WELCOME_MESSAGE, ...conversationDisplayMessages]
+      : conversationDisplayMessages;
   const lastAssistantMessageId = findLastAssistantMessageId(displayMessages);
   const { isStuckToBottom, onScroll, totalSizeRef, scrollContainerRef } =
     useStickToBottom();
@@ -892,7 +944,7 @@ export function OnboardingChat({
       if (!hasTrackedChatStartedRef.current) {
         hasTrackedChatStartedRef.current = true;
         track(ONBOARDING_FUNNEL_EVENTS.CHAT_STARTED, {
-          surface: 'start_chat',
+          surface: funnelSurface,
         });
       }
       sendMessage({ text, ...(metadata ? { metadata } : {}) });
@@ -909,6 +961,7 @@ export function OnboardingChat({
       onTurnstileRequired,
       sendMessage,
       setComposerInput,
+      funnelSurface,
     ]
   );
 
@@ -1101,11 +1154,11 @@ export function OnboardingChat({
     if (!hasTrackedChatCompletedRef.current) {
       hasTrackedChatCompletedRef.current = true;
       track(ONBOARDING_FUNNEL_EVENTS.CHAT_COMPLETED, {
-        surface: 'start_chat',
+        surface: funnelSurface,
       });
     }
     onConversationActivity?.();
-  }, [messages, onConversationActivity, status]);
+  }, [funnelSurface, messages, onConversationActivity, status]);
 
   const shouldReserveStarterVerification =
     hasInitialStarterPrompt &&
@@ -1133,9 +1186,13 @@ export function OnboardingChat({
   const userTurnCount = messages.filter(
     message => message.role === 'user'
   ).length;
-  const hasConversationStarted = messages.length > 0 || hasSentFirst;
+  const hasConversationStarted =
+    entrySurface === 'waitlist' || messages.length > 0 || hasSentFirst;
   const shouldDockComposer =
-    chatError !== null || userTurnCount > 1 || selectedArtist !== null;
+    entrySurface === 'waitlist' ||
+    chatError !== null ||
+    userTurnCount > 1 ||
+    selectedArtist !== null;
   useEffect(() => {
     if (shouldDockComposer) return;
     const scrollContainer = scrollContainerRef.current;
@@ -1185,7 +1242,11 @@ export function OnboardingChat({
   return (
     <section
       className='relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-(--app-shell-content-surface)'
-      aria-label='Jovie Onboarding Chat'
+      aria-label={
+        entrySurface === 'waitlist'
+          ? 'Jovie Waitlist Chat'
+          : 'Jovie Onboarding Chat'
+      }
       data-testid='onboarding-chat'
       data-picker-open={composerPickerOpen ? 'true' : undefined}
     >

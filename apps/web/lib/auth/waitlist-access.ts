@@ -12,6 +12,7 @@ export type WaitlistStatus = CanonicalWaitlistStatus;
 export interface WaitlistAccessResult {
   entryId: string | null;
   status: WaitlistStatus | null;
+  statusReason?: string | null;
 }
 
 /**
@@ -34,6 +35,7 @@ export async function getWaitlistAccess(
     .select({
       id: waitlistEntries.id,
       status: waitlistEntries.status,
+      statusReason: waitlistEntries.statusReason,
     })
     .from(waitlistEntries)
     .where(
@@ -45,12 +47,13 @@ export async function getWaitlistAccess(
     .limit(1);
 
   if (!entry) {
-    return { entryId: null, status: null };
+    return { entryId: null, status: null, statusReason: null };
   }
 
   return {
     entryId: entry.id,
     status: entry.status,
+    statusReason: entry.statusReason,
   };
 }
 

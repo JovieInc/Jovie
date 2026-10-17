@@ -26,9 +26,11 @@ describe('WaitlistOutcomeView pending receipt', () => {
     );
 
     expect(
-      screen.getByText(/jov\.ie\/coolartist is yours/i)
+      screen.getByText(/jov\.ie\/coolartist is held/i)
     ).toBeInTheDocument();
-    expect(screen.getByText(/reserved/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/draft profile stays private/i)
+    ).toBeInTheDocument();
   });
 
   it('falls back to generic saved copy when no handle was reserved', () => {
@@ -64,7 +66,7 @@ describe('WaitlistOutcomeView Start Pro (JOV-7701: anyone can buy)', () => {
       { priceId: 'price_pro_monthly' },
       expect.any(Object)
     );
-    expect(screen.getByTestId('waitlist-resume-start')).toBeInTheDocument();
+    expect(screen.queryByTestId('waitlist-resume-start')).toBeNull();
   });
 
   it('hides Start Pro without a configured price or on error receipts', () => {

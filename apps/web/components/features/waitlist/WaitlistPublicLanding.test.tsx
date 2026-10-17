@@ -1,69 +1,53 @@
 import { render, screen } from '@testing-library/react';
-import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-const { authLayoutMock, authShellMock, pageMock, trackMock } = vi.hoisted(
-  () => ({
-    authLayoutMock: vi.fn(),
-    authShellMock: vi.fn(),
-    pageMock: vi.fn(),
-    trackMock: vi.fn(),
-  })
-);
+const { boundaryMock, pageMock, trackMock } = vi.hoisted(() => ({
+  boundaryMock: vi.fn(),
+  pageMock: vi.fn(),
+  trackMock: vi.fn(),
+}));
 
 vi.mock('@/lib/analytics', () => ({
   page: (...args: unknown[]) => pageMock(...args),
   track: (...args: unknown[]) => trackMock(...args),
 }));
 
-vi.mock('@/features/auth', async () => {
-  const reactModule = await import('react');
-  return {
-    AuthLayout: (props: { children: ReactNode }) => {
-      authLayoutMock(props);
-      return reactModule.createElement(
-        'div',
-        { 'data-testid': 'auth-layout' },
-        props.children
-      );
-    },
-    AuthRoutePrefetch: () => null,
-    AuthShell: (props: Record<string, unknown>) => {
-      authShellMock(props);
-      return reactModule.createElement('div', { 'data-testid': 'auth-shell' });
-    },
-  };
-});
+vi.mock(
+  '@/components/features/onboarding/OnboardingSessionBoundary',
+  async () => {
+    const reactModule = await import('react');
+    return {
+      OnboardingSessionBoundary: (props: Record<string, unknown>) => {
+        boundaryMock(props);
+        return reactModule.createElement('div', {
+          'data-testid': 'onboarding-session-boundary',
+        });
+      },
+    };
+  }
+);
 
-import { APP_ROUTES } from '@/constants/routes';
 import { WAITLIST_FRONT_DOOR_VARIANT_ID } from '@/data/homepageFrontDoorCta';
 import { WaitlistPublicLanding } from './WaitlistPublicLanding';
 
 describe('WaitlistPublicLanding', () => {
-  it('renders the shared sign-up shell on the waitlist URL without a second Get started', () => {
-    render(<WaitlistPublicLanding />);
+  it('renders the existing conversation boundary as the chat-first waitlist entry', () => {
+    render(
+      <WaitlistPublicLanding
+        signInHref='/signin?redirect_url=%2Fwaitlist'
+        starterHandoff={{ kind: 'prompt', prompt: 'Help with my release' }}
+      />
+    );
 
-    expect(authLayoutMock).toHaveBeenCalledWith(
+    expect(boundaryMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        formTitle: 'Continue to Jovie',
-        layoutVariant: 'stack',
-        showFormTitle: false,
-        showFooterPrompt: false,
+        entrySurface: 'waitlist',
+        sessionLabel: 'pending',
+        signInHref: '/signin?redirect_url=%2Fwaitlist',
+        starterHandoff: { kind: 'prompt', prompt: 'Help with my release' },
       })
     );
-    expect(authLayoutMock.mock.calls[0]?.[0].chrome).not.toBe('splash-b');
-    expect(authShellMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        mode: 'sign-up',
-        oppositeModeUrl: APP_ROUTES.SIGNIN,
-        fallbackRedirectUrl: APP_ROUTES.START,
-        suppressOneTap: true,
-      })
-    );
-    expect(screen.getByTestId('auth-shell')).toBeInTheDocument();
-    expect(
-      screen.queryByRole('link', { name: 'Get started' })
-    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('onboarding-session-boundary')).toBeVisible();
     expect(pageMock).toHaveBeenCalledWith(
       'waitlist',
       expect.objectContaining({

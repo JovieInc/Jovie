@@ -1089,26 +1089,16 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       expected: 'page',
     },
   },
-  // waitlist — public auth front door; route lives outside (marketing)/ but manifest binds it
+  // waitlist — chat-first product entry; recipe binding awaits recertification
   {
     glob: 'waitlist/page.tsx',
     recipeId: 'waitlist',
-    renderedSections: [
-      approvedBinding(
-        'apps/web/components/features/auth/AuthLayout.tsx',
-        'hero'
-      ),
-      approvedBinding(
-        'apps/web/components/features/auth/AuthShell.tsx',
-        'capture'
-      ),
-    ],
+    renderedSections: [],
     bindingEvidence: {
-      status: 'verified',
-      source:
-        'source binding audit 2026-09-01; JOV-5376 public waitlist front door',
+      status: 'unverified',
+      source: 'JOV-6581 chat-first source implementation',
       notes:
-        'WaitlistPublicLanding composes the splash-B AuthLayout and sign-up AuthShell capture form for the signed-out public state. The stub recipe remains intentionally incomplete.',
+        'The route now mounts the source-owned onboarding conversation and profile builder. The obsolete splash-B AuthLayout/AuthShell recipe binding is not runtime evidence for this product surface.',
     },
     status: 'active',
     specVersion: '1.0.0',
@@ -1116,8 +1106,8 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     healthCheck: {
       path: '/waitlist',
       expected: 'page',
-      waitFor: '#auth-form',
-      allowsAuthShell: true,
+      waitFor: '[data-testid="onboarding-session-boundary"]',
+      allowsAuthShell: false,
       requiresSharedChrome: false,
     },
   },

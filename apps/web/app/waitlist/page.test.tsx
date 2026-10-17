@@ -5,7 +5,6 @@ const mocks = vi.hoisted(() => ({
   resolve: vi.fn(),
   access: vi.fn(),
   reservedHandle: vi.fn(),
-  gateEnabled: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -19,9 +18,6 @@ vi.mock('@/lib/auth/gate', async () => ({
   resolveUserState: mocks.resolve,
   getWaitlistAccess: mocks.access,
   getWaitlistReservedHandle: mocks.reservedHandle,
-}));
-vi.mock('@/lib/waitlist/settings', () => ({
-  isWaitlistGateEnabled: mocks.gateEnabled,
 }));
 vi.mock('@/components/features/waitlist/WaitlistPublicLanding', () => ({
   WaitlistPublicLanding: () => null,
@@ -48,8 +44,11 @@ describe('waitlist receipt reload', () => {
       state: 'WAITLIST_PENDING',
       context: { email: 'test@example.com' },
     });
-    mocks.gateEnabled.mockResolvedValue(true);
-    mocks.access.mockResolvedValue({ entryId: null, status: null });
+    mocks.access.mockResolvedValue({
+      entryId: null,
+      status: null,
+      statusReason: null,
+    });
     mocks.reservedHandle.mockResolvedValue(null);
   });
 
@@ -65,6 +64,7 @@ describe('waitlist receipt reload', () => {
     mocks.access.mockResolvedValue({
       entryId: 'entry_1',
       status: 'waitlisted',
+      statusReason: 'chat_started',
     });
     mocks.reservedHandle.mockResolvedValue('coolartist');
 
@@ -76,5 +76,19 @@ describe('waitlist receipt reload', () => {
     expect(receipt.props.email).toBe('test@example.com');
     // Anyone waiting can buy Pro now; payment admits them (JOV-7701).
     expect(receipt.props.proCheckoutPriceId).toBe('price_pro_monthly');
+  });
+
+  it('renders capacity-held copy only from the persisted result', async () => {
+    mocks.access.mockResolvedValue({
+      entryId: 'entry_held',
+      status: 'waitlisted',
+      statusReason: 'waitlist_capacity_full',
+    });
+
+    const result = await WaitlistPage();
+
+    expect(result.props.children.props.outcome).toBe(
+      'waitlisted_capacity_full'
+    );
   });
 });

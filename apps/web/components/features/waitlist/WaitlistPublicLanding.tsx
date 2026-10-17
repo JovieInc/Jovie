@@ -1,23 +1,33 @@
 'use client';
 
 import { useEffect } from 'react';
-import { AuthenticatedAuthEntryGuard } from '@/components/features/auth/AuthenticatedAuthEntryGuard';
+import { OnboardingSessionBoundary } from '@/components/features/onboarding/OnboardingSessionBoundary';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   WAITLIST_FRONT_DOOR_CONTEXT,
   WAITLIST_FRONT_DOOR_EVENTS,
 } from '@/data/homepageFrontDoorCta';
-import { AuthLayout, AuthRoutePrefetch, AuthShell } from '@/features/auth';
 import { page, track } from '@/lib/analytics';
+import type { StartEntryHandoff } from '@/lib/onboarding/start-entry-handoff';
+import type { StartEntryProfile } from '@/lib/onboarding/start-entry-profile';
 
 /**
  * Unauthenticated /waitlist handoff (JOV-5334 / JOV-5376).
  *
- * Shared auth shell: chrome-20 mark, Continue to Jovie, email + providers.
- * Get started on marketing pages lands here instead of unfinished /start chat.
- * Auth completion continues into /start.
+ * Reuses the signed anonymous onboarding session. The first useful message
+ * mints the conversation; verified sign-in later claims that exact transcript.
  */
-export function WaitlistPublicLanding() {
+export function WaitlistPublicLanding({
+  entryProfile = null,
+  intentId,
+  signInHref = APP_ROUTES.SIGNIN,
+  starterHandoff = null,
+}: Readonly<{
+  entryProfile?: StartEntryProfile | null;
+  intentId?: string;
+  signInHref?: string;
+  starterHandoff?: StartEntryHandoff | null;
+}>) {
   useEffect(() => {
     page('waitlist', WAITLIST_FRONT_DOOR_CONTEXT);
     track(WAITLIST_FRONT_DOOR_EVENTS.PAGE_VIEW, WAITLIST_FRONT_DOOR_CONTEXT);
@@ -25,22 +35,13 @@ export function WaitlistPublicLanding() {
   }, []);
 
   return (
-    <AuthenticatedAuthEntryGuard>
-      <AuthLayout
-        formTitle='Continue to Jovie'
-        showFormTitle={false}
-        showFooterPrompt={false}
-        layoutVariant='stack'
-      >
-        <AuthRoutePrefetch href={APP_ROUTES.SIGNIN} />
-        <AuthShell
-          mode='sign-up'
-          forceOppositeModeHardNavigation
-          oppositeModeUrl={APP_ROUTES.SIGNIN}
-          fallbackRedirectUrl={APP_ROUTES.START}
-          suppressOneTap
-        />
-      </AuthLayout>
-    </AuthenticatedAuthEntryGuard>
+    <OnboardingSessionBoundary
+      entryProfile={entryProfile}
+      entrySurface='waitlist'
+      intentId={intentId}
+      sessionLabel='pending'
+      signInHref={signInHref}
+      starterHandoff={starterHandoff}
+    />
   );
 }

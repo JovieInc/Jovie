@@ -3,6 +3,8 @@
 import { Button } from '@jovie/ui';
 import { ArrowRight, CheckCircle2, Clock3, RotateCcw } from 'lucide-react';
 import Link from 'next/link';
+import { ChatMessage } from '@/components/jovie/components';
+import type { MessagePart } from '@/components/jovie/types';
 import { APP_ROUTES } from '@/constants/routes';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { track } from '@/lib/analytics';
@@ -33,6 +35,8 @@ interface WaitlistOutcomeViewProps {
    * them on to claim their link.
    */
   readonly proCheckoutPriceId?: string | null;
+  /** App-shell receipts use canonical chat message geometry, not auth cards. */
+  readonly presentation?: 'card' | 'chat';
 }
 
 type OutcomeCopy = {
@@ -67,7 +71,7 @@ const OUTCOME_COPY: Record<WaitlistOutcomeViewProps['outcome'], OutcomeCopy> = {
     body: hasEmail =>
       hasEmail
         ? 'Jovie is in a private rollout. We saved your release context and will email you when access opens — usually within a few days of capacity.'
-        : 'Jovie is in a private rollout. We saved your release context. Return to /start when a spot opens — usually within a few days of capacity.',
+        : 'Jovie is in a private rollout. We saved your release context. Return here to check status while access is pending.',
     icon: Clock3,
     showNextSteps: true,
   },
@@ -76,7 +80,7 @@ const OUTCOME_COPY: Record<WaitlistOutcomeViewProps['outcome'], OutcomeCopy> = {
     body: hasEmail =>
       hasEmail
         ? "Your request is saved. Today's slots are full, so you are on the waitlist. We email when a spot opens."
-        : "Your request is saved. Today's slots are full, so you are on the waitlist. Check back via /start when capacity opens.",
+        : "Your request is saved. Today's slots are full, so you are on the waitlist. Return here to check status when capacity opens.",
     icon: Clock3,
     showNextSteps: true,
   },
@@ -85,7 +89,7 @@ const OUTCOME_COPY: Record<WaitlistOutcomeViewProps['outcome'], OutcomeCopy> = {
     body: hasEmail =>
       hasEmail
         ? 'Your request is already saved with your latest answers. Watch for an email when access opens.'
-        : 'Your request is already saved with your latest answers. Return via /start when access opens.',
+        : 'Your request is already saved with your latest answers. Return here to check status while access is pending.',
     icon: Clock3,
     showNextSteps: true,
   },
@@ -93,10 +97,10 @@ const OUTCOME_COPY: Record<WaitlistOutcomeViewProps['outcome'], OutcomeCopy> = {
     title: "You're on the list",
     body: (hasEmail, reservedHandle) =>
       reservedHandle
-        ? `jov.ie/${reservedHandle} is yours. Your name and profile are reserved, and we'll email you the moment your spot opens.`
+        ? `jov.ie/${reservedHandle} is held for this request. Your draft profile stays private while access is pending, and we'll email you when your spot opens.`
         : hasEmail
           ? "We're opening Jovie in waves. Your request is saved, and we'll email you the moment your spot opens."
-          : "We're opening Jovie in waves. Your request is saved. Come back to /start when your spot opens.",
+          : "We're opening Jovie in waves. Your request is saved. Return here to check status while access is pending.",
     icon: Clock3,
     showNextSteps: true,
   },
@@ -134,14 +138,7 @@ function NextSteps({ email }: { readonly email?: string | null }) {
       <li>{contactLine}</li>
       <li>Expected timing: a few days once capacity opens — not instant.</li>
       <li>
-        Resume anytime at{' '}
-        <Link
-          href={APP_ROUTES.START}
-          className='font-medium text-white/86 underline-offset-2 hover:underline'
-        >
-          /start
-        </Link>{' '}
-        or the waitlist page; your context stays attached to this request.
+        Return to this page to check status; your conversation stays attached.
       </li>
     </ol>
   );
@@ -169,6 +166,7 @@ function PrimaryCtaLink({
 }
 
 export const WAITLIST_START_PRO_TEST_ID = 'waitlist-start-pro-checkout';
+const WAITLIST_RECEIPT_ROLE = 'assistant' as const;
 
 /**
  * Opens the default checkout (no onboarding source), so success lands on
@@ -219,6 +217,7 @@ export function WaitlistOutcomeView({
   email,
   reservedHandle,
   proCheckoutPriceId,
+  presentation = 'card',
 }: Readonly<WaitlistOutcomeViewProps>) {
   const copy = OUTCOME_COPY[outcome];
   const Icon = copy.icon;
@@ -229,20 +228,45 @@ export function WaitlistOutcomeView({
   const { signOut } = useAuthSafe();
   const primaryHref = copy.actionHref;
   const primaryLabel = copy.actionLabel;
-  const showResumeCta = Boolean(copy.showNextSteps && !primaryHref);
   const showStartPro = Boolean(copy.showNextSteps && proCheckoutPriceId);
+  const chatParts: MessagePart[] = [
+    { type: 'text', text: `${copy.title}\n\n${body}` },
+  ];
 
   return (
-    <section className='w-full rounded-2xl border border-white/[0.08] bg-(--color-bg-surface-0) px-5 py-6 text-primary-token shadow-[0_24px_90px_rgba(0,0,0,0.38)] sm:px-6'>
-      <div className='mb-5 flex items-center gap-3'>
-        <span className='inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/74'>
-          <Icon className='h-4 w-4' aria-hidden />
-        </span>
-        <h1 className='text-xl font-semibold leading-6 text-primary-token'>
-          {copy.title}
-        </h1>
-      </div>
-      <p className='text-sm leading-6 text-white/62'>{body}</p>
+    <section
+      className={cn(
+        'w-full text-primary-token',
+        presentation === 'card' &&
+          'rounded-2xl border border-white/[0.08] bg-(--color-bg-surface-0) px-5 py-6 shadow-[0_24px_90px_rgba(0,0,0,0.38)] sm:px-6'
+      )}
+      aria-live='polite'
+    >
+      {presentation === 'chat' ? (
+        <>
+          <h1 className='sr-only'>{copy.title}</h1>
+          <ChatMessage
+            id={`waitlist-${outcome}`}
+            role={WAITLIST_RECEIPT_ROLE}
+            parts={chatParts}
+            renderTools={false}
+            showAssistantActions={false}
+            skipEntrance
+          />
+        </>
+      ) : (
+        <>
+          <div className='mb-5 flex items-center gap-3'>
+            <span className='inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/74'>
+              <Icon className='h-4 w-4' aria-hidden />
+            </span>
+            <h1 className='text-xl font-semibold leading-6 text-primary-token'>
+              {copy.title}
+            </h1>
+          </div>
+          <p className='text-sm leading-6 text-white/62'>{body}</p>
+        </>
+      )}
       {copy.showNextSteps ? <NextSteps email={email} /> : null}
 
       <div className='mt-6 flex flex-col gap-2 sm:flex-row'>
@@ -251,14 +275,6 @@ export function WaitlistOutcomeView({
         ) : null}
         {showStartPro && proCheckoutPriceId ? (
           <StartProCheckoutButton priceId={proCheckoutPriceId} />
-        ) : null}
-        {showResumeCta ? (
-          <PrimaryCtaLink
-            href={APP_ROUTES.START}
-            label='Resume At Start'
-            testId='waitlist-resume-start'
-            variant={showStartPro ? 'secondary' : 'primary'}
-          />
         ) : null}
         {canRetry ? (
           <Button type='button' onClick={onRetry} variant='secondary' size='lg'>

@@ -13,12 +13,16 @@ import {
   useMemo,
   useState,
 } from 'react';
+import { DashboardHeader } from '@/components/features/dashboard/organisms/DashboardHeader';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
 import { SidebarProvider } from '@/components/organisms/sidebar';
 import { APP_ROUTES } from '@/constants/routes';
 import { track } from '@/lib/analytics';
 import { publicEnv } from '@/lib/env-public';
-import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
+import {
+  ONBOARDING_FUNNEL_EVENTS,
+  type OnboardingFunnelSurface,
+} from '@/lib/onboarding/funnel-events';
 import type { StartEntryHandoff } from '@/lib/onboarding/start-entry-handoff';
 import type { StartEntryProfile } from '@/lib/onboarding/start-entry-profile';
 import {
@@ -57,6 +61,10 @@ export interface OnboardingShellProps {
   readonly onBusyChange?: (busy: boolean) => void;
   /** Whether the server resolved a verified account for this request. */
   readonly isSignedIn?: boolean;
+  /** Route-owned presentation and analytics attribution. */
+  readonly entrySurface?: 'start' | 'waitlist';
+  /** Verified-auth handoff that returns to this exact entry route. */
+  readonly signInHref?: string;
   /** First 8 chars of the session id. Debug breadcrumb only — not sensitive. */
   readonly sessionLabel: string;
   /** ID for a homepage-captured starter prompt stored in localStorage. */
@@ -95,6 +103,8 @@ export function buildEntryProfileBuilderState(
 
 export function OnboardingShell({
   isSignedIn = false,
+  entrySurface = 'start',
+  signInHref = APP_ROUTES.SIGNIN,
   intentId,
   sessionLabel,
   starterHandoff,
@@ -110,6 +120,8 @@ export function OnboardingShell({
   actionError = null,
   onBusyChange,
 }: OnboardingShellProps) {
+  const funnelSurface: OnboardingFunnelSurface =
+    entrySurface === 'waitlist' ? 'waitlist_chat' : 'start_chat';
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [profileBuilderState, setProfileBuilderState] =
     useState<OnboardingProfileBuilderState>(
@@ -129,9 +141,9 @@ export function OnboardingShell({
 
   useEffect(() => {
     track(ONBOARDING_FUNNEL_EVENTS.ONBOARDING_STARTED, {
-      surface: 'start_chat',
+      surface: funnelSurface,
     });
-  }, []);
+  }, [funnelSurface]);
 
   const handleConversationActivity = useCallback(() => {
     setClaimTrigger(current => current + 1);
@@ -220,7 +232,8 @@ export function OnboardingShell({
   // artist identity stays in this chat.
   const claimStatus = useOnboardingClaim(
     claimTrigger,
-    !resumeOwnedConversation || claimTrigger > 0
+    !resumeOwnedConversation || claimTrigger > 0,
+    funnelSurface
   );
   const isLinking =
     claimStatus === 'pending' || claimStatus === 'retry-after-webhook';
@@ -241,6 +254,12 @@ export function OnboardingShell({
     <SidebarProvider defaultOpen={false}>
       <AppShellFrame
         sidebar={null}
+        header={
+          entrySurface === 'waitlist' ? (
+            <DashboardHeader breadcrumbs={[{ label: 'Chat' }]} transparent />
+          ) : null
+        }
+        chatAmbientGradient={entrySurface === 'waitlist'}
         containerClassName='[color-scheme:dark]'
         contentClassName='overflow-hidden!'
         main={
@@ -254,6 +273,7 @@ export function OnboardingShell({
                   visible={claimStatus === 'identity-conflict'}
                   isSignedIn={isSignedIn}
                   onLogout={onLogout}
+                  signInHref={signInHref}
                   disabled={actionPending || controlsDisabled}
                 >
                   {onRestart ? (
@@ -285,7 +305,7 @@ export function OnboardingShell({
                       touchTarget
                       className='shrink-0 whitespace-nowrap'
                     >
-                      <NextLink href={APP_ROUTES.SIGNIN}>Sign in</NextLink>
+                      <NextLink href={signInHref}>Sign in</NextLink>
                     </JovieLink>
                   ) : null}
                 </OnboardingIdentityConflict>
@@ -295,7 +315,9 @@ export function OnboardingShell({
                 conversationId={conversationId}
                 interactionDisabled={actionPending}
                 onBusyChange={onBusyChange}
-                headerOverlay={!isSignedIn}
+                entrySurface={entrySurface}
+                funnelSurface={funnelSurface}
+                headerOverlay={!isSignedIn && entrySurface !== 'waitlist'}
                 intentId={intentId}
                 onConversationActivity={handleConversationActivity}
                 onProfileBuilderChange={setProfileBuilderState}
@@ -347,12 +369,14 @@ export function OnboardingIdentityConflict({
   isSignedIn,
   onLogout,
   disabled = false,
+  signInHref = APP_ROUTES.SIGNIN,
   children,
 }: Readonly<{
   visible: boolean;
   isSignedIn: boolean;
   onLogout?: () => void;
   disabled?: boolean;
+  signInHref?: string;
   children?: ReactNode;
 }>) {
   const [expanded, setExpanded] = useState(false);
@@ -407,7 +431,7 @@ export function OnboardingIdentityConflict({
             </Button>
           ) : !isSignedIn ? (
             <JovieLink asChild variant='compact' touchTarget>
-              <NextLink href={APP_ROUTES.SIGNIN}>
+              <NextLink href={signInHref}>
                 Sign in with original account
               </NextLink>
             </JovieLink>

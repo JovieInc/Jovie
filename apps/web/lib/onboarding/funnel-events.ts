@@ -17,6 +17,8 @@ export const ONBOARDING_FUNNEL_EVENTS = {
 export type OnboardingFunnelEvent =
   (typeof ONBOARDING_FUNNEL_EVENTS)[keyof typeof ONBOARDING_FUNNEL_EVENTS];
 
+export type OnboardingFunnelSurface = 'start_chat' | 'waitlist_chat';
+
 export const ONBOARDING_FUNNEL_EVENT_NAMES = Object.values(
   ONBOARDING_FUNNEL_EVENTS
 ) as readonly OnboardingFunnelEvent[];

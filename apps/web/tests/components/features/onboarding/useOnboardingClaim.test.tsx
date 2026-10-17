@@ -2,8 +2,9 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useOnboardingClaim } from '@/components/features/onboarding/useOnboardingClaim';
 
-const { replaceMock } = vi.hoisted(() => ({
+const { replaceMock, trackMock } = vi.hoisted(() => ({
   replaceMock: vi.fn(),
+  trackMock: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -20,14 +21,18 @@ vi.mock('@/hooks/useClerkSafe', () => ({
   }),
 }));
 
+vi.mock('@/lib/analytics', () => ({ track: trackMock }));
+
 function ClaimHarness({
   trigger,
   enabled = true,
+  surface = 'start_chat',
 }: {
   readonly trigger: number;
   readonly enabled?: boolean;
+  readonly surface?: 'start_chat' | 'waitlist_chat';
 }) {
-  const status = useOnboardingClaim(trigger, enabled);
+  const status = useOnboardingClaim(trigger, enabled, surface);
   return <span data-testid='claim-status'>{status}</span>;
 }
 
@@ -223,13 +228,20 @@ describe('useOnboardingClaim', () => {
     );
     vi.stubGlobal('fetch', fetchMock);
 
-    render(renderClaimHarness(0));
+    render(<ClaimHarness trigger={0} surface='waitlist_chat' />);
 
     await waitFor(() =>
       expect(screen.getByTestId('claim-status')).toHaveTextContent('claimed')
     );
     expect(replaceMock).toHaveBeenCalledWith('/waitlist');
     expect(replaceMock).not.toHaveBeenCalledWith('/onboarding/checkout');
+    expect(trackMock).toHaveBeenCalledWith(
+      'waitlisted',
+      expect.objectContaining({
+        entry_id: 'entry-1',
+        surface: 'waitlist_chat',
+      })
+    );
   });
 
   it('keeps missing durable artist data in the same /start conversation', async () => {
