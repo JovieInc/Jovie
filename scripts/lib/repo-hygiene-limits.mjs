@@ -7,12 +7,13 @@ export const HYGIENE_LIMITS = Object.freeze({
   maxChangedBinaryBytes: 60 * MiB,
   maxChangedBinaryFiles: 120,
   maxSnapshotBytes: 12 * MiB,
-  // Raised 100 -> 110 (+10%, the documented per-raise cap): origin/main sat
-  // exactly at 100, so any new visual-regression page coverage blocked the
-  // size guard. Combined with pruning 10 orphaned baselines whose slugs were
-  // removed from admin-surface-manifest.ts (JOV-4326 consolidation), the tree
-  // measures 106 files (~8.7 MiB of the unchanged 12 MiB byte budget).
-  maxSnapshotFiles: 110,
+  // Raised 110 -> 121 (+10%, the documented per-raise cap) for PR #22246.
+  // The merge base already held 110 files, and auth-visual.spec.ts requires
+  // the new modal-signin tablet and wide baselines (tree: 112 files, ~8.5 MiB
+  // of the unchanged 12 MiB byte budget). Hash-identical siblings stay because
+  // each path is still a live toHaveScreenshot contract. See
+  // docs/ci/repository-health.md.
+  maxSnapshotFiles: 121,
   // Raised 180 -> 198 MiB (+10%, the documented per-raise cap) under JOV-6635:
   // origin/main measured 178.14 MiB (99.0% of budget), blocking every PR that
   // adds tracked bytes. Measurements in docs/ci/repository-health.md.
