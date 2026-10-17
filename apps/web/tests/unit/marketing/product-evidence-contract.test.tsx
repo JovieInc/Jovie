@@ -195,9 +195,10 @@ function CopyOnlyProductLanding() {
 
 const COPY_ONLY_FIXTURE_ENTRY: Pick<
   RouteManifestEntry,
-  'glob' | 'recipeId' | 'status' | 'exempt' | 'productEvidence'
+  'glob' | 'url' | 'recipeId' | 'status' | 'exempt' | 'productEvidence'
 > = {
   glob: '(marketing)/copy-only-fixture/page.tsx',
+  url: '/copy-only-fixture',
   recipeId: 'feature',
   status: 'active',
 };
