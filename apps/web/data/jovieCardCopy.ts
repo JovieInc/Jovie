@@ -25,7 +25,7 @@ export const JOVIE_CARD_COPY = {
   },
   hero: {
     headline: 'Your Jovie profile. Ready for the real world.',
-    body: 'We’re bringing your Jovie profile to Apple Wallet, so the people you meet can find your music and links. Join the list for access updates.',
+    body: 'Jovie Card is a planned Apple Wallet card for sharing your music and links after an introduction. Join the list for access updates.',
     availability: 'Coming soon. Wallet passes are not available yet.',
   },
   sections: {
