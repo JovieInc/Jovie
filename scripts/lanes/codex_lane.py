@@ -578,20 +578,28 @@ def app_server_calls(name: str, calls: list[tuple[str, dict | None]], timeout: f
                                  {**os.environ, "CODEX_HOME": str(ACCOUNTS_ROOT / name)}),
                             **({"pass_fds": (lease_handle.fileno(),)} if current else {}))
     deadline = time.monotonic() + timeout
+    pending = b""
 
     def request(request_id: int, method: str, params=None) -> dict:
+        nonlocal pending
         payload = {"id": request_id, "method": method}
         if params is not None:
             payload["params"] = params
         proc.stdin.write(json.dumps(payload) + "\n")
         proc.stdin.flush()
         while time.monotonic() < deadline:
-            ready, _, _ = select.select([proc.stdout], [], [], max(0, deadline - time.monotonic()))
-            if not ready:
-                break
-            line = proc.stdout.readline()
-            if not line:
-                break
+            # Own stdout bytes here: readline can prefetch a response after a
+            # notification, leaving select's OS pipe empty despite buffered data.
+            if b"\n" not in pending:
+                ready, _, _ = select.select([proc.stdout], [], [], max(0, deadline - time.monotonic()))
+                if not ready:
+                    break
+                chunk = os.read(proc.stdout.fileno(), 65536)
+                if not chunk:
+                    break
+                pending += chunk
+                continue
+            line, _, pending = pending.partition(b"\n")
             message = json.loads(line)
             if message.get("id") == request_id:
                 if message.get("error"):
