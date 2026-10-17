@@ -6966,14 +6966,17 @@ class UpdateTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             host, slot, staging = self.mesh_dependency_fixture(Path(tmp).resolve())
             replies = [subprocess.CompletedProcess([], 0, stdout="", stderr="")] * 2
+            # Both child launches are stubbed; never census the persistent host.
             with patch.object(lane.worktree_pool, "ready_slots", return_value=[slot]), \
                     patch.object(lane.worktree_pool, "pool_dir", return_value=slot.parent), \
                     patch.object(lane.worktree_pool, "node_env", return_value={"PATH": os.defpath}), \
-                    patch.object(lane.lifecycle, "run", side_effect=replies) as run:
+                    patch.object(lane.lifecycle, "run", side_effect=replies) as run, \
+                    patch.object(lane, "reap_selftest_processes", return_value=0) as cleanup_reaper:
                 self.assertIsNone(lane.prove_staging(host, staging))
             self.assertEqual(run.call_args_list[0].args[0][-2:], [str(staging), str(slot)])
             self.assertEqual(run.call_args_list[1].args[0],
                              [sys.executable, "-m", "unittest", "-q", *lane.LANE_TESTS])
+            cleanup_reaper.assert_called_once()
 
     def test_mesh_dependency_preference_requires_both_source_and_restored_locks(self):
         with tempfile.TemporaryDirectory() as tmp:
