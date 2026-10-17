@@ -33,12 +33,12 @@
         "lib/db/schema/**"
       ],
       "ignoreDependencies": [
-        "@radix-ui/react-avatar",
+        "@opentelemetry/sdk-trace-base",
         "@radix-ui/react-toggle",
         "@radix-ui/react-toggle-group",
-        "@opentelemetry/sdk-trace-base",
-        "@sentry/node",
+        "@stryker-mutator/core",
         "import-in-the-middle",
+        "promptfoo",
         "require-in-the-middle"
       ],
       "playwright": {

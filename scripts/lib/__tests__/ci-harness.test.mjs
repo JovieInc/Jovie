@@ -52,6 +52,30 @@ const EXPECTED_MERGE_GATE_NAMES = [
   'Database Certification (isolated Neon)',
 ];
 
+describe('Knip dependency ownership', () => {
+  it('keeps only non-imported web tooling exempt from dependency analysis', () => {
+    const knipConfig = JSON.parse(
+      readFileSync(resolve(REPO_ROOT, 'knip.json'), 'utf8')
+    );
+    const webManifest = JSON.parse(
+      readFileSync(resolve(REPO_ROOT, 'apps/web/package.json'), 'utf8')
+    );
+
+    expect(knipConfig.workspaces['apps/web'].ignoreDependencies).toEqual([
+      '@opentelemetry/sdk-trace-base',
+      '@radix-ui/react-toggle',
+      '@radix-ui/react-toggle-group',
+      '@stryker-mutator/core',
+      'import-in-the-middle',
+      'promptfoo',
+      'require-in-the-middle',
+    ]);
+    expect(webManifest.devDependencies).not.toHaveProperty(
+      '@stryker-mutator/vitest-runner'
+    );
+  });
+});
+
 describe('ci-harness manifest', () => {
   it('counts migration files relative to the apps/web working directory', () => {
     const root = mkdtempSync(join(tmpdir(), 'jovie-migration-guard-'));
