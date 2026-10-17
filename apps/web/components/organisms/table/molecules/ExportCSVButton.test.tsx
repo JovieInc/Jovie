@@ -5,6 +5,7 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ExportCSVButton } from './ExportCSVButton';
 
@@ -132,6 +133,40 @@ describe('ExportCSVButton confirmation', () => {
     expect(getData).toHaveBeenCalledOnce();
     expect(download).not.toHaveBeenCalled();
   });
+
+  it.each(['Cancel', 'Escape'] as const)(
+    'restores initiating focus after %s and allows keyboard reopening',
+    async dismissal => {
+      const user = userEvent.setup();
+      const getData = vi.fn().mockResolvedValue(oldRows);
+      render(<ExportCSVButton getData={getData} revalidateBeforeDownload />);
+      const origin = screen.getByRole('button', {
+        name: 'Export data to CSV file',
+      });
+      await user.tab();
+      expect(origin).toHaveFocus();
+      await user.keyboard('{Enter}');
+      const dialog = await screen.findByRole('alertdialog', {
+        name: 'Confirm CSV export',
+      });
+      expect(dialog).toContainElement(document.activeElement as HTMLElement);
+      if (dismissal === 'Cancel')
+        await user.click(screen.getByRole('button', { name: 'Cancel' }));
+      else await user.keyboard('{Escape}');
+      await waitFor(() => expect(dialog).not.toBeInTheDocument());
+      expect(origin).toBeEnabled();
+      await waitFor(() => expect(origin).toHaveFocus());
+      expect(document.body).not.toHaveFocus();
+      expect(getData).toHaveBeenCalledOnce();
+      expect(download).not.toHaveBeenCalled();
+      await user.keyboard('{Enter}');
+      expect(
+        await screen.findByRole('alertdialog', { name: 'Confirm CSV export' })
+      ).toBeVisible();
+      expect(getData).toHaveBeenCalledTimes(2);
+      expect(download).not.toHaveBeenCalled();
+    }
+  );
 
   it('prevents a second download while the authority recheck is pending', async () => {
     let resolveCheck!: (rows: typeof oldRows) => void;

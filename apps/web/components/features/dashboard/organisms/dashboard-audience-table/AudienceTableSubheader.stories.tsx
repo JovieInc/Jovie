@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { type ComponentProps, useLayoutEffect } from 'react';
+import { APP_ROUTES } from '@/constants/routes';
 import { AudienceTableSubheader } from './AudienceTableSubheader';
 import { DEFAULT_AUDIENCE_FILTERS } from './types';
 
@@ -37,7 +38,14 @@ function ExportFixture({
 const meta = {
   title: 'Dashboard/Organisms/DashboardAudienceTable/AudienceTableSubheader',
   component: ExportFixture,
-  parameters: { layout: 'padded', docs: { story: { inline: false } } },
+  parameters: {
+    layout: 'padded',
+    docs: { story: { inline: false } },
+    nextjs: {
+      appDirectory: true,
+      navigation: { pathname: APP_ROUTES.AUDIENCE },
+    },
+  },
   args: {
     mode: 'subscribers',
     profileId,

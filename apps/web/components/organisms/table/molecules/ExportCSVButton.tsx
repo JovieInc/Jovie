@@ -111,6 +111,7 @@ export function ExportCSVButton<T extends object>({
   const [isExporting, setIsExporting] = useState(false);
   const [pendingData, setPendingData] = useState<T[] | null>(null);
   const generation = useRef(0);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   useEffect(
     () => () => {
       generation.current += 1;
@@ -196,12 +197,21 @@ export function ExportCSVButton<T extends object>({
     }
   }, []);
 
+  const handleCloseAutoFocus = useCallback((event: Event) => {
+    // Preparation opens this controlled dialog without a Radix trigger.
+    const trigger = triggerRef.current;
+    if (!trigger?.isConnected || trigger.disabled) return;
+    event.preventDefault();
+    trigger.focus({ preventScroll: true });
+  }, []);
+
   const columnCount =
     columns?.length ??
     (pendingData?.[0] ? Object.keys(pendingData[0]).length : 0);
 
   const button = (
     <Button
+      ref={triggerRef}
       variant={variant}
       size={size}
       onClick={handleOpenConfirmation}
@@ -251,7 +261,7 @@ export function ExportCSVButton<T extends object>({
       )}
 
       <AlertDialog open={isDialogOpen} onOpenChange={handleOpenChange}>
-        <AlertDialogContent>
+        <AlertDialogContent onCloseAutoFocus={handleCloseAutoFocus}>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm CSV export</AlertDialogTitle>
             <AlertDialogDescription>
