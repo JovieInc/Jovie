@@ -23,6 +23,7 @@ const parsedCi = parseYaml(ci) as {
   jobs: Record<
     string,
     {
+      if?: string;
       'timeout-minutes'?: number;
       outputs?: { journey_outcome?: string; certification_outcome?: string };
       steps?: readonly {
