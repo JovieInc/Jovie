@@ -5658,4 +5658,26 @@ describe('full matrix authenticated release fixtures', () => {
     );
     expect(seedIndex).toBeLessThan(job.indexOf('- name: Run E2E tests'));
   });
+
+  it('arms anonymous onboarding on the standalone server', () => {
+    const workflow = readFileSync(
+      resolve(
+        import.meta.dirname,
+        '../../../../../.github/workflows/e2e-full-matrix.yml'
+      ),
+      'utf8'
+    );
+    const job = getJobBlock(workflow, 'e2e-full-matrix');
+    const serverStep = getStepBlock(job, 'Start standalone E2E server');
+    // JOV-4179: a missing secret 503s the first /start message, and a missing
+    // E2E_TEST_MODE flag fail-closes the Redis-backed limiter.
+    expect(serverStep).toContain(
+      'SESSION_SECRET: ${{ secrets.SESSION_SECRET }}'
+    );
+    expect(serverStep).toContain("E2E_TEST_MODE: '1'");
+    expect(serverStep).toContain("CHAT_LLM_FAILURE_INJECTION: '1'");
+    const testStep = getStepBlock(job, 'Run E2E tests (${{ matrix.browser }})');
+    expect(testStep).toContain("E2E_TEST_MODE: '1'");
+    expect(testStep).toContain('Authenticated prod chat turn');
+  });
 });

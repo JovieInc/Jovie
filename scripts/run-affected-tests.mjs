@@ -287,6 +287,8 @@ const SENTRY_AUTOFIX_RECURRENCE_PRIMARY_INPUTS = new Set([
   '.github/workflows/sentry-autofix-recurrence.yml',
   '.github/workflows/sentry-autofix.yml',
   'scripts/sentry-autofix-recurrence.mjs',
+  'scripts/lib/sentry-validation-observation.mjs',
+  'scripts/lib/__tests__/sentry-validation-observation.test.mjs',
   'scripts/lib/__tests__/sentry-autofix-recurrence.test.mjs',
   'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
 ]);
@@ -297,6 +299,7 @@ const SENTRY_AUTOFIX_RECURRENCE_LANE = new Set([
 ]);
 const SENTRY_AUTOFIX_RECURRENCE_SCRIPT_TESTS = [
   'scripts/lib/__tests__/sentry-autofix-recurrence.test.mjs',
+  'scripts/lib/__tests__/sentry-validation-observation.test.mjs',
   'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
@@ -1119,6 +1122,7 @@ export function classifyBlogContentForAffectedTests(base, head, options) {
 const LANE_PYTHON_COVERAGE_INPUTS = new Set([
   ...[
     'backlog_admission',
+    'backlog_writer_guard',
     'lane_runner',
     'qualification_guard',
     'pr_events',
@@ -1684,9 +1688,17 @@ function planAffectedTests(
       mandatoryTests: [],
       selectedTests: [],
       rootVitestTests: [],
-      pythonTests: [],
-      pythonUnittestTests: SENTRY_AUTOFIX_RECURRENCE_PYTHON_TESTS,
+      pythonTests: SENTRY_AUTOFIX_RECURRENCE_PYTHON_TESTS,
+      pythonUnittestTests: [],
       scriptVitestTests: SENTRY_AUTOFIX_RECURRENCE_SCRIPT_TESTS,
+      scriptVitestCoverageArgs: [
+        '--coverage',
+        '--coverage.include=sentry-autofix-recurrence.mjs',
+        '--coverage.include=lib/sentry-validation-observation.mjs',
+        '--coverage.reporter=text',
+        '--coverage.reporter=json-summary',
+        controlCoverageReportsDirectory('sentry-recurrence'),
+      ],
       nodeTests: SENTRY_AUTOFIX_RECURRENCE_NODE_TESTS,
     };
   }

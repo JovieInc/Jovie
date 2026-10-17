@@ -10666,9 +10666,14 @@ class OperatorInstallerGlueTest(unittest.TestCase):
                     child.kill(); child.wait()
 
     def test_each_selftest_run_gets_its_own_process_marker(self):
-        first, second = lane.selftest_env(self.root), lane.selftest_env(self.root)
-        self.assertNotEqual(first[lane.SELFTEST_RUN_ENV], second[lane.SELFTEST_RUN_ENV])
-        self.assertEqual(lane.marked_processes(first[lane.SELFTEST_RUN_ENV]), [])
+        first_scope, second_scope = {}, {}
+        first = lane.selftest_env(self.root, cleanup=first_scope)
+        second = lane.selftest_env(self.root, cleanup=second_scope)
+        self.assertNotEqual(first_scope["scope"], second_scope["scope"])
+        if inherited := os.environ.get(lane.SELFTEST_RUN_ENV):
+            self.assertEqual(first[lane.SELFTEST_RUN_ENV], inherited)
+            self.assertEqual(second[lane.SELFTEST_RUN_ENV], inherited)
+        self.assertEqual(lane.marked_processes(first_scope), {})
 
 
 class RepositoryBindingTest(unittest.TestCase):
@@ -11844,3 +11849,563 @@ class RepairRoutingWorkerPathTest(unittest.TestCase):
         revisit.assert_called_once_with(self.host, [])
         client.assert_not_called(); self.assertEqual(self.path.read_bytes(), before)
         self.posted.assert_not_called(); self.transport.assert_not_called()
+
+
+class SelftestCleanupScopeTest(unittest.TestCase):
+    """Cleanup authority belongs to a proof subtree, never its shared root marker."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.proc = self.root / "proc"
+        self.proc.mkdir()
+        self.marker, self.parent_scope, self.scope = "a" * 32, "b" * 32, "c" * 32
+        self.rows = {100: (1, 100, "S", "owner-start"), 90: (1, 90, "S", "ancestor-start"),
+                     110: (1, 110, "S", "sibling-start")}
+        self.receipt = {"schema": "jovie-selftest-cleanup/v1", "run": self.marker, "scope": self.scope,
+                        "lineage": [self.parent_scope, self.scope],
+                        "owner": {"pid": 100, "start": "owner-start", "uid": os.getuid()},
+                        "baseline": {pid: row[3] for pid, row in self.rows.items()}}
+        real_path = Path
+        def mapped_path(*args, **kwargs):
+            return self.proc if args == ("/proc",) else real_path(*args, **kwargs)
+        mapped_path.home = Path.home
+        self.stack = contextlib.ExitStack()
+        self.addCleanup(self.stack.close)
+        self.stack.enter_context(patch.object(lane, "Path", new=mapped_path))
+        self.stack.enter_context(patch.object(lane.os, "getpid", return_value=100))
+        self.identity_reader = lane._selftest_process_rows
+        self.snapshot = self.stack.enter_context(patch.object(lane, "_selftest_process_rows", side_effect=lambda: dict(self.rows)))
+        self.direct_identity_reader = getattr(lane, "_selftest_process_row", None)
+        self.direct = self.stack.enter_context(patch.object(lane, "_selftest_process_row", create=True,
+                                                           side_effect=lambda entry, pid, uid: self.rows.get(pid)))
+        self.kill = self.stack.enter_context(patch.object(lane.os, "kill"))
+        self.fd_targets, self.closed = {}, []
+        def opened(pid, flags):
+            self.fd_targets[900001] = pid
+            return 900001
+        self.pidfd = self.stack.enter_context(patch.object(lane.os, "pidfd_open", side_effect=opened, create=True))
+        self.send = self.stack.enter_context(patch.object(signal, "pidfd_send_signal", create=True))
+        real_close = os.close
+        def closed(fd):
+            if fd == 900001:
+                self.closed.append(fd)
+            else:
+                real_close(fd)
+        self.stack.enter_context(patch.object(lane.os, "close", side_effect=closed))
+        self.stack.enter_context(patch.dict(os.environ, {
+            "JOVIE_SELFTEST_RUN": self.marker,
+            "JOVIE_SELFTEST_SCOPES": json.dumps([self.parent_scope]),
+        }))
+
+    def member(self, pid, lineage=None, marker=None, raw=None):
+        self.rows[pid] = (1, pid, "S", f"start-{pid}")
+        entry = self.proc / str(pid)
+        entry.mkdir(exist_ok=True)
+        body = (f"JOVIE_SELFTEST_RUN={marker or self.marker}\0JOVIE_SELFTEST_SCOPES="
+                f"{json.dumps(lineage or [self.parent_scope, self.scope], separators=(',', ':'))}\0").encode()
+        (entry / "environ").write_bytes(body if raw is None else raw)
+        return entry / "environ"
+
+    def assertHeld(self, call):
+        with self.assertRaisesRegex(RuntimeError, "selftest"):
+            call()
+        self.kill.assert_not_called()
+        self.send.assert_not_called()
+
+    def test_bare_root_marker_cannot_signal_ancestor_sibling_or_child(self):
+        marker = "a" * 32
+        with tempfile.TemporaryDirectory() as tmp:
+            proc = Path(tmp) / "proc"
+            for pid in (101, 102, 103):
+                entry = proc / str(pid)
+                entry.mkdir(parents=True)
+                (entry / "environ").write_bytes(f"JOVIE_SELFTEST_RUN={marker}\0".encode())
+            real_path = Path
+            def mapped_path(*args, **kwargs):
+                return proc if args == ("/proc",) else real_path(*args, **kwargs)
+            ticks = iter(range(0, 1000, 10))
+            with patch.object(lane, "Path", side_effect=mapped_path), \
+                 patch.object(lane.os, "getpid", return_value=100), \
+                 patch.object(lane.os, "kill") as kill, \
+                 patch.object(lane.time, "monotonic", side_effect=lambda: next(ticks)):
+                held = False
+                try:
+                    lane.reap_selftest_processes(marker)
+                except RuntimeError:
+                    held = True
+                kill.assert_not_called()
+                self.assertTrue(held, "a bare shared root marker is not cleanup authority")
+
+    def test_nested_environment_retains_root_but_has_fresh_bounded_subtree(self):
+        first, nested = {}, {}
+        first_env = lane.selftest_env(self.root / "first", cleanup=first)
+        with patch.dict(os.environ, first_env):
+            nested_env = lane.selftest_env(self.root / "nested", cleanup=nested)
+        self.assertEqual(first_env[lane.SELFTEST_RUN_ENV], self.marker)
+        self.assertEqual(nested_env[lane.SELFTEST_RUN_ENV], self.marker)
+        self.assertNotEqual(first["scope"], nested["scope"])
+        self.assertEqual(nested["lineage"], [*first["lineage"], nested["scope"]])
+        self.assertEqual(json.loads(nested_env[lane.SELFTEST_SCOPES_ENV]), nested["lineage"])
+        self.assertEqual(nested["owner"], self.receipt["owner"])
+        with patch.dict(os.environ, {lane.SELFTEST_SCOPES_ENV: json.dumps([f"{i:032x}" for i in range(32)])}):
+            self.assertHeld(lambda: lane.selftest_env(self.root))
+
+    def test_selects_nested_detached_descendants_and_excludes_ancestor_and_sibling(self):
+        self.member(201)
+        self.member(202, [self.parent_scope, self.scope, "d" * 32])
+        self.member(203, [self.parent_scope, self.scope, "d" * 32, "e" * 32])
+        self.member(204, [self.parent_scope, "f" * 32])
+        self.member(205, [self.parent_scope])
+        self.member(206, marker="9" * 32)
+        self.assertEqual(lane.marked_processes(self.receipt),
+                         {201: "start-201", 202: "start-202", 203: "start-203"})
+        self.kill.assert_not_called()
+
+    def test_preexisting_unreadable_service_is_excluded_by_unchanged_birth(self):
+        path = self.member(90)
+        self.rows[90] = (1, 90, "S", "ancestor-start")
+        real = Path.read_bytes
+        def read(p):
+            if p == path:
+                raise AssertionError("preexisting unrelated environment must not be read")
+            return real(p)
+        with patch.object(Path, "read_bytes", new=read):
+            self.assertEqual(lane.marked_processes(self.receipt), {})
+
+    def test_new_same_uid_unreadable_environment_is_held(self):
+        path = self.member(201)
+        real = Path.read_bytes
+        def read(p):
+            if p == path:
+                raise PermissionError("fixture denied")
+            return real(p)
+        with patch.object(Path, "read_bytes", new=read):
+            self.assertHeld(lambda: lane.marked_processes(self.receipt))
+
+    def test_root_matching_missing_duplicate_malformed_or_reordered_lineage_is_held(self):
+        root = f"JOVIE_SELFTEST_RUN={self.marker}\0".encode()
+        cases = [root, root + b"JOVIE_SELFTEST_SCOPES=not-json\0",
+                 root + b"JOVIE_SELFTEST_SCOPES=[]\0",
+                 root + b"JOVIE_SELFTEST_SCOPES=[\"bad\"]\0",
+                 root + (f"JOVIE_SELFTEST_SCOPES={json.dumps([self.scope, self.parent_scope])}\0").encode(),
+                 root + (f"JOVIE_SELFTEST_SCOPES={json.dumps([self.parent_scope, self.scope])}\0" * 2).encode()]
+        for raw in cases:
+            with self.subTest(raw=raw):
+                self.member(201, raw=raw)
+                self.assertHeld(lambda: lane.marked_processes(self.receipt))
+
+    def test_malformed_creator_or_missing_owner_birth_is_held(self):
+        for change in ({"pid": 101}, {"uid": os.getuid() + 1}, {"start": "reused-owner"}):
+            with self.subTest(change=change):
+                receipt = copy.deepcopy(self.receipt)
+                receipt["owner"].update(change)
+                self.assertHeld(lambda: lane.reap_selftest_processes(receipt))
+        self.rows.pop(100)
+        self.assertHeld(lambda: lane.reap_selftest_processes(self.receipt))
+
+    def test_target_birth_change_during_environment_read_is_held(self):
+        self.member(201)
+        first = self.rows[201]
+        changed = (1, 201, "S", "replacement-start")
+        self.direct.side_effect = [first, changed]
+        self.assertHeld(lambda: lane.marked_processes(self.receipt))
+
+    def test_reaper_revalidates_target_birth_before_each_signal(self):
+        self.member(201)
+        reads = 0
+        def snapshot():
+            nonlocal reads
+            reads += 1
+            if reads == 5:
+                self.rows[201] = (1, 201, "S", "replacement-start")
+            return dict(self.rows)
+        self.snapshot.side_effect = snapshot
+        self.assertHeld(lambda: lane.reap_selftest_processes(self.receipt))
+
+    def test_reaper_revalidates_scope_before_each_signal(self):
+        path = self.member(201)
+        reads = 0
+        def snapshot():
+            nonlocal reads
+            reads += 1
+            if reads == 5:
+                path.write_bytes((f"JOVIE_SELFTEST_RUN={self.marker}\0JOVIE_SELFTEST_SCOPES="
+                                  f"{json.dumps([self.parent_scope, 'f' * 32])}\0").encode())
+            return dict(self.rows)
+        self.snapshot.side_effect = snapshot
+        self.assertHeld(lambda: lane.reap_selftest_processes(self.receipt))
+
+    def test_successful_cleanup_signals_only_its_own_child(self):
+        self.member(201)
+        self.member(202, [self.parent_scope, "f" * 32])
+        def stopped(fd, sig, info, flags):
+            pid = self.fd_targets[fd]
+            self.assertEqual((pid, sig), (201, signal.SIGTERM))
+            self.rows[pid] = (1, pid, "Z", self.rows[pid][3])
+        self.send.side_effect = stopped
+        self.assertEqual(lane.reap_selftest_processes(self.receipt), 1)
+        self.pidfd.assert_called_once_with(201, 0)
+        self.send.assert_called_once_with(900001, signal.SIGTERM, None, 0)
+        self.assertEqual(self.closed, [900001])
+        self.assertEqual(self.receipt["diagnostic"]["outcome"], "drained")
+        self.kill.assert_not_called()
+
+    def test_permission_refusal_and_live_after_escalation_are_held(self):
+        self.member(201)
+        self.send.side_effect = PermissionError("fixture refused")
+        with self.assertRaisesRegex(RuntimeError, "pidfd-refused"):
+            lane.reap_selftest_processes(self.receipt)
+        self.send.reset_mock(side_effect=True)
+        ticks = iter(range(0, 1000, 10))
+        with patch.object(lane.time, "monotonic", side_effect=lambda: next(ticks)):
+            with self.assertRaisesRegex(RuntimeError, "cleanup-unproven"):
+                lane.reap_selftest_processes(self.receipt)
+        self.assertEqual(self.send.call_args_list, [unittest.mock.call(900001, signal.SIGTERM, None, 0),
+                                                  unittest.mock.call(900001, signal.SIGKILL, None, 0)])
+        self.kill.assert_not_called()
+
+    def test_outer_cleanup_keeps_late_doubly_detached_descendant_coverage(self):
+        self.member(201)
+        def stopped(fd, sig, info, flags):
+            pid = self.fd_targets[fd]
+            self.rows[pid] = (1, pid, "Z", self.rows[pid][3])
+            if pid == 201:
+                self.member(202, [self.parent_scope, self.scope, "d" * 32, "e" * 32])
+        self.send.side_effect = stopped
+        ticks = iter(range(0, 1000, 10))
+        with patch.object(lane.time, "monotonic", side_effect=lambda: next(ticks)):
+            self.assertEqual(lane.reap_selftest_processes(self.receipt), 1)
+        self.assertEqual([call.args[0] for call in self.pidfd.call_args_list], [201, 202])
+        self.kill.assert_not_called()
+
+    def test_platform_without_authoritative_proc_is_explicitly_held(self):
+        self.proc.rmdir()
+        self.assertHeld(lambda: lane.marked_processes(self.receipt))
+
+    def test_actual_prove_and_retry_callers_supply_distinct_explicit_scope_receipts(self):
+        stage = self.root / "stage"
+        stage.mkdir()
+        host = lane.Host(state=self.root / "state", repo=ROOT)
+        replies = [subprocess.CompletedProcess([], 0, stdout="", stderr=""),
+                   subprocess.CompletedProcess([], 0, stdout="", stderr=""),
+                   subprocess.CompletedProcess([], 0, stdout="", stderr="")]
+        with patch.object(lane, "mesh_dependency_roots", return_value=[ROOT]), \
+             patch.object(lane.worktree_pool, "node_env", return_value={"PATH": "/usr/bin:/bin"}), \
+             patch.object(lane.lifecycle, "run", side_effect=replies), \
+             patch.object(lane, "reap_selftest_processes", wraps=lane.reap_selftest_processes) as reap:
+            self.assertIsNone(lane.prove_staging(host, stage))
+            self.assertTrue(lane.retry_failed_selectors(stage, "FAIL: test_bound (scripts.tests.test_x.Example)\n"))
+        scopes = [call.args[0] for call in reap.call_args_list]
+        self.assertEqual(len(scopes), 2)
+        self.assertNotEqual(scopes[0]["scope"], scopes[1]["scope"])
+        self.assertTrue(all(scope["run"] == self.marker for scope in scopes))
+        self.kill.assert_not_called()
+
+    def test_timeout_cannot_report_a_pass_when_cleanup_custody_is_unknown(self):
+        stage = self.root / "stage"
+        stage.mkdir()
+        replies = [subprocess.CompletedProcess([], 0, stdout="", stderr=""),
+                   subprocess.TimeoutExpired("mock-only-test", 1, stderr=b"original timeout diagnostic")]
+        with patch.object(lane, "mesh_dependency_roots", return_value=[ROOT]), \
+             patch.object(lane.worktree_pool, "node_env", return_value={"PATH": "/usr/bin:/bin"}), \
+             patch.object(lane.lifecycle, "run", side_effect=replies), \
+             patch.object(lane, "marked_processes", side_effect=lane.SelftestCleanupHeld("fixture unknown")):
+            with self.assertRaisesRegex(RuntimeError, "fixture unknown"):
+                lane.prove_staging(lane.Host(state=self.root / "state", repo=ROOT), stage)
+        diagnostic = json.loads((stage / ".selftest-diagnostic.json").read_text())
+        self.assertTrue(diagnostic["timedOut"])
+        self.assertEqual((stage / ".selftest-stderr.log").read_bytes(), b"original timeout diagnostic")
+        self.assertEqual(diagnostic["cleanup"]["outcome"], "held")
+        self.kill.assert_not_called()
+
+    def test_missing_or_denied_pidfd_holds_without_an_alternate_signal_route(self):
+        self.member(201)
+        with patch.object(lane.os, "pidfd_open", new=None):
+            self.assertHeld(lambda: lane.reap_selftest_processes(self.receipt))
+        self.pidfd.side_effect = PermissionError(1, "fixture denied")
+        self.assertHeld(lambda: lane.reap_selftest_processes(self.receipt))
+        self.assertEqual(self.receipt["diagnostic"]["errno"], 1)
+        self.assertEqual(self.receipt["diagnostic"]["outcome"], "held")
+        self.assertEqual(self.closed, [])
+
+    def test_retry_retains_original_failure_and_cleanup_hold_in_existing_receipt(self):
+        stage = self.root / "stage"
+        stage.mkdir()
+        result = subprocess.CompletedProcess([], 1, stdout="", stderr="original failed retry")
+        with patch.object(lane.lifecycle, "run", return_value=result), \
+             patch.object(lane, "marked_processes", side_effect=lane.SelftestCleanupHeld("fixture unknown")):
+            with self.assertRaisesRegex(RuntimeError, "fixture unknown"):
+                lane.retry_failed_selectors(stage, "FAIL: test_bound (scripts.tests.test_x.Example)\n")
+        receipt = json.loads((stage / ".selftest-retry.json").read_text())
+        self.assertFalse(receipt["passedOnRetry"])
+        self.assertEqual(receipt["returncode"], 1)
+        self.assertEqual(receipt["stderrSha256"], hashlib.sha256(b"original failed retry").hexdigest())
+        self.assertEqual(receipt["cleanup"]["outcome"], "held")
+        self.assertEqual(receipt["cleanup"]["sender"], self.receipt["owner"])
+        self.assertNotIn("JOVIE_SELFTEST_RUN", json.dumps(receipt))
+        self.send.assert_not_called(); self.kill.assert_not_called()
+
+    def stat_fixture(self, pid, start):
+        entry = self.proc / str(pid)
+        entry.mkdir(exist_ok=True)
+        fields = ["S", "1", str(pid)] + ["0"] * 17
+        fields[19] = str(start)
+        (entry / "stat").write_text(f"{pid} (fixture name) " + " ".join(fields))
+
+    def test_same_second_pid_reuse_cannot_inherit_a_baseline_exclusion(self):
+        self.member(201)
+        self.stat_fixture(100, 1000)
+        self.stat_fixture(201, 2000)
+        inventory = {100: (1, 100, "S", "same rounded second"),
+                     201: (1, 201, "S", "same rounded second")}
+        with patch.object(lane, "_selftest_process_rows", new=self.identity_reader), \
+             patch.object(lane, "_selftest_process_row", new=self.direct_identity_reader), \
+             patch.object(lane, "process_snapshot", return_value=inventory):
+            before = lane._selftest_process_rows()
+            self.stat_fixture(201, 2001)
+            after = lane._selftest_process_rows()
+            self.assertNotEqual(before[201][3], after[201][3])
+            receipt = copy.deepcopy(self.receipt)
+            receipt["owner"]["start"] = "linux:1000"
+            receipt["baseline"] = {100: "linux:1000", 201: "linux:2000"}
+            self.assertEqual(lane.marked_processes(receipt), {201: "linux:2001"})
+        self.send.assert_not_called(); self.kill.assert_not_called()
+
+    def test_missing_malformed_or_denied_linux_birth_never_proves_absence(self):
+        self.stat_fixture(100, 1000)
+        self.member(201)
+        inventory = {100: (1, 100, "S", "rounded"), 201: (1, 201, "S", "rounded")}
+        path = self.proc / "201/stat"
+        with patch.object(lane, "_selftest_process_rows", new=self.identity_reader), \
+             patch.object(lane, "_selftest_process_row", new=self.direct_identity_reader), \
+             patch.object(lane, "process_snapshot", return_value=inventory):
+            self.assertHeld(lambda: lane._selftest_process_rows())  # live PID, missing stat
+            for raw in ("", "201 (bad) S 1", "201 (bad) " + " ".join(["S"] + ["0"] * 19)):
+                with self.subTest(raw=raw):
+                    path.write_text(raw)
+                    self.assertHeld(lambda: lane._selftest_process_rows())
+            real = Path.read_text
+            def denied(p, *args, **kwargs):
+                if p == path:
+                    raise PermissionError("fixture denied")
+                return real(p, *args, **kwargs)
+            with patch.object(Path, "read_text", new=denied):
+                self.assertHeld(lambda: lane._selftest_process_rows())
+
+    def real_birth_fixture(self):
+        self.stat_fixture(100, 1000)
+        receipt = copy.deepcopy(self.receipt)
+        receipt["owner"]["start"] = "linux:1000"
+        receipt["baseline"] = {100: "linux:1000"}
+        self.stack.enter_context(patch.object(lane, "_selftest_process_rows", new=self.identity_reader))
+        self.stack.enter_context(patch.object(lane, "_selftest_process_row", new=self.direct_identity_reader))
+        self.stack.enter_context(patch.object(lane, "process_snapshot", return_value={100: self.rows[100]}))
+        return receipt
+
+    def test_pid_born_between_inventory_and_proc_scan_is_observed_and_reaped(self):
+        receipt = self.real_birth_fixture()
+        self.member(201)
+        self.stat_fixture(201, 2000)
+        def stopped(fd, sig, info, flags):
+            self.assertEqual((self.fd_targets[fd], sig), (201, signal.SIGTERM))
+            path = self.proc / "201/stat"
+            path.write_text(path.read_text().replace(") S ", ") Z "))
+        self.send.side_effect = stopped
+        self.assertEqual(lane.reap_selftest_processes(receipt), 1)
+        self.pidfd.assert_called_once_with(201, 0)
+        self.send.assert_called_once_with(900001, signal.SIGTERM, None, 0)
+        self.assertEqual(receipt["diagnostic"]["outcome"], "drained")
+        self.kill.assert_not_called()
+
+    def test_unmarked_same_uid_process_born_after_snapshot_does_not_false_hold(self):
+        receipt = self.real_birth_fixture()
+        self.member(201, raw=b"UNRELATED=fixture\0")
+        self.stat_fixture(201, 2000)
+        self.assertEqual(lane.marked_processes(receipt), {})
+        self.pidfd.assert_not_called(); self.send.assert_not_called(); self.kill.assert_not_called()
+
+    def test_denied_environment_then_authoritative_absence_needs_no_signal(self):
+        receipt = self.real_birth_fixture()
+        env = self.member(201)
+        self.stat_fixture(201, 2000)
+        real = Path.read_bytes
+        def denied_after_exit(path):
+            if path == env:
+                for child in env.parent.iterdir():
+                    child.unlink()
+                env.parent.rmdir()
+                raise PermissionError(13, "fixture exited before environ")
+            return real(path)
+        with patch.object(Path, "read_bytes", new=denied_after_exit):
+            self.assertEqual(lane.marked_processes(receipt), {})
+        self.pidfd.assert_not_called(); self.send.assert_not_called(); self.kill.assert_not_called()
+
+    def test_denied_environment_then_same_birth_zombie_needs_no_signal(self):
+        receipt = self.real_birth_fixture()
+        env = self.member(201)
+        self.stat_fixture(201, 2000)
+        real = Path.read_bytes
+        def denied_after_exit(path):
+            if path == env:
+                stat = env.parent / "stat"
+                stat.write_text(stat.read_text().replace(") S ", ") Z "))
+                raise PermissionError(13, "fixture became zombie before environ")
+            return real(path)
+        with patch.object(Path, "read_bytes", new=denied_after_exit):
+            self.assertEqual(lane.marked_processes(receipt), {})
+        self.pidfd.assert_not_called(); self.send.assert_not_called(); self.kill.assert_not_called()
+
+    def test_denied_environment_of_live_same_birth_still_holds(self):
+        receipt = self.real_birth_fixture()
+        env = self.member(201)
+        self.stat_fixture(201, 2000)
+        real = Path.read_bytes
+        def denied(path):
+            if path == env:
+                raise PermissionError(13, "fixture stays live")
+            return real(path)
+        with patch.object(Path, "read_bytes", new=denied):
+            with self.assertRaisesRegex(RuntimeError, "selftest-process-custody-unreadable"):
+                lane.reap_selftest_processes(receipt)
+        self.assertEqual(receipt["diagnostic"]["observation"], {
+            "pid": 201, "start": "linux:2000", "source": "proc-environ",
+            "errorCode": "selftest-process-custody-unreadable", "errno": 13})
+        self.pidfd.assert_not_called(); self.send.assert_not_called(); self.kill.assert_not_called()
+
+    def test_denied_environment_and_reused_zombie_birth_still_holds(self):
+        receipt = self.real_birth_fixture()
+        env = self.member(201)
+        self.stat_fixture(201, 2000)
+        real = Path.read_bytes
+        def denied_after_reuse(path):
+            if path == env:
+                self.stat_fixture(201, 2001)
+                stat = env.parent / "stat"
+                stat.write_text(stat.read_text().replace(") S ", ") Z "))
+                raise PermissionError(13, "fixture replaced before environ")
+            return real(path)
+        with patch.object(Path, "read_bytes", new=denied_after_reuse):
+            with self.assertRaisesRegex(RuntimeError, "selftest-process-identity-changed"):
+                lane.reap_selftest_processes(receipt)
+        self.assertEqual(receipt["diagnostic"]["observation"]["observedStart"], "linux:2001")
+        self.pidfd.assert_not_called(); self.send.assert_not_called(); self.kill.assert_not_called()
+
+    def test_denied_environment_then_unavailable_birth_still_holds(self):
+        receipt = self.real_birth_fixture()
+        env = self.member(201)
+        self.stat_fixture(201, 2000)
+        real = Path.read_bytes
+        def denied_with_unknown_birth(path):
+            if path == env:
+                (env.parent / "stat").write_text("201 (malformed) S 1")
+                raise PermissionError(13, "fixture birth unreadable")
+            return real(path)
+        with patch.object(Path, "read_bytes", new=denied_with_unknown_birth):
+            with self.assertRaisesRegex(RuntimeError, "selftest-process-birth-unavailable"):
+                lane.reap_selftest_processes(receipt)
+        self.pidfd.assert_not_called(); self.send.assert_not_called(); self.kill.assert_not_called()
+
+    def test_pid_reused_after_snapshot_cannot_inherit_unchanged_baseline_exclusion(self):
+        receipt = self.real_birth_fixture()
+        receipt["baseline"][201] = "linux:2000"
+        self.member(201)
+        self.stat_fixture(201, 2000)
+        with patch.object(lane, "process_snapshot", return_value=dict(self.rows)):
+            real = Path.iterdir
+            def enumerate_after_reuse(path):
+                if path == self.proc:
+                    self.stat_fixture(201, 2001)
+                return real(path)
+            with patch.object(Path, "iterdir", new=enumerate_after_reuse):
+                self.assertEqual(lane.marked_processes(receipt), {201: "linux:2001"})
+        self.pidfd.assert_not_called(); self.send.assert_not_called(); self.kill.assert_not_called()
+
+    def test_missing_birth_diagnostic_retains_sanitized_enumerated_pid(self):
+        receipt = self.real_birth_fixture()
+        self.member(201)  # directory lives; authoritative stat is missing
+        with self.assertRaisesRegex(RuntimeError, "selftest-process-birth-missing"):
+            lane.reap_selftest_processes(receipt)
+        observation = receipt["diagnostic"]["observation"]
+        self.assertEqual(observation, {"pid": 201, "source": "proc-stat",
+            "errorCode": "selftest-process-birth-missing", "errno": 2})
+        self.assertEqual(receipt["diagnostic"]["outcome"], "held")
+        for raw in (self.marker, self.scope, "JOVIE_SELFTEST_RUN", "UNRELATED=fixture"):
+            self.assertNotIn(raw, json.dumps(receipt["diagnostic"]))
+        self.pidfd.assert_not_called(); self.send.assert_not_called(); self.kill.assert_not_called()
+
+    def test_birth_change_after_environment_read_is_typed_and_held_before_pidfd(self):
+        receipt = self.real_birth_fixture()
+        env = self.member(201)
+        self.stat_fixture(201, 2000)
+        real = Path.read_bytes
+        def replaced_after_read(path):
+            raw = real(path)
+            if path == env:
+                self.stat_fixture(201, 2001)
+            return raw
+        with patch.object(Path, "read_bytes", new=replaced_after_read):
+            with self.assertRaisesRegex(RuntimeError, "selftest-process-identity-changed"):
+                lane.reap_selftest_processes(receipt)
+        self.assertEqual(receipt["diagnostic"]["observation"], {
+            "pid": 201, "start": "linux:2000", "observedStart": "linux:2001",
+            "source": "proc-stat", "errorCode": "selftest-process-identity-changed", "errno": None})
+        self.pidfd.assert_not_called(); self.send.assert_not_called(); self.kill.assert_not_called()
+
+    def test_late_inventory_malformed_or_denied_birth_still_holds_with_exact_pid(self):
+        receipt = self.real_birth_fixture()
+        self.member(201)
+        self.stat_fixture(201, 2000)
+        path = self.proc / "201/stat"
+        real = Path.read_text
+        for denied in (False, True):
+            with self.subTest(denied=denied):
+                receipt.pop("diagnostic", None)
+                def unreadable(p, *args, **kwargs):
+                    if p == path:
+                        if denied:
+                            raise PermissionError(13, "fixture denied")
+                        return "201 (malformed) S 1"
+                    return real(p, *args, **kwargs)
+                with patch.object(Path, "read_text", new=unreadable):
+                    self.assertHeld(lambda: lane.reap_selftest_processes(receipt))
+                observation = receipt["diagnostic"]["observation"]
+                self.assertEqual(observation["pid"], 201)
+                self.assertEqual(observation["errorCode"], "selftest-process-birth-unavailable")
+                self.assertEqual(observation["errno"], 13 if denied else None)
+                self.assertNotIn("start", observation)
+        self.pidfd.assert_not_called()
+
+    def test_uid_change_while_reading_birth_is_held_before_environment_access(self):
+        receipt = self.real_birth_fixture()
+        self.member(201)
+        self.stat_fixture(201, 2000)
+        entry = self.proc / "201"
+        real = Path.stat
+        observations = 0
+        def changed_uid(path, *args, **kwargs):
+            nonlocal observations
+            result = real(path, *args, **kwargs)
+            if path == entry:
+                observations += 1
+                if observations >= 2:
+                    fields = list(result); fields[4] = os.getuid() + 1
+                    return os.stat_result(fields)
+            return result
+        with patch.object(Path, "stat", new=changed_uid):
+            with self.assertRaisesRegex(RuntimeError, "selftest-process-uid-changed"):
+                lane.reap_selftest_processes(receipt)
+        self.assertEqual(receipt["diagnostic"]["observation"]["pid"], 201)
+        self.assertEqual(receipt["diagnostic"]["observation"]["start"], "linux:2000")
+        self.pidfd.assert_not_called(); self.send.assert_not_called(); self.kill.assert_not_called()
+
+    def test_initial_owner_birth_failure_is_retained_in_cleanup_summary(self):
+        receipt = self.real_birth_fixture()
+        (self.proc / "100/stat").unlink()
+        with self.assertRaisesRegex(RuntimeError, "selftest-process-birth-missing"):
+            lane.reap_selftest_processes(receipt)
+        self.assertEqual(receipt["diagnostic"]["sender"], receipt["owner"])
+        self.assertEqual(receipt["diagnostic"]["observation"]["pid"], 100)
+        self.assertEqual(receipt["diagnostic"]["outcome"], "held")
+        self.pidfd.assert_not_called(); self.send.assert_not_called(); self.kill.assert_not_called()
