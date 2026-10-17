@@ -9,6 +9,7 @@ import {
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { parseCLI } from 'vitest/node';
 import { STRUCTURAL_PYTHON_REGRESSION_COMMANDS } from '../../ci-fast-lanes.mjs';
 import {
   buildAffectedTestPlan,
@@ -789,6 +790,16 @@ describe('affected-test selector inventory', () => {
     expect(args).toContain('--coverage.include=lib/validation-sync.mjs');
     expect(args).toContain('--coverage.thresholds.lines=85');
     expect(args).toContain('--coverage.thresholds.branches=70');
+    if (!Array.isArray(args)) throw new Error('expected lifecycle test argv');
+    expect(parseCLI(args.slice(1)).options.coverage).toMatchObject({
+      thresholds: {
+        perFile: true,
+        lines: 85,
+        statements: 85,
+        functions: 80,
+        branches: 70,
+      },
+    });
   });
 
   it('references only existing scripts tests', () => {
