@@ -26,9 +26,15 @@ CONTROL_TIMEOUT_S = 25
 WRITE_WINDOW_S = 25
 MIN_WRITE_WINDOW_S = 22
 MAX_MESSAGE_BYTES = 4096
+MAX_FRAME_BYTES = 1024 * 1024
 
 
 class GuardHeld(RuntimeError):
+    pass
+
+
+class ParentOutputHeld(GuardHeld):
+    """A failed output stream cannot be retried as another proof frame."""
     pass
 
 
@@ -90,20 +96,62 @@ def read_control(timeout):
     return value
 
 
-def emit(value):
-    print(json.dumps(value, separators=(",", ":")), flush=True)
+def emit(value, *, deadline=None, clock=time.time, monotonic_deadline=None,
+         monotonic=None):
+    monotonic = monotonic or time.monotonic
+    payload = (json.dumps(value, separators=(",", ":")) + "\n").encode()
+    if len(payload) > MAX_FRAME_BYTES:
+        raise ParentOutputHeld("parent-output-frame-too-large")
+    deadline = clock() + CONTROL_TIMEOUT_S if deadline is None else deadline
+    remaining = deadline - clock()
+    if not 0 < remaining <= CONTROL_TIMEOUT_S:
+        raise ParentOutputHeld("parent-output-deadline")
+    ceiling = monotonic() + remaining
+    monotonic_deadline = ceiling if monotonic_deadline is None else min(ceiling, monotonic_deadline)
+    fd, flags = sys.stdout.fileno(), None
+    try:
+        flags = fcntl.fcntl(fd, fcntl.F_GETFL)
+        fcntl.fcntl(fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+        offset = 0
+        while offset < len(payload):
+            remaining = min(deadline - clock(), monotonic_deadline - monotonic())
+            if not 0 < remaining <= CONTROL_TIMEOUT_S:
+                raise ParentOutputHeld("parent-output-deadline")
+            _, writable, _ = select.select([], [fd], [], remaining)
+            if not writable:
+                raise ParentOutputHeld("parent-output-deadline")
+            try:
+                count = os.write(fd, payload[offset:])
+            except BlockingIOError:
+                continue
+            if count <= 0:
+                raise ParentOutputHeld("parent-output-closed")
+            offset += count
+    except OSError:
+        raise ParentOutputHeld("parent-output-closed") from None
+    finally:
+        if flags is not None:
+            fcntl.fcntl(fd, fcntl.F_SETFL, flags)
 
 
 def run_guard(identifier, expected_version, *, prepare=None, read=read_control,
-              send=emit, lock_factory=ClaimFence, clock=time.time):
+              send=None, lock_factory=ClaimFence, clock=time.time, monotonic=None):
     # Test injection is in-process only. The CLI exposes identity/version, never
     # a supplied observation, lock path, runtime path or authority flag.
     prepare = prepare or backlog_admission.prepare_backlog_guard
+    monotonic = monotonic or time.monotonic
     nonce = secrets.token_hex(32)
     base = {"schema": SCHEMA, "issue": identifier, "expectedVersion": expected_version,
             "nonce": nonce, "authorizesTransition": False, "authorizesDispatch": False}
+    output_deadline = None
+    output_monotonic_deadline = None
     def report(phase, **details):
-        send({**base, "phase": phase, **details})
+        value = {**base, "phase": phase, **details}
+        if send is None:
+            emit(value, deadline=output_deadline, clock=clock,
+                 monotonic_deadline=output_monotonic_deadline, monotonic=monotonic)
+        else:
+            send(value)
     def control(timeout, expected):
         value = read(timeout)
         if (set(value) != {"nonce", "op"} or value["nonce"] != nonce or value["op"] not in expected):
@@ -126,6 +174,7 @@ def run_guard(identifier, expected_version, *, prepare=None, read=read_control,
             report("held", observation=observation)
             return 2
         with lock_factory(prepared.canonical_state_path) as lock:
+            fence_started = monotonic()
             observation = prepared.assert_bound()
             if observation.get("allowed") is not True:
                 report("held", observation=observation)
@@ -135,19 +184,25 @@ def run_guard(identifier, expected_version, *, prepare=None, read=read_control,
             if seen is None or not 0 <= now - seen <= backlog_admission.MAX_AGE_S:
                 raise GuardHeld("native-proof-expired")
             expires = min(now + WRITE_WINDOW_S, seen + backlog_admission.MAX_AGE_S)
-            if expires - now < MIN_WRITE_WINDOW_S:
+            monotonic_now = monotonic()
+            output_monotonic_deadline = min(fence_started + WRITE_WINDOW_S,
+                                            monotonic_now + (expires - now))
+            if min(expires - now, output_monotonic_deadline - monotonic_now) < MIN_WRITE_WINDOW_S:
                 raise GuardHeld("native-proof-write-window-too-short")
+            output_deadline = expires
             identity = lock.check()
             report("locked", issueId=prepared.issue_id, priority=prepared.priority,
                    expiresAt=expires, lockIdentity=identity, observation=observation)
             while True:
-                remaining = expires - clock()
+                wall_remaining = expires - clock()
+                remaining = min(wall_remaining, output_monotonic_deadline - monotonic())
                 # Refuse expiry and clock drift before waiting on the parent;
                 # an expired proof never becomes a negative/unbounded timeout.
-                if not 0 < remaining <= WRITE_WINDOW_S:
+                if not 0 < wall_remaining <= WRITE_WINDOW_S or not 0 < remaining <= WRITE_WINDOW_S:
                     raise GuardHeld("writer-lock-window-expired")
                 op = control(remaining, {"check", "done", "abort"})
-                if not clock() < expires:
+                after_read = expires - clock()
+                if not 0 < after_read <= WRITE_WINDOW_S or not monotonic() < output_monotonic_deadline:
                     raise GuardHeld("writer-lock-window-expired")
                 if lock.check() != identity:
                     raise GuardHeld("canonical-claim-lock-identity-changed")
@@ -164,8 +219,16 @@ def run_guard(identifier, expected_version, *, prepare=None, read=read_control,
         report("released", result=op)
         return 0
     except (OSError, ValueError, TypeError, KeyError, RuntimeError) as error:
+        # A partial/closed stream cannot carry a second, potentially misleading
+        # frame. With unwound, the kernel fence is already released. Oversize
+        # frames write no bytes, so only that case may report a compact hold.
+        if isinstance(error, ParentOutputHeld) and str(error) != "parent-output-frame-too-large":
+            return 2
         reason = str(error) if isinstance(error, GuardHeld) else type(error).__name__
-        report("held", reason=reason, effect="unknown-if-parent-write-started")
+        try:
+            report("held", reason=reason, effect="unknown-if-parent-write-started")
+        except ParentOutputHeld:
+            pass
         return 2
 
 

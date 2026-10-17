@@ -3,11 +3,13 @@ from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 import hashlib
+import fcntl
 import json
 import os
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 
@@ -21,7 +23,7 @@ VERSION = "2026-10-16T20:53:20Z"
 
 class SessionTest(unittest.TestCase):
     def run_session(self, *, allowed=True, fresh_allowed=True, seen=NOW, ops=None,
-                    drift=False, clock=None, prepare_error=None, read_error=None):
+                    drift=False, clock=None, monotonic=None, prepare_error=None, read_error=None):
         messages, events = [], []
         value = {"allowed": allowed, "authorizesTransition": False, "authorizesDispatch": False,
                  "evidence": {"observedAt": seen}}
@@ -64,7 +66,8 @@ class SessionTest(unittest.TestCase):
                 self.assertEqual(events[-1], "unlock")
             messages.append(message)
         code = guard.run_guard("JOV-6641", VERSION, prepare=prepare, read=read, send=send,
-                               lock_factory=lock_factory, clock=clock or (lambda: NOW))
+                               lock_factory=lock_factory, clock=clock or (lambda: NOW),
+                               monotonic=monotonic)
         for message in messages:
             self.assertFalse(message["authorizesTransition"])
             self.assertFalse(message["authorizesDispatch"])
@@ -161,6 +164,30 @@ class SessionTest(unittest.TestCase):
                 self.assertEqual(code, 2)
                 self.assertEqual(events.count("prepare"), 1)
                 self.assertNotIn("private transport body", str(rows))
+
+    def test_modest_wall_rollback_after_prior_check_cannot_reuse_original_fence_window(self):
+        for during_read in [False, True]:
+            wall = iter([NOW, NOW, NOW + 10, NOW + 5] if not during_read else [NOW, NOW, NOW + 5])
+            elapsed = iter([100, 100, 100, 110, 126] if not during_read else [100, 100, 124, 126])
+            with self.subTest(during_read=during_read):
+                code, rows, events = self.run_session(ops=["lock", "check"],
+                                                     clock=lambda: next(wall),
+                                                     monotonic=lambda: next(elapsed))
+                self.assertEqual(code, 2)
+                expected = ["prepared", "locked", "held"] if during_read else ["prepared", "locked", "locked", "held"]
+                self.assertEqual([row["phase"] for row in rows], expected)
+                self.assertEqual(rows[-1]["reason"], "writer-lock-window-expired")
+                self.assertEqual(events.count("control"), 2)
+                self.assertEqual(events[-1], "unlock")
+
+    def test_local_checks_consume_original_kernel_window_before_locked_report(self):
+        elapsed = iter([100, 104])
+        code, rows, events = self.run_session(monotonic=lambda: next(elapsed))
+        self.assertEqual(code, 2)
+        self.assertEqual([row["phase"] for row in rows], ["prepared", "held"])
+        self.assertEqual(rows[-1]["reason"], "native-proof-write-window-too-short")
+        self.assertEqual(events.count("control"), 1)
+        self.assertEqual(events[-1], "unlock")
 
 
 class BoundContextSessionTest(unittest.TestCase):
@@ -373,6 +400,188 @@ class KernelFenceTest(unittest.TestCase):
             with self.assertRaisesRegex(guard.GuardHeld, "not-regular"):
                 with guard.ClaimFence(state):
                     self.fail("symlink became canonical authority")
+
+
+class OutputTest(unittest.TestCase):
+    def test_later_frame_cannot_reset_original_monotonic_ceiling_after_wall_rollback(self):
+        elapsed = iter([100, 100.2, 101.1, 101.1])
+        with tempfile.TemporaryFile("w+b") as stream, patch.object(guard.sys, "stdout", stream):
+            guard.emit({"phase": "locked"}, deadline=11, clock=lambda: 10,
+                       monotonic_deadline=101, monotonic=lambda: next(elapsed))
+            size = stream.tell()
+            with self.assertRaisesRegex(guard.ParentOutputHeld, "output-deadline"):
+                guard.emit({"phase": "locked"}, deadline=11, clock=lambda: 9,
+                           monotonic_deadline=101, monotonic=lambda: next(elapsed))
+            self.assertEqual(stream.tell(), size)
+
+    def test_complete_frames_match_parent_byte_limit_and_restore_descriptor_flags(self):
+        value = {"private": ""}
+        overhead = len((json.dumps(value, separators=(",", ":")) + "\n").encode())
+        value["private"] = "x" * (guard.MAX_FRAME_BYTES - overhead)
+        with tempfile.TemporaryFile("w+b") as stream:
+            fcntl.fcntl(stream.fileno(), fcntl.F_SETFL, os.O_APPEND)
+            flags = fcntl.fcntl(stream.fileno(), fcntl.F_GETFL)
+            with patch.object(guard.sys, "stdout", stream):
+                guard.emit(value, deadline=time.time() + 1)
+                # Darwin adds an internal written bit after ordinary writes;
+                # test the writable status flags this emitter can change.
+                modifiers = os.O_NONBLOCK | os.O_APPEND
+                self.assertEqual(fcntl.fcntl(stream.fileno(), fcntl.F_GETFL) & modifiers,
+                                 flags & modifiers)
+                value["private"] += "x"
+                with self.assertRaisesRegex(guard.ParentOutputHeld, "frame-too-large"):
+                    guard.emit(value)
+            stream.seek(0)
+            frame = stream.read()
+            self.assertEqual(len(frame), guard.MAX_FRAME_BYTES)
+            self.assertTrue(frame.endswith(b"\n"))
+            self.assertEqual(len(json.loads(frame)["private"]), guard.MAX_FRAME_BYTES - overhead)
+
+    def test_expired_nonfinite_and_backwards_wall_clock_cannot_extend_output_deadline(self):
+        with tempfile.TemporaryFile("w+b") as stream, patch.object(guard.sys, "stdout", stream):
+            for deadline in [time.time() - 1, float("nan"), float("inf")]:
+                with self.subTest(deadline=deadline):
+                    with self.assertRaisesRegex(guard.ParentOutputHeld, "output-deadline"):
+                        guard.emit({}, deadline=deadline)
+            clock = iter([10, 9])
+            with patch.object(guard.time, "monotonic", side_effect=[100, 101]):
+                with self.assertRaisesRegex(guard.ParentOutputHeld, "output-deadline"):
+                    guard.emit({}, deadline=11, clock=lambda: next(clock))
+            self.assertEqual(stream.tell(), 0)
+
+    def test_full_pipe_times_out_without_changing_original_descriptor_flags(self):
+        read_fd, write_fd = os.pipe()
+        try:
+            flags = fcntl.fcntl(write_fd, fcntl.F_GETFL)
+            fcntl.fcntl(write_fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+            while True:
+                try:
+                    os.write(write_fd, b"x" * 65536)
+                except BlockingIOError:
+                    break
+            fcntl.fcntl(write_fd, fcntl.F_SETFL, flags)
+            with patch.object(guard.sys, "stdout", SimpleNamespace(fileno=lambda: write_fd)):
+                with self.assertRaisesRegex(guard.ParentOutputHeld, "output-deadline"):
+                    guard.emit({}, deadline=time.time() + 0.03)
+            self.assertEqual(fcntl.fcntl(write_fd, fcntl.F_GETFL) & os.O_NONBLOCK,
+                             flags & os.O_NONBLOCK)
+        finally:
+            os.close(write_fd)
+            os.close(read_fd)
+
+    def test_closed_reader_is_named_without_logging_private_frame(self):
+        read_fd, write_fd = os.pipe()
+        os.close(read_fd)
+        try:
+            with patch.object(guard.sys, "stdout", SimpleNamespace(fileno=lambda: write_fd)):
+                with self.assertRaisesRegex(guard.ParentOutputHeld, "parent-output-closed"):
+                    guard.emit({"private": "must not appear in diagnostics"})
+        finally:
+            os.close(write_fd)
+
+
+class SubprocessOutputSessionTest(unittest.TestCase):
+    """Actual pipes and kernel locks; injected reads confer no authority."""
+    CHILD = r'''
+import json,sys,time
+from pathlib import Path
+sys.path.insert(0,sys.argv[1])
+import backlog_writer_guard as guard
+config=json.loads(sys.argv[3])
+guard.CONTROL_TIMEOUT_S=3
+guard.WRITE_WINDOW_S=config.get('window',0.2)
+guard.MIN_WRITE_WINDOW_S=0.1
+class Context:
+ issue_id='owned-output-fixture';priority=1
+ canonical_state_path=Path(sys.argv[2])
+ observation={'allowed':True,'authorizesTransition':False,'authorizesDispatch':False,'evidence':{'observedAt':time.time()},'private':'x'*config.get('preparedBytes',0)}
+ def revalidate(self):return self.observation
+ def assert_bound(self):return {**self.observation,'private':'x'*config.get('boundBytes',0)}
+sys.exit(guard.run_guard('JOV-FIXTURE','fixture-version',prepare=lambda *_:Context()))
+'''
+
+    @contextmanager
+    def session(self, **config):
+        with tempfile.TemporaryDirectory(prefix="backlog-output-kernel-") as directory:
+            state = Path(directory)
+            (state / "claim.lock").write_text("owned fixture incumbent")
+            child = subprocess.Popen([sys.executable, "-u", "-c", self.CHILD,
+                                      str(Path(guard.__file__).parent), str(state), json.dumps(config)],
+                                     stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            try:
+                yield child, state
+            finally:
+                if child.poll() is None:
+                    child.kill()
+                child.wait(timeout=3)
+                child.stdin.close()
+                child.stdout.close()
+                child.stderr.close()
+
+    def send(self, child, frame, op="lock"):
+        child.stdin.write((json.dumps({"nonce": frame["nonce"], "op": op}) + "\n").encode())
+        child.stdin.flush()
+
+    def released(self, state):
+        with guard.ClaimFence(state):
+            self.assertEqual((state / "claim.lock").read_text(), "owned fixture incumbent")
+
+    def test_unread_full_output_pipe_releases_kernel_fence_at_absolute_window(self):
+        with self.session(preparedBytes=131072, boundBytes=131072) as (child, state):
+            prepared = json.loads(child.stdout.readline())
+            self.assertEqual(prepared["phase"], "prepared")
+            self.send(child, prepared)
+            # Deliberately leave locked output unread until the child expires.
+            self.assertEqual(child.wait(timeout=3), 2)
+            self.released(state)
+            partial = child.stdout.read()
+            self.assertTrue(partial)
+            self.assertNotIn(b'"phase":"held"', partial)
+            self.assertNotIn(b'"phase":"released"', partial)
+            self.assertEqual(child.stderr.read(), b"")
+
+    def test_closed_stdout_reader_releases_kernel_fence_without_second_frame(self):
+        with self.session(boundBytes=131072) as (child, state):
+            prepared = json.loads(child.stdout.readline())
+            child.stdout.close()
+            self.send(child, prepared)
+            self.assertEqual(child.wait(timeout=3), 2)
+            self.released(state)
+            self.assertEqual(child.stderr.read(), b"")
+
+    def test_oversize_prepared_or_locked_frame_is_compact_hold_without_truncation(self):
+        for before_lock in [True, False]:
+            with self.subTest(before_lock=before_lock), self.session(
+                    preparedBytes=guard.MAX_FRAME_BYTES if before_lock else 0,
+                    boundBytes=guard.MAX_FRAME_BYTES) as (child, state):
+                frame = json.loads(child.stdout.readline())
+                if not before_lock:
+                    self.assertEqual(frame["phase"], "prepared")
+                    self.send(child, frame)
+                    frame = json.loads(child.stdout.readline())
+                self.assertEqual(frame["phase"], "held")
+                self.assertEqual(frame["reason"], "parent-output-frame-too-large")
+                self.assertFalse(frame["authorizesTransition"])
+                self.assertFalse(frame["authorizesDispatch"])
+                self.assertEqual(child.wait(timeout=3), 2)
+                self.released(state)
+
+    def test_real_pipe_roundtrip_preserves_complete_observations_and_kernel_custody(self):
+        with self.session(preparedBytes=131072, boundBytes=131072, window=2) as (child, state):
+            prepared = json.loads(child.stdout.readline())
+            self.send(child, prepared)
+            for op in ["check", "done"]:
+                locked = json.loads(child.stdout.readline())
+                self.assertEqual(locked["phase"], "locked")
+                self.assertEqual(len(locked["observation"]["private"]), 131072)
+                with self.assertRaisesRegex(guard.GuardHeld, "busy"):
+                    with guard.ClaimFence(state):
+                        self.fail("native fence disappeared before parent completion")
+                self.send(child, locked, op)
+            released = json.loads(child.stdout.readline())
+            self.assertEqual((released["phase"], released["result"]), ("released", "done"))
+            self.assertEqual(child.wait(timeout=3), 0)
+            self.released(state)
 
 
 class ControlTest(unittest.TestCase):
