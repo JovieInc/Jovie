@@ -269,6 +269,11 @@ const SECTION_RESOLUTIONS = {
     ),
     occurrenceProofs: [
       {
+        variantId: 'centered-none',
+        componentPath: 'apps/web/components/homepage/HomepageYoutubeMvp.tsx',
+        rootBinding: "sectionVariant='centered-none'",
+      },
+      {
         variantId: 'centered-phone',
         componentPath: 'apps/web/components/marketing/MarketingPosterHero.tsx',
         rootBinding: 'sectionVariant={sectionVariant}',
@@ -385,6 +390,11 @@ const SECTION_RESOLUTIONS = {
     ),
     occurrenceProofs: [
       {
+        variantId: 'editorial',
+        componentPath: 'apps/web/components/homepage/HomepageYoutubeMvp.tsx',
+        rootBinding: "data-testid='marketing-section-feature-split'",
+      },
+      {
         variantId: 'phone-right',
         componentPath:
           'apps/web/components/marketing/artist-profile/ArtistProfileOpinionatedSection.tsx',
@@ -435,21 +445,30 @@ const SECTION_RESOLUTIONS = {
       },
     ],
   },
-  'social-proof': sourceRoot(
-    'apps/web/components/marketing/artist-profile/ArtistProfileSocialProof.tsx',
-    'ArtistProfileSocialProof',
-    MARKETING_PEN_CONTRACT_IDS.section.socialProof,
-    'penContractId={MARKETING_PEN_CONTRACT_IDS.section.socialProof}',
-    1,
-    [
+  'social-proof': {
+    ...sourceRoot(
+      'apps/web/components/marketing/artist-profile/ArtistProfileSocialProof.tsx',
+      'ArtistProfileSocialProof',
+      MARKETING_PEN_CONTRACT_IDS.section.socialProof,
+      'penContractId={MARKETING_PEN_CONTRACT_IDS.section.socialProof}',
+      1,
+      [
+        {
+          source:
+            'apps/web/components/marketing/artist-profile/ArtistProfileSectionShell.tsx',
+          binding: 'data-pen-contract={penContractId}',
+          occurrences: 1,
+        },
+      ]
+    ),
+    occurrenceProofs: [
       {
-        source:
-          'apps/web/components/marketing/artist-profile/ArtistProfileSectionShell.tsx',
-        binding: 'data-pen-contract={penContractId}',
-        occurrences: 1,
+        variantId: 'founder-credits',
+        componentPath: 'apps/web/components/homepage/HomepageYoutubeMvp.tsx',
+        rootBinding: "data-testid='marketing-section-social-proof'",
       },
-    ]
-  ),
+    ],
+  },
   stats: sourceRoot(
     'apps/web/components/features/home/HomeStatQuoteSection.tsx',
     'HomeStatQuoteSection',
@@ -464,6 +483,11 @@ const SECTION_RESOLUTIONS = {
       'data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.pricing}'
     ),
     occurrenceProofs: [
+      {
+        variantId: 'one-liner-link',
+        componentPath: 'apps/web/components/homepage/HomepageYoutubeMvp.tsx',
+        rootBinding: "data-testid='marketing-section-pricing'",
+      },
       {
         variantId: 'tier-cards-neutral',
         componentPath: 'apps/web/components/organisms/PricingRecipeBody.tsx',
@@ -524,6 +548,11 @@ const SECTION_RESOLUTIONS = {
       },
     ],
     occurrenceProofs: [
+      {
+        variantId: 'editorial-search',
+        componentPath: 'apps/web/components/homepage/HomepageYoutubeMvp.tsx',
+        rootBinding: "data-testid='marketing-section-cta'",
+      },
       {
         variantId: 'plan-actions',
         componentPath: 'apps/web/components/organisms/PricingRecipeBody.tsx',
@@ -609,6 +638,11 @@ const SECTION_RESOLUTIONS = {
       ]
     ),
     occurrenceProofs: [
+      {
+        variantId: 'bento',
+        componentPath: 'apps/web/components/homepage/HomepageYoutubeMvp.tsx',
+        rootBinding: "data-testid='marketing-section-spec-wall'",
+      },
       {
         variantId: '5-screenshot-bento',
         componentPath:
@@ -722,7 +756,7 @@ const RECIPE_RESOLUTIONS = {
       },
       {
         source: 'apps/web/app/(home)/page.tsx',
-        binding: '<HomepageIdentityStoryStack />',
+        binding: '<HomepageYoutubeMvp />',
         occurrences: 1,
         kind: 'source',
       },

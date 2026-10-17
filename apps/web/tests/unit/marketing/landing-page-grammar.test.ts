@@ -166,6 +166,10 @@ describe('certified landing-page grammar', () => {
       'hero',
       'feature-split',
       'feature-split',
+      'feature-split',
+      'spec-wall',
+      'social-proof',
+      'pricing',
       'cta',
     ]);
     expect(LANDING_PAGE_HOMEPAGE_LOCK.primaryAction).toBe('Find me');
@@ -208,7 +212,7 @@ describe('certified landing-page grammar', () => {
   });
 
   it('exposes canonical route and content-slot lookups', () => {
-    expect(getLandingPageRouteType('homepage').sectionJobs).toHaveLength(4);
+    expect(getLandingPageRouteType('homepage').sectionJobs).toHaveLength(8);
     expect(getLandingPageSlots('hero')).toEqual(
       expect.arrayContaining(['headline', 'primaryCta'])
     );

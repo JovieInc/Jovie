@@ -17,21 +17,23 @@ then promotes). CI refuses `proven` without a reference route. (Charter's 11 +
 
 ## #recipe-homepage (proven)
 
-**Reference:** `/` (selected company-level identity homepage; `/new` redirects
-here). **Audience:** general. **Sections (4):** hero → feature-split (presence)
-→ feature-split (structure) → cta. Permissioned logo proof is conditional and
-omitted by default; available FAQ copy is not a mounted FAQ section.
+**Reference:** `/` (`/new` redirects here). **Audience:** artists who upload
+to YouTube regularly. **Sections (8):** hero → feature-split (thumbnails) →
+feature-split (release launch) → feature-split (public profile) → spec-wall →
+social-proof → pricing → cta. Omit unpermissioned logos and unsupported
+customer-adoption claims.
 
-**Arc:** promise → comprehension → depth → action, using the selected
-homepage's existing identity, presence, structure and claim content authority.
+**Arc:** upload promise → thumbnails → release → reachable fan → connected
+surfaces → attributed founder proof → free profile/current plans → action.
+See [the homepage copy contract](../../apps/web/data/homepageYoutubeMvp.ts).
 
-**CTA cadence:** sparse, "Claim", hero-and-close.
+**CTA cadence:** sparse, “Find me”, hero-and-close. Auth still owns access.
 
-**Decision tree:** `traffic=home OR (audience=general AND intent=category)`.
-The artist-specific capture/reactivation story belongs to its scoped recipe.
+**Decision tree:** `traffic=home AND intent=category` for artist/general
+visitors, before waitlist eligibility. Other audience routes keep their recipes.
 
-**Never:** for audience=artist specifically (use artist-lp); as a feature page
-(use feature — narrower scope).
+**Never:** use this as a specialist feature page; imply automatic fan consent,
+earnings-based billing, customer adoption, or unverified certification.
 
 ## #recipe-pricing (proven)
 

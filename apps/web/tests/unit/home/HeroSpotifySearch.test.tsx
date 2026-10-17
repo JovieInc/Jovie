@@ -361,6 +361,16 @@ describe('HeroSpotifySearch', () => {
       expect(pulseElements.length).toBe(3);
     });
 
+    it('announces a pending search with the shared loading status', async () => {
+      mockHookReturn.state = 'loading';
+      render(<HeroSpotifySearch submitLabel='Find me' />);
+      await userEvent.setup().type(getInput(), 'Tim');
+      const action = screen.getByRole('button', { name: /Find me/ });
+      expect(
+        within(action).getByRole('status', { name: 'Loading' })
+      ).toBeVisible();
+    });
+
     it('shows empty state message when no results', async () => {
       mockHookReturn.state = 'empty';
       renderComponent();

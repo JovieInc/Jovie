@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
+import { HOMEPAGE_YOUTUBE_MVP } from '@/data/homepageYoutubeMvp';
 
 const webRoot = path.resolve(__dirname, '../../..');
 
@@ -46,38 +46,15 @@ describe('homepage hero contract (JOV-5864)', () => {
     expect(componentSource).not.toContain('HOMEPAGE_MEDIA_MAP');
   });
 
-  it('uses the exact identity headline and one support line (Tim 2026-09-28)', () => {
-    expect(HOMEPAGE_IDENTITY_COPY.hero.headline).toBe(
-      'Be found. Be understood.'
-    );
-    expect(HOMEPAGE_IDENTITY_COPY.hero.subhead).toBe(
-      'Claim your name. Jovie makes you easy to reach, for people and for agents.'
-    );
-  });
-
-  it('keeps one primary action: the jov.ie/you claim', () => {
-    expect(HOMEPAGE_IDENTITY_COPY.hero.claim).toEqual({
-      domain: 'jov.ie/',
-      placeholder: 'you',
-      action: 'Claim',
-    });
-
+  it('keeps Find me on the scoped YouTube artist homepage', () => {
+    expect(HOMEPAGE_YOUTUBE_MVP.hero.headline).toBe('Every upload, a release.');
+    expect(HOMEPAGE_YOUTUBE_MVP.search.action).toBe('Find me');
     const pageSource = readFileSync(
       path.join(webRoot, 'app/(home)/page.tsx'),
       'utf8'
     );
-    const heroSource = pageSource.slice(
-      pageSource.indexOf('function HomepageHero()'),
-      pageSource.indexOf('function HomepageUnlockedSections()')
-    );
-
-    expect(heroSource).toContain(
-      "<HomepageIdentityHero headingId='home-hero-heading' />"
-    );
-    expect(heroSource).not.toContain('primaryCta');
-    expect(heroSource).not.toContain('secondaryCta');
-    expect(heroSource).not.toMatch(/Get started|Drop more music|waitlist/i);
-    expect(pageSource).not.toContain('/images/hero/');
+    expect(pageSource).toContain('<HomepageYoutubeMvp />');
+    expect(pageSource).not.toMatch(/Get started|Drop more music|waitlist/i);
   });
 
   it('clips the name-search aura to the pill', () => {

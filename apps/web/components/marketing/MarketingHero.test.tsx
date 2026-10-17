@@ -68,7 +68,7 @@ describe('MarketingHero source-backed default story', () => {
 
     const heading = screen.getByRole('heading', {
       level: 1,
-      name: 'Drop more music, with less work.',
+      name: 'Every upload, a release.',
     });
     expect(heading).toHaveClass('marketing-hero-headline', 'line-clamp-2');
     expect(heading).not.toHaveClass('line-clamp-3');
@@ -81,7 +81,7 @@ describe('MarketingHero source-backed default story', () => {
     expect(heading).not.toHaveAttribute('aria-label');
     expect(
       screen.getByText(
-        'The AI workspace for artists to plan releases, create assets, pitch playlists, and promote every drop.'
+        'YouTube thumbnails, release planning, smart links, and your public profile in one loop.'
       )
     ).toBeInTheDocument();
     expect(

@@ -38,16 +38,19 @@ export const CANONICAL_WEB_SURFACE_OWNERSHIP = {
     liveSourcePaths: [
       'apps/web/app/(home)/page.tsx',
       'apps/web/app/(home)/layout.tsx',
+      'apps/web/components/homepage/HomepageYoutubeMvp.tsx',
     ],
     requiredTokens: [
-      'HomepageIdentityHero',
+      'HomepageYoutubeMvp',
       'PublicPageShell',
-      'HomepageClose',
+      'HomepagePrimaryAction',
+      "placement='hero'",
+      "placement='close'",
     ],
     forbiddenTokens: ['HomePageNarrative'],
-    registryOwnerNeedle: 'HomepageIdentityHero',
-    moleculeOwners: ['PublicPageShell', 'HomepageIdentityHero'],
-    familyToken: 'features/home',
+    registryOwnerNeedle: 'HomepageYoutubeMvp',
+    moleculeOwners: ['PublicPageShell', 'HomepagePrimaryAction'],
+    familyToken: 'homepage',
   },
   'public-profile': {
     liveSourcePaths: [

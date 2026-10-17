@@ -15,7 +15,7 @@
  * Post-charter stubs per ARCHITECTURE.md §15: newsletter-signup (JOV-4067).
  */
 
-import { HOMEPAGE_IDENTITY_COPY } from '../homepageIdentityCopy';
+import { HOMEPAGE_YOUTUBE_MVP } from '../homepageYoutubeMvp';
 import type { MarketingAudience, MarketingSectionId } from './sections';
 
 export type RecipeId =
@@ -162,62 +162,80 @@ export interface MarketingRecipe {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const MARKETING_RECIPES: readonly MarketingRecipe[] = [
-  // ── homepage (proven — selected company-level identity route: /) ─────────
+  // ── homepage (JOV-5885: YouTube artist closed-loop MVP, /) ─────────────
   {
     id: 'homepage',
     label: 'Homepage',
     status: 'proven',
-    referenceRoute: '/', // /new is a retired redirect, not a rendered reference
-    audience: 'general',
-    // The selected identity homepage owns presence and structure as distinct
-    // editorial occurrences. Available FAQ/proof copy does not mount a section.
-    sectionOrder: ['hero', 'feature-split', 'feature-split', 'cta'],
+    referenceRoute: '/',
+    audience: 'artist',
+    sectionOrder: [
+      'hero',
+      'feature-split',
+      'feature-split',
+      'feature-split',
+      'spec-wall',
+      'social-proof',
+      'pricing',
+      'cta',
+    ],
     arc: [
       {
         beat: 'promise',
-        feeling: HOMEPAGE_IDENTITY_COPY.hero.headline,
+        feeling: HOMEPAGE_YOUTUBE_MVP.hero.headline,
         section: 'hero',
       },
-      {
-        beat: 'comprehension',
-        feeling: HOMEPAGE_IDENTITY_COPY.sections[0].headline,
-        section: 'feature-split',
-      },
+      ...HOMEPAGE_YOUTUBE_MVP.features.map(feature => ({
+        beat: feature.id,
+        feeling: feature.headline,
+        section: 'feature-split' as const,
+      })),
       {
         beat: 'depth',
-        feeling: HOMEPAGE_IDENTITY_COPY.sections[1].headline,
-        section: 'feature-split',
+        feeling: 'From upload to the next release.',
+        section: 'spec-wall',
+      },
+      {
+        beat: 'trust',
+        feeling: HOMEPAGE_YOUTUBE_MVP.proof.headline,
+        section: 'social-proof',
+      },
+      {
+        beat: 'value',
+        feeling: HOMEPAGE_YOUTUBE_MVP.pricing.headline,
+        section: 'pricing',
       },
       {
         beat: 'action',
-        feeling: HOMEPAGE_IDENTITY_COPY.close.headline,
+        feeling: HOMEPAGE_YOUTUBE_MVP.close.headline,
         section: 'cta',
       },
     ],
     hierarchy: {
-      oneBigIdea: HOMEPAGE_IDENTITY_COPY.hero.subhead,
+      oneBigIdea: HOMEPAGE_YOUTUBE_MVP.hero.subhead,
       seeFirst: 'hero',
       second: 'feature-split',
-      third: 'feature-split',
+      third: 'spec-wall',
       emphasisBudget: {
         maxDisplayScaleMoments: 1,
         maxFullBleedBreaks: 1,
         maxHeroWeightProofElements: 1,
       },
-      aboveTheFoldContract: {
-        desktop: ['hero'], // identity hero carries headline + claim action + real profile proof
-        mobile: ['hero'],
-      },
+      aboveTheFoldContract: { desktop: ['hero'], mobile: ['hero'] },
     },
     ctaCadence: {
       strategy: 'sparse',
-      primaryLabel: HOMEPAGE_IDENTITY_COPY.hero.claim.action,
+      primaryLabel: HOMEPAGE_YOUTUBE_MVP.search.action,
       cadence: 'hero-and-close',
     },
     fallbacks: [
       {
         missing: 'logo-cloud verified logos',
         fallback: 'omit section logo-cloud (zero-proof path)',
+      },
+      {
+        missing: 'social-proof verified data',
+        fallback: 'omit section social-proof (zero-proof path)',
       },
     ],
     minContent: [
@@ -228,9 +246,8 @@ export const MARKETING_RECIPES: readonly MarketingRecipe[] = [
     ],
     maxContent: { maxSections: 12 },
     chooseWhen:
-      'traffic=home OR (audience=general AND intent=category AND conversion=start)',
+      'traffic=home AND intent=category, including when waitlist is enabled',
     neverUse: [
-      'For audience=artist specifically (use artist-lp recipe — the arc differs)',
       'As a feature page (use feature recipe — narrower scope, deeper demo)',
     ],
   },

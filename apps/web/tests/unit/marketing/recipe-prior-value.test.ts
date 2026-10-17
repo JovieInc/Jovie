@@ -9,6 +9,7 @@ import {
 const brief = (
   overrides: {
     desiredConversion?: 'start' | 'claim-handle' | 'request-access';
+    trafficSource?: 'direct';
     brandConstraints?: { waitlistEnabled: boolean };
   } = {}
 ) => ({
@@ -60,7 +61,7 @@ describe('semantic prior value requirements', () => {
     expect(getMarketingSection('capture').illegalAfter).toContain('hero');
 
     const composition = resolveComposition(
-      brief({ desiredConversion: 'request-access' })
+      brief({ desiredConversion: 'request-access', trafficSource: 'direct' })
     );
     expect(composition.recipeId).toBe('waitlist');
     expect(composition.sections.map(section => section.sectionId)).toEqual([
@@ -81,6 +82,9 @@ describe('semantic prior value requirements', () => {
       'hero',
       'feature-split',
       'feature-split',
+      'feature-split',
+      'spec-wall',
+      'pricing',
       'cta',
     ]);
     for (const [index, sectionId] of sectionIds.entries()) {

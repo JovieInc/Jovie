@@ -166,7 +166,7 @@ describe('MarketingHero — content mode', () => {
   it('renders headline, subtitle and CTAs with no default logo bar', () => {
     render(
       <MarketingHero
-        headline='Drop more music, with less work.'
+        headline='Every upload, a release.'
         subtitle='The AI workspace for artists.'
         primaryCta={{ label: 'Claim my workspace', href: '/start' }}
         secondaryCta={{ label: 'See pricing', href: '/pricing' }}
@@ -175,7 +175,7 @@ describe('MarketingHero — content mode', () => {
 
     expect(
       screen.getByRole('heading', {
-        name: 'Drop more music, with less work.',
+        name: 'Every upload, a release.',
       })
     ).toBeInTheDocument();
     expect(

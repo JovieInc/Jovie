@@ -46,12 +46,12 @@ const CLAIM_PROFILE_CTA = {
 export const MARKETING_PAGE_CONTRACTS = {
   '(home)/page.tsx': {
     routeGlob: '(home)/page.tsx',
-    copyScope: 'shared',
+    copyScope: 'music',
     url: APP_ROUTES.HOME,
-    job: 'help visitors understand their public presence and start with their profile',
-    proof: 'published profile and relationship examples',
-    successEvent: 'visitor starts the onboarding handoff',
-    primaryCta: START_CTA,
+    job: 'help regularly uploading YouTube artists connect thumbnails, release planning, smart links, and reachable fans',
+    proof: 'published product surfaces and attributed founder career history',
+    successEvent: 'artist uses Find me to start the onboarding handoff',
+    primaryCta: { href: APP_ROUTES.START, label: 'Find me' },
   },
   '(marketing)/new/page.tsx': {
     routeGlob: '(marketing)/new/page.tsx',

@@ -1,4 +1,4 @@
-import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
+import { HOMEPAGE_YOUTUBE_MVP } from './homepageYoutubeMvp';
 
 /**
  * JOV-INV-012 optimization contract for the certified root homepage.
@@ -9,7 +9,7 @@ import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
  */
 
 export const HOMEPAGE_CERTIFIED_VARIANT_ID =
-  'homepage-certified:control-how-the-world-sees-you:v1' as const;
+  HOMEPAGE_YOUTUBE_MVP.variantIdentity;
 
 export const HOMEPAGE_CERTIFIED_EVENTS = {
   EXPOSURE: 'homepage_certified_exposed',
@@ -27,8 +27,8 @@ export type HomepageCertifiedPlacement =
 export const HOMEPAGE_CERTIFIED_CONTEXT = {
   variantIdentity: HOMEPAGE_CERTIFIED_VARIANT_ID,
   platform: 'web',
-  contentVariant: 'certified-section-1',
-  actionState: FEATURE_FLAGS.WAITLIST_ENABLED ? 'waitlist-on' : 'waitlist-off',
+  contentVariant: 'youtube-artist-loop',
+  actionState: 'artist-search',
 } as const;
 
 export const HOMEPAGE_CERTIFIED_OPTIMIZATION_CONTRACT = {
@@ -57,13 +57,13 @@ export const HOMEPAGE_CERTIFIED_OPTIMIZATION_CONTRACT = {
     'content-variant',
   ],
   hypothesis:
-    'The certified homepage converts through one name-search hero (Search your name → Find me) into /start. Waitlist writes happen only after verified auth.',
+    'Regularly uploading YouTube artists understand the thumbnail, release, smart-link, and reachable-fan loop and use the name-search hero, Find me, to continue to /start. Waitlist writes happen only after verified auth.',
   primaryMetric:
     'homepage_certified_search_submitted / homepage_certified_exposed',
   guardrails: [
     'No implied customers or borrowed logos on `/`.',
     'No competing hero CTA: Search your name → Find me hands off to /start. Never replace it with Get started, Request access, or a waitlist-first link.',
-    'Broad company-level copy; do not narrow the homepage to one ICP.',
+    'Scope the homepage to youtube-artist-closed-loop-mvp-v1. Claims stay within youtube-thumbnails, release-launch, smart-links, and public-profile; fan contact requires opt-in.',
     'Do not persist search query text in analytics properties.',
   ],
   privacyAndConsent:
@@ -71,7 +71,7 @@ export const HOMEPAGE_CERTIFIED_OPTIMIZATION_CONTRACT = {
   optimizerOwner: 'Product',
   cadence: 'weekly until a founder promote or rollback decision',
   decisionWriteback:
-    'Keep this variant as control. Challengers require a new variantIdentity. Decisions write back on JOV-5864 and this contract.',
+    'Keep this variant as control. Challengers require a new variantIdentity. Decisions write back on JOV-5885 and this contract.',
   rollbackOrControl:
-    'Revert `apps/web/app/(home)/page.tsx` to MarketingPosterHero. Email capture remains the splash-B /waitlist surface, not `/`.',
+    'Revert the scoped homepage composition and matching recipe/manifest together. Email capture remains the splash-B /waitlist surface, not `/`.',
 } as const;

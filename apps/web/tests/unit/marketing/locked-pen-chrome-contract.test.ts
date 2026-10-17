@@ -123,9 +123,8 @@ describe('locked Pen marketing chrome (JOV-6179)', () => {
     expect(
       HOMEPAGE_LAUNCH_COPY.certified.sections.map(section => section.id)
     ).toEqual(['relationships']);
-    expect(homepagePage).toContain('HomepageIdentityHero');
-    expect(homepagePage).toContain('HomepageCertifiedSections');
-    expect(homepagePage).toContain('HomepageClose');
+    expect(homepagePage).toContain('HomepageYoutubeMvp');
+    expect(homepagePage).toContain('HOMEPAGE_YOUTUBE_MVP');
     expect(certified).toContain('HOMEPAGE_LAUNCH_COPY.certified');
     expect(certified).not.toContain('GTcgO');
     expect(certified).not.toContain('jhV4a');

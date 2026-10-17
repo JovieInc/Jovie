@@ -54,22 +54,13 @@ export const STAGED_HOMEPAGE_SOURCE_FILES = [
 export const HOMEPAGE_PROPOSAL_NARRATIVE_SOURCE =
   'apps/web/components/features/home/CaptureFlowSection.tsx' as const;
 
-// Certified nine-section homepage. Sections 2-8 are copy-driven inside one
-// mount, so the source markers are the hero, the certified body, and the close.
-export const LIVE_HOMEPAGE_SECTION_IDS = [
-  'hero',
-  'certified-sections',
-  'close',
-] as const;
-
+// JOV-5885: / composes the scoped MVP; its render contract proves the sections.
+export const LIVE_HOMEPAGE_SECTION_IDS = ['youtube-mvp'] as const;
 export type LiveHomepageSectionId = (typeof LIVE_HOMEPAGE_SECTION_IDS)[number];
-
 export const LIVE_HOMEPAGE_SECTION_MARKERS: Readonly<
   Record<LiveHomepageSectionId, string>
 > = {
-  hero: 'function HomepageHero()',
-  'certified-sections': '<HomepageCertifiedSections',
-  close: '<HomepageClose />',
+  'youtube-mvp': '<HomepageYoutubeMvp />',
 };
 
 export interface HomepageLiveBaseline {

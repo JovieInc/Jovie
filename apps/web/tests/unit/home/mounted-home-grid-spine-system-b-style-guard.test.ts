@@ -49,17 +49,7 @@ describe('mounted homepage grid spine System B source contract', () => {
       expect(pageSource, `${pagePath} leaked ${pattern}`).not.toMatch(pattern);
     }
 
-    // The hero guard slices page.tsx between these two anchors; they must
-    // survive any page-spine edit verbatim.
-    expect(pageSource).toContain('function HomepageHero()');
-    expect(pageSource).toContain('function HomepageUnlockedSections()');
-    expect(pageSource.indexOf('function HomepageHero()')).toBeLessThan(
-      pageSource.indexOf('function HomepageUnlockedSections()')
-    );
-
-    // Page-level wrappers stay neutral: sections mount through named shells,
-    // never through ad-hoc sizing utilities in page markup.
-    expect(pageSource).toContain('homepage-story-stack');
+    expect(pageSource).toContain('<HomepageYoutubeMvp />');
     // Certified homepage: proof is a statement, never a logo strip.
     expect(pageSource).not.toContain('HomeTrustSection');
     expect(pageSource).not.toContain('FaqSection');
@@ -68,38 +58,7 @@ describe('mounted homepage grid spine System B source contract', () => {
   it('mounts each homepage section exactly once', () => {
     const pageSource = readFileSync(path.join(webRoot, pagePath), 'utf8');
 
-    for (const mount of [
-      '<HomepageIdentityHero',
-      '<HomepageCertifiedSections',
-      '<HomepageClose',
-    ]) {
-      expect(
-        countOccurrences(pageSource, mount),
-        `${pagePath} must mount ${mount} exactly once`
-      ).toBe(1);
-    }
-
-    expect(
-      countOccurrences(pageSource, "data-testid='homepage-story-stack'")
-    ).toBe(1);
-
-    // Canonical Pen v3 dark launch mounts each of its sections exactly once.
-    for (const mount of [
-      '<HomepageIdentityHero',
-      '<HomepageIdentitySections',
-      '<HomepageIdentityClose',
-    ]) {
-      expect(
-        countOccurrences(pageSource, mount),
-        `${pagePath} must mount ${mount} exactly once`
-      ).toBe(1);
-    }
-    expect(
-      countOccurrences(
-        pageSource,
-        "data-testid='homepage-identity-story-stack'"
-      )
-    ).toBe(1);
+    expect(countOccurrences(pageSource, '<HomepageYoutubeMvp')).toBe(1);
 
     expect(pageSource).not.toContain('MarketingShippedSitesShowcase');
     expect(pageSource).not.toContain('MarketingPlatformSpecBento');

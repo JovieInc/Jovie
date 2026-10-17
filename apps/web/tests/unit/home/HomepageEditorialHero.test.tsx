@@ -185,10 +185,10 @@ describe('certified homepage optimization contract (JOV-INV-012)', () => {
     );
     expect(HOMEPAGE_CERTIFIED_OPTIMIZATION_CONTRACT.cadence).toMatch(/weekly/);
     expect(HOMEPAGE_CERTIFIED_OPTIMIZATION_CONTRACT.decisionWriteback).toMatch(
-      /JOV-5864/
+      /JOV-5885/
     );
     expect(HOMEPAGE_CERTIFIED_OPTIMIZATION_CONTRACT.rollbackOrControl).toMatch(
-      /MarketingPosterHero/
+      /composition/
     );
   });
 });

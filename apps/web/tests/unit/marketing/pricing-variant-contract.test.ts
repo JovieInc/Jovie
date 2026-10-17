@@ -28,7 +28,7 @@ function pricingBinding(route: '/pricing') {
 }
 
 describe('section.pricing variant contract', () => {
-  it('keeps exactly the two shipped tier-card variants active', () => {
+  it('keeps the shipped tier cards and homepage pricing link active', () => {
     const section = getMarketingSection('pricing');
     const registry = MARKETING_SECTION_REGISTRY.find(
       entry => entry.id === 'section.pricing'
@@ -37,16 +37,15 @@ describe('section.pricing variant contract', () => {
     const activeVariantIds = section.variants
       .filter(variant => variant.status === 'active')
       .map(variant => variant.id);
-    expect(activeVariantIds).toEqual([...MARKETING_PRICING_VARIANTS]);
+    expect(activeVariantIds).toEqual([
+      ...MARKETING_PRICING_VARIANTS,
+      'one-liner-link',
+    ]);
     expect(
       section.variants
         .filter(variant => variant.status === 'unproven')
         .map(variant => variant.id)
-    ).toEqual([
-      'binary-standard-custom',
-      'decision-assistant',
-      'one-liner-link',
-    ]);
+    ).toEqual(['binary-standard-custom', 'decision-assistant']);
     expect(registry?.source).toBe(
       'components/features/pricing/MarketingPricingPlans'
     );
@@ -84,7 +83,7 @@ describe('section.pricing variant contract', () => {
     expect(homepagePricing).toContain("variant='tier-cards-recommended'");
   });
 
-  it('resolves pricing to neutral and keeps pricing out of the selected identity homepage', () => {
+  it('resolves pricing to neutral and the homepage to a plan link', () => {
     const sharedBrief = {
       businessObjective: 'Convert visitors to start',
       targetAudience: 'general' as const,
@@ -107,8 +106,9 @@ describe('section.pricing variant contract', () => {
     ).toBe('tier-cards-neutral');
     expect(homepage.recipeId).toBe('homepage');
     expect(
-      homepage.sections.some(section => section.sectionId === 'pricing')
-    ).toBe(false);
+      homepage.sections.find(section => section.sectionId === 'pricing')
+        ?.variantId
+    ).toBe('one-liner-link');
   });
 
   it('keeps the canonical section and pricing-recipe stories neutral', () => {

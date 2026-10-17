@@ -148,9 +148,9 @@ export const HERO_CODE_BINDING_BY_VARIANT = {
   },
   'centered-homepage': {
     component: 'components/marketing/MarketingHero',
-    sectionVariantId: null,
+    sectionVariantId: 'centered-none',
     implementation:
-      "content mode align='center' on / only (JOV-5085 name search)",
+      "shell variant='centered' on / with the homepage artist search",
   },
   'npm-copy': {
     component: 'components/marketing/MarketingHero',
@@ -176,7 +176,6 @@ export const HERO_CODE_BINDING_BY_VARIANT = {
 export const UNLOCKED_HERO_CODE_VARIANTS = [
   'centered-handle-claim',
   'centered-phone',
-  'centered-none',
 ] as const;
 
 export function heroVariantForCodeVariant(

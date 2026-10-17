@@ -537,9 +537,12 @@ const HOME_ROUTE = {
   warmupStrategy: 'public-route',
   measureMode: 'interactive-shell',
   readySelectors: {
-    // HomepageIdentityHero renders the primary claim form with this input id.
+    // Active MVP search; the legacy claim selector remains valid for its component fixture.
     shell: ['#home-hero-heading'],
-    content: ['#home-hero-heading', 'input#homepage-claim-handle'],
+    content: [
+      '#home-hero-heading',
+      'input#homepage-hero-artist-search, input#homepage-claim-handle',
+    ],
   },
   timings: [
     { metric: 'first-contentful-paint', budget: 2000 },

@@ -27,22 +27,10 @@ describe('homepage v3 dark-launch flag', () => {
     );
   });
 
-  it('switches only the story stack, keeping the live hero and shell intact', () => {
+  it('keeps the scoped MVP independent of the retired v3 flag', () => {
     const page = read('app/(home)/page.tsx');
-    const hero = page.slice(
-      page.indexOf('function HomepageHero()'),
-      page.indexOf('function HomepageUnlockedSections()')
-    );
-    // The identity hero shipped live: it renders unconditionally, flag or not.
-    expect(hero).not.toContain('HOMEPAGE_V3_ENABLED');
-    expect(hero).toContain(
-      "return <HomepageIdentityHero headingId='home-hero-heading' />"
-    );
-
-    // The flag gates only the v3 body (presence, structure, close).
-    expect(page).toContain('HOMEPAGE_V3_ENABLED ? (');
-    expect(page).toContain('<HomepageIdentityStoryStack />');
-    expect(page).toContain('<HomepageStoryStack />');
+    expect(page).not.toContain('HOMEPAGE_V3_ENABLED');
+    expect(page).toContain('<HomepageYoutubeMvp />');
 
     // One canonical shell: the layout no longer branches on the flag.
     const layout = read('app/(home)/layout.tsx');

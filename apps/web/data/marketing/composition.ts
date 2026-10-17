@@ -209,7 +209,17 @@ const RECIPE_DECISION_TABLE: readonly {
   readonly recipeId: RecipeId;
   readonly reason: string;
 }[] = [
-  // 1. Waitlist — gated by brand constraint flag (highest precedence — flips homepage CTAs).
+  // JOV-5885: the root acquisition story stays the YouTube loop before auth.
+  {
+    when: b =>
+      b.trafficSource === 'home' &&
+      b.intent === 'category' &&
+      ['artist', 'general'].includes(b.targetAudience),
+    recipeId: 'homepage',
+    reason:
+      'YouTube artist homepage; access eligibility is resolved after verified auth',
+  },
+  // 1. Explicit waitlist surfaces retain their access request recipe.
   //    Audience guard (A5 fix): only general/fan audiences use the waitlist recipe;
   //    artist/agency/enterprise-buyer with claim-handle/book-demo/contact-sales win on
   //    their audience-specific rows below even when waitlistEnabled=true.
@@ -458,6 +468,7 @@ function matchesVariant(
 ): boolean {
   // hero
   if (sectionId === 'hero') {
+    if (recipeId === 'homepage') return variantId === 'centered-none';
     if (variantId === 'centered-handle-claim') {
       return (
         brief.targetAudience === 'artist' &&
@@ -474,12 +485,12 @@ function matchesVariant(
     }
     if (variantId === 'split-screenshot-right') {
       return (
-        (brief.targetAudience === 'general' || recipeId === 'homepage') &&
+        brief.targetAudience === 'general' &&
         brief.availableAssets.productScreenshots
       );
     }
     if (variantId === 'split-claim-card') {
-      return recipeId === 'homepage';
+      return false; // Retired identity claim-card homepage.
     }
     if (variantId === 'centered-none') {
       return (
@@ -521,6 +532,7 @@ function matchesVariant(
   //   The occurrence index is deterministic and matches
   //   the shipped render order (codebase-baseline §2.4: adaptive then reactivation).
   if (sectionId === 'feature-split') {
+    if (recipeId === 'homepage') return variantId === 'editorial';
     if (variantId === 'video-background') {
       return recipeId === 'launch' && brief.availableAssets.videoAsset;
     }
@@ -552,6 +564,11 @@ function matchesVariant(
   }
   // social-proof
   if (sectionId === 'social-proof') {
+    if (recipeId === 'homepage')
+      return (
+        variantId === 'founder-credits' &&
+        brief.availableAssets.socialProofVerified
+      );
     if (variantId === 'two-rung-aspiration') {
       return (
         brief.targetAudience === 'artist' &&
@@ -570,8 +587,7 @@ function matchesVariant(
     }
     if (variantId === 'case-study-fused') {
       return (
-        (recipeId === 'feature' || recipeId === 'homepage') &&
-        brief.availableAssets.socialProofVerified
+        recipeId === 'feature' && brief.availableAssets.socialProofVerified
       );
     }
     if (variantId === 'quote-grid') {
@@ -597,6 +613,7 @@ function matchesVariant(
   }
   // pricing
   if (sectionId === 'pricing') {
+    if (recipeId === 'homepage') return variantId === 'one-liner-link';
     if (variantId === 'tier-cards-neutral') {
       return recipeId === 'pricing';
     }
@@ -638,6 +655,7 @@ function matchesVariant(
   }
   // cta
   if (sectionId === 'cta') {
+    if (recipeId === 'homepage') return variantId === 'editorial-search';
     if (variantId === 'final-dual-path') {
       return (
         brief.targetAudience !== 'artist' &&
@@ -661,6 +679,7 @@ function matchesVariant(
   }
   // spec-wall
   if (sectionId === 'spec-wall') {
+    if (recipeId === 'homepage') return variantId === 'bento';
     if (variantId === 'bento') {
       return false; // chosen at render time based on tiles.length and emphasis
     }

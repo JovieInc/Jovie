@@ -140,7 +140,7 @@ describe('hero code bindings', () => {
       )
     ).toMatchInlineSnapshot(`
       {
-        "centered-homepage": null,
+        "centered-homepage": "centered-none",
         "f-layout-desktop-screenshot": "split-screenshot-right",
         "left-buttons": null,
         "left-content": "left-none",
@@ -208,7 +208,7 @@ describe('route hero audit', () => {
     // mismatch means the route chose a hero the table does not allow.
     expect(summary).toMatchInlineSnapshot(`
       {
-        "/": "wrong-variant: split-claim-card -> centered-homepage",
+        "/": "ok: centered-homepage",
         "/about": "ok: left-content",
         "/alternatives/*": "ok: left-content",
         "/artist-notifications": "ok: f-layout-desktop-screenshot",
@@ -216,13 +216,13 @@ describe('route hero audit', () => {
         "/blog": "ok: left-content",
         "/blog/category/*": "ok: left-content",
         "/card": "ok: f-layout-desktop-screenshot",
-        "/cli": "unlocked-code-variant: centered-none -> npm-copy",
+        "/cli": "wrong-variant: centered-none -> npm-copy",
         "/compare/*": "ok: left-content",
         "/download": "ok: f-layout-desktop-screenshot",
         "/instant-merch": "ok: f-layout-desktop-screenshot",
         "/launch": "ok: f-layout-desktop-screenshot",
         "/pay": "ok: split-link-claim",
-        "/pricing": "unlocked-code-variant: centered-none -> left-buttons",
+        "/pricing": "wrong-variant: centered-none -> left-buttons",
         "/product": "ok: split-link-claim",
         "/smart-links": "ok: f-layout-desktop-screenshot",
         "/solutions/*": "unlocked-code-variant: centered-phone -> split-link-claim",
@@ -243,7 +243,7 @@ describe('route hero audit', () => {
     const rows = auditHeroRoutes(
       new Map([
         ['/a', null],
-        ['/b', 'centered-none'],
+        ['/b', 'centered-phone'],
         ['/c', 'split-claim-card'],
         ['/d', 'left-none'],
       ]),
