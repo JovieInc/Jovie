@@ -1,6 +1,8 @@
 const fs = require('node:fs');
 
-const ACKNOWLEDGED_SKIP_MARKERS = ['synthetic-robot-auth-unavailable'];
+const OTP_SKIP_MARKER = 'synthetic-otp-unavailable';
+const ROBOT_SKIP_MARKER = 'synthetic-robot-auth-unavailable';
+const ACKNOWLEDGED_SKIP_MARKERS = [OTP_SKIP_MARKER, ROBOT_SKIP_MARKER];
 const ROBOT_RESULT_NAME = 'onboarding-robot-full';
 
 const DEFAULT_RESULT_FILES = (
@@ -188,19 +190,27 @@ function loadSyntheticResultSpecs(
   return { specs, missingResults };
 }
 
+function trimReason(reason) {
+  return typeof reason === 'string' ? reason.trim() : '';
+}
+
+function appendUniqueWarning(warnings, reason) {
+  if (!reason || warnings.includes(reason)) return warnings;
+  return [...warnings, reason];
+}
+
 function parseSyntheticTestResults({
   resultFiles,
   fileSystem = fs,
+  otpSkipReason = '',
   robotSkipReason = '',
 } = {}) {
   const resolvedResultFiles =
     resultFiles ??
     DEFAULT_RESULT_FILES(process.env.LEGACY_CANARY_ENABLED === '1');
-  const skipReason =
-    typeof robotSkipReason === 'string' ? robotSkipReason.trim() : '';
-  const robotSkipAcknowledged = ACKNOWLEDGED_SKIP_MARKERS.some(marker =>
-    skipReason.includes(marker)
-  );
+  const otpReason = trimReason(otpSkipReason);
+  const robotReason = trimReason(robotSkipReason);
+  const robotSkipAcknowledged = robotReason.includes(ROBOT_SKIP_MARKER);
   const acknowledgedMissingNames = robotSkipAcknowledged
     ? new Set([ROBOT_RESULT_NAME])
     : new Set();
@@ -220,10 +230,10 @@ function parseSyntheticTestResults({
   );
   const { skipped, requiredSkipped, warnings, flaky, failed, passed } =
     classifySyntheticTests(tests);
-  const testWarnings =
-    robotSkipAcknowledged && !warnings.includes(skipReason)
-      ? [...warnings, skipReason]
-      : warnings;
+  const testWarnings = appendUniqueWarning(
+    appendUniqueWarning(warnings, otpReason),
+    robotSkipAcknowledged ? robotReason : ''
+  );
   const testStatus = resolveSyntheticTestStatus({
     tests,
     missingResults,

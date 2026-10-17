@@ -147,6 +147,10 @@ describe('Shared fenced-attempt coverage contract', () => {
     const command = STRUCTURAL_PYTHON_REGRESSION_COMMANDS[0];
     expect(command).toContain('scripts/tests/test_execution_attempt.py');
     expect(command).toContain('scripts/tests/test_backlog_admission.py');
+    expect(command).toContain('scripts/tests/test_backlog_writer_guard.py');
+    expect(command).toContain(
+      '*/scripts/lanes/backlog_writer_guard.py" --fail-under=90'
+    );
     expect(command).toContain(
       '*/scripts/lanes/backlog_admission.py" --fail-under=90'
     );

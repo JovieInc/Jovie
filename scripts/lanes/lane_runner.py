@@ -117,7 +117,7 @@ MAX_GATE_TIMEOUTS = 3
 CLAIM_TTL_S = pr_events.CLAIM_TTL_S
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
-LANE_TESTS = ["scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_hyperagent_lane.py",
+LANE_TESTS = ["scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_hyperagent_lane.py",
               "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py", "scripts/tests/test_devin_free_policy.py",
               "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
@@ -7977,74 +7977,289 @@ HOST_CREDENTIAL_PREFIXES = ("GH_", "GITHUB_", "LINEAR_", "JOVIE_BOT_", "JOVIE_GI
 # (start_new_session) leaves the helper's process group and can outlive it, but it cannot shed
 # its environment, so the marker finds it. Not under LANES_: nested selftest_env calls keep it.
 SELFTEST_RUN_ENV = "JOVIE_SELFTEST_RUN"
+SELFTEST_SCOPES_ENV = "JOVIE_SELFTEST_SCOPES"
+SELFTEST_CLEANUP_SCHEMA = "jovie-selftest-cleanup/v1"
 
 
-def selftest_env(scratch: Path) -> dict:
-    env = {key: value for key, value in os.environ.items()
-           if not key.startswith(HOST_KNOB_PREFIXES + HOST_CREDENTIAL_PREFIXES)}
-    # The gh shim mints the host's installation token; the self-test resolves the plain tool.
-    shim = str(Path(os.environ.get("LANES_STATE", Path.home() / ".local/state/jovie-lanes")) / "bin")
-    if "PATH" in env:
-        env["PATH"] = os.pathsep.join(entry for entry in env["PATH"].split(os.pathsep) if entry.rstrip("/") != shim)
-    # The release self-test's own git fixtures inherit this. Without it, Git 2.55
-    # detaches maintenance inside the proof and `lane update` refuses a green tree.
-    return git_housekeeping.apply_fixture_env(
-        {SELFTEST_RUN_ENV: uuid.uuid4().hex, **env, "HOME": str(Path(scratch) / "home"),
-         "LANES_SELFTEST": "1", "LANES_STATE": str(scratch)})
+class SelftestCleanupHeld(RuntimeError):
+    """A proof cannot report cleanup when process custody is incomplete."""
+    def __init__(self, message, *, pid=None, start=None, observed_start=None, source=None, error=None):
+        super().__init__(message)
+        self.code = str(message).split(":", 1)[0]
+        self.observation = None
+        if type(pid) is int and pid > 0 and source in {"proc-stat", "proc-environ", "proc-directory", "scope-owner"}:
+            self.observation = {"pid": pid, "source": source, "errorCode": self.code,
+                                "errno": getattr(error, "errno", None)}
+            for key, value in (("start", start), ("observedStart", observed_start)):
+                if isinstance(value, str) and re.fullmatch(r"linux:[1-9][0-9]*", value):
+                    self.observation[key] = value
 
 
-def marked_processes(marker: str) -> list[int]:
-    """Live processes (other than this one) whose environment carries this self-test's marker."""
-    token = f"{SELFTEST_RUN_ENV}={marker}"
-    found = []
+def _selftest_process_row(entry: Path, pid: int, uid: int) -> tuple | None:
+    """Read one allowed proc identity; snapshot absence cannot prove a live PID absent."""
+    start = None
+    try:
+        if entry.stat().st_uid != uid:
+            return None
+        raw = (entry / "stat").read_text()
+        prefix, rest = raw.rsplit(")", 1)
+        fields = rest.split()
+        if (int(prefix.split("(", 1)[0]) != pid or len(fields) < 20
+                or not fields[19].isdecimal() or int(fields[19]) <= 0):
+            raise ValueError("invalid Linux process birth")
+        start = "linux:" + fields[19]
+        row = (int(fields[1]), int(fields[2]), fields[0], start)
+        if entry.stat().st_uid != uid:
+            raise SelftestCleanupHeld("selftest-process-uid-changed", pid=pid, start=start, source="proc-stat")
+        return row
+    except FileNotFoundError as error:
+        try:
+            entry.stat()
+        except FileNotFoundError:
+            return None  # proc confirms this enumerated directory no longer exists
+        except OSError as observation_error:
+            raise SelftestCleanupHeld("selftest-process-birth-unavailable", pid=pid, start=start,
+                                      source="proc-stat", error=observation_error) from observation_error
+        raise SelftestCleanupHeld("selftest-process-birth-missing", pid=pid, start=start,
+                                  source="proc-stat", error=error) from error
+    except (OSError, ValueError, IndexError) as error:
+        raise SelftestCleanupHeld("selftest-process-birth-unavailable", pid=pid, start=start,
+                                  source="proc-stat", error=error) from error
+
+
+def _selftest_process_rows() -> dict:
+    """Keep the maintained inventory, with Linux birth ticks instead of rounded lstart."""
     proc = Path("/proc")
-    if proc.is_dir():
-        for entry in proc.iterdir():
-            if not entry.name.isdigit() or int(entry.name) == os.getpid():
-                continue
-            try:
-                environ = (entry / "environ").read_bytes()
-            except OSError:
-                continue
-            if token.encode() in environ.split(b"\0"):
-                found.append(int(entry.name))
-        return found
-    # Darwin: `ps -E` appends the environment of this user's processes to the command.
-    listing = subprocess.run(["ps", "-E", "-ww", "-axo", "pid=,stat=,command="],
-                             capture_output=True, text=True, errors="replace", timeout=30)
-    for line in listing.stdout.splitlines():
-        fields = line.split()
-        if (len(fields) > 2 and fields[0].isdigit() and int(fields[0]) != os.getpid()
-                and not fields[1].startswith("Z") and token in fields[2:]):
-            found.append(int(fields[0]))
+    if not proc.is_dir():
+        raise SelftestCleanupHeld("selftest-scoped-cleanup-platform-unsupported")
+    found = {}
+    for pid in process_snapshot():
+        row = _selftest_process_row(proc / str(pid), pid, os.getuid())
+        if row is not None:
+            found[pid] = row
     return found
 
 
-def reap_selftest_processes(marker: str) -> int:
-    """Stop everything the self-test left running (orphaned yc refresh/gbrain pairs lived 4-5
-    days on Gem, 2026-10-11). Returns how many processes were still alive when it ended."""
-    import signal
+def _selftest_lineage(value) -> list[str]:
     try:
-        leftovers = marked_processes(marker)
-    except (OSError, subprocess.SubprocessError):
-        return 0
-    for sig, grace in ((signal.SIGTERM, 3), (signal.SIGKILL, 2)):
-        try:
-            alive = marked_processes(marker)
-        except (OSError, subprocess.SubprocessError):
-            break
-        if not alive:
-            break
-        for pid in alive:
-            try:
-                os.kill(pid, sig)
-            except (ProcessLookupError, PermissionError):
-                pass
-        deadline = time.monotonic() + grace
-        while time.monotonic() < deadline and marked_processes(marker):
-            time.sleep(.05)
-    return len(leftovers)
+        lineage = json.loads(value)
+    except (TypeError, ValueError) as error:
+        raise SelftestCleanupHeld("selftest-scope-lineage-malformed") from error
+    if (not isinstance(lineage, list) or not 1 <= len(lineage) <= 32
+            or any(not isinstance(part, str) or not re.fullmatch(r"[0-9a-f]{32}", part) for part in lineage)
+            or len(set(lineage)) != len(lineage)):
+        raise SelftestCleanupHeld("selftest-scope-lineage-malformed")
+    return lineage
 
+
+def selftest_env(scratch: Path, *, cleanup: dict | None = None) -> dict:
+    env = {key: value for key, value in os.environ.items()
+           if not key.startswith(HOST_KNOB_PREFIXES + HOST_CREDENTIAL_PREFIXES)}
+    marker = env.get(SELFTEST_RUN_ENV) or uuid.uuid4().hex
+    if not isinstance(marker, str) or not re.fullmatch(r"[0-9a-f]{32}", marker):
+        raise SelftestCleanupHeld("selftest-root-marker-malformed")
+    lineage = _selftest_lineage(env[SELFTEST_SCOPES_ENV]) if SELFTEST_SCOPES_ENV in env else []
+    if lineage and SELFTEST_RUN_ENV not in env:
+        raise SelftestCleanupHeld("selftest-scope-without-root")
+    if len(lineage) >= 32:
+        raise SelftestCleanupHeld("selftest-scope-depth-exceeded")
+    scope = uuid.uuid4().hex
+    lineage = [*lineage, scope]
+    if cleanup is not None:
+        if not isinstance(cleanup, dict) or cleanup:
+            raise SelftestCleanupHeld("selftest-scope-receipt-must-be-fresh")
+        rows = _selftest_process_rows()
+        pid = os.getpid()
+        if pid not in rows:
+            raise SelftestCleanupHeld("selftest-scope-owner-unavailable")
+        # Existing identities cannot inherit a nonce that has not been returned yet.
+        cleanup.update(schema=SELFTEST_CLEANUP_SCHEMA, run=marker, scope=scope, lineage=lineage,
+                       owner={"pid": pid, "start": rows[pid][3], "uid": os.getuid()},
+                       baseline={pid: row[3] for pid, row in rows.items()})
+    # The root marker survives nesting for outer cleanup of detached descendants;
+    # the fresh endpoint limits an inner cleanup to its own subtree.
+    env.update({SELFTEST_RUN_ENV: marker, SELFTEST_SCOPES_ENV: json.dumps(lineage, separators=(",", ":"))})
+    shim = str(Path(os.environ.get("LANES_STATE", Path.home() / ".local/state/jovie-lanes")) / "bin")
+    if "PATH" in env:
+        env["PATH"] = os.pathsep.join(entry for entry in env["PATH"].split(os.pathsep) if entry.rstrip("/") != shim)
+    return git_housekeeping.apply_fixture_env(
+        {**env, "HOME": str(Path(scratch) / "home"), "LANES_SELFTEST": "1", "LANES_STATE": str(scratch)})
+
+
+def _selftest_cleanup_rows(cleanup: dict) -> dict:
+    if not isinstance(cleanup, dict) or cleanup.get("schema") != SELFTEST_CLEANUP_SCHEMA:
+        raise SelftestCleanupHeld("selftest-scope-receipt-required")
+    marker, scope = cleanup.get("run"), cleanup.get("scope")
+    if (not isinstance(marker, str) or not re.fullmatch(r"[0-9a-f]{32}", marker)
+            or not isinstance(scope, str) or not re.fullmatch(r"[0-9a-f]{32}", scope)):
+        raise SelftestCleanupHeld("selftest-scope-receipt-malformed")
+    lineage = _selftest_lineage(json.dumps(cleanup.get("lineage")))
+    owner, baseline = cleanup.get("owner"), cleanup.get("baseline")
+    if (lineage[-1] != scope or not isinstance(owner, dict) or not isinstance(baseline, dict)
+            or type(owner.get("pid")) is not int or owner["pid"] != os.getpid()
+            or type(owner.get("uid")) is not int or owner["uid"] != os.getuid()
+            or not isinstance(owner.get("start"), str) or not owner["start"]
+            or baseline.get(owner["pid"]) != owner["start"]
+            or any(type(pid) is not int or pid <= 0 or not isinstance(start, str) or not start
+                   for pid, start in baseline.items())):
+        raise SelftestCleanupHeld("selftest-scope-owner-malformed")
+    rows = _selftest_process_rows()
+    if owner["pid"] not in rows or rows[owner["pid"]][3] != owner["start"]:
+        raise SelftestCleanupHeld("selftest-scope-owner-changed", pid=owner["pid"],
+                                  start=owner["start"], source="scope-owner")
+    return rows
+
+
+def marked_processes(cleanup: dict) -> dict[int, str]:
+    """Select only same-UID members of an explicit cleanup subtree, with birth identities."""
+    _selftest_cleanup_rows(cleanup)
+    proc = Path("/proc")
+    if not proc.is_dir():
+        # ps -E command text cannot prove environment custody. Darwin remains held
+        # until JOV-8517 supplies a separately reviewed authoritative reader.
+        raise SelftestCleanupHeld("selftest-scoped-cleanup-platform-unsupported")
+    found = {}
+    try:
+        for entry in proc.iterdir():
+            if not entry.name.isdecimal():
+                continue
+            pid = int(entry.name)
+            if pid == cleanup["owner"]["pid"]:
+                continue
+            try:
+                # A process may be born or reused between ps and proc enumeration.
+                # Read this entry directly before any baseline exclusion or custody read.
+                row = _selftest_process_row(entry, pid, cleanup["owner"]["uid"])
+                if row is None:
+                    continue  # proc proves gone, or there is no authority over this UID
+                if row[2].startswith("Z") or cleanup["baseline"].get(pid) == row[3]:
+                    continue
+                raw = (entry / "environ").read_bytes()
+            except FileNotFoundError:
+                if _selftest_process_row(entry, pid, cleanup["owner"]["uid"]) is None:
+                    continue
+                raise SelftestCleanupHeld("selftest-process-custody-raced", pid=pid,
+                                          start=row[3], source="proc-environ")
+            except OSError as error:
+                # After a failed environment read, the process may have exited
+                # since its initial birth observation. Only fresh authoritative
+                # absence or a same-birth zombie proves that it cannot execute.
+                after = _selftest_process_row(entry, pid, cleanup["owner"]["uid"])
+                if after is None:
+                    continue
+                if after[3] != row[3]:
+                    raise SelftestCleanupHeld("selftest-process-identity-changed", pid=pid,
+                                              start=row[3], observed_start=after[3],
+                                              source="proc-stat") from error
+                if after[2].startswith("Z"):
+                    continue
+                raise SelftestCleanupHeld("selftest-process-custody-unreadable", pid=pid,
+                                          start=row[3], source="proc-environ", error=error) from error
+            pairs = [part.split(b"=", 1) for part in raw.split(b"\0") if b"=" in part]
+            roots = [value for key, value in pairs if key == SELFTEST_RUN_ENV.encode()]
+            if not roots or roots == [b""]:
+                continue
+            if len(roots) != 1:
+                raise SelftestCleanupHeld("selftest-root-marker-ambiguous", pid=pid, start=row[3], source="proc-environ")
+            if roots[0] != cleanup["run"].encode():
+                continue
+            scopes = [value for key, value in pairs if key == SELFTEST_SCOPES_ENV.encode()]
+            if len(scopes) != 1:
+                raise SelftestCleanupHeld("selftest-process-scope-missing", pid=pid, start=row[3], source="proc-environ")
+            try:
+                lineage = _selftest_lineage(scopes[0].decode("utf-8"))
+            except (UnicodeError, SelftestCleanupHeld) as error:
+                raise SelftestCleanupHeld("selftest-process-scope-malformed", pid=pid, start=row[3], source="proc-environ") from error
+            if cleanup["scope"] not in lineage:
+                continue  # valid sibling or ancestor scope
+            if lineage[:len(cleanup["lineage"])] != cleanup["lineage"]:
+                raise SelftestCleanupHeld("selftest-process-scope-changed", pid=pid, start=row[3], source="proc-environ")
+            found[pid] = row[3]
+    except OSError as error:
+        raise SelftestCleanupHeld("selftest-process-observation-unavailable") from error
+    _selftest_cleanup_rows(cleanup)
+    for pid, start in tuple(found.items()):
+        after = _selftest_process_row(proc / str(pid), pid, cleanup["owner"]["uid"])
+        if after is None:
+            del found[pid]
+        elif after[3] != start:
+            raise SelftestCleanupHeld("selftest-process-identity-changed", pid=pid, start=start,
+                                      observed_start=after[3], source="proc-stat")
+    return found
+
+
+def _selftest_cleanup_summary(cleanup: dict) -> dict:
+    if "diagnostic" not in cleanup:
+        digest = lambda value: hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        cleanup["diagnostic"] = {"schema": "jovie-selftest-cleanup-summary/v1",
+            "source": str(Path(__file__).resolve()), "sourceSha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+            "sender": dict(cleanup.get("owner", {})), "runDigest": digest(cleanup.get("run")),
+            "scopeDigest": digest(cleanup.get("scope")), "lineageDigest": digest(cleanup.get("lineage")),
+            "attempts": [], "outcome": "pending"}
+    return cleanup["diagnostic"]
+
+
+def _selftest_cleanup_failure(cleanup: dict, error: BaseException) -> dict:
+    """Retain only typed observation facts in the existing proof diagnostic."""
+    summary = _selftest_cleanup_summary(cleanup)
+    summary.update(outcome="held", errorCode=error.code if isinstance(error, SelftestCleanupHeld)
+                   else "selftest-cleanup-observation-failed",
+                   errno=getattr(error, "errno", getattr(error.__cause__, "errno", None)))
+    if isinstance(error, SelftestCleanupHeld) and error.observation is not None:
+        summary["observation"] = dict(error.observation)
+    return summary
+
+
+def reap_selftest_processes(cleanup: dict) -> int:
+    """Drain one explicit subtree using Linux PID handles; never fall back to PID signals."""
+    import signal
+    summary = _selftest_cleanup_summary(cleanup) if isinstance(cleanup, dict) else None
+    attempt = None
+    try:
+        _selftest_cleanup_rows(cleanup)
+        if not callable(getattr(os, "pidfd_open", None)) or not callable(getattr(signal, "pidfd_send_signal", None)):
+            raise SelftestCleanupHeld("selftest-pidfd-unavailable")
+        leftovers = marked_processes(cleanup)
+        for sig, grace in ((signal.SIGTERM, 3), (signal.SIGKILL, 2)):
+            alive = marked_processes(cleanup)
+            if not alive:
+                break
+            for pid, start in alive.items():
+                attempt = {"target": {"pid": pid, "start": start}, "signal": int(sig), "outcome": "opening"}
+                summary["attempts"].append(attempt)
+                descriptor = None
+                try:
+                    descriptor = os.pidfd_open(pid, 0)
+                    # The handle pins this process. Validate birth and scope after opening
+                    # it; a PID reused after these reads cannot redirect the signal.
+                    _selftest_cleanup_rows(cleanup)
+                    current = _selftest_process_row(Path("/proc") / str(pid), pid, cleanup["owner"]["uid"])
+                    if current is None or current[3] != start:
+                        raise SelftestCleanupHeld("selftest-signal-target-changed", pid=pid, start=start,
+                                                  observed_start=current[3] if current else None, source="proc-stat")
+                    fresh = marked_processes(cleanup)
+                    if fresh.get(pid) != start:
+                        raise SelftestCleanupHeld("selftest-signal-custody-changed", pid=pid, start=start, source="proc-environ")
+                    signal.pidfd_send_signal(descriptor, sig, None, 0)
+                    attempt["outcome"] = "sent"
+                except OSError as error:
+                    raise SelftestCleanupHeld("selftest-pidfd-refused", pid=pid, start=start, source="proc-stat", error=error) from error
+                finally:
+                    if descriptor is not None:
+                        os.close(descriptor)
+            deadline = time.monotonic() + grace
+            while time.monotonic() < deadline and marked_processes(cleanup):
+                time.sleep(.05)
+        if marked_processes(cleanup):
+            raise SelftestCleanupHeld("selftest-cleanup-unproven")
+        summary["outcome"] = "drained"
+        return len(leftovers)
+    except BaseException as error:
+        if summary is not None:
+            summary = _selftest_cleanup_failure(cleanup, error)
+            if attempt is not None and attempt["outcome"] != "sent":
+                attempt.update(outcome="held", errorCode=summary["errorCode"], errno=summary["errno"])
+        raise
 
 # The installed packages mesh-runtime-bundle.mjs compiles against (exact pins checked there).
 MESH_DEPENDENCY_PINS = ("apps/desktop/node_modules/esbuild/package.json",
@@ -8083,13 +8298,15 @@ def mesh_dependency_roots(host: Host, source_root: Path | None = None) -> list[P
     return matching + [root for root in candidates if root not in matching]
 
 
-def retain_selftest_diagnostic(staging: Path, stderr, returncode, *, timed_out=False, leftovers=0) -> None:
+def retain_selftest_diagnostic(staging: Path, stderr, returncode, *, timed_out=False, leftovers=0, cleanup=None) -> None:
     raw = stderr if isinstance(stderr, bytes) else (stderr or "").encode()
     diagnostic = {"schema": "jovie-lane-selftest-diagnostic/v1", "returncode": returncode,
                   "timedOut": timed_out, "observedAt": now_iso(), "leftoverProcesses": leftovers,
                   "failedSelectors": re.findall(r"^(?:FAIL|ERROR): ([A-Za-z0-9_.]+ \([A-Za-z0-9_.]+\))",
                                                 raw.decode(errors="replace"), re.MULTILINE),
                   "stderrSha256": hashlib.sha256(raw).hexdigest(), "stderrBytes": len(raw)}
+    if cleanup is not None:
+        diagnostic["cleanup"] = _selftest_cleanup_summary(cleanup)
     for filename, content in ((".selftest-diagnostic.json", json.dumps(diagnostic).encode()),
                               (".selftest-stderr.log", raw[:4 * 1024 * 1024])):
         fd = os.open(staging / filename, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
@@ -8170,23 +8387,36 @@ def prove_staging(host: Host, staging: Path) -> str | None:
         return "mesh runtime dependency closure failed"
     # ~60 s on an idle host; simulator/xcodebuild load from other sessions (load avg ~600 on
     # 2026-09-28) pushed it past 300 s, so every release was refused and fixes never landed.
-    env = selftest_env(scratch)
+    cleanup = {}
+    test, run_error = None, None
     leftovers = 0
     try:
+        env = selftest_env(scratch, cleanup=cleanup)
         try:
-            test = lifecycle.run([sys.executable, "-m", "unittest", "-q", *LANE_TESTS],
-                                  cwd=staging, capture_output=True, text=True, timeout=UPDATE_TEST_TIMEOUT_S,
-                                  env=env)
+            try:
+                test = lifecycle.run([sys.executable, "-m", "unittest", "-q", *LANE_TESTS],
+                                      cwd=staging, capture_output=True, text=True, timeout=UPDATE_TEST_TIMEOUT_S,
+                                      env=env)
+            except BaseException as error:
+                run_error = error
+                raise
         finally:
-            leftovers = reap_selftest_processes(env[SELFTEST_RUN_ENV])
+            leftovers = reap_selftest_processes(cleanup)
             if leftovers:
                 print(f"release self-test left {leftovers} process(es) running; stopped", file=sys.stderr)
-    except subprocess.TimeoutExpired as error:
-        retain_selftest_diagnostic(staging, error.stderr, None, timed_out=True, leftovers=leftovers)
-        return f"self-test timeout {UPDATE_TEST_TIMEOUT_S}s"
-    # Retain the original proof diagnostic privately; console truncation must not
-    # lose a failing selector or force repeated release attempts to diagnose it.
-    retain_selftest_diagnostic(staging, test.stderr, test.returncode, leftovers=leftovers)
+    except BaseException as error:
+        original = run_error or error
+        summary = _selftest_cleanup_summary(cleanup)
+        if summary["outcome"] == "pending":
+            _selftest_cleanup_failure(cleanup, error)
+        stderr = getattr(original, "stderr", test.stderr if test is not None else "")
+        retain_selftest_diagnostic(staging, stderr, test.returncode if test is not None else None,
+                                  timed_out=isinstance(original, subprocess.TimeoutExpired),
+                                  leftovers=leftovers, cleanup=cleanup)
+        if isinstance(error, subprocess.TimeoutExpired):
+            return f"self-test timeout {UPDATE_TEST_TIMEOUT_S}s"
+        raise  # a cleanup hold must never become test success, timeout retry, or idle
+    retain_selftest_diagnostic(staging, test.stderr, test.returncode, leftovers=leftovers, cleanup=cleanup)
     if test.returncode != 0:
         print(test.stderr[-2000:], file=sys.stderr)
         if not retry_failed_selectors(staging, test.stderr):
@@ -8226,20 +8456,39 @@ def retry_failed_selectors(staging: Path, stderr) -> bool:
         return False
     scratch = staging / ".selftest-retry-state"
     (scratch / "home").mkdir(parents=True, exist_ok=True)
-    env = selftest_env(scratch)
+    cleanup = {}
+    rerun, timeout, run_error, failure, passed = None, None, None, None, False
     try:
-        rerun = lifecycle.run([sys.executable, "-m", "unittest", "-q", *ids], cwd=staging, capture_output=True,
-                              text=True, timeout=SELFTEST_RETRY_TIMEOUT_S, env=env)
-        passed = rerun.returncode == 0
-    except subprocess.TimeoutExpired:
-        passed = False
-    finally:
-        reap_selftest_processes(env[SELFTEST_RUN_ENV])
+        env = selftest_env(scratch, cleanup=cleanup)
+        try:
+            try:
+                rerun = lifecycle.run([sys.executable, "-m", "unittest", "-q", *ids], cwd=staging,
+                                      capture_output=True, text=True, timeout=SELFTEST_RETRY_TIMEOUT_S, env=env)
+                passed = rerun.returncode == 0
+            except subprocess.TimeoutExpired as error:
+                timeout = error
+            except BaseException as error:
+                run_error = error
+                raise
+        finally:
+            reap_selftest_processes(cleanup)
+    except BaseException as error:
+        failure, passed = error, False
+        summary = _selftest_cleanup_summary(cleanup)
+        if summary["outcome"] == "pending":
+            _selftest_cleanup_failure(cleanup, error)
+    stderr = (timeout.stderr if timeout is not None else rerun.stderr if rerun is not None
+              else getattr(run_error or failure, "stderr", "")) or ""
+    raw = stderr if isinstance(stderr, bytes) else stderr.encode()
     receipt = {"schema": "jovie-lane-selftest-retry/v1", "selectors": ids, "passedOnRetry": passed,
-               "observedAt": now_iso()}
+               "observedAt": now_iso(), "returncode": rerun.returncode if rerun is not None else None,
+               "timedOut": timeout is not None, "stderrSha256": hashlib.sha256(raw).hexdigest(),
+               "stderrBytes": len(raw), "cleanup": _selftest_cleanup_summary(cleanup)}
     fd = os.open(staging / ".selftest-retry.json", os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
     with os.fdopen(fd, "w") as handle:
         handle.write(json.dumps(receipt))
+    if failure is not None:
+        raise failure
     print(f"release self-test retry: {len(ids)} selector(s) {'passed' if passed else 'failed again'}; "
           "see .selftest-retry.json", file=sys.stderr)
     return passed
