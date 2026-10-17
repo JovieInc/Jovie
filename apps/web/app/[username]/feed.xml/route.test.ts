@@ -46,6 +46,7 @@ describe('GET /[username]/feed.xml', () => {
       }
     );
     expect(missing.status).toBe(404);
+    expect(missing.headers.get('Cache-Control')).toBe('no-store');
 
     hoisted.getProfileByUsername.mockResolvedValueOnce({
       id: 'profile-1',
@@ -58,6 +59,7 @@ describe('GET /[username]/feed.xml', () => {
       { params: Promise.resolve({ username: 'realartist' }) }
     );
     expect(privateProfile.status).toBe(404);
+    expect(privateProfile.headers.get('Cache-Control')).toBe('no-store');
     expect(hoisted.getCachedPublicReleasesForProfile).not.toHaveBeenCalled();
   });
 
@@ -76,7 +78,31 @@ describe('GET /[username]/feed.xml', () => {
     });
 
     expect(res.status).toBe(200);
+    expect(res.headers.get('Cache-Control')).toBe('no-store');
     expect(res.headers.get('Content-Type')).toContain('application/rss+xml');
     expect(await res.text()).toContain('Real Artist — Releases');
+  });
+  it('withdraws a previously public feed and denies malformed publication without shared HTTP reuse', async () => {
+    const { GET, dynamic, revalidate } = await import('./route');
+    expect(dynamic).toBe('force-dynamic');
+    expect(revalidate).toBe(0);
+    hoisted.getCachedPublicReleasesForProfile.mockResolvedValue([]);
+    for (const isPublic of [true, false, 'false', null]) {
+      hoisted.getProfileByUsername.mockResolvedValue({
+        id: 'profile-1',
+        username: 'realartist',
+        displayName: 'Real Artist',
+        isPublic,
+      });
+      const response = await GET(
+        new Request('https://jov.ie/realartist/feed.xml'),
+        { params: Promise.resolve({ username: 'realartist' }) }
+      );
+      expect(response.status).toBe(isPublic === true ? 200 : 404);
+      expect(response.headers.get('Cache-Control')).toBe('no-store');
+      if (isPublic !== true)
+        expect(await response.text()).not.toContain('Real Artist');
+    }
+    expect(hoisted.getCachedPublicReleasesForProfile).toHaveBeenCalledTimes(1);
   });
 });

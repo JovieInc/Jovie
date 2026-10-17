@@ -1,9 +1,7 @@
 import 'server-only';
 
 import { and, eq } from 'drizzle-orm';
-import { unstable_cache } from 'next/cache';
 import { cache } from 'react';
-import { sanitizeCacheTags } from '@/lib/cache/tags';
 import { db } from '@/lib/db';
 // eslint-disable-next-line no-restricted-imports -- Schema barrel import needed for the contact type alias
 import type { CreatorContact as DbCreatorContact } from '@/lib/db/schema';
@@ -12,6 +10,7 @@ import { creatorPixels } from '@/lib/db/schema/pixels';
 import { checkBoolean } from '@/lib/entitlements/registry';
 import { calculateRequiredProfileCompletion } from '@/lib/profile/completion';
 import { mergeProfileTheme } from '@/lib/profile/profile-theme';
+import { isPublicProfilePublished } from '@/lib/profile/public-profile-access';
 import { getProfileWithLinks as getCreatorProfileWithLinks } from '@/lib/services/profile';
 import { isDspPlatform } from '@/lib/services/social-links/types';
 import { toISOStringSafe } from '@/lib/utils/date';
@@ -20,7 +19,6 @@ import { isReservedUsername } from '@/lib/validation/username-core';
 import type { CreatorProfile, LegacySocialLink } from '@/types/db';
 import type { PressPhoto } from '@/types/press-photos';
 import { mapProfileWithLinksToCreatorProfile } from './profile-mapper';
-import { shouldBypassPublicProfileQaCache } from './public-profile-qa';
 
 /**
  * Shape returned to every consumer of the public profile loader. Stable
@@ -135,18 +133,14 @@ const fetchProfileAndLinks = async (
   }
 
   try {
-    // The page-level unstable_cache is the canonical cache for public profile
-    // rendering. Bypass the profile service's Redis layer here because its
-    // Upstash fetch is `no-store`, which turns uncached ISR handles into
-    // static-to-dynamic runtime errors in production.
+    // Publication is authoritative on every request. Bypass Redis and do not
+    // let a previous public payload grant access after withdrawal or a failed
+    // invalidation. React.cache below only deduplicates within this request.
     const result = await getCreatorProfileWithLinks(username, {
       skipCache: true,
     });
 
-    // Use truthy check (not strict equality) for isPublic because the neon-http
-    // driver may return boolean columns as non-boolean truthy values (e.g., 1, "t")
-    // in edge cases — same class of issue as dates-as-strings (see JOVIE-WEB-6X).
-    if (!result?.isPublic) {
+    if (!result || !isPublicProfilePublished(result.isPublic)) {
       // Expected 404 — profile not found or not public. No Sentry capture needed;
       // these are normal from typos, crawlers, and enumeration traffic (JOV-1321).
       return {
@@ -172,9 +166,8 @@ const fetchProfileAndLinks = async (
     });
     const profile = {
       ...mappedProfile,
-      // Public profiles render through ISR. Accent extraction downloads remote
-      // avatar bytes and must happen during ingestion/profile saves, not inside
-      // the cached public render path.
+      // Accent extraction downloads remote avatar bytes and belongs in
+      // ingestion/profile saves rather than each anonymous render.
       theme: mergeProfileTheme(mappedProfile.theme, {}),
     };
 
@@ -247,84 +240,9 @@ const fetchProfileAndLinks = async (
   }
 };
 
-const PROFILE_SUCCESS_CACHE_TTL_SECONDS = 3600; // 1 hour
-
-class NonCacheableProfileResultError extends Error {
-  readonly result: PublicProfileLoaderResult;
-
-  constructor(result: PublicProfileLoaderResult) {
-    super(`Profile fetch returned non-cacheable status: ${result.status}`);
-    this.name = 'NonCacheableProfileResultError';
-    this.result = result;
-  }
-}
-
-/**
- * Cached profile fetcher. Only caches successful (status: 'ok') results.
- *
- * IMPORTANT: We intentionally do NOT use a negative cache (caching not_found
- * results). The previous negative cache pattern used thrown errors to signal
- * "don't cache this" to unstable_cache, but unstable_cache treats background
- * revalidation failures by serving the stale value — causing not_found
- * results to become permanently sticky even after the profile becomes
- * available.
- *
- * Instead, not_found and error results are always fetched fresh.
- */
-const getCachedProfileAndLinks = async (
-  username: string
-): Promise<PublicProfileLoaderResult> => {
-  // Skip Next.js cache in test/development environments
-  if (
-    process.env.NODE_ENV === 'test' ||
-    process.env.NODE_ENV === 'development' ||
-    shouldBypassPublicProfileQaCache()
-  ) {
-    return fetchProfileAndLinks(username);
-  }
-
-  // Single fetch path via unstable_cache. The cached function is the sole
-  // fetch path, eliminating the previous double-fetch on first visit.
-  try {
-    const cachedFetch = unstable_cache(
-      async () => {
-        const data = await fetchProfileAndLinks(username);
-        if (data.status !== 'ok') {
-          // Don't cache not_found or error results — throw to prevent
-          // stale success from being served on background revalidation.
-          // Carry the original payload through the throw path so callers
-          // do not need to re-read storage just to render a fresh non-ok
-          // response.
-          throw new NonCacheableProfileResultError(data);
-        }
-        return data;
-      },
-      [`public-profile-${username}`],
-      {
-        tags: sanitizeCacheTags(['profiles-all', `profile:${username}`]),
-        revalidate: PROFILE_SUCCESS_CACHE_TTL_SECONDS,
-      }
-    );
-    return await cachedFetch();
-  } catch (error) {
-    if (error instanceof NonCacheableProfileResultError) {
-      return error.result;
-    }
-
-    // Cache layer failure — fetch fresh
-    return fetchProfileAndLinks(username);
-  }
-};
-
-/**
- * Per-request memoized profile fetcher. Use this from server components and
- * `generateMetadata` so duplicate calls within the same request hit React's
- * `cache()` instead of the database.
- *
- * The username is normalized to lowercase here so callers don't have to.
- */
+/** Per-request deduplication only; no cross-request success can authorize itself. */
 export const getProfileAndLinks = cache(
   async (username: string): Promise<PublicProfileLoaderResult> => {
-    return getCachedProfileAndLinks(username.toLowerCase());
+    return fetchProfileAndLinks(username.toLowerCase());
   }
 );

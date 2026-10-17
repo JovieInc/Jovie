@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { PUBLIC_PROFILE_ELEMENTS } from '@/lib/profile/public-profile-elements';
 import { ProfileUpdateSchema } from './validation';
 
 describe('dashboard profile username updates', () => {
@@ -48,4 +49,17 @@ describe('owner searchability choice validation', () => {
       ).toBe(false);
     }
   );
+});
+
+describe('staged public element policy', () => {
+  it('does not accept a stored choice before all public readers enforce it', () => {
+    const fields = Object.fromEntries(
+      PUBLIC_PROFILE_ELEMENTS.map(key => [key, false])
+    );
+    expect(
+      ProfileUpdateSchema.safeParse({
+        settings: { public_fields: { version: 1, fields } },
+      }).success
+    ).toBe(false);
+  });
 });

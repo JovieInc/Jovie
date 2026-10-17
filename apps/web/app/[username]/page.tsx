@@ -4,9 +4,7 @@ import { Suspense } from 'react';
 import { loadPublicReleaseCredits } from '@/app/[username]/[slug]/_lib/data';
 import { isScreenCertSmartLinkProfileRequest } from '@/app/[username]/[slug]/_lib/screen-cert-fixture';
 
-// No `export const dynamic` here — the parent layout sets `revalidate: 3600`
-// (ISR). The public profile route must stay ISR-cacheable; avoid any Dynamic
-// API (cookies(), headers()) in this RSC tree.
+// The parent layout forces per-request rendering so cached public bodies cannot authorize access.
 
 import { AskJovieWidget } from '@/components/features/ask-jovie/AskJovieWidget';
 import type { ProfileMode } from '@/components/features/profile/contracts';
@@ -40,7 +38,7 @@ import {
 import { getEntityIdentityLinks } from '@/lib/entity/queries';
 import { env } from '@/lib/env-server';
 import { DEFAULT_PROFILE_PAC_ASSIGNMENT } from '@/lib/flags/profile-pac';
-// ISR-safe: profile-variant.ts does NOT import cookies() — no dynamic opt-in
+// profile-variant.ts does not read cookies; anonymous rendering avoids a viewer session lookup.
 import {
   getMerchMvpEnabled,
   getProfileAlertOptInVariant,
@@ -91,9 +89,7 @@ import {
   type PublicProfileLoaderResult,
 } from './_lib/public-profile-loader';
 
-// Profile loader (fetch + cache + per-request memo) lives in
-// _lib/public-profile-loader.ts so per-mode routes (plan PR 3a-2b) can
-// reuse it without duplicating the cache, error class, or TTL contract.
+// Per-mode routes share a fresh profile loader with per-request deduplication.
 
 /**
  * Pre-render featured artist profiles at build time to eliminate cold-start latency.
@@ -264,10 +260,10 @@ async function ArtistPageContent({
 }: Readonly<ArtistPageContentProps>) {
   const isPublicNoAuthSmoke = process.env.PUBLIC_NOAUTH_SMOKE === '1';
 
-  // IMPORTANT: Do NOT read cookies() here — it would opt this ISR route into
-  // dynamic rendering, defeating the revalidate: 3600 set in layout.tsx.
+  // Keep viewer-cookie reads out of this anonymous render. The fresh loader
+  // enforces current publication independently of the visitor session.
   // The jv_aid cookie is set by middleware on every request (analytics still
-  // work). The alertOptInVariant defaults to 'button' for ISR; ProfileCompactTemplate
+  // work). The alertOptInVariant defaults to 'button'; ProfileCompactTemplate
   // renders AnonCookieBootstrap which resolves the per-user variant client-side
   // via /api/profile/audience-anon-cookie and updates its own state.
   // Viewer geo reaches the client through the readable jv_country cookie the
@@ -398,9 +394,9 @@ async function ArtistPageContent({
     tourDatesPromise.catch(() => [] as TourDateViewModel[]),
     releasesPromise,
     merchCardsPromise,
-    // stableId is null for ISR renders — returns the default 'button' variant.
+    // Anonymous server renders use the default 'button' variant without a stableId.
     // AnonCookieBootstrap resolves the per-user variant on the client side.
-    // .catch ensures a Statsig outage doesn't fail the whole ISR page render.
+    // .catch keeps a Statsig outage from failing the anonymous page render.
     getProfileAlertOptInVariant(null).catch(() => 'button' as const),
     getProfilePacAssignment(null).catch(() => DEFAULT_PROFILE_PAC_ASSIGNMENT),
     entityLinksPromise.catch(() => []),

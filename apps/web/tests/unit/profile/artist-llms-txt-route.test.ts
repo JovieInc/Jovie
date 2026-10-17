@@ -127,6 +127,7 @@ describe('GET /{username}/llms.txt', () => {
       makeParams('djtest')
     );
     expect(res.headers.get('Content-Type')).toContain('text/plain');
+    expect(res.headers.get('Cache-Control')).toBe('no-store');
   });
 
   it('includes the canonical profile URL as the entity anchor', async () => {

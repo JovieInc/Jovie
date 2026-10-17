@@ -1,6 +1,7 @@
 import { ImageResponse } from 'next/og';
 import { sanitizeMetadataText } from '@/lib/profile/metadata';
 import { resolveOpaqueInternalProfileUsername } from '@/lib/profile/opaque-internal-profile-handle.server';
+import { isPublicProfilePublished } from '@/lib/profile/public-profile-access';
 import { withTimeout } from '@/lib/resilience/primitives';
 import { getProfileWithLinks } from '@/lib/services/profile';
 import { loadSatoshiFont, OG_SIZE } from '@/lib/share/image-utils';
@@ -38,7 +39,7 @@ async function resolvePublicProfile(username: string) {
   const profile = await getProfileWithLinks(canonicalUsername, {
     skipCache: true,
   });
-  return profile?.isPublic ? profile : null;
+  return profile && isPublicProfilePublished(profile.isPublic) ? profile : null;
 }
 
 export default async function Image({

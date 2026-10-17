@@ -6,7 +6,7 @@
  * - ok results map profile/links/contacts and inject venmo tipping links
  * - non-public profiles resolve to not_found
  * - storage failures resolve to error (never throw into the RSC render)
- * - the unstable_cache layer is bypassed under NODE_ENV=test / QA smoke
+ * - no cross-request cached body grants public access
  *
  * Related surface: public-profile-isr (docs/TEST_RISK_REGISTER.md, 75% target).
  */
@@ -425,7 +425,7 @@ describe('public profile loader behavior (JOV-5778)', () => {
       delete process.env.PUBLIC_NOAUTH_SMOKE;
     });
 
-    it('registers a per-username cache key with profile tags and a 1h revalidate', async () => {
+    it('keeps production profile authority outside cross-request caches', async () => {
       vi.stubEnv('NODE_ENV', 'production');
       delete process.env.PUBLIC_NOAUTH_SMOKE;
       getProfileWithLinksMock.mockResolvedValue(buildProfileWithLinks());
@@ -433,16 +433,13 @@ describe('public profile loader behavior (JOV-5778)', () => {
 
       await getProfileAndLinks('testartist');
 
-      expect(unstableCacheMock).toHaveBeenCalledWith(
-        ['public-profile-testartist'],
-        {
-          tags: ['profiles-all', 'profile:testartist'],
-          revalidate: 3600,
-        }
-      );
+      expect(unstableCacheMock).not.toHaveBeenCalled();
+      expect(getProfileWithLinksMock).toHaveBeenCalledWith('testartist', {
+        skipCache: true,
+      });
     });
 
-    it('does not cache non-ok results: the fetcher throws inside unstable_cache', async () => {
+    it('does not retain non-ok results between requests', async () => {
       vi.stubEnv('NODE_ENV', 'production');
       delete process.env.PUBLIC_NOAUTH_SMOKE;
       getProfileWithLinksMock.mockResolvedValue(

@@ -186,6 +186,7 @@ describe('GET /api/calendar/[eventId]', () => {
     });
 
     expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
     expect(response.headers.get('Content-Type')).toBe(
       'text/calendar; charset=utf-8'
     );
