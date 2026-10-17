@@ -731,15 +731,71 @@ describe('seven-day Sentry event observation', () => {
     )) {
       const params = new URL(`https://sentry.io${path}`).searchParams;
       expect(params.get('start')).toBe(START);
-      expect(params.getAll('environment')).toEqual([
-        'vercel-production',
-        'production',
-        'prd',
-      ]);
-      expect(params.has('query')).toBe(false);
+      expect(params.getAll('environment')).toEqual([]);
+      expect(params.get('query')).toBe(
+        'environment:[vercel-production,production,prd]'
+      );
       expect(params.has('statsPeriod')).toBe(false);
     }
   });
+
+  it('reads quiet history when an accepted production alias does not exist in Sentry', async () => {
+    const base = sentryPort();
+    const sentry = vi.fn(async path => {
+      if (!path.includes('/events/')) return base(path);
+      const params = new URL(`https://sentry.io${path}`).searchParams;
+      // Sentry resolves every environment parameter first. An absent name
+      // returns 200 [] before its paginator, so there is no Link header.
+      if (params.getAll('environment').includes('prd'))
+        return { ok: true, body: [] };
+      if (
+        params.get('query') !== 'environment:[vercel-production,production,prd]'
+      )
+        return { ok: false };
+      return { ok: true, body: [], link: link(false) };
+    });
+    const input = { plan: PLAN, sentry, facts: { contains: vi.fn() } };
+    expect(
+      await observeSentryHistory({
+        ...input,
+        now: new Date('2026-10-20T00:00:00Z'),
+      })
+    ).toEqual({
+      status: 'pending',
+      reason: 'full_observation_window_pending',
+      earliestCompletion: END,
+    });
+    expect(
+      await observeSentryHistory({ ...input, now: new Date(END) })
+    ).toEqual({
+      status: 'unknown',
+      reason: 'observation_coverage_unavailable',
+    });
+    expect(input.facts.contains).not.toHaveBeenCalled();
+  });
+
+  it.each(['vercel-production', 'production', 'prd'])(
+    'detects a descendant recurrence in the %s production alias',
+    async environment => {
+      const sentry = sentryPort([
+        { ...event(), tags: [{ key: 'environment', value: environment }] },
+      ]);
+      const facts = { contains: vi.fn(async () => true) };
+      expect(
+        await observeSentryHistory({
+          plan: PLAN,
+          now: new Date(END),
+          sentry,
+          facts,
+        })
+      ).toMatchObject({
+        status: 'fail',
+        source: 'JOVIE-WEB-XZ',
+        release: DESCENDANT,
+      });
+      expect(facts.contains).toHaveBeenCalledWith(BINDING, DESCENDANT);
+    }
+  );
 
   it('detects recurrence on later repair-containing production descendants', async () => {
     const sentry = sentryPort([event()]);
@@ -848,7 +904,11 @@ describe('seven-day Sentry event observation', () => {
         ? base(path)
         : path.includes('cursor=')
           ? { ok: true, body: [event()], link: link(false) }
-          : { ok: true, body: [], link: link(true) }
+          : {
+              ok: true,
+              body: [],
+              link: '<https://untrusted.invalid/other?query=environment:development>; rel="next"; results="true"; cursor="0:100:0"',
+            }
     );
     expect(
       await observeSentryHistory({
@@ -859,6 +919,21 @@ describe('seven-day Sentry event observation', () => {
       })
     ).toMatchObject({ status: 'fail' });
     expect(sentry.mock.calls[2][0]).toContain('cursor=0%3A100%3A0');
+    for (const [path] of sentry.mock.calls.filter(([path]) =>
+      path.includes('/events/')
+    )) {
+      expect(path.startsWith('/organizations/jovie/issues/1/events/?')).toBe(
+        true
+      );
+      const params = new URL(`https://sentry.io${path}`).searchParams;
+      expect(params.get('query')).toBe(
+        'environment:[vercel-production,production,prd]'
+      );
+      expect(params.has('environment')).toBe(false);
+      expect(params.get('start')).toBe(START);
+      expect(params.get('end')).toBe('2026-10-18T00:00:00.000Z');
+      expect(params.get('per_page')).toBe('100');
+    }
   });
 });
 
