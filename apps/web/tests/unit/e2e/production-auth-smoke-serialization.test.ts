@@ -18,7 +18,8 @@ describe('production auth smoke session contract', () => {
     );
     expect(source).toContain('navigationPath: APP_ROUTES.RELEASES');
     expect(source).toContain('readyPath: APP_ROUTES.LIBRARY');
-    expect(source).toContain("readyTestId: 'library-surface'");
+    expect(source).toContain("readyTestId: 'shell-releases-view'");
+    expect(source).not.toContain("readyTestId: 'library-surface'");
     expect(source).toContain("readyView: 'releases'");
     expect(source).toContain('await page.waitForURL(');
     expect(source.match(/await page.reload\(\{/gu)).toHaveLength(1);

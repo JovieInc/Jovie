@@ -144,16 +144,15 @@ describe('YouTube Jovie link inspect/apply', () => {
     const rolled = await apply('Directed by Ada.', {
       failReadback: true,
     });
-    expect(rolled.result).toMatchObject({
-      error: 'readback-mismatch',
-    });
-    expect(rolled.writer.writes.at(-1)).toBe('Directed by Ada.');
+    expect(rolled.result).toMatchObject({ error: 'rollback-conflict' });
+    expect(rolled.writer.writes).toHaveLength(1);
     const missingReadback = await apply('Directed by Ada.', {
       nullReadback: true,
     });
     expect(missingReadback.result).toMatchObject({
-      error: 'readback-mismatch',
+      error: 'rollback-conflict',
     });
+    expect(missingReadback.writer.writes).toHaveLength(1);
     const a = await apply('Need a link');
     const b = await apply('Need a link', {
       auth: { state: 'revoked' },

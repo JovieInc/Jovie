@@ -1,3 +1,5 @@
+import { hasCompilationProof } from './lesson-compilation-proof.mjs';
+
 export const LEARNING_RECEIPT_SCHEMA = 'jovie-rolling-ci-learning/v1';
 export const LEARNING_RECEIPT_MARKER = 'jovie-rolling-ci-learning';
 
@@ -7,7 +9,7 @@ const GUARDRAIL_DELIVERIES = new Set(['same-pr', 'linked-follow-up']);
 const ENVIRONMENT_INCIDENT_CLASSES = new Set(['runner', 'execution-path']);
 
 /** @typedef {{ repository: string, pr: number, head: string, check: string, fingerprint: string }} LearningIdentity */
-/** @typedef {{ schema: string, identity: LearningIdentity, failureKind: string, rootCauseClass: string, currentHeadReproduction: { reproduced: boolean, head: string, evidence: string }, minimalRepair: string, equivalentSurfaceSweep: { surfaces: string[], outcome: string }, deliberateRedRegression: { fixture: string, failsBeforeRepair: boolean, passesAfterRepair: boolean }, guardrailDecision: { warranted: boolean, reason: string, delivery?: string, followUpIssue?: string }, environmentRemediation?: { incidentClass?: string, executionPathClassifier?: string, runnerFix?: string }, antiRuleSprawlReason?: string, exactHeadGreen: boolean }} LearningReceipt */
+/** @typedef {{ compilation?: object, schema: string, identity: LearningIdentity, failureKind: string, rootCauseClass: string, currentHeadReproduction: { reproduced: boolean, head: string, evidence: string }, minimalRepair: string, equivalentSurfaceSweep: { surfaces: string[], outcome: string }, deliberateRedRegression: { fixture: string, failsBeforeRepair: boolean, passesAfterRepair: boolean }, guardrailDecision: { warranted: boolean, reason: string, delivery?: string, followUpIssue?: string }, environmentRemediation?: { incidentClass?: string, executionPathClassifier?: string, runnerFix?: string }, antiRuleSprawlReason?: string, exactHeadGreen: boolean }} LearningReceipt */
 /** @typedef {{ repository: string, pr: number, check: string, fingerprint: string, status: string, repairedHead: string }} RepairedFailure */
 /** @typedef {{ repairedFailures?: RepairedFailure[], receipts?: LearningReceipt[], comments?: Array<string | LearningReceipt>, liveHead?: string }} LearningPromotionInput */
 
@@ -69,6 +71,8 @@ export function collectLearningReceipts(bodies = []) {
 export function validateLearningReceipt(receipt, options = {}) {
   const liveHead = options.liveHead;
   const errors = [];
+  if (receipt?.compilation && !hasCompilationProof(receipt))
+    errors.push('compilation requires independently executed artifact replay');
   if (receipt?.schema !== LEARNING_RECEIPT_SCHEMA)
     errors.push('invalid learning receipt schema');
   if (!validIdentity(receipt?.identity))

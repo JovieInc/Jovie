@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  admitReleaseBase,
   classifyProducerCoalescence,
   classifyProductionMarkerEvidence,
   normalizeProductionJobs,
@@ -66,6 +67,16 @@ interface MarkerJobStep {
 }
 type MarkerJob = ReturnType<typeof job> & { steps?: MarkerJobStep[] };
 
+// The verified-generation artifact stores this. The classifier does not read
+// terminalReason; admissibility comes from the attempt jobs and descendant proof.
+type VerifiedGenerationPayload = {
+  sha: string;
+  deploymentId: string;
+  controllerRun: string;
+  controllerAttempt: string;
+  terminalReason?: 'promoted' | 'skipped_superseded' | 'not_applicable';
+};
+
 function earlyCoalescedJobs() {
   return [
     job('Coalesce release wave', 1, 'completed', 'success'),
@@ -91,6 +102,12 @@ function primaryMarker(
     'skipped'
   )
 ) {
+  const payload: VerifiedGenerationPayload = {
+    sha,
+    deploymentId: 'dpl_primary123',
+    controllerRun: String(controllerRun),
+    controllerAttempt: '1',
+  };
   return {
     artifact: {
       id: 11,
@@ -98,12 +115,7 @@ function primaryMarker(
       expired: false,
       workflowRunId: controllerRun,
     },
-    payload: {
-      sha,
-      deploymentId: 'dpl_primary123',
-      controllerRun: String(controllerRun),
-      controllerAttempt: '1',
-    },
+    payload,
     attemptRun: run(1, status, conclusion),
     attemptJobs: [
       job(
@@ -182,6 +194,8 @@ describe('production marker attempt state', () => {
   ])(
     'executes the production reader CLI with %s retry evidence',
     async failureMode => {
+      const previousForceTty = process.env.GH_FORCE_TTY;
+      process.env.GH_FORCE_TTY = '1';
       const marker = normalRerunMarker();
       if (failureMode === 'pending') {
         marker.attemptRun.status = 'in_progress';
@@ -274,6 +288,15 @@ describe('production marker attempt state', () => {
           expect(
             calls.filter(call => call.includes('/artifacts?'))
           ).toHaveLength(6);
+          const zipCalls = processRunner.mock.calls.filter(
+            call =>
+              call[0] === 'gh' && String(call[1]?.[1] ?? '').endsWith('/zip')
+          );
+          expect(zipCalls.length).toBeGreaterThan(0);
+          for (const call of zipCalls) {
+            expect(call[2]?.env?.GH_FORCE_TTY).toBeUndefined();
+            expect(typeof call[2]?.stdio?.[1]).toBe('number');
+          }
         }
         expect(
           calls.every(
@@ -285,6 +308,8 @@ describe('production marker attempt state', () => {
           calls.some(call => /--method| -X |enqueue|\/statuses/.test(call))
         ).toBe(false);
       } finally {
+        if (previousForceTty === undefined) delete process.env.GH_FORCE_TTY;
+        else process.env.GH_FORCE_TTY = previousForceTty;
         process.argv = argv;
         output.mockRestore();
         processRunner.mockReset();
@@ -636,6 +661,103 @@ describe('production marker attempt state', () => {
         )
       ).toMatchObject({ state: 'manual', reason: 'invalid_context' });
     }
+  });
+
+  it('keeps a promoted-then-superseded generation verified on its descendant controller head', () => {
+    const head = 'b'.repeat(40);
+    const marker = primaryMarker('completed', 'success');
+    marker.attemptRun.head_sha = head;
+    for (const attemptJob of marker.attemptJobs) attemptJob.head_sha = head;
+    marker.payload.terminalReason = 'skipped_superseded';
+
+    expect(
+      classifyProductionMarkerEvidence(
+        evidence({
+          markers: [marker],
+          descendantHeads: [head],
+          recoveryArtifacts: [],
+        })
+      )
+    ).toMatchObject({
+      state: 'verified',
+      reason: 'exact_attempt_verified',
+      controllerAttempt: 1,
+      deploymentId: 'dpl_primary123',
+    });
+  });
+
+  it('prints the classifier reason when a deployed marker cannot be a release base', () => {
+    const deployed = sha;
+    const release = 'b'.repeat(40);
+    expect(
+      admitReleaseBase(
+        {
+          state: 'manual',
+          reason: 'evidence_api_error',
+          detail: 'refusing to output binary content\n(application/zip)',
+        },
+        deployed,
+        release
+      )
+    ).toEqual({
+      ok: false,
+      errors: [
+        'Canonical production marker state is not admissible as a release base (manual: evidence_api_error).',
+        'refusing to output binary content (application/zip)',
+      ],
+    });
+    expect(
+      admitReleaseBase(
+        {
+          state: 'manual',
+          reason: 'duplicate_primary_marker',
+          detail: 'duplicate_primary_marker',
+        },
+        deployed,
+        release
+      ).errors
+    ).toEqual([
+      'Canonical production marker state is not admissible as a release base (manual: duplicate_primary_marker).',
+    ]);
+    expect(
+      admitReleaseBase(
+        {
+          state: 'verified',
+          reason: 'exact_attempt_verified',
+          deploymentId: 'dpl_primary123',
+        },
+        deployed,
+        release
+      )
+    ).toEqual({ ok: true, errors: [] });
+    expect(
+      admitReleaseBase(
+        {
+          state: 'verified',
+          reason: 'exact_attempt_verified',
+          deploymentId: 'not-applicable',
+        },
+        deployed,
+        release
+      ).ok
+    ).toBe(false);
+    expect(
+      admitReleaseBase(
+        { state: 'none', reason: 'no_marker' },
+        deployed,
+        deployed
+      ).ok
+    ).toBe(false);
+    expect(
+      admitReleaseBase(
+        { state: 'none', reason: 'no_marker' },
+        deployed,
+        release
+      )
+    ).toMatchObject({
+      ok: true,
+      warning: expect.stringContaining(deployed),
+    });
   });
 
   describe('post-verification publication failure (JOV-7724)', () => {

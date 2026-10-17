@@ -1,6 +1,6 @@
-import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { getSessionContext } from '@/lib/auth/session';
+import { ownedConversationCondition } from '@/lib/chat/conversation-access';
 import { getCreatorConversationDetail } from '@/lib/chat/conversation-queries';
 import {
   sanitizeConversationTitle,
@@ -30,7 +30,7 @@ interface RouteParams {
 export async function GET(req: Request, { params }: RouteParams) {
   try {
     const { id } = await params;
-    const { profile } = await getSessionContext({ requireProfile: true });
+    const { user, profile } = await getSessionContext({ requireProfile: true });
 
     if (!profile) {
       return NextResponse.json(
@@ -52,7 +52,9 @@ export async function GET(req: Request, { params }: RouteParams) {
     try {
       detail = await getCreatorConversationDetail({
         conversationId: id,
+        userId: user.id,
         creatorProfileId: profile.id,
+        audience: 'customer',
         limit,
         before,
       });
@@ -124,7 +126,7 @@ export async function GET(req: Request, { params }: RouteParams) {
 export async function PATCH(req: Request, { params }: RouteParams) {
   try {
     const { id } = await params;
-    const { profile } = await getSessionContext({ requireProfile: true });
+    const { user, profile } = await getSessionContext({ requireProfile: true });
 
     if (!profile) {
       return NextResponse.json(
@@ -154,10 +156,12 @@ export async function PATCH(req: Request, { params }: RouteParams) {
         updatedAt: new Date(),
       })
       .where(
-        and(
-          eq(chatConversations.id, id),
-          eq(chatConversations.creatorProfileId, profile.id)
-        )
+        ownedConversationCondition({
+          conversationId: id,
+          userId: user.id,
+          creatorProfileId: profile.id,
+          audience: 'customer',
+        })
       )
       .returning();
 
@@ -204,7 +208,7 @@ export async function PATCH(req: Request, { params }: RouteParams) {
 export async function DELETE(_req: Request, { params }: RouteParams) {
   try {
     const { id } = await params;
-    const { profile } = await getSessionContext({ requireProfile: true });
+    const { user, profile } = await getSessionContext({ requireProfile: true });
 
     if (!profile) {
       return NextResponse.json(
@@ -217,10 +221,12 @@ export async function DELETE(_req: Request, { params }: RouteParams) {
     const [deleted] = await db
       .delete(chatConversations)
       .where(
-        and(
-          eq(chatConversations.id, id),
-          eq(chatConversations.creatorProfileId, profile.id)
-        )
+        ownedConversationCondition({
+          conversationId: id,
+          userId: user.id,
+          creatorProfileId: profile.id,
+          audience: 'customer',
+        })
       )
       .returning({ id: chatConversations.id });
 

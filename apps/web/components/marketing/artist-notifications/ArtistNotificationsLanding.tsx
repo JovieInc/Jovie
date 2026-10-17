@@ -27,7 +27,7 @@ export function ArtistNotificationsLanding({
     <MarketingPageShell
       penContractId={MARKETING_PEN_CONTRACT_IDS.recipe.feature}
     >
-      <main className='overflow-hidden bg-black dark:bg-black text-primary-token'>
+      <div className='overflow-hidden bg-black dark:bg-black text-primary-token'>
         <div data-testid={ARTIST_NOTIFICATIONS_SECTION_TEST_IDS.hero}>
           <ArtistNotificationsHero hero={copy.hero} />
         </div>
@@ -48,6 +48,9 @@ export function ArtistNotificationsLanding({
           <ArtistProfileReactivationSection
             notification={copy.capture.notification}
             reactivation={copy.reactivation}
+            sectionId='feature-split'
+            sectionVariant='editorial'
+            sectionOwner='apps/web/components/marketing/artist-profile/ArtistProfileReactivationSection.tsx'
           />
         </div>
 
@@ -59,6 +62,9 @@ export function ArtistNotificationsLanding({
           <ArtistProfileSpecWall
             specWall={copy.specWall}
             tiles={ARTIST_NOTIFICATIONS_SPEC_TILES}
+            sectionId='spec-wall'
+            sectionVariant='5-screenshot-bento'
+            sectionOwner='apps/web/components/marketing/artist-profile/ArtistProfileSpecWall.tsx'
           />
         </div>
 
@@ -72,7 +78,7 @@ export function ArtistNotificationsLanding({
             ctaHref={copy.finalCta.ctaHref}
           />
         </div>
-      </main>
+      </div>
     </MarketingPageShell>
   );
 }

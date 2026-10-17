@@ -73,7 +73,10 @@ runs:
           [[ -d "$producer_root" && ! -L "$producer_root" ]]
           [[ "$(realpath "$producer_root")" == "$producer_root" ]]
           [[ ! -e "$producer_root/pending" && ! -L "$producer_root/pending" ]]
-          [[ ! -e "$producer_root/blocked" && ! -L "$producer_root/blocked" ]]
+          if [[ -e "$producer_root/blocked" || -L "$producer_root/blocked" ]]; then
+            echo "Refusing upload: the Playwright producer stage is blocked after an unsafe artifact finding."
+            exit 1
+          fi
           [[ -f "$producer_root/current" && ! -L "$producer_root/current" ]]
           IFS='|' read -r current_binding stage_name extra < "$producer_root/current"
           [[ "$current_binding" == "${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}:${GITHUB_JOB}" ]]

@@ -211,15 +211,15 @@ struct DashboardView: View {
 
   @ViewBuilder
   private func appleWalletControl(response: MobileMeResponse) -> some View {
+    let capabilityEnabled = DistributionPushWalletCapability.isEnabled()
     let availability = AppleWalletControlAvailability(
       serverAvailable: response.appleWalletProfilePassAvailable,
-      deviceCanAddPasses: PKAddPassesViewController.canAddPasses()
+      deviceCanAddPasses: capabilityEnabled && PKAddPassesViewController.canAddPasses(),
+      distributionCapabilityEnabled: capabilityEnabled
     )
 
-    if availability == .serverUnavailable {
-      walletStatus("Apple Wallet isn't available for this profile yet.")
-    } else if availability == .deviceUnsupported {
-      walletStatus("Apple Wallet isn't available on this device.")
+    if let message = availability.statusMessage {
+      walletStatus(message)
     } else if appleWalletFlowState == .installed {
       walletStatus("Added to Apple Wallet")
     } else {
@@ -270,6 +270,9 @@ struct DashboardView: View {
   }
 
   private func addAppleWalletPass() async {
+    // PassKit add/contains calls without the Wallet entitlement report the
+    // pass as missing and leave the button in a retry loop.
+    guard DistributionPushWalletCapability.isEnabled() else { return }
     guard appleWalletFlowState.beginRequest() else { return }
 
     do {

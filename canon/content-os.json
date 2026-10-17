@@ -1,0 +1,24 @@
+{
+  "schema": "jovie-content-canon/v1",
+  "character": {
+    "id": "character:tim-white",
+    "name": "Tim White",
+    "identity": {
+      "immutable": true,
+      "source": "https://github.com/JovieInc/Ops/blob/e637f0bde4eb533588f279a9bd5e5b4addd4c3f6/01-canon/02-tim-white.md"
+    },
+    "voice": "canon/VOICE.md#registers",
+    "register": "founder-tim",
+    "wardrobe": {
+      "collectionRef": "character:tim-white/wardrobe",
+      "maxOutfits": 7,
+      "rule": "Only reference approved outfits from the global collection; never invent wardrobe or biographical facts."
+    }
+  },
+  "continuity": {
+    "characterRef": "character:tim-white",
+    "locationRefs": [],
+    "propRefs": [],
+    "sequenceState": null
+  }
+}

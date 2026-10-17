@@ -9,7 +9,7 @@ const impersonationState: ImpersonationState = {
   enabled: true,
   isImpersonating: true,
   effectiveUserId: '11111111-1111-4111-8111-111111111111',
-  realAdminUserId: '22222222-2222-4222-8222-222222222222',
+  actorUserId: '22222222-2222-4222-8222-222222222222',
   timeRemainingMs: 125_000,
   timeRemainingMinutes: 2,
   expiresAt: Date.now() + 125_000,

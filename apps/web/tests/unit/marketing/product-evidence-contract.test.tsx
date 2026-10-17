@@ -249,8 +249,8 @@ describe('product-evidence contract (JOV-6917)', () => {
           : binding.proposalId
       )
     ).toEqual(['hero', 'how-it-works', 'cta']);
-    // This proves local source semantics, not native save/visual acceptance.
-    expect(entry.bindingEvidence.status).toBe('unverified');
+    // Mounted section stamps are declared. Native save proof remains separate.
+    expect(entry.bindingEvidence.status).toBe('verified');
   });
 
   it('fails the declaration gate for a product route with no evidence (deliberate red)', () => {

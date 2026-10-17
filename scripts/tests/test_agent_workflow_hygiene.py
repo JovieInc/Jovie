@@ -1025,9 +1025,10 @@ def test_deep_lanes_are_event_driven_and_bounded() -> None:
 
 
 def test_full_matrix_supersedes_stale_runs_cleanly() -> None:
-    """Main pushes outpace the serial matrix; only the freshest run should
-    survive, and supersession must be a workflow-level cancellation rather
-    than an external mid-test runner kill (JOV-7167, JOV-7569)."""
+    """Main pushes outpace the matrix. The in-progress run must finish and
+    report a real conclusion. GitHub keeps a single pending successor.
+    Path filters stay off so an external sweep cannot kill a non-member
+    mid-test (JOV-7167, JOV-7569). No cron: the lane stays evidence-driven."""
     workflow = (WORKFLOWS / "e2e-full-matrix.yml").read_text(encoding="utf-8")
 
     triggers = workflow.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
@@ -1038,9 +1039,11 @@ def test_full_matrix_supersedes_stale_runs_cleanly() -> None:
         "\njobs:\n", 1
     )[0]
     assert "paths:" not in push_trigger
+    assert "schedule:" not in triggers
     assert "group: e2e-full-matrix-" in concurrency
     assert "github.event_name" in concurrency
-    assert "cancel-in-progress: true" in concurrency
+    assert "cancel-in-progress: false" in concurrency
+    assert "cancel-in-progress: true" not in concurrency
 
 
 def test_nightly_unit_suite_fetches_storybook_provenance_history() -> None:
@@ -1502,11 +1505,16 @@ def test_triage_catch_up_uses_trusted_main_and_preserves_wake_receipts() -> None
     )[0]
     assert "steps.debounce" not in catch_up
     assert (
-        "timeout 90s node scripts/backlog-orchestrator/triage-event-assess.mjs"
+        "timeout 300s node scripts/backlog-orchestrator/triage-event-assess.mjs"
         in catch_up
     )
     assert '--sweep > "$RECEIPT_FILE"' in catch_up
     assert "summer-bottleneck-signing.env" in catch_up
+    # Guarded preparation gets a complete step window without increasing either job budget.
+    assert "timeout-minutes: 8" in block
+    exact_event = _job_block("fleet-gate-refresh.yml", "assess")
+    assert "timeout-minutes: 5" in exact_event
+    assert "timeout 180s node scripts/backlog-orchestrator/triage-event-assess.mjs" in exact_event
     receipt = block.split("- name: Preserve Triage catch-up receipt", 1)[1]
     assert "if: always()" in receipt
     assert (

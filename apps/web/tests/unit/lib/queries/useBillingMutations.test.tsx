@@ -106,7 +106,7 @@ describe('useCheckoutMutation', () => {
       expect.objectContaining({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ priceId: 'price_123' }),
+        body: JSON.stringify({ priceId: 'price_123', humanConfirmed: true }),
       })
     );
   });

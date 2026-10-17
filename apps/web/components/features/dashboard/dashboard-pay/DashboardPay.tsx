@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import {
   Dialog,
@@ -35,7 +36,6 @@ import { BASE_URL } from '@/constants/domains';
 import { CopyToClipboardButton } from '@/features/dashboard/molecules/CopyToClipboardButton';
 import { EarningsTab } from '@/features/dashboard/organisms/EarningsTab';
 import { ShopifyStoreCard } from '@/features/dashboard/organisms/shopify/ShopifyStoreCard';
-import { cn } from '@/lib/utils';
 import { useDashboardPay } from './useDashboardPay';
 import { formatCount } from './utils';
 
@@ -46,60 +46,6 @@ import { formatCount } from './utils';
 // =============================================================================
 // Sub-components
 // =============================================================================
-
-interface StatCardProps {
-  readonly label: string;
-  readonly value: number;
-  readonly description: string;
-  readonly icon: React.ComponentType<{ className?: string }>;
-  readonly iconChipClassName: string;
-  readonly iconClassName: string;
-  readonly bordered?: boolean;
-}
-
-const StatCard = memo(function StatCard({
-  label,
-  value,
-  description,
-  icon: Icon,
-  iconChipClassName,
-  iconClassName,
-  bordered = true,
-}: StatCardProps) {
-  return (
-    <ContentSurfaceCard
-      className={cn(
-        'p-3.5 sm:p-4',
-        !bordered && 'border-0 bg-transparent shadow-none',
-        bordered && 'overflow-hidden'
-      )}
-      aria-label={`${label} metric`}
-    >
-      <dl className='flex h-full flex-col'>
-        <div className='flex items-center gap-2'>
-          <div
-            className={cn(
-              'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg',
-              iconChipClassName
-            )}
-            aria-hidden='true'
-          >
-            <Icon className={cn('h-3.5 w-3.5', iconClassName)} />
-          </div>
-          <dt className='text-app font-caption text-secondary-token'>
-            {label}
-          </dt>
-        </div>
-        <dd className='mt-2 text-2xl font-semibold tabular-nums leading-none tracking-[-0.011em] text-primary-token sm:text-3xl'>
-          {formatCount(value)}
-        </dd>
-        <dd className='mt-1.5 text-2xs leading-4 text-tertiary-token sm:text-app'>
-          {description}
-        </dd>
-      </dl>
-    </ContentSurfaceCard>
-  );
-});
 
 // -----------------------------------------------------------------------------
 
@@ -475,32 +421,38 @@ export function DashboardPay() {
               <ContentSurfaceCard className='overflow-hidden p-0'>
                 <div className='grid grid-cols-1 gap-0 sm:grid-cols-[minmax(0,1fr)_320px]'>
                   <div className='grid grid-cols-2 gap-0 [&>*]:border-b [&>*]:border-[color-mix(in_oklab,var(--app-shell-border)_72%,transparent)] sm:grid-cols-3 sm:[&>*]:border-b-0 sm:[&>*]:border-r sm:[&>*:last-child]:border-r-0'>
-                    <StatCard
+                    <ContentMetricCard
+                      as='section'
+                      layout='icon-chip'
+                      appearance='plain'
                       label='QR Scans'
-                      value={qrTipClicks}
-                      description='Fans who scanned your QR'
+                      aria-label='QR Scans Metric'
+                      value={formatCount(qrTipClicks)}
+                      subtitle='Fans who scanned your QR'
                       icon={ScanLine}
-                      iconChipClassName='border border-subtle bg-surface-1'
-                      iconClassName='text-success'
-                      bordered={false}
+                      tone='success'
                     />
-                    <StatCard
+                    <ContentMetricCard
+                      as='section'
+                      layout='icon-chip'
+                      appearance='plain'
                       label='Link Clicks'
-                      value={linkTipClicks}
-                      description='Fans who clicked your link'
+                      aria-label='Link Clicks Metric'
+                      value={formatCount(linkTipClicks)}
+                      subtitle='Fans who clicked your link'
                       icon={MousePointerClick}
-                      iconChipClassName='border border-subtle bg-surface-1'
-                      iconClassName='text-info'
-                      bordered={false}
+                      tone='info'
                     />
-                    <StatCard
+                    <ContentMetricCard
+                      as='section'
+                      layout='icon-chip'
+                      appearance='plain'
                       label='Total Visits'
-                      value={tipClicks}
-                      description='QR + link combined'
+                      aria-label='Total Visits Metric'
+                      value={formatCount(tipClicks)}
+                      subtitle='QR + link combined'
                       icon={BarChart3}
-                      iconChipClassName='border border-subtle bg-surface-1'
-                      iconClassName='text-accent'
-                      bordered={false}
+                      tone='accent'
                     />
                   </div>
                   <div className='border-t border-[color-mix(in_oklab,var(--app-shell-border)_72%,transparent)] px-4 py-4 sm:border-l sm:border-t-0 sm:px-5'>

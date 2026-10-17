@@ -1,0 +1,84 @@
+{
+  "issue": "JOV-7878",
+  "runtime": "local Chromium / Storybook fixtures on Linux",
+  "sourceBaseCommit": "292063d67befedb9e0fb0ea8bf57dd3b4ba071bb",
+  "sourceSha256": {
+    "apps/web/components/features/dashboard/dashboard-nav/DashboardNav.tsx": "1e0412dbb2f8711cca8d91a24b66fc8ed5ba37af272c1fde7565d810cc06cbbc",
+    "apps/web/components/organisms/OperatorListsNav.tsx": "013c647746f38d9ef35d5e3c98d7f4ef1acf413c8d55327e46757b857e2b0a64",
+    "apps/web/components/organisms/UnifiedSidebar.stories.tsx": "a4a8a6bf75fe5a19170585e9b8e959fcddf4c406d44b6d2937697be8601df47b",
+    "apps/web/components/shell/SidebarThreadsSection.tsx": "a16f0ab43b1f9a2bfbf55ec9dd9b0c358ac0ddd174564fdbff8c4f77907f464b",
+    "apps/web/tests/e2e/storybook-canonical-sidebar.spec.ts": "b3cf1f2451beb4b2c4151faa8ca975075deb6b5f6dd7371469cde32e2e9d2140"
+  },
+  "command": "STORYBOOK_BASE_URL=http://localhost:6006 pnpm --filter @jovie/web exec playwright test --config=playwright.config.storybook.ts tests/e2e/storybook-canonical-sidebar.spec.ts --workers=1 --reporter=line",
+  "result": "16 passed (3.1m)",
+  "animatedCyclesPerProductAndTheme": 10,
+  "authenticatedCreatorDataCertified": false,
+  "packagedMacBuildCertified": false,
+  "nativeIOSBuildCertified": false,
+  "productionBuildCertified": false,
+  "captures": [
+    {
+      "file": "composed-empty-history-dark-expanded.png",
+      "width": 1126,
+      "height": 798,
+      "sha256": "9d838736b371967f9ba682c658cd19d8e19f3134b1609c816ecbe06b6424afa6",
+      "capturedAt": "2026-10-15T04:12:16.056991+00:00"
+    },
+    {
+      "file": "composed-empty-history-light-expanded.png",
+      "width": 1126,
+      "height": 798,
+      "sha256": "6c78d23a023c42bd68efbc0aa4b198ea3f77e09371cb05ab542f1f4fc8d043b7",
+      "capturedAt": "2026-10-15T04:12:22.961942+00:00"
+    },
+    {
+      "file": "composed-history-dark-compact.png",
+      "width": 1126,
+      "height": 798,
+      "sha256": "c92ba99f1adea4a76c9ae53385b8702ef8fe31542af8876ddec923cc9e33f37b",
+      "capturedAt": "2026-10-15T04:12:02.055998+00:00"
+    },
+    {
+      "file": "composed-history-dark-expanded.png",
+      "width": 1126,
+      "height": 798,
+      "sha256": "2128546d1e12f052b86b8a2f0fe5f5398142c814124e40194dd8d639f1209295",
+      "capturedAt": "2026-10-15T04:12:01.455911+00:00"
+    },
+    {
+      "file": "composed-history-dark-preview.png",
+      "width": 1126,
+      "height": 798,
+      "sha256": "cd614b50f8008c6fd2c7fd5ef0afc6845223bf5ca6b9302f1af713e6680cffb8",
+      "capturedAt": "2026-10-15T04:12:05.251461+00:00"
+    },
+    {
+      "file": "composed-history-light-compact.png",
+      "width": 1126,
+      "height": 798,
+      "sha256": "5c4cc8e19c65dbda5658a78bfddc827fd6b092c5842a09b486c260537a189a64",
+      "capturedAt": "2026-10-15T04:12:09.720100+00:00"
+    },
+    {
+      "file": "composed-history-light-expanded.png",
+      "width": 1126,
+      "height": 798,
+      "sha256": "1895edbd493dab9ffad819b2d057040ca73e7ab7ff03e965d2f796ac46cf1e50",
+      "capturedAt": "2026-10-15T04:12:09.439060+00:00"
+    },
+    {
+      "file": "composed-history-light-preview.png",
+      "width": 1126,
+      "height": 798,
+      "sha256": "29f98141a38ffed737d0e93b13ef2ed1d4e2a3efa2e1884b92619fbfb27c600a",
+      "capturedAt": "2026-10-15T04:12:12.874546+00:00"
+    },
+    {
+      "file": "mobile-history-short.png",
+      "width": 390,
+      "height": 568,
+      "sha256": "c95580f77a8b3c9575979d17e7be83419bbf141ac74dd3015fe7d32cc00e43b9",
+      "capturedAt": "2026-10-15T04:12:29.152777+00:00"
+    }
+  ]
+}

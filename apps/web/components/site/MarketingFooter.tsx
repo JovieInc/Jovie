@@ -38,7 +38,6 @@ import { MarketingFooterCta } from './MarketingFooterCta';
 // route. Its own ArtistProfileFinalCta still owns the page's single footer
 // CTA (see PAGE_OWNS_FINAL_CTA_PATHS below).
 const MINIMAL_FOOTER_PATHS = new Set<string>([
-  APP_ROUTES.PRICING,
   APP_ROUTES.ARTIST_PROFILE_LEGACY,
   APP_ROUTES.LEGAL_PRIVACY,
   APP_ROUTES.LEGAL_TERMS,
@@ -56,6 +55,7 @@ const PAGE_OWNS_FINAL_CTA_PATHS = new Set<string>([
   APP_ROUTES.CARD,
   APP_ROUTES.ABOUT,
   APP_ROUTES.AI,
+  APP_ROUTES.PRICING,
   APP_ROUTES.PRODUCT,
   // Renders its own MarketingFooterCta with route-specific copy — see
   // isEditorialFooterCtaPath for the blog/changelog-release/engineering

@@ -70,6 +70,19 @@ function publishReport(
     gh = args =>
       execFileSync('gh', args, { cwd, env, encoding: 'utf8' }).trim(),
     now = Date.now(),
+    recordOrigin = (pr, head) =>
+      execFileSync(
+        'python3',
+        [
+          new URL('../shipping_origin.py', import.meta.url).pathname,
+          'emit-automation',
+          '--pr',
+          pr,
+          '--head-sha',
+          head,
+        ],
+        { cwd, env, encoding: 'utf8', timeout: 60000 }
+      ),
   } = {},
   profile = COVERAGE
 ) {
@@ -140,7 +153,33 @@ function publishReport(
   git('add', '--', ...profile.files);
   git('commit', '-m', profile.title, '-m', `Measured source: ${source}`);
   gh(['auth', 'setup-git', '--hostname', 'github.com']);
-  git('push', 'origin', `HEAD:refs/heads/${branch}`);
+  for (let attempt = 1; ; attempt++) {
+    try {
+      git('push', 'origin', `HEAD:refs/heads/${branch}`);
+      break;
+    } catch (error) {
+      const stderr =
+        error && typeof error === 'object' && 'stderr' in error
+          ? String(error.stderr)
+          : '';
+      // GitHub can time out checking workflow permissions on a report-only
+      // push. Retry that check on the same commit, never a permission denial.
+      if (
+        attempt >= 3 ||
+        !stderr.includes(
+          'Unable to determine if workflow can be created or updated due to timeout'
+        )
+      ) {
+        throw error;
+      }
+      Atomics.wait(
+        new Int32Array(new SharedArrayBuffer(4)),
+        0,
+        0,
+        attempt * 1000
+      );
+    }
+  }
 
   const bodyDir = mkdtempSync(join(tmpdir(), 'coverage-report-'));
   try {
@@ -170,6 +209,7 @@ function publishReport(
     if (!url.startsWith(`https://github.com/${repo}/pull/`)) {
       throw new Error('Coverage report PR creation returned no receipt');
     }
+    recordOrigin(url, git('rev-parse', 'HEAD'));
     const retired = retireGeneratedReports({
       gh,
       repo,

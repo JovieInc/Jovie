@@ -37,7 +37,7 @@ export const OverflowMenuTrigger = React.forwardRef<
       ref={ref}
       type='button'
       aria-label={
-        ariaLabel ??
+        ariaLabel?.trim() ||
         (hasActiveOverflow ? 'More tabs, current tab hidden' : 'More tabs')
       }
       data-active-overflow={hasActiveOverflow ? 'true' : undefined}

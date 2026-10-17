@@ -24,7 +24,12 @@ import { withTimeout } from '@/lib/resilience/primitives';
 import { ACCOUNT_METRIC_COHORTS } from '@/lib/utils/email';
 
 export const SERVER_ANALYTICS_CONTRACT_VERSION = 'server-analytics/v2';
-export const SERVER_ANALYTICS_DELIVERY_TIMEOUT_MS = 2_000;
+export const SERVER_ANALYTICS_STATEMENT_TIMEOUT_MS = 2_000;
+// Standalone delivery includes the shared pool's 15s connection budget
+// (lib/db/client/connection.ts) as well as the insert. Transactional emissions
+// already have a connection and retain their separate 2s statement limit.
+export const SERVER_ANALYTICS_DELIVERY_TIMEOUT_MS =
+  15_000 + SERVER_ANALYTICS_STATEMENT_TIMEOUT_MS;
 export const SERVER_ANALYTICS_PRIVACY_CLASS =
   'pseudonymous_ids_no_contact_data';
 /**
@@ -828,7 +833,7 @@ export async function trackServerEventTx(
   const previousTimeout =
     previousTimeoutResult.rows[0]?.statementTimeout ?? '0';
   await tx.execute(
-    drizzleSql`SELECT set_config('statement_timeout', ${String(SERVER_ANALYTICS_DELIVERY_TIMEOUT_MS)}, true)`
+    drizzleSql`SELECT set_config('statement_timeout', ${String(SERVER_ANALYTICS_STATEMENT_TIMEOUT_MS)}, true)`
   );
   const delivery = await insertServerAnalyticsRow(tx, prepared);
   await tx.execute(

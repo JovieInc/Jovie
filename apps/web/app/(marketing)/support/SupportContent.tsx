@@ -49,7 +49,11 @@ export function SupportChannels() {
 
   return (
     <MarketingContainer width='prose' className='pb-16'>
-      <section>
+      <section
+        data-testid='marketing-section-content-prose'
+        data-marketing-variant='article-body'
+        data-marketing-owner='apps/web/app/(marketing)/support/SupportContent.tsx'
+      >
         <h2 className='text-2xl font-semibold tracking-tight text-primary-token line-clamp-2'>
           How Can We Help?
         </h2>
@@ -93,7 +97,11 @@ export function SupportChannels() {
 export function SupportCta() {
   return (
     <MarketingContainer width='prose' className='pb-24'>
-      <section data-testid='support-cta'>
+      <section
+        data-testid='marketing-section-cta'
+        data-marketing-variant='final-single-claim'
+        data-marketing-owner='apps/web/app/(marketing)/support/SupportContent.tsx'
+      >
         <h2 className='text-2xl font-semibold tracking-tight text-primary-token line-clamp-2'>
           Still Need Help?
         </h2>

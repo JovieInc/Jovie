@@ -49,3 +49,10 @@ export const RightClosed: Story = {
     closedLabel: 'Expand details',
   },
 };
+
+export const ManualRightClosed: Story = {
+  args: {
+    ...RightClosed.args,
+    previewTrigger: false,
+  },
+};

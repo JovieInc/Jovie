@@ -40,6 +40,13 @@ describe('CLI landing page', () => {
       screen.getByRole('heading', { level: 2, name: 'CLI Reference' })
     ).toHaveClass('line-clamp-2');
     expect(screen.getByText(CLI_SUBTITLE)).toBeVisible();
+    expect(screen.getByTestId('marketing-section-hero')).toHaveAttribute(
+      'data-marketing-variant',
+      'centered-none'
+    );
+    expect(
+      screen.getByTestId('marketing-section-content-prose')
+    ).toHaveAttribute('data-marketing-variant', 'article-body');
     expect(screen.getByTestId('cli-hero-install')).toHaveAttribute(
       'href',
       '#install'
@@ -130,7 +137,7 @@ describe('CLI landing page', () => {
       )
     ).toEqual([
       'hero/centered-none',
-      'content-prose',
+      'content-prose/article-body',
       'faq/structured-data-list',
       'cta/final-single-claim',
     ]);

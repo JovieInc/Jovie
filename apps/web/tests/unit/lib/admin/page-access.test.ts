@@ -5,6 +5,9 @@ import {
   requireCurrentAdminPageAccess,
 } from '@/lib/admin/page-access';
 
+const ACTOR_UUID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const TARGET_UUID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+
 const { mockPrivacy, mockGetCachedAuth, mockIsAdmin, mockRedirect } =
   vi.hoisted(() => ({
     mockPrivacy: vi.fn(),
@@ -22,7 +25,7 @@ vi.mock('server-only', () => ({}));
 vi.mock('next/navigation', () => ({ redirect: mockRedirect }));
 
 vi.mock('@/lib/auth/cached', () => ({
-  getCachedAuth: mockGetCachedAuth,
+  getFreshAuth: mockGetCachedAuth,
 }));
 
 vi.mock('@/lib/admin/roles', () => ({
@@ -59,6 +62,22 @@ describe('getCurrentAdminPageAccess', () => {
       hasAdminRole: true,
     });
     expect(mockIsAdmin).toHaveBeenCalledWith('user_admin');
+  });
+
+  it('authorizes and checks privacy as the actor during impersonation', async () => {
+    mockGetCachedAuth.mockResolvedValue({
+      userId: TARGET_UUID,
+      actorUserId: ACTOR_UUID,
+      sessionId: 'admin-session',
+    });
+    mockIsAdmin.mockResolvedValue(true);
+
+    await expect(requireCurrentAdminPageAccess()).resolves.toBe(ACTOR_UUID);
+    expect(mockIsAdmin).toHaveBeenCalledWith(ACTOR_UUID);
+    expect(mockPrivacy).toHaveBeenCalledWith({
+      userId: ACTOR_UUID,
+      sessionId: 'admin-session',
+    });
   });
 
   it('denies page access for authenticated non-admins', async () => {

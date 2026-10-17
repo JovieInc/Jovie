@@ -45,9 +45,24 @@ Scheduled workflows in `.github/workflows/`. Not Vercel crons — these run on G
 
 Broad test and analysis suites are deliberately absent from the schedule table. `nightly-tests.yml`, `nightly-testing-agent.yml`, `e2e-full-matrix.yml`, `test-coverage-audit.yml`, `sonarcloud.yml`, and `codeql.yml` run on relevant `main` input changes; `test-flakiness-report.yml` runs after terminal test-workflow events. Each retains explicit manual dispatch. Fleet Gate Refresh runs on `main` pushes, main CI completion, signed Linear Triage `repository_dispatch`, and manual dispatch, writing the canonical receipt only as a stale fallback; the Gem lanes emitter (`scripts/lanes/fleet_gate_emitter.py`) keeps it fresh between events, so its former `*/5` cron and Runner Heartbeat's dispatch are gone. The disabled Main CI health monitor, Quarantine Recovery, and Auto-PR on Agent Push workflows were deleted on 2026-10-12 (git history has them). Actions Cache GC (which also prunes superseded main generations) runs on every `main` push, which is when large caches are saved. Design Governance (JOV-INV-026 performance pack included) and Visual & A11y Tests (the JOV-INV-018 whole-system Storybook axe sweep) run on the `main` push that changes their inputs. Repo-state audits run on the `main` push that changes their inputs: Doc Gardening Agent and Deprecation Intake (dependency/toolchain paths). Marketing Certification Producer evaluates everything since its last successful run, so a replaced or failed run needs no clock. Security Suppression Audit runs per bot review. Brand Scrub is enforced only in `ci.yml` (diff scan) and the ci-fast structural pytest lane. `ci-schedule-inventory` fails CI if any of these workflows regains a cron without being removed from the evidence-driven registry with a reviewed rationale.
 
+## Learning delivery (JOV-8427)
+
+Shipping SLO's daily clock measures shipping signals only. Its weekly
+post-mortem learning step and artifact are retired. Quality Gap Finder retains
+its `main` evidence pushes and `quality-gap-scan` deliveries; scheduled calls
+to its handler and post-mortem review are rejected before scans or writes.
+
+Growth intake v2 binds a causal event and source revisions rather than an ISO
+week. Weekly v1 receipts remain historical and cannot admit analysis. Delivered
+terminal/exception evidence, changed source evidence, confidence/value threshold
+crossings, and relevant pending jobs cause bounded reconsideration. A week or
+night passing does not. See [current ownership and acceptance](quality/EVENT_DRIVEN_LEARNING.md).
+Hermes's nightly dispatch-log learning is superseded; the local history below
+cannot authorize reactivation or a full-log sweep.
+
 ## Local Hermes Launchd Schedule
 
-These are machine-local Hermes jobs, not Vercel production crons. They run from launchd on the operator Mac and write to `~/.hermes`.
+These are historical machine-local Hermes jobs, separate from Vercel production crons. This table does not authorize installation or activation.
 
 | Unit | Schedule | Purpose | Source |
 |------|----------|---------|--------|

@@ -1,6 +1,5 @@
 import 'server-only';
 
-import { eq } from 'drizzle-orm';
 import { resolveChatAccountContext } from '@/lib/chat/account-context';
 import { canUseOvChatMode } from '@/lib/chat/ov-mode';
 import {
@@ -13,8 +12,6 @@ import {
   type TerminalChatTurnStatus,
   TURN_IN_PROGRESS_ERROR_CODE,
 } from '@/lib/chat/turns';
-import { db } from '@/lib/db';
-import { chatConversations } from '@/lib/db/schema/chat';
 import {
   encodeMobileChatNdjsonEvent,
   MOBILE_CHAT_NDJSON_HEADERS,
@@ -23,10 +20,7 @@ import {
   type ParsedMobileChatTurnRequest,
 } from '@/lib/mobile/chat/contract';
 import { getMobileConversationDetail } from '@/lib/mobile/chat/conversations';
-import {
-  isOvConversationTitle,
-  withOvConversationTitle,
-} from '@/lib/mobile/workspace';
+import { isOvConversationTitle } from '@/lib/mobile/workspace';
 import { prepareOvieChatTurn } from '@/lib/ovie/chat-entry';
 import { getOvieOperatingStore } from '@/lib/ovie/mcp/runtime-store';
 import { assertModelMustNotSelfIdentifyAsOvie } from '@/lib/ovie/program';
@@ -327,21 +321,6 @@ function streamSummerTurn(input: {
   );
 }
 
-async function tagOvConversationTitle(conversationId: string): Promise<void> {
-  const [conversation] = await db
-    .select({ title: chatConversations.title })
-    .from(chatConversations)
-    .where(eq(chatConversations.id, conversationId))
-    .limit(1);
-  if (!conversation) return;
-  const nextTitle = withOvConversationTitle(conversation.title);
-  if (nextTitle === conversation.title) return;
-  await db
-    .update(chatConversations)
-    .set({ title: nextTitle })
-    .where(eq(chatConversations.id, conversationId));
-}
-
 /** Admin-only Summer/ops chat. Never calls fetchMobileArtistContext. */
 export async function handleMobileOvChatTurn(input: {
   readonly userId: string;
@@ -378,7 +357,9 @@ export async function handleMobileOvChatTurn(input: {
   if (parsed.conversationId) {
     const existing = await getMobileConversationDetail({
       conversationId: parsed.conversationId,
+      userId,
       creatorProfileId: profileId,
+      audience: 'ov',
       limit: 1,
     });
     if (!existing) {
@@ -405,6 +386,7 @@ export async function handleMobileOvChatTurn(input: {
     userMessage: parsed.text,
     userId,
     creatorProfileId: profileId,
+    audience: 'ov',
   });
 
   if (reservation.outcome === 'duplicate_in_progress') {
@@ -548,8 +530,6 @@ export async function handleMobileOvChatTurn(input: {
       { type: 'error', errorCode: receipt.errorCode, message: receipt.message },
     ]);
   }
-
-  await tagOvConversationTitle(reservation.conversationId);
 
   const ovieStore = getOvieOperatingStore();
   if (summerTransportRequested) bindEveSummerSpeaker();

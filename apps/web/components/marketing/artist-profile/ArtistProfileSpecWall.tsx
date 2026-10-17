@@ -49,6 +49,9 @@ interface ArtistProfileSpecWallProps {
   readonly specWall: ArtistProfileLandingCopy['specWall'];
   readonly tiles?: readonly MarketingFeatureTile[];
   readonly truthTiles?: readonly ArtistProfileTruthTile[];
+  readonly sectionId?: 'spec-wall';
+  readonly sectionVariant?: string;
+  readonly sectionOwner?: string;
 }
 
 function ScreenshotCrop({
@@ -351,6 +354,9 @@ export function ArtistProfileSpecWall({
   specWall,
   tiles,
   truthTiles,
+  sectionId,
+  sectionVariant,
+  sectionOwner,
 }: Readonly<ArtistProfileSpecWallProps>) {
   if (truthTiles) {
     return (
@@ -396,6 +402,9 @@ export function ArtistProfileSpecWall({
       width='page'
       containerClassName='max-w-none'
       penContractId={MARKETING_PEN_CONTRACT_IDS.section.specWall}
+      sectionId={sectionId}
+      sectionVariant={sectionVariant}
+      sectionOwner={sectionOwner}
     >
       <div className='mx-auto max-w-public-content'>
         <ArtistProfileSectionHeader

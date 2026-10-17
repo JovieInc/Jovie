@@ -1,7 +1,7 @@
 ---
 name: tool-discovery
 description: |
-  Evaluate a tool/product Tim shares (a link, a screenshot, or just a name) without
+  Research how to source a capability, or evaluate a tool/product Tim shares (a link, a screenshot, or just a name) without
   asking him to do the legwork. Use whenever a message shares a tool/repo/product
   and expects an opinion or evaluation — "check this out", "is this worth using",
   "what does this do", a bare link with no context. Extracts search terms, finds
@@ -23,6 +23,24 @@ anything to unlock a link — search around the gap instead.
   is, what it costs, and whether it's worth adopting.
 - Any time the honest next step would be "let me ask Tim for more details" —
   try search first, only ask if search genuinely comes up empty.
+
+## Capability-first mode
+
+For a proposed capability without a named tool, follow the single
+[capability sourcing policy](../../../canon/ENGINEERING.md#capability-sourcing-and-ia-integration).
+Start with current code/dependencies and existing scoped decisions, then platform
+features, official integration/plugin indexes and credible maintained alternatives.
+Record versions, authoritative sources, licenses and checked dates in the existing
+issue/workpad `planningDecisions` receipt. Return the selected disposition and
+bounded custom delta, lifetime cost/risk, outcome tests and renewal triggers.
+Do not require fresh research for an applicable approved implementation.
+
+Missing browsing/package permissions return an executable bounded research or
+trusted dependency-preparation task with the capability, unanswered requirement,
+official index to inspect and expected receipt. Never infer "no SDK exists" from
+an unavailable tool. Do not create a new ledger or install packages here. Other
+workers consume the same task packet/receipt and use their supported research
+tools; availability of this Claude skill is not assumed.
 
 ## Workflow
 

@@ -39,11 +39,38 @@ async function installConsentAndClsObserver(page: Page) {
     ) => {
       const append = (raw: string) => {
         try {
-          window.__JOVIE_NAV_TELEMETRY_OBSERVATIONS__?.push({
-            payload: JSON.parse(raw) as NavigationTelemetryPayload,
-            presenceSurfaceVisible,
-            sequence: observationSequence,
-          });
+          const parsed: unknown = JSON.parse(raw);
+          const record =
+            typeof parsed === 'object' && parsed !== null
+              ? (parsed as {
+                  events?: unknown;
+                  event?: unknown;
+                  item_id?: unknown;
+                })
+              : null;
+          // The wire format is a batch `{ schema_version, events }`. A legacy
+          // single payload is still accepted. Each event becomes one
+          // observation so the activation/destination_ready count stays exact.
+          const events = Array.isArray(record?.events)
+            ? record.events
+            : record && typeof record.event === 'string'
+              ? [record]
+              : [];
+          for (const event of events) {
+            if (
+              typeof event !== 'object' ||
+              event === null ||
+              typeof (event as { event?: unknown }).event !== 'string' ||
+              typeof (event as { item_id?: unknown }).item_id !== 'string'
+            ) {
+              continue;
+            }
+            window.__JOVIE_NAV_TELEMETRY_OBSERVATIONS__?.push({
+              payload: event as NavigationTelemetryPayload,
+              presenceSurfaceVisible,
+              sequence: observationSequence,
+            });
+          }
         } catch {
           // The route schema owns payload validation; malformed bodies are
           // irrelevant to this browser-ordering assertion.

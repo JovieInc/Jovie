@@ -6,8 +6,10 @@ import {
   DEFAULT_AUDIT_PATH,
   GROWTH_LEARNING_INTAKE_SCHEMA,
   GROWTH_LEARNING_SOURCE_REVISION_DIGEST_ALGORITHM,
+  growthLearningEventDedupeKey,
   loadStewardshipAudit,
   projectStewardshipAudit,
+  validateGrowthLearningIntake,
   validateStewardshipAudit,
 } from './audit.mjs';
 
@@ -189,12 +191,23 @@ function fixedGrowthLearningIntake() {
   return {
     schemaVersion: GROWTH_LEARNING_INTAKE_SCHEMA,
     authority: 'evidence-only',
-    period: '2026-W01',
+    causalEvent: {
+      id: 'work-result:fixed-growth-learning',
+      kind: 'terminal-result',
+      sourceRevision: 'fixed-result:v1',
+    },
     sourceDigest,
     sourceRevisionDigestAlgorithm:
       GROWTH_LEARNING_SOURCE_REVISION_DIGEST_ALGORITHM,
     sourceRevisionDigest,
-    dedupeKey: `growth-learning:2026-W01:${sourceRevisionDigest}`,
+    dedupeKey: growthLearningEventDedupeKey(
+      {
+        id: 'work-result:fixed-growth-learning',
+        kind: 'terminal-result',
+        sourceRevision: 'fixed-result:v1',
+      },
+      sourceRevisionDigest
+    ),
     maxSources: 5,
     maxProposals: 1,
     noDuplicateScheduler: true,
@@ -222,18 +235,21 @@ function growthLearningIntake() {
   return intake;
 }
 
-test('current-week artifact validates against a stable review clock', () => {
+test('historical weekly artifact remains readable without admission or live reevaluation', () => {
   const audit = loadStewardshipAudit();
   const result = validateStewardshipAudit(audit, {
     now: CURRENT_ARTIFACT_NOW,
   });
   assert.equal(result.ok, true);
-  assert.equal(result.growthLearning.status, 'validated');
+  assert.equal(result.growthLearning.status, 'historical');
   assert.equal(result.growthLearning.records, 1);
-  assert.equal(
-    result.growthLearning.results[0]?.nextAction,
-    'hold-for-founder-authorization'
-  );
+  assert.equal(result.growthLearning.results[0]?.nextAction, 'historical-only');
+  assert.equal(result.growthLearning.admissionEligible, false);
+  assert.equal(result.growthLearning.results[0]?.eligible, false);
+  const later = validateStewardshipAudit(audit, {
+    now: new Date('2027-01-01'),
+  });
+  assert.deepEqual(later.growthLearning, result.growthLearning);
   assert.deepEqual(
     audit.growthLearningIntake.records[0].sources.map(source => source.id),
     [
@@ -459,7 +475,7 @@ test('generated audit artifact remains evidence-only beside executable authority
   assert.equal(audit.growthLearningIntake.records.length, 1);
 });
 
-test('weekly stewardship caller validates the bounded growth intake receipt', () => {
+test('event-driven stewardship caller validates the bounded growth intake receipt', () => {
   const audit = growthAudit();
   audit.growthLearningIntake = growthLearningIntake();
 
@@ -483,7 +499,7 @@ test('weekly stewardship caller validates the bounded growth intake receipt', ()
   );
 });
 
-test('weekly stewardship caller preserves existing authority for internal measurement', () => {
+test('event-driven stewardship caller preserves existing authority for internal measurement', () => {
   const audit = growthAudit();
   const intake = growthLearningIntake();
   intake.records[0].proposal = {
@@ -502,7 +518,7 @@ test('weekly stewardship caller preserves existing authority for internal measur
   );
 });
 
-test('weekly stewardship caller rejects authority escalation and duplicate intake', () => {
+test('event-driven stewardship caller rejects authority escalation and duplicate intake', () => {
   const audit = growthAudit();
   const intake = growthLearningIntake();
   intake.priorDedupeKeys = [intake.dedupeKey];
@@ -540,7 +556,10 @@ test('weekly stewardship caller rejects authority escalation and duplicate intak
   const tamperedAudit = growthAudit();
   const tamperedDigest = `sha256:${'0'.repeat(64)}`;
   tamperedAudit.growthLearningIntake.sourceRevisionDigest = tamperedDigest;
-  tamperedAudit.growthLearningIntake.dedupeKey = `growth-learning:2026-W01:${tamperedDigest}`;
+  tamperedAudit.growthLearningIntake.dedupeKey = growthLearningEventDedupeKey(
+    tamperedAudit.growthLearningIntake.causalEvent,
+    tamperedDigest
+  );
   const tampered = validateStewardshipAudit(tamperedAudit, {
     now: FIXTURE_NOW,
   });
@@ -557,4 +576,93 @@ test('weekly stewardship caller rejects authority escalation and duplicate intak
   assert.equal(expired.ok, false);
   assert.deepEqual(expired.findings, baseline.findings);
   assert.match(expired.errors.join('\n'), /proposal-expired/);
+});
+
+test('causal events reach bounded validation; clocks and missing event identity cannot admit', () => {
+  for (const kind of [
+    'terminal-result',
+    'exception',
+    'evidence-threshold-crossed',
+    'pending-job',
+  ]) {
+    const intake = fixedGrowthLearningIntake();
+    intake.causalEvent.kind = kind;
+    intake.dedupeKey = growthLearningEventDedupeKey(
+      intake.causalEvent,
+      intake.sourceRevisionDigest
+    );
+    const result = validateGrowthLearningIntake(intake, { now: FIXTURE_NOW });
+    assert.equal(result.status, 'validated', kind);
+    assert.equal(result.admissionEligible, true, kind);
+    assert.equal(result.results.length, 1, kind);
+  }
+  const intake = fixedGrowthLearningIntake();
+  const scheduled = validateGrowthLearningIntake(intake, {
+    now: FIXTURE_NOW,
+    eventName: 'schedule',
+  });
+  assert.equal(scheduled.admissionEligible, false);
+  assert.deepEqual(scheduled.results, []);
+  assert.deepEqual(scheduled.errors, [
+    'growth-learning-scheduled-intake-retired',
+  ]);
+  for (const causalEvent of [
+    undefined,
+    {},
+    { ...intake.causalEvent, kind: 'schedule' },
+    { ...intake.causalEvent, sourceRevision: '' },
+  ]) {
+    const invalid = validateGrowthLearningIntake(
+      { ...intake, causalEvent },
+      { now: FIXTURE_NOW }
+    );
+    assert.equal(invalid.status, 'invalid');
+    assert.equal(invalid.admissionEligible, false);
+    assert.ok(invalid.errors.includes('growth-learning-causal-event-invalid'));
+  }
+  const weekly = validateGrowthLearningIntake(
+    { ...intake, period: '2026-W02' },
+    { now: FIXTURE_NOW }
+  );
+  assert.equal(weekly.admissionEligible, false);
+  assert.ok(weekly.errors.includes('growth-learning-period-retired'));
+});
+
+test('event dedupe survives week rollover and historical keys while revisions reopen identity', () => {
+  const intake = fixedGrowthLearningIntake();
+  const original = intake.dedupeKey;
+  intake.priorDedupeKeys = [
+    loadStewardshipAudit().growthLearningIntake.dedupeKey,
+  ];
+  assert.equal(
+    validateGrowthLearningIntake(intake, { now: FIXTURE_NOW }).status,
+    'validated'
+  );
+  intake.priorDedupeKeys.push(original);
+  for (const now of [FIXTURE_NOW, new Date('2026-01-12T00:00:00Z')]) {
+    const duplicate = validateGrowthLearningIntake(intake, { now });
+    assert.equal(duplicate.admissionEligible, false);
+    assert.ok(
+      duplicate.errors.includes(
+        `growth-learning-duplicate-dedupe-key:${original}`
+      )
+    );
+  }
+  intake.causalEvent.sourceRevision = 'fixed-result:v2';
+  intake.dedupeKey = growthLearningEventDedupeKey(
+    intake.causalEvent,
+    intake.sourceRevisionDigest
+  );
+  assert.notEqual(intake.dedupeKey, original);
+  assert.equal(
+    validateGrowthLearningIntake(intake, { now: FIXTURE_NOW }).status,
+    'validated'
+  );
+  assert.notEqual(
+    growthLearningEventDedupeKey(
+      intake.causalEvent,
+      `sha256:${'b'.repeat(64)}`
+    ),
+    intake.dedupeKey
+  );
 });

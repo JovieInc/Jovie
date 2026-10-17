@@ -20,6 +20,7 @@ interface LoadingTableBodyProps {
    */
   readonly columnConfig?: Array<{
     readonly width?: string;
+    readonly className?: string;
     readonly variant?:
       | 'text'
       | 'avatar'

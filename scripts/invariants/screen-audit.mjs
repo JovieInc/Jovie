@@ -26,6 +26,7 @@ import {
   readAssuranceMatrix,
   uiEvidenceRequirements,
 } from './assurance-matrix.mjs';
+import { browserInputFindings } from './browser-owned-input.mjs';
 import {
   CLS_INTERACTION_BUDGET,
   classifyScreenPath,
@@ -179,6 +180,12 @@ export function auditScreens({
       evidence = true;
       findings.push(...proofMeasurementFindings(proof, screen.viewports));
     }
+    findings.push(
+      ...browserInputFindings(proof?.browserOwnedInput, {
+        screenId: screen.id,
+        headSha,
+      })
+    );
     const judged = judge ? specificJudgeFindings(judge[screen.id]) : [];
     for (const item of judged)
       findings.push(

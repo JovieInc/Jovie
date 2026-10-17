@@ -66,6 +66,7 @@ export async function getOrCreateCustomer(
   email: string,
   name?: string
 ): Promise<Stripe.Customer> {
+  const idempotencyKey = `customer:create:${userId}`;
   return cacheQuery(
     `stripe:customer:${userId}`,
     async () => {
@@ -113,21 +114,27 @@ export async function getOrCreateCustomer(
         // If no customer found, create a new one
         // Synthetic principals (JOV-7697) are marked so revenue reads treat
         // their purchases as proof-of-path, never customer revenue.
-        const customer = await stripeClient.customers.create({
-          email,
-          name,
-          metadata: {
-            clerk_user_id: userId,
-            created_via: 'jovie_app',
-            ...syntheticPrincipalStripeMetadata(email),
+        const customer = await stripeClient.customers.create(
+          {
+            email,
+            name,
+            metadata: {
+              clerk_user_id: userId,
+              created_via: 'jovie_app',
+              ...syntheticPrincipalStripeMetadata(email),
+            },
           },
-        });
+          // Search is eventually consistent. Cold concurrent requests and
+          // retries after a failed DB write must reuse the same customer.
+          { idempotencyKey }
+        );
 
         return customer;
       } catch (error) {
         captureError('Error creating/retrieving Stripe customer', error, {
           userId,
           email,
+          idempotencyKey,
         });
         throw new Error('Failed to create or retrieve customer');
       }

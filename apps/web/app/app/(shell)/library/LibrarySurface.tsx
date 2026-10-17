@@ -235,6 +235,7 @@ import {
   YouTubeMerchRelationshipEditor,
   YouTubeOptimizationPanel,
 } from './YouTubeAssetDrawerPanels';
+import { YouTubeLinkPanel } from './YouTubeLinkPanel';
 
 const EMPTY_RELATIONSHIPS: readonly LibraryRelationshipView[] = [];
 const LIBRARY_CONTENT_INSET_CLASS =
@@ -2771,6 +2772,17 @@ function AssetDrawer({
                       videoId={current.source.canonicalId}
                       merchProducts={merchProducts}
                       relationships={relationships}
+                      disabled={!open}
+                    />
+                  </InspectorSection>
+                ) : null}
+
+                {isYouTubeVideo && current.source ? (
+                  <InspectorSection title='Jovie link' className='py-3'>
+                    <YouTubeLinkPanel
+                      key={current.id}
+                      profileId={profileId}
+                      videoId={current.source.canonicalId}
                       disabled={!open}
                     />
                   </InspectorSection>

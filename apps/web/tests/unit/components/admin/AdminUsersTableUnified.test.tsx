@@ -189,6 +189,9 @@ describe('AdminUsersTableUnified', () => {
     renderUsersTable();
 
     expect(screen.getByText('Ari Lane')).toBeInTheDocument();
+    expect(
+      screen.getByLabelText('Select Ari Lane').closest('.overflow-auto')
+    ).toHaveClass('min-h-0', 'flex-1', 'overflow-auto');
     expect(screen.getByLabelText('Select Ari Lane')).toBeInTheDocument();
     expect(screen.queryByTestId('desktop-table')).not.toBeInTheDocument();
   });
