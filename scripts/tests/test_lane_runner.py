@@ -12226,6 +12226,87 @@ class SelftestCleanupScopeTest(unittest.TestCase):
         self.assertEqual(lane.marked_processes(receipt), {})
         self.pidfd.assert_not_called(); self.send.assert_not_called(); self.kill.assert_not_called()
 
+    def test_denied_environment_then_authoritative_absence_needs_no_signal(self):
+        receipt = self.real_birth_fixture()
+        env = self.member(201)
+        self.stat_fixture(201, 2000)
+        real = Path.read_bytes
+        def denied_after_exit(path):
+            if path == env:
+                for child in env.parent.iterdir():
+                    child.unlink()
+                env.parent.rmdir()
+                raise PermissionError(13, "fixture exited before environ")
+            return real(path)
+        with patch.object(Path, "read_bytes", new=denied_after_exit):
+            self.assertEqual(lane.marked_processes(receipt), {})
+        self.pidfd.assert_not_called(); self.send.assert_not_called(); self.kill.assert_not_called()
+
+    def test_denied_environment_then_same_birth_zombie_needs_no_signal(self):
+        receipt = self.real_birth_fixture()
+        env = self.member(201)
+        self.stat_fixture(201, 2000)
+        real = Path.read_bytes
+        def denied_after_exit(path):
+            if path == env:
+                stat = env.parent / "stat"
+                stat.write_text(stat.read_text().replace(") S ", ") Z "))
+                raise PermissionError(13, "fixture became zombie before environ")
+            return real(path)
+        with patch.object(Path, "read_bytes", new=denied_after_exit):
+            self.assertEqual(lane.marked_processes(receipt), {})
+        self.pidfd.assert_not_called(); self.send.assert_not_called(); self.kill.assert_not_called()
+
+    def test_denied_environment_of_live_same_birth_still_holds(self):
+        receipt = self.real_birth_fixture()
+        env = self.member(201)
+        self.stat_fixture(201, 2000)
+        real = Path.read_bytes
+        def denied(path):
+            if path == env:
+                raise PermissionError(13, "fixture stays live")
+            return real(path)
+        with patch.object(Path, "read_bytes", new=denied):
+            with self.assertRaisesRegex(RuntimeError, "selftest-process-custody-unreadable"):
+                lane.reap_selftest_processes(receipt)
+        self.assertEqual(receipt["diagnostic"]["observation"], {
+            "pid": 201, "start": "linux:2000", "source": "proc-environ",
+            "errorCode": "selftest-process-custody-unreadable", "errno": 13})
+        self.pidfd.assert_not_called(); self.send.assert_not_called(); self.kill.assert_not_called()
+
+    def test_denied_environment_and_reused_zombie_birth_still_holds(self):
+        receipt = self.real_birth_fixture()
+        env = self.member(201)
+        self.stat_fixture(201, 2000)
+        real = Path.read_bytes
+        def denied_after_reuse(path):
+            if path == env:
+                self.stat_fixture(201, 2001)
+                stat = env.parent / "stat"
+                stat.write_text(stat.read_text().replace(") S ", ") Z "))
+                raise PermissionError(13, "fixture replaced before environ")
+            return real(path)
+        with patch.object(Path, "read_bytes", new=denied_after_reuse):
+            with self.assertRaisesRegex(RuntimeError, "selftest-process-identity-changed"):
+                lane.reap_selftest_processes(receipt)
+        self.assertEqual(receipt["diagnostic"]["observation"]["observedStart"], "linux:2001")
+        self.pidfd.assert_not_called(); self.send.assert_not_called(); self.kill.assert_not_called()
+
+    def test_denied_environment_then_unavailable_birth_still_holds(self):
+        receipt = self.real_birth_fixture()
+        env = self.member(201)
+        self.stat_fixture(201, 2000)
+        real = Path.read_bytes
+        def denied_with_unknown_birth(path):
+            if path == env:
+                (env.parent / "stat").write_text("201 (malformed) S 1")
+                raise PermissionError(13, "fixture birth unreadable")
+            return real(path)
+        with patch.object(Path, "read_bytes", new=denied_with_unknown_birth):
+            with self.assertRaisesRegex(RuntimeError, "selftest-process-birth-unavailable"):
+                lane.reap_selftest_processes(receipt)
+        self.pidfd.assert_not_called(); self.send.assert_not_called(); self.kill.assert_not_called()
+
     def test_pid_reused_after_snapshot_cannot_inherit_unchanged_baseline_exclusion(self):
         receipt = self.real_birth_fixture()
         receipt["baseline"][201] = "linux:2000"

@@ -8141,6 +8141,18 @@ def marked_processes(cleanup: dict) -> dict[int, str]:
                 raise SelftestCleanupHeld("selftest-process-custody-raced", pid=pid,
                                           start=row[3], source="proc-environ")
             except OSError as error:
+                # After a failed environment read, the process may have exited
+                # since its initial birth observation. Only fresh authoritative
+                # absence or a same-birth zombie proves that it cannot execute.
+                after = _selftest_process_row(entry, pid, cleanup["owner"]["uid"])
+                if after is None:
+                    continue
+                if after[3] != row[3]:
+                    raise SelftestCleanupHeld("selftest-process-identity-changed", pid=pid,
+                                              start=row[3], observed_start=after[3],
+                                              source="proc-stat") from error
+                if after[2].startswith("Z"):
+                    continue
                 raise SelftestCleanupHeld("selftest-process-custody-unreadable", pid=pid,
                                           start=row[3], source="proc-environ", error=error) from error
             pairs = [part.split(b"=", 1) for part in raw.split(b"\0") if b"=" in part]
