@@ -3,7 +3,7 @@ import 'server-only';
 import { sql as drizzleSql } from 'drizzle-orm';
 import { users } from '@/lib/db/schema/auth';
 import { billingAuditLog } from '@/lib/db/schema/billing';
-import { db } from './index';
+import { withSystemIngestionSession } from '@/lib/ingestion/session';
 
 export interface AtomicBillingUpdateInput {
   readonly userId: string;
@@ -54,7 +54,8 @@ export async function applyBillingUpdateWithAudit(
   const preserveStripePriceId = input.stripePriceId === undefined;
   const preserveLastBillingEventAt = input.lastBillingEventAt === undefined;
 
-  const result = await db.execute<AtomicBillingUpdateResult>(drizzleSql`
+  const result = await withSystemIngestionSession(tx =>
+    tx.execute<AtomicBillingUpdateResult>(drizzleSql`
     with existing_audit as (
       select
         ${billingAuditLog.userId} as "appUserId",
@@ -127,7 +128,8 @@ export async function applyBillingUpdateWithAudit(
       existing_audit."billingVersion",
       true as "deduplicated"
     from existing_audit
-  `);
+    `)
+  );
 
   const row = result.rows[0];
   return row

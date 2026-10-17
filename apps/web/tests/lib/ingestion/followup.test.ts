@@ -18,6 +18,25 @@ function createTxMock() {
 }
 
 describe('enqueueFollowupIngestionJobs', () => {
+  it('does not schedule retired social HTML imports', async () => {
+    const { tx, insert } = createTxMock();
+    await enqueueFollowupIngestionJobs({
+      tx: tx as never,
+      creatorProfileId: '7e093f2b-a8f9-4559-a9df-8f789b4432f8',
+      currentDepth: 0,
+      extraction: {
+        links: [
+          { url: 'https://linktr.ee/artist' },
+          { url: 'https://www.instagram.com/artist' },
+          { url: 'https://youtube.com/@artist' },
+          { url: 'https://beacons.ai/artist' },
+          { url: 'https://beacons.page/artist' },
+        ],
+      },
+    });
+    expect(insert).not.toHaveBeenCalled();
+  });
+
   it('skips insert when extraction has no supported links', async () => {
     const { tx, insert } = createTxMock();
 
@@ -45,6 +64,8 @@ describe('enqueueFollowupIngestionJobs', () => {
           { url: 'https://instagram.com/example_artist' },
           { url: 'https://youtube.com/@artistchannel' },
           { url: 'https://beacons.ai/exampleartist' },
+          { url: 'https://laylo.com/exampleartist' },
+          { url: 'https://tiktok.com/@exampleartist' },
         ],
       },
     });
@@ -57,7 +78,7 @@ describe('enqueueFollowupIngestionJobs', () => {
 
     expect(payload).toEqual([
       expect.objectContaining({
-        jobType: 'import_beacons',
+        jobType: 'import_laylo',
         payload: expect.objectContaining({
           creatorProfileId: '7e093f2b-a8f9-4559-a9df-8f789b4432f8',
           depth: 3,

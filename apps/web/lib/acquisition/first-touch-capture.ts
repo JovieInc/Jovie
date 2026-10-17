@@ -10,6 +10,7 @@
  */
 
 import type { NextRequest, NextResponse } from 'next/server';
+import { AGENT_INTENT_QUERY } from './agent-intent';
 import {
   buildFirstTouch,
   FIRST_TOUCH_COOKIE,
@@ -34,11 +35,17 @@ export async function captureFirstTouchEnvelope(
     const existing = req.cookies.get(FIRST_TOUCH_COOKIE)?.value;
     if (await openFirstTouchEnvelope(existing)) return;
 
+    const handoff = req.nextUrl.searchParams.get(AGENT_INTENT_QUERY);
+    const intentEnvelope = handoff
+      ? await openFirstTouchEnvelope(handoff)
+      : null;
     const sealed = await sealFirstTouchEnvelope(
-      buildFirstTouch({
-        url: req.nextUrl,
-        referer: req.headers.get('referer'),
-      })
+      intentEnvelope?.agentIntent
+        ? intentEnvelope
+        : buildFirstTouch({
+            url: req.nextUrl,
+            referer: req.headers.get('referer'),
+          })
     );
     if (!sealed) return; // No signing secret configured — capture disabled.
 

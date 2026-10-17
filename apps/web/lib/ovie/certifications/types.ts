@@ -43,15 +43,19 @@ export type OvieCertificationTierStatus =
   | 'missing';
 
 export const OVIE_CERTIFICATION_DOMAINS = [
-  'marketing_components',
+  'acquisition',
+  'company',
   'customers',
+  'design_system',
+  'feature_registry',
   'flows',
+  'icps',
+  'lyb',
+  'marketing',
+  'marketing_components',
+  'outcomes',
   'public_profiles',
   'smart_links',
-  'marketing',
-  'lyb',
-  'acquisition',
-  'feature_registry',
 ] as const;
 
 export type OvieCertificationDomainId =
@@ -123,6 +127,8 @@ export interface OvieCertificationRow {
   readonly id: string;
   readonly domain: OvieCertificationDomainId;
   readonly surface: string;
+  /** Accountable operator; null means no owner has been declared. */
+  readonly owner: string | null;
   readonly subject: {
     readonly id: string;
     readonly kind: string;
@@ -203,15 +209,19 @@ export interface OvieCertificationDecisionRequest {
 export const OVIE_CERTIFICATION_DOMAIN_LABELS: Readonly<
   Record<OvieCertificationDomainId, string>
 > = {
-  marketing_components: 'Marketing Components',
-  customers: 'Customers',
+  acquisition: 'Acquisition',
+  company: 'Company',
+  customers: 'Customers / Prospects',
+  design_system: 'Design System / Taste',
+  feature_registry: 'Features / Capabilities',
   flows: 'Flows',
+  icps: 'ICPs',
+  lyb: 'LYB',
+  marketing: 'Marketing',
+  marketing_components: 'Marketing Components',
+  outcomes: 'Outcomes',
   public_profiles: 'Public Profiles',
   smart_links: 'Smart Links',
-  marketing: 'Marketing',
-  lyb: 'LYB',
-  acquisition: 'Acquisition',
-  feature_registry: 'Feature Registry',
 };
 
 export const OVIE_CERTIFICATION_STATE_LABELS: Readonly<

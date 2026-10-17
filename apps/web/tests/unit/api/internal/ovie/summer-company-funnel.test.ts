@@ -2,15 +2,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
   verify: vi.fn(),
-  funnel: vi.fn(),
+  cache: vi.fn(),
   captureError: vi.fn(),
 }));
 
 vi.mock('@/lib/ovie/summer-oidc.server', () => ({
   verifySummerOidcRequest: hoisted.verify,
 }));
-vi.mock('@/lib/analytics/signup-funnel.server', () => ({
-  getSummerFunnel: hoisted.funnel,
+vi.mock('@/lib/ovie/company-state.server', () => ({
+  readCompanyStateCache: hoisted.cache,
 }));
 vi.mock('@/lib/error-tracking', () => ({
   captureError: hoisted.captureError,
@@ -34,7 +34,7 @@ describe('GET /api/internal/ovie/summer-company/funnel', () => {
     expect(response.status).toBe(401);
     expect(response.headers.get('cache-control')).toBe('no-store');
     await expect(response.json()).resolves.toEqual({ error: 'unauthorized' });
-    expect(hoisted.funnel).not.toHaveBeenCalled();
+    expect(hoisted.cache).not.toHaveBeenCalled();
   });
 
   it('returns the aggregate uncached', async () => {
@@ -43,7 +43,9 @@ describe('GET /api/internal/ovie/summer-company/funnel', () => {
       observedAt: '2026-09-26T12:00:00.000Z',
       windows: {},
     };
-    hoisted.funnel.mockResolvedValue(body);
+    hoisted.cache.mockResolvedValue({
+      snapshot: { sourcePayloads: { signupFunnel: body } },
+    });
     const response = await route.GET(new Request(URL));
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('no-store');
@@ -51,7 +53,7 @@ describe('GET /api/internal/ovie/summer-company/funnel', () => {
   });
 
   it('fails closed with 503 and reports the error', async () => {
-    hoisted.funnel.mockRejectedValue(new Error('db down'));
+    hoisted.cache.mockRejectedValue(new Error('redis down'));
     const response = await route.GET(new Request(URL));
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toEqual({

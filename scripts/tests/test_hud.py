@@ -59,12 +59,12 @@ def model(**overrides) -> dict:
         },
         "linear": {"ok": True, "pool": {"agent-ready": 87, "devin": 0, "codex": 19}, "poolTotal": 99,
                    "active": {"JOV-6544": "Audio browsing: verify and close intent prefetch"}, "triage": 11,
-                   "fetchedAt": "2026-09-26T21:00:00+00:00"},
+                   "fetchedAt": hud.utcnow().isoformat()},
         "github": {"ok": True, "errors": {},
                    "open": [{"number": 18724, "title": "JOV-6544 fix(audio): converge now-playing metadata", "lane": "devin",
                              "issue": "JOV-6544", "draft": False, "merge": "UNSTABLE", "updatedAt": "2026-09-26T20:20:26Z"},
                             {"number": 18712, "title": "JOV-6544 fix(web): warm release detail", "lane": "devin", "issue": "JOV-6544",
-                             "draft": True, "merge": "CLEAN", "updatedAt": "2026-09-26T18:29:49Z"}],
+                             "draft": True, "merge": "CLEAN", "headRefOid": "a", "updatedAt": "2026-09-26T18:29:49Z"}],
                    "merged24h": [{"number": 18671, "title": "fix(ios): preserve chat cache timestamps",
                                    "createdAt": "2026-09-26T19:00:00Z", "mergedAt": "2026-09-26T20:12:00Z",
                                    "headRefName": "devin/jov-1-20260926t190000", "lane": "devin"},
@@ -73,9 +73,11 @@ def model(**overrides) -> dict:
                                   "headRefName": "tim/jov-1", "lane": None}],
                    "queue": {"depth": 2, "entries": [{"number": 18724, "state": "AWAITING_CHECKS", "enqueuedAt": "2026-09-26T20:20:28Z"}]},
                    "rate": {"core": 4800, "graphql": 4700, "resetAt": "2026-09-26T21:30:00+00:00"},
-                   "fetchedAt": "2026-09-26T21:00:00+00:00"},
+                   "fetchedAt": hud.utcnow().isoformat()},
         "system": {"load1": 1.2, "cores": 16, "diskFreePct": 3.1, "memAvailPct": 80},
     }
+    for account in base["local"]["codex"]["accounts"].values():
+        account["capacityLease"] = {"sources": {"capacity": {"observedAt": hud.utcnow().isoformat()}}}
     base.update(overrides)
     return base
 
@@ -85,7 +87,7 @@ class MergeEvidenceTest(unittest.TestCase):
         sample = model()
         sample["github"].pop("open")
         text = "\n".join(plain(line) for line in hud.render(sample, width=200))
-        self.assertIn("open lane PRs unknown · draft unknown · ready unknown", text)
+        self.assertIn("open lane PRs unknown · draft unknown · non-draft unknown", text)
         self.assertIn("PR list: not-read-yet", text)
         self.assertNotIn("open lane PRs 0", text)
 
@@ -93,7 +95,7 @@ class MergeEvidenceTest(unittest.TestCase):
         sample = model()
         sample["github"]["errors"]["open"] = "github-budget-floor: 529 (< 600) until reset"
         text = "\n".join(plain(line) for line in hud.render(sample, width=200))
-        self.assertIn("open lane PRs unknown · draft unknown · ready unknown", text)
+        self.assertIn("open lane PRs unknown · draft unknown · non-draft unknown", text)
         self.assertIn("github-budget-floor: 529 (< 600) until reset", text)
         self.assertNotIn("#18724", text)
         self.assertNotIn("#18712", text)
@@ -104,14 +106,14 @@ class MergeEvidenceTest(unittest.TestCase):
                 sample = model()
                 sample["github"]["open"] = inventory
                 text = "\n".join(plain(line) for line in hud.render(sample, width=200))
-                self.assertIn("open lane PRs unknown · draft unknown · ready unknown", text)
+                self.assertIn("open lane PRs unknown · draft unknown · non-draft unknown", text)
                 self.assertNotIn("open lane PRs 0", text)
 
     def test_complete_empty_open_inventory_keeps_true_zero(self):
         sample = model()
         sample["github"]["open"] = []
         text = "\n".join(plain(line) for line in hud.render(sample, width=200))
-        self.assertIn("open lane PRs 0 · draft 0 · ready 0", text)
+        self.assertIn("open lane PRs 0 · draft 0 · non-draft 0", text)
         self.assertNotIn("PR list: not-read-yet", text)
 
     def test_initial_remote_state_does_not_claim_zero_merges(self):
@@ -162,6 +164,102 @@ class MergeEvidenceTest(unittest.TestCase):
         self.assertNotIn("merged24h", result)
         self.assertEqual(collect.call_count, 1)
 
+    def test_open_model_retains_exact_head_and_its_own_read_age(self):
+        pr = {"number": 123, "title": "repair", "headRefName": "codex/jov-123-20261016t000000",
+              "headRefOid": "head-sha", "isDraft": False, "mergeStateStatus": None,
+              "updatedAt": "2026-10-16T00:00:00Z"}
+        with mock.patch.object(hud.lane, "load_github_env"), \
+                mock.patch.object(hud.lane, "load_providers", return_value={"codex": {}}), \
+                mock.patch.object(hud, "promotion_model", return_value={}), \
+                mock.patch.object(hud.merge_evidence, "collect_shared", side_effect=RuntimeError("merge unavailable")), \
+                mock.patch.object(hud, "gh_json", side_effect=[ [pr], RuntimeError("queue timeout"), RuntimeError("rate timeout") ]) as read:
+            result = hud.github_model()
+        self.assertEqual(result["open"][0]["headRefOid"], "head-sha")
+        self.assertIsNone(result["open"][0]["merge"])
+        self.assertEqual(set(result["readAt"]), {"open"})
+        self.assertIn("headRefOid", read.call_args_list[0].args[0][-1])
+        self.assertFalse(result["ok"])
+
+    def test_successful_model_reads_timestamp_each_authority_separately(self):
+        queue = {"data": {"repository": {"mergeQueue": {"entries": {"totalCount": 1,
+            "nodes": [{"pullRequest": {"number": 123}, "state": "AWAITING_CHECKS",
+                       "enqueuedAt": "2026-10-16T00:00:00Z"}]}}}}}
+        merged = {"number": 99, "title": "landed", "mergedAt": "2026-10-16T00:00:00Z",
+                  "createdAt": "2026-10-15T00:00:00Z", "headRefName": "codex/jov-99-20261015"}
+        with mock.patch.object(hud.lane, "load_github_env"), \
+                mock.patch.object(hud.lane, "load_providers", return_value={"disabled": {"enabled": False}, "codex": {}}), \
+                mock.patch.object(hud.lane, "graphql_budget", return_value=(4200, "reset")), \
+                mock.patch.object(hud, "promotion_model", return_value={}), \
+                mock.patch.object(hud.merge_evidence, "collect_shared", return_value={"complete": True, "window": {"until": hud.utcnow().timestamp()}, "prs": [merged]}), \
+                mock.patch.object(hud, "gh_json", side_effect=[[], queue, {"resources": {"core": {"remaining": 4500}}}]):
+            result = hud.github_model()
+        self.assertTrue(result["ok"])
+        self.assertEqual(set(result["readAt"]), {"open", "merged", "queue", "rate"})
+        self.assertEqual(result["queue"]["depth"], 1)
+        self.assertEqual(result["merged24h"][0]["number"], 99)
+        self.assertTrue(all(hud.github_source_error(result, source, hud.utcnow()) is None
+                            for source in result["readAt"]))
+
+    def test_shared_merge_cache_age_is_not_renewed_by_a_successful_read(self):
+        now = hud.utcnow()
+        cached_until = now.timestamp() - 240
+        evidence = {"complete": True, "window": {"until": cached_until}, "prs": []}
+        with mock.patch.object(hud.lane, "load_github_env"), \
+                mock.patch.object(hud.lane, "load_providers", return_value={}), \
+                mock.patch.object(hud, "promotion_model", return_value={}), \
+                mock.patch.object(hud.merge_evidence, "collect_shared", return_value=evidence), \
+                mock.patch.object(hud, "gh_json", side_effect=RuntimeError("queue/rate")):
+            result = hud.github_model()
+        self.assertEqual(hud.datetime.fromisoformat(result["readAt"]["merged"]).timestamp(), cached_until)
+        later = now + hud.timedelta(seconds=840)
+        self.assertIn("stale", hud.github_source_error(result, "merged", later))
+        with mock.patch.object(hud, "utcnow", return_value=later):
+            text = "\n".join(plain(row) for row in hud.render(model(github=result), 200, 45))
+        self.assertIn("RECENTLY MERGED · unknown", text)
+        self.assertNotIn("total 0 in 24h", text)
+
+    def test_truncated_queue_is_unknown_not_partial_membership(self):
+        queue = {"data": {"repository": {"mergeQueue": {"entries": {"totalCount": 21, "nodes": []}}}}}
+        with mock.patch.object(hud.lane, "load_github_env"), \
+                mock.patch.object(hud.lane, "load_providers", return_value={}), \
+                mock.patch.object(hud, "promotion_model", return_value={}), \
+                mock.patch.object(hud.merge_evidence, "collect_shared", side_effect=RuntimeError("merge")), \
+                mock.patch.object(hud, "gh_json", side_effect=[queue, RuntimeError("rate")]):
+            result = hud.github_model()
+        self.assertNotIn("queue", result)
+        self.assertNotIn("queue", result["readAt"])
+        self.assertIn("inventory incomplete", result["errors"]["queue"])
+
+    def test_partial_or_failed_open_read_never_claims_complete_inventory(self):
+        for page in ([{}] * 60, None, RuntimeError("HTTP 504")):
+            with self.subTest(page=type(page).__name__), \
+                    mock.patch.object(hud.lane, "load_github_env"), \
+                    mock.patch.object(hud.lane, "load_providers", return_value={"codex": {}}), \
+                    mock.patch.object(hud, "promotion_model", return_value={}), \
+                    mock.patch.object(hud.merge_evidence, "collect_shared", side_effect=RuntimeError("unavailable")), \
+                    mock.patch.object(hud, "gh_json", side_effect=[page, RuntimeError("queue"), RuntimeError("rate")]):
+                result = hud.github_model()
+                self.assertNotIn("open", result)
+                self.assertNotIn("open", result["readAt"])
+                self.assertIn("open", result["errors"])
+
+    def test_remote_read_exceptions_replace_cached_success_and_keep_polling(self):
+        class Stop(Exception):
+            pass
+        remote = hud.Remote(SimpleNamespace(state=Path("/nonexistent"), linear_env=None))
+        remote.github = model()["github"]
+        with mock.patch.object(hud, "running_workers", return_value=[]), \
+                mock.patch.object(hud, "linear_model", side_effect=RuntimeError("mirror failed")), \
+                mock.patch.object(hud, "github_model", side_effect=RuntimeError("env read failed")) as github, \
+                mock.patch.object(hud.time, "monotonic", return_value=0), \
+                mock.patch.object(hud.time, "sleep", side_effect=[None, Stop()]), self.assertRaises(Stop):
+            remote.run()
+        self.assertEqual(github.call_count, 1)
+        self.assertNotIn("open", remote.github)
+        self.assertNotIn("queue", remote.github)
+        self.assertIn("env read failed", remote.github["errors"]["open"])
+        self.assertIn("mirror failed", remote.linear["error"])
+
     def test_remote_reads_github_every_five_minutes_and_linear_every_tick(self):
         class Stop(Exception):
             pass
@@ -206,6 +304,149 @@ class ParseTest(unittest.TestCase):
         self.assertEqual(hud.phase_of("", "devin"), "starting")
 
 
+class PipelineAccuracyTest(unittest.TestCase):
+    def sample(self, merge="DIRTY", draft=False, held=None, queued=False):
+        value = model()
+        pr = value["github"]["open"][0]
+        pr.update(merge=merge, draft=draft, headRefOid="current-head")
+        value["github"]["open"] = [pr]
+        value["github"]["queue"] = {"depth": int(queued), "entries":
+            value["github"]["queue"]["entries"] if queued else []}
+        value["local"]["held"] = {str(pr["number"]): held} if held else {}
+        return value
+
+    def row(self, value, width=160):
+        return next(plain(row) for row in hud.render(value, width, 45) if "#18724" in row)
+
+    def test_real_conflict_and_exact_head_hold_are_both_visible_at_console_width(self):
+        value = self.sample(held={"sha": "current-head", "reason": "gate-timeout",
+                                  "evidence": ["check-timeout: pre-push-gate.sh"]})
+        row = self.row(value)
+        self.assertIn("merge conflict · held: gate-timeout", row)
+        self.assertNotIn("READY", row)
+
+    def test_malformed_exact_head_hold_evidence_is_unknown_without_crashing(self):
+        for evidence in (4, {"reason": "gate"}, "gate-check-failed", [None, {}], [], None):
+            with self.subTest(evidence=evidence):
+                row = self.row(self.sample(held={"sha": "current-head", "evidence": evidence}))
+                self.assertIn("merge conflict · held: reason unknown", row)
+
+    def test_obsolete_or_unbound_hold_is_not_current_repair_disposition(self):
+        for hold in ({"sha": "old-head", "reason": "gate-timeout"},
+                     {"reason": "gate-timeout"}, "corrupt"):
+            with self.subTest(hold=hold):
+                row = self.row(self.sample(held=hold))
+                self.assertIn("merge conflict", row)
+                self.assertNotIn("held:", row)
+
+    def test_generic_blocked_does_not_invent_failing_checks(self):
+        row = self.row(self.sample(merge="BLOCKED"))
+        self.assertIn("blocked · reason unknown", row)
+        self.assertNotIn("checks", row)
+        self.assertNotIn("READY", row)
+
+    def test_nonpassing_status_and_known_check_failure_remain_distinct(self):
+        self.assertIn("non-passing status", self.row(self.sample(merge="UNSTABLE")))
+        value = self.sample(merge="BLOCKED", held={"sha": "current-head",
+            "reason": "gate-check-failed", "evidence": ["check-failed: unit tests"]})
+        self.assertIn("held: gate-check-failed", self.row(value))
+
+    def test_queue_then_hold_and_draft_precedence(self):
+        queued = self.sample(merge="BLOCKED", draft=True, queued=True)
+        self.assertIn("in queue awaiting_checks", self.row(queued))
+        self.assertNotIn("draft · awaiting gate", self.row(queued))
+        self.assertIn("DRAFT", self.row(queued))
+        held = self.sample(merge="BLOCKED", draft=True, held={"sha": "current-head",
+            "evidence": ["check-failed:bash scripts/hooks/pre-push-gate.sh affected"]})
+        self.assertIn("held: check-failed:pre-push-gate.sh", self.row(held))
+        self.assertNotIn("draft · awaiting gate", self.row(held))
+        self.assertIn("draft · awaiting gate", self.row(self.sample(merge="BLOCKED", draft=True)))
+
+    def test_queued_exact_head_hold_preserves_queue_as_primary_note(self):
+        value = self.sample(merge="BLOCKED", queued=True,
+                            held={"sha": "current-head", "reason": "gate-timeout"})
+        row = self.row(value)
+        self.assertIn("in queue awaiting_checks", row)
+        self.assertIn("held: gate-timeout", row)
+        self.assertLess(row.index("in queue"), row.index("held:"))
+
+    def test_long_queued_hold_keeps_its_reason_visible_at_console_width(self):
+        value = self.sample(merge="BLOCKED", queued=True,
+                            held={"sha": "current-head", "reason": "lockfile-without-manifest"})
+        row = self.row(value)
+        self.assertIn("in queue awaiting_checks", row)
+        self.assertIn("held: lockfile-without-manifest", row)
+        self.assertLessEqual(len(row), 160)
+
+    def test_unmatched_hud_release_does_not_claim_a_restart_has_started(self):
+        value = self.sample()
+        value["local"]["releaseMatchesHud"] = False
+        header = plain(hud.render(value, 160, 45)[0])
+        self.assertIn("hud≠release", header)
+        self.assertNotIn("restarting", header)
+
+    def test_unread_hold_source_is_unknown_not_zero_or_healthy(self):
+        value = self.sample()
+        value["local"]["heldError"] = "held.json unavailable or invalid"
+        value["local"]["doctor"] = {}
+        value["local"]["cooldowns"] = {}
+        value["local"]["requeue"] = {}
+        value["local"]["ledger24h"] = {}
+        text = "\n".join(plain(row) for row in hud.render(value, 200, 45))
+        self.assertIn("hold records unknown", text)
+        self.assertIn("held.json unavailable or invalid", text)
+        self.assertNotIn("nothing needs a human", text)
+
+    def test_null_or_missing_merge_state_is_unknown_not_success(self):
+        for merge in (None, "", "UNKNOWN"):
+            with self.subTest(merge=merge):
+                row = self.row(self.sample(merge=merge))
+                self.assertIn("merge state unknown", row)
+                self.assertNotIn("READY", row)
+                self.assertNotIn("in queue", row)
+
+    def test_bad_or_stale_source_age_cannot_display_current_pr_or_queue_success(self):
+        for stamp in (None, "invalid", "2026-01-01T00:00:00+00:00",
+                      "2026-01-01T00:00:00", (hud.utcnow() + hud.timedelta(seconds=30)).isoformat()):
+            with self.subTest(stamp=stamp):
+                value = self.sample(queued=True)
+                value["github"]["fetchedAt"] = stamp
+                text = "\n".join(plain(row) for row in hud.render(value, 200, 45))
+                self.assertIn("open lane PRs unknown", text)
+                self.assertIn("merge queue unknown", text)
+                self.assertNotIn("#18724", text)
+                self.assertNotIn("in queue", text)
+                self.assertIn("RECENTLY MERGED · unknown", text)
+
+    def test_failed_queue_read_does_not_reuse_cached_membership(self):
+        value = self.sample(queued=True)
+        value["github"]["errors"]["queue"] = "TimeoutError: queue read failed"
+        text = "\n".join(plain(row) for row in hud.render(value, 200, 45))
+        self.assertIn("merge queue unknown", text)
+        self.assertIn("queue read failed", text)
+        self.assertNotIn("in queue", self.row(value))
+
+    def test_invalid_section_timestamps_cannot_fall_back_to_fresh_overall_attempt(self):
+        for stamps in (None, "invalid", {}, {"queue": hud.utcnow().isoformat()}):
+            with self.subTest(stamps=stamps):
+                value = self.sample(queued=True)
+                value["github"]["readAt"] = stamps
+                text = "\n".join(plain(row) for row in hud.render(value, 200, 45))
+                self.assertIn("open lane PRs unknown", text)
+                self.assertNotIn("#18724", text)
+
+    def test_section_timestamps_do_not_refresh_older_reads(self):
+        value = self.sample(queued=True)
+        value["github"]["readAt"] = {"open": "2026-01-01T00:00:00+00:00",
+            "queue": value["github"]["fetchedAt"], "merged": value["github"]["fetchedAt"],
+            "rate": value["github"]["fetchedAt"]}
+        text = "\n".join(plain(row) for row in hud.render(value, 200, 45))
+        self.assertIn("open lane PRs unknown", text)
+        self.assertIn("merge queue 1", text)
+        self.assertIn("stale", text)
+        self.assertNotIn("#18724", text)
+
+
 class RenderTest(unittest.TestCase):
     def test_frame_fits_the_console_exactly(self):
         for width, height in ((160, 45), (120, 30), (240, 60)):
@@ -225,8 +466,9 @@ class RenderTest(unittest.TestCase):
 
     def test_unknown_capacity_is_not_colored_healthy(self):
         value = model()
+        value["local"]["doctor"]["at"] = hud.utcnow().isoformat()
         value["local"]["doctor"]["capacity"] = {
-            "schema": "jovie.capacity-horizon/v1", "incidents": [],
+            "schema": "jovie.capacity-horizon/v1", "generatedAt": hud.utcnow().isoformat(), "incidents": [],
             "topBlocker": "capacity source missing",
             "leases": [{"alias": "current-login", "mode": "unknown", "freshness": {"status": "unknown"}}]}
         row = next(row for row in hud.render(value, 160, 45) if "current-login ?" in row)
@@ -271,16 +513,89 @@ class RenderTest(unittest.TestCase):
 
     def test_capacity_horizon_is_show_only_and_renders_source_gaps(self):
         value = model()
+        value["local"]["doctor"]["at"] = hud.utcnow().isoformat()
         value["local"]["doctor"]["capacity"] = {
-            "schema": "jovie.capacity-horizon/v1", "incidents": [], "topBlocker": "drain evidence stale",
+            "schema": "jovie.capacity-horizon/v1", "generatedAt": hud.utcnow().isoformat(),
+            "incidents": [], "topBlocker": "drain evidence stale",
             "leases": [{"alias": "alpha", "usableRemaining": 48, "bankedCount": 2, "mode": "fast",
                         "event": {"label": "natural reset", "countdownSeconds": 600},
                         "forecast": {"projectedUnused": None}, "route": {"selectedJob": "JOV-9"},
                         "freshness": {"status": "stale"}}]}
         text = "\n".join(plain(line) for line in hud.render(value, 160, 45))
         self.assertIn("CAPACITY HORIZON", text)
-        self.assertIn("alpha 48% · banked 2 · natural reset 10m · drain ? @ ? · unused ? · coverage 0 · FAST · JOV-9 · stale", text)
+        self.assertIn("alpha ? · banked ? · natural reset ? · drain ? @ ? · unused ? · coverage ? · UNKNOWN · selection unknown · stale", text)
         self.assertIn("show-only", text)
+
+    def test_capacity_horizon_ages_saved_receipts_and_account_observations(self):
+        now = hud.utcnow()
+        value = model()
+        feed = value["local"]["doctor"]
+        feed["at"] = now.isoformat()
+        feed["capacity"] = {
+            "schema": "jovie.capacity-horizon/v1", "generatedAt": now.isoformat(),
+            "leases": [{"alias": "alpha", "usableRemaining": 48, "bankedCount": 2, "mode": "normal",
+                        "event": {"label": "natural reset", "at": (now + hud.timedelta(seconds=600)).isoformat(),
+                                  "countdownSeconds": 99999},
+                        "forecast": {}, "route": {"selectedJob": "JOV-9"},
+                        "freshness": {"status": "fresh", "observedAt": now.isoformat()}}]}
+        with mock.patch.object(hud, "utcnow", return_value=now + hud.timedelta(seconds=60)):
+            row = next(line for line in hud.render(value, 200, 45) if "alpha 48%" in line)
+        self.assertIn("natural reset 9m", plain(row), "countdown uses the absolute source deadline")
+        self.assertIn(hud.rgb(hud.GREEN, "")[:-4], row)
+        for target, key in ((feed, "at"), (feed["capacity"], "generatedAt")):
+            for stamp in (None, "invalid", now.replace(tzinfo=None).isoformat(),
+                          (now + hud.timedelta(seconds=1)).isoformat(),
+                          (now - hud.timedelta(seconds=271)).isoformat()):
+                with self.subTest(key=key, stamp=stamp), mock.patch.object(hud, "utcnow", return_value=now):
+                    target[key] = stamp
+                    text = "\n".join(plain(line) for line in hud.render(value, 200, 45))
+                    self.assertIn("CAPACITY HORIZON  unknown", text)
+                    self.assertNotIn("alpha 48%", text)
+                    self.assertNotIn("NORMAL", text)
+            target[key] = now.isoformat()
+        freshness = feed["capacity"]["leases"][0]["freshness"]
+        for stamp, expected in ((None, "unknown"), ("invalid", "unknown"),
+                                (now.replace(tzinfo=None).isoformat(), "unknown"),
+                                ((now + hud.timedelta(seconds=61)).isoformat(), "contradictory"),
+                                ((now - hud.timedelta(seconds=7201)).isoformat(), "stale")):
+            with self.subTest(stamp=stamp), mock.patch.object(hud, "utcnow", return_value=now):
+                freshness["observedAt"] = stamp
+                frame = hud.render(value, 200, 45)
+                row = next(line for line in frame if "alpha ?" in line)
+                self.assertIn("UNKNOWN · selection unknown · " + expected, plain(row))
+                self.assertNotIn(hud.rgb(hud.GREEN, "")[:-4], row)
+                self.assertIn("top blocker: capacity source " + expected, "\n".join(plain(line) for line in frame))
+                self.assertNotIn("no material blocker", "\n".join(plain(line) for line in frame))
+
+    def test_capacity_horizon_unknown_deadline_is_not_a_saved_countdown(self):
+        now = hud.utcnow()
+        value = model()
+        value["local"]["doctor"].update(at=now.isoformat(), capacity={
+            "schema": "jovie.capacity-horizon/v1", "generatedAt": now.isoformat(),
+            "leases": [{"alias": "alpha", "mode": "normal", "event": {"countdownSeconds": 600},
+                        "freshness": {"status": "fresh", "observedAt": now.isoformat()}}]})
+        for stamp in (None, "bad", now.replace(tzinfo=None).isoformat()):
+            with self.subTest(stamp=stamp):
+                value["local"]["doctor"]["capacity"]["leases"][0]["event"]["at"] = stamp
+                row = next(plain(line) for line in hud.render(value, 200, 45) if "alpha ?" in line)
+                self.assertIn("source gap ?", row)
+                self.assertNotIn("10m", row)
+
+    def test_missing_horizon_cannot_bypass_account_source_freshness(self):
+        now = hud.utcnow()
+        for capacity in (None, {"schema": "retired-controller/v1"}):
+            for stamp, expected in ((None, "unknown"), ("bad", "unknown"),
+                                    ((now - hud.timedelta(seconds=7201)).isoformat(), "stale"),
+                                    ((now + hud.timedelta(seconds=61)).isoformat(), "contradictory")):
+                with self.subTest(capacity=capacity, stamp=stamp), mock.patch.object(hud, "utcnow", return_value=now):
+                    value = model()
+                    value["local"]["doctor"] = {"capacity": capacity}
+                    account = value["local"]["codex"]["accounts"]["alpha"]
+                    account["capacityLease"] = {"sources": {"capacity": {"observedAt": stamp}}}
+                    row = next(line for line in hud.render(value, 200, 45) if "alpha" in line)
+                    self.assertIn("? alpha capacity " + expected, plain(row))
+                    self.assertNotIn("48%", row)
+                    self.assertNotIn(hud.rgb(hud.GREEN, "")[:-4], row)
 
     def test_pipeline_attention_and_backlog_rows(self):
         value = model()
@@ -298,7 +613,7 @@ class RenderTest(unittest.TestCase):
         self.assertIn("requeue pending #18720", text)
         self.assertIn("gate-timeout 2", text)
         self.assertIn("Todo candidates 99 (agent-ready 87 · devin 0 · codex 19)", text)
-        self.assertIn("autonomous 1 · manual Codex app 0 · old codex/* 0 · total 2 in 24h", text)
+        self.assertIn("verified 0/2 · inferred 0 · unknown 2 · total 2 in 24h", text)
         self.assertIn("THROUGHPUT 24h · codex offer 0", text)
         self.assertIn("devin offer 1 start 1 productive 1 PR 1 first-pass 100%", text)
         self.assertIn("disk 3.1% free", text)
@@ -314,10 +629,10 @@ class RenderTest(unittest.TestCase):
         text = "\n".join(plain(line) for line in hud.render(broken, 160, 45))
         self.assertIn("Linear HTTPError: 429", text)
         self.assertIn("PR list: RuntimeError: HTTP 504", text)
-        self.assertIn("merge queue timeout", text)
+        self.assertIn("merge queue unknown · timeout", text)
         self.assertIn("new issues unknown (doctor unread)", text)
         self.assertIn("FileNotFoundError: codex", text)
-        self.assertIn("✓ nothing needs a human", text)
+        self.assertIn("no alerts recorded", text)
         self.assertNotIn("UNKNOWN", text)
 
     def test_stale_remote_reads_are_flagged_in_the_header(self):
@@ -363,6 +678,16 @@ class RenderTest(unittest.TestCase):
                                                     "allowed": False, "reason": "over-budget"}}})
         self.assertEqual(hud.pool_hint("codex", value["local"]),
                          "new issues 0 · eligible 8/20 · PRs 14/6 over-budget")
+
+    def test_native_uncapped_pr_budget_is_readable_and_not_a_capacity_limit(self):
+        value = model()
+        value["local"]["doctor"].update(at=hud.utcnow().isoformat(), observed={
+            "poolByProvider": {"codex": 0}, "candidatePoolByProvider": {"codex": 27},
+            "eligiblePoolByProvider": {"codex": 0}, "rejectedByProvider": {"codex": {"sensitive-text": 16}},
+            "newIssueBudgetByProvider": {"codex": hud.lane.read_new_issue_budget("codex", 3)}})
+        hint = hud.pool_hint("codex", value["local"])
+        self.assertEqual(hint, "new issues 0 · eligible 0/27 · PR ceiling none · sensitive-text 16")
+        self.assertNotIn("None", hint)
 
     def test_new_issue_hint_separates_eligibility_budget_and_unknown(self):
         local = {"doctor": {"at": hud.utcnow().isoformat(), "admission": {
@@ -492,11 +817,52 @@ class LedgerSchemaTest(unittest.TestCase):
 
 
 class ManagedReleaseRestartTest(unittest.TestCase):
+    def test_live_redraw_preserves_the_last_console_column(self):
+        class StopLoop(Exception):
+            pass
+
+        width, height = 160, 45
+        sample = model()
+        stamp = hud.utcnow()
+        with mock.patch.object(hud, "utcnow", return_value=stamp):
+            expected = [plain(row) for row in hud.render(sample, width, height)]
+        output = io.StringIO()
+        with mock.patch.object(hud.lane, "Host", return_value=SimpleNamespace(state=Path('/unused'))), \
+                mock.patch.object(hud.lane, "load_github_env"), \
+                mock.patch.object(hud, "Remote"), \
+                mock.patch.object(hud, "current_hud", return_value=None), \
+                mock.patch.object(hud, "build_model", return_value=sample), \
+                mock.patch.object(hud, "utcnow", return_value=stamp), \
+                mock.patch.object(hud.sys, "stdout", output), \
+                mock.patch.object(hud.time, "sleep", side_effect=StopLoop):
+            with self.assertRaises(StopLoop):
+                hud.main(["--width", str(width), "--height", str(height)])
+
+        # tty1 keeps its cursor on the final cell while wrap is pending. EL
+        # after a full-width write therefore erases that cell, including Z or
+        # the end of a hold reason. Apply the emitted terminal controls rather
+        # than checking the pre-terminal render strings alone.
+        trace = output.getvalue().split("\x1b[H", 1)[1].split("\x1b[?25h", 1)[0]
+        screen, row, column = [["~"] * width for _ in range(height)], 0, 0
+        for token in re.split(r"(\x1b\[[0-9;?]*[A-Za-z]|\n)", trace):
+            if token == "\n":  # tty1's ONLCR advances to column one.
+                row, column = row + 1, 0
+            elif token == "\x1b[K":
+                start = min(column, width - 1)
+                screen[row][start:] = [" "] * (width - start)
+            elif not token.startswith("\x1b"):
+                for char in token:
+                    screen[row][min(column, width - 1)] = char
+                    column += 1
+        self.assertEqual(["".join(row) for row in screen], expected)
+        self.assertTrue(any(row[-1] != " " for row in expected))
+
     def test_symlink_launched_process_executes_the_new_release_and_preserves_flags(self):
         with tempfile.TemporaryDirectory() as directory:
             state = Path(directory)
             old, new = state / "old", state / "new"
             shutil.copytree(ROOT / "scripts/lanes", old, ignore=shutil.ignore_patterns("__pycache__"))
+            shutil.copyfile(ROOT / "scripts/shipping_origin.py", state / "shipping_origin.py")
             new.mkdir()
             receipt = state / "executed.json"
             (new / "hud.py").write_text(

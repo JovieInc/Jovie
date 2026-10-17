@@ -8,6 +8,11 @@
 
 > This document is the canonical UX contract for the public profile epic. Implementation sub-issues MUST cite this spec. When a finding conflicts with this spec, update this doc and cite the amendment.
 
+The first-cohort taste cut line is locked separately in
+[`product/canonical-artist-site-experience.md`](product/canonical-artist-site-experience.md).
+That contract uses Tim White's live site as the reference journey and is the
+input to JOV-6572 certification; this document continues to own the general IA.
+
 ---
 
 ## 1. Route Categories
@@ -391,12 +396,15 @@ These labels are not translated in the initial implementation. Internationalizat
 
 ### 5.7 Missing Data Rules
 
+**EVENT: JOV-5189.** Missing tour dates change the Events panel content, not
+destination availability; §2.3 applies to compact and wide navigation.
+
 | Field | Behavior When Missing |
 |---|---|
 | Artist display name | Fall back to `@{username}` handle |
 | Artist avatar | Fall back to initials avatar (first letter of display name or handle) |
 | Artist bio | Omit bio section entirely (do not show a placeholder) |
-| Tour dates | Hide Events tab from tab bar |
+| Tour dates | Keep Events in compact and wide navigation; show the Events empty state (§2.3) |
 | Latest release | Show `ProfilePrimaryActionCard` default/empty variant (not a skeleton) |
 | Social links | Omit social icon row entirely |
 | Contact links | Omit contact trigger from More menu |

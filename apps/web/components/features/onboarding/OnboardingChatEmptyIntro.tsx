@@ -3,7 +3,6 @@
 // @coverage-via apps/web/tests/unit/onboarding/OnboardingShell.sign-in-placement.test.tsx
 
 import { Button } from '@jovie/ui';
-import { LoaderCircle } from 'lucide-react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { JovieMarkElectric } from '@/components/atoms/JovieMarkElectric';
@@ -117,18 +116,14 @@ function EntryProfileCard({
 
 function getEntryCopy(mode: OnboardingEntryMode): {
   readonly title: string;
-  readonly support: string;
+  readonly support: string | null;
 } {
   switch (mode) {
     case 'spotify_handoff':
-      return {
-        title: 'Getting your artist ready',
-        support: 'Your message is on its way.',
-      };
     case 'prompt_handoff':
       return {
-        title: 'Getting this ready',
-        support: 'Your message is on its way.',
+        title: 'Your first message',
+        support: null,
       };
     case 'restoring_intent':
       return {
@@ -193,7 +188,7 @@ export function OnboardingChatEmptyIntro({
       data-entry-mode={mode}
       data-testid='onboarding-empty-intro'
     >
-      {!isBlank ? (
+      {mode === 'restoring_intent' ? (
         <div
           aria-hidden='true'
           className='mb-4 text-primary-token opacity-[0.18]'
@@ -206,28 +201,12 @@ export function OnboardingChatEmptyIntro({
         <h1 className='text-2xl font-semibold text-primary-token'>
           {copy.title}
         </h1>
-        {!isBlank ? (
+        {!isBlank && copy.support ? (
           <p className='mt-2 text-sm leading-6 text-secondary-token'>
             {copy.support}
           </p>
         ) : null}
       </div>
-
-      {!isBlank ? (
-        <div className='flex min-h-11 items-start justify-center pt-3'>
-          <div
-            className='inline-flex min-h-11 items-center gap-2 text-xs text-secondary-token'
-            role='status'
-            aria-live='polite'
-          >
-            <LoaderCircle
-              className='h-3.5 w-3.5 animate-spin motion-reduce:animate-none'
-              aria-hidden='true'
-            />
-            Preparing your first message
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

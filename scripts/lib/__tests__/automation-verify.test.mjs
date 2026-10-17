@@ -100,6 +100,19 @@ describe('lane Python qualification coverage', () => {
   it.each([
     ['lane source', ['scripts/lanes/hyperagent_lane.py']],
     ['attempt regression', ['scripts/tests/test_execution_attempt.py']],
+    ['qualification safety source', ['scripts/lanes/qualification_guard.py']],
+    [
+      'qualification safety regression',
+      ['scripts/tests/test_qualification_guard.py'],
+    ],
+    [
+      'remediation repair',
+      [
+        'scripts/lanes/remediation.py',
+        'scripts/lanes/lane_runner.py',
+        'scripts/tests/test_lane_runner.py',
+      ],
+    ],
     ['merge reader', ['scripts/lanes/merge_evidence.py']],
     ['HUD regression', ['scripts/tests/test_hud.py']],
     ['falsy inputs', [null, false, '', 'scripts/lanes/execution_attempt.py']],
@@ -167,6 +180,57 @@ describe('lane Python qualification coverage', () => {
       }
     }
   );
+});
+
+describe('remediation coverage selection', () => {
+  const repair = [
+    'scripts/lanes/remediation.py',
+    'scripts/lanes/lane_runner.py',
+    'scripts/tests/test_lane_runner.py',
+  ];
+  it.each([
+    ['source alone', ['scripts/lanes/remediation.py']],
+    ['standalone regression', ['scripts/tests/test_remediation.py']],
+    ['actual repair signature', repair],
+  ])(
+    'selects the enforced lane qualifier for %s without unrelated web shards',
+    (_, files) => {
+      const plan = buildAffectedTestPlan(files);
+      expect(plan.mode).toBe('selected');
+      expect(plan.lanePythonCoverage).toBe(true);
+      expect(plan.selectedTests).toEqual([]);
+      const commands = buildSelectedTestCommands(plan, '1');
+      expect(commands).toContainEqual([
+        'env',
+        ['CI=true', 'bash', '-c', STRUCTURAL_PYTHON_REGRESSION_COMMANDS[0]],
+      ]);
+    }
+  );
+  it.each([
+    'scripts/tests/test_remediation.py',
+    'scripts/tests/test_lane_runner.py',
+  ])(
+    'retains full fallback when required behavioral evidence %s is unavailable',
+    missing => {
+      const plan = buildAffectedTestPlan(repair, {
+        isFileAvailable: path => path !== missing,
+      });
+      expect(plan.mode).toBe('full');
+      expect(plan.fallbackReason).toBe(
+        'remediation coverage proof is unavailable'
+      );
+      expect(plan.lanePythonCoverage).toBe(true);
+    }
+  );
+  it.each([
+    'scripts/lanes/unknown-new.py',
+    'apps/web/lib/unknown-control-peer.ts',
+    'package.json',
+  ])('preserves full fallback for unrelated or global peer %s', peer => {
+    const plan = buildAffectedTestPlan([...repair, peer]);
+    expect(plan.mode).toBe('full');
+    expect(plan.lanePythonCoverage).toBe(true);
+  });
 });
 
 describe('merge evidence coverage selection', () => {
@@ -1457,6 +1521,8 @@ const SENTRY_AUTOFIX_RECURRENCE_LANE = [
   '.github/workflows/sentry-autofix-recurrence.yml',
   '.github/workflows/sentry-autofix.yml',
   'scripts/sentry-autofix-recurrence.mjs',
+  'scripts/lib/sentry-validation-observation.mjs',
+  'scripts/lib/__tests__/sentry-validation-observation.test.mjs',
   'scripts/lib/__tests__/sentry-autofix-recurrence.test.mjs',
   'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
   'scripts/tests/test_agent_workflow_hygiene.py',
@@ -1949,14 +2015,33 @@ describe('automation-verify affected scope', () => {
       {
         mode: 'selected',
         selectedTests: [],
-        pythonUnittestTests: ['scripts/tests/test_agent_workflow_hygiene.py'],
+        pythonTests: ['scripts/tests/test_agent_workflow_hygiene.py'],
+        pythonUnittestTests: [],
         scriptVitestTests: [
           'scripts/lib/__tests__/sentry-autofix-recurrence.test.mjs',
+          'scripts/lib/__tests__/sentry-validation-observation.test.mjs',
           'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
           'scripts/lib/__tests__/automation-verify.test.mjs',
         ],
         nodeTests: ['scripts/typecheck-scripts.mjs'],
       }
+    );
+    const plan = buildAffectedTestPlan([
+      'scripts/lib/sentry-validation-observation.mjs',
+      'scripts/lib/__tests__/sentry-validation-observation.test.mjs',
+    ]);
+    expect(plan.mode).toBe('selected');
+    const commands = buildSelectedTestCommands(plan, '1');
+    expect(commands).toContainEqual([
+      'python3',
+      ['-m', 'pytest', 'scripts/tests/test_agent_workflow_hygiene.py', '-q'],
+    ]);
+    expect(commands.flatMap(([, args]) => args)).toEqual(
+      expect.arrayContaining([
+        'lib/__tests__/sentry-validation-observation.test.mjs',
+        '--coverage.include=lib/sentry-validation-observation.mjs',
+        '--coverage.include=sentry-autofix-recurrence.mjs',
+      ])
     );
     expect(
       buildAffectedTestPlan([

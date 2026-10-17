@@ -22,6 +22,9 @@ export const ARTIST_VISIBILITY_OFFER = {
     monthlyUsd: 199,
     currency: 'usd',
     interval: 'month',
+    capabilities: {
+      canAutoCreateLinks: true,
+    },
     outcomes: [
       'Continuous visibility monitoring',
       'Prioritized opportunities',

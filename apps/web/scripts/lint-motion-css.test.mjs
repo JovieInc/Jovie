@@ -6,13 +6,20 @@
  * stylesheet-side checks (transition:all, will-change:all, raw ms/s durations)
  * stay in lockstep with the JSX-side rule's semantics.
  */
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { lintCssSource, shouldScanFile } from './lint-motion-css.mjs';
 
 // The scanner allowlists *.test.*/styles/ paths, so give cases a
 // production-like filename to exercise the checks.
 const filename = 'apps/web/components/atoms/Example.css';
-const grandfatheredFilename = 'apps/web/components/organisms/HeaderNav.css';
+const grandfatheredFilename = 'apps/web/app/globals.css';
+const migratedFiles = [
+  'app/(marketing)/changelog/changelog-editorial.css',
+  'components/organisms/HeaderNav.css',
+  'components/site/MarketingFooter.css',
+];
 
 const run = (code, file = filename) =>
   lintCssSource(code, file).map(v => v.messageId);
@@ -109,6 +116,21 @@ describe('lint-motion-css', () => {
   });
 
   describe('file scoping', () => {
+    it.each(migratedFiles)(
+      'keeps %s free of motion debt and exemptions',
+      file => {
+        const filename = resolve(import.meta.dirname, '..', file);
+        expect(
+          lintCssSource(readFileSync(filename, 'utf8'), filename, {
+            grandfathered: false,
+          })
+        ).toEqual([]);
+        expect(
+          run('.a { transition: color 140ms ease-out; }', filename)
+        ).toEqual(['rawDuration']);
+      }
+    );
+
     it('skips allowlisted paths', () => {
       expect(shouldScanFile('apps/web/styles/design-system.css')).toBe(false);
       expect(shouldScanFile('apps/web/app/exp/x.css')).toBe(false);

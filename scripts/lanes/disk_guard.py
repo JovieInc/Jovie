@@ -6,11 +6,12 @@ never on its own timer: the tick spawns a detached sweep (maybe_sweep) when its
 interval has elapsed, and a worker holding the cleanup lock sweeps in-process. Below LOW_PCT free on the state filesystem the guard sweeps,
 in order: DerivedData idle > 5h, clean worktrees idle > 12h (branches kept),
 .next/test-results inside idle worktrees that stay, idle worktree-pool slots once
-free space is under the pool's floor (`worktree_pool.shed`), transient `_work` output of
-idle self-hosted runners, retired Symphony workspaces (backed up to a branch first when they
-hold work), lane logs older than LOG_IDLE_S, `xcrun simctl delete unavailable`. The runner,
-workspace and log steps took over from Gem's retired gem-disk-reclaim timer (2026-10-11). The shared pnpm store stays intact: pruning it while active worktrees
-install with copy imports amplifies disk use. Free space at or below CRITICAL_PCT
+free space is under the pool's floor (`worktree_pool.shed`), retired Symphony
+workspaces (backed up to a branch first when they hold work), lane logs older than
+LOG_IDLE_S, `xcrun simctl delete unavailable`. The workspace and log steps took over from Gem's retired gem-disk-reclaim timer (2026-10-11).
+Runner-owned `_work` stays intact: an idle process snapshot cannot exclude a job
+starting before deletion (JOV-4317). The shared pnpm store stays intact: pruning it
+while active worktrees install with copy imports amplifies disk use. Free space at or below CRITICAL_PCT
 after the sweep is `critical` in the receipt; the doctor turns that reading into a
 Linear Triage signal for Summer. Every step fails soft: one bad path never stops the rest.
 """
@@ -31,6 +32,7 @@ from types import SimpleNamespace
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import autoscale  # noqa: E402  (sibling module of the release)
 import worktree_pool  # noqa: E402  (sibling module of the release)
+import git_housekeeping  # noqa: E402  (detached git maintenance vs cleanup)
 
 # One threshold (Gem 2026-10-12 04:12Z): autoscale stops growth at or below this free %, so the
 # sweep must already run there. At exactly 15% growth was blocked and nothing was reclaimed
@@ -50,8 +52,6 @@ PRESERVED_REPAIR = ".jovie-preserved-repair.json"
 # repair attempt on "already used by worktree" (2026-10-11, 25 PRs fix-exhausted).
 HARNESS_ARTIFACTS = (PRESERVED_REPAIR, ".codex-last-message.txt")
 SOURCE_PATHSPEC = ("--", ".", *(f":(exclude){name}" for name in HARNESS_ARTIFACTS))
-# What gem-disk-reclaim removed from an idle runner's _work: the job checkouts stay warm.
-RUNNER_TRANSIENT = ("_actions", "_temp", "_tool", "_update")
 # Elixir Symphony is retired; its workspaces only shrink. Linux mount table for mount safety.
 RETIRED_WORKSPACE_DIRS = ("symphony-elixir-workspaces", "symphony-workspaces")
 RETIRED_WORKSPACE_ABSOLUTE = ("/srv/worktrees/jovie",)
@@ -253,39 +253,16 @@ def log_dirs(host) -> list[Path]:
     return [host.state / "runs", *([] if selftest() else [Path.home() / "symphony-ui-pilot-logs"])]
 
 
-def runner_workers(run) -> list[str] | None:
-    """Command lines of running Runner.Worker processes; None when that cannot be observed."""
-    try:
-        ps = run(["ps", "-axo", "args="], capture_output=True, text=True, timeout=30)
-    except (OSError, subprocess.SubprocessError):
-        return None
-    if getattr(ps, "returncode", 1) != 0:
-        return None
-    return [line.strip() for line in ps.stdout.splitlines() if "Runner.Worker" in line]
-
-
 def sweep_runner_work(run, report: dict, roots=None) -> None:
-    """Transient _work output of runners with no job running. A worker whose install cannot
-    be attributed holds every runner: an unknown job is never swept from under itself."""
-    roots = runner_roots() if roots is None else roots
-    if not any(root.is_dir() for root in roots):
-        return
-    workers = runner_workers(run)
-    if workers is None or any(not re.search(r"(^|\s)/\S*Runner\.Worker", line) for line in workers):
-        report["errors"].append("runner-state-unavailable")
-        return
-    for root in roots:
+    """Preserve Actions-owned work until the runner lifecycle can prove exclusivity.
+
+    A process snapshot, even immediately before deletion, races a new job. The
+    generic disk guard owns neither the listener nor its job-start boundary.
+    """
+    for root in runner_roots() if roots is None else roots:
         if root.is_symlink() or not (root / ".runner").is_file() or not (root / "run.sh").exists():
             continue
-        if any(f"{root.resolve()}/" in line for line in workers):
-            report["actions"].append(f"preserved busy runner {root}")
-            continue
-        for name in RUNNER_TRANSIENT:
-            child = root / "_work" / name
-            if child.is_symlink() or not child.is_dir():
-                continue
-            shutil.rmtree(child, ignore_errors=True)
-            (report["errors"] if child.exists() else report["actions"]).append(f"removed runner {child}")
+        report["actions"].append(f"preserved runner-owned work {root}")
 
 
 def mount_points() -> set[Path] | None:
@@ -333,6 +310,10 @@ def sweep_retired_workspaces(host, run, now: float, report: dict, roots=None,
                 continue
             if worktree_sweep.busy(resolved, live) or recently_touched(path, WORKTREE_IDLE_S, now):
                 continue
+            # inspect() is fail-closed when git cannot take the index. Wait out a
+            # detached maintenance writer first; a lock that outlives the wait still
+            # leaves the workspace in place.
+            git_housekeeping.quiesce(path)
             info = worktree_sweep.inspect(path, run) if (path / ".git").exists() else None
             if info is None:
                 worktree_sweep.strip_build_dirs(path)
@@ -345,7 +326,10 @@ def sweep_retired_workspaces(host, run, now: float, report: dict, roots=None,
                     report["actions"].append(f"stripped workspace {path}: backup failed")
                     continue
                 report["actions"].append(f"backed up {path} to {saved}")
-            shutil.rmtree(path, ignore_errors=True)
+            try:
+                git_housekeeping.remove_tree(path)
+            except OSError:
+                pass
             (report["errors"] if path.exists() else report["actions"]).append(f"removed retired workspace {path}")
 
 

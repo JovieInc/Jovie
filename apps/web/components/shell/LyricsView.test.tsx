@@ -24,6 +24,22 @@ describe('LyricsView', () => {
     ).toBeInTheDocument();
   });
 
+  it('focuses the lyrics entry point for empty and populated routes', () => {
+    const { rerender } = render(
+      <LyricsView {...baseProps} currentTimeSec={0} lines={[]} autoFocusView />
+    );
+    expect(screen.getByRole('region', { name: 'Lyrics' })).toHaveFocus();
+    rerender(
+      <LyricsView
+        {...baseProps}
+        currentTimeSec={0}
+        lines={lines}
+        autoFocusView
+      />
+    );
+    expect(screen.getByRole('region', { name: 'Lyrics' })).toHaveFocus();
+  });
+
   it('renders the empty state when lines is empty', () => {
     render(<LyricsView {...baseProps} currentTimeSec={0} lines={[]} />);
     expect(screen.getByText('No Lyrics Yet')).toBeInTheDocument();

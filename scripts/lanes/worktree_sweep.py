@@ -33,6 +33,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from disk_guard import LOW_PCT as DISK_LOW_PCT, ensure_sbin_on_path  # noqa: E402  (sibling module of the release)
+import git_housekeeping  # noqa: E402  (detached git maintenance vs cleanup)
 import lifecycle  # noqa: E402
 
 PRESERVED_REPAIR = ".jovie-preserved-repair.json"
@@ -44,8 +45,11 @@ LOW_INTERVAL_S = 600
 # Regenerable output, plus per-checkout pnpm stores (never the shared store, which lives outside checkouts).
 BUILD_DIRS = frozenset({"node_modules", ".next", ".turbo", "test-results", ".build", "DerivedData",
                         ".pnpm-store", ".pnpm-store-private"})
+# Retired Elixir workspaces used this private store. Keep its cache bytes out of backups.
+LEGACY_PRIVATE_STORE = ".symphony/package-cache/pnpm-store"
 EXCLUDE = [f":(exclude,glob)**/{name}/**" for name in sorted(BUILD_DIRS)] + [f":(exclude){PRESERVED_REPAIR}",
-                                                                          ":(exclude).codex-last-message.txt"]
+                                                                          ":(exclude).codex-last-message.txt",
+                                                                          f":(exclude){LEGACY_PRIVATE_STORE}"]
 
 
 def default_roots(home: Path, state: Path) -> list[Path]:
@@ -113,8 +117,9 @@ def linked_worktrees(repo: Path, run) -> list[tuple[Path, str | None]]:
 
 
 def git(path: Path, run, *args, timeout=300, env=None):
+    merged = git_housekeeping.apply_housekeeping_env({**os.environ, **(env or {})})
     return run(["git", "-C", str(path), *args], capture_output=True, text=True, timeout=timeout,
-               env={**os.environ, **env} if env else None)
+               env=merged)
 
 
 def inspect(path: Path, run) -> dict | None:
@@ -176,7 +181,7 @@ def strip_build_dirs(path: Path) -> None:
     for root, dirs, _files in os.walk(path):
         keep = []
         for name in dirs:
-            if name in BUILD_DIRS:
+            if name in BUILD_DIRS or (Path(root) / name).relative_to(path).as_posix() == LEGACY_PRIVATE_STORE:
                 shutil.rmtree(Path(root) / name, ignore_errors=True)
             elif name != ".git":
                 keep.append(name)
@@ -239,11 +244,12 @@ def retire(repo: Path, path: Path, branch: str | None, live: set[Path], report: 
             report["stripped"].append(str(path))
             return
         report["backups"].append(saved)
-    removed = git(repo, run, "worktree", "remove", "--force", str(path), timeout=900)
-    if removed.returncode == 0:
+    removed, error = git_housekeeping.remove_linked_worktree(
+        lambda args: git(repo, run, *args, timeout=900), path)
+    if removed:
         report["removed"].append({"path": str(path), "reason": reason})
     else:
-        report["errors"].append(f"remove:{path}:{removed.stderr.strip()[:120]}")
+        report["errors"].append(f"remove:{path}:{error[:120]}")
 
 
 def sweep(repos: list[Path], roots: list[Path], never: list[Path], *, run=lifecycle.run,

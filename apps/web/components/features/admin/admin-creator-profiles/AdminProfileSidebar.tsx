@@ -12,11 +12,11 @@ import {
   EntityHeader,
   EntityHeaderStatusGlyph,
   EntityHeaderThumbnail,
-  EntitySidebarShell,
   ShareableLinkRow,
 } from '@/components/molecules/drawer';
 import { useProfileHeaderParts } from '@/components/organisms/profile-sidebar/ProfileSidebarHeader';
 import { BASE_URL } from '@/constants/domains';
+import { AdminDetailRail } from '@/features/admin/layout/AdminDetailRail';
 import { ProfileAboutTab } from '@/features/dashboard/organisms/profile-contact-sidebar/ProfileAboutTab';
 import {
   type CategoryOption,
@@ -165,9 +165,10 @@ export function AdminProfileSidebar({
 
   if (!profile || !contact) {
     return (
-      <EntitySidebarShell
+      <AdminDetailRail
         isOpen={isOpen}
         ariaLabel='Creator profile'
+        scrollStrategy='child'
         title='Creator profile'
         onClose={onClose}
         headerMode='minimal'
@@ -176,19 +177,18 @@ export function AdminProfileSidebar({
         emptyMessage='Select a creator profile to view details.'
       >
         {null}
-      </EntitySidebarShell>
+      </AdminDetailRail>
     );
   }
 
   return (
-    <EntitySidebarShell
+    <AdminDetailRail
       contextMenuItems={contextMenuItems}
       isOpen={isOpen}
       ariaLabel='Creator profile'
+      scrollStrategy='child'
       headerMode='minimal'
       hideMinimalHeaderBar
-      workspaceSurface='raised'
-      entityHeaderSurface='flat'
       entityHeader={
         <>
           <EntityHeader
@@ -304,6 +304,6 @@ export function AdminProfileSidebar({
           <IdentityEnrichmentPanel receipt={profile.identityEnrichment} />
         ) : null}
       </DrawerTabbedCard>
-    </EntitySidebarShell>
+    </AdminDetailRail>
   );
 }

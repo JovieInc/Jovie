@@ -1,7 +1,7 @@
 import { and, desc, eq, gte, isNull, lt } from 'drizzle-orm';
-import { db } from '@/lib/db';
 import { billingAuditLog, stripeWebhookEvents } from '@/lib/db/schema/billing';
 import { env } from '@/lib/env-server';
+import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { logger } from '@/lib/utils/logger';
 import {
   BILLING_SYNC_STALE_FINGERPRINT,
@@ -40,14 +40,16 @@ export async function runBillingSyncRemediation(
   const filed: string[] = [];
   for (const finding of findings) {
     await fileBillingSyncFinding(finding, apiKey);
-    await db.insert(billingAuditLog).values({
-      userId: null,
-      eventType: REMEDIATION_FILED_EVENT,
-      previousState: {},
-      newState: { fingerprint: finding.fingerprint },
-      source: 'remediation',
-      metadata: { fingerprint: finding.fingerprint, label: finding.label },
-    });
+    await withSystemIngestionSession(tx =>
+      tx.insert(billingAuditLog).values({
+        userId: null,
+        eventType: REMEDIATION_FILED_EVENT,
+        previousState: {},
+        newState: { fingerprint: finding.fingerprint },
+        source: 'remediation',
+        metadata: { fingerprint: finding.fingerprint, label: finding.label },
+      })
+    );
     filed.push(finding.fingerprint);
   }
   logger.info('[billing-sync-remediation] filed', { filed });
@@ -62,50 +64,53 @@ export async function loadBillingSyncSnapshot(now: Date): Promise<{
 }> {
   const stuckBefore = new Date(now.getTime() - STUCK_WEBHOOK_AFTER_MS);
   const filedSince = new Date(now.getTime() - REMEDIATION_REFIRING_MS);
-  const [lastRunRows, stuckRows, filedRows] = await Promise.all([
-    db
-      .select({
-        createdAt: billingAuditLog.createdAt,
-        metadata: billingAuditLog.metadata,
-      })
-      .from(billingAuditLog)
-      .where(
-        and(
-          eq(billingAuditLog.source, 'reconciliation'),
-          eq(billingAuditLog.eventType, RECONCILIATION_RUN_EVENT)
+  const [lastRunRows, stuckRows, filedRows] = await withSystemIngestionSession(
+    async tx => {
+      const lastRunRows = await tx
+        .select({
+          createdAt: billingAuditLog.createdAt,
+          metadata: billingAuditLog.metadata,
+        })
+        .from(billingAuditLog)
+        .where(
+          and(
+            eq(billingAuditLog.source, 'reconciliation'),
+            eq(billingAuditLog.eventType, RECONCILIATION_RUN_EVENT)
+          )
         )
-      )
-      .orderBy(desc(billingAuditLog.createdAt))
-      .limit(1),
-    db
-      .select({
-        stripeEventId: stripeWebhookEvents.stripeEventId,
-        type: stripeWebhookEvents.type,
-        createdAt: stripeWebhookEvents.createdAt,
-        payload: stripeWebhookEvents.payload,
-      })
-      .from(stripeWebhookEvents)
-      .where(
-        and(
-          isNull(stripeWebhookEvents.processedAt),
-          lt(stripeWebhookEvents.createdAt, stuckBefore)
+        .orderBy(desc(billingAuditLog.createdAt))
+        .limit(1);
+      const stuckRows = await tx
+        .select({
+          stripeEventId: stripeWebhookEvents.stripeEventId,
+          type: stripeWebhookEvents.type,
+          createdAt: stripeWebhookEvents.createdAt,
+          payload: stripeWebhookEvents.payload,
+        })
+        .from(stripeWebhookEvents)
+        .where(
+          and(
+            isNull(stripeWebhookEvents.processedAt),
+            lt(stripeWebhookEvents.createdAt, stuckBefore)
+          )
         )
-      )
-      .orderBy(desc(stripeWebhookEvents.createdAt))
-      .limit(20),
-    db
-      .select({
-        createdAt: billingAuditLog.createdAt,
-        metadata: billingAuditLog.metadata,
-      })
-      .from(billingAuditLog)
-      .where(
-        and(
-          eq(billingAuditLog.eventType, REMEDIATION_FILED_EVENT),
-          gte(billingAuditLog.createdAt, filedSince)
-        )
-      ),
-  ]);
+        .orderBy(desc(stripeWebhookEvents.createdAt))
+        .limit(20);
+      const filedRows = await tx
+        .select({
+          createdAt: billingAuditLog.createdAt,
+          metadata: billingAuditLog.metadata,
+        })
+        .from(billingAuditLog)
+        .where(
+          and(
+            eq(billingAuditLog.eventType, REMEDIATION_FILED_EVENT),
+            gte(billingAuditLog.createdAt, filedSince)
+          )
+        );
+      return [lastRunRows, stuckRows, filedRows] as const;
+    }
+  );
   const lastFiledAtByFingerprint: Record<string, Date | null> = {
     [BILLING_SYNC_STALE_FINGERPRINT]: null,
     [BILLING_WEBHOOKS_STUCK_FINGERPRINT]: null,

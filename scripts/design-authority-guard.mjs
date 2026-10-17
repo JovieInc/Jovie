@@ -2,6 +2,7 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { checkCensus } from './design-surface-census.mjs';
 
 import {
   findDesignInvariantProjectionViolations,
@@ -170,6 +171,12 @@ export function findDesignAuthorityViolations(repoRoot = process.cwd()) {
 
 if (process.argv[1] === import.meta.filename) {
   const violations = findDesignAuthorityViolations();
+  try {
+    const { summary } = checkCensus();
+    console.log(`Surface census: ${JSON.stringify(summary)}`);
+  } catch (error) {
+    violations.push(`Surface census: ${error.message}`);
+  }
   if (violations.length > 0) {
     console.error(violations.join('\n'));
     process.exitCode = 1;

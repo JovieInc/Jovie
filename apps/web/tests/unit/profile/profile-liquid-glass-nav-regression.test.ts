@@ -24,6 +24,11 @@ describe('public profile Liquid Glass navigation', () => {
   it('renders one floating navigation material with no nested glass', () => {
     expect(NAV).toContain('profile-floating-tab-bar');
     expect(NAV).toContain(
+      "className='profile-liquid-glass-nav h-8 rounded-full border px-px'"
+    );
+    // One pixel of inline padding plus the 1px border gives the lens the same
+    // 2px optical edge inset as its 28px face inside the 32px rail.
+    expect(NAV).not.toContain(
       "className='profile-liquid-glass-nav h-8 rounded-full border px-1'"
     );
     // The bar owns the only backdrop-filter; the shared lens and the tab

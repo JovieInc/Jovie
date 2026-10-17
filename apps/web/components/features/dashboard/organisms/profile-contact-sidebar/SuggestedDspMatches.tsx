@@ -12,6 +12,7 @@ import {
 } from '@/features/dashboard/atoms/DspProviderIcon';
 import { useDspMatchActions } from '@/features/dashboard/organisms/dsp-matches/hooks';
 import { type DspMatch, useDspMatchesQuery } from '@/lib/queries';
+import { compareDspMatchConfidence } from '@/lib/queries/useDspMatchesQuery';
 import { cn } from '@/lib/utils';
 import { isExternalDspImage } from '@/lib/utils/dsp-images';
 
@@ -36,10 +37,7 @@ export function SuggestedDspMatches({ profileId }: SuggestedDspMatchesProps) {
   const [expanded, setExpanded] = useState(false);
 
   const sorted = useMemo(
-    () =>
-      matches
-        ? [...matches].sort((a, b) => b.confidenceScore - a.confidenceScore)
-        : [],
+    () => (matches ? [...matches].sort(compareDspMatchConfidence) : []),
     [matches]
   );
 
@@ -295,7 +293,9 @@ function MatchPopoverContent({
       </div>
 
       <div className='flex items-center gap-2'>
-        <ConfidenceBadge score={match.confidenceScore} size='sm' />
+        {match.confidenceScore !== null && (
+          <ConfidenceBadge score={match.confidenceScore} size='sm' />
+        )}
         {match.matchingIsrcCount > 0 && (
           <span className='text-xs text-tertiary-token'>
             {match.matchingIsrcCount} tracks verified

@@ -8,6 +8,11 @@ import {
   loadProductionCollectPlan,
 } from '../../lighthouse-production-collect.mjs';
 
+const browserLaunchCrash = readFileSync(
+  new URL('./fixtures/lighthouse-browser-launch-crash.txt', import.meta.url),
+  'utf8'
+);
+
 const tempDirs = [];
 
 function makeTempDir() {
@@ -211,6 +216,63 @@ describe('production Lighthouse per-route collect', () => {
     expect(
       executeRouteAttempt.mock.calls.every(c => c[0].url.endsWith('/'))
     ).toBe(true);
+  });
+
+  it('retries a browser-launch crash inside the existing per-route attempt budget', async () => {
+    const root = makeTempDir();
+    const configPath = join(root, 'config.json');
+    const reportsDir = join(root, '.lighthouseci');
+    writeFileSync(
+      configPath,
+      JSON.stringify(baseConfig(['https://jovie-abc-jovie.vercel.app/']))
+    );
+
+    let attempts = 0;
+    const executeRouteAttempt = vi.fn(async ({ numberOfRuns }) => {
+      attempts += 1;
+      if (attempts === 1) {
+        return { code: 1, output: browserLaunchCrash };
+      }
+      const files = Array.from({ length: numberOfRuns }, (_, i) => {
+        const path = join(root, `home-${i}.json`);
+        writeFileSync(
+          path,
+          JSON.stringify({
+            requestedUrl: 'https://jovie-abc-jovie.vercel.app/',
+          })
+        );
+        return path;
+      });
+      return { code: 0, output: '', reportFiles: files };
+    });
+    const report = vi.fn();
+
+    const result = await collectProductionRoutes({
+      configPath,
+      reportsDir,
+      executeRouteAttempt,
+      deadlineMs: Date.now() + 60 * 60_000,
+      estimatedRunMs: 1_000,
+      overheadMs: 0,
+      maxAttempts: 3,
+      cooldownMs: 0,
+      report,
+    });
+
+    expect(result.code).toBe(0);
+    expect(result.reportCount).toBe(3);
+    expect(attempts).toBe(2);
+    expect(executeRouteAttempt).toHaveBeenCalledTimes(2);
+    expect(report).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'LIGHTHOUSE_FAILURE_CLASS=retryable_infra LIGHTHOUSE_ATTEMPT=1/3'
+      )
+    );
+    expect(
+      report.mock.calls.some(call =>
+        String(call[0]).includes('LIGHTHOUSE_ROUTE_FAILED')
+      )
+    ).toBe(false);
   });
 
   it('fails closed when a successful collect returns fewer than numberOfRuns reports', async () => {

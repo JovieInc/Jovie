@@ -104,6 +104,20 @@ describe('JOV-6186 cache isolation', () => {
     ).toEqual({ username: 'public-artist' });
   });
 
+  it('does not copy founder chat conversations into a customer profile cache', () => {
+    const founder = new QueryClient();
+    const customer = new QueryClient();
+    founder.setQueryData(queryKeys.chat.conversations(), [
+      { id: 'founder-internal-session' },
+    ]);
+
+    copyShareableQueryData(founder, customer, 'profile-switch');
+
+    expect(
+      customer.getQueryData(queryKeys.chat.conversations())
+    ).toBeUndefined();
+  });
+
   it('drops all private query data on account-change so A cannot become B mutation input', () => {
     const previous = new QueryClient();
     const next = new QueryClient();

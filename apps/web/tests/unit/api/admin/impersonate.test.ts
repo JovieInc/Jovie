@@ -56,6 +56,7 @@ vi.mock('@/lib/rate-limit', () => ({
 }));
 
 const routeModulePromise = import('@/app/api/admin/impersonate/route');
+const TARGET_USER_ID = '11111111-1111-4111-8111-111111111111';
 
 describe('Admin Impersonate API', () => {
   beforeEach(() => {
@@ -112,15 +113,16 @@ describe('Admin Impersonate API', () => {
       expect(response.status).toBe(200);
       expect(data.enabled).toBe(true);
       expect(data.isImpersonating).toBe(false);
+      expect(mockStartImpersonation).not.toHaveBeenCalled();
+      expect(mockEndImpersonation).not.toHaveBeenCalled();
     });
 
     it('returns active impersonation state', async () => {
       mockRequireAdmin.mockResolvedValue(null);
       mockIsImpersonationEnabled.mockReturnValue(true);
       mockGetImpersonationState.mockResolvedValue({
-        realAdminClerkId: 'admin-clerk-id',
-        effectiveClerkId: 'target-clerk-id',
-        effectiveDbId: 'target-db-id',
+        actorUserId: 'admin-123',
+        effectiveUserId: TARGET_USER_ID,
         issuedAt: Date.now() - 5 * 60 * 1000,
         expiresAt: Date.now() + 10 * 60 * 1000,
       });
@@ -133,7 +135,9 @@ describe('Admin Impersonate API', () => {
       expect(response.status).toBe(200);
       expect(data.enabled).toBe(true);
       expect(data.isImpersonating).toBe(true);
-      expect(data.effectiveClerkId).toBe('target-clerk-id');
+      expect(data.effectiveUserId).toBe(TARGET_USER_ID);
+      expect(data.actorUserId).toBe('admin-123');
+      expect(mockGetImpersonationState).toHaveBeenCalledWith('admin-123');
       expect(data.timeRemainingMinutes).toBe(10);
     });
   });
@@ -148,7 +152,7 @@ describe('Admin Impersonate API', () => {
       const request = new Request('http://localhost/api/admin/impersonate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetClerkId: 'target-123' }),
+        body: JSON.stringify({ targetUserId: TARGET_USER_ID }),
       });
 
       const response = await POST(request);
@@ -167,7 +171,7 @@ describe('Admin Impersonate API', () => {
       const request = new Request('http://localhost/api/admin/impersonate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetClerkId: 'target-123' }),
+        body: JSON.stringify({ targetUserId: TARGET_USER_ID }),
       });
 
       const response = await POST(request);
@@ -185,7 +189,7 @@ describe('Admin Impersonate API', () => {
       const request = new Request('http://localhost/api/admin/impersonate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetClerkId: '' }), // Empty string
+        body: JSON.stringify({ targetUserId: 'not-a-uuid' }),
       });
 
       const response = await POST(request);
@@ -204,7 +208,7 @@ describe('Admin Impersonate API', () => {
       const request = new Request('http://localhost/api/admin/impersonate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetClerkId: 'target-123' }),
+        body: JSON.stringify({ targetUserId: TARGET_USER_ID }),
       });
 
       const response = await POST(request);
@@ -229,7 +233,7 @@ describe('Admin Impersonate API', () => {
       const request = new Request('http://localhost/api/admin/impersonate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetClerkId: 'target-123' }),
+        body: JSON.stringify({ targetUserId: TARGET_USER_ID }),
       });
 
       const response = await POST(request);
@@ -257,7 +261,7 @@ describe('Admin Impersonate API', () => {
         new Request('http://localhost/api/admin/impersonate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ targetClerkId: 'target-123' }),
+          body: JSON.stringify({ targetUserId: TARGET_USER_ID }),
         })
       );
       expect(response.status).toBe(503);
@@ -277,7 +281,7 @@ describe('Admin Impersonate API', () => {
       const request = new Request('http://localhost/api/admin/impersonate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetClerkId: 'target-123' }),
+        body: JSON.stringify({ targetUserId: TARGET_USER_ID }),
       });
 
       const response = await POST(request);
@@ -297,7 +301,7 @@ describe('Admin Impersonate API', () => {
       const request = new Request('http://localhost/api/admin/impersonate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetClerkId: 'target-123' }),
+        body: JSON.stringify({ targetUserId: TARGET_USER_ID }),
       });
 
       const response = await POST(request);
@@ -305,7 +309,14 @@ describe('Admin Impersonate API', () => {
 
       expect(response.status).toBe(200);
       expect(data.success).toBe(true);
-      expect(data.targetClerkId).toBe('target-123');
+      expect(data.effectiveUserId).toBe(TARGET_USER_ID);
+      expect(data.actorUserId).toBe('admin-123');
+      expect(mockStartImpersonation).toHaveBeenCalledWith(
+        'admin-123',
+        TARGET_USER_ID,
+        undefined,
+        undefined
+      );
       expect(data.expiresInMinutes).toBe(15);
     });
   });

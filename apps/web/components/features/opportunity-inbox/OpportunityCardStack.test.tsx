@@ -84,6 +84,34 @@ describe('OpportunityCardStack', () => {
     expect(onOpen).not.toHaveBeenCalled();
   });
 
+  it.each([{ isComposing: true }, { keyCode: 229 }])(
+    'leaves IME arrow input to its owner %j',
+    input => {
+      const onAccept = vi.fn();
+      const onReject = vi.fn();
+      render(
+        <OpportunityCardStack
+          cards={CARDS}
+          onAccept={onAccept}
+          onReject={onReject}
+          onOpen={vi.fn()}
+        />
+      );
+      const control = screen.getByRole('button', {
+        name: 'Review Current Opportunity',
+      });
+      control.focus();
+      expect(fireEvent.keyDown(control, { key: 'ArrowRight', ...input })).toBe(
+        true
+      );
+      expect(fireEvent.keyDown(control, { key: 'ArrowLeft', ...input })).toBe(
+        true
+      );
+      expect(onAccept).not.toHaveBeenCalled();
+      expect(onReject).not.toHaveBeenCalled();
+    }
+  );
+
   it('keeps stack-level keyboard commands direct and predictable', async () => {
     const user = userEvent.setup();
     const onAccept = vi.fn();

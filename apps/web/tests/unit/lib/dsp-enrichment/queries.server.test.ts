@@ -26,6 +26,7 @@ vi.mock('@/lib/db/schema/dsp-enrichment', () => ({
     matchingUpcCount: 'dsp_artist_matches.matching_upc_count',
     totalTracksChecked: 'dsp_artist_matches.total_tracks_checked',
     status: 'dsp_artist_matches.status',
+    matchSource: 'dsp_artist_matches.match_source',
     createdAt: 'dsp_artist_matches.created_at',
     updatedAt: 'dsp_artist_matches.updated_at',
   },
@@ -67,7 +68,9 @@ describe('getDspMatchesForProfile', () => {
   });
 
   it('returns matches when the canonical app user owns the profile', async () => {
-    const matches = [{ id: 'match_1', confidenceScore: '0.95' }];
+    const matches = [
+      { id: 'match_1', confidenceScore: '0.95', externalArtistImageUrl: null },
+    ];
     mockSelect
       .mockReturnValueOnce(
         profileQuery([{ id: 'profile_1', userId: 'user_1' }])
@@ -80,7 +83,9 @@ describe('getDspMatchesForProfile', () => {
 
     await expect(
       getDspMatchesForProfile('profile_1', 'user_1')
-    ).resolves.toEqual([{ id: 'match_1', confidenceScore: 0.95 }]);
+    ).resolves.toEqual([
+      { id: 'match_1', confidenceScore: 0.95, externalArtistImageUrl: null },
+    ]);
     expect(mockSelect.mock.calls[0]?.[0]).toEqual({
       id: 'creator_profiles.id',
       userId: 'creator_profiles.user_id',
@@ -100,5 +105,40 @@ describe('getDspMatchesForProfile', () => {
       getDspMatchesForProfile('profile_1', 'user_other')
     ).rejects.toThrow('You do not have permission to view this profile');
     expect(mockSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it('suppresses MusicFetch reference portraits and preserves source portraits in the API', async () => {
+    mockSelect
+      .mockReturnValueOnce(
+        profileQuery([{ id: 'profile_1', userId: 'user_1' }])
+      )
+      .mockReturnValueOnce(
+        matchesQuery([
+          {
+            id: 'anghami',
+            confidenceScore: null,
+            matchSource: 'musicfetch',
+            externalArtistImageUrl:
+              'https://is1-ssl.mzstatic.com/image/reference.jpg',
+          },
+          {
+            id: 'spotify',
+            confidenceScore: '0.95',
+            matchSource: 'isrc_discovery',
+            externalArtistImageUrl: 'https://i.scdn.co/image/profile.jpg',
+          },
+        ])
+      );
+    const { getDspMatchesForProfile } = await import(
+      '@/lib/dsp-enrichment/queries.server'
+    );
+    const result = await getDspMatchesForProfile('profile_1', 'user_1');
+    expect(result.map(match => match.externalArtistImageUrl)).toEqual([
+      null,
+      'https://i.scdn.co/image/profile.jpg',
+    ]);
+    expect(mockSelect.mock.calls[1]?.[0].matchSource).toBe(
+      'dsp_artist_matches.match_source'
+    );
   });
 });

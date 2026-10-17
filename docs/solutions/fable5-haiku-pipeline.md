@@ -1,5 +1,11 @@
 # Fable 5 + Haiku Pipeline
 
+> **Superseded historical material.** These provider, model, cost, and dispatch
+> examples do not authorize runtime reactivation, a scheduled learning loop, or
+> a full-log sweep. Current evidence owners and bounded event delivery govern
+> [learning](../quality/EVENT_DRIVEN_LEARNING.md); use current source and
+> authorization for any operational action.
+
 ## Problem
 Code-review and PR-creation tasks required expensive model usage (~$15/task on Opus 4.8, 10+ min per PR). Need cheaper, faster mechanical PR creation for well-specified tasks.
 

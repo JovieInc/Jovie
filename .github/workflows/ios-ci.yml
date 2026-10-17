@@ -88,11 +88,14 @@ jobs:
           --test-coverage-lines=90 --test-coverage-branches=85 --test-coverage-functions=90 \
           apps/ios/scripts/import-joviekit.test.mjs \
           apps/ios/scripts/write-configuration.test.mjs \
+          apps/ios/scripts/capture-screenshots.test.mjs \
           apps/ios/scripts/run-xcodebuild.test.mjs \
           apps/ios/scripts/validate-wallet-release-env.test.mjs \
           apps/ios/scripts/validate-testflight-env.test.mjs \
           apps/ios/scripts/validate-testflight-artifact.test.mjs \
-          apps/ios/scripts/settings-style-guard.test.mjs
+          apps/ios/scripts/validate-distribution-capabilities.test.mjs \
+          apps/ios/scripts/settings-style-guard.test.mjs \
+          .github/scripts/testflight-release-lease.test.mjs
 
       - name: Ensure iOS local configuration exists
         run: bash apps/ios/scripts/ensure-configuration.sh
@@ -187,12 +190,19 @@ jobs:
 
       - name: Run full simulator regression
         if: ${{ inputs.full-regression }}
-        timeout-minutes: 30
+        # Execution budget is the slowest measured time-to-result (1679s on
+        # run 38941635068; 1628s on 38927656430) plus six minutes. The
+        # finalization budget starts only after xcodebuild prints a terminal
+        # result; green runs finished that tail in 6–7s. 39 minutes stays
+        # 120s above the sum so this wrapper, not the step killer, reports a
+        # hang. The 55-minute job cap is unchanged.
+        timeout-minutes: 39
         env:
           # GitHub-hosted macOS runners are fresh. A shutdown/boot reset added
           # ten minutes to the release run without providing isolation.
           JOVIE_IOS_RESET_SIMULATOR: "0"
-          JOVIE_IOS_XCODEBUILD_TIMEOUT_SECONDS: "1680"
+          JOVIE_IOS_XCODEBUILD_TIMEOUT_SECONDS: "2040"
+          JOVIE_IOS_XCODEBUILD_FINALIZATION_TIMEOUT_SECONDS: "180"
         run: bash apps/ios/scripts/run-xcodebuild.sh test -derivedDataPath .build/ios-ci
 
       - name: Capture simulator screenshots

@@ -4,6 +4,7 @@ import { ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { UserButton } from '@/components/organisms/user-button';
+import type { SidebarDockStatus } from '@/components/shell/SidebarDock';
 import { Tooltip } from '@/components/shell/Tooltip';
 import { HOSTNAME } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
@@ -16,6 +17,7 @@ export const SIDEBAR_USER_PANEL_TEST_ID = 'sidebar-user-panel';
 
 export interface SidebarIdentityGroupProps {
   readonly calm?: boolean;
+  readonly dockStatus?: SidebarDockStatus;
   readonly profileHref: string | undefined;
   readonly label?: string;
 }
@@ -46,6 +48,7 @@ export function publicProfileAccessibleName(
  */
 export function SidebarIdentityGroup({
   calm = false,
+  dockStatus,
   profileHref,
   label = SIDEBAR_IDENTITY_GROUP_LABEL,
 }: SidebarIdentityGroupProps) {
@@ -87,6 +90,7 @@ export function SidebarIdentityGroup({
       >
         <UserButton
           calm={calm}
+          dockStatus={dockStatus}
           profileHref={profileHref}
           settingsHref={APP_ROUTES.SETTINGS}
           showUserInfo

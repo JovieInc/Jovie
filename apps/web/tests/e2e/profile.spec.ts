@@ -404,7 +404,8 @@ test.describe('Profile Modes @smoke @critical', () => {
   test.describe('deep link routing', () => {
     const deepLinks = [
       { mode: 'listen', path: 'listen' },
-      { mode: 'tip', path: 'tip' },
+      // /tip is a legacy alias of pay mode (LEGACY_PROFILE_MODE_BY_SLUG).
+      { mode: 'pay', path: 'tip' },
       { mode: 'subscribe', path: 'subscribe' },
       { mode: 'about', path: 'about' },
       { mode: 'contact', path: 'contact' },

@@ -133,6 +133,34 @@ describe('Ovie speaks through durable Eve Summer', () => {
       'x-jovie-summer-deployment-id': 'dpl_test',
     });
   });
+  it('injects cached company state without a provider read in Eve', async () => {
+    const readCompanyState = vi.fn(async () => ({
+      snapshot: {
+        schema: 'jovie.summer-company-state/v1',
+        revision: 'r1',
+        generatedAt: '2026-10-14T08:00:00.000Z',
+        shipping: { rollingRatePerDay: { value: 3 } },
+        activeConstraint: 'funnel:onboarding_starts',
+      },
+      cache: { hit: true, readPathUpstreamCalls: 0 },
+    }));
+    const speaker = createEveSummerSpeaker(
+      fetchShadow,
+      readCompanyState as never
+    );
+    for await (const _event of speaker.speak(input)) {
+      // Drain the complete turn.
+    }
+    const posted = JSON.parse(
+      String(fetchShadow.mock.calls[0]?.[1]?.body)
+    ) as Record<string, unknown>;
+    expect(readCompanyState).toHaveBeenCalledOnce();
+    expect(posted.companyState).toMatchObject({
+      revision: 'r1',
+      activeConstraint: 'funnel:onboarding_starts',
+      cache: { hit: true, readPathUpstreamCalls: 0 },
+    });
+  });
   it('bounds the one-time legacy history import to Eve ingress limits', async () => {
     await collect({
       ...input,
@@ -539,5 +567,117 @@ describe('Ovie speaks through durable Eve Summer', () => {
     expect((await store.getDecision(SUMMER_SESSION_DECISION_ID))?.decided).toBe(
       '{bad'
     );
+  });
+});
+
+describe('Summer finite response body cancellation', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it.each([
+    ['admission', 'abort'],
+    ['admission', 'deadline'],
+    ['result', 'abort'],
+    ['result', 'deadline'],
+  ] as const)(
+    'settles a stalled %s body on %s without resubmitting',
+    async (stage, stop) => {
+      vi.useFakeTimers();
+      const abort = new AbortController();
+      const canceled = vi.fn();
+      const removeListener = vi.spyOn(abort.signal, 'removeEventListener');
+      let controller!: ReadableStreamDefaultController<Uint8Array>;
+      const body = new ReadableStream<Uint8Array>({
+        start(value) {
+          controller = value;
+        },
+        cancel: canceled,
+      });
+      const stalled = new Response(body, {
+        status: stage === 'admission' ? 202 : 200,
+        headers: { 'x-jovie-eve-deployment-id': 'dpl_test' },
+      });
+      fetchShadow.mockReset();
+      if (stage === 'result') {
+        fetchShadow.mockResolvedValueOnce(
+          eveResponse({ ok: true, accepted: { eventId } }, { status: 202 })
+        );
+      }
+      fetchShadow.mockResolvedValueOnce(stalled);
+      let settled = false;
+      const pending = collect({ ...input, signal: abort.signal }).then(
+        events => {
+          settled = true;
+          return events;
+        }
+      );
+      try {
+        await vi.advanceTimersByTimeAsync(1);
+        expect(settled).toBe(false);
+        if (stop === 'abort') abort.abort();
+        await vi.advanceTimersByTimeAsync(stop === 'deadline' ? 45_000 : 0);
+        expect(settled).toBe(true);
+        expect(await pending).toEqual([
+          {
+            type: 'error',
+            state: 'unknown',
+            hop:
+              stage === 'admission'
+                ? 'summer_unreachable'
+                : 'summer_result_unverified',
+          },
+        ]);
+        expect(canceled).toHaveBeenCalledOnce();
+        expect(body.locked).toBe(false);
+        expect(removeListener).toHaveBeenCalledWith(
+          'abort',
+          expect.any(Function)
+        );
+        expect(fetchShadow).toHaveBeenCalledTimes(
+          stage === 'admission' ? 1 : 2
+        );
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        if (!settled) {
+          controller.error(new Error('release stalled test fixture'));
+          await pending;
+        }
+      }
+    }
+  );
+
+  it('cleans up timers and listeners after a valid finite answer', async () => {
+    vi.useFakeTimers();
+    const abort = new AbortController();
+    const removeListener = vi.spyOn(abort.signal, 'removeEventListener');
+    expect(await collect({ ...input, signal: abort.signal })).toContainEqual({
+      type: 'text-delta',
+      text: result.responseText,
+    });
+    expect(removeListener).toHaveBeenCalledTimes(2);
+    expect(vi.getTimerCount()).toBe(0);
+    abort.abort();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('cancels a declared oversized response without reading or retrying', async () => {
+    vi.useFakeTimers();
+    const canceled = vi.fn();
+    const body = new ReadableStream<Uint8Array>({ cancel: canceled });
+    fetchShadow.mockReset().mockResolvedValueOnce(
+      new Response(body, {
+        status: 202,
+        headers: {
+          'x-jovie-eve-deployment-id': 'dpl_test',
+          'content-length': String(128 * 1024 + 1),
+        },
+      })
+    );
+    expect(await collect()).toEqual([
+      { type: 'error', state: 'unknown', hop: 'summer_admission_rejected' },
+    ]);
+    expect(canceled).toHaveBeenCalledOnce();
+    expect(body.locked).toBe(false);
+    expect(fetchShadow).toHaveBeenCalledOnce();
+    expect(vi.getTimerCount()).toBe(0);
   });
 });

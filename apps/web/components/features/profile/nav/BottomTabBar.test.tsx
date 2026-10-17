@@ -247,7 +247,8 @@ describe('BottomTabBar — grid layout', () => {
     const { container } = render(<BottomTabBar {...makeProps()} />);
     const nav = screen.getByTestId('profile-bottom-nav');
     expect(nav.className).toContain('h-8');
-    expect(nav.className).toContain('px-1');
+    expect(nav.className).toContain('px-px');
+    expect(nav.className).not.toContain('px-1');
     expect(nav.className).not.toContain('p-1');
     expect(nav.className).toContain('rounded-full');
 
@@ -405,5 +406,22 @@ describe('BottomTabBar — liquid glass lens', () => {
       expect(glyph).not.toBeNull();
       expect(glyph?.querySelector('svg')).not.toBeNull();
     }
+  });
+
+  it('paints a solid nav when the document reduced-transparency hook is set', () => {
+    render(<BottomTabBar {...makeProps()} />);
+    const nav = screen.getByTestId('profile-bottom-nav');
+    expect(nav.style.getPropertyValue('backdrop-filter')).toBe('');
+
+    document.documentElement.dataset.reducedTransparency = 'true';
+    return waitFor(() => {
+      expect(nav.style.getPropertyValue('backdrop-filter')).toBe('none');
+      expect(nav.style.getPropertyPriority('backdrop-filter')).toBe(
+        'important'
+      );
+      expect(nav.style.getPropertyValue('background-image')).toBe('none');
+    }).finally(() => {
+      delete document.documentElement.dataset.reducedTransparency;
+    });
   });
 });

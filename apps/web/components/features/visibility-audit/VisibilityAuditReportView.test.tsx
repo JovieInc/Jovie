@@ -37,7 +37,7 @@ describe('VisibilityAuditReportView', () => {
       screen.getByText(/^Submission .+ \(mapped, not preparable\)$/)
     ).toBeVisible();
     expect(screen.getByText('Submission xperi_allmusic_email')).toBeVisible();
-    expect(screen.getByText(/^DSP bio sync: /)).toBeVisible();
+    expect(screen.queryByText(/^DSP bio sync: /)).not.toBeInTheDocument();
     expect(screen.getByText('Manual: configure_ad_pixels')).toBeVisible();
   });
 

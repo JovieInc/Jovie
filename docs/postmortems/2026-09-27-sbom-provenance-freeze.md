@@ -1,10 +1,14 @@
 ---
 id: 2026-09-27-sbom-provenance-freeze
-status: draft
+status: reviewed
 severity: sev2
 detected: 2026-09-27T03:23Z
 repaired: 2026-09-27T05:14Z
 failure_classes: [pre-merge-parity-gap, silent-production-staleness, green-by-implication]
+detectable_before_human: true
+detection_gaps: [coverage-gap, missing-remediator]
+replay_corpus: [docs/postmortems/2026-09-27-sbom-provenance-freeze.md#timeline-utc-2026-09-27]
+founder_rescues: 0
 incident_issue: JOV-6726
 actions: [JOV-6729, JOV-6684, JOV-6686, JOV-6687]
 gbrain: ops/postmortems/2026-09-27-sbom-provenance-freeze
@@ -137,8 +141,8 @@ took about an hour because no monitor opens an `incident` issue (JOV-6684).
    second freeze where a human or agent opened the incident.
 3. **Controller convergence** (JOV-6687, existing). Stops coalesced no-op
    waves from reading as green while production is stale.
-4. **Store-dependent tooling note.** Any future job step that reads the pnpm
-   store (`pnpm licenses`, `pnpm audit --fix`, `pnpm store` and similar) must
+4. **Store-dependent tooling note** (JOV-6729). Any future job step that reads
+   the pnpm store (`pnpm licenses`, `pnpm audit --fix`, `pnpm store` and similar) must
    set `package_cache: 'false'` or warm the store. The error message added in
    #18926 states this at the failure site.
 

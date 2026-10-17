@@ -77,7 +77,7 @@ export function PresenceIdentityPhoto({
       <Avatar
         key={`${photo.url ?? 'missing'}:${photo.observedAt ?? ''}`}
         src={size !== 'sm' || photo.kind === 'profile' ? photo.url : null}
-        alt={alt}
+        alt='' // The source-aware outer frame owns the accessible identity.
         name={entityName}
         size={size}
         shape={size === 'sm' || photo.kind !== 'generic' ? 'person' : 'artwork'}

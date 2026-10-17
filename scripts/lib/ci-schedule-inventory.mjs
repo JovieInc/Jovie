@@ -20,9 +20,9 @@ export const SCHEDULE_CLASSES = Object.freeze([
 export const EVIDENCE_DRIVEN_WORKFLOWS = Object.freeze([
   '.github/workflows/codeql.yml',
   '.github/workflows/e2e-full-matrix.yml',
-  '.github/workflows/eval-real-model.yml',
   '.github/workflows/nightly-testing-agent.yml',
   '.github/workflows/nightly-tests.yml',
+  '.github/workflows/quality-gap-finder.yml',
   // security.yml intentionally keeps a weekly upstream-advisory baseline
   // (JOV-7565): dependency/OSV advisories publish on their own clock, so a
   // purely causal trigger can miss new findings on unchanged source.
@@ -118,7 +118,7 @@ export const CRON_KEEP_REASONS = Object.freeze({
   '.github/workflows/deepsec-native.yml':
     'AI credits: one subscription-bounded native security scan of main per day; per push would multiply native scanner spend',
   '.github/workflows/desktop-release.yml':
-    'owner-tracked: daily signed staging desktop build until staging rides the Production Controller event without the 2026-09 supersession livelock; see ADMISSION_CRON_DEBT',
+    'compute: one daily signed staging desktop reconciliation; unchanged desktop inputs skip the build',
   '.github/workflows/golden-path-nightly.yml':
     'external: real auth plus Stripe test mode drift without a repository event, and acquisition eligibility needs Golden Path proof under 48 h old',
   '.github/workflows/m2-revenue-path-canary.yml':
@@ -173,15 +173,8 @@ export const CRON_ALLOWLIST_CEILING = 24;
  * be added; the ceiling below only goes down.
  */
 /** @type {Readonly<Record<string, {reason: string, replacement: string}>>} */
-export const ADMISSION_CRON_DEBT = Object.freeze({
-  '.github/workflows/desktop-release.yml': Object.freeze({
-    reason:
-      'daily staging desktop build in the same workflow that opens and labels the release stamp PR',
-    replacement:
-      'staging builds from the existing Production Controller workflow_run trigger; drop the daily clock',
-  }),
-});
-export const ADMISSION_CRON_DEBT_CEILING = 1;
+export const ADMISSION_CRON_DEBT = Object.freeze({});
+export const ADMISSION_CRON_DEBT_CEILING = 0;
 
 /**
  * Workflow steps that hold a runner polling GitHub, git, or queue state. Keyed

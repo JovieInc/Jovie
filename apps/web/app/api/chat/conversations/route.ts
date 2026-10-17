@@ -1,6 +1,7 @@
-import { count, eq } from 'drizzle-orm';
+import { count } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { getSessionContext } from '@/lib/auth/session';
+import { ownedConversationCondition } from '@/lib/chat/conversation-access';
 import { listCreatorConversations } from '@/lib/chat/conversation-queries';
 import { sanitizeConversationTitle } from '@/lib/chat/title';
 import { conversationTitleSource } from '@/lib/chat/title-source';
@@ -30,7 +31,7 @@ const MAX_CONVERSATIONS_PER_USER = 200;
  */
 export async function GET(req: Request) {
   try {
-    const { profile } = await getSessionContext({ requireProfile: true });
+    const { user, profile } = await getSessionContext({ requireProfile: true });
 
     if (!profile) {
       return NextResponse.json(
@@ -47,7 +48,9 @@ export async function GET(req: Request) {
       : 20;
 
     const conversations = await listCreatorConversations({
+      userId: user.id,
       creatorProfileId: profile.id,
+      audience: 'customer',
       limit,
     });
 
@@ -99,7 +102,13 @@ export async function POST(req: Request) {
     const [{ value: conversationCount }] = await db
       .select({ value: count() })
       .from(chatConversations)
-      .where(eq(chatConversations.creatorProfileId, profile.id));
+      .where(
+        ownedConversationCondition({
+          userId: user.id,
+          creatorProfileId: profile.id,
+          audience: 'customer',
+        })
+      );
 
     if (conversationCount >= MAX_CONVERSATIONS_PER_USER) {
       return NextResponse.json(

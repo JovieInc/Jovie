@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
+import { toast } from '@/components/feedback';
 import { applyCacheScope } from './cache-isolation';
 import { createQueryFn, fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
@@ -10,9 +11,8 @@ import { handleMutationError } from './mutation-utils';
 export interface ImpersonationState {
   enabled: boolean;
   isImpersonating: boolean;
-  effectiveClerkId?: string;
-  effectiveDbId?: string;
-  realAdminClerkId?: string;
+  effectiveUserId?: string;
+  actorUserId?: string;
   timeRemainingMs?: number;
   timeRemainingMinutes?: number;
   expiresAt?: number;
@@ -21,6 +21,19 @@ export interface ImpersonationState {
 const fetchImpersonationStatus = createQueryFn<ImpersonationState>(
   '/api/admin/impersonate'
 );
+
+interface StartImpersonationInput {
+  readonly targetUserId: string;
+}
+
+interface StartImpersonationResponse {
+  readonly success: true;
+  readonly effectiveUserId: string;
+  readonly expiresInMinutes: number;
+}
+
+const START_TOAST_ID = 'admin-impersonation-start';
+const END_TOAST_ID = 'admin-impersonation-end';
 
 /**
  * TanStack Query hook for fetching admin impersonation status.
@@ -45,18 +58,46 @@ export function useImpersonationQuery() {
   useEffect(() => {
     applyCacheScope({
       impersonationSubject: impersonation?.isImpersonating
-        ? (impersonation.effectiveDbId ??
-          impersonation.effectiveClerkId ??
-          'impersonating')
+        ? (impersonation.effectiveUserId ?? 'impersonating')
         : null,
     });
-  }, [
-    impersonation?.effectiveClerkId,
-    impersonation?.effectiveDbId,
-    impersonation?.isImpersonating,
-  ]);
+  }, [impersonation?.effectiveUserId, impersonation?.isImpersonating]);
 
   return query;
+}
+
+/** Start an effective-user session and fence all prior client query state. */
+export function useStartImpersonationMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ targetUserId }: StartImpersonationInput) =>
+      fetchWithTimeout<StartImpersonationResponse>('/api/admin/impersonate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetUserId }),
+      }),
+    onMutate: () => {
+      toast.loading('Starting impersonation…', { id: START_TOAST_ID });
+    },
+    onSuccess: data => {
+      queryClient.setQueryData<ImpersonationState>(
+        queryKeys.admin.impersonation(),
+        {
+          enabled: true,
+          isImpersonating: true,
+          effectiveUserId: data.effectiveUserId,
+          timeRemainingMinutes: data.expiresInMinutes,
+        }
+      );
+      applyCacheScope({ impersonationSubject: data.effectiveUserId });
+      toast.dismiss(START_TOAST_ID);
+    },
+    onError: error => {
+      toast.dismiss(START_TOAST_ID);
+      handleMutationError(error, 'Failed to start impersonation');
+    },
+  });
 }
 
 /**
@@ -78,6 +119,9 @@ export function useEndImpersonationMutation() {
         method: 'DELETE',
       });
     },
+    onMutate: () => {
+      toast.loading('Ending impersonation…', { id: END_TOAST_ID });
+    },
     onSuccess: () => {
       // Update cache to reflect ended impersonation
       queryClient.setQueryData(
@@ -85,8 +129,11 @@ export function useEndImpersonationMutation() {
         (old: ImpersonationState | undefined) =>
           old ? { ...old, isImpersonating: false } : old
       );
+      applyCacheScope({ impersonationSubject: null });
+      toast.dismiss(END_TOAST_ID);
     },
     onError: error => {
+      toast.dismiss(END_TOAST_ID);
       handleMutationError(error, 'Failed to end impersonation');
     },
   });

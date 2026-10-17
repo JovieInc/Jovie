@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 
 export interface AdminTableShellRenderProps {
   readonly headerElevated: boolean;
-  /** Pixel offset for sticky table headers when a toolbar is present. */
+  /** Sticky headers start at zero: the toolbar is outside the scrolling region. */
   readonly stickyTopPx: number;
 }
 
@@ -21,12 +21,6 @@ export interface AdminTableShellProps {
   readonly scrollContainerRef?: React.RefObject<HTMLDivElement>;
 }
 
-/**
- * Throttle interval for scroll handler (ms).
- * 100ms provides smooth visual updates while reducing state updates from 60+/sec to 10/sec.
- */
-const SCROLL_THROTTLE_MS = 100;
-
 export function AdminTableShell({
   toolbar,
   footer,
@@ -36,110 +30,47 @@ export function AdminTableShell({
   scrollContainerProps,
   scrollContainerRef: externalRef,
 }: Readonly<AdminTableShellProps>) {
-  const internalRef = React.useRef<HTMLDivElement | null>(null);
-  const tableContainerRef = externalRef ?? internalRef;
   const [headerElevated, setHeaderElevated] = React.useState(false);
-  const [stickyTopPx, setStickyTopPx] = React.useState(0);
-  const lastScrollTimeRef = React.useRef(0);
-  const rafIdRef = React.useRef<number | null>(null);
-  const toolbarRef = React.useRef<HTMLDivElement | null>(null);
 
-  React.useEffect(() => {
-    const container = tableContainerRef.current;
-    if (!container) return;
-
-    // Helper to update header elevation state
-    const updateHeaderElevation = () => {
-      rafIdRef.current = null;
-      const isScrolled = container.scrollTop > 0;
-      setHeaderElevated(prev => (prev === isScrolled ? prev : isScrolled));
-      lastScrollTimeRef.current = Date.now();
-    };
-
-    // Throttled scroll handler using requestAnimationFrame + time check
-    const handleScroll = () => {
-      const now = Date.now();
-
-      // Skip if we're within the throttle window
-      if (now - lastScrollTimeRef.current < SCROLL_THROTTLE_MS) {
-        // Schedule one final update after throttle period ends
-        if (rafIdRef.current !== null) {
-          return;
-        }
-        rafIdRef.current = requestAnimationFrame(updateHeaderElevation);
-        return;
-      }
-
-      lastScrollTimeRef.current = now;
-      const isScrolled = container.scrollTop > 0;
-      setHeaderElevated(prev => (prev === isScrolled ? prev : isScrolled));
-    };
-
-    // Initial check
-    handleScroll();
-    container.addEventListener('scroll', handleScroll, { passive: true });
-
-    return () => {
-      container.removeEventListener('scroll', handleScroll);
-      if (rafIdRef.current === null) {
-        return;
-      }
-      cancelAnimationFrame(rafIdRef.current);
-    };
-  }, [tableContainerRef]);
-
-  React.useEffect(() => {
-    if (!toolbar) {
-      setStickyTopPx(0);
-      return;
+  // Capture scroll from the actual table (or the card/kanban view). The shell
+  // owns chrome; the child owns scrolling and virtualization measurement.
+  const handleScroll = (event: React.UIEvent<HTMLDivElement>) => {
+    if (event.target instanceof HTMLElement) {
+      setHeaderElevated(event.target.scrollTop > 0);
     }
-
-    const toolbarElement = toolbarRef.current;
-    if (!toolbarElement) {
-      return;
-    }
-
-    const updateToolbarHeight = () => {
-      setStickyTopPx(toolbarElement.getBoundingClientRect().height);
-    };
-
-    updateToolbarHeight();
-
-    const resizeObserver = new ResizeObserver(updateToolbarHeight);
-    resizeObserver.observe(toolbarElement);
-
-    return () => {
-      resizeObserver.disconnect();
-    };
-  }, [toolbar]);
+  };
 
   return (
     <div
-      className={cn('flex h-full min-h-0 flex-col contain-layout', className)}
+      className={cn(
+        'flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden contain-layout',
+        className
+      )}
       data-testid={testId}
     >
+      {toolbar ? (
+        <div
+          className={cn(
+            'shrink-0 border-b border-(--app-shell-frame-seam) bg-(--app-shell-content-surface)',
+            headerElevated && 'dark:shadow-inset-highlight'
+          )}
+        >
+          {toolbar}
+        </div>
+      ) : null}
       <div
-        ref={tableContainerRef}
-        className='min-h-0 flex-1 overflow-auto flex flex-col focus-visible:outline-none'
+        ref={externalRef}
+        className='flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden focus-visible:outline-none'
+        onScrollCapture={handleScroll}
         {...scrollContainerProps}
       >
-        {toolbar ? (
-          <div
-            ref={toolbarRef}
-            className={cn(
-              'sticky top-0 z-30 border-b border-(--app-shell-frame-seam) bg-(--app-shell-content-surface)/96 backdrop-blur-md supports-backdrop-filter:bg-(--app-shell-content-surface)/88',
-              headerElevated && 'dark:shadow-inset-highlight'
-            )}
-          >
-            {toolbar}
-          </div>
-        ) : null}
-
-        {children({ headerElevated, stickyTopPx })}
+        {children({ headerElevated, stickyTopPx: 0 })}
       </div>
 
       {footer ? (
-        <div className='border-t border-(--app-shell-frame-seam)'>{footer}</div>
+        <div className='shrink-0 border-t border-(--app-shell-frame-seam)'>
+          {footer}
+        </div>
       ) : null}
     </div>
   );

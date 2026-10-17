@@ -11,6 +11,7 @@ import {
 import { OpportunityRow } from '@/components/organisms/opportunity-card/OpportunityRow';
 import type { OpportunityInboxCardViewModel } from '@/lib/connectors/opportunity-inbox-types';
 import { cn } from '@/lib/utils';
+import { isShellShortcutSuppressed } from '@/lib/utils/keyboard';
 import { OpportunityInboxReportCard } from './OpportunityInboxReportCard';
 import { OpportunityInboxSocialReplyCard } from './OpportunityInboxSocialReplyCard';
 import { OpportunityInboxYoutubeThumbnailCard } from './OpportunityInboxYoutubeThumbnailCard';
@@ -71,12 +72,11 @@ export function OpportunityCardStack({
       // This handler belongs to the dedicated native button. It cannot hijack
       // keyboard behavior from the visible child controls in the stack.
       if (
-        event.defaultPrevented ||
+        isShellShortcutSuppressed(event.nativeEvent) ||
         event.metaKey ||
         event.ctrlKey ||
         event.altKey ||
         event.shiftKey ||
-        event.repeat ||
         event.target !== event.currentTarget
       ) {
         return;

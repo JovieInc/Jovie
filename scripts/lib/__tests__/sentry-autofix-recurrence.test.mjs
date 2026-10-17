@@ -202,6 +202,70 @@ describe('sentry autofix recurrence retry bounds', () => {
 });
 
 describe('sentry autofix recurrence runner', () => {
+  it('observer-only dispatch never enters legacy PR search or unrelated Sentry status writes', async () => {
+    const fetchImpl = vi.fn(async url => {
+      if (String(url) !== 'https://api.linear.app/graphql')
+        throw new Error('legacy path reached');
+      return jsonResponse(200, {
+        data: { issues: { nodes: [], pageInfo: { hasNextPage: false } } },
+      });
+    });
+    expect(
+      await runSentryAutofixRecurrence({
+        githubToken: 'gh',
+        sentryToken: 'sentry',
+        linearApiKey: 'linear',
+        observationsOnly: true,
+        fetchImpl,
+      })
+    ).toMatchObject({
+      ok: true,
+      results: [],
+      observations: { ok: true, results: [] },
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    fetchImpl.mockClear();
+    expect(
+      await runSentryAutofixRecurrence({
+        githubToken: 'gh',
+        sentryToken: 'sentry',
+        linearApiKey: '',
+        observationsOnly: true,
+        fetchImpl,
+      })
+    ).toMatchObject({
+      ok: false,
+      reason: 'missing_linear_api_key',
+    });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('runs registered observations on the existing clock and surfaces an unreadable registration scan', async () => {
+    for (const readable of [true, false]) {
+      const fetchImpl = vi.fn(async url => {
+        if (String(url).includes('api.linear.app')) {
+          return jsonResponse(readable ? 200 : 401, {
+            data: { issues: { nodes: [], pageInfo: { hasNextPage: false } } },
+          });
+        }
+        if (String(url).includes('/commits/main'))
+          return jsonResponse(200, { sha: MAIN_SHA });
+        if (String(url).includes('/search/issues'))
+          return jsonResponse(200, { items: [] });
+        return jsonResponse(404, {});
+      });
+      const result = await runSentryAutofixRecurrence({
+        githubToken: 'github-fixture',
+        sentryToken: 'sentry-fixture',
+        linearApiKey: 'linear-fixture',
+        fetchImpl,
+      });
+      expect(result.ok).toBe(readable);
+      expect(result.observations).toMatchObject({ ok: readable, results: [] });
+      if (!readable) expect(result.reason).toBe('linear_http_401');
+    }
+  });
+
   it('fails closed without tokens and on a malformed search payload', async () => {
     await expect(
       runSentryAutofixRecurrence({ githubToken: '' })

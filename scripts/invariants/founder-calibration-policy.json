@@ -1,0 +1,71 @@
+{
+  "schema": "jovie.founder-calibration-policy/v1",
+  "version": "2026-10-14.1",
+  "invariant": "JOV-INV-034",
+  "issue": "JOV-7199",
+  "certificationContract": "jovie.certification/v1",
+  "certificationGate": "ci-fast",
+  "certificationConsumer": "Structural Contract",
+  "corpusPath": "scripts/invariants/fixtures/founder-calibration-mobile-artist-chat.v1.json",
+  "corpusVersion": "mobile-artist-profile-chat/2026-10-14.1",
+  "corpusDigest": "sha256:95e08ab145e0c2333cb6aafea84ef73c862465e5ecd328c4b7b7953b40b6c060",
+  "rubricVersion": "mobile-artist-profile-chat-rubric/2026-10-14.1",
+  "rubricDigest": "sha256:09c67da3c32f4dfd97eb893245509d94c71ec1fb760c061676d2bc5cec8646cd",
+  "authority": {
+    "label": "Founder",
+    "builder": "candidate-evidence-only",
+    "evaluator": "independent-evaluator",
+    "selfApproval": "forbidden",
+    "rubricChanges": "versioned-founder-authority",
+    "baselineChanges": "versioned-founder-authority"
+  },
+  "heldOut": {
+    "usedForTuning": false,
+    "requiredInCertification": true
+  },
+  "releaseChecks": [
+    {
+      "id": "ci-fast:chat-turn-idempotency",
+      "gate": "ci-fast",
+      "consumer": "Web unit tests",
+      "detector": "apps/web/tests/unit/chat/turns.test.ts",
+      "detectorNeedle": "persistTerminalAssistantMessage short-circuits when a terminal message already exists for the turn"
+    },
+    {
+      "id": "ci-fast:founder-calibration-integrity",
+      "gate": "ci-fast",
+      "consumer": "Structural Contract",
+      "detector": "scripts/invariants/founder-calibration.test.mjs",
+      "detectorNeedle": "rejects missing evidence, suppressed checks, and builder self-approval"
+    },
+    {
+      "id": "ci-fast:mobile-chat-terminal-state",
+      "gate": "ci-fast",
+      "consumer": "Web unit tests",
+      "detector": "apps/web/lib/mobile/ov-workspace.safety.test.ts",
+      "detectorNeedle": "reclaims a stale in-flight turn after an unconfirmed terminal write"
+    },
+    {
+      "id": "ci-fast:mobile-chat-viewport",
+      "gate": "ci-fast",
+      "consumer": "Structural Contract",
+      "detector": "apps/web/tests/unit/chat/mobile-chat-certification.test.ts",
+      "detectorNeedle": "rejects the preserved founder-rejected fixture and names why"
+    },
+    {
+      "id": "ci-golden-eval-set:artist-grounding",
+      "gate": "Golden Eval Set (deterministic)",
+      "consumer": "CI",
+      "detector": "apps/web/tests/eval/golden/golden-eval-set.ci.test.ts",
+      "detectorNeedle": "produces a reply that treats the owned release as the user own work"
+    },
+    {
+      "id": "production-controller:verified-production-identity",
+      "gate": "Production Verified",
+      "consumer": "production-controller",
+      "detector": ".github/scripts/verify-production-alias.sh",
+      "detectorNeedle": "Canonical production did not converge"
+    }
+  ],
+  "policyDigest": "sha256:8c252a8efd9acfb4b1eab2be5a24178548e3a58da9a626d8508858089f092923"
+}

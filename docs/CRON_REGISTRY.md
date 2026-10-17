@@ -43,16 +43,41 @@ Scheduled workflows in `.github/workflows/`. Not Vercel crons — these run on G
 
 ## Changed-evidence workflows
 
-Broad test and analysis suites are deliberately absent from the schedule table. `nightly-tests.yml`, `nightly-testing-agent.yml`, `e2e-full-matrix.yml`, `eval-real-model.yml`, `test-coverage-audit.yml`, `sonarcloud.yml`, and `codeql.yml` run on relevant `main` input changes; `test-flakiness-report.yml` runs after terminal test-workflow events. Each retains explicit manual dispatch. Fleet Gate Refresh runs on `main` pushes, main CI completion, signed Linear Triage `repository_dispatch`, and manual dispatch, writing the canonical receipt only as a stale fallback; the Gem lanes emitter (`scripts/lanes/fleet_gate_emitter.py`) keeps it fresh between events, so its former `*/5` cron and Runner Heartbeat's dispatch are gone. The disabled Main CI health monitor, Quarantine Recovery, and Auto-PR on Agent Push workflows were deleted on 2026-10-12 (git history has them). Actions Cache GC (which also prunes superseded main generations) runs on every `main` push, which is when large caches are saved. Design Governance (JOV-INV-026 performance pack included) and Visual & A11y Tests (the JOV-INV-018 whole-system Storybook axe sweep) run on the `main` push that changes their inputs. Repo-state audits run on the `main` push that changes their inputs: Doc Gardening Agent and Deprecation Intake (dependency/toolchain paths). Marketing Certification Producer evaluates everything since its last successful run, so a replaced or failed run needs no clock. Security Suppression Audit runs per bot review. Brand Scrub is enforced only in `ci.yml` (diff scan) and the ci-fast structural pytest lane. `ci-schedule-inventory` fails CI if any of these workflows regains a cron without being removed from the evidence-driven registry with a reviewed rationale.
+Broad test and analysis suites are deliberately absent from the schedule table. `nightly-tests.yml`, `nightly-testing-agent.yml`, `e2e-full-matrix.yml`, `test-coverage-audit.yml`, `sonarcloud.yml`, and `codeql.yml` run on relevant `main` input changes; `test-flakiness-report.yml` runs after terminal test-workflow events. Each retains explicit manual dispatch. Fleet Gate Refresh runs on `main` pushes, main CI completion, signed Linear Triage `repository_dispatch`, and manual dispatch, writing the canonical receipt only as a stale fallback; the Gem lanes emitter (`scripts/lanes/fleet_gate_emitter.py`) keeps it fresh between events, so its former `*/5` cron and Runner Heartbeat's dispatch are gone. The disabled Main CI health monitor, Quarantine Recovery, and Auto-PR on Agent Push workflows were deleted on 2026-10-12 (git history has them). Actions Cache GC (which also prunes superseded main generations) runs on every `main` push, which is when large caches are saved. Design Governance (JOV-INV-026 performance pack included) and Visual & A11y Tests (the JOV-INV-018 whole-system Storybook axe sweep) run on the `main` push that changes their inputs. Repo-state audits run on the `main` push that changes their inputs: Doc Gardening Agent and Deprecation Intake (dependency/toolchain paths). Marketing Certification Producer evaluates everything since its last successful run, so a replaced or failed run needs no clock. Security Suppression Audit runs per bot review. Brand Scrub is enforced only in `ci.yml` (diff scan) and the ci-fast structural pytest lane. `ci-schedule-inventory` fails CI if any of these workflows regains a cron without being removed from the evidence-driven registry with a reviewed rationale.
+
+## Learning delivery (JOV-8427)
+
+Shipping SLO's daily clock measures shipping signals only. Its weekly
+post-mortem learning step and artifact are retired. Quality Gap Finder retains
+its `main` evidence pushes and `quality-gap-scan` deliveries; scheduled calls
+to its handler and post-mortem review are rejected before scans or writes.
+
+Growth intake v2 binds a causal event and source revisions rather than an ISO
+week. Weekly v1 receipts remain historical and cannot admit analysis. Delivered
+terminal/exception evidence, changed source evidence, confidence/value threshold
+crossings, and relevant pending jobs cause bounded reconsideration. A week or
+night passing does not. See [current ownership and acceptance](quality/EVENT_DRIVEN_LEARNING.md).
+Hermes's nightly dispatch-log learning is superseded; the local history below
+cannot authorize reactivation or a full-log sweep.
 
 ## Local Hermes Launchd Schedule
 
-These are machine-local Hermes jobs, not Vercel production crons. They run from launchd on the operator Mac and write to `~/.hermes`.
+These are historical machine-local Hermes jobs, separate from Vercel production crons. This table does not authorize installation or activation.
 
 | Unit | Schedule | Purpose | Source |
 |------|----------|---------|--------|
 | `co.jovie.hermes.cron-pipeline-scoreboard` | retired | Hard-exits with `retired_linear_only` before reading or publishing historical GitHub-Issue funnel counts. The Linear-primary Gem HUD retains PR/Actions delivery reporting and fails closed when Linear backlog data is unavailable. | `symphony-control/jobs/pipeline-scoreboard.ts` |
 | `co.jovie.hermes.cron-gbrain-health-summary` | 07:15 local daily | Verifies the Tailscale-bound HTTP health endpoint, source freshness, and that exactly one server is running; retains `gbrain doctor` as an advisory diagnostic, writes `ops/gbrain-health/latest`, and posts the summary to Telegram/Slack. | `symphony-control/jobs/gbrain-health-summary.ts` |
+
+## Local Symphony Host Schedule
+
+These machine-local units run from launchd on macOS and systemd user timers on Linux. They are
+not GitHub or Vercel cron jobs.
+
+| Unit | Schedule | Purpose | Source |
+|------|----------|---------|--------|
+| `com.jovie.lanes` / `jovie-lanes.timer` | Every 5 minutes + load/boot | Drain-safe release update, then dispatch idle provider seats. Event-driven workers pull again immediately; this is the idle fallback. | `scripts/lanes/install.sh`, `scripts/lanes/lane_runner.py` |
+| `com.jovie.lanes-watchdog` / `jovie-lanes-watchdog.timer` | Every minute + load/boot | Local-only factory liveness observer. Performs at most three bounded recoveries through the installed lanes service, verifies a new admitting/writing observation, and alerts only on exhaustion or decision-required capacity loss. | `scripts/lanes/install.sh`, `scripts/lanes/factory_watchdog.py` |
 
 ## Production Schedule
 

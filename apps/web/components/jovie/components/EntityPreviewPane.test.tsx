@@ -25,16 +25,12 @@ describe('EntityPreviewPane', () => {
     expect(screen.getByTestId('entity-preview-pane')).toHaveClass(
       'system-b-entity-preview-pane'
     );
-    expect(screen.getByTestId('entity-preview-event-art')).toHaveClass(
-      'system-b-entity-preview-artwork',
-      'system-b-entity-preview-event-art'
+    expect(screen.getByTestId('entity-preview-media')).toHaveAttribute(
+      'data-entity-header-thumbnail-variant',
+      'event'
     );
-    expect(screen.getByText('JUN')).toHaveClass(
-      'system-b-entity-preview-event-month'
-    );
-    expect(screen.getByText('12')).toHaveClass(
-      'system-b-entity-preview-event-day'
-    );
+    expect(screen.getByText('JUN')).toBeInTheDocument();
+    expect(screen.getByText('12')).toBeInTheDocument();
     expect(screen.getByText('1,200')).toHaveClass(
       'system-b-entity-preview-stat-strong'
     );
@@ -56,9 +52,14 @@ describe('EntityPreviewPane', () => {
       />
     );
 
-    expect(screen.getByText('SS')).toHaveClass(
-      'system-b-entity-preview-artwork',
-      'system-b-entity-preview-placeholder-art'
+    expect(screen.getByTestId('entity-preview-media')).toHaveAttribute(
+      'data-entity-header-thumbnail-variant',
+      'artwork'
     );
+    expect(
+      screen
+        .getByTestId('entity-preview-media')
+        .querySelector('[data-artwork-fallback]')
+    ).toBeInTheDocument();
   });
 });

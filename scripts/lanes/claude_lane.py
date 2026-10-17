@@ -11,11 +11,13 @@ limit banks the lane until its reported reset (default 5h); a burst limit backs 
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -52,9 +54,14 @@ def read_state(path: Path = STATE) -> dict:
 
 def write_state(data: dict, path: Path = STATE) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(data, sort_keys=True))
-    tmp.replace(path)
+    fd, temporary = tempfile.mkstemp(prefix=f"{path.name}.", suffix=".tmp", dir=path.parent)
+    tmp = Path(temporary)
+    try:
+        with os.fdopen(fd, "w") as out:
+            json.dump(data, out, sort_keys=True)
+        os.replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
 def reset_at(text: str, now: float) -> float | None:
@@ -103,19 +110,21 @@ def window_runs(state: dict, now: float, window_s: int = WINDOW_S) -> list[dict]
 
 def record_run(model: str, exit_code: int, limit: dict | None, now: float, path: Path = STATE,
                usage: dict | None = None) -> dict:
-    """Keep only the current window; a new limit replaces the bank, success never clears an
-    unexpired usage bank (another concurrent run may have hit it)."""
-    state = read_state(path)
-    runs = window_runs(state, now) + [{"at": now, "model": model, "exit": exit_code,
-                                        **({"limit": limit["kind"]} if limit else {}),
-                                        **({"usage": usage} if usage else {})}]
-    state["runs"] = runs[-200:]
-    if limit:
-        current = banked(state, now)
-        if not current or limit["until"] > current["until"]:
-            state["bank"] = {**limit, "at": now}
-    write_state(state, path)
-    return state
+    """Serialize completion updates; success never clears another run's active bank."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path.with_suffix(".lock"), "w") as guard:
+        fcntl.flock(guard, fcntl.LOCK_EX)
+        state = read_state(path)
+        runs = window_runs(state, now) + [{"at": now, "model": model, "exit": exit_code,
+                                            **({"limit": limit["kind"]} if limit else {}),
+                                            **({"usage": usage} if usage else {})}]
+        state["runs"] = runs[-200:]
+        if limit:
+            current = banked(state, now)
+            if not current or limit["until"] > current["until"]:
+                state["bank"] = {**limit, "at": now}
+        write_state(state, path)
+        return state
 
 
 def child_env(base: dict | None = None, token_file: Path = TOKEN_ENV) -> dict:

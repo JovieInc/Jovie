@@ -231,6 +231,7 @@ export function AudioBar({
       <div className='flex flex-col items-center justify-center min-h-11 min-w-0'>
         <div
           aria-hidden={!waveformOn}
+          inert={!waveformOn || undefined}
           className='w-full overflow-hidden'
           style={{
             maxHeight: waveformOn ? drawerHeight : 0,

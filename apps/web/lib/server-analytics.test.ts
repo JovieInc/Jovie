@@ -25,6 +25,7 @@ import {
   SERVER_ANALYTICS_CONTRACT_VERSION,
   SERVER_ANALYTICS_DELIVERY_TIMEOUT_MS,
   SERVER_ANALYTICS_EVENTS,
+  SERVER_ANALYTICS_STATEMENT_TIMEOUT_MS,
   trackServerEvent,
   trackServerEventTx,
 } from './server-analytics';
@@ -77,7 +78,8 @@ describe('server analytics contract', () => {
     timeout: 60000,
   }, () => {
     expect(SERVER_ANALYTICS_CONTRACT_VERSION).toBe('server-analytics/v2');
-    expect(SERVER_ANALYTICS_DELIVERY_TIMEOUT_MS).toBe(2_000);
+    expect(SERVER_ANALYTICS_DELIVERY_TIMEOUT_MS).toBe(17_000);
+    expect(SERVER_ANALYTICS_STATEMENT_TIMEOUT_MS).toBe(2_000);
     expect(SERVER_ANALYTICS_CONSENT_POLICY).toBe(
       'first_party_operational_measurement'
     );
@@ -281,6 +283,61 @@ describe('server analytics contract', () => {
     });
   });
 
+  it('waits for an insert that completes after database connection startup', async () => {
+    vi.useFakeTimers();
+    mocks.returning.mockImplementationOnce(
+      () =>
+        new Promise(resolve =>
+          setTimeout(() => resolve([{ id: 'event-cold-start' }]), 15_000)
+        )
+    );
+
+    const delivery = trackServerEvent('release_deleted', {
+      profileId: PROFILE_ID,
+      releaseId: RELEASE_ID,
+    });
+    await vi.advanceTimersByTimeAsync(15_000);
+
+    await expect(delivery).resolves.toEqual({
+      ok: true,
+      eventId: 'event-cold-start',
+      deduplicated: false,
+    });
+    expect(mocks.insert).toHaveBeenCalledOnce();
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('preserves a database failure after connection startup instead of reporting unknown delivery', async () => {
+    vi.useFakeTimers();
+    const databaseError = new Error('database connection failed');
+    mocks.returning.mockImplementationOnce(
+      () =>
+        new Promise((_, reject) =>
+          setTimeout(() => reject(databaseError), 3_000)
+        )
+    );
+
+    const delivery = trackServerEvent('release_deleted', {
+      profileId: PROFILE_ID,
+      releaseId: RELEASE_ID,
+    });
+    await vi.advanceTimersByTimeAsync(3_000);
+
+    await expect(delivery).resolves.toEqual({
+      ok: false,
+      error: 'persistence_failed',
+    });
+    expect(mocks.insert).toHaveBeenCalledOnce();
+    expect(Sentry.captureException).toHaveBeenCalledExactlyOnceWith(
+      databaseError,
+      expect.objectContaining({
+        tags: expect.objectContaining({ delivery_outcome: 'failed' }),
+      })
+    );
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it('bounds delivery latency and reports a timed-out insert', async () => {
     vi.useFakeTimers();
     mocks.returning.mockReturnValueOnce(new Promise(() => {}));
@@ -297,7 +354,7 @@ describe('server analytics contract', () => {
     });
     expect(Sentry.captureException).toHaveBeenCalledWith(
       expect.objectContaining({
-        message: 'Server analytics delivery timed out after 2000ms',
+        message: 'Server analytics delivery timed out after 17000ms',
       }),
       expect.objectContaining({
         tags: expect.objectContaining({
@@ -403,7 +460,7 @@ describe('server analytics contract', () => {
       "current_setting('statement_timeout')"
     );
     expect(JSON.stringify(execute.mock.calls[1])).toContain(
-      String(SERVER_ANALYTICS_DELIVERY_TIMEOUT_MS)
+      String(SERVER_ANALYTICS_STATEMENT_TIMEOUT_MS)
     );
     expect(JSON.stringify(execute.mock.calls[2])).toContain('45s');
     expect(execute.mock.invocationCallOrder[1]).toBeLessThan(

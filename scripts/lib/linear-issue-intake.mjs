@@ -220,9 +220,34 @@ export async function ensureLinearLabel({
     },
     'linear_label_create'
   );
-  if (!created.ok) return created;
+  if (!created.ok) {
+    // Linear rejects a duplicate issueLabelCreate with a GraphQL error
+    // (JOV-8235). The search response's label snapshot can already be stale —
+    // a sibling shard or the previous cron run may have created the label
+    // between the search and this create. Re-resolve the exact name before
+    // failing the whole filing run (case-insensitive: Linear enforces label-name uniqueness case-insensitively).
+    const recovered = await findLinearLabelId({
+      name,
+      apiKey,
+      fetchImpl,
+      teamId,
+      ignoreCase: true,
+    });
+    if (recovered.ok && recovered.id) return recovered;
+    return created;
+  }
   const id = created.data?.issueLabelCreate?.issueLabel?.id ?? null;
   if (!created.data?.issueLabelCreate?.success || !id) {
+    // Same stale-snapshot case without a transport failure: someone else
+    // created the label between the search and this mutation.
+    const recovered = await findLinearLabelId({
+      name,
+      apiKey,
+      fetchImpl,
+      teamId,
+      ignoreCase: true,
+    });
+    if (recovered.ok && recovered.id) return recovered;
     return {
       ok: false,
       reason: 'linear_label_create_unsuccessful',
@@ -239,6 +264,7 @@ export async function findLinearLabelId({
   apiKey,
   fetchImpl,
   teamId = JOVIE_TEAM_ID,
+  ignoreCase = false,
 }) {
   const cacheKey = `${teamId}:${name}`;
   if (labelCache.has(cacheKey)) {
@@ -249,7 +275,7 @@ export async function findLinearLabelId({
       query: `
         query FindTeamLabel($teamId: String!, $name: String!) {
           team(id: $teamId) {
-            labels(filter: { name: { eq: $name } }) { nodes { id name } }
+            labels(filter: { name: { ${ignoreCase ? 'eqIgnoreCase' : 'eq'}: $name } }) { nodes { id name } }
           }
         }
       `,
@@ -261,8 +287,12 @@ export async function findLinearLabelId({
   );
   if (!found.ok) return found;
   const id =
-    (found.data?.team?.labels?.nodes ?? []).find(label => label?.name === name)
-      ?.id ?? null;
+    (found.data?.team?.labels?.nodes ?? []).find(
+      label =>
+        label?.name === name ||
+        (ignoreCase &&
+          String(label?.name ?? '').toLowerCase() === name.toLowerCase())
+    )?.id ?? null;
   if (id) labelCache.set(cacheKey, id);
   return { ok: true, id };
 }

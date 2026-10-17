@@ -1,6 +1,7 @@
 """Capacity-limit records: real limits only, on change, signed exactly like the Summer node client."""
 from __future__ import annotations
 
+import copy
 import importlib.util
 import json
 import os
@@ -43,13 +44,20 @@ def row(blockers, demand=6, running=1, base=2, effective=1, reason=None, ceiling
 
 
 OBS = {"disk": {"admitted": True, "freePct": 40}, "githubRemaining": 4000, "codexAttribution": {},
-       "maintenanceQueueByProvider": {}, "eligiblePoolByProvider": {}, "rateBankAt": {}}
+       "maintenanceQueueByProvider": {"devin": 0, "grok": 0, "codex": 0, "hyperagent": 0},
+       "eligiblePoolByProvider": {"devin": 6, "grok": 3, "codex": 6, "hyperagent": 6},
+       "doctorFresh": True, "doctorObservedAt": NOW, "codexObservedAt": NOW, "diskObservedAt": NOW, "rateBankAt": {}}
 CPU = state({"devin": row(["host-pressure"]), "grok": row(["host-pressure"], demand=3)})
 
 
-def run(steps, tracker=None, release=1.0, now=NOW):
+def run(steps, tracker=None, release=1.0, now=None):
     out = []
+    previous = max((r.get("observedAt") or NOW - 60 for r in (tracker or {}).get("seen", {}).values()), default=NOW - 60)
+    now = previous + 60 if now is None else now
     for current, obs in steps:
+        current, obs = copy.deepcopy(current), copy.deepcopy(obs)
+        current["observedAt"] = now
+        obs.update(doctorObservedAt=now, codexObservedAt=now, diskObservedAt=now)
         tracker, emit, changed = C.step(tracker, current, obs, now, host="gem", release_at=release)
         out.append((emit, changed)); now += 60
     return tracker, out
@@ -75,8 +83,8 @@ class CapacityLimitTest(unittest.TestCase):
         body = out[2][0][0]
         self.assertEqual((body["status"], body["resource"], body["lanes"], body["observed"], body["limit"], body["unit"]),
                          ("limited", "host-cpu", ["devin", "grok"], 16.7, 16, "load1"))
-        self.assertIn("load 16.7 on 16 cores", body["needs"]); self.assertLessEqual(len(body["needs"]), 200)
-        self.assertEqual(body["unblock"]["action"], C.UNBLOCK["host-cpu"][0])
+        self.assertIn("CPU load 16.7/16", body["needs"]); self.assertLessEqual(len(body["needs"]), 200)
+        self.assertEqual(body["unblock"]["action"], C.UNBLOCK["host-cpu"])
         body.update(sentAt=A._iso(NOW), deliveryId="gem:host-cpu:limited:1800000000", signatureKeyId="key-1", signature="ed25519=x")
         self.assertTrue(C.valid_body(body))
         # Load moving is jitter, never a re-POST (Gem 03:59-04:05Z churn); a new limit is material.
@@ -110,28 +118,28 @@ class CapacityLimitTest(unittest.TestCase):
         self.assertEqual(out[0][0][0]["status"], "limited")
 
     def test_resources_map_from_measured_holds_only(self):
-        codex_busy = row(["codex-unleased"], running=3, effective=3, ceiling=3)
         cases = (
-            ({"codex": codex_busy}, {**OBS, "codexAttribution": {"loginSlots": 3}}, "codex-accounts"),
-            ({"codex": row(["codex-unleased"], running=0, effective=0, ceiling=0)},
-             {**OBS, "codexAttribution": {"quotaBanked": 1, "earliestCooldownS": 3600}}, "codex-credits"),
-            ({"codex": row(["rate-limited"])}, {**OBS, "rateBankAt": {"codex": NOW - 30}}, "codex-credits"),
-            ({"hyperagent": row(["rate-bank"])}, {**OBS, "rateBankAt": {"hyperagent": NOW - 30}}, "claude-credits"),
-            ({"devin": row(["disk-low"])}, {**OBS, "disk": {"admitted": True, "freePct": 12}, "diskReclaimable": False}, "host-disk"),
-            ({"devin": row(["low-mem"])}, OBS, "host-memory"),
-            ({"devin": row(["github-budget"])}, {**OBS, "githubRemaining": 900}, "github-api-quota"),
-            ({"devin": row(["lane-ceiling"])}, OBS, "host-cpu"),
-            ({"devin": row(["host-ceiling"])}, OBS, "host-cpu"),
+            (state({"codex": row(["codex-unleased"], running=0, effective=0, ceiling=0)}),
+             {**OBS, "codexAttribution": {"state": "quota-banked", "quotaBanked": 1, "earliestCooldownS": 3600}}, "codex-credits"),
+            (state({"devin": row(["disk-low"])}),
+             {**OBS, "disk": {"admitted": True, "freePct": 12}, "diskReclaimable": False}, "host-disk"),
+            (state({"devin": row(["low-mem"])}, mem=4 * GIB), OBS, "host-memory"),
+            (state({"devin": row(["github-budget"])}), {**OBS, "githubRemaining": 900}, "github-api-quota"),
+            (state({"devin": row(["lane-ceiling"])}), OBS, "host-cpu"),
+            (state({"devin": row(["host-ceiling"])}), OBS, "host-cpu"),
         )
         for lanes, obs, resource in cases:
-            with self.subTest(resource=resource, lanes=list(lanes)):
-                _, out = run([(state(lanes), obs)] * 3)
+            with self.subTest(resource=resource):
+                _, out = run([(lanes, obs)] * 3)
                 body = out[2][0][0]
                 self.assertEqual(body["resource"], resource)
+                self.assertNotIn("estCost", body["unblock"])
+                self.assertNotRegex(body["unblock"]["action"], r"upgrade|add.*account|buy|\$")
                 body.update(sentAt=A._iso(NOW), deliveryId="gem:x:limited:1800000000", signatureKeyId="key-1", signature="ed25519=x")
                 self.assertTrue(C.valid_body(body), body)
-        _, out = run([(state({"codex": row(["codex-unleased"], running=0)}), {**OBS, "codexAttribution": {"quotaBanked": 1, "earliestCooldownS": 3600}})] * 3)
-        self.assertIn("until", out[2][0][0])
+                if resource == "codex-credits":
+                    self.assertIn("quota cooldown reported", body["needs"])
+                    self.assertEqual(body["until"], A._iso(NOW + 120 + 3600))
 
     def test_disk_is_no_limit_while_the_sweep_has_targets(self):
         # Gem 04:12Z: host-disk was POSTed at 15% free with ~178 GB of retired workspaces left.
@@ -154,6 +162,246 @@ class CapacityLimitTest(unittest.TestCase):
         disabled = state({"devin": row(["host-pressure"], base=0)})
         _, out = run([(disabled, OBS)] * 4)
         self.assertTrue(all(emit == [] for emit, _ in out))
+
+
+    def test_regression_configured_ceiling_with_low_pressure_is_not_compute(self):
+        low = state({"devin": row(["host-ceiling"])}, load1=3.8)
+        low["hostSample"]["psi"]["cpuSomeAvg10"] = 1.0
+        tracker, out = run([(low, OBS)] * 3)
+        self.assertEqual(tracker["published"], {})
+        self.assertTrue(all(not emit for emit, _ in out))
+
+    def test_regression_configured_codex_seats_are_not_account_limits(self):
+        seats = state({"codex": row(["codex-unleased"], demand=109, running=3, ceiling=3)})
+        tracker, _ = run([(seats, {**OBS, "codexAttribution": {"loginSlots": 3}})] * 3)
+        self.assertEqual(tracker["published"], {})
+
+    def test_regression_auth_and_rate_cooldowns_are_not_credits(self):
+        for attribution in ({"authCooldown": 1}, {"rateCooldown": 1}):
+            tracker, _ = run([(state({"codex": row(["codex-unleased"])}),
+                               {**OBS, "codexAttribution": attribution})] * 3)
+            self.assertEqual(tracker["published"], {})
+
+    def test_regression_cached_snapshot_does_not_advance_hysteresis(self):
+        tracker = None
+        for at in (NOW, NOW + 60, NOW + 120):
+            tracker, emit, _ = C.step(tracker, CPU, OBS, at, host="gem", release_at=1.0)
+            self.assertEqual(emit, [])
+        self.assertEqual(tracker["published"], {})
+
+    def test_regression_reported_waiting_without_eligible_demand_is_not_proof(self):
+        tracker, _ = run([(CPU, {**OBS, "eligiblePoolByProvider": {"devin": 0, "grok": 0},
+                                "maintenanceQueueByProvider": {"devin": 0, "grok": 0}})] * 3)
+        self.assertEqual(tracker["published"], {})
+
+
+    def test_pressure_samples_retain_timestamps_and_replay_latest_measurement(self):
+        pressure = state({"devin": row(["host-ceiling"])}, load1=11.1)
+        pressure["hostSample"]["psi"]["cpuSomeAvg10"] = 31.0
+        tracker, out = run([(pressure, OBS)] * 3)
+        self.assertIn("Observed " + A._iso(NOW + 120), out[2][0][0]["needs"])
+        self.assertEqual(tracker["published"]["host-cpu"]["observedAt"], NOW + 120)
+        newer = copy.deepcopy(pressure)
+        newer["hostSample"]["load1"] = 12.3
+        tracker, out = run([(newer, OBS)], tracker)
+        self.assertEqual(out[0][0], [], "fresh jitter updates local evidence without a ping")
+        self.assertEqual(tracker["published"]["host-cpu"]["observed"], 12.3)
+        tracker, out = run([(newer, OBS)], tracker, release=2.0)
+        self.assertEqual(out[0][0][0]["observed"], 12.3)
+        self.assertIn(A._iso(NOW + 240), out[0][0][0]["needs"])
+        self.assertEqual(out[0][0][0]["since"], A._iso(NOW))
+
+    def test_stale_future_missing_and_out_of_order_observations_do_not_bind(self):
+        for stamp in (NOW - A.STALE_S - 1, NOW + 1, None, True):
+            snapshot = {**CPU, "observedAt": stamp}
+            tracker = None
+            for _ in range(3):
+                tracker, emit, _ = C.step(tracker, snapshot, OBS, NOW, host="gem", release_at=1.0)
+                self.assertEqual(emit, [])
+            self.assertFalse(tracker["published"])
+        tracker, _ = run([(CPU, OBS)] * 2)
+        older = {**CPU, "observedAt": NOW}
+        tracker, emit, _ = C.step(tracker, older, OBS, NOW + 120, host="gem", release_at=1.0)
+        self.assertEqual(emit, [])
+        self.assertFalse(tracker["published"])
+
+    def test_cached_and_stale_calm_observations_do_not_clear_published_limit(self):
+        tracker, _ = run([(CPU, OBS)] * 3)
+        calm = state({"devin": row([], reason="sustained-demand")}, load1=1.0)
+        calm["observedAt"] = NOW + 180
+        for now in (NOW + 180, NOW + 240, NOW + 300, NOW + 1000):
+            tracker, emit, _ = C.step(tracker, calm, OBS, now, host="gem", release_at=1.0)
+            self.assertEqual(emit, [])
+        self.assertIn("host-cpu", tracker["published"])
+
+    def test_unknown_eligible_demand_does_not_clear_a_supported_episode(self):
+        tracker, _ = run([(CPU, OBS)] * 3)
+        unknown = {**OBS, "eligiblePoolByProvider": {}, "maintenanceQueueByProvider": {}}
+        tracker, out = run([(CPU, unknown)] * 3, tracker)
+        self.assertTrue(all(not emit for emit, _ in out))
+        self.assertIn("host-cpu", tracker["published"])
+
+    def test_no_measured_pressure_and_io_pressure_never_default_to_cpu(self):
+        low = state({"devin": row(["psi-high"])}, load1=3.8)
+        low["hostSample"]["psi"] = {"cpuSomeAvg10": 1.0, "memoryFullAvg10": 0.0, "ioFullAvg10": 31.0}
+        tracker, out = run([(low, OBS)] * 3)
+        self.assertFalse(tracker["published"])
+        self.assertTrue(tracker["bottleneckFound"])
+        self.assertTrue(all(not emit for emit, _ in out))
+
+    def test_mixed_quota_auth_and_available_capacity_are_not_all_quota_limits(self):
+        for attribution in (
+            {"state": "cooldown", "quotaBanked": 1, "authCooldown": 1},
+            {"state": "quota-banked", "quotaBanked": 1, "unleasedAvailable": 1},
+            {"state": "unknown", "quotaBanked": 1},
+        ):
+            tracker, out = run([(state({"codex": row(["codex-unleased"])}),
+                                 {**OBS, "codexAttribution": attribution})] * 3)
+            self.assertFalse(tracker["published"])
+            self.assertTrue(all(not emit for emit, _ in out))
+        tracker, _ = run([(state({"codex": row(["codex-unleased"], demand=109, running=3, ceiling=3)}),
+                           {**OBS, "codexAttribution": {"leased": 2, "loginSlots": 3}})] * 3)
+        hold = tracker["software"][0]
+        self.assertEqual((hold["configuredSeats"], hold["leased"], hold["providerHardLimit"]), (3, 2, "unknown"))
+        self.assertEqual((hold["reportedWaiting"], hold["eligibleDemand"]), (109, 6))
+        self.assertEqual((hold["deliveredThroughput"], hold["marginalThroughput"]), ("unknown", "unknown"))
+
+    def test_pending_delivery_identities_survive_temporarily_unsupported_samples(self):
+        tracker = {"outbox": [{"resource": "codex-accounts", "status": "limited", "deliveryId": "legacy-paid"},
+                             {"resource": "host-cpu", "status": "limited", "deliveryId": "supported-retry"},
+                             {"resource": "host-disk", "status": "cleared", "deliveryId": "clear-retry"}]}
+        nxt, _, _ = C.step(tracker, CPU, OBS, NOW, host="gem", release_at=1.0)
+        self.assertEqual([row["deliveryId"] for row in nxt["outbox"]], ["legacy-paid", "supported-retry", "clear-retry"])
+
+
+    def test_unknown_demand_calm_rows_cannot_clear(self):
+        tracker, _ = run([(CPU, OBS)] * 3)
+        calm = state({"devin": row([], reason="sustained-demand")}, load1=1.0)
+        unknown = {**OBS, "eligiblePoolByProvider": {}, "maintenanceQueueByProvider": {}}
+        tracker, out = run([(calm, unknown)] * 3, tracker)
+        self.assertTrue(all(not emit for emit, _ in out))
+        self.assertIn("host-cpu", tracker["published"])
+
+    def test_missing_pressure_cannot_clear(self):
+        tracker, _ = run([(CPU, OBS)] * 3)
+        missing = {**CPU, "hostSample": {}}
+        tracker, out = run([(missing, OBS)] * 3, tracker)
+        self.assertTrue(all(not emit for emit, _ in out))
+        self.assertIn("host-cpu", tracker["published"])
+
+    def test_stale_gap_preserves_pending_alert_and_resumes_same_identity(self):
+        tracker, _ = run([(CPU, OBS)] * 3)
+        pending = {"resource": "host-cpu", "status": "limited", "deliveryId": "same-supported-retry"}
+        tracker["outbox"] = [pending]
+        stale = {**CPU, "observedAt": NOW - A.STALE_S - 1}
+        tracker, emit, _ = C.step(tracker, stale, OBS, NOW + 180, host="gem", release_at=1.0)
+        self.assertEqual((emit, tracker["outbox"]), ([], [pending]))
+        tracker, out = run([(CPU, OBS)], tracker, now=NOW + 240)
+        self.assertEqual((out[0][0], tracker["outbox"]), ([], [pending]))
+
+
+    def test_each_measured_resource_clears_only_on_supported_fresh_values(self):
+        cases = (
+            ("host-memory", state({"devin": row(["low-mem"])}, mem=4 * GIB), OBS,
+             state({"devin": row([], reason="sustained-demand")}, load1=1.0), OBS),
+            ("host-disk", state({"devin": row(["disk-low"])}),
+             {**OBS, "disk": {"freePct": 12, "admitted": True}, "diskReclaimable": False},
+             state({"devin": row([], reason="sustained-demand")}, load1=1.0), OBS),
+            ("github-api-quota", state({"devin": row(["github-budget"])}), {**OBS, "githubRemaining": 900},
+             state({"devin": row([], reason="sustained-demand")}, load1=1.0), OBS),
+            ("codex-credits", state({"codex": row(["codex-unleased"])}),
+             {**OBS, "codexAttribution": {"state": "quota-banked", "quotaBanked": 1}},
+             state({"codex": row(["codex-unleased"])}),
+             {**OBS, "codexAttribution": {"state": "unleased-available", "quotaBanked": 0, "unleasedAvailable": 1}}),
+        )
+        for resource, bound, obs, calm, clear_obs in cases:
+            with self.subTest(resource=resource):
+                tracker, _ = run([(bound, obs)] * 3)
+                self.assertIn(resource, tracker["published"])
+                tracker, out = run([(calm, clear_obs)] * 3, tracker)
+                self.assertEqual(out[-1][0][0]["status"], "cleared")
+                self.assertNotIn(resource, tracker["published"])
+
+    def test_unknown_distinct_sample_breaks_clear_streak(self):
+        tracker, _ = run([(CPU, OBS)] * 3)
+        calm = state({"devin": row([], reason="sustained-demand")}, load1=1.0)
+        tracker, _ = run([(calm, OBS)] * 2, tracker)
+        tracker, _ = run([({**calm, "hostSample": {}}, OBS)], tracker)
+        tracker, out = run([(calm, OBS)] * 2, tracker)
+        self.assertTrue(all(not emit for emit, _ in out))
+        self.assertIn("host-cpu", tracker["published"])
+
+
+    def test_unknown_demand_breaks_partial_clear_streak(self):
+        tracker, _ = run([(CPU, OBS)] * 3)
+        calm = state({"devin": row([], reason="sustained-demand")}, load1=1.0)
+        tracker, _ = run([(calm, OBS)] * 2, tracker)
+        unknown = {**OBS, "eligiblePoolByProvider": {}, "maintenanceQueueByProvider": {}}
+        tracker, _ = run([(CPU, unknown)], tracker)
+        tracker, out = run([(calm, OBS)], tracker)
+        self.assertFalse(out[0][0])
+        self.assertEqual(tracker["seen"]["host-cpu"]["clear"], 1)
+
+    def test_tick_retries_only_after_current_monotonic_support_returns(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = {"origin": "https://summer.example", "keyId": "key-1", "pem": keypair()}
+            calls = []
+            def post(cfg, body):
+                calls.append(body)
+                return 500 if len(calls) == 1 else 202
+            (root / "doctor.json").write_text(json.dumps({"observed": {"now": NOW}}))
+            with patch.object(A, "collect", return_value=OBS):
+                for at in (0, 60, 120):
+                    A.write_state(root, {**CPU, "observedAt": NOW + at})
+                    C.tick(root, {}, NOW + at, config=config, post=post)
+                self.assertEqual(len(calls), 1)
+                delivery_id = calls[0]["deliveryId"]
+                for at, source_at in ((180, NOW - 1000), (240, NOW + 60)):
+                    A.write_state(root, {**CPU, "observedAt": source_at})
+                    C.tick(root, {}, NOW + at, config=config, post=post)
+                    self.assertEqual(len(calls), 1)
+                    self.assertEqual(json.loads((root / C.TRACKER_FILE).read_text())["outbox"][0]["deliveryId"], delivery_id)
+                A.write_state(root, {**CPU, "observedAt": NOW + 300})
+                C.tick(root, {}, NOW + 300, config=config, post=post)
+                self.assertEqual((len(calls), calls[-1]["deliveryId"]), (2, delivery_id))
+                self.assertEqual(json.loads((root / C.TRACKER_FILE).read_text())["outbox"], [])
+
+    def test_legacy_hysteresis_and_since_cannot_certify_a_new_pressure_episode(self):
+        legacy = {"seen": {"host-cpu": {"bound": 99, "clear": 0, "since": NOW - 3600}},
+                  "published": {"host-cpu": {"lanes": ["devin", "grok"], "action": "add compute",
+                                             "since": NOW - 3600, "observed": 3.8, "limit": 16}}}
+        tracker, out = run([(CPU, OBS)] * 3, legacy, now=NOW)
+        self.assertEqual([len(emit) for emit, _ in out], [0, 0, 1])
+        self.assertEqual(out[-1][0][0]["since"], A._iso(NOW))
+
+
+    def test_legacy_pending_body_is_quarantined_until_new_episode_qualifies(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            legacy_body = {"schema": C.SCHEMA, "resource": "host-cpu", "status": "limited", "host": "gem",
+                           "lanes": ["devin", "grok"], "needs": "old low pressure",
+                           "observed": 3.8, "limit": 16, "since": A._iso(NOW - 3600),
+                           "unblock": {"action": "add compute", "estCost": "paid host"},
+                           "deliveryId": "legacy-paid-host-0001"}
+            tracker = {"seen": {"host-cpu": {"bound": 99, "clear": 0, "since": NOW - 3600}},
+                       "published": {"host-cpu": {"lanes": ["devin", "grok"], "action": "add compute",
+                                                  "since": NOW - 3600, "observed": 3.8, "limit": 16}},
+                       "outbox": [legacy_body]}
+            (root / C.TRACKER_FILE).write_text(json.dumps(tracker))
+            (root / "doctor.json").write_text(json.dumps({"observed": {"now": NOW}}))
+            config, calls = {"origin": "https://summer.example", "keyId": "key-1", "pem": keypair()}, []
+            def post(cfg, body):
+                calls.append(body)
+                return 202
+            with patch.object(A, "collect", return_value=OBS):
+                for at in (0, 60, 120):
+                    A.write_state(root, {**CPU, "observedAt": NOW + at})
+                    C.tick(root, {}, NOW + at, config=config, post=post)
+                    self.assertEqual(len(calls), int(at == 120))
+            self.assertEqual(calls[0]["since"], A._iso(NOW))
+            self.assertNotEqual(calls[0]["deliveryId"], legacy_body["deliveryId"])
+            self.assertNotIn("estCost", calls[0]["unblock"])
 
     def test_canonical_and_signature_match_the_node_client_byte_for_byte(self):
         if not shutil.which("node"):
@@ -209,7 +457,8 @@ class CapacityLimitTest(unittest.TestCase):
     def test_tick_writes_the_record_and_delivers_without_blocking(self):
         with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"SYMPHONY_AUTOSCALE": "apply"}):
             root = Path(tmp)
-            (root / "doctor.json").write_text(json.dumps({"observed": {"now": NOW, "githubRemaining": 4000}}))
+            (root / "doctor.json").write_text(json.dumps({"observed": {"now": NOW, "githubRemaining": 4000,
+                "eligiblePoolByProvider": {"devin": 6, "grok": 3}, "maintenanceQueueByProvider": {"devin": 0, "grok": 0}}}))
             A.write_state(root, CPU)
             config, calls = {"origin": "https://summer.example", "keyId": "key-1", "pem": keypair()}, []
             def post(status):
@@ -220,7 +469,9 @@ class CapacityLimitTest(unittest.TestCase):
                     return status
                 return send
             self.assertIsNone(C.tick(root, {}, NOW, config=config, post=post(500)))
+            A.write_state(root, {**CPU, "observedAt": NOW + 60})
             C.tick(root, {}, NOW + 60, config=config, post=post(500))
+            A.write_state(root, {**CPU, "observedAt": NOW + 120})
             record = C.tick(root, {}, NOW + 120, config=config, post=post(None))
             self.assertEqual((record["schema"], record["bottleneckFound"], [r["resource"] for r in record["limited"]]),
                              (C.LOCAL_SCHEMA, False, ["host-cpu"]))
@@ -239,6 +490,7 @@ class CapacityLimitTest(unittest.TestCase):
             # No Summer config on this host: the record is still local, nothing queues.
             A.write_state(root, state({"devin": row([], reason="sustained-demand")}, load1=1.0))
             for at in (360, 420, 480):
+                A.write_state(root, {**state({"devin": row([], reason="sustained-demand")}, load1=1.0), "observedAt": NOW + at})
                 C.tick(root, {}, NOW + at, config={}, post=post(202))
             self.assertEqual(C.read_record(root)["limited"], [])
             self.assertEqual(json.loads((root / C.TRACKER_FILE).read_text())["outbox"], [])

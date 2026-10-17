@@ -75,6 +75,7 @@ vi.mock('@/lib/db/schema/chat', () => ({
   chatConversations: {
     id: 'conversationId',
     title: 'title',
+    userId: 'userId',
     creatorProfileId: 'creatorProfileId',
     updatedAt: 'updatedAt',
   },
@@ -99,7 +100,10 @@ vi.mock('drizzle-orm', () => ({
   desc: vi.fn(),
   eq: vi.fn(),
   isNull: vi.fn(),
+  like: vi.fn(),
   lt: vi.fn(),
+  notLike: vi.fn(),
+  or: vi.fn(),
   sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({
     strings,
     values,
@@ -148,6 +152,7 @@ describe('chat conversation message routes', () => {
     hoisted.insertReturningMock.mockReset();
     hoisted.insertReturningMock.mockResolvedValue([]);
     hoisted.getSessionContextMock.mockResolvedValue({
+      user: { id: 'user-1' },
       profile: { id: 'profile-1' },
     });
   });

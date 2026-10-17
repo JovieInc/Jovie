@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { CheckCircle2 } from 'lucide-react';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -10,6 +10,7 @@ import {
 vi.mock('next/image', () => ({
   default: ({
     fill: _fill,
+    priority: _priority,
     alt,
     ...props
   }: {
@@ -213,7 +214,143 @@ describe('EntityHeaderThumbnail', () => {
     );
 
     const thumb = screen.getByTestId('thumb');
-    expect(thumb).toHaveClass('rounded-full', 'bg-surface-2');
+    expect(thumb).toHaveClass('rounded-full');
+    expect(thumb.firstElementChild).toHaveClass('bg-surface-2');
     expect(screen.getByTestId('provider-glyph')).toBeInTheDocument();
+  });
+});
+
+describe('entity identity semantics across states and densities', () => {
+  it.each([28, 40, 44, 48, 56, 72, 80])(
+    'keeps person media circular at %ipx through failure and replacement',
+    size => {
+      const { container, rerender } = render(
+        <EntityHeaderThumbnail
+          variant='person'
+          name='Alex Rivera'
+          src='https://example.com/broken.jpg'
+          size={size}
+          data-testid='media'
+        />
+      );
+      const media = screen.getByTestId('media');
+      expect(media).toHaveStyle({ width: `${size}px`, height: `${size}px` });
+      fireEvent.error(container.querySelector('img')!);
+      expect(media).toHaveTextContent('AR');
+      expect(media).toHaveClass('rounded-full');
+      expect(
+        screen.getByRole('img', { name: 'Alex Rivera' })
+      ).toBeInTheDocument();
+      rerender(
+        <EntityHeaderThumbnail
+          variant='person'
+          name='Alex Rivera'
+          src='https://example.com/replacement.jpg'
+          size={size}
+          data-testid='media'
+        />
+      );
+      expect(container.querySelector('img')).toHaveAttribute(
+        'src',
+        'https://example.com/replacement.jpg'
+      );
+      expect(media).toHaveStyle({ width: `${size}px`, height: `${size}px` });
+    }
+  );
+
+  it('keeps verification on missing and failed person media, and removes it when the source flag clears', () => {
+    const { container, rerender } = render(
+      <EntityHeaderThumbnail
+        variant='person'
+        name='Alex Rivera'
+        verified
+        src='https://example.com/broken.jpg'
+      />
+    );
+    fireEvent.error(container.querySelector('img')!);
+    expect(
+      screen.getByRole('img', { name: 'Verified Jovie Profile' })
+    ).toBeInTheDocument();
+    expect(screen.getByText('AR')).toBeInTheDocument();
+    rerender(
+      <EntityHeaderThumbnail
+        variant='person'
+        name='Alex Rivera'
+        verified={false}
+      />
+    );
+    expect(
+      screen.queryByRole('img', { name: 'Verified Jovie Profile' })
+    ).toBeNull();
+  });
+
+  it('never turns release/event/connection state into profile verification', () => {
+    for (const variant of ['artwork', 'event', 'connection'] as const) {
+      const { unmount } = render(
+        <EntityHeaderThumbnail variant={variant} name='Entity' verified />
+      );
+      expect(
+        screen.queryByRole('img', { name: 'Verified Jovie Profile' })
+      ).toBeNull();
+      unmount();
+    }
+  });
+
+  it('preserves the complete artwork and media footprint after a failed image', () => {
+    const { container } = render(
+      <EntityHeaderThumbnail
+        variant='artwork'
+        name='Release'
+        src='https://example.com/broken.jpg'
+        size={40}
+        data-testid='media'
+      />
+    );
+    const image = screen.getByRole('img', { name: 'Release' });
+    expect(image).toHaveClass('object-contain');
+    fireEvent.error(image);
+    expect(
+      container.querySelector('[data-artwork-fallback]')
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('media')).toHaveStyle({
+      width: '40px',
+      height: '40px',
+    });
+  });
+
+  it('uses a UTC calendar date stamp, with a calendar icon for missing or invalid dates', () => {
+    const { container, rerender } = render(
+      <EntityHeaderThumbnail
+        variant='event'
+        name='Club night'
+        eventDate='2026-06-12'
+      />
+    );
+    expect(screen.getByText('JUN')).toBeInTheDocument();
+    expect(screen.getByText('12')).toBeInTheDocument();
+    rerender(
+      <EntityHeaderThumbnail
+        variant='event'
+        name='Club night'
+        eventDate='invalid'
+      />
+    );
+    expect(container.querySelector('.lucide-calendar')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Club night' })).toBeInTheDocument();
+  });
+
+  it('supports explicit decorative media without hiding the verification label', () => {
+    render(
+      <EntityHeaderThumbnail
+        variant='person'
+        name='Alex Rivera'
+        alt=''
+        verified
+      />
+    );
+    expect(screen.queryByRole('img', { name: 'Alex Rivera' })).toBeNull();
+    expect(
+      screen.getByRole('img', { name: 'Verified Jovie Profile' })
+    ).toBeInTheDocument();
   });
 });

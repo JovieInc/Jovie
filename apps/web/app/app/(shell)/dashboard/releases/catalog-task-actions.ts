@@ -4,6 +4,7 @@ import { and, count, sql as drizzleSql, eq, isNull, max } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { APP_ROUTES } from '@/constants/routes';
 import { db } from '@/lib/db';
+import { runLegacyDbTransaction } from '@/lib/db/legacy-transaction';
 import { discogReleases } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import {
@@ -183,7 +184,7 @@ export async function instantiateReleaseTasksFromCatalog(
     };
   });
 
-  await db.transaction(async tx => {
+  await runLegacyDbTransaction(async tx => {
     const [freshExisting] = await tx
       .select({ taskCount: count() })
       .from(tasks)
@@ -361,7 +362,7 @@ export async function addCatalogTaskToRelease(releaseId: string, slug: string) {
   const releaseDate = release?.releaseDate ?? null;
 
   try {
-    await db.transaction(async tx => {
+    await runLegacyDbTransaction(async tx => {
       // Re-check inside the transaction to close the read-before-write race.
       // Defense-in-depth on top of the UNIQUE(release_id, catalog_slug) index.
       const [existingSnapshot] = await tx

@@ -24,7 +24,6 @@ FLEET_CONTROLLER_JOBS = (
 )
 
 MODEL_OR_ADVISORY_JOBS = (
-    ("eval-real-model.yml", "real-model-eval"),
     ("sentry-autofix.yml", "autofix"),
 )
 
@@ -401,9 +400,7 @@ def test_changed_evidence_workflows_do_not_use_schedule_dedupe() -> None:
         assert "needs: unchanged" not in workflow, workflow_name
         assert "needs.unchanged.outputs.skip" not in workflow, workflow_name
 
-    live_model = (WORKFLOWS / "eval-real-model.yml").read_text(encoding="utf-8")
     nightly = (WORKFLOWS / "nightly-tests.yml").read_text(encoding="utf-8")
-    assert "uses: ./.github/actions/skip-if-unchanged" not in live_model
     assert "needs: unchanged" not in _job_block("nightly-tests.yml", "e2e-tests")
     assert "needs.unchanged.outputs.skip" not in _job_block(
         "nightly-tests.yml", "e2e-tests"
@@ -998,13 +995,6 @@ def test_scheduled_synthetic_alerts_before_preserving_failure() -> None:
 
 
 
-def test_live_model_work_never_fans_out_from_pull_requests() -> None:
-    """PR evals stay deterministic; live-model spend belongs off the PR path."""
-    real_model = (WORKFLOWS / "eval-real-model.yml").read_text(encoding="utf-8")
-
-    assert "pull_request:" not in real_model
-    assert "pnpm exec vitest run" in real_model
-
 
 def test_deep_lanes_are_event_driven_and_bounded() -> None:
     """Changed-evidence coverage should not fan out across the runner pool."""
@@ -1035,9 +1025,10 @@ def test_deep_lanes_are_event_driven_and_bounded() -> None:
 
 
 def test_full_matrix_supersedes_stale_runs_cleanly() -> None:
-    """Main pushes outpace the serial matrix; only the freshest run should
-    survive, and supersession must be a workflow-level cancellation rather
-    than an external mid-test runner kill (JOV-7167, JOV-7569)."""
+    """Main pushes outpace the matrix. The in-progress run must finish and
+    report a real conclusion. GitHub keeps a single pending successor.
+    Path filters stay off so an external sweep cannot kill a non-member
+    mid-test (JOV-7167, JOV-7569). No cron: the lane stays evidence-driven."""
     workflow = (WORKFLOWS / "e2e-full-matrix.yml").read_text(encoding="utf-8")
 
     triggers = workflow.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
@@ -1048,9 +1039,11 @@ def test_full_matrix_supersedes_stale_runs_cleanly() -> None:
         "\njobs:\n", 1
     )[0]
     assert "paths:" not in push_trigger
+    assert "schedule:" not in triggers
     assert "group: e2e-full-matrix-" in concurrency
     assert "github.event_name" in concurrency
-    assert "cancel-in-progress: true" in concurrency
+    assert "cancel-in-progress: false" in concurrency
+    assert "cancel-in-progress: true" not in concurrency
 
 
 def test_nightly_unit_suite_fetches_storybook_provenance_history() -> None:

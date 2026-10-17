@@ -10,6 +10,7 @@ import {
   ARTIST_OPENAPI_CACHE_CONTROL,
   ARTIST_OPENAPI_DOCUMENT,
   type ArtistOpenApiDocument,
+  type JsonSchema,
 } from '@/lib/api/v1/openapi';
 
 async function readOpenApiResponse(response: Response) {
@@ -25,14 +26,18 @@ async function readOpenApiResponse(response: Response) {
 }
 
 function collectOperations(document: typeof ARTIST_OPENAPI_DOCUMENT) {
-  return Object.values(document.paths).map(pathItem => pathItem.get);
+  return Object.values(document.paths).flatMap(pathItem =>
+    Object.values(pathItem)
+  );
 }
 
-type ArtistOperation = ArtistOpenApiDocument['paths'][string]['get'];
+type ArtistOperation = NonNullable<
+  ArtistOpenApiDocument['paths'][string]['get']
+>;
 
 function resolvesToObjectSchema(
   document: ArtistOpenApiDocument,
-  schema: { readonly $ref?: string; readonly type?: string }
+  schema: JsonSchema
 ) {
   if (schema.type === 'object') return true;
 
@@ -75,29 +80,36 @@ describe('public artist OpenAPI contract', () => {
       const responses = Object.values(operation.responses);
       expect(responses.length).toBeGreaterThan(0);
       for (const response of responses) {
-        const schema = response.content['application/json'].schema;
-        expect(schema.$ref ?? schema.type).toBeTruthy();
+        for (const media of Object.values(response.content)) {
+          const schema = media.schema;
+          expect(schema.$ref ?? schema.type ?? schema.oneOf).toBeTruthy();
+        }
       }
     }
   });
 
-  it('exposes only public GET operations', () => {
+  it('publishes agent writes alongside public reads', () => {
     const pathItems = Object.values(ARTIST_OPENAPI_DOCUMENT.paths);
     expect(pathItems.length).toBeGreaterThan(0);
     for (const pathItem of pathItems) {
-      expect(Object.keys(pathItem)).toEqual(['get']);
+      expect(
+        Object.keys(pathItem).every(method => ['get', 'post'].includes(method))
+      ).toBe(true);
     }
   });
 
-  it('gives every function-callable operation a typed input and object output', () => {
-    const operations = collectOperations(ARTIST_OPENAPI_DOCUMENT);
+  it('gives artist API operations a typed input and object output', () => {
+    const operations = [
+      ARTIST_OPENAPI_DOCUMENT.paths['/api/v1'].get!,
+      ARTIST_OPENAPI_DOCUMENT.paths['/api/v1/{username}'].get!,
+    ];
 
     expect(
       operations.every(operation =>
         isFunctionCallable(ARTIST_OPENAPI_DOCUMENT, operation)
       )
     ).toBe(true);
-    expect(ARTIST_OPENAPI_DOCUMENT.paths['/api/v1'].get.parameters).toEqual([
+    expect(ARTIST_OPENAPI_DOCUMENT.paths['/api/v1'].get!.parameters).toEqual([
       expect.objectContaining({
         name: 'Accept',
         in: 'header',
@@ -108,7 +120,7 @@ describe('public artist OpenAPI contract', () => {
   });
 
   it('deliberately rejects a function operation with no typed request input', () => {
-    const indexOperation = ARTIST_OPENAPI_DOCUMENT.paths['/api/v1'].get;
+    const indexOperation = ARTIST_OPENAPI_DOCUMENT.paths['/api/v1'].get!;
     const missingInputOperation: ArtistOperation = {
       ...indexOperation,
       parameters: [],
@@ -165,17 +177,17 @@ describe('public artist OpenAPI contract', () => {
     expect(ARTIST_OPENAPI_DOCUMENT.paths).toHaveProperty('/api/v1/{username}');
     expect(ARTIST_OPENAPI_DOCUMENT.paths).not.toHaveProperty('/{username}');
 
-    const indexOperation = ARTIST_OPENAPI_DOCUMENT.paths['/api/v1'].get;
+    const indexOperation = ARTIST_OPENAPI_DOCUMENT.paths['/api/v1'].get!;
     expect(indexOperation.operationId).toBe('getArtistApiIndex');
 
     const profileOperation =
-      ARTIST_OPENAPI_DOCUMENT.paths['/api/v1/{username}'].get;
+      ARTIST_OPENAPI_DOCUMENT.paths['/api/v1/{username}'].get!;
     expect(profileOperation.parameters?.[0]?.schema.examples).toEqual([
       'public-handle',
     ]);
     expect(indexOperation.responses['200']).toBeDefined();
     expect(
-      ARTIST_OPENAPI_DOCUMENT.paths['/api/v1'].get.responses['200'].content[
+      ARTIST_OPENAPI_DOCUMENT.paths['/api/v1'].get!.responses['200'].content[
         'application/json'
       ].schema.$ref
     ).toBe('#/components/schemas/ArtistApiIndex');

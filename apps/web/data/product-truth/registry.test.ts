@@ -78,6 +78,19 @@ describe('product-truth capabilities', () => {
     expect(getEntitlementCapabilityId('notAnEntitlement')).toBeNull();
   });
 
+  it('keeps automatic links internal and unavailable until publication commissioning', () => {
+    expect(getEntitlementCapabilityId('canAutoCreateLinks')).toBe(
+      'automatic-links'
+    );
+    const capability = getProductCapability('automatic-links');
+    expect(capability).toMatchObject({
+      maturity: 'proposed',
+      publication: 'internal_only',
+      access: 'unavailable',
+    });
+    expect(capability?.marketing).toBeUndefined();
+  });
+
   it('every app and code flag maps to a capability or is declared non-marketing', () => {
     const flagNames = [
       ...Object.keys(APP_FLAG_KEYS),

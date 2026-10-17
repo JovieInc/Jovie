@@ -71,8 +71,12 @@ describe('ArtistNotificationsHero', () => {
       <ArtistNotificationsHero hero={ARTIST_NOTIFICATIONS_COPY.hero} />
     );
 
-    expect(container.querySelector('section')).toHaveClass(
-      'marketing-hero-dock'
+    const hero = container.querySelector('section');
+    expect(hero).toHaveClass('marketing-hero-dock');
+    expect(hero).toHaveAttribute('data-testid', 'marketing-section-hero');
+    expect(hero).toHaveAttribute(
+      'data-marketing-variant',
+      'split-screenshot-right'
     );
 
     const heroImage = container.querySelector('img[alt=""]');

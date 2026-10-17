@@ -9,7 +9,7 @@ const [{ GET: getCanonical }, { GET: getVersioned }] = await Promise.all([
 ]);
 
 describe('GET /openapi.json', () => {
-  it('serves the same public Artist API spec as /api/v1/openapi.json', async () => {
+  it('serves the same public API spec as /api/v1/openapi.json', async () => {
     const canonical = getCanonical();
     const versioned = getVersioned();
 
@@ -24,7 +24,7 @@ describe('GET /openapi.json', () => {
 
     expect(canonicalSpec).toEqual(versionedSpec);
     expect(canonicalSpec.openapi).toBe('3.1.0');
-    expect(canonicalSpec.info.title).toBe('Jovie Artist API');
+    expect(canonicalSpec.info.title).toBe('Jovie Public API');
     expect(canonicalSpec.paths['/api/v1'].get.operationId).toBe(
       'getArtistApiIndex'
     );

@@ -38,7 +38,7 @@ async function resolveReleasesSurface(
     return 'mobile';
   }
 
-  const desktopRows = page.locator('tbody tr');
+  const desktopRows = page.locator('tbody tr, [data-shell-release-row]');
   if (
     await desktopRows
       .first()
@@ -62,6 +62,11 @@ async function expectPopulatedRoute(page: import('@playwright/test').Page) {
 
   const getDesktopOpenButton = (scope: import('@playwright/test').Locator) =>
     scope.locator('[data-testid^="release-open-"]').first();
+
+  const shellRows = page.locator('[data-shell-release-row]');
+  if ((await shellRows.count()) > 0) {
+    return shellRows.first();
+  }
 
   const rows = page.locator('tbody tr');
   expect(await rows.count()).toBeGreaterThan(0);

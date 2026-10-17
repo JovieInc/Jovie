@@ -12,8 +12,13 @@
  * need an outcome receipt (JOV-7300). Invariant consumer: JOV-INV-041.
  */
 
-import { appendFileSync, readFileSync } from 'node:fs';
-import { resolve as resolvePath } from 'node:path';
+import {
+  appendFileSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
+import { join, resolve as resolvePath } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { deprecationCheckGreen } from './deprecation-observation.mjs';
 import { GREEN_MARKER } from './remediation-signal.mjs';
@@ -26,9 +31,85 @@ import {
   createProductionFacts,
   fetchWithRetry,
   githubClient,
+  githubStatusError,
+  headerRetryMs,
   immutableGithubCache,
+  rateLimitWaitMs,
   reconcileValidation,
 } from './validation-sync.mjs';
+
+/**
+ * The three classifiers merge-mode needs from github-installation-quota.mjs.
+ * The full module also owns Scorecard waits; this writer only classifies.
+ * @typedef {{
+ *   failureDisposition: (
+ *     label: string,
+ *     error: unknown,
+ *   ) => { code: number, log: string, softFailed: boolean },
+ *   installationQuotaLog: (label: string) => string,
+ *   isInstallationQuota403: (text: unknown, status?: number | null) => boolean,
+ * }} InstallationQuotaClassifier
+ */
+
+/**
+ * pull_request merge runs use the workflow file from the PR merge ref and
+ * then check out main. A merge ref from before this module was added omits
+ * it from sparse-checkout. A static import then dies with ERR_MODULE_NOT_FOUND
+ * before any lifecycle write. Load it when the checkout has it. When it does
+ * not, installation 403s stay fatal: this is not a skip and not exit 0.
+ * Any other load error still throws.
+ * @returns {Promise<InstallationQuotaClassifier>}
+ */
+async function loadInstallationQuotaClassifier() {
+  try {
+    return await import('./github-installation-quota.mjs');
+  } catch (error) {
+    const code =
+      error && typeof error === 'object' && 'code' in error
+        ? String(error.code)
+        : '';
+    if (code !== 'ERR_MODULE_NOT_FOUND') throw error;
+    console.error(
+      'Linear Sync: scripts/lib/github-installation-quota.mjs is absent from this sparse checkout. Installation 403s stay fatal. This is not a successful skip.'
+    );
+    return {
+      failureDisposition(_label, failure) {
+        const stderr =
+          failure && typeof failure === 'object' && 'stderr' in failure
+            ? String(/** @type {{ stderr?: unknown }} */ (failure).stderr ?? '')
+            : '';
+        const message =
+          failure instanceof Error ? failure.message : String(failure ?? '');
+        const text = `${stderr}\n${message}`.trim();
+        return {
+          code: 1,
+          log: text || 'unknown failure',
+          softFailed: false,
+        };
+      },
+      installationQuotaLog(label) {
+        return `Linear Sync: installation-quota classifier unavailable for ${label}; installation 403s stay fatal`;
+      },
+      isInstallationQuota403() {
+        return false;
+      },
+    };
+  }
+}
+
+const installationQuota = await loadInstallationQuotaClassifier();
+
+/** True only when the checked-out classifier recognized an installation 403. */
+export const installationQuotaClassifierReady =
+  installationQuota.isInstallationQuota403(
+    'API rate limit exceeded for installation ID 1'
+  ) === true;
+
+export const {
+  failureDisposition,
+  installationQuotaLog,
+  isInstallationQuota403,
+} = installationQuota;
 
 export const LINEAR_API = 'https://api.linear.app/graphql';
 export const COMMISSIONING_PARENT_ALLOWLIST = new Set([
@@ -41,6 +122,46 @@ const IDENTIFIER_RE = /^JOV-(\d+)$/i;
 const COMMISSIONING_LABEL_RE = /commission/i;
 const PARENT_LABEL_RE = /^(parent|epic|type:epic)$/i;
 const MAX_OPEN_PR_PAGES = 20;
+export const SWEEP_CURSOR_SCHEMA = 1;
+export const SWEEP_BATCH_SIZE = 4;
+const SWEEP_CURSOR_FILE = 'cursor.json';
+
+/** @type {(ms: number) => Promise<void>} */
+let sleepFn = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * @param {string | undefined} dir
+ * @returns {{ nextIdentifier: string } | null}
+ */
+export function readSweepCursor(dir) {
+  if (!dir) return null;
+  try {
+    const raw = JSON.parse(readFileSync(join(dir, SWEEP_CURSOR_FILE), 'utf8'));
+    if (raw?.schema !== SWEEP_CURSOR_SCHEMA) return null;
+    const nextIdentifier = String(raw.nextIdentifier ?? '').toUpperCase();
+    if (nextIdentifier && !IDENTIFIER_RE.test(nextIdentifier)) return null;
+    return { nextIdentifier };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @param {string | undefined} dir
+ * @param {string} nextIdentifier
+ */
+export function writeSweepCursor(dir, nextIdentifier) {
+  if (!dir) return;
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(
+    join(dir, SWEEP_CURSOR_FILE),
+    `${JSON.stringify({
+      schema: SWEEP_CURSOR_SCHEMA,
+      nextIdentifier: nextIdentifier || '',
+      savedAt: new Date().toISOString(),
+    })}\n`
+  );
+}
 
 /**
  * Subset of fetch that production `globalThis.fetch` and the regression
@@ -434,8 +555,9 @@ export function lifecycleHolds(input) {
 async function linearGraphql(fetchImpl, apiKey, query, variables) {
   // Bounded retry for transient Linear upstream failures (JOV-8012): a
   // 503/502/504 from Linear used to fail the whole sweep even though the
-  // next scheduled run converged. Retry the transport statuses and the
-  // shared-key rate limit with backoff; persistent errors still throw.
+  // next scheduled run converged. Retry the transport statuses and a short
+  // shared-key rate limit. A reset beyond the sweep budget throws so the
+  // caller can persist the cursor instead of sleeping out the hour.
   const maxAttempts = 4;
   /** @type {Error | null} */
   let lastError = null;
@@ -454,43 +576,72 @@ async function linearGraphql(fetchImpl, apiKey, query, variables) {
           await response.json()
         );
       if (Array.isArray(payload.errors) && payload.errors.length > 0) {
-        throw new Error(
-          payload.errors
-            .map(error =>
-              error && typeof error === 'object' && 'message' in error
-                ? String(error.message)
-                : 'Linear request failed'
-            )
-            .join('; ')
+        const errors = payload.errors;
+        const limited = errors.some(
+          error =>
+            error &&
+            typeof error === 'object' &&
+            'extensions' in error &&
+            /** @type {{ extensions?: { code?: string } }} */ (error).extensions
+              ?.code === 'RATELIMITED'
         );
+        if (!limited) {
+          throw new Error(
+            errors
+              .map(error =>
+                error && typeof error === 'object' && 'message' in error
+                  ? String(error.message)
+                  : 'Linear request failed'
+              )
+              .join('; ')
+          );
+        }
+        lastError = Object.assign(
+          new Error(`Linear rate limited (HTTP ${response.status})`),
+          { rateLimited: true, retryAfterMs: headerRetryMs(response.headers) }
+        );
+      } else {
+        return payload.data ?? {};
       }
-      return payload.data ?? {};
+    } else {
+      // Linear answers a spent rate limit with HTTP 400 and RATELIMITED. The
+      // lifecycle key is shared with Summer and agents, so name it plainly.
+      /** @type {any} */
+      const body = await response.json().catch(() => null);
+      const errors = Array.isArray(body?.errors) ? body.errors : [];
+      const limited =
+        response.status === 429 ||
+        errors.some(
+          (/** @type {any} */ error) =>
+            error?.extensions?.code === 'RATELIMITED'
+        );
+      const detail = errors
+        .map((/** @type {any} */ error) => String(error?.message ?? ''))
+        .filter(Boolean)
+        .join('; ');
+      lastError = Object.assign(
+        new Error(
+          limited
+            ? `Linear rate limited (HTTP ${response.status})`
+            : `Linear HTTP ${response.status}${detail ? `: ${detail}` : ''}`
+        ),
+        {
+          rateLimited: limited,
+          retryAfterMs: limited ? headerRetryMs(response.headers) : 0,
+        }
+      );
     }
-    // Linear answers a spent rate limit with HTTP 400 and RATELIMITED. The
-    // lifecycle key is shared with Summer and agents, so name it plainly.
-    /** @type {any} */
-    const body = await response.json().catch(() => null);
-    const errors = Array.isArray(body?.errors) ? body.errors : [];
-    const limited = errors.some(
-      (/** @type {any} */ error) => error?.extensions?.code === 'RATELIMITED'
-    );
-    const detail = errors
-      .map((/** @type {any} */ error) => String(error?.message ?? ''))
-      .filter(Boolean)
-      .join('; ');
-    lastError = Object.assign(
-      new Error(
-        limited
-          ? `Linear rate limited (HTTP ${response.status})`
-          : `Linear HTTP ${response.status}${detail ? `: ${detail}` : ''}`
-      ),
-      { rateLimited: limited }
-    );
-    const retryable = response.status === 429 || response.status >= 500;
-    if (!retryable || attempt === maxAttempts) throw lastError;
-    // Exponential backoff, bounded for the 15-minute sweep budget.
-    const delayMs = Math.min(4_000, 2 ** (attempt - 1) * 250);
-    await new Promise(resolve => setTimeout(resolve, delayMs));
+    const flagged =
+      /** @type {{ rateLimited?: boolean, retryAfterMs?: number }} */ (
+        lastError
+      );
+    const wait = flagged.rateLimited
+      ? rateLimitWaitMs(flagged.retryAfterMs ?? 0, attempt, maxAttempts)
+      : response.status === 429 || response.status >= 500
+        ? Math.min(4_000, 2 ** (attempt - 1) * 250)
+        : null;
+    if (wait == null || attempt === maxAttempts) throw lastError;
+    await sleepFn(wait);
   }
   throw lastError ?? new Error('Linear request failed');
 }
@@ -505,35 +656,52 @@ async function linearGraphql(fetchImpl, apiKey, query, variables) {
  */
 export async function listOpenPullRequests(input) {
   const maxPages = input.maxPages ?? MAX_OPEN_PR_PAGES;
+  const maxAttempts = 4;
   /** @type {ReturnType<typeof normalizePullRequest>[]} */
   const pulls = [];
   let url = `https://api.github.com/repos/${input.repository}/pulls?state=open&per_page=100&page=1`;
   for (let page = 0; page < maxPages; page += 1) {
-    const response = await input.fetchImpl(url, {
-      headers: {
-        Accept: 'application/vnd.github+json',
-        Authorization: `Bearer ${input.token}`,
-        'X-GitHub-Api-Version': '2022-11-28',
-        'User-Agent': 'jovie-linear-sync-on-merge',
-      },
-    });
-    if (!response.ok) {
-      throw new Error(`GitHub HTTP ${response.status}`);
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      const response = await input.fetchImpl(url, {
+        headers: {
+          Accept: 'application/vnd.github+json',
+          Authorization: `Bearer ${input.token}`,
+          'X-GitHub-Api-Version': '2022-11-28',
+          'User-Agent': 'jovie-linear-sync-on-merge',
+        },
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        const error = githubStatusError(
+          response.status,
+          response.headers,
+          body,
+          `repos/${input.repository}/pulls?state=open`
+        );
+        const wait = error.rateLimited
+          ? rateLimitWaitMs(error.retryAfterMs, attempt, maxAttempts)
+          : null;
+        if (wait == null || attempt === maxAttempts) throw error;
+        await sleepFn(wait);
+        continue;
+      }
+      const batch = await response.json();
+      if (!Array.isArray(batch)) {
+        throw new Error('GitHub pulls response was not a list');
+      }
+      pulls.push(...batch.map(normalizePullRequest));
+      const next = nextLink(response.headers?.get?.('link') ?? '');
+      if (!next) return { pulls, complete: true };
+      url = next;
+      break;
     }
-    const batch = await response.json();
-    if (!Array.isArray(batch)) {
-      throw new Error('GitHub pulls response was not a list');
-    }
-    pulls.push(...batch.map(normalizePullRequest));
-    const next = nextLink(response.headers?.get?.('link') ?? '');
-    if (!next) return { pulls, complete: true };
-    url = next;
   }
   return { pulls, complete: false };
 }
 
 const ISSUE_FIELDS = `
     id
+    updatedAt
     identifier
     title
     description
@@ -543,9 +711,15 @@ const ISSUE_FIELDS = `
       nodes { body createdAt }
       pageInfo { hasNextPage endCursor }
     }
-    children(first: 50) { nodes { identifier state { type } } }
+    children(first: 50) {
+      nodes { identifier completedAt canceledAt state { type } }
+      pageInfo { hasNextPage endCursor }
+    }
     attachments(first: 50) { nodes { url } }
-    history(first: 100) { nodes { fromState { type } toState { type } } }
+    history(first: 100) {
+      nodes { createdAt fromState { type } toState { type } }
+      pageInfo { hasNextPage endCursor }
+    }
     team { states { nodes { id name type } } }`;
 
 const ISSUE_QUERY = `query IssueLifecycle($issueId: String!) {
@@ -562,8 +736,26 @@ const COMMENTS_PAGE_QUERY = `query IssueLifecycleComments($issueId: String!, $af
   }
 }`;
 
+const CHILDREN_PAGE_QUERY = `query IssueLifecycleChildren($issueId: String!, $after: String!) {
+  issue(id: $issueId) {
+    children(first: 50, after: $after) {
+      nodes { identifier completedAt canceledAt state { type } }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
+}`;
+
 const ISSUE_STATE_QUERY = `query IssueLifecycleState($issueId: String!) {
   issue(id: $issueId) { id state { id name } }
+}`;
+
+const HISTORY_PAGE_QUERY = `query IssueLifecycleHistory($issueId: String!, $after: String!) {
+  issue(id: $issueId) {
+    history(first: 100, after: $after) {
+      nodes { createdAt fromState { type } toState { type } }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
 }`;
 
 const SWEEP_QUERY = `query LifecycleSweep($states: [String!]!, $after: String) {
@@ -572,12 +764,13 @@ const SWEEP_QUERY = `query LifecycleSweep($states: [String!]!, $after: String) {
     after: $after
     filter: { team: { key: { eq: "JOV" } }, state: { name: { in: $states } } }
   ) {
-    nodes { identifier updatedAt state { name } attachments(first: 50) { nodes { url } } }
+    nodes { identifier updatedAt state { name } attachments(first: 50) { nodes { url } } children(first: 1) { nodes { identifier } } labels(first: 50) { nodes { name } } }
     pageInfo { hasNextPage endCursor }
   }
 }`;
 
 const MAX_COMMENT_PAGES = 10;
+const MAX_CHILD_PAGES = 20;
 const MAX_SWEEP_PAGES = 10;
 const CI_HARNESS_MANIFEST = '.github/ci-harness/manifest.json';
 const ASSURANCE_MATRIX = 'scripts/invariants/assurance-matrix.json';
@@ -596,8 +789,103 @@ async function readLifecycleIssue(fetchImpl, apiKey, lookupId) {
   });
   const raw = data.issue;
   if (!raw || typeof raw !== 'object') return null;
-  const comments = [...(raw.comments?.nodes ?? [])];
-  let pageInfo = raw.comments?.pageInfo;
+  return materializeLifecycleIssue(fetchImpl, apiKey, raw);
+}
+
+/**
+ * One Linear request for several issue records. Alias batching keeps a sweep
+ * inside the shared request budget; a single id keeps the original query so
+ * existing callers stay unchanged. Pagination and delivery checks happen later,
+ * per issue, so one bounded history read is not fetched twice.
+ *
+ * @param {HttpFetch} fetchImpl
+ * @param {string} apiKey
+ * @param {readonly string[]} lookupIds
+ * @returns {Promise<(Record<string, any> | null)[]>}
+ */
+async function fetchLifecycleRaws(fetchImpl, apiKey, lookupIds) {
+  if (lookupIds.length === 0) return [];
+  if (lookupIds.length === 1) {
+    const data = await linearGraphql(fetchImpl, apiKey, ISSUE_QUERY, {
+      issueId: lookupIds[0],
+    });
+    const raw = data.issue;
+    return [raw && typeof raw === 'object' ? raw : null];
+  }
+  /** @type {Record<string, string>} */
+  const variables = {};
+  const selections = lookupIds.map((id, index) => {
+    variables[`id${index}`] = id;
+    return `i${index}: issue(id: $id${index}) {${ISSUE_FIELDS}
+  }`;
+  });
+  const decls = lookupIds.map((_, index) => `$id${index}: String!`).join(', ');
+  const data = await linearGraphql(
+    fetchImpl,
+    apiKey,
+    `query LifecycleIssueBatch(${decls}) {
+${selections.join('\n')}
+}`,
+    variables
+  );
+  return lookupIds.map((_, index) => {
+    const raw = data[`i${index}`];
+    return raw && typeof raw === 'object' ? raw : null;
+  });
+}
+
+/**
+ * @param {HttpFetch} fetchImpl
+ * @param {string} apiKey
+ * @param {Record<string, any>} raw
+ */
+async function materializeLifecycleIssue(fetchImpl, apiKey, raw) {
+  const history = [];
+  let historyPage = raw.history;
+  for (let page = 0; ; page += 1) {
+    if (
+      !Array.isArray(historyPage?.nodes) ||
+      typeof historyPage?.pageInfo?.hasNextPage !== 'boolean'
+    ) {
+      throw new Error(`Malformed lifecycle history for ${raw.identifier}`);
+    }
+    history.push(...historyPage.nodes);
+    if (!historyPage.pageInfo.hasNextPage) break;
+    if (page >= MAX_COMMENT_PAGES || !historyPage.pageInfo.endCursor) {
+      throw new Error(
+        `Lifecycle history for ${raw.identifier} exceeds the read bound`
+      );
+    }
+    const more = await linearGraphql(fetchImpl, apiKey, HISTORY_PAGE_QUERY, {
+      issueId: raw.id,
+      after: historyPage.pageInfo.endCursor,
+    });
+    historyPage = more.issue?.history;
+  }
+  const reopens = history.filter(
+    entry =>
+      entry?.fromState?.type === 'completed' &&
+      typeof entry?.toState?.type === 'string' &&
+      entry.toState.type !== 'completed'
+  );
+  const reopenTimes = reopens.map(entry =>
+    Date.parse(String(entry.createdAt ?? ''))
+  );
+  const receiptNotBefore = reopenTimes.some(time => !Number.isFinite(time))
+    ? null
+    : reopenTimes.length > 0
+      ? new Date(Math.max(...reopenTimes)).toISOString()
+      : undefined;
+  if (
+    !Array.isArray(raw.comments?.nodes) ||
+    typeof raw.comments?.pageInfo?.hasNextPage !== 'boolean'
+  ) {
+    throw new Error(
+      `Unreadable lifecycle preimage comments for ${raw.identifier}`
+    );
+  }
+  const comments = [...raw.comments.nodes];
+  let pageInfo = raw.comments.pageInfo;
   for (
     let page = 0;
     pageInfo?.hasNextPage === true && page < MAX_COMMENT_PAGES;
@@ -607,8 +895,17 @@ async function readLifecycleIssue(fetchImpl, apiKey, lookupId) {
       issueId: raw.id,
       after: pageInfo.endCursor,
     });
-    comments.push(...(more.issue?.comments?.nodes ?? []));
-    pageInfo = more.issue?.comments?.pageInfo;
+    const nextPage = more.issue?.comments;
+    if (
+      !Array.isArray(nextPage?.nodes) ||
+      typeof nextPage?.pageInfo?.hasNextPage !== 'boolean'
+    ) {
+      throw new Error(
+        `Unreadable lifecycle preimage comments for ${raw.identifier}`
+      );
+    }
+    comments.push(...nextPage.nodes);
+    pageInfo = nextPage.pageInfo;
   }
   if (pageInfo?.hasNextPage === true) {
     throw new Error(
@@ -624,11 +921,51 @@ async function readLifecycleIssue(fetchImpl, apiKey, lookupId) {
     ...raw,
     comments: { nodes: comments },
   });
-  const childNodes = Array.isArray(raw.children?.nodes)
-    ? raw.children.nodes
-    : [];
+  const childNodes = [];
+  let childPage = raw.children;
+  for (let page = 0; ; page += 1) {
+    if (
+      !Array.isArray(childPage?.nodes) ||
+      typeof childPage?.pageInfo?.hasNextPage !== 'boolean'
+    ) {
+      throw new Error(
+        `Child delivery evidence for ${raw.identifier} is incomplete`
+      );
+    }
+    childNodes.push(...childPage.nodes);
+    if (!childPage.pageInfo.hasNextPage) break;
+    // JOV-5853 has more shipped children than one page. A missing cursor is
+    // still incomplete evidence; a later page is read before any child closes.
+    if (page >= MAX_CHILD_PAGES || !childPage.pageInfo.endCursor) {
+      throw new Error(
+        `Child delivery evidence for ${raw.identifier} is incomplete`
+      );
+    }
+    const more = await linearGraphql(fetchImpl, apiKey, CHILDREN_PAGE_QUERY, {
+      issueId: raw.id,
+      after: childPage.pageInfo.endCursor,
+    });
+    childPage = more.issue?.children;
+  }
+  const childDeliveryTimes = childNodes
+    .filter(child => ['completed', 'canceled'].includes(child?.state?.type))
+    .map(child =>
+      Date.parse(
+        String(
+          child.state.type === 'completed'
+            ? child.completedAt
+            : child.canceledAt
+        )
+      )
+    );
+  if (childDeliveryTimes.some(time => !Number.isFinite(time))) {
+    throw new Error(
+      `Child delivery timestamp for ${raw.identifier} is unknown`
+    );
+  }
   return {
     ...snapshot,
+    updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : '',
     state: {
       id: String(raw.state?.id ?? ''),
       name: String(raw.state?.name ?? ''),
@@ -638,6 +975,10 @@ async function readLifecycleIssue(fetchImpl, apiKey, lookupId) {
       body: String(comment?.body ?? ''),
       createdAt: String(comment?.createdAt ?? ''),
     })),
+    children: childNodes.map(child =>
+      String(child?.identifier ?? '').toUpperCase()
+    ),
+    hasChildren: childNodes.length > 0,
     openChildren: childNodes
       .filter(
         child =>
@@ -645,17 +986,66 @@ async function readLifecycleIssue(fetchImpl, apiKey, lookupId) {
       )
       .map(child => String(child?.identifier ?? '').toUpperCase())
       .filter(Boolean),
-    reopenedAfterDone: (raw.history?.nodes ?? []).some(
-      /** @param {any} entry */
-      entry =>
-        entry?.fromState?.type === 'completed' &&
-        typeof entry?.toState?.type === 'string' &&
-        entry.toState.type !== 'completed'
-    ),
+    reopenedAfterDone: reopens.length > 0,
+    receiptNotBefore,
+    ...(childDeliveryTimes.length > 0
+      ? {
+          outcomeNotBefore: new Date(
+            Math.max(...childDeliveryTimes)
+          ).toISOString(),
+        }
+      : {}),
     attachmentUrls: (raw.attachments?.nodes ?? [])
       .map(node => String(node?.url ?? ''))
       .filter(Boolean),
   };
+}
+
+/**
+ * The issue inputs used by this decision, including separately versioned
+ * comments and child delivery. Preserve canonical comment order (including
+ * equal-time ties); normalize only unordered inputs. Never log raw content.
+ * This guards fact-read races; the final read-to-mutation interval remains
+ * non-atomic.
+ *
+ * @param {Awaited<ReturnType<typeof readLifecycleIssue>>} issue
+ */
+function lifecyclePreimage(issue) {
+  if (
+    !issue?.id ||
+    !issue.state.id ||
+    !issue.state.name ||
+    !issue.state.type ||
+    !Number.isFinite(Date.parse(issue.updatedAt)) ||
+    issue.acceptanceMetadataVerified !== true ||
+    issue.commentRecords.some(
+      comment => !Number.isFinite(Date.parse(comment.createdAt))
+    )
+  ) {
+    throw new Error(
+      `Unreadable lifecycle preimage for ${issue?.identifier ?? 'issue'}`
+    );
+  }
+  return JSON.stringify({
+    id: issue.id,
+    updatedAt: issue.updatedAt,
+    state: issue.state,
+    title: issue.title,
+    description: issue.description,
+    labels: [...issue.labels].sort(),
+    reopenedAfterDone: issue.reopenedAfterDone,
+    receiptNotBefore: issue.receiptNotBefore ?? null,
+    outcomeNotBefore: issue.outcomeNotBefore ?? null,
+    comments: issue.commentRecords.map(comment =>
+      JSON.stringify([comment.createdAt, comment.body])
+    ),
+    children: [...issue.children].sort(),
+    openChildren: [...issue.openChildren].sort(),
+    attachments: [...issue.attachmentUrls].sort(),
+    states: issue.states
+      .map(state => JSON.stringify([state.id, state.name, state.type]))
+      .sort(),
+  });
 }
 
 /**
@@ -675,15 +1065,15 @@ async function readLifecycleIssue(fetchImpl, apiKey, lookupId) {
  *   readonly allowlist?: ReadonlySet<string>,
  *   readonly eventPull?: { number: number },
  *   readonly dryRun?: boolean,
+ *   readonly issue?: Awaited<ReturnType<typeof readLifecycleIssue>>,
  *   readonly log: (message: string) => void,
  * }} ctx
  */
 export async function reconcileIssueLifecycle(ctx) {
-  const issue = await readLifecycleIssue(
-    ctx.fetchImpl,
-    ctx.apiKey,
-    ctx.lookupId
-  );
+  const issue =
+    ctx.issue !== undefined
+      ? ctx.issue
+      : await readLifecycleIssue(ctx.fetchImpl, ctx.apiKey, ctx.lookupId);
   if (!issue?.id || !issue.identifier) {
     ctx.log(
       `Could not resolve Linear issue for lookup '${ctx.lookupId}'; skipping`
@@ -718,10 +1108,21 @@ export async function reconcileIssueLifecycle(ctx) {
     dryRun: ctx.dryRun,
     log: ctx.log,
     linear: {
-      readStateId: async issueId =>
-        String(
-          (await linear(ISSUE_STATE_QUERY, { issueId })).issue?.state?.id ?? ''
-        ),
+      readStateId: async issueId => {
+        // Only moving decisions pay for this complete read. Issue updatedAt
+        // alone cannot prove unchanged comments or child delivery/acceptance.
+        const current = await readLifecycleIssue(
+          ctx.fetchImpl,
+          ctx.apiKey,
+          issueId
+        );
+        if (current?.id !== issueId) {
+          throw new Error(`Unreadable lifecycle preimage for ${issueId}`);
+        }
+        return lifecyclePreimage(current) === lifecyclePreimage(issue)
+          ? current.state.id
+          : '';
+      },
       setState: async (issueId, stateId) =>
         String(
           (
@@ -790,14 +1191,43 @@ function loadJson(root, path) {
  *   readonly allowlist?: ReadonlySet<string>,
  *   readonly harnessManifest?: unknown,
  *   readonly assuranceMatrix?: unknown,
+ *   readonly verifyMarker?: (sha: string, controllerWorkflowId: number) => Promise<boolean> | boolean,
+ *   readonly sleep?: (ms: number) => Promise<void>,
  * }} [options]
  */
 export async function syncLinearIssueOnMerge(options = {}) {
+  const previousSleep = sleepFn;
+  if (options.sleep) sleepFn = options.sleep;
+  try {
+    return await runSync(options);
+  } finally {
+    sleepFn = previousSleep;
+  }
+}
+
+/**
+ * @param {{
+ *   readonly fetchImpl?: HttpFetch,
+ *   readonly env?: NodeJS.ProcessEnv,
+ *   readonly log?: (message: string) => void,
+ *   readonly allowlist?: ReadonlySet<string>,
+ *   readonly harnessManifest?: unknown,
+ *   readonly assuranceMatrix?: unknown,
+ *   readonly verifyMarker?: (sha: string, controllerWorkflowId: number) => Promise<boolean> | boolean,
+ * }} options
+ */
+async function runSync(options) {
   /** @type {HttpFetch} */
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
   const env = options.env ?? process.env;
   const log = options.log ?? (message => console.log(message));
   const sweep = env.LIFECYCLE_MODE === 'sweep';
+  const receiptIssue = String(env.LINEAR_VALIDATION_ISSUE ?? '').toUpperCase();
+  // Nonempty malformed targets have their own workflow concurrency group.
+  // They must never widen into parallel global sweeps or make external reads.
+  if (sweep && receiptIssue && !IDENTIFIER_RE.test(receiptIssue)) {
+    throw new Error('Malformed LINEAR_VALIDATION_ISSUE: expected JOV-<number>');
+  }
   const ref = extractMergeIssueRef({
     body: env.PR_BODY,
     headRef: env.HEAD_REF,
@@ -824,7 +1254,7 @@ export async function syncLinearIssueOnMerge(options = {}) {
     );
   }
   const github = immutableGithubCache(
-    githubClient(fetchImpl, token),
+    githubClient(fetchImpl, token, sleepFn),
     env.LINEAR_SYNC_GITHUB_CACHE_DIR
   );
   const facts = createProductionFacts({
@@ -832,23 +1262,58 @@ export async function syncLinearIssueOnMerge(options = {}) {
     github,
     repository,
     versionUrl: env.PRODUCTION_VERSION_URL,
+    verifyMarker: options.verifyMarker,
   });
   const root = env.GITHUB_WORKSPACE ?? process.cwd();
   const harnessManifest =
     options.harnessManifest ?? loadJson(root, CI_HARNESS_MANIFEST);
   const assuranceMatrix =
     options.assuranceMatrix ?? loadJson(root, ASSURANCE_MATRIX);
-  let openPulls = { pulls: /** @type {object[]} */ ([]), complete: true };
+  let openPulls = {
+    pulls: /** @type {object[]} */ ([]),
+    complete: true,
+  };
+  let openPullFailure = '';
   try {
     openPulls = await listOpenPullRequests({ fetchImpl, token, repository });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    const flagged =
+      /** @type {{ rateLimited?: boolean, forbidden?: boolean }} */ (error);
+    if (flagged.rateLimited && sweep) {
+      // Quota is already spent. Evaluating issues would 403 the first linked
+      // pull (JOV-7355 → #19767 on 2026-10-15) and label that as a Linear
+      // deferral. Leave the cursor where it is and let the next sweep resume.
+      // A merge event still fails closed unless the answer is specifically an
+      // installation 403, which the process exit soft-fails.
+      if (isInstallationQuota403(message)) {
+        log(installationQuotaLog('Linear Sync'));
+      }
+      log(`Open pull request scan deferred: ${message}`);
+      return {
+        action: 'deferred',
+        comment: '',
+        identifier: ref.identifier,
+        results: [],
+        deferred: 0,
+      };
+    }
+    if (flagged.forbidden) {
+      throw new Error(
+        `Open pull request scan refused (${message}). This is a token permission gap; permissions and tokens were not changed.`
+      );
+    }
     log(`Open pull request scan failed: ${message}`);
     openPulls = { pulls: [], complete: false };
+    openPullFailure = message;
   }
 
   const lookups = [];
-  if (sweep) {
+  if (sweep && IDENTIFIER_RE.test(receiptIssue)) {
+    // A receipt for parent-only commissioning work need not have a PR.
+    // Read exactly its canonical record; the evaluator still owns admission.
+    lookups.push(receiptIssue);
+  } else if (sweep) {
     /** @type {{ identifier: string, updatedAt: string }[]} */
     const found = [];
     let after = null;
@@ -869,6 +1334,10 @@ export async function syncLinearIssueOnMerge(options = {}) {
         // into the lifecycle or interpreting age/status as completion.
         if (
           ['In Progress', 'In Review'].includes(node.state?.name) &&
+          !(node.children?.nodes?.length > 0) &&
+          !(node.labels?.nodes ?? []).some(label =>
+            /epic|commission/i.test(label?.name ?? '')
+          ) &&
           !(node.attachments?.nodes ?? []).some(attachment =>
             String(attachment.url ?? '')
               .toLowerCase()
@@ -888,75 +1357,160 @@ export async function syncLinearIssueOnMerge(options = {}) {
       if (data.issues?.pageInfo?.hasNextPage !== true) break;
       after = data.issues.pageInfo.endCursor;
     }
-    // Least recently touched first: when a budget runs out mid-sweep, the
-    // next sweep starts where this one could not reach.
+    // Least recently touched first. A persisted cursor rotates the list so a
+    // rate limit resumes at the issue that did not finish, instead of
+    // re-reading the same prefix until the quota is gone again.
     found.sort(
       (left, right) =>
         (Date.parse(left.updatedAt) || 0) - (Date.parse(right.updatedAt) || 0)
     );
-    lookups.push(...found.map(entry => entry.identifier));
+    const ordered = found.map(entry => entry.identifier);
+    const cursor = readSweepCursor(env.LINEAR_SYNC_CURSOR_DIR);
+    const start = cursor?.nextIdentifier
+      ? ordered.indexOf(cursor.nextIdentifier)
+      : -1;
+    lookups.push(...(start > 0 ? ordered.slice(start) : ordered));
   } else {
     lookups.push(ref.issueId || ref.identifier);
   }
 
   const eventPull = sweep ? undefined : { number: Number(env.PR_NUMBER) };
+  const cursorDir =
+    sweep && !receiptIssue ? env.LINEAR_SYNC_CURSOR_DIR : undefined;
   const results = [];
   const failures = [];
-  for (const [index, lookupId] of lookups.entries()) {
+  let deferredNote = '';
+  let deferredDetail = '';
+  let cursorSaved = false;
+  const deferAt = (lookupId, message) => {
+    const source = message.startsWith('Linear')
+      ? 'Linear'
+      : message.startsWith('GitHub')
+        ? 'GitHub'
+        : 'upstream';
+    writeSweepCursor(cursorDir, lookupId);
+    cursorSaved = true;
+    const resumeAt = lookups.indexOf(lookupId);
+    const deferred = lookups.length - (resumeAt === -1 ? 0 : resumeAt);
+    deferredNote = `${deferred} issue(s) deferred to the next sweep by the ${source} rate limit; resume at ${lookupId}`;
+    deferredDetail = message;
+    if (isInstallationQuota403(message)) {
+      log(installationQuotaLog('Linear Sync'));
+    }
+    log(`Lifecycle evaluation deferred at ${lookupId}: ${message}`);
+    log(deferredNote);
+  };
+  for (let index = 0; index < lookups.length; ) {
+    const slice = lookups.slice(index, index + SWEEP_BATCH_SIZE);
+    /** @type {Awaited<ReturnType<typeof fetchLifecycleRaws>> | undefined} */
+    let raws;
     try {
-      results.push(
-        await reconcileIssueLifecycle({
-          lookupId,
-          fetchImpl,
-          apiKey,
-          github,
-          repository,
-          facts,
-          openPulls,
-          harnessManifest,
-          assuranceMatrix,
-          allowlist: options.allowlist,
-          eventPull,
-          dryRun: env.LIFECYCLE_DRY_RUN === '1',
-          log,
-        })
-      );
+      raws = await fetchLifecycleRaws(fetchImpl, apiKey, slice);
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      failures.push(`${lookupId}: ${message}`);
-      log(`Lifecycle evaluation failed for ${lookupId}: ${message}`);
-      if (/** @type {{ rateLimited?: boolean }} */ (error)?.rateLimited) {
-        const deferred = lookups.length - index - 1;
-        if (deferred > 0) {
-          failures.push(
-            `${deferred} issue(s) deferred to the next sweep by the Linear rate limit`
-          );
-        }
+      const flagged = /** @type {{ rateLimited?: boolean }} */ (error);
+      if (flagged.rateLimited) {
+        deferAt(
+          slice[0],
+          error instanceof Error ? error.message : String(error)
+        );
         break;
       }
+      // A rejected batch query falls back to one read per issue. Rate limits
+      // already stopped above, so this is a query the alias form could not run.
+      raws = undefined;
     }
+    let stopped = false;
+    for (let offset = 0; offset < slice.length; offset += 1) {
+      const lookupId = slice[offset];
+      try {
+        const issue = raws
+          ? raws[offset]
+            ? await materializeLifecycleIssue(fetchImpl, apiKey, raws[offset])
+            : null
+          : undefined;
+        results.push(
+          await reconcileIssueLifecycle({
+            lookupId,
+            fetchImpl,
+            apiKey,
+            github,
+            repository,
+            facts,
+            openPulls,
+            harnessManifest,
+            assuranceMatrix,
+            allowlist: options.allowlist,
+            eventPull,
+            dryRun: env.LIFECYCLE_DRY_RUN === '1',
+            issue,
+            log,
+          })
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const flagged =
+          /** @type {{ rateLimited?: boolean, forbidden?: boolean, unreadable?: boolean }} */ (
+            error
+          );
+        if (flagged.unreadable || flagged.forbidden) {
+          log(
+            `Linked pull request was not readable for ${lookupId}: ${message}`
+          );
+          results.push({
+            action: 'skip',
+            identifier: lookupId,
+            target: null,
+            comment: '',
+          });
+          continue;
+        }
+        if (flagged.rateLimited) {
+          deferAt(lookupId, message);
+          stopped = true;
+          break;
+        }
+        failures.push(`${lookupId}: ${message}`);
+        log(`Lifecycle evaluation failed for ${lookupId}: ${message}`);
+      }
+    }
+    if (stopped) break;
+    index += slice.length;
   }
+  if (sweep && !cursorSaved) writeSweepCursor(cursorDir, '');
   const reasons = [...failures];
   if (!openPulls.complete) {
+    const detail =
+      openPullFailure && isInstallationQuota403(openPullFailure)
+        ? ` (${openPullFailure})`
+        : '';
     reasons.unshift(
-      'the open pull request scan failed, so issues were left in place'
+      `the open pull request scan failed${detail}, so issues were left in place`
     );
   }
-  if (reasons.length > 0) {
-    throw new Error(`Lifecycle evaluation failed: ${reasons.join('; ')}`);
+  if (reasons.length > 0 || (deferredNote && !sweep)) {
+    const quotaDetail =
+      deferredDetail && isInstallationQuota403(deferredDetail)
+        ? deferredDetail
+        : '';
+    throw new Error(
+      `Lifecycle evaluation failed: ${[...reasons, deferredNote, quotaDetail].filter(Boolean).join('; ')}`
+    );
   }
   const first = results[0];
   return {
-    action: first?.action ?? 'skip',
+    action: deferredNote ? 'deferred' : (first?.action ?? 'skip'),
     comment: first?.comment ?? '',
     identifier: first?.identifier ?? ref.identifier,
     results,
+    deferred: deferredNote ? Number(deferredNote.split(' ')[0]) || 0 : 0,
   };
 }
 
 /**
  * Record an owner receipt: `receipt --issue JOV-1 --kind outcome --status pass
- * --sha <full sha> --evidence <url> [--note <text>]`. A founder-taste
+ * --sha <full sha> --evidence <url> [--note <text>]
+ * [--episode-started-at null|<server reopen timestamp>]`. Omit the episode flag
+ * only for existing unbound producers; null explicitly binds the initial episode. A founder-taste
  * rejection carries the founder's note into Rework.
  *
  * @param {readonly string[]} args
@@ -974,6 +1528,14 @@ export async function recordValidationReceipt(args, options = {}) {
     sha: value('--sha'),
     evidence: value('--evidence'),
     note: value('--note'),
+    ...(args.includes('--episode-started-at')
+      ? {
+          episodeStartedAt:
+            value('--episode-started-at') === 'null'
+              ? null
+              : value('--episode-started-at'),
+        }
+      : {}),
   });
   const env = options.env ?? process.env;
   const apiKey = env.LINEAR_API_KEY ?? '';
@@ -1011,9 +1573,9 @@ if (isDirectRun) {
       : syncLinearIssueOnMerge();
   run
     .catch(error => {
-      const message = error instanceof Error ? error.message : String(error);
-      console.error(message);
-      process.exitCode = 1;
+      const disposition = failureDisposition('Linear Sync', error);
+      console.error(disposition.log);
+      if (!disposition.softFailed) process.exitCode = disposition.code;
     })
     .finally(() => {
       // Save the immutable-read cache only when its content changed.

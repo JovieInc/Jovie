@@ -66,11 +66,39 @@ export const REVENUE_CONE_REQUIREMENTS = [
       'Repair the failing profile check, then rerun the public-profile canary and M2 workflow.',
   },
   {
+    id: 'selected_rail',
+    label: 'A currently supported commerce rail is selected',
+    owner: 'commerce capability decision (JOV-8215)',
+    nextAction:
+      'Refresh the support matrix and select a rail backed by current provider-access evidence.',
+  },
+  {
     id: 'offer_checkout',
     label: 'The $199 Pro offer is current and checkout is gated correctly',
     owner: 'billing (M2 revenue-path canary, JOV-6439)',
     nextAction:
       'Repair the $199 price option or checkout gate, then rerun the M2 revenue-path canary.',
+  },
+  {
+    id: 'jov6258_preflight',
+    label: 'The JOV-6258 first-dollar Stripe preflight is current',
+    owner: 'billing (JOV-6258)',
+    nextAction:
+      'Restore the canonical Stripe price and startup preflight, then rerun the commerce canary.',
+  },
+  {
+    id: 'handoff_correlation',
+    label: 'The agent handoff remains correlated through claim and checkout',
+    owner: 'acquisition attribution (JOV-8217)',
+    nextAction:
+      'Restore the signed handoff correlation receipt before recommending agentic acquisition.',
+  },
+  {
+    id: 'payment_journey',
+    label: 'The selected rail has a verified payment journey',
+    owner: 'billing Golden Path (JOV-8219)',
+    nextAction:
+      'Rerun the selected-rail payment journey through the existing Stripe Golden Path.',
   },
   {
     id: 'activation',
@@ -86,6 +114,20 @@ export const REVENUE_CONE_REQUIREMENTS = [
     owner: 'billing (Golden Path lane, JOV-7192)',
     nextAction:
       'Fix the Golden Path lane failure tracked on JOV-7192, then rerun Golden Path Nightly.',
+  },
+  {
+    id: 'reversal',
+    label: 'Refund or cancellation reversal evidence is current',
+    owner: 'billing Golden Path (JOV-8219)',
+    nextAction:
+      'Verify refund or cancellation reconciliation and entitlement revocation on the selected rail.',
+  },
+  {
+    id: 'commerce_canary',
+    label: 'The selected commerce canary passed with current evidence',
+    owner: 'commerce certification (JOV-8221)',
+    nextAction:
+      'Run the bounded, human-approved canary only after every commerce prerequisite is green.',
   },
   {
     id: 'instrumentation',

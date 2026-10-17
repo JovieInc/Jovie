@@ -161,7 +161,13 @@ describe('GET /api/onboarding/discovery', () => {
     });
   });
 
-  it('returns a shaped onboarding snapshot with pending discovery state', async () => {
+  async function assertSnapshotPortrait({
+    matchSource,
+    expectedImage,
+  }: {
+    matchSource: string;
+    expectedImage: string | null;
+  }) {
     mockDbSelect
       .mockImplementationOnce(() =>
         limitChain([
@@ -195,6 +201,7 @@ describe('GET /api/onboarding/discovery', () => {
             externalArtistName: 'Artist',
             externalArtistUrl: 'https://open.spotify.com/artist/spotify_1',
             externalArtistImageUrl: 'https://images.test/spotify.png',
+            matchSource,
             confidenceScore: '0.95',
             status: 'confirmed',
             updatedAt: new Date('2025-01-02T00:00:00.000Z'),
@@ -286,8 +293,12 @@ describe('GET /api/onboarding/discovery', () => {
         providerId: 'spotify',
         confidenceScore: 0.95,
         status: 'confirmed',
+        externalArtistImageUrl: expectedImage,
       }),
     ]);
+    expect(mockDbSelect.mock.calls[1]?.[0].matchSource?.name).toBe(
+      'match_source'
+    );
     expect(payload.snapshot.socialItems).toEqual([
       expect.objectContaining({
         id: 'link_1',
@@ -331,7 +342,18 @@ describe('GET /api/onboarding/discovery', () => {
       new Date('2025-01-02T00:00:00.000Z'),
       true
     );
-  });
+  }
+
+  it.each([
+    {
+      matchSource: 'isrc_discovery',
+      expectedImage: 'https://images.test/spotify.png',
+    },
+    { matchSource: 'musicfetch', expectedImage: null },
+  ])(
+    'returns a shaped onboarding snapshot with $matchSource portrait provenance',
+    assertSnapshotPortrait
+  );
 
   it('returns 500 and captures unexpected errors', async () => {
     const discoveryError = new Error('database down');

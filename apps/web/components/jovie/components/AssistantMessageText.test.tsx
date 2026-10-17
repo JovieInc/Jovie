@@ -37,9 +37,9 @@ describe('AssistantMessageText', () => {
       <AssistantMessageText content='Listen to @release:rel_1[Sober] tonight.' />
     );
 
-    const span = screen.getByTestId('entity-mention-span');
-    expect(span).toHaveTextContent('Sober');
-    expect(span).toHaveClass('system-b-entity-mention-span');
+    const span = screen.getByTestId('entity-chip-popover-trigger');
+    expect(span).toHaveTextContent('Unavailable reference');
+    expect(span).toHaveClass('system-b-entity-chip-trigger');
     const markdownSegments = screen.getAllByTestId('chat-markdown');
     expect(markdownSegments[0]).toHaveTextContent('Listen to');
     expect(markdownSegments[1]).toHaveTextContent('tonight.');
@@ -52,7 +52,7 @@ describe('AssistantMessageText', () => {
     await user.click(screen.getByTestId('entity-chip-popover-trigger'));
     const content = await screen.findByTestId('entity-chip-popover-content');
     expect(content).toHaveAttribute('data-entity-kind', 'release');
-    expect(content.textContent).toContain('Sober');
+    expect(content.textContent).toContain('Unavailable reference');
   });
 
   it('keeps structured markdown on the normal block renderer', () => {

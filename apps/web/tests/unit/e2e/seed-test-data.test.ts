@@ -1,5 +1,6 @@
+import { drizzle as createSeedDatabase } from 'drizzle-orm/neon-http';
 import { drizzle } from 'drizzle-orm/pg-proxy';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { promoDownloads } from '@/lib/db/schema/promo-downloads';
 import {
   applyPromoDownloadSeedWrite,
@@ -8,7 +9,11 @@ import {
   isMissingPromoDownloadsRelationError,
   isRetryableSeedDatabaseError,
   type PromoDownloadSeedWrite,
+  seedReadyCreatorReleaseFixtures,
+  seedTestData,
 } from '../../seed-test-data';
+
+vi.mock('drizzle-orm/neon-http', () => ({ drizzle: vi.fn() }));
 
 function assertPromoDownloadRightsAllowed(
   previous: PromoDownloadSeedWrite | null,
@@ -188,5 +193,115 @@ describe('seedTestData database retry classifier', () => {
     );
 
     expect(isMissingPromoDownloadsRelationError(error)).toBe(false);
+  });
+});
+
+describe('ready creator release fixtures', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.clearAllMocks();
+  });
+
+  it.each(['preview', 'production'])(
+    'refuses the isolated mode on %s deployments',
+    async environment => {
+      vi.stubEnv('VERCEL_ENV', environment);
+      vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+      await expect(
+        seedTestData({ readyCreatorReleasesOnly: true })
+      ).rejects.toThrow(
+        'Ready creator release seeding requires local test auth bypass'
+      );
+    }
+  );
+
+  it('requires explicit bypass and a database for isolated seeding', async () => {
+    vi.stubEnv('VERCEL_ENV', 'development');
+    vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '0');
+    await expect(
+      seedTestData({ readyCreatorReleasesOnly: true })
+    ).rejects.toThrow(
+      'Ready creator release seeding requires local test auth bypass'
+    );
+    vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+    vi.stubEnv('DATABASE_URL', '');
+    vi.stubEnv('DATABASE_URL_DIRECT', '');
+    await expect(
+      seedTestData({ readyCreatorReleasesOnly: true })
+    ).rejects.toThrow(
+      'DATABASE_URL is required to seed ready creator releases'
+    );
+  });
+
+  it('seeds releases and approvals on the prepared persona active profile', async () => {
+    const profileId = '00000000-0000-4000-8000-000000000001';
+    const statements: Array<{ query: string; params: unknown[] }> = [];
+    let releaseNumber = 0;
+    const db = drizzle(async (query, params) => {
+      statements.push({ query, params });
+      if (query.includes('from "users"')) return { rows: [[profileId]] };
+      if (query.startsWith('insert into "discog_recordings"')) {
+        return { rows: [['recording-fixture']] };
+      }
+      if (query.startsWith('insert into "discog_releases"')) {
+        releaseNumber += 1;
+        return { rows: [[`release-${releaseNumber}`]] };
+      }
+      return { rows: [] };
+    });
+    vi.stubEnv('VERCEL_ENV', 'development');
+    vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+    vi.stubEnv(
+      'DATABASE_URL',
+      'postgresql://fixture:fixture@localhost/fixture'
+    );
+    vi.mocked(createSeedDatabase).mockReturnValue(
+      db as unknown as ReturnType<typeof createSeedDatabase>
+    );
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      await expect(
+        seedTestData({ readyCreatorReleasesOnly: true })
+      ).resolves.toEqual({ success: true });
+    } finally {
+      log.mockRestore();
+      warn.mockRestore();
+    }
+
+    const lookup = statements[0];
+    expect(lookup.query).toContain('"users"."active_profile_id"');
+    expect(lookup.query).toContain(
+      '"creator_profiles"."user_id" = "users"."id"'
+    );
+    expect(lookup.params).toContain('browse-ready+clerk_test@jov.ie');
+    const releases = statements.filter(({ query }) =>
+      query.startsWith('insert into "discog_releases"')
+    );
+    expect(releases.length).toBeGreaterThan(0);
+    for (const release of releases) {
+      expect(release.params).toContain(profileId);
+      expect(release.query).toContain('on conflict');
+    }
+    const approvals = statements.filter(({ query }) =>
+      query.startsWith('insert into "library_asset_approval_statuses"')
+    );
+    expect(approvals).toHaveLength(releases.length);
+    expect(approvals.every(({ params }) => params.includes(profileId))).toBe(
+      true
+    );
+  });
+
+  it('fails before writing when the persona has no owned active profile', async () => {
+    const request = vi.fn(async () => ({ rows: [] }));
+    const db = drizzle(request);
+    await expect(
+      seedReadyCreatorReleaseFixtures(
+        db as unknown as Parameters<typeof seedReadyCreatorReleaseFixtures>[0]
+      )
+    ).rejects.toThrow(
+      'Prepare the creator-ready persona before seeding releases'
+    );
+    expect(request).toHaveBeenCalledTimes(1);
   });
 });

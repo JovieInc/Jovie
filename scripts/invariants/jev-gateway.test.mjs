@@ -493,6 +493,15 @@ test('real pinned SDK uses evaluation endpoint, fixed Jev route, text state and 
   assert.equal(raw.answers.alignment.choice, 'contradicted');
   assert.equal(calls, 1);
   await assert.rejects(() => evaluateThroughGateway(request, {}));
+  await assert.rejects(
+    () =>
+      evaluateThroughGateway(request, {
+        apiKey: 'test-fixture-only',
+        signal: AbortSignal.abort(),
+        fetch: () => assert.fail('cancelled SDK load reached the gateway'),
+      }),
+    /abort/i
+  );
   calls = 0;
   await assert.rejects(() =>
     evaluateThroughGateway(request, {

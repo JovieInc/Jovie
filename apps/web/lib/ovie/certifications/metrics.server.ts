@@ -19,6 +19,7 @@ import {
   PACKET_FILE_DOMAINS,
   readCertificationPacketFiles,
 } from './packet-files.server';
+import { readQualityScoreboardLedger } from './quality-scoreboard-ledger';
 
 /**
  * Server adapter for the section 8 metrics projection. Subjects, founder
@@ -73,6 +74,7 @@ export async function readCertificationMetrics(
 
   const packetRead = await deps.readPacketFiles();
   const backend = deps.backend();
+  const qualityLedger = await readQualityScoreboardLedger(backend);
 
   const subjects: MetricsSubject[] = [];
   const decisions: MetricsFounderDecision[] = [];
@@ -152,5 +154,8 @@ export async function readCertificationMetrics(
     roster: [],
     receipts: [],
     knownGoodDeploymentIds: [],
+    qualityReceipts: qualityLedger
+      ? Object.values(qualityLedger.receipts)
+      : null,
   });
 }

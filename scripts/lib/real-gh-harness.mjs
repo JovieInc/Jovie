@@ -7,12 +7,15 @@ import {
   mkdirSync,
   mkdtempSync,
   openSync,
+  readdirSync,
   readSync,
+  realpathSync,
   rmSync,
+  statSync,
 } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
-import { basename, delimiter, join } from 'node:path';
+import { basename, delimiter, dirname, join } from 'node:path';
 import { crc32 } from 'node:zlib';
 
 /**
@@ -77,6 +80,27 @@ export function resolveRealGh() {
 export function realGhVersion(gh = resolveRealGh()) {
   if (!gh) return null;
   return execFileSync(gh, ['--version'], { encoding: 'utf8' }).split('\n')[0];
+}
+
+/** Reuse an installed CLI-only directory without copying a macOS executable. */
+export function realGhOnlyDirectory(binary, platform = process.platform) {
+  if (platform !== 'darwin') return null;
+  try {
+    const realBinary = realpathSync(binary);
+    if (
+      basename(realBinary) !== 'gh' ||
+      !statSync(realBinary).isFile() ||
+      isScriptWrapper(realBinary)
+    )
+      return null;
+    accessSync(realBinary, constants.X_OK);
+    const directory = dirname(realBinary);
+    if (directory.includes(delimiter)) return null;
+    const entries = readdirSync(directory);
+    return entries.length === 1 && entries[0] === 'gh' ? directory : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Minimal stored (uncompressed) zip, so real `unzip` can read fixtures. */
@@ -172,11 +196,16 @@ export async function runWithRealGh({
   const home = mkdtempSync(join(tmpdir(), 'real-gh-harness-'));
   mkdirSync(join(home, 'config'));
   // The resolved binary must win `gh` lookup even when the caller supplies its
-  // own PATH (e.g. to shadow `node`): a harness-owned dir holding only the
-  // real gh is prepended after the caller's env is merged. Caller dirs still
-  // shadow everything else. Copy, don't symlink, so wrapper detection and
-  // platform quirks can't resurrect a shim.
-  const ghDir = mkdtempSync(join(tmpdir(), 'real-gh-bin-'));
+  // own PATH (e.g. to shadow `node`): a CLI-only dir is prepended after env
+  // merge, leaving caller shadows for every other executable intact. On macOS,
+  // Chrome can quarantine a newly copied binary, so reuse the installed real
+  // executable when its directory contains only gh. Otherwise retain the
+  // isolated copy; never change security attributes or remove installed files.
+  const installedGhDir = realGhOnlyDirectory(binary);
+  const ownedGhDir = installedGhDir
+    ? null
+    : mkdtempSync(join(tmpdir(), 'real-gh-bin-'));
+  const ghDir = installedGhDir ?? ownedGhDir;
   const basePath = process.env.PATH ?? '';
   const callerPath = env.PATH ?? basePath;
   const callerPrefix = callerPath.endsWith(basePath)
@@ -186,7 +215,7 @@ export async function runWithRealGh({
     ? `${callerPrefix}${ghDir}${delimiter}${basePath}`
     : `${ghDir}${delimiter}${callerPath}`;
   try {
-    copyFileSync(binary, join(ghDir, basename(binary)));
+    if (ownedGhDir) copyFileSync(binary, join(ownedGhDir, basename(binary)));
     return await new Promise((done, fail) => {
       const child = spawn('bash', ['-c', script], {
         env: {
@@ -221,6 +250,6 @@ export async function runWithRealGh({
   } finally {
     server.close();
     rmSync(home, { recursive: true, force: true });
-    rmSync(ghDir, { recursive: true, force: true });
+    if (ownedGhDir) rmSync(ownedGhDir, { recursive: true, force: true });
   }
 }

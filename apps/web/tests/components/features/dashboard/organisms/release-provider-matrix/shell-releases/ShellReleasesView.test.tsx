@@ -1,12 +1,16 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
+  act,
   fireEvent,
   render,
   screen,
   waitFor,
   within,
 } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { TableActionMenuProps } from '@/components/atoms/table-action-menu/types';
+import { useImportPolling } from '@/components/features/dashboard/organisms/release-provider-matrix/hooks/useImportPolling';
 import { ShellReleasesView } from '@/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView';
 import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
 import {
@@ -19,8 +23,9 @@ import {
 } from '@/contexts/RightPanelContext';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
-const { mockUseDspMatchesQuery, mockUsePlanGate, navigationState } = vi.hoisted(
-  () => ({
+const { mockUseDspMatchesQuery, mockUsePlanGate, navigationState, testState } =
+  vi.hoisted(() => ({
+    testState: { realActionMenu: false },
     mockUseDspMatchesQuery: vi.fn(() => ({ data: [], isLoading: false })),
     mockUsePlanGate: vi.fn(() => ({
       isLoading: false,
@@ -36,8 +41,7 @@ const { mockUseDspMatchesQuery, mockUsePlanGate, navigationState } = vi.hoisted(
     navigationState: {
       searchParams: new URLSearchParams(),
     },
-  })
-);
+  }));
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -100,14 +104,7 @@ vi.mock('sonner', () => ({
 vi.mock(
   '@/features/dashboard/organisms/release-provider-matrix/hooks/useImportPolling',
   () => ({
-    useImportPolling: () => ({ importedCount: 0, totalCount: 0 }),
-  })
-);
-
-vi.mock(
-  '@/features/dashboard/organisms/release-provider-matrix/ImportProgressBanner',
-  () => ({
-    ImportProgressBanner: () => <div data-testid='import-progress-banner' />,
+    useImportPolling: vi.fn(() => ({ importedCount: 0, totalCount: 0 })),
   })
 );
 
@@ -223,6 +220,7 @@ vi.mock('@/lib/queries', () => {
   };
 
   return {
+    prefetchReleaseTracks: vi.fn().mockResolvedValue(undefined),
     useFormatReleaseLyricsMutation: () => mutation,
     useRefreshReleaseMutation: () => mutation,
     useRescanIsrcLinksMutation: () => mutation,
@@ -240,19 +238,26 @@ vi.mock('@/lib/queries', () => {
   };
 });
 
-vi.mock('@/components/atoms/table-action-menu/TableActionMenu', () => ({
-  TableActionMenu: ({
-    children,
-    items,
-  }: {
-    children: React.ReactNode;
-    items: Array<{
-      id: string;
-      label: string;
-      onClick?: () => void;
-      children?: Array<{ id: string; label: string; onClick?: () => void }>;
-    }>;
-  }) => (
+vi.mock(
+  '@/components/atoms/table-action-menu/TableActionMenu',
+  async importOriginal => {
+    const actual =
+      await importOriginal<
+        typeof import('@/components/atoms/table-action-menu/TableActionMenu')
+      >();
+    return {
+      TableActionMenu: (props: TableActionMenuProps) =>
+        testState.realActionMenu ? (
+          <actual.TableActionMenu {...props} />
+        ) : (
+          <MockActionMenu {...props} />
+        ),
+    };
+  }
+);
+
+function MockActionMenu({ children, items }: TableActionMenuProps) {
+  return (
     <div>
       {children}
       <div data-testid='mock-release-actions'>
@@ -274,8 +279,8 @@ vi.mock('@/components/atoms/table-action-menu/TableActionMenu', () => ({
           ))}
       </div>
     </div>
-  ),
-}));
+  );
+}
 
 vi.mock('@/components/organisms/release-sidebar', () => ({
   ReleaseSidebar: ({
@@ -290,6 +295,7 @@ vi.mock('@/components/organisms/release-sidebar', () => ({
     release ? (
       <aside data-testid='release-sidebar'>
         <div>{release.title}</div>
+        <input aria-label='Release title draft' defaultValue={release.title} />
         <button type='button' onClick={onClose}>
           Close
         </button>
@@ -384,6 +390,7 @@ function renderShell(
 }
 
 beforeEach(() => {
+  testState.realActionMenu = false;
   navigationState.searchParams = new URLSearchParams();
   mockUseDspMatchesQuery.mockReturnValue({ data: [], isLoading: false });
   mockUsePlanGate.mockReturnValue({
@@ -400,6 +407,88 @@ beforeEach(() => {
 });
 
 describe('ShellReleasesView', () => {
+  it('preserves an open row menu and focus when import completion starts eligibility loading', async () => {
+    testState.realActionMenu = true;
+    const user = userEvent.setup();
+    renderShell([fakeRelease({ id: 'r1', title: 'Lost in the Light' })], {
+      spotifyConnected: true,
+      initialImporting: true,
+    });
+    expect(screen.getByTestId('releases-matrix')).toBeInTheDocument();
+    const row = screen.getByRole('option', { name: /Lost in the Light/ });
+    const progress = screen.getByTestId('spotify-import-progress-banner');
+    const progressSlot = screen.getByTestId('release-import-progress-slot');
+    expect(progress).toHaveAttribute('aria-hidden', 'false');
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Release actions for Lost in the Light',
+      })
+    );
+    const menu = screen.getByRole('menu');
+    const focusedControl = document.activeElement;
+    expect(menu).toContainElement(focusedControl as HTMLElement);
+
+    mockUseDspMatchesQuery.mockReturnValue({ data: [], isLoading: true });
+    act(() => {
+      vi.mocked(useImportPolling).mock.calls.at(-1)?.[0].onImportComplete();
+    });
+
+    expect(row).toBeInTheDocument();
+    expect(screen.getByRole('menu')).toBe(menu);
+    expect(focusedControl).toHaveFocus();
+    expect(screen.getByTestId('release-import-progress-slot')).toBe(
+      progressSlot
+    );
+    expect(screen.getByTestId('spotify-import-progress-banner')).toBe(progress);
+    expect(progress).toHaveAttribute('aria-hidden', 'true');
+
+    mockUseDspMatchesQuery.mockReturnValue({ data: [], isLoading: false });
+    act(() => {
+      vi.mocked(useImportPolling)
+        .mock.calls.at(-1)?.[0]
+        .onReleasesUpdate([
+          fakeRelease({ id: 'r1', title: 'Lost in the Light', totalTracks: 2 }),
+        ]);
+    });
+    expect(screen.getByRole('menu')).toBe(menu);
+    expect(focusedControl).toHaveFocus();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+
+  it('preserves the drawer draft, selection and focus across import polling and completion', async () => {
+    const user = userEvent.setup();
+    renderShell([fakeRelease({ id: 'r1', title: 'Lost in the Light' })], {
+      spotifyConnected: true,
+      initialImporting: true,
+    });
+    await user.click(screen.getByRole('option', { name: /Lost in the Light/ }));
+    const drawer = await screen.findByTestId('release-sidebar');
+    const input = within(drawer).getByRole('textbox', {
+      name: 'Release title draft',
+    }) as HTMLInputElement;
+    await user.clear(input);
+    await user.type(input, 'Unsaved draft');
+    input.setSelectionRange(2, 7);
+
+    mockUseDspMatchesQuery.mockReturnValue({ data: [], isLoading: true });
+    act(() => {
+      const callbacks = vi.mocked(useImportPolling).mock.calls.at(-1)?.[0];
+      callbacks?.onReleasesUpdate([
+        fakeRelease({ id: 'r1', title: 'Updated from Spotify' }),
+      ]);
+      callbacks?.onImportComplete();
+    });
+
+    expect(screen.getByTestId('release-sidebar')).toBe(drawer);
+    expect(input).toHaveValue('Unsaved draft');
+    expect(input).toHaveFocus();
+    expect([input.selectionStart, input.selectionEnd]).toEqual([2, 7]);
+    expect(
+      screen.getByRole('option', { name: /Updated from Spotify/ })
+    ).toHaveAttribute('aria-selected', 'true');
+  });
+
   it('waits to mount the list until Apple eligibility resolves, then commits banner and rows together', () => {
     mockUseDspMatchesQuery.mockReturnValue({ data: [], isLoading: true });
     const rendered = renderShell(

@@ -25,6 +25,7 @@ import {
   createProductionFacts,
   githubClient,
   immutableGithubCache,
+  inspectVerifiedProductionMarker,
   listMergedFiles,
   listMergedLinkedPulls,
   mergedUiEvidence,
@@ -59,7 +60,12 @@ function evaluate(world, fetchImpl, options = {}) {
     parentReason: options.parentReason ?? '',
     github,
     repository: REPO,
-    facts: createProductionFacts({ fetchImpl, github, repository: REPO }),
+    facts: createProductionFacts({
+      fetchImpl,
+      github,
+      repository: REPO,
+      verifyMarker: options.verifyMarker ?? (() => true),
+    }),
     harnessManifest: options.harnessManifest ?? HARNESS_MANIFEST,
     assuranceMatrix:
       'assuranceMatrix' in options ? options.assuranceMatrix : NO_UI_MATRIX,
@@ -74,6 +80,53 @@ function evaluate(world, fetchImpl, options = {}) {
 const merge = (world, fetchImpl, number, options = {}) =>
   evaluate(world, fetchImpl, { ...options, eventPull: { number } });
 
+describe('canonical marker adapter', () => {
+  it.each([
+    ['verified', true],
+    ['none', false],
+    ['pending', false],
+    ['recovery_available', false],
+  ])('maps canonical %s without inventing a pass', (state, expected) => {
+    const execute = (command, args, options) => {
+      expect(command).toBe(process.execPath);
+      expect(args.slice(1)).toEqual([
+        '--repo',
+        REPO,
+        '--sha',
+        MAIN[2],
+        '--controller-workflow-id',
+        '91',
+      ]);
+      expect(args[0]).toMatch(
+        /\.github\/scripts\/production-marker-state\.mjs$/
+      );
+      expect(options.timeout).toBe(45_000);
+      return JSON.stringify({ state });
+    };
+    expect(
+      inspectVerifiedProductionMarker({
+        repository: REPO,
+        sha: MAIN[2],
+        controllerWorkflowId: 91,
+        execute,
+      })
+    ).toBe(expected);
+  });
+  it.each(['{}', '{"state":"manual","reason":"payload_mismatch"}', '{invalid'])(
+    'rejects malformed or unverified classifier output %s',
+    output => {
+      expect(() =>
+        inspectVerifiedProductionMarker({
+          repository: REPO,
+          sha: MAIN[2],
+          controllerWorkflowId: 91,
+          execute: () => output,
+        })
+      ).toThrow();
+    }
+  );
+});
+
 function addMerge(world, number, mergeSha, mergedAt) {
   world.pulls[number] = {
     mergeSha,
@@ -86,6 +139,45 @@ function addMerge(world, number, mergeSha, mergedAt) {
 }
 
 describe('validation sync: deployment', () => {
+  it('does not certify artifact-name presence when the canonical byte/attempt proof is not verified', async () => {
+    const { world, fetchImpl } = createWorld();
+    await evaluate(world, fetchImpl, { verifyMarker: () => false });
+    expect(world.issues['JOV-1'].state).toBe('Merging');
+  });
+
+  it('recognizes the release owner recovery marker through the same canonical proof', async () => {
+    const { world, fetchImpl } = createWorld();
+    const recovered = intercept(fetchImpl, async url => {
+      if (!url.includes('/actions/artifacts?')) return null;
+      const name = `production-generation-verified-recovery-${MAIN[2]}`;
+      return json({
+        artifacts: url.includes(`name=${name}&`)
+          ? [{ name, expired: false, workflow_run: { head_branch: 'main' } }]
+          : [],
+      });
+    });
+    await evaluate(world, recovered, {
+      verifyMarker: (sha, workflow) => {
+        expect(sha).toBe(MAIN[2]);
+        expect(workflow).toBe(91);
+        return true;
+      },
+    });
+    expect(world.issues['JOV-1'].state).toBe('Done');
+  });
+
+  it('holds on malformed canonical marker proof instead of trusting the named artifact', async () => {
+    const { world, fetchImpl } = createWorld();
+    await evaluate(world, fetchImpl, {
+      verifyMarker: () => {
+        throw new Error('marker payload mismatch');
+      },
+    });
+    expect(world.updates).toEqual([]);
+    expect(world.issues['JOV-1'].comments[0].body).toContain(
+      'marker payload mismatch'
+    );
+  });
   it('waits in Merging, then marks an ordinary issue Done once a verified generation contains it', async () => {
     const { world, fetchImpl } = createWorld({ served: MAIN[0].slice(0, 7) });
     expect((await merge(world, fetchImpl, 101)).action).toBe('moved');
@@ -156,6 +248,28 @@ describe('validation sync: deployment', () => {
     expect(world.issues['JOV-1'].state).toBe('Merging');
   });
 
+  it('retains verified validation entry during forward marker lag, but never closes until the new marker arrives', async () => {
+    const { world, fetchImpl } = createWorld();
+    const issue = world.issues['JOV-1'];
+    issue.description = 'validation-required: outcome';
+    await evaluate(world, fetchImpl);
+    expect(issue.state).toBe('Validating');
+    world.served = MAIN[3].slice(0, 7);
+    issue.comments.push(
+      receiptComment('JOV-1', { sha: MAIN[3] }, '2026-10-03T13:00:00Z')
+    );
+    await evaluate(world, fetchImpl);
+    expect(issue.state).toBe('Validating');
+    expect(world.updates).toEqual(['JOV-1:Validating']);
+    expect(issue.comments.at(-1).body).toContain(
+      'Next missing receipt: deployment.'
+    );
+    world.markers.add(MAIN[3]);
+    await evaluate(world, fetchImpl);
+    expect(issue.state).toBe('Done');
+    expect(world.updates).toEqual(['JOV-1:Validating', 'JOV-1:Done']);
+  });
+
   it('leaves issues without a merged pull request on main alone', async () => {
     const { world, fetchImpl } = createWorld();
     world.issues['JOV-1'].state = 'Merging';
@@ -171,6 +285,31 @@ describe('validation sync: deployment', () => {
 
 describe('validation sync: receipts', () => {
   it.each([
+    '{not json}',
+    '{"schema":"jovie.validation-receipt/v1","issue":"JOV-1","kind":"outcome","status":"pass"}',
+    '{"schema":"jovie.validation-receipt/v1"}',
+  ])(
+    'does not fall back to a passing receipt after a malformed newer receipt %s',
+    async malformed => {
+      const { world, fetchImpl } = createWorld();
+      const issue = world.issues['JOV-1'];
+      issue.description = 'validation-required: outcome';
+      issue.state = 'Validating';
+      issue.comments.push(receiptComment('JOV-1', {}, '2026-10-03T13:00:00Z'));
+      issue.comments.push({
+        body: `<!-- validation-receipt:v1\n${malformed}\n-->`,
+        createdAt: '2026-10-03T14:00:00Z',
+      });
+      await evaluate(world, fetchImpl);
+      expect(issue.state).toBe('Validating');
+      expect(issue.comments.at(-1).body).toContain('malformed');
+      issue.comments.push(receiptComment('JOV-1', {}, '2026-10-03T15:00:00Z'));
+      await evaluate(world, fetchImpl);
+      expect(issue.state).toBe('Done');
+    }
+  );
+
+  it.each([
     [
       'JOV-6468: commissioning title and unchecked acceptance',
       {
@@ -183,7 +322,11 @@ describe('validation sync: receipts', () => {
       {
         title: 'Summer product bets: require falsifiable decisions',
         history: [
-          { fromState: { type: 'completed' }, toState: { type: 'unstarted' } },
+          {
+            createdAt: '2026-10-03T11:00:00Z',
+            fromState: { type: 'completed' },
+            toState: { type: 'unstarted' },
+          },
         ],
       },
     ],
@@ -221,6 +364,37 @@ describe('validation sync: receipts', () => {
     );
     await evaluate(world, fetchImpl, { parentReason: 'commissioning' });
     expect(world.issues['JOV-1'].state).toBe('Done');
+  });
+
+  it('ignores a prior-window failure created after a racing reopen, then consumes current proof', async () => {
+    const { world, fetchImpl } = createWorld();
+    const issue = world.issues['JOV-1'];
+    issue.state = 'Validating';
+    issue.history = [
+      {
+        createdAt: '2026-10-03T13:00:00Z',
+        fromState: { type: 'completed' },
+        toState: { type: 'started' },
+      },
+    ];
+    issue.comments.push(
+      receiptComment(
+        'JOV-1',
+        { status: 'fail', episodeStartedAt: null },
+        '2026-10-03T13:00:01Z'
+      )
+    );
+    await evaluate(world, fetchImpl);
+    expect(issue.state).toBe('Validating');
+    issue.comments.push(
+      receiptComment(
+        'JOV-1',
+        { episodeStartedAt: '2026-10-03T13:00:00Z' },
+        '2026-10-03T13:01:00Z'
+      )
+    );
+    await evaluate(world, fetchImpl);
+    expect(issue.state).toBe('Done');
   });
 
   it('routes a required failure to Rework and requires fresh evidence after the fix merges', async () => {
@@ -372,9 +546,9 @@ describe('validation sync: founder taste (JOV-7759)', () => {
   });
 
   /** Summer's JOV-7739 tick: read the order from the body, post the decision. */
-  function summerTick(world, status, comment = null) {
+  function summerTick(world, status, comment = null, orderIndex = 0) {
     const issue = world.issues['JOV-1'];
-    const [raw] = extractWorkBlocks(issue.description).orders;
+    const raw = extractWorkBlocks(issue.description).orders[orderIndex];
     const order = sealWorkOrder(raw);
     const card = {
       id: `card-${order.digest.slice(0, 8)}`,
@@ -440,6 +614,50 @@ describe('validation sync: founder taste (JOV-7759)', () => {
     expect(
       extractWorkBlocks(world.issues['JOV-1'].description).orders
     ).toHaveLength(2);
+  });
+
+  it('files a new taste order after reopening and ignores a delayed result for the previous order', async () => {
+    const { world, fetchImpl } = createWorld();
+    const issue = world.issues['JOV-1'];
+    const firstTime = () => new Date('2026-10-04T01:00:00Z');
+    await merge(world, fetchImpl, 101, {
+      assuranceMatrix: TASTE_MATRIX,
+      now: firstTime,
+    });
+    const oldOrder = extractWorkBlocks(issue.description).orders[0];
+    summerTick(world, 'approved');
+    await evaluate(world, fetchImpl, {
+      assuranceMatrix: TASTE_MATRIX,
+      now: firstTime,
+    });
+    expect(issue.state).toBe('Done');
+    issue.state = 'Validating';
+    issue.history = [
+      {
+        createdAt: '2026-10-04T03:00:00Z',
+        fromState: { type: 'completed' },
+        toState: { type: 'started' },
+      },
+    ];
+    world.clock = Date.parse('2026-10-04T04:00:00Z');
+    // A repeated old work-result gets a later delivery timestamp, but it
+    // remains bound to the previously consumed order and cannot pass.
+    summerTick(world, 'approved');
+    issue.comments.push(receiptComment('JOV-1', {}, '2026-10-04T04:00:00Z'));
+    const now = () => new Date('2026-10-04T04:00:00Z');
+    await evaluate(world, fetchImpl, { assuranceMatrix: TASTE_MATRIX, now });
+    await evaluate(world, fetchImpl, { assuranceMatrix: TASTE_MATRIX, now });
+    expect(issue.state).toBe('Validating');
+    const orders = extractWorkBlocks(issue.description).orders;
+    expect(orders).toHaveLength(2);
+    expect(orders[1].orderId).not.toBe(oldOrder.orderId);
+    expect(orders[1].idempotencyKey).not.toBe(oldOrder.idempotencyKey);
+    expect(orders[1].scope.entityRefs).toContain(
+      'episode:2026-10-04T03:00:00.000Z'
+    );
+    summerTick(world, 'approved', null, 1);
+    await evaluate(world, fetchImpl, { assuranceMatrix: TASTE_MATRIX, now });
+    expect(issue.state).toBe('Done');
   });
 
   it('surfaces a refused order write', async () => {
@@ -589,6 +807,7 @@ describe('validation sync: writes', () => {
           fetchImpl: stateless.fetchImpl,
           github,
           repository: REPO,
+          verifyMarker: () => true,
         }),
         harnessManifest: HARNESS_MANIFEST,
         assuranceMatrix: NO_UI_MATRIX,

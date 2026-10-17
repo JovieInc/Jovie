@@ -14,6 +14,25 @@ import type {
   ConnectorDbStatus as EnumConnectorDbStatus,
   ConnectorProviderId as EnumConnectorProviderId,
 } from '@/lib/db/schema/enums';
+import type { ArtistProfileContract } from './artist-profile-contract';
+import type { DistributorId } from './distributor-ids';
+
+export { DISTRIBUTOR_IDS, type DistributorId } from './distributor-ids';
+
+import type { FileImportConnectorDefinition } from './file-import-contract';
+
+export type { FileImportConnectorDefinition } from './file-import-contract';
+export type {
+  ExactDecimal,
+  RoyaltyCatalogRecord,
+  RoyaltyMoney,
+  RoyaltyPayoutEvidence,
+  RoyaltyPeriod,
+  RoyaltySource,
+  RoyaltyStatement,
+  RoyaltyStatementHeader,
+  RoyaltyStatementLine,
+} from './royalty-contract';
 
 export type ConnectorProviderId = EnumConnectorProviderId;
 export type ConnectorDbStatus = EnumConnectorDbStatus;
@@ -79,7 +98,8 @@ export type ConnectorTokenHandler = 'shared_token_vault';
  * OAuth scopes, token path, sync runner, and webhook key stay on the definition
  * so call sites do not hardcode provider-specific strings.
  */
-export interface ConnectorDefinition {
+export interface OAuthConnectorDefinition {
+  readonly transport: 'oauth';
   /** Provider slug — must equal a `connector_provider` enum value. */
   readonly id: ConnectorProviderId;
   readonly label: string;
@@ -106,5 +126,25 @@ export interface ConnectorDefinition {
   /** Actual operations, shared by Settings and public integration copy. */
   readonly capabilities: readonly ConnectorCapability[];
   readonly accountScope: 'user' | 'identity';
+  /** Artist-profile destinations must declare the complete closed field contract. */
+  readonly artistProfile: ArtistProfileContract | null;
   readonly platforms: readonly ('web' | 'mac' | 'ios')[];
 }
+
+export const CONNECTOR_MANIFEST_IDS = [
+  'awal',
+  'cdbaby',
+  'distrokid',
+  'gmail',
+  'google_calendar',
+  'routenote',
+  'spotify',
+  'symphonic',
+  'tunecore',
+  'unitedmasters',
+  'youtube',
+] as const satisfies readonly (ConnectorProviderId | DistributorId)[];
+export type ConnectorManifestId = (typeof CONNECTOR_MANIFEST_IDS)[number];
+export type ConnectorDefinition =
+  | OAuthConnectorDefinition
+  | FileImportConnectorDefinition;

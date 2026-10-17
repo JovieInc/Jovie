@@ -105,15 +105,9 @@ async function assertDashboardRouteLoaded(
   }
 
   if (path === APP_ROUTES.RELEASES) {
-    const releasesSurface = page
-      .getByTestId('releases-matrix')
-      .or(page.getByTestId('shell-releases-view'))
-      .or(page.getByTestId('library-surface'))
-      .first();
-
     await expect(
-      releasesSurface,
-      'Releases: releases surface did not render'
+      page.getByTestId('shell-releases-view'),
+      'Releases: releases matrix did not render'
     ).toBeVisible({ timeout: SMOKE_TIMEOUTS.NAVIGATION });
     return;
   }
