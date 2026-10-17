@@ -166,6 +166,20 @@ describe('judgeCluster', () => {
     expect(judgment.disposition).toBe('human-escalation');
   });
 
+  it('demotes disposition below raw demand when mature outcomes repeatedly miss', () => {
+    const cluster = customerCluster(3);
+    const baseline = judgeCluster(cluster);
+    const calibrated = judgeCluster(cluster, { outcomePenalty: 1 });
+    expect(calibrated.judgedScore).toBe(Math.max(0, baseline.judgedScore - 30));
+    expect(calibrated.disposition).not.toBe(baseline.disposition);
+    expect(calibrated.evidence).toContainEqual(
+      expect.objectContaining({
+        dimension: 'outcome-history',
+        contribution: -30,
+      })
+    );
+  });
+
   it('reports confidence tiers from evidence quality', () => {
     expect(judgeCluster(customerCluster(6)).confidence).toBe('high');
     expect(judgeCluster(customerCluster(1)).confidence).toBe('medium');

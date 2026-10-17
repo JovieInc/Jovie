@@ -21,20 +21,20 @@
   },
   "dependencies": {
     "@opentelemetry/api": "1.9.1",
-    "@vercel/blob": "2.8.1",
-    "ai": "7.0.137",
+    "@vercel/blob": "2.8.2",
+    "ai": "7.0.140",
     "braintrust": "3.37.2",
     "eve": "0.72.1",
     "just-bash": "3.6.0",
     "microsandbox": "0.7.8",
-    "zod": "4.6.6"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@types/node": "26.6.5",
-    "@vitest/coverage-v8": "5.0.3",
+    "@vitest/coverage-v8": "5.0.4",
     "typescript": "6.0.3",
     "vercel": "59.23.2",
-    "vitest": "5.0.3"
+    "vitest": "5.0.4"
   },
   "pnpm": {
     "patchedDependencies": {

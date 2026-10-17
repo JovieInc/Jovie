@@ -31,6 +31,7 @@ import {
   recoverOrphanedApprovedAction,
 } from '@/lib/connectors/workflows/reconcile-orphaned-approved-actions';
 import { db } from '@/lib/db';
+import { isInvalidUuidInput } from '@/lib/db/invalid-uuid-input';
 import { suggestedActions } from '@/lib/db/schema/connectors';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
@@ -307,6 +308,12 @@ export async function POST(_request: Request, { params }: RouteParams) {
       { status: 200, headers: NO_STORE_HEADERS }
     );
   } catch (err) {
+    if (isInvalidUuidInput(err)) {
+      return NextResponse.json(
+        { error: 'not-found' },
+        { status: 404, headers: NO_STORE_HEADERS }
+      );
+    }
     logger.error('[approve] Failed to approve suggested_action', err);
     await captureError('suggest-action approve failed', err, {
       route: '/api/connectors/suggested-actions/[id]/approve',

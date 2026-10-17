@@ -1,7 +1,7 @@
 'use client';
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
-import { Globe, HelpCircle, Link2, MapPin } from 'lucide-react';
+import { Globe, HelpCircle, Link2, MapPin, Monitor } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import type { ComponentType, SVGProps } from 'react';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
@@ -129,7 +129,7 @@ function ListSection({
 }) {
   return (
     <ContentSurfaceCard>
-      <div className='p-4 lg:p-5'>
+      <div className='min-h-52 p-4 lg:p-5'>
         <div className='mb-3 flex items-center gap-2'>
           <Icon className='h-4 w-4 text-tertiary-token' />
           <h3 className='text-app font-caption text-secondary-token'>
@@ -373,7 +373,7 @@ export function DashboardAnalytics() {
         )}
 
         {/* Lists */}
-        <div className='grid grid-cols-1 gap-3 md:grid-cols-3'>
+        <div className='grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4'>
           <ListSection
             title='Top Cities'
             icon={MapPin}
@@ -406,6 +406,17 @@ export function DashboardAnalytics() {
               value: fmt.format(link.clicks),
             }))}
             emptyMessage='No link data yet'
+          />
+          <ListSection
+            title='Clicks by operating system'
+            icon={Monitor}
+            loading={loading}
+            items={(data?.top_operating_systems ?? []).map(row => ({
+              key: row.os,
+              label: row.os,
+              value: fmt.format(row.count),
+            }))}
+            emptyMessage='No operating system data yet'
           />
         </div>
       </div>

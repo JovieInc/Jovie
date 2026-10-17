@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockBack = vi.fn();
 const mockPush = vi.fn();
+const mockAssign = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -39,10 +40,16 @@ describe('AuthModalShell', () => {
   // any later test file in the same worker process.
   const originalShowModal = HTMLDialogElement.prototype.showModal;
   const originalClose = HTMLDialogElement.prototype.close;
+  const originalLocation = window.location;
 
   beforeEach(() => {
     mockBack.mockReset();
     mockPush.mockReset();
+    mockAssign.mockReset();
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { assign: mockAssign },
+    });
     // jsdom doesn't implement the native dialog API used by showModal().
     HTMLDialogElement.prototype.showModal = vi.fn(function showModalMock(
       this: HTMLDialogElement
@@ -62,6 +69,10 @@ describe('AuthModalShell', () => {
     document.documentElement.style.removeProperty('overscroll-behavior');
     HTMLDialogElement.prototype.showModal = originalShowModal;
     HTMLDialogElement.prototype.close = originalClose;
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: originalLocation,
+    });
   });
 
   it('renders the intercepted auth modal as a single auth surface', () => {
@@ -117,10 +128,13 @@ describe('AuthModalShell', () => {
 
     expect(mockBack).toHaveBeenCalledTimes(1);
     expect(mockPush).not.toHaveBeenCalled();
+    expect(mockAssign).not.toHaveBeenCalled();
   });
 
   // JOV-6225: the visible back control is destination navigation, bound to
   // the same validated context as its label — never history-dependent.
+  // Full navigation is required so an intercepted @auth slot unmounts when
+  // the destination is already the page underneath the modal.
   it('navigates the default back control to the homepage instead of history', () => {
     render(
       <AuthModalShell>
@@ -130,8 +144,9 @@ describe('AuthModalShell', () => {
 
     fireEvent.click(screen.getByLabelText('Back to homepage'));
 
-    expect(mockPush).toHaveBeenCalledTimes(1);
-    expect(mockPush).toHaveBeenCalledWith('/');
+    expect(mockAssign).toHaveBeenCalledTimes(1);
+    expect(mockAssign).toHaveBeenCalledWith('/');
+    expect(mockPush).not.toHaveBeenCalled();
     expect(mockBack).not.toHaveBeenCalled();
   });
 
@@ -147,8 +162,9 @@ describe('AuthModalShell', () => {
 
     fireEvent.click(screen.getByLabelText('Back to chat'));
 
-    expect(mockPush).toHaveBeenCalledTimes(1);
-    expect(mockPush).toHaveBeenCalledWith('/start?intent_id=abc');
+    expect(mockAssign).toHaveBeenCalledTimes(1);
+    expect(mockAssign).toHaveBeenCalledWith('/start?intent_id=abc');
+    expect(mockPush).not.toHaveBeenCalled();
     expect(mockBack).not.toHaveBeenCalled();
   });
 
@@ -164,7 +180,8 @@ describe('AuthModalShell', () => {
 
     fireEvent.click(screen.getByLabelText('Back to @aria'));
 
-    expect(mockPush).toHaveBeenCalledWith('/aria?claim=1');
+    expect(mockAssign).toHaveBeenCalledWith('/aria?claim=1');
+    expect(mockPush).not.toHaveBeenCalled();
     expect(mockBack).not.toHaveBeenCalled();
   });
 
@@ -190,6 +207,7 @@ describe('AuthModalShell', () => {
       fireEvent.click(screen.getByLabelText('Back to homepage'));
 
       expect(mockPush).not.toHaveBeenCalled();
+      expect(mockAssign).not.toHaveBeenCalled();
       expect(mockBack).toHaveBeenCalledTimes(1);
     }
   );
@@ -206,6 +224,7 @@ describe('AuthModalShell', () => {
     fireEvent.click(screen.getByLabelText('Back somewhere'));
 
     expect(mockPush).not.toHaveBeenCalled();
+    expect(mockAssign).not.toHaveBeenCalled();
     expect(mockBack).toHaveBeenCalledTimes(1);
   });
 
@@ -219,6 +238,7 @@ describe('AuthModalShell', () => {
       );
       fireEvent.click(screen.getByLabelText(label));
       expect(mockPush).not.toHaveBeenCalled();
+      expect(mockAssign).not.toHaveBeenCalled();
       expect(mockBack).toHaveBeenCalledTimes(1);
     }
   );
@@ -240,6 +260,7 @@ describe('AuthModalShell', () => {
 
     expect(mockBack).toHaveBeenCalledTimes(2);
     expect(mockPush).not.toHaveBeenCalled();
+    expect(mockAssign).not.toHaveBeenCalled();
   });
 
   it('defaults the back control to an explicit Back to homepage destination', () => {

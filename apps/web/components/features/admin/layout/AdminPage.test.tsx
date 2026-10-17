@@ -10,6 +10,47 @@ vi.mock('next/navigation', () => ({
 }));
 
 describe('AdminPage', () => {
+  it('keeps the task region constrained beneath tabs in workspace mode', () => {
+    render(
+      <AdminPage
+        title='People'
+        layout='workspace'
+        testId='people-page'
+        viewTestId='people-view'
+        tabs={{
+          param: 'view',
+          value: 'customers',
+          options: [
+            { value: 'customers', label: 'Customers' },
+            { value: 'creators', label: 'Creators' },
+          ],
+        }}
+      >
+        <div>Primary table</div>
+      </AdminPage>
+    );
+    expect(screen.getByTestId('people-page')).toHaveAttribute(
+      'data-admin-layout',
+      'workspace'
+    );
+    expect(screen.getByTestId('people-page')).toHaveClass('overflow-hidden');
+    expect(screen.getByTestId('people-view')).toHaveClass('flex-1', 'min-h-0');
+    expect(screen.getByRole('tablist')).toBeVisible();
+  });
+
+  it('retains document scrolling for reports and dossiers', () => {
+    render(
+      <AdminPage title='Report' testId='report-page'>
+        Report content
+      </AdminPage>
+    );
+    expect(screen.getByTestId('report-page')).toHaveAttribute(
+      'data-admin-layout',
+      'document'
+    );
+    expect(screen.getByTestId('report-page')).toHaveClass('overflow-auto');
+  });
+
   it('renders hero metrics and headerless tabs without duplicating the shell title', () => {
     render(
       <AdminPage

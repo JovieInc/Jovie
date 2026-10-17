@@ -22,6 +22,9 @@ export interface AcquisitionFact {
   acquisitionId: string;
   userId?: string;
   capturedAt: string;
+  identityScope?:
+    | 'consented_first_party_browser'
+    | 'pre_auth_first_party_cookie';
   consentRevokedAt?: string;
   firstTouch: Readonly<Record<string, unknown>>;
 }
@@ -36,7 +39,10 @@ export interface PaidAcquisitionReceipt {
   confidence: 'exact' | 'linked' | 'unmatched';
   modelVersion: typeof ACQUISITION_ATTRIBUTION_MODEL_VERSION;
   lookbackDays: number;
-  identityScope: 'consented_first_party_browser' | 'none';
+  identityScope:
+    | 'consented_first_party_browser'
+    | 'pre_auth_first_party_cookie'
+    | 'none';
   availableHistory: { from: string | null; to: string };
   grossAmountCents: number;
   refundAmountCents: number;
@@ -110,7 +116,9 @@ export function reconcilePaidAcquisition(
             : 'unmatched',
       modelVersion: ACQUISITION_ATTRIBUTION_MODEL_VERSION,
       lookbackDays: ACQUISITION_LOOKBACK_DAYS,
-      identityScope: matched ? 'consented_first_party_browser' : 'none',
+      identityScope: matched
+        ? (matched.identityScope ?? 'consented_first_party_browser')
+        : 'none',
       availableHistory: { from: matched?.capturedAt ?? null, to: asOf },
       grossAmountCents: order.grossAmountCents,
       refundAmountCents,

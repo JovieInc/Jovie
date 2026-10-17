@@ -265,6 +265,20 @@ struct MobileMeResponseTests {
   @Test func appleWalletAvailabilityKeepsServerAndDeviceFailuresTruthful() {
     #expect(
       AppleWalletControlAvailability(
+        serverAvailable: true,
+        deviceCanAddPasses: true,
+        distributionCapabilityEnabled: false
+      ) == .capabilityUnavailable
+    )
+    #expect(
+      AppleWalletControlAvailability(
+        serverAvailable: true,
+        deviceCanAddPasses: true,
+        distributionCapabilityEnabled: false
+      ).statusMessage == "Apple Wallet isn't available in this build."
+    )
+    #expect(
+      AppleWalletControlAvailability(
         serverAvailable: false,
         deviceCanAddPasses: true
       ) == .serverUnavailable

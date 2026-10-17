@@ -1,12 +1,9 @@
 {
   "schemaVersion": 1,
   "tool": "scripts/typecheck-scripts.mjs",
-  "generatedAt": "2026-10-04T02:19:21.713Z",
-  "totalErrors": 110,
+  "generatedAt": "2026-10-15T22:53:32.749Z",
+  "totalErrors": 107,
   "files": {
-    ".github/scripts/verify-main-release-readiness.mjs": {
-      "TS2339": 3
-    },
     "apps/web/scripts/generate-brand-assets.ts": {
       "TS1470": 2,
       "TS2339": 3

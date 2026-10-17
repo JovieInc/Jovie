@@ -11,6 +11,7 @@ import json
 import os
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from unittest.mock import ANY, patch
@@ -19,6 +20,29 @@ from pathlib import Path
 from contextlib import redirect_stdout
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def read_ready_pid(path: Path, deadline: float) -> int | None:
+    """Wait until `path` holds a pid.
+
+    The metadata child used to create the ready file and then write the pid.
+    A reader that returns on existence can observe an empty file
+    (`int('')` raises ValueError). Publication is an atomic replace; this wait
+    still accepts only a parseable pid and fails closed when the deadline passes.
+    """
+    while True:
+        try:
+            text = path.read_text().strip()
+        except OSError:
+            text = ""
+        if text:
+            try:
+                return int(text)
+            except ValueError:
+                pass
+        if time.monotonic() >= deadline:
+            return None
+        time.sleep(0.01)
 SPEC = importlib.util.spec_from_file_location("codex_lane", ROOT / "scripts/lanes/codex_lane.py")
 codex = importlib.util.module_from_spec(SPEC)
 sys.modules["codex_lane"] = codex
@@ -458,7 +482,10 @@ for line in sys.stdin:
         self.cli.write_text(f'''#!{sys.executable}
 import os, time
 from pathlib import Path
-Path({str(ready)!r}).write_text(str(os.getpid()))
+ready = Path({str(ready)!r})
+pending = ready.with_name(ready.name + '.tmp')
+pending.write_text(str(os.getpid()))
+os.replace(pending, ready)
 time.sleep(30)
 ''')
         self.cli.chmod(0o755)
@@ -473,11 +500,8 @@ m.reconcile(1_000_000, 0)
                                         stdout=codex.subprocess.DEVNULL, stderr=codex.subprocess.DEVNULL)
         child = None
         try:
-            deadline = time.monotonic() + 5
-            while not ready.exists() and time.monotonic() < deadline:
-                time.sleep(.01)
-            self.assertTrue(ready.exists(), 'metadata process did not start')
-            child = int(ready.read_text())
+            child = read_ready_pid(ready, time.monotonic() + 5)
+            self.assertIsNotNone(child, 'metadata process did not publish its pid')
             parent.kill()
             parent.wait(timeout=2)
             self.assertIsNone(codex.lease('current-login'), 'live child lost inherited account lease')
@@ -498,6 +522,20 @@ m.reconcile(1_000_000, 0)
                 time.sleep(.01)
         self.assertIsNotNone(handle, 'drained metadata process kept account lease')
         handle.close()
+
+    def test_ready_pid_waits_until_the_file_is_parseable(self):
+        ready = self.root / 'metadata-child.pid'
+        ready.write_text('')
+
+        def publish():
+            time.sleep(0.05)
+            pending = ready.with_name(ready.name + '.tmp')
+            pending.write_text('4242')
+            os.replace(pending, ready)
+
+        threading.Thread(target=publish, daemon=True).start()
+        self.assertEqual(read_ready_pid(ready, time.monotonic() + 2), 4242)
+        self.assertIsNone(read_ready_pid(self.root / 'missing.pid', time.monotonic()))
 
     def test_concurrent_corruption_before_final_merge_is_preserved(self):
         def corrupt_after_metadata(_):
@@ -1044,6 +1082,79 @@ class SubscriptionPoolTest(Isolated):
                 provider_cap.return_value = 5
                 self.assertEqual(runner.worker(host, "codex"), 0)
                 work.assert_called_once()
+
+
+    @patch.object(codex, "current_login_available", return_value=True)
+    def test_health_keeps_eligible_fully_leased_subscriptions_healthy(self, _login):
+        self.reconcile()
+        handles = [codex.lease("current-login") for _ in range(3)] + [codex.lease("lyb-pro")]
+        try:
+            self.assertTrue(all(handles))
+            before = codex.read_state()
+            report = codex.status()
+            self.assertEqual(report["available"], [])
+            self.assertTrue(all(row["available"] and row["freeSlots"] == 0
+                                for row in report["accounts"].values()))
+            with redirect_stdout(io.StringIO()):
+                self.assertEqual(codex.main(["health"]), 0)
+            self.assertEqual(codex.read_state(), before)
+            self.assertEqual(codex.status(), report)
+        finally:
+            for handle in handles:
+                if handle is not None:
+                    handle.close()
+
+    @patch.object(codex, "current_login_available", return_value=True)
+    def test_health_rejects_unverified_stale_banked_and_depleted_accounts(self, _login):
+        self.reconcile()
+        verified = codex.read_state()
+        mutations = {
+            "unknown": lambda row: row.pop("subscriptionIdentityVerifiedAt"),
+            "stale": lambda row: row.update(subscriptionIdentityVerifiedAt=self.NOW - codex.LEDGER_CADENCE_S),
+            "binding": lambda row: row.update(subscriptionBinding="unknown"),
+            "auth": lambda row: row.update(lastKind="auth", exhaustedUntil=self.NOW + 60),
+            "quota": lambda row: row.update(lastKind="limit", exhaustedUntil=self.NOW + 60),
+            "depleted": lambda row: row["capacityLease"]["usableCapacityRemaining"]["primary"].update(remainingPercent=0),
+            "expired": lambda row: row["capacityLease"]["usableCapacityRemaining"]["primary"].update(resetsAt=self.NOW),
+            "missing-capacity": lambda row: row.pop("capacityLease"),
+        }
+        for reason, mutate in mutations.items():
+            with self.subTest(reason=reason):
+                state = json.loads(json.dumps(verified))
+                for name in self.profiles:
+                    mutate(state[name])
+                codex.write_state(state)
+                with redirect_stdout(io.StringIO()):
+                    self.assertEqual(codex.main(["health"]), 1)
+                self.assertEqual(codex.status()["available"], [])
+                self.assertEqual(codex.read_state(), state)
+
+    @patch.object(codex, "current_login_available", return_value=True)
+    def test_health_accepts_busy_eligible_account_when_free_account_is_stale(self, _login):
+        self.reconcile()
+        state = codex.read_state()
+        state["current-login"]["subscriptionIdentityVerifiedAt"] = self.NOW - codex.LEDGER_CADENCE_S
+        codex.write_state(state)
+        handle = codex.lease("lyb-pro")
+        self.assertIsNotNone(handle)
+        try:
+            report = codex.status()
+            self.assertEqual(report["available"], [])
+            self.assertFalse(report["accounts"]["current-login"]["available"])
+            self.assertEqual(report["accounts"]["current-login"]["freeSlots"], 3)
+            self.assertTrue(report["accounts"]["lyb-pro"]["available"])
+            self.assertEqual(report["accounts"]["lyb-pro"]["freeSlots"], 0)
+            with redirect_stdout(io.StringIO()):
+                self.assertEqual(codex.main(["health"]), 0)
+        finally:
+            handle.close()
+
+    @patch.object(codex, "current_login_available", return_value=True)
+    def test_health_without_accounts_fails(self, _login):
+        self.reconcile()
+        _login.return_value = False
+        with redirect_stdout(io.StringIO()):
+            self.assertEqual(codex.main(["health"]), 1)
 
     def snapshot(self, name):
         value = current_snapshot(self.NOW)

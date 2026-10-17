@@ -4,8 +4,8 @@ name: Production Release
 # accountable-writer: Symphony
 # capability-gap: Forward-only release lineage must prove that an authorized SHA
 #   is still an ancestor of main. Jobs check out the release SHA, not main.
-#   The staging-alias recheck uses the compare API, then git, when REST is
-#   unavailable. The other rechecks still read lineage through the compare API.
+#   Head, staging-alias, and production mutation rechecks use the compare API,
+#   then authenticated git, when REST is unavailable.
 # revisit-trigger: Revisit when the controller carries lineage on its own
 #   workflow_run payload or promotion moves to a webhook-dispatched writer.
 
@@ -82,36 +82,25 @@ jobs:
     outputs:
       is_current: ${{ steps.head.outputs.is_current }}
     steps:
+      - name: Checkout the lineage guard
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.expected_sha }}
+          persist-credentials: false
+          sparse-checkout: |
+            .github/scripts/gh-api-hold.sh
+            .github/scripts/recheck-main-lineage.sh
+          sparse-checkout-cone-mode: false
       - name: Resolve current main HEAD
         id: head
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_API_HOLD_BUDGET_SECONDS: '60'
           EXPECTED_SHA: ${{ inputs.expected_sha }}
         run: |
-          set -euo pipefail
-          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] || {
-            echo "::error::expected_sha must be a full commit SHA."
-            exit 1
-          }
-          current_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
-          [[ "$current_sha" =~ ^[0-9a-f]{40}$ ]] || {
-            echo "::error::GitHub returned an invalid main HEAD."
-            exit 1
-          }
-          # Forward-only lineage: after the controller authorizes a generation,
-          # main advancing does not cancel it. An authorized SHA that is still an
-          # ancestor of main ships; only a rewind or force-push yields. Exact
-          # equality at every later recheck starved production during PR drains
-          # (2026-09-26: jov.ie 572 commits behind, every generation superseded
-          # mid-pipeline). Stale generations still yield at the controller's
-          # coalesce/authorize boundary before any work starts.
-          if [ "$current_sha" != "$EXPECTED_SHA" ] &&
-            [ "$(gh api "repos/${{ github.repository }}/compare/${EXPECTED_SHA}...${current_sha}" --jq '.status // empty')" != "ahead" ]; then
-            echo "::notice::Release $EXPECTED_SHA left main's lineage (main is $current_sha) before lease work began."
-            echo "is_current=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "is_current=true" >> "$GITHUB_OUTPUT"
-          fi
+          # Authorized ancestor generations keep shipping as main advances.
+          # Only a proven rewind or rewrite yields; unknown lineage fails.
+          bash "$GITHUB_WORKSPACE/.github/scripts/recheck-main-lineage.sh" "before lease work began"
 
   deploy-staging:
     needs: [release-head]
@@ -535,25 +524,23 @@ jobs:
     outputs:
       is_current: ${{ steps.head.outputs.is_current }}
     steps:
+      - name: Checkout the lineage guard
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.expected_sha }}
+          persist-credentials: false
+          sparse-checkout: |
+            .github/scripts/gh-api-hold.sh
+            .github/scripts/recheck-main-lineage.sh
+          sparse-checkout-cone-mode: false
       - name: Resolve current main HEAD
         id: head
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_API_HOLD_BUDGET_SECONDS: '60'
           EXPECTED_SHA: ${{ inputs.expected_sha }}
         run: |
-          set -euo pipefail
-          current_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
-          [[ "$current_sha" =~ ^[0-9a-f]{40}$ ]] || {
-            echo "::error::GitHub returned an invalid main HEAD before staging alias."
-            exit 1
-          }
-          if [ "$current_sha" != "$EXPECTED_SHA" ] &&
-            [ "$(gh api "repos/${{ github.repository }}/compare/${EXPECTED_SHA}...${current_sha}" --jq '.status // empty')" != "ahead" ]; then
-            echo "::notice::Release $EXPECTED_SHA left main's lineage (main is $current_sha) before staging alias."
-            echo "is_current=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "is_current=true" >> "$GITHUB_OUTPUT"
-          fi
+          bash "$GITHUB_WORKSPACE/.github/scripts/recheck-main-lineage.sh" "before staging alias"
 
   alias-staging:
     name: Alias verified preview to staging.jov.ie
@@ -577,6 +564,7 @@ jobs:
         id: head
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_API_HOLD_BUDGET_SECONDS: '600'
           EXPECTED_SHA: ${{ inputs.expected_sha }}
         run: |
           bash "$GITHUB_WORKSPACE/.github/scripts/recheck-main-lineage.sh" "at staging alias"
@@ -726,25 +714,23 @@ jobs:
     outputs:
       is_current: ${{ steps.head.outputs.is_current }}
     steps:
+      - name: Checkout the lineage guard
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.expected_sha }}
+          persist-credentials: false
+          sparse-checkout: |
+            .github/scripts/gh-api-hold.sh
+            .github/scripts/recheck-main-lineage.sh
+          sparse-checkout-cone-mode: false
       - name: Resolve current main HEAD
         id: head
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_API_HOLD_BUDGET_SECONDS: '60'
           EXPECTED_SHA: ${{ inputs.expected_sha }}
         run: |
-          set -euo pipefail
-          current_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
-          [[ "$current_sha" =~ ^[0-9a-f]{40}$ ]] || {
-            echo "::error::GitHub returned an invalid main HEAD before production mutation."
-            exit 1
-          }
-          if [ "$current_sha" != "$EXPECTED_SHA" ] &&
-            [ "$(gh api "repos/${{ github.repository }}/compare/${EXPECTED_SHA}...${current_sha}" --jq '.status // empty')" != "ahead" ]; then
-            echo "::notice::Release $EXPECTED_SHA left main's lineage (main is $current_sha) before production mutation."
-            echo "is_current=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "is_current=true" >> "$GITHUB_OUTPUT"
-          fi
+          bash "$GITHUB_WORKSPACE/.github/scripts/recheck-main-lineage.sh" "before production mutation"
 
   migrate-production:
     name: Migrate production database
@@ -869,22 +855,10 @@ jobs:
         id: mutation-head
         env:
           GH_TOKEN: ${{ github.token }}
+          MAIN_LINEAGE_TRANSPORT: git
           EXPECTED_SHA: ${{ inputs.expected_sha }}
         run: |
-          set -euo pipefail
-          current_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
-          [[ "$current_sha" =~ ^[0-9a-f]{40}$ ]] || {
-            echo "::error::GitHub returned an invalid main HEAD at production mutation."
-            exit 1
-          }
-          if [ "$current_sha" != "$EXPECTED_SHA" ] &&
-            [ "$(gh api "repos/${{ github.repository }}/compare/${EXPECTED_SHA}...${current_sha}" --jq '.status // empty')" != "ahead" ]; then
-            echo "::notice::Release $EXPECTED_SHA left main's lineage (main is $current_sha) at production mutation."
-            echo "superseded_sha=$current_sha" >> "$GITHUB_OUTPUT"
-            echo "is_current=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "is_current=true" >> "$GITHUB_OUTPUT"
-          fi
+          bash "$GITHUB_WORKSPACE/.github/scripts/recheck-main-lineage.sh" "at production mutation"
       # This is deliberately a restore-only cache by default. The cache is a
       # Next compiler/build cache, never a Vercel deployment artifact. Writes
       # require the repository variable JOVIE_PRODUCTION_NEXT_CACHE_SAVE=true
@@ -1300,22 +1274,10 @@ jobs:
         if: ${{ steps.mutation-head.outputs.is_current == 'true' && ((inputs.full_runtime_proof && steps.performance-gate.outcome == 'success') || (!inputs.full_runtime_proof && steps.performance-gate.outcome == 'skipped')) }}
         env:
           GH_TOKEN: ${{ github.token }}
+          MAIN_LINEAGE_TRANSPORT: git
           EXPECTED_MAIN_SHA: ${{ inputs.expected_sha }}
         run: |
-          set -euo pipefail
-          current_main_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
-          if [[ ! "$current_main_sha" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "::error::Could not resolve an exact main HEAD immediately before production promotion."
-            exit 1
-          fi
-          if [[ "$current_main_sha" != "$EXPECTED_MAIN_SHA" ]] &&
-            [ "$(gh api "repos/${{ github.repository }}/compare/${EXPECTED_MAIN_SHA}...${current_main_sha}" --jq '.status // empty')" != "ahead" ]; then
-            echo "::notice::Release $EXPECTED_MAIN_SHA left main's lineage (main is $current_main_sha) after its staged production build; skipping production mutation."
-            echo "superseded_sha=$current_main_sha" >> "$GITHUB_OUTPUT"
-            echo "is_current=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "is_current=true" >> "$GITHUB_OUTPUT"
+          bash "$GITHUB_WORKSPACE/.github/scripts/recheck-main-lineage.sh" "before production promotion"
 
       - name: Security gate before production promotion
         if: ${{ steps.final-current.outputs.is_current == 'true' }}
@@ -1393,7 +1355,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          current_main="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
+          current_main="$(bash "$GITHUB_WORKSPACE/.github/scripts/resolve-main-sha.sh" "$GITHUB_REPOSITORY")"
           [[ "$current_main" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Could not resolve exact main after staging mutation."
             exit 1
@@ -1595,7 +1557,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          current_main="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
+          current_main="$(bash "$GITHUB_WORKSPACE/.github/scripts/resolve-main-sha.sh" "$GITHUB_REPOSITORY")"
           [[ "$current_main" =~ ^[0-9a-f]{40}$ ]] || exit 1
           latency_seconds=$(( $(date -u +%s) - $(date -u -d "$SOURCE_CI_COMPLETED_AT" +%s) ))
           slo_state=within_target
@@ -2158,11 +2120,19 @@ jobs:
       sentry_gate_status: ${{ steps.result.outputs.sentry_gate_status }}
       oauth_gate_status: ${{ steps.result.outputs.oauth_gate_status }}
     steps:
+      - name: Checkout the main resolver
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.expected_sha }}
+          persist-credentials: false
+          sparse-checkout: .github/scripts/resolve-main-sha.sh
+          sparse-checkout-cone-mode: false
       - name: Resolve release result
         id: result
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          RESOLVE_MAIN_BUDGET_SECONDS: '60'
           EXPECTED_SHA: ${{ inputs.expected_sha }}
           PROMOTION_SHA: ${{ needs.promote-production.outputs.promotion_sha }}
           PRODUCTION_DEPLOYMENT_ID: ${{ needs.promote-production.outputs.production_deployment_id }}
@@ -2322,7 +2292,7 @@ jobs:
           # Exact promotion identity and all release gates have passed. A newer
           # main generation must not erase that completed older-generation fact;
           # controller probes remain bound to this immutable deployment and SHA.
-          boundary_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
+          boundary_sha="$(bash "$GITHUB_WORKSPACE/.github/scripts/resolve-main-sha.sh" "${{ github.repository }}")"
           [[ "$boundary_sha" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Could not resolve exact main at the release-result boundary."
             exit 1

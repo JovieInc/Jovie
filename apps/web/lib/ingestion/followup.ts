@@ -4,24 +4,16 @@ import {
   canonicalIdentity,
   detectPlatform,
 } from '@/lib/utils/platform-detection';
-import { isBeaconsUrl, validateBeaconsUrl } from './strategies/beacons';
-import { isInstagramUrl, validateInstagramUrl } from './strategies/instagram';
 import { validateLayloUrl } from './strategies/laylo';
-import { validateLinktreeUrl } from './strategies/linktree';
 import { isTikTokUrl, validateTikTokUrl } from './strategies/tiktok';
 import { isTwitterUrl, validateTwitterUrl } from './strategies/twitter';
-import { isYouTubeChannelUrl } from './strategies/youtube';
 import type { ExtractionResult } from './types';
 
 /**
  * Supported recursive job types for follow-up ingestion.
  */
 type SupportedRecursiveJobType =
-  | 'import_linktree'
   | 'import_laylo'
-  | 'import_youtube'
-  | 'import_beacons'
-  | 'import_instagram'
   | 'import_tiktok'
   | 'import_twitter';
 
@@ -29,11 +21,7 @@ type SupportedRecursiveJobType =
  * Maximum depth allowed for each job type.
  */
 const MAX_DEPTH_BY_JOB_TYPE: Record<SupportedRecursiveJobType, number> = {
-  import_linktree: 3,
   import_laylo: 3,
-  import_youtube: 1,
-  import_beacons: 3,
-  import_instagram: 2,
   import_tiktok: 2,
   import_twitter: 2,
 };
@@ -45,33 +33,10 @@ const MAX_DEPTH_BY_JOB_TYPE: Record<SupportedRecursiveJobType, number> = {
 function classifyLink(
   url: string
 ): { jobType: SupportedRecursiveJobType; sourceUrl: string } | null {
-  // YouTube
-  if (isYouTubeChannelUrl(url)) {
-    return { jobType: 'import_youtube', sourceUrl: url };
-  }
-
-  // Beacons
-  const validatedBeacons = validateBeaconsUrl(url);
-  if (validatedBeacons && isBeaconsUrl(validatedBeacons)) {
-    return { jobType: 'import_beacons', sourceUrl: validatedBeacons };
-  }
-
-  // Linktree
-  const validatedLinktree = validateLinktreeUrl(url);
-  if (validatedLinktree) {
-    return { jobType: 'import_linktree', sourceUrl: validatedLinktree };
-  }
-
   // Laylo
   const validatedLaylo = validateLayloUrl(url);
   if (validatedLaylo) {
     return { jobType: 'import_laylo', sourceUrl: validatedLaylo };
-  }
-
-  // Instagram
-  const validatedInstagram = validateInstagramUrl(url);
-  if (validatedInstagram && isInstagramUrl(validatedInstagram)) {
-    return { jobType: 'import_instagram', sourceUrl: validatedInstagram };
   }
 
   // TikTok

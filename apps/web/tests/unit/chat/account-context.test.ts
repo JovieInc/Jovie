@@ -40,6 +40,7 @@ function makeEntitlements(
     canAccessAdvancedAnalytics: true,
     canFilterSelfFromAnalytics: true,
     canAccessAdPixels: true,
+    canAutoCreateLinks: false,
     canBeVerified: true,
     aiCanUseTools: true,
     canGenerateAlbumArt: true,

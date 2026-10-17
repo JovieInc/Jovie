@@ -317,6 +317,7 @@ export interface UserEntitlements {
   canAccessAdvancedAnalytics: boolean;
   canFilterSelfFromAnalytics: boolean;
   canAccessAdPixels: boolean;
+  canAutoCreateLinks: boolean;
   canBeVerified: boolean;
   aiCanUseTools: boolean;
   canGenerateAlbumArt: boolean;

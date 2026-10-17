@@ -10,5 +10,6 @@
     "hold:tim",
     "queue-deferred"
   ],
-  "queuePoisonLabel": "queue-poison"
+  "queuePoisonLabel": "queue-poison",
+  "machineBlockLabels": ["lane-fix-red"]
 }

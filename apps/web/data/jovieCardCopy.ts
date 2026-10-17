@@ -1,5 +1,14 @@
 export const JOVIE_CARD_PUBLICATION_STATE = 'coming-soon' as const;
 
+// An announcement is not product UI proof. Replace this only with an approved
+// Wallet depiction; a public-profile capture shows the destination, not Card.
+export const JOVIE_CARD_HERO_EVIDENCE = {
+  kind: 'planned-description',
+  capabilityId: 'jovie-card',
+  componentPath: 'apps/web/app/(marketing)/card/JovieCardLanding.tsx',
+  testId: 'jovie-card-planned-description',
+} as const;
+
 export const JOVIE_CARD_COPY = {
   publication: {
     state: JOVIE_CARD_PUBLICATION_STATE,
@@ -10,62 +19,56 @@ export const JOVIE_CARD_COPY = {
     canIssuePasses: false,
   },
   seo: {
-    title: 'Jovie Card: Your profile in Apple Wallet',
+    title: 'Jovie Card: Planned for Apple Wallet',
     description:
-      'Jovie Card is coming to Apple Wallet. Join the list for access updates about sharing your Jovie profile in person.',
+      'Jovie Card is a planned Apple Wallet card for sharing your music and links in person. Join the list for access updates. Passes are not available yet.',
   },
   hero: {
     headline: 'Your Jovie profile. Ready for the real world.',
-    body: 'We’re bringing your Jovie profile to Apple Wallet as a personal card for the people you meet in person. Join the list for access updates.',
+    body: 'Jovie Card is a planned Apple Wallet card for sharing your music and links after an introduction. Join the list for access updates.',
+    availability: 'Coming soon. Wallet passes are not available yet.',
   },
   sections: {
     howItWorks: 'Show your card. They open your profile',
+    howItWorksIntro: 'Here’s the sharing flow we’re planning.',
     introduction: 'An introduction. Not a list of usernames',
     closing: 'Bring your profile into the room',
   },
   steps: [
     {
       title: 'Keep it close',
-      body: 'When access opens, you’ll be able to keep your Jovie profile card in Apple Wallet.',
+      body: 'The planned card would live in Apple Wallet.',
     },
     {
       title: 'Show your card',
-      body: 'Bring up the card when you meet someone and want to share more than a username.',
+      body: 'You’d bring up its QR code after an introduction.',
     },
     {
       title: 'Open your profile',
-      body: 'They’ll scan the card to open your public Jovie profile in their browser.',
+      body: 'They’d scan to find your music and links in their browser.',
     },
   ],
   examples: [
     {
-      audience: 'Artist',
-      body: 'Turn a backstage introduction into one place for your music, story, and next show.',
-    },
-    {
-      audience: 'Founder',
-      body: 'Share the context behind what you are building without reciting a string of handles.',
-    },
-    {
-      audience: 'Creator',
-      body: 'Give a new collaborator one profile that leads to your work and ways to connect.',
+      audience: 'After the set',
+      body: 'Give someone you’ve just met one place to find your music and links.',
     },
   ],
   faq: [
     {
       question: 'How will sharing work?',
       answer:
-        'The planned card will include a QR code that opens your public Jovie profile. The preview on this page is illustrative and does not represent measured leads or a certified rollout.',
+        'The planned card would include a QR code that opens your public Jovie profile. Joining the list signs you up for access updates; it does not issue a pass.',
     },
     {
       question: 'Does the person I meet need Jovie?',
       answer:
-        'No. The planned scan opens a public web profile, so the recipient will not need an account or an app to view it.',
+        'The plan is for the QR code to open a public web profile, with no Jovie account or app needed to view it.',
     },
     {
       question: 'Will it work with Android?',
       answer:
-        'The card is planned for Apple Wallet. An Android phone can still scan its QR code and open the public profile in a browser; Android wallet storage is not being announced here.',
+        'We’re planning browser-based QR sharing, including for people on Android. The card itself is planned for Apple Wallet. Android wallet storage has not been announced.',
     },
     {
       question: 'Who is eligible?',

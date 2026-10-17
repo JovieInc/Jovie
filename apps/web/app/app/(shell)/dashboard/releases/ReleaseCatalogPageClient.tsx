@@ -131,7 +131,7 @@ export function ReleaseCatalogPageClient({
       return <LibrarySurface assets={[]} />;
     }
 
-    if (isError) {
+    if (isError && releases === undefined) {
       return (
         <PageErrorState message='Failed to load library data. Please refresh the page.' />
       );

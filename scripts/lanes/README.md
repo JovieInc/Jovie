@@ -27,7 +27,7 @@ The harness, not the model, owns:
 | Execution attempts: stable action phases fence boundary replay. The dual-format reader supports immutable candidate ownership and terminal recovery; its incompatible writer remains disabled pending verified reader/writer readiness. Enabled recovery publishes only the reserved winner and seals unknown boundaries without another attempt or grant | `execution_attempt.py` |
 | One open PR per issue: branch or `linear-issue-id` marker; an unreadable PR list claims nothing | `in_flight_issues()` |
 | No open-PR ceiling (Tim 2026-10-12): new-issue intake is bounded only by real limits in autoscale (compute, credits, quotas); `new_issue_budget()` reports counts, never refuses | `new_issue_budget()` |
-| Workstreams: one classifier for intake and backlog (`ws:<key>` label override, else ordered rules); exact normalized-title duplicates admit only the oldest (`duplicate-candidate:<JOV>`); order = explicit dispatch-next in the admitted pool → tier (urgent or CI/Symphony-throughput) → aged priority → workstream rank → age | `workstreams.py`, `pool_rejections()`, `admission_order()` |
+| Workstreams: one classifier for intake and backlog (`ws:<key>` label override, else ordered rules); exact normalized-title duplicates admit only the oldest (`duplicate-candidate:<JOV>`); order = explicit Urgent → dispatch-next in the admitted pool → tier (aged or CI/Symphony-throughput) → aged priority → workstream rank → age | `workstreams.py`, `pool_rejections()`, `admission_order()` |
 | File-overlap admission: declared paths, then the workstream map, are compared with the cached open-PR inventory and In Progress lane tasks; hot control-plane and duplicate migration-number collisions wait, shared/generated files sequence, other overlaps flag | `file_overlap.py`, `overlap_inventory()` |
 | Hotspot admission (JOV-7708): an issue whose predicted touch set (named file paths, else its workstream area; Symphony-throughput = the lanes harness) hits a hotspot an open, non-parked PR holds waits as `hotspot-held:<path>#<pr>`. Hotspots = a static seed (lanes harness, `code-flags.ts`, command/product-truth registries, `node-environment-files.json`, `destructive-red-drift.baseline.json`) plus any file two open PRs touch; an unreadable file list admits ungated | `pool_rejections()`, `hotspot_holds()`, `open_hotspot_holds()` |
 | Sweep (every 30 min per lane): retire only explicitly labeled duplicates after live head, hold and queue revalidation; preserve unlabelled stale drafts | `sweep_lane_prs()` |
@@ -115,6 +115,72 @@ body remain candidate context only; they never produce verified attribution.
 Receipt values can appear in the company status feed: use stable non-secret labels,
 never credentials, private paths or personal contact details.
 
+### Non-Symphony publication origins (JOV-8318)
+
+`record-origin` now reads the canonical GitHub repository, PR head and (while open)
+live branch ref before appending. A stale head, duplicate or conflicting exact-head
+origin fails without changing existing bytes. New heads require new receipts;
+neither repair nor review/finalizer receipts rewrite origin history.
+
+The Dependabot metadata-certified producer and atomic pin-sync writer emit after
+their final heads are known. Sentry Autofix, Shipping SLO (snapshot and ratchet),
+Screenshots (new and updated PR), Production Controller customer notes, Desktop
+Release stamps, and both coverage/nightly report publishers use the same
+`shipping_origin.py emit-automation` boundary after publication. Sentry records
+the evidenced Claude provider, without inventing a model from its routing tier.
+
+Hosted producers retain a data-only `shipping-origin-v1` Actions artifact for 30
+days. The existing lanes dispatch tick reads artifacts from both reporting
+repositories, checks the GitHub run's repository/workflow/event and trusted source
+context, rechecks the live exact head, and fsyncs one `jovie-shipping-origin/v1`
+receipt into `runs/ledger.jsonl`. Redelivery is acknowledged without appending.
+Invalid data and conflicts appear in `tick.shippingOriginIngest.rejected`;
+transport/pagination/deadline failures appear in `errors`, retry next tick and
+mark attribution evidence incomplete in the company status feed. Merge counts
+remain independent. The collector is bounded to 45 seconds and ten 100-artifact
+pages per repository; it never extracts or executes archive content.
+
+Founder-operated ChatGPT, Codex and Claude sessions, and independent Hyperagent,
+Grokbot or other agents, use this publication handoff after the last push:
+
+```bash
+python3 scripts/shipping_origin.py submit \
+  --repository JovieInc/Jovie --pr 123 --head-sha <exact-final-head> \
+  --method founder-operated-codex --initiator tim --provider codex \
+  --execution-host <non-secret-host-label> --run-id <session-id> \
+  --linear-issue JOV-123
+```
+
+Choose `founder-operated-chatgpt`, `founder-operated-claude`,
+`founder-operated-codex`, `founder-operated-unknown-provider`, `grokbot`,
+`independent-agent`, or `independent-hyperagent` from actual commissioning
+evidence. Add `--model` only when the run establishes it. Never infer it from
+the author, branch or PR text. `--payload-file` accepts the same minimal fields
+(`repository`, `pr`, `headSha`, `method`, `initiator`, optional `provider`, `model`,
+`executionHost`, `runId`, `linearIssue`); unknown fields and duplicate JSON keys fail.
+Both Jovie and LogYourBody are allowed. Founder/independent handoffs require a
+Linear issue and Tim's authenticated GitHub dispatch; an independent agent hands
+the payload to the existing authorized publisher when it lacks that identity.
+This is an origin attestation, not an autonomous-work admission.
+
+The main-only `shipping-origin.yml` workflow accepts that payload as environment
+data, reads both repositories with an explicitly read-only App token, and retains
+the artifact. It cannot push, review, execute PR code, start implementation or
+merge. The App must already be installed on both repositories; missing read
+access fails visibly. Host-local publishers may instead use `record-origin` with
+the same selected method and metadata.
+
+Ship now: exact-head instrumentation and the existing-tick transport. Re-evaluate
+when a fresh deployed daily window contains integrated producer runs. Then attach
+the producer run/artifact URLs, receipt IDs and fresh `shippingAttribution` status
+report link to JOV-8318, checking increased verified coverage for each producer,
+separate review/remediation/finalizer roles and unknown counts for unreadable or
+uninstrumented projects. Draft publication and deterministic fixtures do not
+establish deployed coverage. JOV-8318 retains this commissioning obligation until
+the independent landing/deploy gate produces those runtime receipts.
+
+Transport reference: [GitHub artifact API](https://docs.github.com/en/rest/actions/artifacts).
+
 Gate reservations use kernel locks for the PR number and head SHA. An adopter carries
 its reservation through checkout, install, checks and terminal receipt publication;
 another contender skips that head without taking a heavy seat or charging an issue
@@ -177,19 +243,20 @@ infrastructure first:
 `library-content` → `analytics-gtm` → `docs-changelog` → `lyb` → `memory-gbrain` →
 `general` → `human-decision`.
 
-`pick_issue()` orders candidates by `admission_order()`: an operator-designated
-`dispatch-next` issue carrying `agent-ready` is first among eligible new claims.
-Use it for the measured bottleneck (including binding CI or deployment work),
-clear a stale designation before replacing it, and verify the actual worker claim.
-It cannot interrupt active work or bypass repair-first, budget, routing, design,
-retry, duplicate, file-overlap or hotspot admission. Untagged aging is unchanged;
-multiple designations retain the existing priority/workstream/age tie-breakers.
-The Todo state filter consumes the designation when work starts. Otherwise tier 0 is urgent work
-(effective P1, including work aged to P1) or a compounding workstream (CI, Symphony
-throughput); then aged priority; then workstream rank; then age. Urgent-first and
-anti-starvation aging are preserved; a non-urgent CI or throughput fix runs ahead of
-non-urgent product work. The Linear backlog carries the same `ws:*` labels so new
-intake and existing work follow one rule.
+`pick_issue()` and the doctor share `admission_order()`. Current explicit Linear
+Urgent ranks before every lower-priority eligible unclaimed candidate, including
+aged CI work and `dispatch-next` (Tim, 2026-10-16; JOV-8022/JOV-7073). Only integer
+priority 1 is Urgent; missing and malformed priorities cannot acquire that status.
+Priority edits take effect on the next claim scan after the canonical Linear mirror
+receives them. Installed ingestion and actual claims require separate receipts.
+
+Within each explicit urgency band, an operator-designated `dispatch-next` issue
+carrying `agent-ready` is first. Otherwise tier 0 is aged priority 1 or compounding
+CI/Symphony throughput; tier 1 is other work. Aged priority, workstream rank and age
+break ties. Aging still prevents starvation among non-urgent work. Designation
+cannot interrupt active work or bypass repair-first, budget, routing, design,
+retry, duplicate, file-overlap or hotspot admission. Todo filtering consumes the
+designation when work starts; labels on Backlog do not establish admission.
 
 Duplicate identity is deliberately exact: titles equal after case, punctuation and
 conventional `bug:`/`P1:` prefixes are stripped (bracketed tags such as `[web-053]`
@@ -203,7 +270,10 @@ Lane reads paginate the Todo pool (up to `LANE_ISSUE_PAGES` × 100).
 Gem has no inbound webhook, so `.github/workflows/lane-fix-relay.yml` turns each GitHub signal
 into a label on the exact PR: CI failure `lane-fix-red`, merge-queue removal `lane-fix-dequeued`,
 a push to main that leaves the PR conflicting `lane-fix-conflict`, requested changes or a human
-review comment `lane-fix-review`, green CI on a lane draft `lane-fix-green`. Every worker pass
+review comment `lane-fix-review`, green CI on a lane draft `lane-fix-green`.
+The same relay deletes a stale `lane-fix-red` once that head is required-green
+(CLEAN, HAS_HOOKS, or UNSTABLE), using the workflow token that applied the label.
+Every worker pass
 does one label search and takes a queued PR ahead of the rest of its work. Labels are consumed
 on claim, or when the PR's own state no longer backs them. A PR whose attempts are spent keeps
 its label, so the PR shows why it is waiting. The dispatch tick handles `green` (ready +
@@ -318,6 +388,62 @@ health is recorded under `ycCorpus` in `tick.json`; it never silently converts a
 A release self-test (`LANES_SELFTEST`) never schedules the refresh, and its default fetch and `gbrain`
 helpers refuse to run there; every self-test process carries a per-run `JOVIE_SELFTEST_RUN` marker and
 `prove_staging` stops any still running when the tests end (`leftoverProcesses` in the diagnostic).
+
+### Bounded lesson analysis (JOV-8420)
+
+[`runLessonAnalysis`](../lib/lesson-analysis.mjs) consumes a sealed reasoning
+WorkOrder after event-driven admission (JOV-8419). It reconstructs the ordered
+attempt graph from sanitized, revision-bound development evidence and returns
+evidence-linked findings plus `target`, `no-change`, or `held`. It grants no
+implementation or promotion authority. JOV-8421 owns compilation.
+
+The existing transport/certification owners supply `environment.routes`,
+`routesVersion`, `certify(route)` and `dispatch(call)`. These are trusted owner
+adapters, never callbacks or capability claims supplied by a model. `certify`
+projects an authenticated current `jovie.certification/v1` receipt: exact route
+ID and tuple digest, certified capabilities and risk ceiling, policy version,
+evidence reference and expiry. Unavailable routes are omitted by that owner.
+This boundary does not mint certificates or maintain another route registry.
+
+The governor's `routeByExpectedCost` selects both actors. Broad, ambiguous,
+control-plane, founder-invariant and repeated-escape lessons require certified
+`reasoning` + `frontier` capability. The existing generator-family exclusion
+policy selects an independent challenger; matching providers or exact models
+are also excluded. Both resolutions retain the exact tuple, governor/routes
+versions, certification receipt, and canonical WorkResult. The challenger sees
+the evidence and proposal, and answers its digest. Its challenge is retained.
+
+`dispatch` receives the sealed child WorkOrder, `toReasoningJob` intake, selected
+route, sanitized packet, output JSON schema, AbortSignal and limits. The owner
+must honor the exact route/schema/packet and enforce the spend, inference and
+zero-tool caps before execution; the legacy ranking lane alone does not satisfy
+this contract. It returns `{ result, output, resolvedTuple, usage }`, where
+`result` is that exact order's WorkResult and `usage` reports inference calls,
+tool calls, inference USD and tool USD. Two calls maximum, one per child order;
+the parent deadline and a maximum 15-minute wall limit apply. There is no local
+retry/failover. Aborted or unknown expense requires owner reconciliation before
+any redispatch under the existing idempotency/lease policy.
+
+Evidence must already be sanitized/authenticated by its source owner. Protected
+cases never enter model inputs; unsafe, cross-binding, wrong-revision or
+incomplete attempt evidence holds analysis. A causal claim needs an independent
+verification link joining a failed attempt to a verified success. Agreement or
+a successful retry alone supplies no causal proof. Missing routes, expiration,
+timeouts, exhausted limits, unsupported claims or disagreement return `held`
+with the original escalation owner/action. Implementation expense is excluded
+from the measured analysis expense. Event wiring and live commissioning remain
+with JOV-8419 and the JOV-2967 acceptance chain; these fixtures prove source
+behavior only.
+
+Ship now: expose this bounded owner boundary. Re-evaluate when admitted live
+events supply route/certificate and expense receipts. Then verify those receipts
+through the existing parent commissioning chain.
+
+Run the deterministic suite and coverage with installed pinned tools:
+
+```bash
+node --import tsx --test --test-isolation=none --experimental-test-coverage --test-coverage-include=scripts/lib/lesson-analysis.mjs scripts/lib/__tests__/lesson-analysis.test.mjs
+```
 
 ## Nothing fails silently
 
@@ -550,6 +676,34 @@ way; preserved-work admission therefore also checks live working directories.
 Cleanup retains protected, dirty or unreadable source. Installed-runtime evidence
 is required before calling this commissioned.
 
+## Cross-session continuity
+
+Before each issue dispatch, Symphony recalls up to four same-repository run
+receipts from the last 256 KiB of `runs/ledger.jsonl`: the current issue first,
+then recent runs in its classified workstream (excluding `general`). New run
+receipts retain that workstream. One Linear read supplies the five newest issue
+comments, including cross-host handoffs. The combined context is capped at 6,500
+characters; individual excerpts are clipped and older comments are explicitly
+marked omitted. Missing or unreadable history is marked unavailable, never
+proof that no fix was attempted. Auth/quota failures remain fail-soft.
+
+The issue prompt tells the agent to inspect prior findings and Git history before
+diagnosis, compare a recorded fix with current source and the exact running
+version, and investigate recurrence or reversion before repeating a mutation.
+Previously supplied inputs stay in authorized records/configuration. At the
+session boundary, agents persist a `Jovie session handoff` on the existing Linear
+issue with findings, ruled-out causes, attempted changes and SHA/PR, checks and
+failures, separate source/CI/merge/deploy/runtime status, and the next step.
+Secrets and private contact details do not belong in handoffs. Durable knowledge
+still goes to GBrain; these are existing operational records, not a second brain.
+
+Ship now: bounded evidence retrieval in the current Symphony issue path.
+Re-evaluate when: duplicate diagnosis persists despite available handoffs, or
+retrieval overhead becomes material. Then: use the broader memory projection
+tracked by JOV-7966, retaining Linear/GBrain/source ownership. Local fixture tests
+prove prompt delivery and failure isolation; they do not certify live agent
+judgment, deployment, or recurrence.
+
 ## Context receipts
 
 The existing spawn preflight checks `context-manifest.json` before issue,
@@ -647,8 +801,10 @@ Remediation-sweep also files ordinary labeled issues (`remediation:pr-<n>-hold`,
 stuck-PR ladder runs by default (Tim 2026-10-12: every exhausted head needs an automatic exit)
 while `LANES_ESCALATION` is on; `LANES_ESCALATION_STUCK_PRS=0` turns it off. Terminal heads
 (exhausted, escalated, `queue-poison`) also get a no-model main sync each time main moves, with
-no clock; the sync lifts `queue-poison`, and that removal is the boundary the poison count
-restarts from. A bot hold whose head moved past it is lifted at once
+no clock, on every local worker pass rather than only an idle one. The sync lifts
+`queue-poison` and `lane-fix-exhausted`: the new head is ordinary re-entry, and a green
+observation of the same exhausted head does not clear it. Poison removal is the boundary
+the poison count restarts from. A bot hold whose head moved past it is lifted at once
 (`LANES_STALE_HOLD_UNHOLD=0` keeps alert-only). An oversize diff goes to a repair lane that
 splits it into a stack instead of bug intake.
 

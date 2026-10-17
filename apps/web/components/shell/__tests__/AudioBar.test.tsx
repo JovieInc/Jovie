@@ -119,6 +119,17 @@ describe('AudioBar', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('makes the hidden waveform inert, including during close motion', () => {
+    const { rerender } = render(
+      <AudioBar {...baseProps} waveformOn onSeek={() => {}} />
+    );
+    const slider = screen.getByRole('slider', { name: 'Seek Track Waveform' });
+    rerender(<AudioBar {...baseProps} waveformOn={false} onSeek={() => {}} />);
+    expect(slider.closest('[aria-hidden="true"]')).toHaveAttribute('inert');
+    rerender(<AudioBar {...baseProps} waveformOn onSeek={() => {}} />);
+    expect(slider.closest('[inert]')).toBeNull();
+  });
+
   it('shows the waveform drawer when expanded', () => {
     render(<AudioBar {...baseProps} waveformOn onSeek={() => {}} />);
     expect(

@@ -40,10 +40,27 @@ describe('production-blocked debug routes', () => {
       match => match[1]
     );
     expect(routes).toHaveLength(8);
-    expect(PRODUCT_SCREENSHOT_CAPTURE_PAGE_PATHS).toEqual([
-      '/exp/shell-v1',
-      ...routes,
-    ]);
+    for (const route of routes) {
+      expect(PRODUCT_SCREENSHOT_CAPTURE_PAGE_PATHS).toContain(route);
+    }
+
+    const registry = readFileSync(
+      new URL('../../../../lib/screenshots/registry.ts', import.meta.url),
+      'utf8'
+    );
+    const catalogPathnames = [
+      ...new Set(
+        [...registry.matchAll(/route:\s*'([^']+)'/g)].map(
+          match => new URL(match[1], 'http://localhost').pathname
+        )
+      ),
+    ].filter(
+      pathname => pathname.startsWith('/demo') || pathname.startsWith('/exp')
+    );
+    expect(catalogPathnames.length).toBeGreaterThan(routes.length);
+    for (const pathname of catalogPathnames) {
+      expect(PRODUCT_SCREENSHOT_CAPTURE_PAGE_PATHS).toContain(pathname);
+    }
   });
 
   it.each([
@@ -58,6 +75,7 @@ describe('production-blocked debug routes', () => {
     '/demo/dropdowns',
     '/demo/founder-video',
     '/demo/showcase/public-profile',
+    '/demo/showcase/release-landing',
     '/exp/shell-v1',
     '/ui/buttons',
     '/sandbox',
@@ -93,7 +111,7 @@ describe('production-blocked debug routes', () => {
     ).toBe(true);
     for (const route of [
       '/demo/other',
-      '/demo/showcase/public-profile',
+      '/demo/showcase/not-a-catalog-surface',
       '/demo/',
       '/demo%2faudience',
       '/%64emo/audience',

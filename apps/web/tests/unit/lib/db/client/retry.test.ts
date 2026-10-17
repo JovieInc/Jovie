@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@sentry/nextjs', () => ({
   getClient: vi.fn(() => undefined),
@@ -23,8 +23,8 @@ describe('isRetryableError', () => {
     expect(isRetryableError(new Error('connection reset by peer'))).toBe(true);
   });
 
-  it('returns true for timeout errors', () => {
-    expect(isRetryableError(new Error('timeout exceeded'))).toBe(true);
+  it('does not replay an uncanceled application timeout', () => {
+    expect(isRetryableError(new Error('timeout exceeded'))).toBe(false);
   });
 
   it('returns true for plain object errors with retryable message text', () => {
@@ -59,11 +59,22 @@ describe('isRetryableError', () => {
   });
 });
 
+const readPolicy = {
+  operation: 'read',
+  maxAttempts: 3,
+  retryBudgetMs: 5000,
+} as const;
+
 describe('withRetry', () => {
   beforeEach(() => {
+    vi.useFakeTimers();
     dbCircuitBreaker.reset();
     vi.mocked(Sentry.captureException).mockClear();
     vi.mocked(Sentry.addBreadcrumb).mockClear();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
   });
   it('returns result on first success', async () => {
     const result = await withRetry(() => Promise.resolve('ok'), 'test', 3);
@@ -78,7 +89,9 @@ describe('withRetry', () => {
       return 'recovered';
     });
 
-    const result = await withRetry(operation, 'test-retry', 3);
+    const pending = withRetry(operation, 'test-retry', readPolicy);
+    await vi.runAllTimersAsync();
+    const result = await pending;
     expect(result).toBe('recovered');
     expect(operation).toHaveBeenCalledTimes(3);
   });
@@ -115,9 +128,11 @@ describe('withRetry', () => {
       throw new Error('connection reset by peer');
     });
 
-    await expect(withRetry(operation, 'test-exhaust', 2)).rejects.toThrow(
-      'connection reset by peer'
-    );
+    const assertion = expect(
+      withRetry(operation, 'test-exhaust', { ...readPolicy, maxAttempts: 2 })
+    ).rejects.toThrow('connection reset by peer');
+    await vi.runAllTimersAsync();
+    await assertion;
     expect(operation).toHaveBeenCalledTimes(2);
   });
 
@@ -136,7 +151,9 @@ describe('withRetry', () => {
       return 'ok';
     });
 
-    const result = await withRetry(operation, 'test-breadcrumb', 3);
+    const pending = withRetry(operation, 'test-breadcrumb', readPolicy);
+    await vi.runAllTimersAsync();
+    const result = await pending;
     expect(result).toBe('ok');
 
     // Intermediate retryable failures: breadcrumb only, no Sentry exception
@@ -162,13 +179,150 @@ describe('withRetry', () => {
       throw new Error('connection reset by peer');
     });
 
-    await expect(
-      withRetry(operation, 'test-retryable-exhaust', 2)
+    const assertion = expect(
+      withRetry(operation, 'test-retryable-exhaust', {
+        ...readPolicy,
+        maxAttempts: 2,
+      })
     ).rejects.toThrow('connection reset by peer');
 
+    await vi.runAllTimersAsync();
+    await assertion;
     // Retryable errors should be breadcrumbs even on final failure —
     // circuit breaker handles the aggregate alert
     expect(Sentry.captureException).not.toHaveBeenCalled();
     expect(Sentry.addBreadcrumb).toHaveBeenCalled();
   });
+});
+
+describe('operation-aware retry safety', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    dbCircuitBreaker.reset();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it.each(['28P01', '22023', '23505', '42601', '57014', '40001', '40P01'])(
+    'does not let transport words override SQLSTATE %s',
+    async code => {
+      const error = new Error('Failed query: select network_timeout', {
+        cause: Object.assign(new Error('temporary connection timeout'), {
+          code,
+        }),
+      });
+      const operation = vi.fn().mockRejectedValue(error);
+      await expect(withRetry(operation, 'permanent', readPolicy)).rejects.toBe(
+        error
+      );
+      expect(operation).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('does not duplicate a write after commit acknowledgment is lost', async () => {
+    let committedWrites = 0;
+    const error = new Error('connection reset after commit');
+    const operation = vi.fn(async () => {
+      committedWrites++;
+      throw error;
+    });
+    const assertion = expect(
+      withRetry(operation, 'uncertain-write', 4)
+    ).rejects.toBe(error);
+    await vi.runAllTimersAsync();
+    await assertion;
+    expect(committedWrites).toBe(1);
+  });
+
+  it('allows one retry owner when read wrappers are nested', async () => {
+    const operation = vi.fn().mockRejectedValue(new Error('connection reset'));
+    const result = withRetry(
+      () => withRetry(operation, 'inner', readPolicy),
+      'outer',
+      readPolicy
+    );
+    const assertion = expect(result).rejects.toThrow('connection reset');
+    await vi.runAllTimersAsync();
+    await assertion;
+    expect(operation).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not multiply retries inside an unclassified outer operation', async () => {
+    const operation = vi.fn().mockRejectedValue(new Error('connection reset'));
+    await expect(
+      withRetry(() => withRetry(operation, 'inner', readPolicy), 'outer')
+    ).rejects.toThrow('connection reset');
+    expect(operation).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not admit another attempt after the retry budget expires', async () => {
+    const error = new Error('connection reset');
+    const operation = vi.fn(async () => {
+      await new Promise(resolve => setTimeout(resolve, 4900));
+      throw error;
+    });
+    const result = withRetry(operation, 'deadline', readPolicy);
+    const assertion = expect(result).rejects.toBe(error);
+    await vi.runAllTimersAsync();
+    await assertion;
+    expect(operation).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('checks the retry budget again after a delayed timer wakes', async () => {
+    vi.spyOn(performance, 'now')
+      .mockReturnValueOnce(0)
+      .mockReturnValueOnce(0)
+      .mockReturnValue(5000);
+    const operation = vi.fn().mockRejectedValue(new Error('connection reset'));
+    const assertion = expect(
+      withRetry(operation, 'oversleep', readPolicy)
+    ).rejects.toThrow('connection reset');
+    await vi.runAllTimersAsync();
+    await assertion;
+    expect(operation).toHaveBeenCalledTimes(1);
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: '[retry_budget_exhausted] connection reset',
+      })
+    );
+  });
+
+  it('keeps plain-object transport errors intact', async () => {
+    const error = { code: '08006', message: 'connection failure' };
+    const operation = vi.fn().mockRejectedValue(error);
+    const assertion = expect(
+      withRetry(operation, 'plain-error', {
+        ...readPolicy,
+        maxAttempts: 2,
+      })
+    ).rejects.toBe(error);
+    await vi.runAllTimersAsync();
+    await assertion;
+    expect(operation).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([0, -1, 1.5, Number.NaN])(
+    'rejects invalid attempt counts: %s',
+    async maxAttempts => {
+      const operation = vi.fn();
+      await expect(
+        withRetry(operation, 'invalid', { ...readPolicy, maxAttempts })
+      ).rejects.toBeInstanceOf(RangeError);
+      expect(operation).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])(
+    'rejects invalid retry budgets: %s',
+    async retryBudgetMs => {
+      const operation = vi.fn();
+      await expect(
+        withRetry(operation, 'invalid', { ...readPolicy, retryBudgetMs })
+      ).rejects.toBeInstanceOf(RangeError);
+      expect(operation).not.toHaveBeenCalled();
+    }
+  );
 });

@@ -108,12 +108,15 @@ const nextConfig = {
   // externalized, re-introduce the includes via a non-symlinked path
   // (e.g. `.npmrc` public-hoist-pattern or a post-build dereference
   // step) instead of pnpm virtual-store globs.
-  // Disable static generation to prevent Clerk context issues during build
   trailingSlash: false,
   // Build optimizations
   poweredByHeader: false,
   compress: true,
   // JOV-7985: Node.js is supported; enable after the dated migration exception clears.
+  // JOV-7987: Cache Components requires migrating route-segment exports and
+  // validating this entire app. Node.js is supported; the explicit `runtime`
+  // export is rejected in 16.4.1. Keep the rendering migration separate from
+  // the security upgrade; existing persistent Data Cache boundaries remain.
   images: {
     localPatterns: [
       {
