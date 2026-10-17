@@ -613,5 +613,3 @@ def project_backlog_admission(packet, *, now, canonical_state_path, _ordering_on
     return _observation(identifier, holds, {"issueUpdatedAt": issue.get("updatedAt"),
                         "priority": issue.get("priority"), "installedPath": installed,
                         "sourceHash": runtime.get("sourceHash"), "policyHash": runtime.get("policyHash")})
-
-
