@@ -455,9 +455,10 @@ export async function observeSentryHistory({ plan, now, sentry, facts }) {
         start: plan.start,
         end,
         per_page: '100',
+        // Environment parameters require every alias to exist in Sentry.
+        // A search list matches any alias without that pre-pagination exit.
+        query: 'environment:[vercel-production,production,prd]',
       });
-      for (const environment of ['vercel-production', 'production', 'prd'])
-        params.append('environment', environment);
       const cursors = new Set();
       for (let page = 0; page < MAX_PAGES; page += 1) {
         const response = await sentry(`${path}?${params}`);
