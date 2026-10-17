@@ -13,7 +13,13 @@ import {
   TooltipShortcut,
 } from '@jovie/ui';
 import { Download, Loader2 } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  type MouseEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { cn } from '@/lib/utils';
@@ -147,48 +153,56 @@ export function ExportCSVButton<T extends object>({
     }
   }, [disabled, getData, isExporting, showError]);
 
-  const handleConfirmExport = useCallback(async () => {
-    if (isExporting || disabled || !pendingData) return;
+  const handleConfirmExport = useCallback(
+    async (event: MouseEvent<HTMLButtonElement>) => {
+      // The controlled dialog owns closing after the authority check completes.
+      event.preventDefault();
+      if (isExporting || disabled || !pendingData) return;
 
-    setIsExporting(true);
-    const requestGeneration = generation.current;
+      setIsExporting(true);
+      const requestGeneration = generation.current;
 
-    try {
-      const data = revalidateBeforeDownload
-        ? await Promise.resolve(getData())
-        : pendingData;
-      if (generation.current !== requestGeneration) return;
-      if (!data || data.length === 0) {
-        showError('No data available to export');
-        return;
+      try {
+        const data = revalidateBeforeDownload
+          ? await Promise.resolve(getData())
+          : pendingData;
+        if (generation.current !== requestGeneration) return;
+        if (!data || data.length === 0) {
+          showError('No data available to export');
+          return;
+        }
+        const blob = toCSVBlob(data, { columns });
+        const timestampedFilename = generateTimestampedFilename(
+          filename,
+          'csv'
+        );
+
+        downloadCSVBlob(blob, timestampedFilename);
+        showSuccess(`Exported ${data.length} rows to ${timestampedFilename}`);
+
+        setIsDialogOpen(false);
+        setPendingData(null);
+      } catch (err) {
+        if (generation.current !== requestGeneration) return;
+        const message =
+          err instanceof Error ? err.message : 'Failed to export CSV';
+        showError(message);
+      } finally {
+        if (generation.current === requestGeneration) setIsExporting(false);
       }
-      const blob = toCSVBlob(data, { columns });
-      const timestampedFilename = generateTimestampedFilename(filename, 'csv');
-
-      downloadCSVBlob(blob, timestampedFilename);
-      showSuccess(`Exported ${data.length} rows to ${timestampedFilename}`);
-
-      setIsDialogOpen(false);
-      setPendingData(null);
-    } catch (err) {
-      if (generation.current !== requestGeneration) return;
-      const message =
-        err instanceof Error ? err.message : 'Failed to export CSV';
-      showError(message);
-    } finally {
-      if (generation.current === requestGeneration) setIsExporting(false);
-    }
-  }, [
-    columns,
-    getData,
-    revalidateBeforeDownload,
-    disabled,
-    filename,
-    isExporting,
-    pendingData,
-    showError,
-    showSuccess,
-  ]);
+    },
+    [
+      columns,
+      getData,
+      revalidateBeforeDownload,
+      disabled,
+      filename,
+      isExporting,
+      pendingData,
+      showError,
+      showSuccess,
+    ]
+  );
 
   const handleOpenChange = useCallback((open: boolean) => {
     setIsDialogOpen(open);
@@ -261,7 +275,12 @@ export function ExportCSVButton<T extends object>({
       )}
 
       <AlertDialog open={isDialogOpen} onOpenChange={handleOpenChange}>
-        <AlertDialogContent onCloseAutoFocus={handleCloseAutoFocus}>
+        <AlertDialogContent
+          onCloseAutoFocus={handleCloseAutoFocus}
+          onEscapeKeyDown={event => {
+            if (isExporting) event.preventDefault();
+          }}
+        >
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm CSV export</AlertDialogTitle>
             <AlertDialogDescription>
