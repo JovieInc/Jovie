@@ -15,14 +15,19 @@
  * it prints a warning and does not fail the run. Every other enqueue mismatch
  * fails. Removing the live mismatch without removing the exception also fails.
  *
- * REST writes, Octokit writes, and the other GraphQL mutations are a separate
- * catalog. They are not enforced here.
+ * REST writes, Octokit writes, and the other GraphQL mutations live in
+ * scripts/lib/workflow-token-scope-catalog.mjs and are installed below.
  */
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { load as loadYaml } from 'js-yaml';
+import {
+  augmentExtractedCalls,
+  installTokenScopeCatalog,
+  scopeExecutedSource,
+} from './lib/workflow-token-scope-catalog.mjs';
 
 const RANK = { read: 1, write: 2, admin: 3 };
 
@@ -55,6 +60,8 @@ export const GRAPHQL_MUTATIONS = callCatalog.graphql;
 export const ACKNOWLEDGED_MISMATCHES = callCatalog.acknowledgements;
 
 const enqueueCall = callCatalog.cliEnqueueKey;
+
+installTokenScopeCatalog(GRAPHQL_MUTATIONS, ACKNOWLEDGED_MISMATCHES);
 
 const SCRIPT_PATH =
   /(?:^|[\s'"`=(])(\.?\/?(?:[A-Za-z0-9_.-]+\/)*?(?:scripts|\.github\/scripts)\/[A-Za-z0-9_./-]+\.(?:mjs|js|cjs|sh))(?=$|[\s'"`);,&|])/g;
@@ -369,17 +376,19 @@ export function extractCalls(source, mode = 'js') {
   /** @type {FoundCall[]} */
   const calls = [];
   pushGraphqlStrings(masked, calls);
-  if (mode !== 'shell') return calls;
-  for (const command of splitShellCommands(masked)) {
-    if (!shellEnqueues(command)) continue;
-    const at = masked.indexOf(command);
-    calls.push({
-      call: enqueueCall,
-      index: at < 0 ? 0 : at,
-      kind: 'cli',
-      requirement: GRAPHQL_MUTATIONS[enqueueCall] ?? null,
-    });
+  if (mode === 'shell') {
+    for (const command of splitShellCommands(masked)) {
+      if (!shellEnqueues(command)) continue;
+      const at = masked.indexOf(command);
+      calls.push({
+        call: enqueueCall,
+        index: at < 0 ? 0 : at,
+        kind: 'cli',
+        requirement: GRAPHQL_MUTATIONS[enqueueCall] ?? null,
+      });
+    }
   }
+  augmentExtractedCalls(masked, mode, calls, GRAPHQL_MUTATIONS);
   return calls;
 }
 
@@ -746,7 +755,11 @@ export function scanWorkflowTokenScopes(root, options = {}) {
               const source = cache.get(abs) ?? readFileSync(abs, 'utf8');
               cache.set(abs, source);
               const scriptMode = script.endsWith('.sh') ? 'shell' : 'js';
-              record(source, script, token, scriptMode);
+              const scoped =
+                scriptMode === 'js'
+                  ? scopeExecutedSource(source, command)
+                  : source;
+              record(scoped, script, token, scriptMode);
             }
           }
         }
