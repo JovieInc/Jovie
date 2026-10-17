@@ -211,6 +211,7 @@ describe.skipIf(!target)(
     }
 
     it('pins actor/limits locally, blocks global helpers, cancels SQL, and reuses the connection', async () => {
+      const [session] = await client`SELECT pg_backend_pid() AS pid`;
       await runAtomicDbOperation(
         async tx => {
           const result = await tx.execute(
@@ -225,15 +226,23 @@ describe.skipIf(!target)(
         },
         { actorId, retry: 'never' }
       );
+      // A 50 ms deadline can expire during setup on Neon, before SQL runs.
+      // Leave room for network round trips and require server cancellation.
+      let sleepStarted = false;
       await expect(
         runAtomicDbOperation(
-          tx => tx.execute(drizzleSql`SELECT pg_sleep(0.2)`),
-          { actorId, retry: 'never', timeoutMs: 50 }
+          tx => {
+            sleepStarted = true;
+            return tx.execute(drizzleSql`SELECT pg_sleep(2)`);
+          },
+          { actorId, retry: 'never', timeoutMs: 1000 }
         )
-      ).rejects.toThrow();
+      ).rejects.toMatchObject({ cause: { code: '57014' } });
+      expect(sleepStarted).toBe(true);
       const [state] =
-        await client`SELECT current_setting('app.clerk_user_id',true) AS actor, current_setting('statement_timeout') AS deadline, 1 AS ok`;
+        await client`SELECT pg_backend_pid() AS pid, current_setting('app.clerk_user_id',true) AS actor, current_setting('statement_timeout') AS deadline, 1 AS ok`;
       expect(state).toMatchObject({
+        pid: session.pid,
         actor: '',
         deadline: sessionStatementTimeout,
         ok: 1,
