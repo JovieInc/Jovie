@@ -4,6 +4,15 @@ import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import {
+  compileDecisionResearch,
+  decisionResearchId,
+  decisionResearchLatestKey,
+  decisionResearchPacketKey,
+  decisionResearchPointerSchema,
+  decisionResearchRequestSchema,
+  pointerForDecisionResearch,
+} from '@/lib/ovie/decision-research';
+import {
   buildHumanServiceCaseBinding,
   buildHumanServiceOutcomeReceipt,
   evaluateHumanServiceRequest,
@@ -68,6 +77,74 @@ export async function POST(request: Request): Promise<NextResponse> {
   const humanServiceOutcome = humanServiceOutcomeRequestSchema.safeParse(
     body.data
   );
+  const decisionResearch = decisionResearchRequestSchema.safeParse(body.data);
+  if (decisionResearch.success) {
+    try {
+      const backend = postgresRecordBackend();
+      const researchId = decisionResearchId(decisionResearch.data);
+      const latestKey = decisionResearchLatestKey(researchId);
+      const priorRaw = await backend.get(latestKey);
+      const prior =
+        priorRaw === null
+          ? null
+          : decisionResearchPointerSchema.safeParse(priorRaw);
+      if (prior !== null && !prior.success) {
+        return json({ error: 'decision_research_history_invalid' }, 409);
+      }
+      const packet = compileDecisionResearch(
+        decisionResearch.data,
+        prior?.data ?? null
+      );
+      const packetKey = decisionResearchPacketKey(packet.packetId);
+      const stored = {
+        packet,
+        canonicalReceipt: packet.canonicalPrediction,
+      };
+      const packetCreated = await backend.setIfAbsent(packetKey, stored, 0);
+      const packetReadback = await backend.get(packetKey);
+      if (!isDeepStrictEqual(packetReadback, stored)) {
+        return json({ error: 'decision_research_packet_conflict' }, 409);
+      }
+
+      const pointer = pointerForDecisionResearch(packet);
+      let pointerUpdated = false;
+      if (priorRaw === null) {
+        pointerUpdated = await backend.setIfAbsent(latestKey, pointer, 0);
+      } else if (!isDeepStrictEqual(priorRaw, pointer)) {
+        pointerUpdated = await backend.compareAndSet(
+          latestKey,
+          priorRaw,
+          pointer,
+          0
+        );
+      }
+      const pointerReadback = await backend.get(latestKey);
+      if (!isDeepStrictEqual(pointerReadback, pointer)) {
+        return json({ error: 'decision_research_version_conflict' }, 409);
+      }
+
+      const cardResult = await submitSummerCard(packet.ovieCard);
+      if (cardResult.outcome === 'conflict') {
+        return json({ error: 'idempotency_key_conflict' }, 409);
+      }
+      const created =
+        packetCreated && pointerUpdated && cardResult.outcome === 'created';
+      return json(
+        {
+          outcome: packetCreated ? 'created' : 'replayed',
+          research: packet,
+          canonicalReceipt: packet.canonicalPrediction,
+          card: cardResult.card,
+        },
+        created ? 201 : 200
+      );
+    } catch (error) {
+      await captureError('Decision research receipt failed', error, {
+        route: ROUTE,
+      });
+      return json({ error: 'decision_research_unavailable' }, 503);
+    }
+  }
   if (humanServiceRequest.success) {
     try {
       const receipt = evaluateHumanServiceRequest(humanServiceRequest.data);

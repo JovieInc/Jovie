@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { decisionResearchRequestFixture } from '@/tests/fixtures/decision-research';
 import {
   humanServiceAcceptedReceiptFixture as humanServiceAcceptance,
   humanServiceOutcomeFixture as humanServiceOutcome,
@@ -10,6 +11,7 @@ const hoisted = vi.hoisted(() => ({
   submit: vi.fn(),
   getCard: vi.fn(),
   list: vi.fn(),
+  recordCompareAndSet: vi.fn(),
   recordGet: vi.fn(),
   recordSetIfAbsent: vi.fn(),
   captureError: vi.fn(),
@@ -29,6 +31,7 @@ vi.mock('@/lib/error-tracking', () => ({
 vi.mock('@/lib/ovie/mcp/postgres-backend', () => ({
   postgresRecordBackend: () => ({
     get: hoisted.recordGet,
+    compareAndSet: hoisted.recordCompareAndSet,
     setIfAbsent: hoisted.recordSetIfAbsent,
   }),
 }));
@@ -42,6 +45,12 @@ const {
   evaluateHumanServiceRequest,
 } = await import('@/lib/ovie/human-service-pilot');
 const { summerCardId } = await import('@/lib/ovie/summer-cards');
+const {
+  compileDecisionResearch,
+  decisionResearchLatestKey,
+  decisionResearchPacketKey,
+  pointerForDecisionResearch,
+} = await import('@/lib/ovie/decision-research');
 
 const URL_BASE = 'https://jov.ie/api/internal/ovie/summer-cards';
 
@@ -79,6 +88,8 @@ describe('POST /api/internal/ovie/summer-cards', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     hoisted.verify.mockResolvedValue(true);
+    hoisted.recordGet.mockResolvedValue(null);
+    hoisted.recordCompareAndSet.mockResolvedValue(true);
     hoisted.recordSetIfAbsent.mockResolvedValue(true);
   });
 
@@ -110,6 +121,86 @@ describe('POST /api/internal/ovie/summer-cards', () => {
     const response = await POST(post(input));
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ card });
+  });
+
+  it('persists and reads back a source-bound research packet before presenting its Ovie card', async () => {
+    const request = decisionResearchRequestFixture();
+    const expected = compileDecisionResearch(request);
+    const pointer = pointerForDecisionResearch(expected);
+    const stored = {
+      packet: expected,
+      canonicalReceipt: expected.canonicalPrediction,
+    };
+    const records = new Map<string, unknown>();
+    hoisted.recordGet.mockImplementation(async key => records.get(key) ?? null);
+    hoisted.recordSetIfAbsent.mockImplementation(async (key, value) => {
+      if (records.has(key)) return false;
+      records.set(key, value);
+      return true;
+    });
+    const researchCard = {
+      id: 'sc_0123456789abcdef0123456789abcdef',
+      ...expected.ovieCard,
+      status: 'pending',
+      comment: null,
+      createdAt: '2026-10-14T08:00:00.000Z',
+      decidedAt: null,
+    };
+    hoisted.submit.mockResolvedValue({
+      outcome: 'created',
+      card: researchCard,
+    });
+
+    const response = await POST(post(request));
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toMatchObject({
+      research: {
+        packetId: expected.packetId,
+        recommendation: 'hold',
+        commissioning: { status: 'pending' },
+      },
+      canonicalReceipt: {
+        predictionId: expected.canonicalPrediction.predictionId,
+      },
+      card: { kind: 'decision', recipient: 'activation-owner' },
+    });
+    expect(records.get(decisionResearchPacketKey(expected.packetId))).toEqual(
+      stored
+    );
+    expect(records.get(decisionResearchLatestKey(expected.researchId))).toEqual(
+      pointer
+    );
+    expect(hoisted.submit).toHaveBeenCalledWith(expected.ovieCard);
+  });
+
+  it('replays the same research identity without overwriting immutable history', async () => {
+    const request = decisionResearchRequestFixture();
+    const first = compileDecisionResearch(request);
+    const pointer = pointerForDecisionResearch(first);
+    const replay = compileDecisionResearch(request, pointer);
+    const stored = {
+      packet: replay,
+      canonicalReceipt: replay.canonicalPrediction,
+    };
+    const records = new Map<string, unknown>([
+      [decisionResearchLatestKey(replay.researchId), pointer],
+      [decisionResearchPacketKey(replay.packetId), stored],
+    ]);
+    hoisted.recordGet.mockImplementation(async key => records.get(key) ?? null);
+    hoisted.recordSetIfAbsent.mockImplementation(
+      async key => !records.has(key)
+    );
+    hoisted.submit.mockResolvedValue({ outcome: 'replayed', card });
+
+    const response = await POST(post(request));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      outcome: 'replayed',
+      research: { packetId: first.packetId, version: 1 },
+    });
+    expect(hoisted.recordCompareAndSet).not.toHaveBeenCalled();
   });
 
   it('routes a request to Tim and accepts only its decided card', async () => {
