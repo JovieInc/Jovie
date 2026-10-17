@@ -10441,6 +10441,117 @@ class RemediationEventRecoveryTest(unittest.TestCase):
             mock.start()
             self.addCleanup(mock.stop)
 
+    def priority_pair(self, first_priority, later_priority):
+        from scripts.tests.test_remediation import linear_issue
+        self.issue['priority'] = first_priority
+        later = linear_issue('JOV-2', 'later-ci-control', title='CI control')
+        later['priority'] = later_priority
+        lane.fetch_labeled_events.return_value = [self.issue, later]
+        states = {row['id']: {'id': 'todo-JOV', 'name': 'Todo'} for row in [self.issue, later]}
+        def gql(query, variables):
+            if query.startswith('query') and 'issue(' in query:
+                return {'issue': {'id': variables['id'], 'state': states[variables['id']],
+                                  'labels': {'nodes': []}}}
+            if query.startswith('mutation') and 'issueUpdate' in query:
+                states[variables['id']] = {'id': variables['s'], 'name': 'In Progress'}
+                return {'issueUpdate': {'success': True}}
+            return {}
+        self.linear = SimpleNamespace(gql=gql, comment=lambda *_: None)
+        return later
+
+    def test_labeled_claim_retains_priority_and_creation_time_without_inflation(self):
+        for index, value in enumerate([1, 2, 3, 4, 0, None, True, '1', 9]):
+            with self.subTest(priority=value):
+                root = Path(self.tmp.name) / str(index)
+                root.mkdir()
+                self.host = lane.Host(state=root, repo=root)
+                self.remote_state = {'id': 'todo-JOV', 'name': 'Todo'}
+                self.issue['priority'] = value
+                lane.claim_remediation_events(self.host, self.linear)
+                claimed = lane.claim_labeled_event(self.host, 'codex', self.linear)
+                self.assertIsNotNone(claimed)
+                expected = value if type(value) is int and 1 <= value <= 4 else 0
+                self.assertEqual(claimed.priority, expected)
+                self.assertEqual(claimed.created_at, self.issue['createdAt'])
+
+    def test_later_urgent_labeled_event_precedes_unclaimed_low(self):
+        later = self.priority_pair(4, 1)
+        lane.claim_remediation_events(self.host, self.linear)
+        claimed = lane.claim_labeled_event(self.host, 'codex', self.linear)
+        self.assertEqual(claimed.identifier, later['identifier'])
+        self.assertEqual(claimed.priority, 1)
+
+    def test_labeled_priority_change_is_consumed_after_persisted_restart_and_replay(self):
+        later = self.priority_pair(3, 4)
+        lane.claim_remediation_events(self.host, self.linear)
+        before = lane.load_escalation(self.host)
+        binding = lane._event_start_claim('later-ci-control', before['events']['later-ci-control'])
+        later['priority'] = 1
+        later['updatedAt'] = '2026-10-03T00:00:00Z'
+        self.host = lane.Host(state=self.host.state, repo=self.host.repo)
+        lane.claim_remediation_events(self.host, self.linear)
+        refreshed = lane.load_escalation(self.host)
+        self.assertEqual(lane._event_start_claim('later-ci-control', refreshed['events']['later-ci-control']), binding)
+        lane.claim_remediation_events(self.host, self.linear)
+        self.assertEqual(lane.load_escalation(self.host), refreshed)
+        claimed = lane.claim_labeled_event(self.host, 'codex', self.linear)
+        self.assertEqual(claimed.identifier, later['identifier'])
+        self.assertEqual(claimed.priority, 1)
+        active = lane.load_escalation(self.host)['events']['later-ci-control']
+        next_claim = lane.claim_labeled_event(self.host, 'codex', self.linear)
+        self.assertEqual(next_claim.identifier, self.issue['identifier'])
+        self.assertIsNone(lane.claim_labeled_event(self.host, 'codex', self.linear))
+        self.assertEqual(lane.load_escalation(self.host)['events']['later-ci-control'], active)
+
+    def test_urgent_labeled_event_does_not_override_an_existing_issue_owner(self):
+        later = self.priority_pair(4, 1)
+        lane.claim_remediation_events(self.host, self.linear)
+        self.assertTrue(lane.linear_sync.claim(self.host.state, later['id'], later['identifier'], 'grok'))
+        before = lane.load_escalation(self.host)['events']['later-ci-control']
+        claimed = lane.claim_labeled_event(self.host, 'codex', self.linear)
+        self.assertEqual(claimed.identifier, self.issue['identifier'])
+        self.assertEqual(lane.load_escalation(self.host)['events']['later-ci-control'], before)
+        self.assertEqual(lane.linear_sync.claim_status(self.host.state, later['id']), 'active')
+
+    def test_unclaimable_urgent_metadata_cannot_break_lower_eligible_selection(self):
+        later = self.priority_pair(4, 1)
+        lane.claim_remediation_events(self.host, self.linear)
+        self.assertTrue(lane.linear_sync.claim(self.host.state, later['id'], later['identifier'], 'grok'))
+        data = lane.load_escalation(self.host)
+        data['events']['later-ci-control']['labels'] = True
+        lane.save_escalation(self.host, data)
+        before = lane.load_escalation(self.host)['events']['later-ci-control']
+        claimed = lane.claim_labeled_event(self.host, 'codex', self.linear)
+        self.assertEqual(claimed.identifier, self.issue['identifier'])
+        self.assertEqual(lane.load_escalation(self.host)['events']['later-ci-control'], before)
+
+    def test_priority_does_not_revive_exhausted_labeled_attempts(self):
+        self.priority_pair(4, 1)
+        lane.claim_remediation_events(self.host, self.linear)
+        data = lane.load_escalation(self.host)
+        data['events']['later-ci-control']['status'] = 'exhausted'
+        lane.save_escalation(self.host, data)
+        before = lane.load_escalation(self.host)['events']['later-ci-control']
+        claimed = lane.claim_labeled_event(self.host, 'codex', self.linear)
+        self.assertEqual(claimed.identifier, self.issue['identifier'])
+        self.assertEqual(lane.load_escalation(self.host)['events']['later-ci-control'], before)
+
+    def test_failed_urgent_start_readback_remains_held_before_lower_eligible_claim(self):
+        later = self.priority_pair(4, 1)
+        lane.claim_remediation_events(self.host, self.linear)
+        original = self.linear.gql
+        def unreadable(query, variables):
+            if query.startswith('query') and variables.get('id') == later['id']:
+                return {'issue': None}
+            return original(query, variables)
+        self.linear.gql = unreadable
+        claimed = lane.claim_labeled_event(self.host, 'codex', self.linear)
+        self.assertEqual(claimed.identifier, self.issue['identifier'])
+        held = lane.load_escalation(self.host)['events']['later-ci-control']
+        self.assertFalse(held.get('running', False))
+        self.assertEqual(held['startDelivery']['error'], 'event-start-readback-unreadable')
+        self.assertNotEqual(lane.linear_sync.claim_status(self.host.state, later['id']), 'active')
+
     def test_ordinary_claim_blocks_labeled_generation_before_remote_start(self):
         lane.claim_remediation_events(self.host, self.linear)
         self.assertTrue(lane.linear_sync.claim(self.host.state, self.issue['id'], 'JOV-1', 'grok'))

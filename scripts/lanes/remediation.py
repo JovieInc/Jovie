@@ -35,7 +35,7 @@ LABEL_PREFIX = "remediation:"
 LABELED_EVENT_QUERY = (
     'query($after:String){issues(first:100,after:$after,filter:{team:{key:{in:["JOV","LYB"]}},'
     'labels:{name:{startsWith:"remediation:"}}}){pageInfo{hasNextPage endCursor} nodes{id identifier title description '
-    'url createdAt updatedAt state{name type} team{key states{nodes{id name type}}} '
+    'url createdAt updatedAt priority state{name type} team{key states{nodes{id name type}}} '
     'labels{nodes{id name}}}}}'
 )
 EVENT_INVENTORY_PAGES = 20
@@ -1346,6 +1346,8 @@ def _absorb_event(row: dict, issue: dict, fingerprint: str) -> None:
     row["team"] = (issue.get("team") or {}).get("key")
     row["title"] = issue.get("title") or ""
     row["description"] = issue.get("description") or ""
+    row["priority"] = issue.get("priority")
+    row["createdAt"] = issue.get("createdAt")
     row["labels"] = [node.get("name") if isinstance(node, dict) else str(node) for node in _label_nodes(issue)]
     todo, started = _state_id(issue, "Todo"), _state_id(issue, "In Progress")
     if todo:
