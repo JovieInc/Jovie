@@ -7014,8 +7014,10 @@ class UpdateTest(unittest.TestCase):
             with patch.object(lane.worktree_pool, "ready_slots", return_value=[slot]), \
                     patch.object(lane.worktree_pool, "pool_dir", return_value=slot.parent), \
                     patch.object(lane.worktree_pool, "node_env", return_value={"PATH": os.defpath}), \
-                    patch.object(lane.lifecycle, "run", side_effect=replies) as run:
+                    patch.object(lane.lifecycle, "run", side_effect=replies) as run, \
+                    patch.object(lane, "reap_selftest_processes", return_value=0) as cleanup_reaper:
                 self.assertIsNone(lane.prove_staging(host, staging))
+            cleanup_reaper.assert_called_once()
             self.assertEqual([call.args[0][-1] for call in run.call_args_list[:2]],
                              [str(host.repo), str(slot)])
             self.assertEqual(run.call_args_list[2].args[0][1:4], ["-m", "unittest", "-q"])
@@ -7043,8 +7045,10 @@ class UpdateTest(unittest.TestCase):
             with patch.object(lane.worktree_pool, "ready_slots", return_value=[slot]), \
                     patch.object(lane.worktree_pool, "pool_dir", return_value=slot.parent), \
                     patch.object(lane.worktree_pool, "node_env", return_value={"PATH": os.defpath}), \
-                    patch.object(lane.lifecycle, "run", side_effect=run):
+                    patch.object(lane.lifecycle, "run", side_effect=run), \
+                    patch.object(lane, "reap_selftest_processes", return_value=0) as cleanup_reaper:
                 self.assertIsNone(lane.prove_staging(host, staging))
+            cleanup_reaper.assert_called_once()
             self.assertEqual(len(calls), 2)
             with lane.worktree_pool.slot_lease(slot) as owned:
                 self.assertTrue(owned, "compilation releases the pool lease")
@@ -7235,8 +7239,29 @@ with patch.object(shipping_origin, "collect", return_value=result) as collect:
                 for rel in ["apps/desktop/node_modules", "packages/agent-transport-contracts/node_modules"]:
                     (clone / rel).parent.mkdir(parents=True, exist_ok=True)
                     (clone / rel).symlink_to((ROOT / rel).resolve(), target_is_directory=True)
-                with patch.object(lane.time, "time", return_value=refused["at"] + lane.UPDATE_RETRY_S + 1):
+                # Run the real staged installer/selector, but keep this private
+                # installation fixture out of the persistent host's /proc census.
+                # Dedicated cleanup tests exercise actual process custody below.
+                real_run, private_proofs = lane.lifecycle.run, []
+                driver = (
+                    "import sys; from pathlib import Path; from unittest.mock import patch\n"
+                    "sys.path.insert(0, str(Path(sys.argv[1]).parent))\n"
+                    "import lane_runner\n"
+                    "assert Path(lane_runner.__file__).resolve() == Path(sys.argv[1]).resolve()\n"
+                    "with patch.object(lane_runner, 'reap_selftest_processes', return_value=0):\n"
+                    "    sys.exit(lane_runner.main(sys.argv[2:]))\n"
+                )
+
+                def private_proof(argv, *args, **kwargs):
+                    if len(argv) > 2 and argv[2] == "prove-staging":
+                        private_proofs.append(argv)
+                        argv = [argv[0], "-c", driver, *argv[1:]]
+                    return real_run(argv, *args, **kwargs)
+
+                with patch.object(lane.time, "time", return_value=refused["at"] + lane.UPDATE_RETRY_S + 1), \
+                        patch.object(lane.lifecycle, "run", side_effect=private_proof):
                     self.assertEqual(lane.update(host), 0)
+                self.assertEqual(len(private_proofs), 1)
                 current = (host.state / "current").resolve()
                 self.assertTrue((current / "lane_runner.py").exists())
                 self.assertTrue((current.parent / "promotion-loss-metrics.mjs").exists())  # HUD PROMOTION line
@@ -10627,8 +10652,11 @@ class OperatorInstallerGlueTest(unittest.TestCase):
                    subprocess.CompletedProcess([], 1, stdout="", stderr=stderr)]
         with patch.object(lane, "mesh_dependency_roots", return_value=[self.host.repo]), \
                 patch.object(lane.worktree_pool, "node_env", return_value={"PATH": os.defpath}), \
-                patch.object(lane.lifecycle, "run", side_effect=replies) as run, contextlib.redirect_stderr(io.StringIO()) as console:
+                patch.object(lane.lifecycle, "run", side_effect=replies) as run, \
+                patch.object(lane, "reap_selftest_processes", return_value=0) as cleanup_reaper, \
+                contextlib.redirect_stderr(io.StringIO()) as console:
             self.assertEqual(lane.prove_staging(self.host, stage), "release tests failed")
+        self.assertEqual(cleanup_reaper.call_count, 2)
         self.assertEqual(run.call_args_list[1].args[0], [sys.executable, "-m", "unittest", "-q", *lane.LANE_TESTS])
         self.assertEqual(run.call_args_list[2].args[0],
                          [sys.executable, "-m", "unittest", "-q", "scripts.tests.test_fixture.Example.test_bound"])
@@ -10651,8 +10679,11 @@ class OperatorInstallerGlueTest(unittest.TestCase):
                    subprocess.CompletedProcess([], 0, stdout="", stderr="")]
         with patch.object(lane, "mesh_dependency_roots", return_value=[self.host.repo]), \
                 patch.object(lane.worktree_pool, "node_env", return_value={"PATH": os.defpath}), \
-                patch.object(lane.lifecycle, "run", side_effect=replies) as run, contextlib.redirect_stderr(io.StringIO()):
+                patch.object(lane.lifecycle, "run", side_effect=replies) as run, \
+                patch.object(lane, "reap_selftest_processes", return_value=0) as cleanup_reaper, \
+                contextlib.redirect_stderr(io.StringIO()):
             self.assertIsNone(lane.prove_staging(self.host, stage))
+        self.assertEqual(cleanup_reaper.call_count, 2)
         retry = run.call_args_list[2]
         self.assertEqual(retry.args[0], [sys.executable, "-m", "unittest", "-q", "scripts.tests.test_hud.LedgerSchemaTest.test_ledger"])
         self.assertEqual(retry.kwargs["cwd"], stage)
