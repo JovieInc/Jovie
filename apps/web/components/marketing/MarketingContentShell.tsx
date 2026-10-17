@@ -5,6 +5,8 @@ import { MarketingContainer } from './MarketingContainer';
 export interface MarketingContentShellProps {
   readonly className?: string;
   readonly children: React.ReactNode;
+  /** Directories retain the public grid; reading surfaces use prose. */
+  readonly width?: 'page' | 'prose';
 }
 
 /**
@@ -16,17 +18,20 @@ export interface MarketingContentShellProps {
 export function MarketingContentShell({
   className,
   children,
+  width = 'prose',
 }: MarketingContentShellProps) {
   return (
     <div
-      className='py-16 sm:py-20 lg:py-24'
+      className='bg-base py-16 text-primary-token sm:py-20 lg:py-24'
+      data-public-content-shell
+      data-public-content-width={width}
       data-pen-contract={MARKETING_PEN_CONTRACT_IDS.shell.prose}
     >
-      <MarketingContainer width='prose'>
+      <MarketingContainer width={width}>
         <div
           className={cn(
             'marketing-body',
-            'text-(--linear-text-secondary)',
+            'min-w-0 text-secondary-token',
             className
           )}
         >

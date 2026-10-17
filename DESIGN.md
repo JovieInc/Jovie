@@ -158,13 +158,13 @@ unless linked below.
 | `contrast (computed pairs)` | `error` | S + G | Yes | No count baseline; 4.5:1 normal text, 3:1 large text/UI |
 | `contrast (raw colors)` | `error` | S | Yes | arbitraryHex=0; bareBgBlack=0; bareBgWhite=0; bareTextBlack=0; bareTextWhite=0 |
 | `deprecated-button-alias` | `error` | G | Yes | 91 |
-| `linear-namespace` | `error` | G + I | Yes | 853 |
+| `linear-namespace` | `error` | G + I | Yes | 852 |
 | `shadcn/no-restyle` | `error` | L + G | Yes | 221 files; 3122 messages (grandfathered) |
 | `source-identity` | `error` | I | Yes | 2611 |
-| `spacing-scale (conservative)` | `error` | S + G | Yes | 654; armed=true; marketing=86; packages/ui=11; web-other=304; web-shell=253 |
+| `spacing-scale (conservative)` | `error` | S + G | Yes | 653; armed=true; marketing=86; packages/ui=11; web-other=303; web-shell=253 |
 | `spacing-scale (strict)` | `warn` | S + G | No | 2310; armed=false; marketing=258; packages/ui=60; web-other=1126; web-shell=866 |
 | `touch-target` | `error` | D | Yes | 159 |
-| `ui-feel ratchet` | `error` | D | Yes | headingNeedsBalance=319; missingTabularNums=81; nonConcentricRadius=0; undersizedHitArea=74 |
+| `ui-feel ratchet` | `error` | D | Yes | headingNeedsBalance=316; missingTabularNums=81; nonConcentricRadius=0; undersizedHitArea=74 |
 
 The [raw-color baseline](apps/web/contrast-ratchet.baseline.json) and
 [computed pair config](apps/web/contrast-pairs.config.json) cover separate

@@ -16,11 +16,11 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import {
-  MarketingContainer,
   MarketingEditorialHeroPhoto,
   MarketingHero,
 } from '@/components/marketing';
 import { ChangelogTimeline } from '@/components/marketing/changelog/ChangelogTimeline';
+import { MarketingContentShell } from '@/components/marketing/MarketingContentShell';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import {
@@ -255,7 +255,7 @@ export default async function ChangelogReleasePage({
         </MarketingHero>
       </div>
 
-      <MarketingContainer width='page' className='pb-20 sm:pb-28'>
+      <MarketingContentShell>
         <div className='border-t border-subtle pt-14'>
           <ChangelogTimeline releases={[release]} showEntryHeader={false} />
         </div>
@@ -268,7 +268,7 @@ export default async function ChangelogReleasePage({
             {/* ui-casing-allow: founder-locked pen copy (iekBP) */}
             Resources for this release
           </h2>
-          <ul className='mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-4'>
+          <ul className='mt-5 grid gap-5 sm:grid-cols-2'>
             {RESOURCE_LINKS.map(resource => (
               <li key={resource.href}>
                 <Link
@@ -369,7 +369,7 @@ export default async function ChangelogReleasePage({
             )}
           </div>
         </nav>
-      </MarketingContainer>
+      </MarketingContentShell>
     </section>
   );
 }
