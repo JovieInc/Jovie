@@ -219,6 +219,11 @@ describe('product-evidence contract (JOV-6917)', () => {
     }
   );
 
+  it('keeps instant merch on the shell composition root', () => {
+    const { container } = render(<InstantMerchLanding />);
+    expect(container.querySelectorAll('main')).toHaveLength(0);
+  });
+
   it('binds Smart Links to its outer section jobs without counting hero media as another section', () => {
     const entry = MARKETING_ROUTE_MANIFEST.find(
       route => route.url === '/smart-links'

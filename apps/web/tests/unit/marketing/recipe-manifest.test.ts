@@ -1587,12 +1587,14 @@ describe('current acquisition source inventory (JOV-4065)', () => {
       'how-it-works',
       'feature-grid',
       'cta',
+      'capture',
     ]);
     expect(bindings.map(binding => binding.componentPath)).toEqual([
       'apps/web/components/marketing/MarketingHero.tsx',
       ...Array(3).fill(
         'apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.tsx'
       ),
+      'apps/web/app/(marketing)/changelog/ChangelogEmailSignup.tsx',
     ]);
     expect(entry.bindingEvidence.status).toBe('verified');
     expect(bindings.map(binding => binding.variantId)).toEqual([
@@ -1600,6 +1602,7 @@ describe('current acquisition source inventory (JOV-4065)', () => {
       '3-step-strip',
       'two-column-text',
       'included-single',
+      'email-only',
     ]);
   });
 });
