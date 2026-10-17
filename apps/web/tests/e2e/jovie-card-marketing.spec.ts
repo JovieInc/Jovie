@@ -54,10 +54,12 @@ test.describe('Jovie Card marketing page', () => {
       await page.evaluate(() => document.fonts.ready);
       await page.screenshot({
         path: testInfo.outputPath(`card-${viewport.name}-viewport.png`),
+        caret: 'initial',
       });
       await page.screenshot({
         path: testInfo.outputPath(`card-${viewport.name}-full.png`),
         fullPage: true,
+        caret: 'initial',
       });
       await page.waitForFunction(() => {
         const trigger = document.querySelector(
