@@ -9,15 +9,18 @@ import {
   type ActionErrorCode,
   type ActionReceipt,
   actionInvocationSchema,
+  createToolRouteReceipt,
   FLEET_ACTION_IDS,
   FLEET_SCOPES,
   type FleetActionId,
+  finishToolRouteReceipt,
   fleetAuthoritySchema,
   fleetHistoryEntrySchema,
   fleetMissionSchema,
   fleetRequestSchema,
   fleetWorkerSchema,
   getActionDescriptor,
+  OBSERVE_TOOL_ROUTE_POLICY,
 } from '@jovie/action-contracts';
 import { z } from 'zod';
 import {
@@ -596,17 +599,76 @@ export class FleetDispatcher {
   private receipt(
     id: FleetActionId,
     channel: ActionChannel,
-    requestId: string
+    requestId: string,
+    transport: 'internal' | 'rest'
   ): ActionReceipt {
+    const executionId = randomUUID();
+    const startedAt = iso(this.now());
     return {
-      executionId: randomUUID(),
+      executionId,
       requestId,
       actionId: id,
       schemaVersion: 1,
       channel,
       status: 'completed',
-      startedAt: iso(this.now()),
-      completedAt: iso(this.now()),
+      startedAt,
+      completedAt: startedAt,
+      route: createToolRouteReceipt({
+        schema: 'jovie.tool-route-receipt/v1',
+        runRef: `sha256:${digest(executionId)}`,
+        workflowId: id,
+        requestedRuntime: 'unknown',
+        actualRuntime: 'jovie-server',
+        requestedTransport:
+          channel === 'mcp' ? 'mcp' : channel === 'cli' ? 'cli' : null,
+        policy: OBSERVE_TOOL_ROUTE_POLICY,
+        catalogVersion: 'canonical-actions.v1',
+        schemaPayloadBytes: Buffer.byteLength(
+          JSON.stringify(z.toJSONSchema(getActionDescriptor(id).inputSchema))
+        ),
+        startedAt,
+        completedAt: startedAt,
+        status: 'in_progress',
+        idempotencyKeyRef: `sha256:${digest(requestId)}`,
+        verifierReceiptRef: `sha256:${digest(executionId)}`,
+        // REST ingress cannot attest any upstream MCP/CLI or child routes.
+        observationComplete: false,
+        isolation: 'none',
+        events: [
+          {
+            boundary: 'adapter',
+            transport,
+            toolId: id,
+            executable: null,
+            destinationHost: null,
+            credentialClass: 'unknown',
+          },
+        ],
+      }),
+    };
+  }
+  private finishReceipt(
+    receipt: ActionReceipt,
+    status: ActionReceipt['status']
+  ): ActionReceipt {
+    const completedAt = iso(this.now());
+    return {
+      ...receipt,
+      status,
+      completedAt,
+      ...(receipt.route
+        ? {
+            route: finishToolRouteReceipt(
+              receipt.route,
+              status === 'completed'
+                ? 'succeeded'
+                : status === 'in_progress'
+                  ? 'in_progress'
+                  : 'failed',
+              completedAt
+            ),
+          }
+        : {}),
     };
   }
   /** Internal control is only called after the existing founder session gate.
@@ -943,14 +1005,15 @@ export class FleetDispatcher {
   async invoke(
     id: FleetActionId,
     raw: unknown,
-    token: string | undefined
+    token: string | undefined,
+    transport: 'internal' | 'rest' = 'internal'
   ): Promise<FleetResult> {
     const descriptor = getActionDescriptor(id),
       parsed = actionInvocationSchema(descriptor.inputSchema).safeParse(raw);
-    const fallback = this.receipt(id, 'cli', randomUUID());
+    const fallback = this.receipt(id, 'cli', randomUUID(), transport);
     const fail = (error: unknown, receipt = fallback): FleetResult => ({
       status: 'unavailable',
-      receipt: { ...receipt, status: 'unavailable' },
+      receipt: this.finishReceipt(receipt, 'unavailable'),
       error: {
         code:
           error instanceof FleetError || error instanceof FleetSummerError
@@ -963,7 +1026,12 @@ export class FleetDispatcher {
     if (!parsed.success) return fail(new FleetError('VALIDATION_FAILED'));
     const envelope = parsed.data,
       { profileId, channel } = envelope.context;
-    const receipt = this.receipt(id, channel, envelope.idempotencyKey);
+    const receipt = this.receipt(
+      id,
+      channel,
+      envelope.idempotencyKey,
+      transport
+    );
     if (!this.deps.enabled)
       return fail(new FleetError('FEATURE_DISABLED'), receipt);
     if (
@@ -1395,7 +1463,7 @@ export class FleetDispatcher {
                   throw new FleetError('CONFLICT');
                 const waiting: FleetResult = {
                   status: 'in_progress',
-                  receipt: { ...receipt, status: 'in_progress' },
+                  receipt: this.finishReceipt(receipt, 'in_progress'),
                   retryAfterMs: OPERATION_RETRY_MS,
                 };
                 s.invocations[invocationId] = { hash, result: waiting };
@@ -1434,7 +1502,7 @@ export class FleetDispatcher {
               s.pendingDefects[fingerprint] = operation;
               const waiting: FleetResult = {
                 status: 'in_progress',
-                receipt: { ...operation.receipt, status: 'in_progress' },
+                receipt: this.finishReceipt(operation.receipt, 'in_progress'),
                 retryAfterMs: OPERATION_RETRY_MS,
               };
               // Bind worker/action/key to the exact canonical payload before effects.
@@ -1443,7 +1511,11 @@ export class FleetDispatcher {
             }
           }
         }
-        const complete: FleetResult = { status: 'completed', receipt, data };
+        const complete: FleetResult = {
+          status: 'completed',
+          receipt: this.finishReceipt(receipt, 'completed'),
+          data,
+        };
         // Store cloned data: later lease transitions must not mutate old receipts.
         s.invocations[invocationId] =
           id === 'fleet.status' || id === 'fleet.directory'
@@ -1550,7 +1622,7 @@ export class FleetDispatcher {
           throw new FleetError('CONFLICT');
         const complete: FleetResult = {
           status: 'completed',
-          receipt: op.receipt,
+          receipt: this.finishReceipt(op.receipt, 'completed'),
           data: { ...resolved },
         };
         // Linear display metadata can change. Keep the immutable dedupe binding

@@ -83,6 +83,288 @@
                 "entityId"
               ],
               "additionalProperties": false
+            },
+            "route": {
+              "type": "object",
+              "properties": {
+                "schema": {
+                  "type": "string",
+                  "const": "jovie.tool-route-receipt/v1"
+                },
+                "runRef": {
+                  "type": "string",
+                  "pattern": "^sha256:[a-f0-9]{64}$"
+                },
+                "workflowId": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_.-]{0,95}$"
+                },
+                "requestedRuntime": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_.-]{0,95}$"
+                },
+                "actualRuntime": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_.-]{0,95}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "requestedTransport": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "builtin",
+                        "cli",
+                        "direct_http",
+                        "internal",
+                        "mcp",
+                        "rest",
+                        "shell"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "policy": {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "controlled_benchmark",
+                        "observe",
+                        "policy_bound"
+                      ]
+                    },
+                    "allowedTransports": {
+                      "maxItems": 7,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "builtin",
+                          "cli",
+                          "direct_http",
+                          "internal",
+                          "mcp",
+                          "rest",
+                          "shell"
+                        ]
+                      }
+                    },
+                    "allowedTools": {
+                      "maxItems": 128,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9_.-]{0,95}$"
+                      }
+                    },
+                    "requireRouteAttestation": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "allowedTransports",
+                    "allowedTools",
+                    "requireRouteAttestation"
+                  ],
+                  "additionalProperties": false
+                },
+                "catalogVersion": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_.-]{0,95}$"
+                },
+                "schemaPayloadBytes": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "startedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                },
+                "completedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "blocked",
+                    "dry_run",
+                    "failed",
+                    "in_progress",
+                    "succeeded"
+                  ]
+                },
+                "idempotencyKeyRef": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^sha256:[a-f0-9]{64}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "verifierReceiptRef": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^sha256:[a-f0-9]{64}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "observationComplete": {
+                  "type": "boolean"
+                },
+                "isolation": {
+                  "type": "string",
+                  "enum": [
+                    "capability",
+                    "none"
+                  ]
+                },
+                "events": {
+                  "maxItems": 128,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "boundary": {
+                        "type": "string",
+                        "enum": [
+                          "adapter",
+                          "sandbox",
+                          "subprocess"
+                        ]
+                      },
+                      "transport": {
+                        "type": "string",
+                        "enum": [
+                          "builtin",
+                          "cli",
+                          "direct_http",
+                          "internal",
+                          "mcp",
+                          "rest",
+                          "shell"
+                        ]
+                      },
+                      "toolId": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9_.-]{0,95}$"
+                      },
+                      "executable": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "claude",
+                              "codex",
+                              "ruflo",
+                              "unrecognized"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "destinationHost": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "credentialClass": {
+                        "type": "string",
+                        "enum": [
+                          "inherited",
+                          "none",
+                          "scoped",
+                          "unknown"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "boundary",
+                      "transport",
+                      "toolId",
+                      "executable",
+                      "destinationHost",
+                      "credentialClass"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "mixedRoute": {
+                  "type": "boolean"
+                },
+                "unknownRoute": {
+                  "type": "boolean"
+                },
+                "bypassDetected": {
+                  "type": "boolean"
+                },
+                "policyDecision": {
+                  "type": "string",
+                  "enum": [
+                    "allow",
+                    "deny",
+                    "report_only"
+                  ]
+                },
+                "benchmarkEligible": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "schema",
+                "runRef",
+                "workflowId",
+                "requestedRuntime",
+                "actualRuntime",
+                "requestedTransport",
+                "policy",
+                "catalogVersion",
+                "schemaPayloadBytes",
+                "startedAt",
+                "completedAt",
+                "status",
+                "idempotencyKeyRef",
+                "verifierReceiptRef",
+                "observationComplete",
+                "isolation",
+                "events",
+                "mixedRoute",
+                "unknownRoute",
+                "bypassDetected",
+                "policyDecision",
+                "benchmarkEligible"
+              ],
+              "additionalProperties": false
             }
           },
           "required": [
@@ -297,6 +579,288 @@
                 "entityId"
               ],
               "additionalProperties": false
+            },
+            "route": {
+              "type": "object",
+              "properties": {
+                "schema": {
+                  "type": "string",
+                  "const": "jovie.tool-route-receipt/v1"
+                },
+                "runRef": {
+                  "type": "string",
+                  "pattern": "^sha256:[a-f0-9]{64}$"
+                },
+                "workflowId": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_.-]{0,95}$"
+                },
+                "requestedRuntime": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_.-]{0,95}$"
+                },
+                "actualRuntime": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_.-]{0,95}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "requestedTransport": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "builtin",
+                        "cli",
+                        "direct_http",
+                        "internal",
+                        "mcp",
+                        "rest",
+                        "shell"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "policy": {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "controlled_benchmark",
+                        "observe",
+                        "policy_bound"
+                      ]
+                    },
+                    "allowedTransports": {
+                      "maxItems": 7,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "builtin",
+                          "cli",
+                          "direct_http",
+                          "internal",
+                          "mcp",
+                          "rest",
+                          "shell"
+                        ]
+                      }
+                    },
+                    "allowedTools": {
+                      "maxItems": 128,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9_.-]{0,95}$"
+                      }
+                    },
+                    "requireRouteAttestation": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "allowedTransports",
+                    "allowedTools",
+                    "requireRouteAttestation"
+                  ],
+                  "additionalProperties": false
+                },
+                "catalogVersion": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_.-]{0,95}$"
+                },
+                "schemaPayloadBytes": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "startedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                },
+                "completedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "blocked",
+                    "dry_run",
+                    "failed",
+                    "in_progress",
+                    "succeeded"
+                  ]
+                },
+                "idempotencyKeyRef": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^sha256:[a-f0-9]{64}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "verifierReceiptRef": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^sha256:[a-f0-9]{64}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "observationComplete": {
+                  "type": "boolean"
+                },
+                "isolation": {
+                  "type": "string",
+                  "enum": [
+                    "capability",
+                    "none"
+                  ]
+                },
+                "events": {
+                  "maxItems": 128,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "boundary": {
+                        "type": "string",
+                        "enum": [
+                          "adapter",
+                          "sandbox",
+                          "subprocess"
+                        ]
+                      },
+                      "transport": {
+                        "type": "string",
+                        "enum": [
+                          "builtin",
+                          "cli",
+                          "direct_http",
+                          "internal",
+                          "mcp",
+                          "rest",
+                          "shell"
+                        ]
+                      },
+                      "toolId": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9_.-]{0,95}$"
+                      },
+                      "executable": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "claude",
+                              "codex",
+                              "ruflo",
+                              "unrecognized"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "destinationHost": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "credentialClass": {
+                        "type": "string",
+                        "enum": [
+                          "inherited",
+                          "none",
+                          "scoped",
+                          "unknown"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "boundary",
+                      "transport",
+                      "toolId",
+                      "executable",
+                      "destinationHost",
+                      "credentialClass"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "mixedRoute": {
+                  "type": "boolean"
+                },
+                "unknownRoute": {
+                  "type": "boolean"
+                },
+                "bypassDetected": {
+                  "type": "boolean"
+                },
+                "policyDecision": {
+                  "type": "string",
+                  "enum": [
+                    "allow",
+                    "deny",
+                    "report_only"
+                  ]
+                },
+                "benchmarkEligible": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "schema",
+                "runRef",
+                "workflowId",
+                "requestedRuntime",
+                "actualRuntime",
+                "requestedTransport",
+                "policy",
+                "catalogVersion",
+                "schemaPayloadBytes",
+                "startedAt",
+                "completedAt",
+                "status",
+                "idempotencyKeyRef",
+                "verifierReceiptRef",
+                "observationComplete",
+                "isolation",
+                "events",
+                "mixedRoute",
+                "unknownRoute",
+                "bypassDetected",
+                "policyDecision",
+                "benchmarkEligible"
+              ],
+              "additionalProperties": false
             }
           },
           "required": [
@@ -416,6 +980,288 @@
                 "entityId"
               ],
               "additionalProperties": false
+            },
+            "route": {
+              "type": "object",
+              "properties": {
+                "schema": {
+                  "type": "string",
+                  "const": "jovie.tool-route-receipt/v1"
+                },
+                "runRef": {
+                  "type": "string",
+                  "pattern": "^sha256:[a-f0-9]{64}$"
+                },
+                "workflowId": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_.-]{0,95}$"
+                },
+                "requestedRuntime": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_.-]{0,95}$"
+                },
+                "actualRuntime": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_.-]{0,95}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "requestedTransport": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "builtin",
+                        "cli",
+                        "direct_http",
+                        "internal",
+                        "mcp",
+                        "rest",
+                        "shell"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "policy": {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "controlled_benchmark",
+                        "observe",
+                        "policy_bound"
+                      ]
+                    },
+                    "allowedTransports": {
+                      "maxItems": 7,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "builtin",
+                          "cli",
+                          "direct_http",
+                          "internal",
+                          "mcp",
+                          "rest",
+                          "shell"
+                        ]
+                      }
+                    },
+                    "allowedTools": {
+                      "maxItems": 128,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9_.-]{0,95}$"
+                      }
+                    },
+                    "requireRouteAttestation": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "allowedTransports",
+                    "allowedTools",
+                    "requireRouteAttestation"
+                  ],
+                  "additionalProperties": false
+                },
+                "catalogVersion": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_.-]{0,95}$"
+                },
+                "schemaPayloadBytes": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "startedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                },
+                "completedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "blocked",
+                    "dry_run",
+                    "failed",
+                    "in_progress",
+                    "succeeded"
+                  ]
+                },
+                "idempotencyKeyRef": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^sha256:[a-f0-9]{64}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "verifierReceiptRef": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^sha256:[a-f0-9]{64}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "observationComplete": {
+                  "type": "boolean"
+                },
+                "isolation": {
+                  "type": "string",
+                  "enum": [
+                    "capability",
+                    "none"
+                  ]
+                },
+                "events": {
+                  "maxItems": 128,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "boundary": {
+                        "type": "string",
+                        "enum": [
+                          "adapter",
+                          "sandbox",
+                          "subprocess"
+                        ]
+                      },
+                      "transport": {
+                        "type": "string",
+                        "enum": [
+                          "builtin",
+                          "cli",
+                          "direct_http",
+                          "internal",
+                          "mcp",
+                          "rest",
+                          "shell"
+                        ]
+                      },
+                      "toolId": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9_.-]{0,95}$"
+                      },
+                      "executable": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "claude",
+                              "codex",
+                              "ruflo",
+                              "unrecognized"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "destinationHost": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "credentialClass": {
+                        "type": "string",
+                        "enum": [
+                          "inherited",
+                          "none",
+                          "scoped",
+                          "unknown"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "boundary",
+                      "transport",
+                      "toolId",
+                      "executable",
+                      "destinationHost",
+                      "credentialClass"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "mixedRoute": {
+                  "type": "boolean"
+                },
+                "unknownRoute": {
+                  "type": "boolean"
+                },
+                "bypassDetected": {
+                  "type": "boolean"
+                },
+                "policyDecision": {
+                  "type": "string",
+                  "enum": [
+                    "allow",
+                    "deny",
+                    "report_only"
+                  ]
+                },
+                "benchmarkEligible": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "schema",
+                "runRef",
+                "workflowId",
+                "requestedRuntime",
+                "actualRuntime",
+                "requestedTransport",
+                "policy",
+                "catalogVersion",
+                "schemaPayloadBytes",
+                "startedAt",
+                "completedAt",
+                "status",
+                "idempotencyKeyRef",
+                "verifierReceiptRef",
+                "observationComplete",
+                "isolation",
+                "events",
+                "mixedRoute",
+                "unknownRoute",
+                "bypassDetected",
+                "policyDecision",
+                "benchmarkEligible"
+              ],
+              "additionalProperties": false
             }
           },
           "required": [
@@ -526,6 +1372,288 @@
                 "entityId"
               ],
               "additionalProperties": false
+            },
+            "route": {
+              "type": "object",
+              "properties": {
+                "schema": {
+                  "type": "string",
+                  "const": "jovie.tool-route-receipt/v1"
+                },
+                "runRef": {
+                  "type": "string",
+                  "pattern": "^sha256:[a-f0-9]{64}$"
+                },
+                "workflowId": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_.-]{0,95}$"
+                },
+                "requestedRuntime": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_.-]{0,95}$"
+                },
+                "actualRuntime": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_.-]{0,95}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "requestedTransport": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "builtin",
+                        "cli",
+                        "direct_http",
+                        "internal",
+                        "mcp",
+                        "rest",
+                        "shell"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "policy": {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "controlled_benchmark",
+                        "observe",
+                        "policy_bound"
+                      ]
+                    },
+                    "allowedTransports": {
+                      "maxItems": 7,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "builtin",
+                          "cli",
+                          "direct_http",
+                          "internal",
+                          "mcp",
+                          "rest",
+                          "shell"
+                        ]
+                      }
+                    },
+                    "allowedTools": {
+                      "maxItems": 128,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9_.-]{0,95}$"
+                      }
+                    },
+                    "requireRouteAttestation": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "allowedTransports",
+                    "allowedTools",
+                    "requireRouteAttestation"
+                  ],
+                  "additionalProperties": false
+                },
+                "catalogVersion": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_.-]{0,95}$"
+                },
+                "schemaPayloadBytes": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "startedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                },
+                "completedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "blocked",
+                    "dry_run",
+                    "failed",
+                    "in_progress",
+                    "succeeded"
+                  ]
+                },
+                "idempotencyKeyRef": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^sha256:[a-f0-9]{64}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "verifierReceiptRef": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^sha256:[a-f0-9]{64}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "observationComplete": {
+                  "type": "boolean"
+                },
+                "isolation": {
+                  "type": "string",
+                  "enum": [
+                    "capability",
+                    "none"
+                  ]
+                },
+                "events": {
+                  "maxItems": 128,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "boundary": {
+                        "type": "string",
+                        "enum": [
+                          "adapter",
+                          "sandbox",
+                          "subprocess"
+                        ]
+                      },
+                      "transport": {
+                        "type": "string",
+                        "enum": [
+                          "builtin",
+                          "cli",
+                          "direct_http",
+                          "internal",
+                          "mcp",
+                          "rest",
+                          "shell"
+                        ]
+                      },
+                      "toolId": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9_.-]{0,95}$"
+                      },
+                      "executable": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "claude",
+                              "codex",
+                              "ruflo",
+                              "unrecognized"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "destinationHost": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "credentialClass": {
+                        "type": "string",
+                        "enum": [
+                          "inherited",
+                          "none",
+                          "scoped",
+                          "unknown"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "boundary",
+                      "transport",
+                      "toolId",
+                      "executable",
+                      "destinationHost",
+                      "credentialClass"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "mixedRoute": {
+                  "type": "boolean"
+                },
+                "unknownRoute": {
+                  "type": "boolean"
+                },
+                "bypassDetected": {
+                  "type": "boolean"
+                },
+                "policyDecision": {
+                  "type": "string",
+                  "enum": [
+                    "allow",
+                    "deny",
+                    "report_only"
+                  ]
+                },
+                "benchmarkEligible": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "schema",
+                "runRef",
+                "workflowId",
+                "requestedRuntime",
+                "actualRuntime",
+                "requestedTransport",
+                "policy",
+                "catalogVersion",
+                "schemaPayloadBytes",
+                "startedAt",
+                "completedAt",
+                "status",
+                "idempotencyKeyRef",
+                "verifierReceiptRef",
+                "observationComplete",
+                "isolation",
+                "events",
+                "mixedRoute",
+                "unknownRoute",
+                "bypassDetected",
+                "policyDecision",
+                "benchmarkEligible"
+              ],
+              "additionalProperties": false
             }
           },
           "required": [
@@ -630,6 +1758,288 @@
               "required": [
                 "entityType",
                 "entityId"
+              ],
+              "additionalProperties": false
+            },
+            "route": {
+              "type": "object",
+              "properties": {
+                "schema": {
+                  "type": "string",
+                  "const": "jovie.tool-route-receipt/v1"
+                },
+                "runRef": {
+                  "type": "string",
+                  "pattern": "^sha256:[a-f0-9]{64}$"
+                },
+                "workflowId": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_.-]{0,95}$"
+                },
+                "requestedRuntime": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_.-]{0,95}$"
+                },
+                "actualRuntime": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_.-]{0,95}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "requestedTransport": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "builtin",
+                        "cli",
+                        "direct_http",
+                        "internal",
+                        "mcp",
+                        "rest",
+                        "shell"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "policy": {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "controlled_benchmark",
+                        "observe",
+                        "policy_bound"
+                      ]
+                    },
+                    "allowedTransports": {
+                      "maxItems": 7,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "builtin",
+                          "cli",
+                          "direct_http",
+                          "internal",
+                          "mcp",
+                          "rest",
+                          "shell"
+                        ]
+                      }
+                    },
+                    "allowedTools": {
+                      "maxItems": 128,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9_.-]{0,95}$"
+                      }
+                    },
+                    "requireRouteAttestation": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "allowedTransports",
+                    "allowedTools",
+                    "requireRouteAttestation"
+                  ],
+                  "additionalProperties": false
+                },
+                "catalogVersion": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_.-]{0,95}$"
+                },
+                "schemaPayloadBytes": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "startedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                },
+                "completedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "blocked",
+                    "dry_run",
+                    "failed",
+                    "in_progress",
+                    "succeeded"
+                  ]
+                },
+                "idempotencyKeyRef": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^sha256:[a-f0-9]{64}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "verifierReceiptRef": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^sha256:[a-f0-9]{64}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "observationComplete": {
+                  "type": "boolean"
+                },
+                "isolation": {
+                  "type": "string",
+                  "enum": [
+                    "capability",
+                    "none"
+                  ]
+                },
+                "events": {
+                  "maxItems": 128,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "boundary": {
+                        "type": "string",
+                        "enum": [
+                          "adapter",
+                          "sandbox",
+                          "subprocess"
+                        ]
+                      },
+                      "transport": {
+                        "type": "string",
+                        "enum": [
+                          "builtin",
+                          "cli",
+                          "direct_http",
+                          "internal",
+                          "mcp",
+                          "rest",
+                          "shell"
+                        ]
+                      },
+                      "toolId": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9_.-]{0,95}$"
+                      },
+                      "executable": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "claude",
+                              "codex",
+                              "ruflo",
+                              "unrecognized"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "destinationHost": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "credentialClass": {
+                        "type": "string",
+                        "enum": [
+                          "inherited",
+                          "none",
+                          "scoped",
+                          "unknown"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "boundary",
+                      "transport",
+                      "toolId",
+                      "executable",
+                      "destinationHost",
+                      "credentialClass"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "mixedRoute": {
+                  "type": "boolean"
+                },
+                "unknownRoute": {
+                  "type": "boolean"
+                },
+                "bypassDetected": {
+                  "type": "boolean"
+                },
+                "policyDecision": {
+                  "type": "string",
+                  "enum": [
+                    "allow",
+                    "deny",
+                    "report_only"
+                  ]
+                },
+                "benchmarkEligible": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "schema",
+                "runRef",
+                "workflowId",
+                "requestedRuntime",
+                "actualRuntime",
+                "requestedTransport",
+                "policy",
+                "catalogVersion",
+                "schemaPayloadBytes",
+                "startedAt",
+                "completedAt",
+                "status",
+                "idempotencyKeyRef",
+                "verifierReceiptRef",
+                "observationComplete",
+                "isolation",
+                "events",
+                "mixedRoute",
+                "unknownRoute",
+                "bypassDetected",
+                "policyDecision",
+                "benchmarkEligible"
               ],
               "additionalProperties": false
             }
@@ -826,6 +2236,288 @@
               "required": [
                 "entityType",
                 "entityId"
+              ],
+              "additionalProperties": false
+            },
+            "route": {
+              "type": "object",
+              "properties": {
+                "schema": {
+                  "type": "string",
+                  "const": "jovie.tool-route-receipt/v1"
+                },
+                "runRef": {
+                  "type": "string",
+                  "pattern": "^sha256:[a-f0-9]{64}$"
+                },
+                "workflowId": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_.-]{0,95}$"
+                },
+                "requestedRuntime": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_.-]{0,95}$"
+                },
+                "actualRuntime": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_.-]{0,95}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "requestedTransport": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "builtin",
+                        "cli",
+                        "direct_http",
+                        "internal",
+                        "mcp",
+                        "rest",
+                        "shell"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "policy": {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "controlled_benchmark",
+                        "observe",
+                        "policy_bound"
+                      ]
+                    },
+                    "allowedTransports": {
+                      "maxItems": 7,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "builtin",
+                          "cli",
+                          "direct_http",
+                          "internal",
+                          "mcp",
+                          "rest",
+                          "shell"
+                        ]
+                      }
+                    },
+                    "allowedTools": {
+                      "maxItems": 128,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9_.-]{0,95}$"
+                      }
+                    },
+                    "requireRouteAttestation": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "allowedTransports",
+                    "allowedTools",
+                    "requireRouteAttestation"
+                  ],
+                  "additionalProperties": false
+                },
+                "catalogVersion": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_.-]{0,95}$"
+                },
+                "schemaPayloadBytes": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "startedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                },
+                "completedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "blocked",
+                    "dry_run",
+                    "failed",
+                    "in_progress",
+                    "succeeded"
+                  ]
+                },
+                "idempotencyKeyRef": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^sha256:[a-f0-9]{64}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "verifierReceiptRef": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^sha256:[a-f0-9]{64}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "observationComplete": {
+                  "type": "boolean"
+                },
+                "isolation": {
+                  "type": "string",
+                  "enum": [
+                    "capability",
+                    "none"
+                  ]
+                },
+                "events": {
+                  "maxItems": 128,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "boundary": {
+                        "type": "string",
+                        "enum": [
+                          "adapter",
+                          "sandbox",
+                          "subprocess"
+                        ]
+                      },
+                      "transport": {
+                        "type": "string",
+                        "enum": [
+                          "builtin",
+                          "cli",
+                          "direct_http",
+                          "internal",
+                          "mcp",
+                          "rest",
+                          "shell"
+                        ]
+                      },
+                      "toolId": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9_.-]{0,95}$"
+                      },
+                      "executable": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "claude",
+                              "codex",
+                              "ruflo",
+                              "unrecognized"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "destinationHost": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "credentialClass": {
+                        "type": "string",
+                        "enum": [
+                          "inherited",
+                          "none",
+                          "scoped",
+                          "unknown"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "boundary",
+                      "transport",
+                      "toolId",
+                      "executable",
+                      "destinationHost",
+                      "credentialClass"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "mixedRoute": {
+                  "type": "boolean"
+                },
+                "unknownRoute": {
+                  "type": "boolean"
+                },
+                "bypassDetected": {
+                  "type": "boolean"
+                },
+                "policyDecision": {
+                  "type": "string",
+                  "enum": [
+                    "allow",
+                    "deny",
+                    "report_only"
+                  ]
+                },
+                "benchmarkEligible": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "schema",
+                "runRef",
+                "workflowId",
+                "requestedRuntime",
+                "actualRuntime",
+                "requestedTransport",
+                "policy",
+                "catalogVersion",
+                "schemaPayloadBytes",
+                "startedAt",
+                "completedAt",
+                "status",
+                "idempotencyKeyRef",
+                "verifierReceiptRef",
+                "observationComplete",
+                "isolation",
+                "events",
+                "mixedRoute",
+                "unknownRoute",
+                "bypassDetected",
+                "policyDecision",
+                "benchmarkEligible"
               ],
               "additionalProperties": false
             }

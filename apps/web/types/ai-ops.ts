@@ -1,3 +1,5 @@
+import type { ToolRoutePolicy } from '@jovie/action-contracts';
+
 export type HermesAiOpsSource =
   | 'github'
   | 'linear'
@@ -90,6 +92,7 @@ export interface HermesAiOpsSummary {
 }
 
 export interface HermesDispatchRequest {
+  readonly routePolicy?: ToolRoutePolicy;
   readonly source: HermesAiOpsSource;
   readonly sourceId?: string;
   readonly sourceUrl?: string | null;
