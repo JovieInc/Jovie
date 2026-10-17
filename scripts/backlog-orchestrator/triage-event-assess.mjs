@@ -1,9 +1,12 @@
 #!/usr/bin/env node
-/** One signed Linear delivery -> one current JOV Triage assessment. No admission writer. */
+/** One signed Linear delivery -> one current JOV intake assessment. */
 
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { fetchBacklogSweepCandidates } from './backlog-current-linear.mjs';
+import { admitBacklogEvent } from './backlog-event-admission.mjs';
+import { worldObservationSummary } from './backlog-observation-summary.mjs';
 import { classifyDeterministic } from './classifier.mjs';
 import { classifyIntakeReadiness } from './intake-readiness.mjs';
 import * as linear from './linear-client.mjs';
@@ -213,6 +216,214 @@ const TODO_STATE_ID = 'c6c00506-dc9f-4910-8ff7-3874dd77174c';
 const BACKLOG_STATE_ID = '1551ed21-7743-4573-82d8-8949410d3b8d';
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const LINEAR_UPDATED_AT =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/;
+const BACKLOG_READ_OPTIONS = Object.freeze({
+  timeoutMs: 4_000,
+  maxAttempts: 1,
+  rateLimitMaxAttempts: 1,
+  rateLimitMaxTotalWaitMs: 0,
+});
+
+function validLinearPriority(priority) {
+  return Number.isInteger(priority) && priority >= 0 && priority <= 4;
+}
+
+/** One transient 5xx retry; never escalate to a different provider or writer. */
+async function requestBoundedAssessment(delivery, summer) {
+  try {
+    return await summer(delivery);
+  } catch (error) {
+    if (!/^summer-triage-assessment-http-5\d\d$/.test(String(error?.message)))
+      throw error;
+    return summer(delivery);
+  }
+}
+
+function backlogHold(base, reason, details = {}) {
+  return {
+    ...base,
+    state: 'Backlog',
+    disposition: 'held',
+    reason,
+    holds: [reason],
+    ...details,
+    authorizesTransition: false,
+    authorizesDispatch: false,
+    mutations: 0,
+    wakeSymphony: false,
+    requiresImmediateInvestigation: false,
+  };
+}
+
+/** Backlog output is metadata only. Private current preimages and raw World
+ * records stay inside the maintained signed/guarded admission path. */
+function backlogAssessmentSummary(receipt) {
+  const pick = (value, keys) =>
+    Object.fromEntries(
+      keys
+        .filter(key => Object.hasOwn(value ?? {}, key))
+        .map(key => [key, value[key]])
+    );
+  const result = pick(receipt, [
+    'schema',
+    'issueIdentifier',
+    'issueId',
+    'deliveryId',
+    'linearUpdatedAt',
+    'state',
+    'priority',
+    'decision',
+    'acceptedInvestigation',
+    'authorizesDispatch',
+  ]);
+  result.backlogIntake = pick(receipt.backlogIntake, [
+    'schema',
+    'status',
+    'policy',
+    'authorizesTransition',
+  ]);
+  result.admissionDelegation = pick(receipt.admissionDelegation, [
+    'contract',
+    'writer',
+    'status',
+    'authorizesTransition',
+  ]);
+  const fence = receipt.legacyGovernorFence;
+  result.legacyGovernorFence = pick(fence, [
+    'status',
+    'contract',
+    'issueIdentifier',
+    'issueId',
+    'idempotencyKey',
+    'dispatchPath',
+    'authorizesTransition',
+    'fenceSetContract',
+  ]);
+  if (Array.isArray(fence?.families))
+    result.legacyGovernorFence.families = fence.families.map(family =>
+      pick(family, [
+        'family',
+        'status',
+        'idempotencyKey',
+        'dispatchPath',
+        'authorizesTransition',
+      ])
+    );
+  if (receipt.workflowDrainObservation)
+    result.workflowDrainObservation = worldObservationSummary(
+      receipt.workflowDrainObservation,
+      receipt.workflowDrainObservation.identity ?? {}
+    );
+  return result;
+}
+
+/**
+ * Observe the maintained Summer delegation and fixed-key negative fence only.
+ * Neither proves old generic-writer drain nor native admission eligibility.
+ * Backlog never enters the Triage Jev/reconcile mutation path below.
+ */
+async function observeBacklogEvent(
+  delivery,
+  issue,
+  base,
+  client,
+  summer,
+  admit
+) {
+  if (
+    issue?.id !== delivery.issueId ||
+    issue?.identifier !== delivery.identifier
+  )
+    return backlogHold(base, 'backlog-event-identity-mismatch');
+  if (
+    issue.state?.id !== BACKLOG_STATE_ID ||
+    issue.state?.name !== 'Backlog' ||
+    issue.state?.type !== 'backlog'
+  )
+    return backlogHold(base, 'backlog-event-state-changed');
+  if (issue.updatedAt !== delivery.expectedLinearUpdatedAt)
+    return backlogHold(base, 'backlog-event-version-changed');
+  if (!validLinearPriority(issue.priority))
+    return backlogHold(base, 'backlog-priority-invalid');
+
+  const snapshot = JSON.stringify([triageSnapshot(issue), issue.comments]);
+  const priority = issue.priority;
+  let summerReceipt;
+  try {
+    // The signed transport validates the exact delegation contract and fence
+    // key/path. The fence request is mandatory even for replayed deliveries.
+    summerReceipt = await requestBoundedAssessment(delivery, summer);
+  } catch (error) {
+    return backlogHold(
+      base,
+      error?.message === 'summer-triage-assessment-http-409'
+        ? 'summer-backlog-observation-conflict'
+        : 'summer-backlog-observation-unavailable'
+    );
+  }
+  let current;
+  try {
+    current = await client.fetchIssue(
+      delivery.identifier,
+      BACKLOG_READ_OPTIONS
+    );
+  } catch {
+    return backlogHold(base, 'backlog-current-read-unavailable');
+  }
+  if (
+    current?.id !== delivery.issueId ||
+    current?.identifier !== delivery.identifier ||
+    current?.state?.id !== BACKLOG_STATE_ID ||
+    current?.state?.name !== 'Backlog' ||
+    current?.state?.type !== 'backlog' ||
+    current?.updatedAt !== delivery.expectedLinearUpdatedAt ||
+    JSON.stringify([triageSnapshot(current), current.comments]) !== snapshot
+  )
+    return backlogHold(base, 'backlog-changed-after-summer-observation');
+  if (
+    !summerReceipt ||
+    summerReceipt.state !== 'Backlog' ||
+    summerReceipt.linearUpdatedAt !== current.updatedAt ||
+    !validLinearPriority(summerReceipt.priority) ||
+    summerReceipt.priority !== priority ||
+    summerReceipt.authorizesDispatch !== false ||
+    summerReceipt.acceptedInvestigation !== false ||
+    summerReceipt.backlogIntake?.authorizesTransition !== false ||
+    summerReceipt.admissionDelegation?.authorizesTransition !== false ||
+    summerReceipt.legacyGovernorFence?.authorizesTransition !== false ||
+    ['assessment', 'assessmentCost', 'escalation', 'escalations'].some(key =>
+      Reflect.has(summerReceipt, key)
+    )
+  )
+    return backlogHold(base, 'summer-backlog-observation-invalid');
+  if (summerReceipt.workflowDrainObservation) {
+    const result = await admit(
+      delivery,
+      current,
+      summerReceipt,
+      client,
+      summer
+    );
+    return {
+      ...base,
+      state: result.disposition === 'Todo' ? 'Todo' : 'Backlog',
+      priority,
+      linearUpdatedAt: current.updatedAt,
+      summerAssessment: backlogAssessmentSummary(summerReceipt),
+      ...result,
+    };
+  }
+  return backlogHold(base, 'backlog-native-admission-unverified', {
+    priority,
+    linearUpdatedAt: current.updatedAt,
+    summerAssessment: backlogAssessmentSummary(summerReceipt),
+    holds: [
+      'generic-writer-drain-unverified',
+      'native-backlog-admission-unverified',
+    ],
+  });
+}
 
 // Sweep throttle (2026-10-10): the fleet-gate-refresh workflow invokes
 // `--sweep` under `if: always()` on every 5-minute tick AND every main push
@@ -238,6 +449,137 @@ function readSweepCache(cacheFile) {
 function writeSweepCache(cacheFile, cache) {
   runtimeState.ensureParentDir(cacheFile);
   writeFileSync(cacheFile, JSON.stringify(cache, null, 2));
+}
+
+/** Recover missed Backlog events on the existing Fleet cadence. Discovery is
+ * metadata only; every attempted admission still joins the private native
+ * predecessor/custody/resource proof. A cursor prevents held old rows from
+ * starving later candidates; current priority/readiness changes reset it. */
+export async function assessBacklogSweep(
+  client = linear,
+  summer = requestSummerAssessment,
+  {
+    cacheFile = undefined,
+    maxIssues = 3,
+    timeBudgetMs = 185_000,
+    now = Date.now,
+    discover = fetchBacklogSweepCandidates,
+    assess = assessTriageEvent,
+  } = {}
+) {
+  const started = now(),
+    results = [];
+  let all;
+  try {
+    all = await discover(client, BACKLOG_READ_OPTIONS);
+  } catch {
+    return {
+      schema: 'linear-backlog-catch-up/v1',
+      observedAt: new Date(now()).toISOString(),
+      issueCount: 0,
+      inventoryUnknown: true,
+      assessed: 0,
+      deferred: 0,
+      failed: 1,
+      wakeSymphony: false,
+      results: [
+        {
+          disposition: 'assessment-failed',
+          reason: 'backlog-catch-up-census-unavailable',
+          owner: 'JOV-8022 Fleet admission owner',
+          mutations: 0,
+          wakeSymphony: false,
+        },
+      ],
+    };
+  }
+  const issues = all.filter(
+    row =>
+      row.state.name === 'Backlog' &&
+      row.archivedAt === null &&
+      row.labels.some(label => label.name === 'agent-ready')
+  );
+  issues.sort(
+    (a, b) =>
+      (a.priority === 1 ? 0 : 1) - (b.priority === 1 ? 0 : 1) ||
+      (a.priority || 5) - (b.priority || 5) ||
+      Date.parse(a.createdAt) - Date.parse(b.createdAt) ||
+      a.id.localeCompare(b.id)
+  );
+  const digest = createHash('sha256')
+    .update(
+      JSON.stringify(
+        issues.map(row => [row.id, row.priority, row.updatedAt, row.labels])
+      )
+    )
+    .digest('hex');
+  const cache = cacheFile ? readSweepCache(cacheFile) : {};
+  let cursor =
+    cache.backlogSweepQueueDigest === digest &&
+    Number.isSafeInteger(cache.backlogSweepCursor)
+      ? Math.max(0, cache.backlogSweepCursor) % Math.max(1, issues.length)
+      : 0;
+  for (let count = 0; count < Math.min(3, maxIssues, issues.length); count++) {
+    // Reserve the existing complete bounded operation rather than killing a
+    // mutation when only a few seconds remain in a catch-up cycle.
+    if (now() - started > timeBudgetMs - 180_000) break;
+    const issue = issues[cursor];
+    cursor = (cursor + 1) % issues.length;
+    try {
+      const result = await assess(
+        {
+          action: 'linear_triage_assess',
+          client_payload: {
+            team_key: 'JOV',
+            state_name: 'Backlog',
+            action: 'update',
+            issue_id: issue.id,
+            issue_identifier: issue.identifier,
+            issue_updated_at: issue.updatedAt,
+            delivery_id: `backlog-catch-up:${issue.id}:${issue.updatedAt}`,
+          },
+        },
+        client,
+        summer
+      );
+      results.push(result);
+      if (
+        [
+          'summer-old-world-writers-unverified',
+          'summer-old-http-window-pending',
+          'summer-provider-latest-mapping-unverified',
+          'summer-production-origin-unverified',
+        ].includes(result.reason)
+      )
+        break;
+    } catch {
+      results.push({
+        issue: issue.identifier,
+        disposition: 'assessment-failed',
+        reason: 'backlog-catch-up-observation-unavailable',
+        mutations: 0,
+        wakeSymphony: false,
+        owner: 'JOV-8022 Fleet admission owner',
+      });
+    }
+  }
+  if (cacheFile)
+    writeSweepCache(cacheFile, {
+      ...readSweepCache(cacheFile),
+      backlogSweepQueueDigest: digest,
+      backlogSweepCursor: cursor,
+    });
+  return {
+    schema: 'linear-backlog-catch-up/v1',
+    observedAt: new Date(now()).toISOString(),
+    issueCount: issues.length,
+    assessed: results.length,
+    deferred: issues.length - results.length,
+    failed: results.filter(row => row.disposition === 'assessment-failed')
+      .length,
+    wakeSymphony: results.some(row => row.wakeSymphony),
+    results,
+  };
 }
 
 /**
@@ -331,10 +673,14 @@ export function parseTriageEvent(event) {
   if (
     event?.action !== 'linear_triage_assess' ||
     payload?.team_key !== 'JOV' ||
-    payload?.state_name !== 'Triage' ||
+    !['Triage', 'Backlog'].includes(payload?.state_name) ||
     !['create', 'update'].includes(payload?.action) ||
     !UUID.test(payload?.issue_id ?? '') ||
-    !/^JOV-\d+$/.test(payload?.issue_identifier ?? '')
+    !/^JOV-\d+$/.test(payload?.issue_identifier ?? '') ||
+    (payload?.state_name === 'Backlog' &&
+      (typeof payload.issue_updated_at !== 'string' ||
+        !LINEAR_UPDATED_AT.test(payload.issue_updated_at) ||
+        !Number.isFinite(Date.parse(payload.issue_updated_at))))
   ) {
     throw new Error('invalid-linear-triage-event');
   }
@@ -349,25 +695,48 @@ export function parseTriageEvent(event) {
         )
       )
       .digest('hex'),
+    ...(payload.state_name === 'Backlog'
+      ? {
+          expectedState: 'Backlog',
+          expectedLinearUpdatedAt: payload.issue_updated_at,
+          fenceLegacyGovernor: true,
+          observeLegacyWorkflowDrain: true,
+        }
+      : {}),
   };
 }
 
 export async function assessTriageEvent(
   event,
   client = linear,
-  summer = requestSummerAssessment
+  summer = requestSummerAssessment,
+  { admit = admitBacklogEvent } = {}
 ) {
   const delivery = parseTriageEvent(event);
-  const issue = await client.fetchIssue(delivery.identifier);
-  if (!issue || issue.id !== delivery.issueId) {
-    throw new Error('linear-triage-identity-mismatch');
-  }
   const base = {
     schema: 'linear-triage-assessment/v1',
     deliveryId: delivery.deliveryId,
     issue: delivery.identifier,
     observedAt: new Date().toISOString(),
   };
+  let issue;
+  try {
+    issue = await client.fetchIssue(
+      delivery.identifier,
+      delivery.expectedState === 'Backlog' ? BACKLOG_READ_OPTIONS : undefined
+    );
+  } catch (error) {
+    // Transport errors can carry private response bodies and nested causes.
+    // The event CLI must return only a named safe Backlog observation hold.
+    if (delivery.expectedState === 'Backlog')
+      return backlogHold(base, 'backlog-current-read-unavailable');
+    throw error;
+  }
+  if (delivery.expectedState === 'Backlog')
+    return observeBacklogEvent(delivery, issue, base, client, summer, admit);
+  if (!issue || issue.id !== delivery.issueId) {
+    throw new Error('linear-triage-identity-mismatch');
+  }
   if (issue.state?.id !== TRIAGE_STATE_ID || issue.state?.name !== 'Triage') {
     return {
       ...base,
@@ -380,14 +749,7 @@ export async function assessTriageEvent(
   // One bounded retry on a transient Summer 5xx: a 503 between attempts
   // must not fail a row the next call answers. Only 5xx responses retry
   // (once); 4xx, timeouts, and network errors fail the row immediately.
-  let summerReceipt;
-  try {
-    summerReceipt = await summer(delivery);
-  } catch (error) {
-    if (!/^summer-triage-assessment-http-5\d\d$/.test(String(error?.message)))
-      throw error;
-    summerReceipt = await summer(delivery);
-  }
+  const summerReceipt = await requestBoundedAssessment(delivery, summer);
   // A provider-blocked escalation is exempt from the sweep's exit no matter
   // which Summer decision branch carries it (urgent-investigation-required
   // without an assessment, or existing-intake-reconcile with an ambiguous
@@ -515,9 +877,24 @@ export async function runCli() {
       return;
     }
   }
-  const receipt = isSweep
+  let receipt = isSweep
     ? await assessTriageSweep()
     : await assessTriageEvent(JSON.parse(readFileSync(eventPath, 'utf8')));
+  if (isSweep) {
+    const backlog = await assessBacklogSweep(linear, requestSummerAssessment, {
+      cacheFile: sweepCacheFile,
+    });
+    receipt = {
+      ...receipt,
+      backlog,
+      assessed: receipt.assessed + backlog.assessed,
+      issueCount: receipt.issueCount + backlog.issueCount,
+      deferred: receipt.deferred + backlog.deferred,
+      failed: receipt.failed + backlog.failed,
+      wakeSymphony: receipt.wakeSymphony || backlog.wakeSymphony,
+      results: [...receipt.results, ...backlog.results],
+    };
+  }
   process.stdout.write(`${JSON.stringify(receipt)}\n`);
   if (
     isSweep &&
