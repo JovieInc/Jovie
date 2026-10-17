@@ -782,6 +782,7 @@ export function selectStateId(name, states) {
  * @param {{
  *   readonly issue: LifecycleIssue,
  *   readonly holds: readonly string[],
+ *   readonly completionHolds?: readonly string[],
  *   readonly parentReason: string,
  *   readonly github: GithubGet,
  *   readonly repository: string,
@@ -966,6 +967,7 @@ export async function reconcileValidation(ctx) {
     state: issue.state,
     manifest,
     holds: ctx.holds,
+    completionHolds: ctx.completionHolds,
     deployment,
     receipts,
     escapedDefect: escapedDefectResult,
@@ -975,6 +977,7 @@ export async function reconcileValidation(ctx) {
     manifest,
     missing: decision.missing,
     failing: decision.failing,
+    completionHolds: ctx.completionHolds,
     deploymentSha: deployment.sha,
   });
   const comment = formatLifecycleComment({

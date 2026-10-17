@@ -380,6 +380,7 @@ const OWNERLESS_RECOVERY_POLICY_TEST =
   'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs';
 const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/sentry-error-gate-request.test.mjs',
+  'scripts/lib/__tests__/sentry-validation-observation.test.mjs',
   'scripts/lib/__tests__/ci-script-test-inventory.test.mjs',
   'scripts/lib/__tests__/native-queue-group-evidence.test.mjs',
   'scripts/lib/__tests__/native-queue-policy-evidence.test.mjs',
@@ -1509,7 +1510,7 @@ function planAffectedTests(
         '--coverage.include=lib/founder-taste-order.mjs',
         '--coverage.reporter=text',
         '--coverage.reporter=json-summary',
-        '--coverage.thresholds.perFile=true',
+        '--coverage.thresholds.perFile',
         '--coverage.thresholds.lines=85',
         '--coverage.thresholds.statements=85',
         '--coverage.thresholds.functions=80',
@@ -2826,6 +2827,7 @@ export function buildControlCoverageCommands() {
     '--coverage.include=lib/pr-conflict-event.mjs',
     '--coverage.include=lib/pr-conflict-handler.mjs',
     '--coverage.include=lib/product-lane-classifier.mjs',
+    '--coverage.include=lib/sentry-validation-observation.mjs',
     '--coverage.thresholds.perFile=true',
     '--coverage.thresholds.lines=85',
     '--coverage.thresholds.branches=75',

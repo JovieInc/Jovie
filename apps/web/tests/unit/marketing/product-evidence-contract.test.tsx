@@ -21,6 +21,7 @@ import { ARTIST_NOTIFICATIONS_COPY } from '@/data/artistNotificationsCopy';
 import {
   isProductRouteEntry,
   MARKETING_ROUTE_MANIFEST,
+  type ProductEvidenceDeclaration,
   productEvidenceDeclarationIssue,
   type RouteManifestEntry,
 } from '@/data/marketing';
@@ -113,7 +114,8 @@ function componentPathExists(componentPath: string): boolean {
  */
 function renderedEvidenceIssue(
   container: HTMLElement,
-  testId: string
+  testId: string,
+  declaration?: ProductEvidenceDeclaration
 ): string | null {
   const root = container.querySelector('main') ?? container;
   const evidence = root.querySelector(`[data-testid="${testId}"]`);
@@ -132,6 +134,23 @@ function renderedEvidenceIssue(
   );
   if (!withinFold) {
     return `[data-testid="${testId}"] renders below the first two top-level sections`;
+  }
+  if (declaration?.kind === 'planned-description') {
+    if (
+      evidence.getAttribute('data-product-evidence-kind') !==
+        declaration.kind ||
+      evidence.getAttribute('data-product-evidence-capability') !==
+        declaration.capabilityId
+    ) {
+      return 'planned description does not expose its capability and announcement state';
+    }
+    if (
+      evidence
+        .closest('section')
+        ?.querySelector('img, canvas, [data-screenshot-scenario]')
+    ) {
+      return 'planned text fallback must not present a product image';
+    }
   }
   return null;
 }
@@ -176,14 +195,86 @@ function CopyOnlyProductLanding() {
 
 const COPY_ONLY_FIXTURE_ENTRY: Pick<
   RouteManifestEntry,
-  'glob' | 'recipeId' | 'status' | 'exempt' | 'productEvidence'
+  'glob' | 'url' | 'recipeId' | 'status' | 'exempt' | 'productEvidence'
 > = {
   glob: '(marketing)/copy-only-fixture/page.tsx',
+  url: '/copy-only-fixture',
   recipeId: 'feature',
   status: 'active',
 };
 
 describe('product-evidence contract (JOV-6917)', () => {
+  it('Card uses an honest planned description instead of a destination-profile screenshot', () => {
+    const { container } = render(<JovieCardLanding />);
+    const hero = container.querySelector<HTMLElement>(
+      '[data-testid="marketing-section-hero"]'
+    )!;
+    expect(within(hero).queryByRole('img')).not.toBeInTheDocument();
+    expect(
+      within(hero).getByTestId('jovie-card-planned-description')
+    ).toHaveTextContent('Coming soon');
+    expect(
+      within(hero).getByRole('link', { name: 'Join the list' })
+    ).toHaveAttribute('href', '#join-the-list');
+    expect(container.querySelector('#join-the-list')).toBeInTheDocument();
+    expect(
+      within(container).queryByRole('heading', { name: 'Founder' })
+    ).not.toBeInTheDocument();
+    expect(
+      within(container).queryByRole('heading', { name: 'Creator' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('does not let a live product replace UI evidence with a planned description', () => {
+    expect(
+      productEvidenceDeclarationIssue({
+        glob: '(marketing)/product/page.tsx',
+        url: '/product',
+        productEvidence: {
+          kind: 'planned-description',
+          capabilityId: 'public-profile',
+          componentPath: 'apps/web/app/(marketing)/product/ProductLanding.tsx',
+          testId: 'product-description',
+        },
+      })
+    ).toMatch(/requires a public interest-capture capability/);
+  });
+
+  it('rejects a planned description borrowed from another route capability', () => {
+    const card = MARKETING_ROUTE_MANIFEST.find(entry => entry.url === '/card')!;
+    expect(productEvidenceDeclarationIssue({ ...card, url: '/voice' })).toMatch(
+      /must match its route capability/
+    );
+  });
+
+  it('rejects product imagery even when it is stamped as planned text', () => {
+    const card = MARKETING_ROUTE_MANIFEST.find(entry => entry.url === '/card')!;
+    const { container } = render(
+      <main>
+        <section>
+          <p
+            data-testid='jovie-card-planned-description'
+            data-product-evidence-kind='planned-description'
+            data-product-evidence-capability='jovie-card'
+          >
+            Coming soon
+          </p>
+          <img
+            src='/public-profile.png'
+            alt='A profile presented as Wallet UI'
+          />
+        </section>
+      </main>
+    );
+    expect(
+      renderedEvidenceIssue(
+        container,
+        card.productEvidence!.testId,
+        card.productEvidence
+      )
+    ).toMatch(/must not present a product image/);
+  });
+
   it('marks every product route with a declared evidence component', () => {
     expect(productRoutes.length).toBeGreaterThan(0);
     const issues = productRoutes.flatMap(entry => {
@@ -213,7 +304,8 @@ describe('product-evidence contract (JOV-6917)', () => {
       const { container } = render(renderPage!());
       const issue = renderedEvidenceIssue(
         container,
-        entry.productEvidence!.testId
+        entry.productEvidence!.testId,
+        entry.productEvidence
       );
       expect(issue, issue ?? '').toBeNull();
     }

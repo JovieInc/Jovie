@@ -177,6 +177,139 @@ describe('validation manifest', () => {
     expect(outcomeAcceptanceReasons({ description: '' })).toEqual([]);
   });
 
+  it('requires the authored plain acceptance paragraph that closed JOV-8618 early', () => {
+    const description =
+      "Acceptance: reproduce the old request failure; prove the repaired request and paginated continuation; detect descendant recurrence for each accepted alias; keep incomplete pagination, malformed identity, transport failures and missing positive coverage UNKNOWN. Run the repository's actual changed-path tests with current coverage and unchanged floors, ordinary protected landing, then verify a genuine subsequent existing-clock artifact uses the repaired source. A passing workflow or empty history must not close [JOV-4312](https://linear.app/jovie/issue/JOV-4312/sentry-alert-hygiene-synthetic-e2eplaywright-failures-captured-as-prod) or erase [JOV-8523](https://linear.app/jovie/issue/JOV-8523/error-server-conn-crashed)'s failed seven-day lineage.";
+    const manifest = manifestFor({ description });
+    expect(outcomeAcceptanceReasons({ description })).toEqual([
+      'acceptance section names evidence a deploy cannot prove',
+    ]);
+    expect(manifest.required.map(entry => entry.kind)).toEqual([
+      'deployment',
+      'outcome',
+    ]);
+    const base = {
+      state: { name: 'Merging', type: 'started' },
+      manifest,
+      holds: [],
+      deployment: VERIFIED,
+    };
+    expect(decideValidationTransition({ ...base, receipts: [] }).target).toBe(
+      'Validating'
+    );
+    expect(
+      decideValidationTransition({
+        ...base,
+        receipts: [receipt({ verifiedArtifact: false })],
+      }).target
+    ).toBe('Validating');
+    expect(
+      decideValidationTransition({
+        ...base,
+        receipts: [receipt({ status: 'fail' })],
+      }).target
+    ).toBe('Rework');
+    expect(
+      decideValidationTransition({ ...base, receipts: [receipt({})] }).target
+    ).toBe('Done');
+  });
+
+  it.each([
+    'Acceptance: verify the actual existing-clock artifact.',
+    'Acceptance criteria: retain the native outcome proof.',
+    'Acceptance evidence:\n\n- Record the actual customer outcome.',
+    'Acceptance checks:\nThe physical actor must complete the observation.',
+    'Completion: verify the independent producer.',
+    'Evaluation / completion: retain the real result.',
+    'Success criteria: verify a real observation.',
+    'Exit criteria: positive coverage is established.',
+    'Definition of done: native execution is observed.',
+    'Done when: the actual producer has completed.',
+    'Done means: the actual producer has completed.',
+    'Verification: UNKNOWN is still missing evidence.',
+    'Proof: evidence has not yet been recorded.',
+    '  aCcEpTaNcE : verify actual evidence.',
+    'Acceptance:\n- [x] Source repaired\n- Further observation is required.',
+    'Acceptance: - [x] Source repaired\n- Further observation is required.',
+  ])('keeps explicit plain acceptance open: %s', description => {
+    expect(outcomeAcceptanceReasons({ description })).toContain(
+      'acceptance section names evidence a deploy cannot prove'
+    );
+  });
+
+  it.each([
+    'A discussion of acceptance: this prose is not a section.',
+    'Acceptance testing remains useful.',
+    'Acceptance status: previously accepted.',
+    'Pre-acceptance: a separate status.',
+    '> Acceptance: quoted text is not the author section.',
+    '"Acceptance: an example string"',
+    '    Acceptance: indented code is an example.',
+    '```text\nAcceptance: a literal example\n```',
+    '~~~~text\nAcceptance: a literal example\n~~~~',
+    '~~~~text\n```\nAcceptance: still inside the tilde literal\n~~~~',
+    '````text\n```\nAcceptance: a shorter marker does not close the literal\n````',
+    '```text\n```not-a-close\nAcceptance: still inside the literal\n```',
+    'Acceptance:\n- [x] Verified\n- [X] Accepted\n\n## Notes\nFree text.',
+    'Acceptance: - [x] Verified\n\n**Notes**\nFree text.',
+    'Acceptance:\n\n## Notes\nNo authored criteria.',
+    'Owner: existing lifecycle owner.\nScope: an ordinary implementation.',
+  ])(
+    'does not invent an outcome from a literal, checked or absent section: %s',
+    description => {
+      expect(outcomeAcceptanceReasons({ description })).toEqual([]);
+    }
+  );
+
+  it('retains plain acceptance after a closed literal example and across a reopen episode', () => {
+    const reopenedAt = '2026-10-03T13:00:00Z';
+    const manifest = manifestFor({
+      description:
+        '```text\nAcceptance: literal\n```\nAcceptance: verify the current native artifact.',
+      reopenedAfterDone: true,
+      receiptNotBefore: reopenedAt,
+    });
+    const base = { state: STARTED, manifest, holds: [], deployment: VERIFIED };
+    const old = receipt({
+      recordedAt: '2026-10-03T14:00:00Z',
+      episodeStartedAt: null,
+    });
+    const fresh = receipt({
+      recordedAt: '2026-10-03T14:00:00Z',
+      episodeStartedAt: reopenedAt,
+    });
+    expect(
+      decideValidationTransition({ ...base, receipts: [old] }).target
+    ).toBe('Validating');
+    expect(
+      decideValidationTransition({ ...base, receipts: [fresh] }).target
+    ).toBe('Done');
+    expect(
+      manifest.required.find(entry => entry.kind === 'outcome')?.reason
+    ).toContain('acceptance section names evidence a deploy cannot prove');
+  });
+
+  it('keeps already completed acceptance historical after plain-section detection', () => {
+    const manifest = manifestFor({
+      description: 'Acceptance: verify a real subsequent native artifact.',
+    });
+    expect(manifest.required.map(entry => entry.kind)).toContain('outcome');
+    expect(
+      decideValidationTransition({
+        state: { name: 'Done', type: 'completed' },
+        manifest,
+        holds: [],
+        deployment: VERIFIED,
+        receipts: [],
+      })
+    ).toEqual({
+      target: null,
+      missing: [],
+      failing: [],
+      explanation: [],
+    });
+  });
+
   it('adds the JOV-7201 dual closure for escaped defects', () => {
     const manifest = manifestFor({}, { escapedDefect: true });
     expect(manifest.required.map(entry => entry.kind)).toContain(
@@ -860,6 +993,29 @@ describe('lifecycle status comment', () => {
       missing: ['outcome'],
       failing: [],
     });
+    expect(
+      lifecycleStatusKey({
+        target: 'Validating',
+        manifest,
+        missing: ['outcome'],
+        failing: [],
+        completionHolds: [],
+      })
+    ).toBe(key);
+    const held = {
+      target: 'Validating',
+      manifest,
+      missing: ['outcome'],
+      failing: [],
+      completionHolds: ['JOV-2 is Merging', 'JOV-3 is Rework'],
+    };
+    expect(lifecycleStatusKey(held)).not.toBe(key);
+    expect(
+      lifecycleStatusKey({
+        ...held,
+        completionHolds: [...held.completionHolds].reverse(),
+      })
+    ).toBe(lifecycleStatusKey(held));
     expect(
       lifecycleStatusKey({
         target: 'Validating',
