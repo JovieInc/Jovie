@@ -1,0 +1,29 @@
+{
+  "schema": "symphony-routing/v1",
+  "issue": "JOV-5141",
+  "modelId": "codex-sol",
+  "model": "gpt-5.6-sol",
+  "escalation": false,
+  "fallback": null,
+  "classification": {
+    "risk": "medium",
+    "complexity": "high",
+    "capabilities": [
+      "root-cause",
+      "architecture"
+    ],
+    "reasons": [
+      "capabilities=root-cause,architecture",
+      "risk=medium",
+      "complexity=high"
+    ]
+  },
+  "candidates": [],
+  "capacity": {
+    "accounts": 4,
+    "ready": 0,
+    "active": null,
+    "readable": true
+  },
+  "fingerprint": "c2d3d68a3d46d40afb9b72cd"
+}
