@@ -6368,13 +6368,15 @@ jobs:
     environment: Preview – jovie
     # Launch-gate job (JOV-3758): full signup -> onboarding -> music import -> live
     # public profile -> Stripe checkout journey against real Better Auth + an ephemeral
-    # Manual golden-path evidence uses the isolated Neon branch.
+    # Manual golden-path evidence prefers the shared Neon branch. A failed
+    # database-certification job still runs this lane through the fallback
+    # branch so certification writes a certificate (JOV-8614).
     # Unlike ci-e2e-smoke this must NOT set NEXT_PUBLIC_CLERK_MOCK or
     # E2E_USE_TEST_AUTH_BYPASS — required mode fails closed if either is present.
     # Path-triggered (not always-on): the spec has a 900s timeout, so always-on would
     # blow the CI budget and churn the external Spotify/Stripe fixtures.
     needs: [ci-path-changes, ci-risk-classifier, ci-build-public, neon-db]
-    if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' && needs.neon-db.result == 'success' }}
+    if: ${{ always() && !cancelled() && needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' && (needs.neon-db.result == 'success' || needs.neon-db.result == 'failure') }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     outputs:
@@ -6729,11 +6731,12 @@ jobs:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
           CERT_DIR: ${{ runner.temp }}/canonical-artist-site-certification
+          PRODUCER_RESULT: ${{ needs.ci-golden-path.result }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
         run: |
           CERT_PATH="$(find "$CERT_DIR" -name certificate.json -print -quit 2>/dev/null || true)"
-          CERT_PATH="$CERT_PATH" node scripts/canonical-artist-site-intake.mjs
+          CERT_PATH="$CERT_PATH" PRODUCER_RESULT="$PRODUCER_RESULT" node scripts/canonical-artist-site-intake.mjs
       - name: File or resolve the Golden Path Linear issue
         if: ${{ always() && !cancelled() }}
         env:
