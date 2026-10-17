@@ -5,10 +5,10 @@
  */
 
 import { and, eq, inArray } from 'drizzle-orm';
-import { unstable_cache } from 'next/cache';
 import { db } from '@/lib/db';
 import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
 import { getFeaturedCreatorsForSearch } from '@/lib/featured-creators';
+import { isProfileSearchable } from '@/lib/profile/public-profile-access';
 import { buildSpotifyArtistUrl } from '@/lib/spotify';
 import { logger } from '@/lib/utils/logger';
 import type { SpotifyArtistResult } from './route';
@@ -112,30 +112,29 @@ function boostVipArtist(
 
 /**
  * Query claimed Spotify IDs from the database.
- * Cached for 30 seconds to reduce DB hits under search traffic.
+ * Only current public, searchable profiles may publish a Jovie association.
  */
 async function queryClaimedSpotifyIds(spotifyIds: string[]): Promise<string[]> {
   const claimed = await db
-    .select({ spotifyId: creatorProfiles.spotifyId })
+    .select({
+      spotifyId: creatorProfiles.spotifyId,
+      isPublic: creatorProfiles.isPublic,
+      settings: creatorProfiles.settings,
+    })
     .from(creatorProfiles)
     .where(
       and(
         inArray(creatorProfiles.spotifyId, spotifyIds),
-        eq(creatorProfiles.isClaimed, true)
+        eq(creatorProfiles.isClaimed, true),
+        eq(creatorProfiles.isPublic, true)
       )
     );
 
-  return claimed.map(r => r.spotifyId).filter((id): id is string => id != null);
+  return claimed
+    .filter(row => row.isPublic === true && isProfileSearchable(row.settings))
+    .map(row => row.spotifyId)
+    .filter((id): id is string => id != null);
 }
-
-const getCachedClaimedSpotifyIds = unstable_cache(
-  queryClaimedSpotifyIds,
-  ['claimed-spotify-ids'],
-  {
-    revalidate: 30,
-    tags: ['claimed-artists'],
-  }
-);
 
 /**
  * Annotate search results with claimed status.
@@ -156,23 +155,30 @@ export async function annotateClaimedStatusWithMeta(
     return { degraded: false, results };
   }
 
+  // Provider caches never grant Jovie discovery or caller ownership authority.
+  const catalogResults = results.map(result => {
+    const catalog = { ...result };
+    delete catalog.isClaimed;
+    delete catalog.isClaimedByCurrentUser;
+    return catalog;
+  });
   try {
     const spotifyIds = results.map(r => r.id);
-    const claimedIds = new Set(await getCachedClaimedSpotifyIds(spotifyIds));
+    const claimedIds = new Set(await queryClaimedSpotifyIds(spotifyIds));
 
     if (claimedIds.size === 0) {
-      return { degraded: false, results };
+      return { degraded: false, results: catalogResults };
     }
 
     return {
       degraded: false,
-      results: results.map(r =>
+      results: catalogResults.map(r =>
         claimedIds.has(r.id) ? { ...r, isClaimed: true } : r
       ),
     };
   } catch (error) {
     logger.warn('[Spotify Search] Claimed status lookup failed:', error);
-    return { degraded: true, results };
+    return { degraded: true, results: catalogResults };
   }
 }
 
