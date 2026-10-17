@@ -18,6 +18,7 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import {
   classifyRolloutFindings,
   evaluateRepoHygiene,
@@ -663,6 +664,37 @@ test('tracked-bytes budget raise stays within the documented +10% cap', () => {
   assert.ok(
     HYGIENE_LIMITS.maxTrackedBytes <= previousBudget * 1.1,
     'payload budget raises are capped at +10% per docs/ci/repository-health.md'
+  );
+});
+
+function countSnapshotFiles(directory) {
+  let count = 0;
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) count += countSnapshotFiles(path);
+    else if (entry.isFile()) count += 1;
+  }
+  return count;
+}
+
+test('visual baseline file budget raise stays within the documented +10% cap', () => {
+  // PR #22246: the merge base held 110 canonical baselines (100% of the prior
+  // file budget). Two auth modal baselines required by auth-visual.spec.ts
+  // make the tree 112. A payload raise is capped at +10%.
+  const previousBudget = 110;
+  assert.equal(HYGIENE_LIMITS.maxSnapshotFiles, 121);
+  assert.ok(
+    HYGIENE_LIMITS.maxSnapshotFiles <= previousBudget * 1.1,
+    'snapshot file budget raises are capped at +10% per docs/ci/repository-health.md'
+  );
+
+  const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+  const count = countSnapshotFiles(
+    join(repoRoot, 'apps/web/tests/e2e/__snapshots__')
+  );
+  assert.ok(
+    count <= HYGIENE_LIMITS.maxSnapshotFiles,
+    `${count} canonical visual baselines exceed ${HYGIENE_LIMITS.maxSnapshotFiles}`
   );
 });
 

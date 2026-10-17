@@ -148,6 +148,21 @@ files (~8.7 MiB of the unchanged 12 MiB `maxSnapshotBytes` budget). The +10%
 raise restores a small headroom so ordinary new coverage does not trip the
 guard on every landing.
 
+Approved raise (measured 2026-10-17, visual-baseline auto-refresh PR #22246):
+`maxSnapshotFiles` 110 → 121 (+10%, the per-raise cap). `apps/web/tests/e2e/__snapshots__/`
+held 61 files on 2026-07-19, 100 on 2026-09-17, and 110 on merge base
+`f3a3db9048d` — 100% of the prior file budget, over the ≥90% qualifying
+threshold. Three contributors touched that directory in the 90-day window.
+This refresh adds `modal-signin-tablet.png` and `modal-signin-wide.png`, which
+`auth-visual.spec.ts` already requests, so the tree is 112 files and 8,931,527
+bytes (~8.52 MiB of the unchanged 12 MiB byte budget). SHA-256 duplicates
+(`signin-dark`/`signup-dark`, `pricing-dark`/`pricing-light`,
+`homepage-mobile`/`homepage-375`, and four admin growth desktop shells) remain
+separate `toHaveScreenshot` names in live specs; visual-qa coverage also reads
+`tim-public-profile-1440x900.png`. No snapshot file is unreferenced, so deleting
+one would drop a live contract. PR Size Guard run 39037015029 is the CI
+measurement. The +10% raise leaves 9 files of headroom.
+
 All must hold: exact-main is at least 90% of an absolute byte budget or two ordinary changes exceed a p99 delta; 30/90-day tree/new-blob, contributor, checkout, and CI measurements are included; Knip, hashes, generated paths, and owners prove no safe removal; increase is at most p99 +25% for deltas or 10% for payloads; tests and rationale change together. Larger changes require a separate decision and Linear issue. A number-only change fails review and never promotes rollout mode.
 
 ### Prune or archive
