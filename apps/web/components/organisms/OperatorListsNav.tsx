@@ -51,6 +51,8 @@ function NavRow({
   readonly icon: typeof List;
   readonly active: boolean;
 }) {
+  const { state, isMobile } = useSidebar();
+
   return (
     <SidebarMenuItem>
       <Tooltip label={label} side='right' block>
@@ -61,8 +63,8 @@ function NavRow({
           className={getSidebarNavRowClassName({
             calm: true,
             active,
-            className:
-              'group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:px-0',
+            collapsed: state === 'closed' && !isMobile,
+            className: 'rounded-lg',
           })}
         >
           <Icon
@@ -155,8 +157,8 @@ function NewListRow() {
           }}
           className={getSidebarNavRowClassName({
             calm: true,
-            className:
-              'group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:px-0',
+            collapsed: state === 'closed' && !isMobile,
+            className: 'rounded-lg',
           })}
         >
           <Plus
