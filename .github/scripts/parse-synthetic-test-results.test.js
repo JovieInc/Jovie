@@ -363,7 +363,13 @@ test('parseSyntheticTestResults keeps a logged OTP skip from failing a required 
   });
 
   const result = parseSyntheticTestResults({
-    resultFiles: [{ name: 'synthetic-production-waitlist', path: 'waitlist.json', required: true }],
+    resultFiles: [
+      {
+        name: 'synthetic-production-waitlist',
+        path: 'waitlist.json',
+        required: true,
+      },
+    ],
     fileSystem,
     otpSkipReason:
       'Skipping OTP-dependent synthetic steps: missing E2E_PROD_OTP_CHECK_TOKEN (Tim-only Cloudflare mailbox secrets).',

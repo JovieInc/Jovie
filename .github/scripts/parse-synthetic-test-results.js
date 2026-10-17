@@ -63,10 +63,12 @@ function optionalOtpSkipText(testCase) {
       chunks.push(value.replace(/\s+/g, ' ').trim());
     }
   };
-  for (const annotation of testCase.annotations ?? []) push(annotation?.description);
+  for (const annotation of testCase.annotations ?? [])
+    push(annotation?.description);
   for (const result of testCase.results ?? []) {
     push(result.error?.message);
-    for (const annotation of result.annotations ?? []) push(annotation?.description);
+    for (const annotation of result.annotations ?? [])
+      push(annotation?.description);
   }
   return chunks[0] ?? '';
 }
@@ -88,7 +90,9 @@ function classifySyntheticTests(tests) {
         .map(text => `${source}: ${spec.title}: ${text.trim()}`)
     );
     const otpSkip = optionalOtpSkipText(testCase);
-    return otpSkip ? [...logged, `${source}: ${spec.title}: ${otpSkip}`] : logged;
+    return otpSkip
+      ? [...logged, `${source}: ${spec.title}: ${otpSkip}`]
+      : logged;
   });
   const flaky = tests.filter(({ testCase }) => testCase.status === 'flaky');
   const failed = tests.filter(

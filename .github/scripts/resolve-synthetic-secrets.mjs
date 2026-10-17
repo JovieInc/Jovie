@@ -94,7 +94,8 @@ function readDopplerSecret(name) {
 }
 
 function publish(name, value) {
-  if (process.env.GITHUB_ENV) appendDelimited(process.env.GITHUB_ENV, name, value);
+  if (process.env.GITHUB_ENV)
+    appendDelimited(process.env.GITHUB_ENV, name, value);
 }
 
 function main() {
@@ -146,10 +147,7 @@ function main() {
   }
 
   if (names.some(name => OTP_SECRET_NAMES.includes(name))) {
-    publish(
-      'E2E_PROD_OTP_AVAILABLE',
-      result.otpAvailable ? 'true' : 'false'
-    );
+    publish('E2E_PROD_OTP_AVAILABLE', result.otpAvailable ? 'true' : 'false');
     publish('OTP_SKIP_REASON', result.otpSkipReason);
     if (process.env.GITHUB_OUTPUT) {
       appendFileSync(
@@ -180,10 +178,7 @@ function main() {
       ),
     ];
     if (result.otpSkipReason) lines.push('', result.otpSkipReason);
-    appendFileSync(
-      process.env.GITHUB_STEP_SUMMARY,
-      `${lines.join('\n')}\n`
-    );
+    appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join('\n')}\n`);
   }
 }
 

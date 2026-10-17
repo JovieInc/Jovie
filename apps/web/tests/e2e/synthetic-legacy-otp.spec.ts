@@ -3,8 +3,8 @@ import {
   buildProductionSignupEmail,
   cleanupProductionSyntheticSignup,
   fillOtpCode,
-  tagProductionSyntheticSignup,
   syntheticOtpUnavailableReason,
+  tagProductionSyntheticSignup,
   validateProductionSignupCanaryConfig,
   waitForProductionSignupOtp,
 } from './utils/production-signup-canary';

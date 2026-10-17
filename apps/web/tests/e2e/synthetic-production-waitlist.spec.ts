@@ -120,7 +120,9 @@ test.describe('Synthetic Monitoring - production waitlist', () => {
         new URL('/api/canary/waitlist/receipt?mode=preflight', 'https://jov.ie')
       )
     );
-    expect(preflight.emailSha256).toBe(hashProductionWaitlistCanaryEmail(email));
+    expect(preflight.emailSha256).toBe(
+      hashProductionWaitlistCanaryEmail(email)
+    );
   });
 
   test('retains identity and proves waitlist suppression', async ({ page }) => {
