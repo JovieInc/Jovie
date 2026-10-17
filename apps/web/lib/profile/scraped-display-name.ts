@@ -13,6 +13,7 @@ export function cleanScrapedDisplayName(
 ): string | null {
   if (!value) return null;
   const cleaned = value
+    .trim()
     .replace(PAGE_TITLE_SUFFIX, '')
     .replace(PIPE_SUFFIX, '')
     .replace(/^@+/, '')
