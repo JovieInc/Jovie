@@ -3,6 +3,8 @@ from copy import deepcopy
 from contextlib import contextmanager
 from types import SimpleNamespace
 import subprocess
+import hashlib
+import shutil
 from pathlib import Path
 import json
 import os
@@ -327,11 +329,76 @@ class ReadBoundaryTest(unittest.TestCase):
         reads.linear = SimpleNamespace(admit=lambda cost: True, gql=lambda query, variables: {"issue": linear_row()})
         return reads
 
+    @contextmanager
+    def installed_runtime(self, *, bind_policy=True):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve(); repo = root / "repo"; repo.mkdir()
+            lanes = repo / "scripts/lanes"; lanes.mkdir(parents=True)
+            (lanes / "lane_runner.py").write_text("# fixture installed source\n")
+            policy = repo / "scripts/fleet-gate/scoped_admission.py"
+            policy.parent.mkdir(); policy.write_text("# fixture fleet policy\n")
+            # Reuse lifecycle tests' independent Git object fixture pattern.
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
+            tree = subprocess.run(["git", "-C", str(repo), "write-tree"], check=True,
+                                  capture_output=True, text=True).stdout.strip()
+            paths = ["scripts/lanes", *(["scripts/fleet-gate/scoped_admission.py"] if bind_policy else [])]
+            objects = {name: subprocess.run(["git", "-C", str(repo), "rev-parse", tree + ":" + name],
+                                           check=True, capture_output=True, text=True).stdout.strip() for name in paths}
+            digest = hashlib.sha256(json.dumps(objects, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+            manifest = {"schema": "jovie-lane-release-bundle/v1", "sourceCommit": "d" * 40,
+                        "objects": objects, "bundleDigest": digest}
+            state = root / "state"; release = state / "releases" / digest
+            shutil.copytree(repo / "scripts", release / "scripts")
+            current = release / "scripts/lanes"
+            (current / ".release.json").write_text(json.dumps(manifest))
+            (current / ".bundle").write_text(digest)
+            (current / ".tree").write_text(objects["scripts/lanes"])
+            yield current, state, manifest
+
+    def test_unlisted_fleet_policy_holds_before_existing_transports(self):
+        import lane_runner as lane
+        with self.installed_runtime(bind_policy=False) as (current, state, _), \
+             patch.object(lane, "__file__", str(current / "lane_runner.py")), \
+             patch.object(lane, "Host") as host, patch.object(lane, "Linear") as linear, \
+             patch.object(lane, "load_github_env") as load, \
+             patch.object(admission._NativeReads, "gh", return_value={"ref": "refs/heads/main", "object": {"type": "commit", "sha": "d" * 40}}) as gh:
+            with self.assertRaisesRegex(admission.Unavailable, "installed-fleet-policy-not-manifest-bound"):
+                admission._NativeReads(current, state)
+            host.assert_not_called(); linear.assert_not_called(); load.assert_not_called(); gh.assert_not_called()
+
+    def test_malformed_fleet_policy_binding_holds_before_release_validation(self):
+        import lane_runner as lane
+        policy = "scripts/fleet-gate/scoped_admission.py"
+        malformed = [None, [], {}, *[{policy: value} for value in [None, False, 7, [], {}, "", "e" * 39, "e" * 41, "E" * 40, "g" * 40]]]
+        with self.installed_runtime() as (current, state, manifest), \
+             patch.object(lane, "__file__", str(current / "lane_runner.py")), \
+             patch.object(lane.lifecycle, "validate_release", wraps=lane.lifecycle.validate_release) as validate, \
+             patch.object(lane, "Host") as host, patch.object(lane, "Linear") as linear, \
+             patch.object(lane, "load_github_env") as load, patch.object(admission._NativeReads, "gh") as gh:
+            for objects in malformed:
+                with self.subTest(objects=objects):
+                    (current / ".release.json").write_text(json.dumps({**manifest, "objects": objects}))
+                    with self.assertRaisesRegex(admission.Unavailable, "installed-fleet-policy-not-manifest-bound"):
+                        admission._NativeReads(current, state)
+            validate.assert_not_called(); host.assert_not_called(); linear.assert_not_called(); load.assert_not_called(); gh.assert_not_called()
+
+    def test_bound_fleet_policy_still_uses_real_source_integrity_validation(self):
+        import lane_runner as lane
+        with self.installed_runtime() as (current, state, _):
+            reads = object.__new__(admission._NativeReads)
+            reads.lane, reads.current, reads.state = lane, current, state
+            reads.validate_runtime()
+            (current.parent / "fleet-gate/scoped_admission.py").write_text("# tampered after qualification\n")
+            with self.assertRaisesRegex(lane.lifecycle.AdmissionHeld, "qualified release source mismatch"):
+                reads.validate_runtime()
+
     def test_runtime_bootstrap_uses_installed_release_validator_and_existing_transports(self):
         import lane_runner as lane
         with tempfile.TemporaryDirectory() as tmp:
             current = Path(tmp).resolve() / ("a" * 64) / "scripts/lanes"; current.mkdir(parents=True)
-            (current / ".release.json").write_text(json.dumps({"schema": "jovie-lane-release-bundle/v1", "bundleDigest": "a" * 64}))
+            (current / ".release.json").write_text(json.dumps({"schema": "jovie-lane-release-bundle/v1", "bundleDigest": "a" * 64,
+                                                                           "objects": {"scripts/fleet-gate/scoped_admission.py": "e" * 40}}))
             state = current.parent.parent.parent
             with patch.object(lane, "__file__", str(current / "lane_runner.py")), \
                  patch.object(lane.lifecycle, "validate_release") as validate, patch.object(lane, "Linear") as linear, \

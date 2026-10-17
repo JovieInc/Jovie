@@ -473,6 +473,9 @@ class DoctorCensusTest(unittest.TestCase):
                     mock.patch.object(lane, "load_providers", return_value=providers), \
                     mock.patch.object(lane, "Linear", return_value=tracker), \
                     mock.patch.object(lane, "in_flight_issues", return_value=frozenset()), \
+                    mock.patch.object(lane, "open_hotspot_holds", return_value={}), \
+                    mock.patch.object(lane, "held_back_issues", return_value=frozenset()), \
+                    mock.patch.object(lane, "overlap_inventory", return_value=([], [])), \
                     mock.patch.object(lane, "load_github_env"), \
                     mock.patch.object(lane, "read_new_issue_budget",
                                       side_effect=lambda name, slots: {"allowed": True, "used": 0, "reason": "within-budget"}), \
