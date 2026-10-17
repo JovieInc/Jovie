@@ -816,6 +816,194 @@ class LedgerSchemaTest(unittest.TestCase):
         self.assertIn("24h verdicts:", text)
 
 
+class SlotViewportTest(unittest.TestCase):
+    def crowded(self, count=36):
+        sample = model()
+        names = ("devin", "codex", "claude")
+        sample["local"]["slots"] = {name: count // 3 for name in names}
+        sample["local"]["providers"] = {name: {} for name in names}
+        sample["local"]["workers"] = [
+            {"pid": index + 1, "provider": names[index // (count // 3)],
+             "run": {"runId": f"run-{index}", "provider": names[index // (count // 3)],
+                     "kind": "issue", "target": f"JOV-{90000 + index}",
+                     "startedAt": "2026-09-26T20:00:00+00:00", "phase": "agent"}}
+            for index in range(count)]
+        return sample
+
+    def targets(self, frame):
+        return set(re.findall(r"\bJOV-9[0-9]{4}\b", "\n".join(plain(row) for row in frame)))
+
+    def test_every_running_slot_is_reachable_at_typical_and_ultrawide_sizes(self):
+        expected = {f"JOV-{90000 + index}" for index in range(36)}
+        for width, height in ((80, 24), (120, 30), (160, 45), (240, 60)):
+            with self.subTest(width=width, height=height):
+                sample, viewport, reached = self.crowded(), hud.SlotViewport(), set()
+                for _ in range(36):
+                    frame = hud.render(sample, width, height, viewport)
+                    self.assertEqual(len(frame), height)
+                    self.assertTrue(all(hud.visible(row) == width for row in frame))
+                    text = "\n".join(plain(row) for row in frame)
+                    self.assertIn("36 running", text)
+                    self.assertIn("PgUp/PgDn", text)
+                    self.assertNotIn("vacant", text)
+                    reached.update(self.targets(frame))
+                    if viewport.offset + viewport.page_size >= viewport.total:
+                        break
+                    viewport.move("page-down")
+                self.assertEqual(reached, expected)
+
+    def test_reduced_slots_and_unconfigured_observed_workers_remain_reachable(self):
+        sample, viewport = self.crowded(12), hud.SlotViewport()
+        sample["local"]["slots"] = {"devin": 0, "codex": 0}
+        reached = set()
+        for _ in range(12):
+            frame = hud.render(sample, 120, 30, viewport)
+            reached.update(self.targets(frame))
+            self.assertNotIn("vacant", "\n".join(plain(row) for row in frame))
+            viewport.move("page-down")
+        self.assertEqual(reached, {f"JOV-{90000 + index}" for index in range(12)})
+
+    def test_end_anchor_survives_resize_and_home_returns_to_first_slot(self):
+        sample, viewport = self.crowded(), hud.SlotViewport()
+        hud.render(sample, 160, 45, viewport)
+        viewport.move("end")
+        for width, height in ((160, 45), (240, 60), (80, 24)):
+            frame = hud.render(sample, width, height, viewport)
+            self.assertIn("JOV-90035", self.targets(frame))
+            self.assertEqual(viewport.offset, viewport.total - viewport.page_size)
+        viewport.move("home")
+        frame = hud.render(sample, 80, 24, viewport)
+        self.assertIn("JOV-90000", self.targets(frame))
+        self.assertNotIn("JOV-90035", self.targets(frame))
+        self.assertEqual(viewport.offset, 0)
+
+    def test_navigation_decodes_split_and_concatenated_terminal_sequences(self):
+        keyboard = hud.TerminalInput()
+        self.assertEqual(keyboard.feed(b"\x1b["), [])
+        self.assertEqual(keyboard.feed(b"6~\x1b[A\x1b[B"), ["page-down", "up", "down"])
+        self.assertEqual(keyboard.feed(b"\x1bOH\x1bOF\x1b[5~"), ["home", "end", "page-up"])
+        self.assertEqual(keyboard.feed(b"ignored\x1b[1~\x1b[4~"), ["home", "end"])
+
+    def test_terminal_attributes_are_restored_after_exception_or_ctrl_c(self):
+        for failure in (RuntimeError("leave"), KeyboardInterrupt()):
+            keyboard = hud.TerminalInput()
+            stream = mock.Mock()
+            stream.isatty.return_value = True
+            stream.fileno.return_value = 42
+            saved = ["original console mode"]
+            with self.subTest(failure=type(failure).__name__), \
+                    mock.patch.object(hud.sys, "stdin", stream), \
+                    mock.patch.object(hud.sys, "stdout", stream), \
+                    mock.patch.object(hud.termios, "tcgetattr", return_value=saved), \
+                    mock.patch.object(hud.tty, "setcbreak") as enter, \
+                    mock.patch.object(hud.termios, "tcsetattr") as restore:
+                with self.assertRaises(type(failure)):
+                    with keyboard:
+                        raise failure
+            enter.assert_called_once_with(42)
+            restore.assert_called_once_with(42, hud.termios.TCSADRAIN, saved)
+
+    def test_noninteractive_output_keeps_sleep_without_reading_input(self):
+        with mock.patch.object(hud.sys, "stdin", io.StringIO()), \
+                mock.patch.object(hud.sys, "stdout", io.StringIO()), \
+                mock.patch.object(hud.time, "sleep") as sleep, \
+                mock.patch.object(hud.select, "select") as select_input, \
+                mock.patch.object(hud.termios, "tcgetattr") as attributes:
+            with hud.TerminalInput() as keyboard:
+                self.assertEqual(keyboard.wait(0.25), [])
+        sleep.assert_called_once_with(0.25)
+        select_input.assert_not_called()
+        attributes.assert_not_called()
+
+    def test_real_loop_resizes_and_scrolls_without_repolling_the_model(self):
+        class StopLoop(Exception):
+            pass
+        class TTYBuffer(io.StringIO):
+            def isatty(self):
+                return True
+        sample, keyboard, frames = self.crowded(), hud.TerminalInput(), []
+        saved_render = hud.render
+        def render(value, width, height, viewport):
+            frame = saved_render(value, width, height, viewport)
+            frames.append((width, height, self.targets(frame)))
+            return frame
+        def wait(_):
+            if len(frames) == 1:
+                return keyboard.feed(b"\x1b[F")
+            if len(frames) == 2:
+                return keyboard.feed(b"\x1b[5~")
+            raise StopLoop()
+        with tempfile.TemporaryDirectory() as directory, \
+                mock.patch.object(hud.lane, "Host", return_value=SimpleNamespace(state=Path(directory))), \
+                mock.patch.object(hud.lane, "load_github_env"), \
+                mock.patch.object(hud, "Remote"), \
+                mock.patch.object(hud, "current_hud", return_value=None), \
+                mock.patch.object(hud, "build_model", return_value=sample) as build, \
+                mock.patch.object(hud, "render", side_effect=render), \
+                mock.patch.object(hud, "TerminalInput", return_value=keyboard), \
+                mock.patch.object(keyboard, "wait", side_effect=wait), \
+                mock.patch.object(hud.time, "monotonic", side_effect=[100] + [104] * 16), \
+                mock.patch.object(shutil, "get_terminal_size", return_value=hud.os.terminal_size((160, 45))), \
+                mock.patch.object(hud.os, "get_terminal_size", side_effect=[
+                    hud.os.terminal_size((160, 45)), hud.os.terminal_size((240, 60)),
+                    hud.os.terminal_size((120, 30))]), \
+                mock.patch.object(hud.sys, "stdin", io.StringIO()), \
+                mock.patch.object(hud.sys, "stdout", TTYBuffer()):
+            with self.assertRaises(StopLoop):
+                hud.main([])
+        self.assertEqual([(width, height) for width, height, _ in frames], [(160, 45), (240, 60), (120, 30)])
+        self.assertIn("JOV-90035", frames[1][2])
+        self.assertIn("JOV-90000", frames[2][2])
+        build.assert_called_once()
+
+    def test_release_reexec_restores_input_before_handoff(self):
+        class Handoff(Exception):
+            pass
+        keyboard, order = hud.TerminalInput(), []
+        def execute(*_):
+            order.append("exec")
+            raise Handoff()
+        with mock.patch.object(hud.lane, "Host", return_value=SimpleNamespace(state=Path("/unused"))), \
+                mock.patch.object(hud.lane, "load_github_env"), \
+                mock.patch.object(hud, "Remote"), \
+                mock.patch.object(hud, "TerminalInput", return_value=keyboard), \
+                mock.patch.object(keyboard, "restore", side_effect=lambda: order.append("restore")), \
+                mock.patch.object(hud, "current_hud", return_value=Path("/new-release/hud.py")), \
+                mock.patch.object(hud.os, "execv", side_effect=execute), \
+                mock.patch.object(hud.sys, "stdin", io.StringIO()), \
+                mock.patch.object(hud.sys, "stdout", io.StringIO()):
+            with self.assertRaises(Handoff):
+                hud.main([])
+        self.assertEqual(order, ["restore", "exec", "restore"])
+
+    def test_current_dimensions_keep_explicit_width_and_height_overrides(self):
+        stream = mock.Mock()
+        stream.isatty.return_value = True
+        args = SimpleNamespace(width=120, height=None)
+        with mock.patch.object(hud.sys, "stdout", stream), \
+                mock.patch.object(hud.os, "get_terminal_size", side_effect=[
+                    hud.os.terminal_size((160, 45)), hud.os.terminal_size((240, 60)),
+                    hud.os.terminal_size((80, 24))]) as size:
+            self.assertEqual(hud.terminal_dimensions(args), (120, 45))
+            self.assertEqual(hud.terminal_dimensions(args), (120, 60))
+            args.width, args.height = None, 40
+            self.assertEqual(hud.terminal_dimensions(args), (80, 40))
+        self.assertEqual(size.call_count, 3)
+
+    def test_once_can_select_the_last_slot_page_without_terminal_input(self):
+        output = io.StringIO()
+        with mock.patch.object(hud.lane, "Host"), \
+                mock.patch.object(hud.lane, "load_github_env"), \
+                mock.patch.object(hud, "build_model", return_value=self.crowded()), \
+                mock.patch.object(hud, "TerminalInput") as keyboard, \
+                mock.patch.object(hud.sys, "stdout", output):
+            self.assertEqual(hud.main(["--once", "--width", "120", "--height", "30", "--slot-offset", "33"]), 0)
+        self.assertIn("JOV-90035", output.getvalue())
+        self.assertNotIn("JOV-90000", output.getvalue())
+        self.assertIn("Rows 34-36 of 36", output.getvalue())
+        keyboard.assert_not_called()
+
+
 class ManagedReleaseRestartTest(unittest.TestCase):
     def test_live_redraw_preserves_the_last_console_column(self):
         class StopLoop(Exception):
