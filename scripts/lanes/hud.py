@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Symphony HUD: the lanes' own truth on the Gem console (tty1), 160x45 by default.
 
-  hud.py                 # loop: render every 2s, refresh Linear/GitHub every 90s
+  hud.py                 # loop: render every 2s, refresh Linear every 90s, GitHub every 5m
   hud.py --once          # one frame to stdout (smoke test, screenshots)
   hud.py --json          # the model the frame is rendered from
 
@@ -166,6 +166,7 @@ def local_model(host) -> dict:
     base_slots = ({name: base_reader(name, spec.get("slots", 1)) for name, spec in enabled.items()}
                   if base_reader else dict(slots))
     doctor = read_json(state / "doctor.json", {})
+    held = read_json(state / "held.json", None)
     # The console unit has its own environment. Dispatcher observations carry the
     # effective host overrides and autoscaler result; HUD defaults are not capacity.
     slot_evidence = dispatcher_slots(doctor, enabled)
@@ -203,7 +204,8 @@ def local_model(host) -> dict:
         "ledger24h": dict(verdicts), "runs24h": len(receipts),
         "receipts24h": receipts, "attributionReceipts": all_receipts,
         "lastLanding": landed[0].get("endedAt") if landed else None,
-        "held": read_json(state / "held.json", {}), "failures": read_json(state / "failures.json", {}),
+        "held": held if isinstance(held, dict) else {},
+        "heldError": None if isinstance(held, dict) else "held.json unavailable or invalid", "failures": read_json(state / "failures.json", {}),
         "gateTimeouts": read_json(state / "gate-timeouts.json", {}), "requeue": read_json(state / "requeue.json", {}),
         "cooldowns": cooldowns, "codex": accounts, "doctor": doctor,
         "tick": read_json(state / "tick.json", {}),
@@ -272,17 +274,21 @@ def gh_json(args: list[str], timeout: int = 40):
 
 def github_model() -> dict:
     lane.load_github_env()
-    model: dict = {"ok": True, "errors": {}}
+    model: dict = {"ok": True, "errors": {}, "readAt": {}}
     try:
+        open_at = utcnow().isoformat()
         prs = []
         for name, spec in lane.load_providers().items():
             if not spec.get("enabled", True):
                 continue
             # One small page per lane: a single 100-PR page with check rollups times out (504).
             # No statusCheckRollup: with dozens of open lane PRs that field makes GitHub 504.
-            prs += gh_json(["pr", "list", "--repo", lane.REPO_SLUG, "--state", "open", "--limit", "60",
+            page = gh_json(["pr", "list", "--repo", lane.REPO_SLUG, "--state", "open", "--limit", "60",
                             "--search", f"head:{name}/", "--json",
-                            "number,title,headRefName,isDraft,mergeStateStatus,updatedAt,url"])
+                            "number,title,headRefName,headRefOid,isDraft,mergeStateStatus,updatedAt,url"])
+            if not isinstance(page, list) or len(page) >= 60:
+                raise RuntimeError(f"open PR inventory incomplete for {name} (page limit 60)")
+            prs += page
         rows = []
         for pr in prs:
             found = lane.LANE_BRANCH.match(pr["headRefName"])
@@ -290,8 +296,9 @@ def github_model() -> dict:
                 continue
             rows.append({"number": pr["number"], "title": pr["title"], "lane": found.group("lane"),
                          "issue": found.group("issue").upper(), "draft": pr["isDraft"], "merge": pr["mergeStateStatus"],
-                         "updatedAt": pr["updatedAt"]})
+                         "updatedAt": pr["updatedAt"], "headRefOid": pr.get("headRefOid")})
         model["open"] = sorted(rows, key=lambda r: r["updatedAt"], reverse=True)
+        model["readAt"]["open"] = open_at
     except Exception as error:
         model["errors"]["open"] = f"{type(error).__name__}: {error}"[:100]
     try:
@@ -301,29 +308,40 @@ def github_model() -> dict:
                                                  state / "merge-window.json" if state else None)
         model["mergedWindow"] = {k: v for k, v in evidence.items() if k != "prs"}
         merged = merge_evidence.require_complete(evidence)
+        source_until = evidence["window"]["until"]
+        if type(source_until) not in (int, float) or not 0 < source_until <= until:
+            raise ValueError("merge window source age unknown")
         model["merged24h"] = [{"number": m["number"], "title": m["title"], "mergedAt": m["mergedAt"],
                                "createdAt": m["createdAt"], "headRefName": m["headRefName"],
                                "headRefOid": m.get("headRefOid"), "mergeCommit": m.get("mergeCommit"),
                                "url": m.get("url"), "author": m.get("author"), "mergedBy": m.get("mergedBy"),
                                "lane": (lambda found: found.group("lane") if found else None)(lane.LANE_BRANCH.match(m["headRefName"]))}
                               for m in sorted(merged, key=lambda m: m["mergedAt"], reverse=True)]
+        # A shared cache preserves its original window end; reading it cannot renew it.
+        model["readAt"]["merged"] = datetime.fromtimestamp(source_until, timezone.utc).isoformat()
     except Exception as error:
         model["errors"]["merged"] = f"{type(error).__name__}: {error}"[:100]
     try:
+        queue_at = utcnow().isoformat()
         queue = gh_json(["api", "graphql", "-f", 'query={ repository(owner:"JovieInc", name:"Jovie"){ mergeQueue(branch:"main"){ '
                          'entries(first:20){ totalCount nodes { pullRequest { number } state enqueuedAt } } } } }'])
         entries = queue["data"]["repository"]["mergeQueue"]["entries"]
+        if len(entries["nodes"]) != entries["totalCount"]:
+            raise RuntimeError("merge queue inventory incomplete (page limit 20)")
         model["queue"] = {"depth": entries["totalCount"],
                           "entries": [{"number": e["pullRequest"]["number"], "state": e["state"], "enqueuedAt": e["enqueuedAt"]}
                                       for e in entries["nodes"]]}
+        model["readAt"]["queue"] = queue_at
     except Exception as error:
         model["errors"]["queue"] = f"{type(error).__name__}: {error}"[:100]
     try:
+        rate_at = utcnow().isoformat()
         limits = gh_json(["api", "rate_limit"])
         budget = lane.graphql_budget()
         if budget is None:
             raise RuntimeError("GraphQL rateLimit unreadable")
         model["rate"] = {"core": limits["resources"]["core"]["remaining"], "graphql": budget[0], "resetAt": budget[1]}
+        model["readAt"]["rate"] = rate_at
     except Exception as error:
         model["errors"]["rate"] = f"{type(error).__name__}: {error}"[:100]
     model["promotion"] = promotion_model()
@@ -494,11 +512,75 @@ def closer(width: int) -> str:
     return rgb(DIM, "└" + "─" * (width - 2) + "┘")
 
 
+def github_source_error(github: dict, source: str, now: datetime) -> str | None:
+    """A quota read or refresh attempt cannot renew an older source's truth."""
+    if error := github.get("errors", {}).get(source):
+        return error
+    stamps = github.get("readAt")
+    if "readAt" in github and not isinstance(stamps, dict):
+        return "source age unknown (invalid read timestamps)"
+    stamp = stamps.get(source) if isinstance(stamps, dict) else github.get("fetchedAt")
+    if not stamp:
+        return "not-read-yet (source age unknown)"
+    try:
+        seconds = (now - datetime.fromisoformat(stamp.replace("Z", "+00:00"))).total_seconds()
+    except (ValueError, TypeError, AttributeError):
+        return "source age unknown (invalid timestamp)"
+    if seconds < 0:
+        return "source age unknown (future timestamp)"
+    if seconds > 3 * REFRESH_GITHUB_S:
+        return "stale · last read " + age(stamp, now)
+    return None
+
+
+def repair_hold(pr: dict, held: dict) -> str | None:
+    """held.json describes a particular head, never a PR's permanent disposition."""
+    entry = held.get(str(pr["number"]))
+    head = pr.get("headRefOid")
+    if not isinstance(entry, dict) or not head or entry.get("sha") != head:
+        return None
+    reason = entry.get("reason")
+    if not isinstance(reason, str) or reason in ("", "unclassified"):
+        evidence = entry.get("evidence")
+        reason = next((line for line in evidence if isinstance(line, str) and line.strip()), "reason unknown") \
+            if isinstance(evidence, list) else "reason unknown"
+        reason = reason.replace("bash scripts/hooks/", "")
+    return "held: " + clip(reason, 48)
+
+
+def timestamp_age(stamp, now: datetime) -> float | None:
+    try:
+        return (now - datetime.fromisoformat(stamp.replace("Z", "+00:00"))).total_seconds()
+    except (ValueError, TypeError, AttributeError):
+        return None
+
+
+def capacity_receipt_error(doctor: dict, capacity: dict, now: datetime) -> str | None:
+    # A saved producer verdict cannot outlive the native receipt that carries it.
+    for source, stamp in (("doctor", doctor.get("at")), ("capacity", capacity.get("generatedAt"))):
+        elapsed = timestamp_age(stamp, now)
+        if elapsed is None:
+            return source + " unread"
+        if not 0 <= elapsed <= 3 * REFRESH_REMOTE_S:
+            return source + " stale"
+    return None
+
+
+def capacity_freshness(row: dict, now: datetime) -> str:
+    freshness = row.get("freshness") or {}
+    status = freshness.get("status") or "unknown"
+    if status != "fresh":
+        return status
+    elapsed = timestamp_age(freshness.get("observedAt"), now)
+    # Match capacity_horizon's existing account observation contract; no policy change.
+    return "unknown" if elapsed is None else "contradictory" if elapsed < -60 else "stale" if elapsed > 7200 else "fresh"
+
+
 def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
     now = utcnow()
     local, linear, github, system = model["local"], model["linear"], model["github"], model["system"]
     lines: list[str] = []
-    open_error = github.get("errors", {}).get("open")
+    open_error = github_source_error(github, "open", now)
     open_known = not open_error and isinstance(github.get("open"), list)
     open_prs = github["open"] if open_known else []
     titles = {}
@@ -507,17 +589,18 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
     titles.update(linear.get("active", {}))
 
     # header
-    gh_note = (f"GitHub {github['rate']['graphql']}/5000" if github.get("rate") else
-               "GitHub " + rgb(RED, github.get("errors", {}).get("rate", "unread")))
+    rate_error = github_source_error(github, "rate", now)
+    gh_note = (f"GitHub {github['rate']['graphql']}/5000" if github.get("rate") and not rate_error else
+               "GitHub " + rgb(RED, rate_error or "unread"))
     linear_note = (f"Linear mirror {age(linear['fetchedAt'], now)} · outbox {linear.get('outbox', 0)}" if linear.get("ok")
                    else "Linear " + rgb(RED, linear.get("error", "unread")))
     stale_flags = []
-    if github.get("fetchedAt") and (now - datetime.fromisoformat(github["fetchedAt"])).total_seconds() > 3 * REFRESH_GITHUB_S:
-        stale_flags.append("github stale " + age(github["fetchedAt"], now))
+    if any("stale" in (github_source_error(github, source, now) or "") for source in ("open", "queue", "merged", "rate")):
+        stale_flags.append("github stale")
     if linear.get("fetchedAt") and (now - datetime.fromisoformat(linear["fetchedAt"])).total_seconds() > 3 * REFRESH_REMOTE_S:
         stale_flags.append("linear stale " + age(linear["fetchedAt"], now))
     release = local.get("release") or "unknown-release"
-    hud_state = rgb(GREEN, "hud=release") if local.get("releaseMatchesHud") else rgb(ORANGE, "hud≠release (restarting)")
+    hud_state = rgb(GREEN, "hud=release") if local.get("releaseMatchesHud") else rgb(ORANGE, "hud≠release")
     tick = local.get("tick") or {}
     tick_age = age(tick.get("at"), now)
     tick_note = rgb(RED, f"tick {tick_age} ✕ {tick['error'][:40]}") if tick.get("error") else \
@@ -576,15 +659,22 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
     accounts = local["codex"]
     capacity = (local.get("doctor") or {}).get("capacity")
     if capacity and capacity.get("schema") == "jovie.capacity-horizon/v1":
+        capacity_error = capacity_receipt_error(local["doctor"], capacity, now)
         incidents = capacity.get("incidents") or []
+        leases = [] if capacity_error else capacity.get("leases") or []
+        source_gaps = sorted({capacity_freshness(row, now) for row in leases} - {"fresh"})
         lines.append(pad(rgb(FG, "CAPACITY HORIZON  ", bold=True) +
-                         rgb(RED if incidents else DIM,
-                             f"{len(capacity.get('leases') or [])} leases · {len(incidents)} incident(s) · show-only"), width))
-        for row in (capacity.get("leases") or [])[:4]:
+                         rgb(ORANGE if capacity_error else RED if incidents else DIM,
+                             f"unknown ({capacity_error}) · show-only" if capacity_error else
+                             f"{len(leases)} leases · {len(incidents)} reported incident(s) · show-only"), width))
+        for row in leases[:4]:
+            status = capacity_freshness(row, now)
+            known = status == "fresh"
             remaining = "?" if row.get("usableRemaining") is None else f"{row['usableRemaining']:g}%"
             banked = "?" if row.get("bankedCount") is None else str(row["bankedCount"])
             event = row.get("event") or {}
-            deadline = "?" if event.get("countdownSeconds") is None else dur(event["countdownSeconds"])
+            elapsed = timestamp_age(event.get("at"), now)
+            deadline = "?" if elapsed is None else dur(max(0, int(-elapsed)))
             forecast = row.get("forecast") or {}
             unused = "?" if forecast.get("projectedUnused") is None else f"{forecast['projectedUnused']:g}%"
             drain = forecast.get("completionP50At") or "?"
@@ -592,17 +682,26 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
             route = row.get("route") or {}
             job = route.get("selectedJob") or "no selected job"
             mode = str(row.get("mode") or "unknown").upper()
-            freshness = row.get("freshness") or {}
+            coverage = str(len(forecast.get("qualifiedWork") or []))
+            if not known:
+                remaining = banked = deadline = drain = rate = unused = coverage = "?"
+                mode, job = "UNKNOWN", "selection unknown"
             detail = (f"{row.get('alias', '?')} {remaining} · banked {banked} · {event.get('label', 'source gap')} "
-                      f"{deadline} · drain {drain} @ {rate} · unused {unused} · coverage {len(forecast.get('qualifiedWork') or [])} · {mode} · {job} · {freshness.get('status', 'unknown')}")
-            lines.append(pad("  " + rgb(RED if mode == "EMERGENCY" else GREEN if mode == "NORMAL" and freshness.get("status") == "fresh" else ORANGE, detail), width))
-        blocker = capacity.get("topBlocker") or "no material blocker"
-        lines.append(pad("  " + rgb(RED if incidents else DIM, f"top blocker: {blocker}"), width))
+                      f"{deadline} · drain {drain} @ {rate} · unused {unused} · coverage {coverage} · {mode} · {job} · {status}")
+            lines.append(pad("  " + rgb(RED if mode == "EMERGENCY" else GREEN if mode == "NORMAL" and known else ORANGE, detail), width))
+        blocker = f"unknown ({capacity_error})" if capacity_error else \
+            "capacity source " + ", ".join(source_gaps) if source_gaps else capacity.get("topBlocker") or "no material blocker"
+        lines.append(pad("  " + rgb(ORANGE if capacity_error or source_gaps else RED if incidents else DIM, f"top blocker: {blocker}"), width))
     elif accounts.get("error"):
         lines.append(pad(rgb(FG, "CODEX ACCOUNTS  ", bold=True) + rgb(RED, accounts["error"]), width))
     else:
         parts = []
         for name, row in accounts.get("accounts", {}).items():
+            source = ((row.get("capacityLease") or {}).get("sources") or {}).get("capacity") or {}
+            status = capacity_freshness({"freshness": {"status": "fresh", "observedAt": source.get("observedAt")}}, now)
+            if status != "fresh":
+                parts.append(rgb(ORANGE, f"? {name} capacity {status}" + (" · leased" if row["leased"] else "")))
+                continue
             remaining = "?" if row.get("remainingPercent") is None else f"{row['remainingPercent']}%"
             reset = "?" if row.get("naturalResetInS") is None else dur(row["naturalResetInS"])
             banked = "?" if row.get("bankedResetCount") is None else str(row["bankedResetCount"])
@@ -619,11 +718,19 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
             lines.append(pad("  " + part, width))
 
     # pipeline
-    queue = github.get("queue", {})
+    queue_error = github_source_error(github, "queue", now)
+    queue = github.get("queue") or {}
+    if not isinstance(queue.get("entries"), list) or not isinstance(queue.get("depth"), int):
+        queue_error = queue_error or "not-read-yet"
+    if queue_error:
+        queue = {}
     queued = {e["number"]: e for e in queue.get("entries", [])}
-    counts = (f"open lane PRs {len(open_prs)} · draft {sum(1 for p in open_prs if p['draft'])} · ready {sum(1 for p in open_prs if not p['draft'])}"
-              if open_known else "open lane PRs unknown · draft unknown · ready unknown")
-    head = f"PIPELINE · {counts} · merge queue {queue.get('depth', rgb(RED, github.get('errors', {}).get('queue', 'unread')))}"
+    counts = (f"open lane PRs {len(open_prs)} · draft {sum(1 for p in open_prs if p['draft'])} · non-draft {sum(1 for p in open_prs if not p['draft'])}"
+              if open_known else "open lane PRs unknown · draft unknown · non-draft unknown")
+    head = f"PIPELINE · {counts} · merge queue {queue.get('depth', rgb(RED, "unknown · " + (queue_error or "unread")))}"
+    if open_known:
+        stamp = (github.get("readAt") or {}).get("open") or github.get("fetchedAt")
+        head += " · PR read " + age(stamp, now)
     if not open_known:
         head += " · " + rgb(RED, "PR list: " + (open_error or "not-read-yet"))
     lines.append(rgb(FG, head, bold=True))
@@ -632,31 +739,38 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
     for pr in open_prs[:pipeline_budget]:
         merge = pr.get("merge") or "UNKNOWN"
         check_text = rgb(merge_colors.get(merge, DIM), f"{merge.lower():<8}")
-        held = local["held"].get(str(pr["number"]))
+        held = repair_hold(pr, local["held"])
         note = ""
         if pr["number"] in queued:
             note = rgb(GREEN, f"in queue {queued[pr['number']]['state'].lower()} {age(queued[pr['number']]['enqueuedAt'], now).replace(' ago', '')}")
-        elif pr["merge"] == "DIRTY":
+        elif merge == "DIRTY":
             note = rgb(RED, "merge conflict")
         elif held:
-            evidence = (held.get("evidence") or ["gate"])[0].replace("bash scripts/hooks/", "")
-            note = rgb(ORANGE, "held: " + evidence[:48])
+            note = rgb(ORANGE, held)
         elif pr["draft"]:
             note = rgb(DIM, "draft · awaiting gate")
-        elif pr["merge"] == "BLOCKED":
-            note = rgb(ORANGE, "ready · blocked by checks")
+        elif merge == "BLOCKED":
+            note = rgb(ORANGE, "blocked · reason unknown")
+        elif merge == "UNSTABLE":
+            note = rgb(ORANGE, "non-passing status")
+        elif merge == "UNKNOWN":
+            note = rgb(DIM, "merge state unknown")
         else:
-            note = rgb(DIM, pr["merge"].lower())
-        state = rgb(DIM, "DRAFT") if pr["draft"] else rgb(GREEN, "READY")
+            note = rgb(DIM, merge.lower())
+        if held and (pr["number"] in queued or merge == "DIRTY"):
+            note += rgb(ORANGE, " · " + held)
+        state = rgb(DIM, "DRAFT" if pr["draft"] else "OPEN ")
         number, lane_name, issue_id = rgb(WHITE, "#" + str(pr["number"])), rgb(DIM, f"{pr['lane']:<6}"), f"{pr['issue']:<9}"
-        title = clip(pr["title"], 58)
-        title += " " * (58 - visible(title))
+        # Keep the full disposition visible on the console before spending space on the title.
+        title_width = max(16, min(58, width - visible(f" {number} {lane_name} {issue_id}  {state} {check_text}  {note}")))
+        title = clip(pr["title"], title_width)
+        title += " " * (title_width - visible(title))
         lines.append(pad(f" {number} {lane_name} {issue_id} {title} {state} {check_text}  {note}", width))
     if len(open_prs) > pipeline_budget:
         lines.append(rgb(DIM, f" … {len(open_prs) - pipeline_budget} more"))
 
     # recently merged
-    merge_error = github.get("errors", {}).get("merged")
+    merge_error = github_source_error(github, "merged", now)
     if not merge_error and "merged24h" not in github:
         merge_error = "merged-pr-evidence:not-read-yet"
     if not merge_error and (github.get("mergedWindow") or {}).get("complete") is False:
@@ -684,6 +798,8 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
     # needs attention
     ledger = local["ledger24h"]
     attention = []
+    if local.get("heldError"):
+        attention.append(rgb(RED, local["heldError"]))
     for key, text in local.get("doctor", {}).get("alerts", {}).items():
         attention.append(rgb(RED, f"✕ {key}: {text}"))
     if local["cooldowns"]:
@@ -700,8 +816,8 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
                                      f"exhausted {escalation.get('ladder_exhausted', 0)} "
                                      f"surfaced {len(escalation.get('surfaced') or [])}"))
     if not attention:
-        attention.append(rgb(GREEN, "✓ nothing needs a human"))
-    lines.append(rgb(FG, "NEEDS ATTENTION  ", bold=True) + rgb(DIM, f"held {len(local['held'])} · failures {len(local['failures'])} · ") + " · ".join(attention[:4]))
+        attention.append(rgb(DIM, "no alerts recorded"))
+    lines.append(rgb(FG, "NEEDS ATTENTION  ", bold=True) + rgb(DIM, f"hold records {'unknown' if local.get('heldError') else len(local['held'])} · failures {len(local['failures'])} · ") + " · ".join(attention[:4]))
     throughput = lane.provider_throughput(local.get("receipts24h") or [], local.get("providers") or {}, merged,
                                           attribution_receipts=attribution_receipts)
     provider_parts = []
@@ -750,7 +866,7 @@ def pool_hint(name: str, local: dict) -> str:
         elapsed = (utcnow() - stamp).total_seconds()
         if elapsed < 0 or elapsed > 3 * REFRESH_REMOTE_S:
             return "new issues unknown (doctor stale)"
-    except (KeyError, TypeError, ValueError):
+    except (KeyError, TypeError, ValueError, AttributeError):
         return "new issues unknown (doctor unread)"
     if admission.get("error"):
         return "new issues unknown (" + admission["error"] + ")"
@@ -766,7 +882,14 @@ def pool_hint(name: str, local: dict) -> str:
         return "new issues unknown (admission unread)"
     reasons = (admission.get("rejectedByProvider") or {}).get(name) or {}
     distribution = ", ".join(f"{reason} {count}" for reason, count in sorted(reasons.items()))
-    capacity = f"PRs {budget['used']}/{budget['cap']} {budget['reason']}"
+    if budget.get("cap") is None and budget.get("allowed") is True:
+        capacity = "PR ceiling none"
+    elif budget.get("reason") == "provider-disabled":
+        capacity = "provider disabled"
+    else:
+        used = "?" if budget.get("used") is None else budget["used"]
+        cap = "?" if budget.get("cap") is None else budget["cap"]
+        capacity = f"PRs {used}/{cap} {budget['reason']}"
     return f"new issues {qualified} · eligible {eligible}/{candidates} · {capacity}" + (" · " + distribution if distribution else "")
 
 
@@ -789,10 +912,17 @@ class Remote(threading.Thread):
         github_at = None
         while True:
             targets = [w["run"]["target"] for w in running_workers(self.host.state) if w["run"]]
-            self.linear = linear_model(self.host.linear_env, targets)
+            try:
+                self.linear = linear_model(self.host.linear_env, targets)
+            except Exception as error:
+                self.linear = {"ok": False, "error": f"{type(error).__name__}: {error}"[:100]}
             if github_at is None or time.monotonic() - github_at >= REFRESH_GITHUB_S:
                 github_at = time.monotonic()
-                self.github = github_model()
+                try:
+                    self.github = github_model()
+                except Exception as error:
+                    self.github = {"ok": False, "errors": {source: f"{type(error).__name__}: {error}"[:100]
+                                   for source in ("open", "queue", "merged", "rate")}}
             time.sleep(REFRESH_REMOTE_S)
 
 
@@ -844,7 +974,9 @@ def main(argv=None) -> int:
                 sys.stdout.flush()
                 os.execv(sys.executable, [sys.executable, str(newer), *sys.argv[1:]])
             frame = render(build_model(host, remote), width, height)
-            sys.stdout.write("\x1b[H" + "\n".join(line + "\x1b[K" for line in frame))
+            # At full width the cursor remains on the final cell; clearing
+            # after writing erases that character while wrap is pending.
+            sys.stdout.write("\x1b[H" + "\n".join("\x1b[K" + line for line in frame))
             sys.stdout.flush()
             try:
                 (host.state / "hud.heartbeat").touch()  # the doctor raises hud-stale when this stops

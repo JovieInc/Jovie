@@ -1,5 +1,6 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -50,6 +51,7 @@ type Job = {
   with?: Record<string, unknown>;
   env?: Record<string, string>;
   steps?: Step[];
+  'timeout-minutes'?: number;
 };
 type Workflow = {
   on: Record<string, unknown>;
@@ -161,6 +163,12 @@ type World = {
   testflightAttempts?: Record<string, Record<string, unknown>>;
   testflightJobs?: Record<string, unknown[]>;
   legacyRuns?: Record<string, unknown>[];
+  quota?: {
+    path: string;
+    message: string;
+    resetInSeconds?: number | null;
+    failures?: number;
+  };
   binaries?: {
     id: number;
     runId: number;
@@ -270,7 +278,32 @@ function routes(world: World) {
     table.set(`actions/runs/${key}`, run);
   for (const [key, jobs] of Object.entries(world.testflightJobs ?? {}))
     table.set(`actions/runs/${key}/jobs?per_page=100`, { jobs });
+  let quotaFailures = world.quota?.failures;
   return (path: string) => {
+    if (
+      world.quota &&
+      (path === 'rate_limit' || path.startsWith('rate_limit?'))
+    ) {
+      return {
+        body: {
+          resources: {
+            core: {
+              reset:
+                world.quota.resetInSeconds === null
+                  ? ''
+                  : Math.floor(Date.now() / 1000) +
+                    (world.quota.resetInSeconds ?? 10_000),
+            },
+          },
+        },
+      };
+    }
+    if (world.quota && path.includes(world.quota.path)) {
+      if (quotaFailures === undefined || quotaFailures > 0) {
+        if (quotaFailures !== undefined) quotaFailures -= 1;
+        return { status: 403, body: { message: world.quota.message } };
+      }
+    }
     if (!path.startsWith(base)) return null;
     const rest = path.slice(base.length);
     return table.has(rest) ? { body: table.get(rest) as object } : null;
@@ -367,6 +400,190 @@ const attestedJob = (transport: string) => ({
 });
 
 describe.skipIf(!gh)('iOS TestFlight release authorization (real gh)', () => {
+  it('defers an installation 403 whose reset is outside the Authorize budget', async () => {
+    const installation = {
+      path: 'actions/workflows/production-controller.yml',
+      message: 'API rate limit exceeded for installation',
+    };
+    const summary = join(tempRoot('jovie-testflight-summary-'), 'summary');
+    writeFileSync(summary, '');
+    const firstRead = await authorize(
+      { quota: installation },
+      { GITHUB_STEP_SUMMARY: summary }
+    );
+    const resetEpoch = /resets at (\d+)/.exec(firstRead.stderr)?.[1];
+    const resetIso = new Date(Number(resetEpoch) * 1000)
+      .toISOString()
+      .replace(/\.\d{3}Z$/, 'Z');
+    const sentence = `Installation quota resets at ${resetIso}. Deferring TestFlight publication of ${RELEASE} to the next reconciliation. No release was authorized.`;
+    expect(firstRead.code, firstRead.stderr).toBe(0);
+    expect(firstRead.outputs.authorized).toBe('false');
+    expect(firstRead.outputs.release_sha).toBe('');
+    expect(firstRead.stderr).toContain('outside the 480s budget');
+    expect(firstRead.stdout).toContain(`::warning::${sentence}`);
+    expect(readFileSync(summary, 'utf8').trim()).toBe(sentence);
+    expect(firstRead.requests.some(path => path.includes('rate_limit'))).toBe(
+      true
+    );
+
+    writeFileSync(summary, '');
+    const afterProof = await authorize(
+      {
+        quota: {
+          path: 'actions/workflows/ios-testflight.yml',
+          message: 'API rate limit exceeded for installation',
+        },
+      },
+      { GITHUB_STEP_SUMMARY: summary }
+    );
+    const laterEpoch = /resets at (\d+)/.exec(afterProof.stderr)?.[1];
+    const laterIso = new Date(Number(laterEpoch) * 1000)
+      .toISOString()
+      .replace(/\.\d{3}Z$/, 'Z');
+    const laterSentence = `Installation quota resets at ${laterIso}. Deferring TestFlight publication of ${RELEASE} to the next reconciliation. No release was authorized.`;
+    expect(afterProof.code, afterProof.stderr).toBe(0);
+    expect(afterProof.outputs.authorized).toBe('false');
+    expect(afterProof.outputs.release_sha).toBe('');
+    expect(afterProof.stdout).toContain(`::warning::${laterSentence}`);
+    expect(readFileSync(summary, 'utf8').trim()).toBe(laterSentence);
+  });
+
+  it('formats a deferred reset with BSD date when GNU -d is rejected', async () => {
+    const root = tempRoot('jovie-testflight-bsd-date-');
+    const summary = join(root, 'summary');
+    const dateLog = join(root, 'date.log');
+    const dateBin = join(root, 'bin');
+    const layoutBin = join(root, 'macos-layout', 'bin');
+    const layoutUsrBin = join(root, 'macos-layout', 'usr', 'bin');
+    mkdirSync(dateBin);
+    mkdirSync(layoutBin, { recursive: true });
+    mkdirSync(layoutUsrBin, { recursive: true });
+    const hostDate = execFileSync('bash', ['-c', 'command -v date'], {
+      encoding: 'utf8',
+    }).trim();
+    expect(hostDate).toMatch(/^\/[\w./-]+$/);
+    const fixtureDate = join(layoutBin, 'date');
+    writeFileSync(
+      fixtureDate,
+      `#!/usr/bin/env bash
+set -euo pipefail
+exec ${hostDate} "$@"
+`,
+      { mode: 0o755 }
+    );
+    writeFileSync(summary, '');
+    writeFileSync(
+      join(dateBin, 'date'),
+      `#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\\n' "$*" >> "$DATE_LOG"
+resolve_real_date() {
+  local candidate candidates="\${DATE_CANDIDATES:-/bin/date:/usr/bin/date}"
+  local IFS=':'
+  for candidate in $candidates; do
+    if [ -n "$candidate" ] && [ -f "$candidate" ] && [ -x "$candidate" ]; then
+      printf '%s\\n' "$candidate"
+      return 0
+    fi
+  done
+  echo "date: no real date binary on DATE_CANDIDATES" >&2
+  return 1
+}
+has_d=0
+has_r=0
+prev=""
+epoch=""
+for arg in "$@"; do
+  if [ "$arg" = "-d" ]; then
+    has_d=1
+  fi
+  if [ "$prev" = "-r" ]; then
+    has_r=1
+    epoch="$arg"
+  fi
+  prev="$arg"
+done
+if [ "$has_d" -eq 1 ]; then
+  echo "date: illegal option -- d" >&2
+  exit 1
+fi
+if [ "$has_r" -eq 1 ]; then
+  node -e 'const epoch = Number(process.argv[1]); if (!Number.isFinite(epoch)) process.exit(1); process.stdout.write(new Date(epoch * 1000).toISOString().slice(0, 19) + "Z\\n");' "$epoch"
+  exit 0
+fi
+real="$(resolve_real_date)" || exit 1
+printf 'resolved %s\\n' "$real" >> "$DATE_LOG"
+exec "$real" "$@"
+`,
+      { mode: 0o755 }
+    );
+    const result = await authorize(
+      {
+        quota: {
+          path: 'actions/workflows/production-controller.yml',
+          message: 'API rate limit exceeded for installation',
+        },
+      },
+      {
+        DATE_CANDIDATES: `${join(layoutUsrBin, 'date')}:${fixtureDate}`,
+        DATE_LOG: dateLog,
+        GITHUB_STEP_SUMMARY: summary,
+        PATH: `${dateBin}:${process.env.PATH}`,
+      }
+    );
+    const resetEpoch = /resets at (\d+)/.exec(result.stderr)?.[1];
+    const resetIso =
+      new Date(Number(resetEpoch) * 1000).toISOString().slice(0, 19) + 'Z';
+    const sentence = `Installation quota resets at ${resetIso}. Deferring TestFlight publication of ${RELEASE} to the next reconciliation. No release was authorized.`;
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.stderr).not.toContain('could not format the reset instant');
+    expect(result.stdout).toContain(`::warning::${sentence}`);
+    expect(readFileSync(summary, 'utf8').trim()).toBe(sentence);
+    const dateCalls = readFileSync(dateLog, 'utf8');
+    expect(dateCalls).toContain('-d ');
+    expect(dateCalls).toContain('-r ');
+    expect(dateCalls).toContain(`resolved ${fixtureDate}`);
+    expect(dateCalls).not.toContain('/usr/bin/date');
+    expect(dateCalls).not.toContain(`resolved ${join(layoutUsrBin, 'date')}`);
+  });
+
+  it('keeps a permission 403 and a missing reset fatal', async () => {
+    const summary = join(tempRoot('jovie-testflight-summary-'), 'summary');
+    writeFileSync(summary, '');
+    const denied = await authorize(
+      {
+        quota: {
+          path: 'actions/workflows/production-controller.yml',
+          message: 'Resource not accessible by integration',
+        },
+      },
+      { GITHUB_STEP_SUMMARY: summary }
+    );
+    expect(denied.code).toBe(1);
+    expect(denied.outputs.authorized).toBe('false');
+    expect(denied.stdout).not.toContain('::warning::');
+    expect(denied.stdout).not.toContain('Deferring TestFlight publication');
+    expect(readFileSync(summary, 'utf8')).toBe('');
+    expect(denied.requests.some(path => path.includes('rate_limit'))).toBe(
+      false
+    );
+
+    const missingReset = await authorize(
+      {
+        quota: {
+          path: 'actions/workflows/production-controller.yml',
+          message: 'API rate limit exceeded for installation',
+          resetInSeconds: null,
+        },
+      },
+      { GITHUB_STEP_SUMMARY: summary }
+    );
+    expect(missingReset.code).toBe(1);
+    expect(missingReset.stderr).toContain('no x-ratelimit-reset');
+    expect(missingReset.stdout).not.toContain('::warning::');
+    expect(readFileSync(summary, 'utf8')).toBe('');
+  });
+
   it('authorizes the exact verified current main as the first release', async () => {
     const result = await authorize({});
     expect(result.code, result.stderr).toBe(0);
@@ -677,10 +894,24 @@ describe.skipIf(!gh)(
     async function record(
       binary: ReturnType<typeof binaryAttestation>,
       betaSha = NEWER,
-      { publisherAttempt = 1, source = RELEASE } = {}
+      {
+        publisherAttempt = 1,
+        source = RELEASE,
+        quota,
+        env = {},
+      }: {
+        publisherAttempt?: number;
+        source?: string;
+        quota?: World['quota'];
+        env?: Record<string, string>;
+      } = {}
     ) {
       const root = tempRoot('jovie-testflight-record-');
-      const step = workflow.jobs['record-upload'].steps?.find(step => step.run);
+      const output = join(root, 'output');
+      writeFileSync(output, '');
+      const step = workflow.jobs['record-upload'].steps?.find(
+        step => step.id === 'record'
+      );
       const result = await runWithRealGh({
         script: String(step?.run),
         env: {
@@ -690,7 +921,9 @@ describe.skipIf(!gh)(
           RUN_ID: '90',
           RUN_ATTEMPT: String(publisherAttempt),
           LEASE: JSON.stringify(binaryAttestation(source, NEWER, 90).lease),
+          ...env,
           GITHUB_WORKSPACE: repoRoot,
+          GITHUB_OUTPUT: output,
           GH_API_HOLD_BUDGET_SECONDS: String(
             step?.env?.GH_API_HOLD_BUDGET_SECONDS
           ),
@@ -707,9 +940,14 @@ describe.skipIf(!gh)(
               : {}),
           },
           binaries: [{ id: 500, runId: 90, attempt: 1, payload: binary }],
+          ...(quota ? { quota } : {}),
         }),
       });
-      return { ...result, path: join(root, 'testflight-upload-verified.json') };
+      return {
+        ...result,
+        path: join(root, 'testflight-upload-verified.json'),
+        outputs: readOutputs(output),
+      };
     }
     it('consumes a publisher-only rerun receipt from its failed earlier upload attempt', async () => {
       const published = await record(
@@ -802,8 +1040,123 @@ describe.skipIf(!gh)(
         RELEASE
       );
       expect(wrongJob.code).toBe(1);
+      expect(existsSync(wrongJob.path)).toBe(false);
       const wrongBinary = await record(binaryAttestation(OLDER, NEWER, 90));
       expect(wrongBinary.code).toBe(1);
+      expect(existsSync(wrongBinary.path)).toBe(false);
+    });
+
+    it('defers an installation 403 whose reset is outside the 180s record budget without writing a marker', async () => {
+      const summary = join(
+        tempRoot('jovie-testflight-record-summary-'),
+        'summary'
+      );
+      writeFileSync(summary, '');
+      const deferred = await record(
+        binaryAttestation(RELEASE, NEWER, 90),
+        NEWER,
+        {
+          quota: {
+            path: 'actions/runs/90',
+            message: 'API rate limit exceeded for installation',
+            resetInSeconds: 10_000,
+          },
+          env: { GITHUB_STEP_SUMMARY: summary },
+        }
+      );
+      const resetEpoch = /resets at (\d+)/.exec(deferred.stderr)?.[1];
+      const resetIso = new Date(Number(resetEpoch) * 1000)
+        .toISOString()
+        .replace(/\.\d{3}Z$/, 'Z');
+      expect(deferred.code, deferred.stderr).toBe(0);
+      expect(deferred.outputs.quota_deferred).toBe('true');
+      expect(deferred.outputs.quota_reset_epoch).toBe(resetEpoch);
+      expect(deferred.stderr).toContain('outside the 180s budget');
+      expect(deferred.stdout).toContain(
+        `Installation quota resets at ${resetIso}. Deferring the TestFlight upload record for ${RELEASE}. No marker was written; the same upload is recorded after the reset.`
+      );
+      expect(readFileSync(summary, 'utf8')).toContain('No marker was written');
+      expect(existsSync(deferred.path)).toBe(false);
+    });
+
+    it('fails a second outside-budget defer instead of skipping the marker', async () => {
+      const retried = await record(
+        binaryAttestation(RELEASE, NEWER, 90),
+        NEWER,
+        {
+          quota: {
+            path: 'actions/runs/90',
+            message: 'API rate limit exceeded for installation',
+            resetInSeconds: 10_000,
+          },
+          env: { TESTFLIGHT_RECORD_QUOTA_RETRY: '1' },
+        }
+      );
+      expect(retried.code, retried.stderr).toBe(1);
+      expect(retried.stderr).toContain(
+        'TestFlight upload record deferred again after the quota retry. Not passing.'
+      );
+      expect(retried.outputs.quota_deferred).toBeUndefined();
+      expect(existsSync(retried.path)).toBe(false);
+    });
+
+    it('records the marker when the installation quota resets inside the 180s budget', async () => {
+      const recorded = await record(
+        binaryAttestation(RELEASE, NEWER, 90),
+        NEWER,
+        {
+          quota: {
+            path: 'actions/runs/90',
+            message: 'API rate limit exceeded for installation',
+            resetInSeconds: -30,
+            failures: 1,
+          },
+        }
+      );
+      expect(recorded.code, recorded.stderr).toBe(0);
+      expect(recorded.outputs.quota_deferred).toBeUndefined();
+      expect(JSON.parse(readFileSync(recorded.path, 'utf8'))).toMatchObject({
+        schema: 'jovie-testflight-upload/v2',
+        sha: RELEASE,
+        transportSha: NEWER,
+        binarySha256: 'd'.repeat(64),
+        buildNumber: '44',
+        uploadJob: '9',
+      });
+      expect(recorded.stderr).toContain('Holding 0s');
+    });
+
+    it('stays fatal for a permission 403 and a rate limit with no reset', async () => {
+      const denied = await record(
+        binaryAttestation(RELEASE, NEWER, 90),
+        NEWER,
+        {
+          quota: {
+            path: 'actions/runs/90',
+            message: 'Resource not accessible by integration',
+          },
+        }
+      );
+      expect(denied.code, denied.stderr).toBe(1);
+      expect(denied.outputs.quota_deferred).toBeUndefined();
+      expect(denied.stdout).not.toContain('No marker was written');
+      expect(existsSync(denied.path)).toBe(false);
+
+      const missingReset = await record(
+        binaryAttestation(RELEASE, NEWER, 90),
+        NEWER,
+        {
+          quota: {
+            path: 'actions/runs/90',
+            message: 'API rate limit exceeded for installation',
+            resetInSeconds: null,
+          },
+        }
+      );
+      expect(missingReset.code, missingReset.stderr).toBe(1);
+      expect(missingReset.stderr).toContain('no x-ratelimit-reset');
+      expect(missingReset.outputs.quota_deferred).toBeUndefined();
+      expect(existsSync(missingReset.path)).toBe(false);
     });
   }
 );
@@ -912,6 +1265,9 @@ describe('certified TestFlight checkout isolation', () => {
     step => step.name === 'Checkout exact authorized main'
   );
   const pin = steps.find(step => step.id === 'pin');
+  const admitCheckout = steps.find(
+    step => step.name === 'Checkout pinned release guard'
+  );
 
   it('keeps transport sparse state out of the certified root checkout', () => {
     expect(bootstrap?.with).toMatchObject({
@@ -924,6 +1280,13 @@ describe('certified TestFlight checkout isolation', () => {
     expect(authorizeStep?.run).toContain(
       '$GITHUB_WORKSPACE/.testflight-bootstrap/.github/scripts/gh-api-hold.sh'
     );
+    expect(String(admitCheckout?.with?.['sparse-checkout'])).toContain(
+      '.github/scripts/testflight-release-lease.mjs'
+    );
+    expect(String(admitCheckout?.with?.['sparse-checkout'])).toContain(
+      '.github/scripts/gh-api-hold.sh'
+    );
+    expect(pin?.env?.GH_API_HOLD_BUDGET_SECONDS).toBe('480');
     expect(source?.with?.ref).toBe(
       '${{ steps.authorize.outputs.release_sha }}'
     );
@@ -1126,6 +1489,16 @@ describe('iOS TestFlight job graph', () => {
       expect(beta?.if).toContain(condition);
     const betaRuns = (beta?.steps ?? []).map(step => step.run ?? '').join('\n');
     expect(betaRuns).toContain('bundle exec fastlane ios beta');
+    const upload = beta?.steps?.find(
+      step => step.name === 'Upload internal TestFlight build'
+    );
+    expect(upload?.env?.GH_API_HOLD_BUDGET_SECONDS).toBe('600');
+    const guardCheckout = beta?.steps?.find(
+      step => step.name === 'Checkout pinned release guard'
+    );
+    expect(String(guardCheckout?.with?.['sparse-checkout'])).toContain(
+      '.github/scripts/gh-api-hold.sh'
+    );
     // The Xcode suite already ran in full-regression; beta must not repeat it.
     expect(betaRuns).not.toContain('fastlane ios ios_tests');
     expect(JSON.stringify(beta)).not.toContain(
@@ -1140,6 +1513,94 @@ describe('iOS TestFlight job graph', () => {
     expect(record?.needs).toEqual(['authorize-release', 'beta']);
     expect(record?.if).toContain("needs.beta.result == 'success'");
   });
+
+  it('records a deferred upload later and fails the workflow if that marker is skipped', () => {
+    const record = workflow.jobs['record-upload'];
+    const wait = workflow.jobs['wait-for-deferred-testflight-record'];
+    const retry = workflow.jobs['record-deferred-upload'];
+    const required = workflow.jobs['require-recorded-upload'];
+    const recordStep = record?.steps?.find(step => step.id === 'record');
+    const artifact = record?.steps?.find(
+      step => step.name === 'Preserve upload-only TestFlight baseline marker'
+    );
+    const checkout = record?.steps?.find(
+      step => step.name === 'Checkout the rate-limit hold'
+    );
+    expect(recordStep?.env?.GH_API_HOLD_BUDGET_SECONDS).toBe('180');
+    expect(recordStep?.run).toContain(
+      '.github/scripts/testflight-record-upload.sh'
+    );
+    expect(String(checkout?.with?.['sparse-checkout'])).toContain(
+      '.github/scripts/gh-api-hold.sh'
+    );
+    expect(String(checkout?.with?.['sparse-checkout'])).toContain(
+      '.github/scripts/testflight-record-upload.sh'
+    );
+    expect(artifact?.if).toContain("quota_deferred != 'true'");
+    expect(artifact?.with?.['if-no-files-found']).toBe('error');
+    expect(wait?.needs).toEqual(['record-upload']);
+    expect(wait?.if).toContain(
+      "needs.record-upload.outputs.quota_deferred == 'true'"
+    );
+    expect(wait?.['timeout-minutes']).toBe(70);
+    const waitRun = String(wait?.steps?.find(step => step.run)?.run);
+    expect(waitRun).toContain('3900');
+    expect(waitRun).not.toContain('gh api');
+    const retryStep = retry?.steps?.find(step => step.run);
+    expect(retry?.needs).toEqual([
+      'authorize-release',
+      'wait-for-deferred-testflight-record',
+    ]);
+    expect(retryStep?.env?.GH_API_HOLD_BUDGET_SECONDS).toBe('180');
+    expect(retryStep?.env?.TESTFLIGHT_RECORD_QUOTA_RETRY).toBe('1');
+    expect(retryStep?.run).toContain(
+      '.github/scripts/testflight-record-upload.sh'
+    );
+    expect(
+      retry?.steps?.find(step =>
+        step.uses?.startsWith('actions/upload-artifact')
+      )?.with?.['if-no-files-found']
+    ).toBe('error');
+    expect(required?.needs).toEqual([
+      'record-upload',
+      'record-deferred-upload',
+    ]);
+    expect(required?.if).toContain("needs.record-upload.result == 'success'");
+    const requireRun = String(required?.steps?.find(step => step.run)?.run);
+    expect(requireRun).toContain(
+      'Successful TestFlight upload was not recorded after the quota defer.'
+    );
+    const runRequire = (deferred: string, retryResult: string) =>
+      spawnSync('bash', ['-c', requireRun], {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          QUOTA_DEFERRED: deferred,
+          RETRY_RESULT: retryResult,
+        },
+      });
+    expect(runRequire('', 'skipped').status).toBe(0);
+    expect(runRequire('true', 'success').status).toBe(0);
+    const skipped = runRequire('true', 'skipped');
+    expect(skipped.status).toBe(1);
+    expect(skipped.stderr).toContain(
+      'Successful TestFlight upload was not recorded after the quota defer.'
+    );
+    const runWait = (epoch: string) =>
+      spawnSync('bash', ['-c', waitRun], {
+        encoding: 'utf8',
+        env: { ...process.env, QUOTA_RESET_EPOCH: epoch },
+      });
+    const ready = runWait(String(Math.floor(Date.now() / 1000) - 30));
+    expect(ready.status, ready.stderr).toBe(0);
+    expect(ready.stdout).toContain('Waiting 0s');
+    const late = runWait(String(Math.floor(Date.now() / 1000) + 10_000));
+    expect(late.status).toBe(1);
+    expect(late.stderr).toContain('outside the 3900s retry cap');
+    const malformed = runWait('nope');
+    expect(malformed.status).toBe(1);
+    expect(malformed.stderr).toContain('no quota reset epoch');
+  });
 });
 
 describe('iOS TestFlight release routing and lane', () => {
@@ -1149,7 +1610,13 @@ describe('iOS TestFlight release routing and lane', () => {
     const called = join(root, 'called');
     writeFileSync(
       guard,
-      `import {writeFileSync} from 'node:fs'; writeFileSync(process.env.FIXTURE_CALLED, process.argv[2]); process.exit(Number(process.env.FIXTURE_GUARD_STATUS));`
+      `import {writeFileSync} from 'node:fs';
+writeFileSync(process.env.FIXTURE_CALLED, process.argv[2]);
+const status = Number(process.env.FIXTURE_GUARD_STATUS);
+if (status !== 0) {
+  console.error('::error::TestFlight lease rejected: fixture denial');
+  process.exit(status);
+}`
     );
     const script = `
       def default_platform(*)\nend
@@ -1170,12 +1637,22 @@ describe('iOS TestFlight release routing and lane', () => {
     const fastfile = resolve(repoRoot, 'fastlane/Fastfile');
     execFileSync('ruby', ['-e', script, fastfile], { env, stdio: 'pipe' });
     expect(readFileSync(called, 'utf8')).toBe('upload');
-    expect(() =>
+    let denial = '';
+    try {
       execFileSync('ruby', ['-e', script, fastfile], {
         env: { ...env, FIXTURE_GUARD_STATUS: '1' },
         stdio: 'pipe',
-      })
-    ).toThrow();
+      });
+    } catch (error) {
+      const thrown = error as { stderr?: Buffer; message?: string };
+      denial = `${thrown.stderr?.toString() ?? ''}\n${thrown.message ?? ''}`;
+    }
+    expect(denial).toContain(
+      'TestFlight certified release lease failed final validation'
+    );
+    expect(denial).toContain(
+      '::error::TestFlight lease rejected: fixture denial'
+    );
   });
   it('classifies TestFlight release inputs into the iOS lane', async () => {
     const { classifyProductLanes } = (await import(

@@ -1,6 +1,10 @@
 import 'server-only';
 import { z } from 'zod';
 import {
+  isHostWithOptionalPort,
+  sessionSecretSchema,
+} from './env-configuration-policy';
+import {
   ovieSummerEveDeploymentOriginSchema,
   ovieSummerEveExpectedDeploymentIdSchema,
 } from './ovie/summer-eve-pin-schema';
@@ -15,13 +19,6 @@ import {
 const databaseUrlValidator = z.string().optional().refine(isDatabaseUrlValid, {
   message: getDatabaseUrlErrorMessage(),
 });
-
-const HOST_WITH_OPTIONAL_PORT_REGEX =
-  /^(?!https?:\/\/)(?!.*\/)[a-z0-9.-]+(?::\d+)?$/i;
-
-function isHostWithOptionalPort(value: string): boolean {
-  return HOST_WITH_OPTIONAL_PORT_REGEX.test(value.trim());
-}
 
 function isTrustedHostList(value: string): boolean {
   return value.split(',').every(entry => {
@@ -297,7 +294,7 @@ export const ServerEnvSchema = z.object({
   JOVIE_ALLOW_PRODUCTION_UPSTASH: z.string().optional(),
 
   // Onboarding chat (anonymous session signing + bot challenge — JOV-2132)
-  SESSION_SECRET: z.string().min(32).optional(),
+  SESSION_SECRET: sessionSecretSchema.optional(),
   TURNSTILE_SECRET_KEY: z.string().optional(),
   /**
    * Nightly/QA-only (JOV-8500): '1' disarms the local E2E Turnstile bypass in

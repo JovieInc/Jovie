@@ -152,13 +152,26 @@ jobs:
             fi
             local attempt
             for attempt in 1 2 3; do
-              # Installation 403s hold inside gh-api-hold.sh until reset, or
-              # fail closed outside the step budget. 408/5xx still retry here.
+              # Installation 403s hold inside gh-api-hold.sh until reset.
+              # A reset outside this job's budget defers the generation.
+              # A missing reset and a permission 403 stay fatal. 408/5xx retry.
               if GH_API_HOLD_BIN="$(command -v gh)" bash "$RUNNER_TEMP/gh-api-hold.sh" "$@" > "$RUNNER_TEMP/desktop-gh-api-out" 2> "$RUNNER_TEMP/desktop-gh-api-err"; then
                 cat "$RUNNER_TEMP/desktop-gh-api-out"
                 return 0
               fi
-              if grep -Eqi 'outside the|Not passing|API rate limit|x-ratelimit-remaining' \
+              if grep -Eq 'outside the .*budget' "$RUNNER_TEMP/desktop-gh-api-err" &&
+                grep -q 'Not passing' "$RUNNER_TEMP/desktop-gh-api-err"; then
+                cat "$RUNNER_TEMP/desktop-gh-api-err" >&2
+                record_desktop_quota_defer "$RUNNER_TEMP/desktop-gh-api-err"
+                # A direct call can exit here. A command substitution only
+                # returns, and the ERR trap finishes the defer.
+                if [ "${BASH_SUBSHELL:-0}" -eq 0 ]; then
+                  finish_desktop_quota_defer
+                  exit 0
+                fi
+                return 1
+              fi
+              if grep -Eqi 'API rate limit|x-ratelimit-remaining' \
                 "$RUNNER_TEMP/desktop-gh-api-err"; then
                 cat "$RUNNER_TEMP/desktop-gh-api-err" >&2
                 return 1
@@ -176,6 +189,66 @@ jobs:
             cat "$RUNNER_TEMP/desktop-gh-api-err" >&2
             return 1
           }
+          # A command substitution fails the assignment under set -e before
+          # the next command, so ERR owns that defer. DEBUG owns a later
+          # explicit exit after a handled failure. A permission 403 and a
+          # missing reset leave no sentinel and stay fatal. Both traps publish
+          # the same warning and step summary as a direct defer.
+          record_desktop_quota_defer() {
+            local reset_epoch reset_iso
+            reset_epoch="$(sed -n 's/.*GitHub rate limit resets at \([0-9][0-9]*\).*/\1/p' "$1" | head -n 1)"
+            # GNU date accepts -d @epoch. BSD/macOS date rejects that and
+            # prints an epoch with -r. GNU -r reads a file mtime, so it is
+            # only the fallback after -d fails to produce an ISO instant.
+            reset_iso="$(date -u -d "@${reset_epoch}" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || true)"
+            if ! [[ "$reset_iso" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]]; then
+              reset_iso="$(date -u -r "$reset_epoch" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || true)"
+            fi
+            if ! [[ "$reset_iso" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]]; then
+              echo "::error::Installation quota defer could not format the reset instant." >&2
+              exit 1
+            fi
+            printf '%s\n' "$reset_iso" > "$RUNNER_TEMP/desktop-authorize-quota-reset"
+            : > "$RUNNER_TEMP/desktop-authorize-quota-defer"
+          }
+          announce_desktop_quota_defer() {
+            local reset_iso deferred_sha line
+            reset_iso="$(head -n 1 "$RUNNER_TEMP/desktop-authorize-quota-reset")"
+            deferred_sha="${release_sha:-}"
+            if ! [[ "$deferred_sha" =~ ^[0-9a-f]{40}$ ]]; then
+              deferred_sha="${TRIGGER_HEAD_SHA:-}"
+            fi
+            if ! [[ "$deferred_sha" =~ ^[0-9a-f]{40}$ ]]; then
+              deferred_sha="${MANUAL_SHA:-}"
+            fi
+            if ! [[ "$deferred_sha" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "::error::Installation quota defer has no release candidate SHA." >&2
+              exit 1
+            fi
+            line="Installation quota resets at ${reset_iso}. Deferring desktop publication of ${deferred_sha} to the next reconciliation. No release was authorized."
+            printf '%s\n' "$line" >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning::${line}"
+          }
+          finish_desktop_quota_defer() {
+            {
+              echo "release_sha="
+              echo "environment="
+              echo "baseline_sha="
+              echo "authorized=false"
+              echo "manual=false"
+              echo "staging_auto=false"
+              echo "already_released=false"
+            } >> "$GITHUB_OUTPUT"
+            announce_desktop_quota_defer
+          }
+          defer_desktop_authorize_for_quota() {
+            if [ -f "$RUNNER_TEMP/desktop-authorize-quota-defer" ]; then
+              finish_desktop_quota_defer
+              exit 0
+            fi
+          }
+          trap defer_desktop_authorize_for_quota ERR
+          trap defer_desktop_authorize_for_quota DEBUG
 
           if [ "$EVENT_NAME" = "workflow_run" ]; then
             [[ "$TRIGGER_RUN_ID" =~ ^[1-9][0-9]*$ ]] &&
@@ -284,8 +357,9 @@ jobs:
 
           echo "environment=$environment" >> "$GITHUB_OUTPUT"
           # git ls-remote does not spend the installation REST budget. The
-          # ancestry compare still has to prove forward-only lineage, so that
-          # read holds until x-ratelimit-reset inside this 10-minute job.
+          # ancestry compare still proves forward-only lineage. It uses the
+          # same hold as the other reads and defers when the reset is outside
+          # this job's budget.
           current_main_sha="$(bash "$RUNNER_TEMP/resolve-main-sha.sh" "$REPOSITORY")"
           [[ "$current_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Could not resolve exact current main for desktop authorization."
@@ -299,7 +373,7 @@ jobs:
             # advanced past still publishes. Exact-SHA supersession starved
             # production desktop from 26.9.14 onward (2026-09-21..26) because
             # the merge queue lands faster than the controller verifies.
-            mainline_compare="$(bash "$RUNNER_TEMP/gh-api-hold.sh" api \
+            mainline_compare="$(gh api \
               "repos/$REPOSITORY/compare/$release_sha...$current_main_sha")"
             jq -e --arg release "$release_sha" --arg current "$current_main_sha" '
               type == "object" and
@@ -1383,6 +1457,7 @@ jobs:
             ${{ runner.os }}-electron-downloads-
 
       - name: Prepare private production draft
+        id: prepare-production
         if: env.ENVIRONMENT == 'production'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -1436,7 +1511,7 @@ jobs:
       # If MAC_CERTIFICATE_BASE64 is absent, this step no-ops and the build
       # continues unsigned (electron-builder will warn, not fail).
       - name: Import Apple Developer cert (macOS)
-        if: env.HAS_MAC_SIGNING_CREDENTIALS == 'true'
+        if: env.HAS_MAC_SIGNING_CREDENTIALS == 'true' && (env.ENVIRONMENT == 'staging' || steps.prepare-production.outputs.prepared == 'true')
         env:
           MAC_CERTIFICATE_BASE64: ${{ secrets.MAC_CERTIFICATE_BASE64 }}
           MAC_CERTIFICATE_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
@@ -1495,7 +1570,7 @@ jobs:
       # Accepts the secret either as raw PEM (-----BEGIN PRIVATE KEY-----) or
       # base64-encoded; whichever Tim pasted works.
       - name: Stage Apple API key (macOS)
-        if: env.HAS_APPLE_API_CREDENTIALS == 'true'
+        if: env.HAS_APPLE_API_CREDENTIALS == 'true' && (env.ENVIRONMENT == 'staging' || steps.prepare-production.outputs.prepared == 'true')
         env:
           APPLE_API_KEY_CONTENTS: ${{ secrets.APPLE_API_KEY }}
         run: |
@@ -1657,7 +1732,7 @@ jobs:
             --dist "apps/desktop/dist"
 
       - name: Package production desktop app
-        if: env.ENVIRONMENT == 'production'
+        if: env.ENVIRONMENT == 'production' && steps.prepare-production.outputs.prepared == 'true'
         env:
           JOVIE_DESKTOP_SOURCE_REVISION: ${{ env.RELEASE_SHA }}
           JOVIE_RELEASE_DMG: 'true'
@@ -1670,7 +1745,7 @@ jobs:
         run: pnpm --filter @jovie/desktop package:production
 
       - name: Verify production desktop artifact set
-        if: env.ENVIRONMENT == 'production'
+        if: env.ENVIRONMENT == 'production' && steps.prepare-production.outputs.prepared == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -1701,7 +1776,7 @@ jobs:
 
       - name: Publish production desktop release
         id: publish-production
-        if: env.ENVIRONMENT == 'production'
+        if: env.ENVIRONMENT == 'production' && steps.prepare-production.outputs.prepared == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -1758,7 +1833,7 @@ jobs:
 
       - name: Capture production publisher identity
         id: publisher-identity
-        if: env.ENVIRONMENT == 'production' || env.ENVIRONMENT == 'staging'
+        if: (env.ENVIRONMENT == 'production' && steps.prepare-production.outputs.prepared == 'true') || env.ENVIRONMENT == 'staging'
         env:
           PUBLISHED_SHA: ${{ steps.publish-staging.outputs.release_sha || steps.publish-production.outputs.release_sha }}
         run: |

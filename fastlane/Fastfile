@@ -26,9 +26,23 @@ end
 def verify_release_sha_is_current_main!
   if env_present?("TESTFLIGHT_LEASE_PATH")
     guard = require_env!("TESTFLIGHT_GUARD_PATH")
-    _, status = Open3.capture2e("node", guard, "upload")
-    UI.user_error!("TestFlight certified release lease failed final validation") unless status.success?
-    return
+    # The archive step holds GitHub reads for 600s. Fastlane does not inherit
+    # that budget unless it is passed into this process.
+    output, status = Open3.capture2e(
+      {
+        "GH_API_HOLD_BUDGET_SECONDS" => ENV.fetch("GH_API_HOLD_BUDGET_SECONDS", "600")
+      },
+      "node",
+      guard,
+      "upload"
+    )
+    if status.success?
+      return
+    end
+    detail = output.to_s.strip
+    message = "TestFlight certified release lease failed final validation"
+    message = "#{message}\n#{detail}" unless detail.empty?
+    UI.user_error!(message)
   end
   release_sha = require_env!("RELEASE_SHA")
   repository = require_env!("GITHUB_REPOSITORY")
@@ -88,6 +102,27 @@ def match_git_auth_options
   options[:git_private_key] = ENV["MATCH_GIT_PRIVATE_KEY"] if env_present?("MATCH_GIT_PRIVATE_KEY")
   options[:git_basic_authorization] = ENV["MATCH_GIT_BASIC_AUTHORIZATION"] if env_present?("MATCH_GIT_BASIC_AUTHORIZATION")
   options
+end
+
+# match prints this path as sigh_<bundle>_appstore_profile-path and stores it
+# on the lane context. Pass that file in directly so a name or directory scan
+# cannot report an installed profile as missing.
+def installed_match_profile_path
+  context = Actions.lane_context
+  candidates = []
+  if defined?(SharedValues) && SharedValues.const_defined?(:SIGH_PROFILE_PATH)
+    candidates << context[SharedValues::SIGH_PROFILE_PATH]
+  end
+  if defined?(SharedValues) && SharedValues.const_defined?(:SIGH_PROFILE_PATHS)
+    paths = context[SharedValues::SIGH_PROFILE_PATHS]
+    candidates << paths[APP_IDENTIFIER] if paths.respond_to?(:[])
+  end
+  candidates << ENV["sigh_#{APP_IDENTIFIER}_appstore_profile-path"]
+  candidates.each do |value|
+    path = value.to_s.strip
+    return path if !path.empty? && File.exist?(path)
+  end
+  nil
 end
 
 def distribution_certificate_name(apple_team_id:)
@@ -287,8 +322,12 @@ platform :ios do
 
     # Compare Release entitlements with the profile match just installed.
     # Gym's capability error is too late and too vague to act on.
+    profile_path = installed_match_profile_path
+    if profile_path.to_s.empty?
+      UI.user_error!("Capability mismatch: match did not export the App Store profile path from lane_context SIGH_PROFILE_PATH or sigh_#{APP_IDENTIFIER}_appstore_profile-path, so entitlements cannot be compared before archive.")
+    end
     sh(
-      "JOVIE_REQUIRE_DISTRIBUTION_PROFILE=1 bash #{repo_path("apps/ios/scripts/validate-distribution-capabilities.sh").shellescape}"
+      "JOVIE_REQUIRE_DISTRIBUTION_PROFILE=1 JOVIE_PROVISIONING_PROFILE=#{profile_path.shellescape} bash #{repo_path("apps/ios/scripts/validate-distribution-capabilities.sh").shellescape}"
     )
 
     signing_xcargs = [
