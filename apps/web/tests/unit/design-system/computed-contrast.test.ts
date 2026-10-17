@@ -38,6 +38,23 @@ const loadDefaultPairs = () =>
  */
 
 describe('computed contrast gate — WCAG AA on design tokens', () => {
+  it.each(['light', 'dark'] as const)(
+    'keeps destructive fill text above AA without a debt allowance [%s]',
+    theme => {
+      const result = checkPair(
+        {
+          name: 'primary destructive button',
+          fg: '--color-btn-destructive-fg',
+          bg: '--color-btn-destructive-bg',
+          minRatio: 4.5,
+        },
+        loadDefaultTables()[theme]
+      );
+      expect(result.status, JSON.stringify(result)).toBe('pass');
+      expect(result.ratio).toBeGreaterThanOrEqual(4.5);
+    }
+  );
+
   it('loads the contrast CLI under tsx cjs output', () => {
     const result = spawnSync(
       process.execPath,
