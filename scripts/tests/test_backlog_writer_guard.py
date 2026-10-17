@@ -23,7 +23,8 @@ VERSION = "2026-10-16T20:53:20Z"
 
 class SessionTest(unittest.TestCase):
     def run_session(self, *, allowed=True, fresh_allowed=True, seen=NOW, ops=None,
-                    drift=False, clock=None, monotonic=None, prepare_error=None, read_error=None):
+                    drift=False, clock=None, monotonic=None, prepare_error=None, read_error=None,
+                    bound_check=None):
         messages, events = [], []
         value = {"allowed": allowed, "authorizesTransition": False, "authorizesDispatch": False,
                  "evidence": {"observedAt": seen}}
@@ -32,7 +33,7 @@ class SessionTest(unittest.TestCase):
             return {**value, "allowed": fresh_allowed}
         prepared = SimpleNamespace(observation=value, issue_id="issue-id", priority=1,
                                    canonical_state_path=Path("/canonical"), revalidate=revalidate,
-                                   assert_bound=lambda: value)
+                                   assert_bound=lambda: bound_check(value) if bound_check else value)
         def prepare(*_):
             events.append("prepare")
             if prepare_error:
@@ -140,7 +141,7 @@ class SessionTest(unittest.TestCase):
     def test_expired_or_nonfinite_window_never_reaches_control_reader(self):
         for at in [NOW + 25, NOW + 26, NOW - 1, float("nan"), float("inf")]:
             with self.subTest(at=at):
-                times = iter([NOW, at])
+                times = iter([NOW, NOW, at])
                 code, rows, events = self.run_session(ops=["lock"], clock=lambda: next(times))
                 self.assertEqual(code, 2)
                 self.assertEqual(rows[-1]["reason"], "writer-lock-window-expired")
@@ -150,7 +151,7 @@ class SessionTest(unittest.TestCase):
     def test_expiry_during_parent_read_never_returns_a_check_receipt(self):
         for after in [NOW + 25, float("nan")]:
             with self.subTest(after=after):
-                times = iter([NOW, NOW + 24, after])
+                times = iter([NOW, NOW, NOW + 24, after])
                 code, rows, _ = self.run_session(clock=lambda: next(times))
                 self.assertEqual(code, 2)
                 self.assertEqual(rows[-1]["reason"], "writer-lock-window-expired")
@@ -167,7 +168,7 @@ class SessionTest(unittest.TestCase):
 
     def test_modest_wall_rollback_after_prior_check_cannot_reuse_original_fence_window(self):
         for during_read in [False, True]:
-            wall = iter([NOW, NOW, NOW + 10, NOW + 5] if not during_read else [NOW, NOW, NOW + 5])
+            wall = iter([NOW, NOW, NOW, NOW + 10, NOW + 5] if not during_read else [NOW, NOW, NOW, NOW + 5])
             elapsed = iter([100, 100, 100, 110, 126] if not during_read else [100, 100, 124, 126])
             with self.subTest(during_read=during_read):
                 code, rows, events = self.run_session(ops=["lock", "check"],
@@ -188,6 +189,32 @@ class SessionTest(unittest.TestCase):
         self.assertEqual(rows[-1]["reason"], "native-proof-write-window-too-short")
         self.assertEqual(events.count("control"), 1)
         self.assertEqual(events[-1], "unlock")
+
+    def test_advertised_parent_deadline_deducts_local_checks_from_original_kernel_window(self):
+        for cost in [1, 2, 3]:
+            for wall_elapsed in [cost, 0]:
+                with self.subTest(cost=cost, wall_elapsed=wall_elapsed):
+                    wall, elapsed, checked = [NOW], [100.0], [False]
+                    def bound_check(value):
+                        if not checked[0]:
+                            wall[0] += wall_elapsed
+                            elapsed[0] += cost
+                            checked[0] = True
+                        return value
+                    code, rows, events = self.run_session(
+                        bound_check=bound_check, clock=lambda: wall[0],
+                        monotonic=lambda: elapsed[0])
+                    self.assertEqual(code, 0)
+                    locked = [row for row in rows if row["phase"] == "locked"]
+                    self.assertEqual(len(locked), 2)
+                    remaining = guard.WRITE_WINDOW_S - cost
+                    self.assertEqual(locked[0]["expiresAt"] - wall[0], remaining)
+                    self.assertEqual(locked[1]["expiresAt"], locked[0]["expiresAt"])
+                    # The Node adapter arms once from this epoch deadline. Its
+                    # remaining timeout must fit the original kernel ceiling.
+                    self.assertLessEqual(locked[0]["expiresAt"] - wall[0],
+                                         100 + guard.WRITE_WINDOW_S - elapsed[0])
+                    self.assertEqual(events[-1], "unlock")
 
 
 class BoundContextSessionTest(unittest.TestCase):

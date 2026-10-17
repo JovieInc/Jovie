@@ -175,6 +175,7 @@ def run_guard(identifier, expected_version, *, prepare=None, read=read_control,
             return 2
         with lock_factory(prepared.canonical_state_path) as lock:
             fence_started = monotonic()
+            fence_wall_started = clock()
             observation = prepared.assert_bound()
             if observation.get("allowed") is not True:
                 report("held", observation=observation)
@@ -183,9 +184,15 @@ def run_guard(identifier, expected_version, *, prepare=None, read=read_control,
             now = clock()
             if seen is None or not 0 <= now - seen <= backlog_admission.MAX_AGE_S:
                 raise GuardHeld("native-proof-expired")
-            expires = min(now + WRITE_WINDOW_S, seen + backlog_admission.MAX_AGE_S)
             monotonic_now = monotonic()
-            output_monotonic_deadline = min(fence_started + WRITE_WINDOW_S,
+            kernel_deadline = fence_started + WRITE_WINDOW_S
+            # The parent's abort timer uses the advertised epoch deadline.
+            # Local checks and wall-clock lag cannot give it a longer window
+            # than the kernel fence's original monotonic ceiling.
+            expires = min(fence_wall_started + WRITE_WINDOW_S,
+                          now + (kernel_deadline - monotonic_now),
+                          seen + backlog_admission.MAX_AGE_S)
+            output_monotonic_deadline = min(kernel_deadline,
                                             monotonic_now + (expires - now))
             if min(expires - now, output_monotonic_deadline - monotonic_now) < MIN_WRITE_WINDOW_S:
                 raise GuardHeld("native-proof-write-window-too-short")
