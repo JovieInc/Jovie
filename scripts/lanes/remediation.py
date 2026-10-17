@@ -1440,11 +1440,36 @@ def plan_labeled_events(issues: list, recorded: dict | None, providers: dict, no
             row["attemptCount"] = len(prior_attempts)
             if canonical is None:
                 if history:
-                    _absorb_event(row, history[0], fingerprint)
+                    closed = next((issue for issue in history if issue.get("id") == recorded_id), history[0])
+                    _absorb_event(row, closed, fingerprint)
+                    # A local landing result also says "done". Only a witnessed
+                    # Linear completion can qualify a fresh same-issue ladder.
+                    completed = row.get("completedGeneration")
+                    completed = completed if isinstance(completed, dict) else {}
+                    completed_at = iso_epoch(completed.get("consumedAt", completed.get("updatedAt")))
+                    closed_at = iso_epoch(closed.get("updatedAt"))
+                    if _state_type(closed) == "completed" and closed_at is not None:
+                        if completed.get("issueId") != closed.get("id") or (completed_at is not None and closed_at > completed_at):
+                            row["completedGeneration"] = {"issueId": closed.get("id"), "updatedAt": closed["updatedAt"],
+                                                          "team": (closed.get("team") or {}).get("key")}
+                    # Only newer or unreadable terminal evidence invalidates a pending completion.
+                    elif completed and (closed_at is None or completed_at is None or closed_at >= completed_at):
+                        row["completedGeneration"] = {**completed, "consumed": True}
+                        # Delayed/unknown terminal reads cannot lower the accepted version.
+                        if closed_at is not None and (completed_at is None or closed_at > completed_at):
+                            row["completedGeneration"]["consumedAt"] = closed["updatedAt"]
                 row["status"] = "done"
                 row["running"] = False
                 events[fingerprint] = row
                 continue
+            completed = row.get("completedGeneration")
+            completed = completed if isinstance(completed, dict) else {}
+            completed_at, reopened_at = iso_epoch(completed.get("updatedAt")), iso_epoch(canonical.get("updatedAt"))
+            observed_recurrence = (not completed.get("consumed")
+                                   and completed.get("issueId") == recorded_id == canonical.get("id")
+                                   and completed.get("team") == (canonical.get("team") or {}).get("key")
+                                   and _state_type(canonical) in {"triage", "backlog", "unstarted", "started"}
+                                   and completed_at is not None and reopened_at is not None and reopened_at > completed_at)
             _absorb_event(row, canonical, fingerprint)
             for other in duplicates:
                 if _note(row, other.get("id")):
@@ -1454,7 +1479,16 @@ def plan_labeled_events(issues: list, recorded: dict | None, providers: dict, no
                                  f"{canonical.get('identifier')}. This issue is not a second event.\n"
                                  + event_marker("dup", fingerprint)),
                     })
-            if recorded_id and canonical.get("id") != recorded_id:
+            if recorded_id and (canonical.get("id") != recorded_id or observed_recurrence):
+                if observed_recurrence:
+                    # Retain the consumed version against a delayed completed snapshot.
+                    row["completedGeneration"] = {**completed, "consumed": True, "consumedAt": canonical["updatedAt"]}
+                    # Structural Linear evidence, independent of a repeated/rolled-back host clock.
+                    # Merely observing a later pending completion must retain this old active binding.
+                    row["activeGeneration"] = {"completedAt": completed["updatedAt"], "openedAt": canonical["updatedAt"]}
+                else:
+                    row.pop("completedGeneration", None)
+                    row.pop("activeGeneration", None)
                 row["release"] = True
                 row["running"] = False
                 row["lane"] = None
@@ -1506,6 +1540,9 @@ def plan_labeled_events(issues: list, recorded: dict | None, providers: dict, no
                 continue
         elif row.get("status") in {"human", "exhausted", "done"} and not row.get("release"):
             if row.get("status") == "done":
+                if escalation_enabled() and (row.get("startDelivery") or {}).get("settled"):
+                    events[fingerprint] = row
+                    continue  # A settled delivery waits for a proven new completed-to-open generation.
                 stamp = str(canonical.get("updatedAt") or "")
                 if _note(row, f"recur:{stamp}"):
                     comments.append({
