@@ -379,14 +379,14 @@ class OperatorGuard:
         env = {key: value for key, value in os.environ.items() if key != FD_ENV}
         return {**env, "LANES_STATE": str(scratch), "LANES_REPO": str(Path(repo).resolve()), "LANES_SELFTEST": "1"}
 
-    def prove_staging(self, staging, repo, *, timeout):
+    def prove_staging(self, staging, repo, *, timeout, pass_fds=()):
         env = self.proof_env(staging, repo)
         # A real private SH owner tracks proof descendants. The canonical EX is
         # never handed to a child or converted to SH, even after parent death.
         with Guard(Path(env["LANES_STATE"])):
             return run([sys.executable, str(Path(staging) / "scripts/lanes/lane_runner.py"),
                         "prove-staging", str(staging)], cwd=staging, capture_output=True,
-                       text=True, timeout=timeout, env=env)
+                       text=True, timeout=timeout, env=env, pass_fds=pass_fds)
 
     def resume(self, release_root, *, acceptance_check):
         _require(callable(acceptance_check), "missing cross-host acceptance check")
