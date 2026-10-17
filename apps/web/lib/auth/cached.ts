@@ -1,7 +1,10 @@
 import 'server-only';
 
 import { cache } from 'react';
-import { getImpersonationState } from '@/lib/admin/impersonation';
+import {
+  getImpersonationState,
+  type ImpersonationToken,
+} from '@/lib/admin/impersonation';
 import {
   type AppUser,
   getAppUserByBetterAuthId,
@@ -143,14 +146,19 @@ function isUsableImpersonationTarget(
   return Boolean(
     user?.betterAuthUserId &&
       user.email &&
+      user.userStatus === 'active' &&
       !checkUserStatus(user.userStatus, user.deletedAt).isBlocked
   );
 }
 
 async function resolveEffectiveAuth(result: AuthResult): Promise<AuthResult> {
-  if (!result.userId) return result;
-
-  const state = await getImpersonationState(result.userId);
+  let state: ImpersonationToken | null;
+  try {
+    state = await getImpersonationState(result.userId);
+  } catch (error) {
+    if (isMissingAuthRequestContext(error)) return result;
+    throw error;
+  }
   if (!state) return result;
 
   const target = await getAppUserById(state.effectiveUserId);
@@ -160,7 +168,7 @@ async function resolveEffectiveAuth(result: AuthResult): Promise<AuthResult> {
   return {
     ...result,
     userId: target.id,
-    actorUserId: result.userId,
+    actorUserId: state.actorUserId,
   };
 }
 
@@ -269,6 +277,7 @@ export const getCachedCurrentUser = cache(
         options?.session === 'fresh' ? 'fresh' : 'cookie'
       );
       if (!session) {
+        await getImpersonationState(null);
         return null;
       }
       const appUser = await getAppUserByBetterAuthId(session.user.id);
@@ -276,6 +285,7 @@ export const getCachedCurrentUser = cache(
         !appUser ||
         checkUserStatus(appUser.userStatus, appUser.deletedAt).isBlocked
       ) {
+        await getImpersonationState(null);
         return null;
       }
 

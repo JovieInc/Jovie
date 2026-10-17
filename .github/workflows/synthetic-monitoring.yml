@@ -63,11 +63,30 @@ jobs:
           sudo apt-get update && sudo apt-get install -y doppler
           doppler --version
 
+      - name: Resolve synthetic secrets
+        id: synthetic-secrets
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          E2E_PROD_MAILBOX_PROVIDER: ${{ secrets.E2E_PROD_MAILBOX_PROVIDER }}
+          E2E_PROD_OTP_CHECK_ORIGIN: ${{ secrets.E2E_PROD_OTP_CHECK_ORIGIN }}
+          E2E_PROD_OTP_CHECK_TOKEN: ${{ secrets.E2E_PROD_OTP_CHECK_TOKEN }}
+          E2E_PROD_OTP_CHECK_URL: ${{ secrets.E2E_PROD_OTP_CHECK_URL }}
+          E2E_PROD_SIGNUP_EMAIL_BASE: ${{ secrets.E2E_PROD_SIGNUP_EMAIL_BASE }}
+          PRODUCTION_WAITLIST_CANARY_READ_TOKEN: ${{ secrets.PRODUCTION_WAITLIST_CANARY_READ_TOKEN }}
+        run: |
+          node .github/scripts/resolve-synthetic-secrets.mjs \
+            --name E2E_PROD_MAILBOX_PROVIDER \
+            --name E2E_PROD_OTP_CHECK_ORIGIN \
+            --name E2E_PROD_OTP_CHECK_TOKEN \
+            --name E2E_PROD_OTP_CHECK_URL \
+            --name E2E_PROD_SIGNUP_EMAIL_BASE \
+            --name PRODUCTION_WAITLIST_CANARY_READ_TOKEN
+
       - name: Check production signup readiness
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
         run: |
-          doppler run -- pnpm --filter=@jovie/web exec tsx scripts/check-signup-readiness.ts --target=prd --source=env
+          doppler run --preserve-env -- pnpm --filter=@jovie/web exec tsx scripts/check-signup-readiness.ts --target=prd --source=env
 
       - name: SEO/AEO ratchet — live robots.txt + sitemap.xml (JOV-11044)
         env:
@@ -84,7 +103,7 @@ jobs:
           E2E_ENVIRONMENT: production
           SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-auth-ui-results.json
         run: |
-          doppler run -- node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-auth-ui.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-auth-ui
+          doppler run --preserve-env -- node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-auth-ui.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-auth-ui
         continue-on-error: true
 
       - name: Run Golden Path Health + Performance
@@ -97,21 +116,20 @@ jobs:
           E2E_ENVIRONMENT: production
           SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-golden-path-results.json
         run: |
-          doppler run -- node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-golden-path.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-golden-path
+          doppler run --preserve-env -- node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-golden-path.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-golden-path
         continue-on-error: true
 
       - name: Run Onboarding Robot Full Synthetic (JOV-2681)
-        env:
-          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
-          BASE_URL: https://jov.ie
-          PLAYWRIGHT_TEST_BASE_URL: https://jov.ie
-          E2E_SKIP_WEB_SERVER: '1'
-          E2E_SYNTHETIC_MODE: 'true'
-          E2E_ENVIRONMENT: production
-          SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/onboarding-robot-full-results.json
+        id: onboarding-robot
         run: |
-          doppler run -- node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/onboarding-robot.full.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/onboarding-robot-full
-        continue-on-error: true
+          reason="synthetic-robot-auth-unavailable: production has no auth bypass for the onboarding robot."
+          echo "::warning title=Onboarding robot skipped::${reason}"
+          {
+            echo "### Onboarding robot"
+            echo "${reason}"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "robot_skip_reason=${reason}" >> "$GITHUB_OUTPUT"
+          exit 0
 
       - name: Run Legacy OTP Signup Canary (gated, JOV-2446 cutover)
         # Skip this step entirely once Layer A is proven green and the Clerk
@@ -129,12 +147,19 @@ jobs:
           E2E_ENVIRONMENT: production
           SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-legacy-otp-results.json
         run: |
-          doppler run -- node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-legacy-otp.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-legacy-otp
+          if [ "${E2E_PROD_OTP_AVAILABLE}" != "true" ]; then
+            echo "::warning title=Tim-only OTP secrets absent::${OTP_SKIP_REASON}"
+            {
+              echo "### Legacy OTP signup canary"
+              echo "${OTP_SKIP_REASON}"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          doppler run --preserve-env -- node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-legacy-otp.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-legacy-otp
         continue-on-error: true
 
       - name: Run Production Waitlist Canary
         env:
-          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
           BASE_URL: https://jov.ie
           PLAYWRIGHT_TEST_BASE_URL: https://jov.ie
           E2E_SKIP_WEB_SERVER: '1'
@@ -144,13 +169,10 @@ jobs:
           SYNTHETIC_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
           SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-production-waitlist-results.json
         run: |
-          WAITLIST_SECRETS='E2E_PROD_SIGNUP_EMAIL_BASE,E2E_PROD_MAILBOX_PROVIDER,E2E_PROD_OTP_CHECK_ORIGIN,E2E_PROD_OTP_CHECK_TOKEN,E2E_PROD_OTP_CHECK_URL,PRODUCTION_WAITLIST_CANARY_READ_TOKEN'
-          if doppler run --project jovie-web --config prd --only-secrets="$WAITLIST_SECRETS" --no-fallback -- env >/dev/null 2>&1; then
-            doppler run --project jovie-web --config prd --only-secrets="$WAITLIST_SECRETS" --no-fallback -- env -u DOPPLER_TOKEN node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-production-waitlist.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-production-waitlist
-          else
-            echo "::warning::waitlist canary secrets missing from jovie-web/prd; running the spec without secret injection so the failure is reported in-band with a results file"
-            env -u DOPPLER_TOKEN node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-production-waitlist.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-production-waitlist
+          if [ "${E2E_PROD_OTP_AVAILABLE}" != "true" ]; then
+            echo "::warning title=Tim-only OTP secrets absent::${OTP_SKIP_REASON} Preflight still runs."
           fi
+          env -u DOPPLER_TOKEN -u DATABASE_URL node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-production-waitlist.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-production-waitlist
         continue-on-error: true
 
       - name: Run Public Profile Smoke Test (JOV-1653)
@@ -163,21 +185,23 @@ jobs:
           E2E_ENVIRONMENT: production
           SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/public-profile-smoke-results.json
         run: |
-          doppler run -- node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/public-profile-smoke.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/public-profile-smoke
+          doppler run --preserve-env -- node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/public-profile-smoke.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/public-profile-smoke
         continue-on-error: true
 
       - name: Confirm synthetic identity policy
         if: always()
         run: |
           echo "The production waitlist canary reuses one exact reserved identity and never deletes it."
-          echo "Onboarding robot cleanup is scoped by exact robot email, Clerk user id, run id, and generated handle."
+          echo "Onboarding robot cleanup is scoped by exact robot email, run id, generated handle, and either a Clerk user_ id or the exact ba_robot_<run-id> id."
           echo "No broad production Clerk cleanup script is run from this workflow."
 
       - name: Parse test results
         id: test-results
         if: ${{ always() }}
         env:
-          LEGACY_CANARY_ENABLED: ${{ vars.E2E_PROD_LEGACY_CANARY != '0' && '1' || '0' }}
+          LEGACY_CANARY_ENABLED: ${{ vars.E2E_PROD_LEGACY_CANARY != '0' && steps.synthetic-secrets.outputs.otp_available == 'true' && '1' || '0' }}
+          OTP_SKIP_REASON: ${{ steps.synthetic-secrets.outputs.otp_skip_reason }}
+          ROBOT_SKIP_REASON: ${{ steps.onboarding-robot.outputs.robot_skip_reason }}
         run: |
           node <<'NODE'
           const fs = require('node:fs');
@@ -190,6 +214,8 @@ jobs:
           const legacyCanaryEnabled = process.env.LEGACY_CANARY_ENABLED === '1';
           const result = parseSyntheticTestResults({
             resultFiles: DEFAULT_RESULT_FILES(legacyCanaryEnabled),
+            otpSkipReason: process.env.OTP_SKIP_REASON,
+            robotSkipReason: process.env.ROBOT_SKIP_REASON,
           });
 
           for (const warning of result.testWarnings) {
@@ -346,18 +372,26 @@ jobs:
       - name: Install Doppler CLI
         uses: ./.github/actions/setup-doppler
 
+      - name: Resolve CRON_SECRET
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: node .github/scripts/resolve-synthetic-secrets.mjs --name CRON_SECRET
+
       - name: Run production Web AI health probe
         id: health
         continue-on-error: true
-        env:
-          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
         run: |
           set +e
-          doppler run --project jovie-web --config prd --only-secrets=CRON_SECRET --no-fallback -- \
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::CRON_SECRET missing from GitHub secrets and Doppler jovie-web/prd"
+            probe_exit=1
+          else
             env -u DOPPLER_TOKEN node .github/scripts/run-web-ai-health.mjs \
               --url https://jov.ie/api/cron/web-ai-health \
               --receipt "$RUNNER_TEMP/web-ai-health/receipt.json"
-          probe_exit=$?
+            probe_exit=$?
+          fi
           set -e
           if [ ! -f "$RUNNER_TEMP/web-ai-health/receipt.json" ]; then
             env -u CRON_SECRET node .github/scripts/run-web-ai-health.mjs \
@@ -471,17 +505,23 @@ jobs:
       - name: Install Doppler CLI
         uses: ./.github/actions/setup-doppler
 
-      - name: Probe production limiter store
-        id: probe
+      - name: Resolve CRON_SECRET
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: node .github/scripts/resolve-synthetic-secrets.mjs --name CRON_SECRET
+
+      - name: Probe production limiter store
+        id: probe
         run: |
           set -euo pipefail
-          # shellcheck disable=SC2016 # expanded by the inner sh, after doppler injects CRON_SECRET
-          doppler run --project jovie-web --config prd --only-secrets=CRON_SECRET --no-fallback -- \
-            env -u DOPPLER_TOKEN sh -c 'curl --silent --show-error --connect-timeout 10 --max-time 20 \
-              -o "$RUNNER_TEMP/redis-health.json" -w "%{http_code}" \
-              -H "Authorization: Bearer $CRON_SECRET" https://jov.ie/api/health/redis' > "$RUNNER_TEMP/redis-code"
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::CRON_SECRET missing from GitHub secrets and Doppler jovie-web/prd"
+            exit 1
+          fi
+          curl --silent --show-error --connect-timeout 10 --max-time 20 \
+            -o "$RUNNER_TEMP/redis-health.json" -w "%{http_code}" \
+            -H "Authorization: Bearer ${CRON_SECRET}" https://jov.ie/api/health/redis > "$RUNNER_TEMP/redis-code"
           code=$(cat "$RUNNER_TEMP/redis-code")
           body=$(jq -c '{status, failureKind}' "$RUNNER_TEMP/redis-health.json" 2>/dev/null || echo '{}')
           echo "Limiter store: HTTP $code $body" | tee -a "$GITHUB_STEP_SUMMARY"
@@ -539,18 +579,24 @@ jobs:
           persist-credentials: false
       - name: Install Doppler CLI
         uses: ./.github/actions/setup-doppler
-      - name: Read authenticated billing health
+      - name: Resolve CRON_SECRET
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: node .github/scripts/resolve-synthetic-secrets.mjs --name CRON_SECRET
+      - name: Read authenticated billing health
+        env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
           GITHUB_RUN_ID: ${{ github.run_id }}
         run: |
           set -euo pipefail
-          # shellcheck disable=SC2016
-          doppler run --project jovie-web --config prd --only-secrets=CRON_SECRET --no-fallback -- \
-            env -u DOPPLER_TOKEN sh -c 'curl --silent --show-error --connect-timeout 10 --max-time 20 \
-              -H "Authorization: Bearer $CRON_SECRET" https://jov.ie/api/billing/health' > "$RUNNER_TEMP/billing-health.json"
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::CRON_SECRET missing from GitHub secrets and Doppler jovie-web/prd"
+            exit 1
+          fi
+          curl --silent --show-error --connect-timeout 10 --max-time 20 \
+            -H "Authorization: Bearer ${CRON_SECRET}" https://jov.ie/api/billing/health > "$RUNNER_TEMP/billing-health.json"
           BILLING_HEALTH_JSON="$(cat "$RUNNER_TEMP/billing-health.json")" \
             node scripts/billing-sync-intake.mjs
 

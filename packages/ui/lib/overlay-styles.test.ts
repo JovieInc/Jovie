@@ -7,6 +7,7 @@ import {
   footerStyles,
   headerStyles,
   overlayClassName,
+  overlayStateReducedMotion,
   overlayStyles,
   sheetOverlayClassName,
   sheetSurfaceStyles,
@@ -87,6 +88,15 @@ describe('overlay-styles', () => {
 
     it('reducedMotion provides motion-reduce fallback', () => {
       expect(centeredContentStyles.reducedMotion).toContain('motion-reduce');
+    });
+
+    it('removes open and closed state animation under reduced motion', () => {
+      expect(overlayStateReducedMotion).toContain(
+        'motion-reduce:data-[state=open]:animate-none'
+      );
+      expect(overlayStateReducedMotion).toContain(
+        'motion-reduce:data-[state=closed]:animate-none'
+      );
     });
   });
 

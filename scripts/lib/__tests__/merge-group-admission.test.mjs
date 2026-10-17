@@ -4,13 +4,16 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
+import { classifyMergeGroupFailure } from '../../merge-group-failure-hold.mjs';
 import * as sharedClassifier from '../github-rate-limit.mjs';
 import {
   ADMISSION_CONTRACT_VERSION,
   buildLiveQueueAdmissionReceipt,
   classifyRequiredCheckPage,
+  clearAdmissionConditionalGetCache,
   isTransientAdmissionFailureMessage,
   isTransientApiError,
+  MERGE_GROUP_ADMISSION_QUOTA_RECOVERY_MS,
   MERGE_GROUP_ADMISSION_WAIT_MS,
   MergeGroupAdmissionError,
   normalizeLiveQueueEntriesPage,
@@ -213,6 +216,82 @@ describe('merge-group admission evidence', () => {
       }
     }
   );
+
+  it('treats an unchanged git ref 304 as the stored body', async () => {
+    clearAdmissionConditionalGetCache();
+    const directory = await mkdtemp(join(tmpdir(), 'merge-admission-etag-'));
+    const eventPath = join(directory, 'event.json');
+    const outputPath = join(directory, 'output.txt');
+    await writeFile(eventPath, JSON.stringify(event()), 'utf8');
+    let refCalls = 0;
+    const fetchImpl = vi.fn(async (url, init) => {
+      if (url.endsWith('/graphql')) {
+        return Response.json(liveQueuePayload([liveQueueNode()]));
+      }
+      if (url.includes('/git/ref/')) {
+        refCalls += 1;
+        if (refCalls === 1) {
+          expect(init.headers['If-None-Match']).toBeUndefined();
+          return Response.json(queueRef(), { headers: { etag: 'W/"ref-1"' } });
+        }
+        expect(init.headers['If-None-Match']).toBe('W/"ref-1"');
+        return new Response(null, { status: 304 });
+      }
+      const checkName = new URL(url).searchParams.get('check_name');
+      if (!checkName) throw new Error(`unexpected request ${url}`);
+      return Response.json(checkPage(checkName, 'completed', 'success').data);
+    });
+    const env = {
+      GH_TOKEN: 'test-token',
+      GITHUB_API_URL: 'https://api.github.test',
+      GITHUB_EVENT_PATH: eventPath,
+      GITHUB_OUTPUT: outputPath,
+      GITHUB_REPOSITORY: 'JovieInc/Jovie',
+      GITHUB_SHA: HEAD,
+    };
+    try {
+      await expect(
+        runAdmissionFromEnv(env, { fetchImpl })
+      ).resolves.toMatchObject({ admitted: true, pr: 123 });
+      expect(refCalls).toBe(2);
+    } finally {
+      clearAdmissionConditionalGetCache();
+      await rm(directory, { force: true, recursive: true });
+    }
+  });
+
+  it('fails closed when a 304 arrives with no stored body', async () => {
+    clearAdmissionConditionalGetCache();
+    const directory = await mkdtemp(
+      join(tmpdir(), 'merge-admission-etag-304-')
+    );
+    const eventPath = join(directory, 'event.json');
+    const outputPath = join(directory, 'output.txt');
+    await writeFile(eventPath, JSON.stringify(event()), 'utf8');
+    const fetchImpl = vi.fn(async url => {
+      if (url.endsWith('/graphql')) {
+        return Response.json(liveQueuePayload([liveQueueNode()]));
+      }
+      if (url.includes('/git/ref/')) return new Response(null, { status: 304 });
+      throw new Error(`unexpected request ${url}`);
+    });
+    const env = {
+      GH_TOKEN: 'test-token',
+      GITHUB_API_URL: 'https://api.github.test',
+      GITHUB_EVENT_PATH: eventPath,
+      GITHUB_OUTPUT: outputPath,
+      GITHUB_REPOSITORY: 'JovieInc/Jovie',
+      GITHUB_SHA: HEAD,
+    };
+    try {
+      await expect(runAdmissionFromEnv(env, { fetchImpl })).rejects.toThrow(
+        /GitHub API 304 for .+ without a stored body/
+      );
+    } finally {
+      clearAdmissionConditionalGetCache();
+      await rm(directory, { force: true, recursive: true });
+    }
+  });
 
   it('neutralizes a vanished queue ref end to end and stays fail-closed on other statuses', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'merge-admission-'));
@@ -573,17 +652,21 @@ describe('merge-group admission evidence', () => {
       );
     });
 
-    it('treats an annotations read that hits the same quota as quota', async () => {
-      const annotations = vi.fn(async () => {
-        throw new MergeGroupAdmissionError(
-          'GitHub API 403 for /x: API rate limit exceeded for installation.',
-          { status: 403 }
-        );
-      });
-      await expect(admit(failedSizeGuard(), annotations)).rejects.toThrow(
-        'PR Size Guard failed on GitHub primary-rate-limit, not on the combined head'
-      );
-    });
+    it.each([403, 429, 503])(
+      'keeps the producer cause unknown when its annotation read fails with %i',
+      async status => {
+        const annotations = vi.fn(async () => {
+          throw new MergeGroupAdmissionError(
+            `GitHub API ${status} for /x: API rate limit exceeded for installation.`,
+            { status }
+          );
+        });
+        const error = await admit(failedSizeGuard(), annotations).catch(e => e);
+        expect(error.message).toBe('PR Size Guard completed with failure');
+        expect(isTransientAdmissionFailureMessage(error.message)).toBe(false);
+        expect(annotations).toHaveBeenCalledTimes(1);
+      }
+    );
 
     it.each([
       ['a real policy failure', ['PR #12 failed size merge-group policy']],
@@ -1119,6 +1202,7 @@ describe('merge-group admission evidence', () => {
 
   it('defaults to a multi-minute admission budget', () => {
     expect(MERGE_GROUP_ADMISSION_WAIT_MS).toBe(360_000);
+    expect(MERGE_GROUP_ADMISSION_QUOTA_RECOVERY_MS).toBe(66 * 60 * 1000);
   });
 });
 
@@ -1240,6 +1324,123 @@ async function withQuotaResponses(respond, verify) {
   }
   if (cleanupError) throw cleanupError;
 }
+
+describe('producer annotation evidence completeness through the HTTP adapter', () => {
+  const quota =
+    'GitHub API 403 for /x: API rate limit exceeded for installation.';
+  const transient = 'GitHub API 503 for /x: Service Unavailable';
+  const annotation = message => ({ annotation_level: 'failure', message });
+  const nextPage =
+    '<https://api.github.test/repos/JovieInc/Jovie/check-runs/1/annotations?page=2>; rel="next"';
+  const failureHoldKind = admissionText =>
+    classifyMergeGroupFailure({
+      conclusion: 'failure',
+      failedSteps: [
+        'Require live queue membership and external admission checks',
+        'Evaluate combined-head checks',
+      ],
+      admissionText,
+    });
+
+  it.each([
+    [
+      'an unreadable annotation endpoint',
+      () => Response.json({ message: 'Service Unavailable' }, { status: 503 }),
+    ],
+    [
+      'an unread overflow policy error',
+      () =>
+        Response.json(
+          Array.from({ length: 50 }, () => annotation(quota)),
+          { headers: { link: nextPage } }
+        ),
+    ],
+    [
+      'an unread overflow quota error',
+      () =>
+        Response.json(
+          Array.from({ length: 50 }, () => annotation(quota)),
+          { headers: { link: nextPage } }
+        ),
+    ],
+  ])(
+    'does not grant infrastructure recovery for %s',
+    async (_label, annotations) => {
+      let annotationReads = 0;
+      await withQuotaResponses(
+        request => {
+          if (request.kind === 'Fork PR Gate')
+            return Response.json(
+              checkPage('Fork PR Gate', 'completed', 'failure').data
+            );
+          if (request.kind === 'annotations') {
+            annotationReads += 1;
+            // The chosen adapter holds incomplete evidence instead of reading more
+            // pages; a second read here would expose the hidden source/quota error.
+            return annotationReads === 1
+              ? annotations()
+              : Response.json([
+                  annotation(
+                    _label.includes('policy')
+                      ? 'PR failed size merge-group policy'
+                      : quota
+                  ),
+                ]);
+          }
+        },
+        async state => {
+          const error = await state.run().catch(e => e);
+          expect(error).toBeInstanceOf(MergeGroupAdmissionError);
+          expect(error.message).toBe('Fork PR Gate completed with failure');
+          expect(isTransientAdmissionFailureMessage(error.message)).toBe(false);
+          expect(failureHoldKind(error.message)).not.toBe(
+            'transient-admission'
+          );
+          expect(
+            state.requests.filter(request => request.kind === 'annotations')
+          ).toHaveLength(1);
+          expect(state.sleeps).toEqual([]);
+          await state.noOutput();
+        }
+      );
+    }
+  );
+
+  it.each([
+    [quota, 'primary-rate-limit'],
+    [transient, 'transient-server'],
+  ])(
+    'preserves complete producer infrastructure evidence: %s',
+    async (message, kind) => {
+      await withQuotaResponses(
+        request => {
+          if (request.kind === 'Fork PR Gate')
+            return Response.json(
+              checkPage('Fork PR Gate', 'completed', 'failure').data
+            );
+          if (request.kind === 'annotations')
+            return Response.json([
+              annotation(message),
+              annotation('Process completed with exit code 1.'),
+            ]);
+        },
+        async state => {
+          const error = await state.run().catch(e => e);
+          expect(error.message).toBe(
+            `Fork PR Gate failed on GitHub ${kind}, not on the combined head`
+          );
+          expect(failureHoldKind(error.message)).toBe('transient-admission');
+          expect(isTransientApiError(error)).toBe(false);
+          expect(
+            state.requests.filter(request => request.kind === 'annotations')
+          ).toHaveLength(1);
+          expect(state.sleeps).toEqual([]);
+          await state.noOutput();
+        }
+      );
+    }
+  );
+});
 
 describe('HTTP quota scheduling and structured GraphQL errors', () => {
   it.each([
@@ -1420,8 +1621,8 @@ describe('HTTP quota scheduling and structured GraphQL errors', () => {
       { ...resetHeaders(120_000), 'x-ratelimit-remaining': '0x' },
     ],
     ['invalid response date', { 'retry-after': '120', date: 'invalid' }],
-    ['reset beyond budget', resetHeaders(400_000)],
-    ['insufficient request allowance', { 'retry-after': '350' }],
+    ['reset beyond budget', resetHeaders(70 * 60 * 1000)],
+    ['insufficient request allowance', { 'retry-after': '4000' }],
   ])('does not retry early for %s', async (_, headers) => {
     await withQuotaResponses(
       () => graphqlQuotaResponse(headers),
@@ -1454,11 +1655,11 @@ describe('HTTP quota scheduling and structured GraphQL errors', () => {
     }
   );
 
-  it('keeps all retries inside the original absolute deadline', async () => {
+  it('keeps quota retries inside the recovery budget', async () => {
     await withQuotaResponses(
       (_, state) =>
         graphqlQuotaResponse({
-          'retry-after': state.requests.length === 1 ? '339' : '20',
+          'retry-after': state.requests.length === 1 ? '339' : '3700',
         }),
       async state => {
         await expect(state.run()).rejects.toThrow(
@@ -1468,6 +1669,20 @@ describe('HTTP quota scheduling and structured GraphQL errors', () => {
         expect(state.requests[1].at).toBe(340_000);
         expect(state.sleeps).toEqual([340_000]);
         await state.noOutput();
+      }
+    );
+  });
+
+  it('holds a quota reset outside the check-poll window and inside the recovery budget', async () => {
+    await withQuotaResponses(
+      (_, state) => {
+        if (state.requests.length === 1) {
+          return graphqlQuotaResponse(resetHeaders(400_000));
+        }
+      },
+      async state => {
+        await expect(state.run()).resolves.toMatchObject({ admitted: true });
+        expect(state.sleeps[0]).toBe(401_000);
       }
     );
   });

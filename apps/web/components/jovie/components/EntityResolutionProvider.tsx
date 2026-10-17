@@ -34,7 +34,7 @@ const NULL_RESOLUTION: EntityResolution = {
 const NULL_RESOLVER: ResolverFn = () => NULL_RESOLUTION;
 
 const EntityResolutionContext = createContext<ResolverFn>(NULL_RESOLVER);
-const EMPTY_ENTITY_CACHE_SNAPSHOT = '0:0:0:0';
+const EMPTY_ENTITY_CACHE_SNAPSHOT = '';
 
 interface EntityResolutionProviderProps {
   readonly profileId: string | null | undefined;
@@ -92,12 +92,17 @@ export function EntityResolutionProvider({
 
     const releaseState = queryClient.getQueryState(releaseMatrixKey);
     const eventState = queryClient.getQueryState(eventsListKey);
-    return [
-      releaseState?.dataUpdateCount ?? 0,
-      releaseState?.dataUpdatedAt ?? 0,
-      eventState?.dataUpdateCount ?? 0,
-      eventState?.dataUpdatedAt ?? 0,
-    ].join(':');
+    return [releaseState, eventState]
+      .map(state =>
+        [
+          state?.dataUpdateCount ?? 0,
+          state?.dataUpdatedAt ?? 0,
+          state?.errorUpdateCount ?? 0,
+          state?.status ?? 'pending',
+          state?.isInvalidated ?? true,
+        ].join(':')
+      )
+      .join('|');
   }, [eventsListKey, queryClient, releaseMatrixKey]);
 
   const subscribeToEntityCache = useCallback(
@@ -151,14 +156,30 @@ export function EntityResolutionProvider({
     }
     return (kind, id) => {
       try {
+        const key =
+          kind === 'release'
+            ? releaseMatrixKey
+            : kind === 'event'
+              ? eventsListKey
+              : null;
+        const state = key ? queryClient.getQueryState(key) : undefined;
+        // Refetch failure/invalidation must not leave private cached artwork or
+        // titles visible after access is lost. Never borrow another profile's row.
+        if (state?.status !== 'success' || state.isInvalidated)
+          return NULL_RESOLUTION;
         if (kind === 'release') {
           const releases = queryClient.getQueryData<ReleaseViewModel[]>(
             queryKeys.releases.matrix(profileId)
           );
           if (!releases) return NULL_RESOLUTION;
-          const row = releases.find(r => r.id === id);
+          const row = releases.find(
+            r => r.id === id && r.profileId === profileId
+          );
           if (!row) return NULL_RESOLUTION;
-          return { ref: releaseRowToEntityRef(row), isLoading: false };
+          return {
+            ref: releaseRowToEntityRef(row, { includeWorkflowStatus: true }),
+            isLoading: false,
+          };
         }
         if (kind === 'event') {
           const events = queryClient.getQueryData<EventRecord[]>(
@@ -170,8 +191,8 @@ export function EntityResolutionProvider({
           return { ref: eventToEntityRef(row), isLoading: false };
         }
         // artist (search-result-scoped, no profile matrix) and track (no query
-        // hook yet) — degrade gracefully. EntityChip falls back to accent dot
-        // + label, which is identical to today's empty-thumbnail behavior.
+        // hook yet) — unresolved. Transcript adapters hide stored labels and
+        // artwork until a supported scoped read can resolve the identity.
         return NULL_RESOLUTION;
       } catch {
         // Improved failure handling: never let resolution errors surface to
@@ -182,7 +203,7 @@ export function EntityResolutionProvider({
     // cacheSnapshot participates so consumers re-derive on cache change.
     // queryClient is stable from React Query's provider.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profileId, queryClient, cacheSnapshot]);
+  }, [profileId, queryClient, cacheSnapshot, releaseMatrixKey, eventsListKey]);
 
   return (
     <EntityResolutionContext.Provider value={resolver}>

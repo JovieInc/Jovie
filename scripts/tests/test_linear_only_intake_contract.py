@@ -34,12 +34,18 @@ def test_workflow_issue_writers_are_removed_or_hard_retired() -> None:
     retired_steps = {
         "production-controller-health.yml": ["Open one manual-recovery incident"],
         "runner-health-monitor.yml": ["Open one fixed-runner degradation incident"],
-        "test-flakiness-report.yml": ["Find or create tracking issue", "Create or update tracking issue", "Auto-file deflake issues for high-severity tests"],
     }
     for name, steps in retired_steps.items():
         workflow = read(WF / name)
         assert "issues: write" not in workflow
         assert all(RETIRED in step(workflow, item) for item in steps)
+    # JOV-6507 deleted the retired GitHub filing steps. Require their current
+    # Linear replacement without demanding that dead writers be restored.
+    flakiness = read(WF / "test-flakiness-report.yml")
+    assert_writes_no_issues(flakiness)
+    filing = step(flakiness, "File Linear remediation when the ratchet is red")
+    assert "scripts/flaky-test-filing-intake.mjs" in filing
+    assert "LINEAR_API_KEY:" in filing
     # The coverage audit's GitHub-issue failure notifier was deleted outright
     # (Slack is the failure channel), so assert it cannot write issues at all.
     coverage = read(WF / "test-coverage-audit.yml")
@@ -75,6 +81,7 @@ def test_active_facades_are_linear_only_and_fail_closed() -> None:
     qa = read(ROOT / "scripts/qa-swarm/propose.mjs")
     assert "fileLinearIssue" in qa and "fileGithubIssue" not in qa
     golden = read(ROOT / "scripts/golden-path-lock.mjs")
+    coordinator = read(ROOT / "scripts/lib/golden-path-lock.mjs")
     intake = read(ROOT / "scripts/lib/golden-path-intake.mjs")
     shared = read(ROOT / "scripts/lib/linear-issue-intake.mjs")
     assert "upsertLinearIssueByTitleFingerprint" in intake and "createGithubIssue" not in intake
@@ -82,17 +89,25 @@ def test_active_facades_are_linear_only_and_fail_closed() -> None:
     # shared primitive; the golden-path intake wraps it and skips Triage.
     assert "createStateName: 'Todo'" in intake
     assert shared.index("query FindIssueByFingerprint") < shared.index("mutation CreateDedupedLinearIssue")
-    assert "createGoldenPathLinearIssue" in golden and "createGithubIssue" not in golden
+    # JOV-6827 moved durable intake and dispatch into executeAutofix. Follow
+    # the CLI delegation and the coordinator instead of the old inline body.
+    imported = re.search(r"import \{([^}]+)\} from './lib/golden-path-lock\.mjs';", golden)
+    assert imported and "executeAutofix," in imported.group(1)
+    assert "import { createGoldenPathLinearIssue } from './golden-path-intake.mjs';" in coordinator
+    assert "createGithubIssue" not in golden and "createGithubIssue" not in coordinator
     observability_linear = read(ROOT / "scripts/observability-issue-linear.mjs")
     assert "upsertLinearIssueByTitleFingerprint" in observability_linear
     assert "api.github.com" not in observability_linear
     synthetic = read(ROOT / "scripts/synthetic-monitoring-intake.mjs")
     assert "upsertLinearIssueByTitleFingerprint" in synthetic
     assert "api.github.com" not in synthetic
-    autofix = golden.split("async function runAutofix", 1)[1]
-    assert autofix.index("createGoldenPathLinearIssue") < autofix.index("if (!linear.ok)")
+    cli_autofix = golden.split("async function runAutofix", 1)[1]
+    assert "const result = await executeAutofix({" in cli_autofix
+    assert "if (result.stage === 'linear_intake')" in cli_autofix
+    autofix = coordinator.split("export async function executeAutofix", 1)[1]
     gate = autofix.index("if (!linear.ok)")
-    assert gate < autofix.index("cursorRequest", gate)
+    assert autofix.index("await createGoldenPathLinearIssue(") < gate
+    assert gate < autofix.index("await jsonRequest(")
 
 def test_local_and_manual_github_issue_shippers_are_source_guarded() -> None:
     launch = read(ROOT / "scripts/create-launch-issues.sh")

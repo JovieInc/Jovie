@@ -153,57 +153,19 @@ describe('readSourceIdentity', () => {
       maxRetries: 0,
     });
   });
-  it('uses explicit YouTube channel avatar fields rather than the page banner', async () => {
-    const channelData = {
-      metadata: { channelMetadataRenderer: { title: 'Channel Name' } },
-      header: {
-        c4TabbedHeaderRenderer: {
-          avatar: {
-            thumbnails: [
-              { url: 'https://yt3.googleusercontent.com/actual-avatar.jpg' },
-            ],
-          },
-        },
-      },
-    };
-    mocks.fetch.mockResolvedValue({
-      html: `<script>var ytInitialData = ${JSON.stringify(channelData)};</script><meta property="og:image" content="https://example.com/banner.jpg">`,
-    });
-    const result = await readSourceIdentity('https://www.youtube.com/@actual');
-    expect(mocks.fetch).toHaveBeenCalledWith(
-      'https://www.youtube.com/@actual/about',
-      expect.objectContaining({
-        timeoutMs: 4000,
-        maxRetries: 0,
-        maxResponseBytes: 6_000_000,
-        allowedHosts: new Set(['youtube.com', 'www.youtube.com']),
-      })
-    );
-    expect(result).toMatchObject({
-      status: 'available',
-      displayName: 'Channel Name',
-      photo: {
-        url: 'https://yt3.googleusercontent.com/actual-avatar.jpg',
-        kind: 'profile',
-        verified: false,
-      },
-    });
-  });
-
-  it('retains unavailable identity when the bounded YouTube read fails', async () => {
-    mocks.fetch.mockRejectedValue(new Error('Response too large'));
-    const result = await readSourceIdentity(
-      'https://www.youtube.com/channel/UCactual'
-    );
-    expect(result).toMatchObject({
-      status: 'unavailable',
+  it.each([
+    'https://youtube.com/@actual',
+    'https://www.youtube.com/channel/UCactual',
+    'https://music.youtube.com/channel/UCactual',
+    'https://beacons.ai/actual',
+    'https://beacons.page/actual',
+  ])('rejects retired social identity reads before fetching %s', async url => {
+    expect(await readSourceIdentity(url)).toMatchObject({
+      status: 'unsupported',
       displayName: null,
       photo: { kind: 'missing', verified: false },
     });
-    expect(mocks.fetch).toHaveBeenCalledTimes(1);
-    expect(mocks.fetch.mock.calls[0][0]).toBe(
-      'https://www.youtube.com/channel/UCactual/about'
-    );
+    expect(mocks.fetch).not.toHaveBeenCalled();
   });
 
   it('reports failures honestly and allows a subsequent request to recover', async () => {

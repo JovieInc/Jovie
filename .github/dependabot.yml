@@ -110,13 +110,6 @@ updates:
       # the migration. Then drop this ignore.
       - dependency-name: 'eve'
         update-types: ['version-update:semver-minor']
-      # Held at 16.3.x (2026-10-13): next 16.4.0 breaks @storybook/nextjs-vite
-      # 10.6.1 (useRouter reads `.data` of undefined under RedirectBoundary), so
-      # every story fails and the merge-group Storybook Surface Matrix hangs
-      # (run 38361065123, #21533). Re-evaluate when Storybook's Next integration
-      # supports 16.4 (JOV-8234). Then drop this ignore.
-      - dependency-name: 'next'
-        versions: ['>=16.4.0 <17']
       # Held at 1.60.0 (2026-10-13): the baked runner image ships Playwright
       # 1.60.0 browsers (.github/runner-image/prerequisites.json, chromium-1223)
       # and runner-setup-action.test.ts requires devDependencies.playwright to
@@ -147,13 +140,17 @@ updates:
       - 'dependencies'
       - 'automated'
     ignore:
-      # Unfixable advisories tracked in JOV-8060 (exact pins by upstream
-      # CLIs; dev-only paths). Scoped to these exact versions only; new
-      # advisories in other versions still raise.
-      - dependency-name: 'undici'
-        versions: ['5.28.4', '5.29.0']
+      # Unfixable advisories: https://linear.app/jovie/issue/JOV-8060
+      # busboy/undici are exact pins in the dev-only Vercel CLI.
+      # sprintf-js is a runtime dependency of just-bash 3.6.0 and has no
+      # patched release (GHSA-hp3w-g68c-fv3c). Exact-version scope only.
+      # Re-evaluate and remove on compatible upstream fixes: JOV-8365.
       - dependency-name: '@fastify/busboy'
         versions: ['2.1.1']
+      - dependency-name: 'sprintf-js'
+        versions: ['1.1.3']
+      - dependency-name: 'undici'
+        versions: ['5.28.4', '5.29.0']
 
   # Standalone deepsec scanner install (deepsec-native.yml runs npm ci
   # daily). Security advisories tracked; version updates stay OFF the same
@@ -174,15 +171,17 @@ updates:
       - 'dependencies'
       - 'automated'
     ignore:
-      # Unfixable advisories tracked in JOV-8060. Exact-version scope only:
-      # - undici 8.5.0 pinned through pi-coding-agent 0.81.1 (deepsec 2.3.10
-      #   exact pin; next is a major).
-      # - sprintf-js 1.1.3 (GHSA-hp3w-g68c-fv3c): no patched release ever
-      #   published; parent just-bash is already latest.
+      # Unfixable advisories: https://linear.app/jovie/issue/JOV-8060
+      # Ship now: exact-version ignores for upstream-blocked packages only.
+      # - protobufjs 7.6.4: pi-coding-agent 0.81.1's published shrinkwrap
+      #   keeps it even with a 7.6.5 override and a fresh npm resolution.
+      # - undici 8.5.0: deepsec 2.3.10 pins pi-coding-agent 0.81.1 exactly.
+      # Re-evaluate when upstream permits patched versions in a clean npm ci.
+      # Then remove the corresponding ignore (JOV-8365); never broaden it.
+      - dependency-name: 'protobufjs'
+        versions: ['7.6.4']
       - dependency-name: 'undici'
         versions: ['8.5.0']
-      - dependency-name: 'sprintf-js'
-        versions: ['1.1.3']
 
   # Enable version updates for GitHub Actions
   - package-ecosystem: 'github-actions'

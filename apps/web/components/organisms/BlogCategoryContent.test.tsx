@@ -45,6 +45,18 @@ describe('BlogCategoryContent', () => {
       screen.getByRole('link', { name: /The Contact Problem/ })
     ).toHaveAttribute('href', '/blog/the-contact-problem');
     expect(container.querySelectorAll('article')).toHaveLength(1);
+    expect(screen.getByTestId('marketing-section-hero')).toHaveAttribute(
+      'data-marketing-variant',
+      'left-none'
+    );
+    expect(screen.getByTestId('marketing-section-hero')).toHaveAttribute(
+      'data-marketing-owner',
+      'apps/web/components/organisms/BlogCategoryContent.tsx'
+    );
+    expect(screen.getByTestId('marketing-section-blog-feed')).toHaveAttribute(
+      'data-marketing-variant',
+      'category-filtered-grid'
+    );
   });
 
   it('renders the existing empty state without inventing posts', () => {

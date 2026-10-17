@@ -16,6 +16,7 @@ import { CONTRACT_LABELS } from '../../hold-contract.mjs';
 import {
   ADMISSION_BLOCKING_LABELS,
   HOLD_LABELS_SCHEMA,
+  MACHINE_BLOCK_LABELS,
   parseHoldLabels,
   QUEUE_POISON_LABEL,
   STOP_HOLD_LABELS,
@@ -36,10 +37,17 @@ const quotedSet = (source, name) => {
   return [...match[1].matchAll(/'([^']+)'/g)].map(m => m[1]);
 };
 
-test('stop labels plus queue-poison make up the admission-blocking set', () => {
+test('stop labels, queue-poison, and machine blocks make up the admission-blocking set', () => {
   assert.deepEqual(sorted(ADMISSION_BLOCKING_LABELS), [
-    ...sorted([...STOP_HOLD_LABELS, QUEUE_POISON_LABEL]),
+    ...sorted([
+      ...STOP_HOLD_LABELS,
+      QUEUE_POISON_LABEL,
+      ...MACHINE_BLOCK_LABELS,
+    ]),
   ]);
+  assert.deepEqual(MACHINE_BLOCK_LABELS, ['lane-fix-red']);
+  assert.equal(STOP_HOLD_LABELS.includes('lane-fix-red'), false);
+  assert.equal(CONTRACT_LABELS.includes('lane-fix-red'), false);
   assert.deepEqual(sorted(CONTRACT_LABELS), sorted(STOP_HOLD_LABELS));
 });
 
@@ -48,6 +56,7 @@ test('the JSON source has the shape every consumer, lanes included, reads', () =
     readFileSync('scripts/lib/admission-hold-labels.json', 'utf8')
   );
   assert.deepEqual(Object.keys(raw).sort(), [
+    'machineBlockLabels',
     'queuePoisonLabel',
     'schema',
     'stopHoldLabels',
@@ -55,7 +64,10 @@ test('the JSON source has the shape every consumer, lanes included, reads', () =
   assert.equal(raw.schema, HOLD_LABELS_SCHEMA);
   assert.deepEqual(raw.stopHoldLabels, [...STOP_HOLD_LABELS]);
   assert.equal(raw.queuePoisonLabel, QUEUE_POISON_LABEL);
+  assert.deepEqual(raw.machineBlockLabels, [...MACHINE_BLOCK_LABELS]);
   const valid = { ...raw };
+  const withoutMachine = { ...valid };
+  delete withoutMachine.machineBlockLabels;
   for (const broken of [
     'not json',
     JSON.stringify({ ...valid, schema: 'v0' }),
@@ -65,6 +77,15 @@ test('the JSON source has the shape every consumer, lanes included, reads', () =
     JSON.stringify({ ...valid, stopHoldLabels: ['hold', ''] }),
     JSON.stringify({ ...valid, queuePoisonLabel: 'hold' }),
     JSON.stringify({ ...valid, queuePoisonLabel: null }),
+    JSON.stringify(withoutMachine),
+    JSON.stringify({ ...valid, machineBlockLabels: [] }),
+    JSON.stringify({
+      ...valid,
+      machineBlockLabels: ['lane-fix-red', 'lane-fix-red'],
+    }),
+    JSON.stringify({ ...valid, machineBlockLabels: ['Lane-Fix-Red'] }),
+    JSON.stringify({ ...valid, machineBlockLabels: ['hold'] }),
+    JSON.stringify({ ...valid, machineBlockLabels: ['queue-poison'] }),
   ]) {
     assert.throws(() => parseHoldLabels(broken));
   }
@@ -79,6 +100,15 @@ test('every enroll, dequeue, and auto-merge copy matches the canonical set', () 
   const enrollScript = enroll.jobs.enroll.steps.find(s => s.with?.script).with
     .script;
   assert.match(enrollScript, /scripts\/lib\/admission-hold-labels\.json/);
+  assert.match(enrollScript, /holdLabels\.machineBlockLabels/);
+  assert.doesNotMatch(enrollScript, /CLEARED stale lane-fix-red/);
+  assert.doesNotMatch(enrollScript, /name: 'lane-fix-red'/);
+  const relaySource = readFileSync('scripts/lanes/pr_events.py', 'utf8');
+  assert.match(relaySource, /LANE_FIX_RED = PREFIX \+ "red"/);
+  assert.match(relaySource, /labels\/\{LANE_FIX_RED\}/);
+  const relayWorkflow = readWorkflow('lane-fix-relay.yml');
+  assert.equal(relayWorkflow.jobs.relay.permissions.issues, 'write');
+  assert.equal(relayWorkflow.jobs.relay.permissions['pull-requests'], 'write');
   assert.match(
     enroll.jobs.enroll.steps.find(s => s.uses?.includes('checkout')).with[
       'sparse-checkout'
@@ -139,12 +169,35 @@ const invokedScripts = (path, source, root) =>
       ),
     ].map(m => normalize(join(dirname(path), m[1]))),
   ].filter(ref => !/__tests__|\/tests\/|\.test\./.test(ref));
+/**
+ * The token-scope catalog names mutations so the scanner can recognize them.
+ * It is data, not a call. A copy that claims to be executable is still a writer.
+ * @param {string} filePath
+ * @param {string} source
+ */
+const isTokenScopeCallCatalog = (filePath, source) => {
+  if (
+    !filePath.replaceAll('\\', '/').endsWith('workflow-token-scope-calls.json')
+  )
+    return false;
+  try {
+    const data = JSON.parse(source);
+    return (
+      data?.executable === false && data?.kind === 'token-scope-call-catalog'
+    );
+  } catch {
+    return false;
+  }
+};
+
 /** @returns {string[] | null} the call chain that reaches a queue write */
 const queueWriteChain = (path, root = '.', seen = new Set(), chain = []) => {
   if (seen.has(path) || chain.length > 4 || !existsSync(path)) return null;
   seen.add(path);
-  const source = uncommented(readFileSync(path, 'utf8'));
-  if (QUEUE_WRITE.test(source)) return [...chain, path];
+  const raw = readFileSync(path, 'utf8');
+  const source = uncommented(raw);
+  if (!isTokenScopeCallCatalog(path, raw) && QUEUE_WRITE.test(source))
+    return [...chain, path];
   for (const ref of invokedScripts(path, source, root)) {
     const hit = queueWriteChain(ref, root, seen, [...chain, path]);
     if (hit) return hit;
@@ -195,6 +248,54 @@ test('the queue-writer scan follows invoked scripts but not mentions', () => {
     ]);
     assert.equal(queueWriteChain(at('note.yml'), dir), null);
     assert.equal(queueWriteChain(at('off.yml'), dir), null);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a real enqueue call outside green enroll is still a writer', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'queue-writer-real-'));
+  try {
+    mkdirSync(join(dir, 'scripts', 'lib'), { recursive: true });
+    const at = name => join(dir, name);
+    writeFileSync(
+      at('scripts/enqueue.mjs'),
+      'const q = `mutation { enqueuePullRequest(input:{}) { x } }`;\n'
+    );
+    writeFileSync(at('other.yml'), 'run: node scripts/enqueue.mjs\n');
+    assert.deepEqual(queueWriteChain(at('other.yml'), dir), [
+      at('other.yml'),
+      at('scripts/enqueue.mjs'),
+    ]);
+
+    const catalog = {
+      kind: 'token-scope-call-catalog',
+      executable: false,
+      graphql: { enqueuePullRequest: { all: { contents: 'write' } } },
+    };
+    writeFileSync(
+      at('scripts/lib/workflow-token-scope-calls.json'),
+      `${JSON.stringify(catalog)}\n`
+    );
+    writeFileSync(
+      at('scripts/scan.mjs'),
+      'import { readFileSync } from "node:fs";\nreadFileSync(new URL("./lib/workflow-token-scope-calls.json", import.meta.url));\n'
+    );
+    writeFileSync(at('scan.yml'), 'run: node scripts/scan.mjs\n');
+    assert.equal(queueWriteChain(at('scan.yml'), dir), null);
+    assert.equal(
+      queueWriteChain(at('scripts/lib/workflow-token-scope-calls.json'), dir),
+      null
+    );
+
+    writeFileSync(
+      at('scripts/lib/workflow-token-scope-calls.json'),
+      `${JSON.stringify({ ...catalog, executable: true })}\n`
+    );
+    assert.deepEqual(
+      queueWriteChain(at('scripts/lib/workflow-token-scope-calls.json'), dir),
+      [at('scripts/lib/workflow-token-scope-calls.json')]
+    );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

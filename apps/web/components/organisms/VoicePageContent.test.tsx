@@ -14,7 +14,7 @@ describe('VoicePageContent source contract', () => {
   it('preserves the exact route body, consent copy, and CTA destinations', () => {
     const { container } = render(<VoicePageContent />);
 
-    expect(container.querySelectorAll('main')).toHaveLength(1);
+    expect(container.querySelectorAll('main')).toHaveLength(0);
     const heading = screen.getByRole('heading', {
       level: 1,
       name: /^Clone your voice\. From any YouTube video\.$/,
@@ -22,7 +22,7 @@ describe('VoicePageContent source contract', () => {
     expect(screen.getAllByRole('heading', { level: 1 })).toEqual([heading]);
     expect(heading).toBeVisible();
     expect(heading).toHaveAttribute('id', 'voice-hero-heading');
-    expect(screen.getByTestId('voice-hero-section')).toHaveAttribute(
+    expect(screen.getByTestId('marketing-section-hero')).toHaveAttribute(
       'aria-labelledby',
       heading.id
     );

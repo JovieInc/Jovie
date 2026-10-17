@@ -530,6 +530,13 @@ export const PRODUCT_CAPABILITIES = {
       routes: ['/pricing'],
     },
   },
+  'automatic-links': {
+    maturity: 'proposed',
+    publication: 'internal_only',
+    access: 'unavailable',
+    entitlementKeys: ['canAutoCreateLinks'],
+    evidence: { captureScenarios: [], routes: [] },
+  },
   'fan-crm': {
     maturity: 'limited_testing',
     publication: 'public',

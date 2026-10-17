@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import test from 'node:test';
 
 import * as reconciliation from './capability-reconciliation.mjs';
@@ -34,6 +35,42 @@ function input(evidenceClass = 'bounded-benchmark') {
   value.event = event();
   value.benchmark.eventId = value.event.id;
   value.benchmark.evidenceClass = evidenceClass;
+  return value;
+}
+
+function commerceInput() {
+  const value = input();
+  value.decisions[0].commerceProjection = {
+    offer: 'artist-visibility-offer-contract-v1',
+    channel: 'agent-handoff',
+    rail: 'ordinary-web-checkout',
+    issueIds: ['JOV-4077', 'JOV-8218'],
+  };
+  value.capabilityGraph[0].linearIssues = [
+    { id: 'JOV-4077', role: 'foundation' },
+    { id: 'JOV-8218', role: 'work' },
+  ];
+  value.issues = [
+    {
+      id: 'uuid-4077',
+      identifier: 'JOV-4077',
+      title: 'Agentic commerce',
+      description: 'Existing epic',
+      priority: 2,
+      state: { id: 'started-id', name: 'In Progress', type: 'started' },
+      comments: { nodes: [] },
+    },
+    {
+      id: 'uuid-8218',
+      identifier: 'JOV-8218',
+      title: 'Invalidate commerce rails',
+      description: 'Existing invalidation issue',
+      priority: 2,
+      state: { id: 'todo-id', name: 'Todo', type: 'unstarted' },
+      comments: { nodes: [] },
+    },
+  ];
+  value.benchmark.results[0].backlogActions = [];
   return value;
 }
 
@@ -93,6 +130,68 @@ test('an unchanged event produces no repeated benchmark or backlog churn', () =>
   });
   assert.equal(unchanged.status, 'unchanged');
   assert.deepEqual(unchanged.actions, []);
+  assert.deepEqual(unchanged.linearReadyUpdates, []);
+});
+
+test('projects bounded Linear updates onto the existing epic and invalidation issue', async () => {
+  const receipt = reconciliation.planCapabilityReconciliation(commerceInput());
+  assert.deepEqual(
+    receipt.linearReadyUpdates.map(update => update.issueId),
+    ['JOV-4077', 'JOV-8218']
+  );
+  for (const update of receipt.linearReadyUpdates) {
+    assert.equal(update.kind, 'comment');
+    assert.match(update.body, /Offer: artist-visibility-offer-contract-v1/u);
+    assert.match(update.body, /Channel: agent-handoff/u);
+    assert.match(update.body, /Rail: ordinary-web-checkout/u);
+    assert.match(update.body, /Prior decision: browser-runtime/u);
+    assert.match(update.body, /Invalidating evidence: evidence:agents-api/u);
+    assert.match(update.body, /Next re-evaluation:/u);
+    assert.ok(update.body.length <= 2000);
+  }
+
+  const current = new Map(
+    commerceInput().issues.map(issue => [issue.identifier, issue])
+  );
+  const client = {
+    async fetchIssue(issueId) {
+      return structuredClone(current.get(issueId));
+    },
+    async addComment(id, body) {
+      const issue = [...current.values()].find(item => item.id === id);
+      issue.comments.nodes.push({ body });
+      return { success: true };
+    },
+  };
+  const applied = await reconciliation.applyCapabilityReconciliation(
+    receipt,
+    client
+  );
+  assert.equal(applied.outcomes.filter(outcome => outcome.updateId).length, 2);
+  const replayed = await reconciliation.applyCapabilityReconciliation(
+    receipt,
+    client
+  );
+  assert.deepEqual(
+    replayed.outcomes.map(outcome => outcome.status),
+    ['unchanged', 'unchanged']
+  );
+});
+
+test('rejects Linear projection targets that are new or outside the affected graph', () => {
+  const value = commerceInput();
+  value.decisions[0].commerceProjection.issueIds.push('JOV-9999');
+  assert.throws(
+    () => reconciliation.planCapabilityReconciliation(value),
+    /Linear-ready update is not eligible: JOV-9999/u
+  );
+
+  const sensitive = commerceInput();
+  sensitive.event.evidenceId = 'pi_reusable';
+  assert.throws(
+    () => reconciliation.planCapabilityReconciliation(sensitive),
+    /event evidenceId contains sensitive or reusable identifiers/u
+  );
 });
 
 test('applies one source-fenced rewrite, verifies readback, and dedupes replay', async () => {
@@ -117,4 +216,297 @@ test('applies one source-fenced rewrite, verifies readback, and dedupes replay',
   assert.equal(current.description, receipt.actions[0].description);
   const replayed = await apply(receipt, client);
   assert.equal(replayed.outcomes[0].status, 'unchanged');
+});
+
+const hash = value => createHash('sha256').update(value).digest('hex');
+const NOW = new Date('2026-10-15T18:00:00.000Z');
+
+function commerceSnapshot() {
+  return {
+    matrixDigest: hash('rail-matrix-r1'),
+    policyDigest: hash('approved-policy'),
+    geographyDigest: hash('approved-us-geography'),
+    merchantOfRecord: 'jovie',
+    eligible: true,
+    geographyCompatible: true,
+    hostedMerchReady: true,
+    observedAt: '2026-10-15T17:00:00.000Z',
+    expiresAt: '2026-10-16T17:00:00.000Z',
+    access: {
+      digest: hash('account-access-r1'),
+      state: 'supported',
+      observedAt: '2026-10-15T17:00:00.000Z',
+      expiresAt: '2026-10-16T17:00:00.000Z',
+    },
+    price: {
+      canonicalIdentityDigest: hash(
+        'canonical-stripe-product-and-price-usd-19900-month'
+      ),
+      observedIdentityDigest: hash(
+        'canonical-stripe-product-and-price-usd-19900-month'
+      ),
+    },
+  };
+}
+
+function commerceChange(
+  mutate = current => {
+    current.eligible = false;
+  },
+  binding = { rail: 'ordinary-web-checkout', provider: 'openai' }
+) {
+  const value = commerceInput();
+  const decision = value.decisions[0];
+  decision.commerceProjection.rail = binding.rail;
+  decision.commerceProjection.decisionRevision = 'decision-r4';
+  decision.commerceProjection.evidence = commerceSnapshot();
+  const current = commerceSnapshot();
+  mutate(current);
+  const change = { decision, current, provider: binding.provider, now: NOW };
+  value.event = reconciliation.capabilityEventFromCommerceEvidence(
+    evidence,
+    change
+  );
+  value.benchmark = null;
+  // A sibling with the same capability and event classes must stay untouched.
+  value.decisions.push({
+    ...structuredClone(decision),
+    id: 'unaffected-rail',
+    commerceProjection: {
+      ...decision.commerceProjection,
+      rail: 'unaffected-web-checkout',
+    },
+  });
+  return { value, change };
+}
+
+/** @type {[string, (current: ReturnType<typeof commerceSnapshot>) => void, string][]} */
+const commerceCases = [
+  [
+    'OpenAI eligibility',
+    current => {
+      current.eligible = false;
+    },
+    'eligibility-changed',
+  ],
+  [
+    'Stripe preview access',
+    current => {
+      current.access.state = 'partner-gated';
+    },
+    'provider-access-lost',
+  ],
+  [
+    'Stripe SPT receipt',
+    current => {
+      current.access.digest = hash('spt-access-revoked');
+      current.access.state = 'unsupported';
+    },
+    'account-access-changed',
+  ],
+  [
+    'hosted-merch readiness',
+    current => {
+      current.hostedMerchReady = false;
+    },
+    'hosted-merch-readiness-lost',
+  ],
+  [
+    '$199 price identity',
+    current => {
+      current.price.observedIdentityDigest = hash(
+        'different-stripe-product-same-usd-19900-month'
+      );
+    },
+    'canonical-price-drift',
+  ],
+  [
+    'policy',
+    current => {
+      current.policyDigest = hash('new-policy');
+    },
+    'policy-changed',
+  ],
+  [
+    'geography',
+    current => {
+      current.geographyCompatible = false;
+    },
+    'geography-incompatible',
+  ],
+  [
+    'merchant',
+    current => {
+      current.merchantOfRecord = 'creator';
+    },
+    'merchant-changed',
+  ],
+  [
+    'matrix digest',
+    current => {
+      current.matrixDigest = hash('new-matrix');
+    },
+    'matrix-evidence-changed',
+  ],
+  [
+    'expired evidence',
+    current => {
+      current.expiresAt = NOW.toISOString();
+    },
+    'evidence-expired',
+  ],
+  [
+    'expired access receipt',
+    current => {
+      current.access.expiresAt = NOW.toISOString();
+    },
+    'evidence-expired',
+  ],
+  [
+    'future observation',
+    current => {
+      current.observedAt = '2026-10-16T00:00:00.000Z';
+    },
+    'evidence-invalid',
+  ],
+];
+for (const [name, mutate, reason] of commerceCases) {
+  test(`${name} closes only the bound commerce decision and its canary`, () => {
+    const rail = name.startsWith('Stripe preview')
+      ? 'stripe-preview'
+      : name.startsWith('Stripe SPT')
+        ? 'stripe-spt'
+        : name.startsWith('hosted-merch')
+          ? 'hosted-merch'
+          : 'ordinary-web-checkout';
+    const { value } = commerceChange(mutate, {
+      rail,
+      provider:
+        name.startsWith('Stripe') || name.startsWith('$199')
+          ? 'stripe'
+          : 'openai',
+    });
+    const receipt = reconciliation.planCapabilityReconciliation(value);
+    assert.deepEqual(
+      receipt.invalidated.map(row => row.decisionId),
+      ['browser-runtime']
+    );
+    assert.equal(receipt.invalidated[0].disposition, 'DEFER');
+    assert.deepEqual(receipt.actions, []);
+    assert.equal(receipt.commerceInvalidations.length, 1);
+    assert.deepEqual(receipt.commerceInvalidations[0], {
+      ...value.event.commerce,
+      invalidatingEvidence: evidence.id,
+      sourceEventId: value.event.id,
+      state: 'blocked',
+      canary: 'invalidated',
+    });
+    assert.ok(receipt.commerceInvalidations[0].reasons.includes(reason));
+    assert.ok(
+      receipt.linearReadyUpdates[0].body.includes(
+        `Offer: artist-visibility-offer-contract-v1\nChannel: agent-handoff\nRail: ${rail}\nPrior decision: browser-runtime`
+      )
+    );
+    assert.match(
+      receipt.linearReadyUpdates[0].body,
+      /Invalidating evidence: evidence:agents-api\nNext re-evaluation:/u
+    );
+  });
+}
+
+test('unchanged commerce inputs emit no event and duplicate evidence does not repeat reconciliation', () => {
+  const { change } = commerceChange(() => {});
+  assert.equal(
+    reconciliation.capabilityEventFromCommerceEvidence(evidence, change),
+    null
+  );
+  const { value, change: changed } = commerceChange();
+  const duplicate = reconciliation.capabilityEventFromCommerceEvidence(
+    { ...evidence, stableIdentity: 'evidence:duplicate-coverage' },
+    changed
+  );
+  assert.equal(duplicate.digest, value.event.digest);
+  const prior = reconciliation.planCapabilityReconciliation(value);
+  const replay = reconciliation.planCapabilityReconciliation({
+    ...value,
+    event: duplicate,
+    priorReceipts: [prior],
+  });
+  assert.equal(replay.status, 'unchanged');
+  assert.deepEqual(replay.commerceInvalidations, prior.commerceInvalidations);
+  assert.deepEqual(replay.linearReadyUpdates, []);
+});
+
+test('expiry becomes a material event once, even when the source digest is unchanged', () => {
+  const { change } = commerceChange(() => {});
+  const expired = { ...change, now: new Date('2026-10-16T17:00:00.000Z') };
+  const first = reconciliation.capabilityEventFromCommerceEvidence(
+    evidence,
+    expired
+  );
+  const later = reconciliation.capabilityEventFromCommerceEvidence(evidence, {
+    ...expired,
+    now: new Date('2026-10-16T18:00:00.000Z'),
+  });
+  assert.deepEqual(first.commerce.reasons, ['evidence-expired']);
+  assert.equal(first.digest, later.digest);
+});
+
+test('old events cannot invalidate a newly certified revision or another offer/channel/rail', () => {
+  for (const field of ['decisionRevision', 'offer', 'channel', 'rail']) {
+    const { value } = commerceChange();
+    value.decisions[0].commerceProjection[field] = 'new-binding';
+    const receipt = reconciliation.planCapabilityReconciliation(value);
+    assert.deepEqual(receipt.invalidated, []);
+    assert.deepEqual(receipt.commerceInvalidations, []);
+    assert.deepEqual(receipt.linearReadyUpdates, []);
+  }
+});
+
+test('commerce events reject missing, malformed or unsafe evidence without leaking it', () => {
+  const { change } = commerceChange();
+  for (const current of [
+    { ...change.current, matrixDigest: 'not-a-digest' },
+    { ...change.current, merchantOfRecord: 'acct_private' },
+    { ...change.current, access: null },
+    { ...change.current, observedAt: 'yesterday' },
+  ]) {
+    assert.throws(() =>
+      reconciliation.capabilityEventFromCommerceEvidence(evidence, {
+        ...change,
+        current,
+      })
+    );
+  }
+  const withExtra = {
+    ...change.current,
+    customerEmail: 'private@example.com',
+    paymentIntent: 'pi_private',
+  };
+  const safe = reconciliation.capabilityEventFromCommerceEvidence(evidence, {
+    ...change,
+    current: withExtra,
+  });
+  assert.ok(!JSON.stringify(safe).includes('private'));
+});
+
+test('completed commerce work stays closed while the runtime block survives apply and replay', async () => {
+  const { value } = commerceChange();
+  for (const issue of value.issues) issue.state.type = 'completed';
+  const receipt = reconciliation.planCapabilityReconciliation(value);
+  assert.deepEqual(receipt.linearReadyUpdates, []);
+  assert.equal(receipt.commerceInvalidations.length, 1);
+  const applied = await reconciliation.applyCapabilityReconciliation(
+    receipt,
+    {}
+  );
+  assert.deepEqual(
+    applied.commerceInvalidations,
+    receipt.commerceInvalidations
+  );
+  const replay = reconciliation.planCapabilityReconciliation({
+    ...value,
+    priorReceipts: [applied],
+  });
+  assert.deepEqual(replay.commerceInvalidations, receipt.commerceInvalidations);
 });

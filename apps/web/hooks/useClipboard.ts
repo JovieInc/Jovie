@@ -39,8 +39,10 @@ export interface UseClipboardReturn {
  * Used when Clipboard API is not available.
  */
 function fallbackCopy(text: string): boolean {
+  const focused = document.activeElement;
+  let textarea: HTMLTextAreaElement | undefined;
   try {
-    const textarea = document.createElement('textarea');
+    textarea = document.createElement('textarea');
     textarea.value = text;
     textarea.style.position = 'fixed';
     textarea.style.left = '-999999px';
@@ -52,10 +54,13 @@ function fallbackCopy(text: string): boolean {
     textarea.select();
     const successful = document.execCommand('copy');
 
-    textarea.remove();
     return successful;
   } catch {
     return false;
+  } finally {
+    textarea?.remove();
+    if (focused instanceof HTMLElement && focused.isConnected)
+      focused.focus({ preventScroll: true });
   }
 }
 
@@ -79,11 +84,16 @@ export function useClipboard(
   const { resetDelay = 2000, onSuccess, onError } = options;
 
   const [status, setStatus] = useState<ClipboardStatus>('idle');
+  const [isCopying, setIsCopying] = useState(false);
+  const generation = useRef(0);
+  const copying = useRef(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
+      generation.current += 1;
+      copying.current = false;
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
@@ -91,11 +101,21 @@ export function useClipboard(
   }, []);
 
   const reset = useCallback(() => {
+    generation.current += 1;
+    copying.current = false;
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    setIsCopying(false);
     setStatus('idle');
   }, []);
 
   const copy = useCallback(
     async (text: string): Promise<boolean> => {
+      if (copying.current) return false;
+      copying.current = true;
+      const request = ++generation.current;
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      setIsCopying(true);
+      setStatus('idle');
       let success = false;
       let lastError: Error | null = null;
 
@@ -109,6 +129,7 @@ export function useClipboard(
           success = fallbackCopy(text);
         }
       } catch (error) {
+        if (request !== generation.current) return false;
         lastError =
           error instanceof Error ? error : new Error('Copy failed (clipboard)');
         // Try fallback if modern API failed
@@ -119,6 +140,9 @@ export function useClipboard(
         }
       }
 
+      if (request !== generation.current) return false;
+      copying.current = false;
+      setIsCopying(false);
       if (success) {
         setStatus('success');
         onSuccess?.();
@@ -140,7 +164,9 @@ export function useClipboard(
         if (timeoutRef.current) {
           clearTimeout(timeoutRef.current);
         }
-        timeoutRef.current = setTimeout(() => setStatus('idle'), resetDelay);
+        timeoutRef.current = setTimeout(() => {
+          if (request === generation.current) setStatus('idle');
+        }, resetDelay);
       }
 
       return success;
@@ -150,7 +176,7 @@ export function useClipboard(
 
   return {
     status,
-    isCopying: false, // Async operation is fast enough that we don't track "copying" state
+    isCopying,
     isSuccess: status === 'success',
     isError: status === 'error',
     copy,

@@ -32,6 +32,92 @@ export interface KeyframeRecord {
   readonly pageErrors: readonly string[];
 }
 
+export interface EssentialViewportAudit {
+  readonly supported: boolean;
+  readonly findings: readonly {
+    readonly selector: string;
+    readonly reason: 'missing' | 'duplicate' | 'clipped' | 'occluded';
+    readonly box?: {
+      readonly left: number;
+      readonly top: number;
+      readonly right: number;
+      readonly bottom: number;
+    };
+  }[];
+}
+
+/** State-specific actions only: transcript/list items may legitimately scroll. */
+export async function inspectEssentialViewport(
+  page: Page,
+  selectors: readonly string[]
+): Promise<EssentialViewportAudit> {
+  // Plain JS avoids transpiler helpers in serialized browser functions.
+  return page.evaluate(`((selectors) => {
+    const viewport = window.visualViewport;
+    if (!viewport) return { supported: false, findings: [] };
+    const findings = [];
+    const visible = el => {
+      if (!el.getClientRects().length) return false;
+      for (let node = el; node; node = node.parentElement) {
+        const style = getComputedStyle(node);
+        if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) return false;
+      }
+      return true;
+    };
+    for (const selector of selectors) {
+      const matches = Array.from(document.querySelectorAll(selector)).filter(visible);
+      if (matches.length !== 1) {
+        findings.push({ selector, reason: matches.length ? 'duplicate' : 'missing' });
+        continue;
+      }
+      const el = matches[0];
+      const rect = el.getBoundingClientRect();
+      const box = { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom };
+      let left = viewport.offsetLeft, top = viewport.offsetTop;
+      let right = left + viewport.width, bottom = top + viewport.height;
+      for (let node = el.parentElement; node; node = node.parentElement) {
+        const style = getComputedStyle(node);
+        const clip = node.getBoundingClientRect();
+        // Motion's composer layout projection scales viewport bounds, while
+        // client dimensions and borders stay in layout pixels. Convert the
+        // clip's client box into the same coordinates as the control's rect.
+        const scaleX = node.offsetWidth > 0 ? clip.width / node.offsetWidth : 1;
+        const scaleY = node.offsetHeight > 0 ? clip.height / node.offsetHeight : 1;
+        if (/(hidden|clip|auto|scroll)/.test(style.overflowX)) {
+          left = Math.max(left, clip.left + node.clientLeft * scaleX);
+          right = Math.min(right, clip.left + (node.clientLeft + node.clientWidth) * scaleX);
+        }
+        if (/(hidden|clip|auto|scroll)/.test(style.overflowY)) {
+          top = Math.max(top, clip.top + node.clientTop * scaleY);
+          bottom = Math.min(bottom, clip.top + (node.clientTop + node.clientHeight) * scaleY);
+        }
+      }
+      if (rect.width <= 0 || rect.height <= 0 || rect.left < left - 1 || rect.top < top - 1 || rect.right > right + 1 || rect.bottom > bottom + 1) {
+        findings.push({ selector, reason: 'clipped', box });
+        continue;
+      }
+      const x = (rect.left + rect.right) / 2, y = (rect.top + rect.bottom) / 2;
+      const points = [[x,y], [rect.left + 1,y], [rect.right - 1,y], [x,rect.top + 1], [x,rect.bottom - 1]];
+      // elementFromPoint skips pointer-events:none, so a painted status pill
+      // looks occluded by whatever sits underneath it. Sample with the target
+      // hit-testable, then restore. A real cover still wins.
+      const occludedAt = (px, py) => {
+        const previous = el.style.pointerEvents;
+        el.style.pointerEvents = 'auto';
+        let hit;
+        try {
+          hit = document.elementFromPoint(px, py);
+        } finally {
+          el.style.pointerEvents = previous;
+        }
+        return !hit || (hit !== el && !el.contains(hit));
+      };
+      if (points.some(([px,py]) => occludedAt(px, py))) findings.push({ selector, reason: 'occluded', box });
+    }
+    return { supported: true, findings };
+  })(${JSON.stringify(selectors)})`);
+}
+
 const pageErrors = new WeakMap<Page, string[]>();
 let sequence = 0;
 

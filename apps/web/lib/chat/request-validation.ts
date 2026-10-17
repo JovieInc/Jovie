@@ -1,5 +1,6 @@
 import type { UIMessage } from 'ai';
 import { NextResponse } from 'next/server';
+import { validateChatMessageParts } from '@/lib/chat/attachment-policy';
 import { parseJsonBody } from '@/lib/http/parse-json';
 
 /** Maximum allowed chat POST body size (bytes). */
@@ -76,6 +77,9 @@ export function validateMessage(message: unknown): string | null {
   if (partsBytes > MAX_TOTAL_PARTS_SERIALIZED_BYTES) {
     return 'Message parts payload too large';
   }
+
+  const partsError = validateChatMessageParts(msg.parts);
+  if (partsError) return partsError;
 
   if (msg.role === 'user') {
     const contentStr = extractUIMessageText(msg.parts as MessagePart[]);

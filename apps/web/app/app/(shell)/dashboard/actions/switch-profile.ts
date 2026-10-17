@@ -5,8 +5,10 @@ import { revalidateTag } from 'next/cache';
 import { attachFirstTouchReceipt } from '@/lib/acquisition/activation-receipt';
 import { appUserIdFilter } from '@/lib/auth/app-user-id';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { setupDbSession } from '@/lib/auth/session';
 import { CACHE_TAGS } from '@/lib/cache/tags';
 import { db } from '@/lib/db';
+import { runLegacyDbTransaction } from '@/lib/db/legacy-transaction';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
@@ -38,7 +40,8 @@ export async function switchActiveProfile(
       return { success: false, error: 'Invalid profile ID' };
     }
 
-    // Look up the database user
+    await setupDbSession(appUserId);
+
     const [user] = await db
       .select({ id: users.id, activeProfileId: users.activeProfileId })
       .from(users)
@@ -49,12 +52,10 @@ export async function switchActiveProfile(
       return { success: false, error: 'User not found' };
     }
 
-    // Already active — no-op
     if (user.activeProfileId === profileId) {
       return { success: true };
     }
 
-    // Verify ownership: check userProfileClaims first, then legacy userId
     const [claim] = await db
       .select({ id: userProfileClaims.id })
       .from(userProfileClaims)
@@ -67,7 +68,6 @@ export async function switchActiveProfile(
       .limit(1);
 
     if (!claim) {
-      // Fallback: check legacy creatorProfiles.userId
       const [legacyProfile] = await db
         .select({ id: creatorProfiles.id })
         .from(creatorProfiles)
@@ -83,7 +83,6 @@ export async function switchActiveProfile(
         return { success: false, error: 'Profile not found or not owned' };
       }
 
-      // Lazy backfill: insert missing userProfileClaims row
       await db
         .insert(userProfileClaims)
         .values({
@@ -94,7 +93,6 @@ export async function switchActiveProfile(
         .onConflictDoNothing();
     }
 
-    // Switch active profile
     await db
       .update(users)
       .set({ activeProfileId: profileId, updatedAt: new Date() })
@@ -161,7 +159,8 @@ export async function createAdditionalProfile(input: {
       };
     }
 
-    // Look up the database user
+    await setupDbSession(appUserId);
+
     const [user] = await db
       .select({ id: users.id })
       .from(users)
@@ -172,7 +171,6 @@ export async function createAdditionalProfile(input: {
       return { success: false, error: 'User not found' };
     }
 
-    // Soft limit: max profiles per user
     const existingProfiles = await db
       .select({ id: creatorProfiles.id })
       .from(creatorProfiles)
@@ -185,8 +183,7 @@ export async function createAdditionalProfile(input: {
       };
     }
 
-    // All writes in a single transaction for atomicity
-    const profile = await db.transaction(async tx => {
+    const profile = await runLegacyDbTransaction(async tx => {
       const [newProfile] = await tx
         .insert(creatorProfiles)
         .values({
@@ -209,14 +206,12 @@ export async function createAdditionalProfile(input: {
         throw new Error('Failed to create profile');
       }
 
-      // Insert userProfileClaims row
       await tx.insert(userProfileClaims).values({
         userId: user.id,
         creatorProfileId: newProfile.id,
         role: 'owner',
       });
 
-      // Switch to the new profile
       await tx
         .update(users)
         .set({ activeProfileId: newProfile.id, updatedAt: new Date() })

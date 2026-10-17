@@ -4,6 +4,7 @@ import type { ReactElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PresenceStatusBadge } from '@/components/features/presence/PresenceStatusParts';
 import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
+import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import {
   buildCompanyPresencePages,
@@ -20,6 +21,10 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
   usePathname: () => '/app/ov/presence',
   useSearchParams: () => new URLSearchParams(),
+}));
+
+vi.mock('@/hooks/useBreakpoint', () => ({
+  useBreakpointDown: vi.fn(() => false),
 }));
 
 vi.mock('@/hooks/useRegisterRightPanel', () => ({
@@ -79,8 +84,19 @@ function lastPanel() {
 }
 
 describe('CompanyPresenceWorkspace', () => {
+  it('removes responsive columns from the table schema rather than only hiding cells', () => {
+    vi.mocked(useBreakpointDown).mockReturnValue(true);
+    const { container } = renderWorkspace(unconfiguredData);
+    expect(
+      screen.queryByRole('columnheader', { name: 'Type' })
+    ).not.toBeInTheDocument();
+    expect(container.querySelectorAll('col')).toHaveLength(2);
+    expect(screen.getAllByRole('columnheader')).toHaveLength(2);
+  });
+
   afterEach(() => {
     vi.mocked(useRegisterRightPanel).mockReset();
+    vi.mocked(useBreakpointDown).mockReturnValue(false);
   });
 
   it('shows every unwired check as Unconfigured instead of a zero', () => {

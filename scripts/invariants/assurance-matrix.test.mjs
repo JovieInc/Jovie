@@ -5,17 +5,24 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  assuranceMatrixDigest,
+  assuranceMatrixEntryDigest,
   assuranceMatrixReceipt,
   blindSpotsByFailureClass,
+  formatAssuranceMatrixEntryDigests,
   invalidatedRows,
   matrixFindings,
   readAssuranceMatrix,
+  readAssuranceMatrixEntryDigests,
   rowCertification,
   UI_FAILURE_CLASSES,
   uiAssuranceReport,
   uiEvidenceRequirements,
   validateAssuranceMatrix,
+  validateAssuranceMatrixEntryDigests,
+  validateAssuranceMatrixPolicy,
 } from './assurance-matrix.mjs';
+import { readInvariantRegistry } from './registry.mjs';
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -178,7 +185,94 @@ describe('assurance matrix (JOV-6064)', () => {
     mutated.rows[0].owner = 'operations';
     const changed = assuranceMatrixReceipt(mutated);
     assert.notEqual(receipt.digest, changed.digest);
-    assert.equal(receipt.matrixRevision, '2026-10-13.1');
+    assert.equal(receipt.matrixRevision, '2026-10-15.1');
+  });
+});
+
+describe('assurance matrix entry digests', () => {
+  function row(matrix, id) {
+    return matrix.rows.find(item => item.id === id);
+  }
+
+  function refresh(digests, id, value) {
+    return digests.map(entry =>
+      entry.id === id
+        ? { id, digest: assuranceMatrixEntryDigest(value) }
+        : entry
+    );
+  }
+
+  it('accepts the checked-in per-entry digests and rejects a whole-file digest', () => {
+    const matrix = healthy();
+    const recorded = readAssuranceMatrixEntryDigests();
+    assert.equal(
+      formatAssuranceMatrixEntryDigests(matrix),
+      `${recorded.map(entry => JSON.stringify({ id: entry.id, digest: entry.digest })).join('\n')}\n`
+    );
+    assert.deepEqual(validateAssuranceMatrixEntryDigests(matrix, recorded), []);
+    assert.deepEqual(
+      validateAssuranceMatrixPolicy(readInvariantRegistry()),
+      []
+    );
+    const retired = clone(readInvariantRegistry());
+    retired.invariants.find(
+      item => item.id === 'JOV-INV-037'
+    ).policy.value.matrixDigest = assuranceMatrixDigest(matrix);
+    assert.ok(
+      validateAssuranceMatrixPolicy(retired).includes(
+        'matrix-digest:whole-file-retired'
+      )
+    );
+  });
+
+  it('fails the changed entry when its digest line is left stale', () => {
+    const matrix = healthy();
+    const recorded = readAssuranceMatrixEntryDigests();
+    row(matrix, 'AM-001').owner = 'operations';
+    const errors = validateAssuranceMatrixEntryDigests(matrix, recorded);
+    assert.deepEqual(errors, ['matrix-digest:mismatch:row:AM-001']);
+    const refreshed = refresh(recorded, 'row:AM-001', row(matrix, 'AM-001'));
+    assert.deepEqual(
+      validateAssuranceMatrixEntryDigests(matrix, refreshed),
+      []
+    );
+  });
+
+  it('keeps a merge of two independently refreshed entries valid', () => {
+    const base = healthy();
+    const recorded = readAssuranceMatrixEntryDigests();
+    const left = clone(base);
+    const right = clone(base);
+    row(left, 'AM-001').owner = 'left-owner';
+    row(right, 'AM-004').owner = 'right-owner';
+    const merged = clone(base);
+    row(merged, 'AM-001').owner = 'left-owner';
+    row(merged, 'AM-004').owner = 'right-owner';
+    const mergedDigests = refresh(
+      refresh(recorded, 'row:AM-001', row(left, 'AM-001')),
+      'row:AM-004',
+      row(right, 'AM-004')
+    );
+
+    assert.deepEqual(
+      validateAssuranceMatrixEntryDigests(merged, mergedDigests),
+      []
+    );
+    assert.notEqual(assuranceMatrixDigest(left), assuranceMatrixDigest(merged));
+    assert.notEqual(
+      assuranceMatrixDigest(right),
+      assuranceMatrixDigest(merged)
+    );
+    assert.ok(
+      validateAssuranceMatrixEntryDigests(merged, recorded).includes(
+        'matrix-digest:mismatch:row:AM-001'
+      )
+    );
+    assert.ok(
+      validateAssuranceMatrixEntryDigests(merged, recorded).includes(
+        'matrix-digest:mismatch:row:AM-004'
+      )
+    );
   });
 });
 
@@ -323,5 +417,84 @@ describe('UI assurance matrix (JOV-7713)', () => {
     assert.ok(row, 'reversible-control row is invalidated');
     assert.ok(row.targets.includes('macos-electron'));
     assert.deepEqual(uiEvidenceRequirements(matrix, ['docs/README.md']), []);
+  });
+
+  it('does not demand rendered UI receipts for the exact JOV-8322 test-only trigger', () => {
+    const matrix = healthy();
+    const paths = [
+      'apps/web/app/api/dsp/bio-sync/route.test.ts',
+      'apps/web/components/features/visibility-audit/VisibilityAuditReportView.test.tsx',
+      'apps/web/lib/connectors/artist-profile-contract.test.ts',
+      'apps/web/lib/connectors/dsp-profile-catalog.test.ts',
+      'apps/web/lib/connectors/dsp-profile-catalog.ts',
+      'apps/web/lib/connectors/profile-writes/service.test.ts',
+      'apps/web/lib/connectors/registry.ts',
+      'apps/web/lib/dsp-bio-sync/api-method.test.ts',
+      'apps/web/lib/dsp-bio-sync/blocked-providers.test.ts',
+      'apps/web/lib/dsp-bio-sync/providers.ts',
+      'apps/web/lib/visibility-audit/__snapshots__/assemble.test.ts.snap',
+      'apps/web/lib/visibility-audit/assemble.test.ts',
+      'apps/web/lib/visibility-audit/render-markdown.ts',
+    ];
+    assert.deepEqual(uiEvidenceRequirements(matrix, paths), []);
+    for (const row of ['AM-020', 'AM-021', 'AM-023'])
+      assert.ok(invalidatedRows(matrix, paths).includes(row));
+  });
+
+  it('keeps test artifacts out of product receipts without suppressing detector invalidation', () => {
+    const matrix = healthy();
+    for (const suffix of [
+      'test.tsx',
+      'spec.tsx',
+      'test.ts',
+      'spec.mts',
+      'test.cts',
+      'spec.jsx',
+      'test.js',
+      'spec.mjs',
+      'test.cjs',
+    ]) {
+      const path = `apps/web/components/Proof.${suffix}`;
+      assert.deepEqual(uiEvidenceRequirements(matrix, [path]), [], path);
+      assert.ok(invalidatedRows(matrix, [path]).includes('AM-021'), path);
+    }
+  });
+
+  it('retains exact-build requirements for actual source and mixed source/test changes', () => {
+    const matrix = healthy();
+    const source =
+      'apps/web/components/features/visibility-audit/VisibilityAuditReportView.tsx';
+    const owed = uiEvidenceRequirements(matrix, [source]);
+    assert.deepEqual(
+      owed.map(row => row.row),
+      ['AM-020', 'AM-021', 'AM-023']
+    );
+    assert.deepEqual(
+      uiEvidenceRequirements(matrix, [
+        `${source.slice(0, -4)}.test.tsx`,
+        source,
+      ]),
+      owed
+    );
+    assert.ok(
+      owed.every(
+        row =>
+          row.targets.includes('web-desktop') &&
+          row.targets.includes('web-mobile')
+      )
+    );
+  });
+
+  it('preserves stories, render fixtures and unreadable-path failures', () => {
+    const matrix = healthy();
+    for (const path of [
+      'apps/web/components/Proof.stories.tsx',
+      'apps/web/components/Proof.fixture.tsx',
+      'apps/web/components/__fixtures__/Proof.tsx',
+      'apps/web/components/Proof.spec-helper.tsx',
+    ])
+      assert.ok(uiEvidenceRequirements(matrix, [path]).length > 0, path);
+    assert.throws(() => uiEvidenceRequirements(matrix, [null]), TypeError);
+    assert.throws(() => uiEvidenceRequirements(matrix, null), TypeError);
   });
 });

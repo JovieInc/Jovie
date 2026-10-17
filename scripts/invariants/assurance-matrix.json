@@ -3,18 +3,158 @@
   "contract": "jovie.certification/v1",
   "issue": "JOV-6064",
   "extends": "JOV-5853",
-  "matrixRevision": "2026-10-13.1",
+  "matrixRevision": "2026-10-15.1",
   "asOf": "2026-10-03T00:00:00Z",
   "evidenceMaxAgeMs": 2592000000,
   "scope": {
     "requiredObjects": [
-      { "id": "journey:marketing-home-render", "kind": "user-journey" },
-      { "id": "journey:signup-onboarding", "kind": "user-journey" },
-      { "id": "journey:artist-profile-public", "kind": "user-journey" },
-      { "id": "journey:checkout-billing", "kind": "user-journey" },
-      { "id": "journey:chat-agent-turn", "kind": "user-journey" },
-      { "id": "journey:release-publish", "kind": "user-journey" },
-      { "id": "journey:smartlink-fan-click", "kind": "user-journey" },
+      {
+        "id": "journey:marketing-home-render",
+        "kind": "user-journey",
+        "outcomeMission": {
+          "id": "outcome:journey:marketing-home-render",
+          "outcome": {
+            "revision": 1,
+            "persona": "prospective artist",
+            "goal": "Understand what Jovie does, what access costs, and how to start with your own artist identity.",
+            "successCriteria": [
+              "The visitor can explain the offered artist outcome and access conditions",
+              "Price and availability agree with current product truth",
+              "The start path preserves the intended artist identity"
+            ],
+            "frictionBudget": {
+              "maxDurationMs": 300000,
+              "maxRetries": 1
+            }
+          }
+        }
+      },
+      {
+        "id": "journey:signup-onboarding",
+        "kind": "user-journey",
+        "outcomeMission": {
+          "id": "outcome:journey:signup-onboarding",
+          "outcome": {
+            "revision": 1,
+            "persona": "new artist",
+            "goal": "Start with your artist identity, establish your account, and reach a usable public profile you own.",
+            "successCriteria": [
+              "The claimed identity is the intended artist",
+              "A fresh session retains the correct ownership",
+              "The public profile is usable and contains the intended catalog"
+            ],
+            "frictionBudget": {
+              "maxDurationMs": 300000,
+              "maxRetries": 1
+            }
+          }
+        }
+      },
+      {
+        "id": "journey:artist-profile-public",
+        "kind": "user-journey",
+        "outcomeMission": {
+          "id": "outcome:journey:artist-profile-public",
+          "outcome": {
+            "revision": 1,
+            "persona": "fan",
+            "goal": "Discover this artist, understand who they are and their latest work, and arrange to hear when they play nearby.",
+            "successCriteria": [
+              "Identity and latest work match the canonical artist",
+              "A listening destination reaches the intended work",
+              "Nearby notification interest and consent persist for the intended artist"
+            ],
+            "frictionBudget": {
+              "maxDurationMs": 300000,
+              "maxRetries": 1
+            }
+          }
+        }
+      },
+      {
+        "id": "journey:checkout-billing",
+        "kind": "user-journey",
+        "outcomeMission": {
+          "id": "outcome:journey:checkout-billing",
+          "outcome": {
+            "revision": 1,
+            "persona": "artist choosing paid access",
+            "goal": "Choose the appropriate plan, complete checkout in test mode, and use the access you paid for.",
+            "successCriteria": [
+              "The charged amount and plan match the offer",
+              "The provider receipt and entitlement agree",
+              "A retry does not duplicate the charge"
+            ],
+            "frictionBudget": {
+              "maxDurationMs": 300000,
+              "maxRetries": 1
+            }
+          }
+        }
+      },
+      {
+        "id": "journey:chat-agent-turn",
+        "kind": "user-journey",
+        "outcomeMission": {
+          "id": "outcome:journey:chat-agent-turn",
+          "outcome": {
+            "revision": 1,
+            "persona": "artist asking for help",
+            "goal": "Ask the assistant to prepare a change to your artist profile, inspect the proposed result, and confirm that the authorized change persists.",
+            "successCriteria": [
+              "The assistant understands the requested artist and change",
+              "Only authorized state changes persist after reload",
+              "A failed or refused action explains how to recover without duplicate writes"
+            ],
+            "frictionBudget": {
+              "maxDurationMs": 300000,
+              "maxRetries": 1
+            }
+          }
+        }
+      },
+      {
+        "id": "journey:release-publish",
+        "kind": "user-journey",
+        "outcomeMission": {
+          "id": "outcome:journey:release-publish",
+          "outcome": {
+            "revision": 1,
+            "persona": "artist releasing music",
+            "goal": "Prepare your real release and share a public link whose identity and listening destinations are correct.",
+            "successCriteria": [
+              "The release belongs to the intended artist",
+              "Saved destinations survive reload",
+              "The shared link resolves to the intended release and provider"
+            ],
+            "frictionBudget": {
+              "maxDurationMs": 300000,
+              "maxRetries": 1
+            }
+          }
+        }
+      },
+      {
+        "id": "journey:smartlink-fan-click",
+        "kind": "user-journey",
+        "outcomeMission": {
+          "id": "outcome:journey:smartlink-fan-click",
+          "outcome": {
+            "revision": 1,
+            "persona": "fan",
+            "goal": "Identify this release and listen on your preferred available service without being sent to another artist or release.",
+            "successCriteria": [
+              "Release identity matches the canonical catalog",
+              "The chosen destination contains the intended music",
+              "An unavailable service has an understandable recovery path"
+            ],
+            "frictionBudget": {
+              "maxDurationMs": 300000,
+              "maxRetries": 1
+            }
+          }
+        }
+      },
       { "id": "boundary:tenant-isolation", "kind": "trust-boundary" },
       { "id": "boundary:auth-identity", "kind": "trust-boundary" },
       { "id": "boundary:billing-entitlement", "kind": "trust-boundary" },
@@ -1121,10 +1261,12 @@
       "owner": "design-system",
       "sources": ["JOV-7713", "JOV-4522", "JOV-4130"],
       "invalidatesOn": [
-        "apps/web/lib/animation",
+        "apps/web/components/jovie",
         "apps/web/components/organisms/sidebar",
         "apps/web/components/shell",
-        "apps/web/eslint-rules/no-raw-motion-values.js"
+        "apps/web/eslint-rules/no-raw-motion-values.js",
+        "apps/web/lib/animation",
+        "packages/ui/atoms/status-glyph.tsx"
       ],
       "layers": {
         "prevent": {
@@ -1155,6 +1297,10 @@
         ],
         "detectors": [
           {
+            "ref": "apps/web/components/jovie/tool-status.test.tsx",
+            "enforcement": "merge-group-blocking"
+          },
+          {
             "ref": "apps/web/eslint-rules/no-raw-motion-values.js",
             "enforcement": "pr-blocking",
             "inventory": ["ui:ownership-registry"],
@@ -1163,6 +1309,10 @@
           },
           {
             "ref": "apps/web/lib/hooks/useReducedMotion.test.ts",
+            "enforcement": "merge-group-blocking"
+          },
+          {
+            "ref": "apps/web/tests/e2e/storybook-agent-status.spec.ts",
             "enforcement": "merge-group-blocking"
           }
         ],
@@ -1182,9 +1332,12 @@
       "whatCanGoWrong": "A control works from one state only, open without close, stale state after hydration, pointer/keyboard desync, lost focus, hidden/inert control after transition, double-bound handlers.",
       "covers": ["ui:ownership-registry", "ui:app-screens"],
       "owner": "design-system",
-      "sources": ["JOV-7713", "JOV-7207", "JOV-7201"],
+      "sources": ["JOV-7201", "JOV-7207", "JOV-7713", "JOV-8019"],
       "invalidatesOn": [
         "apps/web/components/atoms/RailToggleButton.tsx",
+        "apps/web/components/features/admin/certifications",
+        "apps/web/components/jovie/components/EntityChipPopover.tsx",
+        "apps/web/components/jovie/components/EntityResolutionProvider.tsx",
         "apps/web/components/molecules/sidebar-collapse-button",
         "apps/web/components/organisms/sidebar",
         "apps/web/hooks/useSidebarKeyboardShortcut.ts"
@@ -1235,26 +1388,36 @@
         "authority": ["apps/web/data/designSystem/interactionRegistry.ts"],
         "detectors": [
           {
-            "ref": "apps/web/tests/e2e/storybook-overlay-collisions.spec.ts",
-            "enforcement": "path-selected-blocking"
-          },
-          {
-            "ref": "apps/web/components/atoms/RailToggleButton.test.tsx",
+            "ref": "apps/ovie/scripts/app-shell-invariants.test.mjs",
             "enforcement": "merge-group-blocking"
-          },
-          {
-            "ref": "apps/web/tests/unit/design-system/reversible-control-certification.test.tsx",
-            "enforcement": "merge-group-blocking",
-            "deliberateRed": "apps/web/tests/unit/design-system/reversible-control-certification.test.tsx",
-            "liveStatus": "green"
           },
           {
             "ref": "apps/ovie/scripts/desktop-sidebar-contract.test.mjs",
             "enforcement": "merge-group-blocking"
           },
           {
-            "ref": "apps/ovie/scripts/app-shell-invariants.test.mjs",
+            "ref": "apps/web/components/atoms/RailToggleButton.test.tsx",
             "enforcement": "merge-group-blocking"
+          },
+          {
+            "ref": "apps/web/components/features/admin/certifications/OvieCertificationsWorkspace.test.tsx",
+            "enforcement": "merge-group-blocking",
+            "deliberateRed": "apps/web/components/features/admin/certifications/OvieCertificationsWorkspace.test.tsx"
+          },
+          {
+            "ref": "apps/web/components/jovie/components/EntityReferences.contract.test.tsx",
+            "enforcement": "merge-group-blocking",
+            "deliberateRed": "apps/web/components/jovie/components/EntityReferences.contract.test.tsx"
+          },
+          {
+            "ref": "apps/web/tests/e2e/storybook-overlay-collisions.spec.ts",
+            "enforcement": "path-selected-blocking"
+          },
+          {
+            "ref": "apps/web/tests/unit/design-system/reversible-control-certification.test.tsx",
+            "enforcement": "merge-group-blocking",
+            "deliberateRed": "apps/web/tests/unit/design-system/reversible-control-certification.test.tsx",
+            "liveStatus": "green"
           }
         ],
         "requiredEvidence": ["web-desktop", "web-mobile", "macos-electron"],
@@ -1421,15 +1584,18 @@
       "id": "AM-022",
       "surface": "Responsive, mobile and packaged-desktop parity of supported surfaces",
       "failureClass": "ui-responsive-platform-parity",
-      "whatCanGoWrong": "Desktop assumptions break mobile, drawer/sheet/rail parity drifts, safe areas or orientation break, packaged Mac differs from browser for the same surface.",
+      "whatCanGoWrong": "Desktop assumptions break mobile, drawer/sheet/rail parity drifts, safe areas, keyboard/autofill/password-manager UI or orientation break, packaged Mac differs from browser for the same surface.",
       "covers": [
         "ui:supported-platforms",
         "ui:visual-qa-surfaces",
         "ui:screen-cert-routes"
       ],
       "owner": "design-system",
-      "sources": ["JOV-7713", "JOV-6928"],
+      "sources": ["JOV-6061", "JOV-6928", "JOV-7713", "JOV-7846"],
       "invalidatesOn": [
+        "scripts/invariants/browser-owned-input-matrix.json",
+        "apps/web/components/features/auth",
+        "apps/web/components/features/profile/artist-notifications-cta",
         "apps/web/lib/visual-qa",
         "apps/web/lib/platform/supported-platforms.ts",
         "apps/desktop",
@@ -1460,9 +1626,16 @@
         "severity": "high",
         "authority": [
           "apps/web/lib/visual-qa/viewports.ts",
-          "apps/web/lib/platform/supported-platforms.ts"
+          "apps/web/lib/platform/supported-platforms.ts",
+          "scripts/invariants/browser-owned-input-matrix.json"
         ],
         "detectors": [
+          {
+            "ref": "scripts/invariants/browser-owned-input.mjs",
+            "enforcement": "scheduled",
+            "deliberateRed": "scripts/invariants/browser-owned-input.test.mjs",
+            "inventory": ["ui:supported-platforms"]
+          },
           {
             "ref": "apps/web/lib/visual-qa/registry.ts",
             "enforcement": "manual",
@@ -1485,6 +1658,7 @@
         ],
         "requiredEvidence": ["web-desktop", "web-mobile", "macos-electron"],
         "blindSpots": [
+          "Browser-owned UI requires real-device exact-build evidence; UNKNOWN/BLOCKED cells cannot certify (JOV-7846).",
           "Mobile proof only exists in the post-merge screen-certification run.",
           "Packaged Mac parity verified manually through dogfood ledgers, not machine-compared."
         ],

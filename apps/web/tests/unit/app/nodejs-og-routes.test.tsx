@@ -5,10 +5,12 @@ vi.mock('next/og', () => ({
   ImageResponse: class MockImageResponse {
     headers = new Headers();
     body = null;
+    status = 200;
     constructor(
       public element: unknown,
-      public options?: { headers?: Record<string, string> }
+      public options?: { headers?: Record<string, string>; status?: number }
     ) {
+      this.status = options?.status ?? 200;
       for (const [key, value] of Object.entries(options?.headers ?? {})) {
         this.headers.set(key, value);
       }
@@ -33,6 +35,8 @@ const mockGetProfile = vi.mocked(getProfileWithLinks);
 const PUBLIC_PROFILE = {
   isPublic: true,
   displayName: 'Test Artist',
+  username: 'testartist',
+  usernameNormalized: 'testartist',
   genres: ['pop', 'electronic'],
   avatarUrl: 'https://cdn.example.com/avatar.png',
 } as unknown as Awaited<ReturnType<typeof getProfileWithLinks>>;
@@ -58,20 +62,24 @@ describe('profile opengraph-image', () => {
 
   it('declares the nodejs runtime and static OG metadata', () => {
     expect(profileRuntime).toBe('nodejs');
-    expect(profileAlt).toBe('Jovie artist profile');
+    expect(profileAlt).toBe('Public profile preview');
     expect(profileSize).toEqual({ width: 1200, height: 630 });
   });
 
-  it('renders the gradient fallback when the profile lookup fails', async () => {
+  it('returns a neutral uncached 503 when the profile lookup fails', async () => {
     mockGetProfile.mockRejectedValue(new Error('db down'));
     const response = await ProfileOpenGraphImage({
       params: Promise.resolve({ username: 'TestArtist' }),
     });
     expect(response).toBeDefined();
-    expect(mockGetProfile).toHaveBeenCalledWith('testartist');
+    expect(mockGetProfile).toHaveBeenCalledWith('testartist', {
+      skipCache: true,
+    });
+    expect(response.status).toBe(503);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
   });
 
-  it('renders the hero image for a public profile with an avatar', async () => {
+  it('returns a public profile preview even when its avatar cannot be decoded', async () => {
     stubImageFetch();
     mockGetProfile.mockResolvedValue(PUBLIC_PROFILE);
     const response = await ProfileOpenGraphImage({

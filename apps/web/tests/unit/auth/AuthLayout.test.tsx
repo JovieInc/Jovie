@@ -50,6 +50,33 @@ vi.mock('@/hooks/useMobileKeyboard', () => ({
   useMobileKeyboard: () => ({ isKeyboardVisible: keyboardVisible }),
 }));
 
+vi.mock('@/components/providers/AuthClientProviders', () => ({
+  AuthClientProviders: ({ children }: { readonly children: ReactNode }) =>
+    children,
+}));
+
+vi.mock('@/components/providers/ResolvedClientProviders', () => ({
+  ResolvedClientProviders: ({ children }: { readonly children: ReactNode }) =>
+    children,
+}));
+
+vi.mock('@/lib/flags/client', () => ({
+  AppFlagProvider: ({ children }: { readonly children: ReactNode }) => children,
+}));
+
+vi.mock('@/lib/flags/server', () => ({
+  getAppFlagsSnapshot: vi.fn().mockResolvedValue({}),
+}));
+
+vi.mock('@/components/molecules/LoadingSkeleton', () => ({
+  AuthFormSkeleton: () => <div>Loading auth form</div>,
+}));
+
+import AuthRouteLayout from '@/app/(auth)/layout';
+import ErrorPageLoading from '@/app/error/user-creation-failed/loading';
+import UserCreationFailedPage from '@/app/error/user-creation-failed/page';
+import OnboardingCheckoutLoading from '@/app/onboarding/checkout/loading';
+import WaitlistRouteLayout from '@/app/waitlist/layout';
 import { AuthLayout } from '@/components/features/auth/AuthLayout';
 
 describe('AuthLayout', () => {
@@ -57,8 +84,8 @@ describe('AuthLayout', () => {
     keyboardVisible = false;
   });
 
-  it('renders a skip link to a focusable main landmark', async () => {
-    render(
+  it('provides a focusable form container without owning the route landmark', () => {
+    const { container } = render(
       <AuthLayout formTitle='Sign In'>
         <div>Auth form body</div>
       </AuthLayout>
@@ -68,8 +95,58 @@ describe('AuthLayout', () => {
       'href',
       '#auth-form'
     );
-    expect(screen.getByRole('main')).toHaveAttribute('id', 'auth-form');
-    expect(screen.getByRole('main')).toHaveAttribute('tabIndex', '-1');
+    expect(screen.queryByRole('main')).not.toBeInTheDocument();
+    expect(container.querySelector('#auth-form')).toHaveAttribute(
+      'tabIndex',
+      '-1'
+    );
+  });
+
+  it('keeps one main landmark in the actual auth route composition', async () => {
+    render(
+      await AuthRouteLayout({
+        children: (
+          <AuthLayout formTitle='Sign In'>
+            <div>Auth form body</div>
+          </AuthLayout>
+        ),
+      })
+    );
+
+    expect(screen.getAllByRole('main')).toHaveLength(1);
+    expect(screen.getByRole('main')).toHaveTextContent('Auth form body');
+  });
+
+  it('keeps one main landmark in the standalone waitlist route', async () => {
+    render(
+      await WaitlistRouteLayout({
+        children: (
+          <AuthLayout formTitle='Continue to Jovie'>
+            <div>Waitlist form body</div>
+          </AuthLayout>
+        ),
+      })
+    );
+
+    expect(screen.getAllByRole('main')).toHaveLength(1);
+    expect(screen.getByRole('main')).toHaveTextContent('Waitlist form body');
+  });
+
+  it('keeps one main landmark on account-creation recovery', () => {
+    render(<UserCreationFailedPage />);
+
+    expect(screen.getAllByRole('main')).toHaveLength(1);
+    expect(screen.getByRole('main')).toHaveTextContent('Account setup error');
+  });
+
+  it.each([
+    ['account recovery', ErrorPageLoading],
+    ['onboarding checkout', OnboardingCheckoutLoading],
+  ])('keeps one main landmark while standalone %s loads', (_, Loading) => {
+    render(<Loading />);
+
+    expect(screen.getAllByRole('main')).toHaveLength(1);
+    expect(screen.getByRole('main')).toHaveTextContent('Loading auth form');
   });
 
   it('keeps the homepage logo link available when the split rail is shown', async () => {
@@ -83,7 +160,9 @@ describe('AuthLayout', () => {
       'href',
       '/'
     );
-    expect(screen.getByLabelText('Go to homepage')).toHaveClass('size-5');
+    expect(screen.getByLabelText('Go to homepage')).toHaveClass(
+      'auth-quiet-target'
+    );
   });
 
   it('keeps the footer prompt opt-in through the auth shell contract', async () => {
@@ -216,7 +295,7 @@ describe('AuthLayout', () => {
 
     const slot = container.querySelector('[data-auth-splash-logo-slot]');
     expect(slot).not.toBeNull();
-    expect(slot).toHaveClass('h-8');
+    expect(slot).toHaveClass('min-h-11');
     const logoLink = container.querySelector('[data-auth-splash-logo-slot] a');
     expect(logoLink).not.toBeNull();
     expect(logoLink).toHaveAttribute('aria-hidden', 'true');
@@ -260,7 +339,7 @@ describe('AuthLayout', () => {
     expect(hiddenTitle).toHaveTextContent('Sign In');
     expect(hiddenTitle).toHaveAttribute('aria-hidden', 'true');
     expect(screen.queryByText('Need an account?')).not.toBeInTheDocument();
-    expect(screen.getByRole('main')).toHaveTextContent('Auth form body');
+    expect(screen.getByText('Auth form body')).toBeVisible();
   });
 
   it('hides shared-shell chrome while the mobile keyboard is visible', async () => {

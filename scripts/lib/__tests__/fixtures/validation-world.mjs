@@ -96,6 +96,7 @@ export function createWorld(overrides = {}) {
         title: 'Profiles: editorial card replaces the carousel',
         description: '',
         state: 'In Review',
+        updatedAt: '2026-10-03T12:00:00Z',
         labels: [],
         children: [],
         attachments: ['https://github.com/JovieInc/Jovie/pull/101'],
@@ -134,6 +135,8 @@ export function createWorld(overrides = {}) {
     }
     if (href.startsWith('https://api.github.com/')) {
       const path = href.slice('https://api.github.com/'.length);
+      if (path === `repos/${REPO}/actions/workflows/production-controller.yml`)
+        return ok({ id: 91 });
       if (path.startsWith(`repos/${REPO}/pulls?state=open`))
         return ok(world.openPulls);
       let match = /^repos\/JovieInc\/Jovie\/pulls\/(\d+)\/files/.exec(path);
@@ -172,18 +175,23 @@ export function createWorld(overrides = {}) {
           base === head ? 'identical' : head > base ? 'ahead' : 'behind';
         return ok({ status });
       }
-      match = /name=production-generation-verified-([0-9a-f]{40})/.exec(path);
+      match =
+        /name=production-generation-verified-(recovery-)?([0-9a-f]{40})/.exec(
+          path
+        );
       if (match) {
+        const name = `production-generation-verified-${match[1] ?? ''}${match[2]}`;
         return ok({
-          artifacts: world.markers.has(match[1])
-            ? [
-                {
-                  name: `production-generation-verified-${match[1]}`,
-                  expired: false,
-                  workflow_run: { head_branch: 'main' },
-                },
-              ]
-            : [],
+          artifacts:
+            !match[1] && world.markers.has(match[2])
+              ? [
+                  {
+                    name,
+                    expired: false,
+                    workflow_run: { head_branch: 'main' },
+                  },
+                ]
+              : [],
         });
       }
       throw new Error(`unexpected GitHub path ${path}`);
@@ -200,6 +208,10 @@ export function createWorld(overrides = {}) {
                 updatedAt: issue.updatedAt ?? '2026-10-03T12:00:00Z',
                 state: { name: issue.state },
                 attachments: { nodes: issue.attachments.map(url => ({ url })) },
+                children: {
+                  nodes: issue.children.map(([identifier]) => ({ identifier })),
+                },
+                labels: { nodes: issue.labels.map(name => ({ name })) },
               })),
             pageInfo: { hasNextPage: false, endCursor: null },
           },
@@ -216,40 +228,68 @@ export function createWorld(overrides = {}) {
         data: {
           issue: issue && {
             id: issue.id,
+            updatedAt: issue.updatedAt,
             state: { id: `state-${issue.state}`, name: issue.state },
           },
         },
       });
     }
-    if (query.includes('IssueLifecycle(')) {
-      const issue = byKey(variables.issueId);
-      if (!issue) return ok({ data: { issue: null } });
+    const issuePayload = key => {
+      const issue = byKey(key);
+      if (!issue) return null;
       const state = STATES.find(entry => entry.name === issue.state);
-      return ok({
-        data: {
-          issue: {
-            id: issue.id,
-            identifier: issue.identifier,
-            title: issue.title,
-            description: issue.description,
-            state,
-            labels: { nodes: issue.labels.map(name => ({ name })) },
-            comments: {
-              nodes: issue.comments,
-              pageInfo: { hasNextPage: false, endCursor: null },
-            },
-            children: {
-              nodes: issue.children.map(([identifier, type]) => ({
-                identifier,
-                state: { type },
-              })),
-            },
-            attachments: { nodes: issue.attachments.map(url => ({ url })) },
-            history: { nodes: issue.history },
-            team: { states: { nodes: STATES } },
-          },
+      return {
+        id: issue.id,
+        identifier: issue.identifier,
+        title: issue.title,
+        updatedAt: issue.updatedAt,
+        description: issue.description,
+        state,
+        labels: { nodes: issue.labels.map(name => ({ name })) },
+        comments: {
+          nodes: issue.comments,
+          pageInfo: { hasNextPage: false, endCursor: null },
         },
-      });
+        children: {
+          nodes: issue.children.map(([identifier, type, deliveredAt]) => ({
+            identifier,
+            state: { type },
+            completedAt:
+              type === 'completed'
+                ? deliveredAt === undefined
+                  ? '2026-10-03T11:00:00Z'
+                  : deliveredAt
+                : null,
+            canceledAt:
+              type === 'canceled'
+                ? deliveredAt === undefined
+                  ? '2026-10-03T11:00:00Z'
+                  : deliveredAt
+                : null,
+          })),
+          pageInfo: { hasNextPage: false },
+        },
+        inverseRelations: {
+          nodes: issue.inverseRelations ?? [],
+          pageInfo: { hasNextPage: false, endCursor: null },
+        },
+        attachments: { nodes: issue.attachments.map(url => ({ url })) },
+        history: {
+          nodes: issue.history,
+          pageInfo: { hasNextPage: false, endCursor: null },
+        },
+        team: { states: { nodes: STATES } },
+      };
+    };
+    if (query.includes('LifecycleIssueBatch')) {
+      const data = {};
+      for (const [key, value] of Object.entries(variables)) {
+        data[key.replace(/^id/, 'i')] = issuePayload(value);
+      }
+      return ok({ data });
+    }
+    if (query.includes('IssueLifecycle(')) {
+      return ok({ data: { issue: issuePayload(variables.issueId) } });
     }
     if (query.includes('IssueLifecycleDescription')) {
       const issue = byKey(variables.issueId);
@@ -371,16 +411,28 @@ export function validClosure(identifier, deployedSha) {
  */
 export function snapshotFor(world, identifier) {
   const issue = world.issues[identifier];
+  const reopens = issue.history.filter(
+    entry =>
+      entry?.fromState?.type === 'completed' &&
+      entry?.toState?.type !== 'completed'
+  );
+  const times = reopens.map(entry => Date.parse(entry.createdAt ?? ''));
   return {
     id: issue.id,
     identifier: issue.identifier,
     title: issue.title,
+    updatedAt: issue.updatedAt,
     description: issue.description,
     labels: [...issue.labels],
     state: STATES.find(entry => entry.name === issue.state),
     states: STATES,
     commentRecords: [...issue.comments],
     attachmentUrls: [...issue.attachments],
+    receiptNotBefore: times.some(time => !Number.isFinite(time))
+      ? null
+      : times.length
+        ? new Date(Math.max(...times)).toISOString()
+        : undefined,
     reopenedAfterDone: issue.history.some(
       entry =>
         entry?.fromState?.type === 'completed' &&

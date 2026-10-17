@@ -35,7 +35,6 @@ export {
 export {
   extractInstagram,
   extractInstagramHandle,
-  fetchInstagramDocument,
   isInstagramUrl,
   validateInstagramUrl,
 } from './instagram';
@@ -52,7 +51,6 @@ export {
 export {
   extractLinktree,
   extractLinktreeHandle,
-  fetchLinktreeDocument,
   isLinktreeUrl,
   isValidHandle as isValidLinktreeHandle,
   normalizeHandle as normalizeLinktreeHandle,
@@ -141,5 +139,6 @@ export function detectIngestionPlatform(url: string): IngestionPlatform {
  * Checks if a URL is supported for ingestion.
  */
 export function isSupportedIngestionUrl(url: string): boolean {
-  return detectIngestionPlatform(url) !== 'unknown';
+  const platform = detectIngestionPlatform(url);
+  return !['unknown', 'linktree', 'instagram'].includes(platform);
 }

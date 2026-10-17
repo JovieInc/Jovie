@@ -6,6 +6,7 @@
  */
 
 import { NextResponse } from 'next/server';
+import { disabledSocialHtmlDocument } from '@/lib/ingestion/social-html-policy';
 import {
   extractLaylo,
   extractLayloHandle,
@@ -15,9 +16,7 @@ import {
   validateLayloUrl,
 } from '@/lib/ingestion/strategies/laylo';
 import {
-  extractLinktree,
   extractLinktreeHandle,
-  fetchLinktreeDocument,
   isValidHandle,
   normalizeHandle,
   validateLinktreeUrl,
@@ -103,6 +102,16 @@ export function resolveFullExtractionContext(
     };
   }
 
+  if (!isLayloProfile) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: 'Linktree import requires an official API integration' },
+        { status: 422, headers: NO_STORE_HEADERS }
+      ),
+    };
+  }
+
   return { ok: true, validatedUrl, handle };
 }
 
@@ -116,7 +125,7 @@ export function resolveFullExtractionContext(
  */
 export async function fetchFullExtractionProfile(
   isLayloProfile: boolean,
-  validatedUrl: string,
+  _validatedUrl: string,
   handle: string
 ) {
   if (isLayloProfile) {
@@ -124,8 +133,7 @@ export async function fetchFullExtractionProfile(
     return extractLaylo(layloProfile, user);
   }
 
-  const html = await fetchLinktreeDocument(validatedUrl);
-  return extractLinktree(html);
+  return disabledSocialHtmlDocument();
 }
 
 /**

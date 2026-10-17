@@ -27,6 +27,7 @@ export const OVIE_CERTIFICATION_HISTORY_LIMIT = 50;
 export interface KernelCertificationRowInput {
   readonly domain: OvieCertificationDomainId;
   readonly surface: string;
+  readonly owner?: string | null;
   readonly packet: CertificationReviewPacket;
   readonly admission: CertificationAdmission;
   readonly decisions: readonly FounderCertificationDecision[];
@@ -257,6 +258,7 @@ export function normalizeKernelCertificationRow(
     id: `${input.domain}:${packet.subject.id}`,
     domain: input.domain,
     surface: input.surface,
+    owner: input.owner ?? null,
     subject: {
       id: packet.subject.id,
       kind: packet.subject.kind,

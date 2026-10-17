@@ -75,6 +75,27 @@ export const User: Story = {
   render: () => <UserAvatar name='Tim White' size='xl' status='away' />,
 };
 
+export const ImageFailure: Story = {
+  args: { size: 'lg', ring: true },
+  render: ({ size, ring }) => (
+    <UserAvatar
+      name='Tim White'
+      src='/avatar-audit-portrait.png'
+      size={size}
+      ring={ring}
+      status='away'
+    />
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'A failed portrait resolves to named initials in the same circular frame, preserving the ring and presence indicator.',
+      },
+    },
+  },
+};
+
 export const Sizes: Story = {
   render: () => (
     <div className='flex items-end gap-3'>

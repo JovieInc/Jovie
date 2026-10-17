@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { projectCommerceDecisions } from '@/lib/acquisition/commerce-decision';
 import {
   type ConeEvidenceStatus,
   type ConeRequirementId,
@@ -8,6 +9,7 @@ import {
 import type { AcquisitionEligibilityReport } from '@/lib/acquisition/eligibility.server';
 import type { FounderFunnelData } from '@/lib/admin/founder-funnel';
 import type { SummerFunnelResponse } from '@/lib/analytics/signup-funnel.server';
+import { ARTIST_VISIBILITY_OFFER_CONTRACT_ID } from '@/lib/billing/offer-truth';
 import type { ShippingStateProjection } from '@/lib/ovie/shipping-state';
 import {
   buildCompanyState,
@@ -36,7 +38,44 @@ function eligibility(
       detail: 'fixture receipt',
     })),
   });
-  return { ...evaluated, funnel: null };
+  const receipt = {
+    status: 'green' as const,
+    observedAt: FRESH,
+    maxAgeMs,
+  };
+  return {
+    ...evaluated,
+    funnel: null,
+    commerce: projectCommerceDecisions(
+      {
+        matrixRevision: 'matrix-r7',
+        decisions: [
+          {
+            offer: ARTIST_VISIBILITY_OFFER_CONTRACT_ID,
+            channel: 'agent-handoff',
+            rail: 'ordinary-web-checkout',
+            accessState: 'supported',
+            merchantOfRecord: 'jovie',
+            evidence: {
+              selectedRail: receipt,
+              jov6258Preflight: receipt,
+              handoffCorrelation: receipt,
+              paymentJourney: receipt,
+              reversal: receipt,
+            },
+            decisionRevision: 'decision-r4',
+            canary: {
+              result: 'passed',
+              observedAt: FRESH,
+              maxAgeMs,
+            },
+            nextReevaluationTrigger: 'policy-access-price-or-geography-change',
+          },
+        ],
+      },
+      NOW
+    ),
+  };
 }
 
 function funnel(counts: Record<string, number>): SummerFunnelResponse {
@@ -188,6 +227,16 @@ describe('Summer company state', () => {
     });
     expect(authRed.activeConstraint).toBe(
       'certification:onboarding_auth_claim'
+    );
+
+    const commerceUnknown = build({
+      eligibility: eligibility({ selected_rail: 'unknown' }),
+    });
+    expect(
+      commerceUnknown.certification.checkout_payment_entitlement.status
+    ).toBe('unknown');
+    expect(commerceUnknown.activeConstraint).toBe(
+      'certification:checkout_payment_entitlement'
     );
   });
 

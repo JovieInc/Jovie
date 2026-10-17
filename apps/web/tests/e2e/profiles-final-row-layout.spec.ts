@@ -9,7 +9,7 @@
  *     tests/e2e/profiles-final-row-layout.spec.ts --project=chromium
  */
 
-import type { APIResponse, Locator, Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { setTestAuthBypassSession } from '../helpers/auth';
 import { expect, test } from './setup';
@@ -113,8 +113,8 @@ async function readFinalRowMetrics(table: Locator): Promise<FinalRowMetrics> {
  */
 async function captureFirstSuggestionsResponse(page: Page): Promise<{
   // Wrapped in an object: an async function that returns a bare promise
-  // adopts it, so awaiting the route registration would wait for the capture
-  // itself and deadlock before the navigation that triggers the request.
+  // adopts it, so awaiting the listener registration would wait for the
+  // capture itself and deadlock before the navigation that triggers the request.
   readonly captured: Promise<{
     readonly status: number;
     readonly body: string;
@@ -130,23 +130,30 @@ async function captureFirstSuggestionsResponse(page: Page): Promise<{
   }>(resolve => {
     resolveCapture = resolve;
   });
-  await page.route(
-    url => url.pathname === '/api/suggestions',
-    async route => {
-      let fetched: { response: APIResponse; body: string };
-      try {
-        const response = await route.fetch();
-        fetched = { response, body: await response.text() };
-      } catch {
-        // The page tore the request down (navigation/close) before the body
-        // arrived; let a later /api/suggestions request provide the capture.
-        await route.continue().catch(() => {});
-        return;
-      }
-      resolveCapture({ status: fetched.response.status(), body: fetched.body });
-      await route.fulfill({ response: fetched.response, body: fetched.body });
+  let settled = false;
+  // Read the body on the response event. route.fetch() plus continue() on an
+  // aborted redirect never resolves, and the test then waits until its own
+  // timeout with no assertion. A later successful response can still settle.
+  page.on('response', response => {
+    if (settled) return;
+    let pathname = '';
+    try {
+      pathname = new URL(response.url()).pathname;
+    } catch {
+      return;
     }
-  );
+    if (pathname !== '/api/suggestions') return;
+    void response
+      .text()
+      .then(body => {
+        if (settled) return;
+        settled = true;
+        resolveCapture({ status: response.status(), body });
+      })
+      .catch(() => {
+        // Chromium evicts the body after navigation. Keep waiting.
+      });
+  });
   return { captured };
 }
 

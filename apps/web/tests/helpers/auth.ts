@@ -345,6 +345,10 @@ export async function prepareBetterAuthEmailOtp(
   options: {
     readonly email: string;
     readonly entryPath: '/signup' | '/signin';
+    readonly recovery?: {
+      readonly initialEmail: string;
+      readonly resendCode?: boolean;
+    };
     readonly beforeResponseFulfill?: (
       betterAuthUserId: string
     ) => Promise<void>;
@@ -364,13 +368,47 @@ export async function prepareBetterAuthEmailOtp(
   await fillControlledInputUntilEnabled(
     emailInput,
     emailSubmitButton,
-    options.email,
+    options.recovery?.initialEmail ?? options.email,
     timeout
   );
   await emailSubmitButton.click();
   await expect(page.locator('[data-auth-email-code-step="code"]')).toBeVisible({
     timeout,
   });
+
+  if (options.recovery) {
+    await page.getByRole('button', { name: 'Change email' }).click();
+    await expect(
+      page.locator('[data-auth-email-code-step="email"]')
+    ).toBeVisible({ timeout });
+    await fillControlledInputUntilEnabled(
+      emailInput,
+      emailSubmitButton,
+      options.email,
+      timeout
+    );
+    await emailSubmitButton.click();
+    await expect(
+      page.locator('[data-auth-email-code-step="code"]')
+    ).toBeVisible({ timeout });
+
+    if (options.recovery.resendCode) {
+      const resendButton = page.getByRole('button', {
+        name: 'Resend Verification Code',
+      });
+      await expect(resendButton).toBeVisible({ timeout: 35_000 });
+      const resendResponse = page.waitForResponse(
+        response =>
+          response.request().method() === 'POST' &&
+          new URL(response.url()).pathname.endsWith(
+            '/email-otp/send-verification-otp'
+          ),
+        { timeout }
+      );
+      await resendButton.click();
+      expect((await resendResponse).ok()).toBeTruthy();
+    }
+  }
 
   const signInRoute = '**/api/auth/sign-in/email-otp';
   let betterAuthUserId: string | null = null;

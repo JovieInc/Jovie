@@ -1,6 +1,8 @@
 import { readFile } from 'node:fs/promises';
+import { evaluateExposureEvidence } from '../packages/release-channel-contracts/dogfood-exposure.ts';
+import { launchContractReasons } from './lyb-launch-contract.mjs';
 
-export const SCHEMA = 'lyb-native-certification/v1';
+export const SCHEMA = 'lyb-native-certification/v2';
 const TIERS = new Set([
   'component_unit',
   'simulator_interaction',
@@ -14,7 +16,12 @@ const add = (reasons, reason) => {
 
 /** Reconcile a route manifest with records exported from an xcresult. */
 export function certifyNativeReceipt(manifest, receipt) {
-  const reasons = [];
+  const reasons = launchContractReasons(manifest, receipt);
+  const exposure = manifest?.expectedExposure
+    ? certifyNativeExposure(manifest.expectedExposure, receipt)
+    : null;
+  if (exposure && exposure.status !== 'PASS')
+    add(reasons, `exposure:${exposure.status}`);
   const paths = manifest?.paths ?? [];
   const records = receipt?.records ?? [];
   const discovered = new Set(receipt?.discoveredTestIds ?? []);
@@ -78,7 +85,10 @@ export function certifyNativeReceipt(manifest, receipt) {
   }
 
   const counts = {
-    declared: paths.reduce((sum, path) => sum + (path.testIds?.length ?? 0), 0),
+    declared: paths.reduce(
+      (sum, path) => sum + (path?.testIds?.length ?? 0),
+      0
+    ),
     discovered: discovered.size,
     selected: selected.size,
     executed: records.length,
@@ -88,17 +98,72 @@ export function certifyNativeReceipt(manifest, receipt) {
   };
   return {
     schema: SCHEMA,
-    verdict: reasons.length === 0 ? 'PASS' : 'UNVERIFIED',
+    verdict:
+      exposure && exposure.status !== 'PASS'
+        ? exposure.status
+        : reasons.length === 0
+          ? 'PASS'
+          : 'UNVERIFIED',
+    exposure,
     reasons,
     counts,
     tiers: Object.fromEntries(
       [...TIERS].map(tier => [
         tier,
-        paths.filter(path => path.tier === tier).map(path => path.id),
+        paths.filter(path => path?.tier === tier).map(path => path.id),
       ])
     ),
     humanOnlyGates: manifest?.humanOnlyGates ?? [],
   };
+}
+
+/** Installed replay adapter; fixture/unit certification remains a separate scope. */
+export function certifyNativeExposure(expected, receipt) {
+  if (expected?.identity?.product !== 'lyb')
+    return {
+      status: 'BLOCKED_EXPOSURE',
+      reasons: ['native_product_mismatch'],
+      nextAction: 'release_owner',
+    };
+  const evidence = receipt?.exposure;
+  const observations = Array.isArray(evidence?.observations)
+    ? evidence.observations.map(observed => ({
+        ...observed,
+        artifact: {
+          ...observed?.artifact,
+          buildId: receipt?.build?.buildNumber,
+          sourceSha: receipt?.build?.installedGitSha,
+        },
+        fixtureOverride:
+          observed?.fixtureOverride !== false ||
+          (Array.isArray(receipt?.configuration?.flags)
+            ? receipt.configuration.flags
+            : ['unknown-fixture-configuration']
+          ).some(flag => /fixture|override|bypass/i.test(flag)),
+        features: (Array.isArray(observed?.features)
+          ? observed.features
+          : []
+        ).map(feature => ({
+          ...feature,
+          witness:
+            feature?.witness &&
+            feature.witness.kind === 'rendered' &&
+            (Array.isArray(receipt?.captures) ? receipt.captures : []).some(
+              capture =>
+                /^[a-f0-9]{64}$/i.test(capture?.sha256 ?? '') &&
+                feature.witness.evidenceRef === `sha256:${capture.sha256}`
+            )
+              ? feature.witness
+              : null,
+        })),
+      }))
+    : [];
+  return evaluateExposureEvidence(
+    expected,
+    { ...evidence, observations },
+    receipt?.startedAt,
+    receipt?.completedAt
+  );
 }
 
 async function main() {

@@ -68,3 +68,43 @@ describe('auth shell intent', () => {
     expect(isAuthEmailAddress('you@example')).toBe(false);
   });
 });
+
+describe('auth mailbox syntax', () => {
+  it.each([
+    'artist@example.com',
+    'Artist.Name+signup@sub.example.com',
+    "o'connor@example.com",
+    'artist_name@my-label.example.com',
+    'e2e+jov8342@example.com',
+    'canary+jovie-prod-canary@test.jovie.com',
+    '  artist@example.com  ',
+    `${'a'.repeat(64)}@example.com`,
+    `${'a'.repeat(64)}@${'b'.repeat(63)}.${'c'.repeat(63)}.${'d'.repeat(61)}`,
+  ])('preserves valid mailbox %s', email => {
+    expect(isAuthEmailAddress(email)).toBe(true);
+  });
+
+  it.each([
+    '<script>@example.com',
+    'artist,name@example.com',
+    'artíst@example.com',
+    'artist@-example.com',
+    'artist@example-.com',
+    'artist@sub.-example.com',
+    'artist@sub.example-.com',
+    'artist@sub..example.com',
+    'artist..name@example.com',
+    '.artist@example.com',
+    'artist.@example.com',
+    '"artist"@example.com',
+    'artist name@example.com',
+    'artist@example_com',
+    'artist@@example.com',
+    'artist@example.com\u0000',
+    `${'a'.repeat(65)}@example.com`,
+    `${'a'.repeat(64)}@${'b'.repeat(63)}.${'c'.repeat(63)}.${'d'.repeat(62)}`,
+    `artist@${'a'.repeat(64)}.com`,
+  ])('rejects malformed or oversized mailbox %s', email => {
+    expect(isAuthEmailAddress(email)).toBe(false);
+  });
+});

@@ -1,4 +1,8 @@
 import { NextResponse } from 'next/server';
+import {
+  COMMERCE_DECISION_PROJECTION_CONTRACT,
+  unknownCommerceDecisionProjection,
+} from '@/lib/acquisition/commerce-decision';
 import { unknownAcquisitionEligibility } from '@/lib/acquisition/eligibility';
 import { getAcquisitionEligibility } from '@/lib/acquisition/eligibility.server';
 import { captureError } from '@/lib/error-tracking';
@@ -31,7 +35,12 @@ export async function GET(request: Request): Promise<NextResponse> {
       ? await getAcquisitionEligibility({ fresh: true })
       : (await readCompanyStateCache())?.snapshot.sourcePayloads
           .acquisitionEligibility;
-    if (!report) throw new Error('company_state_cache_miss');
+    if (
+      !report ||
+      report.commerce?.contract !== COMMERCE_DECISION_PROJECTION_CONTRACT
+    ) {
+      throw new Error('company_state_cache_miss');
+    }
     return NextResponse.json(report, {
       headers: NO_STORE_HEADERS,
     });
@@ -39,15 +48,17 @@ export async function GET(request: Request): Promise<NextResponse> {
     await captureError('Acquisition eligibility read failed', error, {
       route: '/api/internal/ovie/summer-company/acquisition-eligibility',
     });
+    const now = new Date();
     // Fail closed with a readable verdict rather than an error a planner
     // might treat as "no gate".
     return NextResponse.json(
       {
         ...unknownAcquisitionEligibility(
-          new Date(),
+          now,
           'Acquisition eligibility could not be computed.'
         ),
         funnel: null,
+        commerce: unknownCommerceDecisionProjection(now),
       },
       { headers: NO_STORE_HEADERS }
     );

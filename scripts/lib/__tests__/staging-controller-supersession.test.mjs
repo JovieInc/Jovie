@@ -32,13 +32,32 @@ const fetchReceiptScript = workflow
   .map(line => line.replace(/^ {10}/, ''))
   .join('\n');
 const brokenFetchReceiptScript = fetchReceiptScript.replace(
-  `artifact_id="$(gh api \\
+  `artifact_id="$(gh_api \\
   "repos/$REPOSITORY/actions/artifacts?name=$receipt_name&per_page=100" \\
   --jq '[.artifacts[] | select(.expired == false)] | sort_by(.id) | last | .id // empty')"`,
   `artifact_id="$(gh api "repos/$REPOSITORY/actions/runs/$SOURCE_CI_RUN_ID/artifacts?per_page=100" \\
   --jq --arg name "$receipt_name" \\
   '[.artifacts[] | select(.expired == false and .name == $name)] | sort_by(.id) | last | .id // empty')"`
 );
+function writeGitStub(bin) {
+  const git = join(bin, 'git');
+  writeFileSync(
+    git,
+    `#!/bin/sh
+case "$*" in
+  *ls-remote*)
+    printf '%s\\n' "$MAIN_SHA"
+    ;;
+  *)
+    echo "unexpected git: $*" >&2
+    exit 2
+    ;;
+esac
+`
+  );
+  chmodSync(git, 0o755);
+}
+
 const sourceSha = 'a'.repeat(40);
 const mainSha = 'b'.repeat(40);
 const candidateSha = 'c'.repeat(40);
@@ -73,6 +92,7 @@ function authorize(
         selectedLanes: web ? ['web'] : ['operations'],
       })
     );
+  writeGitStub(bin);
   const gh = join(bin, 'gh');
   writeFileSync(
     gh,
@@ -129,6 +149,7 @@ if (args[0] === 'api') {
       CANDIDATE_SHA: candidateSha,
       CANDIDATE_RELATION: candidateRelation,
       CANDIDATE_MAIN_RELATION: candidateMainRelation,
+      RESOLVE_MAIN_RETRY_SECONDS: '0',
     },
   });
   expect(result.stderr).toBe('');
@@ -138,6 +159,8 @@ if (args[0] === 'api') {
 
 describe('Staging Controller supersession', () => {
   it('queries successful runs when searching for a superseding generation', () => {
+    expect(workflow).toContain('resolve-main-sha.sh');
+    expect(workflow).not.toContain('commits/main');
     expect(workflow).toContain(
       'branch=main&event=push&status=success&per_page=100'
     );
@@ -193,6 +216,7 @@ describe('Staging Controller supersession', () => {
     const bin = join(root, 'bin');
     mkdirSync(bin);
     mkdirSync(join(root, 'product-lane-release'));
+    writeGitStub(bin);
     const gh = join(bin, 'gh');
     writeFileSync(
       gh,
@@ -220,6 +244,7 @@ else process.exit(2);
         SOURCE_CI_HEAD_REPOSITORY: 'JovieInc/Jovie',
         REPOSITORY: 'JovieInc/Jovie',
         MAIN_SHA: sourceSha,
+        RESOLVE_MAIN_RETRY_SECONDS: '0',
       },
     });
     expect(result.status).not.toBe(0);

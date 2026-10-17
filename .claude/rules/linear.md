@@ -78,6 +78,55 @@ Multiple agents run in parallel (Conductor workspaces, autopilot, ad-hoc session
 
 Do not duplicate a Symphony-owned transition. Do not manually mark an issue `Done` on merge; record the missing receipt instead, and the lifecycle moves it. Do not expect a child merge to complete a commissioning parent.
 
+### Entry proof and remaining validation
+
+`Validating` means the applicable release is known and its entry checks have
+passed; required customer/runtime acceptance may still be pending. It does not
+mean final acceptance already happened. The Jovie web writer requires a served,
+Production Verified generation containing the binding merge before entry. Native
+publication, channel availability, installation and running identity remain
+separate receipts under the native release contracts; web deployment cannot
+attest those stages.
+
+The manifest is the bounded list of remaining obligations, not permission to
+repeat every company check. Explicit `validation-required: screen-audit` is
+required even when no UI matrix row was inferred. Unknown proof holds completion;
+a required failure routes to `Rework`; fresh passing receipts trigger the existing
+webhook/deployment reconciliation path to `Done`.
+
+A commissioning parent with no implementing PR may bind its own `outcome`
+receipt to the exact production build it exercised. The lifecycle still checks
+verified deployment, all linked work, and every other required receipt. Child
+delivery timestamps must be complete and the parent's outcome comment must be
+newer than the last child completion/cancellation; an earlier outcome cannot
+certify work delivered later. Each reopened episode gets a new parent evidence
+request even when the terminal children are unchanged. Child
+completion only requests this validation; lane reconciliation never writes the
+parent's `Done`. Ordinary implementation issues still require their merged PR.
+
+After reopening from `Done`, receipts belong to a new acceptance episode.
+The lifecycle reads complete paginated Linear history and uses the latest server
+reopen timestamp. Older receipts and timestamp-free description closure markers
+cannot close the new episode. Re-record the new outcome/closure proof in a comment
+after that transition. An unreadable episode boundary holds the state with an
+actionable history-read explanation. Founder taste orders also bind to this
+episode, so a delayed prior decision cannot satisfy or strand the new request.
+
+### Literal observation metadata in issue descriptions
+
+Keep the existing `sentry-observation:v1` HTML comment and its JSON inside a
+fenced `text` code block when registering an observation in an issue description.
+Linear normalizes bare description Markdown, including bracket escaping and
+issue links, which can corrupt the stored JSON even when the write succeeds.
+The fence preserves the existing schema; do not relax or unescape the parser.
+
+After writing, read the raw server description and run the maintained
+`inspectObservationIssue` against complete current comments/history. Verify the
+exact plan, binding, episode, incident denominator and full window before calling
+it enrolled. A trimmed newline outside the fence is formatting, not a changed
+plan. Enrollment schedules the existing producer; it does not prove coverage or
+permit a passing receipt before every required observation is satisfied.
+
 ### Symphony-dispatched work
 
 When Linear-backed Symphony dispatches work, it must hold the Linear lease and record the `In Progress` transition before implementation begins. If your session was started by Symphony, verify that receipt and do not create or consult a GitHub Issue as fallback intake.

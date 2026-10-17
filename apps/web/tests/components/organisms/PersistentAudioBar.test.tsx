@@ -16,6 +16,7 @@ import {
   registerMediaCanvasTransport,
   resetAudioChromeSnapshot,
 } from '@/components/organisms/audio-chrome-state';
+import { SidebarBottomNowPlayingBridge } from '@/components/organisms/SidebarBottomNowPlayingBridge';
 import {
   APP_ROUTES,
   buildLyricsRoute,
@@ -185,6 +186,50 @@ describe('PersistentAudioBar', () => {
       await new Promise(resolve => requestAnimationFrame(() => resolve(null)));
     });
   }
+
+  it('hands focus between the full dock and sidebar mini after each commit', async () => {
+    setPlaying();
+    const user = userEvent.setup();
+    render(
+      <>
+        <SidebarBottomNowPlayingBridge />
+        <PersistentAudioBar />
+      </>
+    );
+    const hide = screen.getByRole('button', { name: 'Hide Player' });
+    await user.click(hide);
+    const show = screen.getByRole('button', { name: 'Show Player' });
+    await waitFor(() => expect(show).toHaveFocus());
+    await user.click(show);
+    await waitFor(() => expect(hide).toHaveFocus());
+    expect(stop).not.toHaveBeenCalled();
+    expect(toggleTrack).not.toHaveBeenCalled();
+  });
+
+  it('returns focus to the lyrics invoker after route navigation back', async () => {
+    setPlaying({ hasLyrics: true });
+    pathname = APP_ROUTES.LIBRARY;
+    const user = userEvent.setup();
+    const { rerender } = render(<PersistentAudioBar />);
+    const lyrics = screen.getByRole('button', { name: 'Lyrics' });
+    await user.click(lyrics);
+    pathname = buildLyricsRoute('track-1');
+    rerender(<PersistentAudioBar />);
+    lyrics.blur();
+    pathname = APP_ROUTES.LIBRARY;
+    rerender(<PersistentAudioBar />);
+    expect(lyrics).toHaveFocus();
+  });
+
+  it('lets Space activate a focused player button without toggling playback', async () => {
+    setPlaying();
+    const user = userEvent.setup();
+    render(<PersistentAudioBar />);
+    screen.getByRole('button', { name: 'Show waveform' }).focus();
+    await user.keyboard(' ');
+    expect(screen.getByRole('button', { name: 'Hide waveform' })).toHaveFocus();
+    expect(toggleTrack).not.toHaveBeenCalled();
+  });
 
   it('keeps the dock collapsed (zero reserved space) when no track is active', () => {
     render(<PersistentAudioBar />);

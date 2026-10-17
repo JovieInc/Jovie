@@ -1,5 +1,6 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
+import { renderToString } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
@@ -91,6 +92,16 @@ global.fetch = fetchMock as unknown as typeof fetch;
 import { APP_ROUTES } from '@/constants/routes';
 import { SignUpPageClient } from '../../../app/(auth)/signup/SignUpPageClient';
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: Error) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
 describe('signup page', () => {
   beforeEach(() => {
     authShellMock.mockReset();
@@ -100,9 +111,9 @@ describe('signup page', () => {
     authLayoutMock.mockReset();
     fetchMock.mockReset();
     replaceMock.mockReset();
-    fetchMock.mockResolvedValue({
-      json: async () => ({ available: true }),
-    });
+    fetchMock.mockImplementation(async () =>
+      Response.json({ available: true })
+    );
     persistSignupClaimValueMock.mockReset();
     routerPrefetchMock.mockReset();
     searchParamsState.value = '';
@@ -117,6 +128,60 @@ describe('signup page', () => {
       '__client_uat=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
     globalThis.history.replaceState(null, '', '/signup');
   });
+
+  it('server-renders the current checking announcement before hydration', () => {
+    searchParamsState.value = 'handle=TestHandle';
+    const container = document.createElement('div');
+    container.innerHTML = renderToString(<SignUpPageClient />);
+    const statuses = container.querySelectorAll('output');
+    expect(statuses).toHaveLength(1);
+    expect(statuses[0]).toHaveAttribute('aria-live', 'polite');
+    expect(statuses[0]).toHaveAttribute('aria-atomic', 'true');
+    expect(statuses[0]).toHaveAttribute('aria-busy', 'true');
+    expect(statuses[0]).toHaveTextContent(
+      'Checking if @testhandle is available...'
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      name: 'available',
+      response: () => Response.json({ available: true }),
+      message: '@testhandle is available. Sign up to claim it.',
+    },
+    {
+      name: 'taken',
+      response: () => Response.json({ available: false }),
+      message:
+        '@testhandle is already taken. You can pick another handle after signing up.',
+    },
+    {
+      name: 'error',
+      response: () => new Response('Unavailable', { status: 503 }),
+      message:
+        "Couldn't check if @testhandle is available. You can still sign up and choose a handle.",
+    },
+  ])(
+    'keeps one current accessible announcement through $name',
+    async ({ response, message }) => {
+      searchParamsState.value = 'handle=TestHandle';
+      const request = deferred<Response>();
+      fetchMock.mockReturnValueOnce(request.promise);
+      render(<SignUpPageClient />);
+      const output = screen.getByRole('status');
+      expect(output).toHaveAttribute('aria-busy', 'true');
+      expect(output).toHaveTextContent(
+        'Checking if @testhandle is available...'
+      );
+      await act(async () => request.resolve(response()));
+      await waitFor(() => expect(output).toHaveAttribute('aria-busy', 'false'));
+      expect(screen.getAllByRole('status')).toEqual([output]);
+      expect(output).toHaveAttribute('aria-atomic', 'true');
+      expect(output).toHaveTextContent(message);
+      expect(output).not.toHaveTextContent('Checking if');
+    }
+  );
 
   it('does not overwrite offer extras while capturing the signup claim', () => {
     searchParamsState.value = 'plan=pro&interval=monthly&artist=Tim%20White';
@@ -181,9 +246,12 @@ describe('signup page', () => {
       );
     });
 
-    expect(
-      await screen.findByText('@testhandle is available. Sign up to claim it.')
-    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(
+        '@testhandle is available. Sign up to claim it.'
+      )
+    );
+    expect(screen.getByRole('status')).toBeVisible();
     expect(sessionStorage.getItem('pendingClaim')).toBeNull();
   });
 
@@ -236,6 +304,119 @@ describe('signup page', () => {
       screen.getByRole('link', { name: 'Sign in instead' })
     ).toHaveAttribute('href', '/signin?desktop_return=%2Fapp%2Fsettings');
   });
+
+  it.each([
+    [
+      'error=oauth_failed',
+      'Something went wrong with sign-up. Please try again.',
+    ],
+    [
+      'error=access_denied',
+      'Sign-in was cancelled. Try again, or pick a different method.',
+    ],
+    [
+      'error=account_exists',
+      'An account with this email already exists. Try signing in instead.',
+    ],
+    [
+      'error=unknown_provider_error',
+      'Something went wrong with sign-up. Please try again.',
+    ],
+    [
+      'error=&oauth_error=access_denied',
+      'Sign-in was cancelled. Try again, or pick a different method.',
+    ],
+    [
+      'error=access_denied&oauth_error=account_exists',
+      'Sign-in was cancelled. Try again, or pick a different method.',
+    ],
+    [
+      'error=access_denied&error=account_exists',
+      'An account with this email already exists. Try signing in instead.',
+    ],
+    [
+      'error=oauth_failed&error=access_denied',
+      'Sign-in was cancelled. Try again, or pick a different method.',
+    ],
+    [
+      'error=oauth_failed&error=account_exists',
+      'An account with this email already exists. Try signing in instead.',
+    ],
+    [
+      'error=oauth_failed&error=',
+      'Something went wrong with sign-up. Please try again.',
+    ],
+  ])(
+    'shows signup return feedback for %s and consumes only the error parameters',
+    async (error, message) => {
+      const context = 'handle=TestHandle&plan=pro&redirect_url=%2Fstart';
+      searchParamsState.value = `${error}&${context}`;
+      globalThis.history.replaceState(
+        { returnState: 'preserved' },
+        '',
+        `/signup?${searchParamsState.value}#recovery`
+      );
+
+      render(<SignUpPageClient />);
+
+      expect(screen.getAllByRole('alert')).toHaveLength(1);
+      expect(screen.getByRole('alert')).toBeVisible();
+      expect(screen.getByRole('alert')).toHaveTextContent(message);
+      if (message.includes('already exists')) {
+        expect(
+          screen.getByRole('link', { name: 'Sign in instead' })
+        ).toHaveAttribute(
+          'href',
+          '/signin?handle=testhandle&redirect_url=%2Fstart&plan=pro'
+        );
+      }
+      await waitFor(() => {
+        expect(globalThis.location.search).toBe(`?${context}`);
+      });
+      expect(globalThis.location.hash).toBe('#recovery');
+      expect(globalThis.history.state).toEqual({ returnState: 'preserved' });
+      expect(authShellMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mode: 'sign-up',
+          oppositeModeUrl:
+            '/signin?handle=testhandle&redirect_url=%2Fstart&plan=pro',
+          fallbackRedirectUrl: '/start',
+        })
+      );
+    }
+  );
+
+  it.each(['', 'error=&oauth_error='])(
+    'does not show return feedback without an error (%s)',
+    params => {
+      searchParamsState.value = params;
+
+      render(<SignUpPageClient />);
+
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    }
+  );
+
+  it.each(['desktop_return', 'mobile_return'])(
+    'preserves %s in canonical account recovery',
+    returnParam => {
+      searchParamsState.value = `error=account_exists&email=fixture%40example.com&${returnParam}=%2Fapp%2Fsettings`;
+      globalThis.history.replaceState(
+        null,
+        '',
+        `/signup?${searchParamsState.value}`
+      );
+
+      render(<SignUpPageClient />);
+
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'An account for fixture@example.com already exists. Try signing in instead.'
+      );
+      expect(
+        screen.getByRole('link', { name: 'Sign in instead' })
+      ).toHaveAttribute('href', `/signin?${returnParam}=%2Fapp%2Fsettings`);
+    }
+  );
 
   it('preserves redirect_url on the Clerk sign-in footer link', async () => {
     searchParamsState.value = 'redirect_url=%2Fonboarding';
@@ -362,17 +543,16 @@ describe('signup page', () => {
 
   it('renders the taken-handle state when the requested handle is unavailable', async () => {
     searchParamsState.value = 'handle=TakenHandle';
-    fetchMock.mockResolvedValueOnce({
-      json: async () => ({ available: false }),
-    });
+    fetchMock.mockResolvedValueOnce(Response.json({ available: false }));
 
     render(<SignUpPageClient />);
 
-    expect(
-      await screen.findByText(
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(
         '@takenhandle is already taken. You can pick another handle after signing up.'
       )
-    ).toBeInTheDocument();
+    );
+    expect(screen.getByRole('status')).toBeVisible();
   });
 
   it('renders the fallback state when handle availability lookup fails', async () => {
@@ -381,11 +561,358 @@ describe('signup page', () => {
 
     render(<SignUpPageClient />);
 
-    expect(
-      await screen.findByText(
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(
         "Couldn't check if @brokenhandle is available. You can still sign up and choose a handle."
       )
-    ).toBeInTheDocument();
+    );
+    expect(screen.getByRole('status')).toBeVisible();
+  });
+
+  describe('truthful handle availability', () => {
+    const recovery =
+      "Couldn't check if @testhandle is available. You can still sign up and choose a handle.";
+
+    it.each(['@Motion', ' Motion ', ' @Motion '])(
+      'accepts the canonical response for supported input %j',
+      async input => {
+        searchParamsState.value = new URLSearchParams({
+          handle: input,
+        }).toString();
+        fetchMock.mockResolvedValueOnce(
+          Response.json({
+            available: true,
+            reason: 'available',
+            handle: 'motion',
+          })
+        );
+        render(<SignUpPageClient />);
+        await waitFor(() =>
+          expect(screen.getByRole('status')).not.toHaveTextContent(
+            'Checking if'
+          )
+        );
+        expect(screen.getByRole('status')).toHaveTextContent(
+          '@motion is available. Sign up to claim it.'
+        );
+        expect(fetchMock).toHaveBeenCalledWith(
+          '/api/handle/check?handle=motion',
+          expect.objectContaining({ signal: expect.any(AbortSignal) })
+        );
+      }
+    );
+
+    it.each([
+      { name: 'HTTP 500 JSON', status: 500, body: { error: 'Unavailable' } },
+      { name: 'HTTP 429 JSON', status: 429, body: { error: 'Rate limited' } },
+      { name: 'empty successful object', status: 200, body: {} },
+      {
+        name: 'canonical HTTP 500',
+        status: 500,
+        body: { available: false, reason: 'error' },
+      },
+      {
+        name: 'canonical HTTP 429',
+        status: 429,
+        body: { available: false, reason: 'error', error: 'Rate limited' },
+      },
+      {
+        name: 'HTTP error claiming availability',
+        status: 503,
+        body: { available: true },
+      },
+      {
+        name: 'invalid format',
+        status: 400,
+        body: { available: false, reason: 'invalid_format' },
+      },
+      {
+        name: 'reserved handle',
+        status: 400,
+        body: { available: false, reason: 'reserved' },
+      },
+      {
+        name: 'successful error reason',
+        status: 200,
+        body: { available: false, reason: 'error' },
+      },
+      {
+        name: 'successful unknown reason',
+        status: 200,
+        body: { available: false, reason: 'unknown' },
+      },
+      {
+        name: 'completed checking reason',
+        status: 200,
+        body: { available: false, reason: 'checking' },
+      },
+      {
+        name: 'unrecognized reason',
+        status: 200,
+        body: { available: false, reason: 'unrecognized' },
+      },
+      {
+        name: 'null reason',
+        status: 200,
+        body: { available: false, reason: null },
+      },
+      { name: 'string false', status: 200, body: { available: 'false' } },
+      { name: 'string true', status: 200, body: { available: 'true' } },
+      { name: 'numeric zero', status: 200, body: { available: 0 } },
+      { name: 'numeric one', status: 200, body: { available: 1 } },
+      { name: 'null availability', status: 200, body: { available: null } },
+      { name: 'null body', status: 200, body: null },
+      { name: 'array body', status: 200, body: [] },
+      { name: 'string body', status: 200, body: 'available' },
+      { name: 'boolean body', status: 200, body: true },
+      {
+        name: 'available and taken conflict',
+        status: 200,
+        body: { available: true, reason: 'taken' },
+      },
+      {
+        name: 'taken and available conflict',
+        status: 200,
+        body: { available: false, reason: 'available' },
+      },
+      {
+        name: 'available and error conflict',
+        status: 200,
+        body: { available: true, reason: 'error' },
+      },
+      {
+        name: 'available with reported error',
+        status: 200,
+        body: { available: true, error: 'Unavailable' },
+      },
+      {
+        name: 'taken with reported error',
+        status: 200,
+        body: { available: false, error: 'Unavailable' },
+      },
+      {
+        name: 'invalid error type',
+        status: 200,
+        body: { available: false, error: null },
+      },
+      {
+        name: 'different echoed handle',
+        status: 200,
+        body: { available: true, handle: 'anotherhandle' },
+      },
+      {
+        name: 'invalid echoed handle',
+        status: 200,
+        body: { available: true, handle: null },
+      },
+    ])(
+      'uses recovery for $name instead of claiming allocation',
+      async ({ status, body }) => {
+        searchParamsState.value = 'handle=TestHandle';
+        fetchMock.mockResolvedValueOnce(Response.json(body, { status }));
+
+        render(<SignUpPageClient />);
+
+        await waitFor(() =>
+          expect(screen.getByRole('status')).not.toHaveTextContent(
+            'Checking if'
+          )
+        );
+        expect(screen.getByRole('status')).toHaveTextContent(recovery);
+        expect(screen.getAllByRole('status')).toHaveLength(1);
+        expect(screen.getByRole('status')).toHaveAttribute(
+          'aria-live',
+          'polite'
+        );
+        expect(sessionStorage.getItem('pendingClaim')).toBeNull();
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+      }
+    );
+
+    it.each([
+      {
+        name: 'canonical available',
+        body: { available: true, reason: 'available', handle: 'testhandle' },
+        expected: '@testhandle is available. Sign up to claim it.',
+      },
+      {
+        name: 'canonical taken with alternatives',
+        body: {
+          available: false,
+          reason: 'taken',
+          handle: 'TESTHANDLE',
+          suggestedAlternatives: ['anotherhandle'],
+        },
+        expected: '@testhandle is already taken.',
+      },
+      {
+        name: 'boolean-only available with extra metadata',
+        body: { available: true, metadata: { cached: true } },
+        expected: '@testhandle is available. Sign up to claim it.',
+      },
+      {
+        name: 'boolean-only taken with empty error',
+        body: { available: false, error: '' },
+        expected: '@testhandle is already taken.',
+      },
+    ])('preserves $name compatibility', async ({ body, expected }) => {
+      searchParamsState.value = 'handle=TestHandle';
+      fetchMock.mockResolvedValueOnce(Response.json(body));
+      render(<SignUpPageClient />);
+      await waitFor(() =>
+        expect(screen.getByRole('status')).toHaveTextContent(expected)
+      );
+    });
+
+    it.each(['<html>Unavailable</html>', '', '{'])(
+      'recovers from an unparseable successful response %j',
+      async body => {
+        searchParamsState.value = 'handle=TestHandle';
+        fetchMock.mockResolvedValueOnce(new Response(body));
+        render(<SignUpPageClient />);
+        await waitFor(() =>
+          expect(screen.getByRole('status')).toHaveTextContent(recovery)
+        );
+      }
+    );
+
+    it.each(['response', 'error'] as const)(
+      'ignores an old %s after the new handle succeeds',
+      async outcome => {
+        const oldRequest = deferred<Response>();
+        fetchMock.mockReturnValueOnce(oldRequest.promise);
+        searchParamsState.value = 'handle=OldHandle';
+        const { rerender } = render(<SignUpPageClient />);
+        const oldSignal = fetchMock.mock.calls[0]?.[1].signal as AbortSignal;
+        searchParamsState.value = 'handle=TestHandle';
+        rerender(<SignUpPageClient />);
+        await waitFor(() =>
+          expect(screen.getByRole('status')).toHaveTextContent(
+            '@testhandle is available.'
+          )
+        );
+        expect(oldSignal.aborted).toBe(true);
+        await act(async () => {
+          if (outcome === 'response')
+            oldRequest.resolve(Response.json({ available: false }));
+          else oldRequest.reject(new Error('obsolete failure'));
+        });
+        expect(screen.getByRole('status')).toHaveTextContent(
+          '@testhandle is available.'
+        );
+        expect(screen.getByRole('status')).not.toHaveTextContent(
+          'already taken'
+        );
+        expect(screen.getByRole('status')).not.toHaveTextContent(
+          "Couldn't check"
+        );
+      }
+    );
+
+    it('does not settle a new handle from an old response that resolves first', async () => {
+      const oldRequest = deferred<Response>();
+      const currentRequest = deferred<Response>();
+      fetchMock
+        .mockReturnValueOnce(oldRequest.promise)
+        .mockReturnValueOnce(currentRequest.promise);
+      searchParamsState.value = 'handle=OldHandle';
+      const { rerender } = render(<SignUpPageClient />);
+      searchParamsState.value = 'handle=TestHandle';
+      rerender(<SignUpPageClient />);
+      await act(async () =>
+        oldRequest.resolve(Response.json({ available: false }))
+      );
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Checking if @testhandle is available...'
+      );
+      await act(async () =>
+        currentRequest.resolve(Response.json({ available: true }))
+      );
+      expect(screen.getByRole('status')).toHaveTextContent(
+        '@testhandle is available.'
+      );
+    });
+
+    it('ignores a stale body after response headers arrive before navigation', async () => {
+      const parsedBody = deferred<unknown>();
+      const oldResponse = Response.json({ available: false });
+      const jsonSpy = vi
+        .spyOn(oldResponse, 'json')
+        .mockReturnValue(parsedBody.promise);
+      fetchMock.mockResolvedValueOnce(oldResponse);
+      searchParamsState.value = 'handle=OldHandle';
+      const { rerender } = render(<SignUpPageClient />);
+      await waitFor(() => expect(jsonSpy).toHaveBeenCalled());
+      searchParamsState.value = 'handle=TestHandle';
+      rerender(<SignUpPageClient />);
+      await waitFor(() =>
+        expect(screen.getByRole('status')).toHaveTextContent(
+          '@testhandle is available.'
+        )
+      );
+      await act(async () => parsedBody.resolve({ available: false }));
+      expect(screen.getByRole('status')).toHaveTextContent(
+        '@testhandle is available.'
+      );
+    });
+
+    it.each(['', 'handle=ab'])(
+      'clears prior status without a new lookup for %j',
+      async query => {
+        searchParamsState.value = 'handle=TestHandle';
+        const { rerender } = render(<SignUpPageClient />);
+        await waitFor(() =>
+          expect(screen.getByRole('status')).toHaveTextContent(
+            '@testhandle is available.'
+          )
+        );
+        searchParamsState.value = query;
+        rerender(<SignUpPageClient />);
+        expect(screen.queryByRole('status')).not.toBeInTheDocument();
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(screen.getByTestId('auth-shell')).toBeInTheDocument();
+      }
+    );
+
+    it('aborts on unmount and does not affect a remounted lookup', async () => {
+      const oldRequest = deferred<Response>();
+      fetchMock.mockReturnValueOnce(oldRequest.promise);
+      searchParamsState.value = 'handle=TestHandle';
+      const first = render(<SignUpPageClient />);
+      const signal = fetchMock.mock.calls[0]?.[1].signal as AbortSignal;
+      first.unmount();
+      expect(signal.aborted).toBe(true);
+      render(<SignUpPageClient />);
+      await waitFor(() =>
+        expect(screen.getByRole('status')).toHaveTextContent(
+          '@testhandle is available.'
+        )
+      );
+      await act(async () =>
+        oldRequest.reject(new DOMException('Aborted', 'AbortError'))
+      );
+      expect(screen.getByRole('status')).toHaveTextContent(
+        '@testhandle is available.'
+      );
+    });
+
+    it('recovers on remount after an inconclusive lookup', async () => {
+      searchParamsState.value = 'handle=TestHandle';
+      fetchMock.mockResolvedValueOnce(Response.json({}, { status: 500 }));
+      const first = render(<SignUpPageClient />);
+      await waitFor(() =>
+        expect(screen.getByRole('status')).not.toHaveTextContent('Checking if')
+      );
+      expect(screen.getByRole('status')).toHaveTextContent(recovery);
+      first.unmount();
+      render(<SignUpPageClient />);
+      await waitFor(() =>
+        expect(screen.getByRole('status')).toHaveTextContent(
+          '@testhandle is available.'
+        )
+      );
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
   });
 
   it('shows the access denied oauth banner without losing redirect params', async () => {

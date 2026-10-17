@@ -14,3 +14,5 @@
 # pnpm patches of tab-indented upstream files contain a diff-prefix space
 # before those tabs. That is patch syntax, not a whitespace defect.
 *.patch -whitespace
+# Regenerate from scripts/artist-launch-policy.mjs; never edit the inventory.
+docs/product/generated/artist-launch-inventory.json linguist-generated=true
