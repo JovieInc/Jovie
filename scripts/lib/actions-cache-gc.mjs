@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { pathToFileURL } from 'node:url';
 import { planSuperseded } from './actions-cache-supersede.mjs';
+import { failureDisposition } from './github-installation-quota.mjs';
 
 export const CACHE_COUNT_SOFT_LIMIT = 400;
 export const CACHE_BYTES_SOFT_LIMIT = 8 * 1024 * 1024 * 1024;
@@ -324,7 +325,8 @@ if (
   import.meta.url === pathToFileURL(process.argv[1]).href
 ) {
   main().catch(error => {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
+    const disposition = failureDisposition('Actions Cache GC', error);
+    console.error(disposition.log);
+    if (!disposition.softFailed) process.exitCode = disposition.code;
   });
 }

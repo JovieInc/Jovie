@@ -35,6 +35,7 @@ import {
   latestLifecycleStatusKey,
   lifecycleStatusKey,
   parseValidationReceipts,
+  receiptMatchesAcceptanceEpisode,
 } from './validation-lifecycle.mjs';
 
 // Long-running issues collect many linked pull requests (JOV-7707 had more
@@ -91,18 +92,97 @@ export async function fetchWithRetry(fetchImpl, ...args) {
   }
 }
 
+/** Do not sleep inside a 15-minute sweep for a reset that is further out. */
+export const RATE_LIMIT_WAIT_CAP_MS = 8_000;
+
+/**
+ * @param {HttpResponse['headers']} headers
+ * @param {number} [now]
+ * @returns {number}
+ */
+export function headerRetryMs(headers, now = Date.now()) {
+  const retry = headers?.get?.('retry-after');
+  if (typeof retry === 'string' && /^\d+(\.\d+)?$/.test(retry.trim())) {
+    return Math.ceil(Number(retry) * 1000);
+  }
+  let best = 0;
+  for (const name of [
+    'x-ratelimit-reset',
+    'x-ratelimit-requests-reset',
+    'x-ratelimit-complexity-reset',
+  ]) {
+    const value = Number(headers?.get?.(name));
+    if (!Number.isFinite(value) || value <= 0) continue;
+    const epochMs = value < 1e11 ? value * 1000 : value;
+    const delta = epochMs - now;
+    if (delta > best) best = delta;
+  }
+  return best;
+}
+
+/**
+ * Wait only when the server named a delay inside the sweep budget. A reset
+ * that is already past the cap means persist the cursor instead of sleeping.
+ *
+ * @param {number} retryAfterMs
+ * @param {number} attempt
+ * @param {number} maxAttempts
+ * @returns {number | null}
+ */
+export function rateLimitWaitMs(retryAfterMs, attempt, maxAttempts) {
+  if (attempt >= maxAttempts) return null;
+  const hinted = Number(retryAfterMs);
+  // A missing reset can use a short backoff. Infinity / a far reset cannot:
+  // the caller persists the cursor instead of sleeping out the hour.
+  if (!Number.isFinite(hinted)) return null;
+  if (hinted > RATE_LIMIT_WAIT_CAP_MS) return null;
+  if (hinted > 0) return hinted;
+  return Math.min(2_000, 2 ** (attempt - 1) * 250);
+}
+
+/**
+ * @param {number | undefined} status
+ * @param {HttpResponse['headers']} headers
+ * @param {any} body
+ * @param {string} [path]
+ */
+export function githubStatusError(status, headers, body, path) {
+  const remaining = headers?.get?.('x-ratelimit-remaining');
+  const message = typeof body?.message === 'string' ? body.message : '';
+  const rateLimited =
+    status === 429 ||
+    ((status === 403 || status === 429) &&
+      (remaining === '0' || /rate limit/i.test(message)));
+  const retryAfterMs = rateLimited ? headerRetryMs(headers) : 0;
+  const forbidden = status === 403 && !rateLimited;
+  const where = path ? ` for ${path}` : '';
+  const detail = message ? `: ${message}` : '';
+  return Object.assign(
+    new Error(`GitHub HTTP ${status ?? 'error'}${where}${detail}`),
+    {
+      rateLimited,
+      forbidden,
+      retryAfterMs:
+        rateLimited && retryAfterMs <= 0
+          ? Number.POSITIVE_INFINITY
+          : retryAfterMs,
+    }
+  );
+}
+
 /**
  * @param {HttpFetch} fetchImpl
  * @param {string} token
  * @returns {GithubGet}
  */
-export function githubClient(fetchImpl, token) {
+export function githubClient(fetchImpl, token, sleep = defaultSleep) {
   return async path => {
     // Bounded retry for transient GitHub upstream failures: a 503 from
     // api.github.com used to fail the whole lifecycle evaluation (JOV-5143,
     // run 37818346153) even though the next sweep would have converged.
-    // Mirrors the Linear retry in linear-sync-on-merge.mjs: 4 attempts,
-    // exponential backoff; persistent errors and 4xx still throw.
+    // A primary quota 403 (remaining 0) is not retried past the sweep budget:
+    // the caller persists the cursor. A single inaccessible pull request is
+    // `forbidden` so the sweep can skip it.
     const maxAttempts = 4;
     /** @type {Error | null} */
     let lastError = null;
@@ -125,29 +205,34 @@ export function githubClient(fetchImpl, token) {
           link: response.headers?.get?.('link') ?? '',
         };
       }
-      lastError = new Error(
-        `GitHub HTTP ${response.status ?? 'error'} for ${path}`
+      const body = await response.json().catch(() => null);
+      lastError = githubStatusError(
+        response.status,
+        response.headers,
+        body,
+        path
       );
-      // An exhausted repo quota fails every later read in this sweep too:
-      // stop and defer the rest, like a Linear rate limit (2026-10-11 20:05Z
-      // turned one quota hit into 137 per-issue failures).
-      if (
-        (response.status === 403 || response.status === 429) &&
-        response.headers?.get?.('x-ratelimit-remaining') === '0'
-      ) {
-        Object.assign(lastError, { rateLimited: true });
-        throw lastError;
-      }
-      const retryable =
-        response.status === 429 ||
-        (typeof response.status === 'number' && response.status >= 500);
-      if (!retryable || attempt === maxAttempts) throw lastError;
-      // Exponential backoff, bounded for the 15-minute sweep budget.
-      const delayMs = Math.min(4_000, 2 ** (attempt - 1) * 250);
-      await new Promise(resolve => setTimeout(resolve, delayMs));
+      const flagged =
+        /** @type {{ rateLimited?: boolean, forbidden?: boolean, retryAfterMs?: number }} */ (
+          lastError
+        );
+      if (flagged.forbidden) throw lastError;
+      const wait = flagged.rateLimited
+        ? rateLimitWaitMs(flagged.retryAfterMs ?? 0, attempt, maxAttempts)
+        : response.status === 429 ||
+            (typeof response.status === 'number' && response.status >= 500)
+          ? Math.min(4_000, 2 ** (attempt - 1) * 250)
+          : null;
+      if (wait == null || attempt === maxAttempts) throw lastError;
+      await sleep(wait);
     }
     throw lastError ?? new Error(`GitHub request failed for ${path}`);
   };
+}
+
+/** @param {number} ms */
+function defaultSleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 const MERGED_PULL = /^repos\/[^/]+\/[^/]+\/pulls\/(\d+)$/;
@@ -521,10 +606,23 @@ export async function listMergedLinkedPulls(input) {
   }
   /** @type {MergedPull[]} */
   const merged = [];
+  /** @type {number[]} */
+  const unreadable = [];
   for (const number of selected) {
-    const { body } = await input.github(
-      `repos/${input.repository}/pulls/${number}`
-    );
+    let body;
+    try {
+      ({ body } = await input.github(
+        `repos/${input.repository}/pulls/${number}`
+      ));
+    } catch (error) {
+      // A permission 403 on one pull request must not fail the sweep. A rate
+      // limit still throws so the caller can persist the cursor and resume.
+      if (/** @type {{ forbidden?: boolean }} */ (error)?.forbidden) {
+        unreadable.push(number);
+        continue;
+      }
+      throw error;
+    }
     if (
       typeof body?.merged_at === 'string' &&
       /^[0-9a-f]{40}$/i.test(String(body?.merge_commit_sha ?? '')) &&
@@ -539,6 +637,14 @@ export async function listMergedLinkedPulls(input) {
         mergedAt: body.merged_at,
       });
     }
+  }
+  if (unreadable.length > 0) {
+    throw Object.assign(
+      new Error(
+        `GitHub HTTP 403 for repos/${input.repository}/pulls/${unreadable.join(',')}`
+      ),
+      { unreadable: true, forbidden: true }
+    );
   }
   return merged;
 }
@@ -709,8 +815,9 @@ export async function reconcileValidation(ctx) {
     issue.identifier
   ).filter(
     receipt =>
-      receipt.kind !== 'outcome' ||
-      Date.parse(receipt.recordedAt) > outcomeCutoff
+      receiptMatchesAcceptanceEpisode(receipt, issue.receiptNotBefore) &&
+      (receipt.kind !== 'outcome' ||
+        Date.parse(receipt.recordedAt) > outcomeCutoff)
   );
   const parentOutcome = ctx.parentReason
     ? recordedReceipts
@@ -901,10 +1008,10 @@ export async function reconcileValidation(ctx) {
         `Linear team has no ${decision.target} state for ${issue.identifier}`
       );
     }
-    // Another writer may have moved the issue while facts were read. Apply
-    // only from the state this decision was made against.
+    // Recheck the server preimage, not just the state: an intervening reopen
+    // can return to the same state with a new acceptance episode.
     if ((await ctx.linear.readStateId(issue.id)) !== issue.state.id) {
-      ctx.log(`${issue.identifier} moved during evaluation; no write`);
+      ctx.log(`${issue.identifier} changed during evaluation; no write`);
       return {
         action: 'skip',
         identifier: issue.identifier,

@@ -2579,6 +2579,7 @@ export async function POST(req: Request) {
         userMessage: userText || '(image attachment)',
         userId: sessionContext.user.id,
         creatorProfileId: resolvedProfileId,
+        audience: 'customer',
       });
     } catch (error) {
       await captureError(

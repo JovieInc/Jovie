@@ -19,6 +19,13 @@ Headings are stable; do not rename them. Empty fields and placeholders
 
 ## 1. IA / message
 
+Before geometry, complete the [canonical IA preflight](../../canon/ENGINEERING.md#ia-preflight-for-ui-bearing-plans)
+in this existing brief/workpad. Record current mounted/source and Pen/interaction
+owner, absorbing surface/action, merge/replace/delete accounting, states/density,
+and before/after complexity. Include its `planningDecisions.ia` row in PR evidence
+alongside any affected sourcing decisions. "Add a panel" alone is incomplete.
+The new receipt diagnostics run in shadow; existing brief checks stay unchanged.
+
 What the screen communicates and what the user does next.
 
 Completeness: one `Message` line, at least 12 characters, not a placeholder.

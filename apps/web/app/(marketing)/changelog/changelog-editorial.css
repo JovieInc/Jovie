@@ -224,7 +224,7 @@
   font-size: var(--text-app); /* 13px */
   color: var(--color-text-quaternary-token); /* pen tertiary ink */
   border-radius: var(--radius-sm);
-  transition: color var(--duration-subtle, 150ms) ease;
+  transition: color var(--duration-subtle) var(--ease-subtle);
 }
 
 .changelog-subscribe__alt:hover {
@@ -437,7 +437,7 @@
   font-weight: var(--font-weight-medium);
   color: var(--color-text-primary-token);
   border-radius: var(--radius-xs);
-  transition: color var(--duration-subtle, 150ms) ease;
+  transition: color var(--duration-subtle) var(--ease-subtle);
 }
 
 .changelog-entry__action:hover {
@@ -451,7 +451,7 @@
 
 .changelog-entry__tertiary a {
   border-radius: var(--radius-xs);
-  transition: color var(--duration-subtle, 150ms) ease;
+  transition: color var(--duration-subtle) var(--ease-subtle);
 }
 
 .changelog-entry__tertiary a:hover {

@@ -18,12 +18,14 @@ permissions:
   contents: read
 
 concurrency:
-  # Pushes land on main far faster than the serial browser matrix can finish,
-  # so only the freshest tip should keep running. Without this group stale
-  # runs are killed externally mid-test, surfacing as job failures and
-  # failure alerts instead of a clean cancellation.
+  # Every main push joins this group so an external sweep cannot kill a
+  # non-member mid-test. cancel-in-progress stays false so the active run
+  # finishes and reports failure or success. GitHub still cancels the
+  # previously pending run when a newer push queues, leaving one successor.
+  # No clock trigger: execution follows changed evidence, and a cron would
+  # fail the frozen clock gate.
   group: e2e-full-matrix-${{ github.ref }}-${{ github.event_name }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build-web:
@@ -75,7 +77,11 @@ jobs:
       (github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter != ''))
     environment: Preview – jovie
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # Shard 1 was cancelled at 60 minutes. The auth modal waited on homepage
+    # controls that the conversion lock removed, and the serial contrast
+    # inventory never started. Locators now match the live entry points;
+    # this limit lets the remaining shard finish.
+    timeout-minutes: 120
     env:
       E2E_FULL_MATRIX: '1'
       PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
@@ -204,6 +210,14 @@ jobs:
           # lead-attribution cookies; without it claim routes 500.
           URL_ENCRYPTION_KEY: e2e-full-matrix-url-encryption-key
 
+      - name: Seed authenticated release fixtures
+        if: ${{ github.event_name == 'push' || github.event.inputs.test_filter == '' }}
+        run: pnpm --filter=@jovie/web run seed:test-data --ready-creator-releases-only
+        env:
+          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          NODE_ENV: test
+          E2E_USE_TEST_AUTH_BYPASS: '1'
+
       - name: Setup Playwright (Chromium)
         if: matrix.browser == 'chromium'
         uses: ./.github/actions/setup-playwright
@@ -232,7 +246,11 @@ jobs:
             node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm playwright test "${{ github.event.inputs.test_filter }}" --project=${{ matrix.browser }} --reporter=line 2>&1 | tee "$log"
           else
             # The nightly-tagged chaos lane remains owned by nightly-tests.yml.
-            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm playwright test --ignore-snapshots --project=${{ matrix.browser }} --shard=${{ matrix.shard }}/4 --reporter=line 2>&1 | tee "$log"
+            # @red is the intentional Sentry failure lane. The OAuth suite is a
+            # deployed-origin proof (staging.jov.ie / jov.ie) and still runs by
+            # file path in production-release. This localhost matrix must not
+            # invert every @production-smoke test.
+            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm playwright test --ignore-snapshots --project=${{ matrix.browser }} --shard=${{ matrix.shard }}/4 --grep-invert "@red|candidate-bound Better Auth OAuth runtime" --reporter=line 2>&1 | tee "$log"
           fi
         env:
           BASE_URL: ${{ (github.event_name == 'push' || github.event.inputs.test_filter == '') && 'http://127.0.0.1:3100' || '' }}
@@ -248,6 +266,12 @@ jobs:
           # Retain decoded public review captures only for this exact filtered run.
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter == 'tests/e2e/profile/public-profile-cta-identity.spec.ts' }}
           PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter == 'tests/e2e/profile/public-profile-cta-identity.spec.ts' }}
+          # Failed attempts leave error-context.md. Scan and redact that
+          # markdown; without this flag the guard counts it as unknown-binary
+          # and poisons the producer. Containers (.zip, .webm, .html) stay
+          # forbidden. Redacted relative paths name any file that still fails.
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
+          PLAYWRIGHT_ARTIFACT_REPORT_PATHS: 'true'
           NODE_ENV: test
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
@@ -284,6 +308,8 @@ jobs:
           retention-days: 7
           allow-images: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter == 'tests/e2e/profile/public-profile-cta-identity.spec.ts' }}
           public-images: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter == 'tests/e2e/profile/public-profile-cta-identity.spec.ts' }}
+          allow-markdown: 'true'
+          diagnostic-paths: 'true'
 
       - name: Cleanup Clerk E2E test users
         if: ${{ always() && steps.neon-branch.outcome == 'success' }}

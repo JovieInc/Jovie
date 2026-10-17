@@ -92,7 +92,7 @@ describe('visibility audit', () => {
     ).toBe(true);
     expect(
       report.fixes.some(fix => fix.agenticFix.kind === 'dsp_bio_sync')
-    ).toBe(true);
+    ).toBe(false);
     expect(report.searchOwnership.instruction).toContain('SerpAPI');
     expect(report.catalog.policy).toContain('Spotify Developer Policy III.13');
 
@@ -100,6 +100,7 @@ describe('visibility audit', () => {
     expect(markdown).toContain('MusicFetch is not called');
     expect(markdown).toContain('SerpAPI requests: 0');
     expect(markdown).toContain('Spotify Developer Policy III.13');
+    expect(markdown).not.toContain('DSP bio sync');
     expect(markdown).toMatchSnapshot();
   });
 

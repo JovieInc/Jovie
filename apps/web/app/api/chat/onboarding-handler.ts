@@ -84,6 +84,22 @@ import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
 /** Existing Statsig kill switch for all `/api/chat` traffic. */
 const CHAT_DISABLED_GATE = 'ai_chat_disabled';
 
+/**
+ * Nightly/QA-only (JOV-8500): when the standalone QA server sets
+ * `E2E_REQUIRE_TURNSTILE_GATE=1`, the local E2E Turnstile bypass below is
+ * disarmed so the gate runs exactly as it does in production. The canary
+ * spec asserts an anonymous first message reaches this gate (403
+ * TURNSTILE_REQUIRED); with the bypass armed that contract is unreachable.
+ * Inert on Vercel production/preview deploys regardless of value.
+ */
+function shouldRequireTurnstileGate(): boolean {
+  return (
+    env.E2E_REQUIRE_TURNSTILE_GATE === '1' &&
+    env.VERCEL_ENV !== 'production' &&
+    env.VERCEL_ENV !== 'preview'
+  );
+}
+
 /** Maximum onboarding messages we accept in a single request payload. */
 const MAX_ONBOARDING_MESSAGES = 50;
 
@@ -243,6 +259,7 @@ function isSecureTurnstileEnvironment(req: Request): boolean {
 
 function shouldBypassTurnstileForLocalRuntime(req: Request): boolean {
   if (isSecureTurnstileEnvironment(req)) return false;
+  if (shouldRequireTurnstileGate()) return false;
 
   return (
     env.NODE_ENV === 'development' ||

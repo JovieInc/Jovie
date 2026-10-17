@@ -27,6 +27,8 @@ interface MarketingFooterCtaProps {
   readonly ctaAnalyticsEvent?: string;
   readonly ctaAnalyticsSource?: string;
   readonly prefetch?: boolean;
+  /** When set, the section joins the marketing census as this CTA variant. */
+  readonly sectionVariant?: string;
 }
 
 export function MarketingFooterCta({
@@ -38,6 +40,7 @@ export function MarketingFooterCta({
   ctaAnalyticsEvent,
   ctaAnalyticsSource,
   prefetch,
+  sectionVariant,
 }: Readonly<MarketingFooterCtaProps>) {
   const instanceId = useId().replaceAll(':', '-');
   const primaryGradientId = `marketing-footer-cta-primary-${instanceId}`;
@@ -47,6 +50,7 @@ export function MarketingFooterCta({
     <MarketingTerminalCta
       penContractId={MARKETING_PEN_CONTRACT_IDS.shell.footerCta}
       variant='cinematic'
+      sectionVariant={sectionVariant}
       testId='marketing-footer-cta'
       title={title}
       body={body}

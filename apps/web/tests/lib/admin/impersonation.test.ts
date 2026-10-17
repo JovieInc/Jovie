@@ -275,7 +275,7 @@ describe('Admin Impersonation', () => {
       const tokenString = mockCookiesSet.mock.calls[0]?.[1] as string;
       mockCookiesGet.mockReturnValue({ value: tokenString });
       await expect(getImpersonationState(adminUserId)).resolves.toMatchObject({
-        realAdminUserId: adminUserId,
+        actorUserId: adminUserId,
         effectiveUserId: targetUserId,
       });
     });
@@ -287,7 +287,7 @@ describe('Admin Impersonation', () => {
       mockCookiesGet.mockReturnValue(undefined);
 
       const { endImpersonation } = await import('@/lib/admin/impersonation');
-      const result = await endImpersonation();
+      const result = await endImpersonation(adminUserId);
 
       expect(result.success).toBe(true);
       expect(mockCookiesDelete).toHaveBeenCalledWith('jovie_impersonate');
@@ -302,7 +302,7 @@ describe('Admin Impersonation', () => {
       const { getImpersonationState } = await import(
         '@/lib/admin/impersonation'
       );
-      const result = await getImpersonationState();
+      const result = await getImpersonationState(adminUserId);
 
       expect(result).toBeNull();
     });
@@ -314,7 +314,7 @@ describe('Admin Impersonation', () => {
       const { getImpersonationState } = await import(
         '@/lib/admin/impersonation'
       );
-      const result = await getImpersonationState();
+      const result = await getImpersonationState(adminUserId);
 
       expect(result).toBeNull();
     });
@@ -326,7 +326,7 @@ describe('Admin Impersonation', () => {
       const { getImpersonationState } = await import(
         '@/lib/admin/impersonation'
       );
-      const result = await getImpersonationState();
+      const result = await getImpersonationState(adminUserId);
 
       expect(result).toBeNull();
       expect(mockCookiesDelete).toHaveBeenCalledWith('jovie_impersonate');
@@ -339,7 +339,7 @@ describe('Admin Impersonation', () => {
       mockCookiesGet.mockReturnValue(undefined);
 
       const { isImpersonating } = await import('@/lib/admin/impersonation');
-      const result = await isImpersonating();
+      const result = await isImpersonating(adminUserId);
 
       expect(result).toBe(false);
     });
@@ -356,7 +356,7 @@ describe('Admin Impersonation', () => {
       const { getImpersonationState } = await import(
         '@/lib/admin/impersonation'
       );
-      const result = await getImpersonationState();
+      const result = await getImpersonationState(adminUserId);
 
       expect(result).toBeNull();
       expect(mockCookiesDelete).toHaveBeenCalledWith('jovie_impersonate');
@@ -373,7 +373,7 @@ describe('Admin Impersonation', () => {
       const { getImpersonationState } = await import(
         '@/lib/admin/impersonation'
       );
-      const result = await getImpersonationState();
+      const result = await getImpersonationState(adminUserId);
 
       expect(result).toBeNull();
       expect(mockCookiesDelete).toHaveBeenCalledWith('jovie_impersonate');
@@ -390,7 +390,7 @@ describe('Admin Impersonation', () => {
       const { getImpersonationState } = await import(
         '@/lib/admin/impersonation'
       );
-      const result = await getImpersonationState();
+      const result = await getImpersonationState(adminUserId);
 
       expect(result).toBeNull();
       expect(mockCookiesDelete).toHaveBeenCalledWith('jovie_impersonate');

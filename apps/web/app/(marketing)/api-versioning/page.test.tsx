@@ -48,7 +48,9 @@ describe('ApiVersioningPage', () => {
     expect(API_VERSIONING_POLICY.lifecycle.sunset.active).toBe(false);
 
     for (const operation of Object.values(ARTIST_OPENAPI_DOCUMENT.paths)) {
-      for (const response of Object.values(operation.get.responses)) {
+      for (const response of Object.values(
+        operation.get?.responses ?? operation.post!.responses
+      )) {
         expect(response.headers?.Deprecation).toBeUndefined();
         expect(response.headers?.Sunset).toBeUndefined();
       }

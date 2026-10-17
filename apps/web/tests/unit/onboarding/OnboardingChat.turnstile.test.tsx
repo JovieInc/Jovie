@@ -8,6 +8,7 @@ import {
 import { type FormEvent, forwardRef, type ReactNode, useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OnboardingChat } from '@/components/features/onboarding/OnboardingChat';
+import type { OnboardingTurnstileStatus } from '@/components/features/onboarding/OnboardingTurnstile';
 import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
 
 const chatMocks = vi.hoisted(() => ({
@@ -99,6 +100,7 @@ vi.mock('@/components/jovie/components', () => ({
     HTMLTextAreaElement,
     {
       readonly isSubmitting: boolean;
+      readonly isLoading: boolean;
       readonly dictationEnabled?: boolean;
       readonly onChange: (value: string) => void;
       readonly onSubmit: (event?: FormEvent) => void;
@@ -110,6 +112,7 @@ vi.mock('@/components/jovie/components', () => ({
     {
       dictationEnabled,
       isSubmitting,
+      isLoading,
       onChange,
       onSubmit,
       placeholder,
@@ -132,7 +135,11 @@ vi.mock('@/components/jovie/components', () => ({
           onChange={event => onChange(event.currentTarget.value)}
         />
         {statusBanner}
-        <button type='submit' aria-label='Send message' disabled={isSubmitting}>
+        <button
+          type='submit'
+          aria-label='Send message'
+          disabled={isSubmitting || isLoading}
+        >
           Send
         </button>
       </form>
@@ -203,6 +210,7 @@ function TurnstileHarness({
   onTurnstileRejected = vi.fn(),
   onTurnstileRequired = vi.fn(),
   starterPrompt,
+  unverifiedStatus = 'interactive',
 }: Readonly<{
   initialToken?: string | null;
   onConversationActivity?: () => void;
@@ -210,6 +218,7 @@ function TurnstileHarness({
   onTurnstileRejected?: () => void;
   onTurnstileRequired?: (message?: string) => void;
   starterPrompt?: string;
+  unverifiedStatus?: OnboardingTurnstileStatus;
 }>) {
   const [turnstileToken, setTurnstileToken] = useState(initialToken);
   const [instruction, setInstruction] = useState<string | null>(null);
@@ -217,7 +226,7 @@ function TurnstileHarness({
   return (
     <OnboardingChat
       turnstileToken={turnstileToken}
-      turnstileStatus={turnstileToken ? 'verified' : 'interactive'}
+      turnstileStatus={turnstileToken ? 'verified' : unverifiedStatus}
       turnstilePanel={
         instruction ? (
           <div data-testid='test-turnstile-panel'>{instruction}</div>
@@ -376,6 +385,134 @@ describe('OnboardingChat Turnstile gating', () => {
     expect(
       screen.getByLabelText('Chat Message Input').closest('form')
     ).toHaveAttribute('data-dictation-enabled', 'false');
+  });
+
+  it('sizes delayed starter guidance without announcing it, then withdraws sizing on verified send', async () => {
+    const props = {
+      starterHandoff: { kind: 'prompt' as const, prompt: 'Claim my page' },
+      turnstileHasSiteKey: true,
+      turnstileStatus: 'loading' as const,
+      turnstileToken: null,
+    };
+    const { rerender } = render(
+      <OnboardingChat {...props} turnstilePanel={<span hidden />} />
+    );
+
+    const sizingCopy = screen.getByTestId(
+      'onboarding-verification-instruction-size'
+    );
+    expect(sizingCopy).toHaveAttribute('aria-hidden', 'true');
+    expect(sizingCopy).not.toHaveAttribute('role');
+    expect(sizingCopy).not.toHaveAttribute('aria-live');
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(chatMocks.sendMessage).not.toHaveBeenCalled();
+
+    rerender(
+      <OnboardingChat
+        {...props}
+        turnstilePanel={<p role='status'>One quick check before we send</p>}
+      />
+    );
+    expect(screen.getAllByRole('status')).toHaveLength(1);
+    expect(screen.getByRole('status')).toHaveTextContent(
+      sizingCopy.textContent!
+    );
+    expect(screen.getByLabelText('Chat Message Input')).toHaveValue(
+      'Claim my page'
+    );
+    expect(chatMocks.sendMessage).not.toHaveBeenCalled();
+
+    rerender(
+      <OnboardingChat
+        {...props}
+        turnstileToken='fresh-token'
+        turnstileStatus='verified'
+        turnstilePanel={<span hidden />}
+      />
+    );
+    await waitFor(() => expect(chatMocks.sendMessage).toHaveBeenCalledTimes(1));
+    expect(
+      screen.queryByTestId('onboarding-verification-instruction-size')
+    ).toBeNull();
+  });
+
+  it.each([
+    'error',
+    'timeout',
+    'unsupported',
+    'unconfigured',
+    'verified',
+  ] as const)(
+    'does not reserve unavailable starter guidance in %s state',
+    turnstileStatus => {
+      render(
+        <OnboardingChat
+          starterHandoff={{ kind: 'prompt', prompt: 'Claim my page' }}
+          turnstileHasSiteKey
+          turnstileStatus={turnstileStatus}
+          turnstileToken={turnstileStatus === 'verified' ? 'fresh-token' : null}
+          turnstilePanel={<span hidden />}
+        />
+      );
+      expect(
+        screen.queryByTestId('onboarding-verification-instruction-size')
+      ).toBeNull();
+    }
+  );
+
+  it('withdraws starter sizing when the configured key disappears', () => {
+    const props = {
+      starterHandoff: { kind: 'prompt' as const, prompt: 'Claim my page' },
+      turnstileStatus: 'loading' as const,
+      turnstileToken: null,
+      turnstilePanel: <span hidden />,
+    };
+    const { rerender } = render(
+      <OnboardingChat {...props} turnstileHasSiteKey />
+    );
+    expect(
+      screen.getByTestId('onboarding-verification-instruction-size')
+    ).toBeInTheDocument();
+    rerender(<OnboardingChat {...props} turnstileHasSiteKey={false} />);
+    expect(
+      screen.queryByTestId('onboarding-verification-instruction-size')
+    ).toBeNull();
+    expect(screen.getByLabelText('Chat Message Input')).toHaveValue(
+      'Claim my page'
+    );
+    expect(chatMocks.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('does not size a starter instruction for restored history or runtime bypass', () => {
+    chatMocks.messages = [
+      {
+        id: 'owned-history',
+        role: 'user',
+        parts: [{ type: 'text', text: 'Already sent' }],
+      },
+    ];
+    const props = {
+      turnstileHasSiteKey: true,
+      turnstileStatus: 'loading' as const,
+      turnstileToken: null,
+      turnstilePanel: <span hidden />,
+      starterHandoff: { kind: 'prompt' as const, prompt: 'Claim my page' },
+    };
+    const history = render(
+      <OnboardingChat {...props} initialMessages={chatMocks.messages} />
+    );
+    expect(
+      screen.queryByTestId('onboarding-verification-instruction-size')
+    ).toBeNull();
+    expect(chatMocks.sendMessage).not.toHaveBeenCalled();
+    history.unmount();
+    chatMocks.messages = [];
+    document.documentElement.dataset.e2eMode = '1';
+    render(<OnboardingChat {...props} />);
+    expect(
+      screen.queryByTestId('onboarding-verification-instruction-size')
+    ).toBeNull();
+    expect(chatMocks.sendMessage).toHaveBeenCalledTimes(1);
   });
 
   it('auto-submits a queued first message once verification resolves', async () => {
@@ -694,7 +831,12 @@ describe('OnboardingChat Turnstile gating', () => {
     expect(chatMocks.messages).toEqual([]);
     expect(onTurnstileRejected).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('onboarding-message-recovery')).toHaveTextContent(
-      'Complete the security check to send your message.'
+      'One quick check'
+    );
+    expect(screen.queryByRole('button', { name: 'Retry message' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Send message' })).toBeDisabled();
+    expect(screen.getByTestId('onboarding-composer-dock')).toContainElement(
+      screen.getByTestId('onboarding-flow-status')
     );
     expect(screen.getByTestId('onboarding-flow-status')).toHaveTextContent(
       'One quick check before we send'
@@ -705,7 +847,48 @@ describe('OnboardingChat Turnstile gating', () => {
     expect(screen.getByLabelText('Chat Message Input')).toHaveFocus();
   });
 
-  it('auto-retries a rejected first turn after fresh Turnstile verification', async () => {
+  it('keeps failed verification beside the editable draft and retries the check without sending', () => {
+    const onTurnstileRejected = vi.fn();
+    render(
+      <TurnstileHarness
+        initialToken='stale-token'
+        unverifiedStatus='error'
+        onTurnstileRejected={onTurnstileRejected}
+      />
+    );
+    const input = screen.getByLabelText('Chat Message Input');
+    fireEvent.change(input, { target: { value: 'I am Test Artist' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+    errorMocks.metadata = { errorCode: 'TURNSTILE_REQUIRED' };
+    act(() => chatMocks.onError?.(new Error('Forbidden')));
+
+    const recovery = screen.getByTestId('onboarding-message-recovery');
+    expect(recovery).toHaveTextContent('The check couldn’t load');
+    expect(screen.getAllByTestId('onboarding-flow-status')).toHaveLength(1);
+    expect(screen.getAllByTestId('test-turnstile-panel')).toHaveLength(1);
+    expect(screen.getByTestId('onboarding-composer-dock')).toContainElement(
+      recovery
+    );
+    expect(recovery).toContainElement(
+      screen.getByTestId('test-turnstile-panel')
+    );
+    expect(screen.getByRole('button', { name: 'Send message' })).toBeDisabled();
+    const recoveredInput = screen.getByLabelText('Chat Message Input');
+    fireEvent.change(recoveredInput, {
+      target: { value: 'My edited message' },
+    });
+    const sendCount = chatMocks.sendMessage.mock.calls.length;
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Try Security Check Again' })
+    );
+    expect(onTurnstileRejected).toHaveBeenCalledTimes(2);
+    expect(chatMocks.sendMessage).toHaveBeenCalledTimes(sendCount);
+    expect(screen.getByLabelText('Chat Message Input')).toHaveValue(
+      'My edited message'
+    );
+  });
+
+  it('auto-retries the current draft after fresh Turnstile verification', async () => {
     const onTurnstileRejected = vi.fn();
     function TokenRefreshHarness() {
       const [turnstileToken, setTurnstileToken] = useState<string | null>(
@@ -759,13 +942,18 @@ describe('OnboardingChat Turnstile gating', () => {
     });
 
     chatMocks.sendMessage.mockClear();
+    fireEvent.change(screen.getByLabelText('Chat Message Input'), {
+      target: { value: 'My edited artist message' },
+    });
+    screen.getByRole('button', { name: 'Refresh token' }).focus();
     fireEvent.click(screen.getByRole('button', { name: 'Refresh token' }));
 
     await waitFor(() => {
       expect(chatMocks.sendMessage).toHaveBeenCalledWith({
-        text: 'I am Test Artist',
+        text: 'My edited artist message',
       });
     });
+    expect(screen.getByLabelText('Chat Message Input')).toHaveFocus();
     expect(chatMocks.messages).toEqual([]);
   });
 
@@ -811,8 +999,10 @@ describe('OnboardingChat Turnstile gating', () => {
     expect(screen.getByLabelText('Chat Message Input')).toHaveValue(
       'I am Test Artist'
     );
-    expect(onTurnstileRequired).toHaveBeenCalledWith(
-      'One quick check before we send'
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Try Security Check Again' })
     );
+    expect(onTurnstileRejected).toHaveBeenCalledTimes(2);
+    expect(onTurnstileRequired).not.toHaveBeenCalled();
   });
 });

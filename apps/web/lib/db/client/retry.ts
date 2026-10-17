@@ -4,7 +4,7 @@
  * Retry logic for transient database failures with exponential backoff.
  */
 
-import { executeWithRetry } from '@/lib/resilience/primitives';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { PERFORMANCE_THRESHOLDS } from '../config';
 import { getDeepErrorMessage, unwrapPgError } from '../errors';
 import { dbCircuitBreaker } from './circuit-breaker';
@@ -26,10 +26,7 @@ const RETRYABLE_ERROR_PATTERNS: readonly RegExp[] = [
   /connection.*closed/i,
   /server\s+conn\s+crashed\??/i,
   /connection.*unexpectedly/i,
-  /timeout/i,
   /network/i,
-  /temporary/i,
-  /transient/i,
   /econnreset/i,
   /econnrefused/i,
   /etimedout/i,
@@ -75,96 +72,119 @@ function getErrorText(error: unknown): string[] {
  * Check if an error is retryable (transient)
  */
 export function isRetryableError(error: unknown): boolean {
+  const code = unwrapPgError(error).code;
+  // A SQLSTATE is authoritative; query text may itself contain transport words.
+  // Conflicts (40001/40P01) belong to the full-transaction retry owner.
+  if (code && /^[0-9A-Z]{5}$/.test(code)) {
+    return isRetryablePgCode(code);
+  }
+
   const errorText = [...getErrorText(error), getDeepErrorMessage(error)].filter(
     Boolean
   );
-
-  if (errorText.length === 0) {
-    return false;
-  }
-
-  if (isRetryablePgCode(unwrapPgError(error).code)) {
-    return true;
-  }
-
   return RETRYABLE_ERROR_PATTERNS.some(pattern =>
     errorText.some(value => pattern.test(value))
   );
 }
 
+export interface ReadRetryOptions {
+  readonly operation: 'read';
+  readonly maxAttempts?: number;
+  /** Retry admission window, including elapsed SQL time and backoff. */
+  readonly retryBudgetMs: number;
+}
+
+const retryOwner = new AsyncLocalStorage<boolean>();
+
 /**
- * Execute an operation with retry logic for transient failures
+ * Unclassified operations (including the legacy numeric argument) run once:
+ * a transport failure may mean a write committed without acknowledgment.
+ * Only explicitly declared, side-effect-free reads may replay. Callbacks must
+ * enforce SQL cancellation separately; this window only bounds retry admission.
+ * Transaction conflicts belong to the full-transaction primitive, never here.
  */
 export async function withRetry<T>(
   operation: () => Promise<T>,
   context: string,
-  maxRetries: number = DB_CONFIG.maxRetries
+  policy: number | ReadRetryOptions = DB_CONFIG.maxRetries
 ): Promise<T> {
-  if (!Number.isInteger(maxRetries) || maxRetries < 1) {
-    throw new RangeError(
-      `Invalid maxRetries: ${maxRetries}. Expected a positive integer.`
-    );
+  const readPolicy = typeof policy === 'object' ? policy : undefined;
+  const requestedAttempts =
+    readPolicy?.maxAttempts ??
+    (typeof policy === 'number' ? policy : DB_CONFIG.maxRetries);
+  if (!Number.isInteger(requestedAttempts) || requestedAttempts < 1) {
+    throw new RangeError('Expected a positive integer attempt count.');
+  }
+  if (
+    readPolicy &&
+    (!Number.isFinite(readPolicy.retryBudgetMs) ||
+      readPolicy.retryBudgetMs <= 0)
+  ) {
+    throw new RangeError('Expected a positive finite retry budget.');
   }
 
-  return dbCircuitBreaker.execute(
-    async () => {
-      let attempts = 0;
+  // The outermost wrapper owns retries and circuit accounting for the operation.
+  if (retryOwner.getStore()) return operation();
+  const maxAttempts = readPolicy?.operation === 'read' ? requestedAttempts : 1;
+  const deadline = performance.now() + (readPolicy?.retryBudgetMs ?? 0);
 
-      return executeWithRetry(operation, {
-        maxRetries: Math.max(0, maxRetries - 1),
-        baseDelayMs: DB_CONFIG.retryDelay,
-        backoffMultiplier: DB_CONFIG.retryBackoffMultiplier,
-        isRetryable: isRetryableError,
-        onRetry: ({ attempt, maxRetries: retryCount, error }) => {
-          attempts = attempt;
-
-          const totalAttempts = retryCount + 1;
-          const willRetry = attempt <= retryCount;
-          logDbError(
-            'retry_attempt',
-            error,
-            {
-              context,
-              attempt,
-              maxRetries: totalAttempts,
-              isRetryable: true,
-              willRetry,
-            },
-            { asBreadcrumb: willRetry }
-          );
-        },
-      })
-        .then(result => {
-          if (attempts > 0) {
-            logDbInfo(
-              'retry_success',
-              `Operation succeeded on attempt ${attempts + 1}`,
-              { context }
+  return retryOwner.run(true, () =>
+    dbCircuitBreaker.execute(
+      async () => {
+        for (let attempt = 1; ; attempt++) {
+          try {
+            const result = await operation();
+            if (attempt > 1) {
+              logDbInfo(
+                'retry_success',
+                `Operation succeeded on attempt ${attempt}`,
+                { context }
+              );
+            }
+            return result;
+          } catch (error) {
+            const transient = isRetryableError(error);
+            // NOSONAR (S2245) - jitter spreads retry load; not security-sensitive.
+            const jitter = 0.75 + Math.random() * 0.5;
+            const delayMs =
+              DB_CONFIG.retryDelay *
+              DB_CONFIG.retryBackoffMultiplier ** (attempt - 1) *
+              jitter;
+            const willRetry =
+              transient &&
+              attempt < maxAttempts &&
+              performance.now() + delayMs < deadline;
+            logDbError(
+              'retry_attempt',
+              error,
+              {
+                context,
+                operation: readPolicy?.operation ?? 'unclassified',
+                retryBudgetMs: readPolicy?.retryBudgetMs,
+                attempt,
+                maxRetries: maxAttempts,
+                isRetryable: transient,
+                willRetry,
+              },
+              { asBreadcrumb: transient }
             );
+            if (!willRetry) throw error;
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+            // Timer scheduling can overshoot the window; never start late SQL.
+            if (performance.now() >= deadline) {
+              logDbError(
+                'retry_budget_exhausted',
+                error,
+                { context, attempt },
+                { asBreadcrumb: true }
+              );
+              throw error;
+            }
           }
-          return result;
-        })
-        .catch(error => {
-          const isRetryable = isRetryableError(error);
-          const totalAttempts = maxRetries;
-          logDbError(
-            'retry_attempt',
-            error,
-            {
-              context,
-              attempt: Math.min(attempts + 1, totalAttempts),
-              maxRetries: totalAttempts,
-              isRetryable,
-              willRetry: false,
-            },
-            { asBreadcrumb: isRetryable }
-          );
-          throw error;
-        });
-    },
-    {
-      shouldCountFailure: isRetryableError,
-    }
+        }
+      },
+      { shouldCountFailure: isRetryableError }
+    )
   );
 }
 

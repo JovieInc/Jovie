@@ -24,6 +24,11 @@ describe('connector provider registry', () => {
     const enumValues = [...connectorProviderEnum.enumValues].sort();
     const runtimeValues = [...CONNECTOR_PROVIDER_IDS].sort();
     expect(runtimeValues).toEqual(enumValues);
+    const oauthValues = Object.values(CONNECTOR_REGISTRY)
+      .filter(definition => definition.transport === 'oauth')
+      .map(definition => definition.id)
+      .sort();
+    expect(oauthValues).toEqual(enumValues);
   });
 
   it('derives DB status ids from the Drizzle connector_status enum', () => {

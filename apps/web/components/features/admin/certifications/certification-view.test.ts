@@ -37,6 +37,46 @@ describe('certification view helpers', () => {
     ).toEqual(['flows:claim-profile']);
   });
 
+  it('combines owner, revision freshness, and blocker filters across domains', () => {
+    const owned = rows.map((row, index) => ({
+      ...row,
+      owner: index === 0 ? 'Summer' : null,
+    }));
+    expect(
+      filterCertificationRows(owned, {
+        state: 'all',
+        domain: 'all',
+        owner: 'Summer',
+        freshness: 'current',
+        blockers: 'clear',
+      }).map(row => row.id)
+    ).toEqual(['flows:signup-golden-path']);
+    expect(
+      filterCertificationRows(owned, {
+        state: 'all',
+        domain: 'all',
+        owner: 'unassigned',
+        blockers: 'blocked',
+      }).map(row => row.id)
+    ).toEqual(['flows:claim-profile']);
+    expect(
+      filterCertificationRows(
+        [
+          { ...owned[0]!, staleFounderLock: true },
+          { ...owned[1]!, source: null },
+        ],
+        { state: 'all', domain: 'all', freshness: 'stale' }
+      )
+    ).toHaveLength(1);
+    expect(
+      filterCertificationRows([{ ...owned[0]!, source: null }], {
+        state: 'all',
+        domain: 'all',
+        freshness: 'missing',
+      })
+    ).toHaveLength(1);
+  });
+
   it('counts rows per state with an all bucket', () => {
     expect(countRowsByState(rows)).toEqual({
       all: 3,

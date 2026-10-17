@@ -139,6 +139,7 @@ describe('GET /api/ovie/certifications', () => {
         'history',
         'id',
         'links',
+        'owner',
         'source',
         'staleFounderLock',
         'state',

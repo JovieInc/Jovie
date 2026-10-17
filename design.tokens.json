@@ -61,7 +61,7 @@
       "$type": "color"
     },
     "text.tertiary": {
-      "$value": "#8f95a0",
+      "$value": "#9da2ac",
       "$type": "color"
     },
     "text.quaternary": {
@@ -69,7 +69,7 @@
       "$type": "color"
     },
     "text.disabled": {
-      "$value": "#525d75",
+      "$value": "#77839d",
       "$type": "color"
     },
     "border.subtle": {

@@ -96,6 +96,7 @@ export function createWorld(overrides = {}) {
         title: 'Profiles: editorial card replaces the carousel',
         description: '',
         state: 'In Review',
+        updatedAt: '2026-10-03T12:00:00Z',
         labels: [],
         children: [],
         attachments: ['https://github.com/JovieInc/Jovie/pull/101'],
@@ -227,56 +228,64 @@ export function createWorld(overrides = {}) {
         data: {
           issue: issue && {
             id: issue.id,
+            updatedAt: issue.updatedAt,
             state: { id: `state-${issue.state}`, name: issue.state },
           },
         },
       });
     }
-    if (query.includes('IssueLifecycle(')) {
-      const issue = byKey(variables.issueId);
-      if (!issue) return ok({ data: { issue: null } });
+    const issuePayload = key => {
+      const issue = byKey(key);
+      if (!issue) return null;
       const state = STATES.find(entry => entry.name === issue.state);
-      return ok({
-        data: {
-          issue: {
-            id: issue.id,
-            identifier: issue.identifier,
-            title: issue.title,
-            description: issue.description,
-            state,
-            labels: { nodes: issue.labels.map(name => ({ name })) },
-            comments: {
-              nodes: issue.comments,
-              pageInfo: { hasNextPage: false, endCursor: null },
-            },
-            children: {
-              nodes: issue.children.map(([identifier, type, deliveredAt]) => ({
-                identifier,
-                state: { type },
-                completedAt:
-                  type === 'completed'
-                    ? deliveredAt === undefined
-                      ? '2026-10-03T11:00:00Z'
-                      : deliveredAt
-                    : null,
-                canceledAt:
-                  type === 'canceled'
-                    ? deliveredAt === undefined
-                      ? '2026-10-03T11:00:00Z'
-                      : deliveredAt
-                    : null,
-              })),
-              pageInfo: { hasNextPage: false },
-            },
-            attachments: { nodes: issue.attachments.map(url => ({ url })) },
-            history: {
-              nodes: issue.history,
-              pageInfo: { hasNextPage: false, endCursor: null },
-            },
-            team: { states: { nodes: STATES } },
-          },
+      return {
+        id: issue.id,
+        identifier: issue.identifier,
+        title: issue.title,
+        updatedAt: issue.updatedAt,
+        description: issue.description,
+        state,
+        labels: { nodes: issue.labels.map(name => ({ name })) },
+        comments: {
+          nodes: issue.comments,
+          pageInfo: { hasNextPage: false, endCursor: null },
         },
-      });
+        children: {
+          nodes: issue.children.map(([identifier, type, deliveredAt]) => ({
+            identifier,
+            state: { type },
+            completedAt:
+              type === 'completed'
+                ? deliveredAt === undefined
+                  ? '2026-10-03T11:00:00Z'
+                  : deliveredAt
+                : null,
+            canceledAt:
+              type === 'canceled'
+                ? deliveredAt === undefined
+                  ? '2026-10-03T11:00:00Z'
+                  : deliveredAt
+                : null,
+          })),
+          pageInfo: { hasNextPage: false },
+        },
+        attachments: { nodes: issue.attachments.map(url => ({ url })) },
+        history: {
+          nodes: issue.history,
+          pageInfo: { hasNextPage: false, endCursor: null },
+        },
+        team: { states: { nodes: STATES } },
+      };
+    };
+    if (query.includes('LifecycleIssueBatch')) {
+      const data = {};
+      for (const [key, value] of Object.entries(variables)) {
+        data[key.replace(/^id/, 'i')] = issuePayload(value);
+      }
+      return ok({ data });
+    }
+    if (query.includes('IssueLifecycle(')) {
+      return ok({ data: { issue: issuePayload(variables.issueId) } });
     }
     if (query.includes('IssueLifecycleDescription')) {
       const issue = byKey(variables.issueId);
@@ -408,6 +417,7 @@ export function snapshotFor(world, identifier) {
     id: issue.id,
     identifier: issue.identifier,
     title: issue.title,
+    updatedAt: issue.updatedAt,
     description: issue.description,
     labels: [...issue.labels],
     state: STATES.find(entry => entry.name === issue.state),

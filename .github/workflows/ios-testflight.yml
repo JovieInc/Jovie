@@ -1,5 +1,9 @@
 name: iOS TestFlight
-run-name: iOS TestFlight ${{ github.event.workflow_run.head_sha || github.sha }}
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Tim-White
+# necessary-trust-boundary: This existing serial workflow authenticates certified source separately from Actions transports, then binds its irreversible Apple upload to an immutable source lease, intent and binary receipt.
+# revisit-trigger: Replace this artifact handoff only when the canonical release-channel contract supplies equivalent atomic source-bound upload idempotency and durable provenance, proven by the same replay and lineage regressions.
+run-name: iOS TestFlight ${{ github.sha }}
 
 on:
   workflow_dispatch:
@@ -42,12 +46,22 @@ jobs:
     outputs:
       release_sha: ${{ steps.authorize.outputs.release_sha }}
       baseline_sha: ${{ steps.authorize.outputs.baseline_sha }}
-      should_release: ${{ steps.select.outputs.should_release }}
+      should_release: ${{ steps.pin.outputs.lease != '' && steps.select.outputs.should_release == 'true' }}
+      lease: ${{ steps.pin.outputs.lease }}
     steps:
+      - name: Checkout the rate-limit hold
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          path: .testflight-bootstrap
+          persist-credentials: false
+          sparse-checkout: .github/scripts/gh-api-hold.sh
+          sparse-checkout-cone-mode: false
       - name: Cross-prove exact production evidence
         id: authorize
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_API_HOLD_BUDGET_SECONDS: '480'
           EVENT_NAME: ${{ github.event_name }}
           MANUAL_SHA: ${{ github.sha }}
           REPOSITORY: ${{ github.repository }}
@@ -63,6 +77,90 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          gh() {
+            if [ "${1:-}" != "api" ]; then
+              command gh "$@"
+              return
+            fi
+            local err
+            err="$(mktemp)"
+            if GH_API_HOLD_BIN="$(command -v gh)" bash "$GITHUB_WORKSPACE/.testflight-bootstrap/.github/scripts/gh-api-hold.sh" "$@" 2>"$err"; then
+              rm -f "$err"
+              return 0
+            fi
+            cat "$err" >&2
+            # A reset outside this job's budget defers. A missing reset and a
+            # permission 403 stay fatal. Do not treat the 403 body as success.
+            if grep -Eq 'outside the .*budget' "$err" && grep -q 'Not passing' "$err"; then
+              record_testflight_quota_defer "$err"
+              rm -f "$err"
+              if [ "${BASH_SUBSHELL:-0}" -eq 0 ]; then
+                finish_testflight_quota_defer
+                exit 0
+              fi
+              return 1
+            fi
+            rm -f "$err"
+            return 1
+          }
+          # A command substitution fails the assignment under set -e before
+          # the next command, so ERR owns that defer. DEBUG owns a later
+          # explicit exit after a handled failure. A permission 403 and a
+          # missing reset leave no sentinel and stay fatal. Both traps publish
+          # the same warning and step summary as a direct defer.
+          record_testflight_quota_defer() {
+            local reset_epoch reset_iso
+            reset_epoch="$(sed -n 's/.*GitHub rate limit resets at \([0-9][0-9]*\).*/\1/p' "$1" | head -n 1)"
+            # GNU date accepts -d @epoch. BSD/macOS date rejects that and
+            # prints an epoch with -r. GNU -r reads a file mtime, so it is
+            # only the fallback after -d fails to produce an ISO instant.
+            reset_iso="$(date -u -d "@${reset_epoch}" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || true)"
+            if ! [[ "$reset_iso" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]]; then
+              reset_iso="$(date -u -r "$reset_epoch" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || true)"
+            fi
+            if ! [[ "$reset_iso" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]]; then
+              echo "::error::Installation quota defer could not format the reset instant." >&2
+              exit 1
+            fi
+            printf '%s\n' "$reset_iso" > "$RUNNER_TEMP/testflight-authorize-quota-reset"
+            : > "$RUNNER_TEMP/testflight-authorize-quota-defer"
+          }
+          announce_testflight_quota_defer() {
+            local reset_iso deferred_sha line
+            reset_iso="$(head -n 1 "$RUNNER_TEMP/testflight-authorize-quota-reset")"
+            deferred_sha="${release_sha:-}"
+            if ! [[ "$deferred_sha" =~ ^[0-9a-f]{40}$ ]]; then
+              deferred_sha="${TRIGGER_HEAD_SHA:-}"
+            fi
+            if ! [[ "$deferred_sha" =~ ^[0-9a-f]{40}$ ]]; then
+              deferred_sha="${MANUAL_SHA:-}"
+            fi
+            if ! [[ "$deferred_sha" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "::error::Installation quota defer has no release candidate SHA." >&2
+              exit 1
+            fi
+            line="Installation quota resets at ${reset_iso}. Deferring TestFlight publication of ${deferred_sha} to the next reconciliation. No release was authorized."
+            printf '%s\n' "$line" >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning::${line}"
+          }
+          finish_testflight_quota_defer() {
+            {
+              echo "release_sha="
+              echo "baseline_sha="
+              echo "authorized=false"
+              echo "manual=false"
+              echo "already_released=false"
+            } >> "$GITHUB_OUTPUT"
+            announce_testflight_quota_defer
+          }
+          defer_testflight_authorize_for_quota() {
+            if [ -f "$RUNNER_TEMP/testflight-authorize-quota-defer" ]; then
+              finish_testflight_quota_defer
+              exit 0
+            fi
+          }
+          trap defer_testflight_authorize_for_quota ERR
+          trap defer_testflight_authorize_for_quota DEBUG
           {
             echo "release_sha="
             echo "baseline_sha="
@@ -114,7 +212,7 @@ jobs:
           if [ "$EVENT_NAME" = "workflow_run" ]; then
             run_record="$(gh api \
               "repos/$REPOSITORY/actions/runs/$TRIGGER_RUN_ID/attempts/$TRIGGER_RUN_ATTEMPT")"
-            controller_generation_selector='
+            controller_generation_selector="$(cat <<'JQ'
               if (
                 type == "object" and
                 (.id | type == "number" and . >= 1 and floor == .) and
@@ -139,7 +237,8 @@ jobs:
               else
                 empty
               end
-          '
+          JQ
+          )"
             if ! controller_generation="$(jq -er \
               --arg repo "$REPOSITORY" \
               --arg run_id "$TRIGGER_RUN_ID" \
@@ -150,10 +249,8 @@ jobs:
               echo "::error::Exact Production Controller attempt evidence did not match the workflow_run signal."
               exit 1
             fi
-            if [ "$controller_generation" != "$release_sha" ]; then
-              echo "::notice::Production Controller generation $controller_generation was superseded before TestFlight observer dispatch; transport head is $release_sha."
-              exit 0
-            fi
+            controller_transport_sha="$release_sha"
+            release_sha="$controller_generation"
           fi
 
           current_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
@@ -162,8 +259,12 @@ jobs:
             exit 1
           }
           if [ "$current_main_sha" != "$release_sha" ]; then
-            echo "::notice::TestFlight generation $release_sha was superseded by $current_main_sha."
-            exit 0
+            comparison="$(gh api "repos/$REPOSITORY/compare/$release_sha...$current_main_sha")"
+            jq -e --arg sha "$release_sha" '.status == "ahead" and .merge_base_commit.sha == $sha' \
+              >/dev/null <<<"$comparison" || {
+              echo "::error::Certified TestFlight source left main lineage."
+              exit 1
+            }
           fi
 
           prove_existing_production_marker() {
@@ -199,7 +300,7 @@ jobs:
                 --arg sha "$expected_sha" \
                 --arg workflow_id "$production_controller_workflow_id" '
                   type == "object" and
-                  .head_sha == $sha and
+                  (.head_sha | type == "string" and test("^[0-9a-f]{40}$")) and
                   .head_branch == "main" and
                   .head_repository.full_name == $repo and
                   .event == "workflow_run" and
@@ -223,7 +324,7 @@ jobs:
               ' >/dev/null <<<"$controller_jobs"; then
                 continue
               fi
-              verified_count="$(jq --arg sha "$expected_sha" '
+              verified_count="$(jq --arg sha "$(jq -r .head_sha <<<"$controller_json")" '
                 [
                   .[].jobs[]?
                   | select(
@@ -268,7 +369,7 @@ jobs:
               echo "::error::GitHub returned malformed Production Controller job evidence."
               exit 1
             }
-            verified_count="$(jq --arg sha "$release_sha" '
+            verified_count="$(jq --arg sha "$controller_transport_sha" '
               [
                 .[].jobs[]?
                 | select(
@@ -279,7 +380,7 @@ jobs:
                   )
               ] | length
             ' <<<"$jobs_json")"
-            verified_skipped="$(jq --arg sha "$release_sha" '
+            verified_skipped="$(jq --arg sha "$controller_transport_sha" '
               [
                 .[].jobs[]?
                 | select(
@@ -315,11 +416,6 @@ jobs:
           echo "release_sha=$release_sha" >> "$GITHUB_OUTPUT"
           echo "authorized=true" >> "$GITHUB_OUTPUT"
 
-          # A manual dispatch may rebuild already-verified current main, but it
-          # cannot bypass production evidence.
-          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            exit 0
-          fi
 
           testflight_workflow="$(gh api \
             "repos/$REPOSITORY/actions/workflows/ios-testflight.yml")"
@@ -390,6 +486,26 @@ jobs:
             | .[] | [.id, .workflow_run.id] | @tsv
           ' <<<"$marker_listing")"
 
+          accept_upload_frontier() {
+            local candidate="$1" comparison
+            [[ "$candidate" =~ ^[0-9a-f]{40}$ ]] || return 1
+            if [ -z "$baseline_sha" ] || [ "$baseline_sha" = "$candidate" ]; then
+              baseline_sha="$candidate"
+              return 0
+            fi
+            comparison="$(gh api "repos/$REPOSITORY/compare/$baseline_sha...$candidate")" || return 1
+            case "$(jq -r '.status // empty' <<<"$comparison")" in
+              ahead)
+                [ "$(jq -r '.merge_base_commit.sha // empty' <<<"$comparison")" = "$baseline_sha" ] || return 1
+                baseline_sha="$candidate"
+                ;;
+              behind)
+                [ "$(jq -r '.merge_base_commit.sha // empty' <<<"$comparison")" = "$candidate" ] || return 1
+                ;;
+              *) echo "::error::Proven TestFlight uploads have divergent lineage."; return 1 ;;
+            esac
+          }
+
           baseline_sha=""
           while IFS=$'\t' read -r artifact_id run_id; do
             [ -n "$artifact_id" ] || continue
@@ -417,6 +533,23 @@ jobs:
             fi
 
             marker_sha="$(jq -r '.sha' "$marker_json")"
+            marker_transport_sha="$(jq -r '.transportSha // .sha' "$marker_json")"
+            marker_attested=false
+            if jq -e 'has("schema")' >/dev/null "$marker_json"; then
+              jq -e '
+                .schema == "jovie-testflight-upload/v2" and
+                .lease.schema == "jovie-testflight-release-lease/v1" and
+                .lease.sourceSha == .sha and .lease.transportSha == .transportSha and
+                .lease.workflowRun == .workflowRun and
+                .lease.workflowAttempt == .uploadRunAttempt and
+                (.binarySha256 | type == "string" and test("^[0-9a-f]{64}$")) and
+                (.buildNumber | type == "string" and test("^[0-9]+$"))
+              ' >/dev/null "$marker_json" || {
+                echo "::error::TestFlight receipt contradicts its source/transport attestation."
+                exit 1
+              }
+              marker_attested=true
+            fi
             marker_run_id="$(jq -r '.workflowRun' "$marker_json")"
             upload_attempt="$(jq -r '.uploadRunAttempt' "$marker_json")"
             upload_job_id="$(jq -r '.uploadJob' "$marker_json")"
@@ -433,10 +566,11 @@ jobs:
             if ! jq -e \
               --arg repo "$REPOSITORY" \
               --arg run "$run_id" \
-              --arg sha "$marker_sha" \
+              --arg sha "$marker_transport_sha" \
               --arg workflow_id "$testflight_workflow_id" '
                 type == "object" and
                 (.id | tostring) == $run and
+                (.run_attempt | type == "number" and . >= 1 and floor == .) and
                 (.workflow_id | tostring) == $workflow_id and
                 .path == ".github/workflows/ios-testflight.yml" and
                 .display_title == ("iOS TestFlight " + $sha) and
@@ -450,7 +584,12 @@ jobs:
               echo "::warning::Ignoring TestFlight marker $artifact_id without exact workflow identity."
               continue
             fi
+            marker_run_attempt="$(jq -r '.run_attempt' <<<"$marker_run")"
 
+            # A successful publisher-only rerun cannot change the first
+            # attempt's failure. Only an attested v2 receipt may recover that
+            # strictly earlier failed attempt; exact beta success is still
+            # required below. Cancelled or unknown attempts remain rejected.
             upload_run="$(gh api \
               "repos/$REPOSITORY/actions/runs/$run_id/attempts/$upload_attempt")"
             jq -e 'type == "object"' >/dev/null <<<"$upload_run" || {
@@ -461,8 +600,10 @@ jobs:
               --arg repo "$REPOSITORY" \
               --arg run "$run_id" \
               --arg attempt "$upload_attempt" \
-              --arg sha "$marker_sha" \
-              --arg workflow_id "$testflight_workflow_id" '
+              --arg sha "$marker_transport_sha" \
+              --arg workflow_id "$testflight_workflow_id" \
+              --argjson marker_attempt "$marker_run_attempt" \
+              --argjson attested "$marker_attested" '
                 type == "object" and
                 (.id | tostring) == $run and
                 (.run_attempt | tostring) == $attempt and
@@ -474,7 +615,11 @@ jobs:
                 .head_sha == $sha and
                 .head_repository.full_name == $repo and
                 .status == "completed" and
-                .conclusion == "success"
+                .run_attempt <= $marker_attempt and
+                (
+                  .conclusion == "success" or
+                  ($attested and .conclusion == "failure" and .run_attempt < $marker_attempt)
+                )
               ' >/dev/null <<<"$upload_run"; then
               echo "::warning::Ignoring TestFlight marker $artifact_id with mismatched upload attempt."
               continue
@@ -490,7 +635,7 @@ jobs:
               exit 1
             }
             marked_upload_count="$(jq \
-              --arg sha "$marker_sha" \
+              --arg sha "$marker_transport_sha" \
               --arg job "$upload_job_id" '
                 [
                   .[].jobs[]?
@@ -508,9 +653,8 @@ jobs:
               continue
             }
 
-            baseline_sha="$marker_sha"
+            accept_upload_frontier "$marker_sha"
             echo "Accepted exact TestFlight upload marker $artifact_id from run $run_id attempt $upload_attempt."
-            break
           done <<<"$marker_candidates"
 
           if ! testflight_marker_history_allows_legacy_bootstrap \
@@ -599,12 +743,45 @@ jobs:
                   exit 1
                 fi
                 if [ "$beta_count" = "1" ]; then
+                  jq -e --arg sha "$run_sha" '
+                    [.[].jobs[]? | select(.name == "Upload Internal TestFlight" and .head_sha == $sha and .conclusion == "success")] |
+                    length == 1 and all(.[]; (.steps | type == "array" and length > 0) and all(.steps[]; (.name | type == "string" and length > 0)))
+                  ' >/dev/null <<<"$run_jobs" || {
+                    echo "::error::Successful beta step provenance is unknown."
+                    exit 1
+                  }
+                  post_lease_beta="$(jq --arg sha "$run_sha" '[.[].jobs[]? |
+                    select(.name == "Upload Internal TestFlight" and .head_sha == $sha and .conclusion == "success") |
+                    .steps[]? | select(.name == "Preserve exact uploaded binary attestation")
+                  ] | length' <<<"$run_jobs")"
+                  if [ "$post_lease_beta" != "0" ]; then
+                    recovery_artifacts="$(gh api "repos/$REPOSITORY/actions/runs/$run_id/artifacts?per_page=100")"
+                    recovery_id="$(jq -er --arg name "testflight-binary-$attempt" '
+                      [.artifacts[] | select(.name == $name and .expired == false)] |
+                      if length == 1 then .[0].id else error("missing exact uploaded binary attestation") end
+                    ' <<<"$recovery_artifacts")"
+                    gh api "repos/$REPOSITORY/actions/artifacts/$recovery_id/zip" > "$RUNNER_TEMP/recovered-binary.zip"
+                    unzip -p "$RUNNER_TEMP/recovered-binary.zip" testflight-upload-attestation.json > "$RUNNER_TEMP/recovered-binary.json"
+                    jq -e --arg repo "$REPOSITORY" --arg transport "$run_sha" --arg run "$run_id" --arg attempt "$attempt" '
+                      .schema == "jovie-testflight-binary/v1" and
+                      .lease.schema == "jovie-testflight-release-lease/v1" and
+                      .lease.repository == $repo and .lease.transportSha == $transport and
+                      .lease.workflowRun == $run and .lease.workflowAttempt == $attempt and
+                      (.lease.sourceSha | type == "string" and test("^[0-9a-f]{40}$")) and
+                      (.binarySha256 | type == "string" and test("^[0-9a-f]{64}$"))
+                    ' >/dev/null "$RUNNER_TEMP/recovered-binary.json" || {
+                      echo "::error::Successful beta lacks exact source/transport binary attestation."
+                      exit 1
+                    }
+                    run_source_sha="$(jq -r '.lease.sourceSha' "$RUNNER_TEMP/recovered-binary.json")"
+                  else
+                    run_source_sha="$run_sha"
+                  fi
                   run_has_upload=true
                 fi
               done
               if [ "$run_has_upload" = "true" ]; then
-                baseline_sha="$run_sha"
-                break
+                accept_upload_frontier "$run_source_sha"
               fi
             done < <(jq -r '
               sort_by(.created_at, .id) | reverse | .[] |
@@ -625,7 +802,7 @@ jobs:
           echo "baseline_sha=$baseline_sha" >> "$GITHUB_OUTPUT"
 
       - name: Checkout exact authorized main
-        if: ${{ steps.authorize.outputs.authorized == 'true' && steps.authorize.outputs.already_released != 'true' && steps.authorize.outputs.manual != 'true' }}
+        if: ${{ steps.authorize.outputs.authorized == 'true' && steps.authorize.outputs.already_released != 'true' }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ steps.authorize.outputs.release_sha }}
@@ -678,6 +855,8 @@ jobs:
             scripts/ios-best-practices-lint.sh
             .github/workflows/ios-ci.yml
             .github/workflows/ios-testflight.yml
+            .github/scripts/testflight-release-lease.mjs
+            .github/testflight-release-policy.json
           )
           changed_files="$(git diff --name-only "$BASELINE_SHA" "$RELEASE_SHA")"
           relevant_files="$(git diff --name-only "$BASELINE_SHA" "$RELEASE_SHA" -- "${release_paths[@]}")"
@@ -688,6 +867,54 @@ jobs:
           else
             echo "No iOS release changes since the last successful TestFlight upload."
           fi
+
+      - name: Checkout pinned release guard
+        if: ${{ steps.select.outputs.should_release == 'true' }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          path: .testflight-tools
+          sparse-checkout: |
+            .github/scripts/testflight-release-lease.mjs
+            .github/scripts/gh-api-hold.sh
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - name: Pin bounded certified release
+        id: pin
+        if: ${{ steps.select.outputs.should_release == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_API_HOLD_BUDGET_SECONDS: '480'
+          RELEASE_SHA: ${{ steps.authorize.outputs.release_sha }}
+          TESTFLIGHT_TRANSPORT_SHA: ${{ github.sha }}
+          BASELINE_SHA: ${{ steps.authorize.outputs.baseline_sha }}
+          TRIGGER_RUN_ID: ${{ github.event.workflow_run.id }}
+          TRIGGER_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          TESTFLIGHT_LEASE_PATH: ${{ github.workspace }}/testflight-release-lease.json
+        run: |
+          set -euo pipefail
+          # A missing file is an incomplete checkout, not an older source.
+          [ -f fastlane/Fastfile ] || {
+            echo "::error::Certified source checkout is missing fastlane/Fastfile."
+            exit 1
+          }
+          # Older certified sources cannot execute the new final upload guard.
+          # They must wait for a normally certified source containing this fix.
+          if ! grep -q 'TESTFLIGHT_GUARD_PATH' fastlane/Fastfile; then
+            echo "::notice::Certified source predates the bounded upload guard; waiting for its certified descendant."
+            exit 0
+          fi
+          node .testflight-tools/.github/scripts/testflight-release-lease.mjs admit
+
+      - name: Reserve immutable upload intent
+        if: ${{ steps.pin.outputs.lease != '' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: testflight-upload-intent-${{ steps.authorize.outputs.baseline_sha || 'bootstrap' }}
+          path: ${{ github.workspace }}/testflight-release-lease.json
+          if-no-files-found: error
+          retention-days: 90
 
   full-regression:
     name: Full iOS release regression
@@ -723,6 +950,11 @@ jobs:
       CI: "true"
       GH_TOKEN: ${{ github.token }}
       RELEASE_SHA: ${{ needs.authorize-release.outputs.release_sha }}
+      TESTFLIGHT_TRANSPORT_SHA: ${{ github.sha }}
+      BASELINE_SHA: ${{ needs.authorize-release.outputs.baseline_sha }}
+      TESTFLIGHT_LEASE: ${{ needs.authorize-release.outputs.lease }}
+      TESTFLIGHT_LEASE_PATH: ${{ github.workspace }}/testflight-release-lease.json
+      TESTFLIGHT_GUARD_PATH: ${{ github.workspace }}/.testflight-tools/.github/scripts/testflight-release-lease.mjs
       APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
       APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
       APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
@@ -759,21 +991,36 @@ jobs:
         shell: bash
         run: bash apps/ios/scripts/validate-testflight-env.sh
 
-      # The full-regression predecessor validated this authorized SHA. Keep the
-      # archive job focused on current-main provenance and TestFlight upload.
-      - name: Revalidate exact current main before archive
+      - name: Checkout pinned release guard
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          path: .testflight-tools
+          sparse-checkout: |
+            .github/scripts/testflight-release-lease.mjs
+            .github/scripts/gh-api-hold.sh
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - name: Revalidate certified lease before archive
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_API_HOLD_BUDGET_SECONDS: '600'
         shell: bash
         run: |
           set -euo pipefail
-          current_main_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
-          [ "$current_main_sha" = "$RELEASE_SHA" ] || {
-            echo "::error::TestFlight generation $RELEASE_SHA was superseded by $current_main_sha before archive."
+          # Preserve the canonical bounded hold, then re-read all authority in
+          # the lease guard. This preflight cannot renew or replace the lease.
+          held_main_sha="$(bash "$GITHUB_WORKSPACE/.testflight-tools/.github/scripts/gh-api-hold.sh" api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
+          [[ "$held_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::TestFlight archive preflight could not resolve authoritative main."
             exit 1
           }
+          printf '%s\n' "$TESTFLIGHT_LEASE" > "$TESTFLIGHT_LEASE_PATH"
+          node "$TESTFLIGHT_GUARD_PATH" archive
 
       - name: Upload internal TestFlight build
+        env:
+          GH_API_HOLD_BUDGET_SECONDS: '600'
         shell: bash
         run: |
           set -euo pipefail
@@ -783,6 +1030,14 @@ jobs:
           fi
           bundle exec fastlane ios beta
 
+      - name: Preserve exact uploaded binary attestation
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: testflight-binary-${{ github.run_attempt }}
+          path: artifacts/ios-build/testflight-upload-attestation.json
+          if-no-files-found: error
+          retention-days: 90
+
   record-upload:
     name: Record exact TestFlight upload
     needs: [authorize-release, beta]
@@ -790,16 +1045,33 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - name: Checkout the rate-limit hold
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          sparse-checkout: .github/scripts/gh-api-hold.sh
+          sparse-checkout-cone-mode: false
       - name: Cross-prove and record the exact upload job
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_API_HOLD_BUDGET_SECONDS: '180'
           RELEASE_SHA: ${{ needs.authorize-release.outputs.release_sha }}
+          TRANSPORT_SHA: ${{ github.sha }}
+          LEASE: ${{ needs.authorize-release.outputs.lease }}
           REPOSITORY: ${{ github.repository }}
           RUN_ID: ${{ github.run_id }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
         shell: bash
         run: |
           set -euo pipefail
+          gh() {
+            if [ "${1:-}" = "api" ]; then
+              GH_API_HOLD_BIN="$(command -v gh)" bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" "$@"
+              return
+            fi
+            command gh "$@"
+          }
           [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]] &&
             [[ "$RUN_ID" =~ ^[1-9][0-9]*$ ]] &&
             [[ "$RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]] || {
@@ -825,7 +1097,7 @@ jobs:
             --arg repo "$REPOSITORY" \
             --arg run "$RUN_ID" \
             --arg attempt "$RUN_ATTEMPT" \
-            --arg sha "$RELEASE_SHA" \
+            --arg sha "$TRANSPORT_SHA" \
             --arg workflow_id "$testflight_workflow_id" '
               type == "object" and
               (.id | tostring) == $run and
@@ -842,9 +1114,9 @@ jobs:
             exit 1
           }
 
-          # A rerun-all can legitimately create more than one successful upload
-          # attempt. Select the newest attempt with one exact successful beta and
-          # bind the marker to that attempt and job ID.
+          # Publisher-only reruns may retain a successful beta from an earlier
+          # attempt. Upload intents prevent another upload; recover its exact
+          # successful attempt and binary attestation without repeating beta.
           upload_attempt=""
           upload_job=""
           for attempt in $(seq 1 "$RUN_ATTEMPT"); do
@@ -858,7 +1130,7 @@ jobs:
               exit 1
             }
             attempt_matches="$(jq -c \
-              --arg sha "$RELEASE_SHA" \
+              --arg sha "$TRANSPORT_SHA" \
               '
                 [
                   .[].jobs[]?
@@ -888,13 +1160,38 @@ jobs:
             echo "::error::No successful exact TestFlight upload job exists in this run."
             exit 1
           }
+          binary_artifacts="$(gh api "repos/$REPOSITORY/actions/runs/$RUN_ID/artifacts?per_page=100")"
+          binary_id="$(jq -er --arg name "testflight-binary-$upload_attempt" '
+            [.artifacts[] | select(.name == $name and .expired == false)] |
+            if length == 1 then .[0].id else error("ambiguous binary attestation") end
+          ' <<<"$binary_artifacts")"
+          gh api "repos/$REPOSITORY/actions/artifacts/$binary_id/zip" > "$RUNNER_TEMP/testflight-binary.zip"
+          unzip -p "$RUNNER_TEMP/testflight-binary.zip" testflight-upload-attestation.json > "$RUNNER_TEMP/testflight-binary.json"
+          jq -e --argjson lease "$LEASE" --arg sha "$RELEASE_SHA" --arg transport "$TRANSPORT_SHA" --arg run "$RUN_ID" --arg attempt "$upload_attempt" '
+            .schema == "jovie-testflight-binary/v1" and .lease == $lease and
+            .lease.sourceSha == $sha and .lease.transportSha == $transport and
+            .lease.workflowRun == $run and .lease.workflowAttempt == $attempt and
+            (.binarySha256 | type == "string" and test("^[0-9a-f]{64}$")) and
+            (.buildNumber | type == "string" and test("^[0-9]+$"))
+          ' >/dev/null "$RUNNER_TEMP/testflight-binary.json" || {
+            echo "::error::Uploaded binary attestation does not match the certified source lease."
+            exit 1
+          }
           jq -n \
+            --slurpfile binary "$RUNNER_TEMP/testflight-binary.json" \
             --arg sha "$RELEASE_SHA" \
+            --arg transport "$TRANSPORT_SHA" \
+            --argjson lease "$LEASE" \
             --arg workflow_run "$RUN_ID" \
             --arg upload_attempt "$upload_attempt" \
             --arg upload_job "$upload_job" \
             '{
+              schema: "jovie-testflight-upload/v2",
               sha: $sha,
+              transportSha: $transport,
+              lease: $lease,
+              binarySha256: $binary[0].binarySha256,
+              buildNumber: $binary[0].buildNumber,
               workflowRun: $workflow_run,
               uploadRunAttempt: $upload_attempt,
               uploadJob: $upload_job

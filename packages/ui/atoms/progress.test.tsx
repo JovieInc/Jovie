@@ -9,6 +9,12 @@ describe('ProgressBar', () => {
 
     expect(screen.getByText('Uploading')).toBeInTheDocument();
     expect(screen.getByText('42%')).toBeInTheDocument();
+    expect(screen.getByText('Uploading')).toHaveClass('text-primary-token');
+    expect(screen.getByText('42%')).toHaveClass(
+      'text-tertiary-token',
+      'tabular-nums',
+      'shrink-0'
+    );
 
     const bar = screen.getByRole('progressbar');
     expect(bar).toHaveAttribute('aria-valuenow', '42');
@@ -22,6 +28,45 @@ describe('ProgressBar', () => {
     expect(bar).toHaveAttribute('aria-valuemin', '0');
     expect(bar).toHaveAttribute('aria-valuemax', '100');
   });
+
+  it.each([
+    { state: 'waiting', props: { value: 0 } },
+    {
+      state: 'partial',
+      props: { value: 42, label: 'Uploading', showValue: true },
+    },
+    { state: 'complete', props: { value: 100 } },
+    { state: 'implicit indeterminate', props: {} },
+    {
+      state: 'explicit indeterminate',
+      props: { value: 42, indeterminate: true },
+    },
+    { state: 'invalid value', props: { value: Number.NaN } },
+  ])(
+    'uses canonical tokens and reduced-motion fallbacks when $state',
+    ({ props }) => {
+      render(<ProgressBar {...props} />);
+
+      const bar = screen.getByRole('progressbar');
+      const indicator = bar.querySelector('[data-part="indicator"]');
+      expect(bar).toHaveClass('bg-surface-2', 'w-full', 'overflow-hidden');
+      expect(indicator).toHaveClass(
+        'bg-accent',
+        'duration-subtle',
+        'ease-subtle',
+        'motion-reduce:transition-none'
+      );
+      expect(indicator).not.toHaveClass('ease-out');
+      if (bar.dataset.state === 'indeterminate') {
+        expect(indicator).toHaveClass(
+          'animate-progress-indeterminate',
+          'motion-reduce:animate-none'
+        );
+        expect(bar).not.toHaveAttribute('aria-valuenow');
+        expect(bar).not.toHaveAttribute('aria-valuetext');
+      }
+    }
+  );
 
   it('renders indeterminate state without aria-valuenow', () => {
     render(<ProgressBar indeterminate label='Importing' />);

@@ -7880,6 +7880,10 @@ function evaluateChatTitleContract(vars: EvalVars) {
     resolve(process.cwd(), routeSourcePath),
     'utf8'
   );
+  const accessSource = readFileSync(
+    resolve(process.cwd(), 'lib/chat/conversation-access.ts'),
+    'utf8'
+  );
   const telemetrySource = readFileSync(
     resolve(process.cwd(), 'lib/ai/telemetry.ts'),
     'utf8'
@@ -7947,11 +7951,16 @@ function evaluateChatTitleContract(vars: EvalVars) {
       guardedNullUpdateCount === 1 &&
       textIncludesAll(routeSource, [
         'const saveTitle = (title: string)',
-        'eq(chatConversations.id, conversationId)',
-        'eq(chatConversations.creatorProfileId, identity.creatorProfileId)',
+        'ownedConversationCondition({',
+        "audience: 'customer'",
         'await saveTitle(titleSource)',
         'await saveTitle(title)',
         'await saveTitle(fallback)',
+      ]) &&
+      textIncludesAll(accessSource, [
+        'eq(chatConversations.id, input.conversationId)',
+        'eq(chatConversations.userId, input.userId)',
+        'eq(chatConversations.creatorProfileId, input.creatorProfileId)',
       ]),
     fallsBackToSanitizedUserMessage: textIncludesAll(routeSource, [
       'const fallback = sanitizeConversationTitle(titleSource, 50)',
@@ -7961,7 +7970,7 @@ function evaluateChatTitleContract(vars: EvalVars) {
       'const titlePending = hasUserMessage && !conversation.title',
       'scheduleAfter(async () =>',
       'await maybeGenerateTitle(conversationId, messagesToInsert,',
-      'userId: clerkUserId',
+      'userId: user.id',
       'creatorProfileId: profile.id',
     ]),
   };

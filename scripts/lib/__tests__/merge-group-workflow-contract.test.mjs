@@ -25,8 +25,14 @@ import {
   EXACT_HEAD_COVERAGE_JOB_TIMEOUT_MINUTES,
   EXACT_HEAD_COVERAGE_STEP_TIMEOUT,
 } from '../changed-test-coverage.mjs';
-import { MERGE_GROUP_ADMISSION_WAIT_MS } from '../merge-group-admission.mjs';
-import { MERGE_GROUP_POLICY_DEADLINE_MS } from '../merge-group-member-policy.mjs';
+import {
+  MERGE_GROUP_ADMISSION_QUOTA_RECOVERY_MS,
+  MERGE_GROUP_ADMISSION_WAIT_MS,
+} from '../merge-group-admission.mjs';
+import {
+  MERGE_GROUP_JOB_BUDGET_MS,
+  MERGE_GROUP_POLICY_DEADLINE_MS,
+} from '../merge-group-member-policy.mjs';
 import { NATIVE_QUEUE_POLICY } from '../merge-queue-guard.mjs';
 import { resolveRealGh, runWithRealGh } from '../real-gh-harness.mjs';
 import {
@@ -390,7 +396,7 @@ describe('merge_group workflow contract', () => {
       true
     );
     expect(GREEN_ENROLL_WORKFLOW).toContain(
-      'types: [labeled, unlabeled, reopened, ready_for_review, synchronize]'
+      'types: [converted_to_draft, labeled, unlabeled, reopened, ready_for_review, synchronize]'
     );
     expect(getJobBlock(GREEN_ENROLL_WORKFLOW, 'enroll')).toContain(
       "(github.event_name != 'pull_request_target' || github.event.pull_request.draft == false)"
@@ -445,7 +451,8 @@ describe('merge_group workflow contract', () => {
     expect(admission).toContain('needs: [ci-path-changes]');
     expect(admission).toContain("github.event_name == 'merge_group'");
     expect(admission).toContain('runs-on: ubuntu-latest');
-    expect(admission).toContain('timeout-minutes: 8');
+    expect(admission).toContain('timeout-minutes: 75');
+    expect(admission).not.toContain('sleep "$wait_s"');
     expect(admission).toContain('actions: read');
     expect(admission).toContain(
       "admitted: ${{ steps.admission.outputs.admitted || 'false' }}"
@@ -504,6 +511,11 @@ describe('merge_group workflow contract', () => {
     expect(sizeGuard).toContain('--policy=size');
     expect(sizeGuard).toContain('--policy=size --also=fork');
     expect(MERGE_GROUP_POLICY_DEADLINE_MS).toBeLessThan(60_000);
+    // Holds share the Size Guard job clock, which already includes provisioning.
+    expect(MERGE_GROUP_JOB_BUDGET_MS).toBeGreaterThan(
+      MERGE_GROUP_POLICY_DEADLINE_MS
+    );
+    expect(MERGE_GROUP_JOB_BUDGET_MS).toBeLessThanOrEqual(100_000);
     // A still-running required check must be able to finish: the helper
     // polls for minutes, and the job timeout leaves >=90s for setup so the
     // helper's pending diagnostic (not a hard cancel) is the failure mode.
@@ -514,6 +526,10 @@ describe('merge_group workflow contract', () => {
     expect(
       admissionTimeoutMinutes * 60_000 - MERGE_GROUP_ADMISSION_WAIT_MS
     ).toBeGreaterThanOrEqual(90_000);
+    expect(MERGE_GROUP_ADMISSION_QUOTA_RECOVERY_MS).toBe(66 * 60 * 1000);
+    expect(
+      admissionTimeoutMinutes * 60_000 - MERGE_GROUP_ADMISSION_QUOTA_RECOVERY_MS
+    ).toBeGreaterThanOrEqual(MERGE_GROUP_ADMISSION_WAIT_MS + 90_000);
 
     for (const jobId of ['ci-fast-typecheck', 'ci-fast-remaining']) {
       const job = getJobBlock(CI_WORKFLOW, jobId);
@@ -1575,6 +1591,63 @@ describe('merge_group workflow contract', () => {
     }
   });
 
+  it('keeps production-controller expression run blocks under 21000 chars', () => {
+    // A run block that contains ${{ }} is one expression. Crossing 21000
+    // invalidates the whole workflow file (0 jobs, "Exceeded max expression
+    // length"), which is how the authorize step died on 2026-10-15 21:53Z.
+    const lines = PRODUCTION_CONTROLLER_WORKFLOW.split('\n');
+    for (let i = 0; i < lines.length; i += 1) {
+      const start = /^(\s*)run: \|/.exec(lines[i]);
+      if (!start) continue;
+      const indent = start[1].length;
+      const block = [];
+      let j = i + 1;
+      while (
+        j < lines.length &&
+        (/^\s*$/.test(lines[j]) || /^(\s*)/.exec(lines[j])[1].length > indent)
+      ) {
+        block.push(lines[j]);
+        j += 1;
+      }
+      const text = block.join('\n');
+      if (!text.includes('${{')) continue;
+      const base = Math.min(
+        ...block.filter(l => l.trim()).map(l => /^(\s*)/.exec(l)[1].length)
+      );
+      const length = block.reduce(
+        (n, l) => n + Math.max(l.length - base, 0) + 1,
+        0
+      );
+      expect(
+        length,
+        `run block starting at production-controller.yml:${i + 1} exceeds GitHub limit`
+      ).toBeLessThanOrEqual(21000);
+    }
+    const authorize = getJobBlock(
+      PRODUCTION_CONTROLLER_WORKFLOW,
+      'authorize-production'
+    );
+    expect(authorize).toContain('.github/scripts/gh-api-hold.sh');
+    expect(authorize).toContain('"$shim" >> "$GITHUB_PATH"');
+    // The release checkout is not the hold. The shim loads the default-branch
+    // copy, which writes zip bytes to a file and unsets GH_FORCE_TTY.
+    expect(authorize).toContain('path: .rate-limit-hold');
+    expect(authorize).toContain('ref: ${{ github.sha }}');
+    expect(authorize).toContain(
+      'hold="$GITHUB_WORKSPACE/.rate-limit-hold/.github/scripts/gh-api-hold.sh"'
+    );
+    expect(authorize).toContain('GH_API_HOLD_BUDGET_SECONDS:-1500');
+    expect(authorize).toContain('exec bash "$GH_API_HOLD_SCRIPT"');
+    expect(authorize).not.toContain(
+      'node "$GITHUB_WORKSPACE/scripts/lib/github-rate-limit.mjs"'
+    );
+    const proof = authorize.slice(
+      authorize.indexOf('Cross-prove exact successful push CI')
+    );
+    expect(proof).not.toContain('github-rate-limit.mjs');
+    expect(proof).not.toContain('REAL_GH');
+  });
+
   it('materializes an empty path artifact for typed no-op merge groups', () => {
     const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
     const detectStep = pathChanges.slice(
@@ -2599,7 +2672,8 @@ ${selectedGateScript}`,
     expect(coalesce).not.toContain('sleep "$wait_seconds"');
     expect(coalesce).not.toContain('sleep 60');
     // Event source: exact main only; the merge queue is not read.
-    expect(coalesce).toContain('commits/main');
+    expect(coalesce).toContain('resolve-main-sha.sh');
+    expect(coalesce).not.toContain('commits/main');
     expect(coalesce).not.toContain('mergeQueue(branch: "main")');
     expect(coalesce).toContain(
       'record_receipt "proceed" "exact SHA is current"'
@@ -2745,14 +2819,21 @@ ${selectedGateScript}`,
       0,
       POSTDEPLOY_PROBES_WORKFLOW.indexOf('\njobs:')
     );
-    expect(header).not.toContain('workflow_run:');
+    const workflow = /** @type {{ on: { workflow_run: unknown } }} */ (
+      load(POSTDEPLOY_PROBES_WORKFLOW)
+    );
+    expect(workflow.on.workflow_run).toEqual({
+      workflows: ['Production Controller'],
+      types: ['completed'],
+      branches: ['main'],
+    });
     expect(header).toMatch(/^  workflow_dispatch:\s*$/m);
     expect(header).not.toMatch(/^  (pull_request|push|merge_group|schedule):/m);
 
-    // Read-only evidence must never hold the deploy lease; coalescing keeps
-    // only the newest probe run during drains.
+    // Read-only evidence never holds the deploy lease. Active probes finish
+    // during drains while pending completions coalesce to the latest target.
     expect(header).toContain('group: postdeploy-probes');
-    expect(header).toContain('cancel-in-progress: true');
+    expect(header).toContain('cancel-in-progress: false');
     expect(header).toContain('contents: read');
     expect(header).toContain('actions: read');
     expect(POSTDEPLOY_PROBES_WORKFLOW).not.toContain(
@@ -2792,13 +2873,38 @@ ${selectedGateScript}`,
       'EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$deployment_url"'
     );
     expect(resolve).toContain('EXPECTED_VERCEL_ENVIRONMENT=production');
+    // Trigger evidence stays on GitHub REST and defers when that quota is exhausted.
+    expect(resolve).toContain('source scripts/ci/gh-api-or-defer.sh');
+    expect(resolve).toContain("steps.trigger.outputs.quota_deferred != 'true'");
+    // Commit identity and main ancestry must survive shared REST quota exhaustion.
+    expect(resolve).toContain('commit_history="$(mktemp -d)"');
+    expect(resolve).toContain('git init -q "$commit_history"');
+    expect(resolve).toContain('fetch --quiet --no-tags --filter=blob:none');
+    expect(resolve).toContain('"https://github.com/$REPOSITORY.git"');
+    expect(resolve).toContain('refs/heads/main:refs/remotes/origin/main');
+    expect(resolve).toContain('::add-mask::$git_basic_auth');
+    expect(resolve).toContain('-c http.extraheader=');
     expect(resolve).toContain(
-      'gh api "repos/$REPOSITORY/commits/$deployed_sha"'
+      '--config-env="http.https://github.com/$REPOSITORY.git.extraheader=JOVIE_GIT_AUTH_HEADER"'
+    );
+    expect(resolve).toContain('GIT_TERMINAL_PROMPT=0');
+    expect(resolve).toContain('unset git_basic_auth');
+    expect(resolve).not.toContain('http.extraheader=AUTHORIZATION: bearer');
+    expect(resolve).toContain('rev-parse --verify "$deployed_sha^{commit}"');
+    expect(resolve).toContain(
+      'merge-base --is-ancestor "$commit_sha" refs/remotes/origin/main'
+    );
+    expect(resolve).not.toContain('gh api "repos/$REPOSITORY/commits/');
+    expect(resolve).not.toContain('gh api "repos/$REPOSITORY/compare/');
+    expect(resolve).not.toContain(
+      'read_github_json "repos/$REPOSITORY/commits/'
+    );
+    expect(resolve).not.toContain(
+      'read_github_json "repos/$REPOSITORY/compare/'
     );
     expect(resolve).toContain(
-      'gh api "repos/$REPOSITORY/compare/$commit_sha...main"'
+      'Canonical production commit is not an ancestor of main.'
     );
-    expect(resolve).toContain('.merge_base_commit.sha == $sha');
     expect(resolve).toContain(
       'Vercel list metadata disagrees with the exact origin build identity.'
     );
@@ -3000,6 +3106,8 @@ ${selectedGateScript}`,
     expect(sizeGuard).toContain(
       'node scripts/lib/merge-group-member-policy.mjs --policy=size'
     );
+    expect(sizeGuard).toContain('--filter=blob:limit=1g');
+    expect(sizeGuard).not.toContain('--filter=blob:none');
     expect(MEMBER_POLICY).toContain('await enforceCombinedTreePayload({');
     expect(MEMBER_POLICY).toContain('/git/trees/${treeSha}?recursive=1');
     expect(MEMBER_POLICY).not.toContain("from 'node:child_process'");

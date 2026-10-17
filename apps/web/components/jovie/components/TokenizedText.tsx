@@ -37,8 +37,8 @@ interface TokenizedTextProps {
  *
  * When an `EntityResolutionProvider` is mounted above, entity chips lift
  * thumbnail + meta out of the existing TanStack Query cache and render the
- * hover popover with rich preview. Outside the provider, chips degrade to
- * label + accent dot (still surface-aware via `tone`).
+ * hover popover with rich preview. Outside the provider, chips hide stored
+ * labels and degrade to a neutral unavailable reference (still surface-aware via `tone`).
  */
 export function TokenizedText({
   content,
@@ -121,15 +121,17 @@ interface TranscriptEntityChipProps {
   readonly tone: EntityChipTone;
 }
 
-function TranscriptEntityChip({
-  kind,
-  id,
-  label,
-  tone,
-}: TranscriptEntityChipProps) {
+function TranscriptEntityChip({ kind, id, tone }: TranscriptEntityChipProps) {
   const { ref: resolved } = useEntityResolution(kind, id);
+  const label = resolved?.label ?? 'Unavailable reference';
   return (
-    <EntityChipPopover kind={kind} id={id} label={label} entity={resolved}>
+    <EntityChipPopover
+      kind={kind}
+      id={id}
+      label={label}
+      entity={resolved}
+      tone={tone}
+    >
       <EntityChip
         data={{
           kind,

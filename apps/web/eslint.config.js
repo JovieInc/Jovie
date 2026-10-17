@@ -213,7 +213,7 @@ const baseConfig = {
     // Enforce readonly modifiers on React component props for type safety
     '@jovie/readonly-component-props': 'error',
     // Database guardrails - Neon WebSocket driver supports transactions for RLS
-    '@jovie/no-db-transaction': 'off',
+    '@jovie/no-db-transaction': 'error',
     '@jovie/no-manual-db-pooling': 'error',
     // Route management - prevent hardcoded paths
     '@jovie/no-hardcoded-routes': 'error',
@@ -386,6 +386,8 @@ module.exports = [
       '**/*.test.tsx',
     ],
     rules: {
+      // Fixtures may exercise driver transactions directly; runtime code may not.
+      '@jovie/no-db-transaction': 'off',
       '@jovie/use-client-directive': 'off',
       '@next/next/no-img-element': 'off',
       // Call-site no-restyle is a production contract (JOV-6280).
@@ -467,7 +469,6 @@ module.exports = [
   {
     files: ['**/lib/db/**'],
     rules: {
-      '@jovie/no-db-transaction': 'off',
       '@jovie/no-manual-db-pooling': 'off',
     },
   },

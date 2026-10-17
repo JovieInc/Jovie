@@ -148,6 +148,28 @@ describe('event-driven admission contract (JOV-INV-042)', () => {
     }
   });
 
+  it('keeps origin measurement off the lanes control path while blocking scheduled lane commands', () => {
+    const path = '.github/workflows/shipping-slo.yml';
+    const workflow = loadWorkflowFiles(workflowsDir).find(
+      file => file.path === path
+    );
+    const readScript = repoScriptReader(repoRoot);
+    expect(workflow.source).toContain('emit-automation');
+    expect(admissionSignals(workflow.source, readScript)).toEqual([]);
+    const result = checkEventDrivenContract(
+      [
+        {
+          ...workflow,
+          source: `${workflow.source}\nrun: python3 scripts/lanes/lane_runner.py dispatch\n`,
+        },
+      ],
+      { ...empty, cronAllowlist: [path], cronCeiling: 1, readScript }
+    );
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0]).toContain('Gem lanes');
+    expect(result.errors[0]).toContain('must never run from a schedule');
+  });
+
   it('names the real limit behind every kept clock', () => {
     // Tim 2026-10-12: a clock stays only for a time-bound external fact, a
     // calendar window, a real resource limit, or an owner-tracked

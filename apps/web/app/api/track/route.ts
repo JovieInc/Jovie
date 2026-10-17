@@ -496,6 +496,7 @@ export async function POST(request: NextRequest) {
           country: geoCountry,
           city: geoCity,
           deviceType: platformDetected,
+          os: platformDetected === 'web' ? null : platformDetected,
           isBot: botDetection.isBot,
           metadata,
           audienceMemberId,

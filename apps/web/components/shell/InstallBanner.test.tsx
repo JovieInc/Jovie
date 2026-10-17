@@ -61,7 +61,7 @@ describe('InstallBanner', () => {
       />
     );
     fireEvent.click(screen.getByText('Install'));
-    expect(screen.getByText('Install')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Install' })).toBeDisabled();
     expect(onCta).not.toHaveBeenCalled();
   });
 });

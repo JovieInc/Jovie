@@ -80,8 +80,10 @@ vi.mock('drizzle-orm', () => ({
   desc: vi.fn(),
   eq: vi.fn(),
   isNull: vi.fn(),
+  like: vi.fn(),
   lt: vi.fn(),
   notInArray: vi.fn(),
+  notLike: vi.fn(),
   or: vi.fn(),
   sql: vi.fn(() => ({ as: vi.fn(() => 'subquery') })),
 }));
@@ -161,6 +163,7 @@ describe('GET /api/chat/conversations', () => {
       },
     ];
     hoisted.getSessionContextMock.mockResolvedValue({
+      user: { id: 'user_123' },
       profile: { id: 'profile_123' },
     });
     hoisted.selectLimitMock.mockResolvedValue(conversations);
@@ -180,6 +183,7 @@ describe('GET /api/chat/conversations', () => {
 
   it('respects limit query parameter', async () => {
     hoisted.getSessionContextMock.mockResolvedValue({
+      user: { id: 'user_123' },
       profile: { id: 'profile_123' },
     });
     hoisted.selectLimitMock.mockResolvedValue([]);

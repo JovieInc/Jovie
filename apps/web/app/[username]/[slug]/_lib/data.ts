@@ -10,6 +10,7 @@ import { unstable_cache } from 'next/cache';
 import { cache } from 'react';
 import { sanitizeCacheTags } from '@/lib/cache/tags';
 import { db, doesColumnExist, withRetry } from '@/lib/db';
+import { QUERY_TIMEOUTS } from '@/lib/db/query-timeout';
 import {
   type ArtistRole,
   artists,
@@ -37,6 +38,13 @@ import { publicReleaseEligibilitySqlPredicate } from '@/lib/profile/public-relea
 import { toISOStringOrNull } from '@/lib/utils/date';
 import { logger } from '@/lib/utils/logger';
 import { shouldBypassPublicProfileQaCache } from '../../_lib/public-profile-qa';
+
+function withSmartLinkReadRetry<T>(read: () => Promise<T>, context: string) {
+  return withRetry(read, context, {
+    operation: 'read',
+    retryBudgetMs: QUERY_TIMEOUTS.api,
+  });
+}
 
 export type ContentType = 'release' | 'track';
 type HiddenCreditRole = 'vs' | 'with';
@@ -424,7 +432,7 @@ export interface CachedContentData {
  * Fetch creator by normalized username.
  */
 const fetchCreatorByUsername = async (usernameNormalized: string) => {
-  return await withRetry(async () => {
+  return await withSmartLinkReadRetry(async () => {
     // Columns added after the oldest supported creator_profiles schema.
     // Gate each on information_schema so environments that predate their
     // migration don't fail with 42703 ("Failed query: ... does not exist")
@@ -584,7 +592,7 @@ const fetchContentBySlug = async (
   creatorProfileId: string,
   slug: string
 ): Promise<CachedContentData | null> => {
-  return await withRetry(async () => {
+  return await withSmartLinkReadRetry(async () => {
     // Try release first
     const [release] = await db
       .select({
@@ -989,7 +997,7 @@ export const getTrackBySlugInRelease = cache(
     trackSlug: string
   ): Promise<Omit<ContentData, 'creator'> | null> {
     try {
-      return await withRetry(async () => {
+      return await withSmartLinkReadRetry(async () => {
         // Try new model: discog_release_tracks joined to discog_recordings
         const [releaseTrack] = await db
           .select({

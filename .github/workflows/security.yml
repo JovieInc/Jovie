@@ -272,7 +272,12 @@ jobs:
   scorecard:
     name: OSSF Scorecard Supply Chain Security
     runs-on: ubuntu-latest
-    # Scorecard only runs on main branch push and schedule to avoid token issues on PRs
+    # Scorecard only runs on main branch push and schedule to avoid token issues on PRs.
+    # 50 minutes stays under the one-hour installation token. Scorecard sleeps
+    # until x-ratelimit-reset internally; a longer job then retries with a dead
+    # token and fails 401. The preflight below refuses a wait that would
+    # outlast the token, and this timeout caps a wait Scorecard starts itself.
+    timeout-minutes: 50
     if: github.event_name != 'pull_request'
     permissions:
       contents: read
@@ -283,6 +288,11 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - name: Cap Scorecard rate-limit wait under the token lifetime
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/lib/github-installation-quota.mjs scorecard-wait
 
       - name: Run OSSF Scorecard
         uses: ossf/scorecard-action@fa7117db83c52d787ae5a89f350999701505d78e # v2.5.0

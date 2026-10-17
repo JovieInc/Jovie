@@ -1,7 +1,7 @@
 name: Auto-Ready Agent Drafts
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Gem
-# necessary-trust-boundary: Hosted GitHub App token undrafts same-repo green-source drafts after PR Ready and required checks succeed CLEAN; this hop never enables auto-merge or enrolls the merge queue.
+# necessary-trust-boundary: Hosted GitHub App token recovers persisted exact-author/head writer proof after required checks succeed; this hop never enables auto-merge or enrolls the merge queue.
 # removal-trigger: Remove the workflow_run wake when GitHub natively undrafts same-repo drafts that already satisfy required SUCCESS and CLEAN without a hosted App-token hop.
 
 # Two controllers share this workflow:
@@ -12,8 +12,8 @@ name: Auto-Ready Agent Drafts
 #    is scripts/writer-owned-pr-promote.sh. This job never waits for green.
 #
 # 2. Green-source undraft (event-driven). When a draft on JovieInc/Jovie has
-#    PR Ready + required checks SUCCESS and mergeable CLEAN, undraft it so
-#    Auto-Enroll / jovie-bot can pick it up. This job never enables auto-merge
+#    persisted exact-author/head proof, PR Ready + required checks SUCCESS and
+#    mergeable CLEAN, undraft it so Merge Queue Green Enroll can pick it up. This job never enables auto-merge
 #    and never enrolls the merge queue.
 #
 # Green-source never mutates HOLD #17156. Tim-hold / machine hold labels
@@ -23,6 +23,7 @@ name: Auto-Ready Agent Drafts
 # Manual dispatch without pr_number remains writer-proof recovery. Dispatch
 # with pr_number + head_sha is a targeted green-source undraft. Opt out
 # per-PR with machine/security/hold labels or controlled-proof/canary markers.
+# Missing proof is always ineligible; the author need not opt out while working.
 
 # Wake only on the workflows that publish the required source contexts
 # (Source Validation: PR Ready + Migration Guard; Fork PR Gate; PR Size Guard).
@@ -70,7 +71,7 @@ jobs:
     steps:
       - name: Generate short-lived Jovie App token
         id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           # Use the installation identity for the paired PR mutations.
           # Installation permissions stay unbounded here so commit and
@@ -116,11 +117,12 @@ jobs:
           startsWith(github.event.workflow_run.path, '.github/workflows/pr-size-guard.yml')
         )
       )
-    # One lane per PR (or head): a newer wake for the same PR supersedes the
-    # pending one, and wakes for different PRs never cancel each other.
+    # One lane per PR (or head). A newer completion cancels this run during the
+    # debounce, before the Jovie Bot token is minted. Different PRs never share
+    # a group. There is no workflow-level group: that dropped other PRs.
     concurrency:
       group: auto-ready-green-source-${{ github.event.inputs.pr_number || github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_sha || github.run_id }}
-      cancel-in-progress: false
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     permissions:
       actions: read
@@ -129,9 +131,13 @@ jobs:
       issues: write
       pull-requests: write
     steps:
+      - name: Debounce repeated source completions
+        if: github.event_name == 'workflow_run'
+        run: sleep 20
+
       - name: Generate short-lived Jovie App token
         id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}

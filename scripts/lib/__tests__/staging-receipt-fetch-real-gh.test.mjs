@@ -40,7 +40,7 @@ const currentFetch = dedent(
 );
 // The #20164 form that reached main and broke staging (fixed by #20347).
 const brokenFetch = currentFetch.replace(
-  /artifact_id="\$\(gh api \\\n[^\n]*\n[^\n]*\)"/,
+  /artifact_id="\$\(gh_api \\\n[^\n]*\n[^\n]*\)"/,
   `artifact_id="$(gh api "repos/$REPOSITORY/actions/runs/$SOURCE_CI_RUN_ID/artifacts?per_page=100" \\
   --jq --arg name "$receipt_name" \\
   '[.artifacts[] | select(.expired == false and .name == $name)] | sort_by(.id) | last | .id // empty')"`

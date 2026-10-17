@@ -18,7 +18,6 @@ import {
 import {
   DrawerSection,
   EntityHeader,
-  EntitySidebarShell,
   ShareableLinkRow,
 } from '@/components/molecules/drawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
@@ -26,10 +25,12 @@ import {
   PageToolbar,
   PageToolbarTabButton,
   TableEmptyState,
-  UnifiedTable,
 } from '@/components/organisms/table';
 import { WorkspacePage } from '@/components/organisms/WorkspacePage';
 import { BASE_URL } from '@/constants/domains';
+import { AdminDetailRail } from '@/features/admin/layout/AdminDetailRail';
+import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
+import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import {
   COMPANY_PAGE_KIND_LABELS,
@@ -130,12 +131,11 @@ function CompanyPageRail({
 }: Readonly<{ page: CompanyPresencePage | null; onClose: () => void }>) {
   const status = page ? getCompanyPageStatus(page) : null;
   return (
-    <EntitySidebarShell
+    <AdminDetailRail
       isOpen={page !== null}
       ariaLabel='Page details'
       onClose={onClose}
       scrollStrategy='shell'
-      workspaceSurface='raised'
       headerMode='minimal'
       hideMinimalHeaderBar
       isEmpty={!page}
@@ -204,20 +204,15 @@ function CompanyPageRail({
           </DrawerSection>
         </div>
       ) : null}
-    </EntitySidebarShell>
+    </AdminDetailRail>
   );
 }
 
-function checkColumn(
-  id: CompanyPresenceCheckId,
-  size: number,
-  hideBelow?: string
-) {
+function checkColumn(id: CompanyPresenceCheckId, size: number) {
   return columnHelper.display({
     id,
     header: COMPANY_PRESENCE_CHECK_LABELS[id],
     size,
-    meta: { className: hideBelow },
     cell: context => <CheckCell check={context.row.original.checks[id]} />,
   });
 }
@@ -251,6 +246,10 @@ function CompanyPresenceWorkspaceContent({
     ) : null
   );
 
+  const belowMd = useBreakpointDown('md');
+  const belowLg = useBreakpointDown('lg');
+  const belowXl = useBreakpointDown('xl');
+  const below2xl = useBreakpointDown('2xl');
   const columns = useMemo(
     () => [
       columnHelper.accessor('label', {
@@ -279,7 +278,6 @@ function CompanyPresenceWorkspaceContent({
         id: 'type',
         header: 'Type',
         size: 96,
-        meta: { className: 'max-md:hidden' },
         cell: context => (
           <span className='text-xs text-secondary-token'>
             {context.getValue()}
@@ -297,15 +295,14 @@ function CompanyPresenceWorkspaceContent({
           />
         ),
       }),
-      checkColumn('indexed', 104, 'max-lg:hidden'),
-      checkColumn('seo_certification', 104, 'max-lg:hidden'),
-      checkColumn('copy_gate', 104, 'max-xl:hidden'),
-      checkColumn('lighthouse', 104, 'max-xl:hidden'),
+      checkColumn('indexed', 104),
+      checkColumn('seo_certification', 104),
+      checkColumn('copy_gate', 104),
+      checkColumn('lighthouse', 104),
       columnHelper.display({
         id: 'last_checked',
         header: 'Last Checked',
         size: 120,
-        meta: { className: 'max-2xl:hidden' },
         cell: context => <LastCheckedCell page={context.row.original} />,
       }),
     ],
@@ -356,12 +353,20 @@ function CompanyPresenceWorkspaceContent({
         />
       }
     >
-      <UnifiedTable
+      <AdminDataTable
         data={rows}
         columns={columns as ColumnDef<CompanyPresencePage, unknown>[]}
         getRowId={page => page.id}
         onRowClick={setSelected}
         rowMode='two-line'
+        columnVisibility={{
+          type: !belowMd,
+          indexed: !belowLg,
+          seo_certification: !belowLg,
+          copy_gate: !belowXl,
+          lighthouse: !belowXl,
+          last_checked: !below2xl,
+        }}
         containerClassName='min-h-0 flex-1'
         minWidth='0'
         className={styles.table}

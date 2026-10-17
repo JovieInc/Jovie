@@ -8,8 +8,8 @@ vi.mock('@/lib/entitlements/server', () => ({
   getCurrentUserEntitlements: mockGetCurrentUserEntitlements,
 }));
 
-vi.mock('@/lib/ingestion/session', () => ({
-  withSystemIngestionSession: mockWithSystemIngestionSession,
+vi.mock('@/lib/db/legacy-transaction', () => ({
+  runAtomicDbOperation: mockWithSystemIngestionSession,
 }));
 
 vi.mock('@/lib/waitlist/approval', () => ({

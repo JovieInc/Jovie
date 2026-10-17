@@ -415,6 +415,14 @@ existed. Contract:
 5. A new commit or green rerun supersedes obsolete repairs.
 6. Moving on requires an explicit handoff receipt (draft PR, current head,
    acceptance criteria, remaining checks, fingerprints, remediation owner).
+   Non-Symphony origin writers also publish the final-head origin through
+   [`shipping_origin.py submit`](../scripts/lanes/README.md#non-symphony-publication-origins-jov-8318)
+   or host-local `shipping_attribution.py record-origin`. Founder ChatGPT,
+   Codex and Claude sessions and independent Hyperagent/Grokbot handoffs must
+   select their actual method, initiator, evidenced provider/model, available
+   host/run and Linear issue. A remote agent without publication identity hands
+   the minimal payload to Tim's authorized publisher; this grants no autonomous
+   permissions. Review, repair and finalizer work retain their separate roles.
 7. Ready/landing requires the final exact, current head to be green for
    tests, coverage, security, and policy.
 

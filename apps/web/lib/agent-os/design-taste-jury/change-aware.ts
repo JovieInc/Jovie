@@ -35,12 +35,14 @@ export const UI_TOUCH_PATH_PATTERNS = [
   /^apps\/web\/tailwind\.config\./,
   /^apps\/web\/app\/.*\/layout\.tsx$/,
   /^apps\/web\/app\/globals\.css$/,
+  /^apps\/web\/styles\//,
   /^packages\/ui\//,
 ] as const;
 
 const GLOBAL_UI_TOUCH_PATTERNS = [
   /^apps\/web\/tailwind\.config\./,
   /^apps\/web\/app\/globals\.css$/,
+  /^apps\/web\/styles\//,
   /^packages\/ui\//,
   /^apps\/web\/components\/providers\//,
   /^apps\/web\/components\/site\//,

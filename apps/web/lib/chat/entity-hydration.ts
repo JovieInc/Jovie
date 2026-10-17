@@ -23,6 +23,7 @@ import type { ReleaseContext } from '@/lib/chat/types';
 export interface HydrationArtistIdentity {
   readonly displayName: string;
   readonly username: string;
+  readonly spotifyUrl?: string | null;
 }
 
 export interface HydrateReferencedEntitiesInput {
@@ -66,7 +67,7 @@ function describeOwnedRelease(release: ReleaseContext): string {
     facts.push(`${release.totalTracks} ${trackLabel}`);
   }
   const factSuffix = facts.length > 0 ? ` (${facts.join(', ')})` : '';
-  return `- "${release.title}" — a ${noun} in THIS artist's own catalog${factSuffix}. Treat any reference to it as the user's own release, never another artist's work.`;
+  return `- release:${release.id} "${release.title}" — a ${noun} in THIS artist's own catalog${factSuffix}. Treat any reference to it as the user's own release, never another artist's work.`;
 }
 
 /**
@@ -75,12 +76,12 @@ function describeOwnedRelease(release: ReleaseContext): string {
  * caller can omit the section entirely and keep the prompt stable).
  *
  * Resolution rules:
- *  - `@release` / `@track` whose id matches an owned release → hydrated as the
+ *  - `@release` whose id matches an owned release → hydrated as the
  *    artist's own asset with catalog facts.
- *  - `@artist` whose label matches the artist's own display name/username → the
+ *  - `@artist` whose id matches the linked Spotify artist → the
  *    user themselves.
- *  - Anything else → described as "referenced by the user" with a neutral note
- *    so the model does not invent attribution.
+ *  - Anything else → unavailable/unsupported, without trusting the stored
+ *    label as identity, ownership, or an action target.
  */
 export function buildReferencedEntitiesBlock(
   input: HydrateReferencedEntitiesInput
@@ -89,11 +90,15 @@ export function buildReferencedEntitiesBlock(
   if (mentions.length === 0) return undefined;
 
   const releaseById = new Map(input.ownedReleases.map(r => [r.id, r]));
-  const ownNames = new Set(
-    [input.artist.displayName, input.artist.username]
-      .map(name => name?.trim().toLowerCase())
-      .filter((name): name is string => Boolean(name))
-  );
+  let ownArtistId: string | undefined;
+  try {
+    const url = new URL(input.artist.spotifyUrl ?? '');
+    if (url.protocol === 'https:' && url.hostname === 'open.spotify.com') {
+      ownArtistId = /^\/artist\/([^/]+)\/?$/.exec(url.pathname)?.[1];
+    }
+  } catch {
+    // Missing provider identity is not evidence that a matching name is self.
+  }
 
   const seen = new Set<string>();
   const lines: string[] = [];
@@ -103,7 +108,7 @@ export function buildReferencedEntitiesBlock(
     if (seen.has(dedupeKey)) continue;
     seen.add(dedupeKey);
 
-    if (mention.kind === 'release' || mention.kind === 'track') {
+    if (mention.kind === 'release') {
       const owned = releaseById.get(mention.id);
       if (owned) {
         lines.push(describeOwnedRelease(owned));
@@ -113,16 +118,17 @@ export function buildReferencedEntitiesBlock(
 
     if (
       mention.kind === 'artist' &&
-      ownNames.has(mention.label.trim().toLowerCase())
+      ownArtistId !== undefined &&
+      mention.id === ownArtistId
     ) {
       lines.push(
-        `- "${mention.label}" — this is the user (the artist you are assisting), not a different artist.`
+        `- "${input.artist.displayName}" (artist:${mention.id}) — this is the user (the artist you are assisting), not a different artist.`
       );
       continue;
     }
 
     lines.push(
-      `- "${mention.label}" (${mention.kind}) — referenced by the user. Do not assert who it belongs to unless it appears in this artist's own catalog above.`
+      `- ${mention.kind}:${mention.id} — unavailable or unsupported in the current authorized read model. The token label is not verified. Do not infer identity, ownership, or an action target from it; request a supported reference.`
     );
   }
 

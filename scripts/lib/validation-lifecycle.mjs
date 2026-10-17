@@ -401,9 +401,40 @@ export function deriveValidationManifest(input) {
  *   sha: string,
  *   evidence: string,
  *   note?: string,
+ *   episodeStartedAt?: string | null,
  *   recordedAt: string,
  * }} ValidationReceipt
  */
+
+/** @param {unknown} value @returns {value is string} */
+function validEpisodeTimestamp(value) {
+  return (
+    typeof value === 'string' &&
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(
+      value
+    ) &&
+    Number.isFinite(Date.parse(value))
+  );
+}
+
+/**
+ * An explicit episode is independent of the comment creation time: an old
+ * producer can finish its write after the server has reopened the issue.
+ * Unbound legacy receipts retain their existing server-time semantics.
+ * `receiptNotBefore` is undefined for the initial episode, null when unreadable.
+ * @param {{ readonly episodeStartedAt?: string | null }} receipt
+ * @param {string | null} [receiptNotBefore]
+ * @returns {boolean}
+ */
+export function receiptMatchesAcceptanceEpisode(receipt, receiptNotBefore) {
+  if (!Object.hasOwn(receipt, 'episodeStartedAt')) return true;
+  if (receipt.episodeStartedAt === null) return receiptNotBefore === undefined;
+  return (
+    validEpisodeTimestamp(receipt.episodeStartedAt) &&
+    validEpisodeTimestamp(receiptNotBefore) &&
+    Date.parse(receipt.episodeStartedAt) === Date.parse(receiptNotBefore)
+  );
+}
 
 /**
  * Read recorded receipts from issue comments. The time is the comment's
@@ -423,17 +454,34 @@ export function parseValidationReceipts(comments, identifier) {
     const recordedAt = String(comment?.createdAt ?? '');
     if (Number.isNaN(Date.parse(recordedAt))) continue;
     for (const match of String(comment?.body ?? '').matchAll(RECEIPT_MARKER)) {
+      let parsed;
       const invalidate = (kinds = RECORDED_RECEIPT_KINDS) => {
+        // An invalid old-episode payload must not supersede current proof.
+        // Unreadable episode bindings still invalidate conservatively.
+        const episodeBinding =
+          parsed &&
+          typeof parsed === 'object' &&
+          !Array.isArray(parsed) &&
+          Object.hasOwn(parsed, 'episodeStartedAt') &&
+          (parsed.episodeStartedAt === null ||
+            validEpisodeTimestamp(parsed.episodeStartedAt))
+            ? {
+                episodeStartedAt:
+                  parsed.episodeStartedAt === null
+                    ? null
+                    : new Date(parsed.episodeStartedAt).toISOString(),
+              }
+            : {};
         for (const kind of kinds)
           receipts.push({
             kind,
             status: 'invalid',
             sha: '',
             evidence: 'malformed validation receipt',
+            ...episodeBinding,
             recordedAt,
           });
       };
-      let parsed;
       try {
         if (!match[0].endsWith('-->')) throw new Error('unterminated receipt');
         parsed = JSON.parse(match[1]);
@@ -462,7 +510,10 @@ export function parseValidationReceipts(comments, identifier) {
         (status !== 'pass' && status !== 'fail') ||
         !FULL_SHA.test(sha) ||
         typeof parsed.evidence !== 'string' ||
-        parsed.evidence.trim().length < 8
+        parsed.evidence.trim().length < 8 ||
+        (Object.hasOwn(parsed, 'episodeStartedAt') &&
+          parsed.episodeStartedAt !== null &&
+          !validEpisodeTimestamp(parsed.episodeStartedAt))
       ) {
         invalidate([kind]);
         continue;
@@ -477,6 +528,14 @@ export function parseValidationReceipts(comments, identifier) {
         sha,
         evidence: parsed.evidence.trim(),
         ...(note ? { note } : {}),
+        ...(Object.hasOwn(parsed, 'episodeStartedAt')
+          ? {
+              episodeStartedAt:
+                parsed.episodeStartedAt === null
+                  ? null
+                  : new Date(parsed.episodeStartedAt).toISOString(),
+            }
+          : {}),
         recordedAt,
       });
     }
@@ -495,6 +554,7 @@ export function parseValidationReceipts(comments, identifier) {
  *   sha: string,
  *   evidence: string,
  *   note?: string,
+ *   episodeStartedAt?: string | null,
  * }} receipt
  * @returns {string}
  */
@@ -522,6 +582,16 @@ export function formatValidationReceipt(receipt) {
       `receipt note must be at most ${MAX_NOTE_LENGTH} characters`
     );
   }
+  const hasEpisodeBinding = Object.hasOwn(receipt, 'episodeStartedAt');
+  if (
+    hasEpisodeBinding &&
+    receipt.episodeStartedAt !== null &&
+    !validEpisodeTimestamp(receipt.episodeStartedAt)
+  ) {
+    throw new Error(
+      'receipt episodeStartedAt must be null or a valid timestamp'
+    );
+  }
   const payload = {
     schema: VALIDATION_RECEIPT_SCHEMA,
     issue: receipt.issue.toUpperCase(),
@@ -530,6 +600,14 @@ export function formatValidationReceipt(receipt) {
     sha: receipt.sha.toLowerCase(),
     evidence: receipt.evidence.trim(),
     ...(note ? { note } : {}),
+    ...(hasEpisodeBinding
+      ? {
+          episodeStartedAt:
+            receipt.episodeStartedAt === null
+              ? null
+              : new Date(String(receipt.episodeStartedAt)).toISOString(),
+        }
+      : {}),
   };
   return [
     `Validation receipt: ${payload.kind} ${payload.status} for ${payload.sha.slice(0, 12)}. Evidence: ${payload.evidence}`,
@@ -572,7 +650,11 @@ export function currentReceiptsByKind(receipts, receiptNotBefore) {
       : Date.parse(receiptNotBefore ?? '');
   if (Number.isNaN(cutoff)) return latest;
   for (const receipt of receipts) {
-    if (!receipt.containsBinding || !(Date.parse(receipt.recordedAt) > cutoff))
+    if (
+      !receipt.containsBinding ||
+      !receiptMatchesAcceptanceEpisode(receipt, receiptNotBefore) ||
+      !(Date.parse(receipt.recordedAt) > cutoff)
+    )
       continue;
     const previous = latest.get(receipt.kind);
     if (
@@ -713,7 +795,7 @@ export function decideValidationTransition(input) {
     missing: [],
     failing: [],
     explanation: [
-      `Every required receipt passed on verified production generation ${String(input.deployment.sha ?? '').slice(0, 12)}.`,
+      `Every required receipt passed on its recorded verified artifact. Deployment generation ${String(input.deployment.sha ?? '').slice(0, 12)} is verified.`,
     ],
   };
 }

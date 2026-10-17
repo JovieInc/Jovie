@@ -98,7 +98,7 @@ export function BlogPostPage({
 
             {/* Title */}
             <h1
-              className='marketing-h1-linear text-primary-token mb-6 max-w-3xl'
+              className='marketing-h1-linear text-balance text-primary-token mb-6 max-w-3xl'
               data-testid='blog-post-page'
             >
               {post.title}
@@ -122,6 +122,10 @@ export function BlogPostPage({
                 {author.profileUrl ? (
                   <Link
                     href={author.profileUrl}
+                    // Creator profiles are database-backed. Prefetch asks for
+                    // that route during static marketing proof and Chrome logs
+                    // the 404 when the build has no profile rows.
+                    prefetch={false}
                     className='font-semibold text-primary-token hover:underline underline-offset-4'
                   >
                     {author.name}

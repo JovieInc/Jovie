@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import {
   classifyLighthouseFailure,
@@ -6,6 +7,11 @@ import {
   resolveMinAttemptBudgetMs,
   runWithClassifiedRetries,
 } from '../../lighthouse-retry.mjs';
+
+const browserLaunchCrash = readFileSync(
+  new URL('./fixtures/lighthouse-browser-launch-crash.txt', import.meta.url),
+  'utf8'
+);
 
 describe('Lighthouse classified retry', () => {
   it.each([
@@ -23,6 +29,20 @@ describe('Lighthouse classified retry', () => {
     'errors-in-console failure for minScore assertion\nexpected: >=0.9\nfound: 0\nAssertion failed.',
   ])('classifies deterministic Lighthouse assertions: %s', output => {
     expect(classifyLighthouseFailure(output)).toBe('deterministic_assertion');
+  });
+
+  it('classifies a browser-launch crash fixture as retryable infra', () => {
+    expect(classifyLighthouseFailure(browserLaunchCrash)).toBe(
+      'retryable_infra'
+    );
+  });
+
+  it('does not treat a non-crash browser launch failure as retryable infra', () => {
+    expect(
+      classifyLighthouseFailure(
+        'Error: Failed to launch the browser process: spawn ENOENT\nCode: 1'
+      )
+    ).toBe('unknown');
   });
 
   it('classifies job-deadline exhaustion receipts', () => {
@@ -93,6 +113,114 @@ describe('Lighthouse classified retry', () => {
     });
     expect(executeAttempt).toHaveBeenCalledTimes(2);
     expect(sleep).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries a browser-launch crash within the attempt budget', async () => {
+    const executeAttempt = vi
+      .fn()
+      .mockResolvedValueOnce({ code: 1, output: browserLaunchCrash })
+      .mockResolvedValueOnce({ code: 0, output: '' });
+    const sleep = vi.fn().mockResolvedValue(undefined);
+    const report = vi.fn();
+
+    const result = await runWithClassifiedRetries({
+      executeAttempt,
+      cooldownMs: 7,
+      sleep,
+      report,
+      routeLabel: '/',
+    });
+
+    expect(result.failureClass).toBeNull();
+    expect(result.attempts).toBe(2);
+    expect(executeAttempt).toHaveBeenCalledTimes(2);
+    expect(sleep).toHaveBeenCalledWith(7);
+    expect(report).toHaveBeenCalledWith(
+      [
+        'LIGHTHOUSE_FAILURE_CLASS=retryable_infra',
+        'LIGHTHOUSE_ATTEMPT=1/3',
+        'LIGHTHOUSE_ROUTE=/',
+      ].join(' ')
+    );
+    expect(report).toHaveBeenCalledWith(
+      'Browser launch crash; cooling down for 7ms before bounded retry.'
+    );
+  });
+
+  it('fails closed after the attempt budget when every launch crashes', async () => {
+    const executeAttempt = vi
+      .fn()
+      .mockResolvedValue({ code: 1, output: browserLaunchCrash });
+    const sleep = vi.fn().mockResolvedValue(undefined);
+
+    const result = await runWithClassifiedRetries({
+      executeAttempt,
+      maxAttempts: 3,
+      cooldownMs: 0,
+      sleep,
+      report: vi.fn(),
+    });
+
+    expect(result).toMatchObject({
+      code: 1,
+      attempts: 3,
+      failureClass: 'retryable_infra',
+    });
+    expect(executeAttempt).toHaveBeenCalledTimes(3);
+    expect(sleep).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps an assertion failure closed when the log also contains a launch crash', async () => {
+    const executeAttempt = vi.fn().mockResolvedValue({
+      code: 1,
+      output: [
+        browserLaunchCrash,
+        'assertion failure for color-contrast: expected 1, but got 0',
+      ].join('\n'),
+    });
+
+    const result = await runWithClassifiedRetries({
+      executeAttempt,
+      sleep: vi.fn(),
+      report: vi.fn(),
+    });
+
+    expect(result.failureClass).toBe('deterministic_assertion');
+    expect(result.attempts).toBe(1);
+    expect(executeAttempt).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not retry a browser launch crash when the job deadline cannot fit another attempt', async () => {
+    let nowMs = 0;
+    const executeAttempt = vi.fn().mockImplementation(async () => {
+      nowMs += 900_000;
+      return { code: 1, output: browserLaunchCrash };
+    });
+    const sleep = vi.fn();
+    const report = vi.fn();
+
+    const result = await runWithClassifiedRetries({
+      executeAttempt,
+      maxAttempts: 3,
+      cooldownMs: 10_000,
+      deadlineMs: 1_200_000,
+      minAttemptBudgetMs: 400_000,
+      now: () => nowMs,
+      sleep,
+      report,
+      routeLabel: '/',
+    });
+
+    expect(result.failureClass).toBe('job_deadline');
+    expect(result.attempts).toBe(1);
+    expect(executeAttempt).toHaveBeenCalledTimes(1);
+    expect(sleep).not.toHaveBeenCalled();
+    expect(report).toHaveBeenCalledWith(
+      expect.stringContaining('Browser launch crash; skipping further retries')
+    );
+    expect(report).toHaveBeenCalledWith(
+      expect.stringContaining('LIGHTHOUSE_FAILURE_CLASS=job_deadline')
+    );
   });
 
   it('fails unknown errors immediately', async () => {

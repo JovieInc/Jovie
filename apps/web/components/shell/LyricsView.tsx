@@ -88,7 +88,7 @@ export function LyricsView({
   }, [activeIndex]);
 
   useEffect(() => {
-    if (autoFocusView && lines.length > 0) {
+    if (autoFocusView) {
       lyricsRootRef.current?.focus({ preventScroll: true });
     }
   }, [autoFocusView, lines.length]);
@@ -123,6 +123,8 @@ export function LyricsView({
   if (lines.length === 0) {
     return (
       <section
+        ref={lyricsRootRef}
+        tabIndex={-1}
         aria-label='Lyrics'
         className={cn('flex h-full flex-col focus:outline-none', className)}
       >

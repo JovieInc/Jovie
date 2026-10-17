@@ -201,12 +201,15 @@ for (const theme of ['light', 'dark'] as const) {
     ).toHaveCount(1);
     await expect(drawer.getByTestId('release-tabbed-card')).toBeVisible();
 
-    const detailsTab = drawer.getByTestId('drawer-tab-details');
+    const overviewTab = drawer.getByTestId('drawer-tab-overview');
     const platformsTab = drawer.getByTestId('drawer-tab-dsps');
-    await expect(detailsTab).toBeVisible();
+    const tasksTab = drawer.getByTestId('drawer-tab-tasks');
+    await expect(overviewTab).toBeVisible();
     await expect(platformsTab).toBeVisible();
-    await expectFlatPillChrome(detailsTab);
+    await expect(tasksTab).toBeVisible();
+    await expectFlatPillChrome(overviewTab);
     await expectFlatPillChrome(platformsTab);
+    await expectFlatPillChrome(tasksTab);
     await expectCardChrome(drawer.getByTestId('release-tabbed-card'));
     await expectFlatSurface(drawer.getByTestId('release-metadata-card'));
     await expect(drawer.getByTestId('release-header-card')).toBeVisible();

@@ -222,6 +222,28 @@ describe('Marketing terminal CTA wrappers', () => {
     expect(secondary).toHaveAttribute('data-size', 'md');
   });
 
+  it('joins the marketing census when a footer declares a CTA variant', () => {
+    render(
+      <MarketingFooterCta
+        title='Ready to build your Jovie profile?'
+        ctaLabel='Get started'
+        ctaHref='/signup'
+        sectionVariant='final-single-claim'
+      />
+    );
+
+    const section = screen.getByTestId('marketing-section-cta');
+    expect(section).toHaveAttribute(
+      'data-marketing-variant',
+      'final-single-claim'
+    );
+    expect(section).toHaveAttribute(
+      'data-marketing-owner',
+      'apps/web/components/site/MarketingTerminalCta.tsx'
+    );
+    expect(screen.queryByTestId('marketing-footer-cta')).toBeNull();
+  });
+
   it('forwards prefetch={false} to the underlying link for binary redirect targets', () => {
     render(
       <MarketingFooterCta
