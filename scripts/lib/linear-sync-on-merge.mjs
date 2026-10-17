@@ -119,6 +119,9 @@ export const COMMISSIONING_PARENT_ALLOWLIST = new Set([
 ]);
 
 const IDENTIFIER_RE = /^JOV-(\d+)$/i;
+// Prerequisites can belong to another Linear team; only Jovie issues are
+// eligible for this writer's transitions (see IDENTIFIER_RE above).
+const DEPENDENCY_IDENTIFIER_RE = /^[A-Za-z][A-Za-z0-9]*-[1-9][0-9]*$/;
 const COMMISSIONING_LABEL_RE = /commission/i;
 const PARENT_LABEL_RE = /^(parent|epic|type:epic)$/i;
 const MAX_OPEN_PR_PAGES = 20;
@@ -887,7 +890,7 @@ async function materializeLifecycleIssue(fetchImpl, apiKey, raw) {
       if (
         typeof prerequisite?.id !== 'string' ||
         !prerequisite.id ||
-        !IDENTIFIER_RE.test(String(prerequisite.identifier ?? '')) ||
+        !DEPENDENCY_IDENTIFIER_RE.test(String(prerequisite.identifier ?? '')) ||
         typeof prerequisite.state?.id !== 'string' ||
         !prerequisite.state.id ||
         typeof prerequisite.state.name !== 'string' ||

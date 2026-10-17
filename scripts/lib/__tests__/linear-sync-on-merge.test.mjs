@@ -205,6 +205,33 @@ describe('linear sync on merge', () => {
   });
 
   it.each([
+    ['Done', false, 'Done'],
+    ['Merging', false, 'Validating'],
+    ['Done', true, 'Rework'],
+  ])(
+    'reads a %s prerequisite from another team without expanding its writer scope (failure %s)',
+    async (name, failed, target) => {
+      const { world, fetchImpl } = createWorld();
+      const issue = world.issues['JOV-1'];
+      issue.state = 'Validating';
+      const relation = blockingRelation(name);
+      relation.issue.identifier = 'LYB-123';
+      issue.inverseRelations = [relation];
+      if (failed) {
+        issue.description = '- [ ] Verify outcome';
+        issue.comments.push(
+          receiptComment('JOV-1', { status: 'fail' }, '2026-10-03T11:30:00Z')
+        );
+      }
+      expect((await mergeEvent(fetchImpl, 101)).results[0].target).toBe(target);
+      expect(world.updates.every(update => update.startsWith('JOV-1:'))).toBe(
+        true
+      );
+      expect(issue.state).toBe(target);
+    }
+  );
+
+  it.each([
     { id: 'state-done', name: 'Done', type: 'started' },
     { id: 'state-accepted', name: 'Accepted', type: 'completed' },
   ])(
