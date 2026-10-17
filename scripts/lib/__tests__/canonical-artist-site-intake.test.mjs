@@ -8,6 +8,7 @@ import {
   checkKey,
   EVIDENCE_INTEGRITY_KEY,
   intakeKeys,
+  laneRan,
   loadCertificate,
   MISSING_CERTIFICATE_KEY,
   openKeys,
@@ -42,11 +43,11 @@ function closedIssue() {
   return { ok: true, action: 'noop', reason: 'none_open' };
 }
 
-async function filed(certificate, upsert) {
+async function filed(certificate, upsert, report = {}) {
   const opened = [];
   const closed = [];
   await reportCanonicalArtistSiteCertification(
-    { certificate, runId: '9' },
+    { certificate, runId: '9', ...report },
     {
       env: enabled,
       upsert: async args => {
@@ -82,6 +83,36 @@ describe('canonical artist-site intake', () => {
     assert.equal(opened[0].title.includes('launch friction'), false);
     assert.equal(closed.length, 0);
     assert.equal(loadCertificate(''), null);
+  });
+
+  it('does not file a missing certificate when the lane never ran', async () => {
+    for (const producerResult of ['success', 'failure']) {
+      const ran = await filed(null, undefined, { producerResult });
+      assert.equal(ran.opened.length, 1, producerResult);
+      assert.equal(ran.opened[0].fingerprint, MISSING_CERTIFICATE_KEY);
+      assert.equal(ran.closed.length, 0);
+      assert.equal(laneRan(producerResult), true);
+    }
+    for (const producerResult of ['skipped', 'cancelled']) {
+      const idle = await filed(null, undefined, { producerResult });
+      assert.equal(idle.opened.length, 0, producerResult);
+      assert.equal(idle.closed.length, 0, producerResult);
+      assert.deepEqual(openKeys(null, { producerResult }), []);
+      assert.equal(laneRan(producerResult), false);
+    }
+  });
+
+  it('closes the missing-certificate defect once a certificate exists', async () => {
+    const { closed } = await filed(
+      certificate({
+        status: 'RED',
+        safeToSend: false,
+        failingChecks: [
+          { id: 'profile_modes', detail: 'modes', evidence: ['run'] },
+        ],
+      })
+    );
+    assert.equal(closed.includes(MISSING_CERTIFICATE_KEY), true);
   });
 
   it('groups a valid defect key and keeps an invalid id on the check', async () => {
