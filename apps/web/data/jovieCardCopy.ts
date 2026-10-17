@@ -19,9 +19,9 @@ export const JOVIE_CARD_COPY = {
     canIssuePasses: false,
   },
   seo: {
-    title: 'Jovie Card: Your profile in Apple Wallet',
+    title: 'Jovie Card: Planned for Apple Wallet',
     description:
-      'Jovie Card is coming to Apple Wallet. Join the list for access updates about sharing your Jovie profile in person.',
+      'Jovie Card is a planned Apple Wallet card for sharing your music and links in person. Join the list for access updates. Passes are not available yet.',
   },
   hero: {
     headline: 'Your Jovie profile. Ready for the real world.',
