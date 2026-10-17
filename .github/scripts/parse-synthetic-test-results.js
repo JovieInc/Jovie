@@ -1,5 +1,7 @@
 const fs = require('node:fs');
 
+const OPTIONAL_OTP_SKIP_MARKER = 'synthetic-otp-unavailable';
+
 const DEFAULT_RESULT_FILES = (
   legacyCanaryEnabled,
   chatCanaryEnabled = false
@@ -54,21 +56,40 @@ function collectSpecs(suites = [], source, required = true) {
   return specs;
 }
 
+function optionalOtpSkipText(testCase) {
+  const chunks = [];
+  const push = value => {
+    if (typeof value === 'string' && value.includes(OPTIONAL_OTP_SKIP_MARKER)) {
+      chunks.push(value.replace(/\s+/g, ' ').trim());
+    }
+  };
+  for (const annotation of testCase.annotations ?? []) push(annotation?.description);
+  for (const result of testCase.results ?? []) {
+    push(result.error?.message);
+    for (const annotation of result.annotations ?? []) push(annotation?.description);
+  }
+  return chunks[0] ?? '';
+}
+
 function classifySyntheticTests(tests) {
   const skipped = tests.filter(
     ({ testCase }) =>
       testCase.status === 'skipped' ||
       (testCase.results ?? []).some(result => result.status === 'skipped')
   );
-  const requiredSkipped = skipped.filter(({ required }) => required);
-  const warnings = tests.flatMap(({ source, spec, testCase }) =>
-    (testCase.results ?? []).flatMap(result =>
+  const requiredSkipped = skipped.filter(
+    ({ required, testCase }) => required && !optionalOtpSkipText(testCase)
+  );
+  const warnings = tests.flatMap(({ source, spec, testCase }) => {
+    const logged = (testCase.results ?? []).flatMap(result =>
       [...(result.stdout ?? []), ...(result.stderr ?? [])]
         .map(entry => entry.text ?? '')
         .filter(text => text.includes('[Synthetic][warning]'))
         .map(text => `${source}: ${spec.title}: ${text.trim()}`)
-    )
-  );
+    );
+    const otpSkip = optionalOtpSkipText(testCase);
+    return otpSkip ? [...logged, `${source}: ${spec.title}: ${otpSkip}`] : logged;
+  });
   const flaky = tests.filter(({ testCase }) => testCase.status === 'flaky');
   const failed = tests.filter(
     ({ testCase }) => testCase.status === 'unexpected'
@@ -149,7 +170,11 @@ function loadSyntheticResultSpecs(resultFiles, fileSystem = fs) {
   return { specs, missingResults };
 }
 
-function parseSyntheticTestResults({ resultFiles, fileSystem = fs } = {}) {
+function parseSyntheticTestResults({
+  resultFiles,
+  fileSystem = fs,
+  otpSkipReason = '',
+} = {}) {
   const resolvedResultFiles =
     resultFiles ??
     DEFAULT_RESULT_FILES(process.env.LEGACY_CANARY_ENABLED === '1');
@@ -168,6 +193,9 @@ function parseSyntheticTestResults({ resultFiles, fileSystem = fs } = {}) {
   );
   const { skipped, requiredSkipped, warnings, flaky, failed, passed } =
     classifySyntheticTests(tests);
+  const skipReason =
+    typeof otpSkipReason === 'string' ? otpSkipReason.trim() : '';
+  const testWarnings = skipReason ? [...warnings, skipReason] : warnings;
   const testStatus = resolveSyntheticTestStatus({
     tests,
     missingResults,
@@ -193,10 +221,10 @@ function parseSyntheticTestResults({ resultFiles, fileSystem = fs } = {}) {
     passedTests: passed.length,
     flakyTests: flaky.length,
     skippedTests: skipped.length,
-    warningCount: warnings.length,
+    warningCount: testWarnings.length,
     testStatus,
     failedTests,
-    testWarnings: warnings,
+    testWarnings,
   };
 }
 

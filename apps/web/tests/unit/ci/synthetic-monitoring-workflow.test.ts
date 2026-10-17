@@ -12,6 +12,19 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { GATEWAY_ALLOWLIST_NAME } from '@/lib/constants/ai-models';
 
+const GITHUB_SECRET_NAMES = [
+  'CRON_SECRET',
+  'DOPPLER_TOKEN_PRD',
+  'E2E_PROD_MAILBOX_PROVIDER',
+  'E2E_PROD_OTP_CHECK_ORIGIN',
+  'E2E_PROD_OTP_CHECK_TOKEN',
+  'E2E_PROD_OTP_CHECK_URL',
+  'E2E_PROD_SIGNUP_EMAIL_BASE',
+  'LINEAR_API_KEY',
+  'PRODUCTION_WAITLIST_CANARY_READ_TOKEN',
+  'SLACK_WEBHOOK_URL',
+] as const;
+
 const testDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(testDir, '..', '..', '..', '..', '..');
 const workflowPath = resolve(
@@ -159,11 +172,12 @@ describe('synthetic monitoring workflow parser', () => {
         'tests/e2e/synthetic-production-waitlist.spec.ts'
       );
       expect(canaryStep).toContain(
-        'E2E_PROD_SIGNUP_EMAIL_BASE,E2E_PROD_MAILBOX_PROVIDER,E2E_PROD_OTP_CHECK_ORIGIN,E2E_PROD_OTP_CHECK_TOKEN,E2E_PROD_OTP_CHECK_URL,PRODUCTION_WAITLIST_CANARY_READ_TOKEN'
+        'env -u DOPPLER_TOKEN -u DATABASE_URL node .github/scripts/guard-playwright-artifacts.mjs'
       );
-      expect(canaryStep).toContain('--no-fallback -- env -u DOPPLER_TOKEN');
-      expect(canaryStep).toContain('secrets missing from jovie-web/prd');
-      expect(canaryStep).not.toContain('DATABASE_URL');
+      expect(canaryStep).toContain('Tim-only OTP secrets absent');
+      expect(canaryStep).not.toContain('--only-secrets');
+      expect(canaryStep).not.toContain('DOPPLER_TOKEN:');
+      expect(canaryStep).not.toContain('DATABASE_URL=');
       expect(workflow).toContain(
         'SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-production-waitlist-results.json'
       );
@@ -210,13 +224,36 @@ describe('synthetic monitoring workflow parser', () => {
     expect(workflow).toContain("- cron: '47 7 * * *'");
     expect(workflow).toContain("github.event.schedule == '47 7 * * *'");
     expect(workflow).toContain('name: Web AI Health (Daily)');
-    expect(workflow).toContain('--only-secrets=CRON_SECRET --no-fallback');
+    expect(workflow).toContain('secrets.CRON_SECRET');
+    expect(workflow).toContain('--name CRON_SECRET');
+    expect(workflow).not.toContain('--only-secrets=CRON_SECRET --no-fallback');
     expect(workflow).toContain('--url https://jov.ie/api/cron/web-ai-health');
     expect(workflow).toContain('scripts/web-ai-health-intake.mjs');
     expect(workflow).toContain('name: File high-priority Linear bug signal');
     expect(workflow).not.toContain(
       '--only-secrets=AI_GATEWAY_API_KEY --no-fallback'
     );
+  });
+
+  it('reads GitHub secrets before Doppler and documents those exact names', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const doc = readFileSync(
+      resolve(repoRoot, 'docs/SYNTHETIC_MONITORING.md'),
+      'utf8'
+    );
+    const referenced = [
+      ...workflow.matchAll(/\$\{\{\s*secrets\.([A-Z][A-Z0-9_]*)/g),
+    ].map(match => match[1]);
+
+    expect(new Set(referenced)).toEqual(new Set(GITHUB_SECRET_NAMES));
+    expect(workflow).toContain('resolve-synthetic-secrets.mjs');
+    expect(workflow).toContain('doppler run --preserve-env --');
+    expect(workflow).not.toContain('--no-fallback');
+    for (const name of GITHUB_SECRET_NAMES) {
+      expect(doc).toContain(`\`${name}\``);
+    }
+    expect(doc).toContain('GitHub secrets this workflow reads');
+    expect(doc).toContain('synthetic-otp-unavailable');
   });
 
   it('keeps the workflow receipt validator on the canonical gateway allowlist name', () => {

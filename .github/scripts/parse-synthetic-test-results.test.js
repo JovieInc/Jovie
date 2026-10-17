@@ -329,6 +329,61 @@ test('parseSyntheticTestResults ignores optional legacy OTP results when absent'
   assert.equal(result.totalTests, 4);
 });
 
+test('parseSyntheticTestResults keeps a logged OTP skip from failing a required suite', () => {
+  const reason =
+    'synthetic-otp-unavailable: missing E2E_PROD_OTP_CHECK_TOKEN (Tim-only Cloudflare mailbox secrets)';
+  const fileSystem = createMemoryFileSystem({
+    'waitlist.json': JSON.stringify({
+      suites: [
+        {
+          specs: [
+            {
+              title: 'reads the production waitlist preflight receipt',
+              tests: [
+                {
+                  status: 'expected',
+                  results: [{ status: 'passed' }],
+                },
+              ],
+            },
+            {
+              title: 'retains identity and proves waitlist suppression',
+              tests: [
+                {
+                  status: 'skipped',
+                  annotations: [{ type: 'skip', description: reason }],
+                  results: [],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    }),
+  });
+
+  const result = parseSyntheticTestResults({
+    resultFiles: [{ name: 'synthetic-production-waitlist', path: 'waitlist.json', required: true }],
+    fileSystem,
+    otpSkipReason:
+      'Skipping OTP-dependent synthetic steps: missing E2E_PROD_OTP_CHECK_TOKEN (Tim-only Cloudflare mailbox secrets).',
+  });
+
+  assert.equal(result.testStatus, 'passed');
+  assert.equal(result.passedTests, 1);
+  assert.equal(result.skippedTests, 1);
+  assert.equal(
+    result.testWarnings.some(warning => warning.includes(reason)),
+    true
+  );
+  assert.equal(
+    result.testWarnings.some(warning =>
+      warning.includes('Skipping OTP-dependent synthetic steps')
+    ),
+    true
+  );
+});
+
 test('formatGithubOutput emits a JSON-safe failed_tests_slack line', () => {
   const { formatGithubOutput } = require('./parse-synthetic-test-results');
 
