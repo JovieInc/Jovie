@@ -43,7 +43,7 @@ Coverage:
 4. **Dashboard load** - verifies `/app` loads and emits `dashboard_loaded`.
 5. **Public profile load** - verifies `/<handle>` returns a successful response and no not-found/error copy.
 6. **Welcome-chat continuity** - verifies `/api/onboarding/welcome-chat` returns an app chat route.
-7. **Scoped cleanup** - removes only the exact robot user, generated handle/profile, and matching Clerk user id.
+7. **Scoped cleanup** - removes only the exact robot user, generated handle/profile, and the id for that run. Local runs use a Clerk `user_` id. Production runs use exactly `ba_robot_<run-id>`.
 
 The fast PR smoke, `onboarding-robot.smoke.spec.ts`, runs separately through the desktop smoke manifest and only verifies anonymous `/start` chat health plus event emission.
 
@@ -276,7 +276,7 @@ Signup readiness, the SEO/AEO ratchet, Layer A auth UI, the golden path, public 
 - That retained Better Auth identity and its waitlist receipt are never deleted by synthetic monitoring
 - The canary reasserts the supported waitlist traversal idempotently and records a run-bound, redacted durable receipt
 - Onboarding robot accounts use the `+onboarding-robot-<run-id>` suffix and Clerk public metadata `role=synthetic_onboarding_robot`
-- Onboarding robot cleanup requires an exact robot email, Clerk `user_` id, `or-` run id, and generated `jor...` handle before touching the database or Clerk
+- Onboarding robot cleanup requires an exact robot email, an `or-` run id, and a generated `jor...` handle. The id must be a Clerk `user_` id or exactly `ba_robot_<run-id>` for that same run. Any other id, including a real Better Auth `ba:<uuid>` or UUID, is refused before the database is touched.
 
 ### Production Considerations
 

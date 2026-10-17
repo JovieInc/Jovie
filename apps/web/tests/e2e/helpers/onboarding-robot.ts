@@ -68,6 +68,25 @@ export function buildOnboardingRobotRunId(seed = `${Date.now().toString(36)}`) {
   return `or-${withoutPrefix || 'run'}`.slice(0, 48);
 }
 
+const PRODUCTION_ROBOT_USER_ID_PREFIX = 'ba_robot_';
+
+export function buildProductionOnboardingRobotUserId(runId: string): string {
+  if (!runId.startsWith('or-')) {
+    throw new Error(
+      `Refusing production robot user id for non-robot run id: ${runId}`
+    );
+  }
+  return `${PRODUCTION_ROBOT_USER_ID_PREFIX}${runId}`;
+}
+
+function isScopedOnboardingRobotUserId(
+  clerkUserId: string,
+  runId: string
+): boolean {
+  if (clerkUserId.startsWith('user_')) return true;
+  return clerkUserId === `${PRODUCTION_ROBOT_USER_ID_PREFIX}${runId}`;
+}
+
 export function buildOnboardingRobotHandle(
   runId: string,
   clerkUserId: string
@@ -120,9 +139,9 @@ export function assertOnboardingRobotCleanupTarget(
     throw new Error(`Refusing cleanup for non-robot run id: ${target.runId}`);
   }
 
-  if (!target.clerkUserId.startsWith('user_')) {
+  if (!isScopedOnboardingRobotUserId(target.clerkUserId, target.runId)) {
     throw new Error(
-      `Refusing cleanup for non-Clerk user id: ${target.clerkUserId}`
+      `Refusing cleanup for non-robot user id: ${target.clerkUserId}`
     );
   }
 
@@ -157,7 +176,7 @@ async function createProductionOnboardingRobotUser(
 
   return {
     authStrategy: 'clerk_sign_in_token',
-    clerkUserId: `ba_robot_${runId}`,
+    clerkUserId: buildProductionOnboardingRobotUserId(runId),
     email,
     runId,
   };

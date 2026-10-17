@@ -8,6 +8,7 @@ import {
   assertOnboardingRobotCleanupTarget,
   buildOnboardingRobotHandle,
   buildOnboardingRobotRunId,
+  buildProductionOnboardingRobotUserId,
   isLocalOnboardingRobotEmail,
   isProductionOnboardingRobotEmail,
 } from '@/tests/e2e/helpers/onboarding-robot';
@@ -99,5 +100,54 @@ describe('onboarding robot guardrails', () => {
         { E2E_PROD_SIGNUP_EMAIL_BASE: 'test-google@jov.ie' }
       )
     ).toThrow(/Refusing to clean up non-robot onboarding email/);
+  });
+
+  it('cleans up only the production robot id bound to that run', () => {
+    const runId = 'or-jov-2681';
+    const clerkUserId = buildProductionOnboardingRobotUserId(runId);
+    const target = {
+      clerkUserId,
+      email: 'test-google+onboarding-robot-or-jov-2681@jov.ie',
+      handle: buildOnboardingRobotHandle(runId, clerkUserId),
+      runId,
+    };
+    const env = { E2E_PROD_SIGNUP_EMAIL_BASE: 'test-google@jov.ie' };
+
+    expect(clerkUserId).toBe('ba_robot_or-jov-2681');
+    expect(() => assertOnboardingRobotCleanupTarget(target, env)).not.toThrow();
+
+    expect(() =>
+      assertOnboardingRobotCleanupTarget(
+        { ...target, clerkUserId: 'ba_robot_or-other-run' },
+        env
+      )
+    ).toThrow(/Refusing cleanup for non-robot user id/);
+    expect(() =>
+      assertOnboardingRobotCleanupTarget(
+        { ...target, clerkUserId: 'ba_robot_or-jov-2681-extra' },
+        env
+      )
+    ).toThrow(/Refusing cleanup for non-robot user id/);
+    expect(() =>
+      assertOnboardingRobotCleanupTarget(
+        {
+          ...target,
+          clerkUserId: 'ba:11111111-1111-4111-8111-111111111111',
+        },
+        env
+      )
+    ).toThrow(/Refusing cleanup for non-robot user id/);
+    expect(() =>
+      assertOnboardingRobotCleanupTarget(
+        {
+          ...target,
+          clerkUserId: '11111111-1111-4111-8111-111111111111',
+        },
+        env
+      )
+    ).toThrow(/Refusing cleanup for non-robot user id/);
+    expect(() => buildProductionOnboardingRobotUserId('manual')).toThrow(
+      /non-robot run id/
+    );
   });
 });

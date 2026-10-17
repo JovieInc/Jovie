@@ -170,7 +170,7 @@ jobs:
         if: always()
         run: |
           echo "The production waitlist canary reuses one exact reserved identity and never deletes it."
-          echo "Onboarding robot cleanup is scoped by exact robot email, Clerk user id, run id, and generated handle."
+          echo "Onboarding robot cleanup is scoped by exact robot email, run id, generated handle, and either a Clerk user_ id or the exact ba_robot_<run-id> id."
           echo "No broad production Clerk cleanup script is run from this workflow."
 
       - name: Parse test results
