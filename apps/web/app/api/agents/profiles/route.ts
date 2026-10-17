@@ -10,7 +10,7 @@ import { NO_STORE_HEADERS, RETRY_AFTER_SERVICE } from '@/lib/http/headers';
 import { extractHandleFromSocialUrl } from '@/lib/ingestion/flows/handle-extraction';
 import { ingestSocialPlatformUrl } from '@/lib/ingestion/flows/social-platform-ingest';
 import { fetchSpotifyArtistData } from '@/lib/ingestion/flows/spotify-integration';
-import { getPublicProfileIndexingExclusionReason } from '@/lib/profile/public-profile-indexing-policy';
+import { isPublicProfileDiscoveryEligible } from '@/lib/profile/public-profile-indexing-policy';
 import {
   agentProfileCreateLimiter,
   createRateLimitHeaders,
@@ -22,7 +22,7 @@ import { detectPlatform } from '@/lib/utils/platform-detection';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const bodySchema = z.object({ url: z.url().max(500) });
+const bodySchema = z.object({ url: z.url().max(500) }).strict();
 
 function fail(
   status: number,
@@ -33,6 +33,21 @@ function fail(
   return NextResponse.json(
     { error: { code, message } },
     { status, headers: { ...NO_STORE_HEADERS, ...headers } }
+  );
+}
+
+function canExposeProfile(profile: {
+  readonly username: string;
+  readonly isPublic: boolean | null;
+  readonly displayName?: string | null;
+}): boolean {
+  return (
+    profile.isPublic === true &&
+    isPublicProfileDiscoveryEligible({
+      handle: profile.username,
+      displayName: profile.displayName,
+      isPublic: profile.isPublic,
+    })
   );
 }
 
@@ -50,7 +65,7 @@ function profilePayload(profile: {
     // flow (ownership proven by the human), not a bearer ownership grant.
     claimUrl: profile.isClaimed ? null : `${profileUrl}/claim`,
     claimed: profile.isClaimed === true,
-    public: profile.isPublic !== false,
+    public: profile.isPublic === true,
     created: profile.created,
   };
 }
@@ -123,26 +138,28 @@ export async function POST(request: Request) {
         username: creatorProfiles.usernameNormalized,
         isClaimed: creatorProfiles.isClaimed,
         isPublic: creatorProfiles.isPublic,
+        displayName: creatorProfiles.displayName,
       })
       .from(creatorProfiles)
       .where(eq(creatorProfiles.spotifyId, spotify.spotifyId))
       .orderBy(asc(creatorProfiles.createdAt))
       .limit(10);
     const [existing] = candidates
-      .filter(
-        candidate =>
-          getPublicProfileIndexingExclusionReason(candidate.username) === null
-      )
+      .filter(canExposeProfile)
       .sort(
-        (a, b) =>
-          Number(b.isClaimed === true) - Number(a.isClaimed === true) ||
-          Number(b.isPublic !== false) - Number(a.isPublic !== false)
+        (a, b) => Number(b.isClaimed === true) - Number(a.isClaimed === true)
       );
     if (existing) {
       return NextResponse.json(
         profilePayload({ ...existing, created: false }),
         { status: 200, headers: NO_STORE_HEADERS }
       );
+    }
+
+    // Anonymous reuse must not disclose an unpublished identity or create a
+    // replacement that circumvents its owner's publication choice.
+    if (candidates.some(candidate => candidate.isPublic !== true)) {
+      return fail(404, 'ARTIST_NOT_FOUND', 'Spotify artist not found.');
     }
 
     const ingested = await ingestSocialPlatformUrl(url, {
@@ -157,15 +174,25 @@ export async function POST(request: Request) {
       return fail(
         ingested.status >= 400 ? ingested.status : 500,
         'CREATE_FAILED',
-        body?.error ?? 'Profile could not be created.'
+        'Profile could not be created.'
       );
     }
 
     const [created] = await db
-      .select({ isPublic: creatorProfiles.isPublic })
+      .select({
+        isPublic: creatorProfiles.isPublic,
+        isClaimed: creatorProfiles.isClaimed,
+        displayName: creatorProfiles.displayName,
+      })
       .from(creatorProfiles)
       .where(eq(creatorProfiles.usernameNormalized, username))
       .limit(1);
+
+    // Ingestion may quarantine a new row, or publication may change while it
+    // runs. Do not serialize the returned handle until the stored row is public.
+    if (!created || !canExposeProfile({ ...created, username })) {
+      return fail(404, 'ARTIST_NOT_FOUND', 'Spotify artist not found.');
+    }
 
     logger.info('Agent profile created', {
       username,
@@ -175,8 +202,8 @@ export async function POST(request: Request) {
     return NextResponse.json(
       profilePayload({
         username,
-        isClaimed: false,
-        isPublic: created?.isPublic ?? false,
+        isClaimed: created.isClaimed === true,
+        isPublic: created.isPublic,
         created: true,
       }),
       { status: 201, headers: NO_STORE_HEADERS }

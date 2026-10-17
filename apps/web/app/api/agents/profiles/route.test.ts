@@ -43,13 +43,14 @@ const { POST } = await import('./route');
 
 const SPOTIFY_URL = 'https://open.spotify.com/artist/4Z8W4fKeB5YxbusRsdQVPb';
 
-async function post(body: unknown) {
+async function post(body: unknown, headers: Record<string, string> = {}) {
   return expectPublicOpenApiResponse(
     '/api/agents/profiles',
     'post',
     await POST(
       new Request('https://jov.ie/api/agents/profiles', {
         method: 'POST',
+        headers,
         body: JSON.stringify(body),
       })
     )
@@ -117,6 +118,138 @@ describe('POST /api/agents/profiles', () => {
     expect(hoisted.ingest).not.toHaveBeenCalled();
   });
 
+  it.each([false, null, undefined])(
+    'does not disclose a non-public existing profile (%s)',
+    async isPublic => {
+      hoisted.selectRows = [
+        [{ username: 'private_fixture', isClaimed: true, isPublic }],
+      ];
+      const res = await post({ url: SPOTIFY_URL });
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({
+        error: {
+          code: 'ARTIST_NOT_FOUND',
+          message: 'Spotify artist not found.',
+        },
+      });
+      expect(res.headers.get('Cache-Control')).toContain('no-store');
+      expect(hoisted.ingest).not.toHaveBeenCalled();
+    }
+  );
+
+  it('selects a public profile before a claimed private duplicate', async () => {
+    hoisted.selectRows = [
+      [
+        { username: 'private_fixture', isClaimed: true, isPublic: false },
+        { username: 'public_fixture', isClaimed: false, isPublic: true },
+      ],
+    ];
+    const res = await post({ url: SPOTIFY_URL });
+    expect(res.status).toBe(200);
+    expect((await res.json()).username).toBe('public_fixture');
+    expect(hoisted.ingest).not.toHaveBeenCalled();
+  });
+
+  it('does not reuse an earlier public response after the owner unpublishes', async () => {
+    hoisted.selectRows = [
+      [{ username: 'privacy_fixture', isClaimed: true, isPublic: true }],
+      [{ username: 'privacy_fixture', isClaimed: true, isPublic: false }],
+    ];
+    const before = await post({ url: SPOTIFY_URL });
+    const after = await post({ url: SPOTIFY_URL });
+    expect(before.status).toBe(200);
+    expect(before.headers.get('Cache-Control')).toContain('no-store');
+    expect(after.status).toBe(404);
+    expect(await after.text()).not.toContain('privacy_fixture');
+    expect(hoisted.ingest).not.toHaveBeenCalled();
+  });
+
+  it.each([false, null, undefined])(
+    'rechecks publication after ingestion before serializing (%s)',
+    async isPublic => {
+      hoisted.selectRows = [[], [{ isPublic }]];
+      hoisted.ingest.mockResolvedValue(
+        Response.json({ profile: { username: 'private_created_fixture' } })
+      );
+      const res = await post({ url: SPOTIFY_URL });
+      expect(res.status).toBe(404);
+      expect(await res.text()).not.toContain('private_created_fixture');
+      expect(res.headers.get('Cache-Control')).toContain('no-store');
+    }
+  );
+
+  it('fails closed when the ingested row cannot be found', async () => {
+    hoisted.selectRows = [[], []];
+    hoisted.ingest.mockResolvedValue(
+      Response.json({ profile: { username: 'missing_fixture' } })
+    );
+    const res = await post({ url: SPOTIFY_URL });
+    expect(res.status).toBe(404);
+    expect(await res.text()).not.toContain('missing_fixture');
+  });
+
+  it('does not accept ownership or publication assertions from anonymous callers', async () => {
+    const res = await post({
+      url: SPOTIFY_URL,
+      userId: 'spoofed-owner',
+      isClaimed: true,
+      isPublic: true,
+    });
+    expect(res.status).toBe(400);
+    expect(hoisted.spotify).not.toHaveBeenCalled();
+    expect(hoisted.ingest).not.toHaveBeenCalled();
+  });
+
+  it.each(['Mozilla/5.0', 'synthetic-bot/1.0'])(
+    'does not let caller audience headers reveal a private profile (%s)',
+    async userAgent => {
+      hoisted.selectRows = [
+        [
+          {
+            username: 'private_fixture',
+            isPublic: false,
+            isClaimed: true,
+          },
+        ],
+      ];
+      const res = await post(
+        { url: SPOTIFY_URL },
+        {
+          'User-Agent': userAgent,
+          'X-Profile-Owner': 'true',
+        }
+      );
+      expect(res.status).toBe(404);
+      expect(await res.text()).not.toContain('private_fixture');
+      expect(hoisted.ingest).not.toHaveBeenCalled();
+    }
+  );
+
+  it('prefers the claimed profile among publicly eligible duplicates', async () => {
+    hoisted.selectRows = [
+      [
+        { username: 'unclaimed_fixture', isClaimed: false, isPublic: true },
+        { username: 'claimed_fixture', isClaimed: true, isPublic: true },
+      ],
+    ];
+    const res = await post({ url: SPOTIFY_URL });
+    expect(res.status).toBe(200);
+    expect((await res.json()).username).toBe('claimed_fixture');
+  });
+
+  it('fails closed without returning details from an ingestion exception', async () => {
+    hoisted.selectRows = [[]];
+    hoisted.ingest.mockRejectedValue(
+      new Error('private_fixture internal failure')
+    );
+    const res = await post({ url: SPOTIFY_URL });
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({
+      error: { code: 'INTERNAL', message: 'Profile could not be created.' },
+    });
+    expect(res.headers.get('Cache-Control')).toContain('no-store');
+  });
+
   it('omits the claim URL for a claimed profile', async () => {
     hoisted.selectRows = [
       [{ username: 'radiohead', isClaimed: true, isPublic: true }],
@@ -157,6 +290,57 @@ describe('POST /api/agents/profiles', () => {
     });
   });
 
+  it('never serializes a protected identity returned by ingestion', async () => {
+    hoisted.selectRows = [[], [{ isPublic: true }]];
+    hoisted.ingest.mockResolvedValue(
+      Response.json({ profile: { username: 'tmoc9mm7xfvx02c' } })
+    );
+    const res = await post({ url: SPOTIFY_URL });
+    expect(res.status).toBe(404);
+    expect(await res.text()).not.toContain('tmoc9mm7xfvx02c');
+  });
+
+  it('applies the canonical discovery display-name exclusion after ingestion', async () => {
+    hoisted.selectRows = [
+      [],
+      [
+        {
+          isPublic: true,
+          displayName: 'gp synthetic+clerk test',
+        },
+      ],
+    ];
+    hoisted.ingest.mockResolvedValue(
+      Response.json({ profile: { username: 'fixture_excluded' } })
+    );
+    const res = await post({ url: SPOTIFY_URL });
+    expect(res.status).toBe(404);
+    expect(await res.text()).not.toContain('fixture_excluded');
+  });
+
+  it('reports stored claim state and allowlists output after anonymous ingestion', async () => {
+    hoisted.selectRows = [[], [{ isPublic: true, isClaimed: true }]];
+    hoisted.ingest.mockResolvedValue(
+      Response.json({
+        profile: {
+          username: 'public_fixture',
+          userId: 'internal-owner',
+          claimToken: 'synthetic-do-not-disclose',
+        },
+      })
+    );
+    const res = await post({ url: SPOTIFY_URL });
+    expect(res.status).toBe(201);
+    expect(await res.json()).toEqual({
+      username: 'public_fixture',
+      profileUrl: 'https://jov.ie/public_fixture',
+      claimUrl: null,
+      public: true,
+      claimed: true,
+      created: true,
+    });
+  });
+
   it('creates a profile with collision-safe ingestion', async () => {
     hoisted.selectRows = [[], [{ isPublic: true }]];
     hoisted.ingest.mockResolvedValue(
@@ -185,7 +369,7 @@ describe('POST /api/agents/profiles', () => {
     expect(res.status).toBe(422);
     expect((await res.json()).error).toEqual({
       code: 'CREATE_FAILED',
-      message: 'Invalid username',
+      message: 'Profile could not be created.',
     });
   });
 });
