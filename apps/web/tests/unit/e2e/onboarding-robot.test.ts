@@ -11,6 +11,8 @@ import {
   buildProductionOnboardingRobotUserId,
   isLocalOnboardingRobotEmail,
   isProductionOnboardingRobotEmail,
+  SYNTHETIC_ROBOT_AUTH_UNAVAILABLE_MARKER,
+  syntheticRobotAuthUnavailableReason,
 } from '@/tests/e2e/helpers/onboarding-robot';
 
 describe('onboarding funnel event contract', () => {
@@ -149,5 +151,30 @@ describe('onboarding robot guardrails', () => {
     expect(() => buildProductionOnboardingRobotUserId('manual')).toThrow(
       /non-robot run id/
     );
+  });
+
+  it('names the production robot auth skip and leaves other targets runnable', () => {
+    const production = syntheticRobotAuthUnavailableReason({
+      BASE_URL: 'https://jov.ie/',
+      E2E_ENVIRONMENT: 'production',
+    });
+    const preview = syntheticRobotAuthUnavailableReason({
+      BASE_URL: 'https://preview.jov.ie',
+      E2E_ENVIRONMENT: 'preview',
+    });
+
+    expect(production).toContain(SYNTHETIC_ROBOT_AUTH_UNAVAILABLE_MARKER);
+    expect(production).toContain('no auth bypass');
+    expect(
+      syntheticRobotAuthUnavailableReason({
+        PLAYWRIGHT_TEST_BASE_URL: 'https://jov.ie',
+      })
+    ).toBe(production);
+    expect(preview).toBeNull();
+    expect(
+      syntheticRobotAuthUnavailableReason({
+        BASE_URL: 'http://localhost:3100',
+      })
+    ).toBeNull();
   });
 });

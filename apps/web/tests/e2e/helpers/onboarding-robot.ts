@@ -68,7 +68,23 @@ export function buildOnboardingRobotRunId(seed = `${Date.now().toString(36)}`) {
   return `or-${withoutPrefix || 'run'}`.slice(0, 48);
 }
 
+export const SYNTHETIC_ROBOT_AUTH_UNAVAILABLE_MARKER =
+  'synthetic-robot-auth-unavailable';
+
 const PRODUCTION_ROBOT_USER_ID_PREFIX = 'ba_robot_';
+
+export function syntheticRobotAuthUnavailableReason(env: {
+  readonly BASE_URL?: string;
+  readonly E2E_ENVIRONMENT?: string;
+  readonly PLAYWRIGHT_TEST_BASE_URL?: string;
+}): string | null {
+  const environment = env.E2E_ENVIRONMENT?.trim().toLowerCase();
+  const base = (env.BASE_URL ?? env.PLAYWRIGHT_TEST_BASE_URL ?? '')
+    .trim()
+    .replace(/\/$/, '');
+  if (environment !== 'production' && base !== 'https://jov.ie') return null;
+  return `${SYNTHETIC_ROBOT_AUTH_UNAVAILABLE_MARKER}: production has no auth bypass for the onboarding robot.`;
+}
 
 export function buildProductionOnboardingRobotUserId(runId: string): string {
   if (!runId.startsWith('or-')) {

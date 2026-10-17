@@ -101,17 +101,16 @@ jobs:
         continue-on-error: true
 
       - name: Run Onboarding Robot Full Synthetic (JOV-2681)
-        env:
-          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
-          BASE_URL: https://jov.ie
-          PLAYWRIGHT_TEST_BASE_URL: https://jov.ie
-          E2E_SKIP_WEB_SERVER: '1'
-          E2E_SYNTHETIC_MODE: 'true'
-          E2E_ENVIRONMENT: production
-          SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/onboarding-robot-full-results.json
+        id: onboarding-robot
         run: |
-          doppler run -- node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/onboarding-robot.full.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/onboarding-robot-full
-        continue-on-error: true
+          reason="synthetic-robot-auth-unavailable: production has no auth bypass for the onboarding robot."
+          echo "::warning title=Onboarding robot skipped::${reason}"
+          {
+            echo "### Onboarding robot"
+            echo "${reason}"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "robot_skip_reason=${reason}" >> "$GITHUB_OUTPUT"
+          exit 0
 
       - name: Run Legacy OTP Signup Canary (gated, JOV-2446 cutover)
         # Skip this step entirely once Layer A is proven green and the Clerk
@@ -178,6 +177,7 @@ jobs:
         if: ${{ always() }}
         env:
           LEGACY_CANARY_ENABLED: ${{ vars.E2E_PROD_LEGACY_CANARY != '0' && '1' || '0' }}
+          ROBOT_SKIP_REASON: ${{ steps.onboarding-robot.outputs.robot_skip_reason }}
         run: |
           node <<'NODE'
           const fs = require('node:fs');
@@ -190,6 +190,7 @@ jobs:
           const legacyCanaryEnabled = process.env.LEGACY_CANARY_ENABLED === '1';
           const result = parseSyntheticTestResults({
             resultFiles: DEFAULT_RESULT_FILES(legacyCanaryEnabled),
+            robotSkipReason: process.env.ROBOT_SKIP_REASON,
           });
 
           for (const warning of result.testWarnings) {
