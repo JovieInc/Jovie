@@ -68,6 +68,9 @@ const COMMISSIONING_HEADING = /^#{1,6}\s.*commission/im;
 // evidence", "Acceptance checks" and "Evaluation / completion" sections.
 const ACCEPTANCE_SECTION =
   /^\s*(?:#{1,6}\s+|\*\*)\s*(?:acceptance|completion|evaluation|success criteria|exit criteria|definition of done|done (?:when|means)|verification|proof)\b/i;
+// Plain authored labels require a colon; incidental prose is not a section.
+const PLAIN_ACCEPTANCE_SECTION =
+  /^[ \t]{0,3}(?:acceptance(?:[ \t]+(?:criteria|evidence|checks))?|completion(?:[ \t]+(?:criteria|evidence|checks))?|evaluation(?:[ \t]*\/[ \t]*completion)?|success[ \t]+criteria|exit[ \t]+criteria|definition[ \t]+of[ \t]+done|done[ \t]+(?:when|means)|verification|proof)[ \t]*:/i;
 // A `#` heading or a bold-only line (`**Notes**`) ends a section.
 const ANY_HEADING = /^\s*(?:#{1,6}\s|\*\*[^*]+\*\*:?\s*$)/;
 const CHECKED_BOX = /^\s*[-*] \[[xX]\]/;
@@ -159,15 +162,36 @@ export function outcomeAcceptanceReasons(issue, parentReason = '') {
  */
 function hasOpenAcceptanceSection(description) {
   const lines = description.split('\n');
+  let plainFence = '';
   for (const [index, line] of lines.entries()) {
-    if (!ACCEPTANCE_SECTION.test(line)) continue;
-    // `**Acceptance:** text` carries its criteria on the same line.
-    const inline = line
-      .replace(ACCEPTANCE_SECTION, '')
-      .replace(/^[^*]*\*\*\s*:?/, '')
-      .replace(/^\s*:/, '')
-      .trim();
-    if (!/^#/.test(line.trim()) && inline.length > 0) return true;
+    // Plain labels inside a fenced literal are examples, not authored criteria.
+    // Keep the existing Markdown-heading interpretation unchanged.
+    const fence = /^[ \t]{0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+    if (fence) {
+      if (!plainFence) plainFence = fence[1];
+      else if (
+        fence[1][0] === plainFence[0] &&
+        fence[1].length >= plainFence.length &&
+        !fence[2].trim()
+      )
+        plainFence = '';
+    }
+    const plain = !plainFence && PLAIN_ACCEPTANCE_SECTION.exec(line);
+    if (!ACCEPTANCE_SECTION.test(line) && !plain) continue;
+    // Both `**Acceptance:** text` and `Acceptance: text` carry inline criteria.
+    const inline = plain
+      ? line.slice(plain[0].length).trim()
+      : line
+          .replace(ACCEPTANCE_SECTION, '')
+          .replace(/^[^*]*\*\*\s*:?/, '')
+          .replace(/^\s*:/, '')
+          .trim();
+    if (
+      !/^#/.test(line.trim()) &&
+      inline.length > 0 &&
+      !(plain && CHECKED_BOX.test(inline))
+    )
+      return true;
     for (const next of lines.slice(index + 1)) {
       if (ANY_HEADING.test(next)) break;
       if (next.trim() && !CHECKED_BOX.test(next)) return true;
