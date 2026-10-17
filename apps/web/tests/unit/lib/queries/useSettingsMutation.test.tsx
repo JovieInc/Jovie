@@ -151,6 +151,27 @@ describe('useUpdateSettingsMutation', () => {
     });
   });
 
+  it('binds a discovery choice to the selected immutable profile without publishing it', async () => {
+    const { result } = renderHook(
+      () =>
+        useUpdateSettingsMutation({
+          profileId: PROFILE_ID,
+          silentSuccess: true,
+        }),
+      { wrapper: TestWrapper }
+    );
+    await act(async () => {
+      await result.current.mutateAsync({
+        updates: { settings: { searchable: false } },
+      });
+    });
+    expect(mockMutationFn).toHaveBeenCalledWith({
+      profileId: PROFILE_ID,
+      updates: { settings: { searchable: false } },
+    });
+    expect(mockHandleMutationSuccess).not.toHaveBeenCalled();
+  });
+
   it('does not fall back to the legacy GET profile cache envelope', async () => {
     queryClient.setQueryData(['user', 'profile'], {
       profile: { id: 'legacy-envelope-profile' },

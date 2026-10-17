@@ -53,6 +53,12 @@ describe('GET /api/featured-creators', () => {
                 creatorType: 'artist',
               },
               {
+                id: 'unlisted_secret',
+                username: 'unlisted_secret',
+                displayName: 'Unlisted Secret',
+                settings: { searchable: false },
+              },
+              {
                 id: 'profile_3',
                 username: 'creator3',
                 displayName: 'Creator Three',
@@ -70,8 +76,10 @@ describe('GET /api/featured-creators', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
     expect(Array.isArray(data)).toBe(true);
     expect(data).toHaveLength(3);
+    expect(JSON.stringify(data)).not.toContain('unlisted_secret');
     expect(data[0]).toEqual({
       id: 'profile_1',
       handle: 'creator1',

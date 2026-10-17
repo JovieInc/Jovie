@@ -42,17 +42,8 @@ const MAX_QUERY_LENGTH = 60;
 const DEFAULT_LIMIT = 5;
 const MAX_LIMIT = 10;
 const SEARCH_CACHE_TTL_SECONDS = 300; // 5 minutes
-// NOTE: claimed-artist status is cached here for 60s on top of the 30s
-// unstable_cache inside getCachedClaimedSpotifyIds, so effective max staleness
-// for claimed badges is about 90 seconds.
-const SEARCH_RESPONSE_CACHE_TTL_SECONDS = 60; // 1 minute
-
-class SearchEnrichmentFallbackError extends Error {
-  constructor(readonly results: SpotifyArtistResult[]) {
-    super('Spotify search enrichment fell back to a degraded payload');
-    this.name = 'SearchEnrichmentFallbackError';
-  }
-}
+// Cache provider catalog facts only. Jovie consent and caller ownership are
+// evaluated afresh after every cache read, including single-letter searches.
 
 async function getSearchAuthUserId(): Promise<string | null> {
   try {
@@ -213,7 +204,6 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const responseCacheKey = `spotify:search:response:${normalizedQuery}:${limit}`;
     const rawCacheKey = `spotify:search:${normalizedQuery}:${limit}`;
     const loadRawResults = () =>
       cacheQuery<SpotifyArtistResult[]>(
@@ -245,26 +235,10 @@ export async function GET(request: NextRequest) {
       const vipBoosted = await applyVipBoostWithMeta(claimedBoosted, q, limit);
 
       const results = vipBoosted.results;
-      if (annotated.degraded || vipBoosted.degraded) {
-        throw new SearchEnrichmentFallbackError(results);
-      }
       return results;
     };
 
-    let results: SpotifyArtistResult[];
-    try {
-      results = await cacheQuery<SpotifyArtistResult[]>(
-        responseCacheKey,
-        async () => buildEnrichedResults(await loadRawResults()),
-        { ttlSeconds: SEARCH_RESPONSE_CACHE_TTL_SECONDS, useRedis: true }
-      );
-    } catch (error) {
-      if (error instanceof SearchEnrichmentFallbackError) {
-        results = error.results;
-      } else {
-        throw error;
-      }
-    }
+    const results = await buildEnrichedResults(await loadRawResults());
 
     const userAwareResults = await annotateClaimedStatusForCurrentUser(
       results,

@@ -3,6 +3,7 @@ import { BASE_URL } from '@/constants/app';
 import { db } from '@/lib/db';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { isProfileSearchable } from '@/lib/profile/public-profile-access';
 import {
   detectPlatformFromUrl,
   extractHandleFromUrl,
@@ -71,13 +72,19 @@ async function candidates(
   platform: CreatorLookupPlatform,
   likeToken: string
 ): Promise<
-  { username: string; displayName: string | null; url: string | null }[]
+  {
+    username: string;
+    displayName: string | null;
+    url: string | null;
+    settings?: unknown;
+  }[]
 > {
   const pattern = `%${escapeLikePattern(likeToken)}%`;
   const linkRows = db
     .select({
       username: creatorProfiles.username,
       displayName: creatorProfiles.displayName,
+      settings: creatorProfiles.settings,
       url: socialLinks.url,
     })
     .from(socialLinks)
@@ -100,6 +107,7 @@ async function candidates(
     .select({
       username: creatorProfiles.username,
       displayName: creatorProfiles.displayName,
+      settings: creatorProfiles.settings,
       url: creatorProfiles.youtubeUrl,
     })
     .from(creatorProfiles)
@@ -134,6 +142,7 @@ export async function findProfileForSource(
 
   for (const candidate of await candidates(platform, likeToken)) {
     if (
+      isProfileSearchable(candidate.settings) &&
       candidate.url &&
       isSameSourceIdentity(platform, sourceUrl, candidate.url)
     ) {

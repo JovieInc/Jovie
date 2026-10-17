@@ -30,6 +30,7 @@ const publicColumns = {
   appleMusicUrl: creatorProfiles.appleMusicUrl,
   youtubeUrl: creatorProfiles.youtubeUrl,
   isPublic: creatorProfiles.isPublic,
+  settings: creatorProfiles.settings,
 };
 
 const identifiedColumns = {

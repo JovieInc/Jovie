@@ -35,6 +35,8 @@ vi.mock('@/lib/db/schema/profiles', () => ({
     id: 'id',
     spotifyId: 'spotifyId',
     isClaimed: 'isClaimed',
+    isPublic: 'isPublic',
+    settings: 'settings',
     userId: 'userId',
   },
   userProfileClaims: {
@@ -299,7 +301,7 @@ describe('annotateClaimedStatus', () => {
   });
 
   it('marks claimed artists with isClaimed: true', async () => {
-    claimedResult.value = [{ spotifyId: 'claimed-id' }];
+    claimedResult.value = [{ spotifyId: 'claimed-id', isPublic: true }];
 
     const results = [
       makeResult({ id: 'claimed-id', name: 'Claimed Artist' }),
@@ -324,6 +326,38 @@ describe('annotateClaimedStatus', () => {
 
     expect(annotated[0].isClaimed).toBeUndefined();
     expect(annotated[1].isClaimed).toBeUndefined();
+  });
+
+  it.each([
+    { isPublic: false, settings: { searchable: true } },
+    { isPublic: true, settings: { searchable: false } },
+    { isPublic: true, settings: { searchable: 'true' } },
+  ])(
+    'does not publish Jovie claim association outside discovery consent: %j',
+    async policy => {
+      claimedResult.value = [{ spotifyId: 'hidden-id', ...policy }];
+      const result = await annotateClaimedStatus([
+        makeResult({ id: 'hidden-id', name: 'Provider Artist' }),
+      ]);
+      expect(result[0].isClaimed).toBeUndefined();
+      expect(result[0].name).toBe('Provider Artist');
+    }
+  );
+
+  it('removes stale Jovie annotations from cached provider data even when storage fails', async () => {
+    mockSelect.mockImplementationOnce(() => {
+      throw new Error('unavailable');
+    });
+    const result = await annotateClaimedStatus([
+      makeResult({
+        id: 'hidden-id',
+        name: 'Provider Artist',
+        isClaimed: true,
+        isClaimedByCurrentUser: true,
+      }),
+    ]);
+    expect(result[0].isClaimed).toBeUndefined();
+    expect(result[0].isClaimedByCurrentUser).toBeUndefined();
   });
 
   it('returns results unchanged on DB error', async () => {

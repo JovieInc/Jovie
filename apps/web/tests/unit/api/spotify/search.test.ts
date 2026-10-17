@@ -214,11 +214,7 @@ describe('GET /api/spotify/search', () => {
 
     await GET(new NextRequest('http://localhost/api/spotify/search?q=test'));
 
-    expect(mockCacheQuery).toHaveBeenCalledWith(
-      'spotify:search:response:test:5',
-      expect.any(Function),
-      { ttlSeconds: 60, useRedis: true }
-    );
+    expect(mockCacheQuery).toHaveBeenCalledTimes(1);
     expect(mockCacheQuery).toHaveBeenCalledWith(
       'spotify:search:test:5',
       expect.any(Function),
@@ -295,10 +291,49 @@ describe('GET /api/spotify/search', () => {
     expect(response.status).toBe(200);
     expect(data[0].id).toBe('artist_1');
     expect(mockCacheQuery).toHaveBeenCalledWith(
-      'spotify:search:response:artist:5',
+      'spotify:search:artist:5',
       expect.any(Function),
-      { ttlSeconds: 60, useRedis: true }
+      { ttlSeconds: 300, useRedis: true }
     );
+  });
+
+  it('rechecks Jovie annotations after a warm provider search without invalidation', async () => {
+    const cache = new Map<string, unknown>();
+    mockCacheQuery.mockImplementation(
+      async (key: string, load: () => Promise<unknown>) => {
+        if (!cache.has(key)) cache.set(key, await load());
+        return cache.get(key);
+      }
+    );
+    mockSearchArtists.mockResolvedValue([
+      {
+        spotifyId: 'provider-id',
+        name: 'Provider Artist',
+        followerCount: 12,
+        popularity: 3,
+      },
+    ]);
+    mockAnnotateClaimedStatusWithMeta
+      .mockImplementationOnce(async (results: unknown[]) => ({
+        degraded: false,
+        results: results.map((result: object) => ({
+          ...result,
+          isClaimed: true,
+        })),
+      }))
+      .mockImplementationOnce(async (results: unknown[]) => ({
+        degraded: false,
+        results,
+      }));
+    const request = () =>
+      new NextRequest('http://localhost/api/spotify/search?q=provider');
+    const first = await GET(request());
+    expect((await first.json())[0].isClaimed).toBe(true);
+    const second = await GET(request());
+    expect((await second.json())[0].isClaimed).toBeUndefined();
+    expect(second.headers.get('Cache-Control')).toContain('no-store');
+    expect(mockSearchArtists).toHaveBeenCalledTimes(1);
+    expect(mockAnnotateClaimedStatusWithMeta).toHaveBeenCalledTimes(2);
   });
 
   it('uses user key when authenticated and IP key when anonymous', async () => {

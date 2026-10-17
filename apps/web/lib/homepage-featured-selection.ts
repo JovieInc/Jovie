@@ -1,8 +1,6 @@
 import { and, eq } from 'drizzle-orm';
-import { unstable_cache } from 'next/cache';
 import { db, doesTableExist, TABLE_NAMES } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { FOUNDER_DEMO_PERSONA } from '@/lib/demo-personas';
 import { captureError } from '@/lib/error-tracking';
 import {
   type FeaturedCreator,
@@ -19,7 +17,7 @@ export interface HomepageFeaturedSelectionOptions {
 }
 
 export interface HomepageFeaturedSelectionResult {
-  readonly pinnedCreator: FeaturedCreator;
+  readonly pinnedCreator: FeaturedCreator | null;
   readonly creators: FeaturedCreator[];
   readonly claimedFeaturedCandidates: HomepageFeaturedCandidate[];
 }
@@ -33,19 +31,6 @@ export interface HomepageFeaturedCandidate extends FeaturedCreator {
 const DEFAULT_PINNED_HANDLE = 'tim';
 const DEFAULT_LIMIT = 3;
 
-function buildFounderFallbackCreator(): FeaturedCreator {
-  return {
-    id: 'homepage-founder-fallback',
-    handle: FOUNDER_DEMO_PERSONA.profile.handle,
-    name: FOUNDER_DEMO_PERSONA.profile.displayName,
-    src: FOUNDER_DEMO_PERSONA.profile.avatarSrc,
-    tagline: FOUNDER_DEMO_PERSONA.profile.bio,
-    genres: [...FOUNDER_DEMO_PERSONA.profile.genres],
-    latestReleaseTitle: null,
-    latestReleaseType: null,
-  };
-}
-
 async function queryHomepageFeaturedCandidates(): Promise<
   HomepageFeaturedCandidate[]
 > {
@@ -58,6 +43,7 @@ async function queryHomepageFeaturedCandidates(): Promise<
       .select({
         id: creatorProfiles.id,
         username: creatorProfiles.username,
+        settings: creatorProfiles.settings,
         displayName: creatorProfiles.displayName,
         bio: creatorProfiles.bio,
         avatarUrl: creatorProfiles.avatarUrl,
@@ -111,14 +97,7 @@ async function queryHomepageFeaturedCandidates(): Promise<
   }
 }
 
-export const getHomepageFeaturedCandidates = unstable_cache(
-  queryHomepageFeaturedCandidates,
-  ['homepage-featured-candidates'],
-  {
-    revalidate: 60 * 60,
-    tags: ['featured-creators'],
-  }
-);
+export const getHomepageFeaturedCandidates = queryHomepageFeaturedCandidates;
 
 export function filterClaimedFeaturedCandidates(
   candidates: readonly HomepageFeaturedCandidate[]
@@ -128,9 +107,11 @@ export function filterClaimedFeaturedCandidates(
 
 export async function resolveHomepagePinnedCreator(
   options: HomepageFeaturedSelectionOptions = {}
-): Promise<FeaturedCreator> {
+): Promise<FeaturedCreator | null> {
   const handle = options.pinnedHandle ?? DEFAULT_PINNED_HANDLE;
-  return (await getCreatorByHandle(handle)) ?? buildFounderFallbackCreator();
+  // Missing, unavailable, and withdrawn profiles must not be resurrected by a
+  // static identity fallback in an automatic discovery list.
+  return getCreatorByHandle(handle);
 }
 
 export async function resolveHomepageFeaturedCreators(
@@ -149,12 +130,15 @@ export async function resolveHomepageFeaturedCreators(
     ]);
 
   const otherCreators = featuredCreators.filter(
-    creator => creator.handle !== pinnedCreator.handle
+    creator => creator.handle !== pinnedCreator?.handle
   );
 
   return {
     pinnedCreator,
-    creators: [pinnedCreator, ...otherCreators].slice(0, limit),
+    creators: [
+      ...(pinnedCreator ? [pinnedCreator] : []),
+      ...otherCreators,
+    ].slice(0, limit),
     claimedFeaturedCandidates:
       filterClaimedFeaturedCandidates(homepageCandidates),
   };

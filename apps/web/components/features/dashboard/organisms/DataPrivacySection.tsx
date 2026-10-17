@@ -9,8 +9,16 @@ import { SettingsActionRow } from '@/components/molecules/settings/SettingsActio
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { useDeleteAccountMutation, useExportDataMutation } from '@/lib/queries';
+import type { Artist } from '@/types/db';
+import { SettingsSearchabilitySection } from './SettingsSearchabilitySection';
 
-export function DataPrivacySection() {
+export function DataPrivacySection({
+  artist,
+  onArtistUpdate,
+}: {
+  readonly artist?: Artist | null;
+  readonly onArtistUpdate?: (artist: Artist) => void;
+} = {}) {
   const { signOut } = useAuthSafe();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [confirmText, setConfirmText] = useState('');
@@ -36,6 +44,13 @@ export function DataPrivacySection() {
 
   return (
     <div className='space-y-4'>
+      {artist && (
+        <SettingsSearchabilitySection
+          artist={artist}
+          onArtistUpdate={onArtistUpdate}
+        />
+      )}
+
       <SettingsPanel>
         <div className='px-4 py-4 sm:px-5'>
           <SettingsActionRow

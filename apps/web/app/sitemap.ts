@@ -1,7 +1,6 @@
 import * as Sentry from '@sentry/nextjs';
 import { and, eq } from 'drizzle-orm';
 import { MetadataRoute } from 'next';
-import { unstable_cache } from 'next/cache';
 import { BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { getAlternativeSlugs } from '@/content/alternatives';
@@ -13,7 +12,6 @@ import {
   isBlogPostIndexable,
   slugifyCategory,
 } from '@/lib/blog/getBlogPosts';
-import { CACHE_TAGS } from '@/lib/cache/tags';
 import { getChangelogReleases } from '@/lib/changelog-source';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -38,7 +36,8 @@ import {
   toContentRevisionDate,
 } from '@/lib/seo/sitemap-publication';
 
-export const revalidate = 3600;
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 type SitemapCatalog = {
   profiles: Array<{
@@ -76,136 +75,130 @@ const EMPTY_CATALOG: SitemapCatalog = {
   playlists: [],
 };
 
-const getSitemapCatalog = unstable_cache(
-  async (): Promise<SitemapCatalog> => {
-    if (!env.DATABASE_URL) {
-      return EMPTY_CATALOG;
-    }
+const getSitemapCatalog = async (): Promise<SitemapCatalog> => {
+  if (!env.DATABASE_URL) {
+    return EMPTY_CATALOG;
+  }
 
-    try {
-      const [profiles, releases, tracks, playlists] = await Promise.all([
-        db
-          .select({
-            username: creatorProfiles.username,
-            updatedAt: creatorProfiles.updatedAt,
-            avatarUrl: creatorProfiles.avatarUrl,
-            isClaimed: creatorProfiles.isClaimed,
-            displayName: creatorProfiles.displayName,
-            settings: creatorProfiles.settings,
-            ownerEmail: users.email,
-          })
-          .from(creatorProfiles)
-          .leftJoin(users, eq(users.id, creatorProfiles.userId))
-          .where(eq(creatorProfiles.isPublic, true)),
+  try {
+    const [profiles, releases, tracks, playlists] = await Promise.all([
+      db
+        .select({
+          username: creatorProfiles.username,
+          updatedAt: creatorProfiles.updatedAt,
+          avatarUrl: creatorProfiles.avatarUrl,
+          isClaimed: creatorProfiles.isClaimed,
+          displayName: creatorProfiles.displayName,
+          settings: creatorProfiles.settings,
+          ownerEmail: users.email,
+        })
+        .from(creatorProfiles)
+        .leftJoin(users, eq(users.id, creatorProfiles.userId))
+        .where(eq(creatorProfiles.isPublic, true)),
 
-        db
-          .select({
-            username: creatorProfiles.usernameNormalized,
-            slug: discogReleases.slug,
-            updatedAt: discogReleases.updatedAt,
-            artworkUrl: discogReleases.artworkUrl,
-          })
-          .from(discogReleases)
-          .innerJoin(
-            creatorProfiles,
-            eq(discogReleases.creatorProfileId, creatorProfiles.id)
-          )
-          .where(
-            and(
-              eq(creatorProfiles.isPublic, true),
-              publicReleaseEligibilitySqlPredicate()
-            )
-          ),
-
-        db
-          .select({
-            username: creatorProfiles.usernameNormalized,
-            slug: discogRecordings.slug,
-            releaseSlug: discogReleases.slug,
-            updatedAt: discogRecordings.updatedAt,
-          })
-          .from(discogRecordings)
-          .innerJoin(
-            discogReleaseTracks,
-            eq(discogReleaseTracks.recordingId, discogRecordings.id)
-          )
-          .innerJoin(
-            discogReleases,
-            eq(discogReleaseTracks.releaseId, discogReleases.id)
-          )
-          .innerJoin(
-            creatorProfiles,
-            eq(discogRecordings.creatorProfileId, creatorProfiles.id)
-          )
-          // Keep the same earliest-release choice used by the track page when
-          // a recording appears on multiple eligible releases.
-          .orderBy(discogReleases.releaseDate)
-          .where(
-            and(
-              eq(creatorProfiles.isPublic, true),
-              publicReleaseEligibilitySqlPredicate()
-            )
-          ),
-
-        db
-          .select({
-            slug: joviePlaylists.slug,
-            updatedAt: joviePlaylists.updatedAt,
-            coverImageUrl: joviePlaylists.coverImageUrl,
-          })
-          .from(joviePlaylists)
-          .where(eq(joviePlaylists.status, 'published'))
-          .catch(
-            () =>
-              [] as {
-                slug: string;
-                updatedAt: Date | null;
-                coverImageUrl: string | null;
-              }[]
-          ),
-      ]);
-
-      const usernamesWithPublicRelease = new Set(
-        releases.map(release => release.username.trim().toLowerCase())
-      );
-      const discoverableProfiles = filterPublicDiscoveryIdentities(
-        profiles.map(profile => ({
-          ...profile,
-          handle: profile.username,
-          isPublic: true,
-          hasPublicRelease: usernamesWithPublicRelease.has(
-            profile.username.trim().toLowerCase()
-          ),
-        }))
-      );
-      const eligibleUsernames = new Set(
-        discoverableProfiles.map(profile =>
-          profile.username.trim().toLowerCase()
+      db
+        .select({
+          username: creatorProfiles.usernameNormalized,
+          slug: discogReleases.slug,
+          updatedAt: discogReleases.updatedAt,
+          artworkUrl: discogReleases.artworkUrl,
+        })
+        .from(discogReleases)
+        .innerJoin(
+          creatorProfiles,
+          eq(discogReleases.creatorProfileId, creatorProfiles.id)
         )
-      );
+        .where(
+          and(
+            eq(creatorProfiles.isPublic, true),
+            publicReleaseEligibilitySqlPredicate()
+          )
+        ),
 
-      return {
-        profiles: discoverableProfiles.filter(
-          profile =>
-            profile.isClaimed === true ||
-            !isUnclaimedStructuredCreditProfile(profile.settings)
+      db
+        .select({
+          username: creatorProfiles.usernameNormalized,
+          slug: discogRecordings.slug,
+          releaseSlug: discogReleases.slug,
+          updatedAt: discogRecordings.updatedAt,
+        })
+        .from(discogRecordings)
+        .innerJoin(
+          discogReleaseTracks,
+          eq(discogReleaseTracks.recordingId, discogRecordings.id)
+        )
+        .innerJoin(
+          discogReleases,
+          eq(discogReleaseTracks.releaseId, discogReleases.id)
+        )
+        .innerJoin(
+          creatorProfiles,
+          eq(discogRecordings.creatorProfileId, creatorProfiles.id)
+        )
+        // Keep the same earliest-release choice used by the track page when
+        // a recording appears on multiple eligible releases.
+        .orderBy(discogReleases.releaseDate)
+        .where(
+          and(
+            eq(creatorProfiles.isPublic, true),
+            publicReleaseEligibilitySqlPredicate()
+          )
         ),
-        releases: releases.filter(release =>
-          eligibleUsernames.has(release.username.trim().toLowerCase())
+
+      db
+        .select({
+          slug: joviePlaylists.slug,
+          updatedAt: joviePlaylists.updatedAt,
+          coverImageUrl: joviePlaylists.coverImageUrl,
+        })
+        .from(joviePlaylists)
+        .where(eq(joviePlaylists.status, 'published'))
+        .catch(
+          () =>
+            [] as {
+              slug: string;
+              updatedAt: Date | null;
+              coverImageUrl: string | null;
+            }[]
         ),
-        tracks: tracks.filter(track =>
-          eligibleUsernames.has(track.username.trim().toLowerCase())
+    ]);
+
+    const usernamesWithPublicRelease = new Set(
+      releases.map(release => release.username.trim().toLowerCase())
+    );
+    const discoverableProfiles = filterPublicDiscoveryIdentities(
+      profiles.map(profile => ({
+        ...profile,
+        handle: profile.username,
+        isPublic: true,
+        hasPublicRelease: usernamesWithPublicRelease.has(
+          profile.username.trim().toLowerCase()
         ),
-        playlists,
-      };
-    } catch (error) {
-      Sentry.captureException(error);
-      return EMPTY_CATALOG;
-    }
-  },
-  ['sitemap-catalog-v7'],
-  { revalidate: 3600, tags: [CACHE_TAGS.SITEMAP_CATALOG] }
-);
+      }))
+    );
+    const eligibleUsernames = new Set(
+      discoverableProfiles.map(profile => profile.username.trim().toLowerCase())
+    );
+
+    return {
+      profiles: discoverableProfiles.filter(
+        profile =>
+          profile.isClaimed === true ||
+          !isUnclaimedStructuredCreditProfile(profile.settings)
+      ),
+      releases: releases.filter(release =>
+        eligibleUsernames.has(release.username.trim().toLowerCase())
+      ),
+      tracks: tracks.filter(track =>
+        eligibleUsernames.has(track.username.trim().toLowerCase())
+      ),
+      playlists,
+    };
+  } catch (error) {
+    Sentry.captureException(error);
+    return EMPTY_CATALOG;
+  }
+};
 
 function absoluteUrl(path: string): string {
   return path === '/' ? BASE_URL : `${BASE_URL}${path}`;
