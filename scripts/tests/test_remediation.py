@@ -363,6 +363,40 @@ class RouterLadderTest(unittest.TestCase):
                     remediation.classify_blocker(pr(number=21810, body=body, **red))["cls"],
                     "needs-human-decision")
 
+    def test_excluded_credentials_are_assurance_not_a_human_gate(self):
+        """PR #21903 exhausted on assurance that receipts omit credentials and
+        that the CLI cannot isolate them. A positive credential action or a
+        pricing ask in the same text still gates."""
+        assurance = (
+            "Ordinary runs remain report-only. The current CLI boundary cannot "
+            "attest or isolate child tools, credentials, and egress. Raw arguments, "
+            "prompts, executable paths, headers, environment values, credentials, "
+            "and OTPs are excluded from route receipts; dispatch references are hashed."
+        )
+        red = {"statusCheckRollup": [
+            {"name": "Source Validation", "status": "COMPLETED", "conclusion": "FAILURE",
+             "excerpt": "missing-metadata"}]}
+        held = {"sha": HEAD, "reason": "diff-too-large"}
+        classified = remediation.classify_blocker(pr(
+            number=21903, body=assurance, mergeStateStatus="BLOCKED", **red), held)
+        self.assertEqual(classified["cls"], "fixable-by-model")
+        self.assertEqual(classified["subtype"], "check")
+        self.assertNotIn("strategy/pricing/credential/taste content", classified["evidence"])
+        for body in (
+            assurance + " Please update pricing.",
+            assurance + " Rotate the credential before launch.",
+            "We cannot rotate the credential.",
+            "Publish the notes, credentials need rotation.",
+            "Raw arguments and credentials are excluded. Please update pricing.",
+            "Please create a new credential.",
+        ):
+            with self.subTest(body=body):
+                self.assertEqual(
+                    remediation.classify_blocker(
+                        pr(number=21903, body=body, mergeStateStatus="BLOCKED", **red),
+                        held)["cls"],
+                    "needs-human-decision")
+
     def test_direct_permission_asks_cover_github_token_and_app_scopes(self):
         for text in (
             "Please add contents:write permission to GITHUB_TOKEN.",

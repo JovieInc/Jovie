@@ -90,6 +90,9 @@ STRATEGY_TEXT = re.compile(
 # A cost-impact list ("No new service, schedule, controller, credentials")
 # is the same assurance. Only a bare list item is removed; "rotate the
 # credential" and any pricing/taste/strategy ask in that sentence stay.
+# Excluding or withholding credentials, and a boundary that cannot attest
+# or isolate them, is assurance too (JOV-8621, PR #21903). A positive
+# credential action in that same sentence still gates.
 NEGATED_POLICY_TEXT = re.compile(
     r"\bno\s+(?:new\s+)?(?:credentials?|secrets?|tokens?|permissions?|scopes?)\b"
     r"|\b(?:without|not)\s+(?:changing|touching|adding)\s+(?:any\s+)?(?:credentials?|secrets?|permissions?)",
@@ -104,6 +107,26 @@ _NON_CREDENTIAL_STRATEGY = re.compile(
     r"canon/strategy|founder strategy|pricing|taste\b",
     re.IGNORECASE,
 )
+_POSITIVE_CREDENTIAL = re.compile(
+    r"\b(?:rotate|rotating|rotation|create|creating|generate|generating|"
+    r"issue|issuing|install|installing|change|changing|update|updating|"
+    r"replace|replacing)\b.{0,40}\bcredentials?\b"
+    r"|\bcredentials?\b.{0,40}\b(?:rotate|rotating|rotation|need|needs|"
+    r"require|requires|must)\b",
+    re.IGNORECASE,
+)
+_CREDENTIAL_EXCLUSION = re.compile(
+    r"\bcredentials?\b[^.!\n]{0,80}\b(?:are|is|were|was|be|being|been)\s+"
+    r"(?:excluded|omitted|redacted|hashed|stripped|dropped|withheld)\b"
+    r"|\bcredentials?\b[^.!\n]{0,80}\b(?:are|is|were|was|be|being|been)\s+not\s+"
+    r"(?:recorded|stored|logged|included|emitted|printed|persisted)\b"
+    r"|\b(?:excluded|omitted|redacted|hashed|stripped|dropped|withheld)\b"
+    r"[^.!\n]{0,80}\bcredentials?\b"
+    r"|\bcannot\b[^.!\n]{0,160}\b(?:attest|isolate)\b"
+    r"[^.!\n]{0,80}\bcredentials?\b",
+    re.IGNORECASE,
+)
+_CREDENTIAL_WORD = re.compile(r"\bcredentials?\b", re.IGNORECASE)
 ACTIONABLE_FIX = re.compile(
     r"computeRatePercent|use `|replace `|change `|fix:|add (?:the |a )?(?:story|test|colocated)|"
     r"@coverage-via|remove [`']?hold",
@@ -247,8 +270,13 @@ def _strip_negated_policy(text: str) -> str:
             stripped.append(piece)
             continue
         piece = NEGATED_POLICY_TEXT.sub("", piece)
-        if _NO_NEW_ASSURANCE.search(piece) and not _NON_CREDENTIAL_STRATEGY.search(piece):
+        if _NON_CREDENTIAL_STRATEGY.search(piece) or _POSITIVE_CREDENTIAL.search(piece):
+            stripped.append(piece)
+            continue
+        if _NO_NEW_ASSURANCE.search(piece):
             piece = _BARE_LIST_CREDENTIAL.sub("", piece)
+        if _CREDENTIAL_EXCLUSION.search(piece):
+            piece = _CREDENTIAL_WORD.sub("", piece)
         stripped.append(piece)
     return "".join(stripped)
 
