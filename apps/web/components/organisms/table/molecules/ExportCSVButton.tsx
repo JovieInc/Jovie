@@ -118,6 +118,12 @@ export function ExportCSVButton<T extends object>({
   const [pendingData, setPendingData] = useState<T[] | null>(null);
   const generation = useRef(0);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (isDialogOpen && isExporting) {
+      dialogRef.current?.focus({ preventScroll: true });
+    }
+  }, [isDialogOpen, isExporting]);
   useEffect(
     () => () => {
       generation.current += 1;
@@ -276,6 +282,7 @@ export function ExportCSVButton<T extends object>({
 
       <AlertDialog open={isDialogOpen} onOpenChange={handleOpenChange}>
         <AlertDialogContent
+          ref={dialogRef}
           onCloseAutoFocus={handleCloseAutoFocus}
           onEscapeKeyDown={event => {
             if (isExporting) event.preventDefault();

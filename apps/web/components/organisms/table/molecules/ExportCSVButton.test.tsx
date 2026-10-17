@@ -249,6 +249,12 @@ describe('ExportCSVButton confirmation', () => {
     expect(dialog).toBeVisible();
     expect(screen.getByRole('button', { name: 'Exporting...' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    // The named review remains the focus target while both actions are unavailable.
+    await waitFor(() => expect(dialog).toHaveFocus());
+    await user.tab();
+    expect(dialog).toContainElement(document.activeElement as HTMLElement);
+    await user.tab({ shift: true });
+    expect(dialog).toContainElement(document.activeElement as HTMLElement);
     await user.keyboard('{Escape}');
     expect(dialog).toBeVisible();
     expect(download).not.toHaveBeenCalled();
