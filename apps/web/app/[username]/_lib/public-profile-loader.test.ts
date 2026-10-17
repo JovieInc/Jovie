@@ -192,7 +192,7 @@ describe('per-request public authority', () => {
   });
 
   it.each([null, new Error('temporary failure')])(
-    'never stores a negative result or rereads it within one request',
+    'rechecks after a missing or temporarily unavailable read',
     async value => {
       mocks.cache.mockImplementation(
         (fn: () => Promise<unknown>) => async () => {
@@ -214,12 +214,13 @@ describe('per-request public authority', () => {
     }
   );
 
-  it('recovers from cache infrastructure failure by fetching storage once', async () => {
+  it('reads current storage without consulting an unavailable shared cache', async () => {
     mocks.cache.mockImplementation(() => async () => {
       throw new Error('cache unavailable');
     });
     expect((await getProfileAndLinks('testartist')).status).toBe('ok');
     expect(mocks.profile).toHaveBeenCalledTimes(1);
+    expect(mocks.cache).not.toHaveBeenCalled();
   });
 
   it('bypasses the production cache for the explicit QA path', async () => {
