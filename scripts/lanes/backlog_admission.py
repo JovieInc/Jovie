@@ -1,15 +1,26 @@
-"""Pure, non-authorizing Backlog admission evidence projection."""
+"""Canonical installed read adapters and non-authorizing Backlog evidence projection."""
+
 from __future__ import annotations
+
+import argparse
+from contextlib import contextmanager
 from datetime import datetime
-import math
 import hashlib
 import base64
+import importlib.util
 import json
+import math
+import os
 from pathlib import Path
 import re
 import sys
+import subprocess
+import time
+from types import SimpleNamespace
 import zlib
-sys.path.insert(0,str(Path(__file__).resolve().parent))
+
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import execution_attempt
 
 SCHEMA = "jovie.backlog-admission-observation/v1"
@@ -20,7 +31,6 @@ ATTEMPT_OWNER = "Symphony execution reentry owner / JOV-7089"
 RESOURCE_OWNER = "Symphony capacity-before-lease owner / JOV-6030"
 IDENTITY_FIELDS = ("id", "identifier", "state", "updatedAt", "priority")
 RUNTIME_FIELDS = ("installedPath", "sourceHash", "policyHash", "releaseTree")
-
 MAX_PAGES = 100
 CONNECTIONS = {
     "labels": "id name",
@@ -30,10 +40,19 @@ CONNECTIONS = {
     "relations": "id type relatedIssue{id identifier}",
     "inverseRelations": "id type issue{id identifier}",
 }
+CORE = ("id identifier title description createdAt updatedAt priority archivedAt "
+        "state{name type} assignee{id name} delegate{id name} parent{id identifier}")
 
 
 class Unavailable(RuntimeError):
     """A named read boundary failed; never include transport secrets in its text."""
+
+
+def _json_file(path, schema=None):
+    value = json.loads(path.read_text())
+    if not isinstance(value, dict) or schema and value.get("schema") != schema:
+        raise Unavailable("canonical-file-schema:" + path.name)
+    return value
 
 
 def _fingerprint(value):
@@ -69,6 +88,314 @@ def _dependency_ids(issue):
     if any(not isinstance(value, str) or not value for value in outgoing + incoming):
         raise Unavailable("dependency-identity-unreadable")
     return sorted(set(outgoing + incoming))
+
+
+def _issue_digest(issue):
+    value = dict(issue)
+    for name in CONNECTIONS:
+        connection = issue.get(name) or {}
+        nodes = connection.get("nodes")
+        if not isinstance(nodes, list) or (connection.get("pageInfo") or {}).get("hasNextPage") is not False:
+            raise Unavailable("prepared-issue-connection-incomplete")
+        value[name] = {"nodes": sorted(nodes, key=lambda row: row["id"])}
+    return _fingerprint(value)
+
+
+def _metadata_projection(issue):
+    value = {key: issue.get(key) for key in ("id", "identifier", "title", "description", "createdAt", "updatedAt", "priority", "archivedAt", "state", "assignee", "delegate", "parent")}
+    connection = issue.get("labels") or {}
+    if not isinstance(connection.get("nodes"), list) or (connection.get("pageInfo") or {}).get("hasNextPage") is not False:
+        raise Unavailable("global-cohort-labels-incomplete")
+    value["labels"] = sorted(connection["nodes"], key=lambda row: row["id"])
+    return value
+
+
+def _metadata_digest(issue):
+    return _fingerprint(_metadata_projection(issue))
+
+
+def _as_native(lane, row):
+    return lane.Issue(row["id"], row["identifier"], row.get("title") or "", row.get("description") or "",
+                      row["priority"], row["createdAt"], [label["name"] for label in row["labels"]["nodes"]])
+
+
+def _pr_digest(rows, *, raw=False):
+    if raw:
+        rows = [{"number": row["number"], "title": row.get("title"), "body": row.get("body"),
+                 "headRefName": (row.get("head") or {}).get("ref"), "headRefOid": (row.get("head") or {}).get("sha"),
+                 "baseRefName": (row.get("base") or {}).get("ref"), "baseRefOid": (row.get("base") or {}).get("sha"),
+                 "labels": row.get("labels"), "isDraft": row.get("draft")} for row in rows]
+    keys = ("number", "title", "body", "headRefName", "headRefOid", "baseRefName", "baseRefOid", "isDraft")
+    return _fingerprint(sorted(({**{key: row.get(key) for key in keys},
+                                "labels": sorted(label["name"] for label in row.get("labels") or [])}
+                               for row in rows), key=lambda row: row["number"]))
+
+
+class _NativeReads:
+    """Existing authenticated transports, with GET/query-only bounded entrypoints.
+
+    Native Linear quota accounting and token refresh remain its transport's
+    responsibility. Neither claim.lock nor a provider seat is taken here.
+    """
+    def __init__(self, current, state):
+        import lane_runner as lane
+        if Path(lane.__file__).resolve() != current / "lane_runner.py":
+            raise Unavailable("native-module-not-installed")
+        self.lane, self.current, self.state = lane, current, state
+        self.validate_runtime()
+        self.host = lane.Host(state=state)
+        self.linear = lane.Linear(self.host.linear_env)
+        lane.load_github_env()
+        self.canonical_main()
+
+    def validate_runtime(self):
+        manifest = _json_file(self.current / ".release.json", "jovie-lane-release-bundle/v1")
+        if manifest.get("bundleDigest") != self.current.parent.parent.name:
+            raise Unavailable("installed-release-bundle-mismatch")
+        self.lane.lifecycle.validate_release(self.current.parent.parent, manifest)
+        if getattr(self, "_main_sha", None) is not None:
+            if not 0 <= time.time() - self._main_observed_at <= MAX_AGE_S:
+                raise Unavailable("canonical-main-observation-stale")
+
+    def canonical_main(self, *, revalidate=False):
+        previous = getattr(self, "_main_sha", None)
+        if previous is not None and not 0 <= time.time() - self._main_observed_at <= MAX_AGE_S:
+            raise Unavailable("canonical-main-observation-stale")
+        if previous is None or revalidate:
+            started = time.time()
+            value = self.gh("repos/JovieInc/Jovie/git/ref/heads/main")
+            obj = value.get("object") if isinstance(value, dict) else None
+            if (not isinstance(value, dict) or value.get("ref") != "refs/heads/main" or not isinstance(obj, dict) or obj.get("type") != "commit"
+                    or not isinstance(obj.get("sha"), str) or not re.fullmatch(r"[a-f0-9]{40}", obj["sha"])):
+                raise Unavailable("canonical-main-read-unavailable")
+            if previous is not None and obj["sha"] != previous:
+                raise Unavailable("canonical-main-changed")
+            if previous is None:
+                self._main_sha, self._main_observed_at = obj["sha"], started
+        if not 0 <= time.time() - self._main_observed_at <= MAX_AGE_S:
+            raise Unavailable("canonical-main-observation-stale")
+        return self._main_sha
+
+    def query(self, query, variables):
+        if not self.linear.admit(1):
+            raise Unavailable("linear-native-budget-held")
+        value = self.linear.gql(query, variables)
+        if not isinstance(value, dict) or value.get("errors"):
+            raise Unavailable("linear-query-unreadable")
+        return value.get("data", value)
+
+    def issue(self, identity, *, full=True):
+        nested = " ".join(name + "(first:50){pageInfo{hasNextPage endCursor} nodes{" + fields + "}}"
+                          for name, fields in CONNECTIONS.items()) if full else ""
+        row = self.query("query($id:String!){issue(id:$id){" + CORE + " " + nested + "}}", {"id": identity}).get("issue")
+        if not isinstance(row, dict) or not row.get("id"):
+            raise Unavailable("linear-issue-unreadable")
+        if full:
+            for name, fields in CONNECTIONS.items():
+                nodes, cursor, seen = [], None, set()
+                connection = row.get(name) or {}
+                for _ in range(MAX_PAGES):
+                    page, info = connection.get("nodes"), connection.get("pageInfo") or {}
+                    if not isinstance(page, list) or len(page) > 50 or type(info.get("hasNextPage")) is not bool:
+                        raise Unavailable("linear-connection-unreadable:" + name)
+                    for node in page:
+                        if not isinstance(node, dict) or not node.get("id") or node["id"] in seen:
+                            raise Unavailable("linear-connection-duplicate-or-unreadable:" + name)
+                        seen.add(node["id"])
+                    nodes.extend(page)
+                    if not info["hasNextPage"]:
+                        row[name] = {"nodes": nodes, "pageInfo": {"hasNextPage": False}}
+                        break
+                    next_cursor = info.get("endCursor")
+                    if not isinstance(next_cursor, str) or not next_cursor or next_cursor == cursor:
+                        raise Unavailable("linear-cursor-unreadable:" + name)
+                    cursor = next_cursor
+                    if _ == MAX_PAGES - 1:
+                        raise Unavailable("linear-pagination-bound:" + name)
+                    value = self.query("query($id:String!,$after:String){issue(id:$id){updatedAt " + name
+                                       + "(first:50,after:$after){pageInfo{hasNextPage endCursor} nodes{"
+                                       + fields + "}}}}", {"id": row["id"], "after": cursor}).get("issue")
+                    if not isinstance(value, dict) or value.get("updatedAt") != row.get("updatedAt"):
+                        raise Unavailable("linear-issue-changed-during-pagination")
+                    connection = value.get(name) or {}
+                else:
+                    raise Unavailable("linear-pagination-bound:" + name)
+        return row
+
+    def cohort(self):
+        """Complete current urgent/P0 and ready High pool; never reclassify priority.
+
+        High admission uses the existing agent-ready + dispatch-next designation,
+        preserving the authorized compounding scope without a topical classifier.
+        """
+        filters = {"team": {"key": {"eq": "JOV"}}, "state": {"name": {"in": ["Backlog", "Todo"]}},
+                   "or": [{"priority": {"eq": 1}},
+                          {"and": [{"priority": {"eq": 2}}, {"labels": {"some": {"name": {"eq": "agent-ready"}}}},
+                                   {"labels": {"some": {"name": {"eq": "dispatch-next"}}}}]},
+                          {"labels": {"some": {"name": {"eq": "P0"}}}},
+                          {"title": {"startsWith": "P0"}}, {"title": {"startsWith": "[P0]"}}]}
+        nested = "labels(first:50){pageInfo{hasNextPage endCursor} nodes{id name}}"
+        query = ("query($filter:IssueFilter!,$after:String){issues(first:50,after:$after,includeArchived:false,filter:$filter)"
+                 "{pageInfo{hasNextPage endCursor} nodes{" + CORE + " " + nested + "}}}")
+        rows, cursor, cursors, identities = [], None, set(), set()
+        for _ in range(MAX_PAGES):
+            value = self.query(query, {"filter": filters, "after": cursor}).get("issues") or {}
+            page, info = value.get("nodes"), value.get("pageInfo") or {}
+            if not isinstance(page, list) or len(page) > 50 or type(info.get("hasNextPage")) is not bool:
+                raise Unavailable("global-cohort-page-unreadable")
+            for row in page:
+                if not isinstance(row, dict) or not row.get("id") or row["id"] in identities:
+                    raise Unavailable("global-cohort-identity-unreadable")
+                identities.add(row["id"])
+                incomplete = False
+                for name in ("labels",):
+                    connection = row.get(name) or {}
+                    if not isinstance(connection.get("nodes"), list) or type((connection.get("pageInfo") or {}).get("hasNextPage")) is not bool:
+                        raise Unavailable("global-cohort-connection-unreadable")
+                    incomplete |= connection["pageInfo"]["hasNextPage"]
+                complete = self.issue(row["id"]) if incomplete else row
+                _metadata_digest(complete)
+                labels = {label["name"] for label in complete["labels"]["nodes"]}
+                priority, title = complete.get("priority"), complete.get("title") or ""
+                if not (priority == 1 or priority == 2 and {"agent-ready", "dispatch-next"} <= labels
+                        or "P0" in labels or title.startswith(("P0", "[P0]"))):
+                    raise Unavailable("global-cohort-scope-filter-unproven")
+                rows.append(complete)
+            if not info["hasNextPage"]:
+                return sorted(rows, key=lambda row: row["id"])
+            cursor = info.get("endCursor")
+            if not isinstance(cursor, str) or not cursor or cursor in cursors:
+                raise Unavailable("global-cohort-cursor-unreadable")
+            cursors.add(cursor)
+        raise Unavailable("global-cohort-pagination-bound")
+
+    def pr_metadata(self):
+        return _paged(lambda page: self.gh(f"repos/JovieInc/Jovie/pulls?state=open&per_page=100&page={page}"))
+
+    def gh(self, endpoint):
+        result = subprocess.run(["gh", "api", "-X", "GET", endpoint], capture_output=True, text=True, timeout=30)
+        if result.returncode:
+            raise Unavailable("github-read-unavailable")
+        return json.loads(result.stdout)
+
+    def _read_gh_command(self, command, *, timeout=30):
+        if command[:3] != ["gh", "api", "graphql"]:
+            # A legacy REST/file-cache fallback is not an inline scope witness.
+            return SimpleNamespace(returncode=1, stdout="", stderr="scope-read-unavailable")
+        return subprocess.run(command, capture_output=True, text=True, timeout=min(timeout, 30))
+
+    def open_prs(self):
+        proxy = SimpleNamespace(REPO_SLUG="JovieInc/Jovie", sh=self._read_gh_command)
+        report = {}
+        original_cache = self.lane.pr_events.pr_files_cache
+        self.lane.pr_events.pr_files_cache = lambda node: None
+        try:
+            prs = self.lane.pr_events.open_prs_state(proxy, report)
+        finally:
+            self.lane.pr_events.pr_files_cache = original_cache
+        if not isinstance(prs, list) or report.get("complete") is not True:
+            raise Unavailable("native-open-pr-inventory-incomplete")
+        for pr in prs:
+            if pr.get("labelsComplete") is not True or pr.get("filesComplete") is not True:
+                raise Unavailable("native-open-pr-scope-incomplete")
+            # Inline exact head/base files are maintained scope evidence. A
+            # legacy cached or REST fallback must never certify a negative.
+            evidence = pr.get("inlineFilesEvidence")
+            if pr.get("files") and not self.lane.pr_events._valid_target_file_evidence(evidence, "JovieInc/Jovie", time.time()):
+                raise Unavailable("native-open-pr-inline-scope-unavailable:" + str(pr.get("number")))
+        final = [row for page in self.pr_metadata() for row in page]
+        if _pr_digest(final, raw=True) != _pr_digest(prs):
+            raise Unavailable("github-open-pr-set-changed")
+        return prs
+
+    def history(self):
+        endpoint = "repos/JovieInc/Jovie/commits/" + execution_attempt.GITHUB_LEDGER_ANCHOR + "/statuses?per_page=100"
+        pages = execution_attempt._gh({}, "GET", endpoint)
+        if (not isinstance(pages, list) or not 1 <= len(pages) <= MAX_PAGES
+                or any(not isinstance(page, list) or len(page) > 100 for page in pages)):
+            raise Unavailable("canonical-attempt-history-unbounded-or-unreadable")
+        if _fingerprint(self.gh(endpoint + "&page=1")) != _fingerprint(pages[0]):
+            raise Unavailable("paged-history-changed")
+        return pages
+
+    def ownership(self, issue):
+        base = self.current.parent / "backlog-orchestrator"
+        paths = [base / name for name in ("admission-disposition.mjs", "admission-policy.mjs",
+                                         "ownership-inventory.mjs", "ownership-inventory.json")]
+        if any(not path.is_file() or not path.resolve().is_relative_to(self.current.parent.parent) for path in paths):
+            raise Unavailable("installed-custody-interpreter-unavailable")
+        program = ("import {classifyAdmissionDisposition} from " + json.dumps(paths[0].as_uri()) + ";"
+                   "import {isFounderSteeringAssignee} from " + json.dumps(paths[1].as_uri()) + ";"
+                   "let input='';for await(const c of process.stdin)input+=c;const i=JSON.parse(input);"
+                   "console.log(JSON.stringify({ownership:classifyAdmissionDisposition(i).ownership,"
+                   "founder:isFounderSteeringAssignee(i),founderComments:(i.comments?.nodes||[])"
+                   ".filter(c=>isFounderSteeringAssignee({assignee:c.user})).map(c=>c.id)}));")
+        result = subprocess.run(["node", "--input-type=module", "-e", program], input=json.dumps(issue),
+                                capture_output=True, text=True, timeout=15)
+        if result.returncode:
+            raise Unavailable("installed-custody-interpreter-failed")
+        value = json.loads(result.stdout)
+        if not isinstance(value.get("ownership"), dict) or type(value.get("founder")) is not bool:
+            raise Unavailable("installed-custody-result-unreadable")
+        return value
+
+    def fleet_max_age(self):
+        path = self.current.parent / "fleet-gate/scoped_admission.py"
+        spec = importlib.util.spec_from_file_location("backlog_fleet_scoped_policy", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module.MAX_AGE.total_seconds()
+
+    def acceptance(self, issue):
+        """Use an existing owner source-binding receipt; verify its actual merge.
+
+        This proves only an implementation prerequisite, never deployment,
+        dogfood or founder product acceptance. A generic Done/docs link cannot
+        produce this evidence. Unknown contracts stay with their current owner.
+        """
+        ownership = self.ownership(issue)
+        for comment in reversed(issue["comments"]["nodes"]):
+            body = comment.get("body") or ""
+            if comment["id"] not in ownership["founderComments"] or "source binding correction" not in body.lower():
+                continue
+            shas = set(re.findall(r"\b[a-f0-9]{40}\b", body))
+            numbers = re.findall(r"https://github\.com/JovieInc/Jovie/pull/(\d+)\b", body)
+            for number in dict.fromkeys(numbers):
+                pr = self.gh(f"repos/JovieInc/Jovie/pulls/{number}")
+                merge, head = pr.get("merge_commit_sha"), (pr.get("head") or {}).get("sha")
+                if not pr.get("merged") or merge not in shas or head not in shas:
+                    continue
+                files = _paged(lambda page: self.gh(f"repos/JovieInc/Jovie/pulls/{number}/files?per_page=100&page={page}"), recheck=False)
+                paths = [entry["filename"] for page in files for entry in page
+                         if entry.get("filename") in body and Path(entry["filename"]).suffix in {".py", ".ts", ".tsx", ".mjs", ".swift"}]
+                if not paths or all("/tests/" in path or path.endswith(".test.ts") for path in paths):
+                    continue
+                repo = self.host.repo
+                source = subprocess.run(["git", "-C", str(repo), "rev-parse", "origin/main"], capture_output=True, text=True, timeout=10)
+                source_sha = source.stdout.strip()
+                ancestor = subprocess.run(["git", "-C", str(repo), "merge-base", "--is-ancestor", merge, source_sha], capture_output=True, timeout=10)
+                if source.returncode or ancestor.returncode or not re.fullmatch(r"[a-f0-9]{40}", source_sha):
+                    continue
+                if source_sha != self.canonical_main():
+                    raise Unavailable("local-origin-main-not-current-canonical")
+                accepted_source = None
+                for revision in sorted(shas - {merge, head}):
+                    equal = True
+                    for path in paths:
+                        blobs = subprocess.run(["git", "-C", str(repo), "rev-parse", revision + ":" + path, source_sha + ":" + path],
+                                               capture_output=True, text=True, timeout=10)
+                        values = blobs.stdout.splitlines()
+                        if blobs.returncode or len(values) != 2 or values[0] != values[1]:
+                            equal = False
+                            break
+                    if equal:
+                        accepted_source = revision
+                        break
+                if accepted_source is None:
+                    continue
+                return {"kind": "implemented-source", "mergeSha": merge, "sourceSha": source_sha, "paths": paths,
+                        "receipt": "https://linear.app/jovie/issue/" + issue["identifier"] + "#comment-" + comment["id"]}
+        return None
 
 
 def _epoch(value):
