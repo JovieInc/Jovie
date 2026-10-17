@@ -866,6 +866,29 @@ describe('lifecycle status comment', () => {
         manifest,
         missing: ['outcome'],
         failing: [],
+        completionHolds: [],
+      })
+    ).toBe(key);
+    const held = {
+      target: 'Validating',
+      manifest,
+      missing: ['outcome'],
+      failing: [],
+      completionHolds: ['JOV-2 is Merging', 'JOV-3 is Rework'],
+    };
+    expect(lifecycleStatusKey(held)).not.toBe(key);
+    expect(
+      lifecycleStatusKey({
+        ...held,
+        completionHolds: [...held.completionHolds].reverse(),
+      })
+    ).toBe(lifecycleStatusKey(held));
+    expect(
+      lifecycleStatusKey({
+        target: 'Validating',
+        manifest,
+        missing: ['outcome'],
+        failing: [],
         deploymentSha: SHA_C,
       })
     ).toBe(key);

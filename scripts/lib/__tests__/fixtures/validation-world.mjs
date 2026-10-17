@@ -269,6 +269,10 @@ export function createWorld(overrides = {}) {
           })),
           pageInfo: { hasNextPage: false },
         },
+        inverseRelations: {
+          nodes: issue.inverseRelations ?? [],
+          pageInfo: { hasNextPage: false, endCursor: null },
+        },
         attachments: { nodes: issue.attachments.map(url => ({ url })) },
         history: {
           nodes: issue.history,
