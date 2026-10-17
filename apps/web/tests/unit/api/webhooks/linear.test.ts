@@ -423,7 +423,86 @@ describe('POST /api/webhooks/linear', () => {
     expect(mockServerFetch).toHaveBeenCalledTimes(2);
   });
 
-  it('ignores non-JOV and non-Triage Issue updates', async () => {
+  it('requests guarded Backlog observation when current priority or a shared readiness tier changes', async () => {
+    mockAcquireRecentDispatch.mockResolvedValue({
+      acquired: true,
+      reason: 'acquired',
+    });
+    mockServerFetch.mockResolvedValue(new Response(null, { status: 204 }));
+    const { POST } = await import('@/app/api/webhooks/linear/route');
+    for (const scope of [
+      { priority: 1 },
+      {
+        priority: 2,
+        labels: [{ name: 'agent-ready' }, { name: 'dispatch-next' }],
+      },
+      { priority: 3, labels: [{ name: 'P0' }] },
+      { priority: 0, title: 'P0 — existing bounded contract' },
+    ]) {
+      const body = JSON.stringify({
+        type: 'Issue',
+        action: 'update',
+        updatedFrom: { priority: 4 },
+        data: {
+          id: '68b3e8de-588e-46ba-8209-84329d154627',
+          identifier: 'JOV-6641',
+          description: 'Private scope must stay out of dispatch',
+          teamId: 'bdc09edc-f91c-4a06-b308-74b4fcf093f8',
+          stateId: '1551ed21-7743-4573-82d8-8949410d3b8d',
+          updatedAt: '2026-10-16T19:00:00.000Z',
+          ...scope,
+        },
+      });
+      const response = await POST(
+        new Request('https://example.com/api/webhooks/linear', {
+          method: 'POST',
+          headers: { 'linear-signature': sign(body) },
+          body,
+        }) as never
+      );
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ dispatched: true });
+      const dispatch = JSON.parse(mockServerFetch.mock.lastCall?.[1]?.body);
+      expect(dispatch.event_type).toBe('linear_triage_assess');
+      expect(dispatch.client_payload).toMatchObject({
+        state_name: 'Backlog',
+        issue_identifier: 'JOV-6641',
+        issue_updated_at: '2026-10-16T19:00:00.000Z',
+      });
+      expect(JSON.stringify(dispatch)).not.toContain('Private scope');
+      expect(dispatch.client_payload).not.toHaveProperty('priority');
+    }
+  });
+
+  it('ignores unrelated Backlog updates without inflating missing or malformed priority', async () => {
+    const { POST } = await import('@/app/api/webhooks/linear/route');
+    for (const priority of [undefined, 0, 2, 3, 4, '1', true]) {
+      const body = JSON.stringify({
+        type: 'Issue',
+        action: 'update',
+        data: {
+          id: '68b3e8de-588e-46ba-8209-84329d154627',
+          identifier: 'JOV-6641',
+          teamId: 'bdc09edc-f91c-4a06-b308-74b4fcf093f8',
+          state: { name: 'Backlog' },
+          priority,
+          labels: [{ name: 'agent-ready' }],
+        },
+      });
+      const response = await POST(
+        new Request('https://example.com/api/webhooks/linear', {
+          method: 'POST',
+          headers: { 'linear-signature': sign(body) },
+          body,
+        }) as never
+      );
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ ignored: true });
+    }
+    expect(mockServerFetch).not.toHaveBeenCalled();
+  });
+
+  it('ignores non-JOV and unrelated-state Issue updates', async () => {
     const { POST } = await import('@/app/api/webhooks/linear/route');
     for (const data of [
       {

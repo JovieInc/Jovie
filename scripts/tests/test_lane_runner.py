@@ -6966,14 +6966,17 @@ class UpdateTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             host, slot, staging = self.mesh_dependency_fixture(Path(tmp).resolve())
             replies = [subprocess.CompletedProcess([], 0, stdout="", stderr="")] * 2
+            # Both child launches are stubbed; never census the persistent host.
             with patch.object(lane.worktree_pool, "ready_slots", return_value=[slot]), \
                     patch.object(lane.worktree_pool, "pool_dir", return_value=slot.parent), \
                     patch.object(lane.worktree_pool, "node_env", return_value={"PATH": os.defpath}), \
-                    patch.object(lane.lifecycle, "run", side_effect=replies) as run:
+                    patch.object(lane.lifecycle, "run", side_effect=replies) as run, \
+                    patch.object(lane, "reap_selftest_processes", return_value=0) as cleanup_reaper:
                 self.assertIsNone(lane.prove_staging(host, staging))
             self.assertEqual(run.call_args_list[0].args[0][-2:], [str(staging), str(slot)])
             self.assertEqual(run.call_args_list[1].args[0],
                              [sys.executable, "-m", "unittest", "-q", *lane.LANE_TESTS])
+            cleanup_reaper.assert_called_once()
 
     def test_mesh_dependency_preference_requires_both_source_and_restored_locks(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -10670,15 +10673,18 @@ class OperatorInstallerGlueTest(unittest.TestCase):
         self.assertEqual(lane.selftest_retry_ids(b"FAIL: test_b (scripts.tests.test_x.Case)\n"), ["scripts.tests.test_x.Case.test_b"])
 
     def test_selftest_timeout_retains_captured_selector_and_bounded_diagnostic(self):
-        # This is a red regression on a282c4f1: current timeout path discards it.
+        # The mocked lifecycle creates no process; its synthetic timeout must not
+        # census or signal live host processes. Real cleanup has dedicated tests.
         stage = self.root / "stage"; stage.mkdir()
         stderr = b"FAIL: test_partial (scripts.tests.test_fixture.Example)\n" + b"x" * 4000
         replies = [subprocess.CompletedProcess([], 0, stdout="", stderr=""),
                    subprocess.TimeoutExpired("fixture", lane.UPDATE_TEST_TIMEOUT_S, stderr=stderr)]
         with patch.object(lane, "mesh_dependency_roots", return_value=[self.host.repo]), \
                 patch.object(lane.worktree_pool, "node_env", return_value={"PATH": os.defpath}), \
-                patch.object(lane.lifecycle, "run", side_effect=replies):
+                patch.object(lane.lifecycle, "run", side_effect=replies), \
+                patch.object(lane, "reap_selftest_processes", return_value=[]) as cleanup_reaper:
             self.assertEqual(lane.prove_staging(self.host, stage), f"self-test timeout {lane.UPDATE_TEST_TIMEOUT_S}s")
+        cleanup_reaper.assert_called_once()
         diagnostic = json.loads((stage / ".selftest-diagnostic.json").read_text())
         self.assertEqual(diagnostic["failedSelectors"], ["test_partial (scripts.tests.test_fixture.Example)"])
         self.assertEqual((stage / ".selftest-stderr.log").read_bytes(), stderr)
