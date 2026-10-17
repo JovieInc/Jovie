@@ -1,5 +1,7 @@
-/** Legacy bio-sync metadata derives all capability claims from the DSP catalog. */
+import { projectArtistProfileDestination } from '@/lib/connectors/artist-profile-catalog';
+import { ARTIST_PROFILE_DESTINATIONS } from '@/lib/connectors/artist-profile-registry';
 import { DSP_PROFILE_CATALOG } from '@/lib/connectors/dsp-profile-catalog';
+import { PROFILE_DESTINATION_REGISTRY } from '@/lib/connectors/profile-writes/destinations';
 
 export type BioSyncMethod = 'api' | 'email';
 
@@ -17,28 +19,49 @@ export interface DspBioProvider {
   /** Notes about the integration status */
   notes: string;
   /** URL for the DSP's artist portal (for reference/linking) */
-  artistPortalUrl?: string;
+  artistPortalUrl: string;
   /** Max bio character length enforced by this DSP (if known) */
-  maxBioLength?: number;
+  maxBioLength: number;
+}
+
+function bioField(providerId: string) {
+  const destination = Object.values(DSP_PROFILE_CATALOG).find(
+    item => item.legacyBioProviderId === providerId
+  );
+  if (!destination) throw new Error('unregistered-profile-destination');
+  return projectArtistProfileDestination(
+    destination.id,
+    ARTIST_PROFILE_DESTINATIONS[destination.id]
+  ).fields[0];
 }
 
 /**
- * Compatibility projection, not a second capability registry. The historical
- * method describes the delivery category only; enabled requires verified write
- * readiness. No email recipient or delivery permission is inferred from a portal.
+ * Compatibility projection of the canonical DSP catalog. Historical transport
+ * metadata grants no delivery permission; current submission evidence is required.
  */
 export const DSP_BIO_PROVIDERS: Record<string, DspBioProvider> =
   Object.fromEntries(
-    Object.values(DSP_PROFILE_CATALOG).map(destination => [
-      destination.legacyBioProviderId,
+    Object.entries(PROFILE_DESTINATION_REGISTRY).map(([id, destination]) => [
+      id,
       {
         displayName: destination.label,
-        method: destination.transport.legacyBio,
-        enabled: destination.artistProfile.fields.bio.write === 'supported',
-        rollback: 'unsupported',
-        notes: `${destination.blockedReason} ${destination.apiFields.bio.detail}`,
-        artistPortalUrl: destination.artistPortalUrl,
-      } satisfies DspBioProvider,
+        method: destination.method,
+        get enabled() {
+          return bioField(id).submission?.available ?? false;
+        },
+        get rollback(): DspBioProvider['rollback'] {
+          const field = bioField(id);
+          return field.submission?.available
+            ? field.submission.rollback
+            : field.recovery;
+        },
+        notes:
+          destination.method === 'email'
+            ? 'Submission requires current terms evidence and explicit approval.'
+            : 'API bio updates are unsupported.',
+        artistPortalUrl: destination.portal,
+        maxBioLength: destination.maxBioLength,
+      },
     ])
   );
 
@@ -73,7 +96,9 @@ export function getApiBioProviders(): Array<[string, DspBioProvider]> {
  * Get a specific DSP bio provider config.
  */
 export function getBioProvider(providerId: string): DspBioProvider | undefined {
-  return DSP_BIO_PROVIDERS[providerId];
+  return Object.hasOwn(DSP_BIO_PROVIDERS, providerId)
+    ? DSP_BIO_PROVIDERS[providerId]
+    : undefined;
 }
 
 /**

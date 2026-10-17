@@ -1,149 +1,249 @@
-import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { rejectCoreSocialHtmlFetch } from '@/lib/ingestion/social-html-policy';
+import { describe, expect, it } from 'vitest';
 import {
-  fetchLayloProfile,
-  INGESTION_PLATFORM_IDS,
-} from '@/lib/ingestion/strategies';
-import { ARTIST_PROFILE_CATALOG } from './artist-profile-catalog';
+  getBioProvider,
+  getEnabledBioProviders,
+} from '@/lib/dsp-bio-sync/providers';
 import {
-  ARTIST_PROFILE_FIELDS,
-  artistProfileContractSchema,
-} from './artist-profile-contract';
-import { DSP_PROFILE_CATALOG } from './dsp-profile-catalog';
-import { CONNECTOR_REGISTRY } from './registry';
-import { SOCIAL_PROFILE_CATALOG } from './social-profile-catalog';
+  getArtistProfileCatalog,
+  projectArtistProfileDestination,
+} from './artist-profile-catalog';
+import { unknownArtistProfileContract } from './artist-profile-contract';
+import type { ArtistProfileDestinationManifest } from './artist-profile-registry';
+import {
+  buildProfileWriteManifest,
+  getProfileWriteManifest,
+} from './profile-writes/manifest';
 
-afterEach(() => vi.restoreAllMocks());
+const now = new Date('2026-10-16T00:00:00Z');
+function ready(): ArtistProfileDestinationManifest {
+  const profile = unknownArtistProfileContract('fixture');
+  const authorization = {
+    status: 'verified',
+    mechanism: 'oauth',
+    requiredScopes: ['profile.write'],
+    resource: 'connected artist',
+    requiredRole: 'owner',
+    evidenceRef: 'fixture:owner',
+  } as const;
+  const required = {
+    status: 'required',
+    binding: 'destination_field_value',
+    policyRef: 'fixture:exact-value',
+  } as const;
+  for (const name of Object.keys(
+    profile.fields
+  ) as (keyof typeof profile.fields)[]) {
+    profile.fields[name] = {
+      read: 'supported',
+      write: 'supported',
+      authorization: { read: authorization, write: authorization },
+      validation: { status: 'documented', policyRef: 'fixture:validation' },
+      preview: required,
+      confirmation: required,
+      rateLimit: {
+        status: 'documented',
+        policyRef: 'fixture:quota',
+        key: 'connection',
+        maxRequests: 1,
+        windowSeconds: 60,
+        onLimit: 'respect_retry_after',
+      },
+      audit: { mode: 'before_after', policyRef: 'fixture:audit' },
+      rollback: {
+        mode: 'snapshot_restore',
+        policyRef: 'fixture:restore',
+        evidenceRef: 'fixture:restore-proof',
+      },
+      termsApi: {
+        status: 'approved',
+        api: 'official',
+        apiRef: 'fixture:api',
+        termsRef: 'fixture:terms',
+        evidenceRef: 'fixture:terms-proof',
+      },
+      evidence: {
+        status: 'documented',
+        requirements: [
+          'authorization',
+          'before_after',
+          'confirmation',
+          'documentation',
+          'preview',
+          'readback',
+          'rollback',
+          'validation',
+        ],
+        refs: ['fixture:proof'],
+        verifiedAt: '2026-10-15T00:00:00Z',
+        expiresAt: '2099-01-01T00:00:00Z',
+      },
+    };
+  }
+  return {
+    label: 'Fixture',
+    sources: ['connector'],
+    rollout: 'available',
+    profile,
+    constraints: { bio: { maxLength: 1500 } },
+    recovery: 'unsupported',
+  };
+}
 
-describe('shared artist-profile destination coverage', () => {
-  it('requires a conforming manifest for every ingestion platform', () => {
-    // This vocabulary defines IngestionPlatform; additions must register here.
-    expect(Object.keys(SOCIAL_PROFILE_CATALOG)).toEqual(INGESTION_PLATFORM_IDS);
-    for (const id of INGESTION_PLATFORM_IDS) {
-      const destination = ARTIST_PROFILE_CATALOG[id];
-      expect(destination, `missing destination ${id}`).toBeDefined();
-      expect(destination.id).toBe(id);
-      expect(Object.keys(destination.artistProfile.fields)).toEqual(
-        ARTIST_PROFILE_FIELDS
-      );
-      expect(() =>
-        artistProfileContractSchema.parse(destination.artistProfile)
-      ).not.toThrow();
-    }
-    expect(ARTIST_PROFILE_CATALOG).not.toHaveProperty('unknown');
-  });
-
-  it('keeps one sorted definition per platform across social, DSP, and OAuth', () => {
-    const ids = [
-      ...new Set([
-        ...Object.keys(DSP_PROFILE_CATALOG),
-        ...INGESTION_PLATFORM_IDS,
-      ]),
-    ].sort();
-    expect(Object.keys(ARTIST_PROFILE_CATALOG)).toEqual(ids);
-    for (const destination of Object.values(DSP_PROFILE_CATALOG)) {
-      expect(ARTIST_PROFILE_CATALOG[destination.id]).toBe(destination);
-    }
-    for (const id of INGESTION_PLATFORM_IDS) {
-      expect(ARTIST_PROFILE_CATALOG[id]).toBe(SOCIAL_PROFILE_CATALOG[id]);
-    }
-    expect(SOCIAL_PROFILE_CATALOG.youtube).toBe(DSP_PROFILE_CATALOG.youtube);
-    expect(CONNECTOR_REGISTRY.youtube.artistProfile).toBe(
-      ARTIST_PROFILE_CATALOG.youtube.artistProfile
-    );
-    expect(ARTIST_PROFILE_CATALOG).not.toHaveProperty('x');
-    expect(ARTIST_PROFILE_CATALOG).not.toHaveProperty('youtube_music');
-  });
-
-  it('records source evidence, validation constraints, and blocked policies for each new destination', () => {
-    for (const id of INGESTION_PLATFORM_IDS) {
-      if (id === 'youtube') continue;
-      const destination = SOCIAL_PROFILE_CATALOG[id];
-      expect(destination.availability).toBe('planned');
-      expect(destination.evidence.reviewedOn).toBe('2026-10-16');
-      expect(destination.evidence.refs).toContain(
-        'docs/network-support-matrix.md'
-      );
-      expect(destination.evidence.refs).toContain(
-        destination.validation.profileUrlRef
-      );
-      expect(destination.validation.constraints.length).toBeGreaterThan(0);
-      for (const ref of destination.evidence.refs) {
-        const evidencePath = resolve(process.cwd(), '../..', ref);
-        expect(
-          existsSync(evidencePath),
-          `missing source evidence: ${evidencePath}`
-        ).toBe(true);
+describe('credential-free artist-profile catalog', () => {
+  it('represents every destination and field, preserving policies and blocking unverified writes', () => {
+    const catalog = getArtistProfileCatalog(now);
+    expect(catalog.destinations).toHaveLength(13);
+    const youtube = catalog.destinations.find(item => item.id === 'youtube');
+    expect(youtube?.aliases).toEqual(['youtube_music']);
+    expect(youtube?.fields[0].documentation?.field.write).toBe('documented');
+    expect(youtube?.fields[0].write.available).toBe(false);
+    for (const destination of catalog.destinations) {
+      expect(destination.fields.map(field => field.name)).toEqual([
+        'bio',
+        'bio_link',
+        'image',
+        'website',
+      ]);
+      for (const field of destination.fields) {
+        expect(field.write.available).toBe(false);
+        expect(field.write.blockingReason).toBeTruthy();
+        for (const key of [
+          'authorization',
+          'constraints',
+          'preview',
+          'confirmation',
+          'rateLimit',
+          'rollback',
+          'evidence',
+        ])
+          expect(field).toHaveProperty(key);
       }
-      expect(destination.authorization.read.mechanism).toBe('none');
-      expect(destination.authorization.write.mechanism).toBe('unknown');
-      expect(destination.quota.status).toBe('unknown');
-      for (const field of Object.values(destination.artistProfile.fields)) {
-        expect(field.read).toBe('unsupported');
-        expect(field.authorization.read).toEqual({
-          status: 'unsupported',
-          reason: destination.ingestion.detail,
-        });
-        expect(field.write).toBe('unknown');
-        expect(field.authorization.write.status).toBe('unknown');
-        expect(field.validation.status).toBe('unknown');
-        expect(field.rateLimit.status).toBe('unknown');
-        expect(field.preview.status).toBe('unknown');
-        expect(field.confirmation.status).toBe('unknown');
-        expect(field.audit.mode).toBe('unknown');
-        expect(field.rollback.mode).toBe('unknown');
-        expect(field.termsApi.status).toBe('unknown');
-        expect(field.evidence).toEqual({
-          status: 'documented',
-          requirements: ['documentation'],
-          refs: destination.evidence.refs,
-        });
-      }
     }
-  });
-
-  it('aligns policy-blocked reads with the actual core HTML guard', () => {
-    const urls = {
-      beacons: ['https://beacons.ai/artist', 'https://beacons.page/artist'],
-      instagram: ['https://www.instagram.com/artist'],
-      linktree: ['https://linktr.ee/artist', 'https://linktree.com/artist'],
-      tiktok: ['https://www.tiktok.com/@artist'],
-      twitter: ['https://x.com/artist', 'https://twitter.com/artist'],
-    } as const;
-    for (const [id, profileUrls] of Object.entries(urls)) {
-      const destination = SOCIAL_PROFILE_CATALOG[id as keyof typeof urls];
-      expect(destination.ingestion.status).toBe('blocked_policy');
-      for (const url of profileUrls) {
-        expect(() => rejectCoreSocialHtmlFetch(url)).toThrow(
-          expect.objectContaining({ code: 'SOCIAL_HTML_DISABLED' })
-        );
-      }
-    }
-    expect(() =>
-      rejectCoreSocialHtmlFetch('https://www.youtube.com/@artist')
-    ).toThrow(expect.objectContaining({ code: 'SOCIAL_HTML_DISABLED' }));
-    expect(ARTIST_PROFILE_CATALOG.youtube.blockedReason).toContain(
-      'Core YouTube HTML ingestion is prohibited'
+    expect(JSON.stringify(catalog)).not.toMatch(
+      /recipient|supportEmail|tokenHandler|providerAccountId|accessToken|refreshToken/
     );
-    // Official-API documentation stays distinct from operational readiness.
-    expect(ARTIST_PROFILE_CATALOG.youtube.apiFields.bio.read).toBe(
-      'documented'
-    );
-    expect(ARTIST_PROFILE_CATALOG.youtube.artistProfile.fields.bio.read).toBe(
-      'unknown'
-    );
-  });
-
-  it('keeps Laylo blocked when its checked-in fetch rejects the source host', async () => {
-    const fetch = vi.spyOn(globalThis, 'fetch');
-    expect(SOCIAL_PROFILE_CATALOG.laylo.ingestion.status).toBe(
-      'blocked_unreliable'
-    );
-    await expect(fetchLayloProfile('artist')).rejects.toMatchObject({
-      code: 'INVALID_HOST',
+    const submission = catalog.destinations.find(item => item.id === 'spotify')
+      ?.fields[0].submission;
+    expect(submission).toMatchObject({
+      operation: 'email-submission',
+      available: false,
+      preview: 'required',
+      confirmation: 'destination_field_value',
+      maxBioLength: 1500,
+      rollback: 'manual',
+      evidence: { freshness: 'missing' },
     });
-    expect(fetch).not.toHaveBeenCalled();
+    expect(submission?.blockingReason).toBeTruthy();
+    expect(getEnabledBioProviders()).toEqual([]);
+    expect(getBioProvider('spotify')).toMatchObject({
+      enabled: false,
+      rollback: 'unsupported',
+    });
+    expect(getBioProvider('absent')).toBeUndefined();
+  });
+
+  it('exposes fresh validated policies and derives adapter metadata from the same manifest', () => {
+    const manifest = ready();
+    const field = projectArtistProfileDestination('fixture', manifest, now)
+      .fields[0];
+    expect(field.write).toEqual({
+      support: 'supported',
+      available: true,
+      blockingReason: null,
+    });
+    expect(field.authorization.write.label).toContain('owner');
+    expect(field.constraints.maxLength).toBe(1500);
+    expect(buildProfileWriteManifest('fixture', manifest)).toMatchObject({
+      fields: ['bio', 'bioLink', 'image', 'website'],
+      requiredScopes: ['profile.write'],
+      rollback: 'conditional-restore',
+      rateLimitWindowSeconds: 60,
+    });
+    expect(() => getProfileWriteManifest('absent')).toThrow(
+      'unregistered-profile-destination'
+    );
+    expect(() => getProfileWriteManifest('spotify')).toThrow(
+      'unverified-profile-destination'
+    );
+  });
+
+  it.each(['blocked', 'planned'] as const)(
+    'does not advertise %s operations even with fresh evidence',
+    rollout => {
+      const field = projectArtistProfileDestination(
+        'fixture',
+        { ...ready(), rollout },
+        now
+      ).fields[0];
+      expect(field.read.available).toBe(false);
+      expect(field.write.available).toBe(false);
+      expect(field.write.blockingReason).toContain(rollout);
+    }
+  );
+
+  it.each([
+    [undefined, undefined, 'undated'],
+    ['2026-10-14T00:00:00Z', '2026-10-16T00:00:00Z', 'stale'],
+    ['2026-10-17T00:00:00Z', '2026-10-18T00:00:00Z', 'invalid'],
+    ['2026-10-15T00:00:00Z', '2026-10-14T00:00:00Z', 'invalid'],
+  ])(
+    'blocks undated, expired and invalid evidence (%s, %s)',
+    (verifiedAt, expiresAt, expected) => {
+      const manifest = ready();
+      const evidence = manifest.profile.fields.bio.evidence;
+      if (evidence.status !== 'documented') throw new Error('fixture');
+      Object.assign(evidence, { verifiedAt, expiresAt });
+      const field = projectArtistProfileDestination('fixture', manifest, now)
+        .fields[0];
+      expect(field.evidence.freshness).toBe(expected);
+      expect(field.read.available).toBe(false);
+      expect(field.write).toMatchObject({
+        available: false,
+        blockingReason: `Operation evidence is ${expected}.`,
+      });
+    }
+  );
+
+  it('requires a proven rollback and rejects invalid manifests', () => {
+    const manifest = ready();
+    manifest.profile.fields.bio.rollback = {
+      mode: 'unsupported',
+      reason: 'manual only',
+    };
+    const field = projectArtistProfileDestination('fixture', manifest, now)
+      .fields[0];
+    expect(field.write.available).toBe(false);
+    expect(field.read.available).toBe(true);
+    manifest.profile.fields.bio.preview = {
+      status: 'unknown',
+      reason: 'missing preview',
+    };
+    expect(() =>
+      projectArtistProfileDestination('fixture', manifest, now)
+    ).toThrow();
+  });
+
+  it('does not advertise policies the current write ledger cannot enforce', () => {
+    const manifest = ready();
+    const bio = manifest.profile.fields.bio;
+    if (
+      bio.rollback.mode !== 'snapshot_restore' ||
+      bio.rateLimit.status !== 'documented'
+    )
+      throw new Error('fixture');
+    bio.rollback = { ...bio.rollback, mode: 'compensating_write' };
+    expect(
+      projectArtistProfileDestination('fixture', manifest, now).fields[0].write
+        .available
+    ).toBe(false);
+    bio.rollback = { ...bio.rollback, mode: 'snapshot_restore' };
+    bio.rateLimit = { ...bio.rateLimit, key: 'provider' };
+    expect(
+      projectArtistProfileDestination('fixture', manifest, now).fields[0].write
+        .available
+    ).toBe(false);
+    expect(buildProfileWriteManifest('fixture', manifest).fields).not.toContain(
+      'bio'
+    );
   });
 });

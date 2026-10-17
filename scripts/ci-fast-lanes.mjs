@@ -123,6 +123,14 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: false,
   }),
   Object.freeze({
+    id: 'artist-profile-conformance',
+    // Source Validation loads this module from trusted main; older heads may lack these files.
+    command: `node ${shellQuote(fileURLToPath(new URL('./artist-profile-conformance.mjs', import.meta.url)))} && node --test --test-isolation=none ${shellQuote(fileURLToPath(new URL('./artist-profile-conformance.test.mjs', import.meta.url)))}`,
+    inputs:
+      /^(?:apps\/web\/lib\/|scripts\/(?:artist-profile-conformance|ci-fast-lanes))/u,
+    prOnly: false,
+  }),
+  Object.freeze({
     // The repo-wide design-system, metrics-layer and locked Pen chrome
     // guards (~42s) ran only in ci-fast, i.e. merge groups: group pr-21458
     // (2026-10-13) was ejected because a PR added text-destructive to
@@ -433,7 +441,7 @@ export const STRUCTURAL_WEB_JOB_PREFIXES = Object.freeze([
 
 /** Files of the lanes coverage suite (one coverage map, sharded below). */
 const LANES_PYTEST_FILES =
-  'scripts/tests/test_capacity_limit.py scripts/tests/test_claude_lane.py scripts/tests/test_codex_lane.py scripts/tests/test_continuity_clock.py scripts/tests/test_design_gate.py scripts/tests/test_devin_free_policy.py scripts/tests/test_disk_guard.py scripts/tests/test_doctor.py scripts/tests/test_epics.py scripts/tests/test_execution_attempt.py scripts/tests/test_gh_app_token.py scripts/tests/test_hud.py scripts/tests/test_hyperagent_lane.py scripts/tests/test_issue_routing.py scripts/tests/test_lane_runner.py scripts/tests/test_pr_events.py scripts/tests/test_reason_lane.py scripts/tests/test_remediation.py scripts/tests/test_service_census.py scripts/tests/test_shipping_attribution.py scripts/tests/test_shipping_origin.py scripts/tests/test_telegram_archive.py scripts/tests/test_worktree_pool.py scripts/tests/test_worktree_sweep.py';
+  'scripts/tests/test_backlog_admission.py scripts/tests/test_capacity_limit.py scripts/tests/test_claude_lane.py scripts/tests/test_codex_lane.py scripts/tests/test_continuity_clock.py scripts/tests/test_design_gate.py scripts/tests/test_devin_free_policy.py scripts/tests/test_disk_guard.py scripts/tests/test_doctor.py scripts/tests/test_epics.py scripts/tests/test_execution_attempt.py scripts/tests/test_gh_app_token.py scripts/tests/test_hud.py scripts/tests/test_hyperagent_lane.py scripts/tests/test_issue_routing.py scripts/tests/test_lane_runner.py scripts/tests/test_pr_events.py scripts/tests/test_qualification_guard.py scripts/tests/test_reason_lane.py scripts/tests/test_remediation.py scripts/tests/test_service_census.py scripts/tests/test_shipping_attribution.py scripts/tests/test_shipping_origin.py scripts/tests/test_telegram_archive.py scripts/tests/test_worktree_pool.py scripts/tests/test_worktree_sweep.py';
 
 /**
  * The lanes coverage pytest was ci-fast (remaining)'s long pole (174.5s and
@@ -461,7 +469,10 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
   structuralPythonRegression(
     [
       LANES_COVERAGE_RUN,
+      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/backlog_admission.py" --fail-under=90',
+      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/hud.py" --fail-under=80',
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/capacity_limit.py" --fail-under=90',
+      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/qualification_guard.py" --fail-under=85',
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/lane_runner.py,*/scripts/lanes/pr_events.py,*/scripts/lanes/reason_lane.py,*/scripts/lanes/gbrain_catalog.py,*/scripts/lanes/design_gate.py,*/scripts/lanes/doctor.py,*/scripts/lanes/disk_guard.py,*/scripts/lanes/continuity_clock.py" --fail-under=85',
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/hyperagent_lane.py" --fail-under=95',
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/devin_free_policy.py" --fail-under=85',
@@ -492,6 +503,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/agent/pen-native-semantic-manifest-contract.test.mjs',
   'scripts/agent/pen-registry-audit.test.mjs',
   'scripts/api-route-pruning.test.mjs',
+  'scripts/artist-profile-conformance.test.mjs',
   'scripts/backlog-orchestrator/__tests__/admission-disposition.test.mjs',
   'scripts/backlog-orchestrator/__tests__/admission-receipt.test.mjs',
   'scripts/backlog-orchestrator/__tests__/backlog-hygiene.test.mjs',
@@ -541,6 +553,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/invariants/virtual-models.test.mjs',
   'scripts/invariants/writing-surfaces.test.mjs',
   'scripts/ios-ci-cache-contract.test.mjs',
+  '.github/scripts/testflight-release-lease.test.mjs',
   'scripts/inbound-loop/inbound-loop.test.mjs',
   'scripts/lanes/ops-report.test.mjs',
   'scripts/merge-queue-green-enroll.test.mjs',
@@ -551,6 +564,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/lib/__tests__/source-validation-lane-classification.test.mjs',
   'scripts/retire-coverage-reports.test.mjs',
   'scripts/publish-coverage-report.test.mjs',
+  'scripts/lib/__tests__/canonical-artist-site-intake.test.mjs',
   'scripts/lib/__tests__/canonical-json.test.mjs',
   'scripts/lib/__tests__/format-biome-json.test.mjs',
   'scripts/lib/__tests__/dependabot-workflow-run-adapter.test.mjs',
@@ -564,6 +578,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/performance-artifact-retention.test.mjs',
   'scripts/postmortem-linkage-check.test.mjs',
   'scripts/postmortem-review.test.mjs',
+  'scripts/prebuild-install-dep0176.test.mjs',
   'scripts/public-benchmark/public-benchmark.test.mjs',
   'scripts/quality-gap-finder.test.mjs',
   'scripts/screenshot-loop/screenshot-bug-loop.test.mjs',
@@ -631,11 +646,13 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/help-center-recertification-workflow.test.mjs',
   'scripts/lib/__tests__/isolated-ui-docs-policy.test.mjs',
   'scripts/lib/__tests__/learning-evidence.test.mjs',
+  'scripts/lib/__tests__/lesson-compilation.test.mjs',
   'scripts/lib/__tests__/lighthouse-production-collect.test.mjs',
   'scripts/lib/__tests__/lighthouse-retry.test.mjs',
   'scripts/lib/__tests__/m2-revenue-path-canary-intake.test.mjs',
   'scripts/lib/__tests__/synthetic-monitoring-plan.test.mjs',
   'scripts/lib/__tests__/remediation-detector-plans.test.mjs',
+  'scripts/lib/__tests__/docs-deploy-intake-quota.test.mjs',
   'scripts/lib/__tests__/mac-runner-route-contract.test.mjs',
   'scripts/lib/__tests__/mac-lane-script.test.mjs',
   'scripts/lib/__tests__/main-release-readiness.test.mjs',
@@ -2367,7 +2384,7 @@ export async function runStructural(opts = {}) {
     'pnpm ci:control:test',
     'pnpm exec vitest --config scripts/vitest.config.mts run lib/__tests__/pr-visual-review.test.mjs lib/__tests__/pr-visual-capture-path.test.mjs --maxWorkers=1 --coverage --coverage.allowExternal --coverage.include="$PWD/.github/scripts/pr-visual-evidence-gate.mjs" --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-pr-visual-policy-coverage"',
     // merge-group-workflow-contract runs in ci:control:test's Vitest run.
-    'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/production-release-supersession.test.mjs lib/__tests__/staging-controller-supersession.test.mjs lib/__tests__/staging-receipt-fetch-real-gh.test.mjs lib/__tests__/staging-generation-lineage.test.mjs lib/__tests__/release-lineage-gate.test.mjs lib/__tests__/release-risk-policy.test.mjs lib/__tests__/vitest-retry-reporter.test.mjs',
+    'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/recheck-main-lineage-auth.test.mjs lib/__tests__/production-release-supersession.test.mjs lib/__tests__/staging-controller-supersession.test.mjs lib/__tests__/staging-receipt-fetch-real-gh.test.mjs lib/__tests__/staging-generation-lineage.test.mjs lib/__tests__/release-lineage-gate.test.mjs lib/__tests__/release-risk-policy.test.mjs lib/__tests__/vitest-retry-reporter.test.mjs',
     "pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/production-marker-state.test.ts --coverage --coverage.include='**/production-marker-state.mjs' --coverage.allowExternal=true --coverage.thresholds.lines=82 --coverage.thresholds.branches=79 --coverage.thresholds.functions=97",
     'node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/linear-client.mjs --test-coverage-lines=73 --test-coverage-branches=83 --test-coverage-functions=66 scripts/backlog-orchestrator/__tests__/linear-client.transport.test.mjs scripts/backlog-orchestrator/__tests__/linear-pagination.test.mjs',
     'pnpm ci:branching-guard:validate',

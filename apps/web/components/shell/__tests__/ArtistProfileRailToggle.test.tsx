@@ -49,6 +49,22 @@ describe('ArtistProfileRailToggle', () => {
     toggleMock.mockReset();
   });
 
+  it('keeps the in-content manual control canonical and keyboard operable', async () => {
+    const user = userEvent.setup();
+    render(<ArtistProfileRailToggle previewTrigger={false} />);
+    const button = screen.getByTestId('artist-profile-rail-toggle');
+    expect(button).toHaveAttribute('data-rail-preview-trigger', 'false');
+    expect(button).toHaveAttribute('data-rail-toggle', 'right');
+    expect(button).toHaveAttribute(
+      'aria-controls',
+      'shell-artist-profile-rail'
+    );
+    await user.tab();
+    expect(button).toHaveFocus();
+    await user.keyboard(' ');
+    expect(toggleMock).toHaveBeenCalledOnce();
+  });
+
   it('renders a non-avatar rail icon and toggles the panel', async () => {
     const user = userEvent.setup();
 

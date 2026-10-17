@@ -69,6 +69,10 @@ describe('shell UX regressions source contracts (JOV-3958/3959/3960)', () => {
       )
     );
     expect(overlay).toContain('width: fit-content;');
+    expect(overlay).toContain('&:has([data-rail-phase="closed"])');
+    expect(overlay).toMatch(
+      /&:has\(\[data-rail-phase="closed"\]\)[\s\S]*width: 0;[\s\S]*padding: 0;/
+    );
     expect(rail).not.toMatch(/lg:flex-col lg:self-start lg:overflow-hidden/);
   });
 

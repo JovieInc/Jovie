@@ -12,6 +12,7 @@ import {
   seedOnboardedCreatorProfile,
 } from './helpers/e2e-helpers';
 import {
+  chatComposerInputLocator,
   smokeNavigateWithRetry,
   waitForHydration,
 } from './utils/smoke-test-utils';
@@ -358,8 +359,7 @@ test.describe('Golden Path: Chat', { tag: '@golden-path' }, () => {
     await waitForHydration(page);
 
     // Find the chat input
-    const chatInput = page
-      .getByPlaceholder(/ask jovie|chat message/i)
+    const chatInput = chatComposerInputLocator(page)
       .or(page.locator('textarea[data-testid="chat-input"]'))
       .or(page.locator('textarea').first());
     await expect(chatInput).toBeVisible({ timeout: 15_000 });

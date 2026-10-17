@@ -2,6 +2,7 @@ import { type Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
 import { Suspense } from 'react';
 import { loadPublicReleaseCredits } from '@/app/[username]/[slug]/_lib/data';
+import { isScreenCertSmartLinkProfileRequest } from '@/app/[username]/[slug]/_lib/screen-cert-fixture';
 
 // No `export const dynamic` here — the parent layout sets `revalidate: 3600`
 // (ISR). The public profile route must stay ISR-cacheable; avoid any Dynamic
@@ -114,6 +115,14 @@ interface ArtistPageContentProps {
   readonly initialMode: ProfileMode;
   readonly username: string;
   readonly profileResult: PublicProfileLoaderResult;
+}
+
+function ScreenCertFixtureProfilePage() {
+  return (
+    <main>
+      <h1 className='text-balance'>Screen Cert Fixture</h1>
+    </main>
+  );
 }
 
 function assertValidProfileUsername(username: string) {
@@ -567,7 +576,10 @@ async function ArtistPageContent({
       {isPublicNoAuthSmoke ? null : (
         <>
           <DesktopQrOverlayClient handle={artist.handle} />
-          <AskJovieWidget username={artist.handle} artistName={artist.name} />
+          {/* JOV-6571 keeps broad AI off the canonical artist-site journey. */}
+          {!isProofProfile && (
+            <AskJovieWidget username={artist.handle} artistName={artist.name} />
+          )}
         </>
       )}
     </>
@@ -581,6 +593,10 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
 
   if (username.toLowerCase() === 'unfazed') {
     return <UnfazedProfileClient />;
+  }
+
+  if (isScreenCertSmartLinkProfileRequest(username)) {
+    return <ScreenCertFixtureProfilePage />;
   }
 
   await enforceCanonicalPublicProfileUsername(username);
@@ -618,6 +634,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (username.toLowerCase() === 'unfazed') {
     return {
       title: 'Unfazed | Jovie',
+      robots: { index: false, follow: false },
+    };
+  }
+
+  if (isScreenCertSmartLinkProfileRequest(username)) {
+    return {
+      title: 'Screen Cert Fixture | Jovie',
       robots: { index: false, follow: false },
     };
   }

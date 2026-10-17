@@ -10,6 +10,7 @@ import {
   prepareBetterAuthEmailOtp,
 } from '../helpers/auth';
 import { completeGoldenPathBillingJourney } from './helpers/golden-path-billing';
+import { openHomeWelcome } from './helpers/golden-path-home-welcome';
 import {
   captureKeyframe,
   inspectEssentialViewport,
@@ -197,16 +198,10 @@ async function verifyHomeWelcome(page: Page) {
       await page.emulateMedia({
         reducedMotion: viewport.width === 615 ? 'reduce' : 'no-preference',
       });
-      await page.goto(APP_ROUTES.CHAT);
-      await expect(heading).toBeVisible();
-      const initialGreeting = await heading.textContent();
-      const before = await input.boundingBox();
-      if (viewport.width === 1440) {
-        await expect(nextStep.getByRole('status')).toHaveText(
-          'Finding your next step…'
-        );
-        releaseSummary();
-      }
+      const { initialGreeting, before } = await openHomeWelcome(
+        page,
+        viewport.width === 1440 ? releaseSummary : undefined
+      );
       const action = page.getByRole('button', {
         name: 'Draft This With Jovie',
       });

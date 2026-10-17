@@ -22,6 +22,8 @@
 #   JOVIE_IOS_DOGFOOD_ONLY_TESTING  -only-testing selector (default: DogfoodExplorationUITests)
 #   JOVIE_IOS_DOGFOOD_CRASH_DIR     crash-report dir (default: ~/Library/Logs/DiagnosticReports)
 #   JOVIE_IOS_XCODEBUILD_TIMEOUT_SECONDS  forwarded to run-xcodebuild.sh
+#   JOVIE_IOS_XCODEBUILD_FINALIZATION_TIMEOUT_SECONDS
+#                                    separate post-result budget, when set
 #   JOVIE_IOS_RESET_SIMULATOR      0 to keep prior simulator state (default: 1)
 
 set -euo pipefail

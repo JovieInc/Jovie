@@ -210,6 +210,9 @@ describe('ProfileCompactSurface identity header layout', () => {
     expect(contents.slice(ruleStart, declarationIndex)).toContain(
       'data-presentation="embedded"'
     );
+    expect(contents).toContain(
+      'height: calc(100% - var(--profile-bottom-nav-height));'
+    );
   });
 
   it('preserves the landscape track minimum when identity text consumes the viewport', () => {

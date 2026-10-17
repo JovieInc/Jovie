@@ -58,4 +58,26 @@ describe('Next.js security baseline', () => {
       expect(appRequire('next/package.json').version).toBe(next);
     });
   }
+
+  it('replays ISR Location as one field instead of appending a second', () => {
+    const appRequire = createRequire(nextApps[0]?.path ?? import.meta.url);
+    const template = readFileSync(
+      appRequire.resolve('next/dist/esm/build/templates/app-page-runtime.js'),
+      'utf8'
+    );
+    const cjsTemplate = readFileSync(
+      appRequire.resolve('next/dist/build/templates/app-page-runtime.js'),
+      'utf8'
+    );
+    const guard =
+      "key.toLowerCase() === 'location' || key.toLowerCase() === 'x-nextjs-stale-time'";
+
+    for (const source of [template, cjsTemplate]) {
+      expect(source).toContain(guard);
+      const guardAt = source.indexOf(guard);
+      expect(source.slice(guardAt, guardAt + 400)).toContain(
+        'res.setHeader(key, value);'
+      );
+    }
+  });
 });

@@ -1,0 +1,8 @@
+{
+  "shell": "electron",
+  "electronMajor": 44,
+  "minimumMacOSMajor": 13,
+  "minimumMacOSLabel": "macOS 13 Ventura or later",
+  "architectures": ["arm64", "x64"],
+  "artifact": "universal"
+}

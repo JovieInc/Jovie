@@ -84,10 +84,15 @@ it('enforces lifecycle coverage through the real structural selector', async () 
   // The coverage command is an operations-lane part. A merge group narrows
   // CI_PRODUCT_LANES to the diff (web-only for an e2e spec) and the structural
   // jobs set split modes the parent deletes before spawning this suite.
+  // workflow_dispatch keeps that selector off the live checkout. A docs-only
+  // pull_request selects neither product nor control lanes, skips structural
+  // before CI_PRODUCT_LANES applies, and caches that skip for later tests.
   const previous = {
+    GITHUB_EVENT_NAME: process.env.GITHUB_EVENT_NAME,
     CI_PRODUCT_LANES: process.env.CI_PRODUCT_LANES,
     CI_FAST_STRUCTURAL_PYTEST: process.env.CI_FAST_STRUCTURAL_PYTEST,
     CI_FAST_STRUCTURAL_WEB: process.env.CI_FAST_STRUCTURAL_WEB,
+    CI_FAST_SKIP_STRUCTURAL: process.env.CI_FAST_SKIP_STRUCTURAL,
   };
   const collect = async () => {
     const commands = [];
@@ -102,8 +107,10 @@ it('enforces lifecycle coverage through the real structural selector', async () 
     );
   };
   try {
+    process.env.GITHUB_EVENT_NAME = 'workflow_dispatch';
     delete process.env.CI_FAST_STRUCTURAL_PYTEST;
     delete process.env.CI_FAST_STRUCTURAL_WEB;
+    delete process.env.CI_FAST_SKIP_STRUCTURAL;
     process.env.CI_PRODUCT_LANES = 'ios,mac,web,operations,cross-product';
     expect(await collect()).toHaveLength(1);
     process.env.CI_PRODUCT_LANES = 'web';
@@ -139,6 +146,10 @@ describe('Shared fenced-attempt coverage contract', () => {
   it('runs existing fenced-attempt and lane regressions in the real structural selector', () => {
     const command = STRUCTURAL_PYTHON_REGRESSION_COMMANDS[0];
     expect(command).toContain('scripts/tests/test_execution_attempt.py');
+    expect(command).toContain('scripts/tests/test_backlog_admission.py');
+    expect(command).toContain(
+      '*/scripts/lanes/backlog_admission.py" --fail-under=90'
+    );
     expect(command).toContain('scripts/tests/test_remediation.py');
     expect(command).toContain(
       '*/scripts/lanes/remediation.py" --fail-under=85'
@@ -146,7 +157,12 @@ describe('Shared fenced-attempt coverage contract', () => {
     expect(command).toContain('scripts/tests/test_lane_runner.py');
     expect(command).toContain('scripts/tests/test_design_gate.py');
     expect(command).toContain('scripts/tests/test_disk_guard.py');
+    expect(command).toContain('scripts/tests/test_qualification_guard.py');
+    expect(command).toContain(
+      '*/scripts/lanes/qualification_guard.py" --fail-under=85'
+    );
     expect(command).toContain('scripts/tests/test_hud.py');
+    expect(command).toContain('*/scripts/lanes/hud.py" --fail-under=80');
     expect(command).toContain('scripts/tests/test_codex_lane.py');
     expect(command).toContain('*/scripts/lanes/codex_lane.py" --fail-under=85');
     expect(command).toContain('scripts/tests/test_devin_free_policy.py');
@@ -2045,6 +2061,15 @@ describe('source-read guard selection', () => {
   const selected = (event, files) =>
     selectSourceGuards(event, files).map(guard => guard.id);
 
+  it.each(['pull_request', 'merge_group', 'push'])(
+    'runs profile conformance for adapters on %s',
+    event => {
+      expect(
+        selected(event, ['apps/web/lib/connectors/new-social/profile.ts'])
+      ).toContain('artist-profile-conformance');
+    }
+  );
+
   it.each([
     ['pull_request', ['web-source-read-tests', 'script-contracts']],
     ['merge_group', []],
@@ -2104,7 +2129,11 @@ describe('source-read guard selection', () => {
     ],
     [
       'apps/web/lib/queries/fetch.ts',
-      ['merge-group-unit-guards', 'static-revalidate-policy'],
+      [
+        'artist-profile-conformance',
+        'merge-group-unit-guards',
+        'static-revalidate-policy',
+      ],
     ],
     [
       'apps/web/app/(marketing)/download/page.tsx',
@@ -2166,14 +2195,17 @@ describe('source-read guard selection', () => {
     ).toContain('public-command-openapi.test.ts');
   });
 
-  it('keeps web-only guards to PRs; web merge groups already run them', () => {
+  it('keeps web unit guards on PRs and runs profile conformance on every head', () => {
     for (const path of [
       'apps/web/lib/queries/fetch.ts',
       'apps/web/tests/node-environment-files.json',
     ]) {
       expect(classifyProductLanes([path]).selectedLanes).toContain('web');
-      expect(selected('merge_group', [path])).toEqual([]);
-      expect(selected('push', [path])).toEqual([]);
+      const expected = path.startsWith('apps/web/lib/')
+        ? ['artist-profile-conformance']
+        : [];
+      expect(selected('merge_group', [path])).toEqual(expected);
+      expect(selected('push', [path])).toEqual(expected);
     }
   });
 
@@ -2182,6 +2214,7 @@ describe('source-read guard selection', () => {
     // Manual dispatch runs web Unit Tests and structural, which carry the rest.
     expect(selected('workflow_dispatch', ['README.md'])).toEqual([
       'artist-launch-contract',
+      'artist-profile-conformance',
       'ci-schedule-inventory',
     ]);
     expect(selected('', ['README.md'])).toEqual(all);
@@ -2189,19 +2222,26 @@ describe('source-read guard selection', () => {
     expect(selected('pull_request', [])).toEqual(all);
     expect(selected('merge_group', null)).toEqual([
       'artist-launch-contract',
+      'artist-profile-conformance',
       'ci-schedule-inventory',
     ]);
   });
 
   it('points every guard at a test file that exists', () => {
     for (const guard of SOURCE_GUARDS) {
+      if (guard.id === 'artist-profile-conformance') {
+        expect(guard.command).toContain(
+          join(REPO_ROOT, 'scripts/artist-profile-conformance.mjs')
+        );
+        expect(guard.command).toContain(
+          join(REPO_ROOT, 'scripts/artist-profile-conformance.test.mjs')
+        );
+        continue;
+      }
       if (guard.id === 'artist-launch-contract') {
-        expect(guard.command).toContain('--check && node --test');
+        expect(guard.command).toContain('node scripts/artist-');
         expect(
-          readFileSync(
-            join(REPO_ROOT, 'scripts/artist-launch-contract.test.mjs'),
-            'utf8'
-          )
+          readFileSync(join(REPO_ROOT, `scripts/${guard.id}.test.mjs`), 'utf8')
         ).toContain("from 'node:test'");
         continue;
       }

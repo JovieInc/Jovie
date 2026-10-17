@@ -3,7 +3,10 @@
  * hand: relative imports (followed through JS modules) and every string literal
  * that names an existing repo file, from the test or its own directory
  * (`readFileSync(new URL('../../apps/web/lib/leads/constants.ts', import.meta.url))`,
- * `join(ROOT, 'apps/web/...')`).
+ * `join(ROOT, 'apps/web/...')`, `resolve(root, 'DESIGN.md')`,
+ * `new URL('./design-sections.json', import.meta.url)`).
+ * A slashless `*.mjs` / `*.js` basename stays with the import walker. Treating
+ * that mention as a read pulled unrelated module graphs into the selector.
  *
  * #20922 changed apps/web/lib/leads/constants.ts, a web-lane path, and turned
  * main red: scripts/funnel-judge/rubric.test.mjs reads that file but only runs
@@ -17,7 +20,8 @@ const MODULE = /\.(?:mjs|cjs|js)$/u;
 const IMPORT =
   /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+|\brequire\s*\(\s*)(['"])(\.{1,2}\/[^'"\n]+)\1/gu;
 const PATH_LITERAL =
-  /(['"`])((?:\.{1,2}\/)*[\w@.-]+(?:\/[\w@.[\]-]+)+\.\w+)\1/gu;
+  /(['"`])((?:\.{1,2}\/)*[\w@.-]+(?:\/[\w@.[\]-]+)*\.\w+)\1/gu;
+const BARE_MODULE = /^[\w@.-]+\.(?:mjs|cjs|js|ts|mts|tsx|jsx)$/u;
 
 const toRepo = (root, absolute) =>
   relative(root, absolute).split(sep).join('/');
@@ -42,6 +46,7 @@ export function directDependencies(file, root) {
   }
   for (const match of source.matchAll(PATH_LITERAL)) {
     const literal = match[2];
+    if (BARE_MODULE.test(literal)) continue;
     for (const candidate of [join(here, literal), join(root, literal)]) {
       const target = normalize(candidate);
       if (target.startsWith(root + sep) && isFile(target)) {

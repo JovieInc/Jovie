@@ -116,6 +116,10 @@ const LEDGER = {
     kind: 'skipped-in-merge-group',
     greenGroupCalls: 0,
   },
+  'ci-golden-path/Certify canonical outbound artist journey': {
+    kind: 'off',
+    greenGroupCalls: 0,
+  },
   'main-release-ready/Resolve sealed product-lane release routing': {
     kind: 'off',
     greenGroupCalls: 0,
@@ -176,6 +180,10 @@ describe('ci.yml merge-group GITHUB_TOKEN budget', () => {
     expect(CI.jobs['ci-unit-runner-route'].if).toBe(
       "github.event_name == 'workflow_dispatch'"
     );
+    expect(CI.jobs['ci-golden-path'].if).toContain(
+      "github.event_name == 'workflow_dispatch'"
+    );
+    expect(CI.jobs['ci-golden-path'].if).not.toContain("'merge_group'");
     expect(CI.jobs['main-release-ready'].if ?? '').not.toContain(
       "'merge_group'"
     );

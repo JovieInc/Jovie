@@ -22,6 +22,10 @@ import { expect, test } from '@playwright/test';
 const SKIP_EXPENSIVE = process.env.RUN_CONNECTOR_E2E !== '1';
 
 test.describe('Connector endpoints: basic auth checks', () => {
+  // The full-matrix project inherits tests/.auth/user.json. These checks
+  // are specifically unauthenticated, so drop that session.
+  test.use({ storageState: { cookies: [], origins: [] } });
+
   test('approve endpoint returns 401 for unauthenticated requests', async ({
     request,
   }) => {
@@ -41,20 +45,23 @@ test.describe('Connector endpoints: basic auth checks', () => {
     expect([401, 403]).toContain(response.status());
   });
 
-  test('cron process-workflow-runs returns 401 without CRON_SECRET', async ({
+  test('cron process-workflow-runs rejects an untrusted origin before the secret', async ({
     request,
   }) => {
     const response = await request.get('/api/cron/process-workflow-runs');
-    expect(response.status()).toBe(401);
+    // requireTrustedOrigin runs first. The matrix host is not a Jovie cron
+    // origin, so a missing bearer is 403, not 401. The 401 secret path is
+    // locked in lib/cron/auth.test.ts.
+    expect(response.status()).toBe(403);
   });
 
-  test('cron process-workflow-runs returns 401 with wrong secret', async ({
+  test('cron process-workflow-runs rejects a wrong secret from an untrusted origin', async ({
     request,
   }) => {
     const response = await request.get('/api/cron/process-workflow-runs', {
       headers: { Authorization: 'Bearer wrong-secret-xyz' },
     });
-    expect(response.status()).toBe(401);
+    expect(response.status()).toBe(403);
   });
 });
 
