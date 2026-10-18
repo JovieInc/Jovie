@@ -5360,6 +5360,252 @@ class PreservedRecoveryTest(unittest.TestCase):
         self.assertEqual(lane.retire_published_preserved(self.host, 999), [], "another PR's checkout is untouched")
         self.assertTrue(self.path.exists())
 
+    def recovery_source_snapshot(self):
+        index = Path(self.git(self.path, "rev-parse", "--git-path", "index"))
+        if not index.is_absolute():
+            index = self.path / index
+        return {"marker": (self.path / lane.disk_guard.PRESERVED_REPAIR).read_bytes(),
+                "index": index.read_bytes(), "head": self.git(self.path, "rev-parse", "HEAD"),
+                "source": (self.path / "repair.txt").read_bytes(),
+                "refs": self.git(self.host.repo, "for-each-ref", lane.PRESERVED_ARCHIVE_REF),
+                "attempts": (self.host.state / "runs/execution-attempts.jsonl").read_bytes()}
+
+    def supersede_cancelled_recovery_fixture(self):
+        self.cancelled_predecessor(commit=True)
+        self.age_marker()
+        self.git(self.host.repo, "commit", "--allow-empty", "-qm", "current writer head")
+        self.live["headRefOid"] = self.pr["headRefOid"] = self.git(self.host.repo, "rev-parse", "HEAD")
+        self.git(self.host.repo, "update-ref", "refs/remotes/origin/devin/jov-1", self.pr["headRefOid"])
+
+    def test_recovery_reports_custody_refusals_without_changing_source_or_claiming(self):
+        self.supersede_cancelled_recovery_fixture()
+        before = self.recovery_source_snapshot()
+        real = lane.sh
+        cases = [("warning", SimpleNamespace(returncode=0, stdout="", stderr="DO_NOT_COPY_PROCESS_PAYLOAD"),
+                  "process-state-unavailable"),
+                 ("nonzero", SimpleNamespace(returncode=2, stdout="", stderr=""),
+                  "process-state-unavailable"),
+                 ("timeout", subprocess.TimeoutExpired("private-command", 30), "process-state-unavailable"),
+                 ("unreadable", PermissionError("private-path"), "process-state-unavailable"),
+                 ("busy", SimpleNamespace(returncode=0, stdout=f"p123\nn{self.path}\n", stderr=""),
+                  "process-still-running")]
+        for name, observation, custody in cases:
+            with self.subTest(name=name):
+                def shell(args, **kwargs):
+                    if args[0] == "lsof":
+                        if isinstance(observation, Exception):
+                            raise observation
+                        return observation
+                    return real(args, **kwargs)
+                with patch.object(lane, "sh", side_effect=shell), \
+                        patch.object(lane.execution_attempt, "claim") as claim, \
+                        patch.object(lane, "run_agent") as agent:
+                    receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+                self.assertEqual(receipt["verdict"], "recovery-handoff")
+                rows = receipt["preservedRecoveryObservations"]
+                self.assertEqual([(row["phase"], row["reason"], row.get("custodyReason")) for row in rows],
+                                 [("retire", "worktree-not-idle", custody),
+                                  ("archive", "worktree-not-idle", custody)])
+                self.assertTrue(all(row["authorizesRecovery"] is False for row in rows))
+                self.assertTrue(all(row["markerPreimageSha256"] == hashlib.sha256(before["marker"]).hexdigest()
+                                    for row in rows))
+                self.assertTrue(all(row["observerSourceSha256"] == hashlib.sha256(Path(lane.__file__).read_bytes()).hexdigest()
+                                    for row in rows))
+                self.assertEqual(receipt["headBefore"], self.pr["headRefOid"])
+                self.assertNotIn("DO_NOT_COPY_PROCESS_PAYLOAD", json.dumps(receipt))
+                self.assertNotIn("private-command", json.dumps(receipt))
+                self.assertNotIn("private-path", json.dumps(receipt))
+                self.assertEqual(self.recovery_source_snapshot(), before)
+                claim.assert_not_called()
+                agent.assert_not_called()
+
+    def test_recovery_index_lock_refusal_survives_replay(self):
+        self.supersede_cancelled_recovery_fixture()
+        before = self.recovery_source_snapshot()
+        index = Path(self.git(self.path, "rev-parse", "--git-path", "index"))
+        lock = Path(str(index) + ".lock")
+        lock.write_text("foreign fixture owner")
+        with patch.object(lane.execution_attempt, "claim") as claim, patch.object(lane, "run_agent") as agent:
+            for _ in range(2):
+                receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+                rows = receipt["preservedRecoveryObservations"]
+                self.assertEqual([row.get("custodyReason") for row in rows], ["git-index-locked"] * 2)
+                self.assertEqual(receipt["verdict"], "recovery-handoff")
+                self.assertEqual(self.recovery_source_snapshot(), before)
+                self.assertEqual(lock.read_text(), "foreign fixture owner")
+            claim.assert_not_called()
+            agent.assert_not_called()
+
+    def test_recovery_diagnostics_exclude_untrusted_fields_and_unreadable_source(self):
+        observations = []
+        lane.note_preserved_recovery(observations, "archive", "worktree-not-idle",
+                                     marker="PRIVATE_MARKER", custody="PRIVATE_PROCESS_PAYLOAD")
+        self.assertEqual(observations[0]["custodyReason"], "unclassified")
+        self.assertEqual(observations[0]["markerPreimageSha256"], hashlib.sha256(b"PRIVATE_MARKER").hexdigest())
+        self.assertNotIn("PRIVATE_", json.dumps(observations))
+        lane.note_preserved_recovery(observations, "PRIVATE_PHASE", "PRIVATE_REASON")
+        self.assertEqual(len(observations), 1)
+        with patch.object(lane.Path, "read_bytes", side_effect=PermissionError("PRIVATE_PATH")):
+            lane.note_preserved_recovery(observations, "archive", "archive-io-unavailable")
+        self.assertNotIn("observerSourceSha256", observations[-1])
+        self.assertNotIn("PRIVATE_", json.dumps(observations))
+        lane.note_preserved_recovery(None, "archive", "archive-io-unavailable")
+
+    def test_recovery_archive_fault_observations_keep_actual_source_and_effects(self):
+        self.supersede_cancelled_recovery_fixture()
+        (self.path / "draft.txt").write_text("uncommitted source")
+        before = self.recovery_source_snapshot()
+        real = lane.sh
+        cases = [("head", ["git", "rev-parse"], "archive-head-unavailable"),
+                 ("read-index", ["git", "read-tree"], "archive-index-unavailable"),
+                 ("stage-index", ["git", "add"], "archive-index-unavailable"),
+                 ("write-tree", ["git", "write-tree"], "archive-tree-unavailable"),
+                 ("commit", ["git", "commit-tree"], "archive-commit-unavailable"),
+                 ("ref", ["git", "update-ref"], "archive-ref-unavailable"),
+                 ("remove", ["git", "worktree", "remove"], "archive-worktree-retained")]
+        for name, prefix, reason in cases:
+            with self.subTest(name=name):
+                def shell(args, **kwargs):
+                    if args[:len(prefix)] == prefix:
+                        return SimpleNamespace(returncode=1, stdout="", stderr="DO_NOT_COPY_GIT_PAYLOAD")
+                    return real(args, **kwargs)
+                observations = []
+                with patch.object(lane, "sh", side_effect=shell):
+                    result = lane.archive_unresumable_preserved(
+                        self.host, self.path, "preserved-head-superseded", observations=observations)
+                self.assertIsNone(result)
+                self.assertEqual(observations[-1]["reason"], reason)
+                self.assertEqual(observations[-1]["phase"], "archive")
+                self.assertFalse(observations[-1]["authorizesRecovery"])
+                self.assertNotIn("DO_NOT_COPY_GIT_PAYLOAD", json.dumps(observations))
+                after = self.recovery_source_snapshot()
+                if name == "remove":
+                    ref = lane.PRESERVED_ARCHIVE_REF + self.path.name
+                    self.assertEqual(self.git(self.host.repo, "show", f"{ref}:draft.txt"), "uncommitted source")
+                    self.assertEqual(self.git(self.host.repo, "show", f"{ref}:repair.txt"), "unpublished fix")
+                    self.assertNotEqual(after["refs"], before["refs"])
+                    after["refs"] = before["refs"]  # A real retained archive ref is not accepted cleanup.
+                self.assertEqual(after, before)
+                self.assertEqual((self.path / "draft.txt").read_text(), "uncommitted source")
+
+    def test_recovery_archive_io_faults_are_safe_observations(self):
+        self.supersede_cancelled_recovery_fixture()
+        before = self.recovery_source_snapshot()
+        real = lane.sh
+        for error in [PermissionError("PRIVATE_GIT_PAYLOAD"), subprocess.TimeoutExpired("PRIVATE_CMD", 30)]:
+            with self.subTest(error=type(error).__name__):
+                def shell(args, **kwargs):
+                    if args[:2] == ["git", "read-tree"]:
+                        raise error
+                    return real(args, **kwargs)
+                observations = []
+                with patch.object(lane, "sh", side_effect=shell):
+                    self.assertIsNone(lane.archive_unresumable_preserved(
+                        self.host, self.path, "preserved-head-superseded", observations=observations))
+                self.assertEqual(observations[-1]["reason"], "archive-io-unavailable")
+                self.assertNotIn("PRIVATE_", json.dumps(observations))
+                self.assertEqual(self.recovery_source_snapshot(), before)
+
+    def test_recovery_refusal_then_restart_uses_existing_archive_and_claim(self):
+        self.supersede_cancelled_recovery_fixture()
+        before = self.recovery_source_snapshot()
+        real = lane.sh
+        def faulty(args, **kwargs):
+            if args[:2] == ["git", "write-tree"]:
+                return SimpleNamespace(returncode=1, stdout="", stderr="private failure")
+            return real(args, **kwargs)
+        with patch.object(lane, "sh", side_effect=faulty), \
+                patch.object(lane.execution_attempt, "claim") as claim, patch.object(lane, "run_agent") as agent:
+            for _ in range(2):
+                receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+                self.assertEqual(receipt["verdict"], "recovery-handoff")
+                self.assertEqual([row["reason"] for row in receipt["preservedRecoveryObservations"]],
+                                 ["source-not-fully-published", "archive-tree-unavailable"])
+                self.assertNotIn("archivedPreserved", receipt)
+                self.assertEqual(self.recovery_source_snapshot(), before)
+            claim.assert_not_called()
+            agent.assert_not_called()
+        with patch.object(lane, "run_agent", return_value=SimpleNamespace(returncode=0)) as agent:
+            receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+        self.assertEqual(receipt["verdict"], "fix-no-change")
+        self.assertEqual(receipt["archivedPreserved"], [lane.PRESERVED_ARCHIVE_REF + self.path.name])
+        self.assertEqual(receipt["preservedRecoveryObservations"][0]["reason"], "source-not-fully-published")
+        rows = [json.loads(line) for line in (self.host.state / "runs/execution-attempts.jsonl").read_text().splitlines()]
+        added = rows[len(before["attempts"].splitlines()):]
+        starts = [row for row in added if row["event"] == "attempt_started"]
+        self.assertEqual(len(starts), 1)
+        self.assertEqual(starts[0]["identityDigest"], receipt["execution"]["identityDigest"])
+        self.assertEqual(receipt["execution"]["event"], "attempt_finished")
+        self.assertEqual(receipt["execution"]["result"], "failed_known")  # Fixture agent did not push a fix.
+        agent.assert_called_once()
+        self.assertFalse(self.path.exists())
+
+    def test_recovery_fresh_and_foreign_markers_do_not_gain_cleanup_from_diagnostics(self):
+        self.cancelled_predecessor(commit=True)
+        before = self.recovery_source_snapshot()
+        observations = []
+        self.assertIsNone(lane.archive_unresumable_preserved(
+            self.host, self.path, "preserved-head-superseded", observations=observations))
+        self.assertEqual(observations[-1]["reason"], "archive-too-fresh")
+        self.assertEqual(self.recovery_source_snapshot(), before)
+        self.assertEqual(lane.retire_published_preserved(self.host, 999, observations=observations), [])
+        self.assertIsNone(lane.archive_unresumable_preserved(
+            self.host, self.path, "PRIVATE_INVALID_REASON", observations=observations))
+        self.assertEqual(len(observations), 1)
+        self.assertEqual(self.recovery_source_snapshot(), before)
+
+    def test_retirement_io_refusal_records_no_private_error_or_source_change(self):
+        self.supersede_cancelled_recovery_fixture()
+        before = self.recovery_source_snapshot()
+        real = lane.sh
+        def shell(args, **kwargs):
+            if args[:2] == ["git", "status"]:
+                raise PermissionError("PRIVATE_STATUS_PAYLOAD")
+            return real(args, **kwargs)
+        observations = []
+        with patch.object(lane, "sh", side_effect=shell):
+            self.assertEqual(lane.retire_published_preserved(self.host, self.pr["number"],
+                                                           observations=observations), [])
+        self.assertEqual(observations[-1]["reason"], "retire-io-unavailable")
+        self.assertNotIn("PRIVATE_", json.dumps(observations))
+        self.assertEqual(self.recovery_source_snapshot(), before)
+
+    def test_retirement_incomplete_removal_is_observed_without_claiming_cleanup(self):
+        self.cancelled_predecessor()
+        marker = (self.path / lane.disk_guard.PRESERVED_REPAIR).read_bytes()
+        head = self.git(self.path, "rev-parse", "HEAD")
+        observations = []
+        with patch.object(lane, "remove_worktree") as remove:
+            result = lane.retire_published_preserved(self.host, self.pr["number"], observations=observations)
+        self.assertEqual(result, [])
+        remove.assert_called_once_with(self.host, self.path)
+        self.assertTrue(self.path.exists())
+        self.assertEqual(self.git(self.path, "rev-parse", "HEAD"), head)
+        self.assertEqual(observations[-1]["reason"], "retire-worktree-retained")
+        self.assertEqual(observations[-1]["markerPreimageSha256"], hashlib.sha256(marker).hexdigest())
+        self.assertFalse(observations[-1]["authorizesRecovery"])
+
+    def test_recovery_malformed_marker_fields_are_not_exported_or_new_authority(self):
+        self.supersede_cancelled_recovery_fixture()
+        marker = self.path / lane.disk_guard.PRESERVED_REPAIR
+        data = json.loads(marker.read_text())
+        data["at"] = "PRIVATE_INVALID_TIMESTAMP"
+        marker.write_text(json.dumps(data))
+        before = self.recovery_source_snapshot()
+        observations = []
+        self.assertIsNone(lane.archive_unresumable_preserved(
+            self.host, self.path, "preserved-head-superseded", observations=observations))
+        self.assertEqual(observations[-1]["reason"], "archive-too-fresh")  # Existing mtime fallback remains.
+        self.assertNotIn("PRIVATE_", json.dumps(observations))
+        self.assertEqual(self.recovery_source_snapshot(), before)
+        marker.write_text("[]")
+        observations = []
+        self.assertEqual(lane.retire_published_preserved(self.host, self.pr["number"],
+                                                       observations=observations), [])
+        self.assertEqual(observations, [])
+        self.assertEqual(marker.read_text(), "[]")
+        self.assertEqual(self.git(self.path, "rev-parse", "HEAD"), before["head"])
+
     def test_agent_guard_tolerates_a_transient_unreadable_target(self):
         reads = iter([None, None, "live"])
         target = lambda _: dict(self.live) if next(reads, "live") else None

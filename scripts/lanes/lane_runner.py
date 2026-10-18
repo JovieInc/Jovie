@@ -5867,7 +5867,30 @@ def retire_completed_repair(host: Host, worktree: Path, receipt: dict) -> bool:
     return False
 
 
-def retire_published_preserved(host: Host, number: int) -> list[str]:
+def note_preserved_recovery(observations, phase, reason, *, marker=None, custody=None) -> None:
+    """Safe refusal evidence only; never changes a recovery predicate or grants custody."""
+    reasons = {"worktree-not-idle", "source-not-fully-published", "retire-io-unavailable",
+               "retire-worktree-retained", "archive-too-fresh", "archive-head-unavailable",
+               "archive-index-unavailable", "archive-tree-unavailable", "archive-commit-unavailable",
+               "archive-ref-unavailable", "archive-worktree-retained", "archive-io-unavailable"}
+    if type(observations) is not list or type(phase) is not str or type(reason) is not str \
+            or phase not in {"retire", "archive"} or reason not in reasons:
+        return
+    row = {"schema": "jovie-preserved-recovery-observation/v1", "phase": phase, "reason": reason,
+           "authorizesRecovery": False}
+    if custody is not None:
+        row["custodyReason"] = custody if type(custody) is str and custody in {
+            "git-index-locked", "process-state-unavailable", "process-still-running"} else "unclassified"
+    if type(marker) in (str, bytes):
+        row["markerPreimageSha256"] = hashlib.sha256(marker.encode() if type(marker) is str else marker).hexdigest()
+    try:
+        row["observerSourceSha256"] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+    except OSError:
+        pass  # Missing observer identity is not a successful recovery or a custody release.
+    observations.append(row)
+
+
+def retire_published_preserved(host: Host, number: int, *, observations=None) -> list[str]:
     """Under the PR's repair lock: free this PR's preserved checkouts that hold nothing to recover.
 
     A cancelled or unreadable-target run preserves its checkout as evidence. Once that
@@ -5881,7 +5904,8 @@ def retire_published_preserved(host: Host, number: int) -> list[str]:
     for marker_path in sorted((host.state / "worktrees").glob(f"*/{disk_guard.PRESERVED_REPAIR}")):
         path = marker_path.parent
         try:
-            marker = json.loads(marker_path.read_text())
+            marker_text = marker_path.read_text()
+            marker = json.loads(marker_text)
         except (OSError, ValueError):
             continue
         if not isinstance(marker, dict) or marker.get("issue") is not None:
@@ -5891,20 +5915,25 @@ def retire_published_preserved(host: Host, number: int) -> list[str]:
                 marker.get("pr") is None and named and named.group(1) == str(number)):
             continue
         try:
-            if worktree_busy(path):
+            if busy := worktree_busy(path):
+                note_preserved_recovery(observations, "retire", "worktree-not-idle", marker=marker_text, custody=busy)
                 continue
             status = sh(["git", "status", "--porcelain", "--untracked-files=all", *disk_guard.SOURCE_PATHSPEC],
                         cwd=path, timeout=30)
             unpushed = sh(["git", "rev-list", "--count", "HEAD", "--not", "--remotes=origin"],
                           cwd=path, timeout=30)
             if status.returncode or status.stdout.strip() or unpushed.returncode or unpushed.stdout.strip() != "0":
+                note_preserved_recovery(observations, "retire", "source-not-fully-published", marker=marker_text)
                 continue
             marker_path.unlink()
             remove_worktree(host, path)
         except (OSError, subprocess.SubprocessError):
+            note_preserved_recovery(observations, "retire", "retire-io-unavailable", marker=marker_text)
             continue
         if not path.exists():
             retired.append(path.name)
+        else:
+            note_preserved_recovery(observations, "retire", "retire-worktree-retained", marker=marker_text)
     return retired
 
 
@@ -5918,7 +5947,7 @@ PRESERVED_ARCHIVE_REF = "refs/jovie-preserved/"
 PRESERVED_ARCHIVE_AFTER_S = 6 * 3600
 
 
-def archive_unresumable_preserved(host: Host, path: Path, reason: str) -> str | None:
+def archive_unresumable_preserved(host: Host, path: Path, reason: str, *, observations=None) -> str | None:
     """Keep an unresumable preserved checkout's source as a local ref, then free the PR.
 
     The archive commit is the checkout's HEAD plus every uncommitted source file (a temporary
@@ -5929,37 +5958,50 @@ def archive_unresumable_preserved(host: Host, path: Path, reason: str) -> str | 
     marker_path = path / disk_guard.PRESERVED_REPAIR
     if reason not in UNRESUMABLE_PRESERVED or path.resolve().parent != root or not marker_path.exists():
         return None
+    marker = None
     try:
         marker = marker_path.read_text()
         try:
             stamp = datetime.fromisoformat(str(json.loads(marker).get("at")).replace("Z", "+00:00")).timestamp()
         except (ValueError, TypeError, AttributeError):
             stamp = marker_path.stat().st_mtime
-        if time.time() - stamp < PRESERVED_ARCHIVE_AFTER_S or worktree_busy(path):
+        if time.time() - stamp < PRESERVED_ARCHIVE_AFTER_S:
+            note_preserved_recovery(observations, "archive", "archive-too-fresh", marker=marker)
+            return None
+        if busy := worktree_busy(path):
+            note_preserved_recovery(observations, "archive", "worktree-not-idle", marker=marker, custody=busy)
             return None
         head = sh(["git", "rev-parse", "--verify", "HEAD^{commit}"], cwd=path, timeout=30)
         if head.returncode:
+            note_preserved_recovery(observations, "archive", "archive-head-unavailable", marker=marker)
             return None
         with tempfile.TemporaryDirectory(dir=host.state) as scratch:
             env = {**os.environ, "GIT_INDEX_FILE": str(Path(scratch) / "index")}
             for args in (["git", "read-tree", "HEAD"], ["git", "add", "-A", *disk_guard.SOURCE_PATHSPEC]):
                 if sh(args, cwd=path, env=env, timeout=300).returncode:
+                    note_preserved_recovery(observations, "archive", "archive-index-unavailable", marker=marker)
                     return None
             tree = sh(["git", "write-tree"], cwd=path, env=env, timeout=60)
         if tree.returncode or not tree.stdout.strip():
+            note_preserved_recovery(observations, "archive", "archive-tree-unavailable", marker=marker)
             return None
         commit = sh(["git", "commit-tree", tree.stdout.strip(), "-p", head.stdout.strip(),
                      "-m", f"lanes: archive preserved repair {path.name} ({reason})"], cwd=path, timeout=60)
         ref = PRESERVED_ARCHIVE_REF + path.name
-        if commit.returncode or not commit.stdout.strip() \
-                or sh(["git", "update-ref", ref, commit.stdout.strip()], cwd=path, timeout=30).returncode:
+        if commit.returncode or not commit.stdout.strip():
+            note_preserved_recovery(observations, "archive", "archive-commit-unavailable", marker=marker)
+            return None
+        if sh(["git", "update-ref", ref, commit.stdout.strip()], cwd=path, timeout=30).returncode:
+            note_preserved_recovery(observations, "archive", "archive-ref-unavailable", marker=marker)
             return None
         marker_path.unlink()
         sh(["git", "worktree", "remove", "--force", str(path)], cwd=host.repo, timeout=600)
         if path.exists():
             marker_path.write_text(marker)  # Not removed: keep it protected; the ref also holds it.
+            note_preserved_recovery(observations, "archive", "archive-worktree-retained", marker=marker)
             return None
     except (OSError, subprocess.SubprocessError):
+        note_preserved_recovery(observations, "archive", "archive-io-unavailable", marker=marker)
         return None
     return ref
 
@@ -6046,10 +6088,11 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                                        {"headSha": pr["headRefOid"]})
     coordination = execution_coordination(pr["headRefOid"])
     preserved = None
+    preserved_observations = []
     try:
         if not branch_held:
             raise RecoveryHandoff("repair-owner-active", worktree)
-        if retired := retire_published_preserved(host, pr["number"]):
+        if retired := retire_published_preserved(host, pr["number"], observations=preserved_observations):
             receipt["retiredPreserved"] = retired
         for archive_pass in (True, False):
             try:
@@ -6059,7 +6102,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                 break
             except RecoveryHandoff as error:
                 archived = archive_pass and archive_unresumable_preserved(
-                    host, Path(error.evidence["worktree"]), str(error))
+                    host, Path(error.evidence["worktree"]), str(error), observations=preserved_observations)
                 if not archived:
                     raise
                 receipt.setdefault("archivedPreserved", []).append(archived)
@@ -6067,11 +6110,15 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
     except RecoveryHandoff as error:
         receipt.update(verdict="recovery-handoff", reasons=[str(error)], recovery=error.evidence,
                        endedAt=now_iso(), result={"verdict": "recovery-handoff", "pr": pr["number"], "commit": None})
+        if preserved_observations:
+            receipt["preservedRecoveryObservations"] = preserved_observations
         if branch_held:
             end_local_fix_attempt(host, pr, receipt)
         with open(runs / "ledger.jsonl", "a") as ledger:
             ledger.write(json.dumps(receipt) + "\n")
         return receipt
+    if preserved_observations:
+        receipt["preservedRecoveryObservations"] = preserved_observations
     try:
         claimed = execution_attempt.claim(runs / "execution-attempts.jsonl", ident,
                                           {"owner": HOST, "runtime": "symphony-lanes", "provider": name,
