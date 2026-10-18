@@ -1,15 +1,15 @@
 {
-  "at": "2026-10-17T11:34:48.988Z",
+  "at": "2026-10-18T12:03:03.344Z",
   "ciP95Seconds": {
     "pull_request": null,
-    "merge_group": 1549
+    "merge_group": 1242
   },
   "queueWaitP95Seconds": null,
   "queueEjectionRate": null,
   "leadTimeP95Seconds": {
     "devin": null,
-    "codex": 20324,
-    "other": 9549
+    "codex": 21493,
+    "other": 8713
   },
   "remediationP95Seconds": {
     "prRedToGreen": null,
@@ -23,6 +23,6 @@
     "wowGrowth": null,
     "growthTrend": "unknown"
   },
-  "regressions": ["ci_walltime.merge_group.p95"],
+  "regressions": [],
   "flatStall": false
 }
