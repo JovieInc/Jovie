@@ -71,9 +71,10 @@ function healthyMetrics(overrides: Record<string, unknown> = {}): HudMetrics {
 }
 
 beforeEach(() => {
-  vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-09-28T12:00:00.000Z'));
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-09-28T12:00:00.000Z'));
 });
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => vi.useRealTimers());
 
 describe('deriveOpsExceptions', () => {
   it('returns no exceptions for a healthy company', () => {
