@@ -637,13 +637,14 @@ export async function runSentryAutofixRecurrence({
 
 async function main() {
   const result = await runSentryAutofixRecurrence({});
-  if (!result.ok) throw new Error(result.reason);
   console.log(JSON.stringify(result));
+  if (!result.ok) throw new Error(result.reason);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   main().catch(error => {
     console.error(error instanceof Error ? error.message : error);
-    process.exit(1);
+    // Let the workflow pipe drain the structured failure result.
+    process.exitCode = 1;
   });
 }
