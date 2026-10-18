@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures
+from contextvars import ContextVar
 import fcntl
 import hashlib
 import json
@@ -32,6 +33,7 @@ from typing import Any
 
 
 HERMES_DIR = str(Path(__file__).resolve().parent)
+_WORK_OBSERVATION_ONLY = ContextVar("fleet_work_observation_only", default=False)
 if HERMES_DIR not in sys.path:
     sys.path.insert(0, HERMES_DIR)
 
@@ -386,7 +388,7 @@ def gh_json(repo: str, endpoint: str) -> dict[str, Any]:
 
 
 def _gh_json(repo: str, endpoint: str, *, revalidate: bool) -> dict[str, Any]:
-    cache = _github_cache_path(repo, endpoint)
+    cache = None if _WORK_OBSERVATION_ONLY.get() else _github_cache_path(repo, endpoint)
     etag, cached = _read_github_cache(cache) if revalidate and cache is not None else (None, None)
     result = _gh_api(f"repos/{repo}/{endpoint}", etag)
     if result.returncode != 0 and "unknown flag" in result.stderr and "--include" in result.args:
@@ -3562,6 +3564,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--evaluate-json")
+    parser.add_argument("--observe-work-admission", action="store_true")
     parser.add_argument(
         "--consumer",
         choices=("direct-gem", "fleet", "remediation", "promotion", "deployment"),
@@ -3608,6 +3611,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--independent-review-receipt", type=Path)
     parser.add_argument("--model-registry", type=Path)
     args = parser.parse_args()
+    if args.observe_work_admission and (args.dry_run or args.evaluate_json):
+        parser.error("work observation cannot use cached evaluation or publishing modes")
     if not args.production_url:
         # Sibling lanes have no jov.ie deploy; without an explicit override
         # they bind production to their own main head (JOV-5340).
@@ -3642,7 +3647,7 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
     controller_options = {"native_state_dir": native_state} if native_state is not None else {}
     controller = observe_controller(
         args.symphony_url,
-        snapshot_path=fleet_sidecar_path(
+        snapshot_path=None if _WORK_OBSERVATION_ONLY.get() else fleet_sidecar_path(
             args.state_dir, args.repo, "controller-snapshot.json"
         ),
         now=now,
@@ -3665,12 +3670,14 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
             args.repo,
             args.queue_target,
             default_lane_budget,
-            snapshot_path=fleet_sidecar_path(
+            snapshot_path=None if _WORK_OBSERVATION_ONLY.get() else fleet_sidecar_path(
                 args.state_dir, args.repo, "queue-snapshot.json"
             ),
             now=now,
         ),
-        "capacityWorkpad": observe_capacity_workpad(
+        "capacityWorkpad": {"schema": CAPACITY_WORKPAD_SCHEMA, "selected": [],
+            "reason": "not-observed-work-only", "mainSha": main.get("sha")}
+        if _WORK_OBSERVATION_ONLY.get() else observe_capacity_workpad(
             runner=getattr(args, "capacity_workpad_runner", None)
             or CAPACITY_WORKPAD_RUNNER,
             main_sha_value=main.get("sha"),
@@ -3679,19 +3686,105 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
         "ciAudit": observe_ci_audit(args.repo, main.get("sha"), gh_json,
                                     targets=closure.get("lifecycleActions", []) if isinstance(closure, dict) else []),
         "concurrencyEvidence": concurrency,
-        "fallbackSeats": observe_fallback_seats(
+        "fallbackSeats": _unavailable_fallback_seats("not-observed-work-only")
+        if _WORK_OBSERVATION_ONLY.get() else observe_fallback_seats(
             now, registry_path=getattr(args, "model_registry", None)
         ),
-        "independentReview": refresh_independent_review_receipt(
+        "independentReview": observe_work_review(review_path, main, now)
+        if _WORK_OBSERVATION_ONLY.get() else refresh_independent_review_receipt(
             review_path, main, now
         ),
-        "lease": observe_lease(args.lease_guard_bin),
+        "lease": {"status": "unknown", "reason": "not-observed-work-only"}
+        if _WORK_OBSERVATION_ONLY.get() else observe_lease(args.lease_guard_bin),
     }
+
+
+def observe_work_review(path: Path, main: dict[str, Any], now: datetime) -> dict[str, Any]:
+    """The maintained exact-main review projection, without publishing a receipt."""
+    if main.get("status") == "green" and valid_commit_sha(main.get("sha"), exact=True):
+        receipt = build_independent_review_receipt(main, now)
+        if validate_independent_review(receipt, main["sha"], now).get("accepted"):
+            return receipt
+    return observe_independent_review(path, main.get("sha"), now)
+
+
+def _work_input_digest(path: Path) -> str | None:
+    """Bound raw-byte evidence to one stable regular inode, without blocking FIFO opens.
+
+    Same bounded descriptor pattern as lane_runner.maintenance_json. The raw
+    bytes (not reserialized JSON) remain the preimage. Missing is evidence only
+    when the initial lstat was missing, never after an observed inode disappears.
+    """
+    limit = 1024 * 1024
+    try:
+        before = path.lstat()
+    except FileNotFoundError:
+        return None
+    fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
+    try:
+        opened = os.fstat(fd)
+        identity = lambda info: (info.st_dev, info.st_ino, info.st_size,
+                                 info.st_mtime_ns, info.st_ctime_ns)
+        if (not stat.S_ISREG(opened.st_mode) or opened.st_size > limit
+                or identity(before) != identity(opened)):
+            raise ValueError("fleet-work-input-not-bounded-regular")
+        with os.fdopen(fd, "rb", closefd=False) as handle:
+            raw = handle.read(limit + 1)
+        if (len(raw) > limit or len(raw) != opened.st_size
+                or identity(os.fstat(fd)) != identity(opened)
+                or identity(path.lstat()) != identity(opened)):
+            raise ValueError("fleet-work-input-changed-during-read")
+        return hashlib.sha256(raw).hexdigest()
+    finally:
+        os.close(fd)
+
+def work_observation_inputs(args: argparse.Namespace) -> dict[str, str | None]:
+    paths = {args.integrity_receipt or args.state_dir.parent / "integrity.json",
+             args.concurrency_evidence or args.state_dir.parent / "concurrency.json",
+             args.independent_review_receipt or fleet_sidecar_path(args.state_dir, args.repo, "independent-review.json"),
+             args.state_dir / "latest.json"}
+    if args.symphony_url.rstrip("/") == "http://127.0.0.1:4041/api/v1/state" and args.native_controller_state_dir is not None:
+        paths.add(args.native_controller_state_dir / "tick.json")
+    values = {}
+    for path in sorted(paths):
+        values[str(path)] = _work_input_digest(path)
+    return values
+
+
+def observe_work_admission(args: argparse.Namespace) -> dict[str, Any]:
+    """Private work-only evidence. No capacity, promotion or dispatch authority.
+
+    Display-only backlog cohorts and provider probes are deliberately unobserved;
+    evaluate receives their typed unavailable forms, never fabricated passes.
+    """
+    started = utc_now()
+    before = work_observation_inputs(args)
+    token = _WORK_OBSERVATION_ONLY.set(True)
+    try:
+        signals = observe_signals(args, started)
+        receipt = evaluate(signals, isoformat(started))
+        if work_observation_inputs(args) != before:
+            raise ValueError("work-observation-input-changed")
+        return {"schema": "jovie.fleet-work-observation/v1", "observedAt": isoformat(started),
+                "completedAt": isoformat(utc_now()), "mainSha": signals.get("main", {}).get("sha"),
+                "repo": args.repo, "statePath": str(args.state_dir),
+                "nativeStatePath": str(args.native_controller_state_dir),
+                "gateSHA256": _work_input_digest(Path(__file__)),
+                "localInputs": before,
+                "workAdmission": {key: receipt["workAdmission"][key] for key in
+                    ("allowed", "newImplementationAllowed", "newIssueLeaseAllowed", "productNewIssueLeaseAllowed")},
+                "closureAdmission": {"newIssueIntakeAllowed": receipt["closureAdmission"]["newIssueIntakeAllowed"]},
+                "authorizesTransition": False, "authorizesDispatch": False}
+    finally:
+        _WORK_OBSERVATION_ONLY.reset(token)
 
 
 def main() -> int:
     try:
         args = parse_args()
+        if args.observe_work_admission:
+            print(json.dumps(observe_work_admission(args), sort_keys=True))
+            return 0
         if args.evaluate_json:
             signals = json.loads(args.evaluate_json)
             if not isinstance(signals, dict):

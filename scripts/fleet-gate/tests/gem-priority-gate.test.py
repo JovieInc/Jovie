@@ -5394,5 +5394,186 @@ class NativeControllerObservationTest(unittest.TestCase):
                 self.assertEqual(MODULE.observe_native_controller(self.state, self.now)["status"], "failed")
 
 
+class WorkObservationTests(unittest.TestCase):
+    def test_raw_inputs_are_bounded_regular_and_descriptor_identity_is_stable(self):
+        import signal
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "evidence.json"
+            self.assertIsNone(MODULE._work_input_digest(path))
+            path.write_bytes(b'{"actual":true}\\n')
+            self.assertEqual(MODULE._work_input_digest(path), hashlib.sha256(path.read_bytes()).hexdigest())
+            path.unlink(); path.mkdir()
+            with self.assertRaises((ValueError, OSError)): MODULE._work_input_digest(path)
+            path.rmdir(); path.symlink_to(pathlib.Path(tmp) / "absent")
+            with self.assertRaises((ValueError, OSError)): MODULE._work_input_digest(path)
+            path.unlink(); os.mkfifo(path)
+            def deadline(*_): raise TimeoutError("bounded-read-blocked-on-FIFO")
+            previous = signal.signal(signal.SIGALRM, deadline)
+            signal.setitimer(signal.ITIMER_REAL, 2)
+            try:
+                with self.assertRaises(ValueError): MODULE._work_input_digest(path)
+            finally:
+                signal.setitimer(signal.ITIMER_REAL, 0)
+                signal.signal(signal.SIGALRM, previous)
+            path.unlink(); path.touch()
+            with path.open("wb") as handle: handle.truncate(1024 * 1024 + 1)
+            with self.assertRaisesRegex(ValueError, "bounded-regular"): MODULE._work_input_digest(path)
+            path.write_bytes(b"original")
+            original_open = os.open
+            descriptors = []
+            def opened(*args, **kwargs):
+                self.assertTrue(args[1] & os.O_NONBLOCK)
+                self.assertTrue(args[1] & os.O_NOFOLLOW)
+                fd = original_open(*args, **kwargs); descriptors.append(fd)
+                return fd
+            replacement = path.with_name("replacement")
+            replacement.write_bytes(b"original")
+            original_fdopen = os.fdopen
+            @contextlib.contextmanager
+            def replaced(fd, *args, **kwargs):
+                with original_fdopen(fd, *args, **kwargs) as handle:
+                    class Changed:
+                        def read(self, limit):
+                            raw = handle.read(limit)
+                            replacement.replace(path)
+                            return raw
+                    yield Changed()
+            with mock.patch.object(MODULE.os, "open", side_effect=opened), mock.patch.object(MODULE.os, "fdopen", side_effect=replaced):
+                with self.assertRaisesRegex(ValueError, "changed-during-read"): MODULE._work_input_digest(path)
+            for fd in descriptors:
+                with self.assertRaises(OSError): os.fstat(fd)
+            with mock.patch.object(MODULE.os, "open", side_effect=FileNotFoundError):
+                with self.assertRaises(FileNotFoundError): MODULE._work_input_digest(path)
+
+    @contextlib.contextmanager
+    def inputs(self):
+        with tempfile.TemporaryDirectory() as tmp, contextlib.ExitStack() as stack:
+            state = pathlib.Path(tmp) / "gate"
+            args = argparse.Namespace(repo="JovieInc/Jovie", state_dir=state,
+                integrity_receipt=None, concurrency_evidence=None, independent_review_receipt=None,
+                native_controller_state_dir=pathlib.Path(tmp) / "lanes", queue_target=15,
+                symphony_url="http://127.0.0.1:4041/api/v1/state", production_url="https://jov.ie",
+                lease_guard_bin="fixture-report", model_registry=None)
+            for name, value in {"observe_main": GREEN_SIGNALS["main"],
+                    "observe_concurrency": GREEN_SIGNALS["concurrencyEvidence"],
+                    "observe_controller": GREEN_SIGNALS["controller"],
+                    "observe_closure_health": GREEN_SIGNALS["closureHealth"],
+                    "previous_closure_health": None, "observe_production": GREEN_SIGNALS["production"],
+                    "observe_integrity": GREEN_SIGNALS["integrity"],
+                    "observe_queue": GREEN_SIGNALS["queue"], "observe_ci_audit": {},
+                    "observe_lease": {"status": "unknown"}}.items():
+                stack.enter_context(mock.patch.object(MODULE, name, return_value=value))
+            for name in ("write_queue_snapshot", "write_independent_review_receipt", "_write_github_cache",
+                    "refresh_independent_review_receipt", "persist_live_receipt", "apply_concurrency_ratchet",
+                    "write_receipt", "observe_capacity_workpad", "observe_fallback_seats", "observe_lease"):
+                stack.enter_context(mock.patch.object(MODULE, name, side_effect=AssertionError("forbidden:" + name)))
+            yield args
+
+    def test_real_work_projection_never_publishes_or_probes_other_capabilities(self):
+        with self.inputs() as args:
+            result = MODULE.observe_work_admission(args)
+            self.assertEqual(result["schema"], "jovie.fleet-work-observation/v1")
+            self.assertEqual(result["mainSha"], MAIN_SHA)
+            self.assertTrue(result["workAdmission"]["newImplementationAllowed"])
+            self.assertFalse(result["authorizesTransition"])
+            self.assertFalse(result["authorizesDispatch"])
+            self.assertNotIn("concurrency", result)
+            self.assertNotIn("promotionAdmission", result)
+            self.assertEqual(result["gateSHA256"], hashlib.sha256(GATE.read_bytes()).hexdigest())
+            MODULE.observe_queue.assert_called_once()
+            self.assertIsNone(MODULE.observe_queue.call_args.kwargs["snapshot_path"])
+            self.assertIsNone(MODULE.observe_controller.call_args.kwargs["snapshot_path"])
+            self.assertFalse(state_has_files(args.state_dir))
+
+    def test_observation_start_is_retained_and_replay_observes_again(self):
+        from datetime import timedelta
+        with self.inputs() as args:
+            start = MODULE.utc_now()
+            with mock.patch.object(MODULE, "utc_now", side_effect=[start, start + timedelta(seconds=7),
+                    start + timedelta(seconds=20), start + timedelta(seconds=23)]):
+                first = MODULE.observe_work_admission(args)
+                second = MODULE.observe_work_admission(args)
+            self.assertEqual(first["observedAt"], MODULE.isoformat(start))
+            self.assertEqual(second["observedAt"], MODULE.isoformat(start + timedelta(seconds=20)))
+            self.assertEqual(MODULE.observe_main.call_count, 2)
+
+    def test_input_drift_or_observer_failure_never_returns_retained_pass(self):
+        with self.inputs() as args:
+            path = args.state_dir.parent / "integrity.json"
+            path.write_text("before")
+            MODULE.observe_main.side_effect = lambda repo: (path.write_text("after"), GREEN_SIGNALS["main"])[1]
+            with self.assertRaisesRegex(ValueError, "work-observation-input-changed"):
+                MODULE.observe_work_admission(args)
+            MODULE.observe_main.side_effect = OSError("fixture unavailable")
+            with self.assertRaises(OSError): MODULE.observe_work_admission(args)
+            self.assertFalse(MODULE._WORK_OBSERVATION_ONLY.get())
+
+    def test_github_observation_disables_both_cache_read_and_write(self):
+        with self.inputs() as args, mock.patch.object(MODULE, "_read_github_cache", side_effect=AssertionError("cache")), \
+                mock.patch.object(MODULE, "_gh_api", return_value=_gh_completed(["gh"], 'HTTP/2.0 200 OK\nETag: v1\n\n{"ok":true}')):
+            MODULE.observe_main.side_effect = lambda repo: (MODULE.gh_json(repo, "fixture"), GREEN_SIGNALS["main"])[1]
+            self.assertEqual(MODULE.observe_work_admission(args)["mainSha"], MAIN_SHA)
+
+    def test_new_closure_and_integrity_holds_survive_unchanged_generation(self):
+        with self.inputs() as args:
+            MODULE.observe_closure_health.return_value = {**GREEN_SIGNALS["closureHealth"], "newIssueIntakeAllowed": False}
+            result = MODULE.observe_work_admission(args)
+            self.assertFalse(result["closureAdmission"]["newIssueIntakeAllowed"])
+            MODULE.observe_integrity.return_value = {"status": "invalid"}
+            self.assertFalse(MODULE.observe_work_admission(args)["workAdmission"]["newImplementationAllowed"])
+
+    def test_unobserved_display_and_provider_fields_do_not_widen_work_policy(self):
+        with self.inputs() as args:
+            result = MODULE.observe_work_admission(args)
+            for available in (True, False):
+                signals = {**GREEN_SIGNALS,
+                    "capacityWorkpad": {"schema": MODULE.CAPACITY_WORKPAD_SCHEMA, "selected": ["JOV-1"], "mainSha": MAIN_SHA},
+                    "fallbackSeats": fallback_seat_signal(available, available)}
+                normal = MODULE.evaluate(signals, result["observedAt"])
+                for key, value in result["workAdmission"].items():
+                    self.assertEqual(value, normal["workAdmission"][key])
+
+    def test_unobserved_lease_report_has_no_work_or_closure_decision_effect(self):
+        with self.inputs() as args:
+            result = MODULE.observe_work_admission(args)
+            MODULE.observe_lease.assert_not_called()
+            for lease in ({"status": "ok", "capacity": {"available": 999}},
+                          {"status": "unknown"}, {"status": "failed"}):
+                normal = MODULE.evaluate({**GREEN_SIGNALS, "lease": lease,
+                    "capacityWorkpad": {"schema": MODULE.CAPACITY_WORKPAD_SCHEMA, "selected": [], "mainSha": MAIN_SHA},
+                    "fallbackSeats": fallback_seat_signal(False, False)}, result["observedAt"])
+                self.assertEqual(result["workAdmission"], {key: normal["workAdmission"][key] for key in result["workAdmission"]})
+                self.assertEqual(result["closureAdmission"]["newIssueIntakeAllowed"], normal["closureAdmission"]["newIssueIntakeAllowed"])
+
+    def test_cli_observation_rejects_evaluate_json_or_other_modes_before_observers(self):
+        for flags in (["--dry-run"], ["--evaluate-json", "{}"]):
+            with self.subTest(flags=flags), mock.patch.object(sys, "argv", ["gate", "--observe-work-admission", *flags]), \
+                    mock.patch.object(MODULE, "observe_signals") as observe, contextlib.redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit) as held: MODULE.main()
+                self.assertEqual(held.exception.code, 2)
+                observe.assert_not_called()
+
+    def test_real_cli_entry_emits_only_private_work_evidence(self):
+        with self.inputs() as args:
+            args.observe_work_admission = True
+            output = io.StringIO()
+            with mock.patch.object(MODULE, "parse_args", return_value=args), contextlib.redirect_stdout(output):
+                self.assertEqual(MODULE.main(), 0)
+            result = json.loads(output.getvalue())
+            self.assertEqual(result["schema"], "jovie.fleet-work-observation/v1")
+            self.assertFalse(result["authorizesDispatch"])
+            self.assertFalse(result["authorizesTransition"])
+            MODULE.observe_main.assert_called_once()
+
+    def test_unknown_main_does_not_create_an_in_memory_review_pass(self):
+        with self.inputs() as args:
+            verdict = MODULE.observe_work_review(args.state_dir / "absent", {"status": "unknown", "sha": MAIN_SHA}, MODULE.utc_now())
+            self.assertFalse(verdict["accepted"])
+
+
+def state_has_files(path):
+    return path.exists() and any(path.rglob("*"))
+
+
 if __name__ == "__main__":
     unittest.main()
