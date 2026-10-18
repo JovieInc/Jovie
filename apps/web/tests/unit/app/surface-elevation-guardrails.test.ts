@@ -464,7 +464,12 @@ describe('surface elevation guardrails', () => {
     expect(rightDrawer).toContain('rounded-(--app-shell-radius)');
     expect(rightDrawer).toContain('border-(--app-shell-frame-seam)');
     expect(rightDrawer).toContain('bg-surface-1');
-    expect(adminTableShell).toContain('bg-(--app-shell-content-surface)/96');
+    // Toolbar chrome sits outside the scroller, so it uses the solid shell
+    // canvas instead of a translucent sticky overlay.
+    expect(adminTableShell).toContain('bg-(--app-shell-content-surface)');
+    expect(adminTableShell).not.toContain(
+      'bg-(--app-shell-content-surface)/96'
+    );
   });
 
   it('does not use semi-transparent bg-surface-1 in app shell (bg-surface-1/XX)', () => {
@@ -578,6 +583,28 @@ describe('surface elevation guardrails', () => {
 
     expect(adminFeedbackTable).toContain('EntityHeader');
     expect(adminFeedbackTable).not.toContain('EntityHeaderCard');
+    expect(adminFeedbackTable).toContain('<AdminDetailRail');
+    expect(adminFeedbackTable).toContain("variant='flat'");
+    expect(adminFeedbackTable).not.toContain('<EntitySidebarShell');
+    expect(adminFeedbackTable).not.toContain("surface='card'");
+  });
+
+  it('keeps feedback classification and disposition visible in table, drawer, and stories', () => {
+    const adminFeedbackTable = readComponent(
+      'components/features/admin/feedback-table/AdminFeedbackTable.tsx'
+    );
+    const adminFeedbackStories = readComponent(
+      'components/features/admin/feedback-table/AdminFeedbackTable.stories.tsx'
+    );
+
+    expect(adminFeedbackTable).toContain("id: 'disposition'");
+    expect(adminFeedbackTable).toContain("title='Disposition'");
+    expect(adminFeedbackTable).toContain("label='Class'");
+    expect(adminFeedbackTable).toContain("label='Outcome'");
+    expect(adminFeedbackStories).toContain("classification: 'bug_verifiable'");
+    expect(adminFeedbackStories).toContain("disposition: 'auto_remediation'");
+    expect(adminFeedbackStories).toContain('classification: null');
+    expect(adminFeedbackStories).toContain("disposition: 'pending'");
   });
 
   it('names the hidden-header release table for screen readers', () => {

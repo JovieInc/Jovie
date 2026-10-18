@@ -1,3 +1,4 @@
+import '@/styles/system-b-app.css';
 import { TooltipProvider } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -7,8 +8,16 @@ import {
   RightPanelProvider,
   useRightPanel,
 } from '@/contexts/RightPanelContext';
-import { fixtureInventory } from '@/lib/ovie/certifications/fixtures';
-import type { OvieCertificationInventory } from '@/lib/ovie/certifications/types';
+import {
+  fixtureInventory,
+  fixtureRow,
+} from '@/lib/ovie/certifications/fixtures';
+import { countCertificationStates } from '@/lib/ovie/certifications/normalize';
+import {
+  OVIE_CERTIFICATION_DOMAIN_LABELS,
+  OVIE_CERTIFICATION_DOMAINS,
+  type OvieCertificationInventory,
+} from '@/lib/ovie/certifications/types';
 import { queryKeys } from '@/lib/queries/keys';
 import { OvieCertificationsWorkspace } from './OvieCertificationsWorkspace';
 
@@ -56,7 +65,24 @@ function WorkspaceStory({
   );
 }
 
-const inventory = fixtureInventory();
+const baseInventory = fixtureInventory();
+const inventory = {
+  ...baseInventory,
+  rows: baseInventory.rows.map((row, index) => ({
+    ...row,
+    owner: index === 0 ? 'Summer' : null,
+  })),
+  domains: OVIE_CERTIFICATION_DOMAINS.map(
+    domain =>
+      baseInventory.domains.find(item => item.domain === domain) ?? {
+        domain,
+        label: OVIE_CERTIFICATION_DOMAIN_LABELS[domain],
+        status: 'empty' as const,
+        rowCount: 0,
+        note: 'No committed packets yet.',
+      }
+  ),
+};
 const emptyInventory: OvieCertificationInventory = {
   ...inventory,
   counts: {
@@ -97,4 +123,36 @@ export const Empty: Story = {
 
 export const Loading: Story = {
   render: () => <WorkspaceStory />,
+};
+
+const crossDomainRows = [
+  ...inventory.rows,
+  ...(['company', 'design_system', 'icps', 'outcomes'] as const).map(
+    domain => ({
+      ...fixtureRow(domain, {
+        domain,
+        surface: OVIE_CERTIFICATION_DOMAIN_LABELS[domain],
+      }),
+      owner: 'Summer',
+    })
+  ),
+];
+export const CrossDomain: Story = {
+  render: () => (
+    <WorkspaceStory
+      inventory={{
+        ...inventory,
+        rows: crossDomainRows,
+        counts: countCertificationStates(crossDomainRows),
+        domains: inventory.domains.map(item => {
+          const rowCount = crossDomainRows.filter(
+            row => row.domain === item.domain
+          ).length;
+          return rowCount
+            ? { ...item, rowCount, status: 'connected', note: null }
+            : item;
+        }),
+      }}
+    />
+  ),
 };

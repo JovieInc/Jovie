@@ -1,0 +1,12 @@
+name = "jovie-knowledge-ingest"
+main = "src/knowledge/index.ts"
+compatibility_date = "2026-10-15"
+workers_dev = false
+preview_urls = false
+
+[triggers]
+# Approved upstream sources have no event delivery; daily freshness is required.
+crons = ["17 5 * * *"]
+
+# Secret bindings only: KNOWLEDGE_SOURCES_JSON, GBRAIN_MCP_URL, GBRAIN_API_KEY.
+# No source identities, URLs, account identifiers or credentials belong here.

@@ -516,6 +516,19 @@ export function OpportunityInboxPageClient({
               Done For You
             </Button>
           </div>
+          <div className='mb-4' data-testid='opportunity-inbox-notes'>
+            <label
+              htmlFor='opportunity-inbox-notes-field'
+              className='mb-1 block text-xs font-medium text-secondary-token'
+            >
+              Notes
+            </label>
+            <textarea
+              id='opportunity-inbox-notes-field'
+              rows={3}
+              className='system-b-opportunity-inbox-comment-input'
+            />
+          </div>
           {inboxView === 'done' ? (
             profileId ? (
               <JovieWorkFeed

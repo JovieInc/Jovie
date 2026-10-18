@@ -102,6 +102,10 @@ export function LibraryPageClient({
     applyMode(nextMode);
   };
   const rulesDeepLink = searchParams.get('rules');
+  // /app/releases aliases here with ?view=releases. That alias is the
+  // releases matrix (ShellReleasesView), not the asset-grid filter chip.
+  const catalogView =
+    searchParams.get('view') === 'releases' ? 'list' : 'assets';
   useEffect(() => {
     if (rulesDeepLink !== '1') return;
     router.replace(`${APP_ROUTES.SETTINGS_PROFILE}?rules=1`);
@@ -250,7 +254,7 @@ export function LibraryPageClient({
           className='flex min-h-0 flex-1'
         >
           <ReleaseCatalogPageClient
-            view='assets'
+            view={catalogView}
             merchCards={merchCards}
             archivedMerchCards={archivedMerchCards}
             archivedReleases={archivedReleases}

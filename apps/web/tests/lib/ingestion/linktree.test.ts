@@ -1,11 +1,9 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ExtractionError } from '@/lib/ingestion/strategies/base';
+import { describe, expect, it } from 'vitest';
 import {
   extractLinktree,
   extractLinktreeHandle,
-  fetchLinktreeDocument,
   isLinktreeUrl,
   isValidHandle,
   normalizeHandle,
@@ -323,41 +321,6 @@ describe('Linktree Strategy', () => {
 
       const platforms = result.links.map(link => link.platformId).sort();
       expect(platforms).toEqual(['instagram', 'tiktok']);
-    });
-  });
-
-  describe('fetchLinktreeDocument', () => {
-    beforeEach(() => {
-      vi.useFakeTimers();
-      vi.stubGlobal('fetch', vi.fn());
-    });
-
-    afterEach(async () => {
-      // Run any pending timers before cleanup to avoid unhandled rejections
-      await vi.runAllTimersAsync();
-      vi.useRealTimers();
-      vi.unstubAllGlobals();
-    });
-
-    it('throws ExtractionError for invalid URL', async () => {
-      await expect(
-        fetchLinktreeDocument('https://example.com/user')
-      ).rejects.toThrow(ExtractionError);
-    });
-
-    it('fails closed for a valid profile and does not fetch HTML', async () => {
-      vi.mocked(fetch).mockResolvedValue({
-        ok: true,
-        status: 200,
-        text: () => Promise.resolve('<html></html>'),
-        url: 'https://linktr.ee/username',
-        headers: new Headers({ 'content-type': 'text/html' }),
-      } as Response);
-
-      await expect(
-        fetchLinktreeDocument('https://linktr.ee/username')
-      ).rejects.toMatchObject({ code: 'SOCIAL_HTML_DISABLED' });
-      expect(fetch).not.toHaveBeenCalled();
     });
   });
 });

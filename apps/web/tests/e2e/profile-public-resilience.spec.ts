@@ -168,7 +168,13 @@ test.describe('public profile resilience', () => {
         'profile-identity-portrait'
       );
       await expect(brokenHero.locator('img')).toHaveCount(0);
-      await expect(brokenHero.locator('[role="img"]')).toBeVisible();
+      // The decorative portrait and the verification badge both have role=img.
+      const fallback = brokenHero.locator('[role="img"][aria-hidden="true"]');
+      await expect(fallback).toBeVisible();
+      await expect(fallback).toHaveText('TW');
+      await expect(
+        brokenHero.getByRole('img', { name: 'Verified Jovie Profile' })
+      ).toBeVisible();
       await expect(
         brokenMediaPage.getByTestId('profile-identity-header')
       ).toBeVisible();

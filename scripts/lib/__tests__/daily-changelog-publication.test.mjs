@@ -589,7 +589,9 @@ describe('publication transport', () => {
     expect(job.if).toContain("outputs.verified == 'true'");
     expect(publishStep.run).not.toContain('gh pr merge');
     expect(publishStep.run).not.toContain('gh pr list');
-    expect(publishStep.run).toContain('gh api --paginate --slurp');
+    expect(publishStep.run).toContain(
+      'bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" api --paginate --slurp'
+    );
     expect(publishStep.run).toContain(
       'repos/$GITHUB_REPOSITORY/pulls?state=open&base=main&per_page=100'
     );

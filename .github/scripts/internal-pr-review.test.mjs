@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { describe, it } from 'node:test';
 
 import {
@@ -7,6 +8,7 @@ import {
   callGateway,
   changedPathsFromDiff,
   changedSymbolsFromDiff,
+  fetchPullRequest,
   findReviewComment,
   globToRegExp,
   HARD_SKIP_DIFF_CHARS,
@@ -26,12 +28,15 @@ import {
 } from './internal-pr-review.mjs';
 
 const HEAD_SHA = 'a'.repeat(40);
+const BASE_SHA = 'd'.repeat(40);
 const ENV = {
   AI_GATEWAY_API_KEY: 'test-key',
   GH_TOKEN: 'gh-token',
   PR_HEAD_SHA: HEAD_SHA,
   PR_NUMBER: '42',
   REPOSITORY: 'JovieInc/Jovie',
+  GITHUB_RUN_ID: '123',
+  GITHUB_RUN_ATTEMPT: '2',
 };
 
 const jsonResponse = body => ({
@@ -44,13 +49,18 @@ const jsonResponse = body => ({
 /** Fake fetch routing GitHub + gateway calls for run()/main() tests. */
 function fakeFetch({
   comments = [],
+  body = '',
   diff = '@@ small diff @@',
   gateway,
   headSha = HEAD_SHA,
+  baseSha = BASE_SHA,
+  onFetch = () => {},
 }) {
   const calls = [];
   const fetchImpl = async (url, init = {}) => {
     calls.push({ body: init.body, method: init.method ?? 'GET', url });
+    const override = onFetch(url, init, calls);
+    if (override) return override;
     if (url.includes('ai-gateway') || url.includes('/chat/completions')) {
       if (gateway?.error) throw gateway.error;
       return {
@@ -59,10 +69,12 @@ function fakeFetch({
         status: gateway?.status ?? 200,
       };
     }
+    if (url.includes('/compare/'))
+      return { ok: true, status: 200, text: async () => diff };
     if (url.includes('/pulls/')) {
-      if (init.headers?.accept === 'application/vnd.github.v3.diff')
-        return { ok: true, status: 200, text: async () => diff };
       return jsonResponse({
+        body,
+        base: { sha: baseSha },
         changed_files: 3,
         head: headSha ? { sha: headSha } : undefined,
         title: 'test pr',
@@ -198,30 +210,51 @@ describe('internal-pr-review run', () => {
     const { calls, fetchImpl } = fakeFetch({
       gateway: {
         body: {
-          choices: [{ message: { content: 'No material risks found.' } }],
+          choices: [
+            {
+              finish_reason: 'stop',
+              message: { content: 'No material risks found.' },
+            },
+          ],
         },
       },
     });
     const result = await run({ env: ENV, fetchImpl, log: () => {} });
     assert.equal(result.outcome, 'reviewed');
     assert.equal(result.action, 'created');
+    assert.equal(result.commentId, 9);
+    assert.equal(result.headSha, HEAD_SHA);
+    assert.equal(result.baseSha, BASE_SHA);
+    assert.equal(
+      result.diffSha256,
+      createHash('sha256').update('@@ small diff @@').digest('hex')
+    );
+    assert.equal(
+      result.runUrl,
+      'https://github.com/JovieInc/Jovie/actions/runs/123/attempts/2'
+    );
     const post = calls.find(
       c => c.method === 'POST' && c.url.includes('/issues/')
     );
     assert.ok(post);
     assert.ok(post.body.includes(MARKER));
     assert.ok(post.body.includes('No material risks found.'));
+    assert.ok(post.body.includes(result.diffSha256));
+    assert.ok(post.body.includes(result.runUrl));
   });
 
   it('updates the existing comment instead of spamming new ones', async () => {
     const { calls, fetchImpl } = fakeFetch({
       comments: [{ body: `${MARKER} old`, id: 7 }],
       gateway: {
-        body: { choices: [{ message: { content: 'risky' } }] },
+        body: {
+          choices: [{ finish_reason: 'stop', message: { content: 'risky' } }],
+        },
       },
     });
     const result = await run({ env: ENV, fetchImpl, log: () => {} });
     assert.equal(result.action, 'updated');
+    assert.equal(result.commentId, 7);
     const patch = calls.find(c => c.method === 'PATCH');
     assert.ok(patch.url.includes('/issues/comments/7'));
     assert.equal(
@@ -359,7 +392,11 @@ describe('internal-pr-review head binding and dispatch', () => {
   it('stamps the live head on a dispatch run', async () => {
     const live = 'c'.repeat(40);
     const { calls, fetchImpl } = fakeFetch({
-      gateway: { body: { choices: [{ message: { content: 'ok' } }] } },
+      gateway: {
+        body: {
+          choices: [{ finish_reason: 'stop', message: { content: 'ok' } }],
+        },
+      },
       headSha: live,
     });
     const env = { ...ENV, PR_HEAD_SHA: '' };
@@ -375,7 +412,150 @@ describe('internal-pr-review head binding and dispatch', () => {
     const { fetchImpl } = fakeFetch({ gateway: { body: {} }, headSha: null });
     const env = { ...ENV, PR_HEAD_SHA: '' };
     const result = await run({ env, fetchImpl, log: () => {} });
-    assert.deepEqual(result, { outcome: 'skipped', reason: 'head' });
+    assert.equal(result.outcome, 'binding-unverified');
+  });
+
+  it('pins the fetched diff to full base/head IDs even across an ABA synchronize race', async () => {
+    const { calls, fetchImpl } = fakeFetch({
+      onFetch: (url, init) => {
+        // A mutable /pulls/N diff can briefly belong to another head, even
+        // when before/after metadata reads both return the expected head.
+        if (url.includes('/pulls/') && init.headers?.accept.endsWith('.diff'))
+          return { ok: true, text: async () => 'wrong synchronized diff' };
+      },
+    });
+    const pr = await fetchPullRequest(parseEnv(ENV), fetchImpl);
+    assert.equal(pr.diff, '@@ small diff @@');
+    const diffCall = calls.find(c => c.url.includes('/compare/'));
+    assert.equal(
+      diffCall.url,
+      `https://api.github.com/repos/JovieInc/Jovie/compare/${BASE_SHA}...${HEAD_SHA}`
+    );
+    assert.equal(
+      pr.diffSha256,
+      createHash('sha256').update(pr.diff).digest('hex')
+    );
+  });
+
+  for (const phase of ['diff', 'model', 'comments']) {
+    for (const changed of ['head', 'base']) {
+      it(`discards a ${changed} synchronize race during the ${phase} without publishing`, async () => {
+        let advanced = false;
+        const { calls, fetchImpl } = fakeFetch({
+          gateway: {
+            body: {
+              choices: [{ finish_reason: 'stop', message: { content: 'ok' } }],
+            },
+          },
+          onFetch: url => {
+            if (
+              url.includes(
+                {
+                  diff: '/compare/',
+                  model: '/chat/completions',
+                  comments: '/comments',
+                }[phase]
+              )
+            )
+              advanced = true;
+            if (advanced && url.includes('/pulls/'))
+              return jsonResponse({
+                base: { sha: changed === 'base' ? 'b'.repeat(40) : BASE_SHA },
+                head: { sha: changed === 'head' ? 'b'.repeat(40) : HEAD_SHA },
+              });
+          },
+        });
+        const warnings = [];
+        const result = await run({
+          env: ENV,
+          fetchImpl,
+          log: m => warnings.push(m),
+        });
+        assert.equal(result.outcome, 'stale');
+        assert.match(warnings.join('\n'), /::warning::.*stale/);
+        assert.equal(
+          calls.some(c => c.url.includes('/comments') && c.method !== 'GET'),
+          false
+        );
+        if (phase === 'diff')
+          assert.equal(
+            calls.some(c => c.url.includes('/chat/completions')),
+            false
+          );
+      });
+    }
+  }
+
+  it('does not stamp the configured event SHA when live metadata cannot prove it', async () => {
+    for (const source of [
+      { headSha: null },
+      { baseSha: null },
+      { baseSha: 'invalid' },
+    ]) {
+      const { calls, fetchImpl } = fakeFetch(source);
+      const result = await run({ env: ENV, fetchImpl, log: () => {} });
+      assert.equal(result.outcome, 'binding-unverified');
+      assert.equal(
+        calls.some(c => c.url.includes('/compare/') || c.method !== 'GET'),
+        false
+      );
+    }
+  });
+
+  it('keeps compare failures and comment 403s advisory without claiming reviewed', async () => {
+    for (const path of ['/compare/', '/issues/']) {
+      const warnings = [];
+      const { fetchImpl } = fakeFetch({
+        gateway: {
+          body: {
+            choices: [{ finish_reason: 'stop', message: { content: 'ok' } }],
+          },
+        },
+        onFetch: (url, init) =>
+          url.includes(path) && (path === '/compare/' || init.method === 'POST')
+            ? { ok: false, status: 403 }
+            : undefined,
+      });
+      const result = await run({
+        env: ENV,
+        fetchImpl,
+        log: m => warnings.push(m),
+      });
+      assert.equal(result.outcome, 'failed');
+      assert.match(warnings.join('\n'), /::warning::.*403/);
+      assert.equal(await main(ENV, fetchImpl, () => {}), 0);
+    }
+  });
+
+  it('labels a truncated diff or unfinished model answer incomplete', async () => {
+    for (const scenario of [
+      { diff: 'x'.repeat(MAX_DIFF_CHARS + 1), finish: 'stop' },
+      { diff: 'small', finish: 'length' },
+      { diff: 'small', finish: undefined },
+    ]) {
+      const { calls, fetchImpl } = fakeFetch({
+        diff: scenario.diff,
+        gateway: {
+          body: {
+            choices: [
+              {
+                finish_reason: scenario.finish,
+                message: { content: 'partial findings' },
+              },
+            ],
+          },
+        },
+      });
+      const result = await run({ env: ENV, fetchImpl, log: () => {} });
+      assert.equal(result.outcome, 'incomplete');
+      const post = calls.find(
+        c => c.method === 'POST' && c.url.includes('/issues/')
+      );
+      assert.match(
+        JSON.parse(post.body).body,
+        /Receipt status: \*\*incomplete\*\*/
+      );
+    }
   });
 });
 
@@ -548,5 +728,67 @@ describe('internal-pr-review call-site context', () => {
     });
     assert.match(prompt, /must\s+cite a call site/);
     assert.match(prompt, /Call sites on the base branch[\s\S]*scripts\/c\.mjs/);
+  });
+});
+
+describe('capability/IA planning review integration (JOV-INV-044)', () => {
+  it('delivers exact-head PR evidence and deliberate-red IA findings to the existing reviewer', async () => {
+    const body =
+      '```json\n' +
+      JSON.stringify({
+        planningDecisions: {
+          binding: {
+            repository: ENV.REPOSITORY,
+            head: HEAD_SHA,
+            policyDigest: 'stale',
+            policyVersion: 1,
+          },
+          outcome: 'Work file uploads',
+          requirementsRef: 'issue:v1',
+          assumptionsRef: 'security:v1',
+          sourcing: [],
+          ia: [
+            {
+              surface: 'Work media slots',
+              disposition: 'no new surface',
+              before: { controls: 1 },
+              after: { controls: 5 },
+            },
+          ],
+        },
+      }) +
+      '\n```';
+    const { calls, fetchImpl } = fakeFetch({
+      body,
+      diff: 'diff --git a/apps/web/work.tsx b/apps/web/work.tsx\n+<Button>Add video</Button>',
+      gateway: {
+        body: {
+          choices: [
+            { finish_reason: 'stop', message: { content: 'fixture response' } },
+          ],
+        },
+      },
+    });
+    const result = await run({ env: ENV, fetchImpl, log: () => {} });
+    assert.equal(result.outcome, 'reviewed');
+    const prompt = JSON.parse(
+      calls.find(c => c.url.includes('/chat/completions')).body
+    ).messages[0].content;
+    assert.ok(prompt.includes(body));
+    assert.ok(prompt.includes(HEAD_SHA));
+    assert.match(prompt, /unexplained surface growth/);
+    assert.match(prompt, /binding.policyDigest: stale/);
+    assert.match(prompt, /trusted base/);
+    assert.match(prompt, /These diagnostics never block delivery/);
+    const posted = JSON.parse(
+      calls.find(c => c.method === 'POST' && c.url.includes('/issues/')).body
+    ).body;
+    const diagnostic = JSON.parse(/```json\n([\s\S]*?)\n```/.exec(posted)[1]);
+    assert.equal(diagnostic.mode, 'shadow');
+    assert.equal(diagnostic.blocking, false);
+    assert.equal(diagnostic.head, HEAD_SHA);
+    assert.ok(
+      diagnostic.findings.some(f => f.includes('unexplained surface growth'))
+    );
   });
 });

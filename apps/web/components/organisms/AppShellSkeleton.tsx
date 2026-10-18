@@ -109,6 +109,7 @@ export function AppShellSkeleton({
 
   return (
     <AppShellFrame
+      placeholder
       sidebar={resolvedSidebar}
       header={
         <header

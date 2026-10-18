@@ -1,4 +1,5 @@
 'use client';
+// @coverage-via apps/web/tests/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView.test.tsx
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -211,7 +212,6 @@ function ReleasesListContent({
             <DrawerButton
               tone='primary'
               onClick={onConnectSpotify}
-              className='h-7 rounded-lg px-2.5 text-2xs inline-flex items-center gap-2'
               data-testid='shell-releases-connect-spotify'
             >
               <Icon name='RefreshCw' className='h-4 w-4' aria-hidden='true' />
@@ -220,7 +220,6 @@ function ReleasesListContent({
             {canCreateManualReleases && (
               <DrawerButton
                 onClick={onNewRelease}
-                className='h-7 rounded-lg px-2.5 text-2xs inline-flex items-center gap-2'
                 data-testid='shell-releases-create-empty'
               >
                 <Icon name='Plus' className='h-4 w-4' aria-hidden='true' />
@@ -253,7 +252,6 @@ function ReleasesListContent({
               tone='primary'
               disabled={isSyncing}
               onClick={onSync}
-              className='h-7 rounded-lg px-2.5 text-2xs inline-flex items-center gap-2'
               data-testid='shell-releases-sync-empty-state'
             >
               <Icon
@@ -269,7 +267,6 @@ function ReleasesListContent({
             {canCreateManualReleases && (
               <DrawerButton
                 onClick={onNewRelease}
-                className='h-7 rounded-lg px-2.5 text-2xs inline-flex items-center gap-2'
                 data-testid='shell-releases-create-connected-empty'
               >
                 <Icon name='Plus' className='h-4 w-4' aria-hidden='true' />
@@ -395,6 +392,7 @@ export function ShellReleasesView({
     initialArtistName ?? null
   );
   const [isImporting, setIsImporting] = useState(initialImporting);
+  const [isInitialListPaint, setIsInitialListPaint] = useState(true);
   const [spotifySearchOpen, setSpotifySearchOpen] = useState(
     shouldOpenSpotifyConnect
   );
@@ -967,7 +965,17 @@ export function ShellReleasesView({
       enabled: shouldResolveAppleMusicEligibility,
     });
   const shouldGateListPaint =
-    shouldResolveAppleMusicEligibility && isAppleMusicEligibilityLoading;
+    isInitialListPaint &&
+    shouldResolveAppleMusicEligibility &&
+    isAppleMusicEligibilityLoading;
+
+  // Eligibility may start loading after Spotify import completes. Once the
+  // list is visible, keep its menus, selection and focus mounted through it.
+  useEffect(() => {
+    if (isInitialListPaint && !shouldGateListPaint) {
+      setIsInitialListPaint(false);
+    }
+  }, [isInitialListPaint, shouldGateListPaint]);
 
   return (
     <>
@@ -980,48 +988,53 @@ export function ShellReleasesView({
         data-testid='shell-releases-view'
         surfaceMode='table'
       >
-        <ReleaseStateBanners
-          rows={rows}
-          appleMusicMatches={appleMusicMatches}
-          isAppleMusicEligibilityLoading={isAppleMusicEligibilityLoading}
-          showImportProgress={showImportProgress}
-          showReleasesTable={rows.length > 0}
-          artistName={artistName}
-          importedCount={importedCount}
-          totalCount={totalCount}
-          isAppleMusicConnected={isAmConnected}
-          isImporting={isImporting}
-          isSpotifyConnected={isConnected}
-          isPro={isPro}
-          canAccessFutureReleases={canAccessFutureReleases}
-          releasedCount={releasedCount}
-          unreleasedCount={unreleasedCount}
-          onAppleMusicMatchStatusChange={handleMatchStatusChange}
-        />
+        <div
+          className='flex min-h-0 flex-1 flex-col'
+          data-testid='releases-matrix'
+        >
+          <ReleaseStateBanners
+            rows={rows}
+            appleMusicMatches={appleMusicMatches}
+            isAppleMusicEligibilityLoading={isAppleMusicEligibilityLoading}
+            showImportProgress={showImportProgress}
+            showReleasesTable={rows.length > 0}
+            artistName={artistName}
+            importedCount={importedCount}
+            totalCount={totalCount}
+            isAppleMusicConnected={isAmConnected}
+            isImporting={isImporting}
+            isSpotifyConnected={isConnected}
+            isPro={isPro}
+            canAccessFutureReleases={canAccessFutureReleases}
+            releasedCount={releasedCount}
+            unreleasedCount={unreleasedCount}
+            onAppleMusicMatchStatusChange={handleMatchStatusChange}
+          />
 
-        <div className='flex-1 min-h-0 overflow-y-auto'>
-          {!shouldGateListPaint && (
-            <ReleasesListContent
-              showEmptyState={showEmptyState}
-              showConnectedEmptyState={showConnectedEmptyState}
-              visibleReleases={visibleReleases}
-              selectedReleaseId={selectedReleaseId}
-              pills={pills}
-              canCreateManualReleases={canCreateManualReleases}
-              isSyncing={isSyncing}
-              actionMenusByReleaseId={actionMenusByReleaseId}
-              contextMenuItemsByReleaseId={contextMenuItemsByReleaseId}
-              isSmartLinkLocked={isSmartLinkLocked}
-              getSmartLinkLockReason={getSmartLinkLockReason}
-              getSyncStatus={getSyncStatus}
-              onConnectSpotify={() => setSpotifySearchOpen(true)}
-              onNewRelease={handleNewRelease}
-              onSync={handleSync}
-              onSelect={handleSelect}
-              onClearFilters={handleClearFilters}
-              listboxRef={listboxRef}
-            />
-          )}
+          <div className='flex-1 min-h-0 overflow-y-auto'>
+            {!shouldGateListPaint && (
+              <ReleasesListContent
+                showEmptyState={showEmptyState}
+                showConnectedEmptyState={showConnectedEmptyState}
+                visibleReleases={visibleReleases}
+                selectedReleaseId={selectedReleaseId}
+                pills={pills}
+                canCreateManualReleases={canCreateManualReleases}
+                isSyncing={isSyncing}
+                actionMenusByReleaseId={actionMenusByReleaseId}
+                contextMenuItemsByReleaseId={contextMenuItemsByReleaseId}
+                isSmartLinkLocked={isSmartLinkLocked}
+                getSmartLinkLockReason={getSmartLinkLockReason}
+                getSyncStatus={getSyncStatus}
+                onConnectSpotify={() => setSpotifySearchOpen(true)}
+                onNewRelease={handleNewRelease}
+                onSync={handleSync}
+                onSelect={handleSelect}
+                onClearFilters={handleClearFilters}
+                listboxRef={listboxRef}
+              />
+            )}
+          </div>
         </div>
       </PageShell>
 

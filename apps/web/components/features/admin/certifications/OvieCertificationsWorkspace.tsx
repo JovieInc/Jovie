@@ -1,14 +1,9 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import {
-  AlertTriangle,
-  ChevronDown,
-  RefreshCw,
-  ShieldCheck,
-} from 'lucide-react';
+import { AlertTriangle, RefreshCw, ShieldCheck } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from '@/components/feedback';
 import { PageShell } from '@/components/organisms/PageShell';
 import {
@@ -26,9 +21,10 @@ import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import {
   OVIE_CERTIFICATION_DOMAIN_LABELS,
+  OVIE_CERTIFICATION_DOMAINS,
   OVIE_CERTIFICATION_STATE_LABELS,
   type OvieCertificationDecisionKind,
-  type OvieCertificationDomainSummary,
+  type OvieCertificationDecisionRequest,
   type OvieCertificationInventory,
   type OvieCertificationRow,
 } from '@/lib/ovie/certifications/types';
@@ -44,23 +40,28 @@ import {
 } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 import { formatTimeAgo } from '@/lib/utils/date-formatting';
-import { CertificationDetailRail } from './CertificationDetailRail';
 import {
-  CertificationStateGlyph,
-  CertificationTierGlyph,
-} from './CertificationGlyphs';
+  type CertificationDecisionTarget,
+  CertificationDetailRail,
+} from './CertificationDetailRail';
+import { CertificationFiltersMenu } from './CertificationFiltersMenu';
+import { CertificationStateGlyph } from './CertificationGlyphs';
+import {
+  CertificationEvidenceStrip,
+  CertificationIdentity,
+} from './CertificationSummary';
 import { CertificationWalkthrough } from './CertificationWalkthrough';
 import {
   CERTIFICATION_STATE_FILTERS,
   CERTIFICATION_STATE_RANK,
+  type CertificationBlockerFilter,
   type CertificationDomainFilter,
+  type CertificationFreshnessFilter,
   type CertificationStateFilter,
   countRowsByState,
   filterCertificationRows,
   isInventoryStale,
-  OPERATIONAL_TIERS,
   passedTierCount,
-  TASTE_TIERS,
 } from './certification-view';
 
 const columnHelper = createColumnHelper<OvieCertificationRow>();
@@ -85,50 +86,6 @@ function StateCell({ row }: { readonly row: OvieCertificationRow }) {
   );
 }
 
-function SubjectCell({ row }: { readonly row: OvieCertificationRow }) {
-  return (
-    <span className='flex min-w-0 items-center gap-1.5'>
-      <span
-        className='truncate text-app font-medium text-primary-token'
-        title={row.subject.id}
-      >
-        {row.subject.title}
-      </span>
-      {row.staleFounderLock ? (
-        <AlertTriangle
-          className='h-3 w-3 shrink-0 text-warning'
-          aria-label='Stale Founder Approval'
-        />
-      ) : null}
-    </span>
-  );
-}
-
-function EvidenceCell({ row }: { readonly row: OvieCertificationRow }) {
-  return (
-    <span
-      className='flex items-center gap-1'
-      data-testid='certification-evidence-strip'
-    >
-      {TASTE_TIERS.map(tier => (
-        <CertificationTierGlyph
-          key={tier}
-          tier={tier}
-          status={row.tiers[tier]}
-        />
-      ))}
-      <span className='mx-0.5 h-2.5 w-px bg-(--app-shell-frame-seam)' />
-      {OPERATIONAL_TIERS.map(tier => (
-        <CertificationTierGlyph
-          key={tier}
-          tier={tier}
-          status={row.tiers[tier]}
-        />
-      ))}
-    </span>
-  );
-}
-
 // biome-ignore lint/suspicious/noExplicitAny: TanStack Table requires any for mixed-value-type column arrays
 function buildColumns(): ColumnDef<OvieCertificationRow, any>[] {
   return [
@@ -142,7 +99,7 @@ function buildColumns(): ColumnDef<OvieCertificationRow, any>[] {
     columnHelper.accessor(row => row.subject.title.toLowerCase(), {
       id: 'subject',
       header: 'Item',
-      cell: ({ row }) => <SubjectCell row={row.original} />,
+      cell: ({ row }) => <CertificationIdentity row={row.original} />,
       size: 280,
     }),
     columnHelper.accessor(
@@ -162,7 +119,7 @@ function buildColumns(): ColumnDef<OvieCertificationRow, any>[] {
     columnHelper.accessor(row => passedTierCount(row), {
       id: 'evidence',
       header: 'Evidence',
-      cell: ({ row }) => <EvidenceCell row={row.original} />,
+      cell: ({ row }) => <CertificationEvidenceStrip row={row.original} />,
       size: 136,
       sortDescFirst: true,
     }),
@@ -201,54 +158,6 @@ function buildColumns(): ColumnDef<OvieCertificationRow, any>[] {
       sortDescFirst: true,
     }),
   ];
-}
-
-function DomainFilterMenu({
-  domains,
-  value,
-  onChange,
-}: {
-  readonly domains: readonly OvieCertificationDomainSummary[];
-  readonly value: CertificationDomainFilter;
-  readonly onChange: (value: CertificationDomainFilter) => void;
-}) {
-  const label =
-    value === 'all' ? 'All Domains' : OVIE_CERTIFICATION_DOMAIN_LABELS[value];
-  return (
-    <ShellDropdown
-      align='end'
-      width={280}
-      trigger={
-        <Button
-          type='button'
-          variant='ghost'
-          size='sm'
-          className={PAGE_TOOLBAR_MENU_TRIGGER_CLASS}
-          aria-label={`Domain Filter: ${label}`}
-        >
-          <span className='truncate'>{label}</span>
-          <ChevronDown className='h-3 w-3' aria-hidden='true' />
-        </Button>
-      }
-    >
-      <ShellDropdown.Label>Domain</ShellDropdown.Label>
-      <ShellDropdown.RadioGroup
-        value={value}
-        onValueChange={next => onChange(next as CertificationDomainFilter)}
-      >
-        <ShellDropdown.RadioItem value='all' label='All Domains' />
-        {domains.map(domain => (
-          <ShellDropdown.RadioItem
-            key={domain.domain}
-            value={domain.domain}
-            label={`${domain.label} (${domain.rowCount})`}
-            description={domain.note ?? undefined}
-            disabled={domain.rowCount === 0}
-          />
-        ))}
-      </ShellDropdown.RadioGroup>
-    </ShellDropdown>
-  );
 }
 
 function IssuesMenu({
@@ -319,7 +228,11 @@ function FreshnessMeta({
   );
 }
 
-export function OvieCertificationsWorkspace() {
+export function OvieCertificationsWorkspace({
+  initialDomain = 'all',
+}: {
+  readonly initialDomain?: CertificationDomainFilter;
+}) {
   const query = useOvieCertificationsQuery();
   // useMutation returns a new object every render; only the stable
   // mutateAsync may feed memoized callbacks, or the registered right panel
@@ -329,10 +242,26 @@ export function OvieCertificationsWorkspace() {
   const [stateFilter, setStateFilter] =
     useState<CertificationStateFilter>('all');
   const [domainFilter, setDomainFilter] =
-    useState<CertificationDomainFilter>('all');
+    useState<CertificationDomainFilter>(initialDomain);
   // Needs You judgment cards deep-link here with ?row=<rowId> so the founder
   // lands on the exact evidence rail, not a re-search.
-  const linkedRowId = useSearchParams().get('row');
+  const searchParams = useSearchParams();
+  const linkedRowId = searchParams.get('row');
+  const linkedDomain = searchParams.get('domain');
+  useEffect(() => {
+    setDomainFilter(
+      (OVIE_CERTIFICATION_DOMAINS as readonly string[]).includes(
+        linkedDomain ?? ''
+      )
+        ? (linkedDomain as CertificationDomainFilter)
+        : initialDomain
+    );
+  }, [linkedDomain, initialDomain]);
+  const [ownerFilter, setOwnerFilter] = useState('all');
+  const [freshnessFilter, setFreshnessFilter] =
+    useState<CertificationFreshnessFilter>('all');
+  const [blockerFilter, setBlockerFilter] =
+    useState<CertificationBlockerFilter>('all');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   useEffect(() => setSelectedId(linkedRowId), [linkedRowId]);
   const [sorting, setSorting] = useState<SortingState>([
@@ -340,15 +269,29 @@ export function OvieCertificationsWorkspace() {
   ]);
   const [pendingDecision, setPendingDecision] =
     useState<OvieCertificationDecisionKind | null>(null);
-  const [decisionError, setDecisionError] = useState<string | null>(null);
+  const [decisionFailure, setDecisionFailure] = useState<{
+    rowId: string;
+    message: string;
+  } | null>(null);
+  const decisionInFlight = useRef(false);
+  const preparedDecision = useRef<{
+    key: string;
+    request: OvieCertificationDecisionRequest;
+  } | null>(null);
   const [walkthroughOpen, setWalkthroughOpen] = useState(false);
 
   const inventory = query.data;
   const allRows = useMemo(() => inventory?.rows ?? [], [inventory]);
   const domainRows = useMemo(
     () =>
-      filterCertificationRows(allRows, { state: 'all', domain: domainFilter }),
-    [allRows, domainFilter]
+      filterCertificationRows(allRows, {
+        state: 'all',
+        domain: domainFilter,
+        owner: ownerFilter,
+        freshness: freshnessFilter,
+        blockers: blockerFilter,
+      }),
+    [allRows, domainFilter, ownerFilter, freshnessFilter, blockerFilter]
   );
   const counts = useMemo(() => countRowsByState(domainRows), [domainRows]);
   const rows = useMemo(
@@ -356,37 +299,81 @@ export function OvieCertificationsWorkspace() {
       filterCertificationRows(allRows, {
         state: stateFilter,
         domain: domainFilter,
+        owner: ownerFilter,
+        freshness: freshnessFilter,
+        blockers: blockerFilter,
       }),
-    [allRows, stateFilter, domainFilter]
+    [
+      allRows,
+      stateFilter,
+      domainFilter,
+      ownerFilter,
+      freshnessFilter,
+      blockerFilter,
+    ]
   );
   const selected = useMemo(
     () => allRows.find(row => row.id === selectedId) ?? null,
     [allRows, selectedId]
   );
 
-  useEffect(() => {
-    setDecisionError(null);
-  }, [selectedId]);
+  const decisionError =
+    decisionFailure?.rowId === selectedId ? decisionFailure.message : null;
 
   const handleDecide = useCallback(
-    async (kind: OvieCertificationDecisionKind, notes: string | null) => {
-      if (!selected?.decision.evidenceDigest) return false;
-      setPendingDecision(kind);
-      setDecisionError(null);
-      try {
-        await submitDecision({
-          rowId: selected.id,
-          evidenceDigest: selected.decision.evidenceDigest,
-          decision: kind,
-          notes,
-          actionId: crypto.randomUUID(),
+    async (
+      kind: OvieCertificationDecisionKind,
+      notes: string | null,
+      target: CertificationDecisionTarget
+    ) => {
+      if (decisionInFlight.current) return false;
+      if (
+        !target.evidenceDigest ||
+        !selected?.decision.available ||
+        selected.id !== target.rowId ||
+        selected.decision.evidenceDigest !== target.evidenceDigest
+      ) {
+        setDecisionFailure({
+          rowId: target.rowId,
+          message:
+            'The review scope changed. Reopen the current evidence before deciding.',
         });
+        return false;
+      }
+      // Retry an uncertain response with the same domain idempotency key.
+      const key = JSON.stringify([
+        target.rowId,
+        target.evidenceDigest,
+        kind,
+        notes,
+      ]);
+      if (preparedDecision.current?.key !== key) {
+        preparedDecision.current = {
+          key,
+          request: {
+            rowId: target.rowId,
+            evidenceDigest: target.evidenceDigest,
+            decision: kind,
+            notes,
+            actionId: crypto.randomUUID(),
+          },
+        };
+      }
+      decisionInFlight.current = true;
+      setPendingDecision(kind);
+      setDecisionFailure(null);
+      try {
+        await submitDecision(preparedDecision.current.request);
         toast.success(DECISION_TOASTS[kind]);
         return true;
       } catch (error) {
-        setDecisionError(getCertificationDecisionErrorMessage(error));
+        setDecisionFailure({
+          rowId: target.rowId,
+          message: getCertificationDecisionErrorMessage(error),
+        });
         return false;
       } finally {
+        decisionInFlight.current = false;
         setPendingDecision(null);
       }
     },
@@ -432,7 +419,12 @@ export function OvieCertificationsWorkspace() {
 
   const loadFailed = query.isError && !inventory;
   const refreshFailed = query.isError && Boolean(inventory);
-  const filtersActive = stateFilter !== 'all' || domainFilter !== 'all';
+  const filtersActive =
+    stateFilter !== 'all' ||
+    domainFilter !== 'all' ||
+    ownerFilter !== 'all' ||
+    freshnessFilter !== 'all' ||
+    blockerFilter !== 'all';
   const domainLoadFailed = Boolean(
     inventory?.domains.some(
       domain =>
@@ -468,6 +460,9 @@ export function OvieCertificationsWorkspace() {
           onClick: () => {
             setStateFilter('all');
             setDomainFilter('all');
+            setOwnerFilter('all');
+            setFreshnessFilter('all');
+            setBlockerFilter('all');
           },
         }}
       />
@@ -516,10 +511,17 @@ export function OvieCertificationsWorkspace() {
           end={
             <>
               <IssuesMenu issues={inventory?.issues ?? []} />
-              <DomainFilterMenu
+              <CertificationFiltersMenu
+                rows={allRows}
                 domains={inventory?.domains ?? []}
-                value={domainFilter}
-                onChange={setDomainFilter}
+                domain={domainFilter}
+                onDomainChange={setDomainFilter}
+                owner={ownerFilter}
+                onOwnerChange={setOwnerFilter}
+                freshness={freshnessFilter}
+                onFreshnessChange={setFreshnessFilter}
+                blockers={blockerFilter}
+                onBlockersChange={setBlockerFilter}
               />
               <FreshnessMeta
                 generatedAt={inventory?.generatedAt}

@@ -66,17 +66,18 @@
     },
     ".claude/rules/code-style.md": {
       "owner": "@itstimwhite",
-      "claim": "Engineering conventions inherit the engineering canon and executable lint boundaries; internal PR review is advisory and CodeRabbit is optional supplementary evidence.",
-      "documentSha256": "37d1ab1df6c3c7b495c2924c8af284457cfe24c70528b7f01ce871cc6ec02a5c",
+      "claim": "The Prior-Art Gate projects canonical capability sourcing and IA policy; the existing internal reviewer is advisory.",
+      "documentSha256": "ff6c6731ea175aabb7e2fa14476e0138b552b3cce50efb230405d309860bf923",
       "sources": [
         {
           "path": "canon/ENGINEERING.md",
-          "sha256": "ef3b80900618e178419090a8ee322d646d81e8f952ceb14a9372b1ac79e9c120"
+          "section": "## Capability sourcing and IA integration",
+          "sha256": "c38946331cba8c71293a3205dac01cbefc4d9facbdd477bfa50b6078008185a9"
         },
         {
           "path": ".github/workflows/README.md",
           "section": "## Internal PR Review (advisory)",
-          "sha256": "08986dd49baac364e92bd05a395df1af3d2aad974bc911df8de9407f686525cb"
+          "sha256": "81772cf10e4eb82809d3b3eb6ba291c27b5a6e3d3c135fd8ff4a7e8ee7725dff"
         }
       ]
     },
@@ -133,11 +134,11 @@
     ".claude/rules/hermes-air.md": {
       "owner": "@itstimwhite",
       "claim": "Current Mac lane uses the existing fleet authority; historical gateway sections remain explicitly retired.",
-      "documentSha256": "77dcfcaa02d92c21d8cf7c632c0f9c41c05412c3e2422f0f8c919e6a163ff56f",
+      "documentSha256": "df56a62aa2514d1dbd7ea8b7cdb5770173fcc92bb01dd1a71afffb62513285ce",
       "sources": [
         {
           "path": "canon/FLEET.md",
-          "sha256": "48ca3bca6148df9f8464757dfec689f42678ea6a31aa9082cccf38362ab5ca61"
+          "sha256": "367120e3b49f643034f7a721d71927fadadb9c44e0d4f156822d92060da89af6"
         }
       ]
     },
@@ -165,12 +166,16 @@
     },
     ".claude/rules/linear.md": {
       "owner": "@itstimwhite",
-      "claim": "Issue closure behavior is implemented by the existing merge synchronizer.",
-      "documentSha256": "8ec6b7b5551e8b1acc8325927f68eb366510817c5b095f7e8edfcf51cf7a1978",
+      "claim": "Issue closure uses the existing merge synchronizer; literal observation registrations use the maintained inspector with complete current binding and episode history.",
+      "documentSha256": "cd1bdb0f8c77605807980013ccc7eb37a4c882f43f2696fee289ae1adfe140b0",
       "sources": [
         {
           "path": "scripts/lib/linear-sync-on-merge.mjs",
-          "sha256": "00c2eb0bbe938ff5552ba168d7889cf10c724846e200b55646834fd69b19513d"
+          "sha256": "55ae102c0547d154a549ee73e2f54e798666420aae1ac1011c95b616f21a140e"
+        },
+        {
+          "path": "scripts/lib/sentry-validation-observation.mjs",
+          "sha256": "ca426cad8d486d9904acbde2255fa8875640f345bb13712daf5c7a950084c476"
         }
       ]
     },
@@ -343,12 +348,21 @@
     },
     "CLAUDE.md": {
       "owner": "@itstimwhite",
-      "claim": "The top-level router implements the company constitution without replacing it.",
-      "documentSha256": "8a34aa0ffe385bdc1ee2872e0f6a22df21d6a860dfcb224d2c150e951e7dcafa",
+      "claim": "The top-level router inherits the constitution and routes personal/mixed requests to private intake before task tools.",
+      "documentSha256": "375c8ef4d8ad65c06aef6bb63b2159fe44790ba5ee3499ebbccf8c76c8dd9e31",
       "sources": [
         {
           "path": "canon/OPERATING_SYSTEM.md",
           "sha256": "405911b953ba432a2ef6d41efc69633ed330ba80a5d577865fe7027e9baf08f5"
+        },
+        {
+          "path": "scripts/backlog-orchestrator/private-task.mjs",
+          "sha256": "46e9fd81de86670fca59bf19d113786428b7b189f758cad75e682bb8d68924a1"
+        },
+        {
+          "path": "canon/ENGINEERING.md",
+          "section": "## Capability sourcing and IA integration",
+          "sha256": "c38946331cba8c71293a3205dac01cbefc4d9facbdd477bfa50b6078008185a9"
         }
       ]
     },
@@ -371,11 +385,30 @@
     "DESIGN.md": {
       "owner": "@itstimwhite",
       "claim": "Operational design authority derives from company design canon.",
-      "documentSha256": "ed3d2b71cc8b63c55fd026281877c1a89c1480a32eb858b4f376c7df5687d7ad",
+      "documentSha256": "85a3b182f64fa861141e7d77d06c1ac12ccaa4296a2630a2d58f477a6296be6d",
       "sources": [
         {
           "path": "canon/DESIGN.md",
-          "sha256": "e3d010ed5edb9255880135b51208537fd1f38fce623d83b2dab2cd62b209e99d"
+          "sha256": "8a6b7095f7a50904b77c4c2b0599d1b9f4de4621ffe459d1488357a31476839f"
+        }
+      ]
+    },
+    "canon/ENGINEERING.md": {
+      "owner": "@itstimwhite",
+      "claim": "Capability sourcing and IA policy is projected through shared task packets and trusted advisory review; diagnostic field checks do not certify semantics/runtime or blocking promotion.",
+      "documentSha256": "91b7b17bf2192ed5d879c3dc3e20dba3f70b0f3412eb4d0768829d55444f9c1a",
+      "sources": [
+        {
+          "path": "scripts/invariants/capability-planning.mjs",
+          "sha256": "7f72f2f4bc09235a61f3b22708775ce81f67418ff46affaba69afbce1c40adca"
+        },
+        {
+          "path": ".github/scripts/internal-pr-review.mjs",
+          "sha256": "dd0d20dfda2ed9724335435c45ae8e2dbc37d8292865e512aaaa4f9a2257890e"
+        },
+        {
+          "path": "scripts/lanes/lane_runner.py",
+          "sha256": "89557bdcddf29d9ea00df85491243d00cffd2a8cca4335e3768f4f9866592f6a"
         }
       ]
     },
@@ -471,12 +504,43 @@
     },
     "docs/writing/SURFACE_COVERAGE.md": {
       "owner": "@itstimwhite",
-      "claim": "Writing surface completeness is validated by the existing invariant consumer.",
-      "documentSha256": "1a1cf51249295ae88a750bc3a30254aec871c686ca555d01fe3f1d4583d0af68",
+      "claim": "Writing surface completeness is validated by the existing invariant consumer; the bounded post-selection brief uses server confirmation and public evidence; the bounded ops pilot rechecks artifact bindings at its Linear adapter and remains advisory.",
+      "documentSha256": "08e2793e7acc54ab02942c7dea7c59c9f156a633f4c4e218b8ad22d06cca2eb4",
       "sources": [
+        {
+          "path": "apps/web/lib/chat/onboarding-script/engine.ts",
+          "sha256": "2189bc254d59f0cba73b51c54d42da7b3950ca45cdbcb797346d637fd5e47b1f"
+        },
+        {
+          "path": "apps/web/lib/chat/post-selection-writing-brief.ts",
+          "sha256": "3d167c446ef4d8c22b7e58e16084b057b5c1192181ee345d680538e8837ad24f"
+        },
         {
           "path": "scripts/invariants/writing-surfaces.mjs",
           "sha256": "91356a21ccf5164603191080d6fb3e4e03d7455b8d58ad0c08c5651965143145"
+        },
+        {
+          "path": "scripts/lanes/doctor.py",
+          "sha256": "62c6939febf3586175d3bd867909d7fe3ef7bc9175ba7583b7dda921ddf0938a"
+        },
+        {
+          "path": "scripts/lanes/ops-report.mjs",
+          "sha256": "13f2edce9dc44a1aef3bf1180a32aa6b78bb2a23f26b95274b0e23820752327b"
+        }
+      ]
+    },
+    "scripts/backlog-orchestrator/PRIVATE_WORKFLOWS.md": {
+      "owner": "@itstimwhite",
+      "claim": "Conversation intake denies personal/mixed externalization, resumes a private non-secret record, limits escalation, and verifies a live Telegram delivery receipt before completion.",
+      "documentSha256": "760a2fc32a4a4d7c0741e318f7c824444c572fe0dc83c531438d188e770a92a5",
+      "sources": [
+        {
+          "path": "scripts/backlog-orchestrator/conversation-intake.mjs",
+          "sha256": "134b25472d8fe35a7fb299fc2cee917e51210564b09516b01c08da2f724f7d9b"
+        },
+        {
+          "path": "scripts/backlog-orchestrator/private-task.mjs",
+          "sha256": "46e9fd81de86670fca59bf19d113786428b7b189f758cad75e682bb8d68924a1"
         }
       ]
     }

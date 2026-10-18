@@ -2,6 +2,7 @@ import { TooltipProvider } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
+import { RenderedFamily } from '@/.storybook/rendered-family';
 import { SidebarProvider } from '@/components/organisms/sidebar';
 import type { SidebarListsPayload } from '@/lib/ovie/lists/types';
 import { queryKeys } from '@/lib/queries/keys';
@@ -17,8 +18,16 @@ function withLists(payload: SidebarListsPayload | null) {
       <QueryClientProvider client={client}>
         <TooltipProvider>
           <SidebarProvider>
-            <div className='ov-mode w-60 bg-base p-2'>
-              <Story />
+            <div className='ov-mode w-full max-w-60 bg-base'>
+              <RenderedFamily
+                name='OperatorListsNav'
+                owner='OperatorListsNav'
+                interactive
+              >
+                <div className='p-2'>
+                  <Story />
+                </div>
+              </RenderedFamily>
             </div>
           </SidebarProvider>
         </TooltipProvider>
@@ -30,7 +39,7 @@ function withLists(payload: SidebarListsPayload | null) {
 const meta = {
   title: 'Organisms/OperatorListsNav',
   component: OperatorListsNav,
-  parameters: { layout: 'centered' },
+  parameters: { layout: 'fullscreen' },
   args: { pathname: '/app/ov/lists/collab' },
 } satisfies Meta<typeof OperatorListsNav>;
 

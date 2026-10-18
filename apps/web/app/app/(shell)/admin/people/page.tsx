@@ -279,6 +279,8 @@ async function renderPeopleView(
             message: item.message,
             source: item.source,
             status: item.status,
+            classification: item.classification,
+            disposition: item.disposition,
             context: item.context,
             dismissedAtIso: item.dismissedAt?.toISOString() ?? null,
             createdAtIso: item.createdAt.toISOString(),
@@ -302,6 +304,7 @@ export default async function AdminPeoplePage({
   return (
     <AdminPage
       title='People'
+      layout={view === 'recovery' ? 'document' : 'workspace'}
       description='User table, roles, waitlist, creators, and individual actions.'
       tabs={{
         param: 'view',

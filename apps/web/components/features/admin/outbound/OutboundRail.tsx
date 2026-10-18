@@ -20,8 +20,8 @@ import {
   DrawerSection,
   EntityHeader,
   EntityHeaderThumbnail,
-  EntitySidebarShell,
 } from '@/components/molecules/drawer';
+import { AdminDetailRail } from '@/features/admin/layout/AdminDetailRail';
 import type {
   ContactCertificationInspection,
   ContactEvidenceDecision,
@@ -55,8 +55,6 @@ function useRailCommand(
       window.removeEventListener(OUTBOUND_RAIL_COMMAND_EVENT, listener);
   }, [command, enabled, run]);
 }
-
-export const OUTBOUND_RAIL_WIDTH = 440;
 
 export interface OutboundRailProps {
   readonly row: OutboundRow | null;
@@ -244,17 +242,14 @@ export function OutboundRail({
   const certified = certification?.status === 'certified_for_outreach';
 
   return (
-    <EntitySidebarShell
+    <AdminDetailRail
       isOpen={Boolean(row)}
-      width={OUTBOUND_RAIL_WIDTH}
       ariaLabel='Outbound target'
       data-testid='outbound-rail'
       scrollStrategy='shell'
       onClose={onClose}
       headerMode='minimal'
       hideMinimalHeaderBar
-      entityHeaderSurface='flat'
-      footerSurface='flat'
       isEmpty={!row}
       emptyMessage='Select a person to review their facts and message.'
       entityHeader={
@@ -454,6 +449,6 @@ export function OutboundRail({
           ))}
         </>
       ) : null}
-    </EntitySidebarShell>
+    </AdminDetailRail>
   );
 }

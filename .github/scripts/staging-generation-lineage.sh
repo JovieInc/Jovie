@@ -15,7 +15,9 @@ set -euo pipefail
   exit 1
 }
 
-artifact_id="$(gh api \
+hold_script="${GH_API_HOLD_SCRIPT:-$(cd "$(dirname "$0")" && pwd)/gh-api-hold.sh}"
+gh_api() { bash "$hold_script" api "$@"; }
+artifact_id="$(gh_api \
   "repos/$REPOSITORY/actions/artifacts?name=staging-lineage-${STAGING_RECEIPT_SHA}&per_page=100" \
   --jq '[.artifacts[] | select(.expired == false)] | sort_by(.created_at, .id) | last | .id // empty')"
 if [[ ! "$artifact_id" =~ ^[1-9][0-9]*$ ]]; then
@@ -25,7 +27,7 @@ fi
 
 lineage_dir="$RUNNER_TEMP/staging-lineage-$STAGING_RECEIPT_SHA"
 mkdir -p "$lineage_dir"
-gh api "repos/$REPOSITORY/actions/artifacts/$artifact_id/zip" \
+gh_api "repos/$REPOSITORY/actions/artifacts/$artifact_id/zip" \
   > "$lineage_dir/lineage.zip"
 unzip -q -o "$lineage_dir/lineage.zip" -d "$lineage_dir"
 jq -e --arg sha "$STAGING_RECEIPT_SHA" '
@@ -53,13 +55,13 @@ case "$outcome" in
       echo "::error::Staging lineage for $STAGING_RECEIPT_SHA superseded itself. Proof: artifact $artifact_id."
       exit 1
     fi
-    relation="$(gh api \
+    relation="$(gh_api \
       "repos/$REPOSITORY/compare/${replacement}...${EXPECTED_SHA}" \
       --jq '.status // empty')"
     if [[ "$relation" =~ ^(ahead|identical)$ ]]; then
       echo "::notice::Staging generation $STAGING_RECEIPT_SHA was superseded by $replacement on this release lineage; rebinding the exact receipt wait."
       echo "action=rebind replacement=$replacement"
-    elif [ "$(gh api \
+    elif [ "$(gh_api \
       "repos/$REPOSITORY/compare/${EXPECTED_SHA}...${replacement}" \
       --jq '.status // empty')" = "ahead" ]; then
       echo "::notice::Staging generation $STAGING_RECEIPT_SHA was superseded by newer main $replacement; this controller generation yields."

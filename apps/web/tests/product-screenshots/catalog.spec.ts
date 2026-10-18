@@ -15,6 +15,7 @@ import {
   isScreenshotManifestEntry,
   type ScreenshotManifestEntry,
 } from '../../lib/screenshots/types';
+import { formatScreenshotCatalogManifest } from '../../scripts/format-screenshot-catalog-manifest';
 import { pruneFixedOwnedOutputFiles } from '../../scripts/owned-output-path';
 import { optimizePngLosslessly } from '../../scripts/png-optimization';
 import { syncScreenshotPublicExport } from '../../scripts/sync-screenshot-public-export';
@@ -116,7 +117,7 @@ async function writeManifest(
     const entry = manifestEntriesById.get(scenario.id);
     return entry ? [entry] : [];
   });
-  const nextManifest = JSON.stringify(orderedEntries, null, 2) + '\n';
+  const nextManifest = formatScreenshotCatalogManifest(orderedEntries);
   const previousManifest = await readFile(MANIFEST_PATH, 'utf8').catch(
     error => {
       if (

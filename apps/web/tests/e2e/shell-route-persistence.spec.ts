@@ -304,6 +304,23 @@ async function resolveChatConversationPathWithRetry(
   throw lastError;
 }
 
+async function openLibraryReleasesView(page: Page): Promise<void> {
+  const link = page.locator('a[href="/app/library"]').first();
+  await expect(link).toBeVisible({ timeout: 30_000 });
+  await link.evaluate(element => {
+    element.setAttribute('href', '/app/library?view=releases');
+  });
+  await Promise.all([
+    page.waitForURL(
+      url =>
+        url.pathname === '/app/library' &&
+        url.searchParams.get('view') === 'releases',
+      { timeout: 60_000, waitUntil: 'commit' }
+    ),
+    link.click({ noWaitAfter: true }),
+  ]);
+}
+
 async function clickFirstVisibleAppLink(
   page: Page,
   hrefs: readonly string[],
@@ -410,11 +427,7 @@ test('app shell persists across core app routes without duplicate request bursts
   const baselineLoadCount = await readDocumentLoadCount(page);
   await attachReleasesOverlayProbe(page);
 
-  await clickFirstVisibleAppLink(
-    page,
-    [APP_ROUTES.DASHBOARD_RELEASES, APP_ROUTES.RELEASES],
-    [APP_ROUTES.DASHBOARD_RELEASES, APP_ROUTES.RELEASES]
-  );
+  await openLibraryReleasesView(page);
   await expectRouteContent(page, 'releases');
   const currentShellRemounts = await detectKnownShellPersistenceGap(
     page,

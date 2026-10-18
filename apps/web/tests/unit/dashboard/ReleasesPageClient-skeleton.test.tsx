@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { FC } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -47,12 +47,23 @@ vi.mock('@/features/feedback/PageErrorState', () => ({
   PageErrorState: () => <div data-testid='page-error-state' />,
 }));
 
+vi.mock('@/app/app/(shell)/library/LibrarySurface', () => ({
+  LibrarySurface: () => (
+    <div data-testid='library-surface'>
+      <input aria-label='Asset draft' />
+    </div>
+  ),
+}));
+
 vi.mock('@/lib/flags/client', () => ({
   useAppFlag: () => false,
 }));
 
 const { ReleasesPageClient } = await import(
   '@/app/app/(shell)/dashboard/releases/ReleasesPageClient'
+);
+const { ReleaseCatalogPageClient } = await import(
+  '@/app/app/(shell)/dashboard/releases/ReleaseCatalogPageClient'
 );
 
 describe('ReleasesPageClient skeleton behavior', () => {
@@ -91,6 +102,19 @@ describe('ReleasesPageClient skeleton behavior', () => {
 
     expect(screen.queryByTestId('release-table-skeleton')).toBeNull();
     expect(screen.getByTestId('shell-releases-view')).toBeInTheDocument();
+    expect(screen.queryByTestId('library-surface')).not.toBeInTheDocument();
+  });
+
+  it('renders the releases matrix for the releases alias instead of the asset library', () => {
+    useReleasesQueryMock.mockReturnValue({
+      data: [{ id: 'r1' }],
+      isError: false,
+    });
+
+    render(<ReleaseCatalogPageClient view='list' />);
+
+    expect(screen.getByTestId('shell-releases-view')).toBeInTheDocument();
+    expect(screen.queryByTestId('library-surface')).not.toBeInTheDocument();
   });
 
   it('keeps the releases view mounted when populated data is present', async () => {
@@ -127,5 +151,30 @@ describe('ReleasesPageClient skeleton behavior', () => {
 
     expect(screen.queryByTestId('page-error-state')).toBeNull();
     expect(screen.getByTestId('shell-releases-view')).toBeInTheDocument();
+  });
+
+  it('preserves the asset library and focused draft when a background refetch fails', () => {
+    useReleasesQueryMock.mockReturnValue({ data: [], isError: false });
+    const rendered = render(<ReleaseCatalogPageClient view='assets' />);
+    const library = screen.getByTestId('library-surface');
+    const input = screen.getByRole('textbox', { name: 'Asset draft' });
+    fireEvent.change(input, { target: { value: 'Unsaved draft' } });
+    input.focus();
+
+    useReleasesQueryMock.mockReturnValue({ data: [], isError: true });
+    rendered.rerender(<ReleaseCatalogPageClient view='assets' />);
+
+    expect(screen.queryByTestId('page-error-state')).not.toBeInTheDocument();
+    expect(screen.getByTestId('library-surface')).toBe(library);
+    expect(input).toHaveValue('Unsaved draft');
+    expect(input).toHaveFocus();
+  });
+
+  it('shows the asset library error recovery when no cached releases exist', () => {
+    useReleasesQueryMock.mockReturnValue({ data: undefined, isError: true });
+    render(<ReleaseCatalogPageClient view='assets' />);
+
+    expect(screen.getByTestId('page-error-state')).toBeInTheDocument();
+    expect(screen.queryByTestId('library-surface')).not.toBeInTheDocument();
   });
 });

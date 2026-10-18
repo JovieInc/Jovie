@@ -195,6 +195,11 @@
   max-height: calc(100dvh - var(--space-4));
 }
 
+/* Surface chrome eases while text paints immediately for accessible contrast. */
+@utility transition-surface {
+  transition-property: background-color, border-color;
+}
+
 /* Canonical allocation transition shared by sidebar, inspector, and drawers. */
 @utility transition-shell-rail-allocation {
   transition-property: flex-basis, width, border-width, opacity, transform;
@@ -317,5 +322,16 @@
     overflow: hidden;
     padding: var(--space-1-5);
     border-radius: var(--app-shell-radius);
+    /* A closed drawer is width 0, but fit-content still counts this padding,
+       so the rail's border box stays 12px and covers the main plane. Collapse
+       only after the phase settles closed; opening and closing keep the inset. */
+    &:has([data-rail-phase="closed"]):not(
+        :has([data-rail-phase="open"]),
+        :has([data-rail-phase="opening"]),
+        :has([data-rail-phase="closing"])
+      ) {
+      width: 0;
+      padding: 0;
+    }
   }
 }

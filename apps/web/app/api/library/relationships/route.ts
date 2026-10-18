@@ -17,10 +17,8 @@ const mutationSchema = z.object({
   merchCardId: z.string().uuid(),
 });
 
-async function readMutation(request: Request) {
-  const parsed = mutationSchema.safeParse(
-    await request.json().catch(() => null)
-  );
+async function readMutation(payload: unknown) {
+  const parsed = mutationSchema.safeParse(payload);
   if (!parsed.success) {
     return {
       error: NextResponse.json(
@@ -36,7 +34,7 @@ async function readMutation(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const auth = await readMutation(request);
+    const auth = await readMutation(await request.json().catch(() => null));
     if ('error' in auth) return auth.error;
     return NextResponse.json(
       { relationship: await tagMerchInYouTubeVideo(auth.data) },
@@ -65,7 +63,12 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    const auth = await readMutation(request);
+    const { searchParams } = new URL(request.url);
+    const auth = await readMutation({
+      creatorProfileId: searchParams.get('creatorProfileId'),
+      videoId: searchParams.get('videoId'),
+      merchCardId: searchParams.get('merchCardId'),
+    });
     if ('error' in auth) return auth.error;
     await untagMerchInYouTubeVideo(auth.data);
     return NextResponse.json({ ok: true }, { headers: NO_STORE_HEADERS });

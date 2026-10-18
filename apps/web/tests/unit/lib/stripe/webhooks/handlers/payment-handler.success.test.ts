@@ -103,7 +103,16 @@ describe('@critical PaymentHandler - payment succeeded', () => {
       id: 'sub_123',
       status: 'active',
       customer: 'cus_123',
-      metadata: { clerk_user_id: 'user_abc123' },
+      metadata: {
+        clerk_user_id: 'user_abc123',
+        acquisition_id: '7f5bb735-8e88-4d78-ae32-5228cc12a8bb',
+        agent_intent_id: 'f3d8b4dc-e451-4af4-8cd3-5a64b27530a9',
+        agent_channel: 'agent-handoff',
+        agent_offer: 'artist-visibility-offer-contract-v1',
+        agent_rail: 'ordinary-web-checkout',
+        agent_decision_revision: 'decision-r4',
+        agent_matrix_revision: 'matrix-r7',
+      },
       items: { data: [{ price: { id: 'price_pro_monthly' } }] },
     } as unknown as Stripe.Subscription;
 
@@ -119,7 +128,9 @@ describe('@critical PaymentHandler - payment succeeded', () => {
             id: 'in_123',
             customer: 'cus_123',
             subscription: 'sub_123',
-            amount_due: 2000,
+            amount_due: 19900,
+            amount_paid: 19900,
+            currency: 'usd',
             attempt_count: 1,
           } as unknown as Stripe.Invoice,
         },
@@ -139,6 +150,18 @@ describe('@critical PaymentHandler - payment succeeded', () => {
         isPro: true,
         stripeSubscriptionId: 'sub_123',
         eventType: 'payment_succeeded',
+        metadata: expect.objectContaining({
+          logicalOrderId: 'in_123',
+          acquisitionId: '7f5bb735-8e88-4d78-ae32-5228cc12a8bb',
+          agentIntentId: 'f3d8b4dc-e451-4af4-8cd3-5a64b27530a9',
+          agentChannel: 'agent-handoff',
+          agentOffer: 'artist-visibility-offer-contract-v1',
+          agentRail: 'ordinary-web-checkout',
+          agentDecisionRevision: 'decision-r4',
+          agentMatrixRevision: 'matrix-r7',
+          grossAmountCents: 19900,
+          currency: 'usd',
+        }),
       })
     );
     expect(mockInvalidateBillingCache).toHaveBeenCalled();

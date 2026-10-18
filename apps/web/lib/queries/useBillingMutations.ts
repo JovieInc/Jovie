@@ -49,7 +49,11 @@ async function createCheckoutSession(
   return fetchWithTimeout<CheckoutResponse>('/api/stripe/checkout', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ priceId: input.priceId, source: input.source }),
+    body: JSON.stringify({
+      priceId: input.priceId,
+      source: input.source,
+      humanConfirmed: true,
+    }),
   });
 }
 

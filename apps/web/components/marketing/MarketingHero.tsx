@@ -114,6 +114,7 @@ export interface MarketingHeroLandingProps extends MarketingHeroBaseProps {
   readonly headingId: string;
   readonly titleTestId?: string;
   readonly sectionTestId?: string;
+  readonly sectionVariant?: string;
   readonly primaryCtaLabel?: string;
   readonly primaryCtaHref?: string;
   readonly ctaEventName?: string;
@@ -392,12 +393,16 @@ function MarketingHeroLanding({
   mediaClassName,
   gridClassName,
   photo,
+  sectionVariant,
+  sectionOwner,
 }: MarketingHeroLandingProps) {
   return (
     <MarketingHeroFrame
       className='marketing-hero-landing marketing-hero-dock marketing-hero-dock--inset relative overflow-hidden pb-12 md:pb-16 lg:pb-20'
       headingId={headingId}
       testId={testId ?? sectionTestId}
+      sectionVariant={sectionVariant}
+      sectionOwner={sectionOwner}
     >
       {photo ? <MarketingHeroPhoto {...photo} /> : null}
       <div

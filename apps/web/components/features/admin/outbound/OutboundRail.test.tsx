@@ -56,6 +56,11 @@ describe('OutboundRail', () => {
     const props = renderRail({ certification: certification('needs_review') });
     expect(screen.getByRole('button', { name: 'Approve' })).toBeDisabled();
     expect(screen.getByText('Certify facts to approve.')).toBeInTheDocument();
+    expect(
+      screen
+        .getByTestId('outbound-rail')
+        .querySelector('[data-surface-variant="flat"]')
+    ).not.toBeNull();
     act(() => sendOutboundRailCommand('approve'));
     expect(props.onApprove).not.toHaveBeenCalled();
   });

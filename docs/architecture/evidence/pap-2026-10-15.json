@@ -1,0 +1,414 @@
+{
+  "profileId": "pap",
+  "profileRevision": 1,
+  "assessmentIssue": "JOV-7960",
+  "assessmentDate": "2026-10-15",
+  "localSourceRevision": "112f1c63691",
+  "purpose": "Dated assessment evidence cache, not a runtime channel registry or certification receipt.",
+  "evidencePolicy": "Retain bounded findings, public observations and body digests. Reuse this cache until a material semantic event; HTML/template or digest drift alone does not admit work. Raw bodies were inspected locally; immutable publisher links permit source retrieval.",
+  "gbrainStatus": "gbrain-unavailable: localhost:7801 connection refused",
+  "status": {
+    "announced": "verified",
+    "specified": "official-draft-0.1",
+    "tested": "no-jovie-pap-tests",
+    "independentInteroperability": "unverified",
+    "implementationAdmission": "blocked-on-reviewed-requirements-and-prerequisites",
+    "publicCompatibilityClaim": false
+  },
+  "publisherSource": {
+    "repository": "https://github.com/personal-agent-protocol/personal-agent-protocol",
+    "revision": "f766ef8bdc249c66b2a42671ea9e7d53c3555665",
+    "commitDate": "2026-10-14T15:33:18Z",
+    "liveBuildSourceBinding": "not-attested; rendered spec digest is recorded separately"
+  },
+  "receipts": [
+    {
+      "id": "announcement",
+      "kind": "source",
+      "url": "https://sierra.ai/blog/introducing-personal-agent-protocol",
+      "method": "GET",
+      "retrievedAt": "2026-10-15T16:22:29.834221+00:00",
+      "status": 200,
+      "finalUrl": "https://sierra.ai/blog/introducing-personal-agent-protocol",
+      "contentType": "text/html; charset=utf-8",
+      "sha256": "bce663b478a04a7e2a84f469a189a5f321d9619afd0125c81a34f9683e25ee70",
+      "bytes": 188526,
+      "headers": {
+        "Cache-Control": "private, no-cache, no-store, max-age=0, must-revalidate"
+      },
+      "publicationDate": "2026-10-06",
+      "cachedFinding": "OAuth-backed guest-to-customer visits announced; no wire contract supplied in this announcement."
+    },
+    {
+      "id": "api-index",
+      "kind": "runtime",
+      "url": "https://jov.ie/api/v1",
+      "method": "GET",
+      "retrievedAt": "2026-10-15T16:22:30.535877+00:00",
+      "status": 200,
+      "finalUrl": "https://jov.ie/api/v1",
+      "contentType": "application/json",
+      "sha256": "bc7051471d4d99b7e047048a8a495a121624e727606f32d69bbceb3e80115eed",
+      "bytes": 1343,
+      "headers": {
+        "Cache-Control": "no-cache, no-store, must-revalidate"
+      },
+      "observation": {
+        "name": "Jovie Artist API",
+        "version": "1.0.0",
+        "access": "anonymous",
+        "scope": "read-only",
+        "endpoints": {
+          "index": "https://jov.ie/api/v1",
+          "artistTemplate": "https://jov.ie/api/v1/{username}",
+          "openapi": "https://jov.ie/api/v1/openapi.json",
+          "developers": "https://jov.ie/developers",
+          "sitemap": "https://jov.ie/sitemap.xml"
+        }
+      }
+    },
+    {
+      "id": "artist-auth-metadata",
+      "kind": "runtime",
+      "url": "https://jov.ie/.well-known/oauth-authorization-server/api/auth",
+      "method": "GET",
+      "retrievedAt": "2026-10-15T16:22:30.571782+00:00",
+      "status": 200,
+      "finalUrl": "https://jov.ie/.well-known/oauth-authorization-server/api/auth",
+      "contentType": "application/json",
+      "sha256": "a3cb11caa76544eec36ee813dd503f5132e1ae4bb891449d91ec74f14ef40c79",
+      "bytes": 2099,
+      "headers": {
+        "Cache-Control": "public, max-age=15"
+      },
+      "observation": {
+        "issuer": "https://jov.ie/api/auth",
+        "authorization_endpoint": "https://jov.ie/api/auth/oauth2/authorize",
+        "token_endpoint": "https://jov.ie/api/auth/oauth2/token",
+        "revocation_endpoint": "https://jov.ie/api/auth/oauth2/revoke",
+        "scopes_supported": ["openid", "profile", "email", "offline_access"],
+        "grant_types_supported": ["authorization_code", "refresh_token"],
+        "code_challenge_methods_supported": ["S256"]
+      }
+    },
+    {
+      "id": "artist-resource-metadata",
+      "kind": "runtime",
+      "url": "https://jov.ie/.well-known/oauth-protected-resource/api/mcp/radiohead",
+      "method": "GET",
+      "retrievedAt": "2026-10-15T16:22:30.955988+00:00",
+      "status": 200,
+      "finalUrl": "https://jov.ie/.well-known/oauth-protected-resource/api/mcp/radiohead",
+      "contentType": "application/json",
+      "sha256": "e36703fdda08213612d6e6b0404417c2a950e89f93ede4b256d4bd2cc7677e1b",
+      "bytes": 137,
+      "headers": {
+        "Cache-Control": "no-store"
+      },
+      "observation": {
+        "resource": "https://jov.ie/api/mcp/radiohead",
+        "authorization_servers": ["https://jov.ie/api/auth"],
+        "bearer_methods_supported": ["header"]
+      }
+    },
+    {
+      "id": "draft-mcp-tools",
+      "kind": "runtime",
+      "url": "https://jov.ie/api/mcp",
+      "method": "POST",
+      "retrievedAt": "2026-10-15T16:22:30.965222+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/list"
+      },
+      "status": 200,
+      "finalUrl": "https://jov.ie/api/mcp",
+      "contentType": "application/json",
+      "sha256": "973831643d63f404d47b5a9e85feca47d2dc86aeb2d53209472558cb588bc331",
+      "bytes": 4601,
+      "headers": {
+        "Cache-Control": "no-store"
+      },
+      "observation": {
+        "tools": [
+          "artist.search_or_import",
+          "workspace.create_draft",
+          "release.prepare_launch"
+        ],
+        "error": null
+      }
+    },
+    {
+      "id": "draft-publication",
+      "kind": "source",
+      "url": "https://sierra.ai/blog/poppy",
+      "method": "GET",
+      "retrievedAt": "2026-10-15T16:22:29.835171+00:00",
+      "status": 200,
+      "finalUrl": "https://sierra.ai/blog/poppy",
+      "contentType": "text/html; charset=utf-8",
+      "sha256": "91206dd070dd2999076af3a7792745cdb78348cd5d5d58e21ef50f46a3d980a4",
+      "bytes": 191598,
+      "headers": {
+        "Cache-Control": "private, no-cache, no-store, max-age=0, must-revalidate"
+      },
+      "publicationDate": "2026-10-09",
+      "cachedFinding": "Sierra publishes a draft and links personalagentprotocol.org; a reference implementation remains planned."
+    },
+    {
+      "id": "llms",
+      "kind": "runtime",
+      "url": "https://jov.ie/llms.txt",
+      "method": "GET",
+      "retrievedAt": "2026-10-15T16:22:30.373203+00:00",
+      "status": 200,
+      "finalUrl": "https://jov.ie/llms.txt",
+      "contentType": "text/plain; charset=utf-8",
+      "sha256": "9feafc8a8ac82bdcb4d6176c0f7ec3bfffee3156c2985331c4ffa42286dfba87",
+      "bytes": 5576,
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate"
+      },
+      "observation": {
+        "reachable": true,
+        "behavioralJourneyTested": false
+      }
+    },
+    {
+      "id": "mcp-authorization",
+      "kind": "source",
+      "url": "https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization",
+      "method": "GET",
+      "retrievedAt": "2026-10-15T16:22:29.841408+00:00",
+      "status": 200,
+      "finalUrl": "https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization",
+      "contentType": "text/markdown; charset=utf-8",
+      "sha256": "93fd383906873fedb80119a636b342e25b166ed3f9bee4fa8ae1b3bcb4c2b8f7",
+      "bytes": 25173,
+      "headers": {
+        "Cache-Control": "private, no-cache"
+      },
+      "publicationDate": "2026-07-28",
+      "cachedFinding": "Existing MCP authorization baseline; not a PAP specification."
+    },
+    {
+      "id": "music-mcp-initialize",
+      "kind": "runtime",
+      "url": "https://jov.ie/api/music/mcp",
+      "method": "POST",
+      "retrievedAt": "2026-10-15T16:22:30.990895+00:00",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+          "protocolVersion": "2025-03-26",
+          "capabilities": {},
+          "clientInfo": {
+            "name": "jov-7960-readiness-audit",
+            "version": "1"
+          }
+        }
+      },
+      "status": 200,
+      "finalUrl": "https://jov.ie/api/music/mcp",
+      "contentType": "application/json",
+      "sha256": "f2fa86332cf53417bf65145f7786c95f3ef02fe17fd838ac701a3b36df3c09ec",
+      "bytes": 883,
+      "headers": {
+        "Cache-Control": "no-store"
+      },
+      "observation": {
+        "result": {
+          "protocolVersion": "2025-03-26",
+          "capabilities": {
+            "tools": {}
+          },
+          "serverInfo": {
+            "name": "jovie-music-identity",
+            "version": "0.1.0"
+          }
+        },
+        "error": null
+      }
+    },
+    {
+      "id": "oauth-bcp",
+      "kind": "source",
+      "url": "https://www.rfc-editor.org/rfc/rfc9700.html",
+      "method": "GET",
+      "retrievedAt": "2026-10-15T16:22:29.842202+00:00",
+      "status": 200,
+      "finalUrl": "https://www.rfc-editor.org/rfc/rfc9700.html",
+      "contentType": "text/html",
+      "sha256": "c00e2234fcd79581bc29669c60d693afaa42f67d9205bddee848f757ae975419",
+      "bytes": 261599,
+      "headers": {},
+      "publicationDate": "2025-01",
+      "cachedFinding": "Existing OAuth Security BCP; not a PAP specification."
+    },
+    {
+      "id": "openapi",
+      "kind": "runtime",
+      "url": "https://jov.ie/api/v1/openapi.json",
+      "method": "GET",
+      "retrievedAt": "2026-10-15T16:22:30.546535+00:00",
+      "status": 200,
+      "finalUrl": "https://jov.ie/api/v1/openapi.json",
+      "contentType": "application/json",
+      "sha256": "c24762491e3dbf0ed76b6a38986585ae48d138e612e6879f0d312acae66ba088",
+      "bytes": 39703,
+      "headers": {
+        "Cache-Control": "no-cache, no-store, must-revalidate"
+      },
+      "observation": {
+        "openapi": "3.1.0",
+        "paths": [
+          "/api/agents/creator-lookup",
+          "/api/agents/feedback",
+          "/api/agents/profiles",
+          "/api/music/mcp",
+          "/api/v1",
+          "/api/v1/openapi.json",
+          "/api/v1/{username}",
+          "/llms-full.txt",
+          "/llms.txt",
+          "/{username}/llms.txt"
+        ]
+      }
+    },
+    {
+      "id": "pap-path",
+      "kind": "source",
+      "url": "https://personalagentprotocol.org/docs/path-to-1.md",
+      "method": "GET",
+      "retrievedAt": "2026-10-15T16:22:29.840502+00:00",
+      "status": 200,
+      "finalUrl": "https://personalagentprotocol.org/docs/path-to-1.md",
+      "contentType": "text/markdown; charset=utf-8",
+      "sha256": "b5687d12b90606fcc30deaf28d2cf56d3981437bc43c9a1d91cec823e8399985",
+      "bytes": 3387,
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate"
+      },
+      "publicationDate": null,
+      "cachedFinding": "Draft revisions may break compatibility; payments, push and attachments remain open topics."
+    },
+    {
+      "id": "pap-pinned-source",
+      "kind": "source",
+      "url": "https://raw.githubusercontent.com/personal-agent-protocol/personal-agent-protocol/f766ef8bdc249c66b2a42671ea9e7d53c3555665/content/spec.mdx",
+      "method": "GET",
+      "retrievedAt": "2026-10-15T16:23:43.330009+00:00",
+      "status": 200,
+      "sha256": "0177017aeb839313979bcfccf6836c81c79ea2328db9864c3ec1f70a18a54ff0",
+      "bytes": 91263,
+      "publicationDate": "2026-10-14",
+      "cachedFinding": "Publisher source revision f766ef8bdc249c66b2a42671ea9e7d53c3555665. Its MDX hash is separate from the rendered Markdown hash."
+    },
+    {
+      "id": "pap-repository-readme",
+      "kind": "source",
+      "url": "https://raw.githubusercontent.com/personal-agent-protocol/personal-agent-protocol/f766ef8bdc249c66b2a42671ea9e7d53c3555665/README.md",
+      "method": "GET",
+      "retrievedAt": "2026-10-15T16:23:44.009760+00:00",
+      "status": 200,
+      "sha256": "66af5d4a431bfba2341b373d1f09a5e5bbcead4b9f9a7ffc637afc07a0af84a0",
+      "bytes": 3493,
+      "publicationDate": "2026-10-14",
+      "cachedFinding": "Repository describes a documentation site, not an implementation of the protocol APIs."
+    },
+    {
+      "id": "pap-spec",
+      "kind": "source",
+      "url": "https://personalagentprotocol.org/docs/spec.md",
+      "method": "GET",
+      "retrievedAt": "2026-10-15T16:22:29.835998+00:00",
+      "status": 200,
+      "finalUrl": "https://personalagentprotocol.org/docs/spec.md",
+      "contentType": "text/markdown; charset=utf-8",
+      "sha256": "799fa69df0e51e71c34877c9f3629786da91f71b9e8205abe390415e663d45b1",
+      "bytes": 75066,
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate"
+      },
+      "publicationDate": "2026-10-09",
+      "cachedFinding": "Official draft 0.1 specifies discovery, sessions, sign-in, resource-bound API access, browser handoff and conversations. Jovie has not implemented or tested PAP."
+    },
+    {
+      "id": "robots",
+      "kind": "runtime",
+      "url": "https://jov.ie/robots.txt",
+      "method": "GET",
+      "retrievedAt": "2026-10-15T16:22:30.507666+00:00",
+      "status": 200,
+      "finalUrl": "https://jov.ie/robots.txt",
+      "contentType": "text/plain",
+      "sha256": "5bcbfc8f74188d17d8519b079853984ae6b690debee6b0548aaad92b1026aa1b",
+      "bytes": 5345,
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate"
+      },
+      "observation": {
+        "reachable": true,
+        "behavioralJourneyTested": false
+      }
+    },
+    {
+      "id": "version",
+      "kind": "runtime",
+      "url": "https://jov.ie/api/version",
+      "method": "GET",
+      "retrievedAt": "2026-10-15T16:22:30.340553+00:00",
+      "status": 200,
+      "finalUrl": "https://jov.ie/api/version",
+      "contentType": "application/json",
+      "sha256": "a923ef0d25a550731b60bf68c0fa4fb3cccaab9621437cebb1921a8926377984",
+      "bytes": 21,
+      "headers": {
+        "Cache-Control": "no-store"
+      },
+      "observation": {
+        "buildId": "85c8866"
+      }
+    },
+    {
+      "id": "version-after",
+      "kind": "runtime",
+      "url": "https://jov.ie/api/version",
+      "method": "GET",
+      "retrievedAt": "2026-10-15T16:23:44.978309+00:00",
+      "status": 200,
+      "sha256": "a923ef0d25a550731b60bf68c0fa4fb3cccaab9621437cebb1921a8926377984",
+      "bytes": 21,
+      "observation": {
+        "buildId": "85c8866"
+      }
+    }
+  ],
+  "sourceTestRun": {
+    "runner": "pnpm --filter @jovie/web run test:ci",
+    "runtime": "Node 24.21.0; pnpm 9.15.9",
+    "date": "2026-10-15T16:23:25Z",
+    "exitCode": 0,
+    "filesPassed": 12,
+    "testsPassed": 210,
+    "files": [
+      "app/.well-known/oauth-metadata.test.ts",
+      "app/api/mcp/[username]/route.test.ts",
+      "app/api/v1/route.test.ts",
+      "lib/actions/fleet/http.test.ts",
+      "lib/agent-acquisition/api.test.ts",
+      "lib/agent-acquisition/draft-capability.test.ts",
+      "lib/agent-acquisition/draft-store.test.ts",
+      "lib/agent-acquisition/music-mcp.test.ts",
+      "lib/agent-os/dogfood-receipt.exposure.test.ts",
+      "tests/lib/claim/claim-flow.test.ts",
+      "tests/unit/agent-os/certification.test.ts",
+      "tests/unit/lib/action-capabilities.test.ts"
+    ],
+    "limits": "Existing local unit tests, with mocks. No PAP conformance, independent client or deployed authenticated journey proof.",
+    "failedAttempt": "pnpm run test:web run <same first ten files> --maxWorkers=2: Doppler Error: you must provide a token. Used the existing secret-free test:ci runner, not invented credentials."
+  }
+}

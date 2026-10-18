@@ -125,6 +125,34 @@ describe('WorkspaceTabsSurface', () => {
     ).not.toBeInTheDocument();
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
     expect(screen.getByText('Only content')).toBeInTheDocument();
+    expect(screen.getByText('Only content').parentElement).toHaveClass(
+      'space-y-4'
+    );
+  });
+
+  it('fills the viewport when the workspace layout owns the task region', () => {
+    render(
+      <WorkspaceTabsSurface
+        title='People'
+        description='Manage creators and users.'
+        primaryParam='view'
+        primaryValue='creators'
+        primaryOptions={[primaryOptions[0]]}
+        headerless
+        layout='workspace'
+      >
+        <div>Workspace content</div>
+      </WorkspaceTabsSurface>
+    );
+
+    expect(screen.getByText('Workspace content').parentElement).toHaveClass(
+      'flex',
+      'min-h-0',
+      'min-w-0',
+      'flex-1',
+      'flex-col',
+      'overflow-hidden'
+    );
   });
 
   it('keeps tabs but suppresses a duplicate title in headerless mode', () => {

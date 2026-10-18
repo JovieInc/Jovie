@@ -251,6 +251,18 @@ jobs:
           NEXT_DISABLE_TOOLBAR: '1'
           E2E_ALLOW_DEV_CSP: '1'
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
+          # JOV-8500: this process is the server the onboarding chat probe hits.
+          # NEXT_PUBLIC_E2E_MODE=1 arms the local Turnstile bypass unless
+          # E2E_REQUIRE_TURNSTILE_GATE=1. Cookie mint runs first and returns
+          # 503 SESSION_SECRET_NOT_CONFIGURED when SESSION_SECRET is missing;
+          # an unconfigured secret returns 503 TURNSTILE_NOT_CONFIGURED. The
+          # sitekey/secret pair is Cloudflare's public always-pass test pair.
+          # SESSION_SECRET is a CI-only signer (>=32 chars), not a production
+          # credential.
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
+          TURNSTILE_SECRET_KEY: 1x0000000000000000000000000000000AA
+          SESSION_SECRET: nightly-qa-onboarding-session-secret-0123456789abcdef
+          E2E_REQUIRE_TURNSTILE_GATE: '1'
 
       - name: Run nightly route QA breadth pass
         # Temporarily keep this flaky breadth pass out of scheduled runs.

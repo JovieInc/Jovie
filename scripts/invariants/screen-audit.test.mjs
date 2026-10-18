@@ -180,7 +180,11 @@ fi
         ['/unfazed', [{ viewport: 'desktop', findings: [] }]],
       ]),
     });
-    assert.equal(profile.screens[0].verdict, 'green');
+    assert.equal(profile.screens[0].verdict, 'red');
+    assert.match(
+      profile.screens[0].findings[0],
+      /browser-owned-input.*UNKNOWN/
+    );
   });
 
   it('never counts missing evidence or a missing producer as green', () => {
@@ -190,7 +194,7 @@ fi
       'web.marketing-launch': 'missing-evidence',
       'web.homepage': 'missing-evidence',
       'web.tasks': 'missing-evidence',
-      'web.public-profile': 'missing-evidence',
+      'web.public-profile': 'red',
       'ios.chat': 'uncovered',
     });
     assert.equal(ledger.totals.screens, 5);
@@ -240,9 +244,11 @@ fi
     assert.deepEqual(byId['web.marketing-launch'].findings, [
       'mobile: clipped-heading h1#hero-heading',
     ]);
-    assert.deepEqual(byId['web.public-profile'].findings, [
-      '390x844/menu: image-contrast span',
-    ]);
+    assert.equal(
+      byId['web.public-profile'].findings[0],
+      '390x844/menu: image-contrast span'
+    );
+    assert.match(byId['web.public-profile'].findings[1], /browser-owned-input/);
     assert.match(byId['web.tasks'].findings[0], /CLS 0.27 over 0.05/);
     assert.equal(byId['web.tasks'].verdict, 'red');
   });
@@ -383,13 +389,14 @@ fi
       plans.map(plan => plan.fingerprint),
       [
         'screen-audit:web.marketing-launch',
+        'screen-audit:web.public-profile',
         'screen-audit:uncovered',
         'screen-audit:missing-evidence',
       ]
     );
     assert.match(plans[0].title, /has 1 finding$/);
     assert.match(plans[0].description, /on abcdef012345/);
-    assert.match(plans[1].description, /- ios\.chat \(ios, ios\)/);
+    assert.match(plans[2].description, /- ios\.chat \(ios, ios\)/);
   });
 
   it('loads route DOM receipts and screen proofs from nested artifacts', () => {
@@ -520,5 +527,41 @@ fi
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  it('binds web.onboarding-checkout to a proof route that can go green (JOV-8068)', () => {
+    assert.deepEqual(screenProducer('web.onboarding-checkout'), {
+      kind: 'proof-route',
+      route: '/onboarding/checkout',
+    });
+    const passingProof = {
+      screenId: 'web.onboarding-checkout',
+      viewports: ['desktop', 'mobile'].map(id => ({
+        id,
+        rendered: true,
+        axe: { violations: 0 },
+        overflow: { maxHorizontalPx: 0 },
+        cls: { value: 0 },
+        interaction: { passed: true },
+        contrast: { passed: true },
+        runtime: {},
+      })),
+    };
+    const ledger = auditScreens({
+      registry: [
+        {
+          id: 'web.onboarding-checkout',
+          platform: 'web',
+          owner: 'onboarding-checkout',
+          sources: ['apps/web/app/onboarding/checkout/page.tsx'],
+          viewports: ['desktop', 'mobile'],
+        },
+      ],
+      proofs: new Map([['web.onboarding-checkout', passingProof]]),
+      headSha: 'c5cf1c76aa2b7be30d283a46de914c5b23de0140',
+    });
+    assert.equal(ledger.schema, 'screen-audit/v1');
+    assert.equal(ledger.screens[0].verdict, 'green');
+    assert.equal(ledger.screens[0].producer, 'proof-route');
   });
 });

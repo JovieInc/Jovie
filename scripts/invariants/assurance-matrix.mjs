@@ -5,14 +5,36 @@
 // every row cites the owning audit/detector instead of duplicating it.
 
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 export const ASSURANCE_MATRIX_INVARIANT_ID = 'JOV-INV-037';
 export const ASSURANCE_MATRIX_SCHEMA = 'jovie.assurance-matrix/v1';
 export const CERTIFICATION_CONTRACT = 'jovie.certification/v1';
 export const ASSURANCE_MATRIX_PATH = 'scripts/invariants/assurance-matrix.json';
+// One digest per mergeable entry. A single hash of the whole matrix matches
+// each PR and then goes stale on the combined merge-group tree, because git
+// keeps both entries and only one digest. Entry lines merge independently.
+export const ASSURANCE_MATRIX_ENTRY_DIGESTS_PATH =
+  'scripts/invariants/assurance-matrix-entries.jsonl';
+
+const HEADER_FIELDS = Object.freeze([
+  'schema',
+  'contract',
+  'issue',
+  'extends',
+  'matrixRevision',
+  'asOf',
+  'evidenceMaxAgeMs',
+]);
+const COVERED_TOP_LEVEL = new Set([
+  ...HEADER_FIELDS,
+  'scope',
+  'sourceAudits',
+  'rows',
+  'uiEscapeCorpus',
+]);
 
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -91,6 +113,98 @@ export function readAssuranceMatrix(repoRoot = REPO_ROOT) {
 
 export function assuranceMatrixDigest(matrix) {
   return digest(matrix);
+}
+
+export function assuranceMatrixEntryDigest(value) {
+  return digest(value);
+}
+
+/** Stable entry ids. Prefixes keep rows, objects, audits, and escapes apart. */
+export function assuranceMatrixEntries(matrix) {
+  const header = {};
+  for (const field of HEADER_FIELDS) header[field] = matrix?.[field];
+  const entries = [{ id: 'header', value: header }];
+  for (const item of matrix?.scope?.requiredObjects ?? [])
+    entries.push({ id: `object:${item?.id ?? ''}`, value: item });
+  for (const item of matrix?.sourceAudits ?? [])
+    entries.push({ id: `audit:${item?.issue ?? ''}`, value: item });
+  for (const item of matrix?.rows ?? [])
+    entries.push({ id: `row:${item?.id ?? ''}`, value: item });
+  for (const item of matrix?.uiEscapeCorpus ?? [])
+    entries.push({ id: `escape:${item?.id ?? ''}`, value: item });
+  return entries;
+}
+
+export function formatAssuranceMatrixEntryDigests(matrix) {
+  const lines = assuranceMatrixEntries(matrix)
+    .map(entry => ({
+      id: entry.id,
+      digest: assuranceMatrixEntryDigest(entry.value),
+    }))
+    .sort((left, right) => left.id.localeCompare(right.id))
+    .map(entry => JSON.stringify({ id: entry.id, digest: entry.digest }));
+  return `${lines.join('\n')}\n`;
+}
+
+export function readAssuranceMatrixEntryDigests(repoRoot = REPO_ROOT) {
+  return readFileSync(
+    resolve(repoRoot, ASSURANCE_MATRIX_ENTRY_DIGESTS_PATH),
+    'utf8'
+  )
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map(line => JSON.parse(line));
+}
+
+/**
+ * Each recorded digest must match that entry's current bytes. A missing or
+ * stale line is drift. An orphan line is a digest for content that is gone.
+ */
+export function validateAssuranceMatrixEntryDigests(matrix, recorded = []) {
+  const errors = [];
+  if (!isObject(matrix)) return ['matrix-digest:matrix-not-object'];
+  for (const key of Object.keys(matrix))
+    if (!COVERED_TOP_LEVEL.has(key))
+      errors.push(`matrix-digest:uncovered-key:${key}`);
+  if (isObject(matrix.scope))
+    for (const key of Object.keys(matrix.scope))
+      if (key !== 'requiredObjects')
+        errors.push(`matrix-digest:uncovered-key:scope.${key}`);
+
+  const expected = new Map();
+  for (const entry of assuranceMatrixEntries(matrix)) {
+    if (entry.id.endsWith(':')) {
+      errors.push(`matrix-digest:blank-id:${entry.id}`);
+      continue;
+    }
+    if (expected.has(entry.id)) {
+      errors.push(`matrix-digest:duplicate-entry:${entry.id}`);
+      continue;
+    }
+    expected.set(entry.id, assuranceMatrixEntryDigest(entry.value));
+  }
+
+  const seen = new Set();
+  for (const row of recorded ?? []) {
+    if (!hasText(row?.id) || !hasText(row?.digest)) {
+      errors.push('matrix-digest:malformed-record');
+      continue;
+    }
+    if (seen.has(row.id)) {
+      errors.push(`matrix-digest:duplicate-record:${row.id}`);
+      continue;
+    }
+    seen.add(row.id);
+    const want = expected.get(row.id);
+    if (want === undefined) {
+      errors.push(`matrix-digest:orphan:${row.id}`);
+      continue;
+    }
+    if (want !== row.digest) errors.push(`matrix-digest:mismatch:${row.id}`);
+  }
+  for (const id of expected.keys())
+    if (!seen.has(id)) errors.push(`matrix-digest:missing:${id}`);
+  return errors;
 }
 
 function acceptanceValid(acceptance, asOfMs) {
@@ -375,7 +489,11 @@ function matrixPolicy(registry) {
   )?.policy?.value;
 }
 
-/** Binds JOV-INV-037's policy to the exact checked-in matrix revision. */
+/**
+ * Binds JOV-INV-037 to the checked-in matrix revision and to one digest per
+ * entry. The retired whole-file `matrixDigest` is rejected: it cannot stay
+ * true for two entries that land in the same merge group.
+ */
 export function validateAssuranceMatrixPolicy(
   registry,
   { repoRoot = REPO_ROOT } = {}
@@ -389,6 +507,12 @@ export function validateAssuranceMatrixPolicy(
     errors.push(`contract:expected-${CERTIFICATION_CONTRACT}`);
   if (policy.matrixPath !== ASSURANCE_MATRIX_PATH)
     errors.push(`matrix-path:expected-${ASSURANCE_MATRIX_PATH}`);
+  if (policy.entryDigestPath !== ASSURANCE_MATRIX_ENTRY_DIGESTS_PATH)
+    errors.push(
+      `entry-digest-path:expected-${ASSURANCE_MATRIX_ENTRY_DIGESTS_PATH}`
+    );
+  if (Object.hasOwn(policy, 'matrixDigest'))
+    errors.push('matrix-digest:whole-file-retired');
   if (policy.unknownApplicability !== 'fail-closed')
     errors.push('unknown-applicability:must-fail-closed');
   for (const layer of MATRIX_LAYERS)
@@ -405,8 +529,20 @@ export function validateAssuranceMatrixPolicy(
     errors.push('matrix-revision:mismatch');
   if (policy.evidenceMaxAgeMs !== matrix.evidenceMaxAgeMs)
     errors.push('evidence-max-age:mismatch');
-  if (policy.matrixDigest !== assuranceMatrixDigest(matrix))
-    errors.push('matrix-digest:mismatch');
+  if (!existsSync(resolve(repoRoot, ASSURANCE_MATRIX_ENTRY_DIGESTS_PATH))) {
+    errors.push('matrix-digest:file-missing');
+  } else {
+    try {
+      errors.push(
+        ...validateAssuranceMatrixEntryDigests(
+          matrix,
+          readAssuranceMatrixEntryDigests(repoRoot)
+        )
+      );
+    } catch {
+      errors.push('matrix-digest:unreadable');
+    }
+  }
   for (const error of validateAssuranceMatrix(matrix, { repoRoot }))
     errors.push(`matrix:${error}`);
   return errors;
@@ -692,7 +828,13 @@ export function uiAssuranceReport(matrix) {
  * every UI row the changed paths invalidate, with its required targets.
  */
 export function uiEvidenceRequirements(matrix, changedPaths = []) {
-  const hits = new Set(invalidatedRows(matrix, changedPaths));
+  // Tests still invalidate matrix/detector evidence through invalidatedRows,
+  // but owe no rendered-product receipt. Stories and fixtures remain in scope.
+  const runtimePaths = changedPaths.filter(
+    path =>
+      typeof path !== 'string' || !/\.(?:test|spec)\.[cm]?[jt]sx?$/iu.test(path)
+  );
+  const hits = new Set(invalidatedRows(matrix, runtimePaths));
   return (matrix?.rows ?? [])
     .filter(row => isUiRow(row) && hits.has(row.id))
     .map(row => {
@@ -706,10 +848,23 @@ export function uiEvidenceRequirements(matrix, changedPaths = []) {
     });
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+function invokedDirectly() {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  return import.meta.url === pathToFileURL(resolve(entry)).href;
+}
+
+if (invokedDirectly()) {
   const matrix = readAssuranceMatrix();
-  const report = process.argv.includes('--ui')
-    ? uiAssuranceReport(matrix)
-    : assuranceMatrixReceipt(matrix);
-  process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+  if (process.argv.includes('--write-entry-digests')) {
+    writeFileSync(
+      resolve(REPO_ROOT, ASSURANCE_MATRIX_ENTRY_DIGESTS_PATH),
+      formatAssuranceMatrixEntryDigests(matrix)
+    );
+  } else {
+    const report = process.argv.includes('--ui')
+      ? uiAssuranceReport(matrix)
+      : assuranceMatrixReceipt(matrix);
+    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+  }
 }
