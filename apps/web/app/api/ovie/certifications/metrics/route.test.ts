@@ -119,18 +119,21 @@ describe('GET /api/ovie/certifications/metrics', () => {
   });
 
   it('counts founder-facing Summer cards toward cards per day', async () => {
+    // One day before the clock this test actually runs, so the card stays
+    // inside the 30-day metrics window after the wall clock moves.
+    const createdAt = new Date(Date.now() - 86_400_000).toISOString();
     mocks.cards.mockResolvedValue([
       {
         id: 'sc_1',
         kind: 'taste',
         product: 'jov',
-        createdAt: '2026-09-20T00:00:00.000Z',
+        createdAt,
       },
       {
         id: 'sc_2',
         kind: 'spend', // not founder-facing: excluded
         product: 'jov',
-        createdAt: '2026-09-20T00:00:00.000Z',
+        createdAt,
       },
     ]);
     const body = await (await GET(request())).json();
