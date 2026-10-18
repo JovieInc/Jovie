@@ -130,7 +130,7 @@
   "capturedAt": "2026-10-16T06:23:47.215493+00:00",
   "sourceDigests": {
     "apps/web/data/marketing/mediaRecipes.ts": "9b53d7ff7a04195621fbb505ae76e42003b29194d6fc073681a9d1690b2f3263",
-    "apps/web/data/marketing/mediaReferences.ts": "6a5d96c2d1d59f2b570727cc4c26aa474d508a9dce8ab319bd3f8802e0e20247",
+    "apps/web/data/marketing/mediaReferences.ts": "972d8c6fbf7d6035f81a2234152472f9df017cd6e4036dd48798c54fb5c02dcf",
     "apps/web/components/marketing/MarketingMedia.tsx": "44553565729cafc4dbe0c18b1f6def033ae4d60ea3fe3ea78382e1c99a61f7e2"
   },
   "approvalScope": "none; deterministic local observation only",

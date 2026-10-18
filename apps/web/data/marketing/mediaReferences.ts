@@ -84,7 +84,7 @@ export const MARKETING_MEDIA_TOKEN_FILES = [
   'styles/design-system.css',
 ] as const;
 export const MARKETING_MEDIA_TOKEN_REVISION =
-  'ziawi-2026-09-25/5401a2c4275b8fe97a9788a88376bf2ff00647261a30a8f8a15e78befbee95eb' as const;
+  'ziawi-2026-09-25/62267dc6e73c3b9d0b48f4a642e2e2672b2369ff703519bf6d8c602bcd9a20d0' as const;
 
 export interface MarketingMediaRegisteredInput {
   readonly id: string;
@@ -124,8 +124,8 @@ export const MARKETING_MEDIA_INPUTS: readonly MarketingMediaRegisteredInput[] =
       id: 'dashboard-releases-sidebar-desktop',
       kind: 'real-capture',
       recipes: ['dark-glass'],
-      revision: '0d212e11080f11c2cf164ca858116f45fb9c048e',
-      hash: 'defcbc4b35faf6c7f844cec7ba36773b204ee237b29c0fce48b7d180b03c70a9',
+      revision: 'e04c96ab3605cc134fa2c4f479cd5c078a9ae823',
+      hash: 'a0dc630f0c39549bb50f16135142cb6c0810a4b3f079e867f4d72d39bd3405f2',
       files: ['public/product-screenshots/releases-dashboard-sidebar.png'],
       rights: 'jovie-owned',
       evidence:
