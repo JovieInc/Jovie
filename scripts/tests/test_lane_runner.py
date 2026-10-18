@@ -9136,6 +9136,498 @@ class LifecycleOwnershipTest(unittest.TestCase):
             self.assertEqual(spawn.call_args.kwargs["env"][lane.lifecycle.FD_ENV], str(guard.fd))
 
 
+class FleetObservationProfileTest(unittest.TestCase):
+    def test_fixed_arm_cannot_bypass_default_lifecycle_for_arbitrary_options(self):
+        request = lane.FleetObservationRequest(time.monotonic())
+        for options in ({"guard": lambda: None}, {"on_kill": lambda _: None},
+                        {"_lifecycle_helper": True}, {"_lifecycle_terminal": True}):
+            with self.subTest(options=list(options)), patch.object(lane, "_run_fleet_observation") as run:
+                with self.assertRaises(lane.FleetObservationHeld):
+                    lane.run_agent(["arbitrary"], Path.cwd(), None, 60, _fleet_observation=request, **options)
+                run.assert_not_called()
+        with patch.object(lane, "_fleet_observation_profile", side_effect=lane.FleetObservationHeld("unknown")), \
+             patch.object(lane.lifecycle, "spawn_kwargs", side_effect=AssertionError("lifecycle")), \
+             patch.object(lane.subprocess, "Popen", side_effect=AssertionError("spawn")):
+            with self.assertRaisesRegex(lane.FleetObservationHeld, "unknown"):
+                lane.run_agent(["arbitrary"], Path.cwd(), None, 60, _fleet_observation=request)
+
+    def test_unknown_platform_or_consumed_budget_refuses_before_launch_or_auth(self):
+        with patch.object(lane.subprocess, "Popen", side_effect=AssertionError("spawn")), \
+             patch.object(lane.os, "fork", create=True, side_effect=AssertionError("fork")), \
+             patch.object(lane.lifecycle, "validate_release", side_effect=AssertionError("source")):
+            for request in (None, lane.FleetObservationRequest(float("nan")),
+                            lane.FleetObservationRequest(time.monotonic() + 1),
+                            lane.FleetObservationRequest(time.monotonic() - 51)):
+                with self.subTest(request=request), self.assertRaises(lane.FleetObservationHeld):
+                    lane._fleet_observation_profile([], Path.cwd(), request)
+            with patch.object(lane.sys, "platform", "darwin"):
+                with self.assertRaises(lane.FleetObservationHeld):
+                    lane._fleet_observation_profile([], Path.cwd(), lane.FleetObservationRequest(time.monotonic()))
+
+    @contextlib.contextmanager
+    def trusted_fixture(self):
+        with tempfile.TemporaryDirectory() as tmp, contextlib.ExitStack() as stack:
+            home = Path(tmp).resolve(); here = home / ".local/state/jovie-lanes/releases" / ("a" * 64) / "scripts/lanes"
+            here.mkdir(parents=True); gate = here.parent / "fleet-gate"; gate.mkdir()
+            (home / ".local/state/jovie-lanes/current").symlink_to(here, target_is_directory=True)
+            for name in lane.FLEET_OBSERVER_SOURCES:
+                shutil.copyfile(Path(lane.__file__).resolve().parent.parent / "fleet-gate" / name, gate / name)
+            objects = {"scripts/fleet-gate/" + name: "b" * 40 for name in lane.FLEET_OBSERVER_SOURCES}
+            manifest = {"objects": objects}; (here / ".release.json").write_text(json.dumps(manifest))
+            binary = b"\x7fELFfixture-only"
+            expected = {name: hashlib.sha256(binary).hexdigest() for name in lane.FLEET_OBSERVER_EXECUTABLES}
+            original_read, original_lstat = lane.lifecycle._read_regular, Path.lstat
+            def read(path, *args, **kwargs):
+                if str(path) in expected: return binary, SimpleNamespace(st_uid=0, st_mode=0o100755)
+                return original_read(path, *args, **kwargs)
+            def lstat(path, *args, **kwargs):
+                if str(path) in expected: return SimpleNamespace(st_uid=0, st_mode=0o100755)
+                if str(path) == "/dev/null": return SimpleNamespace(st_uid=0, st_mode=0o020666, st_rdev=os.makedev(1, 3))
+                if str(path) == "/dev": return SimpleNamespace(st_uid=0, st_mode=0o040755)
+                return original_lstat(path, *args, **kwargs)
+            original_resolve = Path.resolve
+            def resolve(path, *args, **kwargs):
+                if str(path) in expected: return path
+                return original_resolve(path, *args, **kwargs)
+            for patcher in (patch.object(lane.sys, "platform", "linux"),
+                    patch.object(lane.sys, "executable", "/usr/bin/python3.12"), patch.object(lane, "HERE", here),
+                    patch.object(Path, "home", return_value=home), patch.object(Path, "lstat", lstat),
+                    patch.object(Path, "resolve", resolve),
+                    patch.object(lane.shutil, "which", side_effect=lambda name: "/usr/bin/" + name),
+                    patch.object(lane.lifecycle, "active", return_value=False),
+                    patch.object(lane.lifecycle, "validate_release", return_value=manifest),
+                    patch.object(lane.lifecycle, "_read_regular", side_effect=read),
+                    patch.object(lane, "FLEET_OBSERVER_EXECUTABLES", expected),
+                    patch.object(lane.os, "waitid", create=True), patch.object(lane.os, "WNOWAIT", 0, create=True),
+                    patch.object(lane.os, "pidfd_open", create=True), patch.object(signal, "pidfd_send_signal", create=True),
+                    patch.dict(os.environ, {"GH_TOKEN": "fixture-only-never-sent", "PATH": "/fixture-existing-path"}, clear=True)):
+                stack.enter_context(patcher)
+            command = [lane.sys.executable, "-I", "-B", "-S", "-X", "pycache_prefix=/dev/null", str(gate / "gem-priority-gate.py"), "--observe-work-admission"]
+            yield command, here, gate, manifest, expected
+
+    def test_actual_fixed_source_import_and_transport_preflight_then_unknowns_hold_before_fork(self):
+        with self.trusted_fixture() as (command, here, gate, manifest, expected), \
+             patch.object(lane.subprocess, "Popen", side_effect=AssertionError("spawn")), \
+             patch.object(lane.os, "fork", side_effect=AssertionError("fork")):
+            request = lane.FleetObservationRequest(time.monotonic())
+            result, env, end = lane._fleet_observation_profile(command, here, request)
+            self.assertEqual(result, command)
+            self.assertEqual(env["GH_TOKEN"], "fixture-only-never-sent")
+            self.assertEqual(env["PATH"], "/fixture-existing-path")
+            self.assertEqual(env, dict(os.environ))
+            self.assertEqual(end, request.preparation_started + 60)
+            with self.assertRaisesRegex(lane.FleetObservationHeld, "fixed-command"):
+                lane._fleet_observation_profile(["sh", "-c", "anything"], here, request)
+            for values in ({"GH_HOST": "unknown.invalid"}, {"GH_TOKEN": ""}, {"LD_PRELOAD": "/unknown"}):
+                with self.subTest(keys=list(values)), patch.dict(os.environ, values):
+                    with self.assertRaises(lane.FleetObservationHeld): lane._fleet_observation_profile(command, here, request)
+            expected["/usr/bin/gh"] = "0" * 64
+            with self.assertRaisesRegex(lane.FleetObservationHeld, "executable-closure"):
+                lane._fleet_observation_profile(command, here, request)
+
+    def test_existing_shim_is_held_without_rewriting_path_or_launching(self):
+        with self.trusted_fixture() as (command, here, *_), \
+             patch.object(lane.shutil, "which", return_value="/unknown-minting-shim/gh"), \
+             patch.object(lane.os, "fork", side_effect=AssertionError("fork")):
+            before = dict(os.environ)
+            with self.assertRaises(lane.FleetObservationHeld):
+                lane._fleet_observation_profile(command, here, lane.FleetObservationRequest(time.monotonic()))
+            self.assertEqual(dict(os.environ), before)
+
+    def test_package_extension_and_sourceless_shadows_refuse_before_launch(self):
+        for name, contents in (("closure_health/__init__.py", "raise RuntimeError('unreviewed')"),
+                                ("foreign.pyc", "bytecode"), ("json.so", "extension")):
+            with self.subTest(name=name), self.trusted_fixture() as (command, here, gate, *_):
+                path = gate / name; path.parent.mkdir(exist_ok=True); path.write_text(contents)
+                with self.assertRaisesRegex(lane.FleetObservationHeld, "shadow-import"):
+                    lane._fleet_observation_profile(command, here, lane.FleetObservationRequest(time.monotonic()))
+
+    def test_import_detach_guard_and_shadow_source_closure_is_bound_before_launch(self):
+        for mutation, reason in (("import imaginary_provider\n", "import-closure"),
+                                 ("import os\nos.setsid()\n", "nondetaching")):
+            with self.trusted_fixture() as (command, here, gate, manifest, expected):
+                path = gate / "summer_ci_audit.py"; path.write_text(path.read_text() + "\n" + mutation)
+                with self.assertRaisesRegex(lane.FleetObservationHeld, reason):
+                    lane._fleet_observation_profile(command, here, lane.FleetObservationRequest(time.monotonic()))
+        with self.trusted_fixture() as (command, here, gate, manifest, expected):
+            del manifest["objects"]["scripts/fleet-gate/symphony_proof_context.py"]
+            with self.assertRaisesRegex(lane.FleetObservationHeld, "not-manifest-bound"):
+                lane._fleet_observation_profile(command, here, lane.FleetObservationRequest(time.monotonic()))
+        with self.trusted_fixture() as (command, here, gate, manifest, expected):
+            (gate / "json.py").write_text("raise RuntimeError('shadow')")
+            with self.assertRaisesRegex(lane.FleetObservationHeld, "shadow-import"):
+                lane._fleet_observation_profile(command, here, lane.FleetObservationRequest(time.monotonic()))
+        with self.trusted_fixture() as (command, here, gate, manifest, expected):
+            path = gate / "gem-priority-gate.py"
+            path.write_text(path.read_text().replace('"lease": {"status": "unknown", "reason": "not-observed-work-only"}\n        if _WORK_OBSERVATION_ONLY.get() else observe_lease(args.lease_guard_bin)', '"lease": observe_lease(args.lease_guard_bin)'))
+            with self.assertRaisesRegex(lane.FleetObservationHeld, "guard-bin-closure"):
+                lane._fleet_observation_profile(command, here, lane.FleetObservationRequest(time.monotonic()))
+
+    def test_explicit_control_requires_a_live_read_pipe_and_never_changes_flags(self):
+        with self.trusted_fixture() as (command, here, gate, manifest, expected):
+            read, write = os.pipe()
+            try:
+                flags = fcntl.fcntl(read, fcntl.F_GETFL)
+                lane._fleet_observation_profile(command, here, lane.FleetObservationRequest(time.monotonic(), read))
+                self.assertEqual(fcntl.fcntl(read, fcntl.F_GETFL), flags)
+                with self.assertRaisesRegex(lane.FleetObservationHeld, "control-pipe"):
+                    lane._fleet_observation_profile(command, here, lane.FleetObservationRequest(time.monotonic(), write))
+            finally: os.close(read); os.close(write)
+            fifo = here / "duplex-fifo"; os.mkfifo(fifo)
+            fd = os.open(fifo, os.O_RDWR | os.O_NONBLOCK)
+            try:
+                flags = fcntl.fcntl(fd, fcntl.F_GETFL)
+                with self.assertRaisesRegex(lane.FleetObservationHeld, "control-pipe"):
+                    lane._fleet_observation_profile(command, here, lane.FleetObservationRequest(time.monotonic(), fd))
+                self.assertEqual(fcntl.fcntl(fd, fcntl.F_GETFL), flags)
+            finally: os.close(fd)
+
+    def test_birth_change_never_signals_the_reused_numeric_pid(self):
+        owned = lane.AgentProcesses(100)
+        owned._fixed_handles = {100: 999}
+        before = (1, 100, "S", "linux:111")
+        with patch.object(owned, "observe_fixed", return_value=({100: before}, False)), \
+             patch.object(lane, "_selftest_process_row", return_value=(1, 100, "S", "linux:222")), \
+             patch.object(signal, "pidfd_send_signal", create=True) as send:
+            with self.assertRaisesRegex(lane.FleetObservationHeld, "identity-changed"):
+                owned.stop_fixed(time.monotonic() + 1)
+            send.assert_not_called()
+
+    def test_pipe_allocation_failure_closes_only_owned_fds_before_any_fork(self):
+        read, write = os.pipe(); private = os.pipe()
+        try:
+            flags = fcntl.fcntl(read, fcntl.F_GETFL)
+            with patch.object(lane, "_fleet_observation_profile", return_value=(["fixed"], {}, time.monotonic() + 10)), \
+                 patch.object(lane.os, "pipe2", create=True, side_effect=[private, OSError("fixture allocation failure")]), \
+                 patch.object(lane.os, "fork", side_effect=AssertionError("fork")):
+                with self.assertRaises(OSError):
+                    lane._run_fleet_observation([], Path.cwd(), lane.FleetObservationRequest(time.monotonic(), read))
+            for fd in private:
+                with self.assertRaises(OSError): os.fstat(fd)
+            self.assertEqual(fcntl.fcntl(read, fcntl.F_GETFL), flags)
+            os.write(write, b"preserved"); self.assertEqual(os.read(read, 9), b"preserved")
+        finally:
+            os.close(read); os.close(write)
+
+
+class FleetObservationDrainTest(unittest.TestCase):
+    def test_zero_waitpid_requires_rescan_until_echild_not_false_drain(self):
+        events = []
+        owned = lane.AgentProcesses(100)
+        process = SimpleNamespace(wait=Mock(side_effect=lambda **_: events.append("root-reaped") or 0))
+        def stop(_): events.append(("scan", owned.__dict__.get("_fixed_leader_reaped", False)))
+        owned.stop_fixed = stop
+        with patch.object(lane.os, "waitpid", side_effect=[(0, 0), (222, 0), ChildProcessError()]) as wait, \
+             patch.object(lane.time, "sleep"):
+            self.assertEqual(lane._fleet_observation_drain(owned, process, time.monotonic() + 2), 0)
+        self.assertEqual(events, [("scan", False), "root-reaped", ("scan", True), ("scan", True), ("scan", True)])
+        self.assertEqual(wait.call_count, 3)
+        process.wait.assert_called_once()
+
+    def test_after_leader_reap_unrelated_reused_group_is_never_owned(self):
+        owned = lane.AgentProcesses(100); owned._fixed_custodian = 999; owned._fixed_leader_reaped = True
+        unrelated = Path("/proc/123")
+        with patch.object(Path, "iterdir", return_value=iter([unrelated])), \
+             patch.object(lane, "_selftest_process_row", return_value=(777, 100, "S", "linux:222")), \
+             patch.object(lane.os, "pidfd_open", create=True) as pidfd:
+            self.assertEqual(owned.observe_fixed(time.monotonic() + 1), ({}, False))
+            pidfd.assert_not_called()
+
+    def test_escape_seen_only_in_cleanup_is_sticky_even_when_drained(self):
+        owned = lane.AgentProcesses(100); owned._fixed_custodian = 999
+        root, orphan = Path("/proc/100"), Path("/proc/222")
+        def row(path, pid, uid):
+            return (999, 100, "Z", "linux:111") if pid == 100 else (999, 222, "Z", "linux:222")
+        with patch.object(Path, "iterdir", side_effect=[iter([root]), iter([root, orphan]), iter([root])]), \
+             patch.object(lane, "_selftest_process_row", side_effect=row), \
+             patch.object(lane.os, "pidfd_open", create=True, return_value=888):
+            self.assertEqual(owned.observe_fixed(time.monotonic() + 1), ({}, False))
+            owned.stop_fixed(time.monotonic() + 1)
+            self.assertEqual(owned.observe_fixed(time.monotonic() + 1), ({}, True))
+
+    def custodian_result(self, *, late_escape=False, invalid_output=False):
+        import ctypes
+        import select
+        class Finished(BaseException): pass
+        stdout = SimpleNamespace(fileno=lambda: 77)
+        process = SimpleNamespace(pid=100, stdout=stdout)
+        owned = lane.AgentProcesses(100)
+        frames, pending = [], [invalid_output]
+        def select_ready(read, write, *_):
+            return ([stdout] if read == [stdout] and pending[0] else [], write, [])
+        def read(fd, size):
+            if pending[0]: pending[0] = False; return b"\xff"
+            return b""
+        def drain(*_):
+            owned._fixed_leader_reaped = True
+            owned._fixed_escaped = late_escape
+            return 0
+        with patch.object(lane.os, "setsid"), patch.object(lane.os, "listdir", return_value=[]), \
+             patch.object(ctypes, "CDLL", return_value=SimpleNamespace(prctl=lambda *_: 0)), \
+             patch.object(signal, "signal"), patch.object(lane.subprocess, "Popen", return_value=process), \
+             patch.object(lane.os, "set_blocking"), patch.object(lane, "AgentProcesses", return_value=owned), \
+             patch.object(lane.os, "pidfd_open", create=True, return_value=888), \
+             patch.object(owned, "observe_fixed", return_value=({}, False)), \
+             patch.object(owned, "stop_fixed", side_effect=AssertionError("post-drain cleanup")), \
+             patch.object(owned, "close_fixed"), patch.object(lane, "_fleet_observation_drain", side_effect=drain) as drained, \
+             patch.object(lane.os, "waitid", create=True, return_value=object()), \
+             patch.object(lane.os, "WNOWAIT", 0, create=True), patch.object(select, "select", side_effect=select_ready), \
+             patch.object(lane.os, "read", side_effect=read), \
+             patch.object(lane.os, "write", side_effect=lambda fd, data: frames.append(data) or len(data)), \
+             patch.object(lane.os, "killpg", side_effect=AssertionError("reused group")) as group_signal, \
+             patch.object(lane.os, "_exit", side_effect=Finished):
+            with self.assertRaises(Finished):
+                lane._fleet_observation_custodian(["fixture"], {}, time.monotonic() + 12, 78, 79)
+            group_signal.assert_not_called(); drained.assert_called_once()
+        return json.loads(b"".join(frames))
+
+    def test_cleanup_only_escape_cannot_return_success(self):
+        result = self.custodian_result(late_escape=True)
+        self.assertTrue(result["drained"])
+        self.assertEqual(result["held"], "fleet-observer-detached-child")
+        self.assertNotIn("returncode", result)
+
+    def test_post_reap_output_fault_holds_without_resignaling_reused_group(self):
+        result = self.custodian_result(invalid_output=True)
+        self.assertTrue(result["drained"])
+        self.assertEqual(result["held"], "fleet-observer-output-invalid")
+        self.assertNotIn("returncode", result)
+
+
+class FleetObservationIdentityTest(unittest.TestCase):
+    @contextlib.contextmanager
+    def forbidden_effects(self):
+        with contextlib.ExitStack() as stack:
+            for target, name in ((Path, "exists"), (Path, "mkdir"), (Path, "write_text"), (Path, "chmod"),
+                                 (lane.subprocess, "run"), (lane.subprocess, "Popen")):
+                stack.enter_context(patch.object(target, name, side_effect=AssertionError("observation identity effect")))
+            stack.enter_context(patch.object(lane, "_fleet_observer_transport", return_value="/usr/bin/gh"))
+            yield
+
+    def test_exact_existing_context_loads_without_shim_or_path_changes(self):
+        for key, value in (("GH_TOKEN", "fixture-only"), ("GITHUB_TOKEN", "'fixture-only'")):
+            with self.subTest(key=key), tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"PATH": "/same-existing-route"}, clear=True):
+                path = Path(tmp) / "github.env"; path.write_text("# fixture only\nexport " + key + "=" + value + "\n")
+                with self.forbidden_effects():
+                    lane.load_github_env(path, _fleet_observation=True)
+                self.assertEqual(os.environ, {"PATH": "/same-existing-route", "GH_TOKEN": "fixture-only"})
+
+    def test_invalid_context_never_discovers_app_key_or_shim_or_uses_memory_fallback(self):
+        for contents in (b"", b"GH_TOKEN=\n", b"GH_TOKEN='unterminated\n", b"GH_TOKEN=$(anything)\n",
+                         b"GH_TOKEN=one\nGITHUB_TOKEN=two\n", b"OTHER=value\n", b"\xff", b"x" * 65537):
+            with self.subTest(case=len(contents)), tempfile.TemporaryDirectory() as tmp, \
+                 patch.dict(os.environ, {"GH_TOKEN": "unusable-memory-only", "PATH": "/unchanged"}, clear=True):
+                path = Path(tmp) / "github.env"; path.write_bytes(contents)
+                before = dict(os.environ)
+                with self.forbidden_effects(), self.assertRaises(lane.FleetObservationHeld):
+                    lane.load_github_env(path, _fleet_observation=True)
+                self.assertEqual(dict(os.environ), before)
+
+    def test_missing_unreadable_disappeared_and_special_context_are_truthful_bounded_holds(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "github.env"
+            with self.forbidden_effects(), self.assertRaisesRegex(lane.FleetObservationHeld, "context-missing"):
+                lane.load_github_env(path, _fleet_observation=True)
+            path.write_text("GH_TOKEN=fixture-only\n")
+            for error, reason in ((PermissionError(), "unreadable"), (FileNotFoundError(), "disappeared")):
+                with self.subTest(reason=reason), self.forbidden_effects(), \
+                     patch.object(lane.lifecycle, "_read_regular", side_effect=error), \
+                     self.assertRaisesRegex(lane.FleetObservationHeld, "context-" + reason):
+                    lane.load_github_env(path, _fleet_observation=True)
+            fifo = Path(tmp) / "fifo"; os.mkfifo(fifo)
+            link = Path(tmp) / "link"; link.symlink_to(path)
+            for special in (fifo, link, Path(tmp)):
+                with self.subTest(kind=special.name), self.forbidden_effects(), self.assertRaises(lane.FleetObservationHeld):
+                    lane.load_github_env(special, _fleet_observation=True)
+
+    def test_existing_shim_refusal_precedes_any_context_read(self):
+        with patch.object(lane, "_fleet_observer_transport", side_effect=lane.FleetObservationHeld("existing-route-unknown")), \
+             patch.object(lane.lifecycle, "_read_regular", side_effect=AssertionError("credential read")), \
+             patch.object(Path, "lstat", side_effect=AssertionError("credential metadata")):
+            with self.assertRaisesRegex(lane.FleetObservationHeld, "existing-route-unknown"):
+                lane.load_github_env(_fleet_observation=True)
+
+    def test_default_loader_explicit_and_app_shim_paths_retain_existing_behavior(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"PATH": "/original"}, clear=True), \
+             patch.object(lane, "_fleet_observer_transport", side_effect=AssertionError("changed default")):
+            path, key, shim = Path(tmp) / "github.env", Path(tmp) / "key.pem", Path(tmp) / "bin"
+            path.write_text("GH_TOKEN=fixture-only\n")
+            lane.load_github_env(path, key, shim)
+            self.assertEqual(os.environ["PATH"], "/original")
+            path.unlink(); key.write_text("fixture-only-not-a-real-key")
+            with patch.object(lane.shutil, "which", return_value="/fixture/gh"):
+                lane.load_github_env(path, key, shim)
+            self.assertEqual(os.environ["PATH"], str(shim) + os.pathsep + "/original")
+            self.assertIn("gh_app_token.py --guard", (shim / "gh").read_text())
+
+
+@unittest.skipUnless(sys.platform == "linux" and hasattr(os, "pidfd_open"), "fixed Linux PID-handle observation profile")
+class FleetObservationChildTest(unittest.TestCase):
+    @contextlib.contextmanager
+    def fixture(self, worker):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            worker_file, reader_file = root / "worker.py", root / "reader.py"
+            worker_file.write_text("import os,sys,time,json,signal,subprocess\nfrom pathlib import Path\n" + worker)
+            reader_file.write_text('''import importlib.util,sys,os,json,time
+from pathlib import Path
+sys.dont_write_bytecode=True
+source=Path(sys.argv[1]);sys.path.insert(0,str(source.parent))
+spec=importlib.util.spec_from_file_location("lane_runner",source)
+lane=importlib.util.module_from_spec(spec);sys.modules["lane_runner"]=lane;spec.loader.exec_module(lane)
+root=Path(sys.argv[2]); control=int(sys.argv[3]); command=[sys.executable,"-I","-B","-S","-X","pycache_prefix=/dev/null",str(root/"worker.py")]
+# Test-only private child: production factory has no CLI or receipt override.
+lane._fleet_observation_profile=lambda *_:(command,{"PATH":"/usr/bin:/bin","FIXTURE_ROOT":str(root)},time.monotonic()+8)
+try:
+ result=lane.run_agent(command,root,None,60,_fleet_observation=lane.FleetObservationRequest(time.monotonic(),control))
+ print(json.dumps({"code":result.returncode,"output":result.stdout}),flush=True)
+except lane.FleetObservationHeld as e:print(json.dumps({"held":str(e)}),flush=True)
+''')
+            read, write = os.pipe()
+            flags = fcntl.fcntl(read, fcntl.F_GETFL)
+            reader = subprocess.Popen([sys.executable, "-I", "-B", "-S", str(reader_file),
+                                       str(Path(lane.__file__).resolve()), str(root), str(read)],
+                                      stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                      pass_fds=(read,), text=True)
+            handles = []
+            try:
+                yield root, reader, read, write, flags, handles
+            finally:
+                if reader.poll() is None: reader.terminate()
+                try: reader.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    reader.kill(); reader.wait(timeout=5)
+                # Only actual test-created birth-pinned handles; cleanup never
+                # replaces the test's earlier gone/held assertion.
+                for fd in handles:
+                    try: signal.pidfd_send_signal(fd, signal.SIGKILL, None, 0)
+                    except ProcessLookupError: pass
+                    finally: os.close(fd)
+                for fd in (read, write):
+                    try: os.close(fd)
+                    except OSError: pass
+
+    def launched(self, root, handles):
+        path = root / "identity.json"
+        end = time.monotonic() + 5
+        while time.monotonic() < end:
+            if path.exists():
+                try: row = json.loads(path.read_text())
+                except ValueError: continue
+                for pid in row["pids"]:
+                    handles.append(os.pidfd_open(pid, 0))
+                return row
+            time.sleep(.01)
+        self.fail("private observation did not start")
+
+    def assert_gone(self, handles):
+        import select
+        deadline = time.monotonic() + 6
+        while time.monotonic() < deadline:
+            if all(select.select([fd], [], [], 0)[0] for fd in handles): return
+            time.sleep(.01)
+        self.fail("test-owned observer identity remains alive")
+
+    def test_pending_coalesced_control_bytes_flags_and_unrelated_process_are_preserved(self):
+        worker = '''root=Path(os.environ["FIXTURE_ROOT"])
+fds=[]
+for name in os.listdir("/proc/self/fd"):
+ try:os.readlink("/proc/self/fd/"+name);fds.append(int(name))
+ except FileNotFoundError:pass
+print(json.dumps({"fds":fds}),flush=True)
+'''
+        unrelated = subprocess.Popen([sys.executable, "-c", "import time;time.sleep(30)"])
+        try:
+            with self.fixture(worker) as (root, reader, read, write, flags, handles):
+                payload = b'{"op":"lock"}\n{"op":"check"}\n'
+                os.write(write, payload)
+                output, errors = reader.communicate(timeout=10)
+                self.assertEqual(reader.returncode, 0, errors)
+                value = json.loads(output)
+                self.assertEqual(value["code"], 0)
+                self.assertLessEqual(set(json.loads(value["output"])["fds"]), {0, 1, 2})
+                self.assertEqual(os.read(read, len(payload)), payload)
+                self.assertEqual(fcntl.fcntl(read, fcntl.F_GETFL), flags)
+                self.assertIsNone(unrelated.poll())
+        finally:
+            unrelated.terminate(); unrelated.wait(timeout=5)
+
+    def test_fixed_cache_prefix_ignores_hostile_valid_bytecode_without_mutating_cache(self):
+        import py_compile
+        worker = '''root=Path(os.environ["FIXTURE_ROOT"])
+while not (root/"ready").exists():time.sleep(.005)
+sys.path.insert(0,str(root))
+import payload
+print(json.dumps({"value":payload.VALUE,"prefix":sys.pycache_prefix,"noWrites":sys.dont_write_bytecode}),flush=True)
+'''
+        with self.fixture(worker) as (root, reader, read, write, flags, handles):
+            source = root / "payload.py"; source.write_text("VALUE='unreviewed'\n")
+            cache = Path(py_compile.compile(str(source), invalidation_mode=py_compile.PycInvalidationMode.UNCHECKED_HASH))
+            source.write_text("VALUE='reviewed'\n")
+            before = {str(path.relative_to(root)): hashlib.sha256(path.read_bytes()).hexdigest()
+                      for path in (source, *cache.parent.iterdir())}
+            (root / "ready").touch()
+            output, errors = reader.communicate(timeout=10)
+            value = json.loads(output)
+            self.assertEqual(value["code"], 0, errors)
+            self.assertEqual(json.loads(value["output"]), {"value": "reviewed", "prefix": "/dev/null", "noWrites": True})
+            after = {str(path.relative_to(root)): hashlib.sha256(path.read_bytes()).hexdigest()
+                     for path in (source, *cache.parent.iterdir())}
+            self.assertEqual(after, before)
+
+    def test_parent_eof_behind_pending_bytes_drains_without_consuming_protocol(self):
+        worker = '''root=Path(os.environ["FIXTURE_ROOT"])
+(root/"identity.json").write_text(json.dumps({"pids":[os.getpid()]}))
+time.sleep(30)
+'''
+        with self.fixture(worker) as (root, reader, read, write, flags, handles):
+            self.launched(root, handles)
+            payload = b'{"op":"lock"}\n{"op":"check"}\n'
+            os.write(write, payload); os.close(write)
+            output, errors = reader.communicate(timeout=10)
+            self.assertEqual(json.loads(output)["held"], "fleet-observer-parent-control-closed", errors)
+            self.assertEqual(os.read(read, len(payload)), payload)
+            self.assert_gone(handles)
+
+    def test_timeout_drains_nested_term_refusal_before_its_shared_deadline(self):
+        worker = '''root=Path(os.environ["FIXTURE_ROOT"])
+signal.signal(signal.SIGTERM,signal.SIG_IGN)
+child=subprocess.Popen([sys.executable,"-I","-B","-S","-c","import signal,time;signal.signal(signal.SIGTERM,signal.SIG_IGN);time.sleep(30)"])
+(root/"identity.json").write_text(json.dumps({"pids":[os.getpid(),child.pid]}))
+time.sleep(30)
+'''
+        with self.fixture(worker) as (root, reader, read, write, flags, handles):
+            self.launched(root, handles)
+            started = time.monotonic()
+            output, errors = reader.communicate(timeout=10)
+            self.assertEqual(json.loads(output)["held"], "fleet-observer-timeout", errors)
+            self.assertLess(time.monotonic() - started, 8)
+            self.assert_gone(handles)
+
+    def test_reader_term_and_kill_leave_a_surviving_custodian_that_drains(self):
+        worker = '''root=Path(os.environ["FIXTURE_ROOT"])
+(root/"identity.json").write_text(json.dumps({"pids":[os.getpid()]}))
+time.sleep(30)
+'''
+        for sig in (signal.SIGTERM, signal.SIGKILL):
+            with self.subTest(signal=sig), self.fixture(worker) as (root, reader, read, write, flags, handles):
+                self.launched(root, handles)
+                reader.send_signal(sig); reader.wait(timeout=5)
+                self.assert_gone(handles)
+
+    def test_pre_snapshot_detach_is_held_and_actual_adopted_child_is_drained(self):
+        worker = '''root=Path(os.environ["FIXTURE_ROOT"])
+child=subprocess.Popen([sys.executable,"-I","-B","-S","-c","import time;time.sleep(30)"],start_new_session=True)
+(root/"identity.json").write_text(json.dumps({"pids":[child.pid]}))
+time.sleep(30)
+'''
+        with self.fixture(worker) as (root, reader, read, write, flags, handles):
+            self.launched(root, handles)
+            output, errors = reader.communicate(timeout=10)
+            self.assertEqual(json.loads(output)["held"], "fleet-observer-detached-child", errors)
+            self.assert_gone(handles)
+
+
 if __name__ == "__main__":
     unittest.main()
 

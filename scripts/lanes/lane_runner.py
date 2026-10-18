@@ -2385,6 +2385,403 @@ class AgentProcesses:
         raise RuntimeError("owned-processes-still-running")
 
 
+    def observe_fixed(self, deadline):
+        """This custodian's exact Linux births, never environment/name matching.
+
+        Reuse the maintained proc-stat identity reader, not the self-test scope
+        marker, environment census or its cleanup authority. Default observe and
+        stop remain byte-exact. The root is never reaped while ownership is read.
+        """
+        handles = self.__dict__.setdefault("_fixed_handles", {})
+        rows = {}
+        for entry in Path("/proc").iterdir():
+            if time.monotonic() >= deadline:
+                raise FleetObservationHeld("fleet-observer-process-read-deadline")
+            if entry.name.isdecimal():
+                row = _selftest_process_row(entry, int(entry.name), os.getuid())
+                if row is not None: rows[int(entry.name)] = row
+        live = {pid for pid, birth in self.owned.items() if pid in rows and rows[pid][3] == birth}
+        if not self.owned and self.pid in rows: live.add(self.pid)
+        while True:
+            children = {pid for pid, row in rows.items()
+                        if row[0] in live or row[0] == self._fixed_custodian
+                        or (not self.__dict__.get("_fixed_leader_reaped", False) and row[1] == self.pid)}
+            if children <= live: break
+            live |= children
+        escaped = any(rows[pid][1] != self.pid for pid in live)
+        self._fixed_escaped = self.__dict__.get("_fixed_escaped", False) or escaped
+        for pid in live:
+            row = rows[pid]
+            if pid in self.owned and self.owned[pid] != row[3]:
+                raise FleetObservationHeld("fleet-observer-birth-changed")
+            if pid not in handles:
+                try:
+                    fd = os.pidfd_open(pid, 0)
+                except ProcessLookupError:
+                    if _selftest_process_row(Path("/proc") / str(pid), pid, os.getuid()) is None:
+                        continue
+                    raise FleetObservationHeld("fleet-observer-signal-identity-unavailable") from None
+                after = _selftest_process_row(Path("/proc") / str(pid), pid, os.getuid())
+                if after is None:
+                    os.close(fd)
+                    continue
+                if after[3] != row[3]:
+                    os.close(fd)
+                    raise FleetObservationHeld("fleet-observer-signal-identity-changed")
+                handles[pid] = fd
+            self.owned[pid] = row[3]
+        return {pid: rows[pid] for pid in live if not rows[pid][2].startswith("Z")}, self._fixed_escaped
+
+    def stop_fixed(self, deadline):
+        """TERM/KILL and actual drain fit within the one fixed profile deadline."""
+        import signal
+        term_until = min(time.monotonic() + 2, deadline - 1)
+        sent = set()
+        while time.monotonic() < deadline:
+            rows, _ = self.observe_fixed(deadline)
+            if not rows: return
+            sig = signal.SIGTERM if time.monotonic() < term_until else signal.SIGKILL
+            for pid, row in rows.items():
+                if (pid, row[3], sig) in sent: continue
+                current = _selftest_process_row(Path("/proc") / str(pid), pid, os.getuid())
+                if current is None or current[2].startswith("Z"): continue
+                if current[3] != row[3]:
+                    raise FleetObservationHeld("fleet-observer-signal-identity-changed")
+                signal.pidfd_send_signal(self._fixed_handles[pid], sig, None, 0)
+                sent.add((pid, row[3], sig))
+            time.sleep(min(.01, max(0, deadline - time.monotonic())))
+        raise FleetObservationHeld("fleet-observer-cleanup-unproven")
+
+    def close_fixed(self):
+        for fd in self.__dict__.pop("_fixed_handles", {}).values(): os.close(fd)
+
+
+class FleetObservationHeld(RuntimeError):
+    """A fixed read observer has no launch, observation or cleanup authority."""
+
+
+@dataclass(frozen=True)
+class FleetObservationRequest:
+    # In-process only, from the existing writer protocol, never CLI/JSON input.
+    preparation_started: float
+    control_fd: int | None = None
+
+
+FLEET_OBSERVER_EXECUTABLES = {
+    "/usr/bin/python3.12": "1643dacd9feaedc58f3cc581e4d22577dfe25c09b10282936186ccf0f2e61118",
+    "/usr/bin/gh": "56b8bbbb27b066ecb33dbef9a256dc9d1314adaeff0908a752feba6c34053b40",
+    "/usr/bin/git": "2a8c18fbf43da9f692d75474c72bea9dfd796c260b0f3dfe456376abc3bbd668",
+    "/usr/bin/systemctl": "7ba82b5ba146759c710e1b80fadaa3fdbc0f9b85c8fb2c8c3196b7b1a0037ef8",
+}
+FLEET_OBSERVER_SOURCES = ("gem-priority-gate.py", "closure_health.py", "gem_gate_contract.py",
+                          "summer_ci_audit.py", "symphony_proof_context.py")
+
+
+def _fleet_observer_executable(name):
+    """Verify the actual existing route; never replace a shim by changing PATH."""
+    path = Path("/usr/bin") / name
+    expected = FLEET_OBSERVER_EXECUTABLES.get(str(path))
+    try:
+        actual = shutil.which(name)
+        if not expected or actual is None or Path(actual).resolve(strict=True) != path:
+            raise FleetObservationHeld("fleet-observer-existing-executable-route-unknown")
+        info = path.lstat()
+        raw, opened = lifecycle._read_regular(path, 64 * 1024 * 1024)
+        if (info.st_uid != 0 or info.st_mode & 0o6022 or raw[:4] != b"\x7fELF"
+                or opened.st_uid != 0 or opened.st_mode & 0o6022
+                or hashlib.sha256(raw).hexdigest() != expected):
+            raise FleetObservationHeld("fleet-observer-executable-closure-changed")
+    except OSError:
+        raise FleetObservationHeld("fleet-observer-executable-unavailable") from None
+    return str(path)
+
+
+def _fleet_observer_transport():
+    if any(key.startswith(("LD_", "DYLD_")) or key in {"BASH_ENV", "ENV"} for key in os.environ):
+        raise FleetObservationHeld("fleet-observer-loader-environment-unknown")
+    if os.environ.get("GH_HOST", "github.com") != "github.com":
+        raise FleetObservationHeld("fleet-observer-existing-explicit-github-identity-required")
+    return _fleet_observer_executable("gh")
+
+
+def _fleet_observation_profile(cmd, cwd, request):
+    """Fail before forking on an unknown fixed source/OS/transport closure.
+
+    This exact Gem executable baseline is private pending Native review. A changed
+    binary is a qualification hold, never a fallback to a wrapper or another login.
+    No supplied packet, arbitrary command or environment marks a profile trusted.
+    """
+    import ast
+    import signal
+    import threading
+    now = time.monotonic()
+    if (type(request) is not FleetObservationRequest or type(request.preparation_started) not in (int, float)
+            or not math.isfinite(request.preparation_started) or not 0 <= now - request.preparation_started < 50
+            or sys.platform != "linux" or threading.active_count() != 1
+            or not all(callable(getattr(os, name, None)) for name in ("fork", "waitid", "pidfd_open"))
+            or not callable(getattr(signal, "pidfd_send_signal", None)) or not hasattr(os, "WNOWAIT")):
+        raise FleetObservationHeld("fleet-observer-platform-or-preparation-unavailable")
+    if request.control_fd is not None and (type(request.control_fd) is not int or request.control_fd < 0
+            or not stat.S_ISFIFO(os.fstat(request.control_fd).st_mode)
+            or fcntl.fcntl(request.control_fd, fcntl.F_GETFL) & os.O_ACCMODE != os.O_RDONLY):
+        raise FleetObservationHeld("fleet-observer-explicit-control-pipe-required")
+    state = Path.home() / ".local/state/jovie-lanes"
+    if lifecycle.active() or lifecycle.FD_ENV in os.environ or (state / "current").resolve() != HERE:
+        raise FleetObservationHeld("fleet-observer-canonical-reader-required")
+    gate = HERE.parent / "fleet-gate/gem-priority-gate.py"
+    fixed = [sys.executable, "-I", "-B", "-S", "-X", "pycache_prefix=/dev/null", str(gate), "--observe-work-admission"]
+    if list(cmd) != fixed or Path(cwd) != HERE:
+        raise FleetObservationHeld("fleet-observer-fixed-command-required")
+    _fleet_observer_transport()
+    if not (os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")):
+        raise FleetObservationHeld("fleet-observer-existing-explicit-github-identity-required")
+    # Keep the caller's existing explicit credential; do not fall through to a
+    # minting shim, CLI account lookup or another account. Values never leave env.
+    env = dict(os.environ)
+    for name in FLEET_OBSERVER_EXECUTABLES:
+        _fleet_observer_executable(Path(name).name)
+    if Path(sys.executable).resolve() != Path("/usr/bin/python3.12"):
+        raise FleetObservationHeld("fleet-observer-interpreter-closure-changed")
+    raw, _ = lifecycle._read_regular(HERE / ".release.json", 65536)
+    manifest = lifecycle.validate_release(HERE.parent.parent, json.loads(raw))
+    siblings = {name[:-3] for name in FLEET_OBSERVER_SOURCES}
+    # -B disables writes only. The fixed prefix below the existing null device
+    # prevents bytecode reads too, without deleting a canonical cache.
+    null = Path("/dev/null").lstat()
+    dev = Path("/dev").lstat()
+    if (not stat.S_ISCHR(null.st_mode) or null.st_uid != 0 or null.st_rdev != os.makedev(1, 3)
+            or not stat.S_ISDIR(dev.st_mode) or dev.st_uid != 0 or dev.st_mode & 0o22):
+        raise FleetObservationHeld("fleet-observer-bytecode-boundary-unknown")
+    from importlib.machinery import PathFinder, SourceFileLoader, all_suffixes
+    allowed = {*FLEET_OBSERVER_SOURCES, "scoped_admission.py"}
+    if any(path.name != "__pycache__" and (path.is_dir() and any((path / ("__init__" + suffix)).exists() for suffix in all_suffixes())
+           or any(path.name.endswith(suffix) for suffix in all_suffixes())) and path.name not in allowed
+           for path in gate.parent.iterdir()):
+        raise FleetObservationHeld("fleet-observer-shadow-import-unknown")
+    for name in FLEET_OBSERVER_SOURCES:
+        relative = "scripts/fleet-gate/" + name
+        if relative not in manifest["objects"]:
+            raise FleetObservationHeld("fleet-observer-import-not-manifest-bound")
+        if name != "gem-priority-gate.py":
+            spec = PathFinder.find_spec(name[:-3], [str(gate.parent)])
+            if (spec is None or type(spec.loader) is not SourceFileLoader
+                    or spec.submodule_search_locations is not None or spec.origin != str(gate.parent / name)):
+                raise FleetObservationHeld("fleet-observer-shadow-import-unknown")
+        source, _ = lifecycle._read_regular(gate.parent / name)
+        tree = ast.parse(source)
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                imports = [node.module] if isinstance(node, ast.ImportFrom) else [alias.name for alias in node.names]
+                for value in imports:
+                    module = (value or "").split(".")[0]
+                    if module in siblings: continue
+                    if module in sys.stdlib_module_names:
+                        if PathFinder.find_spec(module, [str(gate.parent)]) is not None:
+                            raise FleetObservationHeld("fleet-observer-shadow-import-unknown")
+                        continue
+                    # Existing closure policy has an explicit ImportError
+                    # fallback for this optional registry. Never silently drop
+                    # a present registry by adding -S; a present/ambiguous module
+                    # needs its own source binding before this profile may run.
+                    if module == "gem_repo_registry" and importlib.util.find_spec(module) is None:
+                        continue
+                    raise FleetObservationHeld("fleet-observer-import-closure-unknown")
+            if isinstance(node, ast.Call):
+                function = ast.unparse(node.func)
+                if (function in {"os.fork", "os.forkpty", "os.setsid", "os.setpgid", "os.system", "eval", "exec", "__import__"}
+                        or function.startswith(("os.spawn", "os.exec"))
+                        or any(k.arg in {"shell", "start_new_session", "preexec_fn"} and not isinstance(k.value, ast.Constant)
+                               or k.arg in {"shell", "start_new_session", "preexec_fn"} and bool(k.value.value)
+                               for k in node.keywords)):
+                    raise FleetObservationHeld("fleet-observer-nondetaching-closure-unknown")
+        if name == "gem-priority-gate.py":
+            observe = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "observe_signals")
+            entry = next(value for node in ast.walk(observe) if isinstance(node, ast.Dict)
+                         for key, value in zip(node.keys, node.values)
+                         if isinstance(key, ast.Constant) and key.value == "lease")
+            if (not isinstance(entry, ast.IfExp) or ast.unparse(entry.test) != "_WORK_OBSERVATION_ONLY.get()"
+                    or not isinstance(entry.body, ast.Dict)
+                    or any(isinstance(n, ast.Call) for n in ast.walk(entry.body))):
+                raise FleetObservationHeld("fleet-observer-guard-bin-closure-not-excluded")
+    deadline = request.preparation_started + 60
+    if deadline - time.monotonic() < 10:
+        raise FleetObservationHeld("fleet-observer-drain-reserve-exhausted")
+    return fixed, env, deadline
+
+
+def _fleet_observation_drain(owned, process, deadline):
+    """ECHILD, not a zero waitpid result, proves this subreaper has no child."""
+    if not owned.__dict__.get("_fixed_leader_reaped", False):
+        owned.stop_fixed(deadline)
+        owned._fixed_returncode = process.wait(timeout=max(.001, deadline - time.monotonic()))
+        owned._fixed_leader_reaped = True
+    while time.monotonic() < deadline:
+        # A fork/adoption can complete after the preceding /proc enumeration.
+        # Once root is reaped its numeric PGID is no longer an ownership witness.
+        owned.stop_fixed(deadline)
+        try:
+            if os.waitpid(-1, os.WNOHANG)[0] == 0:
+                time.sleep(min(.01, max(0, deadline - time.monotonic())))
+        except ChildProcessError:
+            return owned._fixed_returncode
+    raise FleetObservationHeld("fleet-observer-cleanup-unproven")
+
+
+def _fleet_observation_custodian(command, env, deadline, live_fd, result_fd):
+    """One ephemeral child custodian; no lifecycle, canonical state or retries.
+
+    Linux child-subreaping detects even a pre-snapshot detached orphan as a
+    contract violation. It is not containment against custodian SIGKILL.
+    """
+    import ctypes
+    import select
+    import signal
+    process, owned, payload, cancelled = None, None, bytearray(), [False]
+    result = {"held": "fleet-observer-cleanup-unproven", "drained": False}
+    try:
+        os.setsid()
+        # Close every inherited FD except this invocation's two private ends.
+        for name in os.listdir("/proc/self/fd"):
+            fd = int(name)
+            if fd not in {live_fd, result_fd}:
+                try: os.close(fd)
+                except OSError: pass
+        libc = ctypes.CDLL(None, use_errno=True)
+        if libc.prctl(36, 1, 0, 0, 0) != 0:  # PR_SET_CHILD_SUBREAPER, this process only
+            raise FleetObservationHeld("fleet-observer-subreaper-unavailable")
+        def cancel(*_): cancelled[0] = True
+        signal.signal(signal.SIGTERM, cancel)
+        signal.signal(signal.SIGINT, cancel)
+        signal.signal(signal.SIGCHLD, signal.SIG_DFL)
+        process = subprocess.Popen(command, cwd=HERE, env=env, stdin=subprocess.DEVNULL,
+                                   stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                                   close_fds=True, start_new_session=True)
+        owned = AgentProcesses(process.pid)
+        owned._fixed_custodian = os.getpid()
+        # A direct, unreaped child cannot have its PID recycled at this point.
+        # Retain its kernel handle before any observation/output failure.
+        owned._fixed_handles = {process.pid: os.pidfd_open(process.pid, 0)}
+        os.set_blocking(process.stdout.fileno(), False)
+        observer_end = deadline - 5
+        failure = None
+        terminal = False
+        while time.monotonic() < deadline:
+            rows, escaped = owned.observe_fixed(deadline)
+            if escaped: failure = "fleet-observer-detached-child"
+            if cancelled[0] or select.select([live_fd], [], [], 0)[0]:
+                failure = "fleet-observer-parent-closed"
+            if time.monotonic() >= observer_end: failure = failure or "fleet-observer-timeout"
+            chunk = os.read(process.stdout.fileno(), 262145 - len(payload)) if select.select([process.stdout], [], [], 0)[0] else b""
+            payload.extend(chunk)
+            if len(payload) > 262144: failure = "fleet-observer-output-bound"
+            terminal = os.waitid(os.P_PID, process.pid, os.WEXITED | os.WNOHANG | os.WNOWAIT) is not None
+            if failure or terminal:
+                code = _fleet_observation_drain(owned, process, deadline)
+                result["drained"] = True
+                if owned.__dict__.get("_fixed_escaped", False):
+                    failure = failure or "fleet-observer-detached-child"
+                if not failure:
+                    while True:
+                        chunk = os.read(process.stdout.fileno(), 262145 - len(payload))
+                        if not chunk: break
+                        payload.extend(chunk)
+                        if len(payload) > 262144: raise FleetObservationHeld("fleet-observer-output-bound")
+                    result = {"returncode": code, "stdout": payload.decode("utf-8"), "drained": True}
+                else:
+                    result = {"held": failure, "drained": True}
+                break
+            select.select([live_fd, process.stdout], [], [], min(.02, max(0, observer_end - time.monotonic())))
+    except BaseException as error:
+        # Do not expose raw exceptions, environments, subprocess stderr or data.
+        result["held"] = (str(error) if isinstance(error, FleetObservationHeld)
+                          else "fleet-observer-output-invalid" if isinstance(error, UnicodeDecodeError)
+                          else "fleet-observer-observation-unavailable")
+        if owned is not None and not result["drained"] and time.monotonic() < deadline:
+            try:
+                _fleet_observation_drain(owned, process, deadline)
+                result["drained"] = True
+            except BaseException: pass
+        if owned is not None and not result["drained"]:
+            # Kernel handles never retarget a recycled PID/PGID, including a
+            # failure during wait itself. Unknown visibility remains held;
+            # best-effort signals cannot be represented as proven drain.
+            for handle in owned.__dict__.get("_fixed_handles", {}).values():
+                try: signal.pidfd_send_signal(handle, signal.SIGKILL, None, 0)
+                except OSError: pass
+    finally:
+        if owned is not None: owned.close_fixed()
+        try:
+            frame = json.dumps(result, separators=(",", ":")).encode()
+            if len(frame) > 1048576:
+                frame = json.dumps({"held": "fleet-observer-result-bound", "drained": result["drained"]}).encode()
+            offset = 0
+            while offset < len(frame) and time.monotonic() < deadline:
+                if select.select([], [result_fd], [], max(0, deadline - time.monotonic()))[1]:
+                    try: offset += os.write(result_fd, frame[offset:])
+                    except BlockingIOError: continue
+        except OSError: pass  # dead reader never receives a positive outcome
+        os._exit(0)
+
+
+def _run_fleet_observation(cmd, cwd, request):
+    """Fixed-profile arm of run_agent; the default provider path is unchanged."""
+    import select
+    command, env, deadline = _fleet_observation_profile(cmd, cwd, request)
+    control = live_r = live_w = result_r = result_w = None
+    pid = None
+    outcome = bytearray()
+    cancelled = False
+    eof = False
+    try:
+        control = os.dup(request.control_fd) if request.control_fd is not None else None
+        live_r, live_w = os.pipe2(os.O_CLOEXEC | os.O_NONBLOCK)
+        result_r, result_w = os.pipe2(os.O_CLOEXEC | os.O_NONBLOCK)
+        watch = select.poll()
+        # POLLHUP is observable even behind queued control bytes. Never consume
+        # or mistake POLLIN/request-body EOF for this explicit writer protocol.
+        if control is not None: watch.register(control, select.POLLHUP | select.POLLERR)
+        if watch.poll(0): raise FleetObservationHeld("fleet-observer-control-unavailable")
+        pid = os.fork()
+        if pid == 0:
+            try:
+                os.close(live_w); os.close(result_r)
+                if control is not None: os.close(control)
+                _fleet_observation_custodian(command, env, deadline, live_r, result_w)
+            finally:
+                os._exit(1)
+        os.close(live_r); live_r = None
+        os.close(result_w); result_w = None
+        while time.monotonic() < deadline:
+            if watch.poll(0) and not cancelled:
+                cancelled = True
+                os.close(live_w); live_w = None
+            ready, _, _ = select.select([result_r], [], [], min(.02, max(0, deadline - time.monotonic())))
+            if ready:
+                chunk = os.read(result_r, 1048577 - len(outcome))
+                if not chunk:
+                    eof = True
+                    break
+                outcome.extend(chunk)
+                if len(outcome) > 1048576: raise FleetObservationHeld("fleet-observer-result-bound")
+        if cancelled: raise FleetObservationHeld("fleet-observer-parent-control-closed")
+        if not eof: raise FleetObservationHeld("fleet-observer-custodian-deadline")
+        try: value = json.loads(outcome)
+        except ValueError: raise FleetObservationHeld("fleet-observer-custodian-unavailable") from None
+        if value.get("drained") is not True or "held" in value:
+            raise FleetObservationHeld(value.get("held", "fleet-observer-cleanup-unproven"))
+        return subprocess.CompletedProcess(command, value["returncode"], value["stdout"], "")
+    finally:
+        for fd in (control, live_r, live_w, result_r, result_w):
+            if fd is not None:
+                try: os.close(fd)
+                except OSError: pass
+        if pid is not None:
+            # Bounded reap only; killing the custodian would discard custody.
+            while time.monotonic() < deadline:
+                if os.waitpid(pid, os.WNOHANG)[0]: break
+                time.sleep(.005)
+
+
 class RunStopped(BaseException):
     """SIGTERM/SIGINT while a provider runs: the caller's `on_kill` revokes publication
     before the owned process tree is killed."""
@@ -2397,7 +2794,7 @@ class CommandNotStarted(OSError):
 def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
               guard_interval: float = 30, on_kill=None,
               _lifecycle_helper: bool = False, _lifecycle_terminal: bool = False,
-              stderr=subprocess.STDOUT) -> subprocess.CompletedProcess:
+              stderr=subprocess.STDOUT, _fleet_observation=None) -> subprocess.CompletedProcess:
     """Track descendants while the provider runs, including detached test sessions.
     Observation cannot recover a child that daemonizes before its first snapshot;
     preserved checkout admission therefore also refuses live working directories.
@@ -2406,6 +2803,11 @@ def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
     (timeout, guard hold, SIGTERM/SIGINT) writes its revocation receipt first, so a
     stopped run can never be published later (JOV-5060).
     """
+    if _fleet_observation is not None:
+        if (timeout != 60 or log is not None or guard is not None or on_kill is not None
+                or _lifecycle_helper or _lifecycle_terminal or stderr != subprocess.STDOUT):
+            raise FleetObservationHeld("fleet-observer-fixed-profile-required")
+        return _run_fleet_observation(cmd, cwd, _fleet_observation)
     import signal
     free_guard = devin_free_policy.command_guard(cmd, timeout)
     if free_guard:
@@ -8708,7 +9110,7 @@ def install_release(host: Host, *, operator=None) -> int:
 
 def load_github_env(path: Path = Path.home() / ".config/jovie-lanes/github.env",
                     app_key: Path = Path.home() / ".config/jovie-lanes/jovie-bot.pem",
-                    shim_dir: Path | None = None) -> None:
+                    shim_dir: Path | None = None, *, _fleet_observation: bool = False) -> None:
     """A host-specific GitHub identity so each host spends its own API budget instead of everyone
     sharing Tim's token (its secondary limit throttled every lane on 2026-09-27, JOV-6878).
     An explicit GH_TOKEN in github.env wins; otherwise, with the Jovie Bot app key present, a `gh`
@@ -8716,6 +9118,41 @@ def load_github_env(path: Path = Path.home() / ".config/jovie-lanes/github.env",
     the agents' own, so a long run never outlives its token. Calls aimed at a different GH_HOST
     (offline harnesses, other enterprises) keep the caller's credentials — the bot token is a
     github.com installation token and would be wrong there."""
+    if _fleet_observation:
+        # Only the existing fixed observer. Even an in-memory token cannot
+        # permit a minting shim or any app-key/token/CLI account fallback.
+        _fleet_observer_transport()
+        try:
+            path.lstat()
+        except FileNotFoundError:
+            raise FleetObservationHeld("fleet-observer-explicit-context-missing") from None
+        except OSError:
+            raise FleetObservationHeld("fleet-observer-explicit-context-unreadable") from None
+        try:
+            raw, _ = lifecycle._read_regular(path, 65536)
+            tokens = []
+            for line in raw.decode("utf-8").splitlines():
+                line = line.strip()
+                if not line or line.startswith("#"): continue
+                match = re.fullmatch(r"(?:export )?([A-Za-z_][A-Za-z0-9_]*)=(.*)", line)
+                if match is None:
+                    raise ValueError("malformed context")
+                if match[1] not in ("GH_TOKEN", "GITHUB_TOKEN"): continue
+                value = match[2]
+                if len(value) >= 2 and value[0] in {"'", '"'} and value[-1] == value[0]: value = value[1:-1]
+                if not re.fullmatch(r"[A-Za-z0-9_.-]{1,4096}", value):
+                    raise ValueError("malformed explicit context")
+                tokens.append(value)
+            if len(tokens) != 1:
+                raise ValueError("missing or ambiguous explicit context")
+        except FileNotFoundError:
+            raise FleetObservationHeld("fleet-observer-explicit-context-disappeared") from None
+        except OSError:
+            raise FleetObservationHeld("fleet-observer-explicit-context-unreadable") from None
+        except (ValueError, lifecycle.AdmissionHeld):
+            raise FleetObservationHeld("fleet-observer-explicit-context-invalid") from None
+        os.environ["GH_TOKEN"] = tokens[0]
+        return
     try:
         for line in path.read_text().splitlines():
             key, _, value = line.strip().removeprefix("export ").partition("=")
