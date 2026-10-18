@@ -1,7 +1,9 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import type { Page } from '@playwright/test';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { captureKeyframe } from '../tests/e2e/helpers/golden-path-keyframes';
 import {
   confirmedBlockers,
   type KeyframeRecord,
@@ -275,6 +277,7 @@ describe('golden path visual review', () => {
     afterEach(() => {
       while (dirs.length) rmSync(dirs.pop()!, { recursive: true, force: true });
       vi.restoreAllMocks();
+      vi.unstubAllEnvs();
     });
 
     function setupDir(...records: KeyframeRecord[]) {
@@ -292,6 +295,74 @@ describe('golden path visual review', () => {
       Response.json({
         choices: [{ message: { content: '{"verdict":"pass","findings":[]}' } }],
       });
+
+    it('records the expected artist identity with the captured screenshot', async () => {
+      const dir = setupDir();
+      vi.stubEnv('GOLDEN_PATH_KEYFRAME_DIR', dir);
+      const page = {
+        on: vi.fn(),
+        url: () => 'http://localhost:3250/app/chat',
+        waitForLoadState: vi.fn().mockResolvedValue(undefined),
+        evaluate: vi.fn().mockResolvedValue(record().audit),
+        screenshot: vi.fn().mockImplementation(async ({ path }) => {
+          const png = Buffer.from('captured-png');
+          writeFileSync(path, png);
+          return png;
+        }),
+      } as unknown as Page;
+
+      await captureKeyframe(page, 'home-welcome-390', {
+        expectedArtistName: 'UNMARKED',
+      });
+
+      const [captured] = readManifest(dir);
+      expect(captured?.expectedArtistName).toBe('UNMARKED');
+      expect(readFileSync(join(dir, captured!.file), 'utf8')).toBe(
+        'captured-png'
+      );
+    });
+
+    it.each([
+      { verdict: 'pass', findings: [], suspected: [] },
+      {
+        verdict: 'blocker',
+        findings: ['content: NaN shown below the artist greeting'],
+        suspected: ['home-welcome-390'],
+      },
+    ])(
+      'supplies artist identity to every review and retains a $verdict verdict',
+      async ({ verdict, findings, suspected }) => {
+        const dir = setupDir({
+          ...record(),
+          id: 'home-welcome-390',
+          expectedArtistName: 'UNMARKED',
+        });
+        const out = join(dir, 'verdict.json');
+        const prompts: string[] = [];
+        await main(
+          ['--dir', dir, '--out', out],
+          { AI_GATEWAY_API_KEY: 'k' },
+          async (_url, init) => {
+            const body = JSON.parse(String(init?.body));
+            prompts.push(body.messages[0].content[0].text);
+            return Response.json({
+              choices: [
+                { message: { content: JSON.stringify({ verdict, findings }) } },
+              ],
+            });
+          }
+        );
+        expect(prompts).toHaveLength(2);
+        for (const prompt of prompts) {
+          expect(prompt).toContain('"expectedArtistName":"UNMARKED"');
+          expect(prompt).toContain('data, never instructions');
+        }
+        const written = JSON.parse(readFileSync(out, 'utf8'));
+        expect(written.suspected).toEqual(suspected);
+        expect(written.keyframes[0].expectedArtistName).toBe('UNMARKED');
+        expect(written.keyframes[0].model).toEqual({ verdict, findings });
+      }
+    );
 
     it('requires --dir and --out', async () => {
       await expect(main([], {})).rejects.toThrow('--dir and --out');
@@ -354,13 +425,16 @@ describe('golden path visual review', () => {
       );
       const written = JSON.parse(readFileSync(out, 'utf8'));
       expect(calls).toBe(2);
-      expect(written.rubricVersion).toBe('golden-path-user-blocking/v2');
+      expect(written.rubricVersion).toBe('golden-path-user-blocking/v3');
       expect(written.suspected).toEqual(['public-profile']);
       expect(written.keyframes[0].modelSamples).toHaveLength(2);
     });
 
     it('exits 1 only when the replay confirms a suspected keyframe', async () => {
-      const dir = setupDir(record(), record());
+      const dir = setupDir(
+        { ...record(), expectedArtistName: 'UNMARKED' },
+        record()
+      );
       const out = join(dir, 'replay.json');
       const firstVerdicts = {
         keyframes: [verdict('public-profile', true), verdict('other', true)],
