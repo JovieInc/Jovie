@@ -12,12 +12,12 @@
   {
     "file": ".claude/rules/code-style.md",
     "paths": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "**/*.cjs"],
-    "bodySha256": "2d377b00193d605a7b5edafcfd64d2fb75bf87fe426bdb6bbf2267c2d15af609"
+    "bodySha256": "9d9f1b83a05934600725671aebde9439c79e2e9f81ce9dc18304cdb5c8d99722"
   },
   {
     "file": ".claude/rules/db.md",
     "paths": ["**/db/**", "**/drizzle/**", "**/migrations/**", "**/queries/**"],
-    "bodySha256": "4e1b3dc1066ae0ce224369eac942cbc97d07e4d30c518c47ec1885ff429688b0"
+    "bodySha256": "dd8a0de6daeb7b37b8507fd9c2f6ea6e19ada223aad91f1adf9ea7c612e0b8a1"
   },
   {
     "file": ".claude/rules/environment.md",
@@ -68,7 +68,7 @@
       "scripts/lanes/**",
       "docs/PR_FLOW.md"
     ],
-    "bodySha256": "6009923711c8ee459258f7ae96f1783b02dacc906353dba72a5345a61e91ad22"
+    "bodySha256": "a6a5e499e9dd40815b2db9048512cc41d75d4408d7fbd9c4197f9eee6379b4b7"
   },
   {
     "file": ".claude/rules/macos.md",

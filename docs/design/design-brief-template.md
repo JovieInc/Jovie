@@ -67,6 +67,13 @@ Workflows the brief must name, by their existing names:
 
 ## 1. IA / message
 
+Before geometry, complete the [canonical IA preflight](../../canon/ENGINEERING.md#ia-preflight-for-ui-bearing-plans)
+in this existing brief/workpad. Record current mounted/source and Pen/interaction
+owner, absorbing surface/action, merge/replace/delete accounting, states/density,
+and before/after complexity. Include its `planningDecisions.ia` row in PR evidence
+alongside any affected sourcing decisions. "Add a panel" alone is incomplete.
+The new receipt diagnostics run in shadow; existing brief checks stay unchanged.
+
 What the page communicates, before layout or claims.
 
 Completeness: one `Message` line whose value is a real sentence, at least 12

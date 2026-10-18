@@ -14,7 +14,9 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(search.value),
 }));
 vi.mock('../dashboard/releases/ReleaseCatalogPageClient', () => ({
-  ReleaseCatalogPageClient: () => <div>Catalog panel</div>,
+  ReleaseCatalogPageClient: ({ view }: { readonly view: string }) => (
+    <div data-catalog-view={view}>Catalog panel</div>
+  ),
 }));
 vi.mock('./CreatorDocumentsWorkspace', () => ({
   CreatorDocumentsWorkspace: ({
@@ -53,6 +55,26 @@ describe('LibraryPageClient stages', () => {
     expect(screen.queryByRole('button', { name: 'Artist Rules' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Import YouTube' })).toBeNull();
     expect(screen.getByRole('tabpanel')).toHaveTextContent('Catalog panel');
+  });
+
+  it('opens the releases matrix for the /app/releases library alias', () => {
+    search.value = 'view=releases';
+    render(<LibraryPageClient creatorProfileId='profile-1' merchCards={[]} />);
+
+    expect(screen.getByText('Catalog panel')).toHaveAttribute(
+      'data-catalog-view',
+      'list'
+    );
+  });
+
+  it('keeps the asset catalog for other library view filters', () => {
+    search.value = 'view=merch';
+    render(<LibraryPageClient creatorProfileId='profile-1' merchCards={[]} />);
+
+    expect(screen.getByText('Catalog panel')).toHaveAttribute(
+      'data-catalog-view',
+      'assets'
+    );
   });
 
   it('sends artist-rule deep links to settings', () => {

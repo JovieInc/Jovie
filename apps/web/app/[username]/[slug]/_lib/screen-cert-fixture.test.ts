@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { isReservedPublicProfileIdentity } from '@/lib/profile/public-profile-identity-policy';
 import {
+  isScreenCertSmartLinkProfileRequest,
   SCREEN_CERT_SMARTLINK_FIXTURE_CREATOR,
   SCREEN_CERT_SMARTLINK_RELEASE_CONTENT,
   SCREEN_CERT_SMARTLINK_RELEASE_SLUG,
@@ -36,6 +37,39 @@ describe('smartlink screen-cert fixture (JOV-7127)', () => {
     expect(
       SCREEN_CERT_SMARTLINK_RELEASE_CONTENT.releaseDate!.getTime()
     ).toBeLessThan(Date.now());
+  });
+
+  it('admits the profile root only for the reserved handle inside the fixture gate', () => {
+    const captureEnv = {
+      CI: 'true',
+      NODE_ENV: 'production',
+      PUBLIC_NOAUTH_SMOKE: '1',
+    } as const;
+
+    expect(
+      isScreenCertSmartLinkProfileRequest(
+        SCREEN_CERT_SMARTLINK_USERNAME,
+        captureEnv
+      )
+    ).toBe(true);
+    expect(
+      isScreenCertSmartLinkProfileRequest('Jovie-Screen-Fixture', captureEnv)
+    ).toBe(true);
+    expect(isScreenCertSmartLinkProfileRequest('unfazed', captureEnv)).toBe(
+      false
+    );
+    expect(
+      isScreenCertSmartLinkProfileRequest(SCREEN_CERT_SMARTLINK_USERNAME, {
+        ...captureEnv,
+        VERCEL_ENV: 'production',
+      })
+    ).toBe(false);
+    expect(
+      isScreenCertSmartLinkProfileRequest(SCREEN_CERT_SMARTLINK_USERNAME, {
+        NODE_ENV: 'production',
+        PUBLIC_NOAUTH_SMOKE: '1',
+      })
+    ).toBe(false);
   });
 
   it('keeps the track fixture pointed at its parent release fixture', () => {

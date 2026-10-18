@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { memo } from 'react';
+import { AppShellFrameDedupe } from '@/components/organisms/AppShellFrameDedupe';
 import { DesktopTitlebar } from '@/components/organisms/DesktopTitlebar';
 import { AppShellRightRail } from '@/components/shell/AppShellRightRail';
 import { OverlayInteractionGuard } from '@/components/shell/OverlayInteractionGuard';
@@ -79,6 +80,7 @@ export const AppShellFrame = memo(function AppShellFrame({
         containerClassName
       )}
     >
+      {placeholder ? null : <AppShellFrameDedupe />}
       <DesktopTitlebar />
       <div
         data-app-shell-body='true'

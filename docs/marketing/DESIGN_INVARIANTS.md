@@ -48,7 +48,12 @@ Do not use this register as a new human merge gate; preserve JOV-INV-028.
   authorized family; no unrelated locked app-sidebar rebrand. After transport
   loss follow the workspace lock, preserve the checkpoint, and stop mutations.
 
-## MKT-D02 — Broad visibility positioning, concrete promise
+## MKT-D02 — Broad visibility positioning (superseded for `/`)
+
+JOV-5885 under JOV-5881 supersedes this historical homepage direction with
+[the YouTube artist MVP](YOUTUBE_ARTIST_MVP.md): Find me on `/`, the four product
+surfaces, attributed founder proof, machine certification then Tim Taste. Atoms
+stay. No waitlist-first homepage or “Drop more music”. Historical record follows.
 
 - **Scope:** homepage narrative and audience brief, not every product surface.
 - **Requirement:** primarily address founders/investors discovering Tim through

@@ -115,6 +115,18 @@ describe('decideMonitorSignal', () => {
     expect(decideMonitorSignal({ conclusion: 'success' }).action).toBe('green');
     expect(decideMonitorSignal({ conclusion: 'skipped' }).action).toBe('skip');
   });
+
+  it('files a standing canary, not a production failure, on quota deferral', () => {
+    // Every hard quota needs a standing canary (infra guardrail #2): a
+    // deferred post-deploy read surfaces under its own fingerprint instead
+    // of vanishing into a green skip (JOV-8495).
+    const deferred = decideMonitorSignal({ conclusion: 'quota-deferred' });
+    expect(deferred.action).toBe('red');
+    expect(deferred.fingerprint).toBe(
+      'github-quota-deferred-postdeploy-probes'
+    );
+    expect(deferred.detail).toContain('installation quota');
+  });
 });
 
 describe('gateSteadyGreen', () => {
@@ -173,6 +185,14 @@ function linearStub(issueNodes) {
               {
                 id: 'lbl-key',
                 name: 'remediation:production-monitor-continuity',
+              },
+              {
+                id: 'lbl-prod',
+                name: 'remediation:production-monitor-postdeploy-probes',
+              },
+              {
+                id: 'lbl-quota',
+                name: 'remediation:github-quota-deferred-postdeploy-probes',
               },
             ],
           },
@@ -386,5 +406,81 @@ describe('workflow wiring', () => {
         expect(body).not.toContain('REMEDIATION_GATE_STEADY_GREEN');
       }
     }
+  });
+});
+
+describe('real monitor intake preserves quota canary identity', () => {
+  it('files a non-urgent quota canary through the actual CLI entrypoint', async () => {
+    clearRemediationLabelCache();
+    const run = linearStub([]);
+    const values = {
+      LINEAR_API_KEY: 'lin_test',
+      REMEDIATION_MODE: 'monitor',
+      REMEDIATION_CONCLUSION: 'quota-deferred',
+      REMEDIATION_FINGERPRINT: 'production-monitor-postdeploy-probes',
+      REMEDIATION_SOURCE: 'postdeploy-probes.yml',
+      REMEDIATION_RUN_URL: 'https://github.com/JovieInc/Jovie/actions/runs/1',
+      REMEDIATION_INTAKE_DISABLED: '',
+      REMEDIATION_STATE_FILE: '',
+      REMEDIATION_PREVIOUS_FILE: '',
+      REMEDIATION_GATE_STEADY_GREEN: '',
+    };
+    for (const [key, value] of Object.entries(values)) vi.stubEnv(key, value);
+    vi.stubGlobal('fetch', run.fetchImpl);
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      const intakeUrl = new URL(
+        '../../remediation-signal-intake.mjs?quota-canary-entry',
+        import.meta.url
+      );
+      await import(intakeUrl.href);
+      const create = run.calls.find(call => call.query.includes('issueCreate'));
+      expect(create.variables.title).toContain(
+        'github-quota-deferred-postdeploy-probes'
+      );
+      expect(create.variables.title).not.toMatch(/^P0:/);
+      expect(create.variables.priority).toBe(3);
+      expect(create.variables.labelIds).toContain('lbl-quota');
+    } finally {
+      log.mockRestore();
+      vi.unstubAllGlobals();
+      vi.unstubAllEnvs();
+      clearRemediationLabelCache();
+    }
+  });
+
+  it('clears the quota canary only with successful affected probe evidence', () => {
+    expect(
+      decideMonitorSignal({
+        conclusion: 'success',
+        fingerprint: 'production-monitor-postdeploy-probes',
+      }).fingerprints
+    ).toEqual([
+      'production-monitor-postdeploy-probes',
+      'github-quota-deferred-postdeploy-probes',
+    ]);
+    expect(
+      decideMonitorSignal({
+        conclusion: 'success',
+        fingerprint: 'production-monitor-continuity',
+      }).fingerprints
+    ).toBeUndefined();
+  });
+
+  it('preserves urgent production failure filing', async () => {
+    clearRemediationLabelCache();
+    const run = linearStub([]);
+    await applyRemediationDecision(
+      { action: 'red', fingerprint: 'production-monitor-continuity' },
+      {
+        source: 'production-continuity.yml',
+        runUrl: 'https://example.invalid/run',
+        apiKey: 'lin_test',
+        fetchImpl: run.fetchImpl,
+      }
+    );
+    const create = run.calls.find(call => call.query.includes('issueCreate'));
+    expect(create.variables.title).toMatch(/^P0:/);
+    expect(create.variables.priority).toBe(1);
   });
 });

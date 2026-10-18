@@ -49,7 +49,7 @@ async function resolveReleasesSurface(
     return 'mobile';
   }
 
-  const desktopRows = page.locator('tbody tr');
+  const desktopRows = page.locator('tbody tr, [data-shell-release-row]');
   if (
     await desktopRows
       .first()
@@ -65,7 +65,7 @@ async function resolveReleasesSurface(
 async function assertPopulatedRoute(page: import('@playwright/test').Page) {
   await expect(page.getByTestId('releases-matrix')).toBeVisible();
   const rows = page.locator(
-    '[data-testid^="mobile-release-row-"], [data-testid^="release-open-"], tbody tr'
+    '[data-testid^="mobile-release-row-"], [data-testid^="release-open-"], tbody tr, [data-shell-release-row]'
   );
   expect(await rows.count()).toBeGreaterThan(0);
 }

@@ -78,13 +78,18 @@ export async function inspectEssentialViewport(
       for (let node = el.parentElement; node; node = node.parentElement) {
         const style = getComputedStyle(node);
         const clip = node.getBoundingClientRect();
+        // Motion's composer layout projection scales viewport bounds, while
+        // client dimensions and borders stay in layout pixels. Convert the
+        // clip's client box into the same coordinates as the control's rect.
+        const scaleX = node.offsetWidth > 0 ? clip.width / node.offsetWidth : 1;
+        const scaleY = node.offsetHeight > 0 ? clip.height / node.offsetHeight : 1;
         if (/(hidden|clip|auto|scroll)/.test(style.overflowX)) {
-          left = Math.max(left, clip.left + node.clientLeft);
-          right = Math.min(right, clip.left + node.clientLeft + node.clientWidth);
+          left = Math.max(left, clip.left + node.clientLeft * scaleX);
+          right = Math.min(right, clip.left + (node.clientLeft + node.clientWidth) * scaleX);
         }
         if (/(hidden|clip|auto|scroll)/.test(style.overflowY)) {
-          top = Math.max(top, clip.top + node.clientTop);
-          bottom = Math.min(bottom, clip.top + node.clientTop + node.clientHeight);
+          top = Math.max(top, clip.top + node.clientTop * scaleY);
+          bottom = Math.min(bottom, clip.top + (node.clientTop + node.clientHeight) * scaleY);
         }
       }
       if (rect.width <= 0 || rect.height <= 0 || rect.left < left - 1 || rect.top < top - 1 || rect.right > right + 1 || rect.bottom > bottom + 1) {

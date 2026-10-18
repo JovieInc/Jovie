@@ -29,6 +29,7 @@ export const DESKTOP_SMOKE_SPECS = [
   'start-onboarding-llm-failure.spec.ts',
   'onboarding-robot.smoke.spec.ts',
   'signup-funnel.smoke.spec.ts',
+  'signup-handle-availability.spec.ts',
   'claim-prebuilt.smoke.spec.ts',
   'smoke-auth.spec.ts',
   'profiles-final-row-layout.spec.ts',

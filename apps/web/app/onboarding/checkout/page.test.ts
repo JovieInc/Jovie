@@ -51,6 +51,34 @@ beforeEach(() => {
   mocks.profile.mockReset().mockResolvedValue({ selectedProfile: null });
   mocks.hasOfferState.mockReset().mockResolvedValue(false);
   mocks.recordOfferEvent.mockReset().mockResolvedValue({ ok: true });
+  delete process.env.PUBLIC_NOAUTH_SMOKE;
+  delete process.env.NEXT_PUBLIC_E2E_MODE;
+  delete process.env.VERCEL_ENV;
+  delete process.env.CI;
+});
+
+it('renders the screen-cert fixture only outside production (JOV-8068)', async () => {
+  process.env.PUBLIC_NOAUTH_SMOKE = '1';
+  process.env.CI = 'true';
+  const page = await Page({ searchParams: Promise.resolve({}) });
+  expect(page.props).toMatchObject({
+    plan: 'pro',
+    username: 'testartist',
+    displayName: 'Test Artist',
+    isDefaultUpsell: true,
+  });
+  expect(mocks.profile).not.toHaveBeenCalled();
+  expect(mocks.recordOfferEvent).not.toHaveBeenCalled();
+});
+
+it('keeps the checkout fixture closed on a production deployment (JOV-8068)', async () => {
+  process.env.PUBLIC_NOAUTH_SMOKE = '1';
+  process.env.CI = 'true';
+  process.env.VERCEL_ENV = 'production';
+  await expect(
+    Page({ searchParams: Promise.resolve({ plan: 'pro' }) })
+  ).rejects.toThrow('redirect:/app');
+  expect(mocks.recordOfferEvent).not.toHaveBeenCalled();
 });
 it.each(['year', 'annual', 'weekly'])(
   'rejects explicit unsupported interval %s before checkout',

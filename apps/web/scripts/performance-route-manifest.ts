@@ -1515,7 +1515,7 @@ const CREATOR_SHELL_ROUTES = [
     warmupStrategy: 'authenticated-route',
     measureMode: 'redirect',
     readySelectors: {
-      content: ['[data-testid="library-surface"]'],
+      content: ['[data-testid="shell-releases-view"]'],
       redirectDestinations: [`${APP_ROUTES.LIBRARY}?view=releases`],
     },
     timings: [

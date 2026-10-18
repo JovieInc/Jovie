@@ -157,7 +157,7 @@ test('release right rail header stays fixed during keyboard selection changes', 
   page.on('pageerror', err => consoleErrors.push(String(err)));
 
   await gotoWithDevServerRetry(page, RELEASES_URL);
-  await page.waitForURL(/\/app\/(?:dashboard\/)?releases/, {
+  await page.waitForURL(/\/app\/library\?[^#]*\bview=releases\b/, {
     timeout: 60_000,
   });
   await waitForReleaseSurface(page);
@@ -204,7 +204,7 @@ test('audience right rail header stays fixed when a contact has sparse data', as
   page.on('pageerror', err => consoleErrors.push(String(err)));
 
   await gotoWithDevServerRetry(page, AUDIENCE_URL);
-  await page.waitForURL(/\/app\/(?:dashboard\/)?audience/, {
+  await page.waitForURL(/\/app\/contacts\?[^#]*\btab=audience\b/, {
     timeout: 60_000,
   });
   await expect(page.getByTestId('dashboard-audience-table')).toBeVisible({
