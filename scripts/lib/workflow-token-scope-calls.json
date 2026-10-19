@@ -5,14 +5,5 @@
   "graphql": {
     "enqueuePullRequest": { "all": { "contents": "write" } }
   },
-  "acknowledgements": [
-    {
-      "id": "rearm-enqueue-contents-read",
-      "workflow": ".github/workflows/merge-queue-green-enroll.yml",
-      "job": "rearm-green-victims",
-      "call": "enqueuePullRequest",
-      "missing": ["contents:write"],
-      "message": "rearm-green-victims mints jovie-bot (app 2934433) with permission-contents: read but calls enqueuePullRequest via scripts/merge-group-victim-rearm.mjs. enqueuePullRequest needs contents: write. Tim must approve permission-contents: write on that rearm token. This check does not change scopes."
-    }
-  ]
+  "acknowledgements": []
 }
