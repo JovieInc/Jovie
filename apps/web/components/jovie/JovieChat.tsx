@@ -69,6 +69,8 @@ import type { JovieChatProps } from './types';
 const VIRTUALIZATION_THRESHOLD =
   CHAT_TRANSCRIPT_WINDOW.virtualizeAfterMessageCount;
 const CHAT_PICKER_THREAD_CLEARANCE = 'min(620px, calc(100vh - 8rem))';
+// Match the insights fetch deadline without waiting through query retries.
+const EMPTY_NEXT_STEP_TIMEOUT_MS = 10_000;
 
 function findLastAssistantIndex(
   messages: readonly { id: string; role: string }[]
@@ -373,6 +375,7 @@ export function JovieChat({
       measureChatTranscriptRow(el, scrollContainerRef.current),
   });
   const shouldVirtualizeMessages = messages.length > VIRTUALIZATION_THRESHOLD;
+  const [virtualizedMinHeight, setVirtualizedMinHeight] = useState(0);
 
   const scrollToBottom = useCallback(
     (behavior: ScrollBehavior = 'smooth') => {
@@ -424,6 +427,16 @@ export function JovieChat({
       return;
     }
 
+    const scrollport = scrollContainerRef.current;
+    // A 0px scrollport cannot place the tail in the virtual window. Leave the
+    // latch unset so the layout pass below can scroll once the height is real.
+    if (
+      shouldVirtualizeMessages &&
+      (!scrollport || scrollport.clientHeight === 0)
+    ) {
+      return;
+    }
+
     initialConversationScrollRef.current = conversationKey;
     setStuckToBottom(true);
     const frame = requestAnimationFrame(() => scrollToBottom('auto'));
@@ -439,6 +452,9 @@ export function JovieChat({
     messages.length,
     scrollToBottom,
     setStuckToBottom,
+    shouldVirtualizeMessages,
+    scrollContainerRef,
+    virtualizedMinHeight,
   ]);
 
   const lastAssistantIndex = findLastAssistantIndex(messages);
@@ -534,6 +550,7 @@ export function JovieChat({
     data: insightsSummary,
     isLoading: insightsLoading,
     isError: insightsError,
+    isEnabled: insightsEnabled,
   } = useInsightsSummaryQuery({
     enabled: showEmptyGreeting,
   });
@@ -543,11 +560,17 @@ export function JovieChat({
     readonly action: ChatEmptyStateAction | null;
   } | null>(null);
   useEffect(() => {
+    // An enabled query can have no data before its request starts. Wait for
+    // that summary, but a disabled or failed query can use the fallback now.
+    const insightsUnavailable = insightsEnabled === false || insightsError;
+    const insightsSettled =
+      insightsUnavailable ||
+      (!insightsLoading && insightsSummary !== undefined);
     if (showThreadView) {
       setEmptyNextStep(null);
-    } else if (showEmptyGreeting && !insightsLoading && !emptyNextStep) {
+    } else if (showEmptyGreeting && insightsSettled && !emptyNextStep) {
       setEmptyNextStep({
-        action: insightsError
+        action: insightsUnavailable
           ? null
           : resolveChatEmptyStateInsight(insightsSummary?.insights ?? []),
       });
@@ -557,9 +580,18 @@ export function JovieChat({
     showEmptyGreeting,
     insightsLoading,
     insightsError,
+    insightsEnabled,
     insightsSummary,
     emptyNextStep,
   ]);
+  useEffect(() => {
+    if (!showEmptyGreeting || emptyNextStep) return;
+    // Keep one deadline for this visible wait; query updates must not restart it.
+    const timer = setTimeout(() => {
+      setEmptyNextStep({ action: null });
+    }, EMPTY_NEXT_STEP_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [showEmptyGreeting, emptyNextStep]);
   const selectedEmptyAction = emptyNextStep?.action;
   const currentEmptyInsight = insightsSummary?.insights.find(
     insight => insight.id === selectedEmptyAction?.insightId
@@ -612,7 +644,6 @@ export function JovieChat({
   const messageViewportPaddingBottom = shouldReservePickerClearance
     ? CHAT_PICKER_THREAD_CLEARANCE
     : undefined;
-  const [virtualizedMinHeight, setVirtualizedMinHeight] = useState(0);
   const scrollThreadToBottom = useCallback(() => {
     const scrollContainer = scrollContainerRef.current;
     if (!scrollContainer) return;

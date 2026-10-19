@@ -451,6 +451,31 @@ test.describe('current-state essential actions (JOV-7771)', () => {
       (await inspectEssentialViewport(page, ['#action'])).findings
     ).toEqual([expect.objectContaining({ reason: 'occluded' })]);
     await page.locator('#cover').evaluate(el => el.remove());
+    await page.evaluate(() => {
+      const toast = document.createElement('p');
+      toast.id = 'toast';
+      toast.setAttribute('role', 'alert');
+      toast.style.cssText =
+        'position:fixed;left:20px;top:20px;width:350px;height:54px;z-index:40;pointer-events:none';
+      toast.textContent = 'Something went wrong';
+      document.body.append(toast);
+    });
+    expect(await inspectEssentialViewport(page, ['#toast'])).toEqual({
+      supported: true,
+      findings: [],
+    });
+    await page.evaluate(() => {
+      const cover = document.createElement('div');
+      cover.id = 'cover';
+      cover.style.cssText =
+        'position:fixed;inset:0;z-index:50;background:white';
+      document.body.append(cover);
+    });
+    expect((await inspectEssentialViewport(page, ['#toast'])).findings).toEqual(
+      [expect.objectContaining({ reason: 'occluded' })]
+    );
+    await page.locator('#cover').evaluate(el => el.remove());
+    await page.locator('#toast').evaluate(el => el.remove());
     await page.locator('#action').evaluate(el => el.after(el.cloneNode(true)));
     expect(
       (await inspectEssentialViewport(page, ['#action'])).findings
@@ -458,6 +483,46 @@ test.describe('current-state essential actions (JOV-7771)', () => {
     expect(
       (await inspectEssentialViewport(page, ['#missing'])).findings
     ).toEqual([expect.objectContaining({ reason: 'missing' })]);
+  });
+
+  test('audits scaled composer controls in viewport coordinates and still rejects real clipping', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    for (const [scaleX, scaleY] of [
+      [1.25, 1],
+      [1, 1.25],
+      [0.75, 0.75],
+    ]) {
+      await page.setContent(`
+        <div style="position:fixed;left:20px;top:20px;transform:scale(${scaleX},${scaleY});transform-origin:top left">
+          <div id="surface" style="position:relative;box-sizing:border-box;width:240px;height:120px;border:8px solid;overflow:hidden">
+            <button id="action" style="position:absolute;left:164px;top:64px;width:60px;height:32px;border:0">Send</button>
+          </div>
+        </div>
+      `);
+      expect(await inspectEssentialViewport(page, ['#action'])).toEqual({
+        supported: true,
+        findings: [],
+      });
+      // Each axis must keep rejecting a real overflow, including scale < 1
+      // where mixing client pixels and viewport pixels can hide the defect.
+      for (const position of [
+        { left: '215px', top: '64px' },
+        { left: '164px', top: '100px' },
+        { left: '-12px', top: '64px' },
+        { left: '164px', top: '-12px' },
+      ]) {
+        await page.locator('#action').evaluate((el, next) => {
+          Object.assign(el.style, next);
+        }, position);
+        expect(
+          (await inspectEssentialViewport(page, ['#action'])).findings
+        ).toEqual([
+          expect.objectContaining({ selector: '#action', reason: 'clipped' }),
+        ]);
+      }
+    }
   });
 
   for (const viewport of [

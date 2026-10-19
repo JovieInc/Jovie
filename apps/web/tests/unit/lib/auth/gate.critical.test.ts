@@ -220,7 +220,7 @@ describe('@critical gate.ts (Better Auth)', () => {
     });
   });
 
-  it('returns UNAUTHENTICATED when Better Auth has no session', async () => {
+  it('returns UNAUTHENTICATED without starting an unused waitlist lookup when Better Auth has no session', async () => {
     mockGetSession.mockResolvedValue(null);
 
     const result = await resolveUserState();
@@ -229,6 +229,30 @@ describe('@critical gate.ts (Better Auth)', () => {
     expect(result.clerkUserId).toBeNull();
     expect(result.dbUserId).toBeNull();
     expect(result.redirectTo).toBe('/signin');
+    expect(mockIsWaitlistGateEnabled).not.toHaveBeenCalled();
+    expect(mockDbSelect).not.toHaveBeenCalled();
+  });
+
+  it('does not orphan a waitlist lookup when session resolution fails', async () => {
+    mockGetSession.mockRejectedValue(new Error('session lookup unavailable'));
+
+    await expect(resolveUserState()).resolves.toMatchObject({
+      state: CanonicalUserState.UNAUTHENTICATED,
+      redirectTo: '/signin',
+    });
+    expect(mockIsWaitlistGateEnabled).not.toHaveBeenCalled();
+    expect(mockDbSelect).not.toHaveBeenCalled();
+  });
+
+  it('does not orphan a waitlist lookup when the known app identity lookup fails', async () => {
+    const error = new Error('connection terminated due to connection timeout');
+    mockDbSelect.mockReturnValue(chainLimitRejecting(error));
+
+    await expect(
+      resolveUserState({ knownClerkUserId: 'app_user_unavailable' })
+    ).rejects.toBe(error);
+    expect(mockIsWaitlistGateEnabled).not.toHaveBeenCalled();
+    expect(mockDbSelect).toHaveBeenCalledTimes(1);
   });
 
   it('returns ACTIVE for a fully set up BA user with complete profile', async () => {
@@ -496,12 +520,17 @@ describe('@critical gate.ts (Better Auth)', () => {
       user: { id: 'ba_live', email: 'live@example.com' },
       session: { id: 'sess_live' },
     });
-    mockIsWaitlistGateEnabled.mockRejectedValue(
-      new Error('database unavailable')
-    );
+    const error = new Error('database unavailable');
+    mockIsWaitlistGateEnabled.mockRejectedValue(error);
     mockDbSelect.mockReturnValue(chainLimit([activeDbUser()]));
 
     await expect(resolveUserState()).rejects.toThrow('database unavailable');
+    expect(mockRevenueFailure).toHaveBeenCalledExactlyOnceWith({
+      stage: 'returning_access',
+      severity: 'blocked',
+      userId: undefined,
+      error,
+    });
   });
 
   it('creates a DB user when waitlist gate is disabled and no waitlist entry exists', async () => {

@@ -130,7 +130,12 @@ async function getLegalDocumentUncached(
     await fs.readFile(absolutePath, 'utf-8'),
     docInfo.title
   );
-  const doc = await createMarkdownDocument(parsed.body);
+  // Legal readers render GFM tables as scrollable regions at narrow
+  // viewports, so the tables need keyboard focus stops and accessible names
+  // (axe scrollable-region-focusable).
+  const doc = await createMarkdownDocument(parsed.body, {
+    focusableTables: true,
+  });
 
   return {
     slug,

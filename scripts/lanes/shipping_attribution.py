@@ -17,6 +17,8 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import sys
+import time
 from urllib.parse import quote
 
 ATTRIBUTION_SCHEMA = "jovie-company-shipping-attribution/v1"
@@ -41,6 +43,12 @@ PROJECTS = (
     {"channel": "Jovie", "repository": "JovieInc/Jovie", "instrumented": True},
     {"channel": "LogYourBody", "repository": "JovieInc/LogYourBody", "instrumented": True},
 )
+# Pull and git-ref reads lag a force-push. Run 38952636890 logged the push of
+# 1d86ad82 at 19:26:58Z, failed the head check at 19:27:00Z, and the pull's
+# updated_at reached that SHA at 19:27:23Z. Wait that window out, then still
+# reject a head that never converges. Delays are the sleeps between reads.
+ORIGIN_HEAD_READ_ATTEMPTS = 8
+ORIGIN_HEAD_RETRY_DELAYS = (2, 4, 8, 8, 8, 8, 8)
 
 
 def _object(value):
@@ -332,27 +340,43 @@ def validate_origin_receipt(receipt: dict) -> None:
         raise ValueError(error or "invalid-origin-receipt")
 
 
-def resolve_origin_head(repository: str, number: int, expected_head: str, *, fetch=None) -> tuple[str, dict]:
-    """Read canonical GitHub identity; caller assertions alone never establish a head."""
+def resolve_origin_head(repository: str, number: int, expected_head: str, *, fetch=None,
+                        sleep=None, attempts=None) -> tuple[str, dict]:
+    """Read canonical GitHub identity; caller assertions alone never establish a head.
+
+    A just-pushed SHA can be missing from the pull and the git ref for a short
+    window. Poll until both equal ``expected_head``. Repository, pull number,
+    and base repo mismatches are rejected on the first read. A head that is
+    still different after the bounded wait is still a mismatch.
+    """
     def remote(endpoint):
         result = subprocess.run(["gh", "api", endpoint], capture_output=True, text=True,
                                 timeout=20, check=True)
         return json.loads(result.stdout)
     read = fetch or remote
+    pause = sleep or time.sleep
+    tries = ORIGIN_HEAD_READ_ATTEMPTS if attempts is None else attempts
     canonical = read(f"repos/{repository}")["full_name"]
     if canonical not in {project["repository"] for project in PROJECTS}:
         raise ValueError("origin-repository-not-allowed")
-    pr = read(f"repos/{canonical}/pulls/{number}")
-    if (type(pr.get("number")) is not int or pr["number"] != number
-            or _object(_object(pr.get("base")).get("repo")).get("full_name") != canonical
-            or _object(pr.get("head")).get("sha") != expected_head):
-        raise ValueError("origin-receipt-head-mismatch")
-    if pr.get("state") == "open":
-        head = pr["head"]
-        ref = read(f"repos/{head['repo']['full_name']}/git/ref/heads/{quote(head['ref'], safe='')}")
-        if _object(ref.get("object")).get("sha") != expected_head:
+    for attempt in range(max(tries, 0)):
+        pr = read(f"repos/{canonical}/pulls/{number}")
+        if (type(pr.get("number")) is not int or pr["number"] != number
+                or _object(_object(pr.get("base")).get("repo")).get("full_name") != canonical):
             raise ValueError("origin-receipt-head-mismatch")
-    return canonical, pr
+        matched = _object(pr.get("head")).get("sha") == expected_head
+        if matched and pr.get("state") == "open":
+            head = pr["head"]
+            ref = read(f"repos/{head['repo']['full_name']}/git/ref/heads/{quote(head['ref'], safe='')}")
+            matched = _object(ref.get("object")).get("sha") == expected_head
+        if matched:
+            return canonical, pr
+        if attempt + 1 >= tries:
+            break
+        print(f"origin head {str(expected_head)[:12]} not converged for pull {number} "
+              f"(attempt {attempt + 1}/{tries})", file=sys.stderr)
+        pause(ORIGIN_HEAD_RETRY_DELAYS[min(attempt, len(ORIGIN_HEAD_RETRY_DELAYS) - 1)])
+    raise ValueError("origin-receipt-head-mismatch")
 
 
 def append_origin_receipt(path: Path, receipt: dict) -> None:

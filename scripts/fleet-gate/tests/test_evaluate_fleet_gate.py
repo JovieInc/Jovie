@@ -100,7 +100,7 @@ def signals(**overrides):
     return payload
 
 
-def run_wrapper(payload, *, consumer="fleet", expected_sha=None, extra_env=None, dry_run="1"):
+def execute_wrapper(payload, *, consumer="fleet", expected_sha=None, extra_env=None, dry_run="1"):
     with tempfile.TemporaryDirectory() as tmp:
         out = pathlib.Path(tmp) / "github-output"
         receipt = pathlib.Path(tmp) / "receipt.json"
@@ -132,7 +132,24 @@ def run_wrapper(payload, *, consumer="fleet", expected_sha=None, extra_env=None,
                 if "=" in line:
                     key, value = line.split("=", 1)
                     outputs[key] = value
-        return result.returncode, outputs, json.loads(receipt.read_text()) if receipt.exists() else {}
+        return (
+            result.returncode,
+            outputs,
+            json.loads(receipt.read_text()) if receipt.exists() else {},
+            result.stdout,
+            result.stderr,
+        )
+
+
+def run_wrapper(payload, *, consumer="fleet", expected_sha=None, extra_env=None, dry_run="1"):
+    code, outputs, receipt, _stdout, _stderr = execute_wrapper(
+        payload,
+        consumer=consumer,
+        expected_sha=expected_sha,
+        extra_env=extra_env,
+        dry_run=dry_run,
+    )
+    return code, outputs, receipt
 
 
 def run_wrapper_stdout(payload, *, consumer="fleet", dry_run="1"):
@@ -386,7 +403,7 @@ class EvaluateFleetGateWrapperTests(unittest.TestCase):
             consumer="deployment",
             expected_sha=SHA,
         )
-        self.assertEqual(code, 0)
+        self.assertEqual(code, 2)
         self.assertFalse(receipt["deploymentAdmission"]["allowed"])
         self.assertEqual(outputs["deployment_allowed"], "false")
         self.assertEqual(outputs["gate_rc"], "2")
@@ -481,6 +498,80 @@ class EvaluateFleetGateWrapperTests(unittest.TestCase):
         self.assertIn("capacity_accepted", action)
         self.assertIn("value: ${{ steps.evaluate.outputs.receipt_age_seconds }}", action)
         self.assertIn("value: ${{ steps.evaluate.outputs.capacity_accepted }}", action)
+
+    def test_parked_controller_does_not_block_catchup_deployment(self):
+        """controller-failure plus an unbound production SHA freezes promotion
+        and still admits the deploy that can catch production up. The live
+        hold-intake line is not a deployment latch."""
+        code, outputs, receipt, stdout, stderr = execute_wrapper(
+            signals(
+                controller={
+                    "status": "parked",
+                    "retired": True,
+                    "error": "controller-endpoint-retired: Connection refused",
+                },
+                production={"status": "green", "deployedSha": "b" * 40},
+            ),
+            consumer="deployment",
+            expected_sha=SHA,
+        )
+        self.assertEqual(code, 0, stderr)
+        self.assertFalse(receipt["deploymentAdmission"]["allowed"])
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        self.assertEqual(outputs["deployment_allowed"], "true")
+        self.assertEqual(outputs["mode"], "normal")
+        self.assertEqual(outputs["promotion_mode"], "hold-intake")
+        self.assertIn("reasons=[controller-failure;production-deployment-unbound]", stdout)
+        self.assertIn("fleet-gate.scoped allowed=true mode=normal blockers=[]", stdout)
+        self.assertNotIn("::error::Fleet gate blocked production deployment", stderr)
+
+    def test_failed_screenshot_check_fails_deployment_and_logs_scoped_blocker(self):
+        """JOV-4970: a terminal Generate Screenshots failure is the production-web
+        blocker. The deployment consumer must fail the step and name that
+        blocker, while fleet observation of the same main stays green."""
+        payload = signals(
+            main={
+                "status": "green",
+                "sha": SHA,
+                "checks": [
+                    {
+                        "name": "Main Release Ready",
+                        "classification": "required",
+                        "verdict": "success",
+                    },
+                    {
+                        "name": "Generate Screenshots",
+                        "classification": "optional",
+                        "verdict": "failed",
+                        "conclusion": "failure",
+                    },
+                ],
+            }
+        )
+        code, outputs, receipt, stdout, stderr = execute_wrapper(
+            payload, consumer="deployment", expected_sha=SHA
+        )
+        self.assertEqual(receipt["signals"]["main"]["status"], "green")
+        self.assertEqual(code, 2)
+        self.assertEqual(outputs["deployment_allowed"], "false")
+        self.assertEqual(outputs["gate_rc"], "2")
+        self.assertEqual(outputs["mode"], "blocked")
+        self.assertIn(
+            "fleet-gate.scoped allowed=false mode=blocked blockers=[check:Generate Screenshots:unhealthy]",
+            stdout,
+        )
+        self.assertIn("::error::Fleet gate blocked production deployment", stderr)
+        self.assertIn("check:Generate Screenshots", stderr)
+
+        fleet_code, fleet_outputs, _fleet_receipt, fleet_stdout, fleet_stderr = execute_wrapper(
+            payload
+        )
+        self.assertEqual(fleet_code, 0, fleet_stderr)
+        self.assertEqual(fleet_outputs["work_allowed"], "true")
+        self.assertEqual(fleet_outputs["gate_rc"], "0")
+        self.assertIn("fleet-gate.scoped allowed=true", fleet_stdout)
+        self.assertIn("blockers=[]", fleet_stdout)
+        self.assertNotIn("::error::Fleet gate blocked production deployment", fleet_stderr)
 
 
 if __name__ == "__main__":

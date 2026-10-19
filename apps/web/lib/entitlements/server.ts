@@ -4,6 +4,7 @@ import { hasRecentAdminMfaReverification } from '@/lib/admin/mfa';
 import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { getCachedAuth, getCachedCurrentUser } from '@/lib/auth/cached';
 import { resolveUserIdentity } from '@/lib/auth/user-identity';
+import { canAutomaticallyCreateLinks } from '@/lib/entitlements/automatic-links';
 import {
   ENTITLEMENT_REGISTRY,
   getEntitlements,
@@ -313,6 +314,7 @@ export async function getCurrentUserEntitlements(options?: {
     hasStripeSubscription: Boolean(billing.data.stripeSubscriptionId),
     ...ent.booleans,
     ...ent.limits,
+    canAutoCreateLinks: canAutomaticallyCreateLinks(billing.data),
     canSendNotifications,
   };
 }

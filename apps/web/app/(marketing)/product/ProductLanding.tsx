@@ -52,7 +52,7 @@ function ProductClose() {
   return (
     <MarketingCtaSection
       className='product-close'
-      data-testid='product-close'
+      data-testid='marketing-section-cta'
       data-marketing-variant='editorial-search'
       data-marketing-owner='apps/web/app/(marketing)/product/ProductLanding.tsx'
       aria-labelledby='product-close-heading'
@@ -95,6 +95,8 @@ export function ProductLanding() {
           variant='split'
           headingId='product-hero-heading'
           testId='marketing-section-hero'
+          sectionVariant='split-claim-card'
+          sectionOwner='apps/web/app/(marketing)/product/ProductLanding.tsx'
         >
           <div className='max-w-xl'>
             <p className='marketing-kicker'>{hero.kicker}</p>

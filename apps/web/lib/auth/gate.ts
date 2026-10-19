@@ -718,19 +718,18 @@ async function resolveUserStateInternal(
 ): Promise<AuthGateResult> {
   const { createDbUserIfMissing = true, knownClerkUserId } = options;
 
-  // 1. Resolve Better Auth identity and prefetch waitlist gate in parallel.
-  const identityPromise = resolveAuthIdentity(knownClerkUserId);
-  const waitlistGatePromise = readWaitlistGateEnabledForAuthGate();
-  const { clerkUserId, email } = await identityPromise;
+  // Resolve identity before starting optional DB work. Anonymous returns and
+  // identity failures must not leave a rejecting waitlist lookup unobserved.
+  const { clerkUserId, email } = await resolveAuthIdentity(knownClerkUserId);
 
   if (!clerkUserId) {
     return createUnauthenticatedAuthGateResult();
   }
 
-  // 2. Query DB user AND profile in a single JOIN query (performance optimization)
-  const [lookupResult, waitlistGateEnabled] = await Promise.all([
+  // Signed-in lookups remain concurrent, with both rejection paths observed.
+  const [waitlistGateEnabled, lookupResult] = await Promise.all([
+    readWaitlistGateEnabledForAuthGate(),
     loadAuthGateRecord(clerkUserId, email),
-    waitlistGatePromise,
   ]).catch(error => {
     captureRevenueSpineFailure({
       stage: 'returning_access',

@@ -6,8 +6,7 @@ import { ToolPartsRenderer } from '@/components/jovie/tool-ui';
 import type { MessagePart } from '@/components/jovie/types';
 
 const { confirmLink } = vi.hoisted(() => ({ confirmLink: vi.fn() }));
-vi.mock('@/lib/queries', async importOriginal => ({
-  ...(await importOriginal<typeof import('@/lib/queries')>()),
+vi.mock('@/lib/queries/useConfirmChatLinkMutation', () => ({
   useConfirmChatLinkMutation: () => ({ mutate: confirmLink }),
 }));
 
@@ -15,10 +14,20 @@ vi.mock('@/components/jovie/components/ChatMessage', () => ({
   ChatMessage: ({
     id,
     parts,
-  }: Pick<ComponentProps<'div'>, 'id'> & { parts: readonly MessagePart[] }) => (
+    isStreaming,
+  }: Pick<ComponentProps<'div'>, 'id'> & {
+    parts: readonly MessagePart[];
+    isStreaming?: boolean;
+  }) => (
     <div data-testid={`fixture-message-${id}`}>
-      {id === 'playground-tool-running' || id === 'playground-tool-success' ? (
-        <ToolPartsRenderer parts={parts} variant='chat' />
+      {id === 'playground-tool-running' ||
+      id === 'playground-tool-success' ||
+      id === 'playground-grouped-tools' ? (
+        <ToolPartsRenderer
+          parts={parts}
+          isStreaming={isStreaming}
+          variant='chat'
+        />
       ) : (
         id
       )}
@@ -43,7 +52,9 @@ describe('ChatUiPlayground', () => {
     const proposal = within(screen.getByLabelText('Interactive Proposal'));
     await user.click(proposal.getByRole('button', { name: 'Add' }));
     expect(confirmLink).not.toHaveBeenCalled();
-    expect(proposal.getByText('Spotify link added')).toBeInTheDocument();
+    expect(
+      proposal.getByRole('status', { name: 'Link Confirmation' })
+    ).toHaveTextContent('Preview complete. Nothing was saved.');
   });
   it('uses the canonical running tool presentation without an unsupported summary', async () => {
     const user = userEvent.setup();
@@ -51,6 +62,10 @@ describe('ChatUiPlayground', () => {
     await user.click(screen.getByRole('button', { name: 'Tool lifecycle' }));
     const running = within(screen.getByLabelText('Running'));
     expect(running.getByText('Inspecting that source…')).toBeInTheDocument();
+    expect(running.getByRole('status')).toHaveAttribute(
+      'data-operation-status',
+      'working'
+    );
     expect(
       running.queryByText('Reading the supplied press page.')
     ).not.toBeInTheDocument();
@@ -59,11 +74,31 @@ describe('ChatUiPlayground', () => {
     const user = userEvent.setup();
     render(<ChatUiPlayground />);
     await user.click(screen.getByRole('button', { name: 'Tool lifecycle' }));
-    const succeeded = within(screen.getByLabelText('Succeeded'));
+    const succeeded = within(screen.getByRole('region', { name: 'Succeeded' }));
+    expect(succeeded.getByRole('status')).toHaveAttribute(
+      'data-operation-status',
+      'succeeded'
+    );
     expect(
       succeeded.getByText('Feedback sent to the product team.')
     ).toBeInTheDocument();
   });
+  it('keeps grouped completion receipts separate from live execution and failures', async () => {
+    const user = userEvent.setup();
+    render(<ChatUiPlayground />);
+    await user.click(screen.getByRole('button', { name: 'Grouped tool run' }));
+    const grouped = within(
+      screen.getByTestId('fixture-message-playground-grouped-tools')
+    );
+    expect(
+      grouped.getAllByRole('status').map(row => row.dataset.operationStatus)
+    ).toEqual(['succeeded', 'working']);
+    expect(grouped.getByRole('alert')).toHaveAttribute(
+      'data-operation-status',
+      'failed'
+    );
+  });
+
   it('keeps the critical state inventory and cleanup proposal connected', () => {
     expect(
       CHAT_PLAYGROUND_SCENARIOS.flatMap(scenario => scenario.coverage)

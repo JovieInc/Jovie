@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import type { DbOrTransaction } from '@/lib/db';
 import { audienceActions, audienceMembers } from '@/lib/db/schema/analytics';
@@ -38,7 +39,9 @@ export interface RecordAudienceEventOptions {
 
 function compactActionProjection(
   input: RecordAudienceEventInput,
-  label: string
+  label: string,
+  eventId: string,
+  timestamp: Date
 ) {
   const sourceLinkCode =
     typeof input.properties?.code === 'string'
@@ -46,6 +49,7 @@ function compactActionProjection(
       : undefined;
 
   return {
+    eventId,
     label,
     eventType: input.eventType,
     verb: input.verb ?? undefined,
@@ -60,7 +64,7 @@ function compactActionProjection(
     platform: input.platform ?? undefined,
     properties: input.properties ?? undefined,
     context: input.context ?? undefined,
-    timestamp: (input.timestamp ?? new Date()).toISOString(),
+    timestamp: timestamp.toISOString(),
   };
 }
 
@@ -101,7 +105,9 @@ export async function recordAudienceEvent(
       context: input.context,
     }) ?? 'Someone Interacted';
 
+  const eventId = randomUUID();
   await tx.insert(audienceActions).values({
+    id: eventId,
     creatorProfileId: input.creatorProfileId,
     audienceMemberId: input.audienceMemberId,
     label,
@@ -121,7 +127,7 @@ export async function recordAudienceEvent(
     timestamp: now,
   });
   const compactActionJson = JSON.stringify(
-    compactActionProjection(input, label)
+    compactActionProjection(input, label, eventId, now)
   );
 
   await tx

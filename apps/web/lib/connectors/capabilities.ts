@@ -5,6 +5,7 @@ import type {
   ConnectorDefinition,
   ConnectorProviderId,
   ConnectorStatus,
+  OAuthConnectorDefinition,
 } from './types';
 
 /** Access is evidence of permissions, not evidence that an operation succeeded. */
@@ -13,6 +14,7 @@ export function getGrantedConnectorCapabilities(
   status: ConnectorStatus,
   scopes: readonly string[]
 ): readonly ConnectorCapability[] {
+  if (definition.transport !== 'oauth') return [];
   if (status !== 'connected' && status !== 'syncing') return [];
   return definition.capabilities.filter(
     capability =>
@@ -24,7 +26,7 @@ export function getGrantedConnectorCapabilities(
 /** Public copy is a projection of implemented operations, never a provider wishlist. */
 export function getAdvertisedConnectorIntegrations(
   availability: Readonly<Record<ConnectorProviderId, ConnectorAvailability>>,
-  platform: ConnectorDefinition['platforms'][number] = 'web'
+  platform: OAuthConnectorDefinition['platforms'][number] = 'web'
 ) {
   return getConnectorDefinitions().flatMap(definition => {
     if (

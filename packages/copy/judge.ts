@@ -94,6 +94,8 @@ export interface CopyGateResult {
 }
 
 /** `anthropic/claude-opus-5.5` -> `anthropic`. The unit of judge independence. */
+export const JUDGE_INDEPENDENCE_POLICY_VERSION =
+  'generator-family-exclusion/v1';
 export const modelFamily = (model: string) => model.split('/')[0] ?? model;
 const family = modelFamily;
 

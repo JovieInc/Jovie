@@ -1,6 +1,8 @@
 'use client';
 
-import { AlertCircle, CheckCircle2, Loader2, Lock } from 'lucide-react';
+import { StatusGlyph } from '@jovie/ui/atoms/status-glyph';
+import type { OperationStatus } from '@jovie/ui/lib/utils';
+import { Lock } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef } from 'react';
 import {
@@ -44,6 +46,7 @@ import { ChatOpsDataCard } from './components/ChatOpsDataCard';
 import { ChatPitchCard } from './components/ChatPitchCard';
 import { ChatPresenceArtifactCard } from './components/ChatPresenceArtifactCard';
 import { ChatVideoRecordingProposalCard } from './components/ChatVideoRecordingProposalCard';
+import { resolveToolStatuses } from './tool-status';
 import type {
   ChatInsightsToolResult,
   MessagePart,
@@ -65,6 +68,7 @@ export interface ChatToolFeedbackContext {
 }
 
 interface ToolPartsRendererProps {
+  readonly isStreaming?: boolean;
   readonly parts: readonly MessagePart[];
   readonly profileId?: string;
   readonly variant: ToolRendererVariant;
@@ -195,7 +199,7 @@ function getToolStatusBody(event: PersistedToolEvent): string | undefined {
 }
 
 function getToolStatusNextStep(event: PersistedToolEvent): string | undefined {
-  if (event.state !== 'failed') {
+  if (event.state !== 'failed' || event.retryable !== true) {
     return undefined;
   }
 
@@ -206,14 +210,6 @@ function getToolStatusNextStep(event: PersistedToolEvent): string | undefined {
     retryable: event.retryable,
   }).nextStep;
 }
-
-const TOOL_STATUS_ICONS: Record<PersistedToolEvent['state'], typeof Loader2> = {
-  running: Loader2,
-  failed: AlertCircle,
-  denied: AlertCircle,
-  succeeded: CheckCircle2,
-  'needs-approval': CheckCircle2,
-};
 
 function isVerboseToolModeEnabled(): boolean {
   if (env.IS_DEV) return true;
@@ -234,17 +230,6 @@ function isVerboseToolModeEnabled(): boolean {
   }
 }
 
-function getActivityIconState(
-  event: PersistedToolEvent,
-  isLocked: boolean
-): 'running' | 'error' | 'success' | 'locked' | 'default' {
-  if (isLocked) return 'locked';
-  if (event.state === 'running') return 'running';
-  if (event.state === 'failed' || event.state === 'denied') return 'error';
-  if (event.state === 'succeeded') return 'success';
-  return 'default';
-}
-
 function getActivityTimelineEdge(
   index: number,
   count: number
@@ -256,31 +241,46 @@ function getActivityTimelineEdge(
 
 function ToolActivityRow({
   event,
+  status,
   multiple,
   index,
   count,
   feedback,
 }: Readonly<{
   event: PersistedToolEvent;
+  status: OperationStatus;
   multiple: boolean;
   index: number;
   count: number;
   feedback?: ChatToolFeedbackContext;
 }>) {
-  const body = getToolStatusBody(event);
+  const unconfirmed =
+    !isLockedToolEvent(event) &&
+    (status === 'unknown' ||
+      (event.state === 'succeeded' && status === 'pending'));
+  const title = unconfirmed
+    ? `${getToolUiConfig(event.toolName).label}: ${status === 'pending' ? 'saving result' : 'status unknown'}`
+    : getToolStatusTitle(event);
+  const body = unconfirmed
+    ? 'Completion has not been confirmed.'
+    : getToolStatusBody(event);
   const nextStep = getToolStatusNextStep(event);
   const isError = event.state === 'failed' || event.state === 'denied';
-  const isRunning = event.state === 'running';
   const isLocked = isLockedToolEvent(event);
-  const Icon = isLocked ? Lock : TOOL_STATUS_ICONS[event.state];
   const showVerboseDetails = isVerboseToolModeEnabled();
-  const iconState = getActivityIconState(event, isLocked);
+  const iconState =
+    status === 'succeeded'
+      ? 'success'
+      : status === 'failed'
+        ? 'error'
+        : 'default';
 
   return (
     <div
       data-testid='tool-status-row'
       data-tool-name={event.toolName}
       data-tool-state={event.state}
+      data-operation-status={status}
       data-tool-locked={isLocked ? 'true' : undefined}
       role={isError ? 'alert' : 'status'}
       className='system-b-chat-activity-row'
@@ -293,31 +293,28 @@ function ToolActivityRow({
           className='system-b-chat-activity-timeline'
         />
       ) : null}
-      <span
-        className='system-b-chat-activity-icon'
-        data-state={iconState}
-        data-spinning={isRunning ? 'true' : undefined}
-      >
-        <Icon
-          className={cn(isRunning && 'animate-spin motion-reduce:animate-none')}
-          strokeWidth={2.25}
-          aria-hidden='true'
-        />
+      <span className='system-b-chat-activity-icon' data-state={iconState}>
+        {isLocked ? (
+          <Lock aria-hidden='true' />
+        ) : (
+          <StatusGlyph state={status} size='sm' aria-hidden='true' />
+        )}
       </span>
       <div className='system-b-chat-activity-copy'>
         <div
-          title={getToolStatusTitle(event)}
+          title={title}
           data-state={isError ? 'error' : undefined}
           className='system-b-chat-activity-title'
         >
-          {getToolStatusTitle(event)}
+          {title}
         </div>
-        {body ? (
-          <div className='system-b-chat-activity-body'>{body}</div>
-        ) : null}
-        {nextStep ? (
-          <div className='system-b-chat-activity-next'>{nextStep}</div>
-        ) : null}
+        <div
+          className='system-b-chat-activity-body h-4 truncate'
+          title={[body, nextStep].filter(Boolean).join(' ')}
+        >
+          {body}
+          {nextStep ? ` ${nextStep}` : null}
+        </div>
         {showVerboseDetails ? (
           <details
             data-testid='chat-tool-verbose'
@@ -348,10 +345,12 @@ function ToolActivityRow({
 
 function ToolActivityFeed({
   events,
+  statuses,
   variant,
   feedback,
 }: Readonly<{
   events: readonly PersistedToolEvent[];
+  statuses: ReadonlyMap<string, OperationStatus>;
   variant: ToolRendererVariant;
   feedback?: ChatToolFeedbackContext;
 }>) {
@@ -372,6 +371,7 @@ function ToolActivityFeed({
         <ToolActivityRow
           key={event.toolCallId}
           event={event}
+          status={statuses.get(event.toolCallId) ?? 'unknown'}
           multiple={multiple}
           index={index}
           count={events.length}
@@ -792,12 +792,14 @@ function renderArtifactCard(
 
 function renderToolActivityGroups({
   events,
+  statuses,
   profileId,
   variant,
   hasMessageText,
   feedback,
 }: Readonly<{
   events: readonly PersistedToolEvent[];
+  statuses: ReadonlyMap<string, OperationStatus>;
   profileId?: string;
   variant: ToolRendererVariant;
   hasMessageText: boolean;
@@ -819,6 +821,7 @@ function renderToolActivityGroups({
       >
         <ToolActivityFeed
           events={statusEvents}
+          statuses={statuses}
           variant={variant}
           feedback={feedback}
         />
@@ -891,12 +894,17 @@ export function getRenderableToolEvents(parts: readonly MessagePart[]) {
 
 export function ToolPartsRenderer({
   parts,
+  isStreaming = false,
   profileId,
   variant,
   hasMessageText = false,
   feedback,
 }: ToolPartsRendererProps) {
   const events = useMemo(() => getRenderableToolEvents(parts), [parts]);
+  const statuses = useMemo(
+    () => resolveToolStatuses(events, parts, isStreaming),
+    [events, parts, isStreaming]
+  );
   const loggedFallbackToolCallsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -933,6 +941,7 @@ export function ToolPartsRenderer({
     <>
       {renderToolActivityGroups({
         events,
+        statuses,
         profileId,
         variant,
         hasMessageText,

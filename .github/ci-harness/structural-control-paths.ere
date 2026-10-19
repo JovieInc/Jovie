@@ -29,7 +29,7 @@
 ^scripts/brand-scrub\.py
 ^scripts/lanes/
 ^scripts/fleet-gate/
-^scripts/tests/test_(lane_runner|agent_workflow_hygiene|brand_scrub|gh_retry|runner_routing|vercel_prebuilt_deploy)\.py
+^scripts/tests/test_(lane_runner|design_gate|agent_workflow_hygiene|brand_scrub|gh_retry|runner_routing|vercel_prebuilt_deploy)\.py
 
 # Typed company composition must run its real coverage gate on future edits too.
 ^scripts/security/deepsec-(policy|loop)(\.test)?\.mjs$

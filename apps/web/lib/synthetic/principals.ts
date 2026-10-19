@@ -29,6 +29,26 @@ import {
   SYNTHETIC_PRINCIPAL_EMAIL_TAG,
 } from '@/lib/utils/email';
 
+function mailboxOf(email: string): string | null {
+  const normalized = normalizeEmail(email);
+  const atIndex = normalized.lastIndexOf('@');
+  if (atIndex <= 0 || atIndex === normalized.length - 1) return null;
+  const local = normalized.slice(0, atIndex).split('+')[0];
+  return local ? `${local}@${normalized.slice(atIndex + 1)}` : null;
+}
+
+/** True when the email's mailbox is exactly the configured canary base. */
+export function isControlledSyntheticMailbox(
+  email: string,
+  mailboxBase: string | undefined
+): boolean {
+  if (!mailboxBase?.trim()) return false;
+  const base = mailboxOf(mailboxBase);
+  // The configured base must itself be untagged.
+  if (!base || base !== normalizeEmail(mailboxBase)) return false;
+  return mailboxOf(email) === base;
+}
+
 export const SYNTHETIC_PRINCIPAL_SCHEMA = 'jovie.synthetic-principal/v1';
 
 /** Stripe customer / checkout metadata key carrying the roster actor id. */

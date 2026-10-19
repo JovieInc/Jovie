@@ -11,8 +11,13 @@ import {
   cacheHandleAvailability,
   getCachedHandleAvailability,
 } from '@/lib/onboarding/handle-availability-cache';
-import { enforceHandleCheckRateLimit } from '@/lib/onboarding/rate-limit';
 import { checkOnboardingHandleAvailability } from '@/lib/onboarding/reserved-handle';
+import {
+  createRateLimitHeaders,
+  handleCheckLimiter,
+  rateLimitDenialMessage,
+  rateLimitDenialStatus,
+} from '@/lib/rate-limit';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 
 const NO_STORE_HEADERS = {
@@ -113,7 +118,27 @@ export async function GET(request: Request) {
     // Rate limit check using Redis-backed limiter
     const headersList = await headers();
     const ip = extractClientIP(headersList);
-    await enforceHandleCheckRateLimit(ip);
+    const rateLimitResult = await handleCheckLimiter.limit(`ip:${ip}`);
+    if (!rateLimitResult.success) {
+      // Quota exhaustion is an expected response, not an application error.
+      return respondWithConstantTime(
+        serializeHandleCheck(
+          toHandleAvailabilityResult({
+            handle,
+            available: false,
+            error: rateLimitDenialMessage(
+              rateLimitResult,
+              'Too many requests. Please wait.',
+              'Service temporarily unavailable'
+            ),
+          })
+        ),
+        {
+          status: rateLimitDenialStatus(rateLimitResult),
+          headers: createRateLimitHeaders(rateLimitResult),
+        }
+      );
+    }
 
     const handleLower = handle.toLowerCase();
 
@@ -161,20 +186,6 @@ export async function GET(request: Request) {
       handle,
       route: '/api/handle/check',
     });
-
-    // Handle rate limiting - still use constant time
-    if (error instanceof Error && error.message.includes('RATE_LIMITED')) {
-      return respondWithConstantTime(
-        serializeHandleCheck(
-          toHandleAvailabilityResult({
-            handle,
-            available: false,
-            error: 'Too many requests. Please wait.',
-          })
-        ),
-        { status: 429 }
-      );
-    }
 
     // Handle timeout - return error instead of mock data
     if (

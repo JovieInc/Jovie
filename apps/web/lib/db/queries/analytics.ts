@@ -1,9 +1,11 @@
 import {
   and,
+  desc,
   sql as drizzleSql,
   eq,
   getTableName,
   gte,
+  inArray,
   isNotNull,
   isNull,
   lte,
@@ -28,7 +30,12 @@ import {
   resolveRangeStartOrEpoch,
 } from '@/lib/analytics/time-range';
 import { getSessionContext, setupDbSession } from '@/lib/auth/session';
-import { db, doesTableExist, TABLE_NAMES } from '@/lib/db';
+import {
+  type DbOrTransaction,
+  db,
+  doesTableExist,
+  TABLE_NAMES,
+} from '@/lib/db';
 import { cacheQuery } from '@/lib/db/cache';
 import { apiQuery, dashboardQuery } from '@/lib/db/query-timeout';
 import {
@@ -676,6 +683,73 @@ export async function listConsentedSmsRecipientPhones(
     .filter((phone): phone is string => Boolean(phone));
 }
 
+/** Export candidates on the caller's authorized RLS transaction; retain revoked
+ * duplicates so consent chronology is resolved before exporting any email. */
+export async function listEmailSubscriberExportCandidates(
+  tx: DbOrTransaction,
+  profileId: string,
+  selectedIds?: string[]
+) {
+  // Resolve selected identities within this profile, then load their latest
+  // state including revoked duplicates before intersecting immutable IDs.
+  const selected = selectedIds
+    ? await tx
+        .select({ email: notificationSubscriptions.email })
+        .from(notificationSubscriptions)
+        .where(
+          and(
+            eq(notificationSubscriptions.creatorProfileId, profileId),
+            eq(notificationSubscriptions.channel, 'email'),
+            inArray(notificationSubscriptions.id, selectedIds)
+          )
+        )
+    : null;
+  const selectedEmails = selected
+    ? [
+        ...new Set(
+          selected.flatMap(row =>
+            row.email ? [row.email.trim().toLowerCase()] : []
+          )
+        ),
+      ]
+    : null;
+  if (selectedEmails?.length === 0) {
+    return [];
+  }
+  return tx
+    .select({
+      id: notificationSubscriptions.id,
+      email: notificationSubscriptions.email,
+      name: notificationSubscriptions.name,
+      countryCode: notificationSubscriptions.countryCode,
+      channel: notificationSubscriptions.channel,
+      createdAt: notificationSubscriptions.createdAt,
+      confirmedAt: notificationSubscriptions.confirmedAt,
+      unsubscribedAt: notificationSubscriptions.unsubscribedAt,
+      artistEmailOptInAt: notificationSubscriptions.artistEmailOptInAt,
+      artistEmailOptOutAt: notificationSubscriptions.artistEmailOptOutAt,
+    })
+    .from(notificationSubscriptions)
+    .where(
+      and(
+        eq(notificationSubscriptions.creatorProfileId, profileId),
+        eq(notificationSubscriptions.channel, 'email'),
+        isNotNull(notificationSubscriptions.email),
+        selectedEmails
+          ? inArray(
+              drizzleSql`lower(trim(${notificationSubscriptions.email}))`,
+              selectedEmails
+            )
+          : undefined
+      )
+    )
+    .orderBy(
+      desc(notificationSubscriptions.createdAt),
+      desc(notificationSubscriptions.id)
+    )
+    .limit(10001);
+}
+
 /** Canonical profile_views across public claimed profiles, excluding internal accounts.
  * Missing tables remain unmeasured; errors propagate to the evidence loader. */
 export async function getCanonicalCustomerProfileExposure(
@@ -751,4 +825,35 @@ export async function getCanonicalCustomerLinkOutcome(
     );
 
   return { count: Number(row?.count ?? 0), latestAt: row?.latest ?? null };
+}
+
+/**
+ * Tenant fence for historical audience relationships. A click or source link
+ * may be attached only when that row belongs to the member's creator profile.
+ * This is an existence check, not a metrics aggregate.
+ */
+export async function hasUnownedAudienceRelationship(
+  tx: DbOrTransaction,
+  creatorProfileId: string,
+  relationships: readonly {
+    readonly sourceLinkId: string | null;
+    readonly clickEventId: string | null;
+  }[]
+): Promise<boolean> {
+  const result = await tx.execute<{ invalid: string }>(drizzleSql`
+    SELECT count(*)::text AS invalid FROM jsonb_to_recordset(
+      ${JSON.stringify(
+        relationships.map(row => ({
+          source: row.sourceLinkId,
+          click: row.clickEventId,
+        }))
+      )}::jsonb
+    ) AS relation(source uuid, click uuid)
+    WHERE (source IS NOT NULL AND NOT EXISTS (
+      SELECT 1 FROM audience_source_links WHERE id = source AND creator_profile_id = ${creatorProfileId}::uuid
+    )) OR (click IS NOT NULL AND NOT EXISTS (
+      SELECT 1 FROM ${clickEvents} WHERE id = click AND creator_profile_id = ${creatorProfileId}::uuid
+    ))
+  `);
+  return result.rows[0]?.invalid !== '0';
 }

@@ -192,7 +192,7 @@ describe('marketing route health contract', () => {
 
     for (const [url, selector] of [
       ['/pay', '[data-testid="pay-hero"]'],
-      ['/support', '[data-testid="support-hero"]'],
+      ['/support', '[data-testid="marketing-section-hero"]'],
       ['/waitlist', '#auth-form'],
     ] as const) {
       expect(
@@ -211,12 +211,9 @@ describe('marketing route health contract', () => {
     );
     expect(waitlist?.renderedSections).toEqual([
       expect.objectContaining({
-        componentPath: 'apps/web/components/features/auth/AuthLayout.tsx',
-        sectionId: 'hero',
-      }),
-      expect.objectContaining({
         componentPath: 'apps/web/components/features/auth/AuthShell.tsx',
         sectionId: 'capture',
+        variantId: 'email-only',
       }),
     ]);
   });

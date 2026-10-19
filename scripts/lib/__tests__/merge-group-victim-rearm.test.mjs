@@ -1,14 +1,20 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
 import {
   applyVictimRearms,
+  commitRearmFailure,
+  ENQUEUE_PULL_REQUEST_MUTATION,
+  enqueueVictim,
   heldRevisionFromReceipt,
   implicatedPathsFromAnnotations,
   planVictimRearms,
   REARM_CAP,
   REARM_CONTEXT,
+  RearmPermissionError,
   trustedRearmRecords,
 } from '../../merge-group-victim-rearm.mjs';
 
@@ -244,9 +250,10 @@ test('untrusted or foreign-sha receipts do not count toward the cap', () => {
   );
 });
 
-test('apply writes the receipt before enabling and skips a moved head', async () => {
+test('apply writes the receipt after a successful enqueue and skips a moved head', async () => {
   const writes = [];
   const enables = [];
+  const order = [];
   const applied = await applyVictimRearms(
     [
       {
@@ -287,16 +294,74 @@ test('apply writes the receipt before enabling and skips a moved head', async ()
       },
       async writeStatus(receipt) {
         writes.push(receipt);
+        order.push('write');
       },
       async enable(prNumber) {
         enables.push(prNumber);
+        order.push(`enable:${prNumber}`);
       },
     }
   );
   assert.deepEqual(enables, [10]);
+  assert.deepEqual(order, ['enable:10', 'write']);
   assert.equal(writes.length, 1);
   assert.equal(writes[0].description, `n=1;sha=${sha};run=7`);
   assert.equal(applied.length, 1);
+});
+
+test('a failed enqueue writes no receipt and leaves the cap unused', async () => {
+  const writes = [];
+  await assert.rejects(
+    applyVictimRearms(
+      [
+        {
+          action: 'rearm',
+          prNumber: 10,
+          headSha: sha,
+          classification: 'another-pr',
+          n: 1,
+          increment: true,
+          runId: 501,
+        },
+      ],
+      {
+        targetUrl: 'https://github.com/JovieInc/Jovie/actions/runs/501',
+        async readPullRequest() {
+          return {
+            headSha: sha,
+            mergeStateStatus: 'CLEAN',
+            inQueue: false,
+            autoMerge: false,
+          };
+        },
+        async writeStatus(receipt) {
+          writes.push(receipt);
+        },
+        async enable() {
+          throw new RearmPermissionError(10);
+        },
+      }
+    ),
+    error =>
+      error instanceof RearmPermissionError &&
+      error.code === 'ENQUEUE_PERMISSION_DENIED'
+  );
+  assert.deepEqual(writes, []);
+  const [next] = planVictimRearms({
+    runId: 900,
+    implicatedPaths: ['apps/web/story.tsx'],
+    candidates: [
+      candidate({ files: ['docs/guide.md'] }),
+      candidate({
+        prNumber: 11,
+        headSha: other,
+        files: ['apps/web/story.tsx'],
+      }),
+    ],
+  });
+  assert.equal(next.action, 'rearm');
+  assert.equal(next.n, 1);
+  assert.equal(next.increment, true);
 });
 
 test('the rearm job is a later step of the existing enroll workflow', () => {
@@ -351,6 +416,175 @@ test('a revision the failure hold blocked is never rearmed, even as a base-branc
     heldRevision,
   });
   assert.equal(moved[0].action, 'rearm');
+});
+
+test('apply hands the live node id and head to enable', async () => {
+  const seen = [];
+  await applyVictimRearms(
+    [
+      {
+        action: 'rearm',
+        prNumber: 10,
+        headSha: sha,
+        classification: 'base-branch',
+        n: 1,
+        increment: false,
+        runId: 7,
+      },
+    ],
+    {
+      targetUrl: 'https://github.com/JovieInc/Jovie/actions/runs/7',
+      async readPullRequest() {
+        return {
+          nodeId: 'PR_kwDOA',
+          headSha: sha,
+          mergeStateStatus: 'CLEAN',
+          inQueue: false,
+          autoMerge: false,
+        };
+      },
+      async writeStatus() {},
+      async enable(prNumber, current) {
+        seen.push([prNumber, current.nodeId, current.headSha]);
+      },
+    }
+  );
+  assert.deepEqual(seen, [[10, 'PR_kwDOA', sha]]);
+});
+
+test('rearm enqueues the verified head and does not request a merge strategy', () => {
+  const calls = [];
+  const result = enqueueVictim({
+    prNumber: 22127,
+    nodeId: 'PR_kwDOAbcd123',
+    headOid: sha.toUpperCase(),
+    exec(args) {
+      calls.push(args);
+      return JSON.stringify({
+        data: { enqueuePullRequest: { mergeQueueEntry: { position: 2 } } },
+      });
+    },
+  });
+  assert.equal(result.position, 2);
+  assert.equal(calls.length, 1);
+  const flat = calls[0].join('\n');
+  assert.match(
+    flat,
+    /enqueuePullRequest\(input:\{pullRequestId:\$id,expectedHeadOid:\$oid\}\)/
+  );
+  assert.match(flat, new RegExp(`id=PR_kwDOAbcd123`));
+  assert.match(flat, new RegExp(`oid=${sha}`));
+  assert.equal(flat.includes(ENQUEUE_PULL_REQUEST_MUTATION), true);
+  assert.doesNotMatch(
+    flat,
+    /--auto\b|--squash\b|enablePullRequestAutoMerge|mergeMethod/
+  );
+  assert.throws(
+    () =>
+      enqueueVictim({
+        prNumber: 22127,
+        nodeId: 'PR_kwDOAbcd123',
+        headOid: sha,
+        exec() {
+          return JSON.stringify({ data: { enqueuePullRequest: null } });
+        },
+      }),
+    /returned no queue position/
+  );
+  const enroll = readFileSync(
+    '.github/workflows/merge-queue-green-enroll.yml',
+    'utf8'
+  );
+  assert.match(
+    enroll,
+    /enqueuePullRequest\(input: \{ pullRequestId: \$id, expectedHeadOid: \$oid \}\)/
+  );
+});
+
+test('a token that cannot enqueue names the PR and fails the step', () => {
+  const denied = Object.assign(new Error('Command failed: gh api graphql'), {
+    stderr: Buffer.from(
+      'GraphQL: Resource not accessible by integration (enqueuePullRequest)\n'
+    ),
+  });
+  assert.throws(
+    () =>
+      enqueueVictim({
+        prNumber: 22127,
+        nodeId: 'PR_kwDOAbcd123',
+        headOid: sha,
+        exec() {
+          throw denied;
+        },
+      }),
+    error =>
+      error instanceof RearmPermissionError &&
+      error.code === 'ENQUEUE_PERMISSION_DENIED' &&
+      error.prNumber === 22127
+  );
+  const bodyDenied = enqueueVictim.bind(null, {
+    prNumber: 22127,
+    nodeId: 'PR_kwDOAbcd123',
+    headOid: sha,
+    exec() {
+      return {
+        data: { enqueuePullRequest: null },
+        errors: [
+          {
+            type: 'FORBIDDEN',
+            message: 'Resource not accessible by integration',
+            path: ['enqueuePullRequest'],
+          },
+        ],
+      };
+    },
+  });
+  assert.throws(
+    bodyDenied,
+    error =>
+      error instanceof RearmPermissionError &&
+      error.code === 'ENQUEUE_PERMISSION_DENIED'
+  );
+
+  const dir = mkdtempSync(join(tmpdir(), 'rearm-denied-'));
+  const summaryPath = join(dir, 'summary.md');
+  const stderr = [];
+  try {
+    let caught;
+    try {
+      enqueueVictim({
+        prNumber: 22127,
+        nodeId: 'PR_kwDOAbcd123',
+        headOid: sha,
+        exec() {
+          throw denied;
+        },
+      });
+    } catch (error) {
+      caught = error;
+    }
+    const code = commitRearmFailure(caught, {
+      env: { GITHUB_STEP_SUMMARY: summaryPath },
+      stderr: { write: line => stderr.push(line) },
+    });
+    assert.equal(code, 1);
+    const annotation = stderr.join('');
+    const summary = readFileSync(summaryPath, 'utf8');
+    assert.match(annotation, /::error::Rearm of #22127 denied:/);
+    assert.match(annotation, /enqueuePullRequest/);
+    assert.match(summary, /Rearm of #22127 denied:/);
+    assert.doesNotMatch(summary, /::error::/);
+    assert.equal(annotation.includes('\n::error::'), false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('the rearm script no longer calls gh pr merge --auto --squash', () => {
+  const source = readFileSync('scripts/merge-group-victim-rearm.mjs', 'utf8');
+  assert.match(source, /enqueueVictim\(/);
+  assert.doesNotMatch(source, /--auto\b|--squash\b|enablePullRequestAutoMerge/);
+  assert.doesNotMatch(source, /['"]pr['"],\s*['"]merge['"]/);
 });
 
 test('only a trusted blocked receipt for this repository names a held revision', () => {

@@ -1,8 +1,8 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button } from '@jovie/ui/atoms/button';
 import { Check, Loader2, X } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { usePreviewPanelContext } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import {
@@ -10,7 +10,12 @@ import {
   isProposalDismissed,
   undismissProposal,
 } from '@/lib/chat/proposal-dismiss-ledger';
-import { useConfirmChatLinkMutation } from '@/lib/queries';
+import {
+  resolveTaskPersistence,
+  type TaskState,
+} from '@/lib/chat/task-persistence';
+import { FetchError } from '@/lib/queries/fetch';
+import { useConfirmChatLinkMutation } from '@/lib/queries/useConfirmChatLinkMutation';
 import { cn } from '@/lib/utils';
 import { CHAT_TOOL_CANCELLED_LABEL, ChatToolSurface } from './ChatToolSurface';
 
@@ -30,7 +35,16 @@ interface ChatLinkConfirmationCardProps {
   readonly preview?: boolean;
 }
 
-type CardState = 'pending' | 'adding' | 'added' | 'updated' | 'dismissed';
+const LINK_MESSAGES = {
+  checking: 'Checking your save…',
+  draft: 'Review this link before adding it.',
+  failed: 'Unable to add link. Try again.',
+  notRecorded: 'No save recorded. Try Add again.',
+  preview: 'Preview only. Nothing will be saved.',
+  previewComplete: 'Preview complete. Nothing was saved.',
+  submitting: 'Saving your link…',
+  unknown: 'Save unconfirmed. Use Check save.',
+} as const;
 
 /** Canonical SocialIcon platform values. Falls back to 'link' for unknown platforms. */
 const VALID_SOCIAL_PLATFORMS = new Set([
@@ -64,7 +78,17 @@ function normalizeSocialPlatform(icon: string): string {
   return VALID_SOCIAL_PLATFORMS.has(lower) ? lower : 'link';
 }
 
-export function ChatLinkConfirmationCard({
+/** Reset task-local callbacks and state when the account or proposal changes. */
+export function ChatLinkConfirmationCard(props: ChatLinkConfirmationCardProps) {
+  return (
+    <ChatLinkConfirmationTask
+      key={`${props.profileId}:${props.toolCallId}:${props.normalizedUrl}:${props.preview}`}
+      {...props}
+    />
+  );
+}
+
+function ChatLinkConfirmationTask({
   profileId,
   platform,
   normalizedUrl,
@@ -72,177 +96,230 @@ export function ChatLinkConfirmationCard({
   toolCallId,
   preview = false,
 }: ChatLinkConfirmationCardProps) {
-  const [state, setState] = useState<CardState>(() =>
-    isProposalDismissed(toolCallId) ? 'dismissed' : 'pending'
+  const dismissalId = toolCallId ? `${profileId}:${toolCallId}` : undefined;
+  const [state, setState] = useState<TaskState>(() =>
+    isProposalDismissed(dismissalId) ? 'canceled' : 'draft'
   );
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [requestId] = useState(() =>
+    toolCallId ? `link:${toolCallId}` : crypto.randomUUID()
+  );
+  const [message, setMessage] = useState<string>(
+    preview ? LINK_MESSAGES.preview : LINK_MESSAGES.draft
+  );
+  const inFlight = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const confirmLink = useConfirmChatLinkMutation();
   const previewPanel = usePreviewPanelContext();
+  const saved = state === 'persisted-remotely';
+  const unknown = state === 'acknowledgement-unknown';
+  const busy = state === 'submitting';
 
-  const handleAdd = useCallback(() => {
-    setErrorMessage(null);
+  function handleAdd() {
+    if (inFlight.current || saved || state === 'canceled') return;
     if (preview) {
-      setState('added');
+      setMessage(LINK_MESSAGES.previewComplete);
       return;
     }
-    setState('adding');
-
-    // Optimistically add the link to the live profile preview so the bento
-    // updates the instant the user confirms; roll back to the snapshot on error.
-    const snapshot = previewPanel?.previewData ?? null;
-    if (snapshot) {
-      previewPanel?.setPreviewData({
-        ...snapshot,
-        links: [
-          ...snapshot.links,
-          {
-            id: `chat-link-${Date.now()}`,
-            title: platform.name,
-            url: normalizedUrl,
-            platform: platform.id,
-            isVisible: true,
-          },
-        ],
-      });
-    }
-
+    const reconcile = unknown;
+    inFlight.current = true;
+    setState('submitting');
+    setMessage(reconcile ? LINK_MESSAGES.checking : LINK_MESSAGES.submitting);
     confirmLink.mutate(
       {
         profileId,
         platform: platform.id,
         url: originalUrl,
         normalizedUrl,
+        requestId,
+        ...(reconcile ? { reconcile: true } : {}),
       },
       {
         onSuccess: data => {
-          undismissProposal(toolCallId);
-          setState(data.outcome === 'updated' ? 'updated' : 'added');
-        },
-        onError: () => {
-          setState('pending');
-          setErrorMessage('Unable to add link. Please try again.');
-          if (snapshot) {
-            previewPanel?.setPreviewData(snapshot);
+          if (!mounted.current) return;
+          inFlight.current = false;
+          if (
+            reconcile &&
+            data.success === false &&
+            data.acknowledged === false
+          ) {
+            setState('failed');
+            setMessage(LINK_MESSAGES.notRecorded);
+            return;
           }
+          const next =
+            data.success === true
+              ? resolveTaskPersistence(
+                  { scopeId: profileId, requestId },
+                  data.receipt
+                )
+              : 'acknowledgement-unknown';
+          if (next !== 'persisted-remotely') {
+            setState('acknowledgement-unknown');
+            setMessage(LINK_MESSAGES.unknown);
+            return;
+          }
+          undismissProposal(dismissalId);
+          setState(next);
+          setMessage(
+            `${platform.name} link ${data.outcome === 'updated' ? 'updated' : 'added'}.`
+          );
+          // Only acknowledge the live preview after a matching remote receipt.
+          const receipt = data.receipt;
+          if (receipt && !data.replayed && !reconcile) {
+            previewPanel?.setPreviewData(snapshot =>
+              snapshot
+                ? {
+                    ...snapshot,
+                    links: [
+                      ...snapshot.links.filter(
+                        link => link.platform !== platform.id
+                      ),
+                      {
+                        id: receipt.objectId,
+                        title: platform.name,
+                        url: normalizedUrl,
+                        platform: platform.id,
+                        isVisible: true,
+                      },
+                    ],
+                  }
+                : snapshot
+            );
+          }
+        },
+        onError: error => {
+          if (!mounted.current) return;
+          inFlight.current = false;
+          // A known rejection cannot have committed. All transport, decode,
+          // cancellation and server failures require read-only reconciliation.
+          const rejected =
+            !reconcile &&
+            error instanceof FetchError &&
+            error.kind === 'http' &&
+            error.status >= 400 &&
+            error.status < 500 &&
+            error.status !== 408;
+          setState(rejected ? 'failed' : 'acknowledgement-unknown');
+          setMessage(rejected ? LINK_MESSAGES.failed : LINK_MESSAGES.unknown);
         },
       }
     );
-  }, [
-    profileId,
-    platform,
-    originalUrl,
-    normalizedUrl,
-    confirmLink,
-    previewPanel,
-    toolCallId,
-    preview,
-  ]);
-
-  const handleDismiss = useCallback(() => {
-    dismissProposal(toolCallId);
-    setState('dismissed');
-  }, [toolCallId]);
-
-  const handleUndoDismiss = useCallback(() => {
-    undismissProposal(toolCallId);
-    setState('pending');
-  }, [toolCallId]);
-
-  if (state === 'added' || state === 'updated') {
-    return (
-      <ChatToolSurface tone='success'>
-        <div className='flex items-center gap-2 text-success'>
-          <Check className='h-4 w-4' />
-          <span className='text-sm font-medium'>
-            {state === 'updated'
-              ? `${platform.name} link updated`
-              : `${platform.name} link added`}
-          </span>
-        </div>
-      </ChatToolSurface>
-    );
   }
 
-  if (state === 'dismissed') {
-    return (
-      <ChatToolSurface tone='cancelled'>
-        <div className='flex items-center justify-between gap-2 text-secondary-token'>
-          <div className='flex items-center gap-2'>
-            <X className='h-4 w-4' />
-            <span className='text-sm text-secondary-token'>
-              {CHAT_TOOL_CANCELLED_LABEL}
-            </span>
+  function handleDismiss() {
+    if (inFlight.current || saved || unknown) return;
+    if (state === 'canceled') {
+      undismissProposal(dismissalId);
+      setState('draft');
+      setMessage(LINK_MESSAGES.draft);
+    } else {
+      dismissProposal(dismissalId);
+      setState('canceled');
+      setMessage(CHAT_TOOL_CANCELLED_LABEL);
+    }
+  }
+
+  return (
+    <ChatToolSurface className='system-b-chat-link-card system-b-chat-link-card-add @container'>
+      <div
+        className='flex flex-wrap items-center gap-3'
+        data-task-state={state}
+      >
+        <div className='flex min-w-0 flex-1 basis-full items-center gap-3 @sm:basis-0'>
+          <span className='system-b-chat-link-card-icon system-b-chat-link-card-icon-add'>
+            <SocialIcon
+              platform={normalizeSocialPlatform(platform.icon)}
+              className='h-5 w-5 shrink-0'
+              aria-hidden
+            />
+          </span>
+          <div className='min-w-0 flex-1'>
+            <p className='text-sm font-medium text-primary-token'>
+              {platform.name}
+            </p>
+            <p
+              className='truncate text-xs text-tertiary-token'
+              title={normalizedUrl}
+            >
+              {normalizedUrl}
+            </p>
           </div>
+        </div>
+        <div className='ml-auto flex max-w-full flex-wrap items-center justify-end gap-1.5'>
+          <Button
+            type='button'
+            variant='primary'
+            size='sm'
+            onClick={handleAdd}
+            aria-disabled={busy || saved || state === 'canceled'}
+            className='w-20 whitespace-nowrap'
+          >
+            {busy ? (
+              <Loader2
+                aria-hidden
+                className='h-3 w-3 animate-spin motion-reduce:animate-none'
+              />
+            ) : saved ? (
+              <Check aria-hidden className='h-3 w-3' />
+            ) : null}
+            {unknown ? 'Check save' : saved ? 'Added' : 'Add'}
+          </Button>
           <Button
             type='button'
             variant='link'
             size='sm'
-            onClick={handleUndoDismiss}
-            className='px-0 text-xs font-medium text-primary-token underline-offset-2'
-            data-testid='chat-link-dismiss-undo'
+            onClick={handleDismiss}
+            aria-disabled={busy || saved || unknown}
+            className='min-w-11'
+            data-testid={
+              state === 'canceled' ? 'chat-link-dismiss-undo' : undefined
+            }
+            aria-label={
+              state === 'canceled'
+                ? `Undo dismiss ${platform.name} link`
+                : `Dismiss ${platform.name} link`
+            }
           >
-            Undo
+            {state === 'canceled' ? (
+              'Undo'
+            ) : (
+              <X aria-hidden className='h-3.5 w-3.5' />
+            )}
           </Button>
         </div>
-      </ChatToolSurface>
-    );
-  }
-
-  return (
-    <ChatToolSurface className='system-b-chat-link-card system-b-chat-link-card-add'>
-      <div className='flex items-center gap-3'>
-        <span className='system-b-chat-link-card-icon system-b-chat-link-card-icon-add'>
-          <SocialIcon
-            platform={normalizeSocialPlatform(platform.icon)}
-            className='h-5 w-5 shrink-0'
+      </div>
+      <div className='mt-1 grid text-xs'>
+        {/* Reserve the maximum reflowed status, including large text. */}
+        {[
+          ...Object.values(LINK_MESSAGES),
+          `${platform.name} link added.`,
+          `${platform.name} link updated.`,
+        ].map(text => (
+          <span
+            key={text}
             aria-hidden
-          />
-        </span>
-        <div className='min-w-0 flex-1'>
-          <p className='text-sm font-medium text-primary-token'>
-            {platform.name}
-          </p>
-          <p className='truncate text-xs text-tertiary-token'>
-            {normalizedUrl}
-          </p>
-          {errorMessage && (
-            <output className='mt-1 block text-xs text-error'>
-              {errorMessage}
-            </output>
+            className='invisible col-start-1 row-start-1 min-h-8'
+          >
+            {text}
+          </span>
+        ))}
+        <output
+          aria-label='Link Confirmation'
+          aria-live='polite'
+          aria-atomic='true'
+          className={cn(
+            'col-start-1 row-start-1 min-h-8',
+            state === 'failed' ? 'text-error' : 'text-secondary-token'
           )}
-        </div>
-        <div className='shrink-0 flex items-center gap-1.5'>
-          <button
-            type='button'
-            onClick={handleAdd}
-            disabled={state === 'adding'}
-            className={cn(
-              'system-b-chat-link-primary-action',
-              'border border-(--color-btn-primary-bg) bg-btn-primary text-btn-primary-foreground shadow-button-inset hover:border-(--color-btn-primary-hover) hover:bg-btn-primary-hover',
-              'disabled:opacity-50 transition-colors'
-            )}
-          >
-            {state === 'adding' ? (
-              <Loader2 className='h-3 w-3 animate-spin' />
-            ) : (
-              <Check className='h-3 w-3' />
-            )}
-            Add
-          </button>
-          <button
-            type='button'
-            onClick={handleDismiss}
-            disabled={state === 'adding'}
-            className={cn(
-              'system-b-chat-link-dismiss-action',
-              'text-secondary-token hover:bg-surface-0 hover:text-primary-token',
-              'disabled:opacity-50 transition-colors'
-            )}
-            aria-label={`Dismiss ${platform.name} link`}
-          >
-            <X className='h-3.5 w-3.5' />
-          </button>
-        </div>
+        >
+          {message}
+        </output>
       </div>
     </ChatToolSurface>
   );

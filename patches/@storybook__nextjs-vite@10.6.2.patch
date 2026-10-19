@@ -1,0 +1,20 @@
+diff --git a/dist/_browser-chunks/chunk-342N7CWU.js b/dist/_browser-chunks/chunk-342N7CWU.js
+index 342f9b9b78c04e71bef8f43a5b6d1a00d14a45c1..6a69f98180c43aab24badf701d0ca6b14393b386 100644
+--- a/dist/_browser-chunks/chunk-342N7CWU.js
++++ b/dist/_browser-chunks/chunk-342N7CWU.js
+@@ -76,6 +76,7 @@ var getParallelRoutes = (segmentsList) => {
+     return params;
+   }, [routeParams.segments]), newLazyCacheNode = {
+     lazyData: null,
++    bfcacheId: 0,
+     rsc: null,
+     prefetchRsc: null,
+     head: null,
+@@ -117,6 +118,7 @@ var getParallelRoutes = (segmentsList) => {
+           // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+           // @ts-ignore Only available in Next.js >= v15.1.1
+           parentCacheNode: newLazyCacheNode,
++          parentRenderTree: { data: newLazyCacheNode },
+           // END
+           url: pathname,
+           loading: null

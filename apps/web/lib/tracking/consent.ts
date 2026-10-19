@@ -227,6 +227,23 @@ export function getOrCreateAcquisitionId(): string {
   }
 }
 
+/** Adopt the server-verified identity after consented acquisition capture. */
+export function rememberAcquisitionId(id: unknown): void {
+  if (
+    typeof id !== 'string' ||
+    !/^[0-9a-f-]{36}$/i.test(id) ||
+    !isAnalyticsAllowed()
+  )
+    return;
+  try {
+    globalThis.localStorage?.setItem(ACQUISITION_STORAGE_KEY, id);
+    const secure = globalThis.location.protocol === 'https:' ? '; Secure' : '';
+    document.cookie = `${ACQUISITION_COOKIE_NAME}=${id}; path=/; max-age=7776000; SameSite=Lax${secure}`;
+  } catch {
+    // Restricted storage must not break navigation.
+  }
+}
+
 export function clearAcquisitionId(): void {
   if (typeof window === 'undefined') return;
   try {

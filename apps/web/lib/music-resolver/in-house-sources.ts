@@ -136,8 +136,9 @@ function artistFromMusicBrainz(artist: MusicBrainzArtist): ArtistCandidate {
         firstReleaseDate: group['first-release-date'] ?? null,
       })),
       releaseGroupsComplete:
-        artist['release-groups'] !== undefined &&
-        artist['release-groups'].length < 25,
+        artist.releaseGroupsComplete ??
+        (artist['release-groups'] !== undefined &&
+          artist['release-groups'].length < 25),
     },
   };
 }
