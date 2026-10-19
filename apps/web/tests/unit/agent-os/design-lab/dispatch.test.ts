@@ -7,6 +7,7 @@ import {
   realpath,
   rm,
   symlink,
+  utimes,
 } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -223,10 +224,16 @@ describe('triggerDesignLabDispatch artifact lifecycle', () => {
   it('rolls back an empty reservation when it alone crosses the directory budget', async () => {
     const artifactRoot = path.join(tempRoot, 'artifacts');
     await mkdir(artifactRoot, { recursive: true });
+    // Retention deletes incomplete runs once Date.now() is 7 days past their
+    // filesystem mtime. Stamp that mtime from the test clock so a shifted
+    // Date.now() cannot age this budget fixture into the stale window.
+    const fresh = new Date(Date.now() - 60 * 60 * 1000);
     await Promise.all(
-      Array.from({ length: 100 }, (_, index) =>
-        mkdir(path.join(artifactRoot, `existing-${index}`))
-      )
+      Array.from({ length: 100 }, async (_, index) => {
+        const directory = path.join(artifactRoot, `existing-${index}`);
+        await mkdir(directory);
+        await utimes(directory, fresh, fresh);
+      })
     );
     const { triggerDesignLabDispatch } = await import(
       '@/lib/agent-os/design-lab/dispatch'

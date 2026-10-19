@@ -10,7 +10,7 @@ TypeScript, React/Next.js, server/client boundaries, canonical imports, ESLint r
 
 | Layer | Technology |
 |-------|------------|
-| Framework | Next.js 15 (App Router) |
+| Framework | Next.js 16.4 (App Router) |
 | Language | TypeScript (strict mode) |
 | Styling | Tailwind CSS v4 |
 | Database | Neon PostgreSQL + Drizzle ORM |
@@ -60,6 +60,7 @@ const slug = title?.replaceAll(' ', '-') ?? '';
 - Functional components with hooks only.
 - Server Components by default, Client Components when needed.
 - Use `'use client'` directive sparingly and intentionally.
+- Cache Components is recommended upstream; JOV-7985 owns the dated migration exception. Node.js routes are supported, so do not recreate that retired blocker. Keep TanStack Query for client-owned state and audit hydration ownership before duplicating RSC data.
 
 ### Component Definition Rules
 

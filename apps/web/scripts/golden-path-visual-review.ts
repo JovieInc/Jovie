@@ -18,7 +18,9 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 
-export const RUBRIC_VERSION = 'golden-path-user-blocking/v2';
+export const RUBRIC_VERSION = 'golden-path-user-blocking/v3';
+/** Public catalog artist claimed by the golden-path journey. */
+const GOLDEN_PATH_ARTIST_NAME = 'UNMARKED';
 export const REVIEW_MODEL = 'zai/glm-5.3-flash';
 export const MODEL_SAMPLES = 2;
 const VERDICT_SCHEMA = 'jovie.golden-path-visual-review/v1';
@@ -87,9 +89,42 @@ Flag ONLY user-blocking visual defects:
 2. blank: a blank, error or crash screen, or a spinner/skeleton standing in for the main content;
 3. contrast: primary text that is unreadable;
 4. content: garbage shown to users (undefined, NaN, null, [object Object], lorem ipsum, raw translation keys);
+   The golden-path catalog artist is named UNMARKED. That name on a greeting, profile, or release credit is real identity. Do not flag it as a placeholder, template, or missing username.
 5. action: the primary action is missing or visibly unusable.
 Do NOT flag taste, brand, spacing preferences, empty-but-valid states or minor polish.
 Reply with ONLY this JSON: {"verdict":"pass"|"blocker","findings":["<category>: <what and where>"]}`;
+
+const GARBAGE_CONTENT =
+  /\b(?:undefined|nan|null|\[object object\]|lorem ipsum)\b/i;
+const ARTIST_NAME_OBJECTION =
+  /\b(?:placeholder|unset|unresolved|dummy|stub|template)\b|instead of the user|not (?:a |an )?(?:real |actual )?(?:name|username|user)\b|missing (?:name|username)\b/i;
+
+/**
+ * Vision models treat the golden-path artist UNMARKED as an unset placeholder.
+ * That false positive fails the whole journey, including profile-mode
+ * certification. A content finding that only objects to this catalog name is
+ * not a user-blocking defect. Real garbage beside the name still blocks.
+ */
+export function isKnownArtistIdentityFalsePositive(finding: string): boolean {
+  const text = finding.trim();
+  if (!/^content\s*:/i.test(text)) return false;
+  const body = text.slice(text.indexOf(':') + 1);
+  if (!new RegExp(`\\b${GOLDEN_PATH_ARTIST_NAME}\\b`, 'i').test(body))
+    return false;
+  if (GARBAGE_CONTENT.test(body)) return false;
+  return ARTIST_NAME_OBJECTION.test(body);
+}
+
+/** Drops known-artist identity objections. An all-dismissed blocker is a pass. */
+export function acceptModelVerdict(verdict: ModelVerdict): ModelVerdict {
+  if (verdict.verdict !== 'blocker') return verdict;
+  const findings = verdict.findings.filter(
+    finding => !isKnownArtistIdentityFalsePositive(finding)
+  );
+  if (findings.length === 0) return { verdict: 'pass', findings: [] };
+  if (findings.length === verdict.findings.length) return verdict;
+  return { verdict: 'blocker', findings };
+}
 
 /** Any blocker sample wins; otherwise any pass; unknown only if every sample was unknown. */
 export function mergeModelVerdicts(
@@ -269,17 +304,25 @@ export async function main(
     const layout = reviewLayout(record);
     const png = readFileSync(join(values.dir, record.file));
     const modelSamples: ModelVerdict[] = [];
-    for (let i = 0; i < MODEL_SAMPLES; i += 1)
-      modelSamples.push(
-        await reviewWithModel({
-          png,
-          stepId: record.id,
-          path: pathOf(record.url),
-          apiKey: env.AI_GATEWAY_API_KEY,
-          baseUrl,
-          ...(fetchImpl ? { fetchImpl } : {}),
-        })
-      );
+    for (let i = 0; i < MODEL_SAMPLES; i += 1) {
+      const raw = await reviewWithModel({
+        png,
+        stepId: record.id,
+        path: pathOf(record.url),
+        apiKey: env.AI_GATEWAY_API_KEY,
+        baseUrl,
+        ...(fetchImpl ? { fetchImpl } : {}),
+      });
+      if (raw.verdict === 'blocker') {
+        for (const finding of raw.findings) {
+          if (isKnownArtistIdentityFalsePositive(finding))
+            console.log(
+              `[golden-path-review] dismissed known artist identity: ${finding}`
+            );
+        }
+      }
+      modelSamples.push(acceptModelVerdict(raw));
+    }
     const model = mergeModelVerdicts(modelSamples);
     const suspected = layout.blockers.length > 0 || model.verdict === 'blocker';
     verdicts.push({

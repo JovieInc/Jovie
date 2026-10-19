@@ -13,6 +13,8 @@ import { createProductionFacts, githubClient } from './validation-sync.mjs';
 
 export const OBSERVATION_SCHEMA = 'jovie.sentry-observation/v1';
 export const MINIMUM_OBSERVATION_MS = 7 * 24 * 60 * 60 * 1000;
+// JOV-4312 requires a full 48 hours; other contracts keep their minimum.
+const SYNTHETIC_HYGIENE_OBSERVATION_MS = 48 * 60 * 60 * 1000;
 const MAX_PAGES = 10;
 const MAX_PREDECESSORS = 20;
 const FULL_SHA = /^[0-9a-f]{40}$/i;
@@ -99,7 +101,10 @@ export function inspectObservationIssue(issue, depth = 0) {
       !/^[a-z0-9-]+$/.test(plan.organization ?? '') ||
       !Number.isFinite(date(plan.start)) ||
       !Number.isFinite(date(plan.end)) ||
-      date(plan.end) - date(plan.start) < MINIMUM_OBSERVATION_MS ||
+      date(plan.end) - date(plan.start) <
+        (issue.identifier === 'JOV-4312'
+          ? SYNTHETIC_HYGIENE_OBSERVATION_MS
+          : MINIMUM_OBSERVATION_MS) ||
       (episodeStartedAt && date(plan.start) < date(episodeStartedAt)) ||
       !Array.isArray(plan.incidents) ||
       !plan.incidents.length ||
@@ -112,6 +117,13 @@ export function inspectObservationIssue(issue, depth = 0) {
     ) {
       return unknown('invalid_observation_registration');
     }
+    if (
+      issue.identifier === 'JOV-4312' &&
+      (plan.organization !== 'jovie' ||
+        plan.incidents.length !== 1 ||
+        plan.incidents[0].shortId !== 'JOVIE-WEB-QH')
+    )
+      return unknown('incident_acceptance_changed');
     // Successors retain the immutable first registration and each failed
     // predecessor in server comments. Historical manifests, receipts and
     // positive generation ancestry fence a new full window; never reset it.
@@ -443,9 +455,10 @@ export async function observeSentryHistory({ plan, now, sentry, facts }) {
         start: plan.start,
         end,
         per_page: '100',
+        // Environment parameters require every alias to exist in Sentry.
+        // A search list matches any alias without that pre-pagination exit.
+        query: 'environment:[vercel-production,production,prd]',
       });
-      for (const environment of ['vercel-production', 'production', 'prd'])
-        params.append('environment', environment);
       const cursors = new Set();
       for (let page = 0; page < MAX_PAGES; page += 1) {
         const response = await sentry(`${path}?${params}`);
@@ -515,20 +528,33 @@ export async function observeSentryHistory({ plan, now, sentry, facts }) {
 }
 
 /** Read-only supplementary loss evidence, never a coverage/pass attestation.
- * JOV-8523 is the canonical web contacts incident; generic registrations need
- * their own explicit project contract before collecting project statistics. */
+ * JOV-8523 and JOV-4312 explicitly name this project. Generic registrations
+ * need their own project contract; aggregates prove no runtime exposure. */
 export async function collectObservationCoverage({ plan, now, sentry }) {
   const gaps = [
     'production_error_attribution_unavailable',
     'retention_unavailable',
-    'authenticated_contacts_exposure_unavailable',
+    ...(plan.issue === 'JOV-8523'
+      ? ['authenticated_contacts_exposure_unavailable']
+      : plan.issue === 'JOV-4312'
+        ? [
+            'synthetic_workload_unavailable',
+            // Current SHA/ancestry does not prove when a past window began.
+            'post_deployment_window_start_unavailable',
+            'synthetic_ci_failure_visibility_unavailable',
+            'production_error_gate_evidence_unavailable',
+          ]
+        : []),
   ];
   const context = {
     status: 'unknown',
     reason: 'observation_coverage_unavailable',
     gaps,
   };
-  if (plan.issue !== 'JOV-8523' || plan.organization !== 'jovie')
+  if (
+    !['JOV-8523', 'JOV-4312'].includes(plan.issue) ||
+    plan.organization !== 'jovie'
+  )
     return { ...context, read: 'project_contract_unavailable' };
   const end = Math.min(now.getTime(), date(plan.end));
   if (!Number.isFinite(end) || end <= date(plan.start))

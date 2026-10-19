@@ -17,7 +17,7 @@ the release it started with and the next issue runs on the new one.
 from __future__ import annotations
 
 import argparse
-from contextlib import nullcontext
+from contextlib import contextmanager, nullcontext
 import fcntl
 import hashlib
 import importlib
@@ -523,6 +523,7 @@ class Issue:
     priority: int
     created_at: str
     labels: list[str] = field(default_factory=list)
+    event_claim: dict | None = None
 
 
 def failure_record(value) -> dict:
@@ -2704,6 +2705,7 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue, linear: Linear | 
                "branch": branch, "workstream": workstreams.classify(issue.title, issue.labels),
                "startedAt": now_iso(), "offer": {"eligible": True, "accepted": False},
                "attribution": {"category": "autonomous-created", "originProvider": "hyperagent", "finalProvider": "hyperagent"},
+               **({"eventClaim": dict(issue.event_claim)} if issue.event_claim else {}),
                **({"route": spec["route"]} if spec.get("route") else {})}
     def hold(reason):
         return {"verdict": "remote-held", "reasons": [reason], "next_action": "reconcile-existing-remote-attempt"}
@@ -2798,6 +2800,7 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
                "worktree": str(worktree), "offer": {"eligible": True, "accepted": False},
                "attribution": {"category": "autonomous-created", "originProvider": name,
                                "finalProvider": name}, "startedAt": now_iso(),
+               **({"eventClaim": dict(issue.event_claim)} if issue.event_claim else {}),
                **({"route": spec["route"]} if spec.get("route") else {})}
     ident = execution_attempt.identity("linear-work", {"issue": issue.identifier, "outcome": "draft-pr"},
                                        {"title": issue.title, "description": issue.description})
@@ -3042,6 +3045,33 @@ def verify_and_land(host: Host, issue: Issue, branch: str, worktree: Path, log, 
     return gate_pr(host, pr, worktree, log, sensitive=sensitive)
 
 
+@contextmanager
+def gate_admission(host: Host, *, staging: bool = False):
+    """Serialize seat admission with a non-waiting release proof reservation.
+
+    Staging owns every existing gate seat until its proof helper drains. It
+    defers to an admitted qualifier; a new qualifier defers to staging before
+    starting heavy work. This does not attest custody of arbitrary SSH arrivals.
+    """
+    if not staging and lifecycle.draining(host.state):
+        raise lifecycle.AdmissionHeld("operator requested natural controller drain")
+    admission = Locked(host.state / "locks" / "gate-admission.lock", blocking=False)
+    seats = []
+    try:
+        if not admission.held:
+            raise lifecycle.AdmissionHeld("gate-admission-busy")
+        if staging:
+            for index in range(host.gate_slots):
+                seat = Locked(host.state / "slots" / f"gate.{index}.lock", blocking=False)
+                seats.append(seat)
+                if not seat.held:
+                    raise lifecycle.AdmissionHeld("release-proof-gate-active")
+        yield (admission, *seats)
+    finally:
+        for lock in reversed([admission, *seats]):
+            lock.release()
+
+
 def gate_slot(host: Host) -> tuple[Locked, float]:
     """One of `gate_slots` host-wide gate seats; waits (polling) until one is free.
 
@@ -3050,11 +3080,15 @@ def gate_slot(host: Host) -> tuple[Locked, float]:
     """
     started = time.time()
     while True:
-        for index in range(host.gate_slots):
-            lock = Locked(host.state / "slots" / f"gate.{index}.lock", blocking=False)
-            if lock.held:
-                return lock, time.time() - started
-            lock.release()
+        try:
+            with gate_admission(host):
+                for index in range(host.gate_slots):
+                    lock = Locked(host.state / "slots" / f"gate.{index}.lock", blocking=False)
+                    if lock.held:
+                        return lock, time.time() - started
+                    lock.release()
+        except lifecycle.AdmissionHeld as error:
+            raise RepairStopped(str(error), None, "before-gate-seat") from error
         time.sleep(15)
 
 
@@ -4455,6 +4489,14 @@ def _apply_event_plan(linear, plan: dict, host: Host, data: dict, now: float) ->
     return _event_delivery_report(data, now)
 
 
+def _event_start_claim(fingerprint: str, row: dict) -> dict:
+    generation = {"activeGeneration": dict(row["activeGeneration"])} if row.get("activeGeneration") else {}
+    correlation = _event_digest({"issueId": row.get("issueId"), "startedStateId": row.get("startedStateId"),
+                                 "owner": HOST, "generation": row.get("attempts") or [], **generation})
+    return {"fingerprint": fingerprint, "issueId": row.get("issueId"), "team": row.get("team"),
+            "owner": HOST, "lane": row.get("lane"), "correlation": correlation, **generation}
+
+
 def claim_remediation_events(host: Host, linear) -> dict:
     """Claim every labeled remediation event. One cached read, then local planning."""
     issues = fetch_labeled_events(linear)
@@ -4475,6 +4517,27 @@ def claim_remediation_events(host: Host, linear) -> dict:
         baseline = json.loads(json.dumps(data.get("events") or {}))
         plan = remediation.plan_labeled_events(issues, data.get("events") or {}, providers, time.time(),
                                                healthy=healthy, cooled=cooled)
+        # Rotate only a settled, exactly owned start from a proven same-issue generation.
+        # The paired-write preimage below still rejects any concurrent outcome/owner change.
+        for fingerprint, row in plan["events"].items():
+            before = baseline.get(fingerprint) or {}
+            completed = before.get("completedGeneration") or {}
+            renewed = row.get("completedGeneration") or {}
+            delivery = before.get("startDelivery") or {}
+            settled = delivery.get("settled") or {}
+            binding = _event_start_claim(fingerprint, before)
+            opened_at = remediation.iso_epoch(renewed.get("consumedAt"))
+            closed_at = remediation.iso_epoch(completed.get("updatedAt"))
+            if (completed and not completed.get("consumed") and renewed.get("consumed")
+                    and renewed == {**completed, "consumed": True, "consumedAt": renewed.get("consumedAt")}
+                    and completed.get("issueId") == before.get("issueId") == row.get("issueId")
+                    and opened_at is not None and closed_at is not None and opened_at > closed_at
+                    and delivery.get("status") == "acknowledged"
+                    and delivery.get("mutationReceipt") == {"correlation": binding["correlation"], "success": True}
+                    and settled.get("claim") == binding and settled.get("verdict") in {"landing", "verified-not-queued"}
+                    and settled.get("executionDigest") and settled.get("runId")):
+                row["priorStartDeliveries"] = [*(before.get("priorStartDeliveries") or []), delivery][-20:]
+                row.pop("startDelivery", None)
         lock = Locked(host.state / "claim.lock", blocking=True)
         try:
             current = _event_escalation(host)
@@ -4526,7 +4589,7 @@ def claim_labeled_event(host: Host, name: str, linear) -> Issue | None:
     events = data.get("events") or {}
     now = time.time()
     held_back = held_back_issues(host, now)
-    for row in events.values():
+    for fingerprint, row in events.items():
         if not isinstance(row, dict):
             continue
         if row.get("status") != "claimed" or row.get("lane") != name or row.get("running"):
@@ -4537,6 +4600,8 @@ def claim_labeled_event(host: Host, name: str, linear) -> Issue | None:
             continue
         if not row.get("issueId"):
             continue
+        if linear_sync.claim_status(host.state, row["issueId"]) == "active":
+            continue  # Ordinary and labeled generations share the same incumbent issue owner.
         deliveries = _event_delivery_state(host)["actions"].values()
         if any(action["kind"] == "reopens" and action["ownerIssueId"] == row["issueId"]
                and action["status"] not in {"acknowledged", "superseded"} for action in deliveries):
@@ -4553,8 +4618,7 @@ def claim_labeled_event(host: Host, name: str, linear) -> Issue | None:
                 state = (remote.get("issue") or {}).get("state") if isinstance(remote, dict) else None
                 if not isinstance(state, dict):
                     raise RuntimeError("event-start-readback-unreadable")
-                correlation = _event_digest({"issueId": row["issueId"], "startedStateId": started,
-                                             "owner": HOST, "generation": row.get("attempts") or []})
+                correlation = _event_start_claim(fingerprint, row)["correlation"]
                 receipt = delivery.get("mutationReceipt") or {}
                 if state.get("id") == started and receipt != {"correlation": correlation, "success": True}:
                     # A rejected/ambiguous intent never proves this host owns
@@ -4593,6 +4657,11 @@ def claim_labeled_event(host: Host, name: str, linear) -> Issue | None:
                 continue  # No model invocation or local running claim from intent alone.
         else:
             continue  # Missing start-state evidence cannot admit a model repair.
+        # The worker holds claim.lock across both paths. Reserve the same local
+        # issue authority as ordinary intake before exposing a running event.
+        if not linear_sync.claim(host.state, row["issueId"], row.get("identifier") or row["issueId"], name):
+            continue
+        delivery.pop("settled", None)
         row["running"] = True
         row["claimedAt"] = now
         row["release"] = False
@@ -4602,35 +4671,52 @@ def claim_labeled_event(host: Host, name: str, linear) -> Issue | None:
         if dossier:
             description = dossier + "\n\n" + description
         return Issue(row["issueId"], row.get("identifier") or row["issueId"], row.get("title") or "",
-                     description, 2, now_iso(), list(row.get("labels") or []))
+                     description, 2, now_iso(), list(row.get("labels") or []), _event_start_claim(fingerprint, row))
     return None
 
 
-def note_event_outcome(host: Host, issue, verdict: str) -> None:
-    """Hand a labeled event back to the ladder after the lane run, without a Linear read."""
-    if issue is None or not getattr(issue, "id", None):
+def note_event_outcome(host: Host, issue, verdict: str, *, receipt: dict | None = None) -> None:
+    """Record only this admitted event generation's outcome; no Linear/provider read."""
+    binding = getattr(issue, "event_claim", None)
+    if issue is None or not getattr(issue, "id", None) or not isinstance(binding, dict):
         return
-    data = load_escalation(host)
-    events = data.get("events") or {}
-    changed = False
-    for row in events.values():
-        if not isinstance(row, dict) or row.get("issueId") != issue.id:
-            continue
-        row["running"] = False
-        if verdict == "provider-error":
-            row["lane"] = None
-            row["release"] = True
-            row["status"] = "claimed"
-        elif verdict in {"landing", "verified-not-queued"}:
-            row["status"] = "done"
-            row["release"] = False
-        elif verdict in {"not-shippable", "quarantined"}:
-            row["status"] = "exhausted"
-            row["lane"] = None
-            row["release"] = False
-        changed = True
-    if changed:
-        save_escalation(host, data)
+    lock = Locked(host.state / "claim.lock", blocking=True)
+    try:
+        data = _event_escalation(host)
+        for fingerprint, row in (data.get("events") or {}).items():
+            if not isinstance(row, dict) or row.get("issueId") != issue.id:
+                continue
+            delivery = row.get("startDelivery") or {}
+            if (binding != _event_start_claim(fingerprint, row) or delivery.get("status") != "acknowledged"
+                    or delivery.get("mutationReceipt") != {"correlation": binding["correlation"], "success": True}):
+                continue  # Stale/foreign callbacks cannot mutate the current generation.
+            if verdict in {"landing", "verified-not-queued"}:
+                receipt = receipt if isinstance(receipt, dict) else {}
+                execution = receipt.get("execution") or {}
+                ident = execution_attempt.identity("linear-work", {"issue": issue.identifier, "outcome": "draft-pr"},
+                                                   {"title": issue.title, "description": issue.description})
+                if (not isinstance(receipt, dict) or not isinstance(execution, dict)
+                        or receipt.get("schema") != "jovie-lane-run/v1" or receipt.get("repository") != REPO_SLUG
+                        or receipt.get("executionHost") != HOST or receipt.get("provider") != binding["lane"]
+                        or receipt.get("linearIssueId") != issue.id or receipt.get("issue") != issue.identifier
+                        or receipt.get("eventClaim") != binding or receipt.get("verdict") != verdict
+                        or not receipt.get("runId") or not receipt.get("endedAt")
+                        or execution.get("schema") != execution_attempt.SCHEMA or execution.get("event") != "attempt_finished"
+                        or execution.get("terminalState") != "succeeded" or execution.get("result") != "succeeded"
+                        or execution.get("retryDecision") != "stop" or not execution.get("fencingToken")
+                        or any(execution.get(key) != value for key, value in ident.items())):
+                    continue  # A verdict or start ACK alone is never a settled execution receipt.
+                delivery["settled"] = {"claim": binding, "verdict": verdict, "runId": receipt["runId"],
+                                       "executionDigest": _event_digest(execution), "at": time.time()}
+                row["status"], row["release"] = "done", False
+            elif verdict == "provider-error":
+                row["lane"], row["release"], row["status"] = None, True, "claimed"
+            elif verdict in {"not-shippable", "quarantined"}:
+                row["status"], row["lane"], row["release"] = "exhausted", None, False
+            row["running"] = False
+            _save_event_json(host, "escalation.json", data)
+    finally:
+        lock.release()
 
 
 def _rung_result(state, reason, *, transfer=False):
@@ -7388,7 +7474,7 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
     finally:
         file_overlap.release_task(host.state, issue.identifier)
     verdict = receipt.get("verdict")
-    note_event_outcome(host, issue, verdict)
+    note_event_outcome(host, issue, verdict, receipt=receipt)
     if verdict in epics.SETTLED_VERDICTS:
         slot.release()
         return reexec(host, name)
@@ -8527,6 +8613,8 @@ def verify_generated_runtime(proven: Path, existing: Path) -> None:
 
 
 def install_release(host: Host, *, operator=None) -> int:
+    if operator is None and lifecycle.draining(host.state):
+        raise lifecycle.AdmissionHeld("operator requested natural controller drain")
     if operator is not None:
         if not isinstance(operator, lifecycle.OperatorGuard) or operator.state != host.state.resolve():
             raise lifecycle.AdmissionHeld("operator installation owner differs")
@@ -8548,58 +8636,63 @@ def install_release(host: Host, *, operator=None) -> int:
         print(f"lane update backing off: tree {tree[:7]} was refused {refused.get('why')}", file=sys.stderr)
         return 1
     if operator is not None or not release.exists():
-        staging = host.state / "releases" / f".{tree}.tmp"
-        if operator is None:
-            shutil.rmtree(staging, ignore_errors=True)
-        elif staging.exists() or staging.is_symlink():
-            raise lifecycle.AdmissionHeld("operator proof staging already exists; reconcile its owner")
-        staging.mkdir(parents=True, mode=0o700)
-        archive = lifecycle.run(["git", "archive", bundle["sourceCommit"], "scripts/lanes", *RELEASE_EXTRAS, *LANE_TESTS],
-                                 cwd=host.repo, capture_output=True, check=True)
-        lifecycle.run(["tar", "-x", "-C", str(staging)], input=archive.stdout, check=True)
-        def refuse(why: str) -> int:
-            refused_path.write_text(json.dumps({"tree": tree, "at": time.time(), "why": why}))
-            return 1
-        # The staged tree proves itself with its own installer code. On 2026-10-10 the Mac
-        # refused every release for a day because the *installed* installer chose a bare
-        # dependency root; the fix was on main but could never run. An older staged tree
-        # without the subcommand is proven by this copy, as before.
-        try:
-            if operator is not None:
-                proof = operator.prove_staging(staging.resolve(), host.repo, timeout=60 + UPDATE_TEST_TIMEOUT_S)
+        with gate_admission(host, staging=True) as leases:
+            proof_fds = tuple(lock.handle.fileno() for lock in leases)
+            staging = host.state / "releases" / f".{tree}.tmp"
+            if operator is None:
+                shutil.rmtree(staging, ignore_errors=True)
+            elif staging.exists() or staging.is_symlink():
+                raise lifecycle.AdmissionHeld("operator proof staging already exists; reconcile its owner")
+            staging.mkdir(parents=True, mode=0o700)
+            archive = lifecycle.run(["git", "archive", bundle["sourceCommit"], "scripts/lanes", *RELEASE_EXTRAS, *LANE_TESTS],
+                                     cwd=host.repo, capture_output=True, check=True)
+            lifecycle.run(["tar", "-x", "-C", str(staging)], input=archive.stdout, check=True)
+            def refuse(why: str) -> int:
+                refused_path.write_text(json.dumps({"tree": tree, "at": time.time(), "why": why}))
+                return 1
+            # The staged tree proves itself with its own installer code. On 2026-10-10 the Mac
+            # refused every release for a day because the *installed* installer chose a bare
+            # dependency root; the fix was on main but could never run. An older staged tree
+            # without the subcommand is proven by this copy, as before.
+            try:
+                if operator is not None:
+                    # The operator's canonical EX/drain protocol fences new
+                    # launches even after its parent dies. Never pass that EX
+                    # owner to the private proof or replace its durable drain.
+                    proof = operator.prove_staging(staging.resolve(), host.repo, timeout=60 + UPDATE_TEST_TIMEOUT_S)
+                else:
+                    proof = lifecycle.run([sys.executable, str(staging / "scripts/lanes/lane_runner.py"),
+                                           "prove-staging", str(staging)],
+                                          cwd=staging, capture_output=True, text=True,
+                                          timeout=60 + UPDATE_TEST_TIMEOUT_S, pass_fds=proof_fds,
+                                          env={**os.environ, "LANES_STATE": str(host.state), "LANES_REPO": str(host.repo)})
+            except subprocess.TimeoutExpired:
+                refuse(f"self-test timeout {UPDATE_TEST_TIMEOUT_S}s")
+                raise
+            if operator is None and proof.returncode == 2 and "invalid choice" in proof.stderr:
+                why = prove_staging(host, staging)
             else:
-                proof = lifecycle.run([sys.executable, str(staging / "scripts/lanes/lane_runner.py"),
-                                       "prove-staging", str(staging)],
-                                      cwd=staging, capture_output=True, text=True,
-                                      timeout=60 + UPDATE_TEST_TIMEOUT_S,
-                                      env={**os.environ, "LANES_STATE": str(host.state), "LANES_REPO": str(host.repo)})
-        except subprocess.TimeoutExpired:
-            refuse(f"self-test timeout {UPDATE_TEST_TIMEOUT_S}s")
-            raise
-        if operator is None and proof.returncode == 2 and "invalid choice" in proof.stderr:
-            why = prove_staging(host, staging)
-        else:
-            why = None if proof.returncode == 0 else (proof.stdout.strip().splitlines() or ["staging proof failed"])[-1]
-            if why and proof.stderr:
-                print(proof.stderr[-2000:], file=sys.stderr)
-        if why:
-            print(f"lane update refused: {why}", file=sys.stderr)
-            return refuse(why)
-        (staging / "scripts/lanes/.tree").write_text(bundle["objects"]["scripts/lanes"])
-        (staging / "scripts/lanes/.bundle").write_text(tree)
-        (staging / "scripts/lanes/.release.json").write_text(json.dumps(bundle, sort_keys=True))
-        if operator is not None:
-            operator.validate()
-            lifecycle.validate_release(staging, bundle)
-            verify_generated_runtime(staging, release if release.exists() else staging)
-        if operator is not None and release.exists():
-            # Retain the fresh proof artifact without rewriting the running tree.
-            retained = host.state / "releases" / f".{tree}.proof-{operator.request['operationId']}"
-            if retained.exists() or retained.is_symlink():
-                raise lifecycle.AdmissionHeld("operator proof receipt already exists")
-            staging.rename(retained)
-        else:
-            staging.rename(release)
+                why = None if proof.returncode == 0 else (proof.stdout.strip().splitlines() or ["staging proof failed"])[-1]
+                if why and proof.stderr:
+                    print(proof.stderr[-2000:], file=sys.stderr)
+            if why:
+                print(f"lane update refused: {why}", file=sys.stderr)
+                return refuse(why)
+            (staging / "scripts/lanes/.tree").write_text(bundle["objects"]["scripts/lanes"])
+            (staging / "scripts/lanes/.bundle").write_text(tree)
+            (staging / "scripts/lanes/.release.json").write_text(json.dumps(bundle, sort_keys=True))
+            if operator is not None:
+                operator.validate()
+                lifecycle.validate_release(staging, bundle)
+                verify_generated_runtime(staging, release if release.exists() else staging)
+            if operator is not None and release.exists():
+                # Retain the fresh proof artifact without rewriting the running tree.
+                retained = host.state / "releases" / f".{tree}.proof-{operator.request['operationId']}"
+                if retained.exists() or retained.is_symlink():
+                    raise lifecycle.AdmissionHeld("operator proof receipt already exists")
+                staging.rename(retained)
+            else:
+                staging.rename(release)
     if operator is not None:
         operator.validate()
         lifecycle.validate_release(release.resolve(), bundle)
