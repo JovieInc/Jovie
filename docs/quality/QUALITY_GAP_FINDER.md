@@ -16,7 +16,7 @@ distinguishes this deterministic owner from pending shared-compiler acceptance.
 
 | Trigger | Why |
 | --- | --- |
-| Push to `main` touching its repo evidence: post-mortems, invariants, route budgets, the coverage heatmap, the CI incident ledger, ci-fast lanes, or `apps/web/{app,components,lib}` | Churn, coverage, route, post-mortem, and invariant gaps can only change on one of these pushes. Runs coalesce: one runs, the newest waits |
+| Push to `main` touching its repo evidence: post-mortems, invariants, route budgets, the coverage heatmap, the detection coverage registry, the CI incident ledger, ci-fast lanes, or `apps/web/{app,components,lib}` | Churn, coverage, route, post-mortem, and invariant gaps can only change on one of these pushes. Runs coalesce: one runs, the newest waits |
 | `repository_dispatch` type `quality-gap-scan` | Bug intake, dogfood labels, and Sentry mirrors fire this (see "Event hooks") |
 | `workflow_dispatch` (optional `dry_run`) | Manual run |
 
@@ -31,6 +31,8 @@ nothing. Add `--file` with `LINEAR_API_KEY` to file issues.
 | `postmortem-class-unguarded` | A post-mortem failure class that no invariant, CI incident ledger entry, or script names. Classes with open `postmortem-action` issues are skipped while those issues are open | 0.8 when recurring or when every action closed; otherwise 0.55 |
 | `escaped-defect-untested` | A `bug`, `dogfood`, `sentry`, `intake`, or `escaped-defect` issue updated in the last 30 days names a source file that has no test | 0.8 (0.85 if the fix already shipped) |
 | `escaped-defect-closure-unverified` | A completed `escaped-defect` issue lacks a valid product-repair + detector-repair [closure receipt](ESCAPED_DEFECT_CLOSURE.md) | 1.0 |
+| `founder-rescue-detection-gap` | A defect description or Tim comment records a founder rescue and no live-verified detector receipt on that issue predates it. The proposal embeds a typed `jovie.detection-gap/v1` record. A later rescue of a class a live-verified capability already covers is filed as a P0 compiler regression | 1.0 |
+| `detection-capability-unlearned` | The highest impact × recurrence × invisibility × tractability × remediation-leverage blind spot in `apps/web/data/detection-coverage-registry.json` | 0.95 |
 | `component-state-untested` | A UI component changed in the window with neither a story nor a test | 0.78 for shared or 3+ commits; 0.6 for 2 commits; 1 commit is below the floor |
 | `changed-code-untested` | An API route or `lib` module changed in the window with no test | 0.8 for routes or 2+ commits; 1 commit is below the floor |
 | `coverage-evidence-stale` | `docs/TEST_COVERAGE_HEATMAP.md` is older than 30 days, or a module lost 3 or more points of line coverage (`--coverage-summary` plus `--coverage-baseline`) | 0.85 / 0.8 |
@@ -48,6 +50,11 @@ Proposals below 0.5 confidence are dropped as noise.
 An escaped-defect closure proposal names and links the originating defect. Its
 suggested action is to reopen and complete that issue, never to use the quality
 gap proposal as a parallel product-repair record.
+
+A capability is counted as learned only when its registry entry names a
+deliberate-red replay, a valid control case, and the last live or injected
+Summer-path firing. The same registry drives the Ovie HUD coverage, blind-spot,
+founder-rescue, trend, and next-capability view.
 
 ## Routing
 
@@ -67,9 +74,9 @@ labeled issue keeps one writer for the inbox and one system of record (Linear).
   appears in the title as `[qg-xxxxxxxx]` and again in an HTML comment in the
   description.
 - Before filing, the finder reads every Jovie issue whose title contains
-  `[qg-`, including archived ones. Any match suppresses the proposal, whatever
-  its state. **A canceled issue is Tim's durable "no"** for that subject, so
-  the finder never proposes it again.
+  `[qg-`, including archived ones. Open founder DetectionGaps are refreshed as
+  evidence arrives. Completed or canceled matches stay terminal; **a canceled
+  issue is Tim's durable "no"** for that subject.
 - At most **5** new high-confidence issues per run.
 - At most **3** new `quality-gap:needs-tim` issues per UTC day, counted from
   Linear. Extra proposals are deferred to the next run, ranked by
@@ -81,7 +88,8 @@ The workflow accepts `repository_dispatch` with type `quality-gap-scan`.
 The Linear webhook route (`apps/web/app/api/webhooks/linear/route.ts`) fires
 it when a JOV issue gains a `postmortem-action`, `bug`, `dogfood`, `sentry`,
 `intake`, or `escaped-defect` label, or closes while carrying one (a closed
-post-mortem action can turn a handled class into a gap).
+post-mortem action can turn a handled class into a gap). A Tim-authored comment
+that explicitly records a founder rescue also fires the same scan.
 
 An issue created in Triage with one of those labels takes the Triage
 assessment dispatch instead. The next `apps/web` push to `main` re-runs the

@@ -24,15 +24,13 @@ export const HOMEPAGE_IDENTITY_COPY = {
       placeholder: 'you',
       action: 'Claim',
     },
-    // Real first-party proof (JOV-6946, JOV-INV-038 proximal proof): the
-    // claim card shows Tim White's real claimed jov.ie/tim, never a
-    // fictional placeholder person (Tim 2026-09-28).
+    // Artist launch identity primitive (JOV-7750, Tim 2026-10-16).
+    // This describes the free profile, not a claimed customer or paid bundle.
     preview: {
-      label: 'Claimed',
-      name: 'Tim White',
-      role: 'Founder, Jovie',
+      label: 'Your artist profile',
+      name: 'you',
+      role: 'Your music and links, together.',
     },
-    proofAlt: 'Tim White’s Jovie profile at jov.ie/tim',
   },
   // Presence and structure chapters, then the close.
   sections: [
