@@ -17,6 +17,7 @@ import math
 import os
 from pathlib import Path
 import re
+import stat
 import sys
 import subprocess
 import time
@@ -29,6 +30,8 @@ import execution_attempt
 
 SCHEMA = "jovie.backlog-admission-observation/v1"
 MAX_AGE_S = 60
+FLEET_OBSERVER_SOURCES = ("gem-priority-gate.py", "closure_health.py", "gem_gate_contract.py",
+                          "summer_ci_audit.py", "symphony_proof_context.py")
 ISSUE_OWNER = "Summer backlog governor / JOV-7073"
 RUNTIME_OWNER = "Symphony admission owner / JOV-8022"
 ATTEMPT_OWNER = "Symphony execution reentry owner / JOV-7089"
@@ -58,6 +61,36 @@ def _json_file(path, schema=None):
         raise Unavailable("canonical-file-schema:" + path.name)
     return value
 
+
+def _work_input_digest(path: Path) -> str | None:
+    """Bound raw-byte evidence to one stable regular inode, without blocking FIFO opens.
+
+    Same bounded descriptor pattern as lane_runner.maintenance_json. The raw
+    bytes (not reserialized JSON) remain the preimage. Missing is evidence only
+    when the initial lstat was missing, never after an observed inode disappears.
+    """
+    limit = 1024 * 1024
+    try:
+        before = path.lstat()
+    except FileNotFoundError:
+        return None
+    fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
+    try:
+        opened = os.fstat(fd)
+        identity = lambda info: (info.st_dev, info.st_ino, info.st_size,
+                                 info.st_mtime_ns, info.st_ctime_ns)
+        if (not stat.S_ISREG(opened.st_mode) or opened.st_size > limit
+                or identity(before) != identity(opened)):
+            raise ValueError("fleet-work-input-not-bounded-regular")
+        with os.fdopen(fd, "rb", closefd=False) as handle:
+            raw = handle.read(limit + 1)
+        if (len(raw) > limit or len(raw) != opened.st_size
+                or identity(os.fstat(fd)) != identity(opened)
+                or identity(path.lstat()) != identity(opened)):
+            raise ValueError("fleet-work-input-changed-during-read")
+        return hashlib.sha256(raw).hexdigest()
+    finally:
+        os.close(fd)
 
 def _fingerprint(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
@@ -445,7 +478,10 @@ class _NativeReads:
         self.validate_runtime()
         self.host = lane.Host(state=state)
         self.linear = lane.Linear(self.host.linear_env)
-        lane.load_github_env()
+        try:
+            lane.load_github_env(_fleet_observation=True)
+        except lane.FleetObservationHeld as error:
+            raise Unavailable(str(error)) from None
         self.canonical_main()
 
     def validate_runtime(self):
@@ -649,6 +685,83 @@ class _NativeReads:
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         return module.MAX_AGE.total_seconds()
+
+    def prepare_fleet_observation(self, *, preparation_started=None, parent_control_fd=None):
+        """One genuine installed work observation, before issue/cohort preimages.
+
+        This is preparation only. Neither a local fence nor revalidation may
+        invoke the observer or refresh its retained start timestamp.
+        """
+        if getattr(self, "_fleet_prepared", False):
+            raise Unavailable("fleet-work-observation-already-prepared")
+        self._fleet_prepared = True
+        self.validate_runtime()
+        manifest = _json_file(self.current / ".release.json", "jovie-lane-release-bundle/v1")
+        for name in FLEET_OBSERVER_SOURCES:
+            value = manifest.get("objects", {}).get("scripts/fleet-gate/" + name)
+            if not isinstance(value, str) or not re.fullmatch(r"[a-f0-9]{40}", value):
+                raise Unavailable("installed-fleet-observer-not-manifest-bound")
+        gate = self.current.parent / "fleet-gate/gem-priority-gate.py"
+        before = _work_input_digest(gate)
+        request = self.lane.FleetObservationRequest(
+            time.monotonic() if preparation_started is None else preparation_started, parent_control_fd)
+        try:
+            result = self.lane.run_agent([sys.executable, "-I", "-B", "-S", "-X", "pycache_prefix=/dev/null", str(gate), "--observe-work-admission"],
+                                         self.current, None, MAX_AGE_S, _fleet_observation=request)
+        except self.lane.FleetObservationHeld as error:
+            raise Unavailable(str(error)) from None
+        if result.returncode or len(result.stdout) > 262144:
+            raise Unavailable("fleet-work-observation-failed")
+        value = json.loads(result.stdout)
+        if not isinstance(value, dict) or value.get("gateSHA256") != before:
+            raise Unavailable("fleet-work-observation-source-mismatch")
+        # Re-observe canonical main outside the fence; a changed head is held,
+        # never silently adopted by the already prepared proof.
+        self.canonical_main(revalidate=True)
+        self._fleet_observation = value
+        try:
+            self.fleet_observation()
+        except Exception:
+            self._fleet_observation = None
+            raise
+
+    def fleet_observation(self):
+        """Retained proof plus local checks only; never spawn, query or restamp."""
+        value = getattr(self, "_fleet_observation", None)
+        if not isinstance(value, dict) or value.get("schema") != "jovie.fleet-work-observation/v1":
+            raise Unavailable("fleet-work-observation-unprepared")
+        self.validate_runtime()
+        home = self.state.parents[2]
+        fleet = home / "gem-workspace/state/gem-priority-gate"
+        paths = {str(fleet.parent / "integrity.json"), str(fleet.parent / "concurrency.json"),
+                 str(fleet / "independent-review.json"), str(fleet / "latest.json"), str(self.state / "tick.json")}
+        inputs = value.get("localInputs")
+        work, closure = value.get("workAdmission"), value.get("closureAdmission")
+        if (value.get("repo") != "JovieInc/Jovie" or value.get("statePath") != str(fleet)
+                or value.get("nativeStatePath") != str(self.state)
+                or value.get("mainSha") != self._main_sha
+                or value.get("authorizesTransition") is not False or value.get("authorizesDispatch") is not False
+                or not isinstance(inputs, dict) or set(inputs) != paths
+                or not isinstance(work, dict) or not isinstance(closure, dict)
+                or any(type(work.get(key)) is not bool for key in ("allowed", "newImplementationAllowed", "newIssueLeaseAllowed"))
+                or not isinstance(work.get("productNewIssueLeaseAllowed"), dict)
+                or type(work["productNewIssueLeaseAllowed"].get("jovie")) is not bool
+                or type(closure.get("newIssueIntakeAllowed")) is not bool):
+            raise Unavailable("fleet-work-observation-binding-invalid")
+        started, completed = _epoch(value.get("observedAt")), _epoch(value.get("completedAt"))
+        now = time.time()
+        if (started is None or completed is None or not started <= completed <= now
+                or not 0 <= now - started <= self.fleet_max_age()):
+            raise Unavailable("fleet-typed-work-stale")
+        gate = self.current.parent / "fleet-gate/gem-priority-gate.py"
+        if _work_input_digest(gate) != value.get("gateSHA256"):
+            raise Unavailable("fleet-work-observation-source-changed")
+        for name, expected in inputs.items():
+            path = Path(name)
+            actual = _work_input_digest(path)
+            if actual != expected:
+                raise Unavailable("fleet-work-observation-input-changed")
+        return json.loads(json.dumps(value))
 
     def acceptance(self, issue):
         """Use an existing owner source-binding receipt; verify its actual merge.
@@ -1093,7 +1206,7 @@ def _native_runtime(reads, row, prs, binding, observed_at):
     if inventory is None:
         raise Unavailable("native-overlap-inventory-unavailable")
     overlap = lane.file_overlap.admission_policy(issue, *inventory, lane.workstreams.classify, now=observed_at)
-    fleet = _json_file(Path.home() / "gem-workspace/state/gem-priority-gate/latest.json", "jovie-fleet-gate/v1")
+    fleet = reads.fleet_observation()
     if _epoch(fleet.get("observedAt")) is None or not 0 <= observed_at - _epoch(fleet["observedAt"]) <= reads.fleet_max_age():
         raise Unavailable("fleet-typed-work-stale")
     work, closure = fleet.get("workAdmission") or {}, fleet.get("closureAdmission") or {}
@@ -1188,8 +1301,10 @@ def _collect_packet(reads, row, binding, observed_at):
                                "observedAt": history_started, "complete": True, "hasNextPage": False, "pages": pages}}
 
 
-def prepare_backlog_guard(identifier, expected_version, *, home=None, module_path=None):
+def prepare_backlog_guard(identifier, expected_version, *, home=None, module_path=None,
+                          preparation_started=None, parent_control_fd=None):
     """Join actual native reads. Caller supplies only issue identity and version."""
+    preparation_started = time.monotonic() if preparation_started is None else preparation_started
     home = (Path.home() if home is None else Path(home)).resolve()
     state = home / ".local/state/jovie-lanes"
     path = Path(__file__).resolve() if module_path is None else Path(module_path).resolve()
@@ -1220,6 +1335,7 @@ def prepare_backlog_guard(identifier, expected_version, *, home=None, module_pat
                    "releaseTree": (current / ".tree").read_text().strip()}
         evidence.update(binding)
         reads = _NativeReads(current, state)
+        reads.prepare_fleet_observation(preparation_started=preparation_started, parent_control_fd=parent_control_fd)
         started = time.time()
         row = reads.issue(matching[0]["id"])
         if row.get("identifier") != identifier or row.get("updatedAt") != expected_version:
