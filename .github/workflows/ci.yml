@@ -828,6 +828,7 @@ jobs:
           fi
 
           # CHANGELOG.md is customer-facing web content, not documentation.
+          # Native playbook sources are product inputs, not the docs-only exit.
           if ! echo "$CHANGED_FILES" | grep -q -E '^(\.github/|CHANGELOG\.md$|docs/playbooks/[^/]+\.playbook\.md$)' &&
             ! echo "$CHANGED_FILES" | grep -q -v -E '\.(md|txt)$'; then
             echo "Only documentation files changed"

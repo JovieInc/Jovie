@@ -295,12 +295,38 @@ describe('source PR path-output reachability contract', () => {
     expect(detectStep).not.toContain('echo "skip=');
     expect(workflow).not.toContain('needs.ci-path-changes.outputs.skip');
 
-    // Workflows and canonical changelog content cannot take the docs-only exit.
-    // ci-fast additionally keys only
+    // Workflows, the canonical changelog, and native playbook sources cannot
+    // take the docs-only exit. Ordinary markdown still can. ci-fast keys only
     // off the authoritative Path Changes conclusion, including docs-only PRs.
+    const docsOnlyExclusion =
+      '^(\\.github/|CHANGELOG\\.md$|docs/playbooks/[^/]+\\.playbook\\.md$)';
     expect(detectStep).toContain(
-      'if ! echo "$CHANGED_FILES" | grep -q -E \'^(\\.github/|CHANGELOG\\.md$)\''
+      `if ! echo "$CHANGED_FILES" | grep -q -E '${docsOnlyExclusion}'`
     );
+    for (const productPath of [
+      '.github/workflows/ci.yml',
+      'CHANGELOG.md',
+      'docs/playbooks/growth-presence-repair-offer.playbook.md',
+    ]) {
+      expect(
+        spawnSync('grep', ['-q', '-E', docsOnlyExclusion], {
+          input: productPath,
+        }).status,
+        productPath
+      ).toBe(0);
+    }
+    for (const prosePath of [
+      'README.md',
+      'docs/playbooks/TEMPLATE.md',
+      'docs/changelog.md',
+    ]) {
+      expect(
+        spawnSync('grep', ['-q', '-E', docsOnlyExclusion], {
+          input: prosePath,
+        }).status,
+        prosePath
+      ).toBe(1);
+    }
     expect(
       detectStep.lastIndexOf('echo "has_code_changes=true"')
     ).toBeGreaterThan(detectStep.indexOf('Only documentation files changed'));
