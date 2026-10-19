@@ -11,9 +11,8 @@
  * That file is data: it does not call the mutation. A string hit counts inside
  * a string literal, or as `gh pr merge --auto`.
  *
- * The rearm job in merge-queue-green-enroll.yml is an acknowledged exception:
- * it prints a warning and does not fail the run. Every other enqueue mismatch
- * fails. Removing the live mismatch without removing the exception also fails.
+ * Enqueue mismatches fail unless explicitly acknowledged in the catalog.
+ * Removing a live mismatch without removing its acknowledgement also fails.
  *
  * REST writes, Octokit writes, and the other GraphQL mutations are a separate
  * catalog. They are not enforced here.
@@ -48,10 +47,7 @@ const callCatalog = JSON.parse(
 /** @type {Record<string, Requirement>} */
 export const GRAPHQL_MUTATIONS = callCatalog.graphql;
 
-/**
- * Pre-existing rearm failure (run 38960318802, job 117173542106).
- * Scope changes are Tim-only; this check must not edit the token.
- */
+/** Explicit exceptions from the non-executable catalog; normally empty. */
 export const ACKNOWLEDGED_MISMATCHES = callCatalog.acknowledgements;
 
 const enqueueCall = callCatalog.cliEnqueueKey;
