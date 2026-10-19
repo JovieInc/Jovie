@@ -233,7 +233,10 @@ test.describe('Auth signup onboarding canary', () => {
     const result = await page.evaluate(async payload => {
       const res = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-jovie-e2e-require-turnstile': '1',
+        },
         body: JSON.stringify(payload),
       });
       return { status: res.status, body: await res.text() };

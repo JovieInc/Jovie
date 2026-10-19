@@ -3,7 +3,6 @@ set -euo pipefail
 
 deploy_id="${PRODUCTION_DEPLOYMENT_ID:-}"
 vercel_cli="${VERCEL_CLI:-./node_modules/.bin/vercel}"
-gh_cli="${GH_CLI:-gh}"
 expected_main_sha="${EXPECTED_MAIN_SHA:-}"
 repository="${GITHUB_REPOSITORY:-}"
 poll_seconds="${PRODUCTION_PROMOTION_POLL_SECONDS:-5}"
@@ -367,22 +366,31 @@ echo "Current production deployment before promotion: $previous_id ($previous_ur
 
 # Main may advance while the staged production artifact is inspected. Bind the
 # mutation inside this controller, immediately after authoritative Vercel state
-# discovery and before any promote/rollout command.
-current_main_sha="$($gh_cli api "repos/$repository/commits/main" --jq '.sha // empty')"
-if [[ ! "$current_main_sha" =~ ^[0-9a-f]{40}$ ]]; then
-  echo "Unable to resolve exact main immediately before production mutation." >&2
+# discovery and before any promote/rollout command. Lineage is git ls-remote
+# plus merge-base, so an exhausted installation quota cannot block promotion.
+# Unproven ancestry still fails closed. A proven rewind yields.
+lineage_output="$(mktemp)"
+# Keep boolean evidence local: Doppler can mask it across job outputs.
+if ! GITHUB_OUTPUT="$lineage_output" \
+  MAIN_LINEAGE_TRANSPORT=git \
+  EXPECTED_SHA="$expected_main_sha" \
+  bash "$(dirname "$0")/recheck-main-lineage.sh" "inside production promotion"; then
+  rm -f "$lineage_output"
   write_failure production_promotion_state_invalid
   exit 1
 fi
-# Forward-only lineage: an authorized SHA that is still an ancestor of main is
-# promoted even though main advanced; only a rewind or force-push yields.
-if [ "$current_main_sha" != "$expected_main_sha" ] &&
-  [ "$($gh_cli api "repos/$repository/compare/${expected_main_sha}...${current_main_sha}" --jq '.status // empty')" != "ahead" ]; then
+is_current="$(sed -n 's/^is_current=//p' "$lineage_output")"
+superseded_sha="$(sed -n 's/^superseded_sha=//p' "$lineage_output")"
+rm -f "$lineage_output"
+if [ "$is_current" = false ] && [[ "$superseded_sha" =~ ^[0-9a-f]{40}$ ]]; then
   if [ -n "${GITHUB_OUTPUT:-}" ]; then
-    printf 'promotion_sha=%s\n' "$current_main_sha" >> "$GITHUB_OUTPUT"
+    printf 'promotion_sha=%s\n' "$superseded_sha" >> "$GITHUB_OUTPUT"
   fi
-  echo "Release $expected_main_sha left main's lineage (main is $current_main_sha) before production mutation."
+  echo "Release $expected_main_sha left main's lineage (main is $superseded_sha) before production mutation."
   exit 0
+elif [ "$is_current" != true ]; then
+  write_failure production_promotion_state_invalid
+  exit 1
 fi
 if [ -n "${GITHUB_OUTPUT:-}" ]; then
   # The promoted SHA is public, high-entropy release identity. Unlike a boolean

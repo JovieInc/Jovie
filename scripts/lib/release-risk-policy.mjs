@@ -197,7 +197,9 @@ function runCli(args) {
   const receipt = buildReleaseRiskReceipt({
     lineageSha: range.currentSha,
     riskReceipt: release.actualResults?.riskReceipt,
-    deployableWeb: range.selectedLanes.includes('web'),
+    // The planner also requires Web to bind an operations/native-only main
+    // head to production. Product-lane selection alone loses that requirement.
+    deployableWeb: range.runWeb,
     mergeAt: arg(args, 'merge-at'),
   });
   writeFileSync(out, `${JSON.stringify(receipt, null, 2)}\n`);

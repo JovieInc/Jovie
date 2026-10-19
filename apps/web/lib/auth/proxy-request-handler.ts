@@ -300,7 +300,10 @@ export async function handleProxyRequest(
       // Anonymous /waitlist is the public waitlist-first handoff (JOV-5376).
       // Authenticated pre-receipt recovery stays on the page helper.
 
-      // Check if path requires authentication
+      // Check if path requires authentication. Signed-out
+      // /onboarding/checkout stays on this redirect, including screenshot
+      // CI. The checkout proof enters through the test-auth session instead
+      // of opening the route anonymously.
       const needsAuth = pathInfo.isProtectedPath;
 
       if (needsAuth) {

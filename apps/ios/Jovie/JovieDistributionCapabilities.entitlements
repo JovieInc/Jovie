@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!--
+  Release entitlements to select after the match AppStore profile includes
+  Push Notifications, Wallet, and Pass Type ID pass.ie.jov.profile.
+  aps-environment must stay production for TestFlight and the App Store.
+-->
+<dict>
+	<key>aps-environment</key>
+	<string>production</string>
+	<key>com.apple.developer.pass-type-identifiers</key>
+	<array>
+		<string>$(TeamIdentifierPrefix)pass.ie.jov.profile</string>
+	</array>
+</dict>
+</plist>

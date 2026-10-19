@@ -11,4 +11,19 @@ describe('resolvePasskeyRpId', () => {
     expect(resolvePasskeyRpId({ VERCEL_ENV: 'development' })).toBe('localhost');
     expect(resolvePasskeyRpId({})).toBe('localhost');
   });
+
+  it('follows the loopback hostname the browser origin actually uses', () => {
+    expect(
+      resolvePasskeyRpId({
+        VERCEL_ENV: 'development',
+        NEXT_PUBLIC_APP_URL: 'http://127.0.0.1:3100',
+      })
+    ).toBe('127.0.0.1');
+    expect(
+      resolvePasskeyRpId({
+        VERCEL_ENV: 'production',
+        NEXT_PUBLIC_APP_URL: 'http://127.0.0.1:3100',
+      })
+    ).toBe('jov.ie');
+  });
 });

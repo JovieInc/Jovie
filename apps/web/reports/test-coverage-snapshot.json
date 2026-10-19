@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-16T05:56:40.746Z",
+  "generated_at": "2026-10-16T20:07:25.165Z",
   "surfaces": {
     "rls-access-control": {
       "coverage_pct": 77.6,
@@ -32,9 +32,9 @@
       "status": "RED"
     },
     "public-profile-isr": {
-      "coverage_pct": 87,
-      "branch_pct": 78.6,
-      "risk_score": 27.7,
+      "coverage_pct": 85,
+      "branch_pct": 78.3,
+      "risk_score": 27.8,
       "status": "YELLOW"
     },
     "claim-onboarding": {
@@ -50,9 +50,9 @@
       "status": "YELLOW"
     },
     "api-routes-contract": {
-      "coverage_pct": 74.7,
-      "branch_pct": 64.2,
-      "risk_score": 25.1,
+      "coverage_pct": 74.8,
+      "branch_pct": 64.3,
+      "risk_score": 25,
       "status": "YELLOW"
     },
     "marketing-static": {

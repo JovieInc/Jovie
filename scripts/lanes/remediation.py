@@ -87,9 +87,21 @@ STRATEGY_TEXT = re.compile(
 # An ordinary engineering repair frequently states what it did NOT touch
 # ("No credentials or permissions are changed"); a negated credential/secret
 # mention is assurance, not a founder decision surface (JOV-8495 re-review).
+# A cost-impact list ("No new service, schedule, controller, credentials")
+# is the same assurance. Only a bare list item is removed; "rotate the
+# credential" and any pricing/taste/strategy ask in that sentence stay.
 NEGATED_POLICY_TEXT = re.compile(
     r"\bno\s+(?:new\s+)?(?:credentials?|secrets?|tokens?|permissions?|scopes?)\b"
     r"|\b(?:without|not)\s+(?:changing|touching|adding)\s+(?:any\s+)?(?:credentials?|secrets?|permissions?)",
+    re.IGNORECASE,
+)
+_NO_NEW_ASSURANCE = re.compile(r"\bno\s+new\b", re.IGNORECASE)
+_BARE_LIST_CREDENTIAL = re.compile(
+    r"(?<=,)\s*(?:and\s+|or\s+)?credentials?\b",
+    re.IGNORECASE,
+)
+_NON_CREDENTIAL_STRATEGY = re.compile(
+    r"canon/strategy|founder strategy|pricing|taste\b",
     re.IGNORECASE,
 )
 ACTIONABLE_FIX = re.compile(
@@ -226,6 +238,21 @@ def _actionable(text: str) -> bool:
     return bool(text and ACTIONABLE_FIX.search(text))
 
 
+def _strip_negated_policy(text: str) -> str:
+    """Remove assurance-only credential mentions, one sentence at a time."""
+    pieces = re.split(r"([.!\n])", text)
+    stripped = []
+    for index, piece in enumerate(pieces):
+        if index % 2 == 1:
+            stripped.append(piece)
+            continue
+        piece = NEGATED_POLICY_TEXT.sub("", piece)
+        if _NO_NEW_ASSURANCE.search(piece) and not _NON_CREDENTIAL_STRATEGY.search(piece):
+            piece = _BARE_LIST_CREDENTIAL.sub("", piece)
+        stripped.append(piece)
+    return "".join(stripped)
+
+
 def _strategy(pr: dict) -> bool:
     files = pr.get("files") or pr.get("paths") or pr.get("conflictFiles") or []
     # Protected paths are independent evidence; prose assurances cannot negate them.
@@ -233,7 +260,7 @@ def _strategy(pr: dict) -> bool:
         return True
     # Remove only the negated credential mention. A pricing/taste/strategy ask
     # in the same sentence or a separate title still requires authority.
-    return any(STRATEGY_TEXT.search(NEGATED_POLICY_TEXT.sub("", text))
+    return any(STRATEGY_TEXT.search(_strip_negated_policy(text))
                for text in (pr.get("title") or "", pr.get("body") or ""))
 
 
@@ -1413,11 +1440,36 @@ def plan_labeled_events(issues: list, recorded: dict | None, providers: dict, no
             row["attemptCount"] = len(prior_attempts)
             if canonical is None:
                 if history:
-                    _absorb_event(row, history[0], fingerprint)
+                    closed = next((issue for issue in history if issue.get("id") == recorded_id), history[0])
+                    _absorb_event(row, closed, fingerprint)
+                    # A local landing result also says "done". Only a witnessed
+                    # Linear completion can qualify a fresh same-issue ladder.
+                    completed = row.get("completedGeneration")
+                    completed = completed if isinstance(completed, dict) else {}
+                    completed_at = iso_epoch(completed.get("consumedAt", completed.get("updatedAt")))
+                    closed_at = iso_epoch(closed.get("updatedAt"))
+                    if _state_type(closed) == "completed" and closed_at is not None:
+                        if completed.get("issueId") != closed.get("id") or (completed_at is not None and closed_at > completed_at):
+                            row["completedGeneration"] = {"issueId": closed.get("id"), "updatedAt": closed["updatedAt"],
+                                                          "team": (closed.get("team") or {}).get("key")}
+                    # Only newer or unreadable terminal evidence invalidates a pending completion.
+                    elif completed and (closed_at is None or completed_at is None or closed_at >= completed_at):
+                        row["completedGeneration"] = {**completed, "consumed": True}
+                        # Delayed/unknown terminal reads cannot lower the accepted version.
+                        if closed_at is not None and (completed_at is None or closed_at > completed_at):
+                            row["completedGeneration"]["consumedAt"] = closed["updatedAt"]
                 row["status"] = "done"
                 row["running"] = False
                 events[fingerprint] = row
                 continue
+            completed = row.get("completedGeneration")
+            completed = completed if isinstance(completed, dict) else {}
+            completed_at, reopened_at = iso_epoch(completed.get("updatedAt")), iso_epoch(canonical.get("updatedAt"))
+            observed_recurrence = (not completed.get("consumed")
+                                   and completed.get("issueId") == recorded_id == canonical.get("id")
+                                   and completed.get("team") == (canonical.get("team") or {}).get("key")
+                                   and _state_type(canonical) in {"triage", "backlog", "unstarted", "started"}
+                                   and completed_at is not None and reopened_at is not None and reopened_at > completed_at)
             _absorb_event(row, canonical, fingerprint)
             for other in duplicates:
                 if _note(row, other.get("id")):
@@ -1427,7 +1479,16 @@ def plan_labeled_events(issues: list, recorded: dict | None, providers: dict, no
                                  f"{canonical.get('identifier')}. This issue is not a second event.\n"
                                  + event_marker("dup", fingerprint)),
                     })
-            if recorded_id and canonical.get("id") != recorded_id:
+            if recorded_id and (canonical.get("id") != recorded_id or observed_recurrence):
+                if observed_recurrence:
+                    # Retain the consumed version against a delayed completed snapshot.
+                    row["completedGeneration"] = {**completed, "consumed": True, "consumedAt": canonical["updatedAt"]}
+                    # Structural Linear evidence, independent of a repeated/rolled-back host clock.
+                    # Merely observing a later pending completion must retain this old active binding.
+                    row["activeGeneration"] = {"completedAt": completed["updatedAt"], "openedAt": canonical["updatedAt"]}
+                else:
+                    row.pop("completedGeneration", None)
+                    row.pop("activeGeneration", None)
                 row["release"] = True
                 row["running"] = False
                 row["lane"] = None
@@ -1479,6 +1540,9 @@ def plan_labeled_events(issues: list, recorded: dict | None, providers: dict, no
                 continue
         elif row.get("status") in {"human", "exhausted", "done"} and not row.get("release"):
             if row.get("status") == "done":
+                if escalation_enabled() and (row.get("startDelivery") or {}).get("settled"):
+                    events[fingerprint] = row
+                    continue  # A settled delivery waits for a proven new completed-to-open generation.
                 stamp = str(canonical.get("updatedAt") or "")
                 if _note(row, f"recur:{stamp}"):
                     comments.append({

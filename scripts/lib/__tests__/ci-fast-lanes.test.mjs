@@ -10,6 +10,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { parseCLI } from 'vitest/node';
 import {
   ACQUISITION_CERTIFICATION_COMMAND,
   BILLING_PROVENANCE_COVERAGE_COMMAND,
@@ -84,10 +85,15 @@ it('enforces lifecycle coverage through the real structural selector', async () 
   // The coverage command is an operations-lane part. A merge group narrows
   // CI_PRODUCT_LANES to the diff (web-only for an e2e spec) and the structural
   // jobs set split modes the parent deletes before spawning this suite.
+  // workflow_dispatch keeps that selector off the live checkout. A docs-only
+  // pull_request selects neither product nor control lanes, skips structural
+  // before CI_PRODUCT_LANES applies, and caches that skip for later tests.
   const previous = {
+    GITHUB_EVENT_NAME: process.env.GITHUB_EVENT_NAME,
     CI_PRODUCT_LANES: process.env.CI_PRODUCT_LANES,
     CI_FAST_STRUCTURAL_PYTEST: process.env.CI_FAST_STRUCTURAL_PYTEST,
     CI_FAST_STRUCTURAL_WEB: process.env.CI_FAST_STRUCTURAL_WEB,
+    CI_FAST_SKIP_STRUCTURAL: process.env.CI_FAST_SKIP_STRUCTURAL,
   };
   const collect = async () => {
     const commands = [];
@@ -102,8 +108,10 @@ it('enforces lifecycle coverage through the real structural selector', async () 
     );
   };
   try {
+    process.env.GITHUB_EVENT_NAME = 'workflow_dispatch';
     delete process.env.CI_FAST_STRUCTURAL_PYTEST;
     delete process.env.CI_FAST_STRUCTURAL_WEB;
+    delete process.env.CI_FAST_SKIP_STRUCTURAL;
     process.env.CI_PRODUCT_LANES = 'ios,mac,web,operations,cross-product';
     expect(await collect()).toHaveLength(1);
     process.env.CI_PRODUCT_LANES = 'web';
@@ -124,9 +132,20 @@ it('enforces lifecycle coverage through the real structural selector', async () 
       `lib/__tests__/${test}.test.mjs`
     );
   }
-  expect(VALIDATION_LIFECYCLE_COVERAGE_COMMAND).toContain(
-    '--coverage.thresholds.perFile=true'
-  );
+  // An explicit '=true' becomes a string in Vitest 5 and silently checks
+  // aggregate coverage. Exercise its actual parser at this runner boundary.
+  expect(
+    parseCLI(VALIDATION_LIFECYCLE_COVERAGE_COMMAND.replace(/^pnpm exec /u, ''))
+      .options.coverage
+  ).toMatchObject({
+    thresholds: {
+      perFile: true,
+      lines: 90,
+      statements: 90,
+      branches: 75,
+      functions: 85,
+    },
+  });
   expect(VALIDATION_LIFECYCLE_COVERAGE_COMMAND).toContain(
     '--coverage.thresholds.lines=90'
   );
@@ -139,6 +158,14 @@ describe('Shared fenced-attempt coverage contract', () => {
   it('runs existing fenced-attempt and lane regressions in the real structural selector', () => {
     const command = STRUCTURAL_PYTHON_REGRESSION_COMMANDS[0];
     expect(command).toContain('scripts/tests/test_execution_attempt.py');
+    expect(command).toContain('scripts/tests/test_backlog_admission.py');
+    expect(command).toContain('scripts/tests/test_backlog_writer_guard.py');
+    expect(command).toContain(
+      '*/scripts/lanes/backlog_writer_guard.py" --fail-under=90'
+    );
+    expect(command).toContain(
+      '*/scripts/lanes/backlog_admission.py" --fail-under=90'
+    );
     expect(command).toContain('scripts/tests/test_remediation.py');
     expect(command).toContain(
       '*/scripts/lanes/remediation.py" --fail-under=85'
@@ -146,7 +173,12 @@ describe('Shared fenced-attempt coverage contract', () => {
     expect(command).toContain('scripts/tests/test_lane_runner.py');
     expect(command).toContain('scripts/tests/test_design_gate.py');
     expect(command).toContain('scripts/tests/test_disk_guard.py');
+    expect(command).toContain('scripts/tests/test_qualification_guard.py');
+    expect(command).toContain(
+      '*/scripts/lanes/qualification_guard.py" --fail-under=85'
+    );
     expect(command).toContain('scripts/tests/test_hud.py');
+    expect(command).toContain('*/scripts/lanes/hud.py" --fail-under=80');
     expect(command).toContain('scripts/tests/test_codex_lane.py');
     expect(command).toContain('*/scripts/lanes/codex_lane.py" --fail-under=85');
     expect(command).toContain('scripts/tests/test_devin_free_policy.py');

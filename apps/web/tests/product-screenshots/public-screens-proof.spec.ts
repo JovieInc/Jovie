@@ -26,9 +26,6 @@ const PUBLIC_SCREENS = [
   { screenId: 'web.brand', route: '/brand' },
   { screenId: 'web.report', route: '/report' },
   { screenId: 'web.start', route: '/start' },
-  // Auth-gated on production. Screenshot CI renders the fixture branch
-  // on this same route; see apps/web/app/onboarding/checkout/page.tsx.
-  { screenId: 'web.onboarding-checkout', route: '/onboarding/checkout' },
   // /solutions/* is a wildcard manifest family; /solutions/artists is its
   // declared concrete health-check path.
   { screenId: 'web.marketing-solutions', route: '/solutions/artists' },
@@ -103,7 +100,9 @@ test('emits exact-head public screen evidence', async ({ page }) => {
         waitUntil: 'domcontentloaded',
         timeout: 120_000,
       });
-      expect(response?.status()).toBe(200);
+      expect(response?.status(), `${screen.screenId} ${screen.route}`).toBe(
+        200
+      );
       const finalUrl = new URL(page.url());
       expect(finalUrl.pathname).toBe(screen.route);
       expect(finalUrl.search).toBe('');

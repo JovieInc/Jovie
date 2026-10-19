@@ -14,6 +14,16 @@ expected="${EXPECTED_SHA:-${EXPECTED_MAIN_SHA:-}}"
 repository="${GITHUB_REPOSITORY:-${REPOSITORY:-}}"
 remote="${MAIN_LINEAGE_REMOTE:-https://github.com/${repository}.git}"
 gh_cli="${GH_CLI:-gh}"
+hold_script="${GH_API_HOLD_SCRIPT:-$(cd "$(dirname "$0")" && pwd)/gh-api-hold.sh}"
+# rest: try installation REST, then git. git: ls-remote plus merge-base only.
+# The production mutation recheck uses git so an exhausted installation
+# quota cannot block promotion. git still fails closed when ancestry is
+# unproven. It never treats a missing read as current.
+transport="${MAIN_LINEAGE_TRANSPORT:-rest}"
+if [ "$transport" != "rest" ] && [ "$transport" != "git" ]; then
+  echo "::error::MAIN_LINEAGE_TRANSPORT must be rest or git." >&2
+  exit 1
+fi
 
 [[ "$expected" =~ ^[0-9a-f]{40}$ ]] || {
   echo "::error::expected_sha must be a full commit SHA." >&2
@@ -48,10 +58,17 @@ gh_capture() {
   local err output status
   err="$(mktemp)"
   set +e
-  output="$("$gh_cli" api "$@" 2>"$err")"
+  # Hold an installation 403 until x-ratelimit-reset when that instant is
+  # inside GH_API_HOLD_BUDGET_SECONDS. A missing reset, a reset outside the
+  # budget, or any other error still returns non-zero. Callers then prove the
+  # SHA with git or fail closed. A rate-limit body is never an empty success.
+  output="$(GH_API_HOLD_BIN="$gh_cli" bash "$hold_script" api "$@" 2>"$err")"
   status=$?
   set -e
   if [ "$status" -eq 0 ]; then
+    # Keep the hold warning visible. A successful retry is still a rate-limit
+    # event, and dropping stderr would hide it.
+    cat "$err" >&2
     printf '%s\n' "$output"
     rm -f "$err"
     return 0
@@ -63,6 +80,15 @@ gh_capture() {
 
 read_main_sha() {
   local sha status
+  if [ "$transport" = "git" ]; then
+    if ! sha="$(git_main ls-remote "$remote" refs/heads/main | awk 'NR==1 { print $1 }')" \
+      || ! [[ "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+      echo "::error::git could not resolve main ${context}." >&2
+      return 1
+    fi
+    printf '%s\n' "$sha"
+    return 0
+  fi
   set +e
   sha="$(gh_capture "repos/${repository}/commits/main" --jq '.sha // empty')"
   status=$?
@@ -137,6 +163,10 @@ compare_status() {
     printf 'identical\n'
     return 0
   fi
+  if [ "$transport" = "git" ]; then
+    git_lineage "$current"
+    return
+  fi
   set +e
   status="$(gh_capture "repos/${repository}/compare/${expected}...${current}" --jq '.status // empty')"
   api_status=$?
@@ -158,6 +188,7 @@ current="$(read_main_sha)" || exit 1
 lineage="$(compare_status "$current")" || exit 1
 if [ "$lineage" != "identical" ] && [ "$lineage" != "ahead" ]; then
   echo "::notice::Release ${expected} left main's lineage (main is ${current}) ${context}."
+  emit superseded_sha "$current"
   emit is_current false
 else
   emit is_current true

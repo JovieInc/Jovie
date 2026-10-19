@@ -27,6 +27,13 @@ export interface DesktopBuildIdentity {
 }
 
 export interface ElectronAPI {
+  /** Version 1 adds native-authorized client handoff and isolated window roles. */
+  readonly navigationBoundaryVersion?: 1;
+  readonly windowRole?: 'main' | 'profile-preview' | 'auth';
+  readonly routeNavigation?: (
+    url: string
+  ) => Promise<{ ok: boolean; reason?: string }>;
+  readonly onNavigationError?: (callback: (url: string) => void) => () => void;
   readonly platform: NodeJS.Platform;
   readonly electronVersion: string;
   /** Main-process-validated package provenance. Optional for older shells. */
@@ -512,6 +519,7 @@ async function safeInstallUpdateAndRestart(): Promise<boolean> {
 export function isElectronRuntime(): boolean {
   if (globalThis.window === undefined) return false;
   if (isDesktopEnvironment()) return true;
+  if (/\bJovieDesktop\//.test(globalThis.navigator.userAgent)) return true;
   return (
     globalThis.document.documentElement.dataset.desktopRuntime === 'electron'
   );
@@ -1044,3 +1052,8 @@ export const __testing = {
   notifyDesktopAppBooted,
   RELEASE_DOWNLOAD_URL,
 };
+
+/** A public-route recovery must discard Next's intercepted marketing background. */
+export function recoverApplicationDocument(path: string): void {
+  globalThis.location.replace(path);
+}

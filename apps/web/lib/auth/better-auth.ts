@@ -363,7 +363,15 @@ function buildPlugins() {
       storeToken: 'hashed',
     }),
     // Admin second factor (JOV-4806): Touch ID / platform passkeys.
-    passkey({ rpName: 'Jovie', rpID: resolvePasskeyRpId(env) }),
+    // publicEnv carries the loopback origin. The server env proxy drops
+    // NEXT_PUBLIC_* keys, which would leave rpID stuck on localhost.
+    passkey({
+      rpName: 'Jovie',
+      rpID: resolvePasskeyRpId({
+        VERCEL_ENV: env.VERCEL_ENV,
+        NEXT_PUBLIC_APP_URL: publicEnv.NEXT_PUBLIC_APP_URL,
+      }),
+    }),
     adminPasskeyStepUp(),
     // nextCookies MUST stay last so Set-Cookie propagates through Next.js
     // server actions (better-auth docs + plan).

@@ -1,0 +1,7 @@
+{
+  "schema": "jovie-testflight-release-policy/v1",
+  "revision": "JOV-8515-1",
+  "maxCertificationAgeSeconds": 8400,
+  "blocked": false,
+  "revokedSources": []
+}

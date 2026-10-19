@@ -36,3 +36,22 @@ it.each([false, true])(
       expect(screen.queryByTestId('dashboard-header')).not.toBeInTheDocument();
   }
 );
+
+it('keeps its action within the same shared header as the title', () => {
+  render(
+    <SettingsSection
+      id='profile'
+      title='Profile'
+      description='Photo, name, username, and brand details'
+      headerAction={<button type='button'>View profile</button>}
+    >
+      <p>Profile controls</p>
+    </SettingsSection>
+  );
+  // The shared header owns title shrinkage and the action hit-area inset.
+  const heading = screen.getByRole('heading', { name: 'Profile' });
+  const header = heading.parentElement?.parentElement;
+  expect(header).toContainElement(
+    screen.getByRole('button', { name: 'View profile' })
+  );
+});

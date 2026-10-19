@@ -155,7 +155,10 @@ def _collect(state, *, api=None, resolve=None, now=time.monotonic):
                                   timeout=min(15, remaining))
         return response.stdout if binary else json.loads(response.stdout)
     api = api or github
-    resolve = resolve or (lambda repo, pr, head: attribution.resolve_origin_head(repo, pr, head, fetch=api))
+    # Emit already waited for post-push convergence. This tick has a 45s budget,
+    # so a receipt whose head has since moved is rejected on the first read.
+    resolve = resolve or (lambda repo, pr, head: attribution.resolve_origin_head(
+        repo, pr, head, fetch=api, attempts=1))
     result = {"accepted": [], "rejected": [], "errors": []}
     checkpoint = state / "shipping-origin-ingest.json"
     seen = json.loads(checkpoint.read_text()) if checkpoint.exists() else {}

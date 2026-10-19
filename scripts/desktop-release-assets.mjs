@@ -24,9 +24,21 @@ const BASE64_SHA512_PATTERN = /^[A-Za-z0-9+/]{86}==$/;
 // github-rate-limit.mjs (`--attempts 4 --max-wait-seconds 600`). A release
 // read holds only an installation 403 until x-ratelimit-reset inside that
 // window. Permission failures, a missing reset, and a reset past the window
-// stay fatal. Nothing here lengthens the wait or turns a 403 into success.
+// stop the read. Production prepare may defer a known reset beyond the window;
+// publication and verification still fail. No quota response proves a release.
 export const RELEASE_ASSET_READ_ATTEMPTS = 4;
 export const RELEASE_ASSET_READ_MAX_WAIT_MS = 600_000;
+
+class ReleaseAssetQuotaDeferred extends Error {
+  /** @param {number} resetAtMs */
+  constructor(resetAtMs) {
+    const resetAt = new Date(resetAtMs).toISOString();
+    super(
+      `Installation quota resets at ${resetAt}, beyond the release read budget.`
+    );
+    this.resetAt = resetAt;
+  }
+}
 
 /**
  * Wait before repeating a release-asset GET, or null when the answer is final.
@@ -172,7 +184,43 @@ export function selectRecoverableStagingDraft(releases) {
   return release;
 }
 
-export async function fetchRecoverableStagingDraft(
+export function selectRecoverableProductionDraft(
+  releases,
+  { releaseSha, version }
+) {
+  releaseSpec('production', version);
+  invariant(SHA_PATTERN.test(releaseSha), 'Release SHA is malformed.');
+  invariant(Array.isArray(releases), 'GitHub releases are malformed.');
+  const candidates = releases.filter(
+    release =>
+      UNTAGGED_RELEASE_PATTERN.test(release?.tag_name || '') &&
+      release.name === version &&
+      release.target_commitish === releaseSha
+  );
+  invariant(
+    candidates.length <= 1,
+    'Multiple recoverable production drafts exist.'
+  );
+  const release = candidates[0] || null;
+  if (!release) return null;
+  invariant(
+    Number.isInteger(release.id) && release.id > 0,
+    'Recoverable production draft ID is malformed.'
+  );
+  invariant(
+    release.draft === true &&
+      release.prerelease === false &&
+      release.published_at === null,
+    'Recoverable production release must be a private nonprerelease draft.'
+  );
+  invariant(
+    Array.isArray(release.assets) && release.assets.length === 0,
+    'Recoverable production draft must be empty.'
+  );
+  return release;
+}
+
+async function fetchReleaseInventory(
   request,
   { maxPages = MAX_RELEASE_PAGES, pageSize = RELEASE_PAGE_SIZE } = {}
 ) {
@@ -195,11 +243,24 @@ export async function fetchRecoverableStagingDraft(
     );
     releases.push(...batch);
     if (batch.length < pageSize) {
-      return selectRecoverableStagingDraft(releases);
+      return releases;
     }
   }
   throw new Error(
     `GitHub release inventory exceeds the ${maxPages}-page safety bound.`
+  );
+}
+
+export async function fetchRecoverableStagingDraft(request, options) {
+  return selectRecoverableStagingDraft(
+    await fetchReleaseInventory(request, options)
+  );
+}
+
+export async function fetchRecoverableProductionDraft(request, input, options) {
+  return selectRecoverableProductionDraft(
+    await fetchReleaseInventory(request, options),
+    input
   );
 }
 
@@ -709,8 +770,26 @@ export class GitHubClient {
           await this.sleep(waitMs);
           continue;
         }
+        if (
+          method === 'GET' &&
+          attempt < RELEASE_ASSET_READ_ATTEMPTS &&
+          isInstallationQuota403(body, response.status)
+        ) {
+          const { retryAtMs } = classifyGitHubFailure({
+            status: response.status,
+            message: body,
+            headers: response.headers,
+            now: this.now(),
+          });
+          if (retryAtMs !== null && retryAtMs > deadlineMs) {
+            throw new ReleaseAssetQuotaDeferred(retryAtMs);
+          }
+        }
+        const quotaContext = isInstallationQuota403(body, response.status)
+          ? ` [x-ratelimit-remaining=${response.headers.get('x-ratelimit-remaining') ?? 'missing'} x-ratelimit-reset=${response.headers.get('x-ratelimit-reset') ?? 'missing'}]`
+          : '';
         throw new Error(
-          `GitHub API ${method} ${url} failed (${response.status}): ${body.slice(0, 500)}`
+          `GitHub API ${method} ${url} failed (${response.status}): ${body.slice(0, 500)}${quotaContext}`
         );
       }
       if (raw) {
@@ -749,6 +828,13 @@ export class GitHubClient {
   async recoverableStagingDraft() {
     return fetchRecoverableStagingDraft(path =>
       this.request(`/repos/${this.repository}/releases${path}`)
+    );
+  }
+
+  async recoverableProductionDraft(input) {
+    return fetchRecoverableProductionDraft(
+      path => this.request(`/repos/${this.repository}/releases${path}`),
+      input
     );
   }
 
@@ -1040,6 +1126,35 @@ export async function prepare({
 }) {
   const spec = releaseSpec(environment, version);
   let release = await client.releaseOrDraftByTag(spec.tag, true);
+  if (environment === 'production' && !release) {
+    const input = { releaseSha, version };
+    const recoverable = await client.recoverableProductionDraft(input);
+    if (recoverable) {
+      const releaseId = recoverable.id;
+      const fresh = await client.releaseById(releaseId);
+      invariant(
+        fresh?.id === releaseId &&
+          selectRecoverableProductionDraft([fresh], input) === fresh,
+        'Recoverable production draft changed before normalization.'
+      );
+      await updateRelease(client, fresh, environment, releaseSha, version);
+      release = await client.releaseById(releaseId);
+      invariant(
+        release?.id === releaseId &&
+          release.published_at === null &&
+          Array.isArray(release.assets) &&
+          release.assets.length === 0,
+        'Recovered production draft identity or empty private state changed.'
+      );
+      validateReleaseEnvelope({
+        environment,
+        release,
+        releaseSha,
+        version,
+        draft: true,
+      });
+    }
+  }
   if (environment === 'staging') {
     assertStagingVersionTransition({ installedVersion, version });
     if (!release) {
@@ -1083,7 +1198,10 @@ export async function prepare({
 
   if (!release) {
     release = await client.createDraft({ environment, releaseSha, version });
-  } else if (release.target_commitish !== releaseSha) {
+  } else if (
+    environment === 'staging' &&
+    release.target_commitish !== releaseSha
+  ) {
     invariant(
       release.draft === true &&
         Array.isArray(release.assets) &&
@@ -1466,7 +1584,26 @@ async function main() {
   };
 
   if (command === 'prepare') {
-    await prepare(common);
+    if (common.output) await writeOutputs(common.output, { prepared: false });
+    try {
+      await prepare(common);
+    } catch (error) {
+      // Only draft preparation can yield to reconciliation. Upload and
+      // verification must never turn unavailable release proof into success.
+      if (
+        environment !== 'production' ||
+        !(error instanceof ReleaseAssetQuotaDeferred)
+      ) {
+        throw error;
+      }
+      const message = `Installation quota resets at ${error.resetAt}. Deferring desktop preparation of ${releaseSha} to the next reconciliation. No desktop release was published.`;
+      process.stderr.write(`::warning::github-quota-deferred: ${message}\n`);
+      if (process.env.GITHUB_STEP_SUMMARY) {
+        await appendFile(process.env.GITHUB_STEP_SUMMARY, `${message}\n`);
+      }
+      return;
+    }
+    if (common.output) await writeOutputs(common.output, { prepared: true });
   } else if (command === 'upload-and-publish') {
     invariant(args.dist, '--dist is required.');
     await uploadAndPublish({ ...common, dist: args.dist });

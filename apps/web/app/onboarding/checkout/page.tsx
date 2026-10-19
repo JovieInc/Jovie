@@ -62,10 +62,11 @@ export default async function OnboardingCheckoutPage({
 }: Readonly<{
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }>) {
-  // JOV-8068 screen-audit producer. Screenshot CI admits this branch
-  // (PUBLIC_NOAUTH_SMOKE, not a production deployment) so the registered
-  // checkout screen can render without a session. VERCEL_ENV=production
-  // fails closed inside isRenderFixtureEnabled and keeps the auth gate.
+  // JOV-8068 screen-audit producer. The authenticated screenshot proof
+  // enters through /api/dev/test-auth/enter, then this branch renders the
+  // registered checkout screen without the noop database. Signed-out
+  // requests never reach it: the proxy redirects them to /signin.
+  // VERCEL_ENV=production fails closed and keeps the auth gate.
   if (isRenderFixtureEnabled()) {
     const pricing = resolvePriceIds('pro');
     return (
