@@ -87,122 +87,117 @@ function MerchFlowPreview() {
 export function InstantMerchLanding() {
   return (
     <MarketingPageShell className='bg-base text-primary-token'>
-      <main>
-        <MarketingHero
-          eyebrow={copy.hero.eyebrow}
-          title={copy.hero.title}
-          body={copy.hero.body}
-          media={<MerchFlowPreview />}
-          photo={{
-            src: '/images/marketing-hero/instant-merch.webp',
-            width: 1600,
-            height: 901,
-          }}
-          headingId='instant-merch-hero-heading'
-          headlineMaxLines='none'
-          sectionTestId='marketing-section-hero'
-          sectionVariant='split-screenshot-right'
-          sectionOwner='apps/web/app/(marketing)/instant-merch/InstantMerchLanding.tsx'
-          primaryCtaLabel={copy.hero.primaryCta}
-          primaryCtaHref={CREATE_MERCH_HREF}
-          primaryCtaTestId='instant-merch-primary-cta'
-          secondaryCtaLabel={copy.hero.secondaryCta}
-          secondaryCtaHref='#instant-merch-flow'
-          subcopy={copy.hero.subcopy}
-        />
+      <MarketingHero
+        eyebrow={copy.hero.eyebrow}
+        title={copy.hero.title}
+        body={copy.hero.body}
+        media={<MerchFlowPreview />}
+        photo={{
+          src: '/images/marketing-hero/instant-merch.webp',
+          width: 1600,
+          height: 901,
+        }}
+        headingId='instant-merch-hero-heading'
+        headlineMaxLines='none'
+        sectionTestId='marketing-section-hero'
+        sectionVariant='split-screenshot-right'
+        sectionOwner='apps/web/app/(marketing)/instant-merch/InstantMerchLanding.tsx'
+        primaryCtaLabel={copy.hero.primaryCta}
+        primaryCtaHref={CREATE_MERCH_HREF}
+        primaryCtaTestId='instant-merch-primary-cta'
+        secondaryCtaLabel={copy.hero.secondaryCta}
+        secondaryCtaHref='#instant-merch-flow'
+        subcopy={copy.hero.subcopy}
+      />
 
-        <section
-          id='instant-merch-flow'
-          aria-labelledby='instant-merch-flow-heading'
-          className='border-t border-subtle py-16 sm:py-20'
-          data-testid='marketing-section-how-it-works'
-          data-marketing-variant='3-step-strip'
-          data-marketing-owner='apps/web/app/(marketing)/instant-merch/InstantMerchLanding.tsx'
-        >
-          <MarketingContainer width='page'>
-            <div className='mx-auto max-w-3xl text-center'>
-              <p className='homepage-section-eyebrow'>{copy.flow.eyebrow}</p>
-              <h2
-                id='instant-merch-flow-heading'
-                className='mt-3 text-balance text-2xl font-semibold tracking-tight text-primary-token sm:text-3xl line-clamp-2'
-              >
-                {copy.flow.title}
-              </h2>
-              <p className='mt-3 text-pretty leading-7 text-secondary-token'>
-                {copy.flow.body}
-              </p>
-            </div>
-            <div className='mx-auto mt-12 grid max-w-5xl gap-8 md:grid-cols-3'>
-              {copy.flow.steps.map((step, index) => (
-                <article
-                  key={step.title}
-                  className='border-t border-subtle pt-5'
-                >
-                  <p className='text-xs font-mono text-tertiary-token'>
-                    0{index + 1}
-                  </p>
-                  <h3 className='mt-3 text-lg font-medium text-primary-token'>
-                    {step.title}
-                  </h3>
-                  <p className='mt-2 text-sm leading-6 text-secondary-token'>
-                    {step.description}
-                  </p>
-                </article>
-              ))}
-            </div>
-          </MarketingContainer>
-        </section>
-
-        <section
-          aria-labelledby='instant-merch-details-heading'
-          className='bg-panel py-16 sm:py-20'
-          data-testid='marketing-section-feature-grid'
-          data-marketing-variant='two-column-text'
-          data-marketing-owner='apps/web/app/(marketing)/instant-merch/InstantMerchLanding.tsx'
-        >
-          <MarketingContainer width='page'>
-            <div className='mx-auto max-w-3xl'>
-              <p className='homepage-section-eyebrow'>{copy.details.eyebrow}</p>
-              <h2
-                id='instant-merch-details-heading'
-                className='mt-3 text-balance text-2xl font-semibold tracking-tight text-primary-token sm:text-3xl line-clamp-2'
-              >
-                {copy.details.title}
-              </h2>
-              <MarketingFeatureGrid items={copy.details.items} />
-            </div>
-          </MarketingContainer>
-        </section>
-
-        <section
-          aria-labelledby='instant-merch-cta-heading'
-          className='py-16 sm:py-24'
-          data-testid='marketing-section-cta'
-          data-marketing-variant='included-single'
-          data-marketing-owner='apps/web/app/(marketing)/instant-merch/InstantMerchLanding.tsx'
-        >
-          <MarketingContainer width='prose' className='text-center'>
+      <section
+        id='instant-merch-flow'
+        aria-labelledby='instant-merch-flow-heading'
+        className='border-t border-subtle py-16 sm:py-20'
+        data-testid='marketing-section-how-it-works'
+        data-marketing-variant='3-step-strip'
+        data-marketing-owner='apps/web/app/(marketing)/instant-merch/InstantMerchLanding.tsx'
+      >
+        <MarketingContainer width='page'>
+          <div className='mx-auto max-w-3xl text-center'>
+            <p className='homepage-section-eyebrow'>{copy.flow.eyebrow}</p>
             <h2
-              id='instant-merch-cta-heading'
-              className='text-balance text-2xl font-semibold tracking-tight text-primary-token sm:text-3xl line-clamp-2'
+              id='instant-merch-flow-heading'
+              className='mt-3 text-balance text-2xl font-semibold tracking-tight text-primary-token sm:text-3xl line-clamp-2'
             >
-              {copy.cta.title}
+              {copy.flow.title}
             </h2>
             <p className='mt-3 text-pretty leading-7 text-secondary-token'>
-              {copy.cta.body}
+              {copy.flow.body}
             </p>
-            <Button asChild className='mt-8' data-primary-action='true'>
-              <Link
-                href={CREATE_MERCH_HREF}
-                prefetch={resolveMarketingAuthPrefetch(CREATE_MERCH_HREF)}
-                data-testid='instant-merch-final-cta'
-              >
-                {copy.cta.primaryCta}
-              </Link>
-            </Button>
-          </MarketingContainer>
-        </section>
-      </main>
+          </div>
+          <div className='mx-auto mt-12 grid max-w-5xl gap-8 md:grid-cols-3'>
+            {copy.flow.steps.map((step, index) => (
+              <article key={step.title} className='border-t border-subtle pt-5'>
+                <p className='text-xs font-mono text-tertiary-token'>
+                  0{index + 1}
+                </p>
+                <h3 className='mt-3 text-balance text-lg font-medium text-primary-token'>
+                  {step.title}
+                </h3>
+                <p className='mt-2 text-sm leading-6 text-secondary-token'>
+                  {step.description}
+                </p>
+              </article>
+            ))}
+          </div>
+        </MarketingContainer>
+      </section>
+
+      <section
+        aria-labelledby='instant-merch-details-heading'
+        className='bg-panel py-16 sm:py-20'
+        data-testid='marketing-section-feature-grid'
+        data-marketing-variant='two-column-text'
+        data-marketing-owner='apps/web/app/(marketing)/instant-merch/InstantMerchLanding.tsx'
+      >
+        <MarketingContainer width='page'>
+          <div className='mx-auto max-w-3xl'>
+            <p className='homepage-section-eyebrow'>{copy.details.eyebrow}</p>
+            <h2
+              id='instant-merch-details-heading'
+              className='mt-3 text-balance text-2xl font-semibold tracking-tight text-primary-token sm:text-3xl line-clamp-2'
+            >
+              {copy.details.title}
+            </h2>
+            <MarketingFeatureGrid items={copy.details.items} />
+          </div>
+        </MarketingContainer>
+      </section>
+
+      <section
+        aria-labelledby='instant-merch-cta-heading'
+        className='py-16 sm:py-24'
+        data-testid='marketing-section-cta'
+        data-marketing-variant='included-single'
+        data-marketing-owner='apps/web/app/(marketing)/instant-merch/InstantMerchLanding.tsx'
+      >
+        <MarketingContainer width='prose' className='text-center'>
+          <h2
+            id='instant-merch-cta-heading'
+            className='text-balance text-2xl font-semibold tracking-tight text-primary-token sm:text-3xl line-clamp-2'
+          >
+            {copy.cta.title}
+          </h2>
+          <p className='mt-3 text-pretty leading-7 text-secondary-token'>
+            {copy.cta.body}
+          </p>
+          <Button asChild className='mt-8' data-primary-action='true'>
+            <Link
+              href={CREATE_MERCH_HREF}
+              prefetch={resolveMarketingAuthPrefetch(CREATE_MERCH_HREF)}
+              data-testid='instant-merch-final-cta'
+            >
+              {copy.cta.primaryCta}
+            </Link>
+          </Button>
+        </MarketingContainer>
+      </section>
     </MarketingPageShell>
   );
 }

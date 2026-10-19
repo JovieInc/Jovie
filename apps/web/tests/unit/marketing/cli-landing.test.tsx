@@ -140,6 +140,7 @@ describe('CLI landing page', () => {
       'content-prose/article-body',
       'faq/structured-data-list',
       'cta/final-single-claim',
+      'capture/email-only',
     ]);
   });
 
