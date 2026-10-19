@@ -90,6 +90,45 @@ const rankedDecisionHud: DecisionHudView = {
 };
 
 describe('createOvieHomeBriefing', () => {
+  it('keeps snapshot assembly time separate from the local greeting clock', () => {
+    const briefing = createOvieHomeBriefing(snapshot(rankedDecisionHud), {
+      now: new Date('2026-10-19T20:00:00.000Z'),
+      timeZone: 'America/Los_Angeles',
+    });
+
+    expect(briefing.greeting).toBe('Good afternoon, Tim.');
+    expect(briefing.updatedLabel).toBe('Snapshot Sep 28, 5:00 AM PDT');
+    expect(briefing.signal.sourceFreshness).toBe('fresh');
+  });
+
+  it('preserves a ranked source’s stale status instead of refreshing it on render', () => {
+    const currentSnapshot = snapshot(rankedDecisionHud);
+    const candidate = rankedDecisionHud.items[0]!;
+    currentSnapshot.decisionHud = {
+      ...rankedDecisionHud,
+      items: [
+        {
+          ...candidate,
+          candidate: { ...candidate.candidate, freshness: 'stale' },
+        },
+      ],
+    };
+
+    expect(
+      createOvieHomeBriefing(currentSnapshot, { timeZone: 'UTC' }).signal
+        .sourceFreshness
+    ).toBe('stale');
+  });
+
+  it.each([null, { ...snapshot(), generatedAtIso: 'invalid' }])(
+    'does not invent a timestamp when the snapshot clock is unavailable',
+    value => {
+      const briefing = createOvieHomeBriefing(value, { timeZone: 'UTC' });
+      expect(briefing.updatedLabel).toBe('Snapshot time unavailable');
+      expect(briefing.signal.sourceFreshness).toBeUndefined();
+    }
+  );
+
   it('presents only the highest-value ranked signal with contextual actions', () => {
     const briefing = createOvieHomeBriefing(snapshot(rankedDecisionHud), {
       displayName: 'Tim White',
