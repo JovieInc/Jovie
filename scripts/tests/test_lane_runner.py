@@ -9319,7 +9319,7 @@ class FleetObservationDrainTest(unittest.TestCase):
              patch.object(lane, "_selftest_process_row", return_value=before), \
              patch.object(signal, "pidfd_send_signal", create=True, side_effect=ProcessLookupError()) as send, \
              patch.object(lane.time, "sleep"):
-            owned.stop_fixed(time.monotonic() + 1)
+            owned.stop_fixed(time.monotonic() + 5)
         send.assert_called_once_with(999, signal.SIGTERM, None, 0)
         self.assertEqual(observe.call_count, 2)
 
