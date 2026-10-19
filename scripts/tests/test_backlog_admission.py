@@ -287,7 +287,9 @@ class InstalledCollectorTest(unittest.TestCase):
             (state / "linear").mkdir()
             mirror_path = state / "linear/mirror-JOV.json"
             mirror_path.write_text(json.dumps({"issues": {"fixture": {"id": "fixture", "identifier": "JOV-6641", "updatedAt": VERSION}}}))
-            reads = SimpleNamespace(issue=lambda identity: {"id": "fixture", "identifier": "JOV-6641", "updatedAt": VERSION}, validate_runtime=lambda: None)
+            calls = []
+            reads = SimpleNamespace(issue=lambda identity: calls.append("issue") or {"id": "fixture", "identifier": "JOV-6641", "updatedAt": VERSION},
+                                    validate_runtime=lambda: None, prepare_fleet_observation=lambda **kwargs: calls.append("fleet"))
             prepared = SimpleNamespace(observation=admission._observation("JOV-6641", []))
             with patch.object(admission, "_NativeReads", return_value=reads), \
                  patch.object(admission, "_PreparedGuard", return_value=prepared) as context:
@@ -296,6 +298,7 @@ class InstalledCollectorTest(unittest.TestCase):
                 self.assertFalse(result["authorizesDispatch"])
                 self.assertEqual(context.call_args.kwargs["reads"], reads)
                 self.assertEqual(context.call_args.args[0], state.resolve())
+                self.assertEqual(calls, ["fleet", "issue"])
             with patch.object(admission, "_NativeReads", return_value=reads):
                 reads.issue = lambda identity: {"identifier": "JOV-6641", "updatedAt": "changed"}
                 changed = admission.collect_backlog_admission("JOV-6641", VERSION, home=home, module_path=module)
@@ -405,7 +408,7 @@ class ReadBoundaryTest(unittest.TestCase):
                  patch.object(lane, "load_github_env") as load, \
                  patch.object(admission._NativeReads, "gh", return_value={"ref": "refs/heads/main", "object": {"type": "commit", "sha": "d" * 40}}):
                 reads = admission._NativeReads(current, state)
-                validate.assert_called_once(); linear.assert_called_once(); load.assert_called_once()
+                validate.assert_called_once(); linear.assert_called_once(); load.assert_called_once_with(_fleet_observation=True)
                 fleet = current.parent / "fleet-gate"; fleet.mkdir()
                 (fleet / "scoped_admission.py").write_text("from datetime import timedelta\nMAX_AGE=timedelta(minutes=10)\n")
                 self.assertEqual(reads.fleet_max_age(), 600)
@@ -414,6 +417,18 @@ class ReadBoundaryTest(unittest.TestCase):
                 (current / ".release.json").write_text("{}")
                 with self.assertRaisesRegex(admission.Unavailable, "canonical-file-schema"): reads.validate_runtime()
             with self.assertRaisesRegex(admission.Unavailable, "native-module-not-installed"): admission._NativeReads(current, state)
+
+    def test_observation_identity_hold_precedes_first_canonical_github_read(self):
+        import lane_runner as lane
+        with self.installed_runtime() as (current, state, _), \
+             patch.object(lane, "__file__", str(current / "lane_runner.py")), \
+             patch.object(lane, "Host"), patch.object(lane, "Linear"), \
+             patch.object(lane, "load_github_env", side_effect=lane.FleetObservationHeld("existing-route-unknown")) as load, \
+             patch.object(admission._NativeReads, "gh", side_effect=AssertionError("premature canonical read")) as gh:
+            with self.assertRaisesRegex(admission.Unavailable, "existing-route-unknown"):
+                admission._NativeReads(current, state)
+            load.assert_called_once_with(_fleet_observation=True)
+            gh.assert_not_called()
 
     def test_bounded_pagination_is_complete_and_rechecks_first_page(self):
         calls = []
@@ -659,7 +674,8 @@ class NativeJoinTest(unittest.TestCase):
                 file_overlap=SimpleNamespace(_state_path=native.file_overlap._state_path, local_tasks=lambda *args: [], admission_policy=native.file_overlap.admission_policy),
                 workstreams=native.workstreams, disk_guard=SimpleNamespace(free_pct=lambda path: 30, CRITICAL_PCT=5, PRESERVED_REPAIR=native.disk_guard.PRESERVED_REPAIR))
             host = SimpleNamespace(state=state, slots=lambda *args: 6, intake_slots=lambda *args: 6)
-            reads = SimpleNamespace(lane=lane, host=host, state=state, fleet_max_age=lambda: 600, linear=None)
+            reads = SimpleNamespace(lane=lane, host=host, state=state, fleet_max_age=lambda: 600, linear=None,
+                                    fleet_observation=lambda: admission._json_file(gate / "latest.json"))
             binding = {"sourceHash": "b" * 64}
             prs = [{"number": 5, "headRefName": "codex/jov-6641-20261016", "headRefOid": "a" * 40,
                     "body": "<!-- linear-issue-id:JOV-6641 -->", "title": "JOV-6641", "labels": [], "files": []}]
@@ -676,6 +692,13 @@ class NativeJoinTest(unittest.TestCase):
                 self.assertEqual(runtime["resources"]["quota"], "hold")
                 self.assertEqual(runtime["resources"]["freeSlots"], 0)
                 fleet["observedAt"] = NOW - 601; (gate / "latest.json").write_text(json.dumps(fleet))
+                fresh = {**deepcopy(fleet), "observedAt": NOW - 5}
+                reads.fleet_observation = lambda: fresh
+                refreshed = admission._native_runtime(reads, row, [], binding, NOW)[0]
+                self.assertEqual(refreshed["resources"]["workAdmission"], "allowed")
+                self.assertEqual(refreshed["resources"]["quota"], "hold")
+                self.assertEqual(refreshed["resources"]["freeSlots"], 0)
+                reads.fleet_observation = lambda: admission._json_file(gate / "latest.json")
                 with self.assertRaisesRegex(admission.Unavailable, "fleet-typed-work-stale"):
                     admission._native_runtime(reads, row, [], binding, NOW)
                 lane.load_providers = lambda: {}
@@ -750,13 +773,14 @@ class NativeJoinTest(unittest.TestCase):
 
 class PreparedContextTest(unittest.TestCase):
     @contextmanager
-    def context(self, others=(), *, native_holds=(), projection_mutator=None):
+    def context(self, others=(), *, native_holds=(), projection_mutator=None, selected_mutator=None):
         import lane_runner as lane
         with tempfile.TemporaryDirectory() as tmp, patch.object(admission.time, "time", return_value=NOW):
             state = Path(tmp).resolve() / ".local/state/jovie-lanes"
             current = state / "releases" / ("a" * 64) / "scripts/lanes"; current.mkdir(parents=True)
             (state / "current").symlink_to(current)
             selected = linear_row(identity="selected")
+            if selected_mutator: selected_mutator(selected)
             rows = {row["id"]: deepcopy(row) for row in [selected, *others]}
             reads = SimpleNamespace(lane=lane, state=state, current=current, prs=[], pages=[[]],
                                     cohort=lambda: [deepcopy(rows[key]) for key in sorted(rows) if rows[key]["state"]["name"] in ("Backlog", "Todo")],
@@ -797,6 +821,74 @@ class PreparedContextTest(unittest.TestCase):
         row["state"] = {"name": state, "type": "unstarted" if state == "Todo" else "backlog"}
         if not ready: row["labels"]["nodes"] = []
         return row
+
+    def test_selected_urgent_or_p0_without_readiness_holds_before_projection(self):
+        for priority, labels in [(1, []), (3, ["P0"]), (1, ["agent-ready-ish"]),
+                                 (1, ["P0", "dispatch-next"])]:
+            def unready(row):
+                row["priority"] = priority
+                row["labels"]["nodes"] = [{"id": str(i), "name": label} for i, label in enumerate(labels)]
+            with self.subTest(priority=priority, labels=labels), \
+                 patch.object(execution_attempt, "_gh", side_effect=AssertionError("unexpected network")), \
+                 patch.object(execution_attempt, "claim", side_effect=AssertionError("unexpected claim")), \
+                 self.context(selected_mutator=unready) as (ctx, reads, rows, project):
+                for result in (ctx.observation, ctx.revalidate(), ctx.assert_bound()):
+                    self.assertFalse(result["allowed"])
+                    self.assertEqual(result["holds"][0]["code"], "backlog-readiness-not-established")
+                    self.assertEqual(result["holds"][0]["owner"], admission.ISSUE_OWNER)
+                    self.assertTrue(result["holds"][0]["nextAction"])
+                    self.assertFalse(result["authorizesTransition"])
+                    self.assertFalse(result["authorizesDispatch"])
+                project.assert_not_called()
+
+    def test_ready_selected_urgent_and_p0_still_require_all_existing_projection_gates(self):
+        for priority, labels in [(1, ["agent-ready"]), (3, ["P0", "agent-ready"])]:
+            def ready(row):
+                row["priority"] = priority
+                row["labels"]["nodes"] = [{"id": str(i), "name": label} for i, label in enumerate(labels)]
+            for failure in (None, "custody", "dependency", "attempt", "resource"):
+                def gated(value, row):
+                    if failure == "custody": value["custody"]["holders"] = [{"owner": "Incumbent"}]
+                    if failure == "dependency": value["dependencies"]["complete"] = False
+                    if failure == "attempt": value["attemptHistory"]["pages"] = [[status()]]
+                    if failure == "resource": value["runtime"]["resources"]["freeSlots"] = 0
+                with self.subTest(priority=priority, failure=failure), \
+                     self.context(selected_mutator=ready, projection_mutator=gated) as (ctx, reads, rows, project):
+                    self.assertEqual(ctx.observation["allowed"], failure is None)
+                    self.assertFalse(ctx.observation["authorizesTransition"])
+                    self.assertFalse(ctx.observation["authorizesDispatch"])
+                    self.assertGreater(project.call_count, 0)
+
+    def test_readiness_change_requires_fresh_preparation_and_never_reuses_old_version(self):
+        with self.context() as (ctx, reads, rows, project):
+            self.assertTrue(ctx.observation["allowed"])
+            rows["selected"]["labels"]["nodes"] = []
+            rows["selected"]["updatedAt"] = "2026-10-16T19:47:00Z"
+            self.assertFalse(ctx.revalidate()["allowed"])
+            with patch.object(reads, "cohort", side_effect=AssertionError("network under lock")), \
+                 patch.object(reads, "issue", side_effect=AssertionError("network under lock")), \
+                 patch.object(reads, "gh", side_effect=AssertionError("network under lock")):
+                self.assertFalse(ctx.assert_bound()["allowed"])
+            rows["selected"]["labels"]["nodes"] = [{"id": "restored", "name": "agent-ready"}]
+            rows["selected"]["updatedAt"] = "2026-10-16T19:48:00Z"
+            self.assertFalse(ctx.revalidate()["allowed"])
+            fresh = admission._PreparedGuard(Path(ctx.canonical_state_path), "JOV-6641", reads=reads,
+                        row=rows["selected"], binding=ctx._binding, started=NOW)
+            self.assertTrue(fresh.observation["allowed"])
+            self.assertFalse(fresh.observation["authorizesDispatch"])
+
+    def test_retained_selected_readiness_tampering_holds_at_local_prewrite_fence(self):
+        with self.context() as (ctx, reads, rows, project):
+            self.assertTrue(ctx.observation["allowed"])
+            ctx._row["labels"]["nodes"] = []
+            with patch.object(reads, "cohort", side_effect=AssertionError("network under lock")), \
+                 patch.object(reads, "issue", side_effect=AssertionError("network under lock")), \
+                 patch.object(reads, "gh", side_effect=AssertionError("network under lock")):
+                result = ctx.assert_bound()
+            self.assertFalse(result["allowed"])
+            self.assertEqual(result["holds"][0]["evidence"], "retained-cohort-binding-changed")
+            self.assertFalse(result["authorizesTransition"])
+            self.assertFalse(result["authorizesDispatch"])
 
     def test_eligible_urgent_backlog_fences_high_candidate(self):
         for state in ("Backlog",):
@@ -1020,6 +1112,191 @@ class PreparedContextTest(unittest.TestCase):
             rows["selected"]["labels"]["pageInfo"]["hasNextPage"] = True
             with self.assertRaisesRegex(admission.Unavailable, "prepared-issue-connection-incomplete"):
                 admission._issue_digest(rows["selected"])
+
+
+class FleetWorkObservationTest(unittest.TestCase):
+    def test_raw_inputs_are_bounded_regular_and_descriptor_identity_is_stable(self):
+        import signal
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "evidence.json"
+            self.assertIsNone(admission._work_input_digest(path))
+            path.write_bytes(b'{"actual":true}\\n')
+            self.assertEqual(admission._work_input_digest(path), hashlib.sha256(path.read_bytes()).hexdigest())
+            path.unlink(); path.mkdir()
+            with self.assertRaises((ValueError, OSError)): admission._work_input_digest(path)
+            path.rmdir(); path.symlink_to(Path(tmp) / "absent")
+            with self.assertRaises((ValueError, OSError)): admission._work_input_digest(path)
+            path.unlink(); os.mkfifo(path)
+            def deadline(*_): raise TimeoutError("bounded-read-blocked-on-FIFO")
+            previous = signal.signal(signal.SIGALRM, deadline)
+            signal.setitimer(signal.ITIMER_REAL, 2)
+            try:
+                with self.assertRaises(ValueError): admission._work_input_digest(path)
+            finally:
+                signal.setitimer(signal.ITIMER_REAL, 0)
+                signal.signal(signal.SIGALRM, previous)
+            path.unlink(); path.touch()
+            with path.open("wb") as handle: handle.truncate(1024 * 1024 + 1)
+            with self.assertRaisesRegex(ValueError, "bounded-regular"): admission._work_input_digest(path)
+            path.write_bytes(b"original")
+            original_open = os.open
+            descriptors = []
+            def opened(*args, **kwargs):
+                self.assertTrue(args[1] & os.O_NONBLOCK)
+                self.assertTrue(args[1] & os.O_NOFOLLOW)
+                fd = original_open(*args, **kwargs); descriptors.append(fd)
+                return fd
+            replacement = path.with_name("replacement")
+            replacement.write_bytes(b"original")
+            original_fdopen = os.fdopen
+            @contextmanager
+            def replaced(fd, *args, **kwargs):
+                with original_fdopen(fd, *args, **kwargs) as handle:
+                    class Changed:
+                        def read(self, limit):
+                            raw = handle.read(limit)
+                            replacement.replace(path)
+                            return raw
+                    yield Changed()
+            with patch.object(admission.os, "open", side_effect=opened), patch.object(admission.os, "fdopen", side_effect=replaced):
+                with self.assertRaisesRegex(ValueError, "changed-during-read"): admission._work_input_digest(path)
+            for fd in descriptors:
+                with self.assertRaises(OSError): os.fstat(fd)
+            with patch.object(admission.os, "open", side_effect=FileNotFoundError):
+                with self.assertRaises(FileNotFoundError): admission._work_input_digest(path)
+
+    @contextmanager
+    def reader(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.object(admission.time, "time", return_value=NOW):
+            home = Path(tmp); state = home / ".local/state/jovie-lanes"
+            current = state / "releases" / ("a" * 64) / "scripts/lanes"; current.mkdir(parents=True)
+            gate = current.parent / "fleet-gate/gem-priority-gate.py"; gate.parent.mkdir(); gate.write_text("# trusted fixture\n")
+            names = ("gem-priority-gate.py", "closure_health.py", "gem_gate_contract.py", "summer_ci_audit.py", "symphony_proof_context.py")
+            manifest = {"schema": "jovie-lane-release-bundle/v1", "objects": {"scripts/fleet-gate/" + n: "b" * 40 for n in names}}
+            (current / ".release.json").write_text(json.dumps(manifest))
+            reads = object.__new__(admission._NativeReads)
+            reads.current, reads.state, reads._main_sha = current, state, "c" * 40
+            reads.lane = SimpleNamespace(run_agent=lambda *args, **kwargs: None,
+                FleetObservationHeld=admission.Unavailable,
+                FleetObservationRequest=lambda started, control: SimpleNamespace(preparation_started=started, control_fd=control))
+            reads.validate_runtime = lambda: None
+            reads.canonical_main = lambda **kwargs: reads._main_sha
+            reads.fleet_max_age = lambda: 600
+            fleet = home / "gem-workspace/state/gem-priority-gate"
+            paths = [fleet.parent / "integrity.json", fleet.parent / "concurrency.json",
+                     fleet / "independent-review.json", fleet / "latest.json", state / "tick.json"]
+            value = {"schema": "jovie.fleet-work-observation/v1", "repo": "JovieInc/Jovie",
+                "statePath": str(fleet), "nativeStatePath": str(state), "mainSha": reads._main_sha,
+                "gateSHA256": hashlib.sha256(gate.read_bytes()).hexdigest(), "observedAt": NOW - 5,
+                "completedAt": NOW - 1, "localInputs": {str(p): None for p in paths},
+                "workAdmission": {"allowed": True, "newImplementationAllowed": True, "newIssueLeaseAllowed": True,
+                                  "productNewIssueLeaseAllowed": {"jovie": True}},
+                "closureAdmission": {"newIssueIntakeAllowed": True},
+                "authorizesTransition": False, "authorizesDispatch": False}
+            yield reads, value, gate
+
+    def test_one_observation_is_shared_without_prewrite_spawn_or_clock_refresh(self):
+        with self.reader() as (reads, value, gate), patch.object(reads.lane, "run_agent",
+                return_value=subprocess.CompletedProcess([], 0, json.dumps(value), "")) as run:
+            reads.prepare_fleet_observation()
+            self.assertEqual(run.call_count, 1)
+            self.assertEqual(run.call_args.args[0][1:], ["-I", "-B", "-S", "-X", "pycache_prefix=/dev/null", str(gate), "--observe-work-admission"])
+            self.assertEqual(run.call_args.args[3], admission.MAX_AGE_S)
+            self.assertIsNone(run.call_args.kwargs["_fleet_observation"].control_fd)
+            for _ in range(4):
+                result = reads.fleet_observation()
+                self.assertEqual(result["observedAt"], NOW - 5)
+                result["workAdmission"]["allowed"] = False
+            self.assertTrue(reads.fleet_observation()["workAdmission"]["allowed"])
+            with self.assertRaisesRegex(admission.Unavailable, "already-prepared"): reads.prepare_fleet_observation()
+            self.assertEqual(run.call_count, 1)
+
+    def test_unprepared_stale_future_malformed_and_expired_proofs_hold(self):
+        with self.reader() as (reads, value, gate):
+            with self.assertRaisesRegex(admission.Unavailable, "unprepared"): reads.fleet_observation()
+            for fields in ({"observedAt": NOW - 601}, {"completedAt": NOW + 1}, {"observedAt": "bad"},
+                           {"mainSha": "d" * 40}, {"authorizesDispatch": True}, {"localInputs": {}},
+                           {"repo": "Other/Repo"}, {"schema": "jovie-fleet-gate/v1"}):
+                reads._fleet_observation = {**deepcopy(value), **fields}
+                with self.subTest(fields=fields), self.assertRaises(admission.Unavailable): reads.fleet_observation()
+            reads._fleet_observation = deepcopy(value)
+            with patch.object(admission.time, "time", return_value=NOW + 600):
+                with self.assertRaisesRegex(admission.Unavailable, "fleet-typed-work-stale"): reads.fleet_observation()
+
+    def test_input_source_and_new_lease_holds_are_not_reclassified_as_fresh(self):
+        with self.reader() as (reads, value, gate):
+            reads._fleet_observation = deepcopy(value)
+            value["workAdmission"]["newIssueLeaseAllowed"] = False
+            reads._fleet_observation = deepcopy(value)
+            self.assertFalse(reads.fleet_observation()["workAdmission"]["newIssueLeaseAllowed"])
+            tick = reads.state / "tick.json"; tick.write_text("new state")
+            with self.assertRaisesRegex(admission.Unavailable, "input-changed"): reads.fleet_observation()
+            tick.unlink(); gate.write_text("changed source")
+            with self.assertRaisesRegex(admission.Unavailable, "source-changed"): reads.fleet_observation()
+
+    def test_observer_failure_partial_output_missing_binding_and_restart(self):
+        for output in (subprocess.CompletedProcess([], 2, "", "private"),
+                       subprocess.CompletedProcess([], 0, "{", ""),
+                       subprocess.CompletedProcess([], 0, "[]", ""),
+                       subprocess.CompletedProcess([], 0, "x" * 262145, "")):
+            with self.reader() as (reads, value, gate), patch.object(reads.lane, "run_agent", return_value=output):
+                with self.assertRaises((admission.Unavailable, ValueError)): reads.prepare_fleet_observation()
+                with self.assertRaisesRegex(admission.Unavailable, "unprepared"): reads.fleet_observation()
+        with self.reader() as (reads, value, gate), patch.object(reads.lane, "run_agent") as run:
+            (reads.current / ".release.json").write_text(json.dumps({"schema": "jovie-lane-release-bundle/v1", "objects": {}}))
+            with self.assertRaisesRegex(admission.Unavailable, "not-manifest-bound"): reads.prepare_fleet_observation()
+            run.assert_not_called()
+        for _ in range(2):
+            with self.reader() as (reads, value, gate), patch.object(reads.lane, "run_agent", return_value=
+                    subprocess.CompletedProcess([], 0, json.dumps(value), "")) as run:
+                reads.prepare_fleet_observation(); self.assertEqual(run.call_count, 1)
+
+    def test_failed_preparation_cannot_later_become_valid_by_clock_or_input_change(self):
+        with self.reader() as (reads, value, gate):
+            value["completedAt"] = NOW + 1
+            with patch.object(reads.lane, "run_agent", return_value=subprocess.CompletedProcess([], 0, json.dumps(value), "")):
+                with self.assertRaisesRegex(admission.Unavailable, "fleet-typed-work-stale"): reads.prepare_fleet_observation()
+            with patch.object(admission.time, "time", return_value=NOW + 2):
+                with self.assertRaisesRegex(admission.Unavailable, "unprepared"): reads.fleet_observation()
+
+    def test_timeout_and_main_drift_hold_without_retry_or_retained_authority(self):
+        with self.reader() as (reads, value, gate), patch.object(reads.lane, "run_agent",
+                side_effect=subprocess.TimeoutExpired("fixture", admission.MAX_AGE_S)) as run:
+            with self.assertRaises(subprocess.TimeoutExpired): reads.prepare_fleet_observation()
+            with self.assertRaisesRegex(admission.Unavailable, "unprepared"): reads.fleet_observation()
+            self.assertEqual(run.call_count, 1)
+        with self.reader() as (reads, value, gate), patch.object(reads.lane, "run_agent", return_value=
+                subprocess.CompletedProcess([], 0, json.dumps(value), "")):
+            def changed(**kwargs): raise admission.Unavailable("canonical-main-changed")
+            reads.canonical_main = changed
+            with self.assertRaisesRegex(admission.Unavailable, "canonical-main-changed"): reads.prepare_fleet_observation()
+            with self.assertRaisesRegex(admission.Unavailable, "unprepared"): reads.fleet_observation()
+
+    def test_present_but_unmanifested_imported_proof_context_never_starts_child(self):
+        with self.reader() as (reads, value, gate), patch.object(reads.lane, "run_agent") as run:
+            helper = gate.parent / "symphony_proof_context.py"
+            helper.write_text("# present outside the manifest\n")
+            path = reads.current / ".release.json"
+            manifest = json.loads(path.read_text())
+            del manifest["objects"]["scripts/fleet-gate/symphony_proof_context.py"]
+            path.write_text(json.dumps(manifest))
+            with self.assertRaisesRegex(admission.Unavailable, "not-manifest-bound"): reads.prepare_fleet_observation()
+            run.assert_not_called()
+
+    def test_required_source_set_covers_actual_sibling_import_closure(self):
+        import ast
+        directory = Path(admission.__file__).resolve().parent.parent / "fleet-gate"
+        pending, actual = [directory / "gem-priority-gate.py"], set()
+        while pending:
+            file = pending.pop()
+            if file.name in actual: continue
+            actual.add(file.name)
+            for node in ast.walk(ast.parse(file.read_text())):
+                modules = [node.module] if isinstance(node, ast.ImportFrom) else [a.name for a in node.names] if isinstance(node, ast.Import) else []
+                for module in modules:
+                    sibling = directory / ((module or "").split(".")[0] + ".py")
+                    if sibling.is_file(): pending.append(sibling)
+        self.assertEqual(actual, set(admission.FLEET_OBSERVER_SOURCES))
 
 
 if __name__ == "__main__":

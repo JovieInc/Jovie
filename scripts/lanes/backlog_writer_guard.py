@@ -138,8 +138,10 @@ def run_guard(identifier, expected_version, *, prepare=None, read=read_control,
               send=None, lock_factory=ClaimFence, clock=time.time, monotonic=None):
     # Test injection is in-process only. The CLI exposes identity/version, never
     # a supplied observation, lock path, runtime path or authority flag.
+    default_prepare = prepare is None
     prepare = prepare or backlog_admission.prepare_backlog_guard
     monotonic = monotonic or time.monotonic
+    preparation_started = monotonic() if default_prepare else None
     nonce = secrets.token_hex(32)
     base = {"schema": SCHEMA, "issue": identifier, "expectedVersion": expected_version,
             "nonce": nonce, "authorizesTransition": False, "authorizesDispatch": False}
@@ -158,7 +160,16 @@ def run_guard(identifier, expected_version, *, prepare=None, read=read_control,
             raise GuardHeld("parent-control-binding-mismatch")
         return value["op"]
     try:
-        prepared = prepare(identifier, expected_version)
+        # stdin is this production guard's owned control pipe, never a request
+        # body. The collector only borrows it; helper duplicates are closed there.
+        # Ordinary collectors and injected prepare functions receive no inference.
+        parent_control_fd = sys.stdin.fileno() if default_prepare else None
+        if default_prepare and (not stat.S_ISFIFO(os.fstat(parent_control_fd).st_mode)
+                or fcntl.fcntl(parent_control_fd, fcntl.F_GETFL) & os.O_ACCMODE != os.O_RDONLY):
+            raise GuardHeld("parent-control-not-read-pipe")
+        prepared = (prepare(identifier, expected_version, preparation_started=preparation_started,
+                            parent_control_fd=parent_control_fd)
+                    if default_prepare else prepare(identifier, expected_version))
         observation = prepared.observation
         if observation.get("allowed") is not True:
             report("held", observation=observation)
