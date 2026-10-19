@@ -9311,6 +9311,30 @@ class FleetObservationProfileTest(unittest.TestCase):
 
 
 class FleetObservationDrainTest(unittest.TestCase):
+    def test_exited_pidfd_after_identity_read_requires_a_fresh_scan(self):
+        owned = lane.AgentProcesses(100)
+        owned._fixed_handles = {100: 999}
+        before = (1, 100, "S", "linux:111")
+        with patch.object(owned, "observe_fixed", side_effect=[({100: before}, False), ({}, False)]) as observe, \
+             patch.object(lane, "_selftest_process_row", return_value=before), \
+             patch.object(signal, "pidfd_send_signal", create=True, side_effect=ProcessLookupError()) as send, \
+             patch.object(lane.time, "sleep"):
+            owned.stop_fixed(time.monotonic() + 1)
+        send.assert_called_once_with(999, signal.SIGTERM, None, 0)
+        self.assertEqual(observe.call_count, 2)
+
+    def test_other_pidfd_signal_errors_remain_refusals(self):
+        for error in (PermissionError("private fixture"), OSError("private I/O failure")):
+            with self.subTest(error=type(error).__name__):
+                owned = lane.AgentProcesses(100)
+                owned._fixed_handles = {100: 999}
+                before = (1, 100, "S", "linux:111")
+                with patch.object(owned, "observe_fixed", return_value=({100: before}, False)), \
+                     patch.object(lane, "_selftest_process_row", return_value=before), \
+                     patch.object(signal, "pidfd_send_signal", create=True, side_effect=error):
+                    with self.assertRaises(type(error)):
+                        owned.stop_fixed(time.monotonic() + 1)
+
     def test_zero_waitpid_requires_rescan_until_echild_not_false_drain(self):
         events = []
         owned = lane.AgentProcesses(100)
@@ -9463,6 +9487,47 @@ class FleetObservationIdentityTest(unittest.TestCase):
 
 @unittest.skipUnless(sys.platform == "linux" and hasattr(os, "pidfd_open"), "fixed Linux PID-handle observation profile")
 class FleetObservationChildTest(unittest.TestCase):
+    def test_real_child_exit_between_birth_read_and_signal_does_not_mask_drain(self):
+        # A private harness owns its sole child; it cannot adopt or signal the
+        # test runner's unrelated children. The kernel, not a mock, raises ESRCH.
+        probe = '''import importlib.util,json,os,select,signal,subprocess,sys,time
+from pathlib import Path
+source=Path(sys.argv[1]);sys.path.insert(0,str(source.parent))
+spec=importlib.util.spec_from_file_location("pidfd_race_source",source)
+lane=importlib.util.module_from_spec(spec);sys.modules[spec.name]=lane;spec.loader.exec_module(lane)
+child=subprocess.Popen([sys.executable,"-I","-B","-S","-c","import os;os.read(0,1)"],stdin=subprocess.PIPE,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,start_new_session=True)
+owned=lane.AgentProcesses(child.pid);owned._fixed_custodian=os.getpid()
+fd=os.pidfd_open(child.pid,0);owned._fixed_handles={child.pid:fd}
+original=lane._selftest_process_row;triggered=[]
+try:
+ rows,escaped=owned.observe_fixed(time.monotonic()+3)
+ assert set(rows)=={child.pid} and not escaped
+ birth=rows[child.pid][3]
+ def exit_after_birth_read(entry,pid,uid):
+  row=original(entry,pid,uid)
+  if pid==child.pid and sys._getframe(1).f_code.co_name=="stop_fixed" and not triggered:
+   assert row is not None and row[3]==birth and not row[2].startswith("Z")
+   child.stdin.write(b"x");child.stdin.flush();child.stdin.close();child.wait(timeout=2)
+   assert child.returncode==0 and select.select([fd],[],[],0)[0]
+   triggered.append(True)
+  return row
+ lane._selftest_process_row=exit_after_birth_read
+ owned.stop_fixed(time.monotonic()+5)
+ assert triggered and child.returncode==0
+ print(json.dumps({"realExitRace":True,"childJoined":True,"freshScanReturned":True}))
+finally:
+ lane._selftest_process_row=original
+ if child.poll() is None:
+  try:signal.pidfd_send_signal(fd,signal.SIGKILL,None,0)
+  except ProcessLookupError:pass
+ child.wait(timeout=3);owned.close_fixed()
+'''
+        result = subprocess.run([sys.executable, "-I", "-B", "-S", "-c", probe,
+                                 str(Path(lane.__file__).resolve())],
+                                stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout), {"realExitRace": True, "childJoined": True, "freshScanReturned": True})
+
     @contextlib.contextmanager
     def fixture(self, worker):
         with tempfile.TemporaryDirectory() as tmp:
