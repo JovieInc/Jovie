@@ -1,5 +1,6 @@
 import { createRequire } from 'node:module';
-import { type ErrorEvent, withScope } from '@sentry/nextjs';
+import { withScope } from '@sentry/nextjs';
+import type { ErrorEvent } from '@sentry/node';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   buildRevenueSpineFailure,
