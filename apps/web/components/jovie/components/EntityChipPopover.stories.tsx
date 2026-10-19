@@ -31,4 +31,16 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const LabelOnly: Story = {};
+export const Unavailable: Story = {};
+
+export const Renamed: Story = {
+  args: {
+    entity: { kind: 'release', id: 'rel_1', label: 'Current title' },
+    children: (
+      <EntityChip
+        data={{ kind: 'release', id: 'rel_1', label: 'Current title' }}
+        variant='transcript'
+      />
+    ),
+  },
+};

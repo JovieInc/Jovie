@@ -271,6 +271,19 @@ export function ChatThreadMessages({
 }: ChatThreadMessagesProps) {
   // Reads live `virtualizer` state each render; see JovieChat (JOV-6702).
   'use no memo';
+  const virtualItems = shouldVirtualizeMessages
+    ? virtualizer.getVirtualItems()
+    : [];
+  // TanStack Virtual reports nothing while outerSize is 0. A zero-size
+  // scrollport must stay on that path (jsdom, hidden surface). Once the
+  // scrollport has height and the virtualizer is still empty, mount the
+  // transcript so the latest reply is reachable.
+  const virtualizerStuck =
+    shouldVirtualizeMessages &&
+    virtualItems.length === 0 &&
+    messages.length > 0 &&
+    virtualizedMinHeight > 0;
+  const renderVirtualWindow = shouldVirtualizeMessages && !virtualizerStuck;
   const renderMessage = (message: ChatThreadMessage, index: number) => {
     const isThinking =
       message.role === 'assistant' && message.status === 'pending';
@@ -315,7 +328,7 @@ export function ChatThreadMessages({
           </Button>
         </div>
       ) : null}
-      {shouldVirtualizeMessages ? (
+      {renderVirtualWindow ? (
         <div
           ref={totalSizeRef}
           className={`${CHAT_MESSAGE_CONTENT_SHELL_CLASSNAME} flex min-h-full flex-col`}
@@ -325,7 +338,7 @@ export function ChatThreadMessages({
             minHeight: virtualizedMinHeight || undefined,
           }}
         >
-          {virtualizer.getVirtualItems().map(virtualItem => {
+          {virtualItems.map(virtualItem => {
             const message = messages[virtualItem.index];
             const index = virtualItem.index;
             return (

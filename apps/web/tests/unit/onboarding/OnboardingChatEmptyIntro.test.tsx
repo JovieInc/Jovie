@@ -7,6 +7,18 @@ import {
 import { ONBOARDING_ENTRY_TITLE } from '@/lib/onboarding/empty-state';
 
 describe('OnboardingChatEmptyIntro', () => {
+  it.each(['prompt_handoff', 'spotify_handoff'] as const)(
+    'does not report a %s draft as sent before transport acceptance (JOV-7771)',
+    mode => {
+      render(<OnboardingChatEmptyIntro mode={mode} />);
+
+      expect(screen.getAllByRole('heading')).toHaveLength(1);
+      expect(screen.queryByRole('status')).toBeNull();
+      expect(screen.queryByText('Your message is on its way.')).toBeNull();
+      expect(screen.queryByText('Preparing your first message')).toBeNull();
+    }
+  );
+
   it('renders the compact blank entry with its canonical composer', () => {
     render(<OnboardingChatEmptyIntro mode='blank' />);
 
@@ -20,13 +32,13 @@ describe('OnboardingChatEmptyIntro', () => {
     expect(screen.queryByTestId('onboarding-start-ambient-mark')).toBeNull();
   });
 
-  it('replaces blank controls with one stable handoff status', () => {
+  it('shows the first-message draft without claiming it has been sent', () => {
     render(<OnboardingChatEmptyIntro mode='spotify_handoff' />);
 
-    expect(screen.getByText('Getting your artist ready')).toBeTruthy();
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'Preparing your first message'
-    );
+    expect(
+      screen.getByRole('heading', { name: 'Your first message' })
+    ).toBeTruthy();
+    expect(screen.queryByRole('status')).toBeNull();
     expect(screen.queryByTestId('onboarding-sign-in-skip')).toBeNull();
   });
 

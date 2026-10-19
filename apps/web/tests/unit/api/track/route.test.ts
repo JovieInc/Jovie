@@ -99,10 +99,6 @@ vi.mock('@/lib/error-tracking', () => ({
   captureError: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('@/lib/utils', () => ({
-  detectPlatformFromUA: vi.fn().mockReturnValue('mobile'),
-}));
-
 vi.mock('@/lib/utils/ip-extraction', () => ({
   extractClientIP: vi.fn().mockReturnValue('203.0.113.1'),
 }));
@@ -281,6 +277,43 @@ describe('POST /api/track', () => {
       expect(recordAudienceEvent).not.toHaveBeenCalled();
     }
   );
+
+  it.each([
+    ['Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)', 'ios'],
+    ['Mozilla/5.0 (Linux; Android 15)', 'android'],
+    ['Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0)', 'macos'],
+    ['Mozilla/5.0 (Windows NT 10.0)', 'windows'],
+    ['Mozilla/5.0 (X11; Linux x86_64)', 'linux'],
+    ['Unrecognized browser', null],
+    [null, null],
+  ])('stores the detected OS %s as %s', async (userAgent, expected) => {
+    const values = vi.fn().mockReturnValue({
+      returning: vi.fn().mockResolvedValue([{ id: 'click_event_123' }]),
+    });
+    hoisted.withSystemIngestionSession.mockImplementationOnce(async callback =>
+      callback({ insert: vi.fn().mockReturnValue({ values }) })
+    );
+    const request = new NextRequest('http://localhost/api/track', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: 'jv_cc_required=1',
+        ...(userAgent ? { 'User-Agent': userAgent } : {}),
+      },
+      body: JSON.stringify({
+        handle: 'artist123',
+        linkType: 'other',
+        target: 'https://example.com',
+      }),
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(200);
+    expect(values).toHaveBeenCalledWith(
+      expect.objectContaining({ os: expected })
+    );
+  });
 
   it('uses server geo headers when the consent-required cookie is tampered off', async () => {
     const insertMock = vi.fn();

@@ -441,6 +441,21 @@ function NumberedFeatureList({
   );
 }
 
+const LAUNCH_OWNER = 'apps/web/app/(marketing)/launch/page.tsx';
+
+function launchStamp(
+  sectionId: string,
+  variantId: string,
+  occurrenceId?: string
+) {
+  return {
+    'data-testid': `marketing-section-${sectionId}`,
+    'data-marketing-owner': LAUNCH_OWNER,
+    'data-marketing-variant': variantId,
+    ...(occurrenceId ? { 'data-marketing-occurrence': occurrenceId } : {}),
+  };
+}
+
 export default function LaunchPage() {
   return (
     <MarketingPageShell className='system-b-launch-page'>
@@ -449,10 +464,11 @@ export default function LaunchPage() {
       <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
       <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
 
-      <main>
+      <div>
         <section
           aria-labelledby='hero-heading'
           className='system-b-launch-hero marketing-hero-dock relative overflow-hidden'
+          {...launchStamp('hero', 'split-screenshot-right')}
         >
           <MarketingHeroPhoto
             src='/images/marketing-hero/launch.webp'
@@ -494,7 +510,10 @@ export default function LaunchPage() {
                   </a>
                 </div>
               </div>
-              <div className='system-b-launch-profile-stage'>
+              <div
+                className='system-b-launch-profile-stage'
+                data-testid='launch-profile-stage'
+              >
                 <ProfileMockup
                   name={TIM_WHITE_PROFILE.name}
                   handle='tim'
@@ -508,6 +527,7 @@ export default function LaunchPage() {
         <section
           className='system-b-launch-logo-strip'
           aria-label='Supported Platforms'
+          {...launchStamp('logo-cloud', 'platform-reach-row')}
         >
           <MarketingContainer width='page'>
             <ul data-component='platform-logo-strip'>
@@ -522,6 +542,7 @@ export default function LaunchPage() {
           id='how-it-works'
           aria-labelledby='thesis-heading'
           className='system-b-launch-section'
+          {...launchStamp('feature-grid', '3-large', 'pillars')}
         >
           <MarketingContainer width='page'>
             <div className='system-b-launch-thesis'>
@@ -550,6 +571,7 @@ export default function LaunchPage() {
         <section
           aria-labelledby='profiles-heading'
           className='system-b-launch-section'
+          {...launchStamp('feature-split', 'editorial', 'profile')}
         >
           <MarketingContainer width='page'>
             <div className='system-b-launch-two-column'>
@@ -569,6 +591,7 @@ export default function LaunchPage() {
         <section
           aria-labelledby='smartlinks-heading'
           className='system-b-launch-section'
+          {...launchStamp('feature-split', 'editorial', 'smart-links')}
         >
           <MarketingContainer width='page'>
             <div className='system-b-launch-two-column'>
@@ -642,6 +665,7 @@ export default function LaunchPage() {
         <section
           aria-labelledby='deeplinks-heading'
           className='system-b-launch-section'
+          {...launchStamp('feature-grid', '4-equal', 'deeplinks')}
         >
           <MarketingContainer width='page'>
             <SectionIntro
@@ -676,6 +700,7 @@ export default function LaunchPage() {
         <section
           aria-labelledby='ai-heading'
           className='system-b-launch-section'
+          {...launchStamp('feature-split', 'editorial', 'ai')}
         >
           <MarketingContainer width='page'>
             <div className='system-b-launch-two-column'>
@@ -707,6 +732,7 @@ export default function LaunchPage() {
         <section
           aria-labelledby='audience-heading'
           className='system-b-launch-section'
+          {...launchStamp('feature-split', 'editorial', 'audience')}
         >
           <MarketingContainer width='page'>
             <div className='system-b-launch-two-column'>
@@ -807,6 +833,7 @@ export default function LaunchPage() {
         <section
           aria-labelledby='whynow-heading'
           className='system-b-launch-section'
+          {...launchStamp('stats', '3-stat-band')}
         >
           <MarketingContainer width='page'>
             <SectionIntro
@@ -830,6 +857,7 @@ export default function LaunchPage() {
         <section
           aria-labelledby='comparison-heading'
           className='system-b-launch-section'
+          {...launchStamp('comparison', 'feature-matrix')}
         >
           <MarketingContainer width='page'>
             <SectionIntro
@@ -862,6 +890,7 @@ export default function LaunchPage() {
         <section
           aria-labelledby='cta-heading'
           className='system-b-launch-final'
+          {...launchStamp('cta', 'final-dual-path')}
         >
           <MarketingContainer width='page'>
             <h2
@@ -883,7 +912,7 @@ export default function LaunchPage() {
             </div>
           </MarketingContainer>
         </section>
-      </main>
+      </div>
     </MarketingPageShell>
   );
 }

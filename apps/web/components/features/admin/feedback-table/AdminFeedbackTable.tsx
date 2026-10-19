@@ -13,7 +13,6 @@ import {
   DrawerSection,
   DrawerSurfaceCard,
   EntityHeader,
-  EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { EmptyState } from '@/components/molecules/EmptyState';
 import {
@@ -23,6 +22,7 @@ import {
   rowState,
 } from '@/components/organisms/table';
 import { convertContextMenuItems } from '@/components/organisms/table/molecules/TableContextMenu';
+import { AdminDetailRail } from '@/features/admin/layout/AdminDetailRail';
 import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { AdminTableSubheader } from '@/features/admin/table/AdminTableHeader';
 import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
@@ -39,6 +39,16 @@ interface FeedbackRow {
   message: string;
   source: string;
   status: 'pending' | 'dismissed';
+  classification: 'bug_verifiable' | 'feature_or_change' | 'noise' | null;
+  disposition:
+    | 'pending'
+    | 'auto_remediation'
+    | 'duplicate'
+    | 'pending_summer'
+    | 'cert_required'
+    | 'now'
+    | 'later'
+    | 'never';
   createdAtIso: string;
   dismissedAtIso: string | null;
   user: {
@@ -122,6 +132,17 @@ function renderStatusCell({ getValue }: { getValue: () => any }) {
   );
 }
 
+function DispositionCell({ row }: { readonly row: FeedbackRow }) {
+  const label = row.classification
+    ? `${row.classification.replaceAll('_', ' ')} · ${row.disposition.replaceAll('_', ' ')}`
+    : row.disposition.replaceAll('_', ' ');
+  return (
+    <span className='inline-flex min-h-6 items-center rounded bg-surface-1 px-1.5 py-0.5 text-2xs font-medium tracking-tight whitespace-nowrap text-secondary-token'>
+      {label}
+    </span>
+  );
+}
+
 function FeedbackActionsCell({
   row,
   getContextMenuItems,
@@ -168,6 +189,12 @@ function buildFeedbackColumns(deps: {
       size: 120,
     }),
     columnHelper.display({
+      id: 'disposition',
+      header: 'Disposition',
+      cell: ({ row }) => <DispositionCell row={row.original} />,
+      size: 200,
+    }),
+    columnHelper.display({
       id: 'actions',
       header: '',
       cell: ({ row }) => (
@@ -212,9 +239,8 @@ function AdminFeedbackDetailPanel({
     : [];
 
   return (
-    <EntitySidebarShell
+    <AdminDetailRail
       isOpen={Boolean(selected)}
-      width={560}
       ariaLabel='Feedback details'
       scrollStrategy='shell'
       onClose={onClose}
@@ -225,7 +251,7 @@ function AdminFeedbackDetailPanel({
       emptyMessage='Select a feedback row to view details.'
       entityHeader={
         selected ? (
-          <DrawerSurfaceCard variant='card' className='overflow-hidden'>
+          <DrawerSurfaceCard variant='flat' className='overflow-hidden'>
             <div className='p-3.5'>
               <EntityHeader
                 eyebrow='Feedback'
@@ -263,7 +289,7 @@ function AdminFeedbackDetailPanel({
     >
       {selected ? (
         <>
-          <DrawerSection title='User' className='space-y-1.5' surface='card'>
+          <DrawerSection title='User' className='space-y-1.5' surface='plain'>
             <div className='space-y-1'>
               <DrawerPropertyRow
                 label='User'
@@ -284,10 +310,29 @@ function AdminFeedbackDetailPanel({
           </DrawerSection>
 
           <DrawerSection
+            title='Disposition'
+            className='space-y-1.5'
+            surface='plain'
+          >
+            <div className='space-y-1'>
+              <DrawerPropertyRow
+                label='Class'
+                labelWidth={84}
+                value={selected.classification ?? 'unclassified'}
+              />
+              <DrawerPropertyRow
+                label='Outcome'
+                labelWidth={84}
+                value={selected.disposition}
+              />
+            </div>
+          </DrawerSection>
+
+          <DrawerSection
             title='Feedback'
             collapsible={false}
             className='space-y-1.5'
-            surface='card'
+            surface='plain'
           >
             <div className='rounded-md bg-surface-0 px-2.5 py-2 text-xs leading-[19px] whitespace-pre-wrap text-primary-token'>
               {selected.message}
@@ -298,7 +343,7 @@ function AdminFeedbackDetailPanel({
             title='Context'
             collapsible={false}
             className='space-y-1.5'
-            surface='card'
+            surface='plain'
           >
             <div className='overflow-auto rounded-md bg-surface-0 p-0'>
               <pre className='p-2.5 text-3xs leading-4 text-secondary-token'>
@@ -308,7 +353,7 @@ function AdminFeedbackDetailPanel({
           </DrawerSection>
         </>
       ) : null}
-    </EntitySidebarShell>
+    </AdminDetailRail>
   );
 }
 

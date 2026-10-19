@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { fn } from 'storybook/test';
 import { withDashboardProviders } from '@/.storybook/dashboard-fixtures';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import type { DspMatch } from '@/lib/queries/useDspMatchesQuery';
@@ -66,6 +67,8 @@ const meta = {
     spotifyConnected: true,
     releases,
     isLoading: false,
+    onMatchStatusChange:
+      fn<(connected: boolean, artistName: string | null) => void>(),
   },
 } satisfies Meta<typeof AppleMusicSyncBanner>;
 
@@ -96,4 +99,31 @@ export const CompactNoMatch: Story = {
     matches: [],
     compact: true,
   },
+};
+
+export const UnknownConfidence: Story = {
+  args: {
+    matches: [
+      {
+        ...suggestedMatch,
+        confidenceScore: null,
+        confidenceBreakdown: null,
+        matchingIsrcCount: 0,
+        matchingUpcCount: 0,
+        totalTracksChecked: 0,
+      },
+    ],
+  },
+};
+
+export const CompactUnknownConfidence: Story = {
+  args: { ...UnknownConfidence.args, compact: true },
+};
+
+export const HiddenWhileLoading: Story = {
+  args: { matches: [], isLoading: true },
+};
+
+export const Confirmed: Story = {
+  args: { matches: [{ ...suggestedMatch, status: 'confirmed' }] },
 };

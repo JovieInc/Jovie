@@ -11,6 +11,12 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
+vi.mock('@/lib/ingestion/session', () => ({
+  withSystemIngestionSession: vi.fn((operation: (tx: unknown) => unknown) =>
+    operation({ select: mockDbSelect })
+  ),
+}));
+
 vi.mock('@/lib/db/schema', () => ({
   billingAuditLog: {},
   stripeWebhookEvents: {},

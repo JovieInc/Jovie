@@ -1,4 +1,5 @@
 #!/usr/bin/env tsx
+
 /**
  * Computed-contrast gate CLI (JOV #12012).
  *
@@ -11,42 +12,37 @@
  * WCAG 2.1 contrast ratios via lib/a11y-gates/contrast-engine.ts.
  *
  * Thresholds (WCAG 2.1 AA): 4.5:1 normal text, 3.0:1 large text/UI.
- * Pairs that cannot be statically resolved (color-mix, …) warn and skip
- * unless --strict.
+ * Generated surface/state/status pairs use sRGB compositing. Unresolvable
+ * pairs fail closed. Existing failures have per-pair floors in the shrink-only
+ * contrast-computed.baseline.json; new or worsening failures block.
  *
  * Usage:
  *   pnpm --filter web run lint:contrast-computed            # check
  *   tsx scripts/lint-contrast-computed.ts --verbose         # print ratios
- *   tsx scripts/lint-contrast-computed.ts --strict          # warnings fail
+ *   tsx scripts/lint-contrast-computed.ts --update          # shrink baseline
  *
- * Exit 0 = all resolvable pairs meet their threshold. Exit 1 = failure.
+ * Exit 0 = no regressions or coverage loss. Exit 1 = failure.
  * Merge-gate twin: tests/unit/design-system/computed-contrast.test.ts.
  */
 
+import { writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  defaultCssFiles,
-  loadPairsConfig,
-  loadThemeTablesFromFiles,
-  runContrastChecks,
-} from '../lib/a11y-gates/contrast-engine';
+  failureBaseline,
+  loadContrastGate,
+} from '../lib/a11y-gates/contrast-matrix';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(__dirname, '..');
 
-function main(): void {
-  const strict = process.argv.includes('--strict');
+async function main(): Promise<void> {
   const verbose = process.argv.includes('--verbose');
-
-  const tables = loadThemeTablesFromFiles(defaultCssFiles(projectRoot));
-  const pairs = loadPairsConfig(
-    join(projectRoot, 'contrast-pairs.config.json')
-  );
-  const { failures, warnings, passes } = runContrastChecks(pairs, tables);
+  const result = await loadContrastGate(projectRoot);
+  const { failures, warnings, passes, errors } = result;
 
   console.log(
-    `[contrast-computed] Checked ${passes.length + failures.length} resolvable pair-theme combinations (${warnings.length} skipped)`
+    `[contrast-computed] Checked ${passes.length + failures.length} pair-theme combinations; ${failures.length} below threshold; ${warnings.length} unresolvable`
   );
 
   if (verbose) {
@@ -57,31 +53,27 @@ function main(): void {
     }
   }
 
-  for (const w of warnings) {
-    console.warn(
-      `[contrast-computed]   ⚠ ${w.name} [${w.theme}] skipped — ${w.detail}`
-    );
-  }
-
-  if (failures.length > 0) {
-    for (const f of failures) {
-      console.error(
-        `[contrast-computed] ✗ ${f.name} [${f.theme}]: ${f.ratio?.toFixed(2)}:1 < required ${f.minRatio}:1\n` +
-          `    fg ${f.fg} on bg ${f.bg} fails WCAG AA. Adjust the token value\n` +
-          `    or remove the pair from contrast-pairs.config.json with review.`
-      );
-    }
+  if (errors.length > 0) {
+    for (const error of errors) console.error(`[contrast-computed] ✗ ${error}`);
     process.exit(1);
   }
 
-  if (strict && warnings.length > 0) {
-    console.error(
-      `[contrast-computed] ✗ --strict: ${warnings.length} unresolvable pair(s)`
+  // Only reached after regression checks: --update cannot add or worsen debt.
+  if (process.argv.includes('--update')) {
+    writeFileSync(
+      join(projectRoot, 'contrast-computed.baseline.json'),
+      `${JSON.stringify(failureBaseline(result), null, 2)}\n`
     );
-    process.exit(1);
   }
-
-  console.log('[contrast-computed] ✓ All resolvable token pairs meet WCAG AA');
+  console.log(
+    `[contrast-computed] ✓ No regressions (${failures.length} baselined failures)`
+  );
 }
 
-main();
+// tsx emits this script as CommonJS. Top-level await fails that transform
+// (esbuild: "cjs" output format), so the ratchet never reaches the gate.
+main().catch((error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(`[contrast-computed] ✗ ${message}`);
+  process.exit(1);
+});

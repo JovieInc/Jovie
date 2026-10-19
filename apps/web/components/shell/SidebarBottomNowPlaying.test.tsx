@@ -90,6 +90,10 @@ describe('SidebarBottomNowPlaying', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss Player' }));
 
     expect(onDismiss).toHaveBeenCalledOnce();
+    expect(screen.getByLabelText('Dismiss Player')).toHaveClass(
+      'before:h-11',
+      'before:w-11'
+    );
   });
 
   it('keeps compact row geometry stable from paused to playing', () => {

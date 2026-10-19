@@ -9,8 +9,11 @@ import {
   hasAdminCredentials,
   prepareBetterAuthEmailOtp,
 } from '../helpers/auth';
+import { completeGoldenPathBillingJourney } from './helpers/golden-path-billing';
+import { openHomeWelcome } from './helpers/golden-path-home-welcome';
 import {
   captureKeyframe,
+  inspectEssentialViewport,
   watchKeyframeErrors,
 } from './helpers/golden-path-keyframes';
 import {
@@ -19,7 +22,7 @@ import {
 } from './utils/runtime-automation-bypass';
 
 /**
- * Golden Path E2E — Anonymous Chat -> Signup -> Claim -> Live Profile
+ * Golden Path E2E — Anonymous Chat -> Auth -> Claim -> Catalog -> Billing
  *
  * Tests the complete new-user journey end to end with REAL data:
  * - Real anonymous conversation persistence and Better Auth signup
@@ -29,11 +32,8 @@ import {
  *
  * MusicFetch integration coverage remains in musicfetch-coverage.spec.ts.
  *
- * Jovie's pricing is a 14-day reverse trial with NO card required at signup
- * (see docs/PRICING-PHILOSOPHY.md), so the golden path's "first value" moment
- * is the artist's public profile going live with imported music — not a
- * paywall. Checkout is a post-activation upgrade path, not part of this
- * journey; persistence is covered by money-path-persistence.spec.ts.
+ * The profile first-value proof and post-activation Stripe persistence proof
+ * intentionally share one identity, claim, catalog, and production build.
  *
  * Test artist: "UNMARKED" (public catalog, no known Jovie owner)
  */
@@ -56,6 +56,222 @@ const IS_LOCAL_AUTH_BYPASS =
   process.env.E2E_USE_TEST_AUTH_BYPASS === '1' ||
   process.env.NEXT_PUBLIC_CLERK_MOCK === '1' ||
   process.env.NEXT_PUBLIC_CLERK_PROXY_DISABLED === '1';
+const IS_REQUIRED_GOLDEN_PATH = process.env.GOLDEN_PATH_REQUIRED === '1';
+
+/** Auth is real from this journey; Insight responses below are presentation fixtures. */
+async function verifyHomeWelcome(page: Page) {
+  const insight = {
+    id: 'home-tip-fixture',
+    insightType: 'tip_hotspot',
+    category: 'revenue',
+    priority: 'high',
+    title: '27 tip link clicks, zero tips completed',
+    description: '',
+    actionSuggestion: 'Close the conversion gap.',
+    confidence: '0.90',
+    status: 'active',
+    periodStart: new Date(Date.now() - 86_400_000).toISOString(),
+    periodEnd: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+  };
+  let mode: 'action' | 'empty' | 'error' = 'action';
+  let releaseSummary: () => void = () => {};
+  const ready = new Promise<void>(resolve => {
+    releaseSummary = resolve;
+  });
+  let chatPosts = 0;
+  const watchPosts = (request: import('@playwright/test').Request) => {
+    if (
+      request.method() === 'POST' &&
+      new URL(request.url()).pathname === '/api/chat'
+    )
+      chatPosts++;
+  };
+  page.on('request', watchPosts);
+  await page.route('**/api/insights/summary', async route => {
+    await ready;
+    if (mode === 'error') {
+      await route
+        .fulfill({
+          status: 500,
+          json: { error: 'Controlled summary failure' },
+        })
+        .catch(() => {});
+      return;
+    }
+    // An earlier aborted summary must not reject the live fulfill.
+    await route
+      .fulfill({
+        json: {
+          insights:
+            mode === 'empty'
+              ? []
+              : [
+                  {
+                    ...insight,
+                    id: 'expired',
+                    expiresAt: new Date(Date.now() - 1000).toISOString(),
+                  },
+                  insight,
+                ],
+          totalActive: mode === 'empty' ? 0 : 1,
+          lastGeneratedAt: new Date().toISOString(),
+        },
+      })
+      .catch(() => {});
+  });
+  const heading = page.getByTestId('chat-empty-state-greeting-text');
+  const input = page.getByRole('textbox', {
+    name: 'Chat message input',
+    exact: false,
+  });
+  const nextStep = page.getByTestId('chat-empty-state-next-step');
+  const measureCenter = () =>
+    page.evaluate(() => {
+      const group = document.querySelector(
+        '[data-testid="chat-empty-state-greeting-region"]'
+      );
+      const usable = document.querySelector(
+        '[data-testid="chat-empty-state-above-scroll"]'
+      );
+      if (!group || !usable) return null;
+      const box = group.getBoundingClientRect(),
+        region = usable.getBoundingClientRect();
+      const style = getComputedStyle(usable);
+      const top = region.top + parseFloat(style.paddingTop),
+        bottom = region.bottom - parseFloat(style.paddingBottom);
+      return {
+        delta: Math.abs((box.top + box.bottom) / 2 - (top + bottom) / 2),
+        tolerance: Math.max(4, (bottom - top) * 0.02),
+      };
+    });
+  const assertGeometry = async () => {
+    const selectors = [
+      '[data-testid="chat-empty-state-next-step"] button, [data-testid="chat-empty-state-next-step"] a',
+    ];
+    for (const button of await page
+      .getByTestId('chat-composer-surface')
+      .getByRole('button')
+      .all()) {
+      const name = await button.getAttribute('aria-label');
+      const painted = await button.evaluate(el => {
+        const box = el.getBoundingClientRect();
+        return (
+          box.width > 0 &&
+          box.height > 0 &&
+          getComputedStyle(el).opacity !== '0'
+        );
+      });
+      if (name && painted)
+        selectors.push(
+          `[data-testid="chat-composer-surface"] button[aria-label=${JSON.stringify(name)}]`
+        );
+    }
+    expect(
+      await inspectEssentialViewport(page, [
+        ...selectors,
+        '[data-testid="chat-empty-state-greeting-text"]',
+        '[data-testid="chat-empty-state-next-step"]',
+        '[data-testid="chat-composer-surface"]',
+        '[aria-label="Chat message input" i]',
+      ])
+    ).toEqual({ supported: true, findings: [] });
+    const centering = await measureCenter();
+    expect(centering).not.toBeNull();
+    if (centering)
+      expect(centering.delta).toBeLessThanOrEqual(centering.tolerance);
+    await expect(heading).toHaveCount(1);
+    await expect(heading).toContainText(TEST_SPOTIFY_ARTIST.name.split(' ')[0]);
+    await expect(nextStep).toHaveCount(1);
+    await expect(page.getByTestId('chat-empty-state-sample')).toHaveCount(0);
+    await expect(page.getByText(insight.title, { exact: true })).toHaveCount(0);
+  };
+  try {
+    for (const viewport of [
+      { width: 1440, height: 900 },
+      { width: 390, height: 844 },
+      { width: 768, height: 1024 },
+      { width: 615, height: 407 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.emulateMedia({
+        reducedMotion: viewport.width === 615 ? 'reduce' : 'no-preference',
+      });
+      const { initialGreeting, before } = await openHomeWelcome(
+        page,
+        viewport.width === 1440 ? releaseSummary : undefined
+      );
+      const action = page.getByRole('button', {
+        name: 'Draft This With Jovie',
+      });
+      await expect(action).toBeVisible();
+      await expect(nextStep.locator('[data-insight-id]')).toHaveAttribute(
+        'data-insight-id',
+        insight.id
+      );
+      await expect(heading).toHaveText(initialGreeting!);
+      const after = await input.boundingBox();
+      expect(before).not.toBeNull();
+      expect(after).not.toBeNull();
+      if (before && after)
+        expect(Math.abs(before.y - after.y)).toBeLessThanOrEqual(1);
+      await assertGeometry();
+      if (viewport.width === 1440) {
+        // Independent deliberate red: truthful content, wrong bottom placement.
+        const group = page.locator('[data-empty-chat-suggestions]');
+        const previousStyle = await group.getAttribute('style');
+        await group.evaluate(el => {
+          (el as HTMLElement).style.marginTop = 'auto';
+          (el as HTMLElement).style.marginBottom = '0';
+        });
+        const misplaced = await measureCenter();
+        expect(misplaced).not.toBeNull();
+        if (misplaced)
+          expect(misplaced.delta).toBeGreaterThan(misplaced.tolerance);
+        await group.evaluate((el, style) => {
+          if (style === null) el.removeAttribute('style');
+          else el.setAttribute('style', style);
+        }, previousStyle);
+        await assertGeometry();
+      }
+      await action.focus();
+      await page.keyboard.press('Enter');
+      await expect(input).toHaveValue(new RegExp(`Insight ${insight.id}:`));
+      await expect(input).toBeFocused();
+      expect(chatPosts).toBe(0);
+      await input.fill('');
+      await assertGeometry();
+      await page.waitForTimeout(1000); // Idle effects are part of the contract.
+      await assertGeometry();
+      await page.reload();
+      await expect(action).toBeVisible();
+      await assertGeometry();
+      expect(chatPosts).toBe(0);
+      if (process.env.GOLDEN_PATH_KEYFRAME_DIR)
+        await captureKeyframe(page, `home-welcome-${viewport.width}`, {
+          expectedArtistName: TEST_SPOTIFY_ARTIST.name,
+        });
+    }
+    for (const state of ['empty', 'error'] as const) {
+      mode = state;
+      await page.goto(APP_ROUTES.CHAT);
+      await expect(
+        page.getByRole('link', { name: 'Review Your Profile' })
+      ).toBeVisible({ timeout: 30_000 });
+      await expect(
+        page.getByRole('button', { name: 'Draft This With Jovie' })
+      ).toHaveCount(0);
+      await assertGeometry();
+    }
+  } finally {
+    releaseSummary();
+    page.off('request', watchPosts);
+    await page.unroute('**/api/insights/summary');
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+  }
+}
 
 function hasRealEnv(): boolean {
   return Object.values(REQUIRED_ENV).every(
@@ -147,6 +363,132 @@ async function interceptTrackingCalls(page: Page) {
   await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
 }
 
+/** Exercise the Google handoff and its denied-provider recovery UI. */
+async function exerciseGoogleProviderRecovery(page: Page): Promise<void> {
+  const signupPath = `/signup?plan=pro&interval=month&artist_name=${encodeURIComponent(TEST_SPOTIFY_ARTIST.name)}&redirect_url=%2Fstart`;
+  await page.goto(signupPath, { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('[data-auth-shell-hydrated="true"]')).toBeVisible({
+    timeout: 30_000,
+  });
+  const signupOrigin = new URL(page.url()).origin;
+  let errorReturn: string | null = null;
+
+  const googleRoute = async (route: import('@playwright/test').Route) => {
+    await route.abort('aborted');
+  };
+  const socialRoute = async (route: import('@playwright/test').Route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        redirect: true,
+        url: 'https://accounts.google.com/o/oauth2/v2/auth?client_id=golden-path&redirect_uri=http%3A%2F%2Flocalhost%3A3250%2Fapi%2Fauth%2Fcallback%2Fgoogle',
+      }),
+    });
+  };
+  // Provider credentials and consent remain Google-owned. Stub only the
+  // transport response at the Better Auth boundary, then exercise the real
+  // hydrated button, redirect behavior, denial return, and saved offer state.
+  await page.route('**/api/auth/sign-in/social', socialRoute);
+  await page.route('https://accounts.google.com/**', googleRoute);
+  try {
+    const socialPost = page.waitForRequest(
+      request =>
+        request.method() === 'POST' &&
+        new URL(request.url()).pathname === '/api/auth/sign-in/social',
+      { timeout: 30_000 }
+    );
+    const providerNavigation = page.waitForRequest(
+      request =>
+        request.isNavigationRequest() &&
+        new URL(request.url()).hostname === 'accounts.google.com',
+      { timeout: 30_000 }
+    );
+    await page
+      .locator('button[data-auth-provider-slot="google"]')
+      .click({ noWaitAfter: true });
+    const [request, providerRequest] = await Promise.all([
+      socialPost,
+      providerNavigation,
+    ]);
+    const body = request.postDataJSON() as Record<string, unknown>;
+    expect(body.provider).toBe('google');
+    // Auth returns through the server entry so access and subscriber state
+    // resolve before checkout. Every callback must retain the explicit intent.
+    for (const field of [
+      'callbackURL',
+      'newUserCallbackURL',
+      'errorCallbackURL',
+    ] as const) {
+      expect(body[field]).toEqual(expect.any(String));
+      expect(body[field]).not.toBe('');
+      const callback = new URL(String(body[field]), signupOrigin);
+      expect(callback.origin).toBe(signupOrigin);
+      expect(callback.pathname).toBe(APP_ROUTES.SIGNUP);
+      expect(callback.username).toBe('');
+      expect(callback.password).toBe('');
+      expect(callback.hash).toBe('');
+      for (const [key, value] of Object.entries({
+        redirect_url: APP_ROUTES.START,
+        plan: 'pro',
+        interval: 'month',
+        artist_name: TEST_SPOTIFY_ARTIST.name,
+      })) {
+        expect(callback.searchParams.getAll(key)).toEqual([value]);
+      }
+      expect(callback.searchParams.getAll('oauth_error')).toEqual([]);
+      expect(callback.searchParams.getAll('error')).toEqual(
+        field === 'errorCallbackURL' ? ['oauth_failed'] : []
+      );
+      if (field === 'errorCallbackURL')
+        errorReturn = callback.pathname + callback.search;
+    }
+    expect(new URL(providerRequest.url()).hostname).toBe('accounts.google.com');
+  } finally {
+    await page.unroute('**/api/auth/sign-in/social', socialRoute);
+    await page.unroute('https://accounts.google.com/**', googleRoute);
+  }
+
+  expect(errorReturn).not.toBeNull();
+  await page.goto(errorReturn!, {
+    waitUntil: 'domcontentloaded',
+  });
+  // JOV-8349: keep a missing canonical recovery message red while continuing
+  // the same identity's email fallback and downstream Home/billing checks.
+  await expect
+    .soft(page.getByRole('alert').first())
+    .toContainText('Something went wrong with sign-up. Please try again.', {
+      timeout: 30_000,
+    });
+  const savedIntent = await page.evaluate(() =>
+    sessionStorage.getItem('jovie_plan_intent')
+  );
+  expect(savedIntent).toBeTruthy();
+  expect(JSON.parse(String(savedIntent))).toMatchObject({
+    artist: TEST_SPOTIFY_ARTIST.name,
+    interval: 'month',
+    plan: 'pro',
+  });
+
+  // Continue through the product's card-free first-value path before upgrading.
+  // This overwrites only the offer tier; the anonymous claim session and artist
+  // survive into email fallback, and billing later receives explicit correlation.
+  await page.goto(
+    `/signup?plan=free&artist_name=${encodeURIComponent(TEST_SPOTIFY_ARTIST.name)}&redirect_url=%2Fstart`,
+    { waitUntil: 'domcontentloaded' }
+  );
+  await expect(page.locator('[data-auth-shell-hydrated="true"]')).toBeVisible({
+    timeout: 30_000,
+  });
+  const fallbackIntent = await page.evaluate(() =>
+    sessionStorage.getItem('jovie_plan_intent')
+  );
+  expect(JSON.parse(String(fallbackIntent))).toMatchObject({
+    artist: TEST_SPOTIFY_ARTIST.name,
+    plan: 'free',
+  });
+}
+
 /**
  * Create a brand-new Better Auth test user through the visible email-OTP
  * signup surface. E2E_TEST_MODE supplies the deterministic 424242 code only
@@ -157,6 +499,10 @@ async function createFreshUserOnce(page: import('@playwright/test').Page) {
   const preparedAuth = await prepareBetterAuthEmailOtp(page, {
     email,
     entryPath: '/signup',
+    recovery: {
+      initialEmail: email.replace('gp-', 'gp-abandoned-'),
+      resendCode: true,
+    },
     beforeResponseFulfill: ensureDbUser,
   });
 
@@ -410,7 +756,7 @@ async function createFreshUser(page: import('@playwright/test').Page) {
 /*  Test suite                                                          */
 /* ------------------------------------------------------------------ */
 
-test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', () => {
+test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () => {
   test.describe.configure({ mode: 'serial', retries: 0 });
 
   // Fresh browser — no inherited auth state
@@ -418,6 +764,11 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
 
   test.beforeEach(async ({ page }) => {
     if (IS_LOCAL_AUTH_BYPASS) {
+      if (IS_REQUIRED_GOLDEN_PATH) {
+        throw new Error(
+          'Required Golden Path refuses the smoke auth bypass identity'
+        );
+      }
       test.skip(
         true,
         'Golden path requires the dedicated real-auth lane, not the smoke auth bypass'
@@ -425,17 +776,24 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
     }
 
     if (!hasRealEnv()) {
+      if (IS_REQUIRED_GOLDEN_PATH) {
+        throw new Error('Required Golden Path is missing its real database');
+      }
       test.skip(true, 'Better Auth/DB env vars not configured');
+    }
+
+    if (IS_REQUIRED_GOLDEN_PATH && process.env.E2E_TEST_MODE !== '1') {
+      throw new Error('Required Golden Path is missing deterministic OTP mode');
     }
 
     await interceptTrackingCalls(page);
   });
 
-  test('complete user journey from signup to live public profile', async ({
+  test('completes one identity from provider recovery through revoked return', async ({
     page,
     browser,
   }) => {
-    test.setTimeout(600_000);
+    test.setTimeout(900_000);
     // JOV-5489: keyframes for the recorded visual review (no-op unless enabled).
     watchKeyframeErrors(page);
 
@@ -471,6 +829,25 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
     // STEP 3: Create account
     // ──────────────────────────────────────────────────────────────────
     const sql = neon(process.env.DATABASE_URL!);
+    const databaseRole = decodeURIComponent(
+      new URL(process.env.DATABASE_URL!).username
+    );
+    const [databaseContract] = await sql`
+      SELECT current_user AS role,
+             current_schema() AS schema,
+             to_regclass('public.users') IS NOT NULL AS "hasUsers",
+             to_regclass('public.creator_profiles') IS NOT NULL AS "hasProfiles",
+             to_regclass('public.user_profile_claims') IS NOT NULL AS "hasClaims",
+             to_regclass('public.stripe_webhook_events') IS NOT NULL AS "hasStripeEvents"
+    `;
+    expect(databaseContract).toMatchObject({
+      role: databaseRole,
+      schema: 'public',
+      hasUsers: true,
+      hasProfiles: true,
+      hasClaims: true,
+      hasStripeEvents: true,
+    });
     const conflictingProfiles = await sql`
       SELECT cp.id, cp.username_normalized, u.email
       FROM creator_profiles cp
@@ -482,7 +859,9 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
       `Protected Golden Path fixture is already owned; refusing to detach ${TEST_SPOTIFY_ARTIST.id}: ${JSON.stringify(conflictingProfiles)}`
     ).toHaveLength(0);
 
-    const { betterAuthUserId, claimPayload } = await createFreshUser(page);
+    await exerciseGoogleProviderRecovery(page);
+    const { email, betterAuthUserId, claimPayload } =
+      await createFreshUser(page);
 
     // JOV-8068: the mount claim transfers transcript ownership only. It must
     // NOT materialize a profile or authorize a checkout handoff before the
@@ -531,6 +910,15 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
                c.user_id AS "conversationUserId",
                c.creator_profile_id AS "conversationProfileId",
                (
+                 SELECT upc.id
+                 FROM user_profile_claims upc
+                 WHERE upc.user_id = u.id
+                   AND upc.creator_profile_id = cp.id
+                   AND upc.role = 'owner'
+                 ORDER BY upc.created_at ASC
+                 LIMIT 1
+               ) AS "ownerClaimId",
+               (
                  SELECT COUNT(*)::int
                  FROM user_profile_claims upc
                  WHERE upc.user_id = u.id
@@ -562,10 +950,15 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
         onboardingCompletedAt: expect.anything(),
         selectedSpotifyArtistId: TEST_SPOTIFY_ARTIST.id,
         ownerClaimCount: 1,
+        ownerClaimId: expect.any(String),
       });
     const claimedProfile = await readClaimedProfileProof();
     expect(claimedProfile).not.toBeNull();
     const profileId = claimedProfile?.id as string;
+    const appUserId = claimedProfile?.appUserId as string;
+    const claimId = claimedProfile?.ownerClaimId as string;
+    expect(appUserId).toBeTruthy();
+    expect(claimId).toBeTruthy();
     expect(claimedProfile?.activeProfileId).toBe(profileId);
     expect(claimedProfile?.conversationProfileId).toBe(profileId);
     expect(claimedProfile?.conversationUserId).toBe(claimedProfile?.appUserId);
@@ -853,5 +1246,25 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
     } finally {
       await fanContext.close();
     }
+
+    // Use this admitted identity for the actual Home shell. Controlled Insight
+    // presentation does not certify Pro entitlement or a verified success claim.
+    await verifyHomeWelcome(page);
+
+    // STEP 9: Reuse this exact identity and context for the post-activation
+    // checkout, webhook, fresh-browser return, refund, and revoked-cookie proof.
+    await completeGoldenPathBillingJourney({
+      appUserId,
+      betterAuthUserId,
+      browser,
+      claimId,
+      conversationId: String(conversationId),
+      databaseUrl: process.env.DATABASE_URL!,
+      email,
+      handle: uniqueHandle,
+      page,
+      profileId,
+      spotifyArtistId: TEST_SPOTIFY_ARTIST.id,
+    });
   });
 });

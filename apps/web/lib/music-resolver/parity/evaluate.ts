@@ -5,12 +5,22 @@ import {
 } from './catalog';
 import { runParityProbes } from './probes';
 import { rowIsPass, scoreRows } from './score';
+import { matchesTarget, PARITY_TARGET_ROW_COUNT } from './target';
 import type { CatalogEntry, ProbeResult, ScoreReport } from './types';
 
 export function finishEvaluation(
   rows: Parameters<typeof scoreRows>[0]
 ): ScoreReport {
   const scored = scoreRows(rows);
+  const target = buildCatalog();
+  if (!matchesTarget(rows, target)) {
+    return {
+      ...scored,
+      denominator: PARITY_TARGET_ROW_COUNT,
+      exitCode: 1,
+      targetError: 'rows or catalog differ from the frozen target',
+    };
+  }
   if (scored.exitCode !== 0) return scored;
   const passingIds = scored.rows
     .filter(row => rowIsPass(row))

@@ -21,6 +21,7 @@ const {
   mockPlainDbOnConflictDoUpdate,
   mockPlainDbValues,
   mockPlainDbInsert,
+  mockPlainDbReturning,
 } = vi.hoisted(() => ({
   mockLogger: {
     info: vi.fn(),
@@ -33,6 +34,7 @@ const {
   mockPlainDbOnConflictDoUpdate: vi.fn(),
   mockPlainDbValues: vi.fn(),
   mockPlainDbInsert: vi.fn(),
+  mockPlainDbReturning: vi.fn(),
 }));
 
 // Logger
@@ -181,6 +183,7 @@ vi.mock('@/lib/db/schema/profiles', () => ({
 }));
 
 vi.mock('drizzle-orm', () => ({
+  and: vi.fn((...args: unknown[]) => ({ type: 'and', args })),
   eq: vi.fn((...args: unknown[]) => ({ type: 'eq', args })),
   ne: vi.fn((...args: unknown[]) => ({ type: 'ne', args })),
   or: vi.fn((...args: unknown[]) => ({ type: 'or', args })),
@@ -334,6 +337,41 @@ function getOnConflictSqlParts(value: unknown): readonly string[] | null {
   return null;
 }
 
+// Interpret only the predicate operators used by this test's Drizzle mock.
+// This checks admission semantics; it is not a Postgres integration test.
+function admitsConflict(
+  condition: unknown,
+  row: Record<string, unknown>
+): boolean {
+  if (condition === undefined) return true;
+  if (
+    !condition ||
+    typeof condition !== 'object' ||
+    !('type' in condition) ||
+    !('args' in condition) ||
+    !Array.isArray(condition.args)
+  ) {
+    throw new Error('Unsupported conflict condition');
+  }
+  const [column, expected] = condition.args;
+  if (condition.type === 'and')
+    return condition.args.every(arg => admitsConflict(arg, row));
+  if (condition.type === 'or')
+    return condition.args.some(arg => admitsConflict(arg, row));
+  if (
+    !column ||
+    typeof column !== 'object' ||
+    !('name' in column) ||
+    typeof column.name !== 'string'
+  ) {
+    throw new Error('Expected a schema column');
+  }
+  const actual = row[column.name];
+  if (condition.type === 'isNull') return actual == null;
+  if (condition.type === 'eq') return actual != null && actual === expected;
+  throw new Error(`Unsupported predicate ${String(condition.type)}`);
+}
+
 describe('musicfetch-enrichment', () => {
   let mockTx: ReturnType<typeof createMockTx>;
 
@@ -363,7 +401,10 @@ describe('musicfetch-enrichment', () => {
     mockPlainDbInsert.mockImplementation(() => ({
       values: mockPlainDbValues,
     }));
-    mockPlainDbOnConflictDoUpdate.mockResolvedValue(undefined);
+    mockPlainDbOnConflictDoUpdate.mockImplementation(() => ({
+      returning: mockPlainDbReturning,
+    }));
+    mockPlainDbReturning.mockResolvedValue([{ id: 'seeded-match' }]);
     mockTxLimit.mockResolvedValue([makeProfile()]);
   });
 
@@ -834,7 +875,9 @@ describe('musicfetch-enrichment', () => {
     });
 
     it('seeds MusicFetch presence matches without fake confidence data', async () => {
-      const musicFetchResult = makeMusicFetchResult();
+      const musicFetchResult = makeMusicFetchResult({
+        image: { url: 'https://is1-ssl.mzstatic.com/image/reference.jpg' },
+      });
       mockFetchArtistBySpotifyUrl.mockResolvedValue(musicFetchResult);
 
       const { processMusicFetchEnrichmentJob } = await import(
@@ -865,9 +908,112 @@ describe('musicfetch-enrichment', () => {
           confidenceScore: null,
           confidenceBreakdown: null,
           matchSource: 'musicfetch',
-          status: 'auto_confirmed',
+          status: 'suggested',
+          confirmedAt: null,
+          externalArtistImageUrl: null,
         })
       );
+      for (const [values] of mockPlainDbValues.mock.calls) {
+        expect(values).toMatchObject({
+          externalArtistImageUrl: null,
+          status: 'suggested',
+          confirmedAt: null,
+        });
+      }
+    });
+
+    it('does not report guarded matches as newly seeded', async () => {
+      mockFetchArtistBySpotifyUrl.mockResolvedValue(makeMusicFetchResult());
+      mockPlainDbReturning.mockResolvedValue([]);
+      const { processMusicFetchEnrichmentJob } = await import(
+        '@/lib/dsp-enrichment/jobs/musicfetch-enrichment'
+      );
+      await processMusicFetchEnrichmentJob(
+        mockTx as unknown as Parameters<
+          typeof processMusicFetchEnrichmentJob
+        >[0],
+        makePayload()
+      );
+      expect(mockPlainDbValues).toHaveBeenCalled();
+      expect(
+        mockLogger.info.mock.calls.some(
+          ([message]) =>
+            message === 'MusicFetch enrichment: seeded DSP presence matches'
+        )
+      ).toBe(false);
+    });
+
+    it('protects artist decisions, inspected evidence, and conflicting platform identities atomically', async () => {
+      mockFetchArtistBySpotifyUrl.mockResolvedValue(
+        makeMusicFetchResult({
+          services: {
+            appleMusic: {
+              id: '123456',
+              url: 'https://music.apple.com/us/artist/test-artist/123456',
+            },
+          },
+        })
+      );
+      const { processMusicFetchEnrichmentJob } = await import(
+        '@/lib/dsp-enrichment/jobs/musicfetch-enrichment'
+      );
+      await processMusicFetchEnrichmentJob(
+        mockTx as unknown as Parameters<
+          typeof processMusicFetchEnrichmentJob
+        >[0],
+        makePayload()
+      );
+      const { where, set } = mockPlainDbOnConflictDoUpdate.mock.calls[0]?.[0];
+      const uninspected = {
+        match_source: 'musicfetch',
+        status: 'auto_confirmed',
+        confirmed_by: null,
+        confidence_score: null,
+        confidence_breakdown: null,
+        matching_isrc_count: 0,
+        matching_upc_count: 0,
+        total_tracks_checked: 0,
+        external_artist_id: null,
+        external_artist_url:
+          'https://music.apple.com/us/artist/test-artist/123456',
+      };
+      expect(admitsConflict(where, uninspected)).toBe(true);
+      expect(
+        admitsConflict(where, {
+          ...uninspected,
+          status: 'suggested',
+          match_source: null,
+        })
+      ).toBe(true);
+      expect(
+        admitsConflict(where, { ...uninspected, external_artist_id: '123456' })
+      ).toBe(true);
+      for (const protectedFields of [
+        { match_source: 'manual' },
+        { match_source: 'isrc_discovery' },
+        { match_source: 'backfill' },
+        { status: 'confirmed' },
+        { status: 'rejected' },
+        { confirmed_by: 'user-id' },
+        { confidence_score: '0.0000' },
+        { confidence_breakdown: {} },
+        { matching_isrc_count: 1 },
+        { matching_upc_count: 1 },
+        { total_tracks_checked: 1 },
+        { external_artist_id: 'other-artist' },
+        { external_artist_url: 'https://music.apple.com/us/artist/other/999' },
+      ]) {
+        expect(
+          admitsConflict(where, { ...uninspected, ...protectedFields }),
+          JSON.stringify(protectedFields)
+        ).toBe(false);
+      }
+      expect(set).toMatchObject({
+        status: 'suggested',
+        confirmedAt: null,
+        externalArtistImageUrl: null,
+        matchSource: 'musicfetch',
+      });
     });
 
     it('seeds well above ten streaming DSP matches when MusicFetch returns a broad service set', async () => {

@@ -133,7 +133,7 @@ test.describe('Billing plan selection resiliency', () => {
       return;
     }
 
-    await page.route('**/api/stripe/pricing-options', route =>
+    await page.route(/\/api\/stripe\/pricing-options(?:\?|$)/, route =>
       route.fulfill({
         status: 503,
         contentType: 'application/json',
@@ -150,10 +150,11 @@ test.describe('Billing plan selection resiliency', () => {
     await expect(page.getByTestId('billing-error-state')).toBeVisible({
       timeout: 20_000,
     });
+    const recovery = page.getByTestId('billing-error-state');
     await expect(
-      page.getByText(/Billing is temporarily unavailable/i)
+      recovery.getByText(/Billing is temporarily unavailable/i)
     ).toBeVisible({ timeout: 10_000 });
 
-    await page.unroute('**/api/stripe/pricing-options');
+    await page.unroute(/\/api\/stripe\/pricing-options(?:\?|$)/);
   });
 });

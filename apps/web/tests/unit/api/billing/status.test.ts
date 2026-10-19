@@ -55,6 +55,7 @@ describe('GET /api/billing/status', () => {
 
     expect(response.status).toBe(401);
     expect(data.error).toBe('Unauthorized');
+    expect(mockAuth).toHaveBeenCalledWith({ session: 'fresh' });
   });
 
   it('returns billing status for authenticated user', async () => {

@@ -30,6 +30,10 @@ def load(name):
 
 
 guard = load("disk_guard")
+import git_housekeeping  # noqa: E402  (load() puts scripts/lanes on sys.path)
+
+git_housekeeping.install_process_fixture_env()
+git_housekeeping.install_isolated_tempdirs()
 NOW = 1_800_000_000.0
 
 
@@ -173,8 +177,56 @@ class WorktreeTest(unittest.TestCase):
 
 
 class CheckTest(unittest.TestCase):
+    def setUp(self):
+        # These tests model disk pressure, not the operator's actual cleanup scope.
+        self.cleanup = tempfile.TemporaryDirectory()
+        self.addCleanup(self.cleanup.cleanup)
+        scratch = Path(self.cleanup.name)
+        derived = guard.sweep_derived_data
+        isolated = [
+            patch.object(guard, "runner_roots", return_value=[]),
+            patch.object(guard, "retired_workspace_roots", return_value=[]),
+            patch.object(guard, "log_dirs", side_effect=lambda host: [host.state / "runs"]),
+            patch.object(guard.worktree_pool, "shed", return_value=[]),
+            patch.object(guard.shutil, "which", return_value=None),
+            patch.object(guard, "sweep_derived_data",
+                         side_effect=lambda now, report: derived(now, report, root=scratch / "DerivedData")),
+        ]
+        for isolation in isolated:
+            isolation.start()
+            self.addCleanup(isolation.stop)
+
     def host(self, tmp):
         return SimpleNamespace(state=Path(tmp), repo=Path(tmp))
+
+    def test_low_disk_fixture_preserves_an_operator_workspace(self):
+        # A synthetic low-disk host must not inherit real cleanup roots. Reproduce
+        # the escaped sweep with a fake operator home, never the developer's HOME.
+        import worktree_sweep
+
+        with tempfile.TemporaryDirectory() as tmp:
+            scratch = Path(tmp)
+            home = scratch / "operator-home"
+            retained = make_tree(home / "symphony-elixir-workspaces/JOV-1",
+                                 [".git", "source.txt"], age_s=24 * 3600)
+            state = scratch / "state"
+            state.mkdir()
+
+            def run(args, **kwargs):
+                output = "origin\n" if "remote" in args else "0\n" if "rev-list" in args else ""
+                return SimpleNamespace(returncode=0, stdout=output, stderr="")
+
+            with patch.object(Path, "home", return_value=home), \
+                    patch.object(guard, "free_pct", return_value=10.0), \
+                    patch.object(guard, "RETIRED_WORKSPACE_ABSOLUTE", []), \
+                    patch.object(guard, "mount_points", return_value=set()), \
+                    patch.object(guard.git_housekeeping, "quiesce"), \
+                    patch.object(guard, "sweep_derived_data"), \
+                    patch.object(guard, "sweep_runner_work"), \
+                    patch.object(guard, "sweep_worktree_pool"), \
+                    patch.object(guard.shutil, "which", return_value=None):
+                guard.check(self.host(state), run=run, now=NOW, sweep=True)
+            self.assertEqual((retained / "source.txt").read_text(), "x")
 
     def test_healthy_disk_sweeps_nothing(self):
         saved = guard.free_pct
@@ -406,29 +458,63 @@ class RetiredHostLoopTest(unittest.TestCase):
             self.assertEqual((guard.runner_roots(), guard.retired_workspace_roots()), ([], []))
             self.assertEqual(guard.log_dirs(SimpleNamespace(state=self.root)), [self.root / "runs"])
 
-    def test_idle_runner_loses_transient_work_busy_runner_keeps_it(self):
-        idle, busy, unknown = self.runner("r1"), self.runner("r2"), self.root / "r3"
+    def test_runner_owned_paths_survive_idle_busy_or_unobservable_workers(self):
+        names = ("_actions", "_temp", "_tool", "_update")
+        runner = self.runner("r1", transient=names)
+        unknown = self.root / "unknown"
         (unknown / "_work/_temp").mkdir(parents=True)
-        ps = SimpleNamespace(returncode=0, stderr="",
-                             stdout=f"{busy}/bin/Runner.Listener run\n{busy}/bin/Runner.Worker spawnclient 1 2\n")
-        report = self.report()
-        guard.sweep_runner_work(lambda *a, **k: ps, report, roots=[idle, busy, unknown])
-        self.assertEqual(sorted(p.name for p in (idle / "_work").iterdir()), ["Jovie"], "job checkout stays warm")
-        self.assertTrue((busy / "_work/_temp/f").exists())
-        self.assertTrue((unknown / "_work/_temp").exists(), "not a runner install")
-        self.assertIn(f"preserved busy runner {busy}", report["actions"])
-
-    def test_unattributable_or_unobservable_worker_holds_every_runner(self):
-        idle = self.runner("r1")
-        for ps in (SimpleNamespace(returncode=0, stdout="Runner.Worker spawnclient 1 2\n", stderr=""),
-                   SimpleNamespace(returncode=1, stdout="", stderr="ps: denied")):
+        alias = self.root / "alias"
+        alias.symlink_to(runner, target_is_directory=True)
+        for output in ("", f"{runner}/bin/Runner.Worker spawnclient 1 2\n",
+                       "Runner.Worker spawnclient 1 2\n"):
             report = self.report()
-            guard.sweep_runner_work(lambda *a, **k: ps, report, roots=[idle])
-            self.assertTrue((idle / "_work/_temp/f").exists())
-            self.assertEqual(report["errors"], ["runner-state-unavailable"])
+            run = unittest.mock.Mock(return_value=SimpleNamespace(returncode=0, stdout=output))
+            guard.sweep_runner_work(run, report, roots=[runner, unknown, alias])
+            for name in (*names, "Jovie"):
+                self.assertEqual((runner / "_work" / name / "f").read_text(), "x")
+            self.assertTrue((unknown / "_work/_temp").exists())
+            self.assertEqual(report["errors"], [])
+            self.assertEqual(report["actions"], [f"preserved runner-owned work {runner}"])
+            run.assert_not_called()
+
+    def test_job_start_after_idle_snapshot_keeps_actions_and_tools(self):
+        runner = self.runner("r1", transient=("_actions", "_temp", "_tool", "_update"))
+        action = runner / "_work/_actions/actions/checkout/v7/action.yml"
+        action.parent.mkdir(parents=True)
+        action.write_text("checked-out action")
+        worker_started = False
+        observations = []
+        real_is_file = Path.is_file
+
+        def is_file(path):
+            nonlocal worker_started
+            result = real_is_file(path)
+            if path == runner / ".runner":
+                # The old sweep checks registration after observing idle workers.
+                # A job can start in that interval, before any recursive delete.
+                worker_started = True
+            return result
+
+        def run(*args, **kwargs):
+            observations.append(worker_started)
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        with patch.object(Path, "is_file", is_file), \
+                patch.object(guard.shutil, "rmtree", wraps=guard.shutil.rmtree) as delete:
+            guard.sweep_runner_work(run, self.report(), roots=[runner])
+            self.assertTrue(worker_started)
+            self.assertEqual(action.read_text(), "checked-out action")
+            for name in ("_temp", "_tool", "_update"):
+                self.assertTrue((runner / "_work" / name / "f").exists())
+            delete.assert_not_called()
+        self.assertEqual(observations, [], "a process snapshot is not ownership")
 
     def git(self, *args, cwd):
-        subprocess.run(["git", *args], cwd=cwd, env=self.env, check=True, capture_output=True)
+        # self.env strips GIT_* so a host cannot point fixtures at its checkout.
+        # Re-apply housekeeping: Git 2.55 would otherwise detach maintenance and
+        # the retired-workspace sweep would see a locked index or a nonempty objects dir.
+        subprocess.run(["git", *args], cwd=cwd, env=git_housekeeping.apply_fixture_env(self.env),
+                       check=True, capture_output=True)
 
     def checkout(self, root, name, origin):
         path = root / name
@@ -536,7 +622,8 @@ class HarnessArtifactTest(unittest.TestCase):
         import subprocess
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)
-            env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+            env = git_housekeeping.apply_fixture_env(
+                {key: value for key, value in os.environ.items() if not key.startswith("GIT_")})
             subprocess.run(["git", "init", "-q", str(repo)], check=True, env=env)
             for name in guard.HARNESS_ARTIFACTS:
                 (repo / name).write_text("harness\n")
@@ -544,6 +631,111 @@ class HarnessArtifactTest(unittest.TestCase):
                 self.assertTrue(guard.is_clean(repo, subprocess.run), "only harness artifacts: clean")
                 (repo / "unsaved.py").write_text("work\n")
                 self.assertFalse(guard.is_clean(repo, subprocess.run), "a real untracked file is work")
+
+class GitHousekeepingTest(unittest.TestCase):
+    """Detached git writers must not fail cleanup or be swallowed as success."""
+
+    def test_config_appends_without_dropping_existing_pairs(self):
+        env = git_housekeeping.apply_housekeeping_env({
+            "GIT_CONFIG_COUNT": "1",
+            "GIT_CONFIG_KEY_0": "user.name",
+            "GIT_CONFIG_VALUE_0": "kept",
+        })
+        self.assertEqual(env["GIT_CONFIG_KEY_0"], "user.name")
+        self.assertEqual(env["GIT_CONFIG_VALUE_0"], "kept")
+        pairs = [(env[f"GIT_CONFIG_KEY_{i}"], env[f"GIT_CONFIG_VALUE_{i}"])
+                 for i in range(int(env["GIT_CONFIG_COUNT"]))]
+        self.assertIn(("user.name", "kept"), pairs)
+        self.assertIn(("maintenance.auto", "false"), pairs)
+        again = git_housekeeping.apply_housekeeping_env(env)
+        self.assertEqual(again["GIT_CONFIG_COUNT"], env["GIT_CONFIG_COUNT"])
+
+    def test_remove_tree_waits_out_a_writer_refilling_git_objects(self):
+        root = Path(tempfile.mkdtemp(prefix=f"jovie-lanes-{os.getpid()}-writer-"))
+        pack = root / ".git" / "objects" / "pack"
+        pack.mkdir(parents=True)
+        script = (
+            "import pathlib, sys, time\n"
+            "pack = pathlib.Path(sys.argv[1])\n"
+            "for i in range(40):\n"
+            "    pack.mkdir(parents=True, exist_ok=True)\n"
+            "    path = pack / f'tmp_pack_{i}'\n"
+            "    path.write_text('x')\n"
+            "    time.sleep(0.02)\n"
+            "    path.unlink(missing_ok=True)\n"
+        )
+        proc = subprocess.Popen([sys.executable, "-c", script, str(pack)], cwd=root)
+        try:
+            git_housekeeping.remove_tree(root)
+            proc.wait(timeout=5)
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait(timeout=5)
+        self.assertFalse(root.exists())
+
+    def test_remove_tree_stops_a_git_process_holding_the_checkout(self):
+        root = Path(tempfile.mkdtemp(prefix=f"jovie-lanes-{os.getpid()}-git-"))
+        env = git_housekeeping.apply_fixture_env(os.environ)
+        subprocess.run(["git", "init", "-q"], cwd=root, check=True, env=env)
+        proc = subprocess.Popen(["git", "cat-file", "--batch"], cwd=root, env=env,
+                                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            git_housekeeping.remove_tree(root)
+            self.assertFalse(root.exists())
+            self.assertIsNotNone(proc.wait(timeout=15))
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait(timeout=5)
+
+    def test_temporary_directory_stops_a_writer_that_only_names_the_directory(self):
+        # DispatchTest teardown: disk_guard.maybe_sweep starts a child whose cwd
+        # is the runner, while --state/--repo point at the temp dir. The child
+        # keeps creating files there, so rmtree raises ENOTEMPTY. Cleanup must
+        # wait for that child and stop it. A directory that remains still raises.
+        directory = tempfile.TemporaryDirectory()
+        root = Path(directory.name)
+        script = (
+            "import pathlib, sys, time\n"
+            "root = pathlib.Path(sys.argv[1])\n"
+            "end = time.time() + 30\n"
+            "i = 0\n"
+            "while time.time() < end:\n"
+            "    root.mkdir(parents=True, exist_ok=True)\n"
+            "    (root / f'held-{i}').write_text('x')\n"
+            "    i += 1\n"
+            "    time.sleep(0.01)\n"
+        )
+        proc = subprocess.Popen(
+            [sys.executable, "-c", script, str(root)],
+            cwd=Path("/tmp"),
+            start_new_session=True,
+        )
+        try:
+            deadline = time.time() + 2
+            while time.time() < deadline and not any(root.glob("held-*")):
+                time.sleep(0.01)
+            self.assertTrue(any(root.glob("held-*")), "writer did not start")
+            self.assertFalse(git_housekeeping.processes_under(root),
+                             "this writer must not be visible by cwd")
+            directory.cleanup()
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait(timeout=5)
+        self.assertFalse(root.exists())
+        self.assertIsNotNone(proc.poll())
+
+    def test_remove_tree_raises_for_a_file(self):
+        root = Path(tempfile.mkdtemp(prefix=f"jovie-lanes-{os.getpid()}-file-"))
+        target = root / "not-a-directory"
+        target.write_text("keep")
+        with self.assertRaises(OSError):
+            git_housekeeping.remove_tree(target)
+        self.assertEqual(target.read_text(), "keep")
+        git_housekeeping.remove_tree(root)
+
 
 if __name__ == "__main__":
     unittest.main()

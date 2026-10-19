@@ -25,10 +25,12 @@ vi.mock('@/lib/env-server', () => ({
 }));
 
 import type { FounderFunnelData } from '@/lib/admin/founder-funnel';
+import { ARTIST_VISIBILITY_OFFER_CONTRACT_ID } from '@/lib/billing/offer-truth';
 import type { M2RevenuePathReceipt } from '@/lib/canaries/m2-revenue-path';
 import type { CanaryReport } from '@/lib/canaries/public-profile';
 import { resolveHudGithubToken } from '@/lib/github/hud-token.server';
 import { serverFetch } from '@/lib/http/server-fetch';
+import type { CommerceDecisionSource } from './commerce-decision';
 import {
   type AcquisitionEligibilityDeps,
   CONE_WORKFLOWS,
@@ -127,6 +129,40 @@ function funnel(errors: string[] = []): FounderFunnelData {
   };
 }
 
+function commerce(): CommerceDecisionSource {
+  const receipt = () => ({
+    status: 'green' as const,
+    observedAt: RECENT,
+    maxAgeMs: 24 * 60 * 60_000,
+  });
+  return {
+    matrixRevision: 'matrix-r7',
+    decisions: [
+      {
+        offer: ARTIST_VISIBILITY_OFFER_CONTRACT_ID,
+        channel: 'agent-handoff',
+        rail: 'ordinary-web-checkout',
+        accessState: 'supported',
+        merchantOfRecord: 'jovie',
+        evidence: {
+          selectedRail: receipt(),
+          jov6258Preflight: receipt(),
+          handoffCorrelation: receipt(),
+          paymentJourney: receipt(),
+          reversal: receipt(),
+        },
+        decisionRevision: 'decision-r4',
+        canary: {
+          result: 'passed',
+          observedAt: RECENT,
+          maxAgeMs: 24 * 60 * 60_000,
+        },
+        nextReevaluationTrigger: 'policy-access-price-or-geography-change',
+      },
+    ],
+  };
+}
+
 function deps(
   overrides: Partial<AcquisitionEligibilityDeps> = {}
 ): AcquisitionEligibilityDeps {
@@ -136,6 +172,7 @@ function deps(
     readFunnel: async () => funnel(),
     readPublicProfileCanary: async () => canary(),
     readWorkflowRun: async () => run('success'),
+    readCommerceDecision: async () => commerce(),
     runRevenuePathCanary: async () => m2Receipt(),
     ...overrides,
   };
@@ -158,6 +195,46 @@ describe('computeAcquisitionEligibility', () => {
     });
   });
 
+  it('blocks acquisition on a reconciled rail even when the old canary and other evidence remain green', async () => {
+    const input = commerce();
+    input.reconciliations = [
+      {
+        schema: 'jovie.capability-backlog-reconciliation/v1',
+        status: 'ready',
+        commerceInvalidations: [
+          {
+            offer: ARTIST_VISIBILITY_OFFER_CONTRACT_ID,
+            channel: 'agent-handoff',
+            rail: 'ordinary-web-checkout',
+            priorDecision: 'commerce-web-checkout',
+            decisionRevision: 'decision-r4',
+            invalidatingEvidence: 'evidence:openai-eligibility-change',
+            sourceEventId: 'capability-event:commerce-change',
+            matrixEvidenceDigest: 'a'.repeat(64),
+            accountAccessReceiptDigest: 'b'.repeat(64),
+            reasons: ['eligibility-changed'],
+            nextReevaluationTrigger:
+              'eligibility-restored-and-canary-recertified',
+            state: 'blocked',
+            canary: 'invalidated',
+          },
+        ],
+      },
+    ];
+    const result = await computeAcquisitionEligibility(
+      deps({ readCommerceDecision: async () => input })
+    );
+    expect(result.eligible).toBe(false);
+    expect(result.verdict).toBe('BLOCKED');
+    expect(result.blockers.map(item => item.id)).toEqual([
+      'selected_rail',
+      'commerce_canary',
+    ]);
+    expect(result.commerce.matrix[0].invalidations[0].priorDecision).toBe(
+      'commerce-web-checkout'
+    );
+  });
+
   it('maps a failing live M2 step to its cone requirement', async () => {
     const result = await computeAcquisitionEligibility(
       deps({
@@ -166,9 +243,7 @@ describe('computeAcquisitionEligibility', () => {
     );
     expect(result.verdict).toBe('BLOCKED');
     expect(result.firstBlocker?.id).toBe('offer_checkout');
-    expect(result.firstBlocker?.explanation).toContain(
-      'pro_checkout_199 broke'
-    );
+    expect(result.firstBlocker?.explanation).toContain('Step failed.');
   });
 
   it('marks the live-probed requirements unknown when the probe throws', async () => {
@@ -199,9 +274,94 @@ describe('computeAcquisitionEligibility', () => {
     );
     expect(result.verdict).toBe('BLOCKED');
     expect(result.firstBlocker?.id).toBe('payment_entitlement');
-    expect(result.firstBlocker?.evidence[0]?.ref).toBe(
-      'https://github.com/run/1'
+    expect(result.firstBlocker?.evidence[0]?.ref).toBeNull();
+  });
+
+  it.each([
+    ['selectedRail', 'selected_rail'],
+    ['jov6258Preflight', 'jov6258_preflight'],
+    ['handoffCorrelation', 'handoff_correlation'],
+    ['paymentJourney', 'payment_journey'],
+    ['reversal', 'reversal'],
+  ] as const)(
+    'fails closed when commerce %s evidence is missing',
+    async (key, requirement) => {
+      const input = commerce();
+      input.decisions[0].evidence[key] = {
+        status: 'unknown',
+        observedAt: null,
+        maxAgeMs: 24 * 60 * 60_000,
+      };
+      const result = await computeAcquisitionEligibility(
+        deps({ readCommerceDecision: async () => input })
+      );
+      expect(result.eligible).toBe(false);
+      expect(result.blockers.map(item => item.id)).toContain(requirement);
+      expect(result.commerce.eligible).toBe(false);
+    }
+  );
+
+  it('fails closed without leaking a commerce reader error', async () => {
+    const result = await computeAcquisitionEligibility(
+      deps({
+        readCommerceDecision: async () => {
+          throw new Error('provider-credential customer@example.com');
+        },
+      })
     );
+    expect(result.eligible).toBe(false);
+    expect(result.firstBlocker?.id).toBe('selected_rail');
+    expect(JSON.stringify(result)).not.toContain('provider-credential');
+    expect(JSON.stringify(result)).not.toContain('customer@example.com');
+  });
+
+  it('redacts raw canary, workflow and funnel diagnostics', async () => {
+    const revenueBase = m2Receipt(['claim']);
+    const revenue = {
+      ...revenueBase,
+      steps: revenueBase.steps.map((step, index) =>
+        index === 1
+          ? { ...step, detail: 'pi_reusable customer@example.com' }
+          : step
+      ),
+    };
+    const authBase = canary(false);
+    const auth = {
+      ...authBase,
+      checks: authBase.checks.map(check => ({
+        ...check,
+        detail: '4242424242424242',
+      })),
+    };
+    const result = await computeAcquisitionEligibility(
+      deps({
+        runRevenuePathCanary: async () => revenue,
+        readAuthSignupCanary: async () => auth,
+        readWorkflowRun: async () => ({
+          status: 'observed',
+          run: {
+            conclusion: 'failure',
+            createdAt: RECENT,
+            headSha: 'secret-reusable-sha',
+            url: 'https://github.com/run/cs_reusable',
+          },
+        }),
+        readFunnel: async () =>
+          funnel(['provider-credential customer@example.com']),
+      })
+    );
+    const serialized = JSON.stringify(result);
+    for (const secret of [
+      'pi_reusable',
+      'customer@example.com',
+      '4242424242424242',
+      'secret-reusable-sha',
+      'cs_reusable',
+      'provider-credential',
+    ]) {
+      expect(serialized).not.toContain(secret);
+    }
+    expect(result.funnel?.errors).toEqual(['Funnel source reported errors.']);
   });
 
   it('treats cancelled runs, missing runs and unreadable GitHub as unknown', async () => {
@@ -236,7 +396,7 @@ describe('computeAcquisitionEligibility', () => {
       id: 'auth_signup',
       status: 'red',
     });
-    expect(red.firstBlocker?.explanation).toContain('boom');
+    expect(red.firstBlocker?.explanation).toContain('1 of 1 checks failed.');
   });
 
   it('cannot diagnose the funnel when the funnel read is degraded', async () => {

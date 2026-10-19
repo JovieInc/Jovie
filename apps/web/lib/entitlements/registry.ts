@@ -26,6 +26,7 @@ export type BooleanEntitlement =
   | 'canAccessAdvancedAnalytics'
   | 'canFilterSelfFromAnalytics'
   | 'canAccessAdPixels'
+  | 'canAutoCreateLinks'
   | 'canBeVerified'
   | 'aiCanUseTools'
   | 'canGenerateAlbumArt'
@@ -97,6 +98,8 @@ const PRO_BOOLEANS: Record<BooleanEntitlement, boolean> = {
   canAccessAdvancedAnalytics: true,
   canFilterSelfFromAnalytics: true,
   canAccessAdPixels: true,
+  // Resolved from persisted exact-offer billing, never from a plan alias.
+  canAutoCreateLinks: false,
   canBeVerified: true,
   aiCanUseTools: true,
   canGenerateAlbumArt: true,
@@ -169,6 +172,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       canAccessAdvancedAnalytics: false,
       canFilterSelfFromAnalytics: false,
       canAccessAdPixels: false,
+      canAutoCreateLinks: false,
       canBeVerified: false,
       aiCanUseTools: true,
       canGenerateAlbumArt: false,
@@ -256,6 +260,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       canAccessAdvancedAnalytics: true,
       canFilterSelfFromAnalytics: true,
       canAccessAdPixels: true,
+      canAutoCreateLinks: false,
       canBeVerified: true,
       aiCanUseTools: true,
       canGenerateAlbumArt: true,

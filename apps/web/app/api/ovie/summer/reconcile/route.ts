@@ -25,6 +25,7 @@ const NO_STORE_HEADERS = {
   Pragma: 'no-cache',
 } as const;
 const MAX_RESPONSE_BYTES = 128 * 1024;
+const MAX_RESPONSE_READ_MS = 5_000;
 
 /**
  * One source-reviewed recovery target. The browser cannot choose an event or
@@ -40,15 +41,43 @@ const resultEnvelopeSchema = z
         principalHash: z.string().regex(/^[A-Za-z0-9_-]{43}$/u),
         deploymentId: z.string().regex(/^dpl_[A-Za-z0-9]+$/u),
         sessionId: z.string().regex(/^(?:ses_|wrun_)[A-Za-z0-9_-]+$/u),
+        startIndex: z.number().int().nonnegative().safe(),
+        dailySlot: z.number().int().min(1).max(25),
+        utcDay: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u),
+        admittedAt: z.string().datetime().optional(),
         turnId: z.string().min(1).max(128),
         responseText: z.string().max(64 * 1024),
         status: z.enum(['completed', 'failed']),
         nextStartIndex: z.number().int().nonnegative().safe(),
         model: z.literal('zai/glm-5.3-flash'),
       })
-      .strict(),
+      .strict()
+      .refine(result => result.nextStartIndex >= result.startIndex),
   })
   .strict();
+
+const errorEnvelopeSchema = z.union([
+  z
+    .object({
+      ok: z.literal(false),
+      code: z.literal('turn_pending'),
+      eventId: z.literal(SUMMER_RECOVERY_TARGET.eventId),
+    })
+    .strict(),
+  z
+    .object({
+      ok: z.literal(false),
+      code: z.enum([
+        'accepted_turn_unavailable',
+        'terminal_unavailable',
+        'conversation_result_unavailable',
+      ]),
+    })
+    .strict(),
+  z
+    .object({ ok: z.literal(false), code: z.literal('dispatch_abandoned') })
+    .strict(),
+]);
 
 function json(body: Readonly<Record<string, unknown>>, status: number) {
   return NextResponse.json(body, {
@@ -60,25 +89,41 @@ function json(body: Readonly<Record<string, unknown>>, status: number) {
 async function readBoundedJson(response: Response): Promise<unknown> {
   const declaredLength = response.headers.get('content-length');
   if (declaredLength && Number(declaredLength) > MAX_RESPONSE_BYTES) {
+    void response.body?.cancel().catch(() => {});
     throw new Error('oversized_summer_response');
   }
   const reader = response.body?.getReader();
   if (!reader) throw new Error('missing_summer_response');
-  const decoder = new TextDecoder();
-  let bytes = 0;
-  let text = '';
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    bytes += value.byteLength;
-    if (bytes > MAX_RESPONSE_BYTES) {
-      await reader.cancel().catch(() => {});
-      throw new Error('oversized_summer_response');
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timeout = setTimeout(
+      () => reject(new Error('summer_response_timeout')),
+      MAX_RESPONSE_READ_MS
+    );
+  });
+  const read = async (): Promise<unknown> => {
+    const decoder = new TextDecoder();
+    let bytes = 0;
+    let text = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      bytes += value.byteLength;
+      if (bytes > MAX_RESPONSE_BYTES)
+        throw new Error('oversized_summer_response');
+      text += decoder.decode(value, { stream: true });
     }
-    text += decoder.decode(value, { stream: true });
+    text += decoder.decode();
+    return JSON.parse(text) as unknown;
+  };
+  try {
+    return await Promise.race([read(), deadline]);
+  } finally {
+    clearTimeout(timeout);
+    // Cancellation itself can stall; do not extend the response deadline.
+    void reader.cancel().catch(() => {});
+    reader.releaseLock();
   }
-  text += decoder.decode();
-  return JSON.parse(text) as unknown;
 }
 
 export async function GET(): Promise<NextResponse> {
@@ -144,13 +189,27 @@ export async function GET(): Promise<NextResponse> {
   ) {
     return json({ ok: false, code: 'unverified_eve_deployment' }, 503);
   }
-  if (!upstream.ok) {
-    return json({ ok: false, code: 'summer_result_pending' }, 503);
-  }
-
   let parsed: z.infer<typeof resultEnvelopeSchema>;
   try {
-    parsed = resultEnvelopeSchema.parse(await readBoundedJson(upstream));
+    const body = await readBoundedJson(upstream);
+    if (upstream.status !== 200) {
+      const error = errorEnvelopeSchema.parse(body);
+      if (upstream.status === 410 && error.code === 'dispatch_abandoned') {
+        return json({ ok: false, code: 'summer_dispatch_abandoned' }, 410);
+      }
+      if (upstream.status === 503 && error.code !== 'dispatch_abandoned') {
+        return json(
+          {
+            ok: false,
+            code: 'summer_result_pending',
+            upstreamCode: error.code,
+          },
+          503
+        );
+      }
+      return json({ ok: false, code: 'invalid_summer_result' }, 502);
+    }
+    parsed = resultEnvelopeSchema.parse(body);
   } catch {
     return json({ ok: false, code: 'invalid_summer_result' }, 502);
   }
@@ -159,39 +218,63 @@ export async function GET(): Promise<NextResponse> {
     result.eventId !== SUMMER_RECOVERY_TARGET.eventId ||
     result.principalHash !== principalHash ||
     result.deploymentId !== SUMMER_RECOVERY_TARGET.deploymentId ||
-    result.sessionId !== SUMMER_RECOVERY_TARGET.sessionId
+    result.sessionId !== SUMMER_RECOVERY_TARGET.sessionId ||
+    result.startIndex !== SUMMER_RECOVERY_TARGET.startIndex ||
+    result.dailySlot !== SUMMER_RECOVERY_TARGET.dailySlot ||
+    result.utcDay !== SUMMER_RECOVERY_TARGET.utcDay ||
+    (result.admittedAt !== undefined &&
+      result.admittedAt !== SUMMER_RECOVERY_TARGET.admittedAt)
   ) {
     return json({ ok: false, code: 'summer_result_binding_drift' }, 502);
   }
-  if (result.status !== 'completed' || !result.responseText.trim()) {
+  if (result.status === 'failed') {
+    return json({ ok: false, code: 'summer_result_failed' }, 409);
+  }
+  if (!result.responseText.trim()) {
     return json({ ok: false, code: 'summer_result_not_completed' }, 409);
   }
 
-  const recoveryClientTurnId = `summer-reconcile:${result.eventId}`;
+  const recoveryClientTurnId = SUMMER_RECOVERY_TARGET.clientTurnId;
   try {
     const store = getOvieOperatingStore();
-    const appended = await appendSummerTurnWithOutcome(store, {
-      clientTurnId: recoveryClientTurnId,
-      userText: '',
-      assistantText: result.responseText,
-      eveWorkId: null,
-      eveAcks: [],
-      correlationId: recoveryClientTurnId,
-      state: 'completed',
-      toolReceipt: null,
-      eveReceipt: {
-        eventId: result.eventId,
-        sessionId: result.sessionId,
-        turnId: result.turnId,
-        nextStartIndex: result.nextStartIndex,
+    const appended = await appendSummerTurnWithOutcome(
+      store,
+      {
+        clientTurnId: recoveryClientTurnId,
+        userText: '',
+        assistantText: result.responseText,
+        eveWorkId: null,
+        eveAcks: [],
+        correlationId: recoveryClientTurnId,
+        state: 'completed',
+        toolReceipt: null,
+        eveReceipt: {
+          eventId: result.eventId,
+          sessionId: result.sessionId,
+          turnId: result.turnId,
+          nextStartIndex: result.nextStartIndex,
+        },
+        createdAt: new Date().toISOString(),
       },
-      createdAt: new Date().toISOString(),
-    });
-    const committed = appended.session.turns.find(
-      turn =>
-        turn.clientTurnId === recoveryClientTurnId ||
-        turn.eveReceipt?.eventId === result.eventId
+      undefined,
+      {
+        reconcileCheckpoint: {
+          eventId: result.eventId,
+          sessionId: result.sessionId,
+          nextStartIndex: result.startIndex,
+        },
+      }
     );
+    const clientMatch = appended.session.turns.find(
+      turn => turn.clientTurnId === recoveryClientTurnId
+    );
+    const eventMatch = appended.session.turns.find(
+      turn => turn.eveReceipt?.eventId === result.eventId
+    );
+    if (clientMatch && eventMatch && clientMatch !== eventMatch) {
+      return json({ ok: false, code: 'persisted_result_drift' }, 409);
+    }
+    const committed = clientMatch ?? eventMatch;
     if (!committed) {
       throw new Error('committed_recovery_turn_missing');
     }
@@ -201,7 +284,11 @@ export async function GET(): Promise<NextResponse> {
       committed.eveReceipt?.eventId !== result.eventId ||
       committed.eveReceipt.sessionId !== result.sessionId ||
       committed.eveReceipt.turnId !== result.turnId ||
-      committed.eveReceipt.nextStartIndex !== result.nextStartIndex
+      committed.eveReceipt.nextStartIndex !== result.nextStartIndex ||
+      (committed.eveCheckpoint !== undefined &&
+        (committed.eveCheckpoint.eventId !== result.eventId ||
+          committed.eveCheckpoint.sessionId !== result.sessionId ||
+          committed.eveCheckpoint.nextStartIndex !== result.startIndex))
     ) {
       return json({ ok: false, code: 'persisted_result_drift' }, 409);
     }

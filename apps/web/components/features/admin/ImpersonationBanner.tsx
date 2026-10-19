@@ -3,6 +3,7 @@
 import { Badge, Button } from '@jovie/ui';
 import { AlertTriangle, Clock, Eye, EyeOff, X } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   useEndImpersonationMutation,
   useImpersonationQuery,
@@ -86,8 +87,7 @@ export function ImpersonationBanner({
     endImpersonation(undefined, {
       onSuccess: () => {
         onEnd?.();
-        // Reload page to clear any cached user state
-        globalThis.location.reload();
+        globalThis.location.assign(APP_ROUTES.ADMIN);
       },
     });
   };
@@ -140,7 +140,7 @@ export function ImpersonationBanner({
             <span className='text-sm text-amber-900'>
               Viewing as user:{' '}
               <code className='rounded bg-amber-600/30 px-1 py-0.5 font-mono text-xs'>
-                {state.effectiveClerkId?.slice(0, 16)}...
+                {state.effectiveUserId?.slice(0, 16)}...
               </code>
             </span>
           </div>

@@ -116,7 +116,7 @@ export interface SocialLink {
  * @param profileId - Profile ID to fetch links for
  * @param options - Optional filters
  * @param options.activeOnly - Only return active links (default: false)
- * @param options.limit - Maximum number of links to return (default: 100)
+ * @param options.limit - Maximum number of links to return (default: 100; null: all)
  * @returns Array of social links, ordered by sortOrder
  *
  * @example
@@ -131,7 +131,7 @@ export async function getProfileSocialLinks(
   profileId: string,
   options: {
     activeOnly?: boolean;
-    limit?: number;
+    limit?: number | null;
   } = {}
 ): Promise<SocialLink[]> {
   const { activeOnly = false, limit = 100 } = options;
@@ -143,7 +143,7 @@ export async function getProfileSocialLinks(
     conditions.push(eq(socialLinks.isActive, true));
   }
 
-  const links = await tx
+  const links = tx
     .select({
       id: socialLinks.id,
       platform: socialLinks.platform,
@@ -160,10 +160,9 @@ export async function getProfileSocialLinks(
     })
     .from(socialLinks)
     .where(and(...conditions))
-    .orderBy(socialLinks.sortOrder)
-    .limit(limit);
+    .orderBy(socialLinks.sortOrder);
 
-  return links;
+  return limit === null ? links : links.limit(limit);
 }
 
 /**

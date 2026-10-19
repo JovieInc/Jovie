@@ -3,11 +3,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test src/index.test.mjs",
+    "test": "node --test src/index.test.mjs && pnpm run test:knowledge",
+    "test:knowledge": "node --experimental-strip-types --experimental-test-coverage --test-coverage-include='src/knowledge/*.ts' --test src/knowledge/*.test.mjs",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "htmlparser2": "12.0.0",
+    "robots-parser": "3.0.1"
+  },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20261010.1",
+    "@cloudflare/workers-types": "^5.20261016.1",
     "typescript": "^5.8.2"
   }
 }

@@ -42,21 +42,14 @@ export function SettingsSection({
           action={headerAction}
         />
       ) : (
-        <div
-          className={cn(
-            'flex items-center justify-between border-b border-subtle/80',
-            titleClassName
-          )}
-        >
-          <PageHeader
-            title={title}
-            description={description}
-            className='border-b-0'
-            titleClassName='text-app font-caption'
-            subtitleClassName='text-xs text-secondary-token'
-          />
-          {headerAction}
-        </div>
+        <PageHeader
+          title={title}
+          description={description}
+          action={headerAction}
+          className={cn('border-b border-subtle/80', titleClassName)}
+          titleClassName='text-app font-caption'
+          subtitleClassName='truncate text-xs text-secondary-token'
+        />
       )}
       <div
         className={cn(

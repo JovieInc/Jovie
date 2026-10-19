@@ -6,6 +6,9 @@ Run with:
 from __future__ import annotations
 
 import importlib.util
+import concurrent.futures
+import threading
+import uuid
 import json
 import os
 import subprocess
@@ -505,6 +508,79 @@ class RelayTest(unittest.TestCase):
         self.assertEqual(exhausted.made("gh", "api", "-X", "POST"), [],
                          "a terminal head never gets another repair signal")
 
+    def test_required_green_success_clears_stale_lane_fix_red_and_a_red_head_keeps_it(self):
+        def success(status, **extra):
+            view = pr(branch="cursor/fix", sha="h1", merge=status, labels=["lane-fix-red"],
+                      state="OPEN", **extra)
+            shell = Shell({("gh", "pr", "view"): view})
+            run = {"event": "pull_request", "conclusion": "success", "head_sha": "h1",
+                   "pull_requests": [{"number": 5}]}
+            return events.relay("workflow_run", {"workflow_run": run}, shell, set()), shell
+
+        for status in ("CLEAN", "HAS_HOOKS", "UNSTABLE"):
+            added, shell = success(status)
+            self.assertEqual(added, [(5, "cleared-red")], status)
+            delete = ["gh", "api", "-X", "DELETE",
+                      f"repos/{events.REPO}/issues/5/labels/lane-fix-red"]
+            self.assertIn(delete, shell.calls, status)
+            self.assertFalse(events.gh_read_only(delete), status)
+            self.assertEqual(shell.made("gh", "api", "-X", "POST"), [], status)
+        for status in ("BLOCKED", "DIRTY", "BEHIND", "UNKNOWN"):
+            added, shell = success(status)
+            self.assertEqual(added, [], status)
+            self.assertEqual(shell.made("gh", "api", "-X", "DELETE"), [], status)
+        missing = pr(branch="cursor/fix", sha="h1", labels=["lane-fix-red"], state="OPEN")
+        missing.pop("mergeStateStatus")
+        shell = Shell({("gh", "pr", "view"): missing})
+        run = {"event": "pull_request", "conclusion": "success", "head_sha": "h1",
+               "pull_requests": [{"number": 5}]}
+        self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, shell, set()), [])
+        self.assertEqual(shell.made("gh", "api", "-X", "DELETE"), [])
+
+    def test_a_stale_success_and_a_red_event_do_not_clear_lane_fix_red(self):
+        view = pr(branch="cursor/fix", sha="new", merge="CLEAN", labels=["lane-fix-red"], state="OPEN")
+        stale = {"event": "pull_request", "conclusion": "success", "head_sha": "old",
+                 "pull_requests": [{"number": 5}]}
+        shell = Shell({("gh", "pr", "view"): view})
+        self.assertEqual(events.relay("workflow_run", {"workflow_run": stale}, shell, set()), [])
+        self.assertEqual(shell.made("gh", "api", "-X", "DELETE"), [])
+        red = {"event": "pull_request", "conclusion": "failure", "head_sha": "new",
+               "pull_requests": [{"number": 5}]}
+        labeled = Shell({("gh", "pr", "view"): view})
+        self.assertEqual(events.relay("workflow_run", {"workflow_run": red}, labeled, set()), [])
+        self.assertEqual(labeled.made("gh", "api", "-X", "DELETE"), [])
+        self.assertEqual(labeled.made("gh", "api", "-X", "POST"), [])
+
+    def test_a_failed_delete_leaves_lane_fix_red_in_place(self):
+        view = pr(branch="cursor/fix", sha="h1", merge="CLEAN", labels=["lane-fix-red"], state="OPEN")
+        shell = Shell({("gh", "pr", "view"): view, ("gh", "api", "-X", "DELETE"): (1, "")})
+        run = {"event": "pull_request", "conclusion": "success", "head_sha": "h1",
+               "pull_requests": [{"number": 5}]}
+        self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, shell, set()), [])
+        self.assertEqual(len(shell.made("gh", "api", "-X", "DELETE")), 1)
+
+    def test_a_green_lane_draft_drops_lane_fix_red_and_can_still_be_marked_green(self):
+        view = pr(draft=True, merge="CLEAN", labels=["lane-fix-red"], state="OPEN", sha="h1")
+        shell = Shell({("gh", "pr", "view"): view})
+        run = {"event": "pull_request", "conclusion": "success", "head_sha": "h1",
+               "pull_requests": [{"number": 5}]}
+        self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, shell, set()),
+                         [(5, "cleared-red"), (5, "green")])
+
+    def test_a_push_clears_required_green_heads_and_keeps_red_ones(self):
+        rows = [
+            pr(number=5, branch="cursor/fix", merge="CLEAN", labels=["lane-fix-red"], state="OPEN"),
+            pr(number=6, branch="cursor/other", merge="BLOCKED", labels=["Lane-Fix-Red"], state="OPEN"),
+            pr(number=7, branch="cursor/closed", merge="CLEAN", labels=["lane-fix-red"], state="CLOSED"),
+            pr(number=8, branch="cursor/fork", merge="HAS_HOOKS", labels=["lane-fix-red"], state="OPEN",
+               isCrossRepository=True),
+        ]
+        shell = Shell({("gh", "pr", "list"): rows})
+        self.assertEqual(events.relay("push", {}, shell, set()), [(5, "cleared-red")])
+        self.assertEqual(shell.made("gh", "api", "-X", "DELETE"),
+                         [["gh", "api", "-X", "DELETE",
+                           f"repos/{events.REPO}/issues/5/labels/lane-fix-red"]])
+
     def test_a_failure_hold_dequeue_is_relayed_and_a_plain_hand_dequeue_is_not(self):
         view = {"state": "OPEN", "isDraft": False, "headRefName": "codex/jov-6577-20261012t075744",
                 "headRefOid": "h7", "isCrossRepository": False, "labels": []}
@@ -734,6 +810,207 @@ class RelayTest(unittest.TestCase):
             finally:
                 os.environ.clear()
                 os.environ.update(saved)
+
+
+class IntakeConversionTest(unittest.TestCase):
+    fingerprint = 'a123b456c789d012'
+
+    def linear(self, existing=(), pages=None, unknown=False, barrier=None):
+        test = self
+        class Linear:
+            def __init__(self):
+                self.rows = {row['id']: row for row in existing}
+                self.creates, self.reads, self.lock = [], [], threading.Lock()
+                self.unknown = unknown
+
+            def gql(self, query, variables):
+                if 'teams(' in query:
+                    return {'teams': {'nodes': [{'id': 'team', 'states': {'nodes': [{'id': 'todo', 'name': 'Todo'}]},
+                        'labels': {'nodes': [{'id': name, 'name': name} for name in
+                            events.remediation.intake_labels('ci')]}}]}}
+                if 'issueCreate(' in query:
+                    if barrier:
+                        barrier.wait(timeout=5)
+                    with self.lock:
+                        data = variables['i']
+                        issue_id = data.get('id', str(uuid.uuid4()))
+                        self.creates.append(dict(data))
+                        if issue_id in self.rows:
+                            raise RuntimeError('duplicate issue UUID')
+                        self.rows[issue_id] = {'id': issue_id, 'description': data['description'],
+                                              'createdAt': '2026-10-14T01:00:00Z'}
+                        if self.unknown:
+                            self.unknown = False
+                            raise OSError('response lost after commit')
+                        return {'issueCreate': {'success': True, 'issue': {'id': issue_id}}}
+                if 'issues(' in query:
+                    self.reads.append(variables)
+                    if isinstance(pages, Exception):
+                        raise pages
+                    if pages is not None:
+                        return pages[min(len(self.reads) - 1, len(pages) - 1)]
+                    with self.lock:
+                        rows = list(self.rows.values())
+                    return {'issues': {'nodes': rows, 'pageInfo': {'hasNextPage': False, 'endCursor': None}}}
+                test.fail(query)
+        return Linear()
+
+    def shell(self, number=10, comment_failure=False, comments=None, body=None):
+        notes = [] if comments is None else comments
+        body = body if body is not None else events.remediation.intake_body({'source': 'workflow_run',
+            'fingerprint': self.fingerprint, 'ws': 'ci'})
+        updated = datetime.fromtimestamp(NOW - 3601, timezone.utc).isoformat()
+        def comment(args):
+            if comment_failure:
+                return (1, 'unavailable')
+            notes.append({'body': args[-1]})
+            return ''
+        shell = Shell({('gh', 'issue', 'list'): [{'number': number, 'body': body, 'updatedAt': updated}],
+            ('gh', 'api', '--paginate', '--slurp'): lambda args: [notes],
+            ('gh', 'issue', 'comment'): comment})
+        return shell
+
+    def convert(self, linear, shell):
+        return events.convert_intake(None, lambda: linear, shell, NOW)
+
+    def test_two_ticks_and_failed_linkage_recover_one_authoritative_issue(self):
+        for failed in (False, True):
+            with self.subTest(comment_failure=failed):
+                linear, shell = self.linear(), self.shell(comment_failure=failed)
+                self.assertEqual(self.convert(linear, shell), [10])
+                self.convert(linear, shell)
+                self.assertEqual(len(linear.rows), 1)
+                self.assertEqual(len(linear.creates), 1)
+                expected_comments = 2 if failed else 1
+                self.assertEqual(len(shell.made('gh', 'issue', 'comment')), expected_comments)
+
+    def test_committed_unknown_create_is_recovered_without_a_second_mutation(self):
+        linear, shell = self.linear(unknown=True), self.shell()
+        self.assertEqual(self.convert(linear, shell), [10])
+        self.assertEqual(len(linear.creates), 1)
+        self.assertEqual(len(linear.rows), 1)
+        self.assertEqual(len(linear.reads), 2)
+        restarted = self.shell(number=11)
+        self.assertEqual(self.convert(linear, restarted), [11])
+        self.assertEqual(len(linear.creates), 1)
+
+    def test_concurrent_converters_share_one_durable_destination(self):
+        linear = self.linear(barrier=threading.Barrier(2))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            tasks = [pool.submit(self.convert, linear, self.shell(number=number)) for number in (10, 11)]
+            self.assertEqual([task.result(timeout=10) for task in tasks], [[10], [11]])
+        self.assertEqual(len(linear.rows), 1)
+        self.assertEqual({row['id'] for row in linear.creates}, set(linear.rows))
+        self.assertEqual(uuid.UUID(linear.creates[0]['id']).version, 4)
+
+    def test_complete_comment_inventory_recovers_legacy_linkage(self):
+        body = events.remediation.intake_body({'source': 'intake', 'fingerprint': self.fingerprint})
+        existing = {'id': str(uuid.uuid4()), 'description': body, 'createdAt': '2026-10-13T00:00:00Z'}
+        shell = self.shell()
+        shell.routes[('gh', 'api', '--paginate', '--slurp')] = [[], [{'body': f"<!-- linear-issue-id:{existing['id']} -->"}]]
+        linear = self.linear(existing=[existing])
+        self.assertIsNone(self.convert(linear, shell))
+        self.assertFalse(linear.creates)
+        self.assertFalse(shell.made('gh', 'issue', 'comment'))
+
+    def test_unbound_body_or_comment_marker_cannot_suppress_a_due_intake(self):
+        for hint in ('Quoted explanation of linear-issue-id: syntax',
+                     '<!-- linear-issue-id:not-an-id -->', f'<!-- linear-issue-id:{uuid.uuid4()} -->'):
+            for location in ('body', 'comment'):
+                with self.subTest(hint=hint, location=location):
+                    shell = self.shell(comments=[{'body': hint}] if location == 'comment' else [])
+                    if location == 'body':
+                        shell.routes[('gh', 'issue', 'list')][0]['body'] += '\n' + hint
+                    linear = self.linear()
+                    self.assertEqual(self.convert(linear, shell), [10])
+                    self.assertEqual(len(linear.creates), 1)
+                    self.assertEqual(len(shell.made('gh', 'issue', 'comment')), 1)
+
+    def test_unreadable_linkage_does_not_authorize_creation(self):
+        for reply in ((1, '[[]]'), 'not-json', {}, [None], [[{'body': None}]]):
+            with self.subTest(reply=reply):
+                shell = self.shell()
+                shell.routes[('gh', 'api', '--paginate', '--slurp')] = reply
+                linear = self.linear()
+                self.assertIsNone(self.convert(linear, shell))
+                self.assertFalse(linear.creates)
+
+    def test_authoritative_fingerprint_read_is_complete_and_reuses_oldest_canonical(self):
+        body = events.remediation.intake_body({'source': 'intake', 'fingerprint': self.fingerprint})
+        older = {'id': str(uuid.uuid4()), 'description': body, 'createdAt': '2026-10-13T00:00:00Z'}
+        newer = {**older, 'id': str(uuid.uuid4()), 'createdAt': '2026-10-14T00:00:00Z'}
+        linear = self.linear(pages=[{'issues': {'nodes': [newer], 'pageInfo': {'hasNextPage': True, 'endCursor': 'page1'}}},
+            {'issues': {'nodes': [older], 'pageInfo': {'hasNextPage': False, 'endCursor': None}}}])
+        shell = self.shell()
+        self.assertEqual(self.convert(linear, shell), [10])
+        self.assertFalse(linear.creates)
+        self.assertIn(older['id'], shell.made('gh', 'issue', 'comment')[0][-1])
+        self.assertEqual(linear.reads[1]['after'], 'page1')
+
+    def test_unreadable_or_incomplete_authoritative_inventory_never_creates(self):
+        for page in ({}, {'issues': None}, {'issues': {'nodes': None}},
+            {'issues': {'nodes': [], 'pageInfo': {}}},
+            {'issues': {'nodes': [], 'pageInfo': {'hasNextPage': True, 'endCursor': None}}},
+            {'issues': {'nodes': [], 'pageInfo': {'hasNextPage': True, 'endCursor': 'repeat'}}},
+            {'issues': {'nodes': [None], 'pageInfo': {'hasNextPage': False}}}, OSError('read unavailable')):
+            with self.subTest(page=page):
+                linear = self.linear(pages=page if isinstance(page, Exception) else [page])
+                self.assertIsNone(self.convert(linear, self.shell()))
+                self.assertFalse(linear.creates)
+
+    def test_unknown_uncommitted_create_keeps_the_same_uuid_on_later_reconciliation(self):
+        linear, shell = self.linear(), self.shell()
+        gql = linear.gql
+        attempts = []
+        def lose_first(query, variables):
+            if 'issueCreate(' in query:
+                attempts.append(variables['i'].get('id'))
+                if len(attempts) == 1:
+                    raise OSError('unknown request outcome')
+            return gql(query, variables)
+        linear.gql = lose_first
+        self.assertIsNone(self.convert(linear, shell))
+        self.assertEqual(len(attempts), 1, 'no immediate mutation replay')
+        self.assertEqual(self.convert(linear, shell), [10])
+        self.assertEqual(attempts[0], attempts[1])
+        self.assertIsNotNone(attempts[0])
+        self.assertEqual(len(linear.rows), 1)
+
+    def test_ambiguous_linkage_write_recovers_from_authoritative_issue(self):
+        linear, shell = self.linear(), self.shell()
+        def lost(args):
+            raise subprocess.TimeoutExpired(args, 30)
+        shell.routes[('gh', 'issue', 'comment')] = lost
+        self.assertEqual(self.convert(linear, shell), [10])
+        self.assertEqual(self.convert(linear, self.shell()), [10])
+        self.assertEqual(len(linear.creates), 1)
+
+    def test_foreign_or_embedded_fingerprint_cannot_bind_an_unrelated_issue(self):
+        marker = events.remediation.intake_body({'source': 'intake', 'fingerprint': self.fingerprint})
+        for description in ('Unrelated report quotes:\n' + marker,
+                            marker + '\n<!-- symphony-remediation-repository:foreign/repo -->'):
+            with self.subTest(description=description):
+                row = {'id': str(uuid.uuid4()), 'description': description, 'createdAt': '2026-10-13T00:00:00Z'}
+                linear = self.linear(existing=[row])
+                self.assertEqual(self.convert(linear, self.shell()), [10])
+                self.assertEqual(len(linear.creates), 1)
+                self.assertNotEqual(linear.creates[0]['id'], row['id'])
+
+    def test_rebound_destination_or_malformed_rows_fail_closed(self):
+        seed = self.linear()
+        self.convert(seed, self.shell())
+        original = next(iter(seed.rows.values()))
+        for row in ({**original, 'description': 'changed binding'},
+                    {**original, 'createdAt': 'not-a-date'}, {**original, 'id': 'not-a-uuid'}):
+            with self.subTest(row=row):
+                linear = self.linear(existing=[row])
+                self.assertIsNone(self.convert(linear, self.shell()))
+                self.assertFalse(linear.creates)
+
+    def test_missing_fingerprint_does_not_create_from_a_github_issue_number(self):
+        linear = self.linear()
+        self.assertIsNone(self.convert(linear, self.shell(body='unbound remediation')))
+        self.assertFalse(linear.creates)
 
 
 class QuotaRelayTest(unittest.TestCase):
@@ -1076,7 +1353,8 @@ class ClaimTest(unittest.TestCase):
         saved = runner.sh
         runner.sh = lambda args, **k: SimpleNamespace(returncode=0, stderr="", stdout="- review: rename the prop")
         try:
-            prompt = runner.render_fix_prompt({**pr(kinds=["dequeued", "review"]), "title": "t"}, "")
+            prompt = runner.render_fix_prompt({**pr(kinds=["dequeued", "review"]), "title": "t",
+                "reviewSummaries": [{"author": {"login": "reviewer"}, "body": "rename the prop"}]}, "")
         finally:
             runner.sh = saved
         self.assertIn("merge queue removed this PR", prompt)
@@ -1745,6 +2023,8 @@ class RunnerHookTest(unittest.TestCase):
             self.assertEqual((record["reason"], record["next_action"]), ("secret-file", "bug-intake"))
 
     def test_exhausted_disabled_lane_preserves_pr_and_terminal_backlog_disposition(self):
+        fresh = patch.object(runner, "reconcile_fix_target", side_effect=lambda pr: {"state": "OPEN", "isInMergeQueue": False, **pr})
+        fresh.start(); self.addCleanup(fresh.stop)
         stuck = pr(number=7, branch="claude/jov-9-20260926t0100", sha="h1", merge="DIRTY")
         calls, moves, comments = [], [], []
         saved = (runner.sh, runner.load_providers)
@@ -1781,6 +2061,8 @@ class RunnerHookTest(unittest.TestCase):
                        "labels[]=lane-fix-exhausted"], calls)
 
     def test_an_unfixable_hold_escalates_once_without_burning_attempts(self):
+        fresh = patch.object(runner, "reconcile_fix_target", side_effect=lambda pr: {"state": "OPEN", "isInMergeQueue": False, **pr})
+        fresh.start(); self.addCleanup(fresh.stop)
         stuck = pr(number=7, title="big diff")
         calls, triaged = [], []
         saved = (runner.sh, runner.load_providers, events.return_to_pool)
@@ -2051,6 +2333,143 @@ class NativeQueueClaimTest(unittest.TestCase):
             self.assertEqual(events.claim_event_pr(host, module, "devin", [target], NOW)["number"], 5)
             self.assertEqual(json.loads((host.state / "fix-attempts.json").read_text())["5"]["count"], 1)
             self.assertEqual(module.posted, [5])
+
+
+class TargetFileWitnessTest(unittest.TestCase):
+    def node(self, number=21824):
+        return {"number": number, "state": "OPEN", "headRefOid": "a" * 40,
+                "baseRefName": "main", "baseRefOid": "b" * 40,
+                "baseRef": {"target": {"oid": "c" * 40}},
+                "files": {"totalCount": 1, "pageInfo": {"hasNextPage": False},
+                          "nodes": [{"path": "apps/web/lib/profile.ts", "changeType": "MODIFIED"}]}}
+
+    def flattened(self):
+        row = self.node()
+        row["inlineFilesEvidence"] = events.inline_file_evidence(row, "JovieInc/Jovie", NOW - 2)
+        row["files"] = row["files"]["nodes"]
+        row["filesComplete"] = True
+        return row
+
+    def capture(self, row=None, confirmed=None, source_at=NOW-1):
+        row = self.flattened() if row is None else row
+        response = {"data": {"repository": {"nameWithOwner": "JovieInc/Jovie", "p21824":
+                                             self.node() if confirmed is None else confirmed}}}
+        shell = Shell({("gh", "api", "graphql"): response})
+        return events.capture_target_file_witnesses(fake_lane(shell), [row], source_at, NOW), shell
+
+    def test_inline_producer_then_bounded_same_head_and_base_confirmation(self):
+        node = self.node()
+        response = {"data": {"repository": {"nameWithOwner": "JovieInc/Jovie", "pullRequests": {
+            "nodes": [node], "pageInfo": {"hasNextPage": False}}}}}
+        shell = Shell({("gh", "api", "graphql"): response})
+        with patch.object(events.time, "time", return_value=NOW-2):
+            rows = events.open_prs_state(fake_lane(shell))
+        self.assertEqual(rows[0]["inlineFilesEvidence"]["observedAt"], NOW-2)
+        witnesses, confirmation = self.capture(rows[0])
+        self.assertEqual(witnesses[21824]["paths"], ["apps/web/lib/profile.ts"])
+        self.assertEqual(witnesses[21824]["sourceAt"], NOW-1)
+        self.assertEqual(len(confirmation.calls), 1)
+        self.assertIn("baseRef{target{oid}}", confirmation.calls[0][4])
+        self.assertFalse(any("--paginate" in call for call in confirmation.calls))
+
+    def test_head_base_tip_base_diff_anchor_state_and_repository_must_agree(self):
+        for key, value in (("headRefOid", "d"*40), ("baseRefOid", "d"*40),
+                           ("baseRefName", "release"), ("baseRef", {"target": {"oid": "d"*40}}),
+                           ("number", 21810), ("state", "CLOSED")):
+            with self.subTest(key=key):
+                confirmed = {**self.node(), key: value}
+                self.assertEqual(self.capture(confirmed=confirmed)[0], {})
+        row = self.flattened(); row["inlineFilesEvidence"]["repository"] = "other/repo"
+        witnesses, shell = self.capture(row)
+        self.assertEqual(witnesses, {}); self.assertEqual(shell.calls, [])
+        row = self.flattened(); del row["baseRef"]
+        self.assertEqual(self.capture(row)[0], {})
+
+    def test_complete_boolean_or_paginated_and_legacy_head_cache_do_not_certify(self):
+        row = self.flattened(); del row["inlineFilesEvidence"]
+        self.assertTrue(row["filesComplete"])
+        self.assertEqual(self.capture(row)[0], {})
+        raw = self.node(); raw["files"]["pageInfo"]["hasNextPage"] = True
+        self.assertIsNone(events.inline_file_evidence(raw, "JovieInc/Jovie", NOW))
+        # Exercise the legacy producer's cache completion, not merely a hand-built row.
+        raw = self.node(); raw["files"]["totalCount"] = 2
+        response = {"data": {"repository": {"nameWithOwner": "JovieInc/Jovie", "pullRequests": {
+            "nodes": [raw], "pageInfo": {"hasNextPage": False}}}}}
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = Path(tmp) / "legacy.json"
+            cache.write_text(json.dumps([{"path": "one.ts"}, {"path": "two.ts"}]))
+            shell = Shell({("gh", "api", "graphql"): response})
+            with patch.object(events, "pr_files_cache", return_value=cache):
+                rows = events.open_prs_state(fake_lane(shell))
+            self.assertTrue(rows[0]["filesComplete"])
+            self.assertNotIn("inlineFilesEvidence", rows[0])
+            self.assertEqual(self.capture(rows[0])[0], {})
+
+    def test_malformed_partial_duplicate_renamed_and_unsafe_paths_are_unknown(self):
+        bad_files = [None, {}, {"totalCount": True, "nodes": [{"path": "a.ts"}]},
+                     {"totalCount": 2, "nodes": [{"path": "a.ts"}]},
+                     {"totalCount": 2, "nodes": [{"path": "a.ts"}, {"path": "a.ts"}]},
+                     {"totalCount": 1, "nodes": [{"path": "new.ts", "changeType": "RENAMED"}]}]
+        bad_files += [{"totalCount": 1, "nodes": [{"path": value}]} for value in
+                      ("/abs.ts", "../x.ts", "a/../x.ts", "a//x.ts", "./x.ts", "a\\x.ts", "a*.ts", "a\n.ts", None)]
+        for files in bad_files:
+            with self.subTest(files=files):
+                raw = self.node(); raw["files"] = files
+                if isinstance(files, dict): files["pageInfo"] = {"hasNextPage": False}
+                self.assertIsNone(events.inline_file_evidence(raw, "JovieInc/Jovie", NOW))
+
+    def test_original_age_cache_binding_and_confirmation_failure_never_renew_scope(self):
+        for source_at in (None, NOW-61, NOW+1, float("nan"), True):
+            with self.subTest(source_at=source_at):
+                witnesses, shell = self.capture(source_at=source_at)
+                self.assertEqual(witnesses, {}); self.assertEqual(shell.calls, [])
+        for observed_at in (NOW-61, NOW+1):
+            row = self.flattened(); row["inlineFilesEvidence"]["observedAt"] = observed_at
+            self.assertEqual(self.capture(row)[0], {})
+        row = self.flattened(); row["files"][0]["path"] = "different.ts"
+        self.assertEqual(self.capture(row)[0], {})
+        lane = fake_lane(Shell())
+        with patch.object(lane, "sh", side_effect=subprocess.TimeoutExpired("gh", 5)):
+            self.assertEqual(events.capture_target_file_witnesses(lane, [self.flattened()], NOW-1, NOW), {})
+        # Original page age survives a later shared-cache timestamp and confirmation.
+        witnesses, _ = self.capture()
+        card = SimpleNamespace(title="PR #21824 has carried lane-fix-exhausted for more than 24h (remediation:pr-21824-conflict)",
+            labels=["remediation:pr-21824-conflict"], description="https://github.com/JovieInc/Jovie/pull/21824\nFingerprint: `remediation:pr-21824-conflict`")
+        self.assertIsNotNone(events.target_issue_files(card, witnesses, NOW))
+        self.assertIsNone(events.target_issue_files(card, witnesses, NOW+59))
+
+    def test_current_inventory_contradictions_invalidate_within_ttl_without_io(self):
+        witness, shell = self.capture()
+        current = self.flattened()
+        self.assertEqual(events.revalidate_target_file_witnesses(witness, [current], NOW), witness)
+        cases = [[], [current, current]]
+        for key, value in (("headRefOid", "d"*40), ("baseRefOid", "d"*40),
+                           ("baseRefName", "release"), ("baseRef", {"target": {"oid": "d"*40}}),
+                           ("state", "CLOSED"), ("filesComplete", False),
+                           ("files", [{"path": "scripts/lanes/lane_runner.py"}]),
+                           ("inlineFilesEvidence", None)):
+            cases.append([{**current, key: value}])
+        before = list(shell.calls)
+        for rows in cases:
+            with self.subTest(rows=rows):
+                self.assertEqual(events.revalidate_target_file_witnesses(witness, rows, NOW+20), {})
+        self.assertEqual(shell.calls, before)
+
+    def test_target_card_requires_consistent_exact_machine_identity(self):
+        witnesses, _ = self.capture()
+        valid = {"title": "PR #21824 has carried lane-fix-exhausted for more than 24h (remediation:pr-21824-conflict)",
+                 "labels": ["remediation:pr-21824-conflict"],
+                 "description": "https://github.com/JovieInc/Jovie/pull/21824\nFingerprint: `remediation:pr-21824-conflict`"}
+        self.assertEqual(events.target_issue_files(valid, witnesses, NOW), ["apps/web/lib/profile.ts"])
+        for key, value in (("title", valid["title"].replace("#21824", "#21810")), ("labels", []),
+                           ("description", valid["description"].replace("JovieInc/Jovie", "other/repo")),
+                           ("description", valid["description"] + " https://github.com/JovieInc/Jovie/pull/21770"),
+                           ("description", valid["description"].replace("/pull/21824", "/pull/21824/../21724")),
+                           ("description", valid["description"].replace("/pull/21824", "/pull/21824junk")),
+                           ("description", valid["description"].replace("/pull/21824", "/pull/21824?target=21724")),
+                           ("description", "Fingerprint: `remediation:pr-21824-conflict`")):
+            with self.subTest(key=key, value=value):
+                self.assertIsNone(events.target_issue_files({**valid, key: value}, witnesses, NOW))
 
 if __name__ == "__main__":
     unittest.main()

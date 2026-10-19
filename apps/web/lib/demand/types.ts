@@ -6,8 +6,8 @@
 //
 // These types are the durable contract. Producers (CLI/agent request surfaces,
 // Ask Jovie, agent feedback) normalize into DemandSignal; the map in
-// demand-map.ts dedupes, clusters, scores, and recommends. Persistence and
-// route wiring are follow-up slices on the same identity scheme.
+// demand-map.ts dedupes, clusters, scores, and recommends. Durable
+// allocation receipts use the same identity scheme in allocation-governor.ts.
 
 /** Where a request was observed. */
 export type DemandSurface =
@@ -203,6 +203,8 @@ export interface DemandJudgeContext {
   readonly ongoingCost?: number;
   /** Risk of fragmenting the roadmap away from the certified cone. */
   readonly fragmentationRisk?: number;
+  /** Mature outcome misses for this capability/job, normalized 0..1. */
+  readonly outcomePenalty?: number;
   /** Current certified-cone/domain gate status. Default 'clear'. */
   readonly gateStatus?: DemandGateStatus;
 }

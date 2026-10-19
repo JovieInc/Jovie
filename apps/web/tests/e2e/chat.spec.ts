@@ -24,6 +24,7 @@ import {
   setTestAuthBypassSession,
 } from '../helpers/auth';
 import {
+  chatComposerInputLocator,
   gotoAuthenticatedChatRoute,
   smokeNavigateWithRetry,
   waitForHydration,
@@ -126,10 +127,9 @@ test.describe('Chat @smoke', () => {
       'chat-content root not visible'
     ).toBeVisible({ timeout: 30_000 });
 
-    // Locate the chat composer textarea via aria-label
-    const composer = page
-      .getByPlaceholder(/ask jovie|ask a follow-up|chat message/i)
-      .first();
+    // The default composer has no placeholder. Its accessible name is
+    // "Chat Message Input" (combobox or textbox).
+    const composer = chatComposerInputLocator(page);
     await expect(composer, 'chat composer not visible').toBeVisible({
       timeout: 15_000,
     });
@@ -165,9 +165,7 @@ test.describe('Chat @smoke', () => {
       timeout: 30_000,
     });
 
-    const composer = page
-      .getByPlaceholder(/ask jovie|ask a follow-up|chat message/i)
-      .first();
+    const composer = chatComposerInputLocator(page);
     await expect(composer).toBeVisible({ timeout: 15_000 });
     await composer.click();
 
@@ -221,9 +219,7 @@ test.describe('Chat @smoke', () => {
       timeout: 30_000,
     });
 
-    const composer = page
-      .getByPlaceholder(/ask jovie|ask a follow-up|chat message/i)
-      .first();
+    const composer = chatComposerInputLocator(page);
     await expect(composer).toBeVisible({ timeout: 15_000 });
 
     // Record the composer bounding box before slash

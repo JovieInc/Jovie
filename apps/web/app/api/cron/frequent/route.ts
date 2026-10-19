@@ -11,6 +11,7 @@
  * - Schedule + send release notifications: every invocation (15 min)
  * - Redis write/read operability canary: hourly
  * - Daily acquisition-canary receipt freshness alarm: hourly
+ * - Summer company-state reconciliation: every invocation
  *
  * Each sub-job runs in an independent try-catch so one failure
  * doesn't block the others.
@@ -55,6 +56,7 @@ import { processOutreachBatch } from '@/lib/leads/outreach-batch';
 import { pipelineWarn } from '@/lib/leads/pipeline-logger';
 import { processLeadBatch } from '@/lib/leads/process-batch';
 import { cleanupExpiredSuppressions } from '@/lib/notifications/suppression';
+import { refreshCompanyStateCache } from '@/lib/ovie/company-state.server';
 import {
   probeRedisOperability,
   RedisOperabilityError,
@@ -171,6 +173,18 @@ export async function GET(request: Request) {
           );
         })
       : { success: true, skipped: true };
+
+  // JOV-7880: product truth every run; shipping and Linear hourly. Reads use the snapshot.
+  results.companyState = await runSubJob('companyState', async () => {
+    const snapshot = await refreshCompanyStateCache(new Date(), undefined, {
+      includeExecution: minute < 15,
+    });
+    return {
+      revision: snapshot.revision,
+      activeConstraint: snapshot.activeConstraint,
+      investigations: snapshot.investigations.length,
+    };
+  });
 
   // 2. Process campaigns — every invocation (15 min)
   results.campaigns = await runSubJob('campaigns', async () => {

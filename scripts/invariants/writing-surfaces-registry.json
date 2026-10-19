@@ -151,11 +151,13 @@
       "audience": "Artists and prospects talking to Jovie",
       "purpose": "Answer in the Jovie persona and advance the user's task",
       "evidenceSources": [
-        "apps/web/lib/chat/run.ts",
+        "apps/web/app/api/chat/route.ts",
+        "apps/web/lib/chat/post-selection-writing-brief.test.ts",
+        "apps/web/lib/chat/post-selection-writing-brief.ts",
         "apps/web/lib/chat/prompts/registry.ts",
+        "apps/web/lib/chat/run.ts",
         "apps/web/lib/chat/voice-lint.ts",
-        "apps/web/tests/unit/lib/chat/prompt-voice.test.ts",
-        "apps/web/app/api/chat/route.ts"
+        "apps/web/tests/unit/lib/chat/prompt-voice.test.ts"
       ],
       "deliveryAdapter": "sse:/api/chat; ndjson:/api/mobile/v1/chat/turns",
       "policyVersion": "canon/VOICE.md 2026-07-17; prompt-voice test pins",
@@ -198,7 +200,7 @@
       ],
       "pilot": {
         "kind": "product-response",
-        "scope": "bounded Jovie persona reply on the onboarding-mode chat path",
+        "scope": "pre-draft brief for one compact onboarding response after a new server-confirmed artist selection (JOV-8408); writer integration is JOV-8409",
         "via": "JOV-3720"
       },
       "rollout": null

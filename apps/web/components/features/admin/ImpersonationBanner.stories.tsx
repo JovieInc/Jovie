@@ -8,9 +8,8 @@ import { ImpersonationBanner } from './ImpersonationBanner';
 const impersonationState: ImpersonationState = {
   enabled: true,
   isImpersonating: true,
-  effectiveClerkId: 'user_active_impersonation_123456789',
-  effectiveDbId: 'usr_active_123',
-  realAdminClerkId: 'user_admin_123',
+  effectiveUserId: '11111111-1111-4111-8111-111111111111',
+  actorUserId: '22222222-2222-4222-8222-222222222222',
   timeRemainingMs: 125_000,
   timeRemainingMinutes: 2,
   expiresAt: Date.now() + 125_000,

@@ -159,8 +159,8 @@ nodes:
       - merge_group
       - push
       - workflow_dispatch
-    terminalReceipt: job:ci-exact-head-coverage-shard-fail-fast
-    jobCount: 81
+    terminalReceipt: job:main-release-ready
+    jobCount: 64
   - name: CLI Chaos Nightly
     path: .github/workflows/cli-chaos-nightly.yml
     active: true
@@ -509,8 +509,8 @@ nodes:
     triggeringStateTransition:
       - workflow_dispatch
       - workflow_run
-    terminalReceipt: job:record-upload
-    jobCount: 5
+    terminalReceipt: job:require-recorded-upload
+    jobCount: 8
   - name: Jovie artist agent Eve release and rollback
     path: .github/workflows/jovie-agent-release.yml
     active: true
@@ -643,7 +643,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:rearm-green-victims
-    jobCount: 5
+    jobCount: 6
   - name: Merge Queue Ruleset Verify
     path: .github/workflows/merge-queue-ruleset-verify.yml
     active: true
@@ -786,6 +786,7 @@ nodes:
     allowedConsumers: []
     triggeringStateTransition:
       - workflow_dispatch
+      - workflow_run
     terminalReceipt: job:notify-failure
     jobCount: 6
   - name: PR Conflict Handler
@@ -924,6 +925,7 @@ nodes:
       - iOS TestFlight
       - Lane Fix Relay
       - Linear Sync on Merge
+      - Post-Deploy Probes
       - Production Release
     triggeringStateTransition:
       - workflow_run
@@ -1105,7 +1107,8 @@ nodes:
     category: remediation-dispatch
     authoritativeProducer: Lane Fix Relay
     authoritativeFor: []
-    allowedConsumers: []
+    allowedConsumers:
+      - Linear Sync on Merge
     triggeringStateTransition:
       - repository_dispatch
       - schedule
@@ -1122,6 +1125,17 @@ nodes:
     triggeringStateTransition:
       - repository_dispatch
     terminalReceipt: job:autofix
+    jobCount: 1
+  - name: Shipping Origin Receipt
+    path: .github/workflows/shipping-origin.yml
+    active: true
+    category: telemetry-aggregation
+    authoritativeProducer: Delivery Control Receipts
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:receipt
     jobCount: 1
   - name: Shipping SLO Ratchet
     path: .github/workflows/shipping-slo.yml
@@ -1236,8 +1250,8 @@ nodes:
     triggeringStateTransition:
       - workflow_dispatch
       - workflow_run
-    terminalReceipt: job:analyze-flakiness
-    jobCount: 1
+    terminalReceipt: job:publish-queue-results
+    jobCount: 2
   - name: TSC Cache Warm
     path: .github/workflows/tsc-cache-warm.yml
     active: true
@@ -1383,6 +1397,9 @@ edges:
   - from: Production Controller
     to: Linear Sync on Merge
     type: workflow_run
+  - from: Sentry Autofix Recurrence
+    to: Linear Sync on Merge
+    type: workflow_run
   - from: Mac Lane
     to: iOS CI
     type: workflow_call
@@ -1410,6 +1427,9 @@ edges:
   - from: Publish @jovie/cli to npm
     to: CLI Chaos
     type: workflow_call
+  - from: Production Controller
+    to: Post-Deploy Probes
+    type: workflow_run
   - from: Source Validation
     to: PR Review (shadow)
     type: workflow_run

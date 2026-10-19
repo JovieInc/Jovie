@@ -18,6 +18,8 @@ import 'server-only';
 import crypto from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { cookies } from 'next/headers';
+import { z } from 'zod';
+import { checkUserStatus } from '@/lib/auth/status-checker';
 import { db } from '@/lib/db';
 import { adminAuditLog } from '@/lib/db/schema/admin';
 import { users } from '@/lib/db/schema/auth';
@@ -29,6 +31,8 @@ export const IMPERSONATION_COOKIE = 'jovie_impersonate';
 
 // Token validity: 15 minutes maximum
 const TOKEN_TTL_MS = 15 * 60 * 1000;
+const TOKEN_VERSION = 'v2';
+const userIdSchema = z.string().uuid();
 
 // Maximum clock skew allowed: 30 seconds
 const MAX_CLOCK_SKEW_MS = 30 * 1000;
@@ -60,14 +64,10 @@ export function isImpersonationEnabled(): boolean {
  * Impersonation token payload
  */
 export interface ImpersonationToken {
-  /** The real admin's Clerk user ID */
-  realAdminClerkId: string;
-  /** The real admin's database user ID */
-  realAdminDbId: string;
-  /** The target user's Clerk user ID being impersonated */
-  effectiveClerkId: string;
-  /** The target user's database user ID */
-  effectiveDbId: string;
+  /** The administrator's canonical app user ID (`users.id`). */
+  actorUserId: string;
+  /** The target's canonical app user ID (`users.id`). */
+  effectiveUserId: string;
   /** When the token was issued (epoch ms) */
   issuedAt: number;
   /** When the token expires (epoch ms) */
@@ -94,17 +94,17 @@ function generateSignature(
     throw new TypeError('Impersonation secret not configured');
   }
 
-  const data = `${payload.realAdminClerkId}:${payload.realAdminDbId}:${payload.effectiveClerkId}:${payload.effectiveDbId}:${payload.issuedAt}:${payload.expiresAt}`;
+  const data = `${TOKEN_VERSION}:${payload.actorUserId}:${payload.effectiveUserId}:${payload.issuedAt}:${payload.expiresAt}`;
   return crypto.createHmac('sha256', secret).update(data).digest('hex');
 }
 
 /**
  * Serialize token to string for cookie storage
- * Format: realAdminClerkId:realAdminDbId:effectiveClerkId:effectiveDbId:issuedAt:expiresAt:signature
+ * Format: version:actorUserId:effectiveUserId:issuedAt:expiresAt:signature
  */
 function serializeToken(token: ImpersonationToken): string {
   const signature = generateSignature(token);
-  return `${token.realAdminClerkId}:${token.realAdminDbId}:${token.effectiveClerkId}:${token.effectiveDbId}:${token.issuedAt}:${token.expiresAt}:${signature}`;
+  return `${TOKEN_VERSION}:${token.actorUserId}:${token.effectiveUserId}:${token.issuedAt}:${token.expiresAt}:${signature}`;
 }
 
 /**
@@ -116,45 +116,56 @@ function parseToken(tokenString: string): ImpersonationValidation {
   }
 
   const parts = tokenString.split(':');
-  if (parts.length !== 7) {
+  if (parts.length !== 6 || parts[0] !== TOKEN_VERSION) {
     return { valid: false, error: 'Invalid token format' };
   }
 
-  const [
-    realAdminClerkId,
-    realAdminDbId,
-    effectiveClerkId,
-    effectiveDbId,
-    issuedAtStr,
-    expiresAtStr,
-    signature,
-  ] = parts;
+  const [, actorUserId, effectiveUserId, issuedAtStr, expiresAtStr, signature] =
+    parts;
 
-  const issuedAt = Number.parseInt(issuedAtStr, 10);
-  const expiresAt = Number.parseInt(expiresAtStr, 10);
+  if (
+    !userIdSchema.safeParse(actorUserId).success ||
+    !userIdSchema.safeParse(effectiveUserId).success ||
+    actorUserId.toLowerCase() === effectiveUserId.toLowerCase()
+  ) {
+    return { valid: false, error: 'Invalid user ID' };
+  }
 
-  if (Number.isNaN(issuedAt) || Number.isNaN(expiresAt)) {
+  const issuedAt = Number(issuedAtStr);
+  const expiresAt = Number(expiresAtStr);
+
+  if (
+    !Number.isSafeInteger(issuedAt) ||
+    !Number.isSafeInteger(expiresAt) ||
+    String(issuedAt) !== issuedAtStr ||
+    String(expiresAt) !== expiresAtStr ||
+    expiresAt <= issuedAt ||
+    expiresAt - issuedAt > TOKEN_TTL_MS
+  ) {
     return { valid: false, error: 'Invalid timestamp' };
   }
 
   const token: ImpersonationToken = {
-    realAdminClerkId,
-    realAdminDbId,
-    effectiveClerkId,
-    effectiveDbId,
+    actorUserId,
+    effectiveUserId,
     issuedAt,
     expiresAt,
   };
 
   // Check expiry
   const now = Date.now();
-  if (now > expiresAt) {
+  if (now >= expiresAt) {
     return { valid: false, error: 'Token expired' };
   }
 
   // Prevent future-dated tokens (clock skew protection)
   if (issuedAt > now + MAX_CLOCK_SKEW_MS) {
     return { valid: false, error: 'Token issued in future' };
+  }
+
+  // Reject malformed hex before decoding (Buffer.from accepts trailing junk).
+  if (!/^[a-f0-9]{64}$/.test(signature)) {
+    return { valid: false, error: 'Invalid signature' };
   }
 
   // Verify signature
@@ -172,18 +183,34 @@ function parseToken(tokenString: string): ImpersonationValidation {
   return { valid: true, token };
 }
 
+async function getImpersonationTarget(userId: string) {
+  const [targetUser] = await db
+    .select({
+      id: users.id,
+      betterAuthUserId: users.betterAuthUserId,
+      email: users.email,
+      deletedAt: users.deletedAt,
+      userStatus: users.userStatus,
+    })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  return targetUser;
+}
+
 /**
  * Start an impersonation session
  *
- * @param adminClerkId - The Clerk user ID of the admin initiating impersonation
- * @param targetClerkId - The Clerk user ID of the user to impersonate
+ * @param adminUserId - The canonical app user ID of the administrator
+ * @param targetUserId - The canonical app user ID of the target
  * @param ipAddress - IP address of the request (for audit)
  * @param userAgent - User agent of the request (for audit)
  * @returns Result indicating success or failure with error message
  */
 export async function startImpersonation(
-  adminClerkId: string,
-  targetClerkId: string,
+  adminUserId: string,
+  targetUserId: string,
   ipAddress?: string,
   userAgent?: string
 ): Promise<{ success: boolean; error?: string }> {
@@ -192,63 +219,66 @@ export async function startImpersonation(
   }
 
   // Verify the requester is actually an admin
-  const adminStatus = await isAdmin(adminClerkId);
+  const adminStatus = await isAdmin(adminUserId);
   if (!adminStatus) {
     return { success: false, error: 'Not authorized - admin access required' };
   }
 
-  // Get admin's database user ID
-  const [adminUser] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.clerkId, adminClerkId))
-    .limit(1);
-
-  if (!adminUser) {
-    return { success: false, error: 'Admin user not found in database' };
+  if (adminUserId.toLowerCase() === targetUserId.toLowerCase()) {
+    return { success: false, error: 'Cannot impersonate yourself' };
   }
 
-  // Get target user's database info
-  const [targetUser] = await db
-    .select({
-      id: users.id,
-      deletedAt: users.deletedAt,
-      userStatus: users.userStatus,
-    })
-    .from(users)
-    .where(eq(users.clerkId, targetClerkId))
-    .limit(1);
+  const targetUser = await getImpersonationTarget(targetUserId);
 
   if (!targetUser) {
     return { success: false, error: 'Target user not found' };
   }
 
-  if (targetUser.deletedAt || targetUser.userStatus === 'banned') {
+  if (checkUserStatus(targetUser.userStatus, targetUser.deletedAt).isBlocked) {
     return {
       success: false,
-      error: 'Cannot impersonate deleted or banned user',
+      error: 'Cannot impersonate a blocked user',
     };
   }
 
-  // Prevent self-impersonation
-  if (adminClerkId === targetClerkId) {
-    return { success: false, error: 'Cannot impersonate yourself' };
+  if (targetUser.userStatus !== 'active') {
+    return { success: false, error: 'Cannot impersonate an inactive user' };
+  }
+
+  if (!targetUser.betterAuthUserId || !targetUser.email) {
+    return {
+      success: false,
+      error: 'Target user does not have a Better Auth identity',
+    };
   }
 
   // Create the token
   const now = Date.now();
   const token: ImpersonationToken = {
-    realAdminClerkId: adminClerkId,
-    realAdminDbId: adminUser.id,
-    effectiveClerkId: targetClerkId,
-    effectiveDbId: targetUser.id,
+    actorUserId: adminUserId,
+    effectiveUserId: targetUser.id,
     issuedAt: now,
     expiresAt: now + TOKEN_TTL_MS,
   };
 
   const tokenString = serializeToken(token);
 
-  // Set the cookie
+  // Persist the required audit record before activating the session. A failed
+  // audit write must never leave the browser impersonating after a 500.
+  await db.insert(adminAuditLog).values({
+    adminUserId,
+    targetUserId: targetUser.id,
+    action: 'impersonation_started',
+    metadata: {
+      targetUserId,
+      issuedAt: now,
+      expiresAt: now + TOKEN_TTL_MS,
+      ttlMinutes: TOKEN_TTL_MS / 60000,
+    },
+    ipAddress: ipAddress ?? null,
+    userAgent: userAgent ?? null,
+  });
+
   const cookieStore = await cookies();
   cookieStore.set(IMPERSONATION_COOKIE, tokenString, {
     httpOnly: true,
@@ -258,21 +288,6 @@ export async function startImpersonation(
     path: '/',
   });
 
-  // Log the impersonation start
-  await db.insert(adminAuditLog).values({
-    adminUserId: adminUser.id,
-    targetUserId: targetUser.id,
-    action: 'impersonation_started',
-    metadata: {
-      targetClerkId,
-      issuedAt: now,
-      expiresAt: now + TOKEN_TTL_MS,
-      ttlMinutes: TOKEN_TTL_MS / 60000,
-    },
-    ipAddress: ipAddress ?? null,
-    userAgent: userAgent ?? null,
-  });
-
   return { success: true };
 }
 
@@ -280,32 +295,38 @@ export async function startImpersonation(
  * End the current impersonation session
  */
 export async function endImpersonation(
+  actorUserId: string,
   ipAddress?: string,
   userAgent?: string
 ): Promise<{ success: boolean }> {
   const cookieStore = await cookies();
   const tokenString = cookieStore.get(IMPERSONATION_COOKIE)?.value;
 
-  if (tokenString) {
-    const validation = parseToken(tokenString);
-    if (validation.valid && validation.token) {
-      // Log the impersonation end
-      await db.insert(adminAuditLog).values({
-        adminUserId: validation.token.realAdminDbId,
-        targetUserId: validation.token.effectiveDbId,
-        action: 'impersonation_ended',
-        metadata: {
-          targetClerkId: validation.token.effectiveClerkId,
-          sessionDurationMs: Date.now() - validation.token.issuedAt,
-        },
-        ipAddress: ipAddress ?? null,
-        userAgent: userAgent ?? null,
-      });
+  try {
+    if (tokenString) {
+      const validation = parseToken(tokenString);
+      if (
+        validation.valid &&
+        validation.token &&
+        validation.token.actorUserId === actorUserId
+      ) {
+        await db.insert(adminAuditLog).values({
+          adminUserId: validation.token.actorUserId,
+          targetUserId: validation.token.effectiveUserId,
+          action: 'impersonation_ended',
+          metadata: {
+            targetUserId: validation.token.effectiveUserId,
+            sessionDurationMs: Date.now() - validation.token.issuedAt,
+          },
+          ipAddress: ipAddress ?? null,
+          userAgent: userAgent ?? null,
+        });
+      }
     }
+  } finally {
+    // Ending is fail-closed for access even when audit persistence is down.
+    cookieStore.delete(IMPERSONATION_COOKIE);
   }
-
-  // Clear the cookie
-  cookieStore.delete(IMPERSONATION_COOKIE);
 
   return { success: true };
 }
@@ -314,11 +335,9 @@ export async function endImpersonation(
  * Get current impersonation state
  * Returns the validated token if impersonation is active, null otherwise
  */
-export async function getImpersonationState(): Promise<ImpersonationToken | null> {
-  if (!isImpersonationEnabled()) {
-    return null;
-  }
-
+export async function getImpersonationState(
+  actorUserId: string | null
+): Promise<ImpersonationToken | null> {
   const cookieStore = await cookies();
   const tokenString = cookieStore.get(IMPERSONATION_COOKIE)?.value;
 
@@ -327,8 +346,25 @@ export async function getImpersonationState(): Promise<ImpersonationToken | null
   }
 
   const validation = parseToken(tokenString);
-  if (!validation.valid || !validation.token) {
+  if (
+    !validation.valid ||
+    !validation.token ||
+    !actorUserId ||
+    validation.token.actorUserId !== actorUserId ||
+    !(await isAdmin(actorUserId))
+  ) {
     // Invalid or expired token - clear it
+    cookieStore.delete(IMPERSONATION_COOKIE);
+    return null;
+  }
+
+  const target = await getImpersonationTarget(validation.token.effectiveUserId);
+  if (
+    !target?.betterAuthUserId ||
+    !target.email ||
+    target.userStatus !== 'active' ||
+    checkUserStatus(target.userStatus, target.deletedAt).isBlocked
+  ) {
     cookieStore.delete(IMPERSONATION_COOKIE);
     return null;
   }
@@ -339,36 +375,44 @@ export async function getImpersonationState(): Promise<ImpersonationToken | null
 /**
  * Check if the current session is impersonated
  */
-export async function isImpersonating(): Promise<boolean> {
-  const state = await getImpersonationState();
+export async function isImpersonating(
+  actorUserId: string | null
+): Promise<boolean> {
+  const state = await getImpersonationState(actorUserId);
   return state !== null;
 }
 
 /**
  * Get the effective user ID for the current request
- * If impersonating, returns the target user's Clerk ID
+ * If impersonating, returns the target's canonical app user ID.
  * Otherwise returns null (caller should use normal auth)
  */
-export async function getEffectiveClerkId(): Promise<string | null> {
-  const state = await getImpersonationState();
-  return state?.effectiveClerkId ?? null;
+export async function getEffectiveUserId(
+  actorUserId: string | null
+): Promise<string | null> {
+  const state = await getImpersonationState(actorUserId);
+  return state?.effectiveUserId ?? null;
 }
 
 /**
- * Get the real admin's Clerk ID during impersonation
+ * Get the real administrator's canonical app user ID during impersonation.
  * Returns null if not impersonating
  */
-export async function getRealAdminClerkId(): Promise<string | null> {
-  const state = await getImpersonationState();
-  return state?.realAdminClerkId ?? null;
+export async function getActorUserId(
+  actorUserId: string | null
+): Promise<string | null> {
+  const state = await getImpersonationState(actorUserId);
+  return state?.actorUserId ?? null;
 }
 
 /**
  * Get remaining time on impersonation session in milliseconds
  * Returns 0 if not impersonating
  */
-export async function getImpersonationTimeRemaining(): Promise<number> {
-  const state = await getImpersonationState();
+export async function getImpersonationTimeRemaining(
+  actorUserId: string | null
+): Promise<number> {
+  const state = await getImpersonationState(actorUserId);
   if (!state) {
     return 0;
   }

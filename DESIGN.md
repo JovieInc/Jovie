@@ -99,15 +99,7 @@ Read [the copywriting reference](docs/design-system/DETAILS.md#copywriting) when
 
 ### Ovie Ops Cockpit Guardrail
 
-Ovie UI/UX work must use the make-interfaces-better path: load gstack `/design-review`, load `design-taste-frontend` where available, and run the checklist in `docs/ovie-design-guardrails.md`.
-
-Before changing Ovie UI, include the Design Read line:
-
-`Reading this as: <page kind> for <audience>, with a <vibe> language, leaning toward <design system or aesthetic>`
-
-Ovie should read as a macOS ops cockpit: dense but calm, fast, native-feeling, and focused on operator decisions. Do not import landing-page patterns, decorative AI-dashboard chrome, oversized hero/card structures, or motion that makes controls jump.
-
-Ovie UI PRs require before/after screenshots or component evidence and explicit pass/fail for hierarchy, spacing, typography scale, visual density, interaction states, contrast, macOS-native affordances, and no layout jank.
+Follow [the Ovie guardrail](docs/design-system/DETAILS.md#ovie-ops-cockpit-guardrail) before Ovie UI work.
 
 ---
 
@@ -133,9 +125,77 @@ Raw Tailwind color utilities (`text-black`, `bg-white`, `text-[#fff]`) are the r
 
 ### Enforcement
 
-A custom ESLint rule (`@jovie/no-hardcoded-theme-colors`, set to `warn`) flags these patterns at author time. A ratchet script (`pnpm --filter web lint:contrast-ratchet`) counts existing violations and fails CI if new ones are introduced.
+`error` blocks; `warn` advises. Baselines are committed allowances, not live
+inventories. All five raw-color contrast buckets are **zero**; new matches fail.
+
+CI lanes are path-selected; blocking failures fail the required aggregate:
+
+- **L** — [Source Validation](.github/workflows/source-validation.yml),
+  `pnpm --filter @jovie/web lint:eslint:changed` (author-time full check:
+  `pnpm --filter @jovie/web lint:eslint`).
+- **S** — `ci-fast` → Structural Contract (web), including
+  `pnpm --filter @jovie/web lint:contrast-ratchet` and the optical-grid tests.
+- **G** — Source Validation → `merge-group-unit-guards` on web/UI source PRs;
+  `ci-fast` → Merge-group unit guards on selected merge groups. Both run
+  `tests/unit/design-system` through Vitest.
+- **D** — `ci-fast` → Design governance enforcement, including
+  `lint:touch-target` and `lint:ui-feel`.
+- **I** — `ci-fast` → Design-system source identity ratchet,
+  `pnpm design:source-count-ratchet`.
+
+The commands and selectors live in [ci-fast-lanes.mjs](scripts/ci-fast-lanes.mjs).
+Rule severities come from [the web ESLint config](apps/web/eslint.config.js).
+Count baselines live in [the design-system test directory](apps/web/tests/unit/design-system/)
+unless linked below.
+
+| Gate | Severity | CI lane | Blocks? | Committed baseline |
+| --- | --- | --- | --- | --- |
+| `@jovie/no-hardcoded-theme-colors` | `error` | L | Yes | None (no grandfathered count) |
+| `@jovie/ui-feel` | `off` | L | No | None (enforced by the UI-feel ratchet below) |
+| `arbitrary-radius` | `error` | S + G | Yes | 31 occurrences; 15 files |
+| `arbitrary-values` | `error` | G + I | Yes | 2169 |
+| `component-family` | `error` | G | Yes | button=37; emptyState=6; entityHeader=1; palette=4; shell=21; status=9 |
+| `contrast (computed pairs)` | `error` | S + G | Yes | No count baseline; 4.5:1 normal text, 3:1 large text/UI |
+| `contrast (raw colors)` | `error` | S | Yes | arbitraryHex=0; bareBgBlack=0; bareBgWhite=0; bareTextBlack=0; bareTextWhite=0 |
+| `deprecated-button-alias` | `error` | G | Yes | 91 |
+| `linear-namespace` | `error` | G + I | Yes | 853 |
+| `shadcn/no-restyle` | `error` | L + G | Yes | 221 files; 3122 messages (grandfathered) |
+| `source-identity` | `error` | I | Yes | 2611 |
+| `spacing-scale (conservative)` | `error` | S + G | Yes | 654; armed=true; marketing=86; packages/ui=11; web-other=304; web-shell=253 |
+| `spacing-scale (strict)` | `warn` | S + G | No | 2310; armed=false; marketing=258; packages/ui=60; web-other=1126; web-shell=866 |
+| `touch-target` | `error` | D | Yes | 159 |
+| `ui-feel ratchet` | `error` | D | Yes | headingNeedsBalance=318; missingTabularNums=81; nonConcentricRadius=0; undersizedHitArea=74 |
+
+The [raw-color baseline](apps/web/contrast-ratchet.baseline.json) and
+[computed pair config](apps/web/contrast-pairs.config.json) cover separate
+checks. Computed contrast blocks failing resolvable pairs; unresolved pairs
+warn and skip unless `--strict` is supplied. A zero static baseline is not proof
+of rendered contrast on every screen.
+
+The radius detector is active in `concentric-radius-contract.test.ts`.
+Component-family has `WARN_ONLY = false` and also enforces the explicit
+EmptyState path allowlist. Spacing's strict inventory is report-only;
+conservative growth blocks, including per-family ceilings. The source-identity
+gate blocks new `file + rule + value` identities (including arbitrary CSS
+properties), even when total counts stay flat. It also checks the arbitrary-value
+and linear-namespace count ceilings. Lower count baselines in the same PR when
+removing debt; see each detector's shrink policy for merge-group behavior.
+
+The [no-restyle baseline](apps/web/tests/unit/design-system/shadcn-no-restyle.baseline.json)
+grants exact legacy paths a lint override; the changed-file baseline probe and
+unit ratchet still block growth. Test/story files and canonical UI internals
+have scoped rule exemptions in the ESLint config. The separate
+[touch-target](apps/web/touch-target-ratchet.baseline.json) and
+[UI-feel](apps/web/ui-feel-ratchet.baseline.json) baselines remain blocking even
+though the author-time `@jovie/ui-feel` rule is off.
+
+[enforcement-documentation.test.ts](apps/web/tests/unit/design-system/enforcement-documentation.test.ts)
+checks this table against effective ESLint severities, committed counts and spacing
+flags. It runs in G and Source Validation's source-read guard for doc/config edits.
+Update the table with its sources; the test never rewrites allowances.
 
 To fix a violation:
+
 1. Replace with a semantic token (preferred), or
 2. Pair with a `dark:` counterpart (`text-black dark:text-white`), or
 3. Add `// eslint-disable-next-line @jovie/no-hardcoded-theme-colors -- <reason>` for intentional brand/brand-swatch exceptions.
@@ -158,35 +218,7 @@ Read [the spacing reference](docs/design-system/DETAILS.md#spacing) when changin
 
 ## DS_FOUNDATION_V1 canonical decisions
 
-Wave 0 of the DS_FOUNDATION_V1 consolidation locks in the following canonical
-semantic aliases. Downstream files and components should consume these instead
-of redefining them.
-
-- **Canonical public/marketing width = 1298px** (Linear.app parity).
-  Exposed as `--ds-public-content-max` and Tailwind class `max-w-public-content`.
-- **Prose exception = 680px** for long-form reading surfaces.
-  Exposed as `--ds-prose-max` and Tailwind class `max-w-prose-canonical`.
-- **Motion taxonomy:** two intents only.
-  - `subtle` — 150ms with `--ds-motion-subtle-easing`. Use for hover, focus,
-    color, icon swap, toast. Tailwind: `duration-subtle ease-subtle`.
-  - `cinematic` — 420ms with `--ds-motion-cinematic-easing`. Use for drawers,
-    modals, audio player open/close. Tailwind: `duration-cinematic ease-cinematic`.
-  - Raw durations and easings in route code are forbidden (enforced in Wave 4).
-- **Canonical button variants:** `primary`, `secondary`, `tertiary`, `ghost`,
-  and `link`. Destructive styling is a `destructive` prop, not a variant.
-- **Canonical text button size (Tim KEEP 2026-09-10):** `sm`,
-  `marketing`, `md`, and `lg` share one 28px visible ActionButton / product
-  CTA, weight 510, radius 999. Mobile wraps that 28px pill in a 44px tap
-  target. Not 32-in-44 and not density-32 on every size.
-  `icon` remains a distinct 36px square utility control with a 44px hit target.
-- **Touch targets (founder-locked 2026-08-20):** enlarge the hit **container**,
-  never the visible item. Compact controls keep their visual height; the 44px
-  floor is an invisible `::before`/`::after` (or wrapping hit area).
-- **Marketing O-mark (founder-locked 2026-08-12):** render the visible mark at
-  32px and align it to the same control geometry.
-
-See [`docs/DESIGN_TOKENS.md`](docs/DESIGN_TOKENS.md#ds_foundation_v1-canonical-decisions)
-for the canonical CSS + Tailwind references.
+Read [the canonical foundation decisions](docs/design-system/DETAILS.md#ds_foundation_v1-canonical-decisions) before changing this area.
 
 ---
 
@@ -279,27 +311,7 @@ Read [the canonical surface split reference](docs/design-system/DETAILS.md#canon
 
 ## Source-of-Truth File Map
 
-| File | Responsibility |
-|------|----------------|
-| `apps/web/design/ziawi-color-sot.json` | **Color SoT (`ziawi-color-sot-v1`)** — Pen node ZiaWI hex lock. React projects this file. |
-| `apps/web/design/oklch-palette.json` | **OKLCH projection of ZiaWI** — not a color root; hex must match `ziawi-color-sot-v1` |
-| `apps/web/design/tokens.json` | **Machine-readable base-token source** — compiler-owned brand, gray, and radius values plus explicit migration divergences; accent hexes project ZiaWI |
-| `apps/web/styles/generated/design-tokens.css` | **Generated base-token emitter** — CSS projection of `design/tokens.json`; never hand-edit |
-| `apps/web/styles/design-system.css` | **Live semantic emitter** — imports generated base tokens and projects unmigrated semantic/color properties; color hex must match ZiaWI |
-| `apps/web/styles/linear-tokens.css` | Marketing-specific Linear-extracted tokens |
-| `apps/web/styles/theme.css` | Feature accents & animations only |
-| `apps/web/app/globals.css` | Tailwind registration + shared utilities |
-| `apps/web/tailwind.config.js` | Tailwind v4 token mapping |
-| `apps/web/app/(marketing)/layout.tsx` | Marketing shell |
-| `apps/web/components/site/MarketingHeader.tsx` | Marketing header |
-| `apps/web/components/site/MarketingFooter.tsx` | Marketing footer |
-| `apps/web/components/features/auth/AuthLayout.tsx` | Product-funnel shell |
-| `apps/web/components/features/dashboard/dashboard-nav/config.ts` | Reviewed authenticated-shell navigation and rollout insertions |
-| `apps/web/components/shell/SidebarNavItem.tsx` | Canonical sidebar row and icon chrome |
-| `apps/web/components/organisms/table/molecules/PageToolbar.tsx` | Canonical workspace toolbar and action hierarchy |
-| `apps/web/components/homepage/*` | Homepage chat-intake implementation (System B) |
-| `apps/web/components/features/home/*` | Legacy marketing-home components (still used by `(marketing)/new/*`) |
-| `apps/web/app/(home)/layout.tsx` | Homepage shell — `PublicPageShell` |
+Read [the source-of-truth file map](docs/design-system/DETAILS.md#source-of-truth-file-map) before changing this area.
 
 ---
 

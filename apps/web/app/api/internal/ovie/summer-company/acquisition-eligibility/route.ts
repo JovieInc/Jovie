@@ -1,8 +1,13 @@
 import { NextResponse } from 'next/server';
+import {
+  COMMERCE_DECISION_PROJECTION_CONTRACT,
+  unknownCommerceDecisionProjection,
+} from '@/lib/acquisition/commerce-decision';
 import { unknownAcquisitionEligibility } from '@/lib/acquisition/eligibility';
 import { getAcquisitionEligibility } from '@/lib/acquisition/eligibility.server';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { readCompanyStateCache } from '@/lib/ovie/company-state.server';
 import { verifySummerOidcRequest } from '@/lib/ovie/summer-oidc.server';
 
 export const runtime = 'nodejs';
@@ -14,7 +19,8 @@ export const maxDuration = 60;
  * derived $199-cone predicate, its per-receipt explanations, the first
  * blocking receipt with its owner and next action, and the current founder
  * funnel counts. Planners read this before recommending outbound acquisition.
- * `?fresh=1` skips the 10-minute probe cache.
+ * Ordinary reads use canonical company state. `?fresh=1` explicitly bypasses
+ * it for exact/current truth and skips the underlying probe cache.
  */
 export async function GET(request: Request): Promise<NextResponse> {
   if (!(await verifySummerOidcRequest(request))) {
@@ -25,22 +31,34 @@ export async function GET(request: Request): Promise<NextResponse> {
   }
   const fresh = new URL(request.url).searchParams.get('fresh') === '1';
   try {
-    return NextResponse.json(await getAcquisitionEligibility({ fresh }), {
+    const report = fresh
+      ? await getAcquisitionEligibility({ fresh: true })
+      : (await readCompanyStateCache())?.snapshot.sourcePayloads
+          .acquisitionEligibility;
+    if (
+      !report ||
+      report.commerce?.contract !== COMMERCE_DECISION_PROJECTION_CONTRACT
+    ) {
+      throw new Error('company_state_cache_miss');
+    }
+    return NextResponse.json(report, {
       headers: NO_STORE_HEADERS,
     });
   } catch (error) {
     await captureError('Acquisition eligibility read failed', error, {
       route: '/api/internal/ovie/summer-company/acquisition-eligibility',
     });
+    const now = new Date();
     // Fail closed with a readable verdict rather than an error a planner
     // might treat as "no gate".
     return NextResponse.json(
       {
         ...unknownAcquisitionEligibility(
-          new Date(),
+          now,
           'Acquisition eligibility could not be computed.'
         ),
         funnel: null,
+        commerce: unknownCommerceDecisionProjection(now),
       },
       { headers: NO_STORE_HEADERS }
     );

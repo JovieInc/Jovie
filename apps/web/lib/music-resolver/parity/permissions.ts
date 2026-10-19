@@ -66,10 +66,10 @@ export const MUSICFETCH_AGGREGATOR_BLOCKER: Blocker = {
 
 export const CHARTMETRIC_ACCESS_BLOCKER: Blocker = {
   failure:
-    'No Chartmetric refresh token is used here. This session must not call the paid API or spend credits.',
-  owner: 'Chartmetric account owner (signup via hi@chartmetric.com)',
+    'Independent source acquisition, per-use permissions, population/history coverage and canonical public projections are unverified. Public API documentation grants no data-use rights.',
+  owner: 'JOV-7824 / JOV-7827 / JOV-7828',
   reviewTrigger:
-    'A server-side refresh token exists and a local behavioral test calls a shipped adapter without spending credits.',
+    'The allocated implementation issue supplies permitted independent data, dated methodology/coverage receipts, canonical write/readback and deployed API/CLI/MCP evidence. No vendor token or spend is authorized by this catalog.',
 };
 
 export const CHARTMETRIC_SCORE_BLOCKER: Blocker = {
@@ -80,12 +80,12 @@ export const CHARTMETRIC_SCORE_BLOCKER: Blocker = {
     'A credentialed read is separately approved and the value is displayed as Chartmetric Score.',
 };
 
-export const SOCIALBLADE_ACCESS_BLOCKER: Blocker = {
+export const SOCIALBLADE_RIGHTS_BLOCKER: Blocker = {
   failure:
-    'Social Blade Business API requires a client id and prepaid token. Do not call it, including zero-credit samples.',
-  owner: 'Social Blade account owner',
+    'Social Blade Developer Terms section 3.1 prohibit using API data in another product or a similar service. Public discovery samples do not grant product rights.',
+  owner: 'JOV-7824 / Social Blade account owner',
   reviewTrigger:
-    'A server-side client id and token exist and a local test exercises a shipped client without spending credits.',
+    'Written permission covers Jovie product, API, CLI, MCP, retention and comparative use, or an independently permitted platform source replaces the vendor data.',
 };
 
 export const SOCIALBLADE_OPAQUE_BLOCKER: Blocker = {
@@ -98,10 +98,10 @@ export const SOCIALBLADE_OPAQUE_BLOCKER: Blocker = {
 
 export const SOCIALBLADE_HISTORY_BLOCKER: Blocker = {
   failure:
-    'Social Blade history archive and vault auto-downgrade when the requested depth is unavailable.',
-  owner: 'Social Blade',
+    'Requested archive depth can auto-downgrade, returned rows do not identify the granted history tier, and no permitted independent archive currently proves equivalent coverage.',
+  owner: 'JOV-7824 / JOV-7829',
   reviewTrigger:
-    'A credentialed statistics call returns an explicit history depth without auto-downgrade.',
+    'A permitted source returns actual samples with explicit coverage, gaps, buckets and freshness for the requested tier.',
 };
 
 export const SAME_NAME_LEASE_BLOCKER: Blocker = {
@@ -119,17 +119,10 @@ export const SAME_NAME_LEASE_BLOCKER: Blocker = {
 
 export const CANONICAL_ASSERTION_BLOCKER: Blocker = {
   failure:
-    'The canonical assertion store lives on the leased identity resolver. This session does not open a second store.',
-  owner: 'JOV-7818',
-  reviewTrigger: 'PR #20549 merges and the assertion fields land with it.',
-  lease: {
-    issue: 'JOV-7818',
-    prs: [20549],
-    files: [
-      'apps/web/lib/music-resolver/in-house.ts',
-      'apps/web/lib/music-resolver/in-house-contracts.ts',
-    ],
-  },
+    'Revisioned assertion persistence and producer write/readback are unverified. Pure admission contracts do not prove a deployed ledger; PR #20549 is closed and unmerged.',
+  owner: 'JOV-8470 / JOV-8503',
+  reviewTrigger:
+    'Read-only deployed schema inspection identifies the ledger to reuse; revisioned persistence, producer coverage and canonical write/readback receipts land under JOV-8470.',
 };
 
 export const PUBLIC_CONTRACT_BLOCKER: Blocker = {

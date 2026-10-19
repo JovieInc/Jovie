@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { fn } from 'storybook/test';
+import { expect, fn } from 'storybook/test';
 import { AudioBar } from './AudioBar';
 
 const meta = {
@@ -42,6 +42,14 @@ export const Playing: Story = {
 
 export const Compact: Story = {
   args: { waveformOn: false },
+  play: ({ canvasElement }) => {
+    const slider = canvasElement.querySelector<HTMLInputElement>(
+      'input[aria-label="Seek Track Waveform"]'
+    );
+    slider?.focus();
+    expect(slider).not.toHaveFocus();
+    expect(slider?.closest('[inert]')).not.toBeNull();
+  },
 };
 
 export const LyricsOpen: Story = {

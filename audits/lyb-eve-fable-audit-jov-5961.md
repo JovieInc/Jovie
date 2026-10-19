@@ -1,5 +1,9 @@
 # LYB → Eve Hypertrophy Coach — Fable 5.1 Audit (JOV-5961)
 
+Historical audit. The [JOV-6013 launch contract](../docs/product/lyb-launch-contract.md)
+supersedes its launch audience, kill list, and proposed surface breadth.
+The source observations below describe the audited September build only.
+
 Date: 2026-09-04 · Issue: [JOV-5961](https://linear.app/jovie/issue/JOV-5961/lyb-eve-fable-audit-simple-aesthetic-hypertrophy-coach) · Branch: `fallback/JOV-5961-fix`
 
 ## Scope

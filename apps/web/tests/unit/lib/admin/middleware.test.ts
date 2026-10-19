@@ -139,6 +139,25 @@ describe('requireAdmin (Better Auth)', () => {
     expect(mockGetCachedAuth).not.toHaveBeenCalled();
     expect(mockIsAdmin).toHaveBeenCalledWith('user_admin');
   });
+
+  it('authorizes the real admin while an effective user is active', async () => {
+    mockGetFreshAuth.mockResolvedValue({
+      userId: 'user_target',
+      actorUserId: 'user_admin',
+      sessionId: 'sess_admin',
+      orgId: null,
+    });
+    mockIsAdmin.mockResolvedValue(true);
+
+    const { requireAdmin } = await import('@/lib/admin/middleware');
+    await expect(requireAdmin({ session: 'fresh' })).resolves.toBeNull();
+
+    expect(mockIsAdmin).toHaveBeenCalledWith('user_admin');
+    expect(mockPrivacy).toHaveBeenCalledWith({
+      userId: 'user_admin',
+      sessionId: 'sess_admin',
+    });
+  });
 });
 
 describe('checkIsAdmin (Better Auth)', () => {

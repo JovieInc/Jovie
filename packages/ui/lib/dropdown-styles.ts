@@ -225,7 +225,7 @@ const MENU_ROW_INTERACTION_STATES = `${MENU_ITEM_SELECTED_STATE} ${MENU_ITEM_DIS
 export const MENU_ITEM_BASE =
   `relative flex min-h-8 cursor-default select-none items-center gap-2 ${OVERLAY_ITEM_RADIUS} px-2.5 py-1.5 text-app font-normal leading-5 outline-none ` +
   'transition-colors duration-fast ease-interactive ' +
-  'text-secondary-token hover:bg-surface-1 hover:text-primary-token ' +
+  'text-secondary-token hover:bg-(--color-bg-surface-1) hover:text-primary-token ' +
   'data-[highlighted]:bg-surface-1 data-[highlighted]:text-primary-token ' +
   `${MENU_ROW_INTERACTION_STATES} ` +
   `${OVERLAY_ITEM_FOCUS} ` +
@@ -290,7 +290,8 @@ export const MENU_LABEL_BASE =
  * Menu separator styles
  * Uses design token for border consistency
  */
-export const MENU_SEPARATOR_BASE = '-mx-1 my-1 h-px border-t border-subtle';
+export const MENU_SEPARATOR_BASE =
+  '-mx-1 my-1 h-px border-0 bg-(--color-border-subtle)';
 
 /**
  * Keyboard shortcut indicator styles

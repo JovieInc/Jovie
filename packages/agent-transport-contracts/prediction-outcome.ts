@@ -2,9 +2,9 @@ import { z } from 'zod';
 import {
   type DecisionPredictionReceipt,
   DecisionPredictionReceiptSchema,
-} from './prediction-receipt';
+} from './prediction-receipt.ts';
 
-export * from './prediction-receipt';
+export * from './prediction-receipt.ts';
 
 const id = z.string().trim().min(1).max(200);
 const ref = z.string().trim().min(1).max(600);

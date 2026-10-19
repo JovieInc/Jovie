@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+
 /**
  * Quality gap finder: proposes missing tests, guardrails, and invariants from
  * repo and tracker evidence. Deterministic and model-free; one filesystem
@@ -68,6 +69,7 @@ import {
   evaluateEscapedDefectClosure,
   extractEscapedDefectClosureEvidence,
 } from './lib/escaped-defect-closure.mjs';
+import { assertEventDrivenLearning } from './lib/learning-trigger.mjs';
 import {
   JOVIE_TEAM_ID,
   upsertLinearIssueByTitleFingerprint,
@@ -1421,6 +1423,7 @@ export function summarize(report) {
 }
 
 async function main() {
+  assertEventDrivenLearning();
   const args = process.argv.slice(2);
   const file = args.includes('--file');
   const sinceDays = Number(argValue(args, '--since-days') ?? 14);

@@ -1,9 +1,13 @@
+import { PgDialect } from 'drizzle-orm/pg-core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { attachFirstTouchReceipt } from '@/lib/acquisition/activation-receipt';
+import { buildAgentHandoffDiscovery } from '@/lib/acquisition/agent-handoff';
+import { AGENT_INTENT_QUERY } from '@/lib/acquisition/agent-intent';
 import {
   buildFirstTouch,
   sealFirstTouchEnvelope,
 } from '@/lib/acquisition/first-touch-envelope';
+import { supportedAgentDecision } from '@/tests/fixtures/agent-handoff';
 
 const { mockCaptureError, mockInsert, mockReturning, mockCookies } = vi.hoisted(
   () => ({
@@ -47,7 +51,7 @@ describe('attachFirstTouchReceipt', () => {
     mockReturning.mockResolvedValue([{ id: 'receipt-id' }]);
     mockInsert.mockImplementation(() => ({
       values: vi.fn(() => ({
-        onConflictDoNothing: vi.fn(() => ({ returning: mockReturning })),
+        onConflictDoUpdate: vi.fn(() => ({ returning: mockReturning })),
       })),
     }));
   });
@@ -99,6 +103,30 @@ describe('attachFirstTouchReceipt', () => {
     });
     expect(values.capturedAt).toEqual(new Date(capturedAt));
     expect(values.linkedAt).toBeInstanceOf(Date);
+  });
+
+  it('retains signed agent fields and acquisition identity when claim completes', async () => {
+    const discovery = await buildAgentHandoffDiscovery(
+      supportedAgentDecision()
+    );
+    const token = new URL(discovery.handoffUrl as string).searchParams.get(
+      AGENT_INTENT_QUERY
+    );
+    mockCookies.mockReturnValue(cookieStoreWith(token ?? undefined));
+    await expect(attachFirstTouchReceipt(USER_ID)).resolves.toBe(true);
+    const values = lastInsertValues();
+    expect(values.userId).toBe(USER_ID);
+    expect(values.firstTouch.agentIntent).toMatchObject({
+      channel: 'agent-handoff',
+      rail: 'ordinary-web-checkout',
+      matrixRevision: 'matrix-r7',
+    });
+    const write =
+      mockInsert.mock.results.at(-1)?.value.values.mock.results[0].value
+        .onConflictDoUpdate.mock.calls[0][0];
+    expect(write.set.firstTouch).toEqual(values.firstTouch);
+    expect(write.set.userId).toBe(USER_ID);
+    expect(new PgDialect().sqlToQuery(write.setWhere).sql).toContain('is null');
   });
 
   it('records unknown when the envelope is tampered with', async () => {

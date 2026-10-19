@@ -147,6 +147,32 @@ describe('presence actions', () => {
     );
   });
 
+  it('keeps a manually accepted link without presenting MusicFetch artwork as its platform photo', async () => {
+    dashboardQueryMock.mockResolvedValueOnce([
+      {
+        matchId: 'anghami',
+        providerId: 'anghami',
+        externalArtistName: 'Tim White',
+        externalArtistUrl: 'https://play.anghami.com/artist/1754494',
+        externalArtistImageUrl:
+          'https://is1-ssl.mzstatic.com/image/reference.jpg',
+        confidenceScore: null,
+        confidenceBreakdown: null,
+        matchingIsrcCount: 0,
+        status: 'confirmed',
+        matchSource: 'musicfetch',
+        confirmedAt: new Date('2026-04-12T02:06:27.166Z'),
+      },
+    ]);
+    const result = await loadDspPresenceForProfile('profile-123');
+    expect(result.items[0]).toMatchObject({
+      status: 'confirmed',
+      externalArtistUrl: 'https://play.anghami.com/artist/1754494',
+      externalArtistImageUrl: null,
+    });
+    expect(result.confirmedCount).toBe(1);
+  });
+
   it('loads presence for the selected dashboard profile', async () => {
     getDashboardDataEssentialMock.mockResolvedValueOnce({
       needsOnboarding: false,

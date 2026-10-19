@@ -22,10 +22,12 @@ import {
   PaletteList,
 } from '@/components/organisms/SharedCommandPalette';
 import { APP_ROUTES } from '@/constants/routes';
+import { useSequentialShortcuts } from '@/hooks/useSequentialShortcuts';
 import {
   commandsForSurface,
   featuredSkillCommands,
 } from '@/lib/commands/registry';
+import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import { segmentedAccessibleName } from '@/tests/utils/accessible-name';
 
 const pushMock = vi.fn();
@@ -133,6 +135,13 @@ function composerAttachmentActions(
       },
     },
   ];
+}
+
+function NavigationSurfaces({ open }: { readonly open: boolean }) {
+  useSequentialShortcuts();
+  return (
+    <CmdKPalette profileId='profile-1' open={open} onOpenChange={vi.fn()} />
+  );
 }
 
 describe('SharedCommandPalette (cmd+k surface)', () => {
@@ -468,6 +477,41 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     fireEvent.mouseDown(releasesNav!);
     expect(pushMock).toHaveBeenCalledWith(APP_ROUTES.RELEASES);
   });
+
+  it.each(['pointer', 'keyboard'] as const)(
+    'opens the same Work target through the menu and shell sequence (%s)',
+    input => {
+      pushMock.mockClear();
+      const { rerender } = render(<NavigationSurfaces open />);
+      fireEvent.change(
+        screen.getByRole('combobox', { name: 'Command Palette Search' }),
+        { target: { value: 'Work' } }
+      );
+      const row = screen
+        .getAllByRole('option')
+        .find(element =>
+          element.textContent?.includes('What you make and put into the world.')
+        );
+      expect(row).toBeDefined();
+      if (!row) throw new Error('Work menu action missing');
+      if (input === 'pointer') fireEvent.mouseDown(row);
+      else
+        fireEvent.keyDown(
+          screen.getByRole('combobox', { name: 'Command Palette Search' }),
+          { key: 'Enter' }
+        );
+      expect(pushMock).toHaveBeenCalledExactlyOnceWith(
+        NAV_SHORTCUTS.library.href
+      );
+      rerender(<NavigationSurfaces open={false} />);
+      fireEvent.keyDown(document.body, { key: 'g' });
+      fireEvent.keyDown(document.body, { key: 'r' });
+      expect(pushMock.mock.calls).toEqual([
+        [NAV_SHORTCUTS.library.href],
+        [NAV_SHORTCUTS.library.href],
+      ]);
+    }
+  );
 
   it('does not duplicate Audience as a separate command', () => {
     render(<CmdKPalette profileId='profile-1' open onOpenChange={vi.fn()} />);

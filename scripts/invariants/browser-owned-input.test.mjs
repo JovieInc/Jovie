@@ -1,0 +1,817 @@
+import assert from 'node:assert/strict';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+import { test } from 'node:test';
+import {
+  browserInputFindings,
+  browserInputVerdict,
+  INPUT_MATRIX,
+  INPUT_SCHEMA,
+  inputCells,
+  isMissingDeviceEvidence,
+  semanticFindings,
+  transitionFindings,
+} from './browser-owned-input.mjs';
+import { auditScreens, remediationPlans } from './screen-audit.mjs';
+import {
+  evaluateScreenProof,
+  SCREEN_REGISTRY,
+} from './screen-certification.mjs';
+
+const HEAD = 'a'.repeat(40);
+const screenId = 'web.public-profile';
+const asset = () => ({
+  url: 'https://evidence.example/capture',
+  digest: `sha256:${'b'.repeat(64)}`,
+});
+const fields = () =>
+  ['email', 'tel'].map(role => ({
+    role,
+    type: role,
+    autocomplete: role,
+    inputmode: role,
+    name: role,
+    label: role,
+    visible: true,
+  }));
+const samples = () =>
+  INPUT_MATRIX.phases.map(phase => ({
+    phase,
+    fields: fields(),
+    layoutHeight: 844,
+    visualHeight:
+      phase === 'platform-ui-visible' || phase === 'value-filled' ? 430 : 844,
+    visualOffsetTop: 0,
+    scrollY: 12,
+    horizontalOverflow: 0,
+    layoutShift: 0,
+    viewport: { top: 0, bottom: 430, left: 0, right: 390 },
+    field: { top: 100, bottom: 140, left: 20, right: 370 },
+    fieldHit: true,
+    action: { top: 200, bottom: 240, left: 20, right: 370 },
+    actionHit: true,
+    focused: true,
+    actionReachable: true,
+    anchorStable: true,
+    safeAreaCorrect: true,
+    sheetUnclipped: true,
+    domValue: 'fixture@example.test',
+    appValue: 'fixture@example.test',
+    valid: true,
+    nodeId: 'input-1',
+    submitCount: 1,
+    restored: true,
+    viewportOscillations: 0,
+  }));
+const context = { screenId, headSha: HEAD };
+const record = cell => ({
+  cellId: cell.id,
+  status: 'PASS',
+  kind: 'real-device',
+  headSha: HEAD,
+  servedBuildSha: HEAD,
+  operator: 'fixture-operator',
+  url: 'https://deployment.example/unfazed',
+  buildIdentity: asset(),
+  osVersion: 'fixture-os',
+  browserVersion: 'fixture-browser',
+  device: cell.device,
+  inputUiVersion: 'fixture-ui',
+  capturedAt: '2026-10-15T00:00:00Z',
+  recording: asset(),
+  screenshots: Object.fromEntries(
+    INPUT_MATRIX.phases.map(phase => [phase, asset()])
+  ),
+  scenarios: Object.fromEntries(
+    cell.scenarios.map(scenario => [scenario, 'PASS'])
+  ),
+  viewportUnits: { vh: 'PASS', dvh: 'PASS', svh: 'PASS' },
+  samples: samples(),
+});
+const evidence = () => ({
+  schema: INPUT_SCHEMA,
+  records: inputCells(screenId).map(record),
+});
+
+// These are detector unit inputs, never real-device certification evidence.
+test('matrix composes JOV-6061 and JOV-7713, with sorted unique environments/journeys and explicit debt', () => {
+  assert.equal(INPUT_MATRIX.certificationContract, 'jovie.certification/v1');
+  assert.deepEqual(INPUT_MATRIX.owners, ['JOV-6061', 'JOV-7201', 'JOV-7713']);
+  for (const collection of [INPUT_MATRIX.environments, INPUT_MATRIX.journeys]) {
+    const ids = collection.map(item => item.id);
+    assert.deepEqual(ids, [...new Set(ids)].sort());
+  }
+  const platformSource = readFileSync(INPUT_MATRIX.platformAuthority, 'utf8');
+  for (const env of INPUT_MATRIX.environments) {
+    assert.ok(platformSource.includes(`id: '${env.platformRef}'`));
+    assert.ok(['SUPPORTED', 'UNKNOWN', 'BLOCKED'].includes(env.support));
+    if (env.support !== 'SUPPORTED') assert.ok(env.reason);
+  }
+  for (const journey of INPUT_MATRIX.journeys) {
+    assert.ok(existsSync(journey.source), journey.source);
+    assert.ok(['UNKNOWN', 'BLOCKED'].includes(journey.evidence));
+    for (const field of journey.fields)
+      assert.ok(INPUT_MATRIX.semantics[field]);
+  }
+  assert.equal(INPUT_MATRIX.historicalEscapes[0].captureStatus, 'BLOCKED');
+  assert.equal(INPUT_MATRIX.historicalEscapes[0].captureRef, null);
+  const historical = JSON.parse(
+    readFileSync(INPUT_MATRIX.historicalEscapes[0].corpusRef, 'utf8')
+  );
+  assert.equal(historical.replayStatus, 'BLOCKED');
+  assert.equal(historical.commissioningIssue, 'JOV-8387');
+});
+
+test('all declared semantic roles reject wrong type/token/mode, unlabeled or hidden fields', () => {
+  for (const [role, spec] of Object.entries(INPUT_MATRIX.semantics)) {
+    const field = {
+      role,
+      type: spec.types[0],
+      autocomplete: spec.autocomplete,
+      inputmode: spec.inputmode,
+      name: role,
+      label: role,
+      visible: true,
+    };
+    assert.deepEqual(semanticFindings([field], [role]), []);
+    for (const patch of [
+      { type: 'search' },
+      { autocomplete: '' },
+      { autocomplete: 'off' },
+      { inputmode: 'none' },
+      { name: '' },
+      { label: '' },
+      { visible: false },
+    ])
+      assert.ok(semanticFindings([{ ...field, ...patch }], [role]).length);
+    assert.ok(
+      semanticFindings(
+        [field, { ...field, role: null, visible: false }],
+        [role]
+      ).some(f => f.includes('autofill-decoy'))
+    );
+  }
+});
+
+test('deliberate red fixtures block each founder-escape failure boundary', () => {
+  /** @type {[string, (states: ReturnType<typeof samples>) => void, string][]} */
+  const red = [
+    [
+      'missing autocomplete',
+      states => {
+        states[0].fields[0].autocomplete = '';
+      },
+      'semantics:email:invalid',
+    ],
+    [
+      'wrong autocomplete',
+      states => {
+        states[0].fields[0].autocomplete = 'current-password';
+      },
+      'semantics:email:invalid',
+    ],
+    [
+      'fixed CTA behind keyboard',
+      states => {
+        states[2].actionReachable = false;
+      },
+      'action-unreachable',
+    ],
+    [
+      'input under browser chrome',
+      states => {
+        states[2].viewport.top = 150;
+      },
+      'field-obscured',
+    ],
+    [
+      'unstable vh jump',
+      states => {
+        states[2].layoutShift = 0.2;
+      },
+      'layout-jank',
+    ],
+    [
+      'stale autofill state',
+      states => {
+        states[3].appValue = '';
+      },
+      'stale-state',
+    ],
+    [
+      'hidden duplicate email',
+      states => {
+        states[0].fields.push({
+          ...states[0].fields[0],
+          role: null,
+          visible: false,
+        });
+      },
+      'autofill-decoy',
+    ],
+    [
+      'sticky nav toolbar keyboard trap',
+      states => {
+        states[2].actionReachable = false;
+        states[2].safeAreaCorrect = false;
+      },
+      'action-unreachable',
+    ],
+    [
+      'scroll reset',
+      states => {
+        states[3].scrollY = 0;
+      },
+      'scroll-reset',
+    ],
+    [
+      'focus loss',
+      states => {
+        states[3].focused = false;
+      },
+      'focus-lost',
+    ],
+    [
+      'remount',
+      states => {
+        states[3].nodeId = 'input-2';
+      },
+      'remount',
+    ],
+    [
+      'duplicate submit',
+      states => {
+        states[5].submitCount = 2;
+      },
+      'duplicate',
+    ],
+    [
+      'broken dismissal',
+      states => {
+        states[4].restored = false;
+      },
+      'not-restored',
+    ],
+    [
+      'broken retry',
+      states => {
+        states[6].restored = false;
+      },
+      'not-restored',
+    ],
+    [
+      'oscillation',
+      states => {
+        states[2].viewportOscillations = 2;
+      },
+      'oscillation',
+    ],
+    [
+      'overflow',
+      states => {
+        states[2].horizontalOverflow = 6;
+      },
+      'layout-jank',
+    ],
+    [
+      'clipped sheet',
+      states => {
+        states[2].sheetUnclipped = false;
+      },
+      'chrome-safe-area-or-sheet',
+    ],
+  ];
+  assert.deepEqual(transitionFindings(samples(), ['email', 'tel']), []);
+  const hiddenAction = samples();
+  hiddenAction[2].action.top = 600;
+  hiddenAction[2].action.bottom = 640;
+  assert.ok(
+    transitionFindings(hiddenAction, ['email', 'tel']).some(f =>
+      f.includes('action-unreachable')
+    )
+  );
+  for (const [name, mutate, reason] of red) {
+    const states = samples();
+    mutate(states);
+    assert.ok(
+      transitionFindings(states, ['email', 'tel']).some(f =>
+        f.includes(reason)
+      ),
+      name
+    );
+  }
+  assert.ok(
+    transitionFindings([], ['email']).includes(
+      'transitions:missing-or-unordered'
+    )
+  );
+  const incomplete = samples();
+  incomplete[2].visualHeight = null;
+  assert.ok(
+    transitionFindings(incomplete, ['email']).some(f =>
+      f.includes('viewport-unmeasured')
+    )
+  );
+});
+
+test('resting state and synthetic fill cannot pass; every native cell requires exact-build device evidence', () => {
+  const missing = browserInputVerdict(undefined, context);
+  assert.equal(missing.status, 'UNKNOWN');
+  assert.equal(missing.rows.length, inputCells(screenId).length);
+  assert.equal(browserInputVerdict(evidence(), context).status, 'BLOCKED');
+  const supported = {
+    ...INPUT_MATRIX,
+    environments: INPUT_MATRIX.environments.filter(
+      env => env.support === 'SUPPORTED'
+    ),
+  };
+  assert.equal(
+    browserInputVerdict(evidence(), { ...context, matrix: supported }).status,
+    'PASS'
+  );
+  for (const mutate of [
+    proof => {
+      proof.schema = 'wrong';
+    },
+    proof => {
+      proof.records[0].kind = 'playwright-resize';
+    },
+    proof => {
+      proof.records[0].headSha = 'c'.repeat(40);
+    },
+    proof => {
+      proof.records[0].servedBuildSha = 'd'.repeat(40);
+    },
+    proof => {
+      proof.records[0].recording = null;
+    },
+    proof => {
+      delete proof.records[0].screenshots.focused;
+    },
+    proof => {
+      proof.records[0].samples = [];
+    },
+    proof => {
+      proof.records[0].scenarios.keyboard = 'UNKNOWN';
+    },
+    proof => {
+      proof.records[0].viewportUnits.dvh = 'BLOCKED';
+    },
+    proof => {
+      proof.records.push(proof.records[0]);
+    },
+    proof => {
+      proof.records[0].operator = '';
+    },
+  ]) {
+    const proof = evidence();
+    mutate(proof);
+    assert.equal(
+      browserInputVerdict(proof, { ...context, matrix: supported }).status,
+      'BLOCKED'
+    );
+  }
+  assert.equal(
+    browserInputVerdict({ ...evidence(), records: [] }, context).status,
+    'UNKNOWN'
+  );
+  assert.deepEqual(
+    browserInputFindings(undefined, {
+      screenId: 'web.homepage',
+      headSha: HEAD,
+    }),
+    []
+  );
+});
+
+test('certification and screen-audit both block a green resting profile lacking browser-owned UI proof', () => {
+  const screen = {
+    id: screenId,
+    sources: [],
+    viewports: [],
+    platform: 'web',
+    owner: 'public-profile',
+  };
+  const findings = evaluateScreenProof(
+    { schema: 'screen-browser-proof/v1' },
+    { screen, headSha: HEAD }
+  );
+  assert.ok(
+    findings.some(
+      f => f.includes('browser-owned-input') && f.includes('UNKNOWN')
+    )
+  );
+  assert.ok(
+    findings
+      .filter(f => f.startsWith('browser-owned-input'))
+      .every(isMissingDeviceEvidence)
+  );
+  const duplicated = browserInputFindings(
+    {
+      records: [
+        { cellId: 'get-updates/android-chrome/android-current-portrait' },
+        { cellId: 'get-updates/android-chrome/android-current-portrait' },
+      ],
+    },
+    { screenId, headSha: HEAD }
+  );
+  assert.ok(
+    duplicated.some(
+      f => f.includes(': BLOCKED:') && !isMissingDeviceEvidence(f)
+    )
+  );
+  const ledger = auditScreens({
+    registry: [screen],
+    headSha: HEAD,
+    routeDom: new Map([['/unfazed', [{ viewport: 'mobile', findings: [] }]]]),
+  });
+  assert.equal(ledger.screens[0].verdict, 'red');
+  assert.ok(
+    ledger.screens[0].findings.some(f => f.includes('browser-owned-input'))
+  );
+});
+
+const ARTIST_PAY_SOURCES = [
+  'apps/web/app/[username]/pay/page.tsx',
+  'apps/web/components/features/profile/views/PayView.tsx',
+  'apps/web/components/features/profile/views/ProfileIntentPage.tsx',
+  'apps/web/components/organisms/PaySection.tsx',
+];
+const BROWSER_EMAIL_FIELD =
+  /(?:type|autoComplete|autocomplete|inputMode|inputmode)\s*=\s*['"]email['"]/;
+
+test('artist pay owes browser-owned email evidence only when its surface hosts that field', () => {
+  const hosted = ARTIST_PAY_SOURCES.some(path =>
+    BROWSER_EMAIL_FIELD.test(readFileSync(path, 'utf8'))
+  );
+  const bound = INPUT_MATRIX.journeys.some(
+    journey =>
+      journey.fields.includes('email') &&
+      journey.screens.includes('web.artist-pay')
+  );
+  assert.equal(bound, hosted);
+  if (hosted) return;
+  assert.deepEqual(inputCells('web.artist-pay'), []);
+  assert.deepEqual(
+    browserInputFindings(undefined, {
+      screenId: 'web.artist-pay',
+      headSha: HEAD,
+    }),
+    []
+  );
+  const pay = auditScreens({
+    registry: [
+      {
+        id: 'web.artist-pay',
+        platform: 'web',
+        owner: 'artist-pay',
+        sources: ['apps/web/app/[username]/pay/page.tsx'],
+        viewports: ['desktop', 'mobile'],
+      },
+    ],
+    headSha: HEAD,
+  });
+  assert.equal(pay.screens[0].producer, 'none');
+  assert.equal(pay.screens[0].verdict, 'uncovered');
+  assert.deepEqual(pay.screens[0].findings, []);
+  assert.equal(
+    remediationPlans(pay).some(
+      plan => plan.fingerprint === 'screen-audit:web.artist-pay'
+    ),
+    false
+  );
+});
+
+const SETTINGS_BILLING_SOURCES = [
+  'apps/web/app/app/(shell)/settings/billing/page.tsx',
+  'apps/web/components/features/dashboard/organisms/SettingsBillingSection.tsx',
+];
+
+test('settings billing owes payment-tip evidence only when its surface hosts an email field', () => {
+  const hosted = SETTINGS_BILLING_SOURCES.some(path =>
+    BROWSER_EMAIL_FIELD.test(readFileSync(path, 'utf8'))
+  );
+  const bound = INPUT_MATRIX.journeys.some(
+    journey =>
+      journey.id === 'payment-tip' &&
+      journey.screens.includes('web.settings-billing')
+  );
+  assert.equal(bound, hosted);
+  if (hosted) return;
+  assert.deepEqual(inputCells('web.settings-billing'), []);
+  assert.deepEqual(
+    browserInputFindings(undefined, {
+      screenId: 'web.settings-billing',
+      headSha: HEAD,
+    }),
+    []
+  );
+  const billing = auditScreens({
+    registry: [
+      {
+        id: 'web.settings-billing',
+        platform: 'web',
+        owner: 'screen.settings.billing',
+        sources: SETTINGS_BILLING_SOURCES,
+        viewports: ['desktop', 'mobile'],
+      },
+    ],
+    headSha: HEAD,
+  });
+  assert.equal(billing.screens[0].producer, 'none');
+  assert.equal(billing.screens[0].verdict, 'uncovered');
+  assert.deepEqual(billing.screens[0].findings, []);
+  assert.equal(
+    remediationPlans(billing).some(
+      plan => plan.fingerprint === 'screen-audit:web.settings-billing'
+    ),
+    false
+  );
+});
+
+const ARTIST_PROFILE_SETTINGS_ROOTS = [
+  'apps/web/app/app/(shell)/settings/profile',
+  'apps/web/app/app/(shell)/settings/artist-profile',
+  'apps/web/app/app/(shell)/tipping',
+  'apps/web/components/features/dashboard/organisms/settings-profile-section',
+  'apps/web/components/features/dashboard/organisms/SettingsPaySection.tsx',
+  'apps/web/components/features/dashboard/molecules/ProfilePaySurface.tsx',
+  'apps/web/components/features/dashboard/organisms/shopify',
+  'apps/web/app/app/(shell)/library/ArtistRulesSheet.tsx',
+];
+const BROWSER_TEL_FIELD =
+  /(?:type|autoComplete|autocomplete|inputMode|inputmode)\s*=\s*['"]tel['"]/;
+
+function artistProfileSettingsSources(entry, found = []) {
+  for (const path of Array.isArray(entry) ? entry : [entry]) {
+    if (statSync(path).isDirectory()) {
+      for (const child of readdirSync(path, { withFileTypes: true })) {
+        artistProfileSettingsSources(join(path, child.name), found);
+      }
+      continue;
+    }
+    if (
+      /\.(?:ts|tsx)$/.test(path) &&
+      !/\.(?:test|stories)\.(?:ts|tsx)$/.test(path)
+    )
+      found.push(path);
+  }
+  return found;
+}
+
+test('settings artist profile owes contact and tip device cells only for fields it hosts', () => {
+  const sources = artistProfileSettingsSources(ARTIST_PROFILE_SETTINGS_ROOTS);
+  const hosted = {
+    'account-contact':
+      surfaceHosts(sources, BROWSER_EMAIL_FIELD) ||
+      surfaceHosts(sources, BROWSER_TEL_FIELD),
+    'payment-tip': surfaceHosts(sources, BROWSER_EMAIL_FIELD),
+  };
+  const screenId = 'web.settings-artist-profile';
+  for (const [id, present] of Object.entries(hosted)) {
+    const bound = INPUT_MATRIX.journeys.some(
+      journey => journey.id === id && journey.screens.includes(screenId)
+    );
+    assert.equal(bound, present, id);
+  }
+  if (Object.values(hosted).some(Boolean)) return;
+  assert.deepEqual(inputCells(screenId), []);
+  assert.deepEqual(
+    browserInputFindings(undefined, { screenId, headSha: HEAD }),
+    []
+  );
+  const profile = auditScreens({
+    registry: [
+      {
+        id: screenId,
+        platform: 'web',
+        owner: 'settings-artist-profile',
+        sources: ARTIST_PROFILE_SETTINGS_ROOTS,
+        viewports: ['desktop', 'mobile'],
+      },
+    ],
+    headSha: HEAD,
+  });
+  assert.equal(profile.screens[0].producer, 'none');
+  assert.equal(profile.screens[0].verdict, 'uncovered');
+  assert.deepEqual(profile.screens[0].findings, []);
+  assert.equal(
+    remediationPlans(profile).some(
+      plan => plan.fingerprint === 'screen-audit:web.settings-artist-profile'
+    ),
+    false
+  );
+});
+
+function surfaceHosts(paths, pattern) {
+  return paths.some(path => pattern.test(readFileSync(path, 'utf8')));
+}
+
+const WEB_AUTH_SOURCES = [
+  'apps/web/app/(auth)',
+  'apps/web/app/@auth',
+  'apps/web/app/auth-return',
+  'apps/web/app/desktop-auth',
+  'apps/web/app/mobile-auth-return',
+  'apps/web/components/features/auth',
+];
+const HOSTED_PASSWORD_FIELD =
+  /(?:type|autoComplete|autocomplete)\s*=\s*['"](?:password|current-password|new-password|username)['"]/;
+const HOSTED_WEBAUTHN_FIELD =
+  /(?:autoComplete|autocomplete)\s*=\s*['"][^'"]*webauthn[^'"]*['"]/;
+const HOSTED_EMAIL_FIELD =
+  /(?:type|autoComplete|autocomplete|inputMode|inputmode)\s*=\s*['"]email['"]/;
+const HOSTED_OTP_FIELD =
+  /(?:autoComplete|autocomplete)\s*=\s*['"]one-time-code['"]/;
+
+function webAuthSources(dir, found = []) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) webAuthSources(path, found);
+    else if (
+      /\.(?:ts|tsx)$/.test(entry.name) &&
+      !/\.(?:test|stories)\.(?:ts|tsx)$/.test(entry.name)
+    )
+      found.push(path);
+  }
+  return found;
+}
+
+function webAuthHosts(pattern) {
+  return WEB_AUTH_SOURCES.flatMap(dir => webAuthSources(dir)).some(path =>
+    pattern.test(readFileSync(path, 'utf8'))
+  );
+}
+
+test('web auth device cells follow fields the auth routes actually host', () => {
+  const hosted = {
+    'auth-credentials': webAuthHosts(HOSTED_PASSWORD_FIELD),
+    'auth-email': webAuthHosts(HOSTED_EMAIL_FIELD),
+    'auth-otp': webAuthHosts(HOSTED_OTP_FIELD),
+    'auth-passkey': webAuthHosts(HOSTED_WEBAUTHN_FIELD),
+  };
+  for (const [id, present] of Object.entries(hosted)) {
+    const bound = INPUT_MATRIX.journeys.some(
+      journey => journey.id === id && journey.screens.includes('web.auth')
+    );
+    assert.equal(bound, present, id);
+  }
+  const findings = browserInputFindings(undefined, {
+    screenId: 'web.auth',
+    headSha: HEAD,
+  });
+  assert.equal(
+    findings.filter(
+      finding =>
+        finding.includes('auth-credentials/') ||
+        finding.includes('auth-passkey/')
+    ).length,
+    0
+  );
+  assert.ok(
+    findings.some(
+      finding =>
+        finding.startsWith('browser-owned-input auth-email/') &&
+        isMissingDeviceEvidence(finding)
+    )
+  );
+  assert.ok(
+    findings.some(
+      finding =>
+        finding.startsWith('browser-owned-input auth-otp/') &&
+        isMissingDeviceEvidence(finding)
+    )
+  );
+  const auth = auditScreens({
+    registry: [
+      {
+        id: 'web.auth',
+        platform: 'web',
+        owner: 'browser-input-assurance',
+        sources: WEB_AUTH_SOURCES,
+        viewports: ['desktop', 'mobile'],
+      },
+    ],
+    headSha: HEAD,
+  });
+  assert.equal(auth.screens[0].producer, 'none');
+  assert.equal(auth.screens[0].verdict, 'red');
+  assert.ok(
+    auth.screens[0].findings.every(
+      finding =>
+        isMissingDeviceEvidence(finding) &&
+        (finding.includes('auth-email/') || finding.includes('auth-otp/'))
+    )
+  );
+  const plan = remediationPlans(auth).find(
+    item => item.fingerprint === 'screen-audit:web.auth'
+  );
+  assert.ok(plan);
+  assert.equal(plan.description.includes('auth-credentials/'), false);
+  assert.equal(plan.description.includes('auth-passkey/'), false);
+  assert.equal(plan.description.includes('auth-email/'), true);
+  assert.equal(plan.description.includes('auth-otp/'), true);
+});
+
+const HOSTED_TEL_FIELD =
+  /(?:type|autoComplete|autocomplete|inputMode|inputmode)\s*=\s*['"]tel['"]/;
+
+test('settings shell owes account-contact cells only when it hosts email and tel', () => {
+  const screen = SCREEN_REGISTRY.find(entry => entry.id === 'web.settings');
+  assert.ok(screen);
+  const sources = screen.sources.map(path => readFileSync(path, 'utf8'));
+  const hosted =
+    sources.some(source => HOSTED_EMAIL_FIELD.test(source)) &&
+    sources.some(source => HOSTED_TEL_FIELD.test(source));
+  const bound = INPUT_MATRIX.journeys.some(
+    journey =>
+      journey.id === 'account-contact' &&
+      journey.screens.includes('web.settings')
+  );
+  assert.equal(bound, hosted);
+  const accountContact = browserInputFindings(undefined, {
+    screenId: 'web.settings',
+    headSha: HEAD,
+  }).filter(finding => finding.includes('account-contact/'));
+  if (hosted) {
+    assert.equal(accountContact.length, 16);
+    assert.ok(accountContact.every(isMissingDeviceEvidence));
+    return;
+  }
+  assert.deepEqual(accountContact, []);
+  assert.equal(
+    inputCells('web.settings').some(cell =>
+      cell.id.startsWith('account-contact/')
+    ),
+    false
+  );
+  const settings = auditScreens({
+    registry: [screen],
+    headSha: HEAD,
+  });
+  assert.equal(settings.screens[0].producer, 'none');
+  assert.equal(settings.screens[0].verdict, 'uncovered');
+  assert.deepEqual(settings.screens[0].findings, []);
+  assert.equal(
+    remediationPlans(settings).some(
+      plan => plan.fingerprint === 'screen-audit:web.settings'
+    ),
+    false
+  );
+});
+
+const BROWSER_CONTACT_FIELD =
+  /(?:type|autoComplete|autocomplete|inputMode|inputmode)\s*=\s*['"](?:email|tel)['"]/;
+
+function filesUnder(source) {
+  if (!existsSync(source)) return [];
+  let entries;
+  try {
+    entries = readdirSync(source, { withFileTypes: true });
+  } catch {
+    return [source];
+  }
+  return entries.flatMap(entry => {
+    const path = join(source, entry.name);
+    return entry.isDirectory() ? filesUnder(path) : [path];
+  });
+}
+
+test('dashboard contacts owes account-contact evidence only when its surface hosts email or phone inputs', () => {
+  const screen = SCREEN_REGISTRY.find(
+    item => item.id === 'web.dashboard-contacts'
+  );
+  assert.ok(screen);
+  const hosted = screen.sources
+    .flatMap(filesUnder)
+    .some(path => BROWSER_CONTACT_FIELD.test(readFileSync(path, 'utf8')));
+  const bound = INPUT_MATRIX.journeys.some(
+    journey =>
+      journey.id === 'account-contact' &&
+      journey.fields.some(field => field === 'email' || field === 'tel') &&
+      journey.screens.includes('web.dashboard-contacts')
+  );
+  assert.equal(bound, hosted);
+  if (hosted) return;
+  assert.deepEqual(inputCells('web.dashboard-contacts'), []);
+  assert.deepEqual(
+    browserInputFindings(undefined, {
+      screenId: 'web.dashboard-contacts',
+      headSha: HEAD,
+    }),
+    []
+  );
+  const ledger = auditScreens({
+    registry: [screen],
+    headSha: HEAD,
+  });
+  assert.equal(ledger.screens[0].producer, 'none');
+  assert.equal(ledger.screens[0].verdict, 'uncovered');
+  assert.deepEqual(ledger.screens[0].findings, []);
+  assert.equal(
+    remediationPlans(ledger).some(
+      plan => plan.fingerprint === 'screen-audit:web.dashboard-contacts'
+    ),
+    false
+  );
+});

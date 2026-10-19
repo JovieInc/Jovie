@@ -10,6 +10,7 @@ import { and, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { getDspArtistImageUrl } from '@/lib/dsp-enrichment/artist-image';
 import type { DspMatchStatus } from '@/lib/dsp-enrichment/types';
 
 const MAX_MATCHES = 200;
@@ -64,6 +65,7 @@ export async function getDspMatchesForProfile(
       matchingUpcCount: dspArtistMatches.matchingUpcCount,
       totalTracksChecked: dspArtistMatches.totalTracksChecked,
       status: dspArtistMatches.status,
+      matchSource: dspArtistMatches.matchSource,
       createdAt: dspArtistMatches.createdAt,
       updatedAt: dspArtistMatches.updatedAt,
     })
@@ -75,6 +77,7 @@ export async function getDspMatchesForProfile(
   // Transform decimal to number for JSON-compatible output
   return matches.map(match => ({
     ...match,
+    externalArtistImageUrl: getDspArtistImageUrl(match),
     confidenceScore: match.confidenceScore
       ? Number.parseFloat(match.confidenceScore)
       : null,

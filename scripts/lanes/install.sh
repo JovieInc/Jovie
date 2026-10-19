@@ -14,6 +14,7 @@ here="$(cd "$(dirname "$0")" && pwd)"
 mkdir -p "$state"
 LANES_STATE="$state" LANES_REPO="$repo" python3 "$here/lane_runner.py" update
 tick="python3 $state/current/lane_runner.py update; python3 $state/current/codex_lane.py reconcile --if-due $ledger_cadence; exec python3 $state/current/lane_runner.py dispatch"
+watchdog="exec python3 $state/current/factory_watchdog.py"
 # Pin timers to the Node selected by the installing shell.
 node_dir="$(dirname "$(command -v node)")"
 path="$node_dir:$HOME/.local/bin:$HOME/.npm-global/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
@@ -34,6 +35,7 @@ LANES_STATE="$state" python3 "$state/current/codex_lane.py" install-receipt \
 
 if [ "$(uname)" = "Darwin" ]; then
   plist="$HOME/Library/LaunchAgents/com.jovie.lanes.plist"
+  watchdog_plist="$HOME/Library/LaunchAgents/com.jovie.lanes-watchdog.plist"
   cat >"$plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -53,8 +55,28 @@ if [ "$(uname)" = "Darwin" ]; then
   <key>StandardErrorPath</key><string>$state/tick.log</string>
 </dict></plist>
 PLIST
+  cat >"$watchdog_plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.jovie.lanes-watchdog</string>
+  <key>ProgramArguments</key><array><string>/bin/bash</string><string>-c</string><string>$watchdog</string></array>
+  <key>EnvironmentVariables</key><dict>
+    <key>PATH</key><string>$path</string>
+    <key>LANES_STATE</key><string>$state</string>
+    <key>LANES_REPO</key><string>$repo</string>
+    <key>LANES_LINEAR_ENV</key><string>${LANES_LINEAR_ENV:-$HOME/.config/symphony/linear.env}</string>
+  </dict>
+  <key>StartInterval</key><integer>60</integer>
+  <key>RunAtLoad</key><true/>
+  <key>StandardOutPath</key><string>$state/watchdog.log</string>
+  <key>StandardErrorPath</key><string>$state/watchdog.log</string>
+</dict></plist>
+PLIST
   launchctl unload "$plist" 2>/dev/null || true
+  launchctl unload "$watchdog_plist" 2>/dev/null || true
   launchctl load "$plist"
+  launchctl load "$watchdog_plist"
 else
   units="$HOME/.config/systemd/user"
   mkdir -p "$units"
@@ -77,6 +99,27 @@ UNIT
 Description=Idle fallback for Jovie shipping lanes (busy slots pull work themselves)
 [Timer]
 OnCalendar=*:0/5
+Persistent=true
+[Install]
+WantedBy=timers.target
+UNIT
+  cat >"$units/jovie-lanes-watchdog.service" <<UNIT
+[Unit]
+Description=Jovie shipping lanes independent stay-up watchdog
+[Service]
+Type=oneshot
+Environment=PATH=$path
+Environment=LANES_STATE=$state
+Environment=LANES_REPO=$repo
+Environment=LANES_LINEAR_ENV=${LANES_LINEAR_ENV:-$HOME/.config/symphony/linear.env}
+ExecStart=/bin/bash -c '$watchdog'
+UNIT
+  cat >"$units/jovie-lanes-watchdog.timer" <<UNIT
+[Unit]
+Description=Verify and recover Jovie shipping lanes every minute
+[Timer]
+OnActiveSec=15s
+OnUnitActiveSec=60s
 Persistent=true
 [Install]
 WantedBy=timers.target
@@ -117,6 +160,7 @@ UNIT
   fi
   systemctl --user daemon-reload
   systemctl --user enable --now jovie-lanes.timer
+  systemctl --user enable --now jovie-lanes-watchdog.timer
   if [ "${LANES_HUD:-0}" = "1" ]; then
     systemctl --user enable jovie-hud.service
     touch "$state/hud.expected"   # the doctor raises hud-stale when the console stops updating

@@ -1,13 +1,15 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { captureError } from '@/lib/error-tracking';
 
-const mockEnforceHandleCheckRateLimit = vi.hoisted(() => vi.fn());
+const mockHandleCheckLimit = vi.hoisted(() => vi.fn());
 const mockExtractClientIP = vi.hoisted(() => vi.fn());
 const mockGetCachedHandleAvailability = vi.hoisted(() => vi.fn());
 const mockCacheHandleAvailability = vi.hoisted(() => vi.fn());
 const mockCheckOnboardingHandleAvailability = vi.hoisted(() => vi.fn());
 
-vi.mock('@/lib/onboarding/rate-limit', () => ({
-  enforceHandleCheckRateLimit: mockEnforceHandleCheckRateLimit,
+vi.mock('@/lib/rate-limit', async () => ({
+  ...(await import('@/lib/rate-limit/utils')),
+  handleCheckLimiter: { limit: mockHandleCheckLimit },
 }));
 
 vi.mock('@/lib/utils/ip-extraction', () => ({
@@ -37,7 +39,14 @@ describe('GET /api/handle/check', () => {
     vi.clearAllMocks();
     vi.resetModules();
     mockExtractClientIP.mockReturnValue('127.0.0.1');
-    mockEnforceHandleCheckRateLimit.mockResolvedValue(undefined);
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-16T18:00:00.000Z'));
+    mockHandleCheckLimit.mockResolvedValue({
+      success: true,
+      limit: 30,
+      remaining: 29,
+      reset: new Date(Date.now() + 60_000),
+    });
     mockGetCachedHandleAvailability.mockResolvedValue(null);
     mockCacheHandleAvailability.mockResolvedValue(undefined);
     mockCheckOnboardingHandleAvailability.mockResolvedValue({
@@ -45,6 +54,10 @@ describe('GET /api/handle/check', () => {
       available: true,
       reason: 'available',
     });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('returns 400 when handle is missing', async () => {
@@ -256,20 +269,86 @@ describe('GET /api/handle/check', () => {
     );
   });
 
-  it('returns 429 when rate limited', async () => {
-    mockEnforceHandleCheckRateLimit.mockRejectedValue(
-      new Error('RATE_LIMITED')
-    );
+  it('returns retry metadata without reporting an expected rate limit as an error', async () => {
+    mockHandleCheckLimit.mockResolvedValue({
+      success: false,
+      limit: 30,
+      remaining: 0,
+      reset: new Date(Date.now() + 42_100),
+    });
 
     const { GET } = await import('@/app/api/handle/check/route');
-    const request = new Request(
-      'http://localhost/api/handle/check?handle=testhandle'
+    const response = await GET(
+      new Request('http://localhost/api/handle/check?handle=testhandle')
     );
 
-    const response = await GET(request);
-    const data = await response.json();
-
     expect(response.status).toBe(429);
-    expect(data.available).toBe(false);
+    expect(await response.json()).toMatchObject({
+      handle: 'testhandle',
+      available: false,
+      reason: 'error',
+      error: 'Too many requests. Please wait.',
+    });
+    expect(response.headers.get('Retry-After')).toBe('43');
+    expect(response.headers.get('X-RateLimit-Limit')).toBe('30');
+    expect(response.headers.get('X-RateLimit-Remaining')).toBe('0');
+    expect(response.headers.get('X-RateLimit-Reset')).toBe('1792173642');
+    expect(response.headers.get('Cache-Control')).toContain('no-store');
+    expect(mockHandleCheckLimit).toHaveBeenCalledExactlyOnceWith(
+      'ip:127.0.0.1'
+    );
+    expect(mockGetCachedHandleAvailability).not.toHaveBeenCalled();
+    expect(mockCheckOnboardingHandleAvailability).not.toHaveBeenCalled();
+    expect(mockCacheHandleAvailability).not.toHaveBeenCalled();
+    expect(captureError).not.toHaveBeenCalled();
   });
+
+  it('distinguishes an unavailable rate limiter from exhausted quota', async () => {
+    mockHandleCheckLimit.mockResolvedValue({
+      success: false,
+      unavailable: true,
+      limit: 30,
+      remaining: 0,
+      reset: new Date(Date.now() + 5_000),
+    });
+
+    const { GET } = await import('@/app/api/handle/check/route');
+    const response = await GET(
+      new Request('http://localhost/api/handle/check?handle=testhandle')
+    );
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({
+      available: false,
+      error: 'Service temporarily unavailable',
+    });
+    expect(response.headers.get('Retry-After')).toBe('5');
+    expect(mockCheckOnboardingHandleAvailability).not.toHaveBeenCalled();
+    expect(captureError).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['Database timeout', 503],
+    ['Database connection failed', 500],
+    ['Unexpected RATE_LIMITED upstream failure', 500],
+  ])(
+    'still reports unexpected lookup failures: %s',
+    async (message, status) => {
+      const error = new Error(message);
+      mockCheckOnboardingHandleAvailability.mockRejectedValue(error);
+
+      const { GET } = await import('@/app/api/handle/check/route');
+      const response = await GET(
+        new Request('http://localhost/api/handle/check?handle=testhandle')
+      );
+
+      expect(response.status).toBe(status);
+      expect(await response.json()).toMatchObject({ available: false });
+      expect(captureError).toHaveBeenCalledExactlyOnceWith(
+        'Error checking handle availability',
+        error,
+        { handle: 'testhandle', route: '/api/handle/check' }
+      );
+    }
+  );
 });

@@ -62,6 +62,24 @@ describe('AboutPageContent', () => {
       'Frequently Asked Questions',
       'Ready to build your Jovie profile?',
     ]);
+    expect(screen.getByTestId('marketing-section-hero')).toHaveAttribute(
+      'data-marketing-variant',
+      'left-none'
+    );
+    expect(
+      screen.getByTestId('marketing-section-content-prose')
+    ).toHaveAttribute('data-marketing-variant', 'article-body');
+    expect(
+      screen.getByTestId('marketing-section-feature-grid')
+    ).toHaveAttribute('data-marketing-variant', 'two-column-text');
+    expect(screen.getByTestId('marketing-section-faq')).toHaveAttribute(
+      'data-marketing-variant',
+      'objection-handler'
+    );
+    expect(screen.getByTestId('marketing-section-cta')).toHaveAttribute(
+      'data-marketing-variant',
+      'final-single-claim'
+    );
     expect(screen.getByText('Tim White, Founder')).toBeVisible();
     expect(
       screen.getByRole('img', { name: 'Tim White, founder of Jovie' })

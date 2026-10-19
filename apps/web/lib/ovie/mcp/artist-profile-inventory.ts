@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { getArtistProfileCatalog } from '@/lib/connectors/artist-profile-catalog';
 import type { CertificationPass, CertLevel } from './types';
 
 export type ProfileCapability = {
@@ -204,6 +205,22 @@ export function renderArtistProfileInventory(
     item => item.launchRelevance === 'must-sell'
   )) {
     lines.push(`1. **${cap.feature}** — ${cap.proposedMission}`);
+  }
+  lines.push(
+    '',
+    '## Artist-profile connector catalog',
+    '',
+    'Live manifest projection; available means fresh, evidenced readiness, not an account grant. Full policies: GET /api/dsp/bio-sync (catalog).',
+    '',
+    '| Destination | Field | Read | Write | Evidence | Write blocker |',
+    '|---|---|---|---|---|---|'
+  );
+  for (const destination of getArtistProfileCatalog().destinations) {
+    for (const field of destination.fields) {
+      lines.push(
+        `| ${destination.id} | ${field.name} | ${field.read.available ? 'available' : field.read.support} | ${field.write.available ? 'available' : 'blocked'} | ${field.evidence.freshness} | ${field.write.blockingReason ?? 'none'} |`
+      );
+    }
   }
   return `${lines.join('\n')}\n`;
 }

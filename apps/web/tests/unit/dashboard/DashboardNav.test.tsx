@@ -337,19 +337,22 @@ describe('DashboardNav', () => {
   });
 
   it('keeps inactive New Chat distinct from a selected navigation row', () => {
-    mockUsePathname.mockReturnValue(APP_ROUTES.CALENDAR);
+    mockUsePathname.mockReturnValue(APP_ROUTES.LIBRARY);
     const { getByRole } = renderDashboardNav({
       renderFn: fastRender,
     });
 
+    const work = getByRole('link', { name: 'Work' });
     const chatLink = getByRole('link', { name: 'New Chat' });
-    expect(chatLink).toHaveClass(
-      'size-6',
-      'rounded-full',
-      'bg-foreground',
-      'text-(--color-bg-base)'
+    expect(work).toHaveAttribute('aria-current', 'page');
+    expect(work).toHaveClass('bg-sidebar-accent-active');
+    expect(chatLink).toHaveClass('size-6', 'rounded-md', 'text-sidebar-muted');
+    expect(chatLink.parentElement).toHaveAttribute(
+      'data-sidebar-history-header'
     );
     expect(chatLink).not.toHaveClass('bg-sidebar-accent-active');
+    expect(chatLink).not.toHaveClass('rounded-full');
+    expect(chatLink).not.toHaveClass('bg-foreground');
     expect(chatLink).not.toHaveAttribute('aria-current');
   });
 

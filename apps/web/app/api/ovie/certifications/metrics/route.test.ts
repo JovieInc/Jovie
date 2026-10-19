@@ -4,6 +4,8 @@ import {
   memoryCertificationBackend,
 } from '@/lib/ovie/certifications/fixtures';
 import type { CertificationPacketFileRead } from '@/lib/ovie/certifications/packet-files.server';
+import { QUALITY_OUTCOME_RECEIPT_SCHEMA } from '@/lib/ovie/certifications/quality-scoreboard';
+import { recordQualityOutcomeReceipt } from '@/lib/ovie/certifications/quality-scoreboard-ledger';
 import { GET } from './route';
 
 const mocks = vi.hoisted(() => ({
@@ -81,6 +83,11 @@ describe('GET /api/ovie/certifications/metrics', () => {
     const body = await response.json();
 
     expect(body.contract).toBe('jovie.certification-metrics/v1');
+    expect(body.qualityScoreboard).toMatchObject({
+      contract: 'jovie.summer-quality-scoreboard/v1',
+      source: { status: 'disconnected', receiptCount: 0 },
+      engineeringActivity: { role: 'diagnostic_only' },
+    });
     expect(Object.keys(body.lanes).sort()).toEqual(['jov', 'lyb', 'ovie']);
     const jov = body.lanes.jov;
     for (const key of [
@@ -112,22 +119,78 @@ describe('GET /api/ovie/certifications/metrics', () => {
   });
 
   it('counts founder-facing Summer cards toward cards per day', async () => {
+    // One day before the clock this test actually runs, so the card stays
+    // inside the 30-day metrics window after the wall clock moves.
+    const createdAt = new Date(Date.now() - 86_400_000).toISOString();
     mocks.cards.mockResolvedValue([
       {
         id: 'sc_1',
         kind: 'taste',
         product: 'jov',
-        createdAt: '2026-09-20T00:00:00.000Z',
+        createdAt,
       },
       {
         id: 'sc_2',
         kind: 'spend', // not founder-facing: excluded
         product: 'jov',
-        createdAt: '2026-09-20T00:00:00.000Z',
+        createdAt,
       },
     ]);
     const body = await (await GET(request())).json();
     expect(body.lanes.jov.founderCardsPerDay.sampleSize).toBe(1);
     expect(body.lanes.jov.founderCardsPerDay.value).toBeGreaterThan(0);
+  });
+
+  it('projects exact before, after, deploy, and retest evidence from the durable ledger', async () => {
+    const backend = memoryCertificationBackend();
+    const now = new Date().toISOString();
+    const link = (ref: string) => ({ ref, observedAt: now });
+    await recordQualityOutcomeReceipt({
+      backend,
+      recordedAt: now,
+      receipt: {
+        schema: QUALITY_OUTCOME_RECEIPT_SCHEMA,
+        id: 'verified-profile-freshness',
+        kind: 'verified_improvement',
+        product: 'jov',
+        affectedSurface: 'public-profile',
+        occurredAt: now,
+        authority: {
+          producer: 'certification',
+          receipt: link('certification://profile-freshness'),
+        },
+        customerOutcome: 'Visitors receive a fresh public profile.',
+        desiredDirection: 'increase',
+        before: {
+          value: 72,
+          unit: 'fresh_profiles_percent',
+          evidence: link('analytics://profile-freshness/before'),
+        },
+        after: {
+          value: 99,
+          unit: 'fresh_profiles_percent',
+          evidence: link('analytics://profile-freshness/after'),
+        },
+        deployment: {
+          commitSha: 'a'.repeat(40),
+          deploymentId: 'production-profile-001',
+          deployed: link('deploy://production-profile-001'),
+          retest: link('retest://production-profile-001'),
+        },
+      },
+    });
+    mocks.backend.mockReturnValue(backend);
+
+    const body = await (await GET(request())).json();
+    expect(
+      body.qualityScoreboard.productOutcomes.views.verifiedImprovements[0]
+    ).toMatchObject({
+      before: { evidence: { ref: 'analytics://profile-freshness/before' } },
+      after: { evidence: { ref: 'analytics://profile-freshness/after' } },
+      deployment: {
+        deployed: { ref: 'deploy://production-profile-001' },
+        retest: { ref: 'retest://production-profile-001' },
+      },
+    });
   });
 });

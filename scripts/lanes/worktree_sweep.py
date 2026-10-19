@@ -33,6 +33,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from disk_guard import LOW_PCT as DISK_LOW_PCT, ensure_sbin_on_path  # noqa: E402  (sibling module of the release)
+import git_housekeeping  # noqa: E402  (detached git maintenance vs cleanup)
 import lifecycle  # noqa: E402
 
 PRESERVED_REPAIR = ".jovie-preserved-repair.json"
@@ -116,8 +117,9 @@ def linked_worktrees(repo: Path, run) -> list[tuple[Path, str | None]]:
 
 
 def git(path: Path, run, *args, timeout=300, env=None):
+    merged = git_housekeeping.apply_housekeeping_env({**os.environ, **(env or {})})
     return run(["git", "-C", str(path), *args], capture_output=True, text=True, timeout=timeout,
-               env={**os.environ, **env} if env else None)
+               env=merged)
 
 
 def inspect(path: Path, run) -> dict | None:
@@ -242,11 +244,12 @@ def retire(repo: Path, path: Path, branch: str | None, live: set[Path], report: 
             report["stripped"].append(str(path))
             return
         report["backups"].append(saved)
-    removed = git(repo, run, "worktree", "remove", "--force", str(path), timeout=900)
-    if removed.returncode == 0:
+    removed, error = git_housekeeping.remove_linked_worktree(
+        lambda args: git(repo, run, *args, timeout=900), path)
+    if removed:
         report["removed"].append({"path": str(path), "reason": reason})
     else:
-        report["errors"].append(f"remove:{path}:{removed.stderr.strip()[:120]}")
+        report["errors"].append(f"remove:{path}:{error[:120]}")
 
 
 def sweep(repos: list[Path], roots: list[Path], never: list[Path], *, run=lifecycle.run,

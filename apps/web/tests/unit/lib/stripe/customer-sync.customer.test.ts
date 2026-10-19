@@ -24,6 +24,7 @@ const mocks = vi.hoisted(() => ({
     stripeCustomerId: Symbol('users.stripeCustomerId'),
   },
   withDbSession: vi.fn(),
+  withDbSessionTx: vi.fn(),
 }));
 
 vi.mock('server-only', () => ({}));
@@ -32,6 +33,7 @@ vi.mock('@/lib/auth/cached', () => ({
 }));
 vi.mock('@/lib/auth/session', () => ({
   withDbSession: mocks.withDbSession,
+  withDbSessionTx: mocks.withDbSessionTx,
 }));
 vi.mock('@/lib/db', () => ({
   db: {
@@ -64,6 +66,7 @@ vi.mock('@/lib/stripe/customer-sync/queries', () => ({
 vi.mock('drizzle-orm', () => ({
   and: vi.fn((...conditions: unknown[]) => ({ conditions, type: 'and' })),
   eq: vi.fn((left: unknown, right: unknown) => ({ left, right, type: 'eq' })),
+  isNull: vi.fn((column: unknown) => ({ column, type: 'isNull' })),
   sql: vi.fn((strings: unknown, ...values: unknown[]) => ({ strings, values })),
 }));
 
@@ -76,6 +79,10 @@ describe('ensureStripeCustomer', () => {
     mocks.withDbSession.mockImplementation(
       async (operation: (appUserId: string) => Promise<unknown>) =>
         operation(APP_USER_ID)
+    );
+    mocks.withDbSessionTx.mockImplementation(
+      async (operation: (tx: unknown) => Promise<unknown>) =>
+        operation({ insert: mocks.dbInsert, update: mocks.dbUpdate })
     );
   });
 
@@ -136,6 +143,7 @@ describe('ensureStripeCustomer', () => {
       conditions: [
         { left: mocks.usersTable.id, right: APP_USER_ID, type: 'eq' },
         { left: mocks.usersTable.billingVersion, right: 1, type: 'eq' },
+        { column: mocks.usersTable.stripeCustomerId, type: 'isNull' },
       ],
       type: 'and',
     });

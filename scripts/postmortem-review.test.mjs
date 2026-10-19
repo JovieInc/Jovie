@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
+import { load as yamlLoad } from 'js-yaml';
+import { validateEscapedDefectClosureEvidence } from './lib/escaped-defect-closure.mjs';
+import { assertEventDrivenLearning } from './lib/learning-trigger.mjs';
 import {
   buildReviewReport,
   findUnownedSystemicControls,
@@ -14,6 +18,17 @@ import {
   readPostmortemDocuments,
   reviewPostmortem,
 } from './postmortem-review.mjs';
+
+/**
+ * @typedef {{
+ *   on: {
+ *     schedule?: { cron: string }[],
+ *     push?: { paths: string[] },
+ *     repository_dispatch?: { types: string[] }
+ *   },
+ *   jobs: Record<string, { steps: { run?: string }[] }>
+ * }} LearningWorkflow
+ */
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
 const TARGET_PATH = 'docs/postmortems/2026-09-26-production-freeze.md';
@@ -218,7 +233,7 @@ test('systemic controls without an issue are selected for Linear intake', () => 
   ]);
 });
 
-test('weekly grouping opens one class action and ranks rescues', () => {
+test('event-driven grouping opens one class action and ranks rescues', () => {
   const base = reviewPostmortem(fixture(), {
     'JOV-9001': {
       identifier: 'JOV-9001',
@@ -280,9 +295,25 @@ test('repository class-action registry covers every recurring class', () => {
       'green-by-implication',
       'non-convergent-control-loop',
       'pre-merge-parity-gap',
+      'serial-layer-discovery',
       'silent-production-staleness',
     ]
   );
+});
+
+test('recurring serial-layer failures fail review without their class action', () => {
+  const documents = readPostmortemDocuments(REPO_ROOT);
+  const registry = readClassActionRegistry(REPO_ROOT);
+  delete registry['serial-layer-discovery'];
+  const report = buildReviewReport({
+    documents,
+    classActionRegistry: registry,
+    generatedAt: new Date('2026-10-16T00:00:00Z'),
+  });
+  assert.equal(report.verification.patternReviewPassed, false);
+  assert.deepEqual(report.summary.recurringWithoutAction, [
+    'serial-layer-discovery',
+  ]);
 });
 
 test('GBrain mirror is only complete after digest-bound readback', async () => {
@@ -339,4 +370,123 @@ test('GBrain mirror buffers a tool-level write failure', async () => {
   assert.equal(result.status, 'buffered');
   assert.equal(result.reason, 'tool-error');
   assert.equal(calls, 2);
+});
+
+test('shipping SLO retains monitoring while only evidence events run post-mortem review', () => {
+  const shipping = /** @type {LearningWorkflow} */ (
+    yamlLoad(
+      readFileSync(
+        resolve(REPO_ROOT, '.github/workflows/shipping-slo.yml'),
+        'utf8'
+      )
+    )
+  );
+  assert.deepEqual(shipping.on.schedule, [{ cron: '13 7 * * *' }]);
+  const commands = shipping.jobs.measure.steps
+    .map(step => step.run ?? '')
+    .join('\n');
+  assert.match(commands, /shipping-slo-report\.mjs report/);
+  assert.match(commands, /shipping-slo-intake\.mjs/);
+  assert.doesNotMatch(
+    commands,
+    /postmortem|quality-gap-finder|lesson-analysis|invariant-stewardship/
+  );
+  const quality = /** @type {LearningWorkflow} */ (
+    yamlLoad(
+      readFileSync(
+        resolve(REPO_ROOT, '.github/workflows/quality-gap-finder.yml'),
+        'utf8'
+      )
+    )
+  );
+  assert.equal(quality.on.schedule, undefined);
+  assert.ok(quality.on.push.paths.includes('docs/postmortems/**'));
+  assert.deepEqual(quality.on.repository_dispatch.types, ['quality-gap-scan']);
+  assert.match(
+    quality.jobs.find.steps.map(step => step.run ?? '').join('\n'),
+    /postmortem-review\.mjs/
+  );
+});
+
+test('scheduled learning commands reject before filesystem scans or network work', () => {
+  for (const script of [
+    'postmortem-review.mjs',
+    'postmortem-review-report.mjs',
+    'quality-gap-finder.mjs',
+  ]) {
+    const result = spawnSync(
+      process.execPath,
+      [
+        resolve(REPO_ROOT, 'scripts', script),
+        '--root',
+        '/nonexistent-learning-input',
+        '--out',
+        '/nonexistent-learning-output',
+      ],
+      {
+        encoding: 'utf8',
+        timeout: 5000,
+        env: { ...process.env, GITHUB_EVENT_NAME: 'schedule' },
+      }
+    );
+    assert.ifError(result.error);
+    assert.equal(result.status, 1, script);
+    assert.equal(result.stdout, '', script);
+    assert.match(result.stderr, /scheduled-learning-retired/, script);
+    assert.doesNotMatch(result.stderr, /ENOENT|fetch failed/, script);
+  }
+  for (const event of [
+    'push',
+    'repository_dispatch',
+    'workflow_dispatch',
+    undefined,
+  ]) {
+    assert.doesNotThrow(() => assertEventDrivenLearning(event));
+  }
+});
+
+test('JOV-8068 detection gap is the JOV-7084 compiler output', () => {
+  const path = 'docs/postmortems/2026-10-14-onboarding-premature-checkout.md';
+  const source = readFileSync(resolve(REPO_ROOT, path), 'utf8');
+  const review = reviewPostmortem({ path, source });
+  assert.deepEqual(review.errors, []);
+  assert.equal(review.detectionGap.complete, true);
+  assert.equal(review.detectionGap.compilerIssue, 'JOV-7084');
+  assert.equal(review.detectionGap.schema, 'jovie.detection-gap/v1');
+  const compiled = JSON.parse(
+    readFileSync(
+      resolve(
+        REPO_ROOT,
+        'docs/postmortems/reports/jov-8068-detection-gap.json'
+      ),
+      'utf8'
+    )
+  );
+  assert.equal(compiled.schema, 'jovie.detection-gap/v1');
+  assert.equal(compiled.compilerIssue, 'JOV-7084');
+  assert.equal(compiled.originatingIssue, 'JOV-8068');
+  assert.deepEqual(compiled.detectionGap, review.detectionGap);
+});
+
+test('JOV-8068 closure marker matches the production tip', () => {
+  const receipt = readFileSync(
+    resolve(REPO_ROOT, 'docs/quality/receipts/JOV-8068.md'),
+    'utf8'
+  );
+  const match = receipt.match(
+    /<!--\s*escaped-defect-closure:v1\s*\n([\s\S]*?)\n\s*-->/
+  );
+  assert.ok(match, 'closure marker missing');
+  const evidence = JSON.parse(match[1]);
+  assert.deepEqual(
+    validateEscapedDefectClosureEvidence(evidence, {
+      issueIdentifier: 'JOV-8068',
+      expectedDeploymentSha: 'c5cf1c76aa2b7be30d283a46de914c5b23de0140',
+    }),
+    []
+  );
+  assert.equal(
+    evidence.detection.learningCompiler.outputRef,
+    'https://github.com/JovieInc/Jovie/blob/main/docs/postmortems/reports/jov-8068-detection-gap.json'
+  );
 });

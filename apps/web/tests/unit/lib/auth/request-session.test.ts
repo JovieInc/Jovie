@@ -24,6 +24,7 @@ vi.mock('react', async importOriginal => {
 });
 
 vi.mock('next/headers', () => ({
+  cookies: vi.fn(async () => ({ get: vi.fn(() => undefined) })),
   headers: mockHeaders,
 }));
 

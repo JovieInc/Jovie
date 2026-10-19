@@ -2,7 +2,10 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
-import { resolveShrinkOnlyCountEvent } from '@/lib/design/shrink-only-count-ratchet';
+import {
+  evaluateShrinkOnlyCount,
+  resolveShrinkOnlyCountEvent,
+} from '@/lib/design/shrink-only-count-ratchet';
 
 const WEB_ROOT = process.cwd();
 const WORKSPACE_SEAM_CLASS = 'px-3';
@@ -129,7 +132,8 @@ describe('workspace page optical seam contract', () => {
    * from the shared seam (`alignment.workspaceSeamX` / the
    * `--app-shell-content-padding-x` token), never from off-grid literals
    * (`px-3.5` = 14px, `px-2.5` / `pl-2.5` = 10px). Shrink-only: the literal
-   * count across the surface list may not grow; remaining count never fails.
+   * count across the surface list may not grow, and source reductions must
+   * lower the floor. Combined heads allow sibling reductions.
    */
   const WORKSPACE_SEAM_SURFACES = [
     // header
@@ -153,12 +157,10 @@ describe('workspace page optical seam contract', () => {
   ] as const;
   const OFF_GRID_X_PADDING =
     /(?<![\w-])-?(?:px|pl|pr|ps|pe|p)-(?:2\.5|3\.5)(?![\w./%])/g;
-  // Locked to origin/main bf9947c3 (2026-09-09): PageToolbar tab/menu
-  // control padding (px-2.5 ×2), LibrarySurface rail p-2.5 ×1,
-  // AppShellContentPanel outer inset px-2.5 ×1 and compact sm:px-3.5 ×1.
-  // Compact rematerialization is out of scope (detectors-only). Lower
-  // when a later PR resolves them; never raise.
-  const OFF_GRID_X_PADDING_FLOOR = 5;
+  // JOV-5923: semantic shell recovery (#19218) removed AppShellContentPanel's
+  // literal padding. Only PageToolbar control px-2.5 ×2 and LibrarySurface
+  // rail p-2.5 ×1 remain. Lower when these are resolved; never raise.
+  const OFF_GRID_X_PADDING_FLOOR = 3;
 
   it('does not add off-grid x padding literals to workspace seam surfaces (shrink-only)', () => {
     const perFile = new Map<string, number>();
@@ -168,13 +170,17 @@ describe('workspace page optical seam contract', () => {
       if (hits > 0) perFile.set(relativePath, hits);
       count += hits;
     }
-    expect(
+    const verdict = evaluateShrinkOnlyCount({
       count,
-      `off-grid x padding literals on workspace seam surfaces rose to ${count} ` +
-        `(floor ${OFF_GRID_X_PADDING_FLOOR}). Resolve the seam instead ` +
+      baseline: OFF_GRID_X_PADDING_FLOOR,
+      metric: 'off-grid x padding literals on workspace seam surfaces',
+    });
+    expect(
+      verdict.ok,
+      `${verdict.message} Resolve the seam instead ` +
         `(alignment.workspaceSeamX or px-(--app-shell-content-padding-x)).\n` +
         [...perFile.entries()].map(([f, n]) => `  ${f}: ${n}`).join('\n')
-    ).toBeLessThanOrEqual(OFF_GRID_X_PADDING_FLOOR);
+    ).toBe(true);
   });
 
   it('keeps AppShellContentPanel default padding on the live seam token', () => {
@@ -187,8 +193,8 @@ describe('workspace page optical seam contract', () => {
     // default already consumes --app-shell-content-padding-x (JOV-3764).
     expect(body).toContain('px-(--app-shell-content-padding-x)');
     expect(body).toContain('py-(--app-shell-content-padding-y)');
-    // Compact padding may converge independently; the count floor above
-    // prevents growth without requiring the legacy literal to remain.
+    // Compact padding uses its own shell-density inset (JOV-7009); the count
+    // floor above prevents restoring its legacy off-grid literals.
   });
 
   it('keeps the seam token family live (no fork to --linear-app-workspace-seam-x)', () => {
