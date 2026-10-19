@@ -1,6 +1,6 @@
 {
   "schema": "jovie.feedback-guards/v1",
-  "reviewedOn": "2026-10-01",
+  "reviewedOn": "2026-10-17",
   "lessons": [
     {
       "fingerprint": "`captureWarning(message, context)` files Linear as `Error: {json}`",
@@ -509,6 +509,48 @@
           "path": "apps/web/tests/unit/ci/deploy-workflow.test.ts",
           "anchor": "recovers one payload-bound interrupted marker with a full leased rerun",
           "reason": "Checks exact marker recovery lease semantics."
+        }
+      ]
+    },
+    {
+      "fingerprint": "Banned names stay out of marketing and homepage surfaces (JOV-8603)",
+      "lessonSha256": "7845b446518a8baca3d3cef40b75310bc1304229fb7fe1e0db3a04399282064d",
+      "guards": [
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/marketing/correction-pyramid-guards.test.ts",
+          "anchor": "fails when Daniel Kang or Haruki appear in marketing surfaces",
+          "reason": "Fails the build when either banned name appears in marketing surfaces."
+        }
+      ]
+    },
+    {
+      "fingerprint": "Marketing copy and metadata ban niche-music framing and link-in-bio wording (JOV-8606)",
+      "lessonSha256": "ef642575f273a16910e72433e6680437f1f1787bb465da08d6de8be3d93d8f43",
+      "guards": [
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/marketing/correction-pyramid-guards.test.ts",
+          "anchor": "keeps link-in-bio and niche-music phrasing on the warn baseline",
+          "reason": "Warn-ratchets link-in-bio and niche-music phrasing against the committed baseline."
+        }
+      ]
+    },
+    {
+      "fingerprint": "Marketing components source user-facing copy from the copy module (JOV-8607)",
+      "lessonSha256": "63845dc31c4a6c26ab9c98771693ddc249308ffb9499033142c826db3c5a365c",
+      "guards": [
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/marketing/correction-pyramid-guards.test.ts",
+          "anchor": "keeps raw marketing JSX copy on the warn baseline",
+          "reason": "Warn-ratchets raw user-facing JSX strings in marketing components."
+        },
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/marketing/correction-pyramid-guards.test.ts",
+          "anchor": "locks the homepage H1 to the identity copy module",
+          "reason": "Asserts the live homepage H1 stays sourced from the identity copy module."
         }
       ]
     }

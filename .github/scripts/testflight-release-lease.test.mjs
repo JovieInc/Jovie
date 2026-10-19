@@ -9,7 +9,14 @@ import {
   runWithRealGh,
   storedZip,
 } from '../../scripts/lib/real-gh-harness.mjs';
-import { validateLease } from './testflight-release-lease.mjs';
+import {
+  command,
+  comparisonReady,
+  evidenceFailureKind,
+  evidenceInvocation,
+  readEvidence,
+  validateLease,
+} from './testflight-release-lease.mjs';
 
 const SOURCE = 'a'.repeat(40);
 const CONTROLLER_HEAD = 'b'.repeat(40);
@@ -18,6 +25,11 @@ const MAIN = 'd'.repeat(40);
 const NEXT = 'e'.repeat(40);
 const REPOSITORY = 'JovieInc/Jovie';
 const NOW = Date.parse('2026-10-16T08:00:00Z');
+
+// Shell date and the isolated CLI do not inherit the parent Node clock shim.
+function subprocessNow() {
+  return Number(execFileSync('date', ['+%s'], { encoding: 'utf8' })) * 1000;
+}
 
 function fixture() {
   const policy = JSON.parse(
@@ -192,6 +204,289 @@ test('continuous merges preserve one certified source through archive and final 
       lease
     );
   }
+});
+
+test('an unfinished compare after main advances is retried and still not a rewind', () => {
+  const f = fixture();
+  const lease = validateLease(f.input);
+  f.reserve(lease);
+  f.moveMain(NEXT);
+  const original = f.input.api;
+  let unfinished = 2;
+  const pauses = [];
+  f.input.api = route => {
+    if (route.includes('/compare/') && unfinished > 0) {
+      unfinished -= 1;
+      return { message: 'Sorry, the diff is temporarily unavailable.' };
+    }
+    return original(route);
+  };
+  assert.deepEqual(
+    validateLease({
+      ...f.input,
+      previous: lease,
+      phase: 'upload',
+      pause: attempt => pauses.push(attempt),
+    }),
+    lease
+  );
+  assert.deepEqual(pauses, [1, 2]);
+  assert.equal(comparisonReady({ status: 'diverged' }), true);
+  assert.equal(
+    comparisonReady({ message: 'Sorry, the diff is temporarily unavailable.' }),
+    false
+  );
+});
+
+test('a settled identical compare is not accepted as ahead', () => {
+  const f = fixture();
+  const lease = validateLease(f.input);
+  f.reserve(lease);
+  const original = f.input.api;
+  let compares = 0;
+  f.input.api = route => {
+    if (route.includes('/compare/')) {
+      compares += 1;
+      return { status: 'identical', merge_base_commit: { sha: NEXT } };
+    }
+    return original(route);
+  };
+  assert.throws(
+    () =>
+      validateLease({
+        ...f.input,
+        previous: lease,
+        phase: 'upload',
+        pause: () => {
+          throw new Error('settled identical must not be retried');
+        },
+      }),
+    /release lineage rewound or diverged/
+  );
+  assert.equal(compares, 1);
+  assert.equal(comparisonReady({ status: 'identical' }), true);
+});
+
+test('a permanent compare 404 fails closed within five attempts and is not a rewind', () => {
+  const f = fixture();
+  const original = f.input.api;
+  let compares = 0;
+  const pauses = [];
+  f.input.api = route => {
+    if (route.includes('/compare/')) {
+      compares += 1;
+      throw new Error(
+        'gh evidence command failed (1); temporarily unavailable'
+      );
+    }
+    return original(route);
+  };
+  assert.throws(
+    () =>
+      validateLease({
+        ...f.input,
+        pause: attempt => pauses.push(attempt),
+      }),
+    error => {
+      assert.match(error.message, /temporarily unavailable/);
+      assert.doesNotMatch(error.message, /rewound or diverged/);
+      return true;
+    }
+  );
+  assert.equal(compares, 5);
+  assert.deepEqual(pauses, [1, 2, 3, 4]);
+});
+
+test('a settled diverged compare is still a rewind on the first read', () => {
+  const f = fixture();
+  const lease = validateLease(f.input);
+  f.reserve(lease);
+  const original = f.input.api;
+  let compares = 0;
+  f.input.api = route => {
+    if (route.includes('/compare/')) {
+      compares += 1;
+      return { status: 'diverged', merge_base_commit: { sha: NEXT } };
+    }
+    return original(route);
+  };
+  assert.throws(
+    () =>
+      validateLease({
+        ...f.input,
+        previous: lease,
+        phase: 'upload',
+        pause: () => {
+          throw new Error('settled divergence must not be retried');
+        },
+      }),
+    /release lineage rewound or diverged/
+  );
+  assert.equal(compares, 1);
+});
+
+test('an unfinished compare that never settles fails closed without calling it a rewind', () => {
+  const f = fixture();
+  const original = f.input.api;
+  f.input.api = route => {
+    if (route.includes('/compare/')) return { message: 'diff is unavailable' };
+    return original(route);
+  };
+  assert.throws(
+    () =>
+      validateLease({
+        ...f.input,
+        comparisonAttempts: 2,
+        pause: () => {},
+      }),
+    error => {
+      assert.match(error.message, /release comparison was not ready/);
+      assert.doesNotMatch(error.message, /rewound or diverged/);
+      return true;
+    }
+  );
+});
+
+test('compare transport failures are retryable and raw provider output is not classified as success', () => {
+  assert.equal(
+    evidenceFailureKind(
+      'gh: HTTP 404\n',
+      '',
+      'repos/JovieInc/Jovie/compare/aaa...bbb'
+    ),
+    'temporarily unavailable'
+  );
+  assert.equal(
+    evidenceFailureKind(
+      'gh: HTTP 404\n',
+      '',
+      'repos/JovieInc/Jovie/commits/main'
+    ),
+    'failed'
+  );
+  assert.equal(
+    evidenceFailureKind(
+      'gh: API rate limit exceeded for installation. (HTTP 403)\n',
+      '{"message":"API rate limit exceeded for installation."}',
+      'repos/JovieInc/Jovie/compare/aaa...bbb'
+    ),
+    'rate limited'
+  );
+  assert.deepEqual(
+    evidenceInvocation(['gh', 'api', 'repos/acme/commits/main']),
+    [
+      'bash',
+      evidenceInvocation(['gh', 'api', 'x'])[1],
+      'api',
+      'repos/acme/commits/main',
+    ]
+  );
+  assert.deepEqual(evidenceInvocation(['git', 'rev-parse', 'HEAD']), [
+    'git',
+    'rev-parse',
+    'HEAD',
+  ]);
+  let calls = 0;
+  const body = readEvidence(
+    () => {
+      calls += 1;
+      if (calls < 3) {
+        throw new Error(
+          'gh evidence command failed (1); temporarily unavailable'
+        );
+      }
+      return { sha: 'a'.repeat(40) };
+    },
+    'repos/JovieInc/Jovie/commits/main',
+    { pause: () => {}, attempts: 4 }
+  );
+  assert.equal(body.sha, 'a'.repeat(40));
+  assert.equal(calls, 3);
+});
+
+test('installation quota exhaustion waits inside the budget and fails closed outside it', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'tf-hold-'));
+  const fake = join(dir, 'gh');
+  const state = join(dir, 'hits');
+  writeFileSync(
+    fake,
+    `#!/bin/bash
+set -euo pipefail
+if [[ "\${1:-}" == "api" && "\${2:-}" == "rate_limit" ]]; then
+  printf '%s\\n' "$RESET_EPOCH"
+  exit 0
+fi
+if [[ ! -f "$HOLD_STATE" ]]; then
+  : > "$HOLD_STATE"
+  printf '%s\\n' 'gh: API rate limit exceeded for installation. (HTTP 403)' >&2
+  printf '%s\\n' '{"message":"API rate limit exceeded for installation."}'
+  exit 1
+fi
+printf '%s\\n' '{"ok":true}'
+`,
+    { mode: 0o755 }
+  );
+  const envFor = reset => ({
+    ...process.env,
+    GH_API_HOLD_BIN: fake,
+    GH_API_HOLD_BUDGET_SECONDS: '30',
+    HOLD_STATE: state,
+    RESET_EPOCH: String(reset),
+  });
+  try {
+    const within = command(['gh', 'api', 'repos/JovieInc/Jovie/commits/main'], {
+      route: 'repos/JovieInc/Jovie/commits/main',
+      env: envFor(Math.floor(subprocessNow() / 1000) - 5),
+    });
+    assert.equal(within.trim(), '{"ok":true}');
+    rmSync(state, { force: true });
+    assert.throws(
+      () =>
+        command(['gh', 'api', 'repos/JovieInc/Jovie/commits/main'], {
+          route: 'repos/JovieInc/Jovie/commits/main',
+          env: envFor(Math.floor(subprocessNow() / 1000) + 10000),
+        }),
+      error => {
+        assert.match(error.message, /; rate limited: /);
+        assert.match(error.message, /outside the 30s budget/);
+        assert.match(error.message, /Not passing/);
+        assert.doesNotMatch(error.message, /rewound or diverged/);
+        assert.doesNotMatch(
+          error.message,
+          /API rate limit exceeded for installation/
+        );
+        return true;
+      }
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('upload does not retry an installation rate limit as an unfinished compare', () => {
+  const f = fixture();
+  const lease = validateLease(f.input);
+  f.reserve(lease);
+  let calls = 0;
+  f.input.api = () => {
+    calls += 1;
+    throw new Error(
+      'gh evidence command failed (1); rate limited: GitHub rate limit resets at 9, outside the 600s budget. Not passing.'
+    );
+  };
+  assert.throws(
+    () =>
+      validateLease({
+        ...f.input,
+        previous: lease,
+        phase: 'upload',
+        pause: () => {
+          throw new Error('quota exhaustion must not be retried');
+        },
+      }),
+    /outside the 600s budget/
+  );
+  assert.equal(calls, 1);
 });
 
 for (const [label, mutate] of [
@@ -657,7 +952,7 @@ test('shipped CLI uses real gh and unzip for admission and the final actual Git 
       encoding: 'utf8',
     }).trim();
     const f = fixture();
-    f.jobs[0].completed_at = new Date(Date.now() - 60000).toISOString();
+    f.jobs[0].completed_at = new Date(subprocessNow() - 60000).toISOString();
     const remap = value =>
       JSON.parse(
         JSON.stringify(value)

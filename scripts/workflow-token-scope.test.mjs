@@ -49,6 +49,14 @@ export const ENQUEUE_PULL_REQUEST_MUTATION =
 `;
 
 const quiet = { acknowledged: [], requireAcknowledged: false };
+const fixtureAcknowledgement = {
+  id: 'fixture-enqueue-contents-read',
+  workflow: '.github/workflows/fixture.yml',
+  job: 'rearm',
+  call: 'enqueuePullRequest',
+  missing: ['contents:write'],
+  message: 'Known fixture mismatch',
+};
 
 test('enqueuePullRequest counts only inside a string', () => {
   assert.deepEqual(
@@ -296,7 +304,33 @@ test('a javascript dequeuePullRequest call outside a string is not the mutation'
   assert.deepEqual(extractCalls('await dequeuePullRequest(id)', 'js'), []);
 });
 
-test('the rearm acknowledgement does not cover the same bug in another job', () => {
+test('an acknowledgement downgrades only its declared mismatch to a warning', () => {
+  const root = fixture(`
+name: fixture
+permissions: {}
+jobs:
+  rearm:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - run: gh pr merge 12 --auto
+`);
+  const result = scanWorkflowTokenScopes(root, {
+    acknowledged: [fixtureAcknowledgement],
+    requireAcknowledged: true,
+  });
+  assert.equal(result.warnings.length, 1);
+  assert.deepEqual(result.failures, []);
+  const lines = [];
+  assert.equal(
+    reportWorkflowTokenScopes(result, line => lines.push(line)),
+    0
+  );
+  assert.match(lines[0], /::warning .*Known fixture mismatch/);
+});
+
+test('an acknowledgement does not cover the same bug in another job', () => {
   const root = fixture(
     `
 name: fixture
@@ -316,7 +350,7 @@ jobs:
     { 'scripts/merge-group-victim-rearm.mjs': ENQUEUE_SCRIPT }
   );
   const result = scanWorkflowTokenScopes(root, {
-    acknowledged: ACKNOWLEDGED_MISMATCHES,
+    acknowledged: [fixtureAcknowledgement],
     requireAcknowledged: false,
   });
   assert.equal(result.warnings.length, 0);
@@ -336,57 +370,55 @@ jobs:
     steps:
       - run: node --version
 `);
-  const result = scanWorkflowTokenScopes(root);
+  const result = scanWorkflowTokenScopes(root, {
+    acknowledged: [fixtureAcknowledgement],
+    requireAcknowledged: true,
+  });
   assert.ok(
     result.failures.some(
       failure =>
         failure.call === 'acknowledged-exception' &&
-        failure.message.includes('rearm-enqueue-contents-read')
+        failure.message.includes(fixtureAcknowledgement.id)
     )
   );
 });
 
-test('the live repo warns on the rearm enqueue mismatch and fails nothing else', () => {
+test('the live repo warns only on dequeue mismatches and grants every enqueue call', () => {
   const result = scanWorkflowTokenScopes(repoRoot);
+  assert.deepEqual(
+    ACKNOWLEDGED_MISMATCHES.map(item => item.call),
+    ['dequeuePullRequest', 'dequeuePullRequest']
+  );
   assert.deepEqual(result.warnings.map(warning => warning.job).sort(), [
     'dequeue-held',
     'hold-failed-revision',
-    'rearm-green-victims',
   ]);
-  assert.equal(result.failures.length, 0);
-  const rearm = result.warnings.find(
-    warning => warning.job === 'rearm-green-victims'
-  );
-  assert.equal(rearm?.file, 'scripts/merge-group-victim-rearm.mjs');
-  assert.equal(rearm?.call, 'enqueuePullRequest');
-  assert.deepEqual(rearm?.missing, ['contents:write']);
-  assert.match(rearm?.message ?? '', /app 2934433/);
-  assert.match(rearm?.message ?? '', /permission-contents: write/);
-  assert.match(rearm?.message ?? '', /Tim must approve/);
+  for (const warning of result.warnings) {
+    assert.equal(warning.call, 'dequeuePullRequest');
+    assert.deepEqual(warning.missing, ['merge-queues:write']);
+  }
+  assert.deepEqual(result.failures, []);
   const lines = [];
   assert.equal(
     reportWorkflowTokenScopes(result, line => lines.push(line)),
     0
   );
-  assert.equal(lines.filter(line => line.startsWith('::warning ')).length, 3);
+  assert.equal(lines.filter(line => line.startsWith('::warning ')).length, 2);
   assert.equal(
     lines.some(line => line.startsWith('::error ')),
     false
   );
 });
 
-test('the cli reports the rearm warning and exits 0', () => {
+test('the cli reports only the two acknowledged dequeue mismatches and exits 0', () => {
   const result = spawnSync(
     process.execPath,
     ['scripts/workflow-token-scope.mjs'],
     { cwd: repoRoot, encoding: 'utf8' }
   );
+  assert.ifError(result.error);
   assert.equal(result.status, 0, result.stderr);
-  assert.match(
-    result.stderr,
-    /::warning file=scripts\/merge-group-victim-rearm\.mjs/
-  );
-  assert.match(result.stderr, /Tim must approve permission-contents: write/);
-  assert.match(result.stderr, /app 2934433/);
-  assert.equal(result.stderr.includes('::error '), false);
+  assert.match(result.stderr, /2 acknowledged, 0 mismatches/);
+  assert.equal(result.stderr.split('::warning ').length - 1, 2);
+  assert.doesNotMatch(result.stderr, /::error /);
 });

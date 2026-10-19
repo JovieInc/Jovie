@@ -119,6 +119,9 @@ export const COMMISSIONING_PARENT_ALLOWLIST = new Set([
 ]);
 
 const IDENTIFIER_RE = /^JOV-(\d+)$/i;
+// Prerequisites can belong to another Linear team; only Jovie issues are
+// eligible for this writer's transitions (see IDENTIFIER_RE above).
+const DEPENDENCY_IDENTIFIER_RE = /^[A-Za-z][A-Za-z0-9]*-[1-9][0-9]*$/;
 const COMMISSIONING_LABEL_RE = /commission/i;
 const PARENT_LABEL_RE = /^(parent|epic|type:epic)$/i;
 const MAX_OPEN_PR_PAGES = 20;
@@ -715,6 +718,10 @@ const ISSUE_FIELDS = `
       nodes { identifier completedAt canceledAt state { type } }
       pageInfo { hasNextPage endCursor }
     }
+    inverseRelations(first: 50) {
+      nodes { id type issue { id identifier state { id name type } } }
+      pageInfo { hasNextPage endCursor }
+    }
     attachments(first: 50) { nodes { url } }
     history(first: 100) {
       nodes { createdAt fromState { type } toState { type } }
@@ -740,6 +747,15 @@ const CHILDREN_PAGE_QUERY = `query IssueLifecycleChildren($issueId: String!, $af
   issue(id: $issueId) {
     children(first: 50, after: $after) {
       nodes { identifier completedAt canceledAt state { type } }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
+}`;
+
+const BLOCKERS_PAGE_QUERY = `query IssueLifecycleBlockers($issueId: String!, $after: String!) {
+  issue(id: $issueId) {
+    inverseRelations(first: 50, after: $after) {
+      nodes { id type issue { id identifier state { id name type } } }
       pageInfo { hasNextPage endCursor }
     }
   }
@@ -771,6 +787,7 @@ const SWEEP_QUERY = `query LifecycleSweep($states: [String!]!, $after: String) {
 
 const MAX_COMMENT_PAGES = 10;
 const MAX_CHILD_PAGES = 20;
+const MAX_BLOCKER_PAGES = 20;
 const MAX_SWEEP_PAGES = 10;
 const CI_HARNESS_MANIFEST = '.github/ci-harness/manifest.json';
 const ASSURANCE_MATRIX = 'scripts/invariants/assurance-matrix.json';
@@ -840,6 +857,81 @@ ${selections.join('\n')}
  * @param {Record<string, any>} raw
  */
 async function materializeLifecycleIssue(fetchImpl, apiKey, raw) {
+  // Incoming `blocks` edges name this issue's prerequisites. Outgoing
+  // edges and related issues do not make this issue dependent on them.
+  const blockingIssues = [];
+  let blockerPage = raw.inverseRelations;
+  const blockerCursors = new Set();
+  const blockerIds = new Set();
+  for (let page = 0; ; page += 1) {
+    if (
+      !Array.isArray(blockerPage?.nodes) ||
+      typeof blockerPage?.pageInfo?.hasNextPage !== 'boolean'
+    ) {
+      throw new Error(
+        `Blocking dependency metadata for ${raw.identifier} is incomplete`
+      );
+    }
+    for (const relation of blockerPage.nodes) {
+      if (
+        typeof relation?.id !== 'string' ||
+        !relation.id ||
+        blockerIds.has(relation.id) ||
+        typeof relation.type !== 'string' ||
+        !relation.type
+      ) {
+        throw new Error(
+          `Blocking dependency metadata for ${raw.identifier} is incomplete`
+        );
+      }
+      blockerIds.add(relation.id);
+      if (relation.type !== 'blocks') continue;
+      const prerequisite = relation.issue;
+      if (
+        typeof prerequisite?.id !== 'string' ||
+        !prerequisite.id ||
+        !DEPENDENCY_IDENTIFIER_RE.test(String(prerequisite.identifier ?? '')) ||
+        typeof prerequisite.state?.id !== 'string' ||
+        !prerequisite.state.id ||
+        typeof prerequisite.state.name !== 'string' ||
+        !prerequisite.state.name ||
+        typeof prerequisite.state.type !== 'string' ||
+        !prerequisite.state.type
+      ) {
+        throw new Error(
+          `Blocking dependency state for ${raw.identifier} is incomplete`
+        );
+      }
+      blockingIssues.push({
+        relationId: relation.id,
+        id: prerequisite.id,
+        identifier: prerequisite.identifier,
+        state: {
+          id: prerequisite.state.id,
+          name: prerequisite.state.name,
+          type: prerequisite.state.type,
+        },
+      });
+    }
+    if (!blockerPage.pageInfo.hasNextPage) break;
+    const after = blockerPage.pageInfo.endCursor;
+    if (
+      page >= MAX_BLOCKER_PAGES - 1 ||
+      typeof after !== 'string' ||
+      !after ||
+      blockerCursors.has(after)
+    ) {
+      throw new Error(
+        `Blocking dependency metadata for ${raw.identifier} exceeds the read bound`
+      );
+    }
+    blockerCursors.add(after);
+    const more = await linearGraphql(fetchImpl, apiKey, BLOCKERS_PAGE_QUERY, {
+      issueId: raw.id,
+      after,
+    });
+    blockerPage = more.issue?.inverseRelations;
+  }
   const history = [];
   let historyPage = raw.history;
   for (let page = 0; ; page += 1) {
@@ -986,6 +1078,7 @@ async function materializeLifecycleIssue(fetchImpl, apiKey, raw) {
       )
       .map(child => String(child?.identifier ?? '').toUpperCase())
       .filter(Boolean),
+    blockingIssues,
     reopenedAfterDone: reopens.length > 0,
     receiptNotBefore,
     ...(childDeliveryTimes.length > 0
@@ -1041,6 +1134,9 @@ function lifecyclePreimage(issue) {
     ),
     children: [...issue.children].sort(),
     openChildren: [...issue.openChildren].sort(),
+    blockingIssues: issue.blockingIssues
+      .map(dependency => JSON.stringify(dependency))
+      .sort(),
     attachments: [...issue.attachmentUrls].sort(),
     states: issue.states
       .map(state => JSON.stringify([state.id, state.name, state.type]))
@@ -1098,6 +1194,17 @@ export async function reconcileIssueLifecycle(ctx) {
   return reconcileValidation({
     issue,
     holds,
+    completionHolds: issue.blockingIssues
+      .filter(
+        dependency =>
+          dependency.state.type !== 'completed' ||
+          dependency.state.name !== LIFECYCLE_STATES.done
+      )
+      .map(
+        dependency =>
+          `Blocking prerequisite ${dependency.identifier} is ${dependency.state.name}; Done is required before closure.`
+      )
+      .sort(),
     parentReason: parentHoldReason(issue, ctx.allowlist),
     github: ctx.github,
     repository: ctx.repository,
@@ -1222,6 +1329,12 @@ async function runSync(options) {
   const env = options.env ?? process.env;
   const log = options.log ?? (message => console.log(message));
   const sweep = env.LIFECYCLE_MODE === 'sweep';
+  const receiptIssue = String(env.LINEAR_VALIDATION_ISSUE ?? '').toUpperCase();
+  // Nonempty malformed targets have their own workflow concurrency group.
+  // They must never widen into parallel global sweeps or make external reads.
+  if (sweep && receiptIssue && !IDENTIFIER_RE.test(receiptIssue)) {
+    throw new Error('Malformed LINEAR_VALIDATION_ISSUE: expected JOV-<number>');
+  }
   const ref = extractMergeIssueRef({
     body: env.PR_BODY,
     headRef: env.HEAD_REF,
@@ -1303,7 +1416,6 @@ async function runSync(options) {
   }
 
   const lookups = [];
-  const receiptIssue = String(env.LINEAR_VALIDATION_ISSUE ?? '').toUpperCase();
   if (sweep && IDENTIFIER_RE.test(receiptIssue)) {
     // A receipt for parent-only commissioning work need not have a PR.
     // Read exactly its canonical record; the evaluator still owns admission.
@@ -1370,7 +1482,8 @@ async function runSync(options) {
   }
 
   const eventPull = sweep ? undefined : { number: Number(env.PR_NUMBER) };
-  const cursorDir = sweep ? env.LINEAR_SYNC_CURSOR_DIR : undefined;
+  const cursorDir =
+    sweep && !receiptIssue ? env.LINEAR_SYNC_CURSOR_DIR : undefined;
   const results = [];
   const failures = [];
   let deferredNote = '';

@@ -1231,6 +1231,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/admin/feedback/[id]/disposition/route.ts",
+      "kind": "handler",
+      "route": "/api/admin/feedback/[id]/disposition",
+      "methods": ["GET", "POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/admin/feedback/route.ts",
       "kind": "handler",
       "route": "/api/admin/feedback",
@@ -2450,7 +2458,7 @@
       "source": "apps/web/app/api/dashboard/audience/subscribers/route.ts",
       "kind": "handler",
       "route": "/api/dashboard/audience/subscribers",
-      "methods": ["GET"],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },

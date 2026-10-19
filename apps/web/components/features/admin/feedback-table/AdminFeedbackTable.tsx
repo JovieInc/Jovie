@@ -39,6 +39,16 @@ interface FeedbackRow {
   message: string;
   source: string;
   status: 'pending' | 'dismissed';
+  classification: 'bug_verifiable' | 'feature_or_change' | 'noise' | null;
+  disposition:
+    | 'pending'
+    | 'auto_remediation'
+    | 'duplicate'
+    | 'pending_summer'
+    | 'cert_required'
+    | 'now'
+    | 'later'
+    | 'never';
   createdAtIso: string;
   dismissedAtIso: string | null;
   user: {
@@ -122,6 +132,17 @@ function renderStatusCell({ getValue }: { getValue: () => any }) {
   );
 }
 
+function DispositionCell({ row }: { readonly row: FeedbackRow }) {
+  const label = row.classification
+    ? `${row.classification.replaceAll('_', ' ')} · ${row.disposition.replaceAll('_', ' ')}`
+    : row.disposition.replaceAll('_', ' ');
+  return (
+    <span className='inline-flex min-h-6 items-center rounded bg-surface-1 px-1.5 py-0.5 text-2xs font-medium tracking-tight whitespace-nowrap text-secondary-token'>
+      {label}
+    </span>
+  );
+}
+
 function FeedbackActionsCell({
   row,
   getContextMenuItems,
@@ -166,6 +187,12 @@ function buildFeedbackColumns(deps: {
       header: 'Status',
       cell: renderStatusCell,
       size: 120,
+    }),
+    columnHelper.display({
+      id: 'disposition',
+      header: 'Disposition',
+      cell: ({ row }) => <DispositionCell row={row.original} />,
+      size: 200,
     }),
     columnHelper.display({
       id: 'actions',
@@ -278,6 +305,25 @@ function AdminFeedbackDetailPanel({
                 label='Clerk ID'
                 labelWidth={84}
                 value={selected.user.clerkId ?? 'N/A'}
+              />
+            </div>
+          </DrawerSection>
+
+          <DrawerSection
+            title='Disposition'
+            className='space-y-1.5'
+            surface='plain'
+          >
+            <div className='space-y-1'>
+              <DrawerPropertyRow
+                label='Class'
+                labelWidth={84}
+                value={selected.classification ?? 'unclassified'}
+              />
+              <DrawerPropertyRow
+                label='Outcome'
+                labelWidth={84}
+                value={selected.disposition}
               />
             </div>
           </DrawerSection>

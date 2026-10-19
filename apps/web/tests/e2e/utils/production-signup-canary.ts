@@ -18,6 +18,21 @@ const CLOUDFLARE_OTP_SIGNUP_CANARY_KEYS = [
   'E2E_PROD_OTP_CHECK_TOKEN',
 ] as const;
 
+export const SYNTHETIC_OTP_SECRET_NAMES = [
+  'E2E_PROD_OTP_CHECK_ORIGIN',
+  'E2E_PROD_OTP_CHECK_TOKEN',
+  'E2E_PROD_OTP_CHECK_URL',
+] as const;
+
+export function syntheticOtpUnavailableReason(env: CanaryEnv): string | null {
+  const missing = SYNTHETIC_OTP_SECRET_NAMES.filter(key => {
+    const value = env[key];
+    return typeof value !== 'string' || value.trim().length === 0;
+  });
+  if (missing.length === 0) return null;
+  return `synthetic-otp-unavailable: missing ${missing.join(', ')} (Tim-only Cloudflare mailbox secrets)`;
+}
+
 type ProductionSignupCanaryKey =
   | (typeof PRODUCTION_SIGNUP_CANARY_KEYS)[number]
   | (typeof GMAIL_SIGNUP_CANARY_KEYS)[number]

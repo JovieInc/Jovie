@@ -1,19 +1,19 @@
 {
-  "at": "2026-10-16T12:20:51.842Z",
+  "at": "2026-10-19T14:38:41.886Z",
   "ciP95Seconds": {
     "pull_request": null,
-    "merge_group": 1085
+    "merge_group": 1012
   },
   "queueWaitP95Seconds": null,
   "queueEjectionRate": null,
   "leadTimeP95Seconds": {
     "devin": null,
-    "codex": 20664,
-    "other": 8484
+    "codex": 21493,
+    "other": 8713
   },
   "remediationP95Seconds": {
     "prRedToGreen": null,
-    "mainRedToGreen": 1295,
+    "mainRedToGreen": null,
     "productionPromoteHold": null
   },
   "productionLagP95Seconds": null,

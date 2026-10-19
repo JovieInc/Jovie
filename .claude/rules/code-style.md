@@ -10,7 +10,7 @@ TypeScript, React/Next.js, server/client boundaries, canonical imports, ESLint r
 
 | Layer | Technology |
 |-------|------------|
-| Framework | Next.js 15 (App Router) |
+| Framework | Next.js 16.4 (App Router) |
 | Language | TypeScript (strict mode) |
 | Styling | Tailwind CSS v4 |
 | Database | Neon PostgreSQL + Drizzle ORM |
@@ -60,6 +60,7 @@ const slug = title?.replaceAll(' ', '-') ?? '';
 - Functional components with hooks only.
 - Server Components by default, Client Components when needed.
 - Use `'use client'` directive sparingly and intentionally.
+- Cache Components is recommended upstream; JOV-7985 owns the dated migration exception. Node.js routes are supported, so do not recreate that retired blocker. Keep TanStack Query for client-owned state and audit hydration ownership before duplicating RSC data.
 
 ### Component Definition Rules
 
@@ -229,7 +230,7 @@ useQuery({
 | `use-client-directive` | React hooks (`useState`, `useEffect`, etc.) in files without `'use client'` | Add `'use client'` at top of file |
 | `server-only-imports` | `@/lib/db`, `@/lib/auth/better-auth`, `stripe`, `resend`, `drizzle-orm`, `*.server.ts` in `'use client'` files | Move logic to server component or API route |
 | `icon-usage` | Emoji in JSX, non-Lucide UI icons, direct `simple-icons` imports | Use `lucide-react` for UI icons; `SocialIcon` component for social/brand icons |
-| `no-db-transaction` | `db.transaction()` or `tx.transaction()` calls | Use sequential operations or `db.insert().values([...])` batch |
+| `no-db-transaction` | `db.transaction()` or `tx.transaction()` calls | Use `runAtomicDbOperation` for multi-statement invariants |
 | `no-handler-initialization` | `new Stripe()`, `new Pool()`, `new Resend()`, `new Client()` inside `GET`/`POST`/`PUT`/`DELETE` handlers | Move to module-level singleton: `const stripe = getStripe()` at file top |
 | `no-hardcoded-routes` | String literals like `'/app/dashboard/audience'` in app code | Import from `APP_ROUTES`: `import { APP_ROUTES } from '@/constants/routes'` |
 | `no-manual-db-pooling` | `import { Pool } from 'pg'` or `import pg from 'pg'` | Use `import { db } from '@/lib/db'` |

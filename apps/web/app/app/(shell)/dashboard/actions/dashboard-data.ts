@@ -215,6 +215,15 @@ const BIO_LINK_ACTIVATION_EVENT_TYPES = [
 type BioLinkActivationEventType =
   (typeof BIO_LINK_ACTIVATION_EVENT_TYPES)[number];
 
+function isIdleTransactionTermination(error: unknown): boolean {
+  const { code } = unwrapPgError(error);
+  return code
+    ? code === '25P03'
+    : /terminating connection due to idle-in-transaction timeout/i.test(
+        getDeepErrorMessage(error)
+      );
+}
+
 async function buildBioLinkActivation(
   clerkUserId: string,
   profile: Pick<CreatorProfile, 'id' | 'onboardingCompletedAt'>
@@ -271,7 +280,8 @@ async function buildBioLinkActivation(
       maxRetries: 1,
       baseDelayMs: DB_CONFIG.retryDelay,
       isRetryable: error =>
-        isRetryableError(error) && !isPostgresTimeoutError(error),
+        isIdleTransactionTermination(error) ||
+        (isRetryableError(error) && !isPostgresTimeoutError(error)),
     }
   ).catch((error: unknown) => {
     // The transaction wrapper has completed rollback/release before a
@@ -920,13 +930,11 @@ async function fetchAvatarQualityWithSession(
   try {
     return await read();
   } catch (error) {
-    const { code } = unwrapPgError(error);
-    const idleTermination = code
-      ? code === '25P03'
-      : /terminating connection due to idle-in-transaction timeout/i.test(
-          getDeepErrorMessage(error)
-        );
-    if (!idleTermination || performance.now() >= retryDeadline) throw error;
+    if (
+      !isIdleTransactionTermination(error) ||
+      performance.now() >= retryDeadline
+    )
+      throw error;
 
     // The first wrapper has completed rollback/release. RLS reporting remains
     // intact; only this side-effect-free avatar read gets one fresh attempt.

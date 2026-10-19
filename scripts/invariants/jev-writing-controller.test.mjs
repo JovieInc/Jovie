@@ -55,6 +55,7 @@ function fixture(config = {}) {
     ...config.approval,
   };
   const advance = stage => {
+    config.onStage?.(stage);
     if (config.timeoutAt === stage) time = input.deadlineAt;
     if (config.cancelAt === stage) controller.abort();
     if (config.staleAt === stage) stale = true;
@@ -323,24 +324,51 @@ for (const [stage, write, revise, evaluate] of stages) {
       counts(f, write, revise, evaluate);
     });
   }
-  test(`one wall-clock deadline bounds a stalled ${stage}`, async () => {
-    const f = fixture({ repair: true, hangAt: stage });
-    // Use a real wall clock for the outer deadline, without network or sleeps.
-    f.input.deadlineAt = Date.now() + 40;
-    f.options.now = Date.now;
+  test(`one wall-clock deadline bounds a stalled ${stage}`, async t => {
+    let reached = false;
+    const f = fixture({
+      repair: true,
+      hangAt: stage,
+      onStage: entered => {
+        if (entered === stage) reached = true;
+      },
+    });
+    // Isolate the real timer from injected guard-clock expiry. Hashing/setup may
+    // outlast 40ms under load; that must not prevent reaching the stalled stage.
+    // The controller still receives exactly 40ms and uses the real Node timer.
+    f.input.deadlineAt = f.options.now() + 40;
     f.options.approval.expiresAt = f.input.deadlineAt;
     f.options.approval.fingerprint = writingWorkflowFingerprint(f.input);
     f.options.readCurrentFingerprint = () => {
-      if (stage === 'freshness') return new Promise(() => {});
+      if (stage === 'freshness') {
+        reached = true;
+        return new Promise(() => {});
+      }
       return f.options.approval.fingerprint;
     };
-    // The admission fixture's fixed timestamp is only valid for synthetic time.
     const admit = f.options.evaluationApproval;
     f.options.evaluationApproval = async request => {
       const approval = await admit(request);
       return { ...approval, expiresAt: f.input.deadlineAt };
     };
+    const scheduled = [];
+    let controllerTimerFired = false;
+    const realTimeout = globalThis.setTimeout;
+    t.mock.method(globalThis, 'setTimeout', (callback, delay, ...args) => {
+      const index = scheduled.push(delay) - 1;
+      return realTimeout(
+        (...values) => {
+          if (index === 0) controllerTimerFired = true;
+          callback(...values);
+        },
+        delay,
+        ...args
+      );
+    });
     fallback(await f.run(), 'timeout');
+    assert.equal(reached, true, 'the intended stalled stage was reached');
+    assert.equal(scheduled[0], 40, 'the wall-clock governor stays at 40ms');
+    assert.equal(controllerTimerFired, true, 'the real controller timer fired');
     counts(f, write, revise, evaluate);
   });
 }
