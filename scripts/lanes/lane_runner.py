@@ -2447,7 +2447,12 @@ class AgentProcesses:
                 if current is None or current[2].startswith("Z"): continue
                 if current[3] != row[3]:
                     raise FleetObservationHeld("fleet-observer-signal-identity-changed")
-                signal.pidfd_send_signal(self._fixed_handles[pid], sig, None, 0)
+                try:
+                    signal.pidfd_send_signal(self._fixed_handles[pid], sig, None, 0)
+                except ProcessLookupError:
+                    # This kernel-bound birth exited after the identity read.
+                    # Rescan; ESRCH alone does not establish child drain.
+                    continue
                 sent.add((pid, row[3], sig))
             time.sleep(min(.01, max(0, deadline - time.monotonic())))
         raise FleetObservationHeld("fleet-observer-cleanup-unproven")
