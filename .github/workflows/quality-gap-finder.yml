@@ -26,6 +26,7 @@ on:
       - 'scripts/quality-gap-finder.mjs'
       - 'apps/web/app/**'
       - 'apps/web/components/**'
+      - 'apps/web/data/detection-coverage-registry.json'
       - 'apps/web/lib/**'
       - 'apps/web/scripts/performance-route-manifest.ts'
       - '.github/workflows/quality-gap-finder.yml'
