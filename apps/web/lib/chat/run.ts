@@ -296,11 +296,20 @@ export interface ChatTurnFinishSignals {
   readonly toolStepCapExhausted: boolean;
 }
 
+/**
+ * Buffered `streamText` result. `experimental_lowMemory: true` (AI SDK 7.0.143)
+ * omits final-content promises such as `text`; chat does not use that overload.
+ */
+type ChatStreamTextResult = Extract<
+  ReturnType<typeof streamText>,
+  { readonly text: PromiseLike<string> }
+>;
+
 export interface ExecuteChatTurnResult {
   /** Invocation-local original writer record; absent for existing callers. */
   writingDraft?: Promise<WritingPilotResult<WritingPilotDraft>>;
   /** The streamText result. Caller wraps with `.toUIMessageStreamResponse()`. */
-  streamResult: ReturnType<typeof streamText>;
+  streamResult: ChatStreamTextResult;
   /** Resolved model id (`anthropic/...`). Useful for parity assertions and traces. */
   selectedModel: string;
   /** Composed system prompt. Useful for parity tests and eval reproduction. */
@@ -606,6 +615,8 @@ export async function executeChatTurn(
   });
 
   const rawStreamResult = streamText({
+    // Buffered result so the leak guard and callers can read finished text.
+    experimental_lowMemory: false,
     model: blockedForDisclosure
       ? (createStaticTextLanguageModel(
           PROMPT_DISCLOSURE_REFUSAL
@@ -886,10 +897,10 @@ async function resolveCoreChatTrace(input: {
   }
 }
 
-function wrapStreamResultWithLeakGuard<T extends ReturnType<typeof streamText>>(
+function wrapStreamResultWithLeakGuard<T extends ChatStreamTextResult>(
   streamResult: T
 ): T {
-  const textPromise = streamResult?.text;
+  const textPromise = streamResult.text;
   if (!textPromise) {
     return streamResult;
   }
