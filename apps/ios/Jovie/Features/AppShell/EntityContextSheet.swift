@@ -142,7 +142,7 @@ struct EntityContextSheet: View {
 
         Text(item.kindTitle)
           .font(JovieFont.body(size: 14, weight: .medium))
-          .foregroundStyle(JovieColor.EntityAccent.color(for: item.kind))
+          .foregroundStyle(JovieColor.textSecondary)
       }
       Spacer(minLength: 0)
     }

@@ -96,16 +96,18 @@ struct AuthScreenStyleGuardTests {
     let source = try String(contentsOf: repo.appendingPathComponent("apps/ios/Jovie/DesignSystem/JovieTheme.swift"), encoding: .utf8)
     let manifestData = try Data(contentsOf: repo.appendingPathComponent("apps/ios/scripts/native-design-system.manifest.json"))
     let manifest = try #require(JSONSerialization.jsonObject(with: manifestData) as? [String: Any])
-    let bindings = try #require(manifest["bindings"] as? [[String: Any]])
+    let bindings = try #require(manifest["bindings"] as? [[String]])
     let palettePath = try #require(manifest["palette"] as? String)
     let paletteData = try Data(contentsOf: repo.appendingPathComponent(palettePath))
     let palette = try #require(JSONSerialization.jsonObject(with: paletteData) as? [String: Any])
-    let names = try bindings.map { try #require($0["name"] as? String) }
+    let names = bindings.map { $0[0] }
     #expect(Set(names).count == names.count)
     var mappedPaths = Set<String>()
     for binding in bindings {
-      guard let path = binding["json"] as? [String] else { continue }
-      let name = try #require(binding["name"] as? String)
+      #expect(binding.count == 2)
+      guard !binding[1].hasPrefix("--") else { continue }
+      let path = binding[1].components(separatedBy: ".")
+      let name = binding[0]
       #expect(mappedPaths.insert(path.joined(separator: ".")).inserted)
       var value: Any = palette
       for key in path { value = try #require((value as? [String: Any])?[key]) }

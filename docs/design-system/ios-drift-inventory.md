@@ -68,7 +68,7 @@ The only raw-paint exemption is the exact path/owner/statement/count-bound `Jovi
 
 Direct nested rounded modifier anatomy must use named tokens with outer = inner + inset; pills, circles, unrelated siblings and square QR content are excluded. This is a bounded source scanner, not arbitrary Swift AST inference. JOV-5865 spacing scanning is reused: conservative iOS debt drops 12→11, strict inventory stays 20, Mac stays 4. The pill has a 28-point visual minimum and 44-point hit container; Dynamic Type grows content and press opacity preserves the hit area. Locked Chat controls remain 32 points.
 
-Primary/secondary/tertiary text must clear 4.5:1 on all five dark elevations; minimum is tertiary/floating **6.06:1**. Canonical red/floating is **3.95:1**, unsuitable for normal error text. Neutral CTA inverse ink also clears 4.5:1. These calculations do not certify composited native appearance.
+Primary/secondary/tertiary text must clear 4.5:1 on all five dark elevations; minimum is tertiary/floating **6.06:1**. Canonical red/floating is **3.95:1** and ultra/floating **3.55:1**, unsuitable for normal text; entity labels use semantic ink while indicators retain accents. Neutral CTA inverse ink also clears 4.5:1. These calculations do not certify composited native appearance.
 
 The deterministic launch mounts production `JovieChangelogWhatsNewView` through the unchanged resolver. Fixtures cover single/multiple unseen, long content, empty/nonempty dogfood, destinations, same-ID suppression and dismissal. Header/content scroll together; medium/large detents and return to chat remain. JOV-5789’s Done/PR18909 receipt does not demonstrate daily-post Swift semantics, so the actual release-ID behavior is preserved.
 

@@ -4,86 +4,26 @@
   "semantics": "apps/web/styles/design-system.css",
   "theme": "apps/ios/Jovie/DesignSystem/JovieTheme.swift",
   "bindings": [
-    {
-      "name": "backgroundBase",
-      "json": ["elevations", "dark", "canvas"]
-    },
-    {
-      "name": "surface0",
-      "json": ["elevations", "dark", "shell"]
-    },
-    {
-      "name": "surface1",
-      "json": ["elevations", "dark", "card"]
-    },
-    {
-      "name": "surface2",
-      "json": ["elevations", "dark", "elevated"]
-    },
-    {
-      "name": "surface3",
-      "json": ["elevations", "dark", "floating"]
-    },
-    {
-      "name": "accentBlue",
-      "json": ["accents", "hex", "ion"]
-    },
-    {
-      "name": "accentPurple",
-      "json": ["accents", "hex", "ultra"]
-    },
-    {
-      "name": "accentPink",
-      "json": ["accents", "hex", "pulse"]
-    },
-    {
-      "name": "accentMint",
-      "json": ["accents", "hex", "mint"]
-    },
-    {
-      "name": "accentOrange",
-      "json": ["accents", "hex", "orange"]
-    },
-    {
-      "name": "statusDanger",
-      "json": ["accents", "hex", "red"]
-    },
-    {
-      "name": "textPrimary",
-      "css": "--color-text-primary-token"
-    },
-    {
-      "name": "textSecondary",
-      "css": "--color-text-secondary-token"
-    },
-    {
-      "name": "textTertiary",
-      "css": "--color-text-tertiary-token"
-    },
-    {
-      "name": "textInverse",
-      "css": "--noir-ion-text-inverse"
-    },
-    {
-      "name": "buttonPrimaryBackground",
-      "css": "--color-btn-primary-bg"
-    },
-    {
-      "name": "borderSubtle",
-      "css": "--color-border-subtle"
-    },
-    {
-      "name": "borderDefault",
-      "css": "--color-border-default"
-    },
-    {
-      "name": "borderStrong",
-      "css": "--color-border-strong"
-    },
-    {
-      "name": "imageForeground",
-      "css": "--noir-ion-text-strong"
-    }
+    ["backgroundBase", "elevations.dark.canvas"],
+    ["surface0", "elevations.dark.shell"],
+    ["surface1", "elevations.dark.card"],
+    ["surface2", "elevations.dark.elevated"],
+    ["surface3", "elevations.dark.floating"],
+    ["accentBlue", "accents.hex.ion"],
+    ["accentPurple", "accents.hex.ultra"],
+    ["accentPink", "accents.hex.pulse"],
+    ["accentMint", "accents.hex.mint"],
+    ["accentOrange", "accents.hex.orange"],
+    ["statusDanger", "accents.hex.red"],
+    ["textPrimary", "--color-text-primary-token"],
+    ["textSecondary", "--color-text-secondary-token"],
+    ["textTertiary", "--color-text-tertiary-token"],
+    ["textInverse", "--noir-ion-text-inverse"],
+    ["buttonPrimaryBackground", "--color-btn-primary-bg"],
+    ["borderSubtle", "--color-border-subtle"],
+    ["borderDefault", "--color-border-default"],
+    ["borderStrong", "--color-border-strong"],
+    ["imageForeground", "--noir-ion-text-strong"]
   ],
   "strictSources": ["apps/ios/Jovie/App/RootView.swift"],
   "exceptions": [

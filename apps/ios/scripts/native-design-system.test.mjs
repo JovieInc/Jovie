@@ -62,16 +62,16 @@ test('all canonical roles resolve once; values come from JSON and semantic emitt
 test('missing, duplicate, ambiguous or invalid mappings fail closed', () => {
   const missing = copy(manifest);
   missing.bindings = missing.bindings.filter(
-    row => row.json?.join('.') !== 'accents.hex.mint'
+    row => row[1] !== 'accents.hex.mint'
   );
   assert.throws(() => project(missing), /Unmapped canonical/);
   const duplicate = copy(manifest);
   duplicate.bindings.push(copy(duplicate.bindings[0]));
   assert.throws(() => project(duplicate), /Duplicate/);
-  duplicate.bindings.at(-1).name = 'anotherCanvas';
+  duplicate.bindings.at(-1)[0] = 'anotherCanvas';
   assert.throws(() => project(duplicate), /Duplicate palette/);
   const ambiguous = copy(manifest);
-  ambiguous.bindings[0].css = '--color-text-primary-token';
+  ambiguous.bindings[0].push('--color-text-primary-token');
   assert.throws(() => project(ambiguous), /Ambiguous/);
   const absent = copy(palette);
   delete absent.accents.hex.red;
@@ -201,7 +201,7 @@ test('raw paint debt permits neither growth nor silent failure to lower the floo
   assert.deepEqual(paintRatchet({}, {}), []);
 });
 
-test('painted text and pressed CTA pairs clear their actual contrast floor', () => {
+test('canonical text/CTA pairs and opacity controls respect contrast floors', () => {
   const values = semanticDeclarations(css);
   for (const role of [
     '--color-text-primary-token',
@@ -328,17 +328,10 @@ test('the selected source gate goes red on wrong native paint/token bypass and g
     };
     git(['init', '-q']);
     git(['add', '.']);
-    git([
-      '-c',
-      'user.name=Native fixture',
-      '-c',
-      'user.email=fixture@invalid',
-      '-c',
-      'commit.gpgsign=false',
-      'commit',
-      '-qm',
-      'immutable native fixture base',
-    ]);
+    git(['config', 'user.name', 'Native fixture']);
+    git(['config', 'user.email', 'fixture@invalid']);
+    git(['config', 'commit.gpgsign', 'false']);
+    git(['commit', '-qm', 'immutable native fixture base']);
     git(['update-ref', 'refs/remotes/origin/main', 'HEAD']);
     const themePath = resolve(root, manifest.theme);
     const theme = readFileSync(themePath, 'utf8');
@@ -408,6 +401,30 @@ test('the selected source gate goes red on wrong native paint/token bypass and g
     assert.ok(failures.some(issue => issue.includes('raw color')));
     assert.ok(failures.some(issue => issue.includes('off-grid spacing')));
     writeFileSync(viewPath, view);
+    for (const [path, role] of [
+      [
+        'apps/ios/Jovie/Features/Chat/MobileChatMessageViews.swift',
+        'return JovieColor.textPrimary',
+      ],
+      [
+        'apps/ios/Jovie/Features/AppShell/EntityContextSheet.swift',
+        '.foregroundStyle(JovieColor.textSecondary)',
+      ],
+    ]) {
+      const file = resolve(root, path),
+        source = readFileSync(file, 'utf8');
+      writeFileSync(
+        file,
+        source.replace(
+          role,
+          role.replace(/textPrimary|textSecondary/, 'accentPurple')
+        )
+      );
+      assert.ok(
+        checkNativeDesign(root).some(issue => issue.startsWith('Entity '))
+      );
+      writeFileSync(file, source);
+    }
     const floorPath = resolve(root, manifest.paintDebt);
     const floorSource = readFileSync(floorPath, 'utf8');
     const floor = JSON.parse(floorSource);

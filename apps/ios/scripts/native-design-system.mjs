@@ -69,28 +69,32 @@ export function projectedColors(manifest, palette, css) {
   const paths = new Set();
   const lines = [];
   for (const binding of manifest.bindings) {
-    if (!/^[a-zA-Z]\w*$/.test(binding.name) || names.has(binding.name))
-      throw new Error(`Duplicate/invalid native mapping: ${binding.name}`);
-    names.add(binding.name);
-    if (Boolean(binding.json) === Boolean(binding.css))
-      throw new Error(`Ambiguous native mapping: ${binding.name}`);
+    if (
+      !Array.isArray(binding) ||
+      binding.length !== 2 ||
+      typeof binding[1] !== 'string'
+    )
+      throw new Error(
+        'Ambiguous native mapping: expected [name, canonical path]'
+      );
+    const [name, source] = binding;
+    if (!/^[a-zA-Z]\w*$/.test(name) || names.has(name))
+      throw new Error(`Duplicate/invalid native mapping: ${name}`);
+    names.add(name);
     let value;
-    let source;
-    if (binding.json) {
-      source = binding.json.join('.');
+    if (!source.startsWith('--')) {
       if (paths.has(source))
         throw new Error(`Duplicate palette role: ${source}`);
       paths.add(source);
-      value = binding.json.reduce((object, key) => object?.[key], palette);
+      value = source.split('.').reduce((object, key) => object?.[key], palette);
       if (typeof value !== 'string')
         throw new Error(`Missing palette role: ${source}`);
     } else {
-      source = binding.css;
-      value = resolveSemantic(binding.css, declarations);
+      value = resolveSemantic(source, declarations);
     }
     lines.push(
       `  /// Source: ${source}`,
-      `  static let ${binding.name} = ${swiftColor(value)}`
+      `  static let ${name} = ${swiftColor(value)}`
     );
   }
   for (const [group, roles, prefix] of [
@@ -507,6 +511,26 @@ export function checkNativeDesign(root = ROOT, { write = false } = {}) {
   );
   if (/foregroundStyle\(JovieColor\.accent\w*\)/.test(production))
     issues.push('Decorative What’s New glyphs must use neutral semantic ink');
+  const chip = readFileSync(
+    resolve(root, 'apps/ios/Jovie/Features/Chat/MobileChatMessageViews.swift'),
+    'utf8'
+  );
+  const sheet = readFileSync(
+    resolve(root, 'apps/ios/Jovie/Features/AppShell/EntityContextSheet.swift'),
+    'utf8'
+  );
+  if (
+    !/case \.onDark:\s*return JovieColor\.textPrimary\s*case \.onLight:\s*return JovieColor\.textInverse/.test(
+      maskSwift(chip)
+    )
+  )
+    issues.push('Entity chip text must use semantic ink for each tone');
+  if (
+    !/Text\(item\.kindTitle\)\s*\.font\([^\n]+\)\s*\.foregroundStyle\(JovieColor\.textSecondary\)/.test(
+      maskSwift(sheet)
+    )
+  )
+    issues.push('Entity kind text must use semantic secondary ink');
   return issues;
 }
 
