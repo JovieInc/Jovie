@@ -1,3 +1,4 @@
+import { stripVTControlCharacters } from 'node:util';
 import {
   findLinearLabelId,
   noteFingerprintedIssueGreen,
@@ -13,7 +14,18 @@ export const POSTDEPLOY_QUOTA_FINGERPRINT =
   'github-quota-deferred-postdeploy-probes';
 
 const LOGIN_RE = /auth\.setup|authenticate|sign-?in|login/i;
-const TIMEOUT_RE = /timedout|timed\s*out|timeout/i;
+const TIMEOUT_RE =
+  /timed\s*out|TimeoutError|\btimeout(?:\s+of)?\s+\d+\s*ms\s+exceeded|\btimeout:\s*\d+\s*ms\b/i;
+
+function diagnosticText(text) {
+  return stripVTControlCharacters(String(text ?? ''))
+    .split('\n')
+    .filter(
+      line =>
+        !line.includes('[WebServer]') && !/^\s*(?:>\s*)?\d+\s*\|/.test(line)
+    )
+    .join('\n');
+}
 
 /** Filing is on unless this exact kill switch is set. Unset does not dry-run. */
 export function remediationIntakeDisabled(env = process.env) {
@@ -46,7 +58,7 @@ function walkSuite(suite, hits) {
     const title = `${prefix} ${spec?.title ?? ''}`.trim();
     for (const test of spec?.tests ?? []) {
       for (const result of test?.results ?? []) {
-        const message = String(result?.error?.message ?? '');
+        const message = diagnosticText(result?.error?.message);
         const timedOut =
           result?.status === 'timedOut' || TIMEOUT_RE.test(message);
         if (timedOut && LOGIN_RE.test(`${title}\n${message}`)) hits.push(title);
@@ -63,17 +75,147 @@ export function loginTimeoutHits(report) {
 }
 
 export function textHasLoginTimeout(text) {
-  // Dev-server route logs (`[WebServer] GET /signin 200`) are not login
-  // evidence but interleave with unrelated test timeouts; drop them so the
-  // sliding window can't pair a route hit with a stray `Timeout:` line.
-  const lines = String(text ?? '')
-    .split('\n')
-    .filter(line => !line.includes('[WebServer]'));
-  for (let i = 0; i < lines.length; i += 1) {
-    const window = lines.slice(i, i + 12).join('\n');
-    if (LOGIN_RE.test(window) && TIMEOUT_RE.test(window)) return true;
+  // Attribute a diagnostic to its own failed test. Progress from another
+  // test and source options such as `timeout: 60_000` are not failures.
+  let block = [];
+  const hit = () =>
+    LOGIN_RE.test(block.join('\n')) && TIMEOUT_RE.test(block.join('\n'));
+  for (const line of diagnosticText(text).split('\n')) {
+    const progress =
+      /^\s*(?:[✓×✘-]\s*)?(?:\d+|\[\d+\/\d+\])\s+\[[^\]]+\]\s+›/.test(line);
+    if (progress || /^\s*\d+\)\s+/.test(line)) {
+      if (hit()) return true;
+      block = [];
+    }
+    if (!progress) block.push(line);
   }
-  return false;
+  return hit();
+}
+
+/** Read only the current exact attempt; never combine passing jobs from reruns. */
+export async function readLoginMatrixEvidence({
+  repository,
+  runId,
+  attempt,
+  sha,
+  source,
+  runUrl,
+  token,
+  fetchImpl = fetch,
+}) {
+  const hold = reason => ({ ok: false, reason });
+  if (
+    repository !== 'JovieInc/Jovie' ||
+    !token ||
+    !/^[1-9]\d*$/.test(runId ?? '') ||
+    !Number.isSafeInteger(Number(runId)) ||
+    !/^[1-9]\d*$/.test(attempt ?? '') ||
+    !Number.isSafeInteger(Number(attempt)) ||
+    !/^[a-f0-9]{40}$/.test(sha ?? '') ||
+    !/^e2e-full-matrix\.yml:(chromium|firefox)$/.test(source ?? '') ||
+    runUrl !== `https://github.com/${repository}/actions/runs/${runId}`
+  )
+    return hold('matrix_context_unavailable');
+  const base = `https://api.github.com/repos/${repository}/actions/runs/${runId}`;
+  const read = async url => {
+    const response = await fetchImpl(url, {
+      headers: {
+        Accept: 'application/vnd.github+json',
+        Authorization: `Bearer ${token}`,
+      },
+      redirect: 'error',
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) throw new Error('matrix-read-unavailable');
+    return {
+      data: await response.json(),
+      hasNext: /;\s*rel="next"/.test(response.headers.get('link') ?? ''),
+    };
+  };
+  const matchesRun = run =>
+    run?.id === Number(runId) &&
+    run.run_attempt === Number(attempt) &&
+    run.head_sha === sha &&
+    run.path === '.github/workflows/e2e-full-matrix.yml' &&
+    run.event === 'push' &&
+    run.head_branch === 'main' &&
+    run.repository?.full_name === repository;
+  try {
+    // This is the latest run record, not an archived attempt: stale delivery
+    // cannot borrow an earlier attempt's successful siblings.
+    const { data: run } = await read(base);
+    if (!matchesRun(run)) return hold('matrix_run_mismatch');
+
+    const jobs = [];
+    let total;
+    for (let page = 1; page <= 5; page += 1) {
+      const { data: result, hasNext } = await read(
+        `${base}/attempts/${attempt}/jobs?per_page=100&page=${page}`
+      );
+      if (
+        !Number.isSafeInteger(result.total_count) ||
+        result.total_count < 1 ||
+        !Array.isArray(result.jobs) ||
+        result.jobs.length > 100 ||
+        (total !== undefined && total !== result.total_count)
+      )
+        return hold('matrix_pagination_incomplete');
+      total = result.total_count;
+      jobs.push(...result.jobs);
+      if (jobs.length === total) {
+        if (hasNext) return hold('matrix_pagination_incomplete');
+        break;
+      }
+      if (jobs.length > total || result.jobs.length < 100 || page === 5)
+        return hold('matrix_pagination_incomplete');
+    }
+    if (new Set(jobs.map(job => job?.id)).size !== jobs.length)
+      return hold('matrix_duplicate_job');
+    const required = [
+      'Build standalone E2E server',
+      ...['chromium', 'firefox'].flatMap(browser =>
+        [1, 2, 3, 4].map(
+          shard => `E2E (Chrome + Firefox) (${browser}, ${shard})`
+        )
+      ),
+    ];
+    if (
+      jobs.some(
+        job =>
+          job?.name?.startsWith('E2E (Chrome + Firefox)') &&
+          !required.includes(job.name)
+      )
+    )
+      return hold('matrix_unknown_shard');
+    for (const name of required) {
+      const matches = jobs.filter(job => job?.name === name);
+      if (matches.length !== 1)
+        return hold(`matrix_job_missing_or_duplicate:${name}`);
+      const job = matches[0];
+      if (
+        !Number.isSafeInteger(job.id) ||
+        job.id < 1 ||
+        job.run_id !== Number(runId) ||
+        job.head_sha !== sha ||
+        (job.run_attempt !== undefined && job.run_attempt !== Number(attempt))
+      )
+        return hold('matrix_job_identity_mismatch');
+      if (
+        job.status !== 'completed' ||
+        job.conclusion !== 'success' ||
+        typeof job.completed_at !== 'string' ||
+        !Number.isFinite(Date.parse(job.completed_at))
+      )
+        return hold(
+          `matrix_job_not_success:${name}:${job.status}/${job.conclusion ?? 'unknown'}`
+        );
+    }
+    // Revalidate after pagination so an attempt change during the read holds.
+    if (!matchesRun((await read(base)).data)) return hold('matrix_run_changed');
+    return { ok: true, source, runId, attempt, sha };
+  } catch {
+    return hold('matrix_evidence_unavailable');
+  }
 }
 
 export function isLoginTimeout({ text = '', report = null } = {}) {
@@ -84,9 +226,20 @@ export function decideLoginSignal({
   conclusion,
   evidenceText = '',
   report = null,
+  source = '',
+  matrixEvidence,
 }) {
   if (!conclusion || conclusion === 'skipped') return { action: 'skip' };
   if (conclusion === 'success') {
+    if (
+      source.startsWith('e2e-full-matrix.yml:') &&
+      (matrixEvidence?.ok !== true || matrixEvidence.source !== source)
+    ) {
+      return {
+        action: 'skip',
+        reason: matrixEvidence?.reason ?? 'matrix_not_qualified',
+      };
+    }
     return { action: 'green', fingerprints: ['e2e-login-timeout'] };
   }
   // Cancelled runs are superseded by the concurrency group's newer run, which

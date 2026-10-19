@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 /** Detector intake. Files unless REMEDIATION_INTAKE_DISABLED=1. */
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  appendFileSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname } from 'node:path';
 
 import {
@@ -10,6 +15,7 @@ import {
   decideMonitorSignal,
   gateSteadyGreen,
   isLoginTimeout,
+  readLoginMatrixEvidence,
   remediationIntakeDisabled,
 } from './lib/remediation-signal.mjs';
 
@@ -41,13 +47,35 @@ if (process.argv[2] === '--detect-login') {
 
 const env = process.env;
 
-function decision() {
+async function decision() {
   const mode = env.REMEDIATION_MODE;
   if (mode === 'login') {
+    const source = env.REMEDIATION_SOURCE ?? '';
+    const matrixEvidence =
+      env.REMEDIATION_CONCLUSION === 'success' &&
+      source.startsWith('e2e-full-matrix.yml:')
+        ? await readLoginMatrixEvidence({
+            repository: env.GITHUB_REPOSITORY,
+            runId: env.GITHUB_RUN_ID,
+            attempt: env.GITHUB_RUN_ATTEMPT,
+            sha: env.GITHUB_SHA,
+            source,
+            runUrl: env.REMEDIATION_RUN_URL,
+            token: env.GITHUB_TOKEN,
+          })
+        : undefined;
+    if (matrixEvidence && env.GITHUB_OUTPUT) {
+      appendFileSync(
+        env.GITHUB_OUTPUT,
+        `login_matrix_qualified=${matrixEvidence.ok}\n`
+      );
+    }
     return decideLoginSignal({
       conclusion: env.REMEDIATION_CONCLUSION,
       evidenceText: readText(env.REMEDIATION_EVIDENCE_LOG),
       report: readJson(env.REMEDIATION_EVIDENCE_JSON),
+      source,
+      matrixEvidence,
     });
   }
   if (mode === 'auth-smoke') {
@@ -75,7 +103,7 @@ if (remediationIntakeDisabled(env)) {
   process.exit(0);
 }
 
-const chosen = decision();
+const chosen = await decision();
 if ('reason' in chosen && chosen.reason === 'unknown_mode') {
   console.error('remediation-signal-intake: set REMEDIATION_MODE');
   process.exit(1);
@@ -94,7 +122,13 @@ const result = await applyRemediationDecisionWithRetry(gated, {
   detail: gated.detail || env.REMEDIATION_DETAIL,
   apiKey: env.LINEAR_API_KEY,
 });
-console.log(JSON.stringify({ ...result, previous: previous || null }));
+console.log(
+  JSON.stringify({
+    ...result,
+    ...(gated.reason ? { reason: gated.reason } : {}),
+    previous: previous || null,
+  })
+);
 if (
   result.ok &&
   env.REMEDIATION_STATE_FILE &&
