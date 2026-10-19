@@ -46,10 +46,10 @@ export const SignIn: Story = {
 };
 
 export const ClaimTargets: Story = {
-  args: { mode: 'sign-up', claimHandle: 'timwhite', suppressOneTap: true },
+  args: { mode: 'sign-up', claimHandle: 'a'.repeat(30), suppressOneTap: true },
   parameters: {
     nextjs: {
-      navigation: { pathname: '/signup', query: { handle: 'timwhite' } },
+      navigation: { pathname: '/signup', query: { handle: 'a'.repeat(30) } },
     },
   },
 };
