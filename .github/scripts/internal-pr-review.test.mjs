@@ -49,6 +49,7 @@ const jsonResponse = body => ({
 /** Fake fetch routing GitHub + gateway calls for run()/main() tests. */
 function fakeFetch({
   comments = [],
+  body = '',
   diff = '@@ small diff @@',
   gateway,
   headSha = HEAD_SHA,
@@ -72,6 +73,7 @@ function fakeFetch({
       return { ok: true, status: 200, text: async () => diff };
     if (url.includes('/pulls/')) {
       return jsonResponse({
+        body,
         base: { sha: baseSha },
         changed_files: 3,
         head: headSha ? { sha: headSha } : undefined,
@@ -726,5 +728,67 @@ describe('internal-pr-review call-site context', () => {
     });
     assert.match(prompt, /must\s+cite a call site/);
     assert.match(prompt, /Call sites on the base branch[\s\S]*scripts\/c\.mjs/);
+  });
+});
+
+describe('capability/IA planning review integration (JOV-INV-044)', () => {
+  it('delivers exact-head PR evidence and deliberate-red IA findings to the existing reviewer', async () => {
+    const body =
+      '```json\n' +
+      JSON.stringify({
+        planningDecisions: {
+          binding: {
+            repository: ENV.REPOSITORY,
+            head: HEAD_SHA,
+            policyDigest: 'stale',
+            policyVersion: 1,
+          },
+          outcome: 'Work file uploads',
+          requirementsRef: 'issue:v1',
+          assumptionsRef: 'security:v1',
+          sourcing: [],
+          ia: [
+            {
+              surface: 'Work media slots',
+              disposition: 'no new surface',
+              before: { controls: 1 },
+              after: { controls: 5 },
+            },
+          ],
+        },
+      }) +
+      '\n```';
+    const { calls, fetchImpl } = fakeFetch({
+      body,
+      diff: 'diff --git a/apps/web/work.tsx b/apps/web/work.tsx\n+<Button>Add video</Button>',
+      gateway: {
+        body: {
+          choices: [
+            { finish_reason: 'stop', message: { content: 'fixture response' } },
+          ],
+        },
+      },
+    });
+    const result = await run({ env: ENV, fetchImpl, log: () => {} });
+    assert.equal(result.outcome, 'reviewed');
+    const prompt = JSON.parse(
+      calls.find(c => c.url.includes('/chat/completions')).body
+    ).messages[0].content;
+    assert.ok(prompt.includes(body));
+    assert.ok(prompt.includes(HEAD_SHA));
+    assert.match(prompt, /unexplained surface growth/);
+    assert.match(prompt, /binding.policyDigest: stale/);
+    assert.match(prompt, /trusted base/);
+    assert.match(prompt, /These diagnostics never block delivery/);
+    const posted = JSON.parse(
+      calls.find(c => c.method === 'POST' && c.url.includes('/issues/')).body
+    ).body;
+    const diagnostic = JSON.parse(/```json\n([\s\S]*?)\n```/.exec(posted)[1]);
+    assert.equal(diagnostic.mode, 'shadow');
+    assert.equal(diagnostic.blocking, false);
+    assert.equal(diagnostic.head, HEAD_SHA);
+    assert.ok(
+      diagnostic.findings.some(f => f.includes('unexplained surface growth'))
+    );
   });
 });

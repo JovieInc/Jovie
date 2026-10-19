@@ -79,6 +79,21 @@ Two bounded pilots are nominated in the registry:
 
 Both run through the advisory Jev transport; neither is production activation.
 
+The already-landed ops pilot buffers its complete report. For condition-backed
+pilot reports, the existing Python Linear adapter runs `ops-report.mjs --verify`
+to recheck the exact message, audience, destination, current policy,
+evidence digest/freshness and resolved
+model before issue creation. Invalidated or unavailable review uses the existing
+deterministic emergency notice. Approved factual templates are explicitly labeled
+unreviewed; a model verdict grants no sending authority. Metadata receipts remain
+in the existing doctor condition state without raw message text.
+
+Ship now: this bounded ops adapter repair (JOV-3723). Re-evaluate when JOV-3722's
+typed product revision outcome and JOV-6476 calibration are available. Then:
+JOV-8428 owns product buffering and owner-routed connector/publisher slices;
+JOV-6414 owns canary admission and rollback. The product stream remains advisory;
+this repair does not activate semantic enforcement or establish deployed proof.
+
 The product runner lives in
 [`jev-product-response-pilot.mjs`](../../scripts/invariants/jev-product-response-pilot.mjs)
 (JOV-8413). A trusted runner injects `executeChatTurn`, `reviseWritingPilot`,

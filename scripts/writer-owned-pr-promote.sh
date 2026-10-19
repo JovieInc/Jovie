@@ -143,15 +143,26 @@ if [[ "$receipt_rc" -ne 0 || "$action" == "block" ]]; then
   emit_blocker_and_exit "proof" "$reason" "$compensate" "$before"
 fi
 [[ "$action" != "compensate" ]] || emit_blocker_and_exit "precondition" "$reason" 1
-[[ "$action" == "already-complete" ]] && { echo "writer promotion already complete for #$PR_NUMBER@$EXPECTED_HEAD"; exit 0; }
-[[ "$action" == "promote" ]] || emit_blocker_and_exit "precondition" "$reason" 0
+if [[ "$action" == "already-complete" && "$(jq -r '.state' <<<"$before")" == "MERGED" ]]; then
+  echo "writer promotion already complete for #$PR_NUMBER@$EXPECTED_HEAD"; exit 0
+fi
+[[ "$action" == "promote" || "$action" == "already-complete" ]] || emit_blocker_and_exit "precondition" "$reason" 0
 current_body="$(jq -r '.body // ""' <<<"$before")"
 new_body="$(jq -nc --arg body "$current_body" --argjson receipt "$receipt" '{body:$body,receipt:$receipt}' | node "$PROMOTION_LIB" attach)"
 [[ "$DRY_RUN" == "1" ]] && { echo "    [dry-run] would attach writer proof and mark ready #$PR_NUMBER@$EXPECTED_HEAD"; exit 0; }
 gh_retry pr edit "$PR_NUMBER" -R "$REPO" --body "$new_body" >/dev/null || emit_blocker_and_exit "proof-attach" "pr-body-update-failed" 0
-gh_retry pr ready "$PR_NUMBER" -R "$REPO" >/dev/null 2>&1 || emit_blocker_and_exit "ready" "gh-pr-ready-failed" 1
+attached="$(read_state)" || emit_blocker_and_exit "proof-attach" "state-reread-failed" 0
+persisted_receipt="$(jq -r '.body' <<<"$attached" | node "$PROMOTION_LIB" extract)"
+attached_decision="$(decision_for "$persisted_receipt" "$attached")"
+attached_action="$(jq -r '.action' <<<"$attached_decision")"
+[[ "$attached_action" == "promote" || "$attached_action" == "already-complete" ]] || emit_blocker_and_exit "proof-attach" "persisted-proof:$(jq -r '.reason' <<<"$attached_decision")" 0
+if [[ "$attached_action" == "already-complete" ]]; then
+  echo "writer promotion already complete for #$PR_NUMBER@$EXPECTED_HEAD; persisted proof verified"; exit 0
+fi
+gh pr ready "$PR_NUMBER" -R "$REPO" >/dev/null 2>&1 || emit_blocker_and_exit "ready" "gh-pr-ready-failed" 1
 after="$(read_state)" || emit_blocker_and_exit "postcondition-unknown" "state-reread-failed; owner reconciliation required" 0
-postcondition="$(decision_for "$receipt" "$after")"
+persisted_receipt="$(jq -r '.body' <<<"$after" | node "$PROMOTION_LIB" extract)"
+postcondition="$(decision_for "$persisted_receipt" "$after")"
 if [[ "$(jq -r '.action' <<<"$postcondition")" != "already-complete" ]]; then emit_blocker_and_exit "postcondition-unknown" "$(jq -r '.reason' <<<"$postcondition"); owner reconciliation required" 0; fi
 upsert_status_comment "Writer-owned PR promotion completed for exact head \`$EXPECTED_HEAD\` using \`jovie-writer-pr-proof/v1\`: marked ready. Merge Queue Green Enroll admits it once required checks are green."
 echo "writer promotion complete for #$PR_NUMBER@$EXPECTED_HEAD"

@@ -151,7 +151,9 @@ jobs:
           source "${HOME}/.config/symphony/summer-bottleneck.env"
           source "${HOME}/.config/symphony/summer-bottleneck-signing.env"
           set +a
-          timeout 90s node scripts/backlog-orchestrator/triage-event-assess.mjs \
+          # Existing bounded Triage plus Backlog catch-up; same job, cadence,
+          # credentials and provider budgets. Each write retains its own fence.
+          timeout 300s node scripts/backlog-orchestrator/triage-event-assess.mjs \
             --sweep > "$RECEIPT_FILE"
 
       - name: Preserve Triage catch-up receipt
@@ -206,7 +208,9 @@ jobs:
           # shellcheck disable=SC1090
           source "$signing_env"
           set +a
-          timeout 60s node scripts/backlog-orchestrator/triage-event-assess.mjs \
+          # Native preparation is measured before the short mutation fence.
+          # Preserve the enclosing five-minute job limit and one-event writer.
+          timeout 180s node scripts/backlog-orchestrator/triage-event-assess.mjs \
             --event-file="$GITHUB_EVENT_PATH" > "$RECEIPT_FILE"
           jq -e '.schema == "linear-triage-assessment/v1"' "$RECEIPT_FILE"
       - name: Preserve exact assessment receipt

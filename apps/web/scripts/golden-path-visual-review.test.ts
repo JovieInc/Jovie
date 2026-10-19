@@ -3,7 +3,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  acceptModelVerdict,
   confirmedBlockers,
+  isKnownArtistIdentityFalsePositive,
   type KeyframeRecord,
   type KeyframeVerdict,
   main,
@@ -255,6 +257,37 @@ describe('golden path visual review', () => {
     }
   });
 
+  it('treats the golden-path artist name as identity, not a placeholder', () => {
+    const confirmed = [
+      "content: placeholder username 'UNMARKED.' rendered in the greeting 'Good afternoon, UNMARKED.' on the home welcome screen — raw placeholder value shown instead of the user's name",
+      "content: Greeting shows placeholder text 'UNMARKED.' instead of the user's name ('Good afternoon, UNMARKED.') on the welcome screen",
+      "content: unresolved placeholder value 'UNMARKED' rendered as the user's name in the greeting 'Good afternoon, UNMARKED.'",
+      "content: Greeting displays raw placeholder text 'UNMARKED.' instead of the user's name",
+    ];
+    for (const finding of confirmed)
+      expect(isKnownArtistIdentityFalsePositive(finding)).toBe(true);
+    expect(
+      isKnownArtistIdentityFalsePositive('layout: UNMARKED title clipped')
+    ).toBe(false);
+    expect(
+      isKnownArtistIdentityFalsePositive(
+        'content: NaN shown beside UNMARKED in the greeting'
+      )
+    ).toBe(false);
+    expect(
+      isKnownArtistIdentityFalsePositive('content: undefined in the greeting')
+    ).toBe(false);
+    expect(
+      acceptModelVerdict({ verdict: 'blocker', findings: confirmed })
+    ).toEqual({ verdict: 'pass', findings: [] });
+    expect(
+      acceptModelVerdict({
+        verdict: 'blocker',
+        findings: ['layout: CTA clipped', confirmed[0]!],
+      })
+    ).toEqual({ verdict: 'blocker', findings: ['layout: CTA clipped'] });
+  });
+
   it('flags a keyframe when either model sample finds a blocker', () => {
     const pass = { verdict: 'pass', findings: [] } as const;
     const block = {
@@ -354,9 +387,50 @@ describe('golden path visual review', () => {
       );
       const written = JSON.parse(readFileSync(out, 'utf8'));
       expect(calls).toBe(2);
-      expect(written.rubricVersion).toBe('golden-path-user-blocking/v2');
+      expect(written.rubricVersion).toBe('golden-path-user-blocking/v3');
       expect(written.suspected).toEqual(['public-profile']);
       expect(written.keyframes[0].modelSamples).toHaveLength(2);
+    });
+
+    it('does not confirm a blocker that only objects to the artist name UNMARKED', async () => {
+      const dir = setupDir(record({ viewport: { width: 390, height: 844 } }));
+      const out = join(dir, 'replay.json');
+      const confirm = join(dir, 'first.json');
+      writeFileSync(
+        confirm,
+        JSON.stringify({ keyframes: [verdict('public-profile', true)] })
+      );
+      const exitSpy = vi
+        .spyOn(process, 'exit')
+        .mockImplementation((() => undefined) as never);
+      const finding =
+        "content: placeholder username 'UNMARKED.' rendered in the greeting 'Good afternoon, UNMARKED.'";
+      const falsePositiveFetch = async () =>
+        Response.json({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  verdict: 'blocker',
+                  findings: [finding],
+                }),
+              },
+            },
+          ],
+        });
+      await main(
+        ['--dir', dir, '--out', out, '--confirm-against', confirm],
+        { AI_GATEWAY_API_KEY: 'k', VISUAL_REVIEW_BASE_URL: 'https://gw.test' },
+        falsePositiveFetch
+      );
+      const written = JSON.parse(readFileSync(out, 'utf8'));
+      expect(written.suspected).toEqual([]);
+      expect(written.confirmed).toEqual([]);
+      expect(written.keyframes[0].model).toEqual({
+        verdict: 'pass',
+        findings: [],
+      });
+      expect(exitSpy).not.toHaveBeenCalled();
     });
 
     it('exits 1 only when the replay confirms a suspected keyframe', async () => {

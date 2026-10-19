@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 
 import {
+  installationQuotaLog,
+  isInstallationQuota403,
+} from './lib/github-installation-quota.mjs';
+import {
   closeLinearIssueByFingerprint,
   logRemediationDryRun,
   remediationTriggersEnabled,
@@ -86,59 +90,110 @@ export async function applyDocsDeployPlan(
   });
 }
 
-async function main() {
-  const token = process.env.GITHUB_TOKEN;
-  const repo = process.env.GITHUB_REPOSITORY || 'JovieInc/Jovie';
-  if (!token) {
-    console.log(
-      JSON.stringify({ ok: true, action: 'skip', reason: 'missing_token' })
+/**
+ * Installation-quota 403s defer the signal. A permission 403 and every other
+ * list failure still throw. Defer never resolves a Linear issue and never
+ * reports the docs deploy as healthy.
+ * @param {Response} response
+ * @param {string} label
+ */
+async function classifyDocsResponse(response, label) {
+  if (response.ok) return { kind: 'ok' };
+  const text = await response.text();
+  if (isInstallationQuota403(text, response.status)) {
+    console.warn(installationQuotaLog(label));
+    console.warn(
+      `::warning::${label} deferred on an installation 403. The docs deployment was not confirmed healthy and no Linear issue was resolved.`
     );
-    return;
+    return {
+      kind: 'defer',
+      result: {
+        ok: true,
+        action: 'defer',
+        reason: 'installation_rate_limit',
+      },
+    };
   }
+  return { kind: 'fail', status: response.status };
+}
+
+/**
+ * @param {{
+ *   token?: string,
+ *   repo?: string,
+ *   fetchImpl?: typeof fetch,
+ *   runId?: string,
+ *   apply?: typeof applyDocsDeployPlan,
+ * }} [options]
+ */
+export async function intakeDocsDeploy({
+  token = process.env.GITHUB_TOKEN,
+  repo = process.env.GITHUB_REPOSITORY || 'JovieInc/Jovie',
+  fetchImpl = fetch,
+  runId = process.env.GITHUB_RUN_ID,
+  apply = applyDocsDeployPlan,
+} = {}) {
+  if (!token) return { ok: true, action: 'skip', reason: 'missing_token' };
   const headers = {
     Authorization: `Bearer ${token}`,
     Accept: 'application/vnd.github+json',
   };
-  const list = await fetch(
+  const signal = 'jovie-docs deploy signal';
+  const list = await fetchImpl(
     `https://api.github.com/repos/${repo}/deployments?environment=${encodeURIComponent(DOCS_ENVIRONMENT)}&per_page=5`,
     { headers }
   );
-  if (!list.ok) {
-    throw new Error(`docs deployment list failed: ${list.status}`);
+  const listed = await classifyDocsResponse(list, signal);
+  if (listed.kind === 'defer') return listed.result;
+  if (listed.kind === 'fail') {
+    throw new Error(`docs deployment list failed: ${listed.status}`);
   }
   const deployments = await list.json();
   const deployment = Array.isArray(deployments) ? deployments[0] : null;
   if (!deployment?.sha) {
-    console.log(
-      JSON.stringify({ ok: true, action: 'skip', reason: 'no_deployment' })
-    );
-    return;
+    return { ok: true, action: 'skip', reason: 'no_deployment' };
   }
-  const compare = await fetch(
+  const compare = await fetchImpl(
     `https://api.github.com/repos/${repo}/compare/${deployment.sha}...main`,
     { headers }
   );
+  const compared = await classifyDocsResponse(compare, signal);
+  if (compared.kind === 'defer') return compared.result;
+  if (compared.kind === 'fail' && compared.status === 403) {
+    throw new Error(`docs deployment compare failed: ${compared.status}`);
+  }
   const compareBody = /** @type {{ status?: string } | null} */ (
-    compare.ok ? await compare.json() : null
+    compared.kind === 'ok' ? await compare.json() : null
   );
   const onMain = docsShaOnMain(compareBody?.status);
-  const statuses = await fetch(
+  const statuses = await fetchImpl(
     `https://api.github.com/repos/${repo}/deployments/${deployment.id}/statuses?per_page=5`,
     { headers }
   );
-  const statusRows = statuses.ok ? await statuses.json() : [];
+  const statusResult = await classifyDocsResponse(statuses, signal);
+  if (statusResult.kind === 'defer') return statusResult.result;
+  if (statusResult.kind === 'fail' && statusResult.status === 403) {
+    throw new Error(`docs deployment statuses failed: ${statusResult.status}`);
+  }
+  const statusRows = statusResult.kind === 'ok' ? await statuses.json() : [];
   const status = Array.isArray(statusRows) ? statusRows[0]?.state : null;
   const plan = planDocsDeploy({ status, onMain });
-  const result = await applyDocsDeployPlan(plan, {
-    runId: process.env.GITHUB_RUN_ID,
+  const result = await apply(plan, {
+    runId,
     deploymentUrl: docsDeploymentUrl(
       deployment,
       Array.isArray(statusRows) ? statusRows[0] : null
     ),
+    fetchImpl,
   });
-  if (!result.ok)
+  if (!result.ok) {
     throw new Error(`docs deploy intake failed: ${result.reason}`);
-  console.log(JSON.stringify(result));
+  }
+  return result;
+}
+
+async function main() {
+  console.log(JSON.stringify(await intakeDocsDeploy()));
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

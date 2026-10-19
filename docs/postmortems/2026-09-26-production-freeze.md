@@ -162,6 +162,11 @@ Two independent mechanisms, in sequence:
 | [JOV-6689](https://linear.app/jovie/issue/JOV-6689) | CI: incident closure requires a post-mortem | `unowned-incident` | In Review | pending |
 | [JOV-6690](https://linear.app/jovie/issue/JOV-6690) | Summer review, GBrain mirror, weekly class review | `unowned-incident` | verified | [2026-10-14 injected end-to-end review](reports/2026-10-14-weekly-failure-class-review.json) |
 
+After the [2026-10-16 recurrence](2026-10-16-production-lineage-rest-quota.md),
+[JOV-8532](https://linear.app/jovie/issue/JOV-8532) owns class-level
+`serial-layer-discovery` hardening across release stages. Its live verification
+remains pending.
+
 ## Runbook until the controls ship
 
 If jov.ie lags `main` by more than 2 hours: read `/api/health/build-info`,

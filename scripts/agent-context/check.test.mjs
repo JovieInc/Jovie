@@ -327,15 +327,38 @@ test('CI invokes the same dependency-free package scripts on the mandatory risk 
   );
   assert.ok(section.includes('node --run agent-context:check'));
   assert.ok(section.includes('node --run agent-context:test'));
-  assert.ok(
-    !section
-      .slice(
-        section.indexOf(
-          '      - name: Evaluate repository instruction contracts'
-        )
-      )
-      .includes('continue-on-error')
+  const mergeGroupStep = section.slice(
+    section.indexOf('      - name: Evaluate repository instruction contracts')
   );
+  assert.ok(!mergeGroupStep.includes('continue-on-error'));
+  assert.ok(!mergeGroupStep.includes('if:'));
+});
+
+test('pull request source validation runs the same instruction-contract scripts', () => {
+  const workflow = readFileSync(
+    resolve(root, '.github/workflows/source-validation.yml'),
+    'utf8'
+  );
+  assert.match(workflow, /^  pull_request:/m);
+  const job = workflow.slice(
+    workflow.indexOf('  deterministic:'),
+    workflow.indexOf('\n  security:')
+  );
+  const start = job.indexOf(
+    '      - name: Evaluate repository instruction contracts'
+  );
+  assert.ok(start > 0);
+  const step = job.slice(start, job.indexOf('\n      - name:', start + 1));
+  assert.match(step, /test "\$\(git rev-parse HEAD\)" = "\$EXPECTED_HEAD"/);
+  assert.match(
+    step,
+    /node --run agent-context:check\n\s+node --run agent-context:test/
+  );
+  assert.ok(!step.includes('continue-on-error'));
+  assert.ok(!step.includes('if:'));
+  assert.ok(!step.includes('sparse-checkout'));
+  assert.ok(!step.includes('pnpm install'));
+  assert.ok(!step.includes('git diff --quiet'));
 });
 
 test('relocated registry rule keeps authoritative status and before/after audit gates', () => {

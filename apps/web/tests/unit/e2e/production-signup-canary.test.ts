@@ -3,6 +3,7 @@ import {
   buildProductionSignupEmail,
   extractClerkOtp,
   isProductionSyntheticSignupEmail,
+  syntheticOtpUnavailableReason,
   validateProductionSignupCanaryConfig,
   waitForProductionSignupOtp,
 } from '@/tests/e2e/utils/production-signup-canary';
@@ -79,6 +80,23 @@ describe('production signup canary helpers', () => {
     expect(result.missing).toEqual([]);
     expect(result.summary).toContain('E2E_PROD_OTP_CHECK_URL: SET');
     expect(result.summary).not.toContain('worker-token');
+  });
+
+  it('names absent Tim-only OTP secrets without treating a present set as skipped', () => {
+    expect(
+      syntheticOtpUnavailableReason({
+        E2E_PROD_OTP_CHECK_URL: 'https://otp.example/latest',
+      })
+    ).toBe(
+      'synthetic-otp-unavailable: missing E2E_PROD_OTP_CHECK_ORIGIN, E2E_PROD_OTP_CHECK_TOKEN (Tim-only Cloudflare mailbox secrets)'
+    );
+    expect(
+      syntheticOtpUnavailableReason({
+        E2E_PROD_OTP_CHECK_ORIGIN: 'https://otp.example',
+        E2E_PROD_OTP_CHECK_TOKEN: 'worker-token',
+        E2E_PROD_OTP_CHECK_URL: 'https://otp.example/latest',
+      })
+    ).toBeNull();
   });
 
   it('reports missing keys without leaking configured values', () => {

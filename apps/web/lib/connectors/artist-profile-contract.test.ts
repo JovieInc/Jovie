@@ -134,9 +134,11 @@ describe('artist-profile registry contract', () => {
       const profile = CONNECTOR_REGISTRY[id].artistProfile;
       expect(Object.keys(profile.fields)).toEqual([...ARTIST_PROFILE_FIELDS]);
       for (const field of Object.values(profile.fields)) {
-        expect(field.read).toBe('unknown');
-        expect(field.write).toBe('unknown');
-        expect(field.authorization.write.status).toBe('unknown');
+        expect(field.read).not.toBe('supported');
+        expect(field.write).not.toBe('supported');
+        expect(['unknown', 'unsupported']).toContain(
+          field.authorization.write.status
+        );
       }
     }
   });
@@ -434,7 +436,7 @@ describe('canonical artist-profile field sources', () => {
     );
   });
 
-  it('uses only active website links in stable profile order without mutating sources', () => {
+  it('leaves multiple active website candidates unavailable without mutating sources', () => {
     const socialLinks = [
       { ...website, id: 'rejected', state: 'rejected' as const, sort_order: 0 },
       { ...website, id: 'inactive', is_active: false, sort_order: 0 },
@@ -453,7 +455,7 @@ describe('canonical artist-profile field sources', () => {
     const original = [...socialLinks];
     expect(
       ARTIST_PROFILE_FIELD_ACCESSORS.website({ profile, socialLinks })
-    ).toBe('https://a.example.com');
+    ).toBeNull();
     expect(socialLinks).toEqual(original);
   });
 

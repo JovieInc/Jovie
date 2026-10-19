@@ -178,9 +178,10 @@ export function prepareQueueJUnit({
 }
 export function main() {
   fact(
-    process.env.QUARANTINE_AUTO_HEAL_ENABLED === 'true' &&
-      process.env.GITHUB_EVENT_NAME === 'workflow_run',
-    'JUnit publication is disabled'
+    process.env.GITHUB_EVENT_NAME === 'workflow_run' ||
+      (process.env.GITHUB_EVENT_NAME === 'workflow_dispatch' &&
+        /^[1-9]\d*$/.test(process.env.QUEUE_JUNIT_RUN_ID ?? '')),
+    'JUnit publication requires a completed CI run'
   );
   const api = path =>
     JSON.parse(
@@ -190,8 +191,14 @@ export function main() {
         maxBuffer: 16 * 1024 * 1024,
       })
     );
+  const event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
+  if (process.env.GITHUB_EVENT_NAME === 'workflow_dispatch') {
+    const runId = Number(process.env.QUEUE_JUNIT_RUN_ID);
+    fact(positive(runId), 'Invalid queue run identifier');
+    event.workflow_run = api(`repos/${REPO}/actions/runs/${runId}`);
+  }
   const result = prepareQueueJUnit({
-    event: JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8')),
+    event,
     api,
     outputRoot: resolve('queue-junit'),
   });

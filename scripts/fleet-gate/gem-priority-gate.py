@@ -19,6 +19,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import time
@@ -818,10 +819,122 @@ def observe_main(repo: str) -> dict[str, Any]:
         }
 
 
+def native_user_bus_environment(home: Path, *, runtime_root: Path = Path("/run/user")) -> dict[str, str]:
+    """Supply the existing same-user bus when a service runner lacks login context."""
+    env = dict(os.environ)
+    uid = os.geteuid()
+    runtime = runtime_root / str(uid)
+    canonical = {"XDG_RUNTIME_DIR": str(runtime),
+                 "DBUS_SESSION_BUS_ADDRESS": "unix:path=" + str(runtime / "bus")}
+    # Never redirect an explicitly different context or cross a user boundary.
+    if any(env.get(key) and env[key] != value for key, value in canonical.items()):
+        raise ValueError("native controller user bus identity mismatch")
+    if all(env.get(key) == value for key, value in canonical.items()):
+        return env
+    if home.stat().st_uid != uid:
+        raise ValueError("native controller user identity mismatch")
+    directory, socket = runtime.lstat(), (runtime / "bus").lstat()
+    if (not stat.S_ISDIR(directory.st_mode) or directory.st_uid != uid
+            or directory.st_mode & 0o022
+            or not stat.S_ISSOCK(socket.st_mode) or socket.st_uid != uid):
+        raise ValueError("native controller user bus unavailable")
+    return {**env, **canonical}
+
+
+def observe_native_controller(state_dir: Path, now: datetime) -> dict[str, Any]:
+    """Observe the installed lanes runtime; a retired HTTP endpoint is not authority."""
+    failed = {"status": "failed", "kind": "native-lanes", "source": "native-runtime",
+              "observedAt": isoformat(now)}
+    try:
+        state = state_dir.resolve(strict=True)
+        home = state.parents[2]
+        if state != home / ".local/state/jovie-lanes" or not (state / "current").is_symlink():
+            raise ValueError("native state identity unavailable")
+        release = (state / "current").resolve(strict=True)
+        parts = release.relative_to(state / "releases").parts
+        if len(parts) != 3 or parts[1:] != ("scripts", "lanes") or not re.fullmatch(r"[0-9a-f]{64}", parts[0]):
+            raise ValueError("installed release identity unavailable")
+        manifest_path, tick_path = release / ".release.json", state / "tick.json"
+        if manifest_path.is_symlink() or tick_path.is_symlink():
+            raise ValueError("native evidence is not a regular receipt")
+        manifest_bytes, tick_bytes = manifest_path.read_bytes(), tick_path.read_bytes()
+        manifest, tick = json.loads(manifest_bytes), json.loads(tick_bytes)
+        objects = manifest.get("objects")
+        revision = manifest.get("sourceCommit")
+        if (manifest.get("schema") != "jovie-lane-release-bundle/v1"
+                or not valid_commit_sha(revision, exact=True) or not isinstance(objects, dict)
+                or manifest.get("bundleDigest") != parts[0]
+                or hashlib.sha256(json.dumps(objects, sort_keys=True, separators=(",", ":")).encode()).hexdigest() != parts[0]):
+            raise ValueError("installed release manifest mismatch")
+        runner = release / "lane_runner.py"
+        if runner.is_symlink():
+            raise ValueError("installed runner identity unavailable")
+        runner_bytes = runner.read_bytes()
+        git = subprocess.run(
+            ["git", "--no-optional-locks", "-c", "core.hooksPath=" + os.devnull,
+             "-C", str(home / "devin-sweep/Jovie"), "rev-parse",
+             revision + ":scripts/lanes", revision + ":scripts/lanes/lane_runner.py"],
+            capture_output=True, text=True, check=True, timeout=5,
+            env={**{key: value for key, value in os.environ.items() if not key.startswith("GIT_")},
+                 "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull,
+                 "GIT_CONFIG_SYSTEM": os.devnull, "GIT_NO_REPLACE_OBJECTS": "1",
+                 "GIT_NO_LAZY_FETCH": "1", "GIT_OPTIONAL_LOCKS": "0"})
+        identities = git.stdout.splitlines()
+        runner_blob = hashlib.sha1(b"blob " + str(len(runner_bytes)).encode() + b"\0" + runner_bytes).hexdigest()
+        if identities != [objects.get("scripts/lanes"), runner_blob]:
+            raise ValueError("installed runner does not match its source revision")
+        tick_at = tick.get("at")
+        observed = (datetime.fromisoformat(tick_at.replace("Z", "+00:00"))
+                    if isinstance(tick_at, str) else None)
+        tick_revision = tick.get("release")
+        if (observed is None or observed.tzinfo is None or observed.utcoffset() is None
+                or not -timedelta(seconds=30) <= now - observed <= CONTROLLER_SNAPSHOT_TTL
+                or not isinstance(tick_revision, str) or not re.fullmatch(r"[0-9a-f]{7,40}", tick_revision)
+                or not str(objects.get("scripts/lanes", "")).startswith(tick_revision) or "error" not in tick or tick["error"] is not None):
+            raise ValueError("native controller tick is stale, failed or unbound")
+        unit_read = subprocess.run(
+            ["systemctl", "--user", "show", "jovie-lanes.service", "jovie-lanes.timer",
+             "--property=Id,ActiveState,SubState,Result,ExecMainStatus,ExecStart,FragmentPath,Unit"],
+            capture_output=True, text=True, check=True, timeout=5,
+            env=native_user_bus_environment(home))
+        units = {}
+        for block in unit_read.stdout.strip().split("\n\n"):
+            fields = dict(line.split("=", 1) for line in block.splitlines() if "=" in line)
+            units[fields.get("Id")] = fields
+        service, timer = units.get("jovie-lanes.service", {}), units.get("jovie-lanes.timer", {})
+        runner_command = "python3 " + str(state / "current/lane_runner.py")
+        expected_script = (runner_command + " update; python3 "
+                           + str(state / "current/codex_lane.py") + " reconcile --if-due 3600; exec "
+                           + runner_command + " dispatch")
+        expected_exec = "{ path=/bin/bash ; argv[]=/bin/bash -c " + expected_script + " ; ignore_errors=no ;"
+        service_states = {"active": "running", "activating": "start", "inactive": "dead"}
+        if (service.get("Result") != "success" or service.get("ExecMainStatus") != "0"
+                or service.get("ActiveState") not in service_states
+                or service_states[service["ActiveState"]] != service.get("SubState")
+                or service.get("FragmentPath") != str(home / ".config/systemd/user/jovie-lanes.service")
+                or not service.get("ExecStart", "").startswith(expected_exec)
+                or timer.get("ActiveState") != "active" or timer.get("Result") != "success"
+                or timer.get("SubState") not in {"waiting", "running"}
+                or timer.get("FragmentPath") != str(home / ".config/systemd/user/jovie-lanes.timer")
+                or timer.get("Unit") != "jovie-lanes.service"):
+            raise ValueError("native controller service identity or health unavailable")
+        if ((state / "current").resolve(strict=True) != release
+                or manifest_path.read_bytes() != manifest_bytes or tick_path.read_bytes() != tick_bytes
+                or runner.read_bytes() != runner_bytes):
+            raise ValueError("native controller evidence changed during observation")
+        return {"status": "green", "kind": "native-lanes", "source": "native-runtime",
+                "observedAt": isoformat(now), "tickAt": tick["at"],
+                "sourceCommit": revision, "bundleDigest": parts[0],
+                "service": "jovie-lanes.service", "timer": "jovie-lanes.timer"}
+    except (OSError, ValueError, TypeError, IndexError, AttributeError, subprocess.SubprocessError):
+        return {**failed, "error": "native-controller-evidence-unavailable"}
+
+
 def observe_controller(
     url: str,
     snapshot_path: Path | None = None,
     now: datetime | None = None,
+    native_state_dir: Path | None = None,
 ) -> dict[str, Any]:
     """Observe Symphony :4041. Connection blips must not flip hold-intake to blocked.
 
@@ -831,6 +944,8 @@ def observe_controller(
     queue observation (connection refused / timeout).
     """
     observed_at = now or utc_now()
+    if native_state_dir is not None:
+        return observe_native_controller(native_state_dir, observed_at)
     try:
         with urllib.request.urlopen(url, timeout=5) as response:  # noqa: S310 - fixed local URL by default
             value = json.loads(response.read().decode("utf-8"))
@@ -3461,6 +3576,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--queue-target", type=int, default=15)
     parser.add_argument("--production-url", default=None)
     parser.add_argument("--symphony-url", default="http://127.0.0.1:4041/api/v1/state")
+    parser.add_argument("--native-controller-state-dir", type=Path,
+                        default=Path.home() / ".local/state/jovie-lanes")
     parser.add_argument(
         "--lease-guard-bin",
         default=os.environ.get("SYMPHONY_LEASE_GUARD_BIN")
@@ -3520,12 +3637,16 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
         args.independent_review_receipt
         or fleet_sidecar_path(args.state_dir, args.repo, "independent-review.json")
     )
+    native_state = (getattr(args, "native_controller_state_dir", None)
+                    if args.symphony_url.rstrip("/") == "http://127.0.0.1:4041/api/v1/state" else None)
+    controller_options = {"native_state_dir": native_state} if native_state is not None else {}
     controller = observe_controller(
         args.symphony_url,
         snapshot_path=fleet_sidecar_path(
             args.state_dir, args.repo, "controller-snapshot.json"
         ),
         now=now,
+        **controller_options,
     )
     closure = observe_closure_health(
         args.repo,

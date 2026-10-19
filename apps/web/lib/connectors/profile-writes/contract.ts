@@ -27,6 +27,10 @@ export const providerWriteResultSchema = z.object({
 });
 
 export interface ProfileWriteManifest {
+  /** Email receipts attest submission only; they never attest a destination mutation. */
+  readonly operation?: 'email-submission';
+  readonly recipient?: string;
+  readonly maxBioLength?: number;
   readonly providerId: string;
   readonly version: string;
   readonly fields: readonly (keyof ProfileValues)[];
@@ -40,12 +44,15 @@ export interface ProfileWriteManifest {
 }
 
 export interface ProfileDestination {
+  readonly creatorProfileId?: string;
   readonly connectorAccountId: string;
   readonly destinationAccountId: string;
   readonly providerId: string;
 }
 
 export interface ProfileWriteProposal extends ProfileDestination {
+  readonly operation?: 'email-submission';
+  readonly recipient?: string;
   readonly id: string;
   readonly userId: string;
   readonly manifestVersion: string;
@@ -62,6 +69,7 @@ export type ReceiptResult =
   | 'proposed'
   | 'approved'
   | 'started'
+  | 'submitted'
   | 'succeeded'
   | 'partial'
   | 'failed'
@@ -104,12 +112,13 @@ export interface ProfileWriteLedger {
 export interface ProfileWriteAdapter {
   readonly manifest: ProfileWriteManifest;
   read(destination: ProfileDestination): Promise<DestinationSnapshot>;
-  /** The provider MUST atomically reject a stale expectedVersion before mutation. */
+  /** Mutations require atomic version rejection; submissions recheck the canonical source. */
   write(input: {
     destination: ProfileDestination;
     expectedVersion: string;
     values: ProfileValues;
     idempotencyKey: string;
+    manifestDigest: string;
   }): Promise<z.infer<typeof providerWriteResultSchema>>;
 }
 

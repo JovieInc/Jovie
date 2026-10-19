@@ -60,8 +60,12 @@ function decision() {
   if (mode === 'monitor') {
     const decided = decideMonitorSignal({
       conclusion: env.REMEDIATION_CONCLUSION,
+      fingerprint: env.REMEDIATION_FINGERPRINT,
     });
-    return { ...decided, fingerprint: env.REMEDIATION_FINGERPRINT };
+    return {
+      ...decided,
+      fingerprint: decided.fingerprint || env.REMEDIATION_FINGERPRINT,
+    };
   }
   return { action: 'skip', reason: 'unknown_mode' };
 }

@@ -564,12 +564,21 @@ export {
 } from './feature-flags';
 // Feedback
 export {
+  type FeedbackClassification,
+  type FeedbackDecisionKind,
+  type FeedbackDecisionRow,
+  type FeedbackDisposition,
   type FeedbackItem,
   type FeedbackVote,
+  feedbackClassificationEnumValues,
+  feedbackDecisionEnumValues,
+  feedbackDecisions,
+  feedbackDispositionEnumValues,
   feedbackItems,
   feedbackStatusEnumValues,
   feedbackVoteEnumValues,
   insertFeedbackItemSchema,
+  type NewFeedbackDecisionRow,
   type NewFeedbackItem,
   selectFeedbackItemSchema,
 } from './feedback';
@@ -1337,6 +1346,12 @@ export {
   type RiderSection,
   type RiderVisibility,
 } from './riders';
+// Owner-isolated royalty evidence
+export {
+  royaltySources,
+  royaltyStatementLines,
+  royaltyStatementVersions,
+} from './royalties';
 // Sender (Email Quotas, Sending Reputation, Send Attribution)
 export {
   type CreatorEmailQuota,

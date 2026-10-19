@@ -12,6 +12,8 @@ interface RailToggleButtonProps {
   readonly side: 'left' | 'right';
   readonly open: boolean;
   readonly pinned?: boolean;
+  /** In-content controls opt out so a floating preview cannot cover them. */
+  readonly previewTrigger?: boolean;
   readonly openLabel: string;
   readonly closedLabel: string;
   readonly onToggle: () => void;
@@ -32,6 +34,7 @@ export function RailToggleButton({
   side,
   open,
   pinned,
+  previewTrigger = true,
   openLabel,
   closedLabel,
   onToggle,
@@ -59,6 +62,7 @@ export function RailToggleButton({
       disabled={disabled}
       data-testid={dataTestId}
       data-rail-toggle={side}
+      data-rail-preview-trigger={previewTrigger ? undefined : 'false'}
       className={cn(RAIL_TOGGLE_BUTTON_CLASS, className)}
     >
       <Icon

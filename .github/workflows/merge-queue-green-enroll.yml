@@ -38,7 +38,7 @@ on:
   # an unchanged head never earns a second CI flight), so this is the wake
   # that admits an already-green head. Sole ready_for_review subscriber.
   pull_request_target:
-    types: [labeled, unlabeled, reopened, ready_for_review, synchronize]
+    types: [converted_to_draft, labeled, unlabeled, reopened, ready_for_review, synchronize]
   # Event-driven reconciliation (JOV-7589): every landing on main re-scans the
   # roster (re-enrolls green heads whose dequeue left no wake) and re-checks
   # hold receipts, so neither waits on a timer. Pushes coalesce into the one
@@ -60,12 +60,15 @@ permissions: {}
 
 concurrency:
   # A global pending slot loses another PR's final wake. Coalesce only wakes
-  # attributed to the same PR. An association-free receipt coalesces with the
-  # same workflow on the same head, and a different workflow keeps its own slot
-  # so a success cannot replace a failure hold. Receipts with no head stay on
-  # their run ID.
-  group: merge-queue-green-enroll-${{ ((github.event_name == 'workflow_dispatch' && inputs.pr_number == '') || github.event_name == 'push') && 'reconcile' || inputs.pr_number || github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || (github.event.workflow_run.head_sha && format('{0}-{1}', github.event.workflow_run.head_sha, github.event.workflow_run.name)) || github.event.workflow_run.id || github.run_id }}
-  cancel-in-progress: false
+  # attributed to the same PR. Successful pull_request completions share one
+  # cancellable slot per PR (or head, when the receipt has no PR number) so
+  # Source Validation, Fork PR Gate, and PR Size Guard do not each mint a
+  # token. That slot is distinct from pull_request_target, so a green wake
+  # cannot cancel a draft dequeue. Failure holds, merge-group receipts, and
+  # association-free non-success receipts keep a per-workflow slot. A success
+  # must not replace a failure hold. Receipts with no head stay on their run ID.
+  group: merge-queue-green-enroll-${{ ((github.event_name == 'workflow_dispatch' && inputs.pr_number == '') || github.event_name == 'push') && 'reconcile' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event != 'merge_group' && format('success-{0}', github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_sha || github.event.workflow_run.id)) || inputs.pr_number || github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || (github.event.workflow_run.head_sha && format('{0}-{1}', github.event.workflow_run.head_sha, github.event.workflow_run.name)) || github.event.workflow_run.id || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event != 'merge_group' }}
 
 jobs:
   hold-failed-revision:
@@ -150,6 +153,16 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Debounce repeated green wakes
+        # The newer success cancels this run during the sleep, before the
+        # Jovie Bot token is minted. Failure holds and merge-group receipts
+        # do not sleep.
+        if: >-
+          github.event_name == 'workflow_run' &&
+          github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.event != 'merge_group'
+        run: sleep 20
+
       - name: Checkout trusted failure policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -235,6 +248,10 @@ jobs:
               });
             } else {
               let numbers = [];
+              const associatedByNumber = new Map();
+              // A merge-group head_sha is the synthetic queue commit. Keep
+              // pulls.get on that path so the candidate carries the source head.
+              let sourceHeadSha = '';
               if (context.eventName === 'workflow_dispatch') {
                 numbers = [dispatchedPr];
               } else if (context.eventName === 'pull_request_target') {
@@ -254,26 +271,56 @@ jobs:
                   });
                   numbers = [parsed.prNumber];
                 }
+                if (run.event !== 'merge_group' && /^[a-f0-9]{40}$/.test(run.head_sha || '')) {
+                  sourceHeadSha = run.head_sha;
+                }
                 // PR-target workflow receipts can omit their pull_requests association.
                 // Resolve only the exact source SHA and branch, never a fallback full scan.
                 // GET /repos/{owner}/{repo}/commits/{commit_sha}/pulls is
                 // repos.listPullRequestsAssociatedWithCommit. github.rest.commits
                 // does not exist, so calling it throws before any enqueue.
-                if (numbers.length === 0 && /^[a-f0-9]{40}$/.test(run.head_sha || '') && run.head_branch) {
+                if (numbers.length === 0 && sourceHeadSha && run.head_branch) {
                   const pages = await github.paginate(github.rest.repos.listPullRequestsAssociatedWithCommit, {
-                    owner, repo, commit_sha: run.head_sha, per_page: 100,
+                    owner, repo, commit_sha: sourceHeadSha, per_page: 100,
                   });
                   const associated = Array.isArray(pages) ? pages : [];
-                  numbers = associated.flatMap(pr => {
-                    if (!pr || pr.state !== 'open' || pr.base?.ref !== 'main') return [];
-                    if (pr.head?.sha !== run.head_sha || pr.head?.ref !== run.head_branch) return [];
-                    if (pr.head?.repo?.full_name !== `${owner}/${repo}`) return [];
-                    return validNumber(pr.number) ? [pr.number] : [];
-                  });
+                  numbers = [];
+                  for (const pr of associated) {
+                    if (!pr || pr.state !== 'open' || pr.base?.ref !== 'main') continue;
+                    if (pr.head?.sha !== sourceHeadSha || pr.head?.ref !== run.head_branch) continue;
+                    if (pr.head?.repo?.full_name !== `${owner}/${repo}`) continue;
+                    if (!validNumber(pr.number) || associatedByNumber.has(pr.number)) continue;
+                    numbers.push(pr.number);
+                    associatedByNumber.set(pr.number, pr);
+                  }
                 }
               }
               prs = [];
               for (const number of new Set(numbers)) {
+                const known = associatedByNumber.get(number);
+                if (known) {
+                  // The association payload is already the open main candidate.
+                  // pulls.get would repeat that REST read.
+                  prs.push({
+                    ...known,
+                    draft: known.draft === true,
+                    labels: Array.isArray(known.labels) ? known.labels : [],
+                  });
+                  continue;
+                }
+                if (sourceHeadSha) {
+                  // GraphQL readPr is the admission proof and checks this SHA.
+                  // The event already supplied it, so pulls.get is not a proof.
+                  prs.push({
+                    number,
+                    draft: false,
+                    state: 'open',
+                    base: { ref: 'main' },
+                    head: { sha: sourceHeadSha, repo: { full_name: `${owner}/${repo}` } },
+                    labels: [],
+                  });
+                  continue;
+                }
                 const { data } = await github.rest.pulls.get({ owner, repo, pull_number: number });
                 if (data.state === 'open' && data.base.ref === 'main') prs.push(data);
               }
@@ -594,6 +641,57 @@ jobs:
             }
             core.info(`enqueued=${enqueued}`);
 
+  # Conversion to draft does not remove GitHub's native queue entry. Reuse the
+  # existing exact-head/entry guard under the same admission owner, even during
+  # a queue freeze. Never run PR code or grant new installation permissions.
+  dequeue-draft:
+    name: Dequeue an exact draft head
+    if: github.event_name == 'pull_request_target' && github.event.action == 'converted_to_draft'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout trusted queue policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          sparse-checkout: |
+            .nvmrc
+            scripts/merge-queue-backend.mjs
+            scripts/lib/merge-queue-guard.mjs
+            scripts/lib/pre-land-changelog.mjs
+            scripts/version-fanout-guard.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Set up pinned Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Generate Jovie Bot dequeue token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Reconcile only the event's current draft queue entry
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          import { reconcileDraftQueueEntry } from './scripts/merge-queue-backend.mjs';
+          console.log(JSON.stringify(await reconcileDraftQueueEntry({
+            event: JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8')),
+            repository: process.env.GITHUB_REPOSITORY,
+          })));
+          NODE
+
   # Hold contract (scripts/hold-contract.mjs, jovie-hold/v1): every stop label
   # (hold, gated, incident, do-not-merge, tim-hold variants) needs a receipt
   # comment naming an owner plus an expiry or a head-change release.
@@ -713,8 +811,10 @@ jobs:
             }
 
   # Runs only after the hold has dropped merge intent. A green PR dequeued by
-  # another member of the group, or by the base branch, gets squash auto-merge
-  # back on that same SHA. Two rearms per SHA; the enroll job is not involved.
+  # another member of the group, or by the base branch, is enqueued again on
+  # that same SHA via enqueuePullRequest (no --auto, no --squash). A token
+  # that still cannot enqueue names the PR with ::error:: and the step
+  # summary. Two rearms per SHA; the enroll job is not involved.
   rearm-green-victims:
     name: Rearm green merge-group victims
     needs: [hold-failed-revision]
