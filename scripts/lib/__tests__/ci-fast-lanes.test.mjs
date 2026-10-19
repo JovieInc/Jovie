@@ -2168,7 +2168,7 @@ describe('source-read guard selection', () => {
       ],
     ],
     ['apps/web/tests/e2e/public-profile-smoke.spec.ts', []],
-    ['apps/ios/Jovie/App.swift', []],
+    ['apps/ios/Jovie/App.swift', ['native-design-system']],
     // OutboundRail.tsx text-destructive ejected group pr-21458 (10-13).
     [
       'apps/web/components/features/admin/outbound/OutboundRail.tsx',
@@ -2229,6 +2229,7 @@ describe('source-read guard selection', () => {
     const all = SOURCE_GUARDS.map(guard => guard.id);
     // Manual dispatch runs web Unit Tests and structural, which carry the rest.
     expect(selected('workflow_dispatch', ['README.md'])).toEqual([
+      'native-design-system',
       'artist-launch-contract',
       'artist-profile-conformance',
       'ci-schedule-inventory',
@@ -2237,6 +2238,7 @@ describe('source-read guard selection', () => {
     expect(selected('pull_request', null)).toEqual(all);
     expect(selected('pull_request', [])).toEqual(all);
     expect(selected('merge_group', null)).toEqual([
+      'native-design-system',
       'artist-launch-contract',
       'artist-profile-conformance',
       'ci-schedule-inventory',
@@ -2245,6 +2247,17 @@ describe('source-read guard selection', () => {
 
   it('points every guard at a test file that exists', () => {
     for (const guard of SOURCE_GUARDS) {
+      if (guard.id === 'native-design-system') {
+        expect(guard.command).toContain('native-design-system.mjs');
+        expect(guard.command).toContain('native-spacing-scale.mjs');
+        expect(
+          readFileSync(
+            join(REPO_ROOT, 'apps/ios/scripts/native-design-system.test.mjs'),
+            'utf8'
+          )
+        ).toContain("from 'node:test'");
+        continue;
+      }
       if (guard.id === 'artist-profile-conformance') {
         expect(guard.command).toContain(
           join(REPO_ROOT, 'scripts/artist-profile-conformance.mjs')

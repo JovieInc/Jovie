@@ -88,68 +88,68 @@ struct AuthScreenStyleGuardTests {
     #expect(!hasLegacyOuterPadding)
   }
 
-  /// System B token guard: JovieTheme must carry the canonical Noir Ion
-  /// values from DESIGN.md / apps/web/styles/design-system.css and none of the
-  /// pre-Noir-Ion carbon or pre-System-B drifted hexes.
+  /// Read the actual canonical JSON instead of preserving a second list of expected hexes.
   @Test func themeTokensMatchSystemBCanon() throws {
-    let sourceURL = URL(fileURLWithPath: #filePath)
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .appendingPathComponent("Jovie/DesignSystem/JovieTheme.swift")
-    let source = try String(contentsOf: sourceURL, encoding: .utf8)
-
-    // Canonical Noir Ion values present.
-    #expect(source.contains("backgroundBase = Color(hex: 0x030407)"))
-    #expect(source.contains("surface0 = Color(hex: 0x06080D)"))
-    #expect(source.contains("surface1 = Color(hex: 0x0F1420)"))
-    #expect(source.contains("surface2 = Color(hex: 0x151B2A)"))
-    #expect(source.contains("surface3 = Color(hex: 0x1B2436)"))
-    #expect(source.contains("textPrimary = Color(hex: 0xF5F7FB)"))
-    #expect(source.contains("textSecondary = Color(hex: 0xD7DCE8)"))
-    #expect(source.contains("textTertiary = Color(hex: 0xA8B0C3)"))
-    #expect(source.contains("borderSubtle = Color(hex: 0xA8B0C3).opacity(0.10)"))
-    #expect(source.contains("borderDefault = Color(hex: 0xA8B0C3).opacity(0.16)"))
-    #expect(source.contains("borderStrong = Color(hex: 0xC7EDFF).opacity(0.26)"))
-    #expect(source.contains("accent = Color(hex: 0x11AFFF)"))
-    #expect(source.contains("accentBlue = Color(hex: 0x11AFFF)"))
-    #expect(source.contains("accentPurple = Color(hex: 0xA982FF)"))
-    #expect(source.contains("accentPink = Color(hex: 0xFF48D2)"))
-    #expect(source.contains("accentOrange = Color(hex: 0xFFC857)"))
-    #expect(source.contains("errorText = Color(hex: 0xFF677D)"))
-    #expect(source.contains("release = Color(hex: 0x11AFFF)"))
-    #expect(source.contains("artist = Color(hex: 0xA982FF)"))
-    #expect(source.contains("track = Color(hex: 0x11AFFF)"))
-    #expect(source.contains("event = Color(hex: 0xFFC857)"))
+    let repo = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent().deletingLastPathComponent()
+      .deletingLastPathComponent().deletingLastPathComponent()
+    let source = try String(contentsOf: repo.appendingPathComponent("apps/ios/Jovie/DesignSystem/JovieTheme.swift"), encoding: .utf8)
+    let manifestData = try Data(contentsOf: repo.appendingPathComponent("apps/ios/scripts/native-design-system.manifest.json"))
+    let manifest = try #require(JSONSerialization.jsonObject(with: manifestData) as? [String: Any])
+    let bindings = try #require(manifest["bindings"] as? [[String: Any]])
+    let palettePath = try #require(manifest["palette"] as? String)
+    let paletteData = try Data(contentsOf: repo.appendingPathComponent(palettePath))
+    let palette = try #require(JSONSerialization.jsonObject(with: paletteData) as? [String: Any])
+    let names = try bindings.map { try #require($0["name"] as? String) }
+    #expect(Set(names).count == names.count)
+    var mappedPaths = Set<String>()
+    for binding in bindings {
+      guard let path = binding["json"] as? [String] else { continue }
+      let name = try #require(binding["name"] as? String)
+      #expect(mappedPaths.insert(path.joined(separator: ".")).inserted)
+      var value: Any = palette
+      for key in path { value = try #require((value as? [String: Any])?[key]) }
+      let canonicalHex = try #require(value as? String)
+      let hex = canonicalHex.dropFirst().uppercased()
+      let declaration = "static let \(name) = Color(hex: 0x\(hex))"
+      #expect(source.components(separatedBy: declaration).count == 2)
+    }
+    for (group, prefix) in [("elevations", "elevations.dark"), ("accents", "accents.hex")] {
+      let family = try #require(palette[group] as? [String: Any])
+      let roles = try #require(family["roles"] as? [String])
+      for role in roles { #expect(mappedPaths.contains("\(prefix).\(role)")) }
+    }
+    #expect(source.contains("static let errorText = textPrimary"))
+    #expect(source.contains("static let artist = JovieColor.accentPurple"))
+    #expect(source.contains("static let event = JovieColor.accentOrange"))
+    // These existing motion contracts are outside the palette slice and remain protected.
     #expect(source.contains("pressScale: CGFloat = 0.96"))
     #expect(source.contains("timingCurve(0.4, 0, 0.2, 1, duration: subtleDuration)"))
     #expect(source.contains("timingCurve(0.22, 1, 0.36, 1, duration: cinematicDuration)"))
+  }
 
-    // Pre-Noir-Ion carbon values banned.
-    #expect(!source.contains("0x06070A"))
-    #expect(!source.contains("0x0A0B0E"))
-    #expect(!source.contains("0x101216"))
-    #expect(!source.contains("0x161A20"))
-    #expect(!source.contains("0x2A2C32"))
-    #expect(!source.contains("textPrimary = Color(hex: 0xFFFFFF)"))
-    #expect(!source.contains("0xE3E4E6"))
-    #expect(!source.contains("0x969799"))
-    #expect(!source.contains("borderSubtle = Color.white.opacity(0.05)"))
-    #expect(!source.contains("borderDefault = Color.white.opacity(0.08)"))
-    #expect(!source.contains("Color.white.opacity(0.05)"))
-    #expect(!source.contains("Color.white.opacity(0.08)"))
-    #expect(!source.contains("borderStrong = Color.white.opacity(0.10)"))
-    #expect(!source.contains("0x7170FF"))
-    #expect(!source.contains("0x4D7DFF"))
-    #expect(!source.contains("0x9B4DFF"))
-    #expect(!source.contains("0xEA4A9C"))
-    #expect(!source.contains("0xFFAB2E"))
-    #expect(!source.contains("0xFF7A73"))
+  @Test func productionWhatsNewFixturesUseTheRealResolverAndDestinations() throws {
+    let single = try #require(WhatsNewUITestFixture.unseen(arguments: []))
+    let multiple = try #require(WhatsNewUITestFixture.unseen(arguments: ["-ui-testing-whats-new-multiple"]))
+    #expect(single.unseenCount == 1)
+    #expect(single.link == single.entry.url)
+    #expect(multiple.unseenCount == 2)
+    #expect(multiple.link.path == "/changelog")
+    let empty = try #require(WhatsNewUITestFixture.unseen(arguments: ["-ui-testing-whats-new-no-dogfood"]))
+    #expect(empty.entry.dogfood.isEmpty)
+    let long = try #require(WhatsNewUITestFixture.unseen(arguments: ["-ui-testing-whats-new-long"]))
+    #expect(long.entry.title.count > single.entry.title.count)
+    #expect(long.entry.summary.count > single.entry.summary.count)
+    let feed = WhatsNewFeed(version: WhatsNewFeed.contractVersion, changelogUrl: multiple.link, entries: [single.entry])
+    #expect(WhatsNewFeedPolicy.resolve(feed: feed, lastSeenID: single.id) == nil)
+    #expect(WhatsNewFeedPolicy.resolve(feed: feed, lastSeenID: "aged-out")?.unseenCount == 1)
+  }
 
-    // Pre-System-B drifted values banned.
-    #expect(!source.contains("0x0070F3"))
-    #expect(!source.contains("0x8B5CF6"))
-    #expect(!source.contains("0xFF0080"))
-    #expect(!source.contains("0x1F2430"))
+  @Test func neutralPillKeepsCompactPaintAndAtLeast44PointHitArea() {
+    #expect(JoviePillButtonStyle.visibleHeight == 28)
+    #expect(JoviePillButtonStyle.visibleHeight + 2 * JoviePillButtonStyle.hitInset >= JoviePillButtonStyle.minimumHitHeight)
+    // Locked chat controls retain their independent existing 32-point geometry.
+    #expect(JovieActionButtonMetrics.height == 32)
   }
 
   /// Staged entrance guard: the auth screen's first-appearance animation

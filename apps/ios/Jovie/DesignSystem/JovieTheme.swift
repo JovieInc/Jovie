@@ -6,49 +6,65 @@ import AppKit
 import CoreText
 #endif
 
-/// System B dark tokens. Hexes match the Noir Ion table in DESIGN.md and
-/// `--noir-ion-*` anchors in apps/web/styles/design-system.css. Do not invent
-/// a second palette.
+/// Native projection of ZiaWI palette + the product semantic emitter.
+/// Regenerate/check with apps/ios/scripts/native-design-system.mjs; never hand-tune hexes.
 enum JovieColor {
-  static let backgroundBase = Color(hex: 0x030407)
-  static let surface0 = Color(hex: 0x06080D)
-  static let surface1 = Color(hex: 0x0F1420)
-  static let surface2 = Color(hex: 0x151B2A)
-  static let surface3 = Color(hex: 0x1B2436)
-  static let textPrimary = Color(hex: 0xF5F7FB)
-  static let textSecondary = Color(hex: 0xD7DCE8)
-  static let textTertiary = Color(hex: 0xA8B0C3)
-  static let borderSubtle = Color(hex: 0xA8B0C3).opacity(0.10)
-  static let borderDefault = Color(hex: 0xA8B0C3).opacity(0.16)
-  static let borderStrong = Color(hex: 0xC7EDFF).opacity(0.26)
+  // BEGIN GENERATED NATIVE COLORS
+  /// Source: elevations.dark.canvas
+  static let backgroundBase = Color(hex: 0x030406)
+  /// Source: elevations.dark.shell
+  static let surface0 = Color(hex: 0x07080A)
+  /// Source: elevations.dark.card
+  static let surface1 = Color(hex: 0x131417)
+  /// Source: elevations.dark.elevated
+  static let surface2 = Color(hex: 0x1A1B1E)
+  /// Source: elevations.dark.floating
+  static let surface3 = Color(hex: 0x232427)
+  /// Source: accents.hex.ion
   static let accentBlue = Color(hex: 0x11AFFF)
-  static let accentPurple = Color(hex: 0xA982FF)
-  static let accentPink = Color(hex: 0xFF48D2)
-  static let accentOrange = Color(hex: 0xFFC857)
-  /// System B focus/active accent (`--color-accent` / Ion), not a CTA color.
-  static let accent = Color(hex: 0x11AFFF)
+  /// Source: accents.hex.ultra
+  static let accentPurple = Color(hex: 0x8E56F5)
+  /// Source: accents.hex.pulse
+  static let accentPink = Color(hex: 0xF52BB5)
+  /// Source: accents.hex.mint
+  static let accentMint = Color(hex: 0x3FFA8B)
+  /// Source: accents.hex.orange
+  static let accentOrange = Color(hex: 0xFF7800)
+  /// Source: accents.hex.red
+  static let statusDanger = Color(hex: 0xF72A36)
+  /// Source: --color-text-primary-token
+  static let textPrimary = Color(hex: 0xF5F7FB)
+  /// Source: --color-text-secondary-token
+  static let textSecondary = Color(hex: 0xA0A5AF)
+  /// Source: --color-text-tertiary-token
+  static let textTertiary = Color(hex: 0x9DA2AC)
+  /// Source: --noir-ion-text-inverse
+  static let textInverse = Color(hex: 0x020307)
+  /// Source: --color-btn-primary-bg
+  static let buttonPrimaryBackground = Color(hex: 0xE6E6E6)
+  /// Source: --color-border-subtle
+  static let borderSubtle = Color(hex: 0xA8B0C3).opacity(0.1)
+  /// Source: --color-border-default
+  static let borderDefault = Color(hex: 0xA8B0C3).opacity(0.16)
+  /// Source: --color-border-strong
+  static let borderStrong = Color(hex: 0xC7EDFF).opacity(0.26)
+  /// Source: --noir-ion-text-strong
+  static let imageForeground = Color(hex: 0xFFFFFF)
+  // END GENERATED NATIVE COLORS
+
+  /// Ion denotes focus, links and selection, never decorative glyphs or CTA fill.
+  static let accent = accentBlue
   static let progressTrack = accentBlue.opacity(0.08)
-  static let errorText = Color(hex: 0xFF677D)
+  /// Error copy remains readable on every elevation; statusDanger paints status indicators.
+  static let errorText = textPrimary
+  /// Encoded black QR modules require this known white substrate, independent of app surfaces.
   static let qrSurface = Color.white
 
-  /// Per-entity-kind accent colors for inline chat chips (JOV-3608). Ported
-  /// 1:1 from the dark-mode Noir Ion CSS vars in
-  /// apps/web/styles/design-system.css (`--color-accent`,
-  /// `--color-accent-purple`, `--color-accent-blue`,
-  /// `--color-accent-orange`), which is what `EntityChip`/`EntityMentionSpan`
-  /// resolve to via `ENTITY_KIND_ACCENT_VAR` on the web. Distinct from the
-  /// generic `accentBlue`/`accentPurple`/`accentPink` above -- those back
-  /// unrelated iOS-only UI (tool-call cards, buttons) and must not be reused
-  /// here or web/iOS accent parity silently drifts on the next design pass.
   enum EntityAccent {
-    /// release -> --color-accent
-    static let release = Color(hex: 0x11AFFF)
-    /// artist -> --color-accent-purple
-    static let artist = Color(hex: 0xA982FF)
-    /// track -> --color-accent-blue
-    static let track = Color(hex: 0x11AFFF)
-    /// event -> --color-accent-orange
-    static let event = Color(hex: 0xFFC857)
+    static let release = JovieColor.accentBlue
+    static let artist = JovieColor.accentPurple
+    static let track = JovieColor.accentBlue
+    static let event = JovieColor.accentOrange
   }
 }
 
@@ -270,19 +286,26 @@ extension View {
 }
 
 struct JoviePillButtonStyle: ButtonStyle {
+  static let visibleHeight: CGFloat = 28
+  static let minimumHitHeight: CGFloat = 44
+  static let hitInset = JovieSpacing.small
   static let pressedOpacity: Double = 0.8
 
   let filled: Bool
+  @ScaledMetric(relativeTo: .body) private var labelSize: CGFloat = 14
+
+  init(filled: Bool) { self.filled = filled }
 
   func makeBody(configuration: Configuration) -> some View {
     configuration.label
-      .font(JovieFont.body(size: 14, numericWeight: JovieActionButtonMetrics.labelWeight))
-      .foregroundStyle(filled ? JovieColor.backgroundBase : JovieColor.textPrimary)
+      .font(JovieFont.body(size: labelSize, numericWeight: JovieActionButtonMetrics.labelWeight))
+      .foregroundStyle(filled ? JovieColor.textInverse : JovieColor.textPrimary)
       .frame(maxWidth: .infinity)
-      .padding(.vertical, 14)
+      .padding(.vertical, JovieSpacing.xSmall)
+      .frame(minHeight: JoviePillButtonStyle.visibleHeight)
       .background(
         RoundedRectangle(cornerRadius: JovieRadius.pill, style: .continuous)
-          .fill(filled ? Color.white : JovieColor.surface1)
+          .fill(filled ? JovieColor.buttonPrimaryBackground : JovieColor.surface1)
       )
       .overlay {
         RoundedRectangle(cornerRadius: JovieRadius.pill, style: .continuous)
@@ -291,8 +314,9 @@ struct JoviePillButtonStyle: ButtonStyle {
             lineWidth: 1
           )
       }
+      .padding(.vertical, JoviePillButtonStyle.hitInset)
+      .contentShape(Rectangle())
       .opacity(configuration.isPressed ? JoviePillButtonStyle.pressedOpacity : 1)
-      .scaleEffect(configuration.isPressed ? JovieMotion.pressScale : 1)
       .animation(JovieMotion.subtle, value: configuration.isPressed)
   }
 }
@@ -347,7 +371,7 @@ struct JovieLogoMark: View {
       .resizable()
       .renderingMode(.template)
       .scaledToFit()
-      .foregroundStyle(Color.white)
+      .foregroundStyle(JovieColor.imageForeground)
       .frame(width: size, height: size)
       .accessibilityHidden(true)
   }
