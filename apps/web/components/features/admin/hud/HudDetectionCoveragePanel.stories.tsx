@@ -18,7 +18,6 @@ const fullyVerified: DetectionCoverageSnapshot = {
   medianDetectionTrend: 'flat',
   nextCapability: null,
 };
-
 const unmeasured: DetectionCoverageSnapshot = {
   covered: 0,
   total: 4,
@@ -32,24 +31,19 @@ const unmeasured: DetectionCoverageSnapshot = {
   medianDetectionTrend: 'unknown',
   nextCapability: null,
 };
-
 const meta = {
   title: 'Features/Admin/Hud/HudDetectionCoveragePanel',
   component: HudDetectionCoveragePanel,
   parameters: { layout: 'centered' },
 } satisfies Meta<typeof HudDetectionCoveragePanel>;
-
 export default meta;
 type Story = StoryObj<typeof meta>;
-
 export const Measured: Story = {
   args: { snapshot: getDetectionCoverageSnapshot() },
 };
-
 export const FullyVerified: Story = {
   args: { snapshot: fullyVerified },
 };
-
 export const Unmeasured: Story = {
   args: { snapshot: unmeasured },
 };

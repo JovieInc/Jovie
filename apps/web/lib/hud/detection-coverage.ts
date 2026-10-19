@@ -1,5 +1,4 @@
 import registryJson from '@/data/detection-coverage-registry.json';
-
 export type DetectionCoverageTrend = 'down' | 'flat' | 'up' | 'unknown';
 
 interface DetectionCapability {
@@ -21,25 +20,21 @@ interface DetectionCapability {
     readonly score: number;
   };
 }
-
 interface DetectionMetricWindow {
   readonly asOf: string;
   readonly founderRescueRate: number;
   readonly medianDetectionMinutes: number | null;
 }
-
 export interface DetectionFounderRescue {
   readonly id: string;
   readonly occurredAt: string;
   readonly source: string;
   readonly summary: string;
 }
-
 export interface DetectionBlindSpot {
   readonly capability: string;
   readonly summary: string;
 }
-
 export interface DetectionCoverageSnapshot {
   readonly covered: number;
   readonly total: number;
@@ -58,7 +53,6 @@ export interface DetectionCoverageSnapshot {
     readonly nextExpansion: string;
   } | null;
 }
-
 interface DetectionCoverageRegistry {
   readonly schema: string;
   readonly capabilities: readonly DetectionCapability[];
@@ -69,7 +63,6 @@ interface DetectionCoverageRegistry {
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
-
 function asRegistry(value: unknown): DetectionCoverageRegistry {
   if (!isRecord(value))
     throw new Error('Detection coverage registry is invalid');
@@ -85,7 +78,6 @@ function asRegistry(value: unknown): DetectionCoverageRegistry {
   }
   return value as unknown as DetectionCoverageRegistry;
 }
-
 function trend(
   current: number | null,
   previous: number | null
@@ -95,7 +87,6 @@ function trend(
   if (current > previous) return 'up';
   return 'flat';
 }
-
 function isLiveVerified(capability: DetectionCapability): boolean {
   const proof = capability.proof;
   if (capability.status !== 'live-verified') return false;
@@ -131,7 +122,6 @@ export function compileDetectionCoverageRegistry(
   const current = windows.at(-1) ?? null;
   const previous = windows.at(-2) ?? null;
   const next = unlearned[0] ?? null;
-
   return {
     covered: verified.length,
     total: registry.capabilities.length,

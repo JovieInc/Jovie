@@ -10,7 +10,6 @@ describe('HudDetectionCoveragePanel', () => {
   it('exposes coverage, trends, blind spots, rescues, and the next capability', () => {
     const snapshot = getDetectionCoverageSnapshot();
     render(<HudDetectionCoveragePanel snapshot={snapshot} />);
-
     expect(
       screen.getByTestId('hud-detection-coverage-panel')
     ).toBeInTheDocument();
@@ -29,7 +28,6 @@ describe('HudDetectionCoveragePanel', () => {
     expect(snapshot.founderRescueTrend).toBe('down');
     expect(snapshot.medianDetectionTrend).toBe('down');
   });
-
   it('ranks unlearned capabilities and rejects false learned state', () => {
     const capability = (id: string, status: string, score: number) => ({
       id,
@@ -65,7 +63,6 @@ describe('HudDetectionCoveragePanel', () => {
       ],
     });
     expect(snapshot.nextCapability?.id).toBe('c-higher');
-
     expect(() =>
       compileDetectionCoverageRegistry({
         ...base,
