@@ -27,6 +27,11 @@ function diagnosticText(text) {
     .join('\n');
 }
 
+/** @param {unknown} value @returns {value is Record<string, unknown>} */
+function isRecord(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
 /** Filing is on unless this exact kill switch is set. Unset does not dry-run. */
 export function remediationIntakeDisabled(env = process.env) {
   return env.REMEDIATION_INTAKE_DISABLED === '1';
@@ -132,14 +137,17 @@ export async function readLoginMatrixEvidence({
       hasNext: /;\s*rel="next"/.test(response.headers.get('link') ?? ''),
     };
   };
+  /** @param {unknown} run */
   const matchesRun = run =>
-    run?.id === Number(runId) &&
+    isRecord(run) &&
+    run.id === Number(runId) &&
     run.run_attempt === Number(attempt) &&
     run.head_sha === sha &&
     run.path === '.github/workflows/e2e-full-matrix.yml' &&
     run.event === 'push' &&
     run.head_branch === 'main' &&
-    run.repository?.full_name === repository;
+    isRecord(run.repository) &&
+    run.repository.full_name === repository;
   try {
     // This is the latest run record, not an archived attempt: stale delivery
     // cannot borrow an earlier attempt's successful siblings.
@@ -153,6 +161,8 @@ export async function readLoginMatrixEvidence({
         `${base}/attempts/${attempt}/jobs?per_page=100&page=${page}`
       );
       if (
+        !isRecord(result) ||
+        typeof result.total_count !== 'number' ||
         !Number.isSafeInteger(result.total_count) ||
         result.total_count < 1 ||
         !Array.isArray(result.jobs) ||
@@ -227,7 +237,7 @@ export function decideLoginSignal({
   evidenceText = '',
   report = null,
   source = '',
-  matrixEvidence,
+  matrixEvidence = undefined,
 }) {
   if (!conclusion || conclusion === 'skipped') return { action: 'skip' };
   if (conclusion === 'success') {

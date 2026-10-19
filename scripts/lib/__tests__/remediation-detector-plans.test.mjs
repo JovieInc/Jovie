@@ -28,6 +28,22 @@ const MATRIX_SHA = 'a'.repeat(40);
 const MATRIX_SOURCE = 'e2e-full-matrix.yml:firefox';
 const MATRIX_RUN = 42;
 const MATRIX_ATTEMPT = 2;
+/** @typedef {Record<string, unknown>} MatrixJobFixture */
+/** @typedef {Record<string, unknown>} MatrixRunFixture */
+/** @typedef {{
+ * jobs?: MatrixJobFixture[],
+ * run?: MatrixRunFixture | ((read: number) => MatrixRunFixture),
+ * page?: (number: number, jobs: MatrixJobFixture[]) => Response,
+ * env?: Record<string, string>,
+ * twice?: boolean,
+ * }} MatrixIntakeOptions */
+/** @typedef {{ name?: string, if?: string, uses?: string, run?: string }} WorkflowStep */
+/** @typedef {{ jobs: Record<string, {
+ * steps: WorkflowStep[], needs?: string[],
+ * strategy?: {matrix: Record<string, unknown>},
+ * }> }} WorkflowFixture */
+
+/** @returns {MatrixRunFixture} */
 const matrixRun = () => ({
   id: MATRIX_RUN,
   run_attempt: MATRIX_ATTEMPT,
@@ -37,6 +53,7 @@ const matrixRun = () => ({
   head_branch: 'main',
   repository: { full_name: 'JovieInc/Jovie' },
 });
+/** @returns {MatrixJobFixture[]} */
 const matrixJobs = () =>
   [
     'Build standalone E2E server',
@@ -55,7 +72,11 @@ const matrixJobs = () =>
   }));
 let matrixDelivery = 0;
 
-/** Exercise the actual entrypoint and existing Linear guards, entirely intercepted. */
+/**
+ * Exercise the actual entrypoint and existing Linear guards, entirely intercepted.
+ * Unknown fixture fields intentionally exercise malformed API payloads.
+ * @param {MatrixIntakeOptions} [options]
+ */
 async function matrixIntake({
   jobs = matrixJobs(),
   run = matrixRun(),
@@ -276,6 +297,9 @@ describe('login matrix producer clearance', () => {
         new Response(JSON.stringify({ total_count: 10, jobs: matrixJobs() })),
       () => new Response('unavailable', { status: 403 }),
       () => new Response('{'),
+      () => new Response('null'),
+      () => new Response('[]'),
+      () => new Response(JSON.stringify({ total_count: 9, jobs: null })),
       () =>
         new Response(JSON.stringify({ total_count: '9', jobs: matrixJobs() })),
       () =>
@@ -392,13 +416,15 @@ describe('login matrix producer clearance', () => {
   });
 
   it('uses the maintained all-shard notification seam and preserves all browser/shard selectors', () => {
-    const workflow = load(
-      readFileSync(
-        new URL(
-          '../../../.github/workflows/e2e-full-matrix.yml',
-          import.meta.url
-        ),
-        'utf8'
+    const workflow = /** @type {WorkflowFixture} */ (
+      load(
+        readFileSync(
+          new URL(
+            '../../../.github/workflows/e2e-full-matrix.yml',
+            import.meta.url
+          ),
+          'utf8'
+        )
       )
     );
     expect(workflow.jobs['e2e-full-matrix'].strategy.matrix).toEqual({
