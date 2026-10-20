@@ -1202,6 +1202,17 @@ nodes:
       - workflow_run
     terminalReceipt: job:staging-result
     jobCount: 3
+  - name: Stale Branch Sweep
+    path: .github/workflows/stale-branch-sweep.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:sweep
+    jobCount: 1
   - name: Summer Eve identity check
     path: .github/workflows/summer-eve-pin.yml
     active: true
