@@ -9,6 +9,7 @@ import {
   NOT_MEASURED_COUNT,
   SHIPPING_SOURCE_SCHEMAS,
   type ShippingSourceId,
+  type StageSummary,
 } from './contract';
 import { parseTimestamp, sanitizeOpaqueIdentifier } from './envelope';
 import {
@@ -816,6 +817,59 @@ function nonNegativeCount(value: unknown) {
     : NOT_MEASURED_COUNT;
 }
 
+const STAGE_SUMMARY_SCHEMA = 'jovie-stage-summary/v1';
+
+function seconds(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0
+    ? value
+    : null;
+}
+
+/**
+ * Parse `slo.stages` (`jovie-stage-summary/v1`). Malformed rows are dropped;
+ * an unrecognized document yields null so Home shows "Not measured".
+ */
+export function parseStageSummary(value: unknown): StageSummary | null {
+  if (!isRecord(value) || value.schema !== STAGE_SUMMARY_SCHEMA) return null;
+  const at = parseTimestamp(value.at);
+  if (!at) return null;
+  const coverage = isRecord(value.coverage) ? value.coverage : {};
+  const slowestP95 = (
+    Array.isArray(value.slowestP95_7d) ? value.slowestP95_7d : []
+  )
+    .flatMap(row => {
+      if (!isRecord(row)) return [];
+      const stage = sanitizeOpaqueIdentifier(String(row.stage ?? ''), 96);
+      if (!stage || !Number.isSafeInteger(row.n) || Number(row.n) < 0)
+        return [];
+      return [
+        {
+          stage,
+          p50: seconds(row.p50),
+          p95: seconds(row.p95),
+          n: Number(row.n),
+        },
+      ];
+    })
+    .slice(0, 10);
+  const regressions = (
+    Array.isArray(value.regressions) ? value.regressions : []
+  )
+    .filter((item): item is string => typeof item === 'string')
+    .map(item => item.trim().slice(0, 120))
+    .filter(Boolean)
+    .slice(0, 10);
+  const count = (raw: unknown) =>
+    Number.isSafeInteger(raw) && Number(raw) >= 0 ? Number(raw) : null;
+  return {
+    at,
+    stagesTotal: count(coverage.stagesTotal),
+    stagesWithData: count(coverage.stagesWithData),
+    regressions,
+    slowestP95,
+  };
+}
+
 /** Validate a `symphony-lanes-status/v1` document into the lanes block. */
 export function parseLanesStatus(
   payload: Record<string, unknown>
@@ -868,6 +922,9 @@ export function parseLanesStatus(
     heldByReason: countRecord(payload.held_by_reason),
     failedByReason: countRecord(payload.failed_by_reason),
     capacity: parseCapacityHorizon(payload.capacity),
+    stageSummary: isRecord(payload.slo)
+      ? parseStageSummary(payload.slo.stages)
+      : null,
     publishedAt,
     stale: false,
   };

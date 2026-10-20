@@ -64,6 +64,8 @@ export {
   type ShippingSourceId,
   type ShippingStateProjection,
   type SourceObservation,
+  type StageSummary,
+  type StageTiming,
 } from './contract';
 export {
   detectClockSkew,
