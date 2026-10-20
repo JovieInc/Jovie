@@ -9,9 +9,13 @@
     ".": "./index.ts",
     "./sources.json": "./sources.json"
   },
+  "bin": {
+    "jovie-research": "./bin/jovie-research"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "research": "node --experimental-strip-types cli.ts"
   },
   "dependencies": {
     "@jovie/api-client": "workspace:*"
