@@ -120,6 +120,7 @@ function main() {
     archived: 0,
     deleted: 0,
     rejected: [],
+    finishedAt: null,
   };
   const push = (specs, extra = []) => {
     const result = spawnSync(
