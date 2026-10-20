@@ -36,6 +36,7 @@ import file_overlap  # noqa: E402
 import linear_sync  # noqa: E402  (local Linear mirror and outbox status)
 import remediation  # noqa: E402
 import shipping_attribution  # noqa: E402  (company merge provenance report)
+import stage_events  # noqa: E402  (jovie-stage-event/v1 rows for the stage collector)
 
 COOL_OFF_S = 6 * 3600
 NO_LANDING_S = 6 * 3600
@@ -1646,6 +1647,7 @@ PRIMARY_FLAG = Path.home() / ".config/jovie-lanes/primary"
 
 PUBLIC_FEED_MAX_BYTES = 256 * 1024
 STATUS_DETAIL_NAME = "lanes-status-details.json"
+STAGE_EVENTS_NAME = "stage-events.ndjson"
 
 
 def public_status_projection(feed: dict, full_text: str) -> str:
@@ -1709,6 +1711,11 @@ def publish_status(host, lane, feed: dict, tracking_issue: str = "JOV-6637") -> 
         "lanes-status.json": {"content": public_text},
         STATUS_DETAIL_NAME: {"content": full_text},
     }}
+    # docs/metrics/STAGE_EVENTS.md: the lanes stage rows, uploaded only when they changed.
+    stage_text = stage_events.ndjson(host.state / "runs" / "ledger.jsonl", time.time())
+    stage_digest = hashlib.sha256(stage_text.encode("utf-8")).hexdigest()
+    if stage_text and record.get("stageEventsSha256") != stage_digest:
+        packet["files"][STAGE_EVENTS_NAME] = {"content": stage_text}
     packet_path = host.state / "lanes-status-publish.json"
     created_now = not record.get("url")
     if created_now:
@@ -1761,7 +1768,13 @@ def publish_status(host, lane, feed: dict, tracking_issue: str = "JOV-6637") -> 
             raise ValueError("gist identity mismatch")
         for name, expected in packet["files"].items():
             actual = files.get(name)
-            if not isinstance(actual, dict) or actual.get("truncated") is not False or actual.get("content") != expected["content"]:
+            if not isinstance(actual, dict):
+                raise ValueError("incomplete or changed gist evidence")
+            if name == STAGE_EVENTS_NAME and actual.get("truncated") is True:
+                # The API truncates files over 1 MB; the full size is the readback there.
+                if actual.get("size") != len(expected["content"].encode("utf-8")):
+                    raise ValueError("incomplete or changed gist evidence")
+            elif actual.get("truncated") is not False or actual.get("content") != expected["content"]:
                 raise ValueError("incomplete or changed gist evidence")
     except (ValueError, AttributeError):
         raise RuntimeError("status-gist-readback-unconfirmed") from None
@@ -1769,6 +1782,7 @@ def publish_status(host, lane, feed: dict, tracking_issue: str = "JOV-6637") -> 
         "verifiedAt": now_iso(),
         "fullEvidenceSha256": hashlib.sha256(full_text.encode("utf-8")).hexdigest(),
         "publicFeedSha256": hashlib.sha256(public_text.encode("utf-8")).hexdigest(),
+        **({"stageEventsSha256": stage_digest} if STAGE_EVENTS_NAME in packet["files"] else {}),
     })
     path.write_text(json.dumps(record), encoding="utf-8")
     if created_now:
