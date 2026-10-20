@@ -12,6 +12,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import types
 import time
 import unittest
 from pathlib import Path
@@ -451,6 +452,60 @@ class JudgeTest(unittest.TestCase):
                                            "oldestOwnerlessS": 7200,
                                            "unresolved": {"post-merge-without-merged-evidence": 40}}))
         self.assertIn("40 started JOV issues", loud["started-without-owner"])
+
+    def test_registered_host_local_automations_raise_automation_silent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            state = home / ".local/state/jovie-lanes"
+            state.mkdir(parents=True)
+            (state / "fresh.json").write_text("{}")
+            stale = state / "stale.json"
+            stale.write_text("{}")
+            now = time.time()
+            os.utime(stale, (now - 3600, now - 3600))
+            rows = [{"schema": "jovie-automation-registry/v1"},
+                    {"id": "gem:fresh", "status": "live", "host": "gem", "maxStalenessMinutes": 15,
+                     "receipt": {"kind": "host-local", "location": "gem:~/.local/state/jovie-lanes/fresh.json"}},
+                    {"id": "gem:stale", "status": "live", "host": "gem", "maxStalenessMinutes": 30,
+                     "receipt": {"kind": "host-local", "location": "gem:~/.local/state/jovie-lanes/stale.json"}},
+                    {"id": "gem:missing", "status": "live", "host": "gem", "maxStalenessMinutes": 10,
+                     "receipt": {"kind": "host-local", "location": "gem:~/.local/state/jovie-lanes/watchdog.log"}},
+                    {"id": "gem:retired", "status": "retired", "host": "gem",
+                     "receipt": {"kind": "host-local", "location": "gem:~/nowhere"}},
+                    {"id": "mac:x", "status": "live", "host": "tims-macbook-pro", "maxStalenessMinutes": 1,
+                     "receipt": {"kind": "host-local", "location": "tims-macbook-pro:~/nowhere"}}]
+            watch = doctor.automation_watch([row for row in rows if row.get("id")], "gem", now, home=home)
+            self.assertEqual(sorted(watch["silent"]), ["gem:missing", "gem:stale"])
+            alerts = doctor.judge(obs(automation=watch, now=now))
+            self.assertIn("60 min old", alerts["automation-silent:gem:stale"])
+            self.assertIn("missing", alerts["automation-silent:gem:missing"])
+            self.assertEqual(doctor.automation_watch(None, "gem", now), {"known": False, "silent": {}})
+
+    def test_the_hosted_liveness_check_and_the_doctor_watch_each_other(self):
+        now = doctor.datetime(2026, 10, 20, 22, 0, tzinfo=doctor.timezone.utc).timestamp()
+        recent = {"installed": True, "lastRunAt": "2026-10-20T21:30:00Z"}
+        old = {"installed": True, "lastRunAt": "2026-10-20T20:30:00Z"}
+        self.assertNotIn("automation-liveness-silent", doctor.judge(obs(automationLiveness=recent, now=now)))
+        self.assertIn("90 min ago", doctor.judge(obs(automationLiveness=old, now=now))["automation-liveness-silent"])
+        self.assertIn("never", doctor.judge(obs(automationLiveness={"installed": True, "lastRunAt": None},
+                                                now=now))["automation-liveness-silent"])
+        for unknown in ({"installed": False}, {"installed": None}):  # not merged yet, or unreadable
+            self.assertNotIn("automation-liveness-silent", doctor.judge(obs(automationLiveness=unknown, now=now)))
+
+    def test_liveness_read_distinguishes_missing_workflow_from_unreadable(self):
+        def fake(code, stdout="", stderr=""):
+            return types.SimpleNamespace(REPO_SLUG="JovieInc/Jovie", shared=lambda key, ttl, fetch: fetch(),
+                                         sh=lambda *a, **k: types.SimpleNamespace(returncode=code, stdout=stdout, stderr=stderr))
+        self.assertEqual(doctor.automation_liveness(fake(0, '["2026-10-20T21:30:00Z"]'), 0),
+                         {"installed": True, "lastRunAt": "2026-10-20T21:30:00Z"})
+        self.assertEqual(doctor.automation_liveness(fake(1, stderr="gh: Not Found (HTTP 404)"), 0), {"installed": False})
+        self.assertEqual(doctor.automation_liveness(fake(1, stderr="timeout"), 0), {"installed": None})
+
+    def test_a_failed_status_gist_publish_raises_status_feed_stale(self):
+        failed = doctor.judge(obs(), {"statusFeedError": "RuntimeError: status-gist-publish-unconfirmed"})
+        self.assertIn("status-gist-publish-unconfirmed", failed["status-feed-stale"])
+        self.assertNotIn("status-feed-stale", doctor.judge(obs(), {"statusFeed": "https://gist.github.com/x"}))
+        self.assertNotIn("status-feed-stale", doctor.judge(obs(), None))
 
     def test_linear_and_codex_failures_are_their_own_alerts(self):
         self.assertIn("linear-down", doctor.judge(obs(linearError="HTTPError: 429", pool=None)))
