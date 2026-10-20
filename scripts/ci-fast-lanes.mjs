@@ -448,26 +448,70 @@ export const STRUCTURAL_WEB_JOB_PREFIXES = Object.freeze([
 ]);
 
 /** Files of the lanes coverage suite (one coverage map, sharded below). */
-const LANES_PYTEST_FILES =
-  'scripts/tests/test_backlog_admission.py scripts/tests/test_backlog_writer_guard.py scripts/tests/test_capacity_limit.py scripts/tests/test_claude_lane.py scripts/tests/test_codex_lane.py scripts/tests/test_continuity_clock.py scripts/tests/test_design_gate.py scripts/tests/test_devin_free_policy.py scripts/tests/test_disk_guard.py scripts/tests/test_doctor.py scripts/tests/test_epics.py scripts/tests/test_execution_attempt.py scripts/tests/test_gh_app_token.py scripts/tests/test_hud.py scripts/tests/test_hyperagent_lane.py scripts/tests/test_issue_routing.py scripts/tests/test_lane_runner.py scripts/tests/test_pr_events.py scripts/tests/test_qualification_guard.py scripts/tests/test_reason_lane.py scripts/tests/test_remediation.py scripts/tests/test_service_census.py scripts/tests/test_shipping_attribution.py scripts/tests/test_shipping_origin.py scripts/tests/test_telegram_archive.py scripts/tests/test_worktree_pool.py scripts/tests/test_worktree_sweep.py';
+export const LANES_PYTEST_FILES = Object.freeze(
+  'scripts/tests/test_backlog_admission.py scripts/tests/test_backlog_writer_guard.py scripts/tests/test_capacity_limit.py scripts/tests/test_claude_lane.py scripts/tests/test_codex_lane.py scripts/tests/test_continuity_clock.py scripts/tests/test_design_gate.py scripts/tests/test_devin_free_policy.py scripts/tests/test_disk_guard.py scripts/tests/test_doctor.py scripts/tests/test_epics.py scripts/tests/test_execution_attempt.py scripts/tests/test_gh_app_token.py scripts/tests/test_hud.py scripts/tests/test_hyperagent_lane.py scripts/tests/test_issue_routing.py scripts/tests/test_lane_runner.py scripts/tests/test_pr_events.py scripts/tests/test_qualification_guard.py scripts/tests/test_reason_lane.py scripts/tests/test_remediation.py scripts/tests/test_service_census.py scripts/tests/test_shipping_attribution.py scripts/tests/test_shipping_origin.py scripts/tests/test_telegram_archive.py scripts/tests/test_worktree_pool.py scripts/tests/test_worktree_sweep.py'.split(
+    ' '
+  )
+);
 
 /**
- * The lanes coverage pytest was ci-fast (remaining)'s long pole (174.5s and
- * 211.0s in merge groups 38247843089 and 38317277564), one process on a
- * 4 vCPU runner. Two concurrent shards select `-k EXPR` and `-k "not (EXPR)"`
- * over the identical file list, so every collected test runs exactly once;
- * EXPR names test_lane_runner.py's slowest class (~half the suite time). A
- * rename that empties the first shard fails it (pytest exit 5). `coverage
- * combine` merges both branch-coverage maps before the unchanged per-module
- * thresholds read them.
+ * The lanes coverage pytest is ci-fast (remaining)'s long pole: 308.5s of
+ * the job's 5.2 min in merge group 39479966697 (2026-10-20). The old split
+ * (`-k UpdateTest` vs the rest) had drifted to ~5% / ~95% of the suite as it
+ * grew, so the second shard ran almost serially. Four concurrent shards on
+ * the 4 vCPU runner, balanced on a serial --durations run (378s local):
+ *  - a / b: test_lane_runner.py (138s) with `-k EXPR` and `-k "not (EXPR)"`
+ *    over that one file, so each of its tests runs exactly once. EXPR names
+ *    its four slowest classes (~83s); a rename that empties shard a fails it
+ *    (pytest exit 5).
+ *  - c / d: every other file exactly once. Measured concurrently (4 shards,
+ *    2026-10-20): a 111s, b 88s, c 140s, d 179s before test_worktree_pool.py
+ *    moved to c; serial was 405s.
+ * `coverage combine` merges the four branch-coverage maps before the
+ * unchanged per-module thresholds read them.
  */
-export const LANES_PYTEST_SHARD_EXPRESSION = 'UpdateTest';
+export const LANES_PYTEST_SHARD_EXPRESSION =
+  'DependencyOnlyGateTest or RunAgentTest or PreservedRecoveryTest or UpdateTest';
 
-/** @param {string} shard @param {string} expression */
-const lanesCoverageShard = (shard, expression) =>
-  `COVERAGE_FILE="\${RUNNER_TEMP:-/tmp}/jovie-lanes-${shard}.coverage" python3 -m coverage run --branch -m pytest ${LANES_PYTEST_FILES} -q -p no:cacheprovider --basetemp="\${RUNNER_TEMP:-/tmp}/jovie-lanes-pytest-${shard}" -k "${expression}"`;
+const LANES_RUNNER_FILE = 'scripts/tests/test_lane_runner.py';
+const LANES_SHARD_C_FILES = Object.freeze([
+  'scripts/tests/test_remediation.py',
+  'scripts/tests/test_execution_attempt.py',
+  'scripts/tests/test_codex_lane.py',
+  'scripts/tests/test_worktree_sweep.py',
+  'scripts/tests/test_worktree_pool.py',
+]);
 
-const LANES_COVERAGE_RUN = `{ ${lanesCoverageShard('a', LANES_PYTEST_SHARD_EXPRESSION)} & lanes_a=$!; ${lanesCoverageShard('b', `not (${LANES_PYTEST_SHARD_EXPRESSION})`)}; lanes_b=$?; wait "$lanes_a" && test "$lanes_b" -eq 0; } && COVERAGE_FILE="\${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage combine "\${RUNNER_TEMP:-/tmp}/jovie-lanes-a.coverage" "\${RUNNER_TEMP:-/tmp}/jovie-lanes-b.coverage"`;
+/** @type {ReadonlyArray<{ id: string, files: readonly string[], keyword?: string }>} */
+export const LANES_PYTEST_SHARDS = Object.freeze([
+  {
+    id: 'a',
+    files: [LANES_RUNNER_FILE],
+    keyword: LANES_PYTEST_SHARD_EXPRESSION,
+  },
+  {
+    id: 'b',
+    files: [LANES_RUNNER_FILE],
+    keyword: `not (${LANES_PYTEST_SHARD_EXPRESSION})`,
+  },
+  { id: 'c', files: LANES_SHARD_C_FILES },
+  {
+    id: 'd',
+    files: LANES_PYTEST_FILES.filter(
+      file => file !== LANES_RUNNER_FILE && !LANES_SHARD_C_FILES.includes(file)
+    ),
+  },
+]);
+
+/** @param {{ id: string, files: readonly string[], keyword?: string }} shard */
+const lanesCoverageShard = ({ id, files, keyword }) =>
+  `COVERAGE_FILE="\${RUNNER_TEMP:-/tmp}/jovie-lanes-${id}.coverage" python3 -m coverage run --branch -m pytest ${files.join(' ')} -q -p no:cacheprovider --basetemp="\${RUNNER_TEMP:-/tmp}/jovie-lanes-pytest-${id}"${keyword ? ` -k "${keyword}"` : ''}`;
+
+const [LANES_LAST_SHARD] = LANES_PYTEST_SHARDS.slice(-1);
+const LANES_BACKGROUND_SHARDS = LANES_PYTEST_SHARDS.slice(0, -1);
+// Every background shard is waited on (no short-circuit), so none outlives
+// the command; any non-zero shard fails it before coverage is combined.
+const LANES_COVERAGE_RUN = `{ ${LANES_BACKGROUND_SHARDS.map(shard => `${lanesCoverageShard(shard)} & lanes_${shard.id}=$!;`).join(' ')} ${lanesCoverageShard(LANES_LAST_SHARD)}; lanes_status=$?; ${LANES_BACKGROUND_SHARDS.map(shard => `wait "$lanes_${shard.id}" || lanes_status=1;`).join(' ')} test "$lanes_status" -eq 0; } && COVERAGE_FILE="\${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage combine ${LANES_PYTEST_SHARDS.map(shard => `"\${RUNNER_TEMP:-/tmp}/jovie-lanes-${shard.id}.coverage"`).join(' ')}`;
 
 /**
  * Structural Python regressions, split so the pool can overlap them. Each
