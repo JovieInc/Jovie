@@ -14,10 +14,12 @@ import {
   buildOvieHomeShipping,
   buildPulse,
   buildShipRows,
+  buildStageLatency,
   OVIE_NOT_MEASURED,
   OVIE_SHIP_STAGES,
   rememberPulse,
   shipStageForTask,
+  stageLabel,
 } from './shipping-home';
 
 type Feed = ShippingCockpitProjection['operationalTasks'];
@@ -520,5 +522,61 @@ describe('buildOvieAsks', () => {
       declared: true,
     });
     expect(second?.decisionDefault).toBeNull();
+  });
+});
+
+describe('stage latency', () => {
+  const summary = {
+    at: '2026-10-20T21:54:23.984Z',
+    stagesTotal: 31,
+    stagesWithData: 14,
+    regressions: [
+      'remediation:classified.p95',
+      'release:staging->verified.p95',
+    ],
+    slowestP95: [
+      { stage: 'remediation:classified', p50: 3219, p95: 201933, n: 126 },
+      { stage: 'shipping:pr-open', p50: 495, p95: 15147, n: 570 },
+      { stage: 'shipping:ready', p50: null, p95: 23458, n: 571 },
+    ],
+  };
+
+  it('labels stages for people, keeping acronyms', () => {
+    expect(stageLabel('shipping:pr-open')).toBe('Shipping · PR Open');
+    expect(stageLabel('release:staging->verified')).toBe(
+      'Release · Staging → Verified'
+    );
+  });
+
+  it('formats the slowest stages, flags regressions, and lists the rest', () => {
+    const latency = buildStageLatency(summary, 2);
+    expect(latency?.rows).toEqual([
+      {
+        id: 'remediation:classified',
+        label: 'Remediation · Classified',
+        p50: '54m',
+        p95: '2.3d',
+        samples: 126,
+        regressed: true,
+      },
+      {
+        id: 'shipping:pr-open',
+        label: 'Shipping · PR Open',
+        p50: '8m',
+        p95: '4.2h',
+        samples: 570,
+        regressed: false,
+      },
+    ]);
+    expect(latency?.otherRegressions).toEqual(['Release · Staging → Verified']);
+    expect(latency?.coverage).toBe('14 of 31 stages measured');
+  });
+
+  it('keeps unknown durations unknown and returns null without a summary', () => {
+    expect(buildStageLatency(summary)?.rows[2]?.p50).toBe(OVIE_NOT_MEASURED);
+    expect(buildStageLatency(null)).toBeNull();
+    expect(
+      buildStageLatency({ ...summary, stagesTotal: null })?.coverage
+    ).toBeNull();
   });
 });

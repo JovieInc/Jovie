@@ -21,6 +21,7 @@ import {
 import {
   buildOvieAsks,
   buildOvieHomeShipping,
+  buildStageLatency,
   OVIE_SHIP_STAGES,
   type OviePulseMemory,
   ovieAskAction,
@@ -276,6 +277,11 @@ export function OvieHomeCanvas({
   return (
     <HomeLoopCanvas
       answer={answerPanel}
+      latency={
+        snapshot
+          ? buildStageLatency(snapshot.view.delivery.lanes.stageSummary)
+          : null
+      }
       inFlightOverride={inFlightOverride}
       copy={OVIE_HOME_COPY}
       stages={OVIE_SHIP_STAGES}
