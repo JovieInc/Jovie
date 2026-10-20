@@ -2,6 +2,10 @@ import { streamText, type UIMessage } from 'ai';
 import { MockLanguageModelV3 } from 'ai/test';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { downloadChatAttachments } from '@/lib/chat/attachment-policy';
+import {
+  PROMPT_DISCLOSURE_REFUSAL,
+  PROMPT_LEAK_CANARY,
+} from '@/lib/chat/prompt-disclosure-guard';
 import { executeChatTurn } from '@/lib/chat/run';
 import type { ArtistContext } from '@/lib/chat/types';
 
@@ -81,14 +85,21 @@ function input(url = blobUrl): Parameters<typeof executeChatTurn>[0] {
   };
 }
 
-function model(supportedUrls: Record<string, RegExp[]> = { '*/*': [/.*/] }) {
+function model(
+  supportedUrls: Record<string, RegExp[]> = { '*/*': [/.*/] },
+  output = 'ok'
+) {
   return new MockLanguageModelV3({
     supportedUrls,
     doStream: {
       stream: new ReadableStream({
         start(controller) {
           controller.enqueue({ type: 'text-start', id: 'answer' });
-          controller.enqueue({ type: 'text-delta', id: 'answer', delta: 'ok' });
+          controller.enqueue({
+            type: 'text-delta',
+            id: 'answer',
+            delta: output,
+          });
           controller.enqueue({ type: 'text-end', id: 'answer' });
           controller.enqueue({
             type: 'finish',
@@ -220,4 +231,28 @@ describe('chat attachment boundary with the real AI SDK', () => {
     expect(fetchTrap).not.toHaveBeenCalled();
     expect(mocks.dnsTrap).not.toHaveBeenCalled();
   });
+});
+
+describe('chat buffered completion with the real AI SDK', () => {
+  it.each([
+    ['safe answer', 'Your draft is ready.', 'Your draft is ready.'],
+    [
+      'prompt leak',
+      `Internal setup: ${PROMPT_LEAK_CANARY}`,
+      PROMPT_DISCLOSURE_REFUSAL,
+    ],
+  ])(
+    'retains the guarded final text after consuming a %s stream',
+    async (_, output, expected) => {
+      mocks.model = model(undefined, output);
+      const turn = await executeChatTurn(input());
+
+      await turn.streamResult.consumeStream();
+
+      await expect(turn.streamResult.text).resolves.toBe(expected);
+      expect(mocks.model.doStreamCalls).toHaveLength(1);
+      expect(fetchTrap).not.toHaveBeenCalled();
+      expect(mocks.dnsTrap).not.toHaveBeenCalled();
+    }
+  );
 });

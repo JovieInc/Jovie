@@ -1,6 +1,6 @@
 {
   "name": "@jovie/web",
-  "version": "26.10.9",
+  "version": "26.10.10",
   "private": true,
   "sideEffects": false,
   "engines": {
@@ -341,13 +341,13 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@axe-core/playwright": "^4.13.0",
+    "@axe-core/playwright": "^4.14.0",
     "@biomejs/biome": "^2.5.14",
-    "@chromatic-com/storybook": "^5.4.0",
+    "@chromatic-com/storybook": "^5.5.1",
     "@lhci/cli": "^0.15.1",
-    "@next/bundle-analyzer": "^16.4.1",
-    "@playwright/test": "1.64.0",
-    "@sentry/node": "^11.6.0",
+    "@next/bundle-analyzer": "^16.4.2",
+    "@playwright/test": "1.64.1",
+    "@sentry/node": "^11.8.0",
     "@shadcn/lint": "0.2.1",
     "@storybook/addon-a11y": "10.6.2",
     "@storybook/addon-docs": "10.6.2",
@@ -355,7 +355,7 @@
     "@storybook/nextjs-vite": "10.6.2",
     "@stryker-mutator/core": "10.0.0",
     "@tailwindcss/postcss": "^4.3.3",
-    "@tanstack/react-query-devtools": "^5.104.2",
+    "@tanstack/react-query-devtools": "^5.104.4",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.8",
@@ -365,9 +365,9 @@
     "@types/react-dom": "^19.3.0",
     "@typescript-eslint/parser": "^8.71.2",
     "@vitejs/plugin-react": "^6.1.2",
-    "@vitest/browser": "5.0.4",
-    "@vitest/browser-playwright": "5.0.4",
-    "@vitest/coverage-v8": "5.0.4",
+    "@vitest/browser": "5.0.5",
+    "@vitest/browser-playwright": "5.0.5",
+    "@vitest/coverage-v8": "5.0.5",
     "autoprefixer": "^10.6.1",
     "axe-core": "^4.14.0",
     "babel-plugin-react-compiler": "19.1.0-rc.3",
@@ -375,11 +375,11 @@
     "drizzle-kit": "^0.31.11",
     "drizzle-zod": "^0.8.3",
     "eslint": "^10.12.0",
-    "eslint-config-next": "^16.4.1",
+    "eslint-config-next": "^16.4.2",
     "eslint-plugin-boundaries": "^7.2.0",
     "fast-check": "4.10.2",
     "glob": "^13.0.6",
-    "jsdom": "30.1.2",
+    "jsdom": "30.1.3",
     "next-sitemap": "^4.2.3",
     "playwright": "1.60.0",
     "plop": "^4.0.5",
@@ -391,6 +391,6 @@
     "tsx": "^4.23.15",
     "typescript": "^6.0.3",
     "vite": "8.3.4",
-    "vitest": "5.0.4"
+    "vitest": "5.0.5"
   }
 }

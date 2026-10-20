@@ -10,10 +10,18 @@ import { OPERATOR_NAV_GROUP_LABEL } from '@/components/organisms/operator-naviga
 import {
   SidebarMenu,
   SidebarMenuBadge,
-  SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from '@/components/organisms/sidebar';
-import { SHELL_RAIL_LABEL } from '@/components/shell/rail-motion';
+import {
+  SHELL_RAIL_LABEL,
+  SHELL_RAIL_LABEL_OVERLAY,
+} from '@/components/shell/rail-motion';
+import {
+  getSidebarNavIconClassName,
+  getSidebarNavRowClassName,
+} from '@/components/shell/SidebarNavItem';
+import { Tooltip } from '@/components/shell/Tooltip';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   getListErrorMessage,
@@ -43,23 +51,31 @@ function NavRow({
   readonly icon: typeof List;
   readonly active: boolean;
 }) {
+  const { state, isMobile } = useSidebar();
+
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton
-        asChild
-        isActive={active}
-        tooltip={label}
-        className='h-7'
-      >
+      <Tooltip label={label} side='right' block>
         <Link
           href={href}
           aria-current={active ? 'page' : undefined}
-          className='flex w-full min-w-0 items-center gap-2 pr-8'
+          aria-label={label}
+          className={getSidebarNavRowClassName({
+            calm: true,
+            active,
+            collapsed: state === 'closed' && !isMobile,
+            className: 'rounded-lg',
+          })}
         >
-          <Icon className='size-3.5' aria-hidden='true' />
-          <span className='truncate'>{label}</span>
+          <Icon
+            className={getSidebarNavIconClassName({ calm: true, active })}
+            aria-hidden='true'
+          />
+          <span className={cn('min-w-0 truncate', SHELL_RAIL_LABEL_OVERLAY)}>
+            {label}
+          </span>
         </Link>
-      </SidebarMenuButton>
+      </Tooltip>
       <SidebarMenuBadge aria-label={`${count} creators`}>
         {count}
       </SidebarMenuBadge>
@@ -77,6 +93,7 @@ function GroupLabel({ children }: { readonly children: string }) {
 
 function NewListRow() {
   const router = useRouter();
+  const { state, isMobile, setOpen } = useSidebar();
   const create = useCreateOvieListMutation();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState('');
@@ -130,14 +147,29 @@ function NewListRow() {
 
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton
-        tooltip='New List'
-        onClick={() => setEditing(true)}
-        className='h-7'
-      >
-        <Plus className='size-3.5' aria-hidden='true' />
-        <span className='truncate'>New List</span>
-      </SidebarMenuButton>
+      <Tooltip label='New List' side='right' block>
+        <button
+          type='button'
+          aria-label='New List'
+          onClick={() => {
+            if (state === 'closed' && !isMobile) setOpen(true);
+            setEditing(true);
+          }}
+          className={getSidebarNavRowClassName({
+            calm: true,
+            collapsed: state === 'closed' && !isMobile,
+            className: 'rounded-lg',
+          })}
+        >
+          <Plus
+            className={getSidebarNavIconClassName({ calm: true })}
+            aria-hidden='true'
+          />
+          <span className={cn('min-w-0 truncate', SHELL_RAIL_LABEL_OVERLAY)}>
+            New List
+          </span>
+        </button>
+      </Tooltip>
     </SidebarMenuItem>
   );
 }

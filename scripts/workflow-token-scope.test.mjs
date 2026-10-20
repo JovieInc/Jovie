@@ -49,6 +49,14 @@ export const ENQUEUE_PULL_REQUEST_MUTATION =
 `;
 
 const quiet = { acknowledged: [], requireAcknowledged: false };
+const fixtureAcknowledgement = {
+  id: 'fixture-enqueue-contents-read',
+  workflow: '.github/workflows/fixture.yml',
+  job: 'rearm',
+  call: 'enqueuePullRequest',
+  missing: ['contents:write'],
+  message: 'Known fixture mismatch',
+};
 
 test('enqueuePullRequest counts only inside a string', () => {
   assert.deepEqual(
@@ -70,7 +78,12 @@ test('gh pr merge --auto is enqueuePullRequest and --disable-auto is not', () =>
     auto.some(call => call.call === 'enqueuePullRequest'),
     true
   );
-  assert.deepEqual(extractCalls('gh pr merge 12 --disable-auto', 'shell'), []);
+  const undo = extractCalls('gh pr merge 12 --disable-auto', 'shell');
+  assert.equal(undo[0]?.call, 'disablePullRequestAutoMerge');
+  assert.equal(
+    undo.some(call => call.call === 'enqueuePullRequest'),
+    false
+  );
   assert.deepEqual(extractCalls('gh api repos/acme/app/pulls/1', 'shell'), []);
 });
 
@@ -157,7 +170,167 @@ jobs:
   assert.deepEqual(denied.failures[0]?.missing, ['contents:write']);
 });
 
-test('the rearm acknowledgement does not cover the same bug in another job', () => {
+test('REST status writes need statuses and GETs are ignored', () => {
+  const root = fixture(`
+name: fixture
+permissions: {}
+jobs:
+  status:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - run: gh api repos/acme/app/commits/abc
+      - run: gh api -X POST repos/acme/app/statuses/abc -f state=success
+`);
+  const result = scanWorkflowTokenScopes(root, quiet);
+  assert.equal(result.failures.length, 1);
+  assert.equal(result.failures[0]?.call, 'POST repos/{}/{}/statuses/{}');
+  assert.deepEqual(result.failures[0]?.missing, ['statuses:write']);
+});
+
+test('a cancel uses the per-command token, not the read app token', () => {
+  const clean = scanWorkflowTokenScopes(
+    fixture(`
+name: fixture
+permissions: {}
+jobs:
+  supersede:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          permission-actions: read
+      - env:
+          READ_TOKEN: \${{ steps.app-token.outputs.token }}
+          CANCEL_TOKEN: \${{ github.token }}
+        run: GH_TOKEN="$CANCEL_TOKEN" gh api -X POST repos/acme/app/actions/runs/99/cancel
+`),
+    quiet
+  );
+  assert.deepEqual(clean.failures, []);
+  const denied = scanWorkflowTokenScopes(
+    fixture(`
+name: fixture
+permissions: {}
+jobs:
+  supersede:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          permission-actions: read
+      - env:
+          READ_TOKEN: \${{ steps.app-token.outputs.token }}
+        run: GH_TOKEN="$READ_TOKEN" gh api -X POST repos/acme/app/actions/runs/99/cancel
+`),
+    quiet
+  );
+  assert.equal(
+    denied.failures[0]?.call,
+    'POST repos/{}/{}/actions/runs/{}/cancel'
+  );
+  assert.deepEqual(denied.failures[0]?.missing, ['actions:write']);
+});
+
+test('a CLI subcommand does not inherit another command mutation', () => {
+  const script = `
+const CREATE_COMMIT_MUTATION = \`mutation($input:CreateCommitOnBranchInput!){
+  createCommitOnBranch(input:$input){commit{oid}}
+}\`;
+function planCommand() {
+  return { planned: true };
+}
+async function commitCommand() {
+  return CREATE_COMMIT_MUTATION;
+}
+async function main() {
+  const command = process.argv[2];
+  if (command === 'plan') return planCommand();
+  if (command === 'commit') return commitCommand();
+}
+`;
+  const plan = scanWorkflowTokenScopes(
+    fixture(
+      `
+name: fixture
+permissions: {}
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - run: node .fx-policy/scripts/lib/tool.mjs plan
+`,
+      { 'scripts/lib/tool.mjs': script }
+    ),
+    quiet
+  );
+  assert.deepEqual(plan.failures, []);
+  const commit = scanWorkflowTokenScopes(
+    fixture(
+      `
+name: fixture
+permissions: {}
+jobs:
+  commit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - run: node scripts/lib/tool.mjs commit
+`,
+      { 'scripts/lib/tool.mjs': script }
+    ),
+    quiet
+  );
+  assert.equal(commit.failures[0]?.call, 'createCommitOnBranch');
+  assert.deepEqual(commit.failures[0]?.missing, ['contents:write']);
+});
+
+test('a javascript dequeuePullRequest call outside a string is not the mutation', () => {
+  const found = extractCalls(
+    'const q = `mutation($id:ID!){dequeuePullRequest(input:{id:$id}){clientMutationId}}`;',
+    'js'
+  );
+  assert.equal(found[0]?.call, 'dequeuePullRequest');
+  assert.deepEqual(extractCalls('await dequeuePullRequest(id)', 'js'), []);
+});
+
+test('an acknowledgement downgrades only its declared mismatch to a warning', () => {
+  const root = fixture(`
+name: fixture
+permissions: {}
+jobs:
+  rearm:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - run: gh pr merge 12 --auto
+`);
+  const result = scanWorkflowTokenScopes(root, {
+    acknowledged: [fixtureAcknowledgement],
+    requireAcknowledged: true,
+  });
+  assert.equal(result.warnings.length, 1);
+  assert.deepEqual(result.failures, []);
+  const lines = [];
+  assert.equal(
+    reportWorkflowTokenScopes(result, line => lines.push(line)),
+    0
+  );
+  assert.match(lines[0], /::warning .*Known fixture mismatch/);
+});
+
+test('an acknowledgement does not cover the same bug in another job', () => {
   const root = fixture(
     `
 name: fixture
@@ -177,7 +350,7 @@ jobs:
     { 'scripts/merge-group-victim-rearm.mjs': ENQUEUE_SCRIPT }
   );
   const result = scanWorkflowTokenScopes(root, {
-    acknowledged: ACKNOWLEDGED_MISMATCHES,
+    acknowledged: [fixtureAcknowledgement],
     requireAcknowledged: false,
   });
   assert.equal(result.warnings.length, 0);
@@ -197,54 +370,55 @@ jobs:
     steps:
       - run: node --version
 `);
-  const result = scanWorkflowTokenScopes(root);
+  const result = scanWorkflowTokenScopes(root, {
+    acknowledged: [fixtureAcknowledgement],
+    requireAcknowledged: true,
+  });
   assert.ok(
     result.failures.some(
       failure =>
         failure.call === 'acknowledged-exception' &&
-        failure.message.includes('rearm-enqueue-contents-read')
+        failure.message.includes(fixtureAcknowledgement.id)
     )
   );
 });
 
-test('the live repo warns on the rearm enqueue mismatch and fails nothing else', () => {
+test('the live repo warns only on dequeue mismatches and grants every enqueue call', () => {
   const result = scanWorkflowTokenScopes(repoRoot);
   assert.deepEqual(
-    result.warnings.map(warning => warning.job),
-    ['rearm-green-victims']
+    ACKNOWLEDGED_MISMATCHES.map(item => item.call),
+    ['dequeuePullRequest', 'dequeuePullRequest']
   );
-  assert.equal(result.failures.length, 0);
-  const rearm = result.warnings[0];
-  assert.equal(rearm?.file, 'scripts/merge-group-victim-rearm.mjs');
-  assert.equal(rearm?.call, 'enqueuePullRequest');
-  assert.deepEqual(rearm?.missing, ['contents:write']);
-  assert.match(rearm?.message ?? '', /app 2934433/);
-  assert.match(rearm?.message ?? '', /permission-contents: write/);
-  assert.match(rearm?.message ?? '', /Tim must approve/);
+  assert.deepEqual(result.warnings.map(warning => warning.job).sort(), [
+    'dequeue-held',
+    'hold-failed-revision',
+  ]);
+  for (const warning of result.warnings) {
+    assert.equal(warning.call, 'dequeuePullRequest');
+    assert.deepEqual(warning.missing, ['merge-queues:write']);
+  }
+  assert.deepEqual(result.failures, []);
   const lines = [];
   assert.equal(
     reportWorkflowTokenScopes(result, line => lines.push(line)),
     0
   );
-  assert.equal(lines.filter(line => line.startsWith('::warning ')).length, 1);
+  assert.equal(lines.filter(line => line.startsWith('::warning ')).length, 2);
   assert.equal(
     lines.some(line => line.startsWith('::error ')),
     false
   );
 });
 
-test('the cli reports the rearm warning and exits 0', () => {
+test('the cli reports only the two acknowledged dequeue mismatches and exits 0', () => {
   const result = spawnSync(
     process.execPath,
     ['scripts/workflow-token-scope.mjs'],
     { cwd: repoRoot, encoding: 'utf8' }
   );
+  assert.ifError(result.error);
   assert.equal(result.status, 0, result.stderr);
-  assert.match(
-    result.stderr,
-    /::warning file=scripts\/merge-group-victim-rearm\.mjs/
-  );
-  assert.match(result.stderr, /Tim must approve permission-contents: write/);
-  assert.match(result.stderr, /app 2934433/);
-  assert.equal(result.stderr.includes('::error '), false);
+  assert.match(result.stderr, /2 acknowledged, 0 mismatches/);
+  assert.equal(result.stderr.split('::warning ').length - 1, 2);
+  assert.doesNotMatch(result.stderr, /::error /);
 });

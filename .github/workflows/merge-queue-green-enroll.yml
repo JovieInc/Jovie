@@ -856,10 +856,11 @@ jobs:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
           permission-actions: read
-          permission-contents: read
+          # enqueuePullRequest needs the same contents grant as the enroll job.
+          permission-contents: write
           permission-pull-requests: write
           permission-statuses: write
-          # Rearming auto-merge on a head that edits .github/workflows needs it.
+          # Enqueueing a head that edits .github/workflows needs it.
           permission-workflows: write
 
       - name: Rearm green victims of this merge group

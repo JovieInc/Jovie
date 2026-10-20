@@ -20,6 +20,7 @@ export const HUD_NOISE_SECTION_IDS = [
   'velocity',
   'agent-runs',
   'dispatch-details',
+  'detection-coverage',
   'drilldowns',
   'env-exceptions',
 ] as const;
@@ -41,6 +42,7 @@ export const HUD_SECTION_TEST_IDS = {
   velocity: 'hud-shipping-velocity',
   'agent-runs': 'hud-agent-runs',
   'dispatch-details': 'hud-dispatch-details',
+  'detection-coverage': 'hud-detection-coverage',
   'env-exceptions': 'hud-section-env-exceptions',
   exceptions: 'hud-exceptions-section',
   drilldowns: 'hud-drilldowns-section',
@@ -56,6 +58,7 @@ export const HUD_SECTION_LABELS = {
   velocity: 'Velocity',
   'agent-runs': 'Agent runs',
   'dispatch-details': 'Dispatch and diagnostics',
+  'detection-coverage': 'Detection Coverage',
   'env-exceptions': 'Env exceptions',
   exceptions: 'Needs attention',
   drilldowns: 'Search records',
