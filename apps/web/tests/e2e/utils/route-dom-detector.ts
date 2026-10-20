@@ -420,10 +420,15 @@ export async function inspectRouteDom(
         // 4. Headings must not be truncated (JOV-6906). Tight display
         //    leading makes glyphs overflow their box without hiding text, so
         //    measure the clamp itself: the unclamped height must fit.
+        const inkContext = document.createElement('canvas').getContext('2d');
         for (const heading of Array.from(root.querySelectorAll('h1, h2, h3'))) {
           if (!visibleIn(heading) || !(heading instanceof HTMLElement)) {
             continue;
           }
+          const headingBox = heading.getBoundingClientRect();
+          // Match the image-contrast detector: sr-only headings are 1x1px
+          // and intentionally clipped, while remaining accessible.
+          if (headingBox.width <= 1 && headingBox.height <= 1) continue;
           const style = getComputedStyle(heading);
           const clamp = style.getPropertyValue('-webkit-line-clamp');
           const clipsY =
@@ -459,13 +464,45 @@ export async function inspectRouteDom(
             style.textOverflow === 'ellipsis'
               ? heading.scrollWidth - heading.clientWidth
               : 0;
-          // Descender ink (y, g, p) below the last line box: a clamp that
-          // caps block size at exactly N lines crops glyphs even when no
-          // line is hidden (homepage "every", 2026-10-20).
-          const clippedInk =
-            clipsY && heading.scrollHeight - heading.clientHeight > 1
-              ? heading.scrollHeight - heading.clientHeight
-              : 0;
+          // scrollHeight includes the font's line box, including blank
+          // space below glyphs. Confirm actual descender ink crosses the
+          // clip edge rather than treating that spacing as hidden text.
+          let clippedInk = 0;
+          if (clipsY && inkContext && hiddenY < lineHeight / 2) {
+            const clipBottom = headingBox.bottom - px(style.borderBottomWidth);
+            const walker = document.createTreeWalker(
+              heading,
+              NodeFilter.SHOW_TEXT
+            );
+            while (walker.nextNode()) {
+              const node = walker.currentNode;
+              const parent = node.parentElement;
+              if (!parent || !visibleIn(parent)) continue;
+              const textStyle = getComputedStyle(parent);
+              inkContext.font = textStyle.font;
+              const content = node.textContent ?? '';
+              for (let offset = 0; offset < content.length; offset += 1) {
+                let glyph = content[offset];
+                if (!glyph || /\s/.test(glyph)) continue;
+                if (textStyle.textTransform === 'uppercase')
+                  glyph = glyph.toLocaleUpperCase();
+                if (textStyle.textTransform === 'lowercase')
+                  glyph = glyph.toLocaleLowerCase();
+                const range = document.createRange();
+                range.setStart(node, offset);
+                range.setEnd(node, offset + 1);
+                const box = range.getBoundingClientRect();
+                if (box.width === 0 || box.height === 0) continue;
+                const metrics = inkContext.measureText(glyph);
+                const inkBottom =
+                  box.top +
+                  metrics.fontBoundingBoxAscent +
+                  metrics.actualBoundingBoxDescent;
+                if (inkBottom - clipBottom > 1)
+                  clippedInk = Math.max(clippedInk, inkBottom - clipBottom);
+              }
+            }
+          }
           if (hiddenY < lineHeight / 2 && hiddenX <= 2 && clippedInk === 0) {
             continue;
           }
