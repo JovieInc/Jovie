@@ -86,9 +86,13 @@ jobs:
           retention-days: 14
       # component-ship-gate's live-storybook-cert launches Chromium when the
       # diff touches in-scope UI components; without browsers the gate fails
-      # closed before any story is measured.
+      # closed before any story is measured. The disk-read source contracts
+      # below also run on a metadata-only edit, and their script-contracts
+      # guard selects every PR and can run Chromium tests
+      # (component-rendered-evaluator). Gating this step on reuse failed those
+      # edits with "Executable doesn't exist" (#21956, #21946, #21774, #21725),
+      # so it carries the same (absent) condition as that step.
       - name: Setup Playwright (Chromium)
-        if: steps.reuse.outputs.reuse != 'true'
         uses: ./.github/actions/setup-playwright
       - name: Validate customer changelog decision from trusted base
         shell: bash

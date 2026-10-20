@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ComponentProps, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -74,6 +74,12 @@ function renderClient(
   );
 }
 
+function pageShow(persisted: boolean) {
+  const event = new Event('pageshow');
+  Object.defineProperty(event, 'persisted', { value: persisted });
+  return event;
+}
+
 describe('ConnectorsClient', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -91,6 +97,68 @@ describe('ConnectorsClient', () => {
     expect(screen.getByRole('alert')).not.toHaveTextContent(urlError.value);
     expect(screen.getByRole('button', { name: 'Connect Gmail' })).toBeEnabled();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('shows a declined consent as neutral status without an alert or focus change', () => {
+    urlError.value = 'oauth_canceled';
+    renderClient();
+    expect(
+      screen.getByText('Connection canceled. Nothing changed.')
+    ).toHaveAttribute('role', 'status');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(document.activeElement).toBe(document.body);
+    expect(screen.getByRole('button', { name: 'Connect Gmail' })).toBeEnabled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each(['oauth_provider_error', 'oauth_session_changed', 'oauth_expired'])(
+    'keeps the generic safe failure for %s',
+    code => {
+      urlError.value = code;
+      renderClient();
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'The connection did not finish.'
+      );
+      expect(screen.getByRole('alert')).not.toHaveTextContent(code);
+      expect(screen.queryByText(/canceled/i)).not.toBeInTheDocument();
+    }
+  );
+
+  it('starts Google OAuth once for same-tick repeated clicks', () => {
+    renderClient();
+    const button = screen.getByRole('button', { name: 'Connect Gmail' });
+    act(() => {
+      button.click();
+      button.click();
+    });
+    expect(push).toHaveBeenCalledOnce();
+    expect(push).toHaveBeenCalledWith(
+      `/api/connectors/google/authorize?returnTo=${encodeURIComponent(APP_ROUTES.SETTINGS_CONNECTORS)}`
+    );
+  });
+
+  it('releases the attempt only when Back restores the page from the back/forward cache', () => {
+    renderClient();
+    const activate = () =>
+      act(() => {
+        screen.getByRole('button', { name: 'Connect Gmail' }).click();
+      });
+
+    activate();
+    expect(push).toHaveBeenCalledOnce();
+
+    activate();
+    act(() => {
+      window.dispatchEvent(pageShow(false));
+    });
+    activate();
+    expect(push).toHaveBeenCalledOnce();
+
+    act(() => {
+      window.dispatchEvent(pageShow(true));
+    });
+    activate();
+    expect(push).toHaveBeenCalledTimes(2);
   });
 
   it('keeps unavailable and identity-less providers visible without offering usable connections', async () => {

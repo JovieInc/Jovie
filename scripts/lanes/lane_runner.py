@@ -58,6 +58,7 @@ import claude_lane  # noqa: E402  (subscription quota bank read by the router)
 import hyperagent_lane  # noqa: E402
 import linear_app_token  # noqa: E402  (Jovie Lanes OAuth app quota, separate from Tim's user)
 import linear_sync  # noqa: E402  (local issue mirror, claim ledger, write outbox)
+import ownership  # noqa: E402  (started-state live-owner invariant)
 import pr_events  # noqa: E402
 import remediation  # noqa: E402  (classifier, router, escalation ladder)
 import shipping_attribution  # noqa: E402  (receipt-first merged-PR provenance)
@@ -572,6 +573,59 @@ def issue_hits_red_line(issue: Issue) -> bool:
     return False
 
 
+# A reviewed false positive (2026-10-20): the matcher stays as is, and one issue at a time
+# leaves the red-line hold only with BOTH the label and a comment receipt
+# `<!-- sensitive-text-reviewed:v1 {"sha256": ..., "reviewer": ..., "reason": ..., "at": ...} -->`
+# whose sha256 binds the exact title+description it reviewed. Any later edit voids it.
+SENSITIVE_REVIEWED_LABEL = "sensitive-text-reviewed"
+SENSITIVE_REVIEW_MARKER = re.compile(r"<!--\s*sensitive-text-reviewed:v1\s+(\{.*?\})\s*-->", re.S)
+SENSITIVE_REVIEW_TTL_S = 600
+SENSITIVE_REVIEW_QUERY = ('query($id:String!){issue(id:$id){comments(first:20,filter:{body:{contains:'
+                          '"sensitive-text-reviewed:v1"}}){nodes{body}}}}')
+
+
+def issue_text_digest(issue: Issue) -> str:
+    return hashlib.sha256(f"{issue.title}\n{issue.description or ''}".encode()).hexdigest()
+
+
+def sensitive_review_valid(issue: Issue, bodies: list[str]) -> bool:
+    digest = issue_text_digest(issue)
+    for body in bodies:
+        for match in SENSITIVE_REVIEW_MARKER.finditer(body if isinstance(body, str) else ""):
+            try:
+                receipt = json.loads(match.group(1))
+            except ValueError:
+                continue
+            if (isinstance(receipt, dict) and receipt.get("sha256") == digest
+                    and all(isinstance(receipt.get(key), str) and receipt[key].strip()
+                            for key in ("reviewer", "reason", "at"))):
+                return True
+    return False
+
+
+def sensitive_review_comments(issue: Issue) -> list[str] | None:
+    """Receipt comments, one Linear read per issue text per TTL (keyed on the text digest)."""
+    def fetch():
+        data = Linear(Host().linear_env).gql(SENSITIVE_REVIEW_QUERY, {"id": issue.id})
+        nodes = (((data or {}).get("issue") or {}).get("comments") or {}).get("nodes")
+        return [node.get("body") for node in nodes if isinstance(node, dict)] if isinstance(nodes, list) else None
+    return shared(f"sensitive-review-{_cache_token(issue.id)}-{issue_text_digest(issue)[:16]}",
+                  SENSITIVE_REVIEW_TTL_S, fetch)
+
+
+SENSITIVE_REVIEW_READER = sensitive_review_comments
+
+
+def sensitive_text_released(issue: Issue) -> bool:
+    if SENSITIVE_REVIEWED_LABEL not in {label.lower() for label in issue.labels}:
+        return False
+    try:
+        bodies = SENSITIVE_REVIEW_READER(issue)
+    except Exception:  # an unreadable receipt keeps the hold
+        return False
+    return bool(bodies) and sensitive_review_valid(issue, bodies)
+
+
 def label_rejection(issue: Issue, provider: str | None = None) -> str | None:
     """Label policy shared by the Jovie pool and every binding (bindings.refusal)."""
     labels = {label.lower() for label in issue.labels}
@@ -611,7 +665,7 @@ def admission_rejection(issue: Issue, failures: dict, now: float,
     rejected = label_rejection(issue, provider)
     if rejected:
         return rejected
-    if issue_hits_red_line(issue):
+    if issue_hits_red_line(issue) and not sensitive_text_released(issue):
         return "sensitive-text"
     if SENSITIVE_LABELS & labels and provider != SENSITIVE_PROVIDER:
         return "sensitive-provider"
@@ -655,11 +709,50 @@ def predicted_touch(issue: Issue, target_files: dict | None = None, now: float |
     return hints or frozenset(witnessed or ()) or AREA_HOTSPOTS.get(workstreams.classify(issue.title, issue.labels), frozenset())
 
 
-def hotspot_holds(prs: list[dict]) -> dict[str, int]:
+# A draft nobody has touched (no push, comment, label or review: GitHub `updatedAt`) for this
+# long, and that no lane holds a repair lease on, stops holding hotspots: it is recorded as a
+# file-overlap flag instead. 48h matches the reconcile pass's stale-draft SLO. Gem 2026-10-20:
+# green draft #22253, idle 3 days, held six symphony-throughput issues on doctor.py.
+HOTSPOT_DRAFT_IDLE_S = 48 * 3600
+
+
+def stale_hotspot_draft(pr: dict, now: float, leased=lambda number: False) -> bool:
+    """Evidence-based: a draft, with a readable updatedAt older than HOTSPOT_DRAFT_IDLE_S, and
+    no live repair lease. Missing or unreadable evidence keeps the hold."""
+    if pr.get("isDraft") is not True:
+        return False
+    updated = created_at_epoch(str(pr.get("updatedAt") or ""))
+    return updated is not None and now - updated > HOTSPOT_DRAFT_IDLE_S and not leased(pr.get("number"))
+
+
+def repair_leased(number) -> bool:
+    """True while a lane holds this PR's repair lease (probe only; never takes or rewrites it)."""
+    state = lane_state_dir()
+    if state is None or not isinstance(number, int):
+        return False
+    path = state / "locks" / f"repair-pr-{number}.lock"
+    if not path.exists():
+        return False
+    try:
+        with open(path, "a") as handle:
+            try:
+                fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                return True
+            fcntl.flock(handle, fcntl.LOCK_UN)
+    except OSError:
+        return True  # unreadable lease evidence keeps the hold
+    return False
+
+
+def hotspot_holds(prs: list[dict], now: float | None = None, leased=lambda number: False) -> dict[str, int]:
     """{hotspot path: the oldest open PR touching it}. Hotspots are HOTSPOT_SEED plus any file
-    two or more open PRs touch. Parked PRs (held or repair-exhausted) hold nothing: they
-    rebuild from main once the active work lands."""
-    active = sorted((pr for pr in prs if not pr_is_terminal(pr)), key=lambda pr: pr.get("number") or 0)
+    two or more open PRs touch. Parked PRs (held or repair-exhausted) and stale unleased
+    drafts (`stale_hotspot_draft`) hold nothing: they rebuild from main once the active work
+    lands, and file-overlap still flags the overlap."""
+    now = time.time() if now is None else now
+    active = sorted((pr for pr in prs if not pr_is_terminal(pr) and not stale_hotspot_draft(pr, now, leased)),
+                    key=lambda pr: pr.get("number") or 0)
     touched = [(pr["number"], {entry.get("path") for entry in pr.get("files") or [] if entry.get("path")})
                for pr in active]
     seen: dict[str, int] = {}
@@ -2083,7 +2176,11 @@ class Linear:
         data = self.gql('query($id:String!){issue(id:$id){state{name}}}', {"id": issue_id})
         return data["issue"]["state"]["name"]
 
-    def move(self, issue_id: str, state_name: str) -> None:
+    def move(self, issue_id: str, state_name: str, owner: str | None = None) -> None:
+        # Direct (non-outbox) writes have no claim ledger to consult: a started state must
+        # name its live owner explicitly (the orphaned In Progress guard).
+        if state_name in linear_sync.STARTED and not owner:
+            raise linear_sync.StartedWithoutOwner(f"{state_name} for {issue_id} without a live owner")
         states = self.gql('query($id:String!){issue(id:$id){team{states{nodes{id name}}}}}', {"id": issue_id})
         target = next((s["id"] for s in states["issue"]["team"]["states"]["nodes"] if s["name"] == state_name), None)
         if target:
@@ -4211,6 +4308,8 @@ def fetch_labeled_events(linear) -> list:
 
 EVENT_DELIVERY_SCHEMA = "jovie.event-delivery/v1"
 EVENT_DELIVERY_ATTEMPTS = 3
+EXHAUSTED_READBACK_S = 6 * 3600  # an exhausted delivery is only re-read for a late acknowledgement
+EVENT_DELIVERY_HISTORY = 50      # retained attempt history per delivery row
 EVENT_DELIVERY_PENDING_CAP = 256
 EVENT_DELIVERY_STALE_S = 3600
 
@@ -4421,9 +4520,23 @@ def _apply_event_plan(linear, plan: dict, host: Host, data: dict, now: float) ->
     reset. An uncertain send is read back by its stable remote ID before retry.
     The caller holds event-delivery.lock; claim.lock only covers the write fence.
     """
+    owners = _event_escalation(host).get("events") or {}
+    # Exhausted rows can never send again: they sort after every live row and are only read
+    # back every EXHAUSTED_READBACK_S. Before (Gem 2026-10-08..20) four exhausted rows took the
+    # one-action-per-tick budget every tick (5,534 readbacks on one) and 36 pending deliveries
+    # were never attempted. A row whose owning event finished or vanished is superseded.
     for row in sorted(data["actions"].values(), key=lambda row: (
-            row["createdAt"], ("reopens", "comments", "labels").index(row["kind"]), row["key"])):
+            row["status"] == "exhausted", row["createdAt"],
+            ("reopens", "comments", "labels").index(row["kind"]), row["key"])):
         if row["status"] in {"acknowledged", "superseded"} or now < row["nextAt"]:
+            continue
+        owner = owners.get(row["fingerprint"])
+        if row["status"] == "exhausted" and (not isinstance(owner, dict) or owner.get("status") == "done"
+                                             or owner.get("issueId") != row["ownerIssueId"]):
+            row["status"] = "superseded"
+            row["history"] = [*row["history"][-EVENT_DELIVERY_HISTORY:],
+                              {"at": now, "outcome": "owner-finished" if isinstance(owner, dict) else "owner-gone"}]
+            _save_event_delivery(host, data)
             continue
         phase = "readback"
         try:
@@ -4489,7 +4602,9 @@ def _apply_event_plan(linear, plan: dict, host: Host, data: dict, now: float) ->
             row["status"] = "exhausted" if row["attempts"] >= EVENT_DELIVERY_ATTEMPTS or now >= row["deadline"] else "failed"
             row["history"].append({"at": now, "outcome": row["status"], "error": row["error"],
                                    "diagnostic": row["diagnostic"]})
-        row["nextAt"] = now + (60 if row["attempts"] < 2 else 300)
+        row["nextAt"] = now + (EXHAUSTED_READBACK_S if row["status"] == "exhausted"
+                               else 60 if row["attempts"] < 2 else 300)
+        row["history"] = row["history"][-EVENT_DELIVERY_HISTORY:]
         _save_event_delivery(host, data)
         break  # Bounded work; a transport outage must not monopolize dispatch.
     return _event_delivery_report(data, now)
@@ -6560,6 +6675,21 @@ def fix_candidates(name: str) -> list[dict]:
 ISSUE_MARKER = re.compile(r"linear-issue-id:\s*(JOV-\d+)", re.IGNORECASE)
 
 
+def org_merged_prs(identifier: str) -> list[dict] | None:
+    """Merged PRs in the org that mention the issue (title/body checked by the caller)."""
+    owner = REPO_SLUG.split("/", 1)[0]
+    found = sh(["gh", "search", "prs", identifier, "--owner", owner, "--merged",
+                "--json", "repository,number,title,body", "--limit", "20"], timeout=60)
+    try:
+        rows = json.loads(found.stdout) if found.returncode == 0 else None
+    except ValueError:
+        return None
+    if not isinstance(rows, list):
+        return None
+    return [{"repository": (row.get("repository") or {}).get("nameWithOwner"), "number": row.get("number"),
+             "title": row.get("title"), "body": row.get("body")} for row in rows if isinstance(row, dict)]
+
+
 def in_flight_issues() -> frozenset[str] | None:
     """Issues that already have an open PR (lane branch or `linear-issue-id` marker) from any
     lane, host, or agent. GitHub is the shared truth. None when GitHub cannot be read: an
@@ -6587,10 +6717,10 @@ def open_hotspot_holds() -> dict[str, int]:
     hotspot gating ({}): this orders contended work, the in-flight read guards duplicates."""
     def fetch():
         listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--limit", "200",
-                     "--json", "number,labels,files"])
+                     "--json", "number,labels,files,isDraft,updatedAt"])
         return json.loads(listed.stdout or "[]") if listed.returncode == 0 else None
-    prs = shared("hotspot-files", CLAIM_SCAN_TTL_S, fetch)
-    return hotspot_holds(prs) if prs is not None else {}
+    prs = shared("hotspot-files-v2", CLAIM_SCAN_TTL_S, fetch)
+    return hotspot_holds(prs, leased=repair_leased) if prs is not None else {}
 
 
 def is_green(pr: dict) -> bool:
@@ -7488,6 +7618,8 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
     if route_decision and route_decision.get("chosen"):
         log_route(host, name, route_decision)
         spec = {**spec, "model": route_decision["chosen"]["model"], "route": route_decision}
+    # The live owner of the started issue: held until this worker exits or re-execs.
+    _RUN_LEASES.append(ownership.acquire_run_lease(host.state, issue.id, issue.identifier, name))
     linear = linear_sync.Outboxed(host.state, linear)  # every disposition write waits in the outbox
     notify_issue_claim(linear, issue, name, spec)
     try:
@@ -7589,6 +7721,9 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
                                     "release, then retried automatically." if exhausted else "Back to Todo."))
     slot.release()
     return reexec(host, name)
+
+
+_RUN_LEASES: list = []  # open run-lease handles; exec (close-on-exec) or exit releases them
 
 
 def reexec(host: Host, name: str) -> int:
@@ -7713,6 +7848,14 @@ def dispatch(host: Host) -> int:
             tick["issueReconcile"] = epics.reconcile(THIS, host, lambda: Linear(host.linear_env), teams)
     except (Exception, SystemExit) as error:  # epic closure and hold expiry never take dispatch down
         tick["issueReconcileError"] = f"{type(error).__name__}: {error}"[:200]
+    try:
+        # A release self-test or fixture never writes to Linear or reads the host's git.
+        if not os.environ.get("LANES_SELFTEST") and os.environ.get("LANES_EXECUTION_BACKEND") != "local-test":
+            # Every started issue has a live owner, or it moves (outbox) to the right state.
+            tick["ownership"] = ownership.reconcile(host.state, host.repo, in_flight_issues(),
+                                                    search=org_merged_prs)
+    except Exception as error:  # ownership repair never takes dispatch down
+        tick["ownershipError"] = f"{type(error).__name__}: {error}"[:200]
     try:
         corpus_owner = os.environ.get("YC_CORPUS_OWNER", "gem").split(".")[0]
         tick["ycCorpus"] = (yc_corpus.tick(host.state) if HOST == corpus_owner else
@@ -8218,6 +8361,59 @@ def _selftest_cleanup_rows(cleanup: dict) -> dict:
     return rows
 
 
+def _proc_identity(pid: int) -> tuple[int, int, str] | None:
+    """(uid, ppid, birth) of any process, readable even when its environ is not."""
+    try:
+        entry = Path("/proc") / str(pid)
+        uid = entry.stat().st_uid
+        fields = (entry / "stat").read_text().rsplit(")", 1)[1].split()
+        if len(fields) < 20 or not fields[1].isdecimal() or not fields[19].isdecimal():
+            return None
+        return uid, int(fields[1]), "linux:" + fields[19]
+    except (OSError, ValueError, IndexError):
+        return None
+
+
+def _birth(start: str) -> int:
+    return int(start.split(":", 1)[1])
+
+
+def _foreign_lineage(pid: int, start: str, cleanup: dict, identity=_proc_identity) -> bool:
+    """True only when an unreadable process provably is not a self-test descendant.
+
+    A non-dumpable same-UID process (sshd/ssh session, ssh-agent) refuses its environ
+    (EACCES, Gem 2026-10-20 and CI ejections of #22305/#22308). A self-test descendant
+    only ever has self-test descendants, the owner, the owner's own ancestors or init in
+    its parent chain (orphans reparent to an ancestor subreaper or init). So the first
+    ancestor that is none of those and is provably not a descendant (another UID, or alive
+    with the same birth since before the self-test began) proves the process foreign.
+    Every parent must predate its child (a reused PID cannot pass). Anything else holds."""
+    owner = cleanup["owner"]["pid"]
+    ancestors, cursor = set(), owner
+    for _ in range(64):
+        found = identity(cursor)
+        if found is None or found[1] <= 1:
+            break
+        ancestors.add(found[1])
+        cursor = found[1]
+    current, expected = pid, start
+    for _ in range(64):
+        found = identity(current)
+        if found is None or found[2] != expected:
+            return False  # gone or reused since observed: unproven
+        child_birth = _birth(expected)
+        parent = found[1]
+        if parent <= 1 or parent == owner or parent in ancestors:
+            return False
+        observed = identity(parent)
+        if observed is None or _birth(observed[2]) > child_birth:
+            return False
+        if observed[0] != cleanup["owner"]["uid"] or cleanup["baseline"].get(parent) == observed[2]:
+            return True
+        current, expected = parent, observed[2]
+    return False
+
+
 def marked_processes(cleanup: dict) -> dict[int, str]:
     """Select only same-UID members of an explicit cleanup subtree, with birth identities."""
     _selftest_cleanup_rows(cleanup)
@@ -8261,6 +8457,8 @@ def marked_processes(cleanup: dict) -> dict[int, str]:
                                               source="proc-stat") from error
                 if after[2].startswith("Z"):
                     continue
+                if _foreign_lineage(pid, row[3], cleanup):
+                    continue  # provably outside the self-test: a non-dumpable sshd/ssh, xdist sibling
                 raise SelftestCleanupHeld("selftest-process-custody-unreadable", pid=pid,
                                           start=row[3], source="proc-environ", error=error) from error
             pairs = [part.split(b"=", 1) for part in raw.split(b"\0") if b"=" in part]
@@ -8755,10 +8953,12 @@ def load_github_env(path: Path = Path.home() / ".config/jovie-lanes/github.env",
     shim_dir.mkdir(parents=True, exist_ok=True)
     shim = shim_dir / "gh"
     # App installation tokens cannot touch user gists (403), and the status feed is Tim's gist:
-    # `gh gist` keeps the host's own login. A caller that targets another host
+    # `gh gist` and `gh api gists[/...]` keep the host's own login (the doctor's verified
+    # publisher uses the REST form; Gem 2026-10-20 its 403 froze the public feed). A caller that targets another host
     # (GH_HOST, e.g. the offline real-gh test harness) keeps its own credentials:
     # the Jovie Bot installation token only exists for github.com.
     shim.write_text(f'#!/bin/sh\n[ "$1" = gist ] && exec {real} "$@"\n'
+                    f'[ "$1" = api ] && case "$2" in gists|gists/*) exec {real} "$@";; esac\n'
                     f'[ -n "${{GH_HOST:-}}" ] && [ "$GH_HOST" != github.com ] && exec {real} "$@"\n'
                     f'GH_TOKEN="$(python3 {HERE / "gh_app_token.py"} --guard "$@")" || exit $?\n'
                     f'export GH_TOKEN\nexec {real} "$@"\n')

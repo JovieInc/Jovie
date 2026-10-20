@@ -72,7 +72,10 @@ jobs:
     if: ${{ needs.release-source.outputs.eligible == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # actions: read lets the lineage gate read queued successors' staging
+    # completion artifacts so it never yields to a generation that cannot ship.
     permissions:
+      actions: read
       contents: read
     outputs:
       is_current: ${{ steps.coalesce.outputs.is_current }}
