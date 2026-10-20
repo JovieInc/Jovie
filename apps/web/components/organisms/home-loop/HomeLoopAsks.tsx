@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via ./HomeLoopCanvas.test.tsx
+
 import { Button, Input } from '@jovie/ui';
 import { ArrowUp, Check, ChevronRight } from 'lucide-react';
 import { type FormEvent, useId, useState } from 'react';

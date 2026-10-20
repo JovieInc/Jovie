@@ -15,7 +15,11 @@ import {
   HOME_LOOP_FIXTURE_ROWS,
   HOME_LOOP_FIXTURE_STAGES,
 } from './fixtures';
+import { HomeLoopAsks } from './HomeLoopAsks';
 import { HomeLoopCanvas, type HomeLoopCanvasProps } from './HomeLoopCanvas';
+import { HomeLoopPulse } from './HomeLoopPulse';
+import { HomeLoopSection } from './HomeLoopSection';
+import { HomeLoopStageRows } from './HomeLoopStageRows';
 import {
   HOME_LOOP_UNDO_WINDOW_MS,
   useUndoableAnswers,
@@ -50,151 +54,143 @@ function props(
 describe('HomeLoopCanvas', () => {
   it('renders every section populated with named headings and counts', () => {
     render(<HomeLoopCanvas {...props()} />);
-
-    expect(screen.getByTestId('home-loop-constraint')).toHaveTextContent(
-      '2 items are blocked'
-    );
+    expect(screen.getByRole('status')).toHaveTextContent('2 items are blocked');
     expect(screen.getAllByTestId(/^home-loop-tile-/)).toHaveLength(7);
     expect(screen.getByTestId('home-loop-tile-prod')).toHaveTextContent(
       'Was 060037d'
     );
     expect(
-      screen.getByRole('heading', { name: /Blocked On You/ })
-    ).toBeVisible();
-    expect(
       screen.getByTestId('home-loop-asks-section-count')
     ).toHaveTextContent('2');
     expect(screen.getAllByTestId('home-loop-stage-row')).toHaveLength(6);
     expect(screen.getByTestId('home-loop-done')).toHaveTextContent('12 merges');
-    for (const id of [
-      'home-loop-asks-section',
-      'home-loop-in-flight-section',
-      'home-loop-done-section',
-    ])
-      expect(screen.getByTestId(id)).toHaveAttribute('data-state', 'populated');
+    for (const name of ['Blocked On You', 'In Flight', 'Done Today']) {
+      expect(
+        screen.getByRole('heading', { name: new RegExp(name) })
+      ).toBeVisible();
+      expect(
+        screen.getByRole('region', { name: new RegExp(name) })
+      ).toHaveAttribute('data-state', 'populated');
+    }
   });
 
-  it('names stage progress and attention for assistive tech, not color alone', () => {
-    render(<HomeLoopCanvas {...props()} />);
-    const [blocked] = screen.getAllByTestId('home-loop-stage-row');
-    expect(
-      within(blocked as HTMLElement).getByRole('list', {
-        name: 'Stage 1 of 6: Investigating, Blocked',
-      })
-    ).toBeInTheDocument();
-    expect(blocked).toHaveTextContent('Blocked');
-  });
+  it.each(['loading', 'error', 'ready'] as const)(
+    'keeps all sections mounted when %s without data',
+    status => {
+      render(
+        <HomeLoopCanvas
+          {...props({
+            loopStatus: status,
+            asksStatus: status,
+            pulse: [],
+            asks: [],
+            rows: [],
+            done: [],
+            doneSummary: null,
+            constraint: null,
+          })}
+        />
+      );
+      expect(screen.getAllByRole('region')).toHaveLength(3);
+      for (const section of screen.getAllByRole('region')) {
+        expect(section).toHaveAttribute(
+          'data-state',
+          status === 'ready' ? 'empty' : status
+        );
+      }
+      expect(screen.getAllByTestId('home-loop-tile-placeholder')).toHaveLength(
+        7
+      );
+      if (status === 'ready')
+        expect(screen.getByRole('status')).toHaveTextContent(
+          'Nothing is blocking shipping'
+        );
+    }
+  );
+});
 
-  it('keeps one frame per section across loading, error, and empty states', () => {
-    const { rerender } = render(
-      <HomeLoopCanvas
-        {...props({ loopStatus: 'loading', asksStatus: 'loading', pulse: [] })}
+describe('Home loop components', () => {
+  it('names stage progress and attention for assistive tech', () => {
+    render(
+      <HomeLoopStageRows
+        stages={HOME_LOOP_FIXTURE_STAGES}
+        rows={HOME_LOOP_FIXTURE_ROWS}
+        maxRows={3}
       />
     );
-    expect(screen.getAllByTestId('home-loop-tile-placeholder')).toHaveLength(7);
-    expect(screen.getByTestId('home-loop-constraint')).toHaveAttribute(
-      'data-tone',
-      'loading'
-    );
-    expect(screen.getByTestId('home-loop-in-flight-section')).toHaveAttribute(
+    expect(screen.getAllByTestId('home-loop-stage-row')).toHaveLength(3);
+    expect(
+      screen.getByRole('list', { name: 'Stage 1 of 6: Investigating, Blocked' })
+    ).toBeVisible();
+    expect(screen.getByText('Blocked')).toBeVisible();
+    expect(screen.getByText('3 more in flight')).toBeVisible();
+  });
+
+  it('reserves pulse tiles while loading or unavailable, then shows values', () => {
+    const { rerender } = render(<HomeLoopPulse tiles={[]} loading />);
+    expect(screen.getByTestId('home-loop-pulse')).toHaveAttribute(
       'aria-busy',
       'true'
     );
-
-    const onRetryLoop = vi.fn();
-    rerender(
-      <HomeLoopCanvas
-        {...props({
-          loopStatus: 'error',
-          asksStatus: 'error',
-          pulse: [],
-          onRetryLoop,
-        })}
-      />
-    );
-    expect(screen.getByTestId('home-loop-in-flight-section')).toHaveAttribute(
-      'data-state',
-      'error'
-    );
-    // Unavailable tiles keep their frames so sections below never move.
     expect(screen.getAllByTestId('home-loop-tile-placeholder')).toHaveLength(7);
-    fireEvent.click(
-      within(screen.getByTestId('home-loop-in-flight-section')).getByRole(
-        'button',
-        {
-          name: 'Try again',
-        }
-      )
+    rerender(<HomeLoopPulse tiles={[]} />);
+    expect(screen.getByTestId('home-loop-pulse')).toHaveAttribute(
+      'aria-busy',
+      'false'
     );
-    expect(onRetryLoop).toHaveBeenCalledOnce();
-
-    rerender(
-      <HomeLoopCanvas
-        {...props({
-          constraint: null,
-          asks: [],
-          rows: [],
-          done: [],
-          doneSummary: null,
-        })}
-      />
+    expect(screen.getAllByTestId('home-loop-tile-placeholder')).toHaveLength(7);
+    rerender(<HomeLoopPulse tiles={HOME_LOOP_FIXTURE_PULSE} />);
+    expect(screen.queryByTestId('home-loop-tile-placeholder')).toBeNull();
+    expect(screen.getByTestId('home-loop-tile-prod')).toHaveTextContent(
+      'Was 060037d'
     );
-    expect(screen.getByTestId('home-loop-constraint')).toHaveTextContent(
-      'Nothing is blocking shipping'
-    );
-    expect(screen.getByText('Nothing needs your decision.')).toBeVisible();
-    expect(screen.getByText('No work in flight.')).toBeVisible();
-    expect(screen.getByText('Nothing has landed yet today.')).toBeVisible();
   });
 
-  it('answers in one click and sends a written reply', () => {
-    const onApprove = vi.fn();
-    const onReply = vi.fn();
-    render(<HomeLoopCanvas {...props({ onApprove, onReply })} />);
-    const [first] = screen.getAllByTestId('home-loop-ask');
-    const card = within(first as HTMLElement);
+  it('shows the section state and retries a failed read', () => {
+    const onRetry = vi.fn();
+    const section = {
+      title: 'In Flight',
+      isEmpty: true,
+      emptyLabel: 'No work in flight.',
+      errorLabel: 'Shipping data could not load.',
+      skeleton: 'Loading',
+      testId: 'section',
+      onRetry,
+      children: 'Work',
+    };
+    const { rerender } = render(
+      <HomeLoopSection {...section} status='loading' />
+    );
+    expect(screen.getByRole('region')).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByText('Loading')).toBeVisible();
+    rerender(<HomeLoopSection {...section} status='error' />);
+    expect(screen.getByRole('alert')).toHaveTextContent(section.errorLabel);
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(onRetry).toHaveBeenCalledOnce();
+    rerender(<HomeLoopSection {...section} status='ready' />);
+    expect(screen.getByText(section.emptyLabel)).toBeVisible();
+    expect(screen.queryByText('Work')).toBeNull();
+  });
 
+  it('answers in one click, trims replies and discloses evidence on request', () => {
+    const args = props();
+    render(<HomeLoopAsks {...args} />);
+    const card = within(
+      screen.getAllByTestId('home-loop-ask')[0] as HTMLElement
+    );
     fireEvent.click(card.getByTestId('home-loop-ask-approve'));
-    expect(onApprove).toHaveBeenCalledWith(HOME_LOOP_FIXTURE_ASKS[0]);
-
+    expect(args.onApprove).toHaveBeenCalledWith(args.asks[0]);
     const send = card.getByRole('button', { name: 'Send Reply' });
     expect(send).toBeDisabled();
     fireEvent.change(card.getByRole('textbox'), {
-      target: { value: 'Only for production' },
+      target: { value: ' Only for production ' },
     });
     fireEvent.submit(send.closest('form') as HTMLFormElement);
-    expect(onReply).toHaveBeenCalledWith(
-      HOME_LOOP_FIXTURE_ASKS[0],
+    expect(args.onReply).toHaveBeenCalledWith(
+      args.asks[0],
       'Only for production'
     );
-  });
-
-  it('shows the top asks and links the rest', () => {
-    const many = Array.from({ length: 5 }, (_, index) => ({
-      ...HOME_LOOP_FIXTURE_ASKS[0],
-      id: `ask-${index}`,
-    })) as HomeLoopCanvasProps['asks'];
-    render(
-      <HomeLoopCanvas
-        {...props({ asks: many, asksMoreHref: '/app/ov/inbox' })}
-      />
-    );
-    expect(screen.getAllByTestId('home-loop-ask')).toHaveLength(3);
-    expect(screen.getByTestId('home-loop-asks-more')).toHaveAttribute(
-      'href',
-      '/app/ov/inbox'
-    );
-    expect(screen.getByTestId('home-loop-asks-more')).toHaveTextContent(
-      '2 more decisions'
-    );
-  });
-
-  it('keeps the why collapsed until requested', () => {
-    render(<HomeLoopCanvas {...props()} />);
-    const [first] = screen.getAllByTestId('home-loop-ask');
-    const toggle = within(first as HTMLElement).getByRole('button', {
-      name: 'Why',
-    });
+    const toggle = card.getByRole('button', { name: 'Why' });
     const why = document.getElementById(
       toggle.getAttribute('aria-controls') ?? ''
     );
@@ -205,25 +201,31 @@ describe('HomeLoopCanvas', () => {
     expect(why).toBeVisible();
   });
 
-  it('replaces controls with the answer and restores them on failure', () => {
-    const { rerender } = render(
-      <HomeLoopCanvas
-        {...props({
-          answers: {
-            'vercel-concurrency': { label: 'Approved', state: 'pending' },
-          },
-        })}
-      />
-    );
-    const [first] = screen.getAllByTestId('home-loop-ask');
-    expect(first).toHaveAttribute('data-answer-state', 'pending');
+  it('caps the asks and links the rest', () => {
+    const asks = Array.from({ length: 5 }, (_, index) => ({
+      ...HOME_LOOP_FIXTURE_ASKS[0],
+      id: `ask-${index}`,
+    })) as HomeLoopCanvasProps['asks'];
+    render(<HomeLoopAsks {...props({ asks })} moreHref='/app/ov/inbox' />);
+    expect(screen.getAllByTestId('home-loop-ask')).toHaveLength(3);
     expect(
-      within(first as HTMLElement).queryByTestId('home-loop-ask-approve')
-    ).toBeNull();
+      screen.getByRole('link', { name: '2 more decisions' })
+    ).toHaveAttribute('href', '/app/ov/inbox');
+  });
+
+  it('replaces controls with the answer and restores them on failure', () => {
+    const answers = {
+      'vercel-concurrency': { label: 'Approved', state: 'pending' as const },
+    };
+    const { rerender } = render(<HomeLoopCanvas {...props({ answers })} />);
+    expect(screen.getAllByTestId('home-loop-ask')[0]).toHaveAttribute(
+      'data-answer-state',
+      'pending'
+    );
+    expect(screen.getAllByTestId('home-loop-ask-approve')).toHaveLength(1);
     expect(
       screen.getByTestId('home-loop-asks-section-count')
     ).toHaveTextContent('1');
-
     rerender(
       <HomeLoopCanvas
         {...props({
@@ -236,13 +238,13 @@ describe('HomeLoopCanvas', () => {
         })}
       />
     );
-    const [failed] = screen.getAllByTestId('home-loop-ask');
-    expect(within(failed as HTMLElement).getByRole('alert')).toHaveTextContent(
+    expect(screen.getByRole('alert')).toHaveTextContent(
       'Not recorded. Try again.'
     );
+    expect(screen.getAllByTestId('home-loop-ask-approve')).toHaveLength(2);
     expect(
-      within(failed as HTMLElement).getByTestId('home-loop-ask-approve')
-    ).toBeVisible();
+      screen.getByTestId('home-loop-asks-section-count')
+    ).toHaveTextContent('2');
   });
 });
 

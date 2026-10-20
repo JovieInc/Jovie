@@ -1,3 +1,5 @@
+// @coverage-via ./HomeLoopCanvas.test.tsx
+
 import { AlertTriangle, CheckCircle2, CircleAlert } from 'lucide-react';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import type {

@@ -1,3 +1,5 @@
+// @coverage-via ./HomeLoopCanvas.test.tsx
+
 import { Button } from '@jovie/ui';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
