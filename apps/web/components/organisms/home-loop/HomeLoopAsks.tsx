@@ -304,14 +304,23 @@ export function HomeLoopAsks({
   );
 }
 
+/**
+ * Mirrors the populated geometry (title, recommendation, Why, action slot,
+ * three cards) so the sections below do not move when asks arrive.
+ */
 export function HomeLoopAsksSkeleton() {
   return (
     <div className='flex flex-col gap-2'>
-      {(['a1', 'a2'] as const).map(slot => (
+      {(['a1', 'a2', 'a3'] as const).map(slot => (
         <div key={slot} className={CARD_FRAME}>
-          <LoadingSkeleton height='h-4' width='w-3/5' />
-          <LoadingSkeleton height='h-3' width='w-4/5' />
-          <LoadingSkeleton height='h-8' width='w-28' />
+          <div className='flex flex-col gap-1.5'>
+            <LoadingSkeleton height='h-4' width='w-3/5' />
+            <LoadingSkeleton height='h-3' width='w-4/5' />
+          </div>
+          <LoadingSkeleton height='h-8' width='w-16' />
+          <div className={ACTION_SLOT}>
+            <LoadingSkeleton height='h-7' width='w-20' />
+          </div>
         </div>
       ))}
     </div>
