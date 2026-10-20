@@ -4308,6 +4308,8 @@ def fetch_labeled_events(linear) -> list:
 
 EVENT_DELIVERY_SCHEMA = "jovie.event-delivery/v1"
 EVENT_DELIVERY_ATTEMPTS = 3
+EXHAUSTED_READBACK_S = 6 * 3600  # an exhausted delivery is only re-read for a late acknowledgement
+EVENT_DELIVERY_HISTORY = 50      # retained attempt history per delivery row
 EVENT_DELIVERY_PENDING_CAP = 256
 EVENT_DELIVERY_STALE_S = 3600
 
@@ -4518,9 +4520,23 @@ def _apply_event_plan(linear, plan: dict, host: Host, data: dict, now: float) ->
     reset. An uncertain send is read back by its stable remote ID before retry.
     The caller holds event-delivery.lock; claim.lock only covers the write fence.
     """
+    owners = _event_escalation(host).get("events") or {}
+    # Exhausted rows can never send again: they sort after every live row and are only read
+    # back every EXHAUSTED_READBACK_S. Before (Gem 2026-10-08..20) four exhausted rows took the
+    # one-action-per-tick budget every tick (5,534 readbacks on one) and 36 pending deliveries
+    # were never attempted. A row whose owning event finished or vanished is superseded.
     for row in sorted(data["actions"].values(), key=lambda row: (
-            row["createdAt"], ("reopens", "comments", "labels").index(row["kind"]), row["key"])):
+            row["status"] == "exhausted", row["createdAt"],
+            ("reopens", "comments", "labels").index(row["kind"]), row["key"])):
         if row["status"] in {"acknowledged", "superseded"} or now < row["nextAt"]:
+            continue
+        owner = owners.get(row["fingerprint"])
+        if row["status"] == "exhausted" and (not isinstance(owner, dict) or owner.get("status") == "done"
+                                             or owner.get("issueId") != row["ownerIssueId"]):
+            row["status"] = "superseded"
+            row["history"] = [*row["history"][-EVENT_DELIVERY_HISTORY:],
+                              {"at": now, "outcome": "owner-finished" if isinstance(owner, dict) else "owner-gone"}]
+            _save_event_delivery(host, data)
             continue
         phase = "readback"
         try:
@@ -4586,7 +4602,9 @@ def _apply_event_plan(linear, plan: dict, host: Host, data: dict, now: float) ->
             row["status"] = "exhausted" if row["attempts"] >= EVENT_DELIVERY_ATTEMPTS or now >= row["deadline"] else "failed"
             row["history"].append({"at": now, "outcome": row["status"], "error": row["error"],
                                    "diagnostic": row["diagnostic"]})
-        row["nextAt"] = now + (60 if row["attempts"] < 2 else 300)
+        row["nextAt"] = now + (EXHAUSTED_READBACK_S if row["status"] == "exhausted"
+                               else 60 if row["attempts"] < 2 else 300)
+        row["history"] = row["history"][-EVENT_DELIVERY_HISTORY:]
         _save_event_delivery(host, data)
         break  # Bounded work; a transport outage must not monopolize dispatch.
     return _event_delivery_report(data, now)

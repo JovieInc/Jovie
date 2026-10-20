@@ -860,9 +860,14 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
             f"p50 wait {signal.get('queueWaitP50Minutes', 'unknown')}m, "
             f"{signal.get('mergedPerHour', 'unknown')} merged/h vs {signal.get('openedPerHour', 'unknown')} opened/h, "
             f"ejection rate {signal.get('ejectionRate', 'unknown')}")
-    escalation_line = remediation.alert_reason(obs.get("escalation") or {})
+    sweep_view = obs.get("reconcile") or {}
+    dispositions = sweep_view.get("dispositions")
+    open_prs = ({row.get("pr") for row in dispositions if isinstance(row, dict)}
+                if isinstance(dispositions, list) and (sweep_view.get("counts") or {}).get("open") == len(dispositions)
+                else None)  # an incomplete open-PR view keeps every surfaced PR
+    escalation_line = remediation.alert_reason(obs.get("escalation") or {}, open_prs)
     if escalation_line:
-        alerts["escalation-needs-human"] = escalation_line
+        alerts["escalation-surfaced"] = escalation_line
     sweep = obs.get("reconcile") or {}
     swept_age = obs["now"] - float(sweep.get("atEpoch") or 0) if obs.get("now") else None
     if sweep.get("orphans") and swept_age is not None and swept_age < 2 * pr_events.RECONCILE_S:

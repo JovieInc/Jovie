@@ -324,8 +324,20 @@ class JudgeTest(unittest.TestCase):
 
     def test_escalation_alert_names_the_pr_and_class(self):
         alerts = doctor.judge(obs(escalation={"surfaced": [{"pr": 7, "cls": "needs-human-decision"}]}))
-        self.assertIn("#7 needs-human-decision", alerts["escalation-needs-human"])
+        self.assertIn("#7 needs-human-decision", alerts["escalation-surfaced"])
+        self.assertIn("repair-owner", alerts["escalation-surfaced"])  # never Tim by default
         self.assertEqual(doctor.judge(obs(escalation={"surfaced": []})), {})
+
+    def test_escalation_alert_drops_surfaced_prs_that_are_no_longer_open(self):
+        # Gem 2026-10-20: the alert still listed 12 PRs that had merged or closed by 10-13.
+        surfaced = {"surfaced": [{"pr": 20117, "cls": "needs-human-decision"}, {"pr": 21776, "cls": "needs-rebase"}]}
+        sweep = {"counts": {"open": 2}, "dispositions": [{"pr": 21776}, {"pr": 21725}]}
+        alerts = doctor.judge(obs(escalation=surfaced, reconcile=sweep))
+        self.assertIn("#21776", alerts["escalation-surfaced"])
+        self.assertNotIn("#20117", alerts["escalation-surfaced"])
+        self.assertEqual(doctor.judge(obs(escalation={"surfaced": surfaced["surfaced"][:1]}, reconcile=sweep)), {})
+        incomplete = {"counts": {"open": 5}, "dispositions": [{"pr": 21776}]}  # unknown keeps everything
+        self.assertIn("#20117", doctor.judge(obs(escalation=surfaced, reconcile=incomplete))["escalation-surfaced"])
 
     def test_each_rule_names_its_cause(self):
         alerts = doctor.judge(obs(
