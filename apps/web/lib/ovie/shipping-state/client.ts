@@ -200,6 +200,19 @@ const deliveryMergesSchema = z.object({
   ),
   last7Days: countMeasurementSchema,
   prior7Days: countMeasurementSchema,
+  recent: z
+    .array(
+      z.object({
+        repo: z.string().min(1).max(100),
+        number: z.number().int().positive(),
+        title: z.string().min(1).max(200),
+        url: z.string().url().startsWith('https://github.com/'),
+        mergedAt: z.string(),
+      })
+    )
+    .max(12)
+    .optional()
+    .default([]),
 });
 
 const deliveryProductionSchema = z.object({

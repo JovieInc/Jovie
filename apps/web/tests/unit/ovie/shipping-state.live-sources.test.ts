@@ -472,6 +472,56 @@ describe('github-merges (search issueCount)', () => {
     });
   });
 
+  it("lists today's merged PRs newest first and drops malformed nodes", async () => {
+    const pr = (number: number, mergedAt: string, extra = {}) => ({
+      number,
+      title: `PR ${number}`,
+      url: `https://github.com/JovieInc/Jovie/pull/${number}`,
+      mergedAt,
+      repository: { name: 'Jovie' },
+      ...extra,
+    });
+    const read = await readMerges(
+      io(async () =>
+        json({
+          data: {
+            ...counts,
+            org: {
+              issueCount: 292,
+              nodes: [
+                pr(1, '2026-09-26T08:00:00Z'),
+                pr(2, '2026-09-26T09:00:00Z'),
+                pr(3, 'later'),
+                pr(4, '2026-09-26T10:00:00Z', { url: 'https://evil.test/4' }),
+                {},
+              ],
+            },
+          },
+        })
+      )
+    );
+    expect(read).toMatchObject({
+      delivery: {
+        merges: {
+          recent: [
+            {
+              repo: 'Jovie',
+              number: 2,
+              title: 'PR 2',
+              url: 'https://github.com/JovieInc/Jovie/pull/2',
+              mergedAt: '2026-09-26T09:00:00.000Z',
+            },
+            { number: 1 },
+          ],
+        },
+      },
+    });
+    expect(
+      (read as { delivery: { merges: { recent: unknown[] } } }).delivery.merges
+        .recent
+    ).toHaveLength(2);
+  });
+
   it('keeps a zero-merge day as measured zero', async () => {
     const read = await readMerges(
       io(async () =>
