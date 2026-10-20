@@ -76,7 +76,11 @@ export function RailToggleButton({
   );
 
   return (
-    <TooltipShortcut label={label} shortcut={shortcut} side='bottom'>
+    <TooltipShortcut
+      label={label}
+      shortcut={shortcut}
+      side={side === 'left' ? 'right' : 'bottom'}
+    >
       {button}
     </TooltipShortcut>
   );
