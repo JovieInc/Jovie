@@ -10281,6 +10281,39 @@ class EventDeliveryTest(unittest.TestCase):
         self.assertEqual(len(self.writes), 1)
         self.assertEqual(lane.load_escalation(self.host)['events'], self.events)
 
+    def test_an_exhausted_delivery_never_starves_pending_ones(self):
+        # Gem 2026-10-08..20: 4 exhausted rows took every tick's one-action budget (5,534
+        # readbacks on one) and 36 pending comment deliveries were never attempted.
+        self.intent(comments=[{'id': 'issue', 'body': 'old receipt'}])
+        data = lane._event_delivery_state(self.host)
+        [old] = data['actions'].values()
+        old.update(status='exhausted', attempts=3, nextAt=0, deadline=0, history=[{'n': n} for n in range(500)])
+        lane._save_event_delivery(self.host, data)
+        data = lane._event_delivery_state(self.host)
+        lane._queue_event_delivery(data, {'events': self.events, 'comments': [{'id': 'issue', 'body': 'new receipt'}]},
+                                   [self.issue], {'fp'}, 150)
+        lane._save_event_delivery(self.host, data)
+        report = self.drain(200)
+        self.assertEqual([w[1]['i']['body'] for w in self.writes], ['new receipt'])
+        self.assertEqual(report['deliveryAcknowledged'], 1)
+        report = self.drain(300)  # now the exhausted row gets its readback, then waits 6h
+        rows = {row['payload']['body']: row for row in lane._event_delivery_state(self.host)['actions'].values()}
+        self.assertEqual(rows['old receipt']['status'], 'exhausted')
+        self.assertGreaterEqual(rows['old receipt']['nextAt'], 300 + lane.EXHAUSTED_READBACK_S)
+        self.assertLessEqual(len(rows['old receipt']['history']), lane.EVENT_DELIVERY_HISTORY)
+
+    def test_an_exhausted_delivery_whose_event_finished_is_superseded(self):
+        self.intent(comments=[{'id': 'issue', 'body': 'old receipt'}])
+        data = lane._event_delivery_state(self.host)
+        [row] = data['actions'].values()
+        row.update(status='exhausted', attempts=3, nextAt=0, deadline=0)
+        lane._save_event_delivery(self.host, data)
+        lane.save_escalation(self.host, {'events': {'fp': {**self.events['fp'], 'status': 'done'}}})
+        report = self.drain(200)
+        [row] = lane._event_delivery_state(self.host)['actions'].values()
+        self.assertEqual((row['status'], row['history'][-1]['outcome']), ('superseded', 'owner-finished'))
+        self.assertEqual((report['deliveryFailed'], self.writes), (0, []))
+
     def test_linear_missing_comment_error_is_the_absent_preimage_before_send(self):
         self.intent(comments=[{'id': 'issue', 'body': 'one receipt'}])
         self.missing_comment_error = True
