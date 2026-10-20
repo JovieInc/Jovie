@@ -144,6 +144,8 @@ class LinearClientAppModeTest(unittest.TestCase):
             incomplete.write_text("LINEAR_CLIENT_ID=cid\n")
             with self.assertRaises(lane.LinearAppCredentialMissing):
                 lane.Linear(self.legacy, app_env=incomplete)
+            self.assertTrue(issubclass(lane.LinearAppCredentialMissing, Exception),
+                            "doctor/watchdog `except Exception` sites must degrade, not exit")
             bare = lane.Linear.__new__(lane.Linear)
             with self.assertRaises(lane.LinearAppCredentialMissing):
                 bare._authorization()

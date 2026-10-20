@@ -2004,9 +2004,11 @@ class LinearRequestError(RuntimeError):
         super().__init__("linear: Entity not found: Comment" if missing else "linear: request rejected")
 
 
-class LinearAppCredentialMissing(SystemExit):
+class LinearAppCredentialMissing(RuntimeError):
     """No Jovie Lanes app credential: lanes Linear access fails closed (doctor alert
-    `linear-app-credential-missing`). There is no personal-key fallback."""
+    `linear-app-credential-missing`). There is no personal-key fallback. A RuntimeError, so
+    every `except Exception` around Linear (the doctor's tracker, the watchdog) degrades
+    instead of exiting the process."""
 
 
 class Linear:
