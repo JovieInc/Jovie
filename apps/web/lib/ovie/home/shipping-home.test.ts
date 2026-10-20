@@ -430,6 +430,10 @@ describe('buildOvieAsks', () => {
         inboxCase('a', 'needs_you'),
         inboxCase('b', 'waiting'),
         inboxCase('c', 'needs_you', false),
+        {
+          ...inboxCase('d', 'needs_you'),
+          decisionTarget: { kind: 'linear', id: 'd' },
+        },
       ],
       issues: [],
     };
@@ -440,6 +444,7 @@ describe('buildOvieAsks', () => {
         recommendation: 'Approve',
         why: 'Why this matters',
         decidable: true,
+        canReply: true,
         evidence: ['https://example.com/receipt'],
       },
       {
@@ -448,6 +453,16 @@ describe('buildOvieAsks', () => {
         recommendation: 'Approve',
         why: 'Why this matters',
         decidable: false,
+        canReply: false,
+        evidence: ['https://example.com/receipt'],
+      },
+      {
+        id: 'd',
+        title: 'Ask d',
+        recommendation: 'Approve',
+        why: 'Why this matters',
+        decidable: true,
+        canReply: false,
         evidence: ['https://example.com/receipt'],
       },
     ]);
