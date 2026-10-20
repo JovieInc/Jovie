@@ -2976,7 +2976,7 @@ describe('automation-verify affected scope', () => {
 
   it('selects the homepage System B style guards for homepage component changes', () => {
     const plan = buildAffectedTestPlan([
-      'apps/web/components/homepage/HomepageIdentityHero.tsx',
+      'apps/web/components/homepage/HomepageArtistProfile.tsx',
     ]);
 
     expect(plan.mode).toBe('selected');

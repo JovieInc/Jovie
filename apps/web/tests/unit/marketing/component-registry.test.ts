@@ -1666,10 +1666,6 @@ describe('CTA source identity and Pen mapping', () => {
     expect(owner).toContain('return <section {...props} />');
     for (const [file, binding] of [
       [
-        'apps/web/components/homepage/HomepageClose.tsx',
-        "data-marketing-variant='editorial-search'",
-      ],
-      [
         'apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.tsx',
         "data-marketing-variant='included-single'",
       ],

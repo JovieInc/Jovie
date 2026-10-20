@@ -298,36 +298,29 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     recipeId: 'homepage',
     renderedSections: [
       approvedVariantBinding(
-        'apps/web/components/homepage/HomepageIdentityHero.tsx',
+        'apps/web/components/homepage/HomepageArtistProfile.tsx',
         'hero',
         'split-claim-card'
       ),
       // The unsupported adoption strip is intentionally omitted until it has
       // an attributable permission or adoption receipt.
       approvedVariantBinding(
-        'apps/web/components/homepage/HomepageIdentitySections.tsx',
-        'feature-split',
-        'editorial',
-        'presence'
+        'apps/web/components/homepage/HomepageArtistProfile.tsx',
+        'product-gallery',
+        'profile-grid'
       ),
       approvedVariantBinding(
-        'apps/web/components/homepage/HomepageIdentitySections.tsx',
-        'feature-split',
-        'editorial',
-        'structure'
-      ),
-      approvedBinding(
-        'apps/web/components/homepage/HomepageIdentityClose.tsx',
+        'apps/web/components/homepage/HomepageArtistProfile.tsx',
         'cta',
-        'editorial-search'
+        'final-single-claim'
       ),
     ],
     bindingEvidence: {
       status: 'verified',
       source:
-        'JOV-8188 selected identity source reconciliation 2026-10-11; homepage-v3-page and homepage anatomy render contracts; JOV-6220 / JOV-7795 ownership',
+        'EVENT 2026-10-20 artist-profile homepage (HomepageArtistProfile.tsx); homepage-contract render test; marketing-route-health observer on the reviewed head',
       notes:
-        'Selected branch: SHOW_HOME_V1_DESIGN=false, HOMEPAGE_V3_ENABLED=true, and no permissioned homepage logos. FAQ copy remains available but no FAQ is mounted. Rollback compositions, exact deployment, native mapping, visual and outcome receipts remain separate.',
+        'One source owner for hero, product gallery, and the offer close. Deployment, visual certification, and Tim Taste remain separate receipts.',
     },
     status: 'active',
     specVersion: '1.4.0',

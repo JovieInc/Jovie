@@ -44,10 +44,11 @@ describe('support route header contract', () => {
     );
     expect(headerSource).not.toContain('MARKETING_CTA_INTENTS');
     expect(headerSource).not.toContain('APP_ROUTES.ARTIST_PROFILES]:');
-    // Homepage conversion lock (JOV-5085): / shows Find yourself -> /start
-    // even while waitlisting; other routes keep the front-door CTA.
+    // Homepage conversion lock (JOV-5085, label EVENT 2026-10-20): / shows
+    // the artist-profile claim -> /start even while waitlisting; other routes
+    // keep the front-door CTA.
     expect(headerSource).toContain(
-      "[APP_ROUTES.HOME]: { label: 'Find yourself', href: APP_ROUTES.START }"
+      "[APP_ROUTES.HOME]: { label: 'Claim your profile', href: APP_ROUTES.START }"
     );
     expect(headerSource).toContain("treatment: 'wordmark'");
     expect(headerSource).toContain('MARKETING_NAV_LINKS.map');

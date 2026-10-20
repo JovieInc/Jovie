@@ -607,6 +607,24 @@
           "reason": "Pins the shared H1 clamp, including its descender allowance."
         }
       ]
+    },
+    {
+      "fingerprint": "A page change goes through one page contract, not a wall of locks",
+      "lessonSha256": "caa4b9516e3fd0ceb5bcdbd9ee713e8146b846793f00f7eca788b13b5765b7d5",
+      "guards": [
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/home/homepage-contract.test.tsx",
+          "anchor": "mounts exactly the manifest sections, in recipe order",
+          "reason": "The one homepage contract derives order, owners, copy, prices, and media from the typed records."
+        },
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/marketing/recipe-manifest.test.ts",
+          "anchor": "binds the homepage beats to the recipe and one source owner",
+          "reason": "Keeps the homepage manifest bound to its recipe and a single source owner."
+        }
+      ]
     }
   ]
 }
