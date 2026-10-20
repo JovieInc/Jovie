@@ -1,0 +1,147 @@
+{
+  "issue": "JOV-6894",
+  "checked": "2026-10-20",
+  "baselineSha": "8c631355d4fa27ce77c81301c7c8892f1e07d3a5",
+  "repairedSources": {
+    "apps/web/components/organisms/table/organisms/VirtualizedTableBody.tsx": "565a8fde24c1a0a9bf51457f72dd80a3c36c3bf33583f7d56fb381b61990fb2a",
+    "apps/web/components/organisms/table/organisms/VirtualizedTableRow.tsx": "bfbd67e3b0d4d7837c36258e0579871a040e0e3d6403fed23f519ed51ee443d0"
+  },
+  "method": "Headless Chromium, Storybook development build, Linux, synthetic 10000-row canonical table. Forty 100-row scroll jumps; collapse/reopen a 640px viewport; ten 25/10000-row filter toggles. Interaction duration covers DOM click/scroll through two requestAnimationFrame callbacks. Heap/DOM counters collected after forced GC at each checkpoint. No deployed/Mac certification. Cell render counts are committed cell renders recorded through React Profiler callbacks.",
+  "before": {
+    "label": "before",
+    "browser": "148.0.7778.96",
+    "viewport": "1280x800",
+    "fixture": "canonical UnifiedTable / 10000 synthetic people / Storybook dev / Linux Chromium",
+    "initial": {
+      "documents": 1,
+      "nodes": 479,
+      "jsEventListeners": 243,
+      "usedSize": 45572548,
+      "totalSize": 46694400,
+      "embedderHeapUsedSize": 5283528,
+      "backingStorageSize": 32383434,
+      "mountedRows": 25,
+      "cellRenders": 39
+    },
+    "scrolled": {
+      "documents": 1,
+      "nodes": 622,
+      "jsEventListeners": 232,
+      "usedSize": 54534096,
+      "totalSize": 55771136,
+      "embedderHeapUsedSize": 5752664,
+      "backingStorageSize": 36915540,
+      "mountedRows": 30,
+      "cellRenders": 1239
+    },
+    "hidden": {
+      "documents": 1,
+      "nodes": 50466,
+      "jsEventListeners": 10201,
+      "usedSize": 121503252,
+      "totalSize": 124162048,
+      "embedderHeapUsedSize": 61077664,
+      "backingStorageSize": 37011148,
+      "mountedRows": 10000,
+      "cellRenders": 11239
+    },
+    "afterFilters": {
+      "documents": 1,
+      "nodes": 620,
+      "jsEventListeners": 232,
+      "usedSize": 75574044,
+      "totalSize": 77791232,
+      "embedderHeapUsedSize": 5717072,
+      "backingStorageSize": 37011196,
+      "mountedRows": 30,
+      "cellRenders": 11719
+    },
+    "hideMs": 7719.5,
+    "scrollMs": [
+      45.09999990463257, 41.10000038146973, 56.59999990463257,
+      61.59999990463257, 47.80000019073486, 33.90000009536743, 41,
+      33.09999990463257, 66.09999990463257, 75, 65.90000009536743,
+      38.60000038146973, 37.799999713897705, 54.80000019073486,
+      65.39999961853027, 74.90000009536743, 67.80000019073486, 48.5, 29.5,
+      32.40000009536743, 38.69999980926514, 39.59999990463257,
+      31.09999990463257, 29.299999713897705, 32.10000038146973,
+      56.30000019073486, 28.300000190734863, 26.5, 42.200000286102295,
+      42.59999990463257, 45.5, 32.59999990463257, 33.80000019073486,
+      40.40000009536743, 48.40000009536743, 41.700000286102295, 33.5, 30.5,
+      59.30000019073486, 31.5
+    ],
+    "filterMs": [
+      29.100000381469727, 105.90000009536743, 35.5, 39.69999980926514, 26,
+      54.30000019073486, 33.09999990463257, 53.59999990463257,
+      60.40000009536743, 59.80000019073486
+    ]
+  },
+  "after": {
+    "label": "after",
+    "browser": "148.0.7778.96",
+    "viewport": "1280x800",
+    "fixture": "canonical UnifiedTable / 10000 synthetic people / Storybook dev / Linux Chromium",
+    "initial": {
+      "documents": 1,
+      "nodes": 479,
+      "jsEventListeners": 243,
+      "usedSize": 45585984,
+      "totalSize": 46432256,
+      "embedderHeapUsedSize": 5357480,
+      "backingStorageSize": 32383517,
+      "mountedRows": 25,
+      "cellRenders": 39
+    },
+    "scrolled": {
+      "documents": 1,
+      "nodes": 622,
+      "jsEventListeners": 231,
+      "usedSize": 54164992,
+      "totalSize": 55508992,
+      "embedderHeapUsedSize": 5569552,
+      "backingStorageSize": 36914922,
+      "mountedRows": 30,
+      "cellRenders": 1239
+    },
+    "hidden": {
+      "documents": 1,
+      "nodes": 466,
+      "jsEventListeners": 202,
+      "usedSize": 53935460,
+      "totalSize": 55246848,
+      "embedderHeapUsedSize": 5833264,
+      "backingStorageSize": 36914991,
+      "mountedRows": 0,
+      "cellRenders": 1239
+    },
+    "afterFilters": {
+      "documents": 1,
+      "nodes": 593,
+      "jsEventListeners": 226,
+      "usedSize": 59957212,
+      "totalSize": 61014016,
+      "embedderHeapUsedSize": 5299064,
+      "backingStorageSize": 36914961,
+      "mountedRows": 25,
+      "cellRenders": 1515
+    },
+    "hideMs": 15.799999713897705,
+    "scrollMs": [
+      56.59999990463257, 52.700000286102295, 90.90000009536743, 49,
+      40.10000038146973, 38.200000286102295, 81.5, 72.7000002861023, 87.5, 37.5,
+      38.30000019073486, 35.40000009536743, 58.09999990463257,
+      549.2000002861023, 36, 49.90000009536743, 48.200000286102295,
+      47.19999980926514, 49.69999980926514, 42.09999990463257,
+      30.699999809265137, 45.30000019073486, 74.60000038146973,
+      42.09999990463257, 48.09999990463257, 27.800000190734863,
+      30.799999713897705, 38.19999980926514, 47, 40.200000286102295,
+      58.90000009536743, 45, 54.5, 50.30000019073486, 34.299999713897705,
+      48.59999990463257, 70.59999990463257, 42.5, 68.89999961853027, 53
+    ],
+    "filterMs": [
+      33.200000286102295, 85, 30.200000286102295, 94.40000009536743,
+      60.40000009536743, 37.90000009536743, 31.700000286102295,
+      54.700000286102295, 37.59999990463257, 35.30000019073486
+    ]
+  }
+}
