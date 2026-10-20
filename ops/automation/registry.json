@@ -1279,8 +1279,8 @@
       "host": "vercel",
       "trigger": {
         "kind": "vercel-cron",
-        "repo": "none (legacy project summer, prj_sHkukX1jmIyX1RzbmerJWSJtCgWI)",
-        "source": "deployment dpl_BvmSKWqzotsk7eaY9uQbRVm22gy6 (branch grok/summer-gbrain-write)",
+        "repo": "none (legacy Vercel project \"summer\" in team jovie, not linked to a repo)",
+        "source": "its current production deployment, built 2026-09-16 from branch grok/summer-gbrain-write",
         "schedule": "*/15 * * * *; 0 15,16 * * *"
       },
       "purpose": "Legacy Summer bottleneck heartbeat and an old morning briefing; duplicates the current jovie-eve-shadow Summer.",
@@ -1310,7 +1310,7 @@
         "kind": "none"
       },
       "maxStalenessMinutes": 720,
-      "killSwitch": "archive deployment depl_01QyYySjGS9zKjDUt7WMxgEe (ops/agents/summer-improvement-loop/deploy.mjs)",
+      "killSwitch": "archive the summer-improvement-loop deployment (ops/agents/summer-improvement-loop/deploy.mjs)",
       "critical": false,
       "gap": "Deployed 2026-10-20 19:57Z before its PR merged; register its run receipt (session id + start/end) when #22337 lands."
     },
