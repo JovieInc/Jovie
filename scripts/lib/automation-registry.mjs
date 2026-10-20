@@ -1,5 +1,5 @@
 /**
- * Company automation registry (ops/automation/registry.json).
+ * Company automation registry (canon/automation-registry.jsonl).
  *
  * Tim, 2026-10-20: "All automation in our company should be registered in one
  * place, measured, and auditable." This module is the pure half of that
@@ -34,7 +34,7 @@ export function hasCronSchedule(source = '') {
 }
 
 export const REGISTRY_SCHEMA = 'jovie-automation-registry/v1';
-export const REGISTRY_PATH = 'ops/automation/registry.jsonl';
+export const REGISTRY_PATH = 'canon/automation-registry.jsonl';
 export const LIVENESS_SCHEMA = 'jovie-automation-liveness/v1';
 // Shared with the stage-instrumentation contract (scripts/lib/stage-events.mjs,
 // docs/metrics/stage-manifest.json entity `automation-run`).

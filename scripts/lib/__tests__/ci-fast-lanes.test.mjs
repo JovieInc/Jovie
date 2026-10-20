@@ -2109,7 +2109,7 @@ describe('source-read guard selection', () => {
 
   it.each([
     ['scripts/lib/ci-schedule-inventory.mjs', ['ci-schedule-inventory']],
-    ['ops/automation/registry.json', ['automation-registry']],
+    ['canon/automation-registry.jsonl', ['automation-registry']],
     ['scripts/lanes/continuity_clock.py', ['automation-registry']],
     [
       'scripts/lib/__tests__/ci-schedule-inventory.test.mjs',

@@ -4,7 +4,7 @@
 
 > **Question this answers:** "What scheduled jobs already run? Can I add my logic to an existing one?"
 >
-> **Canonical registry (2026-10-20):** every company automation (GitHub, Vercel, lanes, Gem, Macs, Codex, Summer, Managed Agents) is registered with owner, trigger, metric, run-receipt location, max staleness and kill switch in [`ops/automation/registry.jsonl`](../ops/automation/registry.jsonl) (one automation per line). CI (`automation-registry` source guard) fails when a GitHub cron, Vercel cron or lanes clock has no live entry, or a live entry outlives its schedule. This page explains the jobs; the registry is the inventory.
+> **Canonical registry (2026-10-20):** every company automation (GitHub, Vercel, lanes, Gem, Macs, Codex, Summer, Managed Agents) is registered with owner, trigger, metric, run-receipt location, max staleness and kill switch in [`canon/automation-registry.jsonl`](../canon/automation-registry.jsonl) (one automation per line). CI (`automation-registry` source guard) fails when a GitHub cron, Vercel cron or lanes clock has no live entry, or a live entry outlives its schedule. This page explains the jobs; the registry is the inventory.
 >
 > Before creating a new cron job, read [AGENTS.md — Infrastructure & Scheduling Guardrails](../AGENTS.md#infrastructure--scheduling-guardrails-critical).
 > **JOV-5852:** execution follows information, not time. A GitHub Actions cron must declare `# clock-class:` (`skip-if-unchanged` | `production-liveness` | `temporal-resource` | `upstream-advisory`). Do not add a clock when a causal event already exists.
