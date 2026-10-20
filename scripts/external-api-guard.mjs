@@ -7,9 +7,10 @@
  * node scripts/external-api-guard.mjs --bootstrap grandfather every current call site
  *                                                 (only while no ratchet exists)
  */
+import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 import {
   ALLOWLIST_PATH,
@@ -29,7 +30,19 @@ import {
   tightenRatchet,
 } from './lib/external-api-guard.mjs';
 
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+/**
+ * The checkout to scan is the current working tree, not this file's tree:
+ * Source Validation runs the trusted-base copy of this script inside the
+ * source checkout under review.
+ */
+function checkoutRoot() {
+  const top = spawnSync('git', ['rev-parse', '--show-toplevel'], {
+    encoding: 'utf8',
+  });
+  return top.status === 0 ? top.stdout.trim() : process.cwd();
+}
+
+const repoRoot = checkoutRoot();
 
 function save(entries) {
   writeFileSync(
@@ -39,6 +52,16 @@ function save(entries) {
 }
 
 export function main(argv = process.argv.slice(2)) {
+  const adopting = argv.includes('--bootstrap');
+  if (
+    !existsSync(join(repoRoot, 'packages/api-client/providers.json')) ||
+    (!adopting && !existsSync(join(repoRoot, RATCHET_PATH)))
+  ) {
+    process.stdout.write(
+      'external-api-guard: not adopted on this checkout; skipped\n'
+    );
+    return 0;
+  }
   const providers = loadProviders(repoRoot);
   const found = scanRepo(repoRoot, buildRules(providers));
   const base = ciBase(repoRoot);

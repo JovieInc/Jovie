@@ -190,8 +190,9 @@ export const SOURCE_GUARDS = Object.freeze([
     // (.claude/rules/external-apis.md). A new provider host, SDK client or gh
     // call in any scanned source fails here; grandfathered sites only shrink.
     id: 'external-api-guard',
-    command:
-      'node scripts/external-api-guard.mjs && pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/external-api-guard.test.mjs',
+    // Trusted-base copy, run against the source checkout; its contract test
+    // runs with the script contracts (SCRIPT_CONTRACT_VITEST_TESTS).
+    command: `node ${shellQuote(fileURLToPath(new URL('./external-api-guard.mjs', import.meta.url)))}`,
     inputs:
       /(?:\.(?:ts|tsx|js|mjs|cjs|mts|cts|py|sh|bash|ya?ml)$|^packages\/api-client\/providers\.json$|^scripts\/lib\/external-api-guard\.)/u,
     prOnly: false,
@@ -738,6 +739,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/merge-group-token-budget.test.mjs',
   'scripts/lib/__tests__/workflow-triggers.test.mjs',
   'scripts/lib/__tests__/sentry-validation-observation.test.mjs',
+  'scripts/lib/__tests__/external-api-guard.test.mjs',
 ]);
 export const MESH_HOST_ACK_COVERAGE_COMMAND =
   'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/mesh-host-ack.test.mjs --coverage.enabled --coverage.provider=v8 --coverage.include=lanes/mesh-host-ack.mjs --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-mesh-host-ack-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=json-summary --coverage.thresholds.perFile=true --coverage.thresholds.lines=99 --coverage.thresholds.statements=99 --coverage.thresholds.branches=90 --coverage.thresholds.functions=100';

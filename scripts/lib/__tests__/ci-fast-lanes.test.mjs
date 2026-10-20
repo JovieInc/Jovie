@@ -2305,6 +2305,12 @@ describe('source-read guard selection', () => {
         ).toContain("from 'node:test'");
         continue;
       }
+      if (guard.id === 'external-api-guard') {
+        expect(guard.command).toContain(
+          join(REPO_ROOT, 'scripts/external-api-guard.mjs')
+        );
+        continue;
+      }
       if (guard.id === 'script-contracts') {
         expect(guard.command).toContain('/lib/script-contract-affected.mjs');
         continue;
