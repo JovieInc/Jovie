@@ -7,6 +7,11 @@ const mocks = vi.hoisted(() => ({
   push: vi.fn(),
   create: vi.fn(),
   data: undefined as unknown,
+  mobile: false,
+}));
+
+vi.mock('@/hooks/useBreakpoint', () => ({
+  useBreakpointDown: () => mocks.mobile,
 }));
 
 vi.mock('next/navigation', () => ({
@@ -37,6 +42,7 @@ function renderNav(pathname = '/app/ov/hud') {
 describe('OperatorListsNav', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.mobile = false;
     mocks.data = {
       lists: [
         { id: 'l1', name: 'Collab list', count: 12, pendingSuggestions: 3 },
@@ -90,6 +96,68 @@ describe('OperatorListsNav', () => {
     expect(
       screen.getByRole('button', { name: 'New List' })
     ).toBeInTheDocument();
+  });
+
+  it('expands a collapsed rail before entering a new list name', () => {
+    const onOpenChange = vi.fn();
+    render(
+      <TooltipProvider>
+        <SidebarProvider open={false} onOpenChange={onOpenChange}>
+          <OperatorListsNav pathname='/app/ov/hud' />
+        </SidebarProvider>
+      </TooltipProvider>
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'New List' }));
+    expect(onOpenChange).toHaveBeenCalledWith(true);
+    expect(
+      screen.getByRole('textbox', { name: 'New List Name' })
+    ).toHaveFocus();
+  });
+
+  it.each([false, true])(
+    'keeps the focused active list mounted through rail changes (mobile: %s)',
+    mobile => {
+      mocks.mobile = mobile;
+      const view = (open: boolean) => (
+        <TooltipProvider>
+          <SidebarProvider open={open}>
+            <OperatorListsNav pathname='/app/ov/lists/l1' />
+          </SidebarProvider>
+        </TooltipProvider>
+      );
+      const { rerender } = render(view(true));
+      const collab = screen.getByRole('link', { name: 'Collab list' });
+      collab.focus();
+      for (const open of [false, true]) {
+        rerender(view(open));
+        expect(screen.getByRole('link', { name: 'Collab list' })).toBe(collab);
+        expect(collab).toHaveFocus();
+        expect(collab).toHaveAttribute('href', '/app/ov/lists/l1');
+        expect(collab).toHaveAttribute('aria-current', 'page');
+        expect(screen.getByRole('link', { name: 'Favorites' })).toHaveAttribute(
+          'href',
+          '/app/ov/lists/views/favorites'
+        );
+        expect(screen.getByLabelText('12 creators')).toHaveTextContent('12');
+      }
+    }
+  );
+
+  it('starts mobile list creation without changing pinned desktop state', () => {
+    mocks.mobile = true;
+    const onOpenChange = vi.fn();
+    render(
+      <TooltipProvider>
+        <SidebarProvider open={false} onOpenChange={onOpenChange}>
+          <OperatorListsNav pathname='/app/ov/hud' />
+        </SidebarProvider>
+      </TooltipProvider>
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'New List' }));
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole('textbox', { name: 'New List Name' })
+    ).toHaveFocus();
   });
 
   it('still offers New list before any data loads', () => {
