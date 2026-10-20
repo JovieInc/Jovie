@@ -99,6 +99,11 @@ describe('Sentry deployment contract selection', () => {
 
 describe('lane Python qualification coverage', () => {
   it.each([
+    ['managed CLI', ['scripts/hyperagent/hyperagent.py']],
+    ['managed CLI installer', ['scripts/hyperagent/install.py']],
+    ['managed model mappings', ['scripts/hyperagent/models.json']],
+    ['managed CLI regression', ['scripts/tests/test_hyperagent_cli.py']],
+    ['reason command role compatibility', ['scripts/lanes/reason.json']],
     ['lane source', ['scripts/lanes/hyperagent_lane.py']],
     ['attempt regression', ['scripts/tests/test_execution_attempt.py']],
     ['qualification safety source', ['scripts/lanes/qualification_guard.py']],

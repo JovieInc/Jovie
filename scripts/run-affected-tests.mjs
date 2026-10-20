@@ -1121,6 +1121,11 @@ export function classifyBlogContentForAffectedTests(base, head, options) {
 }
 
 const LANE_PYTHON_COVERAGE_INPUTS = new Set([
+  'scripts/hyperagent/hyperagent.py',
+  'scripts/hyperagent/install.py',
+  'scripts/hyperagent/models.json',
+  'scripts/lanes/reason.json',
+  'scripts/tests/test_hyperagent_cli.py',
   ...[
     'backlog_admission',
     'backlog_writer_guard',
