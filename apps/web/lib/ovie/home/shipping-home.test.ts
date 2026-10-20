@@ -15,6 +15,7 @@ import {
   buildPulse,
   buildShipRows,
   buildStageLatency,
+  mergeDoneWithRecent,
   OVIE_NOT_MEASURED,
   OVIE_SHIP_STAGES,
   rememberPulse,
@@ -578,5 +579,44 @@ describe('stage latency', () => {
     expect(
       buildStageLatency({ ...summary, stagesTotal: null })?.coverage
     ).toBeNull();
+  });
+});
+
+describe('mergeDoneWithRecent', () => {
+  it('adds merged PRs no task names, after task items, capped', () => {
+    const done = [
+      {
+        id: 'linear:JOV-2',
+        label: 'Task 2 · #22002',
+        url: null,
+        verified: true,
+      },
+    ];
+    const recent = [
+      {
+        repo: 'Jovie',
+        number: 22002,
+        title: 'Task 2',
+        url: 'https://github.com/JovieInc/Jovie/pull/22002',
+        mergedAt: '2026-10-20T19:00:00.000Z',
+      },
+      {
+        repo: 'Jovie',
+        number: 22010,
+        title: 'Fix the queue',
+        url: 'https://github.com/JovieInc/Jovie/pull/22010',
+        mergedAt: '2026-10-20T18:00:00.000Z',
+      },
+    ];
+    expect(mergeDoneWithRecent(done, recent)).toEqual([
+      done[0],
+      {
+        id: 'pr:Jovie#22010',
+        label: 'Fix the queue · #22010',
+        url: 'https://github.com/JovieInc/Jovie/pull/22010',
+        verified: false,
+      },
+    ]);
+    expect(mergeDoneWithRecent([], recent, 1)).toHaveLength(1);
   });
 });
