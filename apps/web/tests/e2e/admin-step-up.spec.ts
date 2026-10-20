@@ -28,10 +28,20 @@ import { smokeNavigateWithRetry } from './utils/smoke-test-utils';
 const PASSKEY_API = '**/api/auth/passkey';
 const STEP_UP_STATUS_API = '**/api/admin/step-up-status';
 
+function passkeyRpId(): string {
+  try {
+    return new URL(process.env.BASE_URL ?? 'http://localhost:3100').hostname;
+  } catch {
+    return 'localhost';
+  }
+}
+
+const PASSKEY_RP_ID = passkeyRpId();
+
 const AUTHENTICATE_OPTIONS = {
   challenge: 'ZmFrZS1jaGFsbGVuZ2U',
   timeout: 60_000,
-  rpId: 'localhost',
+  rpId: PASSKEY_RP_ID,
   allowCredentials: [],
   userVerification: 'preferred',
 };
@@ -75,7 +85,7 @@ function fakeAssertionScript(mode: 'resolve' | 'hang') {
 
 const REGISTER_OPTIONS = {
   challenge: 'ZmFrZS1jaGFsbGVuZ2U',
-  rp: { name: 'Jovie', id: 'localhost' },
+  rp: { name: 'Jovie', id: PASSKEY_RP_ID },
   user: { id: 'dXNlcg', name: 'admin@jovie.test', displayName: 'Admin' },
   pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
   timeout: 60_000,
@@ -173,7 +183,7 @@ test.describe('Admin passkey step-up (JOV-6892)', () => {
     await mockPasskeyApi(page, { unlocked: true });
 
     await smokeNavigateWithRetry(page, APP_ROUTES.HUD, { timeout: 60_000 });
-    const unlock = page.getByRole('button', { name: 'Unlock to continue' });
+    const unlock = page.getByRole('button', { name: 'Unlock', exact: true });
     await expect(unlock).toBeVisible();
 
     const verifyRequest = page.waitForRequest(
@@ -197,7 +207,7 @@ test.describe('Admin passkey step-up (JOV-6892)', () => {
     await mockPasskeyApi(page, { unlocked: false });
 
     await smokeNavigateWithRetry(page, APP_ROUTES.HUD, { timeout: 60_000 });
-    const unlock = page.getByRole('button', { name: 'Unlock to continue' });
+    const unlock = page.getByRole('button', { name: 'Unlock', exact: true });
     await expect(unlock).toBeVisible();
     await unlock.click();
 
@@ -206,7 +216,7 @@ test.describe('Admin passkey step-up (JOV-6892)', () => {
     );
     // Recovery is available — the user can retry instead of looping.
     await expect(
-      page.getByRole('button', { name: 'Unlock to continue' })
+      page.getByRole('button', { name: 'Unlock', exact: true })
     ).toBeEnabled();
   });
 
@@ -217,7 +227,7 @@ test.describe('Admin passkey step-up (JOV-6892)', () => {
     await mockPasskeyApi(page, { unlocked: true, passkeys: [] });
 
     await smokeNavigateWithRetry(page, APP_ROUTES.HUD, { timeout: 60_000 });
-    const unlock = page.getByRole('button', { name: 'Unlock to continue' });
+    const unlock = page.getByRole('button', { name: 'Unlock', exact: true });
     await expect(unlock).toBeVisible();
 
     let authenticateRequested = false;
@@ -238,7 +248,7 @@ test.describe('Admin passkey step-up (JOV-6892)', () => {
       .poll(() => authenticateRequested, { timeout: 5_000 })
       .toBe(false);
     await expect(
-      page.getByRole('button', { name: 'Unlock to continue' })
+      page.getByRole('button', { name: 'Unlock', exact: true })
     ).toBeEnabled();
   });
 
@@ -252,7 +262,7 @@ test.describe('Admin passkey step-up (JOV-6892)', () => {
     await mockPasskeyApi(page, { unlocked: true });
 
     await smokeNavigateWithRetry(page, APP_ROUTES.HUD, { timeout: 60_000 });
-    const unlock = page.getByRole('button', { name: 'Unlock to continue' });
+    const unlock = page.getByRole('button', { name: 'Unlock', exact: true });
     await expect(unlock).toBeVisible();
     await unlock.click();
 
@@ -260,7 +270,7 @@ test.describe('Admin passkey step-up (JOV-6892)', () => {
       'passkey prompt did not appear'
     );
     await expect(
-      page.getByRole('button', { name: 'Unlock to continue' })
+      page.getByRole('button', { name: 'Unlock', exact: true })
     ).toBeEnabled();
     await expect
       .poll(() =>

@@ -4,10 +4,12 @@ import SPEC_FIXTURE from './fixtures/linear-dropdown-spec.json';
 const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
 
 /**
- * Dropdown Parity — Linear.app match
+ * Dropdown Parity — Noir Ion contract
  *
- * Deterministic computed-style assertions against values extracted directly
- * from linear.app/demo via Playwright JS execution (2026-03-05).
+ * Deterministic computed-style assertions. The fixture records the current
+ * Noir Ion tokens (overlay radius 16px, inner radius 12px, type scale
+ * 10/12, font-normal 400, Lucide 16px stroke 2, disabled opacity 0.5),
+ * not the March 2026 Linear scrape. Equality stays exact.
  *
  * Critical tests added in this revision (previously missing — caused false passes):
  *   - Container background color (white in light, elevated dark surface in dark)
@@ -85,7 +87,7 @@ function relativeLuminance(r: number, g: number, b: number): number {
   return 0.2126 * R + 0.7152 * G + 0.0722 * B;
 }
 
-test.describe('Dropdown Parity — Linear.app match', () => {
+test.describe('Dropdown Parity — Noir Ion', () => {
   test.skip(
     FAST_ITERATION,
     'Visual parity checks run outside the fast deploy gate'
@@ -97,7 +99,7 @@ test.describe('Dropdown Parity — Linear.app match', () => {
 
   // ─── Container structure ──────────────────────────────────────────────────
 
-  test('container: radius 8px, padding 4px, min-width ≥192px, no backdrop-blur', async ({
+  test('container: radius 16px, padding 4px, min-width ≥192px, no backdrop-blur', async ({
     page,
   }) => {
     const menu = page.locator('[data-testid="menu-normal"]');
@@ -274,7 +276,7 @@ test.describe('Dropdown Parity — Linear.app match', () => {
 
   // ─── Item styles ─────────────────────────────────────────────────────────
 
-  test('item: padding, font size 13px, weight 450, radius 4px, gap 8px', async ({
+  test('item: padding, font size 12px, weight 400, radius 12px, gap 8px', async ({
     page,
   }) => {
     const item = page
@@ -342,9 +344,7 @@ test.describe('Dropdown Parity — Linear.app match', () => {
 
   // ─── Icon ────────────────────────────────────────────────────────────────
 
-  test('icon: 14×14px size and stroke-width ~1.5 (thin, refined)', async ({
-    page,
-  }) => {
+  test('icon: 16×16px size and Lucide stroke 2', async ({ page }) => {
     const icon = page
       .locator('[data-testid="menu-normal"] [data-testid="item-normal"] svg')
       .first();
@@ -362,10 +362,8 @@ test.describe('Dropdown Parity — Linear.app match', () => {
 
     expect(width).toBe(SPEC.icon.size);
     expect(height).toBe(SPEC.icon.size);
-    // Linear uses stroke-width ~1.5 for refined icons (CSS overrides SVG attr)
-    const strokeNum = Number.parseFloat(strokeCSS ?? strokeAttr ?? '2');
-    expect(strokeNum).toBeGreaterThanOrEqual(1.2);
-    expect(strokeNum).toBeLessThanOrEqual(1.8);
+    const strokeNum = Number.parseFloat(strokeCSS ?? strokeAttr ?? '');
+    expect(strokeNum).toBe(Number.parseFloat(FIXTURE.icon.strokeWidth));
   });
 
   test('icon: dim at rest, bright on hover (tertiary → primary)', async ({
@@ -413,7 +411,7 @@ test.describe('Dropdown Parity — Linear.app match', () => {
     expect(hoverAvg).toBeGreaterThan(220);
   });
 
-  test('item: dark mode text is near-white (avg rgb > 200)', async ({
+  test('item: dark mode text is the Noir Ion secondary token', async ({
     page,
   }) => {
     await page.evaluate(() =>
@@ -436,15 +434,13 @@ test.describe('Dropdown Parity — Linear.app match', () => {
         return { r: pr, g: pg, b: pb };
       });
 
-    // Linear dark mode secondary text = lch(90.65%) = ~rgb(227,228,231)
-    // Must be very bright — catch regressions like oklch(62%) = dim gray
-    const avg = (r + g + b) / 3;
-    expect(avg).toBeGreaterThan(200);
+    // .system-b-marketing.dark --color-text-secondary-token is #a0a5af.
+    expect({ r, g, b }).toEqual({ r: 160, g: 165, b: 175 });
   });
 
   // ─── States ──────────────────────────────────────────────────────────────
 
-  test('disabled item: opacity 0.46', async ({ page }) => {
+  test('disabled item: opacity 0.5', async ({ page }) => {
     const disabledItem = page.locator(
       '[data-testid="menu-disabled"] [data-testid="item-disabled"]'
     );
@@ -493,7 +489,7 @@ test.describe('Dropdown Parity — Linear.app match', () => {
 
   // ─── Label & separator ───────────────────────────────────────────────────
 
-  test('label: 11px, not uppercase, weight 500', async ({ page }) => {
+  test('label: 12px, not uppercase, weight 500', async ({ page }) => {
     const label = page
       .locator('[data-testid="menu-labels"] [data-testid="menu-label"]')
       .first();
@@ -542,7 +538,7 @@ test.describe('Dropdown Parity — Linear.app match', () => {
 
   // ─── Shortcut ────────────────────────────────────────────────────────────
 
-  test('shortcut: 11px font size, normal letter-spacing, right-aligned', async ({
+  test('shortcut: 10px font size, normal letter-spacing, right-aligned', async ({
     page,
   }) => {
     const shortcut = page
@@ -566,7 +562,12 @@ test.describe('Dropdown Parity — Linear.app match', () => {
     });
 
     expect(styles.fontSize).toBe(SPEC.shortcut.fontSize);
-    const ls = Number.parseFloat(styles.letterSpacing);
+    // The CSS keyword "normal" is 0. Parsing it as a float is NaN and
+    // fails a spacing that already matches the fixture.
+    const ls =
+      styles.letterSpacing === 'normal'
+        ? 0
+        : Number.parseFloat(styles.letterSpacing);
     expect(Math.abs(ls)).toBeLessThan(SPEC.shortcut.letterSpacingMax);
     // Shortcut must be right-aligned within the menu item (ml-auto)
     expect(styles.rightAligned).toBe(true);
@@ -587,6 +588,9 @@ test.describe('Dropdown Parity — Linear.app match', () => {
     );
 
     await item.hover();
+    // duration-fast is 100ms. The icon hover test in this file already
+    // waits 200ms so it reads settled paint rather than the first frame.
+    await page.waitForTimeout(200);
 
     const bgAfterHover = await item.evaluate(
       el => globalThis.getComputedStyle(el).backgroundColor

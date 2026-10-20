@@ -5,6 +5,7 @@ import { and, asc, sql as drizzleSql, eq, exists } from 'drizzle-orm';
 import { unstable_cache } from 'next/cache';
 import { CACHE_TAGS } from '@/lib/cache/tags';
 import { db, withRetry } from '@/lib/db';
+import { QUERY_TIMEOUTS } from '@/lib/db/query-timeout';
 import { users } from '@/lib/db/schema/auth';
 import { discogReleases } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -177,7 +178,7 @@ async function queryArtistsDirectoryCatalog(
           .orderBy(asc(directorySortKey), asc(creatorProfiles.id))
           .limit(ARTISTS_DIRECTORY_PAGE_SIZE + 1),
       'artists-directory-page',
-      2
+      { operation: 'read', maxAttempts: 2, retryBudgetMs: QUERY_TIMEOUTS.api }
     );
 
     if (rows.length === 0) {
@@ -227,7 +228,7 @@ async function queryArtistsDirectoryCount(): Promise<number> {
   const rows = await withRetry(
     async () => selectDirectoryRows().where(PUBLIC_DIRECTORY_PREDICATE),
     'artists-directory-count',
-    2
+    { operation: 'read', maxAttempts: 2, retryBudgetMs: QUERY_TIMEOUTS.api }
   );
   return filterPublicDiscoveryIdentities(
     rows.map(row => ({ ...row, handle: row.username }))

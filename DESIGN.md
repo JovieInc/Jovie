@@ -153,7 +153,7 @@ unless linked below.
 | `@jovie/no-hardcoded-theme-colors` | `error` | L | Yes | None (no grandfathered count) |
 | `@jovie/ui-feel` | `off` | L | No | None (enforced by the UI-feel ratchet below) |
 | `arbitrary-radius` | `error` | S + G | Yes | 31 occurrences; 15 files |
-| `arbitrary-values` | `error` | G + I | Yes | 2170 |
+| `arbitrary-values` | `error` | G + I | Yes | 2169 |
 | `component-family` | `error` | G | Yes | button=37; emptyState=6; entityHeader=1; palette=4; shell=21; status=9 |
 | `contrast (computed pairs)` | `error` | S + G | Yes | No count baseline; 4.5:1 normal text, 3:1 large text/UI |
 | `contrast (raw colors)` | `error` | S | Yes | arbitraryHex=0; bareBgBlack=0; bareBgWhite=0; bareTextBlack=0; bareTextWhite=0 |
@@ -164,7 +164,7 @@ unless linked below.
 | `spacing-scale (conservative)` | `error` | S + G | Yes | 654; armed=true; marketing=86; packages/ui=11; web-other=304; web-shell=253 |
 | `spacing-scale (strict)` | `warn` | S + G | No | 2310; armed=false; marketing=258; packages/ui=60; web-other=1126; web-shell=866 |
 | `touch-target` | `error` | D | Yes | 159 |
-| `ui-feel ratchet` | `error` | D | Yes | headingNeedsBalance=322; missingTabularNums=81; nonConcentricRadius=0; undersizedHitArea=74 |
+| `ui-feel ratchet` | `error` | D | Yes | headingNeedsBalance=318; missingTabularNums=81; nonConcentricRadius=0; undersizedHitArea=74 |
 
 The [raw-color baseline](apps/web/contrast-ratchet.baseline.json) and
 [computed pair config](apps/web/contrast-pairs.config.json) cover separate

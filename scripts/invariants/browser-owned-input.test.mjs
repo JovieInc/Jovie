@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import {
@@ -528,6 +528,84 @@ test('settings billing owes payment-tip evidence only when its surface hosts an 
     false
   );
 });
+
+const ARTIST_PROFILE_SETTINGS_ROOTS = [
+  'apps/web/app/app/(shell)/settings/profile',
+  'apps/web/app/app/(shell)/settings/artist-profile',
+  'apps/web/app/app/(shell)/tipping',
+  'apps/web/components/features/dashboard/organisms/settings-profile-section',
+  'apps/web/components/features/dashboard/organisms/SettingsPaySection.tsx',
+  'apps/web/components/features/dashboard/molecules/ProfilePaySurface.tsx',
+  'apps/web/components/features/dashboard/organisms/shopify',
+  'apps/web/app/app/(shell)/library/ArtistRulesSheet.tsx',
+];
+const BROWSER_TEL_FIELD =
+  /(?:type|autoComplete|autocomplete|inputMode|inputmode)\s*=\s*['"]tel['"]/;
+
+function artistProfileSettingsSources(entry, found = []) {
+  for (const path of Array.isArray(entry) ? entry : [entry]) {
+    if (statSync(path).isDirectory()) {
+      for (const child of readdirSync(path, { withFileTypes: true })) {
+        artistProfileSettingsSources(join(path, child.name), found);
+      }
+      continue;
+    }
+    if (
+      /\.(?:ts|tsx)$/.test(path) &&
+      !/\.(?:test|stories)\.(?:ts|tsx)$/.test(path)
+    )
+      found.push(path);
+  }
+  return found;
+}
+
+test('settings artist profile owes contact and tip device cells only for fields it hosts', () => {
+  const sources = artistProfileSettingsSources(ARTIST_PROFILE_SETTINGS_ROOTS);
+  const hosted = {
+    'account-contact':
+      surfaceHosts(sources, BROWSER_EMAIL_FIELD) ||
+      surfaceHosts(sources, BROWSER_TEL_FIELD),
+    'payment-tip': surfaceHosts(sources, BROWSER_EMAIL_FIELD),
+  };
+  const screenId = 'web.settings-artist-profile';
+  for (const [id, present] of Object.entries(hosted)) {
+    const bound = INPUT_MATRIX.journeys.some(
+      journey => journey.id === id && journey.screens.includes(screenId)
+    );
+    assert.equal(bound, present, id);
+  }
+  if (Object.values(hosted).some(Boolean)) return;
+  assert.deepEqual(inputCells(screenId), []);
+  assert.deepEqual(
+    browserInputFindings(undefined, { screenId, headSha: HEAD }),
+    []
+  );
+  const profile = auditScreens({
+    registry: [
+      {
+        id: screenId,
+        platform: 'web',
+        owner: 'settings-artist-profile',
+        sources: ARTIST_PROFILE_SETTINGS_ROOTS,
+        viewports: ['desktop', 'mobile'],
+      },
+    ],
+    headSha: HEAD,
+  });
+  assert.equal(profile.screens[0].producer, 'none');
+  assert.equal(profile.screens[0].verdict, 'uncovered');
+  assert.deepEqual(profile.screens[0].findings, []);
+  assert.equal(
+    remediationPlans(profile).some(
+      plan => plan.fingerprint === 'screen-audit:web.settings-artist-profile'
+    ),
+    false
+  );
+});
+
+function surfaceHosts(paths, pattern) {
+  return paths.some(path => pattern.test(readFileSync(path, 'utf8')));
+}
 
 const WEB_AUTH_SOURCES = [
   'apps/web/app/(auth)',

@@ -409,7 +409,9 @@ class HostWiringTest(unittest.TestCase):
             self.assertEqual(sweeper.default_repos(home, lanes_repo), [lanes_repo, home / "Jovie"])
             roots, never = sweeper.default_roots(home, home / "state"), sweeper.default_never(home)
             for path in (home / ".codex/worktrees/a1/Jovie", home / "conductor/workspaces/x/y",
-                         home / "state/worktrees/run", home / "jovie-wt-fix"):
+                         home / "state/worktrees/run", home / "jovie-wt-fix",
+                         # Binding (LYB) run checkouts were never swept; 347 were reclaimed by hand.
+                         home / "state/bindings/LYB/worktrees/20261020T000000Z-LYB-1-codex-abc123"):
                 self.assertTrue(sweeper.in_scope(path, roots, never), path)
             for path in (home / ".cache/pnpm", home / "Library/pnpm/store", home / "Jovie"):
                 self.assertFalse(sweeper.in_scope(path, roots, never), path)

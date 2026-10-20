@@ -6,8 +6,10 @@ Run with:
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import time
@@ -430,6 +432,14 @@ class JudgeTest(unittest.TestCase):
         self.assertIn("provider-down:devin", alerts)
         self.assertNotIn("provider-idle:devin", alerts)
 
+    def test_started_issues_without_a_live_owner_escalate_after_the_grace(self):
+        quiet = doctor.judge(obs(ownership={"started": 536, "ownerless": 3, "overGrace": 0}))
+        self.assertNotIn("started-without-owner", quiet)  # inside the grace period
+        loud = doctor.judge(obs(ownership={"started": 536, "ownerless": 40, "overGrace": 40,
+                                           "oldestOwnerlessS": 7200,
+                                           "unresolved": {"post-merge-without-merged-evidence": 40}}))
+        self.assertIn("40 started JOV issues", loud["started-without-owner"])
+
     def test_linear_and_codex_failures_are_their_own_alerts(self):
         self.assertIn("linear-down", doctor.judge(obs(linearError="HTTPError: 429", pool=None)))
         self.assertIn("codex-broken", doctor.judge(obs(codex={"error": "no codex", "accounts": {}, "available": []})))
@@ -755,6 +765,7 @@ class ReconcileTest(unittest.TestCase):
         tracker = doctor.Tracker(FakeLinear(), "gem")
         with (mock.patch.object(tracker, "_remediation_label_id", return_value=None),
               mock.patch.object(tracker, "contradict_invariant"),
+              mock.patch.object(doctor, "verify_ops_report", side_effect=lambda prepared, *_: prepared) as verify,
               mock.patch.object(doctor, "prepare_ops_report", return_value=reviewed) as prepare):
             state = doctor.reconcile({"disk-low": "4% free"}, {}, tracker, 1_000_000.0,
                                      {"disk-low": condition})
@@ -763,6 +774,7 @@ class ReconcileTest(unittest.TestCase):
         self.assertEqual(created[0]["description"], reviewed["message"])
         self.assertEqual(len(created), 1)
         prepare.assert_called_once()
+        verify.assert_called_once_with(reviewed, "disk-low", "4% free", condition, "gem", tracker.title("disk-low"))
         self.assertEqual(state["conditions"]["disk-low"]["writingReview"], reviewed["review"])
         self.assertEqual(state["conditions"]["disk-low"]["writingDecision"], "approved-template")
 
@@ -899,6 +911,78 @@ class ReconcileTest(unittest.TestCase):
         doctor.Tracker(linear, "gem").contradict_invariant(event)
         self.assertEqual(linear.moves, [("owner", "Triage")])
         self.assertIn("gem:provider-idle:devin:2", linear.comments[0][1])
+
+
+class OpsReportDeliveryTest(unittest.TestCase):
+    def setUp(self):
+        self.condition = {
+            "condition": "disk-low", "state": "active", "owner": "symphony-lanes-doctor",
+            "source": {"producer": "scripts/lanes/doctor.py", "observedAt": doctor.now_iso()},
+            "nextAction": "inspect disk usage", "generation": 1,
+        }
+        self.target = "Symphony doctor: disk-low (test-host)"
+        self.source = mock.patch.object(doctor, "_source_version", return_value="UNKNOWN")
+        self.source.start()
+        self.addCleanup(self.source.stop)
+
+    def prepare(self):
+        prepared = doctor.prepare_ops_report("disk-low", "4% free", self.condition, "test-host", self.target)
+        self.assertEqual(prepared["review"]["reviewStatus"], "missing-source-receipt")
+        return prepared
+
+    def verify(self, prepared, condition=None, target=None):
+        return doctor.verify_ops_report(prepared, "disk-low", "4% free", condition or self.condition,
+                                        "test-host", target or self.target)
+
+    def test_real_cli_checks_exact_delivery_without_model_calls(self):
+        prepared = self.prepare()
+        self.assertIs(self.verify(prepared), prepared)
+        for field, value in (("message", "edited after review"), ("audience", "changed audience"),
+                             ("destination", {"adapter": "linear-issue", "target": "other"})):
+            with self.subTest(field=field):
+                result = self.verify({**prepared, field: value})
+                self.assertEqual(result["review"]["reviewStatus"], "emergency-reviewer-unavailable")
+                self.assertNotIn("edited after review", result["message"])
+        stale = {**self.condition, "source": {**self.condition["source"], "observedAt": "2000-01-01T00:00:00Z"}}
+        for condition, target in ((stale, None), (None, "changed issue")):
+            result = self.verify(prepared, condition, target)
+            self.assertEqual(result["review"]["reviewStatus"], "emergency-reviewer-unavailable")
+        self.assertNotIn("4% free", json.dumps(prepared["review"]))
+
+    def test_reviewer_outage_keeps_preapproved_emergency_notice_available(self):
+        with mock.patch.object(doctor.subprocess, "run", side_effect=subprocess.TimeoutExpired("node", 20)) as run:
+            prepared = doctor.prepare_ops_report("disk-low", "4% free", self.condition, "test-host", self.target)
+            result = self.verify({**prepared, "message": "edited emergency notice"})
+        run.assert_called_once()
+        self.assertEqual(result["review"]["reviewStatus"], "emergency-reviewer-unavailable")
+        self.assertIn("Root cause: UNKNOWN", result["message"])
+        self.assertNotIn("edited emergency notice", result["message"])
+
+    def test_linear_adapter_rechecks_after_prepare_and_preserves_duplicate_lookup(self):
+        created = []
+
+        class FakeLinear:
+            def gql(self, query, variables):
+                if "title:{eq:$t}" in query:
+                    return {"issues": {"nodes": [{"id": "iss-1"}] if created else []}}
+                if "teams(filter" in query:
+                    return {"teams": {"nodes": [{"id": "team", "states": {"nodes": [
+                        {"id": "triage", "name": "Triage"}]}, "labels": {"nodes": []}}]}}
+                if "issueCreate" in query:
+                    created.append(variables["i"])
+                    return {"issueCreate": {"issue": {"id": "iss-1"}}}
+                raise AssertionError(query)
+
+        tracker = doctor.Tracker(FakeLinear(), "test-host")
+        tampered = {**self.prepare(), "message": "edited after review"}
+        with (mock.patch.object(tracker, "_remediation_label_id", return_value=None),
+              mock.patch.object(doctor, "prepare_ops_report", return_value=tampered) as prepare):
+            for _ in range(2):
+                self.assertEqual(tracker.open("disk-low", "4% free", self.condition), "iss-1")
+        prepare.assert_called_once()
+        self.assertEqual(len(created), 1)
+        self.assertIn("Symphony emergency notice", created[0]["description"])
+        self.assertNotIn("edited after review", created[0]["description"])
 
 
 class TransitionAcknowledgmentTest(unittest.TestCase):
@@ -1286,6 +1370,9 @@ class RunnablePoolTest(unittest.TestCase):
                     mock.patch.object(lane, "load_providers", return_value=providers), \
                     mock.patch.object(lane, "Linear", return_value=tracker), \
                     mock.patch.object(lane, "in_flight_issues", return_value=frozenset({"JOV-OWNED"})), \
+                    mock.patch.object(lane, "open_hotspot_holds", return_value={}), \
+                    mock.patch.object(lane, "held_back_issues", return_value=frozenset()), \
+                    mock.patch.object(lane, "overlap_inventory", return_value=([], [])), \
                     mock.patch.object(lane, "load_github_env"), \
                     mock.patch.object(lane, "read_new_issue_budget", side_effect=lambda name, slots: lane.new_issue_budget(name, slots, [])), \
                     mock.patch.object(lane, "graphql_budget", return_value=None):
@@ -1524,6 +1611,9 @@ class AdmissionBackpressureTest(unittest.TestCase):
                     mock.patch.object(lane, "load_providers", return_value=providers), \
                     mock.patch.object(lane, "load_github_env"), \
                     mock.patch.object(lane, "in_flight_issues", return_value=frozenset()), \
+                    mock.patch.object(lane, "open_hotspot_holds", return_value={}), \
+                    mock.patch.object(lane, "held_back_issues", return_value=frozenset()), \
+                    mock.patch.object(lane, "overlap_inventory", return_value=([], [])), \
                     mock.patch.object(lane, "graphql_budget", return_value=None), \
                     mock.patch.object(lane, "read_new_issue_budget", side_effect=lambda name, slots: lane.new_issue_budget(name, slots, inventory)):
                 observed = doctor.observe(host, lane, SimpleNamespace(status=lambda: {}), now=10000)
@@ -1554,7 +1644,85 @@ class AdmissionBackpressureTest(unittest.TestCase):
                 self.assertNotIn("pool-empty", result["alerts"])
 
 
+
+class _GistApiFake:
+    """A stored gist with independent write and GET responses; never calls GitHub."""
+
+    def __init__(self, gist_id="abc123"):
+        self.gist_id = gist_id
+        self.files = {}
+        self.calls = []
+        self.write_count = 0
+        self.fail_write = False
+        self.ambiguous_create = False
+        self.readback_mode = None
+        self.after_write = lambda: None
+
+    def __call__(self, args, **kwargs):
+        self.calls.append((list(args), kwargs.get("timeout")))
+        if args[1] == "gist":  # The pre-fix transport is a valid deliberate-red control.
+            self.write_count += 1
+            self.files["lanes-status.json"] = Path(args[-1]).read_text()
+            self.after_write()
+            return SimpleNamespace(returncode=1 if self.fail_write else 0,
+                                   stdout="" if self.ambiguous_create or args[2] == "edit"
+                                   else f"https://gist.example/{self.gist_id}", stderr="")
+        method = args[args.index("--method") + 1]
+        if method != "GET":
+            self.write_count += 1
+            packet = json.loads(Path(args[args.index("--input") + 1]).read_text())
+            if self.fail_write:
+                return SimpleNamespace(returncode=1, stdout="", stderr="synthetic write failure")
+            self.files.update({name: row["content"] for name, row in packet["files"].items()})
+            self.after_write()
+            if method == "POST" and self.ambiguous_create:
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+        files = {name: {"content": content, "truncated": False} for name, content in self.files.items()}
+        if method == "GET" and self.readback_mode == "changed":
+            files["lanes-status-details.json"]["content"] += "\n"
+        if method == "GET" and self.readback_mode == "truncated":
+            files["lanes-status-details.json"]["truncated"] = True
+        return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({
+            "id": self.gist_id, "html_url": f"https://gist.example/{self.gist_id}", "files": files,
+        }))
+
+
 class PublishTest(unittest.TestCase):
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.state = Path(tmp.name)
+        self.host = SimpleNamespace(state=self.state)
+        self.lane = SimpleNamespace(load_github_env=mock.Mock())
+        primary = self.state / "primary"
+        primary.touch()
+        primary_patch = mock.patch.object(doctor, "PRIMARY_FLAG", primary)
+        primary_patch.start()
+        self.addCleanup(primary_patch.stop)
+        self.api = _GistApiFake()
+        api_patch = mock.patch.object(doctor.lifecycle, "run", self.api)
+        api_patch.start()
+        self.addCleanup(api_patch.stop)
+        self.record = self.state / "status-gist.json"
+        self.record.write_text(json.dumps({"url": "https://gist.example/abc123", "id": "abc123"}))
+
+    def feed(self, row_count=400):
+        return {
+            "schema": "symphony-lanes-status/v1", "at": "2026-10-17T18:00:00Z",
+            "host": "gem", "release": "a" * 40, "running": 2, "idle": 1, "pool": None,
+            "lanes": {"codex": {"running": 2, "slots": 3}}, "alerts": {"source-unknown": "held"},
+            "conditions": {"source-unknown": {"owner": "existing-owner", "attempt": "b" * 64,
+                                               "effect": "unknown", "readback": None}},
+            "remediation": {"held": [{"issue": "JOV-1", "attempt": "c" * 64, "notSent": None}]},
+            "shippingAttribution": {
+                "schema": "jovie-shipping-attribution/v1", "complete": False, "mergeCount": None,
+                "projects": [{"repository": "JovieInc/Jovie", "denominatorComplete": True,
+                              "attributionEvidenceComplete": False, "unknownCount": row_count,
+                              "pullRequests": [{"prNumber": i + 1, "origin": {"confidence": "unknown"},
+                                                "diagnostic": "x" * 1024} for i in range(row_count)]}],
+            },
+        }
+
     def test_only_the_primary_host_publishes(self):
         saved = doctor.PRIMARY_FLAG
         with tempfile.TemporaryDirectory() as tmp:
@@ -1563,8 +1731,113 @@ class PublishTest(unittest.TestCase):
             try:
                 self.assertIsNone(doctor.publish_status(host, None, {"x": 1}))
                 self.assertFalse((Path(tmp) / "lanes-status.json").exists(), "a non-primary host writes nothing")
+                self.assertEqual(self.api.calls, [])
             finally:
                 doctor.PRIMARY_FLAG = saved
+
+    def test_growth_keeps_public_bytes_bounded_and_full_evidence_verifiable(self):
+        feed = self.feed()
+        self.assertGreater(len(json.dumps(feed).encode()), 256 * 1024)
+        self.assertEqual(doctor.publish_status(self.host, self.lane, feed), "https://gist.example/abc123")
+        public_text = self.api.files["lanes-status.json"]
+        self.assertLessEqual(len(public_text.encode("utf-8")), 256 * 1024)
+        public = json.loads(public_text)
+        self.assertEqual(public["schema"], feed["schema"])
+        for key in ("at", "release", "lanes", "pool", "alerts", "conditions", "remediation"):
+            self.assertEqual(public[key], feed[key], key)
+        detail = self.api.files["lanes-status-details.json"]
+        self.assertEqual(json.loads(detail), feed)
+        self.assertEqual((self.state / "lanes-status.json").read_text(), detail)
+        proof = public["publicProjection"]["fullEvidence"]
+        self.assertEqual(proof["fileName"], "lanes-status-details.json")
+        self.assertEqual(proof["sha256"], hashlib.sha256(detail.encode()).hexdigest())
+        self.assertEqual(proof["bytes"], len(detail.encode()))
+        self.assertEqual((proof["at"], proof["release"]), (feed["at"], feed["release"]))
+        project = public["shippingAttribution"]["projects"][0]
+        self.assertNotIn("pullRequests", project, "omitted detail must never masquerade as an empty array")
+        self.assertEqual(project["pullRequestsRef"]["recordCount"], 400)
+        self.assertEqual(project["pullRequestsRef"]["jsonPointer"], "/shippingAttribution/projects/0/pullRequests")
+        self.assertIs(project["attributionEvidenceComplete"], False)
+        self.assertIsNone(public["shippingAttribution"]["mergeCount"])
+        self.assertEqual(self.api.write_count, 1)
+        self.assertEqual(len(self.api.calls), 2, "one atomic write and one independent readback")
+
+    def test_essential_oversize_is_explicit_unavailable_without_fake_empty_counts(self):
+        feed = self.feed(0)
+        feed["conditions"]["source-unknown"]["evidence"] = "x" * (256 * 1024)
+        doctor.publish_status(self.host, self.lane, feed)
+        public = json.loads(self.api.files["lanes-status.json"])
+        self.assertLessEqual(len(self.api.files["lanes-status.json"].encode()), 256 * 1024)
+        self.assertEqual(public["status"], "unavailable")
+        self.assertEqual(public["reason"], "essential-public-feed-exceeds-byte-limit")
+        self.assertNotEqual(public["schema"], "symphony-lanes-status/v1")
+        for key in ("running", "idle", "pool", "lanes", "alerts", "conditions"):
+            self.assertNotIn(key, public, "refusal cannot manufacture a healthy empty fleet")
+        self.assertEqual(json.loads(self.api.files["lanes-status-details.json"]), feed)
+
+    def test_utf8_limit_counts_bytes_and_preserves_full_multibyte_evidence(self):
+        feed = self.feed(0)
+        feed["conditions"]["source-unknown"]["evidence"] = "界" * 100_000
+        self.assertLess(len(json.dumps(feed, ensure_ascii=False, separators=(",", ":"))), 256 * 1024)
+        doctor.publish_status(self.host, self.lane, feed)
+        self.assertEqual(json.loads(self.api.files["lanes-status.json"])["status"], "unavailable")
+        self.assertEqual(json.loads(self.api.files["lanes-status-details.json"]), feed)
+
+    def test_unknown_attribution_is_not_rewritten_to_empty_detail(self):
+        feed = self.feed(0)
+        feed["shippingAttribution"]["projects"][0]["pullRequests"] = None
+        doctor.publish_status(self.host, self.lane, feed)
+        public = json.loads(self.api.files["lanes-status.json"])
+        self.assertIsNone(public["shippingAttribution"]["projects"][0]["pullRequests"])
+        self.assertIs(public["shippingAttribution"]["complete"], False)
+
+    def test_failed_publication_does_not_report_a_successful_feed(self):
+        self.api.fail_write = True
+        with self.assertRaises(RuntimeError):
+            doctor.publish_status(self.host, self.lane, self.feed(0))
+        self.assertEqual(len(self.api.calls), 1)
+
+    def test_changed_or_incomplete_readback_cannot_certify_full_evidence(self):
+        for mode in ("changed", "truncated"):
+            with self.subTest(mode=mode):
+                self.api.readback_mode = mode
+                with self.assertRaises(RuntimeError):
+                    doctor.publish_status(self.host, self.lane, self.feed(0))
+
+    def test_create_keeps_one_identity_after_unknown_or_unverified_effect(self):
+        self.record.unlink()
+        self.api.ambiguous_create = True
+        with self.assertRaises(RuntimeError):
+            doctor.publish_status(self.host, self.lane, self.feed(0))
+        with self.assertRaises(RuntimeError):
+            doctor.publish_status(self.host, self.lane, self.feed(0))
+        self.assertEqual(self.api.write_count, 1, "unknown create is reconcile-required, never another gist")
+
+    def test_known_create_with_unverified_readback_reuses_the_same_gist(self):
+        self.record.unlink()
+        self.api.readback_mode = "truncated"
+        with self.assertRaises(RuntimeError):
+            doctor.publish_status(self.host, self.lane, self.feed(0))
+        self.assertEqual(json.loads(self.record.read_text())["id"], self.api.gist_id)
+        self.api.readback_mode = None
+        doctor.publish_status(self.host, self.lane, self.feed(0))
+        methods = [args[args.index("--method") + 1] for args, _timeout in self.api.calls]
+        self.assertEqual(methods, ["POST", "GET", "PATCH", "GET"])
+
+    def test_foreign_resource_path_is_refused_before_any_github_effect(self):
+        self.record.write_text(json.dumps({"url": "https://gist.example/abc123", "id": "../user"}))
+        with self.assertRaises(RuntimeError):
+            doctor.publish_status(self.host, self.lane, self.feed(0))
+        self.assertEqual(self.api.calls, [])
+
+    def test_existing_publication_deadline_covers_write_and_readback(self):
+        clock = {"now": 0}
+        self.api.after_write = lambda: clock.update(now=61)
+        with mock.patch.object(doctor.time, "monotonic", side_effect=lambda: clock["now"]):
+            with self.assertRaises(RuntimeError):
+                doctor.publish_status(self.host, self.lane, self.feed(0))
+        self.assertEqual(len(self.api.calls), 1)
+        self.assertLessEqual(self.api.calls[0][1], 60)
 
 
 class DeliveryTest(unittest.TestCase):
@@ -2008,13 +2281,208 @@ class StatusFeedContractTest(unittest.TestCase):
             stamp = datetime.fromisoformat(feed["at"].replace("Z", "+00:00"))
             self.assertLess(abs(time.time() - stamp.timestamp()), 60)
             with mock.patch.object(doctor, "PRIMARY_FLAG", Path(tmp) / "primary"), \
-                    mock.patch.object(doctor.lifecycle, "run", return_value=SimpleNamespace(returncode=0, stdout="", stderr="")):
+                    mock.patch.object(doctor.lifecycle, "run", _GistApiFake("abc123")):
                 (Path(tmp) / "primary").write_text("")
-                (Path(tmp) / "status-gist.json").write_text(json.dumps({"url": "https://gist.example/x", "id": "x"}))
+                (Path(tmp) / "status-gist.json").write_text(json.dumps({"url": "https://gist.example/abc123", "id": "abc123"}))
                 doctor.publish_status(host, SimpleNamespace(load_github_env=lambda: None), feed)
             published = json.loads((Path(tmp) / "lanes-status.json").read_text())
             self.assertEqual((published["schema"], published["at"]), ("symphony-lanes-status/v1", feed["at"]))
 
+
+
+class WorkerCensusParityTest(unittest.TestCase):
+    def fixture(self, stack, host, lane, issues, inventory=([], [])):
+        providers = {"codex": {"label": "codex", "slots": 1}}
+        client = mock.Mock()
+        client.lane_issues.return_value = issues
+        for name, value in {
+            "Linear": client, "load_providers": providers, "load_github_env": None,
+            "in_flight_issues": frozenset(),
+            "open_hotspot_holds": {"scripts/lanes/lane_runner.py": 21724},
+            "held_back_issues": frozenset({"JOV-HELD"}), "overlap_inventory": inventory,
+        }.items():
+            stack.enter_context(mock.patch.object(lane, name, return_value=value))
+        return {"codex": {"slots": 1, "base": 1, "running": 0}}
+
+    def test_four_target_cards_have_worker_census_parity_without_writing_admission(self):
+        from contextlib import ExitStack
+        lane = load("lane_runner")
+        issues, witnesses = [], {}
+        for number in (21824, 21810, 21793, 21770):
+            fingerprint = f"remediation:pr-{number}-conflict"
+            issues.append(lane.Issue(str(number), f"JOV-{number}",
+                f"PR #{number} has carried lane-fix-exhausted for more than 24h ({fingerprint})",
+                f"https://github.com/JovieInc/Jovie/pull/{number}\nFingerprint: `{fingerprint}`",
+                2, "2026-01-01T00:00:00Z", [fingerprint]))
+            witnesses[number] = {"schema": lane.pr_events.TARGET_FILES_SCHEMA, "source": "graphql-inline",
+                "repository": "JovieInc/Jovie", "number": number, "state": "OPEN", "headRefOid": "a"*40,
+                "baseRefName": "main", "baseRefOid": "b"*40, "baseTipOid": "c"*40,
+                "paths": [f"apps/web/lib/product-{number}.ts"], "totalCount": 1,
+                "observedAt": 9998, "sourceAt": 9999, "confirmedAt": 10000}
+        with tempfile.TemporaryDirectory() as tmp, ExitStack() as stack:
+            host = lane.Host(state=Path(tmp), linear_env=Path(tmp) / "none")
+            current = [{**row, "baseRef": {"target": {"oid": row["baseTipOid"]}},
+                        "files": [{"path": path} for path in row["paths"]], "filesComplete": True,
+                        "inlineFilesEvidence": row} for row in witnesses.values()]
+            capacity = self.fixture(stack, host, lane, issues, inventory=(current, []))
+            stack.enter_context(mock.patch.object(lane.pr_events, "capture_target_file_witnesses", return_value=witnesses))
+            record = stack.enter_context(mock.patch.object(doctor.file_overlap, "record_admission"))
+            clock = stack.enter_context(mock.patch.object(doctor.time, "time", return_value=10001))
+            for row in witnesses.values():
+                row["confirmedAt"] = 10001  # Capture finished after the original observation time.
+            qualified = doctor.qualified_pool(host, lane, capacity, 10000)[0]["codex"]
+            self.assertEqual(qualified, issues)
+            self.assertIn(lane.pick_issue(issues, {}, now=10001, provider="codex",
+                holds=lane.open_hotspot_holds(), target_files=witnesses), qualified)
+            self.assertEqual(doctor.qualified_pool(host, lane, capacity, 10061)[0]["codex"], [])
+            record.assert_not_called()
+            self.assertEqual(list(host.state.iterdir()), [])
+
+    def test_hotspot_and_preserved_only_pools_match_the_worker_and_keep_ready_neighbors(self):
+        from contextlib import ExitStack
+        lane = load("lane_runner")
+        issue = lambda key, path: lane.Issue(key, key, "Task", path, 1, "2026-01-01T00:00:00Z", [])
+        hot = issue("JOV-HOT", "scripts/lanes/lane_runner.py")
+        held = issue("JOV-HELD", "docs/preserved.md")
+        good = issue("JOV-GOOD", "docs/available.md")
+        with tempfile.TemporaryDirectory() as tmp, ExitStack() as stack:
+            host = lane.Host(state=Path(tmp), linear_env=Path(tmp) / "none")
+            capacity = self.fixture(stack, host, lane, [hot, held])
+            qualified, _, _, rejected, details = doctor.qualified_pool(host, lane, capacity, 10000)
+            self.assertEqual(qualified, {"codex": []})
+            self.assertEqual(rejected["codex"], {"hotspot-held": 1, "preserved-or-recovery-held": 1})
+            self.assertEqual(details["JOV-HOT"], "hotspot-held:scripts/lanes/lane_runner.py#21724")
+            lane.Linear.return_value.lane_issues.return_value = [hot, held, good]
+            qualified = doctor.qualified_pool(host, lane, capacity, 10000)[0]
+            picked = lane.pick_issue([hot, held, good], {}, now=10000, provider="codex",
+                                     holds=lane.open_hotspot_holds(), held_back=lane.held_back_issues(host))
+            self.assertEqual(qualified["codex"], [picked])
+            self.assertIs(picked, good)
+            self.assertEqual(list(host.state.iterdir()), [], "census cannot reserve or write telemetry")
+
+    def test_unavailable_file_ownership_is_unknown_and_blocked_preview_is_not_eligible(self):
+        from contextlib import ExitStack
+        lane = load("lane_runner")
+        issue = lane.Issue("id", "JOV-GOOD", "Task", "docs/available.md", 1, "2026-01-01T00:00:00Z", [])
+        with tempfile.TemporaryDirectory() as tmp, ExitStack() as stack:
+            host = lane.Host(state=Path(tmp), linear_env=Path(tmp) / "none")
+            capacity = self.fixture(stack, host, lane, [issue], inventory=None)
+            with self.assertRaisesRegex(RuntimeError, "file-overlap ownership unreadable"):
+                doctor.qualified_pool(host, lane, capacity, 10000)
+            lane.overlap_inventory.return_value = ([], [])
+            with mock.patch.object(doctor.file_overlap, "admission_policy", return_value={"allowed": False}), \
+                    mock.patch.object(doctor.file_overlap, "record_admission") as record:
+                qualified, _, _, rejected, _ = doctor.qualified_pool(host, lane, capacity, 10000)
+            self.assertEqual(qualified["codex"], [])
+            self.assertEqual(rejected["codex"], {"file-overlap-held": 1})
+            record.assert_not_called()
+
+    def test_preview_and_worker_use_identical_overlap_policy_but_only_worker_records(self):
+        overlap = doctor.file_overlap
+        issue = SimpleNamespace(identifier="JOV-GOOD")
+        with mock.patch.object(overlap, "guard_mode", return_value="flag"), \
+                mock.patch.object(overlap, "predict_issue_files", return_value={"files": ["x"], "source": "fixture"}), \
+                mock.patch.object(overlap, "classify_pair", return_value={"policyAction": "sequence"}), \
+                mock.patch.object(overlap, "record_admission") as record:
+            args = (issue, [{"number": 7, "files": ["x"]}], [], lambda _: {})
+            preview = overlap.admission_policy(*args)
+            record.assert_not_called()
+            self.assertEqual(overlap.admission_decisions("host", "lane", *args), preview)
+            record.assert_called_once_with("host", "lane", issue, preview["decisions"])
+
+
+class ProviderPayloadCensusTest(unittest.TestCase):
+    def process(self, proc, pid, name, cwd, args=None):
+        entry = proc / str(pid)
+        entry.mkdir(parents=True)
+        (entry / "comm").write_text(name)
+        (entry / "cmdline").write_bytes(b"\0".join(value.encode() for value in (args or ["/bin/" + name, "exec"])))
+        (entry / "cwd").symlink_to(cwd, target_is_directory=True)
+        (entry / "stat").write_text(str(pid) + " (" + name + ") " + " ".join(["S", "1"] + ["0"] * 17 + ["100", "0"]))
+        return entry
+
+    def test_native_payloads_are_separate_from_workers_and_unrelated_or_login_processes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp) / "state"
+            cwd = state / "worktrees/native-run"
+            cwd.mkdir(parents=True)
+            proc = Path(tmp) / "proc"
+            self.process(proc, 12, "codex", cwd)
+            self.process(proc, 13, "grok", cwd, ["/bin/grok", "--prompt-file", "prompt.md"])
+            self.process(proc, 14, "codex", cwd, ["/bin/codex", "login", "status"])
+            self.process(proc, 15, "codex", Path(tmp))
+            result = doctor.provider_payloads(state, ["codex", "grok", "devin"], proc)
+            self.assertEqual((result["codex"]["running"], result["codex"]["pids"]), (1, [12]))
+            self.assertEqual(result["grok"]["running"], 1)
+            self.assertIsNone(result["devin"]["running"])
+
+    def test_missing_probe_and_live_unreadable_identity_stay_unknown(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.assertIsNone(doctor.provider_payloads(root, ["codex"], root / "missing")["codex"]["running"])
+            cwd = root / "worktrees/run"
+            cwd.mkdir(parents=True)
+            proc = root / "proc"
+            entry = self.process(proc, 12, "codex", cwd)
+            (entry / "stat").unlink()
+            self.assertIsNone(doctor.provider_payloads(root, ["codex"], proc)["codex"]["running"])
+
+    def test_pid_reuse_is_unknown_instead_of_a_payload(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cwd = root / "worktrees/run"
+            cwd.mkdir(parents=True)
+            proc = root / "proc"
+            entry = self.process(proc, 12, "codex", cwd)
+            stat = (entry / "stat").read_text()
+            original = Path.read_text
+            calls = []
+            def read(path, *args, **kwargs):
+                if path == entry / "stat":
+                    calls.append(path)
+                    return stat if len(calls) == 1 else stat.replace("100", "101")
+                return original(path, *args, **kwargs)
+            with mock.patch.object(Path, "read_text", read):
+                result = doctor.provider_payloads(root, ["codex"], proc)
+            self.assertFalse(result["codex"]["known"])
+            self.assertIsNone(result["codex"]["running"])
+
+    def test_invalid_process_name_is_unknown_without_aborting_observation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cwd = root / "worktrees/run"
+            cwd.mkdir(parents=True)
+            proc = root / "proc"
+            entry = self.process(proc, 12, "codex", cwd)
+            (entry / "comm").write_bytes(b"\xff")
+            result = doctor.provider_payloads(root, ["codex", "grok"], proc)
+            self.assertIsNone(result["codex"]["running"])
+            self.assertIsNone(result["grok"]["running"])
+
+    def test_binding_payloads_share_the_host_census_but_unmanaged_neighbors_do_not(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            binding = root / "bindings/logyourbody/worktrees/run"
+            other = root / "bindings/logyourbody/unmanaged"
+            binding.mkdir(parents=True)
+            other.mkdir()
+            proc = root / "proc"
+            self.process(proc, 12, "codex", binding)
+            self.process(proc, 13, "grok", binding, ["/bin/grok", "--prompt-file", "prompt.md"])
+            self.process(proc, 14, "codex", other)
+            result = doctor.provider_payloads(root, ["codex", "grok"], proc)
+            self.assertEqual(result["codex"]["pids"], [12])
+            self.assertEqual(result["grok"]["pids"], [13])
+
+    def test_grok_models_is_health_even_inside_a_managed_worktree(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cwd = root / "worktrees/run"
+            cwd.mkdir(parents=True)
+            proc = root / "proc"
+            self.process(proc, 12, "grok", cwd, ["/bin/grok", "models"])
+            result = doctor.provider_payloads(root, ["grok"], proc)
+            self.assertEqual(result["grok"]["running"], 0)
 
 if __name__ == "__main__":
     unittest.main()

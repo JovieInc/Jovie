@@ -1,3 +1,4 @@
+import { cleanScrapedDisplayName } from '@/lib/profile/scraped-display-name';
 import {
   draftOutboundCopy,
   type OutboundApprovalState,
@@ -58,13 +59,7 @@ export function cleanOutboundName(
   displayName: string | null,
   handle: string
 ): string {
-  const raw = (displayName ?? '').trim();
-  const cleaned = raw
-    .replace(/\s+[-|–]\s+(listen on|official|instagram|tour dates).*$/i, '')
-    .replace(/\s+\|\s+.*$/, '')
-    .replace(/^@+/, '')
-    .trim();
-  return cleaned || handle;
+  return cleanScrapedDisplayName(displayName) ?? handle;
 }
 
 export function fitBand(score: number | null): OutboundBand {

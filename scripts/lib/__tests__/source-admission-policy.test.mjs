@@ -60,6 +60,20 @@ test('trusted source-read guards reject a deleted test on an old head and execut
       '#!/bin/sh\n[ "$PWD" = "$SOURCE_CHECKOUT" ] || exit 9\ncase "$*" in *node-environment-files.test.ts*) case "$(cat apps/web/tests/node-environment-files.json)" in *qa-gate.test.ts*) test -f apps/web/lib/merch/qa-gate.test.ts ;; *) exit 0 ;; esac ;; *) exit 0 ;; esac\n',
       { mode: 0o755 }
     );
+    // This fixture has no launch or profile inventory. Isolate those unrelated
+    // checker, as pnpm above isolates the other guards, while checking its cwd.
+    writeFileSync(
+      join(bin, 'node'),
+      `#!/bin/sh
+case "$*" in
+  scripts/artist-launch-contract.mjs*|*scripts/artist-launch-contract.test.mjs|*scripts/artist-profile-conformance.mjs*|*scripts/artist-profile-conformance.test.mjs)
+    [ "$PWD" = "$SOURCE_CHECKOUT" ] || exit 9
+    exit 0 ;;
+esac
+exec "$SOURCE_FIXTURE_NODE" "$@"
+`,
+      { mode: 0o755 }
+    );
     git('init', '--quiet', '--initial-branch=source-head');
     git('config', 'user.name', 'Source guard test');
     git('config', 'user.email', 'source-guard@example.invalid');
@@ -84,6 +98,7 @@ test('trusted source-read guards reject a deleted test on an old head and execut
           EXPECTED_HEAD: git('rev-parse', 'HEAD'),
           RUNNER_TEMP: runner,
           SOURCE_CHECKOUT: repo,
+          SOURCE_FIXTURE_NODE: process.execPath,
         },
       });
     const rejected = invoke();
@@ -1153,6 +1168,10 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
       );
   }
   const always = [
+    // The disk-read guards run on every edit and can launch Chromium, so
+    // their browser setup must run whenever they do (#21956, 2026-10-20).
+    'Setup Playwright (Chromium)',
+    'Validate disk-read source contracts from trusted base',
     'Validate customer changelog decision from trusted base',
     'Measure actual installed source dependency graph',
     'Preserve exact source dependency evidence',
@@ -1173,6 +1192,22 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
     ).if,
     gate
   );
+  // Every step that can launch Chromium runs after the browser setup and is
+  // never broader than it.
+  const names = deterministic.map(step => step.name);
+  const setup = names.indexOf('Setup Playwright (Chromium)');
+  for (const name of [
+    'Validate disk-read source contracts from trusted base',
+    'Run deterministic source contract',
+  ]) {
+    assert.ok(setup >= 0 && names.indexOf(name) > setup, name);
+    const step = deterministic[names.indexOf(name)];
+    assert.ok(
+      deterministic[setup].if === undefined ||
+        step.if === deterministic[setup].if,
+      `${name} can run without Playwright`
+    );
+  }
   assert.equal(
     workflow.jobs.ready.steps[0].run,
     'test "$RESULTS" = \'success,success,success,success\''

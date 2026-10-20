@@ -10,7 +10,6 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { QueryProvider } from '@/components/providers/QueryProvider';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
 import { track } from '@/lib/analytics';
@@ -39,8 +38,12 @@ const BillingDashboardContent = memo(function BillingDashboardContent() {
   const historyQuery = useBillingHistoryQuery();
   const cancelMutation = useCancelSubscriptionMutation();
 
-  const isLoading = billingQuery.isLoading || pricingQuery.isLoading;
-  const hasError = Boolean(billingQuery.error || pricingQuery.error);
+  // A failed sibling must not stay behind the other query's skeleton.
+  // Pricing 503s while billing status is still inside its deadline, and
+  // `isLoading` is true for the whole pair until both settle.
+  const hasError = billingQuery.isError || pricingQuery.isError;
+  const isLoading =
+    !hasError && (billingQuery.isLoading || pricingQuery.isLoading);
 
   useEffect(() => {
     if (hasError && !isLoading) {
@@ -116,10 +119,7 @@ const BillingDashboardContent = memo(function BillingDashboardContent() {
   return (
     <div className='space-y-8'>
       {billingInfo?.stale && (
-        <ContentSurfaceCard
-          className='flex items-start gap-2 border-[color-mix(in_oklab,var(--linear-warning)_32%,var(--app-shell-frame-seam))] bg-[color-mix(in_oklab,var(--linear-warning)_10%,var(--app-shell-content-surface))] px-4 py-3 text-app text-primary-token'
-          surface='nested'
-        >
+        <div className='flex items-start gap-2 rounded-lg border border-[color-mix(in_oklab,var(--linear-warning)_32%,var(--app-shell-frame-seam))] bg-[color-mix(in_oklab,var(--linear-warning)_10%,var(--app-shell-content-surface))] px-4 py-3 text-app text-primary-token shadow-none'>
           <AlertCircle
             className='mt-0.5 h-4 w-4 shrink-0 text-(--linear-warning)'
             aria-hidden='true'
@@ -128,7 +128,7 @@ const BillingDashboardContent = memo(function BillingDashboardContent() {
             {billingInfo.staleReason ??
               'Billing details are temporarily unavailable. Displaying your latest saved status.'}
           </p>
-        </ContentSurfaceCard>
+        </div>
       )}
 
       <BillingHeader plan={currentPlan} />

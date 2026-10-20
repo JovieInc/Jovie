@@ -56,7 +56,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
-      should_probe: ${{ steps.trigger.outputs.should_probe }}
+      # A rate-limited trigger read sets quota_deferred and must not dispatch
+      # probes or page production. Commit identity is resolved with git,
+      # outside that REST quota (JOV-8495).
+      should_probe: ${{ steps.trigger.outputs.should_probe == 'true' && steps.trigger.outputs.quota_deferred != 'true' }}
+      quota_deferred: ${{ steps.trigger.outputs.quota_deferred == 'true' }}
       deployment_id: ${{ steps.target.outputs.deployment_id }}
       deployment_url_b64: ${{ steps.target.outputs.deployment_url_b64 }}
       commit_sha: ${{ steps.target.outputs.commit_sha }}
@@ -87,6 +91,8 @@ jobs:
         run: |
           set -euo pipefail
           echo "should_probe=false" >> "$GITHUB_OUTPUT"
+          # shellcheck source=scripts/ci/gh-api-or-defer.sh
+          source scripts/ci/gh-api-or-defer.sh
 
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             echo "should_probe=true" >> "$GITHUB_OUTPUT"
@@ -111,8 +117,9 @@ jobs:
             exit 1
           }
 
-          controller_workflow_json="$(gh api \
-            "repos/$REPOSITORY/actions/workflows/production-controller.yml")"
+          read_github_json \
+            "repos/$REPOSITORY/actions/workflows/production-controller.yml" \
+            controller_workflow_json
           jq -e '
             type == "object" and
             (.id | type == "number" and . > 0) and
@@ -125,8 +132,9 @@ jobs:
           }
           controller_workflow_id="$(jq -r '.id' <<<"$controller_workflow_json")"
 
-          run_record="$(gh api \
-            "repos/$REPOSITORY/actions/runs/$TRIGGER_RUN_ID/attempts/$TRIGGER_RUN_ATTEMPT")"
+          read_github_json \
+            "repos/$REPOSITORY/actions/runs/$TRIGGER_RUN_ID/attempts/$TRIGGER_RUN_ATTEMPT" \
+            run_record
           jq -e \
             --arg repo "$REPOSITORY" \
             --arg sha "$TRIGGER_HEAD_SHA" \
@@ -150,8 +158,9 @@ jobs:
             exit 1
           }
 
-          jobs_json="$(gh api \
-            "repos/$REPOSITORY/actions/runs/$TRIGGER_RUN_ID/attempts/$TRIGGER_RUN_ATTEMPT/jobs?per_page=100")"
+          read_github_json \
+            "repos/$REPOSITORY/actions/runs/$TRIGGER_RUN_ID/attempts/$TRIGGER_RUN_ATTEMPT/jobs?per_page=100" \
+            jobs_json
           jq -e '
             type == "object" and
             (.total_count | type == "number") and
@@ -302,22 +311,37 @@ jobs:
             exit 1
           }
 
-          # Expand the deployed prefix inside this repository, then prove that
-          # exact commit is on main. GitHub rejects ambiguous or foreign SHAs.
-          commit_json="$(gh api "repos/$REPOSITORY/commits/$deployed_sha")"
-          commit_sha="$(jq -r '.sha // ""' <<<"$commit_json")"
+          # Resolve the deployed prefix and prove ancestry through git, outside
+          # the shared REST quota (JOV-8495). Fetch main into an isolated object
+          # store so a shallow checkout or stale local refs cannot supply proof.
+          # No checkout is needed; omit blobs to keep the history read small.
+          commit_history="$(mktemp -d)"
+          trap 'rm -rf "$commit_history"' EXIT
+          git init -q "$commit_history"
+          # Use the existing Actions token in Git's Basic x-access-token form.
+          # Keep the derived value out of argv and persisted Git configuration.
+          git_basic_auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+          echo "::add-mask::$git_basic_auth"
+          JOVIE_GIT_AUTH_HEADER="AUTHORIZATION: basic $git_basic_auth" \
+          GIT_TERMINAL_PROMPT=0 \
+            git -C "$commit_history" \
+              -c http.extraheader= \
+              -c "http.https://github.com/$REPOSITORY.git.extraheader=" \
+              --config-env="http.https://github.com/$REPOSITORY.git.extraheader=JOVIE_GIT_AUTH_HEADER" \
+              fetch --quiet --no-tags --filter=blob:none \
+              "https://github.com/$REPOSITORY.git" \
+              refs/heads/main:refs/remotes/origin/main
+          unset git_basic_auth
+          commit_sha="$(git -C "$commit_history" rev-parse --verify "$deployed_sha^{commit}")" || {
+            echo "::error::Deployed commit identity did not resolve uniquely in main history."
+            exit 1
+          }
           [[ "$commit_sha" =~ ^[0-9a-f]{40}$ ]] &&
             [[ "$commit_sha" == "$deployed_sha"* ]] || {
             echo "::error::Deployed commit identity did not resolve uniquely in this repository."
             exit 1
           }
-          comparison_json="$(gh api "repos/$REPOSITORY/compare/$commit_sha...main")"
-          jq -e --arg sha "$commit_sha" '
-            type == "object" and
-            (.status == "ahead" or .status == "identical") and
-            .base_commit.sha == $sha and
-            .merge_base_commit.sha == $sha
-          ' >/dev/null <<<"$comparison_json" || {
+          git -C "$commit_history" merge-base --is-ancestor "$commit_sha" refs/remotes/origin/main || {
             echo "::error::Canonical production commit is not an ancestor of main."
             exit 1
           }
@@ -586,7 +610,7 @@ jobs:
   remediation:
     name: File post-deploy probe remediation
     needs: [resolve-target, smoke, auth-smoke, lighthouse]
-    if: ${{ always() && (needs.resolve-target.result == 'failure' || needs.resolve-target.outputs.should_probe == 'true') }}
+    if: ${{ always() && (needs.resolve-target.result == 'failure' || needs.resolve-target.outputs.should_probe == 'true' || needs.resolve-target.outputs.quota_deferred == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
@@ -603,8 +627,8 @@ jobs:
           REMEDIATION_MODE: monitor
           REMEDIATION_FINGERPRINT: production-monitor-postdeploy-probes
           REMEDIATION_SOURCE: postdeploy-probes.yml
-          REMEDIATION_CONCLUSION: ${{ (needs.resolve-target.result == 'success' && needs.smoke.result == 'success' && needs.auth-smoke.result == 'success' && needs.lighthouse.result == 'success') && 'success' || 'failure' }}
-          REMEDIATION_DETAIL: resolve=${{ needs.resolve-target.result }} sha=${{ needs.resolve-target.outputs.commit_sha }} deployment=${{ needs.resolve-target.outputs.deployment_id }} smoke=${{ needs.smoke.result }} auth-smoke=${{ needs.auth-smoke.result }} lighthouse=${{ needs.lighthouse.result }}; landed-build evidence only, never release or freeze recovery proof (JOV-7195)
+          REMEDIATION_CONCLUSION: ${{ needs.resolve-target.outputs.quota_deferred == 'true' && 'quota-deferred' || ((needs.resolve-target.result == 'success' && needs.smoke.result == 'success' && needs.auth-smoke.result == 'success' && needs.lighthouse.result == 'success') && 'success' || 'failure') }}
+          REMEDIATION_DETAIL: quota-deferred=${{ needs.resolve-target.outputs.quota_deferred }} resolve=${{ needs.resolve-target.result }} sha=${{ needs.resolve-target.outputs.commit_sha }} deployment=${{ needs.resolve-target.outputs.deployment_id }} smoke=${{ needs.smoke.result }} auth-smoke=${{ needs.auth-smoke.result }} lighthouse=${{ needs.lighthouse.result }}; landed-build evidence only, never release or freeze recovery proof (JOV-7195)
           REMEDIATION_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: node scripts/remediation-signal-intake.mjs
 

@@ -32,6 +32,7 @@ const mergeTailwindClasses = extendTailwindMerge({
   extend: {
     classGroups: {
       z: [{ z: [...OVERLAY_Z_LAYERS] }],
+      transition: [{ transition: ['surface'] }],
       // `border-strong` is a theme border color. Without this group, tailwind-merge
       // keeps it beside the keycap's arbitrary border utility and the border flips.
       'border-color': [{ border: ['strong'] }],

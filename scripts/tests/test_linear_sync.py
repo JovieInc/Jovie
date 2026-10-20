@@ -163,6 +163,7 @@ class OutboxTest(Base):
         return {"issueUpdate": {"success": True, "issue": node(1, "In Progress", "2026-10-11T12:01:00.000Z")}}
 
     def test_entries_are_idempotent_and_a_newer_move_replaces_a_pending_one(self):
+        ls.claim(self.state, "id-1", "JOV-1", "codex")
         ls.enqueue(self.state, "move", "id-1", target="In Progress")
         ls.enqueue(self.state, "comment", "id-1", body="claimed")
         ls.enqueue(self.state, "comment", "id-1", body="claimed")
@@ -184,6 +185,7 @@ class OutboxTest(Base):
         self.assertEqual(ls.claim_status(self.state, "id-1"), "active")
 
     def test_budget_rate_limit_and_errors_keep_the_entry_without_failing_work(self):
+        ls.claim(self.state, "id-1", "JOV-1", "codex")
         ls.enqueue(self.state, "move", "id-1", target="In Progress")
         self.assertEqual(ls.flush(self.state, FakeLinear([]), lambda n: False, (Limited,))["outcome"], "budget-held")
         self.assertEqual(ls.flush(self.state, FakeLinear([Limited()]), lambda n: True, (Limited,))["outcome"], "rate-limited")
@@ -224,3 +226,121 @@ class OutboxTest(Base):
         report = ls.tick(self.state, linear, lambda n: True, (Limited,), teams=("JOV", "LYB"))
         self.assertEqual(report["JOV"]["outcome"], "error:RuntimeError")
         self.assertEqual(report["LYB"]["outcome"], "filled")
+
+
+import ownership  # noqa: E402  (sibling of linear_sync)
+from types import SimpleNamespace  # noqa: E402
+
+
+class StartedOwnershipTest(Base):
+    """Gem 2026-10-20: 536 started JOV issues, 144 active claims (median 5.6 days), 4 workers.
+    Every started issue needs a live owner; ownerless ones move through the outbox."""
+    NOW = 1_800_000_000.0
+
+    def git(self, subjects=()):
+        log = "".join(f"{subject}\n\n\x1e" for subject in subjects)
+        return lambda *a, **k: SimpleNamespace(returncode=0, stdout=log, stderr="")
+
+    def started(self, n, state="In Progress", days_idle=5, labels=("codex",)):
+        updated = time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime(self.NOW - days_idle * 86400))
+        ls.apply(self.state, "JOV", [node(n, state, updated, labels=labels, kind="started")])
+
+    def reconcile(self, open_prs=frozenset(), git=None, at=0.0, **kw):
+        return ownership.reconcile(self.state, self.state, open_prs, run=git or self.git(), now=self.NOW + at, **kw)
+
+    def moves(self):
+        return {e["issueId"]: e["target"] for e in ls._read(ls._outbox_path(self.state), ls.OUTBOX).get("entries", [])
+                if e["op"] == "move"}
+
+    def claim_at(self, n, claimed_at):
+        with mock.patch.object(ls.time, "time", return_value=claimed_at):
+            self.assertTrue(ls.claim(self.state, f"id-{n}", f"JOV-{n}", "codex"))
+
+    def test_owner_process_dies_then_the_issue_returns_to_the_pool(self):
+        self.started(1)
+        self.claim_at(1, self.NOW - 3600)
+        lease = ownership.acquire_run_lease(self.state, "id-1", "JOV-1", "codex")
+        self.assertIsNone(ownership.acquire_run_lease(self.state, "id-1", "JOV-1", "codex"))  # exclusive
+        report = self.reconcile()
+        self.assertEqual((report["owners"], report["ownerless"]), ({"run": 1}, 0))
+        lease.close()  # the worker died: the kernel released its lease
+        self.assertEqual(ownership.run_lease(self.state, "id-1"), "ended")
+        self.assertEqual(self.reconcile(at=1)["ownerless"], 1)
+        self.assertEqual(self.moves(), {}, "an owner may vanish for one grace period")
+        report = self.reconcile(at=ownership.GRACE_S + 1)
+        self.assertEqual(self.moves(), {"id-1": "Todo"})
+        self.assertEqual(ls.claim_status(self.state, "id-1"), "released")
+        self.assertIn("id-1", [row["id"] for row in ls.todo(self.state, "JOV")])  # dispatchable again
+        self.assertEqual(report["moved"][0]["reason"], "no-live-owner")
+
+    def test_merged_pr_hands_the_issue_to_the_merge_lifecycle(self):
+        # Done is the lifecycle's (receipts); lanes moves to Merging, its entry state.
+        self.started(2)
+        self.reconcile(git=self.git(["fix(web): thing (JOV-2) (#123)"]))
+        self.reconcile(git=self.git(["fix(web): thing (JOV-2) (#123)"]), at=ownership.GRACE_S + 1)
+        self.assertEqual(self.moves(), {"id-2": "Merging"})
+        ls.apply(self.state, "JOV", [node(2, "Merging", "2026-12-01T00:00:00.000Z", kind="started")])
+        report = self.reconcile(git=self.git(["fix(web): thing (JOV-2) (#123)"]), at=ownership.GRACE_S + 2)
+        self.assertEqual(report["owners"], {"lifecycle": 1})
+
+    def test_closed_pr_returns_the_issue(self):
+        self.started(3, "In Review")
+        self.assertEqual(self.reconcile(open_prs=frozenset({"JOV-3"}))["owners"], {"pr": 1})
+        self.reconcile(open_prs=frozenset())
+        self.reconcile(open_prs=frozenset(), at=ownership.GRACE_S + 1)
+        self.assertEqual(self.moves(), {"id-3": "Todo"})
+
+    def test_active_claim_without_a_live_lease_is_released(self):
+        ls.apply(self.state, "JOV", [node(4, "Todo")])
+        self.claim_at(4, self.NOW - ownership.LEGACY_RUN_GRACE_S - 1)  # a legacy claim, no lease file
+        self.claim_at(5, self.NOW - 60)                                # inside the claim grace
+        report = self.reconcile()
+        self.assertEqual(report["claimsReleased"], ["JOV-4"])
+        self.assertEqual(ls.claim_status(self.state, "id-4"), "released")
+        self.assertEqual(ls.claim_status(self.state, "id-5"), "active")
+        lease = ownership.acquire_run_lease(self.state, "id-5", "JOV-5", "codex")
+        lease.close()  # a run that ended: released without waiting for the legacy grace
+        self.assertEqual(self.reconcile(at=ownership.CLAIM_GRACE_S)["claimsReleased"], ["JOV-5"])
+
+    def test_a_started_state_without_an_owner_is_rejected(self):
+        with self.assertRaises(ls.StartedWithoutOwner):
+            ls.enqueue(self.state, "move", "id-6", target="In Progress")
+        with self.assertRaises(ls.StartedWithoutOwner):
+            ls.Outboxed(self.state, None).move("id-6", "Rework")
+        ls.enqueue(self.state, "move", "id-6", target="Todo")  # non-started needs no owner
+        ls.enqueue(self.state, "move", "id-6", target="Merging", owner="lifecycle:merged-on-main")
+        self.assertTrue(ls.claim(self.state, "id-7", "JOV-7", "codex"))
+        ls.enqueue(self.state, "move", "id-7", target="In Progress")  # the claim is its owner
+        import lane_runner
+        client = lane_runner.Linear.__new__(lane_runner.Linear)
+        client.gql = mock.Mock(side_effect=AssertionError("no write"))
+        with self.assertRaises(ls.StartedWithoutOwner):
+            client.move("id-8", "In Progress")
+
+    def test_rework_is_repair_demand_and_post_merge_states_are_never_guessed(self):
+        self.started(9, "Rework")
+        self.started(10, "Validating")
+        self.started(11, "Validating")
+        self.started(12, "In Progress", days_idle=0.5)                 # a session touched it today
+        self.started(13, "In Progress", labels=("hold",))
+        git = self.git(["feat: x (JOV-11)", "docs: mentions JOV-9 in passing (#5)"])
+        self.reconcile(git=git)
+        report = self.reconcile(git=git, at=ownership.GRACE_S + 1)
+        self.assertEqual(self.moves(), {"id-9": "Todo"})
+        self.assertEqual(report["unresolved"], {"post-merge-without-merged-evidence": 1})
+        self.assertEqual(report["owners"], {"lifecycle": 1, "recent-activity": 1, "hold": 1})
+
+    def test_unknown_evidence_never_moves_and_writes_are_budgeted(self):
+        for n in (20, 21, 22):
+            self.started(n)
+        unreadable = lambda *a, **k: SimpleNamespace(returncode=128, stdout="", stderr="fatal")
+        ownership.reconcile(self.state, self.state, None, run=self.git(), now=self.NOW)
+        report = ownership.reconcile(self.state, self.state, None, run=self.git(), now=self.NOW + 9999)
+        self.assertEqual((report["owners"], self.moves()), ({"unknown-pr-inventory": 3}, {}))
+        self.reconcile(git=unreadable)
+        report = self.reconcile(git=unreadable, at=ownership.GRACE_S + 1)
+        self.assertEqual((report["unresolved"], self.moves()), ({"merged-evidence-unreadable": 3}, {}))
+        report = self.reconcile(at=ownership.GRACE_S + 2, max_moves=2)
+        self.assertEqual((len(self.moves()), report["unresolved"]), (2, {"move-budget": 1}))
+        again = self.reconcile(at=ownership.GRACE_S + 3, max_moves=2)  # idempotent: pending moves count
+        self.assertEqual((len(self.moves()), again["started"], len(again["moved"])), (3, 1, 1))

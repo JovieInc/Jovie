@@ -176,9 +176,105 @@ class WorktreeTest(unittest.TestCase):
                 self.assertTrue(any("preserved busy" in a for a in report["actions"]))
 
 
+class CwdHolderTest(unittest.TestCase):
+    """Gem 2026-10-20: Docker overlay/nsfs lsof warnings made every lane-end cleanup
+    preserve its worktree, and reparented dev servers kept checkouts busy."""
+    OVERLAY = ("lsof: WARNING: can't stat() overlay file system /var/lib/docker/overlay2/abc/merged\n"
+               "      Output information may be incomplete.\n"
+               "lsof: WARNING: can't stat() nsfs file system /run/docker/netns/def\n"
+               "      Output information may be incomplete.\n")
+
+    def lsof(self, stdout="", stderr="", code=0):
+        return lambda args, **kw: SimpleNamespace(returncode=code, stdout=stdout, stderr=stderr)
+
+    def test_unrelated_mount_warnings_do_not_hide_idleness_or_activity(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp).resolve()
+            self.assertIsNone(guard.busy_reason(path, self.lsof(stderr=self.OVERLAY)))
+            self.assertEqual(guard.busy_reason(path, self.lsof(f"p42\nfcwd\nn{path}/apps/web\n", self.OVERLAY)),
+                             "process-still-running")
+
+    def test_other_or_enclosing_warnings_still_fail_closed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp).resolve()
+            for stderr in ("WARNING: cannot stat mount",
+                           f"lsof: WARNING: can't stat() overlay file system {path.parent}\n",
+                           "lsof: no pwd entry for UID 1000\n"):
+                with self.subTest(stderr=stderr):
+                    self.assertEqual(guard.busy_reason(path, self.lsof(stderr=stderr)), "process-state-unavailable")
+            self.assertEqual(guard.busy_reason(path, self.lsof(code=2)), "process-state-unavailable")
+
+    def test_reap_stops_only_processes_working_in_the_run_checkout(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp).resolve()
+            alive = {101, 102, 103}
+            listing = lambda: "".join(f"p{pid}\nfcwd\nn{path if pid != 103 else '/elsewhere'}\n"
+                                      for pid in sorted(alive))
+            kills = []
+            def kill(pid, sig):
+                kills.append((pid, sig))
+                if pid == 101 or sig == 9:
+                    alive.discard(pid)  # 101 honours SIGTERM; 102 needs SIGKILL
+            run = lambda args, **kw: SimpleNamespace(returncode=0, stdout=listing(), stderr="")
+            self.assertEqual(guard.reap_cwd_holders(path, run, kill, sleep=lambda s: None), [101, 102])
+            self.assertEqual(kills, [(101, 15), (102, 15), (102, 9)])
+            self.assertIn(103, alive)
+            self.assertIsNone(guard.busy_reason(path, run))
+            # An unreadable inventory reaps nothing.
+            self.assertEqual(guard.reap_cwd_holders(path, self.lsof(code=2), kill), [])
+
+
 class CheckTest(unittest.TestCase):
+    def setUp(self):
+        # These tests model disk pressure, not the operator's actual cleanup scope.
+        self.cleanup = tempfile.TemporaryDirectory()
+        self.addCleanup(self.cleanup.cleanup)
+        scratch = Path(self.cleanup.name)
+        derived = guard.sweep_derived_data
+        isolated = [
+            patch.object(guard, "runner_roots", return_value=[]),
+            patch.object(guard, "retired_workspace_roots", return_value=[]),
+            patch.object(guard, "log_dirs", side_effect=lambda host: [host.state / "runs"]),
+            patch.object(guard.worktree_pool, "shed", return_value=[]),
+            patch.object(guard.shutil, "which", return_value=None),
+            patch.object(guard, "sweep_derived_data",
+                         side_effect=lambda now, report: derived(now, report, root=scratch / "DerivedData")),
+        ]
+        for isolation in isolated:
+            isolation.start()
+            self.addCleanup(isolation.stop)
+
     def host(self, tmp):
         return SimpleNamespace(state=Path(tmp), repo=Path(tmp))
+
+    def test_low_disk_fixture_preserves_an_operator_workspace(self):
+        # A synthetic low-disk host must not inherit real cleanup roots. Reproduce
+        # the escaped sweep with a fake operator home, never the developer's HOME.
+        import worktree_sweep
+
+        with tempfile.TemporaryDirectory() as tmp:
+            scratch = Path(tmp)
+            home = scratch / "operator-home"
+            retained = make_tree(home / "symphony-elixir-workspaces/JOV-1",
+                                 [".git", "source.txt"], age_s=24 * 3600)
+            state = scratch / "state"
+            state.mkdir()
+
+            def run(args, **kwargs):
+                output = "origin\n" if "remote" in args else "0\n" if "rev-list" in args else ""
+                return SimpleNamespace(returncode=0, stdout=output, stderr="")
+
+            with patch.object(Path, "home", return_value=home), \
+                    patch.object(guard, "free_pct", return_value=10.0), \
+                    patch.object(guard, "RETIRED_WORKSPACE_ABSOLUTE", []), \
+                    patch.object(guard, "mount_points", return_value=set()), \
+                    patch.object(guard.git_housekeeping, "quiesce"), \
+                    patch.object(guard, "sweep_derived_data"), \
+                    patch.object(guard, "sweep_runner_work"), \
+                    patch.object(guard, "sweep_worktree_pool"), \
+                    patch.object(guard.shutil, "which", return_value=None):
+                guard.check(self.host(state), run=run, now=NOW, sweep=True)
+            self.assertEqual((retained / "source.txt").read_text(), "x")
 
     def test_healthy_disk_sweeps_nothing(self):
         saved = guard.free_pct

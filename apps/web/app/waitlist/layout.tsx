@@ -24,7 +24,9 @@ export default async function WaitlistLayout({
 }>) {
   return (
     <ResolvedClientProviders>
-      <main id='main-content'>{children}</main>
+      <main id='main-content' className='min-h-svh'>
+        {children}
+      </main>
     </ResolvedClientProviders>
   );
 }

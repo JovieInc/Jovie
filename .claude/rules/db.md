@@ -46,20 +46,45 @@ writes fail for about 1h40m, including LYB OAuth token exchange.
   `set_config(..., false)`, or `ALTER ROLE/DATABASE ... SET`.
 - `.claude/hooks/prod-db-session-guard.mjs` blocks these forms in agent Bash commands.
 
-### Transaction Restrictions (Canonical Policy)
+### Business Atomicity (Canonical Policy)
 
-- **NEVER** introduce new direct `db.transaction()` usage in app code without explicit human approval.
-- Existing transaction-based RLS/session helpers are legacy exceptions and must not be copied into new call-sites.
-- Transaction callbacks contain database work only. Authenticate first, then finish external I/O, retries, and image processing before opening the transaction; pass precomputed values into the database helper.
-- If you need transaction-scoped session state, use an approved wrapper or escalate before adding new transaction logic.
-- For atomicity, use Drizzle's batch operations: `db.insert().values([...items])`.
-- If you need true ACID transactions, document the requirement and discuss alternatives.
+- A business invariant spanning multiple statements must commit entirely or roll
+  back entirely. Sequential writes and one batch insert do not make the surrounding
+  operation atomic. Prefer a conditional statement or a constraint when sufficient.
+- Use `runAtomicDbOperation` from `@/lib/db/legacy-transaction`; this evolves the
+  audited rollback boundary. Direct app-level `db.transaction()` remains forbidden.
+- Resolve authentication/authorization first. Pass the trusted application user ID
+  as `actorId`; privileged `system: true` is only for already-authorized system work.
+  The wrapper pins local RLS and statement/lock/idle deadlines to `tx`.
+- Every protected helper must use the supplied `tx`. Global client access fails
+  closed inside certified callbacks, including indirect helpers and pooled queries
+  constructed before entry. Never pass a global client as a protected handle.
+- Callbacks contain awaited database work only: no authentication, external HTTP,
+  models, images, notification delivery, detached tasks, or nested retry loops.
+- Select `retry: 'never'` or `'serialization'` explicitly. Only SQLSTATE 40001/40P01
+  replay the whole operation, within the original deadline. Transport errors and
+  uncertain COMMIT results require durable-state reconciliation, never blind replay.
+  JOV-3775 owns pool acquisition/cancellation budgets; a JS timeout is not SQL cancellation.
+- Commit consequential state and existing durable intent/outbox together. Deliver
+  after commit using stable deduplication keys and provider idempotency/reconciliation;
+  do not promise exactly-once external delivery.
+- Certify every write boundary with failure injection on real Postgres. Preserve
+  ordinary single-statement and read-only paths. See [certification](../../docs/DB_ATOMIC_OPERATIONS.md).
+
+```typescript
+// actorId comes from authenticated server context; inputs are prepared already.
+await runAtomicDbOperation(async tx => {
+  await updateAccess(tx, input);
+  await enqueueExistingDurableIntent(tx, input);
+}, { actorId, retry: 'serialization' });
+// External delivery runs in the existing worker after commit.
+```
 
 ### Forbidden Database Patterns
 
 | Forbidden | Why | Alternative |
 |-----------|-----|-------------|
-| `db.transaction(async (tx) => ...)` | Requires explicit approval; use approved RLS wrappers | Sequential operations or batch insert |
+| Direct `db.transaction(async (tx) => ...)` | Bypasses certified atomicity contract | `runAtomicDbOperation` |
 | `import { Pool } from 'pg'` | Manual pooling conflicts with Neon | `import { db } from '@/lib/db'` |
 | `import pg from 'pg'` | Direct postgres driver | `import { db } from '@/lib/db'` |
 | `new Pool()` or `pool.connect()` | Manual connection management | `import { db } from '@/lib/db'` |

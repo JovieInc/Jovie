@@ -55,9 +55,9 @@ describe('createMarkdownDocument', () => {
       '- [x] Essential cookies',
       '- [ ] Marketing cookies',
     ].join('\n');
-    const doc = await createMarkdownDocument(md);
+    const doc = await createMarkdownDocument(md, { focusableTables: true });
 
-    expect(doc.html).toContain('<table>');
+    expect(doc.html).toContain('<table tabindex="0"');
     expect(doc.html).toContain('<th>Cookie Name</th>');
     expect(doc.html).toContain('<code>jv_cc</code>');
     expect(doc.html).toContain('class="contains-task-list"');
@@ -74,14 +74,45 @@ describe('createMarkdownDocument', () => {
       '- [x] <span onclick="alert(3)">Checked</span>',
       '- [ ] <script>alert("x")</script>Unchecked',
     ].join('\n');
-    const doc = await createMarkdownDocument(md);
+    const doc = await createMarkdownDocument(md, { focusableTables: true });
 
-    expect(doc.html).toContain('<table>');
+    expect(doc.html).toContain('<table tabindex="0"');
     expect(doc.html).toContain('Unsafe');
     expect(doc.html).toContain('Checked');
     expect(doc.html).toContain('Unchecked');
     expect(doc.html).not.toContain('<script');
     expect(doc.html).not.toContain('javascript:');
     expect(doc.html).not.toContain('onclick');
+  });
+  // Regression: readers render GFM tables as scrollable regions
+  // (overflow-x-auto) at narrow viewports; an unfocusable scrollable region
+  // fails axe's scrollable-region-focusable rule, so every table gets a
+  // sequential focus stop and an accessible name built from its header row.
+  it('makes GFM tables keyboard-focusable scrollable regions with accessible names', async () => {
+    const md = [
+      '| Cookie Name | Purpose | Duration |',
+      '| --- | --- | --- |',
+      '| `jovie_lead_attribution` | Stores claim-invite attribution | 30 days |',
+    ].join('\n');
+    const doc = await createMarkdownDocument(md, { focusableTables: true });
+
+    expect(doc.html).toContain(
+      '<table tabindex="0" aria-label="Table: Cookie Name, Purpose, Duration">'
+    );
+  });
+
+  it('falls back to a generic accessible name for headerless tables', async () => {
+    const md = ['|  |  |', '| --- | --- |', '| a | b |'].join('\n');
+    const doc = await createMarkdownDocument(md, { focusableTables: true });
+
+    expect(doc.html).toContain('<table tabindex="0" aria-label="Data table">');
+  });
+
+  it('keeps tables plain for readers whose tables never scroll', async () => {
+    const md = ['| A | B |', '| --- | --- |', '| 1 | 2 |'].join('\n');
+    const doc = await createMarkdownDocument(md);
+
+    expect(doc.html).toContain('<table>');
+    expect(doc.html).not.toContain('tabindex');
   });
 });

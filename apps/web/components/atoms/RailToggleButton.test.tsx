@@ -4,13 +4,47 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@jovie/ui', async importOriginal => ({
   ...(await importOriginal<typeof import('@jovie/ui')>()),
-  TooltipShortcut: ({ children }: { readonly children: React.ReactNode }) =>
+  TooltipShortcut: ({
     children,
+    side,
+  }: {
+    readonly children: React.ReactNode;
+    readonly side: string;
+  }) => <span data-tooltip-side={side}>{children}</span>,
 }));
 
 import { RailToggleButton } from './RailToggleButton';
 
 describe('RailToggleButton', () => {
+  it('keeps manual disclosure keyboard reachable through explicit pinning', async () => {
+    const onToggle = vi.fn();
+    const user = userEvent.setup();
+    const props = {
+      side: 'right' as const,
+      previewTrigger: false,
+      controlsId: 'profile-rail',
+      openLabel: 'Hide profile',
+      closedLabel: 'Show profile',
+      onToggle,
+    };
+    const { rerender } = render(<RailToggleButton {...props} open={false} />);
+    const button = screen.getByRole('button', { name: 'Show profile' });
+    expect(button).toHaveAttribute('data-rail-preview-trigger', 'false');
+    expect(button).toHaveAttribute('aria-controls', 'profile-rail');
+    await user.tab();
+    await user.hover(button);
+    expect(button).toHaveFocus();
+    expect(button).toHaveAttribute('aria-expanded', 'false');
+    expect(onToggle).not.toHaveBeenCalled();
+    await user.keyboard(' ');
+    expect(onToggle).toHaveBeenCalledOnce();
+    rerender(<RailToggleButton {...props} open pinned />);
+    expect(button).toHaveFocus();
+    expect(button).toHaveAccessibleName('Hide profile');
+    expect(button).toHaveAttribute('aria-expanded', 'true');
+    expect(button).toHaveAttribute('aria-pressed', 'true');
+  });
+
   it('uses one static chrome contract for a left rail', async () => {
     const onToggle = vi.fn();
     const user = userEvent.setup();
@@ -29,6 +63,7 @@ describe('RailToggleButton', () => {
 
     const button = screen.getByTestId('left-toggle');
     expect(button).toHaveAttribute('data-rail-toggle', 'left');
+    expect(button.parentElement).toHaveAttribute('data-tooltip-side', 'right');
     expect(button).toHaveClass(
       'h-7',
       'w-7',

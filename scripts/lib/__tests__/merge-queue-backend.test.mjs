@@ -29,6 +29,7 @@ import {
   preflightMergeQueue,
   proveCanonicalMembership,
   proveExactHeadQueueReceipt,
+  reconcileDraftQueueEntry,
   resolveMergeQueueBackend,
   runCli,
   SELECTOR_BLOCKING_LABELS,
@@ -2518,6 +2519,62 @@ describe('native enrollment', () => {
 });
 
 describe('native dequeue', () => {
+  const draftEvent = overrides => ({
+    action: 'converted_to_draft', repository: { full_name: REPOSITORY },
+    pull_request: { number: 14359, draft: true, head: { sha: HEAD, repo: { full_name: REPOSITORY } } },
+    ...overrides,
+  });
+
+  it.each([
+    undefined,
+    draftEvent({ action: 'ready_for_review' }),
+    draftEvent({ repository: { full_name: 'other/repo' } }),
+    draftEvent({ pull_request: { number: 14359, draft: true, head: { sha: HEAD, repo: { full_name: 'fork/repo' } } } }),
+    draftEvent({ pull_request: { number: 14359, draft: false } }),
+  ])('ignores callbacks without exact same-repo draft authority', async event => {
+    const runner = vi.fn();
+    await expect(reconcileDraftQueueEntry({ event, repository: REPOSITORY, runner }))
+      .resolves.toMatchObject({ skipped: true, reason: 'not-draft-event' });
+    expect(runner).not.toHaveBeenCalled();
+  });
+
+  it('a stale conversion cannot dequeue a replacement head', async () => {
+    const runner = createNativeRunner({ states: [prState({ headRefOid: OTHER_HEAD, isInMergeQueue: true, mergeQueueEntry: QUEUE_ENTRY })] });
+    await expect(reconcileDraftQueueEntry({ ...nativeOptions(runner), event: draftEvent() }))
+      .resolves.toMatchObject({ changed: false, skipped: true, reason: 'head-changed' });
+    expect(invokedNativeMutation(runner)).toBe(false);
+  });
+
+  it('draft cleanup requires a head and cannot disable newly ready auto-merge', async () => {
+    await expect(dequeuePullRequest({ ...nativeOptions(vi.fn()), requireDraft: true }))
+      .rejects.toMatchObject({ code: 'expected_head_required' });
+    const queued = prState({ isDraft: true, isInMergeQueue: true, mergeQueueEntry: QUEUE_ENTRY });
+    const runner = createNativeRunner({ states: [queued, queued, prState({ isDraft: false, autoMergeRequest: AUTO_MERGE })] });
+    await expect(reconcileDraftQueueEntry({ ...nativeOptions(runner), event: draftEvent() }))
+      .rejects.toMatchObject({ code: 'dequeue_draft_raced' });
+    expect(runner.mock.calls.some(([args]) => queryText(args).includes('disablePullRequestAutoMerge'))).toBe(false);
+  });
+  it.each([
+    ['already ready', [prState({ isDraft: false, isInMergeQueue: true, mergeQueueEntry: QUEUE_ENTRY })]],
+    ['ready during revalidation', [
+      prState({ isDraft: true, isInMergeQueue: true, mergeQueueEntry: QUEUE_ENTRY }),
+      prState({ isDraft: false, isInMergeQueue: true, mergeQueueEntry: QUEUE_ENTRY }),
+    ]],
+  ])('draft cleanup preserves a qualified head that is %s', async (_name, states) => {
+    const runner = createNativeRunner({ states });
+    await expect(dequeuePullRequest({ ...nativeOptions(runner), expectedHeadOid: HEAD, requireDraft: true }))
+      .resolves.toMatchObject({ changed: false, skipped: true, reason: 'not-open-draft' });
+    expect(invokedNativeMutation(runner)).toBe(false);
+  });
+
+  it('removes a stale draft queue entry without changing author readiness', async () => {
+    const queued = prState({ isDraft: true, isInMergeQueue: true, mergeQueueEntry: QUEUE_ENTRY });
+    const runner = createNativeRunner({ states: [queued, queued, prState({ isDraft: true })] });
+    await expect(dequeuePullRequest({ ...nativeOptions(runner), expectedHeadOid: HEAD, requireDraft: true }))
+      .resolves.toMatchObject({ changed: true, guardedQueueEntry: { id: ENTRY_ID }, state: { isDraft: true, headRefOid: HEAD, mergeQueueEntry: null } });
+    expect(runner.mock.calls.filter(([args]) => queryText(args).includes('dequeuePullRequest'))).toHaveLength(1);
+  });
+
   it('rejects guarded CLI dequeue without the sole-writer authorization', async () => {
     const runner = vi.fn();
 

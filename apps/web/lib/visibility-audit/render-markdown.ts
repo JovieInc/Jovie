@@ -155,7 +155,7 @@ export function renderVisibilityAuditMarkdown(
 
   lines.push('## Prioritized fixes', '');
   lines.push(
-    'Agentic fixes map to Pro submissions (MusicBrainz, AllMusic) and DSP bio sync. MusicBrainz authenticated edits stay mapped and not preparable.',
+    'Each fix lists its provider or manual action. MusicBrainz authenticated edits stay mapped and not preparable.',
     ''
   );
   for (const fix of report.fixes) {

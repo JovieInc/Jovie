@@ -216,6 +216,21 @@ describe('/api/analytics/navigation', () => {
     expect(mockCaptureError).not.toHaveBeenCalled();
   });
 
+  it('discards an unavailable store during E2E instead of failing the page console', async () => {
+    vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
+    mockGetCachedAuth.mockResolvedValue({ userId: 'discarded-auth-id' });
+    mockRecord.mockRejectedValue(
+      new NavigationTelemetryStoreUnavailableError()
+    );
+
+    try {
+      expect((await POST(post(VALID_PAYLOAD))).status).toBe(204);
+      expect(mockCaptureError).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('fails closed without error capture when the keyed privacy state is unavailable', async () => {
     mockGetCachedAuth.mockResolvedValue({ userId: 'discarded-auth-id' });
     mockRecord.mockRejectedValue(

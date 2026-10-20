@@ -86,9 +86,13 @@ jobs:
           retention-days: 14
       # component-ship-gate's live-storybook-cert launches Chromium when the
       # diff touches in-scope UI components; without browsers the gate fails
-      # closed before any story is measured.
+      # closed before any story is measured. The disk-read source contracts
+      # below also run on a metadata-only edit, and their script-contracts
+      # guard selects every PR and can run Chromium tests
+      # (component-rendered-evaluator). Gating this step on reuse failed those
+      # edits with "Executable doesn't exist" (#21956, #21946, #21774, #21725),
+      # so it carries the same (absent) condition as that step.
       - name: Setup Playwright (Chromium)
-        if: steps.reuse.outputs.reuse != 'true'
         uses: ./.github/actions/setup-playwright
       - name: Validate customer changelog decision from trusted base
         shell: bash
@@ -143,6 +147,22 @@ jobs:
           trap 'rm -rf "$guard_root"' EXIT
           git archive "$trusted_ref" scripts/agent-context | tar -x -C "$guard_root"
           node "$guard_root/scripts/agent-context/merge-budget.mjs" --base "$trusted_ref" --head "$EXPECTED_HEAD"
+      # CI Risk Classifier runs these only on merge_group (ci.yml has no
+      # pull_request trigger). #21997 was green here and red in the queue:
+      # check.test.mjs design extraction. The suite is about a second and
+      # dependency-free, so it runs on every pull_request instead of a path
+      # filter that can miss a file the test reads. This job already checked
+      # out the full tree and installed Node; a sparse list omitted an import
+      # before (ERR_MODULE_NOT_FOUND) and a second pnpm install spends the
+      # installation quota. The merge-group step stays unconditional.
+      - name: Evaluate repository instruction contracts
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          node --run agent-context:check
+          node --run agent-context:test
       - name: Validate UI interaction source from trusted base
         shell: bash
         env:
@@ -194,6 +214,8 @@ jobs:
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
           git fetch --no-tags origin "${{ github.base_ref }}"
           node scripts/verify-workflow-references.mjs
+          node scripts/workflow-token-scope.mjs
+          node --test scripts/workflow-token-scope.test.mjs
           node scripts/lockfile-specifier-preflight.mjs
           node scripts/ci-release-incident-contract.mjs
           pnpm ci:harness:check

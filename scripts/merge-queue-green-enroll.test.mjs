@@ -24,10 +24,11 @@ const run = new AsyncFunction(
 );
 const sha = 'a'.repeat(40);
 const mainSha = 'c'.repeat(40);
-test('both native queue mutation clients request repository contents write', () => {
+test('all native queue mutation clients request repository contents write', () => {
   for (const job of [
     workflow.jobs['hold-failed-revision'],
     workflow.jobs.enroll,
+    workflow.jobs['rearm-green-victims'],
   ]) {
     const token = job.steps.find(step => step.id === 'app-token');
     assert.equal(token.with['permission-contents'], 'write');
@@ -754,6 +755,42 @@ test('a queue-breaker restore is fenced against revocation and a new hold', asyn
   assert.deepEqual(held.labelRemovals, []);
 });
 
+test('does not remove lane-fix-red and does not enroll while the label remains', async () => {
+  for (const mergeStateStatus of [
+    'CLEAN',
+    'HAS_HOOKS',
+    'UNSTABLE',
+    'BLOCKED',
+  ]) {
+    const result = await fixture({
+      roster: [{ ...candidate(1), labels: [{ name: 'lane-fix-red' }] }],
+      readCurrentSnapshot: () => ({
+        ...current(1),
+        mergeStateStatus,
+        labels: {
+          pageInfo: { hasNextPage: false },
+          nodes: [{ name: 'lane-fix-red' }],
+        },
+      }),
+    });
+    assert.deepEqual(result.labelRemovals, [], mergeStateStatus);
+    assert.deepEqual(result.mutations, [], mergeStateStatus);
+  }
+});
+
+test('enrolls a required-green head once lane-fix-red is gone', async () => {
+  const result = await fixture({
+    roster: [{ ...candidate(1), labels: [] }],
+    readCurrentSnapshot: () => ({
+      ...current(1),
+      mergeStateStatus: 'CLEAN',
+      labels: { pageInfo: { hasNextPage: false }, nodes: [] },
+    }),
+  });
+  assert.deepEqual(result.labelRemovals, []);
+  assert.deepEqual(result.mutations, [{ id: 'PR_1', oid: sha }]);
+});
+
 test('a hold released after a manual dequeue re-enrolls the same head; check failures never do', async () => {
   const removal = reason => ({
     timelineItems: { nodes: [{ createdAt: '2026-10-02T13:00:00Z', reason }] },
@@ -770,8 +807,14 @@ test('a hold released after a manual dequeue re-enrolls the same head; check fai
     1
   );
   assert.equal(await enqueued(removal('manual')), 0);
+  // lane-fix-red is a machine block, so removing it after a manual dequeue
+  // is an explicit release of that same head.
   assert.equal(
     await enqueued({ ...removal('manual'), ...release('lane-fix-red') }),
+    1
+  );
+  assert.equal(
+    await enqueued({ ...removal('FAILED_CHECKS'), ...release('lane-fix-red') }),
     0
   );
   assert.equal(
@@ -884,6 +927,7 @@ test('a blocking label on a queued PR dequeues only that PR', () => {
     'incident',
     'do-not-merge',
     'queue-poison',
+    'lane-fix-red',
   ]) {
     assert.ok(job.if.includes(`"${label}"`), label);
   }
@@ -906,6 +950,7 @@ test('wakes on completed Source Validation and on the push-to-main reconciliatio
   assert.ok(workflow.on.workflow_run.workflows.includes('Source Validation'));
   assert.deepEqual(workflow.on.workflow_run.types, ['completed']);
   assert.deepEqual(workflow.on.pull_request_target.types, [
+    'converted_to_draft',
     'labeled',
     'unlabeled',
     'reopened',
@@ -929,6 +974,31 @@ test('wakes on completed Source Validation and on the push-to-main reconciliatio
   );
   assert.ok(ready.on.workflow_run.workflows.includes('Source Validation'));
   assert.match(ready.jobs['green-source'].if, /source-validation\.yml/);
+});
+
+test('draft cleanup stays with the admission owner and trusted exact-head backend', () => {
+  const job = workflow.jobs['dequeue-draft'];
+  assert.match(job.if, /converted_to_draft/);
+  assert.doesNotMatch(job.if, /QUEUE_FREEZE/);
+  const checkout = job.steps.find(step =>
+    step.uses?.startsWith('actions/checkout@')
+  );
+  assert.equal(
+    checkout.with.ref,
+    '${{ github.event.repository.default_branch }}'
+  );
+  const cleanup = job.steps.find(step =>
+    step.run?.includes('reconcileDraftQueueEntry')
+  );
+  assert.equal(cleanup.env.GH_TOKEN, '${{ steps.app-token.outputs.token }}');
+  assert.match(cleanup.run, /GITHUB_EVENT_PATH/);
+  assert.doesNotMatch(
+    cleanup.run,
+    /enqueuePullRequest|pr ready|enablePullRequestAutoMerge/
+  );
+  const token = job.steps.find(step => step.id === 'app-token');
+  assert.equal(token.with['permission-pull-requests'], 'write');
+  assert.equal(token.with['permission-merge-queues'], undefined);
 });
 
 const retryFailure = {
@@ -1161,7 +1231,7 @@ test('PR-target workflow receipts resolve only an exact same-repo source associa
     },
   });
   assert.equal(result.inventories.length, 1);
-  assert.deepEqual(result.gets, [7]);
+  assert.deepEqual(result.gets, []);
   assert.deepEqual(result.reads, [7]);
   assert.equal(result.mutations.length, 1);
 });
@@ -1219,9 +1289,38 @@ test('paginated commit associations enqueue each exact open main PR once', async
     },
   });
   assert.equal(result.inventories.length, 1);
-  assert.deepEqual(result.gets, [7, 8]);
+  assert.deepEqual(result.gets, []);
   assert.deepEqual(result.reads, [7, 8]);
   assert.equal(result.mutations.length, 2);
+});
+
+test('a green wake that already carries the head skips pulls.get', async () => {
+  const result = await fixture({
+    eventName: 'workflow_run',
+    payload: {
+      workflow_run: {
+        event: 'pull_request',
+        head_sha: sha,
+        pull_requests: [{ number: 7 }],
+      },
+    },
+  });
+  assert.deepEqual(result.gets, []);
+  assert.deepEqual(result.reads, [7]);
+  assert.equal(result.mutations.length, 1);
+  const mismatch = await fixture({
+    eventName: 'workflow_run',
+    payload: {
+      workflow_run: {
+        event: 'pull_request',
+        head_sha: 'b'.repeat(40),
+        pull_requests: [{ number: 7 }],
+      },
+    },
+  });
+  assert.deepEqual(mismatch.gets, []);
+  assert.deepEqual(mismatch.reads, [7]);
+  assert.deepEqual(mismatch.mutations, []);
 });
 
 test('duplicated automatic PR associations do not multiply live reads or enqueue mutations', async () => {
@@ -1238,42 +1337,62 @@ test('duplicated automatic PR associations do not multiply live reads or enqueue
   assert.equal(result.mutations.length, 1);
 });
 
-// GitHub keeps only one pending run per concurrency group, even when
-// cancel-in-progress is false. Evaluate the actual YAML expression so a
-// repository-wide group cannot silently replace another PR's final wake.
+// GitHub keeps only one pending run per concurrency group. Evaluate the
+// actual YAML expression so a repository-wide group cannot silently replace
+// another PR's final wake.
+function formatExpression(template, ...args) {
+  return template.replace(/\{(\d+)\}/g, (_whole, index) =>
+    String(args[Number(index)] ?? '')
+  );
+}
+
+function evalWorkflowExpr(expression, github) {
+  const js = expression
+    .replaceAll(
+      'github.event.pull_request.number',
+      'github.event.pull_request?.number'
+    )
+    .replaceAll(
+      'github.event.workflow_run.pull_requests[0].number',
+      'github.event.workflow_run?.pull_requests?.[0]?.number'
+    )
+    .replaceAll(
+      'github.event.workflow_run.head_sha',
+      'github.event.workflow_run?.head_sha'
+    )
+    .replaceAll(
+      'github.event.workflow_run.name',
+      'github.event.workflow_run?.name'
+    )
+    .replaceAll('github.event.workflow_run.id', 'github.event.workflow_run?.id')
+    .replaceAll(
+      'github.event.workflow_run.conclusion',
+      'github.event.workflow_run?.conclusion'
+    )
+    .replaceAll(
+      'github.event.workflow_run.event',
+      'github.event.workflow_run?.event'
+    );
+  return new Function('github', 'inputs', 'format', `return (${js});`)(
+    github,
+    github.inputs ?? {},
+    formatExpression
+  );
+}
+
 function concurrencyGroup(github) {
   const group = workflow.concurrency.group;
-  return group.replace(/\$\{\{([\s\S]*?)\}\}/g, (_whole, expression) => {
-    const js = expression
-      .replaceAll(
-        'github.event.pull_request.number',
-        'github.event.pull_request?.number'
-      )
-      .replaceAll(
-        'github.event.workflow_run.pull_requests[0].number',
-        'github.event.workflow_run?.pull_requests?.[0]?.number'
-      )
-      .replaceAll(
-        'github.event.workflow_run.head_sha',
-        'github.event.workflow_run?.head_sha'
-      )
-      .replaceAll(
-        'github.event.workflow_run.name',
-        'github.event.workflow_run?.name'
-      )
-      .replaceAll(
-        'github.event.workflow_run.id',
-        'github.event.workflow_run?.id'
-      )
-      .replace(
-        /format\('\{0\}-\{1\}',\s*([^,]+?),\s*([^)]+?)\)/g,
-        '`${$1}-${$2}`'
-      );
-    return new Function('github', 'inputs', `return (${js});`)(
-      github,
-      github.inputs ?? {}
-    );
-  });
+  return group.replace(/\$\{\{([\s\S]*?)\}\}/g, (_whole, expression) =>
+    evalWorkflowExpr(expression, github)
+  );
+}
+
+function cancelInProgress(github) {
+  const value = workflow.concurrency['cancel-in-progress'];
+  if (typeof value !== 'string') return value;
+  const match = value.match(/^\$\{\{([\s\S]*)\}\}$/);
+  if (!match) return value;
+  return evalWorkflowExpr(match[1].trim(), github);
 }
 
 const wake = (number, id) => ({
@@ -1319,7 +1438,8 @@ test('same-PR wakes coalesce while unattributed receipts and manual reconciliati
     run_id: 1,
   };
   assert.equal(concurrencyGroup(label), concurrencyGroup(wake(7, 101)));
-  assert.equal(workflow.concurrency['cancel-in-progress'], false);
+  assert.equal(cancelInProgress(label), false);
+  assert.equal(cancelInProgress(wake(7, 101)), false);
   assert.equal(workflow.jobs.enroll['timeout-minutes'], 5);
   const sameHead = (id, name) => ({
     event_name: 'workflow_run',
@@ -1340,6 +1460,58 @@ test('same-PR wakes coalesce while unattributed receipts and manual reconciliati
   assert.notEqual(
     concurrencyGroup(sameHead(101, 'CI')),
     concurrencyGroup(sameHead(102, 'PR Size Guard'))
+  );
+  const green = (id, name, number) => ({
+    event_name: 'workflow_run',
+    event: {
+      workflow_run: {
+        id,
+        name,
+        conclusion: 'success',
+        event: 'pull_request',
+        head_sha: 'a'.repeat(40),
+        pull_requests: number ? [{ number }] : [],
+      },
+    },
+    run_id: id + 1000,
+  });
+  assert.equal(
+    concurrencyGroup(green(101, 'CI', 7)),
+    concurrencyGroup(green(102, 'PR Size Guard', 7))
+  );
+  assert.equal(
+    concurrencyGroup(green(101, 'CI')),
+    concurrencyGroup(green(102, 'Fork PR Gate'))
+  );
+  assert.notEqual(
+    concurrencyGroup(green(101, 'CI', 7)),
+    concurrencyGroup(label)
+  );
+  assert.notEqual(
+    concurrencyGroup(green(101, 'CI', 7)),
+    concurrencyGroup(green(102, 'CI', 8))
+  );
+  assert.equal(cancelInProgress(green(101, 'CI', 7)), true);
+  assert.equal(cancelInProgress(green(101, 'CI')), true);
+  const mergeGroup = conclusion => ({
+    event_name: 'workflow_run',
+    event: {
+      workflow_run: {
+        id: 50,
+        name: 'CI',
+        conclusion,
+        event: 'merge_group',
+        head_sha: 'b'.repeat(40),
+        pull_requests: [],
+      },
+    },
+    run_id: 9,
+  });
+  assert.equal(cancelInProgress(mergeGroup('failure')), false);
+  assert.equal(cancelInProgress(mergeGroup('success')), false);
+  assert.notEqual(
+    concurrencyGroup(green(101, 'CI', 7)),
+    concurrencyGroup(mergeGroup('failure'))
   );
 });
 
@@ -1570,6 +1742,7 @@ for (const label of [
   'incident',
   'do-not-merge',
   'queue-poison',
+  'lane-fix-red',
 ]) {
   test(`dequeues the unchanged queued head while ${label} is still present`, async () => {
     const result = await dequeueFixture({
@@ -1804,4 +1977,130 @@ test('QUEUE_FREEZE gates every job that can enqueue or arm, and nothing else', (
     'merge-queue-green-enroll.yml#enroll',
     'merge-queue-green-enroll.yml#rearm-green-victims',
   ]);
+});
+
+// JOV-6620 replay of #22280 (2026-10-20): the merge group failed at the source
+// head (run 39455689721, retryable-product: UnifiedTable rendered 10,000 rows).
+// The old one-retry allowance re-enqueued that head on the next push sweep
+// (run 39458246113) after Tim had dequeued it, and jovie-bot then lifted the
+// queue-poison label he added. A failed head waits for a new head or a person.
+const failedHoldStatus = classification => ({
+  context: 'jovie-queue-failure-hold/v1',
+  state: 'success',
+  creator: { type: 'Bot', login: 'jovie-bot[bot]' },
+  description: `class=${classification};n=1;run=39455689721;try=1`,
+  target_url: 'https://github.com/JovieInc/Jovie/actions/runs/39455689721',
+});
+const ejected = (actor = undefined, reason = 'failed_checks') => ({
+  1: {
+    commits: { nodes: [{ commit: { committedDate: '2026-10-20T11:18:16Z' } }] },
+    timelineItems: {
+      nodes: [{ createdAt: '2026-10-20T16:27:33Z', reason, actor }],
+    },
+  },
+});
+const unlabeledBy = (sender, label = 'queue-poison') => ({
+  action: 'unlabeled',
+  label: { name: label },
+  sender,
+  pull_request: {
+    number: 1,
+    state: 'open',
+    draft: false,
+    head: { sha },
+    updated_at: '2026-10-20T16:39:08Z',
+  },
+});
+
+test('a merge-group failure at a head blocks every automatic re-enrollment of that head (#22280)', async () => {
+  const statuses = [failedHoldStatus('retryable-product')];
+  for (const run of [
+    { eventName: 'push' },
+    { eventName: 'workflow_dispatch' },
+    // jovie-bot (lanes) lifting queue-poison is not a release.
+    {
+      eventName: 'pull_request_target',
+      payload: unlabeledBy({ login: 'jovie-bot[bot]', type: 'Bot' }),
+    },
+  ]) {
+    const result = await fixture({ statuses, overrides: ejected(), ...run });
+    assert.deepEqual(result.mutations, [], run.eventName);
+    assert.deepEqual(result.statusWrites, [], run.eventName);
+  }
+  // The failure-hold job's own receipt blocks the same head immediately.
+  const direct = await fixture({
+    eventName: 'workflow_dispatch',
+    overrides: ejected(),
+    failureReceipt: JSON.stringify({
+      schema: 'jovie-merge-group-failure-hold/v1',
+      repository: 'JovieInc/Jovie',
+      prNumber: 1,
+      sourceHeadSha: sha,
+      classification: 'retryable-product',
+      failureNumber: 1,
+      workflowRunId: 39455689721,
+      workflowRunAttempt: 1,
+      retryDisposition: 'blocked-until-new-source-head',
+    }),
+  });
+  assert.deepEqual(direct.mutations, []);
+});
+
+test('a person removing queue-poison or hold releases the failed head exactly once (#22280)', async () => {
+  const statuses = [failedHoldStatus('retryable-product')];
+  for (const label of ['queue-poison', 'hold']) {
+    const released = await fixture({
+      statuses,
+      overrides: ejected(
+        { __typename: 'User', login: 'itstimwhite' },
+        'manual'
+      ),
+      eventName: 'pull_request_target',
+      payload: unlabeledBy({ login: 'itstimwhite', type: 'User' }, label),
+    });
+    assert.deepEqual(released.mutations, [{ id: 'PR_1', oid: sha }], label);
+    assert.deepEqual(
+      released.statusWrites.map(status => status.description),
+      ['spent:run=39455689721;try=1'],
+      label
+    );
+  }
+  // A release names its exact head; a moved head is a new revision instead.
+  const stale = await fixture({
+    statuses,
+    overrides: ejected(),
+    eventName: 'pull_request_target',
+    payload: {
+      ...unlabeledBy({ login: 'itstimwhite', type: 'User' }),
+      pull_request: {
+        ...unlabeledBy({}).pull_request,
+        head: { sha: 'f'.repeat(40) },
+      },
+    },
+  });
+  assert.deepEqual(stale.mutations, []);
+});
+
+test('a person dequeuing a head withdraws its automatic infrastructure retry', async () => {
+  const statuses = [failedHoldStatus('transient-infrastructure')];
+  // Without a manual removal the one infrastructure retry still runs.
+  const retried = await fixture({
+    statuses,
+    overrides: ejected(),
+    eventName: 'push',
+  });
+  assert.deepEqual(retried.mutations, [{ id: 'PR_1', oid: sha }]);
+  const human = await fixture({
+    statuses,
+    overrides: ejected({ __typename: 'User', login: 'itstimwhite' }, 'manual'),
+    eventName: 'push',
+  });
+  assert.deepEqual(human.mutations, []);
+  // jovie-bot's own dequeue during a failure hold is not a human withdrawal.
+  const bot = await fixture({
+    statuses,
+    overrides: ejected({ __typename: 'Bot', login: 'jovie-bot' }, 'manual'),
+    eventName: 'push',
+  });
+  assert.deepEqual(bot.mutations, [{ id: 'PR_1', oid: sha }]);
 });

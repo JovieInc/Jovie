@@ -175,6 +175,32 @@ async function callMiddleware(
   return result as NextResponse;
 }
 
+function snapshotFixtureEnv() {
+  return {
+    CI: process.env.CI,
+    NEXT_PUBLIC_E2E_MODE: process.env.NEXT_PUBLIC_E2E_MODE,
+    PUBLIC_NOAUTH_SMOKE: process.env.PUBLIC_NOAUTH_SMOKE,
+    VERCEL_ENV: process.env.VERCEL_ENV,
+  };
+}
+
+function clearFixtureEnv() {
+  delete process.env.CI;
+  delete process.env.NEXT_PUBLIC_E2E_MODE;
+  delete process.env.PUBLIC_NOAUTH_SMOKE;
+  delete process.env.VERCEL_ENV;
+}
+
+function restoreFixtureEnv(previous: ReturnType<typeof snapshotFixtureEnv>) {
+  for (const [key, value] of Object.entries(previous)) {
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
+  }
+}
+
 function resetMocks() {
   for (const mock of Object.values(mocks)) {
     if (typeof mock.mockClear === 'function') mock.mockClear();
@@ -677,6 +703,79 @@ describe('proxy.ts middleware', () => {
       expect(res.headers.get('location')).toContain(
         'redirect_url=%2Fapp%2Fearnings'
       );
+    });
+
+    it('redirects anonymous /onboarding/checkout to sign-in outside the screenshot fixture', async () => {
+      const previous = snapshotFixtureEnv();
+      clearFixtureEnv();
+      try {
+        const req = createUnauthenticatedRequest({
+          pathname: APP_ROUTES.ONBOARDING_CHECKOUT,
+        });
+        const res = await callMiddleware(req);
+
+        expect(res.status).toBeGreaterThanOrEqual(300);
+        expect(res.status).toBeLessThan(400);
+        expect(isRedirectTo(res, '/signin')).toBe(true);
+      } finally {
+        restoreFixtureEnv(previous);
+      }
+    });
+
+    it('keeps anonymous /onboarding/checkout behind sign-in when the screenshot fixture is admitted', async () => {
+      const previous = snapshotFixtureEnv();
+      clearFixtureEnv();
+      process.env.CI = 'true';
+      process.env.PUBLIC_NOAUTH_SMOKE = '1';
+      try {
+        const req = createUnauthenticatedRequest({
+          pathname: APP_ROUTES.ONBOARDING_CHECKOUT,
+        });
+        const res = await callMiddleware(req);
+
+        expect(res.status).toBe(307);
+        expect(isRedirectTo(res, '/signin')).toBe(true);
+        expect(res.headers.get('location')).toContain(
+          'redirect_url=%2Fonboarding%2Fcheckout'
+        );
+      } finally {
+        restoreFixtureEnv(previous);
+      }
+    });
+
+    it('keeps anonymous /onboarding/checkout behind sign-in on a production deployment', async () => {
+      const previous = snapshotFixtureEnv();
+      clearFixtureEnv();
+      process.env.CI = 'true';
+      process.env.PUBLIC_NOAUTH_SMOKE = '1';
+      process.env.VERCEL_ENV = 'production';
+      try {
+        const req = createUnauthenticatedRequest({
+          pathname: APP_ROUTES.ONBOARDING_CHECKOUT,
+        });
+        const res = await callMiddleware(req);
+
+        expect(res.status).toBeGreaterThanOrEqual(300);
+        expect(res.status).toBeLessThan(400);
+        expect(isRedirectTo(res, '/signin')).toBe(true);
+      } finally {
+        restoreFixtureEnv(previous);
+      }
+    });
+
+    it('does not open other protected routes when the screenshot fixture is admitted', async () => {
+      const previous = snapshotFixtureEnv();
+      clearFixtureEnv();
+      process.env.CI = 'true';
+      process.env.PUBLIC_NOAUTH_SMOKE = '1';
+      try {
+        const req = createUnauthenticatedRequest({ pathname: '/app' });
+        const res = await callMiddleware(req);
+
+        expect(isRedirectTo(res, '/signin')).toBe(true);
+      } finally {
+        restoreFixtureEnv(previous);
+      }
     });
 
     it('redirects unauthenticated GET /onboarding to /start before rendering', async () => {

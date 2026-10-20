@@ -17,7 +17,7 @@ describe('getLegalDocument', () => {
 
     expect(doc.title).toBe('Cookie Policy');
     expect(doc.lastUpdated).toBe('May 2026');
-    expect(doc.html).toContain('<table>');
+    expect(doc.html).toContain('<table tabindex="0"');
     expect(doc.html).toContain('<th>Cookie Name</th>');
     expect(doc.html).toContain('<code>jv_cc</code>');
   });

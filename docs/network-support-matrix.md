@@ -5,14 +5,22 @@ A quick reference for what we do on each high-traffic platform. Detection = link
 | Platform | Detection & Normalization | Scraping / Ingestion | Recursive Crawl | Notes |
 | --- | --- | --- | --- | --- |
 | Linktree | ✅ Supported | 🚫 Unavailable | 🚫 Disabled | Core HTML fetch and import jobs removed; an official API integration is required. |
-| Beacons | ✅ Supported | ✅ Single-page scrape via `lib/ingestion/strategies/beacons.ts` | 🚫 Not enabled | Skips internal Beacons hosts; profile-only fetch. |
+| Beacons | ✅ Supported | 🚫 Unavailable | 🚫 Disabled | Core HTML reads of `beacons.ai` and `beacons.page` fail closed; isolated provider required. |
 | Laylo | ✅ Supported | ✅ Single-page scrape via `lib/ingestion/strategies/laylo.ts` | 🚫 Not enabled | Uses public profile fetch; no secondary requests. |
-| YouTube | ✅ Supported | ✅ About-page scrape via `lib/ingestion/strategies/youtube.ts` | 🚫 Not enabled | Channel/about fetch only; no playlist/video crawling. |
+| YouTube | ✅ Supported | 🚫 HTML unavailable | 🚫 Disabled | Core HTML reads of `youtube.com` and `youtu.be` fail closed; use official APIs or an isolated provider. |
 | Stan (stan.store) | ⚠️ Fallback only | 🚫 Not available | 🚫 Not available | No dedicated detection/ingestion yet; treated as generic website. |
 | Twitch | ✅ Detection & normalization only | 🚫 Not available (policy) | 🚫 Not available (policy) | Bot-protected; keep to detection-classification for now. |
 | OnlyFans | ✅ Detection & normalization only | 🚫 Not available (policy) | 🚫 Not available (policy) | Auth/bot-protected; detection-only to avoid scraping. |
 
 Linktree and Instagram URLs remain valid social links. Core ingestion does not fetch their HTML or derive profile metadata from it; legacy imports fail explicitly, and discovered links do not schedule these imports. Shared scraper configuration tables retain other providers and historical rows.
+
+## Policy: no core YouTube or Beacons HTML
+
+`lib/ingestion/social-html-policy.ts` blocks YouTube and Beacons page hosts in both `fetchDocument` and `safeFetchPublicHtml`, including redirect targets. `fetchYouTubeAboutDocument` and `fetchBeaconsDocument` reject valid profile URLs with `SOCIAL_HTML_DISABLED` before any network request. Discovered links do not schedule YouTube or Beacons HTML imports. URL detection, normalization, and parsing of supplied HTML remain available.
+
+`FEATURE_SOCIAL_HTML_ISOLATED_PROVIDER` never permits direct core scraping: both flag states fail closed until a provider is wired (JOV-8463). Official YouTube Data API calls on Google API hosts remain allowed (JOV-5138). For top-level profile fields, Google SERP evidence can be used when sufficient; full-page reads require an isolated third-party provider.
+
+EVENT: Tim's 2026-10-15 decision prohibits YouTube and Beacons HTML scraping from Jovie IPs. This extends the core social HTML retirement from JOV-7621; neither platform has a core HTML exception (JOV-8465).
 
 ## Policy: Twitch & OnlyFans are detection-only
 

@@ -186,7 +186,7 @@ export const MARKETING_PAGE_CONTRACTS = {
     url: APP_ROUTES.CARD,
     job: 'explain the planned in-person profile-sharing product and how to get access updates',
     proof:
-      'illustrative Wallet-card preview paired with an approved public-profile capture',
+      'planned Wallet sharing flow and access-update capture; text-led until an approved Wallet depiction is available',
     successEvent:
       'visitor persists or confirms a deduplicated Jovie Card interest request',
     primaryCta: {

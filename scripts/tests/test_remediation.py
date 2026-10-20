@@ -91,6 +91,76 @@ class ClassifierFixtureTest(unittest.TestCase):
         human = remediation.classify_blocker(held)
         self.assertEqual((human["cls"], human["subtype"]), ("fixable-by-model", "human-hold"))
 
+    def test_changes_requested_routes_to_the_automated_review_fix_ladder(self):
+        """Tim 2026-10-15 (#21932): ordinary requested changes ship through the
+        automated review-fix ladder, not tim-decides. Only a genuine human gate
+        (strategy/taste/credential content) keeps the needs-human-decision class."""
+        # No bot review threads: an ordinary actionable CHANGES_REQUESTED review.
+        ordinary = pr(number=21932, reviewDecision="CHANGES_REQUESTED")
+        classified = remediation.classify_blocker(ordinary)
+        self.assertEqual((classified["cls"], classified.get("subtype")),
+                         ("fixable-by-model", "review"))
+        self.assertEqual(classified["next_action"], "escalate")
+        # An actionable prescribed fix (the review's own words) is a human-hold fix.
+        prescribed = pr(number=21932, reviewDecision="CHANGES_REQUESTED",
+                         held={"sha": HEAD, "evidence": ["replace `AUTHORIZATION: bearer` with the scoped Basic form"],
+                               "reason": "fix-exhausted"})
+        fixable = remediation.classify_blocker(prescribed, prescribed["held"])
+        self.assertEqual((fixable["cls"], fixable.get("subtype")),
+                         ("fixable-by-model", "human-hold"))
+        self.assertEqual(fixable["next_action"], "apply-prescribed-fix")
+        # A human review thread still routes through the same fixable ladder,
+        # with the unresolved thread named in the evidence.
+        threaded = pr(number=21932, reviewDecision="CHANGES_REQUESTED",
+                      reviewThreads=[{"resolved": False, "author": "itstimwhite",
+                                      "body": "replace `bearer` with the documented Basic form"}])
+        threaded_cls = remediation.classify_blocker(threaded)
+        self.assertEqual((threaded_cls["cls"], threaded_cls.get("subtype")),
+                         ("fixable-by-model", "review"))
+        self.assertTrue(any("unresolved human review thread" in line for line in threaded_cls["evidence"]))
+        # A strategy/taste surface keeps the human gate (unchanged).
+        strategy = pr(number=21932, reviewDecision="CHANGES_REQUESTED",
+                      files=["canon/strategy/theses.md"])
+        self.assertEqual(remediation.classify_blocker(strategy)["cls"], "needs-human-decision")
+
+    def test_review_routing_preserves_explicit_stops_and_real_decisions(self):
+        """Independent re-review counterexamples (#21932, 2026-10-16): an
+        explicit stop label, a negated policy statement in an ordinary repair,
+        and a real founder decision inside a review thread must all keep their
+        gates; only ordinary actionable feedback rides the automated ladder."""
+        # An explicit stop label outranks the review-fix ladder: the early
+        # human_review return must not swallow a do-not-merge hold.
+        stopped = pr(number=21933, reviewDecision="CHANGES_REQUESTED",
+                     labels=[{"name": "do-not-merge"}],
+                     holdNote={"author": "itstimwhite",
+                               "body": "hold pending external review"})
+        stop_cls = remediation.classify_blocker(stopped)
+        self.assertEqual(stop_cls["cls"], "needs-human-decision")
+        self.assertEqual(stop_cls["next_action"], "tim-decides")
+        # An ordinary repair that states what it did NOT touch ("No
+        # credentials or permissions are changed") is assurance, not a
+        # founder decision surface; a positive credential/pricing change
+        # still keeps the gate.
+        negative = pr(number=21934, reviewDecision="CHANGES_REQUESTED",
+                      body="Fix the CI auth format. No credentials or permissions are changed.")
+        self.assertEqual(remediation.classify_blocker(negative)["cls"], "fixable-by-model")
+        positive = pr(number=21935, reviewDecision="CHANGES_REQUESTED",
+                      body="Rotate the production credential and update the pricing table")
+        self.assertEqual(remediation.classify_blocker(positive)["cls"], "needs-human-decision")
+        # A current unresolved human thread carrying a real spend decision
+        # surfaces the ask instead of routing it as prescribed implementation.
+        spend = pr(number=21936, reviewDecision="CHANGES_REQUESTED",
+                   reviewThreads=[{"resolved": False, "author": "itstimwhite",
+                                   "body": "Should we purchase a paid plan before implementation?"}])
+        spend_cls = remediation.classify_blocker(spend)
+        self.assertEqual(spend_cls["cls"], "needs-human-decision")
+        self.assertTrue(any("spend" in line for line in spend_cls["evidence"]))
+        # An ordinary engineering ask in the same position stays fixable.
+        ordinary = pr(number=21937, reviewDecision="CHANGES_REQUESTED",
+                      reviewThreads=[{"resolved": False, "author": "itstimwhite",
+                                      "body": "replace `bearer` with the documented Basic form"}])
+        self.assertEqual(remediation.classify_blocker(ordinary)["cls"], "fixable-by-model")
+
     def test_lockfile_only_and_main_red_and_events(self):
         lock = pr(mergeStateStatus="DIRTY", conflictFiles=["pnpm-lock.yaml"])
         self.assertEqual(remediation.classify_blocker(lock)["subtype"], "lockfile-only")
@@ -224,6 +294,184 @@ class RouterLadderTest(unittest.TestCase):
             self.assertEqual(plan["reason"], "escalation-disabled")
         finally:
             os.environ.pop("LANES_ESCALATION", None)
+
+    def test_review_preserves_required_codeowner_gate(self):
+        for extra in ({"codeownersBlocked": True}, {"labels": ["codeowners"]}):
+            with self.subTest(extra=extra):
+                subject = pr(reviewDecision="CHANGES_REQUESTED", **extra)
+                result = remediation.classify_blocker(subject)
+                self.assertEqual(result["cls"], "needs-human-decision")
+                self.assertEqual(result["subtype"], "codeowners")
+
+    def test_review_permission_expansion_is_not_ordinary_implementation(self):
+        subject = pr(
+            reviewDecision="CHANGES_REQUESTED",
+            reviewThreads=[{"author": "reviewer", "resolved": False,
+                            "body": "Expand the GitHub token permissions to include workflow writes."}])
+        result = remediation.classify_blocker(subject)
+        self.assertEqual(result["cls"], "needs-human-decision")
+        self.assertIn("decision", " ".join(result["evidence"]))
+
+    def test_review_reusing_existing_auth_does_not_ask_for_permission(self):
+        for text in (
+            "Reuse the existing workflow token in Basic form.",
+            "Do not expand token permissions; reuse the existing token.",
+            "Never grant additional App permissions. Add the regression test.",
+            'Add a regression for the quoted request "Expand the GitHub token permissions".',
+        ):
+            with self.subTest(text=text):
+                subject = pr(reviewDecision="CHANGES_REQUESTED",
+                             reviewThreads=[{"author": "reviewer", "resolved": False, "body": text}])
+                result = remediation.classify_blocker(subject)
+                self.assertEqual(result["cls"], "fixable-by-model")
+
+    def test_negated_credentials_do_not_mask_positive_strategy_or_paths(self):
+        for extra in (
+            {"title": "Update pricing", "body": "No new credentials or permissions are changed."},
+            {"body": "No credentials change, but update pricing."},
+            {"body": "No new credentials or permissions are changed.",
+             "files": ["canon/strategy/pricing.md"]},
+        ):
+            with self.subTest(extra=extra):
+                self.assertEqual(remediation.classify_blocker(pr(**extra))["cls"],
+                                 "needs-human-decision")
+
+    def test_no_new_credential_list_is_assurance_not_a_human_gate(self):
+        """PR #21810 exhausted on a cost-impact list. "No new service, schedule,
+        controller, credentials" names what the change does not add. A positive
+        credential action or a pricing/taste ask in the same text still gates."""
+        assurance = (
+            "Cost impact: one bounded inventory scan only when the exact production "
+            "tag is missing. No new service, schedule, controller, credentials, or "
+            "paid capacity."
+        )
+        red = {"statusCheckRollup": [
+            {"name": "Source Validation", "status": "COMPLETED", "conclusion": "FAILURE"}]}
+        classified = remediation.classify_blocker(pr(
+            number=21810, body=assurance, mergeStateStatus="BLOCKED", **red))
+        self.assertEqual(classified["cls"], "fixable-by-model")
+        self.assertNotIn("strategy/pricing/credential/taste content", classified["evidence"])
+        for body in (
+            assurance + " Please update pricing.",
+            "No new service, but rotate the credential.",
+            "Publish the notes, credentials need rotation.",
+            "No new pricing page, credentials, and a rollout.",
+            "No new service, schedule, or credentials. Update pricing in the title.",
+        ):
+            with self.subTest(body=body):
+                self.assertEqual(
+                    remediation.classify_blocker(pr(number=21810, body=body, **red))["cls"],
+                    "needs-human-decision")
+
+    def test_excluded_credentials_are_assurance_not_a_human_gate(self):
+        assurance = (
+            "Ordinary runs remain report-only. The current CLI boundary cannot "
+            "attest or isolate child tools, credentials, and egress. Raw arguments, "
+            "prompts, executable paths, headers, environment values, credentials, "
+            "and OTPs are excluded from route receipts; dispatch references are hashed."
+        )
+        red = {"statusCheckRollup": [
+            {"name": "Source Validation", "status": "COMPLETED", "conclusion": "FAILURE"}]}
+        classified = remediation.classify_blocker(pr(
+            number=21903, body=assurance, mergeStateStatus="BLOCKED", **red),
+            {"sha": HEAD, "reason": "diff-too-large"})
+        self.assertEqual((classified["cls"], classified["subtype"]),
+                         ("fixable-by-model", "check"))
+        for extra in ({"title": "Update pricing"},
+                      {"files": ["canon/strategy/pricing.md"]},
+                      {"files": ["scripts/credential-store.py"]}):
+            with self.subTest(extra=extra):
+                self.assertEqual(remediation.classify_blocker(
+                    pr(body=assurance, **red, **extra))["cls"], "needs-human-decision")
+
+    def test_assurance_removal_preserves_each_independent_credential_mention(self):
+        # PR #22238 removed every mention in a sentence after matching one
+        # assurance. Unknown verbs must remain protected too, without a verb list.
+        assurances = (
+            "Credentials are excluded from receipts",
+            "Credentials, and OTPs are excluded from receipts",
+            "The CLI cannot attest or isolate child tools, credentials, and egress",
+        )
+        actions = (
+            "copy credentials to a new provider",
+            "upload credentials to the service",
+            "share credentials with the provider",
+            "print credentials in the logs",
+            "rotate the credential before launch",
+            "synchronize credentials with the provider",
+            "credentials need rotation",
+        )
+        for assurance in assurances:
+            self.assertEqual(remediation.classify_blocker(pr(body=assurance))["cls"], "ready")
+            for action in actions:
+                for body in (f"{assurance} and {action}", f"{action} and {assurance}"):
+                    with self.subTest(body=body):
+                        self.assertEqual(remediation.classify_blocker(pr(body=body))["cls"],
+                                         "needs-human-decision")
+        for body in ("Copy credentials to the provider and logs are excluded",
+                     "Credentials need rotation and headers are excluded",
+                     "We cannot rotate the credential"):
+            with self.subTest(body=body):
+                self.assertEqual(remediation.classify_blocker(pr(body=body))["cls"],
+                                 "needs-human-decision")
+
+    def test_direct_permission_asks_cover_github_token_and_app_scopes(self):
+        for text in (
+            "Please add contents:write permission to GITHUB_TOKEN.",
+            "Grant workflows:write permission to the GitHub App.",
+            "Could we increase the GitHub App scopes?",
+        ):
+            with self.subTest(text=text):
+                subject = pr(reviewDecision="CHANGES_REQUESTED",
+                             reviewThreads=[{"author": "reviewer", "resolved": False, "body": text}])
+                self.assertEqual(remediation.classify_blocker(subject)["cls"],
+                                 "needs-human-decision")
+
+    def test_current_direct_credential_requests_keep_authority_gate(self):
+        for body in (
+            "Please create a new GitHub token for the monitor.",
+            "Please add the new credential to repository secrets.",
+            "Generate a new token for this workflow.",
+            "We need a new credential.",
+        ):
+            subject = pr(reviewDecision="CHANGES_REQUESTED", reviewSummaries=[
+                {"author": {"type": "User", "login": "reviewer"}, "body": body,
+                 "state": "CHANGES_REQUESTED", "reviewedHead": HEAD}])
+            self.assertEqual(remediation.classify_blocker(subject)["cls"], "needs-human-decision", body)
+
+    def test_review_assurances_and_examples_preserve_independent_positive_asks(self):
+        ordinary = (
+            "No new spend is required. Please add a regression test.",
+            "Add a test asserting that purchase a paid plan never runs.",
+            "No manual deploy is needed; add a regression test.",
+            'Add a test for the quoted request "Please create a new GitHub token".',
+            "Do not purchase a paid plan. Reuse the existing workflow token.",
+            "Please change the existing token header from Bearer to Basic.",
+            "Add a new test for the token refresh path.",
+            "Add a retry so users don't have to rerun this manually.",
+            "Update DNS parser tests.",
+        )
+        positive = (
+            "No new spend is required, but please purchase a paid plan.",
+            "Add a regression test; please add the new credential to repository secrets.",
+            "No manual deploy is needed. Please expand GitHub token permissions.",
+            "Please submit the App Store build.",
+            "Please perform the billing action.",
+            "Please change DNS.",
+            "Please update pricing.",
+            "Create a new token for tests.",
+            "Install a new credential for tests.",
+            "Deploy manually.",
+            "Please contact outside humans.",
+            "Add a new test for token refresh; please purchase a paid plan.",
+        )
+        for body, expected in [(body, "fixable-by-model") for body in ordinary] + [
+                (body, "needs-human-decision") for body in positive]:
+            with self.subTest(body=body):
+                subject = pr(reviewDecision="CHANGES_REQUESTED", reviewSummaries=[
+                    {"author": {"type": "User", "login": "reviewer"}, "body": body,
+                     "state": "CHANGES_REQUESTED", "reviewedHead": HEAD}])
+                self.assertEqual(remediation.classify_blocker(subject)["cls"], expected, body)
 
     def test_surface_and_hold_nag_dedupe(self):
         body = remediation.surface_body(pr(number=9), {"cls": "needs-human-decision", "subtype": "hold",

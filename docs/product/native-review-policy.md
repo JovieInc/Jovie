@@ -160,3 +160,60 @@ Apple evidence collection reuses [JOV-6738](https://linear.app/jovie/issue/JOV-6
 Summer `company-signal/v1` owner in summer-config, rather than adding a collector
 here. Its credential and acceptance work remains with that owner. Neither item
 is a gate on the currently prioritized Log Your Body beta.
+
+## Immutable local-package distribution
+
+The real LYB Xcode resolver timed out fetching Jovie. The root Git-package
+facade is removed; source revision `2fec0fe05f95e454da24cb6a9fd7021501ca414b`
+remains the immutable policy snapshot. Distribution is a separate dependent
+change, preserving the schema and API.
+
+**Compose:** Apple's [local packages](https://developer.apple.com/documentation/xcode/organizing-your-code-with-local-packages)
+and [relative package dependency](https://developer.apple.com/documentation/packagedescription/package/dependency/package(path:))
+with the existing company pinned-source contract. The maintained substrate is
+Xcode/SwiftPM plus the host's curl HTTPS client. The small custom gap is verifying
+and importing only the existing package, instead of cloning Jovie's Git history.
+
+| Option | Fit and boundary |
+| --- | --- |
+| Existing Git dependency / system SCM provider | Actual LYB attempts timed out; increasing clone timeouts is not the repair |
+| SwiftPM mirrors, shallow/partial clones and caches | Mirrors map repositories; no tested repo mechanism establishes a portable package-only checkout. Warm caches do not qualify fresh dev/CI resolution |
+| Swift package registry or binary distribution | Maintained mechanisms, but introduce a publication/account boundary and migration work unnecessary for this source package; no new registry, repository, credentials or release is authorized here |
+| Verified local source import | Existing company convention; source stays inspectable and portable, builds resolve offline, consumer updates and rollback remain independent |
+
+`apps/ios/Packages/JovieKit.source.json` records canonical repository, package
+path, full Git revision and SHA-256 for every imported file, including tests and
+the proprietary license. `apps/ios/scripts/import-joviekit.mjs` downloads only
+those exact public GitHub source URLs. It does not clone, run upstream code,
+follow redirects, send credentials, retry indefinitely or overwrite a destination.
+Every file must verify before the complete snapshot is materialized.
+
+Consumers import the reviewed tool and manifest, recording their distribution
+Git revision and content hashes in their own source registry. Run with Node 24
+and curl, using paths relative to the consumer repository:
+
+```sh
+node scripts/import-joviekit.mjs import Vendor/JovieKit.source.json Vendor/JovieKit
+node scripts/import-joviekit.mjs check Vendor/JovieKit.source.json Vendor/JovieKit
+```
+
+Commit the complete snapshot, its `.jovie-source.json` receipt, manifest and
+importer; use Xcode's `XCLocalSwiftPackageReference` with
+`relativePath = Vendor/JovieKit` and product `JovieKit`. CI runs `check` before
+native resolution/build. It needs no network or Jovie checkout. Missing, changed,
+extra and symlinked source files fail validation; generated root `.build` and
+`.swiftpm` state is outside the source receipt.
+
+For an update, the canonical writer prepares a new reviewed manifest from the
+intended full source revision. Import into a fresh directory, verify, then replace
+the previous snapshot in an independent consumer PR. Do not edit policy copies.
+Rollback reverts that PR's manifest and snapshot together. Failed downloads leave
+the previous consumer source intact; no runtime downloads occur. If GitHub source
+availability or package scale becomes the bottleneck, re-evaluate a dedicated
+package repository/registry with its publication and licensing authorization.
+
+Qualification: the real remote 18-file snapshot verified, and a fresh iOS Xcode
+project resolved it using only the relative package path. An unsigned generic-iOS
+fixture build stalled during SDK preprocessing; compilation and native UI are
+not certified by the resolver receipt. LYB's actual project qualification belongs
+to its consumer writer. Current TestFlight delivery remains independent.

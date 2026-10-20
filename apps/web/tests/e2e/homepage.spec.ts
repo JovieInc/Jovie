@@ -1,6 +1,7 @@
 import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
 import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
 import { expect, test } from './setup';
+import { inspectRouteDom } from './utils/route-dom-detector';
 import { waitForHydration } from './utils/smoke-test-utils';
 
 const isFastIteration = process.env.E2E_FAST_ITERATION === '1';
@@ -110,6 +111,25 @@ test.describe('Homepage', () => {
     await page.locator('#homepage-claim-handle').fill('averyclaims');
     await page.getByTestId('homepage-primary-cta').click();
     await startRequest;
+  });
+
+  test('aligns the founder proof card on desktop and mobile', async ({
+    page,
+  }) => {
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: 900 });
+      const proof = page.getByTestId('homepage-hero-real-profile');
+      await proof.scrollIntoViewIfNeeded();
+      await expect(proof.getByText('Tim White')).toBeVisible();
+      await expect(proof.getByText('Founder, Jovie')).toBeVisible();
+      await expect(proof.getByText(/jov\.ie\/tim/)).toBeVisible();
+      const snapshot = await inspectRouteDom(page, { surface: 'marketing' });
+      expect(
+        snapshot.findings.filter(
+          finding => finding.kind === 'misaligned-text-stack'
+        )
+      ).toEqual([]);
+    }
   });
 
   test('mounts hero, presence, structure, and close in order', async ({

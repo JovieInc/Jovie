@@ -115,7 +115,74 @@ def host_capacity(host, lane, now: float | None = None) -> dict:
     return capacity
 
 
-def qualified_pool(host, lane, capacity: dict, now: float) -> tuple[dict, int, dict, dict]:
+def provider_payloads(state: Path, providers, proc: Path = Path("/proc")) -> dict:
+    """Observe native Codex/Grok payload processes, separately from slot/account locks.
+
+    A missing probe, unreadable candidate or changing PID stays unknown. A worker
+    without a payload can be scanning, waiting or qualifying; never call it idle.
+    """
+    result = {name: {"known": False, "running": None, "pids": [],
+                     "reason": "payload-probe-unavailable"} for name in providers}
+    supported = set(providers) & {"codex", "grok"}
+    if not proc.is_dir():
+        return result
+    try:
+        entries = list(proc.iterdir())
+    except OSError:
+        return result
+    for name in supported:
+        result[name] = {"known": True, "running": 0, "pids": [], "reason": None}
+    root = (state / "worktrees").resolve()
+    binding_root = (state / "bindings").resolve()
+    for entry in entries:
+        if not entry.name.isdecimal():
+            continue
+        try:
+            name = (entry / "comm").read_text().strip()
+        except FileNotFoundError:
+            if entry.exists():
+                for provider in supported:
+                    result[provider].update(known=False, reason="process-inventory-unreadable")
+            continue  # A process that exited during enumeration cannot be executing.
+        except (OSError, UnicodeError):
+            for name in supported:
+                result[name].update(known=False, reason="process-inventory-unreadable")
+            continue
+        if name not in supported:
+            continue
+        try:
+            before = (entry / "stat").read_text().rsplit(") ", 1)[1].split()[19]
+            args = (entry / "cmdline").read_bytes().split(b"\0")
+            cwd = (entry / "cwd").resolve(strict=True)
+            binding_parts = cwd.relative_to(binding_root).parts if binding_root in cwd.parents else ()
+            managed_binding = len(binding_parts) >= 3 and binding_parts[1] == "worktrees"
+            if cwd != root and root not in cwd.parents and not managed_binding:
+                continue
+            if Path(os.fsdecode(args[0])).name != name:
+                continue
+            if name == "codex":
+                if b"exec" not in args[1:6]:
+                    continue
+            elif not any(arg == b"--prompt-file" and index + 1 < len(args)
+                         and args[index + 1] and not args[index + 1].startswith(b"-")
+                         for index, arg in enumerate(args)):
+                continue
+            after = (entry / "stat").read_text().rsplit(") ", 1)[1].split()[19]
+            if before != after or (entry / "cwd").resolve(strict=True) != cwd:
+                raise ValueError("process identity changed")
+            result[name]["pids"].append(int(entry.name))
+        except FileNotFoundError:
+            if entry.exists():
+                result[name].update(known=False, reason="payload-identity-unreadable")
+        except (OSError, UnicodeError, ValueError, IndexError):
+            result[name].update(known=False, reason="payload-identity-unreadable")
+    for name in supported:
+        result[name]["pids"].sort()
+        result[name]["running"] = len(result[name]["pids"]) if result[name]["known"] else None
+    return result
+
+
+def qualified_pool(host, lane, capacity: dict, now: float) -> tuple[dict, int, dict, dict, dict]:
     """Apply the worker predicate instead of treating label inventory as runnable."""
     linear = lane.Linear(host.linear_env)
     failures = read_json(host.state / "failures.json", {})
@@ -124,24 +191,50 @@ def qualified_pool(host, lane, capacity: dict, now: float) -> tuple[dict, int, d
     if in_flight is None:
         raise RuntimeError("in-flight PR ownership unreadable; runnable pool unknown")
     in_flight = frozenset(identifier.lower() for identifier in in_flight)
+    holds = lane.open_hotspot_holds()
+    held_back = lane.held_back_issues(host, now)
+    inventory = lane.overlap_inventory(host, linear)
+    if inventory is None:
+        raise RuntimeError("file-overlap ownership unreadable; runnable pool unknown")
+    overlap_prs, overlap_tasks = inventory
+    try:
+        target_files = lane.pr_events.capture_target_file_witnesses(
+            lane, overlap_prs, lane._SUMMARY.get("sourceAt"))
+    except Exception:
+        target_files = {}  # Unknown witness retains the ordinary conservative prediction.
     specs = lane.load_providers()
     candidates = {name: linear.lane_issues(specs[name]["label"])
                   for name, seats in capacity.items() if seats["slots"] > 0}
+    # Confirmation and candidate reads happen after observe() sampled now.
+    scope_now = max(now, time.time())
+    target_files = lane.pr_events.revalidate_target_file_witnesses(target_files, overlap_prs, scope_now,
+                                                                  lane.REPO_SLUG)
     qualified, rejected = {}, {}
     rejected_issues = {}
     for name in capacity:
         qualified[name], rejected[name] = [], {}
         # Work the router sends to another lane is not this lane's idle capacity (JOV-7706).
         route = lane.issue_router(host, name, specs) if hasattr(lane, "issue_router") else None
-        duplicates = lane.pool_rejections(candidates.get(name, []))
+        duplicates = lane.pool_rejections(candidates.get(name, []), holds, target_files, scope_now)
         for issue in candidates.get(name, []):
             # Census key stays bounded: one bucket for all duplicate candidates.
-            reason = ("duplicate-candidate" if issue.identifier in duplicates
-                      else lane.admission_rejection(issue, failures, now, in_flight, name, route))
+            reason = duplicates.get(issue.identifier)
+            if reason and not reason.startswith("hotspot-held:"):
+                reason = "duplicate-candidate"
+            if reason is None and issue.identifier in held_back:
+                reason = "preserved-or-recovery-held"
+            if reason is None:
+                reason = lane.admission_rejection(issue, failures, now, in_flight, name, route)
+            if reason is None:
+                decision = file_overlap.admission_policy(
+                    issue, overlap_prs, overlap_tasks, lane.workstreams.classify, target_files, scope_now)
+                if not decision["allowed"]:
+                    reason = "file-overlap-held"
             if reason is None:
                 qualified[name].append(issue)
             else:
-                rejected[name][reason] = rejected[name].get(reason, 0) + 1
+                bucket = "hotspot-held" if reason.startswith("hotspot-held:") else reason
+                rejected[name][bucket] = rejected[name].get(bucket, 0) + 1
                 # Per-issue view (bounded): the remediator surfaces
                 # route-held/over-budget per selected issue without host access.
                 rejected_issues[issue.identifier] = reason
@@ -278,6 +371,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "leaseAgesComplete": all(row.get("leaseAgesComplete") is True for row in busy_capacity),
         "oldestLeaseAge": max(known_lease_ages) if known_lease_ages else None,
         "capacityByProvider": capacity_by_provider,
+        "providerPayloads": provider_payloads(state, capacity_by_provider),
         "codex": accounts, "pool": pool, "candidatePool": candidate_pool, "poolByProvider": pool_by_provider,
         "eligiblePool": eligible_pool, "eligiblePoolByProvider": eligible_by_provider,
         "newIssueBudgetByProvider": budgets, "openPRCount": len(open_numbers) if open_numbers is not None else None,
@@ -292,6 +386,8 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "fileOverlap": file_overlap.doctor_view(state),
         "linearError": linear_error, "linearSkipped": linear_skipped, "githubRemaining": github,
         "linearSync": linear_sync.status(state, now),
+        "ownership": {key: value for key, value in read_json(state / "ownership.json", {}).items()
+                      if key not in ("ownerlessSince", "moved", "claimsReleased")},
         "merged24h": merged, "mergedAttributionError": merged_error,
         "mergeThroughput": merge_throughput, "mergeThroughputError": merge_throughput_error,
         "autoscale": _autoscale_block(host),
@@ -480,7 +576,8 @@ def delivery_evidence(obs: dict, previous: dict) -> dict:
             "admission": {"eligiblePool": obs.get("eligiblePool"), "runnablePool": runnable if known else None,
                           "admittedLocalOutputs": admitted,
                           "budgets": obs.get("newIssueBudgetByProvider") or {}},
-            "workerLiveness": {"busySlots": obs.get("busy"), "capacity": capacity}}
+            "workerLiveness": {"busySlots": obs.get("busy"), "capacity": capacity,
+                               "providerPayloads": obs.get("providerPayloads")}}
 
 
 def _active_lease(path: Path, now: float) -> dict | None:
@@ -661,6 +758,13 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
             alerts[f"pr-inventory-unavailable:{name}"] = (
                 f"{name} new-issue PR budget unknown: {budget.get('error') or 'incomplete read'}; new claims deferred")
     alerts.update(linear_sync.alerts(obs.get("linearSync") or {}))
+    owned = obs.get("ownership") or {}
+    if owned.get("overGrace"):
+        # The started-state invariant (ownership.py): escalated as a lanes repair, never to Tim.
+        alerts["started-without-owner"] = (
+            f"{owned['overGrace']} started JOV issues have had no live owner past the grace period "
+            f"(oldest {round((owned.get('oldestOwnerlessS') or 0) / 3600, 1)}h; unresolved "
+            f"{owned.get('unresolved') or {}}); ownership.reconcile moves them each tick")
     if obs.get("linearError"):
         alerts["linear-down"] = f"Linear unreadable: {obs['linearError']}"
     elif obs.get("linearSkipped") or obs.get("pool") is None:
@@ -951,8 +1055,7 @@ def _emergency_ops_report(key: str, text: str, condition: dict, host_name: str, 
     }
 
 
-def prepare_ops_report(key: str, text: str, condition: dict, host_name: str, target: str) -> dict:
-    """Prepare, but never send, one company-scoped report through the Jev observation seam."""
+def _ops_report_input(key: str, text: str, condition: dict, target: str) -> dict:
     source = condition.get("source") or {}
     observed_at = source.get("observedAt") or "UNKNOWN"
     source_version = _source_version()
@@ -968,7 +1071,7 @@ def prepare_ops_report(key: str, text: str, condition: dict, host_name: str, tar
         proof["recurrence"].update(status="PROVEN", receipt=condition.get("idempotencyKey") or "UNKNOWN")
     else:
         proof["recurrence"].update(status="NOT_APPLICABLE", receipt="NOT_APPLICABLE")
-    payload = {
+    return {
         "domain": "company",
         "producer": "Symphony",
         "currentOwner": condition.get("owner"),
@@ -981,6 +1084,11 @@ def prepare_ops_report(key: str, text: str, condition: dict, host_name: str, tar
         "proofTiers": proof,
         "destination": {"adapter": "linear-issue", "target": target},
     }
+
+
+def prepare_ops_report(key: str, text: str, condition: dict, host_name: str, target: str) -> dict:
+    """Prepare, but never send, one company-scoped report through the Jev observation seam."""
+    payload = _ops_report_input(key, text, condition, target)
     try:
         result = subprocess.run(
             ["node", str(OPS_REPORT_SCRIPT)], cwd=REPO_ROOT, input=json.dumps(payload),
@@ -994,6 +1102,27 @@ def prepare_ops_report(key: str, text: str, condition: dict, host_name: str, tar
         return prepared
     except (OSError, ValueError, subprocess.SubprocessError):
         return _emergency_ops_report(key, text, condition, host_name, target)
+
+
+def verify_ops_report(prepared: dict, key: str, text: str, condition: dict,
+                      host_name: str, target: str) -> dict:
+    """Recheck the actual Linear payload; unavailable review uses the existing emergency notice."""
+    review = prepared.get("review") if isinstance(prepared, dict) else None
+    if isinstance(review, dict) and review.get("reviewStatus") == "emergency-reviewer-unavailable":
+        return _emergency_ops_report(key, text, condition, host_name, target)
+    try:
+        result = subprocess.run(
+            ["node", str(OPS_REPORT_SCRIPT), "--verify"], cwd=REPO_ROOT,
+            input=json.dumps({"preparedReport": prepared,
+                              "currentInput": _ops_report_input(key, text, condition, target)}),
+            capture_output=True, text=True, timeout=5, check=False,
+            env={**os.environ, "JOVIE_AGENT_PROFILE": "no_agent"})
+        if result.returncode != 0 or json.loads(result.stdout) != {"verified": True}:
+            raise ValueError("ops delivery review invalidated")
+        return prepared
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return _emergency_ops_report(key, text, condition, host_name, target)
+
 
 class Tracker:
     """Linear Triage issues, one per alert key, reused within the cool-off."""
@@ -1097,6 +1226,7 @@ class Tracker:
                            "(`tick.json`, `runs/ledger.jsonl`, `doctor.json`).")
             if condition:
                 prepared = prepare_ops_report(key, text, condition, self.host, self.title(key))
+                prepared = verify_ops_report(prepared, key, text, condition, self.host, self.title(key))
                 description = prepared["message"]
                 self.last_writing_report = prepared
             data = self.linear.gql(
@@ -1335,7 +1465,8 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
         obs.get("now") or time.time())
     return {"schema": "symphony-lanes-status/v1", "at": now_iso(), "host": lane.HOST, "release": tick.get("release"),
             "fileOverlap": overlap, "linear": obs.get("linearSync") or tick.get("linear"),
-            "lanes": counts, "running": sum(c["running"] for c in counts.values()),
+            "ownership": obs.get("ownership"),
+            "lanes": counts, "providerPayloads": obs.get("providerPayloads"), "running": sum(c["running"] for c in counts.values()),
             "idle": sum(max(0, c["slots"] - c["running"]) for c in counts.values()),
             "pool": obs.get("pool"), "candidatePool": obs.get("candidatePool"), "lastLandingAgeS": obs.get("lastLandingAge"),
             "admission": {"pool": obs.get("pool"), "candidatePool": obs.get("candidatePool"),
@@ -1397,33 +1528,140 @@ def _autoscale_block(host) -> dict:
 PRIMARY_FLAG = Path.home() / ".config/jovie-lanes/primary"
 
 
+PUBLIC_FEED_MAX_BYTES = 256 * 1024
+STATUS_DETAIL_NAME = "lanes-status-details.json"
+
+
+def public_status_projection(feed: dict, full_text: str) -> str:
+    """Keep operational fields whole; detailed attribution lives in the same gist."""
+    def identity(value, limit):
+        return value if isinstance(value, str) and len(value) <= limit else None
+
+    evidence = {
+        "fileName": STATUS_DETAIL_NAME,
+        "sha256": hashlib.sha256(full_text.encode("utf-8")).hexdigest(),
+        "bytes": len(full_text.encode("utf-8")),
+        "at": identity(feed.get("at"), 64),
+        "host": identity(feed.get("host"), 64),
+        "release": identity(feed.get("release"), 128),
+        "binding": "declared-feed-identity",
+    }
+    public = json.loads(full_text)
+    attribution = public.get("shippingAttribution")
+    projects = attribution.get("projects") if isinstance(attribution, dict) else None
+    if isinstance(projects, list):
+        for index, project in enumerate(projects):
+            if isinstance(project, dict) and isinstance(project.get("pullRequests"), list):
+                rows = project.pop("pullRequests")
+                # Absence with an explicit locator is not an empty evidence array.
+                project["pullRequestsRef"] = {
+                    "recordCount": len(rows),
+                    "jsonPointer": f"/shippingAttribution/projects/{index}/pullRequests",
+                }
+    public["publicProjection"] = {
+        "schema": "symphony-lanes-public-projection/v1", "fullEvidence": evidence,
+    }
+    text = json.dumps(public, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+    if len(text.encode("utf-8")) <= PUBLIC_FEED_MAX_BYTES:
+        return text
+    # Never trim operational ownership/hold/attempt arrays to pretend they fit.
+    # Existing schema-checking readers reject this as unknown, not an empty fleet.
+    return json.dumps({
+        "schema": "symphony-lanes-status-unavailable/v1", "status": "unavailable",
+        "reason": "essential-public-feed-exceeds-byte-limit",
+        "requiredBytes": len(text.encode("utf-8")), "maxBytes": PUBLIC_FEED_MAX_BYTES,
+        "fullEvidence": evidence,
+    }, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+
+
 def publish_status(host, lane, feed: dict, tracking_issue: str = "JOV-6637") -> str | None:
-    """Keep one secret gist current with the status feed; create it once and announce its URL.
-    Only the primary host (flag file ~/.config/jovie-lanes/primary) publishes, so a second
-    host running the same release never creates a second feed."""
+    """Publish one bounded status view plus complete evidence in the existing gist."""
     if not PRIMARY_FLAG.exists():
         return None
+    deadline = time.monotonic() + 60
     path = host.state / "status-gist.json"
-    record = read_json(path, {})
+    record = json.loads(path.read_text()) if path.exists() else {}
+    if not isinstance(record, dict):
+        raise RuntimeError("status-gist-record-unavailable")
+    full_text = json.dumps(feed, indent=1, ensure_ascii=False, allow_nan=False)
     body = host.state / "lanes-status.json"
-    body.write_text(json.dumps(feed, indent=1))
+    body.write_text(full_text, encoding="utf-8")
+    if body.read_bytes() != full_text.encode("utf-8"):
+        raise RuntimeError("status-feed-evidence-readback-changed")
+    public_text = public_status_projection(feed, full_text)
+    packet = {"files": {
+        "lanes-status.json": {"content": public_text},
+        STATUS_DETAIL_NAME: {"content": full_text},
+    }}
+    packet_path = host.state / "lanes-status-publish.json"
+    created_now = not record.get("url")
+    if created_now:
+        if record:
+            raise RuntimeError("status-gist-creation-reconcile-required")
+        packet.update({"description": "Symphony lanes status (written every tick by doctor.py)", "public": False})
+    elif not isinstance(record.get("id"), str) or not re.fullmatch(r"[a-f0-9]{1,64}", record["id"]):
+        raise RuntimeError("status-gist-record-unavailable")
+    packet_text = json.dumps(packet, ensure_ascii=False, allow_nan=False)
+    packet_path.write_text(packet_text, encoding="utf-8")
     lane.load_github_env()
-    if not record.get("url"):
-        created = lifecycle.run(["gh", "gist", "create", "--desc", "Symphony lanes status (written every tick by doctor.py)",
-                                  "--filename", "lanes-status.json", str(body)], capture_output=True, text=True, timeout=60)
-        url = (created.stdout or "").strip().splitlines()[-1] if created.returncode == 0 and created.stdout.strip() else None
-        if not url:
-            return None
-        record = {"url": url, "id": url.rstrip("/").split("/")[-1], "createdAt": now_iso()}
-        path.write_text(json.dumps(record))
+
+    def api(endpoint, method, input_path=None):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise RuntimeError("status-gist-deadline-exceeded")
+        args = ["gh", "api", endpoint, "--method", method]
+        if input_path is not None:
+            args.extend(["--input", str(input_path)])
+        result = lifecycle.run(args, capture_output=True, text=True, timeout=remaining)
+        if result.returncode != 0:
+            raise RuntimeError("status-gist-publish-unconfirmed")
+        return result
+
+    if created_now:
+        # An uncertain create must not create another gist on the next tick.
+        path.write_text(json.dumps({
+            "creationAttemptedAt": now_iso(),
+            "payloadSha256": hashlib.sha256(packet_text.encode("utf-8")).hexdigest(),
+        }), encoding="utf-8")
+        result = api("gists", "POST", packet_path)
         try:
-            lane.Linear(host.linear_env).comment(tracking_issue and _issue_id(lane, host, tracking_issue),
-                                                  f"🤖 doctor: lanes status feed (raw JSON, refreshed every tick): {url}/raw/lanes-status.json")
+            created = json.loads(result.stdout)
+            if (not isinstance(created.get("id"), str) or not re.fullmatch(r"[a-f0-9]{1,64}", created["id"]) or
+                    not isinstance(created.get("html_url"), str) or not created["html_url"]):
+                raise ValueError("missing gist identity")
+            record = {"url": created["html_url"], "id": created["id"], "createdAt": now_iso()}
+        except (ValueError, AttributeError):
+            raise RuntimeError("status-gist-create-unconfirmed") from None
+        # Retain the known identity even if subsequent readback is unavailable.
+        path.write_text(json.dumps(record), encoding="utf-8")
+    else:
+        api(f"gists/{record['id']}", "PATCH", packet_path)
+
+    result = api(f"gists/{record['id']}", "GET")
+    try:
+        stored = json.loads(result.stdout)
+        files = stored.get("files")
+        if stored.get("id") != record["id"] or not isinstance(files, dict):
+            raise ValueError("gist identity mismatch")
+        for name, expected in packet["files"].items():
+            actual = files.get(name)
+            if not isinstance(actual, dict) or actual.get("truncated") is not False or actual.get("content") != expected["content"]:
+                raise ValueError("incomplete or changed gist evidence")
+    except (ValueError, AttributeError):
+        raise RuntimeError("status-gist-readback-unconfirmed") from None
+    record.update({
+        "verifiedAt": now_iso(),
+        "fullEvidenceSha256": hashlib.sha256(full_text.encode("utf-8")).hexdigest(),
+        "publicFeedSha256": hashlib.sha256(public_text.encode("utf-8")).hexdigest(),
+    })
+    path.write_text(json.dumps(record), encoding="utf-8")
+    if created_now:
+        try:
+            lane.Linear(host.linear_env).comment(
+                tracking_issue and _issue_id(lane, host, tracking_issue),
+                f"🤖 doctor: lanes status feed (raw JSON, refreshed every tick): {record['url']}/raw/lanes-status.json")
         except Exception:
             pass
-        return url
-    lifecycle.run(["gh", "gist", "edit", record["id"], "--filename", "lanes-status.json", str(body)],
-                   capture_output=True, text=True, timeout=60)
     return record["url"]
 
 

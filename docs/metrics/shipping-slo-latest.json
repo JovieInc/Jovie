@@ -1,19 +1,19 @@
 {
-  "at": "2026-10-15T12:38:20.742Z",
+  "at": "2026-10-20T12:42:19.659Z",
   "ciP95Seconds": {
     "pull_request": null,
-    "merge_group": 621
+    "merge_group": 1012
   },
   "queueWaitP95Seconds": null,
   "queueEjectionRate": null,
   "leadTimeP95Seconds": {
-    "devin": 10068,
-    "codex": 15813,
-    "other": 20126
+    "devin": null,
+    "codex": 37836,
+    "other": 9940
   },
   "remediationP95Seconds": {
     "prRedToGreen": null,
-    "mainRedToGreen": 2108,
+    "mainRedToGreen": null,
     "productionPromoteHold": null
   },
   "productionLagP95Seconds": null,
@@ -23,6 +23,6 @@
     "wowGrowth": null,
     "growthTrend": "unknown"
   },
-  "regressions": [],
+  "regressions": ["lead_time.codex.p95"],
   "flatStall": false
 }

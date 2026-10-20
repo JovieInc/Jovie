@@ -3,15 +3,26 @@ import { useTheme } from 'next-themes';
 import { type ReactNode, useEffect, useRef } from 'react';
 import { useSidebar } from '@/components/organisms/sidebar';
 
-const variant = (interactive: boolean, radius = '--radius-none') => ({
-  'data-jovie-eval-variant': 'current-story',
-  'data-jovie-eval-target': 'true',
-  'data-jovie-eval-tone': 'neutral',
-  'data-jovie-eval-padding-x': '--space-0',
-  'data-jovie-eval-padding-y': '--space-0',
-  'data-jovie-eval-radius': radius,
-  'data-jovie-eval-interactive': String(interactive),
-});
+const variant = (
+  interactive: boolean,
+  radius = '--radius-none',
+  keyboardTargetSelector?: string
+) => {
+  const attributes: Record<string, string> = {
+    'data-jovie-eval-variant': 'current-story',
+    'data-jovie-eval-target': 'true',
+    'data-jovie-eval-tone': 'neutral',
+    'data-jovie-eval-padding-x': '--space-0',
+    'data-jovie-eval-padding-y': '--space-0',
+    'data-jovie-eval-radius': radius,
+    'data-jovie-eval-interactive': String(interactive),
+  };
+  if (keyboardTargetSelector !== undefined) {
+    attributes['data-jovie-eval-keyboard-target-selector'] =
+      keyboardTargetSelector;
+  }
+  return attributes;
+};
 
 const family = (
   name: string,
@@ -31,11 +42,13 @@ export function RenderedFamily({
   name,
   owner,
   interactive,
+  keyboardTargetSelector,
   children,
 }: {
   name: string;
   owner: string;
   interactive: boolean;
+  keyboardTargetSelector?: string;
   children: ReactNode;
 }) {
   const { resolvedTheme } = useTheme();
@@ -44,7 +57,9 @@ export function RenderedFamily({
       className='w-full min-w-0 bg-base'
       {...family(name, owner, resolvedTheme ?? '', '--color-bg-base')}
     >
-      <div {...variant(interactive)}>{children}</div>
+      <div {...variant(interactive, '--radius-none', keyboardTargetSelector)}>
+        {children}
+      </div>
     </div>
   );
 }
