@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { OutboundQueue } from '@/lib/outbound/types';
+import { mockTableViewport } from '@/tests/utils/table-viewport';
 import { OutboundWorkspace } from './OutboundWorkspace';
 import { outboundFixtureQueue, outboundFixtureRow } from './outbound-fixtures';
 import { OUTBOUND_RAIL_COMMAND_EVENT } from './outbound-keys';
@@ -70,6 +71,8 @@ function renderWorkspace() {
     </TooltipProvider>
   );
 }
+
+mockTableViewport();
 
 describe('OutboundWorkspace', () => {
   beforeEach(() => {

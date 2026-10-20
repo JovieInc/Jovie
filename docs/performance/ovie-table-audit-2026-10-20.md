@@ -24,10 +24,11 @@ keyboard render budget. Contacts, Users and Creators consume `AdminDataTable`
    leak in every browser.
 
 Both new performance tests failed before the repair; both pass afterwards.
-Existing alignment, keyboard and SSR behavior remains covered. The affected
-Founder registry integration fixture now supplies its measured 640px viewport
-and 40px compact rows explicitly, preserving every table/right-rail assertion
-instead of relying on jsdom's zero-height full-dataset fallback.
+Existing alignment, keyboard and SSR behavior remains covered. Affected real-table
+integration fixtures opt into a shared measured 640px viewport and canonical row
+mode heights, preserving their assertions instead of relying on jsdom's
+zero-height full-dataset fallback. Presence explicitly scrolls its off-window
+Pricing page into view before inspecting or opening it.
 
 ## Same-method browser measurements
 

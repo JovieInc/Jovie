@@ -7,6 +7,7 @@ import {
 } from '@testing-library/react';
 import { NuqsTestingAdapter } from 'nuqs/adapters/testing';
 import { describe, expect, it, vi } from 'vitest';
+import { mockTableViewport } from '@/tests/utils/table-viewport';
 
 // Mock Clerk's useUser hook (pulled in transitively via DemoAuthShell → UnifiedSidebar → UserButton)
 vi.mock('@clerk/nextjs', () => ({
@@ -238,6 +239,8 @@ async function openReleaseDrawer(
     );
   });
 }
+
+mockTableViewport();
 
 describe('DemoReleasesExperience', () => {
   it(

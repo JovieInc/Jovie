@@ -3,8 +3,8 @@ import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
 import type { AdminLead } from '@/lib/queries';
+import { mockTableViewport } from '@/tests/utils/table-viewport';
 
 // Mock the queries
 const mockLeadsInfiniteQuery = vi.fn();
@@ -105,6 +105,8 @@ async function getLeadTable() {
   );
   return LeadTable;
 }
+
+mockTableViewport();
 
 describe('LeadTable', () => {
   afterEach(() => {
