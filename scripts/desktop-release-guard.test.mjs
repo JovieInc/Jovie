@@ -2612,7 +2612,10 @@ test('desktop installation quota defer is visible and retried once', async t => 
 
   const missingSentinel = runExit(75, { RUNNER_TEMP: join(root, 'absent') });
   assert.equal(missingSentinel.status, 75);
-  assert.match(missingSentinel.stderr, /without an installation-quota defer sentinel/);
+  assert.match(
+    missingSentinel.stderr,
+    /without an installation-quota defer sentinel/
+  );
 
   const retried = runExit(75, { DESKTOP_QUOTA_RETRY: '1' });
   assert.equal(retried.status, 75);
@@ -2650,7 +2653,10 @@ printf '%s\\n' "$1" > "${sleepLog}"
   const now = Math.floor(Date.now() / 1000);
   const held = runWaiter(now + 30);
   assert.equal(held.status, 0, held.stderr);
-  assert.match(held.stdout, new RegExp(`Reattempting desktop publication of ${releaseSha}`));
+  assert.match(
+    held.stdout,
+    new RegExp(`Reattempting desktop publication of ${releaseSha}`)
+  );
   const slept = Number((await readFile(sleepLog, 'utf8')).trim());
   assert.ok(slept >= 30 && slept <= 40, `Unexpected waiter sleep: ${slept}`);
   await rm(sleepLog);

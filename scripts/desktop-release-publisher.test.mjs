@@ -7,9 +7,8 @@ import { join } from 'node:path';
 import test from 'node:test';
 import {
   announceDesktopQuotaDeferral,
-  decideReleaseAssetQuotaHold,
   DesktopReleaseQuotaDeferred,
-  ReleaseAssetQuotaDeferred,
+  decideReleaseAssetQuotaHold,
   expectedDesktopAssetNames,
   GitHubClient,
   parseArgs,
@@ -17,6 +16,7 @@ import {
   prepare,
   RELEASE_ASSET_READ_ATTEMPTS,
   RELEASE_ASSET_READ_MAX_WAIT_MS,
+  ReleaseAssetQuotaDeferred,
   releaseMetadataUpdate,
   reportDesktopReleaseFailure,
   uploadAndPublish,
@@ -1024,7 +1024,12 @@ globalThis.fetch = async (url, options) => {
     { mode: 'mutation', code: 1 },
     { mode: 'outside-budget', code: 1, environment: 'staging' },
     { mode: 'outside-budget', code: 1, retry: true },
-    { mode: 'outside-budget', code: 75, command: 'upload-and-publish', defer: true },
+    {
+      mode: 'outside-budget',
+      code: 75,
+      command: 'upload-and-publish',
+      defer: true,
+    },
     { mode: 'outside-budget', code: 1, command: 'verify-published' },
   ]) {
     for (const file of ['outputs', 'summary', 'calls', 'sleeps']) {
@@ -1343,10 +1348,9 @@ test('publish and recover mutations wait out an installation 403 inside the budg
     },
     log: () => {},
   });
-  const published = await client.request(
-    '/repos/JovieInc/Jovie/releases/7',
-    { method: 'PATCH' }
-  );
+  const published = await client.request('/repos/JovieInc/Jovie/releases/7', {
+    method: 'PATCH',
+  });
   assert.equal(published.id, 7);
   assert.equal(calls.length, 2);
   assert.deepEqual(sleeps, [reset * 1000 + 1000 - nowMs]);
@@ -1428,9 +1432,18 @@ test('outside-budget installation 403 defers with a warning and is retried later
     process.stderr.write = original;
   }
   const sentence = `Installation quota resets at ${new Date(resetEpoch * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z')}. Deferring desktop publication of ${releaseSha} to the quota retry. No release was published.`;
-  assert.equal(chunks.join(''), `::warning::github-quota-deferred: ${sentence}\n`);
-  assert.equal((await readFile(process.env.GITHUB_STEP_SUMMARY, 'utf8')).trim(), sentence);
-  assert.match(await readFile(process.env.GITHUB_OUTPUT, 'utf8'), /quota_deferred=true/);
+  assert.equal(
+    chunks.join(''),
+    `::warning::github-quota-deferred: ${sentence}\n`
+  );
+  assert.equal(
+    (await readFile(process.env.GITHUB_STEP_SUMMARY, 'utf8')).trim(),
+    sentence
+  );
+  assert.match(
+    await readFile(process.env.GITHUB_OUTPUT, 'utf8'),
+    /quota_deferred=true/
+  );
   assert.match(
     await readFile(process.env.GITHUB_OUTPUT, 'utf8'),
     new RegExp(`quota_reset_epoch=${resetEpoch}`)
