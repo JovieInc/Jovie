@@ -43,6 +43,9 @@ const loadPolicy = name =>
 
 export const REPO_HEALTH_BASELINE = loadPolicy('repo-health-baseline.json');
 export const REPO_HEALTH_ROLLOUT = loadPolicy('repo-health-rollout.json');
+export const REPO_ROOT_ALLOWLIST = Object.freeze(
+  new Set(loadPolicy('repo-root-allowlist.json').entries)
+);
 
 const BINARY_EXTENSIONS = new Set([
   '.avif',
@@ -607,6 +610,7 @@ export function evaluateRepoHygiene({
   now = new Date(),
   root = process.cwd(),
   rollout = REPO_HEALTH_ROLLOUT,
+  rootAllowlist = REPO_ROOT_ALLOWLIST,
   trackedPaths = [],
 }) {
   const errors = [
@@ -655,6 +659,10 @@ export function evaluateRepoHygiene({
       errors.push(`${path}: repeated adjacent path component/sequence`);
     if (FORBIDDEN_ROOT_DIRECTORIES.has(parts[0]))
       errors.push(`${path}: generated/runtime root directory is not tracked`);
+    else if (parts[0] && !rootAllowlist.has(parts[0]))
+      errors.push(
+        `${path}: new repository-root entry "${parts[0]}" is not in scripts/repo-root-allowlist.json; place it under docs/, canon/, scripts/ or an app (${HYGIENE_POLICY_DOC})`
+      );
     if (FORBIDDEN_GENERATED_PATHS.some(pattern => pattern.test(path)))
       errors.push(`${path}: generated output path is not tracked`);
     if (parts.length === 1 && isBinary(path))
