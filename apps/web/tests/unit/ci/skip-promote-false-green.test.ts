@@ -322,13 +322,13 @@ describe('skip-promote false-green detector (JOV-5458)', () => {
 
   it('fails closed on HTTP errors and malformed run evidence', async () => {
     for (const response of [
-      { ok: false, status: 403 },
-      { ok: true, json: async () => ({ workflow_runs: null }) },
+      new Response(null, { status: 403 }),
+      Response.json({ workflow_runs: null }),
     ]) {
       expect(
         await deferToInFlightSupersede({
           ...supersedeContext,
-          fetchImpl: async () => response as Response,
+          fetchImpl: async () => response,
         })
       ).toMatchObject({
         deferred: false,
