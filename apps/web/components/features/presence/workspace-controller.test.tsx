@@ -1,12 +1,8 @@
 import { act, renderHook } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it } from 'vitest';
-import type { CompanyPresencePage } from './company-types';
 import type { ProfileWorkspaceRow } from './types';
-import {
-  COMPANY_PRESENCE_ADAPTER,
-  CREATOR_PRESENCE_ADAPTER,
-} from './workspace-adapters';
+import { CREATOR_PRESENCE_ADAPTER } from './workspace-adapters';
 import {
   type PresenceWorkspaceAdapter,
   PresenceWorkspaceBoundary,
@@ -30,19 +26,6 @@ const creator: ProfileWorkspaceRow = {
   rank: null,
   previousRank: null,
   lastObservedAt: null,
-};
-const unwired = { state: 'unconfigured' as const, reason: 'No source.' };
-const company: CompanyPresencePage = {
-  id: 'row',
-  path: '/',
-  label: 'Original',
-  kind: 'marketing',
-  checks: {
-    indexed: unwired,
-    seo_certification: unwired,
-    copy_gate: unwired,
-    lighthouse: unwired,
-  },
 };
 
 function controllerContract<
@@ -94,7 +77,7 @@ function controllerContract<
   result.unmount();
 }
 
-describe('shared Presence target adapters', () => {
+describe('canonical Presence identity adapter', () => {
   it('keeps creator selection current, clears it on filtering and removes revoked rows', () =>
     controllerContract(
       'creator',
@@ -103,13 +86,13 @@ describe('shared Presence target adapters', () => {
       'all',
       'catalog'
     ));
-  it('keeps company selection current, clears it on filtering and removes revoked rows', () =>
+  it('keeps company selection current through the same canonical adapter', () =>
     controllerContract(
       'company',
-      company,
-      COMPANY_PRESENCE_ADAPTER,
+      creator,
+      CREATOR_PRESENCE_ADAPTER,
       'all',
-      'legal'
+      'catalog'
     ));
   it.each(['actorId', 'workspaceId', 'target'] as const)(
     'remounts target draft and controller state when %s changes',
