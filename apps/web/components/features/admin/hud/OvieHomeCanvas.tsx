@@ -1,0 +1,212 @@
+'use client';
+
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  HomeLoopCanvas,
+  type HomeLoopCopy,
+  type HomeLoopSectionStatus,
+} from '@/components/organisms/home-loop';
+import { useUndoableAnswers } from '@/components/organisms/home-loop/useUndoableAnswers';
+import { APP_ROUTES } from '@/constants/routes';
+import type { HomeLoopAsk } from '@/lib/home-loop/contract';
+import {
+  buildOvieAsks,
+  buildOvieHomeShipping,
+  OVIE_SHIP_STAGES,
+  type OviePulseMemory,
+  rememberPulse,
+} from '@/lib/ovie/home/shipping-home';
+import { inboxDecisionRequest, type OvieInbox } from '@/lib/ovie/inbox';
+import { FREQUENT_CACHE } from '@/lib/queries/cache-strategies';
+import { useHudShippingStateQuery } from './useHudShippingStateQuery';
+
+const OVIE_HOME_COPY: HomeLoopCopy = {
+  constraintClear: 'Nothing is blocking shipping',
+  asksTitle: 'Blocked On You',
+  asksEmpty: 'Nothing needs your decision.',
+  asksError: 'Decisions could not load.',
+  inFlightTitle: 'In Flight',
+  inFlightEmpty: 'No work in flight.',
+  inFlightError: 'Shipping data could not load.',
+  doneTitle: 'Done Today',
+  doneEmpty: 'Nothing has landed yet today.',
+};
+
+const INBOX_QUERY_KEY = ['ovie', 'inbox'] as const;
+const PULSE_MEMORY_KEY = 'ovie.home.pulse-memory.v1';
+
+function readPulseMemory(): OviePulseMemory {
+  try {
+    const raw = globalThis.sessionStorage?.getItem(PULSE_MEMORY_KEY);
+    return raw ? (JSON.parse(raw) as OviePulseMemory) : {};
+  } catch {
+    return {};
+  }
+}
+
+function writePulseMemory(memory: OviePulseMemory): void {
+  try {
+    globalThis.sessionStorage?.setItem(
+      PULSE_MEMORY_KEY,
+      JSON.stringify(memory)
+    );
+  } catch {
+    // Pulse history is a per-tab convenience; the tiles render without it.
+  }
+}
+
+async function fetchInbox(signal: AbortSignal): Promise<OvieInbox> {
+  const response = await fetch('/api/ovie/inbox', {
+    signal,
+    cache: 'no-store',
+  });
+  if (!response.ok) throw new Error('Decisions could not load.');
+  return (await response.json()) as OvieInbox;
+}
+
+/**
+ * Ovie Home: the company loop rendered through the shared Home loop canvas.
+ * Shipping comes from `ovie.shipping-state.v1` and asks from the Ovie inbox;
+ * this component adds no polling of its own beyond those existing queries.
+ */
+export function OvieHomeCanvas() {
+  const queryClient = useQueryClient();
+  const shipping = useHudShippingStateQuery(null);
+  const inbox = useQuery<OvieInbox>({
+    queryKey: INBOX_QUERY_KEY,
+    queryFn: ({ signal }) => fetchInbox(signal),
+    ...FREQUENT_CACHE,
+    refetchOnWindowFocus: true,
+    refetchInterval: 30_000,
+  });
+
+  const [pulseMemory, setPulseMemory] =
+    useState<OviePulseMemory>(readPulseMemory);
+
+  const snapshot = shipping.isPending ? null : shipping;
+  const home = useMemo(
+    () =>
+      snapshot
+        ? buildOvieHomeShipping({
+            delivery: snapshot.view.delivery,
+            operationalTasks: snapshot.operationalTasks,
+            pulseMemory,
+          })
+        : null,
+    [snapshot, pulseMemory]
+  );
+
+  useEffect(() => {
+    if (!home) return;
+    const next = rememberPulse(pulseMemory, home.pulse);
+    // Only store real changes; an unchanged read must not re-render.
+    if (JSON.stringify(next) === JSON.stringify(pulseMemory)) return;
+    setPulseMemory(next);
+    writePulseMemory(next);
+  }, [home, pulseMemory]);
+
+  const asks = useMemo(
+    () => (inbox.data ? buildOvieAsks(inbox.data) : []),
+    [inbox.data]
+  );
+
+  const onCommitted = useCallback(
+    (id: string) => {
+      queryClient.setQueryData<OvieInbox>(INBOX_QUERY_KEY, current =>
+        current
+          ? {
+              ...current,
+              cases: current.cases.filter(entry => entry.id !== id),
+            }
+          : current
+      );
+      void queryClient.invalidateQueries({ queryKey: INBOX_QUERY_KEY });
+    },
+    [queryClient]
+  );
+  const { answers, answer } = useUndoableAnswers({ onCommitted });
+
+  const decide = useCallback(
+    (ask: HomeLoopAsk, decision: 'approve' | 'reject', notes: string) => {
+      const target = inbox.data?.cases.find(
+        item => item.id === ask.id
+      )?.decisionTarget;
+      answer({
+        id: ask.id,
+        label: decision === 'approve' ? 'Approved' : `Replied: ${notes}`,
+        commit: async () => {
+          if (!target) throw new Error('This decision is no longer open.');
+          const request = inboxDecisionRequest(
+            target,
+            decision,
+            notes,
+            crypto.randomUUID()
+          );
+          const response = await fetch(request.url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(request.body),
+          });
+          if (!response.ok)
+            throw new Error(
+              response.status === 409
+                ? 'This decision changed. Review it and retry.'
+                : 'Not recorded. Try again.'
+            );
+        },
+      });
+    },
+    [answer, inbox.data]
+  );
+
+  const connection = snapshot?.view.connection ?? null;
+  // The task feed reports `syncing` with no observation until its first
+  // reconciled read; that is loading, not an empty pipeline.
+  const awaitingFirstTasks =
+    snapshot?.operationalTasks.syncState === 'syncing' &&
+    snapshot.operationalTasks.observedAt === null &&
+    snapshot.operationalTasks.tasks.length === 0;
+  const loopStatus: HomeLoopSectionStatus =
+    !snapshot || awaitingFirstTasks
+      ? 'loading'
+      : connection === 'unauthorized'
+        ? 'error'
+        : 'ready';
+  // A disconnected feed keeps the last values but must say so in text.
+  const constraint =
+    home?.constraint ??
+    (connection === 'disconnected'
+      ? { tone: 'warn' as const, text: 'Shipping data is disconnected' }
+      : null);
+  const asksStatus: HomeLoopSectionStatus = inbox.data
+    ? 'ready'
+    : inbox.isError
+      ? 'error'
+      : 'loading';
+
+  return (
+    <HomeLoopCanvas
+      copy={OVIE_HOME_COPY}
+      stages={OVIE_SHIP_STAGES}
+      constraint={constraint}
+      pulse={home?.pulse ?? []}
+      asks={asks}
+      rows={home?.rows ?? []}
+      done={home?.done ?? []}
+      doneSummary={
+        home?.mergesToday != null
+          ? `${home.mergesToday} ${home.mergesToday === 1 ? 'merge' : 'merges'}`
+          : null
+      }
+      loopStatus={loopStatus}
+      asksStatus={asksStatus}
+      answers={answers}
+      onApprove={ask => decide(ask, 'approve', '')}
+      onReply={(ask, text) => decide(ask, 'reject', text)}
+      onRetryLoop={() => void shipping.refetch()}
+      onRetryAsks={() => void inbox.refetch()}
+      asksMoreHref={APP_ROUTES.ADMIN_INBOX}
+    />
+  );
+}
