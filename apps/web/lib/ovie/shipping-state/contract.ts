@@ -362,6 +362,14 @@ export type StageSummary = {
   readonly slowestP95: readonly StageTiming[];
 };
 
+export type DeliveryMergedPullRequest = {
+  readonly repo: string;
+  readonly number: number;
+  readonly title: string;
+  readonly url: string;
+  readonly mergedAt: string;
+};
+
 export type DeliveryLanes = {
   readonly running: CountMeasurement;
   readonly slots: CountMeasurement;
@@ -392,6 +400,8 @@ export type DeliveryMerges = {
   readonly byRepo: Readonly<Record<DeliveryMergeRepo, CountMeasurement>>;
   readonly last7Days: CountMeasurement;
   readonly prior7Days: CountMeasurement;
+  /** Up to 12 PRs merged since `since`, newest first, for "done today". */
+  readonly recent?: readonly DeliveryMergedPullRequest[];
 };
 
 export type DeliveryProduction = {
@@ -559,6 +569,7 @@ export function emptyDeliverySummary(): DeliverySummary {
       },
       last7Days: NOT_MEASURED_COUNT,
       prior7Days: NOT_MEASURED_COUNT,
+      recent: [],
     },
     mergeQueueDepth: NOT_MEASURED_COUNT,
     inFlight: NOT_MEASURED_COUNT,

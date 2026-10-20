@@ -10,6 +10,7 @@ export {
   type DeliveryCertifiedHead,
   type DeliveryLane,
   type DeliveryLanes,
+  type DeliveryMergedPullRequest,
   type DeliveryMergeRepo,
   type DeliveryMerges,
   type DeliveryPatch,
