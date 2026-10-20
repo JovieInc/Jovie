@@ -652,11 +652,37 @@ def deliver(state: dict, config: dict | None, poster=post_json, now: float | Non
 
 
 # ---------------------------------------------------------------------------------------------
+# decision-log triage
+
+def triage_signals(since: str, runner=None) -> dict:
+    """Hand this run's pages to the research router's decision log (`jovie-research
+    triage-signals`): high-scoring internal adopt/buy/borrow/clone items become review triggers,
+    once per signal. Fail-open: a missing or failing command never fails the watcher."""
+    import subprocess
+    runner = runner or subprocess.run
+    if runner is subprocess.run and not shutil.which("jovie-research"):
+        return {"status": "not-installed"}
+    try:
+        done = runner(["jovie-research", "triage-signals", "--since", since, "--json"],
+                      capture_output=True, text=True, timeout=180)
+    except (OSError, subprocess.SubprocessError) as error:
+        return {"status": "unavailable", "error": type(error).__name__}
+    if done.returncode:
+        return {"status": "failed", "exit": done.returncode}
+    try:
+        result = json.loads(done.stdout or "{}")
+        return {"status": "ok", "scanned": result.get("scanned"), "actionable": result.get("actionable"),
+                "reviews": len(result.get("reviews") or [])}
+    except ValueError:
+        return {"status": "ok", "output": (done.stdout or "")[-200:]}
+
+
+# ---------------------------------------------------------------------------------------------
 # run
 
 def run(state_path: Path, *, env=None, sources: list[dict] | None = None, inbox: Path = DEFAULT_INBOX,
         fetcher=fetch, poster=post_json, put=yc_corpus.gbrain_put, summer=None, now: float | None = None,
-        dry_run: bool = False) -> dict:
+        dry_run: bool = False, triage=triage_signals) -> dict:
     env = os.environ if env is None else env
     now = now or time.time()
     observed = now_iso(now)
@@ -765,6 +791,8 @@ def run(state_path: Path, *, env=None, sources: list[dict] | None = None, inbox:
               "verdicts": verdicts, "top": top, "pending": len(state["pending"]), "stored": stored,
               "cardsQueued": queued, "delivery": delivery, "jevSpentTodayUsd": budget["spentUsd"],
               "jevCallsToday": budget["calls"], "failures": failures[:20], "failureCount": len(failures)}
+    if stored and not dry_run:
+        result["triage"] = triage(observed)
     state["lastRun"] = result
     state["nextAttemptAt"] = now + (3600 if result["status"] != "ok" else REFRESH_INTERVAL_S)
     if not dry_run:

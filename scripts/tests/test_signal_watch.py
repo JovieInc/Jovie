@@ -236,6 +236,7 @@ class RunTests(unittest.TestCase):
 
     def run_once(self, poster, brain, env=None, **kwargs):
         fetcher = Fetcher({"https://vercel.com/atom": RSS, "https://t.co/abc": ARTICLE})
+        kwargs.setdefault("triage", lambda since: {"status": "ok", "since": since})
         return W.run(self.dir / "state.json", env={"AI_GATEWAY_API_KEY": "k", **(env or {})}, sources=[source()],
                      inbox=self.inbox, fetcher=fetcher, poster=poster, put=brain, summer=self.summer, now=NOW, **kwargs)
 
@@ -284,7 +285,8 @@ class RunTests(unittest.TestCase):
         later = W.run(self.dir / "state.json", env={"AI_GATEWAY_API_KEY": "k"}, sources=[source()], inbox=self.inbox,
                       fetcher=Fetcher({"https://vercel.com/atom": lambda h: {"status": 304, "body": "", "url": "",
                                                                               "etag": None, "lastModified": None}}),
-                      poster=Poster(), put=brain, summer=self.summer, now=NOW + 7200)
+                      poster=Poster(), put=brain, summer=self.summer, now=NOW + 7200,
+                      triage=lambda since: {"status": "ok"})
         self.assertEqual((later["classified"], later["pending"]), (2, 0))
 
     def test_failed_gbrain_writes_stay_pending_with_their_verdict(self):
@@ -299,7 +301,8 @@ class RunTests(unittest.TestCase):
         later = W.run(self.dir / "state.json", env={"AI_GATEWAY_API_KEY": "k"}, sources=[source()], inbox=self.inbox,
                       fetcher=Fetcher({"https://vercel.com/atom": lambda h: {"status": 304, "body": "", "url": "",
                                                                               "etag": None, "lastModified": None}}),
-                      poster=poster, put=brain, summer=self.summer, now=NOW + 3600)
+                      poster=poster, put=brain, summer=self.summer, now=NOW + 3600,
+                      triage=lambda since: {"status": "ok"})
         self.assertEqual((later["status"], later["stored"], later["pending"], later["classified"]), ("ok", 2, 0, 0))
         self.assertEqual(sum(1 for call in poster.calls if call[0] == W.JEV_URL), jev_calls)
         self.assertEqual(len(later["cardsQueued"]), 1)
@@ -318,6 +321,23 @@ class RunTests(unittest.TestCase):
         state = json.loads((self.dir / "state.json").read_text())
         self.assertEqual(state["pending"][0]["title"], "Queues GA")
         self.assertEqual(state["pending"][0]["verdict"]["action"], "ignore")
+
+    def test_triage_runs_after_stored_pages_and_fails_open(self):
+        result = self.run_once(Poster(), Brain())
+        self.assertEqual(result["triage"], {"status": "ok", "since": "2026-10-20T00:00:00Z"})
+        self.assertEqual(W.triage_signals("x", runner=lambda *a, **k: (_ for _ in ()).throw(FileNotFoundError())),
+                         {"status": "unavailable", "error": "FileNotFoundError"})
+        done = subprocess.CompletedProcess([], 0, '{"scanned": 4, "actionable": 1, "reviews": [{"signal": "s"}]}', "")
+        self.assertEqual(W.triage_signals("x", runner=lambda *a, **k: done),
+                         {"status": "ok", "scanned": 4, "actionable": 1, "reviews": 1})
+        self.assertEqual(W.triage_signals("x", runner=lambda *a, **k: subprocess.CompletedProcess([], 2, "", "")),
+                         {"status": "failed", "exit": 2})
+        original = W.shutil.which
+        W.shutil.which = lambda name: None
+        try:
+            self.assertEqual(W.triage_signals("x"), {"status": "not-installed"})
+        finally:
+            W.shutil.which = original
 
     def test_undeployed_summer_route_keeps_cards_in_outbox(self):
         poster = Poster({"Queues GA": jev_answer("adopt", 0.9)}, summer_status=404)
