@@ -307,7 +307,7 @@ jobs:
           NEXT_PUBLIC_FEATURE_THEME_SWITCHING: '1'
 
       - name: File login-timeout remediation
-        if: ${{ always() && steps.e2e-matrix.outcome != 'skipped' }}
+        if: ${{ always() && steps.e2e-matrix.outcome == 'failure' }}
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           REMEDIATION_INTAKE_DISABLED: ${{ vars.REMEDIATION_INTAKE_DISABLED }}
@@ -367,6 +367,28 @@ jobs:
     if: ${{ always() && github.event_name == 'push' }}
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: ${{ needs.build-web.result == 'success' && needs.e2e-full-matrix.result == 'success' }}
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        if: ${{ needs.build-web.result == 'success' && needs.e2e-full-matrix.result == 'success' }}
+        with:
+          node-version-file: .nvmrc
+      - name: Clear only a complete login-timeout matrix
+        id: matrix-remediation
+        if: ${{ needs.build-web.result == 'success' && needs.e2e-full-matrix.result == 'success' }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_INTAKE_DISABLED: ${{ vars.REMEDIATION_INTAKE_DISABLED }}
+          REMEDIATION_MODE: login
+          REMEDIATION_CONCLUSION: success
+          REMEDIATION_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          for browser in chromium firefox; do
+            REMEDIATION_SOURCE="e2e-full-matrix.yml:${browser}" node scripts/remediation-signal-intake.mjs
+          done
       - name: Slack notification on failure
         if: ${{ needs.build-web.result == 'failure' || needs.e2e-full-matrix.result == 'failure' }}
         uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
@@ -392,7 +414,7 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       - name: Slack notification on success
-        if: ${{ needs.build-web.result == 'success' && needs.e2e-full-matrix.result == 'success' }}
+        if: ${{ needs.build-web.result == 'success' && needs.e2e-full-matrix.result == 'success' && steps.matrix-remediation.outputs.login_matrix_qualified == 'true' }}
         uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
         with:
           status: custom
