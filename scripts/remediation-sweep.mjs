@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 
 import { execFile } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
 import { promisify } from 'node:util';
+import { runCheck as runCredentialsCheck } from './credentials-spend-check.mjs';
 import {
   COMPANY_DOMAINS,
   parseRdap,
@@ -293,6 +295,29 @@ export async function loadDomainRecords({
   return records;
 }
 
+/**
+ * Live credentials/spend evaluation for the sweep. Writes the run record
+ * (stage timestamps, counts) to CREDENTIALS_RUN_RECEIPT for the artifact.
+ */
+export async function loadCredentialsPlans({
+  env = process.env,
+  check = runCredentialsCheck,
+} = {}) {
+  const report = await check({ env, live: true });
+  if (env.CREDENTIALS_RUN_RECEIPT)
+    writeFileSync(
+      env.CREDENTIALS_RUN_RECEIPT,
+      `${JSON.stringify(report.run)}\n`
+    );
+  const warnings = report.run.stages
+    .filter(stage => stage.ok === false)
+    .map(
+      stage =>
+        `Credentials registry read ${stage.name} unavailable: ${stage.reason}`
+    );
+  return { plans: report.plans, warnings };
+}
+
 function warn(message) {
   console.error(message);
   if (process.env.GITHUB_ACTIONS === 'true')
@@ -313,6 +338,7 @@ async function main() {
     loadSummerPulls: () => loadSummerConfigPullRequests(),
     loadDeployments: () => loadVercelDeployments({ token: token?.token }),
     loadDomains: () => loadDomainRecords(),
+    loadCredentials: () => loadCredentialsPlans(),
     vercelTokenPresent: Boolean(token),
     upsert: upsertLinearIssueByTitleFingerprint,
     apiKey: process.env.LINEAR_API_KEY,
