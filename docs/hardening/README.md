@@ -2,6 +2,9 @@
 
 Tracking issue: [JOV-2712](https://linear.app/jovie/issue/JOV-2712/track-platform-hardening-deliverables-and-ios-evidence-baseline)
 
+Moved from the repository root to `docs/hardening/` on 2026-10-20 (repo
+hygiene pass); `RELEASE_CHECKLIST.md` stays at the root.
+
 This file is the index for the production-readiness deliverables requested in
 the June 2 hardening brief. Each linked artifact distinguishes verified,
 failing, and evidence-required areas, with evidence from local checks, CI,
