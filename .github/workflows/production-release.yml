@@ -311,6 +311,18 @@ jobs:
             echo "subject_digest=sha256:$digest"
           } >> "$GITHUB_OUTPUT"
           rm -f "$subject_path"
+      # EVENT 2026-10-20 (Tim): on-demand Vercel builds for jovie prod/staging
+      # on a fixed Standard machine, hard cap $10/mo, cutoff $8, alert $5.
+      # The ledger is the only writer of the on-demand flag and runs before
+      # every jovie build, so it stops spend before it accrues. It never fails
+      # the release: off only means the normal build queue.
+      - name: Enforce Vercel on-demand spend cap
+        continue-on-error: true
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+        run: node .github/scripts/vercel-on-demand-ledger.mjs
+
       - name: Deploy (staging preview, prebuilt)
         timeout-minutes: 10
         id: deploy
@@ -883,6 +895,18 @@ jobs:
           key: jovie-production-next-cache-v1-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js', 'apps/web/vercel.json') }}
           restore-keys: |
             jovie-production-next-cache-v1-${{ runner.os }}-
+      # EVENT 2026-10-20 (Tim): on-demand Vercel builds for jovie prod/staging
+      # on a fixed Standard machine, hard cap $10/mo, cutoff $8, alert $5.
+      # The ledger is the only writer of the on-demand flag and runs before
+      # every jovie build, so it stops spend before it accrues. It never fails
+      # the release: off only means the normal build queue.
+      - name: Enforce Vercel on-demand spend cap
+        continue-on-error: true
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+        run: node .github/scripts/vercel-on-demand-ledger.mjs
+
       - name: Build and stage production deployment
         id: stage-production
         if: ${{ steps.mutation-head.outputs.is_current == 'true' }}
