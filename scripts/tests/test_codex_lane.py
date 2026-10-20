@@ -1330,6 +1330,38 @@ class SubscriptionPoolTest(Isolated):
         codex.reconcile(self.NOW,fetch=fetch)
         self.assertEqual(seen,["current-login","lyb-pro"])
 
+    def test_identity_evidence_refreshes_before_it_lapses_and_a_failed_refresh_recovers(self):
+        # Gem 2026-10-20: a metadata timeout throttled the next attempt for a whole cadence,
+        # identity evidence lapsed on both accounts and the lane read "all-accounts-banked"
+        # with 99% capacity left. Refresh must start before the lapse and retry quickly.
+        calls = []
+        def fetch_at(at, fail=False):
+            def fetch(name):
+                calls.append((at, name))
+                if fail:
+                    raise TimeoutError("public subscription metadata unavailable")
+                value = current_snapshot(at)
+                value["account"]["account"].update(email=self.emails[name], planType="pro")
+                return value
+            return fetch
+        codex.reconcile(self.NOW, fetch=fetch_at(self.NOW))
+        lead = self.NOW + codex.LEDGER_CADENCE_S - codex.SUBSCRIPTION_REFRESH_LEAD_S
+        codex.reconcile(lead - 1, fetch=fetch_at(lead - 1))
+        self.assertEqual([at for at, _ in calls], [self.NOW, self.NOW], "fresh evidence keeps the cadence")
+        codex.reconcile(lead, fetch=fetch_at(lead, fail=True))
+        self.assertEqual(calls[2:], [(lead, "current-login"), (lead, "lyb-pro")])
+        codex.reconcile(lead + 1, fetch=fetch_at(lead + 1))
+        self.assertEqual(len(calls), 4, "a failed refresh is never hot-looped")
+        state = codex.read_state()
+        self.assertTrue(all(codex.available(name, state, lead) for name in self.profiles))
+        retry = lead + codex.SUBSCRIPTION_RETRY_S
+        result = codex.reconcile(retry, fetch=fetch_at(retry))
+        self.assertTrue(all(row["reconciled"] for row in result["profiles"].values()))
+        lapsed = self.NOW + codex.LEDGER_CADENCE_S + 60
+        state = codex.read_state()
+        self.assertTrue(all(codex.available(name, state, lapsed) for name in self.profiles))
+        self.assertLess(retry, self.NOW + codex.LEDGER_CADENCE_S)
+
     def test_auth_bank_clears_only_after_newer_bound_official_identity_observation(self):
         self.reconcile()
         for failed_at,verified_at,clears in ((self.NOW-1,self.NOW,True),

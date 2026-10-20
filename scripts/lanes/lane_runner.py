@@ -810,7 +810,12 @@ def quota_pressure(host: "Host", name: str, spec: dict, now: float) -> dict:
             return {"ok": True, "why": "accounts unread", "pressure": 0}
         spent = sum(1 for row in rows if not row.get("available"))
         if spent >= len(rows):
-            return {"ok": False, "why": "all-accounts-banked", "pressure": 0}
+            # An unavailable account is not necessarily banked: stale or missing capacity
+            # evidence also refuses it. Name which, so the exclusion is explainable.
+            banked = sum(1 for row in rows if row.get("exhaustedUntil"))
+            why = ("all-accounts-banked" if banked >= len(rows) else
+                   f"all-accounts-unavailable ({banked} banked, {len(rows) - banked} without fresh capacity evidence)")
+            return {"ok": False, "why": why, "pressure": 0}
         return {"ok": True, "why": f"{spent}/{len(rows)} accounts banked", "pressure": spent / len(rows)}
     if source == "ledger":
         used = recent_lane_runs(host, name, float(quota.get("windowS", 86400)), now)
