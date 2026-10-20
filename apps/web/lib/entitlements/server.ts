@@ -11,6 +11,7 @@ import {
   hasAdvancedFeatures,
   isProPlan,
 } from '@/lib/entitlements/registry';
+import { captureRevenueSpineFailure } from '@/lib/observability/revenue-spine';
 import { isLegacyFanSendPrice } from '@/lib/stripe/config';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync';
 import { logger } from '@/lib/utils/logger';
@@ -197,6 +198,14 @@ export async function getCurrentUserEntitlements(options?: {
     hasAdminRole && (await hasRecentAdminMfaReverification(authResult));
 
   if (!billing.success) {
+    captureRevenueSpineFailure({
+      stage: 'entitlement_readback',
+      failureCode: isMissingBillingRecord(billing.error)
+        ? 'record_missing'
+        : 'billing_unavailable',
+      severity: 'degraded',
+      userId,
+    });
     if (isMissingBillingRecord(billing.error)) {
       return buildFreeEntitlements({
         userId,
@@ -227,6 +236,12 @@ export async function getCurrentUserEntitlements(options?: {
   }
 
   if (!billing.data) {
+    captureRevenueSpineFailure({
+      stage: 'entitlement_readback',
+      failureCode: 'record_missing',
+      severity: 'unknown',
+      userId,
+    });
     // User exists in auth but not in billing DB — genuinely a new/free user.
     return buildFreeEntitlements({
       userId,
@@ -253,6 +268,12 @@ export async function getCurrentUserEntitlements(options?: {
   });
 
   if (normalized.mismatch) {
+    captureRevenueSpineFailure({
+      stage: 'entitlement_readback',
+      failureCode: 'plan_mismatch',
+      severity: 'degraded',
+      userId,
+    });
     logger.warn('Billing plan mismatch normalized for entitlements', {
       userId,
       rawPlan: normalized.mismatch.rawPlan,

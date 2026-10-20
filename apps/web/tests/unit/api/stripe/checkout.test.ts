@@ -12,6 +12,11 @@ import {
 import { supportedAgentDecision } from '@/tests/fixtures/agent-handoff';
 import { malformedJsonRequest } from '@/tests/helpers/malformed-json-request';
 
+const mockRevenueFailure = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/observability/revenue-spine', () => ({
+  captureRevenueSpineFailure: mockRevenueFailure,
+}));
+
 const mockGetCachedAuth = vi.hoisted(() => vi.fn());
 const mockCreateCheckoutSession = vi.hoisted(() => vi.fn());
 const mockCreateBillingPortalSession = vi.hoisted(() => vi.fn());
@@ -618,6 +623,12 @@ describe('POST /api/stripe/checkout', () => {
     expect(response.status).toBe(503);
     expect(response.headers.get('Retry-After')).toBe('5');
     expect(payload.error).toContain('temporarily unavailable');
+    expect(mockRevenueFailure).toHaveBeenCalledExactlyOnceWith({
+      stage: 'checkout',
+      severity: 'blocked',
+      userId: 'user_123',
+      error: expect.any(Error),
+    });
     expect(mockCreateCheckoutSession).toHaveBeenCalledTimes(3);
   });
 
