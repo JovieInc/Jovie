@@ -86,7 +86,7 @@ const approvedVariantBinding = (
 ): RenderedSectionBinding =>
   approvedBinding(componentPath, sectionId, variantId, occurrenceId);
 
-/** Layout opt-in from MarketingEmailSignup on the public product pages. */
+/** Layout opt-in from MarketingEmailSignup on product-update and editorial pages. */
 const productUpdatesCapture = approvedVariantBinding(
   'apps/web/app/(marketing)/changelog/ChangelogEmailSignup.tsx',
   'capture',
@@ -383,12 +383,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'cta',
         'plan-actions'
       ),
-      approvedVariantBinding(
-        'apps/web/app/(marketing)/changelog/ChangelogEmailSignup.tsx',
-        'capture',
-        'email-only',
-        'product-updates'
-      ),
+      productUpdatesCapture,
     ],
     bindingEvidence: {
       status: 'verified',
@@ -472,12 +467,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'cta',
         'final-single-claim'
       ),
-      approvedVariantBinding(
-        'apps/web/app/(marketing)/changelog/ChangelogEmailSignup.tsx',
-        'capture',
-        'email-only',
-        'product-updates'
-      ),
+      productUpdatesCapture,
     ],
     bindingEvidence: {
       status: 'verified',
