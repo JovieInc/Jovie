@@ -555,7 +555,7 @@
         },
         {
           "path": "scripts/lib/stage-events.mjs",
-          "sha256": "3d66ba10bd994fbb660a419c6c0ffb77a6c45b29b2ca12ef8f307318184c208c"
+          "sha256": "7a89f64269f3d4089a864edd587f22a2d116ab9652e5443dd17c910ecddef79c"
         }
       ]
     }

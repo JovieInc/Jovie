@@ -184,7 +184,9 @@ export function chainStages(
         ? 'completed'
         : next
           ? 'advanced'
-          : (stamp.outcome ?? 'open'),
+          : OUTCOMES.includes(stamp.outcome)
+            ? stamp.outcome
+            : 'open',
       sourceReceipt: stamp.sourceReceipt,
     });
   }
@@ -206,7 +208,9 @@ const seconds = (from, to) => {
 function dwellSamples(events) {
   const out = {};
   for (const event of events) {
-    if (!event.exitedAt || event.outcome === 'completed') continue;
+    // Terminal stages are reported as arrivals by computeStageTimings, so a
+    // dwell sample is kept for every exited stage whatever its outcome.
+    if (!event.exitedAt) continue;
     const value = seconds(event.enteredAt, event.exitedAt);
     if (value === null) continue;
     const key = `${event.entityType}:${event.stage}`;

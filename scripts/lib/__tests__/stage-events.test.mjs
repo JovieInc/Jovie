@@ -140,6 +140,13 @@ describe('stage event contract', () => {
       MANIFEST
     );
     expect(open[0]).toMatchObject({ outcome: 'open', exitedAt: null });
+    const bogus = chainStages(
+      'shipping',
+      'y',
+      [{ stage: 'ready', at: ago(3), sourceReceipt: 'r', outcome: 'shipped' }],
+      MANIFEST
+    );
+    expect(bogus[0].outcome).toBe('open');
   });
 });
 
