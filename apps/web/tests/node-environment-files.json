@@ -1063,6 +1063,7 @@
   "tests/unit/marketing/composition-validation.test.ts",
   "tests/unit/marketing/copy-review-panel.test.ts",
   "tests/unit/marketing/copy-semantic-guard.test.ts",
+  "tests/unit/marketing/correction-pyramid-guards.test.ts",
   "tests/unit/marketing/cta-neutral-style-guard.test.ts",
   "tests/unit/marketing/demovideo-system-b-style-guard.test.ts",
   "tests/unit/marketing/feature-tile-accent-uniqueness.test.ts",

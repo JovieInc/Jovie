@@ -917,6 +917,28 @@
     flex: 1 1 0%;
     min-height: 0;
   }
+
+  /* The phone card is a fixed height and the dock is absolute, so column
+     margin alone still left the scroll border box on the card bottom (the
+     dock then covered the last ~42px). Cap the column itself. Mobile overflow
+     mode stays in the max-width block above and is unchanged. */
+  [data-testid="profile-compact-surface"]:not(
+    [data-presentation="embedded"]
+  ):has(> .profile-floating-tab-bar) > .profile-content-column {
+    flex: 1 1 auto;
+    height: calc(100% - var(--profile-bottom-nav-height));
+    max-height: calc(100% - var(--profile-bottom-nav-height));
+    min-height: 0;
+    margin-bottom: 0;
+  }
+
+  [data-testid="profile-compact-surface"]:not(
+      [data-presentation="embedded"]
+    ):has(> .profile-floating-tab-bar)
+    .profile-content-scroll-region {
+    max-height: 100%;
+    min-height: 0;
+  }
 }
 
 /* Mobile home: the identity header and the rail share one scroll region.

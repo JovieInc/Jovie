@@ -437,7 +437,7 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         media: 'none',
         alignment: 'left',
         chooseWhen:
-          'explicit YouTube paste-first source binding only; no automatic selection',
+          'explicit informational source binding, including planned announcements without an approved capture; no automatic selection',
         exemplar: { route: '/youtube-thumbnails', section: 'hero' },
         status: 'active',
       },

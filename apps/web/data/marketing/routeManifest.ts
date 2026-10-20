@@ -14,6 +14,12 @@
  * surfaces or sanction an exemption.
  */
 
+import { JOVIE_CARD_HERO_EVIDENCE } from '@/data/jovieCardCopy';
+import {
+  getProductCapability,
+  type ProductCapabilityId,
+  ROUTE_CAPABILITY_BINDINGS,
+} from '@/data/product-truth/registry';
 import { isRenderFixturePathname } from '@/lib/render-fixture-policy';
 import type { ProposedSectionId } from './designGaps';
 import type { RecipeId } from './recipes';
@@ -80,6 +86,14 @@ const approvedVariantBinding = (
 ): RenderedSectionBinding =>
   approvedBinding(componentPath, sectionId, variantId, occurrenceId);
 
+/** Layout opt-in from MarketingEmailSignup on the public product-update pages. */
+const productUpdatesCapture = approvedVariantBinding(
+  'apps/web/app/(marketing)/changelog/ChangelogEmailSignup.tsx',
+  'capture',
+  'email-only',
+  'product-updates'
+);
+
 /**
  * Product evidence kind (JOV-6917, invariant `product-page-shows-product`):
  * the canonical product UI a product route must render.
@@ -95,8 +109,7 @@ export type ProductEvidenceKind =
   | 'interactive-mockup'
   | 'annotated-callout';
 
-export interface ProductEvidenceDeclaration {
-  readonly kind: ProductEvidenceKind;
+interface ProductEvidenceLocation {
   /**
    * Source file that renders the evidence (the landing component or the
    * evidence component itself). Must exist on disk.
@@ -108,6 +121,20 @@ export interface ProductEvidenceDeclaration {
    */
   readonly testId: string;
 }
+
+/**
+ * Planned descriptions are explicit announcement fallbacks, not product UI
+ * proof. They are allowed only for a route's public interest-capture capability.
+ * Live product routes must still show their actual product evidence.
+ */
+export type ProductEvidenceDeclaration = ProductEvidenceLocation &
+  (
+    | { readonly kind: ProductEvidenceKind }
+    | {
+        readonly kind: 'planned-description';
+        readonly capabilityId: ProductCapabilityId;
+      }
+  );
 
 /**
  * Recipes whose routes are product pages: they exist to demonstrate a real
@@ -140,7 +167,7 @@ export function isProductRouteEntry(
  * well-formed. Rendered-DOM enforcement lives in the contract test.
  */
 export function productEvidenceDeclarationIssue(
-  entry: Pick<RouteManifestEntry, 'glob' | 'productEvidence'>
+  entry: Pick<RouteManifestEntry, 'glob' | 'url' | 'productEvidence'>
 ): string | null {
   const evidence = entry.productEvidence;
   if (!evidence) {
@@ -151,6 +178,21 @@ export function productEvidenceDeclarationIssue(
   }
   if (!evidence.testId.trim()) {
     return `${entry.glob} productEvidence.testId is empty`;
+  }
+  if (evidence.kind === 'planned-description') {
+    const boundCapability = Object.entries(ROUTE_CAPABILITY_BINDINGS).find(
+      ([url]) => url === entry.url
+    )?.[1];
+    if (boundCapability !== evidence.capabilityId) {
+      return `${entry.glob} planned description must match its route capability`;
+    }
+    const capability = getProductCapability(evidence.capabilityId);
+    if (
+      capability?.publication !== 'public' ||
+      capability.access !== 'interest_capture'
+    ) {
+      return `${entry.glob} planned description requires a public interest-capture capability`;
+    }
   }
   return null;
 }
@@ -351,12 +393,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'cta',
         'plan-actions'
       ),
-      approvedVariantBinding(
-        'apps/web/app/(marketing)/changelog/ChangelogEmailSignup.tsx',
-        'capture',
-        'email-only',
-        'product-updates'
-      ),
+      productUpdatesCapture,
     ],
     bindingEvidence: {
       status: 'verified',
@@ -440,12 +477,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'cta',
         'final-single-claim'
       ),
-      approvedVariantBinding(
-        'apps/web/app/(marketing)/changelog/ChangelogEmailSignup.tsx',
-        'capture',
-        'email-only',
-        'product-updates'
-      ),
+      productUpdatesCapture,
     ],
     bindingEvidence: {
       status: 'verified',
@@ -634,6 +666,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'cta',
         'final-single-claim'
       ),
+      productUpdatesCapture,
     ],
     bindingEvidence: {
       status: 'verified',
@@ -687,6 +720,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'cta',
         'final-single-claim'
       ),
+      productUpdatesCapture,
     ],
     bindingEvidence: {
       status: 'verified',
@@ -733,6 +767,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'cta',
         'final-single-claim'
       ),
+      productUpdatesCapture,
     ],
     bindingEvidence: {
       status: 'verified',
@@ -819,6 +854,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'cta',
         'included-single'
       ),
+      productUpdatesCapture,
     ],
     bindingEvidence: {
       status: 'verified',
@@ -860,6 +896,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'cta',
         'included-single'
       ),
+      productUpdatesCapture,
     ],
     bindingEvidence: {
       status: 'verified',
@@ -920,7 +957,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       approvedVariantBinding(
         'apps/web/components/marketing/MarketingHero.tsx',
         'hero',
-        'split-screenshot-right'
+        'left-none'
       ),
       approvedVariantBinding(
         'apps/web/app/(marketing)/card/JovieCardLanding.tsx',
@@ -946,18 +983,14 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     bindingEvidence: {
       status: 'verified',
       source:
-        'JOV-6237 source implementation and route-health contract 2026-09-19',
+        'JOV-6237 / JOV-7750 planned Card announcement and interest-capture contract',
       notes:
-        'Coming-soon feature page using canonical marketing sections, an explicitly illustrative card preview, and the approved public-profile screenshot registry. Exact mounted identities are exercised by marketing-route-health.',
+        'Text-led coming-soon page while an approved Wallet depiction is unavailable. The declared planned description is not Wallet UI or issuance proof. Exact mounted identities are exercised by marketing-route-health.',
     },
     status: 'active',
     specVersion: '1.4.0',
     url: '/card',
-    productEvidence: {
-      kind: 'framed-screenshot',
-      componentPath: 'apps/web/components/marketing/ProductScreenshotFrame.tsx',
-      testId: 'product-screenshot-frame-public-profile-mobile',
-    },
+    productEvidence: JOVIE_CARD_HERO_EVIDENCE,
     healthCheck: {
       path: '/card',
       expected: 'page',
@@ -1065,6 +1098,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'cta',
         'final-dual-path'
       ),
+      productUpdatesCapture,
     ],
     bindingEvidence: {
       status: 'verified',
@@ -1104,6 +1138,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'cta',
         'final-single-claim'
       ),
+      productUpdatesCapture,
     ],
     bindingEvidence: {
       status: 'verified',
@@ -1133,6 +1168,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'cta',
         'final-single-claim'
       ),
+      productUpdatesCapture,
     ],
     bindingEvidence: {
       status: 'verified',
@@ -1221,6 +1257,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'cta',
         'final-single-claim'
       ),
+      productUpdatesCapture,
     ],
     bindingEvidence: {
       status: 'verified',

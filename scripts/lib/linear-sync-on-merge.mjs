@@ -119,6 +119,9 @@ export const COMMISSIONING_PARENT_ALLOWLIST = new Set([
 ]);
 
 const IDENTIFIER_RE = /^JOV-(\d+)$/i;
+// Prerequisites can belong to another Linear team; only Jovie issues are
+// eligible for this writer's transitions (see IDENTIFIER_RE above).
+const DEPENDENCY_IDENTIFIER_RE = /^[A-Za-z][A-Za-z0-9]*-[1-9][0-9]*$/;
 const COMMISSIONING_LABEL_RE = /commission/i;
 const PARENT_LABEL_RE = /^(parent|epic|type:epic)$/i;
 const MAX_OPEN_PR_PAGES = 20;
@@ -701,6 +704,7 @@ export async function listOpenPullRequests(input) {
 
 const ISSUE_FIELDS = `
     id
+    updatedAt
     identifier
     title
     description
@@ -712,6 +716,10 @@ const ISSUE_FIELDS = `
     }
     children(first: 50) {
       nodes { identifier completedAt canceledAt state { type } }
+      pageInfo { hasNextPage endCursor }
+    }
+    inverseRelations(first: 50) {
+      nodes { id type issue { id identifier state { id name type } } }
       pageInfo { hasNextPage endCursor }
     }
     attachments(first: 50) { nodes { url } }
@@ -744,6 +752,15 @@ const CHILDREN_PAGE_QUERY = `query IssueLifecycleChildren($issueId: String!, $af
   }
 }`;
 
+const BLOCKERS_PAGE_QUERY = `query IssueLifecycleBlockers($issueId: String!, $after: String!) {
+  issue(id: $issueId) {
+    inverseRelations(first: 50, after: $after) {
+      nodes { id type issue { id identifier state { id name type } } }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
+}`;
+
 const ISSUE_STATE_QUERY = `query IssueLifecycleState($issueId: String!) {
   issue(id: $issueId) { id state { id name } }
 }`;
@@ -770,6 +787,7 @@ const SWEEP_QUERY = `query LifecycleSweep($states: [String!]!, $after: String) {
 
 const MAX_COMMENT_PAGES = 10;
 const MAX_CHILD_PAGES = 20;
+const MAX_BLOCKER_PAGES = 20;
 const MAX_SWEEP_PAGES = 10;
 const CI_HARNESS_MANIFEST = '.github/ci-harness/manifest.json';
 const ASSURANCE_MATRIX = 'scripts/invariants/assurance-matrix.json';
@@ -839,6 +857,81 @@ ${selections.join('\n')}
  * @param {Record<string, any>} raw
  */
 async function materializeLifecycleIssue(fetchImpl, apiKey, raw) {
+  // Incoming `blocks` edges name this issue's prerequisites. Outgoing
+  // edges and related issues do not make this issue dependent on them.
+  const blockingIssues = [];
+  let blockerPage = raw.inverseRelations;
+  const blockerCursors = new Set();
+  const blockerIds = new Set();
+  for (let page = 0; ; page += 1) {
+    if (
+      !Array.isArray(blockerPage?.nodes) ||
+      typeof blockerPage?.pageInfo?.hasNextPage !== 'boolean'
+    ) {
+      throw new Error(
+        `Blocking dependency metadata for ${raw.identifier} is incomplete`
+      );
+    }
+    for (const relation of blockerPage.nodes) {
+      if (
+        typeof relation?.id !== 'string' ||
+        !relation.id ||
+        blockerIds.has(relation.id) ||
+        typeof relation.type !== 'string' ||
+        !relation.type
+      ) {
+        throw new Error(
+          `Blocking dependency metadata for ${raw.identifier} is incomplete`
+        );
+      }
+      blockerIds.add(relation.id);
+      if (relation.type !== 'blocks') continue;
+      const prerequisite = relation.issue;
+      if (
+        typeof prerequisite?.id !== 'string' ||
+        !prerequisite.id ||
+        !DEPENDENCY_IDENTIFIER_RE.test(String(prerequisite.identifier ?? '')) ||
+        typeof prerequisite.state?.id !== 'string' ||
+        !prerequisite.state.id ||
+        typeof prerequisite.state.name !== 'string' ||
+        !prerequisite.state.name ||
+        typeof prerequisite.state.type !== 'string' ||
+        !prerequisite.state.type
+      ) {
+        throw new Error(
+          `Blocking dependency state for ${raw.identifier} is incomplete`
+        );
+      }
+      blockingIssues.push({
+        relationId: relation.id,
+        id: prerequisite.id,
+        identifier: prerequisite.identifier,
+        state: {
+          id: prerequisite.state.id,
+          name: prerequisite.state.name,
+          type: prerequisite.state.type,
+        },
+      });
+    }
+    if (!blockerPage.pageInfo.hasNextPage) break;
+    const after = blockerPage.pageInfo.endCursor;
+    if (
+      page >= MAX_BLOCKER_PAGES - 1 ||
+      typeof after !== 'string' ||
+      !after ||
+      blockerCursors.has(after)
+    ) {
+      throw new Error(
+        `Blocking dependency metadata for ${raw.identifier} exceeds the read bound`
+      );
+    }
+    blockerCursors.add(after);
+    const more = await linearGraphql(fetchImpl, apiKey, BLOCKERS_PAGE_QUERY, {
+      issueId: raw.id,
+      after,
+    });
+    blockerPage = more.issue?.inverseRelations;
+  }
   const history = [];
   let historyPage = raw.history;
   for (let page = 0; ; page += 1) {
@@ -875,8 +968,16 @@ async function materializeLifecycleIssue(fetchImpl, apiKey, raw) {
     : reopenTimes.length > 0
       ? new Date(Math.max(...reopenTimes)).toISOString()
       : undefined;
-  const comments = [...(raw.comments?.nodes ?? [])];
-  let pageInfo = raw.comments?.pageInfo;
+  if (
+    !Array.isArray(raw.comments?.nodes) ||
+    typeof raw.comments?.pageInfo?.hasNextPage !== 'boolean'
+  ) {
+    throw new Error(
+      `Unreadable lifecycle preimage comments for ${raw.identifier}`
+    );
+  }
+  const comments = [...raw.comments.nodes];
+  let pageInfo = raw.comments.pageInfo;
   for (
     let page = 0;
     pageInfo?.hasNextPage === true && page < MAX_COMMENT_PAGES;
@@ -886,8 +987,17 @@ async function materializeLifecycleIssue(fetchImpl, apiKey, raw) {
       issueId: raw.id,
       after: pageInfo.endCursor,
     });
-    comments.push(...(more.issue?.comments?.nodes ?? []));
-    pageInfo = more.issue?.comments?.pageInfo;
+    const nextPage = more.issue?.comments;
+    if (
+      !Array.isArray(nextPage?.nodes) ||
+      typeof nextPage?.pageInfo?.hasNextPage !== 'boolean'
+    ) {
+      throw new Error(
+        `Unreadable lifecycle preimage comments for ${raw.identifier}`
+      );
+    }
+    comments.push(...nextPage.nodes);
+    pageInfo = nextPage.pageInfo;
   }
   if (pageInfo?.hasNextPage === true) {
     throw new Error(
@@ -947,6 +1057,7 @@ async function materializeLifecycleIssue(fetchImpl, apiKey, raw) {
   }
   return {
     ...snapshot,
+    updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : '',
     state: {
       id: String(raw.state?.id ?? ''),
       name: String(raw.state?.name ?? ''),
@@ -956,6 +1067,10 @@ async function materializeLifecycleIssue(fetchImpl, apiKey, raw) {
       body: String(comment?.body ?? ''),
       createdAt: String(comment?.createdAt ?? ''),
     })),
+    children: childNodes.map(child =>
+      String(child?.identifier ?? '').toUpperCase()
+    ),
+    hasChildren: childNodes.length > 0,
     openChildren: childNodes
       .filter(
         child =>
@@ -963,6 +1078,7 @@ async function materializeLifecycleIssue(fetchImpl, apiKey, raw) {
       )
       .map(child => String(child?.identifier ?? '').toUpperCase())
       .filter(Boolean),
+    blockingIssues,
     reopenedAfterDone: reopens.length > 0,
     receiptNotBefore,
     ...(childDeliveryTimes.length > 0
@@ -976,6 +1092,56 @@ async function materializeLifecycleIssue(fetchImpl, apiKey, raw) {
       .map(node => String(node?.url ?? ''))
       .filter(Boolean),
   };
+}
+
+/**
+ * The issue inputs used by this decision, including separately versioned
+ * comments and child delivery. Preserve canonical comment order (including
+ * equal-time ties); normalize only unordered inputs. Never log raw content.
+ * This guards fact-read races; the final read-to-mutation interval remains
+ * non-atomic.
+ *
+ * @param {Awaited<ReturnType<typeof readLifecycleIssue>>} issue
+ */
+function lifecyclePreimage(issue) {
+  if (
+    !issue?.id ||
+    !issue.state.id ||
+    !issue.state.name ||
+    !issue.state.type ||
+    !Number.isFinite(Date.parse(issue.updatedAt)) ||
+    issue.acceptanceMetadataVerified !== true ||
+    issue.commentRecords.some(
+      comment => !Number.isFinite(Date.parse(comment.createdAt))
+    )
+  ) {
+    throw new Error(
+      `Unreadable lifecycle preimage for ${issue?.identifier ?? 'issue'}`
+    );
+  }
+  return JSON.stringify({
+    id: issue.id,
+    updatedAt: issue.updatedAt,
+    state: issue.state,
+    title: issue.title,
+    description: issue.description,
+    labels: [...issue.labels].sort(),
+    reopenedAfterDone: issue.reopenedAfterDone,
+    receiptNotBefore: issue.receiptNotBefore ?? null,
+    outcomeNotBefore: issue.outcomeNotBefore ?? null,
+    comments: issue.commentRecords.map(comment =>
+      JSON.stringify([comment.createdAt, comment.body])
+    ),
+    children: [...issue.children].sort(),
+    openChildren: [...issue.openChildren].sort(),
+    blockingIssues: issue.blockingIssues
+      .map(dependency => JSON.stringify(dependency))
+      .sort(),
+    attachments: [...issue.attachmentUrls].sort(),
+    states: issue.states
+      .map(state => JSON.stringify([state.id, state.name, state.type]))
+      .sort(),
+  });
 }
 
 /**
@@ -1028,6 +1194,17 @@ export async function reconcileIssueLifecycle(ctx) {
   return reconcileValidation({
     issue,
     holds,
+    completionHolds: issue.blockingIssues
+      .filter(
+        dependency =>
+          dependency.state.type !== 'completed' ||
+          dependency.state.name !== LIFECYCLE_STATES.done
+      )
+      .map(
+        dependency =>
+          `Blocking prerequisite ${dependency.identifier} is ${dependency.state.name}; Done is required before closure.`
+      )
+      .sort(),
     parentReason: parentHoldReason(issue, ctx.allowlist),
     github: ctx.github,
     repository: ctx.repository,
@@ -1038,10 +1215,21 @@ export async function reconcileIssueLifecycle(ctx) {
     dryRun: ctx.dryRun,
     log: ctx.log,
     linear: {
-      readStateId: async issueId =>
-        String(
-          (await linear(ISSUE_STATE_QUERY, { issueId })).issue?.state?.id ?? ''
-        ),
+      readStateId: async issueId => {
+        // Only moving decisions pay for this complete read. Issue updatedAt
+        // alone cannot prove unchanged comments or child delivery/acceptance.
+        const current = await readLifecycleIssue(
+          ctx.fetchImpl,
+          ctx.apiKey,
+          issueId
+        );
+        if (current?.id !== issueId) {
+          throw new Error(`Unreadable lifecycle preimage for ${issueId}`);
+        }
+        return lifecyclePreimage(current) === lifecyclePreimage(issue)
+          ? current.state.id
+          : '';
+      },
       setState: async (issueId, stateId) =>
         String(
           (
@@ -1141,6 +1329,12 @@ async function runSync(options) {
   const env = options.env ?? process.env;
   const log = options.log ?? (message => console.log(message));
   const sweep = env.LIFECYCLE_MODE === 'sweep';
+  const receiptIssue = String(env.LINEAR_VALIDATION_ISSUE ?? '').toUpperCase();
+  // Nonempty malformed targets have their own workflow concurrency group.
+  // They must never widen into parallel global sweeps or make external reads.
+  if (sweep && receiptIssue && !IDENTIFIER_RE.test(receiptIssue)) {
+    throw new Error('Malformed LINEAR_VALIDATION_ISSUE: expected JOV-<number>');
+  }
   const ref = extractMergeIssueRef({
     body: env.PR_BODY,
     headRef: env.HEAD_REF,
@@ -1222,7 +1416,6 @@ async function runSync(options) {
   }
 
   const lookups = [];
-  const receiptIssue = String(env.LINEAR_VALIDATION_ISSUE ?? '').toUpperCase();
   if (sweep && IDENTIFIER_RE.test(receiptIssue)) {
     // A receipt for parent-only commissioning work need not have a PR.
     // Read exactly its canonical record; the evaluator still owns admission.
@@ -1289,7 +1482,8 @@ async function runSync(options) {
   }
 
   const eventPull = sweep ? undefined : { number: Number(env.PR_NUMBER) };
-  const cursorDir = sweep ? env.LINEAR_SYNC_CURSOR_DIR : undefined;
+  const cursorDir =
+    sweep && !receiptIssue ? env.LINEAR_SYNC_CURSOR_DIR : undefined;
   const results = [];
   const failures = [];
   let deferredNote = '';
@@ -1421,7 +1615,9 @@ async function runSync(options) {
 
 /**
  * Record an owner receipt: `receipt --issue JOV-1 --kind outcome --status pass
- * --sha <full sha> --evidence <url> [--note <text>]`. A founder-taste
+ * --sha <full sha> --evidence <url> [--note <text>]
+ * [--episode-started-at null|<server reopen timestamp>]`. Omit the episode flag
+ * only for existing unbound producers; null explicitly binds the initial episode. A founder-taste
  * rejection carries the founder's note into Rework.
  *
  * @param {readonly string[]} args
@@ -1439,6 +1635,14 @@ export async function recordValidationReceipt(args, options = {}) {
     sha: value('--sha'),
     evidence: value('--evidence'),
     note: value('--note'),
+    ...(args.includes('--episode-started-at')
+      ? {
+          episodeStartedAt:
+            value('--episode-started-at') === 'null'
+              ? null
+              : value('--episode-started-at'),
+        }
+      : {}),
   });
   const env = options.env ?? process.env;
   const apiKey = env.LINEAR_API_KEY ?? '';

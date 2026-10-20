@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -941,6 +942,140 @@ test('release-asset read holds an installation 403 until x-ratelimit-reset', () 
   );
 });
 
+test('production prepare defers a known quota reset beyond budget without claiming publication', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'jovie-desktop-prepare-quota-'));
+  t.after(() => rm(root, { force: true, recursive: true }));
+  const releaseSha = 'c'.repeat(40);
+  const version = '26.10.9';
+  const release = {
+    ...releaseFixture('production', version, releaseSha),
+    assets: [],
+  };
+  await writeFile(join(root, 'VERSION'), `${version}\n`);
+  const preload = join(root, 'github.mjs');
+  await writeFile(
+    preload,
+    `import { appendFileSync } from 'node:fs';
+let now = 1700000000000;
+Date.now = () => now;
+globalThis.setTimeout = (callback, ms) => {
+  appendFileSync('sleeps', String(ms) + '\\n');
+  now += ms;
+  callback();
+  return 0;
+};
+let calls = 0;
+globalThis.fetch = async (url, options) => {
+  calls += 1;
+  const mode = process.env.MOCK_MODE;
+  const method = options.method || 'GET';
+  appendFileSync('calls', method + ' ' + new URL(url).pathname + '\\n');
+  if (mode === 'mutation' && method === 'GET') {
+    return new Response(url.includes('/tags/') ? '{}' : '[]', {
+      status: url.includes('/tags/') ? 404 : 200,
+    });
+  }
+  if (mode === 'success' || (mode === 'retry' && calls > 1)) {
+    return Response.json(${JSON.stringify(release)});
+  }
+  const headers = mode === 'missing-reset' ? {} : {
+    'x-ratelimit-remaining': '0',
+    'x-ratelimit-reset': String(now / 1000 + (mode === 'retry' || mode === 'attempt-cap' ? 30 : 3600)),
+  };
+  return new Response(JSON.stringify({ message: mode === 'permission'
+    ? 'Resource not accessible by integration' : 'API rate limit exceeded for installation' }),
+    { status: 403, headers });
+};
+`
+  );
+  for (const scenario of [
+    { mode: 'outside-budget', code: 0, prepared: 'false' },
+    { mode: 'retry', code: 0, prepared: 'true' },
+    { mode: 'success', code: 0, prepared: 'true' },
+    { mode: 'permission', code: 1 },
+    { mode: 'missing-reset', code: 1 },
+    { mode: 'attempt-cap', code: 1 },
+    { mode: 'mutation', code: 1 },
+    { mode: 'outside-budget', code: 1, environment: 'staging' },
+    { mode: 'outside-budget', code: 1, command: 'upload-and-publish' },
+    { mode: 'outside-budget', code: 1, command: 'verify-published' },
+  ]) {
+    for (const file of ['outputs', 'summary', 'calls', 'sleeps']) {
+      await writeFile(join(root, file), '');
+    }
+    const result = spawnSync(
+      process.execPath,
+      [
+        '--import',
+        preload,
+        new URL('./desktop-release-assets.mjs', import.meta.url).pathname,
+        scenario.command || 'prepare',
+        '--repository',
+        'JovieInc/Jovie',
+        '--sha',
+        releaseSha,
+        '--environment',
+        scenario.environment || 'production',
+        '--version',
+        scenario.environment ? `${version}-staging.1.1` : version,
+        '--dist',
+        root,
+      ],
+      {
+        cwd: root,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          GH_TOKEN: 'test-token',
+          GITHUB_OUTPUT: join(root, 'outputs'),
+          GITHUB_STEP_SUMMARY: join(root, 'summary'),
+          MOCK_MODE: scenario.mode,
+        },
+      }
+    );
+    const label = JSON.stringify(scenario);
+    assert.equal(result.status, scenario.code, `${label}: ${result.stderr}`);
+    const outputs = await readFile(join(root, 'outputs'), 'utf8');
+    const summary = await readFile(join(root, 'summary'), 'utf8');
+    const calls = await readFile(join(root, 'calls'), 'utf8');
+    const sleeps = await readFile(join(root, 'sleeps'), 'utf8');
+    assert.doesNotMatch(outputs, /published_sha|publisher_attempt|release_sha/);
+    if (scenario.prepared) {
+      const prepared = outputs
+        .trim()
+        .split('\n')
+        .filter(line => line.startsWith('prepared='))
+        .at(-1);
+      assert.equal(prepared, `prepared=${scenario.prepared}`, label);
+    }
+    if (scenario.prepared === 'false') {
+      assert.match(result.stderr, /github-quota-deferred/);
+      assert.match(summary, /2023-11-14T23:13:21.000Z/);
+      assert.ok(summary.includes(releaseSha), summary);
+      assert.match(summary, /No desktop release was published/);
+      assert.equal(calls.trim().split('\n').length, 1);
+      assert.equal(sleeps, '');
+    } else {
+      assert.equal(summary, '', label);
+      assert.doesNotMatch(result.stderr, /github-quota-deferred/, label);
+    }
+    if (scenario.mode === 'retry') {
+      assert.equal(calls.trim().split('\n').length, 2);
+      assert.equal(sleeps, '31000\n');
+    }
+    if (scenario.mode === 'mutation') {
+      assert.match(calls, /POST .*\/releases/);
+      assert.equal(sleeps, '');
+    }
+    if (scenario.mode === 'attempt-cap') {
+      assert.equal(calls.trim().split('\n').length, 4);
+    }
+    if (scenario.mode === 'missing-reset') {
+      assert.match(result.stderr, /x-ratelimit-reset=missing/);
+    }
+  }
+});
+
 test('existing release tag read survives one installation 403 and does not create another draft', async () => {
   const releaseSha = 'c'.repeat(40);
   const version = '26.10.5';
@@ -1019,7 +1154,7 @@ test('release-asset read fails closed on permission, exhausted budget, mutations
         }),
       ],
       method: 'GET',
-      error: /failed \(403\)/,
+      error: /beyond the release read budget/,
     },
     {
       label: 'installation 403 without x-ratelimit-reset',

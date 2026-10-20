@@ -120,14 +120,14 @@ export function HomepageYoutubeMvp() {
                   contentClassName='p-8 sm:p-10'
                 >
                   <p className='mt-4 text-2xl font-semibold text-primary-token'>
-                    Preview before you publish.
+                    {copy.media.thumbnailPreview}
                   </p>
                 </MarketingSurfaceCard>
               )}
               {feature.id === 'release-launch' && (
                 <MarketingScreenshot
                   scenarioId='dashboard-releases-desktop'
-                  title='Release workspace'
+                  title={copy.media.releaseWorkspaceTitle}
                 />
               )}
               {feature.id === 'public-profile' && (
@@ -160,8 +160,7 @@ export function HomepageYoutubeMvp() {
             id='home-loop-heading'
             className='text-balance text-2xl font-semibold tracking-tight text-primary-token sm:text-3xl'
           >
-            {/* ui-casing-allow: marketing display headline (DESIGN.md) */}
-            From upload to the next release.
+            {copy.loop.headline}
           </h2>
           <ul className='mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4'>
             {copy.surfaces.map(surface => (
@@ -187,18 +186,20 @@ export function HomepageYoutubeMvp() {
         <MarketingContentShell>
           <h2
             id='home-founder-proof-heading'
-            className='text-xs font-medium text-primary-token'
+            className='text-balance text-xs font-medium text-primary-token'
           >
             {copy.proof.headline}
           </h2>
-          <p className='mt-6 text-secondary-token'>Music: {copy.proof.music}</p>
+          <p className='mt-6 text-secondary-token'>
+            {copy.proof.musicLabel}: {copy.proof.music}
+          </p>
           <p className='mt-4 text-secondary-token'>
-            Digital marketing: {copy.proof.marketing}
+            {copy.proof.marketingLabel}: {copy.proof.marketing}
           </p>
           <div className='mt-8 flex items-center gap-4'>
             <Image
               src={TIM_WHITE_PROFILE.avatarSrc}
-              alt='Tim White'
+              alt={TIM_WHITE_PROFILE.name}
               width={64}
               height={64}
               className='size-16 rounded-full object-cover'
@@ -209,7 +210,7 @@ export function HomepageYoutubeMvp() {
             href={APP_ROUTES.ABOUT}
             className='mt-5 inline-block text-secondary-token underline underline-offset-4'
           >
-            Read the story
+            {copy.proof.storyAction}
           </Link>
         </MarketingContentShell>
       </section>
@@ -228,7 +229,7 @@ export function HomepageYoutubeMvp() {
           </h2>
           <p className='mt-5 text-secondary-token'>{copy.pricing.body}</p>
           <Button asChild variant='link' className='mt-5'>
-            <Link href={APP_ROUTES.PRICING}>See plans and pricing</Link>
+            <Link href={APP_ROUTES.PRICING}>{copy.pricing.action}</Link>
           </Button>
         </MarketingContentShell>
       </section>

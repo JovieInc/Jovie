@@ -13,6 +13,12 @@ export function OvieEditorialBriefing({
   onSelectAction,
 }: OvieEditorialBriefingProps) {
   const { signal } = briefing;
+  const freshnessLabel =
+    signal.sourceFreshness === 'fresh'
+      ? 'Reported current'
+      : signal.sourceFreshness === 'stale'
+        ? 'Reported stale'
+        : 'Freshness unknown';
 
   return (
     <article
@@ -80,6 +86,12 @@ export function OvieEditorialBriefing({
               <dt className='text-2xs text-tertiary-token'>Source</dt>
               <dd className='mt-1 text-xs text-secondary-token'>
                 {signal.sourceLabel}
+                <span
+                  className='block'
+                  data-testid='ovie-home-source-freshness'
+                >
+                  {freshnessLabel}
+                </span>
               </dd>
             </div>
           </dl>

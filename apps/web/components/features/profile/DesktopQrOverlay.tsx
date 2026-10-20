@@ -2,7 +2,7 @@
 // @coverage-via apps/web/tests/unit/DesktopQrOverlay.test.tsx
 
 import { Smartphone, X } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { getQrCodeUrl, QRCode } from '@/components/molecules/QRCode';
 import { PROFILE_Z } from '@/lib/profile/z-index-constants';
@@ -32,6 +32,7 @@ function resolveDesktopQrPresentation(handle: string): {
 export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
   const [mode, setMode] = useState<'hidden' | 'icon' | 'open'>('hidden');
   const [url, setUrl] = useState('');
+  const openCardRef = useRef<HTMLDivElement>(null);
   const qrUrl = useMemo(() => {
     if (!url) return '';
     return getQrCodeUrl(url, 120);
@@ -96,6 +97,22 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
     };
   }, [handle]);
 
+  // Pay mode opens this card while the pay drawer is an aria-modal. A
+  // modal marks the rest of the page inert, so the close control was
+  // visible but not clickable. The top layer sits above that dialog.
+  useEffect(() => {
+    const node = openCardRef.current;
+    if (mode !== 'open' || !node || typeof node.showPopover !== 'function') {
+      return;
+    }
+    try {
+      if (!node.matches(':popover-open')) node.showPopover();
+    } catch {
+      // jsdom and older engines have no popover top layer. The card still
+      // renders in place for those runtimes.
+    }
+  }, [mode]);
+
   const close = () => {
     setMode('icon');
   };
@@ -116,7 +133,9 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
       {mode === 'open' && (
         <div
           key='qr'
-          className={`group fixed bottom-4 right-4 ${PROFILE_Z.DRAWER_CONTENT} flex flex-col items-center overflow-hidden rounded-xl bg-surface-0 p-3 shadow-xl ring-1 ring-(--color-border-subtle) backdrop-blur-md animate-in fade-in slide-in-from-bottom-4 zoom-in-95 duration-cinematic ease-out motion-reduce:animate-none`}
+          ref={openCardRef}
+          popover='manual'
+          className={`group fixed bottom-4 right-4 m-0 w-fit border-0 ${PROFILE_Z.DRAWER_CONTENT} flex flex-col items-center overflow-hidden rounded-xl bg-surface-0 p-3 shadow-xl ring-1 ring-(--color-border-subtle) backdrop-blur-md animate-in fade-in slide-in-from-bottom-4 zoom-in-95 duration-cinematic ease-out motion-reduce:animate-none`}
         >
           <div className='pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-slower group-hover:opacity-100'>
             <div className='absolute inset-0 bg-[radial-gradient(80%_60%_at_50%_0%,rgba(255,255,255,0.35),transparent_60%)]' />

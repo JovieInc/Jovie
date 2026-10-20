@@ -11,6 +11,8 @@ import {
   resolveComposition,
 } from '@/data/marketing';
 import { PRODUCT_CAPABILITIES } from '@/data/product-truth/registry';
+import { auditPageCopy, extractSeoHead } from '@/lib/seo/page-certification';
+import { evaluateHomepageHtml } from '../../../../../scripts/lib/golden-path-lock.mjs';
 
 const flags = vi.hoisted(() => ({
   HOMEPAGE_V3_ENABLED: true,
@@ -80,6 +82,19 @@ describe('YouTube artist MVP page composition', { timeout: 60_000 }, () => {
     ).toHaveAttribute('href', '/about');
   });
 
+  it('passes the SEO copy gate with the rendered founder credits', async () => {
+    const { container } = await renderHomePage();
+    const head = extractSeoHead(container.innerHTML);
+    expect(auditPageCopy(head, 'marketing', '/')).not.toContainEqual(
+      expect.objectContaining({ id: 'copy-lint', status: 'failed' })
+    );
+  });
+
+  it('passes the production homepage probe with the native Find me handoff', async () => {
+    const { container } = await renderHomePage();
+    expect(evaluateHomepageHtml(container.innerHTML).ok).toBe(true);
+  });
+
   it.each([true, false])(
     'keeps the upload loop and Find me with waitlist=%s',
     async waitlist => {
@@ -132,7 +147,7 @@ describe('YouTube artist MVP page composition', { timeout: 60_000 }, () => {
 
       expect(screen.queryByText(/Drop more music/i)).toBeNull();
       const proof = screen.getByTestId('marketing-section-social-proof');
-      expect(proof).toHaveTextContent("BUILT BY PEOPLE WHO'VE CREATED FOR");
+      expect(proof).toHaveTextContent("Built by people who've created for");
       expect(
         container
           .querySelector('[data-capability-id="smart-links"]')

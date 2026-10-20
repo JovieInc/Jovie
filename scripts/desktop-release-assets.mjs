@@ -24,9 +24,21 @@ const BASE64_SHA512_PATTERN = /^[A-Za-z0-9+/]{86}==$/;
 // github-rate-limit.mjs (`--attempts 4 --max-wait-seconds 600`). A release
 // read holds only an installation 403 until x-ratelimit-reset inside that
 // window. Permission failures, a missing reset, and a reset past the window
-// stay fatal. Nothing here lengthens the wait or turns a 403 into success.
+// stop the read. Production prepare may defer a known reset beyond the window;
+// publication and verification still fail. No quota response proves a release.
 export const RELEASE_ASSET_READ_ATTEMPTS = 4;
 export const RELEASE_ASSET_READ_MAX_WAIT_MS = 600_000;
+
+class ReleaseAssetQuotaDeferred extends Error {
+  /** @param {number} resetAtMs */
+  constructor(resetAtMs) {
+    const resetAt = new Date(resetAtMs).toISOString();
+    super(
+      `Installation quota resets at ${resetAt}, beyond the release read budget.`
+    );
+    this.resetAt = resetAt;
+  }
+}
 
 /**
  * Wait before repeating a release-asset GET, or null when the answer is final.
@@ -758,8 +770,26 @@ export class GitHubClient {
           await this.sleep(waitMs);
           continue;
         }
+        if (
+          method === 'GET' &&
+          attempt < RELEASE_ASSET_READ_ATTEMPTS &&
+          isInstallationQuota403(body, response.status)
+        ) {
+          const { retryAtMs } = classifyGitHubFailure({
+            status: response.status,
+            message: body,
+            headers: response.headers,
+            now: this.now(),
+          });
+          if (retryAtMs !== null && retryAtMs > deadlineMs) {
+            throw new ReleaseAssetQuotaDeferred(retryAtMs);
+          }
+        }
+        const quotaContext = isInstallationQuota403(body, response.status)
+          ? ` [x-ratelimit-remaining=${response.headers.get('x-ratelimit-remaining') ?? 'missing'} x-ratelimit-reset=${response.headers.get('x-ratelimit-reset') ?? 'missing'}]`
+          : '';
         throw new Error(
-          `GitHub API ${method} ${url} failed (${response.status}): ${body.slice(0, 500)}`
+          `GitHub API ${method} ${url} failed (${response.status}): ${body.slice(0, 500)}${quotaContext}`
         );
       }
       if (raw) {
@@ -1554,7 +1584,26 @@ async function main() {
   };
 
   if (command === 'prepare') {
-    await prepare(common);
+    if (common.output) await writeOutputs(common.output, { prepared: false });
+    try {
+      await prepare(common);
+    } catch (error) {
+      // Only draft preparation can yield to reconciliation. Upload and
+      // verification must never turn unavailable release proof into success.
+      if (
+        environment !== 'production' ||
+        !(error instanceof ReleaseAssetQuotaDeferred)
+      ) {
+        throw error;
+      }
+      const message = `Installation quota resets at ${error.resetAt}. Deferring desktop preparation of ${releaseSha} to the next reconciliation. No desktop release was published.`;
+      process.stderr.write(`::warning::github-quota-deferred: ${message}\n`);
+      if (process.env.GITHUB_STEP_SUMMARY) {
+        await appendFile(process.env.GITHUB_STEP_SUMMARY, `${message}\n`);
+      }
+      return;
+    }
+    if (common.output) await writeOutputs(common.output, { prepared: true });
   } else if (command === 'upload-and-publish') {
     invariant(args.dist, '--dist is required.');
     await uploadAndPublish({ ...common, dist: args.dist });

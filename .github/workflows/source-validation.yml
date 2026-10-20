@@ -210,6 +210,8 @@ jobs:
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
           git fetch --no-tags origin "${{ github.base_ref }}"
           node scripts/verify-workflow-references.mjs
+          node scripts/workflow-token-scope.mjs
+          node --test scripts/workflow-token-scope.test.mjs
           node scripts/lockfile-specifier-preflight.mjs
           node scripts/ci-release-incident-contract.mjs
           pnpm ci:harness:check

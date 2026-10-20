@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { getDashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 
 /**
  * Regression tests for the statement_timeout 25P02 cascade (JOV-4189,
@@ -25,13 +26,17 @@ type TxState = { poisoned: boolean; closed: boolean; rolledBack: boolean };
 
 const {
   captureExceptionMock,
+  cleanupGates,
   loggerErrorMock,
   loggerWarnMock,
   outcomes,
+  setupFailures,
   txStates,
   withDbSessionTxMock,
 } = vi.hoisted(() => {
+  const cleanupGates = new Map<number, () => Promise<void>>();
   const outcomes: QueryOutcome[] = [];
+  const setupFailures = new Map<number, QueryOutcome>();
   const txStates: TxState[] = [];
 
   function createAbortedTxError(): Error & { code?: string } {
@@ -97,13 +102,21 @@ const {
         closed: false,
         rolledBack: false,
       };
+      const transactionIndex = txStates.length;
       txStates.push(state);
       try {
+        const setupError = setupFailures.get(transactionIndex)?.().error;
+        if (setupError) {
+          state.poisoned = true;
+          throw setupError;
+        }
         return await handler(createTx(state), 'user_123');
       } catch (error) {
         state.rolledBack = true;
         throw error;
       } finally {
+        const cleanup = cleanupGates.get(transactionIndex);
+        if (cleanup) await cleanup();
         state.closed = true;
       }
     }
@@ -111,9 +124,11 @@ const {
 
   return {
     captureExceptionMock: vi.fn(),
+    cleanupGates,
     loggerErrorMock: vi.fn(),
     loggerWarnMock: vi.fn(),
     outcomes,
+    setupFailures,
     txStates,
     withDbSessionTxMock,
   };
@@ -153,10 +168,8 @@ vi.mock('react', async () => {
   };
 });
 
-vi.mock('@sentry/nextjs', async importOriginal => {
-  const actual = await importOriginal<typeof import('@sentry/nextjs')>();
+vi.mock('@sentry/nextjs', () => {
   return {
-    ...actual,
     getClient: vi.fn(() => undefined),
     captureException: captureExceptionMock,
     captureMessage: vi.fn(),
@@ -364,15 +377,43 @@ function capturedCascadeErrors(): unknown[] {
   );
 }
 
+function queueReadsBeforeDistribution(): void {
+  outcomes.push(
+    ok([userRow]),
+    ok([dashboardProfile]),
+    ok([{ sidebarCollapsed: false }]),
+    ok([{ count: 0 }]),
+    ok([{ count: 0 }]),
+    ok([{ hasLinks: true, hasMusicLinks: true }]),
+    ok([{ width: 1024, height: 1024 }]),
+    ok([{ totalReceived: 100, monthReceived: 50, tipsSubmitted: 2 }]),
+    ok([{ total: 3, qr: 1, link: 2 }])
+  );
+}
+
+function idleDistributionError(code?: string): Error {
+  const cause = new Error(
+    'terminating connection due to idle-in-transaction timeout'
+  );
+  if (code) Object.assign(cause, { code });
+  return new Error(
+    "Failed query: SELECT set_config('statement_timeout', $1, true)",
+    { cause }
+  );
+}
+
 describe('dashboard data transaction isolation (JOV-4189)', () => {
   beforeEach(async () => {
-    vi.resetModules();
     vi.clearAllMocks();
     captureExceptionMock.mockReset();
     loggerWarnMock.mockReset();
+    const { setStatementTimeout } = await import('@/lib/db/query-timeout');
+    vi.mocked(setStatementTimeout).mockReset().mockResolvedValue(undefined);
     const { doesTableExist } = await import('@/lib/db');
     vi.mocked(doesTableExist).mockReset().mockResolvedValue(false);
+    cleanupGates.clear();
     outcomes.length = 0;
+    setupFailures.clear();
     txStates.length = 0;
   });
 
@@ -390,9 +431,6 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       ok([{ total: 3, qr: 1, link: 2 }])
     );
 
-    const { getDashboardData } = await import(
-      '@/app/app/(shell)/dashboard/actions/dashboard-data'
-    );
     const result = await getDashboardData();
 
     // Fallback semantics for the failed read are preserved.
@@ -447,9 +485,6 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       ok([{ total: 3, qr: 1, link: 2 }])
     );
 
-    const { getDashboardData } = await import(
-      '@/app/app/(shell)/dashboard/actions/dashboard-data'
-    );
     const result = await getDashboardData();
 
     // The shell still renders and the Inbox fails open — never hidden by a
@@ -500,9 +535,6 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       ok([{ total: 3, qr: 1, link: 2 }])
     );
 
-    const { getDashboardData } = await import(
-      '@/app/app/(shell)/dashboard/actions/dashboard-data'
-    );
     const result = await getDashboardData();
 
     // The shell still renders and the Inbox fails open — never hidden by a
@@ -544,9 +576,6 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       ok([{ total: 3, qr: 1, link: 2 }])
     );
 
-    const { getDashboardData } = await import(
-      '@/app/app/(shell)/dashboard/actions/dashboard-data'
-    );
     const result = await getDashboardData();
 
     expect(result.inboxNavigation).toEqual({
@@ -578,9 +607,6 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       ok([{ total: 3, qr: 1, link: 2 }])
     );
 
-    const { getDashboardData } = await import(
-      '@/app/app/(shell)/dashboard/actions/dashboard-data'
-    );
     const result = await getDashboardData();
 
     expect(result.avatarQuality).toEqual({
@@ -625,9 +651,6 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       fail(timeoutError) // click-source aggregate times out
     );
 
-    const { getDashboardData } = await import(
-      '@/app/app/(shell)/dashboard/actions/dashboard-data'
-    );
     const result = await getDashboardData();
 
     expect(result.tippingStats).toEqual({
@@ -661,9 +684,6 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       ok([{ createdAt: activationDate, eventType: 'activated' }])
     );
 
-    const { getDashboardData } = await import(
-      '@/app/app/(shell)/dashboard/actions/dashboard-data'
-    );
     const result = await getDashboardData();
 
     // Tipping fell back to empty stats with the real error reported.
@@ -703,9 +723,6 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       ok([{ createdAt: activatedAt, eventType: 'activated' }])
     );
 
-    const { getDashboardData } = await import(
-      '@/app/app/(shell)/dashboard/actions/dashboard-data'
-    );
     const result = await getDashboardData();
 
     expect(doesTableExist).not.toHaveBeenCalled();
@@ -744,9 +761,6 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       fail(new Error('Failed query', { cause: missingTable }))
     );
 
-    const { getDashboardData } = await import(
-      '@/app/app/(shell)/dashboard/actions/dashboard-data'
-    );
     const result = await getDashboardData();
 
     expect(doesTableExist).not.toHaveBeenCalled();
@@ -789,9 +803,6 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       ok([{ total: 3, qr: 1, link: 2 }]),
       fail(error)
     );
-    const { getDashboardData } = await import(
-      '@/app/app/(shell)/dashboard/actions/dashboard-data'
-    );
     const result = await getDashboardData();
     expect(result.selectedProfile?.id).toBe('profile_1');
     expect(result.bioLinkActivation?.activatedAt).toBeNull();
@@ -830,9 +841,6 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
         return { rows: [{ createdAt: activatedAt, eventType: 'activated' }] };
       }
     );
-    const { getDashboardData } = await import(
-      '@/app/app/(shell)/dashboard/actions/dashboard-data'
-    );
     const result = await getDashboardData();
     expect(result.bioLinkActivation?.activatedAt).toBe(
       activatedAt.toISOString()
@@ -841,6 +849,209 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     expect(captureExceptionMock).not.toHaveBeenCalled();
     expect(withDbSessionTxMock).toHaveBeenCalledTimes(6);
     expect(txStates.every(state => state.closed)).toBe(true);
+  });
+
+  it.each([
+    { label: 'SQLSTATE 25P03', code: '25P03' },
+    { label: 'the exact code-less idle cause', code: undefined },
+  ])(
+    'JOV-8586: recovers $label only after failed distribution cleanup',
+    async ({ code }) => {
+      const idle = idleDistributionError(code);
+      const activatedAt = new Date('2026-07-21T12:00:00.000Z');
+      let releaseCleanup!: () => void;
+      let signalCleanup!: () => void;
+      const cleanupStarted = new Promise<void>(resolve => {
+        signalCleanup = resolve;
+      });
+      const cleanupReleased = new Promise<void>(resolve => {
+        releaseCleanup = resolve;
+      });
+      cleanupGates.set(4, () => {
+        signalCleanup();
+        return cleanupReleased;
+      });
+      const { setStatementTimeout } = await import('@/lib/db/query-timeout');
+      let attempts = 0;
+      vi.mocked(setStatementTimeout).mockImplementation(async (_tx, ms) => {
+        if (ms === 8000 && ++attempts === 1) {
+          txStates[4].poisoned = true;
+          throw idle;
+        }
+      });
+      queueReadsBeforeDistribution();
+      outcomes.push(() => {
+        expect(txStates[4]).toMatchObject({ closed: true, rolledBack: true });
+        expect(txStates[5]).toMatchObject({ closed: false, poisoned: false });
+        return { rows: [{ createdAt: activatedAt, eventType: 'activated' }] };
+      });
+      const resultPromise = getDashboardData();
+      await cleanupStarted;
+      try {
+        expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
+        expect(txStates[4].closed).toBe(false);
+        expect(captureExceptionMock).not.toHaveBeenCalled();
+      } finally {
+        releaseCleanup();
+      }
+      const result = await resultPromise;
+      expect(result.bioLinkActivation?.activatedAt).toBe(
+        activatedAt.toISOString()
+      );
+      expect(attempts).toBe(2);
+      expect(withDbSessionTxMock).toHaveBeenCalledTimes(6);
+      expect(withDbSessionTxMock).toHaveBeenNthCalledWith(
+        6,
+        expect.any(Function),
+        { clerkUserId: 'user_123' }
+      );
+      expect(txStates.every(state => state.closed)).toBe(true);
+      expect(captureExceptionMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it('JOV-8586: awaits asynchronous SQL timeout setup before any distribution query or recovery', async () => {
+    const idle = idleDistributionError('25P03');
+    const activatedAt = new Date('2026-07-21T12:00:00.000Z');
+    let rejectSetup!: (error: Error) => void;
+    let signalSetup!: () => void;
+    const setupStarted = new Promise<void>(resolve => {
+      signalSetup = resolve;
+    });
+    const pendingSetup = new Promise<void>((_resolve, reject) => {
+      rejectSetup = reject;
+    });
+    void pendingSetup.catch(() => {});
+    const { setStatementTimeout } = await import('@/lib/db/query-timeout');
+    let attempts = 0;
+    vi.mocked(setStatementTimeout).mockImplementation(async (_tx, ms) => {
+      if (ms === 8000 && ++attempts === 1) {
+        signalSetup();
+        await pendingSetup;
+      }
+    });
+    let queryStarted = false;
+    queueReadsBeforeDistribution();
+    outcomes.push(() => {
+      queryStarted = true;
+      expect(txStates[4]).toMatchObject({ closed: true, rolledBack: true });
+      return { rows: [{ createdAt: activatedAt, eventType: 'activated' }] };
+    });
+    const resultPromise = getDashboardData();
+    await setupStarted;
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
+    try {
+      expect(queryStarted).toBe(false);
+      expect(txStates[4].closed).toBe(false);
+      expect(captureExceptionMock).not.toHaveBeenCalled();
+    } finally {
+      rejectSetup(idle);
+    }
+    const result = await resultPromise;
+    expect(result.bioLinkActivation?.activatedAt).toBe(
+      activatedAt.toISOString()
+    );
+    expect(attempts).toBe(2);
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(6);
+    expect(txStates.every(state => state.closed)).toBe(true);
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+  });
+
+  it('JOV-8586: stops after two idle setup failures and reports only after both transactions close', async () => {
+    const idle = idleDistributionError('25P03');
+    const { setStatementTimeout } = await import('@/lib/db/query-timeout');
+    let attempts = 0;
+    vi.mocked(setStatementTimeout).mockImplementation(async (_tx, ms) => {
+      if (ms === 8000) {
+        attempts++;
+        throw idle;
+      }
+    });
+    captureExceptionMock.mockImplementation(error => {
+      if (error === idle) {
+        expect(txStates.slice(4)).toHaveLength(2);
+        expect(
+          txStates.slice(4).every(state => state.closed && state.rolledBack)
+        ).toBe(true);
+      }
+    });
+    queueReadsBeforeDistribution();
+    const result = await getDashboardData();
+    expect(result.bioLinkActivation?.activatedAt).toBeNull();
+    expect(result.dashboardLoadError).toBeUndefined();
+    expect(attempts).toBe(2);
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(6);
+    expect(captureExceptionMock).toHaveBeenCalledWith(
+      idle,
+      expect.objectContaining({
+        level: 'warning',
+        tags: expect.objectContaining({ query: 'creator_distribution_events' }),
+      })
+    );
+  });
+
+  it.each([
+    { code: '57014', message: 'canceling statement due to statement timeout' },
+    {
+      code: '25P02',
+      message: 'terminating connection due to idle-in-transaction timeout',
+    },
+    {
+      code: '42501',
+      message: 'terminating connection due to idle-in-transaction timeout',
+    },
+    {
+      code: '40001',
+      message: 'terminating connection due to idle-in-transaction timeout',
+    },
+  ])(
+    'JOV-8586: keeps authoritative $code distribution failures single-attempt',
+    async ({ code, message }) => {
+      const error = new Error('Failed query: SELECT set_config', {
+        cause: Object.assign(new Error(message), { code }),
+      });
+      const { setStatementTimeout } = await import('@/lib/db/query-timeout');
+      vi.mocked(setStatementTimeout).mockImplementation(async (_tx, ms) => {
+        if (ms === 8000) throw error;
+      });
+      queueReadsBeforeDistribution();
+      const result = await getDashboardData();
+      expect(result.bioLinkActivation?.activatedAt).toBeNull();
+      expect(result.dashboardLoadError).toBeUndefined();
+      expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
+      expect(
+        vi
+          .mocked(setStatementTimeout)
+          .mock.calls.filter(([, ms]) => ms === 8000)
+      ).toHaveLength(1);
+      expect(txStates[4]).toMatchObject({ closed: true, rolledBack: true });
+      expect(captureExceptionMock).toHaveBeenCalledWith(
+        error,
+        expect.anything()
+      );
+    }
+  );
+
+  it('JOV-8586: retries pre-callback RLS setup failure within the same two-attempt boundary', async () => {
+    const idle = idleDistributionError('25P03');
+    const activatedAt = new Date('2026-07-21T12:00:00.000Z');
+    setupFailures.set(4, fail(idle));
+    queueReadsBeforeDistribution();
+    outcomes.push(() => {
+      expect(txStates[4]).toMatchObject({ closed: true, rolledBack: true });
+      return { rows: [{ createdAt: activatedAt, eventType: 'activated' }] };
+    });
+    const result = await getDashboardData();
+    const { setStatementTimeout } = await import('@/lib/db/query-timeout');
+    expect(result.bioLinkActivation?.activatedAt).toBe(
+      activatedAt.toISOString()
+    );
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(6);
+    expect(
+      vi.mocked(setStatementTimeout).mock.calls.filter(([, ms]) => ms === 8000)
+    ).toHaveLength(1);
+    expect(txStates.every(state => state.closed)).toBe(true);
+    expect(captureExceptionMock).not.toHaveBeenCalled();
   });
 
   it('happy path assembles full dashboard data across isolated reads', async () => {
@@ -856,9 +1067,6 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       ok([{ total: 5, qr: 2, link: 3 }])
     );
 
-    const { getDashboardData } = await import(
-      '@/app/app/(shell)/dashboard/actions/dashboard-data'
-    );
     const result = await getDashboardData();
 
     expect(result.user?.id).toBe('user_db_1');
@@ -882,5 +1090,251 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     expect(result.dashboardLoadError).toBeUndefined();
     expect(captureExceptionMock).not.toHaveBeenCalled();
     expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
+  });
+  it('JOV-8580-recovery: recovers avatar metadata on a fresh transaction after idle setup cleanup', async () => {
+    const idle = new Error('Failed query: SELECT set_config', {
+      cause: Object.assign(
+        new Error('terminating connection due to idle-in-transaction timeout'),
+        { code: '25P03' }
+      ),
+    });
+    setupFailures.set(2, fail(idle));
+    outcomes.push(
+      ok([userRow]),
+      ok([dashboardProfile]),
+      ok([{ sidebarCollapsed: false }]),
+      ok([{ count: 0 }]),
+      ok([{ count: 0 }]),
+      ok([{ hasLinks: true, hasMusicLinks: true }]),
+      () => {
+        expect(txStates[2]).toMatchObject({ closed: true, rolledBack: true });
+        expect(txStates[3]).toMatchObject({ closed: false, poisoned: false });
+        return { rows: [{ width: 1024, height: 1024 }] };
+      },
+      ok([{ totalReceived: 100, monthReceived: 50, tipsSubmitted: 2 }]),
+      ok([{ total: 3, qr: 1, link: 2 }])
+    );
+    const result = await getDashboardData();
+    const { setStatementTimeout } = await import('@/lib/db/query-timeout');
+    expect(result.avatarQuality).toEqual({
+      status: 'ok',
+      width: 1024,
+      height: 1024,
+    });
+    expect(result.tippingStats.totalReceivedCents).toBe(100);
+    expect(result.dashboardLoadError).toBeUndefined();
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(6);
+    expect(setStatementTimeout).toHaveBeenCalledWith(expect.anything(), 5000);
+    expect(txStates.every(state => state.closed)).toBe(true);
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+  });
+
+  it('JOV-8580: waits for asynchronous timeout setup failure and cleanup before fallback or tipping', async () => {
+    const timeout = Object.assign(
+      new Error('canceling statement due to statement timeout'),
+      { code: '57014' }
+    );
+    let rejectTimeout!: (error: Error) => void;
+    let signalSetup!: () => void;
+    const setupStarted = new Promise<void>(resolve => {
+      signalSetup = resolve;
+    });
+    const pendingSetup = new Promise<void>((_resolve, reject) => {
+      rejectTimeout = reject;
+    });
+    // Keep the mutation proof from producing an unhandled rejection if the
+    // source accidentally stops awaiting timeout setup.
+    void pendingSetup.catch(() => {});
+    const { setStatementTimeout } = await import('@/lib/db/query-timeout');
+    vi.mocked(setStatementTimeout).mockImplementationOnce(() => {
+      signalSetup();
+      return pendingSetup;
+    });
+    let avatarOrTippingStarted = false;
+    outcomes.push(
+      ok([userRow]),
+      ok([dashboardProfile]),
+      ok([{ sidebarCollapsed: false }]),
+      ok([{ count: 0 }]),
+      ok([{ count: 0 }]),
+      ok([{ hasLinks: true, hasMusicLinks: true }]),
+      () => {
+        avatarOrTippingStarted = true;
+        expect(txStates[2]).toMatchObject({ closed: true, rolledBack: true });
+        return {
+          rows: [{ totalReceived: 100, monthReceived: 50, tipsSubmitted: 2 }],
+        };
+      },
+      ok([{ total: 3, qr: 1, link: 2 }])
+    );
+    captureExceptionMock.mockImplementation(error => {
+      if (error === timeout) {
+        expect(txStates[2]).toMatchObject({ closed: true, rolledBack: true });
+      }
+    });
+    const resultPromise = getDashboardData();
+    await setupStarted;
+    // Drain already-admitted work so an omitted await cannot pass by timing.
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
+    try {
+      expect(avatarOrTippingStarted).toBe(false);
+      expect(captureExceptionMock).not.toHaveBeenCalled();
+      expect(txStates).toHaveLength(3);
+      expect(txStates[2].closed).toBe(false);
+    } finally {
+      rejectTimeout(timeout);
+    }
+    const result = await resultPromise;
+    expect(result.avatarQuality?.status).toBe('unknown');
+    expect(result.tippingStats.totalReceivedCents).toBe(100);
+    expect(
+      vi.mocked(setStatementTimeout).mock.calls.filter(([, ms]) => ms === 5000)
+    ).toHaveLength(1);
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
+    expect(captureExceptionMock).toHaveBeenCalledWith(
+      timeout,
+      expect.objectContaining({
+        tags: expect.objectContaining({ query: 'avatar_quality' }),
+      })
+    );
+    expect(txStates.every(state => state.closed)).toBe(true);
+  });
+
+  it('JOV-8580: stops after two idle setup failures and reports fallback only after cleanup', async () => {
+    const idle = Object.assign(
+      new Error('terminating connection due to idle-in-transaction timeout'),
+      { code: '25P03' }
+    );
+    setupFailures.set(2, fail(idle));
+    setupFailures.set(3, fail(idle));
+    captureExceptionMock.mockImplementation(error => {
+      if (error === idle) {
+        expect(txStates[2]).toMatchObject({ closed: true, rolledBack: true });
+        expect(txStates[3]).toMatchObject({ closed: true, rolledBack: true });
+      }
+    });
+    outcomes.push(
+      ok([userRow]),
+      ok([dashboardProfile]),
+      ok([{ sidebarCollapsed: false }]),
+      ok([{ count: 0 }]),
+      ok([{ count: 0 }]),
+      ok([{ hasLinks: true, hasMusicLinks: true }]),
+      ok([{ totalReceived: 100, monthReceived: 50, tipsSubmitted: 2 }]),
+      ok([{ total: 3, qr: 1, link: 2 }])
+    );
+    const result = await getDashboardData();
+    expect(result.avatarQuality?.status).toBe('unknown');
+    expect(result.tippingStats.totalReceivedCents).toBe(100);
+    expect(result.dashboardLoadError).toBeUndefined();
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(6);
+    expect(captureExceptionMock).toHaveBeenCalledWith(
+      idle,
+      expect.objectContaining({
+        tags: expect.objectContaining({ query: 'avatar_quality' }),
+      })
+    );
+    expect(capturedCascadeErrors()).toEqual([]);
+    expect(txStates.every(state => state.closed)).toBe(true);
+  });
+
+  it('JOV-8580: recovers code-less wrapped idle setup errors without losing query results', async () => {
+    setupFailures.set(
+      2,
+      fail(
+        new Error('Failed query: SELECT set_config', {
+          cause: new Error(
+            'terminating connection due to idle-in-transaction timeout'
+          ),
+        })
+      )
+    );
+    outcomes.push(
+      ok([userRow]),
+      ok([dashboardProfile]),
+      ok([{ sidebarCollapsed: false }]),
+      ok([{ count: 0 }]),
+      ok([{ count: 0 }]),
+      ok([{ hasLinks: true, hasMusicLinks: true }]),
+      ok([{ width: 1024, height: 1024 }]),
+      ok([{ totalReceived: 100, monthReceived: 50, tipsSubmitted: 2 }]),
+      ok([{ total: 3, qr: 1, link: 2 }])
+    );
+    const result = await getDashboardData();
+    expect(result.avatarQuality).toEqual({
+      status: 'ok',
+      width: 1024,
+      height: 1024,
+    });
+    expect(result.tippingStats.totalReceivedCents).toBe(100);
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(6);
+  });
+
+  it.each([
+    ['57014', 'canceling statement due to statement timeout'],
+    [
+      '42501',
+      'permission denied: idle-in-transaction timeout text is not authoritative',
+    ],
+  ])(
+    'JOV-8580: does not replay avatar setup for SQLSTATE %s',
+    async (code, message) => {
+      setupFailures.set(
+        2,
+        fail(
+          new Error('Failed query: SELECT set_config', {
+            cause: Object.assign(new Error(message), { code }),
+          })
+        )
+      );
+      outcomes.push(
+        ok([userRow]),
+        ok([dashboardProfile]),
+        ok([{ sidebarCollapsed: false }]),
+        ok([{ count: 0 }]),
+        ok([{ count: 0 }]),
+        ok([{ hasLinks: true, hasMusicLinks: true }]),
+        ok([{ totalReceived: 100, monthReceived: 50, tipsSubmitted: 2 }]),
+        ok([{ total: 3, qr: 1, link: 2 }])
+      );
+      const result = await getDashboardData();
+      expect(result.avatarQuality?.status).toBe('unknown');
+      expect(result.tippingStats.totalReceivedCents).toBe(100);
+      expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
+      expect(txStates.every(state => state.closed)).toBe(true);
+    }
+  );
+
+  it('JOV-8580: declines another avatar attempt after the read retry budget expires', async () => {
+    const clock = vi.spyOn(performance, 'now').mockReturnValue(0);
+    setupFailures.set(2, () => {
+      clock.mockReturnValue(9000);
+      return {
+        error: Object.assign(
+          new Error(
+            'terminating connection due to idle-in-transaction timeout'
+          ),
+          { code: '25P03' }
+        ),
+      };
+    });
+    outcomes.push(
+      ok([userRow]),
+      ok([dashboardProfile]),
+      ok([{ sidebarCollapsed: false }]),
+      ok([{ count: 0 }]),
+      ok([{ count: 0 }]),
+      ok([{ hasLinks: true, hasMusicLinks: true }]),
+      ok([{ totalReceived: 100, monthReceived: 50, tipsSubmitted: 2 }]),
+      ok([{ total: 3, qr: 1, link: 2 }])
+    );
+    try {
+      const result = await getDashboardData();
+      expect(result.avatarQuality?.status).toBe('unknown');
+      expect(result.tippingStats.totalReceivedCents).toBe(100);
+      expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
+    } finally {
+      clock.mockRestore();
+    }
   });
 });

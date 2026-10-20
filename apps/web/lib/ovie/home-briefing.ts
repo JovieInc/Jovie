@@ -1,4 +1,7 @@
-import type { RankedDecisionItem } from '@/lib/hud/decision-signals';
+import type {
+  DecisionSignalTrust,
+  RankedDecisionItem,
+} from '@/lib/hud/decision-signals';
 import type { OvieMacHudSnapshot } from '@/lib/hud/ovie-mac-hud';
 
 export interface OvieHomeBriefingAction {
@@ -15,6 +18,8 @@ export interface OvieHomeBriefingSignal {
   readonly delta: string | null;
   readonly target: string | null;
   readonly sourceLabel: string;
+  /** Omitted by older briefings; never infer freshness from render time. */
+  readonly sourceFreshness?: DecisionSignalTrust;
   readonly nextAction: string;
   readonly removalEvent: string;
   readonly summerCanAct: boolean;
@@ -57,15 +62,23 @@ function greetingFor(
   return `Good ${period}, ${firstName(displayName)}.`;
 }
 
-function updatedLabel(now: Date, timeZone: string): string {
-  return `Updated ${new Intl.DateTimeFormat('en-US', {
+function updatedLabel(
+  snapshot: OvieMacHudSnapshot | null,
+  timeZone: string
+): string {
+  const builtAt = snapshot ? new Date(snapshot.generatedAtIso) : null;
+  if (!builtAt || !Number.isFinite(builtAt.getTime())) {
+    return 'Snapshot time unavailable';
+  }
+  // This is assembly time, not an observation time for every underlying source.
+  return `Snapshot ${new Intl.DateTimeFormat('en-US', {
     month: 'short',
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
     timeZone,
     timeZoneName: 'short',
-  }).format(now)}`;
+  }).format(builtAt)}`;
 }
 
 function sourceLabel(source: string): string {
@@ -88,6 +101,7 @@ function signalFromDecision(item: RankedDecisionItem): OvieHomeBriefingSignal {
     delta: candidate.delta,
     target: candidate.target,
     sourceLabel: sourceLabel(candidate.source),
+    sourceFreshness: candidate.freshness,
     nextAction:
       candidate.nextAction ?? 'Review the signal and choose a next step.',
     removalEvent: candidate.removalEvent,
@@ -195,7 +209,7 @@ export function createOvieHomeBriefing(
 
   return {
     greeting: greetingFor(options.displayName, now, options.timeZone),
-    updatedLabel: updatedLabel(now, options.timeZone),
+    updatedLabel: updatedLabel(snapshot, options.timeZone),
     signal,
     actions: actionsFor(signal),
   };

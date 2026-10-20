@@ -92,11 +92,14 @@ const CHAT_DISABLED_GATE = 'ai_chat_disabled';
  * TURNSTILE_REQUIRED); with the bypass armed that contract is unreachable.
  * Inert on Vercel production/preview deploys regardless of value.
  */
-function shouldRequireTurnstileGate(): boolean {
+function shouldRequireTurnstileGate(req: Request): boolean {
+  if (env.VERCEL_ENV === 'production' || env.VERCEL_ENV === 'preview') {
+    return false;
+  }
+  if (env.E2E_REQUIRE_TURNSTILE_GATE === '1') return true;
   return (
-    env.E2E_REQUIRE_TURNSTILE_GATE === '1' &&
-    env.VERCEL_ENV !== 'production' &&
-    env.VERCEL_ENV !== 'preview'
+    publicEnv.NEXT_PUBLIC_E2E_MODE === '1' &&
+    req.headers.get('x-jovie-e2e-require-turnstile') === '1'
   );
 }
 
@@ -259,7 +262,7 @@ function isSecureTurnstileEnvironment(req: Request): boolean {
 
 function shouldBypassTurnstileForLocalRuntime(req: Request): boolean {
   if (isSecureTurnstileEnvironment(req)) return false;
-  if (shouldRequireTurnstileGate()) return false;
+  if (shouldRequireTurnstileGate(req)) return false;
 
   return (
     env.NODE_ENV === 'development' ||

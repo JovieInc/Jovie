@@ -20,6 +20,7 @@ import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { buildBreadcrumbSchema, buildFaqSchema } from '@/lib/constants/schemas';
+import { MAC_APP_SUPPORT } from '@/lib/desktop/mac-compatibility';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
 
 export const revalidate = false;
@@ -107,7 +108,7 @@ const FEATURE_ROWS = [
 ] as const;
 
 const REQUIREMENTS = [
-  { label: 'Operating System', value: 'macOS 11 Big Sur or later' },
+  { label: 'Operating System', value: MAC_APP_SUPPORT.minimumMacOSLabel },
   { label: 'Architecture', value: 'Apple Silicon or Intel Mac' },
   { label: 'Memory', value: '4 GB RAM minimum, 8 GB recommended' },
   { label: 'Disk Space', value: '500 MB free' },

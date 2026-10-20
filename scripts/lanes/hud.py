@@ -17,9 +17,12 @@ import importlib.util
 import json
 import os
 import re
+import select
 import subprocess
 import sys
 import threading
+import termios
+import tty
 import time
 from collections import Counter
 from datetime import datetime, timedelta, timezone
@@ -548,7 +551,137 @@ def repair_hold(pr: dict, held: dict) -> str | None:
     return "held: " + clip(reason, 48)
 
 
-def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
+def timestamp_age(stamp, now: datetime) -> float | None:
+    try:
+        return (now - datetime.fromisoformat(stamp.replace("Z", "+00:00"))).total_seconds()
+    except (ValueError, TypeError, AttributeError):
+        return None
+
+
+def capacity_receipt_error(doctor: dict, capacity: dict, now: datetime) -> str | None:
+    # A saved producer verdict cannot outlive the native receipt that carries it.
+    for source, stamp in (("doctor", doctor.get("at")), ("capacity", capacity.get("generatedAt"))):
+        elapsed = timestamp_age(stamp, now)
+        if elapsed is None:
+            return source + " unread"
+        if not 0 <= elapsed <= 3 * REFRESH_REMOTE_S:
+            return source + " stale"
+    return None
+
+
+def capacity_freshness(row: dict, now: datetime) -> str:
+    freshness = row.get("freshness") or {}
+    status = freshness.get("status") or "unknown"
+    if status != "fresh":
+        return status
+    elapsed = timestamp_age(freshness.get("observedAt"), now)
+    # Match capacity_horizon's existing account observation contract; no policy change.
+    return "unknown" if elapsed is None else "contradictory" if elapsed < -60 else "stale" if elapsed > 7200 else "fresh"
+
+
+class SlotViewport:
+    """A view over all slot rows; visibility never changes worker state."""
+    def __init__(self, offset: int = 0):
+        self.offset = max(0, offset)
+        self.page_size, self.total = 1, 0
+        self.bottom = False
+
+    def window(self, rows: list[str], budget: int) -> list[str]:
+        self.total, self.page_size = len(rows), max(1, budget)
+        maximum = max(0, self.total - self.page_size)
+        self.offset = maximum if self.bottom else min(maximum, max(0, self.offset))
+        return rows[self.offset:self.offset + self.page_size]
+
+    def move(self, key: str) -> None:
+        maximum = max(0, self.total - self.page_size)
+        if key == "home":
+            self.offset, self.bottom = 0, False
+        elif key == "end":
+            self.offset, self.bottom = maximum, True
+        elif key in {"up", "down", "page-up", "page-down"}:
+            direction = -1 if key in {"up", "page-up"} else 1
+            step = self.page_size if key.startswith("page-") else 1
+            self.offset = min(maximum, max(0, self.offset + direction * step))
+            self.bottom = direction > 0 and maximum > 0 and self.offset == maximum
+
+
+class TerminalInput:
+    """Read navigation only, restoring the console before exit or re-exec."""
+    KEYS = {
+        b"\x1b[A": "up", b"\x1b[B": "down",
+        b"\x1b[5~": "page-up", b"\x1b[6~": "page-down",
+        b"\x1b[H": "home", b"\x1b[F": "end",
+        b"\x1bOH": "home", b"\x1bOF": "end",
+        b"\x1b[1~": "home", b"\x1b[4~": "end",
+        b"\x1b[7~": "home", b"\x1b[8~": "end",
+    }
+
+    def __init__(self):
+        self.fd, self.saved = None, None
+        self.closed, self.pending = False, b""
+
+    def __enter__(self):
+        if sys.stdin.isatty() and sys.stdout.isatty():
+            try:
+                self.fd = sys.stdin.fileno()
+                self.saved = termios.tcgetattr(self.fd)
+                tty.setcbreak(self.fd)
+            except (OSError, ValueError, termios.error):
+                self.restore()
+        return self
+
+    def restore(self) -> None:
+        if self.fd is not None and self.saved is not None:
+            try:
+                termios.tcsetattr(self.fd, termios.TCSADRAIN, self.saved)
+            except (OSError, ValueError, termios.error):
+                pass  # A disconnected console must not prevent process cleanup.
+        self.fd, self.saved = None, None
+
+    def __exit__(self, *_):
+        self.restore()
+
+    def feed(self, data: bytes) -> list[str]:
+        self.pending = (self.pending + data)[-64:]
+        keys = []
+        while self.pending:
+            sequence = next((key for key in self.KEYS if self.pending.startswith(key)), None)
+            if sequence is not None:
+                keys.append(self.KEYS[sequence])
+                self.pending = self.pending[len(sequence):]
+            elif any(key.startswith(self.pending) for key in self.KEYS):
+                break  # A terminal may split an escape sequence across reads.
+            else:
+                self.pending = self.pending[1:]
+        return keys
+
+    def wait(self, timeout: float) -> list[str]:
+        timeout = max(0.0, timeout)
+        if self.fd is None or self.closed:
+            time.sleep(timeout)
+            return []
+        try:
+            if not select.select([self.fd], [], [], timeout)[0]:
+                return []
+            data = os.read(self.fd, 64)
+            if data:
+                return self.feed(data)
+        except (OSError, ValueError):
+            pass
+        self.closed = True
+        return []
+
+
+def terminal_dimensions(args) -> tuple[int, int]:
+    try:
+        size = os.get_terminal_size() if sys.stdout.isatty() else os.terminal_size((160, 45))
+    except OSError:
+        size = os.terminal_size((160, 45))
+    return max(1, args.width or size.columns), max(1, args.height or size.lines)
+
+
+def render(model: dict, width: int = 160, height: int = 45,
+           viewport: SlotViewport | None = None) -> list[str]:
     now = utcnow()
     local, linear, github, system = model["local"], model["linear"], model["github"], model["system"]
     lines: list[str] = []
@@ -598,15 +731,15 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
     per = " · ".join(parts)
     auto = f" · auto:{autoscale_mode}" if autoscale_mode != "off" else ""
     lines.append(section(f"ACTIVE SLOTS · {len(busy)} running / {total_slots if slots_known else 'unknown'} ({per}){auto} · gate seats {local['gateSeats']}", width))
-    rows_budget = max(3, min(total_slots, height - 30))
-    shown = 0
-    for name, count in local["slots"].items():
+    slot_rows = []
+    slot_names = list(local["slots"])
+    slot_names.extend(dict.fromkeys(w["provider"] for w in workers if w["provider"] not in local["slots"]))
+    for name in slot_names:
+        count = local["slots"].get(name, 0)
         mine = [w for w in workers if w["provider"] == name]
         # Seats taken before an autoscale reduction finish naturally; hiding them showed
         # "codex 2/0" with no rows while two codex workers were still running.
         for index in range(max(count, len(mine))):
-            if shown >= rows_budget:
-                break
             worker = mine[index] if index < len(mine) else None
             if worker and worker["run"]:
                 run = worker["run"]
@@ -623,23 +756,36 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
                 text = rgb(DIM, "○ ") + rgb(FG, f"{name:<6} ") + rgb(DIM, "worker polling · " + pool_hint(name, local))
             else:
                 text = rgb(DIM, "○ ") + rgb(FG, f"{name:<6} ") + rgb(DIM, "vacant · " + vacancy_hint(name, local, linear))
-            lines.append(pad("│ " + text, width - 1) + rgb(DIM, "│"))
-            shown += 1
+            slot_rows.append(pad("│ " + text, width - 1) + rgb(DIM, "│"))
+    viewport = viewport or SlotViewport()
+    rows_budget = max(1, min(len(slot_rows), max(3, height - 30)))
+    visible_slots = viewport.window(slot_rows, rows_budget)
+    lines.extend(visible_slots)
     lines.append(closer(width))
+    if len(slot_rows) > rows_budget:
+        lines.append(pad(rgb(DIM, f"  Rows {viewport.offset + 1}-{viewport.offset + len(visible_slots)} of {len(slot_rows)}"
+                             " · ↑↓ scroll · PgUp/PgDn · Home/End"), width))
 
     # Perishable capacity: the exact receipt Ovi consumes, with no HUD-side forecast math.
     accounts = local["codex"]
     capacity = (local.get("doctor") or {}).get("capacity")
     if capacity and capacity.get("schema") == "jovie.capacity-horizon/v1":
+        capacity_error = capacity_receipt_error(local["doctor"], capacity, now)
         incidents = capacity.get("incidents") or []
+        leases = [] if capacity_error else capacity.get("leases") or []
+        source_gaps = sorted({capacity_freshness(row, now) for row in leases} - {"fresh"})
         lines.append(pad(rgb(FG, "CAPACITY HORIZON  ", bold=True) +
-                         rgb(RED if incidents else DIM,
-                             f"{len(capacity.get('leases') or [])} leases · {len(incidents)} incident(s) · show-only"), width))
-        for row in (capacity.get("leases") or [])[:4]:
+                         rgb(ORANGE if capacity_error else RED if incidents else DIM,
+                             f"unknown ({capacity_error}) · show-only" if capacity_error else
+                             f"{len(leases)} leases · {len(incidents)} reported incident(s) · show-only"), width))
+        for row in leases[:4]:
+            status = capacity_freshness(row, now)
+            known = status == "fresh"
             remaining = "?" if row.get("usableRemaining") is None else f"{row['usableRemaining']:g}%"
             banked = "?" if row.get("bankedCount") is None else str(row["bankedCount"])
             event = row.get("event") or {}
-            deadline = "?" if event.get("countdownSeconds") is None else dur(event["countdownSeconds"])
+            elapsed = timestamp_age(event.get("at"), now)
+            deadline = "?" if elapsed is None else dur(max(0, int(-elapsed)))
             forecast = row.get("forecast") or {}
             unused = "?" if forecast.get("projectedUnused") is None else f"{forecast['projectedUnused']:g}%"
             drain = forecast.get("completionP50At") or "?"
@@ -647,17 +793,26 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
             route = row.get("route") or {}
             job = route.get("selectedJob") or "no selected job"
             mode = str(row.get("mode") or "unknown").upper()
-            freshness = row.get("freshness") or {}
+            coverage = str(len(forecast.get("qualifiedWork") or []))
+            if not known:
+                remaining = banked = deadline = drain = rate = unused = coverage = "?"
+                mode, job = "UNKNOWN", "selection unknown"
             detail = (f"{row.get('alias', '?')} {remaining} · banked {banked} · {event.get('label', 'source gap')} "
-                      f"{deadline} · drain {drain} @ {rate} · unused {unused} · coverage {len(forecast.get('qualifiedWork') or [])} · {mode} · {job} · {freshness.get('status', 'unknown')}")
-            lines.append(pad("  " + rgb(RED if mode == "EMERGENCY" else GREEN if mode == "NORMAL" and freshness.get("status") == "fresh" else ORANGE, detail), width))
-        blocker = capacity.get("topBlocker") or "no material blocker"
-        lines.append(pad("  " + rgb(RED if incidents else DIM, f"top blocker: {blocker}"), width))
+                      f"{deadline} · drain {drain} @ {rate} · unused {unused} · coverage {coverage} · {mode} · {job} · {status}")
+            lines.append(pad("  " + rgb(RED if mode == "EMERGENCY" else GREEN if mode == "NORMAL" and known else ORANGE, detail), width))
+        blocker = f"unknown ({capacity_error})" if capacity_error else \
+            "capacity source " + ", ".join(source_gaps) if source_gaps else capacity.get("topBlocker") or "no material blocker"
+        lines.append(pad("  " + rgb(ORANGE if capacity_error or source_gaps else RED if incidents else DIM, f"top blocker: {blocker}"), width))
     elif accounts.get("error"):
         lines.append(pad(rgb(FG, "CODEX ACCOUNTS  ", bold=True) + rgb(RED, accounts["error"]), width))
     else:
         parts = []
         for name, row in accounts.get("accounts", {}).items():
+            source = ((row.get("capacityLease") or {}).get("sources") or {}).get("capacity") or {}
+            status = capacity_freshness({"freshness": {"status": "fresh", "observedAt": source.get("observedAt")}}, now)
+            if status != "fresh":
+                parts.append(rgb(ORANGE, f"? {name} capacity {status}" + (" · leased" if row["leased"] else "")))
+                continue
             remaining = "?" if row.get("remainingPercent") is None else f"{row['remainingPercent']}%"
             reset = "?" if row.get("naturalResetInS") is None else dur(row["naturalResetInS"])
             banked = "?" if row.get("bankedResetCount") is None else str(row["bankedResetCount"])
@@ -822,7 +977,7 @@ def pool_hint(name: str, local: dict) -> str:
         elapsed = (utcnow() - stamp).total_seconds()
         if elapsed < 0 or elapsed > 3 * REFRESH_REMOTE_S:
             return "new issues unknown (doctor stale)"
-    except (KeyError, TypeError, ValueError):
+    except (KeyError, TypeError, ValueError, AttributeError):
         return "new issues unknown (doctor unread)"
     if admission.get("error"):
         return "new issues unknown (" + admission["error"] + ")"
@@ -838,7 +993,14 @@ def pool_hint(name: str, local: dict) -> str:
         return "new issues unknown (admission unread)"
     reasons = (admission.get("rejectedByProvider") or {}).get(name) or {}
     distribution = ", ".join(f"{reason} {count}" for reason, count in sorted(reasons.items()))
-    capacity = f"PRs {budget['used']}/{budget['cap']} {budget['reason']}"
+    if budget.get("cap") is None and budget.get("allowed") is True:
+        capacity = "PR ceiling none"
+    elif budget.get("reason") == "provider-disabled":
+        capacity = "provider disabled"
+    else:
+        used = "?" if budget.get("used") is None else budget["used"]
+        cap = "?" if budget.get("cap") is None else budget["cap"]
+        capacity = f"PRs {used}/{cap} {budget['reason']}"
     return f"new issues {qualified} · eligible {eligible}/{candidates} · {capacity}" + (" · " + distribution if distribution else "")
 
 
@@ -898,6 +1060,8 @@ def main(argv=None) -> int:
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--width", type=int)
     parser.add_argument("--height", type=int)
+    parser.add_argument("--slot-offset", type=int, default=0,
+                        help="first slot row; interactive arrows and Page Up/Down scroll")
     parser.add_argument("--interval", type=float, default=2.0)
     args = parser.parse_args(argv)
     host = lane.Host()
@@ -905,33 +1069,47 @@ def main(argv=None) -> int:
     if args.json:
         print(json.dumps(build_model(host), indent=1, default=str))
         return 0
-    size = os.get_terminal_size() if sys.stdout.isatty() else os.terminal_size((160, 45))
-    width, height = args.width or size.columns, args.height or size.lines
+    viewport = SlotViewport(args.slot_offset)
     if args.once:
-        sys.stdout.write("\n".join(render(build_model(host), width, height)) + "\n")
+        width, height = terminal_dimensions(args)
+        sys.stdout.write("\n".join(render(build_model(host), width, height, viewport)) + "\n")
         return 0
     remote = Remote(host)
     remote.start()
     sys.stdout.write("\x1b[?25l\x1b[2J")
+    refresh_at, current_model = None, None
     try:
-        while True:
-            newer = current_hud(host)
-            # HERE binds the loaded release. Resolving __file__ again can follow
-            # the moved `current` symlink and incorrectly compare new to new.
-            if newer and newer != HERE / "hud.py":
-                sys.stdout.write("\x1b[?25h")
+        with TerminalInput() as keyboard:
+            while True:
+                newer = current_hud(host)
+                # HERE binds the loaded release. Preserve flags and restore tty
+                # attributes before exec: the new process must see its real mode.
+                if newer and newer != HERE / "hud.py":
+                    keyboard.restore()
+                    sys.stdout.write("\x1b[?25h")
+                    sys.stdout.flush()
+                    os.execv(sys.executable, [sys.executable, str(newer), *sys.argv[1:]])
+                now = time.monotonic()
+                refreshed = refresh_at is None or now >= refresh_at
+                if refreshed:
+                    current_model = build_model(host, remote)
+                    refresh_at = time.monotonic() + max(0.0, args.interval)
+                width, height = terminal_dimensions(args)
+                frame = render(current_model, width, height, viewport)
+                # Clear before writing so a full-width row keeps its final cell.
+                sys.stdout.write("\x1b[H" + "\n".join("\x1b[K" + line for line in frame))
                 sys.stdout.flush()
-                os.execv(sys.executable, [sys.executable, str(newer), *sys.argv[1:]])
-            frame = render(build_model(host, remote), width, height)
-            sys.stdout.write("\x1b[H" + "\n".join(line + "\x1b[K" for line in frame))
-            sys.stdout.flush()
-            try:
-                (host.state / "hud.heartbeat").touch()  # the doctor raises hud-stale when this stops
-            except OSError:
-                pass
-            time.sleep(args.interval)
+                if refreshed:
+                    try:
+                        (host.state / "hud.heartbeat").touch()
+                    except OSError:
+                        pass
+                for key in keyboard.wait(max(0.0, refresh_at - time.monotonic())):
+                    viewport.move(key)
     finally:
         sys.stdout.write("\x1b[?25h")
+        sys.stdout.flush()
+    return 0
 
 
 if __name__ == "__main__":

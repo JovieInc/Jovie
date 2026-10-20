@@ -48,8 +48,8 @@ Copy:
 - feature-split: Preview thumbnails that fit your channel. Review before anything is applied to YouTube.
 - feature-split: Launch the release behind the upload. Bring the plan, metadata, and listening links together.
 - feature-split: Give every viewer a place to return. Fans choose whether to receive updates.
-- spec-wall: From upload to the next release. Explore the four product surfaces.
-- social-proof: BUILT BY PEOPLE WHO'VE CREATED FOR. Tim White wrote/produced for We Are Loud, Justin Prime, and Orjan Nilsen, engineered for Lauryn Hill, and ran digital marketing for the NFL, the NBA All-Star Game, Google, and Netflix. Source: `apps/web/data/aboutCopy.ts`; past work, not Jovie customer adoption.
+- spec-wall: Plan the next release. Explore the four product surfaces.
+- social-proof: Built by people who've created for. Tim White wrote/produced for We Are Loud, Justin Prime, and Orjan Nilsen, engineered for Lauryn Hill, and ran digital marketing for the NFL, the NBA All-Star Game, Google, and Netflix. Source: `apps/web/data/aboutCopy.ts`; past work, not Jovie customer adoption.
 - pricing: Start with a free profile. Link to current plans; no earnings-based billing claim.
 - cta: Make your next upload a release. Find me.
 

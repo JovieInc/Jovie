@@ -101,16 +101,16 @@ test.describe('Homepage', () => {
     await handoff;
   });
 
-  test('aligns the founder proof copy and story action on desktop and mobile', async ({
-    page,
-  }) => {
+  test('aligns the founder credits on desktop and mobile', async ({ page }) => {
     for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 900 });
       const proof = page.getByTestId('marketing-section-social-proof');
       await proof.scrollIntoViewIfNeeded();
+      await expect(proof.getByRole('img', { name: 'Tim White' })).toBeVisible();
+      await expect(proof.getByText(copy.proof.attribution)).toBeVisible();
       await expect(
-        proof.getByRole('link', { name: 'Read the story' })
-      ).toBeVisible();
+        proof.getByRole('link', { name: copy.proof.storyAction })
+      ).toHaveAttribute('href', '/about');
       const snapshot = await inspectRouteDom(page, { surface: 'marketing' });
       expect(
         snapshot.findings.filter(
@@ -129,7 +129,7 @@ test.describe('Homepage', () => {
     expect(headings.filter(Boolean)).toEqual([
       copy.hero.headline,
       ...copy.features.map(feature => feature.headline),
-      'From upload to the next release.',
+      copy.loop.headline,
       copy.proof.headline,
       copy.pricing.headline,
       copy.close.headline,

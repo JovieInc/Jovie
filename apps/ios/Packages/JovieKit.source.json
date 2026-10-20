@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "repository": "JovieInc/Jovie",
+  "revision": "2fec0fe05f95e454da24cb6a9fd7021501ca414b",
+  "packagePath": "apps/ios/Packages/JovieKit",
+  "files": [
+    {
+      "path": ".gitignore",
+      "sha256": "acc718146d21aae829cba1761475e05de39d73209d83af2ab8487a74843cead0"
+    },
+    {
+      "path": "Package.swift",
+      "sha256": "aa88704f7220d98307ea057bc06e052605809218e64b40886c063b429c2521ab"
+    },
+    {
+      "path": "Sources/JovieKit/AppReviewPolicy.swift",
+      "sha256": "1e98c8a910ca08730e5b7ce843cbf22a259b035f6b36abe993b28a70ed379f12"
+    },
+    {
+      "path": "Sources/JovieKit/EyesFreeCaptureAPI.swift",
+      "sha256": "c2c70a21efa724a313c090fb111c2b4f15aabc957167d4eaf15f5a301bf42feb"
+    },
+    {
+      "path": "Sources/JovieKit/MobileChatAuthorizing.swift",
+      "sha256": "5580aaf71485ad4b6e88bd7a8ec6433d314b5038768d1fd3e5753081b827e02f"
+    },
+    {
+      "path": "Sources/JovieKit/MobileChatNDJSONParser.swift",
+      "sha256": "b4723fff9354d795561020361850fd12a9e917b599581e08206db95f172b3ee8"
+    },
+    {
+      "path": "Sources/JovieKit/MobileChatNDJSONReader.swift",
+      "sha256": "3ef2251781c1a7023d20a7d4502d2d83972662132b1e850fcef26f47b4dd1dee"
+    },
+    {
+      "path": "Sources/JovieKit/MobileChatStreamCoalescer.swift",
+      "sha256": "11595b916203e117f721b1eaa8f0253b7957b088d9b45cd1572bcca2071f0ff3"
+    },
+    {
+      "path": "Sources/JovieKit/MobileChatStreamEvent.swift",
+      "sha256": "6fc3a978e0786fac7abcc9cf979535d4193fce15b5261aeb0c3be054454df58b"
+    },
+    {
+      "path": "Sources/JovieKit/MobileChatTransport.swift",
+      "sha256": "0f3829a8811b6020f6c872d66cf3f0d5630312fcb73ddf784165f55aab3246ba"
+    },
+    {
+      "path": "Sources/JovieKit/MobileConversationModels.swift",
+      "sha256": "532510cc83b1124af92e0ea027da518a9480c4c52e7723603ccaafd615aa7775"
+    },
+    {
+      "path": "Tests/JovieKitTests/AppReviewPolicyTests.swift",
+      "sha256": "5a6744fac1c654fd769a0e5ca6504ef3db1f47dffdd802a8b1509a793978a79a"
+    },
+    {
+      "path": "Tests/JovieKitTests/MobileChatNDJSONParserTests.swift",
+      "sha256": "4a3508df5567cbaa3d094d65b32826ef9cb170d8395c278bd50ee096198dfc7f"
+    },
+    {
+      "path": "Tests/JovieKitTests/MobileChatNDJSONReaderTests.swift",
+      "sha256": "247e989555ecbb27ba61121319126ec71feb969ec7061c6916a3247c71df3225"
+    },
+    {
+      "path": "Tests/JovieKitTests/MobileChatStreamCoalescerTests.swift",
+      "sha256": "1c5e23c756fe04ab422622d862e4b219fcea78ee75e8851dc374c49e0a085cf8"
+    },
+    {
+      "path": "Tests/JovieKitTests/MobileChatTransportTests.swift",
+      "sha256": "77f477526edfec88f9a42e506f231c3acc2d000450ac21c7aa060d7ddce47380"
+    },
+    {
+      "path": "Tests/JovieKitTests/MobileConversationModelsTests.swift",
+      "sha256": "a2823075a5f0de5f9dd691db4fa5f6bdf53e87ae924c337205d52a8d039cceb3"
+    },
+    {
+      "path": "LICENSE",
+      "sha256": "b6eb8a4e5f2aa94db96d0ec35126fb88561f162ae3383d82330996ead3361526"
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-import { APP_ROUTES } from '@/constants/routes';
+import { APP_ROUTES } from '../constants/routes';
 
 export const HOMEPAGE_YOUTUBE_MVP = {
   variantIdentity: 'youtube-artist-closed-loop-mvp-v1',
@@ -13,7 +13,11 @@ export const HOMEPAGE_YOUTUBE_MVP = {
     subhead:
       'Turn each YouTube upload into thumbnails, a release plan, a smart link, and a profile where fans can opt in to hear from you again.',
   },
-  search: { placeholder: 'Search your artist name', action: 'Find me' },
+  search: { placeholder: 'Search your name', action: 'Find me' },
+  media: {
+    thumbnailPreview: 'Preview before you publish.',
+    releaseWorkspaceTitle: 'Release workspace',
+  },
   features: [
     {
       id: 'youtube-thumbnails',
@@ -37,6 +41,7 @@ export const HOMEPAGE_YOUTUBE_MVP = {
       action: 'Explore artist profiles',
     },
   ],
+  loop: { headline: 'Plan the next release.' },
   surfaces: [
     {
       id: 'youtube-thumbnails',
@@ -56,15 +61,19 @@ export const HOMEPAGE_YOUTUBE_MVP = {
     },
   ],
   proof: {
-    headline: "BUILT BY PEOPLE WHO'VE CREATED FOR",
+    headline: "Built by people who've created for",
+    musicLabel: 'Music',
+    marketingLabel: 'Digital marketing',
     // First-party career history, not customer adoption: data/aboutCopy.ts.
     music: 'We Are Loud, Justin Prime, Orjan Nilsen, and Lauryn Hill.',
     marketing: 'The NFL, the NBA All-Star Game, Google, and Netflix.',
     attribution: 'Tim White, artist and founder of Jovie',
+    storyAction: 'Read the story',
   },
   pricing: {
     headline: 'Start with a free profile.',
     body: 'Build your presence first. Compare current plans and included features when you need more.',
+    action: 'See plans and pricing',
   },
   close: { headline: 'Make your next upload a release.' },
 } as const;

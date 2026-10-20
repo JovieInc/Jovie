@@ -29,7 +29,7 @@ exposes an admin-only link to Apple's own TestFlight enrollment surface.
 | - | - | - |
 | merged / certified | Exact `CI` success on `main` | `ci.yml` |
 | release-eligible | `Production Verified` job + `production-generation-verified-<sha>` marker artifact | `production-controller.yml` |
-| uploaded | `testflight-upload-verified` artifact bound to the exact run/attempt/job | `ios-testflight.yml` `record-upload` |
+| uploaded | `testflight-upload-verified` artifact bound to the exact run/attempt/job | `ios-testflight.yml` `record-upload`, or `record-deferred-upload` after an installation-quota defer |
 | processed | `upload_to_testflight` waits for ASC processing (`skip_waiting_for_build_processing: false`, `TESTFLIGHT_PROCESSING_TIMEOUT`) before the upload job can succeed | `fastlane/Fastfile` `beta` |
 | distributed to dogfood | `distribute_external: false` distributes to internal testers; ASC internal-group state is observable via JOV-6738 signals | `fastlane/Fastfile` `beta` |
 | installed/running / dogfood-verified | Device + dogfood runs (`apps/ios/scripts/dogfood-ios.sh`, `report.json` schema `jovie-ios-dogfood/v1`); in-app provenance row shows channel + commit | `docs/IOS_DOGFOOD.md`, Settings "App" section |

@@ -22,6 +22,7 @@ import {
 import {
   classifyConversationRequest,
   externalizeConversationRequest,
+  redactExternalText,
   resumePrivateTask,
 } from '../private-task.mjs';
 
@@ -66,16 +67,100 @@ function client(issues) {
 }
 
 describe('conversation issue reconciliation', () => {
+  it('denies personal or mixed cleanup before tracker, prompt or dispatch packet construction', async t => {
+    const directory = privateFixture(t);
+    const secrets = [
+      'b'.repeat(32),
+      '+1 (202) 555-0199',
+      '681'.repeat(2),
+      'local.session',
+    ];
+    const cases = [
+      { title: 'Archive my Telegram chats' },
+      { title: 'Cleanup Telegram inbox', classification: 'jovie' },
+      {
+        title: 'Export Telegram messages',
+        classification: 'jovie',
+        description: 'Message contents: private-canary-omit-entirely',
+        conversationReceipt: { id: 'export-receipt' },
+      },
+      {
+        title: 'Export Telegram messages via webhook',
+        classification: 'jovie',
+        conversationReceipt: { id: 'webhook-export-receipt' },
+      },
+      { title: 'Update Telegram profile', classification: 'jovie' },
+      { title: 'Local request', classification: 'personal' },
+      { title: 'Company bug plus private task', classification: 'mixed' },
+      { title: 'Local request', externalization: 'denied' },
+      { title: 'Company incident', evidence: [{ api_hash: secrets[0] }] },
+      { title: 'Jovie incident', evidence: [{ api_hash: secrets[0] }] },
+      { title: 'Company incident', summary: `phone ${secrets[1]}` },
+      { title: 'Company incident', description: `login_code=${secrets[2]}` },
+      {
+        title: 'Company incident',
+        conversationReceipt: { url: `https://example.test/${secrets[3]}` },
+      },
+    ];
+    for (const input of cases) {
+      const calls = [];
+      const api = new Proxy(
+        {},
+        {
+          get: (_, key) => () => {
+            calls.push(key);
+            throw new Error('outbound call');
+          },
+        }
+      );
+      const result = await reconcileConversationRequest({
+        request: { ...input, privateContext: 'private-canary-omit-entirely' },
+        teamId: 'team',
+        stateId: 'triage',
+        client: api,
+        privateTaskDirectory: directory,
+      });
+      assert.equal(result.disposition, 'private_task');
+      assert.ok(['personal', 'mixed'].includes(result.classification));
+      assert.equal(result.externalization, 'denied');
+      assert.ok('issuesCreated' in result);
+      assert.equal(result.issuesCreated, 0);
+      assert.deepEqual(calls, []);
+      for (const secret of secrets)
+        assert.ok(!JSON.stringify(result).includes(secret));
+      assert.ok(
+        !JSON.stringify(result).includes('private-canary-omit-entirely')
+      );
+    }
+  });
+
+  it('keeps company Telegram webhook repairs eligible for normal intake', async () => {
+    const api = client([]);
+    const result = await reconcileConversationRequest({
+      request: {
+        ...request,
+        title: 'Fix Telegram webhook retry handling',
+        summary: 'Webhook retries fail.',
+        classification: 'jovie',
+      },
+      teamId: 'team',
+      stateId: 'triage',
+      client: api,
+    });
+    assert.equal(result.disposition, 'new_issue');
+    assert.equal(api.calls.creates.length, 1);
+  });
+
   it('normalizes wording and scores repeated intent highly', () => {
-    assert.deepEqual(normalizeIntent('Requested: archiving Telegram chats'), [
+    assert.deepEqual(normalizeIntent('Requested: archiving dashboard chats'), [
       'archiv',
       'chat',
-      'telegram',
+      'dashboard',
     ]);
     assert.ok(
       intentSimilarity(
-        'Archive stale Telegram chats',
-        'Missed Telegram chat archiving never completed despite 5 requests'
+        'Archive stale dashboard chats',
+        'Missed dashboard chat archiving never completed despite 5 requests'
       ) >= 0.82
     );
   });
@@ -432,8 +517,8 @@ describe('private conversation intake and recovery', () => {
     const phone = ['+1', '202', '555', '0123'].join('');
     const input = {
       ...request,
-      description: `Fix Jovie retries; api_key=${sensitive}; contact ${phone}; hash ${'b'.repeat(32)}.`,
-      summary: `Jovie update api_key=${sensitive}`,
+      description: 'Fix Jovie retries.',
+      summary: 'Jovie update',
       rawTranscript: sensitive,
       accountSession: sensitive,
       codingAgentPrompt: sensitive,
@@ -454,6 +539,9 @@ describe('private conversation intake and recovery', () => {
       api.calls.creates,
       existing.calls.comments,
       externalizeConversationRequest(input),
+      redactExternalText(
+        `Fix Jovie retries; api_key=${sensitive}; contact ${phone}; hash ${'b'.repeat(32)}.`
+      ),
     ]);
     for (const secret of [
       sensitive,
