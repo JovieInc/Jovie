@@ -27,6 +27,7 @@ import type { OvieInbox, OvieInboxCase } from '@/lib/ovie/inbox';
 import type { ShippingCockpitProjection } from '@/lib/ovie/shipping-state/client';
 import type {
   CountMeasurement,
+  DeliveryMergedPullRequest,
   DeliverySummary,
   StageSummary,
 } from '@/lib/ovie/shipping-state/contract';
@@ -389,6 +390,29 @@ export function buildConstraint(
   return null;
 }
 
+/**
+ * Add today's merged PRs that no task already names. Task items come first
+ * (they carry verification); merged-only PRs are "landed", not verified.
+ */
+export function mergeDoneWithRecent(
+  done: readonly OvieDoneItem[],
+  recent: readonly DeliveryMergedPullRequest[],
+  limit = 12
+): readonly OvieDoneItem[] {
+  const named = new Set(
+    done.map(item => /#(\d+)$/.exec(item.label)?.[1]).filter(Boolean)
+  );
+  const extra = recent
+    .filter(pr => !named.has(String(pr.number)))
+    .map(pr => ({
+      id: `pr:${pr.repo}#${pr.number}`,
+      label: `${pr.title} · #${pr.number}`,
+      url: pr.url,
+      verified: false,
+    }));
+  return [...done, ...extra].slice(0, limit);
+}
+
 export function buildOvieHomeShipping(input: {
   readonly delivery: DeliverySummary;
   readonly operationalTasks: OperationalTaskFeed;
@@ -402,7 +426,10 @@ export function buildOvieHomeShipping(input: {
     constraint: buildConstraint(delivery, rows, operationalTasks.syncState),
     pulse: buildPulse(delivery, input.pulseMemory),
     rows,
-    done: buildDoneToday(operationalTasks, since),
+    done: mergeDoneWithRecent(
+      buildDoneToday(operationalTasks, since),
+      delivery.merges.recent ?? []
+    ),
     mergesToday: countValue(delivery.merges.today),
     tasksSyncState: operationalTasks.syncState,
   };
