@@ -64,6 +64,8 @@ MAX_SEEN_PER_SOURCE = 600
 MAX_SEEN_BOOKMARKS = 5000
 MAX_CLASSIFY_PER_RUN = 80
 MAX_PENDING = 200
+# gbrain writes take 5-30 s each; bound one run so it fits the lanes tick's detached budget.
+MAX_STORE_PER_RUN = 40
 DEFAULT_BUDGET_USD = 0.25
 DEFAULT_CARDS_PER_DAY = 3
 CARD_MIN_SCORE = 0.6
@@ -698,8 +700,16 @@ def run(state_path: Path, *, env=None, sources: list[dict] | None = None, inbox:
     if digest_rows.get("day") != day:
         digest_rows.clear()
         digest_rows.update(day=day, rows=[])
-    for item, verdict in rows:
+    # Card candidates first so a slow brain still lands them; the rest wait for the next run.
+    rows.sort(key=lambda pair: -(pair[1]["score"] if card_worthy(pair[1]) else -1))
+    state["pending"] = [{**item, **({"verdict": verdict} if verdict else {})} for item, verdict in rows][-MAX_PENDING:]
+    if not dry_run:
+        write_state(state_path, state)  # checkpoint: a killed run loses no verdicts
+    for position, (item, verdict) in enumerate(rows):
         slug = brain_slug(item)
+        if position >= MAX_STORE_PER_RUN:
+            pending.append({**item, **({"verdict": verdict} if verdict else {})})
+            continue
         ok, error = (False, "dry-run") if dry_run else put(slug, item["title"], render_page(item, verdict, observed))
         if ok:
             stored += 1
@@ -712,6 +722,9 @@ def run(state_path: Path, *, env=None, sources: list[dict] | None = None, inbox:
             failures.append(f"gbrain {slug}: {error}")
         if not ok or verdict is None:
             pending.append({**item, **({"verdict": verdict} if verdict else {})})
+        if not dry_run and position % 10 == 9:
+            state["pending"] = (pending + [{**i, **({"verdict": v} if v else {})} for i, v in rows[position + 1:]])[-MAX_PENDING:]
+            write_state(state_path, state)
     state["pending"] = pending[-MAX_PENDING:]
 
     # Cards: best first, capped per day across runs.

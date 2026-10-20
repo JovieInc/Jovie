@@ -304,6 +304,21 @@ class RunTests(unittest.TestCase):
         self.assertEqual(sum(1 for call in poster.calls if call[0] == W.JEV_URL), jev_calls)
         self.assertEqual(len(later["cardsQueued"]), 1)
 
+    def test_store_bound_lands_card_candidates_first_and_keeps_the_rest(self):
+        original = W.MAX_STORE_PER_RUN
+        W.MAX_STORE_PER_RUN = 1
+        try:
+            brain = Brain()
+            result = self.run_once(Poster({"Old thing": jev_answer("clone", 0.9)}), brain)
+        finally:
+            W.MAX_STORE_PER_RUN = original
+        self.assertEqual((result["stored"], result["pending"]), (1, 1))
+        self.assertEqual([slug for slug in brain.pages if "changelog" in slug], ["signals/changelog/vercel-changelog/65c74c15a686"])
+        self.assertEqual(len(result["cardsQueued"]), 1)
+        state = json.loads((self.dir / "state.json").read_text())
+        self.assertEqual(state["pending"][0]["title"], "Queues GA")
+        self.assertEqual(state["pending"][0]["verdict"]["action"], "ignore")
+
     def test_undeployed_summer_route_keeps_cards_in_outbox(self):
         poster = Poster({"Queues GA": jev_answer("adopt", 0.9)}, summer_status=404)
         result = self.run_once(poster, Brain())
