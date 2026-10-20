@@ -26,8 +26,8 @@
       "costBasis": "estimate: 20k input + 1k output tokens at Gateway list $0.20/$1.50 per M",
       "qualityMetric": "cost per successful outcome: total spend (turns, repairs, failures) / tasks passing deterministic checks on the Summer task eval; live: canary success vs control",
       "evalStatus": "ready",
-      "evalRef": "JovieInc/summer-config apps/summer/evals/model-eval/cases.json",
-      "evalSize": 28,
+      "evalRef": "JovieInc/summer-config apps/summer/evals/model-eval/cases.json (v2)",
+      "evalSize": 96,
       "evalRunner": "apps/summer/evals/model-eval/summer_model_eval.py",
       "screens": ["same-family-successor", "gateway-allowlisted"],
       "candidates": [
