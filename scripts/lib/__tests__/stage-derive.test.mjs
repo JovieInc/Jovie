@@ -2,7 +2,13 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildReport, stageMarkdown } from '../../shipping-slo-report.mjs';
-import { collectStageRaw, parseGhOutput } from '../stage-collect.mjs';
+import {
+  attachRedPrSuites,
+  collectMergedPrs,
+  collectStageRaw,
+  listWorkflowRuns,
+  parseGhOutput,
+} from '../stage-collect.mjs';
 import {
   deriveStageEvents,
   linearIdFor,
@@ -21,7 +27,7 @@ const MANIFEST = JSON.parse(
 const NOW = Date.parse('2026-10-20T12:00:00Z');
 const iso = ms => new Date(ms).toISOString();
 const ago = minutes => iso(NOW - minutes * 60_000);
-
+const q = value => JSON.stringify(value);
 const event = overrides => ({
   schema: STAGE_EVENT_SCHEMA,
   entityType: 'shipping',
@@ -34,7 +40,6 @@ const event = overrides => ({
   sourceReceipt: 'https://github.com/JovieInc/Jovie/pull/1',
   ...overrides,
 });
-
 const pr = (number, overrides = {}) => ({
   repository: 'JovieInc/Jovie',
   number,
@@ -45,52 +50,25 @@ const pr = (number, overrides = {}) => ({
   mergedAt: ago(100),
   mergeCommitSha: `sha${number}`,
   timeline: [
-    { type: 'ready_for_review', at: ago(250) },
-    { type: 'added_to_merge_queue', at: ago(200) },
-    { type: 'removed_from_merge_queue', at: ago(190) },
-    { type: 'added_to_merge_queue', at: ago(150) },
-    { type: 'merged', at: ago(100) },
-  ],
+    ['ready_for_review', 250],
+    ['added_to_merge_queue', 200],
+    ['removed_from_merge_queue', 190],
+    ['added_to_merge_queue', 150],
+    ['merged', 100],
+  ].map(([type, minutes]) => ({ type, at: ago(minutes) })),
   commits: [],
   ...overrides,
 });
-
 const job = (name, startedAt, completedAt) => ({
   name,
   conclusion: 'SUCCESS',
   startedAt,
   completedAt,
 });
-
+const controllers = JSON.parse(
+  `{"production":[{"headSha":"sha7","headCommitAt":${q(ago(120))},"url":"https://github.com/JovieInc/Jovie/actions/runs/1","jobs":[${q(job('Production Release / Promote to Production', ago(60), ago(40)))},${q(job('Production Verified', ago(35), ago(30)))}]}],"staging":[{"headSha":"sha7","createdAt":${q(ago(95))},"url":"https://github.com/JovieInc/Jovie/actions/runs/2","jobs":[${q(job('Staging Release / Canary Health Gate (staging)', ago(80), ago(78)))}]}]}`
+);
 describe('stage derivation from receipts', () => {
-  const controllers = {
-    production: [
-      {
-        headSha: 'sha7',
-        headCommitAt: ago(120),
-        url: 'https://github.com/JovieInc/Jovie/actions/runs/1',
-        jobs: [
-          job('Production Release / Promote to Production', ago(60), ago(40)),
-          job('Production Verified', ago(35), ago(30)),
-        ],
-      },
-    ],
-    staging: [
-      {
-        headSha: 'sha7',
-        createdAt: ago(95),
-        url: 'https://github.com/JovieInc/Jovie/actions/runs/2',
-        jobs: [
-          job(
-            'Staging Release / Canary Health Gate (staging)',
-            ago(80),
-            ago(78)
-          ),
-        ],
-      },
-    ],
-  };
-
   it('joins generations by merge-commit sha, not the earlier merge-group commit time', () => {
     const generations = releaseGenerations(
       controllers,
@@ -102,29 +80,21 @@ describe('stage derivation from receipts', () => {
       verifiedAt: ago(30),
     });
   });
-
   it('derives the shipping chain from Linear, GitHub and controller receipts', () => {
     const raw = {
       prs: [pr(7, { mergedAt: ago(90) })],
       controllers,
-      linearIssues: {
-        'JOV-7': {
-          createdAt: ago(1000),
-          startedAt: ago(400),
-          initialType: 'backlog',
-          history: [{ at: ago(800), fromType: 'backlog', toType: 'unstarted' }],
-        },
-      },
+      linearIssues: JSON.parse(
+        `{"JOV-7":{"createdAt":${q(ago(1000))},"startedAt":${q(ago(400))},"initialType":"backlog","history":[{"at":${q(ago(800))},"fromType":"backlog","toType":"unstarted"}]}}`
+      ),
       feeds: {
         lanes: {
           events: [
-            event({
-              entityId: 'JOV-7',
-              stage: 'worker-start',
-              enteredAt: ago(390),
-              exitedAt: null,
-              outcome: 'open',
-            }),
+            event(
+              JSON.parse(
+                `{"entityId":"JOV-7","stage":"worker-start","enteredAt":${q(ago(390))},"exitedAt":null,"outcome":"open"}`
+              )
+            ),
           ],
         },
       },
@@ -156,33 +126,18 @@ describe('stage derivation from receipts', () => {
     ]);
     expect(release[2]).toMatchObject({ enteredAt: ago(60), exitedAt: ago(30) });
   });
-
   it('derives red → classified → green remediation episodes', () => {
-    const suite = (conclusion, updatedAt) => ({
-      conclusion,
-      createdAt: updatedAt,
-      updatedAt,
-      event: 'pull_request',
-    });
+    const at = minutes => q(ago(minutes));
+    const suite = (conclusion, minutes) =>
+      `{"conclusion":${q(conclusion)},"createdAt":${at(minutes)},"updatedAt":${at(minutes)},"event":"pull_request"}`;
     const raw = {
       prs: [
-        pr(9, {
-          timeline: [{ type: 'labeled', at: ago(170), label: 'lane-fix-ci' }],
-          commits: [
-            {
-              oid: 'aaaaaaaaaaaaaaaa',
-              committedDate: ago(200),
-              rollup: 'FAILURE',
-              suites: [suite('FAILURE', ago(180)), suite('SUCCESS', ago(185))],
-            },
-            {
-              oid: 'bbbb',
-              committedDate: ago(160),
-              rollup: 'SUCCESS',
-              suites: [suite('SUCCESS', ago(140)), suite('SUCCESS', ago(130))],
-            },
-          ],
-        }),
+        pr(
+          9,
+          JSON.parse(
+            `{"timeline":[{"type":"labeled","at":${at(170)},"label":"lane-fix-ci"}],"commits":[{"oid":"aaaaaaaaaaaaaaaa","committedDate":${at(200)},"rollup":"FAILURE","suites":[${suite('FAILURE', 180)},${suite('SUCCESS', 185)}]},{"oid":"bbbb","committedDate":${at(160)},"rollup":"SUCCESS","suites":[${suite('SUCCESS', 140)},${suite('SUCCESS', 130)}]}]}`
+          )
+        ),
       ],
     };
     const events = deriveStageEvents(raw, MANIFEST).filter(
@@ -196,26 +151,36 @@ describe('stage derivation from receipts', () => {
       ['JovieInc/Jovie#9@aaaaaaaaaaaa', 'green', ago(130), ago(130)],
     ]);
   });
-
-  it('derives LogYourBody merge → TestFlight and passes summer feed rows through', () => {
-    const raw = {
-      lyb: {
-        runs: [
-          {
-            headSha: 'l1',
-            createdAt: ago(60),
-            url: 'u',
-            jobs: [
-              job(
-                'Deploy to TestFlight / Deploy to TestFlight (alpha)',
-                ago(20),
-                ago(10)
-              ),
-            ],
-          },
-          { headSha: 'l2', createdAt: ago(60), url: 'u', jobs: [] },
+  it('does not time remediation or queue admission from a truncated history', () => {
+    const truncated = deriveStageEvents(
+      {
+        prs: [
+          pr(8, { timelineTruncated: true }),
+          pr(
+            9,
+            JSON.parse(
+              `{"commitsTruncated":true,"commits":[{"oid":"${'a'.repeat(40)}","committedDate":${q(ago(180))},"rollup":"FAILURE","suites":[]},{"oid":"${'b'.repeat(40)}","committedDate":${q(ago(130))},"rollup":"SUCCESS","suites":[]}]}`
+            )
+          ),
         ],
       },
+      MANIFEST
+    );
+    const shipping = truncated.filter(item => item.entityId.endsWith('#8'));
+    expect(shipping.map(item => item.stage)).toEqual(
+      expect.arrayContaining(['merged'])
+    );
+    expect(shipping.map(item => item.stage)).not.toContain('queued');
+    expect(shipping.map(item => item.stage)).not.toContain('ready');
+    expect(truncated.filter(item => item.entityType === 'remediation')).toEqual(
+      []
+    );
+  });
+  it('derives LogYourBody merge → TestFlight and passes summer feed rows through', () => {
+    const raw = {
+      ...JSON.parse(
+        `{"lyb":{"runs":[{"headSha":"l1","createdAt":${q(ago(60))},"url":"u","jobs":[${q(job('Deploy to TestFlight / Deploy to TestFlight (alpha)', ago(20), ago(10)))}]},{"headSha":"l2","createdAt":${q(ago(60))},"url":"u","jobs":[]}]}}`
+      ),
       feeds: {
         summer: {
           events: [
@@ -239,91 +204,37 @@ describe('stage derivation from receipts', () => {
     ).toBe('JOV-12');
   });
 });
-
 describe('stage collector', () => {
   it('parses NDJSON from streaming --jq filters', () => {
     expect(parseGhOutput('{"a":1}\n{"a":2}\n')).toEqual([{ a: 1 }, { a: 2 }]);
     expect(parseGhOutput('[1]')).toEqual([1]);
     expect(parseGhOutput('')).toBeNull();
   });
-
   it('settles every source to data or a recorded failure, never a silent zero', async () => {
     const calls = [];
+    const at = minutes => q(ago(minutes));
     const gh = args => {
       calls.push(args);
       if (args[1] === 'graphql') {
         const query = args.find(a => a.startsWith('query=')) ?? '';
         if (query.includes('search('))
-          return JSON.stringify({
-            data: {
-              search: {
-                pageInfo: { hasNextPage: false },
-                nodes: [
-                  {
-                    number: 3,
-                    title: 'JOV-3',
-                    headRefName: 'x',
-                    createdAt: ago(9),
-                    mergedAt: ago(2),
-                    mergeCommit: { oid: 'm3' },
-                  },
-                ],
-              },
-            },
-          });
-        return JSON.stringify({
-          data: {
-            nodes: [
-              {
-                checkSuite: {
-                  checkRuns: {
-                    nodes: [
-                      {
-                        name: 'Production Verified',
-                        conclusion: 'SUCCESS',
-                        startedAt: ago(2),
-                        completedAt: ago(1),
-                      },
-                    ],
-                  },
-                },
-              },
-            ],
-          },
-        });
+          return `{"data":{"search":{"pageInfo":{"hasNextPage":false},"nodes":[{"number":3,"title":"JOV-3","headRefName":"x","createdAt":${at(9)},"mergedAt":${at(2)},"mergeCommit":{"oid":"m3"}}]}}}`;
+        return `{"data":{"nodes":[{"checkSuite":{"checkRuns":{"nodes":[{"name":"Production Verified","conclusion":"SUCCESS","startedAt":${at(2)},"completedAt":${at(1)}}]}}}]}}`;
       }
       if (args[1].includes('LogYourBody'))
         throw new Error('HTTP 404: Not Found');
       if (args[1].includes('production-controller'))
-        return JSON.stringify([
-          {
-            id: 1,
-            nodeId: 'N1',
-            headSha: 'm3',
-            conclusion: 'success',
-            createdAt: ago(3),
-          },
-        ]);
+        return `[{"id":1,"nodeId":"N1","headSha":"m3","conclusion":"success","createdAt":${at(3)}}]`;
       return '[]';
     };
     const fetchImpl = async url => {
       if (url.includes('linear'))
         return {
           ok: true,
-          json: async () => ({
-            data: {
-              issues: {
-                nodes: [
-                  {
-                    identifier: 'JOV-3',
-                    createdAt: ago(50),
-                    startedAt: ago(20),
-                    history: { nodes: [] },
-                  },
-                ],
-              },
-            },
-          }),
+          json: async () =>
+            JSON.parse(
+              `{"data":{"issues":{"nodes":[{"identifier":"JOV-3","createdAt":${at(50)},"startedAt":${at(20)},"history":{"nodes":[]}}]}}}`
+            ),
         };
       return { ok: false, status: 404, text: async () => '' };
     };
@@ -357,8 +268,89 @@ describe('stage collector', () => {
     // Three 3-day search chunks cover 7 days, plus one batched job lookup.
     expect(calls.filter(a => a[1] === 'graphql')).toHaveLength(4);
   });
+  it('flags truncated PR timelines and commits', () => {
+    const failures = [];
+    const prs = collectMergedPrs({
+      gh: () =>
+        `{"data":{"search":{"pageInfo":{"hasNextPage":false},"nodes":[{"number":9,"title":"t","headRefName":"x","createdAt":${q(ago(10))},"mergedAt":${q(ago(1))},"timelineItems":{"pageInfo":{"hasNextPage":true},"nodes":[]},"commits":{"pageInfo":{"hasPreviousPage":true},"nodes":[]}}]}}}`,
+      repository: 'JovieInc/Jovie',
+      sinceMs: NOW - 86_400_000,
+      nowMs: NOW,
+      failures,
+    });
+    expect(prs[0].timelineTruncated).toBe(true);
+    expect(prs[0].commitsTruncated).toBe(true);
+    expect(failures.join('\n')).toMatch(/timeline truncated/);
+    expect(failures.join('\n')).toMatch(/commits truncated/);
+  });
+  it('keeps merged PRs when one commit-suite batch fails', () => {
+    const failures = [];
+    const prs = attachRedPrSuites({
+      gh: () => {
+        throw new Error('HTTP 403 secondary rate limit');
+      },
+      failures,
+      prs: [
+        JSON.parse(
+          '{"number":4,"commits":[{"id":"C1","oid":"abc","rollup":"FAILURE","suites":[]}]}'
+        ),
+      ],
+    });
+    expect(prs).toHaveLength(1);
+    expect(prs[0].commits[0].suites).toEqual([]);
+    expect(failures[0]).toMatch(/403/);
+  });
+  it('records invalid timings JSON as a source failure', async () => {
+    const gh = args =>
+      args[1] === 'graphql'
+        ? '{"data":{"search":{"pageInfo":{"hasNextPage":false},"nodes":[]}}}'
+        : '[]';
+    const raw = await collectStageRaw({
+      gh,
+      fetchImpl: async () => ({
+        ok: true,
+        status: 200,
+        text: async () => 'not-json',
+      }),
+      env: {},
+      manifest: JSON.parse(
+        '{"sources":{"timings":{"kind":"timings","url":"https://example.test/t"}}}'
+      ),
+      now: NOW,
+      days: 1,
+    });
+    expect(raw.sources.timings.error).toMatch(/invalid JSON/);
+    expect(raw.external).toEqual({});
+  });
+  it('splits workflow listings into weeks and records a full slice', () => {
+    const ranges = [];
+    const gh = args => {
+      const range = decodeURIComponent(args[1].match(/created=([^&]+)/)[1]);
+      ranges.push(range);
+      const page = Number(args[1].match(/&page=(\d+)/)[1]);
+      if (range.startsWith('2026-10-01') && page <= 10)
+        return `[${Array.from({ length: 100 }, (_, index) => `{"id":"${range}-${page}-${index}","createdAt":"2026-10-01T00:00:00Z"}`).join(',')}]`;
+      return `[{"id":${q(range)},"createdAt":"2026-10-08T00:00:00Z"}]`;
+    };
+    const failures = [];
+    const runs = listWorkflowRuns({
+      gh,
+      repository: 'JovieInc/Jovie',
+      workflow: 'production-controller.yml',
+      sinceMs: Date.parse('2026-10-01T00:00:00Z'),
+      nowMs: Date.parse('2026-10-20T12:00:00Z'),
+      failures,
+    });
+    expect(ranges[0]).toBe('2026-10-01..2026-10-07');
+    expect(failures[0]).toMatch(/1000-result cap/);
+    expect(runs.map(run => run.id)).toEqual(
+      expect.arrayContaining([
+        '2026-10-08..2026-10-14',
+        '2026-10-15..2026-10-20',
+      ])
+    );
+  });
 });
-
 describe('shipping SLO integration', () => {
   it('embeds stage timings and the compact summary in the SLO snapshot', () => {
     const baseline = JSON.parse(
@@ -398,8 +390,45 @@ describe('shipping SLO integration', () => {
     expect(without.stageTimings).toBeNull();
     expect(without.gistSlo.stages).toBeUndefined();
   });
+  it('replaces tighten candidates when stage lag overrides the legacy value', () => {
+    const mergedAt = ago(100);
+    const baseline = JSON.parse(
+      '{"schemaVersion":1,"thresholds":{"improvementFraction":0.1,"improvementHoldDays":3,"regressionFraction":0.2},"metrics":{"production_lag.merged_to_verified.p95":{"value":1000,"unit":"seconds","direction":"lower"}},"history":[{"date":"2026-10-18","values":{"production_lag.merged_to_verified.p95":80}},{"date":"2026-10-19","values":{"production_lag.merged_to_verified.p95":70}}]}'
+    );
+    const report = buildReport(
+      {
+        runs: {},
+        mergedPrs: [
+          JSON.parse(
+            `{"number":7,"title":"x","headRefName":"codex/jov-7-x","createdAt":${q(ago(300))},"mergedAt":${q(mergedAt)},"mergeCommitSha":"sha7"}`
+          ),
+        ],
+        productionVerifications: [
+          {
+            sha: 'sha7',
+            verifiedAt: new Date(Date.parse(mergedAt) + 60_000).toISOString(),
+          },
+        ],
+        stages: {
+          prs: [pr(7)],
+          controllers,
+          sources: { 'github-pr': { ok: true, n: 1 } },
+        },
+      },
+      baseline,
+      { now: NOW, stageManifest: MANIFEST }
+    );
+    expect(
+      report.flat['production_lag.merged_to_verified.p95']
+    ).toBeGreaterThan(1000);
+    expect(
+      report.evaluation.tightenCandidates.map(item => item.key)
+    ).not.toContain('production_lag.merged_to_verified.p95');
+    expect(report.evaluation.regressions.map(item => item.key)).toContain(
+      'production_lag.merged_to_verified.p95'
+    );
+  });
 });
-
 describe('committed stage-timings snapshot', () => {
   it('packs windows as [n, p50, p95] and regressions as primitive arrays', () => {
     const t = computeStageTimings(
