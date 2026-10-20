@@ -6657,6 +6657,21 @@ def fix_candidates(name: str) -> list[dict]:
 ISSUE_MARKER = re.compile(r"linear-issue-id:\s*(JOV-\d+)", re.IGNORECASE)
 
 
+def org_merged_prs(identifier: str) -> list[dict] | None:
+    """Merged PRs in the org that mention the issue (title/body checked by the caller)."""
+    owner = REPO_SLUG.split("/", 1)[0]
+    found = sh(["gh", "search", "prs", identifier, "--owner", owner, "--merged",
+                "--json", "repository,number,title,body", "--limit", "20"], timeout=60)
+    try:
+        rows = json.loads(found.stdout) if found.returncode == 0 else None
+    except ValueError:
+        return None
+    if not isinstance(rows, list):
+        return None
+    return [{"repository": (row.get("repository") or {}).get("nameWithOwner"), "number": row.get("number"),
+             "title": row.get("title"), "body": row.get("body")} for row in rows if isinstance(row, dict)]
+
+
 def in_flight_issues() -> frozenset[str] | None:
     """Issues that already have an open PR (lane branch or `linear-issue-id` marker) from any
     lane, host, or agent. GitHub is the shared truth. None when GitHub cannot be read: an
@@ -7819,7 +7834,8 @@ def dispatch(host: Host) -> int:
         # A release self-test or fixture never writes to Linear or reads the host's git.
         if not os.environ.get("LANES_SELFTEST") and os.environ.get("LANES_EXECUTION_BACKEND") != "local-test":
             # Every started issue has a live owner, or it moves (outbox) to the right state.
-            tick["ownership"] = ownership.reconcile(host.state, host.repo, in_flight_issues())
+            tick["ownership"] = ownership.reconcile(host.state, host.repo, in_flight_issues(),
+                                                    search=org_merged_prs)
     except Exception as error:  # ownership repair never takes dispatch down
         tick["ownershipError"] = f"{type(error).__name__}: {error}"[:200]
     try:
