@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { withScope } from '@sentry/nextjs';
 import type { ErrorEvent } from '@sentry/node';
@@ -104,6 +106,26 @@ describe('revenue spine contract', () => {
       expect(event.affected_user_id).toBeNull();
       expect(event.failure_code).toBe('unexpected_error');
     }
+  });
+
+  it('hashes internal user ids with Node SHA-256 and does not import node crypto statically', () => {
+    const source = readFileSync(
+      new URL('./revenue-spine.ts', import.meta.url),
+      'utf8'
+    );
+    expect(source).not.toMatch(/from\s+['"]node:crypto['"]/);
+    expect(source).not.toMatch(/import\s*\(\s*['"]node:crypto['"]\s*\)/);
+    expect(source).not.toMatch(/require\(\s*['"]node:crypto['"]\s*\)/);
+    const expected = createHash('sha256')
+      .update(`revenue-spine:v1:${USER_A.toLowerCase()}`)
+      .digest('hex');
+    expect(
+      buildRevenueSpineFailure({
+        stage: 'checkout',
+        severity: 'blocked',
+        userId: USER_A,
+      }).affected_user_id
+    ).toBe(expected);
   });
 
   it('rejects runtime values outside the closed contract', () => {

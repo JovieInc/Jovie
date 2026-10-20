@@ -1,6 +1,5 @@
 import 'server-only';
 
-import { createHash } from 'node:crypto';
 import * as Sentry from '@sentry/nextjs';
 
 export const REVENUE_SPINE_STAGES = [
@@ -116,6 +115,21 @@ function classifyFailure(error: unknown): RevenueSpineFailureCode {
 const APP_USER_ID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+function hashRevenueSpineUserId(userId: string): string {
+  // Storybook stubs `server-only`, then evaluates this module in the browser
+  // preview. Resolve SHA-256 only while hashing. A static node builtin import
+  // is externalized and throws before the story mounts.
+  const nodeProcess = globalThis.process;
+  if (typeof nodeProcess?.getBuiltinModule !== 'function') {
+    throw new Error('Revenue spine user hashing requires Node crypto');
+  }
+  return nodeProcess
+    .getBuiltinModule('node:crypto')
+    .createHash('sha256')
+    .update(`revenue-spine:v1:${userId.toLowerCase()}`)
+    .digest('hex');
+}
+
 export function buildRevenueSpineFailure(
   input: RevenueSpineFailureInput
 ): RevenueSpineFailure {
@@ -129,9 +143,7 @@ export function buildRevenueSpineFailure(
   }
   const affectedUserId =
     typeof input.userId === 'string' && APP_USER_ID.test(input.userId)
-      ? createHash('sha256')
-          .update(`revenue-spine:v1:${input.userId.toLowerCase()}`)
-          .digest('hex')
+      ? hashRevenueSpineUserId(input.userId)
       : null;
 
   return {
