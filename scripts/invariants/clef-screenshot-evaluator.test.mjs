@@ -6,7 +6,9 @@ import { test } from 'node:test';
 import {
   aggregate,
   buildQuestions,
+  CONNECT_ATTEMPT_TIMEOUT_MS,
   callClef,
+  ensureConnectAttemptBudget,
   evaluateScreenshots,
   MAX_REVISIONS,
   planRequests,
@@ -267,4 +269,137 @@ test('callClef posts data URIs and maps errors without leaking bodies', async ()
     }),
     /PNG or JPEG/
   );
+});
+
+test('wrangler token is refreshed before expiry and after an auth or fetch failure', async () => {
+  const oauth = (token, expires) => ({
+    accountId: 'acct',
+    token,
+    source: 'wrangler-oauth',
+    expires,
+  });
+  const now = () => 1_000_000;
+
+  // Near-expiry token: refreshed before the first call.
+  let refreshes = 0;
+  const seenTokens = [];
+  const pre = await evaluateScreenshots([{ label: 'x', overview: PNG }], {
+    auth: oauth('old', now() + 60_000),
+    env: env(tmp()),
+    now,
+    refreshAuth: () => {
+      refreshes += 1;
+      return oauth('fresh', now() + 3_600_000);
+    },
+    call: async ({ auth: a }) => {
+      seenTokens.push(a.token);
+      return { answers: answers(), usage: { input_tokens: 1 } };
+    },
+  });
+  assert.equal(pre.status, 'evaluated');
+  assert.deepEqual([refreshes, seenTokens], [1, ['fresh']]);
+
+  // A token that still looks valid but is rejected ("fetch failed" or 10000): refresh once and retry.
+  for (const failure of ['fetch failed', 'workers-ai-error-10000']) {
+    const tokens = [];
+    const r = await evaluateScreenshots([{ label: 'x', overview: PNG }], {
+      auth: oauth('stale', now() + 3_600_000),
+      env: env(tmp()),
+      now,
+      refreshAuth: () => oauth('fresh', now() + 3_600_000),
+      call: async ({ auth: a }) => {
+        tokens.push(a.token);
+        if (a.token === 'stale') throw new TypeError(failure);
+        return { answers: answers(), usage: { input_tokens: 1 } };
+      },
+    });
+    assert.equal(r.status, 'evaluated', failure);
+    assert.deepEqual(tokens, ['stale', 'fresh']);
+  }
+
+  // A refresh that cannot fix it still fails open, after exactly one retry.
+  let attempts = 0;
+  const failed = await evaluateScreenshots([{ label: 'x', overview: PNG }], {
+    auth: oauth('stale', now() + 3_600_000),
+    env: env(tmp()),
+    now,
+    refreshAuth: () => oauth('still-bad', now() + 3_600_000),
+    call: async () => {
+      attempts += 1;
+      throw new TypeError('fetch failed');
+    },
+  });
+  assert.equal(failed.status, 'provider-error');
+  assert.equal(failed.pass, null);
+  assert.equal(attempts, 2);
+
+  // Env tokens are never refreshed; an auth error fails open without a retry.
+  let envCalls = 0;
+  const envAuth = await evaluateScreenshots([{ label: 'x', overview: PNG }], {
+    auth,
+    env: env(tmp()),
+    refreshAuth: () => assert.fail('env token must not be refreshed'),
+    call: async () => {
+      envCalls += 1;
+      throw new Error('workers-ai-error-10000');
+    },
+  });
+  assert.equal(envAuth.status, 'provider-error');
+  assert.equal(envCalls, 1);
+});
+
+test('resolveWorkersAiAuth runs the wrangler refresh for an expired token', () => {
+  const home = tmp();
+  mkdirSync(join(home, 'config'));
+  const file = join(home, 'config/default.toml');
+  writeFileSync(
+    file,
+    'oauth_token = "expired"\nexpiration_time = "2000-01-01T00:00:00.000Z"\n'
+  );
+  let ran = 0;
+  const out = resolveWorkersAiAuth({
+    env: { WRANGLER_HOME: home },
+    runRefresh: () => {
+      ran += 1;
+      writeFileSync(
+        file,
+        `oauth_token = "renewed"\nexpiration_time = "${new Date(Date.now() + 3_600_000).toISOString()}"\n`
+      );
+    },
+  });
+  assert.equal(ran, 1);
+  assert.equal(out.token, 'renewed');
+  assert.ok(out.expires > Date.now());
+  // A failing refresh falls through to the readable token instead of throwing.
+  const kept = resolveWorkersAiAuth({
+    env: { WRANGLER_HOME: home },
+    force: true,
+    runRefresh: () => {
+      throw new Error('wrangler missing');
+    },
+  });
+  assert.equal(kept.token, 'renewed');
+});
+
+test('calls raise the connect attempt budget that caused "fetch failed" timeouts', async () => {
+  const net = await import('node:net');
+  net.setDefaultAutoSelectFamilyAttemptTimeout(250);
+  await callClef({
+    auth,
+    model: 'clef',
+    state: 's',
+    questions: {},
+    images: [PNG],
+    fetchImpl: async () => ({
+      ok: true,
+      json: async () => ({ success: true, result: {} }),
+    }),
+  });
+  assert.equal(
+    net.getDefaultAutoSelectFamilyAttemptTimeout(),
+    CONNECT_ATTEMPT_TIMEOUT_MS
+  );
+  net.setDefaultAutoSelectFamilyAttemptTimeout(10_000);
+  ensureConnectAttemptBudget();
+  assert.equal(net.getDefaultAutoSelectFamilyAttemptTimeout(), 10_000);
 });

@@ -12,6 +12,10 @@
 
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
+import {
+  getDefaultAutoSelectFamilyAttemptTimeout,
+  setDefaultAutoSelectFamilyAttemptTimeout,
+} from 'node:net';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -255,11 +259,15 @@ function readWranglerToken(path) {
  * Credential order: CLOUDFLARE_WORKERS_AI_TOKEN, then the local `wrangler login`
  * OAuth token (refreshed via `wrangler whoami` when near expiry). Never logged.
  */
+const runWranglerWhoami = () =>
+  execFileSync('wrangler', ['whoami'], { stdio: 'ignore', timeout: 20_000 });
+
 export function resolveWorkersAiAuth({
   env = process.env,
   refresh = true,
   force = false,
   now = Date.now,
+  runRefresh = runWranglerWhoami,
 } = {}) {
   const accountId = env.CLOUDFLARE_ACCOUNT_ID || DEFAULT_ACCOUNT_ID;
   if (env.CLOUDFLARE_WORKERS_AI_TOKEN) {
@@ -269,10 +277,7 @@ export function resolveWorkersAiAuth({
   let found = readWranglerToken(path);
   if (refresh && (force || !found || !(found.expires > now() + 120_000))) {
     try {
-      execFileSync('wrangler', ['whoami'], {
-        stdio: 'ignore',
-        timeout: 20_000,
-      });
+      runRefresh();
     } catch {
       // Fall through: an expired or missing token surfaces as an auth error.
     }
@@ -282,7 +287,32 @@ export function resolveWorkersAiAuth({
     throw new Error(
       'no Workers AI credential: set CLOUDFLARE_WORKERS_AI_TOKEN or run `wrangler login`'
     );
-  return { accountId, token: found.token, source: 'wrangler-oauth' };
+  return {
+    accountId,
+    token: found.token,
+    source: 'wrangler-oauth',
+    expires: found.expires,
+  };
+}
+
+/** Wrangler OAuth access tokens last about an hour; refresh this close to expiry. */
+const REFRESH_MARGIN_MS = 120_000;
+const AUTH_ERROR = /-(401|403|10000|10001)$/;
+// Undici reports an expired-token connection reset or DNS blip as "fetch failed".
+const NETWORK_ERROR =
+  /fetch failed|ECONNRESET|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|socket/i;
+const TRANSIENT_ERROR = /-(429|5\d\d)$|timeout|abort/i;
+
+/**
+ * Node's happy-eyeballs gives each address 250 ms to connect. On hosts without
+ * IPv6 and with a slow IPv4 handshake (observed 2026-10-20: about 0.8 s),
+ * every attempt times out and fetch rejects with "fetch failed" (ETIMEDOUT)
+ * even though curl succeeds. Raise the per-attempt budget, never lower it.
+ */
+export const CONNECT_ATTEMPT_TIMEOUT_MS = 2_500;
+export function ensureConnectAttemptBudget() {
+  if (getDefaultAutoSelectFamilyAttemptTimeout() < CONNECT_ATTEMPT_TIMEOUT_MS)
+    setDefaultAutoSelectFamilyAttemptTimeout(CONNECT_ATTEMPT_TIMEOUT_MS);
 }
 
 /** One Workers AI decision call. Zero retries; bounded by timeoutMs. */
@@ -297,6 +327,7 @@ export async function callClef({
 }) {
   const id = CLEF_MODELS[model];
   if (!id) throw new Error(`unknown model: ${model}`);
+  ensureConnectAttemptBudget();
   const res = await fetchImpl(
     `https://api.cloudflare.com/client/v4/accounts/${auth.accountId}/ai/run/${id}`,
     {
@@ -357,6 +388,7 @@ export async function evaluateScreenshots(views, options = {}) {
     dailyCapUsd = Number(env.CLEF_EVAL_DAILY_CAP_USD) || 5,
     call = callClef,
     now = Date.now,
+    refreshAuth = () => resolveWorkersAiAuth({ env, now, force: true }),
   } = options;
   const base = {
     schema: SCREENSHOT_EVAL_SCHEMA,
@@ -376,18 +408,27 @@ export async function evaluateScreenshots(views, options = {}) {
   let inputTokens = 0;
   try {
     let resolved = auth ?? resolveWorkersAiAuth({ env, now });
+    const refreshable = () => resolved.source === 'wrangler-oauth';
     for (const req of requests) {
+      // Long runs outlive the hourly wrangler token: refresh before it lapses.
+      if (refreshable() && !(resolved.expires > now() + REFRESH_MARGIN_MS))
+        resolved = refreshAuth();
       const send = () =>
         call({ auth: resolved, model, state, questions, images: req.images });
       let result;
       try {
         result = await send();
       } catch (error) {
-        // One retry: transient capacity errors, or an OAuth token that expired mid-run.
-        const code = String(error.message);
-        if (/-(401|403)$|-10000$/.test(code) && !auth)
-          resolved = resolveWorkersAiAuth({ env, now, force: true });
-        else if (!/-(429|5\d\d)$|timeout|abort/i.test(code)) throw error;
+        // One retry: refresh a wrangler token after an auth or network failure,
+        // or wait out a transient capacity error. Anything else fails open.
+        const code = String(error?.message ?? error);
+        if (
+          refreshable() &&
+          (AUTH_ERROR.test(code) || NETWORK_ERROR.test(code))
+        )
+          resolved = refreshAuth();
+        else if (!TRANSIENT_ERROR.test(code) && !NETWORK_ERROR.test(code))
+          throw error;
         result = await send();
       }
       answered.push({ label: req.label, answers: result.answers });
