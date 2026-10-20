@@ -944,6 +944,11 @@ body {
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
   }
+  /* The same ink allowance is needed by clamped section/CTA headings.
+     Their tight Satoshi leading can crop descenders even with no hidden line. */
+  :where(.home-viewport, .system-b-marketing) :where(h2, h3).line-clamp-2 {
+    padding-block-end: 0.16em;
+  }
   @media (min-width: 768px) {
     .marketing-h1-linear {
       font-size: var(--linear-h1-size-md);
