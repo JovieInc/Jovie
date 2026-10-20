@@ -573,6 +573,59 @@ def issue_hits_red_line(issue: Issue) -> bool:
     return False
 
 
+# A reviewed false positive (2026-10-20): the matcher stays as is, and one issue at a time
+# leaves the red-line hold only with BOTH the label and a comment receipt
+# `<!-- sensitive-text-reviewed:v1 {"sha256": ..., "reviewer": ..., "reason": ..., "at": ...} -->`
+# whose sha256 binds the exact title+description it reviewed. Any later edit voids it.
+SENSITIVE_REVIEWED_LABEL = "sensitive-text-reviewed"
+SENSITIVE_REVIEW_MARKER = re.compile(r"<!--\s*sensitive-text-reviewed:v1\s+(\{.*?\})\s*-->", re.S)
+SENSITIVE_REVIEW_TTL_S = 600
+SENSITIVE_REVIEW_QUERY = ('query($id:String!){issue(id:$id){comments(first:20,filter:{body:{contains:'
+                          '"sensitive-text-reviewed:v1"}}){nodes{body}}}}')
+
+
+def issue_text_digest(issue: Issue) -> str:
+    return hashlib.sha256(f"{issue.title}\n{issue.description or ''}".encode()).hexdigest()
+
+
+def sensitive_review_valid(issue: Issue, bodies: list[str]) -> bool:
+    digest = issue_text_digest(issue)
+    for body in bodies:
+        for match in SENSITIVE_REVIEW_MARKER.finditer(body if isinstance(body, str) else ""):
+            try:
+                receipt = json.loads(match.group(1))
+            except ValueError:
+                continue
+            if (isinstance(receipt, dict) and receipt.get("sha256") == digest
+                    and all(isinstance(receipt.get(key), str) and receipt[key].strip()
+                            for key in ("reviewer", "reason", "at"))):
+                return True
+    return False
+
+
+def sensitive_review_comments(issue: Issue) -> list[str] | None:
+    """Receipt comments, one Linear read per issue text per TTL (keyed on the text digest)."""
+    def fetch():
+        data = Linear(Host().linear_env).gql(SENSITIVE_REVIEW_QUERY, {"id": issue.id})
+        nodes = (((data or {}).get("issue") or {}).get("comments") or {}).get("nodes")
+        return [node.get("body") for node in nodes if isinstance(node, dict)] if isinstance(nodes, list) else None
+    return shared(f"sensitive-review-{_cache_token(issue.id)}-{issue_text_digest(issue)[:16]}",
+                  SENSITIVE_REVIEW_TTL_S, fetch)
+
+
+SENSITIVE_REVIEW_READER = sensitive_review_comments
+
+
+def sensitive_text_released(issue: Issue) -> bool:
+    if SENSITIVE_REVIEWED_LABEL not in {label.lower() for label in issue.labels}:
+        return False
+    try:
+        bodies = SENSITIVE_REVIEW_READER(issue)
+    except Exception:  # an unreadable receipt keeps the hold
+        return False
+    return bool(bodies) and sensitive_review_valid(issue, bodies)
+
+
 def label_rejection(issue: Issue, provider: str | None = None) -> str | None:
     """Label policy shared by the Jovie pool and every binding (bindings.refusal)."""
     labels = {label.lower() for label in issue.labels}
@@ -612,7 +665,7 @@ def admission_rejection(issue: Issue, failures: dict, now: float,
     rejected = label_rejection(issue, provider)
     if rejected:
         return rejected
-    if issue_hits_red_line(issue):
+    if issue_hits_red_line(issue) and not sensitive_text_released(issue):
         return "sensitive-text"
     if SENSITIVE_LABELS & labels and provider != SENSITIVE_PROVIDER:
         return "sensitive-provider"
