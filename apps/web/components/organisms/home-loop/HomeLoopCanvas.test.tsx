@@ -1,0 +1,316 @@
+import {
+  act,
+  fireEvent,
+  render,
+  renderHook,
+  screen,
+  within,
+} from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  HOME_LOOP_FIXTURE_ASKS,
+  HOME_LOOP_FIXTURE_COPY,
+  HOME_LOOP_FIXTURE_DONE,
+  HOME_LOOP_FIXTURE_PULSE,
+  HOME_LOOP_FIXTURE_ROWS,
+  HOME_LOOP_FIXTURE_STAGES,
+} from './fixtures';
+import { HomeLoopCanvas, type HomeLoopCanvasProps } from './HomeLoopCanvas';
+import {
+  HOME_LOOP_UNDO_WINDOW_MS,
+  useUndoableAnswers,
+} from './useUndoableAnswers';
+
+const toastMock = vi.hoisted(() => vi.fn());
+vi.mock('@/components/feedback', () => ({ toast: toastMock }));
+
+function props(
+  overrides: Partial<HomeLoopCanvasProps> = {}
+): HomeLoopCanvasProps {
+  return {
+    copy: HOME_LOOP_FIXTURE_COPY,
+    stages: HOME_LOOP_FIXTURE_STAGES,
+    constraint: { tone: 'bad', text: '2 items are blocked' },
+    pulse: HOME_LOOP_FIXTURE_PULSE,
+    asks: HOME_LOOP_FIXTURE_ASKS,
+    rows: HOME_LOOP_FIXTURE_ROWS,
+    done: HOME_LOOP_FIXTURE_DONE,
+    doneSummary: '12 merges',
+    loopStatus: 'ready',
+    asksStatus: 'ready',
+    answers: {},
+    onApprove: vi.fn(),
+    onReply: vi.fn(),
+    onRetryLoop: vi.fn(),
+    onRetryAsks: vi.fn(),
+    ...overrides,
+  };
+}
+
+describe('HomeLoopCanvas', () => {
+  it('renders every section populated with named headings and counts', () => {
+    render(<HomeLoopCanvas {...props()} />);
+
+    expect(screen.getByTestId('home-loop-constraint')).toHaveTextContent(
+      '2 items are blocked'
+    );
+    expect(screen.getAllByTestId(/^home-loop-tile-/)).toHaveLength(7);
+    expect(screen.getByTestId('home-loop-tile-prod')).toHaveTextContent(
+      'Was 060037d'
+    );
+    expect(
+      screen.getByRole('heading', { name: /Blocked On You/ })
+    ).toBeVisible();
+    expect(
+      screen.getByTestId('home-loop-asks-section-count')
+    ).toHaveTextContent('2');
+    expect(screen.getAllByTestId('home-loop-stage-row')).toHaveLength(6);
+    expect(screen.getByTestId('home-loop-done')).toHaveTextContent('12 merges');
+    for (const id of [
+      'home-loop-asks-section',
+      'home-loop-in-flight-section',
+      'home-loop-done-section',
+    ])
+      expect(screen.getByTestId(id)).toHaveAttribute('data-state', 'populated');
+  });
+
+  it('names stage progress and attention for assistive tech, not color alone', () => {
+    render(<HomeLoopCanvas {...props()} />);
+    const [blocked] = screen.getAllByTestId('home-loop-stage-row');
+    expect(
+      within(blocked as HTMLElement).getByRole('list', {
+        name: 'Stage 1 of 6: Investigating, Blocked',
+      })
+    ).toBeInTheDocument();
+    expect(blocked).toHaveTextContent('Blocked');
+  });
+
+  it('keeps one frame per section across loading, error, and empty states', () => {
+    const { rerender } = render(
+      <HomeLoopCanvas
+        {...props({ loopStatus: 'loading', asksStatus: 'loading', pulse: [] })}
+      />
+    );
+    expect(screen.getAllByTestId('home-loop-tile-placeholder')).toHaveLength(7);
+    expect(screen.getByTestId('home-loop-constraint')).toHaveAttribute(
+      'data-tone',
+      'loading'
+    );
+    expect(screen.getByTestId('home-loop-in-flight-section')).toHaveAttribute(
+      'aria-busy',
+      'true'
+    );
+
+    const onRetryLoop = vi.fn();
+    rerender(
+      <HomeLoopCanvas
+        {...props({
+          loopStatus: 'error',
+          asksStatus: 'error',
+          pulse: [],
+          onRetryLoop,
+        })}
+      />
+    );
+    expect(screen.getByTestId('home-loop-in-flight-section')).toHaveAttribute(
+      'data-state',
+      'error'
+    );
+    // Unavailable tiles keep their frames so sections below never move.
+    expect(screen.getAllByTestId('home-loop-tile-placeholder')).toHaveLength(7);
+    fireEvent.click(
+      within(screen.getByTestId('home-loop-in-flight-section')).getByRole(
+        'button',
+        {
+          name: 'Try again',
+        }
+      )
+    );
+    expect(onRetryLoop).toHaveBeenCalledOnce();
+
+    rerender(
+      <HomeLoopCanvas
+        {...props({
+          constraint: null,
+          asks: [],
+          rows: [],
+          done: [],
+          doneSummary: null,
+        })}
+      />
+    );
+    expect(screen.getByTestId('home-loop-constraint')).toHaveTextContent(
+      'Nothing is blocking shipping'
+    );
+    expect(screen.getByText('Nothing needs your decision.')).toBeVisible();
+    expect(screen.getByText('No work in flight.')).toBeVisible();
+    expect(screen.getByText('Nothing has landed yet today.')).toBeVisible();
+  });
+
+  it('answers in one click and sends a written reply', () => {
+    const onApprove = vi.fn();
+    const onReply = vi.fn();
+    render(<HomeLoopCanvas {...props({ onApprove, onReply })} />);
+    const [first] = screen.getAllByTestId('home-loop-ask');
+    const card = within(first as HTMLElement);
+
+    fireEvent.click(card.getByTestId('home-loop-ask-approve'));
+    expect(onApprove).toHaveBeenCalledWith(HOME_LOOP_FIXTURE_ASKS[0]);
+
+    const send = card.getByRole('button', { name: 'Send Reply' });
+    expect(send).toBeDisabled();
+    fireEvent.change(card.getByRole('textbox'), {
+      target: { value: 'Only for production' },
+    });
+    fireEvent.submit(send.closest('form') as HTMLFormElement);
+    expect(onReply).toHaveBeenCalledWith(
+      HOME_LOOP_FIXTURE_ASKS[0],
+      'Only for production'
+    );
+  });
+
+  it('shows the top asks and links the rest', () => {
+    const many = Array.from({ length: 5 }, (_, index) => ({
+      ...HOME_LOOP_FIXTURE_ASKS[0],
+      id: `ask-${index}`,
+    })) as HomeLoopCanvasProps['asks'];
+    render(
+      <HomeLoopCanvas
+        {...props({ asks: many, asksMoreHref: '/app/ov/inbox' })}
+      />
+    );
+    expect(screen.getAllByTestId('home-loop-ask')).toHaveLength(3);
+    expect(screen.getByTestId('home-loop-asks-more')).toHaveAttribute(
+      'href',
+      '/app/ov/inbox'
+    );
+    expect(screen.getByTestId('home-loop-asks-more')).toHaveTextContent(
+      '2 more decisions'
+    );
+  });
+
+  it('keeps the why collapsed until requested', () => {
+    render(<HomeLoopCanvas {...props()} />);
+    const [first] = screen.getAllByTestId('home-loop-ask');
+    const toggle = within(first as HTMLElement).getByRole('button', {
+      name: 'Why',
+    });
+    const why = document.getElementById(
+      toggle.getAttribute('aria-controls') ?? ''
+    );
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(why).not.toBeVisible();
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(why).toBeVisible();
+  });
+
+  it('replaces controls with the answer and restores them on failure', () => {
+    const { rerender } = render(
+      <HomeLoopCanvas
+        {...props({
+          answers: {
+            'vercel-concurrency': { label: 'Approved', state: 'pending' },
+          },
+        })}
+      />
+    );
+    const [first] = screen.getAllByTestId('home-loop-ask');
+    expect(first).toHaveAttribute('data-answer-state', 'pending');
+    expect(
+      within(first as HTMLElement).queryByTestId('home-loop-ask-approve')
+    ).toBeNull();
+    expect(
+      screen.getByTestId('home-loop-asks-section-count')
+    ).toHaveTextContent('1');
+
+    rerender(
+      <HomeLoopCanvas
+        {...props({
+          answers: {
+            'vercel-concurrency': {
+              label: 'Not recorded. Try again.',
+              state: 'failed',
+            },
+          },
+        })}
+      />
+    );
+    const [failed] = screen.getAllByTestId('home-loop-ask');
+    expect(within(failed as HTMLElement).getByRole('alert')).toHaveTextContent(
+      'Not recorded. Try again.'
+    );
+    expect(
+      within(failed as HTMLElement).getByTestId('home-loop-ask-approve')
+    ).toBeVisible();
+  });
+});
+
+describe('useUndoableAnswers', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    toastMock.mockReset();
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('commits after the undo window and reports success', async () => {
+    const commit = vi.fn().mockResolvedValue(undefined);
+    const onCommitted = vi.fn();
+    const { result } = renderHook(() => useUndoableAnswers({ onCommitted }));
+
+    act(() => result.current.answer({ id: 'a', label: 'Approved', commit }));
+    expect(result.current.answers.a).toEqual({
+      label: 'Approved',
+      state: 'pending',
+    });
+    expect(toastMock).toHaveBeenCalledWith(
+      'Approved',
+      expect.objectContaining({ duration: HOME_LOOP_UNDO_WINDOW_MS })
+    );
+    expect(commit).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(HOME_LOOP_UNDO_WINDOW_MS);
+    });
+    expect(commit).toHaveBeenCalledOnce();
+    expect(result.current.answers.a).toEqual({
+      label: 'Approved',
+      state: 'sent',
+    });
+    expect(onCommitted).toHaveBeenCalledWith('a');
+  });
+
+  it('undo inside the window never sends', async () => {
+    const commit = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useUndoableAnswers());
+
+    act(() => result.current.answer({ id: 'a', label: 'Approved', commit }));
+    const undo = toastMock.mock.calls[0]?.[1]?.action?.onClick as () => void;
+    act(() => undo());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(HOME_LOOP_UNDO_WINDOW_MS);
+    });
+    expect(commit).not.toHaveBeenCalled();
+    expect(result.current.answers.a).toBeUndefined();
+  });
+
+  it('surfaces a failed commit and ignores duplicate clicks', async () => {
+    const commit = vi
+      .fn()
+      .mockRejectedValue(new Error('Not recorded. Try again.'));
+    const { result } = renderHook(() => useUndoableAnswers());
+
+    act(() => {
+      result.current.answer({ id: 'a', label: 'Approved', commit });
+      result.current.answer({ id: 'a', label: 'Approved', commit });
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(HOME_LOOP_UNDO_WINDOW_MS);
+    });
+    expect(commit).toHaveBeenCalledOnce();
+    expect(result.current.answers.a).toEqual({
+      label: 'Not recorded. Try again.',
+      state: 'failed',
+    });
+  });
+});

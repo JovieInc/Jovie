@@ -250,14 +250,14 @@ function rawPulse(
     },
     {
       key: 'merges-today',
-      label: 'Merges today',
+      label: 'Merges Today',
       value: formatCount(today),
       measured: today !== null,
       tone: today === null ? 'neutral' : today > 0 ? 'good' : 'warn',
     },
     {
       key: 'merges-7d',
-      label: 'Merges 7d',
+      label: 'Merges 7 Days',
       value: formatCount(last7),
       measured: last7 !== null,
       tone:
@@ -298,7 +298,7 @@ function rawPulse(
     },
     {
       key: 'gem-disk',
-      label: 'Gem disk free',
+      label: 'Gem Disk Free',
       value: disk === null ? OVIE_NOT_MEASURED : `${Math.round(disk)}%`,
       measured: disk !== null,
       tone:
