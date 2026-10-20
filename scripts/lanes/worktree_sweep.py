@@ -12,7 +12,7 @@ It covers lanes, Codex, Conductor, Claude-scratch and manual `jovie-wt-*` checko
   has been idle for `idle_s`. Idle is the newest reflog entry or dirty-file mtime, never the
   directory mtime (git status and maintenance bump those).
 - Dirty or unpushed state is first committed off-index (`commit-tree`, no hooks, the
-  checkout is untouched) and pushed as `backup/<host>/<name>-<date>`. If that push fails,
+  checkout is untouched) and pushed as `backup/<host>/<name>-<date>-<snapshot>`. If that push fails,
   the checkout stays and loses only regenerable build output.
 - Preserved repairs (`.jovie-preserved-repair.json`) expire once their PR is closed or
   after `preserved_ttl_s`, through the same backup-then-remove path.
@@ -170,10 +170,15 @@ def backup(path: Path, info: dict, run, prefix: str, date: str) -> str | None:
         finally:
             index.unlink(missing_ok=True)
     name = path.name if path.name not in {"Jovie", "LogYourBody"} else f"{path.parent.name}-{path.name}"
-    branch = f"{prefix}/{re.sub(r'[^A-Za-z0-9._-]', '-', name)}-{date}"
-    # Backup refs carry no PR or CI meaning; hooks would gate a snapshot, not a change.
-    pushed = git(path, run, "push", "--no-verify", "--force", "-q", info["remote"],
-                 f"{sha}:refs/heads/{branch}", timeout=900)
+    # Leave room for the date, snapshot and Git's ref lock suffix on long checkout names.
+    name = re.sub(r"[^A-Za-z0-9._-]", "-", name)[:160]
+    branch = f"{prefix}/{name}-{date}-{sha}"
+    ref = f"refs/heads/{branch}"
+    # Same-named checkouts and repeated sweeps must never overwrite an earlier snapshot.
+    # The empty expected value permits only creation (or an already identical ref),
+    # including when another writer races this push. Normal pre-push hooks still run.
+    pushed = git(path, run, "push", "-q", f"--force-with-lease={ref}:", info["remote"],
+                 f"{sha}:{ref}", timeout=900)
     return branch if pushed.returncode == 0 else None
 
 

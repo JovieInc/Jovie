@@ -79,6 +79,14 @@ class SweepTest(unittest.TestCase):
     def remote_branches(self):
         return git(self.remote, "for-each-ref", "--format=%(refname:short)", "refs/heads/backup").split()
 
+    def backup_branch(self, name):
+        matches = [branch for branch in self.remote_branches()
+                   if branch.startswith(f"backup/mac/{name}-20261003-")]
+        self.assertEqual(len(matches), 1)
+        branch = matches[0]
+        self.assertTrue(branch.endswith("-" + git(self.remote, "rev-parse", branch)))
+        return branch
+
     def test_existing_drain_starts_no_cleanup_commands(self):
         state = self.base / "state"
         state.mkdir()
@@ -114,7 +122,7 @@ class SweepTest(unittest.TestCase):
         self.assertTrue(report["drained"])
         self.assertFalse(first.exists())
         self.assertTrue(second.exists())
-        self.assertEqual(git(self.remote, "show", "backup/mac/first-20261003:a.txt"),
+        self.assertEqual(git(self.remote, "show", f"{self.backup_branch('first')}:a.txt"),
                          "keep this edit")
         self.assertEqual(len(report["removed"]), 1)
         self.assertFalse(any("prune" in args for args in commands))
@@ -159,11 +167,77 @@ class SweepTest(unittest.TestCase):
         provenance.write_text("retain provenance\n")
         report = self.sweep(now=time.time() + 2 * DAY)
         self.assertFalse(path.exists())
-        self.assertEqual(report["backups"], ["backup/mac/dirty-20261003"])
-        files = git(self.remote, "ls-tree", "-r", "--name-only", "backup/mac/dirty-20261003").split()
+        branch = self.backup_branch("dirty")
+        self.assertEqual(report["backups"], [branch])
+        files = git(self.remote, "ls-tree", "-r", "--name-only", branch).split()
         self.assertEqual(sorted(files), [".symphony/package-cache/network-trace", "a.txt", "b.txt", "new.txt"],
                          "private cache bytes never reach the backup; source and provenance do")
-        self.assertEqual(git(self.remote, "show", "backup/mac/dirty-20261003:a.txt"), "edited")
+        self.assertEqual(git(self.remote, "show", f"{branch}:a.txt"), "edited")
+
+    def test_same_named_checkouts_keep_both_remote_snapshots(self):
+        paths = []
+        for name in ("first", "second"):
+            path = self.roots[0] / name / "shared-name"
+            git(self.repo, "worktree", "add", "-q", "-b", name, str(path), "origin/main")
+            (path / "a.txt").write_text(f"{name} unsaved work\n")
+            paths.append(path)
+        report = self.sweep()
+        self.assertTrue(all(not path.exists() for path in paths))
+        branches = self.remote_branches()
+        self.assertEqual(len(branches), 2, "each deleted checkout needs its own surviving snapshot")
+        self.assertEqual(set(report["backups"]), set(branches))
+        self.assertEqual({git(self.remote, "show", f"{branch}:a.txt") for branch in branches},
+                         {"first unsaved work", "second unsaved work"})
+
+    def test_backup_ref_cannot_be_advanced_even_to_a_descendant(self):
+        path = self.worktree("occupied-ref")
+        initial = git(path, "rev-parse", "HEAD")
+        (path / "a.txt").write_text("unpushed work\n")
+        git(path, "commit", "-qam", "local only")
+        head = git(path, "rev-parse", "HEAD")
+        branch = f"backup/mac/occupied-ref-20261003-{head}"
+        git(self.remote, "update-ref", f"refs/heads/{branch}", initial)
+        report = self.sweep()
+        self.assertTrue(path.exists(), "a conflicting immutable ref leaves the checkout in place")
+        self.assertEqual(git(self.remote, "rev-parse", branch), initial)
+        self.assertEqual(report["backups"], [])
+        self.assertEqual(report["stripped"], [str(path)])
+
+    def test_long_checkout_name_still_gets_a_recoverable_backup(self):
+        path = self.worktree("long-" + "x" * 210)
+        (path / "a.txt").write_text("long checkout unsaved work\n")
+        report = self.sweep()
+        self.assertFalse(path.exists())
+        self.assertEqual(len(report["backups"]), 1)
+        branch = report["backups"][0]
+        self.assertLess(len(branch.rsplit("/", 1)[-1]) + len(".lock"), 255)
+        self.assertEqual(git(self.remote, "show", f"{branch}:a.txt"), "long checkout unsaved work")
+
+    def test_identical_snapshot_backup_can_be_retried(self):
+        path = self.worktree("retry")
+        (path / "a.txt").write_text("unpushed work\n")
+        git(path, "commit", "-qam", "local only")
+        info = sweeper.inspect(path, no_processes)
+        first = sweeper.backup(path, info, no_processes, "backup/mac", "20261003")
+        self.assertIsNotNone(first)
+        self.assertEqual(sweeper.backup(path, info, no_processes, "backup/mac", "20261003"), first)
+        self.assertEqual(self.remote_branches(), [first])
+        self.assertEqual(git(self.remote, "show", f"{first}:a.txt"), "unpushed work")
+
+    def test_backup_push_hook_rejection_keeps_unsaved_work(self):
+        path = self.worktree("hook-rejected")
+        (path / "a.txt").write_text("must survive rejected backup\n")
+        hooks = self.base / "hooks"
+        hooks.mkdir()
+        hook = hooks / "pre-push"
+        hook.write_text("#!/bin/sh\nexit 1\n")
+        hook.chmod(0o755)
+        git(self.repo, "config", "core.hooksPath", str(hooks))
+        report = self.sweep()
+        self.assertTrue(path.exists(), "a rejected backup never authorizes deletion")
+        self.assertEqual((path / "a.txt").read_text(), "must survive rejected backup\n")
+        self.assertEqual(self.remote_branches(), [])
+        self.assertEqual(report["stripped"], [str(path)])
 
     def test_failed_backup_keeps_checkout_and_strips_build_output(self):
         path = self.worktree("unsaved")
@@ -284,8 +358,8 @@ class SweepTest(unittest.TestCase):
         self.assertFalse(expired.exists())
         self.assertEqual(sorted(r["reason"] for r in report["removed"]), ["preserved-expired", "preserved-pr-closed"])
         self.assertEqual(sorted(self.remote_branches()),
-                         ["backup/mac/closed-repair-20261003", "backup/mac/expired-repair-20261003"])
-        files = git(self.remote, "ls-tree", "-r", "--name-only", "backup/mac/closed-repair-20261003").split()
+                         [self.backup_branch("closed-repair"), self.backup_branch("expired-repair")])
+        files = git(self.remote, "ls-tree", "-r", "--name-only", self.backup_branch("closed-repair")).split()
         self.assertNotIn(sweeper.PRESERVED_REPAIR, files)
 
 
