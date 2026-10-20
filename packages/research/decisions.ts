@@ -37,6 +37,14 @@ export interface DecisionInput {
   readonly date?: string;
 }
 
+/**
+ * Remote gbrain callers may only write holders on their allow-list; the
+ * default agent tokens allow `world`. Set JOVIE_RESEARCH_TAKE_HOLDER=brain
+ * once the token's allow-list includes it.
+ */
+export const takeHolder = () =>
+  process.env.JOVIE_RESEARCH_TAKE_HOLDER ?? 'world';
+
 export const slugify = (text: string) =>
   text
     .toLowerCase()
@@ -46,8 +54,12 @@ export const slugify = (text: string) =>
 
 const today = () => new Date().toISOString().slice(0, 10);
 const q = (s: string) => JSON.stringify(s);
-const link = (ref: string) =>
-  /^https?:/.test(ref) ? ref : `[[${ref.replace(/^gbrain:/, '')}]]`;
+/** Evidence refs: URLs as-is, repo:<path> as code, anything else as a gbrain wikilink. */
+const link = (ref: string) => {
+  if (/^https?:/.test(ref)) return ref;
+  if (ref.startsWith('repo:')) return `\`${ref}\``;
+  return `[[${ref.replace(/^gbrain:/, '')}]]`;
+};
 
 export function decisionSlug(
   input: Pick<DecisionInput, 'area' | 'title' | 'slug'>
@@ -132,7 +144,7 @@ export async function recordDecision(
     slug,
     claim: `${input.title}: ${input.chosen}`.slice(0, 280),
     kind: 'take',
-    holder: 'brain',
+    holder: takeHolder(),
     weight: input.confidence ?? 0.7,
     since: input.date ?? today(),
     source: input.evidence[0] ?? 'jovie-research decision',
@@ -319,7 +331,7 @@ export async function resolveReview(
       slug: old,
       claim: `Re-affirmed ${today()} after ${reviewSlug}`,
       kind: 'fact',
-      holder: 'brain',
+      holder: takeHolder(),
       weight: 0.8,
       source: evidence[0] ?? reviewSlug,
     });

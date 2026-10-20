@@ -47,11 +47,10 @@ export interface Wiring {
 export function createDefaultWiring(
   options: { ctx?: CredentialEnv; state?: ResearchState } = {}
 ): Wiring {
-  const gbrain = createGbrainClient();
+  // Writes (pages, takes, decisions) chunk and embed server-side: 10-30s.
+  const gbrain = createGbrainClient({ timeoutMs: 90_000 });
   // Tier 0 must stay fast: a busy shared daemon (seen at 15s) is skipped, not awaited.
   const gbrainFast = createGbrainClient({ timeoutMs: 8_000 });
-  // Page writes chunk and embed server-side (10-30s); they run in the background.
-  const gbrainWrite = createGbrainClient({ timeoutMs: 90_000 });
   const state = options.state ?? new ResearchState();
   const clients = createProviderClients({ ctx: options.ctx });
   const root = repoRoot();
@@ -151,7 +150,7 @@ export function createDefaultWiring(
     judges,
     prior: q => priorDecisions(gbrainFast, q),
     loadPersisted: key => loadResearch(gbrain, key),
-    persist: (result, caller) => saveResearch(gbrainWrite, result, caller),
+    persist: (result, caller) => saveResearch(gbrain, result, caller),
     slugFor: researchSlug,
   });
   return { gbrain, state, router, judges };

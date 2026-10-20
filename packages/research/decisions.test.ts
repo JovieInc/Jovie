@@ -26,6 +26,7 @@ const DECISION = {
   evidence: [
     'gbrain:research/q-1',
     'https://developers.cloudflare.com/workers-ai/',
+    'repo:packages/research/sources.json',
   ],
   shipNow: 'clef-flash first, jev fallback',
   reevaluateWhen: ['new decision model', 'agreement < 80%'],
@@ -42,6 +43,7 @@ describe('decision log', () => {
     );
     expect(page).toContain('- **clef-flash** (chosen)');
     expect(page).toContain('[[research/q-1]]');
+    expect(page).toContain('- `repo:packages/research/sources.json`');
     expect(decisionSlug(DECISION)).toBe('decisions/research/judge-order');
     expect(() => decisionPage({ ...DECISION, chosen: 'nope' })).toThrow(
       'not among'
