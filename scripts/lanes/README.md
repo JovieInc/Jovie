@@ -836,8 +836,9 @@ MusicFetch.
 `by_class`, `routed_by_lane`, `failovers24h`, `escalations24h`, `ladder_exhausted`,
 `surfaced`, plus the event counters). The same event counters are top-level:
 `eventsOpen`, `eventsClaimed`, `eventsHuman`, `eventsExhausted`, and `byFingerprint`
-(state, issue, class, lane, and the exact ask). A non-empty `surfaced` list raises
-alert `escalation-needs-human`.
+(state, issue, class, lane, and the exact ask). A surfaced PR that is still open raises
+alert `escalation-surfaced` for the lanes repair owner (never a human by default); PRs
+that merged or closed drop out once the reconcile pass has a complete open-PR view.
 
 ## Tests
 

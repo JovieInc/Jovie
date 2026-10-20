@@ -4,11 +4,9 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
 
-const producers = [
-  'test-homepage.mjs',
-  'test-homepage.cjs',
-  'apps/web/test-homepage-playwright.js',
-];
+// The root puppeteer copies (test-homepage.{mjs,cjs}) were retired: puppeteer
+// is not a workspace dependency, so they could not run.
+const producers = ['apps/web/test-homepage-playwright.js'];
 const outputPath = 'test-results/homepage/homepage-test-screenshot.png';
 
 test('homepage screenshot producers replace one ignored owned artifact', () => {

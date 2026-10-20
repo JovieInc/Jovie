@@ -27,6 +27,7 @@ import {
   REPO_HEALTH_BASELINE,
   REPO_HEALTH_CANDIDATE_LIMITS,
   REPO_HEALTH_ROLLOUT,
+  REPO_ROOT_ALLOWLIST,
   RETIRED_TRACKED_FILE_CEILING,
   validateHygieneExceptions,
   validateRepoHealthBaselineChange,
@@ -436,7 +437,10 @@ test('reports measured repository and per-area growth findings in shadow mode', 
     { length: REPO_HEALTH_CANDIDATE_LIMITS.maxNetTrackedFiles + 1 },
     (_, index) => `area-${index}/source.ts`
   );
-  const broadResult = evaluateRepoHygiene({ addedPaths: broadPaths });
+  const broadResult = evaluateRepoHygiene({
+    addedPaths: broadPaths,
+    rootAllowlist: new Set(broadPaths.map(path => path.split('/')[0])),
+  });
   assert.deepEqual(broadResult.errors, []);
   assert.match(
     broadResult.advisories.join('\n'),
@@ -460,6 +464,44 @@ test('reports measured repository and per-area growth findings in shadow mode', 
   assert.deepEqual(offsetResult.areaGrowth, [
     { added: 8, area: 'scripts', deleted: 4, net: 4 },
   ]);
+});
+
+test('blocks new repository-root entries outside the allowlist', () => {
+  const result = evaluateRepoHygiene({
+    addedPaths: [
+      'NEW_AUDIT.md',
+      'check-console-errors.mjs',
+      'scratch-dir/notes.md',
+      'docs/audits/new-audit.md',
+      'package.json',
+    ],
+  });
+  const rootErrors = result.errors.filter(error =>
+    error.includes('new repository-root entry')
+  );
+  assert.deepEqual(
+    rootErrors.map(error => error.split(':')[0]),
+    ['NEW_AUDIT.md', 'check-console-errors.mjs', 'scratch-dir/notes.md']
+  );
+  for (const entry of ['package.json', 'docs', 'apps', 'CLAUDE.md']) {
+    assert.ok(REPO_ROOT_ALLOWLIST.has(entry), `${entry} stays allowlisted`);
+  }
+});
+
+test('root allowlist names exactly the tracked top-level entries', () => {
+  const tracked = new Set(
+    execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' })
+      .split('\0')
+      .filter(Boolean)
+      .map(path => path.split('/')[0])
+  );
+  const stale = [...REPO_ROOT_ALLOWLIST].filter(entry => !tracked.has(entry));
+  const missing = [...tracked].filter(entry => !REPO_ROOT_ALLOWLIST.has(entry));
+  assert.deepEqual(
+    { missing, stale },
+    { missing: [], stale: [] },
+    'update scripts/repo-root-allowlist.json: remove retired entries, and add new ones only with review'
+  );
 });
 
 test('keeps tighter binary churn advisory until rollout promotion', () => {

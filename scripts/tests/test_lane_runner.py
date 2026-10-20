@@ -453,6 +453,55 @@ class SelectionTest(unittest.TestCase):
                 task.description = description
                 self.assertIsNone(lane.pick_issue([task], {}, provider="codex"))
 
+    def reviewed(self, issue_, reviewer="claude-code lanes agent", text_of=None):
+        digest = lane.issue_text_digest(text_of or issue_)
+        receipt = {"sha256": digest, "reviewer": reviewer, "at": "2026-10-20",
+                   "reason": "product feature that builds revoke controls; no live credential is touched"}
+        return f"Reviewed.\n<!-- sensitive-text-reviewed:v1 {json.dumps(receipt)} -->"
+
+    def test_a_reviewed_false_positive_is_released_only_with_label_and_bound_receipt(self):
+        task = issue("JOV-6597", labels=["agent-ready"])
+        task.title = "Minimize OAuth scopes and add connected-account token hygiene"
+        task.description = "Encrypt refresh tokens, show connected apps/accounts with revoke controls."
+        self.assertTrue(lane.issue_hits_red_line(task))
+        receipt = [self.reviewed(task)]
+        with patch.object(lane, "SENSITIVE_REVIEW_READER", return_value=receipt) as reader:
+            self.assertEqual(lane.admission_rejection(task, {}, 0), "sensitive-text")  # receipt alone
+            reader.assert_not_called()
+            task.labels.append("sensitive-text-reviewed")
+            self.assertIsNone(lane.admission_rejection(task, {}, 0))  # label + bound receipt
+        for bodies in ([], None, ["<!-- sensitive-text-reviewed:v1 {not json} -->"],
+                       [self.reviewed(task, reviewer=" ")]):
+            with self.subTest(bodies=bodies), patch.object(lane, "SENSITIVE_REVIEW_READER", return_value=bodies):
+                self.assertEqual(lane.admission_rejection(task, {}, 0), "sensitive-text")
+        with patch.object(lane, "SENSITIVE_REVIEW_READER", side_effect=RuntimeError("linear down")):
+            self.assertEqual(lane.admission_rejection(task, {}, 0), "sensitive-text")
+
+    def test_an_edit_after_review_voids_the_receipt(self):
+        task = issue("JOV-6866", labels=["agent-ready", "sensitive-text-reviewed"])
+        task.title = "Agent auth: JOVIE_API_KEY"
+        task.description = "A settings UI to mint/revoke. Keys lift the anonymous rate limit."
+        receipt = [self.reviewed(task)]
+        with patch.object(lane, "SENSITIVE_REVIEW_READER", return_value=receipt):
+            self.assertIsNone(lane.admission_rejection(task, {}, 0))
+            task.description += "\nAlso revoke production API keys."
+            self.assertEqual(lane.admission_rejection(task, {}, 0), "sensitive-text")
+            task.title = "Agent auth: JOVIE_API_KEY (edited)"
+            self.assertEqual(lane.admission_rejection(task, {}, 0), "sensitive-text")
+
+    def test_unreviewed_true_positives_and_the_pricing_comparison_stay_held(self):
+        held = self.pricing_comparison_issue()  # JOV-7863 per #22106: no review
+        with patch.object(lane, "SENSITIVE_REVIEW_READER", return_value=[]):
+            self.assertEqual(lane.admission_rejection(held, {}, 0), "sensitive-text")
+        secret = issue("JOV-7390", labels=["sensitive-text-reviewed"])
+        secret.title = "Provision SUMMER_COMPOSIO_API_KEY"
+        secret.description = "Do not rotate or touch any other secrets."
+        other = issue("JOV-6597")
+        other.title, other.description = "Other issue", "revoke controls for tokens"
+        # A receipt bound to another issue's text never releases this one.
+        with patch.object(lane, "SENSITIVE_REVIEW_READER", return_value=[self.reviewed(other)]):
+            self.assertEqual(lane.admission_rejection(secret, {}, 0), "sensitive-text")
+
     def test_plural_production_prices_are_held(self):
         task = issue("JOV-9", labels=["agent-ready"])
         task.title = "Update annual plan"
@@ -10280,6 +10329,39 @@ class EventDeliveryTest(unittest.TestCase):
         self.drain(200)
         self.assertEqual(len(self.writes), 1)
         self.assertEqual(lane.load_escalation(self.host)['events'], self.events)
+
+    def test_an_exhausted_delivery_never_starves_pending_ones(self):
+        # Gem 2026-10-08..20: 4 exhausted rows took every tick's one-action budget (5,534
+        # readbacks on one) and 36 pending comment deliveries were never attempted.
+        self.intent(comments=[{'id': 'issue', 'body': 'old receipt'}])
+        data = lane._event_delivery_state(self.host)
+        [old] = data['actions'].values()
+        old.update(status='exhausted', attempts=3, nextAt=0, deadline=0, history=[{'n': n} for n in range(500)])
+        lane._save_event_delivery(self.host, data)
+        data = lane._event_delivery_state(self.host)
+        lane._queue_event_delivery(data, {'events': self.events, 'comments': [{'id': 'issue', 'body': 'new receipt'}]},
+                                   [self.issue], {'fp'}, 150)
+        lane._save_event_delivery(self.host, data)
+        report = self.drain(200)
+        self.assertEqual([w[1]['i']['body'] for w in self.writes], ['new receipt'])
+        self.assertEqual(report['deliveryAcknowledged'], 1)
+        report = self.drain(300)  # now the exhausted row gets its readback, then waits 6h
+        rows = {row['payload']['body']: row for row in lane._event_delivery_state(self.host)['actions'].values()}
+        self.assertEqual(rows['old receipt']['status'], 'exhausted')
+        self.assertGreaterEqual(rows['old receipt']['nextAt'], 300 + lane.EXHAUSTED_READBACK_S)
+        self.assertLessEqual(len(rows['old receipt']['history']), lane.EVENT_DELIVERY_HISTORY)
+
+    def test_an_exhausted_delivery_whose_event_finished_is_superseded(self):
+        self.intent(comments=[{'id': 'issue', 'body': 'old receipt'}])
+        data = lane._event_delivery_state(self.host)
+        [row] = data['actions'].values()
+        row.update(status='exhausted', attempts=3, nextAt=0, deadline=0)
+        lane._save_event_delivery(self.host, data)
+        lane.save_escalation(self.host, {'events': {'fp': {**self.events['fp'], 'status': 'done'}}})
+        report = self.drain(200)
+        [row] = lane._event_delivery_state(self.host)['actions'].values()
+        self.assertEqual((row['status'], row['history'][-1]['outcome']), ('superseded', 'owner-finished'))
+        self.assertEqual((report['deliveryFailed'], self.writes), (0, []))
 
     def test_linear_missing_comment_error_is_the_absent_preimage_before_send(self):
         self.intent(comments=[{'id': 'issue', 'body': 'one receipt'}])
