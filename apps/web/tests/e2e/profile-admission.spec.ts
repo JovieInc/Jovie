@@ -13,6 +13,7 @@ import {
   expectedPublicProfileLayout,
   PROFILE_DESKTOP_SURFACE_SHIPPED,
 } from './utils/profile-desktop-surface';
+import { certifyProfileModeHistory } from './utils/profile-mode-history';
 import { auditPublicProfileLayout } from './utils/public-profile-layout-invariant';
 import {
   installPublicRouteMocks,
@@ -25,6 +26,18 @@ const PHONE_COLUMN_ONLY =
   'Exercises the default mobile-first desktop column; the build ships the desktop surface';
 
 const diagnostics = new WeakMap<object, () => Promise<void>>();
+
+for (const viewport of [
+  { width: 390, height: 844 },
+  { width: 1440, height: 900 },
+]) {
+  test(`profile mode history survives Home refresh at ${viewport.width}px`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize(viewport);
+    await certifyProfileModeHistory(page, testInfo, 'unfazed');
+  });
+}
 
 test.beforeEach(({ page }) => {
   diagnostics.set(page, observeProfileAdmissionFailure(page));

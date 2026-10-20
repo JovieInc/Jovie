@@ -62,6 +62,7 @@ function fixture(): CanonicalArtistSiteCliOptions {
     m2Status: 'success',
     m2ReceiptPath,
     profileStatus: 'success',
+    navigationStatus: 'success',
     profileResultPath,
     outputPath: join(directory, 'certificate.json'),
   };
@@ -74,6 +75,26 @@ afterEach(() => {
 });
 
 describe('canonical artist-site certification CLI adapter', () => {
+  it.each(['failure', 'skipped', undefined])(
+    'blocks send readiness when live profile navigation is %s despite a green claim journey',
+    navigationStatus => {
+      const certificate = certifyCanonicalArtistSite({
+        ...fixture(),
+        navigationStatus,
+      });
+      expect(certificate.status).toBe('RED');
+      expect(certificate.queue).toBe('blocked');
+      for (const id of ['profile_modes', 'refresh_back_retry']) {
+        expect(certificate.failingChecks).toContainEqual(
+          expect.objectContaining({
+            id,
+            defectRef: 'canonical-artist-site-refresh-back-retry',
+          })
+        );
+      }
+    }
+  );
+
   it('writes GREEN only when production-faithful and live evidence agree', () => {
     const options = fixture();
     const certificate = certifyCanonicalArtistSite(options);

@@ -6729,6 +6729,25 @@ jobs:
           PROFILE_RESULT: ${{ runner.temp }}/canonical-artist-site/profile-result.json
         run: mkdir -p "$(dirname "$PROFILE_RESULT")" && pnpm --filter=@jovie/web exec tsx scripts/certify-artist-profile.ts --output "$PROFILE_CERT_DIR" > "$PROFILE_RESULT" && cat "$PROFILE_RESULT"
 
+      - name: Verify live canonical profile navigation
+        id: canonical_navigation
+        continue-on-error: true
+        env:
+          BASE_URL: https://jov.ie
+          CANONICAL_CANDIDATE_ID: acquisition:premade-artist-profile:tim-white:${{ github.run_id }}-${{ github.run_attempt }}
+          CANONICAL_PROFILE_RESULT: ${{ runner.temp }}/canonical-artist-site/profile-result.json
+          CANONICAL_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+          E2E_SKIP_WEB_SERVER: '1'
+          PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
+          PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
+          PLAYWRIGHT_ARTIFACT_PATHS: apps/web/test-results/canonical-navigation
+        run: >-
+          node .github/scripts/guard-playwright-artifacts.mjs --run --
+          pnpm --filter=@jovie/web exec playwright test tests/e2e/canonical-artist-navigation.spec.ts
+          --config=playwright.config.noauth.ts --project=chromium
+          --grep 'canonical artist navigation' --workers=1 --retries=0
+          --output=test-results/canonical-navigation --reporter=line
+
       - name: Certify canonical outbound artist journey
         id: canonical_certification
         if: ${{ always() && !cancelled() }}
@@ -6738,6 +6757,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           JOURNEY_STATUS: ${{ steps.canonical_journey.outcome || 'skipped' }}
           M2_STATUS: ${{ steps.canonical_revenue.outcome || 'skipped' }}
+          NAVIGATION_STATUS: ${{ steps.canonical_navigation.outcome || 'skipped' }}
           PROFILE_STATUS: ${{ steps.canonical_profile.outcome || 'skipped' }}
           WAITLIST_STATUS: ${{ steps.canonical_waitlist.outcome || 'skipped' }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -6756,7 +6776,7 @@ jobs:
           if [ "$failed" -ne 0 ]; then
             : > "$HISTORY"
           fi
-          pnpm --filter=@jovie/web exec tsx scripts/certify-canonical-artist-site.ts --candidate-id "acquisition:premade-artist-profile:tim-white:${{ github.run_id }}-${{ github.run_attempt }}" --run-id "${{ github.run_id }}-${{ github.run_attempt }}" --source-revision "${{ github.sha }}" --run-url "$RUN_URL" --golden-path-status "$JOURNEY_STATUS" --claim-contract-status "$CLAIM_CONTRACT_STATUS" --waitlist-status "$WAITLIST_STATUS" --m2-status "$M2_STATUS" --m2-receipt "$CERT_DIR/m2-receipt.json" --profile-status "$PROFILE_STATUS" --profile-result "$CERT_DIR/profile-result.json" --source-history "$CERT_DIR/source-history.txt" --output "$CERT_DIR/certificate.json"
+          pnpm --filter=@jovie/web exec tsx scripts/certify-canonical-artist-site.ts --candidate-id "acquisition:premade-artist-profile:tim-white:${{ github.run_id }}-${{ github.run_attempt }}" --run-id "${{ github.run_id }}-${{ github.run_attempt }}" --source-revision "${{ github.sha }}" --run-url "$RUN_URL" --golden-path-status "$JOURNEY_STATUS" --claim-contract-status "$CLAIM_CONTRACT_STATUS" --waitlist-status "$WAITLIST_STATUS" --m2-status "$M2_STATUS" --m2-receipt "$CERT_DIR/m2-receipt.json" --profile-status "$PROFILE_STATUS" --navigation-status "$NAVIGATION_STATUS" --profile-result "$CERT_DIR/profile-result.json" --source-history "$CERT_DIR/source-history.txt" --output "$CERT_DIR/certificate.json"
 
       - name: Upload canonical artist-site certification
         if: ${{ always() }}
@@ -6765,6 +6785,16 @@ jobs:
           name: canonical-artist-site-certification-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/canonical-artist-site
           if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload canonical navigation evidence
+        if: ${{ always() && hashFiles('apps/web/test-results/canonical-navigation/**') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: canonical-artist-site-navigation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: apps/web/test-results/canonical-navigation/
+          allow-images: 'true'
+          public-images: 'true'
           retention-days: 30
 
       - name: Upload Playwright Artifacts on Failure
