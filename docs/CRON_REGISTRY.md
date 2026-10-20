@@ -79,6 +79,16 @@ not GitHub or Vercel cron jobs.
 | `com.jovie.lanes` / `jovie-lanes.timer` | Every 5 minutes + load/boot | Drain-safe release update, then dispatch idle provider seats. Event-driven workers pull again immediately; this is the idle fallback. | `scripts/lanes/install.sh`, `scripts/lanes/lane_runner.py` |
 | `com.jovie.lanes-watchdog` / `jovie-lanes-watchdog.timer` | Every minute + load/boot | Local-only factory liveness observer. Performs at most three bounded recoveries through the installed lanes service, verifies a new admitting/writing observation, and alerts only on exhaustion or decision-required capacity loss. | `scripts/lanes/install.sh`, `scripts/lanes/factory_watchdog.py` |
 
+**Proposed, not active:** the market signal watcher (`scripts/signals/signal_watch.py`) is built to
+run from the Gem lanes tick like `yc_corpus.tick`: at most one detached run every 6 h. It polls the
+curated changelog list in `scripts/signals/sources.json` with conditional GETs, reads new X
+bookmarks, classifies them with Jev under a $0.25/day cap, writes `signals/` gbrain pages, and sends
+at most 3 cards a day to Summer's `market-intel` source. `scripts/lanes/**` has a sole writer, so
+the hook (`signal_watch.tick(host.state)` in `finish_dispatch`, plus `scripts/signals` in
+`RELEASE_EXTRAS`) is proposed to the lanes owner rather than edited here. The upstream changelogs
+publish on their own clock (`upstream-advisory`); adding a GitHub cron would grow the frozen
+JOV-INV-042 allowlist.
+
 ## Production Schedule
 
 Source of truth: `apps/web/vercel.json`. The Vercel project's Root Directory is set to `apps/web/` (verified via `vercel project inspect jovie`), so Vercel reads that file, not the repo-root `vercel.json`. The root-level `vercel.json` exists for historical reasons and is **not** what Vercel consumes — keep both in sync until it can be deleted (see JOV-1901 / AUTOMATION_AUDIT.md for the original deletion intent).
