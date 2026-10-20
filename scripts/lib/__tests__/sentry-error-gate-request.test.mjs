@@ -88,7 +88,11 @@ describe('single-document Sentry evidence', () => {
 /** @param {Array<{status: number, body?: string, headers?: Record<string, string>}>} responses */
 async function configurationProbe(
   responses,
-  { stepId = 'sentry-config', shortDeadline = false } = {}
+  {
+    stepId = 'sentry-config',
+    shortDeadline = false,
+    fixedRetryDelay = false,
+  } = {}
 ) {
   const requests = [];
   const scratch = mkdtempSync(join(tmpdir(), 'sentry-gate-read-'));
@@ -112,19 +116,33 @@ async function configurationProbe(
   });
   try {
     let fixturePath = process.env.PATH;
+    if (shortDeadline || fixedRetryDelay) {
+      const bin = join(scratch, 'bin');
+      mkdirSync(bin);
+      fixturePath = `${bin}:${fixturePath}`;
+    }
     if (shortDeadline) {
       const actualTimeout = (
         await exec('bash', ['-c', 'command -v timeout'])
       ).stdout.trim();
-      const bin = join(scratch, 'bin');
-      mkdirSync(bin);
       // Accelerate the same outer timeout instead of waiting 55s in unit CI.
       writeFileSync(
-        join(bin, 'timeout'),
+        join(scratch, 'bin', 'timeout'),
         `#!/bin/bash\nargs=("$@")\n[ "$3" = 55s ] || exit 90\nargs[2]=0.2s\nexec '${actualTimeout}' "\${args[@]}"\n`,
         { mode: 0o755 }
       );
-      fixturePath = `${bin}:${fixturePath}`;
+    }
+    if (fixedRetryDelay) {
+      const actualCurl = (
+        await exec('bash', ['-c', 'command -v curl'])
+      ).stdout.trim();
+      // Keep real HTTP and curl's retry policy/count; accelerate only long
+      // exhaustion probes. The four-attempt regression uses native backoff.
+      writeFileSync(
+        join(scratch, 'bin', 'curl'),
+        `#!/bin/bash\nexec '${actualCurl}' "$@" --retry-delay 1\n`,
+        { mode: 0o755 }
+      );
     }
     const address = server.address();
     if (!address || typeof address === 'string') {
@@ -199,10 +217,43 @@ describe('production Sentry project read', () => {
     ).toBe(true);
   }, 15000);
 
-  it('exhausts at three attempts and emits no project or observation-window authority', async () => {
-    const result = await configurationProbe([{ status: 503 }]);
+  it('recovers after all three observed 503 responses instead of exhausting a short burst', async () => {
+    const result = await configurationProbe([
+      ...Array.from({ length: 3 }, () => ({
+        status: 503,
+        body: '{"id":"wrong"}',
+      })),
+      { status: 200 },
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.requests).toHaveLength(4);
+    expect(result.output).toContain('project_id=123\n');
+    expect(result.output).not.toContain('wrong');
+  }, 15000);
+
+  it('recovers on the final bounded attempt without admitting failed response bodies', async () => {
+    const result = await configurationProbe(
+      [
+        ...Array.from({ length: 5 }, () => ({
+          status: 503,
+          body: '{"id":"wrong"}',
+        })),
+        { status: 200 },
+      ],
+      { fixedRetryDelay: true }
+    );
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.requests).toHaveLength(6);
+    expect(result.output).toContain('project_id=123\n');
+    expect(result.output).not.toContain('wrong');
+  }, 15000);
+
+  it('exhausts at six attempts and emits no project or observation-window authority', async () => {
+    const result = await configurationProbe([{ status: 503 }], {
+      fixedRetryDelay: true,
+    });
     expect(result.status).not.toBe(0);
-    expect(result.requests).toHaveLength(3);
+    expect(result.requests).toHaveLength(6);
     expect(result.output).toBe('');
   }, 15000);
 
@@ -239,7 +290,8 @@ describe('production Sentry project read', () => {
     const source = readFileSync(helper, 'utf8');
     expect(source).toContain('--connect-timeout 5');
     expect(source).toContain('--max-time 15');
-    expect(source).toContain('--retry 2');
+    expect(source).toContain('--retry 5');
+    expect(source).not.toContain('--retry-delay');
     expect(source).toContain('--retry-max-time 40');
     expect(source).toContain('timeout --signal=TERM --kill-after=1s 55s');
     expect(source).not.toContain('--retry-all-errors');

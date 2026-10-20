@@ -4709,9 +4709,8 @@ describe('production promotion exact-artifact contract', () => {
     );
     expect(sentryReadHelper).toContain('curl --fail --silent --show-error');
     expect(sentryReadHelper).toContain('--connect-timeout 5 --max-time 15');
-    expect(sentryReadHelper).toContain(
-      '--retry 2 --retry-delay 1 --retry-max-time 40'
-    );
+    expect(sentryReadHelper).toContain('--retry 5 --retry-max-time 40');
+    expect(sentryReadHelper).not.toContain('--retry-delay');
     expect(sentryReadHelper).toContain(
       'timeout --signal=TERM --kill-after=1s 55s'
     );

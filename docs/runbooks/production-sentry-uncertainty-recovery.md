@@ -23,9 +23,13 @@ have been mutated. Do not replay, re-promote, change aliases or relax either gua
 
 ## Source repair and review boundary
 
-The ordinary Sentry action now bounds each read to three attempts, with a 5s
-connection timeout, 15s attempt timeout, 1s retry delay and 40s retry scheduling
-budget. An outer timeout bounds Retry-After, retries and body reads to 55s, with
+The ordinary Sentry action bounds each read to six attempts, with a 5s
+connection timeout, 15s attempt timeout, native exponential retry delays
+(1s, 2s, 4s, 8s, 16s) and a 40s retry scheduling budget. Recurrence run
+`39473216363` exhausted the former three-attempt policy in about 2.4s with
+consecutive project-lookup HTTP503 responses; the earlier repair was present
+in the exact checked-out candidate `c9b767a24265ad33f407c1ff18ca4020a5442052`.
+An outer timeout bounds Retry-After, retries and body reads to 55s, with
 at most one further second before forced termination. HTTP/auth failures,
 malformed or concatenated JSON, missing project identity and exhausted transport
 still fail. Each successful response must contain exactly one JSON document.

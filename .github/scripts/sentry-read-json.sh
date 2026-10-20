@@ -9,10 +9,12 @@ sentry_read_json() (
   status=0
   # Retry-After can extend curl's delay. An outer deadline bounds all retries
   # and response reads to 55s, plus at most 1s before forced termination.
+  # Native backoff waits 1, 2, 4, 8 and 16s: a brief provider outage must not
+  # exhaust every attempt in the first two seconds of the existing budget.
   timeout --signal=TERM --kill-after=1s 55s \
     curl --fail --silent --show-error \
     --connect-timeout 5 --max-time 15 \
-    --retry 2 --retry-delay 1 --retry-max-time 40 \
+    --retry 5 --retry-max-time 40 \
     --output "$response_file" "$@" || status=$?
   if [ "$status" -ne 0 ]; then
     echo "::error::Bounded Sentry read failed; observation remains unknown." >&2
