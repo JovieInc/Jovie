@@ -510,8 +510,10 @@ const lanesCoverageShard = ({ id, files, keyword }) =>
 const [LANES_LAST_SHARD] = LANES_PYTEST_SHARDS.slice(-1);
 const LANES_BACKGROUND_SHARDS = LANES_PYTEST_SHARDS.slice(0, -1);
 // Every background shard is waited on (no short-circuit), so none outlives
-// the command; any non-zero shard fails it before coverage is combined.
-const LANES_COVERAGE_RUN = `{ ${LANES_BACKGROUND_SHARDS.map(shard => `${lanesCoverageShard(shard)} & lanes_${shard.id}=$!;`).join(' ')} ${lanesCoverageShard(LANES_LAST_SHARD)}; lanes_status=$?; ${LANES_BACKGROUND_SHARDS.map(shard => `wait "$lanes_${shard.id}" || lanes_status=1;`).join(' ')} test "$lanes_status" -eq 0; } && COVERAGE_FILE="\${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage combine ${LANES_PYTEST_SHARDS.map(shard => `"\${RUNNER_TEMP:-/tmp}/jovie-lanes-${shard.id}.coverage"`).join(' ')}`;
+// the command. The first non-zero shard status is the command's status (the
+// qualifiers in automation-verify read pytest/coverage exit codes), and it
+// fails the command before coverage is combined.
+const LANES_COVERAGE_RUN = `{ ${LANES_BACKGROUND_SHARDS.map(shard => `${lanesCoverageShard(shard)} & lanes_${shard.id}=$!;`).join(' ')} ${lanesCoverageShard(LANES_LAST_SHARD)}; lanes_status=$?; ${LANES_BACKGROUND_SHARDS.map(shard => `wait "$lanes_${shard.id}"; lanes_shard=$?; [ "$lanes_status" -ne 0 ] || lanes_status=$lanes_shard;`).join(' ')} (exit "$lanes_status"); } && COVERAGE_FILE="\${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage combine ${LANES_PYTEST_SHARDS.map(shard => `"\${RUNNER_TEMP:-/tmp}/jovie-lanes-${shard.id}.coverage"`).join(' ')}`;
 
 /**
  * Structural Python regressions, split so the pool can overlap them. Each

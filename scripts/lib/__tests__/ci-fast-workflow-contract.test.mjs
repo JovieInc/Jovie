@@ -387,7 +387,8 @@ describe('ci-fast bounded parallel workflow', () => {
         for (const id of ['a', 'b', 'c', 'd'])
           expect(calls).toContain(`jovie-lanes-${id}.coverage -m coverage run`);
         if (failing) {
-          expect(result.status, failing).not.toBe(0);
+          // The failing shard's own exit status (9) is propagated.
+          expect(result.status, failing).toBe(9);
           expect(calls).not.toContain('-m coverage report');
         } else {
           expect(result.status, result.stderr).toBe(0);
