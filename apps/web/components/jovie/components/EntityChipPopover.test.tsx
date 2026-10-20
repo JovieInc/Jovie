@@ -43,6 +43,14 @@ function renderPopover(children?: ReactNode) {
 }
 
 describe('EntityChipPopover', () => {
+  it('discloses on keyboard focus without moving focus into the card', async () => {
+    renderPopover();
+    await userEvent.setup().tab();
+    expect(
+      await screen.findByTestId('entity-chip-popover-content')
+    ).toBeVisible();
+    expect(screen.getByTestId('entity-chip-popover-trigger')).toHaveFocus();
+  });
   beforeEach(() => {
     mockEntityPanelState.entityPanel = null;
   });

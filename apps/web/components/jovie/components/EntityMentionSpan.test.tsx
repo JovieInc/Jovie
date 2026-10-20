@@ -4,6 +4,17 @@ import { fastRender } from '@/tests/utils/fast-render';
 import { EntityMentionSpan } from './EntityMentionSpan';
 
 describe('EntityMentionSpan', () => {
+  it('preserves formatted source labels in the inline span', () => {
+    fastRender(
+      <EntityMentionSpan
+        kind='artist'
+        label={<strong>9.9K followers</strong>}
+      />
+    );
+    expect(
+      screen.getByTestId('entity-mention-span').querySelector('strong')
+    ).toHaveTextContent('9.9K followers');
+  });
   it.each([
     ['release', '--system-b-entity-chip-release-accent'],
     ['artist', '--system-b-entity-chip-artist-accent'],

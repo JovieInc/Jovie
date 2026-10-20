@@ -7,8 +7,16 @@ import {
 } from './OnboardingProfileRail';
 
 vi.mock('@/features/profile/templates/ProfileCompactSurface', () => ({
-  ProfileCompactSurface: ({ dataTestId }: { dataTestId?: string }) => (
-    <div data-testid={dataTestId ?? 'profile-compact-surface'} />
+  ProfileCompactSurface: ({
+    dataTestId,
+    artist,
+  }: {
+    dataTestId?: string;
+    artist: { tagline?: string };
+  }) => (
+    <div data-testid={dataTestId ?? 'profile-compact-surface'}>
+      {artist.tagline}
+    </div>
   ),
 }));
 
@@ -59,6 +67,8 @@ describe('OnboardingProfileRail', () => {
     // Geometry (clear of Listen now at 1280x720 and 390x844) is asserted by
     // tests/e2e/storybook-onboarding-dsp-strip-clearance.spec.ts.
     expect(rail).toContainElement(strip);
+    expect(rail).toHaveTextContent('12.3K Spotify followers');
+    expect(rail).not.toHaveTextContent('source: enrichment');
     expect(phonePreview).not.toContainElement(strip);
   });
 

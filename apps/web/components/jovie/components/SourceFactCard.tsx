@@ -1,4 +1,5 @@
 'use client';
+// @coverage-via apps/web/components/jovie/components/SourceEvidence.test.tsx
 
 import {
   EntityCard,

@@ -2,6 +2,7 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import type { UIMessage } from 'ai';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { OnboardingChat } from '@/components/features/onboarding/OnboardingChat';
+import { sourceFixture } from '@/components/jovie/components/source-evidence.fixtures';
 import { ONBOARDING_ENTRY_TITLE } from '@/lib/onboarding/empty-state';
 
 const chatMocks = vi.hoisted(() => ({
@@ -114,9 +115,15 @@ vi.mock('@/components/jovie/components', () => ({
   ChatInput: () => <div data-testid='chat-input' />,
   ChatMessage: ({
     parts,
+    sourceFacts,
   }: {
+    readonly sourceFacts?: readonly unknown[];
     readonly parts: Array<{ type: 'text'; text: string }>;
-  }) => <div data-testid='chat-message'>{parts[0]?.text}</div>,
+  }) => (
+    <div data-testid='chat-message' data-source-count={sourceFacts?.length}>
+      {parts[0]?.text}
+    </div>
+  ),
 }));
 
 describe('OnboardingChat empty intro', () => {
@@ -130,7 +137,17 @@ describe('OnboardingChat empty intro', () => {
       {
         id: 'saved-assistant',
         role: 'assistant',
-        parts: [{ type: 'text', text: 'Your artist is saved' }],
+        parts: [
+          { type: 'text', text: 'Your artist is saved' },
+          {
+            type: 'dynamic-tool',
+            toolName: 'fixtureEvidence',
+            toolCallId: 'evidence',
+            state: 'output-available',
+            input: {},
+            output: { enrichedFacts: [sourceFixture()] },
+          },
+        ],
       },
     ];
     const activity = vi.fn();
@@ -150,6 +167,10 @@ describe('OnboardingChat empty intro', () => {
       id: 'saved-conversation',
       messages: initialMessages,
     });
+    expect(screen.getByText('Your artist is saved')).toHaveAttribute(
+      'data-source-count',
+      '1'
+    );
     expect(chatMocks.sendMessage).not.toHaveBeenCalled();
     expect(activity).not.toHaveBeenCalled();
     expect(

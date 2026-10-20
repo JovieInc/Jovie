@@ -1,9 +1,12 @@
+import { TooltipProvider } from '@jovie/ui';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import type { EnrichedFact } from '@/lib/profile-facts/enrichment';
 import { fastRender } from '@/tests/utils/fast-render';
 import { AssistantMessageText } from './AssistantMessageText';
+import { ChatMarkdown } from './ChatMarkdown';
+import { ChatMessage } from './ChatMessage';
 import { SourceEvidenceProvider } from './SourceEvidence';
 import { SourceFactCard } from './SourceFactCard';
 import { sourceFixture } from './source-evidence.fixtures';
@@ -20,6 +23,31 @@ function renderEvidence(
 }
 
 describe('inline typed source evidence', () => {
+  it('mounts receipt-backed sources through the canonical chat message', () => {
+    const messageProps = { id: 'receipt', role: 'assistant' as const };
+    fastRender(
+      <TooltipProvider>
+        <ChatMessage
+          {...messageProps}
+          parts={[{ type: 'text', text: '9.9K followers' }]}
+          sourceFacts={[sourceFixture()]}
+        />
+      </TooltipProvider>
+    );
+    expect(screen.getByTestId('entity-chip-popover-trigger')).toHaveTextContent(
+      '9.9K followers'
+    );
+  });
+  it('keeps inline markdown fragments inline with inspectable evidence', () => {
+    fastRender(
+      <SourceEvidenceProvider facts={[sourceFixture()]}>
+        <ChatMarkdown content='9.9K followers' inline />
+      </SourceEvidenceProvider>
+    );
+    expect(
+      screen.getByTestId('entity-chip-popover-trigger').closest('p')
+    ).toBeNull();
+  });
   it.each([
     ['book.title', 'Book'],
     ['publication.title', 'Publication'],

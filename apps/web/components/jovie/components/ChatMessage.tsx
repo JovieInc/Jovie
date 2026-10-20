@@ -1,6 +1,6 @@
 'use client';
 
-// @coverage-via apps/web/tests/unit/chat/InlineChatArea.tool-rendering.test.tsx
+// @coverage-via apps/web/components/jovie/components/SourceEvidence.test.tsx
 
 import { Button, SimpleTooltip } from '@jovie/ui';
 import { Check, Copy } from 'lucide-react';
