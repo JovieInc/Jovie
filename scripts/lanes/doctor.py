@@ -387,7 +387,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "linearError": linear_error, "linearSkipped": linear_skipped, "githubRemaining": github,
         "linearSync": linear_sync.status(state, now),
         "ownership": {key: value for key, value in read_json(state / "ownership.json", {}).items()
-                      if key not in ("ownerlessSince", "moved", "claimsReleased")},
+                      if key not in ("ownerlessSince", "evidenceNoted", "moved", "claimsReleased")},
         "merged24h": merged, "mergedAttributionError": merged_error,
         "mergeThroughput": merge_throughput, "mergeThroughputError": merge_throughput_error,
         "autoscale": _autoscale_block(host),

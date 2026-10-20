@@ -11,7 +11,8 @@ on every dispatch tick:
 - `claim-grace` / `legacy-run`: a fresh local claim inside its grace window;
 - `pr`: an open PR for the issue (the fix loop and merge queue own every open PR);
 - `handoff`: an unexpired handoff record (`handoff-cooldown.json`);
-- `lifecycle`: Merging/Validating with merged evidence on origin/main (linear-sync-on-merge and
+- `lifecycle`: Merging/Validating with merged evidence: origin/main, or a merged PR anywhere in the
+  org that claims the issue (bounded GitHub search, cached; Summer/Ops/LYB work). linear-sync-on-merge and
   its receipts own Merging -> Validating -> Done; lanes never writes Done, per linear.md);
 - `epic-children`: an epic with open child issues;
 - `hold`: a `hold` label (it expires on its own after 72h of inactivity);
@@ -48,8 +49,14 @@ LIFECYCLE_QUIET_S = 7 * 86400    # reported (lifecycleQuiet) when the merge life
 REPORT = "ownership.json"
 ISSUE = re.compile(r"\bJOV-\d+\b", re.IGNORECASE)
 MERGE_REFERENCE = re.compile(
-    r"linear-issue-identifier:\s*(JOV-\d+)|^(?:refs|fixes|closes|resolves)\s+(JOV-\d+)\.?\s*$",
+    r"linear-issue-identifier:\s*(JOV-\d+)|^(?:refs|fixes|closes|resolves)\s+((?:JOV-\d+[\s,;]*)+)\.?\s*$",
     re.IGNORECASE | re.MULTILINE)
+
+
+def referenced(body: str) -> set[str]:
+    """Issues a body names as its own: the lanes marker, or a Refs/Fixes line (one or a list)."""
+    return {ident.upper() for marker, refs in MERGE_REFERENCE.findall(body or "")
+            for ident in ([marker] if marker else ISSUE.findall(refs))}
 
 
 def _lease_dir(state: Path) -> Path:
@@ -105,8 +112,48 @@ def merged_identifiers(repo: Path, run=subprocess.run) -> set[str] | None:
     for record in (log.stdout or "").split("\x1e"):
         subject, _, body = record.strip().partition("\n")
         found |= {match.upper() for match in ISSUE.findall(subject)}
-        found |= {(a or b).upper() for a, b in MERGE_REFERENCE.findall(body)}
+        found |= referenced(body)
     return found
+
+
+EVIDENCE = "merged-evidence.json"
+SEARCHES_PER_TICK = 5            # GitHub search API: 30/min; one tick spends at most 5
+NEGATIVE_EVIDENCE_TTL_S = 24 * 3600
+
+
+def pr_names_issue(pr: dict, ident: str) -> bool:
+    """The PR claims the issue as its own: in its title, the lanes marker, or a Refs line."""
+    if ident in {match.upper() for match in ISSUE.findall(pr.get("title") or "")}:
+        return True
+    return ident in referenced(pr.get("body") or "")
+
+
+def org_merged_evidence(state: Path, ident: str, search, now: float, budget: list) -> list[str] | None:
+    """Merged PRs anywhere in the org that claim the issue (Summer, Ops and LYB work lands
+    outside Jovie main). Positive evidence is kept; a miss is retried after a day. None
+    when no search budget is left this tick or the search is unreadable."""
+    path = state / EVIDENCE
+    try:
+        cache = json.loads(path.read_text())
+    except (OSError, ValueError):
+        cache = {}
+    row = cache.get(ident) if isinstance(cache, dict) else None
+    if isinstance(row, dict) and (row.get("prs") or now - float(row.get("at") or 0) < NEGATIVE_EVIDENCE_TTL_S):
+        return list(row.get("prs") or [])
+    if search is None or budget[0] <= 0:
+        return None
+    budget[0] -= 1
+    found = search(ident)
+    if found is None:
+        return None
+    prs = sorted({f"{pr['repository']}#{pr['number']}" for pr in found
+                  if isinstance(pr, dict) and pr.get("repository") and pr.get("number") and pr_names_issue(pr, ident)})
+    cache = cache if isinstance(cache, dict) else {}
+    cache[ident] = {"at": now, "prs": prs}
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(cache))
+    os.replace(tmp, path)
+    return prs
 
 
 def handoff_identifiers(state: Path, now: float) -> set[str]:
@@ -182,7 +229,7 @@ def resolution(row: dict, merged: set[str] | None) -> tuple[str | None, str]:
 
 
 def reconcile(state: Path, repo: Path, open_prs: frozenset[str] | None, *, run=subprocess.run,
-              now: float | None = None, team: str = "JOV", max_moves: int = MAX_MOVES) -> dict:
+              now: float | None = None, team: str = "JOV", max_moves: int = MAX_MOVES, search=None) -> dict:
     """One incremental, idempotent pass over the local mirror (no Linear read). Writes go
     through the outbox, which is flushed under the shared Linear budget."""
     now = time.time() if now is None else now
@@ -202,7 +249,8 @@ def reconcile(state: Path, repo: Path, open_prs: frozenset[str] | None, *, run=s
     report = {"at": now, "openPrsKnown": open_prs is not None, "mergedKnown": merged is not None,
               "started": 0, "owners": {}, "ownerless": 0, "overGrace": 0, "oldestOwnerlessS": 0,
               "unresolved": {}, "moved": [], "claimsReleased": [], "sample": []}
-    next_since, moves = {}, 0
+    next_since, moves, budget = {}, 0, [SEARCHES_PER_TICK]
+    noted = set(previous.get("evidenceNoted") or [])
     for row in sorted(rows, key=lambda r: r.get("updatedAt") or ""):
         current = pending.get(row["id"], row["state"])
         if current not in STARTED:
@@ -215,6 +263,15 @@ def reconcile(state: Path, repo: Path, open_prs: frozenset[str] | None, *, run=s
                          worktrees=worktrees, open_children=open_children, now=now)
         if owner is None and open_prs is None:
             owner = "unknown-pr-inventory"  # an unreadable PR list never orphans an issue
+        if owner is None and current in ("Merging", "Validating"):
+            evidence = org_merged_evidence(state, row["identifier"].upper(), search, now, budget)
+            if evidence:
+                owner = "lifecycle"
+                if row["id"] not in noted:  # one receipt per issue, through the outbox
+                    linear_sync.enqueue(state, "comment", row["id"], body=(
+                        f"🤖 lanes ownership: merged evidence {', '.join(evidence)} claims this issue; it "
+                        f"belongs to the merge lifecycle ({current} → Done by its receipts), not to a lane."))
+                    noted.add(row["id"])
         if owner is not None:
             report["owners"][owner] = report["owners"].get(owner, 0) + 1
             updated = _epoch(row.get("updatedAt"))
@@ -263,7 +320,8 @@ def reconcile(state: Path, repo: Path, open_prs: frozenset[str] | None, *, run=s
         report["claimsReleased"].append(claim.get("identifier"))
     report["claimsActive"] = sum(1 for row in linear_sync._claims(state).values() if row.get("status") == "active")
     report["ownerlessSince"] = next_since
+    report["evidenceNoted"] = sorted(noted)
     tmp = report_path.with_suffix(".tmp")
     tmp.write_text(json.dumps(report))
     os.replace(tmp, report_path)
-    return {key: value for key, value in report.items() if key != "ownerlessSince"}
+    return {key: value for key, value in report.items() if key not in ("ownerlessSince", "evidenceNoted")}
