@@ -59,14 +59,14 @@ def fake_run(overrides=None):
 REGISTRY = {"schema": radar.REGISTRY_SCHEMA, "channels": {"subscription-claude": "", "gateway-allowlist": "", "workers-ai": "", "subscription-grok": ""},
             "tasks": [
                 {"id": "layout", "taskType": "x", "currentModel": "anthropic/claude-sonnet-5", "channel": "subscription-claude",
-                 "source": {"path": "a.ts", "match": "claude-sonnet-5"}, "costPerRun": {}, "qualityMetric": "q",
-                 "evalSet": {"status": "partial"}, "screens": ["same-family-successor"]},
+                 "sourcePath": "a.ts", "sourceMatch": "claude-sonnet-5", "costUsd": 0, "qualityMetric": "q",
+                 "evalStatus": "partial", "screens": ["same-family-successor"]},
                 {"id": "triage", "taskType": "x", "currentModel": "typesafe-ai/jev", "channel": "gateway-allowlist",
-                 "source": {"path": "missing.mjs", "match": "jev", "pending": "PR"}, "costPerRun": {}, "qualityMetric": "q",
-                 "evalSet": {"status": "ready"}, "screens": ["workers-ai-decision", "workers-ai-extraction"]},
+                 "sourcePath": "missing.mjs", "sourceMatch": "jev", "sourcePending": "PR", "costUsd": 0, "qualityMetric": "q",
+                 "evalStatus": "ready", "screens": ["workers-ai-decision", "workers-ai-extraction"]},
                 {"id": "chain", "taskType": "x", "currentModel": "grok-4.6", "channel": "subscription-grok",
-                 "source": {"path": "a.ts", "match": "claude"}, "costPerRun": {}, "qualityMetric": "q",
-                 "evalSet": {"status": "live-ab"}, "screens": ["same-family-successor"],
+                 "sourcePath": "a.ts", "sourceMatch": "claude", "costUsd": None, "qualityMetric": "q",
+                 "evalStatus": "live-ab", "screens": ["same-family-successor"],
                  "candidates": ["@cf/cloudflare/clairic"]},
             ]}
 
@@ -79,17 +79,17 @@ class RegistryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             (Path(tmp) / "a.ts").write_text("model: 'anthropic/claude-sonnet-5.5'")
             reg = json.loads(json.dumps(REGISTRY))
-            reg["tasks"][0]["source"]["match"] = "claude-opus-4"
-            reg["tasks"][1]["source"].pop("pending")
+            reg["tasks"][0]["sourceMatch"] = "claude-opus-4"
+            reg["tasks"][1].pop("sourcePending")
             reg["tasks"][2]["channel"] = "nope"
             reg["tasks"][2]["screens"] = ["bogus"]
-            reg["tasks"][2]["evalSet"]["status"] = "great"
+            reg["tasks"][2]["evalStatus"] = "great"
             reg["tasks"].append(dict(reg["tasks"][0]))
             del reg["tasks"][-1]["qualityMetric"]
             errors = radar.validate_registry({**reg, "schema": "x"}, Path(tmp))
         text = "\n".join(errors)
         for needle in ("schema must be", "no longer contains 'claude-opus-4'", "missing.mjs does not exist", "unknown channel nope",
-                       "unknown screen bogus", "evalSet.status", "duplicate id", "qualityMetric is required"):
+                       "unknown screen bogus", "evalStatus", "duplicate id", "qualityMetric is required"):
             self.assertIn(needle, text)
 
     def test_pending_source_is_skipped_until_it_lands(self):

@@ -1,6 +1,6 @@
 {
   "schema": "jovie-model-task-registry/v1",
-  "_comment": "Every AI-using loop or task: what kind of work it is, the model it runs today, where that model is configured (source.path must contain source.match; scripts/tests/test_model_radar.py fails CI on drift), the channel it is allowed to buy through, cost per run, the quality metric and the eval set a candidate model must beat. scripts/lanes/model_radar.py screens new models against this file. automation = the ops/automation/registry.json entry id when the task runs on a schedule.",
+  "_comment": "Every AI loop/task: type, current model, where it is configured (sourcePath must contain sourceMatch; the radar test fails CI on drift), buying channel, cost per run, quality metric and eval set. Screened by scripts/lanes/model_radar.py. automation = ops/automation/registry.json id.",
   "updatedAt": "2026-10-20",
   "channels": {
     "subscription-claude": "Claude Code subscription (claude CLI). Marginal $0 inside the pool.",
@@ -20,21 +20,15 @@
       "automation": "summer:model-turns",
       "currentModel": "zai/glm-5.3-flash",
       "channel": "gateway-allowlist",
-      "source": {
-        "path": "apps/eve-pilot/agent/lib/summer-web-conversation.ts",
-        "match": "SUMMER_CONVERSATION_MODEL = 'zai/glm-5.3-flash'"
-      },
-      "costPerRun": {
-        "usd": 0.0055,
-        "basis": "estimate: 20k input + 1k output tokens at Gateway list $0.20/$1.50 per M"
-      },
+      "sourcePath": "apps/eve-pilot/agent/lib/summer-web-conversation.ts",
+      "sourceMatch": "SUMMER_CONVERSATION_MODEL = 'zai/glm-5.3-flash'",
+      "costUsd": 0.0055,
+      "costBasis": "estimate: 20k input + 1k output tokens at Gateway list $0.20/$1.50 per M",
       "qualityMetric": "cost per successful outcome: total spend (turns, repairs, failures) / tasks passing deterministic checks on the Summer task eval; live: canary success vs control",
-      "evalSet": {
-        "ref": "JovieInc/summer-config apps/summer/evals/model-eval/cases.json",
-        "size": 28,
-        "status": "ready",
-        "runner": "apps/summer/evals/model-eval/summer_model_eval.py"
-      },
+      "evalStatus": "ready",
+      "evalRef": "JovieInc/summer-config apps/summer/evals/model-eval/cases.json",
+      "evalSize": 28,
+      "evalRunner": "apps/summer/evals/model-eval/summer_model_eval.py",
       "screens": ["same-family-successor", "gateway-allowlisted"],
       "candidates": [
         "deepseek/deepseek-v4.1-flash",
@@ -63,21 +57,15 @@
       "automation": null,
       "currentModel": "zai/glm-5.3",
       "channel": "gateway-allowlist",
-      "source": {
-        "path": "apps/web/lib/constants/ai-models.ts",
-        "match": "CHAT_MODEL = 'zai/glm-5.3'"
-      },
-      "costPerRun": {
-        "usd": 0.013,
-        "basis": "estimate: 20k input + 1k output at Gateway $0.5625/$1.83 per M"
-      },
+      "sourcePath": "apps/web/lib/constants/ai-models.ts",
+      "sourceMatch": "CHAT_MODEL = 'zai/glm-5.3'",
+      "costUsd": 0.013,
+      "costBasis": "estimate: 20k input + 1k output at Gateway $0.5625/$1.83 per M",
       "qualityMetric": "daily web AI health turn passes; chat turn non-empty and on-policy",
-      "evalSet": {
-        "ref": ".github/scripts/run-web-ai-health.mjs",
-        "size": 1,
-        "status": "partial",
-        "gap": "health probe, not a quality set"
-      },
+      "evalStatus": "partial",
+      "evalRef": ".github/scripts/run-web-ai-health.mjs",
+      "evalSize": 1,
+      "evalGap": "health probe, not a quality set",
       "screens": ["same-family-successor", "gateway-allowlisted"]
     },
     {
@@ -86,21 +74,15 @@
       "automation": "vercel:jovie-web:generate-insights",
       "currentModel": "zai/glm-5.3-flash",
       "channel": "gateway-allowlist",
-      "source": {
-        "path": "apps/web/lib/constants/ai-models.ts",
-        "match": "INSIGHT_MODEL = 'zai/glm-5.3-flash'"
-      },
-      "costPerRun": {
-        "usd": 0.004,
-        "basis": "estimate: 15k input + 1k output at Gateway list"
-      },
+      "sourcePath": "apps/web/lib/constants/ai-models.ts",
+      "sourceMatch": "INSIGHT_MODEL = 'zai/glm-5.3-flash'",
+      "costUsd": 0.004,
+      "costBasis": "estimate: 15k input + 1k output at Gateway list",
       "qualityMetric": "insight accepted (not dismissed) by the artist",
-      "evalSet": {
-        "ref": null,
-        "size": 0,
-        "status": "missing",
-        "gap": "no replay set; build from dismissed vs kept insights"
-      },
+      "evalStatus": "missing",
+      "evalRef": null,
+      "evalSize": 0,
+      "evalGap": "no replay set; build from dismissed vs kept insights",
       "screens": [
         "same-family-successor",
         "gateway-allowlisted",
@@ -113,21 +95,14 @@
       "automation": "gem:lanes-tick",
       "currentModel": "codex-default",
       "channel": "subscription-codex",
-      "source": {
-        "path": "scripts/lanes/providers.json",
-        "match": "\"model\": \"codex-default\""
-      },
-      "costPerRun": {
-        "usd": 0,
-        "basis": "subscription; providers.json route cost 3.5 relative units"
-      },
+      "sourcePath": "scripts/lanes/providers.json",
+      "sourceMatch": "\"model\": \"codex-default\"",
+      "costUsd": 0,
+      "costBasis": "subscription; providers.json route cost 3.5 relative units",
       "qualityMetric": "PR merged without a repair rung (lanes merge_evidence / shipping_attribution)",
-      "evalSet": {
-        "ref": "scripts/lanes/merge_evidence.py",
-        "size": null,
-        "status": "live-ab",
-        "gap": "no frozen replay; measured on live merged-PR outcomes per route"
-      },
+      "evalStatus": "live-ab",
+      "evalRef": "scripts/lanes/merge_evidence.py",
+      "evalGap": "no frozen replay; measured on live merged-PR outcomes per route",
       "screens": ["same-family-successor"]
     },
     {
@@ -136,21 +111,14 @@
       "automation": "gem:lanes-tick",
       "currentModel": "claude-sonnet-5-5",
       "channel": "subscription-claude",
-      "source": {
-        "path": "scripts/lanes/providers.json",
-        "match": "\"model\": \"claude-sonnet-5-5\""
-      },
+      "sourcePath": "scripts/lanes/providers.json",
+      "sourceMatch": "\"model\": \"claude-sonnet-5-5\"",
       "alsoRoutes": ["claude-opus-5-5"],
-      "costPerRun": {
-        "usd": 0,
-        "basis": "subscription; route cost 2 (sonnet) / 3 (opus) relative units"
-      },
+      "costUsd": 0,
+      "costBasis": "subscription; route cost 2 (sonnet) / 3 (opus) relative units",
       "qualityMetric": "PR merged without a repair rung",
-      "evalSet": {
-        "ref": "scripts/lanes/merge_evidence.py",
-        "size": null,
-        "status": "live-ab"
-      },
+      "evalStatus": "live-ab",
+      "evalRef": "scripts/lanes/merge_evidence.py",
       "screens": ["same-family-successor"]
     },
     {
@@ -159,20 +127,13 @@
       "automation": "gem:lanes-tick",
       "currentModel": "z-ai/glm-5.3",
       "channel": "hyperagent-credits",
-      "source": {
-        "path": "scripts/lanes/providers.json",
-        "match": "\"model\": \"z-ai/glm-5.3\""
-      },
-      "costPerRun": {
-        "usd": null,
-        "basis": "Hyperagent credits; route cost 1 relative unit"
-      },
+      "sourcePath": "scripts/lanes/providers.json",
+      "sourceMatch": "\"model\": \"z-ai/glm-5.3\"",
+      "costUsd": null,
+      "costBasis": "Hyperagent credits; route cost 1 relative unit",
       "qualityMetric": "PR merged without a repair rung",
-      "evalSet": {
-        "ref": "scripts/lanes/merge_evidence.py",
-        "size": null,
-        "status": "live-ab"
-      },
+      "evalStatus": "live-ab",
+      "evalRef": "scripts/lanes/merge_evidence.py",
       "screens": ["same-family-successor", "hyperagent-listed"]
     },
     {
@@ -181,20 +142,13 @@
       "automation": "gem:lanes-tick",
       "currentModel": "grok-4.7",
       "channel": "subscription-grok",
-      "source": {
-        "path": "scripts/lanes/providers.json",
-        "match": "\"model\": \"grok-4.7\""
-      },
-      "costPerRun": {
-        "usd": 0,
-        "basis": "subscription"
-      },
+      "sourcePath": "scripts/lanes/providers.json",
+      "sourceMatch": "\"model\": \"grok-4.7\"",
+      "costUsd": 0,
+      "costBasis": "subscription",
       "qualityMetric": "PR merged without a repair rung",
-      "evalSet": {
-        "ref": "scripts/lanes/merge_evidence.py",
-        "size": null,
-        "status": "live-ab"
-      },
+      "evalStatus": "live-ab",
+      "evalRef": "scripts/lanes/merge_evidence.py",
       "screens": ["same-family-successor"]
     },
     {
@@ -203,20 +157,14 @@
       "automation": "github:jovie:remediation-sweep",
       "currentModel": "grok-4.6",
       "channel": "subscription-grok",
-      "source": {
-        "path": "scripts/backlog-orchestrator/config/model-registry.json",
-        "match": "\"model\": \"grok-4.6\""
-      },
-      "costPerRun": {
-        "usd": 0,
-        "basis": "subscription head of route_chains.remediation; list $2/$6 per M if metered"
-      },
+      "sourcePath": "scripts/backlog-orchestrator/config/model-registry.json",
+      "sourceMatch": "\"model\": \"grok-4.6\"",
+      "costUsd": 0,
+      "costBasis": "subscription head of route_chains.remediation; list $2/$6 per M if metered",
       "qualityMetric": "remediation PR merged; failure fingerprint does not recur",
-      "evalSet": {
-        "ref": "scripts/backlog-orchestrator/config/model-registry.json#min_samples",
-        "size": 5,
-        "status": "live-ab"
-      },
+      "evalStatus": "live-ab",
+      "evalRef": "scripts/backlog-orchestrator/config/model-registry.json#min_samples",
+      "evalSize": 5,
       "screens": ["same-family-successor"],
       "notes": "lanes providers.json already runs grok-4.7; this chain still names grok-4.6."
     },
@@ -226,21 +174,15 @@
       "automation": "gem:lanes-tick",
       "currentModel": "claude-opus-5-5",
       "channel": "subscription-claude",
-      "source": {
-        "path": "scripts/lanes/reason.json",
-        "match": "\"model\": \"claude-opus-5-5\""
-      },
-      "costPerRun": {
-        "usd": 3,
-        "basis": "cap: proposer maxBudgetUsd"
-      },
+      "sourcePath": "scripts/lanes/reason.json",
+      "sourceMatch": "\"model\": \"claude-opus-5-5\"",
+      "costUsd": 3,
+      "costBasis": "cap: proposer maxBudgetUsd",
       "qualityMetric": "proposal accepted by reviewers (grok-4.7) and converted to a shipped issue",
-      "evalSet": {
-        "ref": null,
-        "size": 0,
-        "status": "missing",
-        "gap": "keep reviewer verdicts as the replay set"
-      },
+      "evalStatus": "missing",
+      "evalRef": null,
+      "evalSize": 0,
+      "evalGap": "keep reviewer verdicts as the replay set",
       "screens": ["same-family-successor"]
     },
     {
@@ -249,20 +191,14 @@
       "automation": null,
       "currentModel": "openai/gpt-5.6-luna",
       "channel": "gateway-allowlist",
-      "source": {
-        "path": ".github/workflows/rolling-ci-dispatch.yml",
-        "match": "FX_MODEL: openai/gpt-5.6-luna"
-      },
-      "costPerRun": {
-        "usd": null,
-        "basis": "FX_AI_GATEWAY_API_KEY, 12 agent steps max; not measured"
-      },
+      "sourcePath": ".github/workflows/rolling-ci-dispatch.yml",
+      "sourceMatch": "FX_MODEL: openai/gpt-5.6-luna",
+      "costUsd": null,
+      "costBasis": "FX_AI_GATEWAY_API_KEY, 12 agent steps max; not measured",
       "qualityMetric": "bounded patch makes the failing job pass",
-      "evalSet": {
-        "ref": null,
-        "size": 0,
-        "status": "missing"
-      },
+      "evalStatus": "missing",
+      "evalRef": null,
+      "evalSize": 0,
       "screens": ["same-family-successor"],
       "notes": "openai/* on a Gateway key conflicts with JOV-7119; flagged, not changed here."
     },
@@ -272,20 +208,14 @@
       "automation": null,
       "currentModel": "openai/gpt-5.6-sol",
       "channel": "gateway-allowlist",
-      "source": {
-        "path": ".github/workflows/pr-conflict-handler.yml",
-        "match": "openai/gpt-5.6-sol"
-      },
-      "costPerRun": {
-        "usd": null,
-        "basis": "fx ask on FX_AI_GATEWAY_API_KEY; not measured"
-      },
+      "sourcePath": ".github/workflows/pr-conflict-handler.yml",
+      "sourceMatch": "openai/gpt-5.6-sol",
+      "costUsd": null,
+      "costBasis": "fx ask on FX_AI_GATEWAY_API_KEY; not measured",
       "qualityMetric": "conflict resolved and required checks green",
-      "evalSet": {
-        "ref": null,
-        "size": 0,
-        "status": "missing"
-      },
+      "evalStatus": "missing",
+      "evalRef": null,
+      "evalSize": 0,
       "screens": ["same-family-successor"],
       "notes": "openai/* on a Gateway key conflicts with JOV-7119; flagged, not changed here."
     },
@@ -295,21 +225,14 @@
       "automation": null,
       "currentModel": "zai/glm-5.3-flash",
       "channel": "gateway-allowlist",
-      "source": {
-        "path": ".github/scripts/internal-pr-review.mjs",
-        "match": "DEFAULT_MODEL = 'zai/glm-5.3-flash'"
-      },
-      "costPerRun": {
-        "usd": 0.042,
-        "basis": "estimate: 60k input + 20k output (model-registry review job) at $0.20/$1.50 per M"
-      },
+      "sourcePath": ".github/scripts/internal-pr-review.mjs",
+      "sourceMatch": "DEFAULT_MODEL = 'zai/glm-5.3-flash'",
+      "costUsd": 0.042,
+      "costBasis": "estimate: 60k input + 20k output (model-registry review job) at $0.20/$1.50 per M",
       "qualityMetric": "review-kernel precision on the weekly replay",
-      "evalSet": {
-        "ref": "docs/evaluations/pr-review-kernel.md",
-        "size": null,
-        "status": "ready",
-        "runner": "github:jovie:pr-review-learn"
-      },
+      "evalStatus": "ready",
+      "evalRef": "docs/evaluations/pr-review-kernel.md",
+      "evalRunner": "github:jovie:pr-review-learn",
       "screens": ["same-family-successor", "gateway-allowlisted"]
     },
     {
@@ -318,21 +241,15 @@
       "automation": "github:jovie:deepsec-native",
       "currentModel": "zai/glm-5.3-flash",
       "channel": "gateway-allowlist",
-      "source": {
-        "path": "scripts/security/deepsec/policy.json",
-        "match": "\"model\": \"zai/glm-5.3-flash\""
-      },
-      "costPerRun": {
-        "usd": null,
-        "basis": "policy.json cheap tier; not measured"
-      },
+      "sourcePath": "scripts/security/deepsec/policy.json",
+      "sourceMatch": "\"model\": \"zai/glm-5.3-flash\"",
+      "costUsd": null,
+      "costBasis": "policy.json cheap tier; not measured",
       "qualityMetric": "true-positive findings confirmed by triage / false-positive rate",
-      "evalSet": {
-        "ref": null,
-        "size": 0,
-        "status": "missing",
-        "gap": "seed with past confirmed advisories (OSV/Semgrep baseline) and known-safe diffs"
-      },
+      "evalStatus": "missing",
+      "evalRef": null,
+      "evalSize": 0,
+      "evalGap": "seed with past confirmed advisories (OSV/Semgrep baseline) and known-safe diffs",
       "screens": ["same-family-successor", "gateway-allowlisted"]
     },
     {
@@ -341,20 +258,13 @@
       "automation": null,
       "currentModel": "typesafe-ai/jev",
       "channel": "gateway-allowlist",
-      "source": {
-        "path": "scripts/invariants/jev-gateway.mjs",
-        "match": "model: 'typesafe-ai/jev'"
-      },
-      "costPerRun": {
-        "usd": 0.0001,
-        "basis": "measured: docs/evaluations/jev-ci-failure-triage.md"
-      },
+      "sourcePath": "scripts/invariants/jev-gateway.mjs",
+      "sourceMatch": "model: 'typesafe-ai/jev'",
+      "costUsd": 0.0001,
+      "costBasis": "measured: docs/evaluations/jev-ci-failure-triage.md",
       "qualityMetric": "agreement with labeled outcome at the decision floor; abstention rate",
-      "evalSet": {
-        "ref": "docs/evaluations/jev-gateway-integration.md",
-        "size": null,
-        "status": "partial"
-      },
+      "evalStatus": "partial",
+      "evalRef": "docs/evaluations/jev-gateway-integration.md",
       "screens": ["same-family-successor", "workers-ai-decision"]
     },
     {
@@ -363,21 +273,15 @@
       "automation": null,
       "currentModel": "typesafe-ai/jev",
       "channel": "gateway-allowlist",
-      "source": {
-        "path": "scripts/invariants/jev-ci-failure-triage.mjs",
-        "match": "jev-gateway.mjs",
-        "pending": "PR #22324"
-      },
-      "costPerRun": {
-        "usd": 0.0001,
-        "basis": "measured 2026-10-20 (39 jobs)"
-      },
+      "sourcePath": "scripts/invariants/jev-ci-failure-triage.mjs",
+      "sourceMatch": "jev-gateway.mjs",
+      "sourcePending": "PR #22324",
+      "costUsd": 0.0001,
+      "costBasis": "measured 2026-10-20 (39 jobs)",
       "qualityMetric": "precision at the 0.8 floor on labeled tails; misroutes of unclear tails",
-      "evalSet": {
-        "ref": "ops/models/evals/ci-triage-replay-2026-10-20.json",
-        "size": 39,
-        "status": "ready"
-      },
+      "evalStatus": "ready",
+      "evalRef": "ops/models/evals/ci-triage-replay-2026-10-20.json",
+      "evalSize": 39,
       "screens": ["workers-ai-decision", "workers-ai-extraction"]
     },
     {
@@ -386,21 +290,14 @@
       "automation": null,
       "currentModel": "@cf/cloudflare/clef",
       "channel": "workers-ai",
-      "source": {
-        "path": "scripts/invariants/clef-screenshot-evaluator.mjs",
-        "match": "'@cf/cloudflare/clef'",
-        "pending": "PR #22339"
-      },
-      "costPerRun": {
-        "usd": 0.001,
-        "basis": "$0.24 per M input tokens; output free"
-      },
+      "sourcePath": "scripts/invariants/clef-screenshot-evaluator.mjs",
+      "sourceMatch": "'@cf/cloudflare/clef'",
+      "sourcePending": "PR #22339",
+      "costUsd": 0.001,
+      "costBasis": "$0.24 per M input tokens; output free",
       "qualityMetric": "rule violations caught vs design review labels",
-      "evalSet": {
-        "ref": "docs/evaluations/clef-screenshot-evaluator.md",
-        "size": null,
-        "status": "partial"
-      },
+      "evalStatus": "partial",
+      "evalRef": "docs/evaluations/clef-screenshot-evaluator.md",
       "screens": ["same-family-successor", "workers-ai-decision"]
     },
     {
@@ -409,21 +306,15 @@
       "automation": null,
       "currentModel": "@cf/cloudflare/clef-flash",
       "channel": "workers-ai",
-      "source": {
-        "path": "packages/research/judge.ts",
-        "match": "'clef-flash'",
-        "pending": "wt-research (ops/research-system)"
-      },
-      "costPerRun": {
-        "usd": 0.0001,
-        "basis": "$0.038 per M input"
-      },
+      "sourcePath": "packages/research/judge.ts",
+      "sourceMatch": "'clef-flash'",
+      "sourcePending": "wt-research (ops/research-system)",
+      "costUsd": 0.0001,
+      "costBasis": "$0.038 per M input",
       "qualityMetric": "relevance precision of kept sources",
-      "evalSet": {
-        "ref": null,
-        "size": 0,
-        "status": "missing"
-      },
+      "evalStatus": "missing",
+      "evalRef": null,
+      "evalSize": 0,
       "screens": ["workers-ai-decision", "workers-ai-extraction"]
     },
     {
@@ -432,21 +323,15 @@
       "automation": null,
       "currentModel": "typesafe-ai/jev",
       "channel": "gateway-allowlist",
-      "source": {
-        "path": "scripts/signals/signal_watch.py",
-        "match": "JEV_MODEL = \"typesafe-ai/jev\"",
-        "pending": "wt-signals (ops/signal-watchers)"
-      },
-      "costPerRun": {
-        "usd": 2e-5,
-        "basis": "per item, from the watcher docstring"
-      },
+      "sourcePath": "scripts/signals/signal_watch.py",
+      "sourceMatch": "JEV_MODEL = \"typesafe-ai/jev\"",
+      "sourcePending": "wt-signals (ops/signal-watchers)",
+      "costUsd": 2e-5,
+      "costBasis": "per item, from the watcher docstring",
       "qualityMetric": "high-score items Summer acts on",
-      "evalSet": {
-        "ref": null,
-        "size": 0,
-        "status": "missing"
-      },
+      "evalStatus": "missing",
+      "evalRef": null,
+      "evalSize": 0,
       "screens": ["workers-ai-decision", "workers-ai-extraction"]
     },
     {
@@ -455,26 +340,19 @@
       "automation": null,
       "currentModel": "anthropic/claude-opus-5.5",
       "channel": "subscription-claude",
-      "source": {
-        "path": "packages/copy/judge.ts",
-        "match": "flagship: ['anthropic/claude-opus-5.5'"
-      },
+      "sourcePath": "packages/copy/judge.ts",
+      "sourceMatch": "flagship: ['anthropic/claude-opus-5.5'",
       "alsoRoutes": [
         "anthropic/claude-sonnet-5",
         "openai/gpt-5.5",
         "zai/glm-5.3",
         "zai/glm-5.3-flash"
       ],
-      "costPerRun": {
-        "usd": 0,
-        "basis": "subscription routes; zai via Gateway"
-      },
+      "costUsd": 0,
+      "costBasis": "subscription routes; zai via Gateway",
       "qualityMetric": "judge agreement with Tim's copy taste corrections",
-      "evalSet": {
-        "ref": "packages/copy",
-        "size": null,
-        "status": "partial"
-      },
+      "evalStatus": "partial",
+      "evalRef": "packages/copy",
       "screens": ["same-family-successor"]
     },
     {
@@ -483,20 +361,13 @@
       "automation": null,
       "currentModel": "anthropic/claude-sonnet-5",
       "channel": "subscription-claude",
-      "source": {
-        "path": "apps/web/data/marketing/modelRoles.ts",
-        "match": "id: 'anthropic/claude-sonnet-5'"
-      },
-      "costPerRun": {
-        "usd": 0,
-        "basis": "subscription"
-      },
+      "sourcePath": "apps/web/data/marketing/modelRoles.ts",
+      "sourceMatch": "id: 'anthropic/claude-sonnet-5'",
+      "costUsd": 0,
+      "costBasis": "subscription",
       "qualityMetric": "chosen registered variant passes marketing certification first try",
-      "evalSet": {
-        "ref": "apps/web/tests/unit/marketing/model-roles.test.ts",
-        "size": null,
-        "status": "partial"
-      },
+      "evalStatus": "partial",
+      "evalRef": "apps/web/tests/unit/marketing/model-roles.test.ts",
       "screens": ["same-family-successor"]
     },
     {
@@ -505,20 +376,13 @@
       "automation": null,
       "currentModel": "anthropic/claude-opus-5.5",
       "channel": "subscription-claude",
-      "source": {
-        "path": "scripts/backlog-orchestrator/config/model-registry.json",
-        "match": "\"id\": \"anthropic/claude-opus-5.5\""
-      },
-      "costPerRun": {
-        "usd": 0,
-        "basis": "subscription"
-      },
+      "sourcePath": "scripts/backlog-orchestrator/config/model-registry.json",
+      "sourceMatch": "\"id\": \"anthropic/claude-opus-5.5\"",
+      "costUsd": 0,
+      "costBasis": "subscription",
       "qualityMetric": "copy gate (@jovie/copy) pass rate and taste corrections",
-      "evalSet": {
-        "ref": "packages/copy",
-        "size": null,
-        "status": "partial"
-      },
+      "evalStatus": "partial",
+      "evalRef": "packages/copy",
       "screens": ["same-family-successor"]
     },
     {
@@ -527,21 +391,15 @@
       "automation": null,
       "currentModel": "anthropic/claude-opus-5.5",
       "channel": "subscription-claude",
-      "source": {
-        "path": "scripts/vision/art-evaluator.mjs",
-        "match": "anthropic/claude-opus-5.5"
-      },
+      "sourcePath": "scripts/vision/art-evaluator.mjs",
+      "sourceMatch": "anthropic/claude-opus-5.5",
       "alsoRoutes": ["openai/gpt-5.5"],
-      "costPerRun": {
-        "usd": 0,
-        "basis": "subscription"
-      },
+      "costUsd": 0,
+      "costBasis": "subscription",
       "qualityMetric": "identity/focal verdict agrees with casting-board decisions",
-      "evalSet": {
-        "ref": "canon/virtual-models.json#boardDecisions",
-        "size": 10,
-        "status": "ready"
-      },
+      "evalStatus": "ready",
+      "evalRef": "canon/virtual-models.json#boardDecisions",
+      "evalSize": 10,
       "screens": ["same-family-successor", "workers-ai-decision"]
     },
     {
@@ -550,20 +408,13 @@
       "automation": null,
       "currentModel": "openai/gpt-image-1.5",
       "channel": "subscription-codex",
-      "source": {
-        "path": "scripts/backlog-orchestrator/config/model-registry.json",
-        "match": "\"id\": \"openai/gpt-image-1.5\""
-      },
-      "costPerRun": {
-        "usd": null,
-        "basis": "subscription; not measured"
-      },
+      "sourcePath": "scripts/backlog-orchestrator/config/model-registry.json",
+      "sourceMatch": "\"id\": \"openai/gpt-image-1.5\"",
+      "costUsd": null,
+      "costBasis": "subscription; not measured",
       "qualityMetric": "render passes art-evaluator + casting gates",
-      "evalSet": {
-        "ref": "canon/virtual-models.json",
-        "size": null,
-        "status": "partial"
-      },
+      "evalStatus": "partial",
+      "evalRef": "canon/virtual-models.json",
       "screens": ["same-family-successor"]
     },
     {
@@ -572,20 +423,14 @@
       "automation": null,
       "currentModel": "spacexai/grok-imagine-image",
       "channel": "gateway-image",
-      "source": {
-        "path": "apps/web/lib/constants/ai-models.ts",
-        "match": "ALBUM_ART_GATEWAY_IMAGE_MODEL = 'spacexai/grok-imagine-image'"
-      },
-      "costPerRun": {
-        "usd": null,
-        "basis": "Gateway image pricing; not measured"
-      },
+      "sourcePath": "apps/web/lib/constants/ai-models.ts",
+      "sourceMatch": "ALBUM_ART_GATEWAY_IMAGE_MODEL = 'spacexai/grok-imagine-image'",
+      "costUsd": null,
+      "costBasis": "Gateway image pricing; not measured",
       "qualityMetric": "artist keeps the generated art",
-      "evalSet": {
-        "ref": null,
-        "size": 0,
-        "status": "missing"
-      },
+      "evalStatus": "missing",
+      "evalRef": null,
+      "evalSize": 0,
       "screens": ["same-family-successor"]
     },
     {
@@ -594,20 +439,14 @@
       "automation": null,
       "currentModel": "google/gemini-2.5-flash-image",
       "channel": "vendor-api",
-      "source": {
-        "path": "apps/web/lib/services/retouching/provider-gemini.ts",
-        "match": "google/gemini-2.5-flash-image"
-      },
-      "costPerRun": {
-        "usd": null,
-        "basis": "not measured"
-      },
+      "sourcePath": "apps/web/lib/services/retouching/provider-gemini.ts",
+      "sourceMatch": "google/gemini-2.5-flash-image",
+      "costUsd": null,
+      "costBasis": "not measured",
       "qualityMetric": "retouch accepted by artist",
-      "evalSet": {
-        "ref": null,
-        "size": 0,
-        "status": "missing"
-      },
+      "evalStatus": "missing",
+      "evalRef": null,
+      "evalSize": 0,
       "screens": ["same-family-successor"]
     },
     {
@@ -616,22 +455,16 @@
       "automation": "vercel:jovie-web:voice-pipeline",
       "currentModel": "eleven_turbo_v2_5",
       "channel": "vendor-api",
-      "source": {
-        "path": "apps/web/lib/ai/tools/voice-promo.ts",
-        "match": "default('eleven_turbo_v2_5')"
-      },
+      "sourcePath": "apps/web/lib/ai/tools/voice-promo.ts",
+      "sourceMatch": "default('eleven_turbo_v2_5')",
       "alsoRoutes": ["eleven_multilingual_v2"],
-      "costPerRun": {
-        "usd": null,
-        "basis": "ElevenLabs per-character; not measured"
-      },
+      "costUsd": null,
+      "costBasis": "ElevenLabs per-character; not measured",
       "qualityMetric": "promo approved without re-render",
-      "evalSet": {
-        "ref": null,
-        "size": 0,
-        "status": "missing",
-        "gap": "LogYourBody has no audio model in this repo; Jovie audio is this tool only"
-      },
+      "evalStatus": "missing",
+      "evalRef": null,
+      "evalSize": 0,
+      "evalGap": "LogYourBody has no audio model in this repo; Jovie audio is this tool only",
       "screens": ["same-family-successor"]
     },
     {
@@ -640,21 +473,15 @@
       "automation": null,
       "currentModel": "claude-haiku-4-5",
       "channel": "vendor-api",
-      "source": {
-        "path": "scripts/screenshot-loop/screenshot-bug-loop.mjs",
-        "match": "claude-haiku-4-5"
-      },
+      "sourcePath": "scripts/screenshot-loop/screenshot-bug-loop.mjs",
+      "sourceMatch": "claude-haiku-4-5",
       "alsoRoutes": ["openai/gpt-5-mini"],
-      "costPerRun": {
-        "usd": 0.0045,
-        "basis": "estimate: 2k input + 0.5k output at Haiku 4.5 $1/$5 per M"
-      },
+      "costUsd": 0.0045,
+      "costBasis": "estimate: 2k input + 0.5k output at Haiku 4.5 $1/$5 per M",
       "qualityMetric": "filed screenshot bugs that are real (not closed as noise)",
-      "evalSet": {
-        "ref": null,
-        "size": 0,
-        "status": "missing"
-      },
+      "evalStatus": "missing",
+      "evalRef": null,
+      "evalSize": 0,
       "screens": ["same-family-successor", "workers-ai-decision"],
       "notes": "Metered ANTHROPIC_API_KEY and openai/* Gateway fallback both conflict with JOV-7119."
     },
@@ -664,22 +491,16 @@
       "automation": "gem:lanes-tick",
       "currentModel": "codex-default",
       "channel": "subscription-codex",
-      "source": {
-        "path": "scripts/lanes/providers.json",
-        "match": "\"model\": \"codex-default\""
-      },
+      "sourcePath": "scripts/lanes/providers.json",
+      "sourceMatch": "\"model\": \"codex-default\"",
       "alsoRoutes": ["claude-sonnet-5-5", "z-ai/glm-5.3", "grok-4.7"],
-      "costPerRun": {
-        "usd": 0,
-        "basis": "subscription lanes; no dedicated test-generation loop exists"
-      },
+      "costUsd": 0,
+      "costBasis": "subscription lanes; no dedicated test-generation loop exists",
       "qualityMetric": "mutation score and flake rate of the touched suites",
-      "evalSet": {
-        "ref": null,
-        "size": 0,
-        "status": "missing",
-        "gap": "measure with a mutation run on the campaign's target suites before and after"
-      },
+      "evalStatus": "missing",
+      "evalRef": null,
+      "evalSize": 0,
+      "evalGap": "measure with a mutation run on the campaign's target suites before and after",
       "screens": ["same-family-successor"]
     }
   ]

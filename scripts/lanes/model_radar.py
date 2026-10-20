@@ -54,7 +54,7 @@ REFRESH_INTERVAL_S = 24 * 60 * 60
 CAMPAIGN_APPROVAL_USD = 25.0
 GATEWAY_URL = "https://ai-gateway.vercel.sh/v1/models"
 ELEVENLABS_URL = "https://api.elevenlabs.io/v1/models"
-TASK_FIELDS = ("id", "taskType", "currentModel", "channel", "source", "costPerRun", "qualityMetric", "evalSet", "screens")
+TASK_FIELDS = ("id", "taskType", "currentModel", "channel", "sourcePath", "sourceMatch", "costUsd", "qualityMetric", "evalStatus", "screens")
 SCREENS = {"same-family-successor", "gateway-allowlisted", "hyperagent-listed", "workers-ai-decision", "workers-ai-extraction"}
 VARIANT_TOKENS = {"batch", "fast", "beta", "highspeed", "decisions", "thinking", "non", "reasoning", "exp", "preview",
                   "vision", "latest", "instruct", "it", "fp8", "multi", "agent"}
@@ -69,7 +69,7 @@ def load_registry(path: Path = REGISTRY_PATH) -> dict:
 
 def validate_registry(registry: dict, root: Path = ROOT) -> list[str]:
     """Structure plus drift: each task's declared model must still appear in its source file.
-    A task whose source has not landed yet declares `source.pending` and is checked once it lands."""
+    A task whose source has not landed yet declares `sourcePending` and is checked once it lands."""
     errors = []
     if registry.get("schema") != REGISTRY_SCHEMA:
         errors.append(f"schema must be {REGISTRY_SCHEMA}")
@@ -88,20 +88,17 @@ def validate_registry(registry: dict, root: Path = ROOT) -> list[str]:
         for screen in task.get("screens") or []:
             if screen not in SCREENS:
                 errors.append(f"{at}: unknown screen {screen}")
-        ev = task.get("evalSet") or {}
-        if ev.get("status") not in {"ready", "partial", "missing", "live-ab"}:
-            errors.append(f"{at}: evalSet.status must be ready|partial|missing|live-ab")
-        if ev.get("status") == "missing" and not ev.get("gap"):
-            pass  # a missing set is allowed; the screen reports it as the first thing to build
-        source = task.get("source") or {}
-        file = root / str(source.get("path", ""))
+        if task.get("evalStatus") not in {"ready", "partial", "missing", "live-ab"}:
+            errors.append(f"{at}: evalStatus must be ready|partial|missing|live-ab")
+        path, match = task.get("sourcePath", ""), task.get("sourceMatch")
+        file = root / str(path)
         if not file.is_file():
-            if not source.get("pending"):
-                errors.append(f"{at}: source {source.get('path')} does not exist")
+            if not task.get("sourcePending"):
+                errors.append(f"{at}: source {path} does not exist")
             continue
-        if source.get("match") and source["match"] not in file.read_text(errors="replace"):
-            errors.append(f"{at}: {source.get('path')} no longer contains {source['match']!r} "
-                          f"(update currentModel and source.match when the model changes)")
+        if match and match not in file.read_text(errors="replace"):
+            errors.append(f"{at}: {path} no longer contains {match!r} "
+                          f"(update currentModel and sourceMatch when the model changes)")
     return errors
 
 
@@ -376,7 +373,7 @@ def screen(registry: dict, catalog: dict, allowlist: set[str]) -> list[dict]:
             blocked = channel_policy(task, model, allowlist)
             rows.append({"task": task["id"], "current": task["currentModel"], "candidate": model["id"], "source": model["source"],
                          "why": why, "priceIn": model.get("priceIn"), "priceOut": model.get("priceOut"),
-                         "policy": blocked or "eligible", "evalSet": task["evalSet"]["status"]})
+                         "policy": blocked or "eligible", "evalStatus": task["evalStatus"]})
     return rows
 
 
