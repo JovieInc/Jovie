@@ -182,6 +182,14 @@ def provider_payloads(state: Path, providers, proc: Path = Path("/proc")) -> dic
     return result
 
 
+def _linear_app_credential(lane) -> bool | None:
+    """Installed Jovie Lanes app credential (presence only; never read into the report).
+    None where no host file applies (self-test, fixtures)."""
+    tokens = getattr(lane, "linear_app_token", None)
+    path = tokens.default_path() if tokens else None
+    return None if path is None else bool(tokens.credentials(path))
+
+
 def qualified_pool(host, lane, capacity: dict, now: float) -> tuple[dict, int, dict, dict, dict]:
     """Apply the worker predicate instead of treating label inventory as runnable."""
     linear = lane.Linear(host.linear_env)
@@ -386,6 +394,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "fileOverlap": file_overlap.doctor_view(state),
         "linearError": linear_error, "linearSkipped": linear_skipped, "githubRemaining": github,
         "linearSync": linear_sync.status(state, now),
+        "linearAppCredential": _linear_app_credential(lane),
         "ownership": {key: value for key, value in read_json(state / "ownership.json", {}).items()
                       if key not in ("ownerlessSince", "evidenceNoted", "moved", "claimsReleased")},
         "merged24h": merged, "mergedAttributionError": merged_error,
@@ -758,6 +767,10 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
             alerts[f"pr-inventory-unavailable:{name}"] = (
                 f"{name} new-issue PR budget unknown: {budget.get('error') or 'incomplete read'}; new claims deferred")
     alerts.update(linear_sync.alerts(obs.get("linearSync") or {}))
+    if obs.get("linearAppCredential") is False:
+        alerts["linear-app-credential-missing"] = (
+            "no Jovie Lanes Linear app credential (~/.config/jovie-lanes/linear-app.env); lanes Linear "
+            "access fails closed (no personal-key fallback) until the lanes host owner reinstalls it")
     owned = obs.get("ownership") or {}
     if owned.get("overGrace"):
         # The started-state invariant (ownership.py): escalated as a lanes repair, never to Tim.
