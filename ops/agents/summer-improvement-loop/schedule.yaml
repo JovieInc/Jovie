@@ -1,7 +1,9 @@
 # Scheduled deployment settings for the Summer improvement loop.
 # Not an `ant apply` file on purpose: the deployment carries GitHub repository
 # tokens that must never be committed, so deploy.sh builds the create body from
-# this file plus tokens read at a silent prompt.
+# this file plus a token from $LOOP_GITHUB_TOKEN or, when unset, the macOS
+# Keychain item `jovie-summer-loop-github` (stored once with
+# `security add-generic-password -a jovie -s jovie-summer-loop-github -w`).
 #
 # Budget math (validated in scripts/lib/__tests__/summer-improvement-loop-config.test.mjs):
 #   every 6 hours -> at most 31 days x 4 = 124 sessions/month
@@ -24,9 +26,11 @@ repositories:
   - url: https://github.com/JovieInc/Jovie
     mount_path: /workspace/Jovie
     token_env: LOOP_GITHUB_TOKEN
+    keychain_service: jovie-summer-loop-github
   - url: https://github.com/JovieInc/summer-config
     mount_path: /workspace/summer-config
     token_env: LOOP_GITHUB_TOKEN
+    keychain_service: jovie-summer-loop-github
 memory_store:
   access: read_write
   instructions: >-

@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildDeploymentBody,
+  KEYCHAIN_SERVICE,
+  keychainItemExists,
   loadLoopConfig,
   maxRunsPerMonth,
+  readKeychainSecret,
   redactBody,
+  resolveRepoTokens,
   validateLoopConfig,
   worstCaseMonthlyUsd,
 } from '../summer-improvement-loop-config.mjs';
@@ -115,5 +119,52 @@ describe('summer improvement loop config', () => {
         env: { LOOP_GITHUB_TOKEN: 't' },
       })
     ).toThrow(/agentId/);
+  });
+
+  it('prefers the env token and falls back to the Keychain item', () => {
+    const cfg = fresh();
+    const asked = [];
+    const fromKeychain = service => {
+      asked.push(service);
+      return 'kc-token';
+    };
+    expect(
+      resolveRepoTokens(cfg, { LOOP_GITHUB_TOKEN: 'env-token' }, fromKeychain)
+        .LOOP_GITHUB_TOKEN
+    ).toBe('env-token');
+    expect(asked).toEqual([]);
+    expect(resolveRepoTokens(cfg, {}, fromKeychain).LOOP_GITHUB_TOKEN).toBe(
+      'kc-token'
+    );
+    expect(asked[0]).toBe(KEYCHAIN_SERVICE);
+    expect(
+      resolveRepoTokens(cfg, {}, () => null).LOOP_GITHUB_TOKEN
+    ).toBeUndefined();
+  });
+
+  it('reads the Keychain with -w and checks existence without it', () => {
+    const calls = [];
+    const fake = status => (cmd, args) => {
+      calls.push([cmd, ...args]);
+      return { status, stdout: status === 0 ? 'secret\n' : '' };
+    };
+    expect(readKeychainSecret(KEYCHAIN_SERVICE, fake(0))).toBe('secret');
+    expect(readKeychainSecret(KEYCHAIN_SERVICE, fake(44))).toBeNull();
+    expect(keychainItemExists(KEYCHAIN_SERVICE, fake(0))).toBe(true);
+    expect(keychainItemExists(KEYCHAIN_SERVICE, fake(44))).toBe(false);
+    expect(calls[0]).toEqual([
+      'security',
+      'find-generic-password',
+      '-s',
+      KEYCHAIN_SERVICE,
+      '-w',
+    ]);
+    expect(calls[2]).not.toContain('-w');
+  });
+
+  it('requires every repo to name the loop Keychain item', () => {
+    const cfg = fresh();
+    cfg.schedule.repositories[0].keychain_service = 'other';
+    expect(validateLoopConfig(cfg).join('\n')).toMatch(/keychain_service/);
   });
 });

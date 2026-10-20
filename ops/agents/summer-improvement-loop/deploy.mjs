@@ -5,8 +5,13 @@
 //   node ops/agents/summer-improvement-loop/deploy.mjs validate   # offline config check
 //   node ops/agents/summer-improvement-loop/deploy.mjs plan       # ant apply --dry-run
 //   node ops/agents/summer-improvement-loop/deploy.mjs apply      # sync agent/env/memory (asks y/n)
-//   LOOP_GITHUB_TOKEN=... node .../deploy.mjs create              # create the scheduled deployment
-//   node .../deploy.mjs run | pause | unpause | status
+//   node .../deploy.mjs create                                    # create the scheduled deployment
+//
+// create reads the GitHub token from $LOOP_GITHUB_TOKEN, or when unset from the
+// macOS Keychain item `jovie-summer-loop-github`. Store it once, with hidden
+// input, so it never appears in a terminal:
+//   security add-generic-password -a jovie -s jovie-summer-loop-github -w
+//   node .../deploy.mjs ready | run | pause | unpause | status
 //
 // Kill switch: `deploy.mjs pause` (or `ant beta:deployments pause --deployment-id <id>`)
 // stops scheduled firings; running sessions finish under their own budget cap.
@@ -16,9 +21,12 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   buildDeploymentBody,
+  KEYCHAIN_SERVICE,
+  keychainItemExists,
   LOOP_DIR,
   loadLoopConfig,
   redactBody,
+  resolveRepoTokens,
   validateLoopConfig,
   worstCaseMonthlyUsd,
 } from '../../../scripts/lib/summer-improvement-loop-config.mjs';
@@ -82,7 +90,25 @@ const commands = {
   apply() {
     validate();
     // Interactive: ant prints the plan and asks before changing anything.
-    ant(['apply', '--lock-file', LOCK, ...APPLY_FILES], { inherit: true });
+    // `apply --yes` applies the plan without the prompt (approved runs only).
+    const yes = process.argv.includes('--yes') ? ['--yes'] : [];
+    ant(['apply', '--lock-file', LOCK, ...yes, ...APPLY_FILES], {
+      inherit: true,
+    });
+  },
+  ready() {
+    // Prerequisites for create, checked without reading any secret.
+    const auth = spawnSync('ant', ['beta:agents', 'list', '--max-items', '1'], {
+      stdio: 'ignore',
+    });
+    const loggedIn = auth.status === 0;
+    const token =
+      Boolean(process.env.LOOP_GITHUB_TOKEN) ||
+      keychainItemExists(KEYCHAIN_SERVICE);
+    process.stdout.write(
+      `ant-authenticated=${loggedIn} github-token=${token}\n`
+    );
+    if (!loggedIn || !token) process.exitCode = 1;
   },
   create() {
     const cfg = validate();
@@ -92,7 +118,7 @@ const commands = {
       agentId: lockedId('agent.md'),
       environmentId: lockedId('environment.yaml'),
       memoryStoreId: lockedId('memory_store-runs.yaml'),
-      env: process.env,
+      env: resolveRepoTokens(cfg, process.env),
     });
     process.stdout.write(`${JSON.stringify(redactBody(body), null, 2)}\n`);
     // Body (with tokens) goes over stdin only; never argv, never disk.

@@ -1,6 +1,7 @@
 // Loads and validates the Summer improvement loop's Claude Managed Agents
 // config (ops/agents/summer-improvement-loop/) and builds the scheduled
 // deployment create body. Pure functions: no network, no secrets on disk.
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,6 +12,43 @@ export const LOOP_DIR = resolve(
   here,
   '../../ops/agents/summer-improvement-loop'
 );
+
+export const KEYCHAIN_SERVICE = 'jovie-summer-loop-github';
+
+// Reads a generic-password item from the macOS login Keychain. Returns null
+// when the item is missing. The value is returned to the caller only; it is
+// never printed or written anywhere.
+export function readKeychainSecret(service, run = spawnSync) {
+  const res = run('security', ['find-generic-password', '-s', service, '-w'], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+  });
+  if (res.status !== 0) return null;
+  const value = String(res.stdout ?? '').replace(/\r?\n$/, '');
+  return value || null;
+}
+
+// Returns true when the Keychain item exists, without reading its secret.
+export function keychainItemExists(service, run = spawnSync) {
+  const res = run('security', ['find-generic-password', '-s', service], {
+    stdio: 'ignore',
+  });
+  return res.status === 0;
+}
+
+// Fills each repo's token_env from the environment, falling back to the
+// repo's Keychain item, so the token never has to be typed into a shell.
+export function resolveRepoTokens(cfg, env, readSecret = readKeychainSecret) {
+  const out = { ...env };
+  for (const repo of cfg.schedule.repositories ?? []) {
+    if (out[repo.token_env]) continue;
+    const value = repo.keychain_service
+      ? readSecret(repo.keychain_service)
+      : null;
+    if (value) out[repo.token_env] = value;
+  }
+  return out;
+}
 
 export const ALLOWED_MODELS = new Set(['claude-opus-5-5', 'claude-sonnet-5-5']);
 export const MAX_SESSION_CAP_CENTS = 100;
@@ -192,6 +230,8 @@ export function validateLoopConfig(cfg) {
   for (const repo of schedule.repositories ?? []) {
     if (!/^[A-Z][A-Z0-9_]*$/.test(repo.token_env ?? ''))
       err(`repo ${repo.url} needs token_env`);
+    if (repo.keychain_service !== KEYCHAIN_SERVICE)
+      err(`repo ${repo.url} keychain_service must be ${KEYCHAIN_SERVICE}`);
   }
   const starts = schedule.initial_events ?? [];
   if (!starts.length || starts.some(e => e.type !== 'user.message')) {
@@ -225,7 +265,10 @@ export function buildDeploymentBody(
   const s = cfg.schedule;
   const resources = s.repositories.map(repo => {
     const token = env[repo.token_env];
-    if (!token) throw new Error(`${repo.token_env} is not set`);
+    if (!token)
+      throw new Error(
+        `${repo.token_env} is not set and Keychain item ${repo.keychain_service ?? '(none)'} was not found`
+      );
     return {
       type: 'github_repository',
       url: repo.url,
