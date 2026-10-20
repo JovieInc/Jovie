@@ -164,4 +164,26 @@ describe('HomeLoopSection', () => {
     expect(screen.getByText('Body')).toBeVisible();
     expect(screen.getByTestId('section-count')).toHaveTextContent('3');
   });
+
+  it('replaces a clear empty line when a source warning is present', () => {
+    render(
+      <HomeLoopSection
+        title='Blocked On You'
+        status='ready'
+        isEmpty
+        emptyLabel='Nothing here'
+        errorLabel='Could not load'
+        notice='Some sources are unavailable.'
+        skeleton={<p>Skeleton</p>}
+        testId='section'
+      >
+        <p>Body</p>
+      </HomeLoopSection>
+    );
+    expect(screen.getByTestId('section-notice')).toHaveTextContent(
+      'Some sources are unavailable.'
+    );
+    expect(screen.queryByText('Nothing here')).not.toBeInTheDocument();
+    expect(screen.queryByText('Body')).not.toBeInTheDocument();
+  });
 });

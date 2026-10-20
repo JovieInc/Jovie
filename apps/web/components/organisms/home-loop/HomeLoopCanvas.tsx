@@ -35,6 +35,8 @@ export interface HomeLoopCanvasProps {
   /** Status of the shipping read (constraint, pulse, in flight, done). */
   readonly loopStatus: HomeLoopSectionStatus;
   readonly asksStatus: HomeLoopSectionStatus;
+  /** Partial source failure while some or no asks are still shown. */
+  readonly asksNotice?: string | null;
   readonly answers: Readonly<Record<string, HomeLoopAnswer>>;
   readonly onApprove: (ask: HomeLoopAsk) => void;
   readonly onReply: (ask: HomeLoopAsk, text: string) => void;
@@ -61,6 +63,7 @@ export function HomeLoopCanvas({
   doneSummary,
   loopStatus,
   asksStatus,
+  asksNotice,
   answers,
   onApprove,
   onReply,
@@ -87,6 +90,7 @@ export function HomeLoopCanvas({
           isEmpty={asks.length === 0}
           emptyLabel={copy.asksEmpty}
           errorLabel={copy.asksError}
+          notice={asksNotice}
           onRetry={onRetryAsks}
           skeleton={<HomeLoopAsksSkeleton />}
           minBodyClassName='min-h-24'
