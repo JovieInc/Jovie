@@ -8,6 +8,7 @@ import { motion, useReducedMotion } from 'motion/react';
 import { memo, useEffect, useRef, useState } from 'react';
 import { useClipboard } from '@/hooks/useClipboard';
 import { copyMarkdownToClipboard } from '@/lib/chat/copy-markdown';
+import type { EnrichedFact } from '@/lib/profile-facts/enrichment';
 import { cn } from '@/lib/utils';
 import { getRenderableToolEvents, ToolPartsRenderer } from '../tool-ui';
 import type { MessagePart } from '../types';
@@ -17,12 +18,14 @@ import { ChatFeedbackControl } from './ChatFeedbackControl';
 import { ChatStepLimitAffordance } from './ChatStepLimitAffordance';
 import { FileAttachmentChip } from './FileAttachmentChip';
 import { ImageAttachmentChip } from './ImageAttachmentChip';
+import { SourceEvidenceProvider } from './SourceEvidence';
 import { TokenizedText } from './TokenizedText';
 
 interface ChatMessageProps {
   readonly id: string;
   readonly role: 'user' | 'assistant' | 'system';
   readonly parts: readonly MessagePart[];
+  readonly sourceFacts?: readonly EnrichedFact[];
   /** Whether this message is actively being streamed from the AI. */
   readonly isStreaming?: boolean;
   /** Whether this is a synthetic pending placeholder (compact live typing bubble). */
@@ -64,6 +67,7 @@ function areChatMessagePropsEqual(
     previous.id === next.id &&
     previous.role === next.role &&
     previous.parts === next.parts &&
+    previous.sourceFacts === next.sourceFacts &&
     previous.isStreaming === next.isStreaming &&
     previous.isThinking === next.isThinking &&
     previous.avatarUrl === next.avatarUrl &&
@@ -83,6 +87,7 @@ export const ChatMessage = memo(function ChatMessage({
   id,
   role,
   parts,
+  sourceFacts = [],
   isStreaming,
   isThinking,
   profileId,
@@ -257,10 +262,12 @@ export const ChatMessage = memo(function ChatMessage({
                   data-testid='chat-message-reply'
                   className='system-b-chat-message-reply'
                 >
-                  <AssistantMessageText
-                    content={messageText}
-                    isStreaming={Boolean(isStreaming)}
-                  />
+                  <SourceEvidenceProvider facts={sourceFacts}>
+                    <AssistantMessageText
+                      content={messageText}
+                      isStreaming={Boolean(isStreaming)}
+                    />
+                  </SourceEvidenceProvider>
                 </div>
               ) : null}
 

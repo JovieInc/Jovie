@@ -39,9 +39,10 @@ interface AssistantMessageTextProps {
  * Plain markdown segments still flow through `ChatMarkdown`.
  */
 export function AssistantMessageText({
-  content,
+  content: rawContent,
   isStreaming = false,
 }: AssistantMessageTextProps) {
+  const content = rawContent.replace(/\s*\(source:\s*enrichment\)/gi, '');
   const tokens = useMemo(() => parseTokens(content), [content]);
 
   if (tokens.length === 1 && tokens[0]?.type === 'text') {

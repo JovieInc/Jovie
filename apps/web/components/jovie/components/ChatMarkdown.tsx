@@ -4,6 +4,10 @@ import { memo } from 'react';
 import { Streamdown } from 'streamdown';
 
 import { getChatMarkdownStreamdownConfig } from '@/lib/markdown/streamdown-config';
+import {
+  INLINE_SOURCE_MARKDOWN_COMPONENTS,
+  SOURCE_MARKDOWN_COMPONENTS,
+} from './SourceEvidence';
 
 interface ChatMarkdownProps {
   readonly content: string;
@@ -25,6 +29,9 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   return (
     <Streamdown
       {...getChatMarkdownStreamdownConfig(isStreaming, className, inline)}
+      components={
+        inline ? INLINE_SOURCE_MARKDOWN_COMPONENTS : SOURCE_MARKDOWN_COMPONENTS
+      }
     >
       {content}
     </Streamdown>

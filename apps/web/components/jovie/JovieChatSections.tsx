@@ -31,6 +31,7 @@ import { ChatUsageAlert } from './components/ChatUsageAlert';
 import type { PendingAudio } from './hooks/useChatAudioAttachments';
 import type { PendingFile } from './hooks/useChatFileAttachments';
 import { type ComposerDraft, useComposerDraft } from './hooks/useComposerDraft';
+import { sourceFactsByMessage } from './source-facts';
 import type { ChatError, MessagePart } from './types';
 
 interface ChatComposerSurfaceProps {
@@ -284,6 +285,7 @@ export function ChatThreadMessages({
     messages.length > 0 &&
     virtualizedMinHeight > 0;
   const renderVirtualWindow = shouldVirtualizeMessages && !virtualizerStuck;
+  const sourceFacts = sourceFactsByMessage(messages);
   const renderMessage = (message: ChatThreadMessage, index: number) => {
     const isThinking =
       message.role === 'assistant' && message.status === 'pending';
@@ -297,6 +299,7 @@ export function ChatThreadMessages({
           id={message.id}
           role={message.role}
           parts={message.parts}
+          sourceFacts={sourceFacts.get(message.id)}
           isStreaming={isStreaming && index === lastAssistantIndex}
           isThinking={isThinking}
           avatarUrl={message.role === 'user' ? avatarUrl : undefined}
