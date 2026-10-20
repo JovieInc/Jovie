@@ -2,21 +2,26 @@
 /**
  * node scripts/external-api-guard.mjs [--check]   fail on new direct provider calls
  * node scripts/external-api-guard.mjs --write     lower the ratchet to today's counts
+ * node scripts/external-api-guard.mjs --onboard     grandfather existing calls to a provider
+ *                                                 just added to providers.json
  * node scripts/external-api-guard.mjs --bootstrap grandfather every current call site
  *                                                 (only while no ratchet exists)
  */
-import { existsSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import {
   ALLOWLIST_PATH,
+  baseProvidersAt,
   baseRatchetAt,
   buildRules,
   checkGuard,
   ciBase,
   countsOf,
   loadProviders,
+  onboardedHits,
+  onboardRatchet,
   RATCHET_PATH,
   RATCHET_SCHEMA,
   readJson,
@@ -34,7 +39,15 @@ function save(entries) {
 }
 
 export function main(argv = process.argv.slice(2)) {
-  const found = scanRepo(repoRoot, buildRules(loadProviders(repoRoot)));
+  const providers = loadProviders(repoRoot);
+  const found = scanRepo(repoRoot, buildRules(providers));
+  const base = ciBase(repoRoot);
+  const onboarded = onboardedHits(
+    found,
+    baseProvidersAt(base, repoRoot),
+    providers,
+    path => readFileSync(join(repoRoot, path), 'utf8')
+  );
   const allowlist = readJson(join(repoRoot, ALLOWLIST_PATH), {
     entries: [],
   }).entries;
@@ -56,6 +69,10 @@ export function main(argv = process.argv.slice(2)) {
     return 0;
   }
   const ratchet = readJson(ratchetFile, { entries: {} }).entries;
+  if (argv.includes('--onboard')) {
+    save(onboardRatchet(ratchet, found, onboarded));
+    return 0;
+  }
   if (argv.includes('--write')) {
     save(tightenRatchet(ratchet, found));
     return 0;
@@ -64,7 +81,8 @@ export function main(argv = process.argv.slice(2)) {
     found,
     ratchet,
     allowlist,
-    baseRatchet: baseRatchetAt(ciBase(repoRoot), repoRoot),
+    baseRatchet: baseRatchetAt(base, repoRoot),
+    onboarded,
   });
   for (const error of errors)
     process.stderr.write(`external-api-guard: ${error}\n`);

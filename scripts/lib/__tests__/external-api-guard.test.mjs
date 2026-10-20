@@ -11,6 +11,8 @@ import {
   ciBase,
   inScope,
   loadProviders,
+  onboardedHits,
+  onboardRatchet,
   RATCHET_PATH,
   readJson,
   scanRepo,
@@ -148,5 +150,30 @@ describe('external API guard', () => {
     expect(check(found, {}, [{ ...entry, reason: 'because' }])[0]).toMatch(
       /needs path, rule, max/
     );
+  });
+
+  it('grandfathers existing calls only for a provider newly added to providers.json', () => {
+    const head = loadProviders(repoRoot);
+    const base = structuredClone(head);
+    head.providers.exa = { ...head.providers.vercel, hosts: ['api.exa.ai'] };
+    const headRules = buildRules(head);
+    const text =
+      "fetch('https://api.exa.ai/search');\nfetch('https://api.vercel.com/v1');";
+    const found = {
+      'scripts/voc.mjs': scanSource('scripts/voc.mjs', text, headRules),
+    };
+    const baseRatchet = { 'scripts/voc.mjs': { 'provider-host': 1 } };
+    const onboarded = onboardedHits(found, base, head, () => text);
+    expect(onboarded).toEqual({ 'scripts/voc.mjs': 1 });
+    const ratchet = onboardRatchet(baseRatchet, found, onboarded);
+    expect(ratchet['scripts/voc.mjs']['provider-host']).toBe(2);
+    expect(
+      checkGuard({ found, ratchet, allowlist: [], baseRatchet, onboarded })
+    ).toEqual([]);
+    // Without a provider registration the same growth is rejected.
+    expect(
+      checkGuard({ found, ratchet, allowlist: [], baseRatchet })[0]
+    ).toMatch(/only shrinks/);
+    expect(onboardedHits(found, head, head, () => text)).toEqual({});
   });
 });

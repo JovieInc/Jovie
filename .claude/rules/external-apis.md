@@ -39,5 +39,6 @@ layer. Existing sites are grandfathered in
 `scripts/lib/external-api-guard.ratchet.gen.json`, which only shrinks; run
 `--write` after removing one. A permanent exception needs an entry with a
 reason and a cap in `scripts/lib/external-api-guard.allowlist.json`.
-New provider: add it to `providers.json` with its budget headers and a
-fake-provider test of 429, secondary-limit and reset behavior.
+New provider: register it in `providers.json` (the one registry both languages
+and the guard read; no per-consumer hooks) with its budget headers, then run
+`--onboard` to grandfather calls to it that already exist.

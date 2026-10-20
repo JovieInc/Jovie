@@ -36,8 +36,8 @@ const NOT_SOURCE =
 
 const escape = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-/** Provider hosts from the shared contract (sentry only for its /api/ path). */
-export function providerHostPattern(providers) {
+/** Host (+ path prefix) entries from the shared contract, regex-escaped. */
+export function providerHosts(providers) {
   const hosts = [];
   for (const spec of Object.values(providers.providers)) {
     for (const host of spec.hosts)
@@ -45,7 +45,35 @@ export function providerHostPattern(providers) {
         escape(host) + (spec.pathPrefix ? escape(spec.pathPrefix) : '')
       );
   }
+  return hosts;
+}
+
+/** Provider hosts from the shared contract (sentry only for its /api/ path). */
+export function providerHostPattern(
+  providers,
+  hosts = providerHosts(providers)
+) {
   return new RegExp(`(?:https?://|['"\`])(?:${hosts.join('|')})`, 'g');
+}
+
+/**
+ * Registering a provider in providers.json is the one reviewed way to grow
+ * the ratchet: existing calls to a host the base contract did not list may
+ * be grandfathered (`--onboard`). Returns per-file hit counts for those hosts.
+ */
+export function onboardedHits(found, baseProviders, providers, read) {
+  if (!baseProviders) return {};
+  const known = new Set(providerHosts(baseProviders));
+  const added = providerHosts(providers).filter(host => !known.has(host));
+  if (added.length === 0) return {};
+  const pattern = providerHostPattern(providers, added);
+  const hits = {};
+  for (const path of Object.keys(found)) {
+    if (!found[path]['provider-host']) continue;
+    const count = [...read(path).matchAll(pattern)].length;
+    if (count > 0) hits[path] = count;
+  }
+  return hits;
 }
 
 const GH_SUBCOMMANDS =
@@ -178,7 +206,13 @@ function allowedBy(allowlist, path, rule) {
 /**
  * @returns {string[]} errors; empty means the tree honors the contract.
  */
-export function checkGuard({ found, ratchet, allowlist, baseRatchet = null }) {
+export function checkGuard({
+  found,
+  ratchet,
+  allowlist,
+  baseRatchet = null,
+  onboarded = {},
+}) {
   const errors = [];
   for (const entry of allowlist) {
     if (
@@ -212,14 +246,32 @@ export function checkGuard({ found, ratchet, allowlist, baseRatchet = null }) {
           `${RATCHET_PATH}: ${path} ${rule} is ${now}, ratchet says ${count}; lower it (node scripts/external-api-guard.mjs --write)`
         );
       }
-      if (baseRatchet && count > (baseRatchet[path]?.[rule] ?? 0)) {
+      const base = baseRatchet?.[path]?.[rule] ?? 0;
+      const admitted = rule === 'provider-host' ? (onboarded[path] ?? 0) : 0;
+      if (baseRatchet && count > base + admitted) {
         errors.push(
-          `${RATCHET_PATH}: ${path} ${rule} rose to ${count} (base ${baseRatchet[path]?.[rule] ?? 0}); the ratchet only shrinks`
+          `${RATCHET_PATH}: ${path} ${rule} rose to ${count} (base ${base}); the ratchet only shrinks, except for calls to a provider newly added to providers.json (--onboard)`
         );
       }
     }
   }
   return errors;
+}
+
+/** Grandfather today's calls to newly registered provider hosts. */
+export function onboardRatchet(ratchet, found, onboarded) {
+  const next = structuredClone(ratchet);
+  for (const [path, extra] of Object.entries(onboarded)) {
+    const now = found[path]?.['provider-host']?.count ?? 0;
+    const current = next[path]?.['provider-host'] ?? 0;
+    const target = Math.min(now, current + extra);
+    if (target > current) (next[path] ??= {})['provider-host'] = target;
+  }
+  return Object.fromEntries(
+    Object.keys(next)
+      .sort()
+      .map(path => [path, next[path]])
+  );
 }
 
 /** Lower every grandfathered count to today's value; never add entries. */
@@ -247,6 +299,21 @@ export function readJson(path, fallback) {
 
 export function loadProviders(repoRoot) {
   return JSON.parse(readFileSync(join(repoRoot, PROVIDERS_PATH), 'utf8'));
+}
+
+/** providers.json on the revision this diff is measured against, or null. */
+export function baseProvidersAt(ref, repoRoot) {
+  if (!ref) return null;
+  const shown = spawnSync('git', ['show', `${ref}:${PROVIDERS_PATH}`], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  if (shown.status !== 0) return null;
+  try {
+    return JSON.parse(shown.stdout);
+  } catch {
+    return null;
+  }
 }
 
 /** The ratchet on the revision this diff is measured against, or null. */

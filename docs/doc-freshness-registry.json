@@ -122,7 +122,7 @@
     ".claude/rules/external-apis.md": {
       "owner": "@itstimwhite",
       "claim": "Every third-party API call goes through packages/api-client or scripts/apiclient, enforced by the external API guard ratchet.",
-      "documentSha256": "0971c98eecb4a8bc0d4e8e6985cf7db293bf831d6feba06168a0748850f09fc5",
+      "documentSha256": "7ad13110ec9c4b1501f6e18737412e10432c337e75c89b769737655d72f5c1b5",
       "sources": [
         {
           "path": "packages/api-client/providers.json",
@@ -130,7 +130,7 @@
         },
         {
           "path": "scripts/lib/external-api-guard.mjs",
-          "sha256": "d69b0e942f4de36b664c9ffac1e7ca366d3a8075b8f2e34be3e938aa90ccec59"
+          "sha256": "93114f8531a7c0bd8722e8c2086294a4ecf226cc4123c3044765e77298f9c8ba"
         }
       ]
     },
