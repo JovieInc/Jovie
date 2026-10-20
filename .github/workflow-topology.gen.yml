@@ -56,7 +56,7 @@ inactiveWorkflows:
   - Rolling CI Dispatch
   - Stuck Draft Auto-Close
 generatedAt: deterministic
-normalPrCheckRecords: 22
+normalPrCheckRecords: 23
 nodes:
   - name: Workflow Lint
     path: .github/workflows/actionlint.yml
@@ -862,7 +862,7 @@ nodes:
       - merge_group
       - pull_request
     terminalReceipt: job:size
-    jobCount: 3
+    jobCount: 4
   - name: PR targets main
     path: .github/workflows/pr-targets-main.yml
     active: true

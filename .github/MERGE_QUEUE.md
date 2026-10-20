@@ -313,11 +313,13 @@ runtime behavior, or Summer commissioning.
   `format()` expression exceeds GitHub's 21,000-character limit (2026-10-20,
   #21826). `node scripts/workflow-expression-budget.mjs --ref HEAD --merge-with
   origin/main` reproduces it. Source Validation runs that check on the head and
-  its merge with main, and PR Size Guard's "Require combined-head workflows to
-  load" step fails the group that introduced it, so the queue ejects it and the
-  failure hold keeps that exact head out. A group stacked on an already broken
-  base passes that step. The ruleset's 60-minute check response timeout remains
-  the backstop.
+  its merge with main. In the queue, PR Size Guard's `Workflow Load Guard` job
+  ("Require combined-head workflows to load") fails only for the group that
+  introduced it; a group stacked on an already broken base passes. The failure
+  hold then records `jovie-queue-failure-hold/v1` on the exact source head and
+  reports `PR Ready` failed on the synthetic group head, so the queue ejects it
+  at once. The ruleset's 60-minute check response timeout remains the backstop
+  for any other cause.
 
 ## Queue freeze (queue-watch runbook)
 

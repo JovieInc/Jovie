@@ -2067,11 +2067,7 @@ describe('workflow-load guard failures (2026-10-20 queue stall, #21826)', () => 
     // The guard fails only when the group's base loads, so the failure is
     // this group's own diff whatever the group ahead is doing.
     let state = queuedPr();
-    const writeStatus = vi.fn(async receipt => {
-      expect(receipt.sha).toBe(SOURCE);
-      expect(receipt.context).toBe(FAILURE_HOLD_CONTEXT);
-      expect(receipt.description).toContain('class=deterministic-source');
-    });
+    const writeStatus = vi.fn(async () => {});
     const result = await applyMergeGroupFailure(
       {
         ...failureInput,
@@ -2090,14 +2086,48 @@ describe('workflow-load guard failures (2026-10-20 queue stall, #21826)', () => 
         }),
       }
     );
-    expect(writeStatus).toHaveBeenCalledTimes(1);
+    // First the exact-head hold receipt, then the required context failed on
+    // the synthetic group head so the queue ejects it now.
+    expect(writeStatus.mock.calls.map(([receipt]) => receipt)).toEqual([
+      expect.objectContaining({
+        sha: SOURCE,
+        context: FAILURE_HOLD_CONTEXT,
+        state: 'success',
+        description: expect.stringContaining('class=deterministic-source'),
+      }),
+      expect.objectContaining({
+        sha: GROUP,
+        context: 'PR Ready',
+        state: 'failure',
+      }),
+    ]);
     expect(result).toMatchObject({
       prNumber: 42,
       classification: 'deterministic-source',
       retryDisposition: 'blocked-until-new-source-head',
       autoMergeDisabled: true,
+      groupEjected: true,
     });
     expect(result.skipped).toBeUndefined();
+  });
+
+  it('never reports PR Ready failed for an ordinary CI failure', async () => {
+    let state = queuedPr();
+    const writeStatus = vi.fn(async () => {});
+    const result = await applyMergeGroupFailure(failureInput, {
+      writeStatus,
+      readPullRequest: vi.fn(async () => structuredClone(state)),
+      dequeuePullRequest: vi.fn(async () => {
+        state = { ...state, isInMergeQueue: false, mergeQueueEntry: null };
+      }),
+      disableAutoMerge: vi.fn(async () => {
+        state = { ...state, autoMergeRequest: null };
+      }),
+    });
+    expect(
+      writeStatus.mock.calls.some(([receipt]) => receipt.context === 'PR Ready')
+    ).toBe(false);
+    expect(result.groupEjected).toBeUndefined();
   });
 
   it('rejects a PR Size Guard run from any other workflow path', async () => {

@@ -23,6 +23,10 @@ export const CI_WORKFLOW_ID = 178737329;
 // only merge-group evidence of the failure.
 export const PR_SIZE_GUARD_WORKFLOW_ID = 299199506;
 export const WORKFLOW_LOAD_STEP = 'Require combined-head workflows to load';
+// CI never reports on a group whose ci.yml does not load, so the queue would
+// wait for the ruleset's response timeout. Reporting the required context
+// failed on the exact synthetic head ejects the group now.
+export const WORKFLOW_LOAD_EJECT_CONTEXT = 'PR Ready';
 const MERGE_GROUP_FAILURE_WORKFLOWS = new Map([
   [CI_WORKFLOW_ID, '.github/workflows/ci.yml'],
   [PR_SIZE_GUARD_WORKFLOW_ID, '.github/workflows/pr-size-guard.yml'],
@@ -991,6 +995,18 @@ export async function applyMergeGroupFailure(
     });
   }
 
+  let groupEjected = false;
+  if (failedSteps?.includes?.(WORKFLOW_LOAD_STEP)) {
+    await writeStatus({
+      sha: groupHeadSha,
+      context: WORKFLOW_LOAD_EJECT_CONTEXT,
+      description: `Workflows in this group cannot load; held ${sourceHeadSha.slice(0, 12)}`,
+      state: 'failure',
+      targetUrl: run.html_url,
+    });
+    groupEjected = true;
+  }
+
   current = await readPullRequest(front.prNumber);
   let dequeued = false;
   let autoMergeDisabled = false;
@@ -1074,6 +1090,7 @@ export async function applyMergeGroupFailure(
     dequeued,
     dequeueOutcome,
     autoMergeDisabled,
+    ...(groupEjected ? { groupEjected } : {}),
   };
 }
 
