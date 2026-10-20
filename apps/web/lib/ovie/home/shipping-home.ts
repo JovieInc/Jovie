@@ -412,6 +412,9 @@ function askFromCase(item: OvieInboxCase): OvieAsk {
     recommendation: item.recommendation,
     why: item.body,
     decidable: item.decisionTarget !== null,
+    // Linear asks only accept approval; their discussion lives in Linear.
+    canReply:
+      item.decisionTarget !== null && item.decisionTarget.kind !== 'linear',
     evidence: item.evidence,
   };
 }

@@ -63,7 +63,10 @@ export interface HomeLoopAsk {
   readonly recommendation: string;
   /** Collapsed "why" body. */
   readonly why: string;
+  /** The recommended answer can be sent in one click. */
   readonly decidable: boolean;
+  /** A written reply (request changes) is accepted for this ask. */
+  readonly canReply: boolean;
   readonly evidence: readonly string[];
 }
 
