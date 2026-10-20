@@ -473,6 +473,9 @@ const LANES_COVERAGE_RUN = `{ ${lanesCoverageShard('a', LANES_PYTEST_SHARD_EXPRE
  * Structural Python regressions, split so the pool can overlap them. Each
  * command keeps its original `&&` dependencies (coverage run → report).
  */
+/** @jovie/api-client (TS) unit + conformance suite, run with the operations lane. */
+export const API_CLIENT_TS_COMMAND = 'pnpm --filter @jovie/api-client test';
+
 export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
   structuralPythonRegression(
     [
@@ -2366,6 +2369,7 @@ export async function runStructural(opts = {}) {
       ? ['pnpm invariants:check']
       : [];
   const operationsParts = [
+    API_CLIENT_TS_COMMAND,
     'node --test .github/scripts/publish-queue-junit.test.mjs scripts/record-quarantine-releases.test.mjs',
     'node --test .github/scripts/dependency-parity-evidence.test.mjs',
     'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-native-controller.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-native-controller.test.mjs',
