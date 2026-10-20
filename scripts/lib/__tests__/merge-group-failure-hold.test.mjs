@@ -28,8 +28,11 @@ import {
   FAILURE_HOLD_CONTEXT,
   FAILURE_RETRY_CONTEXT,
   failureReceiptStatus,
+  humanFailureReleaseIntent,
+  humanReleaseDisposition,
   ownerHoldReleaseIntent,
   parseMergeQueueBranch,
+  REVISION_FAILED_AT_HEAD,
   reenrollmentDisposition,
   retryReleasedDescription,
   retrySpentDescription,
@@ -48,6 +51,104 @@ const classify = (conclusion, failedSteps = []) =>
   classifyMergeGroupFailure({ conclusion, failedSteps });
 const disposition = statuses =>
   revisionFailureDisposition({ repository: REPOSITORY, statuses });
+
+describe('human release of a failed head (JOV-6620)', () => {
+  const unlabeled = (overrides = {}) => ({
+    action: 'unlabeled',
+    label: { name: 'queue-poison' },
+    sender: { login: 'itstimwhite', type: 'User' },
+    pull_request: {
+      number: 22280,
+      state: 'open',
+      draft: false,
+      head: { sha: SOURCE },
+    },
+    ...overrides,
+  });
+  const failed = disposition([status({ classification: 'retryable-product' })]);
+
+  it('only a person removing hold or queue-poison from the exact head releases it', () => {
+    const release = humanFailureReleaseIntent({
+      eventName: 'pull_request_target',
+      event: unlabeled(),
+    });
+    expect(release).toMatchObject({ prNumber: 22280, headSha: SOURCE });
+    expect(
+      humanReleaseDisposition({
+        failure: failed,
+        release,
+        prNumber: 22280,
+        headSha: SOURCE,
+      })
+    ).toMatchObject({ action: 'retry-once', reason: 'human-failure-release' });
+    expect(
+      humanFailureReleaseIntent({
+        eventName: 'pull_request_target',
+        event: unlabeled({ label: { name: 'hold' } }),
+      })
+    ).not.toBeNull();
+    // A new head is its own revision; an old release never moves to it.
+    expect(
+      humanReleaseDisposition({
+        failure: failed,
+        release,
+        prNumber: 22280,
+        headSha: NEW_SOURCE,
+      })
+    ).toBe(failed);
+  });
+
+  it('replays #22280/#21869: jovie-bot lifting queue-poison never releases the failed head', () => {
+    for (const sender of [
+      { login: 'jovie-bot[bot]', type: 'Bot' },
+      { login: 'github-actions[bot]', type: 'Bot' },
+      { login: 'jovie-bot[bot]', type: 'User' },
+      undefined,
+    ])
+      expect(
+        humanFailureReleaseIntent({
+          eventName: 'pull_request_target',
+          event: unlabeled({ sender }),
+        })
+      ).toBeNull();
+    for (const event of [
+      unlabeled({ action: 'labeled' }),
+      unlabeled({ label: { name: 'lane-fix-red' } }),
+      unlabeled({ pull_request: { ...unlabeled().pull_request, draft: true } }),
+    ])
+      expect(
+        humanFailureReleaseIntent({ eventName: 'pull_request_target', event })
+      ).toBeNull();
+    expect(
+      humanFailureReleaseIntent({ eventName: 'push', event: unlabeled() })
+    ).toBeNull();
+  });
+
+  it('never releases a deterministic failure or an unblocked head', () => {
+    const release = humanFailureReleaseIntent({
+      eventName: 'pull_request_target',
+      event: unlabeled(),
+    });
+    const deterministic = disposition([status()]);
+    expect(
+      humanReleaseDisposition({
+        failure: deterministic,
+        release,
+        prNumber: 22280,
+        headSha: SOURCE,
+      })
+    ).toBe(deterministic);
+    const clean = disposition([]);
+    expect(
+      humanReleaseDisposition({
+        failure: clean,
+        release,
+        prNumber: 22280,
+        headSha: SOURCE,
+      })
+    ).toBe(clean);
+  });
+});
 
 it('restores only a current exact-head owner hold release, never an unchanged CI retry', () => {
   const event = {
@@ -1186,8 +1287,8 @@ describe('failure classification and revision-scoped suppression', () => {
       expect(enqueueWasRejected(error)).toBe(false);
   });
 
-  it('newest trusted release restores the unused retry; a later reservation blocks it', () => {
-    const first = status({ classification: 'unclassified' });
+  it('newest trusted release restores the unused infrastructure retry; a later reservation blocks it', () => {
+    const first = status({ classification: 'transient-infrastructure' });
     const spent = status({
       context: 'jovie-queue-failure-retry/v1',
       description: retrySpentDescription({ runId: 123, runAttempt: 1 }),
@@ -1219,14 +1320,10 @@ describe('failure classification and revision-scoped suppression', () => {
       action: 'block',
       reason: 'deterministic-source-failure',
     });
+    // A released reservation never re-admits an attributable failure.
     expect(
-      disposition([
-        released,
-        spent,
-        first,
-        status({ classification: 'unclassified', number: 2, runId: 124 }),
-      ])
-    ).toMatchObject({ action: 'block', reason: 'revision-retry-exhausted' });
+      disposition([released, spent, status({ classification: 'unclassified' })])
+    ).toMatchObject({ action: 'block', reason: REVISION_FAILED_AT_HEAD });
   });
 
   it('blocks the unchanged deterministic head while a new head has no hold', () => {
@@ -1255,13 +1352,13 @@ describe('failure classification and revision-scoped suppression', () => {
     expect(
       disposition([infra(1, 123), spent(123), infra(2, 124), spent(124)])
     ).toMatchObject({ action: 'block', reason: 'revision-retry-spent' });
-    // One attributable failure plus infrastructure noise keeps its retry; a
-    // second attributable failure still exhausts the revision.
+    // An attributable failure blocks its head even after infrastructure
+    // noise; infrastructure after a released attributable failure retries.
     const unclassified = (number, runId) =>
       status({ classification: 'unclassified', number, runId });
     expect(
       disposition([infra(1, 123), spent(123), unclassified(2, 124)])
-    ).toMatchObject({ action: 'retry-once' });
+    ).toMatchObject({ action: 'block', reason: REVISION_FAILED_AT_HEAD });
     expect(
       disposition([unclassified(1, 123), spent(123), unclassified(2, 124)])
     ).toMatchObject({ action: 'block', reason: 'revision-retry-exhausted' });
@@ -1270,27 +1367,17 @@ describe('failure classification and revision-scoped suppression', () => {
     ).toMatchObject({ action: 'retry-once' });
   });
 
-  it('allows one non-deterministic retry, then blocks the same revision', () => {
-    const first = status({ classification: 'unclassified' });
-    expect(disposition([first])).toMatchObject({ action: 'retry-once' });
-    const spent = status({
-      context: 'jovie-queue-failure-retry/v1',
-      description: retrySpentDescription({ runId: 123, runAttempt: 1 }),
-    });
-    expect(disposition([first, spent])).toMatchObject({
-      action: 'block',
-      reason: 'revision-retry-spent',
-    });
-    expect(
-      disposition([
-        first,
-        status({
-          classification: 'unclassified',
-          number: 2,
-          runId: 124,
-        }),
-      ])
-    ).toMatchObject({ action: 'block', reason: 'revision-retry-exhausted' });
+  it('blocks a failed head at once, whatever non-infrastructure step failed (JOV-6620)', () => {
+    for (const classification of ['unclassified', 'retryable-product']) {
+      const first = status({ classification });
+      expect(disposition([first])).toMatchObject({
+        action: 'block',
+        reason: REVISION_FAILED_AT_HEAD,
+      });
+      expect(
+        disposition([first, status({ classification, number: 2, runId: 124 })])
+      ).toMatchObject({ action: 'block', reason: 'revision-retry-exhausted' });
+    }
   });
 });
 
@@ -1477,10 +1564,20 @@ describe('terminal failure hold application', () => {
       },
       io()
     );
+    // JOV-6620: any attributable failure blocks its exact head at once.
     expect(afterInfra).toMatchObject({
       classification: 'unclassified',
       failureNumber: 2,
-      retryDisposition: 'one-queue-authority-retry',
+      retryDisposition: 'blocked-until-new-source-head',
+    });
+    const firstProduct = await applyMergeGroupFailure(
+      { ...failureInput, failedSteps: ['Run unit tests'], statuses: [] },
+      io()
+    );
+    expect(firstProduct).toMatchObject({
+      classification: 'retryable-product',
+      failureNumber: 1,
+      retryDisposition: 'blocked-until-new-source-head',
     });
   });
 
