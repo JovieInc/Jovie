@@ -1,11 +1,3 @@
-/**
- * Derive jovie-stage-event/v1 rows from durable receipts (GitHub PR timelines,
- * check suites, controller jobs, Linear history, producer feeds). Pure: the
- * collector (scripts/lib/stage-collect.mjs) supplies the raw evidence. Because
- * every derived stage comes from a receipt that already exists, re-running
- * the derivation over a 28d window backfills history on day one.
- */
-
 import { chainStages } from './stage-events.mjs';
 
 const JOV_ID = /\bjov-(\d+)\b/i;
@@ -16,7 +8,7 @@ const earliest = list =>
   list.filter(Boolean).sort((a, b) => ms(a) - ms(b))[0] ?? null;
 const latest = list =>
   list.filter(Boolean).sort((a, b) => ms(b) - ms(a))[0] ?? null;
-
+const stamp = (stage, at, sourceReceipt) => ({ stage, at, sourceReceipt });
 /** JOV-123 from the branch first (lanes branches carry it), then the title. */
 export function linearIdFor(pr) {
   const match =
@@ -24,7 +16,6 @@ export function linearIdFor(pr) {
     String(pr?.title ?? '').match(JOV_ID);
   return match ? `JOV-${match[1]}` : null;
 }
-
 /** Same lane classifier as the SLO lead-time split. */
 export function laneFor(pr) {
   const first = String(pr?.headRefName ?? '')
@@ -35,14 +26,8 @@ export function laneFor(pr) {
     ? first
     : (pr?.author ?? 'other');
 }
-
-/**
- * Production generations from Production Controller runs. Main is linear
- * (squash merges through the queue), so a generation whose head is PR X's
- * merge commit ships every PR merged at or before X. `shaMergedAt` maps merge
- * commit → mergedAt; the head commit timestamp is only a fallback because a
- * merge-group commit is created before the PR is marked merged.
- */
+// `shaMergedAt` wins over the head-commit time: a merge-group commit exists
+// before the PR is merged.
 export function releaseGenerations(controllers, shaMergedAt = new Map()) {
   const generations = [];
   for (const run of controllers?.production ?? []) {
@@ -64,19 +49,15 @@ export function releaseGenerations(controllers, shaMergedAt = new Map()) {
   }
   return generations.sort((a, b) => ms(a.headCommitAt) - ms(b.headCommitAt));
 }
-
 function firstGeneration(generations, mergedAt, field) {
   const candidates = generations
     .filter(g => g[field] && ms(g.headCommitAt) >= ms(mergedAt))
     .sort((a, b) => ms(a[field]) - ms(b[field]));
   return candidates[0] ?? null;
 }
-
 function feedStampsFor(feedStamps, keys) {
   return keys.flatMap(key => feedStamps.get(key) ?? []);
 }
-
-/** Index producer-feed events as stamps keyed by entityId. */
 export function indexFeedEvents(events) {
   const out = new Map();
   for (const event of events ?? []) {
@@ -91,7 +72,6 @@ export function indexFeedEvents(events) {
   }
   return out;
 }
-
 export function deriveShippingEvents(
   { prs, linearIssues = {}, generations = [], feed = new Map() },
   manifest
@@ -101,39 +81,29 @@ export function deriveShippingEvents(
     if (!pr?.mergedAt) continue;
     const entityId = `${pr.repository}#${pr.number}`;
     const prUrl = `https://github.com/${pr.repository}/pull/${pr.number}`;
-    const timeline = pr.timeline ?? [];
+    // Truncation drops the newest events, so ready/queued would be invented.
+    const timeline = pr.timelineTruncated ? [] : (pr.timeline ?? []);
     const before = type =>
       timeline
         .filter(e => e.type === type && ms(e.at) <= ms(pr.mergedAt))
         .map(e => e.at);
     const stamps = [
-      { stage: 'pr-open', at: pr.createdAt, sourceReceipt: prUrl },
-      {
-        stage: 'ready',
-        at: latest(before('ready_for_review')) ?? pr.createdAt,
-        sourceReceipt: prUrl,
-      },
-      {
-        stage: 'queued',
-        at: latest(before('added_to_merge_queue')),
-        sourceReceipt: prUrl,
-      },
-      { stage: 'merged', at: pr.mergedAt, sourceReceipt: prUrl },
+      stamp('pr-open', pr.createdAt, prUrl),
+      stamp(
+        'ready',
+        latest(before('ready_for_review')) ??
+          (pr.timelineTruncated ? null : pr.createdAt),
+        prUrl
+      ),
+      stamp('queued', latest(before('added_to_merge_queue')), prUrl),
+      stamp('merged', pr.mergedAt, prUrl),
     ];
     const deployed = firstGeneration(generations, pr.mergedAt, 'deployedAt');
     if (deployed)
-      stamps.push({
-        stage: 'deployed',
-        at: deployed.deployedAt,
-        sourceReceipt: deployed.runUrl,
-      });
+      stamps.push(stamp('deployed', deployed.deployedAt, deployed.runUrl));
     const verified = firstGeneration(generations, pr.mergedAt, 'verifiedAt');
     if (verified)
-      stamps.push({
-        stage: 'verified',
-        at: verified.verifiedAt,
-        sourceReceipt: verified.runUrl,
-      });
+      stamps.push(stamp('verified', verified.verifiedAt, verified.runUrl));
     const linearId = linearIdFor(pr);
     const issue = linearId ? linearIssues[linearId] : null;
     if (issue?.createdAt) {
@@ -143,19 +113,14 @@ export function deriveShippingEvents(
           (issue.history ?? []).filter(h => h.toType === type).map(h => h.at)
         );
       stamps.push(
-        { stage: 'issue', at: issue.createdAt, sourceReceipt: url },
-        {
-          stage: 'eligible',
-          at:
-            toType('unstarted') ??
+        stamp('issue', issue.createdAt, url),
+        stamp(
+          'eligible',
+          toType('unstarted') ??
             (issue.initialType === 'unstarted' ? issue.createdAt : null),
-          sourceReceipt: url,
-        },
-        {
-          stage: 'admitted',
-          at: issue.startedAt ?? toType('started'),
-          sourceReceipt: url,
-        }
+          url
+        ),
+        stamp('admitted', issue.startedAt ?? toType('started'), url)
       );
     }
     stamps.push(
@@ -180,11 +145,11 @@ export function deriveShippingEvents(
   }
   return events;
 }
-
 /** Red→green episodes on merged PRs, from commit check rollups. */
 export function deriveRemediationEvents({ prs, feed = new Map() }, manifest) {
   const events = [];
   for (const pr of prs ?? []) {
+    if (pr?.commitsTruncated) continue;
     const commits = [...(pr?.commits ?? [])].sort(
       (a, b) => ms(a.committedDate) - ms(b.committedDate)
     );
@@ -204,21 +169,23 @@ export function deriveRemediationEvents({ prs, feed = new Map() }, manifest) {
         const greenAt =
           latest(suites.map(s => s.updatedAt)) ?? commit.committedDate;
         const entityId = `${pr.repository}#${pr.number}@${String(red.sha).slice(0, 12)}`;
-        const classified = earliest(
-          (pr.timeline ?? [])
-            .filter(
-              e =>
-                e.type === 'labeled' &&
-                String(e.label ?? '').startsWith('lane-fix-') &&
-                ms(e.at) >= ms(red.at) &&
-                ms(e.at) <= ms(greenAt)
-            )
-            .map(e => e.at)
-        );
+        const classified = pr.timelineTruncated
+          ? null
+          : earliest(
+              (pr.timeline ?? [])
+                .filter(
+                  e =>
+                    e.type === 'labeled' &&
+                    String(e.label ?? '').startsWith('lane-fix-') &&
+                    ms(e.at) >= ms(red.at) &&
+                    ms(e.at) <= ms(greenAt)
+                )
+                .map(e => e.at)
+            );
         const stamps = [
-          { stage: 'red', at: red.at, sourceReceipt: prUrl },
-          { stage: 'classified', at: classified, sourceReceipt: prUrl },
-          { stage: 'green', at: greenAt, sourceReceipt: prUrl },
+          stamp('red', red.at, prUrl),
+          stamp('classified', classified, prUrl),
+          stamp('green', greenAt, prUrl),
           ...feedStampsFor(feed, [`remediation\u0000${entityId}`]),
         ].filter(s => s.at && ms(s.at) >= ms(red.at));
         events.push(
@@ -232,7 +199,6 @@ export function deriveRemediationEvents({ prs, feed = new Map() }, manifest) {
   }
   return events;
 }
-
 /** One release entity per production generation that promoted or verified. */
 export function deriveReleaseEvents({ controllers }, manifest) {
   const staging = new Map();
@@ -251,18 +217,10 @@ export function deriveReleaseEvents({ controllers }, manifest) {
       j => j.conclusion === 'SUCCESS' && /Canary Health Gate/.test(j.name ?? '')
     );
     const stamps = [
-      {
-        stage: 'staging',
-        at: stagingRun?.createdAt ?? null,
-        sourceReceipt: stagingRun?.url,
-      },
-      {
-        stage: 'canary',
-        at: canary?.startedAt,
-        sourceReceipt: stagingRun?.url,
-      },
-      { stage: 'prod', at: promote?.startedAt, sourceReceipt: run.url },
-      { stage: 'verified', at: verified?.completedAt, sourceReceipt: run.url },
+      stamp('staging', stagingRun?.createdAt ?? null, stagingRun?.url),
+      stamp('canary', canary?.startedAt, stagingRun?.url),
+      stamp('prod', promote?.startedAt, run.url),
+      stamp('verified', verified?.completedAt, run.url),
     ].filter(s => s.at && s.sourceReceipt);
     events.push(
       ...chainStages(
@@ -278,7 +236,6 @@ export function deriveReleaseEvents({ controllers }, manifest) {
   }
   return events;
 }
-
 /** LogYourBody iOS Release Loop runs → merge/testflight/review (+feed). */
 export function deriveIosReleaseEvents({ lyb, feed = new Map() }, manifest) {
   const events = [];
@@ -292,13 +249,9 @@ export function deriveIosReleaseEvents({ lyb, feed = new Map() }, manifest) {
     if (!testflight) continue;
     const entityId = `JovieInc/LogYourBody@${run.headSha}`;
     const stamps = [
-      { stage: 'merge', at: run.createdAt, sourceReceipt: run.url },
-      { stage: 'testflight', at: testflight, sourceReceipt: run.url },
-      {
-        stage: 'review',
-        at: done('Deploy to App Store'),
-        sourceReceipt: run.url,
-      },
+      stamp('merge', run.createdAt, run.url),
+      stamp('testflight', testflight, run.url),
+      stamp('review', done('Deploy to App Store'), run.url),
       ...feedStampsFor(feed, [`ios-release\u0000${entityId}`]),
     ].filter(s => s.at);
     events.push(
@@ -309,12 +262,6 @@ export function deriveIosReleaseEvents({ lyb, feed = new Map() }, manifest) {
   }
   return events;
 }
-
-/**
- * All derived + fed events. Feed events for entity types with no derivation
- * (summer-turn) pass through as-is; feed stamps for derived entity types are
- * merged into the derived chains above.
- */
 export function deriveStageEvents(raw, manifest) {
   const feedEvents = Object.values(raw?.feeds ?? {}).flatMap(
     feed => feed?.events ?? []
@@ -326,7 +273,7 @@ export function deriveStageEvents(raw, manifest) {
       .map(pr => [pr.mergeCommitSha, pr.mergedAt])
   );
   const generations = releaseGenerations(raw?.controllers, shaMergedAt);
-  const derivedTypes = new Set([
+  const derived = new Set([
     'shipping',
     'remediation',
     'release',
@@ -334,17 +281,12 @@ export function deriveStageEvents(raw, manifest) {
   ]);
   return [
     ...deriveShippingEvents(
-      {
-        prs: raw?.prs,
-        linearIssues: raw?.linearIssues,
-        generations,
-        feed,
-      },
+      { prs: raw?.prs, linearIssues: raw?.linearIssues, generations, feed },
       manifest
     ),
     ...deriveRemediationEvents({ prs: raw?.prs, feed }, manifest),
     ...deriveReleaseEvents({ controllers: raw?.controllers }, manifest),
     ...deriveIosReleaseEvents({ lyb: raw?.lyb, feed }, manifest),
-    ...feedEvents.filter(event => !derivedTypes.has(event.entityType)),
+    ...feedEvents.filter(event => !derived.has(event.entityType)),
   ];
 }

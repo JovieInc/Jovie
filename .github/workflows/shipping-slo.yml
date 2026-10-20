@@ -83,8 +83,10 @@ jobs:
             Jovie
             LogYourBody
           permission-actions: read
+          permission-checks: read
           permission-contents: read
           permission-pull-requests: read
+          permission-statuses: read
 
       - name: Measure and evaluate
         id: slo

@@ -529,11 +529,10 @@ export function buildReport(
     if (lag?.['7d']?.n) {
       metrics.productionLag.lag = lag['7d'];
       flat['production_lag.merged_to_verified.p95'] = lag['7d'].p95;
-      evaluation.regressions = evaluateShippingSlo(
-        flat,
-        baseline,
-        {}
-      ).regressions;
+      const refreshed = evaluateShippingSlo(flat, baseline, {});
+      evaluation.regressions = refreshed.regressions;
+      evaluation.tightenCandidates = refreshed.tightenCandidates;
+      evaluation.flatStall = refreshed.flatStall;
       Object.assign(
         gistSlo,
         buildGistSloBlock(flat, evaluation, { now: nowMs })
