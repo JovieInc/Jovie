@@ -12,7 +12,7 @@ It covers lanes, Codex, Conductor, Claude-scratch and manual `jovie-wt-*` checko
   has been idle for `idle_s`. Idle is the newest reflog entry or dirty-file mtime, never the
   directory mtime (git status and maintenance bump those).
 - Dirty or unpushed state is first committed off-index (`commit-tree`, no hooks, the
-  checkout is untouched) and pushed as `backup/<host>/<name>-<date>-<snapshot>`. If that push fails,
+  checkout is untouched) and pushed as `refs/jovie-preserved/sweep/<host>/<name>-<date>-<snapshot>` (never a branch). If that push fails,
   the checkout stays and loses only regenerable build output.
 - Preserved repairs (`.jovie-preserved-repair.json`) expire once their PR is closed or
   after `preserved_ttl_s`, through the same backup-then-remove path.
@@ -143,8 +143,20 @@ def inspect(path: Path, run) -> dict | None:
     return {"dirty": len(dirty), "unpushed": unpushed or "?", "remote": remote, "activity": activity}
 
 
+# Same namespace as lane_runner.PRESERVED_ARCHIVE_REF. A sweep snapshot is never a branch:
+# refs/heads/backup/* pushes started GitHub Actions and Vercel builds (77 queued on
+# 2026-10-20, stalling production); refs/jovie-preserved/* trigger neither.
+PRESERVED_REF = "refs/jovie-preserved/"
+
+
+def sweep_prefix() -> str:
+    """`sweep/<host>` under PRESERVED_REF (`sweep/mac` on a Mac)."""
+    return "sweep/mac" if sys.platform == "darwin" else f"sweep/{os.uname().nodename.split('.')[0]}"
+
+
 def backup(path: Path, info: dict, run, prefix: str, date: str) -> str | None:
-    """Snapshot the checkout (tracked + untracked, minus build output) onto a backup branch."""
+    """Snapshot the checkout (tracked + untracked, minus build output) to
+    refs/jovie-preserved/<prefix>/<name>-<date>-<snapshot>; returns that full ref."""
     head = git(path, run, "rev-parse", "HEAD").stdout.strip()
     if not head or not info["remote"]:
         return None
@@ -172,14 +184,13 @@ def backup(path: Path, info: dict, run, prefix: str, date: str) -> str | None:
     name = path.name if path.name not in {"Jovie", "LogYourBody"} else f"{path.parent.name}-{path.name}"
     # Leave room for the date, snapshot and Git's ref lock suffix on long checkout names.
     name = re.sub(r"[^A-Za-z0-9._-]", "-", name)[:160]
-    branch = f"{prefix}/{name}-{date}-{sha}"
-    ref = f"refs/heads/{branch}"
+    ref = f"{PRESERVED_REF}{prefix}/{name}-{date}-{sha}"
     # Same-named checkouts and repeated sweeps must never overwrite an earlier snapshot.
     # The empty expected value permits only creation (or an already identical ref),
     # including when another writer races this push. Normal pre-push hooks still run.
     pushed = git(path, run, "push", "-q", f"--force-with-lease={ref}:", info["remote"],
                  f"{sha}:{ref}", timeout=900)
-    return branch if pushed.returncode == 0 else None
+    return ref if pushed.returncode == 0 else None
 
 
 def strip_build_dirs(path: Path) -> None:
@@ -259,7 +270,7 @@ def retire(repo: Path, path: Path, branch: str | None, live: set[Path], report: 
 
 def sweep(repos: list[Path], roots: list[Path], never: list[Path], *, run=lifecycle.run,
           now: float | None = None, closed: dict[Path, set[str]] | None = None, idle_s: float = IDLE_S,
-          preserved_ttl_s: float = PRESERVED_TTL_S, prefix: str = "backup/mac",
+          preserved_ttl_s: float = PRESERVED_TTL_S, prefix: str = "sweep/mac",
           date: str | None = None, state: Path | None = None) -> dict:
     now = time.time() if now is None else now
     date = date or datetime.fromtimestamp(now, timezone.utc).strftime("%Y%m%d")
@@ -362,7 +373,7 @@ def guarded_main(args) -> int:
             if lifecycle.draining(args.state):
                 break
             closed[repo] = closed_branches(repo, subprocess.run)
-        prefix = "backup/mac" if sys.platform == "darwin" else f"backup/{os.uname().nodename.split('.')[0]}"
+        prefix = sweep_prefix()
         report = sweep(repos, default_roots(home, args.state), default_never(home),
                        closed=closed, prefix=prefix, state=args.state)
     stamp = args.state / "worktree-sweep.json"

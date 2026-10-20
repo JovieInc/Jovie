@@ -76,12 +76,16 @@ class SweepTest(unittest.TestCase):
         kw.setdefault("now", self.now)
         return sweeper.sweep([self.repo], self.roots, [self.base / "never"], date="20261003", **kw)
 
-    def remote_branches(self):
-        return git(self.remote, "for-each-ref", "--format=%(refname:short)", "refs/heads/backup").split()
+    def remote_snapshots(self):
+        """Sweep snapshots on the remote; a sweep never creates a branch (refs/heads/*), since
+        branch pushes started Actions and Vercel builds (77 queued on 2026-10-20)."""
+        heads = git(self.remote, "for-each-ref", "--format=%(refname)", "refs/heads/").split()
+        self.assertEqual([ref for ref in heads if ref != "refs/heads/main"], [], "sweep created a branch")
+        return git(self.remote, "for-each-ref", "--format=%(refname)", "refs/jovie-preserved/").split()
 
-    def backup_branch(self, name):
-        matches = [branch for branch in self.remote_branches()
-                   if branch.startswith(f"backup/mac/{name}-20261003-")]
+    def backup_ref(self, name):
+        matches = [branch for branch in self.remote_snapshots()
+                   if branch.startswith(f"refs/jovie-preserved/sweep/mac/{name}-20261003-")]
         self.assertEqual(len(matches), 1)
         branch = matches[0]
         self.assertTrue(branch.endswith("-" + git(self.remote, "rev-parse", branch)))
@@ -122,7 +126,7 @@ class SweepTest(unittest.TestCase):
         self.assertTrue(report["drained"])
         self.assertFalse(first.exists())
         self.assertTrue(second.exists())
-        self.assertEqual(git(self.remote, "show", f"{self.backup_branch('first')}:a.txt"),
+        self.assertEqual(git(self.remote, "show", f"{self.backup_ref('first')}:a.txt"),
                          "keep this edit")
         self.assertEqual(len(report["removed"]), 1)
         self.assertFalse(any("prune" in args for args in commands))
@@ -147,7 +151,7 @@ class SweepTest(unittest.TestCase):
         report = self.sweep()
         self.assertFalse(path.exists())
         self.assertEqual(report["removed"], [{"path": str(path), "reason": "idle"}])
-        self.assertEqual(self.remote_branches(), [])
+        self.assertEqual(self.remote_snapshots(), [])
 
     def test_dirty_and_unpushed_work_is_backed_up_before_removal(self):
         path = self.worktree("dirty")
@@ -167,7 +171,7 @@ class SweepTest(unittest.TestCase):
         provenance.write_text("retain provenance\n")
         report = self.sweep(now=time.time() + 2 * DAY)
         self.assertFalse(path.exists())
-        branch = self.backup_branch("dirty")
+        branch = self.backup_ref("dirty")
         self.assertEqual(report["backups"], [branch])
         files = git(self.remote, "ls-tree", "-r", "--name-only", branch).split()
         self.assertEqual(sorted(files), [".symphony/package-cache/network-trace", "a.txt", "b.txt", "new.txt"],
@@ -183,7 +187,7 @@ class SweepTest(unittest.TestCase):
             paths.append(path)
         report = self.sweep()
         self.assertTrue(all(not path.exists() for path in paths))
-        branches = self.remote_branches()
+        branches = self.remote_snapshots()
         self.assertEqual(len(branches), 2, "each deleted checkout needs its own surviving snapshot")
         self.assertEqual(set(report["backups"]), set(branches))
         self.assertEqual({git(self.remote, "show", f"{branch}:a.txt") for branch in branches},
@@ -195,8 +199,8 @@ class SweepTest(unittest.TestCase):
         (path / "a.txt").write_text("unpushed work\n")
         git(path, "commit", "-qam", "local only")
         head = git(path, "rev-parse", "HEAD")
-        branch = f"backup/mac/occupied-ref-20261003-{head}"
-        git(self.remote, "update-ref", f"refs/heads/{branch}", initial)
+        branch = f"refs/jovie-preserved/sweep/mac/occupied-ref-20261003-{head}"
+        git(self.remote, "update-ref", branch, initial)
         report = self.sweep()
         self.assertTrue(path.exists(), "a conflicting immutable ref leaves the checkout in place")
         self.assertEqual(git(self.remote, "rev-parse", branch), initial)
@@ -218,10 +222,10 @@ class SweepTest(unittest.TestCase):
         (path / "a.txt").write_text("unpushed work\n")
         git(path, "commit", "-qam", "local only")
         info = sweeper.inspect(path, no_processes)
-        first = sweeper.backup(path, info, no_processes, "backup/mac", "20261003")
+        first = sweeper.backup(path, info, no_processes, "sweep/mac", "20261003")
         self.assertIsNotNone(first)
-        self.assertEqual(sweeper.backup(path, info, no_processes, "backup/mac", "20261003"), first)
-        self.assertEqual(self.remote_branches(), [first])
+        self.assertEqual(sweeper.backup(path, info, no_processes, "sweep/mac", "20261003"), first)
+        self.assertEqual(self.remote_snapshots(), [first])
         self.assertEqual(git(self.remote, "show", f"{first}:a.txt"), "unpushed work")
 
     def test_backup_push_hook_rejection_keeps_unsaved_work(self):
@@ -236,7 +240,7 @@ class SweepTest(unittest.TestCase):
         report = self.sweep()
         self.assertTrue(path.exists(), "a rejected backup never authorizes deletion")
         self.assertEqual((path / "a.txt").read_text(), "must survive rejected backup\n")
-        self.assertEqual(self.remote_branches(), [])
+        self.assertEqual(self.remote_snapshots(), [])
         self.assertEqual(report["stripped"], [str(path)])
 
     def test_failed_backup_keeps_checkout_and_strips_build_output(self):
@@ -357,9 +361,9 @@ class SweepTest(unittest.TestCase):
         self.assertFalse(closed.exists())
         self.assertFalse(expired.exists())
         self.assertEqual(sorted(r["reason"] for r in report["removed"]), ["preserved-expired", "preserved-pr-closed"])
-        self.assertEqual(sorted(self.remote_branches()),
-                         [self.backup_branch("closed-repair"), self.backup_branch("expired-repair")])
-        files = git(self.remote, "ls-tree", "-r", "--name-only", self.backup_branch("closed-repair")).split()
+        self.assertEqual(sorted(self.remote_snapshots()),
+                         [self.backup_ref("closed-repair"), self.backup_ref("expired-repair")])
+        files = git(self.remote, "ls-tree", "-r", "--name-only", self.backup_ref("closed-repair")).split()
         self.assertNotIn(sweeper.PRESERVED_REPAIR, files)
 
 
@@ -379,7 +383,7 @@ class SweepTest(unittest.TestCase):
         self.assertEqual([row["reason"] for row in report["removed"]], ["preserved-clean"])
         self.assertTrue(work.exists(), "real uncommitted work stays preserved until its TTL")
         self.assertTrue(repair.exists(), "a cancelled repair's marker is not a cleanup marker")
-        self.assertEqual(self.remote_branches(), [], "a clean checkout needs no backup branch")
+        self.assertEqual(self.remote_snapshots(), [], "a clean checkout needs no backup branch")
 
 class ScopeTest(unittest.TestCase):
     def test_glob_roots_match_only_direct_children(self):
@@ -495,13 +499,13 @@ class HostWiringTest(unittest.TestCase):
             state = Path(tmp) / "state"
             state.mkdir()
             (state / "worktree-sweep.json").write_text(json.dumps({"startedAt": 5.0}))
-            report = {"removed": [], "backups": ["backup/mac/x-1"], "stripped": [], "kept": 3, "errors": []}
+            report = {"removed": [], "backups": ["refs/jovie-preserved/sweep/mac/x-1"], "stripped": [], "kept": 3, "errors": []}
             with patch.object(sweeper, "sweep", return_value=report) as run_sweep, \
                     patch.object(sweeper, "default_repos", return_value=[]):
                 self.assertEqual(sweeper.main(["--state", str(state), "--repo", tmp]), 0)
                 run_sweep.assert_called_once()
                 saved = json.loads((state / "worktree-sweep.json").read_text())
-                self.assertEqual((saved["startedAt"], saved["backups"]), (5.0, ["backup/mac/x-1"]))
+                self.assertEqual((saved["startedAt"], saved["backups"]), (5.0, ["refs/jovie-preserved/sweep/mac/x-1"]))
                 import fcntl
                 with open(state / "disk-cleanup.lock", "a") as held:
                     fcntl.flock(held, fcntl.LOCK_EX)

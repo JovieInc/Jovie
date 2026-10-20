@@ -606,7 +606,10 @@ class RetiredHostLoopTest(unittest.TestCase):
             guard.sweep_retired_workspaces(SimpleNamespace(state=self.root), self.run_cmd, NOW, report, roots=[root])
         self.assertFalse(clean.exists())
         self.assertFalse(dirty.exists())
-        backups = subprocess.run(["git", "for-each-ref", "--format=%(refname)", "refs/heads/backup"],
+        branches = subprocess.run(["git", "for-each-ref", "--format=%(refname)", "refs/heads/backup"],
+                                  cwd=origin, env=self.env, capture_output=True, text=True).stdout.split()
+        self.assertEqual(branches, [], "a retired-workspace snapshot is never a branch")
+        backups = subprocess.run(["git", "for-each-ref", "--format=%(refname)", "refs/jovie-preserved/sweep/"],
                                  cwd=origin, env=self.env, capture_output=True, text=True).stdout.split()
         self.assertEqual(len(backups), 1, report)
         self.assertIn("/JOV-2-" + guard.datetime.fromtimestamp(NOW, guard.timezone.utc).strftime("%Y%m%d") + "-",
