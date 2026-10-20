@@ -104,7 +104,7 @@ describe('JOV-4639 admin settings are owned by their workspace', () => {
     const opsPage = readFileSync(OPS_PAGE, 'utf8');
     const panel = readFileSync(OPERATIONAL_CONTROL_PANEL, 'utf8');
 
-    expect(opsPage).toContain("from '@/app/hud/page'");
+    expect(opsPage).toContain('return HudPage({ searchParams });');
     expect(opsPage).not.toContain('OperationalControlPanel');
     expect(panel).toContain("data-testid='operational-control-panel'");
     expect(panel).toContain('Dev toolbar');
