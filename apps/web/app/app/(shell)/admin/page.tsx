@@ -4,10 +4,6 @@ import AdminChatPage from './chat/page';
 
 export { metadata } from './chat/page';
 
-// Next.js route-segment config must be a local literal.
-export const dynamic = 'force-dynamic';
-export const runtime = 'nodejs';
-
 /**
  * /app/ov is Ovie Home (founder decision 2026-10-20): the living canvas above
  * the shared composer. `/app/ov/chat` renders the same Home for deep links.
