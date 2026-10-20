@@ -11973,6 +11973,81 @@ class RepositoryBindingTest(unittest.TestCase):
         self.assertFalse(Path(receipt["worktree"]).exists())
         self.assertFalse(any("pre-push-gate" in " ".join(map(str, args)) for args in calls))
 
+    def repair_origin(self):
+        root = Path(self.tmp.name)
+        env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.com",
+               "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.com"}
+        env.pop("GIT_DIR", None)
+        run = lambda *args, cwd=root: subprocess.run(args, cwd=cwd, env=env, check=True, capture_output=True,
+                                                     text=True).stdout.strip()
+        run("git", "init", "-q", "--bare", "-b", "main", str(root / "origin.git"))
+        shutil.rmtree(self.repo)
+        run("git", "clone", "-q", str(root / "origin.git"), str(self.repo))
+        run("git", "commit", "-q", "--allow-empty", "-m", "init", cwd=self.repo)
+        run("git", "push", "-q", "origin", "HEAD:main", cwd=self.repo)
+        run("git", "commit", "-q", "--allow-empty", "-m", "bump", cwd=self.repo)
+        run("git", "push", "-q", "origin", "HEAD:refs/heads/dependabot/npm/x", cwd=self.repo)
+        head = run("git", "rev-parse", "HEAD", cwd=self.repo)
+        return env, {"number": 77, "headRefName": "dependabot/npm/x", "headRefOid": head, "isDraft": False}
+
+    def test_repair_install_accepts_the_stale_lockfile_it_is_repairing(self):
+        # Gem 2026-10-20: `--frozen-lockfile` failed ERR_PNPM_OUTDATED_LOCKFILE on every
+        # Dependabot PR under repair; new issue work keeps the frozen install.
+        binding = dataclasses.replace(self.binding, install=("pnpm", "install", "--frozen-lockfile", "--prefer-offline"))
+        self.assertEqual(lane.bindings.install_command(binding, {"number": 1}),
+                         ["pnpm", "install", "--no-frozen-lockfile", "--prefer-offline"])
+        self.assertEqual(lane.bindings.install_command(binding, None), list(binding.install))
+        env, pr = self.repair_origin()
+        binding = dataclasses.replace(self.binding, install=("sh", "-c", 'test "$0" = --no-frozen-lockfile',
+                                                             "--frozen-lockfile"))
+        spec = {"model": "m", "cmd": ["sh", "-c", "true"]}
+        with patch.dict(os.environ, env), patch.object(lane, "context_pack", return_value=""), \
+                patch.object(lane.bindings, "merge_group_evidence", return_value=""):
+            receipt = lane.bindings.run(lane, self.host, binding, "codex", spec, pr=pr)
+        self.assertTrue(receipt.get("agentStarted"), receipt)
+        self.assertEqual(receipt["verdict"], "no-change")
+
+    def test_setup_failure_is_uncharged_and_leaves_no_checkout(self):
+        env, pr = self.repair_origin()
+        # The failing install dirties the checkout: before the fix that preserved 1.2GB per try.
+        binding = dataclasses.replace(self.binding, install=("sh", "-c", "echo junk > junk.txt; exit 1"))
+        spec = {"model": "m", "cmd": ["sh", "-c", "exit 99"]}
+        with patch.dict(os.environ, env), patch.object(lane, "context_pack", return_value=""):
+            receipt = lane.bindings.run(lane, self.host, binding, "codex", spec, pr=pr)
+        self.assertEqual(receipt["verdict"], "failed")
+        self.assertIn("install-failed", receipt["reasons"][0])
+        self.assertTrue(lane.bindings.setup_failed(receipt))
+        self.assertFalse(Path(receipt["worktree"]).exists())
+        self.assertNotIn("preservedWorktree", receipt)
+        key, now = f"LYB#77:{pr['headRefOid']}", time.time()
+        attempts = {key: {"count": 1, "at": now - 10}}
+        lane.bindings.refund_setup_failure(attempts, key, now)
+        self.assertEqual(attempts[key]["count"], 0)
+        candidate = {**pr, "headRefName": "codex/lyb-10-20261011t000000", "mergeStateStatus": "BEHIND",
+                     "statusCheckRollup": [], "committedAt": "2020-01-01T00:00:00Z"}
+        with patch.object(lane.bindings, "lane_owned", return_value=[candidate]):
+            self.assertIsNone(lane.bindings.repair_candidate(lane, self.binding, [candidate], attempts, now=now + 60))
+            self.assertEqual(lane.bindings.repair_candidate(
+                lane, self.binding, [candidate], attempts,
+                now=now + lane.bindings.SETUP_RETRY_S + 1)["number"], 77)
+        # An agent that started is a real attempt even when the harness then fails.
+        self.assertFalse(lane.bindings.setup_failed({"verdict": "failed", "agentStarted": True}))
+
+    def test_run_end_reaps_escaped_processes_and_records_them(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            receipt = {}
+            with patch.object(lane.disk_guard, "reap_cwd_holders", return_value=[4242]) as reap:
+                lane.reap_run_processes(Path(tmp), receipt)
+            self.assertEqual(receipt["reapedProcesses"], [4242])
+            self.assertEqual(reap.call_args.args[0], Path(tmp))
+            with patch.object(lane.disk_guard, "reap_cwd_holders", side_effect=OSError("lsof")):
+                lane.reap_run_processes(Path(tmp), receipt)
+            self.assertIn("OSError", receipt["reapError"])
+        receipt = {}
+        with patch.object(lane.disk_guard, "reap_cwd_holders") as reap:
+            lane.reap_run_processes(Path(tmp), receipt)  # gone: nothing to reap
+        reap.assert_not_called()
+
     def test_repair_leaves_a_draft_lyb_lane_pr_ready(self):
         pr = {"number": 41, "headRefName": "codex/lyb-9-20261011t000000", "headRefOid": "b" * 40, "isDraft": True}
         for head, verdict in (("c" * 40, "pushed"), ("b" * 40, "no-change")):
