@@ -1,6 +1,7 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { renderToStaticMarkup } from 'react-dom/server';
+import { hydrateRoot } from 'react-dom/client';
+import { renderToStaticMarkup, renderToString } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
@@ -90,6 +91,51 @@ describe('EmailCodeAuthForm', () => {
     expect(
       screen.getByRole('button', { name: /send sign-in code/i })
     ).toBeInTheDocument();
+  });
+
+  it('keeps an email typed before hydration and sends the code for it', async () => {
+    // Production regression (2026-10-18/20): an email typed or autofilled
+    // into the server-rendered field before React hydrated was wiped by the
+    // first post-hydration render, and the next click showed "Enter your
+    // email address." with no OTP request.
+    mockSendVerificationOtp.mockResolvedValueOnce({ data: {}, error: null });
+    const element = (
+      <EmailCodeAuthForm mode='sign-in' redirectUrl='/app/dashboard' />
+    );
+    const container = document.createElement('div');
+    container.innerHTML = renderToString(element);
+    document.body.append(container);
+    const ssrInput = container.querySelector<HTMLInputElement>('#auth-email');
+    if (!ssrInput) throw new Error('server-rendered email input missing');
+    ssrInput.value = 'artist@example.com';
+
+    let root: ReturnType<typeof hydrateRoot> | undefined;
+    try {
+      await act(async () => {
+        root = hydrateRoot(container, element);
+      });
+
+      const view = within(container);
+      expect(view.getByLabelText('Email')).toHaveValue('artist@example.com');
+
+      await act(async () => {
+        fireEvent.click(
+          view.getByRole('button', { name: /send sign-in code/i })
+        );
+      });
+
+      expect(mockSendVerificationOtp).toHaveBeenCalledWith({
+        email: 'artist@example.com',
+        type: 'sign-in',
+      });
+      expect(
+        view.queryByText('Enter your email address.')
+      ).not.toBeInTheDocument();
+      expect(await view.findByText(/enter the code sent to/i)).toBeVisible();
+    } finally {
+      act(() => root?.unmount());
+      container.remove();
+    }
   });
 
   it('does not send an OTP when a session is already present', async () => {
