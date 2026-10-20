@@ -35,8 +35,9 @@ export async function verifyCatalogUrl(
   let artist: unknown;
   let ids: Record<string, unknown> | null;
   if (provider === 'spotify') {
-    const id = url.pathname.match(
-      new RegExp(`^/(?:intl-[a-z]{2}/)?${kind}/([A-Za-z0-9]{22})/?$`)
+    const catalogPath = url.pathname.replace(/^\/intl-([a-z]{2})\//, '/');
+    const id = catalogPath.match(
+      new RegExp(`^/${kind}/([A-Za-z0-9]{22})/?$`)
     )?.[1];
     if (!id || url.hostname !== 'open.spotify.com') return null;
     const { isSpotifyAvailable, spotifyClient } = await import(
