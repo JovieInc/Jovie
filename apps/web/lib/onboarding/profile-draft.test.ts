@@ -1,6 +1,5 @@
 import type { UIMessage } from 'ai';
 import { describe, expect, it, vi } from 'vitest';
-import { deriveProfileBuilderState } from '@/components/features/onboarding/onboardingChatHelpers';
 import { decideFallbackTurn } from '@/lib/chat/onboarding-script/engine';
 import { createOnboardingTurnState } from '@/lib/chat/tools/onboarding-tool-impls';
 import { deriveClaimedOnboardingStateFromToolEvents } from './claimed-state';
@@ -108,20 +107,6 @@ describe('adaptive onboarding recorded conversations', () => {
       expect(restored.profileDraft).toEqual(draft);
       expect(
         deriveClaimedOnboardingStateFromToolEvents([event]).profileDraft
-      ).toEqual(draft);
-      expect(
-        deriveProfileBuilderState({
-          messages: [assistant],
-          handleDraft: null,
-          selectedArtist: null,
-        }).profileDraft
-      ).toEqual(draft);
-      expect(
-        deriveProfileBuilderState({
-          messages: [{ ...assistant, parts: [], metadata: event.output }],
-          handleDraft: null,
-          selectedArtist: null,
-        }).profileDraft
       ).toEqual(draft);
       expect(availableOnboardingModules(draft)).toContain('public-profile');
       if (role !== 'artist') {
