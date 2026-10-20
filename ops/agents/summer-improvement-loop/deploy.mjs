@@ -11,7 +11,8 @@
 // macOS Keychain item `jovie-summer-loop-github`. Store it once, with hidden
 // input, so it never appears in a terminal:
 //   security add-generic-password -a jovie -s jovie-summer-loop-github -w
-//   node .../deploy.mjs ready | run | pause | unpause | status
+//   node .../deploy.mjs ready | pin | run | pause | unpause | status
+//   (run `pin` after every `apply` that changes agent.md)
 //
 // Kill switch: `deploy.mjs pause` (or `ant beta:deployments pause --deployment-id <id>`)
 // stops scheduled firings; running sessions finish under their own budget cap.
@@ -131,6 +132,28 @@ const commands = {
     );
     process.stdout.write(
       `created ${created.id}; next runs ${JSON.stringify(created.schedule?.upcoming_runs_at ?? [])}\n`
+    );
+  },
+  pin() {
+    // Deployments pin the agent version they were created with; after `apply`
+    // changes the agent, move the deployment to the latest version.
+    const agentId = lockedId('agent.md');
+    const { version } = antJson([
+      'beta:agents',
+      'retrieve',
+      '--agent-id',
+      agentId,
+    ]);
+    const updated = antJson(
+      ['beta:deployments', 'update', '--deployment-id', deploymentId()],
+      {
+        input: JSON.stringify({
+          agent: { type: 'agent', id: agentId, version },
+        }),
+      }
+    );
+    process.stdout.write(
+      `${updated.id} now runs ${agentId} v${updated.agent?.version}\n`
     );
   },
   run() {
