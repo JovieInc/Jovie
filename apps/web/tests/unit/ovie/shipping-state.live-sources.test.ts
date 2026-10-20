@@ -516,10 +516,7 @@ describe('github-merges (search issueCount)', () => {
         },
       },
     });
-    expect(
-      (read as { delivery: { merges: { recent: unknown[] } } }).delivery.merges
-        .recent
-    ).toHaveLength(2);
+    expect(read.delivery?.merges?.recent).toHaveLength(2);
   });
 
   it('keeps a zero-merge day as measured zero', async () => {
