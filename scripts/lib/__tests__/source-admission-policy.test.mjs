@@ -1307,10 +1307,19 @@ test('affected unit tests gate PR Ready and select only unit-affecting diffs (JO
   const names = job.steps.map(step => step.name);
   for (const name of [
     'Run web unit tests related to the exact PR diff',
+    'Run CI contract tests read from disk',
     'Run packages/ui unit tests',
     'Run Ovie route and private-boundary coverage',
   ])
     assert.ok(names.includes(name), name);
+  // Whole-suite extras run on exactly one shard each.
+  const shardOf = name =>
+    /matrix\.shard == '(\d\/4)'/.exec(
+      job.steps.find(step => step.name === name).if
+    )?.[1];
+  assert.equal(shardOf('Run packages/ui unit tests'), '1/4');
+  assert.equal(shardOf('Run Ovie route and private-boundary coverage'), '2/4');
+  assert.equal(shardOf('Run CI contract tests read from disk'), '3/4');
   const web = job.steps.find(
     step => step.name === 'Run web unit tests related to the exact PR diff'
   ).run;
@@ -1373,34 +1382,41 @@ test('affected unit tests gate PR Ready and select only unit-affecting diffs (JO
     };
     // Test-only edits are exactly the diffs the coverage ratchet skips, so
     // they must still select their related tests.
-    assert.deepEqual(scope(['apps/web/tests/unit/a/b.test.ts']), {
-      web: 'true',
-      ui: 'false',
-      ovie: 'false',
-    });
-    assert.deepEqual(scope(['packages/ui/src/button.tsx']), {
-      web: 'true',
-      ui: 'true',
-      ovie: 'false',
-    });
-    assert.deepEqual(scope(['apps/ovie/app/page.tsx']), {
-      web: 'false',
-      ui: 'false',
-      ovie: 'true',
-    });
-    assert.deepEqual(scope(['pnpm-lock.yaml']), {
-      web: 'true',
-      ui: 'false',
-      ovie: 'false',
-    });
+    const expectScope = (paths, web, ui, ovie, ci) =>
+      assert.deepEqual(scope(paths), { web, ui, ovie, ci }, paths.join(','));
+    expectScope(
+      ['apps/web/tests/unit/a/b.test.ts'],
+      'true',
+      'false',
+      'false',
+      'false'
+    );
+    expectScope(
+      ['packages/ui/src/button.tsx'],
+      'true',
+      'true',
+      'false',
+      'false'
+    );
+    expectScope(['apps/ovie/app/page.tsx'], 'false', 'false', 'true', 'false');
+    expectScope(['pnpm-lock.yaml'], 'true', 'false', 'false', 'false');
+    // Web tests import scripts/ and .github/ modules, and tests/unit/ci read
+    // workflow YAML from disk: both select tests (review finding on #22360).
+    expectScope(
+      ['scripts/ci-fast-lanes.mjs'],
+      'true',
+      'false',
+      'false',
+      'true'
+    );
+    expectScope(['.github/workflows/ci.yml'], 'true', 'false', 'false', 'true');
     // Nothing unit-affecting: a non-applicable receipt, no tests run.
-    assert.deepEqual(
-      scope([
-        'docs/PR_FLOW.md',
-        'scripts/ci-fast-lanes.mjs',
-        'apps/ios/A.swift',
-      ]),
-      { web: 'false', ui: 'false', ovie: 'false' }
+    expectScope(
+      ['docs/PR_FLOW.md', 'apps/ios/A.swift'],
+      'false',
+      'false',
+      'false',
+      'false'
     );
   } finally {
     rmSync(root, { recursive: true, force: true });

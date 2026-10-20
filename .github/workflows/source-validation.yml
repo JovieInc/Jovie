@@ -493,11 +493,16 @@ jobs:
           base_sha="$(git merge-base "origin/${{ github.base_ref }}" HEAD)"
           echo "base=$base_sha" >> "$GITHUB_OUTPUT"
           changed() { ! git diff --quiet "$base_sha" HEAD -- "$@"; }
-          web=false; ui=false; ovie=false
-          if changed apps/web packages pnpm-lock.yaml package.json turbo.json; then web=true; fi
+          web=false; ui=false; ovie=false; ci=false
+          # Web unit tests also import scripts/ and .github/ modules, so
+          # those paths select their related tests too.
+          if changed apps/web packages pnpm-lock.yaml package.json turbo.json scripts .github; then web=true; fi
           if changed packages/ui; then ui=true; fi
           if changed apps/ovie; then ovie=true; fi
-          printf 'web=%s\nui=%s\novie=%s\n' "$web" "$ui" "$ovie" >> "$GITHUB_OUTPUT"
+          # tests/unit/ci read workflow YAML and scripts from disk, outside
+          # the module graph `--changed` follows: run that suite whole.
+          if changed scripts .github; then ci=true; fi
+          printf 'web=%s\nui=%s\novie=%s\nci=%s\n' "$web" "$ui" "$ovie" "$ci" >> "$GITHUB_OUTPUT"
           if [[ "$web$ui$ovie" == 'falsefalsefalse' ]]; then
             echo 'No unit-affecting source changed; non-applicable receipt recorded.'
           fi
@@ -526,6 +531,13 @@ jobs:
             --retry=${{ steps.quarantine.outputs.unit_default_retries }} \
             --changed "$BASE_SHA" --passWithNoTests \
             --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }}
+      - name: Run CI contract tests read from disk
+        if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.ci == 'true' && matrix.shard == '3/4'
+        run: |
+          set -euo pipefail
+          # Same command and quarantine as the merge group's structural web lane.
+          command="$(node -e "import('./scripts/ci-fast-lanes.mjs').then(m => process.stdout.write(m.webCiContractTestsCommand()))")"
+          bash -c "$command"
       - name: Run packages/ui unit tests
         if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.ui == 'true' && matrix.shard == '1/4'
         run: pnpm turbo test --filter=@jovie/ui
