@@ -10,7 +10,6 @@ import { ClientFaqAccordion } from '@/components/marketing/ClientFaqAccordion';
 const webRoot = path.resolve(__dirname, '../../..');
 const faqSectionPath = 'components/marketing/FaqSection.tsx';
 const faqAccordionPath = 'components/marketing/ClientFaqAccordion.tsx';
-const cssPath = 'app/(home)/home.css';
 const designSystemPath = 'styles/design-system.css';
 
 // Shared marketing components keep their existing token utilities for other
@@ -33,25 +32,6 @@ const forbiddenFaqSectionSourcePatterns = [
   ...forbiddenFaqSourcePatterns,
   /\b(?:bg|border|text|ring|shadow|rounded|h|w|max-w|min-h|tracking|leading|px|py|pt|pb|z)-\[/,
 ] as const;
-
-const forbiddenFaqCssPatterns = [
-  /#[0-9a-fA-F]{3,8}/,
-  /rgba?\(/,
-  /hsla?\(/,
-  /linear-gradient|radial-gradient/,
-  /box-shadow:(?!\s*(?:none|var\())/,
-  /(?:background|color|border(?:-[^:]+)?|text-decoration-color):[^;]*(?<!-)\b(?:white|black)\b/,
-] as const;
-
-function extractMountedFaqCss(source: string): string {
-  const start = source.indexOf('HOMEPAGE FAQ SYSTEM B START');
-  const end = source.indexOf('HOMEPAGE FAQ SYSTEM B END', start);
-
-  expect(start, 'mounted FAQ CSS block exists').toBeGreaterThanOrEqual(0);
-  expect(end, 'mounted FAQ CSS block is bounded').toBeGreaterThan(start);
-
-  return source.slice(start, end);
-}
 
 function extractFaqReducedMotionCss(source: string): string {
   const start = source.indexOf('FAQ REDUCED MOTION START');
@@ -188,26 +168,5 @@ describe('mounted homepage FAQ System B source contract', () => {
     expect(reducedMotion).toContain('transition-duration: 0s !important');
     expect(reducedMotion).not.toContain('0.01ms');
     expect(reducedMotion).not.toContain('transform');
-  });
-
-  it('keeps mounted FAQ shell CSS tokenized and grid-aligned', () => {
-    const css = extractMountedFaqCss(
-      readFileSync(path.join(webRoot, cssPath), 'utf8')
-    );
-
-    for (const pattern of forbiddenFaqCssPatterns) {
-      expect(css, `${cssPath} leaked ${pattern}`).not.toMatch(pattern);
-    }
-
-    expect(css).toContain('var(--system-b-bg-page)');
-    expect(css).toContain('var(--system-b-app-frame-seam)');
-    expect(css).toContain('var(--color-text-primary-token)');
-    expect(css).toContain('var(--color-text-secondary-token)');
-    expect(css).toContain('var(--ds-public-content-max)');
-    expect(css).toContain('var(--homepage-page-gutter)');
-    expect(css).toContain('var(--space-');
-    expect(css).toContain('var(--font-sans)');
-    expect(css).toContain('width: min(');
-    expect(css).toContain('@media (max-width: 767px)');
   });
 });

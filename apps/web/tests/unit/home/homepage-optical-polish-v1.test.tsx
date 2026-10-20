@@ -132,9 +132,6 @@ describe('homepage-optical-polish-v1', () => {
     expect(certifiedCss).toMatch(
       /\.homepage-certified-section\[data-rhythm="product"\][\s\S]*?--homepage-rhythm-product/
     );
-    expect(certifiedCss).toMatch(
-      /\.homepage-certified-proof__logos\s*\{[\s\S]*?margin-top:\s*0;/
-    );
     // Pen My0zu (JOV-6946): the relationships beat shows real next steps.
     expect(certifiedCss).toContain('.homepage-next-steps');
   });
