@@ -427,6 +427,35 @@ export function ovieAskAction(kind: InboxDecisionTarget['kind'] | undefined): {
   }
 }
 
+/** `jovie.decision-default/v1` as the inbox publishes it (PR #22371). */
+type InboxDecisionDefaultWire = {
+  readonly contract?: unknown;
+  readonly decision?: unknown;
+  readonly summary?: unknown;
+  readonly deadline?: unknown;
+  readonly declared?: unknown;
+};
+
+function decisionDefaultOf(item: OvieInboxCase): OvieAsk['decisionDefault'] {
+  const wire = (
+    item as { readonly decisionDefault?: InboxDecisionDefaultWire | null }
+  ).decisionDefault;
+  if (
+    !wire ||
+    wire.contract !== 'jovie.decision-default/v1' ||
+    (wire.decision !== 'approve' && wire.decision !== 'reject') ||
+    typeof wire.summary !== 'string' ||
+    typeof wire.deadline !== 'string'
+  )
+    return null;
+  return {
+    decision: wire.decision,
+    summary: wire.summary,
+    deadline: wire.deadline,
+    declared: wire.declared === true,
+  };
+}
+
 function askFromCase(item: OvieInboxCase): OvieAsk {
   return {
     id: item.id,
@@ -439,6 +468,9 @@ function askFromCase(item: OvieInboxCase): OvieAsk {
     canReply:
       item.decisionTarget !== null && item.decisionTarget.kind !== 'linear',
     evidence: item.evidence,
+    decisionDefault: decisionDefaultOf(item),
+    // Summer cards accept post-ship feedback once decided.
+    canFeedback: item.decisionTarget?.kind === 'summer',
   };
 }
 

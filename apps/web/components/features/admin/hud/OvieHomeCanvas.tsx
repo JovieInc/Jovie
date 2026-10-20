@@ -2,6 +2,7 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { toast } from '@/components/feedback';
 import { ChatOpsDataCard } from '@/components/jovie/components/ChatOpsDataCard';
 import type { HomeCanvasState } from '@/components/jovie/types';
 import {
@@ -181,6 +182,29 @@ export function OvieHomeCanvas({
     snapshot?.operationalTasks.syncState === 'syncing' &&
     snapshot.operationalTasks.observedAt === null &&
     snapshot.operationalTasks.tasks.length === 0;
+  const sendFeedback = useCallback(
+    (ask: HomeLoopAsk, comment: string) => {
+      const target = inbox.data?.cases.find(
+        item => item.id === ask.id
+      )?.decisionTarget;
+      if (target?.kind !== 'summer') return;
+      void fetch(
+        `/api/ovie/summer-cards/${encodeURIComponent(target.id)}/feedback`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ comment }),
+        }
+      )
+        .then(response => {
+          if (!response.ok) throw new Error('Feedback was not recorded.');
+          toast.success('Feedback sent');
+        })
+        .catch(() => toast.error('Feedback was not recorded. Try again.'));
+    },
+    [inbox.data]
+  );
+
   const loopStatus: HomeLoopSectionStatus =
     !snapshot || awaitingFirstTasks
       ? 'loading'
@@ -271,6 +295,7 @@ export function OvieHomeCanvas({
       answers={answers}
       onApprove={ask => decide(ask, 'approve', '')}
       onReply={(ask, text) => decide(ask, 'reject', text)}
+      onFeedback={sendFeedback}
       onRetryLoop={() => void shipping.refetch()}
       onRetryAsks={() => void inbox.refetch()}
       asksMoreHref={APP_ROUTES.ADMIN_INBOX}
