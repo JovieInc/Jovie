@@ -123,7 +123,7 @@ function AskCard({
               onClick={() => onApprove(ask)}
               data-testid='home-loop-ask-approve'
             >
-              {approveLabel}
+              {ask.actionLabel ?? approveLabel}
             </Button>
           ) : null}
           {ask.canReply ? (
