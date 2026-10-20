@@ -21,7 +21,7 @@ describe('MarketingPricingPlans', () => {
     expect(screen.queryByTestId('marketing-pricing-plan-max')).toBeNull();
   });
 
-  it('uses public claim CTAs, including limited-access Pro and Enterprise', () => {
+  it('uses public claim CTAs, including self-serve Pro and Enterprise', () => {
     const freeClaim = getPublicPriceClaim('free');
     const proClaim = getPublicPriceClaim('pro');
     const enterpriseClaim = getPublicPriceClaim('enterprise');
@@ -55,7 +55,7 @@ describe('MarketingPricingPlans', () => {
         'link',
         { name: proClaim.ctaLabel }
       )
-    ).toHaveAttribute('href', '/waitlist');
+    ).toHaveAttribute('href', '/claim?plan=pro');
     expect(
       screen.queryByRole('link', { name: 'Start Free Trial' })
     ).not.toBeInTheDocument();
@@ -105,7 +105,7 @@ describe('MarketingPricingPlans', () => {
       'data-variant',
       'primary'
     );
-    expect(within(proCard).getByText('Limited access')).toBeInTheDocument();
+    expect(within(proCard).getByText('Self-serve')).toBeInTheDocument();
 
     for (const plan of ['free', 'enterprise']) {
       const card = screen.getByTestId(`marketing-pricing-plan-${plan}`);

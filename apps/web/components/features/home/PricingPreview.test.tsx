@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { PRO_SELF_SERVE_TRUTH } from '@/lib/billing/offer-truth';
 import { PricingPreview } from './PricingPreview';
 
 describe('PricingPreview', () => {
@@ -24,7 +25,7 @@ describe('PricingPreview', () => {
     expect(
       screen.getByText('Public artist profile and audience capture')
     ).toBeInTheDocument();
-    expect(screen.getByText('Limited access.')).toBeInTheDocument();
-    expect(screen.getByText('$199')).toBeInTheDocument();
+    expect(screen.getByText(PRO_SELF_SERVE_TRUTH)).toBeInTheDocument();
+    expect(screen.getByText('$12')).toBeInTheDocument();
   });
 });
