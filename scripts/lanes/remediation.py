@@ -104,6 +104,16 @@ _NON_CREDENTIAL_STRATEGY = re.compile(
     r"canon/strategy|founder strategy|pricing|taste\b",
     re.IGNORECASE,
 )
+# Match only the stated assurance, capturing its credential mention. Never
+# erase another mention in the same sentence: it may request a real action.
+_CREDENTIAL_ASSURANCE = re.compile(
+    r"\b(?P<passive>credentials?)(?:,\s*(?:and\s+)?OTPs?)?\s+"
+    r"(?:are|is|were|was)\s+(?:(?:excluded|omitted|redacted|hashed|stripped|dropped|withheld)"
+    r"|not\s+(?:recorded|stored|logged|included|emitted|printed|persisted))\b"
+    r"|\bcannot\s+(?:attest|isolate)(?:\s+or\s+(?:attest|isolate))?\s+"
+    r"(?:child\s+tools,\s*)?(?P<boundary>credentials?)\b",
+    re.IGNORECASE,
+)
 ACTIONABLE_FIX = re.compile(
     r"computeRatePercent|use `|replace `|change `|fix:|add (?:the |a )?(?:story|test|colocated)|"
     r"@coverage-via|remove [`']?hold",
@@ -249,6 +259,8 @@ def _strip_negated_policy(text: str) -> str:
         piece = NEGATED_POLICY_TEXT.sub("", piece)
         if _NO_NEW_ASSURANCE.search(piece) and not _NON_CREDENTIAL_STRATEGY.search(piece):
             piece = _BARE_LIST_CREDENTIAL.sub("", piece)
+        piece = _CREDENTIAL_ASSURANCE.sub(
+            lambda match: match[0].replace(match[match.lastgroup], "", 1), piece)
         stripped.append(piece)
     return "".join(stripped)
 
