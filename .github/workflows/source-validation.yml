@@ -104,7 +104,12 @@ jobs:
           trap 'rm -rf "$guard_root"' EXIT
           git archive "$trusted_ref" scripts | tar -x -C "$guard_root"
           node "$guard_root/scripts/changelog-source-guard.mjs"
+      # Script contracts here launch Chromium. Playwright setup is skipped when
+      # an exact-head proof is reused, so this step stays behind that same gate.
+      # A metadata edit otherwise fails closed on a missing browser after a
+      # green head (run 39420655467).
       - name: Validate disk-read source contracts from trusted base
+        if: steps.reuse.outputs.reuse != 'true'
         shell: bash
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}

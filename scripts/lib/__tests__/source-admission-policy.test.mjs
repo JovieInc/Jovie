@@ -1188,6 +1188,19 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
     ).if,
     gate
   );
+  // Script contracts launch Chromium. Playwright setup is already behind this
+  // gate, so a reused proof must not re-run the suite without a browser.
+  assert.equal(
+    deterministic.find(
+      step =>
+        step.name === 'Validate disk-read source contracts from trusted base'
+    ).if,
+    gate
+  );
+  assert.equal(
+    deterministic.find(step => step.name === 'Setup Playwright (Chromium)').if,
+    gate
+  );
   assert.equal(
     workflow.jobs.ready.steps[0].run,
     'test "$RESULTS" = \'success,success,success,success\''
