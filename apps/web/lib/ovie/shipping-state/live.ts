@@ -3,6 +3,7 @@ import {
   DELIVERY_MERGE_REPOS,
   type DeliveryLane,
   type DeliveryLanes,
+  type DeliveryMergedPullRequest,
   type DeliveryMergeRepo,
   isExactSha,
   measuredCount,
@@ -66,7 +67,7 @@ const LANE_PR_FIELDS =
   'issueCount nodes{... on PullRequest{number title url createdAt headRefName headRefOid isDraft mergeable reviewDecision updatedAt mergeQueueEntry{position state} author{login} commits(last:1){nodes{commit{statusCheckRollup{state contexts(first:50){nodes{__typename ... on CheckRun{name status conclusion} ... on StatusContext{context state}}}}}}}}}';
 const LANE_PULL_REQUESTS_QUERY = `query ShippingStateLanePullRequests($query:String!){search(type:ISSUE,first:100,query:$query){${LANE_PR_FIELDS}}}`;
 const MERGES_QUERY =
-  'query ShippingStateMerges($org:String!,$jovie:String!,$lyb:String!,$summer:String!,$last7:String!,$prior7:String!){org:search(type:ISSUE,query:$org,first:1){issueCount}jovie:search(type:ISSUE,query:$jovie,first:1){issueCount}lyb:search(type:ISSUE,query:$lyb,first:1){issueCount}summer:search(type:ISSUE,query:$summer,first:1){issueCount}last7:search(type:ISSUE,query:$last7,first:1){issueCount}prior7:search(type:ISSUE,query:$prior7,first:1){issueCount}}';
+  'query ShippingStateMerges($org:String!,$jovie:String!,$lyb:String!,$summer:String!,$last7:String!,$prior7:String!){org:search(type:ISSUE,query:$org,first:12){issueCount nodes{... on PullRequest{number title url mergedAt repository{name}}}}jovie:search(type:ISSUE,query:$jovie,first:1){issueCount}lyb:search(type:ISSUE,query:$lyb,first:1){issueCount}summer:search(type:ISSUE,query:$summer,first:1){issueCount}last7:search(type:ISSUE,query:$last7,first:1){issueCount}prior7:search(type:ISSUE,query:$prior7,first:1){issueCount}}';
 const BEHIND_MAIN_QUERY =
   'query ShippingStateBehindMain($owner:String!,$name:String!,$sha:String!){repository(owner:$owner,name:$name){ref(qualifiedName:"main"){compare(headRef:$sha){behindBy}}}}';
 const PRODUCTION_VERIFIED_JOB_NAME = 'Production Verified';
@@ -1208,6 +1209,40 @@ export async function readLanePullRequests(io: LiveIo): Promise<AuthorityRead> {
   }
 }
 
+/** Merged PRs from the org search, newest first; malformed nodes drop. */
+function recentMerged(
+  data: Record<string, unknown>
+): DeliveryMergedPullRequest[] {
+  const search = data.org;
+  if (!isRecord(search) || !Array.isArray(search.nodes)) return [];
+  return search.nodes
+    .flatMap(node => {
+      if (!isRecord(node) || !isRecord(node.repository)) return [];
+      const mergedAt = parseTimestamp(node.mergedAt);
+      const url = typeof node.url === 'string' ? node.url : '';
+      const title =
+        typeof node.title === 'string'
+          ? node.title.replace(/\s+/g, ' ').trim().slice(0, 200)
+          : '';
+      const repo = sanitizeOpaqueIdentifier(
+        String(node.repository.name ?? ''),
+        100
+      );
+      if (
+        !mergedAt ||
+        !title ||
+        !repo ||
+        !url.startsWith('https://github.com/') ||
+        !Number.isSafeInteger(node.number) ||
+        Number(node.number) <= 0
+      )
+        return [];
+      return [{ repo, number: Number(node.number), title, url, mergedAt }];
+    })
+    .sort((a, b) => Date.parse(b.mergedAt) - Date.parse(a.mergedAt))
+    .slice(0, 12);
+}
+
 function issueCount(data: Record<string, unknown>, alias: string) {
   const search = data[alias];
   return isRecord(search) &&
@@ -1282,6 +1317,7 @@ export async function readMerges(io: LiveIo): Promise<AuthorityRead> {
           },
           last7Days: measuredCount(last7),
           prior7Days: measuredCount(prior7),
+          recent: recentMerged(data),
         },
       },
     };
