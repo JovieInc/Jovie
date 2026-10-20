@@ -471,7 +471,7 @@ describe('Button', () => {
       expect(btn).toHaveAttribute('data-variant', variant);
       expect(btn).toHaveAttribute('data-destructive', 'true');
       expect(btn.className).toContain(
-        variant === 'primary' ? 'bg-error' : 'text-error'
+        variant === 'primary' ? 'bg-btn-destructive' : 'text-error'
       );
     }
   );

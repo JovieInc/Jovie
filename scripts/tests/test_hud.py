@@ -249,6 +249,7 @@ class MergeEvidenceTest(unittest.TestCase):
         remote = hud.Remote(SimpleNamespace(state=Path("/nonexistent"), linear_env=None))
         remote.github = model()["github"]
         with mock.patch.object(hud, "running_workers", return_value=[]), \
+                mock.patch.object(hud, "production_model", side_effect=RuntimeError("prod unread")), \
                 mock.patch.object(hud, "linear_model", side_effect=RuntimeError("mirror failed")), \
                 mock.patch.object(hud, "github_model", side_effect=RuntimeError("env read failed")) as github, \
                 mock.patch.object(hud.time, "monotonic", return_value=0), \
@@ -259,6 +260,7 @@ class MergeEvidenceTest(unittest.TestCase):
         self.assertNotIn("queue", remote.github)
         self.assertIn("env read failed", remote.github["errors"]["open"])
         self.assertIn("mirror failed", remote.linear["error"])
+        self.assertIn("prod unread", remote.production["error"])
 
     def test_remote_reads_github_every_five_minutes_and_linear_every_tick(self):
         class Stop(Exception):
@@ -271,6 +273,7 @@ class MergeEvidenceTest(unittest.TestCase):
                 raise Stop()
         remote = hud.Remote(SimpleNamespace(state=Path("/nonexistent"), linear_env=None))
         with mock.patch.object(hud, "running_workers", return_value=[]), \
+                mock.patch.object(hud, "production_model", return_value={}) as production, \
                 mock.patch.object(hud, "linear_model", return_value={"ok": True}) as linear, \
                 mock.patch.object(hud, "github_model", return_value={"ok": True}) as github, \
                 mock.patch.object(hud.time, "monotonic", side_effect=lambda: next(clock)), \
@@ -279,6 +282,7 @@ class MergeEvidenceTest(unittest.TestCase):
             remote.run()
         self.assertEqual(linear.call_count, 4)
         self.assertEqual(github.call_count, 2)
+        self.assertEqual(production.call_count, 4)
         self.assertEqual(sleeps, [hud.REFRESH_REMOTE_S] * 4)
 
 
@@ -633,7 +637,8 @@ class RenderTest(unittest.TestCase):
         self.assertIn("new issues unknown (doctor unread)", text)
         self.assertIn("FileNotFoundError: codex", text)
         self.assertIn("no alerts recorded", text)
-        self.assertNotIn("UNKNOWN", text)
+        self.assertNotIn("CAPACITY HORIZON", text, "a broken codex lane is not an unknown capacity horizon")
+        self.assertIn("CONSTRAINT ? UNKNOWN   evidence · lanes-status unread", text)
 
     def test_stale_remote_reads_are_flagged_in_the_header(self):
         stale = model()
@@ -758,6 +763,9 @@ class LedgerSchemaTest(unittest.TestCase):
         local = hud.local_model(host)
         self.assertEqual(local["workers"], [])
         self.worker_snapshot.assert_called_once_with(host.state)
+        self.assertIsNone(local["feed"], "a host without the doctor's status feed says so")
+        (host.state / "lanes-status.json").write_text('{"schema": "symphony-lanes-status/v1", "at": "x"}')
+        self.assertEqual(hud.local_model(host)["feed"]["schema"], "symphony-lanes-status/v1")
 
     def test_dispatcher_slot_override_retains_an_explicit_busy_worker(self):
         host = self.host_with_ledger([])
@@ -1030,11 +1038,16 @@ class ManagedReleaseRestartTest(unittest.TestCase):
         # after a full-width write therefore erases that cell, including Z or
         # the end of a hold reason. Apply the emitted terminal controls rather
         # than checking the pre-terminal render strings alone.
-        trace = output.getvalue().split("\x1b[H", 1)[1].split("\x1b[?25h", 1)[0]
+        trace = output.getvalue().split("\x1b[?25l", 1)[1].split("\x1b[?25h", 1)[0]
         screen, row, column = [["~"] * width for _ in range(height)], 0, 0
         for token in re.split(r"(\x1b\[[0-9;?]*[A-Za-z]|\n)", trace):
             if token == "\n":  # tty1's ONLCR advances to column one.
                 row, column = row + 1, 0
+            elif token == "\x1b[2J":
+                screen = [[" "] * width for _ in range(height)]
+            elif token.endswith("H") and token.startswith("\x1b["):
+                place = token[2:-1].split(";")
+                row, column = (int(place[0]) - 1, int(place[1]) - 1) if place != [""] else (0, 0)
             elif token == "\x1b[K":
                 start = min(column, width - 1)
                 screen[row][start:] = [" "] * (width - start)
@@ -1190,3 +1203,208 @@ class LinearAndBudgetTest(unittest.TestCase):
         finally:
             hud.lane.subprocess.run = original
         self.assertEqual(seen[0][:3], ["gh", "api", "graphql"])
+
+
+class ProductionTest(unittest.TestCase):
+    PROD, MAIN = "a" * 40, "b" * 40
+    DONE, PENDING, ELSEWHERE = "c" * 40, "d" * 40, "e" * 40
+
+    def git(self, behind=(), recent=()):
+        def run(args, **_):
+            command = args[3:]
+            out, code = "", 0
+            if command[:1] == ["rev-parse"]:
+                ref = command[-1]
+                out = self.MAIN if "origin/main" in ref else self.PROD if ref.startswith("060037d") else ""
+                code = 0 if out else 1
+            elif command[:1] == ["rev-list"]:
+                out = "\n".join(recent if "--since=72 hours ago" in command else behind)
+            return SimpleNamespace(returncode=code, stdout=out)
+        return run
+
+    def test_served_build_ancestry_marks_each_merge_deployed_or_not(self):
+        merged = [{"number": 1, "mergeCommit": {"oid": self.DONE}}, {"number": 2, "mergeCommit": {"oid": self.PENDING}},
+                  {"number": 3, "mergeCommit": self.ELSEWHERE}, {"number": 4, "mergeCommit": None}]
+        with tempfile.TemporaryDirectory() as directory:
+            history = Path(directory) / hud.SERVED_BUILDS
+            result = hud.production_model(Path("/repo"), merged, history, fetch=lambda: "060037d",
+                                          run=self.git(behind=[self.PENDING, self.MAIN], recent=[self.DONE, self.PENDING]),
+                                          marker=lambda sha, now: {"status": "verified", "at": "2026-10-20T13:15:52Z"},
+                                          now=1_800_000_000)
+            self.assertEqual(json.loads(history.read_text())[-1]["buildId"], "060037d")
+        self.assertIsNone(result["error"])
+        self.assertEqual((result["prodSha"], result["mainSha"], result["behind"]), (self.PROD, self.MAIN, 2))
+        self.assertEqual(result["deployed"], {self.DONE: True, self.PENDING: False, self.ELSEWHERE: None})
+
+    def test_unknown_build_or_unreadable_ancestry_is_an_error_not_a_deploy(self):
+        for fetch, run, expected in ((lambda: "f" * 7, self.git(), "not in the local clone"),
+                                     (self.fail_fetch, self.git(), "production version unread")):
+            with self.subTest(expected=expected):
+                result = hud.production_model(Path("/repo"), [], None, fetch=fetch, run=run, marker=lambda *_: {}, now=1)
+                self.assertIn(expected, result["error"])
+                self.assertEqual(result["deployed"], {})
+
+    def test_stale_production_read_is_unknown(self):
+        value = model()
+        value["production"] = {"readAt": "2026-01-01T00:00:00+00:00", "prodSha": self.PROD}
+        text = "\n".join(plain(row) for row in hud.render(value, 160, 45))
+        self.assertIn("served build unknown · stale", text)
+        self.assertIn("deployed ?", text)
+
+    def test_production_rows_show_served_build_lag_and_the_state_flow(self):
+        value = model()
+        now = hud.utcnow() + hud.timedelta(seconds=1)  # after every read the fixture stamps
+        merged = value["github"]["merged24h"]
+        merged[0].update(mergeCommit={"oid": self.DONE}, mergedAt=(now - hud.timedelta(hours=5)).isoformat())
+        merged[1].update(mergeCommit={"oid": self.PENDING}, mergedAt=(now - hud.timedelta(hours=4)).isoformat())
+        value["production"] = {"readAt": now.isoformat(), "error": None, "buildId": "060037d", "prodSha": self.PROD,
+                               "mainSha": self.MAIN, "behind": 3, "marker": {"status": "verified", "at": (now - hud.timedelta(hours=6)).isoformat()},
+                               "deployed": {self.DONE: True, self.PENDING: False}}
+        frame = [plain(row) for row in hud.render(value, 160, 45, now=now)]
+        self.assertIn("CONSTRAINT ✕ FAIL   deploy · 1 merged PR(s) not in production · oldest 4h00m", frame[1])
+        self.assertIn(f"serves {self.PROD[:7]} · ✓ verified 6h00m ago · main {self.MAIN[:7]} · behind 3 commits · 1 undeployed", frame[2])
+        self.assertIn("draft 1 → prepared 0 → queued 2 → merged 2 → deployed 1 → verified 1", frame[3])
+        value["production"]["marker"] = {"status": "pending"}
+        frame = [plain(row) for row in hud.render(value, 160, 45, now=now)]
+        self.assertIn("Production Verified marker pending", frame[2])
+        self.assertIn("deployed 1 → verified ?", frame[3], "a pending marker is not verification")
+
+    @staticmethod
+    def fail_fetch():
+        raise RuntimeError("production version unread (URLError)")
+
+    def test_served_build_is_bounded_validated_and_retried_once(self):
+        class Response(io.BytesIO):
+            def __enter__(self):
+                return self
+            def __exit__(self, *_):
+                return False
+        calls = []
+        def opener(request, timeout):
+            calls.append(timeout)
+            if len(calls) == 1:
+                raise OSError("reset")
+            return Response(b'{"buildId": "060037D"}')
+        self.assertEqual(hud.served_build(opener=opener), "060037d")
+        self.assertEqual(calls, [5, 5])
+        with self.assertRaisesRegex(RuntimeError, "not a commit"):
+            hud.served_build(opener=lambda *_args, **_kw: Response(b'{"buildId": "main"}'))
+        with self.assertRaisesRegex(RuntimeError, "unread"):
+            hud.served_build(opener=mock.Mock(side_effect=OSError("down")))
+
+    def test_verified_marker_is_final_and_pending_is_asked_again_per_interval(self):
+        hud._markers.clear()
+        name = "production-generation-verified-" + self.PROD
+        pages = [{"artifacts": []}, {"artifacts": []},
+                 {"artifacts": [{"name": name, "expired": False, "workflow_run": {"head_branch": "main"},
+                                 "created_at": "2026-10-20T13:15:52Z"}]}]
+        gh = mock.Mock(side_effect=pages)
+        self.assertEqual(hud.verified_marker(self.PROD, 1000, gh)["status"], "pending")
+        self.assertEqual(hud.verified_marker(self.PROD, 1000 + hud.REFRESH_GITHUB_S - 1, gh)["status"], "pending")
+        self.assertEqual(gh.call_count, 2, "both marker names were read once")
+        verified = hud.verified_marker(self.PROD, 1000 + hud.REFRESH_GITHUB_S, gh)
+        self.assertEqual((verified["status"], verified["at"]), ("verified", "2026-10-20T13:15:52Z"))
+        self.assertIs(hud.verified_marker(self.PROD, 10 ** 9, gh), verified)
+        hud._markers.clear()
+        self.assertEqual(hud.verified_marker(self.PROD, 1, mock.Mock(return_value={"oops": 1}))["status"], "unknown")
+        hud._markers.clear()
+
+
+class RefreshCostTest(unittest.TestCase):
+    def test_ledger_reads_only_appended_complete_lines(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory)
+            (state / "runs").mkdir()
+            ledger = state / "runs" / "ledger.jsonl"
+            ledger.write_text('{"runId": "a"}\n{"runId": "b"}\n')
+            rows = hud.ledger_rows(state)
+            self.assertEqual([row["runId"] for row in rows], ["a", "b"])
+            with mock.patch.object(hud.json, "loads", wraps=json.loads) as parse:
+                self.assertIs(hud.ledger_rows(state), rows)
+                parse.assert_not_called()
+            with open(ledger, "a") as handle:
+                handle.write('{"runId": "c"}\nnot json\n[1]\n{"runId": "d"')
+            self.assertEqual([row["runId"] for row in hud.ledger_rows(state)], ["a", "b", "c"])
+            with open(ledger, "a") as handle:
+                handle.write("}\n")
+            self.assertEqual([row["runId"] for row in hud.ledger_rows(state)], ["a", "b", "c", "d"])
+            ledger.write_text('{"runId": "z"}\n')
+            self.assertEqual([row["runId"] for row in hud.ledger_rows(state)], ["z"])
+            ledger.unlink()
+            self.assertEqual(hud.ledger_rows(state), [])
+
+    def test_state_json_is_parsed_again_only_when_it_changes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "lanes-status.json"
+            path.write_text('{"at": 1}')
+            first = hud.read_json_cached(path)
+            with mock.patch.object(hud, "read_json", wraps=hud.read_json) as read:
+                self.assertIs(hud.read_json_cached(path), first)
+                read.assert_not_called()
+            path.write_text('{"at": 22}')
+            self.assertEqual(hud.read_json_cached(path), {"at": 22})
+            path.unlink()
+            self.assertIsNone(hud.read_json_cached(path))
+
+    def test_redraw_writes_only_changed_rows(self):
+        first = hud.paint_frame(["a", "b", "c"], None)
+        self.assertEqual(first, "\x1b[1;1H\x1b[Ka\x1b[2;1H\x1b[Kb\x1b[3;1H\x1b[Kc")
+        self.assertEqual(hud.paint_frame(["a", "B", "c"], ["a", "b", "c"]), "\x1b[2;1H\x1b[KB")
+        self.assertEqual(hud.paint_frame(["a", "b", "c"], ["a", "b", "c"]), "")
+
+    def test_receipt_joins_are_reused_until_the_ledger_or_window_moves(self):
+        value = model()
+        receipts = value["local"]["attributionReceipts"]
+        with mock.patch.object(hud.lane, "pr_attribution", wraps=hud.lane.pr_attribution) as attribute:
+            first = hud.derived(value)
+            self.assertIs(hud.derived(value), first)
+            calls = attribute.call_count
+            receipts.append(dict(receipts[0], runId="lane-2"))
+            self.assertIsNot(hud.derived(value), first)
+            self.assertGreater(attribute.call_count, calls)
+
+
+class ConstraintTest(unittest.TestCase):
+    def facts(self, **feed):
+        base = {"schema": hud.STATUS_SCHEMA, "at": hud.utcnow().isoformat(), "running": 4, "idle": 0,
+                "admission": {"eligiblePool": 3, "candidatePool": 9, "rejectedByProvider": {}},
+                "mergeThroughput": {"mergedPerHour": 4, "ejectionRate": 0}}
+        base.update(feed)
+        value = model()
+        value["local"]["feed"] = base
+        return hud.interpret(value, hud.utcnow())
+
+    def test_ladder_names_capacity_intake_queue_and_evidence(self):
+        self.assertEqual(self.facts()["constraint"][:2], ("warn", "worker capacity"))
+        intake = self.facts(admission={"eligiblePool": 0, "candidatePool": 9,
+                                       "rejectedByProvider": {"codex": {"sensitive-text": 6}, "grok": {"sensitive-text": 6}}})
+        self.assertEqual(intake["constraint"][:2], ("warn", "intake"))
+        self.assertIn((1, "sensitive-text 6"), intake["constraint"][2])
+        queue = self.facts(mergeThroughput={"ejectionRate": 0.5, "queueDepth": 4})
+        self.assertEqual(queue["constraint"][:2], ("warn", "merge queue"))
+        flowing = self.facts(idle=2)
+        self.assertEqual(flowing["constraint"][:2], ("ok", "none binding"))
+        value = model()
+        value["local"]["feed"] = {"schema": hud.STATUS_SCHEMA, "at": "2026-01-01T00:00:00Z"}
+        self.assertEqual(hud.interpret(value, hud.utcnow())["constraint"][:2], ("unknown", "evidence"))
+
+    def test_status_feed_is_only_current_evidence(self):
+        now = hud.utcnow()
+        for feed, error in ((None, "lanes-status unread"), ({"schema": "other"}, "lanes-status schema other"),
+                            ({"schema": hud.STATUS_SCHEMA, "at": "bad"}, "lanes-status age unknown"),
+                            ({"schema": hud.STATUS_SCHEMA, "at": (now - hud.timedelta(seconds=300)).isoformat()}, "lanes-status stale 5m")):
+            with self.subTest(error=error):
+                self.assertEqual(hud.status_feed({"feed": feed}, now), (None, error))
+
+
+class ConsoleTextTest(unittest.TestCase):
+    def test_untrusted_text_cannot_inject_escapes_or_shift_columns(self):
+        self.assertEqual(hud.console_text("ok\x1b[2Jé漢😀\ttab"), "ok?[2Jé?? tab")
+        self.assertEqual(hud.titled("#1 ", "x\x1b[31my", 20), "#1 x?[31my")
+        self.assertEqual(hud.titled("#1 ", "fix(leads): normalize names (JOV-7859)", 36), "#1 fix(leads): normalize names…")
+
+    def test_fit_drops_whole_parts_least_important_first(self):
+        parts = [(0, "#22307 merged"), (2, "low value"), (1, "deployed 7")]
+        self.assertEqual(plain(hud.fit(parts, 40)), "#22307 merged · low value · deployed 7")
+        self.assertEqual(plain(hud.fit(parts, 26)), "#22307 merged · deployed 7")
+        self.assertEqual(plain(hud.fit(parts, 14)), "#22307 merged")

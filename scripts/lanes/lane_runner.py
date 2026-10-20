@@ -58,6 +58,7 @@ import claude_lane  # noqa: E402  (subscription quota bank read by the router)
 import hyperagent_lane  # noqa: E402
 import linear_app_token  # noqa: E402  (Jovie Lanes OAuth app quota, separate from Tim's user)
 import linear_sync  # noqa: E402  (local issue mirror, claim ledger, write outbox)
+import ownership  # noqa: E402  (started-state live-owner invariant)
 import pr_events  # noqa: E402
 import remediation  # noqa: E402  (classifier, router, escalation ladder)
 import shipping_attribution  # noqa: E402  (receipt-first merged-PR provenance)
@@ -655,11 +656,50 @@ def predicted_touch(issue: Issue, target_files: dict | None = None, now: float |
     return hints or frozenset(witnessed or ()) or AREA_HOTSPOTS.get(workstreams.classify(issue.title, issue.labels), frozenset())
 
 
-def hotspot_holds(prs: list[dict]) -> dict[str, int]:
+# A draft nobody has touched (no push, comment, label or review: GitHub `updatedAt`) for this
+# long, and that no lane holds a repair lease on, stops holding hotspots: it is recorded as a
+# file-overlap flag instead. 48h matches the reconcile pass's stale-draft SLO. Gem 2026-10-20:
+# green draft #22253, idle 3 days, held six symphony-throughput issues on doctor.py.
+HOTSPOT_DRAFT_IDLE_S = 48 * 3600
+
+
+def stale_hotspot_draft(pr: dict, now: float, leased=lambda number: False) -> bool:
+    """Evidence-based: a draft, with a readable updatedAt older than HOTSPOT_DRAFT_IDLE_S, and
+    no live repair lease. Missing or unreadable evidence keeps the hold."""
+    if pr.get("isDraft") is not True:
+        return False
+    updated = created_at_epoch(str(pr.get("updatedAt") or ""))
+    return updated is not None and now - updated > HOTSPOT_DRAFT_IDLE_S and not leased(pr.get("number"))
+
+
+def repair_leased(number) -> bool:
+    """True while a lane holds this PR's repair lease (probe only; never takes or rewrites it)."""
+    state = lane_state_dir()
+    if state is None or not isinstance(number, int):
+        return False
+    path = state / "locks" / f"repair-pr-{number}.lock"
+    if not path.exists():
+        return False
+    try:
+        with open(path, "a") as handle:
+            try:
+                fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                return True
+            fcntl.flock(handle, fcntl.LOCK_UN)
+    except OSError:
+        return True  # unreadable lease evidence keeps the hold
+    return False
+
+
+def hotspot_holds(prs: list[dict], now: float | None = None, leased=lambda number: False) -> dict[str, int]:
     """{hotspot path: the oldest open PR touching it}. Hotspots are HOTSPOT_SEED plus any file
-    two or more open PRs touch. Parked PRs (held or repair-exhausted) hold nothing: they
-    rebuild from main once the active work lands."""
-    active = sorted((pr for pr in prs if not pr_is_terminal(pr)), key=lambda pr: pr.get("number") or 0)
+    two or more open PRs touch. Parked PRs (held or repair-exhausted) and stale unleased
+    drafts (`stale_hotspot_draft`) hold nothing: they rebuild from main once the active work
+    lands, and file-overlap still flags the overlap."""
+    now = time.time() if now is None else now
+    active = sorted((pr for pr in prs if not pr_is_terminal(pr) and not stale_hotspot_draft(pr, now, leased)),
+                    key=lambda pr: pr.get("number") or 0)
     touched = [(pr["number"], {entry.get("path") for entry in pr.get("files") or [] if entry.get("path")})
                for pr in active]
     seen: dict[str, int] = {}
@@ -2083,7 +2123,11 @@ class Linear:
         data = self.gql('query($id:String!){issue(id:$id){state{name}}}', {"id": issue_id})
         return data["issue"]["state"]["name"]
 
-    def move(self, issue_id: str, state_name: str) -> None:
+    def move(self, issue_id: str, state_name: str, owner: str | None = None) -> None:
+        # Direct (non-outbox) writes have no claim ledger to consult: a started state must
+        # name its live owner explicitly (the orphaned In Progress guard).
+        if state_name in linear_sync.STARTED and not owner:
+            raise linear_sync.StartedWithoutOwner(f"{state_name} for {issue_id} without a live owner")
         states = self.gql('query($id:String!){issue(id:$id){team{states{nodes{id name}}}}}', {"id": issue_id})
         target = next((s["id"] for s in states["issue"]["team"]["states"]["nodes"] if s["name"] == state_name), None)
         if target:
@@ -6587,10 +6631,10 @@ def open_hotspot_holds() -> dict[str, int]:
     hotspot gating ({}): this orders contended work, the in-flight read guards duplicates."""
     def fetch():
         listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--limit", "200",
-                     "--json", "number,labels,files"])
+                     "--json", "number,labels,files,isDraft,updatedAt"])
         return json.loads(listed.stdout or "[]") if listed.returncode == 0 else None
-    prs = shared("hotspot-files", CLAIM_SCAN_TTL_S, fetch)
-    return hotspot_holds(prs) if prs is not None else {}
+    prs = shared("hotspot-files-v2", CLAIM_SCAN_TTL_S, fetch)
+    return hotspot_holds(prs, leased=repair_leased) if prs is not None else {}
 
 
 def is_green(pr: dict) -> bool:
@@ -7488,6 +7532,8 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
     if route_decision and route_decision.get("chosen"):
         log_route(host, name, route_decision)
         spec = {**spec, "model": route_decision["chosen"]["model"], "route": route_decision}
+    # The live owner of the started issue: held until this worker exits or re-execs.
+    _RUN_LEASES.append(ownership.acquire_run_lease(host.state, issue.id, issue.identifier, name))
     linear = linear_sync.Outboxed(host.state, linear)  # every disposition write waits in the outbox
     notify_issue_claim(linear, issue, name, spec)
     try:
@@ -7589,6 +7635,9 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
                                     "release, then retried automatically." if exhausted else "Back to Todo."))
     slot.release()
     return reexec(host, name)
+
+
+_RUN_LEASES: list = []  # open run-lease handles; exec (close-on-exec) or exit releases them
 
 
 def reexec(host: Host, name: str) -> int:
@@ -7713,6 +7762,13 @@ def dispatch(host: Host) -> int:
             tick["issueReconcile"] = epics.reconcile(THIS, host, lambda: Linear(host.linear_env), teams)
     except (Exception, SystemExit) as error:  # epic closure and hold expiry never take dispatch down
         tick["issueReconcileError"] = f"{type(error).__name__}: {error}"[:200]
+    try:
+        # A release self-test or fixture never writes to Linear or reads the host's git.
+        if not os.environ.get("LANES_SELFTEST") and os.environ.get("LANES_EXECUTION_BACKEND") != "local-test":
+            # Every started issue has a live owner, or it moves (outbox) to the right state.
+            tick["ownership"] = ownership.reconcile(host.state, host.repo, in_flight_issues())
+    except Exception as error:  # ownership repair never takes dispatch down
+        tick["ownershipError"] = f"{type(error).__name__}: {error}"[:200]
     try:
         corpus_owner = os.environ.get("YC_CORPUS_OWNER", "gem").split(".")[0]
         tick["ycCorpus"] = (yc_corpus.tick(host.state) if HOST == corpus_owner else
@@ -8218,6 +8274,59 @@ def _selftest_cleanup_rows(cleanup: dict) -> dict:
     return rows
 
 
+def _proc_identity(pid: int) -> tuple[int, int, str] | None:
+    """(uid, ppid, birth) of any process, readable even when its environ is not."""
+    try:
+        entry = Path("/proc") / str(pid)
+        uid = entry.stat().st_uid
+        fields = (entry / "stat").read_text().rsplit(")", 1)[1].split()
+        if len(fields) < 20 or not fields[1].isdecimal() or not fields[19].isdecimal():
+            return None
+        return uid, int(fields[1]), "linux:" + fields[19]
+    except (OSError, ValueError, IndexError):
+        return None
+
+
+def _birth(start: str) -> int:
+    return int(start.split(":", 1)[1])
+
+
+def _foreign_lineage(pid: int, start: str, cleanup: dict, identity=_proc_identity) -> bool:
+    """True only when an unreadable process provably is not a self-test descendant.
+
+    A non-dumpable same-UID process (sshd/ssh session, ssh-agent) refuses its environ
+    (EACCES, Gem 2026-10-20 and CI ejections of #22305/#22308). A self-test descendant
+    only ever has self-test descendants, the owner, the owner's own ancestors or init in
+    its parent chain (orphans reparent to an ancestor subreaper or init). So the first
+    ancestor that is none of those and is provably not a descendant (another UID, or alive
+    with the same birth since before the self-test began) proves the process foreign.
+    Every parent must predate its child (a reused PID cannot pass). Anything else holds."""
+    owner = cleanup["owner"]["pid"]
+    ancestors, cursor = set(), owner
+    for _ in range(64):
+        found = identity(cursor)
+        if found is None or found[1] <= 1:
+            break
+        ancestors.add(found[1])
+        cursor = found[1]
+    current, expected = pid, start
+    for _ in range(64):
+        found = identity(current)
+        if found is None or found[2] != expected:
+            return False  # gone or reused since observed: unproven
+        child_birth = _birth(expected)
+        parent = found[1]
+        if parent <= 1 or parent == owner or parent in ancestors:
+            return False
+        observed = identity(parent)
+        if observed is None or _birth(observed[2]) > child_birth:
+            return False
+        if observed[0] != cleanup["owner"]["uid"] or cleanup["baseline"].get(parent) == observed[2]:
+            return True
+        current, expected = parent, observed[2]
+    return False
+
+
 def marked_processes(cleanup: dict) -> dict[int, str]:
     """Select only same-UID members of an explicit cleanup subtree, with birth identities."""
     _selftest_cleanup_rows(cleanup)
@@ -8261,6 +8370,8 @@ def marked_processes(cleanup: dict) -> dict[int, str]:
                                               source="proc-stat") from error
                 if after[2].startswith("Z"):
                     continue
+                if _foreign_lineage(pid, row[3], cleanup):
+                    continue  # provably outside the self-test: a non-dumpable sshd/ssh, xdist sibling
                 raise SelftestCleanupHeld("selftest-process-custody-unreadable", pid=pid,
                                           start=row[3], source="proc-environ", error=error) from error
             pairs = [part.split(b"=", 1) for part in raw.split(b"\0") if b"=" in part]
@@ -8755,10 +8866,12 @@ def load_github_env(path: Path = Path.home() / ".config/jovie-lanes/github.env",
     shim_dir.mkdir(parents=True, exist_ok=True)
     shim = shim_dir / "gh"
     # App installation tokens cannot touch user gists (403), and the status feed is Tim's gist:
-    # `gh gist` keeps the host's own login. A caller that targets another host
+    # `gh gist` and `gh api gists[/...]` keep the host's own login (the doctor's verified
+    # publisher uses the REST form; Gem 2026-10-20 its 403 froze the public feed). A caller that targets another host
     # (GH_HOST, e.g. the offline real-gh test harness) keeps its own credentials:
     # the Jovie Bot installation token only exists for github.com.
     shim.write_text(f'#!/bin/sh\n[ "$1" = gist ] && exec {real} "$@"\n'
+                    f'[ "$1" = api ] && case "$2" in gists|gists/*) exec {real} "$@";; esac\n'
                     f'[ -n "${{GH_HOST:-}}" ] && [ "$GH_HOST" != github.com ] && exec {real} "$@"\n'
                     f'GH_TOKEN="$(python3 {HERE / "gh_app_token.py"} --guard "$@")" || exit $?\n'
                     f'export GH_TOKEN\nexec {real} "$@"\n')

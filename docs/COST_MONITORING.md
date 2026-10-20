@@ -142,6 +142,39 @@ This is the primary defense. Walk this checklist on initial setup and re-verify 
 - Verify every production project is individually live after a budget incident;
   a READY deployment does not override a project-level pause.
 
+#### On-demand build concurrency for `jovie` (hard-capped)
+
+**EVENT:** 2026-10-20, authorized by Tim. Vercel on-demand concurrency for
+jovie prod/staging, Standard machine, hard cap $10/mo (cutoff at $8).
+
+- Why: the `jovie` team has one concurrent build slot. On 2026-10-20 two
+  staging generations queued 30+ min behind log-your-body `backup/**`
+  previews and production stalled for hours.
+- Machine: the `jovie` project is pinned to `buildMachineSelection: fixed`,
+  `buildMachineType: standard` (4 vCPU). Elastic or Turbo would multiply the
+  cost per build (Turbo is 30 vCPU).
+- Price: each build is billed whole minutes × 4 vCPU × $0.0035. A prebuilt
+  jovie deploy builds in under a minute, so it costs $0.014. The measured
+  14 builds/day comes to about $6/month.
+- Hard stop: Vercel Spend Management cannot cap one feature. Its only hard
+  action pauses production for every project on the team, which is not
+  acceptable. Instead, `.github/scripts/vercel-on-demand-ledger.mjs` runs
+  before every staging and production deploy and is the only writer of the
+  project's `elasticConcurrencyEnabled` flag. It reads jovie builds since the
+  later of the billing-period start and enablement, and Vercel's billed build
+  charges (`/v1/billing/charges`). Spend counts as the larger of the two.
+  The ledger turns on-demand off when actual or projected spend reaches $8,
+  warns at $5, and turns it off when spend is unknown or the machine is not
+  pinned Standard. Turning it off only puts staging and production back on
+  the normal queue. The policy lives in `.github/vercel-on-demand-policy.json`.
+  Set `enabled: false` there to turn the feature off.
+- Scope: on-demand is a project-level setting with no per-deployment switch.
+  The `jovie` project has Git deployments disabled. Its builds are the
+  staging and production CLI deploys, plus rare registry-admitted bounded
+  previews, which the ledger also counts.
+- Backstop: the team-wide Spend Management notifications (50/75/100%) in
+  Layer 0 remain in place.
+
 ### Anthropic
 
 - Dashboard: **Console → Plans & Billing → Usage limits**
