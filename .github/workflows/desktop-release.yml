@@ -1920,7 +1920,7 @@ jobs:
             echo "::error::Installation quota reset is ${wait_for}s away, outside the 3900s retry cap. Not passing." >&2
             exit 1
           fi
-          reset_iso="$(date -u -d "@$QUOTA_RESET_EPOCH" +%Y-%m-%dT%H:%M:%SZ)"
+          reset_iso="$(node -e 'console.log(new Date(Number(process.argv[1]) * 1000).toISOString().replace(/\.\d{3}Z$/, "Z"))' "$QUOTA_RESET_EPOCH")"
           sentence="Reattempting desktop publication of $RELEASE_SHA after the installation quota reset at ${reset_iso}."
           echo "::notice::${sentence}"
           echo "$sentence" >> "$GITHUB_STEP_SUMMARY"

@@ -2626,6 +2626,18 @@ test('desktop installation quota defer is visible and retried once', async t => 
   const mockBin = join(waiterRoot, 'bin');
   await mkdir(mockBin);
   const sleepLog = join(waiterRoot, 'sleep.log');
+  // Exercise the workflow with the common GNU/BSD date interface only.
+  await writeFile(
+    join(mockBin, 'date'),
+    `#!/usr/bin/env bash
+if [ "$#" -ne 1 ] || [ "$1" != '+%s' ]; then
+  echo "date: unsupported option (GNU-only date formatting is unavailable)" >&2
+  exit 1
+fi
+node -e 'console.log(Math.floor(Date.now() / 1000))'
+`,
+    { mode: 0o755 }
+  );
   await writeFile(
     join(mockBin, 'sleep'),
     `#!/usr/bin/env bash
@@ -2655,7 +2667,9 @@ printf '%s\\n' "$1" > "${sleepLog}"
   assert.equal(held.status, 0, held.stderr);
   assert.match(
     held.stdout,
-    new RegExp(`Reattempting desktop publication of ${releaseSha}`)
+    new RegExp(
+      `Reattempting desktop publication of ${releaseSha} after the installation quota reset at ${new Date((now + 30) * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z')}`
+    )
   );
   const slept = Number((await readFile(sleepLog, 'utf8')).trim());
   assert.ok(slept >= 30 && slept <= 40, `Unexpected waiter sleep: ${slept}`);
