@@ -138,6 +138,15 @@
     "bodySha256": "58152f4ec8c78b5f966f72df3eba353992a1d6bfd2f853220634c3406a59e90b"
   },
   {
+    "file": ".claude/rules/research.md",
+    "paths": [
+      "packages/research/**",
+      "scripts/voc/**",
+      "scripts/ops/firecrawl-crawl.sh"
+    ],
+    "bodySha256": "44ce1aede6d53cd1c02f3b25997114015fd83b28656ef89b8a5622082af2042b"
+  },
+  {
     "file": ".claude/rules/security.md",
     "paths": [
       "apps/web/app/api/**",

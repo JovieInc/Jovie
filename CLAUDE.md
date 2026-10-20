@@ -13,9 +13,9 @@ task or permission authority.
 - Implement/fix requests authorize work through verification. State reversible
   assumptions.
 - Preserve existing edits and ownership. Use an isolated worktree when needed.
-- Query gbrain for prior decisions and ownership before exploration. If
-  unreachable, record `gbrain-unavailable` and use repo evidence. Refresh mutable
-  claims from source/runtime; write durable findings back.
+- Query gbrain for prior decisions/owners first; if down, record
+  `gbrain-unavailable`; use repo evidence. Recheck mutable claims at
+  source/runtime; save findings.
 - Set `JOVIE_AGENT_PROFILE` before editing. `coder` implements assigned work;
   non-coding profiles dispatch/verify; `no_agent` runs deterministic scripts only.
   See [ownership rules](.claude/rules/linear.md). For direct work without an issue,
@@ -26,11 +26,11 @@ task or permission authority.
 - Destructive operations, credential changes, and consequential external actions
   require authorization. Prepare the reviewable result first. Do not re-ask for
   the same authorized action.
-- Respect human time. Before asking Tim to check, look up, or verify, use
+- Respect human time. Before asking Tim to check, look up or verify, use
   existing CLIs, authenticated APIs, browser automation, gbrain, and stronger
   models/subagents. Ask only for outbound actions, taste, new spend or
   credentials, or after tooling failed (say what was tried). Taste never blocks:
-  propose a default with a deadline, ship if unanswered, revise post-ship.
+  propose a default and deadline, ship if unanswered, revise post-ship.
 - Quantifiable decisions record **Ship now / Re-evaluate when / Then**; permanent
   taste/identity/security decisions use `EVENT:`. Track follow-ups in Linear.
   Legacy `human-review-required`, `needs-human`, and `no-auto` labels do not pause
@@ -61,12 +61,13 @@ Context guidance: [agent context](docs/agent-context/README.md).
 | iOS/macOS | [ios](.claude/rules/ios.md) / [macos](.claude/rules/macos.md) |
 | Pen canvas/registry | [pen](.claude/rules/pen.md) |
 | Skills | [gstack](.claude/rules/gstack.md) |
+| Research | [research](.claude/rules/research.md) |
 
 Other scoped rules: ci-branching, event-driven, infra, linear, motion,
 pr-stacking, swarm, hermes-air.
-Company domain canon: [index](canon/README.md). API/cron/webhook maps:
+Company domain canon: [index](canon/README.md). API/cron/webhook map:
 [AI_AGENT_GUIDE](docs/AI_AGENT_GUIDE.md). Codex: [CODEX](CODEX.md).
-<!-- doc-freshness:scoped-rules-count:21 -->
+<!-- doc-freshness:scoped-rules-count:22 -->
 
 ## Tools and workflow
 
