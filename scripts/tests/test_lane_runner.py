@@ -11204,6 +11204,64 @@ print(headers + '\\r\\n\\r\\n' + json.dumps(data))
             self.assertIn("page=2", (root / "requests").read_text())
 
 
+class SelftestForeignLineageTest(unittest.TestCase):
+    """An unreadable environ (EACCES) held self-test cleanup even for processes that are not
+    self-test descendants: an sshd session on Gem (release refused 2026-10-20 16:52/18:47)
+    and an xdist sibling's non-dumpable child in CI (merge-group ejections of #22305, #22308)."""
+    UID = 1000
+    CLEANUP = {"owner": {"pid": 10, "uid": UID, "start": "linux:5"}, "baseline": {10: "linux:5", 450: "linux:80"}}
+
+    def lineage(self, table, pid=500, start="linux:100"):
+        procs = {10: (self.UID, 200, "linux:5"), 200: (self.UID, 1, "linux:2"), **table}
+        return lane._foreign_lineage(pid, start, self.CLEANUP, identity=procs.get)
+
+    def test_a_foreign_parent_proves_the_process_is_not_a_selftest_descendant(self):
+        sshd = {500: (self.UID, 400, "linux:100"), 400: (0, 300, "linux:90")}
+        self.assertTrue(self.lineage(sshd))
+        sibling = {500: (self.UID, 450, "linux:100"), 450: (self.UID, 200, "linux:80")}
+        self.assertTrue(self.lineage(sibling))  # alive since before the self-test began
+        two_hops = {500: (self.UID, 460, "linux:100"), 460: (self.UID, 400, "linux:95"), 400: (0, 1, "linux:90")}
+        self.assertTrue(self.lineage(two_hops))
+
+    @unittest.skipUnless(Path("/proc/self/environ").exists() and os.geteuid() != 0, "Linux /proc custody, non-root")
+    def test_a_real_non_dumpable_foreign_process_does_not_hold_cleanup(self):
+        # A process that existed before the self-test (an xdist sibling, sshd) starts a
+        # non-dumpable child (ssh/ssh-agent call PR_SET_DUMPABLE 0) during the self-test.
+        script = ("import ctypes, os, sys, time\n"
+                  "sys.stdin.readline()\n"
+                  "if os.fork() == 0:\n"
+                  "    ctypes.CDLL(None).prctl(4, 0, 0, 0, 0)\n"
+                  "    print(os.getpid(), flush=True); time.sleep(60); os._exit(0)\n"
+                  "time.sleep(60)\n")
+        helper = subprocess.Popen([sys.executable, "-c", script], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+        try:
+            with tempfile.TemporaryDirectory() as scratch:
+                cleanup = {}
+                lane.selftest_env(Path(scratch), cleanup=cleanup)
+                helper.stdin.write("go\n"); helper.stdin.flush()
+                child = int(helper.stdout.readline())
+                with self.assertRaises(PermissionError):
+                    Path(f"/proc/{child}/environ").read_bytes()  # the exact EACCES that held cleanup
+                self.assertEqual(lane.marked_processes(cleanup), {})
+        finally:
+            subprocess.run(["pkill", "-P", str(helper.pid)], check=False)
+            helper.kill()
+            helper.wait(timeout=10)
+
+    def test_anything_short_of_proof_keeps_the_hold(self):
+        for name, table in {
+            "owner-descendant": {500: (self.UID, 10, "linux:100")},
+            "reparented-to-init": {500: (self.UID, 1, "linux:100")},
+            "reparented-to-owner-subreaper": {500: (self.UID, 200, "linux:100")},
+            "new-same-uid-parent-only": {500: (self.UID, 460, "linux:100"), 460: (self.UID, 10, "linux:95")},
+            "reused-parent-pid": {500: (self.UID, 400, "linux:100"), 400: (0, 1, "linux:120")},
+            "parent-gone": {500: (self.UID, 400, "linux:100")},
+            "target-reused": {500: (self.UID, 400, "linux:101"), 400: (0, 1, "linux:90")},
+        }.items():
+            with self.subTest(name):
+                self.assertFalse(self.lineage(table))
+
+
 class OperatorInstallerGlueTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix="operator-installer-glue-")

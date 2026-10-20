@@ -8274,6 +8274,59 @@ def _selftest_cleanup_rows(cleanup: dict) -> dict:
     return rows
 
 
+def _proc_identity(pid: int) -> tuple[int, int, str] | None:
+    """(uid, ppid, birth) of any process, readable even when its environ is not."""
+    try:
+        entry = Path("/proc") / str(pid)
+        uid = entry.stat().st_uid
+        fields = (entry / "stat").read_text().rsplit(")", 1)[1].split()
+        if len(fields) < 20 or not fields[1].isdecimal() or not fields[19].isdecimal():
+            return None
+        return uid, int(fields[1]), "linux:" + fields[19]
+    except (OSError, ValueError, IndexError):
+        return None
+
+
+def _birth(start: str) -> int:
+    return int(start.split(":", 1)[1])
+
+
+def _foreign_lineage(pid: int, start: str, cleanup: dict, identity=_proc_identity) -> bool:
+    """True only when an unreadable process provably is not a self-test descendant.
+
+    A non-dumpable same-UID process (sshd/ssh session, ssh-agent) refuses its environ
+    (EACCES, Gem 2026-10-20 and CI ejections of #22305/#22308). A self-test descendant
+    only ever has self-test descendants, the owner, the owner's own ancestors or init in
+    its parent chain (orphans reparent to an ancestor subreaper or init). So the first
+    ancestor that is none of those and is provably not a descendant (another UID, or alive
+    with the same birth since before the self-test began) proves the process foreign.
+    Every parent must predate its child (a reused PID cannot pass). Anything else holds."""
+    owner = cleanup["owner"]["pid"]
+    ancestors, cursor = set(), owner
+    for _ in range(64):
+        found = identity(cursor)
+        if found is None or found[1] <= 1:
+            break
+        ancestors.add(found[1])
+        cursor = found[1]
+    current, expected = pid, start
+    for _ in range(64):
+        found = identity(current)
+        if found is None or found[2] != expected:
+            return False  # gone or reused since observed: unproven
+        child_birth = _birth(expected)
+        parent = found[1]
+        if parent <= 1 or parent == owner or parent in ancestors:
+            return False
+        observed = identity(parent)
+        if observed is None or _birth(observed[2]) > child_birth:
+            return False
+        if observed[0] != cleanup["owner"]["uid"] or cleanup["baseline"].get(parent) == observed[2]:
+            return True
+        current, expected = parent, observed[2]
+    return False
+
+
 def marked_processes(cleanup: dict) -> dict[int, str]:
     """Select only same-UID members of an explicit cleanup subtree, with birth identities."""
     _selftest_cleanup_rows(cleanup)
@@ -8317,6 +8370,8 @@ def marked_processes(cleanup: dict) -> dict[int, str]:
                                               source="proc-stat") from error
                 if after[2].startswith("Z"):
                     continue
+                if _foreign_lineage(pid, row[3], cleanup):
+                    continue  # provably outside the self-test: a non-dumpable sshd/ssh, xdist sibling
                 raise SelftestCleanupHeld("selftest-process-custody-unreadable", pid=pid,
                                           start=row[3], source="proc-environ", error=error) from error
             pairs = [part.split(b"=", 1) for part in raw.split(b"\0") if b"=" in part]
