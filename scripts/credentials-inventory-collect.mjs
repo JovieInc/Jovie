@@ -82,7 +82,10 @@ async function vercelStores(token) {
     });
     if (!response.ok)
       throw new Error(`vercel ${project} HTTP ${response.status}`);
-    const keys = ((await response.json()).envs ?? []).map(env => env.key);
+    const body = /** @type {{ envs?: { key: string }[] }} */ (
+      await response.json()
+    );
+    const keys = (body.envs ?? []).map(env => env.key);
     stores.push({
       id: `vercel:${project}`,
       kind: 'vercel-project-env',
@@ -106,7 +109,13 @@ export function workflowSecretReferences(dir = WORKFLOWS_DIR) {
   return names;
 }
 
+/**
+ * @typedef {{ id: string, kind: string, names: string[],
+ *   environmentNames?: string[], referencedMissing?: string[] }} Store
+ */
+
 async function githubStores() {
+  /** @type {Store[]} */
   const stores = [];
   for (const repo of GITHUB_REPOS) {
     const names = await json('gh', [
@@ -186,14 +195,16 @@ async function main() {
   const observedAt = new Date().toISOString();
   const fresh = [];
   const errors = [];
-  for (const [label, collect] of [
+  /** @type {[string, () => Promise<object[]>][]} */
+  const collectors = [
     ['doppler', dopplerStores],
     [
       'vercel',
       () => vercelStores(process.env.VERCEL_TOKEN || localVercelToken()),
     ],
     ['github', githubStores],
-  ]) {
+  ];
+  for (const [label, collect] of collectors) {
     try {
       fresh.push(...(await collect()));
     } catch (error) {

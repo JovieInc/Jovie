@@ -89,6 +89,19 @@ async function stage(stages, name, now, fn) {
   }
 }
 
+/**
+ * @param {{
+ *   env?: Record<string, string | undefined>,
+ *   live?: boolean,
+ *   vercelCliAuth?: boolean,
+ *   codexPath?: string,
+ *   fetchImpl?: typeof fetch,
+ *   now?: () => number,
+ *   registry?: { credentials: any, spend: any, thirdPartyGrants?: any[] },
+ *   fileLinear?: boolean,
+ *   upsert?: (plan: any) => Promise<any>,
+ * }} [options]
+ */
 export async function runCheck({
   env = process.env,
   live = false,

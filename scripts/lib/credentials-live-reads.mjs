@@ -27,7 +27,9 @@ export async function readGatewayCredits({ token, fetchImpl = fetch, now }) {
   });
   if (!response.ok)
     return { ok: false, reason: `gateway-credits-http-${response.status}` };
-  const body = await response.json();
+  const body = /** @type {{ balance?: string, total_used?: string }} */ (
+    await response.json()
+  );
   const balanceUsd = Number(body?.balance);
   const totalUsedUsd = Number(body?.total_used);
   if (!Number.isFinite(balanceUsd) || !Number.isFinite(totalUsedUsd))
@@ -82,7 +84,8 @@ export async function readSummerGrants({
   });
   if (!response.ok)
     return { ok: false, reason: `vercel-env-http-${response.status}` };
-  const envs = (await response.json())?.envs ?? [];
+  const body = /** @type {{ envs?: any[] }} */ (await response.json());
+  const envs = body?.envs ?? [];
   return { ok: true, value: summarizeGrants(envs) };
 }
 

@@ -298,6 +298,14 @@ export async function loadDomainRecords({
 /**
  * Live credentials/spend evaluation for the sweep. Writes the run record
  * (stage timestamps, counts) to CREDENTIALS_RUN_RECEIPT for the artifact.
+ *
+ * @param {{
+ *   env?: Record<string, string | undefined>,
+ *   check?: (options: { env: Record<string, string | undefined>, live: boolean }) => Promise<{
+ *     run: { stages: { name: string, ok?: boolean, reason?: string }[] },
+ *     plans: any[],
+ *   }>,
+ * }} [options]
  */
 export async function loadCredentialsPlans({
   env = process.env,
