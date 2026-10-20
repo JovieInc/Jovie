@@ -1,6 +1,10 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  advanceOnboardingProfileDraft,
+  emptyOnboardingProfileDraft,
+} from '@/lib/onboarding/profile-draft';
+import {
   type OnboardingProfileBuilderState,
   OnboardingProfileRail,
   resolvePreviewArtist,
@@ -35,6 +39,30 @@ const CONFIRMED_STATE: OnboardingProfileBuilderState = {
 };
 
 describe('OnboardingProfileRail', () => {
+  it('shows the chosen non-music source and goal even with an earlier artist selection', () => {
+    const profileDraft = advanceOnboardingProfileDraft(
+      emptyOnboardingProfileDraft(),
+      {
+        id: 'founder',
+        text: 'I am a founder https://company.example I want buyer contact',
+      }
+    );
+    const state = { ...CONFIRMED_STATE, profileDraft };
+    expect(resolvePreviewArtist(state)).toMatchObject({
+      name: 'company.example',
+      url: '',
+      tagline: 'buyer contact',
+    });
+    render(<OnboardingProfileRail placement='inline' state={state} />);
+    expect(
+      screen.getByTestId('onboarding-profile-rail-inline')
+    ).toHaveAttribute('data-onboarding-stage', 'review');
+    expect(
+      screen.queryByTestId('onboarding-dsp-match-strip')
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('Draft · founder · Review')).toBeInTheDocument();
+    expect(screen.queryByText('Test Artist')).not.toBeInTheDocument();
+  });
   it('renders nothing when there is no preview artist', () => {
     const { container } = render(
       <OnboardingProfileRail

@@ -1,5 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import {
+  advanceOnboardingProfileDraft,
+  emptyOnboardingProfileDraft,
+} from '@/lib/onboarding/profile-draft';
+import {
   EMPTY_ONBOARDING_PROFILE_BUILDER_STATE,
   type OnboardingProfileBuilderState,
   OnboardingProfileRail,
@@ -70,4 +74,54 @@ export const InlineClearance: Story = {
       />
     </div>
   ),
+};
+
+const founderDraft = advanceOnboardingProfileDraft(
+  emptyOnboardingProfileDraft(),
+  {
+    id: 'founder-story',
+    text: 'I am a founder. https://company.example I want qualified buyer contact',
+  }
+);
+if (founderDraft.selectedSource) {
+  founderDraft.selectedSource.status = 'available';
+  founderDraft.selectedSource.title = 'Acme product';
+}
+
+export const FounderDraft: Story = {
+  args: {
+    placement: 'inline',
+    state: {
+      ...EMPTY_ONBOARDING_PROFILE_BUILDER_STATE,
+      handle: 'acme',
+      profileDraft: founderDraft,
+    },
+  },
+  render: args => (
+    <>
+      <OnboardingProfileRail {...args} placement='inline' />
+      <div className='h-170 w-95 max-lg:hidden'>
+        <OnboardingProfileRail {...args} placement='side' />
+      </div>
+    </>
+  ),
+};
+
+export const UnavailableFounderSource: Story = {
+  args: {
+    placement: 'inline',
+    state: {
+      ...EMPTY_ONBOARDING_PROFILE_BUILDER_STATE,
+      profileDraft: {
+        ...founderDraft,
+        selectedSource: founderDraft.selectedSource
+          ? {
+              ...founderDraft.selectedSource,
+              status: 'unavailable',
+              title: null,
+            }
+          : null,
+      },
+    },
+  },
 };

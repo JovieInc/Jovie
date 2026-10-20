@@ -1,6 +1,10 @@
 import type { UIMessage } from 'ai';
 import { describe, expect, it, vi } from 'vitest';
 import { normalizeArtistMetrics } from '@/lib/onboarding/canonical-metrics';
+import {
+  advanceOnboardingProfileDraft,
+  emptyOnboardingProfileDraft,
+} from '@/lib/onboarding/profile-draft';
 import { getSpotifyArtist } from '@/lib/spotify';
 import {
   buildConfirmSpotifyArtistOutput,
@@ -220,6 +224,57 @@ describe('confirmSpotifyArtist tool (JOV-7134)', () => {
       artist: { name: 'David Guetta', followers: 28_000_000 },
     });
     expect(state.spotifyArtistId).toBe('1Cs0zKBU1kc0i8ypK3B9ai');
+  });
+});
+
+describe('adaptive job access and current offer', () => {
+  it('does not reuse music qualification for a founder job or an unresolved priority', async () => {
+    const state = createOnboardingTurnState({
+      sessionId: 'multiple-jobs',
+      turnCount: 3,
+      messages: [assistantMessage],
+    });
+    state.profileDraft = advanceOnboardingProfileDraft(
+      emptyOnboardingProfileDraft(),
+      {
+        id: 'founder',
+        text: 'I am a founder https://company.example I want buyer contact',
+      }
+    );
+    const tools = buildOnboardingTools(state);
+    await expect(
+      tools.proposeNextStep.execute?.({}, {} as never)
+    ).resolves.toMatchObject({ decision: { kind: 'waitlist' } });
+    await expect(
+      tools.proposeCheckout.execute?.({ plan: 'free' }, {} as never)
+    ).resolves.toMatchObject({ action: 'checkout_unavailable' });
+    state.profileDraft = advanceOnboardingProfileDraft(state.profileDraft, {
+      id: 'role-conflict',
+      text: 'I am also a musician',
+    });
+    await expect(
+      tools.proposeNextStep.execute?.({}, {} as never)
+    ).resolves.toMatchObject({
+      decision: {
+        kind: 'needs_more_info',
+        rationale: 'role_priority_required',
+      },
+    });
+  });
+
+  it('rejects an unavailable paid offer even with current artist qualification', async () => {
+    const state = createOnboardingTurnState({
+      sessionId: 'artist-offer',
+      turnCount: 3,
+      messages: [assistantMessage],
+    });
+    const tools = buildOnboardingTools(state);
+    await expect(
+      tools.proposeCheckout.execute?.({ plan: 'pro' }, {} as never)
+    ).resolves.toMatchObject({ action: 'checkout_unavailable' });
+    await expect(
+      tools.proposeCheckout.execute?.({ plan: 'free' }, {} as never)
+    ).resolves.toMatchObject({ action: 'propose_checkout', plan: 'free' });
   });
 });
 
