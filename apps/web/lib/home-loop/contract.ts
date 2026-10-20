@@ -73,6 +73,36 @@ export interface HomeLoopAsk {
   /** A written reply (request changes) is accepted for this ask. */
   readonly canReply: boolean;
   readonly evidence: readonly string[];
+  /**
+   * What happens if the founder stays silent until `deadline`
+   * (`jovie.decision-default/v1`). `null` means no default yet.
+   */
+  readonly decisionDefault: HomeLoopDecisionDefault | null;
+  /** Post-ship feedback is accepted once the ask is decided. */
+  readonly canFeedback: boolean;
+}
+
+export interface HomeLoopDecisionDefault {
+  readonly decision: 'approve' | 'reject';
+  readonly summary: string;
+  readonly deadline: string;
+  /** The asker declared it; otherwise it is the contract's fallback. */
+  readonly declared: boolean;
+}
+
+/** Natural countdown to a deadline: "in 2d", "in 5h", "in 12m", or "now". */
+export function formatCountdown(
+  deadline: string,
+  nowMs: number
+): string | null {
+  const at = Date.parse(deadline);
+  if (!Number.isFinite(at)) return null;
+  const minutes = Math.round((at - nowMs) / 60_000);
+  if (minutes <= 0) return 'now';
+  if (minutes < 60) return `in ${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return `in ${hours}h`;
+  return `in ${Math.round(hours / 24)}d`;
 }
 
 /** One row of the stage latency table: durations already formatted. */
