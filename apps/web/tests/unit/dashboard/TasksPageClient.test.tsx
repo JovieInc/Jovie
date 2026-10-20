@@ -1212,7 +1212,9 @@ describe('TasksPageClient', () => {
       const control = screen.getByRole('button', {
         name: new RegExp(`^${action} .*${value}`),
       });
+      // Named from content, so axe's label-in-name rule cannot diverge.
       expect(control).not.toHaveAttribute('aria-label');
+      expect(control).not.toHaveAttribute('aria-labelledby');
     }
   });
 
