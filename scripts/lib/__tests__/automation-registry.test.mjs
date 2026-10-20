@@ -105,6 +105,7 @@ describe('automation registry', () => {
       schema: REGISTRY_SCHEMA,
       entries: [
         { ...base, id: 'x:no-kill', killSwitch: '' },
+        { ...base, id: 'x:no-identity', runsAs: undefined },
         { ...base, id: 'x:no-beat', heartbeat: undefined },
         {
           ...base,
@@ -128,6 +129,7 @@ describe('automation registry', () => {
       ],
     }).join('\n');
     expect(errors).toMatch(/x:no-kill\): killSwitch is required/);
+    expect(errors).toMatch(/x:no-identity\): runsAs is required/);
     expect(errors).toMatch(
       /x:no-beat\): critical loops declare heartbeat\.proof/
     );
