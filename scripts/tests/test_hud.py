@@ -32,7 +32,7 @@ def plain(line: str) -> str:
 
 
 def cells(frame: list[str], raw: bool = False) -> list[str]:
-    """Each column's segment of each physical row (the panel layout is laid out in columns)."""
+    """Each column's segment of each physical row (the frame is laid out in columns)."""
     return [cell for row in frame for cell in (row if raw else plain(row)).split(hud.GUTTER)]
 
 
@@ -92,7 +92,7 @@ class MergeEvidenceTest(unittest.TestCase):
         sample = model()
         sample["github"].pop("open")
         text = "\n".join(plain(line) for line in hud.render(sample, width=200))
-        self.assertIn("open lane PRs unknown · draft unknown · non-draft unknown", text)
+        self.assertIn("open lane PRs unknown", text)
         self.assertIn("PR list: not-read-yet", text)
         self.assertNotIn("open lane PRs 0", text)
 
@@ -100,10 +100,10 @@ class MergeEvidenceTest(unittest.TestCase):
         sample = model()
         sample["github"]["errors"]["open"] = "github-budget-floor: 529 (< 600) until reset"
         text = "\n".join(plain(line) for line in hud.render(sample, width=200))
-        self.assertIn("open lane PRs unknown · draft unknown · non-draft unknown", text)
+        self.assertIn("open lane PRs unknown", text)
         self.assertIn("github-budget-floor: 529 (< 600) until reset", text)
-        self.assertNotIn("#18724", text)
-        self.assertNotIn("#18712", text)
+        frame = hud.render(sample, width=200)
+        self.assertFalse([cell for cell in cells(frame) if cell.startswith(("#18724 ", "#18712 "))])
 
     def test_non_list_inventory_renders_unknown_without_iterating_titles(self):
         for inventory in (None, {"partial": "unread"}):
@@ -111,7 +111,7 @@ class MergeEvidenceTest(unittest.TestCase):
                 sample = model()
                 sample["github"]["open"] = inventory
                 text = "\n".join(plain(line) for line in hud.render(sample, width=200))
-                self.assertIn("open lane PRs unknown · draft unknown · non-draft unknown", text)
+                self.assertIn("open lane PRs unknown", text)
                 self.assertNotIn("open lane PRs 0", text)
 
     def test_complete_empty_open_inventory_keeps_true_zero(self):
@@ -124,9 +124,9 @@ class MergeEvidenceTest(unittest.TestCase):
     def test_initial_remote_state_does_not_claim_zero_merges(self):
         sample = model(github=hud.Remote(None).github)
         text = "\n".join(plain(line) for line in hud.render(sample, width=200))
-        self.assertIn("RECENTLY MERGED · unknown", text)
+        self.assertIn("merged unknown", text)
         self.assertIn("not-read-yet", text)
-        self.assertNotIn("total 0 in 24h", text)
+        self.assertNotIn("merged 0 in 24h", text)
         self.assertIn("landed unknown", text)
 
     def test_complete_empty_window_remains_true_zero(self):
@@ -134,15 +134,15 @@ class MergeEvidenceTest(unittest.TestCase):
         sample["github"]["merged24h"] = []
         sample["github"]["mergedWindow"] = {"complete": True}
         text = "\n".join(plain(line) for line in hud.render(sample, width=200))
-        self.assertIn("total 0 in 24h", text)
+        self.assertIn("merged 0 in 24h", text)
         self.assertIn("landed 0", text)
 
     def test_explicit_incomplete_receipt_suppresses_stale_rows(self):
         sample = model()
         sample["github"]["mergedWindow"] = {"complete": False, "reason": "unstable_snapshot"}
         text = "\n".join(plain(line) for line in hud.render(sample, width=200))
-        self.assertIn("RECENTLY MERGED · unknown", text)
-        self.assertNotIn("total 2 in 24h", text)
+        self.assertIn("merged unknown", text)
+        self.assertNotIn("merged 2 in 24h", text)
         self.assertNotIn("#18671", text)
 
     def test_unreadable_merge_evidence_is_unknown_not_zero(self):
@@ -150,8 +150,8 @@ class MergeEvidenceTest(unittest.TestCase):
         sample["github"]["errors"]["merged"] = "merged-pr-evidence:unstable_snapshot"
         sample["github"]["merged24h"] = []
         text = "\n".join(plain(line) for line in hud.render(sample, width=200))
-        self.assertIn("RECENTLY MERGED · unknown", text)
-        self.assertNotIn("total 0 in 24h", text)
+        self.assertIn("merged unknown", text)
+        self.assertNotIn("merged 0 in 24h", text)
         self.assertIn("landed unknown", text)
 
     def test_github_model_uses_shared_reader_and_retains_incomplete_reason(self):
@@ -220,8 +220,8 @@ class MergeEvidenceTest(unittest.TestCase):
         self.assertIn("stale", hud.github_source_error(result, "merged", later))
         with mock.patch.object(hud, "utcnow", return_value=later):
             text = "\n".join(plain(row) for row in hud.render(model(github=result), 200, 45))
-        self.assertIn("RECENTLY MERGED · unknown", text)
-        self.assertNotIn("total 0 in 24h", text)
+        self.assertIn("merged unknown", text)
+        self.assertNotIn("merged 0 in 24h", text)
 
     def test_truncated_queue_is_unknown_not_partial_membership(self):
         queue = {"data": {"repository": {"mergeQueue": {"entries": {"totalCount": 21, "nodes": []}}}}}
@@ -325,7 +325,10 @@ class PipelineAccuracyTest(unittest.TestCase):
         return value
 
     def row(self, value, width=160):
-        return next(plain(row) for row in hud.render(value, width, 45) if "#18724" in row)
+        return next(cell for cell in cells(hud.render(value, width, 45)) if cell.startswith("#18724 "))
+
+    def pr_rows(self, frame):
+        return [cell for cell in cells(frame) if cell.startswith(("#18724 ", "#18712 "))]
 
     def test_real_conflict_and_exact_head_hold_are_both_visible_at_console_width(self):
         value = self.sample(held={"sha": "current-head", "reason": "gate-timeout",
@@ -362,7 +365,7 @@ class PipelineAccuracyTest(unittest.TestCase):
 
     def test_queue_then_hold_and_draft_precedence(self):
         queued = self.sample(merge="BLOCKED", draft=True, queued=True)
-        self.assertIn("in queue awaiting_checks", self.row(queued))
+        self.assertIn("queued awaiting_checks", self.row(queued))
         self.assertNotIn("draft · awaiting gate", self.row(queued))
         self.assertIn("DRAFT", self.row(queued))
         held = self.sample(merge="BLOCKED", draft=True, held={"sha": "current-head",
@@ -375,23 +378,24 @@ class PipelineAccuracyTest(unittest.TestCase):
         value = self.sample(merge="BLOCKED", queued=True,
                             held={"sha": "current-head", "reason": "gate-timeout"})
         row = self.row(value)
-        self.assertIn("in queue awaiting_checks", row)
+        self.assertIn("queued awaiting_checks", row)
         self.assertIn("held: gate-timeout", row)
-        self.assertLess(row.index("in queue"), row.index("held:"))
+        self.assertLess(row.index("queued"), row.index("held:"))
 
     def test_long_queued_hold_keeps_its_reason_visible_at_console_width(self):
         value = self.sample(merge="BLOCKED", queued=True,
                             held={"sha": "current-head", "reason": "lockfile-without-manifest"})
         row = self.row(value)
-        self.assertIn("in queue awaiting_checks", row)
+        self.assertIn("queued awaiting_checks", row)
         self.assertIn("held: lockfile-without-manifest", row)
         self.assertLessEqual(len(row), 160)
+        self.assertIn("queued awaiting_checks · held: lockfile-without-manifest", row)
 
     def test_unmatched_hud_release_does_not_claim_a_restart_has_started(self):
         value = self.sample()
         value["local"]["releaseMatchesHud"] = False
         header = plain(hud.render(value, 160, 45)[0])
-        self.assertIn("hud≠release", header)
+        self.assertIn("! hud≠release", header)
         self.assertNotIn("restarting", header)
 
     def test_unread_hold_source_is_unknown_not_zero_or_healthy(self):
@@ -412,7 +416,7 @@ class PipelineAccuracyTest(unittest.TestCase):
                 row = self.row(self.sample(merge=merge))
                 self.assertIn("merge state unknown", row)
                 self.assertNotIn("READY", row)
-                self.assertNotIn("in queue", row)
+                self.assertNotIn("queued", row)
 
     def test_bad_or_stale_source_age_cannot_display_current_pr_or_queue_success(self):
         for stamp in (None, "invalid", "2026-01-01T00:00:00+00:00",
@@ -424,36 +428,38 @@ class PipelineAccuracyTest(unittest.TestCase):
                 self.assertIn("open lane PRs unknown", text)
                 self.assertIn("merge queue unknown", text)
                 self.assertNotIn("#18724", text)
-                self.assertNotIn("in queue", text)
-                self.assertIn("RECENTLY MERGED · unknown", text)
+                self.assertNotIn("queued awaiting", text)
+                self.assertIn("merged unknown", text)
 
     def test_failed_queue_read_does_not_reuse_cached_membership(self):
         value = self.sample(queued=True)
         value["github"]["errors"]["queue"] = "TimeoutError: queue read failed"
         text = "\n".join(plain(row) for row in hud.render(value, 200, 45))
         self.assertIn("merge queue unknown", text)
-        self.assertIn("queue read failed", text)
-        self.assertNotIn("in queue", self.row(value))
+        self.assertIn("queue read: TimeoutError: queue read failed", text)
+        self.assertNotIn("queued", self.row(value))
 
     def test_invalid_section_timestamps_cannot_fall_back_to_fresh_overall_attempt(self):
         for stamps in (None, "invalid", {}, {"queue": hud.utcnow().isoformat()}):
             with self.subTest(stamps=stamps):
                 value = self.sample(queued=True)
                 value["github"]["readAt"] = stamps
-                text = "\n".join(plain(row) for row in hud.render(value, 200, 45))
+                frame = hud.render(value, 200, 45)
+                text = "\n".join(plain(row) for row in frame)
                 self.assertIn("open lane PRs unknown", text)
-                self.assertNotIn("#18724", text)
+                self.assertFalse(self.pr_rows(frame))
 
     def test_section_timestamps_do_not_refresh_older_reads(self):
         value = self.sample(queued=True)
         value["github"]["readAt"] = {"open": "2026-01-01T00:00:00+00:00",
             "queue": value["github"]["fetchedAt"], "merged": value["github"]["fetchedAt"],
             "rate": value["github"]["fetchedAt"]}
-        text = "\n".join(plain(row) for row in hud.render(value, 200, 45))
+        frame = hud.render(value, 200, 45)
+        text = "\n".join(plain(row) for row in frame)
         self.assertIn("open lane PRs unknown", text)
         self.assertIn("merge queue 1", text)
         self.assertIn("stale", text)
-        self.assertNotIn("#18724", text)
+        self.assertFalse(self.pr_rows(frame))
 
 
 class RenderTest(unittest.TestCase):
@@ -472,6 +478,7 @@ class RenderTest(unittest.TestCase):
         self.assertEqual(len(physical_rows), 45)
         self.assertIn("JOVIE · SYMPHONY", plain(physical_rows[0]))
         self.assertIn("gh: budget-floor retry later", "\n".join(plain(row) for row in frame))
+        self.assertTrue(all(len(plain(row)) == 160 for row in frame))
 
     def test_unknown_capacity_is_not_colored_healthy(self):
         value = model()
@@ -480,9 +487,9 @@ class RenderTest(unittest.TestCase):
             "schema": "jovie.capacity-horizon/v1", "generatedAt": hud.utcnow().isoformat(), "incidents": [],
             "topBlocker": "capacity source missing",
             "leases": [{"alias": "current-login", "mode": "unknown", "freshness": {"status": "unknown"}}]}
-        row = next(row for row in hud.render(value, 160, 45) if "current-login ?" in row)
-        self.assertIn(hud.rgb(hud.ORANGE, "")[:-4] + "current-login ?", row)
-        self.assertNotIn(hud.rgb(hud.GREEN, "")[:-4] + "current-login ?", row)
+        row = next(cell for cell in cells(hud.render(value, 160, 45), raw=True) if "current-login ?" in cell)
+        self.assertIn("\x1b[35m? current-login ?", row, "unknown capacity carries the unknown style and glyph")
+        self.assertNotIn("\x1b[36m", row)
 
     def test_dispatcher_slots_respect_zero_overrides_and_autoscaling(self):
         now = hud.utcnow()
@@ -505,9 +512,10 @@ class RenderTest(unittest.TestCase):
     def test_running_and_vacant_slots_are_truthful(self):
         text = "\n".join(plain(line) for line in hud.render(model(), 160, 45))
         self.assertIn("1 running / 3 (devin 1/2 · codex 0/1)", text)
-        self.assertIn("JOV-6544   Audio browsing: verify and close intent prefetch", text)
-        self.assertIn("worker polling · new issues unknown (doctor unread)", text)
-        self.assertIn("codex  vacant · no worker", text)
+        self.assertIn("JOV-6544  issue   agent", text)
+        self.assertIn("Audio browsing", text)
+        self.assertIn("devin      polling · new issues unknown (doctor unread)", text)
+        self.assertIn("codex      vacant · no worker process", text)
         self.assertIn("✓ alpha 48% left · reset 10m · banked 2", text)
         self.assertIn("✕ beta 0% left · reset 1h30m · banked 1 · retry 1h30m", text)
         self.assertIn("● gamma 90% left · reset 2h00m · banked 0 · leased", text)
@@ -518,7 +526,7 @@ class RenderTest(unittest.TestCase):
         text = "\n".join(plain(line) for line in hud.render(value, 160, 45))
         self.assertIn("devin 1/0", text)
         self.assertIn("JOV-6544", text, "a running worker over the reduced cap is still shown")
-        self.assertIn("worker polling", text)
+        self.assertIn("polling", text)
 
     def test_capacity_horizon_is_show_only_and_renders_source_gaps(self):
         value = model()
@@ -531,8 +539,9 @@ class RenderTest(unittest.TestCase):
                         "forecast": {"projectedUnused": None}, "route": {"selectedJob": "JOV-9"},
                         "freshness": {"status": "stale"}}]}
         text = "\n".join(plain(line) for line in hud.render(value, 160, 45))
-        self.assertIn("CAPACITY HORIZON", text)
-        self.assertIn("alpha ? · banked ? · natural reset ? · drain ? @ ? · unused ? · coverage ? · UNKNOWN · selection unknown · stale", text)
+        self.assertIn("capacity horizon", text)
+        self.assertIn("? alpha ? · banked ? · natural reset ?", text)
+        self.assertIn("UNKNOWN · selection unknown · stale", text)
         self.assertIn("show-only", text)
 
     def test_capacity_horizon_ages_saved_receipts_and_account_observations(self):
@@ -548,9 +557,9 @@ class RenderTest(unittest.TestCase):
                         "forecast": {}, "route": {"selectedJob": "JOV-9"},
                         "freshness": {"status": "fresh", "observedAt": now.isoformat()}}]}
         with mock.patch.object(hud, "utcnow", return_value=now + hud.timedelta(seconds=60)):
-            row = next(line for line in hud.render(value, 200, 45) if "alpha 48%" in line)
+            row = next(cell for cell in cells(hud.render(value, 200, 45), raw=True) if "alpha 48%" in cell)
         self.assertIn("natural reset 9m", plain(row), "countdown uses the absolute source deadline")
-        self.assertIn(hud.rgb(hud.GREEN, "")[:-4], row)
+        self.assertIn("\x1b[36m✓ alpha 48%", row)
         for target, key in ((feed, "at"), (feed["capacity"], "generatedAt")):
             for stamp in (None, "invalid", now.replace(tzinfo=None).isoformat(),
                           (now + hud.timedelta(seconds=1)).isoformat(),
@@ -558,7 +567,7 @@ class RenderTest(unittest.TestCase):
                 with self.subTest(key=key, stamp=stamp), mock.patch.object(hud, "utcnow", return_value=now):
                     target[key] = stamp
                     text = "\n".join(plain(line) for line in hud.render(value, 200, 45))
-                    self.assertIn("CAPACITY HORIZON  unknown", text)
+                    self.assertIn("capacity horizon unknown", text)
                     self.assertNotIn("alpha 48%", text)
                     self.assertNotIn("NORMAL", text)
             target[key] = now.isoformat()
@@ -570,9 +579,9 @@ class RenderTest(unittest.TestCase):
             with self.subTest(stamp=stamp), mock.patch.object(hud, "utcnow", return_value=now):
                 freshness["observedAt"] = stamp
                 frame = hud.render(value, 200, 45)
-                row = next(line for line in frame if "alpha ?" in line)
-                self.assertIn("UNKNOWN · selection unknown · " + expected, plain(row))
-                self.assertNotIn(hud.rgb(hud.GREEN, "")[:-4], row)
+                row = next(cell for cell in cells(frame, raw=True) if "alpha ?" in cell)
+                self.assertRegex(plain(row), r"UNKNOWN( · selection unknown)? · " + expected)
+                self.assertNotIn("\x1b[36m", row)
                 self.assertIn("top blocker: capacity source " + expected, "\n".join(plain(line) for line in frame))
                 self.assertNotIn("no material blocker", "\n".join(plain(line) for line in frame))
 
@@ -586,7 +595,7 @@ class RenderTest(unittest.TestCase):
         for stamp in (None, "bad", now.replace(tzinfo=None).isoformat()):
             with self.subTest(stamp=stamp):
                 value["local"]["doctor"]["capacity"]["leases"][0]["event"]["at"] = stamp
-                row = next(plain(line) for line in hud.render(value, 200, 45) if "alpha ?" in line)
+                row = next(cell for cell in cells(hud.render(value, 200, 45)) if "alpha ?" in cell)
                 self.assertIn("source gap ?", row)
                 self.assertNotIn("10m", row)
 
@@ -601,10 +610,10 @@ class RenderTest(unittest.TestCase):
                     value["local"]["doctor"] = {"capacity": capacity}
                     account = value["local"]["codex"]["accounts"]["alpha"]
                     account["capacityLease"] = {"sources": {"capacity": {"observedAt": stamp}}}
-                    row = next(line for line in hud.render(value, 200, 45) if "alpha" in line)
+                    row = next(cell for cell in cells(hud.render(value, 200, 45), raw=True) if "alpha capacity" in cell)
                     self.assertIn("? alpha capacity " + expected, plain(row))
                     self.assertNotIn("48%", row)
-                    self.assertNotIn(hud.rgb(hud.GREEN, "")[:-4], row)
+                    self.assertNotIn("\x1b[36m", row)
 
     def test_pipeline_attention_and_backlog_rows(self):
         value = model()
@@ -613,21 +622,22 @@ class RenderTest(unittest.TestCase):
                                              "actionTaken": "stack", "files": ["scripts/lanes/lane_runner.py"]}],
             "metrics": {"conflicts_prevented": 2, "overlap_flags": 3, "rebases_caused_by_overlap": 1}}
         text = "\n".join(plain(line) for line in hud.render(value, 160, 45))
-        self.assertIn("#18724 devin  JOV-6544", text)
-        self.assertIn("unstable", text)
-        self.assertIn("in queue awaiting_checks", text)
+        self.assertIn("#18724 JOV-6544  OPEN  queued awaiting_checks  devin · JOV-6544 fix(audio)", text)
+        self.assertIn("queued awaiting_checks", text)
         self.assertIn("held: check-failed:pre-push-gate.sh affected", text)
-        self.assertIn("✕ dispatch-crash: dispatch failed 3 ticks in a row", text)
+        self.assertIn("✕ dispatch-crash: dispatch failed 3 ticks in a row · owner ?", text)
         self.assertIn("cooldown hyperagent 10m", text)
         self.assertIn("requeue pending #18720", text)
         self.assertIn("gate-timeout 2", text)
-        self.assertIn("Todo candidates 99 (agent-ready 87 · devin 0 · codex 19)", text)
-        self.assertIn("verified 0/2 · inferred 0 · unknown 2 · total 2 in 24h", text)
-        self.assertIn("THROUGHPUT 24h · codex offer 0", text)
-        self.assertIn("devin offer 1 start 1 productive 1 PR 1 first-pass 100%", text)
+        self.assertIn("Todo 99 →", text)
+        self.assertIn("attribution verified 0/2 · inferred 0 · unknown 2", text)
+        self.assertIn("merged 2 in 24h", text)
+        self.assertIn("codex      24h started 0", text)
+        self.assertIn("devin      24h started 1 · productive 1 · PR 1 · first-pass 100%", text)
         self.assertIn("disk 3.1% free", text)
-        self.assertIn("FILE OVERLAP  enforce · active 1 · prevented 2 · flags 3 · rebases 1", text)
-        self.assertIn("pr:#20141 → pr:#20166 stack scripts/lanes/lane_runner.py", text)
+        # Vanity counters are gone: overlap flags never answered an operator question.
+        self.assertNotIn("FILE OVERLAP", text)
+        self.assertNotIn("flags 3", text)
 
     def test_failed_sources_render_their_reason_never_a_blank(self):
         broken = model(linear={"ok": False, "error": "HTTPError: 429"},
@@ -638,12 +648,12 @@ class RenderTest(unittest.TestCase):
         text = "\n".join(plain(line) for line in hud.render(broken, 160, 45))
         self.assertIn("Linear HTTPError: 429", text)
         self.assertIn("PR list: RuntimeError: HTTP 504", text)
-        self.assertIn("merge queue unknown · timeout", text)
+        self.assertIn("merge queue unknown", text)
+        self.assertIn("queue read: timeout", text)
         self.assertIn("new issues unknown (doctor unread)", text)
         self.assertIn("FileNotFoundError: codex", text)
-        self.assertIn("no alerts recorded", text)
-        self.assertNotIn("CAPACITY HORIZON", text, "a broken codex lane is not an unknown capacity horizon")
-        self.assertIn("CONSTRAINT ? UNKNOWN   evidence · lanes-status unread", text)
+        self.assertIn("? lanes-status unread · owner doctor.py on the primary host", text)
+        self.assertNotIn("no alerts recorded", text, "an unread feed is itself an alert")
 
     def test_stale_remote_reads_are_flagged_in_the_header(self):
         stale = model()
@@ -662,9 +672,12 @@ class RenderTest(unittest.TestCase):
             "candidatePoolByProvider": {"devin": 8, "codex": 1},
             "rejectedByProvider": {"devin": {"excluded-label:type:epic": 5, "sensitive-text": 3}}})
         text = "\n".join(plain(line) for line in hud.render(value, 160, 45))
-        self.assertIn("new issues 0 · eligible 0/8 · PRs 0/8 within-budget · excluded-label:type:epic 5, sensitive-text 3", text)
-        self.assertIn("NEW ISSUES devin", text)
+        self.assertIn("devin      new 0 · eligible 0/8 · PRs 0/8 within-budget", text)
+        self.assertIn("   5 excluded  excluded-label:type:epic", text)
+        self.assertIn("   3 excluded  sensitive-text", text)
         self.assertNotIn("pool 87", text)
+        self.assertEqual(hud.pool_hint("devin", value["local"]),
+                         "new issues 0 · eligible 0/8 · PRs 0/8 within-budget · excluded-label:type:epic 5, sensitive-text 3")
         # An unrelated direct Linear read failure does not invalidate the fresh receipt.
         value["linear"] = {"ok": False, "error": "HTTP 429"}
         self.assertIn("new issues 0 · eligible 0/8 · PRs 0/8 within-budget", hud.pool_hint("devin", value["local"]))
@@ -715,7 +728,7 @@ class RenderTest(unittest.TestCase):
         self.assertEqual(hud.pool_hint("codex", local), "new issues unknown (PR budget unread)")
 
     def test_clip_keeps_ansi_balanced_and_width_exact(self):
-        colored = hud.rgb(hud.RED, "x" * 50)
+        colored = hud.paint("fail", "x" * 50)
         self.assertEqual(len(plain(hud.clip(colored, 10))), 10)
         self.assertEqual(len(plain(hud.pad("ab", 5))), 5)
         self.assertEqual(hud.dur(5400), "1h30m")
@@ -760,7 +773,8 @@ class LedgerSchemaTest(unittest.TestCase):
         self.assertEqual(local["slots"], {"devin": 0, "codex": 3})
         self.assertEqual(local["slotEvidence"], "fresh-dispatcher")
         text = "\n".join(plain(row) for row in hud.render(model(local=local), 160, 45))
-        self.assertIn("running / 3 (devin 0/0 · codex 0/3)", text)
+        self.assertIn("running / 3 (codex 0/3)", text)
+        self.assertIn("off devin", text)
         self.assertNotIn("running / 7", text)
 
     def test_temporary_ledger_uses_its_process_snapshot(self):
@@ -785,7 +799,7 @@ class LedgerSchemaTest(unittest.TestCase):
             local = hud.local_model(host)
         self.assertEqual(local["workers"], [worker])
         text = "\n".join(plain(row) for row in hud.render(model(local=local), 160, 45))
-        self.assertIn("running / 3 (devin 0/0 · codex 1/3)", text)
+        self.assertIn("running / 3 (codex 1/3)", text)
 
     def test_missing_and_null_verdicts_become_unclassified_not_a_crash(self):
         host = self.host_with_ledger([
@@ -1013,7 +1027,7 @@ class SlotViewportTest(unittest.TestCase):
             self.assertEqual(hud.main(["--once", "--width", "120", "--height", "30", "--slot-offset", "33"]), 0)
         self.assertIn("JOV-90035", output.getvalue())
         self.assertNotIn("JOV-90000", output.getvalue())
-        self.assertIn("Rows 34-36 of 36", output.getvalue())
+        self.assertRegex(output.getvalue(), r"Rows \d+-36 of 36")
         keyboard.assert_not_called()
 
 
@@ -1143,12 +1157,14 @@ class PromotionTest(unittest.TestCase):
         hud._promotion.update(at=0.0, data=None)
 
     def test_line_renders_metrics_and_errors(self):
-        text = "\n".join(plain(line) for line in hud.render(model(github={**model()["github"], "promotion": self.METRICS}), 200, 45))
-        self.assertIn("first-pass 74% · ejected→back p75 365m (2 waiting) · open→enqueue p75 106.7m", text)
-        self.assertIn("opens/h 12.6 vs merges/h 7.3 · CLEAN not queued 6 · keys >1 PR 10", text)
-        self.assertIn("queue entries/merge 2.2", text)
-        self.assertIn("PROMOTION 8h  unread", plain(hud.promotion_line(None)))
-        self.assertIn("boom", plain(hud.promotion_line({"error": "boom"})))
+        text = "\n".join(plain(line) for line in hud.render(model(github={**model()["github"], "promotion": self.METRICS}), 160, 45))
+        self.assertIn("first-pass 74% · ejected→back p75 365m (2 waiting)", text)
+        self.assertIn("open→enqueue p75 106.7m · CLEAN not queued 6 · queue entries/merge 2.2", text)
+        self.assertNotIn("keys >1 PR", text, "a vanity counter, dropped from the HUD")
+        self.assertIn("? promotion: not-read-yet", plain(hud.promotion_lines(None)[0]))
+        narrow = "\n".join(plain(line) for line in hud.render(model(github={**model()["github"], "promotion": self.METRICS}), 200, 45))
+        self.assertIn("open→enqueue p75 106.7m", narrow, "narrow columns drop whole parts, never the lead metric")
+        self.assertIn("boom", plain(hud.promotion_lines({"error": "boom"})[0]))
 
     def test_model_runs_the_script_once_per_interval_and_reports_failures(self):
         calls = []
@@ -1208,231 +1224,6 @@ class LinearAndBudgetTest(unittest.TestCase):
         finally:
             hud.lane.subprocess.run = original
         self.assertEqual(seen[0][:3], ["gh", "api", "graphql"])
-
-
-class ProductionTest(unittest.TestCase):
-    PROD, MAIN = "a" * 40, "b" * 40
-    DONE, PENDING, ELSEWHERE = "c" * 40, "d" * 40, "e" * 40
-
-    def git(self, behind=(), recent=()):
-        def run(args, **_):
-            command = args[3:]
-            out, code = "", 0
-            if command[:1] == ["rev-parse"]:
-                ref = command[-1]
-                out = self.MAIN if "origin/main" in ref else self.PROD if ref.startswith("060037d") else ""
-                code = 0 if out else 1
-            elif command[:1] == ["rev-list"]:
-                out = "\n".join(recent if "--since=72 hours ago" in command else behind)
-            return SimpleNamespace(returncode=code, stdout=out)
-        return run
-
-    def test_served_build_ancestry_marks_each_merge_deployed_or_not(self):
-        merged = [{"number": 1, "mergeCommit": {"oid": self.DONE}}, {"number": 2, "mergeCommit": {"oid": self.PENDING}},
-                  {"number": 3, "mergeCommit": self.ELSEWHERE}, {"number": 4, "mergeCommit": None}]
-        with tempfile.TemporaryDirectory() as directory:
-            history = Path(directory) / hud.SERVED_BUILDS
-            result = hud.production_model(Path("/repo"), merged, history, fetch=lambda: "060037d",
-                                          run=self.git(behind=[self.PENDING, self.MAIN], recent=[self.DONE, self.PENDING]),
-                                          marker=lambda sha, now: {"status": "verified", "at": "2026-10-20T13:15:52Z"},
-                                          now=1_800_000_000)
-            self.assertEqual(json.loads(history.read_text())[-1]["buildId"], "060037d")
-        self.assertIsNone(result["error"])
-        self.assertEqual((result["prodSha"], result["mainSha"], result["behind"]), (self.PROD, self.MAIN, 2))
-        self.assertEqual(result["deployed"], {self.DONE: True, self.PENDING: False, self.ELSEWHERE: None})
-
-    def test_unknown_build_or_unreadable_ancestry_is_an_error_not_a_deploy(self):
-        for fetch, run, expected in ((lambda: "f" * 7, self.git(), "not in the local clone"),
-                                     (self.fail_fetch, self.git(), "production version unread")):
-            with self.subTest(expected=expected):
-                result = hud.production_model(Path("/repo"), [], None, fetch=fetch, run=run, marker=lambda *_: {}, now=1)
-                self.assertIn(expected, result["error"])
-                self.assertEqual(result["deployed"], {})
-
-    def test_stale_production_read_is_unknown(self):
-        value = model()
-        value["production"] = {"readAt": "2026-01-01T00:00:00+00:00", "prodSha": self.PROD}
-        text = "\n".join(plain(row) for row in hud.render(value, 160, 45))
-        self.assertIn("served build unknown · stale", text)
-        self.assertIn("deployed ?", text)
-
-    def test_production_rows_show_served_build_lag_and_the_state_flow(self):
-        value = model()
-        now = hud.utcnow() + hud.timedelta(seconds=1)  # after every read the fixture stamps
-        merged = value["github"]["merged24h"]
-        merged[0].update(mergeCommit={"oid": self.DONE}, mergedAt=(now - hud.timedelta(hours=5)).isoformat())
-        merged[1].update(mergeCommit={"oid": self.PENDING}, mergedAt=(now - hud.timedelta(hours=4)).isoformat())
-        value["production"] = {"readAt": now.isoformat(), "error": None, "buildId": "060037d", "prodSha": self.PROD,
-                               "mainSha": self.MAIN, "behind": 3, "marker": {"status": "verified", "at": (now - hud.timedelta(hours=6)).isoformat()},
-                               "deployed": {self.DONE: True, self.PENDING: False}}
-        frame = [plain(row) for row in hud.render(value, 160, 45, now=now)]
-        self.assertIn("CONSTRAINT ✕ FAIL   deploy · 1 merged PR(s) not in production · oldest 4h00m", frame[1])
-        self.assertIn(f"serves {self.PROD[:7]} · ✓ verified 6h00m ago · main {self.MAIN[:7]} · behind 3 commits · 1 undeployed", frame[2])
-        self.assertIn("draft 1 → prepared 0 → queued 2 → merged 2 → deployed 1 → verified 1", frame[3])
-        value["production"]["marker"] = {"status": "pending"}
-        frame = [plain(row) for row in hud.render(value, 160, 45, now=now)]
-        self.assertIn("Production Verified marker pending", frame[2])
-        self.assertIn("deployed 1 → verified ?", frame[3], "a pending marker is not verification")
-
-    @staticmethod
-    def fail_fetch():
-        raise RuntimeError("production version unread (URLError)")
-
-    def test_served_build_is_bounded_validated_and_retried_once(self):
-        class Response(io.BytesIO):
-            def __enter__(self):
-                return self
-            def __exit__(self, *_):
-                return False
-        calls = []
-        def opener(request, timeout):
-            calls.append(timeout)
-            if len(calls) == 1:
-                raise OSError("reset")
-            return Response(b'{"buildId": "060037D"}')
-        self.assertEqual(hud.served_build(opener=opener), "060037d")
-        self.assertEqual(calls, [5, 5])
-        with self.assertRaisesRegex(RuntimeError, "not a commit"):
-            hud.served_build(opener=lambda *_args, **_kw: Response(b'{"buildId": "main"}'))
-        with self.assertRaisesRegex(RuntimeError, "unread"):
-            hud.served_build(opener=mock.Mock(side_effect=OSError("down")))
-
-    def test_verified_marker_is_final_and_pending_is_asked_again_per_interval(self):
-        hud._markers.clear()
-        name = "production-generation-verified-" + self.PROD
-        pages = [{"artifacts": []}, {"artifacts": []},
-                 {"artifacts": [{"name": name, "expired": False, "workflow_run": {"head_branch": "main"},
-                                 "created_at": "2026-10-20T13:15:52Z"}]}]
-        gh = mock.Mock(side_effect=pages)
-        self.assertEqual(hud.verified_marker(self.PROD, 1000, gh)["status"], "pending")
-        self.assertEqual(hud.verified_marker(self.PROD, 1000 + hud.REFRESH_GITHUB_S - 1, gh)["status"], "pending")
-        self.assertEqual(gh.call_count, 2, "both marker names were read once")
-        verified = hud.verified_marker(self.PROD, 1000 + hud.REFRESH_GITHUB_S, gh)
-        self.assertEqual((verified["status"], verified["at"]), ("verified", "2026-10-20T13:15:52Z"))
-        self.assertIs(hud.verified_marker(self.PROD, 10 ** 9, gh), verified)
-        hud._markers.clear()
-        self.assertEqual(hud.verified_marker(self.PROD, 1, mock.Mock(return_value={"oops": 1}))["status"], "unknown")
-        hud._markers.clear()
-
-
-class RefreshCostTest(unittest.TestCase):
-    def test_ledger_reads_only_appended_complete_lines(self):
-        with tempfile.TemporaryDirectory() as directory:
-            state = Path(directory)
-            (state / "runs").mkdir()
-            ledger = state / "runs" / "ledger.jsonl"
-            ledger.write_text('{"runId": "a"}\n{"runId": "b"}\n')
-            rows = hud.ledger_rows(state)
-            self.assertEqual([row["runId"] for row in rows], ["a", "b"])
-            with mock.patch.object(hud.json, "loads", wraps=json.loads) as parse:
-                self.assertIs(hud.ledger_rows(state), rows)
-                parse.assert_not_called()
-            with open(ledger, "a") as handle:
-                handle.write('{"runId": "c"}\nnot json\n[1]\n{"runId": "d"')
-            self.assertEqual([row["runId"] for row in hud.ledger_rows(state)], ["a", "b", "c"])
-            with open(ledger, "a") as handle:
-                handle.write("}\n")
-            self.assertEqual([row["runId"] for row in hud.ledger_rows(state)], ["a", "b", "c", "d"])
-            ledger.write_text('{"runId": "z"}\n')
-            self.assertEqual([row["runId"] for row in hud.ledger_rows(state)], ["z"])
-            ledger.unlink()
-            self.assertEqual(hud.ledger_rows(state), [])
-
-    def test_state_json_is_parsed_again_only_when_it_changes(self):
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "lanes-status.json"
-            path.write_text('{"at": 1}')
-            first = hud.read_json_cached(path)
-            with mock.patch.object(hud, "read_json", wraps=hud.read_json) as read:
-                self.assertIs(hud.read_json_cached(path), first)
-                read.assert_not_called()
-            path.write_text('{"at": 22}')
-            self.assertEqual(hud.read_json_cached(path), {"at": 22})
-            path.unlink()
-            self.assertIsNone(hud.read_json_cached(path))
-
-    def test_redraw_writes_only_changed_rows(self):
-        first = hud.paint_frame(["a", "b", "c"], None)
-        self.assertEqual(first, "\x1b[1;1H\x1b[Ka\x1b[2;1H\x1b[Kb\x1b[3;1H\x1b[Kc")
-        self.assertEqual(hud.paint_frame(["a", "B", "c"], ["a", "b", "c"]), "\x1b[2;1H\x1b[KB")
-        self.assertEqual(hud.paint_frame(["a", "b", "c"], ["a", "b", "c"]), "")
-
-    def test_receipt_joins_are_reused_until_the_ledger_or_window_moves(self):
-        value = model()
-        receipts = value["local"]["attributionReceipts"]
-        with mock.patch.object(hud.lane, "pr_attribution", wraps=hud.lane.pr_attribution) as attribute:
-            first = hud.derived(value)
-            self.assertIs(hud.derived(value), first)
-            calls = attribute.call_count
-            receipts.append(dict(receipts[0], runId="lane-2"))
-            self.assertIsNot(hud.derived(value), first)
-            self.assertGreater(attribute.call_count, calls)
-
-
-class ConstraintTest(unittest.TestCase):
-    def facts(self, **feed):
-        base = {"schema": hud.STATUS_SCHEMA, "at": hud.utcnow().isoformat(), "running": 4, "idle": 0,
-                "admission": {"eligiblePool": 3, "candidatePool": 9, "rejectedByProvider": {}},
-                "mergeThroughput": {"mergedPerHour": 4, "ejectionRate": 0}}
-        base.update(feed)
-        value = model()
-        value["local"]["feed"] = base
-        return hud.interpret(value, hud.utcnow())
-
-    def test_ladder_names_capacity_intake_queue_and_evidence(self):
-        self.assertEqual(self.facts()["constraint"][:2], ("warn", "worker capacity"))
-        intake = self.facts(admission={"eligiblePool": 0, "candidatePool": 9,
-                                       "rejectedByProvider": {"codex": {"sensitive-text": 6}, "grok": {"sensitive-text": 6}}})
-        self.assertEqual(intake["constraint"][:2], ("warn", "intake"))
-        self.assertIn((1, "sensitive-text 6"), intake["constraint"][2])
-        queue = self.facts(mergeThroughput={"ejectionRate": 0.5, "queueDepth": 4})
-        self.assertEqual(queue["constraint"][:2], ("warn", "merge queue"))
-        flowing = self.facts(idle=2)
-        self.assertEqual(flowing["constraint"][:2], ("ok", "none binding"))
-        value = model()
-        value["local"]["feed"] = {"schema": hud.STATUS_SCHEMA, "at": "2026-01-01T00:00:00Z"}
-        self.assertEqual(hud.interpret(value, hud.utcnow())["constraint"][:2], ("unknown", "evidence"))
-
-    def test_status_feed_is_only_current_evidence(self):
-        now = hud.utcnow()
-        for feed, error in ((None, "lanes-status unread"), ({"schema": "other"}, "lanes-status schema other"),
-                            ({"schema": hud.STATUS_SCHEMA, "at": "bad"}, "lanes-status age unknown"),
-                            ({"schema": hud.STATUS_SCHEMA, "at": (now - hud.timedelta(seconds=300)).isoformat()}, "lanes-status stale 5m")):
-            with self.subTest(error=error):
-                self.assertEqual(hud.status_feed({"feed": feed}, now), (None, error))
-
-
-class ConsoleTextTest(unittest.TestCase):
-    def test_untrusted_text_cannot_inject_escapes_or_shift_columns(self):
-        self.assertEqual(hud.console_text("ok\x1b[2Jé漢😀\ttab"), "ok?[2Jé?? tab")
-        self.assertEqual(hud.titled("#1 ", "x\x1b[31my", 20), "#1 x?[31my")
-        self.assertEqual(hud.titled("#1 ", "fix(leads): normalize names (JOV-7859)", 36), "#1 fix(leads): normalize names…")
-
-    def test_fit_drops_whole_parts_least_important_first(self):
-        parts = [(0, "#22307 merged"), (2, "low value"), (1, "deployed 7")]
-        self.assertEqual(plain(hud.fit(parts, 40)), "#22307 merged · low value · deployed 7")
-        self.assertEqual(plain(hud.fit(parts, 26)), "#22307 merged · deployed 7")
-        self.assertEqual(plain(hud.fit(parts, 14)), "#22307 merged")
-    def test_row_allocation_is_fixed_by_geometry_alone(self):
-        for count, columns in hud.LAYOUTS.items():
-            for rows in (19, 40, 60):
-                for names in columns:
-                    alloc = hud.allocate(names, rows)
-                    with self.subTest(columns=count, rows=rows, names=names):
-                        self.assertEqual(sum(alloc.values()), rows)
-                        self.assertEqual(alloc, hud.allocate(names, rows))
-        self.assertEqual(hud.allocate(["workers", "supply"], 4), {"workers": 4}, "a panel that cannot fit is hidden whole")
-
-
-    def test_once_draws_the_panel_layout_on_request(self):
-        value, now = fixture("live")
-        output = io.StringIO()
-        with mock.patch.object(hud.lane, "Host"), mock.patch.object(hud.lane, "load_github_env"), \
-                mock.patch.object(hud, "build_model", return_value=value), \
-                mock.patch.object(hud, "utcnow", return_value=now), mock.patch.object(hud.sys, "stdout", output):
-            self.assertEqual(hud.main(["--once", "--layout", "panels", "--width", "160", "--height", "45"]), 0)
-        self.assertIn(" WORKERS ", output.getvalue())
-        self.assertNotIn("ACTIVE SLOTS", output.getvalue())
 
 
 FIXTURES = ROOT / "scripts/lanes/hud_fixtures"
@@ -1497,7 +1288,7 @@ class FrameSnapshotTest(unittest.TestCase):
         for name in FIXTURE_NAMES:
             for width, height in SNAPSHOT_SIZES:
                 value, now = fixture(name)
-                cls.rendered.append((name, width, height, hud.render_panels(value, width, height, now=now)))
+                cls.rendered.append((name, width, height, hud.render(value, width, height, now=now)))
 
     def frames(self):
         return iter(self.rendered)
@@ -1558,7 +1349,7 @@ class FrameSnapshotTest(unittest.TestCase):
 
     def test_the_live_frame_answers_the_operator_questions_in_order(self):
         value, now = fixture("live")
-        frame = [plain(row) for row in hud.render_panels(value, 160, 45, now=now)]
+        frame = [plain(row) for row in hud.render(value, 160, 45, now=now)]
         self.assertIn("CONSTRAINT ! WARN   deploy · 7 merged PR(s) not in production · oldest 1h41m", frame[1])
         self.assertIn("serves 060037d · ✓ verified", frame[2])
         self.assertIn("behind 18 commits", frame[2])
@@ -1570,7 +1361,7 @@ class FrameSnapshotTest(unittest.TestCase):
 
     def test_degraded_sources_say_so_and_the_worst_constraint_wins(self):
         value, now = fixture("degraded")
-        frame = [plain(row) for row in hud.render_panels(value, 160, 45, now=now)]
+        frame = [plain(row) for row in hud.render(value, 160, 45, now=now)]
         text = "\n".join(frame)
         self.assertIn("CONSTRAINT ✕ FAIL   delivery", frame[1])
         self.assertIn("Production Verified marker pending", frame[2])
@@ -1585,8 +1376,223 @@ class FrameSnapshotTest(unittest.TestCase):
 
     def test_missing_data_renders_unknown_never_zero(self):
         value, now = fixture("missing")
-        text = "\n".join(plain(row) for row in hud.render_panels(value, 80, 24, now=now))
+        text = "\n".join(plain(row) for row in hud.render(value, 80, 24, now=now))
         self.assertIn("CONSTRAINT ? UNKNOWN", text)
         self.assertIn("served build unknown", text)
         self.assertIn("merged ? → deployed ? → verified ?", text)
         self.assertNotRegex(text, r"merged 0|deployed 0|open lane PRs 0")
+
+
+class ConstraintTest(unittest.TestCase):
+    def facts(self, **feed):
+        base = {"schema": hud.STATUS_SCHEMA, "at": hud.utcnow().isoformat(), "running": 4, "idle": 0,
+                "admission": {"eligiblePool": 3, "candidatePool": 9, "rejectedByProvider": {}},
+                "mergeThroughput": {"mergedPerHour": 4, "ejectionRate": 0}}
+        base.update(feed)
+        value = model()
+        value["local"]["feed"] = base
+        return hud.interpret(value, hud.utcnow())
+
+    def test_ladder_names_capacity_intake_queue_and_evidence(self):
+        self.assertEqual(self.facts()["constraint"][:2], ("warn", "worker capacity"))
+        intake = self.facts(admission={"eligiblePool": 0, "candidatePool": 9,
+                                       "rejectedByProvider": {"codex": {"sensitive-text": 6}, "grok": {"sensitive-text": 6}}})
+        self.assertEqual(intake["constraint"][:2], ("warn", "intake"))
+        self.assertIn((1, "sensitive-text 6"), intake["constraint"][2])
+        queue = self.facts(mergeThroughput={"ejectionRate": 0.5, "queueDepth": 4})
+        self.assertEqual(queue["constraint"][:2], ("warn", "merge queue"))
+        flowing = self.facts(idle=2)
+        self.assertEqual(flowing["constraint"][:2], ("ok", "none binding"))
+        value = model()
+        value["local"]["feed"] = {"schema": hud.STATUS_SCHEMA, "at": "2026-01-01T00:00:00Z"}
+        self.assertEqual(hud.interpret(value, hud.utcnow())["constraint"][:2], ("unknown", "evidence"))
+
+    def test_status_feed_is_only_current_evidence(self):
+        now = hud.utcnow()
+        for feed, error in ((None, "lanes-status unread"), ({"schema": "other"}, "lanes-status schema other"),
+                            ({"schema": hud.STATUS_SCHEMA, "at": "bad"}, "lanes-status age unknown"),
+                            ({"schema": hud.STATUS_SCHEMA, "at": (now - hud.timedelta(seconds=300)).isoformat()}, "lanes-status stale 5m")):
+            with self.subTest(error=error):
+                self.assertEqual(hud.status_feed({"feed": feed}, now), (None, error))
+
+
+class ProductionTest(unittest.TestCase):
+    PROD, MAIN = "a" * 40, "b" * 40
+    DONE, PENDING, ELSEWHERE = "c" * 40, "d" * 40, "e" * 40
+
+    def git(self, behind=(), recent=()):
+        def run(args, **_):
+            command = args[3:]
+            out, code = "", 0
+            if command[:1] == ["rev-parse"]:
+                ref = command[-1]
+                out = self.MAIN if "origin/main" in ref else self.PROD if ref.startswith("060037d") else ""
+                code = 0 if out else 1
+            elif command[:1] == ["rev-list"]:
+                out = "\n".join(recent if "--since=72 hours ago" in command else behind)
+            return SimpleNamespace(returncode=code, stdout=out)
+        return run
+
+    def test_served_build_ancestry_marks_each_merge_deployed_or_not(self):
+        merged = [{"number": 1, "mergeCommit": {"oid": self.DONE}}, {"number": 2, "mergeCommit": {"oid": self.PENDING}},
+                  {"number": 3, "mergeCommit": self.ELSEWHERE}, {"number": 4, "mergeCommit": None}]
+        with tempfile.TemporaryDirectory() as directory:
+            history = Path(directory) / hud.SERVED_BUILDS
+            result = hud.production_model(Path("/repo"), merged, history, fetch=lambda: "060037d",
+                                          run=self.git(behind=[self.PENDING, self.MAIN], recent=[self.DONE, self.PENDING]),
+                                          marker=lambda sha, now: {"status": "verified", "at": "2026-10-20T13:15:52Z"},
+                                          now=1_800_000_000)
+            self.assertEqual(json.loads(history.read_text())[-1]["buildId"], "060037d")
+        self.assertIsNone(result["error"])
+        self.assertEqual((result["prodSha"], result["mainSha"], result["behind"]), (self.PROD, self.MAIN, 2))
+        self.assertEqual(result["deployed"], {self.DONE: True, self.PENDING: False, self.ELSEWHERE: None})
+
+    def test_unknown_build_or_unreadable_ancestry_is_an_error_not_a_deploy(self):
+        for fetch, run, expected in ((lambda: "f" * 7, self.git(), "not in the local clone"),
+                                     (self.fail_fetch, self.git(), "production version unread")):
+            with self.subTest(expected=expected):
+                result = hud.production_model(Path("/repo"), [], None, fetch=fetch, run=run, marker=lambda *_: {}, now=1)
+                self.assertIn(expected, result["error"])
+                self.assertEqual(result["deployed"], {})
+
+    def test_production_rows_show_served_build_lag_and_the_state_flow(self):
+        value = model()
+        now = hud.utcnow() + hud.timedelta(seconds=1)  # after every read the fixture stamps
+        merged = value["github"]["merged24h"]
+        merged[0].update(mergeCommit={"oid": self.DONE}, mergedAt=(now - hud.timedelta(hours=5)).isoformat())
+        merged[1].update(mergeCommit={"oid": self.PENDING}, mergedAt=(now - hud.timedelta(hours=4)).isoformat())
+        value["production"] = {"readAt": now.isoformat(), "error": None, "buildId": "060037d", "prodSha": self.PROD,
+                               "mainSha": self.MAIN, "behind": 3, "marker": {"status": "verified", "at": (now - hud.timedelta(hours=6)).isoformat()},
+                               "deployed": {self.DONE: True, self.PENDING: False}}
+        frame = [plain(row) for row in hud.render(value, 160, 45, now=now)]
+        self.assertIn("CONSTRAINT ✕ FAIL   deploy · 1 merged PR(s) not in production · oldest 4h00m", frame[1])
+        self.assertIn(f"serves {self.PROD[:7]} · ✓ verified 6h00m ago · main {self.MAIN[:7]} · behind 3 commits · 1 undeployed", frame[2])
+        self.assertIn("draft 1 → prepared 0 → queued 2 → merged 2 → deployed 1 → verified 1", frame[3])
+        value["production"]["marker"] = {"status": "pending"}
+        frame = [plain(row) for row in hud.render(value, 160, 45, now=now)]
+        self.assertIn("Production Verified marker pending", frame[2])
+        self.assertIn("deployed 1 → verified ?", frame[3], "a pending marker is not verification")
+
+    @staticmethod
+    def fail_fetch():
+        raise RuntimeError("production version unread (URLError)")
+
+    def test_served_build_is_bounded_validated_and_retried_once(self):
+        class Response(io.BytesIO):
+            def __enter__(self):
+                return self
+            def __exit__(self, *_):
+                return False
+        calls = []
+        def opener(request, timeout):
+            calls.append(timeout)
+            if len(calls) == 1:
+                raise OSError("reset")
+            return Response(b'{"buildId": "060037D"}')
+        self.assertEqual(hud.served_build(opener=opener), "060037d")
+        self.assertEqual(calls, [5, 5])
+        with self.assertRaisesRegex(RuntimeError, "not a commit"):
+            hud.served_build(opener=lambda *_args, **_kw: Response(b'{"buildId": "main"}'))
+        with self.assertRaisesRegex(RuntimeError, "unread"):
+            hud.served_build(opener=mock.Mock(side_effect=OSError("down")))
+
+    def test_verified_marker_is_final_and_pending_is_asked_again_per_interval(self):
+        hud._markers.clear()
+        name = "production-generation-verified-" + self.PROD
+        pages = [{"artifacts": []}, {"artifacts": []},
+                 {"artifacts": [{"name": name, "expired": False, "workflow_run": {"head_branch": "main"},
+                                 "created_at": "2026-10-20T13:15:52Z"}]}]
+        gh = mock.Mock(side_effect=pages)
+        self.assertEqual(hud.verified_marker(self.PROD, 1000, gh)["status"], "pending")
+        self.assertEqual(hud.verified_marker(self.PROD, 1000 + hud.REFRESH_GITHUB_S - 1, gh)["status"], "pending")
+        self.assertEqual(gh.call_count, 2, "both marker names were read once")
+        verified = hud.verified_marker(self.PROD, 1000 + hud.REFRESH_GITHUB_S, gh)
+        self.assertEqual((verified["status"], verified["at"]), ("verified", "2026-10-20T13:15:52Z"))
+        self.assertIs(hud.verified_marker(self.PROD, 10 ** 9, gh), verified)
+        hud._markers.clear()
+        self.assertEqual(hud.verified_marker(self.PROD, 1, mock.Mock(return_value={"oops": 1}))["status"], "unknown")
+        hud._markers.clear()
+
+    def test_stale_production_read_is_unknown(self):
+        value = model()
+        value["production"] = {"readAt": "2026-01-01T00:00:00+00:00", "prodSha": self.PROD}
+        text = "\n".join(plain(row) for row in hud.render(value, 160, 45))
+        self.assertIn("served build unknown · stale", text)
+        self.assertIn("deployed ?", text)
+
+
+class RefreshCostTest(unittest.TestCase):
+    def test_ledger_reads_only_appended_complete_lines(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory)
+            (state / "runs").mkdir()
+            ledger = state / "runs" / "ledger.jsonl"
+            ledger.write_text('{"runId": "a"}\n{"runId": "b"}\n')
+            rows = hud.ledger_rows(state)
+            self.assertEqual([row["runId"] for row in rows], ["a", "b"])
+            with mock.patch.object(hud.json, "loads", wraps=json.loads) as parse:
+                self.assertIs(hud.ledger_rows(state), rows)
+                parse.assert_not_called()
+            with open(ledger, "a") as handle:
+                handle.write('{"runId": "c"}\nnot json\n[1]\n{"runId": "d"')
+            self.assertEqual([row["runId"] for row in hud.ledger_rows(state)], ["a", "b", "c"])
+            with open(ledger, "a") as handle:
+                handle.write("}\n")
+            self.assertEqual([row["runId"] for row in hud.ledger_rows(state)], ["a", "b", "c", "d"])
+            ledger.write_text('{"runId": "z"}\n')
+            self.assertEqual([row["runId"] for row in hud.ledger_rows(state)], ["z"])
+            ledger.unlink()
+            self.assertEqual(hud.ledger_rows(state), [])
+
+    def test_state_json_is_parsed_again_only_when_it_changes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "lanes-status.json"
+            path.write_text('{"at": 1}')
+            first = hud.read_json_cached(path)
+            with mock.patch.object(hud, "read_json", wraps=hud.read_json) as read:
+                self.assertIs(hud.read_json_cached(path), first)
+                read.assert_not_called()
+            path.write_text('{"at": 22}')
+            self.assertEqual(hud.read_json_cached(path), {"at": 22})
+            path.unlink()
+            self.assertIsNone(hud.read_json_cached(path))
+
+    def test_redraw_writes_only_changed_rows(self):
+        first = hud.paint_frame(["a", "b", "c"], None)
+        self.assertEqual(first, "\x1b[1;1H\x1b[Ka\x1b[2;1H\x1b[Kb\x1b[3;1H\x1b[Kc")
+        self.assertEqual(hud.paint_frame(["a", "B", "c"], ["a", "b", "c"]), "\x1b[2;1H\x1b[KB")
+        self.assertEqual(hud.paint_frame(["a", "b", "c"], ["a", "b", "c"]), "")
+
+    def test_receipt_joins_are_reused_until_the_ledger_or_window_moves(self):
+        value = model()
+        receipts = value["local"]["attributionReceipts"]
+        with mock.patch.object(hud.lane, "pr_attribution", wraps=hud.lane.pr_attribution) as attribute:
+            first = hud.derived(value)
+            self.assertIs(hud.derived(value), first)
+            calls = attribute.call_count
+            receipts.append(dict(receipts[0], runId="lane-2"))
+            self.assertIsNot(hud.derived(value), first)
+            self.assertGreater(attribute.call_count, calls)
+
+
+class ConsoleTextTest(unittest.TestCase):
+    def test_untrusted_text_cannot_inject_escapes_or_shift_columns(self):
+        self.assertEqual(hud.console_text("ok\x1b[2Jé漢😀\ttab"), "ok?[2Jé?? tab")
+        self.assertEqual(hud.titled("#1 ", "x\x1b[31my", 20), "#1 x?[31my")
+        self.assertEqual(hud.titled("#1 ", "fix(leads): normalize names (JOV-7859)", 36), "#1 fix(leads): normalize names…")
+
+    def test_fit_drops_whole_parts_least_important_first(self):
+        parts = [(0, "#22307 merged"), (2, "low value"), (1, "deployed 7")]
+        self.assertEqual(plain(hud.fit(parts, 40)), "#22307 merged · low value · deployed 7")
+        self.assertEqual(plain(hud.fit(parts, 26)), "#22307 merged · deployed 7")
+        self.assertEqual(plain(hud.fit(parts, 14)), "#22307 merged")
+
+    def test_row_allocation_is_fixed_by_geometry_alone(self):
+        for count, columns in hud.LAYOUTS.items():
+            for rows in (19, 40, 60):
+                for names in columns:
+                    alloc = hud.allocate(names, rows)
+                    with self.subTest(columns=count, rows=rows, names=names):
+                        self.assertEqual(sum(alloc.values()), rows)
+                        self.assertEqual(alloc, hud.allocate(names, rows))
+        self.assertEqual(hud.allocate(["workers", "supply"], 4), {"workers": 4}, "a panel that cannot fit is hidden whole")
