@@ -54,6 +54,17 @@ describe('POST /api/admin/feature-flags', () => {
     expect(mockWriteFlagOverride).not.toHaveBeenCalled();
   });
 
+  it.each(['DESIGN_V1', 'INBOX_HOME', 'PROFILES_WORKSPACE'])(
+    'rejects writes to the retired %s product gate',
+    async flagKey => {
+      const res = await POST(
+        request({ flagKey, envTier: 'prod', enabled: false })
+      );
+      expect(res.status).toBe(400);
+      expect(mockWriteFlagOverride).not.toHaveBeenCalled();
+    }
+  );
+
   it('rejects an invalid env tier', async () => {
     const res = await POST(
       request({ flagKey: 'SPOTIFY_OAUTH', envTier: 'qa', enabled: true })

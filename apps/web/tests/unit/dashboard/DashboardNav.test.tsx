@@ -73,7 +73,6 @@ describe('DashboardNav', () => {
   it('renders the canonical navigation in exact order and no forbidden primary rows', () => {
     const { container, getByRole, queryByRole } = renderDashboardNav({
       renderFn: fastRender,
-      appFlags: { PROFILES_WORKSPACE: true },
     });
 
     expect(
@@ -121,8 +120,8 @@ describe('DashboardNav', () => {
     );
   });
 
-  it('hides Identity when PROFILES_WORKSPACE is off so the rail cannot 404', () => {
-    const { container, queryByRole } = renderDashboardNav({
+  it('shows Identity without any rollout override', () => {
+    const { container, getByRole } = renderDashboardNav({
       renderFn: fastRender,
     });
 
@@ -131,15 +130,11 @@ describe('DashboardNav', () => {
         link.textContent?.trim(),
         link.getAttribute('href'),
       ])
-    ).toEqual([
-      ['Inbox', APP_ROUTES.DASHBOARD],
-      ['Work', APP_ROUTES.LIBRARY],
-      ['Audience', APP_ROUTES.CONTACTS_AUDIENCE],
-    ]);
-    expect(queryByRole('link', { name: 'Identity' })).toBeNull();
-    expect(
-      container.querySelector(`a[href="${APP_ROUTES.PRESENCE}"]`)
-    ).toBeNull();
+    ).toEqual(CANONICAL_NAV);
+    expect(getByRole('link', { name: 'Identity' })).toHaveAttribute(
+      'href',
+      APP_ROUTES.PRESENCE
+    );
   });
 
   it('keeps the Inbox attention center visible when it is settled empty', () => {
@@ -246,7 +241,7 @@ describe('DashboardNav', () => {
     } as DashboardData['creatorProfiles'][number];
     const { container, getByRole } = renderDashboardNav({
       renderFn: fastRender,
-      appFlags: { PROFILES_WORKSPACE: true },
+
       overrides: {
         selectedProfile,
         creatorProfiles: [
@@ -403,7 +398,7 @@ describe('DashboardNav', () => {
   it('handles collapsed state without changing the canonical rows', () => {
     const { container, getByRole } = renderDashboardNav({
       renderFn: fastRender,
-      appFlags: { PROFILES_WORKSPACE: true },
+
       sidebarProps: { defaultOpen: false },
       navChildren: <button type='button'>Search fixture</button>,
     });

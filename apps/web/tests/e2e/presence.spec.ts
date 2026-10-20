@@ -18,9 +18,7 @@ test.describe
         retries: 2,
       });
       await page.waitForLoadState('domcontentloaded');
-      // JOV-7161 / #20953: /app/presence is the Profiles workspace. Admins
-      // resolve PROFILES_WORKSPACE on, so this route stays put and renders
-      // the workspace instead of the old settings music tab.
+      // The canonical Profiles workspace needs no product rollout override.
       await expect(page).toHaveURL(
         url => url.pathname === APP_ROUTES.PRESENCE,
         { timeout: 60_000 }

@@ -29,7 +29,6 @@ import {
   type OpportunityInboxTourDateItem,
 } from '@/lib/connectors/opportunity-inbox-types';
 import type { AvailableDSP } from '@/lib/dsp';
-import { useAppFlag } from '@/lib/flags/client';
 import { useOpportunityInboxMutations } from '@/lib/queries/useOpportunityInboxMutations';
 import { useTourDateReviewMutations } from '@/lib/queries/useTourDateReviewMutations';
 import { cn } from '@/lib/utils';
@@ -122,7 +121,6 @@ export function OpportunityInboxPageClient({
   const inboxPageRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const router = useRouter();
-  const inboxHomeEnabled = useAppFlag('INBOX_HOME');
   const [cards, setCards] = useState(inbox.cards);
   const [isRefreshing, startRefresh] = useTransition();
   const retryFocusRecoveryRef = useRef(false);
@@ -625,7 +623,6 @@ export function OpportunityInboxPageClient({
                   pendingFeedbackId={pendingFeedbackId}
                   pendingReviseId={pendingReviseId}
                   pendingNextStepId={pendingNextStepId}
-                  enableStackInteractions={inboxHomeEnabled}
                   stackKeyboardControlRef={stackKeyboardControlRef}
                   onStackActionInitiated={beginStackAction}
                   onStackNextStep={handleStackNextStep}

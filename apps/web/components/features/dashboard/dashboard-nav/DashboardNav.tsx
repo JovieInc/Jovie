@@ -26,7 +26,6 @@ import {
 import { useChatThreadContextMenu } from '@/components/shell/useChatThreadContextMenu';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
-import { useAppFlag } from '@/lib/flags/client';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQuery';
 import {
@@ -42,7 +41,6 @@ import {
   canonicalSidebarNavigation,
   chatNavItem,
   inboxNavItem,
-  navigationVisibleForFlags,
   userSettingsNavigation,
 } from './config';
 import { NavMenuItem } from './NavMenuItem';
@@ -77,14 +75,7 @@ export function DashboardNav({
 }: DashboardNavProps) {
   const { selectedProfile, inboxNavigation } = useDashboardData();
   const runtimeUpdate = useRuntimeUpdate();
-  const profilesWorkspaceEnabled = useAppFlag('PROFILES_WORKSPACE');
-  const sidebarNavigation = useMemo(
-    () =>
-      navigationVisibleForFlags(canonicalSidebarNavigation, {
-        PROFILES_WORKSPACE: profilesWorkspaceEnabled,
-      }),
-    [profilesWorkspaceEnabled]
-  );
+  const sidebarNavigation = canonicalSidebarNavigation;
   const hasRuntimeUpdate = Boolean(runtimeUpdate?.available);
   const homeAttentionLabel = inboxNavItem.name;
   const homeAttentionName = hasRuntimeUpdate

@@ -46,7 +46,7 @@ vi.mock('@/lib/tracking/navigation-telemetry', () => ({
     mockTrackNavigationImpressions(...args),
 }));
 
-const EXPANDED_LABELS = ['Inbox', 'Work', 'Audience'] as const;
+const EXPANDED_LABELS = ['Inbox', 'Identity', 'Work', 'Audience'] as const;
 
 describe('DashboardMobileTabs', () => {
   beforeEach(() => {
@@ -61,7 +61,7 @@ describe('DashboardMobileTabs', () => {
     mockTrackNavigationImpressions.mockReset();
   });
 
-  it('keeps Inbox, Work, and Audience direct while Identity is flag-gated off', () => {
+  it('keeps Inbox, Identity, and Work direct without rollout overrides', () => {
     render(<DashboardMobileTabs />);
 
     const tabs = screen.getByRole('navigation', { name: 'Dashboard Tabs' });
@@ -71,10 +71,12 @@ describe('DashboardMobileTabs', () => {
 
     expect(directLinks.map(link => link.textContent?.trim())).toEqual([
       'Inbox',
+      'Identity',
       'Work',
-      'Audience',
     ]);
-    expect(within(tabs).queryByRole('link', { name: 'Identity' })).toBeNull();
+    expect(
+      within(tabs).getByRole('link', { name: 'Identity' })
+    ).toHaveAttribute('href', APP_ROUTES.PRESENCE);
     expect(
       within(tabs).getByRole('button', { name: 'More options' })
     ).toHaveClass('min-w-11', 'flex-1');
@@ -88,7 +90,7 @@ describe('DashboardMobileTabs', () => {
     render(<DashboardMobileTabs />);
 
     expect(mockTrackNavigationImpressions).toHaveBeenCalledWith(
-      ['home', 'library', 'audience'],
+      ['home', 'presence', 'library'],
       APP_ROUTES.CHAT,
       expect.objectContaining({
         isMobile: true,
@@ -122,19 +124,22 @@ describe('DashboardMobileTabs', () => {
     });
     const links = within(menu).getAllByRole('link');
 
-    expect(links.slice(0, 3).map(link => link.textContent?.trim())).toEqual(
+    expect(links.slice(0, 4).map(link => link.textContent?.trim())).toEqual(
       EXPANDED_LABELS
     );
-    expect(links.slice(0, 3).map(link => link.getAttribute('href'))).toEqual([
+    expect(links.slice(0, 4).map(link => link.getAttribute('href'))).toEqual([
       APP_ROUTES.DASHBOARD,
+      APP_ROUTES.PRESENCE,
       APP_ROUTES.LIBRARY,
       APP_ROUTES.CONTACTS_AUDIENCE,
     ]);
-    expect(within(menu).queryByRole('link', { name: 'Identity' })).toBeNull();
-    expect(links.at(3)).toHaveTextContent('Public Profile');
-    expect(links.at(3)).toHaveAttribute('href', '/timwhite');
-    expect(links.at(4)).toHaveTextContent('Settings');
-    expect(links.at(4)).toHaveAttribute('href', APP_ROUTES.SETTINGS);
+    expect(
+      within(menu).getByRole('link', { name: 'Identity' })
+    ).toHaveAttribute('href', APP_ROUTES.PRESENCE);
+    expect(links.at(4)).toHaveTextContent('Public Profile');
+    expect(links.at(4)).toHaveAttribute('href', '/timwhite');
+    expect(links.at(5)).toHaveTextContent('Settings');
+    expect(links.at(5)).toHaveAttribute('href', APP_ROUTES.SETTINGS);
 
     for (const label of [
       'Events',
@@ -267,7 +272,7 @@ describe('DashboardMobileTabs', () => {
     const directLinks = within(tabs).getAllByRole('link');
     expect(directLinks.map(link => link.textContent?.trim())).toEqual([
       'Inbox',
-      'Work',
+      'Identity',
       'Audience',
     ]);
     expect(
