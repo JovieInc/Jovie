@@ -47,6 +47,7 @@
 @source "../components/features/tracking";
 @source "../components/features/ui";
 @source "../components/jovie";
+@source "../components/organisms/home-loop";
 @source "../components/onboarding";
 @source "../components/canonical";
 @source "../components/design-studio";

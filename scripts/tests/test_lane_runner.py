@@ -10345,11 +10345,31 @@ class EventDeliveryTest(unittest.TestCase):
         report = self.drain(200)
         self.assertEqual([w[1]['i']['body'] for w in self.writes], ['new receipt'])
         self.assertEqual(report['deliveryAcknowledged'], 1)
-        report = self.drain(300)  # now the exhausted row gets its readback, then waits 6h
+        report = self.drain(300)  # now the exhausted row gets its readback: absent and past its deadline
         rows = {row['payload']['body']: row for row in lane._event_delivery_state(self.host)['actions'].values()}
-        self.assertEqual(rows['old receipt']['status'], 'exhausted')
-        self.assertGreaterEqual(rows['old receipt']['nextAt'], 300 + lane.EXHAUSTED_READBACK_S)
-        self.assertLessEqual(len(rows['old receipt']['history']), lane.EVENT_DELIVERY_HISTORY)
+        self.assertEqual((rows['old receipt']['status'], rows['old receipt']['history'][-1]['outcome']),
+                         ('superseded', 'expired-unsent'))
+        self.assertLessEqual(len(rows['old receipt']['history']), lane.EVENT_DELIVERY_HISTORY + 1)
+        self.assertEqual((report['deliveryFailed'], len(self.writes)), (0, 1))
+
+    def test_an_exhausted_row_inside_its_deadline_waits_six_hours(self):
+        self.intent(comments=[{'id': 'issue', 'body': 'old receipt'}])
+        data = lane._event_delivery_state(self.host)
+        [row] = data['actions'].values()
+        row.update(status='exhausted', attempts=3, nextAt=0, deadline=10_000)
+        lane._save_event_delivery(self.host, data)
+        report = self.drain(300)
+        [row] = lane._event_delivery_state(self.host)['actions'].values()
+        self.assertEqual((row['status'], report['deliveryFailed'], self.writes), ('exhausted', 1, []))
+        self.assertGreaterEqual(row['nextAt'], 300 + lane.EXHAUSTED_READBACK_S)
+
+    def test_a_starved_intent_past_its_deadline_expires_without_a_send(self):
+        # Gem 2026-10-20: 36 comment intents waited 3-12 days behind exhausted rows.
+        self.intent(comments=[{'id': 'issue', 'body': 'stale receipt'}])
+        report = self.drain(100 + lane.EVENT_DELIVERY_STALE_S + 1)
+        [row] = lane._event_delivery_state(self.host)['actions'].values()
+        self.assertEqual((row['status'], row['history'][-1]['outcome']), ('superseded', 'expired-unsent'))
+        self.assertEqual((report['deliveryFailed'], report['deliveryPending'], self.writes), (0, 0, []))
 
     def test_an_exhausted_delivery_whose_event_finished_is_superseded(self):
         self.intent(comments=[{'id': 'issue', 'body': 'old receipt'}])
