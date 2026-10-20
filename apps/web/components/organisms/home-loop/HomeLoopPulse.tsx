@@ -23,16 +23,7 @@ const TONE_LABEL: Record<HomeLoopTone, string> = {
   neutral: 'No status',
 };
 
-const PLACEHOLDER_SLOTS = [
-  'slot-1',
-  'slot-2',
-  'slot-3',
-  'slot-4',
-  'slot-5',
-  'slot-6',
-  'slot-7',
-  'slot-8',
-] as const;
+const PLACEHOLDER_SLOTS = Array.from({ length: 8 }, (_, index) => index);
 
 const TILE_FRAME =
   'flex h-24 min-w-0 flex-col justify-between gap-1 rounded-lg border border-subtle bg-surface-1 px-3 py-2';

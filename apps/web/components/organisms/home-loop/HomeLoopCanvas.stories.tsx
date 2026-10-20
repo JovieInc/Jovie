@@ -1,4 +1,3 @@
-import '@/app/globals.css';
 import '@/styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { fn } from 'storybook/test';
