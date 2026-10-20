@@ -105,6 +105,7 @@ export async function main(
       caller: values.caller ?? process.env.JOVIE_AGENT_PROFILE ?? 'cli',
     });
     print(values.json ? result : renderResult(result));
+    await wiring.router.flush();
     return 0;
   }
   if (command === 'stats') {

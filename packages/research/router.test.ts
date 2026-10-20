@@ -115,7 +115,13 @@ describe('router', () => {
       hits: [hit('exa', 'good-a'), hit('exa', 'good-b'), hit('exa', 'good-c')],
       usd: 0.007,
     });
-    const persist = vi.fn(async () => 'research/q-x');
+    let releaseWrite!: () => void;
+    const persist = vi.fn(
+      () =>
+        new Promise<string>(resolve => {
+          releaseWrite = () => resolve('research/q-x');
+        })
+    );
     const prior = vi.fn(async () => [{ slug: 'decisions/a', title: 'A' }]);
     const router = createRouter({
       state,
@@ -123,19 +129,50 @@ describe('router', () => {
       judges: [titleJudge()],
       persist,
       prior,
+      slugFor: key => `research/q-${key}`,
     });
     const first = await router.research({ query: 'q web', caller: 'test' });
     expect(first.stoppedAtTier).toBe(2);
     expect(first.hits[0].title).toBe('good-a');
     expect(first.usd).toBeCloseTo(0.007 + 3 * 0.00001);
-    expect(first.gbrainSlug).toBe('research/q-x');
+    // Returned before the slow gbrain write finished; flush() waits for it.
+    expect(first.gbrainSlug).toBe(`research/q-${first.key}`);
+    expect(persist).toHaveBeenCalledTimes(1);
+    releaseWrite();
+    await router.flush();
     expect(first.priorDecisions).toEqual([{ slug: 'decisions/a', title: 'A' }]);
     const second = await router.research({ query: 'Q  web?', caller: 'test' });
     expect(second.cache).toBe('local');
     expect(sources.exa.run).toHaveBeenCalledTimes(1);
     const metrics = await state.readMetrics();
-    expect(metrics.map(m => m.cache)).toEqual(['miss', 'local']);
-    expect(metrics[1].usd).toBe(0);
+    expect(metrics.map(m => m.event)).toEqual([
+      'research',
+      'persist',
+      'research',
+    ]);
+    expect(metrics.map(m => m.cache)).toEqual(['miss', undefined, 'local']);
+    expect(metrics[2].usd).toBe(0);
+    expect(second.ms).toBeLessThan(first.ms + 1000);
+  });
+
+  it('logs a failed gbrain write without failing the research call', async () => {
+    const sources = {
+      gbrain: source([]),
+      repo: source([]),
+      firecrawl: source([hit('f', 'good')]),
+      exa: source([]),
+    };
+    const persist = vi.fn(async () =>
+      Promise.reject(new Error('gbrain-unavailable: HTTP 503'))
+    );
+    const router = createRouter({ state, sources, judges: [], persist });
+    const result = await router.research({ query: 'write fails' });
+    await router.flush();
+    expect(result.hits).toHaveLength(1);
+    const failed = (await state.readMetrics()).find(
+      m => m.event === 'persist-failed'
+    );
+    expect(failed?.error).toContain('HTTP 503');
   });
 
   it('honors localOnly and maxTier', async () => {

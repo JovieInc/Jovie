@@ -41,6 +41,8 @@ export interface RouterDeps {
     query: string
   ) => Promise<{ slug: string; title: string }[]>;
   readonly loadPersisted?: (key: string) => Promise<ResearchResult | null>;
+  /** gbrain page a persisted result lands on (shown to callers immediately). */
+  readonly slugFor?: (key: string) => string;
   readonly persist?: (
     result: ResearchResult,
     caller?: string
@@ -71,6 +73,7 @@ const inflight = new Map<string, Promise<ResearchResult>>();
 export function createRouter(deps: RouterDeps) {
   const config = deps.config ?? SOURCES;
   const now = deps.now ?? Date.now;
+  const pending = new Set<Promise<unknown>>();
 
   /** First judge that answers wins; failures are recorded as tier -1 runs. */
   async function judge(
@@ -274,7 +277,9 @@ export function createRouter(deps: RouterDeps) {
         hits: result.hits.length,
         sources: result.runs.filter(r => r.ok).map(r => r.source),
       });
-      return result;
+      return result.cache === 'miss'
+        ? result
+        : { ...result, ms: now() - started };
     };
 
     if (!req.refresh) {
@@ -314,10 +319,22 @@ export function createRouter(deps: RouterDeps) {
           result.hits.length > 0 &&
           deps.persist
         ) {
-          const slug = await deps
+          // Writing a gbrain page (chunk + embed) takes 5-20s; never make the
+          // caller wait for it. CLI callers await flush() after printing.
+          const write = deps
             .persist(result, req.caller)
-            .catch(() => undefined);
-          if (slug) result = { ...result, gbrainSlug: slug };
+            .then(slug => deps.state.log({ event: 'persist', key, slug }))
+            .catch((error: Error) =>
+              deps.state.log({
+                event: 'persist-failed',
+                key,
+                error: error.message.slice(0, 160),
+              })
+            )
+            .finally(() => pending.delete(write));
+          pending.add(write);
+          if (deps.slugFor)
+            result = { ...result, gbrainSlug: deps.slugFor(key) };
         }
         await deps.state.putCached(result);
         return result;
@@ -333,7 +350,12 @@ export function createRouter(deps: RouterDeps) {
     }
   }
 
-  return { research };
+  /** Wait for background gbrain writes (call before a short-lived process exits). */
+  async function flush(): Promise<void> {
+    while (pending.size) await Promise.allSettled([...pending]);
+  }
+
+  return { research, flush };
 }
 
 export type Router = ReturnType<typeof createRouter>;
