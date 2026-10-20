@@ -350,7 +350,10 @@ describe('ci-fast bounded parallel workflow', () => {
     expect([...whole, ...keyed[0].files].sort()).toEqual(
       [...LANES_PYTEST_FILES].sort()
     );
-    expect(LANES_PYTEST_FILES).toHaveLength(27);
+    expect(LANES_PYTEST_FILES).toHaveLength(28);
+    expect(LANES_PYTEST_FILES).toContain(
+      'scripts/tests/test_provider_economics.py'
+    );
     expect(new Set(shards.map(shard => shard.basetemp)).size).toBe(4);
     expect(new Set(shards.map(shard => shard.data)).size).toBe(4);
     const combine = command.indexOf(
