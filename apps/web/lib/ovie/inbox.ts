@@ -24,8 +24,22 @@ export type InboxDecisionTarget =
       readonly evidenceDigest: string;
     };
 
+/**
+ * Default-plus-deadline contract (`jovie.decision-default/v1`): at `deadline`
+ * the `decision` is recorded unless the founder decided first. `null` on a case
+ * means its source has no default yet and will wait until decided.
+ */
+export interface InboxDecisionDefault {
+  readonly contract: 'jovie.decision-default/v1';
+  readonly decision: 'approve' | 'reject';
+  readonly summary: string;
+  readonly deadline: string;
+  readonly declared: boolean;
+}
+
 export interface OvieInboxCase extends InteractionCase {
   readonly decisionTarget: InboxDecisionTarget | null;
+  readonly decisionDefault: InboxDecisionDefault | null;
   readonly body: string;
   readonly certification?: {
     readonly row: OvieCertificationRow;
@@ -45,7 +59,23 @@ const pending = {
   nextAction: 'Review the recommendation',
   waitingUntil: null,
   confidence: null,
+  decisionDefault: null,
 } as const;
+
+function summerCardDefault(card: SummerCard): InboxDecisionDefault {
+  return {
+    contract: 'jovie.decision-default/v1',
+    decision: card.defaultDecision,
+    summary:
+      card.defaultIfSilent ??
+      (card.defaultDecision === 'approve'
+        ? card.recommendation
+        : 'No action is taken.'),
+    deadline: card.decideBy,
+    // Legacy cards and cards filed without one get the conservative default.
+    declared: card.defaultIfSilent !== null,
+  };
+}
 
 /** Source IDs and decision tokens remain owned by their existing domain stores. */
 export function projectOvieInbox(
@@ -89,7 +119,7 @@ export function projectOvieInbox(
         card.body,
         card.recipient ? `Recipient: ${card.recipient}` : null,
         card.amountUsd !== null ? `Amount: USD ${card.amountUsd}` : null,
-        card.defaultIfSilent ? `If silent: ${card.defaultIfSilent}` : null,
+        `If silent by ${card.decideBy}: ${summerCardDefault(card).summary}`,
       ]
         .filter(Boolean)
         .join('\n\n'),
@@ -97,6 +127,8 @@ export function projectOvieInbox(
       priority: card.kind === 'spend' || card.kind === 'outbound' ? 1 : 2,
       createdAt: card.createdAt,
       evidence: card.evidence,
+      waitingUntil: card.decideBy,
+      decisionDefault: summerCardDefault(card),
       decisionTarget: { kind: 'summer', id: card.id },
     });
   }

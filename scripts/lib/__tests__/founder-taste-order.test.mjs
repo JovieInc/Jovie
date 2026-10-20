@@ -85,6 +85,12 @@ describe('founder taste work order (JOV-7759 x JOV-7703)', () => {
     expect(sealed.digest).toBe(filed.digest);
     const card = toSummerCard(sealed, { priorResults: [] });
     expect(card.kind).toBe('taste');
+    // Default-plus-deadline: silence accepts the live build after 48 hours.
+    expect(card.defaultDecision).toBe('approve');
+    expect(card.defaultIfSilent).toMatch(/^Accept: the live build stays/);
+    expect(Date.parse(card.decideBy) - Date.parse(filed.createdAt)).toBe(
+      48 * 60 * 60 * 1000
+    );
     expect(card.title).toBe(
       'Taste JOV-1 @ 333333333333: Rail toggle mirrors the left rail'
     );

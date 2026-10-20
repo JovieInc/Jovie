@@ -44,6 +44,11 @@ const card: SummerCard = {
   comment: null,
   createdAt: inventory.generatedAt,
   decidedAt: null,
+  decideBy: '2026-10-22T12:00:00.000Z',
+  defaultDecision: 'reject',
+  resolution: null,
+  feedback: [],
+  feedbackAt: null,
 };
 
 describe('Ovie inbox projection', () => {
@@ -61,6 +66,44 @@ describe('Ovie inbox projection', () => {
       evidence: card.evidence,
     });
     expect(result.cases[0]?.body).toContain('USD 25');
+  });
+  it('carries the default and deadline every founder ask resolves to', () => {
+    const [taste] = projectOvieInbox(
+      [],
+      [
+        {
+          ...card,
+          kind: 'taste',
+          defaultIfSilent: 'Ship the darker header',
+          defaultDecision: 'approve',
+        },
+      ],
+      inventory
+    ).cases;
+    expect(taste).toMatchObject({
+      waitingUntil: '2026-10-22T12:00:00.000Z',
+      decisionDefault: {
+        contract: 'jovie.decision-default/v1',
+        decision: 'approve',
+        summary: 'Ship the darker header',
+        deadline: '2026-10-22T12:00:00.000Z',
+        declared: true,
+      },
+    });
+    expect(taste?.body).toContain(
+      'If silent by 2026-10-22T12:00:00.000Z: Ship the darker header'
+    );
+
+    const [legacy] = projectOvieInbox(
+      [],
+      [{ ...card, defaultIfSilent: null }],
+      inventory
+    ).cases;
+    expect(legacy?.decisionDefault).toMatchObject({
+      decision: 'reject',
+      summary: 'No action is taken.',
+      declared: false,
+    });
   });
   it('preserves source failures rather than claiming complete coverage', () => {
     expect(

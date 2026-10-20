@@ -5,8 +5,12 @@ import { z } from 'zod';
 import { db } from '@/lib/db';
 import { ovieOperatingKv } from '@/lib/db/schema/ovie';
 import {
+  effectiveSummerCardDeadline,
+  SUMMER_CARD_DEFAULT_DECIDER,
+  SUMMER_CARD_MAX_FEEDBACK,
   type SummerCard,
   type SummerCardInput,
+  summerCardDecisionContract,
   summerCardId,
   summerCardPayloadDigest,
 } from './summer-cards';
@@ -36,16 +40,33 @@ const storedCardSchema = z.object({
   decidedBy: z.string().nullable(),
   createdAt: z.string(),
   decidedAt: z.string().nullable(),
+  // Deadline contract fields; rows filed before it parse with legacy defaults.
+  decideBy: z.string().nullable().default(null),
+  defaultDecision: z.enum(['approve', 'reject']).default('reject'),
+  resolution: z.enum(['founder', 'default']).nullable().default(null),
+  feedback: z
+    .array(z.object({ comment: z.string(), at: z.string() }))
+    .default([]),
+  feedbackAt: z.string().nullable().default(null),
 });
 
 type StoredCard = z.infer<typeof storedCardSchema>;
 
 function toCard(stored: StoredCard): SummerCard {
   const { payloadDigest: _digest, decidedBy: _decidedBy, ...card } = stored;
-  return card;
+  return {
+    ...card,
+    decideBy: effectiveSummerCardDeadline(stored),
+    // Cards decided before the contract were decided by the founder.
+    resolution:
+      stored.resolution ?? (stored.status === 'pending' ? null : 'founder'),
+  };
 }
 
-async function readStoredCard(id: string): Promise<StoredCard | null> {
+/** The parsed card plus the raw JSON the compare-and-set must match. */
+async function readStoredRow(
+  id: string
+): Promise<{ readonly card: StoredCard; readonly raw: unknown } | null> {
   const [row] = await db
     .select({ value: ovieOperatingKv.value })
     .from(ovieOperatingKv)
@@ -56,7 +77,31 @@ async function readStoredCard(id: string): Promise<StoredCard | null> {
   if (!parsed.success) {
     throw new Error(`Summer card ${id} is not a valid stored card`);
   }
-  return parsed.data;
+  return { card: parsed.data, raw: row.value };
+}
+
+async function readStoredCard(id: string): Promise<StoredCard | null> {
+  return (await readStoredRow(id))?.card ?? null;
+}
+
+/** Compare-and-set against the exact stored JSON; false when another write won. */
+async function replaceStoredCard(
+  id: string,
+  raw: unknown,
+  next: StoredCard,
+  now: Date
+): Promise<boolean> {
+  const updated = await db
+    .update(ovieOperatingKv)
+    .set({ value: next, updatedAt: now })
+    .where(
+      and(
+        eq(ovieOperatingKv.key, `${KEY_PREFIX}${id}`),
+        eq(ovieOperatingKv.value, raw)
+      )
+    )
+    .returning({ key: ovieOperatingKv.key });
+  return updated.length === 1;
 }
 
 export async function getSummerCard(id: string): Promise<SummerCard | null> {
@@ -74,6 +119,7 @@ export async function submitSummerCard(
   now = new Date()
 ): Promise<SummerCardSubmission> {
   const id = summerCardId(input.idempotencyKey);
+  const contract = summerCardDecisionContract(input, now);
   const stored: StoredCard = {
     id,
     idempotencyKey: input.idempotencyKey,
@@ -93,6 +139,11 @@ export async function submitSummerCard(
     decidedBy: null,
     createdAt: now.toISOString(),
     decidedAt: null,
+    decideBy: contract.decideBy,
+    defaultDecision: contract.defaultDecision,
+    resolution: null,
+    feedback: [],
+    feedbackAt: null,
   };
   const inserted = await db
     .insert(ovieOperatingKv)
@@ -114,10 +165,12 @@ export async function submitSummerCard(
 export async function listSummerCards(options: {
   readonly status: 'pending' | 'decided' | 'all';
   readonly since?: string;
+  readonly feedbackSince?: string;
   readonly limit: number;
 }): Promise<SummerCard[]> {
   const status = drizzleSql`${ovieOperatingKv.value}->>'status'`;
   const createdAt = drizzleSql`${ovieOperatingKv.value}->>'createdAt'`;
+  const feedbackAt = drizzleSql`${ovieOperatingKv.value}->>'feedbackAt'`;
   const rows = await db
     .select({ value: ovieOperatingKv.value })
     .from(ovieOperatingKv)
@@ -133,6 +186,10 @@ export async function listSummerCards(options: {
         // createdAt is always toISOString(), so text order is time order.
         options.since
           ? drizzleSql`${createdAt} >= ${new Date(options.since).toISOString()}`
+          : undefined,
+        // feedbackAt is toISOString() too; NULL never matches.
+        options.feedbackSince
+          ? drizzleSql`${feedbackAt} >= ${new Date(options.feedbackSince).toISOString()}`
           : undefined
       )
     )
@@ -156,36 +213,123 @@ export async function decideSummerCard(
     readonly decision: 'approve' | 'reject';
     readonly comment: string | null;
     readonly decidedBy: string | null;
+    readonly resolution?: 'founder' | 'default';
   },
   now = new Date()
 ): Promise<SummerCardDecisionResult> {
-  const current = await readStoredCard(input.id);
+  const current = await readStoredRow(input.id);
   if (!current) return { outcome: 'not_found' };
-  if (current.status !== 'pending') {
-    return { outcome: 'already_decided', card: toCard(current) };
+  if (current.card.status !== 'pending') {
+    return { outcome: 'already_decided', card: toCard(current.card) };
   }
 
   const next: StoredCard = {
-    ...current,
+    ...current.card,
     status: input.decision === 'approve' ? 'approved' : 'rejected',
     comment: input.comment,
     decidedBy: input.decidedBy,
     decidedAt: now.toISOString(),
+    resolution: input.resolution ?? 'founder',
   };
-  const updated = await db
-    .update(ovieOperatingKv)
-    .set({ value: next, updatedAt: now })
-    .where(
-      and(
-        eq(ovieOperatingKv.key, `${KEY_PREFIX}${input.id}`),
-        eq(ovieOperatingKv.value, current)
-      )
-    )
-    .returning({ key: ovieOperatingKv.key });
-  if (updated.length === 1) return { outcome: 'decided', card: toCard(next) };
+  if (await replaceStoredCard(input.id, current.raw, next, now)) {
+    return { outcome: 'decided', card: toCard(next) };
+  }
 
   const raced = await readStoredCard(input.id);
   return raced
     ? { outcome: 'already_decided', card: toCard(raced) }
     : { outcome: 'not_found' };
+}
+
+export type SummerCardDefaultsResult = {
+  readonly checked: number;
+  readonly defaulted: number;
+  readonly approvedByDefault: number;
+  readonly rejectedByDefault: number;
+  readonly raced: number;
+  readonly cardIds: readonly string[];
+};
+
+/**
+ * Applies each overdue card's declared default. The founder still wins a race:
+ * the same compare-and-set as a manual decision moves the card at most once.
+ */
+export async function applySummerCardDefaults(
+  now = new Date(),
+  limit = 100
+): Promise<SummerCardDefaultsResult> {
+  const pending = await listSummerCards({ status: 'pending', limit });
+  const due = pending.filter(
+    card => Date.parse(card.decideBy) <= now.getTime()
+  );
+  let approvedByDefault = 0;
+  let rejectedByDefault = 0;
+  let raced = 0;
+  const cardIds: string[] = [];
+  for (const card of due) {
+    const result = await decideSummerCard(
+      {
+        id: card.id,
+        decision: card.defaultDecision,
+        comment: `Decided by default at the ${card.decideBy} deadline: ${
+          card.defaultIfSilent ?? 'no action is taken'
+        }`,
+        decidedBy: SUMMER_CARD_DEFAULT_DECIDER,
+        resolution: 'default',
+      },
+      now
+    );
+    if (result.outcome !== 'decided') {
+      raced += 1;
+      continue;
+    }
+    cardIds.push(card.id);
+    if (card.defaultDecision === 'approve') approvedByDefault += 1;
+    else rejectedByDefault += 1;
+  }
+  return {
+    checked: pending.length,
+    defaulted: cardIds.length,
+    approvedByDefault,
+    rejectedByDefault,
+    raced,
+    cardIds,
+  };
+}
+
+export type SummerCardFeedbackResult =
+  | { readonly outcome: 'recorded'; readonly card: SummerCard }
+  | { readonly outcome: 'pending'; readonly card: SummerCard }
+  | { readonly outcome: 'not_found' }
+  | { readonly outcome: 'conflict' };
+
+/**
+ * Post-ship feedback hook: the founder can comment on any decided card,
+ * including one settled by default. It never changes the decision; Summer
+ * reads it (`feedbackSince`) and files the revision.
+ */
+export async function recordSummerCardFeedback(
+  input: { readonly id: string; readonly comment: string },
+  now = new Date()
+): Promise<SummerCardFeedbackResult> {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const current = await readStoredRow(input.id);
+    if (!current) return { outcome: 'not_found' };
+    if (current.card.status === 'pending') {
+      return { outcome: 'pending', card: toCard(current.card) };
+    }
+    const at = now.toISOString();
+    const next: StoredCard = {
+      ...current.card,
+      feedback: [
+        ...current.card.feedback,
+        { comment: input.comment, at },
+      ].slice(-SUMMER_CARD_MAX_FEEDBACK),
+      feedbackAt: at,
+    };
+    if (await replaceStoredCard(input.id, current.raw, next, now)) {
+      return { outcome: 'recorded', card: toCard(next) };
+    }
+  }
+  return { outcome: 'conflict' };
 }
