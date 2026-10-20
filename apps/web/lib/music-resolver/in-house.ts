@@ -34,8 +34,8 @@ export { PROVENANCE_CONFIDENCE } from './in-house-contracts';
  * stays ambiguous so a caller can ask for a choice instead of saving it.
  *
  * Sources are Spotify, Apple Music, Deezer, and MusicBrainz. A third-party
- * link aggregator is not called: its terms do not grant a backend we can
- * cache and republish.
+ * link aggregator is not called: its terms restrict use to build a competing
+ * aggregation service.
  */
 
 export function normalizeCatalogName(value: string): string {

@@ -58,8 +58,14 @@ describe('createDefaultInHouseSources', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubGlobal('fetch', fetchMock);
-    fetchMock.mockResolvedValue(json({ results: [] }));
+    fetchMock.mockImplementation(async () => json({ results: [] }));
     mocks.isSpotifyAvailable.mockReturnValue(true);
+    mocks.spotifyRequestJson.mockResolvedValue({
+      id: SPOTIFY_ID,
+      type: 'track',
+      name: 'Song',
+      artists: [{ name: 'Artist' }],
+    });
     mocks.lookupAppleMusicByIsrc.mockResolvedValue(null);
     mocks.lookupDeezerByIsrc.mockResolvedValue(null);
     mocks.lookupSpotifyByIsrc.mockResolvedValue(null);
@@ -127,25 +133,33 @@ describe('createDefaultInHouseSources', () => {
         return json({
           results: [
             {
+              wrapperType: 'track',
+              kind: 'song',
+              trackId: 456,
+              collectionId: 123,
               trackName: 'Apple Song',
               artistName: 'Apple Artist',
               trackViewUrl:
                 'http://itunes.apple.com/us/album/apple-song/123?i=456&uo=4',
-              isrc: 'usapple12345',
+              isrc: 'usapp1234567',
             },
           ],
         });
       }
       return json({
+        id: 789,
+        type: 'track',
         title: 'Deezer Song',
         artist: { name: 'Deezer Artist' },
         link: 'http://www.deezer.com/track/789',
-        isrc: 'usdeezer1234',
+        isrc: 'usdez1234567',
       });
     });
     mocks.spotifyRequestJson.mockResolvedValue({
+      id: SPOTIFY_ID,
+      type: 'track',
       name: 'Spotify Song',
-      external_ids: { isrc: 'usspotify123' },
+      external_ids: { isrc: 'usspt1234567' },
       artists: [{ name: 'Spotify Artist' }],
     });
     const sources = createDefaultInHouseSources();
@@ -158,7 +172,7 @@ describe('createDefaultInHouseSources', () => {
       expect.objectContaining({
         provider: 'apple_music',
         title: 'Apple Song',
-        isrc: 'USAPPLE12345',
+        isrc: 'USAPP1234567',
       })
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
@@ -172,7 +186,7 @@ describe('createDefaultInHouseSources', () => {
       expect.objectContaining({
         provider: 'deezer',
         title: 'Deezer Song',
-        isrc: 'USDEEZER1234',
+        isrc: 'USDEZ1234567',
       })
     );
     await expect(
@@ -181,28 +195,19 @@ describe('createDefaultInHouseSources', () => {
       expect.objectContaining({
         provider: 'spotify',
         title: 'Spotify Song',
-        isrc: 'USSPOTIFY123',
+        isrc: 'USSPT1234567',
       })
     );
   });
 
-  it('returns a stable Spotify URL result when metadata is unavailable', async () => {
+  it('reports missing Spotify credentials instead of fabricating a URL result', async () => {
     mocks.isSpotifyAvailable.mockReturnValue(false);
 
     await expect(
       createDefaultInHouseSources().trackByUrl(
         `https://open.spotify.com/track/${SPOTIFY_ID}`
       )
-    ).resolves.toEqual({
-      provider: 'spotify',
-      title: SPOTIFY_ID,
-      artist: '',
-      url: `https://open.spotify.com/track/${SPOTIFY_ID}`,
-      isrc: null,
-      upc: null,
-      provenance: 'input_url',
-      confidence: 0.95,
-    });
+    ).rejects.toThrow('Spotify catalog source unavailable');
     expect(mocks.spotifyRequestJson).not.toHaveBeenCalled();
   });
 
@@ -299,6 +304,9 @@ describe('createDefaultInHouseSources', () => {
       json({
         results: [
           {
+            wrapperType: 'collection',
+            collectionType: 'Album',
+            collectionId: 123,
             collectionName: 'Album',
             artistName: 'Artist',
             collectionViewUrl:
@@ -331,10 +339,18 @@ describe('createDefaultInHouseSources', () => {
         provenance: 'exact_name',
       }),
     ]);
+    fetchMock.mockResolvedValueOnce(
+      json({
+        id: 456,
+        type: 'album',
+        title: 'Deezer Album',
+        artist: { name: 'Artist' },
+      })
+    );
     await expect(
       sources.albumByUrl('https://www.deezer.com/album/456')
     ).resolves.toEqual(
-      expect.objectContaining({ provider: 'deezer', title: 'deezer' })
+      expect.objectContaining({ provider: 'deezer', title: 'Deezer Album' })
     );
   });
 
@@ -492,7 +508,11 @@ describe('createDefaultInHouseSources', () => {
       'GB'
     );
     expect(mocks.spotifyRequestJson).toHaveBeenCalledWith(
-      `/tracks/${SPOTIFY_ID}?market=GB`
+      `/tracks/${SPOTIFY_ID}?market=GB`,
+      expect.objectContaining({
+        signal: expect.any(AbortSignal),
+        redirect: 'error',
+      })
     );
   });
 
