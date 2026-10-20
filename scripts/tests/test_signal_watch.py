@@ -204,7 +204,8 @@ class ClassifyTests(unittest.TestCase):
         self.assertAlmostEqual(verdict["costUsd"], 0.000021)
         self.assertTrue(W.card_worthy(verdict))
         self.assertFalse(W.card_worthy({**verdict, "action": "ignore"}))
-        self.assertFalse(W.card_worthy({**verdict, "score": 0.3}))
+        self.assertFalse(W.card_worthy({**verdict, "score": 0.2}))
+        self.assertFalse(W.card_worthy({**verdict, "score": 0.5}, min_score=0.6))
         self.assertFalse(W.card_worthy({**verdict, "actionP": 0.3}))
 
     def test_classify_rejects_off_contract_answers(self):

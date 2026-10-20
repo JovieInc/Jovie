@@ -68,7 +68,9 @@ MAX_PENDING = 200
 MAX_STORE_PER_RUN = 40
 DEFAULT_BUDGET_USD = 0.25
 DEFAULT_CARDS_PER_DAY = 3
-CARD_MIN_SCORE = 0.6
+# Calibrated on the first real run (2026-10-20): Jev's worth probability topped out at 0.38 over
+# 80 items (71 ignore). Override with SIGNALS_CARD_MIN_SCORE.
+CARD_MIN_SCORE = 0.3
 CARD_MIN_ACTION_P = 0.5
 OUTBOX_MAX_AGE_S = 3 * 24 * 3600
 SUMMARY_CHARS = 700
@@ -568,9 +570,9 @@ def classify(item: dict, api_key: str, poster=post_json) -> dict:
             "costUsd": cost, "inputTokens": int(usage.get("input_tokens") or 0)}
 
 
-def card_worthy(verdict: dict | None) -> bool:
+def card_worthy(verdict: dict | None, min_score: float = CARD_MIN_SCORE) -> bool:
     return bool(verdict) and verdict["action"] != "ignore" and verdict["surface"] != "none" and \
-        verdict["score"] >= CARD_MIN_SCORE and verdict["actionP"] >= CARD_MIN_ACTION_P
+        verdict["score"] >= min_score and verdict["actionP"] >= CARD_MIN_ACTION_P
 
 
 # ---------------------------------------------------------------------------------------------
@@ -727,7 +729,8 @@ def run(state_path: Path, *, env=None, sources: list[dict] | None = None, inbox:
         digest_rows.clear()
         digest_rows.update(day=day, rows=[])
     # Card candidates first so a slow brain still lands them; the rest wait for the next run.
-    rows.sort(key=lambda pair: -(pair[1]["score"] if card_worthy(pair[1]) else -1))
+    min_score = float(env.get("SIGNALS_CARD_MIN_SCORE") or CARD_MIN_SCORE)
+    rows.sort(key=lambda pair: -(pair[1]["score"] if card_worthy(pair[1], min_score) else -1))
     state["pending"] = [{**item, **({"verdict": verdict} if verdict else {})} for item, verdict in rows][-MAX_PENDING:]
     if not dry_run:
         write_state(state_path, state)  # checkpoint: a killed run loses no verdicts
@@ -758,7 +761,7 @@ def run(state_path: Path, *, env=None, sources: list[dict] | None = None, inbox:
     if cards.get("day") != day:
         cards.update(day=day, sent=[])
     cap = int(env.get("SIGNALS_CARDS_PER_DAY") or DEFAULT_CARDS_PER_DAY)
-    worthy = sorted(((item, verdict) for item, verdict in landed if card_worthy(verdict)), key=lambda pair: -pair[1]["score"])
+    worthy = sorted(((item, verdict) for item, verdict in landed if card_worthy(verdict, min_score)), key=lambda pair: -pair[1]["score"])
     outbox = state.setdefault("outbox", [])
     queued = []
     for item, verdict in worthy:
