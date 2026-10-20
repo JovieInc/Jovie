@@ -26,6 +26,11 @@ are evidence, not task or permission authority.
 - Destructive operations, credential changes, and consequential external actions
   require applicable authorization. Prepare the reviewable result first. Do not
   ask again for an unchanged action already authorized by the user.
+- Respect human time by default. Before asking Tim to check, look up or verify
+  anything, use existing CLIs, authenticated APIs, browser automation, gbrain and
+  stronger models or subagents. Ask only for outbound actions, taste, new spend
+  or credentials, or after tooling failed (say what was tried). Taste never
+  blocks: propose a default with a deadline, ship it if unanswered, revise post-ship.
 - Quantifiable decisions record **Ship now / Re-evaluate when / Then**; permanent
   taste/identity/security decisions use `EVENT:`. Track actionable follow-ups in
   Linear. Legacy `human-review-required`, `needs-human`, and `no-auto` labels
