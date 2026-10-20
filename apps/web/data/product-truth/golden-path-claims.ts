@@ -129,17 +129,13 @@ export const GOLDEN_PATH_CLAIMS: readonly GoldenPathClaim[] = [
     evidence: { class: 'dogfood', proofIds: ['dogfood-tim-known-contacts'] },
   },
   {
-    id: 'homepage.hero.claimed-preview',
+    id: 'homepage.hero.artist-profile',
     step: 'homepage',
     route: '/',
     source: HOMEPAGE_COPY,
-    copy: 'Tim White’s Jovie profile at jov.ie/tim',
-    nature: 'outcome',
+    copy: 'Your music and links, together.',
+    nature: 'capability',
     capabilityIds: ['public-profile'],
-    evidence: {
-      class: 'dogfood',
-      proofIds: ['product-profile-subscribe-capture'],
-    },
   },
   {
     id: 'homepage.presence.headline',

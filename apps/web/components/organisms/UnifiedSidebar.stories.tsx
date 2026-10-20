@@ -80,8 +80,11 @@ queryClient.setQueryData(queryKeys.chat.conversations(), [
 ]);
 
 queryClient.setQueryData(queryKeys.admin.lists.sidebar(), {
-  lists: [],
-  smartViews: [],
+  lists: [
+    { id: 'collab', name: 'Collab list', count: 12, pendingSuggestions: 0 },
+    { id: 'press', name: 'Press', count: 0, pendingSuggestions: 0 },
+  ],
+  smartViews: [{ id: 'favorites', name: 'Favorites', count: 4 }],
 });
 
 const dashboardData: DashboardData = {

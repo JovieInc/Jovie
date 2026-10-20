@@ -14,13 +14,16 @@ import {
   collectChangedCodeGaps,
   collectComponentStateGaps,
   collectCoverageGaps,
+  collectDetectionCoverageGaps,
   collectEscapedDefectClosureGaps,
   collectEscapedDefectGaps,
+  collectFounderDetectionGaps,
   collectInvariantGaps,
   collectPostmortemGaps,
   collectRouteBudgetGaps,
   fetchExistingFingerprints,
   fetchRecentDefects,
+  filingPriority,
   fingerprintOf,
   hasTest,
   issueDescription,
@@ -28,6 +31,7 @@ import {
   LABEL_LOW,
   MAX_LOW_PER_DAY,
   moduleCoverage,
+  readDetectionCoverageRegistry,
   readPostmortems,
   readRunnerIncludePrefixes,
   route,
@@ -322,6 +326,192 @@ describe('quality-gap-finder', () => {
     assert.equal(gaps[0].key, 'JOV-1:apps/web/components/organisms/Banner.tsx');
     assert.equal(gaps[0].confidence, 0.85);
     assert.equal(gaps[0].area, 'area:ovie');
+  });
+
+  describe('founder rescue intake', () => {
+    it('deliberate red: emits a typed DetectionGap for the JOV-7207 failure class', () => {
+      const [gap] = collectFounderDetectionGaps([
+        {
+          id: 'JOV-7207',
+          title: 'sidebar works once then stops reopening',
+          description:
+            'Founder live dogfood found a one-click test passed while the repeated transition was broken.',
+          createdAt: '2026-10-03T12:00:00.000Z',
+          labels: ['dogfood', 'escaped-defect'],
+          comments: [],
+        },
+      ]);
+
+      assert.equal(gap.kind, 'founder-rescue-detection-gap');
+      assert.equal(gap.originatingIssue, 'JOV-7207');
+      assert.deepEqual(gap.detectionGap.gapClasses, [
+        'false-green',
+        'founder-only-surface',
+        'coverage-gap',
+      ]);
+      assert.equal(
+        gap.detectionGap.existingLiveVerifiedDetectorCaughtFirst,
+        false
+      );
+      const body = issueDescription({ ...gap, lane: 'issue' });
+      assert.match(body, /<!-- detection-gap:v1/);
+      assert.match(body, /originating replay and at least one valid control/);
+      assert.match(body, /live or injected event/);
+    });
+
+    it('valid control: suppresses the gap only when live detector proof predates the report', () => {
+      const issue = {
+        id: 'JOV-9',
+        identifier: 'JOV-9',
+        title: 'founder-visible failure',
+        description: `Founder manually found the broken journey.\n${escapedDefectEvidence()}`,
+        createdAt: '2026-09-28T12:00:00.000Z',
+        labels: ['escaped-defect'],
+        comments: [],
+      };
+
+      assert.deepEqual(collectFounderDetectionGaps([issue]), []);
+      assert.equal(
+        collectFounderDetectionGaps([
+          { ...issue, createdAt: '2026-09-28T10:30:00.000Z' },
+        ]).length,
+        1,
+        'a detector compiled after Tim noticed the defect is still a DetectionGap'
+      );
+    });
+  });
+
+  describe('detection coverage registry', () => {
+    const capability = (id, status, score, overrides = {}) => ({
+      id,
+      title: id,
+      status,
+      knownBlindSpots: [`${id} blind spot`],
+      nextExpansion: `expand ${id}`,
+      proof: {
+        deliberateRedFixtures: status === 'live-verified' ? ['red'] : [],
+        controlCases: status === 'live-verified' ? ['green'] : [],
+        lastVerifiedLiveFiring:
+          status === 'live-verified'
+            ? {
+                evidenceRef: 'live-run',
+                verifiedAt: '2026-10-14T00:00:00.000Z',
+              }
+            : null,
+      },
+      priority: {
+        impact: score,
+        historicalRecurrence: 1,
+        invisibilityRisk: 1,
+        detectionTractability: 1,
+        remediationLeverage: 1,
+        founderRescues: 0,
+        score,
+      },
+      ...overrides,
+    });
+
+    it('autonomously proposes only the highest-value unlearned capability', () => {
+      const gaps = collectDetectionCoverageGaps({
+        schema: 'jovie.detection-coverage-registry/v1',
+        capabilities: [
+          capability('already-learned', 'live-verified', 10),
+          capability('highest-gap', 'planned', 9),
+          capability('lower-gap', 'planned', 4),
+        ],
+      });
+
+      assert.equal(gaps.length, 1);
+      assert.equal(gaps[0].key, 'highest-gap');
+      assert.equal(gaps[0].kind, 'detection-capability-unlearned');
+      assert.match(gaps[0].suggestion, /live Summer path/);
+    });
+
+    it('marks a later rescue of a learned class as a P0 compiler regression', () => {
+      const [gap] = collectFounderDetectionGaps(
+        [
+          {
+            id: 'JOV-90',
+            title: 'sidebar failed again',
+            description:
+              'Founder manually found the repeated transition broken after the green certification.',
+            createdAt: '2026-10-14T12:00:00.000Z',
+            labels: ['dogfood'],
+            comments: [],
+          },
+        ],
+        {
+          capabilities: [
+            {
+              id: 'reversible-shell-control-transition-graph',
+              status: 'live-verified',
+              failureClasses: ['coverage-gap', 'false-green'],
+              proof: {
+                lastVerifiedLiveFiring: {
+                  verifiedAt: '2026-10-07T07:02:33.000Z',
+                },
+              },
+            },
+          ],
+        }
+      );
+
+      assert.match(gap.title, /P0 regression/);
+      assert.equal(
+        gap.detectionGap.repeatOfLearnedDetector,
+        'reversible-shell-control-transition-graph'
+      );
+      assert.equal(filingPriority({ ...gap, lane: 'issue' }), 1);
+    });
+
+    it('refuses to call a detector learned without red, control, and live proof', () => {
+      assert.throws(
+        () =>
+          collectDetectionCoverageGaps({
+            schema: 'jovie.detection-coverage-registry/v1',
+            capabilities: [
+              capability('unproven', 'live-verified', 5, {
+                proof: {
+                  deliberateRedFixtures: ['red'],
+                  controlCases: [],
+                  lastVerifiedLiveFiring: null,
+                },
+              }),
+            ],
+          }),
+        /cannot be learned/
+      );
+    });
+
+    it('rejects a live capability whose proof file is absent', () => {
+      assert.throws(
+        () =>
+          collectDetectionCoverageGaps({
+            schema: 'jovie.detection-coverage-registry/v1',
+            capabilities: [
+              capability('missing-proof', 'live-verified', 2, {
+                proof: {
+                  deliberateRedFixtures: ['apps/web/does-not-exist.ts#nope'],
+                  controlCases: ['apps/web/does-not-exist.ts#nope'],
+                  lastVerifiedLiveFiring: {
+                    evidenceRef: 'apps/web/does-not-exist.ts',
+                    verifiedAt: '2026-10-14T00:00:00.000Z',
+                  },
+                },
+              }),
+            ],
+          }),
+        /proof is missing/
+      );
+    });
+
+    it('loads the committed registry and proposes the highest unlearned capability', () => {
+      const registry = readDetectionCoverageRegistry();
+      const gaps = collectDetectionCoverageGaps(registry);
+      assert.equal(gaps.length, 1);
+      assert.equal(gaps[0].key, 'founder-rescue-detection-gap-intake');
+      assert.equal(gaps[0].kind, 'detection-capability-unlearned');
+    });
   });
 
   describe('escaped defect closure', () => {
@@ -740,7 +930,7 @@ describe('quality-gap-finder', () => {
       assert.match(gap.evidence.join('\n'), /originatingIssue/);
     });
 
-    it('fetches comments only for completed escaped-defect closure candidates', async () => {
+    it('fetches comments for defect candidates so founder rescues and closure receipts are observed', async () => {
       const queries = [];
       const issues = await fetchRecentDefects(
         'lin_test',
@@ -798,7 +988,8 @@ describe('quality-gap-finder', () => {
 
       assert.equal(queries.length, 2);
       assert.match(queries[1], /issue\(id: "JOV-9"\)/);
-      assert.doesNotMatch(queries[1], /JOV-10|JOV-11/);
+      assert.match(queries[1], /issue\(id: "JOV-10"\)/);
+      assert.match(queries[1], /issue\(id: "JOV-11"\)/);
       assert.equal(issues[0].comments.length, 1);
       assert.deepEqual(issues[1].comments, []);
       assert.deepEqual(issues[2].comments, []);
@@ -905,6 +1096,26 @@ describe('quality-gap-finder', () => {
       assert.equal(picked.deferred.length, 4);
     });
 
+    it('refreshes open DetectionGaps but preserves terminal dedupe', () => {
+      const [open, terminal] = make(2, 1).map(item => ({
+        ...item,
+        refreshExisting: true,
+      }));
+      const existing = new Set([open.fingerprint, terminal.fingerprint]);
+      const picked = selectForFiling([open, terminal], {
+        existing,
+        refreshable: new Set([open.fingerprint]),
+      });
+      assert.deepEqual(
+        picked.file.map(item => item.fingerprint),
+        [open.fingerprint]
+      );
+      assert.deepEqual(
+        picked.suppressed.map(item => item.fingerprint),
+        [terminal.fingerprint]
+      );
+    });
+
     it('writes the fingerprint into the title and the Tim handoff into low cards', () => {
       const [item] = route(make(1, 0.6));
       assert.ok(issueTitle(item).startsWith(`[${item.fingerprint}]`));
@@ -927,11 +1138,13 @@ describe('quality-gap-finder', () => {
                 {
                   title: '[qg-0000aaaa] Quality gap: a',
                   createdAt: '2026-09-26T09:00:00Z',
+                  state: { type: 'started' },
                   labels: { nodes: [{ name: LABEL_LOW }] },
                 },
                 {
                   title: '[qg-0000bbbb] Quality gap: b',
                   createdAt: '2026-09-25T09:00:00Z',
+                  state: { type: 'canceled' },
                   labels: { nodes: [{ name: LABEL_LOW }] },
                 },
                 {
@@ -949,6 +1162,7 @@ describe('quality-gap-finder', () => {
         'qg-0000aaaa',
         'qg-0000bbbb',
       ]);
+      assert.deepEqual([...result.refreshable], ['qg-0000aaaa']);
       assert.equal(result.lowFiledToday, 1);
     });
   });

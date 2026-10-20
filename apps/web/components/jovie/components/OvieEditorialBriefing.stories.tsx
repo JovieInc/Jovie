@@ -5,7 +5,7 @@ import { OvieEditorialBriefing } from './OvieEditorialBriefing';
 
 const briefing: OvieHomeBriefing = {
   greeting: 'Good morning, Tim.',
-  updatedLabel: 'Updated Sep 28, 8:00 AM PDT',
+  updatedLabel: 'Snapshot Sep 28, 8:00 AM PDT',
   signal: {
     id: 'activation.first-user',
     title: 'The first real user completed onboarding',
@@ -14,6 +14,7 @@ const briefing: OvieHomeBriefing = {
     delta: '+1 today',
     target: 'Learn what made the path work',
     sourceLabel: 'Founder Funnel',
+    sourceFreshness: 'fresh',
     nextAction: 'Review the session and preserve the shortest successful path.',
     removalEvent: 'The activation lesson is recorded and applied.',
     summerCanAct: true,
@@ -77,6 +78,25 @@ export const WithoutDeltaOrTarget: Story = {
         delta: null,
         target: null,
       },
+    },
+  },
+};
+
+export const StaleSource: Story = {
+  args: {
+    briefing: {
+      ...briefing,
+      signal: { ...briefing.signal, sourceFreshness: 'stale' },
+    },
+  },
+};
+
+export const UnknownSourceFreshness: Story = {
+  args: {
+    briefing: {
+      ...briefing,
+      updatedLabel: 'Snapshot time unavailable',
+      signal: { ...briefing.signal, sourceFreshness: undefined },
     },
   },
 };
