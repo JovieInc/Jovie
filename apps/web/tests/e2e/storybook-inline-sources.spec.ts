@@ -26,7 +26,7 @@ for (const theme of ['light', 'dark']) {
     await expect(card).toBeVisible();
     const directScreenshot = testInfo.outputPath(`source-direct-${theme}.png`);
     await page.screenshot({ path: directScreenshot, animations: 'disabled' });
-    await testInfo.attach(`source-direct-${theme}`, {
+    await testInfo.attach(`source-direct-${theme}.png`, {
       path: directScreenshot,
       contentType: 'image/png',
     });
@@ -67,7 +67,7 @@ for (const theme of ['light', 'dark']) {
     await expect(composer).toHaveValue('Unsent draft');
     const screenshot = testInfo.outputPath(`source-card-${theme}.png`);
     await page.screenshot({ path: screenshot, animations: 'disabled' });
-    await testInfo.attach(`source-card-${theme}`, {
+    await testInfo.attach(`source-card-${theme}.png`, {
       path: screenshot,
       contentType: 'image/png',
     });
@@ -98,7 +98,7 @@ test('wrapped source at 200% text size repositions inside the viewport with redu
   await assertInViewport();
   await page.mouse.wheel(0, 100);
   await assertInViewport();
-  await testInfo.attach('source-zoom-reduced-motion', {
+  await testInfo.attach('source-zoom-reduced-motion.png', {
     body: await page.screenshot({ animations: 'disabled' }),
     contentType: 'image/png',
   });
@@ -125,7 +125,7 @@ test('iPhone portrait tap uses the canonical bottom sheet and restores focus', a
   expect(await transcript.boundingBox()).toEqual(before);
   const mobileScreenshot = testInfo.outputPath('source-iphone-sheet.png');
   await page.screenshot({ path: mobileScreenshot, animations: 'disabled' });
-  await testInfo.attach('source-iphone-sheet', {
+  await testInfo.attach('source-iphone-sheet.png', {
     path: mobileScreenshot,
     contentType: 'image/png',
   });
