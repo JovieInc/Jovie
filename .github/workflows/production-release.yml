@@ -450,6 +450,17 @@ jobs:
               ;;
           esac
 
+      # Observability only: records how long staging waited in the shared
+      # Vercel team build queue and what it waited behind. Never fails.
+      - name: Measure staging build queue wait
+        if: ${{ always() && steps.deploy.outputs.deploy_url != '' }}
+        continue-on-error: true
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deploy_url }}
+        run: node .github/scripts/vercel-build-queue.mjs staging "$DEPLOYMENT_URL"
+
       - name: Encode deployment URL for downstream jobs
         id: encode_deploy_url
         env:
@@ -1139,6 +1150,17 @@ jobs:
           doppler run --project jovie-web --config prd \
             --only-secrets=BETTER_AUTH_URL,NEXT_PUBLIC_BETTER_AUTH_URL,NEXT_PUBLIC_GOOGLE_CLIENT_ID,BETTER_AUTH_SECRET,DATABASE_URL,SESSION_SECRET,AI_GATEWAY_API_KEY,NEXT_PUBLIC_TURNSTILE_SITE_KEY,TURNSTILE_SECRET_KEY,AUTH_GOOGLE_CLIENT_ID,AUTH_GOOGLE_CLIENT_SECRET,AUTH_APPLE_CLIENT_ID,AUTH_APPLE_TEAM_ID,AUTH_APPLE_KEY_ID,AUTH_APPLE_PRIVATE_KEY,SENTRY_AUTH_TOKEN \
             --no-fallback -- env -u DOPPLER_TOKEN bash -c production_stage
+
+      # Observability only: production waits are prioritized ahead of
+      # previews by the jovie project's Prioritize Production Builds setting.
+      - name: Measure production build queue wait
+        if: ${{ always() && steps.stage-production.outputs.production_deployment_id != '' }}
+        continue-on-error: true
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          DEPLOYMENT_ID: ${{ steps.stage-production.outputs.production_deployment_id }}
+        run: node .github/scripts/vercel-build-queue.mjs production "$DEPLOYMENT_ID"
 
       - name: Preserve production input and artifact provenance
         if: ${{ always() && steps.mutation-head.outputs.is_current == 'true' }}
