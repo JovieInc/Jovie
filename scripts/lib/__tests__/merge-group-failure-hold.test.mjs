@@ -2067,7 +2067,7 @@ describe('workflow-load guard failures (2026-10-20 queue stall, #21826)', () => 
     // The guard fails only when the group's base loads, so the failure is
     // this group's own diff whatever the group ahead is doing.
     let state = queuedPr();
-    const writeStatus = vi.fn(async () => {});
+    const writeStatus = vi.fn(async (/** @type {any} */ _receipt) => {});
     const result = await applyMergeGroupFailure(
       {
         ...failureInput,
@@ -2113,7 +2113,7 @@ describe('workflow-load guard failures (2026-10-20 queue stall, #21826)', () => 
 
   it('never reports PR Ready failed for an ordinary CI failure', async () => {
     let state = queuedPr();
-    const writeStatus = vi.fn(async () => {});
+    const writeStatus = vi.fn(async (/** @type {any} */ _receipt) => {});
     const result = await applyMergeGroupFailure(failureInput, {
       writeStatus,
       readPullRequest: vi.fn(async () => structuredClone(state)),
@@ -2125,9 +2125,11 @@ describe('workflow-load guard failures (2026-10-20 queue stall, #21826)', () => 
       }),
     });
     expect(
-      writeStatus.mock.calls.some(([receipt]) => receipt.context === 'PR Ready')
+      writeStatus.mock.calls.some(
+        ([receipt]) => receipt?.context === 'PR Ready'
+      )
     ).toBe(false);
-    expect(result.groupEjected).toBeUndefined();
+    expect(result).not.toHaveProperty('groupEjected');
   });
 
   it('rejects a PR Size Guard run from any other workflow path', async () => {
