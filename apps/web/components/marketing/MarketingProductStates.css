@@ -1,0 +1,187 @@
+/*
+ * Canonical marketing product bodies: MarketingPhoneStateGallery and
+ * MarketingOfferSummary. Tokens only.
+ */
+
+/* ── Phone state gallery ──────────────────────────────────────────────── */
+
+.marketing-phone-gallery {
+  width: 100%;
+  padding: 0 0 var(--space-4);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  border-radius: var(--radius-xl);
+}
+
+.marketing-phone-gallery:focus-visible {
+  outline: 2px solid var(--color-focus-ring, var(--color-text-secondary-token));
+  outline-offset: var(--space-2);
+}
+
+.marketing-phone-gallery__list {
+  display: flex;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.marketing-phone-gallery::-webkit-scrollbar {
+  display: none;
+}
+
+.marketing-phone-gallery__item {
+  flex: 0 0 min(72vw, 17rem);
+  scroll-snap-align: start;
+}
+
+/* Phones: the rail bleeds to the viewport edge and snaps to the page
+   gutter, so the next state peeks in instead of being cut at the column.
+   Pages set --marketing-phone-gallery-bleed to their gutter. */
+@media (max-width: 47.99rem) {
+  .marketing-phone-gallery {
+    margin-inline: calc(var(--marketing-phone-gallery-bleed, 0px) * -1);
+    padding-inline: var(--marketing-phone-gallery-bleed, 0px);
+    scroll-padding-inline: var(--marketing-phone-gallery-bleed, 0px);
+  }
+}
+
+.marketing-phone-gallery__figure {
+  display: grid;
+  gap: var(--space-5);
+  margin: 0;
+}
+
+.marketing-phone-gallery__phone {
+  margin-inline: 0;
+}
+
+@media (min-width: 48rem) {
+  .marketing-phone-gallery__phone {
+    margin-inline: auto;
+  }
+}
+
+.marketing-phone-gallery__caption {
+  display: grid;
+  gap: var(--space-2);
+  max-width: 21.25rem;
+}
+
+@media (min-width: 48rem) {
+  .marketing-phone-gallery__caption {
+    width: 100%;
+    margin-inline: auto;
+  }
+}
+
+.marketing-phone-gallery__title {
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary-token);
+}
+
+.marketing-phone-gallery__body {
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: var(--color-text-secondary-token);
+  text-wrap: pretty;
+}
+
+@media (min-width: 48rem) {
+  .marketing-phone-gallery {
+    padding-bottom: 0;
+    overflow: visible;
+  }
+
+  .marketing-phone-gallery__list {
+    display: grid;
+    grid-template-columns: repeat(
+        var(--marketing-phone-gallery-columns, 3),
+        minmax(0, 1fr)
+      );
+    gap: var(--space-8);
+  }
+
+  .marketing-phone-gallery[data-count="2"] {
+    --marketing-phone-gallery-columns: 2;
+  }
+
+  .marketing-phone-gallery[data-count="4"] {
+    --marketing-phone-gallery-columns: 4;
+  }
+}
+
+/* ── Offer summary ────────────────────────────────────────────────────── */
+
+.marketing-offer-summary {
+  padding: var(--space-8);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--color-bg-surface-1);
+}
+
+.marketing-offer-summary__price {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.marketing-offer-summary__amount {
+  font-family: var(--font-display);
+  font-size: var(--text-5xl);
+  font-weight: var(--font-weight-medium);
+  line-height: 1;
+  letter-spacing: -0.022em;
+  color: var(--color-text-primary-token);
+}
+
+.marketing-offer-summary__badge {
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary-token);
+}
+
+.marketing-offer-summary__note {
+  margin-top: var(--space-4);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: var(--color-text-secondary-token);
+}
+
+.marketing-offer-summary__label {
+  margin-top: var(--space-8);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--color-border-subtle);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary-token);
+}
+
+.marketing-offer-summary__list {
+  display: grid;
+  gap: var(--space-3);
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.marketing-offer-summary__item {
+  display: grid;
+  grid-template-columns: var(--space-4) minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: start;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--color-text-secondary-token);
+}
+
+.marketing-offer-summary__check {
+  width: var(--space-4);
+  height: var(--space-4);
+  margin-top: var(--space-0-5);
+  color: var(--color-text-primary-token);
+}

@@ -311,6 +311,15 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
     await expectDeliberateRed(page, 'marketing', 'clipped-heading');
   });
 
+  test('rejects a two-line heading whose cap crops descenders (/ hero)', async ({
+    page,
+  }) => {
+    await page.setContent(
+      '<main><section><h1 style="width:640px;font-size:64px;line-height:1.06;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;max-block-size:calc(2 * 1lh);overflow:hidden">One profile. For every fan.</h1></section></main>'
+    );
+    await expectDeliberateRed(page, 'marketing', 'clipped-heading');
+  });
+
   test('rejects an unstyled terminal CTA stack (/product footer CTA)', async ({
     page,
   }) => {

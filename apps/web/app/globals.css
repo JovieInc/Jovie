@@ -935,7 +935,11 @@ body {
   .marketing-h1-max-two-lines,
   :where(.home-viewport, .system-b-marketing) :where(h1:not(.sr-only)) {
     display: -webkit-box;
-    max-block-size: calc(2 * 1lh);
+    /* 2026-10-20: tight display leading (1.06) puts descenders below the
+       second line box; the em allowance keeps "y", "g", and "p" whole. The
+       line clamp still hides any third line. */
+    max-block-size: calc(2 * 1lh + 0.16em);
+    padding-block-end: 0.16em;
     overflow: hidden;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
@@ -1034,6 +1038,33 @@ body {
     .marketing-hero-photo {
       display: none;
     }
+  }
+  /* System B marketing type (2026-10-20). One class per role, bound to the
+     --ds-marketing-* ramp in design-system.css. New marketing pages use these
+     instead of the retired marketing-*-linear classes or page-local clamps:
+     display = the page h1, section = h2 chapter titles, lede = supporting
+     copy. Color stays on token utilities in markup. */
+  .marketing-type-display {
+    font-family: var(--font-display);
+    font-size: var(--ds-marketing-title-size);
+    font-weight: var(--font-weight-medium);
+    letter-spacing: -0.03em;
+    line-height: var(--ds-marketing-title-leading);
+    text-wrap: balance;
+  }
+  .marketing-type-section {
+    font-family: var(--font-display);
+    font-size: clamp(var(--text-3xl), 3vw, var(--text-4xl));
+    font-weight: var(--font-weight-medium);
+    letter-spacing: -0.025em;
+    line-height: 1.12;
+    text-wrap: balance;
+  }
+  .marketing-type-lede {
+    font-size: var(--ds-marketing-lede-size);
+    letter-spacing: var(--ds-marketing-lede-tracking);
+    line-height: var(--ds-marketing-lede-leading);
+    text-wrap: pretty;
   }
   .marketing-lead-linear {
     /* Exact Linear.app: 15px, 400wt, -0.165px tracking, 24px line-height */
