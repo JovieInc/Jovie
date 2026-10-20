@@ -60,7 +60,10 @@ it('selects writing readiness regressions and the evaluator coverage command', a
     process.env.CI_PRODUCT_LANES = 'operations';
     const commands = [];
     await runStructural({
-      changedFileList: ['scripts/invariants/jev-writing-readiness.mjs'],
+      changedFileList: [
+        'scripts/invariants/jev-revision-report.mjs',
+        'scripts/invariants/jev-writing-readiness.mjs',
+      ],
       stop: () => false,
       execute: command => {
         commands.push(command);
@@ -70,6 +73,11 @@ it('selects writing readiness regressions and the evaluator coverage command', a
     expect(
       commands.some(command =>
         command.includes('scripts/invariants/jev-writing-readiness.test.mjs')
+      )
+    ).toBe(true);
+    expect(
+      commands.some(command =>
+        command.includes('scripts/invariants/jev-revision-report.test.mjs')
       )
     ).toBe(true);
     expect(commands).toContain('pnpm invariants:check');

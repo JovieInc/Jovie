@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const mockRevenueFailure = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/observability/revenue-spine', () => ({
+  captureRevenueSpineFailure: mockRevenueFailure,
+}));
+
 const {
   mockDbSelect,
   mockIdentityConflict,
@@ -303,6 +308,14 @@ describe('materializeClaimedOnboardingProfile', () => {
       status: 409,
     });
     expect(mockReserveOnboardingHandle).not.toHaveBeenCalled();
+    expect(mockRevenueFailure).toHaveBeenCalledWith({
+      stage: 'profile_claim',
+      severity: 'blocked',
+      userId: 'user_1',
+      error: expect.objectContaining({
+        errorCode: 'SPOTIFY_IDENTITY_CONFLICT',
+      }),
+    });
   });
 
   it('refuses to overwrite an owned profile identity from a stale transcript', async () => {
