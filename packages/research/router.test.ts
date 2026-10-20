@@ -211,6 +211,26 @@ describe('router', () => {
     expect(result.stoppedAtTier).toBe(0);
   });
 
+  it('charges nothing for a failed paid call and releases its reservation', async () => {
+    const sources = {
+      gbrain: source([]),
+      repo: source([]),
+      firecrawl: source([]),
+      exa: source([], {
+        run: async () => Promise.reject(new Error('exa exhausted')),
+      }),
+    };
+    const router = createRouter({ state, sources, judges: [] });
+    const result = await router.research({ query: 'paid failure' });
+    expect(result.runs.find(r => r.source === 'exa')).toMatchObject({
+      ok: false,
+      usd: 0,
+    });
+    expect(result.usd).toBe(0);
+    const usage = await state.readUsage();
+    expect(usage.sources.exa.day).toMatchObject({ calls: 1, usd: 0 });
+  });
+
   it('coalesces concurrent identical queries into one execution', async () => {
     let release!: () => void;
     const gate = new Promise<void>(r => {

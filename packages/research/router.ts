@@ -156,6 +156,8 @@ export function createRouter(deps: RouterDeps) {
         answer: out.answer,
       };
     } catch (error) {
+      // A failed call returned nothing billable; release the reserved estimate.
+      if (spec.caps) await deps.state.settle(name, estimate, 0);
       return {
         run: {
           source: name,
@@ -163,7 +165,7 @@ export function createRouter(deps: RouterDeps) {
           ok: false,
           hits: 0,
           ms: now() - started,
-          usd: estimate,
+          usd: 0,
           error: (error as Error).message.slice(0, 160),
         },
         hits: [],
