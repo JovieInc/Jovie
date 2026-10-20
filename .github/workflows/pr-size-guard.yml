@@ -84,6 +84,7 @@ jobs:
             scripts/lib/merge-group-member-policy.mjs
             scripts/lib/pr-size-guard-policy.mjs
             scripts/lib/repo-hygiene-limits.mjs
+            scripts/workflow-expression-budget.mjs
           sparse-checkout-cone-mode: false
 
       - name: Restore per-head policy evidence
@@ -162,6 +163,56 @@ jobs:
             )
           fi
           node scripts/lib/merge-group-member-policy.mjs --policy=size --also=fork
+
+      # A combined head whose workflows GitHub cannot load (an interpolated run
+      # script over the 21,000-character expression limit) gets a zero-job CI
+      # run attributed to push, never a merge_group check, so the group sat in
+      # AWAITING_CHECKS for 39 minutes on 2026-10-20 (#21826). This required
+      # context fails instead, so the queue ejects the group that introduced
+      # it; a group stacked on an already broken base passes (the group ahead
+      # owns it), and the failure hold keeps the exact head out of the queue.
+      - name: Require combined-head workflows to load
+        if: github.event.merge_group.base_sha != '7641ffa76d03326542541c62080735c28190a1f0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GROUP_BASE: ${{ github.event.merge_group.base_sha }}
+          GROUP_HEAD: ${{ github.event.merge_group.head_sha }}
+        run: |
+          set -euo pipefail
+          if [[ ! -f scripts/workflow-expression-budget.mjs ]]; then
+            echo 'Trusted main predates the workflow load guard; nothing to check.'
+            exit 0
+          fi
+          [[ "$GROUP_HEAD" =~ ^[0-9a-f]{40}$ && "$GROUP_BASE" =~ ^[0-9a-f]{40}$ ]]
+          AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+          trap 'unset AUTH_HEADER' EXIT
+          GIT_CONFIG_COUNT=2 \
+          GIT_CONFIG_KEY_0=http.https://github.com/.extraheader \
+          GIT_CONFIG_VALUE_0="$AUTH_HEADER" \
+          GIT_CONFIG_KEY_1=core.hooksPath \
+          GIT_CONFIG_VALUE_1=/dev/null \
+          GIT_TERMINAL_PROMPT=0 \
+          GIT_LFS_SKIP_SMUDGE=1 \
+            bash --noprofile --norc -c '
+              # The member policy above normally fetched the group commit and
+              # its parent (the group base) already; fetch only when absent.
+              git cat-file -e "$GROUP_HEAD^{tree}" 2>/dev/null &&
+                git cat-file -e "$GROUP_BASE^{tree}" 2>/dev/null && exit 0
+              timeout --kill-after=5s 40s \
+                git fetch --filter=blob:limit=1g --no-tags --depth=2 origin "$GROUP_HEAD" || true
+            '
+          # Bounded inside the job's 3-minute budget. An unreadable tree or a
+          # timeout fails open; only a positive over-budget finding fails this
+          # required context.
+          status=0
+          timeout --kill-after=5s 30s \
+            node scripts/workflow-expression-budget.mjs --ref "$GROUP_HEAD" --introduced-since "$GROUP_BASE" \
+            || status=$?
+          if [[ "$status" -eq 124 || "$status" -eq 137 ]]; then
+            echo '::warning::Workflow load guard timed out; not blocking the group.'
+            status=0
+          fi
+          exit "$status"
 
   merge-group-fork:
     # The merge-group "Fork PR Gate" required context, decided from the size

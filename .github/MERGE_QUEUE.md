@@ -306,6 +306,18 @@ runtime behavior, or Summer commissioning.
   merge-group attempts per merge plus deterministic same-head recurrence.
 - Emergency response: inspect the native ruleset and exact queue entry,
   repair the source or required check, and prove a fresh native canary.
+- Groups stuck in AWAITING_CHECKS with a CI run named
+  `.github/workflows/ci.yml`, zero jobs and event `push` on the
+  `gh-readonly-queue/*` ref: GitHub could not load ci.yml, so no merge_group
+  check reports. The known cause is an interpolated `run:` script whose
+  `format()` expression exceeds GitHub's 21,000-character limit (2026-10-20,
+  #21826). `node scripts/workflow-expression-budget.mjs --ref HEAD --merge-with
+  origin/main` reproduces it. Source Validation runs that check on the head and
+  its merge with main, and PR Size Guard's "Require combined-head workflows to
+  load" step fails the group that introduced it, so the queue ejects it and the
+  failure hold keeps that exact head out. A group stacked on an already broken
+  base passes that step. The ruleset's 60-minute check response timeout remains
+  the backstop.
 
 ## Queue freeze (queue-watch runbook)
 

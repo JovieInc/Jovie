@@ -71,6 +71,9 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event != 'merge_group' }}
 
 jobs:
+  # CI failures, plus PR Size Guard's "Require combined-head workflows to
+  # load" step: a ci.yml GitHub cannot load reports no CI check at all
+  # (2026-10-20, #21826), and the script ignores every other size failure.
   hold-failed-revision:
     name: Hold failed source revision
     outputs:
@@ -78,7 +81,7 @@ jobs:
       admission_recovery_receipt: ${{ steps.failure-hold.outputs.admission_recovery_receipt }}
     if: >-
       github.event_name == 'workflow_run' &&
-      github.event.workflow_run.workflow_id == 178737329 &&
+      (github.event.workflow_run.workflow_id == 178737329 || github.event.workflow_run.workflow_id == 299199506) &&
       github.event.workflow_run.event == 'merge_group' &&
       github.event.workflow_run.head_repository.full_name == github.repository &&
       contains(fromJSON('["failure","timed_out","action_required","startup_failure","stale"]'), github.event.workflow_run.conclusion)
