@@ -199,16 +199,20 @@ export const CONTROLLER_WORKFLOW_PATH = 'production-controller.yml';
 
 /**
  * When a generation is superseded before marker preservation, live jov.ie
- * legitimately lags origin/main while the superseding generation's own
- * controller run is still proving the bind. Deferring is non-mutating (the
- * finalize step only runs for is_current or canonical_verified runs), so an
- * in-flight superseding run is a safe skip-success owner. Any other state
+ * legitimately lags origin/main while a newer controller generation in the
+ * same forward lineage is still proving the bind. Main can advance again
+ * before that generation starts, so it need not target the latest main.
+ * Deferring is non-mutating (finalize only runs for is_current or
+ * canonical_verified runs), so an in-flight superseding run is a safe
+ * skip-success owner. Any other state
  * keeps the fail-closed posture (JOV-5458): nothing owns the bind proof, so
  * the run must stay red.
  *
  * @param {{
  *   fetchImpl?: typeof fetch,
  *   mainSha?: string | null,
+ *   liveSha?: string | null,
+ *   expectedSha?: string | null,
  *   repo?: string,
  *   excludeRunId?: string | number | null,
  *   token?: string,
@@ -219,6 +223,8 @@ export const CONTROLLER_WORKFLOW_PATH = 'production-controller.yml';
 export async function deferToInFlightSupersede({
   fetchImpl = fetch,
   mainSha,
+  liveSha,
+  expectedSha = process.env.EXPECTED_SHA ?? '',
   repo = process.env.GITHUB_REPOSITORY ?? '',
   excludeRunId = process.env.GITHUB_RUN_ID ?? '',
   token = process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN ?? '',
@@ -226,7 +232,17 @@ export async function deferToInFlightSupersede({
   workflowPath = CONTROLLER_WORKFLOW_PATH,
 } = {}) {
   const currentMain = exactSha(mainSha);
-  if (!currentMain || !REPO_PATTERN.test(repo)) {
+  const live = exactSha(liveSha);
+  const expected = exactSha(expectedSha);
+  const currentRunId = Number(excludeRunId);
+  if (
+    !currentMain ||
+    !live ||
+    !expected ||
+    !REPO_PATTERN.test(repo) ||
+    !Number.isSafeInteger(currentRunId) ||
+    currentRunId <= 0
+  ) {
     return {
       deferred: false,
       reason: SUPERSEDE_DEFER_REASONS.inFlightCheckUnavailable,
@@ -234,39 +250,71 @@ export async function deferToInFlightSupersede({
   }
 
   try {
-    const response = await fetchImpl(
-      `${apiBaseUrl}/repos/${repo}/actions/workflows/${workflowPath}/runs?per_page=30`,
-      {
+    // One deadline bounds the listing and all ancestry reads; no polling.
+    const signal = AbortSignal.timeout(LIVE_BIND_FETCH_TIMEOUT_MS);
+    const api = async path => {
+      const response = await fetchImpl(`${apiBaseUrl}/repos/${repo}/${path}`, {
         headers: {
           Accept: 'application/vnd.github+json',
           'X-GitHub-Api-Version': '2022-11-28',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
+        signal,
+      });
+      if (!response?.ok) {
+        throw new Error(
+          `Production Controller evidence failed: HTTP ${response?.status ?? 'unknown'}`
+        );
       }
+      return response.json();
+    };
+    const payload = await api(
+      `actions/workflows/${workflowPath}/runs?branch=main&event=workflow_run&per_page=30`
     );
-    if (!response?.ok) {
-      throw new Error(
-        `Production Controller run listing failed: HTTP ${
-          response?.status ?? 'unknown'
-        }`
-      );
+    if (!Array.isArray(payload?.workflow_runs)) {
+      throw new Error('Production Controller run listing is malformed.');
     }
-    const payload = await response.json();
-    const runs = Array.isArray(payload?.workflow_runs)
-      ? payload.workflow_runs
-      : [];
-    const excluded = String(excludeRunId ?? '');
-    const owners = runs.filter(
-      run =>
-        run?.head_sha === currentMain &&
-        IN_FLIGHT_RUN_STATUSES.includes(run?.status) &&
-        String(run?.id ?? '') !== excluded
-    );
-    if (owners.length > 0) {
+    const comparisons = new Map();
+    const ancestor = async (base, head) => {
+      if (base === head) return true;
+      const range = `${base}...${head}`;
+      if (!comparisons.has(range)) {
+        const comparison = await api(`compare/${range}`);
+        comparisons.set(range, comparison?.status === 'ahead');
+      }
+      return comparisons.get(range);
+    };
+    for (const run of payload.workflow_runs) {
+      if (
+        !Number.isSafeInteger(run?.id) ||
+        run.id <= currentRunId ||
+        run.head_branch !== 'main' ||
+        run.event !== 'workflow_run' ||
+        !IN_FLIGHT_RUN_STATUSES.includes(run.status)
+      ) {
+        continue;
+      }
+      // workflow_run head_sha is the policy checkout. The existing run-name
+      // contract identifies the release SHA carried from the staging receipt.
+      const generation =
+        typeof run.display_title === 'string'
+          ? run.display_title.match(
+              /^Production Controller ([0-9a-f]{40}) from CI [1-9][0-9]* attempt [1-9][0-9]*$/
+            )?.[1]
+          : null;
+      if (
+        !generation ||
+        generation === expected ||
+        !(await ancestor(live, currentMain)) ||
+        !(await ancestor(expected, generation)) ||
+        !(await ancestor(generation, currentMain))
+      ) {
+        continue;
+      }
       return {
         deferred: true,
         reason: SUPERSEDE_DEFER_REASONS.supersedingRunInFlight,
-        runIds: owners.map(run => run.id),
+        runIds: [run.id],
       };
     }
     return {
@@ -307,6 +355,7 @@ async function main() {
       result.reason === LIVE_BIND_REASONS.skipSuccessUnbound
     ) {
       const deferral = await deferToInFlightSupersede({
+        liveSha: result.liveSha,
         mainSha: result.mainSha,
       });
       if (deferral.deferred) {

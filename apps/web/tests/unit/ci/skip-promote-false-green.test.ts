@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   assertLiveProductionBind,
   classifyLiveProductionBind,
@@ -53,6 +53,46 @@ const screenshotsWorkflowPath = resolve(
 
 const LIVE_SHA = 'dbcf7874da481aea6707d38fb9de32b5fa58de44';
 const MAIN_SHA = '4c44a9489de7cbfbea3506ac1ddcca753f80500c';
+
+const EXPECTED_SHA = 'a'.repeat(40);
+const INTERMEDIATE_SHA = 'b'.repeat(40);
+const supersedeContext = {
+  mainSha: MAIN_SHA,
+  liveSha: LIVE_SHA,
+  expectedSha: EXPECTED_SHA,
+  repo: 'JovieInc/Jovie',
+  excludeRunId: '100',
+  token: '',
+};
+
+function controllerRun(id: number, sha: string, status = 'pending') {
+  return {
+    id,
+    // workflow_run head_sha identifies the policy checkout, not the release.
+    head_sha: MAIN_SHA,
+    head_branch: 'main',
+    event: 'workflow_run',
+    display_title: `Production Controller ${sha} from CI 123 attempt 1`,
+    status,
+  };
+}
+
+function supersedeFetch(
+  runs: ReturnType<typeof controllerRun>[],
+  comparisons: Record<string, string> = {}
+) {
+  return vi.fn(async (input: Parameters<typeof fetch>[0]) => {
+    const url = new URL(String(input));
+    const comparison = url.pathname.split('/compare/')[1];
+    return {
+      ok: true,
+      json: async () =>
+        comparison
+          ? { status: comparisons[comparison] ?? 'ahead' }
+          : { workflow_runs: runs },
+    } as Response;
+  });
+}
 
 function getJobBlock(workflow: string, jobKey: string): string {
   const lines = workflow.split('\n');
@@ -162,93 +202,107 @@ describe('skip-promote false-green detector (JOV-5458)', () => {
     expect(ran.stderr).toContain('skip_success_unbound');
   });
 
-  it('defers a superseded skip-success when a newer controller run owns the bind', async () => {
-    let requested: string | undefined;
+  it('defers to an in-flight generation for exact main', async () => {
+    const fetchImpl = supersedeFetch([
+      controllerRun(101, MAIN_SHA, 'in_progress'),
+      controllerRun(100, EXPECTED_SHA, 'in_progress'),
+    ]);
     const result = await deferToInFlightSupersede({
-      fetchImpl: async url => {
-        requested = String(url);
-        return {
-          ok: true,
-          json: async () => ({
-            workflow_runs: [
-              { id: 2, head_sha: MAIN_SHA, status: 'in_progress' },
-              { id: 1, head_sha: LIVE_SHA, status: 'in_progress' },
-            ],
-          }),
-        } as Response;
-      },
-      mainSha: MAIN_SHA,
-      repo: 'JovieInc/Jovie',
-      excludeRunId: '999',
-      token: '',
+      ...supersedeContext,
+      fetchImpl,
     });
 
-    expect(requested).toContain(
+    expect(String(fetchImpl.mock.calls[0]?.[0])).toContain(
       '/actions/workflows/production-controller.yml/runs'
     );
     expect(result).toEqual({
       deferred: true,
       reason: SUPERSEDE_DEFER_REASONS.supersedingRunInFlight,
-      runIds: [2],
+      runIds: [101],
     });
   });
 
-  it('stays fail-closed when no superseding controller run is in-flight', async () => {
-    const result = await deferToInFlightSupersede({
-      fetchImpl: async () =>
-        ({
-          ok: true,
-          json: async () => ({
-            workflow_runs: [
-              { id: 3, head_sha: MAIN_SHA, status: 'completed' },
-              { id: 2, head_sha: LIVE_SHA, status: 'in_progress' },
-            ],
-          }),
-        }) as Response,
-      mainSha: MAIN_SHA,
-      repo: 'JovieInc/Jovie',
-      excludeRunId: '999',
-      token: '',
-    });
+  it.each(['queued', 'pending', 'in_progress', 'waiting', 'requested'])(
+    'defers to a newer intermediate release while main advances (%s, JOV-8175)',
+    async status => {
+      const run = controllerRun(101, INTERMEDIATE_SHA, status);
+      run.head_sha = EXPECTED_SHA;
+      const fetchImpl = supersedeFetch([run]);
+      expect(
+        await deferToInFlightSupersede({ ...supersedeContext, fetchImpl })
+      ).toEqual({
+        deferred: true,
+        reason: SUPERSEDE_DEFER_REASONS.supersedingRunInFlight,
+        runIds: [101],
+      });
+      const urls = fetchImpl.mock.calls.map(([url]) => String(url));
+      expect(urls).toContain(
+        `https://api.github.com/repos/JovieInc/Jovie/compare/${LIVE_SHA}...${MAIN_SHA}`
+      );
+      expect(urls).toContain(
+        `https://api.github.com/repos/JovieInc/Jovie/compare/${EXPECTED_SHA}...${INTERMEDIATE_SHA}`
+      );
+      expect(urls).toContain(
+        `https://api.github.com/repos/JovieInc/Jovie/compare/${INTERMEDIATE_SHA}...${MAIN_SHA}`
+      );
+    }
+  );
 
-    expect(result).toEqual({
+  it.each([
+    controllerRun(101, MAIN_SHA, 'completed'),
+    controllerRun(100, MAIN_SHA),
+    controllerRun(99, MAIN_SHA),
+    controllerRun(101, EXPECTED_SHA),
+    { ...controllerRun(101, MAIN_SHA), head_branch: 'feature' },
+    { ...controllerRun(101, MAIN_SHA), event: 'pull_request' },
+    { ...controllerRun(101, MAIN_SHA), display_title: 'malformed' },
+  ])('does not defer to a completed, older or unrelated run: %j', async run => {
+    expect(
+      await deferToInFlightSupersede({
+        ...supersedeContext,
+        fetchImpl: supersedeFetch([run]),
+      })
+    ).toEqual({
       deferred: false,
       reason: SUPERSEDE_DEFER_REASONS.noSupersedingRunInFlight,
     });
   });
 
-  it('excludes the current run when scanning for a superseding owner', async () => {
-    const result = await deferToInFlightSupersede({
-      fetchImpl: async () =>
-        ({
-          ok: true,
-          json: async () => ({
-            workflow_runs: [
-              { id: 999, head_sha: MAIN_SHA, status: 'in_progress' },
-            ],
+  it.each([
+    [`${LIVE_SHA}...${MAIN_SHA}`, 'diverged'],
+    [`${EXPECTED_SHA}...${INTERMEDIATE_SHA}`, 'behind'],
+    [`${INTERMEDIATE_SHA}...${MAIN_SHA}`, 'diverged'],
+    [`${INTERMEDIATE_SHA}...${MAIN_SHA}`, 'unknown'],
+  ])(
+    'fails closed without forward main lineage: %s = %s',
+    async (range, status) => {
+      expect(
+        await deferToInFlightSupersede({
+          ...supersedeContext,
+          fetchImpl: supersedeFetch([controllerRun(101, INTERMEDIATE_SHA)], {
+            [range]: status,
           }),
-        }) as Response,
-      mainSha: MAIN_SHA,
-      repo: 'JovieInc/Jovie',
-      excludeRunId: '999',
-      token: '',
-    });
+        })
+      ).toMatchObject({ deferred: false });
+    }
+  );
 
-    expect(result.deferred).toBe(false);
-    expect(result.reason).toBe(
-      SUPERSEDE_DEFER_REASONS.noSupersedingRunInFlight
-    );
+  it('does not mistake current-main policy code for a newer release', async () => {
+    expect(
+      await deferToInFlightSupersede({
+        ...supersedeContext,
+        fetchImpl: supersedeFetch([controllerRun(101, EXPECTED_SHA)]),
+      })
+    ).toMatchObject({ deferred: false });
   });
 
   it('stays fail-closed when the in-flight check cannot run', async () => {
     expect(
       await deferToInFlightSupersede({
+        ...supersedeContext,
         fetchImpl: async () => {
           throw new Error('network down');
         },
-        mainSha: MAIN_SHA,
-        repo: 'JovieInc/Jovie',
-        token: '',
       })
     ).toMatchObject({
       deferred: false,
@@ -257,14 +311,81 @@ describe('skip-promote false-green detector (JOV-5458)', () => {
 
     expect(
       await deferToInFlightSupersede({
+        ...supersedeContext,
         mainSha: 'not-a-sha',
-        repo: 'JovieInc/Jovie',
-        token: '',
       })
     ).toEqual({
       deferred: false,
       reason: SUPERSEDE_DEFER_REASONS.inFlightCheckUnavailable,
     });
+  });
+
+  it('fails closed on HTTP errors and malformed run evidence', async () => {
+    for (const response of [
+      { ok: false, status: 403 },
+      { ok: true, json: async () => ({ workflow_runs: null }) },
+    ]) {
+      expect(
+        await deferToInFlightSupersede({
+          ...supersedeContext,
+          fetchImpl: async () => response as Response,
+        })
+      ).toMatchObject({
+        deferred: false,
+        reason: SUPERSEDE_DEFER_REASONS.inFlightCheckFailed,
+      });
+    }
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          workflow_runs: [controllerRun(101, INTERMEDIATE_SHA)],
+        }),
+      })
+      .mockRejectedValueOnce(new Error('compare unavailable'));
+    expect(
+      await deferToInFlightSupersede({ ...supersedeContext, fetchImpl })
+    ).toMatchObject({
+      deferred: false,
+      reason: SUPERSEDE_DEFER_REASONS.inFlightCheckFailed,
+    });
+  });
+
+  it('CLI passes live identity and expected generation into non-mutating deferral', () => {
+    const preload = `globalThis.fetch = async () => ({
+      ok: true,
+      json: async () => ({
+        workflow_runs: [${JSON.stringify(controllerRun(101, INTERMEDIATE_SHA))}],
+        status: 'ahead'
+      })
+    });`;
+    const ran = spawnSync(
+      process.execPath,
+      [
+        '--import',
+        `data:text/javascript,${encodeURIComponent(preload)}`,
+        liveBindScriptPath,
+        '--main-sha',
+        MAIN_SHA,
+        '--live-sha',
+        LIVE_SHA,
+        '--allow-in-flight-supersede',
+      ],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          EXPECTED_SHA,
+          GITHUB_REPOSITORY: 'JovieInc/Jovie',
+          GITHUB_RUN_ID: '100',
+        },
+      }
+    );
+    expect(ran.status, ran.stderr).toBe(0);
+    const receipt = JSON.parse(ran.stdout.trim().split('\n').at(-1)!);
+    expect(receipt).toMatchObject({ bound: false, deferred: true });
+    expect(receipt.deferral.runIds).toEqual([101]);
   });
 
   it('holds screenshot merge-queue while Production Controller is in-flight', () => {
