@@ -175,6 +175,85 @@ const commands = {
       inherit: true,
     });
   },
+  review() {
+    // Everything a run review needs: the latest (or given) session's status,
+    // cost and duration, its tool calls and messages, and the memory store.
+    const sessionId =
+      process.argv[3] ??
+      ant([
+        'beta:deployment-runs',
+        'list',
+        '--deployment-id',
+        deploymentId(),
+        '--max-items',
+        '1',
+        '--transform',
+        'session_id',
+        '-r',
+      ]).trim();
+    const s = antJson(['beta:sessions', 'retrieve', '--session-id', sessionId]);
+    const cents = Number(s.usage?.list_cost?.amount ?? 0);
+    process.stdout.write(
+      `# ${sessionId} ${s.status} created=${s.created_at} updated=${s.updated_at} ` +
+        `active=${s.usage?.active_seconds}s cost=$${(cents / 100).toFixed(2)}/$1.00 ` +
+        `in=${s.usage?.input_tokens} cache_read=${s.usage?.cache_read_input_tokens} out=${s.usage?.output_tokens}\n`
+    );
+    const events = ant([
+      'beta:sessions:events',
+      'list',
+      '--session-id',
+      sessionId,
+      '--format',
+      'jsonl',
+      '--transform',
+      '{type,name,cmd:input.command,text:content.#(type=="text").text,err:error.message,perm:evaluated_permission}',
+    ])
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map(line => JSON.parse(line));
+    for (const e of events) {
+      if (e.type === 'agent.tool_use') {
+        process.stdout.write(
+          `TOOL ${e.name} [${e.perm}] ${(e.cmd ?? '').slice(0, 300)}\n`
+        );
+      } else if (e.type === 'agent.tool_result') {
+        process.stdout.write(
+          `  -> ${(e.text ?? '').slice(0, 300).replaceAll('\n', ' | ')}\n`
+        );
+      } else if (e.type === 'agent.message') {
+        process.stdout.write(`MSG ${e.text}\n`);
+      } else if (e.type === 'session.error' || e.err) {
+        process.stdout.write(`ERROR ${e.type} ${e.err}\n`);
+      }
+    }
+    const storeId = lockedId('memory_store-runs.yaml');
+    const memories = ant([
+      'beta:memory-stores:memories',
+      'list',
+      '--memory-store-id',
+      storeId,
+      '--format',
+      'jsonl',
+      '--transform',
+      '{id,path}',
+    ])
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map(line => JSON.parse(line));
+    for (const m of memories) {
+      const full = antJson([
+        'beta:memory-stores:memories',
+        'retrieve',
+        '--memory-store-id',
+        storeId,
+        '--memory-id',
+        m.id,
+      ]);
+      process.stdout.write(`\n## memory ${m.path}\n${full.content ?? ''}\n`);
+    }
+  },
   status() {
     const id = deploymentId();
     const d = antJson(['beta:deployments', 'retrieve', '--deployment-id', id]);

@@ -49,8 +49,11 @@ one PR, or record a justified no-op. Then write a receipt.
    Use `git log --since=7.days`, recent failing check names
    (`curl -s https://api.github.com/repos/JovieInc/<repo>/commits/main/check-runs`)
    and open PRs to see what is already being fixed. Skip anything with an open PR.
-   Unauthenticated api.github.com calls share a 60/hour quota and are often
-   exhausted; when they are, use git (authenticated by the repo proxy) instead:
+   Repo-scoped REST calls (`/repos/JovieInc/Jovie/...`,
+   `/repos/JovieInc/summer-config/...`) may be authenticated by the repo proxy;
+   try one and record its `x-ratelimit-limit` header before assuming the quota
+   is gone. Other api.github.com calls share a 60/hour unauthenticated quota and
+   are often exhausted; then use git (authenticated by the repo proxy) instead:
    `git ls-remote origin 'refs/pull/*/head'` for open PR heads and `git fetch`
    for branches. Record `github-api-rate-limited` rather than guessing.
 5. Linear: only if `$LINEAR_API_KEY` is set, query open issues labelled
