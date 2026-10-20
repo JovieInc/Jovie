@@ -86,6 +86,7 @@ describe('GET /claim/start', () => {
     expect(target.pathname).toBe('/signup');
     expect(target.searchParams.get('plan')).toBe('pro');
     expect(target.searchParams.get('artist_name')).toBe('Indie Artist');
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
     const cookies = response.headers.getSetCookie().join('\n');
     expect(cookies).toContain('jovie_plan_intent=pro');
     expect(cookies).toContain('jovie_billing_interval=month');
@@ -146,6 +147,19 @@ describe('GET /claim/start', () => {
     mocks.dbRows = [[{ isClaimed: true }]];
     const response = await GET(request('new=1'));
     expect(location(response)).toBe('/claim?state=already_subscribed');
+  });
+
+  it('keeps successive viewers on their own claim path', async () => {
+    mocks.auth.mockResolvedValueOnce({ userId: 'subscriber' });
+    mocks.entitlements.mockResolvedValue({ isPro: true, isTrialing: false });
+    mocks.dbRows = [[{ isClaimed: true }]];
+    expect(location(await GET(request('new=1')))).toBe(
+      '/claim?state=already_subscribed'
+    );
+
+    const anonymous = await GET(request('new=1'));
+    expect(location(anonymous)).toBe('/signup?plan=pro&interval=month');
+    expect(anonymous.headers.get('Cache-Control')).toBe('no-store');
   });
 
   it('lets a trialing artist with a claimed profile pay', async () => {

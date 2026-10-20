@@ -30,7 +30,6 @@ import { isSpotifyAvailable, spotifyClient } from '@/lib/spotify';
 import { ACQUISITION_COOKIE_NAME } from '@/lib/tracking/consent';
 
 export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
 
 class ArtistLookupUnavailableError extends Error {}
 
