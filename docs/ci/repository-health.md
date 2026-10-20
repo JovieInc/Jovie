@@ -172,7 +172,7 @@ Remote branches grew to 7,752 by 2026-10-20 because GitHub only auto-deletes mer
 
 The sweep never touches `main`, `gh-readonly-queue/*`, `backup/*` (hostops preservation owned by `scripts/lanes/worktree_sweep.py`), `release/*`, `dependabot/*`, a branch with an open PR, or a branch named in `--keep-file` (for example, one checked out in a local worktree). `refs/archive/*` is not fetched by the default refspec, so archived work costs clones nothing. To restore a branch, run `git push origin refs/archive/<branch>:refs/heads/<branch>`.
 
-GitHub crons are frozen (JOV-INV-042), so `.github/workflows/stale-branch-sweep.yml` is `workflow_dispatch` only. The automation registry owns its cadence (weekly dispatch with `apply=true`), and each run uploads a `jovie-stale-branch-sweep/v1` receipt.
+GitHub crons are frozen (JOV-INV-042), so `.github/workflows/stale-branch-sweep.yml` has no schedule. The Gem lanes clock fires `repository_dispatch` type `clock_stale_branch_sweep` weekly; that event applies unless `client_payload.apply` is `false`. The automation registry records the cadence. Manual `workflow_dispatch` is a dry-run unless `apply=true`. Each run uploads a `jovie-stale-branch-sweep/v1` receipt.
 
 ### Split a package or repository
 

@@ -6,10 +6,15 @@ name: Stale Branch Sweep
 
 # Archives then deletes stale remote branches; policy in
 # scripts/lib/stale-branch-sweep.mjs and docs/ci/repository-health.md.
-# No clock here (JOV-INV-042 freezes GitHub crons): the automation registry
-# owns the cadence and dispatches this workflow. Dry-run unless apply=true.
+# No clock here (JOV-INV-042 freezes GitHub crons): the Gem lanes clock fires
+# repository_dispatch clock_stale_branch_sweep on the cadence the automation
+# registry records (the bot token cannot send workflow_dispatch). A clock event
+# applies unless client_payload.apply is false; manual dispatch is a dry-run
+# unless apply=true.
 
 on:
+  repository_dispatch:
+    types: [clock_stale_branch_sweep]
   workflow_dispatch:
     inputs:
       apply:
@@ -49,7 +54,7 @@ jobs:
 
       - name: Plan and sweep
         env:
-          APPLY: ${{ inputs.apply }}
+          APPLY: ${{ github.event_name == 'repository_dispatch' && (github.event.client_payload.apply != false && 'true' || 'false') || inputs.apply }}
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |

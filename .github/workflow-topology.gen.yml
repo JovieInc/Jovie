@@ -1210,6 +1210,7 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
+      - repository_dispatch
       - workflow_dispatch
     terminalReceipt: job:sweep
     jobCount: 1
