@@ -346,6 +346,22 @@ export type DeliveryLane = {
   readonly slots: number;
 };
 
+/** Seconds; `null` means unknown, never zero. */
+export type StageTiming = {
+  readonly stage: string;
+  readonly p50: number | null;
+  readonly p95: number | null;
+  readonly n: number;
+};
+
+export type StageSummary = {
+  readonly at: string;
+  readonly stagesTotal: number | null;
+  readonly stagesWithData: number | null;
+  readonly regressions: readonly string[];
+  readonly slowestP95: readonly StageTiming[];
+};
+
 export type DeliveryLanes = {
   readonly running: CountMeasurement;
   readonly slots: CountMeasurement;
@@ -358,6 +374,12 @@ export type DeliveryLanes = {
   readonly heldByReason: Readonly<Record<string, number>>;
   readonly failedByReason: Readonly<Record<string, number>>;
   readonly capacity: CapacityHorizon | null;
+  /**
+   * `jovie-stage-summary/v1` from the lanes feed's `slo.stages` (PR #22385):
+   * the slowest 7d p95 stages and current regressions. Null when the feed
+   * does not publish it.
+   */
+  readonly stageSummary?: StageSummary | null;
   readonly publishedAt: string | null;
   /** The feed's own `at` is older than the lanes semantic window. */
   readonly stale: boolean;
@@ -523,6 +545,7 @@ export function emptyDeliverySummary(): DeliverySummary {
       heldByReason: {},
       failedByReason: {},
       capacity: null,
+      stageSummary: null,
       publishedAt: null,
       stale: false,
     },

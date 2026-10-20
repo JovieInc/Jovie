@@ -15,6 +15,7 @@ import {
   type LiveIo,
   NAMED_AUTHORITY_URLS,
   pacificMidnightIso,
+  parseStageSummary,
   readLanePullRequests,
   readLanesStatus,
   readLiveBuild,
@@ -159,6 +160,81 @@ describe('lanes-status (symphony-lanes-status/v1 gist)', () => {
     expect(projection.capacityAvailable).toEqual({
       state: 'measured-nonzero',
       value: 2,
+    });
+  });
+
+  it('reads the stage summary from slo.stages and drops malformed rows', async () => {
+    const read = await readLanesStatus(
+      io(async () =>
+        json({
+          ...LANES_FEED,
+          slo: {
+            stages: {
+              schema: 'jovie-stage-summary/v1',
+              at: '2026-09-27T01:58:00Z',
+              coverage: { stagesTotal: 31, stagesWithData: 14, events: 25262 },
+              regressions: ['remediation:classified.p95', 42],
+              slowestP95_7d: [
+                {
+                  stage: 'remediation:classified',
+                  p50: 3219,
+                  p95: 201933,
+                  n: 126,
+                },
+                { stage: 'shipping:ready', p50: null, p95: 23458, n: 571 },
+                { stage: '', p50: 1, p95: 2, n: 3 },
+                { stage: 'bad-n', p50: 1, p95: 2, n: -1 },
+              ],
+              endToEnd7d: {},
+            },
+          },
+        })
+      )
+    );
+    expect(read).toMatchObject({
+      status: 'ok',
+      delivery: {
+        lanes: {
+          stageSummary: {
+            at: '2026-09-27T01:58:00.000Z',
+            stagesTotal: 31,
+            stagesWithData: 14,
+            regressions: ['remediation:classified.p95'],
+            slowestP95: [
+              {
+                stage: 'remediation:classified',
+                p50: 3219,
+                p95: 201933,
+                n: 126,
+              },
+              { stage: 'shipping:ready', p50: null, p95: 23458, n: 571 },
+            ],
+          },
+        },
+      },
+    });
+  });
+
+  it('reports no stage summary when the feed omits or mislabels it', async () => {
+    const read = await readLanesStatus(io(async () => json(LANES_FEED)));
+    expect(read).toMatchObject({ delivery: { lanes: { stageSummary: null } } });
+    expect(
+      parseStageSummary({ schema: 'other/v1', at: '2026-09-27T01:58:00Z' })
+    ).toBeNull();
+    expect(
+      parseStageSummary({ schema: 'jovie-stage-summary/v1', at: 'soon' })
+    ).toBeNull();
+    expect(
+      parseStageSummary({
+        schema: 'jovie-stage-summary/v1',
+        at: '2026-09-27T01:58:00Z',
+      })
+    ).toEqual({
+      at: '2026-09-27T01:58:00.000Z',
+      stagesTotal: null,
+      stagesWithData: null,
+      regressions: [],
+      slowestP95: [],
     });
   });
 
