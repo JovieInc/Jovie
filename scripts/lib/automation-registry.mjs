@@ -20,7 +20,7 @@
  *   started -> finished pair per run), so every run's start and end land in
  *   the stage-timing pipeline.
  *
- * Network reads live in scripts/automation-liveness.mjs.
+ * Network reads live in the hosted liveness job (scripts/automation-liveness.mjs).
  */
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
