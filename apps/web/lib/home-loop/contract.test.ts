@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   formatCountdown,
+  formatDurationSeconds,
   HOME_LOOP_NOT_MEASURED,
   type HomeLoopTile,
   rememberTiles,
@@ -63,5 +64,22 @@ describe('formatCountdown', () => {
 
   it('returns null for an unparseable deadline', () => {
     expect(formatCountdown('soon', now)).toBeNull();
+  });
+});
+
+describe('formatDurationSeconds', () => {
+  it.each([
+    [42, '42s'],
+    [495, '8m'],
+    [15147, '4.2h'],
+    [86400, '24h'],
+    [201933, '2.3d'],
+  ])('formats %s seconds as %s', (value, expected) => {
+    expect(formatDurationSeconds(value)).toBe(expected);
+  });
+
+  it('never turns unknown into zero', () => {
+    expect(formatDurationSeconds(null)).toBe(HOME_LOOP_NOT_MEASURED);
+    expect(formatDurationSeconds(-1)).toBe(HOME_LOOP_NOT_MEASURED);
   });
 });

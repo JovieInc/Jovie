@@ -115,3 +115,30 @@ export const GeneratingAnswer: Story = {
     ),
   },
 };
+
+export const WithStageLatency: Story = {
+  args: {
+    latency: {
+      rows: [
+        {
+          id: 'remediation:classified',
+          label: 'Remediation · Classified',
+          p50: '54m',
+          p95: '2.3d',
+          samples: 126,
+          regressed: true,
+        },
+        {
+          id: 'shipping:ready',
+          label: 'Shipping · Ready',
+          p50: '3m',
+          p95: '6.5h',
+          samples: 571,
+          regressed: false,
+        },
+      ],
+      otherRegressions: ['Remediation · Red → Green'],
+      coverage: '14 of 31 stages measured',
+    },
+  },
+};

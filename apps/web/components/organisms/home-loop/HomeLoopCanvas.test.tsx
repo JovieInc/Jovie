@@ -191,6 +191,39 @@ describe('HomeLoopCanvas', () => {
     );
   });
 
+  it('shows the stage latency section only when the persona supplies it', () => {
+    const { rerender } = render(<HomeLoopCanvas {...props()} />);
+    expect(screen.queryByTestId('home-loop-latency-section')).toBeNull();
+    rerender(<HomeLoopCanvas {...props({ latency: null })} />);
+    expect(screen.getByTestId('home-loop-latency-section')).toHaveAttribute(
+      'data-state',
+      'empty'
+    );
+    rerender(
+      <HomeLoopCanvas
+        {...props({
+          latency: {
+            rows: [
+              {
+                id: 'a',
+                label: 'Shipping · Ready',
+                p50: '3m',
+                p95: '6.5h',
+                samples: 571,
+                regressed: false,
+              },
+            ],
+            otherRegressions: [],
+            coverage: null,
+          },
+        })}
+      />
+    );
+    expect(screen.getByTestId('home-loop-latency-row')).toHaveTextContent(
+      '6.5h'
+    );
+  });
+
   it('keeps the why collapsed until requested', () => {
     render(<HomeLoopCanvas {...props()} />);
     const [first] = screen.getAllByTestId('home-loop-ask');

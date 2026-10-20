@@ -6,6 +6,7 @@ import type {
   HomeLoopConstraint,
   HomeLoopCopy,
   HomeLoopDoneItem,
+  HomeLoopLatencyRow,
   HomeLoopRow,
   HomeLoopTile,
 } from '@/lib/home-loop/contract';
@@ -14,6 +15,7 @@ import {
   HomeLoopAsks,
   HomeLoopAsksSkeleton,
 } from './HomeLoopAsks';
+import { HomeLoopLatency } from './HomeLoopLatency';
 import { HomeLoopConstraintBanner, HomeLoopPulse } from './HomeLoopPulse';
 import { HomeLoopSection, type HomeLoopSectionStatus } from './HomeLoopSection';
 import {
@@ -51,6 +53,12 @@ export interface HomeLoopCanvasProps {
   readonly answer?: ReactNode;
   /** Generated UI that updates the in-flight section in place. */
   readonly inFlightOverride?: ReactNode;
+  /** Slowest stages and regressions; omit for personas without stage data. */
+  readonly latency?: {
+    readonly rows: readonly HomeLoopLatencyRow[];
+    readonly otherRegressions: readonly string[];
+    readonly coverage: string | null;
+  } | null;
 }
 
 /**
@@ -80,6 +88,7 @@ export function HomeLoopCanvas({
   asksMoreHref,
   answer,
   inFlightOverride,
+  latency,
 }: HomeLoopCanvasProps) {
   const openAsks = asks.filter(
     ask => !answers[ask.id] || answers[ask.id]?.state === 'failed'
@@ -127,11 +136,10 @@ export function HomeLoopCanvas({
           onRetry={onRetryLoop}
           skeleton={<HomeLoopStageRowsSkeleton />}
           minBodyClassName='min-h-24'
-          className='xl:row-span-2 2xl:row-span-1'
           testId='home-loop-in-flight-section'
         >
           {inFlightOverride ?? (
-            <HomeLoopStageRows stages={stages} rows={rows} />
+            <HomeLoopStageRows stages={stages} rows={rows} maxRows={8} />
           )}
         </HomeLoopSection>
         <HomeLoopSection
@@ -148,6 +156,29 @@ export function HomeLoopCanvas({
         >
           <HomeLoopDoneChips items={done} summary={doneSummary} />
         </HomeLoopSection>
+        {latency !== undefined ? (
+          <HomeLoopSection
+            title={copy.latencyTitle ?? 'Slowest Stages'}
+            status={loopStatus}
+            isEmpty={!latency || latency.rows.length === 0}
+            emptyLabel={
+              copy.latencyEmpty ?? 'Stage timings are not measured yet.'
+            }
+            errorLabel={copy.inFlightError}
+            onRetry={onRetryLoop}
+            skeleton={<HomeLoopStageRowsSkeleton rows={3} />}
+            minBodyClassName='min-h-24'
+            testId='home-loop-latency-section'
+          >
+            {latency ? (
+              <HomeLoopLatency
+                rows={latency.rows}
+                otherRegressions={latency.otherRegressions}
+                coverage={latency.coverage}
+              />
+            ) : null}
+          </HomeLoopSection>
+        ) : null}
       </div>
     </div>
   );

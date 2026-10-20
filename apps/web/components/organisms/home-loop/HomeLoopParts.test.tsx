@@ -7,6 +7,7 @@ import {
   HOME_LOOP_FIXTURE_STAGES,
   HOME_LOOP_FIXTURE_UNMEASURED_PULSE,
 } from './fixtures';
+import { HomeLoopLatency } from './HomeLoopLatency';
 import { HomeLoopConstraintBanner, HomeLoopPulse } from './HomeLoopPulse';
 import { HomeLoopSection } from './HomeLoopSection';
 import { HomeLoopDoneChips, HomeLoopStageRows } from './HomeLoopStageRows';
@@ -185,5 +186,45 @@ describe('HomeLoopSection', () => {
     );
     expect(screen.queryByText('Nothing here')).not.toBeInTheDocument();
     expect(screen.queryByText('Body')).not.toBeInTheDocument();
+  });
+});
+
+describe('HomeLoopLatency', () => {
+  it('lists slowest stages with regressions named in text', () => {
+    render(
+      <HomeLoopLatency
+        rows={[
+          {
+            id: 'a',
+            label: 'Remediation · Classified',
+            p50: '54m',
+            p95: '2.3d',
+            samples: 126,
+            regressed: true,
+          },
+          {
+            id: 'b',
+            label: 'Shipping · PR Open',
+            p50: '8m',
+            p95: '4.2h',
+            samples: 570,
+            regressed: false,
+          },
+        ]}
+        otherRegressions={['Release · Staging → Verified']}
+        coverage='14 of 31 stages measured'
+      />
+    );
+    const rows = screen.getAllByTestId('home-loop-latency-row');
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toHaveTextContent('Regressed');
+    expect(rows[0]).toHaveTextContent('2.3d');
+    expect(rows[1]).not.toHaveTextContent('Regressed');
+    expect(
+      screen.getByRole('table', { name: 'Slowest stages by 7-day p95' })
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('home-loop-latency')).toHaveTextContent(
+      'Also regressed: Release · Staging → Verified · 14 of 31 stages measured'
+    );
   });
 });
