@@ -625,14 +625,14 @@ export function ProfileCompactTemplate({
 
   const syncRequestedModeFromLocation = useCallback(
     (fallbackMode = mode) => {
-      setRequestedMode(currentMode => {
-        const nextMode = getInitialModeFromLocation(fallbackMode, true);
-        if (currentMode !== nextMode) {
-          suppressNextHistorySyncRef.current = true;
-          initialLocationModeAlignedRef.current = false;
-        }
-        return nextMode;
-      });
+      const nextMode = getInitialModeFromLocation(fallbackMode, true);
+      // React may replay a state updater after the alignment effect commits.
+      // Keep history guards outside that replay using the committed mode.
+      if (lastSyncedModeRef.current !== nextMode) {
+        suppressNextHistorySyncRef.current = true;
+        initialLocationModeAlignedRef.current = false;
+      }
+      setRequestedMode(nextMode);
     },
     [mode]
   );
