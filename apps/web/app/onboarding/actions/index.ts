@@ -5,6 +5,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { isRedirectError } from 'next/dist/client/components/redirect-error';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
@@ -326,10 +327,12 @@ export async function completeOnboarding({
   redirectToDashboard?: boolean;
 }): Promise<OnboardingCompletionResult> {
   let pendingClaim: Awaited<ReturnType<typeof readPendingClaimContext>> = null;
+  let affectedUserId: string | null = null;
 
   try {
     // Step 1: Authentication check
     const { userId } = await getCachedAuth();
+    affectedUserId = userId;
     if (!userId) {
       const error = createOnboardingError(
         OnboardingErrorCode.NOT_AUTHENTICATED,
@@ -591,6 +594,7 @@ export async function completeOnboarding({
 
     return completion;
   } catch (error) {
+    if (isRedirectError(error)) throw error;
     const claimExpired =
       pendingClaim?.mode === 'token_backed' &&
       error instanceof Error &&
@@ -613,13 +617,9 @@ export async function completeOnboarding({
         reason: failureReason,
       });
     }
-    await captureError('completeOnboarding failed', error, {
-      route: 'onboarding',
-    });
     const loggedError = logOnboardingError(error, {
-      username,
-      displayName,
-      email,
+      stage: pendingClaim ? 'profile_claim' : 'onboarding_persistence',
+      userId: affectedUserId,
     });
     // Next hides thrown Server Action messages in production. Return only the
     // known recovery code; provider/database errors remain on the thrown path.

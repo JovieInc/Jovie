@@ -321,6 +321,19 @@ describe('completeOnboarding', () => {
     mockProfileIsPublishable.mockReturnValue(false);
   });
 
+  it('does not report a successful redirect as a persistence failure', async () => {
+    const redirect = Object.assign(new Error('NEXT_REDIRECT'), {
+      digest: 'NEXT_REDIRECT;replace;/app;307;',
+    });
+    mockRedirect.mockImplementationOnce(() => {
+      throw redirect;
+    });
+    await expect(
+      completeOnboarding({ username: 'artist', displayName: 'Artist' })
+    ).rejects.toBe(redirect);
+    expect(mockLogOnboardingError).not.toHaveBeenCalled();
+  });
+
   it('rejects unauthenticated users before touching persistence', async () => {
     mockGetCachedAuth.mockResolvedValueOnce({ userId: null });
 
@@ -472,12 +485,10 @@ describe('completeOnboarding', () => {
       })
     ).rejects.toThrow('RATE_LIMITED');
 
-    expect(mockCaptureError).toHaveBeenCalledWith(
-      'completeOnboarding failed',
-      rateLimitError,
-      expect.objectContaining({ route: 'onboarding' })
-    );
-    expect(mockLogOnboardingError).toHaveBeenCalled();
+    expect(mockLogOnboardingError).toHaveBeenCalledWith(rateLimitError, {
+      stage: 'onboarding_persistence',
+      userId: 'clerk-user-123',
+    });
   });
 
   it('claims the exact prebuilt profile for token-backed pending claims', async () => {

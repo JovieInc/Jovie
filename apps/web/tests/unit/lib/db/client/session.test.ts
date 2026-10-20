@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const mockRevenueFailure = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/observability/revenue-spine', () => ({
+  captureRevenueSpineFailure: mockRevenueFailure,
+}));
+
 const { mockDbExecute, mockCaptureError } = vi.hoisted(() => ({
   mockDbExecute: vi.fn(),
   mockCaptureError: vi.fn(),
@@ -169,6 +174,12 @@ describe('lib/db/client/session RLS helpers', () => {
       })
     );
     expect(mockCaptureError).toHaveBeenCalledTimes(1);
+    expect(mockRevenueFailure).toHaveBeenCalledExactlyOnceWith({
+      stage: 'rls_setup',
+      severity: 'blocked',
+      userId: 'user_tx_fail',
+      error: setConfigError,
+    });
   });
 
   it('applyRlsTransactionUser uses transaction-local SQL on success', async () => {
