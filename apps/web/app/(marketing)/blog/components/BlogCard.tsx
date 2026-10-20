@@ -31,6 +31,7 @@ function formatDate(dateString: string): string {
 
 export function BlogCard({ post, author, variant = 'default' }: BlogCardProps) {
   const artworkHeadline = EDITORIAL_HEADLINES[post.slug];
+  const artworkId = `blog-card-artwork-${post.slug}`;
   const titleId = `blog-card-title-${post.slug}`;
 
   return (
@@ -41,7 +42,9 @@ export function BlogCard({ post, author, variant = 'default' }: BlogCardProps) {
     >
       <Link
         href={`/blog/${post.slug}`}
-        aria-labelledby={titleId}
+        aria-labelledby={
+          post.image && artworkHeadline ? `${artworkId} ${titleId}` : titleId
+        }
         className='group row-span-2 grid grid-rows-subgrid gap-y-4 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token focus-visible:ring-offset-2'
       >
         <div className='relative aspect-video overflow-hidden rounded-lg bg-surface-3'>
@@ -57,7 +60,7 @@ export function BlogCard({ post, author, variant = 'default' }: BlogCardProps) {
               />
               {artworkHeadline && (
                 <span
-                  aria-hidden='true'
+                  id={artworkId}
                   className='relative px-6 text-center text-2xl font-semibold text-white dark:text-white'
                 >
                   {artworkHeadline}

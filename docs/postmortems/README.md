@@ -10,6 +10,7 @@ Tim is never required.
 
 | Date | Incident | Failure classes | Status |
 | --- | --- | --- | --- |
+| 2026-10-20 | [Screenshot accessibility failures blocked production freshness](2026-10-20-screenshot-accessible-name-freeze.md) | `pre-merge-parity-gap` | draft |
 | 2026-10-16 | [Desktop draft preparation failed on installation quota](2026-10-16-desktop-draft-quota.md) | `pre-merge-parity-gap`, `serial-layer-discovery` | draft |
 | 2026-10-16 | [Production lineage checks failed on the shared REST quota](2026-10-16-production-lineage-rest-quota.md) | `pre-merge-parity-gap`, `serial-layer-discovery` | draft |
 | 2026-10-16 | [Verified TestFlight sources starved while main advanced](2026-10-16-testflight-main-advance-starvation.md) | `non-convergent-control-loop`, `pre-merge-parity-gap`, `green-by-implication` | draft |
