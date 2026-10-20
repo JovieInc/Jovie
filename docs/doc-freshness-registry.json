@@ -119,6 +119,21 @@
         }
       ]
     },
+    ".claude/rules/external-apis.md": {
+      "owner": "@itstimwhite",
+      "claim": "Every third-party API call goes through packages/api-client or scripts/apiclient, enforced by the external API guard ratchet.",
+      "documentSha256": "0971c98eecb4a8bc0d4e8e6985cf7db293bf831d6feba06168a0748850f09fc5",
+      "sources": [
+        {
+          "path": "packages/api-client/providers.json",
+          "sha256": "f8e449fcee1f5f8cef5329d41f6955d4f36de08d0cd592e469aba8f7c674c09f"
+        },
+        {
+          "path": "scripts/lib/external-api-guard.mjs",
+          "sha256": "d69b0e942f4de36b664c9ffac1e7ca366d3a8075b8f2e34be3e938aa90ccec59"
+        }
+      ]
+    },
     ".claude/rules/gstack.md": {
       "owner": "@itstimwhite",
       "claim": "Skill templates and regeneration follow the existing context contract, not copied provider policy.",

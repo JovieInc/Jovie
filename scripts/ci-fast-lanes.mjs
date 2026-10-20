@@ -186,6 +186,17 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: true,
   }),
   Object.freeze({
+    // Third-party API calls go through packages/api-client / scripts/apiclient
+    // (.claude/rules/external-apis.md). A new provider host, SDK client or gh
+    // call in any scanned source fails here; grandfathered sites only shrink.
+    id: 'external-api-guard',
+    command:
+      'node scripts/external-api-guard.mjs && pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/external-api-guard.test.mjs',
+    inputs:
+      /(?:\.(?:ts|tsx|js|mjs|cjs|mts|cts|py|sh|bash|ya?ml)$|^packages\/api-client\/providers\.json$|^scripts\/lib\/external-api-guard\.)/u,
+    prOnly: false,
+  }),
+  Object.freeze({
     // Every disk-reading web unit test whose path literals name a changed
     // file (scripts/lib/web-source-read-tests.mjs). Such tests ejected ~45
     // merge groups in the 7 days to 2026-10-12 because the import-graph

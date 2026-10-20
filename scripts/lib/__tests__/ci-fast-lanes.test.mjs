@@ -2084,6 +2084,11 @@ describe('failing test identities in lane excerpts', () => {
 describe('source-read guard selection', () => {
   const selected = (event, files) =>
     selectSourceGuards(event, files).map(guard => guard.id);
+  // external-api-guard scans every source, script and workflow file.
+  const apiGuard = path =>
+    /\.(?:ts|tsx|js|mjs|cjs|mts|cts|py|sh|bash|ya?ml)$/u.test(path)
+      ? ['external-api-guard']
+      : [];
 
   it.each(['pull_request', 'merge_group', 'push'])(
     'runs profile conformance for adapters on %s',
@@ -2103,7 +2108,7 @@ describe('source-read guard selection', () => {
     (event, pr) => {
       expect(
         selected(event, ['.github/workflows/upstash-quota-headroom.yml'])
-      ).toEqual(['ci-schedule-inventory', ...pr]);
+      ).toEqual(['ci-schedule-inventory', 'external-api-guard', ...pr]);
     }
   );
 
@@ -2187,6 +2192,7 @@ describe('source-read guard selection', () => {
     // PR-wide guards narrow inside their scripts.
     expect(selected('pull_request', [path])).toEqual([
       ...guards,
+      ...apiGuard(path),
       'web-source-read-tests',
       'script-contracts',
     ]);
@@ -2226,7 +2232,7 @@ describe('source-read guard selection', () => {
     ]) {
       expect(classifyProductLanes([path]).selectedLanes).toContain('web');
       const expected = path.startsWith('apps/web/lib/')
-        ? ['artist-profile-conformance']
+        ? ['artist-profile-conformance', ...apiGuard(path)]
         : [];
       expect(selected('merge_group', [path])).toEqual(expected);
       expect(selected('push', [path])).toEqual(expected);
@@ -2254,6 +2260,7 @@ describe('source-read guard selection', () => {
       'artist-profile-conformance',
       'ci-schedule-inventory',
       'playbook-authoring',
+      'external-api-guard',
     ]);
     expect(selected('', ['README.md'])).toEqual(all);
     expect(selected('pull_request', null)).toEqual(all);
@@ -2263,6 +2270,7 @@ describe('source-read guard selection', () => {
       'artist-profile-conformance',
       'ci-schedule-inventory',
       'playbook-authoring',
+      'external-api-guard',
     ]);
   });
 
