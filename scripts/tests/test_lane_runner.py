@@ -2306,6 +2306,18 @@ class HostHandoffAdmissionTest(unittest.TestCase):
 
 
 class RunIssueTest(unittest.TestCase):
+    def test_unmeasured_execution_never_turns_reservation_into_cash(self):
+        lane.verify_and_land = lambda *a, **k: {"verdict": "no-change", "reasons": []}
+        receipt = lane.run_issue(self.host, "devin", {"cmd": ["true"], "model": "swe-2-medium"},
+                                 FakeLinear([]), issue("JOV-8663"))
+        economics = receipt["economics"][0]
+        self.assertIsNone(economics["measurements"]["cashUsd"])
+        self.assertIsNone(economics["measurements"]["credits"])
+        self.assertEqual(economics["reservedLimits"], {"dispatchUnits": 1})
+        self.assertEqual(economics["binding"]["executionGeneration"], receipt["execution"]["executionGeneration"])
+        self.assertEqual(economics["binding"]["provider"], "devin")
+        self.assertEqual(self.ledger()[-1]["economics"], receipt["economics"])
+
     def setUp(self):
         disk = patch.object(lane.disk_guard, "free_pct", return_value=50.0)
         disk.start()
@@ -2523,6 +2535,12 @@ class RunIssueTest(unittest.TestCase):
         self.assertEqual(seen, [["codex-test"], ["claude-test", "opus"]])
         self.assertEqual(len(receipt["handoffs"]), 1)
         self.assertEqual(receipt["verdict"], "provider-error")
+        first, second = receipt["economics"]
+        self.assertEqual((first["exitCode"], second["exitCode"]), (75, 75))
+        self.assertEqual(second["binding"]["model"], "opus")
+        self.assertEqual(second["binding"]["handoffFrom"], first["binding"]["executionId"])
+        self.assertNotEqual(first["binding"]["executionId"], second["binding"]["executionId"])
+        self.assertEqual(first["binding"]["attemptId"], second["binding"]["attemptId"])
 
     def test_next_provider_takes_the_cheapest_enabled_healthy_uncooled_lane(self):
         providers = {

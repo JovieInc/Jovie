@@ -104,6 +104,51 @@ cooldown policy, not a fresh positive quota reading. An empty unleased-available
 list does not mean all quotas are exhausted. Usage-limit, auth, rate and unknown
 holds remain distinct, and stale or incomplete rows report unknown.
 
+### Provider economics (JOV-8663)
+
+Issue dispatches, repairs and provider handoffs add `economics` entries to the
+existing `runs/ledger.jsonl` receipt. Each entry binds repository, issue,
+execution generation, attempt number and hashed attempt ID, provider/model,
+local execution or remote thread, and the preceding handoff execution.
+Unknown cash, consumed credits and USD estimates remain separate nulls.
+`reservedLimits` contains dispatch units and any verified remote USD cap;
+neither it nor account balances are measured spend. Claude subscription output
+supplies only a notional USD estimate. Failed executions retain observations.
+
+An authorized operator can import a provider's usage total or an attributable
+billing line without dispatching work or fetching account data:
+
+```sh
+python3 scripts/lanes/provider_economics.py record --ledger <state>/runs/ledger.jsonl \
+  --authorized-evidence-file /private/usage.json --source-kind billing \
+  --source-id invoice-line-id --provider hyperagent
+python3 scripts/lanes/provider_economics.py summarize --ledger <state>/runs/ledger.jsonl
+```
+
+The JSON input has exactly `schema` (`jovie-provider-economics/v1`), `binding`
+(copied verbatim from the existing entry), `metric` (`cashUsd`, `credits` or
+`estimateUsd`), `amount` (nonnegative decimal string), `unit` (`USD` for money,
+the provider's credit unit otherwise), `scope` (`execution-total`), `source`
+(`kind`, `id`, `provider`, matching the separately authorized CLI source),
+`sourceObservedAt` and `observedAt` (UTC ISO timestamps). Import only evidence
+already authorized for this exact execution; the input must not be model prose,
+account-level charges/balances, limits, credentials or an inferred price.
+Totals are complete execution totals, never incremental samples. Source IDs
+and observation times survive in an append-only measurement receipt. Duplicate,
+conflicting, older and foreign evidence is rejected before append. Resumed
+remote snapshots count once, and incompatible credit units remain separate.
+Reports expose measured subtotals and unknown counts; an unknown amount is
+never a zero. Historical receipts without economics remain unmeasured.
+
+Hyperagent emits one fixed, redacted unavailable-spend explanation per existing
+attempt. Its journal preserves the thread and attempt; it never probes billing,
+replaces a thread or changes retry/spending authority to obtain a measurement.
+
+Ship now: extend the existing ledger using standard-library validation and
+locking. Re-evaluate when authorized provider output exposes attributable cash
+or credits. Then: add a narrowly scoped adapter for that output, retaining the
+same attempt binding and independent measurement categories.
+
 Manual and independently orchestrated runs can append provenance without gaining
 execution authority. After the PR's final head is known, run
 `python3 scripts/lanes/shipping_attribution.py record-origin --ledger <state>/runs/ledger.jsonl
