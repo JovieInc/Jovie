@@ -479,7 +479,7 @@ export const DSP_PROFILE_CATALOG = {
     connectorProviderId: 'youtube',
     artistPortalUrl: 'https://artists.youtube.com',
     availability: 'planned',
-    blockedReason: noAdapter,
+    blockedReason: `${noAdapter} Core YouTube HTML ingestion is prohibited by social-html-policy.ts in both isolated-provider flag states; only official APIs or an isolated provider may establish future reads.`,
     transport: {
       legacyBio: 'api',
       read: 'official_api',
@@ -522,6 +522,8 @@ export const DSP_PROFILE_CATALOG = {
         youtubeApi,
         youtubeUpdate,
         'https://developers.google.com/youtube/v3/docs/channels/list',
+        'https://github.com/JovieInc/Jovie/blob/main/apps/web/lib/ingestion/social-html-policy.ts',
+        'https://github.com/JovieInc/Jovie/blob/main/docs/network-support-matrix.md',
       ],
     },
     apiFields: {

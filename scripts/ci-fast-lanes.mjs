@@ -160,6 +160,14 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: true,
   }),
   Object.freeze({
+    id: 'playbook-authoring',
+    command:
+      'pnpm --filter @jovie/web run playbooks:validate && pnpm --filter @jovie/web run playbooks:compile && pnpm --filter @jovie/web exec vitest run lib/playbooks/compile.test.ts lib/playbooks/growth-governance.test.ts lib/playbooks/register.test.ts tests/unit/lib/playbooks/schema.test.ts lib/launch/growth-preparation.test.ts',
+    inputs:
+      /^(?:docs\/playbooks\/[^/]+\.playbook\.md|apps\/web\/(?:lib\/playbooks\/|scripts\/(?:validate|compile)-playbooks\.ts|lib\/launch\/growth-preparation))/u,
+    prOnly: false,
+  }),
+  Object.freeze({
     id: 'public-command-openapi',
     command:
       'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/api/v1/public-command-openapi.test.ts app/api/agents/creator-lookup/route.test.ts app/api/agents/feedback/route.test.ts app/api/agents/profiles/route.test.ts',
@@ -544,6 +552,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/invariants/assurance-matrix.test.mjs',
   'scripts/invariants/browser-owned-input.test.mjs',
   'scripts/invariants/founder-calibration.test.mjs',
+  'scripts/invariants/jev-revision-report.test.mjs',
   'scripts/invariants/jev-writing-readiness.test.mjs',
   'scripts/time-bomb/scan.test.mjs',
   'scripts/invariants/model-audit-contract.test.mjs',

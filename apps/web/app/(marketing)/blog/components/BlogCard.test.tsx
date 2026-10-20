@@ -26,7 +26,9 @@ describe('BlogCard editorial navigation', () => {
       const { container } = render(
         <BlogCard post={post} author={author} variant={variant} />
       );
-      const articleLink = screen.getByRole('link', { name: post.title });
+      const articleLink = screen.getByRole('link', {
+        name: name => name.includes(post.title),
+      });
       expect(articleLink).toHaveAttribute('href', `/blog/${post.slug}`);
       expect(
         screen.getByRole('link', { name: 'Music Business' })
@@ -43,6 +45,22 @@ describe('BlogCard editorial navigation', () => {
         'suno-playbook.svg'
       );
       expect(container.querySelector('time')).toHaveTextContent('July 4, 2026');
+    }
+  );
+
+  it.each([
+    ['the-suno-playbook-teardown', 'The hard part.'],
+    ['the-contact-problem', 'The handoff.'],
+    ['the-myspace-problem', 'Build your home.'],
+    ['the-friday-problem', 'Before Friday.'],
+  ])(
+    'includes all visible link text in the accessible name for %s',
+    (slug, headline) => {
+      render(<BlogCard post={{ ...post, slug }} author={author} />);
+
+      expect(
+        screen.getByRole('link', { name: name => name.includes(post.title) })
+      ).toHaveAccessibleName(`${headline} ${post.title}`);
     }
   );
 
@@ -68,6 +86,13 @@ describe('BlogCard editorial navigation', () => {
     expect(screen.getByText('By Tim White')).toBeInTheDocument();
   });
 
+  it('uses the title alone when an editorial article has no artwork', () => {
+    render(<BlogCard post={{ ...post, image: undefined }} author={author} />);
+    expect(screen.getByRole('link', { name: post.title })).toHaveAccessibleName(
+      post.title
+    );
+  });
+
   it('omits related entries without resolved authors and handles an empty feed', () => {
     const { rerender } = render(
       <BlogRelatedPosts posts={[]} authors={new Map()} />
@@ -79,7 +104,9 @@ describe('BlogCard editorial navigation', () => {
         authors={new Map([[post.slug, author]])}
       />
     );
-    expect(screen.getAllByRole('link', { name: post.title })).toHaveLength(1);
+    expect(
+      screen.getAllByRole('link', { name: name => name.includes(post.title) })
+    ).toHaveLength(1);
     expect(screen.getByRole('region', { name: 'Related Posts' })).toBeVisible();
   });
 });

@@ -18,11 +18,13 @@ const hoisted = vi.hoisted(() => {
   const enforceOnboardingRateLimitMock = vi.fn();
   const revalidatePathMock = vi.fn();
   const captureErrorMock = vi.fn();
+  const logOnboardingErrorMock = vi.fn((error: unknown) => error);
 
   return {
     attributeLeadSignupFromAppUserIdMock,
     cacheHandleAvailabilityMock,
     captureErrorMock,
+    logOnboardingErrorMock,
     cookiesMock,
     currentUserMock,
     enforceOnboardingRateLimitMock,
@@ -128,7 +130,7 @@ vi.mock('@/app/onboarding/actions/avatar', () => ({
 }));
 
 vi.mock('@/app/onboarding/actions/errors', () => ({
-  logOnboardingError: vi.fn((error: unknown) => error),
+  logOnboardingError: hoisted.logOnboardingErrorMock,
 }));
 
 vi.mock('@/app/onboarding/actions/helpers', () => ({
@@ -195,8 +197,7 @@ describe('completeOnboarding', () => {
         redirectToDashboard: false,
       })
     ).rejects.toThrow('Your profile is saved');
-    expect(hoisted.captureErrorMock).toHaveBeenCalledWith(
-      'completeOnboarding failed',
+    expect(hoisted.logOnboardingErrorMock).toHaveBeenCalledWith(
       expect.objectContaining({
         message: expect.stringContaining('Your profile is saved'),
       }),
