@@ -6,7 +6,15 @@ import {
   within,
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 import { FounderReviewRegistry } from '@/components/features/admin/FounderReviewRegistry';
 import {
   HeaderActionsProvider,
@@ -149,6 +157,24 @@ function renderRegistry() {
 }
 
 describe('FounderReviewRegistry', () => {
+  beforeAll(() => {
+    // jsdom has no layout: supply a real viewport rather than relying on the
+    // virtual table's former full-dataset fallback for a zero-height element.
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(
+      function (this: HTMLElement) {
+        return this.tagName === 'TR' ? 40 : 640;
+      }
+    );
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(1024);
+    vi.spyOn(Element.prototype, 'clientHeight', 'get').mockImplementation(
+      function (this: Element) {
+        return this.tagName === 'TR' ? 40 : 640;
+      }
+    );
+    vi.spyOn(Element.prototype, 'clientWidth', 'get').mockReturnValue(1024);
+  });
+  afterAll(() => vi.restoreAllMocks());
+
   afterEach(() => {
     localStorage.clear();
     vi.clearAllMocks();

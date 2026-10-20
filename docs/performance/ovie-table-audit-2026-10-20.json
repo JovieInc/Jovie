@@ -143,5 +143,35 @@
       60.40000009536743, 37.90000009536743, 31.700000286102295,
       54.700000286102295, 37.59999990463257, 35.30000019073486
     ]
+  },
+  "observerProbe": {
+    "method": "Capture early window error events by phase in the same dev fixture; Vite intercepts these before Playwright pageerror.",
+    "before": {
+      "errors": [],
+      "windowErrors": [
+        {
+          "message": "ResizeObserver loop completed with undelivered notifications.",
+          "time": 25746,
+          "phase": "hide"
+        }
+      ],
+      "rows": 30
+    },
+    "after": {
+      "errors": [],
+      "windowErrors": [
+        {
+          "message": "ResizeObserver loop completed with undelivered notifications.",
+          "time": 25987.700000286102,
+          "phase": "hide"
+        },
+        {
+          "message": "ResizeObserver loop completed with undelivered notifications.",
+          "time": 26105.200000286102,
+          "phase": "reveal"
+        }
+      ],
+      "rows": 25
+    }
   }
 }

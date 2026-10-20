@@ -24,7 +24,10 @@ keyboard render budget. Contacts, Users and Creators consume `AdminDataTable`
    leak in every browser.
 
 Both new performance tests failed before the repair; both pass afterwards.
-Existing alignment, keyboard and SSR behavior remains covered.
+Existing alignment, keyboard and SSR behavior remains covered. The affected
+Founder registry integration fixture now supplies its measured 640px viewport
+and 40px compact rows explicitly, preserving every table/right-rail assertion
+instead of relying on jsdom's zero-height full-dataset fallback.
 
 ## Same-method browser measurements
 
@@ -49,7 +52,11 @@ animation frames. Exact samples and repaired source digests are in the
 Scroll and filter latency did not consistently improve under shared host load;
 no claim is made for those timings. The eliminated full-dataset render explains
 the repeatable viewport transition spike. This does not establish the cause of
-every reported People interaction spike.
+every reported People interaction spike. Early window-error capture also finds
+single-frame ResizeObserver notification warnings on the baseline's hide and the
+repair's hide/reveal transitions. Vite intercepts them before Playwright's
+`pageerror` channel. Their remaining investigation is included in JOV-8660;
+passing row/retention budgets do not certify warning-free navigation.
 
 ## Regression budgets and reproduction
 
