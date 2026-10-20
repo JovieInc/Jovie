@@ -182,7 +182,9 @@ test.describe('Admin passkey step-up (JOV-6892)', () => {
     await page.addInitScript(fakeAssertionScript('resolve'));
     await mockPasskeyApi(page, { unlocked: true });
 
-    await smokeNavigateWithRetry(page, APP_ROUTES.HUD, { timeout: 60_000 });
+    await smokeNavigateWithRetry(page, APP_ROUTES.ADMIN_OPS, {
+      timeout: 60_000,
+    });
     const unlock = page.getByRole('button', { name: 'Unlock', exact: true });
     await expect(unlock).toBeVisible();
 
@@ -206,7 +208,9 @@ test.describe('Admin passkey step-up (JOV-6892)', () => {
     await page.addInitScript(fakeAssertionScript('resolve'));
     await mockPasskeyApi(page, { unlocked: false });
 
-    await smokeNavigateWithRetry(page, APP_ROUTES.HUD, { timeout: 60_000 });
+    await smokeNavigateWithRetry(page, APP_ROUTES.ADMIN_OPS, {
+      timeout: 60_000,
+    });
     const unlock = page.getByRole('button', { name: 'Unlock', exact: true });
     await expect(unlock).toBeVisible();
     await unlock.click();
@@ -226,7 +230,9 @@ test.describe('Admin passkey step-up (JOV-6892)', () => {
     await page.addInitScript(CANCELLED_REGISTRATION_SCRIPT);
     await mockPasskeyApi(page, { unlocked: true, passkeys: [] });
 
-    await smokeNavigateWithRetry(page, APP_ROUTES.HUD, { timeout: 60_000 });
+    await smokeNavigateWithRetry(page, APP_ROUTES.ADMIN_OPS, {
+      timeout: 60_000,
+    });
     const unlock = page.getByRole('button', { name: 'Unlock', exact: true });
     await expect(unlock).toBeVisible();
 
@@ -261,7 +267,9 @@ test.describe('Admin passkey step-up (JOV-6892)', () => {
     `);
     await mockPasskeyApi(page, { unlocked: true });
 
-    await smokeNavigateWithRetry(page, APP_ROUTES.HUD, { timeout: 60_000 });
+    await smokeNavigateWithRetry(page, APP_ROUTES.ADMIN_OPS, {
+      timeout: 60_000,
+    });
     const unlock = page.getByRole('button', { name: 'Unlock', exact: true });
     await expect(unlock).toBeVisible();
     await unlock.click();
