@@ -232,6 +232,78 @@ test.describe('public profile browser admission', () => {
     });
   }
 
+  // JOV-6253: on the smallest phone viewport the floating tab bar must never
+  // sit on top of the content scroll box. The reservation lives outside the
+  // scroll box so rows are not rendered under the dock at rest, and the last
+  // row still scrolls fully into view.
+  test('320x568 bottom nav should not cover scroll content', async ({
+    page,
+  }) => {
+    await installPublicRouteMocks(page);
+    await page.setViewportSize({ width: 320, height: 568 });
+    const response = await page.goto('/unfazed', {
+      waitUntil: 'domcontentloaded',
+    });
+    expect(response?.status()).toBe(200);
+
+    const nav = page.getByTestId('profile-bottom-nav');
+    await expect(nav).toBeVisible();
+    await waitForSettledProfile(page);
+
+    for (const tab of ['Home', 'Music', 'Events', 'About']) {
+      await page
+        .getByTestId('profile-bottom-nav')
+        .getByRole('button', { name: tab, exact: true })
+        .click();
+      await expect(
+        page.getByTestId('profile-compact-surface'),
+        `${tab} should activate its mode`
+      ).toBeVisible();
+      await page.waitForTimeout(300);
+
+      const geometry = await page.evaluate(() => {
+        const scroll = document.querySelector<HTMLElement>(
+          '[data-testid="profile-content-scroll"]'
+        );
+        const navigation = document.querySelector<HTMLElement>(
+          '[data-testid="profile-bottom-nav"]'
+        );
+        if (!scroll || !navigation) return null;
+        // Overflow-scroll home deliberately unboxes the region and scrolls the
+        // document instead; its last row still has to clear the fixed dock.
+        const overflowScroll =
+          document
+            .querySelector('[data-testid="profile-compact-surface"]')
+            ?.getAttribute('data-profile-overflow-mode') === 'scroll';
+        window.scrollTo(0, document.documentElement.scrollHeight);
+        scroll.scrollTop = scroll.scrollHeight;
+        const scrollBox = scroll.getBoundingClientRect();
+        const navBox = navigation.getBoundingClientRect();
+        const lastChild = scroll.lastElementChild;
+        const lastChildBox = lastChild?.getBoundingClientRect() ?? null;
+        return {
+          overflowScroll,
+          scrollBoxBottom: scrollBox.bottom,
+          navTop: navBox.top,
+          lastChildBottom: lastChildBox?.bottom ?? null,
+        };
+      });
+      expect(geometry, `${tab} scroll region should render`).not.toBeNull();
+      if (!geometry!.overflowScroll) {
+        expect(
+          geometry!.scrollBoxBottom,
+          `${tab} scroll content must end above the bottom nav`
+        ).toBeLessThanOrEqual(geometry!.navTop + 1);
+      }
+      if (geometry!.lastChildBottom !== null) {
+        expect(
+          geometry!.lastChildBottom,
+          `${tab} last row must stay reachable above the bottom nav`
+        ).toBeLessThanOrEqual(geometry!.navTop + 1);
+      }
+    }
+  });
+
   test('1512px public route blocks the founder-reported compact desktop hybrid', async ({
     page,
   }, testInfo) => {

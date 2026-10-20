@@ -288,9 +288,6 @@ async function collectLayoutMetrics(page: Page) {
     const homeRail = document.querySelector<HTMLElement>(
       '[data-testid="profile-home-rail"]'
     );
-    const homeContentColumn = document.querySelector<HTMLElement>(
-      '.profile-home-content-column'
-    );
     const featuredCards = Array.from(
       document.querySelectorAll<HTMLElement>(
         '[data-testid="profile-home-rail"] > [data-presentation="featured"]'
@@ -340,11 +337,20 @@ async function collectLayoutMetrics(page: Page) {
       homeRail: box(homeRail),
       featuredCardCount: featuredCards.length,
       homeCarouselCount,
-      homeContentColumnMarginBottom: homeContentColumn
-        ? Number.parseFloat(
-            window.getComputedStyle(homeContentColumn).marginBottom
-          )
-        : null,
+      contentScrollReservation: (() => {
+        const scrollRegion = document.querySelector<HTMLElement>(
+          '[data-testid="profile-content-scroll"]'
+        );
+        if (!scrollRegion) return null;
+        const style = window.getComputedStyle(scrollRegion);
+        // The dock reservation lives as margin outside the scroll box in the
+        // fixed shell, or as in-flow end padding in overflow-scroll home
+        // (JOV-7192, JOV-6253). Either way it equals the nav token.
+        return (
+          Number.parseFloat(style.marginBottom) +
+          Number.parseFloat(style.paddingBottom)
+        );
+      })(),
       profileBottomNavHeight: resolveCssLength(
         root,
         '--profile-bottom-nav-height'
@@ -900,10 +906,10 @@ test.describe('Public profile /tim layout hardening @regression', () => {
         ).not.toBeNull();
         expect(
           Math.abs(
-            (metrics.homeContentColumnMarginBottom ?? 0) -
+            (metrics.contentScrollReservation ?? 0) -
               (metrics.profileBottomNavHeight ?? 0)
           ),
-          `${viewport.id} home content should reserve the exact bottom-nav token outside its scroll box`
+          `${viewport.id} scroll content should reserve the exact bottom-nav token outside its scroll box`
         ).toBeLessThanOrEqual(1);
         expect(
           Math.abs(

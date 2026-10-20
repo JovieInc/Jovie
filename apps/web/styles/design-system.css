@@ -871,26 +871,21 @@
   flex: 0 0 auto;
 }
 
-/* Reserve the floating dock outside the home scroll box at every compact
-   breakpoint. End padding makes the last row reachable after scrolling, but
-   it cannot stop an absolute dock from covering the current viewport. The
-   desktop shell is a fixed-height phone card, so without this the last card
-   renders half-covered by the dock at rest even though it can technically
-   scroll into view (JOV-7192). Embedded previews render no dock, so they keep
-   the in-box padding instead. */
-:where(
-  [data-testid="profile-compact-surface"][data-mode="profile"]:not(
-      [data-presentation="embedded"]
-    )
-    > .profile-home-content-column
-) {
+/* Reserve the floating dock outside the scroll box whenever the compact
+   surface renders it. End padding makes the last row reachable after
+   scrolling, but it cannot stop an absolute/fixed dock from covering the
+   current viewport (JOV-7192). The reservation keys off dock presence, not
+   presentation: data-presentation="embedded" is the md+ drawer presentation
+   every public compact surface computes, while real previews render no dock
+   at all. Without this the non-home modes never reserved space, so the tab
+   bar covered live scroll content at rest (JOV-6253), and the home
+   reservation silently disabled itself on the desktop phone card.
+   Overflow-scroll home keeps its in-flow padding contract instead. */
+[data-testid="profile-compact-surface"]:not(
+    [data-profile-overflow-mode="scroll"]
+  ):has(> .profile-floating-tab-bar)
+  .profile-content-scroll-region {
   margin-bottom: var(--profile-bottom-nav-height);
-}
-
-[data-testid="profile-compact-surface"][data-mode="profile"]:not(
-    [data-presentation="embedded"]
-  )
-  .profile-home-content-scroll {
   padding-bottom: 0;
 }
 

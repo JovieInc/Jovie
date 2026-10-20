@@ -42,10 +42,7 @@ describe('public profile Liquid Glass navigation', () => {
     expect(desktopHomeLayoutStart).toBeGreaterThan(0);
     const compactHomeBaseLayout = CSS.slice(0, desktopHomeLayoutStart);
     expect(compactHomeBaseLayout).toMatch(
-      /\.profile-home-content-column\s*\n\s*\) \{\s*margin-bottom:\s*var\(--profile-bottom-nav-height\)/
-    );
-    expect(compactHomeBaseLayout).toMatch(
-      /\.profile-home-content-scroll \{\s*padding-bottom:\s*0;/
+      /\):has\(> \.profile-floating-tab-bar\)\s*\n\s*\.profile-content-scroll-region \{\s*margin-bottom:\s*var\(--profile-bottom-nav-height\);\s*padding-bottom:\s*0;/
     );
     expect(CSS).toMatch(
       /\.profile-floating-tab-bar\)[\s\S]{0,180}position:\s*absolute[\s\S]{0,120}pointer-events:\s*none/

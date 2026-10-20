@@ -192,7 +192,7 @@ describe('ProfileCompactSurface identity header layout', () => {
     );
   });
 
-  it('reserves the floating dock outside the scroll box at every viewport (JOV-7192)', () => {
+  it('reserves the floating dock outside the scroll box at every viewport (JOV-7192, JOV-6253)', () => {
     const contents = readFileSync(DESIGN_SYSTEM, 'utf8');
 
     // The reservation must live at top level, not inside the max-width media
@@ -204,10 +204,12 @@ describe('ProfileCompactSurface identity header layout', () => {
     const lastMedia = contents.lastIndexOf('@media', declarationIndex);
     const lastTopLevelClose = contents.lastIndexOf('\n}', declarationIndex);
     expect(lastMedia).toBeLessThan(lastTopLevelClose);
-    // Embedded previews render no dock, so they keep the in-box padding.
-    const ruleStart = contents.lastIndexOf(':where(', declarationIndex);
-    expect(contents.slice(ruleStart, declarationIndex)).toContain(
-      'data-presentation="embedded"'
+    // The reservation keys off dock presence so it covers every compact mode
+    // and the md+ phone card (whose data-presentation is "embedded" drawer
+    // chrome, not a preview). Surfaces without the floating tab bar — real
+    // embedded previews — keep the in-box padding.
+    expect(contents).toMatch(
+      /\[data-testid="profile-compact-surface"\]:not\(\s*\[data-profile-overflow-mode="scroll"\]\s*\):has\(> \.profile-floating-tab-bar\)\s*\.profile-content-scroll-region\s*\{[^}]*margin-bottom:\s*var\(--profile-bottom-nav-height\);[^}]*padding-bottom:\s*0;/
     );
   });
 
