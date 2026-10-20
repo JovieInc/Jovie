@@ -1,0 +1,18 @@
+# Cloud sandbox for the Summer improvement loop. Deny-by-default egress: only
+# the hosts the system prompt reads, GitHub (git proxy + REST), Linear (used only
+# if a LINEAR_API_KEY vault credential is attached) and package registries for
+# running repo tests.
+name: summer-improvement-loop
+config:
+  type: cloud
+  networking:
+    type: limited
+    allow_package_managers: true
+    allow_mcp_servers: false
+    allowed_hosts:
+      - summer.jov.ie
+      - api.github.com
+      - github.com
+      - codeload.github.com
+      - objects.githubusercontent.com
+      - api.linear.app
