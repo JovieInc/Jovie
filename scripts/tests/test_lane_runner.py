@@ -453,6 +453,55 @@ class SelectionTest(unittest.TestCase):
                 task.description = description
                 self.assertIsNone(lane.pick_issue([task], {}, provider="codex"))
 
+    def reviewed(self, issue_, reviewer="claude-code lanes agent", text_of=None):
+        digest = lane.issue_text_digest(text_of or issue_)
+        receipt = {"sha256": digest, "reviewer": reviewer, "at": "2026-10-20",
+                   "reason": "product feature that builds revoke controls; no live credential is touched"}
+        return f"Reviewed.\n<!-- sensitive-text-reviewed:v1 {json.dumps(receipt)} -->"
+
+    def test_a_reviewed_false_positive_is_released_only_with_label_and_bound_receipt(self):
+        task = issue("JOV-6597", labels=["agent-ready"])
+        task.title = "Minimize OAuth scopes and add connected-account token hygiene"
+        task.description = "Encrypt refresh tokens, show connected apps/accounts with revoke controls."
+        self.assertTrue(lane.issue_hits_red_line(task))
+        receipt = [self.reviewed(task)]
+        with patch.object(lane, "SENSITIVE_REVIEW_READER", return_value=receipt) as reader:
+            self.assertEqual(lane.admission_rejection(task, {}, 0), "sensitive-text")  # receipt alone
+            reader.assert_not_called()
+            task.labels.append("sensitive-text-reviewed")
+            self.assertIsNone(lane.admission_rejection(task, {}, 0))  # label + bound receipt
+        for bodies in ([], None, ["<!-- sensitive-text-reviewed:v1 {not json} -->"],
+                       [self.reviewed(task, reviewer=" ")]):
+            with self.subTest(bodies=bodies), patch.object(lane, "SENSITIVE_REVIEW_READER", return_value=bodies):
+                self.assertEqual(lane.admission_rejection(task, {}, 0), "sensitive-text")
+        with patch.object(lane, "SENSITIVE_REVIEW_READER", side_effect=RuntimeError("linear down")):
+            self.assertEqual(lane.admission_rejection(task, {}, 0), "sensitive-text")
+
+    def test_an_edit_after_review_voids_the_receipt(self):
+        task = issue("JOV-6866", labels=["agent-ready", "sensitive-text-reviewed"])
+        task.title = "Agent auth: JOVIE_API_KEY"
+        task.description = "A settings UI to mint/revoke. Keys lift the anonymous rate limit."
+        receipt = [self.reviewed(task)]
+        with patch.object(lane, "SENSITIVE_REVIEW_READER", return_value=receipt):
+            self.assertIsNone(lane.admission_rejection(task, {}, 0))
+            task.description += "\nAlso revoke production API keys."
+            self.assertEqual(lane.admission_rejection(task, {}, 0), "sensitive-text")
+            task.title = "Agent auth: JOVIE_API_KEY (edited)"
+            self.assertEqual(lane.admission_rejection(task, {}, 0), "sensitive-text")
+
+    def test_unreviewed_true_positives_and_the_pricing_comparison_stay_held(self):
+        held = self.pricing_comparison_issue()  # JOV-7863 per #22106: no review
+        with patch.object(lane, "SENSITIVE_REVIEW_READER", return_value=[]):
+            self.assertEqual(lane.admission_rejection(held, {}, 0), "sensitive-text")
+        secret = issue("JOV-7390", labels=["sensitive-text-reviewed"])
+        secret.title = "Provision SUMMER_COMPOSIO_API_KEY"
+        secret.description = "Do not rotate or touch any other secrets."
+        other = issue("JOV-6597")
+        other.title, other.description = "Other issue", "revoke controls for tokens"
+        # A receipt bound to another issue's text never releases this one.
+        with patch.object(lane, "SENSITIVE_REVIEW_READER", return_value=[self.reviewed(other)]):
+            self.assertEqual(lane.admission_rejection(secret, {}, 0), "sensitive-text")
+
     def test_plural_production_prices_are_held(self):
         task = issue("JOV-9", labels=["agent-ready"])
         task.title = "Update annual plan"
