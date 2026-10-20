@@ -11350,6 +11350,15 @@ class SelftestForeignLineageTest(unittest.TestCase):
             helper.kill()
             helper.wait(timeout=10)
 
+    def test_an_unproven_hold_records_its_parent_chain(self):
+        procs = {10: (self.UID, 200, "linux:5"), 200: (self.UID, 1, "linux:2"),
+                 500: (self.UID, 200, "linux:100")}
+        hops = lane._lineage_evidence(500, self.CLEANUP, identity=procs.get)
+        self.assertEqual([(h["pid"], h["ownerAncestor"], h["sameUid"]) for h in hops], [(500, False, True), (200, True, True)])
+        held = lane.SelftestCleanupHeld("selftest-process-custody-unreadable", pid=500, start="linux:100",
+                                        source="proc-environ", lineage=hops)
+        self.assertEqual(held.observation["lineage"][1]["pid"], 200)
+
     def test_anything_short_of_proof_keeps_the_hold(self):
         for name, table in {
             "owner-descendant": {500: (self.UID, 10, "linux:100")},
@@ -11671,6 +11680,10 @@ class OperatorInstallerGlueTest(unittest.TestCase):
                     safe["source"] = observation["source"]
                 if type(observation.get("errno")) is int:
                     safe["errno"] = observation["errno"]
+                if isinstance(observation.get("lineage"), list):
+                    safe["lineage"] = [{key: hop.get(key) for key in ("pid", "comm", "sameUid", "birth", "baseline",
+                                                                      "owner", "ownerAncestor", "parent", "gone")
+                                        if key in hop} for hop in observation["lineage"][:16] if isinstance(hop, dict)]
                 digest = cleanup.get("sourceSha256")
                 if isinstance(digest, str) and len(digest) == 64 and set(digest) <= set("0123456789abcdef"):
                     safe["sourceSha256"] = digest

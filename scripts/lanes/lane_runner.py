@@ -8240,13 +8240,16 @@ SELFTEST_CLEANUP_SCHEMA = "jovie-selftest-cleanup/v1"
 
 class SelftestCleanupHeld(RuntimeError):
     """A proof cannot report cleanup when process custody is incomplete."""
-    def __init__(self, message, *, pid=None, start=None, observed_start=None, source=None, error=None):
+    def __init__(self, message, *, pid=None, start=None, observed_start=None, source=None, error=None,
+                 lineage=None):
         super().__init__(message)
         self.code = str(message).split(":", 1)[0]
         self.observation = None
         if type(pid) is int and pid > 0 and source in {"proc-stat", "proc-environ", "proc-directory", "scope-owner"}:
             self.observation = {"pid": pid, "source": source, "errorCode": self.code,
                                 "errno": getattr(error, "errno", None)}
+            if isinstance(lineage, list):
+                self.observation["lineage"] = lineage[:16]
             for key, value in (("start", start), ("observedStart", observed_start)):
                 if isinstance(value, str) and re.fullmatch(r"linux:[1-9][0-9]*", value):
                     self.observation[key] = value
@@ -8420,6 +8423,38 @@ def _foreign_lineage(pid: int, start: str, cleanup: dict, identity=_proc_identit
     return False
 
 
+def _lineage_evidence(pid: int, cleanup: dict, identity=_proc_identity) -> list[dict]:
+    """Why an unreadable process could not be proven foreign: each parent hop's role, with
+    only a sanitized command name (no environment, arguments or paths). CI ejections of
+    #22378 kept failing after #22316; this records the chain instead of guessing."""
+    owner = cleanup["owner"]["pid"]
+    ancestors, cursor = set(), owner
+    for _ in range(64):
+        found = identity(cursor)
+        if found is None or found[1] <= 1:
+            break
+        ancestors.add(found[1])
+        cursor = found[1]
+    hops, current = [], pid
+    for _ in range(16):
+        found = identity(current)
+        if found is None:
+            hops.append({"pid": current, "gone": True})
+            break
+        try:
+            comm = (Path("/proc") / str(current) / "comm").read_text().strip()
+        except OSError:
+            comm = ""
+        hops.append({"pid": current, "comm": re.sub(r"[^A-Za-z0-9._-]", "_", comm)[:16],
+                     "sameUid": found[0] == cleanup["owner"]["uid"], "birth": found[2],
+                     "baseline": cleanup["baseline"].get(current) == found[2],
+                     "owner": current == owner, "ownerAncestor": current in ancestors, "parent": found[1]})
+        if current == owner or current in ancestors or found[1] <= 1:
+            break
+        current = found[1]
+    return hops
+
+
 def marked_processes(cleanup: dict) -> dict[int, str]:
     """Select only same-UID members of an explicit cleanup subtree, with birth identities."""
     _selftest_cleanup_rows(cleanup)
@@ -8466,7 +8501,8 @@ def marked_processes(cleanup: dict) -> dict[int, str]:
                 if _foreign_lineage(pid, row[3], cleanup):
                     continue  # provably outside the self-test: a non-dumpable sshd/ssh, xdist sibling
                 raise SelftestCleanupHeld("selftest-process-custody-unreadable", pid=pid,
-                                          start=row[3], source="proc-environ", error=error) from error
+                                          start=row[3], source="proc-environ", error=error,
+                                          lineage=_lineage_evidence(pid, cleanup)) from error
             pairs = [part.split(b"=", 1) for part in raw.split(b"\0") if b"=" in part]
             roots = [value for key, value in pairs if key == SELFTEST_RUN_ENV.encode()]
             if not roots or roots == [b""]:
