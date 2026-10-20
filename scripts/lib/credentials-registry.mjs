@@ -446,7 +446,7 @@ export function evaluateRegistry({
   spend,
   thirdPartyGrants = [],
   nowMs = Date.now(),
-  live = {},
+  live = /** @type {{ credentials?: object[], spend?: Record<string, object> }} */ ({}),
   thresholds = {},
 }) {
   const errors = [
