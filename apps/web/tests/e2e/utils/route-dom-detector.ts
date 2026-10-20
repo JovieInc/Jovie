@@ -459,13 +459,28 @@ export async function inspectRouteDom(
             style.textOverflow === 'ellipsis'
               ? heading.scrollWidth - heading.clientWidth
               : 0;
-          if (hiddenY < lineHeight / 2 && hiddenX <= 2) continue;
+          // Descender ink (y, g, p) below the last line box: a clamp that
+          // caps block size at exactly N lines crops glyphs even when no
+          // line is hidden (homepage "every", 2026-10-20).
+          const clippedInk =
+            clipsY && heading.scrollHeight - heading.clientHeight > 1
+              ? heading.scrollHeight - heading.clientHeight
+              : 0;
+          if (hiddenY < lineHeight / 2 && hiddenX <= 2 && clippedInk === 0) {
+            continue;
+          }
           findings.push({
             kind: 'clipped-heading',
             message:
-              'A heading is clamped or clipped and hides part of its text.',
+              clippedInk > 0 && hiddenY < lineHeight / 2 && hiddenX <= 2
+                ? 'A heading clips glyph ink (descenders) at its block-size cap.'
+                : 'A heading is clamped or clipped and hides part of its text.',
             elements: [describe(heading)],
-            measurements: { hiddenY: round(hiddenY), hiddenX: round(hiddenX) },
+            measurements: {
+              hiddenY: round(hiddenY),
+              hiddenX: round(hiddenX),
+              clippedInk: round(clippedInk),
+            },
           });
         }
 

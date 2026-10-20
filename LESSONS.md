@@ -114,6 +114,21 @@ policy-only fingerprints are listed explicitly and do not prove executable preve
 
 ## Marketing Pages
 
+### Marketing plan prices come only from offer truth
+**Mistake:** The artist-profile homepage brief asked for the $12 offer, but no $12 plan exists in `lib/billing/offer-truth.ts` yet (JOV-8368 owns publishing it). Typing "$12/mo" into page copy would have sold a price that billing does not charge.
+
+**Rule:** Render plan prices through `MarketingOfferSummary` or `getPublicPriceClaim`, never as literals. Publish a new offer in offer truth first; marketing pages pick it up from there. `offer-price-source-guard` blocks recurring-price literals in marketing source.
+
+### Marketing pages share one spine and one type ramp
+**Mistake:** The homepage hero and the sections below it used two gutter definitions (24px against 20px at 390px). Three marketing type ramps also coexisted: `ap-shell-*`, the retired `marketing-*-linear` classes, and the unused `--ds-marketing-*` tokens. Each new page drifted a few pixels and re-declared sizes locally.
+
+**Rule:** Frame sections with `ArtistProfileSectionShell` and put any hero on `.ap-section-container`, so there is one width and one gutter. Set type with `.marketing-type-display`, `.marketing-type-section` and `.marketing-type-lede`. Do not add page-local gutters, widths or font-size clamps.
+
+### Two-line display clamps must not crop descenders
+**Mistake:** The shared two-line H1 clamp capped the block size at exactly `2lh` with `line-height: 1.06`, so the "y" in "every" was cropped on every marketing H1 with a descender on its last line. Hidden-line checks did not notice because no line was hidden.
+
+**Rule:** Clamped headings reserve descender room (`padding-block-end` inside the cap). The route DOM detector reports `clipped-heading` when a clamped heading's `scrollHeight` exceeds its `clientHeight`.
+
 ### Never link to `/claim` from CTAs
 **Mistake:** PricingSection CTAs linked to `/claim` which 404s. The correct signup route is `/signup`.
 
