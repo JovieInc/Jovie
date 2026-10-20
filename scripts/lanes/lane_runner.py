@@ -655,11 +655,50 @@ def predicted_touch(issue: Issue, target_files: dict | None = None, now: float |
     return hints or frozenset(witnessed or ()) or AREA_HOTSPOTS.get(workstreams.classify(issue.title, issue.labels), frozenset())
 
 
-def hotspot_holds(prs: list[dict]) -> dict[str, int]:
+# A draft nobody has touched (no push, comment, label or review: GitHub `updatedAt`) for this
+# long, and that no lane holds a repair lease on, stops holding hotspots: it is recorded as a
+# file-overlap flag instead. 48h matches the reconcile pass's stale-draft SLO. Gem 2026-10-20:
+# green draft #22253, idle 3 days, held six symphony-throughput issues on doctor.py.
+HOTSPOT_DRAFT_IDLE_S = 48 * 3600
+
+
+def stale_hotspot_draft(pr: dict, now: float, leased=lambda number: False) -> bool:
+    """Evidence-based: a draft, with a readable updatedAt older than HOTSPOT_DRAFT_IDLE_S, and
+    no live repair lease. Missing or unreadable evidence keeps the hold."""
+    if pr.get("isDraft") is not True:
+        return False
+    updated = created_at_epoch(str(pr.get("updatedAt") or ""))
+    return updated is not None and now - updated > HOTSPOT_DRAFT_IDLE_S and not leased(pr.get("number"))
+
+
+def repair_leased(number) -> bool:
+    """True while a lane holds this PR's repair lease (probe only; never takes or rewrites it)."""
+    state = lane_state_dir()
+    if state is None or not isinstance(number, int):
+        return False
+    path = state / "locks" / f"repair-pr-{number}.lock"
+    if not path.exists():
+        return False
+    try:
+        with open(path, "a") as handle:
+            try:
+                fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                return True
+            fcntl.flock(handle, fcntl.LOCK_UN)
+    except OSError:
+        return True  # unreadable lease evidence keeps the hold
+    return False
+
+
+def hotspot_holds(prs: list[dict], now: float | None = None, leased=lambda number: False) -> dict[str, int]:
     """{hotspot path: the oldest open PR touching it}. Hotspots are HOTSPOT_SEED plus any file
-    two or more open PRs touch. Parked PRs (held or repair-exhausted) hold nothing: they
-    rebuild from main once the active work lands."""
-    active = sorted((pr for pr in prs if not pr_is_terminal(pr)), key=lambda pr: pr.get("number") or 0)
+    two or more open PRs touch. Parked PRs (held or repair-exhausted) and stale unleased
+    drafts (`stale_hotspot_draft`) hold nothing: they rebuild from main once the active work
+    lands, and file-overlap still flags the overlap."""
+    now = time.time() if now is None else now
+    active = sorted((pr for pr in prs if not pr_is_terminal(pr) and not stale_hotspot_draft(pr, now, leased)),
+                    key=lambda pr: pr.get("number") or 0)
     touched = [(pr["number"], {entry.get("path") for entry in pr.get("files") or [] if entry.get("path")})
                for pr in active]
     seen: dict[str, int] = {}
@@ -6587,10 +6626,10 @@ def open_hotspot_holds() -> dict[str, int]:
     hotspot gating ({}): this orders contended work, the in-flight read guards duplicates."""
     def fetch():
         listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--limit", "200",
-                     "--json", "number,labels,files"])
+                     "--json", "number,labels,files,isDraft,updatedAt"])
         return json.loads(listed.stdout or "[]") if listed.returncode == 0 else None
-    prs = shared("hotspot-files", CLAIM_SCAN_TTL_S, fetch)
-    return hotspot_holds(prs) if prs is not None else {}
+    prs = shared("hotspot-files-v2", CLAIM_SCAN_TTL_S, fetch)
+    return hotspot_holds(prs, leased=repair_leased) if prs is not None else {}
 
 
 def is_green(pr: dict) -> bool:

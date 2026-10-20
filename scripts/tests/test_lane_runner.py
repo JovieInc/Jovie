@@ -540,6 +540,39 @@ class HotspotAdmissionTest(unittest.TestCase):
         self.assertEqual(lane.hotspot_holds(prs), {"apps/web/lib/flags/code-flags.ts": 30,
                                                    "apps/web/a.ts": 20})
 
+    def test_stale_unleased_draft_stops_holding_hotspots(self):
+        # Gem 2026-10-20: green draft #22253, untouched since 10-17, held six lanes issues.
+        now = lane.created_at_epoch("2026-10-20T16:00:00Z")
+        def pr(number, path, draft, updated):
+            return {**self.open_pr(number, path), "isDraft": draft, "updatedAt": updated}
+        idle = pr(22253, "scripts/lanes/doctor.py", True, "2026-10-17T18:58:04Z")
+        self.assertEqual(lane.hotspot_holds([idle], now=now), {})
+        # Kept: a live repair lease, recent activity, a ready PR, or unreadable evidence.
+        self.assertEqual(lane.hotspot_holds([idle], now=now, leased=lambda n: n == 22253),
+                         {"scripts/lanes/doctor.py": 22253})
+        for kept in (pr(1, "scripts/lanes/doctor.py", True, "2026-10-19T09:35:10Z"),
+                     pr(2, "scripts/lanes/doctor.py", False, "2026-10-01T00:00:00Z"),
+                     pr(3, "scripts/lanes/doctor.py", True, None),
+                     self.open_pr(4, "scripts/lanes/doctor.py")):
+            with self.subTest(pr=kept["number"]):
+                self.assertEqual(lane.hotspot_holds([kept], now=now), {"scripts/lanes/doctor.py": kept["number"]})
+        lanes_work = self.titled("JOV-8253", "Enforce daily redacted receipts, incident dedupe, and soak accounting",
+                                 labels=["ws:symphony-throughput"])
+        self.assertEqual(lane.pool_rejections([lanes_work], lane.hotspot_holds([idle], now=now)), {})
+
+    def test_repair_lease_probe_never_takes_or_rewrites_the_lease(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"LANES_STATE": tmp}):
+            self.assertFalse(lane.repair_leased(7))
+            path = Path(tmp) / "locks" / "repair-pr-7.lock"
+            holder = lane.Locked(path, blocking=False)
+            receipt = path.read_text()
+            try:
+                self.assertTrue(lane.repair_leased(7))
+                self.assertEqual(path.read_text(), receipt)
+            finally:
+                holder.release()
+            self.assertFalse(lane.repair_leased(7))
+
     def test_predicted_touch_prefers_named_files_then_the_workstream_area(self):
         named = self.titled("JOV-1", "Lane cooldown", "Edit `lane_runner.py` and lib/flags/code-flags.ts.")
         self.assertEqual(lane.predicted_touch(named), frozenset({"lane_runner.py", "lib/flags/code-flags.ts"}))
@@ -570,9 +603,12 @@ class HotspotAdmissionTest(unittest.TestCase):
     def test_open_hotspot_holds_fails_open_when_github_is_unreadable(self):
         with patch.object(lane, "sh", return_value=SimpleNamespace(returncode=1, stdout="", stderr="502")):
             self.assertEqual(lane.open_hotspot_holds(), {})
-        listed = json.dumps([self.open_pr(5, "scripts/lanes/hud.py")])
-        with patch.object(lane, "sh", return_value=SimpleNamespace(returncode=0, stdout=listed, stderr="")):
+        listed = json.dumps([self.open_pr(5, "scripts/lanes/hud.py"),
+                             {**self.open_pr(6, "scripts/lanes/doctor.py"), "isDraft": True,
+                              "updatedAt": "2020-01-01T00:00:00Z"}])
+        with patch.object(lane, "sh", return_value=SimpleNamespace(returncode=0, stdout=listed, stderr="")) as sh:
             self.assertEqual(lane.open_hotspot_holds(), {"scripts/lanes/hud.py": 5})
+        self.assertIn("isDraft", sh.call_args.args[0][-1])
 
 
 class TargetFileAdmissionTest(unittest.TestCase):
