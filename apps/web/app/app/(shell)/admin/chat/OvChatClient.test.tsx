@@ -1,31 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { OvieHomeBriefing } from '@/lib/ovie/home-briefing';
-
-const homeBriefing: OvieHomeBriefing = {
-  greeting: 'Good morning, Tim.',
-  updatedLabel: 'Updated Sep 28, 8:00 AM PDT',
-  signal: {
-    id: 'shipping.milestone',
-    title: 'The release milestone landed',
-    summary: 'The highest-value shipping milestone is complete.',
-    currentValue: '1 milestone',
-    delta: null,
-    target: null,
-    sourceLabel: 'Shipping',
-    nextAction: 'Review the customer impact.',
-    removalEvent: 'The impact review is complete.',
-    summerCanAct: true,
-  },
-  actions: [
-    {
-      id: 'shipping.milestone:evidence',
-      label: 'Show The Evidence',
-      prompt: 'Show the release evidence.',
-    },
-  ],
-};
 
 const dashboard = vi.hoisted(() => ({
   selectedProfile: {
@@ -54,22 +29,27 @@ vi.mock('@/components/jovie/ChatWorkspaceSurface', () => ({
   ),
 }));
 
+vi.mock('@/components/features/admin/hud/OvieHomeCanvas', () => ({
+  OvieHomeCanvas: () => <div data-testid='ovie-home-canvas' />,
+}));
+
 vi.mock('@/components/jovie/JovieChat', () => ({
   JovieChat: ({
     profileId,
     chatMode,
-    ovieHomeBriefing,
+    homeCanvas,
   }: {
     readonly profileId?: string;
     readonly chatMode?: 'ov' | null;
-    readonly ovieHomeBriefing?: OvieHomeBriefing;
+    readonly homeCanvas?: ReactNode;
   }) => (
     <div
       data-testid='shared-jovie-chat'
       data-profile-id={profileId}
       data-chat-mode={chatMode ?? undefined}
-      data-signal-id={ovieHomeBriefing?.signal.id}
-    />
+    >
+      {homeCanvas}
+    </div>
   ),
 }));
 
@@ -85,8 +65,8 @@ describe('OvChatClient shared component ownership', () => {
     };
   });
 
-  it('passes the OV mode and briefing through the canonical Jovie workspace', () => {
-    render(<OvChatClient homeBriefing={homeBriefing} />);
+  it('passes the OV mode and company Home canvas through the shared workspace', () => {
+    render(<OvChatClient />);
 
     expect(screen.getByTestId('shared-chat-workspace')).toContainElement(
       screen.getByTestId('shared-jovie-chat')
@@ -95,15 +75,14 @@ describe('OvChatClient shared component ownership', () => {
       'data-chat-mode',
       'ov'
     );
-    expect(screen.getByTestId('shared-jovie-chat')).toHaveAttribute(
-      'data-signal-id',
-      'shipping.milestone'
+    expect(screen.getByTestId('shared-jovie-chat')).toContainElement(
+      screen.getByTestId('ovie-home-canvas')
     );
   });
 
   it('renders founder OV chat without an artist profile', () => {
     dashboard.selectedProfile = null;
-    render(<OvChatClient homeBriefing={homeBriefing} />);
+    render(<OvChatClient />);
 
     expect(screen.getByTestId('shared-chat-workspace')).toContainElement(
       screen.getByTestId('shared-jovie-chat')
