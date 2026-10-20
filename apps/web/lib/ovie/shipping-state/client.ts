@@ -163,6 +163,26 @@ const deliveryLanesSchema = z.object({
   heldByReason: z.record(z.string(), z.number().int().nonnegative()),
   failedByReason: z.record(z.string(), z.number().int().nonnegative()),
   capacity: capacityHorizonSchema.nullable().optional().default(null),
+  stageSummary: z
+    .object({
+      at: z.string(),
+      stagesTotal: z.number().int().nonnegative().nullable(),
+      stagesWithData: z.number().int().nonnegative().nullable(),
+      regressions: z.array(z.string().max(120)).max(10),
+      slowestP95: z
+        .array(
+          z.object({
+            stage: z.string().min(1).max(96),
+            p50: z.number().finite().nonnegative().nullable(),
+            p95: z.number().finite().nonnegative().nullable(),
+            n: z.number().int().nonnegative(),
+          })
+        )
+        .max(10),
+    })
+    .nullable()
+    .optional()
+    .default(null),
   publishedAt: z.string().nullable(),
   stale: z.boolean(),
 });
