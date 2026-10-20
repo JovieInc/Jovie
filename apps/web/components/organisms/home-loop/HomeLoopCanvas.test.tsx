@@ -263,6 +263,59 @@ describe('home loop parts', () => {
   });
 });
 
+describe('HomeLoopAsks defaults and feedback', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('shows the declared default with a live countdown', () => {
+    vi.useFakeTimers({ now: Date.parse('2026-10-22T07:00:00.000Z') });
+    render(
+      <HomeLoopAsks
+        asks={HOME_LOOP_FIXTURE_ASKS}
+        answers={{}}
+        onApprove={vi.fn()}
+        onReply={vi.fn()}
+      />
+    );
+    expect(screen.getByTestId('home-loop-ask-default')).toHaveTextContent(
+      'Approves by default — Enable it for project jovie only'
+    );
+    expect(screen.getByTestId('home-loop-ask-countdown')).toHaveTextContent(
+      'in 5h'
+    );
+    act(() => {
+      vi.advanceTimersByTime(4 * 60 * 60_000 + 60_000);
+    });
+    expect(screen.getByTestId('home-loop-ask-countdown')).toHaveTextContent(
+      'in 59m'
+    );
+    // Asks without a default show no default line.
+    expect(screen.getAllByTestId('home-loop-ask-default')).toHaveLength(1);
+  });
+
+  it('offers feedback on a decided ask and sends it', () => {
+    const onFeedback = vi.fn();
+    render(
+      <HomeLoopAsks
+        asks={HOME_LOOP_FIXTURE_ASKS}
+        answers={{ 'vercel-concurrency': { label: 'Approved', state: 'sent' } }}
+        onApprove={vi.fn()}
+        onReply={vi.fn()}
+        onFeedback={onFeedback}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Add Feedback' }));
+    fireEvent.change(screen.getByRole('textbox', { name: /Feedback:/ }), {
+      target: { value: 'Too dark on iPhone SE' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Send Feedback' }));
+    expect(onFeedback).toHaveBeenCalledWith(
+      HOME_LOOP_FIXTURE_ASKS[0],
+      'Too dark on iPhone SE'
+    );
+    expect(screen.queryByRole('button', { name: 'Send Feedback' })).toBeNull();
+  });
+});
+
 describe('HomeLoopAnswerPanel', () => {
   it('bounds history navigation and exposes every control by name', () => {
     const handlers = {

@@ -39,6 +39,8 @@ export interface HomeLoopCanvasProps {
   readonly answers: Readonly<Record<string, HomeLoopAnswer>>;
   readonly onApprove: (ask: HomeLoopAsk) => void;
   readonly onReply: (ask: HomeLoopAsk, text: string) => void;
+  /** Post-ship feedback on a decided ask; the decision stands. */
+  readonly onFeedback?: (ask: HomeLoopAsk, text: string) => void;
   readonly onRetryLoop?: () => void;
   readonly onRetryAsks?: () => void;
   /** Where the full list of asks lives once Home shows the top few. */
@@ -69,6 +71,7 @@ export function HomeLoopCanvas({
   answers,
   onApprove,
   onReply,
+  onFeedback,
   onRetryLoop,
   onRetryAsks,
   asksMoreHref,
@@ -107,6 +110,7 @@ export function HomeLoopCanvas({
             moreHref={asksMoreHref}
             onApprove={onApprove}
             onReply={onReply}
+            onFeedback={onFeedback}
           />
         </HomeLoopSection>
         <HomeLoopSection
