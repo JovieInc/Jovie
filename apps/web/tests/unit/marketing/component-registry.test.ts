@@ -1001,12 +1001,15 @@ describe('current-main Pen source contracts (JOV-4961)', () => {
       status: 'active',
       exemplar: { route: '/artist-profiles', section: 'outcomes' },
     });
-    for (const unsupported of [
-      '3-large',
-      '4-equal',
-      '6-compact',
-      'icon-list',
-    ]) {
+    expect(variant('feature-grid', '3-large')).toMatchObject({
+      status: 'active',
+      exemplar: { route: '/artist-notifications', section: 'benefits' },
+    });
+    expect(variant('feature-grid', '4-equal')).toMatchObject({
+      status: 'active',
+      exemplar: { route: '/pay', section: 'use-cases' },
+    });
+    for (const unsupported of ['6-compact', 'icon-list']) {
       expect(variant('feature-grid', unsupported)?.status).toBe('unproven');
     }
   });

@@ -1,12 +1,10 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
 import React from 'react';
 import {
   SidebarContext,
   type SidebarContextValue,
 } from '@/components/shell/SidebarContext';
-import { useRailPreview } from '@/components/shell/useRailPreview';
 import { useRailToggleFocusContinuity } from '@/components/shell/useRailToggleFocusContinuity';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { useSidebarCookieState } from '@/hooks/useSidebarCookieState';
@@ -42,20 +40,12 @@ export const SidebarProvider = React.forwardRef<
     },
     ref
   ) => {
-    const pathname = usePathname();
     const isMobile = useBreakpointDown('lg');
     const [openMobile, setOpenMobile] = React.useState(false);
     const { open, setOpen } = useSidebarCookieState({
       defaultOpen,
       open: openProp,
       onOpenChange: setOpenProp,
-    });
-
-    const { isPreview, isFloating, dismissPreview } = useRailPreview({
-      side: 'left',
-      pinned: open,
-      enabled: !isMobile,
-      resetKey: pathname,
     });
 
     useRailToggleFocusContinuity('left', open);
@@ -68,37 +58,28 @@ export const SidebarProvider = React.forwardRef<
 
     // Helper to toggle the sidebar.
     const toggleSidebar = React.useCallback(() => {
-      dismissPreview();
       return isMobile ? setOpenMobile(open => !open) : setOpen(open => !open);
-    }, [isMobile, setOpen, setOpenMobile, dismissPreview]);
+    }, [isMobile, setOpen, setOpenMobile]);
 
     useSidebarKeyboardShortcut(toggleSidebar, SIDEBAR_KEYBOARD_SHORTCUT);
 
-    const state = open || isPreview ? 'open' : 'closed';
+    // Left navigation opens only on explicit activation. A hover preview
+    // changes the toggle's position before the pointer can click it.
+    const state = open ? 'open' : 'closed';
 
     const contextValue = React.useMemo<SidebarContextValue>(
       () => ({
         state,
         open,
-        isPreview,
-        isFloating,
+        isPreview: false,
+        isFloating: false,
         setOpen,
         isMobile,
         openMobile,
         setOpenMobile,
         toggleSidebar,
       }),
-      [
-        state,
-        open,
-        isPreview,
-        isFloating,
-        setOpen,
-        isMobile,
-        openMobile,
-        setOpenMobile,
-        toggleSidebar,
-      ]
+      [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
     );
 
     return (

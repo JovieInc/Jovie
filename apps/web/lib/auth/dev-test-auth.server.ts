@@ -26,12 +26,16 @@ import {
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { baUsers } from '@/lib/db/schema/better-auth';
+import { discogReleases } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import {
   DEVELOPMENT_ONLY_ERROR,
   isExplicitDevelopmentEnvironment,
   isLocalDevelopmentAutomationHostname,
 } from '@/lib/security/development-only';
+// Pre-existing cycle through proxy-state and admin roles. Seeding a release
+// does not add a new edge; the changed-file lint now sees the old import.
+// eslint-disable-next-line import/no-cycle -- existing bypass seed cycle
 import {
   DEFAULT_TEST_AVATAR_URL,
   ensureBetterAuthTestUser,
@@ -443,6 +447,29 @@ async function ensurePersonaProfile(
       }
     }
   }
+
+  await ensurePersonaRelease(profileId);
+}
+
+async function ensurePersonaRelease(profileId: string) {
+  const [existingRelease] = await db
+    .select({ id: discogReleases.id })
+    .from(discogReleases)
+    .where(eq(discogReleases.creatorProfileId, profileId))
+    .limit(1);
+  if (existingRelease) return;
+
+  await db
+    .insert(discogReleases)
+    .values({
+      creatorProfileId: profileId,
+      title: 'Browse Test Single',
+      slug: 'browse-test-single',
+      status: 'released',
+      releaseDate: new Date('2024-01-15T00:00:00.000Z'),
+      totalTracks: 1,
+    })
+    .onConflictDoNothing();
 }
 
 export const getCachedDevTestAuthSession = cache(async () => {

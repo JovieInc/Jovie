@@ -60,6 +60,7 @@ import {
 import { OnboardingMessageRecoveryRow } from './OnboardingMessageRecoveryRow';
 import type { OnboardingProfileBuilderState } from './OnboardingProfileRail';
 import { OnboardingProfileRail } from './OnboardingProfileRail';
+import { OnboardingSecurityCheckRecovery } from './OnboardingSecurityCheckRecovery';
 import {
   OnboardingArtistConfirmedCard,
   type OnboardingArtistSelection,
@@ -784,6 +785,7 @@ export function OnboardingChat({
     hasInitialStarterPrompt ? initialStarterPrompt : null
   );
   const wasAwaitingTurnstileRetryRef = useRef(false);
+  const wasSecurityCheckRecoveryRef = useRef(false);
   const pendingVerifiedSubmitRef = useRef(false);
   const [localAutomationBypass, setLocalAutomationBypass] = useState<
     boolean | null
@@ -844,6 +846,7 @@ export function OnboardingChat({
       }
       if (metadata.errorCode === 'TURNSTILE_REQUIRED') {
         setHasSentFirst(false);
+        setVerificationRequested(true);
         onTurnstileRejected?.();
       }
     },
@@ -868,7 +871,11 @@ export function OnboardingChat({
     onBusyChange?.(isSubmitted || isStreaming);
   }, [isSubmitted, isStreaming, onBusyChange]);
   useLayoutEffect(() => {
-    if (!chatError) return;
+    const shouldRestoreFocus =
+      chatError !== null || wasSecurityCheckRecoveryRef.current;
+    wasSecurityCheckRecoveryRef.current =
+      chatError?.errorCode === 'TURNSTILE_REQUIRED';
+    if (!shouldRestoreFocus) return;
     composerInputRef.current?.focus({ preventScroll: true });
   }, [chatError]);
 
@@ -1100,7 +1107,7 @@ export function OnboardingChat({
     if (!chatError.failedMessage || isBusy) return;
 
     wasAwaitingTurnstileRetryRef.current = false;
-    const failedMessage = chatError.failedMessage;
+    const failedMessage = latestInputRef.current;
     setChatError(null);
     submitText(failedMessage);
   }, [
@@ -1161,6 +1168,7 @@ export function OnboardingChat({
   const hasConversationStarted = messages.length > 0 || hasSentFirst;
   const shouldDockComposer =
     chatError !== null || userTurnCount > 1 || selectedArtist !== null;
+  const isSecurityCheckRecovery = chatError?.errorCode === 'TURNSTILE_REQUIRED';
   useEffect(() => {
     if (shouldDockComposer) return;
     const scrollContainer = scrollContainerRef.current;
@@ -1176,7 +1184,7 @@ export function OnboardingChat({
     value: input,
     onChange: handleInputChange,
     onSubmit: handleSubmit,
-    isLoading: isBusy,
+    isLoading: isBusy || (isSecurityCheckRecovery && isAwaitingFirstToken),
     isSubmitting: isSubmitted,
     isStreaming,
     onStop: stop,
@@ -1195,8 +1203,18 @@ export function OnboardingChat({
   const sendLocalError = chatError;
   const onboardingComposerSurface = (
     <div className='mx-auto w-full max-w-[45rem]'>
-      {flowStatus}
-      {sendLocalError ? (
+      {isSecurityCheckRecovery ? null : flowStatus}
+      {isSecurityCheckRecovery ? (
+        <OnboardingSecurityCheckRecovery
+          status={turnstileStatus}
+          verification={flowStatus}
+          onRetry={() => {
+            setVerificationRequested(true);
+            onTurnstileRejected?.();
+          }}
+          isBusy={isBusy}
+        />
+      ) : sendLocalError ? (
         <OnboardingMessageRecoveryRow
           chatError={sendLocalError}
           handleRetry={handleRetry}

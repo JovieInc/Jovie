@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 import {
   certifyArtistProfile,
+  exposedDeferredSurfaces,
   isDeclaredRedirect,
 } from './certify-artist-profile';
 
@@ -24,6 +25,23 @@ async function output() {
 const html = `<link rel="canonical" href="https://jov.ie/tim"><script type="application/ld+json">{"@graph":[{"@id":"https://jov.ie/tim#musicgroup","sameAs":["${TIM_WHITE_PROFILE.spotifyUrl}"]}]}</script><section data-testid="profile-aeo-content"><a href="/tim">Tim White</a><a href="/broken">other</a><a href="https://example.com/">external</a></section>`;
 
 describe('artist proof collector', () => {
+  it('treats the live pay control as the deferred tips surface', () => {
+    for (const marker of [
+      'pay-trigger',
+      'profile-mode-drawer-pay',
+      'profile-pay-recipient',
+      'tip-button',
+      'tip-drawer',
+    ]) {
+      expect(
+        exposedDeferredSurfaces(`<button data-testid="${marker}"></button>`)
+      ).toEqual(['tips']);
+    }
+    expect(
+      exposedDeferredSurfaces('<button data-testid="listen-trigger"></button>')
+    ).toEqual([]);
+  });
+
   it('persists raw evidence and failure receipts, probes only same-origin links and never follows redirects', async () => {
     const directory = await output();
     const fetcher = vi
@@ -208,5 +226,58 @@ describe('artist proof collector', () => {
     expect(isDeclaredRedirect(new URL('https://jov.ie/moved'), 'tim')).toBe(
       false
     );
+  });
+
+  it('requires the reference release to return explicitly to Tim White', async () => {
+    const releaseHtml = `<a href="/tim" aria-label="Back to Tim White">Back to Tim White</a>`;
+    const profileHtml = `<link rel="canonical" href="https://jov.ie/tim"><script type="application/ld+json">{"@graph":[{"@id":"https://jov.ie/tim#musicgroup","sameAs":["${TIM_WHITE_PROFILE.spotifyUrl}"],"mentions":[{"@type":"MusicRecording","name":"Never Say a Word","url":"https://jov.ie/tim/never-say-a-word"}]}]}</script><section data-testid="profile-aeo-content"><a href="/tim">Tim White</a><a href="/tim/never-say-a-word">Never Say a Word</a></section>`;
+    const routes: Record<string, string> = {
+      'https://jov.ie/tim': profileHtml,
+      'https://jov.ie/tim/never-say-a-word': releaseHtml,
+    };
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(async url => {
+      const key = String(url);
+      if (key.endsWith('/api/health/build-info')) {
+        return Response.json({
+          commitSha: '0f42058e6e24a9882a538a6b5d94fa84b2f7c15f',
+        });
+      }
+      const body = routes[key];
+      if (body === undefined) throw new Error(`unexpected fetch ${key}`);
+      return new Response(body, { status: 200 });
+    });
+    const passed = await certifyArtistProfile(
+      ['--output', await output()],
+      fetcher
+    );
+    expect(passed.failed).toBe(false);
+    expect(passed.exposedDeferredSurfaces).toEqual([]);
+    const report = JSON.parse(await readFile(passed.reportPath, 'utf8'));
+    expect(report.linkChecks).toContainEqual(
+      expect.objectContaining({
+        url: 'https://jov.ie/tim/never-say-a-word',
+        canonicalArtistReturn: true,
+      })
+    );
+    routes['https://jov.ie/tim'] =
+      `${profileHtml}<button data-ask-jovie-launcher></button>`;
+    routes['https://jov.ie/tim/never-say-a-word'] =
+      `${releaseHtml}<div data-testid="operator-banner"></div>`;
+    const exposed = await certifyArtistProfile(
+      ['--output', await output()],
+      fetcher
+    );
+    expect(exposed.failed).toBe(false);
+    expect(exposed.exposedDeferredSurfaces).toEqual([
+      'broad_ai',
+      'operator_controls',
+    ]);
+    routes['https://jov.ie/tim/never-say-a-word'] = '<a href="/">Jovie</a>';
+    const failed = await certifyArtistProfile(
+      ['--output', await output()],
+      fetcher
+    );
+    expect(failed.failed).toBe(true);
+    expect(failed.brokenArtistLoops).toHaveLength(1);
   });
 });

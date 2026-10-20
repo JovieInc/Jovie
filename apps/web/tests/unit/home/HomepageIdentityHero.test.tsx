@@ -44,10 +44,6 @@ vi.mock('next/image', () => ({
   },
 }));
 
-// Generic identity homepage: no single-ICP wording, no em dashes.
-const ICP_TERMS =
-  /\b(?:artists?|musicians?|music|songs?|releases?|tours?|fans?|streams?|albums?|presaves?|creators?)\b/i;
-
 function css(): string {
   return readFileSync(
     resolve(process.cwd(), 'components/homepage/HomepageIdentity.css'),
@@ -139,34 +135,28 @@ describe('HomepageIdentityHero', () => {
     }
   });
 
-  it('proves the claim with the real jov.ie/tim profile and shows no product screenshot', () => {
+  it('shows the visitor identity without presenting a founder or claimed customer', () => {
     render(<HomepageIdentityHero />);
 
-    const proof = screen.getByTestId('homepage-hero-real-profile');
-    expect(within(proof).getByRole('img')).toHaveAttribute(
-      'alt',
-      HOMEPAGE_IDENTITY_COPY.hero.proofAlt
-    );
-    expect(proof).toHaveTextContent('Tim White');
-    expect(screen.queryByText(/Avery|Illustrative/)).toBeNull();
+    const identity = screen.getByTestId('homepage-hero-identity');
+    expect(identity).toHaveTextContent('jov.ie/you');
+    expect(identity).toHaveTextContent('Your artist profile');
+    expect(within(identity).queryByRole('img')).toBeNull();
+    expect(screen.queryByText(/Tim White|Founder|Claimed|Avery/)).toBeNull();
     expect(document.querySelectorAll('video, canvas')).toHaveLength(0);
   });
 
-  it('keeps the claim card narrow and the role on one line at 768 (JOV-7126)', () => {
+  it('preserves the narrow claim-card geometry at 768 (JOV-7126)', () => {
     render(<HomepageIdentityHero />);
 
     // Pen x4j9f (768 split): the claim card is ~340px (max-w-85), not the
     // wider max-w-120 the split shell's half-width column at 768 can't fit
-    // alongside the headline. whitespace-nowrap keeps "Founder, Jovie" from
-    // wrapping when that column gets tight. Real layout/line-wrap coverage
+    // alongside the headline. Real layout/line-wrap coverage
     // lives in the Playwright regression at tests/e2e/homepage.spec.ts,
     // since jsdom does not lay out text.
     const card = screen.getByTestId('homepage-claim-card');
     expect(card.className).toContain('max-w-85');
     expect(card.className).not.toContain('max-w-120');
-
-    const role = screen.getByText(HOMEPAGE_IDENTITY_COPY.hero.preview.role);
-    expect(role.className).toContain('whitespace-nowrap');
 
     const source = css();
     expect(source).toMatch(
@@ -200,11 +190,11 @@ describe('HomepageIdentityHero', () => {
       screen.getByRole('textbox')
     );
     expect(
-      within(card).getByTestId('homepage-hero-real-profile')
+      within(card).getByTestId('homepage-hero-identity')
     ).toBeInTheDocument();
   });
 
-  it('keeps hero copy generic and free of em dashes', () => {
+  it('describes the free artist profile without inventing a paid launch benefit', () => {
     const { hero, seo } = HOMEPAGE_IDENTITY_COPY;
     const copy = [
       seo.title,
@@ -214,11 +204,13 @@ describe('HomepageIdentityHero', () => {
       ...Object.values(hero.preview),
     ];
     for (const line of copy) {
-      expect(line).not.toMatch(ICP_TERMS);
       expect(line).not.toContain('—');
     }
     const { container } = render(<HomepageIdentityHero />);
-    expect(container.textContent ?? '').not.toMatch(ICP_TERMS);
+    expect(container).toHaveTextContent('Your music and links, together.');
+    expect(container.textContent ?? '').not.toMatch(
+      /\$12|\$199|continuous monitoring|unattended|advanced analytics/i
+    );
     expect(container.textContent ?? '').not.toContain('—');
   });
 

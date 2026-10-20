@@ -18,9 +18,21 @@ ios_now() {
   date -u +%Y-%m-%dT%H:%M:%SZ
 }
 
+caller_has_errexit() {
+  case $- in
+    *e*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 run_phase() {
   local phase_name="$1"
   shift
+
+  local caller_errexit=0
+  if caller_has_errexit; then
+    caller_errexit=1
+  fi
 
   local started_at
   local start_seconds
@@ -33,7 +45,9 @@ run_phase() {
   set +e
   "$@"
   local status=$?
-  set -e
+  if [[ "$caller_errexit" -eq 1 ]]; then
+    set -e
+  fi
 
   local end_seconds
   end_seconds="$(date +%s)"
@@ -57,10 +71,7 @@ run_with_timeout() {
     local now
     now="$(date +%s)"
     if ((now - start_time >= timeout_seconds)); then
-      kill "$command_pid" 2>/dev/null || true
-      sleep 1
-      kill -9 "$command_pid" 2>/dev/null || true
-      wait "$command_pid" 2>/dev/null || true
+      terminate_timed_out_pid "$command_pid"
       return 124
     fi
 
@@ -70,10 +81,148 @@ run_with_timeout() {
   wait "$command_pid"
 }
 
+terminate_timed_out_pid() {
+  local command_pid="$1"
+  kill "$command_pid" 2>/dev/null || true
+  sleep 1
+  kill -9 "$command_pid" 2>/dev/null || true
+  wait "$command_pid" 2>/dev/null || true
+}
+
+terminate_timed_out_pids() {
+  local command_pid
+  for command_pid in "$@"; do
+    kill "$command_pid" 2>/dev/null || true
+  done
+  sleep 1
+  for command_pid in "$@"; do
+    kill -9 "$command_pid" 2>/dev/null || true
+    wait "$command_pid" 2>/dev/null || true
+  done
+}
+
+# xcodebuild prints these on their own line when the test or build phase is
+# done and only result-bundle finalization remains.
+xcodebuild_terminal_result_line() {
+  local line="$1"
+  line="${line//$'\r'/}"
+  while [[ "$line" == *$'\033'* ]]; do
+    local before="${line%%$'\033'*}"
+    local after="${line#*$'\033'}"
+    if [[ "$after" == '['* ]]; then
+      after="${after#[}"
+      while [[ "$after" == [0-9\;]* ]]; do
+        after="${after:1}"
+      done
+      if [[ "$after" == [[:alpha:]]* ]]; then
+        after="${after:1}"
+      fi
+    fi
+    line="${before}${after}"
+  done
+  line="${line#"${line%%[![:space:]]*}"}"
+  line="${line%"${line##*[![:space:]]}"}"
+  case "$line" in
+    "** TEST SUCCEEDED **" | "** TEST FAILED **" | "** TEST EXECUTE FAILED **" | "** BUILD SUCCEEDED **" | "** BUILD FAILED **")
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+# Relays xcodebuild output and records when a terminal result line appears.
+# The parent applies the finalization budget from that moment; this loop must
+# keep reading so a full pipe cannot stall xcodebuild.
+relay_xcodebuild_output() {
+  local line
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+    if [[ ! -f "$XCODEBUILD_RESULT_FLAG" ]] && xcodebuild_terminal_result_line "$line"; then
+      : >"$XCODEBUILD_RESULT_FLAG"
+    fi
+  done
+}
+
+# Test execution and xcresult finalization have separate budgets. A passing
+# suite that has already printed a terminal result must not be killed by the
+# execution budget while xcodebuild writes the result bundle. A hang on either
+# side still exits 124.
+run_with_split_timeout() {
+  local timeout_seconds="$1"
+  local finalization_timeout_seconds="$2"
+  shift 2
+
+  local start_time work_dir output_fifo reader_pid command_pid result_at now elapsed status spins
+  start_time="$(date +%s)"
+  result_at=""
+  XCODEBUILD_TIMEOUT_REASON=""
+  work_dir="$(mktemp -d "${TMPDIR:-/tmp}/jovie-xcodebuild-timeout.XXXXXX")" || return 1
+  output_fifo="$work_dir/output"
+  XCODEBUILD_RESULT_FLAG="$work_dir/result"
+  mkfifo "$output_fifo" || return 1
+
+  relay_xcodebuild_output <"$output_fifo" &
+  reader_pid=$!
+  "$@" >"$output_fifo" 2>&1 &
+  command_pid=$!
+
+  while true; do
+    if [[ -z "$result_at" && -f "$XCODEBUILD_RESULT_FLAG" ]]; then
+      result_at="$(date +%s)"
+      elapsed=$((result_at - start_time))
+      echo "iOS xcodebuild reported a terminal result after ${elapsed}s; finalization budget ${finalization_timeout_seconds}s" >&2
+    fi
+
+    if ! kill -0 "$command_pid" 2>/dev/null; then
+      break
+    fi
+
+    now="$(date +%s)"
+    if [[ -n "$result_at" ]]; then
+      if ((now - result_at >= finalization_timeout_seconds)); then
+        XCODEBUILD_TIMEOUT_REASON="finalization"
+        terminate_timed_out_pids "$command_pid" "$reader_pid"
+        rm -rf "$work_dir"
+        return 124
+      fi
+    elif ((now - start_time >= timeout_seconds)); then
+      XCODEBUILD_TIMEOUT_REASON="execution"
+      terminate_timed_out_pids "$command_pid" "$reader_pid"
+      rm -rf "$work_dir"
+      return 124
+    fi
+
+    sleep 1
+  done
+
+  set +e
+  wait "$command_pid"
+  status=$?
+
+  spins=0
+  while kill -0 "$reader_pid" 2>/dev/null && ((spins < 5)); do
+    sleep 1
+    spins=$((spins + 1))
+  done
+  if kill -0 "$reader_pid" 2>/dev/null; then
+    terminate_timed_out_pid "$reader_pid"
+  else
+    wait "$reader_pid" 2>/dev/null || true
+  fi
+  rm -rf "$work_dir" || true
+  return "$status"
+}
+
 run_phase_with_optional_timeout() {
   local phase_name="$1"
   local timeout_seconds="$2"
   shift 2
+
+  local finalization_timeout_seconds="${JOVIE_IOS_XCODEBUILD_FINALIZATION_TIMEOUT_SECONDS:-}"
+  local caller_errexit=0
+  if caller_has_errexit; then
+    caller_errexit=1
+  fi
 
   if [[ -n "$timeout_seconds" ]]; then
     if [[ ! "$timeout_seconds" =~ ^[0-9]+$ ]]; then
@@ -81,18 +230,44 @@ run_phase_with_optional_timeout() {
       return 2
     fi
 
+    if [[ -n "$finalization_timeout_seconds" ]]; then
+      if [[ ! "$finalization_timeout_seconds" =~ ^[0-9]+$ ]] || [[ "$finalization_timeout_seconds" -eq 0 ]]; then
+        echo "Invalid finalization timeout for $phase_name: $finalization_timeout_seconds" >&2
+        return 2
+      fi
+    fi
+
     set +e
-    run_phase "$phase_name" run_with_timeout "$timeout_seconds" "$@"
+    if [[ -n "$finalization_timeout_seconds" ]]; then
+      XCODEBUILD_TIMEOUT_REASON=""
+      run_phase "$phase_name" run_with_split_timeout "$timeout_seconds" "$finalization_timeout_seconds" "$@"
+    else
+      run_phase "$phase_name" run_with_timeout "$timeout_seconds" "$@"
+    fi
     local status=$?
-    set -e
     if [[ "$status" -eq 124 ]]; then
-      echo "iOS phase timed out after ${timeout_seconds}s: $phase_name" >&2
+      if [[ "${XCODEBUILD_TIMEOUT_REASON:-}" == "finalization" ]]; then
+        echo "iOS xcodebuild finalization timed out after ${finalization_timeout_seconds}s after a reported test result: $phase_name" >&2
+        echo "::error::iOS xcodebuild finalization timed out after ${finalization_timeout_seconds}s after a reported test result: $phase_name" >&2
+      else
+        echo "iOS phase timed out after ${timeout_seconds}s: $phase_name" >&2
+        echo "::error::iOS phase timed out after ${timeout_seconds}s: $phase_name" >&2
+      fi
+    fi
+    if [[ "$caller_errexit" -eq 1 ]]; then
+      set -e
     fi
     return "$status"
   fi
 
   run_phase "$phase_name" "$@"
 }
+
+# Tests source this file to exercise the timeout watcher without launching
+# xcodebuild. Execution continues into the real action when the variable is unset.
+if [[ "${JOVIE_IOS_XCODEBUILD_SOURCE_ONLY:-}" == "1" ]]; then
+  return 0 2>/dev/null || exit 0
+fi
 
 if [[ "$ACTION" == "-resolvePackageDependencies" ]]; then
   echo "Resolving Swift package dependencies without a simulator destination..." >&2

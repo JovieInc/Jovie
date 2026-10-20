@@ -108,6 +108,7 @@ jobs:
             exit 1
           }
           project_response="$(curl --fail --silent --show-error \
+            --retry 3 --retry-delay 2 --retry-all-errors --connect-timeout 10 --max-time 20 \
             -H "Authorization: Bearer $SENTRY_AUTH_TOKEN" \
             "https://sentry.io/api/0/projects/$SENTRY_ORG/$SENTRY_PROJECT/")"
           project_id="$(jq -r '.id // empty | tostring' <<<"$project_response")"
@@ -133,6 +134,7 @@ jobs:
           echo "Current window: $START_ISO to $END_ISO (${LOOKBACK_MINUTES} min)"
 
           STATS_RESPONSE=$(curl --fail --silent --show-error \
+            --retry 3 --retry-delay 2 --retry-all-errors --connect-timeout 10 --max-time 20 \
             -H "Authorization: Bearer $SENTRY_AUTH_TOKEN" \
             "https://sentry.io/api/0/organizations/$SENTRY_ORG/events-stats/?project=$SENTRY_PROJECT_ID&field=count()&start=$START_ISO&end=$END_ISO&interval=1m")
           jq -e '
@@ -173,6 +175,7 @@ jobs:
             END_ISO=$(date -u -d "@$END_EPOCH" '+%Y-%m-%dT%H:%M:%S')
 
             STATS_RESPONSE=$(curl --fail --silent --show-error \
+              --retry 3 --retry-delay 2 --retry-all-errors --connect-timeout 10 --max-time 20 \
               -H "Authorization: Bearer $SENTRY_AUTH_TOKEN" \
               "https://sentry.io/api/0/organizations/$SENTRY_ORG/events-stats/?project=$SENTRY_PROJECT_ID&field=count()&start=$START_ISO&end=$END_ISO&interval=1m")
             jq -e '

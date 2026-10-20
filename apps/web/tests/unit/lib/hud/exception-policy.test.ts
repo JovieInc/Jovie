@@ -80,18 +80,17 @@ function labels(metrics: HudMetrics): string[] {
 }
 
 beforeEach(() => {
-  vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-09-28T12:00:00.000Z'));
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(GENERATED_AT_MS);
 });
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => vi.useRealTimers());
 
 describe('Hud exception policy', () => {
   it('uses wall-clock age and reports stale money observations without claiming contradiction', () => {
     const metrics = healthyMetrics({
       overview: { financialDataAvailable: false },
     });
-    vi.mocked(Date.now).mockReturnValue(
-      GENERATED_AT_MS + HUD_SOURCE_STALE_AFTER_MS + 1
-    );
+    vi.setSystemTime(GENERATED_AT_MS + HUD_SOURCE_STALE_AFTER_MS + 1);
     const ids = deriveOpsExceptions(metrics).map(entry => entry.id);
     expect(ids).toContain('source-stale-stripe');
     expect(ids).toContain('source-stale-mercury');

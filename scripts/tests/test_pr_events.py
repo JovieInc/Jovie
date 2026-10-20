@@ -1353,7 +1353,8 @@ class ClaimTest(unittest.TestCase):
         saved = runner.sh
         runner.sh = lambda args, **k: SimpleNamespace(returncode=0, stderr="", stdout="- review: rename the prop")
         try:
-            prompt = runner.render_fix_prompt({**pr(kinds=["dequeued", "review"]), "title": "t"}, "")
+            prompt = runner.render_fix_prompt({**pr(kinds=["dequeued", "review"]), "title": "t",
+                "reviewSummaries": [{"author": {"login": "reviewer"}, "body": "rename the prop"}]}, "")
         finally:
             runner.sh = saved
         self.assertIn("merge queue removed this PR", prompt)
@@ -2022,6 +2023,8 @@ class RunnerHookTest(unittest.TestCase):
             self.assertEqual((record["reason"], record["next_action"]), ("secret-file", "bug-intake"))
 
     def test_exhausted_disabled_lane_preserves_pr_and_terminal_backlog_disposition(self):
+        fresh = patch.object(runner, "reconcile_fix_target", side_effect=lambda pr: {"state": "OPEN", "isInMergeQueue": False, **pr})
+        fresh.start(); self.addCleanup(fresh.stop)
         stuck = pr(number=7, branch="claude/jov-9-20260926t0100", sha="h1", merge="DIRTY")
         calls, moves, comments = [], [], []
         saved = (runner.sh, runner.load_providers)
@@ -2058,6 +2061,8 @@ class RunnerHookTest(unittest.TestCase):
                        "labels[]=lane-fix-exhausted"], calls)
 
     def test_an_unfixable_hold_escalates_once_without_burning_attempts(self):
+        fresh = patch.object(runner, "reconcile_fix_target", side_effect=lambda pr: {"state": "OPEN", "isInMergeQueue": False, **pr})
+        fresh.start(); self.addCleanup(fresh.stop)
         stuck = pr(number=7, title="big diff")
         calls, triaged = [], []
         saved = (runner.sh, runner.load_providers, events.return_to_pool)
@@ -2328,6 +2333,143 @@ class NativeQueueClaimTest(unittest.TestCase):
             self.assertEqual(events.claim_event_pr(host, module, "devin", [target], NOW)["number"], 5)
             self.assertEqual(json.loads((host.state / "fix-attempts.json").read_text())["5"]["count"], 1)
             self.assertEqual(module.posted, [5])
+
+
+class TargetFileWitnessTest(unittest.TestCase):
+    def node(self, number=21824):
+        return {"number": number, "state": "OPEN", "headRefOid": "a" * 40,
+                "baseRefName": "main", "baseRefOid": "b" * 40,
+                "baseRef": {"target": {"oid": "c" * 40}},
+                "files": {"totalCount": 1, "pageInfo": {"hasNextPage": False},
+                          "nodes": [{"path": "apps/web/lib/profile.ts", "changeType": "MODIFIED"}]}}
+
+    def flattened(self):
+        row = self.node()
+        row["inlineFilesEvidence"] = events.inline_file_evidence(row, "JovieInc/Jovie", NOW - 2)
+        row["files"] = row["files"]["nodes"]
+        row["filesComplete"] = True
+        return row
+
+    def capture(self, row=None, confirmed=None, source_at=NOW-1):
+        row = self.flattened() if row is None else row
+        response = {"data": {"repository": {"nameWithOwner": "JovieInc/Jovie", "p21824":
+                                             self.node() if confirmed is None else confirmed}}}
+        shell = Shell({("gh", "api", "graphql"): response})
+        return events.capture_target_file_witnesses(fake_lane(shell), [row], source_at, NOW), shell
+
+    def test_inline_producer_then_bounded_same_head_and_base_confirmation(self):
+        node = self.node()
+        response = {"data": {"repository": {"nameWithOwner": "JovieInc/Jovie", "pullRequests": {
+            "nodes": [node], "pageInfo": {"hasNextPage": False}}}}}
+        shell = Shell({("gh", "api", "graphql"): response})
+        with patch.object(events.time, "time", return_value=NOW-2):
+            rows = events.open_prs_state(fake_lane(shell))
+        self.assertEqual(rows[0]["inlineFilesEvidence"]["observedAt"], NOW-2)
+        witnesses, confirmation = self.capture(rows[0])
+        self.assertEqual(witnesses[21824]["paths"], ["apps/web/lib/profile.ts"])
+        self.assertEqual(witnesses[21824]["sourceAt"], NOW-1)
+        self.assertEqual(len(confirmation.calls), 1)
+        self.assertIn("baseRef{target{oid}}", confirmation.calls[0][4])
+        self.assertFalse(any("--paginate" in call for call in confirmation.calls))
+
+    def test_head_base_tip_base_diff_anchor_state_and_repository_must_agree(self):
+        for key, value in (("headRefOid", "d"*40), ("baseRefOid", "d"*40),
+                           ("baseRefName", "release"), ("baseRef", {"target": {"oid": "d"*40}}),
+                           ("number", 21810), ("state", "CLOSED")):
+            with self.subTest(key=key):
+                confirmed = {**self.node(), key: value}
+                self.assertEqual(self.capture(confirmed=confirmed)[0], {})
+        row = self.flattened(); row["inlineFilesEvidence"]["repository"] = "other/repo"
+        witnesses, shell = self.capture(row)
+        self.assertEqual(witnesses, {}); self.assertEqual(shell.calls, [])
+        row = self.flattened(); del row["baseRef"]
+        self.assertEqual(self.capture(row)[0], {})
+
+    def test_complete_boolean_or_paginated_and_legacy_head_cache_do_not_certify(self):
+        row = self.flattened(); del row["inlineFilesEvidence"]
+        self.assertTrue(row["filesComplete"])
+        self.assertEqual(self.capture(row)[0], {})
+        raw = self.node(); raw["files"]["pageInfo"]["hasNextPage"] = True
+        self.assertIsNone(events.inline_file_evidence(raw, "JovieInc/Jovie", NOW))
+        # Exercise the legacy producer's cache completion, not merely a hand-built row.
+        raw = self.node(); raw["files"]["totalCount"] = 2
+        response = {"data": {"repository": {"nameWithOwner": "JovieInc/Jovie", "pullRequests": {
+            "nodes": [raw], "pageInfo": {"hasNextPage": False}}}}}
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = Path(tmp) / "legacy.json"
+            cache.write_text(json.dumps([{"path": "one.ts"}, {"path": "two.ts"}]))
+            shell = Shell({("gh", "api", "graphql"): response})
+            with patch.object(events, "pr_files_cache", return_value=cache):
+                rows = events.open_prs_state(fake_lane(shell))
+            self.assertTrue(rows[0]["filesComplete"])
+            self.assertNotIn("inlineFilesEvidence", rows[0])
+            self.assertEqual(self.capture(rows[0])[0], {})
+
+    def test_malformed_partial_duplicate_renamed_and_unsafe_paths_are_unknown(self):
+        bad_files = [None, {}, {"totalCount": True, "nodes": [{"path": "a.ts"}]},
+                     {"totalCount": 2, "nodes": [{"path": "a.ts"}]},
+                     {"totalCount": 2, "nodes": [{"path": "a.ts"}, {"path": "a.ts"}]},
+                     {"totalCount": 1, "nodes": [{"path": "new.ts", "changeType": "RENAMED"}]}]
+        bad_files += [{"totalCount": 1, "nodes": [{"path": value}]} for value in
+                      ("/abs.ts", "../x.ts", "a/../x.ts", "a//x.ts", "./x.ts", "a\\x.ts", "a*.ts", "a\n.ts", None)]
+        for files in bad_files:
+            with self.subTest(files=files):
+                raw = self.node(); raw["files"] = files
+                if isinstance(files, dict): files["pageInfo"] = {"hasNextPage": False}
+                self.assertIsNone(events.inline_file_evidence(raw, "JovieInc/Jovie", NOW))
+
+    def test_original_age_cache_binding_and_confirmation_failure_never_renew_scope(self):
+        for source_at in (None, NOW-61, NOW+1, float("nan"), True):
+            with self.subTest(source_at=source_at):
+                witnesses, shell = self.capture(source_at=source_at)
+                self.assertEqual(witnesses, {}); self.assertEqual(shell.calls, [])
+        for observed_at in (NOW-61, NOW+1):
+            row = self.flattened(); row["inlineFilesEvidence"]["observedAt"] = observed_at
+            self.assertEqual(self.capture(row)[0], {})
+        row = self.flattened(); row["files"][0]["path"] = "different.ts"
+        self.assertEqual(self.capture(row)[0], {})
+        lane = fake_lane(Shell())
+        with patch.object(lane, "sh", side_effect=subprocess.TimeoutExpired("gh", 5)):
+            self.assertEqual(events.capture_target_file_witnesses(lane, [self.flattened()], NOW-1, NOW), {})
+        # Original page age survives a later shared-cache timestamp and confirmation.
+        witnesses, _ = self.capture()
+        card = SimpleNamespace(title="PR #21824 has carried lane-fix-exhausted for more than 24h (remediation:pr-21824-conflict)",
+            labels=["remediation:pr-21824-conflict"], description="https://github.com/JovieInc/Jovie/pull/21824\nFingerprint: `remediation:pr-21824-conflict`")
+        self.assertIsNotNone(events.target_issue_files(card, witnesses, NOW))
+        self.assertIsNone(events.target_issue_files(card, witnesses, NOW+59))
+
+    def test_current_inventory_contradictions_invalidate_within_ttl_without_io(self):
+        witness, shell = self.capture()
+        current = self.flattened()
+        self.assertEqual(events.revalidate_target_file_witnesses(witness, [current], NOW), witness)
+        cases = [[], [current, current]]
+        for key, value in (("headRefOid", "d"*40), ("baseRefOid", "d"*40),
+                           ("baseRefName", "release"), ("baseRef", {"target": {"oid": "d"*40}}),
+                           ("state", "CLOSED"), ("filesComplete", False),
+                           ("files", [{"path": "scripts/lanes/lane_runner.py"}]),
+                           ("inlineFilesEvidence", None)):
+            cases.append([{**current, key: value}])
+        before = list(shell.calls)
+        for rows in cases:
+            with self.subTest(rows=rows):
+                self.assertEqual(events.revalidate_target_file_witnesses(witness, rows, NOW+20), {})
+        self.assertEqual(shell.calls, before)
+
+    def test_target_card_requires_consistent_exact_machine_identity(self):
+        witnesses, _ = self.capture()
+        valid = {"title": "PR #21824 has carried lane-fix-exhausted for more than 24h (remediation:pr-21824-conflict)",
+                 "labels": ["remediation:pr-21824-conflict"],
+                 "description": "https://github.com/JovieInc/Jovie/pull/21824\nFingerprint: `remediation:pr-21824-conflict`"}
+        self.assertEqual(events.target_issue_files(valid, witnesses, NOW), ["apps/web/lib/profile.ts"])
+        for key, value in (("title", valid["title"].replace("#21824", "#21810")), ("labels", []),
+                           ("description", valid["description"].replace("JovieInc/Jovie", "other/repo")),
+                           ("description", valid["description"] + " https://github.com/JovieInc/Jovie/pull/21770"),
+                           ("description", valid["description"].replace("/pull/21824", "/pull/21824/../21724")),
+                           ("description", valid["description"].replace("/pull/21824", "/pull/21824junk")),
+                           ("description", valid["description"].replace("/pull/21824", "/pull/21824?target=21724")),
+                           ("description", "Fingerprint: `remediation:pr-21824-conflict`")):
+            with self.subTest(key=key, value=value):
+                self.assertIsNone(events.target_issue_files({**valid, key: value}, witnesses, NOW))
 
 if __name__ == "__main__":
     unittest.main()

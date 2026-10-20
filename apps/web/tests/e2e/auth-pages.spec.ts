@@ -1,7 +1,7 @@
 /**
  * Auth pages E2E tests — JOV-2037
  *
- * Covers /signin, /signup, redirect normalization, SSO-only auth,
+ * Covers /signin, /signup, redirect normalization, email-code/provider auth,
  * plan intent capture, and authenticated-user redirect behaviour.
  *
  * Tests use an anonymous context unless noted.
@@ -148,7 +148,7 @@ test.describe('/signin page', () => {
     }
   });
 
-  test('email query does not render credential fields on the SSO-only surface', async ({
+  test('email query prefills editable email entry beside providers without a password field', async ({
     browser,
   }) => {
     const { page, context } = await createAnonPage(browser);
@@ -156,29 +156,43 @@ test.describe('/signin page', () => {
 
     try {
       await blockAnalytics(page);
-      await page.goto(`${APP_ROUTES.SIGNIN}?email=${testEmail}`, {
-        waitUntil: 'load',
-        timeout: AUTH_TIMEOUT,
-      });
-
-      await waitForClerkAuthUi(page);
-      if (await isAuthUnavailable(page)) {
-        const bodyText = await page.locator('body').textContent();
-        expect(bodyText).not.toContain('Unhandled Runtime Error');
-        return;
+      await page.goto(
+        `${APP_ROUTES.SIGNIN}?email=${encodeURIComponent(testEmail)}`,
+        {
+          waitUntil: 'load',
+          timeout: AUTH_TIMEOUT,
+        }
+      );
+      const signin = page.locator('[data-auth-shell-mode="sign-in"]');
+      await expect(signin).toHaveCount(1);
+      await expect(signin).toHaveAttribute('data-auth-shell-hydrated', 'true');
+      for (const provider of ['Google', 'Apple']) {
+        const button = signin.getByRole('button', {
+          name: `Continue with ${provider}`,
+          exact: true,
+        });
+        await expect(button).toHaveCount(1);
+        await expect(button).toBeVisible({ timeout: VISIBILITY_TIMEOUT });
+        await expect(button).toBeEnabled();
       }
-
-      await expect(
-        page.getByRole('button', { name: /continue with google/i })
-      ).toBeVisible({ timeout: VISIBILITY_TIMEOUT });
-      await expect(
-        page.getByRole('button', { name: /continue with apple/i })
-      ).toBeVisible({ timeout: VISIBILITY_TIMEOUT });
-      await expect(
-        page.locator(
-          'input[type="email"], input[name="identifier"], input[name="emailAddress"], input[type="password"]'
-        )
-      ).toHaveCount(0);
+      const email = signin.getByRole('textbox', { name: 'Email', exact: true });
+      await expect(email).toHaveCount(1);
+      await expect(email).toHaveAttribute('type', 'email');
+      await expect(page.locator('input[type="email"]')).toHaveCount(1);
+      await expect(email).toHaveAttribute('name', 'emailAddress');
+      await expect(email).toBeVisible();
+      await expect(email).toBeEditable();
+      await expect(email).toHaveValue(testEmail);
+      await expect(signin.locator('input[type="password"]')).toHaveCount(0);
+      await email.fill('edited@example.com');
+      await expect(email).toBeFocused();
+      await expect(email).toHaveValue('edited@example.com');
+      await page.reload({ waitUntil: 'load', timeout: AUTH_TIMEOUT });
+      await expect(signin).toHaveAttribute('data-auth-shell-hydrated', 'true');
+      await expect(email).toHaveValue(testEmail);
+      await expect(page.locator('input[type="email"]')).toHaveCount(1);
+      await expect(email).toHaveAttribute('name', 'emailAddress');
+      await expect(signin.locator('input[type="password"]')).toHaveCount(0);
     } finally {
       await context.close();
     }

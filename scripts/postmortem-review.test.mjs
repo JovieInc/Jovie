@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
 import { load as yamlLoad } from 'js-yaml';
+import { validateEscapedDefectClosureEvidence } from './lib/escaped-defect-closure.mjs';
 import { assertEventDrivenLearning } from './lib/learning-trigger.mjs';
 import {
   buildReviewReport,
@@ -294,9 +295,25 @@ test('repository class-action registry covers every recurring class', () => {
       'green-by-implication',
       'non-convergent-control-loop',
       'pre-merge-parity-gap',
+      'serial-layer-discovery',
       'silent-production-staleness',
     ]
   );
+});
+
+test('recurring serial-layer failures fail review without their class action', () => {
+  const documents = readPostmortemDocuments(REPO_ROOT);
+  const registry = readClassActionRegistry(REPO_ROOT);
+  delete registry['serial-layer-discovery'];
+  const report = buildReviewReport({
+    documents,
+    classActionRegistry: registry,
+    generatedAt: new Date('2026-10-16T00:00:00Z'),
+  });
+  assert.equal(report.verification.patternReviewPassed, false);
+  assert.deepEqual(report.summary.recurringWithoutAction, [
+    'serial-layer-discovery',
+  ]);
 });
 
 test('GBrain mirror is only complete after digest-bound readback', async () => {
@@ -426,4 +443,50 @@ test('scheduled learning commands reject before filesystem scans or network work
   ]) {
     assert.doesNotThrow(() => assertEventDrivenLearning(event));
   }
+});
+
+test('JOV-8068 detection gap is the JOV-7084 compiler output', () => {
+  const path = 'docs/postmortems/2026-10-14-onboarding-premature-checkout.md';
+  const source = readFileSync(resolve(REPO_ROOT, path), 'utf8');
+  const review = reviewPostmortem({ path, source });
+  assert.deepEqual(review.errors, []);
+  assert.equal(review.detectionGap.complete, true);
+  assert.equal(review.detectionGap.compilerIssue, 'JOV-7084');
+  assert.equal(review.detectionGap.schema, 'jovie.detection-gap/v1');
+  const compiled = JSON.parse(
+    readFileSync(
+      resolve(
+        REPO_ROOT,
+        'docs/postmortems/reports/jov-8068-detection-gap.json'
+      ),
+      'utf8'
+    )
+  );
+  assert.equal(compiled.schema, 'jovie.detection-gap/v1');
+  assert.equal(compiled.compilerIssue, 'JOV-7084');
+  assert.equal(compiled.originatingIssue, 'JOV-8068');
+  assert.deepEqual(compiled.detectionGap, review.detectionGap);
+});
+
+test('JOV-8068 closure marker matches the production tip', () => {
+  const receipt = readFileSync(
+    resolve(REPO_ROOT, 'docs/quality/receipts/JOV-8068.md'),
+    'utf8'
+  );
+  const match = receipt.match(
+    /<!--\s*escaped-defect-closure:v1\s*\n([\s\S]*?)\n\s*-->/
+  );
+  assert.ok(match, 'closure marker missing');
+  const evidence = JSON.parse(match[1]);
+  assert.deepEqual(
+    validateEscapedDefectClosureEvidence(evidence, {
+      issueIdentifier: 'JOV-8068',
+      expectedDeploymentSha: 'c5cf1c76aa2b7be30d283a46de914c5b23de0140',
+    }),
+    []
+  );
+  assert.equal(
+    evidence.detection.learningCompiler.outputRef,
+    'https://github.com/JovieInc/Jovie/blob/main/docs/postmortems/reports/jov-8068-detection-gap.json'
+  );
 });

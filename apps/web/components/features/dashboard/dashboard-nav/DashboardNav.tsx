@@ -433,24 +433,8 @@ export function DashboardNav({
     ]
   );
 
-  // The same action changes slots on rail reveal; keep its keyboard focus.
-  const newChatRef = useRef<HTMLAnchorElement | null>(null);
-  const restoreNewChatFocus = useRef(false);
-  const preserveNewChatFocus = useCallback((node: HTMLAnchorElement | null) => {
-    if (!node) {
-      restoreNewChatFocus.current =
-        newChatRef.current === document.activeElement;
-    }
-    newChatRef.current = node;
-    if (node && restoreNewChatFocus.current) {
-      node.focus({ preventScroll: true });
-      restoreNewChatFocus.current = false;
-    }
-  }, []);
-
   const newChatAction = (
     <Link
-      ref={preserveNewChatFocus}
       href={APP_ROUTES.CHAT}
       onClick={event => handleCommandClick(event, chatNavItem)}
       aria-busy={pendingNavigation?.itemId === chatNavItem.id || undefined}
@@ -578,7 +562,7 @@ export function DashboardNav({
                   </Link>
                 )}
               </RailStagedContent>
-              {threadsVisible ? null : newChatAction}
+              {newChatAction}
             </div>
             <SidebarGroupContent className='pb-2 pt-5'>
               {navSections.map(section => (
@@ -599,7 +583,7 @@ export function DashboardNav({
                 normalizeTrailingSlash(pathname) === APP_ROUTES.CHATS
               }
               onThreadContextMenu={onThreadContextMenu}
-              newThreadAction={newChatAction}
+              newThreadAction={false}
               state={
                 conversationsError
                   ? 'error'

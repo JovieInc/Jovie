@@ -440,8 +440,6 @@ describe('migration-drift fail-soft (JOV-3353)', () => {
   });
 
   it('still throws non-drift DB errors (no broad swallow)', async () => {
-    // Non-retryable so withRetry does not burn the 5s CI testTimeout on backoff.
-    // Transient connection errors still throw after retry (not fail-soft).
     setupDbSelectError(new Error('syntax error in SQL'));
 
     await expect(isWaitlistGateEnabled()).rejects.toThrow(
@@ -450,7 +448,7 @@ describe('migration-drift fail-soft (JOV-3353)', () => {
     expect(captureWarning).not.toHaveBeenCalled();
   });
 
-  it('throws transient connection errors after retry instead of fail-softing', async () => {
+  it('throws transient connection errors instead of fail-softing', async () => {
     vi.useFakeTimers();
     setupDbSelectError(new Error('connection terminated unexpectedly'));
 
@@ -490,7 +488,7 @@ describe('withRetry scoping (JOV-6137)', () => {
     getWaitlistSettings = mod.getWaitlistSettings;
   });
 
-  it('retries transient errors on the pooled client (default db) and fails after the bounded retry window', async () => {
+  it('does not retry unclassified settings operations on the pooled client', async () => {
     vi.useFakeTimers();
     setupDbSelectError(new Error('connection terminated unexpectedly'));
 
@@ -500,9 +498,36 @@ describe('withRetry scoping (JOV-6137)', () => {
       );
       await vi.runAllTimersAsync();
       await assertion;
-      // Bounded by withRetry (maxRetries=4): initial attempt + 3 retries.
-      // Exactly 4 — not the tx-path single attempt, and not unbounded.
-      expect(mockDbSelect).toHaveBeenCalledTimes(4);
+      // The callback can upsert on a miss, so it cannot declare read safety.
+      expect(mockDbSelect).toHaveBeenCalledTimes(1);
+      expect(captureWarning).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not replay a settings upsert after its acknowledgment is lost', async () => {
+    vi.useFakeTimers();
+    setupDbSelectMock(null);
+    const error = new Error('connection terminated unexpectedly');
+    let committedWrites = 0;
+    const returning = vi.fn(async () => {
+      committedWrites++;
+      throw error;
+    });
+    mockDbInsert.mockReturnValue({
+      values: vi.fn().mockReturnValue({
+        onConflictDoUpdate: vi.fn().mockReturnValue({ returning }),
+      }),
+    });
+
+    try {
+      const assertion = expect(getWaitlistSettings()).rejects.toBe(error);
+      await vi.runAllTimersAsync();
+      await assertion;
+      expect(committedWrites).toBe(1);
+      expect(mockDbSelect).toHaveBeenCalledTimes(1);
+      expect(mockDbInsert).toHaveBeenCalledTimes(1);
       expect(captureWarning).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();

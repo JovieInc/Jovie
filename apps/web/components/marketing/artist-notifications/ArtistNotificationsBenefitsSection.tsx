@@ -14,6 +14,9 @@ export function ArtistNotificationsBenefitsSection({
       width='landing'
       className='py-20 sm:py-24 lg:py-28'
       containerClassName='lg:max-w-none'
+      sectionId='feature-grid'
+      sectionVariant='3-large'
+      sectionOwner='apps/web/components/marketing/artist-notifications/ArtistNotificationsBenefitsSection.tsx'
     >
       <div className='mx-auto max-w-315 px-5 sm:px-8 lg:px-10'>
         <ArtistProfileSectionHeader
