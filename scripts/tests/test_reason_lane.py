@@ -502,6 +502,27 @@ class ExecuteTest(unittest.TestCase):
         self.assertIn("Astra memo", out["comment"])
         self.assertFalse(out["retry"])
 
+    def test_research_feeds_router_evidence_into_the_memo_prompt(self):
+        job = reason.parse_job("JOV-9", "t", description({**JOB_BLOCK, "decisionType": "research", "question": "Exa pricing?"}))
+        evidence = "research k1 | cache=miss tier=1\n1. [2.9] Exa pricing <https://exa.ai/pricing> (firecrawl)"
+        run = Runner(**{"jovie-research": done(evidence)}, hyperagent=done(json.dumps({"ok": True, "text": "memo"})))
+        with tempfile.TemporaryDirectory() as tmp:
+            out = reason.execute(job, CONFIG, "ctx", Path(tmp), run=run)
+        self.assertEqual(run.made("jovie-research")[0][:3], ["jovie-research", "ask", "Exa pricing?"])
+        prompt = run.made("hyperagent")[0][-1]
+        self.assertIn("ROUTER EVIDENCE", prompt)
+        self.assertIn("https://exa.ai/pricing", prompt)
+        self.assertEqual(out["record"]["confidence"], "research")
+
+    def test_router_failure_never_blocks_research(self):
+        job = reason.parse_job("JOV-9", "t", description({**JOB_BLOCK, "decisionType": "research"}))
+        for router in (OSError("missing"), done("", 75, "cap"), done("No relevant results. Consider --mode deep")):
+            run = Runner(**{"jovie-research": router}, hyperagent=done(json.dumps({"ok": True, "text": "memo"})))
+            with tempfile.TemporaryDirectory() as tmp:
+                out = reason.execute(job, CONFIG, "ctx", Path(tmp), run=run)
+            self.assertNotIn("ROUTER EVIDENCE", run.made("hyperagent")[0][-1])
+            self.assertEqual(out["record"]["confidence"], "research")
+
     def test_research_goes_to_the_research_backend(self):
         job = reason.parse_job("JOV-9", "t", description({**JOB_BLOCK, "decisionType": "research"}))
         run = Runner(hyperagent=done(json.dumps({"ok": True, "text": "Answer: yes. Sources: ..."})))
