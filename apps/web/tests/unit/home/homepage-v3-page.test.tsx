@@ -95,69 +95,67 @@ describe('YouTube artist MVP page composition', { timeout: 60_000 }, () => {
     expect(evaluateHomepageHtml(container.innerHTML).ok).toBe(true);
   });
 
-  it.each([true, false])(
-    'keeps the upload loop and Find me with waitlist=%s',
-    async waitlist => {
-      flags.WAITLIST_ENABLED = waitlist;
-      const { container } = await renderHomePage();
+  it.each([true, false])('keeps upload loop, waitlist=%s', async waitlist => {
+    flags.WAITLIST_ENABLED = waitlist;
+    const { container } = await renderHomePage();
 
-      const ids = [...container.querySelectorAll('[data-homepage-testid]')]
-        .map(section => section.getAttribute('data-homepage-testid'))
-        .filter(id => !id?.startsWith('homepage-possibility-'));
-      expect(ids).toEqual(['homepage-hero-shell', 'homepage-close']);
-      expect(
-        screen.getByRole('heading', {
-          level: 1,
-          name: 'Every upload, a release.',
-        })
-      ).toBeInTheDocument();
+    const ids = [...container.querySelectorAll('[data-homepage-testid]')]
+      .map(section => section.getAttribute('data-homepage-testid'))
+      .filter(id => !id?.startsWith('homepage-possibility-'));
+    expect(ids).toEqual(['homepage-hero-shell', 'homepage-close']);
+    expect(
+      screen.getByRole('heading', {
+        level: 1,
+        name: 'Every upload, a release.',
+      })
+    ).toBeInTheDocument();
 
-      expect(screen.queryByTestId('marketing-section-faq')).toBeNull();
+    expect(screen.queryByTestId('marketing-section-faq')).toBeNull();
 
-      // Bind the manifest to the mounted sections, rather than the available
-      // copy fields (FAQ copy can exist without mounting a FAQ).
-      const mountedSectionIds = [
-        ...container.querySelectorAll(
-          'section[data-testid^="marketing-section-"]'
-        ),
-      ].map(section =>
-        section.getAttribute('data-testid')?.replace('marketing-section-', '')
+    // Bind the manifest to the mounted sections, rather than the available
+    // copy fields (FAQ copy can exist without mounting a FAQ).
+    const mountedSectionIds = [
+      ...container.querySelectorAll(
+        'section[data-testid^="marketing-section-"]'
+      ),
+    ].map(section =>
+      section.getAttribute('data-testid')?.replace('marketing-section-', '')
+    );
+    const entry = MARKETING_ROUTE_MANIFEST.find(route => route.url === '/')!;
+    expect(getRouteRecipeParity(entry).actualSectionIds).toEqual(
+      mountedSectionIds
+    );
+
+    // Find me hands off to /start; auth owns access eligibility.
+    const hero = screen.getByTestId('marketing-section-hero');
+    const close = screen.getByTestId('marketing-section-cta');
+    for (const region of [hero, close]) {
+      expect(within(region).getByRole('combobox')).toHaveAttribute(
+        'placeholder',
+        copy.search.placeholder
       );
-      const entry = MARKETING_ROUTE_MANIFEST.find(route => route.url === '/')!;
-      expect(getRouteRecipeParity(entry).actualSectionIds).toEqual(
-        mountedSectionIds
-      );
-
-      // Find me hands off to /start; auth owns access eligibility.
-      const hero = screen.getByTestId('marketing-section-hero');
-      const close = screen.getByTestId('marketing-section-cta');
-      for (const region of [hero, close]) {
-        expect(within(region).getByRole('combobox')).toHaveAttribute(
-          'placeholder',
-          copy.search.placeholder
-        );
-        expect(
-          within(region).getByRole('button', { name: 'Find me' })
-        ).toBeVisible();
-        expect(within(region).queryAllByRole('link')).toHaveLength(0);
-        expect(
-          within(region).queryByText('Request access')
-        ).not.toBeInTheDocument();
-      }
-
-      expect(screen.queryByText(/Drop more music/i)).toBeNull();
-      const proof = screen.getByTestId('marketing-section-social-proof');
-      expect(proof).toHaveTextContent("Built by people who've created for");
       expect(
-        container
-          .querySelector('[data-capability-id="smart-links"]')
-          ?.compareDocumentPosition(proof)
-      ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+        within(region).getByRole('button', { name: 'Find me' })
+      ).toBeVisible();
+      expect(within(region).queryAllByRole('link')).toHaveLength(0);
       expect(
-        container.querySelector('[data-homepage-variant]')
-      ).toHaveAttribute('data-homepage-variant', copy.variantIdentity);
+        within(region).queryByText('Request access')
+      ).not.toBeInTheDocument();
     }
-  );
+
+    expect(screen.queryByText(/Drop more music/i)).toBeNull();
+    const proof = screen.getByTestId('marketing-section-social-proof');
+    expect(proof).toHaveTextContent("Built by people who've created for");
+    expect(
+      container
+        .querySelector('[data-capability-id="smart-links"]')
+        ?.compareDocumentPosition(proof)
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(container.querySelector('[data-homepage-variant]')).toHaveAttribute(
+      'data-homepage-variant',
+      copy.variantIdentity
+    );
+  });
 
   it('resolves the artist homepage brief to the same sections before auth', () => {
     const brief = MarketingBriefSchema.parse({
