@@ -410,3 +410,65 @@ export function buildStageSummary(timings) {
     endToEnd7d: endToEnd,
   };
 }
+
+const packWindow = w => [w?.n ?? 0, w?.p50 ?? null, w?.p95 ?? null];
+const packRegression = r =>
+  r
+    ? [
+        Boolean(r.regressed),
+        r.ratio === null ? null : Math.round(r.ratio * 100) / 100,
+        r.recentP95,
+        r.baselineP95,
+        r.recentN,
+        r.baselineN,
+      ]
+    : null;
+
+/**
+ * Committed form of the stage-timings document: each window is
+ * [n, p50, p95] and each regression is
+ * [regressed, ratio, recentP95, baselineP95, recentN, baselineN], so the
+ * daily snapshot stays a few hundred lines and diffs stay reviewable.
+ */
+export function compactStageTimings(timings) {
+  const entities = {};
+  for (const [type, entity] of Object.entries(timings.entities)) {
+    const stages = {};
+    for (const [id, row] of Object.entries(entity.stages))
+      stages[id] = {
+        status: row.status,
+        ...(row.terminal ? { terminal: true } : {}),
+        ...Object.fromEntries(
+          timings.windows.map(w => [w, packWindow(row[w])])
+        ),
+        regression: packRegression(row.regression),
+      };
+    const endToEnd = {};
+    for (const [pair, row] of Object.entries(entity.endToEnd))
+      endToEnd[pair] = {
+        ...Object.fromEntries(
+          timings.windows.map(w => [w, packWindow(row[w])])
+        ),
+        regression: packRegression(row.regression),
+      };
+    entities[type] = { stages, endToEnd };
+  }
+  return {
+    schema: 'jovie-stage-timings-compact/v1',
+    generatedAt: timings.generatedAt,
+    unit: timings.unit,
+    windowFormat: ['n', 'p50', 'p95'],
+    regressionFormat: [
+      'regressed',
+      'ratio',
+      'recentP95',
+      'baselineP95',
+      'recentN',
+      'baselineN',
+    ],
+    regressions: timings.regressions,
+    coverage: timings.coverage,
+    sources: timings.sources,
+    entities,
+  };
+}
