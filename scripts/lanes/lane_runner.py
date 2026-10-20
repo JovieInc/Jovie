@@ -58,6 +58,7 @@ import claude_lane  # noqa: E402  (subscription quota bank read by the router)
 import hyperagent_lane  # noqa: E402
 import linear_app_token  # noqa: E402  (Jovie Lanes OAuth app quota, separate from Tim's user)
 import linear_sync  # noqa: E402  (local issue mirror, claim ledger, write outbox)
+import ownership  # noqa: E402  (started-state live-owner invariant)
 import pr_events  # noqa: E402
 import remediation  # noqa: E402  (classifier, router, escalation ladder)
 import shipping_attribution  # noqa: E402  (receipt-first merged-PR provenance)
@@ -2083,7 +2084,11 @@ class Linear:
         data = self.gql('query($id:String!){issue(id:$id){state{name}}}', {"id": issue_id})
         return data["issue"]["state"]["name"]
 
-    def move(self, issue_id: str, state_name: str) -> None:
+    def move(self, issue_id: str, state_name: str, owner: str | None = None) -> None:
+        # Direct (non-outbox) writes have no claim ledger to consult: a started state must
+        # name its live owner explicitly (the orphaned In Progress guard).
+        if state_name in linear_sync.STARTED and not owner:
+            raise linear_sync.StartedWithoutOwner(f"{state_name} for {issue_id} without a live owner")
         states = self.gql('query($id:String!){issue(id:$id){team{states{nodes{id name}}}}}', {"id": issue_id})
         target = next((s["id"] for s in states["issue"]["team"]["states"]["nodes"] if s["name"] == state_name), None)
         if target:
@@ -7488,6 +7493,8 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
     if route_decision and route_decision.get("chosen"):
         log_route(host, name, route_decision)
         spec = {**spec, "model": route_decision["chosen"]["model"], "route": route_decision}
+    # The live owner of the started issue: held until this worker exits or re-execs.
+    _RUN_LEASES.append(ownership.acquire_run_lease(host.state, issue.id, issue.identifier, name))
     linear = linear_sync.Outboxed(host.state, linear)  # every disposition write waits in the outbox
     notify_issue_claim(linear, issue, name, spec)
     try:
@@ -7589,6 +7596,9 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
                                     "release, then retried automatically." if exhausted else "Back to Todo."))
     slot.release()
     return reexec(host, name)
+
+
+_RUN_LEASES: list = []  # open run-lease handles; exec (close-on-exec) or exit releases them
 
 
 def reexec(host: Host, name: str) -> int:
@@ -7713,6 +7723,13 @@ def dispatch(host: Host) -> int:
             tick["issueReconcile"] = epics.reconcile(THIS, host, lambda: Linear(host.linear_env), teams)
     except (Exception, SystemExit) as error:  # epic closure and hold expiry never take dispatch down
         tick["issueReconcileError"] = f"{type(error).__name__}: {error}"[:200]
+    try:
+        # A release self-test or fixture never writes to Linear or reads the host's git.
+        if not os.environ.get("LANES_SELFTEST") and os.environ.get("LANES_EXECUTION_BACKEND") != "local-test":
+            # Every started issue has a live owner, or it moves (outbox) to the right state.
+            tick["ownership"] = ownership.reconcile(host.state, host.repo, in_flight_issues())
+    except Exception as error:  # ownership repair never takes dispatch down
+        tick["ownershipError"] = f"{type(error).__name__}: {error}"[:200]
     try:
         corpus_owner = os.environ.get("YC_CORPUS_OWNER", "gem").split(".")[0]
         tick["ycCorpus"] = (yc_corpus.tick(host.state) if HOST == corpus_owner else
