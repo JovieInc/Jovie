@@ -199,7 +199,11 @@ class AdoptionTests(unittest.TestCase):
         self.assertEqual(radar.verdict(base, {"success": 22, "n": 28, "usd": 0.05})["decision"], "re-evaluate")
         pricey = radar.verdict(base, {"success": 28, "n": 28, "usd": 2.0})
         self.assertEqual((pricey["decision"], pricey["why"][:6]), ("re-evaluate", "better"))
-        self.assertIsNone(radar.verdict({"success": 0, "n": 5, "usd": 1}, {"success": 0, "n": 5, "usd": 1})["costPerSuccessRatio"])
+        self.assertEqual(radar.verdict({"success": 0, "n": 5, "usd": 1}, {"success": 0, "n": 5, "usd": 1})["costPerSuccessRatio"], 1.0)
+        self.assertEqual(radar.verdict({"success": 0, "n": 30, "usd": 1}, {"success": 25, "n": 30, "usd": 1})["decision"], "adopt")
+        free = radar.verdict({"success": 5, "n": 10, "usd": 0}, {"success": 5, "n": 10, "usd": 0})
+        self.assertEqual(free["costPerSuccessRatio"], 1.0)
+        self.assertIsNone(radar.verdict({"success": 5, "n": 10, "usd": 0}, {"success": 6, "n": 10, "usd": 1})["costPerSuccessRatio"])
         self.assertTrue(radar.needs_approval(25.01))
         self.assertFalse(radar.needs_approval(25))
 
@@ -251,9 +255,16 @@ class DetectTests(unittest.TestCase):
             saved = json.loads(state.read_text())
             self.assertIn("workers:@cf/cloudflare/clef", saved["catalog"])  # failed source keeps last snapshot
             self.assertIn("signals/changelog/a/b", pages["models/radar/2027-01-16"])
-            failing = radar.detect(state, run=fake_run(), fetch=fetch, put=lambda *a: (False, "down"), now=1_800_200_000,
-                                   registry=REGISTRY, dry_run=False)
+            newer = {"data": more["data"] + [{"id": "anthropic/claude-sonnet-7", "type": "language", "released": 500}]}
+            failing = radar.detect(state, run=fake_run(), fetch=lambda url, headers=None: newer, put=lambda *a: (False, "down"),
+                                   now=1_800_200_000, registry=REGISTRY, dry_run=False)
             self.assertEqual(failing["status"], "failed")
+            self.assertNotIn("gateway:anthropic/claude-sonnet-7", json.loads(state.read_text())["catalog"])
+            with patch.object(radar, "MAX_EVENTS_PER_RUN", 0):
+                retried = radar.detect(state, run=fake_run(), fetch=lambda url, headers=None: newer, put=put,
+                                       now=1_800_300_000, registry=REGISTRY)
+            self.assertEqual(retried["events"]["new"], 1)  # detected again because it was never stored
+            self.assertNotIn("gateway:anthropic/claude-sonnet-7", json.loads(state.read_text())["catalog"])
             dry = radar.detect(Path(tmp) / "dry.json", run=fake_run(), fetch=fetch, put=put, dry_run=True, registry=REGISTRY)
             self.assertFalse((Path(tmp) / "dry.json").exists())
             self.assertEqual(dry["status"], "ok")

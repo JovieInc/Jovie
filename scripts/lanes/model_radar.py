@@ -52,6 +52,7 @@ GATEWAY_POLICY_PATH = ROOT / "apps/web/lib/constants/ai-models.ts"
 DEFAULT_STATE = Path.home() / ".local/state/jovie-model-radar/state.json"
 REFRESH_INTERVAL_S = 24 * 60 * 60
 CAMPAIGN_APPROVAL_USD = 25.0
+MAX_EVENTS_PER_RUN = 100
 GATEWAY_URL = "https://ai-gateway.vercel.sh/v1/models"
 ELEVENLABS_URL = "https://api.elevenlabs.io/v1/models"
 TASK_FIELDS = ("id", "taskType", "currentModel", "channel", "sourcePath", "sourceMatch", "costUsd", "qualityMetric", "evalStatus", "screens")
@@ -387,7 +388,15 @@ def verdict(base: dict, cand: dict, *, z: float = 1.96, cost_ratio_cap: float = 
     se = math.sqrt(max(pooled * (1 - pooled), 1e-9) * (1 / n1 + 1 / n2))
     delta = p2 - p1
     cps = lambda r: r["usd"] / r["success"] if r["success"] else math.inf
-    ratio = cps(cand) / cps(base) if cps(base) not in (0, math.inf) else (0 if cps(cand) == 0 else math.inf)
+    cb, cc = cps(base), cps(cand)
+    if cb == cc:  # includes both free and both without a success
+        ratio = 1.0
+    elif cb == math.inf:  # any success beats none
+        ratio = 0.0
+    elif cb == 0:  # a free baseline cannot be undercut
+        ratio = math.inf
+    else:
+        ratio = cc / cb
     if delta < -z * se:
         decision, why = "reject", "success is worse beyond noise"
     elif delta > z * se and ratio <= cost_ratio_cap:
@@ -498,13 +507,14 @@ def detect(state_path: Path = DEFAULT_STATE, *, run=default_run, fetch=default_f
     registry = registry or load_registry()
     rows = screen(registry, catalog, gateway_allowlist())
     news = lab_news(run, (state.get("lastRun") or {}).get("at", "")[:10] or None)
-    failures = []
+    failures, unpersisted = [], [e["key"] for e in events[MAX_EVENTS_PER_RUN:]]
     if not dry_run:
-        for event in events[:100]:
+        for event in events[:MAX_EVENTS_PER_RUN]:
             slug = f"models/events/{day}/{event['model']['source']}-{re.sub(r'[^a-z0-9]+', '-', event['model']['id'].lower()).strip('-')}"
             ok, error = put(slug, f"{event['type']} model {event['model']['id']}", event_page(event, observed))
             if not ok:
                 failures.append(f"{slug}: {error}")
+                unpersisted.append(event["key"])
         ok, error = put(f"models/radar/{day}", f"Model radar {day}", digest_page(day, status, events, rows, news))
         if not ok:
             failures.append(f"digest: {error}")
@@ -513,6 +523,11 @@ def detect(state_path: Path = DEFAULT_STATE, *, run=default_run, fetch=default_f
                 run(["jovie-research", "decision", "trigger", "--kind", "model", "--trigger",
                      f"new model {event['model']['id']} on {event['model']['source']}", "--topic", "model"])
     merged = {**{k: v for k, v in previous.items() if v.get("source") in failed}, **catalog}
+    for key in unpersisted:  # an event that was not stored is detected again next run
+        if key in previous:
+            merged[key] = previous[key]
+        else:
+            merged.pop(key, None)
     result = {"status": "failed" if failures or len(failed) == len(status) else "ok", "at": observed, "baseline": baseline,
               "sources": status, "events": {t: sum(e["type"] == t for e in events) for t in ("new", "changed", "deprecated", "removed")},
               "candidates": len(rows), "eligible": sum(r["policy"] == "eligible" for r in rows), "failures": failures[:20]}
