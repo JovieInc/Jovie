@@ -134,7 +134,7 @@ export function HomeLoopCanvas({
           emptyLabel={copy.inFlightEmpty}
           errorLabel={copy.inFlightError}
           onRetry={onRetryLoop}
-          skeleton={<HomeLoopStageRowsSkeleton />}
+          skeleton={<HomeLoopStageRowsSkeleton rows={8} />}
           minBodyClassName='min-h-24'
           testId='home-loop-in-flight-section'
         >
