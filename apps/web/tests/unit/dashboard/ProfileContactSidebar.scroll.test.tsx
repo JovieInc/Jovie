@@ -5,7 +5,6 @@ import { ProfileContactSidebar } from '@/features/dashboard/organisms/profile-co
 
 const mockState = vi.hoisted(() => ({
   close: vi.fn(),
-  identityEnabled: true,
   previewLoading: false,
   push: vi.fn(),
   replace: vi.fn(),
@@ -32,10 +31,6 @@ const mockState = vi.hoisted(() => ({
       },
     },
   },
-}));
-
-vi.mock('@/lib/flags/client', () => ({
-  useAppFlag: () => mockState.identityEnabled,
 }));
 
 vi.mock('next/navigation', () => ({
@@ -136,7 +131,6 @@ vi.mock('@/features/dashboard/organisms/dsp-matches/hooks', () => ({
 describe('ProfileContactSidebar scroll contract', () => {
   beforeEach(() => {
     mockState.close.mockReset();
-    mockState.identityEnabled = true;
     mockState.previewLoading = false;
     mockState.push.mockReset();
   });
@@ -172,17 +166,13 @@ describe('ProfileContactSidebar scroll contract', () => {
     }
   );
 
-  it.each([
-    [true, 'Manage In Identity', APP_ROUTES.PRESENCE],
-    [false, 'Manage Profile', `${APP_ROUTES.SETTINGS_PROFILE}?tab=music`],
-  ] as const)(
-    'hands management off and closes the rail with Identity=%s',
-    (enabled, label, destination) => {
-      mockState.identityEnabled = enabled;
-      render(<ProfileContactSidebar />);
-      fireEvent.click(screen.getByRole('button', { name: label }));
-      expect(mockState.close).toHaveBeenCalledTimes(1);
-      expect(mockState.push).toHaveBeenCalledWith(destination);
-    }
-  );
+  it('hands management off to Identity and closes the rail without a rollout provider', () => {
+    render(<ProfileContactSidebar />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Manage In Identity' }));
+
+    expect(mockState.close).toHaveBeenCalledTimes(1);
+    expect(mockState.push).toHaveBeenCalledTimes(1);
+    expect(mockState.push).toHaveBeenCalledWith(APP_ROUTES.PRESENCE);
+  });
 });
