@@ -2943,6 +2943,7 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
             if receipt.get("verdict") in {"disk-held", "pr-readback-pending"}:
                 preserve_repair(worktree, receipt)
             else:
+                reap_run_processes(worktree, receipt)
                 if remove_worktree(host, worktree):
                     sh(["git", "branch", "-D", branch], cwd=host.repo)
     evidence = read_provider_evidence(provider_evidence)
@@ -5799,6 +5800,20 @@ def qualify_preserved_pr(host: Host, pr: dict, preserved):
         raise RecoveryHandoff(f"preserved-read-unavailable:{type(error).__name__}", preserved[0]) from error
 
 
+def reap_run_processes(worktree: Path, receipt: dict) -> None:
+    """The run is over and owns this checkout: stop what still works in it (a reparented
+    `next dev` or esbuild) so cleanup can prove it idle instead of preserving it."""
+    if not worktree.exists():
+        return
+    try:
+        reaped = disk_guard.reap_cwd_holders(worktree, run=lambda cmd, **kw: sh(cmd, timeout=kw.get("timeout", 30)))
+    except Exception as error:  # cleanup still fails closed through worktree_busy
+        receipt["reapError"] = f"{type(error).__name__}: {error}"[:200]
+        return
+    if reaped:
+        receipt["reapedProcesses"] = reaped
+
+
 def worktree_busy(path: Path) -> str | None:
     """Why a worktree must not be destroyed now; None only when proven idle."""
     return disk_guard.busy_reason(path, run=lambda cmd, **kw: sh(cmd, timeout=kw.get("timeout", 30)))
@@ -6243,6 +6258,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
             elif receipt.get("verdict") in {"cancelled", "revoked", "reconcile-unavailable", "disk-held", "recovery-handoff"}:
                 preserve_repair(worktree, receipt)
             else:
+                reap_run_processes(worktree, receipt)
                 remove_worktree(host, worktree)
             # The attempt is over: a head it did not move may be tried again by the next lane.
             # A head the fix itself pushed continues this generation rather than earning
@@ -6349,6 +6365,7 @@ def _adopt_pr(host: Host, name: str, pr: dict, claim: GateClaim, *, sensitive: b
         except Exception as error:
             receipt.update(verdict="failed", reasons=[f"harness-error:{type(error).__name__}:{error}"[:300]])
         finally:
+            reap_run_processes(worktree, receipt)
             remove_worktree(host, worktree)
     receipt["endedAt"] = now_iso()
     receipt["result"] = {"verdict": receipt.get("verdict"), "commit": receipt.get("headSha"),

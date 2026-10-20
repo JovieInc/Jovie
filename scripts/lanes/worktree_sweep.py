@@ -54,7 +54,7 @@ EXCLUDE = [f":(exclude,glob)**/{name}/**" for name in sorted(BUILD_DIRS)] + [f":
 
 def default_roots(home: Path, state: Path) -> list[Path]:
     """Where agent checkouts live; anything else is out of scope."""
-    return [state / "worktrees", home / ".codex/worktrees", home / "conductor/workspaces",
+    return [state / "worktrees", state / "bindings", home / ".codex/worktrees", home / "conductor/workspaces",
             home / "jovie-worktrees", home / "worktrees", home / "LogYourBody-wt",
             home / "jovie-wt-*", Path("/private/tmp/claude-501"), Path("/private/tmp/jovie-*")]
 
