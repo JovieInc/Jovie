@@ -10,7 +10,6 @@ import {
 import { recordSummerCardFeedback } from '@/lib/ovie/summer-cards.server';
 
 export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
 
 const ROUTE = '/api/ovie/summer-cards/[id]/feedback';
 const headers = { 'Cache-Control': 'private, no-store' } as const;
