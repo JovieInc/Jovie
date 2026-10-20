@@ -2099,16 +2099,18 @@ describe('source-read guard selection', () => {
     ['merge_group', []],
     ['push', []],
   ])(
-    'runs ci-schedule-inventory on %s when a workflow changes',
+    'runs ci-schedule-inventory and automation-registry on %s when a workflow changes',
     (event, pr) => {
       expect(
         selected(event, ['.github/workflows/upstash-quota-headroom.yml'])
-      ).toEqual(['ci-schedule-inventory', ...pr]);
+      ).toEqual(['ci-schedule-inventory', 'automation-registry', ...pr]);
     }
   );
 
   it.each([
     ['scripts/lib/ci-schedule-inventory.mjs', ['ci-schedule-inventory']],
+    ['ops/automation/registry.json', ['automation-registry']],
+    ['scripts/lanes/continuity_clock.py', ['automation-registry']],
     [
       'scripts/lib/__tests__/ci-schedule-inventory.test.mjs',
       ['ci-schedule-inventory'],
@@ -2253,6 +2255,7 @@ describe('source-read guard selection', () => {
       'artist-launch-contract',
       'artist-profile-conformance',
       'ci-schedule-inventory',
+      'automation-registry',
       'playbook-authoring',
     ]);
     expect(selected('', ['README.md'])).toEqual(all);
@@ -2262,6 +2265,7 @@ describe('source-read guard selection', () => {
       'artist-launch-contract',
       'artist-profile-conformance',
       'ci-schedule-inventory',
+      'automation-registry',
       'playbook-authoring',
     ]);
   });
