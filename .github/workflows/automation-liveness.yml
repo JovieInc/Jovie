@@ -1,0 +1,93 @@
+name: Automation Liveness
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: A hosted dead-man reads every registered automation's run receipt (GitHub runs, the public lanes status gist, Summer and production health) outside the hosts that run those loops, so a silent host cannot hide its own silence; it only files or resolves fingerprinted Linear issues.
+# removal-trigger: Remove when the lanes doctor and an independent hosted deadman both read canon/automation-registry.jsonl and alert on silence for 30 consecutive days.
+
+# Dead-man check for canon/automation-registry.jsonl (Tim 2026-10-20: every
+# automation registered, measured and auditable; silence is an alert). No new
+# clock (JOV-INV-042): it follows each Runner Health Monitor completion, which
+# the Gem lanes tick fires every 10 minutes and GitHub's cron backstops when Gem
+# is down.
+
+on:
+  workflow_run:
+    workflows: [Runner Health Monitor]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      file:
+        description: File or resolve Linear issues for critical loops
+        type: boolean
+        default: true
+
+concurrency:
+  group: automation-liveness
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  liveness:
+    name: Check automation heartbeats
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Restore previous alert state
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p liveness
+          id="$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=automation-liveness-state&per_page=100" --jq '([(.artifacts // [])[] | select(.expired|not)] | sort_by(.created_at) | last | .id) // empty' || true)"
+          if [ -n "$id" ]; then
+            gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${id}/zip" > liveness/prior.zip || true
+            unzip -p liveness/prior.zip state.json > liveness/state.json 2>/dev/null || true
+          fi
+
+      - name: Compare receipts to max staleness
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_INTAKE_DISABLED: ${{ vars.REMEDIATION_INTAKE_DISABLED }}
+          FILE_ISSUES: ${{ (github.event_name != 'workflow_dispatch' || inputs.file) && 'true' || 'false' }}
+        run: |
+          args=(
+            --output liveness/report.json
+            --events liveness/stage-events.ndjson
+            --decisions liveness/decisions.json
+            --previous liveness/state.json
+          )
+          if [ "$FILE_ISSUES" = "true" ]; then args+=(--file); fi
+          node scripts/automation-liveness.mjs "${args[@]}"
+
+      - name: Save alert state
+        if: ${{ hashFiles('liveness/state.json') != '' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: automation-liveness-state
+          path: liveness/state.json
+          if-no-files-found: ignore
+          retention-days: 90
+
+      - name: Save run receipts
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: automation-liveness-receipts
+          path: |
+            liveness/report.json
+            liveness/stage-events.ndjson
+            liveness/decisions.json
+          if-no-files-found: ignore
+          retention-days: 90

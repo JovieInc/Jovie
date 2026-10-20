@@ -103,7 +103,9 @@ export function validateRegistry(registry) {
     seen.add(entry.id);
     if (!STATUSES.includes(entry.status))
       errors.push(`${at}: status must be one of ${STATUSES.join('|')}`);
-    for (const field of ['owner', 'host', 'purpose', 'killSwitch']) {
+    // runsAs names the identity in canon/agent-identities.json the automation
+    // acts as, so the identity, mesh and automation registries cross-check.
+    for (const field of ['owner', 'runsAs', 'host', 'purpose', 'killSwitch']) {
       if (!nonEmpty(entry[field])) errors.push(`${at}: ${field} is required`);
     }
     const trigger = entry.trigger ?? {};
