@@ -1154,16 +1154,18 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
     reuseStep.if,
     "${{ github.event.action == 'edited' && !github.event.changes.base }}"
   );
-  for (const job of ['security', 'migration', 'coverage']) {
+  for (const job of ['security', 'migration', 'coverage', 'unit']) {
     const [first, ...rest] = workflow.jobs[job].steps;
     assert.equal(first.id, 'reuse', job);
     assert.ok(workflow.jobs[job].permissions.actions === 'read', job);
-    // Coverage's route-budget build narrows further to build-affecting diffs.
+    // Coverage's route-budget build and the unit lanes narrow further to the
+    // diff they can affect; none may run on a reused metadata-only edit.
     for (const step of rest)
       assert.ok(
         step.if === gate ||
           (job === 'coverage' &&
-            step.if === `${gate} && steps.scope.outputs.build == 'true'`),
+            step.if === `${gate} && steps.scope.outputs.build == 'true'`) ||
+          (job === 'unit' && step.if?.startsWith(`${gate} && `)),
         `${job}: ${step.name ?? step.uses}`
       );
   }
@@ -1210,7 +1212,7 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
   }
   assert.equal(
     workflow.jobs.ready.steps[0].run,
-    'test "$RESULTS" = \'success,success,success,success\''
+    'test "$RESULTS" = \'success,success,success,success,success\''
   );
 });
 
@@ -1288,6 +1290,117 @@ test('route budgets build only when the diff can change build output', () => {
         'apps/ios/Jovie/App.swift',
       ]),
       'build=false'
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('affected unit tests gate PR Ready and select only unit-affecting diffs (JOV-6834)', () => {
+  const workflow = sourceValidationWorkflow();
+  const job = workflow.jobs.unit;
+  // A required source proof: PR Ready aggregates it, so a red shard blocks
+  // enqueue instead of ejecting the PR from the merge queue.
+  assert.ok(workflow.jobs.ready.needs.includes('unit'));
+  assert.equal(workflow.on.pull_request.types.includes('synchronize'), true);
+  assert.deepEqual(job.strategy.matrix.shard, ['1/4', '2/4', '3/4', '4/4']);
+  const names = job.steps.map(step => step.name);
+  for (const name of [
+    'Run web unit tests related to the exact PR diff',
+    'Run packages/ui unit tests',
+    'Run Ovie route and private-boundary coverage',
+  ])
+    assert.ok(names.includes(name), name);
+  const web = job.steps.find(
+    step => step.name === 'Run web unit tests related to the exact PR diff'
+  ).run;
+  // Same fast config and quarantine as the merge-group shards, narrowed to
+  // the module graph the exact diff reaches.
+  assert.match(web, /pnpm --filter @jovie\/web test:fast --/);
+  assert.match(web, /--changed "\$BASE_SHA"/);
+  assert.match(web, /--shard=\$\{\{ matrix\.shard \}\}/);
+  assert.match(web, /unit_excludes/);
+  // The merge-group Unit Tests job is unchanged: the combined head still owns
+  // exact integration evidence.
+  const ci = load(readFileSync('.github/workflows/ci.yml', 'utf8'));
+  assert.ok(ci.jobs['ci-unit-tests']);
+  assert.match(ci.jobs['ci-unit-tests'].if, /merge_group/);
+
+  const script = job.steps
+    .find(step => step.id === 'scope')
+    .run.replace(/\$\{\{\s*github.base_ref\s*\}\}/g, 'main');
+  const root = mkdtempSync(join(tmpdir(), 'source-unit-scope-'));
+  const repo = join(root, 'repo');
+  mkdirSync(repo, { recursive: true });
+  const git = (...args) =>
+    execFileSync('/usr/bin/git', args, { cwd: repo, encoding: 'utf8' }).trim();
+  const write = path => {
+    mkdirSync(join(repo, path, '..'), { recursive: true });
+    writeFileSync(join(repo, path), `${path}\n`);
+  };
+  try {
+    git('init', '--quiet', '--initial-branch=main');
+    git('config', 'user.name', 'Unit scope test');
+    git('config', 'user.email', 'unit-scope@example.invalid');
+    write('README.md');
+    git('add', '.');
+    git('commit', '--quiet', '-m', 'base');
+    git('remote', 'add', 'origin', repo);
+    git('update-ref', 'refs/remotes/origin/main', git('rev-parse', 'HEAD'));
+    const scope = paths => {
+      git('checkout', '--quiet', '-B', 'head', 'origin/main');
+      for (const path of paths) write(path);
+      git('add', '.');
+      git('commit', '--quiet', '--allow-empty', '-m', 'head');
+      const output = join(root, `output-${Math.random()}`);
+      const result = spawnSync('/bin/bash', ['-c', script], {
+        cwd: repo,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          EXPECTED_HEAD: git('rev-parse', 'HEAD'),
+          GITHUB_OUTPUT: output,
+        },
+      });
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+      return Object.fromEntries(
+        readFileSync(output, 'utf8')
+          .trim()
+          .split('\n')
+          .map(line => line.split('='))
+          .filter(([key]) => key !== 'base')
+      );
+    };
+    // Test-only edits are exactly the diffs the coverage ratchet skips, so
+    // they must still select their related tests.
+    assert.deepEqual(scope(['apps/web/tests/unit/a/b.test.ts']), {
+      web: 'true',
+      ui: 'false',
+      ovie: 'false',
+    });
+    assert.deepEqual(scope(['packages/ui/src/button.tsx']), {
+      web: 'true',
+      ui: 'true',
+      ovie: 'false',
+    });
+    assert.deepEqual(scope(['apps/ovie/app/page.tsx']), {
+      web: 'false',
+      ui: 'false',
+      ovie: 'true',
+    });
+    assert.deepEqual(scope(['pnpm-lock.yaml']), {
+      web: 'true',
+      ui: 'false',
+      ovie: 'false',
+    });
+    // Nothing unit-affecting: a non-applicable receipt, no tests run.
+    assert.deepEqual(
+      scope([
+        'docs/PR_FLOW.md',
+        'scripts/ci-fast-lanes.mjs',
+        'apps/ios/A.swift',
+      ]),
+      { web: 'false', ui: 'false', ovie: 'false' }
     );
   } finally {
     rmSync(root, { recursive: true, force: true });
