@@ -573,6 +573,59 @@ def issue_hits_red_line(issue: Issue) -> bool:
     return False
 
 
+# A reviewed false positive (2026-10-20): the matcher stays as is, and one issue at a time
+# leaves the red-line hold only with BOTH the label and a comment receipt
+# `<!-- sensitive-text-reviewed:v1 {"sha256": ..., "reviewer": ..., "reason": ..., "at": ...} -->`
+# whose sha256 binds the exact title+description it reviewed. Any later edit voids it.
+SENSITIVE_REVIEWED_LABEL = "sensitive-text-reviewed"
+SENSITIVE_REVIEW_MARKER = re.compile(r"<!--\s*sensitive-text-reviewed:v1\s+(\{.*?\})\s*-->", re.S)
+SENSITIVE_REVIEW_TTL_S = 600
+SENSITIVE_REVIEW_QUERY = ('query($id:String!){issue(id:$id){comments(first:20,filter:{body:{contains:'
+                          '"sensitive-text-reviewed:v1"}}){nodes{body}}}}')
+
+
+def issue_text_digest(issue: Issue) -> str:
+    return hashlib.sha256(f"{issue.title}\n{issue.description or ''}".encode()).hexdigest()
+
+
+def sensitive_review_valid(issue: Issue, bodies: list[str]) -> bool:
+    digest = issue_text_digest(issue)
+    for body in bodies:
+        for match in SENSITIVE_REVIEW_MARKER.finditer(body if isinstance(body, str) else ""):
+            try:
+                receipt = json.loads(match.group(1))
+            except ValueError:
+                continue
+            if (isinstance(receipt, dict) and receipt.get("sha256") == digest
+                    and all(isinstance(receipt.get(key), str) and receipt[key].strip()
+                            for key in ("reviewer", "reason", "at"))):
+                return True
+    return False
+
+
+def sensitive_review_comments(issue: Issue) -> list[str] | None:
+    """Receipt comments, one Linear read per issue text per TTL (keyed on the text digest)."""
+    def fetch():
+        data = Linear(Host().linear_env).gql(SENSITIVE_REVIEW_QUERY, {"id": issue.id})
+        nodes = (((data or {}).get("issue") or {}).get("comments") or {}).get("nodes")
+        return [node.get("body") for node in nodes if isinstance(node, dict)] if isinstance(nodes, list) else None
+    return shared(f"sensitive-review-{_cache_token(issue.id)}-{issue_text_digest(issue)[:16]}",
+                  SENSITIVE_REVIEW_TTL_S, fetch)
+
+
+SENSITIVE_REVIEW_READER = sensitive_review_comments
+
+
+def sensitive_text_released(issue: Issue) -> bool:
+    if SENSITIVE_REVIEWED_LABEL not in {label.lower() for label in issue.labels}:
+        return False
+    try:
+        bodies = SENSITIVE_REVIEW_READER(issue)
+    except Exception:  # an unreadable receipt keeps the hold
+        return False
+    return bool(bodies) and sensitive_review_valid(issue, bodies)
+
+
 def label_rejection(issue: Issue, provider: str | None = None) -> str | None:
     """Label policy shared by the Jovie pool and every binding (bindings.refusal)."""
     labels = {label.lower() for label in issue.labels}
@@ -612,7 +665,7 @@ def admission_rejection(issue: Issue, failures: dict, now: float,
     rejected = label_rejection(issue, provider)
     if rejected:
         return rejected
-    if issue_hits_red_line(issue):
+    if issue_hits_red_line(issue) and not sensitive_text_released(issue):
         return "sensitive-text"
     if SENSITIVE_LABELS & labels and provider != SENSITIVE_PROVIDER:
         return "sensitive-provider"
@@ -4255,6 +4308,8 @@ def fetch_labeled_events(linear) -> list:
 
 EVENT_DELIVERY_SCHEMA = "jovie.event-delivery/v1"
 EVENT_DELIVERY_ATTEMPTS = 3
+EXHAUSTED_READBACK_S = 6 * 3600  # an exhausted delivery is only re-read for a late acknowledgement
+EVENT_DELIVERY_HISTORY = 50      # retained attempt history per delivery row
 EVENT_DELIVERY_PENDING_CAP = 256
 EVENT_DELIVERY_STALE_S = 3600
 
@@ -4465,9 +4520,23 @@ def _apply_event_plan(linear, plan: dict, host: Host, data: dict, now: float) ->
     reset. An uncertain send is read back by its stable remote ID before retry.
     The caller holds event-delivery.lock; claim.lock only covers the write fence.
     """
+    owners = _event_escalation(host).get("events") or {}
+    # Exhausted rows can never send again: they sort after every live row and are only read
+    # back every EXHAUSTED_READBACK_S. Before (Gem 2026-10-08..20) four exhausted rows took the
+    # one-action-per-tick budget every tick (5,534 readbacks on one) and 36 pending deliveries
+    # were never attempted. A row whose owning event finished or vanished is superseded.
     for row in sorted(data["actions"].values(), key=lambda row: (
-            row["createdAt"], ("reopens", "comments", "labels").index(row["kind"]), row["key"])):
+            row["status"] == "exhausted", row["createdAt"],
+            ("reopens", "comments", "labels").index(row["kind"]), row["key"])):
         if row["status"] in {"acknowledged", "superseded"} or now < row["nextAt"]:
+            continue
+        owner = owners.get(row["fingerprint"])
+        if row["status"] == "exhausted" and (not isinstance(owner, dict) or owner.get("status") == "done"
+                                             or owner.get("issueId") != row["ownerIssueId"]):
+            row["status"] = "superseded"
+            row["history"] = [*row["history"][-EVENT_DELIVERY_HISTORY:],
+                              {"at": now, "outcome": "owner-finished" if isinstance(owner, dict) else "owner-gone"}]
+            _save_event_delivery(host, data)
             continue
         phase = "readback"
         try:
@@ -4520,6 +4589,12 @@ def _apply_event_plan(linear, plan: dict, host: Host, data: dict, now: float) ->
             if acknowledged:
                 row.update(status="acknowledged", acknowledgedAt=now, receipt=receipt)
                 row["history"].append({"at": now, "outcome": "authoritative-readback"})
+            elif now >= row["deadline"]:
+                # The readback proved the action absent and its deadline forbids a send: the
+                # intent expired. Gem 2026-10-20: 36 comments starved for 3-12 days expired
+                # this way and held remediation-delivery open with nothing left to deliver.
+                row["status"] = "superseded"
+                row["history"].append({"at": now, "outcome": "expired-unsent", "receipt": receipt})
             else:
                 raise RuntimeError("event-delivery-unacknowledged")
         except Exception as error:
@@ -4533,7 +4608,9 @@ def _apply_event_plan(linear, plan: dict, host: Host, data: dict, now: float) ->
             row["status"] = "exhausted" if row["attempts"] >= EVENT_DELIVERY_ATTEMPTS or now >= row["deadline"] else "failed"
             row["history"].append({"at": now, "outcome": row["status"], "error": row["error"],
                                    "diagnostic": row["diagnostic"]})
-        row["nextAt"] = now + (60 if row["attempts"] < 2 else 300)
+        row["nextAt"] = now + (EXHAUSTED_READBACK_S if row["status"] == "exhausted"
+                               else 60 if row["attempts"] < 2 else 300)
+        row["history"] = row["history"][-EVENT_DELIVERY_HISTORY:]
         _save_event_delivery(host, data)
         break  # Bounded work; a transport outage must not monopolize dispatch.
     return _event_delivery_report(data, now)
@@ -6604,6 +6681,21 @@ def fix_candidates(name: str) -> list[dict]:
 ISSUE_MARKER = re.compile(r"linear-issue-id:\s*(JOV-\d+)", re.IGNORECASE)
 
 
+def org_merged_prs(identifier: str) -> list[dict] | None:
+    """Merged PRs in the org that mention the issue (title/body checked by the caller)."""
+    owner = REPO_SLUG.split("/", 1)[0]
+    found = sh(["gh", "search", "prs", identifier, "--owner", owner, "--merged",
+                "--json", "repository,number,title,body", "--limit", "20"], timeout=60)
+    try:
+        rows = json.loads(found.stdout) if found.returncode == 0 else None
+    except ValueError:
+        return None
+    if not isinstance(rows, list):
+        return None
+    return [{"repository": (row.get("repository") or {}).get("nameWithOwner"), "number": row.get("number"),
+             "title": row.get("title"), "body": row.get("body")} for row in rows if isinstance(row, dict)]
+
+
 def in_flight_issues() -> frozenset[str] | None:
     """Issues that already have an open PR (lane branch or `linear-issue-id` marker) from any
     lane, host, or agent. GitHub is the shared truth. None when GitHub cannot be read: an
@@ -7766,7 +7858,8 @@ def dispatch(host: Host) -> int:
         # A release self-test or fixture never writes to Linear or reads the host's git.
         if not os.environ.get("LANES_SELFTEST") and os.environ.get("LANES_EXECUTION_BACKEND") != "local-test":
             # Every started issue has a live owner, or it moves (outbox) to the right state.
-            tick["ownership"] = ownership.reconcile(host.state, host.repo, in_flight_issues())
+            tick["ownership"] = ownership.reconcile(host.state, host.repo, in_flight_issues(),
+                                                    search=org_merged_prs)
     except Exception as error:  # ownership repair never takes dispatch down
         tick["ownershipError"] = f"{type(error).__name__}: {error}"[:200]
     try:
