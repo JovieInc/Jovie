@@ -1,5 +1,10 @@
 # Jovie AI Pricing Strategy
 
+> API roadmap: the [API pricing schema](#api-pricing-schema-proposal-jov-4875)
+> below is a proposal, not an offer or billing configuration. For current
+> subscription prices, use `apps/web/lib/config/plan-prices.ts`; the weekly
+> packaging decision and cost scenarios below are historical planning context.
+
 > Status: weekly packaging approved for launch on 2026-08-17. Paid overage is
 > still a proposal and must not launch until the telemetry, billing, and consent
 > gates below pass. Governing principles live in
@@ -12,6 +17,62 @@ and uses additional completed responses as the variable-cost upsell.
 
 The customer sees one meter: **Weekly messages**. Internal model calls, tool
 steps, retries, and tokens are implementation details, not customer units.
+
+## API pricing schema — proposal (JOV-4875)
+
+Tim's August 7, 2026 directive in [JOV-4875](https://linear.app/jovie/issue/JOV-4875)
+sets the API model: free to start, scale with successful usage. A business can
+build before it can pay, with a bounded subsidy and strict rate limits. This
+section is the canonical **proposal schema** for that model; it neither changes
+the subscription schema nor creates a second SKU. The
+[self-serve PM brief](../product/api-agentic-self-serve.md) owns the account,
+payment, caching, and verification contracts.
+
+The later [API priority lock](../../canon/strategy/theses/2026-09-03-apis-mcps-core-not-first.md)
+keeps API/MCP/CLI access on the existing artist workflow, behind the YouTube
+artist loop in priority. The
+[bounded-subsidy thesis](../../canon/strategy/theses/2026-10-02-sell-outcomes-replaceable-substrate.md)
+requires an explicit cost ceiling and exit. API access is a way to deliver the
+artist outcome, not a standalone platform expansion.
+
+All fields below describe a future versioned policy record, not new runtime
+fields. `[VERIFY]` means unresolved, never zero, unlimited, or a default price.
+An incomplete record cannot activate API paid usage. Tim must approve exact
+amounts in a dated receipt before any price, Stripe meter/product, invoice,
+charge, or live billing configuration is created or changed for this proposal.
+
+| Field | Proposed contract | Approval / unresolved value |
+|---|---|---|
+| `approval` | Policy version, dated Tim decision, effective date, currency, operation-to-meter mapping | Exact amounts and activation receipt `[VERIFY]` |
+| `billable_unit` | One successfully completed, customer-visible API operation, classified by operation type; no seats, tokens, internal tool steps, or retries | Operation catalog and any high-cost exclusions `[VERIFY]` |
+| `billing_period` | Explicit UTC start/end; account-wide included units per meter, shared across keys and API/MCP/CLI | Period and reset policy `[VERIFY]` |
+| `cache_hits` | A new successful logical operation consumes one unit even on a fresh cache hit; replay of the same operation consumes none | Disclose before opt-in; cached work has no extra crawl/LLM surcharge |
+| `free_allowance` | Generous included units per account, bounded by per-period quota and subsidy budget; hard stop at exhaustion | Included units, subsidy ceiling, and reset `[VERIFY]` |
+| `limits` | Strict per-account and per-key burst, sustained, concurrency, and expensive-operation limits, plus IP/signup abuse controls; paid accounts remain bounded | Numeric limits for each operation class `[VERIFY]` |
+| `overage` | Explicit opt-in; charge only completed units beyond included allowance at the accepted policy rate | Unit rates, currency, rounding, invoice cadence, and volume bands `[VERIFY]` |
+| `spend_cap` | Account-selected period cap, default paid authority zero; atomically reserve worst-case cost before work | Allowed caps and maximum per-operation reservation `[VERIFY]` |
+| `subsidy_exit` | Stop at quota, cost ceiling, or abuse limit; offer opt-in paid use after approval; no automatic upgrade, debt, or retroactive charging | Trial cohort size and cost envelope `[VERIFY]` |
+
+For an approved meter and period, `excess_units = max(0, completed_units -
+included_units)`. The proposed amount is `excess_units × approved_unit_rate`,
+using the approved currency/rounding rules. If volume bands are later approved,
+they must replace that rule explicitly in the accepted policy version. Failed,
+canceled, unauthorized, validation-blocked, rate-limited, and idempotently
+replayed operations contribute zero billable units. Successful API operations
+do not also consume a chat allowance for the same work.
+
+Keep internal resource-cost telemetry separate from the customer meter. A cache
+hit can reduce COGS without changing the quoted unit. Free allowance consumption
+and paid excess allocation must be atomic across concurrent requests. No card
+is required for free access; quota exhaustion cannot initiate checkout or a
+charge without a valid delegated payment grant and explicit opt-in.
+
+**Ship now:** reconcile this schema and the PM brief as documentation only.
+**Re-evaluate when:** the existing API workstream produces account-level shadow
+usage, cost, cache, and abuse evidence for a bounded cohort.
+**Then:** Tim chooses exact allowances, limits, prices, caps, and the cohort
+budget; implementation must pass the brief's payment and metering gates before
+activation. No numeric API offer is approved by this document.
 
 ## Weekly allowances
 
