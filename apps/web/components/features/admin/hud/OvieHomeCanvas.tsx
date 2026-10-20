@@ -15,6 +15,7 @@ import {
   buildOvieHomeShipping,
   OVIE_SHIP_STAGES,
   type OviePulseMemory,
+  ovieAskAction,
   rememberPulse,
 } from '@/lib/ovie/home/shipping-home';
 import { inboxDecisionRequest, type OvieInbox } from '@/lib/ovie/inbox';
@@ -134,7 +135,10 @@ export function OvieHomeCanvas() {
       )?.decisionTarget;
       answer({
         id: ask.id,
-        label: decision === 'approve' ? 'Approved' : `Replied: ${notes}`,
+        label:
+          decision === 'approve'
+            ? ovieAskAction(target?.kind).committedLabel
+            : `Replied: ${notes}`,
         commit: async () => {
           if (!target) throw new Error('This decision is no longer open.');
           const request = inboxDecisionRequest(
@@ -184,6 +188,12 @@ export function OvieHomeCanvas() {
     : inbox.isError
       ? 'error'
       : 'loading';
+  // Mirror the inbox: a successful read can still omit a source. Showing the
+  // loaded asks alone would claim the section is complete.
+  const asksNotice =
+    inbox.data && inbox.data.issues.length > 0
+      ? `Some sources are unavailable. ${inbox.data.issues.join(' ')}`
+      : null;
 
   return (
     <HomeLoopCanvas
@@ -201,6 +211,7 @@ export function OvieHomeCanvas() {
       }
       loopStatus={loopStatus}
       asksStatus={asksStatus}
+      asksNotice={asksNotice}
       answers={answers}
       onApprove={ask => decide(ask, 'approve', '')}
       onReply={(ask, text) => decide(ask, 'reject', text)}

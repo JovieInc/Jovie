@@ -65,6 +65,11 @@ export interface HomeLoopAsk {
   readonly why: string;
   /** The recommended answer can be sent in one click. */
   readonly decidable: boolean;
+  /**
+   * Primary one-click label. Omitted asks use the canvas approve label.
+   * Ovie matches the inbox verbs (Approve, Mark done, Certify).
+   */
+  readonly actionLabel?: string;
   /** A written reply (request changes) is accepted for this ask. */
   readonly canReply: boolean;
   readonly evidence: readonly string[];

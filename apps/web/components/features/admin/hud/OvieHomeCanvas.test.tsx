@@ -186,4 +186,107 @@ describe('OvieHomeCanvas', () => {
       expect.objectContaining({ method: 'POST' })
     );
   });
+
+  it('names Linear and certification actions instead of Approve', async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url === '/api/ovie/inbox') {
+        return new Response(
+          JSON.stringify({
+            issues: [],
+            cases: [
+              {
+                ...INBOX.cases[0],
+                id: 'linear:JOV-9',
+                title: 'Close the launch issue',
+                decisionTarget: { kind: 'linear', id: 'JOV-9' },
+              },
+              {
+                ...INBOX.cases[0],
+                id: 'certification:row-1',
+                title: 'Certify the homepage',
+                decisionTarget: {
+                  kind: 'certification',
+                  id: 'row-1',
+                  evidenceDigest: 'digest',
+                },
+              },
+            ],
+          }),
+          { status: 200 }
+        );
+      }
+      return new Response('not found', { status: 404 });
+    });
+    renderCanvas();
+    expect(
+      await screen.findByRole('button', { name: 'Mark done' })
+    ).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Certify' })).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'Approve' })
+    ).not.toBeInTheDocument();
+
+    vi.useFakeTimers();
+    const linearCard = screen
+      .getByRole('heading', { name: 'Close the launch issue' })
+      .closest('[data-testid="home-loop-ask"]') as HTMLElement;
+    fireEvent.click(
+      within(linearCard).getByRole('button', { name: 'Mark done' })
+    );
+    expect(within(linearCard).getByRole('status')).toHaveTextContent(
+      'Marked done'
+    );
+  });
+
+  it('keeps loaded asks and names the missing source when the inbox is partial', async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url === '/api/ovie/inbox') {
+        return new Response(
+          JSON.stringify({
+            ...INBOX,
+            issues: ['Requested work could not be loaded.'],
+          }),
+          { status: 200 }
+        );
+      }
+      return new Response('not found', { status: 404 });
+    });
+    renderCanvas();
+    expect(
+      await screen.findByText('Vercel on-demand concurrency')
+    ).toBeVisible();
+    expect(
+      screen.getByTestId('home-loop-asks-section-notice')
+    ).toHaveTextContent(
+      'Some sources are unavailable. Requested work could not be loaded.'
+    );
+    expect(screen.getByTestId('home-loop-asks-section')).toHaveAttribute(
+      'data-state',
+      'populated'
+    );
+  });
+
+  it('does not call a partial inbox empty when no asks loaded', async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url === '/api/ovie/inbox') {
+        return new Response(
+          JSON.stringify({
+            cases: [],
+            issues: ['Requested work could not be loaded.'],
+          }),
+          { status: 200 }
+        );
+      }
+      return new Response('not found', { status: 404 });
+    });
+    renderCanvas();
+    expect(
+      await screen.findByTestId('home-loop-asks-section-notice')
+    ).toHaveTextContent(
+      'Some sources are unavailable. Requested work could not be loaded.'
+    );
+    expect(
+      screen.queryByText('Nothing needs your decision.')
+    ).not.toBeInTheDocument();
+  });
 });

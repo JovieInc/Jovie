@@ -23,7 +23,11 @@ import {
   rememberTiles,
   withTileHistory,
 } from '@/lib/home-loop/contract';
-import type { OvieInbox, OvieInboxCase } from '@/lib/ovie/inbox';
+import type {
+  InboxDecisionTarget,
+  OvieInbox,
+  OvieInboxCase,
+} from '@/lib/ovie/inbox';
 import type { ShippingCockpitProjection } from '@/lib/ovie/shipping-state/client';
 import type {
   CountMeasurement,
@@ -435,6 +439,24 @@ export function buildOvieHomeShipping(input: {
   };
 }
 
+/**
+ * Same primary verbs as the inbox drawer. Home must not call a Linear close
+ * or a founder certification an approval.
+ */
+export function ovieAskAction(kind: InboxDecisionTarget['kind'] | undefined): {
+  readonly actionLabel: string;
+  readonly committedLabel: string;
+} {
+  switch (kind) {
+    case 'linear':
+      return { actionLabel: 'Mark done', committedLabel: 'Marked done' };
+    case 'certification':
+      return { actionLabel: 'Certify', committedLabel: 'Certified' };
+    default:
+      return { actionLabel: 'Approve', committedLabel: 'Approved' };
+  }
+}
+
 function askFromCase(item: OvieInboxCase): OvieAsk {
   return {
     id: item.id,
@@ -442,6 +464,7 @@ function askFromCase(item: OvieInboxCase): OvieAsk {
     recommendation: item.recommendation,
     why: item.body,
     decidable: item.decisionTarget !== null,
+    actionLabel: ovieAskAction(item.decisionTarget?.kind).actionLabel,
     // Linear asks only accept approval; their discussion lives in Linear.
     canReply:
       item.decisionTarget !== null && item.decisionTarget.kind !== 'linear',

@@ -447,6 +447,7 @@ describe('buildOvieAsks', () => {
         recommendation: 'Approve',
         why: 'Why this matters',
         decidable: true,
+        actionLabel: 'Approve',
         canReply: true,
         evidence: ['https://example.com/receipt'],
       },
@@ -456,6 +457,7 @@ describe('buildOvieAsks', () => {
         recommendation: 'Approve',
         why: 'Why this matters',
         decidable: false,
+        actionLabel: 'Approve',
         canReply: false,
         evidence: ['https://example.com/receipt'],
       },
@@ -465,10 +467,28 @@ describe('buildOvieAsks', () => {
         recommendation: 'Approve',
         why: 'Why this matters',
         decidable: true,
+        actionLabel: 'Mark done',
         canReply: false,
         evidence: ['https://example.com/receipt'],
       },
     ]);
+  });
+
+  it('names certification as certify rather than approve', () => {
+    const inbox: OvieInbox = {
+      cases: [
+        {
+          ...inboxCase('cert', 'needs_you'),
+          decisionTarget: {
+            kind: 'certification',
+            id: 'cert',
+            evidenceDigest: 'digest',
+          },
+        },
+      ],
+      issues: [],
+    };
+    expect(buildOvieAsks(inbox)[0]?.actionLabel).toBe('Certify');
   });
 });
 
