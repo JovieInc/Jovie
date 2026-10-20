@@ -42,13 +42,17 @@ one PR, or record a justified no-op. Then write a receipt.
 2. Summer runtime: `curl -s https://summer.jov.ie/runtime/v1/health` and
    `/runtime/v1/identity`. Note every `status` that is not `verified`/`up`, the
    `criticalPath.blocking` issues, and the deployed `sourceRevision`.
-3. Shipping lanes: `curl -s https://api.github.com/gists/07ec460956451da7632fe852934f21c5`
-   and read `files["lanes-status.json"].content` (and `-details.json` only if
-   needed). Note red or stale lanes and SLO breaches.
+3. Shipping lanes: `curl -s https://gist.githubusercontent.com/itstimwhite/07ec460956451da7632fe852934f21c5/raw/lanes-status.json`
+   (raw gist files are not API rate limited; `lanes-status-details.json` only
+   if needed). Note red or stale lanes and SLO breaches.
 4. Repos are mounted at `/workspace/Jovie` and `/workspace/summer-config`.
    Use `git log --since=7.days`, recent failing check names
    (`curl -s https://api.github.com/repos/JovieInc/<repo>/commits/main/check-runs`)
    and open PRs to see what is already being fixed. Skip anything with an open PR.
+   Unauthenticated api.github.com calls share a 60/hour quota and are often
+   exhausted; when they are, use git (authenticated by the repo proxy) instead:
+   `git ls-remote origin 'refs/pull/*/head'` for open PR heads and `git fetch`
+   for branches. Record `github-api-rate-limited` rather than guessing.
 5. Linear: only if `$LINEAR_API_KEY` is set, query open issues labelled
    `summer` or `ops` via `https://api.linear.app/graphql`. If it is not set,
    record `linear-unavailable` in the receipt and continue.

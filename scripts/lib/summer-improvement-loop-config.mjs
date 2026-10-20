@@ -59,6 +59,7 @@ export const EXPECTED_REPOS = [
 export const ALLOWED_HOSTS = new Set([
   'summer.jov.ie',
   'api.github.com',
+  'gist.githubusercontent.com',
   'github.com',
   'codeload.github.com',
   'objects.githubusercontent.com',
