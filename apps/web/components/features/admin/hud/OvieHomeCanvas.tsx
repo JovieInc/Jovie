@@ -2,7 +2,10 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ChatOpsDataCard } from '@/components/jovie/components/ChatOpsDataCard';
+import type { HomeCanvasState } from '@/components/jovie/types';
 import {
+  HomeLoopAnswerPanel,
   HomeLoopCanvas,
   type HomeLoopCopy,
   type HomeLoopSectionStatus,
@@ -10,6 +13,10 @@ import {
 import { useUndoableAnswers } from '@/components/organisms/home-loop/useUndoableAnswers';
 import { APP_ROUTES } from '@/constants/routes';
 import type { HomeLoopAsk } from '@/lib/home-loop/contract';
+import {
+  buildCanvasTurns,
+  partitionCanvasCards,
+} from '@/lib/ovie/home/canvas-turns';
 import {
   buildOvieAsks,
   buildOvieHomeShipping,
@@ -20,6 +27,7 @@ import {
 } from '@/lib/ovie/home/shipping-home';
 import { inboxDecisionRequest, type OvieInbox } from '@/lib/ovie/inbox';
 import { FREQUENT_CACHE } from '@/lib/queries/cache-strategies';
+import { useCanvasHistory } from './useCanvasHistory';
 import { useHudShippingStateQuery } from './useHudShippingStateQuery';
 
 const OVIE_HOME_COPY: HomeLoopCopy = {
@@ -71,7 +79,9 @@ async function fetchInbox(signal: AbortSignal): Promise<OvieInbox> {
  * Shipping comes from `ovie.shipping-state.v1` and asks from the Ovie inbox;
  * this component adds no polling of its own beyond those existing queries.
  */
-export function OvieHomeCanvas() {
+export function OvieHomeCanvas({
+  chat,
+}: Readonly<{ readonly chat?: HomeCanvasState }> = {}) {
   const queryClient = useQueryClient();
   const shipping = useHudShippingStateQuery(null);
   const inbox = useQuery<OvieInbox>({
@@ -195,8 +205,54 @@ export function OvieHomeCanvas() {
       ? `Some sources are unavailable. ${inbox.data.issues.join(' ')}`
       : null;
 
+  const turns = useMemo(
+    () => buildCanvasTurns(chat?.messages ?? [], chat?.isStreaming ?? false),
+    [chat?.messages, chat?.isStreaming]
+  );
+  const history = useCanvasHistory(turns.length);
+  const turn = history.index >= 0 ? turns[history.index] : undefined;
+  const generated = turn ? partitionCanvasCards(turn.cards) : null;
+  const answerPanel = turn ? (
+    <HomeLoopAnswerPanel
+      prompt={turn.prompt}
+      reply={turn.reply}
+      pending={turn.pending}
+      position={history.index + 1}
+      total={turns.length}
+      onBack={history.back}
+      onForward={history.forward}
+      onHome={history.home}
+      onOpenTranscript={() => chat?.onOpenTranscript()}
+    >
+      {generated?.answer.length
+        ? generated.answer.map((card, index) => (
+            <ChatOpsDataCard
+              // Cards are positional within one immutable turn.
+              key={`${turn.id}:${card.kind}:${card.title}:${index}`}
+              card={card}
+            />
+          ))
+        : null}
+    </HomeLoopAnswerPanel>
+  ) : null;
+  const inFlightOverride = generated?.inFlight.length ? (
+    <div
+      className='flex flex-col gap-2'
+      data-testid='home-loop-in-flight-generated'
+    >
+      {generated.inFlight.map((card, index) => (
+        <ChatOpsDataCard
+          key={`${turn?.id}:${card.kind}:${card.title}:${index}`}
+          card={card}
+        />
+      ))}
+    </div>
+  ) : undefined;
+
   return (
     <HomeLoopCanvas
+      answer={answerPanel}
+      inFlightOverride={inFlightOverride}
       copy={OVIE_HOME_COPY}
       stages={OVIE_SHIP_STAGES}
       constraint={constraint}
