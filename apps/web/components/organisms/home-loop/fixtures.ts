@@ -66,6 +66,13 @@ export const HOME_LOOP_FIXTURE_ASKS: readonly HomeLoopAsk[] = [
     decidable: true,
     canReply: true,
     evidence: ['https://vercel.com/docs/builds/managing-builds'],
+    decisionDefault: {
+      decision: 'approve',
+      summary: 'Enable it for project jovie only',
+      deadline: '2026-10-22T12:00:00.000Z',
+      declared: true,
+    },
+    canFeedback: true,
   },
   {
     id: 'lyb-review',
@@ -75,6 +82,8 @@ export const HOME_LOOP_FIXTURE_ASKS: readonly HomeLoopAsk[] = [
     decidable: true,
     canReply: false,
     evidence: [],
+    decisionDefault: null,
+    canFeedback: false,
   },
 ];
 
