@@ -1,0 +1,437 @@
+{
+  "schema": "jovie.spend-ledger/v1",
+  "description": "Per-provider balance, burn, runway and caps. Metadata only. Snapshots are dated readings; the live check overlays fresh reads where a read path exists.",
+  "updatedAt": "2026-10-20T20:00:00Z",
+  "thresholds": {
+    "runwayAlertDays": 14,
+    "capAlertPercents": [50, 80, 100],
+    "observationMaxAgeDays": 8
+  },
+  "providers": [
+    {
+      "id": "vercel-ai-gateway-credits",
+      "label": "Vercel AI Gateway credit balance (team jovie)",
+      "provider": "vercel",
+      "owner": "tim",
+      "kind": "prepaid-credit",
+      "cap": null,
+      "snapshot": {
+        "observedAt": "2026-10-20T19:51:34Z",
+        "balanceUsd": 21.23,
+        "totalUsedUsd": 559.4,
+        "source": "ai-gateway /v1/credits via short-lived OIDC token"
+      },
+      "burnPerDayUsd": {
+        "value": 1.4,
+        "source": "operator-estimate-2026-10-20",
+        "observedAt": "2026-10-20T20:10:00Z"
+      },
+      "readPath": {
+        "method": "GET https://ai-gateway.vercel.sh/v1/credits with AI_GATEWAY_API_KEY or VERCEL_OIDC_TOKEN",
+        "live": "gateway-credits"
+      },
+      "notes": "Shared by every Gateway key and project, including Summer. Auto-reload is off/unverified. The live check measures burn as the total_used slope from this snapshot."
+    },
+    {
+      "id": "summer-gateway-monthly",
+      "label": "Summer standing AI Gateway budget",
+      "provider": "summer-config",
+      "owner": "summer-config",
+      "kind": "capped-spend",
+      "cap": {
+        "amountUsd": 100,
+        "period": "month",
+        "enforcement": "software-breaker",
+        "periodKey": "2026-10"
+      },
+      "snapshot": null,
+      "readPath": {
+        "method": "Summer private ledger (summer-company/provider-budget); exposed through Summer receipts, not a public API",
+        "live": null
+      },
+      "notes": "Funded only by the shared Gateway credit balance (no purchases, no top-up). At the full $100/month pace ($3.33/day) the $21 balance lasts about 6 days, so the balance, not this cap, is the binding limit."
+    },
+    {
+      "id": "gateway-budget-jovie-eve-shadow",
+      "label": "AI Gateway project budget: jovie-eve-shadow (Summer)",
+      "provider": "vercel",
+      "owner": "summer-config",
+      "kind": "capped-spend",
+      "cap": {
+        "amountUsd": 5,
+        "period": "day",
+        "enforcement": "provider-hard",
+        "periodKey": "daily"
+      },
+      "snapshot": {
+        "observedAt": "2026-10-20T19:50:00Z",
+        "spentUsd": 0.01,
+        "source": "vercel ai-gateway budgets ls --scope jovie"
+      },
+      "readPath": {
+        "method": "vercel ai-gateway budgets ls --scope jovie",
+        "live": null
+      }
+    },
+    {
+      "id": "gateway-budget-jovie",
+      "label": "AI Gateway project budget: jovie",
+      "provider": "vercel",
+      "owner": "jovie-web",
+      "kind": "capped-spend",
+      "cap": {
+        "amountUsd": 5,
+        "period": "day",
+        "enforcement": "provider-hard",
+        "periodKey": "daily"
+      },
+      "snapshot": {
+        "observedAt": "2026-10-20T19:50:00Z",
+        "spentUsd": 0.0,
+        "source": "vercel ai-gateway budgets ls --scope jovie"
+      },
+      "readPath": {
+        "method": "vercel ai-gateway budgets ls --scope jovie",
+        "live": null
+      }
+    },
+    {
+      "id": "gateway-key-jovie-production",
+      "label": "AI Gateway key budget: Jovie_Production",
+      "provider": "vercel",
+      "owner": "jovie-web",
+      "kind": "capped-spend",
+      "cap": {
+        "amountUsd": 20,
+        "period": "month",
+        "enforcement": "provider-hard",
+        "periodKey": "2026-10"
+      },
+      "snapshot": {
+        "observedAt": "2026-10-20T19:50:00Z",
+        "spentUsd": 6.21,
+        "source": "vercel ai-gateway budgets ls --scope jovie"
+      },
+      "readPath": {
+        "method": "vercel ai-gateway budgets ls --scope jovie",
+        "live": null
+      }
+    },
+    {
+      "id": "gateway-key-golden-path-review",
+      "label": "AI Gateway key budget: jovie-golden-path-review",
+      "provider": "vercel",
+      "owner": "ci",
+      "kind": "capped-spend",
+      "cap": {
+        "amountUsd": 10,
+        "period": "month",
+        "enforcement": "provider-hard",
+        "periodKey": "2026-10"
+      },
+      "snapshot": {
+        "observedAt": "2026-10-20T19:50:00Z",
+        "spentUsd": 0.18,
+        "source": "vercel ai-gateway budgets ls --scope jovie"
+      },
+      "readPath": {
+        "method": "vercel ai-gateway budgets ls --scope jovie",
+        "live": null
+      }
+    },
+    {
+      "id": "vercel-team-usage",
+      "label": "Vercel team usage (jovie, Pro)",
+      "provider": "vercel",
+      "owner": "tim",
+      "kind": "capped-spend",
+      "cap": null,
+      "snapshot": {
+        "observedAt": "2026-10-20T19:00:00Z",
+        "spentUsd": 14.62,
+        "window": "2026-10-05..2026-10-19 billed usage excl. Pro seat",
+        "source": "GET /v1/billing/charges"
+      },
+      "burnPerDayUsd": {
+        "value": 1.04,
+        "source": "billing-charges-14d-mean",
+        "observedAt": "2026-10-20T19:00:00Z"
+      },
+      "readPath": {
+        "method": "GET https://api.vercel.com/v1/billing/charges?teamId=\u2026",
+        "live": null
+      },
+      "notes": "Spend Management cap amount and its 50/75/100% notifications live in the dashboard (docs/COST_MONITORING.md Layer 0); the cap value is not readable by API."
+    },
+    {
+      "id": "vercel-on-demand-builds",
+      "label": "Vercel on-demand build concurrency (jovie prod/staging)",
+      "provider": "vercel",
+      "owner": "ci",
+      "kind": "capped-spend",
+      "cap": {
+        "amountUsd": 10,
+        "period": "month",
+        "enforcement": "ledger-cutoff-at-8",
+        "periodKey": "billing-period"
+      },
+      "snapshot": null,
+      "readPath": {
+        "method": ".github/scripts/vercel-on-demand-ledger.mjs (runs before each staging/production deploy)",
+        "live": null
+      },
+      "notes": "EVENT 2026-10-20 (Tim). The ledger turns on-demand off at $8 actual or projected and warns at $5."
+    },
+    {
+      "id": "cloudflare-credits",
+      "label": "Cloudflare Startup Program credits (Tim@jov.ie's Account)",
+      "provider": "cloudflare",
+      "owner": "tim",
+      "kind": "prepaid-credit",
+      "cap": {
+        "amountUsd": 10000,
+        "period": "total",
+        "enforcement": "credit",
+        "periodKey": "startup-2026-06-09"
+      },
+      "snapshot": {
+        "observedAt": "2026-10-20T20:25:00Z",
+        "balanceUsd": 10000,
+        "spentUsd": 0,
+        "source": "Cloudflare dashboard Billing > Credits (browser read)"
+      },
+      "readPath": {
+        "method": "Cloudflare dashboard Billing > Credits (no credit API found)",
+        "live": null
+      },
+      "notes": "Programme started 2026-06-09; 0% used. Credits exclude Registrar and AI Gateway; R2 capped at $10k, Workers AI at $50k.",
+      "expiries": [
+        {
+          "id": "startup-credits",
+          "label": "Startup Program credits expire",
+          "expiresAt": "2027-06-09T00:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "hyperagent-credits",
+      "label": "Hyperagent Founding 500 credits",
+      "provider": "hyperagent",
+      "owner": "gem-lanes",
+      "kind": "prepaid-credit",
+      "cap": {
+        "amountUsd": 20000,
+        "period": "total",
+        "enforcement": "credit",
+        "periodKey": "founding-500"
+      },
+      "snapshot": {
+        "observedAt": "2026-10-20T20:22:00Z",
+        "spentUsd": 14320.15,
+        "balanceUsd": 5679.85,
+        "periodUsageUsd": 1095.82,
+        "source": "Hyperagent Settings > Usage (browser read)"
+      },
+      "readPath": {
+        "method": "Hyperagent Settings > Usage (no API found)",
+        "live": null
+      },
+      "burnPerDayUsd": {
+        "value": 47.6,
+        "source": "current-period-usage $1,095.82 over ~23 days (estimate)",
+        "observedAt": "2026-10-20T20:22:00Z"
+      },
+      "notes": "Plan: Founding 500, $200/year, $0 included usage; usage is covered by bonus credits. 30-day tokens 10.8B (peak 2.32B/day). Mostly GLM 5.3 and Kimi K3."
+    },
+    {
+      "id": "anthropic-api-credit",
+      "label": "Claude API monthly credit",
+      "provider": "anthropic",
+      "owner": "tim",
+      "kind": "credit-grant",
+      "cap": {
+        "amountUsd": 200,
+        "period": "month",
+        "enforcement": "credit",
+        "periodKey": "2026-10"
+      },
+      "snapshot": null,
+      "readPath": {
+        "method": "Anthropic Admin API usage/cost report; needs an admin key, which no store holds",
+        "live": null
+      }
+    },
+    {
+      "id": "managed-agents-loop",
+      "label": "Claude Managed Agents loop",
+      "provider": "anthropic",
+      "owner": "gem-lanes",
+      "kind": "capped-spend",
+      "cap": {
+        "amountUsd": 150,
+        "period": "month",
+        "enforcement": "software ($1/session)",
+        "periodKey": "2026-10"
+      },
+      "snapshot": null,
+      "readPath": {
+        "method": "Managed Agents session ledger (worker building, 2026-10-20)",
+        "live": null
+      },
+      "notes": "Draws on the $200/month Claude API credit."
+    },
+    {
+      "id": "codex-current-login",
+      "label": "Codex subscription capacity: current-login (pro)",
+      "provider": "openai",
+      "owner": "gem-lanes",
+      "kind": "subscription-capacity",
+      "cap": null,
+      "snapshot": {
+        "observedAt": "2026-10-20T19:00:05Z",
+        "remainingPercent": 99,
+        "windowResetsAt": "2026-10-27T08:57:13Z",
+        "lastKind": "ok",
+        "source": "Gem ~/.local/state/jovie-lanes/codex-accounts.json"
+      },
+      "expiries": [
+        {
+          "id": "banked-reset-1",
+          "label": "banked rate-limit reset redemption deadline",
+          "expiresAt": "2026-11-06T23:35:26Z"
+        }
+      ],
+      "readPath": {
+        "method": "Gem codex-accounts.json (account/rateLimits/read)",
+        "live": "codex-ledger"
+      }
+    },
+    {
+      "id": "codex-fourth",
+      "label": "Codex subscription capacity: fourth (pro)",
+      "provider": "openai",
+      "owner": "gem-lanes",
+      "kind": "subscription-capacity",
+      "cap": null,
+      "snapshot": {
+        "observedAt": "2026-10-07T18:08:23Z",
+        "remainingPercent": 83,
+        "windowResetsAt": "2026-10-14T03:28:22Z",
+        "lastKind": "ok",
+        "source": "Gem ~/.local/state/jovie-lanes/codex-accounts.json"
+      },
+      "expiries": [
+        {
+          "id": "banked-reset-1",
+          "label": "banked rate-limit reset redemption deadline",
+          "expiresAt": "2026-10-29T19:10:07Z"
+        }
+      ],
+      "readPath": {
+        "method": "Gem codex-accounts.json (account/rateLimits/read)",
+        "live": "codex-ledger"
+      }
+    },
+    {
+      "id": "codex-jovie",
+      "label": "Codex subscription capacity: jovie (pro)",
+      "provider": "openai",
+      "owner": "gem-lanes",
+      "kind": "subscription-capacity",
+      "cap": null,
+      "snapshot": {
+        "observedAt": "2026-10-07T16:06:02Z",
+        "remainingPercent": 99,
+        "windowResetsAt": "2026-10-14T03:28:18Z",
+        "lastKind": "ok",
+        "source": "Gem ~/.local/state/jovie-lanes/codex-accounts.json"
+      },
+      "expiries": [],
+      "readPath": {
+        "method": "Gem codex-accounts.json (account/rateLimits/read)",
+        "live": "codex-ledger"
+      }
+    },
+    {
+      "id": "codex-lyb-pro",
+      "label": "Codex subscription capacity: lyb-pro (pro)",
+      "provider": "openai",
+      "owner": "gem-lanes",
+      "kind": "subscription-capacity",
+      "cap": null,
+      "snapshot": {
+        "observedAt": "2026-10-20T18:50:14Z",
+        "remainingPercent": 95,
+        "windowResetsAt": "2026-10-27T06:52:38Z",
+        "lastKind": "ok",
+        "source": "Gem ~/.local/state/jovie-lanes/codex-accounts.json"
+      },
+      "expiries": [
+        {
+          "id": "banked-reset-1",
+          "label": "banked rate-limit reset redemption deadline",
+          "expiresAt": "2026-11-06T23:36:10Z"
+        }
+      ],
+      "readPath": {
+        "method": "Gem codex-accounts.json (account/rateLimits/read)",
+        "live": "codex-ledger"
+      }
+    },
+    {
+      "id": "codex-meetjovie",
+      "label": "Codex subscription capacity: meetjovie (pro)",
+      "provider": "openai",
+      "owner": "gem-lanes",
+      "kind": "subscription-capacity",
+      "cap": null,
+      "snapshot": {
+        "observedAt": "2026-10-07T15:05:12Z",
+        "remainingPercent": 99,
+        "windowResetsAt": "2026-10-14T03:28:18Z",
+        "lastKind": "ok",
+        "source": "Gem ~/.local/state/jovie-lanes/codex-accounts.json"
+      },
+      "expiries": [],
+      "readPath": {
+        "method": "Gem codex-accounts.json (account/rateLimits/read)",
+        "live": "codex-ledger"
+      }
+    },
+    {
+      "id": "codex-tim-jov-ie",
+      "label": "Codex subscription capacity: tim-jov-ie (unknown plan)",
+      "provider": "openai",
+      "owner": "gem-lanes",
+      "kind": "subscription-capacity",
+      "cap": null,
+      "snapshot": null,
+      "expiries": [],
+      "readPath": {
+        "method": "Gem codex-accounts.json (account/rateLimits/read)",
+        "live": "codex-ledger"
+      },
+      "notes": "Last run failed auth; no capacity reading."
+    },
+    {
+      "id": "codex-timwhite-co",
+      "label": "Codex subscription capacity: timwhite-co (pro)",
+      "provider": "openai",
+      "owner": "gem-lanes",
+      "kind": "subscription-capacity",
+      "cap": null,
+      "snapshot": {
+        "observedAt": "2026-10-07T18:08:23Z",
+        "remainingPercent": 99,
+        "windowResetsAt": "2026-10-14T08:04:05Z",
+        "lastKind": "ok",
+        "source": "Gem ~/.local/state/jovie-lanes/codex-accounts.json"
+      },
+      "expiries": [],
+      "readPath": {
+        "method": "Gem codex-accounts.json (account/rateLimits/read)",
+        "live": "codex-ledger"
+      }
+    }
+  ]
+}

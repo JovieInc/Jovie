@@ -183,6 +183,15 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
     /^(apps\/(web|ovie|extension)\/|packages\/(action-contracts|audio-contracts|brand|extension-contracts|jovie-cli|ui)\/|workers\/(observability-ingest|canary-otp|knowledge-ingest)\/|app\/|content\/|lib\/|trigger\/|creator_profiles\/|vercel\.json$|\.vercelignore$|skills\/jovie\/(SKILL\.md|README\.md|LICENSE)$|\.github\/workflows\/(production-release|production-marker-recovery|postdeploy-probes|canary-health-gate)\.yml$)/,
   ],
   [
+    // @jovie/api-client: the shared third-party API client used by scripts,
+    // lanes (via scripts/apiclient) and CI shell steps. No product app imports
+    // it yet; move it to shared-contract when one does.
+    'operations-api-client',
+    'operations-tooling',
+    [],
+    /^packages\/api-client\//,
+  ],
+  [
     'operations-tooling',
     'operations-tooling',
     [],
