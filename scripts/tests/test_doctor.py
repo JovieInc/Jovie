@@ -432,6 +432,14 @@ class JudgeTest(unittest.TestCase):
         self.assertIn("provider-down:devin", alerts)
         self.assertNotIn("provider-idle:devin", alerts)
 
+    def test_started_issues_without_a_live_owner_escalate_after_the_grace(self):
+        quiet = doctor.judge(obs(ownership={"started": 536, "ownerless": 3, "overGrace": 0}))
+        self.assertNotIn("started-without-owner", quiet)  # inside the grace period
+        loud = doctor.judge(obs(ownership={"started": 536, "ownerless": 40, "overGrace": 40,
+                                           "oldestOwnerlessS": 7200,
+                                           "unresolved": {"post-merge-without-merged-evidence": 40}}))
+        self.assertIn("40 started JOV issues", loud["started-without-owner"])
+
     def test_linear_and_codex_failures_are_their_own_alerts(self):
         self.assertIn("linear-down", doctor.judge(obs(linearError="HTTPError: 429", pool=None)))
         self.assertIn("codex-broken", doctor.judge(obs(codex={"error": "no codex", "accounts": {}, "available": []})))

@@ -65,7 +65,10 @@ class FakeLinear:
             return {"issueRemoveLabel": {"success": True, "issue": {"labels": {"nodes": left}}}}
         raise AssertionError(query)
 
-    def move(self, issue_id, state):
+    def move(self, issue_id, state, owner=None):
+        # The started-state guard: a fake client enforces it like the real one.
+        if state in ("In Progress", "In Review", "Rework", "Merging", "Validating") and not owner:
+            raise AssertionError(f"{state} without an owner")
         self.moves.append((issue_id, state))
 
     def comment(self, issue_id, body):

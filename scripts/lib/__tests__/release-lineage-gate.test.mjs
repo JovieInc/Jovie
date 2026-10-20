@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import {
   chmodSync,
   mkdirSync,
@@ -51,6 +51,9 @@ function runGate({
   buildInfoFails = false,
   starvationSeconds = 5400,
   inFlight = false,
+  // Queued successors with staging evidence: { sha, staging: 'deployed' |
+  // 'superseded' | 'not_applicable' | 'failure' | 'missing' | 'no-artifact' }.
+  successors = /** @type {{sha: string, staging: string}[]} */ ([]),
 } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'lineage-gate-'));
   tempRoots.push(root);
@@ -70,9 +73,51 @@ function runGate({
           id: 101 + i,
           status: 'pending',
         })),
+        ...successors.map((successor, i) => ({
+          id: 201 + i,
+          status: 'pending',
+          display_title: `Production Controller ${successor.sha} from CI ${301 + i} attempt 1`,
+        })),
         { id: 50, status: 'pending' },
       ],
     });
+  const extraRoutes = {};
+  const stagingRuns = [];
+  successors.forEach((successor, i) => {
+    if (successor.staging === 'missing') return;
+    const stagingId = 401 + i;
+    stagingRuns.push({
+      id: stagingId,
+      run_attempt: 1,
+      status: 'completed',
+      conclusion: successor.staging === 'failure' ? 'failure' : 'success',
+      display_title: `${successor.sha} from CI ${301 + i} attempt 1`,
+    });
+    const artifacts =
+      successor.staging === 'no-artifact'
+        ? []
+        : [{ id: 501 + i, name: 'staging-completion-1', expired: false }];
+    extraRoutes[
+      `repos/JovieInc/Jovie/actions/runs/${stagingId}/artifacts?per_page=100`
+    ] = JSON.stringify({ total_count: artifacts.length, artifacts });
+    const dir = join(root, `zip-${501 + i}`);
+    mkdirSync(dir);
+    writeFileSync(
+      join(dir, 'staging-completion.json'),
+      JSON.stringify({ sha: successor.sha, outcome: successor.staging })
+    );
+    execFileSync(
+      'zip',
+      ['-q', join(root, `${501 + i}.zip`), 'staging-completion.json'],
+      {
+        cwd: dir,
+      }
+    );
+  });
+  extraRoutes[
+    'repos/JovieInc/Jovie/actions/workflows/staging-controller.yml/runs?branch=main&event=workflow_run&per_page=50'
+  ] = JSON.stringify({ workflow_runs: stagingRuns });
+  writeFileSync(join(root, 'routes.json'), JSON.stringify(extraRoutes));
   const compare = compareFails
     ? ''
     : JSON.stringify({
@@ -93,7 +138,8 @@ cat <<'JSON'
 ${runs}
 JSON
   ;;
-  *) exit 1 ;;
+  */zip) id="\${2%/zip}"; cat "${root}/\${id##*/}.zip" ;;
+  *) exec node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"))[process.argv[2]];if(r===undefined)process.exit(1);process.stdout.write(r)' "${root}/routes.json" "$2" ;;
 esac
 `
   );
@@ -297,6 +343,54 @@ describe('release lineage gate', () => {
       unshipped_commits: '0',
     });
   });
+
+  it('does not yield to queued successors whose staging cannot ship (2026-10-20, run 39460322150)', () => {
+    // 826b00a held a deployed staging generation, but four queued successors
+    // were superseded in staging by a397d64, whose staging canary then failed.
+    // Yielding to them left production on 060037d with no generation able to
+    // promote.
+    const run = runGate({
+      main: NEWER_SHA,
+      inFlight: true,
+      successors: [
+        { sha: 'd'.repeat(40), staging: 'superseded' },
+        { sha: 'e'.repeat(40), staging: 'superseded' },
+        { sha: 'f'.repeat(40), staging: 'superseded' },
+        { sha: '1'.repeat(40), staging: 'failure' },
+      ],
+    });
+    expect(run.result.status, run.result.stderr).toBe(0);
+    expect(run.decision).toBe('decision=proceed');
+    expect(run.outputs).toMatchObject({
+      successor_pending: 'false',
+      skipped_successors: '4',
+      gate_decision: 'proceed',
+    });
+    expect(run.outputs.gate_reason).toContain(
+      '4 queued successor(s) cannot ship'
+    );
+    expect(run.result.stderr).toContain('staging 404 concluded failure');
+    expect(run.result.stderr).toContain('staging 401 finished superseded');
+  });
+
+  it.each(['deployed', 'not_applicable', 'missing', 'no-artifact'])(
+    'still yields to a newer successor whose staging is %s or unknown',
+    staging => {
+      const run = runGate({
+        main: NEWER_SHA,
+        successors: [
+          { sha: 'd'.repeat(40), staging: 'superseded' },
+          { sha: 'e'.repeat(40), staging },
+        ],
+      });
+      expect(run.result.status, run.result.stderr).toBe(0);
+      expect(run.decision).toBe('decision=yield');
+      expect(run.outputs).toMatchObject({
+        successor_pending: 'true',
+        skipped_successors: '0',
+      });
+    }
+  );
 
   it('fails closed on malformed inputs', () => {
     const run = runGate({ main: 'not-a-sha' });
