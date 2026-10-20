@@ -186,6 +186,10 @@ export async function observeEntry(entry, context) {
   return null;
 }
 
+/**
+ * @typedef {(url: string, init?: any) => Promise<{status: number, json: () => Promise<any>}>} FetchLike
+ * @param {{registry: any, fetchImpl?: FetchLike, token?: string, nowMs?: number}} options
+ */
 export async function runLiveness({
   registry,
   fetchImpl = fetch,
@@ -329,7 +333,7 @@ export async function main({
         apiKey: env.LINEAR_API_KEY,
       });
       process.stdout.write(
-        `${JSON.stringify({ fingerprint: decision.fingerprint, action: decision.action, ok: result.ok, reason: result.reason ?? null })}\n`
+        `${JSON.stringify({ fingerprint: decision.fingerprint, action: decision.action, ok: result.ok, reason: 'reason' in result ? result.reason : null })}\n`
       );
       // Keep the prior state when filing failed so the next run retries.
       if (!result.ok)

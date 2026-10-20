@@ -34,7 +34,7 @@ export function hasCronSchedule(source = '') {
 }
 
 export const REGISTRY_SCHEMA = 'jovie-automation-registry/v1';
-export const REGISTRY_PATH = 'ops/automation/registry.json';
+export const REGISTRY_PATH = 'ops/automation/registry.jsonl';
 export const LIVENESS_SCHEMA = 'jovie-automation-liveness/v1';
 // Shared with the stage-instrumentation contract (scripts/lib/stage-events.mjs,
 // docs/metrics/stage-manifest.json entity `automation-run`).
@@ -85,6 +85,7 @@ export function validateRegistry(registry) {
   const errors = [];
   if (!registry || typeof registry !== 'object')
     return ['registry must be an object'];
+  for (const message of registry.parseErrors ?? []) errors.push(message);
   if (registry.schema !== REGISTRY_SCHEMA)
     errors.push(`schema must be ${REGISTRY_SCHEMA}`);
   const entries = Array.isArray(registry.entries) ? registry.entries : null;
@@ -504,6 +505,28 @@ export function readPath(value, path) {
     );
 }
 
+/**
+ * The registry is JSON Lines: line 1 is the header ({ schema, ... }), every
+ * later non-blank line is one automation. One line per automation keeps each
+ * change a one-line, auditable diff. Unparseable lines surface as
+ * `parseErrors`, which validateRegistry reports.
+ */
+export function parseRegistry(text = '') {
+  const lines = String(text).split('\n');
+  const parseErrors = [];
+  const rows = [];
+  for (const [index, line] of lines.entries()) {
+    if (!line.trim()) continue;
+    try {
+      rows.push(JSON.parse(line));
+    } catch {
+      parseErrors.push(`line ${index + 1}: invalid JSON`);
+    }
+  }
+  const [header = {}, ...entries] = rows;
+  return { ...header, entries, parseErrors };
+}
+
 export function loadRegistry(repoRoot) {
-  return JSON.parse(readFileSync(join(repoRoot, REGISTRY_PATH), 'utf8'));
+  return parseRegistry(readFileSync(join(repoRoot, REGISTRY_PATH), 'utf8'));
 }
