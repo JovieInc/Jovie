@@ -1689,7 +1689,12 @@ class _GistApiFake:
             self.after_write()
             if method == "POST" and self.ambiguous_create:
                 return SimpleNamespace(returncode=0, stdout="", stderr="")
-        files = {name: {"content": content, "truncated": False} for name, content in self.files.items()}
+        files = {name: {"content": content, "truncated": False, "size": len(content.encode("utf-8"))}
+                 for name, content in self.files.items()}
+        if method == "GET" and self.readback_mode == "stage-truncated":
+            files["stage-events.ndjson"].update(content=files["stage-events.ndjson"]["content"][:10], truncated=True)
+        if method == "GET" and self.readback_mode == "stage-short":
+            files["stage-events.ndjson"].update(content="", truncated=True, size=5)
         if method == "GET" and self.readback_mode == "changed":
             files["lanes-status-details.json"]["content"] += "\n"
         if method == "GET" and self.readback_mode == "truncated":
@@ -1734,6 +1739,60 @@ class PublishTest(unittest.TestCase):
                                                 "diagnostic": "x" * 1024} for i in range(row_count)]}],
             },
         }
+
+    def ledger(self, rows):
+        (self.state / "runs").mkdir(exist_ok=True)
+        (self.state / "runs" / "ledger.jsonl").write_text("".join(json.dumps(row) + "\n" for row in rows) + "not json\n")
+
+    def test_stage_events_publish_with_the_status_feed_and_only_when_they_change(self):
+        now = time.time()
+        iso = lambda delta: doctor.datetime.fromtimestamp(now - delta, doctor.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        self.ledger([
+            {"runId": "r1", "issue": "JOV-5", "provider": "codex", "startedAt": iso(3600), "endedAt": iso(600),
+             "verdict": "landing", "pr": 22315},
+            {"runId": "r2", "issue": "JOV-6", "provider": "grok", "startedAt": iso(900), "endedAt": iso(300),
+             "verdict": "provider-error"},
+            {"runId": "r3", "kind": "fix-red", "pr": 22301, "headBefore": "0123456789abcdef", "provider": "codex",
+             "startedAt": iso(500), "endedAt": iso(100), "verdict": "fix-no-change"},
+            {"runId": "old", "issue": "JOV-1", "provider": "codex", "startedAt": iso(40 * 86400), "endedAt": iso(29 * 86400)},
+            {"runId": "lyb", "binding": "LYB", "issue": "LYB-1", "provider": "codex", "startedAt": iso(60), "endedAt": iso(30)},
+            {"runId": "adopt", "kind": "adopt", "pr": 1, "provider": "codex", "startedAt": iso(60), "endedAt": iso(30)}])
+        doctor.publish_status(self.host, self.lane, self.feed(1))
+        rows = [json.loads(line) for line in self.api.files["stage-events.ndjson"].splitlines()]
+        self.assertEqual([(r["entityType"], r["entityId"], r["stage"], r["actor"], r["outcome"], r["sourceReceipt"]) for r in rows], [
+            ("shipping", "JovieInc/Jovie#22315", "worker-start", "codex", "advanced", "lanes-ledger:r1"),
+            ("shipping", "JOV-6", "worker-start", "grok", "failed", "lanes-ledger:r2"),
+            ("remediation", "JovieInc/Jovie#22301@0123456789ab", "repair-start", "codex", "failed", "lanes-ledger:r3")])
+        self.assertTrue(all(r["schema"] == "jovie-stage-event/v1" and r["enteredAt"] < r["exitedAt"] for r in rows))
+        writes = self.api.write_count
+        doctor.publish_status(self.host, self.lane, self.feed(1))
+        packet = json.loads((self.state / "lanes-status-publish.json").read_text())
+        self.assertNotIn("stage-events.ndjson", packet["files"], "unchanged rows are not re-uploaded")
+        self.assertEqual(self.api.write_count, writes + 1)
+
+    def test_a_truncated_stage_file_is_read_back_by_its_size(self):
+        now = time.time()
+        iso = lambda delta: doctor.datetime.fromtimestamp(now - delta, doctor.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        self.ledger([{"runId": "r1", "issue": "JOV-5", "provider": "codex", "startedAt": iso(60), "endedAt": iso(30)}])
+        self.api.readback_mode = "stage-truncated"
+        self.assertEqual(doctor.publish_status(self.host, self.lane, self.feed(1)), "https://gist.example/abc123")
+        self.ledger([{"runId": "r2", "issue": "JOV-7", "provider": "codex", "startedAt": iso(60), "endedAt": iso(30)}])
+        self.api.readback_mode = "stage-short"
+        with self.assertRaisesRegex(RuntimeError, "status-gist-readback-unconfirmed"):
+            doctor.publish_status(self.host, self.lane, self.feed(1))
+
+    def test_the_stage_file_is_capped_newest_first(self):
+        now = time.time()
+        rows = [{"runId": f"r{i}", "issue": "JOV-5", "provider": "codex",
+                 "startedAt": doctor.datetime.fromtimestamp(now - 3600 + i, doctor.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                 "endedAt": doctor.datetime.fromtimestamp(now - 1800 + i, doctor.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
+                for i in range(50)]
+        self.ledger(rows)
+        with mock.patch.object(doctor.stage_events, "MAX_BYTES", 1000):
+            text = doctor.stage_events.ndjson(self.state / "runs" / "ledger.jsonl", now)
+        self.assertLessEqual(len(text.encode()), 1000)
+        self.assertIn("lanes-ledger:r49", text)
+        self.assertNotIn("lanes-ledger:r0\"", text)
 
     def test_only_the_primary_host_publishes(self):
         saved = doctor.PRIMARY_FLAG
