@@ -1,9 +1,9 @@
 /**
  * JOV-7350: qualification-only decision routing for the existing screen gate.
  * Declarations describe intent; they are never approval or delivery receipts.
- * No trusted Gem -> Ovie adapter is available in this process. Keep that gap
- * explicit, including when no declaration is supplied. ENGINEERING.md requires
- * ship-cohort qualification before any new delivery requirement is enforced.
+ * This projection performs no delivery. The explicit screen-event-routing
+ * adapter records producer readback separately; declarations grant no authority.
+ * ENGINEERING.md requires ship-cohort qualification before enforcement.
  */
 export const SCREEN_DECISION_SCHEMA = 'screen-decision-declarations/v1';
 const KINDS = Object.freeze({

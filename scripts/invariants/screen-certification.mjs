@@ -1540,6 +1540,30 @@ if (isMain) {
         ...(artifactId ? { artifactId: Number(artifactId) } : {}),
         ...(marketingArtifactName ? { marketingArtifactName } : {}),
       });
+  if (process.argv.includes('--route-event-reviews')) {
+    const { routeScreenEventReviews } = await import(
+      './screen-event-routing.mjs'
+    );
+    const committed = spawnSync(
+      'git',
+      ['show', '-s', '--format=%cI', result.receipt.headSha],
+      {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+        timeout: 5_000,
+      }
+    );
+    result.receipt.decisionRouting = await routeScreenEventReviews(
+      result.receipt.decisionRouting,
+      {
+        issueIdentifier: process.argv
+          .find(arg => arg.startsWith('--decision-issue='))
+          ?.slice('--decision-issue='.length),
+        headCommittedAt:
+          committed.status === 0 ? committed.stdout.trim() : undefined,
+      }
+    );
+  }
   if (receiptOut) {
     // The receipt is the immutable machine record: exact head/base, per-screen
     // verdicts with artifact digest + renderer provenance, and the certified bit.
@@ -1549,7 +1573,7 @@ if (isMain) {
     );
   }
   process.stdout.write(
-    `[${activeGate}] decision-routing=${result.receipt.decisionRouting.status} mode=qualification-only founder-candidates=${result.receipt.decisionRouting.founderReviewCandidates.length} delivery=not-verified\n`
+    `[${activeGate}] decision-routing=${result.receipt.decisionRouting.status} mode=qualification-only founder-candidates=${result.receipt.decisionRouting.founderReviewCandidates.length} delivery=${result.receipt.decisionRouting.deliveryVerified ? 'verified' : 'not-verified'}\n`
   );
   if (result.ok) {
     process.stdout.write(
