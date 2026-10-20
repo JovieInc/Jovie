@@ -30,6 +30,7 @@ interface ActionDialProps {
 const SNAP_MS = 150;
 const SWIPE_STEP_PX = 68;
 const SWIPE_THRESHOLD_PX = 26;
+const TAP_SLOP_PX = 6;
 
 function wrapIndex(index: number, count: number): number {
   return ((index % count) + count) % count;
@@ -62,6 +63,7 @@ export function ActionDial({
     options.findIndex(option => option.id === selectedId)
   );
   const [visualIndex, setVisualIndex] = useState(selectedIndex);
+  const [outgoingIndex, setOutgoingIndex] = useState<number | null>(null);
   const [dragY, setDragY] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [settledTieSign, setSettledTieSign] = useState(1);
@@ -70,6 +72,7 @@ export function ActionDial({
     id: number;
     y: number;
     tapOffset: number | null;
+    moved: boolean;
   } | null>(null);
   const snapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressClickRef = useRef(false);
@@ -95,6 +98,7 @@ export function ActionDial({
         clearTimeout(snapTimerRef.current);
         snapTimerRef.current = null;
       }
+      setOutgoingIndex(null);
       const option = options[index];
       if (!option || option.id === selectedId) return;
       onSelect(option.id);
@@ -108,6 +112,7 @@ export function ActionDial({
       const next = wrapIndex(index, options.length);
       if (options[next]?.id === options[visualIndexRef.current]?.id) return;
       if (snapTimerRef.current) clearTimeout(snapTimerRef.current);
+      setOutgoingIndex(visualIndexRef.current);
       setSettledTieSign(index > visualIndexRef.current ? -1 : 1);
       setVisualIndex(next);
       visualIndexRef.current = next;
@@ -125,14 +130,20 @@ export function ActionDial({
 
   const onPointerDown = useCallback(
     (event: PointerEvent<HTMLFieldSetElement>) => {
-      if (options.length < 2) return;
+      if (options.length < 2 || pointerRef.current) return;
       if (event.pointerType === 'mouse' && event.button !== 0) return;
       const target = event.target instanceof Element ? event.target : null;
       // Leave the fixed action alone so its native link/button activation works.
       if (target?.closest('[data-dsp-provider]')) return;
       const row = target?.closest<HTMLElement>('[data-dial-offset]');
       const tapOffset = row ? Number(row.dataset.dialOffset) : null;
-      pointerRef.current = { id: event.pointerId, y: event.clientY, tapOffset };
+      pointerRef.current = {
+        id: event.pointerId,
+        y: event.clientY,
+        tapOffset,
+        moved: false,
+      };
+      setOutgoingIndex(null);
       setIsDragging(true);
       event.currentTarget.setPointerCapture?.(event.pointerId);
     },
@@ -142,9 +153,9 @@ export function ActionDial({
   const onPointerMove = useCallback(
     (event: PointerEvent<HTMLFieldSetElement>) => {
       if (pointerRef.current?.id !== event.pointerId) return;
-      setDragY(
-        Math.max(-84, Math.min(84, event.clientY - pointerRef.current.y))
-      );
+      const distance = event.clientY - pointerRef.current.y;
+      if (Math.abs(distance) > TAP_SLOP_PX) pointerRef.current.moved = true;
+      setDragY(Math.max(-84, Math.min(84, distance)));
     },
     []
   );
@@ -159,22 +170,23 @@ export function ActionDial({
         setSettledTieSign(distance > 0 ? -1 : 1);
       setDragY(0);
       setIsDragging(false);
-      if (canceled) return;
-      if (!Number.isFinite(distance)) return;
-      if (Math.abs(distance) < SWIPE_THRESHOLD_PX) {
-        if (start.tapOffset !== null) {
-          suppressClickRef.current = true;
-          setTimeout(() => {
-            suppressClickRef.current = false;
-          }, 0);
-          select(visualIndexRef.current + start.tapOffset);
-        }
-        return;
-      }
+      // A captured drag can still synthesize a click on its starting row.
       suppressClickRef.current = true;
       setTimeout(() => {
         suppressClickRef.current = false;
       }, 0);
+      if (canceled) return;
+      if (!Number.isFinite(distance)) return;
+      if (Math.abs(distance) < SWIPE_THRESHOLD_PX) {
+        if (
+          !start.moved &&
+          Math.abs(distance) <= TAP_SLOP_PX &&
+          start.tapOffset !== null
+        ) {
+          select(visualIndexRef.current + start.tapOffset);
+        }
+        return;
+      }
       // One swipe settles the adjacent provider actually shown in the track.
       select(visualIndexRef.current + (distance < 0 ? 1 : -1));
     },
@@ -204,8 +216,14 @@ export function ActionDial({
             <span
               key={option.id}
               className={cn(
-                'absolute inset-0 transition duration-subtle ease-subtle motion-reduce:transition-none',
-                isDragging && 'transition-none',
+                'absolute inset-0 transition-transform duration-subtle ease-out motion-reduce:transition-none',
+                // Other providers wrap between clipped edges. Animating that
+                // rebase would sweep an unrelated icon through the action.
+                (isDragging ||
+                  (outgoingIndex !== null &&
+                    index !== visualIndex &&
+                    index !== outgoingIndex)) &&
+                  'transition-none',
                 Math.abs(offset) <= 1 ? 'opacity-100' : 'opacity-0'
               )}
               style={{

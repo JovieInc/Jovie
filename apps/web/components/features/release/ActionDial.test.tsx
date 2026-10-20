@@ -225,14 +225,109 @@ describe('ActionDial', () => {
     });
   });
 
+  it.each([103, 120])(
+    'returns a partial row drag ending at %i without selecting the tapped row',
+    endY => {
+      vi.useFakeTimers();
+      const onSelect = vi.fn();
+      render(<Fixture onSelect={onSelect} />);
+      const row = screen.getByRole('button', { name: 'Select Apple Music' });
+      dispatchTouchPointer(row, 'pointerdown', 120);
+      dispatchTouchPointer(row, 'pointermove', 103);
+      dispatchTouchPointer(row, 'pointermove', endY);
+      dispatchTouchPointer(row, 'pointerup', endY);
+      expect(screen.getByTestId('action-dial-icon-spotify')).not.toHaveClass(
+        'transition-none'
+      );
+      expect(screen.getByTestId('action-dial-icon-apple')).not.toHaveClass(
+        'transition-none'
+      );
+      fireEvent.click(row);
+      act(() => vi.advanceTimersByTime(180));
+
+      expect(onSelect).not.toHaveBeenCalled();
+      expect(
+        screen.getByRole('link', { name: 'Stream Now with Spotify' })
+      ).toBeInTheDocument();
+      expect(screen.getByTestId('action-dial-icon-spotify')).toHaveStyle({
+        transform: 'translateY(0%)',
+      });
+    }
+  );
+
+  it('rebases the hidden third icon without sweeping it through the CTA', () => {
+    render(<Fixture />);
+    const dial = screen.getByTestId('action-dial');
+    dispatchTouchPointer(dial, 'pointerdown', 120);
+    dispatchTouchPointer(dial, 'pointermove', 86);
+    dispatchTouchPointer(dial, 'pointerup', 86);
+
+    expect(screen.getByTestId('action-dial-icon-deezer')).toHaveClass(
+      'transition-none'
+    );
+    expect(screen.getByTestId('action-dial-icon-spotify')).not.toHaveClass(
+      'transition-none'
+    );
+    expect(screen.getByTestId('action-dial-icon-apple')).not.toHaveClass(
+      'transition-none'
+    );
+  });
+
+  it('returns a canceled row drag without persisting a new provider', () => {
+    vi.useFakeTimers();
+    const onSelect = vi.fn();
+    render(<Fixture onSelect={onSelect} />);
+    const row = screen.getByRole('button', { name: 'Select Apple Music' });
+    dispatchTouchPointer(row, 'pointerdown', 120);
+    dispatchTouchPointer(row, 'pointermove', 86);
+    dispatchTouchPointer(row, 'pointercancel', 86);
+    act(() => vi.advanceTimersByTime(180));
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(screen.getByTestId('action-dial-icon-spotify')).toHaveStyle({
+      transform: 'translateY(0%)',
+    });
+  });
+
+  it('keeps the final provider when a reverse swipe interrupts settling', () => {
+    vi.useFakeTimers();
+    const onSelect = vi.fn();
+    render(<Fixture onSelect={onSelect} />);
+    const dial = screen.getByTestId('action-dial');
+    dispatchTouchPointer(dial, 'pointerdown', 120);
+    dispatchTouchPointer(dial, 'pointermove', 86);
+    dispatchTouchPointer(dial, 'pointerup', 86);
+    act(() => vi.advanceTimersByTime(30));
+    dispatchTouchPointer(dial, 'pointerdown', 120);
+    dispatchTouchPointer(dial, 'pointermove', 154);
+    dispatchTouchPointer(dial, 'pointerup', 154);
+    act(() => vi.advanceTimersByTime(180));
+
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(screen.getByTestId('action-dial-icon-spotify')).toHaveStyle({
+      transform: 'translateY(0%)',
+    });
+    expect(
+      screen.getByRole('link', { name: 'Stream Now with Spotify' })
+    ).toBeInTheDocument();
+  });
+
   it('keeps reduced-motion icon changes discrete', () => {
     vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: true }));
-    render(<Fixture />);
+    const onSelect = vi.fn();
+    render(<Fixture onSelect={onSelect} />);
 
     expect(
       screen.queryByTestId('action-dial-icon-track')
     ).not.toBeInTheDocument();
     expect(screen.getByText('Spotify icon')).toBeInTheDocument();
+    const dial = screen.getByTestId('action-dial');
+    dispatchTouchPointer(dial, 'pointerdown', 120);
+    dispatchTouchPointer(dial, 'pointermove', 86);
+    expect(screen.getByText('Spotify icon')).toBeInTheDocument();
+    expect(onSelect).not.toHaveBeenCalled();
+    dispatchTouchPointer(dial, 'pointerup', 86);
+    expect(onSelect).toHaveBeenCalledExactlyOnceWith('apple');
+    expect(screen.getByText('Apple icon')).toBeInTheDocument();
   });
 
   it('keeps server markup compatible with reduced-motion hydration', () => {
