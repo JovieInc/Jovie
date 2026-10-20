@@ -880,7 +880,10 @@ export class GitHubClient {
       return null;
     }
     if (!response?.ok) return null;
-    const body = await response.json();
+    const body =
+      /** @type {{ resources?: { core?: { remaining?: unknown, reset?: unknown } } }} */ (
+        await response.json()
+      );
     const core = body?.resources?.core;
     const remaining = Number(core?.remaining);
     const reset = Number(core?.reset);
@@ -1774,7 +1777,9 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
       },
       reportError => {
         const message =
-          reportError instanceof Error ? reportError.message : String(reportError);
+          reportError instanceof Error
+            ? reportError.message
+            : String(reportError);
         process.stderr.write(`[desktop-release-assets] ${message}\n`);
         process.exitCode = 1;
       }
