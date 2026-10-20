@@ -447,6 +447,8 @@ describe('buildOvieAsks', () => {
         actionLabel: 'Approve',
         canReply: true,
         evidence: ['https://example.com/receipt'],
+        decisionDefault: null,
+        canFeedback: true,
       },
       {
         id: 'c',
@@ -457,6 +459,8 @@ describe('buildOvieAsks', () => {
         actionLabel: 'Approve',
         canReply: false,
         evidence: ['https://example.com/receipt'],
+        decisionDefault: null,
+        canFeedback: false,
       },
       {
         id: 'd',
@@ -467,6 +471,8 @@ describe('buildOvieAsks', () => {
         actionLabel: 'Mark done',
         canReply: false,
         evidence: ['https://example.com/receipt'],
+        decisionDefault: null,
+        canFeedback: false,
       },
     ]);
   });
@@ -486,5 +492,33 @@ describe('buildOvieAsks', () => {
       issues: [],
     };
     expect(buildOvieAsks(inbox)[0]?.actionLabel).toBe('Certify');
+  });
+
+  it('maps the decision default contract and ignores malformed defaults', () => {
+    const withDefault = {
+      ...inboxCase('a', 'needs_you'),
+      decisionDefault: {
+        contract: 'jovie.decision-default/v1',
+        decision: 'reject',
+        summary: 'Keep the current copy',
+        deadline: '2026-10-22T12:00:00.000Z',
+        declared: true,
+      },
+    } as OvieInboxCase;
+    const malformed = {
+      ...inboxCase('b', 'needs_you'),
+      decisionDefault: { contract: 'other/v1', decision: 'approve' },
+    } as unknown as OvieInboxCase;
+    const [first, second] = buildOvieAsks({
+      cases: [withDefault, malformed],
+      issues: [],
+    });
+    expect(first?.decisionDefault).toEqual({
+      decision: 'reject',
+      summary: 'Keep the current copy',
+      deadline: '2026-10-22T12:00:00.000Z',
+      declared: true,
+    });
+    expect(second?.decisionDefault).toBeNull();
   });
 });
