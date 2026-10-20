@@ -25,6 +25,14 @@ jovie-research ask "<q>" --social --fresh week  # adds last30days (Reddit, HN, X
 jovie-research ask "<q>" --local                # gbrain + repo only, never spends
 ```
 
+Questions that name our own systems (Jovie, gbrain, lanes, Summer and the
+other terms in `internalTerms`) never reach the paid tier unless you pass
+`--max-tier 2`.
+
+Scripts that need one provider endpoint rather than routed research (a miner,
+a crawler) use `jovie-research call <exa|firecrawl|cloudflare> <METHOD> <path>`
+or `callSource()`: same credentials, caps, ledger, cache and metrics.
+
 Pass `--fresh live|day|week|month|evergreen` when you know it; otherwise the
 router infers it. Output is bounded (8 hits, short snippets); use `--json` only
 when a program consumes it.
@@ -72,3 +80,9 @@ router escalates only when too few hits are relevant.
   new record with `"supersedes"`.
 - `jovie-research decision check <slug>` shows contradiction findings and
   takes for one decision.
+- `jovie-research triage-signals` turns signal-watcher items (gbrain
+  `type: signal`, verdict adopt/buy/borrow/clone for internal ops) into
+  decision triggers, once per signal.
+- Before superseding a research decision, compare options with
+  `jovie-research bench --baseline <exa|exa:fast|firecrawl>` (the 20-question
+  harness, one independent judge) and cite its output as evidence.

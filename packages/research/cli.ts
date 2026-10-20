@@ -11,9 +11,10 @@
  *   jovie-research decision check <slug>
  *   jovie-research mcp
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 
+import { loadQuestions, renderBench, runBench } from './bench.ts';
 import { createProviderClients } from './credentials.ts';
 import {
   checkDecision,
@@ -24,20 +25,25 @@ import {
   resolveReview,
   type TriggerKind,
 } from './decisions.ts';
+import { callSource, GATEWAY_SOURCES, type GatewaySource } from './gateway.ts';
 import { serveMcp } from './mcp.ts';
 import { renderResult, sourcesTable } from './report.ts';
+import { triageSignals } from './signals.ts';
 import { last30daysScript } from './sources-web.ts';
 import { summarize } from './state.ts';
 import type { Freshness, Mode } from './types.ts';
 import { createDefaultWiring } from './wiring.ts';
 
-export const USAGE = `usage: jovie-research <ask|stats|sources|decision|mcp> ...
+export const USAGE = `usage: jovie-research <ask|stats|sources|decision|call|bench|triage-signals|mcp> ...
   ask "<question>" [--fresh live|day|week|month|evergreen] [--mode quick|standard|deep]
                    [--social] [--local] [--max-tier 0|1|2] [--refresh] [--no-persist] [--json] [--caller name]
   stats [--days N] [--json]
   sources
   decision find "<topic>" | record --file <json> | trigger --kind <k> --trigger "<t>" [--topic t] [--evidence r]... [--dry-run]
            | resolve <review-slug> --kept|--superseded [--evidence r] | check <slug>
+  call <exa|firecrawl|cloudflare> <METHOD> <path> [--body <json|@file>] [--units N] [--cache-ttl-ms N] [--caller name]
+  bench [--questions file.json] [--baseline exa,exa:fast,firecrawl] [--judge jev] [--label name] [--out file.json]
+  triage-signals [--dry-run] [--since <iso>] [--min-score 0.6] [--limit N]
   mcp`;
 
 const FRESH = new Set(['live', 'day', 'week', 'month', 'evergreen']);
@@ -71,6 +77,17 @@ export async function main(
       'dry-run': { type: 'boolean' },
       kept: { type: 'boolean' },
       superseded: { type: 'boolean' },
+      body: { type: 'string' },
+      units: { type: 'string' },
+      'cache-ttl-ms': { type: 'string' },
+      questions: { type: 'string' },
+      baseline: { type: 'string' },
+      judge: { type: 'string' },
+      label: { type: 'string' },
+      out: { type: 'string' },
+      since: { type: 'string' },
+      'min-score': { type: 'string' },
+      limit: { type: 'string' },
       help: { type: 'boolean', short: 'h' },
     },
   });
@@ -193,6 +210,74 @@ export async function main(
       return 0;
     }
     throw new UsageError(`bad decision command: ${rest.join(' ')}`);
+  }
+  if (command === 'call') {
+    const [source, method, path] = rest;
+    if (
+      !GATEWAY_SOURCES.includes(source as GatewaySource) ||
+      !method ||
+      !path?.startsWith('/')
+    )
+      throw new UsageError('call <exa|firecrawl|cloudflare> <METHOD> </path>');
+    const raw = values.body?.startsWith('@')
+      ? readFileSync(values.body.slice(1), 'utf8')
+      : values.body;
+    const result = await callSource(wiring, source as GatewaySource, {
+      method,
+      path,
+      body: raw === undefined ? undefined : JSON.parse(raw),
+      units: values.units === undefined ? undefined : Number(values.units),
+      cacheTtlMs:
+        values['cache-ttl-ms'] === undefined
+          ? undefined
+          : Number(values['cache-ttl-ms']),
+      caller: values.caller ?? process.env.JOVIE_AGENT_PROFILE ?? 'cli',
+    });
+    out(
+      typeof result.body === 'string'
+        ? result.body
+        : JSON.stringify(result.body)
+    );
+    return result.status >= 400 ? 1 : 0;
+  }
+  if (command === 'bench') {
+    const judgeName = values.judge ?? 'jev';
+    const judge = wiring.judge(judgeName);
+    if (!judge) throw new UsageError(`unknown judge ${judgeName}`);
+    const label = values.label ?? new Date().toISOString().slice(0, 10);
+    const { rows, summary } = await runBench(
+      { ...wiring, judge },
+      {
+        questions: loadQuestions(values.questions),
+        baselines: (values.baseline ?? 'exa').split(',').filter(Boolean),
+        label,
+        log: row => process.stderr.write(`${JSON.stringify(row)}\n`),
+      }
+    );
+    if (values.out)
+      writeFileSync(
+        values.out,
+        JSON.stringify({ label, judge: judgeName, rows, summary }, null, 2)
+      );
+    print(values.json ? summary : renderBench(label, summary, rows.length));
+    return 0;
+  }
+  if (command === 'triage-signals') {
+    const result = await triageSignals(wiring, {
+      dryRun: values['dry-run'],
+      since: values.since,
+      minScore:
+        values['min-score'] === undefined
+          ? undefined
+          : Number(values['min-score']),
+      limit: values.limit === undefined ? undefined : Number(values.limit),
+    });
+    print(
+      values.json
+        ? result
+        : `signals scanned ${result.scanned}, actionable ${result.actionable}, reviews ${result.reviews.length}${result.reviews.map(r => `\n  ${r.signal} -> ${r.decision} -> ${r.review ?? '(dry run)'}`).join('')}`
+    );
+    return 0;
   }
   if (command === 'mcp') {
     await serveMcp(wiring);

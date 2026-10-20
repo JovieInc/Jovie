@@ -34,6 +34,8 @@ export interface SourcesConfig {
   readonly schema: 'jovie-research-sources/v1';
   readonly reviewed: string;
   readonly freshnessTtlMs: Readonly<Record<Freshness, number>>;
+  /** Words that mark a question as about our own systems (no paid tier). */
+  readonly internalTerms?: readonly string[];
   readonly judge: {
     readonly order: readonly string[];
     readonly keepScore: number;

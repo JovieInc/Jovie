@@ -68,6 +68,15 @@ export function plan(
 
 export const LOCAL_SOURCES = new Set(['gbrain', 'repo']);
 
+/** True when the question names one of our own systems (whole-word match). */
+export function isInternalQuery(
+  query: string,
+  terms: readonly string[]
+): boolean {
+  const words = new Set(query.toLowerCase().split(/[^a-z0-9_-]+/));
+  return terms.some(t => words.has(t.toLowerCase()));
+}
+
 const inflight = new Map<string, Promise<ResearchResult>>();
 
 export function createRouter(deps: RouterDeps) {
@@ -138,7 +147,12 @@ export function createRouter(deps: RouterDeps) {
     if (!(await impl.available())) return skip('no credential');
     const estimate = spec.usdPerCall ?? 0;
     if (spec.caps) {
-      const blocked = await deps.state.reserve(name, spec.caps, estimate);
+      const blocked = await deps.state.reserve(
+        name,
+        spec.caps,
+        estimate,
+        spec.creditsPerCall ?? 1
+      );
       if (blocked) return skip(`cap ${blocked}`);
     }
     try {
@@ -186,7 +200,13 @@ export function createRouter(deps: RouterDeps) {
     const urls = extractUrls(req.query);
     const call: SourceCall = { query: req.query, freshness, mode, urls };
     const tiers = plan({ mode, social: req.social ?? false }, urls);
-    const maxTier = req.localOnly ? 0 : (req.maxTier ?? 2);
+    // Questions about our own systems are answered from gbrain and the repo;
+    // the paid web tier only costs money there. An explicit maxTier overrides.
+    const internal = isInternalQuery(req.query, config.internalTerms ?? []);
+    const paidTier = tiers.length - 1;
+    const maxTier = req.localOnly
+      ? 0
+      : (req.maxTier ?? (internal ? paidTier - 1 : paidTier));
     const enough = config.judge.enoughGood[mode];
     const runs: SourceRun[] = [];
     let pool: Hit[] = [];
@@ -198,6 +218,7 @@ export function createRouter(deps: RouterDeps) {
     const priorPromise =
       deps.prior?.(req.query).catch(() => []) ?? Promise.resolve([]);
 
+    let satisfied = false;
     for (let tier = 0; tier <= Math.min(maxTier, tiers.length - 1); tier++) {
       if (tiers[tier].length === 0) continue;
       stoppedAtTier = tier;
@@ -226,10 +247,24 @@ export function createRouter(deps: RouterDeps) {
         const good = kept.filter(
           h => (h.score ?? 0) >= config.judge.goodScore
         ).length;
-        if (good >= enough || (verdict.answered >= 0.7 && good >= 1)) break;
+        satisfied = good >= enough || (verdict.answered >= 0.7 && good >= 1);
       } else {
         kept = pool;
-        if (pool.filter(h => h.source !== 'repo').length >= enough * 2) break;
+        satisfied = pool.filter(h => h.source !== 'repo').length >= enough * 2;
+      }
+      if (satisfied) break;
+    }
+    if (!satisfied && internal && req.maxTier === undefined && !req.localOnly) {
+      for (const source of tiers[paidTier]) {
+        runs.push({
+          source,
+          tier: paidTier,
+          ok: false,
+          hits: 0,
+          ms: 0,
+          usd: 0,
+          skipped: 'internal question: paid tier off (pass --max-tier 2)',
+        });
       }
     }
 

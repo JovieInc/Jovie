@@ -8,11 +8,29 @@
     "month": 1209600000,
     "evergreen": 7776000000
   },
+  "internalTerms": [
+    "jovie",
+    "gbrain",
+    "summer",
+    "ovie",
+    "hermes",
+    "lane",
+    "lanes",
+    "symphony",
+    "hud",
+    "gem",
+    "jov",
+    "lyb"
+  ],
   "judge": {
     "order": ["clef-flash", "jev"],
     "keepScore": 1.5,
     "goodScore": 2,
-    "enoughGood": { "quick": 2, "standard": 3, "deep": 5 }
+    "enoughGood": {
+      "quick": 2,
+      "standard": 3,
+      "deep": 5
+    }
   },
   "sources": {
     "gbrain": {
@@ -33,7 +51,10 @@
       "billing": "credits",
       "apiProvider": "cloudflare",
       "usdPerCall": 0.0005,
-      "caps": { "dailyCalls": 300, "monthlyCalls": 6000 },
+      "caps": {
+        "dailyCalls": 300,
+        "monthlyCalls": 6000
+      },
       "note": "Browser Rendering /markdown. Cloudflare credits; replaces Firecrawl scrape for single URLs."
     },
     "firecrawl": {
@@ -43,15 +64,21 @@
       "apiProvider": "firecrawl",
       "usdPerCall": 0,
       "creditsPerCall": 2,
-      "caps": { "dailyCalls": 40, "monthlyCalls": 400 },
-      "note": "Existing plan: 1000 credits per billing month; search costs 2 credits per 5 results. Cap keeps 20% for crawl jobs."
+      "caps": {
+        "dailyCalls": 80,
+        "monthlyCalls": 800
+      },
+      "note": "Existing plan: 1000 credits per billing month. Caps count credits (search 2 per call, crawl 1 per page) and keep 20% for ad hoc use."
     },
     "last30days": {
       "tier": 1,
       "kind": "social",
       "billing": "free",
       "usdPerCall": 0,
-      "caps": { "dailyCalls": 20, "monthlyCalls": 300 },
+      "caps": {
+        "dailyCalls": 20,
+        "monthlyCalls": 300
+      },
       "note": "~/.claude/skills/last30days engine (Reddit, HN, X, YouTube, GitHub). ScrapeCreators free calls."
     },
     "hyperagent": {
@@ -89,7 +116,10 @@
       "billing": "paid",
       "apiProvider": "perplexity",
       "usdPerCall": 0.006,
-      "caps": { "dailyCalls": 0, "monthlyCalls": 0 },
+      "caps": {
+        "dailyCalls": 0,
+        "monthlyCalls": 0
+      },
       "note": "Disabled: no credential on this machine. Enabling is new spend and needs Tim."
     },
     "clef-flash": {
@@ -97,8 +127,11 @@
       "kind": "judge",
       "billing": "credits",
       "apiProvider": "cloudflare",
-      "usdPerCall": 0.00002,
-      "caps": { "dailyCalls": 5000, "monthlyCalls": 60000 },
+      "usdPerCall": 2e-5,
+      "caps": {
+        "dailyCalls": 5000,
+        "monthlyCalls": 60000
+      },
       "note": "Cloudflare Workers AI decision model (@cf/cloudflare/clef-flash, $0.038/M input) on Cloudflare credits."
     },
     "jev": {
@@ -106,7 +139,7 @@
       "kind": "judge",
       "billing": "paid",
       "apiProvider": "ai-gateway",
-      "usdPerCall": 0.00003,
+      "usdPerCall": 3e-5,
       "caps": {
         "dailyCalls": 3000,
         "monthlyCalls": 40000,
