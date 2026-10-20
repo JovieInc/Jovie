@@ -9,8 +9,9 @@
  * validation receipts and terminal founder work results on JOV issues become `linear_validation_receipt`
  * (Linear Sync on Merge re-evaluates the lifecycle); a JOV issue that gains
  * a Quality Gap Finder input label (post-mortem action or escaped defect), or
- * closes while carrying one, becomes `quality-gap-scan`. These are the events
- * those workflows used to catch on a clock.
+ * closes while carrying one, or a founder rescue comment becomes
+ * `quality-gap-scan`. These are the events those workflows used to catch on a
+ * clock.
  *
  * Issue pickup is owned by upstream OpenAI Symphony. The Triage event is
  * an assessment wake-up, not an admission or worker dispatch.
@@ -51,8 +52,11 @@ const LINEAR_ISSUE_ID =
 const MAX_PROVIDER_EVENT_AGE_MS = 6 * 60 * 60 * 1000;
 const JOV_TEAM_ID = 'bdc09edc-f91c-4a06-b308-74b4fcf093f8';
 const JOV_TRIAGE_STATE_ID = '9844cfe6-6cf4-4347-842c-893a68f349b8';
+const JOV_BACKLOG_STATE_ID = '1551ed21-7743-4573-82d8-8949410d3b8d';
 const JOV_IDENTIFIER = /^JOV-\d+$/;
 const VALIDATION_RECEIPT_MARKER = /<!--\s*validation-receipt:v1\b/;
+const FOUNDER_RESCUE_PATTERN =
+  /\b(?:founder(?:[- ](?:found|discovered|reported|visible|rescue)|\s+(?:live\s+)?dogfood)|tim\s+(?:manually\s+)?(?:found|discovered|reported|reproduced|rescued|chased|explained)|manual(?:ly)?\s+(?:found|discovered|rescued)|found by tim)\b/i;
 // Mirrors DEFECT_LABELS plus `postmortem-action` in scripts/quality-gap-finder.mjs.
 const QUALITY_GAP_INPUT_LABELS = new Set([
   'postmortem-action',
@@ -90,6 +94,7 @@ interface LinearIssueData {
   description?: string;
   url?: string;
   updatedAt?: string;
+  priority?: number;
   teamId?: string;
   team?: {
     id?: string;
@@ -175,15 +180,36 @@ function isCodeRabbitPlanComment(payload: LinearWebhookPayload): boolean {
   return isCodeRabbitAuthor && hasPlanMarker;
 }
 
+function isJovIdentifier(issue: LinearIssueData | undefined): boolean {
+  return Boolean(issue?.id && JOV_IDENTIFIER.test(issue.identifier ?? ''));
+}
+
 function isJovIssue(issue: LinearIssueData | undefined): boolean {
-  return Boolean(
-    issue?.id &&
-      JOV_IDENTIFIER.test(issue.identifier ?? '') &&
-      (issue.teamId === JOV_TEAM_ID || issue.team?.key === 'JOV')
+  return (
+    isJovIdentifier(issue) &&
+    (issue?.teamId === JOV_TEAM_ID || issue?.team?.key === 'JOV')
   );
 }
 
-function isJovTriageIssueChange(payload: LinearWebhookPayload): boolean {
+function admissionState(
+  issue: LinearIssueData | undefined
+): 'Triage' | 'Backlog' | null {
+  if (
+    issue?.stateId === JOV_TRIAGE_STATE_ID ||
+    issue?.state?.id === JOV_TRIAGE_STATE_ID ||
+    issue?.state?.name === 'Triage'
+  )
+    return 'Triage';
+  if (
+    issue?.stateId === JOV_BACKLOG_STATE_ID ||
+    issue?.state?.id === JOV_BACKLOG_STATE_ID ||
+    issue?.state?.name === 'Backlog'
+  )
+    return 'Backlog';
+  return null;
+}
+
+function isJovAdmissionIssueChange(payload: LinearWebhookPayload): boolean {
   if (
     payload.type !== 'Issue' ||
     !['create', 'update'].includes(payload.action ?? '')
@@ -191,11 +217,20 @@ function isJovTriageIssueChange(payload: LinearWebhookPayload): boolean {
     return false;
   }
   const issue = payload.data as LinearIssueData | undefined;
+  if (!isJovIssue(issue)) return false;
+  const state = admissionState(issue);
+  if (state === 'Triage') return true;
+  // This only requests a signed, current-state observation from the existing
+  // writer. Priority, labels and titles never establish execution eligibility.
   return (
-    isJovIssue(issue) &&
-    (issue?.stateId === JOV_TRIAGE_STATE_ID ||
-      issue?.state?.id === JOV_TRIAGE_STATE_ID ||
-      issue?.state?.name === 'Triage')
+    state === 'Backlog' &&
+    (issue?.priority === 1 ||
+      issue?.labels?.some(label => label.name?.toLowerCase() === 'p0') ===
+        true ||
+      /^(?:P0\b|\[P0\])/i.test(issue?.title ?? '') ||
+      (issue?.priority === 2 &&
+        issue?.labels?.some(label => label.name === 'agent-ready') === true &&
+        issue?.labels?.some(label => label.name === 'dispatch-next') === true))
   );
 }
 
@@ -339,7 +374,22 @@ async function hydrateValidationReceiptIssue(
 }
 
 function isQualityGapInputChange(payload: LinearWebhookPayload): boolean {
-  if (payload.type !== 'Issue' || payload.action !== 'update') return false;
+  if (payload.type === 'Comment' && payload.action === 'create') {
+    const comment = payload.data as LinearCommentData | undefined;
+    const author = (comment?.user?.name ?? comment?.user?.displayName ?? '')
+      .trim()
+      .toLowerCase();
+    return (
+      isJovIdentifier(comment?.issue) &&
+      author === 'tim white' &&
+      FOUNDER_RESCUE_PATTERN.test(comment?.body ?? '')
+    );
+  }
+  if (
+    payload.type !== 'Issue' ||
+    !['create', 'update'].includes(payload.action ?? '')
+  )
+    return false;
   const issue = payload.data as LinearIssueData | undefined;
   if (!isJovIssue(issue)) return false;
   const inputLabels = (issue?.labels ?? []).filter(label =>
@@ -351,8 +401,9 @@ function isQualityGapInputChange(payload: LinearWebhookPayload): boolean {
     CLOSED_STATE_TYPES.has(issue?.state?.type ?? '');
   const previousLabelIds = payload.updatedFrom?.labelIds;
   const gainedLabel =
-    Array.isArray(previousLabelIds) &&
-    inputLabels.some(label => !previousLabelIds.includes(label.id ?? ''));
+    payload.action === 'create' ||
+    (Array.isArray(previousLabelIds) &&
+      inputLabels.some(label => !previousLabelIds.includes(label.id ?? '')));
   return closed || gainedLabel;
 }
 
@@ -361,7 +412,7 @@ function classifyLinearEvent(
 ): LinearEventKind | null {
   if (isCodeRabbitPlanComment(payload)) return 'plan';
   if (isValidationReceiptComment(payload)) return 'validation-receipt';
-  if (isJovTriageIssueChange(payload)) return 'triage-assess';
+  if (isJovAdmissionIssueChange(payload)) return 'triage-assess';
   if (isQualityGapInputChange(payload)) return 'quality-gap-input';
   return null;
 }
@@ -583,7 +634,7 @@ export async function POST(request: NextRequest) {
             issue_updated_at: issueData?.updatedAt ?? null,
             team_key: isTriageEvent ? 'JOV' : (issueData?.team?.key ?? null),
             state_name: isTriageEvent
-              ? 'Triage'
+              ? admissionState(issueData)
               : (issueData?.state?.name ?? null),
             action: payload.action ?? null,
             ...(automationContract && {

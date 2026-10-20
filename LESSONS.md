@@ -247,3 +247,23 @@ policy-only fingerprints are listed explicitly and do not prove executable preve
 **Mistake:** Production and staging duplicated a Vercel bypass exchange in shell, while preview and release workflows exposed secrets and runtime values in process arguments. Exact-deployment probes assumed every target was `production`, searched only the newest deployment page, and accepted status-only page evidence. A 200 not-found profile, a 204 critical route, a duplicate same-SHA deployment, or a partially propagated READY record could therefore look healthy. Static auth liveness/configuration stood in for the actual provider UI and Better Auth catch-all, independently named auth secrets could be mixed, an interrupted marker upload could suppress same-SHA recovery forever, and workflow jobs carried credentials/permissions they did not need. Separate Lighthouse validation and upload also left a same-UID mutable, symlink-following artifact gap.
 
 **Rule:** All protected Vercel probes use `apps/web/scripts/vercel-protected-origin.cjs`. Read protection and CLI secrets only from process environment; never put `--token` or `--env KEY=value` on argv. Require the caller to choose `preview` or `production`, bind the exact URL and deployment ID through deadline-bounded pagination, retry only missing/known-transient evidence, fail immediately on present contradictions, verify the full commit through a host-only cookie, and require semantic HTTP-200 content. After exact staging alias ownership, click both real provider buttons and prove their Better Auth catch-all POST plus external navigation and callback URI; `/api/auth/ok` is not runtime auth proof. Select one complete named auth credential pair and derive auth status from the completed test result. Runtime cookies must be masked and included in artifact scans. Browser routes must be awaited before navigation. Lighthouse validation owns upload from one hash-sealed mode-0400 isolated copy, re-proves source and isolated file identity after the same-UID child, and rejects symlinks, FIFOs, directories, and mutation. Grant OIDC/attestation only to a dedicated no-checkout, no-secret attestation job; secret-bearing checkout/deploy jobs must never receive it. Disable persisted credentials on every checkout, and accept a production marker only with completed-success controller and verification evidence; consume the single SHA-bound interrupted-marker recovery lease before mutation.
+
+## Marketing copy guardrails
+
+### Banned names stay out of marketing and homepage surfaces (JOV-8603)
+
+**Mistake:** Marketing pages, homepage code, copy modules, and metadata have picked up real people's names that are not the product story. `Daniel Kang` and `Haruki` are the names this guard locks out.
+
+**Rule:** Those names fail the build when they appear in marketing routes, homepage and marketing components, marketing content, copy modules, or schema metadata. The check is blocking and the current tree is clean. Scraping and profile-import code are outside this scan.
+
+### Marketing copy and metadata ban niche-music framing and link-in-bio wording (JOV-8606)
+
+**Mistake:** Shared marketing copy and JSON-LD still describe Jovie as a link-in-bio or a musician-only product. Homepage schema ships `Jovie Link in Bio` (JOV-8565).
+
+**Rule:** Marketing copy, content, and metadata/JSON-LD are scanned for `link in bio` / `Link in Bio` (including hyphenated wording) and niche-music framing (`niche-music`, `for musicians`, `musician-first`, `music creators`, `music-only`). Warn mode keeps the current hits in a committed baseline, fails new keys, and rewrites the baseline when the live set shrinks. Import slugs, file paths, legal docs, and investor docs are not violations.
+
+### Marketing components source user-facing copy from the copy module (JOV-8607)
+
+**Mistake:** Marketing components paste user-facing sentences into JSX, so headlines drift away from the copy module.
+
+**Rule:** User-facing JSX text and `aria-label`, `alt`, `title`, and `placeholder` literals in homepage, marketing, and site components are a warn ratchet. New strings fail, and a smaller set tightens the baseline. The live homepage H1 stays `Be found. Be understood.` and is rendered from `HOMEPAGE_IDENTITY_COPY.hero.headline`.

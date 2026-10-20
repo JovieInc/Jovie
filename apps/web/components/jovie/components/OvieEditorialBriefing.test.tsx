@@ -34,6 +34,29 @@ const briefing: OvieHomeBriefing = {
 };
 
 describe('OvieEditorialBriefing', () => {
+  it.each([
+    ['fresh', 'Reported current'],
+    ['stale', 'Reported stale'],
+    ['unknown', 'Freshness unknown'],
+    [undefined, 'Freshness unknown'],
+  ] as const)('shows the reported source freshness: %s', (freshness, label) => {
+    const onSelectAction = vi.fn();
+    fastRender(
+      <OvieEditorialBriefing
+        briefing={{
+          ...briefing,
+          signal: { ...briefing.signal, sourceFreshness: freshness },
+        }}
+        onSelectAction={onSelectAction}
+      />
+    );
+
+    expect(screen.getByTestId('ovie-home-source-freshness')).toHaveTextContent(
+      label
+    );
+    expect(onSelectAction).not.toHaveBeenCalled();
+  });
+
   it('renders one current signal and sends its contextual action prompt', () => {
     const onSelectAction = vi.fn();
     fastRender(

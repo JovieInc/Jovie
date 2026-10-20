@@ -509,8 +509,8 @@ nodes:
     triggeringStateTransition:
       - workflow_dispatch
       - workflow_run
-    terminalReceipt: job:record-upload
-    jobCount: 5
+    terminalReceipt: job:require-recorded-upload
+    jobCount: 8
   - name: Jovie artist agent Eve release and rollback
     path: .github/workflows/jovie-agent-release.yml
     active: true

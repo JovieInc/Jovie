@@ -1,6 +1,6 @@
 {
   "_comment": "UI-feel ratchet baseline — per-check counts of @jovie/ui-feel violations (JOV-8197). To reduce: fix violations then run `pnpm --filter web lint:ui-feel -- --update` (or `node scripts/lint-ui-feel.mjs --update`) and commit this file. CI fails if any count exceeds its baseline.",
-  "headingNeedsBalance": 316,
+  "headingNeedsBalance": 315,
   "missingTabularNums": 81,
   "nonConcentricRadius": 0,
   "undersizedHitArea": 74
