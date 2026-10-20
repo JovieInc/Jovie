@@ -905,6 +905,23 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(surfaces).toContain('--workers=2');
   });
 
+  it('runs destructive Button contrast proof through the guarded Storybook matrix', () => {
+    const surfaces = jobBlock(
+      'ci-storybook-surfaces',
+      'ci-cross-product-integration'
+    );
+    const invocation = surfaces.match(
+      /pnpm exec playwright test ([\s\S]*?)--config=playwright\.config\.storybook\.ts/
+    );
+    expect(invocation).not.toBeNull();
+    const selected =
+      invocation[1].match(/tests\/e2e\/storybook-[a-z0-9-]+\.spec\.ts/g) ?? [];
+    const contrast = 'tests/e2e/storybook-destructive-button.spec.ts';
+    expect(selected.filter(path => path === contrast)).toHaveLength(1);
+    expect(existsSync(resolve(REPO_ROOT, 'apps/web', contrast))).toBe(true);
+    expect(surfaces).toContain('guard-playwright-artifacts.mjs" --run --');
+  });
+
   it('runs existing Kbd and Spotify Storybook specs through the scanned evidence path', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',

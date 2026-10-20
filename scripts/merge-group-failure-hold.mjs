@@ -407,6 +407,71 @@ export function ownerHoldReleaseIntent({ eventName, event } = {}) {
   return { prNumber: pr.number, headSha: pr.head.sha, releasedAt };
 }
 
+export const REVISION_FAILED_AT_HEAD = 'revision-failed-at-head';
+// Labels whose removal by a person is an explicit release of a failed head.
+export const HUMAN_RELEASE_LABELS = Object.freeze(['hold', 'queue-poison']);
+
+/**
+ * A person (never a bot or app) removing `hold` or `queue-poison` from the
+ * current head is the explicit release JOV-6620 allows for a head whose merge
+ * group failed. jovie-bot's lanes lift `queue-poison` on their own schedule
+ * (#22280 and #21869, 2026-10-20), so a bot removal is never a release.
+ * @param {{ eventName?: string, event?: any }} [input]
+ */
+export function humanFailureReleaseIntent({ eventName, event } = {}) {
+  const pr = event?.pull_request;
+  const sender = event?.sender;
+  const label = String(event?.label?.name ?? '').toLowerCase();
+  if (
+    eventName !== 'pull_request_target' ||
+    event?.action !== 'unlabeled' ||
+    !HUMAN_RELEASE_LABELS.includes(label) ||
+    sender?.type !== 'User' ||
+    typeof sender?.login !== 'string' ||
+    /\[bot\]$/i.test(sender.login) ||
+    pr?.state !== 'open' ||
+    pr?.draft !== false ||
+    !Number.isSafeInteger(pr?.number) ||
+    pr.number <= 0 ||
+    !/^[0-9a-f]{40}$/.test(pr?.head?.sha ?? '')
+  )
+    return null;
+  return {
+    prNumber: pr.number,
+    headSha: pr.head.sha,
+    releasedBy: sender.login,
+    label,
+  };
+}
+
+/**
+ * Converts a failed-head block into one retry only for an exact human release
+ * of that head. Deterministic failures stay blocked: a rerun cannot pass. The
+ * retry reservation (FAILURE_RETRY_CONTEXT) makes each release single-use.
+ * @param {{ failure: any, release: any, prNumber: number, headSha: string }} input
+ */
+export function humanReleaseDisposition({
+  failure,
+  release,
+  prNumber,
+  headSha,
+}) {
+  if (
+    !release ||
+    failure?.action !== 'block' ||
+    ![
+      REVISION_FAILED_AT_HEAD,
+      'revision-retry-spent',
+      'revision-retry-exhausted',
+    ].includes(failure.reason) ||
+    release.prNumber !== prNumber ||
+    release.headSha !== headSha ||
+    !failure.latest
+  )
+    return failure;
+  return { ...failure, action: 'retry-once', reason: 'human-failure-release' };
+}
+
 /**
  * Recovery never replaces a source failure; owner hold release is not a CI retry.
  * @param {{ failure: object, statuses: object[], repository: string, prNumber: number, lastRemoval: string|undefined, headCommittedAt: string|undefined, autoMergeEnabled: boolean, headSha?: string, lastRemovalReason?: string, ownerHoldRelease?: object|null }} input
@@ -502,9 +567,16 @@ export function attributableFailureCount(failures) {
   ).length;
 }
 
-// The exact commit endpoint scopes failures: deterministic blocks immediately;
-// other failures receive one queue-authority retry. Each infrastructure failure
-// gets its own retry and never exhausts the revision.
+// The exact commit endpoint scopes failures. JOV-6620: a merge group that
+// failed at source head X never re-enrolls X automatically, whatever product
+// step failed (deterministic, retryable product test, or unclassified). X
+// waits for a new head or an explicit human release (humanFailureRelease).
+// PR #22280 (2026-10-20) re-entered at its failed head twice: once through
+// victim rearm and once through the old one-retry allowance for
+// retryable-product failures, and each re-entry ejected the groups behind it.
+// Only failures that say nothing about X (a runner/checkout failure, or a red
+// queue base after main moves) keep an automatic retry. Each infrastructure
+// failure gets its own retry and never exhausts the revision.
 /** @param {{ statuses?: unknown[], repository?: string, currentMainSha?: string }} input */
 export function revisionFailureDisposition({
   statuses,
@@ -535,11 +607,11 @@ export function revisionFailureDisposition({
       currentMainSha !== latest.mainSha;
     if (!resolved) return result('block', 'base-branch-failure');
   }
-  if (
-    !NON_ATTRIBUTABLE_CLASSES.has(latest.classification) &&
-    attributableFailureCount(failures) >= 2
-  ) {
+  if (attributableFailureCount(failures) >= 2) {
     return result('block', 'revision-retry-exhausted');
+  }
+  if (!NON_ATTRIBUTABLE_CLASSES.has(latest.classification)) {
+    return result('block', REVISION_FAILED_AT_HEAD);
   }
   // Newest statuses win: a proven rejection releases only its reservation.
   const latestRetry = retries.find(
@@ -965,14 +1037,9 @@ export async function applyMergeGroupFailure(
     retryDisposition:
       classification === 'base-branch'
         ? 'requeue-after-base-moves'
-        : classification === 'deterministic-source' ||
-            (!NON_ATTRIBUTABLE_CLASSES.has(classification) &&
-              attributableFailureCount([
-                ...existing.failures.filter(item => item !== duplicate),
-                { classification },
-              ]) >= 2)
-          ? 'blocked-until-new-source-head'
-          : 'one-queue-authority-retry',
+        : NON_ATTRIBUTABLE_CLASSES.has(classification)
+          ? 'one-queue-authority-retry'
+          : 'blocked-until-new-source-head',
     statusWritten: !duplicate,
     currentHeadSha:
       typeof current?.headRefOid === 'string'

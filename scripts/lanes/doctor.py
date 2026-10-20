@@ -386,6 +386,8 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "fileOverlap": file_overlap.doctor_view(state),
         "linearError": linear_error, "linearSkipped": linear_skipped, "githubRemaining": github,
         "linearSync": linear_sync.status(state, now),
+        "ownership": {key: value for key, value in read_json(state / "ownership.json", {}).items()
+                      if key not in ("ownerlessSince", "evidenceNoted", "moved", "claimsReleased")},
         "merged24h": merged, "mergedAttributionError": merged_error,
         "mergeThroughput": merge_throughput, "mergeThroughputError": merge_throughput_error,
         "autoscale": _autoscale_block(host),
@@ -756,6 +758,13 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
             alerts[f"pr-inventory-unavailable:{name}"] = (
                 f"{name} new-issue PR budget unknown: {budget.get('error') or 'incomplete read'}; new claims deferred")
     alerts.update(linear_sync.alerts(obs.get("linearSync") or {}))
+    owned = obs.get("ownership") or {}
+    if owned.get("overGrace"):
+        # The started-state invariant (ownership.py): escalated as a lanes repair, never to Tim.
+        alerts["started-without-owner"] = (
+            f"{owned['overGrace']} started JOV issues have had no live owner past the grace period "
+            f"(oldest {round((owned.get('oldestOwnerlessS') or 0) / 3600, 1)}h; unresolved "
+            f"{owned.get('unresolved') or {}}); ownership.reconcile moves them each tick")
     if obs.get("linearError"):
         alerts["linear-down"] = f"Linear unreadable: {obs['linearError']}"
     elif obs.get("linearSkipped") or obs.get("pool") is None:
@@ -851,9 +860,14 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
             f"p50 wait {signal.get('queueWaitP50Minutes', 'unknown')}m, "
             f"{signal.get('mergedPerHour', 'unknown')} merged/h vs {signal.get('openedPerHour', 'unknown')} opened/h, "
             f"ejection rate {signal.get('ejectionRate', 'unknown')}")
-    escalation_line = remediation.alert_reason(obs.get("escalation") or {})
+    sweep_view = obs.get("reconcile") or {}
+    dispositions = sweep_view.get("dispositions")
+    open_prs = ({row.get("pr") for row in dispositions if isinstance(row, dict)}
+                if isinstance(dispositions, list) and (sweep_view.get("counts") or {}).get("open") == len(dispositions)
+                else None)  # an incomplete open-PR view keeps every surfaced PR
+    escalation_line = remediation.alert_reason(obs.get("escalation") or {}, open_prs)
     if escalation_line:
-        alerts["escalation-needs-human"] = escalation_line
+        alerts["escalation-surfaced"] = escalation_line
     sweep = obs.get("reconcile") or {}
     swept_age = obs["now"] - float(sweep.get("atEpoch") or 0) if obs.get("now") else None
     if sweep.get("orphans") and swept_age is not None and swept_age < 2 * pr_events.RECONCILE_S:
@@ -1456,6 +1470,7 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
         obs.get("now") or time.time())
     return {"schema": "symphony-lanes-status/v1", "at": now_iso(), "host": lane.HOST, "release": tick.get("release"),
             "fileOverlap": overlap, "linear": obs.get("linearSync") or tick.get("linear"),
+            "ownership": obs.get("ownership"),
             "lanes": counts, "providerPayloads": obs.get("providerPayloads"), "running": sum(c["running"] for c in counts.values()),
             "idle": sum(max(0, c["slots"] - c["running"]) for c in counts.values()),
             "pool": obs.get("pool"), "candidatePool": obs.get("candidatePool"), "lastLandingAgeS": obs.get("lastLandingAge"),

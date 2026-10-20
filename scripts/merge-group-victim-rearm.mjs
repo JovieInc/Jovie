@@ -5,9 +5,14 @@
 // the same call the enroll job uses. The merge queue owns the merge method,
 // so this path does not arm auto-merge or choose a strategy. Bounded to REARM_CAP
 // successful rearms per head SHA. A repeated decision for the same CI run
-// does not increment. A head the failure hold already blocked (its second
-// failure on the same revision) is never rearmed: it waits for a new head
-// (JOV-7708).
+// does not increment. The revision the failure hold names is the failure
+// owner's: the enroll job alone decides whether it may re-enter (JOV-6620).
+// Victim rearm restores it only on positive evidence that another PR in the
+// group owns the failing paths. "No implicated path is in this PR's files" is
+// not that evidence: on 2026-10-20 #22280 (a lockfile-only dependency bump)
+// broke an untouched UnifiedTable test, was classified base-branch here, and
+// was re-enqueued at its failed head 35 s after the ejection (run
+// 39457131496), ejecting the groups behind it again (JOV-7708).
 
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
@@ -105,9 +110,12 @@ export function planVictimRearms({
       reason,
     });
     if (!SHA.test(candidate.headSha ?? '')) return skip('head-sha');
-    if (
+    const failureOwner =
       heldRevision?.prNumber === candidate.prNumber &&
-      heldRevision.headSha === candidate.headSha
+      heldRevision.headSha === candidate.headSha;
+    if (
+      failureOwner &&
+      heldRevision.retryDisposition === 'blocked-until-new-source-head'
     ) {
       return skip('revision-held');
     }
@@ -128,6 +136,9 @@ export function planVictimRearms({
     }
     const verdict = classify(candidate, candidates, paths);
     if (!verdict.classification) return skip(verdict.reason);
+    if (failureOwner && verdict.classification !== 'another-pr') {
+      return skip('failure-owner');
+    }
     const records = trustedRearmRecords(candidate.statuses).filter(
       record => record.sha === candidate.headSha
     );
@@ -158,9 +169,9 @@ export function planVictimRearms({
 }
 
 /**
- * The failure-hold job's receipt names the exact revision it blocked until a
- * new head. Anything else (absent, unparsable, or retryable) blocks nothing.
- * @returns {{ prNumber: number, headSha: string } | null}
+ * The failure-hold job's receipt names the exact revision whose merge group
+ * failed, with its retry disposition. Absent or unparsable receipts name none.
+ * @returns {{ prNumber: number, headSha: string, retryDisposition: string } | null}
  */
 export function heldRevisionFromReceipt(raw, repository) {
   if (!raw) return null;
@@ -173,13 +184,17 @@ export function heldRevisionFromReceipt(raw, repository) {
   if (
     receipt?.schema !== 'jovie-merge-group-failure-hold/v1' ||
     receipt.repository !== repository ||
-    receipt.retryDisposition !== 'blocked-until-new-source-head' ||
+    typeof receipt.retryDisposition !== 'string' ||
     !Number.isSafeInteger(receipt.prNumber) ||
     !SHA.test(String(receipt.sourceHeadSha ?? ''))
   ) {
     return null;
   }
-  return { prNumber: receipt.prNumber, headSha: receipt.sourceHeadSha };
+  return {
+    prNumber: receipt.prNumber,
+    headSha: receipt.sourceHeadSha,
+    retryDisposition: receipt.retryDisposition,
+  };
 }
 
 export function rearmDescription({ n, headSha, runId }) {

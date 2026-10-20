@@ -4,7 +4,9 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react';
+import { hydrateRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EmailCodeAuthForm } from './EmailCodeAuthForm';
@@ -109,6 +111,54 @@ describe('EmailCodeAuthForm', () => {
     );
     expect(input).toBeEnabled();
     expect(input).toHaveValue(email);
+  });
+
+  it('keeps an email typed before hydration and sends the code for it', async () => {
+    // Production regression (2026-10-18/20): an email typed or autofilled
+    // into the server-rendered field before React hydrated was wiped by the
+    // first post-hydration render, and the next click showed "Enter your
+    // email address." with no OTP request.
+    sendVerificationOtp.mockResolvedValueOnce({
+      data: { success: true },
+      error: null,
+    });
+    const element = (
+      <EmailCodeAuthForm mode='sign-in' redirectUrl='/app/dashboard' />
+    );
+    const container = document.createElement('div');
+    container.innerHTML = renderToString(element);
+    document.body.append(container);
+    const ssrInput = container.querySelector<HTMLInputElement>('#auth-email');
+    if (!ssrInput) throw new Error('server-rendered email input missing');
+    ssrInput.value = 'artist@example.com';
+
+    let root: ReturnType<typeof hydrateRoot> | undefined;
+    try {
+      await act(async () => {
+        root = hydrateRoot(container, element);
+      });
+
+      const view = within(container);
+      expect(view.getByLabelText('Email')).toHaveValue('artist@example.com');
+
+      await act(async () => {
+        fireEvent.click(
+          view.getByRole('button', { name: /send sign-in code/i })
+        );
+      });
+
+      expect(sendVerificationOtp).toHaveBeenCalledWith({
+        email: 'artist@example.com',
+        type: 'sign-in',
+      });
+      expect(
+        view.queryByText('Enter your email address.')
+      ).not.toBeInTheDocument();
+      expect(await view.findByText(/enter the code sent to/i)).toBeVisible();
+    } finally {
+      act(() => root?.unmount());
+      container.remove();
+    }
   });
 
   it('allows correcting a malformed mailbox to a plus address', async () => {
