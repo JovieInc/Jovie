@@ -62,6 +62,10 @@ const BLOG_LATENCY_PATH = resolve(
   REPO_ROOT,
   'docs/metrics/blog-publish-latency-latest.json'
 );
+// CI stopped running on pull_request on 2026-09-29 (#19436, JOV-7844); Source
+// Validation is the PR gate, so it feeds the pull_request wall-time and PR
+// red→green metrics that otherwise stay null.
+const DEFAULT_WORKFLOWS = 'ci.yml,source-validation.yml';
 const TIMELINE_PR_LIMIT = 80;
 const DEPLOYMENT_LIMIT = 60;
 
@@ -77,7 +81,35 @@ function gh(args, { parseJson = true } = {}) {
     maxBuffer: 64 * 1024 * 1024,
     env: { ...process.env, GH_PAGER: 'cat' },
   });
-  return parseJson ? JSON.parse(out) : out;
+  // A streaming --jq filter prints NDJSON; JSON.parse on that threw and the
+  // callers' catch blocks silently dropped timelines, deployments and
+  // production verifications (null queue-wait and production-lag SLOs).
+  return parseJson ? (parseGhOutput(out) ?? []) : out;
+}
+
+/** gh prints one JSON document, or NDJSON when a --jq filter streams. */
+export function parseGhOutput(out) {
+  const text = String(out ?? '').trim();
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text
+      .split('\n')
+      .filter(line => line.trim())
+      .map(line => JSON.parse(line));
+  }
+}
+
+/**
+ * `gh api --paginate --slurp` rejects `--jq` before sending any request, so
+ * those calls always threw and their callers silently fell back (no PR files,
+ * no blog qualification jobs, no Production Verified evidence). Slurp the
+ * pages and filter in JS instead.
+ */
+function ghPages(endpoint) {
+  const pages = gh(['api', endpoint, '--paginate', '--slurp']);
+  return Array.isArray(pages) ? pages : [];
 }
 
 function repo() {
@@ -117,26 +149,42 @@ export function collectRaw({ workflows, days }) {
     }
   }
 
-  let mergedPrs = [];
-  try {
-    mergedPrs = gh([
-      'pr',
-      'list',
-      '--repo',
-      ghRepo,
-      '--state',
-      'merged',
-      '--search',
-      `merged:>=${sinceIso.slice(0, 10)}`,
-      '--json',
-      'number,title,headRefName,headRefOid,createdAt,mergedAt,mergeCommit',
-      '--limit',
-      '300',
-    ]).map(pr => ({ ...pr, mergeCommitSha: pr.mergeCommit?.oid ?? null }));
-  } catch (error) {
-    console.error(
-      `[shipping-slo] warn: merged PR fetch failed: ${error.message}`
-    );
+  // ~100 merges/day. GitHub search returns at most 1000 hits, so a single
+  // `merged:>=` query silently truncated the window (a 300 cap first, then
+  // the 1000 search cap), understating merges/day and WoW growth. Query
+  // 5-day slices instead; each stays well under the cap.
+  const mergedPrs = [];
+  const seenPrs = new Set();
+  for (let start = sinceMs; start <= Date.now(); start += 5 * 86_400_000) {
+    const from = new Date(start).toISOString().slice(0, 10);
+    const to = new Date(Math.min(start + 4 * 86_400_000, Date.now()))
+      .toISOString()
+      .slice(0, 10);
+    try {
+      const slice = gh([
+        'pr',
+        'list',
+        '--repo',
+        ghRepo,
+        '--state',
+        'merged',
+        '--search',
+        `merged:${from}..${to}`,
+        '--json',
+        'number,title,headRefName,headRefOid,createdAt,mergedAt,mergeCommit',
+        '--limit',
+        '1000',
+      ]);
+      for (const pr of Array.isArray(slice) ? slice : []) {
+        if (seenPrs.has(pr.number)) continue;
+        seenPrs.add(pr.number);
+        mergedPrs.push({ ...pr, mergeCommitSha: pr.mergeCommit?.oid ?? null });
+      }
+    } catch (error) {
+      console.error(
+        `[shipping-slo] warn: merged PR fetch failed for ${from}..${to}: ${error.message}`
+      );
+    }
   }
 
   const timelines = {};
@@ -169,14 +217,15 @@ export function collectRaw({ workflows, days }) {
     }
 
     try {
-      pr.files = gh([
-        'api',
-        `repos/${ghRepo}/pulls/${pr.number}/files?per_page=100`,
-        '--paginate',
-        '--slurp',
-        '--jq',
-        '[.[][] | {filename, status, previousFilename: .previous_filename}]',
-      ]);
+      pr.files = ghPages(
+        `repos/${ghRepo}/pulls/${pr.number}/files?per_page=100`
+      )
+        .flat()
+        .map(file => ({
+          filename: file.filename,
+          status: file.status,
+          previousFilename: file.previous_filename,
+        }));
     } catch {
       pr.files = null;
     }
@@ -200,14 +249,16 @@ export function collectRaw({ workflows, days }) {
     );
     if (run) {
       try {
-        const jobs = gh([
-          'api',
-          `repos/${ghRepo}/actions/runs/${run.id}/attempts/${run.run_attempt}/jobs?per_page=100`,
-          '--paginate',
-          '--slurp',
-          '--jq',
-          '[.[].jobs[] | select(.name == "Blog Content Qualification") | {conclusion, startedAt: .started_at, completedAt: .completed_at}]',
-        ]);
+        const jobs = ghPages(
+          `repos/${ghRepo}/actions/runs/${run.id}/attempts/${run.run_attempt}/jobs?per_page=100`
+        )
+          .flatMap(page => page?.jobs ?? [])
+          .filter(job => job.name === 'Blog Content Qualification')
+          .map(job => ({
+            conclusion: job.conclusion,
+            startedAt: job.started_at,
+            completedAt: job.completed_at,
+          }));
         const job = jobs.find(candidate => candidate.conclusion === 'success');
         pr.blogQualificationConfirmedAbsent =
           run.conclusion === 'success' &&
@@ -297,14 +348,15 @@ export function collectRaw({ workflows, days }) {
     );
     for (const controllerRun of controllerRuns) {
       try {
-        const jobs = gh([
-          'api',
-          `repos/${ghRepo}/actions/runs/${controllerRun.id}/jobs?per_page=100`,
-          '--paginate',
-          '--slurp',
-          '--jq',
-          '[.[].jobs[] | select(.name == "Production Verified" and .conclusion == "success") | {completedAt: .completed_at}]',
-        ]);
+        const jobs = ghPages(
+          `repos/${ghRepo}/actions/runs/${controllerRun.id}/jobs?per_page=100`
+        )
+          .flatMap(page => page?.jobs ?? [])
+          .filter(
+            job =>
+              job.name === 'Production Verified' && job.conclusion === 'success'
+          )
+          .map(job => ({ completedAt: job.completed_at }));
         const first = jobs
           .map(j => j?.completedAt)
           .filter(Boolean)
@@ -579,7 +631,7 @@ function main() {
   }
 
   if (command === 'collect') {
-    const workflows = String(argValue(args, '--workflows', 'ci.yml'))
+    const workflows = String(argValue(args, '--workflows', DEFAULT_WORKFLOWS))
       .split(',')
       .map(s => s.trim())
       .filter(Boolean);
@@ -601,7 +653,7 @@ function main() {
   const raw = inputPath
     ? JSON.parse(readFileSync(inputPath, 'utf8'))
     : collectRaw({
-        workflows: String(argValue(args, '--workflows', 'ci.yml'))
+        workflows: String(argValue(args, '--workflows', DEFAULT_WORKFLOWS))
           .split(',')
           .map(s => s.trim())
           .filter(Boolean),
