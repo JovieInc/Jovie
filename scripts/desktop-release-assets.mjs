@@ -897,7 +897,11 @@ export class GitHubClient {
       return null;
     }
     if (!response?.ok) return null;
-    const body = await response.json();
+    // Node types Response.json() as unknown under scripts/tsconfig (lib es2022).
+    const body =
+      /** @type {{ resources?: { core?: { remaining?: unknown, reset?: unknown } } } | null} */ (
+        await response.json()
+      );
     const core = body?.resources?.core;
     const remaining = Number(core?.remaining);
     const reset = Number(core?.reset);
@@ -956,7 +960,7 @@ export class GitHubClient {
               status: response.status,
               quotaReset,
             })
-          : { action: 'fail' };
+          : /** @type {{ action: 'fail' }} */ ({ action: 'fail' });
         if (decision.action === 'wait') {
           this.log(
             `installation quota on ${method} ${url}; holding ${Math.ceil(decision.waitMs / 1000)}s for x-ratelimit-reset (attempt ${attempt}/${RELEASE_ASSET_READ_ATTEMPTS}).`
@@ -1848,7 +1852,9 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
       },
       reportError => {
         const message =
-          reportError instanceof Error ? reportError.message : String(reportError);
+          reportError instanceof Error
+            ? reportError.message
+            : String(reportError);
         process.stderr.write(`[desktop-release-assets] ${message}\n`);
         process.exitCode = 1;
       }
