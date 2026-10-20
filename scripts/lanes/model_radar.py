@@ -391,7 +391,7 @@ def verdict(base: dict, cand: dict, *, z: float = 1.96, cost_ratio_cap: float = 
     cb, cc = cps(base), cps(cand)
     if cb == cc:  # includes both free and both without a success
         ratio = 1.0
-    elif cb == math.inf:  # any success beats none
+    elif cb == math.inf:  # finite cost per success; adoption still requires evidence
         ratio = 0.0
     elif cb == 0:  # a free baseline cannot be undercut
         ratio = math.inf
@@ -401,7 +401,7 @@ def verdict(base: dict, cand: dict, *, z: float = 1.96, cost_ratio_cap: float = 
         decision, why = "reject", "success is worse beyond noise"
     elif delta > z * se and ratio <= cost_ratio_cap:
         decision, why = "adopt", "success is better beyond noise at acceptable cost per success"
-    elif abs(delta) <= z * se and ratio <= cost_drop:
+    elif abs(delta) <= z * se and math.isfinite(cb) and ratio <= cost_drop:
         decision, why = "adopt", "equal success within noise and cost per success drops"
     elif delta > z * se:
         decision, why = "re-evaluate", "better beyond noise but cost per success is above the cap"

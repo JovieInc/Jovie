@@ -207,6 +207,15 @@ class AdoptionTests(unittest.TestCase):
         self.assertTrue(radar.needs_approval(25.01))
         self.assertFalse(radar.needs_approval(25))
 
+    def test_zero_success_baseline_requires_gain_beyond_noise(self):
+        base = {"success": 0, "n": 30, "usd": 1}
+        for spend in (0, 1):
+            with self.subTest(candidate_usd=spend):
+                result = radar.verdict(base, {"success": 1, "n": 30, "usd": spend})
+                self.assertEqual(result["decision"], "re-evaluate")
+                self.assertIn("within noise", result["why"])
+                self.assertEqual(result["costPerSuccessRatio"], 0.0)
+
     def test_decision_page_and_record(self):
         d = {"title": "Clairic for CI triage", "context": "ctx", "options": [{"name": "reject", "summary": "s"}, {"name": "adopt", "summary": "t"}],
              "chosen": "reject", "evidence": ["gbrain:models/radar/2026-10-20"], "shipNow": "keep Jev", "reevaluateWhen": ["GA"], "then": "rerun"}
