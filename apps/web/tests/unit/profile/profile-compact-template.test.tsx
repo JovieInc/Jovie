@@ -1370,6 +1370,61 @@ describe('ProfileCompactTemplate', () => {
     pushStateSpy.mockRestore();
   });
 
+  it('keeps Home canonical after an Events deep link, remount, and browser history in Strict Mode', async () => {
+    window.history.replaceState(null, '', '/test-artist?mode=tour&source=qr');
+    const pushStateSpy = vi.spyOn(window.history, 'pushState');
+    const profile = (
+      <React.StrictMode>
+        <ProfileCompactTemplate
+          mode='profile'
+          artist={mockArtist}
+          socialLinks={[]}
+          contacts={[]}
+        />
+      </React.StrictMode>
+    );
+    const expectMode = (label: string, mode: string, search: string) => {
+      expect(window.location.search).toBe(search);
+      expect(screen.getByTestId('profile-compact-surface')).toHaveAttribute(
+        'data-mode',
+        mode
+      );
+      expect(
+        within(screen.getByTestId('profile-bottom-nav')).getByRole('button', {
+          name: label,
+        })
+      ).toHaveAttribute('aria-current', 'page');
+    };
+
+    try {
+      const view = render(profile);
+      await waitFor(() => expectMode('Events', 'tour', '?mode=tour&source=qr'));
+      expect(pushStateSpy).not.toHaveBeenCalled();
+
+      fireEvent.click(
+        within(screen.getByTestId('profile-bottom-nav')).getByRole('button', {
+          name: 'Home',
+        })
+      );
+      await waitFor(() => expectMode('Home', 'profile', '?source=qr'));
+      expect(pushStateSpy).toHaveBeenCalledTimes(1);
+
+      // Recreate the component from the canonical URL, as a reload would.
+      view.unmount();
+      render(profile);
+      await waitFor(() => expectMode('Home', 'profile', '?source=qr'));
+      expect(pushStateSpy).toHaveBeenCalledTimes(1);
+
+      act(() => window.history.back());
+      await waitFor(() => expectMode('Events', 'tour', '?mode=tour&source=qr'));
+      act(() => window.history.forward());
+      await waitFor(() => expectMode('Home', 'profile', '?source=qr'));
+      expect(pushStateSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      pushStateSpy.mockRestore();
+    }
+  });
+
   it('does not push a source-less URL before the source param hydrates', async () => {
     mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
     window.history.replaceState(null, '', '/test-artist?source=qr');
