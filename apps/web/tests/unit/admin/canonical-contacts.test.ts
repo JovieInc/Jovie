@@ -7,23 +7,39 @@ const TABLES = vi.hoisted(() => ({
   leads: { __table: 'leads' },
   users: { __table: 'users' },
   creatorProfiles: { __table: 'creator_profiles' },
+  userProfileClaims: { __table: 'user_profile_claims' },
   contacts: { __table: 'contacts' },
   contactStageTransitions: { __table: 'contact_stage_transitions' },
 }));
 
 const state = vi.hoisted(() => ({
   rowsByTable: new Map<object, unknown[]>(),
+  sourceRowsByTable: new Map<object, unknown[]>(),
+  failedTable: null as object | null,
   inserts: [] as { table: object; values: unknown }[],
   updates: [] as { table: object; values: unknown }[],
   tableExists: true,
 }));
 
-function thenable(rows: unknown[]) {
+function thenable(rows: unknown[], table?: object) {
+  let selected =
+    table === TABLES.userProfileClaims
+      ? rows.filter(row => (row as { role: string }).role === 'owner')
+      : rows;
   const chain: Record<string, unknown> = {
     where: () => chain,
     orderBy: () => chain,
-    limit: () => chain,
-    then: (resolve: (value: unknown[]) => unknown) => resolve(rows),
+    limit: () => {
+      selected = state.sourceRowsByTable.get(table ?? {}) ?? selected;
+      return chain;
+    },
+    then: (
+      resolve: (value: unknown[]) => unknown,
+      reject: (error: Error) => unknown
+    ) =>
+      state.failedTable === table
+        ? reject(new Error('identity lookup unavailable'))
+        : resolve(selected),
   };
   return chain;
 }
@@ -32,7 +48,8 @@ vi.mock('@/lib/db', () => ({
   doesTableExist: vi.fn(async () => state.tableExists),
   db: {
     select: () => ({
-      from: (table: object) => thenable(state.rowsByTable.get(table) ?? []),
+      from: (table: object) =>
+        thenable(state.rowsByTable.get(table) ?? [], table),
     }),
     insert: (table: object) => ({
       values: (values: unknown) => {
@@ -56,6 +73,12 @@ vi.mock('@/lib/db', () => ({
 vi.mock('drizzle-orm', () => ({
   eq: vi.fn((column: unknown, value: unknown) => ({ eq: [column, value] })),
   desc: vi.fn((column: unknown) => column),
+  and: vi.fn(),
+  or: vi.fn(),
+  inArray: vi.fn(),
+  ilike: vi.fn(),
+  exists: vi.fn(),
+  sql: vi.fn(),
 }));
 
 vi.mock('@/lib/db/schema/waitlist', () => ({
@@ -65,6 +88,7 @@ vi.mock('@/lib/db/schema/leads', () => ({ leads: TABLES.leads }));
 vi.mock('@/lib/db/schema/auth', () => ({ users: TABLES.users }));
 vi.mock('@/lib/db/schema/profiles', () => ({
   creatorProfiles: TABLES.creatorProfiles,
+  userProfileClaims: TABLES.userProfileClaims,
 }));
 vi.mock('@/lib/db/schema/contacts', () => ({
   contacts: TABLES.contacts,
@@ -73,11 +97,18 @@ vi.mock('@/lib/db/schema/contacts', () => ({
 vi.mock('@/lib/error-tracking', () => ({ captureError: vi.fn() }));
 
 import {
+  getCanonicalContactByKey,
   getCanonicalContactMetrics,
   getCanonicalContacts,
   getContactStageTimeline,
   setCanonicalContactStage,
 } from '@/lib/admin/contacts';
+import {
+  getCustomerPopulationExclusions,
+  isNonCustomerUser,
+} from '@/lib/admin/customer-population';
+import { getDeterministicTestBetterAuthUserId } from '@/lib/auth/dev-test-auth-identity';
+import { CONTACT_LIFECYCLE_STAGES } from '@/lib/contacts/lifecycle';
 
 const NOW = new Date('2026-09-28T00:00:00Z');
 
@@ -111,17 +142,21 @@ function seed(rows: {
   profiles?: unknown[];
   contacts?: unknown[];
   transitions?: unknown[];
+  claims?: unknown[];
 }) {
   state.rowsByTable.set(TABLES.waitlistEntries, rows.waitlist ?? []);
   state.rowsByTable.set(TABLES.leads, rows.leads ?? []);
   state.rowsByTable.set(TABLES.users, rows.users ?? []);
   state.rowsByTable.set(TABLES.creatorProfiles, rows.profiles ?? []);
   state.rowsByTable.set(TABLES.contacts, rows.contacts ?? []);
+  state.rowsByTable.set(TABLES.userProfileClaims, rows.claims ?? []);
   state.rowsByTable.set(TABLES.contactStageTransitions, rows.transitions ?? []);
 }
 
 beforeEach(() => {
   state.rowsByTable.clear();
+  state.sourceRowsByTable.clear();
+  state.failedTable = null;
   state.inserts.length = 0;
   state.updates.length = 0;
   state.tableExists = true;
@@ -164,7 +199,7 @@ describe('canonical contacts read model (JOV-6888)', () => {
       leads: [
         leadRow({
           displayName: 'Grace Hopper',
-          contactEmail: 'grace@example.com',
+          contactEmail: 'grace@artist-mail.com',
           handle: 'grace',
           status: 'new',
           outreachStatus: 'sent',
@@ -195,14 +230,14 @@ describe('canonical contacts read model (JOV-6888)', () => {
       waitlist: [
         waitlistRow({
           fullName: 'Alan',
-          emailNormalized: 'alan@example.com',
+          emailNormalized: 'alan@artist-mail.com',
           status: 'waitlisted',
           waitlistedAt: NOW,
         }),
       ],
       contacts: [
         {
-          dedupeKey: 'email:alan@example.com',
+          dedupeKey: 'email:alan@artist-mail.com',
           stage: 'certified',
           certifiedAt: new Date('2026-09-01T00:00:00Z'),
         },
@@ -222,7 +257,7 @@ describe('canonical contacts read model (JOV-6888)', () => {
       users: [
         userRow({
           name: 'Newer Person',
-          email: 'newer@example.com',
+          email: 'newer@artist-mail.com',
           userStatus: 'active',
           createdAt: new Date('2026-09-02T00:00:00Z'),
           updatedAt: new Date('2026-09-03T00:00:00Z'),
@@ -230,7 +265,7 @@ describe('canonical contacts read model (JOV-6888)', () => {
         userRow({
           id: 'u2',
           name: 'Older Person',
-          email: 'older@example.com',
+          email: 'older@artist-mail.com',
           userStatus: 'active',
           createdAt: new Date('2026-09-01T00:00:00Z'),
           updatedAt: new Date('2026-09-01T00:00:00Z'),
@@ -240,11 +275,11 @@ describe('canonical contacts read model (JOV-6888)', () => {
 
     const pageOne = await getCanonicalContacts({ page: 1, pageSize: 1 });
     expect(pageOne.total).toBe(2);
-    expect(pageOne.contacts[0].email).toBe('newer@example.com');
+    expect(pageOne.contacts[0].email).toBe('newer@artist-mail.com');
 
     const searched = await getCanonicalContacts({ search: 'older' });
     expect(searched.total).toBe(1);
-    expect(searched.contacts[0].email).toBe('older@example.com');
+    expect(searched.contacts[0].email).toBe('older@artist-mail.com');
 
     const filtered = await getCanonicalContacts({ stage: 'paying' });
     expect(filtered.total).toBe(0);
@@ -286,7 +321,7 @@ describe('canonical contacts read model (JOV-6888)', () => {
       waitlist: [
         waitlistRow({
           fullName: 'Solo',
-          emailNormalized: 'solo@example.com',
+          emailNormalized: 'solo@artist-mail.com',
           status: 'waitlisted',
           waitlistedAt: NOW,
         }),
@@ -302,17 +337,20 @@ describe('setCanonicalContactStage', () => {
   it('inserts a new contact and appends transition provenance', async () => {
     seed({});
     const result = await setCanonicalContactStage({
-      dedupeKey: 'email:new@example.com',
+      dedupeKey: 'email:new@artist-mail.com',
       toStage: 'certified',
       actorUserId: 'admin-1',
       actorType: 'founder',
       reason: 'manual review',
-      identity: { displayName: 'New', emailNormalized: 'new@example.com' },
+      identity: { displayName: 'New', emailNormalized: 'new@artist-mail.com' },
     });
     expect(result).toEqual({ ok: true, stage: 'certified' });
     expect(
       state.inserts.find(i => i.table === TABLES.contacts)?.values
-    ).toMatchObject({ dedupeKey: 'email:new@example.com', stage: 'certified' });
+    ).toMatchObject({
+      dedupeKey: 'email:new@artist-mail.com',
+      stage: 'certified',
+    });
     expect(
       state.inserts.find(i => i.table === TABLES.contactStageTransitions)
         ?.values
@@ -396,5 +434,216 @@ describe('getContactStageTimeline', () => {
   it('returns empty when the transitions table is missing', async () => {
     state.tableExists = false;
     expect(await getContactStageTimeline('k')).toEqual([]);
+  });
+});
+
+describe('customer population isolation (JOV-7395)', () => {
+  it.each(CONTACT_LIFECYCLE_STAGES)(
+    'excludes internal identities before %s overrides, counts, lookup and search',
+    async stage => {
+      seed({
+        waitlist: [
+          waitlistRow({
+            emailNormalized: 'fixture@jov.ie',
+            status: 'approved',
+          }),
+        ],
+        users: [
+          userRow({
+            email: 'fixture@jov.ie',
+            userStatus: 'active',
+            stripeSubscriptionId: 'sub_fixture',
+          }),
+        ],
+        profiles: [
+          profileRow({
+            userId: 'u1',
+            waitlistEntryId: 'w1',
+            usernameNormalized: 'synthetic-profile',
+            isVerified: true,
+            claimedAt: NOW,
+          }),
+        ],
+        leads: [
+          leadRow({
+            signupUserId: 'u1',
+            creatorProfileId: 'p1',
+            handle: 'synthetic-lead',
+            contactEmail: 'alias@artist-mail.com',
+            paidAt: NOW,
+          }),
+        ],
+        contacts: [
+          {
+            dedupeKey: 'email:fixture@jov.ie',
+            stage,
+            emailNormalized: 'renamed@artist-mail.com',
+          },
+        ],
+      });
+      const rawBefore = structuredClone([...state.rowsByTable.values()]);
+      const result = await getCanonicalContacts({
+        search: 'fixture',
+        pageSize: 1,
+      });
+      expect(result).toMatchObject({
+        contacts: [],
+        total: 0,
+        metrics: { total: 0 },
+      });
+      expect(Object.values(result.metrics).every(value => value === 0)).toBe(
+        true
+      );
+      expect(await getCanonicalContactByKey('email:fixture@jov.ie')).toBeNull();
+      expect([...state.rowsByTable.values()]).toEqual(rawBefore);
+      expect([state.inserts, state.updates]).toEqual([[], []]);
+    }
+  );
+
+  it('uses exact auth provisioning and reserved profiles, including graph edges outside the source scan', async () => {
+    const fixtureEmail = 'ordinary-name@artist-mail.com';
+    seed({
+      users: [
+        userRow({
+          id: 'old-fixture',
+          email: fixtureEmail,
+          betterAuthUserId: getDeterministicTestBetterAuthUserId(fixtureEmail),
+        }),
+        userRow({
+          id: 'real',
+          email: 'demo@label.com',
+          betterAuthUserId: '11111111-1111-8111-8111-111111111111',
+          userStatus: 'active',
+          stripeSubscriptionId: 'sub_real',
+        }),
+      ],
+      waitlist: [waitlistRow({ emailNormalized: 'canary@example.com' })],
+      profiles: [
+        profileRow({
+          id: 'auth-fixture',
+          userId: null,
+          usernameNormalized: 'ordinary-fixture',
+        }),
+        profileRow({ id: 'reserved', usernameNormalized: 'browse-ready-user' }),
+        profileRow({
+          id: 'waitlist-fixture',
+          usernameNormalized: 'waitlist-fixture',
+          waitlistEntryId: 'w1',
+        }),
+      ],
+      claims: [
+        {
+          creatorProfileId: 'auth-fixture',
+          userId: 'old-fixture',
+          role: 'owner',
+        },
+      ],
+      leads: [
+        leadRow({ signupUserId: 'old-fixture', handle: 'outside-scan' }),
+        leadRow({
+          id: 'l2',
+          creatorProfileId: 'auth-fixture',
+          handle: 'linked-fixture',
+        }),
+        leadRow({
+          id: 'l3',
+          creatorProfileId: 'reserved',
+          handle: 'linked-reserved',
+        }),
+      ],
+    });
+    state.sourceRowsByTable.set(TABLES.users, [
+      state.rowsByTable.get(TABLES.users)![1],
+    ]);
+    state.sourceRowsByTable.set(TABLES.waitlistEntries, []);
+    const result = await getCanonicalContacts({ pageSize: 1 });
+    expect(result.contacts.map(row => row.email)).toEqual(['demo@label.com']);
+    expect(result.metrics).toMatchObject({ total: 1, paying: 1 });
+    expect(result.total).toBe(1);
+    expect(isNonCustomerUser({ email: null, betterAuthUserId: null })).toBe(
+      false
+    );
+  });
+
+  it('preserves customers with internal managers/viewers and superseded legacy ownership', async () => {
+    seed({
+      users: [
+        userRow({ id: 'internal', email: 'operator@jov.ie' }),
+        userRow({
+          id: 'real',
+          email: 'artist-public@label.com',
+          userStatus: 'active',
+        }),
+      ],
+      profiles: [
+        profileRow({
+          userId: 'internal',
+          usernameNormalized: 'real-artist',
+          isVerified: true,
+          claimedAt: NOW,
+        }),
+      ],
+      claims: [
+        { creatorProfileId: 'p1', userId: 'internal', role: 'manager' },
+        { creatorProfileId: 'p1', userId: 'internal', role: 'viewer' },
+        { creatorProfileId: 'p1', userId: 'real', role: 'owner' },
+      ],
+    });
+    expect((await getCustomerPopulationExclusions()).profileIds.size).toBe(0);
+    const result = await getCanonicalContacts({ search: 'real-artist' });
+    expect(result.total).toBe(1);
+    expect(result.contacts[0]).toMatchObject({
+      userId: 'real',
+      email: 'artist-public@label.com',
+      creatorProfileId: 'p1',
+    });
+    expect(result.contacts[0].sources).toEqual(['profile', 'user']);
+    expect(result.metrics.total).toBe(1);
+  });
+
+  it('keeps pagination, stages, metrics and caller overrides on the same eligible set', async () => {
+    seed({
+      users: [
+        userRow({ email: 'fixture@example.net', userStatus: 'active' }),
+        userRow({ id: 'u2', email: 'real@label.com', userStatus: 'active' }),
+        userRow({ id: 'u3', email: 'second@label.com', userStatus: 'active' }),
+      ],
+    });
+    const first = await getCanonicalContacts({ pageSize: 1 });
+    const second = await getCanonicalContacts({
+      page: 2,
+      pageSize: 1,
+      stage: first.contacts[0].stage,
+    });
+    expect([
+      first.total,
+      second.total,
+      first.metrics.total,
+      second.metrics.total,
+    ]).toEqual([2, 2, 2, 2]);
+    expect(first.contacts[0].email).not.toBe(second.contacts[0].email);
+    seed({
+      users: [userRow({ email: 'real@label.com' })],
+      contacts: [
+        {
+          dedupeKey: 'email:real@label.com',
+          stage: 'certified',
+          emailNormalized: 'override@jov.ie',
+        },
+      ],
+    });
+    expect((await getCanonicalContacts()).metrics.total).toBe(0);
+  });
+
+  it('fails closed when provenance lookup fails and preserves strict outage reporting', async () => {
+    seed({
+      users: [userRow({ email: 'real@label.com' })],
+      profiles: [profileRow({ usernameNormalized: 'real-artist' })],
+    });
+    state.failedTable = TABLES.userProfileClaims;
+    expect((await getCanonicalContacts()).contacts).toEqual([]);
+    await expect(getCanonicalContacts({ throwOnError: true })).rejects.toThrow(
+      'identity lookup unavailable'
+    );
   });
 });

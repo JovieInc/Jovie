@@ -75,8 +75,8 @@ export function getEmailSendBlockReason(email: string): string | null {
 //
 // Company reads (e.g. Summer revenue + cohorts, JOV-6673) must only count real
 // external customers. Team inboxes live on jov.ie (and any configured admin
-// domain); seeded QA/E2E/demo accounts use recognizable local parts. Keep the
-// JS classifier and INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN in sync — the SQL copy
+// domain); explicit fixture domains and provisioning tags mark synthetic
+// accounts. Keep the JS classifier and INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN in sync — the SQL copy
 // is a POSIX ERE used by Postgres `~*` queries where per-row JS filtering
 // would break aggregate counts.
 // ============================================================================
@@ -100,18 +100,6 @@ const INTERNAL_ACCOUNT_EMAIL_DOMAINS = [
  */
 const DOGFOOD_ACCOUNT_EMAIL_DOMAINS = ['test.jovie.com'] as const;
 
-/**
- * Local-part prefixes used by seeded QA/E2E accounts. Written as a POSIX-safe
- * alternation so the same source can drive both the JS RegExp below and the
- * SQL pattern (`auth[-_]?qa` covers both `auth-qa` and `auth_qa`).
- */
-const TEST_ACCOUNT_LOCAL_PART_PREFIXES =
-  '(e2e|browse|auth[-_]?qa|qa|smoke|staging|test|demo|dogfood|seed|fixture|autotest)';
-
-const TEST_ACCOUNT_LOCAL_PART_PATTERN = new RegExp(
-  `^${TEST_ACCOUNT_LOCAL_PART_PREFIXES}([-_.+]|$)`
-);
-
 /** Clerk test-address tag, e.g. browse+clerk_test@jov.ie */
 const CLERK_TEST_TAG_PATTERN = /\+clerk_test(\+|$)/;
 
@@ -128,9 +116,6 @@ export const PRODUCTION_CANARY_EMAIL_TAG =
   '+jovie-prod-waitlist-canary' as const;
 const SYNTHETIC_PRINCIPAL_TAG_PATTERN =
   /\+synthetic-(?:[a-z0-9])|\+jovie-prod-waitlist-canary$/;
-
-/** Seeded demo personas, e.g. dualipa-public@jov.ie */
-const DEMO_PLACEHOLDER_LOCAL_PART_PATTERN = /-public$/;
 
 /**
  * POSIX ERE equivalent of `isInternalOrTestAccountEmail` for use in Postgres
@@ -152,19 +137,14 @@ export const INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN = [
   // Synthetic dogfood principal tag anywhere in the local part (JOV-7697)
   '^[^@]*\\+synthetic-([a-z0-9])[^@]*@',
   '^[^@]*\\+jovie-prod-waitlist-canary@',
-  // Demo placeholder personas: *-public@…
-  '^[^@]+-public@',
-  // Known test/QA local-part prefixes on any domain (separator or bare local)
-  `^${TEST_ACCOUNT_LOCAL_PART_PREFIXES}([-_.+][^@]*)?@`,
 ].join('|');
 
 /**
  * True when the email belongs to an internal or test/demo account rather than
  * a real external customer: team domains (jov.ie, admin domain), dogfood/QA
  * mailbox domains (test.jovie.com), reserved test domains, Clerk `+clerk_test`
- * tags, synthetic principal `+synthetic-` tags, `*-public` demo placeholders,
- * and seeded QA local-part prefixes (e2e, browse, qa, auth-qa, smoke, staging,
- * test, demo, dogfood, seed, fixture, autotest).
+ * tags and synthetic principal `+synthetic-` tags. External names such as
+ * demo@label.com or artist-public@label.com are not fixture provenance.
  */
 export function isInternalOrTestAccountEmail(
   email: string | null | undefined
@@ -189,10 +169,8 @@ export function isInternalOrTestAccountEmail(
   if (isReservedTestEmailDomain(domain)) return true;
 
   return (
-    TEST_ACCOUNT_LOCAL_PART_PATTERN.test(localPart) ||
     CLERK_TEST_TAG_PATTERN.test(localPart) ||
-    SYNTHETIC_PRINCIPAL_TAG_PATTERN.test(localPart) ||
-    DEMO_PLACEHOLDER_LOCAL_PART_PATTERN.test(localPart)
+    SYNTHETIC_PRINCIPAL_TAG_PATTERN.test(localPart)
   );
 }
 

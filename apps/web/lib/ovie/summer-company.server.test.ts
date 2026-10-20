@@ -251,7 +251,7 @@ describe('getSummerCohort', () => {
     });
   });
 
-  it('maps expired subscription checkouts to unconverted users', async () => {
+  it('maps expired checkouts while preserving external QA-like customer addresses', async () => {
     const created = Math.floor(NOW.getTime() / 1000) - 3600;
     hoisted.sessionsList.mockResolvedValue({
       has_more: false,
@@ -259,6 +259,7 @@ describe('getSummerCohort', () => {
         { id: 'cs_1', mode: 'subscription', customer: 'cus_1', created },
         { id: 'cs_2', mode: 'payment', customer: 'cus_2', created },
         { id: 'cs_3', mode: 'subscription', customer: null, created },
+        { id: 'cs_4', mode: 'subscription', customer: 'cus_3', created },
       ],
     });
     hoisted.dbResults.push([
@@ -278,7 +279,7 @@ describe('getSummerCohort', () => {
         id: 'u3',
         name: null,
         email: 'qa-fan@gmail.com',
-        stripeCustomerId: 'cus_2',
+        stripeCustomerId: 'cus_3',
       },
     ]);
     const cohort = await getSummerCohort('checkout_abandoned', 10, NOW);
@@ -287,16 +288,22 @@ describe('getSummerCohort', () => {
     );
     expect(cohort).toEqual({
       metricScope: 'customer_only',
-      total: 1,
-      excludedInternal: 2,
-      customerTotal: 1,
+      total: 2,
+      excludedInternal: 1,
+      customerTotal: 2,
       rawTotal: 3,
-      syntheticHealth: { total: 2 },
+      syntheticHealth: { total: 1 },
       rows: [
         {
           id: 'u1',
           displayName: 'a@band.com',
           email: 'a@band.com',
+          detail: `checkout expired ${new Date(created * 1000).toISOString()}`,
+        },
+        {
+          id: 'u3',
+          displayName: 'qa-fan@gmail.com',
+          email: 'qa-fan@gmail.com',
           detail: `checkout expired ${new Date(created * 1000).toISOString()}`,
         },
       ],
