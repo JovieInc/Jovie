@@ -14,6 +14,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts/lanes"))
 import continuity_clock as clock
+import credentials_spend
 
 NOW = 1790860000.0
 
@@ -268,3 +269,84 @@ class CadenceClocksTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CredentialsSpendTickTest(unittest.TestCase):
+    """The six-hourly credentials/spend check runs from the release with a scrubbed env."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        root = Path(self.tmp.name)
+        self.state, self.release, self.home = root / "state", root / "release", root / "home"
+        self.state.mkdir()
+        (self.release / "scripts").mkdir(parents=True)
+        (self.release / credentials_spend.SCRIPT).write_text("// fixture\n")
+        self.calls = []
+        env = patch.dict(credentials_spend.os.environ, {"PATH": "/usr/bin", "LINEAR_API_KEY": "secret",
+                                                        "GH_TOKEN": "secret"}, clear=True)
+        env.start()
+        self.addCleanup(env.stop)
+        no_app = patch.object(credentials_spend, "app_access_token", return_value=None)  # never the host's
+        no_app.start()
+        self.addCleanup(no_app.stop)
+
+    def run_check(self, returncode=0, stdout=None):
+        def run(args, **kwargs):
+            self.calls.append((args, kwargs))
+            return SimpleNamespace(returncode=returncode, stdout=stdout if stdout is not None else json.dumps(
+                {"findings": [{"severity": "high"}, {"severity": "high"}, {"severity": "low"}]}), stderr="boom")
+        return run
+
+    def test_due_run_records_counts_and_waits_six_hours(self):
+        result = credentials_spend.tick(self.state, self.release, run=self.run_check(), now=NOW, home=self.home,
+                                        linear_token=lambda _state: None)
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["filing"], "unavailable")
+        self.assertEqual(result["bySeverity"], {"high": 2, "low": 1})
+        [(args, kwargs)] = self.calls
+        self.assertEqual(args[:3], ["node", str(self.release / credentials_spend.SCRIPT), "--live"])
+        self.assertIn(str(credentials_spend.receipt_path(self.home)), args)
+        self.assertNotIn("--file-linear", args)
+        self.assertEqual(sorted(kwargs["env"]), ["HOME", "PATH"], "no host credential reaches the check")
+        state = json.loads((self.state / credentials_spend.STATE_FILE).read_text())
+        self.assertEqual(state["nextAttemptAt"], NOW + credentials_spend.INTERVAL_S)
+        self.assertEqual(credentials_spend.tick(self.state, self.release, run=self.run_check(), now=NOW + 3600,
+                                                home=self.home, linear_token=lambda _state: None)["status"], "current")
+        self.assertEqual(len(self.calls), 1)
+
+    def test_findings_are_filed_as_the_linear_app_never_a_personal_key(self):
+        result = credentials_spend.tick(self.state, self.release, run=self.run_check(), now=NOW, home=self.home,
+                                        linear_token=lambda state: "app-access" if state == self.state else None)
+        [(args, kwargs)] = self.calls
+        self.assertIn("--file-linear", args)
+        self.assertEqual(kwargs["env"]["LINEAR_ACCESS_TOKEN"], "app-access")
+        self.assertNotIn("LINEAR_API_KEY", kwargs["env"])
+        self.assertEqual(result["filing"], "linear-app")
+
+    def test_a_failing_token_read_still_runs_the_check_without_filing(self):
+        def broken(_state):
+            raise RuntimeError("mint")
+        result = credentials_spend.tick(self.state, self.release, run=self.run_check(), now=NOW, home=self.home,
+                                        linear_token=broken)
+        self.assertEqual((result["status"], result["filing"]), ("ok", "unavailable"))
+        self.assertNotIn("--file-linear", self.calls[0][0])
+
+    def test_failure_keeps_only_the_error_class_and_retries_sooner(self):
+        result = credentials_spend.tick(self.state, self.release, run=self.run_check(returncode=1), now=NOW,
+                                        home=self.home)
+        self.assertEqual(result, {"status": "failed", "error": "RuntimeError", "at": result["at"]})
+        state = json.loads((self.state / credentials_spend.STATE_FILE).read_text())
+        self.assertEqual(state["nextAttemptAt"], NOW + credentials_spend.RETRY_S)
+        bad = credentials_spend.tick(self.state, self.release, run=self.run_check(stdout="{}"),
+                                     now=NOW + credentials_spend.RETRY_S, home=self.home)
+        self.assertEqual(bad["error"], "ValueError")
+
+    def test_missing_script_and_selftest_never_run(self):
+        (self.release / credentials_spend.SCRIPT).unlink()
+        self.assertEqual(credentials_spend.tick(self.state, self.release, run=self.run_check(), now=NOW,
+                                                home=self.home)["status"], "script-missing")
+        with patch.dict(credentials_spend.os.environ, {"LANES_SELFTEST": "1"}):
+            self.assertEqual(credentials_spend.tick(self.state, self.release, run=self.run_check(), now=NOW,
+                                                    home=self.home)["status"], "selftest-skipped")
+        self.assertEqual(self.calls, [])
