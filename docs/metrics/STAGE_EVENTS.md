@@ -13,7 +13,7 @@ One row per entity per stage. Stage dwell time is `exitedAt - enteredAt`.
 | Field | Type | Meaning |
 | --- | --- | --- |
 | `schema` | `"jovie-stage-event/v1"` | Contract version. Breaking changes bump it. |
-| `entityType` | manifest key | `shipping`, `remediation`, `release`, `ios-release`, `revenue-funnel`, `summer-turn`, `automation-run` |
+| `entityType` | manifest key | `shipping`, `remediation`, `release`, `release-replay`, `ios-release`, `revenue-funnel`, `summer-turn`, `automation-run` |
 | `entityId` | string | Stable id; the format is declared per entity in the manifest. |
 | `stage` | manifest stage id | Must be registered for the entity type. Unregistered stages are rejected. |
 | `enteredAt` | ISO-8601 | When the entity entered the stage. |
@@ -127,6 +127,25 @@ failed, pre-fix; fixed in summer-config #270).
 
 `entityId` = `<conversation>:<turn>`, both hashed by summer-config. `outcome` on the terminal row: `completed`,
 `failed` or `abandoned`. Backfill from the existing receipt blobs.
+
+### Controller replay (`release-replay`)
+
+Live emitter: `.github/scripts/controller-quota-replay.mjs` (workflow
+`controller-quota-replay.yml`, on Staging/Production Controller completion).
+It replays only transient failures (GitHub quota, 5xx, network, runner loss)
+of the newest run of that controller while production lags main, up to
+controller attempt 3, after waiting for the token's quota reset or
+2^(attempt-1) x 120s. Rows go to the artifact
+`release-replay-receipts/stage-events.ndjson`, next to `decision.json`.
+
+| Stage | Timestamp |
+| --- | --- |
+| `release-replay:blocked` | the failed attempt's `updated_at`; exits at the decision. `outcome` `advanced` (replayed), `abandoned` (not transient, superseded, or prod already on main) or `failed` (attempt/wait cap, rejected rerun) |
+| `release-replay:replayed` | the accepted `gh run rerun --failed` request |
+
+`entityId` = `<workflow file>#<run id>@<attempt>`. Like `automation-run`, the
+source is an artifact, so it reaches stage timings once the collector reads
+artifact sources.
 
 ### Automation liveness (`automation-run`)
 
