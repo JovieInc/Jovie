@@ -1,16 +1,18 @@
 {
-  "$comment": "Initial client JS ratchet for /app routes (gzip -9 KB). Measured 2026-09-27 on main + shell skeleton split. Target from docs/performance/route-budgets.json is 250 KB; lower these as routes get lighter. Enforced by scripts/route-js-budget.mjs in the merge-queue build. 2026-10-02: /app/admin/hud 990 -> 992 after UnifiedTable took the shared column-priority layout; the merge-group build measured 991 KB. 2026-10-04: /app/admin/people 1055 -> 1057 and /app/admin/hud 992 -> 994 after the shared nav learned to hide Identity when the Profiles workspace is off (#20180); merge-group builds measured 1056 and 993 KB. 2026-10-05: restored /app/admin/people 1057 -> 1055 and /app/admin/hud 994 -> 992 after preserving the command palette lazy boundary (#20721); combined head 60a29588989b05173ceef98b577ed353f0013e59 measured 1047 and 973 KB. 2026-10-12: /app/admin/hud 992 -> 995 after main crept back to the ceiling; merge groups for unrelated PRs (#20203, #20970, #20958) measured 993 KB on main b70df22fe0. Lower again once the creep since #20741 is traced (follow-up). 2026-10-12: /app/admin/hud 995 -> 975 and /app/admin/people 1055 -> default 900 after lazy-loading the collapsed HUD noise sections and the non-default People views (#21464); dispatch build b93bd51 measured 965 and 888 KB. 2026-10-13: /app/admin/certifications 900 -> 904 and /app/admin/platform-connections 900 -> 903 after the shell's BrandLogo, Logo and footer moved to the construction geometry from @jovie/ui/brand (JOV-7797, #20570). The geometry object is inlined into four initial chunks per route, which adds 6-7 KB on every shell route. Local builds measured main ece9918d27 at 897/895 KB and the PR merged onto it at 903/902 KB. Follow-up: a mark-only geometry export would recover most of this. 2026-10-12: new /app/admin/inbox route (JOV-6795, #21230) gets 905 KB, matching /app/admin/features; merge-group builds 38248419716 and 38306196113 measured 905 KB.",
+  "$comment": "Initial client JS ratchet for /app routes (gzip -9 KB). Measured 2026-09-27 on main + shell skeleton split. Target from docs/performance/route-budgets.json is 250 KB; lower these as routes get lighter. Enforced by scripts/route-js-budget.mjs in the merge-queue build. 2026-10-02: /app/admin/hud 990 -> 992 after UnifiedTable took the shared column-priority layout; the merge-group build measured 991 KB. 2026-10-04: /app/admin/people 1055 -> 1057 and /app/admin/hud 992 -> 994 after the shared nav learned to hide Identity when the Profiles workspace is off (#20180); merge-group builds measured 1056 and 993 KB. 2026-10-05: restored /app/admin/people 1057 -> 1055 and /app/admin/hud 994 -> 992 after preserving the command palette lazy boundary (#20721); combined head 60a29588989b05173ceef98b577ed353f0013e59 measured 1047 and 973 KB. 2026-10-12: /app/admin/hud 992 -> 995 after main crept back to the ceiling; merge groups for unrelated PRs (#20203, #20970, #20958) measured 993 KB on main b70df22fe0. Lower again once the creep since #20741 is traced (follow-up). 2026-10-12: /app/admin/hud 995 -> 975 and /app/admin/people 1055 -> default 900 after lazy-loading the collapsed HUD noise sections and the non-default People views (#21464); dispatch build b93bd51 measured 965 and 888 KB. 2026-10-13: /app/admin/certifications 900 -> 904 and /app/admin/platform-connections 900 -> 903 after the shell's BrandLogo, Logo and footer moved to the construction geometry from @jovie/ui/brand (JOV-7797, #20570). The geometry object is inlined into four initial chunks per route, which adds 6-7 KB on every shell route. Local builds measured main ece9918d27 at 897/895 KB and the PR merged onto it at 903/902 KB. Follow-up: a mark-only geometry export would recover most of this. 2026-10-12: new /app/admin/inbox route (JOV-6795, #21230) gets 905 KB, matching /app/admin/features; merge-group builds 38248419716 and 38306196113 measured 905 KB. 2026-10-20: /app/admin (Ovie Home, JOV-5959) renders the same page as /app/admin/chat, so it takes that route's 1345 KB budget (PR #22359 measured 1311 KB); /app/admin/ops now renders the Ops dashboard that /app/admin/hud carried and takes its 975 KB budget (measured 942 KB).",
   "defaultMaxGzipKb": 900,
   "routes": {
     "/app/chat/[id]": 1385,
     "/app/chat": 1385,
     "/app/admin/chat": 1345,
+    "/app/admin": 1345,
     "/app/tasks": 1245,
     "/app/library": 1215,
     "/app/dashboard/releases": 1080,
     "/app/settings/profile": 1035,
     "/app/admin/system": 1030,
     "/app/admin/hud": 975,
+    "/app/admin/ops": 975,
     "/app/presence": 950,
     "/app": 935,
     "/app/contacts": 925,
@@ -21,8 +23,8 @@
     "/app/tour-dates": 915,
     "/app/settings/connectors": 910,
     "/app/admin/features": 905,
+    "/app/admin/inbox": 905,
     "/app/admin/certifications": 904,
-    "/app/admin/platform-connections": 903,
-    "/app/admin/inbox": 905
+    "/app/admin/platform-connections": 903
   }
 }
