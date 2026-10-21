@@ -94,8 +94,8 @@ Checked-in source: `.github/rulesets/branch-protection.yml`.
 - Maximum entries building concurrently: checked-in ceiling `10`. Lower live
   values remain supported as a reversible runner-capacity brake. Raise the
   file and the live ruleset together.
-- Check response timeout: `60` minutes (source-first cutover and live readback
-  verified 2026-09-24). Required checks and ALLGREEN remain unchanged.
+- Check response timeout: `20` minutes (Tim-approved tuning and live readback
+  verified 2026-10-21). Required checks and ALLGREEN remain unchanged.
 - Production health governs deployment and promotion through the existing
   production controls. Native source admission uses the required checks above;
   the retired Auto-Enroll fleet gate does not create a second admission gate.
@@ -324,7 +324,7 @@ runtime behavior, or Summer commissioning.
   introduced it; a group stacked on an already broken base passes. The failure
   hold then records `jovie-queue-failure-hold/v1` on the exact source head and
   reports `PR Ready` failed on the synthetic group head, so the queue ejects it
-  at once. The ruleset's 60-minute check response timeout remains the backstop
+  at once. The ruleset's 20-minute check response timeout remains the backstop
   for any other cause.
 
 ## Queue freeze (queue-watch runbook)

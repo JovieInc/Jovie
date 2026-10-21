@@ -388,8 +388,8 @@ existed. Contract:
    `Exact-head Coverage` runs V8 coverage and the 60% changed-line ratchet on
    web-impacting source heads without repository secrets; the native queue
    repeats it on the synthetic combined head and must finish inside the
-   current merge-queue check budget (20 minutes until the 60-minute ruleset
-   cutover). Non-web heads emit an explicit
+   current merge-queue check budget (20 minutes since the 2026-10-21 tuning).
+   Non-web heads emit an explicit
    non-applicable receipt. Nightly retains the global risk-surface debt check,
    so stale unrelated debt cannot deadlock promotion.
    Regression receipt: source run 32547855063 spent 3180.55 seconds collecting
