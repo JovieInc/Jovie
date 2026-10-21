@@ -60,7 +60,7 @@ describe('priority marketing page crawler contracts', () => {
     );
   });
 
-  it('keeps the pricing offer schema aligned with limited paid access', () => {
+  it('keeps the pricing offer schema aligned with the self-serve paid offer', () => {
     const { container } = render(<PricingPage />);
     const script = container.querySelector(
       'script[type="application/ld+json"]'
@@ -81,8 +81,8 @@ describe('priority marketing page crawler contracts', () => {
         }),
         expect.objectContaining({
           offers: expect.objectContaining({
-            price: '199',
-            availability: 'https://schema.org/LimitedAvailability',
+            price: '12',
+            availability: 'https://schema.org/InStock',
           }),
         }),
       ])

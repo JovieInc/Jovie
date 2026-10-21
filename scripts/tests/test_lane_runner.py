@@ -5589,6 +5589,8 @@ class PreservedRecoveryTest(unittest.TestCase):
         self.assertIsNone(marker["pr"], "source-safe cleanup retained the checkout without a target binding")
         self.assertNotIn("preservedWorktree", prior)
         self.calls.clear()
+        # A busy checkout still hands off with the canonical reason and keeps its source.
+        self.active = f"p123\nn{self.path}\n"
         with patch.object(lane.execution_attempt, "claim") as claim, patch.object(lane, "run_agent") as agent:
             receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
         self.assertEqual(receipt["verdict"], "recovery-handoff")
@@ -5597,6 +5599,36 @@ class PreservedRecoveryTest(unittest.TestCase):
         self.assertEqual((self.path / "repair.txt").read_text(), "preserved useful edit")
         claim.assert_not_called()
         agent.assert_not_called()
+
+    def test_finished_predecessor_leftovers_are_archived_at_once_and_the_repair_runs(self):
+        # 2026-10-20 on Gem: a fix-no-change run left regenerated artifacts, and every later
+        # repair of that PR handed off for 6h (72 handoffs/24h) waiting for an owner that is gone.
+        def predecessor(cmd, cwd, log, timeout, **kwargs):
+            (cwd / "repair.txt").write_text("preserved useful edit")
+            return SimpleNamespace(returncode=0)
+        with patch.object(lane, "run_agent", side_effect=predecessor):
+            prior = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+        self.assertEqual(prior["verdict"], "fix-no-change")
+        self.path = Path(prior["worktree"])
+        self.calls.clear()
+        ran = []
+        def agent(cmd, cwd, log, timeout, **kwargs):
+            ran.append(cwd)
+            return SimpleNamespace(returncode=0)
+        with patch.object(lane, "run_agent", side_effect=agent):
+            receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+        ref = lane.PRESERVED_ARCHIVE_REF + self.path.name
+        self.assertEqual(receipt["archivedPreserved"], [ref])
+        self.assertEqual(receipt["verdict"], "fix-no-change")
+        self.assertEqual(len(ran), 1)
+        self.assertFalse(self.path.exists())
+        self.assertEqual(self.git(self.host.repo, "show", f"{ref}:repair.txt"), "preserved useful edit")
+
+    def test_interrupted_predecessor_still_waits_for_reconciliation(self):
+        prior = self.cancelled_predecessor(commit=True)
+        self.assertFalse(lane._ended_on_its_own_terms(self.host, prior["runId"]))
+        self.assertFalse(lane._ended_on_its_own_terms(self.host, None))
+        self.assertFalse(lane._ended_on_its_own_terms(self.host, "no-such-run"))
 
     def test_competing_checkout_after_reconciliation_is_refused_safely(self):
         competitor = self.host.state / "worktrees/competing-owner"
@@ -6824,6 +6856,29 @@ class FixRedTest(unittest.TestCase):
                           second["execution"]["terminalState"]), ("retry", 2, "quarantined"))
 
 @unittest.skipIf(os.environ.get("LANES_SELFTEST") == "1", "running inside a release self-test")
+def lanes_release_fixture_files() -> list[Path]:
+    """Every tracked-shape file of scripts/lanes, nested ones included: a release is the whole
+    scripts/lanes tree. #22317 added scripts/lanes/hud_fixtures/, which a top-level-only copy
+    left out, so the staged release's own test_hud failed and every merge group behind it
+    ejected on this update test (2026-10-20)."""
+    return sorted(p.relative_to(ROOT) for p in (ROOT / "scripts/lanes").rglob("*")
+                  if p.is_file() and "__pycache__" not in p.parts and p.suffix != ".pyc")
+
+
+class LanesReleaseFixtureTest(unittest.TestCase):
+    def test_the_update_fixture_copies_nested_lanes_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            nested = Path(tmp) / "scripts/lanes/hud_fixtures/__snapshots__"
+            nested.mkdir(parents=True)
+            (nested / "live-80x24.txt").write_text("x")
+            (Path(tmp) / "scripts/lanes/hud.py").write_text("")
+            (Path(tmp) / "scripts/lanes/__pycache__").mkdir()
+            (Path(tmp) / "scripts/lanes/__pycache__/hud.cpython-312.pyc").write_text("")
+            with patch(f"{__name__}.ROOT", Path(tmp)):
+                self.assertEqual([str(p) for p in lanes_release_fixture_files()],
+                                 ["scripts/lanes/hud.py", "scripts/lanes/hud_fixtures/__snapshots__/live-80x24.txt"])
+
+
 class UpdateTest(unittest.TestCase):
     def git(self, *args, cwd):
         subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True)
@@ -7291,7 +7346,7 @@ with patch.object(shipping_origin, "collect", return_value=result) as collect:
             origin, clone = tmp / "origin.git", tmp / "clone"
             self.git("init", "-q", "--bare", "-b", "main", str(origin), cwd=tmp)
             self.git("clone", "-q", str(origin), str(clone), cwd=tmp)
-            files = [p.relative_to(ROOT) for p in (ROOT / "scripts/lanes").iterdir() if p.is_file()]
+            files = lanes_release_fixture_files()
             for rel in [*files, *map(Path, lane.LANE_TESTS), *map(Path, lane.RELEASE_EXTRAS)]:
                 (clone / rel).parent.mkdir(parents=True, exist_ok=True)
                 (clone / rel).write_text((ROOT / rel).read_text())

@@ -380,13 +380,13 @@ export function evaluateSpend(ledger, nowMs, live = {}, thresholds = {}) {
       );
     }
     if (percent !== null) {
-      const crossed = [...t.capAlertPercents]
+      const crossed = [...(entry.cap.alertPercents ?? t.capAlertPercents)]
         .sort((a, b) => b - a)
         .find(level => percent >= level);
       if (crossed !== undefined) {
         findings.push(
           finding({
-            fingerprint: `spend-cap:${entry.id}:${entry.cap.periodKey ?? entry.cap.period ?? 'cap'}:${crossed}`,
+            fingerprint: `spend-cap:${entry.id}:${observed?.periodKey ?? entry.cap.periodKey ?? entry.cap.period ?? 'cap'}:${crossed}`,
             type: 'cap',
             severity:
               crossed >= 100 ? 'critical' : crossed >= 80 ? 'high' : 'medium',

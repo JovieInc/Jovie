@@ -12,35 +12,30 @@ import {
   ovieOpsKioskHref,
 } from '@/lib/ovie/ops-entrypoint';
 
-describe('Ovie Ops packaged-app entry contract', () => {
-  it('hands M1 exactly one Ops product at /hud', () => {
+describe('Ovie entry contract (founder decision 2026-10-20)', () => {
+  it('opens both packaged doors on Ovie Home and keeps one Ops dashboard', () => {
+    expect(OVIE_PACKAGED_DEFAULT_ROUTE).toBe(APP_ROUTES.OV);
+    expect(OVIE_PACKAGED_TALK_ROUTE).toBe(APP_ROUTES.OV);
+    expect(OVIE_OPS_ENTRY.packagedDefaultRoute).toBe('/app/ov');
+    expect(OVIE_OPS_ENTRY.packagedTalkRoute).toBe('/app/ov');
     expect(OVIE_OPS_PRODUCT_NAME).toBe('Ops');
-    expect(OVIE_OPS_ROUTE).toBe(APP_ROUTES.HUD);
+    expect(OVIE_OPS_ROUTE).toBe(APP_ROUTES.ADMIN_OPS);
+    expect(OVIE_OPS_ROUTE).toBe('/app/ov/ops');
     expect(OVIE_OPS_COMPONENT).toBe('OpsCockpitClient');
-    expect(OVIE_PACKAGED_DEFAULT_ROUTE).toBe(APP_ROUTES.HUD);
-    expect(OVIE_OPS_ENTRY.packagedDefaultRoute).toBe('/hud');
-    expect(OVIE_PACKAGED_TALK_ROUTE).toBe(APP_ROUTES.ADMIN_CHAT);
-    expect(OVIE_OPS_ENTRY.packagedTalkRoute).toBe('/app/ov/chat');
   });
 
   it('keeps fullscreen and kiosk as presentation inputs, not products', () => {
-    expect(ovieOpsFullscreenHref()).toBe(APP_ROUTES.HUD);
+    expect(ovieOpsFullscreenHref()).toBe(APP_ROUTES.ADMIN_OPS);
     expect(ovieOpsKioskHref('token-1')).toBe(
       `${APP_ROUTES.HUD}?kiosk=${encodeURIComponent('token-1')}`
     );
     expect(OVIE_OPS_ENTRY.presentations.fullscreen.density).toBe('shell');
     expect(OVIE_OPS_ENTRY.presentations.kiosk.presentationMode).toBe('token');
     expect(OVIE_OPS_ENTRY.presentations.mac.search).toBe('ovie=mac');
-    expect(OVIE_OPS_ENTRY.presentations.mac.component).toBe(
-      'HudDashboardClient'
-    );
   });
 
-  it('maps compatibility aliases onto /hud', () => {
-    expect(OVIE_OPS_COMPAT_ALIASES[APP_ROUTES.OV]).toBe(APP_ROUTES.HUD);
-    expect(OVIE_OPS_COMPAT_ALIASES[`${APP_ROUTES.OV}/ops`]).toBe(
-      APP_ROUTES.HUD
-    );
+  it('maps the legacy /hud door onto Home', () => {
+    expect(OVIE_OPS_COMPAT_ALIASES[APP_ROUTES.HUD]).toBe(APP_ROUTES.OV);
     expect(OVIE_OPS_COMPAT_ALIASES[APP_ROUTES.HUD_TV]).toBe(APP_ROUTES.HUD);
   });
 });
