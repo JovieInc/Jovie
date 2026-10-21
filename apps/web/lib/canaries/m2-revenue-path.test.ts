@@ -71,7 +71,7 @@ function headerValue(headers: Headers | null, name: string): string | null {
 }
 
 describe('M2 revenue-path canary contract', () => {
-  it('is the $199 Artist Presence path, not generic uptime', () => {
+  it('is the $12 Artist Presence path, not generic uptime', () => {
     expect(M2_REVENUE_PATH_CANARY).toBe('m2-revenue-path');
     expect(M2_REVENUE_PATH_ISSUE).toBe('JOV-6439');
     expect(M2_REVENUE_PATH_DISTINCT_FROM).toBe('generic-uptime');
@@ -81,10 +81,10 @@ describe('M2 revenue-path canary contract', () => {
       'pro_checkout_199',
       'activation',
     ]);
-    expect(M2_PRO_MONTHLY_USD).toBe(199);
-    expect(M2_PRO_MONTHLY_AMOUNT_CENTS).toBe(19900);
+    expect(M2_PRO_MONTHLY_USD).toBe(12);
+    expect(M2_PRO_MONTHLY_AMOUNT_CENTS).toBe(1200);
     expect(M2_PRO_MONTHLY_USD).toBe(ARTIST_VISIBILITY_OFFER.pro.monthlyUsd);
-    expect(M2_CLAIM_PRICE_DISPLAY).toBe('$199');
+    expect(M2_CLAIM_PRICE_DISPLAY).toBe('$12');
     expect(M2_ACTIVATION_MARKERS).toEqual(
       expect.arrayContaining([
         ARTIST_VISIBILITY_ACTIVATION_COPY.status,
@@ -151,7 +151,7 @@ describe('evaluateSignedOutSurface', () => {
 });
 
 describe('evaluateClaimSurface', () => {
-  it('requires claim-first copy, $199, and the Pro signup handoff', () => {
+  it('requires claim-first copy, $12, and the Pro signup handoff', () => {
     expect(
       evaluateClaimSurface({
         pricingStatus: 200,
@@ -174,11 +174,11 @@ describe('evaluateClaimSurface', () => {
     expect(
       evaluateClaimSurface({
         pricingStatus: 200,
-        pricingBody: PRICING_HTML.replace('$199', '$39'),
+        pricingBody: PRICING_HTML.replace('$12', '$39'),
         signupStatus: 200,
         signupBody: `<html><body>${'signup'.repeat(200)}<div data-auth-shell-ready="true"></div></body></html>`,
       }).detail
-    ).toMatch(/\$199/);
+    ).toMatch(/\$12/);
   });
 });
 
@@ -187,7 +187,7 @@ describe('evaluateProCheckout199', () => {
     pricingOptions: [
       {
         priceId: 'price_visibility_pro',
-        amount: 19900,
+        amount: 1200,
         currency: 'usd',
         interval: 'month',
         description: 'Artist Presence',
@@ -195,7 +195,7 @@ describe('evaluateProCheckout199', () => {
     ],
   });
 
-  it('selects only the live $199 monthly Pro option', () => {
+  it('selects only the live $12 monthly Pro option', () => {
     expect(
       findProMonthlyOption([
         {
@@ -206,7 +206,7 @@ describe('evaluateProCheckout199', () => {
         },
         {
           priceId: 'price_visibility_pro',
-          amount: 19900,
+          amount: 1200,
           interval: 'month',
           description: 'Artist Presence',
         },
@@ -214,7 +214,7 @@ describe('evaluateProCheckout199', () => {
     ).toBe('price_visibility_pro');
   });
 
-  it('passes when unsigned checkout stays gated and $199 is live', () => {
+  it('passes when unsigned checkout stays gated and $12 is live', () => {
     expect(
       evaluateProCheckout199({
         pricingStatus: 200,
@@ -333,7 +333,7 @@ describe('runM2RevenuePathCanary', () => {
             pricingOptions: [
               {
                 priceId: 'price_visibility_pro',
-                amount: 19900,
+                amount: 1200,
                 currency: 'usd',
                 interval: 'month',
                 description: 'Artist Presence',
@@ -375,7 +375,7 @@ describe('runM2RevenuePathCanary', () => {
     expect(formatM2RevenuePathSummary(receipt)).toContain('PASS');
   });
 
-  it('stays red when checkout pricing drifts off $199', async () => {
+  it('stays red when checkout pricing drifts off $12', async () => {
     const receipt = await runM2RevenuePathCanary({
       baseUrl: 'https://staging.jov.ie',
       fetchImpl: async (input, init) => {
@@ -423,7 +423,7 @@ describe('runM2RevenuePathCanary', () => {
       step => step.name === 'pro_checkout_199'
     );
     expect(checkout?.ok).toBe(false);
-    expect(checkout?.detail).toMatch(/19900/);
+    expect(checkout?.detail).toMatch(/1200/);
     expect(formatM2RevenuePathSummary(receipt)).toContain('FAIL');
   });
 });

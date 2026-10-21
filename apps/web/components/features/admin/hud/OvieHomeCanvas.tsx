@@ -2,7 +2,11 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { toast } from '@/components/feedback';
+import { ChatOpsDataCard } from '@/components/jovie/components/ChatOpsDataCard';
+import type { HomeCanvasState } from '@/components/jovie/types';
 import {
+  HomeLoopAnswerPanel,
   HomeLoopCanvas,
   type HomeLoopCopy,
   type HomeLoopSectionStatus,
@@ -11,14 +15,20 @@ import { useUndoableAnswers } from '@/components/organisms/home-loop/useUndoable
 import { APP_ROUTES } from '@/constants/routes';
 import type { HomeLoopAsk } from '@/lib/home-loop/contract';
 import {
+  buildCanvasTurns,
+  partitionCanvasCards,
+} from '@/lib/ovie/home/canvas-turns';
+import {
   buildOvieAsks,
   buildOvieHomeShipping,
   OVIE_SHIP_STAGES,
   type OviePulseMemory,
+  ovieAskAction,
   rememberPulse,
 } from '@/lib/ovie/home/shipping-home';
 import { inboxDecisionRequest, type OvieInbox } from '@/lib/ovie/inbox';
 import { FREQUENT_CACHE } from '@/lib/queries/cache-strategies';
+import { useCanvasHistory } from './useCanvasHistory';
 import { useHudShippingStateQuery } from './useHudShippingStateQuery';
 
 const OVIE_HOME_COPY: HomeLoopCopy = {
@@ -70,7 +80,12 @@ async function fetchInbox(signal: AbortSignal): Promise<OvieInbox> {
  * Shipping comes from `ovie.shipping-state.v1` and asks from the Ovie inbox;
  * this component adds no polling of its own beyond those existing queries.
  */
-export function OvieHomeCanvas() {
+export interface OvieHomeCanvasProps {
+  /** Shell chat state; absent when Home renders outside the composer slot. */
+  readonly chat?: HomeCanvasState;
+}
+
+export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
   const queryClient = useQueryClient();
   const shipping = useHudShippingStateQuery(null);
   const inbox = useQuery<OvieInbox>({
@@ -134,7 +149,10 @@ export function OvieHomeCanvas() {
       )?.decisionTarget;
       answer({
         id: ask.id,
-        label: decision === 'approve' ? 'Approved' : `Replied: ${notes}`,
+        label:
+          decision === 'approve'
+            ? ovieAskAction(target?.kind).committedLabel
+            : `Replied: ${notes}`,
         commit: async () => {
           if (!target) throw new Error('This decision is no longer open.');
           const request = inboxDecisionRequest(
@@ -167,6 +185,29 @@ export function OvieHomeCanvas() {
     snapshot?.operationalTasks.syncState === 'syncing' &&
     snapshot.operationalTasks.observedAt === null &&
     snapshot.operationalTasks.tasks.length === 0;
+  const sendFeedback = useCallback(
+    (ask: HomeLoopAsk, comment: string) => {
+      const target = inbox.data?.cases.find(
+        item => item.id === ask.id
+      )?.decisionTarget;
+      if (target?.kind !== 'summer') return;
+      void fetch(
+        `/api/ovie/summer-cards/${encodeURIComponent(target.id)}/feedback`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ comment }),
+        }
+      )
+        .then(response => {
+          if (!response.ok) throw new Error('Feedback was not recorded.');
+          toast.success('Feedback sent');
+        })
+        .catch(() => toast.error('Feedback was not recorded. Try again.'));
+    },
+    [inbox.data]
+  );
+
   const loopStatus: HomeLoopSectionStatus =
     !snapshot || awaitingFirstTasks
       ? 'loading'
@@ -184,9 +225,61 @@ export function OvieHomeCanvas() {
     : inbox.isError
       ? 'error'
       : 'loading';
+  // Mirror the inbox: a successful read can still omit a source. Showing the
+  // loaded asks alone would claim the section is complete.
+  const asksNotice =
+    inbox.data && inbox.data.issues.length > 0
+      ? `Some sources are unavailable. ${inbox.data.issues.join(' ')}`
+      : null;
+
+  const turns = useMemo(
+    () => buildCanvasTurns(chat?.messages ?? [], chat?.isStreaming ?? false),
+    [chat?.messages, chat?.isStreaming]
+  );
+  const history = useCanvasHistory(turns.length);
+  const turn = history.index >= 0 ? turns[history.index] : undefined;
+  const generated = turn ? partitionCanvasCards(turn.cards) : null;
+  const answerPanel = turn ? (
+    <HomeLoopAnswerPanel
+      prompt={turn.prompt}
+      reply={turn.reply}
+      pending={turn.pending}
+      position={history.index + 1}
+      total={turns.length}
+      onBack={history.back}
+      onForward={history.forward}
+      onHome={history.home}
+      onOpenTranscript={() => chat?.onOpenTranscript()}
+    >
+      {generated?.answer.length
+        ? generated.answer.map((card, index) => (
+            <ChatOpsDataCard
+              // Cards are positional within one immutable turn.
+              key={`${turn.id}:${card.kind}:${card.title}:${index}`}
+              card={card}
+            />
+          ))
+        : null}
+    </HomeLoopAnswerPanel>
+  ) : null;
+  const inFlightOverride = generated?.inFlight.length ? (
+    <div
+      className='flex flex-col gap-2'
+      data-testid='home-loop-in-flight-generated'
+    >
+      {generated.inFlight.map((card, index) => (
+        <ChatOpsDataCard
+          key={`${turn?.id}:${card.kind}:${card.title}:${index}`}
+          card={card}
+        />
+      ))}
+    </div>
+  ) : undefined;
 
   return (
     <HomeLoopCanvas
+      answer={answerPanel}
+      inFlightOverride={inFlightOverride}
       copy={OVIE_HOME_COPY}
       stages={OVIE_SHIP_STAGES}
       constraint={constraint}
@@ -201,9 +294,11 @@ export function OvieHomeCanvas() {
       }
       loopStatus={loopStatus}
       asksStatus={asksStatus}
+      asksNotice={asksNotice}
       answers={answers}
       onApprove={ask => decide(ask, 'approve', '')}
       onReply={(ask, text) => decide(ask, 'reject', text)}
+      onFeedback={sendFeedback}
       onRetryLoop={() => void shipping.refetch()}
       onRetryAsks={() => void inbox.refetch()}
       asksMoreHref={APP_ROUTES.ADMIN_INBOX}

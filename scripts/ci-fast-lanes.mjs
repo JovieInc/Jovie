@@ -408,6 +408,7 @@ export const STRUCTURAL_PYTEST_FILES = Object.freeze([
   'scripts/tests/test_brand_scrub.py',
   'scripts/tests/test_agent_workflow_hygiene.py',
   'scripts/tests/test_runner_routing.py',
+  'scripts/tests/test_signal_watch.py',
 ]);
 
 /**
@@ -535,7 +536,7 @@ export const API_CLIENT_TS_COMMAND = 'pnpm --filter @jovie/api-client test';
 
 /** scripts/apiclient: the Python port, held to the same conformance fixtures. */
 export const API_CLIENT_PY_COMMAND = structuralPythonRegression(
-  'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-apiclient.coverage" python3 -m coverage run --branch --include="*/scripts/apiclient/*" -m pytest scripts/tests/test_apiclient.py scripts/tests/test_apiclient_conformance.py -q -p no:cacheprovider --basetemp="${RUNNER_TEMP:-/tmp}/jovie-apiclient-pytest" && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-apiclient.coverage" python3 -m coverage report --fail-under=85'
+  'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-apiclient.coverage" python3 -m coverage run --branch --include="*/scripts/apiclient/*" -m pytest scripts/tests/test_apiclient.py scripts/tests/test_apiclient_adapters.py scripts/tests/test_apiclient_conformance.py -q -p no:cacheprovider --basetemp="${RUNNER_TEMP:-/tmp}/jovie-apiclient-pytest" && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-apiclient.coverage" python3 -m coverage report --fail-under=85'
 );
 
 export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
@@ -691,6 +692,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/mesh-native-terminal.test.mjs',
   'scripts/lib/__tests__/mesh-runtime-bundle.test.mjs',
   'scripts/lib/__tests__/mesh-current-wire.test.mjs',
+  'scripts/lib/__tests__/summer-improvement-loop-config.test.mjs',
   'scripts/lib/__tests__/blog-content-ci.test.mjs',
   'scripts/lib/__tests__/blog-publish-latency.test.mjs',
   'scripts/lib/__tests__/nightly-agent-workflow.test.mjs',
@@ -776,6 +778,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/sparse-checkout-import-closure.test.mjs',
   'scripts/lib/__tests__/shipping-slo-collector.test.mjs',
   'scripts/lib/__tests__/shipping-slo.test.mjs',
+  'scripts/lib/__tests__/stage-events.test.mjs',
   'scripts/lib/__tests__/stale-pr-base-sha.test.mjs',
   'scripts/lib/__tests__/story-coverage-ratchet.test.mjs',
   'scripts/lib/__tests__/taste-classifier.test.mjs',
