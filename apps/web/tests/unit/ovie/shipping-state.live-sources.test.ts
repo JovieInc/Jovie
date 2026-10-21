@@ -286,7 +286,7 @@ describe('lanes-status (symphony-lanes-status/v1 gist)', () => {
       at: '2026-09-27T01:58:00Z',
       endToEnd7d: { [key]: { n: 1, p50: 1, p95: 2 } },
     });
-    expect(summary?.endToEnd7d.map(row => row.pipeline)).toEqual(
+    expect(summary?.endToEnd7d?.map(row => row.pipeline)).toEqual(
       accepted ? [key] : []
     );
   });
