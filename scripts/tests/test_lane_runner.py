@@ -11665,7 +11665,15 @@ class OperatorInstallerGlueTest(unittest.TestCase):
         self.assertEqual(diagnostic["stderrSha256"], hashlib.sha256(stderr.encode()).hexdigest())
         self.assertEqual(diagnostic["stderrBytes"], len(stderr.encode()))
         self.assertEqual((stage / ".selftest-stderr.log").read_text(), stderr)
-        self.assertNotIn("test_bound", console.getvalue())
+        # The raw FAIL header sits outside the 2000-character console tail. The
+        # refusal still names that selector on its own lines (2026-10-21).
+        console_text = console.getvalue()
+        tail, separator, named = console_text.partition("release self-test retry:")
+        self.assertEqual(separator, "release self-test retry:")
+        self.assertEqual(tail, "x" * 2000 + "\n")
+        self.assertNotIn("test_bound", tail)
+        self.assertIn("release self-test failed selector(s): scripts.tests.test_fixture.Example.test_bound", named)
+        self.assertIn("release self-test failure: FAIL: test_bound (scripts.tests.test_fixture.Example)", named)
         for name in [".selftest-diagnostic.json", ".selftest-stderr.log"]:
             self.assertEqual((stage / name).stat().st_mode & 0o777, 0o600)
 
@@ -13705,6 +13713,29 @@ class SelftestProcessAbsenceTest(unittest.TestCase):
         with self.assertRaises(lane.SelftestCleanupHeld):
             lane._selftest_process_row(self.entry(PermissionError(13, "denied"), []), 201, os.getuid())
 
+
+class SelftestRetryDiagnosticTest(unittest.TestCase):
+    """A refused release names the selector that failed twice (CI summaries keep only stderr)."""
+
+    def test_failed_retry_prints_selectors_and_failure_lines(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            stage = Path(tmp)
+            rerun = subprocess.CompletedProcess([], 1, stdout="", stderr=(
+                "FAIL: test_bound (scripts.tests.test_x.Example.test_bound)\n"
+                "Traceback (most recent call last):\n  noise\n"
+                "AssertionError: 2 != 0\n"))
+            with patch.object(lane, "selftest_env", return_value={}), \
+                 patch.object(lane, "reap_selftest_processes", return_value=0), \
+                 patch.object(lane, "_selftest_cleanup_summary", return_value={"outcome": "clean"}), \
+                 patch.object(lane.lifecycle, "run", return_value=rerun), \
+                 contextlib.redirect_stderr(io.StringIO()) as err:
+                self.assertFalse(lane.retry_failed_selectors(
+                    stage, "FAIL: test_bound (scripts.tests.test_x.Example.test_bound)\n"))
+            text = err.getvalue()
+            self.assertIn("release self-test failed selector(s): scripts.tests.test_x.Example.test_bound", text)
+            self.assertIn("release self-test failure: FAIL: test_bound", text)
+            self.assertIn("release self-test failure: AssertionError: 2 != 0", text)
+            self.assertNotIn("noise", text)
 
 
 class AdoptionShareTest(unittest.TestCase):
