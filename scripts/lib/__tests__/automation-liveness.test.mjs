@@ -177,15 +177,47 @@ describe('dead-man liveness', () => {
     }
   );
 
-  it.each([401, 403, 404, 429, 503])(
-    'keeps an HTTP %s main-ref failure red with its diagnostic reason',
-    async status => {
+  it.each([500, 502, 503, 504, { name: 'AbortError' }, new Error('reset')])(
+    'recovers a transient main-ref read with one bounded retry (%j)',
+    async failure => {
+      let attempts = 0;
       const { report } = await runLiveness({
         registry: only('derived:jovie:production-promotion'),
         nowMs: NOW,
         fetchImpl: fakeFetch({
           'jov.ie/api/health/build-info': { commitSha: MAIN },
-          '/git/ref/heads/main': status,
+          '/git/ref/heads/main': () => {
+            attempts += 1;
+            if (attempts > 1) return mainRef(MAIN);
+            if (typeof failure === 'number') return failure;
+            throw failure;
+          },
+        }),
+      });
+      expect(
+        rowFor(report, 'derived:jovie:production-promotion')
+      ).toMatchObject({
+        status: 'fresh',
+        reason: 'production-current',
+      });
+      expect(attempts).toBe(2);
+      expect(livenessDecisions(report)).toEqual([]);
+    }
+  );
+
+  it.each([401, 403, 404, 429, 503])(
+    'keeps an HTTP %s main-ref failure red with its diagnostic reason',
+    async status => {
+      let attempts = 0;
+      const { report } = await runLiveness({
+        registry: only('derived:jovie:production-promotion'),
+        nowMs: NOW,
+        fetchImpl: fakeFetch({
+          'jov.ie/api/health/build-info': { commitSha: MAIN },
+          '/git/ref/heads/main': () => {
+            attempts += 1;
+            return status;
+          },
         }),
       });
       expect(
@@ -194,6 +226,7 @@ describe('dead-man liveness', () => {
         status: 'unknown',
         reason: `main-ref-http-${status}`,
       });
+      expect(attempts).toBe(status === 503 ? 2 : 1);
       expect(livenessDecisions(report)[0].action).toBe('red');
     }
   );

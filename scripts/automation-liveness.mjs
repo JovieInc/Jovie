@@ -160,11 +160,23 @@ export async function observeProductionFreshness(
   const headers = githubHeaders(token);
   // Only the branch identity is needed here. The commit endpoint also
   // computes changed files and patches, adding avoidable work to this probe.
-  const head = await readJson(
-    fetchImpl,
-    `${apiUrl}/repos/${receipt.repo}/git/ref/heads/main`,
-    headers
-  );
+  const headUrl = `${apiUrl}/repos/${receipt.repo}/git/ref/heads/main`;
+  let head = await readJson(fetchImpl, headUrl, headers);
+  // A single transient read is not proof of a silent promotion loop. Retry
+  // once within this job's budget; quota and permission failures stay red.
+  if (
+    !head.ok &&
+    [
+      'timeout',
+      'transport',
+      'http-500',
+      'http-502',
+      'http-503',
+      'http-504',
+    ].includes(head.reason)
+  ) {
+    head = await readJson(fetchImpl, headUrl, headers);
+  }
   if (!head.ok) return { ok: false, reason: `main-ref-${head.reason}` };
   const main =
     head.body?.ref === 'refs/heads/main' && head.body?.object?.type === 'commit'
