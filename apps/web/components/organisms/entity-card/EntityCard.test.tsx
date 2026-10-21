@@ -408,6 +408,32 @@ describe('ProfilePacCard landscape states', () => {
     });
   });
 
+  it.each([
+    ['an upcoming release', '2999-01-01', 'Coming soon'],
+    ['a released release', '2020-01-01', 'Listen'],
+    ['a release with no date', null, 'Listen'],
+  ])(
+    'labels the degraded listen action for %s as %s',
+    (_name, releaseDate, label) => {
+      render(
+        <ProfilePacCard
+          artist={pacArtist}
+          release={{
+            title: 'Release',
+            slug: 'release',
+            artworkUrl: '/release.jpg',
+            releaseDate,
+          }}
+          assignment={DEFAULT_PROFILE_PAC_ASSIGNMENT}
+          layout='profile-landscape'
+          captureEnabled={false}
+        />
+      );
+
+      expect(screen.getByRole('link', { name: label })).toBeInTheDocument();
+    }
+  );
+
   it('never prompts, submits, or emits capture events when capture is disabled', async () => {
     render(
       <ProfilePacCard
