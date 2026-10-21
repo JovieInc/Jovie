@@ -2,11 +2,11 @@
 
 // @coverage-via apps/web/tests/unit/components/organisms/UnifiedSidebar.library.test.tsx
 
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ChevronRight } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { AskJovieMark } from '@/components/ask-jovie/AskJovie';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
@@ -93,24 +93,94 @@ function SettingsNavGroup({
   );
 }
 
+const TOOLS_OPEN_KEY = 'ovie.nav.tools-open.v1';
+
+/**
+ * One operator nav group. Tools is collapsed by default (Tim 2026-10-21: Ovie
+ * is one Home), remembers the viewer's choice, and is always open while one
+ * of its destinations is active so the current page is never hidden.
+ */
+function OperatorNavSection({
+  section,
+  pathname,
+}: Readonly<{
+  readonly section: (typeof OPERATOR_NAV_SECTIONS)[number];
+  readonly pathname: string;
+}>) {
+  const [stored, setStored] = useState(false);
+  useEffect(() => {
+    if (!section.collapsible) return;
+    try {
+      setStored(globalThis.localStorage?.getItem(TOOLS_OPEN_KEY) === '1');
+    } catch {
+      // Storage is a per-viewer convenience; the group defaults to closed.
+    }
+  }, [section.collapsible]);
+  const isActive = (item: NavItem) =>
+    isOperatorNavigationHrefActive(pathname, item.href);
+  const holdsActive = section.items.some(isActive);
+  const open = !section.collapsible || stored || holdsActive;
+  const toggle = () => {
+    const next = !stored;
+    setStored(next);
+    try {
+      globalThis.localStorage?.setItem(TOOLS_OPEN_KEY, next ? '1' : '0');
+    } catch {
+      // Ignore unavailable storage.
+    }
+  };
+  const groupId = `ov-nav-${section.id}`;
+  return (
+    <div data-testid={`ov-nav-section-${section.id}`}>
+      {section.label && section.collapsible ? (
+        <button
+          type='button'
+          className={cn(
+            OPERATOR_NAV_GROUP_LABEL,
+            SHELL_RAIL_LABEL,
+            'flex w-full items-center gap-1 text-left hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring'
+          )}
+          aria-expanded={open}
+          aria-controls={groupId}
+          disabled={holdsActive}
+          onClick={toggle}
+        >
+          <ChevronRight
+            aria-hidden='true'
+            className={cn(
+              'size-3 transition-transform duration-subtle motion-reduce:transition-none',
+              open && 'rotate-90'
+            )}
+          />
+          {section.label}
+        </button>
+      ) : section.label ? (
+        <span className={cn(OPERATOR_NAV_GROUP_LABEL, SHELL_RAIL_LABEL)}>
+          {section.label}
+        </span>
+      ) : null}
+      <div id={groupId} hidden={!open}>
+        <SettingsNavGroup
+          items={section.items}
+          pathname={pathname}
+          isItemActive={isActive}
+        />
+      </div>
+    </div>
+  );
+}
+
 /** Dedicated operator navigation; customer DashboardNav stays customer-only. */
 function OperatorNavigation({ pathname }: { readonly pathname: string }) {
   return (
     <div className='flex flex-1 flex-col gap-4 overflow-y-auto pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
       <nav aria-label='OV Navigation' className='flex flex-col gap-4'>
         {OPERATOR_NAV_SECTIONS.map(section => (
-          <div key={section.label}>
-            <span className={cn(OPERATOR_NAV_GROUP_LABEL, SHELL_RAIL_LABEL)}>
-              {section.label}
-            </span>
-            <SettingsNavGroup
-              items={section.items}
-              pathname={pathname}
-              isItemActive={item =>
-                isOperatorNavigationHrefActive(pathname, item.href)
-              }
-            />
-          </div>
+          <OperatorNavSection
+            key={section.id}
+            section={section}
+            pathname={pathname}
+          />
         ))}
       </nav>
       {/* Dynamic list hrefs stay outside the canonical OV landmark so the
