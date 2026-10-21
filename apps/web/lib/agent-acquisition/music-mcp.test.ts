@@ -48,6 +48,7 @@ import { BASE_URL } from '@/constants/app';
 import timArtist from '@/lib/dsp-enrichment/providers/fixtures/tim-white-musicbrainz.json';
 import timUrl from '@/lib/dsp-enrichment/providers/fixtures/tim-white-musicbrainz-url.json';
 import { musicResolveSchema } from '@/lib/music-resolver/public-read';
+import { runCli } from '../../../../packages/jovie-cli/src/cli';
 import { MUSIC_READ_TIMEOUT_MS } from './music-mcp';
 import { musicFetchSchema, musicSearchSchema } from './music-read';
 
@@ -214,6 +215,95 @@ describe('public music identity MCP, real SDK and canonical resolver', () => {
     }
   });
 
+  it.each<[string, Record<string, string>]>([
+    ['anonymous', {}],
+    ['session cookie', { Cookie: 'session=caller-asserted' }],
+    [
+      'claimed paid data key',
+      {
+        Authorization: 'Bearer caller-asserted-data-key',
+        'X-Jovie-Plan': 'max',
+      },
+    ],
+  ])(
+    'keeps raw HTTP and CLI core-only for %s; official MCP agrees',
+    async (_caller, headers) => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async input =>
+          Response.json(
+            String(input).includes('/ws/2/url?')
+              ? timUrl
+              : {
+                  ...timArtist,
+                  relations: [
+                    ...timArtist.relations,
+                    {
+                      type: 'social network',
+                      url: { resource: 'https://instagram.com/private-graph' },
+                    },
+                  ],
+                  access_token: 'private-source-token',
+                }
+          )
+        )
+      );
+      const input = 'https://open.spotify.com/artist/4Uwpa6zW3zzCSQvooQNksm';
+      const raw = await POST(
+        request(
+          rpc('tools/call', { name: 'resolve', arguments: { input } }),
+          headers
+        )
+      );
+      const body = await raw.json();
+      expect(body.result.isError).toBe(false);
+      const core = body.result.structuredContent;
+      expect(core).toMatchObject({ status: 'resolved', mbid: timArtist.id });
+      expect(core.artistMetadata).not.toHaveProperty('externalLinks');
+      expect(core.artistMetadata).not.toHaveProperty('releaseGroups');
+      expect(JSON.parse(body.result.content[0].text)).toEqual(core);
+      expect(JSON.stringify(body)).not.toMatch(
+        /instagram|private-|releaseGroups|externalLinks|access_token/
+      );
+
+      let stdout = '';
+      const exit = await runCli(['music', 'resolve', input, '--json'], {
+        fetchImpl: async (endpoint, init) => POST(new Request(endpoint, init)),
+        stdout: {
+          write: chunk => {
+            stdout += chunk;
+          },
+        },
+        stderr: {
+          write: chunk => {
+            throw new Error(chunk);
+          },
+        },
+      });
+      expect(exit).toBe(0);
+      expect(JSON.parse(stdout)).toEqual(core);
+
+      const client = new Client({ name: 'core-only-client', version: '1.0.0' });
+      await client.connect(
+        new StreamableHTTPClientTransport(new URL(url), {
+          fetch: async (endpoint, init) => POST(new Request(endpoint, init)),
+        })
+      );
+      try {
+        const result = await client.callTool({
+          name: 'resolve',
+          arguments: { input },
+        });
+        expect(result.isError).toBe(false);
+        expect(result.structuredContent).toEqual(core);
+      } finally {
+        await client.close();
+      }
+      expect(mocks.draft).not.toHaveBeenCalled();
+      expect(mocks.writeLimit).not.toHaveBeenCalled();
+    }
+  );
+
   it.each([
     `spotify:${ID}`,
     `https://open.spotify.com/artist/${ID}?si=secret`,
@@ -336,6 +426,10 @@ describe('public music identity MCP, real SDK and canonical resolver', () => {
     ['fetch', { id: `spotify:${ID}`, full: true }],
     ['fetch', { id: null }],
     ['fetch', {}],
+    ['resolve', { input: 'Tim White', fields: ['socials'] }],
+    ['resolve', { input: 'Tim White', expand: ['releaseGroups'] }],
+    ['resolve', { input: 'Tim White', tier: 'paid' }],
+    ['resolve', { input: 'Tim White', maxCharge: 1 }],
     ['work.claim', { id: 'worker' }],
   ])('rejects invalid %s before any provider call', async (name, args) => {
     const { body } = await call(name as string, args);

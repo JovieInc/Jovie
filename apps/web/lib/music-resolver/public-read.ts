@@ -3,7 +3,8 @@ import 'server-only';
 import type { z } from 'zod';
 import { type InHouseQuery, resolveInHouse } from './in-house';
 import { createDefaultInHouseSources } from './in-house-sources';
-import { musicResolveOutputSchema, musicResolveSchema } from './public-schemas';
+import { projectPublicMusic } from './public-projection';
+import { musicResolveSchema } from './public-schemas';
 
 export { musicResolveOutputSchema, musicResolveSchema } from './public-schemas';
 
@@ -66,5 +67,5 @@ export async function resolvePublicMusic(
     return { error: { code: 'CANCELLED', retryable: false } };
   if (result.status === 'upstream_error')
     return { error: { code: 'UPSTREAM_FAILURE', retryable: true } };
-  return musicResolveOutputSchema.parse(result);
+  return projectPublicMusic(result);
 }

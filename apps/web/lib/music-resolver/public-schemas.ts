@@ -13,7 +13,7 @@ export const musicResolveSchema = z
   .strict();
 
 const nullableText = z.string().nullable();
-const artistMetadataSchema = z
+export const coreArtistMetadataSchema = z
   .object({
     source: z.literal('musicbrainz'),
     sourceUrl: z.url(),
@@ -26,27 +26,6 @@ const artistMetadataSchema = z
     isnis: z.array(z.string()),
     ipis: z.array(z.string()),
     wikidataIds: z.array(z.string()),
-    externalLinks: z.array(
-      z
-        .object({
-          provider: nullableText,
-          url: z.url(),
-          relationship: z.string(),
-          provenance: z.literal('musicbrainz_url_rel'),
-        })
-        .strict()
-    ),
-    releaseGroups: z.array(
-      z
-        .object({
-          mbid: z.string(),
-          title: z.string(),
-          primaryType: nullableText,
-          firstReleaseDate: nullableText,
-        })
-        .strict()
-    ),
-    releaseGroupsComplete: z.boolean(),
   })
   .strict();
 
@@ -77,6 +56,6 @@ export const musicResolveOutputSchema = z
     confidence: z.number().min(0).max(1),
     provenance: z.record(z.string(), z.string()),
     candidateCount: z.number().int().nonnegative(),
-    artistMetadata: artistMetadataSchema.optional(),
+    artistMetadata: coreArtistMetadataSchema.optional(),
   })
   .strict();
