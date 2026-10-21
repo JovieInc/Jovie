@@ -1,5 +1,5 @@
 'use client';
-// @coverage-via apps/web/tests/unit/app/surface-elevation-guardrails.test.ts
+// @coverage-via apps/web/tests/unit/admin/LeadTable.test.tsx
 
 import { Badge, Button } from '@jovie/ui';
 import { useQueryClient } from '@tanstack/react-query';
